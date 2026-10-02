@@ -57,7 +57,6 @@ final class QA {
     var keyOut: ((KeyOut) -> Void)?             // as if from the fn tap (App.key)
     var pageCmd: (([String: Any]) -> Void)?     // as if from the page (App.command)
     var sendCore: (([String: Any]) -> Void)?    // to the core itself (Core.send)
-    var statusItem: (() -> StatusItem?)?        // the menu-bar item (App.status), for its shots
 
     private let capsule: Capsule
     private let edge: Edge
@@ -815,42 +814,48 @@ final class QA {
     // the states SPEC §0 gives the 18 px pearl, in an order where each one
     // wins over what is left of the one before (IconLook.of's precedence)
     static let menubarStates = ["still", "work", "need", "away", "done", "fail", "listen"]
-    private var ownStatus: StatusItem?
+    // each state's IconLook, from amb-mac's own rules (IconLook.of)
+    static func menubarLook(_ s: String, count: Int) -> IconLook? {
+        func of(working: Bool = false, count c: Int = 0, quiet: Bool = false, holding: Bool = false, glint: Bool = false, failed: Bool = false) -> IconLook {
+            IconLook.of(working: working, count: c, quiet: quiet, holding: holding,
+                        glintUntil: glint ? 1 : -1, failedUntil: failed ? 1 : -1, now: 0, reduceMotion: false)
+        }
+        switch s {
+        case "still": return of()
+        case "work": return of(working: true)
+        case "need": return of(count: count)
+        case "away": return of(quiet: true)
+        case "done": return of(glint: true)
+        case "fail": return of(failed: true)
+        case "listen": return of(holding: true)
+        default: return nil
+        }
+    }
 
-    // the item put in each state through StatusItem's own API, its button's
-    // composed image (amb-mac's draw: the pearl's frame, the ▲/☾, the rose
-    // pill) written at 1x and 2x, transparent and on a light and a dark
-    // menu-bar strip; `frames` > 1: that many successive frames of a moving
-    // mood, at its own rate. The item is put back at rest after.
+    // each state's icon as amb-mac composes it (StatusItem.compose: the
+    // pearl's frame, the ▲/☾, the rose pill; no menu-bar item is made),
+    // written at 1x and 2x, transparent and on a light and a dark menu-bar
+    // strip; `frames`: that many frames of a moving mood's loop (0: all)
     private func menubar(_ q: [String: Any]) async throws -> [String: Any] {
-        // QA mode has no menu-bar item of its own (App makes it with the keys):
-        // the shots make one, amb-mac's StatusItem itself, kept until quit
-        if statusItem?() == nil && ownStatus == nil { ownStatus = StatusItem() }
-        guard let st = statusItem?() ?? ownStatus else { throw Failure(description: "no menu-bar item") }
         let dir = q["dir"] as? String ?? NSTemporaryDirectory()
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         let count = (q["count"] as? NSNumber)?.intValue ?? 2
-        let frames = max(1, min(48, (q["frames"] as? NSNumber)?.intValue ?? 1))
+        let want = (q["frames"] as? NSNumber)?.intValue ?? 1
         let states = (q["states"] as? [String]) ?? QA.menubarStates
-        let rest = { st.set(holding: false); st.set(quiet: false); st.set(working: false, count: 0) }
+        let pearl = PearlFrames()
         var out: [[String: Any]] = []
-        rest()
         for s in states {
-            switch s {
-            case "still": rest()
-            case "work": rest(); st.set(working: true, count: 0)
-            case "need": rest(); st.set(working: false, count: count)
-            case "away": rest(); st.set(quiet: true)
-            case "done": rest(); st.glint()
-            case "fail": rest(); st.failed()
-            case "listen": rest(); st.set(holding: true)
-            default: throw Failure(description: "menubar state \(s): one of \(QA.menubarStates.joined(separator: ", "))")
+            guard let look = QA.menubarLook(s, count: count) else {
+                throw Failure(description: "menubar state \(s): one of \(QA.menubarStates.joined(separator: ", "))")
             }
+            let n = pearl.count(look.mood)
+            if n == 0 { throw Failure(description: "no pearl frames for \(look.mood.rawValue) in the app bundle (the :* fallback)") }
+            let frames = look.moving ? (want <= 0 ? n : min(want, n)) : 1
             var files: [String] = []
-            let fps = s == "listen" ? 24.0 : 12.0
+            var size = NSSize.zero
             for f in 0..<frames {
-                if f > 0 { try? await Task.sleep(nanoseconds: UInt64(1e9 / fps)) }
-                guard let img = statusImage(st) else { throw Failure(description: "the menu-bar item has no button") }
+                guard let img = StatusItem.compose(look, frame: f, pearl: pearl) else { continue }
+                size = img.size
                 let base = dir + "/" + s + (frames > 1 ? String(format: "-%02d", f) : "")
                 for (suffix, scale, strip) in [("@1x", 1.0, nil), ("@2x", 2.0, nil), (".light@2x", 2.0, "light"), (".dark@2x", 2.0, "dark")] as [(String, CGFloat, String?)] {
                     guard let cg = QA.render(img, scale: scale, strip: strip) else { continue }
@@ -858,28 +863,10 @@ final class QA {
                     files.append(base + suffix + ".png")
                 }
             }
-            out.append(["state": s, "files": files, "size": [statusImage(st)?.size.width ?? 0, statusImage(st)?.size.height ?? 0]])
+            out.append(["state": s, "mood": look.mood.rawValue, "extra": look.extra, "count": look.count, "frames": frames,
+                        "loop": n, "files": files, "size": [size.width, size.height]])
         }
-        rest()
         return ["states": out, "dir": dir]
-    }
-
-    // the button's image as the menu bar shows it; before the pearl's frames
-    // exist the item is the `:*` title: then the button's own drawing
-    private func statusImage(_ st: StatusItem) -> NSImage? {
-        guard let w = st.iconWindow, let view = w.contentView else { return nil }
-        func button(_ v: NSView) -> NSButton? {
-            if let b = v as? NSButton { return b }
-            for s in v.subviews { if let b = button(s) { return b } }
-            return nil
-        }
-        guard let b = button(view) else { return nil }
-        if let img = b.image { return img }
-        guard let rep = b.bitmapImageRepForCachingDisplay(in: b.bounds) else { return nil }
-        b.cacheDisplay(in: b.bounds, to: rep)
-        let img = NSImage(size: b.bounds.size)
-        img.addRepresentation(rep)
-        return img
     }
 
     // an image at a scale: transparent, or on a menu-bar strip (24 pt tall,

@@ -113,33 +113,44 @@ final class StatusItem: NSObject {
     // frames exist), then the extra (▲ ☾) and the rose count pill
     private func draw(_ look: IconLook) {
         guard let button = item.button else { return }
-        let body: NSImage? = pearl.image(look.mood, frame: look.moving ? frame : 0)
-        let extraFont = NSFont.systemFont(ofSize: 11, weight: .semibold)
-        let pillFont = NSFont.systemFont(ofSize: 10.5, weight: .bold)
-        let extraColor = look.extra == "▲" ? StatusItem.fail : NSColor.secondaryLabelColor
-        let extra = NSAttributedString(string: look.extra, attributes: [.font: extraFont, .foregroundColor: extraColor])
-        let pillText = NSAttributedString(string: look.count > 0 ? "\(look.count)" : "", attributes: [.font: pillFont, .foregroundColor: StatusItem.onRose])
-        let h: CGFloat = 18
-        let bodyW: CGFloat = body == nil ? 0 : 18
-        let extraW = look.extra.isEmpty ? 0 : extra.size().width + 3
-        let pillW = look.count > 0 ? max(14, pillText.size().width + 8) : 0
-        if body == nil {
-            // the fallback: today's :* glyph with the same extras
-            let t = NSMutableAttributedString(string: ":*", attributes: [
-                .font: NSFont(name: "JetBrains Mono", size: 13) ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold),
-                .baselineOffset: 0.5,
-                .foregroundColor: look.mood == .still ? NSColor.labelColor.withAlphaComponent(0.6) : NSColor.labelColor])
-            if !look.extra.isEmpty { t.append(NSAttributedString(string: " ")); t.append(extra) }
-            if look.count > 0 {
-                t.append(NSAttributedString(string: " \(look.count)", attributes: [.font: pillFont, .foregroundColor: StatusItem.rose]))
-            }
-            button.image = nil
-            button.attributedTitle = t
+        if let img = StatusItem.compose(look, frame: look.moving ? frame : 0, pearl: pearl) {
+            button.attributedTitle = NSAttributedString(string: "")
+            button.image = img
             return
         }
+        // the fallback: today's :* glyph with the same extras
+        let t = NSMutableAttributedString(string: ":*", attributes: [
+            .font: NSFont(name: "JetBrains Mono", size: 13) ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold),
+            .baselineOffset: 0.5,
+            .foregroundColor: look.mood == .still ? NSColor.labelColor.withAlphaComponent(0.6) : NSColor.labelColor])
+        if !look.extra.isEmpty { t.append(NSAttributedString(string: " ")); t.append(StatusItem.extraText(look)) }
+        if look.count > 0 {
+            t.append(NSAttributedString(string: " \(look.count)", attributes: [.font: StatusItem.pillFont, .foregroundColor: StatusItem.rose]))
+        }
+        button.image = nil
+        button.attributedTitle = t
+    }
+
+    private static let pillFont = NSFont.systemFont(ofSize: 10.5, weight: .bold)
+
+    private static func extraText(_ look: IconLook) -> NSAttributedString {
+        let extraColor = look.extra == "▲" ? StatusItem.fail : NSColor.secondaryLabelColor
+        return NSAttributedString(string: look.extra, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold), .foregroundColor: extraColor])
+    }
+
+    // the icon's image for a look (pure: QA's menu-bar shots use it too):
+    // the pearl's frame, the extra, the rose pill; nil before the frames exist
+    static func compose(_ look: IconLook, frame: Int, pearl: PearlFrames) -> NSImage? {
+        guard let body = pearl.image(look.mood, frame: frame) else { return nil }
+        let extra = extraText(look)
+        let pillText = NSAttributedString(string: look.count > 0 ? "\(look.count)" : "", attributes: [.font: pillFont, .foregroundColor: StatusItem.onRose])
+        let h: CGFloat = 18
+        let bodyW: CGFloat = 18
+        let extraW = look.extra.isEmpty ? 0 : extra.size().width + 3
+        let pillW = look.count > 0 ? max(14, pillText.size().width + 8) : 0
         let w = bodyW + extraW + (pillW > 0 ? pillW + 3 : 0)
         let img = NSImage(size: NSSize(width: w, height: h), flipped: false) { _ in
-            body?.draw(in: NSRect(x: 0, y: 0, width: 18, height: 18))
+            body.draw(in: NSRect(x: 0, y: 0, width: 18, height: 18))
             var x = bodyW
             if extraW > 0 {
                 let sz = extra.size()
@@ -156,8 +167,7 @@ final class StatusItem: NSObject {
             return true
         }
         img.isTemplate = false
-        button.attributedTitle = NSAttributedString(string: "")
-        button.image = img
+        return img
     }
 
     // "type to main      fn space": the keys right-aligned, dim
