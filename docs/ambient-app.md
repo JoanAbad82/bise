@@ -132,12 +132,15 @@ with another workspace it writes `<bise dev dir>/ambient/switch.json` and sends 
 in `app.pid` (`open` ignores `--args` on a running app). `bise ambient` execs that script from the
 app root (v1 is dev-only).
 
-App-only events to the web UI: `app_fn` (`down`/`up`/`double`), `app_shot` (`app`, `title`,
+App-only events to the web UI: `app_fn` (`state`: `down`/`up`/`double`/`tap`/`cancel`, `key`:
+`fn`/`right_option`; the web UI turns them into `cut_in`/`hush`/`talk_cancel`), `app_globe` (`use`:
+`none`/`input`/`emoji`/`dictation`/`unknown`: macOS's "press 🌐 to"), `app_shot` (`app`, `title`,
 `skipped`, `frame: {x, y, w, h}` for the pink corners), `app_perm` (`perm`: `screen`/`mic`/
 `accessibility`, `state`: `granted`/`denied`/`ask`), `app_settings` (`edge_glow`), `app_hidden`
 (bool), `app_reduce_motion` (bool), `app_key` (fn + key: `space`, `1`…`9`, `i`, `0`, `o`, `.`,
-`enter`, `esc`). Web UI command `app_perm` (`perm`, `do`: `continue` opens macOS's prompt,
-`settings` opens its pane).
+`enter`, `esc`). Web UI commands `app_perm` (`perm`, `do`: `continue` opens macOS's prompt,
+`settings` opens its pane), `app_setting` (`key`: `edge_glow`/`right_option`, `value`); `app_hide`
+takes an optional `hidden` (bool; none: toggle).
 Web UI commands for the app (not forwarded): `app_size` (`w`, `h`, `radius`: the capsule's frame
 follows the content; optional `note: {y, h, radius}`: the needs-you glass under the capsule, in the
 same web view, so the blur view masks two rounded rects), `app_focus` (`on`: the panel takes the
