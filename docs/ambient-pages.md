@@ -158,7 +158,7 @@ AppleScript path above. computer-use owns the broker + sw.js side (~half a day).
 
 ### 2.9 The guide and main's rule (owner: amb-kit, words with ambient-pm and ambient)
 
-`prompts/skills/bise-pages/SKILL.md` (a built-in skill like `bise-demo`): the blocks, one example
+`prompts/skills-all/bise-pages/SKILL.md` (a built-in skill every agent sees, main and tasks: `prompts/skills-all/`, amb-kit 82782bee; `prompts/skills/` stays main's own, like `bise-demo`): the blocks, one example
 page per kind, the rules, `sb page publish`, how to answer notes. Main's rule (vision §3 B) in
 main's prompt (`rust/switchboard/src/prompts.rs` or the prompt file it reads), pointing to it.
 
@@ -177,7 +177,7 @@ system. The capsule's web UI moves to the same file. An identity = another token
 |---|---|
 | ambient-lead | this file, `docs/ambient-app.md`, `tests/ambient_pages_e2e.py`, integration |
 | amb-core | `rust/switchboard/src/pages/` (except lint.rs), the hub/daemon/cli/core lines for pages, `rust/tui/src/ambient/**` |
-| amb-kit | `apps/ambient/kit/` (except notes.js), `rust/switchboard/src/pages/lint.rs`, `prompts/skills/bise-pages/`, main's rule |
+| amb-kit | `apps/ambient/kit/` (except notes.js), `rust/switchboard/src/pages/lint.rs`, `prompts/skills-all/bise-pages/`, main's rule |
 | amb-web | `apps/ambient/kit/notes.js`, `apps/ambient/web/**` ("for you", fn + o) |
 | amb-mac | `apps/ambient/mac/**`, `scripts/ambient.sh` |
 

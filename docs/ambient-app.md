@@ -151,6 +151,12 @@ pill), `app_hidden`
 `settings` opens its pane, `not_now`: the refused path, its one line once, the menu bar and the
 spotlight keep working), `app_setting` (`key`: `edge_glow`/`right_option`, `value`); `app_hide`
 takes an optional `hidden` (bool; none: toggle).
+§8's split (amb-web 375369f8, amb-mac 29c6885f): the web sends `app_content` (`kind`: `talk`,
+`type`, `got`, `answer`, `needs` (+ `card`), `open`, `line`, `none`) on every change of what it
+shows, and `app_hide` on esc; the app's one Visibility state machine owns every show/hide timer
+and sends `app_visible {on}` (false: the orb stops) and `app_hidden {on}`; `app_show {for}` opens
+it from the app's side (opened by hand also sends `app_key '0'`, the full view).
+
 Web UI commands for the app (not forwarded): `app_size` (`w`, `h`, `radius`: the capsule's frame
 follows the content; optional `note: {y, h, radius}`: the needs-you glass under the capsule, in the
 same web view, so the blur view masks two rounded rects), `app_focus` (`on`: the panel takes the
