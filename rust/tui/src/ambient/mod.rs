@@ -11,6 +11,7 @@
 
 mod core;
 mod hub;
+mod plain;
 mod speech;
 #[cfg(test)]
 mod tests;

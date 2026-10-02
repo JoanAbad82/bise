@@ -183,6 +183,10 @@ pub struct Core {
     /// main's turns seen (the `turn` of `main` and `word`)
     turn: u64,
     in_turn: bool,
+    /// the turn running answers a user message (main's words are sent)
+    for_user: bool,
+    /// a user message main has not taken into a turn yet
+    user_waiting: bool,
     /// main's last message of this turn, as sent in `main`
     main_text: String,
     /// the last message sent was said: Some(reached main's turn yet)
@@ -210,6 +214,8 @@ impl Core {
             phase: Phase::Idle,
             turn: 0,
             in_turn: false,
+            for_user: false,
+            user_waiting: false,
             main_text: String::new(),
             voice_out: None,
             talk: None,
@@ -372,6 +378,8 @@ impl Core {
         let had_shot = shot.is_some();
         self.sent_shots.extend(shot);
         self.voice_out = voice.then_some(false);
+        // the hub echoes it as `sb you` too; this one counts if it does not
+        self.user_waiting = true;
         self.emit(json!({"ev": "sent", "text": words, "voice": voice, "shot": had_shot}));
         self.set_phase(Phase::Sending, None);
     }
@@ -460,13 +468,21 @@ impl Core {
             "state" => self.state(&v),
             "ready" => {
                 self.ready = true;
-                // the replay told where main's turn is
-                let p = if self.in_turn { Phase::Working } else { Phase::Idle };
+                // the replay told where main's turn is (working only on
+                // a turn that answers the user)
+                let p = if self.in_turn && self.for_user { Phase::Working } else { Phase::Idle };
                 if self.talk.is_none() && self.speech.is_none() {
                     self.set_phase(p, None);
                 }
             }
-            "line" if s("agent") == "main" => self.main_line(&s("line")),
+            "line" => {
+                let line = s("line");
+                if self.ready && line.starts_with("sb msg-you : ") {
+                    self.msg_you(&line);
+                } else if s("agent") == "main" {
+                    self.main_line(&line);
+                }
+            }
             _ => {}
         }
     }
@@ -514,17 +530,30 @@ impl Core {
         self.emit(json!({"ev": "state", "agents": agents, "cards": cards}));
     }
 
-    /// One line of main's feed. Before `ready` (the hello replay) it only
-    /// tells whether main is in a turn.
+    /// One line of main's feed (ambient's review, m_4672: only main's
+    /// words FOR THE USER reach the capsule). A turn answers the user when
+    /// a user message reached it: `sb you` (the TUI's, or this core's
+    /// echoed) before it started, or steered into it. Main's other turns
+    /// (an agent's report, a message between agents) send nothing: no
+    /// `main`, no phase. Before `ready` (the hello replay) the lines only
+    /// say where main is; nothing of them is sent.
     fn main_line(&mut self, line: &str) {
         let obs = line.strip_prefix("  obs: ");
+        if let Some(t) = line.strip_prefix("sb you : ") {
+            // a slash command (`/answer`) is the hub's, never a turn
+            if !t.trim_start().starts_with('/') {
+                self.user_waiting = true;
+            }
+            return;
+        }
         if obs == Some("turn_started") {
             self.in_turn = true;
             self.turn += 1;
             self.main_text.clear();
+            self.for_user = std::mem::take(&mut self.user_waiting);
             if self.ready {
                 self.reached();
-                if self.speech.is_none() {
+                if self.for_user && self.speech.is_none() {
                     self.set_phase(Phase::Working, None);
                 }
             }
@@ -532,21 +561,35 @@ impl Core {
         }
         if let Some(how) = obs.and_then(|o| o.strip_prefix("turn_done: ")) {
             self.in_turn = false;
+            let for_user = std::mem::take(&mut self.for_user);
             if self.ready {
-                self.turn_done(how, line);
+                self.turn_done(how, line, for_user);
             }
             return;
         }
-        if !self.ready {
+        if obs.is_some_and(|o| o.starts_with("steering_received: ") || o.starts_with("steered: ")) {
+            // the user's message went into the running turn
+            if self.in_turn && self.user_waiting {
+                self.user_waiting = false;
+                if !self.for_user {
+                    self.for_user = true;
+                    if self.ready && self.speech.is_none() {
+                        self.set_phase(Phase::Working, None);
+                    }
+                }
+            }
+            if self.ready {
+                self.reached();
+            }
             return;
         }
-        if obs.is_some_and(|o| o.starts_with("steering_received: ") || o.starts_with("steered: ")) {
-            return self.reached();
+        if !self.ready || !self.for_user {
+            return;
         }
         match parse_line(line) {
             Some(Ev::Assistant(t)) => {
                 let vis = crate::wire::split_thinking(&t).map(|(_, v)| v).unwrap_or(t);
-                let text = crate::markdown::unescape_md(&vis).trim().to_string();
+                let text = super::plain::plain(&crate::markdown::unescape_md(&vis));
                 if !text.is_empty() {
                     self.main_text = text.clone();
                     let turn = self.turn;
@@ -563,6 +606,17 @@ impl Core {
         }
     }
 
+    /// `sb msg-you : {from} : {text}` in any feed: an agent (or main)
+    /// writing to the user, shown as main's words, with who wrote it.
+    fn msg_you(&mut self, line: &str) {
+        let Some(Ev::AgentMsg { from, text, level: 2, .. }) = parse_line(line) else { return };
+        let text = super::plain::plain(&text);
+        if !text.is_empty() {
+            let turn = self.turn;
+            self.emit(json!({"ev": "main", "text": text, "turn": turn, "from": from}));
+        }
+    }
+
     /// Main's turn has the message sent last: its shots and its voice.
     fn reached(&mut self) {
         for s in &mut self.sent_shots {
@@ -573,11 +627,18 @@ impl Core {
         }
     }
 
-    fn turn_done(&mut self, how: &str, line: &str) {
+    fn turn_done(&mut self, how: &str, line: &str, for_user: bool) {
         // the shots main's turn had are forgotten now
         let (done, keep): (Vec<Shot>, Vec<Shot>) = self.sent_shots.drain(..).partition(|s| s.reached);
         self.sent_shots = keep;
         self.forget(done);
+        if !for_user {
+            // a turn for an agent: the capsule keeps its status line
+            if self.voice_out == Some(true) {
+                self.voice_out = None;
+            }
+            return;
+        }
         if how != "completed" {
             let why = match parse_line(line) {
                 Some(Ev::Err(t) | Ev::Warn(t)) => t,

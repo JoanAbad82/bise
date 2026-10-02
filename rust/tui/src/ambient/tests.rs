@@ -159,6 +159,13 @@ impl T {
         self.take();
     }
 
+    /// Everything the hub said so far is handled (a state round trip).
+    fn sync(&mut self) {
+        self.hub.say(json!({"ev": "state", "agents": [], "cards": []}));
+        self.until(|o| has(o, "state"));
+        self.out.retain(|v| v["ev"] != "state");
+    }
+
     fn main_turn(&mut self, text: &str) {
         self.hub.line("main", "  obs: turn_started");
         self.hub.line("main", &format!("  obs: assistant: {text}"));
@@ -280,15 +287,37 @@ fn a_shot_steered_into_a_running_turn_is_forgotten_at_its_end() {
     let text = t.hub.next()["text"].as_str().unwrap().to_string();
     assert!(text.starts_with("<image name=\"[Screen]\" path=\"Notes\""), "{text}");
     let b64 = PathBuf::from(&bend_images::markers(&text)[0].b64);
-    // a turn_done before main has it (the turn ran before the message) keeps it
+    // steered into the running turn (a report's): from then on it is the
+    // user's, main works for them, then done; the shot goes at its end
+    assert!(phase_is(&t.take(), "sending"));
+    t.sync();
+    assert!(!has(&t.take(), "phase"), "nothing yet: the turn is an agent's");
+    t.hub.line("main", &format!("  obs: steering_received: {text}"));
+    t.until(|o| phase_is(o, "working"));
+    assert!(b64.exists());
     t.hub.line("main", "  obs: turn_done: completed");
     t.until(|o| phase_is(o, "done"));
-    assert!(b64.exists());
-    t.hub.line("main", "  obs: turn_started");
-    t.hub.line("main", &format!("  obs: steered: {text}"));
-    t.hub.line("main", "  obs: turn_done: completed");
-    t.until(|o| phases(o).iter().filter(|p| *p == "done").count() == 2);
     assert!(!b64.exists());
+}
+
+#[test]
+fn a_message_sent_during_an_agents_turn_waits_for_the_next_one() {
+    let mut t = T::new();
+    t.hub.line("main", "  obs: turn_started");
+    t.ready();
+    t.cmd(Cmd::Send { text: "after this".into() });
+    t.hub.next();
+    t.take();
+    // the agent's turn ends without it: nothing said
+    t.hub.line("main", "  obs: assistant: for the agent");
+    t.hub.line("main", "  obs: turn_done: completed");
+    t.sync();
+    let out = t.take();
+    assert!(!has(&out, "main") && !phases(&out).contains(&"done".to_string()), "{out:?}");
+    // the next turn is the user's
+    t.main_turn("Here, after it.");
+    t.until(|o| phase_is(o, "done"));
+    assert!(t.take().contains(&json!({"ev": "main", "text": "Here, after it.", "turn": 2})));
 }
 
 #[test]
@@ -390,9 +419,11 @@ fn voice_out_only_after_a_voice_input() {
     t.main_turn("Now too.");
     t.until(|o| phase_is(o, "speaking"));
     assert_eq!(t_synths(&t), 1);
-    // the next turn (no new voice input) is text again
+    // a typed message after it: text again
     t.cmd(Cmd::Hush);
-    t.main_turn("A report came in.");
+    t.cmd(Cmd::Send { text: "and typed?".into() });
+    t.hub.next();
+    t.main_turn("Typed, so text.");
     t.until(|o| o.iter().filter(|v| v["ev"] == "main").count() == 2);
     t.until(|o| phase_is(o, "done"));
     assert_eq!(t_synths(&t), 1);
@@ -480,6 +511,7 @@ fn no_voice_model_keeps_the_text() {
 fn a_failed_turn_is_phase_failed_with_its_line() {
     let mut t = T::new();
     t.ready();
+    t.hub.line("main", "sb you : what's up");
     t.hub.line("main", "  obs: turn_started");
     t.hub.line("main", "  obs: turn_done: failed: the provider is down");
     t.until(|o| phase_is(o, "failed"));
@@ -492,15 +524,18 @@ fn a_failed_turn_is_phase_failed_with_its_line() {
 fn the_hello_replay_says_where_main_is_but_not_its_old_words() {
     let mut t = T::new();
     t.take();
+    t.hub.line("main", "sb you : an old question");
     t.hub.line("main", "  obs: turn_started");
     t.hub.line("main", "  obs: assistant: an old message");
     t.hub.line("main", "  obs: turn_done: completed");
+    t.hub.line("main", "sb msg-you : docs : an old note");
+    t.hub.line("main", "sb you : the question main is on");
     t.hub.line("main", "  obs: turn_started");
     t.hub.say(json!({"ev": "ready"}));
     t.until(|o| has(o, "phase"));
     let out = t.take();
     assert_eq!(phases(&out), vec!["working"]);
-    assert!(!has(&out, "main"));
+    assert!(!has(&out, "main"), "nothing of the replay is sent: {out:?}");
     // other agents' lines never move main's phase
     t.hub.line("cookies", "  obs: turn_done: completed");
     t.hub.line("main", "  obs: turn_done: completed");
@@ -599,4 +634,52 @@ fn the_run_loop_writes_lines_and_ends_with_stdin() {
     super::run(&mut core, rx, &mut out);
     let text = String::from_utf8(out).unwrap();
     assert_eq!(text, format!("{}\n", json!({"ev": "hub", "up": false, "workspace": WS})));
+}
+
+#[test]
+fn a_report_triggered_turn_sends_no_words_and_no_phase() {
+    let mut t = T::new();
+    // the replay at launch: main answering an agent's report
+    t.hub.line("main", "sb msg-in : perf m_12 : [report: done] signup 4.1 s -> 0.9 s");
+    t.hub.line("main", "  obs: turn_started");
+    t.ready();
+    t.hub.line("main", "tool_intent #1 : reads the report");
+    t.hub.line("main", "  obs: assistant: **perf** is done; I merged it.");
+    t.hub.line("main", "  obs: turn_done: completed");
+    // live: another report, another turn
+    t.hub.line("main", "sb msg-in : docs m_13 : [report: progress] half way");
+    t.main_turn("Noted, docs is half way.");
+    t.sync();
+    let out = t.take();
+    assert!(!has(&out, "main") && !has(&out, "phase"), "{out:?}");
+}
+
+#[test]
+fn a_tui_user_turn_sends_main_words_as_plain_text() {
+    let mut t = T::new();
+    t.ready();
+    // typed in the terminal: the hub echoes it in main's feed
+    t.hub.line("main", "sb you : is the build green?");
+    t.main_turn("**Yes**: the `gate` is green, see [the PR](https://x/412).\\n\\n- 412 tests\\n- 0 flaky");
+    t.until(|o| phase_is(o, "done"));
+    let out = t.take();
+    assert_eq!(phases(&out), vec!["working", "done"]);
+    let main: Vec<&Value> = out.iter().filter(|v| v["ev"] == "main").collect();
+    assert_eq!(main, vec![&json!({"ev": "main", "text": "Yes: the gate is green, see the PR.\n\n- 412 tests\n- 0 flaky", "turn": 1})]);
+    // a slash command is the hub's: the turn after it is not the user's
+    t.hub.line("main", "sb you : /answer 3 yes");
+    t.main_turn("t1 has your answer.");
+    t.sync();
+    assert!(!has(&t.take(), "main"));
+}
+
+#[test]
+fn msg_you_lines_are_main_words_with_who_wrote_them() {
+    let mut t = T::new();
+    t.ready();
+    t.hub.line("docs", "sb msg-you : docs : the **v2** page is up");
+    t.until(|o| has(o, "main"));
+    let out = t.take();
+    assert!(out.contains(&json!({"ev": "main", "text": "the v2 page is up", "turn": 0, "from": "docs"})), "{out:?}");
+    assert!(!has(&out, "phase"));
 }
