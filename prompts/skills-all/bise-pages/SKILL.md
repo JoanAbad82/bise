@@ -155,10 +155,17 @@ The user should see the page within about 10 seconds of asking, then watch it fi
    swaps the new blocks in place, the user's scroll stays). Keep the ids you already used.
 3. **Last publish**: drop the `writing` callout, add the sources.
 
-**A page of items** (mails to answer, comments, bugs): don't read all 20 first. Publish each
-few items as soon as they are drafted (a version per 2 or 3 items, the newest under the others,
-`writing…` saying how many are left: `5 of 20 read`), so the user starts reviewing while you
-write the rest.
+**A page of items** (mails to answer, comments, bugs): draft and publish as you read, never
+read everything first.
+1. List the items first, subjects and senders only (one call, no bodies), and pick the ones that
+   need the user.
+2. Read the first 2 or 3 of those, draft their replies, and publish them as v2 **within about 45
+   seconds of the ask**, with the `writing` callout saying where you are: `5 of 20 read`.
+3. Then one version per 2 or 3 more items, each added under the others, the callout counting up.
+4. Last: what you skipped (newsletters, notifications) as one short table or callout, the
+   `writing` callout gone, the sources.
+The user starts reviewing the first replies while you write the rest. `examples/inbox-writing.html`
+is such a v2.
 
 **Drafts stay on the page.** While you write and until the user's word on the page (`send`,
 `approve`, "put it in my drafts"), nothing goes to their accounts: no draft in Gmail or Outlook,
