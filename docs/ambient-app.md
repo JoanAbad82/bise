@@ -247,7 +247,9 @@ His words: "On valide http://127.0.0.1:4747/content/ambient/identity8.html". Dir
 smoked glass, white text, bise pink `#f4a6b0`), the pink **mist pearl** as bise's body (replaces
 the constellation orb: `marble.js` variant 1 with the bise-pink palette), out of the way (§8,
 SPEC §0), the moods and the menu-bar states. Reference: identity8.html, SPEC §0, marble.js
-(ambient's, untracked; ported, never copied whole into git).
+(ambient's, untracked). ambient's call (m_5151): the shader is copied as is (variant 1, palette
+'pink') into the app's code, since it is the product; SPEC.md §0-§1 is the source of truth (the
+mood table with every uniform, sizes, cost, tokens by role; `--working` is motion, not a color).
 
 | piece | owner | what |
 |---|---|---|
