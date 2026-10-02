@@ -664,7 +664,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // the count of items waiting for you
     private func statusIcon() {
         let mainBusy = ["working", "sending", "speaking"].contains(phase)
-        status?.set(working: working || mainBusy, count: cards.count)
+        // the cards waiting + the ready pages he hasn't opened (count.json, shared with the web)
+        status?.set(working: working || mainBusy, count: MenuRows.count(memory["state"] ?? [:]))
     }
 
     // you away: no key or mouse for 5 minutes

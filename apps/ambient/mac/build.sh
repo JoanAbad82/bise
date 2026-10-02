@@ -42,6 +42,7 @@ case "${1:-}" in
     ;;
   --test)
     t="$(mktemp -d "${TMPDIR:-/tmp}/ambient-test.XXXXXX")"
+    export AMBIENT_FIXTURES="$HERE/../web/fixtures"   # shared with the web (count.json)
     rc=0
     # the pure sources (a+b: concatenated) with their laws, one interpreter run each
     for pair in KeyMachine:KeyMachineTests PageOpen:PageOpenTests Quiet:QuietTests MenuRows:MenuRowsTests \

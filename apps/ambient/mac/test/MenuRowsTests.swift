@@ -65,7 +65,7 @@ law("state.timers: the ones with an id, in order", watches.map(\.id) == [3, 4, 5
 law("no timers in the state: no watch rows", MenuWatch.list(["pages": []]).isEmpty)
 law("a page's unopened versions: version − opened_version",
     wpages.first { $0.id == "launch-watch" }?.unopened == 3 && wpages.first { $0.id == "seen" }?.unopened == 0)
-law("a hub without opened_version counts none", wpages.first { $0.id == "old" }?.unopened == 0)
+law("a hub without opened_version: never opened", wpages.first { $0.id == "old" }?.unopened == 4)
 law("a watch with a page: its title and what's new",
     MenuRows.watch(watches[0], pages: wpages) == "watching the launch · 3 new for you")
 law("nothing new: no count", MenuRows.watch(watches[1], pages: wpages) == "watching seen page")
@@ -76,6 +76,21 @@ law("a page not in the state: the order's words",
 law("no words either: its number", MenuRows.watch(MenuWatch(id: 9, text: " ", page: nil), pages: []) == "watching: #9")
 law("a watch row opens its page; none without one",
     MenuRows.watchURL(watches[0], pages: wpages) == "http://h/p/launch-watch" && MenuRows.watchURL(watches[2], pages: wpages) == nil)
+
+// the icon's number: amb-web's shared fixture (build.sh --test sets
+// AMBIENT_FIXTURES), so the app and the web never drift
+let fixtures = ProcessInfo.processInfo.environment["AMBIENT_FIXTURES"] ?? "../web/fixtures"
+if let d = FileManager.default.contents(atPath: fixtures + "/count.json"),
+   let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+   let cases = j["cases"] as? [[String: Any]], !cases.isEmpty {
+    for c in cases {
+        let got = MenuRows.count(c["state"] as? [String: Any] ?? [:])
+        let want = (c["count"] as? NSNumber)?.intValue ?? -1
+        law("count.json: \(c["name"] as? String ?? "?") → \(want)", got == want)
+    }
+} else {
+    law("count.json is readable at \(fixtures)", false)
+}
 
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all MenuRows laws hold")

@@ -12,8 +12,9 @@ struct MenuPage: Equatable {
     var url: String
     var opened: Int? = nil    // the newest version the user opened (hub's opened_version)
 
-    // versions published since he last opened it (0 when the hub doesn't say)
-    var unopened: Int { opened.map { max(0, version - $0) } ?? 0 }
+    // versions published since he last opened it (a hub without
+    // opened_version: never opened, as amb-web's fixtures/count.json says)
+    var unopened: Int { max(0, version - (opened ?? 0)) }
 
     // state.pages, newest first: the ones with a URL to open
     static func list(_ state: [String: Any]) -> [MenuPage] {
@@ -76,6 +77,21 @@ enum MenuRows {
     static func watchURL(_ w: MenuWatch, pages: [MenuPage]) -> String? {
         guard let id = w.page else { return nil }
         return pages.first(where: { $0.id == id })?.url
+    }
+
+    // the menu-bar icon's number (docs/ambient-app.md §8, amb-web's
+    // fixtures/count.json, shared with the web's M.count): the cards waiting
+    // + the pages with a version he hasn't opened (a page still being
+    // written for the first time is not counted; updating has a version)
+    static func count(_ state: [String: Any]) -> Int {
+        let cards = (state["cards"] as? [[String: Any]] ?? []).count
+        let pages = (state["pages"] as? [[String: Any]] ?? []).filter { p in
+            let st = p["state"] as? String ?? "ready"
+            let v = (p["version"] as? NSNumber)?.intValue ?? 1
+            let opened = (p["opened_version"] as? NSNumber)?.intValue ?? 0
+            return st != "writing" && v > opened
+        }.count
+        return cards + pages
     }
 
     // "agent: question" on one line
