@@ -376,6 +376,27 @@ law("message: copy gives Slack markup of what the page shows, the kit's button l
   assert.equal(K.toSlack(m), "*bise is live* today, _finally_.\n\n• the repo is <https://github.com/acme/bise|public>\n• install: `brew install bise`\n\nthanks ~all~ everyone!");
 });
 
+law("writing: the last 5 intents, newest at the bottom, the rest folded; the last one is current while working", () => {
+  const seven = ["reading your Gmail", "reading #launch", "counting stars", "reading HN", "comparing", "drafting", "checking links"];
+  const w = j(K.intentLines(seven, true));
+  assert.equal(w.earlier, 2);
+  assert.deepEqual(w.lines.map((x) => x.text), seven.slice(2));
+  assert.deepEqual(w.lines.map((x) => x.current), [false, false, false, false, true]);
+  assert.equal(K.W.earlier(w.earlier), "+2 earlier");
+  const done = j(K.intentLines(seven.slice(0, 2), false));
+  assert.deepEqual(done, { earlier: 0, lines: [{ text: "reading your Gmail", current: false }, { text: "reading #launch", current: false }] });
+  assert.deepEqual(j(K.intentLines(["", " "], true)), { earlier: 0, lines: [] });
+});
+
+law("writing: the frame's time counts up; the words are ambient's", () => {
+  assert.equal(K.since(0, 12_400), "12 s");
+  assert.equal(K.since(0, 61_000), "1 min");
+  assert.equal(K.since(5_000, 0), "0 s");
+  assert.equal(K.W.asked("the launch recap for Slack"), "you asked: “the launch recap for Slack”");
+  assert.equal(K.W.failed("the Slack token expired"), "▲ couldn't finish: the Slack token expired. main is on it.");
+  assert.equal(K.W.tabWriting("launch recap"), "launch recap · writing");
+});
+
 law("ago: short words", () => {
   const now = 10_000_000;
   assert.equal(K.ago(now - 5_000, now), "just now");

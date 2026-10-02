@@ -30,6 +30,13 @@
     updating: (agent) => `${said(agent)} is updating this page…`,
     writing: (agent) => `${said(agent)} is writing this page…`,
     stopped: (agent) => `${said(agent)} stopped before writing anything here.`,
+    // the writing state (ambient m_5095)
+    writingFrame: "writing",
+    asked: (ask) => `you asked: “${ask}”`,
+    onIt: "on it.",
+    earlier: (n) => `+${n} earlier`,
+    failed: (reason) => (reason ? `▲ couldn't finish: ${reason}. main is on it.` : "▲ couldn't finish. main is on it."),
+    tabWriting: (title) => `${title} · writing`,
     changed: "what changed",
     send: "send",
     latest: "see the latest",
@@ -45,6 +52,23 @@
     copy: "copy",
     copied: "copied",
   };
+
+  // ---- the writing state: the agent's intents, newest at the bottom, the last 5 shown ----
+  // `list`: the progress lines so far; `working`: the agent is still at it (the last one is
+  // current). Returns {earlier: how many fold into "+N earlier", lines: [{text, current}]}.
+  function intentLines(list, working, max = 5) {
+    const all = (list || []).filter((t) => String(t).trim() !== "");
+    const shown = all.slice(-max);
+    return {
+      earlier: all.length - shown.length,
+      lines: shown.map((text, i) => ({ text: String(text), current: !!working && i === shown.length - 1 })),
+    };
+  }
+  // the time since the page started, counting up: "12 s", "3 min"
+  function since(startMs, nowMs) {
+    const s = Math.max(0, Math.floor((nowMs - startMs) / 1000));
+    return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min`;
+  }
 
   // ---- time ----
   function ago(atMs, nowMs) {
@@ -328,7 +352,7 @@
     return { ...res, marked: [...marked] };
   }
 
-  const BiseKit = { W, said, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, options, norm };
+  const BiseKit = { W, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, options, norm };
   root.BiseKit = BiseKit;
 
   // ---- the browser: the frame, the stream, the keys ----
@@ -373,11 +397,29 @@
     const stWords = el("span", {}, W.updating(agent));
     const stProgress = el("span", { class: "p" });
     st.append(stWords, stProgress);
-    // the page before its first version: what the agent is doing, live (SSE progress)
+    // the page before its first version (ambient m_5095): its title, what you asked, then what the
+    // agent is doing, live (SSE progress), newest at the bottom; a failure says so
     const placeholder = el("div", { "data-kit-ui": "", class: "bise-writing" });
-    const phWords = el("p", { class: "w" }, W.writing(agent));
-    const phProgress = el("p", { class: "p" });
-    placeholder.append(phWords, phProgress);
+    const phTitle = el("h1", {}, title);
+    const phAsk = el("p", { class: "ask" }, d.ask ? W.asked(d.ask) : null);
+    if (!d.ask) phAsk.hidden = true;
+    const phMore = el("p", { class: "more", hidden: "" });
+    const phList = el("ol", { class: "intents" });
+    const phFail = el("p", { class: "fail", hidden: "" });
+    placeholder.append(phTitle, phAsk, phMore, phList, phFail);
+    let intents = [];
+    let failure = null;
+    function drawIntents() {
+      const working = main.dataset.state !== "ready";
+      const { earlier, lines } = intentLines(intents, working);
+      phMore.hidden = earlier === 0;
+      phMore.textContent = W.earlier(earlier);
+      const items = lines.length ? lines : working ? [{ text: W.onIt, current: true }] : [];
+      phList.replaceChildren(...items.map((x) => el("li", { "data-current": x.current ? "" : null }, x.text)));
+      phFail.hidden = working;
+      phFail.textContent = W.failed(failure);
+    }
+    const startedMs = num(d.started, Date.now());
     const sp = el("span", { class: "sp" });
     const wc = el("button", { type: "button", disabled: "" }, W.changed);
     // the version: "v3 ▾" opens the list of versions (ambient m_4918), older ones read-only
@@ -400,10 +442,15 @@
 
     function drawMeta() {
       const v = versionOf(meta, shown);
-      const latestN = meta ? Math.max(...meta.versions.map((x) => x.n)) : latestAtLoad;
+      const latestN = meta && meta.versions.length ? Math.max(...meta.versions.map((x) => x.n)) : latestAtLoad;
       const parts = [W.by(agent)];
-      if (v && v.at_ms) parts.push(ago(v.at_ms, Date.now()));
+      if (main.dataset.state === "writing") {
+        // "by launch recap · writing · 12 s", counting up
+        const t0 = meta && meta.created_ms ? meta.created_ms : startedMs;
+        parts.push(W.writingFrame, since(t0, Date.now()));
+      } else if (v && v.at_ms) parts.push(ago(v.at_ms, Date.now()));
       m.textContent = parts.join(" · ");
+      doc.title = main.dataset.state === "writing" ? W.tabWriting(title) : title;
       latest.hidden = shown >= latestN;
       vb.textContent = (shown < latestN ? W.older(shown, latestN) : `v${shown}`) + (latestN > 1 ? " ▾" : "");
       if (latestN > 1) vb.removeAttribute("disabled"); else vb.setAttribute("disabled", "");
@@ -426,7 +473,9 @@
       return meta;
     }
     loadMeta().then(() => { drawMeta(); markChanged(changedIn(meta, shown)); });
-    setInterval(drawMeta, 30000);
+    // the meta line every 30 s; every second while writing (the time counts up)
+    let tick = 0;
+    setInterval(() => { tick++; if (main.dataset.state === "writing" || tick % 30 === 0) drawMeta(); }, 1000);
 
     // the reading position: the first block whose bottom is under the frame
     const view = {
@@ -457,22 +506,27 @@
 
     // the frame and the placeholder follow the state: writing (no version yet), updating (notes
     // sent), ready; a page still at version 0 when it is ready again: its agent stopped
-    function setState(s) {
+    function setState(s, reason) {
       f.setAttribute("data-state", s);
       main.dataset.state = s;
-      stWords.textContent = s === "writing" ? W.writing(agent) : W.updating(agent);
-      if (s === "ready") { stProgress.textContent = ""; phProgress.textContent = ""; }
+      stWords.textContent = W.updating(agent);
+      if (s === "ready") stProgress.textContent = "";
+      if (reason) failure = reason;
       const empty = blocks().length === 0;
+      // nothing published yet: no send, no count, no versions in the frame, whatever the state
+      if (empty) f.setAttribute("data-empty", ""); else f.removeAttribute("data-empty");
       if (empty && !placeholder.parentNode) main.append(placeholder);
       if (!empty && placeholder.parentNode) placeholder.remove();
       placeholder.setAttribute("data-state", s);
-      phWords.textContent = s === "ready" ? W.stopped(agent) : W.writing(agent);
+      drawIntents();
+      drawMeta();
       doc.dispatchEvent(new root.CustomEvent("bise:state", { detail: { state: s } }));
     }
     function progress(text) {
-      if (main.dataset.state === "ready") return;
-      stProgress.textContent = text ? ` · ${text}` : "";
-      phProgress.textContent = text || "";
+      if (main.dataset.state === "ready" || !text) return;
+      stProgress.textContent = ` · ${text}`;
+      if (intents[intents.length - 1] !== text) intents.push(text);
+      drawIntents();
     }
     if (blocks().length === 0) setState(d.state || "writing");
 
@@ -480,7 +534,7 @@
       const es = new root.EventSource(`/p/${id}/events`);
       const data = (e) => { try { return JSON.parse(e.data); } catch (_) { return {}; } };
       es.addEventListener("version", (e) => { const v = data(e).n; swapping = swapping.then(() => goTo(v)).catch(() => {}); });
-      es.addEventListener("state", (e) => setState(data(e).state || "ready"));
+      es.addEventListener("state", (e) => { const x = data(e); setState(x.state || "ready", x.reason); });
       es.addEventListener("progress", (e) => progress(String(data(e).text || "")));
       const relay = (ev, name) => es.addEventListener(ev, (e) => doc.dispatchEvent(new root.CustomEvent(name, { detail: data(e) })));
       es.addEventListener("notes", (e) => doc.dispatchEvent(new root.CustomEvent("bise:notes", { detail: { notes: data(e).notes || [] } })));

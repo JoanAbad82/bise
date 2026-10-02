@@ -32,6 +32,7 @@
   --ok: #3f7a2a;
   --risk: #b3261e;
   --changed: #f4a6b026;           /* "what changed" */
+  --working: #a8741a;             /* an agent at work (writing, updating): ochre, never the accent (ambient m_5095; values amb-kit's guess) */
 
   /* surface-talk: where you talk to bise (glass): the frame, the note toolbar, the side list, the send bar */
   --surface-talk: linear-gradient(180deg, #2a2224e0, #1a1516f0);
@@ -42,6 +43,7 @@
   --talk-pen: #ff8fa6;
   --talk-ok: #b9d99a;
   --talk-moved: #ffd38a;
+  --talk-working: #e0b45a;
   --talk-raised: #ffffff14;
   --talk-raised-on: #ffffff2a;
   --talk-stroke: inset 0 0 0 1px #ffffff22;
@@ -94,6 +96,7 @@
     --ok: #b9d99a;
     --risk: #ff5a52;
     --changed: #f4a6b01c;
+    --working: #e0b45a;
   }
 }
 
