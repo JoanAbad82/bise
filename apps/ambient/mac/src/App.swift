@@ -118,8 +118,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private func statusAndKeys() {
         let st = StatusItem()
         st.onSpotlight = { [weak self] in self?.spotlight() }
-        st.onToggle = { [weak self] in self?.visFeed(.toggle) }
-        st.onOpen = { [weak self] in self?.visFeed(.open) }
+        st.onToggle = { [weak self] in self?.toggleByHand() }
+        st.onOpen = { [weak self] in self?.agentsView() }
         st.onPage = { Browser.open($0) }
         st.onCard = { [weak self] id in
             // bise open on that card: the inbox (fn + i) at it
@@ -134,7 +134,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
         let nt = Notify()
         nt.onAnswer = { [weak self] card, reply in self?.toCore(["cmd": "answer", "card": card, "reply": reply]) }
-        nt.onOpen = { [weak self] in self?.visFeed(.open) }
+        nt.onOpen = { [weak self] in self?.agentsView() }
         notify = nt
 
         keys.onOut = { [weak self] in self?.key($0) }
@@ -433,7 +433,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case .key(let k):
             switch k {
             case ".":
-                visFeed(.toggle)
+                toggleByHand()
             case "space":
                 spotlight()
             case "i", "0":
@@ -530,6 +530,12 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         morning()
         visFeed(.open)
         capsule.post(["ev": "app_key", "key": "0"])
+    }
+
+    // fn . or the menu's show/hide: opened by hand = the full view (app_key 0,
+    // amb-web's one source for "opened by hand"); shown already = hide
+    private func toggleByHand() {
+        if capsule.hidden { agentsView() } else { visFeed(.dismiss) }
     }
 
     // the menu-bar icon is the status (§8): working (agents or main busy) and
