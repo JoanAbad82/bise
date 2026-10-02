@@ -59,6 +59,7 @@ Every tool returns JSON; PNG files are written under
 | `page_meta({id})` | `qa.py page meta --id x` | versions, state, the notes and their status |
 | `page_drive({id, steps, schemes})` | `qa.py page drive --id x --steps f.json` | the page in a throwaway headless Chrome (no logins, local only): your steps, 2x shots in light and dark |
 | `page_fixture()` | `qa.py page fixture` | weekly-update at v1, four notes sent (note, voice, edit, unsure), then v2 marking one done, answering one, and moving the unsure one's block |
+| `run({scenario, headless})` | `qa.py run weekly-update\|inbox\|offsite [--headless] [--keep]` | a scripted product run on a model hub with the fake accounts (costs credits): the ask through the core, then times, notes, outbox; a one-screen report (see "Scripted product runs") |
 | `stop()` | `qa.py stop` | quit the QA app and the fake hub |
 
 ## The pictures: what is real and what is composited
@@ -127,6 +128,30 @@ open (`events`: `qa_open_url`) instead of opening it. The page itself:
 
 The `computer` plugin (the user's own Chrome, with his logins) is not for
 QA: only when the user asks for that run himself.
+
+## Scripted product runs
+
+`qa.py run <scenario> [--headless]` measures speed and the notes loop the
+same way every time, on a model hub (your model and keys, throwaway
+state, costs credits) with the fake accounts only:
+
+| scenario | the ask |
+|---|---|
+| `weekly-update` | draft my weekly update from Slack and Linear |
+| `inbox` | go through my mail, draft replies, don't send |
+| `offsite` | plan the offsite: the venue we decided, the budget, and an agenda for the two days, from my mail and Slack |
+
+The ask goes through a core like the capsule's (the QA app's own; with
+`--headless` a `bise ambient-core` child, text only: no mic, no voice).
+It records the time to the page's first appearance (`sb page start`) and
+to v1, v1's blocks, then posts 3 scripted notes over the page API (make
+this shorter / drop this part / where does this number come from), sends,
+and records the time to v2 and each note's outcome; the outbox (a send on
+`inbox` fails the run; drafts are fine); main's capsule line and its
+length (over 120 characters fails); cards that showed. Output in
+`<qa dir>/out/runs/<scenario>-<time>/`: `run.json`, `report.txt` (one
+screen), the page bodies. It stops the hub (and app) it started unless
+`--keep`. One run at a time: it uses your QA dir's hub.
 
 ## Limits
 

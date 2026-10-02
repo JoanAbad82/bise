@@ -30,6 +30,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 # realpath: the plugin is linked into an agent's .agents/plugins; the repo is where it really lives
@@ -754,6 +755,231 @@ def page_fixture(id="weekly-update"):
     return {"v1": v1, "v2": v2, "notes": page_meta(id).get("notes", [])}
 
 
+# ---------------------------------------------------------------- scripted product runs
+
+# ambient-lead m_5306: the same asks, notes and measures every time, on a
+# model hub with the fake accounts only (never the user's accounts)
+SCENARIOS = {
+    "weekly-update": {"ask": "draft my weekly update from Slack and Linear", "no_send": False},
+    "inbox": {"ask": "go through my mail, draft replies, don't send", "no_send": True},
+    "offsite": {"ask": "plan the offsite: the venue we decided, the budget, and an agenda for the two days, from my mail and Slack", "no_send": False},
+}
+RUN_NOTES = ["make this shorter, two sentences max", "drop this part", "where does this number come from? add the source"]
+# writes that leave the user's hands (a draft does not)
+SENDS = {"send_message", "post_message", "comment_issue", "add_comment", "create_issue", "update_issue", "create_event", "modify_labels"}
+
+
+class _Core:
+    """The ask goes through a core like the capsule's. headless: a `bise
+    ambient-core` child on stdio, sent text only (no talk_start: no mic; a
+    text send is never spoken: no speaker). Else the QA app's own core
+    (QA op cmd), the app on screen."""
+
+    def __init__(self, bise, root, info, headless, log_dir):
+        self.p, self.evs, self.lock, self.seen = None, [], threading.Lock(), 0
+        if headless:
+            env = {k: v for k, v in os.environ.items() if not k.startswith("SB_") and k not in ("BISE_ROLE", "BISE_EXPORTS_FOR")}
+            env.update(info.get("env") or {})
+            env["BISE_APP_ROOT"] = root
+            if os.path.exists(os.path.join(root, "sb-core")):
+                env["SB_CORE_BIN"] = os.path.join(root, "sb-core")
+            self.p = subprocess.Popen([bise, "ambient-core", "--workspace", info["ws"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                      stderr=open(os.path.join(log_dir, "core.err"), "a"), text=True, cwd=root, env=env)
+            threading.Thread(target=self._read, daemon=True).start()
+        else:
+            self.seen = len(events(2000)["events"])
+
+    def _read(self):
+        for line in self.p.stdout:
+            try:
+                v = json.loads(line)
+            except ValueError:
+                continue
+            with self.lock:
+                self.evs.append(v)
+
+    def send(self, text):
+        cmd = {"cmd": "send", "text": text}
+        if self.p:
+            self.p.stdin.write(json.dumps(cmd) + "\n")
+            self.p.stdin.flush()
+        else:
+            call("cmd", cmd=cmd)
+
+    def new(self):
+        """The core's events since the last call."""
+        if self.p:
+            with self.lock:
+                out, self.seen = self.evs[self.seen:], len(self.evs)
+            return out
+        evs = events(2000)["events"]
+        out, self.seen = evs[self.seen:], len(evs)
+        return [e["ev"] for e in out if e.get("dir") == "core>app"]
+
+    def close(self):
+        if self.p:
+            try:
+                self.p.stdin.close()
+                self.p.wait(5)
+            except (OSError, subprocess.TimeoutExpired):
+                self.p.terminate()
+
+
+def run_report(r):
+    """One screen of text from a run's JSON."""
+    s = lambda v: "-" if v is None else "%.1f s" % v
+    L = ["%s  (%s, model hub, fake accounts)  %s" % (r["scenario"], "headless" if r["headless"] else "app", r["at"]),
+         "ask: %s" % r["ask"]]
+    m = r["main_lines"]
+    if m:
+        L.append("main's line: %d chars at %s: %s" % (m[0]["len"], s(m[0]["at"]), m[0]["text"][:160]))
+        if len(m) > 1:
+            L.append("  then %d more lines, longest %d chars" % (len(m) - 1, max(x["len"] for x in m[1:])))
+    else:
+        L.append("main's line: none reached the core")
+    p = r.get("page")
+    if p:
+        L.append("page %s: first seen %s, v1 %s, %d blocks: %s" % (p["id"], s(r["t"].get("page_first")), s(r["t"].get("v1")), len(p["blocks"]),
+                                                                    " ".join(b["kit"] for b in p["blocks"])[:120]))
+        if r.get("notes"):
+            L.append("notes sent at %s; v%s %s after send" % (s(r["t"].get("send")), r["t"].get("v2_n") or "2", s(r["t"].get("v2_after_send"))))
+            for n in r["notes"]:
+                L.append("  %-10s %-9s %s -> %s" % (n.get("block"), n.get("status"), n.get("text", "")[:40], (n.get("answer") or "")[:60]))
+    else:
+        L.append("page: none in %s" % s(r["t"].get("end")))
+    ob = r["outbox"]
+    L.append("outbox: %d writes (%s), %d sends" % (len(ob["writes"]), ", ".join(sorted({w["service"] + "." + w["action"] for w in ob["writes"]})) or "none",
+                                                   len(ob["sends"])))
+    if r["cards"]:
+        L.append("cards: " + "; ".join("#%s %s" % (c.get("id"), (c.get("text") or "")[:60]) for c in r["cards"]))
+    L.append("verdict: " + ("pass" if not r["fails"] else "FAIL: " + "; ".join(r["fails"])))
+    L.append("files: %s" % r["dir"])
+    return "\n".join(L)
+
+
+def run(scenario, headless=False, timeout=900, keep=False, out=None):
+    """A scripted product run (ambient-lead m_5306): a model hub (the user's
+    model and keys, throwaway state) with the fake accounts only; the
+    scenario's ask through the core like the capsule's; times the page's
+    first appearance (sb page start), v1, then 3 scripted notes over the
+    page API, send, v2 and the notes' outcomes; the outbox (no send for a
+    'don't send' ask); main's capsule line length. Writes run.json and
+    report.txt in its folder; stops what it started unless `keep`."""
+    if scenario not in SCENARIOS:
+        raise QAError("scenario: %s" % ", ".join(SCENARIOS))
+    sc = SCENARIOS[scenario]
+    bise, root = find_bise()
+    if headless:
+        if alive():
+            raise QAError("a QA app is running: stop it first (qa.py stop), or run without --headless")
+        info = _start_hub(bise, root, "model")
+    else:
+        launch(hub="model", restart=True)
+        info = _read(HUB)
+    d = out or os.path.join(OUT, "runs", "%s-%s" % (scenario, time.strftime("%Y%m%d-%H%M%S")))
+    os.makedirs(d, exist_ok=True)
+    r = {"scenario": scenario, "ask": sc["ask"], "headless": headless, "at": time.strftime("%Y-%m-%d %H:%M"), "dir": d, "tree": tree_info(root),
+         "t": {}, "main_lines": [], "cards": [], "page": None, "notes": [], "fails": []}
+    c, _ = _hub()
+    core = None
+    try:
+        _wait(lambda: c.state, 30, "the hub's state")
+        c.wait_idle("main", timeout=300)
+        core = _Core(bise, root, info, headless, d)
+        if headless:
+            _wait(lambda: any(e.get("ev") == "hub" and e.get("up") for e in core.evs), 60, "the core on the hub")
+        before = {p["id"] for p in c.state.get("pages", [])}
+        t0 = time.time()
+        rel = lambda: round(time.time() - t0, 1)
+        cards = {}
+
+        def poll():
+            for e in core.new():
+                if e.get("ev") == "main" and e.get("text"):
+                    r["main_lines"].append({"at": rel(), "text": e["text"], "len": len(e["text"])})
+            for cd in c.cards():
+                cards.setdefault(cd.get("id"), dict(cd, at=rel()))
+            pages = [p for p in (c.state or {}).get("pages", []) if p["id"] not in before]
+            return pages[0] if pages else None
+
+        def settled():
+            return all(a.get("status") in ("idle", "done", "blocked") for a in (c.state or {}).get("agents", []))
+
+        core.send(sc["ask"])
+        page, quiet = None, None
+        while time.time() - t0 < timeout:
+            page = poll()
+            if page and "page_first" not in r["t"]:
+                r["t"]["page_first"] = rel()
+            if page and page.get("version", 0) >= 1 and "v1" not in r["t"]:
+                r["t"]["v1"] = rel()
+            # done: v1 out and everyone idle for 3 s; no page: everyone idle for 60 s
+            quiet = (quiet or time.time()) if settled() and rel() > 5 else None
+            if quiet and time.time() - quiet > (3 if "v1" in r["t"] else 60):
+                break
+            time.sleep(0.5)
+        r["t"]["end"] = rel()
+        if not page or "v1" not in r["t"]:
+            r["fails"].append("no page v1 in %.0f s" % r["t"]["end"])
+        else:
+            meta = page_meta(page["id"])
+            last = meta["versions"][-1]
+            r["page"] = {"id": page["id"], "url": page.get("url"), "title": page.get("title"), "v1_n": last["n"],
+                         "blocks": [{"id": b["id"], "kit": b["kit"]} for b in last.get("blocks", [])]}
+            port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
+            st, body = _http(port, "GET", "/p/%s/v/%d/body" % (page["id"], last["n"]))
+            open(os.path.join(d, "v%d.body.html" % last["n"]), "w").write(body)
+            blocks = last.get("blocks", [])
+            prose = [b for b in blocks if b["kit"] in ("prose", "callout", "table", "heading")]
+            picks = (prose + [b for b in blocks if b not in prose])[:3]
+            notes = [{"block": b["id"], "kind": "note", "text": t} for b, t in zip(picks, RUN_NOTES)]
+            r["t"]["send"] = rel()
+            sent = page_notes(page["id"], notes, send=True)
+            ids = [n["id"] for n in sent["saved"]]
+            t_send = time.time()
+            v2 = None
+            while time.time() - t_send < timeout:
+                poll()
+                m = page_meta(page["id"])
+                mine = [n for n in m.get("notes", []) if n["id"] in ids]
+                if m["versions"][-1]["n"] > last["n"] and mine and all(n["status"] not in ("draft", "sent", "open") for n in mine) and settled():
+                    v2 = m
+                    break
+                time.sleep(2)
+            if v2:
+                r["t"]["v2_after_send"] = round(time.time() - t_send, 1)
+                r["t"]["v2_n"] = v2["versions"][-1]["n"]
+                st, body = _http(port, "GET", "/p/%s/v/%d/body" % (page["id"], r["t"]["v2_n"]))
+                open(os.path.join(d, "v%d.body.html" % r["t"]["v2_n"]), "w").write(body)
+            else:
+                r["fails"].append("no v2 with the 3 notes handled in %d s" % timeout)
+            m = page_meta(page["id"])
+            r["notes"] = [{"id": n["id"], "block": n.get("block"), "text": n.get("text"), "status": n.get("status"), "answer": n.get("answer")}
+                          for n in m.get("notes", []) if n["id"] in ids]
+        r["cards"] = list(cards.values())
+        r["main_tail"] = c.lines("main")[-40:]
+    finally:
+        if core:
+            core.close()
+        try:
+            writes = [json.loads(l) for l in open(os.path.join(info["tmp"], "outbox.jsonl")) if l.strip()]
+        except FileNotFoundError:
+            writes = []
+        r["outbox"] = {"writes": writes, "sends": [w for w in writes if w["action"] in SENDS]}
+        if sc["no_send"] and r["outbox"]["sends"]:
+            r["fails"].append("sent %d items on a 'don't send' ask" % len(r["outbox"]["sends"]))
+        if r["main_lines"] and r["main_lines"][0]["len"] > 120:
+            r["fails"].append("main's capsule line is %d chars (one short line)" % r["main_lines"][0]["len"])
+        if not keep:
+            r["stopped"] = _stop_hub() if headless else stop()
+        with open(os.path.join(d, "run.json"), "w") as f:
+            json.dump(r, f, indent=1, ensure_ascii=False)
+        r["report"] = run_report(r)
+        with open(os.path.join(d, "report.txt"), "w") as f:
+            f.write(r["report"] + "\n")
+    return r
+
+
 # ---------------------------------------------------------------- the scenes
 
 def fake_scenes():
@@ -996,6 +1222,10 @@ def _cli(argv):
     p.add_argument("--title", default="weekly update"); p.add_argument("--notes", help="JSON list of notes"); p.add_argument("--send", action="store_true")
     p.add_argument("--done", help="n1,n2"); p.add_argument("--edit", help='JSON {"old": "new"} applied to the file first')
     p = sub.add_parser("list")
+    p = sub.add_parser("run", help="a scripted product run on a model hub with the fake accounts")
+    p.add_argument("scenario", choices=sorted(SCENARIOS)); p.add_argument("--headless", action="store_true", help="no app: a bise ambient-core child")
+    p.add_argument("--timeout", type=int, default=900); p.add_argument("--keep", action="store_true", help="leave the hub (and app) running"); p.add_argument("--out")
+    p.add_argument("--json", action="store_true", help="print run.json instead of the report")
     p = sub.add_parser("say"); p.add_argument("text"); p.add_argument("--no-wait", action="store_true")
     p = sub.add_parser("snapshot"); p.add_argument("--what", default="both"); p.add_argument("--backdrop"); p.add_argument("--name"); p.add_argument("--out")
     sub.add_parser("state"); sub.add_parser("reset"); sub.add_parser("ping"); sub.add_parser("outbox")
@@ -1033,6 +1263,11 @@ def _cli(argv):
     elif a.cmd == "list":
         sc, _ = all_scenes()
         r = [{"id": s["id"], "spec": s["spec"], "label": s["label"]} for s in sc]
+    elif a.cmd == "run":
+        r = run(a.scenario, a.headless, a.timeout, a.keep, a.out)
+        if not a.json:
+            print(r["report"])
+            return
     elif a.cmd == "say":
         r = say(a.text, wait_answer=not a.no_wait)
     elif a.cmd == "snapshot":

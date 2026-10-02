@@ -57,6 +57,9 @@ TOOLS = [
      {"events": {"type": "array"}, "shots": {"type": "array"}, "name": {"type": "string"}, "backdrop": {"type": "string"}}, ["events"]),
     ("outbox", "What the QA hub's main wrote to the fake accounts (drafts, sends, Slack posts, Linear issues, calendar events, GitHub comments): QA hubs only have fake Gmail, Slack, Linear, calendar, GitHub and HN accounts with fixture data, never the user's.", {}, []),
     ("reset", "The pages start over (the model back to its start), the panel shown.", {}, []),
+    ("run", "A scripted product run, measured the same way every time: a model hub (the user's model and keys, costs credits) with the fake accounts only; the scenario's ask through the core like the capsule's; times the page's first appearance, v1, then 3 scripted notes, send, v2 and the notes' outcomes; the outbox (no send on 'don't send'); main's capsule line length. Returns the one-screen report and its folder (run.json, report.txt, page bodies). Takes minutes.",
+     {"scenario": {"type": "string", "enum": sorted(qa.SCENARIOS)}, "headless": {"type": "boolean", "description": "no app: a bise ambient-core child (text only: no mic, no voice)"},
+      "timeout": {"type": "integer"}, "keep": {"type": "boolean"}}, ["scenario"]),
 ]
 
 
@@ -142,6 +145,9 @@ def run(name, a):
         r = qa.outbox()
     elif name == "reset":
         r = qa.reset()
+    elif name == "run":
+        full = qa.run(a["scenario"], bool(a.get("headless")), int(a.get("timeout") or 900), bool(a.get("keep")))
+        r = {"report": full["report"], "dir": full["dir"], "fails": full["fails"], "t": full["t"]}
     else:
         raise qa.QAError("unknown tool %s" % name)
     content = [{"type": "text", "text": json.dumps(r, ensure_ascii=False)}]

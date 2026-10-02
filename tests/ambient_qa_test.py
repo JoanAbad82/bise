@@ -198,6 +198,29 @@ def fake_accounts():
 
 
 @test
+def run_scenarios():
+    """scripted runs: the three asks, an unknown one refused before any hub, a one-screen report that names times, notes, outbox and verdict"""
+    check(set(qa.SCENARIOS) == {"weekly-update", "inbox", "offsite"} and qa.SCENARIOS["inbox"]["no_send"], qa.SCENARIOS)
+    try:
+        qa.run("nope")
+        check(False, "ran an unknown scenario")
+    except qa.QAError as e:
+        check("weekly-update" in str(e), e)
+    r = {"scenario": "inbox", "ask": qa.SCENARIOS["inbox"]["ask"], "headless": True, "at": "2026-10-02 23:50", "dir": "/x",
+         "t": {"page_first": 8.2, "v1": 61.0, "send": 63.0, "v2_after_send": 40.5, "v2_n": 2, "end": 61.0},
+         "main_lines": [{"at": 4.1, "text": "inbox triage is on it. you'll get a page.", "len": 41}],
+         "page": {"id": "inbox", "blocks": [{"id": "h1", "kit": "heading"}, {"id": "p1", "kit": "prose"}]},
+         "notes": [{"id": "n1", "block": "p1", "text": "drop this part", "status": "done", "answer": None}],
+         "outbox": {"writes": [{"service": "gmail", "action": "create_draft"}], "sends": []}, "cards": [], "fails": []}
+    rep = qa.run_report(r)
+    for want in ("main's line: 41 chars at 4.1 s", "first seen 8.2 s, v1 61.0 s", "v2 40.5 s after send", "1 writes (gmail.create_draft), 0 sends", "verdict: pass"):
+        check(want in rep, (want, rep))
+    check(len(rep.splitlines()) <= 25, "one screen")
+    r["page"], r["fails"] = None, ["no page v1 in 61 s"]
+    check("page: none" in qa.run_report(r) and "FAIL: no page" in qa.run_report(r), qa.run_report(r))
+
+
+@test
 def page_drive_local_only():
     """the page driver refuses any non-local URL before it starts Chrome (never a real site, never the user's browser)"""
     for url in ("https://mail.google.com/", "http://example.com/p/x"):
