@@ -502,6 +502,11 @@ law("a watching page: 'watching · checked 3 min ago · until tomorrow 18:00'; a
   assert.equal(K.watchLine({ timer: 3, every: "every 10m", checked_ms: now - 3 * 60000, until_ms: at(14, 18, 0) }, now), "watching · checked 3 min ago · until tomorrow 18:00");
   assert.equal(K.watchLine({ timer: 3, every: "every 10m" }, now), "watching");
   assert.equal(K.watchLine(null, now), null);
+  // his taste file was followed (meta.taste {rules}): the frame says so, with the count
+  assert.equal(K.tasteWords({ rules: 4 }), "following your taste · 4 rules");
+  assert.equal(K.tasteWords({ rules: 1 }), "following your taste · 1 rule");
+  assert.equal(K.tasteWords({ rules: 0 }), null);
+  assert.equal(K.tasteWords(undefined), null);
   const r = blocks(parse(`<section data-kit="review" data-id="w" data-verb="open-reply"><ol><li data-id="hn-1" data-reply="https://news.ycombinator.com/item?id=1"><p>pg · Hacker News · 1 h ago</p><blockquote>q?</blockquote><p>a.</p></li><li data-id="x-2" data-reply="https://x.com/a/status/2"><p>@a · X</p><blockquote>q</blockquote><p>b</p></li></ol></section>`))[0];
   K.decorate([r], "launch-watch", doc);
   const [hn, x] = K.options(r);

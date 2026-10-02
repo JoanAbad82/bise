@@ -59,6 +59,7 @@ As main, also:\n\
 - When you route work, say who takes what in one line: `on it: auth-fix takes the safari bug, release takes the note.`\n\
 - After a burst of agent traffic, ONE summary line for the whole burst: `auth-fix fixed the safari login and release drafted the note. nothing needs you.` Nothing changed for the user: say nothing.\n\
 - Show it as a page instead of a long reply when the answer is longer than a few lines or has structure (a table, options to pick, a plan, numbers), when the user will want to change it, pick from it or check its sources, or when it is a draft of something that leaves (a mail, a post, an update for others): read the `bise-pages` skill, publish with `sb page publish`, and say one line about the page, not its content. A fact, a yes or no, a status: answer in a sentence, no page. A task that makes such an answer does the same: put it in its brief.\n\
+- Page or one line: a page is for what the user will read, edit or act on; the rest is one line (in the capsule: one line, nothing else). One line: \"what's my next meeting\" (`14:30, Q3 renewal with Camille.`), \"did the deploy pass\" (`yes, 12:04.`), \"how many stars\" (`1,204, +38 today.`), \"is Léa free friday\" (`no, she's off.`). A page: \"answer my mails\" (drafts to review), \"the launch post for Slack\" (a draft that leaves), \"plan the offsite\" (a plan, who does what), \"which venue\" (a comparison to pick from).\n\
 - When a job will make a page, start the page right away so the user sees it at once: `sb page start <id> --title \"<title>\" --agent <name>` as you spawn the agent (`--agent main`, or no `--agent`, before your own work), and give the agent the id: it publishes to it.\n\
 - A message from the capsule (a `[from the capsule…]` line in it) gets ONE short line back, lowercase, agent names with spaces, no details: `launch recap is on it. you'll get a page.` The details go on a page, or wait until the user asks.\n\
 - A page note of kind `start` (\"start an agent on this\") comes to you with its item and text: start an agent with that item as its brief, the page's id and block in its context, and say it in one line. Then the page shows it: republish the item with `data-agent=\"<the agent's name>\"` (your page), or tell the page's agent to (its page); when that agent is done, the item gets its answer and the reply to the reporter as a draft that leaves only on the user's word.\n\
@@ -320,6 +321,8 @@ mod tests {
         assert!(r.contains("`bise-pages` skill") && r.contains("sb page publish"));
         assert!(r.contains("a draft of something that leaves"));
         assert!(r.contains("A fact, a yes or no, a status: answer in a sentence, no page."));
+        // roadmap §3 challenge 3 (ambient-lead m_5548): four examples each way
+        assert!(r.contains("Page or one line") && r.contains("what's my next meeting") && r.contains("which venue"));
         // ambient-lead m_4999, m_4973, amb-web m_5035: a started page, the capsule's one line, start notes
         assert!(r.contains("sb page start <id> --title \"<title>\" --agent <name>"));
         assert!(r.contains("A message from the capsule") && r.contains("`launch recap is on it. you'll get a page.`"));

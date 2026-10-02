@@ -63,6 +63,7 @@
     watching: "watching",
     stop: "stop",
     putInDrafts: "put it in my drafts",
+    followingTaste: "following your taste",
     // feedback into work (roadmap C)
     start: "start an agent",
     starting: "starting…",
@@ -600,6 +601,13 @@
     return line;
   }
 
+  // meta.taste {rules: N} (sb page publish --taste, amb-core m_5554): 'following your taste · 4 rules'
+  function tasteWords(t) {
+    const n = t && Number(t.rules);
+    if (!t || !Number.isFinite(n) || n < 1) return null;
+    return `${W.followingTaste} · ${n} ${n === 1 ? "rule" : "rules"}`;
+  }
+
   // ---- a watching page (roadmap B: a standing order on a timer) ----
   // meta.watch / SSE 'watch' {timer, every, checked_ms, until_ms?}: the frame says
   // 'watching · checked 3 min ago · until tomorrow 18:00' and has 'stop'
@@ -623,7 +631,7 @@
     return parts.join(" · ");
   }
 
-  const BiseKit = { W, ticked, untilWords, watchLine, replyWent, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, wentWords, wentFor, applyWent, editableParts, options, norm };
+  const BiseKit = { W, ticked, untilWords, watchLine, replyWent, tasteWords, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, wentWords, wentFor, applyWent, editableParts, options, norm };
   root.BiseKit = BiseKit;
 
   // ---- the browser: the frame, the stream, the keys ----
@@ -666,6 +674,8 @@
     const f = frame(title);
     f.setAttribute("data-state", d.state || "ready");
     const m = el("span", { class: "m" });
+    // to the page of what bise keeps about him (about-you), where he edits the rules
+    const tasteLink = el("a", { class: "taste", href: "/p/about-you", hidden: "" });
     const st = el("span", { class: "st" });
     const stWords = el("span", {}, W.updating(agent));
     const stProgress = el("span", { class: "p" });
@@ -720,7 +730,7 @@
       wStop.disabled = true;
       doc.dispatchEvent(new root.CustomEvent("bise:stop", { detail: { page: id, timer: watch.timer == null ? null : watch.timer } }));
     });
-    f.append(m, st, wbox, sp, wc, vbox, latest, n, send);
+    f.append(m, tasteLink, st, wbox, sp, wc, vbox, latest, n, send);
     const openMenu = (on) => { menu.hidden = !on; vb.setAttribute("aria-expanded", String(on)); };
     vb.addEventListener("click", (e) => { e.stopPropagation(); if (!vb.disabled) openMenu(menu.hidden); });
     doc.addEventListener("click", (e) => { if (!menu.hidden && !vbox.contains(e.target)) openMenu(false); });
@@ -740,6 +750,10 @@
         parts.push(W.writingFrame, since(t0, Date.now()));
       } else if (v && v.at_ms) parts.push(ago(v.at_ms, Date.now()));
       m.textContent = parts.join(" · ");
+      // the agent read his taste file (sb page publish --taste): 'following your taste · 4 rules'
+      const tw = tasteWords(meta && meta.taste);
+      tasteLink.hidden = !tw || main.dataset.state === "writing";
+      tasteLink.textContent = tw || "";
       doc.title = main.dataset.state === "writing" ? W.tabWriting(title) : title;
       latest.hidden = shown >= latestN;
       // at v1 there is nothing to compare or go back to: no 'what changed', no 'v1' chip

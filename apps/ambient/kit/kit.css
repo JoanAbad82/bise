@@ -68,6 +68,11 @@ body {
 .bise-frame .w { display: flex; align-items: center; gap: 8px; min-width: 0; font: 12px var(--font-mono); color: var(--talk-meta); overflow: hidden; }
 .bise-frame .w > span { overflow: hidden; text-overflow: ellipsis; }
 .bise-frame .w[hidden] { display: none; }
+/* the agent followed his taste file (roadmap §3, 4): a quiet link to the rules (about-you) */
+.bise-frame a.taste { font: 12px var(--font-mono); color: var(--talk-meta); text-decoration: none; }
+.bise-frame a.taste:hover { color: var(--talk-ink); text-decoration: underline; text-underline-offset: 2px; }
+.bise-frame a.taste::before { content: "· "; }
+.bise-frame a.taste[hidden] { display: none; }
 /* the version menu: "v3 ▾", a small list of versions under it */
 .bise-frame .v { position: relative; }
 .bise-frame .v > button { font-family: var(--font-mono); font-size: 12px; }

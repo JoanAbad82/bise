@@ -13,11 +13,21 @@ them to you; you publish the next version and the same tab updates in place.
 You never write CSS, classes, scripts or colors: the kit draws everything. If something can't be
 said with the blocks below, say it in words.
 
-Not every answer is a page: a fact, a yes or no, a status, a one-line answer stay a sentence in
-your reply.
+Not every answer is a page. A page is for what the user will read, edit or act on: drafts,
+lists of items to handle, plans, comparisons. A fact, a yes or no, a status, a time stay one
+line in your reply:
+
+| one line | a page |
+|---|---|
+| "what's my next meeting": `14:30, Q3 renewal with Camille.` | "answer my mails": the drafts to review |
+| "did the deploy pass": `yes, 12:04.` | "the launch post for Slack": a draft that leaves |
+| "how many stars": `1,204, +38 today.` | "plan the offsite": a plan, who does what |
+| "is Léa free friday": `no, she's off.` | "which venue": options to pick from |
 
 Before you write: if `~/bise/taste.md` exists, read it. It holds the user's taste rules (tone,
-length, what they always want or never want); follow them on the page.
+length, what they always want or never want); follow them on the page, and publish every
+version with `--taste` so the page says `following your taste · 4 rules` (a link to them; the
+count is the file's `- ` lines). No file, or you didn't read it: no `--taste`.
 
 ## 1. The blocks
 
@@ -213,7 +223,8 @@ block, quote, kind and words (an edit has its text before and after; a pick has 
 
 Two kinds of notes ask for more than a change of the page:
 - **`taste: true`**: the user said yes to "keep this for next time?". Besides doing the note,
-  append the preference as one line to `~/bise/taste.md` (create it if needed), in general
+  append the preference as one `- ` line to `~/bise/taste.md` (create it if needed; each `- `
+  line is one rule, the frame counts them), in general
   words that will hold for other pages (`numbers: one per cell, the change in its own column`),
   never the page's own content.
 - **kind `start`** ("start an agent on this", with an item and its text): it goes to main, not
