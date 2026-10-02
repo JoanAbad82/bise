@@ -24,6 +24,7 @@
     failed: 8000,
     error: 6000,
     key: 3000,       // a key's own line (cancelled, later, hush...)
+    page: 8000,      // `<page> is ready · fn + o`
     hide: 1500,      // fn + . : the line, then hide
   };
 
@@ -50,6 +51,8 @@
       radius: 16,                   // macOS's window radius (app_settings.radius); 16 until it comes
       flashes: [],                  // [{ glyph, text, sub, at, ttl, kiss, still, kind }]
       turnNames: null, chips: [],   // agents that appeared during your turn
+      pages: [],                    // "for you": the pages made for you, newest first (state.pages)
+      lastPage: null,               // the page `is ready · fn + o` named last
       pane: null,                   // null | 'agents' | 'inbox' | 'spot'
       spotText: "",
       answered: {},                 // card id -> true, until the hub drops the card
@@ -58,6 +61,9 @@
   }
 
   const names = (agents) => agents.map((a) => a.name);
+  const sortPages = (pages) => pages.slice().sort((a, b) => (b.at_ms || 0) - (a.at_ms || 0));
+  // a page's name on your surfaces: its title, else its id with spaces (vision §3 B)
+  const pageName = (p) => p.title || String(p.id).replace(/-/g, " ");
   const working = (agents) => agents.filter((a) => a.working ?? ["working", "waiting", "starting"].includes(a.status)).length;
   const visibleCards = (m) => m.cards.filter((c) => !m.answered[c.id]);
   const lv = (m, who, now) => (now - m.lvl[who].at < T.level ? m.lvl[who].v : 0);
@@ -100,7 +106,7 @@
       case "state": {
         const agents = Array.isArray(ev.agents) ? ev.agents : [];
         const cards = Array.isArray(ev.cards) ? ev.cards : [];
-        let m2 = { ...m, agents, cards, seen: true };
+        let m2 = { ...m, agents, cards, seen: true, pages: Array.isArray(ev.pages) ? sortPages(ev.pages) : m.pages };
         // the hub dropped a card: forget that it was answered here
         const ids = new Set(cards.map((c) => c.id));
         m2.answered = Object.fromEntries(Object.keys(m.answered).filter((id) => ids.has(id)).map((id) => [id, true]));
@@ -138,6 +144,19 @@
         }
         if (phase !== "listening") m2.handsFree = false;
         return none(m2);
+      }
+
+      // a page published or changing state (docs/ambient-pages.md §2.3): a new version that is
+      // ready says `<page> is ready · fn + o`, unless the app opens it in front itself
+      case "page": {
+        if (!ev.id) return none(m);
+        const prev = m.pages.find((p) => p.id === ev.id);
+        const page = { ...(prev || {}), ...ev };
+        delete page.ev; delete page.front;
+        const m2 = { ...m, pages: sortPages([page, ...m.pages.filter((p) => p.id !== ev.id)]) };
+        const fresh = page.state === "ready" && (!prev || prev.version !== page.version || prev.state !== "ready");
+        if (!fresh || ev.front) return none(fresh ? { ...m2, lastPage: ev.id } : m2);
+        return none(flashQueue({ ...m2, lastPage: ev.id }, { kind: "page", text: Wd.pageReady(pageName(page)), ttl: T.page, page: ev.id }, now));
       }
 
       case "heard":
@@ -215,6 +234,10 @@
         if (!opt || m.answered[card.id]) return none(m);
         return answer(m, card, opt, now);
       }
+      case "ui_page": {      // a click on a page in "for you"
+        const p = m.pages.find((x) => x.id === ev.page);
+        return p ? { m: { ...m, lastPage: p.id }, cmds: [{ cmd: "app_open_url", url: p.url, page: p.id }] } : none(m);
+      }
       case "ui_capsule":     // a click on the small capsule: the agents
         return setPane(m, m.pane ? null : visibleCards(m).length > 1 ? "inbox" : "agents");
       case "ui_close":
@@ -251,6 +274,11 @@
     }
     switch (k) {
       case "space": return setPane(m, m.pane === "spot" ? null : "spot");
+      // fn + o: the page the capsule named last, else the newest; the app opens it or brings its tab
+      case "o": {
+        const p = m.pages.find((x) => x.id === m.lastPage) || m.pages[0];
+        return p ? { m: { ...m, lastPage: p.id }, cmds: [{ cmd: "app_open_url", url: p.url, page: p.id }] } : none(m);
+      }
       case "i": return setPane(m, m.pane === "inbox" ? null : "inbox");
       case "0": return setPane(m, m.pane === "agents" ? null : "agents");
       case "up": return none({ ...m, sel: Math.max(0, m.sel - 1) });
@@ -277,7 +305,8 @@
   }
 
   // ---- what the capsule shows now
-  function view(m, now) {
+  // `wall`: the epoch clock (a page's age); `now` may be the page's own monotonic clock
+  function view(m, now, wall = now) {
     const cards = visibleCards(m);
     const need = cards.length > 0;
     const flash = m.flashes.find((f) => f.at <= now && now < f.at + f.ttl) || null;
@@ -368,6 +397,8 @@
       v.state = "agents"; v.size = "open";
       v.label = { text: `${m.hub.workspace || "agents"} · ${Wd.plural(m.agents.length, "agent", "agents")}` };
       if (cards.length) v.inbox = inbox();
+      // then "for you": the pages made for you, newest first (vision §3 B)
+      if (m.pages.length) v.forYou = { title: Wd.forYou, pages: m.pages.map((p) => ({ id: p.id, name: pageName(p), meta: Wd.pageMeta(p, wall) })) };
       v.list = m.agents.map((a) => {
         const asks = cards.some((c) => c.agent === a.name);
         return {

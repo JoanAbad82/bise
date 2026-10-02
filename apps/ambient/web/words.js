@@ -64,6 +64,17 @@
     return perm === "screen" && macos && macos < 15 ? s.replace("Screen & System Audio Recording", "Screen Recording") : s;
   }
 
+  // a page for you (docs/ambient-vision.md §3 B; not signed off yet: asked to ambient)
+  const pageReady = (name) => `${name} is ready · fn + o`;
+  const forYou = "for you";
+  // a page's line in "for you": `v2 · 3 min ago`, or `updating…`
+  function pageMeta(p, nowMs) {
+    if (p.state === "updating") return "updating…";
+    const s = Math.max(0, Math.floor(((nowMs || 0) - (p.at_ms || 0)) / 1000));
+    const ago = !p.at_ms || s < 60 ? "just now" : s < 3600 ? `${Math.floor(s / 60)} min ago` : s < 86400 ? `${Math.floor(s / 3600)} h ago` : `${Math.floor(s / 86400)} d ago`;
+    return `v${p.version || 1} · ${ago}`;
+  }
+
   // the inbox's label, the TUI's `inbox · 2 waiting for you`
   const waiting = (n) => `${n} waiting for you`;
 
@@ -152,5 +163,5 @@
   // an agent's row is a label, not a sentence: no final period
   const rowLabel = (s) => String(s || "").replace(/\.$/, "");
 
-  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain };
+  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, pageMeta };
 })(typeof window !== "undefined" ? window : globalThis);

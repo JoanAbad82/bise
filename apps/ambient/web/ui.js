@@ -122,13 +122,14 @@
       [...el.chips.children].forEach((c) => { if (!v.chips.includes(c.dataset.n)) c.remove(); });
       for (const n of v.chips) if (!have.has(n)) el.chips.insertAdjacentHTML("beforeend", `<span class="chip" data-n="${esc(n)}"><b>∿</b>${esc(n)}</span>`);
     });
-    put("rows", JSON.stringify([v.list, v.inbox]), () => {
-      // what waits for you first (the inbox, or the agents view's top), then the agents
+    put("rows", JSON.stringify([v.list, v.inbox, v.forYou]), () => {
+      // what waits for you first (the inbox, or the agents view's top), then "for you", then the agents
       show(el.rows, v.list || v.inbox);
       const qs = (v.inbox || []).map((q, i) => `<div class="q${q.sel ? " sel" : ""}" style="animation-delay:${i * 0.06}s"><div class="who">? ${esc(q.agent)}</div><div class="tq">${esc(q.text)}</div>${opts(q)}</div>`);
-      const n = qs.length;
+      const fy = v.forYou ? [`<div class="sec">${esc(v.forYou.title)}</div>`, ...v.forYou.pages.map((p) => `<button type="button" class="page" data-page="${esc(p.id)}"><span class="gl">◰</span><span class="pn">${esc(p.name)}</span><span class="pm">${esc(p.meta)}</span></button>`)] : [];
+      const n = qs.length + fy.length;
       const rs = (v.list || []).map((r, i) => `<div class="row ${esc(r.kind)}" style="animation-delay:${(n + i) * 0.06}s"><span class="gl">${esc(r.glyph)}</span><span class="nm">${esc(r.name)}</span><span class="wh">${esc(r.what)}</span><span class="ag">${esc(r.age)}</span></div>`);
-      el.rows.innerHTML = qs.join("") + rs.join("");
+      el.rows.innerHTML = qs.join("") + fy.join("") + rs.join("");
       el.rows.scrollTop = 0;
     });
     put("spot", v.spot ? "on" : "", () => {
@@ -224,7 +225,7 @@
   function frame() {
     raf = 0;
     const t = now();
-    const v = M.view(model, t);
+    const v = M.view(model, t, Date.now());
     lastV = v;
     render(v);
     layout(v);
@@ -243,6 +244,8 @@
     if (cap.classList.contains("small")) recv({ ev: "ui_capsule" });
   });
   host.addEventListener("click", (e) => {
+    const pg = e.target.closest("button[data-page]");
+    if (pg) recv({ ev: "ui_page", page: pg.dataset.page });
     const b = e.target.closest("button[data-card]");
     if (b) recv({ ev: "ui_option", card: b.dataset.card, i: +b.dataset.i });
     const p = e.target.closest(".perm button");

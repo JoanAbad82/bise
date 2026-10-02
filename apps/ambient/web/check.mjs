@@ -10,8 +10,8 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Uint8Array, Float32Array, String, Number });
-for (const f of ["words.js", "face.js", "model.js", "fakecore.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
-const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake } = ctx;
+for (const f of ["words.js", "face.js", "model.js", "fakecore.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes } = ctx;
 const W = Wd.W;
 
 // the scripts run in their own realm: compare plain data
@@ -399,6 +399,118 @@ law("reduced motion: every state is still (the pixel smile), no edge glow", () =
 law("unknown events and junk change nothing", () => {
   const m = M.init();
   for (const ev of [null, {}, { ev: "nope" }, { ev: "word", turn: 3, i: 2 }]) M.view(M.step(m, ev, 0).m, 1);
+});
+
+// ---- v2: pages for you in the capsule
+law("a page ready: `weekly update is ready · fn + o`; fn + o opens it (app_open_url); fn + 0 lists for you", () => {
+  const evs = sceneEvents("pages");
+  const t0 = evs.find(([, e]) => e.ev === "page")[1].at_ms;
+  let m = M.init();
+  for (const [t, ev] of evs.filter(([t]) => t < 3500)) m = M.step(m, ev, t).m;
+  const v = M.view(m, 1000, t0 + 1000);
+  assert.equal(v.text, "weekly update is ready · fn + o");
+  const o = M.step(m, { ev: "app_key", key: "o" }, 3500);
+  eq(o.cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/weekly-update", page: "weekly-update" }]);
+  const a = M.view(M.step(o.m, { ev: "app_key", key: "0" }, 5000).m, 5000, t0 + 5000);
+  eq(a.forYou.pages.map((p) => [p.name, p.meta]), [["weekly update", "v1 · just now"], ["which gray wins?", "v2 · 40 min ago"]]);
+  // a click in for you opens that page
+  eq(M.step(o.m, { ev: "ui_page", page: "grays" }, 6000).cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/grays", page: "grays" }]);
+});
+law("a page updating, then its next version ready, says ready again; a page opened in front says nothing", () => {
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
+  m = M.step(m, { ev: "page", id: "wu", title: "weekly update", version: 1, url: "u", at_ms: 1, state: "ready", front: true }, 10).m;
+  assert.equal(M.view(m, 20).text, Wd.idleLine(0));
+  m = M.step(m, { ev: "page", id: "wu", version: 1, state: "updating", at_ms: 2 }, 30).m;
+  assert.equal(M.view(m, 40, 50).text, Wd.idleLine(0));
+  m = M.step(m, { ev: "page", id: "wu", version: 2, state: "ready", at_ms: 3 }, 50).m;
+  assert.equal(M.view(m, 60).text, "weekly update is ready · fn + o");
+  eq(M.step(M.init(), { ev: "app_key", key: "o" }, 0).cmds, []);   // no page: nothing
+});
+
+// ---- the page's note layer (apps/ambient/kit/notes.js): anchoring, re-anchoring, the model
+const N = BiseNotes.core;
+law("notes: a quote anchors on the block's visible text, the occurrence nearest its old offset", () => {
+  const t = "Revenue  grew in Q2.\n Revenue in Q3 is flat.";
+  eq(N.locate(t, "Revenue", 0), { start: 0, end: 7 });
+  eq(N.locate(t, "Revenue", 20), { start: 20, end: 27 });
+  eq(N.locate(t, "grew   in", 0), { start: 8, end: 15 });
+  assert.equal(N.locate(t, "Q4"), null);
+  assert.equal(N.locate(t, ""), null);
+});
+law("notes: on a new version, a note whose block or quote is gone is `moved`; an edit holds on its words", () => {
+  const notes = [
+    { id: "n1", block: "t1", kind: "note", text: "use March" },
+    { id: "n2", block: "p2", kind: "drop", quote: "we shipped dark mode" },
+    { id: "n3", block: "p4", kind: "edit", before: "Q2", after: "Q3" },
+    { id: "n4", block: "p9", kind: "keep" },
+    { id: "n5", block: "p4", kind: "edit", before: "May", after: "June" },
+  ];
+  const v2 = { t1: "Revenue March", p2: "we shipped  dark mode, and more", p4: "numbers for Q3 are in" };
+  eq(N.reanchor(notes, v2).map((n) => n.anchor), ["ok", "ok", "ok", "moved", "moved"]);
+  eq(N.reanchor(notes, { t1: "x", p2: "we shipped the light mode", p4: "Q2" }).map((n) => n.anchor), ["ok", "moved", "ok", "moved", "moved"]);
+});
+law("notes: an edit is the smallest changed span, by words", () => {
+  const d = N.diffWords("revenue for Q2 was 4.1 M", "revenue for Q3 was 4.1 M");
+  eq([d.before, d.after], ["Q2", "Q3"]);
+  eq((({ before, after }) => [before, after])(N.diffWords("a b c", "a x y c")), ["b", "x y"]);
+  assert.equal(N.label({ kind: "edit", before: "Q2", after: "Q3" }), 'you changed "Q2" → "Q3"');
+});
+law("notes: the model keeps drafts until send, one edit note per block, ⌘z undoes edits and removals", () => {
+  const m = N.model([]);
+  const a = m.add({ version: 1, block: "t1", kind: "note", text: "use March" }, 1);
+  const b = m.add({ version: 1, block: "p2", kind: "drop", quote: "dark mode" }, 2);
+  assert.equal(a.id, "n1"); assert.equal(b.id, "n2"); assert.equal(m.drafts().length, 2);
+  const e = m.edit("p4", "Q2", "Q3", 3);
+  assert.equal(e.kind, "edit");
+  m.edit("p4", "Q2", "Q4", 4);                       // the same block again: one note, its first before
+  eq(m.all().filter((n) => n.kind === "edit").map((n) => [n.before, n.after]), [["Q2", "Q4"]]);
+  assert.equal(m.edit("p4", "Q2", "Q2", 5), null);   // back to the original: the note goes
+  assert.equal(m.all().some((n) => n.kind === "edit"), false);
+  m.edit("p4", "Q2", "Q3", 6);
+  m.remove("n1");
+  assert.equal(m.undo().type, "remove");             // the removal comes back
+  assert.ok(m.get("n1"));
+  assert.equal(m.undo().note.kind, "edit");          // then the edit goes
+  assert.equal(m.all().some((n) => n.kind === "edit"), false);
+  eq(m.payload().notes.map((n) => n.id).sort(), ["n1", "n2"]);
+});
+law("notes: send makes the drafts sent; the server's outcomes win; a new version says done, the answer, or open", () => {
+  const m = N.model([]);
+  m.add({ version: 1, block: "t1", kind: "note", text: "x" }, 1);
+  m.add({ version: 1, block: "p2", kind: "keep" }, 2);
+  m.add({ version: 1, block: "p3", kind: "drop" }, 3);
+  m.sent(10);
+  assert.equal(m.drafts().length, 0);
+  m.merge([{ id: "n1", version: 1, block: "t1", kind: "note", text: "x", status: "done" }, { id: "n2", version: 1, block: "p2", kind: "keep", status: "answered", answer: "kept: Marc asked for it" }]);
+  m.reanchor({ t1: "a", p2: "b", p3: "c" }, 2);
+  eq(m.all().map((n) => N.outcome(n).text), ["✓ done", "kept: Marc asked for it", "open"]);
+  // a server draft we don't know (another tab, a reload) joins; ids keep counting after it
+  m.merge([{ id: "n7", version: 2, block: "t1", kind: "note", text: "y", status: "draft" }]);
+  assert.equal(m.add({ version: 2, block: "t1", kind: "note" }, 20).id, "n8");
+  // the server never takes a note back to draft
+  m.merge([{ id: "n1", status: "draft" }]);
+  assert.equal(m.get("n1").status, "done");
+});
+law("notes: the words (ambient's), names with spaces", () => {
+  assert.equal(N.NW.listTitle("weekly update", 3), "notes for weekly update · 3");
+  assert.equal(N.NW.sendBar(3, N.spaced("weekly-update")), '3 notes for weekly update · or just say "send"');
+  assert.equal(N.NW.sent(N.spaced("weekly-update")), "sent. weekly update is on it.");
+  assert.equal(N.NW.updating("weekly update"), "weekly update is updating this page…");
+});
+// a fake DOM: text nodes and elements, enough for the Range walk
+function fakeText(s) { return { nodeType: 3, nodeValue: s }; }
+function fakeEl(...kids) { return { nodeType: 1, childNodes: kids, classList: { contains: () => false } }; }
+law("notes: a Range for a quote walks the block's text nodes, whitespace collapsed like norm()", () => {
+  const a = fakeText("  Revenue\n   grew "), b = fakeText("in "), c = fakeText(" Q2.  ");
+  const block = fakeEl(a, fakeEl(b), c);
+  const pts = BiseNotes.rawPoints(block);
+  // one point per normalized char (a collapsed run keeps its first whitespace char)
+  assert.equal(pts.map(([n, i]) => n.nodeValue[i].replace(/\s/, " ")).join(""), "Revenue grew in Q2.");
+  const doc = { createRange: () => ({ setStart(n, o) { this.s = [n, o]; }, setEnd(n, o) { this.e = [n, o]; } }) };
+  const at = N.locate("Revenue grew in Q2.", "in Q2");
+  const r = BiseNotes.rangeFor(doc, block, at.start, at.end);
+  assert.equal(r.s[0], b); assert.equal(r.s[1], 0);
+  assert.equal(r.e[0], c); assert.equal(c.nodeValue.slice(0, r.e[1]), " Q2");
 });
 
 // ---- coverage: every scene plays, every SPEC §2 state shows from contract events

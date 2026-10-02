@@ -166,6 +166,18 @@
     { id: "hide", spec: ["idle"], label: "fn + .: hide", build: () => sort([...base(), [600, { ev: "app_key", key: "." }]]) },
     { id: "perm", spec: ["idle"], label: "a permission", build: () => sort([...base(), [500, { ev: "app_perm", perm: "accessibility", state: "ask" }]]) },
     { id: "perm-denied", spec: ["idle"], label: "a permission refused", build: () => sort([...base(), [500, { ev: "app_perm", perm: "accessibility", state: "denied" }]]) },
+    // v2, the page loop: a page is ready (`weekly update is ready · fn + o`), fn + o opens it, fn + 0 lists "for you"
+    { id: "pages", spec: ["for you"], label: "a page is ready · fn + o", build: () => {
+      const t0 = Date.now();
+      const old = { id: "grays", title: "which gray wins?", agent: "dark-mode", version: 2, url: "http://127.0.0.1:47123/p/grays", at_ms: t0 - 40 * 60000, state: "ready", open_notes: 0 };
+      const wu = { id: "weekly-update", title: "weekly update", agent: "weekly-update", version: 1, url: "http://127.0.0.1:47123/p/weekly-update", at_ms: t0, state: "ready", open_notes: 0 };
+      return sort([
+        [0, { ev: "hub", up: true, workspace: "~/acme" }], [0, { ...state(AGENTS), pages: [old] }],
+        [900, { ev: "page", ...wu }],
+        [3500, { ev: "app_key", key: "o" }],
+        [5000, { ev: "app_key", key: "0" }],
+      ]);
+    } },
     { id: "still", spec: ["reduced motion"], label: "reduced motion", build: () => sort([[0, { ev: "app_reduce_motion", on: true }], ...base(), ...talkTurn(1500).ev, [16000, state(AGENTS, [CARD])]]) },
   ];
 

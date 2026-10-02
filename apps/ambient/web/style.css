@@ -102,6 +102,14 @@ html:not(.app) .cap, html:not(.app) .note {
 .q .who { font: 12px var(--mono); color: var(--acc); }
 .q .tq { font-size: 14.5px; margin-top: 1px; }
 
+/* "for you": the pages made for you, a click opens one (or brings its tab) */
+.sec { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin: 12px 4px 4px; }
+.page { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; align-items: center; width: 100%; text-align: left; padding: 7px 4px; border: 0; border-radius: 10px; background: none; color: #fff; font: 13.5px var(--sans); cursor: pointer; animation: arrive .5s var(--expo) both; }
+.page:hover { background: #ffffff10; }
+.page .gl { font-family: var(--mono); color: var(--acc); text-align: center; }
+.page .pn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.page .pm { font: 11px var(--mono); color: #ffffff70; }
+
 /* options: `1 yes` `2 no`, the first one lit */
 .opts { display: flex; gap: 8px; margin-top: 10px; }
 .opts button { flex: 1; font: 13px var(--sans); color: #fff; background: #ffffff1c; border: 0; border-radius: 10px; padding: 7px 10px; cursor: pointer; }
