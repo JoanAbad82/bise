@@ -188,15 +188,21 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         try? "\(getpid())\n".write(toFile: pidPath, atomically: true, encoding: .utf8)
     }
 
+    // reduced motion (SPEC §1): the system's setting, or QA's (--qa: its
+    // scenes set it, and a page reload gets QA's value back, never the system's)
+    func setReduceMotion(_ on: Bool) {
+        reduceMotion = on
+        status?.reduceMotion = on
+        capsule.post(["ev": "app_reduce_motion", "on": on])
+        edgeSetup()
+    }
+
     private func observe() {
         let ws = NSWorkspace.shared.notificationCenter
         ws.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
-                guard let self else { return }
-                self.reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-                self.status?.reduceMotion = self.reduceMotion
-                self.capsule.post(["ev": "app_reduce_motion", "on": self.reduceMotion])
-                self.edgeSetup()
+                guard let self, self.qa == nil else { return }   // QA sets its own
+                self.setReduceMotion(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
             }
         }
         let dn = DistributedNotificationCenter.default()
