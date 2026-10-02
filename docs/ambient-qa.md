@@ -273,6 +273,9 @@ product checks, through `qa.py scenes` and `snapshot`:
 - [ ] "put it in my drafts" (said on the page or the frame's button) → in Gmail drafts, **no card**;
       the frame says `in your Gmail drafts · open`, the link opens that draft.
 - [ ] v3 after more notes updates **the same** Gmail draft (one draft in Gmail, not two).
+- [ ] Before his word (an item or question on the page still open, no approve, send or `put it
+      in my drafts`), an agent's `create_draft` becomes an approval card instead of running
+      (amb-home 68e03f09); after his word it runs with no card. Fake outbox: nothing before.
 - [ ] The Gmail connector fails → one line `Gmail didn't take it. copy · try again`; copy gives
       rich text; never a file path.
 - [ ] A Slack message page: `copy` + `open #channel` (slack:// link), the frame says `copied ·
