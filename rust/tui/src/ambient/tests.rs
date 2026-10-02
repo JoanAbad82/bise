@@ -491,6 +491,24 @@ fn stop_watching_goes_to_the_hub_and_timers_ride_the_state() {
 }
 
 #[test]
+fn a_turn_on_input_from_a_page_never_shows_in_the_capsule() {
+    let mut t = T::new();
+    t.ready();
+    // the hub's notes message to main, with its page marker
+    t.hub.line("main", "sb you : you sent 1 note on your page \"plan\" (plan v1): 1. start an agent on b2\\n\\n[from the page: answer on the page; one short line at most]");
+    t.hub.line("main", "  obs: turn_started");
+    t.hub.line("main", "  obs: assistant: I started fixer on b2. It hasn't confirmed yet.");
+    t.hub.line("main", "  obs: turn_done: completed");
+    t.sync();
+    let out = t.take();
+    assert!(!has(&out, "main") && phases(&out).is_empty(), "{out:?}");
+    // his own message after it: shown as usual
+    t.hub.line("main", "sb you : is it done?");
+    t.main_turn("Yes.");
+    t.until(|o| has(o, "main"));
+}
+
+#[test]
 fn voice_answers_off_is_text_only_until_on_again() {
     let mut t = T::new();
     t.ready();

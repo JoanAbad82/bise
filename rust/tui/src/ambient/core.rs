@@ -19,6 +19,10 @@ use std::time::{Duration, Instant};
 /// what was heard goes.
 pub const FINAL_WAIT: Duration = Duration::from_millis(1500);
 
+/// The hub's marker on what reaches main from a page (switchboard's
+/// daemon PAGE_HINT): that turn's words stay on the page.
+const PAGE_MARK: &str = "[from the page:";
+
 /// A note talk's words that send the page's notes (§4.1): the word
 /// alone, any case, its punctuation dropped.
 fn send_word(words: &str) -> bool {
@@ -693,8 +697,11 @@ impl Core {
     fn main_line(&mut self, line: &str) {
         let obs = line.strip_prefix("  obs: ");
         if let Some(t) = line.strip_prefix("sb you : ") {
-            // a slash command (`/answer`) is the hub's, never a turn
-            if !t.trim_start().starts_with('/') {
+            // a slash command (`/answer`) is the hub's, never a turn; what
+            // comes from a page (notes, starts, picks, ticks: the hub's
+            // marker) is answered on the page, never in the capsule
+            // (ambient-lead m_5724, pm's 27)
+            if !t.trim_start().starts_with('/') && !t.contains(PAGE_MARK) {
                 self.user_waiting = true;
             }
             return;

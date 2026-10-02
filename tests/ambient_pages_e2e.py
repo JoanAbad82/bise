@@ -37,6 +37,25 @@ PAGE_V3 = PAGE_V2 + (
 )
 
 
+def settle(c, timeout=120):
+    """main is idle and no turn of its runs, twice 2 s apart: a message
+    the hub sent main (a notes message, a tick) has had its turn. Else
+    the next [[bash]] steers into that turn and the scripted model answers
+    the first message instead (a race on a loaded machine)."""
+    import time
+
+    def quiet():
+        lines = c.lines("main")
+        started = max((i for i, l in enumerate(lines) if l.strip() == "obs: turn_started"), default=-1)
+        idle = max((i for i, l in enumerate(lines) if l == "--- idle"), default=-1)
+        return idle >= started
+
+    for _ in range(2):
+        c.wait_idle("main", timeout=timeout)
+        c.wait(quiet, timeout, "main's turn over")
+        time.sleep(2)
+
+
 def request(port, method, path, body=None, headers=None):
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
     h = {"Host": "127.0.0.1:%d" % port}
@@ -101,13 +120,13 @@ def main():
         # a page the lint refuses: one line, nothing stored
         c.say('[[bash: sb page publish %s --id weekly-update]]' % bad)
         c.wait_line("main", "style", 90)
-        c.wait_idle("main")
+        settle(c)
         check(not os.path.exists(os.path.join(E.state, "pages", "weekly-update")), "a refused page stores nothing")
 
         # main publishes
         c.say('[[bash: sb page publish %s --id weekly-update --title "weekly update"]]' % v1)
         c.wait_line("main", "published weekly-update v1", 90)
-        c.wait_idle("main")
+        settle(c)
         port = int(open(os.path.join(E.state, "pages.port")).read().strip())
         check(47100 <= port < 47900, "the port is in the pages range: %d" % port)
         c.wait(lambda: any(p["id"] == "weekly-update" for p in (c.state or {}).get("pages", [])), 30, "state.pages")
@@ -143,7 +162,7 @@ def main():
         check(any("page-notes" in l and nid in l for l in c.lines("main")), "the notes block in main's input")
         c.wait(lambda: sse.seen("state", lambda d: d["state"] == "updating"), 10, "SSE updating")
         # main's turn ends without a publish: ready again, the note stays sent
-        c.wait_idle("main")
+        settle(c)
         c.wait(lambda: sse.seen("state", lambda d: d["state"] == "ready"), 30, "SSE ready again")
         m = json.loads(request(port, "GET", "/p/weekly-update/meta")[2])
         check([n["status"] for n in m["notes"] if n["id"] == nid] == ["sent"], "no publish: the note stays sent, never done: %r" % m["notes"])
@@ -160,20 +179,20 @@ def main():
         check(body2 == PAGE_V2, "v2's fragment as published")
 
         # the page's agent is gone: its notes go to main, main takes the page over
-        c.wait_idle("main")
+        settle(c)
         c.say('/new t1: {{bash: sb page publish %s --id t1-page --title "t1 page"}}' % v1)
         c.wait(lambda: any(p["id"] == "t1-page" for p in (c.state or {}).get("pages", [])), 120, "t1's page")
         check(json.loads(request(port, "GET", "/p/t1-page/meta")[2])["agent"] == "t1", "t1 owns its page")
         c.wait_idle("main", "t1")
         c.say("/archive t1 --force")
         c.wait_status("t1", ["archived", "stopped"], 60)
-        c.wait_idle("main")
+        settle(c)
         st, _, _ = request(port, "POST", "/api/p/t1-page/notes", {"notes": [{"block": "p1", "kind": "drop"}]}, {"Origin": origin, "X-Bise-Token": token})
         check(st == 200, "a note on t1's page: %d" % st)
         st, _, _ = request(port, "POST", "/api/p/t1-page/send", {}, {"Origin": origin, "X-Bise-Token": token})
         check(st == 200, "send on t1's page: %d" % st)
         c.wait(lambda: any("you sent 1 note" in l and "t1-page v1" in l for l in c.lines("main")), 30, "t1's notes in main's feed")
-        c.wait_idle("main")
+        settle(c)
         c.say('[[bash: sb page publish %s --id t1-page --notes-done n1]]' % v2)
         c.wait_line("main", "published t1-page v2", 90)
         m = json.loads(request(port, "GET", "/p/t1-page/meta")[2])
@@ -189,7 +208,7 @@ def main():
 
         # §4.2 questions in two places: each question block is one card
         # with its page link
-        c.wait_idle("main")
+        settle(c)
         v3 = os.path.join(E.tmp, "page-v3.html")
         open(v3, "w").write(PAGE_V3)
         c.say('[[bash: sb page publish %s --id weekly-update]]' % v3)
@@ -207,7 +226,7 @@ def main():
         li = [l for l in home.split("<li") if 'data-page="weekly-update"' in l]
         check(li and "data-asking" in li[0], "for you: the page is asking: %r" % li)
         # the same question again: the same card
-        c.wait_idle("main")
+        settle(c)
         c.say('[[bash: sb page publish %s --id weekly-update]]' % v3)
         c.wait_line("main", "published weekly-update v4", 90)
         check(card("q1")["id"] == q1["id"] and len([x for x in c.cards() if x.get("page")]) == 2, "one card per question")
@@ -237,7 +256,7 @@ def main():
         check(sorted(vs[1]["changed"]) == ["q1", "q2"] and vs[0]["changed"] == [], "what each changed: %r" % vs)
 
         # sb page start (m_5000): the page shows at once, writing, empty
-        c.wait_idle("main")
+        settle(c)
         # subscribed before it exists: the scripted turn ends at once
         plan = Sse(port, "/p/the-plan/events")
         c.say('[[bash: sb page start the-plan --title "the plan" --ask "plan my week"]]')
@@ -248,14 +267,14 @@ def main():
         check('data-ask="plan my week"' in body and 'data-started="' in body, "the ask and the start: %s" % body[-400:])
         c.wait(lambda: plan.seen("state", lambda d: d["state"] == "writing"), 10, "SSE writing")
         # its turn ends with no publish: ready, still no version, and why
-        c.wait_idle("main")
+        settle(c)
         c.wait(lambda: plan.seen("state", lambda d: d == {"state": "ready", "reason": "the turn ended without a page"}), 30, "the placeholder back to ready, with its reason")
         m = json.loads(request(port, "GET", "/p/the-plan/meta")[2])
         check(m["versions"] == [] and m["state"] == "ready", "no version yet: %r" % m)
         # another agent's page needs that agent; the first publish is v1
         c.say('[[bash: sb page start x-plan --agent nobody]]')
         c.wait_line("main", "no agent nobody", 90)
-        c.wait_idle("main")
+        settle(c)
         c.say('[[bash: sb page start the-plan && sb page publish %s --id the-plan]]' % v1)
         c.wait_line("main", "published the-plan v1", 90)
         c.wait(lambda: plan.seen("state", lambda d: d["state"] == "writing") and plan.seen("version", lambda d: d["n"] == 1), 30, "writing, then v1")
@@ -265,7 +284,7 @@ def main():
         # a question with no open card (a fixture page written on disk,
         # amb-kit m_5336): the pick still closes the loop, as a sent
         # 'pick' note to the page's agent, and the page hears 'answered'
-        c.wait_idle("main")
+        settle(c)
         fx = os.path.join(E.state, "pages", "fixture-q")
         os.makedirs(fx)
         open(os.path.join(fx, "v1.html"), "w").write(PAGE_V3)
@@ -285,14 +304,14 @@ def main():
         # (amb-home) slice C: an item's agent shows live on the page
         # ('agent' frames for each data-agent of the latest version, at
         # connect and on each change), and start notes go to main
-        c.wait_idle("main")
+        settle(c)
         c.say("/new fixer: stay around")
         c.wait_status("fixer", "idle", 90)
         bugs = os.path.join(E.tmp, "bugs.html")
         open(bugs, "w").write(BUGS)
         c.say('[[bash: sb page publish %s --id bugs --title "bugs today"]]' % bugs)
         c.wait_line("main", "published bugs v1", 90)
-        c.wait_idle("main")
+        settle(c)
         bs = Sse(port, "/p/bugs/events")
         c.wait(lambda: bs.seen("agent", lambda d: d["name"] == "fixer" and d["status"] == "idle"), 15, "fixer idle at connect")
         c.say("[[bash: sleep 2]]", focus="fixer")
@@ -311,7 +330,7 @@ def main():
         # main's turn on that message is over (else the next [[bash]]
         # steers into it and the scripted model answers the first one)
         c.wait(lambda: any("assistant: ack: you asked for an agent" in l for l in c.lines("main")[n_main:]), 60, "main's turn on the start message")
-        c.wait_idle("main")
+        settle(c)
         notes = json.loads(request(port, "GET", "/p/bugs/meta")[2])["notes"]
         check([(n["kind"], n["status"], n.get("to")) for n in notes] == [("start", "sent", "main")], "the start note, routed: %r" % notes)
 
@@ -322,14 +341,14 @@ def main():
         m = json.loads(request(port, "GET", "/p/bugs/meta")[2])
         w = m["went"][0]
         check((w["kind"], w["block"], w["url"]) == ("gmail-draft", "reply-nina", "https://mail.google.com/mail/#drafts/r-1") and w["at"] > 0, "meta.went: %r" % m["went"])
-        c.wait_idle("main")
+        settle(c)
         c.say('[[bash: sb page publish %s --id bugs --went "gmail-draft:r-1=https://mail.google.com/mail/#drafts/r-1b" --went "kit-draft:42=https://app.kit.com/b/42"]]' % bugs)
         c.wait_line("main", "published bugs v3", 90)
         m = json.loads(request(port, "GET", "/p/bugs/meta")[2])
         check([(w["kind"], w["url"]) for w in m["went"]] == [("gmail-draft", "https://mail.google.com/mail/#drafts/r-1b"), ("kit-draft", "https://app.kit.com/b/42")], "the same draft replaced, another added: %r" % m["went"])
         bs2 = Sse(port, "/p/bugs/events")
         c.wait(lambda: bs2.seen("went", lambda d: len(d["went"]) == 2) and bs2.seen("agent", lambda d: d["name"] == "fixer"), 15, "went and the agents at connect")
-        c.wait_idle("main")
+        settle(c)
         c.say('[[bash: sb page publish %s --id bugs --went "gmail-draft:r-1=file:///etc/passwd"]]' % bugs)
         c.wait_line("main", "must be an http(s) link", 90)
         check(json.loads(request(port, "GET", "/p/bugs/meta")[2])["versions"][-1]["n"] == 3, "a bad --went publishes nothing")
@@ -337,10 +356,10 @@ def main():
         # (amb-home) roadmap B: a watched page. sb every --page puts the
         # timer in the state, meta.watch and SSE 'watch'; the page's stop
         # note ends it with no model turn; the menu's every_stop op too
-        c.wait_idle("main")
+        settle(c)
         c.say('[[bash: sb page publish %s --id launch-watch --title "the launch" && sb every 1h "check HN and republish" --page launch-watch --until 2h]]' % v1)
         c.wait_line("main", "timer set", 90)
-        c.wait_idle("main")
+        settle(c)
         timers = (c.state or {}).get("timers", [])
         lw = [t for t in timers if t.get("page") == "launch-watch"]
         check(len(lw) == 1 and lw[0]["label"] == "every 1h" and lw[0]["agent"] == "main" and "until_ms" in lw[0], "the timer in the state: %r" % timers)
@@ -360,11 +379,11 @@ def main():
         c.wait(lambda: not any(t["id"] == tid for t in (c.state or {}).get("timers", [])), 15, "the timer gone from the state")
         m = json.loads(request(port, "GET", "/p/launch-watch/meta")[2])
         check("watch" not in m and [n["status"] for n in m["notes"]] == ["done"], "no watch, the stop note done: %r" % m)
-        c.wait_idle("main")
+        settle(c)
         c.say('[[bash: sb every 1h "later" --page launch-watch]]')
         lwt = lambda: [t for t in (c.state or {}).get("timers", []) if t.get("page") == "launch-watch"]
         c.wait(lambda: lwt(), 90, "a second watch timer")
-        c.wait_idle("main")
+        settle(c)
         t2 = lwt()[0]["id"]
         c.wait(lambda: ws.seen("watch", lambda d: d and d["timer"] == t2), 15, "watching again")
         c.send({"op": "every_stop", "id": t2})
@@ -381,7 +400,7 @@ def main():
         def publish_plan(done, n):
             f = os.path.join(E.tmp, "plan-%d.html" % n)
             open(f, "w").write(plan_html(done))
-            c.wait_idle("main")
+            settle(c)
             c.say('[[bash: sb page publish %s --id plan --title "buy the domain"]]' % f)
             c.wait_line("main", "published plan v%d" % n, 90)
 
@@ -410,10 +429,10 @@ def main():
         # bise does t3 and t4: t5's turn; 'done with the payment' from the capsule names it to main
         publish_plan(["t1", "t3", "t4"], 3)
         c.wait(lambda: step_card("t5"), 30, "t5's card")
-        c.wait_idle("main")
+        settle(c)
         c.send({"op": "input", "focus": "main", "text": "done with the payment", "via": "capsule"})
         c.wait(lambda: any("his open steps: plan t5" in l for l in c.lines("main")), 30, "the open step in main's input")
-        c.wait_idle("main")
+        settle(c)
         c.say("[[bash: sb page tick plan t5]]")
         c.wait_line("main", "ticked plan t5", 90)
         c.wait(lambda: ps.seen("ticked", lambda d: d == {"block": "steps", "item": "t5"}), 30, "SSE ticked t5")
@@ -425,6 +444,27 @@ def main():
         check(ticks == ["o1", "t2", "t5"], "his steps all ticked: %r" % notes)
         check(not [x for x in c.cards() if (x.get("page") or {}).get("id") == "plan"], "no card left for the plan")
 
+        # a task's page (pm's 25): its first row is his, so its card comes at
+        # publish; a question on it gets its card too (sb-core makes cards
+        # for main only: the hub asks as main, answers on the page's path)
+        tp = os.path.join(E.tmp, "task-plan.html")
+        open(tp, "w").write('<section data-kit="checklist" data-id="steps"><ol>'
+                            '<li data-id="s1" data-who="yours">pay the domain</li><li data-id="s2">point the DNS</li></ol></section>'
+                            + PAGE_V3.split(PAGE_V2)[1])
+        settle(c)
+        c.say('/new t4: {{bash: sb page publish %s --id task-plan --title "task plan"}}' % tp)
+        c.wait(lambda: step_card("s1"), 120, "the first row's card, on a task's page")
+        c.wait(lambda: any((x.get("page") or {}).get("id") == "task-plan" and (x.get("page") or {}).get("block") == "q1" for x in c.cards()), 30, "the task page's question card")
+        tq = next(x for x in c.cards() if (x.get("page") or {}).get("id") == "task-plan" and (x.get("page") or {}).get("block") == "q1")
+        tps = Sse(port, "/p/task-plan/events")
+        c.say("/answer %d 2" % tq["id"])
+        c.wait(lambda: tps.seen("answered", lambda d: d == {"block": "q1", "reply": "wait for Marc"}), 30, "the task page's answer on the page")
+        c.say("/answer %d done" % step_card("s1")["id"])
+        c.wait(lambda: tps.seen("ticked", lambda d: d == {"block": "steps", "item": "s1"}), 30, "the task page's step ticked")
+        # q2 (PAGE_V3's second question) stays asked; s1 and q1 are done
+        left = lambda: sorted((x["page"].get("item") or x["page"]["block"]) for x in c.cards() if (x.get("page") or {}).get("id") == "task-plan")
+        c.wait(lambda: left() == ["q2"], 30, "only q2 left on the task's page")
+
         # a copied page whose question names a card this hub never had,
         # read at the hub's start (pm's m_5456): the first pick is no 409,
         # the page hears it, the pick goes as a note
@@ -434,7 +474,7 @@ def main():
         json.dump({"id": "fixture-stale", "title": "stale", "agent": "main", "created_ms": 1,
                    "versions": [{"n": 1, "at_ms": 1, "blocks": []}], "state": "ready"}, open(os.path.join(fs, "meta.json"), "w"))
         json.dump([{"block": "q1", "text": "post now?", "options": ["post now", "wait for Marc"], "card": 9999}], open(os.path.join(fs, "questions.json"), "w"))
-        c.wait_idle("main")
+        settle(c)
         E.stop_hub()
         c = E.start_hub()
         c.wait_status("main", "idle", 60)

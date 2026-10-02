@@ -42,6 +42,10 @@ use std::time::Duration;
 /// ones stay in the transcript: the client pages them with the
 /// `history` op when the user scrolls up).
 const BUFFER_LINES: usize = 1000;
+/// The line a page's input to main ends with (ambient-lead m_5724):
+/// ambient-core keys on "[from the page:" to keep that turn off the
+/// capsule; main's rule (prompts.rs, amb-kit 83c1a8af) reads it.
+const PAGE_HINT: &str = "[from the page: answer on the page; one short line at most]";
 /// Lines one `history` page may carry.
 const PAGE_LINES: usize = 2000;
 
@@ -966,6 +970,7 @@ impl Shell {
                 let starts = pages.locked(|s| s.route_starts(&id)).unwrap_or_default();
                 if let (false, Some(meta)) = (starts.is_empty(), pages.store.meta(&id)) {
                     let msg = crate::pages::store::start_message(&meta, &pages.url(&id), &starts);
+                    let msg = Self::page_hint(MAIN, msg);
                     self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text: msg });
                     pages.push(&id, "notes", &json!({"notes": pages.store.notes(&id)}));
                 }
@@ -978,6 +983,7 @@ impl Shell {
                         self.broadcast(&pages.page_ev(&meta));
                     }
                     // as from the user (client 0: no view of its own)
+                    let text = Self::page_hint(&to, text);
                     self.step(Input::ClientInput { client: 0, focus: to, text });
                 }
                 let snap = self.snapshot();
@@ -986,8 +992,7 @@ impl Shell {
             crate::pages::PageMsg::Answer { id, block, reply } => {
                 // the same path as the capsule's and the TUI's answer
                 if let Some(card) = self.page_card(&id, &block) {
-                    let text = self.page_reply_text(&format!("/answer {card} {reply}")).unwrap_or_default();
-                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text });
+                    self.page_question_answer(&id, &block, card, &reply);
                 } else {
                     // no open card for it (it never opened, or the store
                     // was written another way): the loop still closes,
@@ -1194,13 +1199,14 @@ impl Shell {
         let mut qs = plan.questions;
         for q in qs.iter_mut().filter(|q| q.card == 0 && q.reply.is_none()) {
             let before: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
-            // as the page's agent asking (no message to reply to: the
-            // answer goes to that agent, or to main when it is gone);
-            // no client waits for the reply (token 0: never a
-            // connection's; sb-core's numbers are small)
+            // sb-core opens cards for main only (a task's request is
+            // refused: pm's 25), so main asks; the hub answers it itself
+            // (page_card_answer: the pick goes to the page's agent `agent`).
+            // No client waits for the reply (token 0: never a connection's)
+            let _ = agent;
             self.step(Input::Agent {
                 token: 0,
-                from: agent.to_string(),
+                from: MAIN.to_string(),
                 req: crate::core::AgentReq::Card { text: q.card_text(), for_msg: None },
             });
             let card = self.hub.st.open_cards().filter(|c| !before.contains(&c.id) && c.kind == "question").map(|c| c.id).max();
@@ -1285,10 +1291,11 @@ impl Shell {
             }
             let mut s = crate::pages::checklist::Step { block: r.block.clone(), item: r.item.clone(), text: r.text.clone(), card: 0, reply: None };
             let before: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
-            // as the page's agent asking, like a question block's card
+            // main asks (sb-core's cards are main's, pm's 25); its answer
+            // is the hub's own path (page_card_answer → page_tick)
             self.step(Input::Agent {
                 token: 0,
-                from: meta.agent.clone(),
+                from: MAIN.to_string(),
                 req: crate::core::AgentReq::Card { text: s.card_text(), for_msg: None },
             });
             match self.hub.st.open_cards().filter(|c| !before.contains(&c.id) && c.kind == "question").map(|c| c.id).max() {
@@ -1361,8 +1368,34 @@ impl Shell {
         let Some((n, reply)) = rest.trim().split_once(' ') else { return false };
         let Ok(card) = n.trim_start_matches('#').parse::<u64>() else { return false };
         let Some((id, key)) = self.page_cards().get(&card).cloned() else { return false };
-        let Some(item) = key.strip_prefix("row:").and_then(|k| k.split_once('/')).map(|(_, i)| i.to_string()) else { return false };
-        self.page_tick(&id, &item, reply)
+        match key.strip_prefix("row:").and_then(|k| k.split_once('/')).map(|(_, i)| i.to_string()) {
+            Some(item) => self.page_tick(&id, &item, reply),
+            None => self.page_question_answer(&id, &key, card, reply),
+        }
+    }
+
+    /// A page question's card answered (from the TUI, the capsule or the
+    /// page): the card closes, and the answer takes the page's path: the
+    /// page hears `answered`, the page's agent gets it as a pick note
+    /// (main when it is gone). sb-core's question path would send it to
+    /// main, the card's asker (pm's 25: a task's page).
+    fn page_question_answer(&mut self, id: &str, block: &str, card: u64, reply: &str) -> bool {
+        let Some(pages) = self.pages.clone() else { return false };
+        let reply = reply.trim();
+        let words = match reply.parse::<usize>() {
+            Ok(k) => pages.store.questions(id).iter().find(|q| q.block == block).and_then(|q| q.option(k).map(String::from)),
+            Err(_) => None,
+        }
+        .unwrap_or_else(|| reply.to_string());
+        if words.is_empty() {
+            return false;
+        }
+        self.page_cards().remove(&card);
+        if self.hub.st.open_cards().any(|c| c.id == card) {
+            self.step(Input::ConfirmClose { card, res: "answered".into() });
+        }
+        self.page_answer_without_card(id, block, &words);
+        true
     }
 
     /// The card of question `block` on page `id`, when it is still open.
@@ -2412,6 +2445,19 @@ impl Shell {
             return text;
         }
         format!("{text}\n\n[from the capsule: answer in one short line]")
+    }
+
+    /// What reaches main from a page (notes, starts, picks, ticks) carries
+    /// this line: main answers on the page, and the capsule never shows
+    /// that turn's words (ambient-lead m_5724, pm's 27; ambient-core
+    /// reads the same marker).
+    fn page_hint(to: &str, text: String) -> String {
+        if to != MAIN {
+            return text;
+        }
+        format!("{text}
+
+{PAGE_HINT}")
     }
 
     /// The user's open steps (roadmap D) as one more line of a capsule
