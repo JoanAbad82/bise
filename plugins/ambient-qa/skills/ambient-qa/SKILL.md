@@ -62,6 +62,7 @@ Every tool returns JSON; PNG files are written under
 | `menubar({states, frames, count})` | `qa.py snapshot --menubar [--states work,need] [--frames 12] [--count 3]` | the menu-bar item (the 18 px pearl) in each state (still, work, need+N, away ☾, done, fail ▲, listen) through amb-mac's StatusItem: its own composed image at 1x/2x, transparent and on light/dark menu-bar strips, and a sheet |
 | `pearl()` | `qa.py pearl` | every pearl frame amb-mac plays, per mood, at 1x and 2x |
 | `launch({hub, no_app: true})` | `qa.py launch --hub fake\|model --no-app` | the throwaway hub, its page server and the fake accounts only (pages, notes, outbox checks): never builds or opens the app; returns `pages_url` and the outbox file; `page_*`, `outbox` and `stop` work on it |
+| `ask({texts, capsule})` | `qa.py ask "what's my next meeting" "plan the offsite" [--file asks.txt] [--no-capsule]` | asks to main on the running throwaway hub (`launch --hub model --no-app` first), one after the other, through a core like the capsule's: main's words, their length, the time until all idle, the pages made or updated, the cards; asks-<time>.json |
 | `run({scenario, headless})` | `qa.py run weekly-update\|inbox\|offsite [--headless] [--keep]` | a scripted product run on a model hub with the fake accounts (costs credits): the ask through the core, then times, notes, outbox; a one-screen report (see "Scripted product runs") |
 | `stop()` | `qa.py stop` | quit the QA app and the fake hub |
 

@@ -959,6 +959,73 @@ class _Core:
                 self.p.terminate()
 
 
+def ask(texts, capsule=True, timeout=600, out=None):
+    """Asks to main on the running throwaway hub (launch --no-app, or with
+    the app), one after the other (ambient-pm m_5573): through a headless
+    core like the capsule's (`capsule`, so main reads the capsule's hint),
+    else as the TUI does. For each: main's final words to the capsule, their
+    length, the time until everyone is idle again, the pages it made or
+    updated, the cards. Writes asks-<time>.json in the QA out dir."""
+    if isinstance(texts, str):
+        texts = [texts]
+    info = _read(HUB)
+    if not info or not _pid_alive(info.get("pid")):
+        raise QAError("no throwaway hub: qa.py launch --hub model --no-app first")
+    c, _ = _hub()
+    _wait(lambda: c.state, 30, "the hub's state")
+    root = (_read(RUN) or {}).get("app_root") or find_bise(info.get("bise"))[1]
+    d = out or os.path.join(OUT, "asks")
+    os.makedirs(d, exist_ok=True)
+    core = _Core(info["bise"], root, info, True, d) if capsule else None
+    results = []
+    try:
+        if core:
+            _wait(lambda: any(e.get("ev") == "hub" and e.get("up") for e in core.evs), 60, "the core on the hub")
+        for text in texts:
+            c.wait_idle("main", timeout=timeout)
+            pages0 = {p["id"]: p.get("version", 0) for p in (c.state or {}).get("pages", [])}
+            cards0 = {cd.get("id") for cd in c.cards()}
+            n0 = len(c.lines("main"))
+            if core:
+                core.new()
+                core.send(text)
+            else:
+                c.say(text)
+            t0, words, busy, quiet = time.time(), [], False, None
+            while time.time() - t0 < timeout:
+                if core:
+                    words += [e["text"] for e in core.new() if e.get("ev") == "main" and e.get("text")]
+                agents = (c.state or {}).get("agents", [])
+                idle = all(a.get("status") in ("idle", "done", "blocked") for a in agents)
+                busy = busy or not idle or bool(words) or len(c.lines("main")) > n0
+                quiet = (quiet or time.time()) if idle and (busy or time.time() - t0 > 20) else None
+                if quiet and time.time() - quiet > 3:
+                    break
+                time.sleep(0.5)
+            if core:
+                words += [e["text"] for e in core.new() if e.get("ev") == "main" and e.get("text")]
+            else:
+                words = [l for l in c.lines("main")[n0:] if l.strip()][-3:]
+            pages = [{"id": p["id"], "version": p.get("version"), "url": p.get("url"), "new": p["id"] not in pages0}
+                     for p in (c.state or {}).get("pages", []) if p.get("version", 0) > pages0.get(p["id"], -1)]
+            last = words[-1] if words else ""
+            results.append({"ask": text, "secs": round(time.time() - t0, 1), "main": last, "len": len(last), "lines": words,
+                            "pages": pages, "cards": [cd for cd in c.cards() if cd.get("id") not in cards0],
+                            "timed_out": time.time() - t0 >= timeout})
+    finally:
+        if core:
+            core.close()
+    path = os.path.join(d, "asks-%s.json" % time.strftime("%Y%m%d-%H%M%S"))
+    with open(path, "w") as f:
+        json.dump({"capsule": capsule, "hub": info.get("kind"), "load": round(os.getloadavg()[0], 1), "asks": results}, f, indent=1, ensure_ascii=False)
+    lines = []
+    for x in results:
+        pg = ", ".join("%s v%s%s" % (p["id"], p["version"], " (new)" if p["new"] else "") for p in x["pages"]) or "no page"
+        lines.append("%-34s %6.1f s  %3d chars  %s%s%s\n    %s" % ('"%s"' % x["ask"][:32], x["secs"], x["len"], pg, ", %d card(s)" % len(x["cards"]) if x["cards"] else "",
+                                                             " TIMEOUT" if x["timed_out"] else "", x["main"][:200] or "(no words to the capsule)"))
+    return {"file": path, "asks": results, "report": "\n".join(lines)}
+
+
 def run_report(r):
     """One screen of text from a run's JSON."""
     s = lambda v: "-" if v is None else "%.1f s" % v
@@ -1428,6 +1495,9 @@ def _cli(argv):
     p.add_argument("--count", type=int, default=2, help="menubar: the need state's count")
     p = sub.add_parser("pearl", help="every pearl frame amb-mac plays, per mood, at 1x and 2x"); p.add_argument("--out")
     sub.add_parser("state"); sub.add_parser("reset"); sub.add_parser("ping"); sub.add_parser("outbox")
+    p = sub.add_parser("ask", help="asks to main on the running throwaway hub, one after the other: its words, length, time, pages")
+    p.add_argument("texts", nargs="*"); p.add_argument("--file", help="one ask per line"); p.add_argument("--no-capsule", action="store_true", help="as the TUI, not through a core")
+    p.add_argument("--timeout", type=int, default=600); p.add_argument("--json", action="store_true")
     p = sub.add_parser("tick", help="the launch's next batch of fake comments comes in now (numbers move)"); p.add_argument("--n", type=int, default=1)
     p = sub.add_parser("events"); p.add_argument("n", nargs="?", type=int, default=40); p.add_argument("--levels", action="store_true")
     p = sub.add_parser("fn"); p.add_argument("state"); p.add_argument("--key", default="fn")
@@ -1478,6 +1548,14 @@ def _cli(argv):
         r = snapshot(a.what, a.backdrop, a.name, a.out)
     elif a.cmd == "state":
         r = state()
+    elif a.cmd == "ask":
+        texts = list(a.texts) + ([l.strip() for l in open(a.file) if l.strip()] if a.file else [])
+        if not texts:
+            raise QAError("ask: give the asks (or --file)")
+        r = ask(texts, not a.no_capsule, a.timeout)
+        if not a.json:
+            print(r["report"] + "\n" + r["file"])
+            return
     elif a.cmd == "tick":
         r = tick(a.n)
     elif a.cmd == "outbox":

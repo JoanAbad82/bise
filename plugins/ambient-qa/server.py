@@ -57,6 +57,8 @@ TOOLS = [
     ("play", "A custom timeline into the app: events [[ms, ev], ...], shots [{at: ms, what}] (the core is muted while it plays). Files are named <name>@<s>s.",
      {"events": {"type": "array"}, "shots": {"type": "array"}, "name": {"type": "string"}, "backdrop": {"type": "string"}}, ["events"]),
     ("outbox", "What the QA hub's main wrote to the fake accounts (drafts, sends, Slack posts, Linear issues, calendar events, GitHub comments): QA hubs only have fake Gmail, Slack, Linear, calendar, GitHub, HN, Reddit, X and Bluesky accounts with fixture data, never the user's.", {}, []),
+    ("ask", "Asks to main on the running throwaway hub (launch {hub: 'model', no_app: true} first), one after the other, through a core like the capsule's (capsule: false = as the TUI): main's words to the capsule, their length, the time until all idle, the pages made or updated, the cards.",
+     {"texts": {"type": "array", "items": {"type": "string"}}, "capsule": {"type": "boolean"}, "timeout": {"type": "integer"}}, ["texts"]),
     ("tick", "The fake launch's next batch of HN/Reddit/X/Bluesky comments comes in now, and its points, rank and likes move (they also come every 30 min of hub time).", {"n": {"type": "integer"}}, []),
     ("reset", "The pages start over (the model back to its start), the panel shown.", {}, []),
     ("run", "A scripted product run, measured the same way every time: a model hub (the user's model and keys, costs credits) with the fake accounts only; the scenario's ask through the core like the capsule's; times the page's first appearance, v1, then 3 scripted notes, send, v2 and the notes' outcomes; the outbox (no send on 'don't send'); main's capsule line length. Returns the one-screen report and its folder (run.json, report.txt, page bodies). Takes minutes.",
@@ -146,6 +148,9 @@ def run(name, a):
         r = [{"id": s["id"], "spec": s["spec"], "label": s["label"]} for s in sc]
     elif name == "play":
         r = qa.play(a["events"], a.get("shots", []), a.get("name", "play"), a.get("backdrop"))
+    elif name == "ask":
+        full = qa.ask(a["texts"], a.get("capsule", True) is not False, int(a.get("timeout") or 600))
+        r = {"report": full["report"], "file": full["file"], "asks": full["asks"]}
     elif name == "tick":
         r = qa.tick(int(a.get("n") or 1))
     elif name == "outbox":
