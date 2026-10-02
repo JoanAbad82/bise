@@ -4,7 +4,7 @@
 // Everything that decides lives in model.js; this file only draws what view() says.
 (function () {
   "use strict";
-  const { AmbModel: M, AmbPearl } = window;
+  const { AmbModel: M, AmbPearl, AmbWords: Wd } = window;
   const $ = (s, r = document) => r.querySelector(s);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const native = () => !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.bise);
@@ -13,24 +13,33 @@
   // ---- the DOM, once
   const host = $("#amb") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "amb" }));
   host.classList.add("amb");
+  // VoiceOver (ambient-lead m_5313): the capsule is a region named bise; the pearl an image whose
+  // label says its mood; what changes is read once from one polite live line (the words animate
+  // word by word, so the visible text itself is hidden from the reader); glyphs are hidden (the
+  // words already say waiting, done, failed); options and pages are buttons; the full view's rows a
+  // list under headings; the spotlight's field is labelled and comes first in the focus order
+  host.setAttribute("role", "region");
+  host.setAttribute("aria-label", "bise");
   host.innerHTML = `
     <div class="cap small" id="cap">
-      <div class="orbbox"><canvas class="pearl"></canvas></div>
+      <div class="orbbox"><canvas class="pearl" role="img" aria-label="bise"></canvas></div>
       <div class="tx">
-        <div class="lab"></div>
-        <div class="line"></div>
-        <div class="words"></div>
-        <div class="sub"></div>
-        <div class="sees"></div>
-        <div class="chips"></div>
+        <div class="say" aria-live="polite" aria-atomic="true"></div>
+        <div class="lab" aria-hidden="true"></div>
+        <div class="line" aria-hidden="true"></div>
+        <div class="words" aria-hidden="true"></div>
+        <div class="sub" aria-hidden="true"></div>
+        <div class="sees" aria-hidden="true"></div>
+        <div class="chips" aria-hidden="true"></div>
         <div class="rows"></div>
-        <div class="more"></div>
-        <div class="spot"><input type="text" spellcheck="false" autocomplete="off"><div class="keys"></div></div>
+        <div class="more" aria-hidden="true"></div>
+        <div class="spot"><input type="text" spellcheck="false" autocomplete="off"><div class="keys" aria-hidden="true"></div></div>
         <div class="perm"><p></p><button type="button" data-do="continue"></button><button type="button" class="later" data-do="not_now"></button></div>
       </div>
     </div>
-    <div class="note" id="note"></div>`;
+    <div class="note" id="note" role="alertdialog" aria-live="assertive"></div>`;
   const cap = $("#cap", host), note = $("#note", host), tx = $(".tx", cap);
+  const sayEl = $(".say", tx), pearlCv = $(".pearl", cap);
   const el = { lab: $(".lab", tx), line: $(".line", tx), words: $(".words", tx), sub: $(".sub", tx), sees: $(".sees", tx), chips: $(".chips", tx), rows: $(".rows", tx), more: $(".more", tx), spot: $(".spot", tx), perm: $(".perm", tx) };
   const input = $("input", el.spot);
   const pearl = AmbPearl.create($(".pearl", cap));
@@ -112,6 +121,10 @@
     cap.classList.toggle("small", v.size === "small");
     cap.classList.toggle("open", v.size === "open");
     cap.dataset.state = v.state;
+    // VoiceOver: the pearl's mood in words, and one sentence per change read from the live line
+    put("a11y", JSON.stringify([v.mood, v.hidden]), () => pearlCv.setAttribute("aria-label", Wd.moodLabel(v.mood)));
+    const say = v.hidden ? "" : Wd.sayOf(v);
+    if (sayEl.textContent !== say) sayEl.textContent = say;
 
     put("lab", JSON.stringify(v.label), () => {
       show(el.lab, v.label);
@@ -147,12 +160,12 @@
       // first); the inbox alone shows only its cards
       show(el.rows, v.list || v.inbox);
       const t = v.titles || {};
-      const sec = (s) => (s ? [`<div class="sec">${esc(s)}</div>`] : []);
+      const sec = (s) => (s ? [`<div class="sec" role="heading" aria-level="2">${esc(s)}</div>`] : []);
       let k = 0;
       const delay = () => `animation-delay:${(k++) * 0.06}s`;
-      const rs = (v.list || []).map((r) => `<div class="row ${esc(r.kind)}" style="${delay()}"><span class="gl">${esc(r.glyph)}</span><span class="nm">${esc(r.name)}</span><span class="wh">${esc(r.what)}</span><span class="ag">${esc(r.age)}</span></div>`);
+      const rs = (v.list || []).map((r) => `<div class="row ${esc(r.kind)}" style="${delay()}"><span class="gl" aria-hidden="true">${esc(r.glyph)}</span><span class="nm">${esc(r.name)}</span><span class="wh">${esc(r.what)}</span><span class="ag">${esc(r.age)}</span></div>`);
       const qs = (v.inbox || []).map((q) => `<div class="q${q.sel ? " sel" : ""}" style="${delay()}"><div class="who">? ${esc(q.agent)}</div><div class="tq">${esc(q.text)}</div>${opts(q)}</div>`);
-      const fy = v.forYou ? v.forYou.pages.map((p) => `<button type="button" class="page${p.unopened ? " new" : ""}" data-page="${esc(p.id)}" style="${delay()}"><span class="gl">◰</span><span class="pn">${esc(p.name)}</span><span class="pm">${esc(p.meta)}</span></button>`) : [];
+      const fy = v.forYou ? v.forYou.pages.map((p) => `<button type="button" class="page${p.unopened ? " new" : ""}" data-page="${esc(p.id)}" style="${delay()}"><span class="gl" aria-hidden="true">◰</span><span class="pn">${esc(p.name)}</span><span class="pm">${esc(p.meta)}</span></button>`) : [];
       const em = v.empty || {};
       const none = (s) => (s ? [`<div class="none" style="${delay()}">${esc(s)}</div>`] : []);
       el.rows.innerHTML = v.list
@@ -162,7 +175,7 @@
     });
     put("spot", v.spot ? "on" : "", () => {
       show(el.spot, v.spot);
-      if (v.spot) { input.value = v.spot.text; input.placeholder = v.spot.hint; setTimeout(() => input.focus(), 0); }
+      if (v.spot) { input.value = v.spot.text; input.placeholder = v.spot.hint; input.setAttribute("aria-label", v.spot.hint); setTimeout(() => input.focus(), 0); }
       else input.blur();
     });
     // the key bar, key then word like the TUI's, three spaces between pairs
@@ -183,7 +196,7 @@
       if (!v.note) { note.innerHTML = ""; return; }
       const n = v.note;
       note.innerHTML = `<div class="h"><span class="app">:*</span>bise${n.more > 0 ? `<span class="more">+${n.more}</span>` : ""}</div>
-        <div class="ttl"><span class="gl">?</span>${esc(n.title)}</div><div class="qq">${esc(n.text)}</div>${opts(n)}${n.open ? `<button type="button" class="hint open" data-open="${esc(n.id)}">${esc(n.open)}</button>` : ""}<div class="hint">${esc(n.hint)}</div>`;
+        <div class="ttl"><span class="gl" aria-hidden="true">?</span>${esc(n.title)}</div><div class="qq">${esc(n.text)}</div>${opts(n)}${n.open ? `<button type="button" class="hint open" data-open="${esc(n.id)}">${esc(n.open)}</button>` : ""}<div class="hint">${esc(n.hint)}</div>`;
     });
   }
   const opts = (c) => c.options.length ? `<div class="opts">${c.options.map((o) => `<button type="button" data-card="${esc(c.id)}" data-i="${o.i}">${esc(o.label)}</button>`).join("")}</div>` : "";

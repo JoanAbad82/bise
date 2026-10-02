@@ -127,6 +127,17 @@
   const needsLine = (agent) => `${agent} needs you`;
   // `✓ cookies has it.` / with the option it took: `✓ cookies has it: yes.`
   const answeredLine = (agent, choice) => (choice ? `${agent} has it: ${choice}.` : `${agent} has it.`);
+  // VoiceOver: the pearl is an image whose label says its mood (best guesses, asked to ambient)
+  const MOOD_SAYS = { rest: "bise", listen: "bise is listening", speak: "bise is talking", work: "bise is working", need: "bise needs you", done: "bise: done", fail: "bise: something failed", away: "bise is quiet", still: "bise" };
+  const moodLabel = (mood) => MOOD_SAYS[mood] || "bise";
+  // what VoiceOver reads when the capsule changes: one sentence per view, its glyphs dropped (they
+  // are read as words already: ? waiting, ✓ done, ▲ failed)
+  function sayOf(v) {
+    if (!v || v.content && v.content.kind === "none" && !v.inbox && !v.list) return "";
+    const words = v.words ? v.words.list.slice(0, v.words.lit).join(" ") : "";
+    const parts = [v.label && [v.label.text, v.label.rest].filter(Boolean).join(", "), v.text, words, v.sub, v.sees && `${v.sees.head}${v.sees.tail}`, v.perm && v.perm.text, v.note && `${v.note.title}: ${v.note.text}`];
+    return parts.filter(Boolean).join(". ").replace(/\s+/g, " ").trim();
+  }
   // the speaker on the capsule is bise (roadmap §3.1)
   const seesLine = (app, title) => (title ? `bise sees ${app} · ${title}` : `bise sees ${app}`);
   // the chip in two parts: `head` is never cut (the app, a URL's host), `tail` may end in … (a
@@ -183,5 +194,5 @@
   // an agent's row is a label, not a sentence: no final period
   const rowLabel = (s) => String(s || "").replace(/\.$/, "");
 
-  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, voiceNoteOn };
+  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, voiceNoteOn, moodLabel, sayOf };
 })(typeof window !== "undefined" ? window : globalThis);

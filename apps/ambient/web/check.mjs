@@ -575,6 +575,16 @@ law("the pearl's mood follows the capsule: listen, speak, work, need, done, fail
   const sp = sweep("talk");
   assert.ok(sp.at.some((t) => sp.view(t).state === "speaking" && sp.view(t).mood === "speak"));
 });
+law("VoiceOver: the pearl's label says its mood; one sentence per view is read, nothing at rest", () => {
+  eq(["rest", "listen", "speak", "work", "need", "away"].map(Wd.moodLabel), ["bise", "bise is listening", "bise is talking", "bise is working", "bise needs you", "bise is quiet"]);
+  assert.equal(Wd.sayOf(run(sceneEvents("idle"), [100]).view(100)), "");
+  const n = run(sceneEvents("needs-wait"), [1000]).view(1000);
+  assert.equal(Wd.sayOf(n), "1 waiting for you. cookies needs you: keep the banner on mobile?");
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
+  m = M.step(m, { ev: "app_fn", state: "down", key: "fn" }, 10).m;
+  m = M.step(m, { ev: "heard", text: "make it half the size", final: false }, 20).m;
+  assert.equal(Wd.sayOf(M.view(m, 30)), "listening, let go of fn to send. make it half the size");
+});
 law("the morning page (app_morning): 'good morning. your page is open   fn o' before 11:00 (greet), 'your page is open   fn o' after; fn + o opens it", () => {
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
   assert.equal(M.view(M.step(m, { ev: "app_morning", id: "x", title: "t", url: "u", greet: true }, 10).m, 20).text, "good morning. your page is open   fn o");

@@ -160,3 +160,6 @@ html:not(.app) .cap, html:not(.app) .note {
 /* reduced motion: text appears without fades, nothing springs */
 .still *, .still *::before, .still *::after { transition: none !important; animation: none !important; }
 .still .words .w { filter: none; }
+
+/* VoiceOver's live line: read, never seen */
+.tx > .say { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
