@@ -54,7 +54,10 @@ numbers.
 ## 3. The core loops
 
 **A. Ask.** Hold fn and talk (or fn + space and type) from any app. Main sees the front window
-(v1). Main answers in a sentence when a sentence is enough, by voice when you talked.
+(v1). Main answers in a sentence when a sentence is enough, by voice when you talked. The
+capsule shows while you talk; `got it` / `on it` stays 2 s, then the work goes on in the menu bar;
+an answer to you shows and hides 4 s after it ends (after the voice), unless the mouse is on it
+(§3 G).
 
 **B. Show.** When the answer is more than a short message, an agent makes a page. Your pages
 live in one tab group of your own browser window, `bise` (pink), separate from the agents'
@@ -97,7 +100,9 @@ highlight, a toggle) shows the changes since the last version. Older versions st
 replies", "make it a Google Doc". Anything that leaves your Mac goes through the approvals gate
 (a card, or the page's own approve button, which is the same approval). Done: `posted in #team.`
 
-**F. Needs you** stays v1's card: one question, fn + 1…9. A question with more than a few words
+**F. Needs you** stays v1's card: one question, fn + 1…9. It shows in the capsule for 6 s, then
+hides; the menu-bar count keeps it, and fn + 1…9 answers the top one while hidden (§3 G). A
+question with more than a few words
 or options becomes a **question** block on a page, and its card says `? offsite needs you` with
 `open it`, which takes you to that question on the page. Answering on the page answers the card:
 one question, two places, never two answers.
@@ -110,8 +115,9 @@ que quelque chose se passe. Il faut que ce soit out of the way."). This override
   work is running (it moves, quietly) or not (still); how many things wait for you (a number:
   questions, approvals, pages you haven't opened); something needs you (the accent).
 - **The capsule appears** when you hold fn or open the spotlight, when bise answers you (it stays
-  while it speaks, then fades after a few seconds), and when something needs you (the needs-you
-  glass shows once, then folds into the icon's count after a few seconds; fn + 1…9 still answers
+  while it speaks, then hides 4 s after, unless the mouse is on it; `got it` / `on it` stays 2 s),
+  and when something needs you (the needs-you glass shows for 6 s, then folds into the icon's
+  count; fn + 1…9 still answers
   it without the capsule).
 - **While agents work, you can hide it** (fn + ., or a click on the icon): the icon keeps moving,
   nothing else shows. bise doesn't bring it back unless you talk or something needs you.
