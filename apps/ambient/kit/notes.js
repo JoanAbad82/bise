@@ -26,6 +26,8 @@
     sentTag: "sent",
     changed: (before, after) => `you changed "${before}" → "${after}"`,
     marks: { keep: "♡ keep", drop: "✗ drop", unsure: "~ not sure" },
+    // a voice note's pin while you talk (the mocks' `you · voice`; asked to ambient)
+    voiceBy: "you · voice",
     // a question's option you picked (ambient, m_4795)
     picked: (option, text) => (text ? `you picked ${option}: ${text}` : `you picked ${option}`),
     tools: { note: "note", keep: "♡", drop: "✗", unsure: "~", edit: "edit", pin: "pin" },
@@ -73,6 +75,29 @@
   // every note, re-anchored on a new version's blocks
   const reanchor = (notes, blocks) => notes.map((n) => ({ ...n, anchor: anchorOf(n, blocks) }));
 
+  // ---- the words nearest a point in a block's text (a voice note's or a pin's anchor): the word
+  // at `offset` and its neighbours, at most `n` words, never across a sentence's end
+  function nearestQuote(text, offset, n = 5) {
+    const t = norm(text);
+    if (!t) return null;
+    const words = [];
+    const re = /\S+/g;
+    let m;
+    while ((m = re.exec(t))) words.push({ w: m[0], at: m.index });
+    if (!words.length) return null;
+    let i = words.findIndex((x) => x.at + x.w.length >= offset);
+    if (i < 0) i = words.length - 1;
+    let a = i, b = i;
+    const ends = (k) => /[.!?:;]$/.test(words[k].w);
+    while (b - a + 1 < n) {
+      const grew = b - a;
+      if (b + 1 < words.length && !ends(b)) b++;
+      if (b - a + 1 < n && a > 0 && !ends(a - 1)) a--;
+      if (b - a === grew) break;
+    }
+    return { quote: words.slice(a, b + 1).map((x) => x.w).join(" "), offset: words[a].at };
+  }
+
   // ---- an edit: the smallest changed span, by words (`you changed "Q2" → "Q3"`)
   function diffWords(before, after) {
     const a = norm(before).split(" "), b = norm(after).split(" ");
@@ -110,7 +135,35 @@
     const idOf = (opts && opts.id) || newId;
     const api = {
       all: () => notes.slice(),
-      drafts: () => notes.filter((n) => n.status === "draft"),
+      // a voice note still listening is not a draft yet (not counted, not saved)
+      drafts: () => notes.filter((n) => n.status === "draft" && !n.listening),
+      listening: () => notes.find((n) => n.listening) || null,
+      // a voice note at the mouse (§4.1): start pins it listening, heard fills it, end saves it as a
+      // draft (empty words: it goes), cancel removes it; one at a time
+      voiceStart(anchor, version, now) {
+        api.voiceCancel();
+        return api.add({ version, ...anchor, kind: "voice", text: "", listening: true }, now);
+      },
+      voiceHeard(text) {
+        const v = api.listening();
+        if (v) notes = notes.map((n) => (n === v ? { ...n, text: text || "" } : n));
+        return api.listening();
+      },
+      voiceEnd(text, now) {
+        const v = api.listening();
+        if (!v) return null;
+        const words = norm(text != null ? text : v.text);
+        if (!words) { notes = notes.filter((n) => n !== v); return null; }
+        const done = { ...v, text: words, at_ms: now || v.at_ms };
+        delete done.listening;
+        notes = notes.map((n) => (n === v ? done : n));
+        return done;
+      },
+      voiceCancel() {
+        const v = api.listening();
+        if (v) notes = notes.filter((n) => n !== v);
+        return v;
+      },
       get: (id) => notes.find((n) => n.id === id) || null,
       nextId: (now) => { let id; do id = idOf(now); while (api.get(id)); return id; },
       add(n, now) {
@@ -152,9 +205,17 @@
       // latest wins; picking the same option again takes it back
       pick(block, option, text, version, now) {
         const prev = notes.find((n) => n.status === "draft" && n.kind === "pick" && n.block === block);
-        if (prev && String(prev.option) === String(option)) { notes = notes.filter((x) => x !== prev); return null; }
+        // option null: kit.js took the pick back
+        if (option == null || (prev && String(prev.option) === String(option))) { if (prev) notes = notes.filter((x) => x !== prev); return null; }
         if (prev) return api.update(prev.id, { option, text, at_ms: now || prev.at_ms });
         return api.add({ version, block, kind: "pick", option, text }, now);
+      },
+      // a question answered elsewhere (the capsule, the TUI: §4.2): one card, one answer, so a
+      // draft pick on that block goes
+      answered(block) {
+        const had = notes.some((n) => n.status === "draft" && n.kind === "pick" && n.block === block);
+        notes = notes.filter((n) => !(n.status === "draft" && n.kind === "pick" && n.block === block));
+        return had;
       },
       // the server's notes (meta, SSE): its statuses and answers win; drafts it doesn't know stay
       merge(server) {
@@ -166,12 +227,12 @@
       sent(now) { notes = notes.map((n) => (n.status === "draft" ? { ...n, status: "sent", sent_ms: now || 0 } : n)); undo.length = 0; },
       reanchor(blocks, version) { notes = reanchor(notes, blocks).map((n) => (n.status === "sent" ? { ...n, version_seen: version } : n)); },
       // what the server keeps: the drafts, without the page's own fields
-      payload: () => ({ notes: api.drafts().map(({ anchor, version_seen, ...n }) => n) }),
+      payload: () => ({ notes: api.drafts().map(({ anchor, version_seen, listening, ...n }) => n) }),
     };
     return api;
   }
 
-  const core = { NW, spaced, norm, locate, anchorOf, reanchor, diffWords, outcome, label, model };
+  const core = { NW, spaced, norm, locate, anchorOf, reanchor, diffWords, outcome, label, model, nearestQuote };
 
   // ======================================================================================
   // the DOM: only on a page the shell served (#bise-page)
@@ -345,12 +406,21 @@
         const b = blockById(n.block);
         if (!b) return;
         const r = b.getBoundingClientRect();
-        const p = el("div", `bn-pin bn-${n.status}`, String(i + 1));
+        const p = el("div", `bn-pin bn-${n.status}${n.listening ? " bn-listening" : ""}`, String(i + 1));
         p.dataset.note = n.id;
         // CSSOM, not style= (the shell's CSP)
-        p.style.left = `${r.left + sx + n.pin.x * r.width}px`;
-        p.style.top = `${r.top + sy + n.pin.y * r.height}px`;
+        const x = r.left + sx + n.pin.x * r.width, y = r.top + sy + n.pin.y * r.height;
+        p.style.left = `${x}px`;
+        p.style.top = `${y}px`;
         pins.append(p);
+        // a voice note while you talk: your words land beside its pin
+        if (n.listening) {
+          const bub = el("div", "bn-bubble");
+          bub.append(el("div", "bn-by", NW.voiceBy), el("div", "bn-said", n.text || "…"));
+          bub.style.left = `${x + 18}px`;
+          bub.style.top = `${y - 8}px`;
+          pins.append(bub);
+        }
       });
     }
 
@@ -508,6 +578,52 @@
       render();
     });
     doc.addEventListener("bise:notes", (e) => { M.merge((e.detail && e.detail.notes) || []); M.reanchor(blockTexts(), version); render(); });
+    // ---- a voice note at the mouse (§4.1): fn held on this page; the core's words arrive as
+    // kit.js's bise:voice {phase, text}; the pin goes where the mouse last was over a block
+    let mouse = null;
+    doc.addEventListener("mousemove", (e) => { mouse = { x: e.clientX, y: e.clientY }; }, { passive: true });
+    function anchorAt(pt) {
+      let b = pt && doc.elementFromPoint(pt.x, pt.y);
+      b = b && b.closest && b.closest("[data-kit][data-id]");
+      if (!b || !page.contains(b)) {
+        // no block under the mouse: the block nearest the middle of the window
+        const mid = win.innerHeight / 2;
+        b = blocks().reduce((best, x) => { const r = x.getBoundingClientRect(), d = Math.abs((r.top + r.bottom) / 2 - mid); return !best || d < best.d ? { x, d } : best; }, null);
+        b = b && b.x;
+        pt = null;
+      }
+      if (!b) return null;
+      const r = b.getBoundingClientRect();
+      const at = { block: b.dataset.id, pin: pt ? { x: +((pt.x - r.left) / r.width).toFixed(3), y: +((pt.y - r.top) / r.height).toFixed(3) } : { x: 0, y: 0 } };
+      // the nearest words: the text before the caret under the mouse
+      const caret = pt && (doc.caretRangeFromPoint ? doc.caretRangeFromPoint(pt.x, pt.y) : doc.caretPositionFromPoint && (() => { const p = doc.caretPositionFromPoint(pt.x, pt.y); if (!p) return null; const r2 = doc.createRange(); r2.setStart(p.offsetNode, p.offset); return r2; })());
+      let offset = 0;
+      if (caret && b.contains(caret.startContainer)) {
+        const pre = doc.createRange();
+        pre.selectNodeContents(b);
+        pre.setEnd(caret.startContainer, caret.startOffset);
+        offset = norm(pre.toString()).length;
+      }
+      const q = nearestQuote(b.textContent, offset);
+      if (q) { at.quote = q.quote; at.offset = q.offset; }
+      return at;
+    }
+    doc.addEventListener("bise:voice", (e) => {
+      const d = e.detail || {};
+      if (d.phase === "start") { const at = anchorAt(mouse); if (at) M.voiceStart(at, version, now()); }
+      else if (d.phase === "heard") M.voiceHeard(d.text);
+      else if (d.phase === "end") { if (M.voiceEnd(d.text, now())) save(); }
+      else if (d.phase === "cancel") M.voiceCancel();
+      else if (d.phase === "send") { M.voiceCancel(); return send(); }
+      render();
+    });
+
+    // a question answered in the capsule or the TUI: kit.js's question shows the answer; a draft
+    // pick of ours on it goes (one card, one answer)
+    doc.addEventListener("bise:answered", (e) => {
+      if (M.answered((e.detail || {}).block)) { save(); render(); }
+    });
+
     // a question's option picked (kit.js marks it on the page; the note is ours)
     doc.addEventListener("bise:pick", (e) => {
       const d = e.detail || {};

@@ -132,6 +132,8 @@
       case "phase": {
         const phase = ev.phase || "idle";
         let m2 = { ...m, phase, phaseAt: now, line: ev.line || "" };
+        // a note talk (fn held on a bise page, §4.1): its words go to the page, not to main
+        m2.notePage = phase === "listening" ? ev.page || m.notePage || null : null;
         if (phase === "listening" && m.phase !== "listening") {
           m2 = { ...m2, heard: { text: "", final: false }, mine: true, turnNames: names(m.agents), chips: [], hushed: false, pane: null };
           if (m.pane === "spot") return { m: m2, cmds: [{ cmd: "app_focus", on: false }] };
@@ -364,11 +366,14 @@
       const you = lv(m, "you", now);
       v.pose = you > 0.04 || m.heard.text ? "talk" : "listen";
       v.lvl = you;
-      // `listening · let go of fn to send` on the label's line, the words under it
-      v.label = { text: now - m.cutAt < T.cutIn ? W.cutIn : W.listening, acc: true, rest: m.handsFree ? W.handsFree : W.letGo };
+      // `listening · let go of fn to send` on the label's line, the words under it; on a page,
+      // `voice note on weekly update` (the words pin on the page, main sees nothing)
+      const np = m.notePage;
+      v.label = { text: np ? Wd.voiceNoteOn(np.title || pageName(np)) : now - m.cutAt < T.cutIn ? W.cutIn : W.listening, acc: true, rest: m.handsFree ? W.handsFree : W.letGo };
+      if (np) v.state = "voice_note";
       v.words = { list: m.heard.text.split(/\s+/).filter(Boolean), per: 0.24 };
       v.words.lit = v.words.list.length;
-      if (m.shot) v.sees = m.shot.skipped ? { head: W.notSeen, tail: "" } : Wd.seesParts(m.shot.app, m.shot.title);
+      if (m.shot && !np) v.sees = m.shot.skipped ? { head: W.notSeen, tail: "" } : Wd.seesParts(m.shot.app, m.shot.title);
       v.edge = { on: m.edgeGlow && !m.reduce, lvl: you };
     } else if (m.mine && (m.phase === "sending" || m.phase === "working" || (m.phase === "idle" && now - m.sentAt < 30000 && !m.main.text))) {
       v.state = "working"; v.size = "open"; v.pose = "think";

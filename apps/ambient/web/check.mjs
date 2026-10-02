@@ -509,6 +509,49 @@ law("notes: a pick on a question (kit.js's bise:pick) is one note per block, the
   assert.equal(m.pick("q1", 3, "the loft", 1, 3), null);
   assert.equal(m.drafts().length, 0);
 });
+law("notes: a voice note at the mouse: start pins it listening (not a draft yet), heard fills it, end saves it, cancel and empty words remove it", () => {
+  const m = N.model([], counted());
+  const v = m.voiceStart({ block: "p2", pin: { x: 0.4, y: 0.5 }, quote: "we shipped dark mode", offset: 12 }, 1, 1);
+  assert.equal(v.kind, "voice"); assert.ok(m.listening());
+  assert.equal(m.drafts().length, 0); eq(m.payload().notes, []);
+  m.voiceHeard("this gray is");
+  m.voiceHeard("this gray is too light");
+  assert.equal(m.listening().text, "this gray is too light");
+  const done = m.voiceEnd("this gray is too light. use the one in tokens.css", 5);
+  assert.equal(done.text, "this gray is too light. use the one in tokens.css");
+  assert.equal(m.listening(), null);
+  eq(m.payload().notes.map((n) => [n.kind, n.block, n.quote, n.text]), [["voice", "p2", "we shipped dark mode", "this gray is too light. use the one in tokens.css"]]);
+  assert.equal(m.payload().notes[0].listening, undefined);
+  m.voiceStart({ block: "p3" }, 1, 6); m.voiceHeard("hmm"); m.voiceCancel();
+  m.voiceStart({ block: "p3" }, 1, 7); assert.equal(m.voiceEnd("  ", 8), null);
+  assert.equal(m.all().length, 1);
+});
+law("notes: a voice note anchors on the words nearest the mouse, never across a sentence", () => {
+  const t = "Revenue grew in Q2. We shipped dark mode for the settings page last week.";
+  eq(N.nearestQuote(t, t.indexOf("dark") + 1), { quote: "We shipped dark mode for", offset: t.indexOf("We") });
+  eq(N.nearestQuote(t, 2), { quote: "Revenue grew in Q2.", offset: 0 });
+  assert.equal(N.nearestQuote("", 0), null);
+});
+law("notes: a question answered elsewhere drops our draft pick; a pick taken back (option null) goes too", () => {
+  const m = N.model([], counted());
+  m.pick("q1", 2, "the barn", 1, 1);
+  assert.equal(m.answered("q1"), true); assert.equal(m.drafts().length, 0);
+  m.pick("q2", 1, "yes", 1, 2);
+  assert.equal(m.pick("q2", null, null, 1, 3), null); assert.equal(m.drafts().length, 0);
+});
+law("capsule: fn held on a bise page says `voice note on weekly update`, no `main sees`, then back to the status line", () => {
+  let m = M.init();
+  for (const [, ev] of sceneEvents("idle")) m = M.step(m, ev, 0).m;
+  m = M.step(m, { ev: "app_fn", state: "down", key: "fn" }, 10).m;
+  m = M.step(m, { ev: "phase", phase: "listening", page: { id: "weekly-update", title: "weekly update" } }, 20).m;
+  m = M.step(m, { ev: "heard", text: "this gray", final: false }, 30).m;
+  const v = M.view(m, 40);
+  assert.equal(v.state, "voice_note"); assert.equal(v.label.text, "voice note on weekly update"); assert.equal(v.sees, null);
+  m = M.step(m, { ev: "app_fn", state: "up", key: "fn" }, 50).m;
+  m = M.step(m, { ev: "phase", phase: "idle" }, 60).m;
+  const w = M.view(m, 70);
+  assert.equal(w.size, "small"); assert.equal(w.text, W.idle);
+});
 law("notes: the words (ambient's), names with spaces", () => {
   assert.equal(N.NW.listTitle("weekly update", 3), "notes for weekly update · 3");
   assert.equal(N.NW.sendBar(3, N.spaced("weekly-update")), '3 notes for weekly update · or just say "send"');
