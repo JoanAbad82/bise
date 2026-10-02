@@ -259,3 +259,68 @@ approvals gate. Guide-only: the skill shows how (the fragment's text in order, s
 ### 5.4 Drawing (owner: amb-web): `d` draws on the page; a drawing is a note with an SVG path and
 its blocks, and the notes message carries a screenshot of the area (the server renders nothing:
 the page sends the PNG it drew with canvas).
+
+## 6. Roadmap A-D as built (docs/ambient-roadmap.md §2)
+
+The contracts as they landed on `ambient-app`. QA: docs/ambient-qa.md's done-when checks, run on
+fake accounts only (`plugins/ambient-qa`, `qa.py run <scenario>`).
+
+### 6.1 Rules every slice follows
+- **Nothing leaves before his word on the page** (main's rule + the guide, amb-kit 038fc00b): no
+  draft, message, post or label in his accounts during the first versions; only after a send,
+  approve or "put it in my drafts" note on that page. The hub enforces it as a guard (amb-home
+  68e03f09, `tests/draft_guard_e2e.py`): a draft-making connector call from an agent whose page
+  has an unreviewed review item or open question becomes a card `<agent> wants to put drafts in
+  Gmail before you reviewed "<page>"`. Draft tools otherwise need no card; send, post and delete
+  stay gated.
+- **Page or one line** (main's rule, amb-kit 07f0b9d4): a fact, a yes/no, a status, a time get one
+  capsule line; a page is for what he'll read, edit or act on.
+- **Publish fast** (the guide, a9338abc: SKILL.md ≤ 1200 words, details in `blocks.md`,
+  `leaving.md`, `watch.md`, `feedback.md`, `about-you.md` read on demand): `sb page start` at
+  once, items published 2-3 at a time as drafted, first real items within ~45 s.
+- **His taste** (amb-home d75aefe4): `sb page publish --taste` sets `meta.taste {rules: N}` (the
+  `- `/`* ` lines of `~/bise/taste.md`), SSE `taste`; the frame says `following your taste · N
+  rules` (link `/p/about-you`).
+- **A button does only what it names** (ambient): `stop` and `start an agent` send their one note
+  alone; his other drafts stay drafts until ⌘⏎.
+
+### 6.2 A: drafts where they live
+Gmail reply: an email block, `put it in my drafts` (or `send` for one he lets bise send). Slack:
+a message block with `copy` + `data-open` (`copied · open #team`). Kit newsletter: an email block
+with `data-verb="draft"`, Kit create-draft, never send (amb-kit 56cfd679). After the act the agent
+runs `sb page publish --went <kind>:<ref>[@<block>]=<url>` (amb-home f7758504): `meta.went
+[{kind, ref, url, at, block?}]`, SSE `went`; kit.js draws `in your Gmail drafts · open`.
+
+### 6.3 B: watch for me
+`sb every <interval> "<message>" --page <id> [--until …]` (amb-home 796ea3d3, 3f22c3bc): the hub
+wakes the agent, the agent republishes. State: `timers [{id, agent, label, text, by, next_ms,
+last_ms, fired, until_ms?, times?, page?}]`; `meta.watch {timer, every, checked_ms, until_ms}`,
+SSE `watch`. The frame: `watching · checked 3 min ago · until tomorrow 18:00` + `stop` (a note
+of kind `stop`, handled by the hub: it ends the page's timers, no model turn). The menu bar
+(amb-mac bae165c1): `watching <page> · N new for you`, `stop watching` → core `{cmd:
+"every_stop", id}` → hub op `every_stop` (amb-core 527fa441). Review items for read-only places
+take `data-verb="open-reply"`: `open with the reply` (X/Bluesky compose intent, else copy + open
+the thread), never send (amb-kit f0a88b01, 0873589e).
+
+### 6.4 C: feedback into work
+A review item per report with `data-verb="start"`: `start an agent` / `answer <name>` / `skip`
+(amb-kit d418d973). `start` sends one note of kind `start` (amb-web 1c034fb3), which the hub routes
+to main, never to the page's agent (amb-home f7758504); main starts the agent with the item as
+its brief and republishes the item with `data-agent="<name>"`. Items with `data-agent` get SSE
+`agent {name, status, note?}` (replayed at connect, from `pages/<id>/agents.json`); kit.js draws
+`∿ <name> working · <note>`, `✓ <name> done`, `▲ <name> failed`, `? <name> needs you · <note>`.
+The drafted reply follows A's rules.
+
+### 6.5 D: steps only you can do
+A checklist row with `data-who="yours"` (kit: `you · friday` in the accent) becomes one question
+card when every row before it is done (amb-core 527fa441): `card.page = {id, block, item,
+url#item}`, `urgent: false`. It closes on a tick on the page, `data-done` in a republish, `done`
+on the card, or `sb page tick <page> <item> [words]`; ticks push SSE `ticked` and a notes message
+to the page's agent. A capsule message to main carries `[his open steps: …]` so a spoken "done
+with the payment" becomes a `sb page tick`. bise's own rows: `data-done` on republish.
+
+### 6.6 The full view's "for you" and the count
+Unopened pages first (`version > opened_version`, amb-core 03821a37), newest first, then seen ones
+dim; a watched page shows its watch line (amb-web 6e78047f). The menu-bar count and this list use
+one rule (questions + approvals + unopened pages), fixed in `apps/ambient/web/fixtures/count.json`
+and tested on both sides.
