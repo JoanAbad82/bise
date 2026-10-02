@@ -193,6 +193,9 @@ body {
 #bise-page [data-kit="review"] li[data-id] > p:first-child { font-size: var(--text-small); color: var(--dim); }
 #bise-page [data-kit="review"] li[data-id] > [data-kit-ui] { grid-column: 2; grid-row: 1 / span 4; }
 #bise-page [data-kit="review"] li[data-verdict="skip"] > :not([data-kit-ui]) { opacity: .45; }
+/* what bise keeps (data-verb="keep"): a struck rule is struck through; no 'approve N' bar */
+#bise-page [data-kit="review"][data-verb="keep"] li[data-verdict="skip"] > :not([data-kit-ui]) { text-decoration: line-through; text-decoration-color: var(--rule-strong); }
+#bise-page [data-kit="review"][data-verb="keep"] > p[data-kit-ui] { display: none; }
 #bise-page [data-kit="review"] li[data-verdict="approve"] { box-shadow: inset 3px 0 0 var(--ok); padding-left: var(--space-3); }
 
 /* email: a draft ready to leave, its header lines labeled, approve / skip under it */
@@ -215,25 +218,44 @@ body {
 #bise-page [data-kit="compare"] li[data-id] > [data-kit-ui] button[data-act="pick"] { margin-left: auto; }
 #bise-page [data-kit="compare"] li[data-verdict="pick"] { box-shadow: inset 0 0 0 1.5px var(--ink), 3px 3px 0 var(--drop); }
 #bise-page [data-kit="compare"] li[data-verdict="drop"] > :not([data-kit-ui]) { opacity: .45; }
+/* the cards line up: name, facts, why and buttons share rows across the cards (subgrid), so a
+   name that wraps on two lines moves every card's facts down together */
+@supports (grid-template-rows: subgrid) {
+  #bise-page [data-kit="compare"] li[data-id] { display: grid; grid-row: span 4; grid-template-rows: subgrid; row-gap: 0; align-content: start; }
+  #bise-page [data-kit="compare"] li[data-id] > h3 { align-self: end; }
+  #bise-page [data-kit="compare"] li[data-id] > [data-kit-ui] { align-self: end; }
+}
 #bise-page [data-verdict="keep"] > [data-kit-ui] button[data-act="keep"], #bise-page [data-verdict="drop"] > [data-kit-ui] button[data-act="drop"],
 #bise-page [data-verdict="pick"] > [data-kit-ui] button[data-act="pick"] { box-shadow: inset 0 0 0 1.5px var(--ink); }
 #bise-page [data-verdict="pick"] > [data-kit-ui] button[data-act="pick"]::before { content: "✓ "; }
 
 /* checklist: a box per item (the kit's), who · when in small; ticked items are struck through */
 #bise-page [data-kit="checklist"] > :is(ol, ul) { list-style: none; padding: 0; margin: 0; }
-#bise-page [data-kit="checklist"] li[data-id] { display: flex; align-items: baseline; gap: var(--space-3); margin: 0; padding: 7px 0; border-bottom: 1px solid var(--rule); }
-#bise-page [data-kit="checklist"] li[data-id] small { margin-left: auto; padding-left: var(--space-3); font: 12px var(--font-mono); color: var(--kick); white-space: nowrap; }
-#bise-page [data-kit="checklist"] li[data-id] > [data-kit-ui] { flex: none; align-self: center; }
+/* a flow row (not flex): the box inline-block, the who/when tag and the agent line floats, so a
+   done item's strike crosses its words only (floats and inline-blocks take no strike) */
+#bise-page [data-kit="checklist"] li[data-id] { display: flow-root; margin: 0; padding: 7px 0; border-bottom: 1px solid var(--rule); }
+#bise-page [data-kit="checklist"] li[data-id] small { float: right; padding-left: var(--space-3); font: 12px var(--font-mono); color: var(--kick); white-space: nowrap; }
+#bise-page [data-kit="checklist"] li[data-id] > [data-kit-ui]:not([data-when]):not([data-agent-line]) { display: inline-block; vertical-align: -3px; margin-right: var(--space-3); }
+#bise-page [data-kit="checklist"] li[data-id] > [data-when] { float: right; margin-left: 0; }
+#bise-page [data-kit="checklist"] li[data-id] > [data-agent-line] { float: left; clear: both; width: 100%; padding-left: calc(18px + var(--space-3)); }
 #bise-page [data-kit="checklist"] [data-kit-ui] button[data-act="tick"] { width: 18px; height: 18px; padding: 0; border-radius: 4px; font-size: 0; background: var(--surface-card); box-shadow: inset 0 0 0 1.5px var(--rule-strong); }
 #bise-page [data-kit="checklist"] li[data-verdict="tick"] [data-kit-ui] button[data-act="tick"] { background: var(--ink); }
 #bise-page [data-kit="checklist"] li[data-verdict="tick"] [data-kit-ui] button[data-act="tick"]::before { content: "✓"; font: 600 12px/18px var(--font-ui); color: var(--surface-made); }
 #bise-page [data-kit="checklist"] li[data-verdict="tick"] { color: var(--dim); text-decoration: line-through; text-decoration-color: var(--rule-strong); }
+#bise-page [data-kit="checklist"] li[data-verdict="tick"] > [data-when] { color: var(--faint); }
 
 /* message: a draft that leaves (Slack, a post), in the reading font, editable, its channel above */
 [data-kit="message"] { background: var(--surface-card); border-radius: 10px; padding: var(--space-3) var(--space-4) var(--space-4); margin: var(--space-4) 0; box-shadow: 3px 3px 0 var(--drop); }
 [data-kit="message"]::before { content: attr(data-to); display: block; font: var(--text-kicker)/1.4 var(--font-mono); color: var(--kick); margin-bottom: var(--space-2); }
 #bise-page [data-kit="message"] > p { margin: 0 0 10px; }
 #bise-page [data-kit="message"] > [data-kit-ui] { margin-top: var(--space-3); justify-content: flex-end; }
+/* an email says where it goes the same way, when it has data-to ('Gmail · reply to Camille Roux') */
+[data-kit="email"][data-to]::before { content: attr(data-to); display: block; font: var(--text-kicker)/1.4 var(--font-mono); color: var(--kick); margin-bottom: var(--space-2); }
+
+/* where a draft went (slice A): 'in your Gmail drafts · open', 'copied · open #launch' */
+#bise-page [data-kit] > p[data-went] { display: block; margin: var(--space-3) 0 0; font: 12px/1.5 var(--font-mono); color: var(--ok); }
+#bise-page [data-kit] > p[data-went] > a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+#bise-page [data-kit] > p[data-went] > a::before { content: " · "; display: inline-block; white-space: pre; text-decoration: none; }
 
 /* what changed: a soft wash on the blocks that differ from the version before */
 body.bise-changes [data-changed] { background: var(--changed); box-shadow: -10px 0 0 var(--changed), 10px 0 0 var(--changed); }

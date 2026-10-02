@@ -437,6 +437,45 @@ law("checklist who and when: due dates in words, late in its own state, done ite
   assert.equal(when(t3), undefined, "no who, no due: no tag");
 });
 
+law("where a draft went: the user's tool and its link on the block it came from, copied with the channel", () => {
+  const main = parse(`<section data-kit="email" data-id="e1" data-to="Gmail · reply to Camille"><p data-field="to">c</p><p data-field="subject">s</p><p>hi</p></section><section data-kit="message" data-id="m1" data-to="Slack · #launch" data-open="slack://channel?team=T1&id=C1"><p>x</p></section><section data-kit="message" data-id="m2" data-to="Slack · @benjamin"><p>y</p></section>`);
+  const [e1, m1, m2] = blocks(main);
+  assert.deepEqual(j(K.wentWords({ kind: "gmail-draft", url: "https://mail.google.com/x" }, e1)), { text: "in your Gmail drafts", open: "open", href: "https://mail.google.com/x" });
+  assert.deepEqual(j(K.wentWords({ kind: "copy" }, m1)), { text: "copied", open: "open #launch", href: "slack://channel?team=T1&id=C1" });
+  assert.deepEqual(j(K.wentWords({ kind: "slack", url: "javascript:alert(1)" }, m2)), { text: "posted in @benjamin", open: null, href: null }, "a link that isn't https/slack/mailto is dropped");
+  const went = [{ kind: "gmail-draft", ref: "r1", url: "https://mail.google.com/a", at: 1 }, { kind: "copy", ref: "c", at: 2, block: "m2" }, { kind: "kit-draft", ref: "k", at: 3, block: "gone" }];
+  const map = K.wentFor(went, blocks(main));
+  assert.deepEqual([...map.keys()].sort(), ["e1", "m2"], "no block: a draft goes to the first email; a missing block is skipped");
+  K.applyWent(doc, blocks(main), went);
+  const line = (b) => b.children.find((n) => n.hasAttribute("data-went"));
+  assert.equal(line(e1).textContent, "in your Gmail draftsopen");
+  assert.equal(line(e1).getAttribute("data-went"), "gmail-draft");
+  assert.equal(line(m1), undefined);
+  K.applyWent(doc, blocks(main), [{ kind: "outlook-draft", ref: "r2", url: "https://outlook.office.com/b", at: 5 }]);
+  assert.equal(e1.children.filter((n) => n.hasAttribute("data-went")).length, 1, "redrawn in place");
+  assert.ok(line(e1).textContent.startsWith("in your Outlook drafts"));
+  assert.ok(line(m2), "a local 'copied' stays until the server says where it went");
+});
+
+law("send, not approve, when the draft leaves; the editable parts are the drafts only", () => {
+  const main = parse(`<section data-kit="review" data-id="r" data-verb="send"><ol><li data-id="m1"><p>Léa · dates · 9:12</p><p>yes</p></li><li data-id="m2"><p>Marc · invoice</p><blockquote>paid?</blockquote><p>yes, friday</p></li></ol></section><section data-kit="review" data-id="b"><ol><li data-id="x1"><p>a</p><p>b</p></li></ol></section><section data-kit="email" data-id="e"><p data-field="to">c</p><p data-field="subject">s</p><p>hi</p></section>`);
+  const [r, b, e] = blocks(main);
+  K.decorate([r, b, e], "inbox", doc);
+  const labels = (el) => el.children.filter((n) => n.hasAttribute("data-kit-ui")).flatMap((u) => u.children).map((x) => x.textContent);
+  assert.deepEqual(labels(K.options(r)[0]), ["send", "skip"]);
+  assert.deepEqual(labels(r), ["send all 2"]);
+  assert.deepEqual(labels(K.options(b)[0]), ["approve", "skip"]);
+  assert.deepEqual(labels(b), ["approve 1"]);
+  assert.deepEqual(labels(e), ["send", "skip"]);
+  const k = blocks(parse(`<section data-kit="review" data-id="taste" data-verb="keep"><ol><li data-id="no-emoji"><p>from your notes</p><p>no emoji</p></li></ol></section>`))[0];
+  K.decorate([k], "main", doc);
+  assert.deepEqual(labels(K.options(k)[0]), ["keep", "strike"], "what bise keeps: keep / strike");
+  const ed = (el) => K.editableParts(el).map((x) => x.textContent);
+  assert.deepEqual(ed(r), ["yes", "yes, friday"], "never the who line nor the quoted comment");
+  assert.deepEqual(ed(e), ["s", "hi"], "subject and body, not to");
+  assert.ok(K.editableParts(e).every((x) => x.hasAttribute("data-editable")));
+});
+
 law("an item's agent: its name first (spaces, not hyphens), then its live status and note", () => {
   assert.equal(K.agentLine("fix-login"), "∿ fix login");
   assert.equal(K.agentLine("fix-login", { name: "fix-login", status: "working", note: "reading the Safari logs" }), "∿ fix login · working · reading the Safari logs");

@@ -32,11 +32,11 @@ across versions (the user's notes anchor on them): `p1`, `t1`, `q1`, `src`.
 | `callout` | one thing not to miss | a first `<h3>` (a short label: `heads-up`, `not checked`) + `<p>`; `data-tone="note"` (default), `"good"` or `"risk"` |
 | `question` | a decision the user makes | one `<p>` (the question) + `<ol>` of 2 to 4 short options; after the answer, `data-answer="2"` |
 | `sources` | where each fact comes from | `<ol>` of `<li><a href="…">name · tool</a>, when</li>`, last on the page |
-| `review` | items the user approves or skips one by one (mails to answer, tickets, expenses) | `<ol>` of `<li data-id="m1">`: a first `<p>` saying what it is (`Léa Martin · offsite dates · 9:12`), then the proposal |
-| `message` | a draft that leaves through a channel (Slack, a post) | `data-to="Slack · #launch"` (where it goes, shown above it), then `<p>`s and `<ul>`, with `<strong>`, `<em>`, `<code>`, `<a>`: the kit's `copy` turns them into Slack markup |
+| `review` | items the user approves or skips one by one (mails to answer, tickets, expenses) | `<ol>` of `<li data-id="m1">`: a first `<p>` saying what it is (`Léa Martin · offsite dates · 9:12`), then the proposal; `data-verb="send"` on the block when the proposals are drafts that leave (replies to mails or messages): the buttons say `send` and `send all 3`, not `approve` |
+| `message` | a draft that leaves through a channel (Slack, a post) | `data-to="Slack · #launch"` (where it goes, shown above it), then `<p>`s and `<ul>`, with `<strong>`, `<em>`, `<code>`, `<a>`: the kit's `copy` turns them into Slack markup; optional `data-open` = the channel's `slack://` or `https://` link (after a copy the page says `copied · open #launch`) |
 | `compare` | 2 to 4 options side by side (venues, drafts, tools) | `<ol>` of `<li data-id="moulin">`: an `<h3>` name, a `<ul>` of facts, a `<p>` with the why |
 | `checklist` | what's left to do, who, by when | `<ol>` of `<li data-id="t1" data-who="Camille" data-due="2026-05-20">` the task `</li>`; `data-done` on what is done; the kit shows `Camille · friday` and what is late |
-| `email` | one mail ready to send | `<p data-field="to">`, optional `<p data-field="cc">`, `<p data-field="subject">`, then the body as `<p>`s |
+| `email` | one mail ready to send | `data-to="Gmail · reply to Camille Roux"` (where it goes, shown above it), `<p data-field="to">`, optional `<p data-field="cc">`, `<p data-field="subject">`, then the body as `<p>`s |
 
 Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
 `<img src="data:image/…" alt="…">`. Nothing else.
@@ -236,5 +236,33 @@ Acting on the page is a separate step the user asks for ("post it in #team", "se
   mail's to, cc, subject;
 - a whole page as a doc: headings as headings, tables as tables, each `<sup>n</sup>` as a link to
   its source (or the sources as a list at the end);
+- "put it in my drafts": a draft doesn't leave, so it needs no card. Make the draft in the user's
+  tool (Gmail, Outlook, Kit), then record where it went on the block it came from:
+  `sb page publish $TMPDIR/p.html --id <id> --went gmail-draft:<draft id>@e1=<its https link>`
+  (kinds: `gmail-draft`, `outlook-draft`, `kit-draft`, `slack`, `copy`). The page shows
+  `in your Gmail drafts · open` under that block. A later version updates the same draft (read
+  it back first, the user may have edited it there), never a second one;
+- Slack has no drafts: the user copies (the `message` block's `copy`, with `data-open` for the
+  channel link); a post you made after their approval is `--went slack:<ts>@m1=<its link>`;
+- a tool that fails (Gmail didn't take the draft): one line in your reply and a `risk` callout
+  on the page (`Gmail didn't take it: copy it from here`), never a file path;
 - then say where it went in one line (`posted in #team.`) and, when it makes sense, publish a last
   version that says so (a `good` callout: `posted in #team, 14:02`).
+
+## 8. What bise keeps about the user
+
+"what do you know about me?", "show me my taste rules": main publishes one page, id `about-you`,
+from `~/bise/taste.md` (the taste rules) and `~/bise/people.md` (who is who), when they exist:
+- a `heading` (`what i keep about you`, meta line: `5 taste rules · 4 people · edit or strike any`);
+- `## your taste`: a `review` with `data-verb="keep"`, one item per rule, its `data-id` the
+  rule's slug (`no-emoji`): a first `<p>` saying where it came from (`from your notes on the
+  launch recap · 12 may`), then the rule in a `<p>`, as the user would say it. The kit gives each
+  one `keep` / `strike`, and the rule's words are editable in place; each change comes back as a
+  note;
+- `## who is who`: the same, one item per person (`data-id` their slug): `<p>Lélio Martin</p>`
+  then `<p>your manager. the weekly update goes to him on fridays.</p>`;
+- a `callout` (`note`): `nothing else is kept: no mail, no messages. strike a line and it's gone.`
+- no `sources` (it is the user's own words) and no `question`.
+Notes on it go to main, who rewrites the files (a struck rule: deleted; an edited one: replaced,
+in the user's words) and publishes the next version with `--notes-done`. Nothing kept is ever
+shown elsewhere without the user asking.

@@ -354,7 +354,42 @@ fn a_message_says_where_it_goes() {
     );
     has(
         &errs(r#"<section data-kit="prose" data-id="p" data-to="Slack"><p>x</p></section>"#),
-        "p: data-to is not a kit attribute",
+        "p: data-to is not a kit attribute here",
+    );
+    ok(
+        r#"<section data-kit="email" data-id="e" data-to="Gmail · reply to Camille Roux"><p data-field="to">a</p><p data-field="subject">b</p></section>"#,
+    );
+}
+
+#[test]
+fn a_review_of_drafts_says_send() {
+    ok(
+        r#"<section data-kit="review" data-id="r" data-verb="send"><ol><li data-id="m1"><p>x</p></li></ol></section>"#,
+    );
+    has(
+        &errs(r#"<section data-kit="review" data-id="r" data-verb="post"><ol><li data-id="m1"><p>x</p></li></ol></section>"#),
+        "r: data-verb=\"post\" is not a verb",
+    );
+    has(
+        &errs(r#"<section data-kit="prose" data-id="p" data-verb="send"><p>x</p></section>"#),
+        "p: data-verb is not a kit attribute here",
+    );
+}
+
+#[test]
+fn a_message_may_link_its_channel() {
+    ok(
+        r#"<section data-kit="message" data-id="slack" data-to="Slack · #launch" data-open="slack://channel?team=T01&amp;id=C02"><p>x</p></section>"#,
+    );
+    has(
+        &errs(
+            r#"<section data-kit="message" data-id="slack" data-to="Slack · #launch" data-open="javascript:alert(1)"><p>x</p></section>"#,
+        ),
+        "slack: data-open=\"javascript:alert(1)\" is not a link to the channel",
+    );
+    has(
+        &errs(r#"<section data-kit="email" data-id="e" data-open="https://x.y"><p data-field="to">a</p><p data-field="subject">b</p></section>"#),
+        "e: data-open is not a kit attribute here",
     );
 }
 

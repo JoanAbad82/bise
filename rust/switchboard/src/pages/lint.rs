@@ -476,11 +476,41 @@ impl<'a> Linter<'a> {
                         .into(),
                 );
             }
-        } else if get("data-to").is_some() {
+            if let Some(u) = get("data-open") {
+                if !(u.starts_with("slack://") || u.starts_with("https://")) {
+                    self.err(
+                        &at,
+                        format!("data-open=\"{u}\" is not a link to the channel: use its slack:// or https:// URL"),
+                    );
+                }
+            }
+        } else if get("data-open").is_some() {
             self.err(
                 &at,
-                "data-to is not a kit attribute here: only a message block takes it".into(),
+                "data-open is not a kit attribute here: only a message block takes it".into(),
             );
+        }
+        // an email may say where it goes too (data-to="Gmail · reply to Camille Roux")
+        if get("data-to").is_some() && !matches!(kit.as_deref(), Some("message" | "email")) {
+            self.err(
+                &at,
+                "data-to is not a kit attribute here: only a message or an email block takes it"
+                    .into(),
+            );
+        }
+        match (kit.as_deref(), get("data-verb")) {
+            (_, None) => {}
+            (Some("review"), Some(v)) if matches!(v.as_str(), "send" | "approve" | "keep") => {}
+            (Some("review"), Some(v)) => self.err(
+                &at,
+                format!(
+                    "data-verb=\"{v}\" is not a verb: use send (drafts that leave), keep (what bise keeps about the user) or approve"
+                ),
+            ),
+            _ => self.err(
+                &at,
+                "data-verb is not a kit attribute here: only a review block takes it".into(),
+            ),
         }
         if kit.as_deref() == Some("callout") {
             if let Some(t) = get("data-tone") {
@@ -622,14 +652,20 @@ impl<'a> Linter<'a> {
                 let ok = if block {
                     matches!(
                         n,
-                        "data-kit" | "data-id" | "data-tone" | "data-answer" | "data-to"
+                        "data-kit"
+                            | "data-id"
+                            | "data-tone"
+                            | "data-answer"
+                            | "data-to"
+                            | "data-open"
+                            | "data-verb"
                     )
                 } else {
                     false
                 };
                 if !ok {
                     let hint = if block {
-                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message)"
+                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message, email), data-open (message), data-verb (review)"
                     } else {
                         "inside a block only a review's <li data-id> and an email's <p data-field> take one"
                     };

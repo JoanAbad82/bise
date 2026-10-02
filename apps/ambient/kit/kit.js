@@ -51,6 +51,14 @@
     tick: "done",
     copy: "copy",
     copied: "copied",
+    copyFailed: "couldn't copy: select the text and copy it",
+    open: "open",
+    openIn: (ch) => `open ${ch}`,
+    postedIn: (ch) => `posted in ${ch}`,
+    send: "send",
+    sendAll: (n) => `send all ${n}`,
+    keepRule: "keep",
+    strike: "strike",
     replyOn: (site) => `reply on ${site}`,
     copyOpen: (site) => `copy + open ${site}`,
   };
@@ -332,24 +340,34 @@
       if (kit === "checklist") decorateWho(doc, li, Date.now());
       decorateAgent(doc, li);
       // a reply item: its approve says what it does ('reply on X', or 'copy + open' on Hacker News)
+      // and a review of drafts that leave (data-verb="send") says 'send', never 'approve'
       const t = kit === "review" && replyTarget(li.getAttribute("data-reply"), "");
-      if (t) {
-        const ok = kids(li).filter(ui).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "approve");
-        if (ok) ok.textContent = t.copy ? W.copyOpen(t.site) : W.replyOn(t.site);
-      }
+      const ok = kit === "review" && kids(li).filter(ui).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "approve");
+      // and what bise keeps about the user (data-verb="keep") says 'keep' / 'strike'
+      if (ok) ok.textContent = t ? (t.copy ? W.copyOpen(t.site) : W.replyOn(t.site)) : sends(block) ? W.send : keeps(block) ? W.keepRule : W.approve;
+      const no = keeps(block) && kids(li).filter(ui).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "skip");
+      if (no) no.textContent = W.strike;
     }
   }
+  const keeps = (block) => block.getAttribute("data-verb") === "keep";
+  // a review whose items are drafts bise sends once the user says so (mail replies, messages)
+  const sends = (block) => block.getAttribute("data-verb") === "send";
   function decorateReview(doc, block) {
     decorateItems(doc, block, "review");
     let all = kids(block).find(ui);
     if (!all) { all = doc.createElement("p"); all.setAttribute("data-kit-ui", ""); all.append(button(doc, "approve-all", "")); block.append(all); }
     const n = pending(block).length;
     const b = kids(all)[0];
-    b.textContent = W.approveAll(n);
+    b.textContent = sends(block) ? W.sendAll(n) : W.approveAll(n);
     if (n) b.removeAttribute("disabled"); else b.setAttribute("disabled", "");
   }
+  // an email always leaves: 'send' / 'skip' (its note is still an approve)
   function decorateEmail(doc, block) {
-    if (!kids(block).some(ui)) block.append(acts(doc, ["approve", "skip"]));
+    if (!kids(block).some((c) => ui(c) && c.getAttribute("data-went") == null)) {
+      const bar = acts(doc, ["approve", "skip"]);
+      kids(bar)[0].textContent = W.send;
+      block.append(bar);
+    }
   }
   // react to an item (review approve/skip, compare keep/drop/pick, checklist tick) or a whole
   // email (item null); the same again takes it back; a pick is one per block (the last wins).
@@ -398,12 +416,88 @@
     return out.filter(Boolean).join("\n\n");
   }
   function decorateMessage(doc, block) {
-    if (!kids(block).some(ui)) block.append(acts(doc, ["copy"]));
+    if (!kids(block).some((c) => ui(c) && c.getAttribute("data-went") == null)) block.append(acts(doc, ["copy"]));
   }
+
+  // ---- where a draft went (slice A): meta.went [{kind, ref, url, at, block?}], from
+  // `sb page publish --went <kind>:<ref>[@<block>]=<url>`, and on SSE 'went' {went}. A draft put in
+  // the user's tool shows "in your Gmail drafts · open"; a message copied "copied · open #launch".
+  const DRAFTS = { "gmail-draft": "in your Gmail drafts", "outlook-draft": "in your Outlook drafts", "kit-draft": "in your Kit drafts" };
+  const safeLink = (u) => (/^(https:|slack:|mailto:)/.test(String(u || "")) ? String(u) : null);
+  // the channel a message goes to, from its data-to ("Slack · #launch" → "#launch")
+  const channelOf = (block) => String(block.getAttribute("data-to") || "").split("·").pop().trim();
+  function wentWords(entry, block) {
+    const kind = String((entry && entry.kind) || "");
+    const href = safeLink(entry && entry.url) || (block.getAttribute("data-kit") === "message" ? safeLink(block.getAttribute("data-open")) : null);
+    const ch = block.getAttribute("data-kit") === "message" ? channelOf(block) : "";
+    const text = DRAFTS[kind] || (kind === "copy" ? W.copied : kind === "slack" ? W.postedIn(ch || "Slack") : kind.replace(/[-_]+/g, " "));
+    return { text, open: href ? (ch && (kind === "copy" || kind === "slack") ? W.openIn(ch) : W.open) : null, href };
+  }
+  // which block each entry belongs to: its own block, else a draft → the first email block and
+  // slack/copy → the first message block (either, for another kind); the last entry wins
+  function wentFor(went, blocks) {
+    const out = new Map();
+    const first = (kits) => blocks.find((b) => kits.includes(b.getAttribute("data-kit")));
+    for (const e of went || []) {
+      if (!e || !e.kind) continue;
+      const k = String(e.kind);
+      const b = e.block ? blocks.find((x) => idOf(x) === String(e.block)) : first(DRAFTS[k] ? ["email"] : k === "slack" || k === "copy" ? ["message"] : ["email", "message"]);
+      if (!b) continue;
+      const was = out.get(idOf(b));
+      if (!was || (e.at || 0) >= (was.at || 0)) out.set(idOf(b), e);
+    }
+    return out;
+  }
+  function drawWent(doc, block, entry) {
+    let line = kids(block).find((c) => ui(c) && c.getAttribute("data-went") != null);
+    if (!entry) { if (line) block.removeChild(line); return; }
+    if (!line) { line = doc.createElement("p"); line.setAttribute("data-kit-ui", ""); line.setAttribute("data-went", ""); block.append(line); }
+    const w = wentWords(entry, block);
+    line.setAttribute("data-went", String(entry.kind));
+    const t = doc.createElement("span");
+    t.textContent = w.text;
+    const parts = [t];
+    if (w.href) {
+      const a = doc.createElement("a");
+      a.setAttribute("href", w.href);
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener");
+      a.textContent = w.open;
+      parts.push(a);
+    }
+    for (const c of kids(line)) line.removeChild(c);
+    line.append(...parts);
+  }
+  function applyWent(doc, blocks, went) {
+    const map = wentFor(went, blocks);
+    for (const b of blocks) {
+      const kit = b.getAttribute("data-kit");
+      if (kit !== "email" && kit !== "message") continue;
+      const e = map.get(idOf(b));
+      // a local "copied" stays until the server says where the draft went
+      const line = kids(b).find((c) => ui(c) && c.getAttribute("data-went") != null);
+      if (!e && line && line.getAttribute("data-went") === "copy") continue;
+      drawWent(doc, b, e || null);
+    }
+  }
+
+  // the parts the user may edit in place (amb-web's notes.js edits only inside [data-editable]):
+  // a review item's proposal (after its 'who · what · when' line, never the quoted comment), an
+  // email's subject and body (not to/cc), a message's text. Set by the kit, never by the agent.
+  function editableParts(block) {
+    const kit = block.getAttribute("data-kit");
+    const own = (e) => kids(e).filter((c) => !ui(c));
+    if (kit === "message") return own(block);
+    if (kit === "email") return own(block).filter((c) => { const f = c.getAttribute("data-field"); return f == null || f === "subject"; });
+    if (kit === "review") return items(block).flatMap((li) => own(li).slice(1).filter((c) => c.tagName.toLowerCase() !== "blockquote"));
+    return [];
+  }
+  function markEditable(block) { for (const e of editableParts(block)) e.setAttribute("data-editable", ""); }
 
   function decorate(blocks, agent, doc) {
     for (const b of blocks) {
       const kit = b.getAttribute("data-kit");
+      markEditable(b);
       if (kit === "table") decorateTable(b);
       else if (kit === "question") decorateQuestion(b, agent);
       else if (kit === "review" && doc) decorateReview(doc, b);
@@ -430,7 +524,7 @@
     return { ...res, marked: [...marked] };
   }
 
-  const BiseKit = { W, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, options, norm };
+  const BiseKit = { W, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, wentWords, wentFor, applyWent, editableParts, options, norm };
   root.BiseKit = BiseKit;
 
   // ---- the browser: the frame, the stream, the keys ----
@@ -532,6 +626,9 @@
       m.textContent = parts.join(" · ");
       doc.title = main.dataset.state === "writing" ? W.tabWriting(title) : title;
       latest.hidden = shown >= latestN;
+      // at v1 there is nothing to compare or go back to: no 'what changed', no 'v1' chip
+      wc.hidden = latestN < 2;
+      vbox.hidden = latestN < 2;
       vb.textContent = (shown < latestN ? W.older(shown, latestN) : `v${shown}`) + (latestN > 1 ? " ▾" : "");
       if (latestN > 1) vb.removeAttribute("disabled"); else vb.setAttribute("disabled", "");
       const vs = meta ? meta.versions.slice().sort((a, b) => b.n - a.n) : [];
@@ -552,7 +649,13 @@
       try { const r = await fetch(`/p/${id}/meta`, { cache: "no-store" }); if (r.ok) meta = await r.json(); } catch (_) { /* offline: the page still reads */ }
       return meta;
     }
-    loadMeta().then(() => { drawMeta(); markChanged(changedIn(meta, shown)); });
+    // where the page's drafts went (meta.went, then SSE 'went'): the whole list each time
+    let went = [];
+    loadMeta().then(() => {
+      drawMeta();
+      markChanged(changedIn(meta, shown));
+      if (meta && meta.went) { went = meta.went; applyWent(doc, blocks(), went); }
+    });
     // the meta line every 30 s; every second while writing (the time counts up)
     let tick = 0;
     setInterval(() => { tick++; if (main.dataset.state === "writing" || tick % 30 === 0) drawMeta(); }, 1000);
@@ -582,6 +685,8 @@
       shown = v;
       drawMeta();
       markChanged(res.marked);
+      if (meta && meta.went) went = meta.went;
+      applyWent(doc, blocks(), went);
     }
 
     // the frame and the placeholder follow the state: writing (no version yet), updating (notes
@@ -619,6 +724,7 @@
       const relay = (ev, name) => es.addEventListener(ev, (e) => doc.dispatchEvent(new root.CustomEvent(name, { detail: data(e) })));
       es.addEventListener("notes", (e) => doc.dispatchEvent(new root.CustomEvent("bise:notes", { detail: { notes: data(e).notes || [] } })));
       relay("voice", "bise:voice"); // slice 2 (§4.1): {phase, text}, notes.js pins it
+      es.addEventListener("went", (e) => { const x = data(e); if (Array.isArray(x.went)) { went = x.went; applyWent(doc, blocks(), went); } });
       // slice C: an agent's live status {name, status, note?} redraws the items it works on
       es.addEventListener("agent", (e) => {
         const x = data(e);
@@ -657,6 +763,11 @@
       const sup = e.target.closest && e.target.closest("sup");
       if (sup) showSource(parseInt(sup.textContent, 10));
     });
+    // an edit landed or was undone (notes.js sets data-edited): 'approve N' counts again
+    doc.addEventListener("bise:edited", (e) => {
+      const b = blocks().find((x) => x.dataset.id === (e.detail && e.detail.block));
+      if (b) decorate([b], agent, doc);
+    });
     doc.addEventListener("keydown", (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey || !/^[1-9]$/.test(e.key)) return;
       const t = e.target;
@@ -670,8 +781,16 @@
       const block = btn.closest("[data-kit][data-id]");
       const kind = btn.getAttribute("data-act");
       if (kind === "copy") {
-        const done = () => { btn.textContent = W.copied; setTimeout(() => { btn.textContent = W.copy; }, 1600); };
-        if (root.navigator && root.navigator.clipboard) root.navigator.clipboard.writeText(toSlack(block)).then(done, () => {});
+        // copied: the button says so a moment, and the block keeps "copied · open #launch" (its
+        // data-open link) until the server says where it went; a refused clipboard says so too
+        const done = () => {
+          btn.textContent = W.copied;
+          setTimeout(() => { btn.textContent = W.copy; }, 1600);
+          if (!wentFor(went, [block]).has(block.dataset.id)) drawWent(doc, block, { kind: "copy" });
+        };
+        const failed = () => { btn.textContent = W.copyFailed; setTimeout(() => { btn.textContent = W.copy; }, 3200); };
+        if (root.navigator && root.navigator.clipboard) root.navigator.clipboard.writeText(toSlack(block)).then(done, failed);
+        else failed();
         return;
       }
       const li = btn.closest("li[data-id]");
