@@ -640,7 +640,10 @@ def menubar(states=None, frames=1, count=2, out=None):
                 tiles.append({"path": f[0], "label": "%s · %s%s" % (s["state"], strip, " · %d frames" % frames if frames > 1 else "")})
     if tiles:
         r["sheet"] = os.path.join(out, "sheet.menubar.png")
-        call("sheet", items=tiles, out=r["sheet"], cols=4, tile_w=220, title="bise ambient · the menu-bar item, 2x (need = %d)" % count, timeout=60)
+        # every tile at one scale, 8x of 1x (ambient m_5479): the strips share one width
+        zoom = 8
+        call("sheet", items=tiles, out=r["sheet"], cols=4, tile_w=zoom * float(r.get("strip_w") or 48),
+             title="bise ambient · the menu-bar item at %dx (need = %d)" % (zoom, count), timeout=60)
     return r
 
 

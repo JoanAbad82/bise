@@ -604,6 +604,9 @@ final class QA {
         // comes in only when the app's own Visibility says so (ambient's gate
         // run 2: a QA show here put 'perf is done.' in a glass nobody opened)
         if !capsule.hidden, let visIn {
+            // a scene left fn held (listen): its talk ends first, a dismiss
+            // alone keeps a talk's glass in
+            visIn(.cancelled)
             visIn(.dismiss)
             try? await Task.sleep(nanoseconds: 800_000_000)   // the 0.6 s back into the icon
         }
@@ -878,6 +881,9 @@ final class QA {
         let states = (q["states"] as? [String]) ?? QA.menubarStates
         let pearl = PearlFrames()
         var out: [[String: Any]] = []
+        // one strip width for all (ambient m_5479: sizes compare on the sheet)
+        let stripW = states.compactMap { QA.menubarLook($0, count: count) }
+            .compactMap { StatusItem.compose($0, frame: 0, pearl: pearl)?.size.width }.max().map { $0 + 12 } ?? 30
         for s in states {
             guard let look = QA.menubarLook(s, count: count) else {
                 throw Failure(description: "menubar state \(s): one of \(QA.menubarStates.joined(separator: ", "))")
@@ -892,7 +898,7 @@ final class QA {
                 size = img.size
                 let base = dir + "/" + s + (frames > 1 ? String(format: "-%02d", f) : "")
                 for (suffix, scale, strip) in [("@1x", 1.0, nil), ("@2x", 2.0, nil), (".light@2x", 2.0, "light"), (".dark@2x", 2.0, "dark")] as [(String, CGFloat, String?)] {
-                    guard let cg = QA.render(img, scale: scale, strip: strip) else { continue }
+                    guard let cg = QA.render(img, scale: scale, strip: strip, width: strip == nil ? nil : stripW) else { continue }
                     try PNG.write(cg, base + suffix + ".png")
                     files.append(base + suffix + ".png")
                 }
@@ -900,14 +906,15 @@ final class QA {
             out.append(["state": s, "mood": look.mood.rawValue, "extra": look.extra, "count": look.count, "frames": frames,
                         "loop": n, "files": files, "size": [size.width, size.height]])
         }
-        return ["states": out, "dir": dir]
+        return ["states": out, "dir": dir, "strip_w": stripW]
     }
 
     // an image at a scale: transparent, or on a menu-bar strip (24 pt tall,
     // 6 pt each side) in the light or dark appearance
-    static func render(_ img: NSImage, scale: CGFloat, strip: String?) -> CGImage? {
+    static func render(_ img: NSImage, scale: CGFloat, strip: String?, width: CGFloat? = nil) -> CGImage? {
         let pad: CGFloat = strip == nil ? 0 : 6
-        let size = NSSize(width: img.size.width + 2 * pad, height: strip == nil ? img.size.height : 24)
+        // a strip `width` wide (the widest state's): every strip the same size, the icon left-aligned
+        let size = NSSize(width: max(width ?? 0, img.size.width + 2 * pad), height: strip == nil ? img.size.height : 24)
         let w = Int((size.width * scale).rounded(.up)), h = Int((size.height * scale).rounded(.up))
         guard w > 0, h > 0, let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
                                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
