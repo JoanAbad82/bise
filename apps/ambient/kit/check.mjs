@@ -336,6 +336,7 @@ law("the kit's own controls never count as a change of the agent's block", () =>
 
 law("names: an agent's id reads with spaces on the page (by launch recap), the id stays", () => {
   assert.equal(K.W.by("launch-recap"), "by launch recap");
+  assert.equal(K.W.by("main"), "by bise", "main speaks as bise on the ambient surfaces");
   assert.equal(K.W.updating("weekly-update"), "weekly update is updating this page…");
   const q = blocks(parse(Q))[0];
   K.decorate([q], "launch-recap", doc);
@@ -485,6 +486,27 @@ law("send, not approve, when the draft leaves; the editable parts are the drafts
   assert.deepEqual(ed(r), ["yes", "yes, friday"], "never the who line nor the quoted comment");
   assert.deepEqual(ed(e), ["s", "hi"], "subject and body, not to");
   assert.ok(K.editableParts(e).every((x) => x.hasAttribute("data-editable")));
+});
+
+law("a watching page: 'watching · checked 3 min ago · until tomorrow 18:00'; a read-only reply says what happened", () => {
+  const now = new Date(2026, 4, 13, 14, 20).getTime();
+  const at = (d, h, m) => new Date(2026, 4, d, h, m).getTime();
+  assert.equal(K.untilWords(at(13, 18, 0), now), "until 18:00");
+  assert.equal(K.untilWords(at(14, 18, 0), now), "until tomorrow 18:00");
+  assert.equal(K.untilWords(at(16, 9, 5), now), "until saturday 9:05");
+  assert.equal(K.untilWords(at(30, 9, 0), now), "until 30 may");
+  assert.equal(K.untilWords(null, now), null);
+  assert.equal(K.watchLine({ timer: 3, every: "every 10m", checked_ms: now - 3 * 60000, until_ms: at(14, 18, 0) }, now), "watching · checked 3 min ago · until tomorrow 18:00");
+  assert.equal(K.watchLine({ timer: 3, every: "every 10m" }, now), "watching");
+  assert.equal(K.watchLine(null, now), null);
+  const r = blocks(parse(`<section data-kit="review" data-id="w" data-verb="open-reply"><ol><li data-id="hn-1" data-reply="https://news.ycombinator.com/item?id=1"><p>pg · Hacker News · 1 h ago</p><blockquote>q?</blockquote><p>a.</p></li><li data-id="x-2" data-reply="https://x.com/a/status/2"><p>@a · X</p><blockquote>q</blockquote><p>b</p></li></ol></section>`))[0];
+  K.decorate([r], "launch-watch", doc);
+  const [hn, x] = K.options(r);
+  const labels = (el) => el.children.filter((n) => n.hasAttribute("data-kit-ui")).flatMap((u) => u.children).map((y) => y.textContent);
+  assert.deepEqual(labels(hn), ["open with the reply", "skip"], "never 'send' on a read-only place");
+  assert.equal(K.replyWent(doc, hn, K.replyTarget(hn.getAttribute("data-reply"), "a.")).textContent, "copiedopen the thread");
+  assert.equal(K.replyWent(doc, x, K.replyTarget(x.getAttribute("data-reply"), "b")).textContent, "opened on X");
+  assert.equal(x.children.filter((n) => n.hasAttribute("data-went")).length, 1);
 });
 
 law("an item's agent: its name first (spaces, not hyphens), then its live status and note", () => {

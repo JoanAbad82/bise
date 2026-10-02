@@ -65,6 +65,7 @@ As main, also:\n\
 - A page's drafts stay on the page until the user's word there (`send`, `approve`, \"put it in my drafts\"): nothing goes to an account before (no draft in Gmail, no message, no post), not even while the first versions are written; the page says where a draft went only after that. Put it in the brief of a task that makes such a page.\n\
 - A job over many items (mails to answer, comments, bugs): its brief says to draft and publish as it reads: list the items first (subjects only), publish the first 2-3 drafted items within about 45 s of the ask, then a version per 2-3 items, what was skipped last; never read everything before the first items.\n\
 - When the user says a step of his is done (a page's checklist row with `data-who=\"yours\"`; his open steps come with his message), run `sb page tick <page> <item>` and say it in one line.\n\
+- A standing order (\"watch the launch until tomorrow\", \"tell me when the PR is reviewed\"): one agent, one page it republishes, woken by a timer it sets with `sb every 10m \"<instruction>\" --page <id> [--until …]`, never by sleeping; a card only for what the user asked to be told about, numbers stay on the page.\n\
 - When an agent finishes, say what shipped, in one line with its name: `auth-fix is done: the login test waits for the event now.`\n\
 - When you answer an agent's question on the user's behalf (the brief or the user already decided it), answer it explicitly with `sb send <agent> --reply-to <id> --why \"<one sentence: why this answer>\" \"<answer>\"` (the user sees your answer and the why), then tell the user in one line: `docs asked v1 or v2; the brief says v2, so i answered.`\n\n\
 {cmds}\n\
@@ -329,6 +330,8 @@ mod tests {
         assert!(r.contains("A job over many items") && r.contains("within about 45 s of the ask"));
         // roadmap D (amb-core m_5403): a spoken tick of his own step
         assert!(r.contains("run `sb page tick <page> <item>`"));
+        // roadmap B (ambient-lead m_5446): a standing order on a timer tied to its page
+        assert!(r.contains("A standing order") && r.contains("--page <id>"));
         let skill = include_str!("../../../prompts/skills-all/bise-pages/SKILL.md");
         assert!(skill.starts_with("---\nname: bise-pages\ndescription: "));
     }

@@ -64,6 +64,10 @@ body {
 .bise-frame button:hover, .bise-frame a.b:hover, .bise-frame button.on { background: var(--talk-raised-on); }
 .bise-frame button[disabled] { opacity: .4; cursor: default; background: var(--talk-raised); }
 .bise-frame [hidden] { display: none; }
+/* a watching page (roadmap B): 'watching · checked 3 min ago · until tomorrow 18:00' and 'stop' */
+.bise-frame .w { display: flex; align-items: center; gap: 8px; min-width: 0; font: 12px var(--font-mono); color: var(--talk-meta); overflow: hidden; }
+.bise-frame .w > span { overflow: hidden; text-overflow: ellipsis; }
+.bise-frame .w[hidden] { display: none; }
 /* the version menu: "v3 ▾", a small list of versions under it */
 .bise-frame .v { position: relative; }
 .bise-frame .v > button { font-family: var(--font-mono); font-size: 12px; }
@@ -259,6 +263,12 @@ body {
 #bise-page [data-kit] > p[data-went] { display: block; margin: var(--space-3) 0 0; font: 12px/1.5 var(--font-mono); color: var(--ok); }
 #bise-page [data-kit] > p[data-went] > a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 #bise-page [data-kit] > p[data-went] > a::before { content: " · "; display: inline-block; white-space: pre; text-decoration: none; }
+/* a reply opened from its item (roadmap B): 'opened on X', 'copied · open the thread' */
+#bise-page li[data-id] > [data-went] { display: block; grid-column: 1 / -1; font: 12px/1.5 var(--font-mono); color: var(--ok); }
+#bise-page li[data-id] > [data-went] > a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+#bise-page li[data-id] > [data-went] > a::before { content: " · "; display: inline-block; white-space: pre; text-decoration: none; }
+/* read-only places: no bulk 'open 5' (one thread at a time) */
+#bise-page [data-kit="review"][data-verb="open-reply"] > p[data-kit-ui] { display: none; }
 
 /* what changed: a soft wash on the blocks that differ from the version before */
 body.bise-changes [data-changed] { background: var(--changed); box-shadow: -10px 0 0 var(--changed), 10px 0 0 var(--changed); }

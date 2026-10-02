@@ -22,7 +22,9 @@
   "use strict";
 
   // an agent's id as people read it (vision §3): hyphens become spaces, the id itself never changes
-  const said = (agent) => String(agent || "").replace(/-/g, " ");
+  // an agent's name as the user reads it: spaces, not hyphens; main speaks as bise on the ambient
+  // surfaces (ambient m_5473, amb-web 4139b4fe): 'by bise', an agent's page keeps its own name
+  const said = (agent) => (agent === "main" ? "bise" : String(agent || "").replace(/-/g, " "));
 
   // ---- the words (ambient's) ----
   const W = {
@@ -58,6 +60,12 @@
     send: "send",
     sendAll: (n) => `send all ${n}`,
     yours: "you",
+    watching: "watching",
+    stop: "stop",
+    openReply: "open with the reply",
+    openedOn: (site) => `opened on ${site}`,
+    copiedOpen: "copied",
+    openThread: "open the thread",
     keepRule: "keep",
     strike: "strike",
     replyOn: (site) => `reply on ${site}`,
@@ -353,7 +361,9 @@
       const t = kit === "review" && replyTarget(li.getAttribute("data-reply"), "");
       const ok = kit === "review" && kids(li).filter(ui).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "approve");
       // and what bise keeps about the user (data-verb="keep") says 'keep' / 'strike'
-      if (ok) ok.textContent = t ? (t.copy ? W.copyOpen(t.site) : W.replyOn(t.site)) : sends(block) ? W.send : keeps(block) ? W.keepRule : W.approve;
+      // a read-only place (data-verb="open-reply", roadmap B): 'open with the reply', never 'send'
+      const verb = block.getAttribute("data-verb");
+      if (ok) ok.textContent = verb === "open-reply" ? W.openReply : t ? (t.copy ? W.copyOpen(t.site) : W.replyOn(t.site)) : sends(block) ? W.send : keeps(block) ? W.keepRule : W.approve;
       const no = keeps(block) && kids(li).filter(ui).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "skip");
       if (no) no.textContent = W.strike;
     }
@@ -545,7 +555,51 @@
     return true;
   }
 
-  const BiseKit = { W, ticked, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, wentWords, wentFor, applyWent, editableParts, options, norm };
+  // a reply opened from its item (roadmap B): the item says what happened, 'opened on X' (the
+  // reply prefilled) or 'copied · open the thread' (the link, to open it again)
+  function replyWent(doc, li, t) {
+    let line = kids(li).find((c) => ui(c) && c.getAttribute("data-went") != null);
+    if (!line) { line = doc.createElement("span"); line.setAttribute("data-kit-ui", ""); line.setAttribute("data-went", "reply"); li.append(line); }
+    for (const c of kids(line)) line.removeChild(c);
+    const s = doc.createElement("span");
+    s.textContent = t.copy ? W.copiedOpen : W.openedOn(t.site);
+    line.append(s);
+    const href = safeLink(li.getAttribute("data-reply"));
+    if (t.copy && href) {
+      const a = doc.createElement("a");
+      a.setAttribute("href", href);
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener");
+      a.textContent = W.openThread;
+      line.append(a);
+    }
+    return line;
+  }
+
+  // ---- a watching page (roadmap B: a standing order on a timer) ----
+  // meta.watch / SSE 'watch' {timer, every, checked_ms, until_ms?}: the frame says
+  // 'watching · checked 3 min ago · until tomorrow 18:00' and has 'stop'
+  const hm = (d) => `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+  function untilWords(untilMs, nowMs) {
+    if (!untilMs) return null;
+    const d = new Date(untilMs), now = new Date(nowMs);
+    const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.round((day(d) - day(now)) / 86400000);
+    if (days <= 0) return `until ${hm(d)}`;
+    if (days === 1) return `until tomorrow ${hm(d)}`;
+    if (days < 7) return `until ${DAYS[d.getDay()]} ${hm(d)}`;
+    return `until ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  }
+  function watchLine(w, nowMs) {
+    if (!w) return null;
+    const parts = [W.watching];
+    if (w.checked_ms) parts.push(`checked ${ago(w.checked_ms, nowMs)}`);
+    const u = untilWords(w.until_ms, nowMs);
+    if (u) parts.push(u);
+    return parts.join(" · ");
+  }
+
+  const BiseKit = { W, ticked, untilWords, watchLine, replyWent, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, wentWords, wentFor, applyWent, editableParts, options, norm };
   root.BiseKit = BiseKit;
 
   // ---- the browser: the frame, the stream, the keys ----
@@ -625,7 +679,24 @@
     const latest = el("a", { class: "b", href: `/p/${id}`, hidden: "" }, W.latest);
     const n = el("span", { class: "n", "data-bise-notes-count": "" });
     const send = el("button", { type: "button", class: "send", "data-bise-send": "", disabled: "" }, W.send);
-    f.append(m, st, sp, wc, vbox, latest, n, send);
+    // a watching page: 'watching · checked 3 min ago · until tomorrow 18:00' and 'stop' (a stop
+    // note to main through notes.js: document bise:stop {page, timer})
+    const wbox = el("span", { class: "w", hidden: "" });
+    const wWords = el("span", {});
+    const wStop = el("button", { type: "button", class: "stop" }, W.stop);
+    wbox.append(wWords, wStop);
+    let watch = null;
+    function drawWatch() {
+      const line = main.dataset.state === "writing" ? null : watchLine(watch, Date.now());
+      wbox.hidden = !line;
+      wWords.textContent = line || "";
+    }
+    wStop.addEventListener("click", () => {
+      if (!watch) return;
+      wStop.disabled = true;
+      doc.dispatchEvent(new root.CustomEvent("bise:stop", { detail: { page: id, timer: watch.timer == null ? null : watch.timer } }));
+    });
+    f.append(m, st, wbox, sp, wc, vbox, latest, n, send);
     const openMenu = (on) => { menu.hidden = !on; vb.setAttribute("aria-expanded", String(on)); };
     vb.addEventListener("click", (e) => { e.stopPropagation(); if (!vb.disabled) openMenu(menu.hidden); });
     doc.addEventListener("click", (e) => { if (!menu.hidden && !vbox.contains(e.target)) openMenu(false); });
@@ -676,10 +747,11 @@
       drawMeta();
       markChanged(changedIn(meta, shown));
       if (meta && meta.went) { went = meta.went; applyWent(doc, blocks(), went); }
+      if (meta && meta.watch) { watch = meta.watch; drawWatch(); }
     });
     // the meta line every 30 s; every second while writing (the time counts up)
     let tick = 0;
-    setInterval(() => { tick++; if (main.dataset.state === "writing" || tick % 30 === 0) drawMeta(); }, 1000);
+    setInterval(() => { tick++; if (main.dataset.state === "writing" || tick % 30 === 0) { drawMeta(); drawWatch(); } }, 1000);
 
     // the reading position: the first block whose bottom is under the frame
     const view = {
@@ -745,6 +817,14 @@
       const relay = (ev, name) => es.addEventListener(ev, (e) => doc.dispatchEvent(new root.CustomEvent(name, { detail: data(e) })));
       es.addEventListener("notes", (e) => doc.dispatchEvent(new root.CustomEvent("bise:notes", { detail: { notes: data(e).notes || [] } })));
       relay("voice", "bise:voice"); // slice 2 (§4.1): {phase, text}, notes.js pins it
+      // a watching page (amb-home m_5458): the whole watch object on each change, null when it ends
+      es.addEventListener("watch", (e) => {
+        let x = null;
+        try { x = JSON.parse(e.data); } catch (_) { x = null; }
+        watch = x && typeof x === "object" ? x : null;
+        wStop.disabled = false;
+        drawWatch();
+      });
       es.addEventListener("ticked", (e) => {
         const x = data(e);
         const b = blocks().find((y) => y.dataset.id === x.block && y.dataset.kit === "checklist");
@@ -835,6 +915,7 @@
         if (t) {
           if (t.copy && root.navigator && root.navigator.clipboard) root.navigator.clipboard.writeText(text).catch(() => {});
           root.open(t.open, "_blank", "noopener");
+          replyWent(doc, li, t);
         }
       }
       decorate([block], agent, doc);

@@ -55,8 +55,10 @@ How to write them well:
   call, through the user's approvals, after their `send`.
 - **Replies to comments** (Hacker News, Reddit, X, Bluesky): a `review` item with
   `data-reply="<the comment's https link>"`, then `<p>who · where · when</p>`, the comment in a
-  `<blockquote>`, and your drafted reply in `<p>`s. Approving it opens the thread with the reply
-  ready (prefilled on X, copied for the others): bise never posts, the user does.
+  `<blockquote>`, and your drafted reply in `<p>`s. Put `data-verb="open-reply"` on the block:
+  these places are read-only for bise, so the button says `open with the reply`, never `send`;
+  it opens the thread with the reply ready (prefilled on X and Bluesky, copied for the others)
+  and the item says `opened on X` or `copied · open the thread`. bise never posts, the user does.
 - **Work handed to agents** (bug reports from Slack or Linear, tickets, a to-do list): one
   `review` item per report, its id the ticket's (`ENG-412`) or the message's, a first `<p>`
   `who · where · when`, then what is wrong in one or two sentences with its number of reports.
@@ -214,11 +216,18 @@ Two kinds of notes ask for more than a change of the page:
 
 "watch the launch for me", "tell me when the PR is reviewed": one page you keep current, not a
 new page each time.
-- Check on a timer: `sb every 10m "<what to check>"`, written as the instruction to your future
-  self (`check the launch on HN, X and Reddit; republish launch-watch with what's new`). It
-  wakes you with `timer #3 (every 10m, …): <that line>`. Add `--until 18:00` or `--times 6` when
-  the user gave an end. `sb every` lists the timers; `sb every --stop 3` stops one: when the user
-  says so or the thing is over.
+- Check on a timer, never by sleeping: `sb every 10m "<what to check>" --page <id>`, the line
+  written as the instruction to your future self (`check the launch on HN, X, Reddit and
+  Bluesky; republish launch-watch with what's new`). `--page` ties the timer to the page: its
+  frame says `watching · checked 3 min ago · until tomorrow 18:00` and has `stop` (the user's
+  stop ends the timer without you). It wakes you with `timer #3 (every 10m, …): <that line>`.
+  Add `--until 18:00` or `--times 6` when the user gave an end. `sb every` lists the timers;
+  `sb every --stop 3` stops one when the thing is over.
+- The launch (comments on Hacker News, Reddit, X, Bluesky): the numbers in the heading's meta
+  line, one number per fact (`HN #7 · 412 points · 1,204 stars · 38 comments`), never a card for
+  them; then one `review` per group, each under an `h2` (`questions`, `bugs`, `praise`),
+  `data-verb="open-reply"`, one item per comment that needs an answer, its reply drafted. See
+  `examples/launch-watch.html`.
 - Each check republishes the **same page id**: what is new on top (a `callout` saying `since
   14:10` and what came), the items still to handle under it, the handled ones gone or folded into
   one line (`12 answered earlier`). Keep each item's `data-id` (the comment's id, the PR's
