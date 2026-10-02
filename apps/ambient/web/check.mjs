@@ -426,6 +426,34 @@ law("a page updating, then its next version ready, says ready again; a page open
   assert.equal(M.view(m, 60).text, "weekly update is ready · fn + o");
   eq(M.step(M.init(), { ev: "app_key", key: "o" }, 0).cmds, []);   // no page: nothing
 });
+law("in a call or a meeting (app_quiet), only urgent cards ask; the rest wait in the inbox; off, they ask again", () => {
+  const cards = [{ id: "c1", agent: "cookies", text: "keep the banner?", options: ["yes", "no"] }, { id: "c2", agent: "deploy", text: "ship it now?", options: ["yes", "no"], urgent: true }];
+  let m = M.step(M.init(), { ev: "state", agents: [], cards, pages: [] }, 0).m;
+  m = M.step(m, { ev: "app_quiet", on: true, why: "meeting" }, 10).m;
+  let v = M.view(m, 20);
+  assert.equal(v.text, "1 waiting for you"); assert.equal(v.note.agent, "deploy"); assert.equal(v.note.more, 0);
+  m = M.step(m, { ev: "state", agents: [], cards: [cards[0]], pages: [] }, 30).m;
+  v = M.view(m, 40);
+  assert.equal(v.state, "idle"); assert.equal(v.note, null); assert.equal(v.need, false);
+  assert.equal(M.view(M.step(m, { ev: "app_key", key: "i" }, 50).m, 60).inbox.length, 1);   // still in the inbox
+  m = M.step(m, { ev: "app_quiet", on: false, why: "" }, 70).m;
+  assert.equal(M.view(m, 80).note.agent, "cookies");
+});
+law("a card clicked in the menu bar (app_key i + card) opens the inbox at that card", () => {
+  const cards = ["a", "b", "c"].map((id) => ({ id, agent: id, text: id, options: ["yes", "no"] }));
+  let m = M.step(M.init(), { ev: "state", agents: [], cards, pages: [] }, 0).m;
+  const r = M.step(m, { ev: "app_key", key: "i", card: "c" }, 10);
+  const v = M.view(r.m, 20);
+  assert.equal(v.state, "inbox"); eq(v.inbox.map((c) => c.sel), [false, false, true]);
+  // again while open: it stays open (a click never closes it)
+  assert.equal(M.view(M.step(r.m, { ev: "app_key", key: "i", card: "a" }, 30).m, 40).state, "inbox");
+});
+law("the morning page (app_morning): `your morning page · fn + o`, and fn + o opens it", () => {
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
+  m = M.step(m, { ev: "app_morning", id: "morning-0612", title: "your morning", url: "http://127.0.0.1:47123/p/morning-0612" }, 10).m;
+  assert.equal(M.view(m, 20).text, "your morning page · fn + o");
+  eq(M.step(m, { ev: "app_key", key: "o" }, 30).cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/morning-0612", page: "morning-0612" }]);
+});
 
 // ---- the page's note layer (apps/ambient/kit/notes.js): anchoring, re-anchoring, the model
 const N = BiseNotes.core;

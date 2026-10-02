@@ -49,6 +49,7 @@
       perms: {}, permAsk: null,
       hidden: false, reduce: false, edgeGlow: true,
       radius: 16,                   // macOS's window radius (app_settings.radius); 16 until it comes
+      quiet: null,                  // { why: 'call' | 'meeting' | '' } while in a call or a meeting (app_quiet)
       flashes: [],                  // [{ glyph, text, sub, at, ttl, kiss, still, kind }]
       turnNames: null, chips: [],   // agents that appeared during your turn
       pages: [],                    // "for you": the pages made for you, newest first (state.pages)
@@ -227,7 +228,26 @@
       case "app_reduce_motion":
         return none({ ...m, reduce: !!(ev.on ?? ev.reduce) });
       case "app_key":
+        // a card clicked in the menu bar's :* menu (amb-mac, 60c247e9): the inbox, at that card
+        if (ev.key === "i" && ev.card) {
+          const i = visibleCards(m).findIndex((c) => c.id === ev.card);
+          const r = setPane(m, "inbox");
+          return { m: { ...r.m, sel: Math.max(0, i) }, cmds: r.cmds };
+        }
         return key(m, ev.key, now);
+      // a call or a meeting (amb-mac, 62d2105; replayed after a reload): main answers in text only
+      // and the non-urgent cards wait (no needs-you glass); the inbox still lists them
+      case "app_quiet":
+        return none({ ...m, quiet: ev.on ? { why: ev.why || "" } : null });
+      // today's morning page, opened in front by the app (amb-mac, 7d65d59e): the capsule names
+      // it, fn + o brings it back
+      case "app_morning": {
+        if (!ev.id) return none(m);
+        const prev = m.pages.find((p) => p.id === ev.id);
+        const page = { state: "ready", ...(prev || {}), id: ev.id, title: ev.title || (prev && prev.title), url: ev.url || (prev && prev.url) };
+        const m2 = { ...m, pages: sortPages([page, ...m.pages.filter((p) => p.id !== ev.id)]), lastPage: ev.id };
+        return none(flashQueue(m2, { kind: "page", text: Wd.morning, ttl: T.page, page: ev.id }, now));
+      }
 
       // ---- the page's own (clicks, the spotlight field)
       case "ui_option": {
@@ -310,7 +330,9 @@
   // `wall`: the epoch clock (a page's age); `now` may be the page's own monotonic clock
   function view(m, now, wall = now) {
     const cards = visibleCards(m);
-    const need = cards.length > 0;
+    // in a call or a meeting, only the urgent cards ask (the rest wait in the inbox)
+    const asking = m.quiet ? cards.filter((c) => c.urgent) : cards;
+    const need = asking.length > 0;
     const flash = m.flashes.find((f) => f.at <= now && now < f.at + f.ttl) || null;
     const v = {
       size: "small", pose: "rest", poseMs: now, lvl: 0, need, still: m.reduce,
@@ -348,8 +370,8 @@
 
     // the needs-you glass, unless a view already lists the cards
     if (need && !m.pane && !m.permAsk) {
-      const c = cards[0];
-      v.note = { id: c.id, agent: c.agent, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsHint, more: cards.length - 1,
+      const c = asking[0];
+      v.note = { id: c.id, agent: c.agent, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsHint, more: asking.length - 1,
         options: Wd.options(c).map((o) => ({ i: o.i, label: Wd.optionLabel(o.n, o.label) })) };
     }
 
@@ -428,7 +450,7 @@
       v.state = "hub_down"; v.text = W.hubDown; v.frozen = true;
     } else if (need) {
       // the glass under it names the agent; the capsule counts (designer: the two never repeat)
-      v.state = "needs"; v.glyph = "?"; v.text = Wd.waiting(cards.length);
+      v.state = "needs"; v.glyph = "?"; v.text = Wd.waiting(asking.length);
     } else {
       v.state = "idle"; v.text = Wd.idleLine(working(m.agents));
       if (inTurn(m)) v.pose = "think";   // main on its own turn: the * turns, the capsule stays small

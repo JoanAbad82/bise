@@ -67,6 +67,8 @@
   // a page for you (docs/ambient-vision.md §3 B; signed off by ambient, m_4786)
   const pageReady = (name) => `${name} is ready · fn + o`;
   const forYou = "for you";
+  // today's morning page, opened in front by the app (amb-mac's app_morning; best guess, asked to ambient)
+  const morning = "your morning page · fn + o";
   // fn held on a bise page: the words pin on the page (§4.1; ambient, m_4877)
   const voiceNoteOn = (name) => `voice note on ${name}`;
   // a page's line in "for you": `v2 · 3 min ago`, or `updating…`
@@ -165,5 +167,5 @@
   // an agent's row is a label, not a sentence: no final period
   const rowLabel = (s) => String(s || "").replace(/\.$/, "");
 
-  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, pageMeta, voiceNoteOn };
+  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, voiceNoteOn };
 })(typeof window !== "undefined" ? window : globalThis);
