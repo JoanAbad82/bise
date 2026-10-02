@@ -234,6 +234,26 @@ s after notes, the outbox empty (20 fixed). Question 16 on a page by main: the o
 `/answer` returns 409, and the fallback pick note lands in the side list; the answered state on
 the page with an open card (a task agent's page) is not checked yet.
 
+### Results: 2026-10-03, after midnight (headless, model hubs on fake accounts)
+
+- **16 fixed** (527fa441): the first pick on a page's question → `/answer` 200 → the page shows the
+  answer.
+- **Main's "page or one line" rule** (`qa.py ask`): pass. The four short asks got one line and no
+  page in 5-14 s; the four page asks each made a page with a one-line capsule reply. Fails 23
+  (times in UTC, not his zone) and 24 (a follow-up made a second page) went to amb-kit; fixed in
+  c535c7ce, not rechecked yet.
+- **The skill trim** (a9338abc): v1 at 26 s instead of 77 s. It lost the message block for the
+  Slack draft; fixed in c535c7ce and rechecked: `heading message callout callout sources`, v1 at
+  24 s, the next version 26 s after notes, the outbox empty.
+- **B, watch for me:** the first page passes (seen at 18-22 s, v1 at 33-37 s, 4 of 4 comments that
+  need an answer, the outbox empty, main's line clean). The checks after the first tick
+  (republish, one card, open-reply, stop) haven't run: `qa.py run launch-watch` stops at tick 1
+  (a 404, then a connection reset, both in amb-tools' tool).
+- **D, checklists: fail.** The page came at 17 s and v1 at 29 s, with 7 sourced steps. Fail 25:
+  no card for his first step within 400 s (amb-core). Fail 26: bise took none of the steps (5
+  yours, 2 Lucas'); fixed in dc32a7c9 (bise drafts what it can, his are only sign-in, 2FA,
+  payment, his word). Rerun once 25 lands.
+
 ## The look the user validated: round 8 (main m_5134)
 
 ambient owns the pixels against `site/content/ambient/identity8.html` and its SPEC; these are the
