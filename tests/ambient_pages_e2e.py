@@ -486,6 +486,37 @@ def main():
         st, _, r = request(port, "POST", "/api/p/fixture-stale/answer", {"block": "q1", "option": 2}, {"Origin": origin, "X-Bise-Token": token})
         check(st == 200, "the first pick on a stale card: %d %s" % (st, r))
         c.wait(lambda: fss.seen("answered", lambda d: d == {"block": "q1", "reply": "wait for Marc"}), 30, "SSE answered on the stale page")
+
+        # pm's B (m_5765): a reader polling a page while its agent republishes
+        # it 20 times always gets a whole answer, never a dropped connection
+        c.wait_idle("main")
+        busy = os.path.join(E.tmp, "busy.html")
+        open(busy, "w").write(PAGE_V1)
+        c.say('[[bash: sb page publish %s --id busy-watch --title "busy watch"]]' % busy)
+        c.wait_line("main", "published busy-watch v1", 90)
+        c.wait_idle("main")
+        polls = {"n": 0, "bad": []}
+        stop = threading.Event()
+
+        def poll():
+            while not stop.is_set():
+                for path in ("/p/busy-watch/meta", "/p/busy-watch"):
+                    try:
+                        st, _, b = request(port, "GET", path)
+                        if st != 200 or (path.endswith("/meta") and json.loads(b).get("id") != "busy-watch"):
+                            polls["bad"].append("%s: %s" % (path, st))
+                    except Exception as e:  # a dropped connection is the bug
+                        polls["bad"].append("%s: %r" % (path, e))
+                    polls["n"] += 1
+        t = threading.Thread(target=poll, daemon=True)
+        t.start()
+        c.say('[[bash: for i in $(seq 2 21); do sb page publish %s --id busy-watch >/dev/null || echo FAILED; done; echo republished]]' % busy)
+        c.wait_line("main", "republished", 180)
+        stop.set()
+        t.join(20)
+        st, _, b = request(port, "GET", "/p/busy-watch/meta")
+        check(json.loads(b)["versions"][-1]["n"] == 21, "20 republishes: v21")
+        check(polls["n"] > 20 and not polls["bad"], "%d reads during the republishes, bad: %s" % (polls["n"], polls["bad"][:3]))
     except AssertionError as e:
         print("FAIL", e)
         ok = False
