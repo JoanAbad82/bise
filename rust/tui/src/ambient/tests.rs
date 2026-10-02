@@ -835,3 +835,20 @@ fn talk_start_with_a_page_is_a_note_talk() {
     assert_eq!(Cmd::parse(r#"{"cmd":"talk_start","page":{"id":" "}}"#), Ok(Cmd::TalkStart));
     assert_eq!(Cmd::parse(r#"{"cmd":"talk_start","page":null}"#), Ok(Cmd::TalkStart));
 }
+
+#[test]
+fn what_the_capsule_sends_main_says_it_came_from_the_capsule() {
+    let mut t = T::new();
+    t.ready();
+    t.cmd(Cmd::Send { text: "what's running?".into() });
+    assert_eq!(
+        t.hub.next(),
+        json!({"op": "input", "focus": "main", "text": "what's running?", "via": "capsule"})
+    );
+    // an answer is an /answer command: no via, the hub adds no hint to it
+    t.hub.say(json!({"ev": "state", "agents": [], "cards": [
+        {"id": 4, "kind": "question", "agent": "a", "text": "now?\n1. yes\n2. no"}]}));
+    t.until(|o| has(o, "state"));
+    t.cmd(Cmd::Answer { card: 4, reply: "1".into() });
+    assert!(t.hub.next().get("via").is_none());
+}
