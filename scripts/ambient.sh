@@ -143,34 +143,40 @@ TRY_BISE="$TRY_TARGET/debug/bise"
 # (bins.sh, at this checkout's root): a second run rebuilds only what
 # changed. Under a file-size cap (an agent's shell: ulimit -f), the
 # build runs as a launchd job, which has none, and this waits for it.
+# A submitted job is KeepAlive: launchd restarts it when it ends, so the
+# job removes its own label as its last step (and on any exit: trap).
 try_build() {
   local job="$RUN/try-job.sh" rc="$RUN/try.rc" log="$RUN/try.log" v
+  local label="dev.bise.ambient.try.$$"
   mkdir -p "$RUN" "$TRY_TARGET"
   {
     echo '#!/bin/bash'
+    printf 'trap "launchctl remove %s 2>/dev/null" EXIT\n' "$label"
     for v in HOME PATH BISE_HOME SB_BUILD_DIR MACOSX_DEPLOYMENT_TARGET; do
       [ -z "${!v:-}" ] || printf 'export %s=%q\n' "$v" "${!v}"
     done
     printf 'export CARGO_TARGET_DIR=%q\n' "$TRY_TARGET"
-    printf 'cd %q && nice -n 5 cargo build -p bend-harness \\\n' "$REPO/rust"
-    printf '  && cd %q && nice -n 5 scripts/bins.sh repl-live sb-core\n' "$REPO"
+    printf 'cd %q && nice -n 10 cargo build -p bend-harness \\\n' "$REPO/rust"
+    printf '  && cd %q && nice -n 10 scripts/bins.sh repl-live sb-core\n' "$REPO"
     printf 'echo $? > %q\n' "$rc"
   } > "$job"
   rm -f "$rc"
   if [ "$(ulimit -f)" = unlimited ]; then
     bash "$job" 2>&1 | tee "$log" >&2
   else
-    local label="dev.bise.ambient.try.$$"
     say "a file-size cap here: building as a launchd job (log: $log)"
     : > "$log"
     launchctl submit -l "$label" -o "$log" -e "$log" -- /bin/bash "$job"
     local last=""
+    # this wait ending early (^C) must not leave the job behind
+    trap 'launchctl remove "$label" 2>/dev/null' EXIT
     while [ ! -s "$rc" ]; do
       sleep 2
       local now; now="$(tail -n 1 "$log" 2>/dev/null || true)"
       if [ -n "$now" ] && [ "$now" != "$last" ]; then echo "  $now" >&2; last="$now"; fi
     done
     launchctl remove "$label" 2>/dev/null || true
+    trap - EXIT
   fi
   local code; code="$(cat "$rc" 2>/dev/null || echo 1)"
   [ "$code" = 0 ] || { say "the build failed (exit $code): $log"; tail -n 20 "$log" >&2; exit 1; }
