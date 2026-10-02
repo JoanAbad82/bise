@@ -104,12 +104,21 @@
   // fn held on a bise page: the words pin on the page (§4.1; ambient, m_4877)
   const voiceNoteOn = (name) => `voice note on ${name}`;
   // a page's line in "for you": `v2 · 3 min ago`, or `updating…`
-  function pageMeta(p, nowMs) {
+  const agoOf = (atMs, nowMs) => {
+    const s = Math.max(0, Math.floor(((nowMs || 0) - (atMs || 0)) / 1000));
+    return !atMs || s < 60 ? "just now" : s < 3600 ? `${Math.floor(s / 60)} min ago` : s < 86400 ? `${Math.floor(s / 3600)} h ago` : `${Math.floor(s / 86400)} d ago`;
+  };
+  // a page's meta in for you (ambient-lead m_5515): one you never opened says 'new'; one with
+  // versions since you last opened it 'v3 · 2 new versions'; one you've seen 'v2 · 40 min ago'
+  // (best guesses, sent to ambient). openedAt: the newest version you opened (0: never)
+  function pageMeta(p, nowMs, openedAt) {
     if (p.state === "updating") return "updating…";
-    const s = Math.max(0, Math.floor(((nowMs || 0) - (p.at_ms || 0)) / 1000));
-    const ago = !p.at_ms || s < 60 ? "just now" : s < 3600 ? `${Math.floor(s / 60)} min ago` : s < 86400 ? `${Math.floor(s / 3600)} h ago` : `${Math.floor(s / 86400)} d ago`;
-    return `v${p.version || 1} · ${ago}`;
+    const v = p.version || 1;
+    if (openedAt != null && openedAt < v) return openedAt <= 0 ? "new" : `v${v} · ${plural(v - openedAt, "new version", "new versions")}`;
+    return `v${v} · ${agoOf(p.at_ms, nowMs)}`;
   }
+  // a page an agent watches (sb every --page; the hub's timers): 'watching · checked 3 min ago'
+  const watching = (lastMs, nowMs) => (lastMs > 0 ? `watching · checked ${agoOf(lastMs, nowMs)}` : "watching");
 
   // the inbox's label, the TUI's `inbox · 2 waiting for you`
   const waiting = (n) => `${n} waiting for you`;

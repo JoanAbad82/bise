@@ -540,6 +540,12 @@ law("it grows out of the menu-bar icon (SPEC §0): scale + fade from the icon's 
   // no icon yet: from the panel's top right
   assert.equal(M.grow(true, false, false, null, { x: 0, y: 0, w: 360 }).origin, "360px 0px");
   eq(M.grow(true, false, true, icon, null), { open: true, ms: 200, fade: true, ease: "linear" });
+  // reduced motion from either side, in any order (ambient m_5557): the app's flag or the system's
+  eq([M.reduced(false, false), M.reduced(true, false), M.reduced(false, true)], [false, true, true]);
+  for (const sys of [false, true]) for (const app of [false, true]) if (app || sys) {
+    const g = M.grow(true, false, M.reduced(app, sys), icon, { x: 10, y: 0, w: 360 });
+    assert.equal(g.fade, true); assert.equal(g.from, undefined); assert.equal(g.ms, 200);
+  }
   // app_icon is kept on the model, a broken one dropped
   assert.equal(M.view(M.step(M.init(), { ev: "app_icon", x: 1, y: -2, w: 18, h: 18 }, 0).m, 0).icon.y, -2);
   assert.equal(M.view(M.step(M.init(), { ev: "app_icon", x: "a" }, 0).m, 0).icon, null);

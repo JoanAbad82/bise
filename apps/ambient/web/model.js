@@ -413,6 +413,9 @@
   // hides the capsule. `icon` is the icon's rect in the page's CSS px (amb-mac's app_icon; above
   // the panel, so y < 0); without it, the panel's top right. Reduced motion: a plain fade.
   const GROW = { open: 750, close: 600, fade: 200, from: 0.15, easeOut: "cubic-bezier(.16, 1, .3, 1)", easeIn: "cubic-bezier(.7, 0, .84, 0)" };
+  // reduced motion for the grow: the app's flag (app_reduce_motion) or the system's (the web
+  // view's prefers-reduced-motion), either one is enough, whichever arrived first
+  const reduced = (appFlag, system) => !!appFlag || !!system;
   function grow(wasHidden, hidden, reduce, icon, box) {
     if (wasHidden === hidden) return null;
     const open = !hidden;
@@ -622,5 +625,5 @@
     return v;
   }
 
-  root.AmbModel = { init, step, view, T, visibleCards, grow, GROW };
+  root.AmbModel = { init, step, view, T, visibleCards, grow, GROW, reduced };
 })(typeof window !== "undefined" ? window : globalThis);

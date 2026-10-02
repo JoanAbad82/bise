@@ -99,13 +99,16 @@
   // the app shows or hides the capsule (app_hidden): it grows out of the menu-bar icon and goes
   // back into it (SPEC §0; amb-mac keeps the panel on screen for the close), a fade under reduced motion
   let wasHidden = null, growAnim = null;
+  const reduceMq = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
   function showHide(v) {
     if (wasHidden === null) { wasHidden = v.hidden; host.style.display = v.hidden ? "none" : ""; return; }
-    // reduced motion that arrives while a grow plays (the app's app_reduce_motion after the show):
-    // never a scale under it, the box lands where it is (SPEC §1)
-    if (v.still && growAnim && growAnim.scaled) growAnim.finish();
+    // reduced motion, whatever the order of events (ambient's recheck m_5557, ambient-lead m_5562):
+    // the app's app_reduce_motion OR the system's own setting as WebKit reads it, at show time; a
+    // grow never starts when either is on, and one that plays when reduce arrives lands at once
+    const reduce = M.reduced(v.still, !!(reduceMq && reduceMq.matches));
+    if (reduce && growAnim && growAnim.scaled) growAnim.finish();
     const r = host.getBoundingClientRect();
-    const g = M.grow(wasHidden, v.hidden, v.still, v.icon, { x: r.left, y: r.top, w: r.width });
+    const g = M.grow(wasHidden, v.hidden, reduce, v.icon, { x: r.left, y: r.top, w: r.width });
     wasHidden = v.hidden;
     if (!g) return;
     if (growAnim) growAnim.cancel();
