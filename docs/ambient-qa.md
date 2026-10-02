@@ -197,6 +197,20 @@ Slice 1 holds its done-when except speed and 10-12.
 - [ ] With the extension: the page opens in the `bise` tab group of my window, reuses its tab; no
       tab in an agent's group. Without it: the AppleScript/`open` path still works.
 
+## The look the user validated: round 8 (main m_5134)
+
+ambient owns the pixels against `site/content/ambient/identity8.html` and its SPEC; these are the
+product checks, through `qa.py scenes` and `snapshot`:
+
+- [ ] The capsule is direction A's glass: dark smoked glass, white text, bise pink `#f4a6b0` as the
+      only accent; no constellation orb anywhere: the pink mist pearl is bise's body.
+- [ ] The pearl's moods read at a glance and match the state: at rest, listening (follows my
+      voice), working, needs you (one nudge, then still), done (a nod), failed (still, no joke),
+      reduced motion (still).
+- [ ] The menu-bar states match round 8: idle, working, a count, needs you.
+- [ ] The pages' frame and note layer use the same pink and the same glass for bise's own chrome,
+      so the capsule and a page feel like one app.
+
 ## Out of the way (vision §3 G, the user's change m_5030)
 
 - [ ] At rest, after launch: nothing on screen but the menu-bar icon (no idle capsule).

@@ -180,11 +180,12 @@ owns the look and the words):
   to watch. Shown, editable, never creepy: everything it keeps about you is one page.
 - **A little kiss.** The `:*` at most once, at hello, never at a failure.
 
-Agreed with ambient (m_4863), and drawn in its identity round 4 on the user's pick, lamplight
-(`site/content/ambient/identity4.html`, "who bise is: the lamp left on"): bise is the lamp someone
-leaves on in the next room. At rest it breathes slowly; when you talk it leans in; while agents
-work it flickers; when it needs you it nudges once, then holds still; done is a nod; failed goes
-still; when you're away it lowers to an ember. On ambient surfaces the speaker is bise (`release
+Agreed with ambient (m_4863). The look the user validated is round 8
+(`site/content/ambient/identity8.html`, main m_5134): direction A's dark smoked glass, white text,
+bise pink, and the pink mist pearl as bise's body, with its moods (how it rests, listens, works,
+nudges once when it needs you, nods when done, goes still on a failure) and the menu-bar states.
+At rest it's out of sight (vision §3 G): the personality lives in the menu-bar icon and in the
+moments the capsule shows. On ambient surfaces the speaker is bise (`release
 failed. i'm on it.`, the label `bise`, `bise sees Chrome · …`), the agents are its hands, `main`
 stays the TUI thread's name: the signed `W` lines change **only once the user says yes to round 4**.
 `keep this for next time?` is a quiet line under the note, once per preference, never a dialog.

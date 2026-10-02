@@ -123,8 +123,10 @@ que quelque chose se passe. Il faut que ce soit out of the way."). This override
   nothing else shows. bise doesn't bring it back unless you talk or something needs you.
 - **A click on the icon** opens the capsule's full view: what's running, what needs you, "for
   you". It closes on esc or when you click elsewhere.
-- The look (ambient's lamplight) is for the moments the capsule shows; the icon is its smallest
-  form. ambient designs the icon and its states.
+- The look is for the moments the capsule shows; the icon is its smallest form. Decided by the
+  user (round 8, `site/content/ambient/identity8.html`, via main m_5134): direction A's glass
+  (dark smoked glass, white text, bise pink `#f4a6b0`), the pink mist pearl as bise's body (it
+  replaces the constellation orb), its moods, and the menu-bar states.
 
 The loop is A → B → (C → D)* → E. Most of the value is in C → D: the page is how the agent asks
 for feedback, and your notes are how you steer, without writing a prompt.
