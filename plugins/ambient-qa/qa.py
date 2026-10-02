@@ -109,6 +109,28 @@ def tree_info(root):
             "ambient_app": _git(root, "log", "-1", "--format=%h", "ambient-app")}
 
 
+HELPERS = ("repl-live", "repl-scripted", "sb-core")
+
+
+def ensure_helpers(root):
+    """The app root's helper binaries, rebuilt from its own sources before
+    any hub starts (ambient-lead m_5829): a stale sb-core dropped a timer's
+    wake (amb-home bc1c143f). The tree's scripts/bins.sh copies the build
+    of its sources (a cache hit ~0.3 s, a miss compiles). Returns each
+    helper's source key, for the report."""
+    bins = os.path.join(root, "scripts", "bins.sh")
+    if not os.path.exists(bins):
+        raise QAError("%s has no scripts/bins.sh: can't make sure its helpers are current" % root)
+    p = subprocess.run([bins, "--src", root] + list(HELPERS), capture_output=True, text=True, cwd=root, timeout=900)
+    if p.returncode != 0:
+        raise QAError("scripts/bins.sh %s failed in %s: %s" % (" ".join(HELPERS), root, (p.stderr or p.stdout)[-1200:]))
+    keys = {}
+    for h in HELPERS:
+        k = subprocess.run([bins, "key", "--src", root, h], capture_output=True, text=True, cwd=root, timeout=120)
+        keys[h] = (k.stdout.strip() or "?")[:12]
+    return {"from": _git(root, "log", "-1", "--format=%h"), "keys": keys}
+
+
 def require_commits(root, require=None):
     """A stale build must not read as a product fail (ambient-lead m_5358):
     the commits of `require` the tree lacks refuse the run; else a tree
@@ -478,7 +500,11 @@ def _start_hub(bise, root, kind="fake", connectors=False, computer=False, user_a
         if same and not keep and not reuse:
             return old
         _stop_hub()
+    # never a hub on stale helpers: the tree's own bins.sh first (ambient-lead m_5829)
+    helpers = ensure_helpers(root)
     os.makedirs(QA_DIR, exist_ok=True)
+    with open(os.path.join(QA_DIR, "helpers.json"), "w") as f:
+        json.dump(dict(helpers, root=root), f)
     log = open(os.path.join(QA_DIR, "hub.log"), "a")
     # never the calling agent's hub identity (e2e.host_env drops it for the hub; the daemon too)
     env = {k: v for k, v in os.environ.items() if not k.startswith("SB_") and k not in ("BISE_ROLE", "BISE_EXPORTS_FOR")}
@@ -1529,6 +1555,9 @@ def run_report(r):
     if tr:
         L.append("build: %s%s%s" % (tr.get("head", "")[:60], ", %s behind ambient-app (STALE: a fail may be the build)" % tr["behind_ambient_app"] if tr.get("behind_ambient_app") else ", at ambient-app's tip",
                                    ", has %s" % ",".join(tr["required"]) if tr.get("required") else ""))
+    hp = r.get("helpers") or {}
+    if hp:
+        L.append("helpers: rebuilt by bins.sh from %s's sources (%s)" % (hp.get("from", "?"), ", ".join("%s %s" % kv for kv in sorted(hp.get("keys", {}).items()))))
     if r.get("load"):
         L.append("machine load %s at start, %s at end%s" % (r["load"].get("start"), r["load"].get("end", "-"),
                                                            " (loaded: times are an upper bound)" if max(r["load"].values()) > 30 else ""))
@@ -1602,7 +1631,7 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
     os.makedirs(d, exist_ok=True)
     r = {"scenario": scenario, "ask": sc["ask"], "headless": headless, "at": time.strftime("%Y-%m-%d %H:%M"), "dir": d, "tree": dict(tree_info(root), required=build["required"]),
          "t": {}, "main_lines": [], "cards": [], "page": None, "notes": [], "fails": [], "load": {"start": round(os.getloadavg()[0], 1)},
-         "seeded": seeded}
+         "seeded": seeded, "helpers": _read(os.path.join(QA_DIR, "helpers.json"))}
     c, _ = _hub()
     core = None
     try:
