@@ -384,6 +384,15 @@ def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", for
         time.sleep(0.25)
     if not ping:
         raise QAError("the QA app didn't open its socket in 30 s: see %s" % os.path.join(APP_DIR, "app.log"))
+    # the one app path, checked on the running process (open could pick another
+    # registered copy of dev.bise.ambient): another path is stopped, loudly
+    exe = subprocess.run(["ps", "-p", str(ping.get("pid")), "-o", "comm="], capture_output=True, text=True).stdout.strip()
+    if exe and not os.path.realpath(exe).startswith(os.path.realpath(app) + "/"):
+        try:
+            call("quit", timeout=3)
+        except (QAError, OSError):
+            os.kill(ping["pid"], signal.SIGTERM)
+        raise QAError("the QA app ran from %s, not the one app path %s: stopped. Delete that copy and launch again" % (exe, app))
     call("backdrop", kind=backdrop)
     hub_up = _wait_hub(30)
     run = {"hub": hub, "workspace": ws, "bise": bise, "app_root": root, "tree": tree_info(root), "web": web, "app": app, "pid": ping.get("pid"),

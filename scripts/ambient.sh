@@ -30,7 +30,13 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 if [ -n "${BISE_HOME:-}" ]; then STATE="$BISE_HOME/dev"
 elif [ -e "$HOME/.bise/migrated.json" ]; then STATE="$HOME/.bise/dev"
 else STATE="$HOME/.local/state/switchboard"; fi
-BUILD="${SB_BUILD_DIR:-$STATE/build}/ambient"
+# the app's one path, whoever calls: never under SB_BUILD_DIR (an agent's
+# shell sets it to another hub's build dir, which made second copies the
+# EDR deletes; bins.sh's cache still uses it)
+BUILD="$STATE/build/ambient"
+if [ -n "${SB_BUILD_DIR:-}" ] && [ "$SB_BUILD_DIR" != "$STATE/build" ]; then
+  echo "ambient: SB_BUILD_DIR=$SB_BUILD_DIR ignored for the app: its one path is $BUILD" >&2
+fi
 APP="$BUILD/bise ambient.app"
 BIN="$APP/Contents/MacOS/bise ambient"
 RUN="$STATE/ambient"
