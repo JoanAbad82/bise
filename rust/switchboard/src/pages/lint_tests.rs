@@ -40,10 +40,26 @@ fn every_example_page_passes() {
     assert!(n >= 3, "examples in {}: {n}", dir.display());
 }
 
-/// The page the bise-pages skill teaches passes the lint as written.
+/// The bise-pages skill stays short (every page agent reads it before its first version), its
+/// skeleton passes the lint, and the reference files it names sit next to it.
+#[test]
+fn the_skill_is_short_and_its_skeleton_passes() {
+    let skill = include_str!("../../../../prompts/skills-all/bise-pages/SKILL.md");
+    let words = skill.split_whitespace().count();
+    assert!(words <= 1200, "SKILL.md is {words} words: keep it under 1200, details in its reference files");
+    let html = skill.split("```html\n").nth(1).and_then(|s| s.split("```").next()).expect("a skeleton");
+    ok(html);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../prompts/skills-all/bise-pages");
+    for f in ["blocks.md", "leaving.md", "watch.md", "feedback.md", "about-you.md"] {
+        assert!(skill.contains(&format!("`{f}`")), "SKILL.md names {f}");
+        assert!(dir.join(f).is_file(), "{f} sits next to SKILL.md");
+    }
+}
+
+/// The page the bise-pages skill teaches (blocks.md's full example) passes the lint as written.
 #[test]
 fn the_skills_example_passes() {
-    let skill = include_str!("../../../../prompts/skills-all/bise-pages/SKILL.md");
+    let skill = include_str!("../../../../prompts/skills-all/bise-pages/blocks.md");
     let html = skill
         .split("```html\n")
         .nth(1)

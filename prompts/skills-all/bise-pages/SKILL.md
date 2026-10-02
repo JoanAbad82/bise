@@ -5,318 +5,95 @@ description: Make a page for the user instead of a long reply, with the bise kit
 
 # bise pages: show it as a page
 
-A page is a short HTML fragment you write in one go (about 50 lines), made of kit blocks. bise
-wraps it in its frame (whose page, version, age, notes, send), draws every block in the user's
-look, light and dark, and opens it in the user's browser. The user reads it, leaves notes, sends
-them to you; you publish the next version and the same tab updates in place.
+A page is a short HTML fragment (about 50 lines) made of kit blocks. bise wraps it in its frame,
+draws it in the user's look, light and dark, and opens it in the user's browser. The user reads
+it, leaves notes, sends them to you; you publish the next version and the tab updates in place.
+You never write CSS, classes, scripts or colors.
 
-You never write CSS, classes, scripts or colors: the kit draws everything. If something can't be
-said with the blocks below, say it in words.
+This file is what every page needs. Next to it, in the same folder, read only the one you need:
+`blocks.md` (every block in detail, the lint, a full example), `leaving.md` (send, post, "put it
+in my drafts", newsletters), `watch.md` (standing orders, the launch watch, the morning page),
+`feedback.md` (bug reports agents fix), `about-you.md` (what bise keeps about the user).
 
-Not every answer is a page. A page is for what the user will read, edit or act on: drafts,
-lists of items to handle, plans, comparisons. A fact, a yes or no, a status, a time stay one
-line in your reply:
+## Page or one line
 
-| one line | a page |
-|---|---|
-| "what's my next meeting": `14:30, Q3 renewal with Camille.` | "answer my mails": the drafts to review |
-| "did the deploy pass": `yes, 12:04.` | "the launch post for Slack": a draft that leaves |
-| "how many stars": `1,204, +38 today.` | "plan the offsite": a plan, who does what |
-| "is Léa free friday": `no, she's off.` | "which venue": options to pick from |
+A page is for what the user will read, edit or act on: drafts, lists of items, plans,
+comparisons. A fact, a yes or no, a status, a time is one line in your reply:
+"what's my next meeting" → `14:30, Q3 renewal with Camille.`; "did the deploy pass" →
+`yes, 12:04.` A page: "answer my mails", "the launch post for Slack", "plan the offsite",
+"which venue".
 
-Before you write: if `~/bise/taste.md` exists, read it. It holds the user's taste rules (tone,
-length, what they always want or never want); follow them on the page, and publish every
-version with `--taste` so the page says `following your taste · 4 rules` (a link to them; the
-count is the file's `- ` lines). No file, or you didn't read it: no `--taste`.
+## Before you write
 
-## 1. The blocks
+If `~/bise/taste.md` exists, read it: the user's taste rules (tone, length, what they always or
+never want). Follow them, and publish every version with `--taste` (the page says `following
+your taste · 4 rules`). No file, or not read: no `--taste`.
 
-Every block is a `<section>` with its kind and an id. Ids are short, unique, and stay the same
-across versions (the user's notes anchor on them): `p1`, `t1`, `q1`, `src`.
+## Publish fast, then fill it
 
-| `data-kit` | what | inside |
-|---|---|---|
-| `heading` | the page's title, or a section's | `<h1>` (once, first) + an optional `<p>` meta line; or `<h2>` / `<h3>` alone |
-| `prose` | the text | `<p>`, `<ul>`/`<ol>`/`<li>`, `<blockquote>`, `<pre><code>`, inline `<strong> <em> <code> <a> <sup>` |
-| `table` | rows to read or compare | one `<table>` (`<thead>` + `<tbody>`, `<th>`/`<td>`), then an optional `<p>` caption |
-| `callout` | one thing not to miss | a first `<h3>` (a short label: `heads-up`, `not checked`) + `<p>`; `data-tone="note"` (default), `"good"` or `"risk"` |
-| `question` | a decision the user makes | one `<p>` (the question) + `<ol>` of 2 to 4 short options; after the answer, `data-answer="2"` |
-| `sources` | where each fact comes from | `<ol>` of `<li><a href="…">name · tool</a>, when</li>`, last on the page |
-| `review` | items the user approves or skips one by one (mails to answer, tickets, expenses) | `<ol>` of `<li data-id="m1">`: a first `<p>` saying what it is (`Léa Martin · offsite dates · 9:12`), then the proposal; `data-verb="send"` on the block when the proposals are drafts that leave (replies to mails or messages): the buttons say `send` and `send all 3`, not `approve` |
-| `message` | a draft that leaves through a channel (Slack, a post) | `data-to="Slack · #launch"` (where it goes, shown above it), then `<p>`s and `<ul>`, with `<strong>`, `<em>`, `<code>`, `<a>`: the kit's `copy` turns them into Slack markup; optional `data-open` = the channel's `slack://` or `https://` link (after a copy the page says `copied · open #launch`) |
-| `compare` | 2 to 4 options side by side (venues, drafts, tools) | `<ol>` of `<li data-id="moulin">`: an `<h3>` name, a `<ul>` of facts, a `<p>` with the why |
-| `checklist` | what's left to do, who, by when | `<ol>` of `<li data-id="t1" data-who="Camille" data-due="2026-05-20">` the task `</li>`; `data-done` on what is done; the kit shows `Camille · friday` and what is late. `data-who="yours"` for a step only the user can do (a payment, a login, a signature): it shows `you · friday`, and when every step before it is done the user gets a card for it; your own steps take `data-who="bise"` or none; any other name is someone else's |
-| `email` | one mail ready to send, or a newsletter | `data-to="Gmail · reply to Camille Roux"` (where it goes, shown above it), `data-verb="draft"` when it goes to his drafts (`put it in my drafts`, §7), optional `<p data-field="preview">` for a newsletter, `<p data-field="to">`, optional `<p data-field="cc">`, `<p data-field="subject">`, then the body as `<p>`s |
-
-Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
-`<img src="data:image/…" alt="…">`. Nothing else.
-
-How to write them well:
-- **Sources:** every fact you took from somewhere gets a `<sup>n</sup>` right after it, n = its
-  line in the `sources` block (the kit links them). A fact with no source says so in the text.
-- **Numbers:** write them as they read (`412`, `4.1 s`, `3.2 %`, `€12,400`): table columns of
-  numbers are aligned and set in mono by the kit. One number per cell: `11 (10 new)` is not a
-  number, make it two columns (`total`, `new today`). In prose, put a key number in `<code>`.
-- **Items** (review, compare, checklist) have their own `data-id`, kept across versions like
-  block ids. The kit draws the reactions and each one comes back to you as a note with the
-  item's id: review `approve` / `skip` (and `approve 3` for the rest), email `approve` / `skip`,
-  compare `keep` (♡) / `drop` (✗) / `pick` (one per block), checklist `tick`. Mark a checklist
-  item done with `data-done` when it is done. Sending, replying or booking is still your tool
-  call, through the user's approvals, after their `send`.
-- **Replies to comments** (Hacker News, Reddit, X, Bluesky): a `review` item with
-  `data-reply="<the comment's https link>"`, then `<p>who · where · when</p>`, the comment in a
-  `<blockquote>`, and your drafted reply in `<p>`s. Put `data-verb="open-reply"` on the block:
-  these places are read-only for bise, so the button says where it goes (`open on X`), never
-  `send`; it opens the thread with the reply ready and the item says what is left to do:
-  `opened on X · your reply is in the box` (X prefilled) or `copied · paste it in the thread`
-  (the others). bise never posts, the user does.
-- **Feedback into work** (bug reports from Slack or Linear, tickets): a `review` with
-  `data-verb="start"`, one item per report, its id the ticket's (`ENG-412`) or the message's
-  (`s-101`): a first `<p>` `who · where · when`, what they said in a `<blockquote>` (linked in
-  the sources), then what you think it is in one or two sentences. The kit gives each item
-  `start an agent`, `answer Benjamin` (the reporter's first name) and `skip`. "start an agent"
-  is a note to main, who starts the agent with the item as its brief; then the item carries the
-  agent's name, `<li data-id="s-101" data-agent="fix-install-path">` (review and checklist
-  items), and the kit shows its line live: `∿ fix install path working · reading the
-  installer`, `? … needs you`, `✓ … done`. When the agent is done, republish the item with
-  its answer (`fixed in 0.4.2`, the PR) and add the reply to the reporter as a `message` block
-  (`data-to="Slack · Benjamin Roy"`, `fixed in 0.4.2. try again?`) that leaves only on the
-  user's word. `answer Benjamin` on an item: draft that reply now, same block. See
-  `examples/feedback-bridge.html`.
-- **Drafts** (a Slack message, a post, a reply): in a `message` block with its `data-to`, as
-  `<p>`s and `<ul>`, so the user reads it in the page's font, edits it in place and copies it.
-  Never in `<pre>` or `<code>`: those are for code. A mail goes in an `email` block.
-- **Questions:** one per decision, options short enough for a button; the user picks on the page
-  (or presses 1-3) and the pick comes back to you as a note.
-- **Words:** the user's language and voice; lowercase headings, short sentences, concrete.
-- **Size:** about 50 lines. A page is for reading in one go; split a big one in two pages.
-
-## 2. The rules (the lint)
-
-`sb page publish` checks the page first. It refuses, with one line per problem, and stores
-nothing: `style` (attribute or element), `class` or `id`, `<script>`, `<iframe>`, `<link>`,
-`<div>`, `<span>` or any element not listed above, `on…=` handlers, an unknown `data-kit` or
-`data-` attribute, a block without `data-id` or with one already used, text outside a block, a
-block inside a block, `<!doctype>`/`<html>`/`<body>` (write only the blocks), images from the
-network (use a `data:` src), `javascript:` links, more than 1 MB. Links to the outside
-(`https:`, `mailto:`) are fine. Each line names the block and what to do: fix it and publish again.
-
-## 3. An example: the weekly update
+The user should see the page within about 10 seconds, then watch it fill in.
+- **A started page:** when your brief gives a page id (main ran `sb page start`), the page is
+  already open and shows your actions live (the one-line description of each command: say what
+  you do in the user's words, `reading #launch in Slack`). Publish to that id.
+- **Skeleton first**, before you gather anything: the title, the headings you expect and a
+  `writing…` callout. Then publish again as each part is ready (same `--id`, same block ids:
+  the tab swaps the blocks in place). Last publish: no `writing` callout, the sources added.
+- **A page of items** (mails, comments, bugs): never read everything first. List them (subjects
+  only), draft the first 2 or 3 and publish them within about 45 seconds of the ask, the callout
+  saying `5 of 20 read`; then a version per 2 or 3 more; what you skipped last.
 
 ```html
-<section data-kit="heading" data-id="title">
-  <h1>the week, in three lines</h1>
-  <p>week 41 · for #team · draft 1</p>
-</section>
-
-<section data-kit="prose" data-id="p1">
-  <p>signup is faster: <code>4.1 s → 0.9 s</code> on a mid-range phone<sup>1</sup>. dark mode ships on the settings page monday<sup>2</sup>.</p>
-</section>
-
+<section data-kit="heading" data-id="title"><h1>the week, in three lines</h1><p>week 41 · for #team</p></section>
+<section data-kit="callout" data-id="writing"><h3>writing…</h3><p>reading Slack and Linear for this week.</p></section>
 <section data-kit="heading" data-id="h-numbers"><h2>numbers</h2></section>
-
-<section data-kit="table" data-id="t1">
-  <table>
-    <thead><tr><th>metric</th><th>last week</th><th>this week</th></tr></thead>
-    <tbody>
-      <tr><td>signups</td><td>412</td><td>468</td></tr>
-      <tr><td>signup time (p50)</td><td>4.1 s</td><td>0.9 s</td></tr>
-    </tbody>
-  </table>
-  <p>from the growth dashboard, monday 9:00<sup>3</sup></p>
-</section>
-
-<section data-kit="callout" data-id="c1" data-tone="risk">
-  <h3>heads-up</h3>
-  <p><strong>release 2.5 slips to wednesday.</strong> the checksum didn't match on friday<sup>4</sup>.</p>
-</section>
-
-<section data-kit="question" data-id="q1">
-  <p>post it in #team now, or wait for Marc's check?</p>
-  <ol><li>post now</li><li>wait for Marc</li></ol>
-</section>
-
-<section data-kit="sources" data-id="src">
-  <ol>
-    <li><a href="https://acme.slack.com/archives/C01PERF/p1712">#perf · Slack</a>, thursday</li>
-    <li><a href="https://linear.app/acme/issue/DARK-12">DARK-12 · Linear</a></li>
-    <li><a href="https://metabase.acme.dev/dashboard/7">growth dashboard · Metabase</a></li>
-    <li><a href="https://acme.slack.com/archives/C01REL/p1713">#release · Slack</a>, friday</li>
-  </ol>
-</section>
 ```
-
-More examples, each one passing the lint: `apps/ambient/kit/examples/` in the bise app
-(`weekly-update.html` a doc, `offsite-venues.html` a table to choose from,
-`pricing-question.html` a decision, `inbox-review.html` the inbox: replies to approve and a mail
-ready to send, `launch-post.html` a Slack post to check and copy, `offsite-plan.html` a plan:
-venues to compare and what's left to do, `offsite-todo.html` who does what by when,
-`launch-watch.html` a standing order: new comments with drafted replies).
-
-## 4. Publish fast, then fill it
-
-The user should see the page within about 10 seconds of asking, then watch it fill in. So:
-
-0. **A page started for you:** when your brief gives you a page id (main ran `sb page start`),
-   the page is already open and says you are writing it, with your actions as its live progress
-   line (the one-line description you give each command: make them say what you do, in the user's
-   words: `reading #launch in Slack`). Publish to that id; your first publish replaces the
-   placeholder.
-
-1. **Skeleton first**, before you gather anything: the title, the section headings you expect,
-   and a callout that says what you are doing. Publish it at once.
-   ```html
-   <section data-kit="heading" data-id="title"><h1>the week, in three lines</h1><p>week 41 · for #team</p></section>
-   <section data-kit="callout" data-id="writing"><h3>writing…</h3><p>reading Slack and Linear for this week.</p></section>
-   <section data-kit="heading" data-id="h-numbers"><h2>numbers</h2></section>
-   ```
-2. **Fill it** with further publishes of the same `--id` as each part is ready (the open tab
-   swaps the new blocks in place, the user's scroll stays). Keep the ids you already used.
-3. **Last publish**: drop the `writing` callout, add the sources.
-
-**A page of items** (mails to answer, comments, bugs): draft and publish as you read, never
-read everything first.
-1. List the items first, subjects and senders only (one call, no bodies), and pick the ones that
-   need the user.
-2. Read the first 2 or 3 of those, draft their replies, and publish them as v2 **within about 45
-   seconds of the ask**, with the `writing` callout saying where you are: `5 of 20 read`.
-3. Then one version per 2 or 3 more items, each added under the others, the callout counting up.
-4. Last: what you skipped (newsletters, notifications) as one short table or callout, the
-   `writing` callout gone, the sources.
-The user starts reviewing the first replies while you write the rest. `examples/inbox-writing.html`
-is such a v2.
-
-**Drafts stay on the page.** While you write and until the user's word on the page (`send`,
-`approve`, "put it in my drafts"), nothing goes to their accounts: no draft in Gmail or Outlook,
-no message, no post, no label. The page is where they review; the account comes after.
 
 Write the fragment in your temp folder, then:
 
 ```
-sb page publish $TMPDIR/weekly-update.html --id weekly-update --title "weekly update"
+sb page publish $TMPDIR/weekly-update.html --id weekly-update --title "weekly update" --taste
 ```
 
-- `--id`: lowercase, digits and `-`, 40 at most; keep it for every version of the page.
-- `--title`: what the user calls it, lowercase (shown in the frame and in "for you").
-- It prints `published weekly-update v1 · <url>`. The user gets it in "for you" (and in front
-  if they were waiting for it): don't paste the HTML in your reply. Say one line with what the
-  page is and what you want from them: `the weekly update is ready: check the numbers and pick
-  when to post.`
-- A refusal prints the lint's lines: fix each one, publish again.
+`--id`: lowercase, digits and `-`, kept for every version. `--title`: what the user calls it,
+lowercase. It prints `published weekly-update v1 · <url>`: don't paste the HTML, say one line
+(`the weekly update is ready: check the numbers and pick when to post.`). A refusal prints the
+lint's lines (one per problem, `blocks.md`): fix each, publish again.
 
-## 5. Answer the notes
+## Nothing leaves before his word
 
-When the user sends notes you get one message: `you sent 3 notes on your page "weekly update"
-(weekly-update v1, <url>)`, a numbered list, and a `<page-notes>` block with each note's id,
-block, quote, kind and words (an edit has its text before and after; a pick has the option).
+While you write and until the user's word on the page (`send`, `approve`, "put it in my
+drafts"), nothing goes to their accounts: no draft in Gmail or Outlook, no message, no post, no
+label. Then `leaving.md`.
 
-1. Change the page for each note. Keep the same ids for the same blocks: change their content,
-   don't renumber. Keep the user's own edits as they are unless a note asks otherwise. An
-   answered question gets `data-answer="<option number>"`.
-2. Publish the next version with the outcome of each note:
-   ```
-   sb page publish $TMPDIR/weekly-update.html --id weekly-update --notes-done n1,n3 --note-answer n2="the March numbers are not out yet: i kept February"
-   ```
-   `--notes-done` for the notes you did; `--note-answer` (one per note) for a note you answer in
-   words instead, or only partly did. Every note sent gets one or the other.
+## The blocks
+
+Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kept across versions.
+- `heading`: `<h1>` once first (+ a `<p>` meta line above it), or `<h2>`/`<h3>`.
+- `prose`: `<p>`, lists, `<blockquote>`, inline `<strong> <em> <code> <a> <sup>`.
+- `table`: one `<table>` with `<thead>`, then an optional `<p>` caption; one number per cell.
+- `callout`: an `<h3>` label + `<p>`; `data-tone` `note`, `good` or `risk`.
+- `question`: a `<p>` + `<ol>` of 2 to 4 short options; answered: `data-answer="2"`.
+- `sources`: `<ol>` of `<li><a href="…">name · tool</a>, when</li>`, last; facts cite `<sup>n</sup>`.
+- `review`: `<ol>` of `<li data-id>` to handle one by one; `data-verb` `send`, `open-reply`,
+  `start`, `keep` (`blocks.md`).
+- `message`: a draft for a channel, `data-to="Slack · #launch"`, `<p>`s; never `<pre>`.
+- `email`: `data-to`, `<p data-field="to">`, `subject`, the body; `data-verb="draft"` for his drafts.
+- `compare`: 2 to 4 `<li data-id>` side by side: `<h3>`, `<ul>` of facts, `<p>` why.
+- `checklist`: `<li data-id data-who data-due="2026-05-20">`, `data-done` when done.
+
+Words: the user's language and voice, lowercase headings, short sentences, concrete.
+
+## Answer the notes
+
+A message `you sent 3 notes on your page "weekly update" (weekly-update v1, <url>)` comes with a
+`<page-notes>` block (each note's id, block, quote, kind, words).
+1. Change the page for each note; same ids for the same blocks; keep the user's own edits. An
+   answered question gets `data-answer`.
+2. Publish the next version: `sb page publish $TMPDIR/weekly-update.html --id weekly-update
+   --notes-done n1,n3 --note-answer n2="the March numbers are not out yet: i kept February"`.
+   Every note gets one or the other.
 3. Reply in one line: `v2 is up: 3 notes done.`
 
-Two kinds of notes ask for more than a change of the page:
-- **`taste: true`**: the user said yes to "keep this for next time?". Besides doing the note,
-  append the preference as one `- ` line to `~/bise/taste.md` (create it if needed; each `- `
-  line is one rule, the frame counts them), in general
-  words that will hold for other pages (`numbers: one per cell, the change in its own column`),
-  never the page's own content.
-- **kind `start`** ("start an agent on this", with an item and its text): it goes to main, not
-  to you; main starts an agent on it. Nothing to change on your page unless another note asks.
-
-## 6. A standing order: one page, kept up to date
-
-"watch the launch for me", "tell me when the PR is reviewed": one page you keep current, not a
-new page each time.
-- Check on a timer, never by sleeping: `sb every 10m "<what to check>" --page <id>`, the line
-  written as the instruction to your future self (`check the launch on HN, X, Reddit and
-  Bluesky; republish launch-watch with what's new`). `--page` ties the timer to the page: its
-  frame says `watching · checked 3 min ago · until tomorrow 18:00` and has `stop` (the user's
-  stop ends the timer without you). It wakes you with `timer #3 (every 10m, …): <that line>`.
-  Add `--until 18:00` or `--times 6` when the user gave an end. `sb every` lists the timers;
-  `sb every --stop 3` stops one when the thing is over.
-- The launch (comments on Hacker News, Reddit, X, Bluesky): the numbers in the heading's meta
-  line, one number per fact (`HN #7 · 412 points · 1,204 stars · 38 comments`), never a card for
-  them; then one `review` per group, each under an `h2` (`questions`, `bugs`, `praise`),
-  `data-verb="open-reply"`, one item per comment that needs an answer, its reply drafted. See
-  `examples/launch-watch.html`.
-- Each check republishes the **same page id**: what is new on top (a `callout` saying `since
-  14:10` and what came), the items still to handle under it, the handled ones gone or folded into
-  one line (`12 answered earlier`). Keep each item's `data-id` (the comment's id, the PR's
-  number) so the user's notes stay on it.
-- Nothing new: don't publish; at most update the heading's meta line (`last check 14:20`) on the
-  next real change.
-- A card (`sb card`, through main) only for what the user asked to be told about, in their
-  words ("tell me if Simon posts"); everything else waits on the page.
-
-**The morning page** ("a page every morning with my day"): a daily timer,
-`sb every day 07:30 "make today's morning page"`, and each morning a new page with the id
-`morning-YYYY-MM-DD` (today's date: the app opens exactly that id). In this order, each part
-left out when empty:
-1. a `heading`: `your tuesday` and the meta line (`3 meetings · 2 wait for you`);
-2. what waits for the user: a `review` of the mails and messages to answer, the questions
-   agents left open, each with its draft;
-3. today's meetings: a `table` (`time`, `what`, `with`, `prep`), the prep in words
-   (`read Camille's renewal mail`);
-4. what agents finished overnight: one line each with its page or PR, in a `prose` list;
-5. pages not opened yet: a `prose` list of links (`/p/<id>`), oldest first.
-Nothing waits and no meetings: a short page that says so, never an empty one.
-
-## 7. When the page leaves
-
-Acting on the page is a separate step the user asks for ("post it in #team", "send the mail",
-"make it a Google Doc"), through the usual approvals, never before their word:
-- take the text from your last published version, in the page's order, with the user's edits
-  (they came to you as notes), without the kit's chrome (no frame, no buttons, no "sources" label);
-- a `message` block goes as is to its `data-to` channel (Slack markup: `*bold*`, `_italic_`,
-  `• ` items, `<url|text>` links); an `email` block through the mail tool, its fields as the
-  mail's to, cc, subject;
-- a whole page as a doc: headings as headings, tables as tables, each `<sup>n</sup>` as a link to
-  its source (or the sources as a list at the end);
-- "put it in my drafts" (the user's words, or their `send` on a draft they want to finish in
-  their tool): a draft doesn't leave, so it needs no card, but it waits for that word like
-  anything else: never make drafts in their account on your own, never during the first
-  versions. Then make the draft in the user's tool (Gmail, Outlook, Kit), only the ones they
-  approved, and record where it went on the block it came from:
-  `sb page publish $TMPDIR/p.html --id <id> --went gmail-draft:<draft id>@e1=<its https link>`
-  (kinds: `gmail-draft`, `outlook-draft`, `kit-draft`, `slack`, `copy`). The page shows
-  `in your Gmail drafts · open` under that block. A later version updates the same draft (read
-  it back first, the user may have edited it there), never a second one;
-- a mail the user finishes in his tool (a Gmail reply he wants to send himself) or a newsletter:
-  an `email` block with `data-verb="draft"`, so its button says `put it in my drafts`, never
-  `send`. A **newsletter** (Kit): `data-to="Kit · newsletter to 1,204 subscribers"`, `to` =
-  `all subscribers · 1,204`, the `subject`, a `preview` field (the preview text), then the body
-  (`<p>`, `<ul>`, links). On his word: Kit's create-draft with the subject, the body as HTML and
-  the preview, then `--went kit-draft:<broadcast id>@nl=<its link in Kit>`: the page says
-  `in your Kit drafts · open`. There is no send for Kit: he sends it there. See
-  `examples/newsletter.html`;
-- Slack has no drafts: the user copies (the `message` block's `copy`, with `data-open` for the
-  channel link); a post you made after their approval is `--went slack:<ts>@m1=<its link>`;
-- a tool that fails (Gmail didn't take the draft): one line in your reply and a `risk` callout
-  on the page (`Gmail didn't take it: copy it from here`), never a file path;
-- then say where it went in one line (`posted in #team.`) and, when it makes sense, publish a last
-  version that says so (a `good` callout: `posted in #team, 14:02`).
-
-## 8. What bise keeps about the user
-
-"what do you know about me?", "show me my taste rules": main publishes one page, id `about-you`,
-from `~/bise/taste.md` (the taste rules) and `~/bise/people.md` (who is who), when they exist:
-- a `heading` (`what i keep about you`, meta line: `5 taste rules · 4 people · edit or strike any`);
-- `## your taste`: a `review` with `data-verb="keep"`, one item per rule, its `data-id` the
-  rule's slug (`no-emoji`): a first `<p>` saying where it came from (`from your notes on the
-  launch recap · 12 may`), then the rule in a `<p>`, as the user would say it. The kit gives each
-  one `keep` / `strike`, and the rule's words are editable in place; each change comes back as a
-  note;
-- `## who is who`: the same, one item per person (`data-id` their slug): `<p>Lélio Martin</p>`
-  then `<p>your manager. the weekly update goes to him on fridays.</p>`;
-- a `callout` (`note`): `nothing else is kept: no mail, no messages. strike a line and it's gone.`
-- no `sources` (it is the user's own words) and no `question`.
-Notes on it go to main, who rewrites the files (a struck rule: deleted; an edited one: replaced,
-in the user's words) and publishes the next version with `--notes-done`. Nothing kept is ever
-shown elsewhere without the user asking.
+A note with `taste: true`: also append the preference to `~/bise/taste.md` as one `- ` line, in
+general words (`numbers: one per cell, the change in its own column`), never the page's content.
+A note of kind `start` goes to main, not to you.
