@@ -30,8 +30,12 @@
     // a voice note's pin while you talk (the mocks' `you · voice`; ambient, m_4877)
     voiceBy: "you · voice",
     // a drawing in the side list, and the hint while you draw (§5.4; asked to ambient)
+    // signed by ambient (m_4926): esc still ends it, it just doesn't need saying
     drawing: "✎ drawing",
-    drawHint: "draw on the page   d or esc done",
+    drawHint: "draw on the page   d done",
+    // the agent's answer to a note is a reply (ambient, m_4919 (3)): its name dim, its words, then yours
+    replyBy: (agent) => `${agent}:`,
+    replyField: "reply, or hold fn and say it",
     // a question's option you picked (ambient, m_4795)
     picked: (option, text) => (text ? `you picked ${option}: ${text}` : `you picked ${option}`),
     tools: { note: "note", keep: "♡", drop: "✗", unsure: "~", edit: "edit", pin: "pin" },
@@ -120,6 +124,16 @@
     if (n.status === "answered") return { tag: "answer", text: n.answer || "" };
     if (n.status === "sent") return { tag: n.version_seen && n.version_seen > n.version ? "open" : "sent", text: n.version_seen && n.version_seen > n.version ? NW.open : NW.sentTag };
     return { tag: "draft", text: "" };
+  }
+
+  // where a note sits, in the page's words, never a block id (ambient, m_4919 (2)): the quoted
+  // words when there was a selection, else the block's name (its kicker or heading)
+  const where = (n, name) => (n.quote ? `"${n.quote}"` : name || n.where || "");
+  // a block's name from what it shows: its own heading or kicker (a heading, a callout's h3), else
+  // the heading of its section (the heading block above it), else its first words
+  function blockName(own, section, text) {
+    const cut = (s, k) => { const w = norm(s).split(" ").filter(Boolean); return w.length > k ? `${w.slice(0, k).join(" ")}…` : w.join(" "); };
+    return norm(own) ? cut(own, 8) : norm(section) ? cut(section, 8) : cut(text, 6);
   }
 
   // a note's one line in the side list
@@ -268,7 +282,7 @@
       .map(([id]) => id);
   }
 
-  const core = { NW, spaced, norm, locate, anchorOf, reanchor, diffWords, outcome, label, model, nearestQuote, strokePath, strokesBox, blocksIn };
+  const core = { NW, spaced, norm, locate, anchorOf, reanchor, diffWords, outcome, label, where, blockName, model, nearestQuote, strokePath, strokesBox, blocksIn };
 
   // ======================================================================================
   // the DOM: only on a page the shell served (#bise-page)
@@ -369,19 +383,43 @@
     const listHead = el("div", "bn-head");
     const listBody = el("ol", "bn-items");
     const listKeys = el("div", "bn-keys", NW.keys);
-    list.append(listHead, listBody, listKeys);
+    // the composer is the list's last row: a note you type never covers the page (QA m_4929: it
+    // opened over the next block)
+    const composer = el("form", "bn-composer");
+    const composerWhere = el("div", "bn-where");
+    const input = el("textarea", "bn-input");
+    input.rows = 2; input.placeholder = NW.placeholder;
+    composer.append(composerWhere, input);
+    list.append(listHead, listBody, composer, listKeys);
     const bar = el("div", "bn-ui bn-bar");
     const barText = el("span", "bn-bar-text");
     const barSend = el("button", "bn-send", NW.send);
     barSend.type = "button";
     bar.append(barText, barSend);
     const tools = el("div", "bn-ui bn-tools");
-    const composer = el("form", "bn-ui bn-composer");
-    const input = el("textarea", "bn-input");
-    input.rows = 2; input.placeholder = NW.placeholder;
-    composer.append(input);
     const pins = el("div", "bn-ui bn-pins");
-    doc.body.append(list, bar, tools, composer, pins);
+    doc.body.append(list, bar, tools, pins);
+    // a line whose leading ✎ or ✓ keeps its own color (the pen's, the olive's): ambient, m_4926, m_4919 (4)
+    const glyphed = (tag, cls, text) => {
+      const m = /^([✎✓])(\s.*)$/su.exec(text || "");
+      if (!m) return el(tag, cls, text);
+      const e = el(tag, cls);
+      e.append(el("span", "bn-glyph", m[1]), m[2]);
+      return e;
+    };
+    // a block's name, as the page shows it (never its id)
+    const heads = "h1, h2, h3, h4";
+    function nameOf(id) {
+      const b = id && blockById(id);
+      if (!b) return "";
+      const own = b.querySelector(heads);
+      let section = null;
+      for (let p = b.previousElementSibling; p && !section; p = p.previousElementSibling) if (p.dataset && p.dataset.kit === "heading") section = p.querySelector(heads);
+      const kit = b.dataset.kit;
+      // a heading block is its own name; a callout's kicker is its first h2/h3; a table or a
+      // prose block goes by its section
+      return blockName(kit === "heading" || kit === "callout" ? own && own.textContent : "", section ? section.textContent : "", b.textContent);
+    }
     const frameCount = () => doc.querySelector("[data-bise-notes-count]");
     const frameSend = () => doc.querySelector("[data-bise-send]");
 
@@ -410,12 +448,18 @@
       listBody.replaceChildren(...all.map((n) => {
         const li = el("li", `bn-item bn-${n.status}${n.anchor === "moved" ? " bn-moved" : ""}`);
         li.dataset.note = n.id;
-        const where = el("div", "bn-where", n.quote ? `"${n.quote}"` : n.block ? n.block : "");
-        const what = el("div", "bn-what", label(n));
-        li.append(where, what);
+        li.append(el("div", "bn-where", where(n, nameOf(n.block))), glyphed("div", "bn-what", label(n)));
         const o = outcome(n);
-        const tag = n.anchor === "moved" ? NW.moved : o.text;
-        if (tag) li.append(el("div", `bn-tag bn-tag-${n.anchor === "moved" ? "moved" : o.tag}`, tag));
+        if (n.anchor === "moved") li.append(el("div", "bn-tag bn-tag-moved", NW.moved));
+        else if (o.tag === "answer") {
+          // the agent's answer is a reply, and the note stays open: its name dim, its words, then
+          // a field for yours (ambient, m_4919 (3))
+          const rep = el("div", "bn-reply");
+          rep.append(el("span", "bn-reply-by", NW.replyBy(spaced(meta.agent || "main"))), el("span", "bn-reply-text", ` ${o.text}`));
+          const field = el("input", "bn-reply-field");
+          field.type = "text"; field.placeholder = NW.replyField; field.dataset.replyTo = n.id;
+          li.append(rep, field);
+        } else if (o.text) li.append(glyphed("div", `bn-tag bn-tag-${o.tag}`, o.text));
         if (n.status === "draft") {
           const x = el("button", "bn-x", "×");
           x.type = "button"; x.title = NW.remove; x.dataset.remove = n.id;
@@ -462,56 +506,91 @@
     }
 
     // ---- the toolbar: over a selection, or over the block under the mouse
+    // (QA m_4929: on a block too, not only on a selection, so ♡ ✗ ~ work on a whole block or row
+    // and `edit` is reachable on prose)
     let target = null;   // {block, quote?, offset?, pin?}
     function showTools(t, rect) {
       target = t;
       const b = blockById(t.block);
       const prose = b && b.dataset.kit === "prose";
       const btn = (k, text) => { const e = el("button", "bn-tool", text); e.type = "button"; e.dataset.tool = k; return e; };
-      tools.replaceChildren(btn("note", NW.tools.note), btn("keep", NW.tools.keep), btn("drop", NW.tools.drop), btn("unsure", NW.tools.unsure), ...(prose && !t.quote ? [btn("edit", NW.tools.edit)] : []));
+      tools.replaceChildren(btn("note", NW.tools.note), btn("keep", NW.tools.keep), btn("drop", NW.tools.drop), btn("unsure", NW.tools.unsure), ...(prose ? [btn("edit", NW.tools.edit)] : []));
       tools.style.left = `${rect.left + win.scrollX}px`;
       tools.style.top = `${rect.top + win.scrollY - 40}px`;
+      tools.dataset.on = t.quote ? "selection" : "block";
       tools.classList.add("bn-on");
     }
-    const hideTools = () => { tools.classList.remove("bn-on"); };
-    function compose(t, rect) {
+    const hideTools = () => { tools.classList.remove("bn-on"); delete tools.dataset.on; };
+    // the note you type: in the list's last row, under where it goes
+    function compose(t) {
       target = t;
       hideTools();
-      composer.style.left = `${rect.left + win.scrollX}px`;
-      composer.style.top = `${rect.bottom + win.scrollY + 8}px`;
+      composerWhere.textContent = t.drawing ? NW.drawing : where(t, nameOf(t.block));
       composer.classList.add("bn-on");
-      input.value = ""; input.focus();
+      input.value = "";
       render();
+      input.focus();
     }
     const closeComposer = () => { composer.classList.remove("bn-on"); input.blur(); render(); };
-    function addNote(kind, text) {
+    function addNote(kind, text, extra) {
       if (!target) return;
       // words for a drawing just made: they go on its note
       if (target.drawing) { M.update(target.drawing, { text: text || undefined }); target = null; save(); render(); return; }
-      M.add({ version, block: target.block, quote: target.quote, offset: target.offset, pin: target.pin, kind, text: text || undefined }, now());
+      M.add({ version, block: target.block, quote: target.quote, offset: target.offset, pin: target.pin, kind, text: text || undefined, where: nameOf(target.block) || undefined, ...extra }, now());
       barNote = "";
       save(); render();
     }
 
+    const selecting = () => { const s = win.getSelection(); return !!(s && !s.isCollapsed && s.toString().trim()); };
     doc.addEventListener("mouseup", () => {
       win.setTimeout(() => {
         const s = fromSelection(win.getSelection(), page);
         if (!s) return;
+        clearTimeout(hoverT);
         showTools(s, win.getSelection().getRangeAt(0).getBoundingClientRect());
       }, 0);
     });
-    let hover = null;
-    page.addEventListener("mouseover", (e) => { hover = e.target.closest && e.target.closest("[data-kit][data-id]"); });
+    // on a block under the mouse, after a short rest; a selection's toolbar stays until it goes
+    let hover = null, hoverT = 0;
+    const busy = () => selecting() || drawing || pinning || editing || composer.classList.contains("bn-on") || tools.dataset.on === "selection";
+    page.addEventListener("mouseover", (e) => {
+      const b = e.target.closest && e.target.closest("[data-kit][data-id]");
+      if (b === hover) return;
+      hover = b;
+      clearTimeout(hoverT);
+      if (!b) return;
+      hoverT = win.setTimeout(() => { if (hover === b && !busy()) showTools({ block: b.dataset.id }, b.getBoundingClientRect()); }, 250);
+    });
+    page.addEventListener("mouseleave", () => {
+      hover = null; clearTimeout(hoverT);
+      hoverT = win.setTimeout(() => { if (tools.dataset.on === "block" && !tools.matches(":hover")) hideTools(); }, 300);
+    });
+    tools.addEventListener("mouseleave", () => { if (tools.dataset.on === "block" && !hover) hideTools(); });
+    doc.addEventListener("selectionchange", () => { if (tools.dataset.on === "selection" && !selecting()) hideTools(); });
     tools.addEventListener("mousedown", (e) => e.preventDefault());   // keep the selection
     tools.addEventListener("click", (e) => {
       const k = e.target.dataset && e.target.dataset.tool;
       if (!k || !target) return;
       const b = blockById(target.block);
-      if (k === "note") return compose(target, b.getBoundingClientRect());
+      if (k === "note") return compose(target);
       if (k === "edit") { hideTools(); return startEdit(b); }
       addNote(k);
       hideTools();
       win.getSelection().removeAllRanges();
+    });
+    // your reply to the agent's answer: a note on the same place, kept as a draft until send
+    list.addEventListener("keydown", (e) => {
+      const f = e.target;
+      if (!f.dataset || !f.dataset.replyTo) return;
+      e.stopPropagation();
+      if (e.key === "Escape") { f.value = ""; f.blur(); return; }
+      if (e.key !== "Enter" || e.metaKey) return;
+      e.preventDefault();
+      const n = M.get(f.dataset.replyTo), text = f.value.trim();
+      if (!n || !text) return;
+      target = { block: n.block, quote: n.quote, offset: n.offset, pin: n.pin };
+      addNote("note", text, { reply_to: n.id });
+      target = null;
     });
     composer.addEventListener("submit", (e) => { e.preventDefault(); });
     input.addEventListener("keydown", (e) => {
@@ -529,7 +608,7 @@
       e.preventDefault();
       pinning = false; doc.documentElement.classList.remove("bn-pinning");
       const r = b.getBoundingClientRect();
-      compose({ block: b.dataset.id, pin: { x: +((e.clientX - r.left) / r.width).toFixed(3), y: +((e.clientY - r.top) / r.height).toFixed(3) } }, { left: e.clientX, bottom: e.clientY, top: e.clientY });
+      compose({ block: b.dataset.id, pin: { x: +((e.clientX - r.left) / r.width).toFixed(3), y: +((e.clientY - r.top) / r.height).toFixed(3) } });
     }, true);
 
     // ---- edit in place (prose only): the block becomes editable; leaving it makes the note
@@ -577,7 +656,7 @@
         return;
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === "t" && hover) { e.preventDefault(); compose({ block: hover.dataset.id }, hover.getBoundingClientRect()); }
+      if (e.key === "t" && hover) { e.preventDefault(); compose({ block: hover.dataset.id }); }
       else if (e.key === "p") { e.preventDefault(); pinning = !pinning; doc.documentElement.classList.toggle("bn-pinning", pinning); }
       else if (e.key === "d") { e.preventDefault(); drawing ? stopDraw() : startDraw(); }
       else if (e.key === "Escape") { hideTools(); pinning = false; doc.documentElement.classList.remove("bn-pinning"); if (drawing) stopDraw(); }
@@ -730,7 +809,7 @@
       save(); render(); renderInk();
       // words for it, if you want (Enter keeps them, Esc keeps the drawing alone)
       target = { block: under[0], drawing: note.id };
-      compose(target, { left: pr.left + box.x, top: pr.top + box.y, bottom: pr.top + box.y + box.h });
+      compose(target);
       areaPng(box, note.path).then((png) => { if (png && M.get(note.id)) { M.update(note.id, { png }); save(); } });
     }
     // the area as the page shows it, with the drawing on top: the page's HTML and CSS in an SVG

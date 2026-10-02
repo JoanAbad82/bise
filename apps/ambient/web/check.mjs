@@ -576,6 +576,19 @@ law("notes: the words (ambient's), names with spaces", () => {
   assert.equal(N.NW.updating("weekly update"), "weekly update is updating this page…");
   assert.equal(N.NW.keys, "t type   p pin   d draw   ⌘z undo   ⌘⏎ send");
   assert.equal(N.NW.empty, "no notes yet. select some text, or hold fn and talk.");
+  // signed by ambient (m_4926): every key hint is `<key> <word>`
+  assert.equal(N.NW.drawHint, "draw on the page   d done");
+  assert.equal(N.NW.replyBy(N.spaced("launch-recap")), "launch recap:");
+});
+law("notes: a note's place is the quoted words or the block's name (its kicker or heading, else its section's), never a block id (ambient, m_4919)", () => {
+  assert.equal(N.where({ block: "c-check", quote: "post it now" }, "check before posting"), '"post it now"');
+  assert.equal(N.where({ block: "c-check" }, "check before posting"), "check before posting");
+  // the block is gone (a reload on a newer version): the name kept on the note, else nothing
+  assert.equal(N.where({ block: "h-numbers", where: "raw numbers" }, ""), "raw numbers");
+  assert.equal(N.where({ block: "h-numbers" }, ""), "");
+  assert.equal(N.blockName("check before posting", "numbers", "x"), "check before posting");
+  assert.equal(N.blockName("", "raw numbers", "11 stars today"), "raw numbers");
+  assert.equal(N.blockName(" ", "", "we shipped dark mode on monday and light mode today"), "we shipped dark mode on monday…");
 });
 // a fake DOM: text nodes and elements, enough for the Range walk
 function fakeText(s) { return { nodeType: 3, nodeValue: s }; }
