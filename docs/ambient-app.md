@@ -139,7 +139,8 @@ App-only events to the web UI: `app_fn` (`state`: `down`/`up`/`double`/`tap`/`ca
 `accessibility`, `state`: `granted`/`denied`/`ask`), `app_settings` (`edge_glow`), `app_hidden`
 (bool), `app_reduce_motion` (bool), `app_key` (fn + key: `space`, `1`…`9`, `i`, `0`, `o`, `.`,
 `enter`, `esc`). Web UI commands `app_perm` (`perm`, `do`: `continue` opens macOS's prompt,
-`settings` opens its pane), `app_setting` (`key`: `edge_glow`/`right_option`, `value`); `app_hide`
+`settings` opens its pane, `not_now`: the refused path, its one line once, the menu bar and the
+spotlight keep working), `app_setting` (`key`: `edge_glow`/`right_option`, `value`); `app_hide`
 takes an optional `hidden` (bool; none: toggle).
 Web UI commands for the app (not forwarded): `app_size` (`w`, `h`, `radius`: the capsule's frame
 follows the content; optional `note: {y, h, radius}`: the needs-you glass under the capsule, in the
