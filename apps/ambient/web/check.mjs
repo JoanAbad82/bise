@@ -429,6 +429,14 @@ law("a page updating, then its next version ready, says ready again; a page open
 
 // ---- the page's note layer (apps/ambient/kit/notes.js): anchoring, re-anchoring, the model
 const N = BiseNotes.core;
+// the tests' notes count n1, n2... (the page's own ids are n + time + random)
+const counted = () => { let i = 0; return { id: () => `n${++i}` }; };
+law("notes: every note gets its own id (n + time + random), never one in use, never the server's numbering", () => {
+  const m = N.model([{ id: "n1", status: "sent" }]);
+  const ids = new Set(Array.from({ length: 200 }, (_, i) => m.add({ kind: "note" }, 1700000000000 + i).id));
+  assert.equal(ids.size, 200);
+  for (const id of ids) assert.ok(/^n[0-9a-z]{8,}$/.test(id) && id !== "n1", id);
+});
 law("notes: a quote anchors on the block's visible text, the occurrence nearest its old offset", () => {
   const t = "Revenue  grew in Q2.\n Revenue in Q3 is flat.";
   eq(N.locate(t, "Revenue", 0), { start: 0, end: 7 });
@@ -456,7 +464,7 @@ law("notes: an edit is the smallest changed span, by words", () => {
   assert.equal(N.label({ kind: "edit", before: "Q2", after: "Q3" }), 'you changed "Q2" → "Q3"');
 });
 law("notes: the model keeps drafts until send, one edit note per block, ⌘z undoes edits and removals", () => {
-  const m = N.model([]);
+  const m = N.model([], counted());
   const a = m.add({ version: 1, block: "t1", kind: "note", text: "use March" }, 1);
   const b = m.add({ version: 1, block: "p2", kind: "drop", quote: "dark mode" }, 2);
   assert.equal(a.id, "n1"); assert.equal(b.id, "n2"); assert.equal(m.drafts().length, 2);
@@ -475,7 +483,7 @@ law("notes: the model keeps drafts until send, one edit note per block, ⌘z und
   eq(m.payload().notes.map((n) => n.id).sort(), ["n1", "n2"]);
 });
 law("notes: send makes the drafts sent; the server's outcomes win; a new version says done, the answer, or open", () => {
-  const m = N.model([]);
+  const m = N.model([], counted());
   m.add({ version: 1, block: "t1", kind: "note", text: "x" }, 1);
   m.add({ version: 1, block: "p2", kind: "keep" }, 2);
   m.add({ version: 1, block: "p3", kind: "drop" }, 3);
@@ -484,9 +492,10 @@ law("notes: send makes the drafts sent; the server's outcomes win; a new version
   m.merge([{ id: "n1", version: 1, block: "t1", kind: "note", text: "x", status: "done" }, { id: "n2", version: 1, block: "p2", kind: "keep", status: "answered", answer: "kept: Marc asked for it" }]);
   m.reanchor({ t1: "a", p2: "b", p3: "c" }, 2);
   eq(m.all().map((n) => N.outcome(n).text), ["✓ done", "kept: Marc asked for it", "open"]);
-  // a server draft we don't know (another tab, a reload) joins; ids keep counting after it
-  m.merge([{ id: "n7", version: 2, block: "t1", kind: "note", text: "y", status: "draft" }]);
-  assert.equal(m.add({ version: 2, block: "t1", kind: "note" }, 20).id, "n8");
+  // a server draft we don't know (another tab, a reload) joins; a new id never takes one in use
+  m.merge([{ id: "n4", version: 2, block: "t1", kind: "note", text: "y", status: "draft" }]);
+  assert.equal(m.get("n4").text, "y");
+  assert.equal(m.add({ version: 2, block: "t1", kind: "note" }, 20).id, "n5");
   // the server never takes a note back to draft
   m.merge([{ id: "n1", status: "draft" }]);
   assert.equal(m.get("n1").status, "done");

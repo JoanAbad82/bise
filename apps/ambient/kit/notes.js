@@ -101,17 +101,20 @@
 
   // ---- the notes model: drafts are yours until `send`; the server's statuses win for the rest
   const STATUS = ["draft", "sent", "done", "answered"];
-  function model(init) {
+  // every note gets its own id here: the server numbers id-less notes n<max+1>, so a removed
+  // draft's number could come back (ambient-lead, m_4805). `n` + time + random, base 36.
+  const newId = (now) => `n${Math.floor(now || Date.now()).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  function model(init, opts) {
     let notes = (init || []).map((n) => ({ ...n }));
     const undo = [];          // edits and removals, newest last: {type, note}
-    let seq = notes.reduce((m, n) => Math.max(m, +(String(n.id).match(/\d+$/) || [0])[0]), 0);
+    const idOf = (opts && opts.id) || newId;
     const api = {
       all: () => notes.slice(),
       drafts: () => notes.filter((n) => n.status === "draft"),
       get: (id) => notes.find((n) => n.id === id) || null,
-      nextId: () => `n${++seq}`,
+      nextId: (now) => { let id; do id = idOf(now); while (api.get(id)); return id; },
       add(n, now) {
-        const note = { id: api.nextId(), status: "draft", at_ms: now || 0, ...n };
+        const note = { id: api.nextId(now), status: "draft", at_ms: now || 0, ...n };
         notes.push(note);
         if (note.kind === "edit") undo.push({ type: "add", note });
         return note;
@@ -158,7 +161,6 @@
         const by = Object.fromEntries((server || []).map((n) => [n.id, n]));
         notes = notes.map((n) => (by[n.id] && STATUS.indexOf(by[n.id].status) >= STATUS.indexOf(n.status) ? { ...n, ...by[n.id], anchor: n.anchor } : n));
         for (const s of server || []) if (!notes.some((n) => n.id === s.id)) notes.push({ ...s });
-        seq = notes.reduce((m, n) => Math.max(m, +(String(n.id).match(/\d+$/) || [0])[0]), seq);
       },
       // sent: the drafts are now the agent's
       sent(now) { notes = notes.map((n) => (n.status === "draft" ? { ...n, status: "sent", sent_ms: now || 0 } : n)); undo.length = 0; },
@@ -518,9 +520,10 @@
 
     // ---- the drafts and the outcomes already on the server
     api(`/p/${pageId}/meta`).then((r) => {
-      const m = r.meta || {};
+      // flat {id, title, agent, state, versions, url, notes} (amb-core, ecb6ff9); {meta, notes} read too
+      const m = r.meta || r || {};
       meta.title = m.title || meta.title; meta.agent = m.agent || ""; state = m.state || state;
-      M.merge(r.notes || []);
+      M.merge(r.notes || m.notes || []);
       M.reanchor(blockTexts(), version);
       // your edits in place, back on the page after a reload
       for (const n of M.drafts().filter((x) => x.kind === "edit")) reapplyEdit(n);
