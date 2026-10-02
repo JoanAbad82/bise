@@ -2,7 +2,8 @@
 // something needs you (a card, or, while bise is hidden, an agent main
 // started). A click means "what's going on": bise shows, open on the
 // agents and the inbox (the fn + 0 view). A right click (or ⌃ click) opens
-// the small menu.
+// the menu: "needs you" (the cards: a click opens bise on one), "for you"
+// (the newest pages: a click opens one), then the keys and quit.
 
 import AppKit
 
@@ -21,7 +22,11 @@ final class StatusItem: NSObject {
     var onClick: (() -> Void)?
     var onSpotlight: (() -> Void)?
     var onToggle: (() -> Void)?
+    var onPage: ((String) -> Void)?          // a page's URL
+    var onCard: ((String) -> Void)?          // a card's id
     var isHidden: () -> Bool = { false }
+    var pages: () -> [MenuPage] = { [] }
+    var cards: () -> [Card] = { [] }
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var needsYou = false
@@ -70,6 +75,27 @@ final class StatusItem: NSObject {
         let e = NSApp.currentEvent
         if e?.type == .rightMouseUp || e?.modifierFlags.contains(.control) == true {
             let m = NSMenu()
+            // needs you first: it is what is waiting
+            let cs = cards().prefix(MenuRows.maxCards)
+            if !cs.isEmpty {
+                m.addItem(header(MenuRows.needsYou))
+                for c in cs {
+                    let it = entry(MenuRows.card(agent: c.agent, text: c.text), nil, #selector(card(_:)))
+                    it.representedObject = c.id
+                    m.addItem(it)
+                }
+                m.addItem(.separator())
+            }
+            let ps = pages().prefix(MenuRows.maxPages)
+            if !ps.isEmpty {
+                m.addItem(header(MenuRows.forYou))
+                for p in ps {
+                    let it = entry(MenuRows.page(p), nil, #selector(page(_:)))
+                    it.representedObject = p.url
+                    m.addItem(it)
+                }
+                m.addItem(.separator())
+            }
             m.addItem(entry(MenuWords.talk, MenuWords.talkKeys, #selector(spotlight)))
             m.addItem(entry(isHidden() ? MenuWords.show : MenuWords.hide, MenuWords.hideKeys, #selector(toggle)))
             m.addItem(.separator())
@@ -82,6 +108,15 @@ final class StatusItem: NSObject {
         }
     }
 
+    private func header(_ title: String) -> NSMenuItem {
+        if #available(macOS 14.0, *) { return NSMenuItem.sectionHeader(title: title) }
+        let it = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        it.isEnabled = false
+        return it
+    }
+
+    @objc private func page(_ sender: NSMenuItem) { if let u = sender.representedObject as? String { onPage?(u) } }
+    @objc private func card(_ sender: NSMenuItem) { if let id = sender.representedObject as? String { onCard?(id) } }
     @objc private func spotlight() { onSpotlight?() }
     @objc private func toggle() { onToggle?() }
     @objc private func quit() { NSApp.terminate(nil) }

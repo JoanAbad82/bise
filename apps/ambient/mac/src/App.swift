@@ -27,6 +27,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var edgeGlow = true
     private var cards: [Card] = []
     private var pagesURL: String?            // the hub's page server (state.pages_url)
+    private var menuPages: [MenuPage] = []   // "for you" in the :* menu (state.pages)
     private var settleTalk: (() -> Void)?    // a note-or-not decision still pending
     // it knows when not to talk: a call (the mic busy elsewhere), a meeting (the calendar, opt-in)
     private var quiet = QuietMachine()
@@ -95,6 +96,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         st.onClick = { [weak self] in self?.agentsView() }
         st.onSpotlight = { [weak self] in self?.spotlight() }
         st.onToggle = { [weak self] in self?.toggleHidden() }
+        st.onPage = { Browser.open($0) }
+        st.onCard = { [weak self] id in
+            // bise open on that card: the inbox (fn + i) at it
+            guard let self else { return }
+            if self.capsule.hidden { self.setHidden(false) }
+            self.capsule.post(["ev": "app_key", "key": "i", "card": id])
+        }
+        st.pages = { [weak self] in self?.menuPages ?? [] }
+        st.cards = { [weak self] in self?.cards ?? [] }
         st.isHidden = { [weak self] in self?.capsule.hidden ?? false }
         status = st
 
@@ -291,6 +301,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             }
         case "state":
             cards = Card.list(ev)
+            menuPages = MenuPage.list(ev)
             if pagesURL == nil, let p = (ev["pages"] as? [[String: Any]])?.first, let u = p["url"] as? String {
                 pagesURL = PageOpen.pagesBase(fromPageURL: u)
             }

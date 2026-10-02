@@ -31,7 +31,7 @@ case "${1:-}" in
     t="$(mktemp -d "${TMPDIR:-/tmp}/ambient-test.XXXXXX")"
     rc=0
     # each pure source with its laws, one interpreter run each
-    for pair in KeyMachine:KeyMachineTests PageOpen:PageOpenTests Quiet:QuietTests; do
+    for pair in KeyMachine:KeyMachineTests PageOpen:PageOpenTests Quiet:QuietTests MenuRows:MenuRowsTests; do
       cat "$HERE/src/${pair%%:*}.swift" "$HERE/test/${pair#*:}.swift" > "$t/${pair%%:*}.swift"
       swift "$t/${pair%%:*}.swift" || rc=1
     done
