@@ -18,6 +18,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var notify: Notify?
     private var status: StatusItem?
     private var signals: [DispatchSourceSignal] = []
+    private var qa: QA?                  // --qa only: the QA channel (QA.swift)
 
     private var phase = "idle"
     private var talking = false          // talk_start sent, no talk_end/cancel yet
@@ -30,13 +31,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // what a page loaded later needs: the last event of each of these kinds
     private var memory: [String: [String: Any]] = [:]
     private static let remembered: Set<String> = ["hub", "state", "phase", "main"]
-    private let defaults = UserDefaults.standard
+    // QA keeps its own settings: never the user's asked/told marks or edge glow
+    private let defaults: UserDefaults
     // the pages name macOS's settings by version ("Screen & System Audio Recording" on 15+)
     private let macosMajor = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
 
     init(config: Config) {
         self.config = config
         core = Core(config: config)
+        defaults = config.qa != nil ? (UserDefaults(suiteName: "dev.bise.ambient.qa") ?? .standard) : .standard
         super.init()
     }
 
@@ -51,29 +54,24 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if defaults.object(forKey: "rightOption") != nil { keys.rightOption = defaults.bool(forKey: "rightOption") }
         reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
 
-        capsule.onCmd = { [weak self] in self?.command($0) }
+        if let m = config.qa.flatMap(QA.Mode.init(rawValue:)) { qaSetup(m) }
+        capsule.onCmd = { [weak self] in
+            guard let self else { return }
+            if let qa = self.qa { qa.fromPage($0) } else { self.command($0) }
+        }
         capsule.onReady = { [weak self] in self?.pageReady() }
         capsule.load(webDir: config.web)
         capsule.show()
         edge.load(webDir: config.web)
         edgeSetup()
 
-        let st = StatusItem()
-        st.onClick = { [weak self] in self?.agentsView() }
-        st.onSpotlight = { [weak self] in self?.spotlight() }
-        st.onToggle = { [weak self] in self?.toggleHidden() }
-        st.isHidden = { [weak self] in self?.capsule.hidden ?? false }
-        status = st
+        // QA: no menu-bar item, no macOS notification, never the real fn
+        if qa == nil { statusAndKeys() }
 
-        let nt = Notify()
-        nt.onAnswer = { [weak self] card, reply in self?.core.send(["cmd": "answer", "card": card, "reply": reply]) }
-        nt.onOpen = { [weak self] in self?.setHidden(false) }
-        notify = nt
-
-        keys.onOut = { [weak self] in self?.key($0) }
-        if Keys.trusted { keys.start() }
-
-        core.onEvent = { [weak self] in self?.coreEvent($0) }
+        core.onEvent = { [weak self] in
+            guard let self else { return }
+            if let qa = self.qa { qa.fromCore($0) } else { self.coreEvent($0) }
+        }
         core.onExit = { [weak self] _ in
             guard let self else { return }
             self.coreEvent(["ev": "hub", "up": false, "workspace": self.config.workspace])
@@ -84,9 +82,44 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         handleSignals()
     }
 
+    private func statusAndKeys() {
+        let st = StatusItem()
+        st.onClick = { [weak self] in self?.agentsView() }
+        st.onSpotlight = { [weak self] in self?.spotlight() }
+        st.onToggle = { [weak self] in self?.toggleHidden() }
+        st.isHidden = { [weak self] in self?.capsule.hidden ?? false }
+        status = st
+
+        let nt = Notify()
+        nt.onAnswer = { [weak self] card, reply in self?.toCore(["cmd": "answer", "card": card, "reply": reply]) }
+        nt.onOpen = { [weak self] in self?.setHidden(false) }
+        notify = nt
+
+        keys.onOut = { [weak self] in self?.key($0) }
+        if Keys.trusted { keys.start() }
+    }
+
+    // the QA channel's doors into the app (QA.swift; only with --qa)
+    private func qaSetup(_ mode: QA.Mode) {
+        let q = QA(mode: mode, dir: config.ambientDir, capsule: capsule, edge: edge)
+        q.coreEvent = { [weak self] in self?.coreEvent($0) }
+        q.keyOut = { [weak self] in self?.key($0) }
+        q.pageCmd = { [weak self] in self?.command($0) }
+        q.sendCore = { [weak self] in self?.core.send($0) }
+        qa = q
+        q.start()
+    }
+
+    // every cmd for the core: QA mode fakes the voice and drops writes when read-only
+    private func toCore(_ cmd: [String: Any]) {
+        if let qa, !qa.allow(cmd) { return }
+        core.send(cmd)
+    }
+
     func applicationWillTerminate(_ n: Notification) {
         core.kill()
         keys.stop()
+        qa?.stop()
         try? FileManager.default.removeItem(atPath: pidPath)
         Log.say("app: quit")
     }
@@ -192,7 +225,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "app_open_url":
             // a page: its tab forward in a running Chromium browser, else a new tab (§2.8)
             if let s = cmd["url"] as? String, let u = URL(string: s), ["http", "https", "file", "x-apple.systempreferences"].contains(u.scheme?.lowercased() ?? "") {
-                Browser.open(s)
+                if let qa { qa.opened(s) } else { Browser.open(s) }
             }
         case "app_perm":
             permCommand(cmd["perm"] as? String ?? "", cmd["do"] as? String ?? "")
@@ -202,9 +235,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             pageReady()
         case "send":
             // a spotlight send: the front window goes with it (SPEC §3)
-            shoot { [weak self] in self?.core.send(cmd) }
+            shoot { [weak self] in self?.toCore(cmd) }
         default:
-            if name.hasPrefix("app_") { Log.say("app: unknown \(name)") } else { core.send(cmd) }
+            if name.hasPrefix("app_") { Log.say("app: unknown \(name)") } else { toCore(cmd) }
         }
     }
 
@@ -237,7 +270,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "page":
             // a page you're waiting for opens in front, without fn + o (ambient-pages §2.8)
             if ev["front"] as? Bool == true, let url = ev["url"] as? String, PageOpen.isWeb(url) {
-                Browser.open(url)
+                if let qa { qa.opened(url) } else { Browser.open(url) }
             }
         case "state":
             cards = Card.list(ev)
@@ -263,7 +296,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case .talkEnd:
             guard talking else { return }
             talking = false
-            core.send(["cmd": "talk_end"])
+            toCore(["cmd": "talk_end"])
             fnEvent("up")
             edge.glow(false)
         case .cancel:
@@ -299,7 +332,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if askBeforeTalk() { return }
         talking = true
         fnEvent(state)
-        core.send(["cmd": "talk_start"])
+        toCore(["cmd": "talk_start"])
         if edgeGlow && !reduceMotion { edge.glow(true) }
         shoot(then: nil)
     }
@@ -335,6 +368,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // the front window to the core (shot), its chip and corners to the
     // pages, then `then` (a send waits for it, at most 1.5 s)
     private func shoot(then: (() -> Void)?) {
+        if let qa {   // QA: a fake shot, never the user's screen
+            let (ev, bounds) = qa.fakeShot()
+            capsule.post(ev)
+            if let b = bounds { edge.corners(ev, cgBounds: b) }
+            then?()
+            return
+        }
         guard Shot.allowed, !shooting else { then?(); return }
         shooting = true
         var done = false
@@ -346,7 +386,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             guard let self else { return }
             self.shooting = false
             if let r {
-                if let p = r.path { self.core.send(["cmd": "shot", "path": p, "app": r.app, "title": r.title]) }
+                if let p = r.path { self.toCore(["cmd": "shot", "path": p, "app": r.app, "title": r.title]) }
                 let ev: [String: Any] = ["ev": "app_shot", "app": r.app, "title": r.title, "skipped": r.skipped]
                 self.capsule.post(ev)
                 if let b = r.bounds, !r.skipped { self.edge.corners(ev, cgBounds: b) }
@@ -375,6 +415,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // at launch: Accessibility first (nothing works without fn)
     private func firstAsk() {
+        guard qa == nil else { return }   // QA: no permission is ever asked
         if Keys.trusted {
             if !keys.running { keys.start() }
             return
@@ -402,6 +443,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // the first hold: the mic, then the screen, each its sentence first;
     // true = an ask is showing, no talk this time
     private func askBeforeTalk() -> Bool {
+        guard qa == nil else { return false }
         switch micState {
         case .notDetermined:
             // after 'not now' the mic is never asked again: a hold does nothing
@@ -418,6 +460,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     }
 
     private func permCommand(_ p: String, _ action: String) {
+        guard qa == nil else { return }   // QA: never a macOS prompt or a settings pane
         if action == "settings" {
             let pane = ["accessibility": "Privacy_Accessibility", "mic": "Privacy_Microphone", "screen": "Privacy_ScreenCapture"][p] ?? "Privacy"
             if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") { NSWorkspace.shared.open(u) }

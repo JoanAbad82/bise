@@ -75,10 +75,10 @@ final class Capsule: NSObject, WKNavigationDelegate {
 
     let panel: CapsulePanel
     private let effect: NSVisualEffectView
-    private let web: WKWebView
+    let web: WKWebView          // QA (--qa only) snapshots it and reads its model
     private(set) var ready = false
     private(set) var hidden = false
-    private var shape = CapsuleShape()
+    private(set) var shape = CapsuleShape()
     private var shrink: DispatchWorkItem?
     private var webDir: String?
     private var watcher: DirWatcher?

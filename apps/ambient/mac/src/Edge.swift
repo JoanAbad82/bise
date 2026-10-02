@@ -85,6 +85,9 @@ final class Edge: NSObject, WKNavigationDelegate {
         post(ev)
     }
 
+    // QA (--qa only): each screen's overlay window and web view, for its snapshots
+    var views: [(window: NSWindow, web: WKWebView)] { overlays.map { ($0.window, $0.web) } }
+
     // to every screen's page
     func post(_ ev: [String: Any]) {
         for i in overlays.indices { send(ev, to: i) }

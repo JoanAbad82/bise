@@ -17,6 +17,7 @@ struct Config {
     var web: String? = nil
     var dev = ""
     var childEnv: [String: String] = [:]   // --env K=V: for the core (open drops the shell's env)
+    var qa: String? = nil                  // --qa fake|real: the QA channel (QA.swift, plugins/ambient-qa); nil = a normal launch
 
     // --workspace <ws> --bise <exe> [--web <dir>] [--dev <dir>] [--env K=V]...
     // BISE_AMBIENT_WEB (live dev) wins over --web.
@@ -30,6 +31,7 @@ struct Config {
             case "--bise": c.bise = next() ?? "bise"
             case "--web": c.web = next()
             case "--dev": c.dev = next() ?? ""
+            case "--qa": c.qa = next()
             case "--env":
                 if let kv = next(), let eq = kv.firstIndex(of: "=") {
                     c.childEnv[String(kv[..<eq])] = String(kv[kv.index(after: eq)...])
