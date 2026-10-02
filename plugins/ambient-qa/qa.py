@@ -881,6 +881,157 @@ SCENARIOS = {
 }
 
 
+SCENARIOS.update({
+    # roadmap A (ambient-lead m_5616): a Kit draft only after his word, the went line, no send
+    "newsletter": {"ask": "write the newsletter for the launch from the release notes", "no_send": True, "notes": False, "flow": "newsletter"},
+    # roadmap C: the feedback review, 'start an agent' on two items, agents with the item as brief, nothing leaves
+    "feedback": {"ask": "Benjamin's bug reports in #acme-feedback: handle them so adoption is easy", "no_send": True, "notes": False, "flow": "feedback"},
+    # roadmap D (amb-core 527fa441): a step-by-step plan, bise ticks its own, a card per step of his when its turn comes
+    "checklist": {"ask": "check my mail and give me a step by step to buy the domain", "no_send": True, "notes": False, "flow": "checklist"},
+})
+
+
+def _writes(info):
+    try:
+        return [json.loads(l) for l in open(os.path.join(info["tmp"], "outbox.jsonl")) if l.strip()]
+    except FileNotFoundError:
+        return []
+
+
+def _body(x, n):
+    st, b = _http(x["port"], "GET", "/p/%s/v/%d/body" % (x["page"]["id"], n))
+    open(os.path.join(x["d"], "v%d.body.html" % n), "w").write(b)
+    return b
+
+
+def _until(x, pred, what):
+    """Polls the run (its main lines, cards) until pred() or the timeout; the seconds it took, or None (a fail recorded)."""
+    t = time.time()
+    while time.time() - t < x["timeout"]:
+        x["poll"]()
+        try:
+            if pred():
+                return round(time.time() - t, 1)
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(2)
+    x["r"]["fails"].append("%s: not within %d s" % (what, x["timeout"]))
+    return None
+
+
+def _flow_newsletter(x):
+    """A: nothing in the outbox before his word; 'put it in my drafts' on the
+    page; then one Kit draft in the outbox and the page's went line."""
+    r, pid = x["r"], x["page"]["id"]
+    early = [w for w in _writes(x["info"]) if w.get("kind", "").endswith("draft")]
+    if early:
+        r["fails"].append("%d draft(s) before his word" % len(early))
+    blocks = x["last"].get("blocks", [])
+    r["t"]["go"] = x["rel"]()
+    page_notes(pid, [{"block": blocks[0]["id"] if blocks else "page", "kind": "drafts", "text": "put it in my drafts"}], send=True)
+    took = _until(x, lambda: any(w.get("kind") == "kit-draft" for w in _writes(x["info"]))
+                  and any(g.get("kind") == "kit-draft" for g in page_meta(pid).get("went", [])) and x["settled"](), "a Kit draft and the went line after 'put it in my drafts'")
+    r["t"]["draft_after_go"] = took
+    meta = page_meta(pid)
+    r["went"] = meta.get("went", [])
+    kd = [w for w in _writes(x["info"]) if w.get("kind") == "kit-draft"]
+    if len(kd) > 1:
+        r["fails"].append("%d Kit drafts (one expected)" % len(kd))
+    r["flow"] = {"kit_drafts": len(kd), "went": [(g.get("kind"), g.get("url")) for g in r["went"]], "version": meta["versions"][-1]["n"]}
+    _body(x, meta["versions"][-1]["n"])
+
+
+def _flow_feedback(x):
+    """C: the review names Benjamin's three reports; 'start an agent' on two;
+    two agents start with the item as their brief; nothing leaves."""
+    r, c, pid = x["r"], x["c"], x["page"]["id"]
+    reports = [m for m in json.load(open(os.path.join(FAKE_ACCOUNTS, "fixtures.json")))["slack"]["messages"] if m["channel"] == "acme-feedback"]
+    low = x["body"].lower()
+    words = {"s212": "fish", "s213": "proxy", "s214": "fran"}
+    r["coverage"] = {"v1": {"found": sum(words[m["id"]] in low for m in reports), "of": len(reports),
+                            "missing": [m["id"] for m in reports if words[m["id"]] not in low]}}
+    items = re.findall(r'<li[^>]*\bdata-id="([^"]+)"', re.search(r'<section[^>]*data-kit="review".*?</section>', x["body"], re.S).group(0)) \
+        if 'data-kit="review"' in x["body"] else []
+    if len(items) < 2:
+        r["fails"].append("the review has %d items (2 needed to start agents)" % len(items))
+        return
+    block = re.search(r'<section[^>]*data-kit="review"[^>]*data-id="([^"]+)"|<section[^>]*data-id="([^"]+)"[^>]*data-kit="review"', x["body"])
+    block = next(g for g in block.groups() if g) if block else items[0]
+    names0 = {a["name"] for a in (c.state or {}).get("agents", [])}
+    r["t"]["start"] = x["rel"]()
+    page_notes(pid, [{"block": block, "item": i, "kind": "start"} for i in items[:2]], send=True)
+    new = lambda: [a for a in (c.state or {}).get("agents", []) if a["name"] not in names0]
+    r["t"]["agents_after_start"] = _until(x, lambda: len(new()) >= 2, "two agents started from the page")
+    agents = new()
+    briefs = {}
+    for a in agents:
+        text = " ".join(c.lines(a["name"])[:40]).lower()
+        briefs[a["name"]] = [k for k, w in words.items() if w in text]
+    r["flow"] = {"items": items, "started": [a["name"] for a in agents], "briefs": briefs}
+    if agents and not all(briefs.values()):
+        r["fails"].append("an agent's brief doesn't name its report: %s" % briefs)
+    # the items show their agents (data-agent) once the page republishes
+    took = _until(x, lambda: page_meta(pid)["versions"][-1]["n"] > x["last"]["n"]
+                  and _body(x, page_meta(pid)["versions"][-1]["n"]).count("data-agent=") >= 2, "the items showing their agents (data-agent)")
+    r["t"]["items_show_agents"] = took
+
+
+def _rows(body):
+    """A page body's checklist rows: block, item, yours, done."""
+    out = []
+    for sec in re.finditer(r"<section([^>]*)>(.*?)</section>", body, re.S):
+        if 'data-kit="checklist"' not in sec.group(1):
+            continue
+        b = re.search(r'data-id="([^"]+)"', sec.group(1))
+        for li in re.finditer(r"<li([^>]*)>", sec.group(2)):
+            a = li.group(1)
+            i = re.search(r'data-id="([^"]+)"', a)
+            if i:
+                out.append({"block": b.group(1) if b else "", "item": i.group(1), "yours": 'data-who="yours"' in a, "done": "data-done" in a})
+    return out
+
+
+def _flow_checklist(x):
+    """D: a plan of steps, his marked yours; one card per step of his when
+    its turn comes; the first closed by a tick note on the page, the next
+    by 'done' on its card; at the end every step done or ticked, no card left."""
+    r, c, pid = x["r"], x["c"], x["page"]["id"]
+    rows = _rows(x["body"])
+    yours = [w for w in rows if w["yours"]]
+    r["flow"] = {"steps": len(rows), "yours": len(yours), "cards": [], "closed_by": []}
+    if len(rows) < 3 or not yours:
+        r["fails"].append("the plan has %d steps, %d of his (a checklist with his steps expected)" % (len(rows), len(yours)))
+        return
+    step_card = lambda: next((cd for cd in c.cards() if (cd.get("page") or {}).get("id") == pid and (cd.get("page") or {}).get("item")), None)
+    for k in range(len(yours)):
+        took = _until(x, lambda: step_card() is not None, "the card for his step %d" % (k + 1))
+        if took is None:
+            return
+        cd = step_card()
+        item, block = cd["page"]["item"], cd["page"]["block"]
+        r["flow"]["cards"].append({"item": item, "text": cd.get("text"), "after": took})
+        if k % 2 == 0:
+            page_notes(pid, [{"block": block, "item": item, "kind": "tick"}], send=False)   # a tick on the page, even a draft
+            r["flow"]["closed_by"].append("tick note")
+        else:
+            x["core"].p.stdin.write(json.dumps({"cmd": "answer", "card": cd["id"], "reply": "1"}) + "\n")
+            x["core"].p.stdin.flush()
+            r["flow"]["closed_by"].append("card answer")
+        if _until(x, lambda: all((d.get("page") or {}).get("item") != item for d in c.cards()), "the card of %s closing" % item) is None:
+            return
+    _until(x, lambda: x["settled"]() and not step_card(), "no step card left")
+    meta = page_meta(pid)
+    ticks = {(n["block"], n.get("item")) for n in meta.get("notes", []) if n.get("kind") == "tick"}
+    final = _rows(_body(x, meta["versions"][-1]["n"]))
+    left = [w["item"] for w in final if not w["done"] and (w["block"], w["item"]) not in ticks]
+    r["flow"]["left"] = left
+    if left:
+        r["fails"].append("steps neither done nor ticked: %s" % ", ".join(left))
+
+
+FLOWS = {"newsletter": _flow_newsletter, "feedback": _flow_feedback, "checklist": _flow_checklist}
+
+
 def _covered(body, items):
     """Which comments a page body names (its id, as in amb-kit's data-id, or its author)."""
     low = (body or "").lower()
@@ -1145,7 +1296,11 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
             port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
             st, body = _http(port, "GET", "/p/%s/v/%d/body" % (page["id"], last["n"]))
             open(os.path.join(d, "v%d.body.html" % last["n"]), "w").write(body)
-            if not sc.get("notes", True):
+            if sc.get("flow") in FLOWS:
+                # roadmap A, C, D: what the user does after v1, and what must follow
+                FLOWS[sc["flow"]](dict(r=r, c=c, page=page, port=port, last=last, body=body, d=d, poll=poll, settled=settled, rel=rel,
+                                       timeout=timeout, info=info, core=core, cards=cards))
+            elif not sc.get("notes", True):
                 # launch watch (roadmap B): v1 holds batch 0's needs-an-answer items;
                 # after a tick the page republishes with the new batch's
                 truth0 = launch_truth(1)

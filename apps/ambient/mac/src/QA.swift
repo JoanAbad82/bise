@@ -105,9 +105,13 @@ final class QA {
         let name = cmd["cmd"] as? String ?? ""
         switch name {
         case "app_perm":
-            // never macOS's prompt: `continue` is granted, like the fake core
-            let p = cmd["perm"] as? String ?? ""
-            if cmd["do"] as? String == "continue" {
+            // App's permission plan runs on fake states in QA (amb-mac 1f531e9f):
+            // it fakes macOS's prompt as granted itself (never TCC, never a
+            // settings pane) and moves the plan on (mic granted -> screen ask)
+            if let pageCmd {
+                pageCmd(cmd)
+            } else if cmd["do"] as? String == "continue" {
+                let p = cmd["perm"] as? String ?? ""
                 after(0.6) { self.toPage(["ev": "app_perm", "perm": p, "state": "granted"]) }
             }
         case "app_focus":
