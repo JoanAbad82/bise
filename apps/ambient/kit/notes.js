@@ -1146,15 +1146,27 @@
       const P = win.AmbPearl;
       if (!P) return;
       const reduce = !!(win.matchMedia && win.matchMedia("(prefers-reduced-motion: reduce)").matches);
+      // WebGL only once the spot can be seen and the page has painted (speed, roadmap §3.5): the
+      // ':*' text holds the place until then, so the first paint never waits on a shader compile
+      const later = (f) => (win.requestIdleCallback ? win.requestIdleCallback(f, { timeout: 500 }) : win.setTimeout(f, 50));
+      const whenSeen = (spot, f) => {
+        if (!win.IntersectionObserver) return later(f);
+        const io = new win.IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); later(f); } });
+        io.observe(spot);
+      };
       for (const spot of doc.querySelectorAll("[data-bise-pearl]")) {
         if (spot.dataset.pearlOn) continue;
         spot.dataset.pearlOn = "on";
+        whenSeen(spot, () => startPearl(spot));
+      }
+      function startPearl(spot) {
+        if (!doc.contains(spot)) return;
         const n = +spot.dataset.bisePearl || 36;
         const cv = doc.createElement("canvas");
         cv.className = "bn-pearl";
         cv.style.width = cv.style.height = `${n}px`;   // CSSOM, not style= (the shell's CSP)
         const p = P.create(cv);
-        if (p.failed) continue;
+        if (p.failed) return;
         let shown = false;
         const tick = () => {
           if (!doc.contains(spot)) return;
