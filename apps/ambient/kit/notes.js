@@ -58,12 +58,16 @@
     // a question's option you picked (ambient, m_4795)
     picked: (option, text) => (text ? `you picked ${option}: ${text}` : `you picked ${option}`),
     tools: { note: "note", keep: "♡", drop: "✗", unsure: "~", edit: "edit", pin: "pin", start: "start an agent" },
+    // what VoiceOver says for the toolbar's buttons and the layer's parts (best guesses, asked to ambient)
+    say: { note: "write a note", keep: "keep", drop: "drop", unsure: "not sure", edit: "edit the text", start: "start an agent", list: "your notes", tools: "note tools" },
     placeholder: "your note",
     // signed off by ambient (m_4786): 'block' is our word, not hers; keys like the TUI's key bar
     empty: "no notes yet. select some text, or hold fn and talk.",
     // the page is being written, no version yet (ambient, m_5095 via amb-kit m_5106)
     writing: "notes open with the first version",
     keys: "t type   p pin   d draw   ⌘z undo   ⌘⏎ send",
+    // the same without a mouse, on the block tab reached (ambient-lead m_5651; best guess, asked to ambient)
+    keysTab: "tab a block   n note   h ♡   x ✗   e edit",
     remove: "remove",
     undo: "undo",
     failed: "couldn't save your notes. trying again.",
@@ -523,7 +527,7 @@
     const list = el("aside", "bn-ui bn-list");
     const listHead = el("div", "bn-head");
     const listBody = el("ol", "bn-items");
-    const listKeys = el("div", "bn-keys", NW.keys);
+    const listKeys = el("div", "bn-keys", `${NW.keys}\n${NW.keysTab}`);
     // the composer is the list's last row: a note you type never covers the page (QA m_4929: it
     // opened over the next block)
     const composer = el("form", "bn-composer");
@@ -539,6 +543,11 @@
     bar.append(barText, barSend);
     const tools = el("div", "bn-ui bn-tools");
     const pins = el("div", "bn-ui bn-pins");
+    // VoiceOver: the list is a region named 'your notes' with a real list in it, the toolbar a
+    // toolbar, the send bar's line read politely when it changes
+    list.setAttribute("role", "region"); list.setAttribute("aria-label", NW.say.list);
+    tools.setAttribute("role", "toolbar"); tools.setAttribute("aria-label", NW.say.tools);
+    barText.setAttribute("aria-live", "polite");
     doc.body.append(list, bar, tools, pins);
     // a line whose leading ✎ or ✓ keeps its own color (the pen's, the olive's): ambient, m_4926, m_4919 (4)
     const glyphed = (tag, cls, text) => {
@@ -613,7 +622,7 @@
         } else if (n.taste === true) li.append(el("div", "bn-tag", NW.tasteKept));
         if (n.status === "draft") {
           const x = el("button", "bn-x", "×");
-          x.type = "button"; x.title = NW.remove; x.dataset.remove = n.id;
+          x.type = "button"; x.title = NW.remove; x.setAttribute("aria-label", NW.remove); x.dataset.remove = n.id;
           li.append(x);
         }
         return li;
@@ -667,7 +676,8 @@
       if (writing()) return;
       target = t;
       const b = blockById(t.block);
-      const btn = (k, text) => { const e = el("button", "bn-tool", text); e.type = "button"; e.dataset.tool = k; return e; };
+      // VoiceOver: each button says its action in words (♡ is 'keep'), the bar is a toolbar
+      const btn = (k, text) => { const e = el("button", "bn-tool", text); e.type = "button"; e.dataset.tool = k; e.setAttribute("aria-label", NW.say[k] || text); return e; };
       // edit on prose, a review's item, an email
       tools.replaceChildren(btn("note", NW.tools.note), btn("keep", NW.tools.keep), btn("drop", NW.tools.drop), btn("unsure", NW.tools.unsure), ...(editable(b, t.item) ? [btn("edit", NW.tools.edit)] : []),
         // a review's item can start an agent (slice C)
@@ -863,6 +873,53 @@
       else if (e.key === "Escape") { hideTools(); pinning = false; doc.documentElement.classList.remove("bn-pinning"); if (drawing) stopDraw(); }
     });
 
+    // ---- without a mouse (ambient-lead m_5651): tab reaches every block (and a review's items),
+    // the toolbar comes with the focus, and on the focused one n note, h ♡, x ✗, ~ not sure,
+    // e edit, s start an agent, ⏎ the toolbar's first button; ⌘⏎ sends as everywhere
+    function focusable() {
+      for (const b of page.querySelectorAll("[data-kit][data-id]")) {
+        if (!b.hasAttribute("tabindex")) b.tabIndex = 0;
+        if (b.dataset.kit === "review") for (const li of b.querySelectorAll("li[data-id]")) if (!li.hasAttribute("tabindex")) li.tabIndex = 0;
+      }
+    }
+    const focusTarget = (node) => {
+      if (!node || !node.closest || node.closest("[data-kit-ui]")) return null;
+      const b = node.matches("[data-kit][data-id]") ? node : node.matches("li[data-id][tabindex]") ? node.closest("[data-kit][data-id]") : null;
+      if (!b || !page.contains(b)) return null;
+      return node === b ? { t: { block: b.dataset.id }, el: b } : { t: { block: b.dataset.id, item: node.dataset.id }, el: node };
+    };
+    let pointerAt = -1e9;
+    doc.addEventListener("pointerdown", () => { pointerAt = win.performance.now(); }, true);
+    page.addEventListener("focusin", (e) => {
+      // a focus from the keyboard (not a click) brings the toolbar
+      if (win.performance.now() - pointerAt < 300 || busy()) return;
+      const f = focusTarget(e.target);
+      if (f) showTools(f.t, f.el.getBoundingClientRect());
+    });
+    page.addEventListener("keydown", (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || writing() || editing) return;
+      const f = focusTarget(e.target);
+      if (!f) return;
+      const k = { n: "note", t: "note", h: "keep", x: "drop", "~": "unsure", e: "edit", s: "start" }[e.key];
+      if (e.key === "Enter") { e.preventDefault(); showTools(f.t, f.el.getBoundingClientRect()); const first = tools.querySelector("button"); if (first) first.focus(); return; }
+      if (!k) return;
+      e.preventDefault(); e.stopPropagation();
+      target = f.t;
+      const b = blockById(f.t.block);
+      if (k === "note") return compose(f.t);
+      if (k === "edit") { if (editable(b, f.t.item)) { hideTools(); startEdit(b, f.t.item); } return; }
+      if (k === "start") { if (b && b.dataset.kit === "review" && f.t.item) { const x = editEl(f.t.block, f.t.item); M.start(f.t.block, f.t.item, norm(textOf(x)), version, now()); barNote = ""; save(); render(); } return; }
+      addNote(k);
+    });
+    // the toolbar's keys: ← → between its buttons, esc back to the block
+    tools.addEventListener("keydown", (e) => {
+      const bs = [...tools.querySelectorAll("button")], i = bs.indexOf(doc.activeElement);
+      if (i < 0) return;
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); bs[(i + (e.key === "ArrowRight" ? 1 : bs.length - 1)) % bs.length].focus(); }
+      else if (e.key === "Escape") { e.preventDefault(); const b = target && blockById(target.block); hideTools(); if (b) b.focus(); }
+    });
+    focusable();
+
     // ---- the list's clicks: go to the note, remove a draft
     list.addEventListener("click", (e) => {
       const x = e.target.dataset && e.target.dataset.remove;
@@ -917,6 +974,7 @@
       version = (e.detail && e.detail.version) || +page.dataset.version || version;
       for (const id of Object.keys(originals)) delete originals[id];   // the new text is the agent's
       M.reanchor(blockTexts(), version);
+      focusable();
       render();
     });
     doc.addEventListener("bise:notes", (e) => { M.merge((e.detail && e.detail.notes) || []); M.reanchor(blockTexts(), version); render(); });

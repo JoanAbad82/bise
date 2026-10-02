@@ -461,7 +461,9 @@
       case "spotlight": return { kind: "type" };
       case "working": return { kind: v.words ? "answer" : "got" };
       case "speaking": case "end": return { kind: "answer" };
-      case "agents": case "inbox": case "perm": case "settings": return { kind: "open" };
+      case "agents": case "inbox": case "settings": return { kind: "open" };
+      // a permission ask is opened (until he answers); its refused line is a timed line, 8 s (amb-mac m_5679)
+      case "perm": return { kind: v.perm ? "open" : "line" };
       case "needs": return { kind: "needs", card: asking[0] && asking[0].id };
       case "idle": return { kind: "none" };
       // SPEC §0: never for done, failed, a page ready (they live in the menu-bar marble); an

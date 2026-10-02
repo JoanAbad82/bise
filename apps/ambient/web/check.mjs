@@ -358,8 +358,12 @@ law("a permission ask is alone in the capsule: no agent line under it (ambient, 
 });
 law("not now: the refused path, sent to the app", () => {
   let r = M.step(M.init(), { ev: "app_perm", perm: "mic", state: "ask" }, 0);
+  assert.equal(M.view(r.m, 5).content.kind, "open");                 // the ask waits for him
   r = M.step(r.m, { ev: "ui_perm", perm: "mic", do: "not_now" }, 10);
   eq(r.cmds, [{ cmd: "app_perm", perm: "mic", do: "not_now" }]);
+  // its refused line is a timed line (8 s), never a pinned pane (amb-mac m_5679)
+  const d = M.view(M.step(M.init(), { ev: "app_perm", perm: "accessibility", state: "denied" }, 0).m, 10);
+  eq([d.text, d.content.kind], [W.permDenied.accessibility, "line"]);
   assert.equal(M.view(r.m, 20).perm, null);
   r = M.step(r.m, { ev: "app_perm", perm: "mic", state: "denied" }, 30);
   assert.equal(M.view(r.m, 40).text, W.permDenied.mic);

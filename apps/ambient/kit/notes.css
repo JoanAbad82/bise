@@ -64,6 +64,11 @@ html.bn-pinning #bise-page [data-kit][data-id] { cursor: crosshair; }
 .bn-send:disabled { opacity: .45; cursor: default; }
 .bn-bar.bn-error .bn-bar-text { color: var(--pen, #c8264a); }
 
+/* without a mouse: the block or item tab reached, and the layer's own buttons, get a visible ring
+   in the page's ink (never the accent: rose is for what waits for him) */
+#bise-page [data-kit][data-id]:focus-visible, #bise-page li[data-id][tabindex]:focus-visible { outline: 2px solid var(--ink, #1d1a19); outline-offset: 6px; border-radius: var(--radius-small, 6px); }
+.bn-ui button:focus-visible, .bn-ui input:focus-visible, .bn-ui textarea:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
 /* the toolbar over a selection or a block, and the composer */
 .bn-tools { position: absolute; display: none; gap: 2px; padding: 4px; border-radius: 999px; background: var(--surface-talk, #1d1a19ee); color: var(--talk-ink, #fff); box-shadow: 0 8px 24px -8px #0008; z-index: 2147483002; }
 .bn-tools.bn-on { display: flex; animation: bn-pop .3s var(--ease-pop, cubic-bezier(.34, 1.56, .5, 1)) both; }
