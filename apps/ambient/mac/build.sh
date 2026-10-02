@@ -5,7 +5,7 @@
 # deletes fresh unsigned binaries: one stable path, ad-hoc signed).
 #
 #   build.sh --check        type-check every source, no binary
-#   build.sh --test         KeyMachine's and PageOpen's laws through the swift interpreter
+#   build.sh --test         the pure laws (keys, pages, quiet) through the swift interpreter
 #                           (JIT in memory: no binary on disk)
 #   build.sh <app dir>      build the bundle there, in place, and sign it
 #
@@ -19,7 +19,8 @@ SDK="$(xcrun --show-sdk-path)"
 SOURCES=("$HERE"/src/*.swift)
 FLAGS=(-swift-version 5 -target "$ARCH-apple-macos$TARGET" -sdk "$SDK"
        -framework AppKit -framework WebKit -framework ScreenCaptureKit
-       -framework UserNotifications -framework AVFoundation -framework ApplicationServices)
+       -framework UserNotifications -framework AVFoundation -framework ApplicationServices
+       -framework CoreAudio -framework EventKit)
 
 case "${1:-}" in
   --check)
@@ -30,7 +31,7 @@ case "${1:-}" in
     t="$(mktemp -d "${TMPDIR:-/tmp}/ambient-test.XXXXXX")"
     rc=0
     # each pure source with its laws, one interpreter run each
-    for pair in KeyMachine:KeyMachineTests PageOpen:PageOpenTests; do
+    for pair in KeyMachine:KeyMachineTests PageOpen:PageOpenTests Quiet:QuietTests; do
       cat "$HERE/src/${pair%%:*}.swift" "$HERE/test/${pair#*:}.swift" > "$t/${pair%%:*}.swift"
       swift "$t/${pair%%:*}.swift" || rc=1
     done

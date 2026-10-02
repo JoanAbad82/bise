@@ -28,6 +28,11 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var cards: [Card] = []
     private var pagesURL: String?            // the hub's page server (state.pages_url)
     private var settleTalk: (() -> Void)?    // a note-or-not decision still pending
+    // it knows when not to talk: a call (the mic busy elsewhere), a meeting (the calendar, opt-in)
+    private var quiet = QuietMachine()
+    private var meetingQuiet = false
+    private var calendar: CalendarProbe?
+    private var quietTimers: [Timer] = []
     private var agents = Set<String>()
     private var agentWhileHidden = false   // main started an agent while bise was hidden
     // what a page loaded later needs: the last event of each of these kinds
@@ -82,6 +87,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
         observe()
         handleSignals()
+        if qa == nil { startQuiet() }   // QA never reads the user's mic state or calendar
     }
 
     private func statusAndKeys() {
@@ -203,16 +209,17 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     private func pageReady() {
         capsule.post(["ev": "app_reduce_motion", "on": reduceMotion])
-        capsule.post(["ev": "app_settings", "edge_glow": edgeGlow, "macos": macosMajor, "radius": capsule.radius])
+        capsule.post(settingsEvent())
         capsule.post(["ev": "app_hidden", "on": capsule.hidden])
         capsule.post(["ev": "app_globe", "use": globeUse()])
         for k in ["hub", "state", "phase", "main"] { if let ev = memory[k] { capsule.post(ev) } }
+        if quiet.on { capsule.post(["ev": "app_quiet", "on": true, "why": quiet.why]) }
         firstAsk()
     }
 
     private func edgeSetup() {
         edge.setup(["ev": "app_reduce_motion", "on": reduceMotion])
-        edge.setup(["ev": "app_settings", "edge_glow": edgeGlow, "macos": macosMajor, "radius": capsule.radius])
+        edge.setup(settingsEvent())
     }
 
     private func command(_ cmd: [String: Any]) {
@@ -243,12 +250,18 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func settingsEvent() -> [String: Any] {
+        ["ev": "app_settings", "edge_glow": edgeGlow, "macos": macosMajor, "radius": capsule.radius, "meeting_quiet": meetingQuiet]
+    }
+
     private func setting(_ key: String, _ value: Any?) {
         switch key {
+        case "meeting_quiet":
+            setMeetingQuiet(value as? Bool ?? false)
         case "edge_glow":
             edgeGlow = value as? Bool ?? true
             defaults.set(edgeGlow, forKey: "edgeGlow")
-            capsule.post(["ev": "app_settings", "edge_glow": edgeGlow, "macos": macosMajor, "radius": capsule.radius])
+            capsule.post(settingsEvent())
             edgeSetup()
         case "right_option":
             keys.rightOption = value as? Bool ?? true
@@ -304,6 +317,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             guard talking else { return }
             settleTalk?()       // talk_start always goes before talk_end
             talking = false
+            quiet.own(open: false, at: uptime)
             toCore(["cmd": "talk_end"])
             fnEvent("up")
             edge.glow(false)
@@ -311,6 +325,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             guard talking else { return }
             settleTalk?()
             talking = false
+            quiet.own(open: false, at: uptime)
             fnEvent("cancel")   // the page sends talk_cancel and says so
             edge.glow(false)
         case .tap:
@@ -343,6 +358,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         lastKey = key
         if askBeforeTalk() { return }
         talking = true
+        quiet.own(open: true, at: uptime)
         if edgeGlow && !reduceMotion { edge.glow(true) }
         // QA never asks the user's browser anything
         guard qa == nil, let base = pagesURL, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
@@ -397,6 +413,62 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         guard h != capsule.hidden else { return }
         if h { capsule.hide() } else { capsule.show(); agentWhileHidden = false; pink() }
         capsule.post(["ev": "app_hidden", "on": h])
+    }
+
+    // MARK: quiet (a call, a meeting): the core answers in text, the page holds cards
+
+    private var uptime: Double { ProcessInfo.processInfo.systemUptime }
+
+    private func startQuiet() {
+        if defaults.object(forKey: "meetingQuiet") != nil { meetingQuiet = defaults.bool(forKey: "meetingQuiet") }
+        // the mic every second: a property read, never the mic itself
+        quietTimers.append(Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let running = MicProbe.running() else { return }
+                self.quiet.mic(running: running, at: self.uptime)
+                self.sayQuiet()
+            }
+        })
+        if meetingQuiet && CalendarProbe.granted { watchMeetings() } else if meetingQuiet { meetingQuiet = false }
+    }
+
+    private func watchMeetings() {
+        let cal = calendar ?? CalendarProbe()
+        calendar = cal
+        let look = { [weak self] in
+            guard let self, self.meetingQuiet else { return }
+            self.quiet.meeting(CalendarEvent.meetingNow(cal.around(Date()), now: Date()))
+            self.sayQuiet()
+        }
+        look()
+        quietTimers.append(Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in MainActor.assumeIsolated { look() } })
+    }
+
+    // the setting (default off): turning it on asks macOS for the calendar, once
+    private func setMeetingQuiet(_ on: Bool) {
+        let done = { [weak self] (on: Bool) in
+            guard let self else { return }
+            self.meetingQuiet = on
+            self.defaults.set(on, forKey: "meetingQuiet")
+            if on { self.watchMeetings() } else { self.quiet.meeting(false); self.sayQuiet() }
+            self.capsule.post(self.settingsEvent())
+        }
+        guard on, qa == nil else { done(false); return }
+        if CalendarProbe.granted { done(true); return }
+        let cal = calendar ?? CalendarProbe()
+        calendar = cal
+        cal.ask { [weak self] ok in
+            if !ok { self?.perm("calendar", "denied") }
+            done(ok)
+        }
+    }
+
+    // a change: the page (app_quiet) and the core (quiet: text only)
+    private func sayQuiet() {
+        guard let c = quiet.change() else { return }
+        Log.say("app: quiet \(c.on) \(c.why)")
+        capsule.post(["ev": "app_quiet", "on": c.on, "why": c.why])
+        toCore(["cmd": "quiet", "on": c.on, "why": c.why])
     }
 
     // MARK: the shot

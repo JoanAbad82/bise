@@ -30,6 +30,8 @@
 	<string>hold fn and talk. the mic is on only while you talk to bise: fn held, or hands-free until you tap fn.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>bise opens your pages in one tab group, and brings a page that's already open to the front instead of opening it twice.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>bise stays quiet during your meetings: it reads when they are, nothing else, and it stays on this Mac.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>when you talk, main sees the window in front. it goes to your model with your words, and isn't kept.</string>
 </dict>
