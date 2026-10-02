@@ -412,7 +412,8 @@ law("a page ready: `weekly update is ready · fn + o`; fn + o opens it (app_open
   const o = M.step(m, { ev: "app_key", key: "o" }, 3500);
   eq(o.cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/weekly-update", page: "weekly-update" }]);
   const a = M.view(M.step(o.m, { ev: "app_key", key: "0" }, 5000).m, 5000, t0 + 5000);
-  eq(a.forYou.pages.map((p) => [p.name, p.meta]), [["weekly update", "v1 · just now"], ["which gray wins?", "v2 · 40 min ago"]]);
+  // unopened first: weekly update was just opened by fn + o, so the grays come first
+  eq(a.forYou.pages.map((p) => [p.name, p.meta, p.unopened]), [["which gray wins?", "v2 · 40 min ago", true], ["weekly update", "v1 · just now", false]]);
   // a click in for you opens that page
   eq(M.step(o.m, { ev: "ui_page", page: "grays" }, 6000).cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/grays", page: "grays" }]);
 });
@@ -486,6 +487,35 @@ law("out of the way (§8): hidden (app_hidden on) closes an open pane and the sp
   m = M.step(M.step(m, { ev: "app_hidden", on: false }, 40).m, { ev: "app_visible", on: false }, 50).m;
   assert.equal(M.view(m, 60).unseen, true);
   assert.equal(M.view(M.step(m, { ev: "app_visible", on: true }, 70).m, 80).unseen, false);
+});
+law("the full view (fn 0, a hand-open): running (agents + pages being written), needs you (1-9 answer), for you (unopened first, then newest; fn o opens the first); esc closes", () => {
+  const agents = [{ name: "perf", status: "working", note: "signup 4.1 s → 0.9 s" }, { name: "docs", status: "done", note: "readme" }];
+  const cards = [{ id: "c1", agent: "perf", text: "ship it?", options: ["yes", "no"] }];
+  const pages = [
+    { id: "a", title: "launch recap", version: 3, state: "ready", url: "ua", at_ms: 300 },
+    { id: "b", title: "the grays", version: 1, state: "ready", url: "ub", at_ms: 200, opened_version: 1 },
+    { id: "c", title: "weekly update", version: 1, state: "writing", url: "uc", at_ms: 400 },
+    { id: "d", title: "inbox", version: 2, state: "updating", url: "ud", at_ms: 100 },
+  ];
+  let m = M.step(M.init(), { ev: "state", agents, cards, pages }, 0).m;
+  m = M.step(m, { ev: "app_key", key: "0" }, 10).m;
+  const v = M.view(m, 20, 1000);
+  assert.equal(v.state, "agents"); assert.equal(v.content.kind, "open");
+  eq(v.titles, { running: "running", needs: "1 waiting for you" });
+  eq(v.list.map((r) => [r.name, r.what]), [["perf", "needs you"], ["docs", "readme"], ["weekly update", "writing…"], ["inbox", "updating…"]]);
+  eq(v.inbox.map((c) => c.id), ["c1"]);
+  // a page being written is not for you yet; unopened first (b was opened at its version)
+  eq(v.forYou.pages.map((p) => [p.id, p.unopened]), [["a", true], ["d", true], ["b", false]]);
+  // fn o opens the first, which then counts as opened
+  const o = M.step(m, { ev: "app_key", key: "o" }, 30);
+  eq(o.cmds, [{ cmd: "app_open_url", url: "ua", page: "a" }]);
+  eq(M.view(o.m, 40, 1000).forYou.pages.map((p) => p.id), ["d", "a", "b"]);
+  // a new version of an opened page is unopened again
+  const n = M.step(o.m, { ev: "page", id: "a", version: 4, state: "ready", at_ms: 500 }, 50).m;
+  assert.equal(M.view(n, 60, 1000).forYou.pages[0].id, "a");
+  // 1 answers the card; esc closes
+  eq(M.step(m, { ev: "app_key", key: "1" }, 30).cmds, [{ cmd: "answer", card: "c1", reply: "1" }]);
+  assert.equal(M.step(m, { ev: "app_key", key: "esc" }, 30).m.pane, null);
 });
 law("the morning page (app_morning): 'good morning. your page is open   fn o' before 11:00 (greet), 'your page is open   fn o' after; fn + o opens it", () => {
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;

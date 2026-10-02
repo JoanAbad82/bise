@@ -9,6 +9,11 @@
     // §2 states
     idle: "nothing needs you. 3 agents working.",
     quiet: "all quiet. hold fn to talk.",
+    // the full view's sections (vision §3 G; best guesses, asked to ambient): what's running, and a
+    // page being written in it
+    running: "running",
+    pageWriting: "writing…",
+    pageUpdating: "updating…",
     listening: "listening",
     letGo: "let go of fn to send",
     got: ":* got it.",

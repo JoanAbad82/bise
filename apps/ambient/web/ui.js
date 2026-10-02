@@ -122,14 +122,20 @@
       [...el.chips.children].forEach((c) => { if (!v.chips.includes(c.dataset.n)) c.remove(); });
       for (const n of v.chips) if (!have.has(n)) el.chips.insertAdjacentHTML("beforeend", `<span class="chip" data-n="${esc(n)}"><b>∿</b>${esc(n)}</span>`);
     });
-    put("rows", JSON.stringify([v.list, v.inbox, v.forYou]), () => {
-      // what waits for you first (the inbox, or the agents view's top), then "for you", then the agents
+    put("rows", JSON.stringify([v.list, v.inbox, v.forYou, v.titles]), () => {
+      // the full view (vision §3 G): what's running, then what needs you, then for you (unopened
+      // first); the inbox alone shows only its cards
       show(el.rows, v.list || v.inbox);
-      const qs = (v.inbox || []).map((q, i) => `<div class="q${q.sel ? " sel" : ""}" style="animation-delay:${i * 0.06}s"><div class="who">? ${esc(q.agent)}</div><div class="tq">${esc(q.text)}</div>${opts(q)}</div>`);
-      const fy = v.forYou ? [`<div class="sec">${esc(v.forYou.title)}</div>`, ...v.forYou.pages.map((p) => `<button type="button" class="page" data-page="${esc(p.id)}"><span class="gl">◰</span><span class="pn">${esc(p.name)}</span><span class="pm">${esc(p.meta)}</span></button>`)] : [];
-      const n = qs.length + fy.length;
-      const rs = (v.list || []).map((r, i) => `<div class="row ${esc(r.kind)}" style="animation-delay:${(n + i) * 0.06}s"><span class="gl">${esc(r.glyph)}</span><span class="nm">${esc(r.name)}</span><span class="wh">${esc(r.what)}</span><span class="ag">${esc(r.age)}</span></div>`);
-      el.rows.innerHTML = qs.join("") + fy.join("") + rs.join("");
+      const t = v.titles || {};
+      const sec = (s) => (s ? [`<div class="sec">${esc(s)}</div>`] : []);
+      let k = 0;
+      const delay = () => `animation-delay:${(k++) * 0.06}s`;
+      const rs = (v.list || []).map((r) => `<div class="row ${esc(r.kind)}" style="${delay()}"><span class="gl">${esc(r.glyph)}</span><span class="nm">${esc(r.name)}</span><span class="wh">${esc(r.what)}</span><span class="ag">${esc(r.age)}</span></div>`);
+      const qs = (v.inbox || []).map((q) => `<div class="q${q.sel ? " sel" : ""}" style="${delay()}"><div class="who">? ${esc(q.agent)}</div><div class="tq">${esc(q.text)}</div>${opts(q)}</div>`);
+      const fy = v.forYou ? v.forYou.pages.map((p) => `<button type="button" class="page${p.unopened ? " new" : ""}" data-page="${esc(p.id)}" style="${delay()}"><span class="gl">◰</span><span class="pn">${esc(p.name)}</span><span class="pm">${esc(p.meta)}</span></button>`) : [];
+      el.rows.innerHTML = v.list
+        ? [...(rs.length ? sec(t.running) : []), ...rs, ...(qs.length ? sec(t.needs) : []), ...qs, ...(fy.length ? sec(v.forYou.title) : []), ...fy].join("")
+        : qs.join("");
       el.rows.scrollTop = 0;
     });
     put("spot", v.spot ? "on" : "", () => {

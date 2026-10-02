@@ -109,6 +109,11 @@ html:not(.app) .cap, html:not(.app) .note {
 .page .gl { font-family: var(--mono); color: var(--acc); text-align: center; }
 .page .pn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .page .pm { font: 11px var(--mono); color: #ffffff70; }
+/* a page you haven't opened yet: its name in full ink, a small dot before its meta */
+.page.new .pn { font-weight: 600; }
+.page.new .pm::before { content: "• "; color: var(--acc); }
+/* a page being written, in the running rows */
+.row.page .gl { color: var(--acc); }
 
 /* options: `1 yes` `2 no`, the first one lit */
 .opts { display: flex; gap: 8px; margin-top: 10px; }

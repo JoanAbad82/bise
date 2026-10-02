@@ -51,6 +51,7 @@
       radius: 16,                   // macOS's window radius (app_settings.radius); 16 until it comes
       quiet: null,                  // { why: 'call' | 'meeting' | '' } while in a call or a meeting (app_quiet)
       visible: true,                // app_visible: false while nobody can see the capsule (no orb frames)
+      opened: {},                   // page id -> the version the capsule opened (for you: unopened first)
       flashes: [],                  // [{ glyph, text, sub, at, ttl, kiss, still, kind }]
       turnNames: null, chips: [],   // agents that appeared during your turn
       pages: [],                    // "for you": the pages made for you, newest first (state.pages)
@@ -63,6 +64,17 @@
   }
 
   const names = (agents) => agents.map((a) => a.name);
+  // a page you opened (from the capsule, or the core's opened_version when it says so) at its
+  // current version; for you lists the ready pages, unopened first, then newest
+  const opened = (m, p) => Math.max(m.opened[p.id] || 0, p.opened_version || 0) >= (p.version || 1);
+  const forYouPages = (m) => {
+    const ready = m.pages.filter((p) => p.state !== "writing");
+    return [...ready.filter((p) => !opened(m, p)), ...ready.filter((p) => opened(m, p))];
+  };
+  // the capsule opens a page: app_open_url, and the page counts as opened at its version
+  function openPage(m, p, url) {
+    return { m: { ...m, lastPage: p.id, opened: { ...m.opened, [p.id]: p.version || 1 } }, cmds: [{ cmd: "app_open_url", url: url || p.url, page: p.id }] };
+  }
   const sortPages = (pages) => pages.slice().sort((a, b) => (b.at_ms || 0) - (a.at_ms || 0));
   // a page's name on your surfaces: its title, else its id with spaces (vision §3 B)
   const pageName = (p) => p.title || String(p.id).replace(/-/g, " ");
@@ -271,7 +283,7 @@
         return openCard(m, m.cards.find((c) => c.id === ev.card));
       case "ui_page": {      // a click on a page in "for you"
         const p = m.pages.find((x) => x.id === ev.page);
-        return p ? { m: { ...m, lastPage: p.id }, cmds: [{ cmd: "app_open_url", url: p.url, page: p.id }] } : none(m);
+        return p ? openPage(m, p) : none(m);
       }
       case "ui_capsule":     // a click on the small capsule: the agents
         return setPane(m, m.pane ? null : visibleCards(m).length > 1 ? "inbox" : "agents");
@@ -299,6 +311,8 @@
   function openCard(m, card) {
     const p = card && card.page;
     if (!p || !p.url) return { m, cmds: [] };
+    const known = m.pages.find((x) => x.id === p.id);
+    if (known) return openPage(m, known, p.url);
     return { m: { ...m, lastPage: p.id || m.lastPage }, cmds: [{ cmd: "app_open_url", url: p.url, page: p.id }] };
   }
 
@@ -318,10 +332,11 @@
       // card.page {id, block, url}, the url ending with #block)
       case "enter": return openCard(m, cards[m.pane === "inbox" || m.pane === "agents" ? m.sel : 0]);
       case "space": return setPane(m, m.pane === "spot" ? null : "spot");
-      // fn + o: the page the capsule named last, else the newest; the app opens it or brings its tab
+      // fn + o: in the full view, the first page of for you (unopened first); else the page the
+      // capsule named last, else the newest; the app opens it or brings its tab
       case "o": {
-        const p = m.pages.find((x) => x.id === m.lastPage) || m.pages[0];
-        return p ? { m: { ...m, lastPage: p.id }, cmds: [{ cmd: "app_open_url", url: p.url, page: p.id }] } : none(m);
+        const p = (m.pane === "agents" && forYouPages(m)[0]) || m.pages.find((x) => x.id === m.lastPage) || m.pages[0];
+        return p ? openPage(m, p) : none(m);
       }
       case "i": return setPane(m, m.pane === "inbox" ? null : "inbox");
       case "0": return setPane(m, m.pane === "agents" ? null : "agents");
@@ -463,12 +478,19 @@
       v.chips = m.chips;
       kissAt(m.doneAt);
     } else if (m.pane === "agents") {
-      // fn + 0 and the menu-bar click: what waits for you first, then the agents
+      // the full view (vision §3 G, SPEC §0: fn 0, a hand-open of the app): what's running (each
+      // agent with its live line, the pages being written), what needs you (the inbox, 1-9 answer
+      // the chosen card), what's for you (the pages, unopened first, then newest; fn o or a click
+      // opens one); esc or a click elsewhere closes it
       v.state = "agents"; v.size = "open";
       v.label = { text: `${m.hub.workspace || "agents"} · ${Wd.plural(m.agents.length, "agent", "agents")}` };
+      v.titles = { running: W.running, needs: Wd.waiting(cards.length) };
       if (cards.length) v.inbox = inbox();
-      // then "for you": the pages made for you, newest first (vision §3 B)
-      if (m.pages.length) v.forYou = { title: Wd.forYou, pages: m.pages.map((p) => ({ id: p.id, name: pageName(p), meta: Wd.pageMeta(p, wall) })) };
+      const ready = forYouPages(m);
+      if (ready.length) v.forYou = { title: Wd.forYou, pages: ready.map((p) => ({ id: p.id, name: pageName(p), meta: Wd.pageMeta(p, wall), unopened: !opened(m, p) })) };
+      const writingRows = m.pages.filter((p) => p.state === "writing" || p.state === "updating").map((p) => ({
+        name: pageName(p), glyph: "◰", kind: "page", what: Wd.rowLabel(p.state === "writing" ? W.pageWriting : W.pageUpdating), age: "", page: p.id,
+      }));
       v.list = m.agents.map((a) => {
         const asks = cards.some((c) => c.agent === a.name);
         return {
@@ -479,7 +501,7 @@
           what: Wd.rowLabel(asks ? "needs you" : a.note || a.status),
           age: Wd.age(a.turn_ms),
         };
-      });
+      }).concat(writingRows);
     } else if (m.pane === "inbox") {
       v.state = "inbox"; v.size = "open";
       v.label = { text: cards.length ? Wd.waiting(cards.length) : W.quiet };
