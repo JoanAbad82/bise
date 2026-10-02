@@ -200,7 +200,9 @@
       if (n.removed && n.ctx) return NW.removedAt(n.removed, n.side || "after", n.ctx);
       return NW.changed(n.before || "", n.after || "");
     }
-    if (NW.marks[n.kind]) return n.text ? `${NW.marks[n.kind]}: ${n.text}` : NW.marks[n.kind];
+    // a mark on a compare's variant (kit.js's reaction, item set): the place line is the variant's
+    // label, the note reads just '♡ keep' (its words stay on the note for the agent; QA m_5280 (17))
+    if (NW.marks[n.kind]) return n.text && !n.item ? `${NW.marks[n.kind]}: ${n.text}` : NW.marks[n.kind];
     if (n.kind === "pick" && n.option != null) return NW.picked(n.option, n.text);
     if (n.kind === "draw") return n.text ? `${NW.drawing}: ${n.text}` : NW.drawing;
     // the item's own words are long (a whole mail): its place line names it, the note says the verdict

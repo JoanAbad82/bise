@@ -802,6 +802,12 @@ law("notes: kit.js's reactions: keep/drop one per variant, a pick one per block,
   m.react("k1", "t1", "tick", "book the room", 1, 5);
   eq(m.drafts().map((n) => [n.block, n.item, n.kind]), [["c1", "v1", "drop"], ["c1", "v2", "pick"], ["k1", "t1", "tick"]]);
   assert.equal(N.label(m.drafts()[1]), "picked");
+  // a mark on a variant reads just its word; the variant's words stay on the note (QA m_5280 (17))
+  const k = m.react("c2", "v9", "keep", "Le Moulin, Normandy 12-14 june, €12,400", 1, 7);
+  assert.equal(N.label(k), "♡ keep"); assert.equal(k.text, "Le Moulin, Normandy 12-14 june, €12,400"); assert.equal(k.quote, undefined);
+  assert.equal(N.label({ kind: "keep", text: "use this one", block: "p1" }), "♡ keep: use this one");
+  assert.equal(N.where({ block: "c2", item: "v9" }, "Le Moulin, Normandy"), "Le Moulin, Normandy");
+  m.react("c2", "v9", null, "", 1, 8);
   m.react("k1", "t1", null, "", 1, 6);                          // unticked
   eq(m.drafts().map((n) => n.kind), ["drop", "pick"]);
 });
