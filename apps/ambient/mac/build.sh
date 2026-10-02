@@ -53,6 +53,23 @@ case "${1:-}" in
     rm -f "$BIN"
     swiftc -O "${FLAGS[@]}" -o "$BIN" "${SOURCES[@]}"
     sed "s/__MINOS__/$TARGET/" "$HERE/Info.plist" > "$APP/Contents/Info.plist"
+    # the menu-bar pearl's frames (amb-web renders them, docs/ambient-app.md
+    # §9), flat in Resources so NSImage picks @2x/@3x by name
+    rm -f "$APP/Contents/Resources/"*.png
+    if [ -d "$HERE/Resources/pearl" ]; then
+      find "$HERE/Resources/pearl" -name '*.png' -exec cp {} "$APP/Contents/Resources/" \;
+    fi
+    # the app icon: the 1024 px render -> AppIcon.icns (sips + iconutil)
+    if [ -f "$HERE/Resources/icon-1024.png" ]; then
+      set_dir="$(mktemp -d "${TMPDIR:-/tmp}/ambient-icon.XXXXXX")/AppIcon.iconset"
+      mkdir -p "$set_dir"
+      for sz in 16 32 128 256 512; do
+        sips -z $sz $sz "$HERE/Resources/icon-1024.png" --out "$set_dir/icon_${sz}x${sz}.png" >/dev/null
+        sips -z $((sz * 2)) $((sz * 2)) "$HERE/Resources/icon-1024.png" --out "$set_dir/icon_${sz}x${sz}@2x.png" >/dev/null
+      done
+      iconutil -c icns "$set_dir" -o "$APP/Contents/Resources/AppIcon.icns"
+      rm -rf "$(dirname "$set_dir")"
+    fi
     codesign --force --sign - --identifier dev.bise.ambient "$APP" >/dev/null
     echo "ambient mac: built $APP"
     ;;

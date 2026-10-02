@@ -56,25 +56,29 @@ enum MenuRows {
     }
 }
 
-// the menu-bar icon's look (ambient's SPEC §0 states), on today's glyph
-// until the marble: one state wins, the count stays beside it
+// the menu-bar icon's look (ambient's SPEC §0 states, §1 moods): one mood
+// wins, the count stays beside it. StatusItem plays the pearl's frames for
+// the mood (or draws :* until they exist).
 struct IconLook: Equatable {
-    enum Tint: Equatable { case dim, normal, bright, olive, ember }
-    var tint: Tint
-    var moving: Bool          // the slow turn (a pulse on the glyph for now)
-    var extra: String         // "", "▲" (failed, 8 s), "☾" (quiet)
-    var count: Int            // rose, never blinking; none at 0
+    enum Mood: String, Equatable { case still, work, listen, done, fail, away }
+    var mood: Mood
+    var moving: Bool          // play the mood's loop (else its first frame, once)
+    var extra: String         // "", "▲" (fail, 8 s), "☾" (away: quiet)
+    var count: Int            // the rose pill, never blinking; none at 0
 
-    static let flash = 8.0    // done / page ready glint, failed stop
+    static let flash = 8.0    // done glint, fail stop
 
     static func of(working: Bool, count: Int, quiet: Bool, holding: Bool,
                    glintUntil: Double, failedUntil: Double, now: Double, reduceMotion: Bool) -> IconLook {
-        let still = reduceMotion
-        if holding { return IconLook(tint: .bright, moving: !still, extra: "", count: count) }
-        if now < failedUntil { return IconLook(tint: .normal, moving: false, extra: "▲", count: count) }
-        if now < glintUntil { return IconLook(tint: .olive, moving: working && !still, extra: "", count: count) }
-        if quiet { return IconLook(tint: .ember, moving: false, extra: "☾", count: count) }
-        if working { return IconLook(tint: .normal, moving: !still, extra: "", count: count) }
-        return IconLook(tint: .dim, moving: false, extra: "", count: count)
+        let move = !reduceMotion
+        if holding { return IconLook(mood: .listen, moving: move, extra: "", count: count) }
+        if now < failedUntil { return IconLook(mood: .fail, moving: false, extra: "▲", count: count) }
+        if now < glintUntil { return IconLook(mood: .done, moving: move, extra: "", count: count) }
+        if quiet { return IconLook(mood: .away, moving: false, extra: "☾", count: count) }
+        if working { return IconLook(mood: .work, moving: move, extra: "", count: count) }
+        return IconLook(mood: .still, moving: false, extra: "", count: count)
     }
+
+    // frames per second of a mood's loop (listen: faster)
+    var fps: Double { mood == .listen ? 24 : 12 }
 }

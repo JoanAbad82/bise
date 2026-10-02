@@ -39,8 +39,10 @@ final class StatusItem: NSObject {
     private var glintUntil = -1.0
     private var failedUntil = -1.0
     var reduceMotion = false { didSet { refresh() } }
-    private var pulse: Timer?
-    private var dim = false
+    private var player: Timer?
+    private var frame = 0
+    private var playing: IconLook.Mood?
+    private let pearl = PearlFrames()
     private var later: DispatchWorkItem?
 
     override init() {
@@ -70,15 +72,21 @@ final class StatusItem: NSObject {
     private func refresh() {
         let look = IconLook.of(working: working, count: count, quiet: quiet, holding: holding,
                                glintUntil: glintUntil, failedUntil: failedUntil, now: now, reduceMotion: reduceMotion)
-        if look.moving, pulse == nil {
-            // the slow turn, for now a pulse of the glyph (the marble replaces it)
-            pulse = Timer.scheduledTimer(withTimeInterval: holding ? 0.45 : 0.9, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { guard let self else { return }; self.dim.toggle(); self.refresh() }
+        // the mood's loop at its frame rate; a mood that doesn't move: its first frame, once
+        let frames = pearl.count(look.mood)
+        if look.moving && frames > 1 {
+            if playing != look.mood || player == nil {
+                player?.invalidate()
+                playing = look.mood
+                player = Timer.scheduledTimer(withTimeInterval: 1 / look.fps, repeats: true) { [weak self] _ in
+                    MainActor.assumeIsolated { guard let self else { return }; self.frame += 1; self.draw(self.currentLook()) }
+                }
             }
-        } else if !look.moving {
-            pulse?.invalidate()
-            pulse = nil
-            dim = false
+        } else {
+            player?.invalidate()
+            player = nil
+            playing = nil
+            frame = 0
         }
         draw(look)
         // a glint or a stop ends by itself
@@ -91,32 +99,64 @@ final class StatusItem: NSObject {
         }
     }
 
-    private static let rose = NSColor(srgbRed: 0xf4 / 255, green: 0xa6 / 255, blue: 0xb0 / 255, alpha: 1)
-    private static let olive = NSColor(srgbRed: 0xb8 / 255, green: 0xc0 / 255, blue: 0x7a / 255, alpha: 1)
-    private static let ember = NSColor(srgbRed: 0xd9 / 255, green: 0x93 / 255, blue: 0x6a / 255, alpha: 0.75)
+    private func currentLook() -> IconLook {
+        IconLook.of(working: working, count: count, quiet: quiet, holding: holding,
+                    glintUntil: glintUntil, failedUntil: failedUntil, now: now, reduceMotion: reduceMotion)
+    }
 
+    private static let rose = NSColor(srgbRed: 0xf4 / 255, green: 0xa6 / 255, blue: 0xb0 / 255, alpha: 1)
+    private static let onRose = NSColor(srgbRed: 0x2a / 255, green: 0x14 / 255, blue: 0x1b / 255, alpha: 1)
+    private static let fail = NSColor(srgbRed: 0xff / 255, green: 0x9a / 255, blue: 0x8a / 255, alpha: 1)
+
+    // the one seam for the icon's drawing: the pearl's frame (or :* until the
+    // frames exist), then the extra (▲ ☾) and the rose count pill
     private func draw(_ look: IconLook) {
-        let font = NSFont(name: "JetBrains Mono", size: 13) ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold)
-        let small = NSFont(name: "JetBrains Mono", size: 11) ?? NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
-        var color: NSColor
-        switch look.tint {
-        case .dim: color = NSColor.labelColor.withAlphaComponent(0.6)
-        case .normal: color = .labelColor
-        case .bright: color = .labelColor
-        case .olive: color = StatusItem.olive
-        case .ember: color = StatusItem.ember
+        guard let button = item.button else { return }
+        let body: NSImage? = pearl.image(look.mood, frame: look.moving ? frame : 0)
+        let extraFont = NSFont.systemFont(ofSize: 11, weight: .semibold)
+        let pillFont = NSFont.systemFont(ofSize: 10.5, weight: .bold)
+        let extraColor = look.extra == "▲" ? StatusItem.fail : NSColor.secondaryLabelColor
+        let extra = NSAttributedString(string: look.extra, attributes: [.font: extraFont, .foregroundColor: extraColor])
+        let pillText = NSAttributedString(string: look.count > 0 ? "\(look.count)" : "", attributes: [.font: pillFont, .foregroundColor: StatusItem.onRose])
+        let h: CGFloat = 18
+        let bodyW: CGFloat = body == nil ? 0 : 18
+        let extraW = look.extra.isEmpty ? 0 : extra.size().width + 3
+        let pillW = look.count > 0 ? max(14, pillText.size().width + 8) : 0
+        if body == nil {
+            // the fallback: today's :* glyph with the same extras
+            let t = NSMutableAttributedString(string: ":*", attributes: [
+                .font: NSFont(name: "JetBrains Mono", size: 13) ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold),
+                .baselineOffset: 0.5,
+                .foregroundColor: look.mood == .still ? NSColor.labelColor.withAlphaComponent(0.6) : NSColor.labelColor])
+            if !look.extra.isEmpty { t.append(NSAttributedString(string: " ")); t.append(extra) }
+            if look.count > 0 {
+                t.append(NSAttributedString(string: " \(look.count)", attributes: [.font: pillFont, .foregroundColor: StatusItem.rose]))
+            }
+            button.image = nil
+            button.attributedTitle = t
+            return
         }
-        if dim { color = color.withAlphaComponent(color.alphaComponent * 0.5) }
-        let title = NSMutableAttributedString(string: ":*", attributes: [
-            .font: look.tint == .bright ? NSFont.monospacedSystemFont(ofSize: 13, weight: .heavy) : font,
-            .baselineOffset: 0.5, .foregroundColor: color])
-        if !look.extra.isEmpty {
-            title.append(NSAttributedString(string: " " + look.extra, attributes: [.font: small, .baselineOffset: 1, .foregroundColor: NSColor.secondaryLabelColor]))
+        let w = bodyW + extraW + (pillW > 0 ? pillW + 3 : 0)
+        let img = NSImage(size: NSSize(width: w, height: h), flipped: false) { _ in
+            body?.draw(in: NSRect(x: 0, y: 0, width: 18, height: 18))
+            var x = bodyW
+            if extraW > 0 {
+                let sz = extra.size()
+                extra.draw(at: NSPoint(x: x + 2, y: (h - sz.height) / 2))
+                x += extraW
+            }
+            if pillW > 0 {
+                let r = NSRect(x: x + 3, y: (h - 14) / 2, width: pillW, height: 14)
+                StatusItem.rose.setFill()
+                NSBezierPath(roundedRect: r, xRadius: 7, yRadius: 7).fill()
+                let sz = pillText.size()
+                pillText.draw(at: NSPoint(x: r.midX - sz.width / 2, y: r.midY - sz.height / 2))
+            }
+            return true
         }
-        if look.count > 0 {
-            title.append(NSAttributedString(string: " \(look.count)", attributes: [.font: small, .baselineOffset: 1, .foregroundColor: StatusItem.rose]))
-        }
-        item.button?.attributedTitle = title
+        img.isTemplate = false
+        button.attributedTitle = NSAttributedString(string: "")
+        button.image = img
     }
 
     // "type to main      fn space": the keys right-aligned, dim
@@ -186,4 +226,29 @@ final class StatusItem: NSObject {
     @objc private func spotlight() { onSpotlight?() }
     @objc private func toggle() { onToggle?() }
     @objc private func quit() { NSApp.terminate(nil) }
+}
+
+// the pearl's sprite frames, rendered by amb-web from marble.js into
+// apps/ambient/mac/Resources/pearl/ and copied flat into the bundle's
+// Resources: <mood>-<NN>.png (+ @2x, @3x), NN from 00 (docs/ambient-app.md §9)
+@MainActor
+final class PearlFrames {
+    private var cache: [IconLook.Mood: [NSImage]] = [:]
+
+    private func load(_ m: IconLook.Mood) -> [NSImage] {
+        if let c = cache[m] { return c }
+        var out: [NSImage] = []
+        while out.count < 240, let img = Bundle.main.image(forResource: String(format: "%@-%02d", m.rawValue, out.count)) {
+            out.append(img)
+        }
+        cache[m] = out
+        return out
+    }
+
+    func count(_ m: IconLook.Mood) -> Int { load(m).count }
+
+    func image(_ m: IconLook.Mood, frame: Int) -> NSImage? {
+        let f = load(m)
+        return f.isEmpty ? nil : f[frame % f.count]
+    }
 }

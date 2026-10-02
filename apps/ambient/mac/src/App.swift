@@ -601,7 +601,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
                 morning()
             } else {
                 capsule.post(["ev": "app_hidden", "on": true])  // the page shrinks it into the icon
-                capsule.hide(after: reduceMotion ? 0.2 : 0.45)  // then out
+                capsule.hide(after: reduceMotion ? 0.2 : 0.6)   // then out (ambient: 0.6 s back in)
             }
             sayVisible()
             watchClicks(shown)
