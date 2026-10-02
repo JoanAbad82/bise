@@ -210,10 +210,12 @@ This replaces v1's "idle capsule shown by default" (SPEC §5.5). The behavior, b
 (round 6) comes through the tokens and ambient's icon when picked:
 
 - **At rest: nothing on screen.** No capsule, no edge. Only the menu-bar icon.
-- **The menu-bar icon is the status.** Three things at a glance: at rest (still), agents working
-  (a quiet sign of activity: ambient's design; until then a subtle animation of the glyph), and the
-  number of inbox items waiting for him (a count next to the icon, none at 0). Click: the menu
-  ("needs you", "for you", commands); option-click or fn + . : show the capsule.
+- **The menu-bar icon is the status** (vision §3 G, ambient-pm 715aca9d, which wins where this
+  differs): still when idle; moving quietly while work runs (ambient's design; until then a subtle
+  animation of the glyph); a number = things waiting for him (questions, approvals, unopened pages),
+  none at 0; accent when something needs him. A click opens the **full view** (the capsule with
+  what's running, needs you, for you); esc or a click away closes it. The right-click menu stays
+  (commands).
 - **The capsule shows only when there is something to see**, then goes away by itself:
   - while he talks (fn held, hands-free) or types (fn + space), and the edge glow while fn is held;
   - main's answer to his own turn: it shows, then hides 4 s after the end of the turn (or after
@@ -221,9 +223,10 @@ This replaces v1's "idle capsule shown by default" (SPEC §5.5). The behavior, b
   - `got it` / `on it` after a send: brief (2 s), then hidden: the work goes on in the menu bar;
   - a new item that needs him: the capsule shows it for 6 s (the card, `1 yes 2 no`), then hides;
     the count stays in the menu bar; fn + 1…9 still answers the top item while hidden;
-  - when he opens it (menu bar, fn + .), it stays until esc, fn + ., or a click elsewhere.
-- **Hide while working**: esc or fn + . hides it at any moment; nothing is lost, the menu bar
-  keeps the sign. A spoken answer keeps speaking when hidden (esc while speaking = text only, as
+  - when he opens it (the icon, fn + .), it stays until esc, fn + ., or a click elsewhere.
+- **Hide while working**: esc, fn + . or a click on the icon hides it at any moment; then nothing
+  brings it back while agents work except his own talk or a new needs-you; the menu bar keeps the
+  sign. A spoken answer keeps speaking when hidden (esc while speaking = text only, as
   before).
 - macOS notifications stay for the screen locked or the user away (v1 rule), not for "hidden".
 
