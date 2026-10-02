@@ -59,6 +59,8 @@ Every tool returns JSON; PNG files are written under
 | `page_meta({id})` | `qa.py page meta --id x` | versions, state, the notes and their status |
 | `page_drive({id, steps, schemes})` | `qa.py page drive --id x --steps f.json` | the page in a throwaway headless Chrome (no logins, local only): your steps, 2x shots in light and dark |
 | `page_fixture()` | `qa.py page fixture` | weekly-update at v1, four notes sent (note, voice, edit, unsure), then v2 marking one done, answering one, and moving the unsure one's block |
+| `menubar({states, frames, count})` | `qa.py snapshot --menubar [--states work,need] [--frames 12] [--count 3]` | the menu-bar item (the 18 px pearl) in each state (still, work, need+N, away ☾, done, fail ▲, listen) through amb-mac's StatusItem: its own composed image at 1x/2x, transparent and on light/dark menu-bar strips, and a sheet |
+| `pearl()` | `qa.py pearl` | every pearl frame amb-mac plays, per mood, at 1x and 2x |
 | `run({scenario, headless})` | `qa.py run weekly-update\|inbox\|offsite [--headless] [--keep]` | a scripted product run on a model hub with the fake accounts (costs credits): the ask through the core, then times, notes, outbox; a one-screen report (see "Scripted product runs") |
 | `stop()` | `qa.py stop` | quit the QA app and the fake hub |
 
@@ -151,7 +153,9 @@ and records the time to v2 and each note's outcome; the outbox (a send on
 length (over 120 characters fails); cards that showed. Output in
 `<qa dir>/out/runs/<scenario>-<time>/`: `run.json`, `report.txt` (one
 screen), the page bodies. It stops the hub (and app) it started unless
-`--keep`. One run at a time: it uses your QA dir's hub.
+`--keep`. The report names the build: a tree behind ambient-app prints a
+WARNING (a fail may be the stale build); `--require <sha>,<sha>` refuses
+a tree that lacks those commits. One run at a time: it uses your QA dir's hub.
 
 ## Limits
 

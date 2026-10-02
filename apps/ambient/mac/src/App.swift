@@ -155,6 +155,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         q.keyOut = { [weak self] in self?.key($0) }
         q.pageCmd = { [weak self] in self?.command($0) }
         q.sendCore = { [weak self] in self?.core.send($0) }
+        q.statusItem = { [weak self] in self?.status }
         qa = q
         q.start()
     }

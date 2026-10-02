@@ -108,6 +108,22 @@ def tree_info(root):
             "ambient_app": _git(root, "log", "-1", "--format=%h", "ambient-app")}
 
 
+def require_commits(root, require=None):
+    """A stale build must not read as a product fail (ambient-lead m_5358):
+    the commits of `require` the tree lacks refuse the run; else a tree
+    behind ambient-app prints a WARNING. Returns what it found."""
+    req = [c for c in (require.split(",") if isinstance(require, str) else (require or [])) if c.strip()]
+    missing = [c.strip() for c in req if subprocess.run(["git", "-C", root, "merge-base", "--is-ancestor", c.strip(), "HEAD"],
+                                                         capture_output=True).returncode != 0]
+    if missing:
+        raise QAError("the bise tree %s lacks %s: build a tree that has them (or pass bise=<exe>)" % (root, ", ".join(missing)))
+    b = behind(root)
+    if b:
+        print("ambient-qa: WARNING: the bise tree %s is %s commits behind ambient-app: a fail may be a stale build (--require <commit> refuses one)"
+              % (root, b), file=sys.stderr)
+    return {"required": req, "behind_ambient_app": b}
+
+
 def find_bise(explicit=None):
     """A bise with `ambient-core` and its app root (a tree with a built
     repl-live): --bise, $AMBIENT_QA_BISE, the last launch's pair, the repo's
@@ -583,6 +599,37 @@ def snapshot(what="both", backdrop=None, name=None, out=None):
     return call("snapshot", **q)
 
 
+MENUBAR_STATES = ("still", "work", "need", "away", "done", "fail", "listen")
+
+
+def menubar(states=None, frames=1, count=2, out=None):
+    """The menu-bar item (amb-mac's StatusItem) in each SPEC §0 state, put
+    there through its own API: its button's composed image (the pearl's
+    frame, ▲/☾, the rose count pill) at 1x and 2x, transparent and on a
+    light and a dark menu-bar strip, plus one sheet of them all. `frames`:
+    successive frames of the moving moods (work, done, listen)."""
+    out = out or os.path.join(OUT, "menubar-%s" % time.strftime("%Y%m%d-%H%M%S"))
+    q = {"dir": out, "frames": int(frames), "count": int(count)}
+    if states:
+        q["states"] = [s for s in states.split(",") if s] if isinstance(states, str) else list(states)
+    r = call("menubar", timeout=120, **q)
+    tiles = []
+    for s in r["states"]:
+        for strip in ("dark", "light"):
+            f = [p for p in s["files"] if p.endswith(".%s@2x.png" % strip)]
+            if f:
+                tiles.append({"path": f[0], "label": "%s · %s%s" % (s["state"], strip, " · %d frames" % frames if frames > 1 else "")})
+    if tiles:
+        r["sheet"] = os.path.join(out, "sheet.menubar.png")
+        call("sheet", items=tiles, out=r["sheet"], cols=4, tile_w=220, title="bise ambient · the menu-bar item, 2x (need = %d)" % count, timeout=60)
+    return r
+
+
+def pearl(out=None):
+    """Every pearl frame amb-mac plays per mood (the bundle's <mood>-NN.png), at 1x and 2x."""
+    return call("pearl", dir=out or os.path.join(OUT, "pearl"), timeout=120)
+
+
 def state():
     return call("state")
 
@@ -830,6 +877,13 @@ def run_report(r):
     s = lambda v: "-" if v is None else "%.1f s" % v
     L = ["%s  (%s, model hub, fake accounts)  %s" % (r["scenario"], "headless" if r["headless"] else "app", r["at"]),
          "ask: %s" % r["ask"]]
+    tr = r.get("tree") or {}
+    if tr:
+        L.append("build: %s%s%s" % (tr.get("head", "")[:60], ", %s behind ambient-app (STALE: a fail may be the build)" % tr["behind_ambient_app"] if tr.get("behind_ambient_app") else ", at ambient-app's tip",
+                                   ", has %s" % ",".join(tr["required"]) if tr.get("required") else ""))
+    if r.get("load"):
+        L.append("machine load %s at start, %s at end%s" % (r["load"].get("start"), r["load"].get("end", "-"),
+                                                           " (loaded: times are an upper bound)" if max(r["load"].values()) > 30 else ""))
     m = r["main_lines"]
     if m:
         L.append("main's line: %d chars at %s: %s" % (m[0]["len"], s(m[0]["at"]), m[0]["text"][:160]))
@@ -857,7 +911,7 @@ def run_report(r):
     return "\n".join(L)
 
 
-def run(scenario, headless=False, timeout=900, keep=False, out=None):
+def run(scenario, headless=False, timeout=900, keep=False, out=None, require=None):
     """A scripted product run (ambient-lead m_5306): a model hub (the user's
     model and keys, throwaway state) with the fake accounts only; the
     scenario's ask through the core like the capsule's; times the page's
@@ -869,6 +923,7 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None):
         raise QAError("scenario: %s" % ", ".join(SCENARIOS))
     sc = SCENARIOS[scenario]
     bise, root = find_bise()
+    build = require_commits(root, require)
     if headless:
         if alive():
             raise QAError("a QA app is running: stop it first (qa.py stop), or run without --headless")
@@ -878,8 +933,8 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None):
         info = _read(HUB)
     d = out or os.path.join(OUT, "runs", "%s-%s" % (scenario, time.strftime("%Y%m%d-%H%M%S")))
     os.makedirs(d, exist_ok=True)
-    r = {"scenario": scenario, "ask": sc["ask"], "headless": headless, "at": time.strftime("%Y-%m-%d %H:%M"), "dir": d, "tree": tree_info(root),
-         "t": {}, "main_lines": [], "cards": [], "page": None, "notes": [], "fails": []}
+    r = {"scenario": scenario, "ask": sc["ask"], "headless": headless, "at": time.strftime("%Y-%m-%d %H:%M"), "dir": d, "tree": dict(tree_info(root), required=build["required"]),
+         "t": {}, "main_lines": [], "cards": [], "page": None, "notes": [], "fails": [], "load": {"start": round(os.getloadavg()[0], 1)}}
     c, _ = _hub()
     core = None
     try:
@@ -959,6 +1014,7 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None):
         r["cards"] = list(cards.values())
         r["main_tail"] = c.lines("main")[-40:]
     finally:
+        r["load"]["end"] = round(os.getloadavg()[0], 1)
         if core:
             core.close()
         try:
@@ -1226,8 +1282,13 @@ def _cli(argv):
     p.add_argument("scenario", choices=sorted(SCENARIOS)); p.add_argument("--headless", action="store_true", help="no app: a bise ambient-core child")
     p.add_argument("--timeout", type=int, default=900); p.add_argument("--keep", action="store_true", help="leave the hub (and app) running"); p.add_argument("--out")
     p.add_argument("--json", action="store_true", help="print run.json instead of the report")
+    p.add_argument("--require", help="commits the bise tree must have (comma-separated): refused otherwise")
     p = sub.add_parser("say"); p.add_argument("text"); p.add_argument("--no-wait", action="store_true")
     p = sub.add_parser("snapshot"); p.add_argument("--what", default="both"); p.add_argument("--backdrop"); p.add_argument("--name"); p.add_argument("--out")
+    p.add_argument("--menubar", action="store_true", help="the menu-bar item in each state (still, work, need, away, done, fail, listen) at 1x and 2x, and a sheet")
+    p.add_argument("--states", help="menubar: a subset, comma-separated"); p.add_argument("--frames", type=int, default=1, help="menubar: successive frames of a moving mood")
+    p.add_argument("--count", type=int, default=2, help="menubar: the need state's count")
+    p = sub.add_parser("pearl", help="every pearl frame amb-mac plays, per mood, at 1x and 2x"); p.add_argument("--out")
     sub.add_parser("state"); sub.add_parser("reset"); sub.add_parser("ping"); sub.add_parser("outbox")
     p = sub.add_parser("events"); p.add_argument("n", nargs="?", type=int, default=40); p.add_argument("--levels", action="store_true")
     p = sub.add_parser("fn"); p.add_argument("state"); p.add_argument("--key", default="fn")
@@ -1264,12 +1325,16 @@ def _cli(argv):
         sc, _ = all_scenes()
         r = [{"id": s["id"], "spec": s["spec"], "label": s["label"]} for s in sc]
     elif a.cmd == "run":
-        r = run(a.scenario, a.headless, a.timeout, a.keep, a.out)
+        r = run(a.scenario, a.headless, a.timeout, a.keep, a.out, a.require)
         if not a.json:
             print(r["report"])
             return
     elif a.cmd == "say":
         r = say(a.text, wait_answer=not a.no_wait)
+    elif a.cmd == "pearl":
+        r = pearl(a.out)
+    elif a.cmd == "snapshot" and a.menubar:
+        r = menubar(a.states, a.frames, a.count, a.out)
     elif a.cmd == "snapshot":
         r = snapshot(a.what, a.backdrop, a.name, a.out)
     elif a.cmd == "state":

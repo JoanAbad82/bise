@@ -59,7 +59,10 @@ TOOLS = [
     ("reset", "The pages start over (the model back to its start), the panel shown.", {}, []),
     ("run", "A scripted product run, measured the same way every time: a model hub (the user's model and keys, costs credits) with the fake accounts only; the scenario's ask through the core like the capsule's; times the page's first appearance, v1, then 3 scripted notes, send, v2 and the notes' outcomes; the outbox (no send on 'don't send'); main's capsule line length. Returns the one-screen report and its folder (run.json, report.txt, page bodies). Takes minutes.",
      {"scenario": {"type": "string", "enum": sorted(qa.SCENARIOS)}, "headless": {"type": "boolean", "description": "no app: a bise ambient-core child (text only: no mic, no voice)"},
-      "timeout": {"type": "integer"}, "keep": {"type": "boolean"}}, ["scenario"]),
+      "timeout": {"type": "integer"}, "keep": {"type": "boolean"}, "require": {"type": "array", "items": {"type": "string"}, "description": "commits the bise tree must have, else refused"}}, ["scenario"]),
+    ("menubar", "The menu-bar item (the 18 px pearl) in each SPEC §0 state: still, work, need (+count), away ☾, done, fail ▲, listen, put there through amb-mac's StatusItem API; its own composed image at 1x and 2x, transparent and on a light and a dark menu-bar strip, and a sheet (returned as an image). frames > 1: successive frames of the moving moods.",
+     {"states": {"type": "array", "items": {"type": "string"}}, "frames": {"type": "integer"}, "count": {"type": "integer"}}, []),
+    ("pearl", "Every pearl frame amb-mac plays, per mood (the bundle's <mood>-NN.png), at 1x and 2x.", {}, []),
 ]
 
 
@@ -145,8 +148,14 @@ def run(name, a):
         r = qa.outbox()
     elif name == "reset":
         r = qa.reset()
+    elif name == "menubar":
+        r = qa.menubar(a.get("states"), int(a.get("frames") or 1), int(a.get("count") or 2))
+        if r.get("sheet"):
+            images.append(r["sheet"])
+    elif name == "pearl":
+        r = qa.pearl()
     elif name == "run":
-        full = qa.run(a["scenario"], bool(a.get("headless")), int(a.get("timeout") or 900), bool(a.get("keep")))
+        full = qa.run(a["scenario"], bool(a.get("headless")), int(a.get("timeout") or 900), bool(a.get("keep")), require=a.get("require"))
         r = {"report": full["report"], "dir": full["dir"], "fails": full["fails"], "t": full["t"]}
     else:
         raise qa.QAError("unknown tool %s" % name)

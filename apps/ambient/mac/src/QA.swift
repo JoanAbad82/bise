@@ -57,6 +57,7 @@ final class QA {
     var keyOut: ((KeyOut) -> Void)?             // as if from the fn tap (App.key)
     var pageCmd: (([String: Any]) -> Void)?     // as if from the page (App.command)
     var sendCore: (([String: Any]) -> Void)?    // to the core itself (Core.send)
+    var statusItem: (() -> StatusItem?)?        // the menu-bar item (App.status), for its shots
 
     private let capsule: Capsule
     private let edge: Edge
@@ -537,6 +538,10 @@ final class QA {
         case "reset":
             await reset()
             return [:]
+        case "menubar":
+            return try await menubar(q)
+        case "pearl":
+            return try pearlFrames(q)
         case "quit":
             after(0.1) { NSApp.terminate(nil) }
             return [:]
@@ -803,6 +808,119 @@ final class QA {
         ctx.restoreGState()
 
         if let web { ctx.draw(web, in: r, flipped: true) }
+    }
+
+    // MARK: the menu-bar item (ambient's gate item 7)
+
+    // the states SPEC §0 gives the 18 px pearl, in an order where each one
+    // wins over what is left of the one before (IconLook.of's precedence)
+    static let menubarStates = ["still", "work", "need", "away", "done", "fail", "listen"]
+
+    // the item put in each state through StatusItem's own API, its button's
+    // composed image (amb-mac's draw: the pearl's frame, the ▲/☾, the rose
+    // pill) written at 1x and 2x, transparent and on a light and a dark
+    // menu-bar strip; `frames` > 1: that many successive frames of a moving
+    // mood, at its own rate. The item is put back at rest after.
+    private func menubar(_ q: [String: Any]) async throws -> [String: Any] {
+        guard let st = statusItem?() else { throw Failure(description: "no menu-bar item hook (App.qaSetup: q.statusItem)") }
+        let dir = q["dir"] as? String ?? NSTemporaryDirectory()
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let count = (q["count"] as? NSNumber)?.intValue ?? 2
+        let frames = max(1, min(48, (q["frames"] as? NSNumber)?.intValue ?? 1))
+        let states = (q["states"] as? [String]) ?? QA.menubarStates
+        let rest = { st.set(holding: false); st.set(quiet: false); st.set(working: false, count: 0) }
+        var out: [[String: Any]] = []
+        rest()
+        for s in states {
+            switch s {
+            case "still": rest()
+            case "work": rest(); st.set(working: true, count: 0)
+            case "need": rest(); st.set(working: false, count: count)
+            case "away": rest(); st.set(quiet: true)
+            case "done": rest(); st.glint()
+            case "fail": rest(); st.failed()
+            case "listen": rest(); st.set(holding: true)
+            default: throw Failure(description: "menubar state \(s): one of \(QA.menubarStates.joined(separator: ", "))")
+            }
+            var files: [String] = []
+            let fps = s == "listen" ? 24.0 : 12.0
+            for f in 0..<frames {
+                if f > 0 { try? await Task.sleep(nanoseconds: UInt64(1e9 / fps)) }
+                guard let img = statusImage(st) else { throw Failure(description: "the menu-bar item has no button") }
+                let base = dir + "/" + s + (frames > 1 ? String(format: "-%02d", f) : "")
+                for (suffix, scale, strip) in [("@1x", 1.0, nil), ("@2x", 2.0, nil), (".light@2x", 2.0, "light"), (".dark@2x", 2.0, "dark")] as [(String, CGFloat, String?)] {
+                    guard let cg = QA.render(img, scale: scale, strip: strip) else { continue }
+                    try PNG.write(cg, base + suffix + ".png")
+                    files.append(base + suffix + ".png")
+                }
+            }
+            out.append(["state": s, "files": files, "size": [statusImage(st)?.size.width ?? 0, statusImage(st)?.size.height ?? 0]])
+        }
+        rest()
+        return ["states": out, "dir": dir]
+    }
+
+    // the button's image as the menu bar shows it; before the pearl's frames
+    // exist the item is the `:*` title: then the button's own drawing
+    private func statusImage(_ st: StatusItem) -> NSImage? {
+        guard let w = st.iconWindow, let view = w.contentView else { return nil }
+        func button(_ v: NSView) -> NSButton? {
+            if let b = v as? NSButton { return b }
+            for s in v.subviews { if let b = button(s) { return b } }
+            return nil
+        }
+        guard let b = button(view) else { return nil }
+        if let img = b.image { return img }
+        guard let rep = b.bitmapImageRepForCachingDisplay(in: b.bounds) else { return nil }
+        b.cacheDisplay(in: b.bounds, to: rep)
+        let img = NSImage(size: b.bounds.size)
+        img.addRepresentation(rep)
+        return img
+    }
+
+    // an image at a scale: transparent, or on a menu-bar strip (24 pt tall,
+    // 6 pt each side) in the light or dark appearance
+    static func render(_ img: NSImage, scale: CGFloat, strip: String?) -> CGImage? {
+        let pad: CGFloat = strip == nil ? 0 : 6
+        let size = NSSize(width: img.size.width + 2 * pad, height: strip == nil ? img.size.height : 24)
+        let w = Int((size.width * scale).rounded(.up)), h = Int((size.height * scale).rounded(.up))
+        guard w > 0, h > 0, let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                               space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        if let strip {
+            ctx.setFillColor(strip == "light" ? CGColor(srgbRed: 0.93, green: 0.93, blue: 0.94, alpha: 1) : CGColor(srgbRed: 0.13, green: 0.12, blue: 0.13, alpha: 1))
+            ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        }
+        ctx.scaleBy(x: scale, y: scale)
+        let appearance = NSAppearance(named: strip == "light" ? .aqua : .darkAqua) ?? NSAppearance.currentDrawing()
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
+        appearance.performAsCurrentDrawingAppearance {
+            img.draw(in: NSRect(x: pad, y: (size.height - img.size.height) / 2, width: img.size.width, height: img.size.height))
+        }
+        NSGraphicsContext.restoreGraphicsState()
+        return ctx.makeImage()
+    }
+
+    // every frame amb-mac plays per mood (PearlFrames: the bundle's
+    // <mood>-NN.png), at 1x and 2x, transparent
+    private func pearlFrames(_ q: [String: Any]) throws -> [String: Any] {
+        let dir = q["dir"] as? String ?? NSTemporaryDirectory()
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let pearl = PearlFrames()
+        var out: [String: Any] = [:]
+        for m in [IconLook.Mood.still, .work, .listen, .done, .fail, .away] {
+            let n = pearl.count(m)
+            for f in 0..<n {
+                guard let img = pearl.image(m, frame: f) else { continue }
+                for (suffix, scale) in [("@1x", 1.0), ("@2x", 2.0)] as [(String, CGFloat)] {
+                    if let cg = QA.render(img, scale: scale, strip: nil) {
+                        try PNG.write(cg, dir + "/" + String(format: "%@-%02d%@.png", m.rawValue, f, suffix))
+                    }
+                }
+            }
+            out[m.rawValue] = n
+        }
+        return ["frames": out, "dir": dir]
     }
 
     // MARK: the contact sheet
