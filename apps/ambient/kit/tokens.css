@@ -25,7 +25,7 @@
   --ink: #1d1a17;                 /* everything you read */
   --dim: #5a5349;                 /* secondary text */
   --faint: #8a8174;               /* labels, keys, the quietest text */
-  --kick: #8a8174;                /* kickers, captions, meta lines */
+  --kick: #857d72;                /* kickers, captions, meta lines (identity8 .pb .meta) */
   --line: #1d1a171c;              /* rules between rows, never text */
   --rule: var(--line);
   --rule-strong: #1d1a17;         /* the rule under a table's head */
@@ -41,10 +41,12 @@
   --working: #5a5349;             /* work in progress: shown by motion (a breathing dot), not by a color (= --dim) */
 
   /* surface-talk: where bise talks (glass, over the paper): the frame, the note toolbar, the side list, the send bar */
-  --surface-talk: linear-gradient(180deg, #2a2224 56%, #1a1516 72%);
+  /* identity8.html's page frame and notes panel (.pf, .pn): smoked glass, more opaque than the capsule */
+  --surface-talk: linear-gradient(180deg, rgba(42, 34, 36, .86), rgba(26, 21, 22, .92));
   --talk-ink: #ffffff;
   --talk-dim: #ffffffa0;
   --talk-faint: #ffffff70;
+  --talk-meta: #ffffff80;         /* the frame's 'by … · 2 min' (identity8 .pf .m) */
   --talk-accent: #f4a6b0;
   --talk-on-accent: #2a141b;
   --talk-pen: #f4a6b0;
@@ -53,9 +55,9 @@
   --talk-line: #ffffff12;
   --talk-moved: #ffffffa0;
   --talk-working: #ffffffa0;
-  --talk-raised: #ffffff14;
+  --talk-raised: #ffffff16;
   --talk-raised-on: #ffffff2a;
-  --talk-stroke: inset 0 0 0 1px #ffffff26, inset 0 1px 0 #ffffff38;
+  --talk-stroke: inset 0 0 0 1px #ffffff1a;
   --talk-shadow: 0 30px 80px -24px #000b;
   --talk-blur: blur(44px) saturate(1.9);
 
