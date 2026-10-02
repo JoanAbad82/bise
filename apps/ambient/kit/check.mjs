@@ -416,8 +416,8 @@ law("reply items: the reply is what follows the quoted comment; the approve butt
   const [hn, x] = K.options(b);
   assert.equal(K.replyText(hn), "one thread per repo, and agents that talk to each other.");
   const label = (li) => li.children.find((c) => c.hasAttribute("data-kit-ui")).children.find((c) => c.getAttribute("data-act") === "approve").textContent;
-  assert.equal(label(hn), "copy + open Hacker News");
-  assert.equal(label(x), "reply on X");
+  assert.equal(label(hn), "open on Hacker News");
+  assert.equal(label(x), "open on X");
 });
 
 law("checklist who and when: due dates in words, late in its own state, done items never late", () => {
@@ -503,9 +503,9 @@ law("a watching page: 'watching · checked 3 min ago · until tomorrow 18:00'; a
   K.decorate([r], "launch-watch", doc);
   const [hn, x] = K.options(r);
   const labels = (el) => el.children.filter((n) => n.hasAttribute("data-kit-ui")).flatMap((u) => u.children).map((y) => y.textContent);
-  assert.deepEqual(labels(hn), ["open with the reply", "skip"], "never 'send' on a read-only place");
-  assert.equal(K.replyWent(doc, hn, K.replyTarget(hn.getAttribute("data-reply"), "a.")).textContent, "copiedopen the thread");
-  assert.equal(K.replyWent(doc, x, K.replyTarget(x.getAttribute("data-reply"), "b")).textContent, "opened on X");
+  assert.deepEqual(labels(hn), ["open on Hacker News", "skip"], "never 'send' on a read-only place");
+  assert.equal(K.replyWent(doc, hn, K.replyTarget(hn.getAttribute("data-reply"), "a.")).textContent, "copiedpaste it in the thread");
+  assert.equal(K.replyWent(doc, x, K.replyTarget(x.getAttribute("data-reply"), "b")).textContent, "opened on X · your reply is in the box");
   assert.equal(x.children.filter((n) => n.hasAttribute("data-went")).length, 1);
 });
 

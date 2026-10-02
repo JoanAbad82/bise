@@ -56,9 +56,10 @@ How to write them well:
 - **Replies to comments** (Hacker News, Reddit, X, Bluesky): a `review` item with
   `data-reply="<the comment's https link>"`, then `<p>who · where · when</p>`, the comment in a
   `<blockquote>`, and your drafted reply in `<p>`s. Put `data-verb="open-reply"` on the block:
-  these places are read-only for bise, so the button says `open with the reply`, never `send`;
-  it opens the thread with the reply ready (prefilled on X and Bluesky, copied for the others)
-  and the item says `opened on X` or `copied · open the thread`. bise never posts, the user does.
+  these places are read-only for bise, so the button says where it goes (`open on X`), never
+  `send`; it opens the thread with the reply ready and the item says what is left to do:
+  `opened on X · your reply is in the box` (X prefilled) or `copied · paste it in the thread`
+  (the others). bise never posts, the user does.
 - **Work handed to agents** (bug reports from Slack or Linear, tickets, a to-do list): one
   `review` item per report, its id the ticket's (`ENG-412`) or the message's, a first `<p>`
   `who · where · when`, then what is wrong in one or two sentences with its number of reports.

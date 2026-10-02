@@ -62,10 +62,12 @@
     yours: "you",
     watching: "watching",
     stop: "stop",
+    // a reply on a read-only place (ambient m_5493): where it goes, then what's left to do
     openReply: "open with the reply",
-    openedOn: (site) => `opened on ${site}`,
+    openOn: (site) => `open on ${site}`,
+    openedOn: (site) => `opened on ${site} · your reply is in the box`,
     copiedOpen: "copied",
-    openThread: "open the thread",
+    openThread: "paste it in the thread",
     keepRule: "keep",
     strike: "strike",
     replyOn: (site) => `reply on ${site}`,
@@ -363,7 +365,7 @@
       // and what bise keeps about the user (data-verb="keep") says 'keep' / 'strike'
       // a read-only place (data-verb="open-reply", roadmap B): 'open with the reply', never 'send'
       const verb = block.getAttribute("data-verb");
-      if (ok) ok.textContent = verb === "open-reply" ? W.openReply : t ? (t.copy ? W.copyOpen(t.site) : W.replyOn(t.site)) : sends(block) ? W.send : keeps(block) ? W.keepRule : W.approve;
+      if (ok) ok.textContent = t ? W.openOn(t.site) : verb === "open-reply" ? W.openReply : sends(block) ? W.send : keeps(block) ? W.keepRule : W.approve;
       const no = keeps(block) && kids(li).filter(ui).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "skip");
       if (no) no.textContent = W.strike;
     }
