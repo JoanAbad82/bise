@@ -81,7 +81,8 @@ body {
   background: var(--surface-talk); -webkit-backdrop-filter: var(--talk-blur); backdrop-filter: var(--talk-blur); box-shadow: var(--talk-stroke), var(--talk-shadow); }
 .bise-frame .vmenu[hidden] { display: none; }
 .bise-frame .vmenu a { font: 12px/1.2 var(--font-mono); color: var(--talk-ink); text-decoration: none; padding: 7px 10px; border-radius: 6px; }
-.bise-frame .vmenu a:hover { background: var(--talk-raised-on); }
+.bise-frame .vmenu a:hover, .bise-frame .vmenu a:focus { background: var(--talk-raised-on); outline: none; }
+.bise-frame .vmenu a:focus-visible { box-shadow: inset 0 0 0 1.5px var(--talk-ink); }
 .bise-frame .vmenu a[aria-current] { color: var(--talk-dim); }
 .bise-frame .vmenu a[aria-current]::after { content: " ·  shown"; }
 .bise-frame .n { font: 12px var(--font-mono); color: var(--talk-dim); }

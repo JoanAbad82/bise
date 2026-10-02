@@ -62,6 +62,7 @@
     openInPlace: (place) => `open in ${place}`,
     yours: "you",
     inThePage: "in the page",
+    versions: "versions of this page",
     watching: "watching",
     stop: "stop",
     putInDrafts: "put it in my drafts",
@@ -740,8 +741,8 @@
     const wc = el("button", { type: "button", disabled: "" }, W.changed);
     // the version: "v3 ▾" opens the list of versions (ambient m_4918), older ones read-only
     const vbox = el("span", { class: "v" });
-    const vb = el("button", { type: "button", "aria-haspopup": "true", "aria-expanded": "false" }, `v${shown}`);
-    const menu = el("span", { class: "vmenu", role: "menu", hidden: "" });
+    const vb = el("button", { type: "button", "aria-haspopup": "menu", "aria-expanded": "false", "aria-controls": "bise-vmenu", "aria-label": W.versions }, `v${shown}`);
+    const menu = el("span", { class: "vmenu", role: "menu", id: "bise-vmenu", "aria-label": W.versions, hidden: "" });
     vbox.append(vb, menu);
     const latest = el("a", { class: "b", href: `/p/${id}`, hidden: "" }, W.latest);
     const n = el("span", { class: "n", "data-bise-notes-count": "" });
@@ -764,10 +765,30 @@
       doc.dispatchEvent(new root.CustomEvent("bise:stop", { detail: { page: id, timer: watch.timer == null ? null : watch.timer } }));
     });
     f.append(m, tasteLink, st, wbox, sp, wc, vbox, latest, n, send);
-    const openMenu = (on) => { menu.hidden = !on; vb.setAttribute("aria-expanded", String(on)); };
-    vb.addEventListener("click", (e) => { e.stopPropagation(); if (!vb.disabled) openMenu(menu.hidden); });
+    // the version menu (amb-web m_5684): ↓ ⏎ space on the button open it on the shown version;
+    // ↑ ↓ Home End move, ⏎ space pick, esc closes back on the button, tab closes
+    const menuItems = () => Array.from(menu.querySelectorAll('[role="menuitemradio"]'));
+    const openMenu = (on, focusItem) => {
+      menu.hidden = !on;
+      vb.setAttribute("aria-expanded", String(on));
+      if (on && focusItem) { const its = menuItems(); (its.find((a) => a.getAttribute("aria-checked") === "true") || its[0] || vb).focus(); }
+    };
+    vb.addEventListener("click", (e) => { e.stopPropagation(); if (!vb.disabled) openMenu(menu.hidden, e.detail === 0); });
+    vb.addEventListener("keydown", (e) => {
+      if (vb.disabled || !["ArrowDown", "ArrowUp"].includes(e.key)) return;
+      e.preventDefault();
+      openMenu(true, true);
+    });
+    menu.addEventListener("keydown", (e) => {
+      const its = menuItems(), i = its.indexOf(doc.activeElement);
+      const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: its.length - 1 }[e.key];
+      if (to != null) { e.preventDefault(); its[(to + its.length) % its.length].focus(); return; }
+      if (e.key === " " && i >= 0) { e.preventDefault(); its[i].click(); return; }
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); openMenu(false); vb.focus(); return; }
+      if (e.key === "Tab") openMenu(false);
+    });
     doc.addEventListener("click", (e) => { if (!menu.hidden && !vbox.contains(e.target)) openMenu(false); });
-    doc.addEventListener("keydown", (e) => { if (e.key === "Escape" && !menu.hidden) openMenu(false); });
+    doc.addEventListener("keydown", (e) => { if (e.key === "Escape" && !menu.hidden) { openMenu(false); vb.focus(); } });
 
     const blocks = () => Array.from(main.querySelectorAll(":scope > [data-kit][data-id]"));
     blocks().forEach(remember);
@@ -804,7 +825,8 @@
       if (latestN > 1) vb.removeAttribute("disabled"); else vb.setAttribute("disabled", "");
       const vs = meta ? meta.versions.slice().sort((a, b) => b.n - a.n) : [];
       menu.replaceChildren(...vs.map((x) => {
-        const a = el("a", { role: "menuitem", href: x.n === latestN ? `/p/${id}` : `/p/${id}/v/${x.n}` }, `v${x.n}` + (x.at_ms ? ` · ${ago(x.at_ms, Date.now())}` : ""));
+        // a real menu (amb-web m_5684): radio items, the shown version checked, focus moved by keys
+        const a = el("a", { role: "menuitemradio", tabindex: "-1", "aria-checked": String(x.n === shown), href: x.n === latestN ? `/p/${id}` : `/p/${id}/v/${x.n}` }, `v${x.n}` + (x.at_ms ? ` · ${ago(x.at_ms, Date.now())}` : ""));
         if (x.n === shown) a.setAttribute("aria-current", "page");
         return a;
       }));
