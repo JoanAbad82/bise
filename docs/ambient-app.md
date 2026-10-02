@@ -127,7 +127,9 @@ App-only events to the web UI: `app_fn` (`down`/`up`/`double`), `app_shot` (`app
 `skipped`), `app_perm` (`screen`/`mic`/`input`: `granted`/`denied`/`ask`), `app_hidden` (bool),
 `app_reduce_motion` (bool), `app_key` (fn + key: `space`, `1`…`9`, `i`, `0`, `o`, `.`, `enter`, `esc`).
 Web UI commands for the app (not forwarded): `app_size` (`w`, `h`, `radius`: the capsule's frame
-follows the content), `app_open_url` (`url`), `app_hide`.
+follows the content; optional `note: {y, h, radius}`: the needs-you glass under the capsule, in the
+same web view, so the blur view masks two rounded rects), `app_focus` (`on`: the panel takes the
+keys while the spotlight field is open, gives them back after), `app_open_url` (`url`), `app_hide`.
 
 ## 5. Slices
 
