@@ -9,6 +9,7 @@
 //                                              back), when the server has no /answer route (slice 1)
 //   bise:answered {block, reply}               the question's card was answered (SSE answered)
 //   bise:voice   {phase, text}                 a voice note at the mouse (SSE voice, slice 2)
+//   (a message block's `copy` puts its Slack markup on the clipboard; no event)
 //   bise:react   {block, item, kind, text}     approve / skip on a review item or an email
 //                                              (item null), kind null: taken back
 // The kit's own controls inside blocks carry data-kit-ui (never part of a quote or anchor).
@@ -34,6 +35,8 @@
     approve: "approve",
     skip: "skip",
     approveAll: (n) => `approve ${n}`,
+    copy: "copy",
+    copied: "copied",
   };
 
   // ---- time ----
@@ -231,6 +234,39 @@
     return pending(block).map((li) => react(block, li.getAttribute("data-id"), "approve"));
   }
 
+  // ---- message (slice A): a draft that leaves through a channel; `copy` gives its markup ----
+  const nodesOf = (e) => Array.from(e.childNodes || e.nodes || []);
+  const isText = (n) => n.nodeType === 3 || (n.tagName == null && n.textContent != null);
+  // The block as Slack mrkdwn, from what the page shows now (the user's edits included):
+  // strong *x*, em _x_, del ~x~, code `x`, links <url|text>, list items "• ", paragraphs apart.
+  function toSlack(block) {
+    const inline = (e) => nodesOf(e).map((n) => {
+      if (isText(n)) return n.textContent.replace(/\s+/g, " ");
+      if (ui(n)) return "";
+      const t = n.tagName.toLowerCase(), x = inline(n);
+      if (t === "strong" || t === "b") return `*${x.trim()}*`;
+      if (t === "em" || t === "i") return `_${x.trim()}_`;
+      if (t === "del" || t === "s") return `~${x.trim()}~`;
+      if (t === "code" || t === "kbd") return "`" + x + "`";
+      if (t === "a") { const h = n.getAttribute("href") || ""; return /^(https?:|mailto:)/.test(h) ? `<${h}|${x.trim()}>` : x; }
+      if (t === "br") return "\n";
+      return x;
+    }).join("");
+    const out = [];
+    for (const c of kids(block)) {
+      if (ui(c)) continue;
+      const t = c.tagName.toLowerCase();
+      if (t === "ul" || t === "ol") out.push(kids(c).map((li, i) => `${t === "ol" ? `${i + 1}.` : "•"} ${inline(li).trim()}`).join("\n"));
+      else if (t === "pre") out.push("```\n" + c.textContent.replace(/\n$/, "") + "\n```");
+      else if (t === "blockquote") out.push(inline(c).trim().split("\n").map((l) => `> ${l}`).join("\n"));
+      else out.push(inline(c).trim());
+    }
+    return out.filter(Boolean).join("\n\n");
+  }
+  function decorateMessage(doc, block) {
+    if (!kids(block).some(ui)) block.append(acts(doc, ["copy"]));
+  }
+
   function decorate(blocks, agent, doc) {
     for (const b of blocks) {
       const kit = b.getAttribute("data-kit");
@@ -238,6 +274,7 @@
       else if (kit === "question") decorateQuestion(b, agent);
       else if (kit === "review" && doc) decorateReview(doc, b);
       else if (kit === "email" && doc) decorateEmail(doc, b);
+      else if (kit === "message" && doc) decorateMessage(doc, b);
     }
   }
 
@@ -258,7 +295,7 @@
     return { ...res, marked: [...marked] };
   }
 
-  const BiseKit = { W, said, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, options, norm };
+  const BiseKit = { W, said, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, options, norm };
   root.BiseKit = BiseKit;
 
   // ---- the browser: the frame, the stream, the keys ----
@@ -431,6 +468,11 @@
     function onAct(btn) {
       const block = btn.closest("[data-kit][data-id]");
       const kind = btn.getAttribute("data-act");
+      if (kind === "copy") {
+        const done = () => { btn.textContent = W.copied; setTimeout(() => { btn.textContent = W.copy; }, 1600); };
+        if (root.navigator && root.navigator.clipboard) root.navigator.clipboard.writeText(toSlack(block)).then(done, () => {});
+        return;
+      }
       const li = btn.closest("li[data-id]");
       const out = kind === "approve-all" ? approveAll(block) : [react(block, block.dataset.kit === "review" && li ? li.dataset.id : null, kind)];
       for (const d of out) if (d) doc.dispatchEvent(new root.CustomEvent("bise:react", { detail: d }));

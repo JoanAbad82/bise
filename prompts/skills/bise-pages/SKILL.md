@@ -33,6 +33,7 @@ across versions (the user's notes anchor on them): `p1`, `t1`, `q1`, `src`.
 | `question` | a decision the user makes | one `<p>` (the question) + `<ol>` of 2 to 4 short options; after the answer, `data-answer="2"` |
 | `sources` | where each fact comes from | `<ol>` of `<li><a href="…">name · tool</a>, when</li>`, last on the page |
 | `review` | items the user approves or skips one by one (mails to answer, tickets, expenses) | `<ol>` of `<li data-id="m1">`: a first `<p>` saying what it is (`Léa Martin · offsite dates · 9:12`), then the proposal |
+| `message` | a draft that leaves through a channel (Slack, a post) | `data-to="Slack · #launch"` (where it goes, shown above it), then `<p>`s and `<ul>`, with `<strong>`, `<em>`, `<code>`, `<a>`: the kit's `copy` turns them into Slack markup |
 | `email` | one mail ready to send | `<p data-field="to">`, optional `<p data-field="cc">`, `<p data-field="subject">`, then the body as `<p>`s |
 
 Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
@@ -48,9 +49,9 @@ How to write them well:
   `approve 3` for the rest; each reaction comes back to you as a note (kind `approve` or `skip`,
   with the item's id). Item ids stay across versions like block ids. Sending or replying is
   still your tool call, through the user's approvals, after their `send`.
-- **Drafts** (a Slack message, a post, a reply): in a `prose` block, as `<p>`s and `<ul>`, so
-  the user reads it in the page's font and edits it in place. Never in `<pre>` or `<code>`:
-  those are for code. A mail goes in an `email` block.
+- **Drafts** (a Slack message, a post, a reply): in a `message` block with its `data-to`, as
+  `<p>`s and `<ul>`, so the user reads it in the page's font, edits it in place and copies it.
+  Never in `<pre>` or `<code>`: those are for code. A mail goes in an `email` block.
 - **Questions:** one per decision, options short enough for a button; the user picks on the page
   (or presses 1-3) and the pick comes back to you as a note.
 - **Words:** the user's language and voice; lowercase headings, short sentences, concrete.
@@ -114,7 +115,7 @@ network (use a `data:` src), `javascript:` links, more than 1 MB. Links to the o
 More examples, each one passing the lint: `apps/ambient/kit/examples/` in the bise app
 (`weekly-update.html` a doc, `offsite-venues.html` a table to choose from,
 `pricing-question.html` a decision, `inbox-review.html` the inbox: replies to approve and a mail
-ready to send).
+ready to send, `launch-post.html` a Slack post to check and copy).
 
 ## 4. Publish fast, then fill it
 

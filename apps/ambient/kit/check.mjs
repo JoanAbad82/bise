@@ -343,6 +343,14 @@ law("names: an agent's id reads with spaces on the page (by launch recap), the i
   assert.equal(q.getAttribute("data-id"), "q1");
 });
 
+law("message: copy gives Slack markup of what the page shows, the kit's button left out", () => {
+  const m = blocks(parse(`<section data-kit="message" data-id="slack" data-to="Slack · #launch"><p><strong>bise is live</strong> today, <em>finally</em>.</p>
+<ul><li>the repo is <a href="https://github.com/acme/bise">public</a></li><li>install: <code>brew install bise</code></li></ul><p>thanks <del>all</del> everyone!</p></section>`))[0];
+  K.decorate([m], "launch", doc);
+  assert.equal(m.children.filter((c) => c.hasAttribute("data-kit-ui")).length, 1);
+  assert.equal(K.toSlack(m), "*bise is live* today, _finally_.\n\n• the repo is <https://github.com/acme/bise|public>\n• install: `brew install bise`\n\nthanks ~all~ everyone!");
+});
+
 law("ago: short words", () => {
   const now = 10_000_000;
   assert.equal(K.ago(now - 5_000, now), "just now");
@@ -381,7 +389,7 @@ law("the fonts tokens.css names are in the kit (the CSP loads nothing from outsi
 });
 
 law("every example page is a fragment of known blocks with unique ids", () => {
-  const kinds = new Set(["prose", "heading", "callout", "sources", "table", "question", "review", "email"]);
+  const kinds = new Set(["prose", "heading", "callout", "sources", "table", "question", "review", "email", "message"]);
   for (const f of readdirSync(join(here, "examples"))) {
     const main = parse(readFileSync(join(here, "examples", f), "utf8"));
     assert.ok(main.children.length > 0 && main.children.every((c) => c.tagName === "SECTION" && kinds.has(c.getAttribute("data-kit"))), f);

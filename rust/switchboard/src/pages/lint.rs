@@ -26,7 +26,7 @@ pub struct Block {
 
 /// The kinds of the kit: v0's six, then slice 2's review and email (docs/ambient-pages.md §4.3).
 pub const KINDS: &[&str] = &[
-    "prose", "heading", "callout", "sources", "table", "question", "review", "email",
+    "prose", "heading", "callout", "sources", "table", "question", "review", "email", "message",
 ];
 
 /// `data-field` of an email's header lines.
@@ -410,6 +410,20 @@ impl<'a> Linter<'a> {
             ),
             _ => {}
         }
+        if kit.as_deref() == Some("message") {
+            if get("data-to").is_none_or(|t| t.trim().is_empty()) {
+                self.err(
+                    &at,
+                    "a message block needs data-to: where it goes (data-to=\"Slack · #launch\")"
+                        .into(),
+                );
+            }
+        } else if get("data-to").is_some() {
+            self.err(
+                &at,
+                "data-to is not a kit attribute here: only a message block takes it".into(),
+            );
+        }
         if kit.as_deref() == Some("callout") {
             if let Some(t) = get("data-tone") {
                 if !TONES.contains(&t.as_str()) {
@@ -540,13 +554,16 @@ impl<'a> Linter<'a> {
                 }
             } else if n.starts_with("data-") {
                 let ok = if block {
-                    matches!(n, "data-kit" | "data-id" | "data-tone" | "data-answer")
+                    matches!(
+                        n,
+                        "data-kit" | "data-id" | "data-tone" | "data-answer" | "data-to"
+                    )
                 } else {
                     false
                 };
                 if !ok {
                     let hint = if block {
-                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question)"
+                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message)"
                     } else {
                         "inside a block only a review's <li data-id> and an email's <p data-field> take one"
                     };

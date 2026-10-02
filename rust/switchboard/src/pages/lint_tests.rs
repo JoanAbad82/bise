@@ -342,3 +342,18 @@ fn an_email_has_to_and_subject() {
         "p: data-field is not a kit attribute",
     );
 }
+
+#[test]
+fn a_message_says_where_it_goes() {
+    ok(
+        r#"<section data-kit="message" data-id="slack" data-to="Slack · #launch"><p><strong>bise is live</strong> 🎉</p><ul><li>repo public</li></ul></section>"#,
+    );
+    has(
+        &errs(r#"<section data-kit="message" data-id="slack"><p>x</p></section>"#),
+        "slack: a message block needs data-to",
+    );
+    has(
+        &errs(r#"<section data-kit="prose" data-id="p" data-to="Slack"><p>x</p></section>"#),
+        "p: data-to is not a kit attribute",
+    );
+}

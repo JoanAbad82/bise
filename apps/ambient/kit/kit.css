@@ -167,6 +167,12 @@ body {
 #bise-page [data-kit="email"] > [data-kit-ui] { margin-top: var(--space-4); }
 #bise-page [data-kit="email"][data-verdict="skip"] > :not([data-kit-ui]) { opacity: .45; }
 
+/* message: a draft that leaves (Slack, a post), in the reading font, editable, its channel above */
+[data-kit="message"] { background: var(--surface-card); border-radius: 10px; padding: var(--space-3) var(--space-4) var(--space-4); margin: var(--space-4) 0; box-shadow: 3px 3px 0 var(--drop); }
+[data-kit="message"]::before { content: attr(data-to); display: block; font: var(--text-kicker)/1.4 var(--font-mono); color: var(--kick); margin-bottom: var(--space-2); }
+#bise-page [data-kit="message"] > p { margin: 0 0 10px; }
+#bise-page [data-kit="message"] > [data-kit-ui] { margin-top: var(--space-3); justify-content: flex-end; }
+
 /* what changed: a soft wash on the blocks that differ from the version before */
 body.bise-changes [data-changed] { background: var(--changed); box-shadow: -10px 0 0 var(--changed), 10px 0 0 var(--changed); }
 body.bise-changes [data-kit="question"][data-changed], body.bise-changes [data-kit="callout"][data-changed] { box-shadow: 0 0 0 10px var(--changed); }
