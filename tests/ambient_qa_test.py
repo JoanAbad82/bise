@@ -13,6 +13,7 @@ from the gate (docs/ambient-app.md §7).
 
 Run: python3 -u tests/ambient_qa_test.py [--live]
 """
+import datetime
 import json
 import os
 import socket
@@ -26,6 +27,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN = os.path.join(HERE, "..", "plugins", "ambient-qa")
 sys.path.insert(0, PLUGIN)
 import qa  # noqa: E402
+sys.path.insert(0, os.path.join(PLUGIN, "fake-accounts"))
+import fake_accounts as fake  # noqa: E402
 
 SPEC_STATES = {"idle", "hold fn", "let go", "main speaks", "end of turn", "needs you", "answered", "done", "failed"}
 failures = []
@@ -162,11 +165,22 @@ def fake_accounts():
     init = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
     for svc in qa.FAKE_SERVICES:
         r = call(svc, init, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
-        check(r[0]["result"]["serverInfo"]["name"] == "fake-" + svc and len(r[1]["result"]["tools"]) >= 3, (svc, r))
+        check(r[0]["result"]["serverInfo"]["name"] == "fake-" + svc and len(r[1]["result"]["tools"]) >= 2, (svc, r))
         check(all("fake QA account" in t["description"] for t in r[1]["result"]["tools"]), "every tool says it's fake")
     r = call("gmail", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "search_messages", "arguments": {"query": "offsite"}}})
     found = json.loads(r[1]["result"]["content"][0]["text"])["messages"]
-    check({m["id"] for m in found} == {"m102", "m105", "m106"}, found)   # m105's body says "offsites"
+    check({"m102", "m106", "m109", "m110", "m111"} <= {m["id"] for m in found}, found)
+    data = fake.load()
+    check(len(data["gmail"]["messages"]) == 20 and {"team", "launch"} <= {c["name"] for c in data["slack"]["channels"]}, "20 mails, #team and #launch")
+    check(len([m for m in data["gmail"]["messages"] if m["thread"] == "t109"]) == 3, "a thread with a decision")
+    today = datetime.date.today().isoformat()
+    check(sum(e["start"].startswith(today) for e in data["calendar"]["events"]) >= 4, "today's meetings are on the real today")
+    later = fake.load("2026-11-20")
+    check(sum(e["start"].startswith("2026-11-20") for e in later["calendar"]["events"]) >= 4 and "INV-2026-09-4471" in json.dumps(later), "dates move by whole days, ids don't")
+    r = call("github", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "repo_stats", "arguments": {}}})
+    check(json.loads(r[1]["result"]["content"][0]["text"])["stars"] == 1284, r)
+    r = call("hn", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "find_story", "arguments": {"query": "show hn acme"}}})
+    check(json.loads(r[1]["result"]["content"][0]["text"])["stories"][0]["rank"]["front"] == 7, r)
     r = call("gmail", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "create_draft", "arguments": {"to": "marc@acme.test", "subject": "weekly", "body": "x"}}})
     check(json.loads(r[1]["result"]["content"][0]["text"])["fake"] is True, r)
     r = call("slack", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "post_message", "arguments": {"channel": "team", "text": "hi"}}})

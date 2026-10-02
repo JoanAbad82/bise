@@ -298,13 +298,13 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="")
 
 
 FAKE_ACCOUNTS = os.path.join(HERE, "fake-accounts")
-FAKE_SERVICES = ("gmail", "slack", "linear", "calendar")
+FAKE_SERVICES = ("gmail", "slack", "linear", "calendar", "github", "hn")
 
 
 def install_fake_accounts(ws):
     """One workspace plugin per fake service in <ws>/.agents/plugins (out of
     the throwaway repo's git): tools.gmail.*, tools.slack.*, tools.linear.*,
-    tools.calendar.* over fake-accounts/fixtures.json."""
+    tools.calendar.*, tools.github.*, tools.hn.* over fake-accounts/fixtures.json."""
     root = os.path.join(ws, ".agents", "plugins")
     for svc in FAKE_SERVICES:
         d = os.path.join(root, svc)

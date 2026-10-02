@@ -1,5 +1,6 @@
 {
-  "_about": "Fake accounts for QA hubs (the user's rule: no test touches his real accounts). Camille, ops at a 20-person startup (docs/ambient-vision.md's persona). Every item is invented.",
+  "_about": "Fake accounts for QA hubs (the user's rule: no test touches his real accounts). Camille, ops at a 20-person startup (docs/ambient-vision.md's persona). Every item is invented. Dates are written for _today and moved by whole days to the hub's today when served (FAKE_ACCOUNTS_TODAY pins it).",
+  "_today": "2026-10-02",
   "gmail": {
     "me": "camille@acme.test",
     "labels": ["INBOX", "IMPORTANT", "team", "vendors", "finance", "later"],
@@ -19,7 +20,31 @@
       {"id": "m107", "thread": "t107", "from": "Insurance Co <claims@insure.test>", "to": "camille@acme.test", "date": "2026-09-30T10:02:00Z", "labels": ["INBOX", "vendors"], "unread": false,
        "subject": "Renewal: office insurance due Oct 31", "body": "Your office insurance renews on Oct 31. Reply to confirm the same coverage, or tell us what changed (headcount: 20?)."},
       {"id": "m108", "thread": "t101", "from": "Marc Dubois <marc@acme.test>", "to": "camille@acme.test", "date": "2026-10-02T09:01:00Z", "labels": ["INBOX", "team"], "unread": true,
-       "subject": "Re: weekly update: can you post it by noon?", "body": "Also mention we hired Ines (starts Monday)."}
+       "subject": "Re: weekly update: can you post it by noon?", "body": "Also mention we hired Ines (starts Monday)."},
+      {"id": "m109", "thread": "t109", "from": "Nora Haddad <nora@acme.test>", "to": "camille@acme.test, marc@acme.test", "date": "2026-10-01T10:15:00Z", "labels": ["INBOX", "team"], "unread": false,
+       "subject": "Offsite venue: La Grange or Les Tilleuls?", "body": "Two options left for the offsite: La Grange (EUR 4,200, 1h) or Les Tilleuls (EUR 5,100, 45 min). Marc, your call? We need to tell Lea by Friday."},
+      {"id": "m110", "thread": "t109", "from": "Marc Dubois <marc@acme.test>", "to": "nora@acme.test, camille@acme.test", "date": "2026-10-01T14:40:00Z", "labels": ["INBOX", "team"], "unread": false,
+       "subject": "Re: Offsite venue: La Grange or Les Tilleuls?", "body": "La Grange. Les Tilleuls is over the EUR 4,500 cap and 15 minutes don't justify EUR 900."},
+      {"id": "m111", "thread": "t109", "from": "Nora Haddad <nora@acme.test>", "to": "camille@acme.test, marc@acme.test", "date": "2026-10-02T06:55:00Z", "labels": ["INBOX", "IMPORTANT", "team"], "unread": true,
+       "subject": "Re: Offsite venue: La Grange or Les Tilleuls?", "body": "Decided: La Grange, cap EUR 4,500 all in. Camille, can you confirm with Lea and ask for the deposit terms? Thanks!"},
+      {"id": "m112", "thread": "t112", "from": "Ines Moreau <ines.moreau@mail.test>", "to": "camille@acme.test", "date": "2026-10-02T07:05:00Z", "labels": ["INBOX"], "unread": true,
+       "subject": "Question before Monday", "body": "Hi Camille, what time should I arrive on Monday, and should I bring anything (ID, bank details for payroll)? Ines"},
+      {"id": "m113", "thread": "t113", "from": "Paul Girard <paul@compta.test>", "to": "camille@acme.test", "date": "2026-10-01T11:20:00Z", "labels": ["INBOX", "finance"], "unread": true,
+       "subject": "3 receipts missing for September", "body": "Hello, to close September I still need 3 receipts: train Paris-Lyon (EUR 112), team lunch Sept 18 (EUR 236), Figma seats (EUR 90). Can you send them by Tuesday? Paul"},
+      {"id": "m114", "thread": "t114", "from": "Jobs board <noreply@jobs.test>", "to": "camille@acme.test", "date": "2026-10-01T08:30:00Z", "labels": ["INBOX"], "unread": true,
+       "subject": "Ops intern: 2 candidates asked for an interview slot", "body": "Hugo Lambert and Sara Benali replied to your ops intern post. Both are free Tuesday or Wednesday afternoon. Reply with a slot."},
+      {"id": "m115", "thread": "t115", "from": "GitHub <notifications@github.test>", "to": "camille@acme.test", "date": "2026-10-01T16:02:00Z", "labels": ["INBOX"], "unread": false,
+       "subject": "[acme/app] PR #212 merged: dark mode on the settings page", "body": "lucas merged #212 into main. 14 files changed. Checks passed."},
+      {"id": "m116", "thread": "t116", "from": "Lucas Bernard <lucas@acme.test>", "to": "team@acme.test", "date": "2026-10-01T16:20:00Z", "labels": ["INBOX", "team"], "unread": false,
+       "subject": "Dark mode: release notes draft", "body": "Draft for Monday: 'Dark mode is here, starting with the settings page. Turn it on in Settings > Appearance.' Comments welcome until Friday."},
+      {"id": "m117", "thread": "t117", "from": "Calendar <calendar@acme.test>", "to": "camille@acme.test", "date": "2026-10-01T09:45:00Z", "labels": ["INBOX"], "unread": false,
+       "subject": "Invitation: Interview, ops intern (today 16:30)", "body": "Marc invited you to 'Interview: ops intern', 16:30-17:00, Room 1."},
+      {"id": "m118", "thread": "t118", "from": "The Ops Letter <hello@opsletter.test>", "to": "camille@acme.test", "date": "2026-10-02T05:00:00Z", "labels": ["INBOX"], "unread": true,
+       "subject": "The Ops Letter #88: offsites that people actually like", "body": "This week: why half-day agendas beat full days, and a checklist for venues."},
+      {"id": "m119", "thread": "t119", "from": "Product Daily <digest@productdaily.test>", "to": "camille@acme.test", "date": "2026-10-02T04:30:00Z", "labels": ["INBOX"], "unread": true,
+       "subject": "Today's top 5 launches", "body": "1. Pagecraft  2. Inbox Zero AI  3. Shiplog  4. Desko  5. Tally Forms 3"},
+      {"id": "m120", "thread": "t120", "from": "Figma <no-reply@figma.test>", "to": "camille@acme.test", "date": "2026-09-30T18:00:00Z", "labels": ["INBOX"], "unread": true,
+       "subject": "What's new in Figma this month", "body": "New: variables in prototypes, faster dev mode, and more."}
     ]
   },
   "slack": {
@@ -27,7 +52,8 @@
     "channels": [
       {"id": "C01", "name": "team", "topic": "everyone at acme"},
       {"id": "C02", "name": "ops", "topic": "offices, tools, people"},
-      {"id": "C03", "name": "random", "topic": ""}
+      {"id": "C03", "name": "random", "topic": ""},
+      {"id": "C04", "name": "launch", "topic": "dark mode launch: numbers and go/no-go"}
     ],
     "messages": [
       {"id": "s201", "channel": "team", "user": "marc", "ts": "2026-10-02T08:30:00Z", "text": "reminder: weekly update today please @camille"},
@@ -35,7 +61,12 @@
       {"id": "s203", "channel": "ops", "user": "sam", "ts": "2026-10-01T17:35:00Z", "text": "ines starts monday, laptop arrives monday morning"},
       {"id": "s204", "channel": "team", "user": "lucas", "ts": "2026-10-01T16:00:00Z", "text": "dark mode is on staging, settings page first. feedback welcome"},
       {"id": "s205", "channel": "random", "user": "ines", "ts": "2026-10-01T12:00:00Z", "text": "hello everyone, see you monday!"},
-      {"id": "s206", "channel": "ops", "user": "camille", "ts": "2026-09-30T11:00:00Z", "text": "insurance renewal is oct 31, i'll check the headcount"}
+      {"id": "s206", "channel": "ops", "user": "camille", "ts": "2026-09-30T11:00:00Z", "text": "insurance renewal is oct 31, i'll check the headcount"},
+      {"id": "s207", "channel": "launch", "user": "marc", "ts": "2026-10-02T09:10:00Z", "text": "numbers this morning: signups yesterday 312 (+24% vs last Thursday), trial to paid 3.1%, signup time 0.9 s (was 4.1 s)"},
+      {"id": "s208", "channel": "launch", "user": "lucas", "ts": "2026-10-02T09:20:00Z", "text": "GitHub: 1,284 stars (+96 since yesterday), 6 open PRs. our Show HN is #7 on the front page with 182 points, 64 comments"},
+      {"id": "s209", "channel": "launch", "user": "nora", "ts": "2026-10-02T09:32:00Z", "text": "support load is fine: 14 tickets yesterday, median first reply 22 min"},
+      {"id": "s210", "channel": "launch", "user": "marc", "ts": "2026-10-02T09:40:00Z", "text": "go for dark mode on Monday. @camille can the weekly update carry these numbers?"},
+      {"id": "s211", "channel": "team", "user": "nora", "ts": "2026-10-02T07:00:00Z", "text": "offsite venue decided: La Grange, Nov 14-15. details from camille soon"}
     ]
   },
   "linear": {
@@ -54,7 +85,37 @@
       {"id": "e302", "title": "Weekly update due", "start": "2026-10-02T12:00:00Z", "end": "2026-10-02T12:15:00Z", "attendees": ["camille"], "location": ""},
       {"id": "e303", "title": "Venue call with Lea", "start": "2026-10-03T14:00:00Z", "end": "2026-10-03T14:30:00Z", "attendees": ["camille", "lea@venues.test"], "location": "phone"},
       {"id": "e304", "title": "Ines onboarding", "start": "2026-10-06T11:00:00Z", "end": "2026-10-06T12:00:00Z", "attendees": ["camille", "sam", "ines"], "location": "Room 1"},
-      {"id": "e305", "title": "Finance: Q4 budgets", "start": "2026-10-03T09:00:00Z", "end": "2026-10-03T10:00:00Z", "attendees": ["camille", "nora"], "location": "Room 2"}
+      {"id": "e305", "title": "Finance: Q4 budgets", "start": "2026-10-03T09:00:00Z", "end": "2026-10-03T10:00:00Z", "attendees": ["camille", "nora"], "location": "Room 2"},
+      {"id": "e306", "title": "Launch standup", "start": "2026-10-02T07:30:00Z", "end": "2026-10-02T07:45:00Z", "attendees": ["camille", "marc", "lucas", "nora"], "location": "#launch huddle"},
+      {"id": "e307", "title": "1:1 Marc / Camille", "start": "2026-10-02T13:00:00Z", "end": "2026-10-02T13:30:00Z", "attendees": ["camille", "marc"], "location": "Room 3"},
+      {"id": "e308", "title": "Interview: ops intern", "start": "2026-10-02T14:30:00Z", "end": "2026-10-02T15:00:00Z", "attendees": ["camille", "marc"], "location": "Room 1"}
+    ]
+  },
+  "github": {
+    "repo": "acme/app",
+    "stats": {"stars": 1284, "stars_since_yesterday": 96, "forks": 71, "watchers": 38, "open_issues": 23, "open_pulls": 6,
+              "traffic_14d": {"views": 4210, "unique_visitors": 1930, "clones": 212},
+              "latest_release": {"tag": "v2.4.0", "date": "2026-09-29T10:00:00Z", "downloads": 842}},
+    "issues": [
+      {"number": 231, "title": "Dark mode: contrast too low on disabled buttons", "state": "open", "author": "jdoe", "comments": 3, "created": "2026-10-02T06:10:00Z", "labels": ["bug", "dark-mode"]},
+      {"number": 229, "title": "Signup hangs on Safari 17 with a password manager", "state": "open", "author": "mkim", "comments": 5, "created": "2026-10-01T19:40:00Z", "labels": ["bug"]},
+      {"number": 226, "title": "Feature request: export the weekly report as PDF", "state": "open", "author": "alex-r", "comments": 1, "created": "2026-09-30T13:00:00Z", "labels": ["enhancement"]}
+    ],
+    "pulls": [
+      {"number": 212, "title": "Dark mode on the settings page", "state": "merged", "author": "lucas", "merged": "2026-10-01T16:02:00Z"},
+      {"number": 233, "title": "Fix disabled button contrast in dark mode", "state": "open", "author": "lucas", "created": "2026-10-02T08:50:00Z", "checks": "passing"}
+    ]
+  },
+  "hn": {
+    "stories": [
+      {"id": 41712001, "title": "Show HN: Acme - a calmer project tracker for small teams", "url": "https://acme.test", "by": "marcdubois", "points": 182, "comments": 64,
+       "rank": {"front": 7, "show": 2}, "posted": "2026-10-02T06:00:00Z",
+       "top_comments": [
+         {"by": "pg_fan", "points": null, "text": "The 0.9 s signup is noticeable. What did you change?"},
+         {"by": "tptacek_not", "points": null, "text": "How do you handle SSO for teams under 20? Pricing page doesn't say."},
+         {"by": "kls", "points": null, "text": "Dark mode on Monday is the right priority, my eyes thank you."}
+       ]},
+      {"id": 41698770, "title": "Ask HN: What do you use for team offsites?", "url": null, "by": "opsnerd", "points": 41, "comments": 58, "rank": {"front": null}, "posted": "2026-10-01T15:00:00Z", "top_comments": []}
     ]
   }
 }

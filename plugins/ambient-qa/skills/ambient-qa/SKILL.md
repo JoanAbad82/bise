@@ -14,10 +14,14 @@ in QA mode (`--qa fake|real`): a second instance with its own files under
 Outlook, Slack, Linear, calendar, any connector, read or write, and his
 browser through computer use), unless he asks for that one run himself.
 Every QA hub has fake accounts instead: `tools.gmail.*`, `tools.slack.*`,
-`tools.linear.*`, `tools.calendar.*` over canned items (Camille, ops at
-acme: the weekly update, offsite venues, an invoice, a new hire), whose
-writes (drafts, sends, posts, issues, events) only land in the hub's
-outbox (`outbox()`). Real connectors and the computer plugin are refused
+`tools.linear.*`, `tools.calendar.*`, `tools.github.*`, `tools.hn.*` over
+canned items (Camille, ops at acme: 20 mails of her day with a few to
+answer, newsletters and a thread where the offsite venue gets decided;
+Slack #team and #launch with the launch numbers; 5 Linear issues; today's
+meetings; the repo's stars and traffic; a Show HN at #7), dated on the
+hub's today (FAKE_ACCOUNTS_TODAY pins it), whose writes (drafts, sends,
+posts, issues, events, comments) only land in the hub's outbox
+(`outbox()`). Real connectors and the computer plugin are refused
 unless `real_accounts_approved_by_user=<the user's own message id>`: never
 set it on your own.
 

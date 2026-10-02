@@ -1,19 +1,37 @@
 #!/usr/bin/env python3
 """Fake accounts for QA hubs: a stdio MCP server per service (gmail, slack,
-linear, calendar) over fixtures.json. The user's rule (main m_5200): no
+linear, calendar, github, hn) over fixtures.json. The user's rule (main m_5200): no
 test, QA or demo touches his real accounts, so a QA hub's main reads these
 canned items and its writes (drafts, sends, posts, issues, events) go to
 $FAKE_ACCOUNTS_OUTBOX (one JSON line each), never anywhere else.
 
   fake_accounts.py <service>     the MCP server (qa.py installs one plugin per service)
 """
+import datetime
 import json
 import os
+import re
 import sys
 import time
 
 HERE = os.path.dirname(os.path.realpath(__file__))
-DATA = json.load(open(os.path.join(HERE, "fixtures.json")))
+ISO_DAY = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)")
+
+
+def load(today=None):
+    """fixtures.json with every YYYY-MM-DD moved by whole days from its
+    _today to today (FAKE_ACCOUNTS_TODAY, else the local date), so 'today's
+    meetings' and 'yesterday's mails' mean the hub's today."""
+    text = open(os.path.join(HERE, "fixtures.json")).read()
+    base = datetime.date.fromisoformat(json.loads(text)["_today"])
+    today = datetime.date.fromisoformat(today or os.environ.get("FAKE_ACCOUNTS_TODAY") or datetime.date.today().isoformat())
+    delta = today - base
+    if delta:
+        text = ISO_DAY.sub(lambda m: (datetime.date.fromisoformat(m.group(1)) + delta).isoformat(), text)
+    return json.loads(text)
+
+
+DATA = load()
 OUTBOX = os.environ.get("FAKE_ACCOUNTS_OUTBOX") or os.path.join(os.environ.get("PLUGIN_DATA") or HERE, "outbox.jsonl")
 NOTE = "fake QA account (fixture data): nothing here is real, writes go to a QA outbox"
 
@@ -88,7 +106,30 @@ def calendar():
     }
 
 
-SERVICES = {"gmail": gmail, "slack": slack, "linear": linear, "calendar": calendar}
+def github():
+    g = DATA["github"]
+    return {
+        "repo_stats": ("The repo's stars, forks, open issues and PRs, 14-day traffic, latest release downloads.", S(), lambda a: dict(g["stats"], repo=g["repo"])),
+        "list_issues": ("Issues, newest first, filtered by words or state.", S(query="string", state="string"),
+                        lambda a: {"issues": [i for i in g["issues"] if match(i, a.get("query", "")) and (not a.get("state") or i["state"] == a["state"])]}),
+        "list_pulls": ("Pull requests, filtered by state (open, merged).", S(state="string"),
+                       lambda a: {"pulls": [p for p in g["pulls"] if not a.get("state") or p["state"] == a["state"]]}),
+        "comment_issue": ("Comment on an issue or PR.", S(number="integer", body="string"), lambda a: write("github", "comment_issue", a)),
+    }
+
+
+def hn():
+    h = DATA["hn"]
+    short = lambda s: {k: s[k] for k in ("id", "title", "by", "points", "comments", "rank", "posted")}
+    return {
+        "find_story": ("Stories matching words, with live points, comment count and rank (front page, /show).", S(query="string"),
+                       lambda a: {"stories": [short(s) for s in h["stories"] if match(s, a.get("query", ""))]}),
+        "story": ("One story with its top comments.", S(id="integer"),
+                  lambda a: next((s for s in h["stories"] if str(s["id"]) == str(a.get("id"))), {"error": "no story %s" % a.get("id")})),
+    }
+
+
+SERVICES = {"gmail": gmail, "slack": slack, "linear": linear, "calendar": calendar, "github": github, "hn": hn}
 
 
 def main():
