@@ -5,7 +5,8 @@
 #   scripts/ambient.sh path         the same (the .app path is the only stdout line)
 #   scripts/ambient.sh key          the source hash the build is keyed on
 #   scripts/ambient.sh check        type-check the Swift (no binary) + KeyMachine's laws
-#   scripts/ambient.sh open --workspace <ws> --bise <exe> [--web <dir>]
+#   scripts/ambient.sh open [--workspace <ws> | --home] --bise <exe> [--web <dir>]
+#                                   (--home: the home workspace ~/bise, no repo)
 #                                   build if needed, open the app; when it already
 #                                   runs: switch.json + SIGUSR1 (open drops --args)
 #   scripts/ambient.sh stop         quit the running app (the pid in app.pid, never by name)
@@ -96,35 +97,37 @@ build() {
 js() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
 
 open_app() {
-  local ws="" bise="" web="${BISE_AMBIENT_WEB:-$REPO/apps/ambient/web}"
+  local ws="" home=0 bise="" web="${BISE_AMBIENT_WEB:-$REPO/apps/ambient/web}"
   while [ $# -gt 0 ]; do
     case "$1" in
       --workspace) ws="$2"; shift 2 ;;
+      --home) home=1; shift ;;
       --bise) bise="$2"; shift 2 ;;
       --web) web="${BISE_AMBIENT_WEB:-$2}"; shift 2 ;;
       *) say "unknown option: $1"; exit 2 ;;
     esac
   done
-  [ -n "$ws" ] || ws="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
+  if [ "$home" = 0 ] && [ -z "$ws" ]; then ws="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"; fi
   [ -n "$bise" ] || bise="$(command -v bise || true)"
   [ -n "$bise" ] || { say "no bise: pass --bise <exe>"; exit 2; }
   build
   mkdir -p "$RUN"
   local pid
   if pid="$(running_pid)"; then
-    printf '{"workspace": %s, "bise": %s, "web": %s}\n' "$(js "$ws")" "$(js "$bise")" "$(js "$web")" > "$RUN/switch.json"
+    printf '{"workspace": %s, "home": %s, "bise": %s, "web": %s}\n' "$(js "$ws")" "$([ "$home" = 1 ] && echo true || echo false)" "$(js "$bise")" "$(js "$web")" > "$RUN/switch.json"
     kill -USR1 "$pid"
-    say "running (pid $pid): told it the workspace $ws"
+    say "running (pid $pid): told it the workspace ${ws:-~/bise (home)}"
     return 0
   fi
-  local args=(--workspace "$ws" --bise "$bise" --web "$web" --dev "$STATE")
+  local args=(--bise "$bise" --web "$web" --dev "$STATE")
+  [ "$home" = 1 ] || args+=(--workspace "$ws")
   [ -z "${BISE_HOME:-}" ] || args+=(--env "BISE_HOME=$BISE_HOME")
   # the core finds repl-live there (open drops the shell's env; a bise
   # built outside its tree has no app root of its own)
   [ -z "${BISE_APP_ROOT:-}" ] || args+=(--env "BISE_APP_ROOT=$BISE_APP_ROOT")
   args+=(--env "PATH=$PATH")
   open -a "$APP" --args "${args[@]}"
-  say "opened $APP for $ws"
+  say "opened $APP for ${ws:-~/bise (home)}"
 }
 
 case "${1:-}" in

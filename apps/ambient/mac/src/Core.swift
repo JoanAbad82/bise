@@ -65,12 +65,14 @@ final class Core {
         gen += 1
         let g = gen
         let p = Process()
+        // no workspace (launched from Finder or the menu bar): the home workspace, ~/bise
+        let args = config.workspace.isEmpty ? ["ambient-core", "--home"] : ["ambient-core", "--workspace", config.workspace]
         if config.bise.contains("/") {
             p.executableURL = URL(fileURLWithPath: config.bise)
-            p.arguments = ["ambient-core", "--workspace", config.workspace]
+            p.arguments = args
         } else {   // a bare name: through PATH
             p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            p.arguments = [config.bise, "ambient-core", "--workspace", config.workspace]
+            p.arguments = [config.bise] + args
         }
         var env = ProcessInfo.processInfo.environment
         for (k, v) in config.childEnv { env[k] = v }

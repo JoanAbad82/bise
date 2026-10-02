@@ -50,7 +50,9 @@ struct Config {
         guard let d = FileManager.default.contents(atPath: path),
               let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { return false }
         var changed = false
-        if let w = o["workspace"] as? String, !w.isEmpty, w != workspace { workspace = w; changed = true }
+        // "workspace": "" (or "home": true) = the home workspace, ~/bise
+        let home = o["home"] as? Bool == true
+        if let w = home ? "" : o["workspace"] as? String, w != workspace { workspace = w; changed = true }
         if let b = o["bise"] as? String, !b.isEmpty, b != bise { bise = b; changed = true }
         if let w = o["web"] as? String, !w.isEmpty, w != web { web = w; changed = true }
         return changed

@@ -45,10 +45,25 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private let macosMajor = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
 
     init(config: Config) {
-        self.config = config
-        core = Core(config: config)
         defaults = config.qa != nil ? (UserDefaults(suiteName: "dev.bise.ambient.qa") ?? .standard) : .standard
+        let c = AmbientApp.remembered(config, defaults)
+        self.config = c
+        core = Core(config: c)
         super.init()
+    }
+
+    // a launch from Finder or the menu bar has no --bise or --web: the last
+    // ones scripts/ambient.sh gave (launchd's PATH doesn't find bise)
+    private static func remembered(_ config: Config, _ d: UserDefaults) -> Config {
+        var c = config
+        let fm = FileManager.default
+        if c.bise.contains("/") { d.set(c.bise, forKey: "lastBise") }
+        else if let b = d.string(forKey: "lastBise"), fm.isExecutableFile(atPath: b) { c.bise = b }
+        if let w = c.web { d.set(w, forKey: "lastWeb") }
+        else if let w = d.string(forKey: "lastWeb"), fm.fileExists(atPath: w) { c.web = w }
+        if c.childEnv["PATH"] != nil { d.set(c.childEnv["PATH"], forKey: "lastPath") }
+        else if let p = d.string(forKey: "lastPath") { c.childEnv["PATH"] = p }
+        return c
     }
 
     // MARK: launch and quit
