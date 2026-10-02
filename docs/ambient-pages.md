@@ -68,8 +68,8 @@ the workspace id in 47100-47899, kept in `<state>/pages.port`), in `hello` and `
 | `GET /` | "for you": the list of pages (a kit page the server writes) |
 | `GET /p/<id>` and `/p/<id>/v/<n>` | the page: the server's shell (§2.5) around the fragment |
 | `GET /p/<id>/v/<n>/body` | the fragment alone (live swap) |
-| `GET /p/<id>/events` | SSE: `version {n}`, `state {state}`, `notes {…}` |
-| `GET /p/<id>/meta` | meta.json + notes.json |
+| `GET /p/<id>/events` | SSE, events named `version {n}`, `state {state}`, `notes {…}` (`/events`: the home list's, `pages`) |
+| `GET /p/<id>/meta` | flat: `{id, title, agent, created_ms, state, versions, url, notes}` |
 | `GET /kit/<file>` | the kit's files, from the app root's `apps/ambient/kit/` |
 | `POST /api/p/<id>/notes` | upsert/delete draft notes `{notes: [...]}` |
 | `POST /api/p/<id>/send` | the drafts become `sent`, the notes message goes to the agent (§2.6) |
@@ -136,7 +136,10 @@ The hooks between them (agreed with amb-web; amb-kit builds to them):
   `data-page`/`data-version`; the token is `<meta name="bise-token">`;
 - the API (amb-core): `POST /api/p/<id>/notes {notes: [...]}` = the page's whole draft list (it
   replaces the drafts; sent/done/answered untouched; delete = leave it out); `POST
-  /api/p/<id>/send {}` → `{sent: n}`; `GET /p/<id>/meta` → `{meta, notes}`.
+  /api/p/<id>/send {}` → `{sent: n}`; `GET /p/<id>/meta` → flat `{id, title, agent, created_ms,
+  state, versions, url, notes}` (as built). notes.js gives every note its own id (`n` + a random
+  or time-based suffix): the server numbers an id-less note `n<max+1>`, so a deleted draft's id
+  could come back.
 
 ### 2.8 Opening a page (owners: amb-mac, amb-web, amb-core)
 

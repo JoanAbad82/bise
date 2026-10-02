@@ -122,6 +122,10 @@ Events from the core (stdout):
 | `word` | `turn`, `i` | main's voice reached word `i` |
 | `sent` | `text`, `voice` (bool), `shot` (bool) | the hub took the message |
 | `error` | `text` | one sentence for the user (no key, no env) |
+| `page` | `id`, `title`, `agent`, `version`, `url`, `at_ms`, `state`, `front` (bool) | a page published or changed state (docs/ambient-pages.md §2.3); `front`: main published it in the user's turn, or its agent was born since the user's last turn started: open it without fn + o |
+
+`state` also carries `pages: [{id, title, agent, version, url, at_ms, state, open_notes}]`, newest
+first (the capsule's "for you").
 
 The process rules: the core exits on stdin EOF (the app died: no orphan); its stderr goes to
 `<bise dev dir>/ambient/core.log`, the app's own log to `<bise dev dir>/ambient/app.log`.
