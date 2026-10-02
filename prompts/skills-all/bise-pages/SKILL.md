@@ -12,7 +12,7 @@ You never write CSS, classes, scripts or colors.
 
 This file is what every page needs. Next to it, in the same folder, read only the one you need:
 `blocks.md` (every block in detail, the lint, a full example), `leaving.md` (send, post, "put it
-in my drafts", newsletters), `watch.md` (standing orders, the launch watch), `morning.md` (the morning page),
+in my drafts", newsletters), `watch.md` (standing orders, the launch watch), `morning.md` (the morning page), `meetings.md` (a brief before, follow-ups after),
 `feedback.md` (bug reports agents fix), `about-you.md` (what bise keeps about the user).
 
 ## Page or one line

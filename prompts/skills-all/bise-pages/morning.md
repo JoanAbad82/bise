@@ -29,6 +29,9 @@ opens on that item), a PR or a doc by its https link.
 5. **Watched**, a `prose` list under `## watched`: each standing order's page with what is new
    since he last looked (`<a href="/p/launch-watch">the launch</a> · 4 new, 2 need a reply`).
 
+When the user wants briefs before his meetings, the same wake also sets each meeting's two
+timers (`meetings.md`).
+
 No `sources` block (every line links to its place), no `question`, no `review`: decisions are
 made on their own pages. Nothing waits, nothing new, no meetings: a short page that says so in
 one line, never an empty one. See `examples/morning.html`.
