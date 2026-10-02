@@ -10,10 +10,12 @@ draws it in the user's look, light and dark, and opens it in the user's browser.
 it, leaves notes, sends them to you; you publish the next version and the tab updates in place.
 You never write CSS, classes, scripts or colors.
 
-This file is what every page needs. Next to it, in the same folder, read only the one you need:
-`blocks.md` (every block in detail, the lint, a full example), `leaving.md` (send, post, "put it
-in my drafts", newsletters), `watch.md` (standing orders, the launch watch), `morning.md` (the morning page), `meetings.md` (a brief before, follow-ups after),
-`feedback.md` (bug reports agents fix), `about-you.md` (what bise keeps about the user).
+This file is enough for a first version: publish the skeleton before you open anything else.
+Next to it, read only the one you need, when you need it: `blocks.md` (every block in detail,
+the lint, a full example), `leaving.md` (send, post, "put it in my drafts", newsletters),
+`watch.md` (standing orders, the launch watch), `morning.md` (the morning page), `meetings.md`
+(a brief before, follow-ups after), `feedback.md` (bug reports agents fix), `about-you.md`
+(what bise keeps about the user).
 
 ## Page or one line
 
