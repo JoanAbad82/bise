@@ -683,3 +683,39 @@ fn msg_you_lines_are_main_words_with_who_wrote_them() {
     assert!(out.contains(&json!({"ev": "main", "text": "the v2 page is up", "turn": 0, "from": "docs"})), "{out:?}");
     assert!(!has(&out, "phase"));
 }
+
+#[test]
+fn pages_ride_the_state_and_a_waited_page_comes_in_front() {
+    let mut t = T::new();
+    t.hub.say(json!({"ev": "state", "agents": [{"name": "main", "main": true, "status": "idle"}, {"name": "old", "status": "idle"}], "cards": [],
+        "pages": [{"id": "w", "title": "weekly update", "agent": "old", "version": 1, "url": "http://127.0.0.1:47100/p/w", "at_ms": 5, "state": "ready", "open_notes": 0}]}));
+    t.until(|o| has(o, "state"));
+    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    assert_eq!(st["pages"][0]["id"], "w");
+    t.ready();
+    let page = |agent: &str| json!({"ev": "page", "id": "p", "title": "p", "agent": agent, "version": 1, "url": "u", "at_ms": 1, "state": "ready"});
+    let front = |t: &mut T| -> bool {
+        t.until(|o| has(o, "page"));
+        let out = t.take();
+        out.iter().find(|v| v["ev"] == "page").unwrap()["front"].as_bool().unwrap()
+    };
+    // nobody asked: never in front
+    t.hub.say(page("main"));
+    assert!(!front(&mut t));
+    // the user asks; main publishes in that turn: in front
+    t.hub.line("main", "sb you : draft my weekly update");
+    t.hub.line("main", "  obs: turn_started");
+    t.hub.say(page("main"));
+    assert!(front(&mut t));
+    // an agent that was there before the user's turn: not in front
+    t.hub.say(page("old"));
+    assert!(!front(&mut t));
+    // an agent born since (main started it for the user): in front, even after main's turn
+    t.hub.say(json!({"ev": "state", "agents": [{"name": "main", "main": true, "status": "idle"}, {"name": "old", "status": "idle"}, {"name": "weekly-update", "status": "working"}], "cards": [], "pages": []}));
+    t.hub.line("main", "  obs: turn_done: completed");
+    t.hub.say(page("weekly-update"));
+    assert!(front(&mut t));
+    // updating: not in front
+    t.hub.say(json!({"ev": "page", "id": "p", "agent": "weekly-update", "state": "updating"}));
+    assert!(!front(&mut t));
+}

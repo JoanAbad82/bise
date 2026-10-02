@@ -187,6 +187,12 @@ pub struct Core {
     for_user: bool,
     /// a user message main has not taken into a turn yet
     user_waiting: bool,
+    /// every agent of the last state (main included)
+    agent_names: Vec<String>,
+    /// the agents there were when the user's last turn started: a page
+    /// from main in that turn, or from an agent born since, is one the
+    /// user waits for (docs/ambient-pages.md §2.8)
+    user_turn_agents: Option<Vec<String>>,
     /// main's last message of this turn, as sent in `main`
     main_text: String,
     /// the last message sent was said: Some(reached main's turn yet)
@@ -216,6 +222,8 @@ impl Core {
             in_turn: false,
             for_user: false,
             user_waiting: false,
+            agent_names: Vec::new(),
+            user_turn_agents: None,
             main_text: String::new(),
             voice_out: None,
             talk: None,
@@ -475,6 +483,7 @@ impl Core {
                     self.set_phase(p, None);
                 }
             }
+            "page" if self.ready => self.page(v),
             "line" => {
                 let line = s("line");
                 if self.ready && line.starts_with("sb msg-you : ") {
@@ -487,9 +496,26 @@ impl Core {
         }
     }
 
+    /// The hub's `page` event, relayed with `front`: the user is waiting
+    /// for it (main's page in the user's turn, or a page of an agent born
+    /// since the user's last turn started), so the app opens it without
+    /// fn + o (docs/ambient-pages.md §2.8).
+    fn page(&mut self, mut v: Value) {
+        let agent = v.get("agent").and_then(Value::as_str).unwrap_or("").to_string();
+        let ready = v.get("state").and_then(Value::as_str) == Some("ready");
+        let waited = match &self.user_turn_agents {
+            None => false,
+            Some(_) if agent == "main" => self.for_user && self.in_turn,
+            Some(known) => !known.contains(&agent),
+        };
+        v["front"] = json!(ready && waited);
+        self.emit(v);
+    }
+
     fn state(&mut self, v: &Value) {
         let s = |x: &Value, k: &str| x.get(k).and_then(Value::as_str).unwrap_or("").to_string();
         let list = |k: &str| v.get(k).and_then(Value::as_array).cloned().unwrap_or_default();
+        self.agent_names = list("agents").iter().map(|a| s(a, "name")).collect();
         let agents: Vec<Value> = list("agents")
             .iter()
             .filter(|a| !a.get("main").and_then(Value::as_bool).unwrap_or(false))
@@ -527,7 +553,8 @@ impl Core {
                 json!({"id": c.id, "kind": c.kind, "agent": c.agent, "text": c.text, "options": options})
             })
             .collect();
-        self.emit(json!({"ev": "state", "agents": agents, "cards": cards}));
+        let pages = list("pages");
+        self.emit(json!({"ev": "state", "agents": agents, "cards": cards, "pages": pages}));
     }
 
     /// One line of main's feed (ambient's review, m_4672: only main's
@@ -551,6 +578,9 @@ impl Core {
             self.turn += 1;
             self.main_text.clear();
             self.for_user = std::mem::take(&mut self.user_waiting);
+            if self.for_user {
+                self.user_turn_agents = Some(self.agent_names.clone());
+            }
             if self.ready {
                 self.reached();
                 if self.for_user && self.speech.is_none() {
@@ -573,6 +603,7 @@ impl Core {
                 self.user_waiting = false;
                 if !self.for_user {
                     self.for_user = true;
+                    self.user_turn_agents = Some(self.agent_names.clone());
                     if self.ready && self.speech.is_none() {
                         self.set_phase(Phase::Working, None);
                     }
