@@ -171,7 +171,8 @@ def fake_accounts():
     found = json.loads(r[1]["result"]["content"][0]["text"])["messages"]
     check({"m102", "m106", "m109", "m110", "m111"} <= {m["id"] for m in found}, found)
     data = fake.load()
-    check(len(data["gmail"]["messages"]) == 20 and {"team", "launch"} <= {c["name"] for c in data["slack"]["channels"]}, "20 mails, #team and #launch")
+    check(len(data["gmail"]["messages"]) >= 20 and {"team", "launch"} <= {c["name"] for c in data["slack"]["channels"]}, "20+ mails, #team and #launch")
+    check(any("acme.app" in m["subject"] for m in data["gmail"]["messages"]), "roadmap D's domain mails")
     check(len([m for m in data["gmail"]["messages"] if m["thread"] == "t109"]) == 3, "a thread with a decision")
     today = datetime.date.today().isoformat()
     check(sum(e["start"].startswith(today) for e in data["calendar"]["events"]) >= 4, "today's meetings are on the real today")
@@ -258,6 +259,15 @@ def run_scenarios():
     check(not qa._card_about({"text": "approve: run sb every 30m"}, need), "a card off the ask")
     body = '<li data-id="hn-41713010">agentsmith</li><li data-id="reddit-lq2e6f7"></li>'
     check(qa._covered(body, need)["found"] == 2, qa._covered(body, need))
+    # roadmap A, C, D runs (ambient-lead m_5616)
+    for k in ("newsletter", "feedback", "checklist"):
+        check(qa.SCENARIOS[k]["flow"] in qa.FLOWS and qa.SCENARIOS[k]["no_send"] and not qa.SCENARIOS[k]["notes"], k)
+    plan = ('<section data-kit="checklist" data-id="buy"><ol><li data-id="s1" data-done>read the mails</li>'
+            '<li data-id="s2" data-who="yours">sign in to Gandi</li><li data-id="s3" data-who="bise">check the price</li>'
+            '<li data-id="s4" data-who="yours">pay</li></ol></section><section data-kit="prose" data-id="p"><p>x</p></section>')
+    rows = qa._rows(plan)
+    check([(w["item"], w["yours"], w["done"]) for w in rows] == [("s1", False, True), ("s2", True, False), ("s3", False, False), ("s4", True, False)]
+          and {w["block"] for w in rows} == {"buy"}, rows)
     try:
         qa.run("nope")
         check(False, "ran an unknown scenario")
