@@ -99,6 +99,6 @@ A message `you sent 3 notes on your page "weekly update" (weekly-update v1, <url
    Every note gets one or the other.
 3. Reply in one line: `v2 is up: 3 notes done.`
 
-A note with `taste: true`: also append the preference to `~/bise/taste.md` as one `- ` line, in
-general words (`numbers: one per cell, the change in its own column`), never the page's content.
+A note with `taste: true`: also keep the preference, in general words, never the page's content:
+`sb taste add "numbers: one per cell, the change in its own column" --from "the weekly update"`.
 A note of kind `start` goes to main, not to you.

@@ -69,7 +69,8 @@ As main, also:\n\
 - When the user says a step of his is done (a page's checklist row with `data-who=\"yours\"`; his open steps come with his message), run `sb page tick <page> <item>` and say it in one line.\n\
 - A standing order (\"watch the launch until tomorrow\", \"tell me when the PR is reviewed\"): one agent, one page it republishes, woken by a timer it sets with `sb every 10m \"<instruction>\" --page <id> [--until …]`, never by sleeping; a card only for what the user asked to be told about, numbers stay on the page.\n\
 - The morning page (\"a page every morning with my day\"): set it once, `sb every day 07:30 \"make today's morning page (bise-pages morning.md)\"`; each wake, publish a new page `morning-<YYYY-MM-DD>` before he starts his day: what needs him, what agents finished overnight, today's meetings with a three-line brief each, what is watched; under a minute to read, every line linked to where it is handled, never computed when he opens it.\n\
-- Meetings (\"brief me before my meetings\"): each morning, for each meeting with other people, set two one-shot timers (`sb every day 14:20 \"brief <meeting> (<page id>)\" --times 1` ten minutes before, the follow-ups fifteen minutes after its end); the brief is a page `meeting-<slug>-<YYYY-MM-DD>` (who, last time, what is open, three questions), the follow-ups its next version from Granola's notes (decisions, who does what, drafts that leave only on his word); no card for either (bise-pages meetings.md).\n\
+- What bise keeps about the user (his taste rules, who is who) changes only through `sb taste add \"<rule>\" --from \"<where>\"`, `sb taste remove <n>`, `sb people set <name> \"<who>\"`, `sb people remove <name>`, never by editing the files; the hub keeps the about-you page fresh after the first publish.\n\
+- Meetings (\"brief me before my meetings\"): each morning, for each meeting with other people, set two one-shot timers (`sb every day 14:20 \"brief <meeting> (<page id>)\" --times 1 --until 23:59` ten minutes before, the follow-ups fifteen minutes after its end); the brief is a page `meeting-<slug>-<YYYY-MM-DD>` (who, last time, what is open, three questions), the follow-ups its next version from Granola's notes (decisions, who does what, drafts that leave only on his word); no card for either (bise-pages meetings.md).\n\
 - When an agent finishes, say what shipped, in one line with its name: `auth-fix is done: the login test waits for the event now.`\n\
 - When you answer an agent's question on the user's behalf (the brief or the user already decided it), answer it explicitly with `sb send <agent> --reply-to <id> --why \"<one sentence: why this answer>\" \"<answer>\"` (the user sees your answer and the why), then tell the user in one line: `docs asked v1 or v2; the brief says v2, so i answered.`\n\n\
 {cmds}\n\
@@ -344,7 +345,9 @@ mod tests {
         // roadmap E (ambient-lead m_5633): the morning order and its page id
         assert!(r.contains("The morning page") && r.contains("morning-<YYYY-MM-DD>"));
         // meetings (ambient-lead m_5650): a brief before, follow-ups after, one page per meeting
-        assert!(r.contains("Meetings (") && r.contains("meeting-<slug>-<YYYY-MM-DD>") && r.contains("--times 1"));
+        assert!(r.contains("Meetings (") && r.contains("meeting-<slug>-<YYYY-MM-DD>") && r.contains("--times 1 --until 23:59"));
+        // amb-home 5d1f7d6f: taste and people change only through sb taste / sb people
+        assert!(r.contains("`sb taste add \"<rule>\" --from \"<where>\"`") && r.contains("`sb people set <name> \"<who>\"`"));
         // roadmap C (ambient-lead m_5489): the started item carries its agent
         assert!(r.contains("republish the item with `data-agent=\"<the agent's name>\"`"));
         let skill = include_str!("../../../prompts/skills-all/bise-pages/SKILL.md");

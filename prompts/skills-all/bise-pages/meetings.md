@@ -7,9 +7,10 @@ either: the menu-bar count says the page is there.
 
 **The timers.** When you make the morning page (`morning.md`), also set, for each of today's
 meetings with other people, two one-shot timers in his time zone:
-`sb every day 14:20 "brief Q3 renewal (meeting-q3-renewal-2026-05-19, bise-pages meetings.md)" --times 1`
-ten minutes before it starts, and `… "follow-ups for Q3 renewal (…)" --times 1` fifteen minutes
-after it ends. A meeting cancelled or moved: stop or replace its timers (`sb every`, `sb every
+`sb every day 14:20 "brief Q3 renewal (meeting-q3-renewal-2026-05-19, bise-pages meetings.md)" --times 1 --until 23:59`
+ten minutes before it starts, and `… "follow-ups for Q3 renewal (…)" --times 1 --until 23:59`
+fifteen minutes after it ends (`--until 23:59`: a time already passed today never fires
+tomorrow). A meeting cancelled or moved: stop or replace its timers (`sb every`, `sb every
 --stop <n>`).
 
 ## The brief (v1), read in a minute before the meeting

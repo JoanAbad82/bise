@@ -13,6 +13,11 @@ id `about-you`, from `~/bise/taste.md` (the taste rules, one `- ` line each) and
 - a `callout` (`note`): `nothing else is kept: no mail, no messages. strike a line and it's gone.`
 - no `sources` (it is the user's own words) and no `question`.
 
-Notes on it go to main, who rewrites the files (a struck rule: deleted; an edited one: replaced,
-in the user's words) and publishes the next version with `--notes-done`. Nothing kept is ever
-shown elsewhere without the user asking. See `examples/about-you.html`.
+The first publish is main's; after that the hub keeps the page fresh itself. Notes on it go to
+main, who changes the files only through `sb taste` and `sb people`, never by editing them: a
+struck rule `sb taste remove <n>` (numbers from `sb taste`), an edited one `sb taste remove <n>`
+then `sb taste add "<the user's words>" --from "your note on about-you"`; a person
+`sb people set <name> "<who>"` or `sb people remove <name>`. The hub redraws the page after each
+change; mark the notes done with `sb page publish … --notes-done` only if you republish yourself,
+else answer in one line. Nothing kept is ever shown elsewhere without the user asking. See
+`examples/about-you.html`.
