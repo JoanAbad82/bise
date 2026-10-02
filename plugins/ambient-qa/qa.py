@@ -32,7 +32,8 @@ import sys
 import tempfile
 import time
 
-HERE = os.path.dirname(os.path.abspath(__file__))
+# realpath: the plugin is linked into an agent's .agents/plugins; the repo is where it really lives
+HERE = os.path.dirname(os.path.realpath(__file__))
 REPO = os.path.abspath(os.environ.get("AMBIENT_QA_REPO") or os.path.join(HERE, "..", ".."))
 WEB = os.path.join(REPO, "apps", "ambient", "web")
 
@@ -47,7 +48,9 @@ def dev_dir():
     return os.path.join(home, ".local", "state", "switchboard")
 
 
-QA_DIR = os.environ.get("AMBIENT_QA_DIR") or os.path.join(dev_dir(), "qa")
+# one QA app, hub and socket per agent: ambient, ambient-pm and ambient-lead
+# can QA at the same time without driving each other's app
+QA_DIR = os.environ.get("AMBIENT_QA_DIR") or os.path.join(dev_dir(), "qa", os.environ.get("SB_AGENT") or "me")
 APP_DIR = os.path.join(QA_DIR, "ambient")          # the QA app's own: app.pid, app.log, core.log, qa.sock
 SOCK = os.path.join(APP_DIR, "qa.sock")
 RUN = os.path.join(QA_DIR, "run.json")
@@ -61,26 +64,83 @@ class QAError(Exception):
 
 # ---------------------------------------------------------------- the bise
 
+def _is_exe(p):
+    return bool(p) and os.path.isfile(p) and os.access(p, os.X_OK)
+
+
+def app_root_of(bise):
+    """The source tree a debug bise runs from: it must hold a built repl-live
+    (./run.sh), else the hub dies with 'repl-live not found' (a bise built
+    in an outside CARGO_TARGET_DIR, like ambient-int/target, has none next
+    to it). $AMBIENT_QA_APP_ROOT wins."""
+    env = os.environ.get("AMBIENT_QA_APP_ROOT")
+    if env:
+        return env
+    d = os.path.dirname(os.path.realpath(bise))
+    for up in [d] + list(_ancestors(d, 4)):
+        for root in (up, os.path.join(up, "harness")):
+            if os.path.isfile(os.path.join(root, "rust", "Cargo.toml")) and os.path.exists(os.path.join(root, "repl-live")):
+                return root
+    return None
+
+
+def _ancestors(d, n):
+    for _ in range(n):
+        d = os.path.dirname(d)
+        yield d
+
+
+def _git(root, *args):
+    r = subprocess.run(["git", "-C", root] + list(args), capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def behind(root, branch="ambient-app"):
+    """How many of ambient-app's commits the tree's HEAD lacks (big when unknown)."""
+    n = _git(root, "rev-list", "--count", "HEAD.." + branch)
+    return int(n) if n.isdigit() else 10 ** 6
+
+
+def tree_info(root):
+    """The tree the app root comes from: its commit and what of ambient-app it lacks."""
+    return {"head": _git(root, "log", "-1", "--format=%h %s")[:100], "behind_ambient_app": behind(root),
+            "ambient_app": _git(root, "log", "-1", "--format=%h", "ambient-app")}
+
+
 def find_bise(explicit=None):
-    """A bise with `ambient-core`: --bise, $AMBIENT_QA_BISE, the repo's own
-    debug build, else the newest debug build among this hub's worktrees."""
-    for c in (explicit, os.environ.get("AMBIENT_QA_BISE"), os.path.join(REPO, "rust", "target", "debug", "bise")):
-        if c and os.path.isfile(c) and os.access(c, os.X_OK):
-            return os.path.abspath(c)
-    roots = set()
+    """A bise with `ambient-core` and its app root (a tree with a built
+    repl-live): --bise, $AMBIENT_QA_BISE, the last launch's pair, the repo's
+    own build, else the newest such build among this hub's worktrees.
+    Returns (bise, app_root)."""
+    last = _read(RUN) or {}
+    tries = [explicit, os.environ.get("AMBIENT_QA_BISE")]
+    for c in tries:
+        if _is_exe(c):
+            root = app_root_of(c)
+            if not root:
+                raise QAError("%s has no app root with a built repl-live: set AMBIENT_QA_APP_ROOT to a tree that has one (./run.sh builds it)" % c)
+            return os.path.abspath(c), root
+    if _is_exe(last.get("bise")) and last.get("app_root") and os.path.exists(os.path.join(last["app_root"], "repl-live")):
+        return last["bise"], last["app_root"]
+    own = os.path.join(REPO, "rust", "target", "debug", "bise")
+    if _is_exe(own) and app_root_of(own):
+        return own, app_root_of(own)
+    found = []
     wt = os.path.dirname(os.path.dirname(REPO))     # .../worktrees/<hub>/<task>/harness -> .../worktrees/<hub>
     if os.path.basename(os.path.dirname(wt)) == "worktrees":
-        roots.add(wt)
-    found = []
-    for r in roots:
-        for task in os.listdir(r):
+        for task in os.listdir(wt):
             for rel in ("target/debug/bise", "harness/rust/target/debug/bise"):
-                p = os.path.join(r, task, rel)
-                if os.path.isfile(p) and os.path.isdir(os.path.join(r, task, "harness", "rust", "tui", "src", "ambient")):
-                    found.append((os.path.getmtime(p), p))
+                p = os.path.join(wt, task, rel)
+                if _is_exe(p) and os.path.isdir(os.path.join(wt, task, "harness", "rust", "tui", "src", "ambient")):
+                    root = app_root_of(p)
+                    if root:
+                        found.append((os.path.getmtime(p), p, root))
     if found:
-        return max(found)[1]
-    raise QAError("no bise with ambient-core: pass bise=<exe> (a debug build of the ambient-app branch) or set AMBIENT_QA_BISE")
+        # the tree closest to ambient-app's tip (fewest of its commits missing), then the newest build
+        _, _, p, root = min((behind(root), -mt, p, root) for mt, p, root in found)
+        return p, root
+    raise QAError("no bise with ambient-core next to a built repl-live: pass bise=<exe> (a debug build of the ambient-app branch, "
+                  "its tree built with ./run.sh) or set AMBIENT_QA_BISE and AMBIENT_QA_APP_ROOT")
 
 
 # ---------------------------------------------------------------- the socket
@@ -154,10 +214,16 @@ def _read(path):
 
 # ---------------------------------------------------------------- the fake hub
 
-def hub_daemon(bise):
-    """Runs detached (`qa.py _hub`): a throwaway hub with tests/e2e.py's
-    scripted provider on a fresh git repo, until SIGTERM. Main answers
-    "ack: <your words>"; `[[bash: ...]]` in what you say scripts it more."""
+# what a real model's hub must not take from the scripted one (hub "model")
+SCRIPTED_VARS = ("BEND_PROVIDER_URL", "BEND_MODEL", "MISTRAL_API_KEY", "BISE_APPROVALS")
+
+
+def hub_daemon(bise, kind="fake"):
+    """Runs detached (`qa.py _hub`): a throwaway hub on a fresh git repo,
+    until SIGTERM. fake: tests/e2e.py's scripted provider, main answers
+    "ack: <your words>" (`[[bash: ...]]` in what you say scripts it more).
+    model: the same throwaway hub and workspace, but your configured model
+    and keys and your approvals mode (it costs credits; never the real main)."""
     sys.path.insert(0, os.path.join(REPO, "tests"))
     tmp = os.path.join(QA_DIR, "h")                 # short: the hub's sockets live under it
     os.makedirs(tmp, exist_ok=True)
@@ -165,6 +231,9 @@ def hub_daemon(bise):
     import e2e  # noqa: E402
     e2e.EXE = bise
     E = e2e.Env()
+    if kind == "model":
+        for k in SCRIPTED_VARS:
+            E.env.pop(k, None)
     stop = {"now": False}
 
     def term(*_):
@@ -172,9 +241,22 @@ def hub_daemon(bise):
     signal.signal(signal.SIGTERM, term)
     signal.signal(signal.SIGINT, term)
     try:
-        c = E.start_hub()
-        c.wait_status("main", "idle", 90)
-        info = {"pid": os.getpid(), "tmp": E.tmp, "ws": E.ws, "state": E.state, "bise": bise,
+        # e2e's start_hub waits 20 s: a loaded machine (5 agents building) needs more
+        err_path = os.path.join(E.tmp, "hub.stderr")
+        err = open(err_path, "a")
+        E.hub = subprocess.Popen([bise, "sbd", "--workspace", E.ws], cwd=e2e.ROOT, env=E.env,
+                                 stdin=subprocess.DEVNULL, stdout=err, stderr=err)
+        sock = os.path.join(E.state, "hub.sock")
+        t0 = time.time()
+        limit = 60 * e2e.load_factor()
+        while not os.path.exists(sock):
+            if E.hub.poll() is not None or time.time() - t0 > limit:
+                tail = open(err_path, errors="replace").read()[-3000:]
+                raise RuntimeError("the hub did not start in %.0f s (exit %s); its stderr:\n%s" % (limit, E.hub.poll(), tail))
+            time.sleep(0.1)
+        c = e2e.Client(sock)
+        c.wait_status("main", "idle", 120)
+        info = {"pid": os.getpid(), "kind": kind, "tmp": E.tmp, "ws": E.ws, "state": E.state, "bise": bise,
                 "env": {k: E.env[k] for k in ("SB_STATE_DIR",)}}
         with open(HUB + ".tmp", "w") as f:
             json.dump(info, f)
@@ -189,24 +271,31 @@ def hub_daemon(bise):
         E.close()
 
 
-def _start_hub(bise):
+def _start_hub(bise, root, kind="fake"):
     old = _read(HUB)
     if old and _pid_alive(old.get("pid")):
-        return old
+        if old.get("kind", "fake") == kind and old.get("bise") == bise:
+            return old
+        _stop_hub()
     os.makedirs(QA_DIR, exist_ok=True)
     log = open(os.path.join(QA_DIR, "hub.log"), "a")
-    p = subprocess.Popen([sys.executable, "-u", os.path.abspath(__file__), "_hub", "--bise", bise],
-                         stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True, cwd=REPO)
+    # never the calling agent's hub identity (e2e.host_env drops it for the hub; the daemon too)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("SB_") and k not in ("BISE_ROLE", "BISE_EXPORTS_FOR")}
+    env["BISE_APP_ROOT"] = root    # e2e.Env passes it on to the hub: its repl-live
+    env["AMBIENT_QA_DIR"] = QA_DIR  # without SB_AGENT the daemon would pick another QA dir
+    p = subprocess.Popen([sys.executable, "-u", os.path.realpath(__file__), "_hub", "--bise", bise, "--kind", kind],
+                         stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True, cwd=REPO, env=env)
     t0 = time.time()
-    while time.time() - t0 < 120:
+    # the daemon gives the hub 60 s and main 120 s, each times the load (up to 4): wait for all of it
+    while time.time() - t0 < 900:
         info = _read(HUB)
         if info and info.get("pid") == p.pid:
             return info
         if p.poll() is not None:
-            raise QAError("the fake hub exited (%s): see %s" % (p.returncode, os.path.join(QA_DIR, "hub.log")))
+            raise QAError("the %s hub exited (%s): %s" % (kind, p.returncode, open(os.path.join(QA_DIR, "hub.log"), errors="replace").read()[-1500:]))
         time.sleep(0.2)
     p.terminate()
-    raise QAError("the fake hub didn't come up in 120 s: see %s" % os.path.join(QA_DIR, "hub.log"))
+    raise QAError("the %s hub didn't come up in 900 s: see %s" % (kind, os.path.join(QA_DIR, "hub.log")))
 
 
 def _stop_hub():
@@ -223,7 +312,11 @@ def _stop_hub():
 # ---------------------------------------------------------------- launch and stop
 
 def _sh(args, **kw):
-    return subprocess.run(args, capture_output=True, text=True, cwd=REPO, **kw)
+    # the one app path: scripts/ambient.sh resolves the dev dir itself (BISE_HOME,
+    # ~/.bise/dev once migrated); an agent shell's SB_BUILD_DIR (another hub's
+    # build dir) made it build a second copy, which the EDR deletes
+    env = {k: v for k, v in os.environ.items() if k != "SB_BUILD_DIR"}
+    return subprocess.run(args, capture_output=True, text=True, cwd=REPO, env=env, **kw)
 
 
 def app_path(force_build=False):
@@ -243,21 +336,21 @@ def app_path(force_build=False):
 
 
 def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", force_build=False, restart=False):
-    if hub not in ("fake", "real"):
-        raise QAError("hub: fake (a throwaway scripted hub) or real (your workspace, read-only)")
+    if hub not in ("fake", "model", "real"):
+        raise QAError("hub: fake (a throwaway scripted hub), model (a throwaway hub with your real model and keys) or real (your workspace, read-only)")
     up = alive()
     if up and not restart:
         run = _read(RUN) or {}
         if run.get("hub") == hub:
             return dict(run, already=True, pid=up.get("pid"))
     if up:
-        stop(keep_hub=(hub == "fake"))
-    bise = find_bise(bise)
+        stop(keep_hub=(hub != "real"))
+    bise, root = find_bise(bise)
     app = app_path(force_build)
     web = web or os.environ.get("BISE_AMBIENT_WEB") or WEB
-    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}
-    if hub == "fake":
-        info = _start_hub(bise)
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "BISE_APP_ROOT": root}
+    if hub in ("fake", "model"):
+        info = _start_hub(bise, root, hub)
         ws = info["ws"]
         env.update(info["env"])
     else:
@@ -269,7 +362,8 @@ def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", for
         os.unlink(SOCK)
     except OSError:
         pass
-    args = ["open", "-n", "-a", app, "--args", "--qa", hub, "--workspace", ws, "--bise", bise,
+    # the app's QA mode: real = read-only; fake and model hubs are throwaways it may write to
+    args = ["open", "-n", "-a", app, "--args", "--qa", "real" if hub == "real" else "fake", "--workspace", ws, "--bise", bise,
             "--web", web, "--dev", QA_DIR]
     for k, v in env.items():
         args += ["--env", "%s=%s" % (k, v)]
@@ -287,7 +381,7 @@ def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", for
         raise QAError("the QA app didn't open its socket in 30 s: see %s" % os.path.join(APP_DIR, "app.log"))
     call("backdrop", kind=backdrop)
     hub_up = _wait_hub(30)
-    run = {"hub": hub, "workspace": ws, "bise": bise, "web": web, "app": app, "pid": ping.get("pid"),
+    run = {"hub": hub, "workspace": ws, "bise": bise, "app_root": root, "tree": tree_info(root), "web": web, "app": app, "pid": ping.get("pid"),
            "hub_up": hub_up, "socket": SOCK, "out": OUT, "logs": [os.path.join(APP_DIR, "app.log"), os.path.join(APP_DIR, "core.log")]}
     with open(RUN, "w") as f:
         json.dump(run, f, indent=1)
@@ -391,6 +485,134 @@ def reset():
     return call("reset")
 
 
+# ---------------------------------------------------------------- pages on the throwaway hub
+
+KIT_EXAMPLE = os.path.join(REPO, "apps", "ambient", "kit", "examples", "weekly-update.html")
+
+
+def _hub():
+    info = _read(HUB)
+    if not info or not _pid_alive(info.get("pid")):
+        raise QAError("no throwaway hub: launch() (hub fake or model) first")
+    sys.path.insert(0, os.path.join(REPO, "tests"))
+    import e2e  # noqa: E402
+    c = e2e.Client(os.path.join(info["state"], "hub.sock"))
+    return c, info
+
+
+def _http(port, method, path, body=None, headers=None):
+    import http.client
+    c = http.client.HTTPConnection("127.0.0.1", port, timeout=15)
+    h = {"Host": "127.0.0.1:%d" % port}
+    h.update(headers or {})
+    data = json.dumps(body).encode() if body is not None else None
+    if data is not None:
+        h["Content-Type"] = "application/json"
+    c.request(method, path, body=data, headers=h)
+    r = c.getresponse()
+    out = (r.status, r.read().decode())
+    c.close()
+    return out
+
+
+def _wait(pred, timeout, what):
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        try:
+            v = pred()
+            if v:
+                return v
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(0.2)
+    raise QAError("timeout waiting for %s" % what)
+
+
+def page_publish(file=None, id="weekly-update", title="weekly update", done=None, answers=None, edit=None, timeout=120):
+    """The throwaway hub's main publishes a page (`sb page publish` through
+    the scripted provider's [[bash: ...]]): `file`, else amb-kit's
+    weekly-update example; `edit` {old: new} changes the text first (a v2).
+    `done` note ids, `answers` {note id: text}. Returns the page's url,
+    version and the page server's port."""
+    c, info = _hub()
+    src = open(file or KIT_EXAMPLE).read()
+    for a, b in (edit or {}).items():
+        src = src.replace(a, b)
+    before = {p["id"]: p.get("version", 0) for p in (_wait(lambda: c.state, 10, "the hub's state") or {}).get("pages", [])}
+    path = os.path.join(info["tmp"], "qa-page-%s-%d.html" % (id, int(time.time() * 1000)))
+    with open(path, "w") as f:
+        f.write(src)
+    cmd = 'sb page publish %s --id %s --title "%s"' % (path, id, title.replace('"', ""))
+    if done:
+        cmd += " --notes-done " + ",".join(done)
+    for nid, text in (answers or {}).items():
+        cmd += ' --note-answer %s="%s"' % (nid, text.replace('"', ""))
+    if info.get("kind") == "model":
+        raise QAError("page_publish scripts the fake main; on a model hub ask main yourself")
+    c.say("[[bash: %s]]" % cmd)
+    page = _wait(lambda: next((p for p in c.state.get("pages", []) if p["id"] == id and p.get("version", 0) > before.get(id, 0)), None),
+                 timeout, "page %s published (main's lines: %s)" % (id, c.lines("main")[-3:]))
+    port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
+    return {"id": id, "version": page.get("version"), "url": page.get("url"), "port": port, "pages_url": "http://127.0.0.1:%d/" % port}
+
+
+def page_notes(id, notes, send=False):
+    """Draft notes on a page through its own API (the token from the page's
+    shell, the server's origin), as notes.js would; `send` sends them to
+    the page's agent. A note: {block, kind: note|keep|drop|unsure|edit|voice|pin,
+    quote?, text?, before?, after?}."""
+    _, info = _hub()
+    port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
+    st, body = _http(port, "GET", "/p/%s" % id)
+    if st != 200:
+        raise QAError("GET /p/%s: %d" % (id, st))
+    token = body.split('<meta name="bise-token" content="')[1].split('"')[0]
+    h = {"Origin": "http://127.0.0.1:%d" % port, "X-Bise-Token": token}
+    st, saved = _http(port, "POST", "/api/p/%s/notes" % id, {"notes": notes}, h)
+    if st != 200:
+        raise QAError("POST notes: %d %s" % (st, saved))
+    out = {"saved": json.loads(saved).get("notes", [])}
+    if send:
+        st, sent = _http(port, "POST", "/api/p/%s/send" % id, {}, h)
+        if st != 200:
+            raise QAError("POST send: %d %s" % (st, sent))
+        out["sent"] = json.loads(sent)
+    return out
+
+
+def page_meta(id):
+    _, info = _hub()
+    port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
+    st, body = _http(port, "GET", "/p/%s/meta" % id)
+    if st != 200:
+        raise QAError("GET /p/%s/meta: %d" % (id, st))
+    return json.loads(body)
+
+
+def page_fixture(id="weekly-update"):
+    """ambient's fixture (m_4872): v1, three notes sent (a note, a voice
+    note, an edit), then v2 answering them: one done, one answered, the
+    edit kept as an open draft-free sent note; a fourth note on a block v2
+    removes shows as moved. Returns the urls of v1 and v2 and the notes."""
+    v1 = page_publish(id=id)
+    notes = [
+        {"block": "p1", "quote": "dark mode ships on the settings page monday", "kind": "note", "text": "say which monday"},
+        {"block": "p2", "kind": "voice", "text": "can we add who owns the release"},
+        {"block": "p1", "kind": "edit", "before": "half the size", "after": "a third of the size"},
+        {"block": "c1", "kind": "unsure"},
+    ]
+    sent = page_notes(id, notes, send=True)
+    ids = [n["id"] for n in sent["saved"]]
+    # the notes made main take a turn: v2 goes after it (else it waits behind it)
+    c, _ = _hub()
+    c.wait_line("main", "you sent 4 notes", 120)
+    c.wait_idle("main", timeout=180)
+    v2 = page_publish(id=id, edit={"dark mode ships on the settings page monday": "dark mode ships on the settings page on monday 14",
+                                   '<section data-kit="callout" data-id="c1">': '<section data-kit="callout" data-id="c1b">'},
+                      done=ids[:1], answers={ids[1]: "release is owned by perf until the 20th"})
+    return {"v1": v1, "v2": v2, "notes": page_meta(id).get("notes", [])}
+
+
 # ---------------------------------------------------------------- the scenes
 
 def fake_scenes():
@@ -439,6 +661,18 @@ def extra_scenes(agents, card):
                                                                                         [900, {"ev": "ui_spot_type", "text": "what's perf doing?"}]]},
         {"id": "agents-5", "spec": ["agents"], "label": "fn + 0: 5 agents", "events": [hub, [0, st(many(5))], [500, {"ev": "app_key", "key": "0"}]]},
         {"id": "agents-15", "spec": ["agents"], "label": "fn + 0: 15 agents", "events": [hub, [0, st(many(15))], [500, {"ev": "app_key", "key": "0"}]]},
+    ]
+    # pages (docs/ambient-pages.md §2.3, ambient-pm m_4888): the core's page event and state.pages
+    url = "http://127.0.0.1:47123/p/weekly-update"
+    page = {"id": "weekly-update", "title": "weekly update", "agent": "main", "version": 1, "url": url, "at_ms": 1790000000000, "state": "ready", "open_notes": 0}
+    older = dict(page, id="offsite-venues", title="offsite venues", url=url.replace("weekly-update", "offsite-venues"), at_ms=1789990000000, version=2)
+    pev = dict(page, ev="page")
+    out += [
+        {"id": "page-ready", "spec": ["pages"], "label": "a page is ready · fn + o", "events": [hub, [0, st(agents)], [600, pev]]},
+        {"id": "page-updating", "spec": ["pages"], "label": "a page updating (notes sent)", "events": [hub, [0, dict(st(agents), pages=[page])], [600, dict(pev, state="updating")]]},
+        {"id": "page-fn-o", "spec": ["pages"], "label": "fn + o opens the newest page (logged, not opened)", "events": [hub, [0, st(agents)], [600, pev], [2200, {"ev": "app_key", "key": "o"}]]},
+        {"id": "page-front", "spec": ["pages"], "label": "a page you wait for opens in front (logged)", "events": [hub, [0, st(agents)], [600, dict(pev, front=True)]]},
+        {"id": "for-you", "spec": ["pages", "agents"], "label": "fn + 0 with 'for you' pages", "events": [hub, [0, dict(st(agents), pages=[page, older])], [500, {"ev": "app_key", "key": "0"}]]},
     ]
     for p in ("mic", "screen"):
         for s in ("ask", "denied"):
@@ -489,9 +723,39 @@ def all_scenes():
     return f["scenes"] + extra_scenes(f["agents"], f["card"]), f["respond"]
 
 
-def scenes(only=None, backdrops=("dark",), out=None, at=None, what="both", cols=4):
+def tokens_css(path):
+    """A tokens file as CSS for the capsule: .css as is; .json {name: value}
+    (or {"tokens": {...}}) as :root custom properties (--name: value)."""
+    if not path:
+        return ""
+    txt = open(os.path.expanduser(path)).read()
+    if path.endswith(".json"):
+        t = json.loads(txt)
+        t = t.get("tokens", t)
+        return ":root{%s}" % ";".join("--%s:%s" % (k.lstrip("-"), v) for k, v in t.items())
+    return txt
+
+
+def look(tokens=None, reduce=None):
+    """The app's look for the next shots: a tokens file (None: the app's
+    own), reduced motion on or off (None: leave it)."""
+    out = {}
+    if tokens is not None:
+        out["css"] = call("css", css=tokens_css(tokens))
+    if reduce is not None:
+        inject({"ev": "app_reduce_motion", "on": bool(reduce)})
+        out["reduce_motion"] = bool(reduce)
+    return out
+
+
+def scenes(only=None, backdrops=("dark",), out=None, at=None, what="both", cols=4, reduce=False, tokens=None,
+           screen_h=300, frames=None, every=80, span=None):
     """Play every scene (or `only`) in the real app, shoot each state, and
-    make a contact sheet per backdrop (the panels) plus one of the screens."""
+    make a contact sheet per backdrop (the panels) plus one of the screens.
+    reduce: reduced motion on for every scene; tokens: a tokens file (.css or
+    .json) on the capsule; screen_h: the screen shots' top in points (0: all);
+    frames: a scene id: a strip of frames every `every` ms over `span`
+    [from, to] ms (default the whole scene), for the motion."""
     if not alive():
         raise QAError("the QA app isn't running: launch() first")
     if isinstance(only, str):
@@ -499,38 +763,63 @@ def scenes(only=None, backdrops=("dark",), out=None, at=None, what="both", cols=
     if isinstance(backdrops, str):
         backdrops = [b for b in backdrops.split(",") if b]
     sc, respond = all_scenes()
+    if frames:
+        only = [frames]
     if only:
         missing = set(only) - {s["id"] for s in sc}
         if missing:
             raise QAError("no scene %s; there are: %s" % (", ".join(sorted(missing)), ", ".join(s["id"] for s in sc)))
         sc = [s for s in sc if s["id"] in only]
-    run = out or os.path.join(OUT, time.strftime("scenes-%Y%m%d-%H%M%S"))
+    tag = "".join(["-reduce" if reduce else "", "-tokens" if tokens else "", "-frames" if frames else ""])
+    run = out or os.path.join(OUT, time.strftime("scenes-%Y%m%d-%H%M%S") + tag)
     os.makedirs(run, exist_ok=True)
-    result = {"dir": run, "scenes": [], "sheets": []}
-    for bd in backdrops:
-        tiles, screens = [], []
-        for s in sc:
-            times = at or shot_times(s["events"])
-            shots = [{"at": t, "what": what, "label": "%s @%.1fs" % (s["id"], t / 1000)} for t in times]
-            prefix = "%s.%s" % (s["id"], bd)
-            r = call("play", timeout=120, events=s["events"], shots=shots, respond=respond, dir=os.path.join(run, bd),
-                     prefix=prefix, backdrop=bd, tail_ms=300)
-            for sh in r.get("shots", []):
-                label = "%s · %s @%.1fs" % (s["id"], s["label"], sh["at_ms"] / 1000)
-                if sh.get("panel"):
-                    tiles.append({"path": sh["panel"], "label": label})
-                if sh.get("screen"):
-                    screens.append({"path": sh["screen"], "label": label})
-            result["scenes"].append({"id": s["id"], "spec": s["spec"], "label": s["label"], "backdrop": bd, "shots": r.get("shots", [])})
-        if tiles:
-            p = os.path.join(run, "sheet.%s.png" % bd)
-            call("sheet", items=tiles, out=p, cols=cols, title="bise ambient · SPEC §2 states · %s backdrop · panel" % bd, timeout=120)
-            result["sheets"].append(p)
-        if screens:
-            p = os.path.join(run, "sheet.%s.screen.png" % bd)
-            call("sheet", items=screens, out=p, cols=cols, tile_w=420, title="bise ambient · %s backdrop · screen" % bd, timeout=120)
-            result["sheets"].append(p)
-    reset()
+    result = {"dir": run, "scenes": [], "sheets": [], "reduce": bool(reduce), "tokens": tokens}
+    if tokens:
+        look(tokens=tokens)
+    try:
+        for bd in backdrops:
+            tiles, screens = [], []
+            for s in sc:
+                events = s["events"]
+                if reduce:
+                    events = [[0, {"ev": "app_reduce_motion", "on": True}]] + events
+                if frames:
+                    end = max((ms for ms, _ in events), default=0) + 1200
+                    a, b = (span or [0, end])[:2]
+                    times = list(range(int(a), int(b) + 1, max(30, int(every))))
+                    w = "panel"
+                else:
+                    times = at or shot_times(events)
+                    w = what
+                shots = [{"at": t, "what": w} for t in times]
+                prefix = "%s.%s%s" % (s["id"], bd, tag)
+                r = call("play", timeout=300, events=events, shots=shots, respond=respond, dir=os.path.join(run, bd),
+                         prefix=prefix, backdrop=bd, tail_ms=300, screen_h=screen_h)
+                for sh in r.get("shots", []):
+                    label = "%s · %s @%.2fs" % (s["id"], s["label"], sh["at_ms"] / 1000) if not frames else "%s %.0f ms" % (s["id"], sh["at_ms"])
+                    if sh.get("panel"):
+                        tiles.append({"path": sh["panel"], "label": label})
+                    if sh.get("screen"):
+                        screens.append({"path": sh["screen"], "label": label})
+                result["scenes"].append({"id": s["id"], "spec": s["spec"], "label": s["label"], "backdrop": bd, "shots": r.get("shots", [])})
+                if reduce:
+                    inject({"ev": "app_reduce_motion", "on": False})
+            look_s = " · reduced motion" if reduce else ""
+            look_s += " · tokens %s" % os.path.basename(tokens) if tokens else ""
+            if tiles:
+                p = os.path.join(run, "sheet.%s.png" % bd)
+                title = ("bise ambient · %s frames every %d ms" % (frames, every)) if frames else "bise ambient · SPEC §2 states"
+                call("sheet", items=tiles, out=p, cols=(8 if frames else cols), tile_w=(320 if frames else 560),
+                     title="%s · %s backdrop%s · panel" % (title, bd, look_s), timeout=180)
+                result["sheets"].append(p)
+            if screens:
+                p = os.path.join(run, "sheet.%s.screen.png" % bd)
+                call("sheet", items=screens, out=p, cols=cols, tile_w=420, title="bise ambient · %s backdrop%s · screen" % (bd, look_s), timeout=180)
+                result["sheets"].append(p)
+    finally:
+        if tokens:
+            look(tokens="")
+        reset()
     with open(os.path.join(run, "index.json"), "w") as f:
         json.dump(result, f, indent=1)
     return result
@@ -557,6 +846,14 @@ def _cli(argv):
     p.add_argument("--web"); p.add_argument("--backdrop", default="dark"); p.add_argument("--force-build", action="store_true"); p.add_argument("--restart", action="store_true")
     p = sub.add_parser("stop"); p.add_argument("--keep-hub", action="store_true")
     p = sub.add_parser("scenes"); p.add_argument("--only"); p.add_argument("--backdrops", default="dark"); p.add_argument("--out"); p.add_argument("--what", default="both")
+    p.add_argument("--reduce-motion", action="store_true"); p.add_argument("--tokens"); p.add_argument("--screen-h", type=int, default=300)
+    p.add_argument("--frames", help="a scene id: a strip of frames"); p.add_argument("--every", type=int, default=80)
+    p.add_argument("--span", help="from,to in ms (frames)"); p.add_argument("--at", help="ms,ms,... instead of the automatic moments")
+    p = sub.add_parser("look"); p.add_argument("--tokens", help="a .css or .json tokens file ('' = the app's own)"); p.add_argument("--reduce-motion", choices=["on", "off"])
+    p = sub.add_parser("page", help="pages on the throwaway hub")
+    p.add_argument("action", choices=["publish", "notes", "meta", "fixture"]); p.add_argument("--id", default="weekly-update"); p.add_argument("--file")
+    p.add_argument("--title", default="weekly update"); p.add_argument("--notes", help="JSON list of notes"); p.add_argument("--send", action="store_true")
+    p.add_argument("--done", help="n1,n2"); p.add_argument("--edit", help='JSON {"old": "new"} applied to the file first')
     p = sub.add_parser("list")
     p = sub.add_parser("say"); p.add_argument("text"); p.add_argument("--no-wait", action="store_true")
     p = sub.add_parser("snapshot"); p.add_argument("--what", default="both"); p.add_argument("--backdrop"); p.add_argument("--name"); p.add_argument("--out")
@@ -565,17 +862,30 @@ def _cli(argv):
     p = sub.add_parser("fn"); p.add_argument("state"); p.add_argument("--key", default="fn")
     p = sub.add_parser("key"); p.add_argument("k")
     p = sub.add_parser("inject"); p.add_argument("ev")
-    p = sub.add_parser("_hub"); p.add_argument("--bise", required=True)
+    p = sub.add_parser("_hub"); p.add_argument("--bise", required=True); p.add_argument("--kind", default="fake")
     a = ap.parse_args(argv)
     if a.cmd == "_hub":
-        return hub_daemon(a.bise)
+        return hub_daemon(a.bise, a.kind)
     if a.cmd == "launch":
         r = launch(a.hub, a.workspace, a.bise, a.web, a.backdrop, a.force_build, a.restart)
     elif a.cmd == "stop":
         r = stop(a.keep_hub)
     elif a.cmd == "scenes":
-        r = scenes(a.only, a.backdrops, a.out, what=a.what)
+        nums = lambda v: [float(x) for x in v.split(",")] if v else None
+        r = scenes(a.only, a.backdrops, a.out, at=nums(a.at), what=a.what, reduce=a.reduce_motion, tokens=a.tokens,
+                   screen_h=a.screen_h, frames=a.frames, every=a.every, span=nums(a.span))
         r = {"dir": r["dir"], "sheets": r["sheets"], "scenes": len(r["scenes"])}
+    elif a.cmd == "look":
+        r = look(a.tokens, None if a.reduce_motion is None else a.reduce_motion == "on")
+    elif a.cmd == "page":
+        if a.action == "publish":
+            r = page_publish(a.file, a.id, a.title, a.done.split(",") if a.done else None, None, json.loads(a.edit) if a.edit else None)
+        elif a.action == "notes":
+            r = page_notes(a.id, json.loads(a.notes or "[]"), a.send)
+        elif a.action == "meta":
+            r = page_meta(a.id)
+        else:
+            r = page_fixture(a.id)
     elif a.cmd == "list":
         sc, _ = all_scenes()
         r = [{"id": s["id"], "spec": s["spec"], "label": s["label"]} for s in sc]

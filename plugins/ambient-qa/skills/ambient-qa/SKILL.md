@@ -8,7 +8,7 @@ description: QA of bise ambient.app without the user's hands - launch the real a
 The app is the real one (`<bise dev dir>/build/ambient/bise ambient.app`,
 built by `scripts/ambient.sh` from the repo the plugin lives in), launched
 in QA mode (`--qa fake|real`): a second instance with its own files under
-`<bise dev dir>/qa/` and a control socket. Nothing here needs the user.
+`<bise dev dir>/qa/<your agent name>/` (one QA app, hub and socket per agent: you never drive another agent's app) and a control socket. Nothing here needs the user.
 
 What QA mode never does: open the mic (the voice is faked inside the app),
 play a sound, capture the user's screen, post a macOS notification, take
@@ -24,8 +24,10 @@ Every tool returns JSON; PNG files are written under
 
 | tool | CLI | what |
 |---|---|---|
-| `launch({hub})` | `qa.py launch [--hub fake\|real]` | fake (default): a throwaway hub, tests/e2e.py's scripted provider: main answers `ack: <your words>`. real: your workspace, read-only (nothing is ever sent) |
-| `scenes({only, backdrops, at})` | `qa.py scenes [--only talk,needs] [--backdrops dark,bright,busy]` | plays each scene in the app, shoots each moment, returns contact sheets (panel and screen) |
+| `launch({hub})` | `qa.py launch [--hub fake\|model\|real]` | fake (default): a throwaway hub, tests/e2e.py's scripted provider: main answers `ack: <your words>`. model: the same throwaway hub and workspace with your configured model, keys and approvals mode (costs credits; for main's real behavior, never the real main). real: your workspace, read-only (nothing is ever sent). The result names the bise, its tree, the tree's commit and `behind_ambient_app` |
+| `scenes({only, backdrops, at, reduce, tokens, screen_h})` | `qa.py scenes [--only talk,needs] [--backdrops dark,bright,busy] [--reduce-motion] [--tokens f.css] [--at 400,1200]` | plays each scene in the app, shoots each moment, returns contact sheets (panel, and the screen's top 300 px; `screen_h: 0` = the whole screen) |
+| `frames({scene, every, span})` | `qa.py scenes --frames talk --every 80 [--span 0,2000]` | a strip of panel frames for the motion (springs, the lean-in, the needs-you edge); each file says when it was really taken (`taken_ms`) |
+| `look({tokens, reduce})` | `qa.py look --tokens f.json --reduce-motion on` | another look for what follows: a tokens file (`.css` as is, `.json` `{name: value}` as `:root --name`), kept across reloads; `tokens: ""` = the app's own |
 | `list_scenes()` | `qa.py list` | the scene ids and their SPEC §2 states |
 | `say({text})` | `qa.py say "words"` | hold fn, the words heard one by one with a voice level, let go: sent to the fake main; waits for main's answer, then "speaks" it word by word. Returns main's text |
 | `fn({state})` | `qa.py fn down\|up\|tap\|double\|cancel` | fn through the app's real key path (glow, fake shot, talk) |
@@ -36,6 +38,10 @@ Every tool returns JSON; PNG files are written under
 | `events({n})` | `qa.py events 40` | the last events in and out, levels left out |
 | `play({events, shots, name})` | - | your own timeline `[[ms, ev], ...]`, shots `[{at: ms, what}]` |
 | `reset()` | `qa.py reset` | the capsule starts over, shown |
+| `page_publish({file, id, edit, done, answers})` | `qa.py page publish [--file f.html] [--id x]` | the throwaway hub's main publishes a page (`sb page publish`): your file or amb-kit's weekly-update example; returns its URL |
+| `page_notes({id, notes, send})` | `qa.py page notes --id x --notes '[...]' --send` | draft notes through the page's own API (token, origin), as notes.js does; `send` sends them to the page's agent |
+| `page_meta({id})` | `qa.py page meta --id x` | versions, state, the notes and their status |
+| `page_fixture()` | `qa.py page fixture` | weekly-update at v1, four notes sent (note, voice, edit, unsure), then v2 marking one done, answering one, and moving the unsure one's block |
 | `stop()` | `qa.py stop` | quit the QA app and the fake hub |
 
 ## The pictures: what is real and what is composited
@@ -83,6 +89,27 @@ Every tool returns JSON; PNG files are written under
 Read-only on your real work: `launch({hub: "real", workspace: ...})`
 shows your real agents and cards; nothing you do reaches main.
 
+## Pages in Chrome (with the computer plugin)
+
+The capsule's side of pages (`page-ready`, `page-updating`, `page-fn-o`,
+`page-front`, `for-you` scenes) plays here; QA mode logs the URL it would
+open (`events`: `qa_open_url`) instead of opening it. The page itself is
+in Chrome:
+
+1. `launch()`, then `page_fixture()` (or `page_publish(...)`): you get
+   the page's URL on the throwaway hub's page server (127.0.0.1).
+2. Load the `computer:computer-use` skill. Open the URL in your own tab
+   group (never the user's tabs), at a fixed size; `/p/<id>/v/1` and
+   `/p/<id>/v/2` give each version.
+3. Screenshot the page (the frame, the blocks, the notes in each state:
+   open, sent, done, answered, moved); light and dark: switch with the
+   tab's color scheme emulation if the computer plugin offers it, else
+   macOS's appearance is the user's, so ask before changing it.
+4. Act like the user: select text, add a note, edit a block, send.
+   Check the result with `page_meta(id)` (the notes' status) and
+   `events()` (the core's `page` events reaching the capsule).
+5. Close your tabs at the end.
+
 ## Limits
 
 - Main never really speaks: the voice out is played by the app from
@@ -91,5 +118,4 @@ shows your real agents and cards; nothing you do reaches main.
   set by QA; the core's mic, listener and image marker are not exercised
   (amb-core's tests cover those).
 - The menu-bar `:*` and the macOS notifications are off in QA mode.
-- Pages in Chrome (the v2 page loop): use the `computer` plugin's
-  screenshots on the fake hub's page server; not this plugin yet.
+- One throwaway hub per agent; a `model` hub costs credits.

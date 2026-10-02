@@ -526,6 +526,11 @@ final class QA {
             return try await play(q)
         case "sheet":
             return try sheet(q)
+        case "css":
+            // another look on the same app: CSS (a tokens file) on the capsule and the edges, kept across reloads
+            css = q["css"] as? String ?? ""
+            applyCSS()
+            return ["bytes": css.utf8.count]
         case "backdrop":
             backdrop = q["kind"] as? String ?? "dark"
             return ["backdrop": backdrop]
@@ -625,7 +630,10 @@ final class QA {
         for (ms, s) in shots { items.append((ms + 0.5, nil, s)) }
         items.sort { $0.ms < $1.ms }
         let t0 = Date()
-        var files: [[String: Any]] = []
+        // shots run beside the timeline: a slow composite never delays the
+        // next event (frames every 80 ms stay on time); each says when it
+        // was really taken (taken_ms)
+        var pending: [Task<[String: Any], Never>] = []
         for it in items {
             let wait = it.ms / 1000 - Date().timeIntervalSince(t0)
             if wait > 0.002 { try await Task.sleep(nanoseconds: UInt64(wait * 1e9)) }
@@ -634,14 +642,23 @@ final class QA {
                 var sq = s
                 sq["dir"] = dir
                 if sq["backdrop"] == nil, let bd { sq["backdrop"] = bd }
+                if sq["screen_h"] == nil, let h = q["screen_h"] { sq["screen_h"] = h }
                 let at = (s["at"] as? NSNumber)?.doubleValue ?? 0
                 if sq["name"] == nil { sq["name"] = String(format: "%@@%.2fs", prefix, at / 1000) }
-                var r = try await snapshot(sq)
-                r["at_ms"] = at
-                r["label"] = s["label"] ?? NSNull()
-                files.append(r)
+                let taken = Date().timeIntervalSince(t0) * 1000
+                let label = s["label"] ?? NSNull()
+                pending.append(Task { @MainActor in
+                    var r: [String: Any]
+                    do { r = try await self.snapshot(sq) } catch { r = ["error": "\(error)"] }
+                    r["at_ms"] = at
+                    r["taken_ms"] = taken.rounded()
+                    r["label"] = label
+                    return r
+                })
             }
         }
+        var files: [[String: Any]] = []
+        for t in pending { files.append(await t.value) }
         if let tail = (q["tail_ms"] as? NSNumber)?.doubleValue, tail > 0 {
             try await Task.sleep(nanoseconds: UInt64(tail * 1e6))
         }
@@ -650,6 +667,24 @@ final class QA {
             for k in ["hub", "state", "phase"] { if let ev = lastCore[k] { coreEvent?(ev) } }
         }
         return ["shots": files, "played": events.count]
+    }
+
+    // MARK: another look (css)
+
+    private var css = ""
+
+    // the CSS as a <style id="qa-css"> after the page's own: now, and in every
+    // later load (a user script next to the app's boot script)
+    private func applyCSS() {
+        let lit = JSON.string(["css": css]) ?? "{\"css\":\"\"}"
+        let js = "(function(){var c=(\(lit)).css;var s=document.getElementById('qa-css');if(!c){if(s)s.remove();return;}if(!s){s=document.createElement('style');s.id='qa-css';}s.textContent=c;(document.head||document.documentElement).appendChild(s);})();"
+        for web in [capsule.web] + edge.views.map({ $0.web }) {
+            let ucc = web.configuration.userContentController
+            ucc.removeAllUserScripts()
+            ucc.addUserScript(WKUserScript(source: Capsule.bootJS, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+            ucc.addUserScript(WKUserScript(source: js, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+            web.evaluateJavaScript(js, completionHandler: nil)
+        }
     }
 
     // MARK: snapshots
@@ -712,7 +747,9 @@ final class QA {
             var edgeImg: CGImage?
             if let ov = edge.views.first, ov.window.isVisible { edgeImg = await webImage(ov.web) }
             let menuH = sf.maxY - screen.visibleFrame.maxY
-            let img = Composite.draw(size: sf.size, scale: scale) { ctx in
+            // screen_h: only the top of the screen (the capsule, the note, the top glow)
+            let cropH = (q["screen_h"] as? NSNumber).map { CGFloat($0.doubleValue) }.flatMap { $0 > 0 ? min($0, sf.height) : nil } ?? sf.height
+            let img = Composite.draw(size: CGSize(width: sf.width, height: cropH), scale: scale) { ctx in
                 if let back { ctx.draw(back, in: CGRect(origin: .zero, size: sf.size), flipped: true) }
                 // the menu bar, plain (the user's own is never captured)
                 ctx.setFillColor(CGColor(gray: 0.08, alpha: 0.35))

@@ -10,13 +10,13 @@ import sys
 import tempfile
 import traceback
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import qa  # noqa: E402
 
 EV = {"type": "object", "description": "a contract event (docs/ambient-app.md §4): {ev: ..., ...}"}
 TOOLS = [
     ("launch", "Start the real bise ambient.app in QA mode. hub=fake (default): a throwaway scripted hub, main answers 'ack: <your words>'; hub=real: the real workspace, read-only (nothing is ever sent). Builds the app at its one path if its sources changed (refused while the user's own app runs, unless force_build).",
-     {"hub": {"type": "string", "enum": ["fake", "real"]}, "workspace": {"type": "string"}, "bise": {"type": "string", "description": "a bise with ambient-core (default: found)"},
+     {"hub": {"type": "string", "enum": ["fake", "model", "real"]}, "workspace": {"type": "string"}, "bise": {"type": "string", "description": "a bise with ambient-core (default: found)"},
       "backdrop": {"type": "string", "description": "dark, bright, busy, none, or a picture file"}, "force_build": {"type": "boolean"}, "restart": {"type": "boolean"}}, []),
     ("stop", "Quit the QA app and its fake hub.", {"keep_hub": {"type": "boolean"}}, []),
     ("inject", "An event into the app as if real: a core event (hub, state, phase, heard, level, main, word, sent, error, page) or an app/web one (app_fn, app_key, app_perm, app_shot, app_hidden, app_reduce_motion, app_settings, ui_*).",
@@ -33,8 +33,21 @@ TOOLS = [
      {"n": {"type": "integer"}, "levels": {"type": "boolean"}}, []),
     ("scenes", "Play every SPEC §2 state (fakecore.js's scenes plus the extra ones) in the real app, shoot each moment, and return a contact sheet per backdrop. `only`: scene ids; `at`: ms to shoot at instead of the automatic moments.",
      {"only": {"type": "array", "items": {"type": "string"}}, "backdrops": {"type": "array", "items": {"type": "string"}}, "at": {"type": "array", "items": {"type": "number"}},
-      "what": {"type": "string", "enum": ["both", "panel", "screen"]}, "image": {"type": "boolean"}}, []),
+      "what": {"type": "string", "enum": ["both", "panel", "screen"]}, "image": {"type": "boolean"},
+      "reduce": {"type": "boolean", "description": "reduced motion on for every scene"}, "tokens": {"type": "string", "description": "a tokens file (.css/.json) on the capsule"},
+      "screen_h": {"type": "number", "description": "the screen shots' top in points (default 300, 0 = the whole screen)"}}, []),
     ("list_scenes", "The scene ids, their SPEC §2 states and labels.", {}, []),
+    ("frames", "A strip of frames of one scene for the motion (the open/close spring, the hold-fn lean-in, the needs-you edge): a panel PNG every `every` ms over `span` [from, to] ms, and one sheet.",
+     {"scene": {"type": "string"}, "every": {"type": "number"}, "span": {"type": "array", "items": {"type": "number"}}, "backdrop": {"type": "string"}, "reduce": {"type": "boolean"}, "tokens": {"type": "string"}}, ["scene"]),
+    ("look", "The app's look for what follows: a tokens file (.css as is, .json {name: value} as :root --name; '' = the app's own) and/or reduced motion on/off.",
+     {"tokens": {"type": "string"}, "reduce": {"type": "boolean"}}, []),
+    ("page_publish", "On the throwaway hub, main publishes a page (sb page publish): `file` or amb-kit's weekly-update example, `edit` {old: new} for a v2, `done` note ids, `answers` {note id: text}. Returns its url (open it in Chrome with the computer plugin).",
+     {"file": {"type": "string"}, "id": {"type": "string"}, "title": {"type": "string"}, "edit": {"type": "object"}, "done": {"type": "array", "items": {"type": "string"}}, "answers": {"type": "object"}}, []),
+    ("page_notes", "Draft notes on a page through its API (as notes.js would), optionally send them to the page's agent. A note: {block, kind: note|keep|drop|unsure|edit|voice|pin, quote?, text?, before?, after?}.",
+     {"id": {"type": "string"}, "notes": {"type": "array"}, "send": {"type": "boolean"}}, ["id", "notes"]),
+    ("page_meta", "A page's meta: versions, state, notes with their status (draft, sent, done, answered).", {"id": {"type": "string"}}, ["id"]),
+    ("page_fixture", "ambient's fixture: the weekly-update page at v1, four notes sent (a note, a voice note, an edit, an unsure on a block v2 renames: moved), then v2 marking one done and answering one. Returns both urls and the notes.",
+     {"id": {"type": "string"}}, []),
     ("play", "A custom timeline into the app: events [[ms, ev], ...], shots [{at: ms, what}] (the core is muted while it plays). Files are named <name>@<s>s.",
      {"events": {"type": "array"}, "shots": {"type": "array"}, "name": {"type": "string"}, "backdrop": {"type": "string"}}, ["events"]),
     ("reset", "The pages start over (the model back to its start), the panel shown.", {}, []),
@@ -88,11 +101,28 @@ def run(name, a):
     elif name == "events":
         r = qa.events(a.get("n", 50), a.get("levels", False))
     elif name == "scenes":
-        r = qa.scenes(a.get("only"), a.get("backdrops") or ["dark"], None, a.get("at"), a.get("what", "both"))
+        r = qa.scenes(a.get("only"), a.get("backdrops") or ["dark"], None, a.get("at"), a.get("what", "both"),
+                      reduce=a.get("reduce", False), tokens=a.get("tokens"), screen_h=a.get("screen_h", 300))
         if a.get("image", True) and r["sheets"]:
             images.append(r["sheets"][0])
         r = {"dir": r["dir"], "sheets": r["sheets"],
              "scenes": [{"id": s["id"], "backdrop": s["backdrop"], "shots": [sh.get("panel") or sh.get("screen") for sh in s["shots"]]} for s in r["scenes"]]}
+    elif name == "frames":
+        r = qa.scenes(backdrops=[a.get("backdrop", "dark")], frames=a["scene"], every=a.get("every", 80), span=a.get("span"),
+                      reduce=a.get("reduce", False), tokens=a.get("tokens"))
+        if r["sheets"]:
+            images.append(r["sheets"][0])
+        r = {"dir": r["dir"], "sheets": r["sheets"], "frames": [sh.get("panel") for s in r["scenes"] for sh in s["shots"]]}
+    elif name == "look":
+        r = qa.look(a.get("tokens"), a.get("reduce"))
+    elif name == "page_publish":
+        r = qa.page_publish(a.get("file"), a.get("id", "weekly-update"), a.get("title", "weekly update"), a.get("done"), a.get("answers"), a.get("edit"))
+    elif name == "page_notes":
+        r = qa.page_notes(a["id"], a["notes"], a.get("send", False))
+    elif name == "page_meta":
+        r = qa.page_meta(a["id"])
+    elif name == "page_fixture":
+        r = qa.page_fixture(a.get("id", "weekly-update"))
     elif name == "list_scenes":
         sc, _ = qa.all_scenes()
         r = [{"id": s["id"], "spec": s["spec"], "label": s["label"]} for s in sc]
