@@ -362,6 +362,17 @@ fn a_message_says_where_it_goes() {
 }
 
 #[test]
+fn a_newsletter_is_an_email_bise_only_drafts() {
+    ok(
+        r#"<section data-kit="email" data-id="nl" data-to="Kit · newsletter" data-verb="draft"><p data-field="to">all subscribers</p><p data-field="subject">s</p><p data-field="preview">p</p><p>hi</p><ul><li>a</li></ul></section>"#,
+    );
+    has(
+        &errs(r#"<section data-kit="email" data-id="nl" data-verb="post"><p data-field="to">a</p><p data-field="subject">s</p></section>"#),
+        "nl: data-verb=\"post\" is not an email's verb",
+    );
+}
+
+#[test]
 fn a_review_of_drafts_says_send() {
     ok(
         r#"<section data-kit="review" data-id="r" data-verb="send"><ol><li data-id="m1"><p>x</p></li></ol></section>"#,

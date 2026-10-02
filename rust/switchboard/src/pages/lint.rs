@@ -43,7 +43,8 @@ pub const KINDS: &[&str] = &[
 pub const ITEM_KINDS: &[&str] = &["review", "compare", "checklist"];
 
 /// `data-field` of an email's header lines.
-pub const FIELDS: &[&str] = &["to", "cc", "subject"];
+/// An email block's fields; `preview` is a newsletter's preview text (Kit).
+pub const FIELDS: &[&str] = &["to", "cc", "subject", "preview"];
 
 /// A page past this size is refused.
 pub const MAX_BYTES: usize = 1 << 20;
@@ -508,9 +509,15 @@ impl<'a> Linter<'a> {
                     "data-verb=\"{v}\" is not a verb: use send (drafts that leave), open-reply (replies on read-only places: HN, Reddit, X, Bluesky), start (feedback an agent can fix), keep (what bise keeps about the user) or approve"
                 ),
             ),
+            // an email bise only drafts (a Kit newsletter, 'put it in my drafts'), or sends
+            (Some("email"), Some(v)) if matches!(v.as_str(), "draft" | "send") => {}
+            (Some("email"), Some(v)) => self.err(
+                &at,
+                format!("data-verb=\"{v}\" is not an email's verb: use draft (it goes to the user's drafts, he sends it) or send"),
+            ),
             _ => self.err(
                 &at,
-                "data-verb is not a kit attribute here: only a review block takes it".into(),
+                "data-verb is not a kit attribute here: only a review or an email block takes it".into(),
             ),
         }
         if kit.as_deref() == Some("callout") {

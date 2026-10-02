@@ -62,6 +62,7 @@
     yours: "you",
     watching: "watching",
     stop: "stop",
+    putInDrafts: "put it in my drafts",
     // feedback into work (roadmap C)
     start: "start an agent",
     starting: "starting…",
@@ -404,9 +405,12 @@
   function decorateEmail(doc, block) {
     if (!kids(block).some((c) => ui(c) && c.getAttribute("data-went") == null)) {
       const bar = acts(doc, ["approve", "skip"]);
-      kids(bar)[0].textContent = W.send;
       block.append(bar);
     }
+    // a draft bise never sends (data-verb="draft": a Kit newsletter, a mail he finishes in Gmail):
+    // 'put it in my drafts'; otherwise the mail leaves: 'send'
+    const ok = kids(block).filter((c) => ui(c) && c.getAttribute("data-went") == null).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "approve");
+    if (ok) ok.textContent = block.getAttribute("data-verb") === "draft" ? W.putInDrafts : W.send;
   }
   // react to an item (review approve/skip, compare keep/drop/pick, checklist tick) or a whole
   // email (item null); the same again takes it back; a pick is one per block (the last wins).

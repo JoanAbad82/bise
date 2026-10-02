@@ -479,6 +479,9 @@ law("send, not approve, when the draft leaves; the editable parts are the drafts
   assert.deepEqual(labels(K.options(b)[0]), ["approve", "skip"]);
   assert.deepEqual(labels(b), ["approve 1"]);
   assert.deepEqual(labels(e), ["send", "skip"]);
+  const nl = blocks(parse(`<section data-kit="email" data-id="nl" data-verb="draft"><p data-field="to">all subscribers</p><p data-field="subject">s</p><p>hi</p></section>`))[0];
+  K.decorate([nl], "newsletter", doc);
+  assert.deepEqual(labels(nl), ["put it in my drafts", "skip"], "a newsletter bise only drafts: never 'send'");
   const k = blocks(parse(`<section data-kit="review" data-id="taste" data-verb="keep"><ol><li data-id="no-emoji"><p>from your notes</p><p>no emoji</p></li></ol></section>`))[0];
   K.decorate([k], "main", doc);
   assert.deepEqual(labels(K.options(k)[0]), ["keep", "strike"], "what bise keeps: keep / strike");

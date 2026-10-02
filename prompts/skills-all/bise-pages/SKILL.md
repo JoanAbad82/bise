@@ -36,7 +36,7 @@ across versions (the user's notes anchor on them): `p1`, `t1`, `q1`, `src`.
 | `message` | a draft that leaves through a channel (Slack, a post) | `data-to="Slack · #launch"` (where it goes, shown above it), then `<p>`s and `<ul>`, with `<strong>`, `<em>`, `<code>`, `<a>`: the kit's `copy` turns them into Slack markup; optional `data-open` = the channel's `slack://` or `https://` link (after a copy the page says `copied · open #launch`) |
 | `compare` | 2 to 4 options side by side (venues, drafts, tools) | `<ol>` of `<li data-id="moulin">`: an `<h3>` name, a `<ul>` of facts, a `<p>` with the why |
 | `checklist` | what's left to do, who, by when | `<ol>` of `<li data-id="t1" data-who="Camille" data-due="2026-05-20">` the task `</li>`; `data-done` on what is done; the kit shows `Camille · friday` and what is late. `data-who="yours"` for a step only the user can do (a payment, a login, a signature): it shows `you · friday`, and when every step before it is done the user gets a card for it; your own steps take `data-who="bise"` or none; any other name is someone else's |
-| `email` | one mail ready to send | `data-to="Gmail · reply to Camille Roux"` (where it goes, shown above it), `<p data-field="to">`, optional `<p data-field="cc">`, `<p data-field="subject">`, then the body as `<p>`s |
+| `email` | one mail ready to send, or a newsletter | `data-to="Gmail · reply to Camille Roux"` (where it goes, shown above it), `data-verb="draft"` when it goes to his drafts (`put it in my drafts`, §7), optional `<p data-field="preview">` for a newsletter, `<p data-field="to">`, optional `<p data-field="cc">`, `<p data-field="subject">`, then the body as `<p>`s |
 
 Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
 `<img src="data:image/…" alt="…">`. Nothing else.
@@ -277,6 +277,14 @@ Acting on the page is a separate step the user asks for ("post it in #team", "se
   (kinds: `gmail-draft`, `outlook-draft`, `kit-draft`, `slack`, `copy`). The page shows
   `in your Gmail drafts · open` under that block. A later version updates the same draft (read
   it back first, the user may have edited it there), never a second one;
+- a mail the user finishes in his tool (a Gmail reply he wants to send himself) or a newsletter:
+  an `email` block with `data-verb="draft"`, so its button says `put it in my drafts`, never
+  `send`. A **newsletter** (Kit): `data-to="Kit · newsletter to 1,204 subscribers"`, `to` =
+  `all subscribers · 1,204`, the `subject`, a `preview` field (the preview text), then the body
+  (`<p>`, `<ul>`, links). On his word: Kit's create-draft with the subject, the body as HTML and
+  the preview, then `--went kit-draft:<broadcast id>@nl=<its link in Kit>`: the page says
+  `in your Kit drafts · open`. There is no send for Kit: he sends it there. See
+  `examples/newsletter.html`;
 - Slack has no drafts: the user copies (the `message` block's `copy`, with `data-open` for the
   channel link); a post you made after their approval is `--went slack:<ts>@m1=<its link>`;
 - a tool that fails (Gmail didn't take the draft): one line in your reply and a `risk` callout
