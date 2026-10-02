@@ -26,7 +26,7 @@
     sentTag: "sent",
     changed: (before, after) => `you changed "${before}" → "${after}"`,
     marks: { keep: "♡ keep", drop: "✗ drop", unsure: "~ not sure" },
-    // a question's option you picked (not signed off yet: asked to ambient)
+    // a question's option you picked (ambient, m_4795)
     picked: (option, text) => (text ? `you picked ${option}: ${text}` : `you picked ${option}`),
     tools: { note: "note", keep: "♡", drop: "✗", unsure: "~", edit: "edit", pin: "pin" },
     placeholder: "your note",

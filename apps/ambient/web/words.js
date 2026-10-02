@@ -64,7 +64,7 @@
     return perm === "screen" && macos && macos < 15 ? s.replace("Screen & System Audio Recording", "Screen Recording") : s;
   }
 
-  // a page for you (docs/ambient-vision.md §3 B; not signed off yet: asked to ambient)
+  // a page for you (docs/ambient-vision.md §3 B; signed off by ambient, m_4786)
   const pageReady = (name) => `${name} is ready · fn + o`;
   const forYou = "for you";
   // a page's line in "for you": `v2 · 3 min ago`, or `updating…`
