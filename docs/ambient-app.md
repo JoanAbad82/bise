@@ -123,9 +123,21 @@ Events from the core (stdout):
 | `sent` | `text`, `voice` (bool), `shot` (bool) | the hub took the message |
 | `error` | `text` | one sentence for the user (no key, no env) |
 
+The process rules: the core exits on stdin EOF (the app died: no orphan); its stderr goes to
+`<bise dev dir>/ambient/core.log`, the app's own log to `<bise dev dir>/ambient/app.log`.
+
+Launch: `scripts/ambient.sh open --workspace <ws> --bise <exe> [--web <dir>]` builds when the hash
+changed (stopping the running app first), opens the app at its one path; when the app already runs
+with another workspace it writes `<bise dev dir>/ambient/switch.json` and sends SIGUSR1 to the pid
+in `app.pid` (`open` ignores `--args` on a running app). `bise ambient` execs that script from the
+app root (v1 is dev-only).
+
 App-only events to the web UI: `app_fn` (`down`/`up`/`double`), `app_shot` (`app`, `title`,
-`skipped`), `app_perm` (`screen`/`mic`/`input`: `granted`/`denied`/`ask`), `app_hidden` (bool),
-`app_reduce_motion` (bool), `app_key` (fn + key: `space`, `1`…`9`, `i`, `0`, `o`, `.`, `enter`, `esc`).
+`skipped`, `frame: {x, y, w, h}` for the pink corners), `app_perm` (`perm`: `screen`/`mic`/
+`accessibility`, `state`: `granted`/`denied`/`ask`), `app_settings` (`edge_glow`), `app_hidden`
+(bool), `app_reduce_motion` (bool), `app_key` (fn + key: `space`, `1`…`9`, `i`, `0`, `o`, `.`,
+`enter`, `esc`). Web UI command `app_perm` (`perm`, `do`: `continue` opens macOS's prompt,
+`settings` opens its pane).
 Web UI commands for the app (not forwarded): `app_size` (`w`, `h`, `radius`: the capsule's frame
 follows the content; optional `note: {y, h, radius}`: the needs-you glass under the capsule, in the
 same web view, so the blur view masks two rounded rects), `app_focus` (`on`: the panel takes the
