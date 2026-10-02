@@ -79,7 +79,7 @@
 
   // the first sentence of a report, at most `max` characters
   function firstSentence(text, max = 90) {
-    const t = String(text || "").trim().replace(/\s+/g, " ");
+    const t = plain(text);
     if (!t) return "";
     const m = t.match(/^.*?[.!?](?=\s|$)/);
     let s = m ? m[0] : t;
@@ -128,8 +128,34 @@
     return `${Math.floor(s / 3600)}h`;
   }
 
+  // main's markdown, word by word: one token per whitespace run of the raw text (so the core's
+  // word.i still points at the right word), its marks stripped (**, __, a heading's #, a quote's >,
+  // a list's - or 1.), and `code` flagged so it renders in mono without its backticks
+  function mdWords(text) {
+    const raw = String(text || "").split(/\s+/).filter(Boolean);
+    let code = false;
+    return raw.map((w, i) => {
+      const starts = w.startsWith("`");
+      if (starts) code = true;
+      const inCode = code;
+      if (w.replace(/^`/, "").includes("`") || (w.endsWith("`") && !(starts && w.length === 1))) code = false;
+      let s = w.replace(/`/g, "");
+      if (!inCode) {
+        // a heading's #, a quote's >, a list's - or 1. at the start of a line (the split lost the
+        // newlines: the start of the text, or after a sentence or a colon)
+        const lineStart = i === 0 || /[.!?:]$/.test(raw[i - 1]);
+        if (lineStart && /^(#{1,6}|>|[-*+]|\d+\.)$/.test(w)) s = "";
+        s = s.replace(/\*\*|__/g, "").replace(/^\*(?=\S)|(?<=\S)\*$/g, "");
+        s = s.replace(/^\[([^\]]*)\]\([^)]*\)([.,;:!?]?)$/, "$1$2");
+      }
+      return { w: s, code: inCode && s !== "" };
+    });
+  }
+  // the same, as one plain line (an agent's report in a status line)
+  const plain = (text) => mdWords(text).map((t) => t.w).filter(Boolean).join(" ");
+
   // an agent's row is a label, not a sentence: no final period
   const rowLabel = (s) => String(s || "").replace(/\.$/, "");
 
-  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel };
+  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain };
 })(typeof window !== "undefined" ? window : globalThis);

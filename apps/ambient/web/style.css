@@ -63,6 +63,10 @@ html:not(.app) .cap, html:not(.app) .note {
 .words .w { opacity: 0; filter: blur(3px); transition: opacity .24s ease-out, filter .24s ease-out; }
 .words.main .w { transition-duration: .29s; }
 .words .w.on { opacity: 1; filter: none; }
+.words .w:empty { display: none; }
+.words .w.code { font: .88em var(--mono); color: #ffe6ea; }
+/* main's reply: at most 3 lines, then … (ambient) */
+.tx > .words.clamp.on { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 .words .w.cur::after { content: ""; display: inline-block; width: 2px; height: .9em; background: var(--acc); margin-left: 3px; vertical-align: -2px; animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 .sub { font-size: 13px; color: var(--dim); margin-top: 4px; }

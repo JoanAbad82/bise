@@ -341,6 +341,45 @@ law("a permission: its sentence and continue; continue goes to the app", () => {
   r = M.step(M.init(), { ev: "app_perm", perm: "accessibility", state: "denied" }, 0);
   assert.equal(M.view(r.m, 10).text, W.permDenied.accessibility);
 });
+law("a permission ask is alone in the capsule: no agent line under it (ambient, m_4671)", () => {
+  let m = M.step(M.init(), { ev: "state", agents: Fake.AGENTS, cards: [] }, 0).m;
+  m = M.step(m, { ev: "app_perm", perm: "accessibility", state: "ask" }, 10).m;
+  m = M.step(m, { ev: "state", agents: Fake.AGENTS.map((a) => a.name === "perf" ? { ...a, status: "done", report: "Both fixes are on `ambient-app` as 4d74d7d." } : a), cards: [] }, 20).m;
+  const v = M.view(m, 30);
+  assert.equal(v.state, "perm"); assert.equal(v.sub, null); assert.equal(v.text, null); assert.equal(v.words, null);
+  // once the ask is answered, the line is plain: no backticks
+  m = M.step(m, { ev: "ui_perm", perm: "accessibility", do: "not_now" }, 40).m;
+  assert.equal(M.view(m, 50).text, "perf is done: Both fixes are on ambient-app as 4d74d7d.");
+});
+law("not now: the refused path, sent to the app", () => {
+  let r = M.step(M.init(), { ev: "app_perm", perm: "mic", state: "ask" }, 0);
+  r = M.step(r.m, { ev: "ui_perm", perm: "mic", do: "not_now" }, 10);
+  eq(r.cmds, [{ cmd: "app_perm", perm: "mic", do: "not_now" }]);
+  assert.equal(M.view(r.m, 20).perm, null);
+  r = M.step(r.m, { ev: "app_perm", perm: "mic", state: "denied" }, 30);
+  assert.equal(M.view(r.m, 40).text, W.permDenied.mic);
+});
+law("at launch the capsule shows the status line, never main's last reply", () => {
+  let m = M.init();
+  for (const [, ev] of sceneEvents("idle")) m = M.step(m, ev, 0).m;
+  m = M.step(m, { ev: "main", text: "amb-web is done: **both** fixes", turn: 41 }, 10).m;
+  m = M.step(m, { ev: "phase", phase: "done" }, 20).m;
+  const v = M.view(m, 30);
+  assert.equal(v.size, "small"); assert.equal(v.text, W.idle); assert.equal(v.words, null);
+});
+law("main's markdown: marks stripped, `code` flagged, one token per raw word (word.i stays right), 3 lines", () => {
+  const t = Wd.mdWords("**done**: the fix is in `apps/ambient/web/ui.js` now. - next: run `node check.mjs` and see [the page](http://x).");
+  eq(t.map((x) => x.w), ["done:", "the", "fix", "is", "in", "apps/ambient/web/ui.js", "now.", "", "next:", "run", "node", "check.mjs", "and", "see", "[the", "page](http://x)."]);
+  eq(t.filter((x) => x.code).map((x) => x.w), ["apps/ambient/web/ui.js", "node", "check.mjs"]);
+  let m = M.init();
+  m = M.step(m, { ev: "sent", text: "x", voice: true, shot: false }, 0).m;
+  m = M.step(m, { ev: "main", text: "the `fix` is in", turn: 1 }, 10).m;
+  m = M.step(m, { ev: "phase", phase: "speaking" }, 20).m;
+  m = M.step(m, { ev: "word", turn: 1, i: 1 }, 30).m;
+  const v = M.view(m, 40);
+  eq(v.words.list, ["the", "fix", "is", "in"]); eq(v.words.code, [false, true, false, false]);
+  assert.equal(v.words.lit, 2); assert.equal(v.words.clamp, 3);
+});
 law("the hub lost: one line, then back", () => {
   const r = run(sceneEvents("hub"), [1000, 5500]);
   assert.equal(r.view(1000).text, W.hubDown); assert.equal(r.view(5500).text, W.idle);

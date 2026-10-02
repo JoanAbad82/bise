@@ -67,11 +67,13 @@
     node.classList.toggle("main", !!main);
     const kids = node.children;
     let same = 0;
-    while (same < kids.length && same < w.list.length && kids[same].dataset.w === w.list[same]) same++;
+    const code = (i) => !!(w.code && w.code[i]);
+    while (same < kids.length && same < w.list.length && kids[same].dataset.w === w.list[same] && kids[same].classList.contains("code") === code(same)) same++;
     while (kids.length > same) node.removeChild(node.lastChild);
     for (let i = same; i < w.list.length; i++) {
       const s = document.createElement("span");
-      s.className = "w"; s.dataset.w = w.list[i]; s.textContent = w.list[i];
+      // `code` in mono, without its backticks; a word that was only a markdown mark stays empty
+      s.className = code(i) ? "w code" : "w"; s.dataset.w = w.list[i]; s.textContent = w.list[i];
       if (i > 0 || node.childNodes.length) node.appendChild(document.createTextNode(" "));
       node.appendChild(s);
     }
@@ -101,8 +103,9 @@
       el.line.innerHTML = v.text == null ? "" : `${v.glyph ? `<span class="gl${fail ? " fail" : ""}">${esc(v.glyph)}</span>` : ""}${esc(v.text)}`;
       el.line.classList.remove("arrive"); void el.line.offsetWidth; el.line.classList.add("arrive");
     });
-    put("words", JSON.stringify(v.words && [v.state === "listening", v.words.list, v.words.lit]), () => {
+    put("words", JSON.stringify(v.words && [v.state === "listening", v.words.list, v.words.code, v.words.lit]), () => {
       show(el.words, v.words);
+      el.words.classList.toggle("clamp", !!(v.words && v.words.clamp));
       if (v.words) words(el.words, v.words, v.state !== "listening");
       else el.words.textContent = "";
     });

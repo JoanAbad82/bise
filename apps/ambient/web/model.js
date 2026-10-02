@@ -300,10 +300,12 @@
       hidden: m.hidden,
       kiss: false,
     };
+    // main's reply, its markdown rendered (marks stripped, `code` flagged), one entry per raw word
+    // so word.i lights the right one; the capsule shows at most 3 lines of it, then …
     const mainWords = () => {
-      const list = m.main.text.split(/\s+/).filter(Boolean);
-      const lit = m.voice && !m.hushed && m.phase === "speaking" && m.word.turn === m.main.turn ? Math.min(list.length, m.word.i + 1) : list.length;
-      return { list, lit, per: 0.28 };
+      const toks = Wd.mdWords(m.main.text);
+      const lit = m.voice && !m.hushed && m.phase === "speaking" && m.word.turn === m.main.turn ? Math.min(toks.length, m.word.i + 1) : toks.length;
+      return { list: toks.map((t) => t.w), code: toks.map((t) => t.code), lit, per: 0.28, clamp: 3 };
     };
     const inbox = () => cards.map((c, i) => ({ id: c.id, agent: c.agent, text: c.text, sel: i === m.sel,
       options: Wd.options(c).map((o) => ({ i: o.i, label: Wd.optionLabel(o.n, o.label) })) }));
@@ -393,8 +395,9 @@
       v.state = "idle"; v.text = Wd.idleLine(working(m.agents));
       if (inTurn(m)) v.pose = "think";   // main on its own turn: the * turns, the capsule stays small
     }
-    // the open states keep the key lines too (cancelled, an error) as their sub line
-    if (flash && v.size === "open" && !v.sub && flash.kind !== "answered") v.sub = flash.text;
+    // the open states keep the key lines too (cancelled, an error) as their sub line; a
+    // permission ask stays alone in the capsule (ambient, m_4671)
+    if (flash && v.size === "open" && !v.sub && v.state !== "perm" && flash.kind !== "answered") v.sub = flash.text;
     if (m.reduce) { v.still = true; v.edge.on = false; }
     return v;
   }
