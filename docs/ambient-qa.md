@@ -227,6 +227,13 @@ Kit fixtures (fake hub, headless): pass for approve and skip, `approve N` counti
 header, `approve N` counts edited items, a question option doesn't answer, ♡ copies the whole
 variant, no `open #channel`), all routed; 14, 15, 17 and 18 are fixed, 16 has a fallback note.
 
+Rechecks at the tip (after 038fc00b, 2ffdf1f2, 03821a37 and amb-core's main-words fix):
+`qa.py run inbox --headless` on fake accounts **passes**: something on the page at 10 s, review
+items at 34 s (21 fixed), main's capsule line short and clean (9 and 22 fixed), the next version 14
+s after notes, the outbox empty (20 fixed). Question 16 on a page by main: the option is marked,
+`/answer` returns 409, and the fallback pick note lands in the side list; the answered state on
+the page with an open card (a task agent's page) is not checked yet.
+
 ## The look the user validated: round 8 (main m_5134)
 
 ambient owns the pixels against `site/content/ambient/identity8.html` and its SPEC; these are the
