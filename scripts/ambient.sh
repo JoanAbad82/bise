@@ -119,6 +119,9 @@ open_app() {
   fi
   local args=(--workspace "$ws" --bise "$bise" --web "$web" --dev "$STATE")
   [ -z "${BISE_HOME:-}" ] || args+=(--env "BISE_HOME=$BISE_HOME")
+  # the core finds repl-live there (open drops the shell's env; a bise
+  # built outside its tree has no app root of its own)
+  [ -z "${BISE_APP_ROOT:-}" ] || args+=(--env "BISE_APP_ROOT=$BISE_APP_ROOT")
   args+=(--env "PATH=$PATH")
   open -a "$APP" --args "${args[@]}"
   say "opened $APP for $ws"

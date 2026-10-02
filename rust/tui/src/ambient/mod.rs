@@ -133,6 +133,9 @@ pub fn launch_main(workspace: &std::path::Path, exe: &std::path::Path, app_root:
         .arg(workspace)
         .arg("--bise")
         .arg(exe)
+        // the core's app root (repl-live): `open` drops this env, the
+        // script hands it to the app with --env
+        .env("BISE_APP_ROOT", app_root)
         .current_dir(app_root)
         .status();
     match st {
