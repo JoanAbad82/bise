@@ -29,12 +29,13 @@ struct Card {
     }
 }
 
-// the words (ambient's W; placeholders until signed off)
+// the words (signed off by ambient). The buttons are the option words
+// without digits: a digit promises a key a macOS notification can't take.
 enum NotifyWords {
     static func title(_ c: Card) -> String { c.agent.isEmpty ? "bise needs you" : "\(c.agent) needs you" }
     static let reply = "reply"
     static let replyButton = "send"
-    static let replyPlaceholder = "or say it: hold fn"
+    static let replyPlaceholder = "type it, or hold fn and say it"
 }
 
 @MainActor
@@ -83,7 +84,7 @@ final class Notify: NSObject, UNUserNotificationCenterDelegate {
                                                              textInputPlaceholder: NotifyWords.replyPlaceholder))
             } else {
                 for (i, o) in c.options.prefix(2).enumerated() {
-                    actions.append(UNNotificationAction(identifier: "opt.\(i + 1)", title: "\(i + 1) \(o)", options: []))
+                    actions.append(UNNotificationAction(identifier: "opt.\(i + 1)", title: o, options: []))
                 }
             }
             self.categories[cat] = UNNotificationCategory(identifier: cat, actions: actions, intentIdentifiers: [], options: [])

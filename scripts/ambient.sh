@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ambient.sh — build, open and stop Bise Ambient.app (docs/ambient-app.md §2).
+# ambient.sh — build, open and stop bise ambient.app (docs/ambient-app.md §2).
 #
 #   scripts/ambient.sh build        build the app if its sources changed; print its path
 #   scripts/ambient.sh path         the same (the .app path is the only stdout line)
@@ -12,7 +12,7 @@
 #   scripts/ambient.sh status       running or not, its pid, the built key
 #   scripts/ambient.sh logs         the app's and the core's logs (tail)
 #
-# One app, one path: <bise dev dir>/build/ambient/Bise Ambient.app (bins.sh's
+# One app, one path: <bise dev dir>/build/ambient/bise ambient.app (bins.sh's
 # STATE), rebuilt only when the hash of apps/ambient/mac changed, ad-hoc signed
 # (bundle id dev.bise.ambient). The EDR deletes fresh unsigned binaries: never
 # build another copy, never start the app from a test, never pkill by name.
@@ -25,8 +25,8 @@ if [ -n "${BISE_HOME:-}" ]; then STATE="$BISE_HOME/dev"
 elif [ -e "$HOME/.bise/migrated.json" ]; then STATE="$HOME/.bise/dev"
 else STATE="$HOME/.local/state/switchboard"; fi
 BUILD="${SB_BUILD_DIR:-$STATE/build}/ambient"
-APP="$BUILD/Bise Ambient.app"
-BIN="$APP/Contents/MacOS/Bise Ambient"
+APP="$BUILD/bise ambient.app"
+BIN="$APP/Contents/MacOS/bise ambient"
 RUN="$STATE/ambient"
 SRC="$REPO/apps/ambient/mac"
 
@@ -54,13 +54,14 @@ key() {
    swiftc --version 2>&1 | head -1) | shasum | cut -c1-12
 }
 
-# the running app's pid, if app.pid names a live Bise Ambient
+# the running app's pid, if app.pid names a live bise ambient
 running_pid() {
   local pid
   pid="$(cat "$RUN/app.pid" 2>/dev/null || true)"
   [ -n "$pid" ] || return 1
-  case "$(ps -p "$pid" -o comm= 2>/dev/null || true)" in
-    *"Bise Ambient.app/Contents/MacOS/Bise Ambient") echo "$pid" ;;
+  # any case: the app was "Bise Ambient" before designer's lowercase name
+  case "$(ps -p "$pid" -o comm= 2>/dev/null | tr '[:upper:]' '[:lower:]' || true)" in
+    *"bise ambient.app/contents/macos/bise ambient") echo "$pid" ;;
     *) return 1 ;;
   esac
 }
@@ -84,6 +85,9 @@ build() {
   say "building $APP ($k)"
   mkdir -p "$BUILD"
   rm -f "$BUILD/key"
+  # a fresh bundle: the disk is case-insensitive, so the old "Bise Ambient.app"
+  # would keep its capitals if we built into it
+  rm -rf "$APP"
   "$SRC/build.sh" "$APP" >&2
   echo "$k" > "$BUILD/key"
 }

@@ -25,6 +25,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var reduceMotion = false
     private var edgeGlow = true
     private var cards: [Card] = []
+    private var agents = Set<String>()
+    private var agentWhileHidden = false   // main started an agent while bise was hidden
     // what a page loaded later needs: the last event of each of these kinds
     private var memory: [String: [String: Any]] = [:]
     private static let remembered: Set<String> = ["hub", "state", "phase", "main"]
@@ -55,6 +57,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         edgeSetup()
 
         let st = StatusItem()
+        st.onClick = { [weak self] in self?.agentsView() }
         st.onSpotlight = { [weak self] in self?.spotlight() }
         st.onToggle = { [weak self] in self?.toggleHidden() }
         st.isHidden = { [weak self] in self?.capsule.hidden ?? false }
@@ -145,6 +148,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         config = c
         memory = [:]
         cards = []
+        agents = []
+        agentWhileHidden = false
+        pink()
         core.restart(config: c)
         if c.web != webBefore {
             capsule.load(webDir: c.web)
@@ -227,7 +233,10 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             if talking { edge.post(ev) }
         case "state":
             cards = Card.list(ev)
-            status?.setNeedsYou(!cards.isEmpty)
+            let names = Set((ev["agents"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String })
+            if capsule.hidden && !names.subtracting(agents).isEmpty && !agents.isEmpty { agentWhileHidden = true }
+            agents = names
+            pink()
             notify?.cards(cards, quiet: !capsule.hidden && !locked)
         default:
             break
@@ -292,11 +301,22 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         capsule.post(["ev": "app_key", "key": "space"])
     }
 
+    // a menu-bar click: what's going on (the agents and the inbox, fn + 0)
+    private func agentsView() {
+        if capsule.hidden { setHidden(false) }
+        capsule.post(["ev": "app_key", "key": "0"])
+    }
+
+    // the :* is pink while a card waits, or main started an agent while hidden (SPEC §1)
+    private func pink() {
+        status?.setNeedsYou(!cards.isEmpty || agentWhileHidden)
+    }
+
     private func toggleHidden() { setHidden(!capsule.hidden) }
 
     private func setHidden(_ h: Bool) {
         guard h != capsule.hidden else { return }
-        if h { capsule.hide() } else { capsule.show() }
+        if h { capsule.hide() } else { capsule.show(); agentWhileHidden = false; pink() }
         capsule.post(["ev": "app_hidden", "on": h])
     }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# build.sh — compile Bise Ambient.app with swiftc and the Command Line Tools
+# build.sh — compile bise ambient.app with swiftc and the Command Line Tools
 # (no Xcode project). Called by scripts/ambient.sh, which picks the one app
 # path and the source hash; never build anywhere else by hand (the EDR
 # deletes fresh unsigned binaries: one stable path, ad-hoc signed).
@@ -37,7 +37,7 @@ case "${1:-}" in
     echo "usage: build.sh --check | --test | <app dir>" >&2; exit 2 ;;
   *)
     APP="$1"
-    BIN="$APP/Contents/MacOS/Bise Ambient"
+    BIN="$APP/Contents/MacOS/bise ambient"
     mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
     # unlink first: a running copy keeps its inode, we never write into it
     rm -f "$BIN"

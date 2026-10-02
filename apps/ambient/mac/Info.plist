@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>Bise Ambient</string>
+	<string>bise ambient</string>
 	<key>CFBundleDisplayName</key>
-	<string>Bise Ambient</string>
+	<string>bise ambient</string>
 	<key>CFBundleExecutable</key>
-	<string>Bise Ambient</string>
+	<string>bise ambient</string>
 	<key>CFBundleIdentifier</key>
 	<string>dev.bise.ambient</string>
 	<key>CFBundlePackageType</key>

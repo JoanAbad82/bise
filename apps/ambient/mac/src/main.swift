@@ -1,4 +1,4 @@
-// Bise Ambient: the macOS shell of bise ambient (docs/ambient-app.md).
+// bise ambient: the macOS shell of bise ambient (docs/ambient-app.md).
 // An agent app (LSUIElement: no Dock, no cmd-tab), launched by
 // scripts/ambient.sh open --workspace <ws> --bise <exe> [--web <dir>].
 
