@@ -167,6 +167,31 @@ body {
 #bise-page [data-kit="email"] > [data-kit-ui] { margin-top: var(--space-4); }
 #bise-page [data-kit="email"][data-verdict="skip"] > :not([data-kit-ui]) { opacity: .45; }
 
+/* compare: 2 to 4 variants side by side, each a card with its facts and its why; ♡ ✗ pick under it */
+#bise-page [data-kit="compare"] > :is(ol, ul) { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-3); }
+#bise-page [data-kit="compare"] li[data-id] { display: flex; flex-direction: column; margin: 0; background: var(--surface-card); border-radius: 10px; padding: var(--space-3) var(--space-4); box-shadow: 3px 3px 0 var(--drop); font-size: var(--text-small); transition: opacity .3s var(--ease-arrive), box-shadow .3s var(--ease-arrive); }
+#bise-page [data-kit="compare"] li[data-id] > h3 { font-size: 19px; margin: 0 0 6px; }
+#bise-page [data-kit="compare"] li[data-id] ul { padding-left: 1.1em; margin: 0 0 var(--space-2); }
+#bise-page [data-kit="compare"] li[data-id] li { margin: 0 0 2px; }
+#bise-page [data-kit="compare"] li[data-id] > p { margin: 0 0 var(--space-2); color: var(--dim); }
+#bise-page [data-kit="compare"] li[data-id] > [data-kit-ui] { margin-top: auto; padding-top: var(--space-2); }
+#bise-page [data-kit="compare"] li[data-id] > [data-kit-ui] button[data-act="pick"] { margin-left: auto; }
+#bise-page [data-kit="compare"] li[data-verdict="pick"] { box-shadow: inset 0 0 0 1.5px var(--ink), 3px 3px 0 var(--drop); }
+#bise-page [data-kit="compare"] li[data-verdict="drop"] > :not([data-kit-ui]) { opacity: .45; }
+#bise-page [data-verdict="keep"] > [data-kit-ui] button[data-act="keep"], #bise-page [data-verdict="drop"] > [data-kit-ui] button[data-act="drop"],
+#bise-page [data-verdict="pick"] > [data-kit-ui] button[data-act="pick"] { box-shadow: inset 0 0 0 1.5px var(--ink); }
+#bise-page [data-verdict="pick"] > [data-kit-ui] button[data-act="pick"]::before { content: "✓ "; }
+
+/* checklist: a box per item (the kit's), who · when in small; ticked items are struck through */
+#bise-page [data-kit="checklist"] > :is(ol, ul) { list-style: none; padding: 0; margin: 0; }
+#bise-page [data-kit="checklist"] li[data-id] { display: flex; align-items: baseline; gap: var(--space-3); margin: 0; padding: 7px 0; border-bottom: 1px solid var(--rule); }
+#bise-page [data-kit="checklist"] li[data-id] small { margin-left: auto; padding-left: var(--space-3); font: 12px var(--font-mono); color: var(--kick); white-space: nowrap; }
+#bise-page [data-kit="checklist"] li[data-id] > [data-kit-ui] { flex: none; align-self: center; }
+#bise-page [data-kit="checklist"] [data-kit-ui] button[data-act="tick"] { width: 18px; height: 18px; padding: 0; border-radius: 4px; font-size: 0; background: var(--surface-card); box-shadow: inset 0 0 0 1.5px var(--rule-strong); }
+#bise-page [data-kit="checklist"] li[data-verdict="tick"] [data-kit-ui] button[data-act="tick"] { background: var(--ink); }
+#bise-page [data-kit="checklist"] li[data-verdict="tick"] [data-kit-ui] button[data-act="tick"]::before { content: "✓"; font: 600 12px/18px var(--font-ui); color: var(--surface-made); }
+#bise-page [data-kit="checklist"] li[data-verdict="tick"] { color: var(--dim); text-decoration: line-through; text-decoration-color: var(--rule-strong); }
+
 /* message: a draft that leaves (Slack, a post), in the reading font, editable, its channel above */
 [data-kit="message"] { background: var(--surface-card); border-radius: 10px; padding: var(--space-3) var(--space-4) var(--space-4); margin: var(--space-4) 0; box-shadow: 3px 3px 0 var(--drop); }
 [data-kit="message"]::before { content: attr(data-to); display: block; font: var(--text-kicker)/1.4 var(--font-mono); color: var(--kick); margin-bottom: var(--space-2); }

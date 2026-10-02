@@ -357,3 +357,39 @@ fn a_message_says_where_it_goes() {
         "p: data-to is not a kit attribute",
     );
 }
+
+#[test]
+fn a_compare_has_two_to_four_variants_with_ids() {
+    ok(r#"<section data-kit="compare" data-id="venues"><ol>
+<li data-id="moulin"><h3>Le Moulin</h3><ul><li>€12,400</li><li>22 rooms</li></ul><p>why: in budget, daylight room.</p></li>
+<li data-id="pins"><h3>Domaine des Pins</h3><ul><li>€13,900</li></ul></li></ol></section>"#);
+    has(
+        &errs(
+            r#"<section data-kit="compare" data-id="c"><ol><li data-id="a">a</li></ol></section>"#,
+        ),
+        "c: a compare block has 2 to 4 variants",
+    );
+    has(
+        &errs(
+            r#"<section data-kit="compare" data-id="c"><ol><li data-id="a">a</li><li>b</li></ol></section>"#,
+        ),
+        "c: a compare item without data-id",
+    );
+}
+
+#[test]
+fn a_checklist_has_items_and_may_mark_them_done() {
+    ok(
+        r#"<section data-kit="checklist" data-id="todo"><ol><li data-id="t1" data-done>book the venue <small>Gabriel · friday</small></li><li data-id="t2">send the invite</li></ol></section>"#,
+    );
+    has(
+        &errs(r#"<section data-kit="checklist" data-id="todo"><ol><li>x</li></ol></section>"#),
+        "todo: a checklist item without data-id",
+    );
+    has(
+        &errs(
+            r#"<section data-kit="review" data-id="r"><ol><li data-id="m1" data-done>x</li></ol></section>"#,
+        ),
+        "r: data-done is not a kit attribute",
+    );
+}

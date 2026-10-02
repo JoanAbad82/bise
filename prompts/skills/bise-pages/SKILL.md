@@ -34,6 +34,8 @@ across versions (the user's notes anchor on them): `p1`, `t1`, `q1`, `src`.
 | `sources` | where each fact comes from | `<ol>` of `<li><a href="…">name · tool</a>, when</li>`, last on the page |
 | `review` | items the user approves or skips one by one (mails to answer, tickets, expenses) | `<ol>` of `<li data-id="m1">`: a first `<p>` saying what it is (`Léa Martin · offsite dates · 9:12`), then the proposal |
 | `message` | a draft that leaves through a channel (Slack, a post) | `data-to="Slack · #launch"` (where it goes, shown above it), then `<p>`s and `<ul>`, with `<strong>`, `<em>`, `<code>`, `<a>`: the kit's `copy` turns them into Slack markup |
+| `compare` | 2 to 4 options side by side (venues, drafts, tools) | `<ol>` of `<li data-id="moulin">`: an `<h3>` name, a `<ul>` of facts, a `<p>` with the why |
+| `checklist` | what's left to do, who, by when | `<ol>` of `<li data-id="t1">` the task `<small>who · when</small></li>`; `data-done` on what is done |
 | `email` | one mail ready to send | `<p data-field="to">`, optional `<p data-field="cc">`, `<p data-field="subject">`, then the body as `<p>`s |
 
 Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
@@ -45,10 +47,12 @@ How to write them well:
 - **Numbers:** write them as they read (`412`, `4.1 s`, `3.2 %`, `€12,400`): table columns of
   numbers are aligned and set in mono by the kit. One number per cell: `11 (10 new)` is not a
   number, make it two columns (`total`, `new today`). In prose, put a key number in `<code>`.
-- **Review and email:** the kit draws `approve` / `skip` on each item and on the mail, and
-  `approve 3` for the rest; each reaction comes back to you as a note (kind `approve` or `skip`,
-  with the item's id). Item ids stay across versions like block ids. Sending or replying is
-  still your tool call, through the user's approvals, after their `send`.
+- **Items** (review, compare, checklist) have their own `data-id`, kept across versions like
+  block ids. The kit draws the reactions and each one comes back to you as a note with the
+  item's id: review `approve` / `skip` (and `approve 3` for the rest), email `approve` / `skip`,
+  compare `keep` (♡) / `drop` (✗) / `pick` (one per block), checklist `tick`. Mark a checklist
+  item done with `data-done` when it is done. Sending, replying or booking is still your tool
+  call, through the user's approvals, after their `send`.
 - **Drafts** (a Slack message, a post, a reply): in a `message` block with its `data-to`, as
   `<p>`s and `<ul>`, so the user reads it in the page's font, edits it in place and copies it.
   Never in `<pre>` or `<code>`: those are for code. A mail goes in an `email` block.
@@ -115,7 +119,8 @@ network (use a `data:` src), `javascript:` links, more than 1 MB. Links to the o
 More examples, each one passing the lint: `apps/ambient/kit/examples/` in the bise app
 (`weekly-update.html` a doc, `offsite-venues.html` a table to choose from,
 `pricing-question.html` a decision, `inbox-review.html` the inbox: replies to approve and a mail
-ready to send, `launch-post.html` a Slack post to check and copy).
+ready to send, `launch-post.html` a Slack post to check and copy, `offsite-plan.html` a plan:
+venues to compare and what's left to do).
 
 ## 4. Publish fast, then fill it
 
@@ -163,5 +168,16 @@ block, quote, kind and words (an edit has its text before and after; a pick has 
    words instead, or only partly did. Every note sent gets one or the other.
 3. Reply in one line: `v2 is up: 3 notes done.`
 
-Acting on the page (posting it, sending the mail) is a separate step the user asks for, through
-the usual approvals.
+## 6. When the page leaves
+
+Acting on the page is a separate step the user asks for ("post it in #team", "send the mail",
+"make it a Google Doc"), through the usual approvals, never before their word:
+- take the text from your last published version, in the page's order, with the user's edits
+  (they came to you as notes), without the kit's chrome (no frame, no buttons, no "sources" label);
+- a `message` block goes as is to its `data-to` channel (Slack markup: `*bold*`, `_italic_`,
+  `• ` items, `<url|text>` links); an `email` block through the mail tool, its fields as the
+  mail's to, cc, subject;
+- a whole page as a doc: headings as headings, tables as tables, each `<sup>n</sup>` as a link to
+  its source (or the sources as a list at the end);
+- then say where it went in one line (`posted in #team.`) and, when it makes sense, publish a last
+  version that says so (a `good` callout: `posted in #team, 14:02`).

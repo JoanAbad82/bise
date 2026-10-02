@@ -343,6 +343,31 @@ law("names: an agent's id reads with spaces on the page (by launch recap), the i
   assert.equal(q.getAttribute("data-id"), "q1");
 });
 
+law("compare: ♡ ✗ pick on each variant, one pick per block (the last wins), the variant's facts left inside", () => {
+  const c = blocks(parse(`<section data-kit="compare" data-id="venues"><ol>
+<li data-id="moulin"><h3>Le Moulin</h3><ul><li>€12,400</li><li>22 rooms</li></ul><p>why: in budget.</p></li>
+<li data-id="pins"><h3>Domaine des Pins</h3><ul><li>€13,900</li></ul></li></ol></section>`))[0];
+  K.decorate([c], "offsite", doc);
+  const variants = K.options(c);
+  assert.equal(variants.length, 2, "the inner facts lists are not variants");
+  assert.deepEqual(variants[0].children.find((x) => x.hasAttribute("data-kit-ui")).children.map((b) => b.getAttribute("data-act")), ["keep", "drop", "pick"]);
+  assert.equal(j(K.react(c, "moulin", "pick")).kind, "pick");
+  assert.equal(j(K.react(c, "pins", "pick")).kind, "pick");
+  assert.deepEqual(variants.map((v) => v.getAttribute("data-verdict")), [null, "pick"]);
+  assert.equal(j(K.react(c, "moulin", "keep")).text, "Le Moulin €12,400 22 rooms why: in budget.");
+});
+
+law("checklist: a tick box first in each item; an item the agent marked data-done starts ticked; a tick toggles", () => {
+  const c = blocks(parse(`<section data-kit="checklist" data-id="todo"><ol><li data-id="t1" data-done>book the venue <small>Gabriel · friday</small></li><li data-id="t2">send the invite</li></ol></section>`))[0];
+  K.decorate([c], "offsite", doc);
+  const [t1, t2] = K.options(c);
+  assert.ok(t1.nodes[0].hasAttribute && t1.nodes[0].hasAttribute("data-kit-ui"), "the box comes first");
+  assert.equal(t1.getAttribute("data-verdict"), "tick");
+  assert.deepEqual(j(K.react(c, "t2", "tick")), { block: "todo", item: "t2", kind: "tick", text: "send the invite" });
+  assert.equal(j(K.react(c, "t2", "tick")).kind, null);
+  assert.equal(t2.getAttribute("data-verdict"), null);
+});
+
 law("message: copy gives Slack markup of what the page shows, the kit's button left out", () => {
   const m = blocks(parse(`<section data-kit="message" data-id="slack" data-to="Slack · #launch"><p><strong>bise is live</strong> today, <em>finally</em>.</p>
 <ul><li>the repo is <a href="https://github.com/acme/bise">public</a></li><li>install: <code>brew install bise</code></li></ul><p>thanks <del>all</del> everyone!</p></section>`))[0];
@@ -389,7 +414,7 @@ law("the fonts tokens.css names are in the kit (the CSP loads nothing from outsi
 });
 
 law("every example page is a fragment of known blocks with unique ids", () => {
-  const kinds = new Set(["prose", "heading", "callout", "sources", "table", "question", "review", "email", "message"]);
+  const kinds = new Set(["prose", "heading", "callout", "sources", "table", "question", "review", "email", "message", "compare", "checklist"]);
   for (const f of readdirSync(join(here, "examples"))) {
     const main = parse(readFileSync(join(here, "examples", f), "utf8"));
     assert.ok(main.children.length > 0 && main.children.every((c) => c.tagName === "SECTION" && kinds.has(c.getAttribute("data-kit"))), f);

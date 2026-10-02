@@ -26,8 +26,21 @@ pub struct Block {
 
 /// The kinds of the kit: v0's six, then slice 2's review and email (docs/ambient-pages.md §4.3).
 pub const KINDS: &[&str] = &[
-    "prose", "heading", "callout", "sources", "table", "question", "review", "email", "message",
+    "prose",
+    "heading",
+    "callout",
+    "sources",
+    "table",
+    "question",
+    "review",
+    "email",
+    "message",
+    "compare",
+    "checklist",
 ];
+
+/// The kinds whose list items are things the user reacts to, each with its own data-id.
+pub const ITEM_KINDS: &[&str] = &["review", "compare", "checklist"];
 
 /// `data-field` of an email's header lines.
 pub const FIELDS: &[&str] = &["to", "cc", "subject"];
@@ -154,6 +167,8 @@ struct Open {
     items: Vec<String>,
     fields: Vec<String>,
     bare_items: bool,
+    /// how deep in ol/ul the reader is (an item kind's items are the li of its first list)
+    list_depth: usize,
 }
 
 impl Open {
@@ -300,6 +315,15 @@ impl<'a> Linter<'a> {
             Some(b) => b.label(),
             None => format!("line {}", tag.line),
         };
+        if matches!(name, "ol" | "ul") {
+            if let Some(b) = self.open.as_mut() {
+                if tag.close {
+                    b.list_depth = b.list_depth.saturating_sub(1);
+                } else {
+                    b.list_depth += 1;
+                }
+            }
+        }
         if tag.close {
             return;
         }
@@ -331,12 +355,19 @@ impl<'a> Linter<'a> {
                 .map(|(_, v)| v.clone().unwrap_or_default())
         };
         let mut inner: &[&str] = &[];
-        if kit == "review" && name == "li" {
-            inner = &["data-id"];
+        if ITEM_KINDS.contains(&kit.as_str())
+            && name == "li"
+            && self.open.as_ref().is_some_and(|b| b.list_depth == 1)
+        {
+            inner = if kit == "checklist" {
+                &["data-id", "data-done"]
+            } else {
+                &["data-id"]
+            };
             match get("data-id") {
                 None => self.open.as_mut().unwrap().bare_items = true,
                 Some(v) if !valid_id(&v) => self.err(&at, format!("item data-id=\"{v}\" is not a valid id: letters, digits, - and _, 40 at most")),
-                Some(v) if self.open.as_ref().unwrap().items.contains(&v) => self.err(&at, format!("item {v}: this data-id is used twice in the review")),
+                Some(v) if self.open.as_ref().unwrap().items.contains(&v) => self.err(&at, format!("item {v}: this data-id is used twice in the {kit}")),
                 Some(v) => self.open.as_mut().unwrap().items.push(v),
             }
         } else if kit == "email" && name == "p" {
@@ -444,6 +475,7 @@ impl<'a> Linter<'a> {
             items: Vec::new(),
             fields: Vec::new(),
             bare_items: false,
+            list_depth: 0,
         });
     }
 
@@ -476,10 +508,17 @@ impl<'a> Linter<'a> {
                 "li",
                 "a review block needs its items as <ol><li data-id=\"m1\">…</li></ol>",
             )],
+            "checklist" => &[(
+                "li",
+                "a checklist block needs its items as <ol><li data-id=\"t1\">…</li></ol>",
+            )],
             _ => &[],
         };
-        if kit == "review" && b.bare_items {
-            self.err(&at, "a review item without data-id: give each <li> its own (m1, m2) so approve and skip know which".into());
+        if ITEM_KINDS.contains(&kit.as_str()) && b.bare_items {
+            self.err(&at, format!("a {kit} item without data-id: give each <li> of its list its own (m1, m2) so reactions know which"));
+        }
+        if kit == "compare" && !(2..=4).contains(&b.items.len()) {
+            self.err(&at, format!("a compare block has 2 to 4 variants as <ol><li data-id=\"v1\">…</li></ol>, not {}", b.items.len()));
         }
         if kit == "email" {
             for f in ["to", "subject"] {

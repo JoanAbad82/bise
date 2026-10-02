@@ -10,8 +10,9 @@
 //   bise:answered {block, reply}               the question's card was answered (SSE answered)
 //   bise:voice   {phase, text}                 a voice note at the mouse (SSE voice, slice 2)
 //   (a message block's `copy` puts its Slack markup on the clipboard; no event)
-//   bise:react   {block, item, kind, text}     approve / skip on a review item or an email
-//                                              (item null), kind null: taken back
+//   bise:react   {block, item, kind, text}     approve / skip (review item, email: item null),
+//                                              keep / drop / pick (compare), tick (checklist);
+//                                              kind null: taken back
 // The kit's own controls inside blocks carry data-kit-ui (never part of a quote or anchor).
 // notes.js marks a review item the user edited with data-edited: "approve N" leaves it out.
 // and the frame's [data-bise-notes-count] and [data-bise-send] (notes.js writes and binds them).
@@ -35,6 +36,10 @@
     approve: "approve",
     skip: "skip",
     approveAll: (n) => `approve ${n}`,
+    keep: "♡",
+    drop: "✗",
+    pick: "pick",
+    tick: "done",
     copy: "copy",
     copied: "copied",
   };
@@ -205,10 +210,33 @@
     for (const k of kinds) bar.append(button(doc, k, W[k]));
     return bar;
   }
+  // an item's words as one line: block elements apart, inline ones as written, the kit's controls out
+  const BLOCKY = /^(p|li|ul|ol|h1|h2|h3|blockquote|pre|table|tr|td|th|caption)$/i;
+  function textOf(el) {
+    const walk = (e) => nodesOf(e).map((n) => {
+      if (isText(n)) return n.textContent;
+      if (ui(n)) return "";
+      return BLOCKY.test(n.tagName) ? ` ${walk(n)} ` : walk(n);
+    }).join("");
+    return walk(el).replace(/\s+/g, " ").trim();
+  }
   // the items "approve N" approves: no verdict yet, and not edited by the user (those go with send)
   const pending = (block) => items(block).filter((li) => li.getAttribute("data-verdict") == null && li.getAttribute("data-edited") == null);
+  // the buttons each item kind gets (review: approve / skip; compare: ♡ ✗ pick; checklist: a tick)
+  const ITEM_ACTS = { review: ["approve", "skip"], compare: ["keep", "drop", "pick"], checklist: ["tick"] };
+  function decorateItems(doc, block, kit) {
+    for (const li of items(block)) {
+      if (!kids(li).some(ui)) {
+        const bar = acts(doc, ITEM_ACTS[kit]);
+        // a checklist's tick goes first, like a box; an item the agent marked done is ticked
+        if (kit === "checklist") li.insertBefore(bar, li.firstChild || (li.nodes && li.nodes[0]) || null);
+        else li.append(bar);
+      }
+      if (kit === "checklist" && li.getAttribute("data-done") != null && li.getAttribute("data-verdict") == null) li.setAttribute("data-verdict", "tick");
+    }
+  }
   function decorateReview(doc, block) {
-    for (const li of items(block)) if (!kids(li).some(ui)) li.append(acts(doc, ["approve", "skip"]));
+    decorateItems(doc, block, "review");
     let all = kids(block).find(ui);
     if (!all) { all = doc.createElement("p"); all.setAttribute("data-kit-ui", ""); all.append(button(doc, "approve-all", "")); block.append(all); }
     const n = pending(block).length;
@@ -219,14 +247,16 @@
   function decorateEmail(doc, block) {
     if (!kids(block).some(ui)) block.append(acts(doc, ["approve", "skip"]));
   }
-  // approve or skip an item of a review (item id) or a whole email (item null); the same again
-  // takes it back. Returns {block, item, kind (null: taken back), text}, or null.
+  // react to an item (review approve/skip, compare keep/drop/pick, checklist tick) or a whole
+  // email (item null); the same again takes it back; a pick is one per block (the last wins).
+  // Returns {block, item, kind (null: taken back), text}, or null.
   function react(block, item, kind) {
     const target = item == null ? block : items(block).find((li) => li.getAttribute("data-id") === item);
     if (!target) return null;
     const again = target.getAttribute("data-verdict") === kind;
+    if (kind === "pick" && !again) for (const li of items(block)) if (li.getAttribute("data-verdict") === "pick") li.removeAttribute("data-verdict");
     if (again) target.removeAttribute("data-verdict"); else target.setAttribute("data-verdict", kind);
-    const text = norm(kids(target).filter((c) => !ui(c)).map((c) => c.textContent).join(" "));
+    const text = textOf(target);
     return { block: idOf(block), item: item == null ? null : item, kind: again ? null : kind, text };
   }
   // "approve N": every pending item, one reaction each
@@ -275,6 +305,7 @@
       else if (kit === "review" && doc) decorateReview(doc, b);
       else if (kit === "email" && doc) decorateEmail(doc, b);
       else if (kit === "message" && doc) decorateMessage(doc, b);
+      else if ((kit === "compare" || kit === "checklist") && doc) decorateItems(doc, b, kit);
     }
   }
 
@@ -474,7 +505,7 @@
         return;
       }
       const li = btn.closest("li[data-id]");
-      const out = kind === "approve-all" ? approveAll(block) : [react(block, block.dataset.kit === "review" && li ? li.dataset.id : null, kind)];
+      const out = kind === "approve-all" ? approveAll(block) : [react(block, block.dataset.kit !== "email" && li ? li.dataset.id : null, kind)];
       for (const d of out) if (d) doc.dispatchEvent(new root.CustomEvent("bise:react", { detail: d }));
       decorate([block], agent, doc);
     }
