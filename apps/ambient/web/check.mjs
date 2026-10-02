@@ -824,6 +824,14 @@ law("notes: kit.js's reactions: keep/drop one per variant, a pick one per block,
   m.react("k1", "t1", null, "", 1, 6);                          // unticked
   eq(m.drafts().map((n) => n.kind), ["drop", "pick"]);
 });
+law("notes: a row its agent ticked (bise:ticked) drops our draft tick on that row only (amb-kit 74539129)", () => {
+  const m = N.model([], counted());
+  m.react("k1", "t1", "tick", "book the room", 1, 1);
+  m.react("k1", "t2", "tick", "send the invites", 1, 2);
+  assert.equal(m.ticked("k1", "t1"), true);
+  eq(m.drafts().map((n) => n.item), ["t2"]);
+  assert.equal(m.ticked("k1", "t1"), false);                   // nothing left there
+});
 law("notes: taste: a note that states a preference is offered once; yes marks it taste, no stops asking (roadmap §3.4)", () => {
   for (const t of ["never use emoji", "always cite the source", "too long", "no emoji", "shorter please", "jamais de tirets", "toujours en français", "trop long"]) assert.ok(N.tastes(t), t);
   for (const t of ["use March", "the barn", "longest day"]) assert.ok(!N.tastes(t), t);

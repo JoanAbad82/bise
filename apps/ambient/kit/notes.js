@@ -338,6 +338,14 @@
         notes = notes.filter((n) => !(n.status === "draft" && n.kind === "pick" && n.block === block));
         return had;
       },
+      // a checklist row ticked by its agent (SSE ticked, kit.js's bise:ticked; roadmap D, amb-kit
+      // 74539129): it's done, so a draft tick of ours on that row has nothing left to say
+      ticked(block, item) {
+        const mine = (n) => n.status === "draft" && n.kind === "tick" && n.block === block && (n.item || null) === (item || null);
+        const had = notes.some(mine);
+        notes = notes.filter((n) => !mine(n));
+        return had;
+      },
       // the server's notes (meta, SSE): its statuses and answers win; drafts it doesn't know stay
       merge(server) {
         const by = Object.fromEntries((server || []).map((n) => [n.id, n]));
@@ -916,6 +924,11 @@
     // pick of ours on it goes (one card, one answer)
     doc.addEventListener("bise:answered", (e) => {
       if (M.answered((e.detail || {}).block)) { save(); render(); }
+    });
+    // a checklist row ticked by its agent: a draft tick of ours on that row goes
+    doc.addEventListener("bise:ticked", (e) => {
+      const d = e.detail || {};
+      if (d.block && M.ticked(d.block, d.item || null)) { save(); render(); }
     });
 
     // a question's option picked (kit.js marks it on the page; the note is ours)
