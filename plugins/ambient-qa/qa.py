@@ -24,6 +24,7 @@ copy of the app (scripts/ambient.sh builds the one path), pkill by name
 """
 import json
 import os
+import re
 import shutil
 import signal
 import socket
@@ -274,6 +275,11 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="")
         # calendar items as workspace plugins; their writes go to the outbox
         install_fake_accounts(E.ws)
         E.env["FAKE_ACCOUNTS_OUTBOX"] = os.path.join(E.tmp, "outbox.jsonl")
+        # the launch's clock: batch 0 now, then `qa.py tick` or every AMBIENT_QA_TICK_MIN minutes (0: ticks only)
+        clock = os.path.join(E.tmp, "fake-clock.json")
+        with open(clock, "w") as f:
+            json.dump({"start": time.time(), "ticks": [], "every_min": float(os.environ.get("AMBIENT_QA_TICK_MIN") or 30)}, f)
+        E.env["FAKE_ACCOUNTS_CLOCK"] = clock
     if not user_ask:
         computer = False
     E.env["BEND_PLUGINS_STATE"] = hub_plugins_state(E.tmp, computer, keep_user=bool(user_ask and connectors))
@@ -315,7 +321,43 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="")
 
 
 FAKE_ACCOUNTS = os.path.join(HERE, "fake-accounts")
-FAKE_SERVICES = ("gmail", "slack", "linear", "calendar", "github", "hn")
+FAKE_SERVICES = ("gmail", "slack", "linear", "calendar", "github", "hn", "reddit", "x", "bluesky")
+
+
+def _clock_path(clock=None):
+    if clock:
+        return clock
+    info = _read(HUB)
+    if not info or not _pid_alive(info.get("pid")):
+        raise QAError("no throwaway hub: launch() first")
+    return os.path.join(info["tmp"], "fake-clock.json")
+
+
+def tick(n=1, clock=None):
+    """The launch's next comment batch(es) come in now (roadmap B: the
+    fake HN/Reddit/X/Bluesky comments grow, the numbers move)."""
+    path = _clock_path(clock)
+    try:
+        c = json.load(open(path))
+    except (OSError, ValueError):
+        c = {"start": time.time(), "ticks": [], "every_min": 0}
+    now = time.time()
+    c.setdefault("ticks", []).extend([now] * int(n))
+    with open(path + ".tmp", "w") as f:
+        json.dump(c, f)
+    os.replace(path + ".tmp", path)
+    return {"ticks": len(c["ticks"]), "clock": path}
+
+
+def launch_truth(batches=1):
+    """What a launch watcher should find after `batches` batches: the
+    comments that need an answer (questions, bugs), all and the newest batch's."""
+    L = json.load(open(os.path.join(FAKE_ACCOUNTS, "fixtures.json")))["launch"]
+    seen = [c for c in L["comments"] if c["batch"] < batches]
+    need = [c for c in seen if c["needs_answer"]]
+    return {"seen": len(seen), "needs_answer": len(need),
+            "new_needs_answer": [{"id": c["id"], "place": c["place"], "author": c["author"], "text": c["text"]} for c in need if c["batch"] == batches - 1],
+            "new": [c for c in seen if c["batch"] == batches - 1]}
 
 
 def install_fake_accounts(ws):
@@ -832,7 +874,30 @@ SCENARIOS = {
     "weekly-update": {"ask": "draft my weekly update from Slack and Linear", "no_send": False},
     "inbox": {"ask": "go through my mail, draft replies, don't send", "no_send": True},
     "offsite": {"ask": "plan the offsite: the venue we decided, the budget, and an agenda for the two days, from my mail and Slack", "no_send": False},
+    # roadmap B (ambient-lead m_5447): a review page, republished after a tick
+    # with the new comments, cards only for what needs an answer, nothing posted
+    "launch-watch": {"ask": "watch the launch until tomorrow, tell me what needs an answer", "no_send": True, "no_writes": True,
+                     "notes": False, "ticks": 1},
 }
+
+
+def _covered(body, items):
+    """Which comments a page body names (its id, as in amb-kit's data-id, or its author)."""
+    low = (body or "").lower()
+    hit = [c for c in items if str(c["id"]).lower() in low or c["author"].lower() in low]
+    return {"found": len(hit), "of": len(items), "missing": ["%s on %s" % (c["author"], c["place"]) for c in items if c not in hit]}
+
+
+def _card_about(card, items):
+    """A card is about a comment when it names its author or shares its words."""
+    t = json.dumps(card, ensure_ascii=False).lower()
+    for c in items:
+        if c["author"].lower() in t or str(c["id"]) in t:
+            return True
+        words = [w for w in re.findall(r"[a-z0-9]{5,}", c["text"].lower())]
+        if sum(w in t for w in words) >= 2:
+            return True
+    return False
 RUN_NOTES = ["make this shorter, two sentences max", "drop this part", "where does this number come from? add the source"]
 # writes that leave the user's hands (a draft does not)
 SENDS = {"send_message", "post_message", "comment_issue", "add_comment", "create_issue", "update_issue", "create_event", "modify_labels"}
@@ -917,6 +982,13 @@ def run_report(r):
     if p:
         L.append("page %s: first seen %s, v1 %s, %d blocks: %s" % (p["id"], s(r["t"].get("page_first")), s(r["t"].get("v1")), len(p["blocks"]),
                                                                     " ".join(b["kit"] for b in p["blocks"])[:120]))
+        cov = r.get("coverage") or {}
+        if cov:
+            L.append("needs an answer in v1: %d of %d%s" % (cov["v1"]["found"], cov["v1"]["of"], " (missing: %s)" % ", ".join(cov["v1"]["missing"]) if cov["v1"]["missing"] else ""))
+            for k in sorted(x for x in cov if x.startswith("tick")):
+                n = k[4:]
+                L.append("tick %s at %s: republished as v%s %s after, its new ones: %d of %d" % (
+                    n, s(r["t"].get("tick" + n)), r["t"].get("v2_n"), s(r["t"].get("republish%s_after_tick" % n)), cov[k]["found"], cov[k]["of"]))
         if r.get("notes"):
             L.append("notes sent at %s; v%s %s after send" % (s(r["t"].get("send")), r["t"].get("v2_n") or "2", s(r["t"].get("v2_after_send"))))
             for n in r["notes"]:
@@ -1006,6 +1078,41 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
             port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
             st, body = _http(port, "GET", "/p/%s/v/%d/body" % (page["id"], last["n"]))
             open(os.path.join(d, "v%d.body.html" % last["n"]), "w").write(body)
+            if not sc.get("notes", True):
+                # launch watch (roadmap B): v1 holds batch 0's needs-an-answer items;
+                # after a tick the page republishes with the new batch's
+                truth0 = launch_truth(1)
+                r["coverage"] = {"v1": _covered(body, [c for c in launch_truth(1)["new"] if c["needs_answer"]])}
+                for k in range(int(sc.get("ticks", 1))):
+                    tick()
+                    r["t"]["tick%d" % (k + 1)] = rel()
+                    t_tick = time.time()
+                    want = launch_truth(k + 2)["new_needs_answer"]
+                    nv, found = last["n"], None
+                    while time.time() - t_tick < timeout:
+                        poll()
+                        m = page_meta(page["id"])
+                        n = m["versions"][-1]["n"]
+                        if n > nv:
+                            st, b2 = _http(port, "GET", "/p/%s/v/%d/body" % (page["id"], n))
+                            if _covered(b2, want)["found"] and settled():
+                                found = (n, b2)
+                                break
+                        time.sleep(3)
+                    if found:
+                        r["t"]["republish%d_after_tick" % (k + 1)] = round(time.time() - t_tick, 1)
+                        r["t"]["v2_n"] = found[0]
+                        open(os.path.join(d, "v%d.body.html" % found[0]), "w").write(found[1])
+                        r["coverage"]["tick%d" % (k + 1)] = _covered(found[1], want)
+                        last = {"n": found[0]}
+                    else:
+                        r["fails"].append("no republish with tick %d's new comments in %d s" % (k + 1, timeout))
+                        break
+                r["truth"] = {"needs_answer_v1": truth0["needs_answer"], "batches": int(sc.get("ticks", 1)) + 1}
+                blocks = []
+            else:
+                blocks = last.get("blocks", [])
+        if page and "v1" in r["t"] and sc.get("notes", True):
             blocks = last.get("blocks", [])
             prose = [b for b in blocks if b["kit"] in ("prose", "callout", "table", "heading")]
             picks = (prose + [b for b in blocks if b not in prose])[:3]
@@ -1046,6 +1153,15 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
         r["outbox"] = {"writes": writes, "sends": [w for w in writes if w["action"] in SENDS]}
         if sc["no_send"] and r["outbox"]["sends"]:
             r["fails"].append("sent %d items on a 'don't send' ask" % len(r["outbox"]["sends"]))
+        if sc.get("no_writes") and r["outbox"]["writes"]:
+            r["fails"].append("%d writes on a read-only ask (outbox must stay empty)" % len(r["outbox"]["writes"]))
+        if sc.get("ticks"):
+            # a card only for what he asked to be told: a comment that needs an answer
+            need = [c for b in range(1, int(sc["ticks"]) + 2) for c in launch_truth(b)["new"] if c["needs_answer"]]
+            off = [cd for cd in r["cards"] if not _card_about(cd, need)]
+            r["cards_off_ask"] = off
+            if off:
+                r["fails"].append("%d card(s) not about a comment that needs an answer" % len(off))
         if r["main_lines"] and r["main_lines"][0]["len"] > 120:
             r["fails"].append("main's capsule line is %d chars (one short line)" % r["main_lines"][0]["len"])
         if not keep:
@@ -1312,6 +1428,7 @@ def _cli(argv):
     p.add_argument("--count", type=int, default=2, help="menubar: the need state's count")
     p = sub.add_parser("pearl", help="every pearl frame amb-mac plays, per mood, at 1x and 2x"); p.add_argument("--out")
     sub.add_parser("state"); sub.add_parser("reset"); sub.add_parser("ping"); sub.add_parser("outbox")
+    p = sub.add_parser("tick", help="the launch's next batch of fake comments comes in now (numbers move)"); p.add_argument("--n", type=int, default=1)
     p = sub.add_parser("events"); p.add_argument("n", nargs="?", type=int, default=40); p.add_argument("--levels", action="store_true")
     p = sub.add_parser("fn"); p.add_argument("state"); p.add_argument("--key", default="fn")
     p = sub.add_parser("key"); p.add_argument("k")
@@ -1361,6 +1478,8 @@ def _cli(argv):
         r = snapshot(a.what, a.backdrop, a.name, a.out)
     elif a.cmd == "state":
         r = state()
+    elif a.cmd == "tick":
+        r = tick(a.n)
     elif a.cmd == "outbox":
         r = outbox()
     elif a.cmd == "reset":

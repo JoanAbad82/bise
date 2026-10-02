@@ -58,6 +58,7 @@ final class QA {
     var pageCmd: (([String: Any]) -> Void)?     // as if from the page (App.command)
     var sendCore: (([String: Any]) -> Void)?    // to the core itself (Core.send)
     var visIn: ((VisIn) -> Void)?               // the Visibility machine's input (App.visFeed), as the real keys feed it
+    var reduceMotionIn: ((Bool) -> Void)?       // App's reduce motion (its native fades), as the system setting feeds it
 
     private let capsule: Capsule
     private let edge: Edge
@@ -345,6 +346,7 @@ final class QA {
             case "app_reduce_motion":
                 reduce = ev["on"] as? Bool ?? false
                 edge.setup(ev)
+                reduceMotionIn?(reduce)   // the native panel's fade too (amb-mac m_5534)
             case "app_settings":
                 edgeGlow = ev["edge_glow"] as? Bool ?? true
                 edge.setup(ev)

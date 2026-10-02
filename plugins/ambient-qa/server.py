@@ -56,7 +56,8 @@ TOOLS = [
      {"id": {"type": "string"}}, []),
     ("play", "A custom timeline into the app: events [[ms, ev], ...], shots [{at: ms, what}] (the core is muted while it plays). Files are named <name>@<s>s.",
      {"events": {"type": "array"}, "shots": {"type": "array"}, "name": {"type": "string"}, "backdrop": {"type": "string"}}, ["events"]),
-    ("outbox", "What the QA hub's main wrote to the fake accounts (drafts, sends, Slack posts, Linear issues, calendar events, GitHub comments): QA hubs only have fake Gmail, Slack, Linear, calendar, GitHub and HN accounts with fixture data, never the user's.", {}, []),
+    ("outbox", "What the QA hub's main wrote to the fake accounts (drafts, sends, Slack posts, Linear issues, calendar events, GitHub comments): QA hubs only have fake Gmail, Slack, Linear, calendar, GitHub, HN, Reddit, X and Bluesky accounts with fixture data, never the user's.", {}, []),
+    ("tick", "The fake launch's next batch of HN/Reddit/X/Bluesky comments comes in now, and its points, rank and likes move (they also come every 30 min of hub time).", {"n": {"type": "integer"}}, []),
     ("reset", "The pages start over (the model back to its start), the panel shown.", {}, []),
     ("run", "A scripted product run, measured the same way every time: a model hub (the user's model and keys, costs credits) with the fake accounts only; the scenario's ask through the core like the capsule's; times the page's first appearance, v1, then 3 scripted notes, send, v2 and the notes' outcomes; the outbox (no send on 'don't send'); main's capsule line length. Returns the one-screen report and its folder (run.json, report.txt, page bodies). Takes minutes.",
      {"scenario": {"type": "string", "enum": sorted(qa.SCENARIOS)}, "headless": {"type": "boolean", "description": "no app: a bise ambient-core child (text only: no mic, no voice)"},
@@ -145,6 +146,8 @@ def run(name, a):
         r = [{"id": s["id"], "spec": s["spec"], "label": s["label"]} for s in sc]
     elif name == "play":
         r = qa.play(a["events"], a.get("shots", []), a.get("name", "play"), a.get("backdrop"))
+    elif name == "tick":
+        r = qa.tick(int(a.get("n") or 1))
     elif name == "outbox":
         r = qa.outbox()
     elif name == "reset":

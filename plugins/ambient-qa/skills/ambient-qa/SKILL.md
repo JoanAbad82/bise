@@ -143,6 +143,17 @@ state, costs credits) with the fake accounts only:
 | `weekly-update` | draft my weekly update from Slack and Linear |
 | `inbox` | go through my mail, draft replies, don't send |
 | `offsite` | plan the offsite: the venue we decided, the budget, and an agenda for the two days, from my mail and Slack |
+| `launch-watch` | watch the launch until tomorrow, tell me what needs an answer (no notes: after v1 it ticks once, the page must republish with the new comments that need an answer; any write or a card not about such a comment fails) |
+
+The launch (roadmap B) lives in the fake `tools.hn.*`, `tools.reddit.*`,
+`tools.x.*`, `tools.bluesky.*` (the real plugins' tool names, read-only):
+acme's Show HN, r/SaaS post, X and Bluesky posts, 19 comments in three
+batches (questions, bugs, praise, spam, one "does it work with Claude
+Code?"). Batch 0 is there at the hub's start; `tick()` (`qa.py tick`)
+brings the next one now (else every 30 min of hub time,
+AMBIENT_QA_TICK_MIN), and points, rank and likes move with each batch.
+Links are the real places' (news.ycombinator.com/item?id=, reddit
+/r/<sub>/comments/<id>, x.com/<user>/status/<id>, bsky.app/profile/...).
 
 The ask goes through a core like the capsule's (the QA app's own; with
 `--headless` a `bise ambient-core` child, text only: no mic, no voice).

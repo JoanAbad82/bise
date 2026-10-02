@@ -179,8 +179,8 @@ def fake_accounts():
     check(sum(e["start"].startswith("2026-11-20") for e in later["calendar"]["events"]) >= 4 and "INV-2026-09-4471" in json.dumps(later), "dates move by whole days, ids don't")
     r = call("github", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "repo_stats", "arguments": {}}})
     check(json.loads(r[1]["result"]["content"][0]["text"])["stars"] == 1284, r)
-    r = call("hn", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "find_story", "arguments": {"query": "show hn acme"}}})
-    check(json.loads(r[1]["result"]["content"][0]["text"])["stories"][0]["rank"]["front"] == 7, r)
+    r = call("hn", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "story_status", "arguments": {"id": "41712001"}}})
+    check(json.loads(r[1]["result"]["content"][0]["text"])["rank"]["front"] == 7, r)
     r = call("gmail", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "create_draft", "arguments": {"to": "marc@acme.test", "subject": "weekly", "body": "x"}}})
     check(json.loads(r[1]["result"]["content"][0]["text"])["fake"] is True, r)
     r = call("slack", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "post_message", "arguments": {"channel": "team", "text": "hi"}}})
@@ -198,9 +198,53 @@ def fake_accounts():
 
 
 @test
+def launch_grows():
+    """the launch's comments come in batches (start, then a tick or every_min of hub time), numbers move, links are the real places', and the QA's truth never shows"""
+    d = tempfile.mkdtemp(prefix="aq-")
+    clk = os.path.join(d, "clock.json")
+    srv = os.path.join(PLUGIN, "fake-accounts", "fake_accounts.py")
+    init = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
+
+    def tool(svc, name, args):
+        msgs = [init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": name, "arguments": args}}]
+        p = subprocess.run([sys.executable, "-B", srv, svc], input="".join(json.dumps(m) + "\n" for m in msgs),
+                           capture_output=True, text=True, timeout=30, env=dict(os.environ, FAKE_ACCOUNTS_CLOCK=clk))
+        return json.loads(json.loads(p.stdout.splitlines()[1])["result"]["content"][0]["text"])
+    t0 = time.time() - 120
+    json.dump({"start": t0, "ticks": [], "every_min": 0}, open(clk, "w"))
+    first = tool("hn", "comments", {"id": "41712001"})["comments"]
+    pts0 = tool("hn", "story_status", {"id": "41712001"})["points"]
+    check(len(first) == 3 and "Claude Code" not in json.dumps(first), first)
+    check(not any(k in json.dumps(first) for k in ("needs_answer", "\"kind\"")), "the QA's truth stays hidden")
+    qa.tick(clock=clk)
+    later = tool("hn", "comments", {"id": "41712001"})["comments"]
+    check(len(later) == 5 and any("Claude Code" in c["text"] for c in later), later)
+    check(tool("hn", "story_status", {"id": "41712001"})["points"] > pts0, "points move")
+    check([c["author"] for c in tool("hn", "comments", {"id": "41712001", "since": "30m"})["comments"]] == ["agentsmith", "skeptic42"], "since")
+    check(later[0]["url"] == "https://news.ycombinator.com/item?id=41712140", later[0])
+    xs = tool("x", "mentions", {})["posts"]
+    check(xs and all(p["url"].startswith("https://x.com/") for p in xs), xs)
+    check(tool("bluesky", "thread", {"uri": "https://bsky.app/profile/acme.test/post/3l5acmelaunch"})["replies"] == 2, "bluesky grows")
+    check(tool("reddit", "comments", {"url_or_id": "1fx9k2q"})["comments"][0]["url"].startswith("https://www.reddit.com/r/SaaS/comments/1fx9k2q/"), "reddit link")
+    json.dump({"start": time.time() - 3 * 60 - 5, "ticks": [], "every_min": 1}, open(clk, "w"))
+    check(len(tool("hn", "comments", {"id": "41712001"})["comments"]) == 7, "every_min of hub time")
+    fb = tool("slack", "read_channel", {"channel": "acme-feedback"})["messages"]
+    check(len(fb) == 3 and {m["user"] for m in fb} == {"benjamin.roy"} and fb[0]["url"].startswith("https://acme.slack.com/archives/C05/p"), fb)
+    truth = qa.launch_truth(batches=2)
+    check(truth["needs_answer"] == 8 and len(truth["new_needs_answer"]) == 4, truth)
+
+
+@test
 def run_scenarios():
     """scripted runs: the three asks, an unknown one refused before any hub, a one-screen report that names times, notes, outbox and verdict"""
-    check(set(qa.SCENARIOS) == {"weekly-update", "inbox", "offsite"} and qa.SCENARIOS["inbox"]["no_send"], qa.SCENARIOS)
+    check({"weekly-update", "inbox", "offsite", "launch-watch"} <= set(qa.SCENARIOS) and qa.SCENARIOS["inbox"]["no_send"], qa.SCENARIOS)
+    lw = qa.SCENARIOS["launch-watch"]
+    check(lw["no_writes"] and lw["ticks"] == 1 and not lw["notes"], lw)
+    need = [c for c in qa.launch_truth(2)["new"] if c["needs_answer"]]
+    check(qa._card_about({"text": "agentsmith asks if it works with Claude Code"}, need), "a card about a comment")
+    check(not qa._card_about({"text": "approve: run sb every 30m"}, need), "a card off the ask")
+    body = '<li data-id="hn-41713010">agentsmith</li><li data-id="reddit-lq2e6f7"></li>'
+    check(qa._covered(body, need)["found"] == 2, qa._covered(body, need))
     try:
         qa.run("nope")
         check(False, "ran an unknown scenario")
