@@ -367,8 +367,10 @@
     frame(W.forYou);
     const list = () => main.querySelector('[data-kit="pages"] > ul');
     function line(li) {
-      li.querySelectorAll(".bise-meta").forEach((x) => x.remove());
+      li.querySelectorAll(".bise-meta, .bise-kicker").forEach((x) => x.remove());
       const s = li.dataset;
+      // what the page is for: its heading's meta line (the server's data-kicker)
+      if (s.kicker) li.append(el("span", { class: "bise-kicker" }, s.kicker));
       const parts = [s.agent, `v${s.version}`];
       if (s.state === "updating") parts.push(W.updating(s.agent).replace(" this page…", "…"));
       else if (s.at) parts.push(ago(parseInt(s.at, 10), Date.now()));
@@ -385,7 +387,7 @@
         const ul = list();
         if (!ul) return;
         ul.replaceChildren(...pages.map((p) => {
-          const li = el("li", { "data-page": p.id, "data-agent": p.agent, "data-version": p.version, "data-state": p.state, "data-at": p.at_ms });
+          const li = el("li", { "data-page": p.id, "data-agent": p.agent, "data-version": p.version, "data-state": p.state, "data-at": p.at_ms, "data-kicker": p.kicker || null, "data-asking": p.asking ? "" : null });
           li.append(el("a", { href: `/p/${p.id}` }, p.title || p.id));
           return li;
         }));

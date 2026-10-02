@@ -309,6 +309,17 @@ law("kit.css takes its colors from tokens.css only", () => {
   assert.ok(!/rgba?\(|hsla?\(/.test(css), "raw rgb/hsl in kit.css");
 });
 
+law("the fonts tokens.css names are in the kit (the CSP loads nothing from outside), each with its OFL", () => {
+  const css = readFileSync(join(here, "tokens.css"), "utf8");
+  const urls = [...css.matchAll(/url\(([^)]+)\)/g)].map((m) => m[1]);
+  assert.ok(urls.length >= 3, "font urls");
+  for (const u of urls) {
+    assert.ok(!/^(https?:)?\/\//.test(u), `${u} is outside`);
+    assert.ok(readFileSync(join(here, u)).length > 10000, `${u} missing`);
+  }
+  for (const f of ["OFL-newsreader.txt", "OFL-jetbrains-mono.txt"]) assert.ok(readFileSync(join(here, "fonts", f), "utf8").includes("SIL Open Font License"), f);
+});
+
 law("every example page is a fragment of known blocks with unique ids", () => {
   const kinds = new Set(["prose", "heading", "callout", "sources", "table", "question"]);
   for (const f of readdirSync(join(here, "examples"))) {

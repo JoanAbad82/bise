@@ -43,6 +43,7 @@ body {
 .bise-frame button[disabled] { opacity: .4; cursor: default; background: var(--talk-raised); }
 .bise-frame [hidden] { display: none; }
 .bise-frame .n { font: 12px var(--font-mono); color: var(--talk-dim); }
+.bise-frame .n:empty { display: none; }
 .bise-frame button.send { background: var(--talk-accent); color: var(--on-accent); font-weight: 600; }
 .bise-frame button.send[disabled] { background: var(--talk-raised); color: var(--talk-dim); opacity: 1; }
 @media (max-width: 720px) { .bise-frame .m, .bise-frame .n { display: none; } }
@@ -83,9 +84,9 @@ body {
 [data-kit="table"] table { width: 100%; border-collapse: collapse; margin: 10px 0 6px; font-size: 17px; }
 [data-kit="table"] caption { caption-side: bottom; text-align: left; font: italic 15px var(--font-read); color: var(--kick); padding-top: 6px; }
 [data-kit="table"] th { font: 400 var(--text-kicker) var(--font-mono); color: var(--kick); text-align: left; padding: 6px 10px; border-bottom: 1.5px solid var(--rule-strong); vertical-align: bottom; }
-[data-kit="table"] td { padding: 9px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+[data-kit="table"] td { padding: 9px 10px; border-bottom: 1px solid var(--rule); vertical-align: baseline; line-height: 1.5; }
 [data-kit="table"] [data-num] { text-align: right; }
-[data-kit="table"] td[data-num] { font: 15px var(--font-mono); white-space: nowrap; }
+[data-kit="table"] td[data-num] { font-family: var(--font-mono); font-size: 15px; line-height: 1.5; white-space: nowrap; }
 [data-kit="table"] > p { font: italic 15px var(--font-read); color: var(--kick); }
 
 /* callout: a card off the page with a mono kicker (its first h2/h3); the tone colors the kicker only */
@@ -138,7 +139,10 @@ body.bise-changes [data-changed]::after { content: "changed"; position: absolute
 [data-kit="pages"] li { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--rule); }
 [data-kit="pages"] li > a { font: 600 22px/1.25 var(--font-read); color: var(--ink); text-decoration: none; letter-spacing: -.01em; }
 [data-kit="pages"] li > a:hover { text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 4px; }
+[data-kit="pages"] .bise-kicker { grid-column: 1; font: italic 16px/1.4 var(--font-read); color: var(--dim); }
 [data-kit="pages"] .bise-meta { grid-column: 1; font: 12px var(--font-mono); color: var(--kick); }
+/* a page that holds an open question: the asking dot after its title */
+[data-kit="pages"] li[data-asking] > a::after { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 10px; vertical-align: .2em; box-shadow: 0 0 0 3px var(--accent-soft); }
 [data-kit="pages"] li[data-state="updating"] .bise-meta { color: var(--accent); }
 [data-kit="pages"] .bise-open { grid-column: 2; grid-row: 1 / span 2; align-self: center; font: 12px var(--font-mono); color: var(--accent); }
 [data-kit="pages"]:empty::before, [data-kit="pages"] > ul:empty::before { content: "nothing here yet. when an agent makes a page for you, it shows here."; font: italic 17px var(--font-read); color: var(--kick); }

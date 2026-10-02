@@ -13,6 +13,12 @@ them to you; you publish the next version and the same tab updates in place.
 You never write CSS, classes, scripts or colors: the kit draws everything. If something can't be
 said with the blocks below, say it in words.
 
+Not every answer is a page: a fact, a yes or no, a status, a one-line answer stay a sentence in
+your reply.
+
+Before you write: if `~/bise/taste.md` exists, read it. It holds the user's taste rules (tone,
+length, what they always want or never want); follow them on the page.
+
 ## 1. The blocks
 
 Every block is a `<section>` with its kind and an id. Ids are short, unique, and stay the same
@@ -99,7 +105,20 @@ More examples, each one passing the lint: `apps/ambient/kit/examples/` in the bi
 (`weekly-update.html` a doc, `offsite-venues.html` a table to choose from,
 `pricing-question.html` a decision).
 
-## 4. Publish
+## 4. Publish fast, then fill it
+
+The user should see the page within about 10 seconds of asking, then watch it fill in. So:
+
+1. **Skeleton first**, before you gather anything: the title, the section headings you expect,
+   and a callout that says what you are doing. Publish it at once.
+   ```html
+   <section data-kit="heading" data-id="title"><h1>the week, in three lines</h1><p>week 41 · for #team</p></section>
+   <section data-kit="callout" data-id="writing"><h3>writing…</h3><p>reading Slack and Linear for this week.</p></section>
+   <section data-kit="heading" data-id="h-numbers"><h2>numbers</h2></section>
+   ```
+2. **Fill it** with further publishes of the same `--id` as each part is ready (the open tab
+   swaps the new blocks in place, the user's scroll stays). Keep the ids you already used.
+3. **Last publish**: drop the `writing` callout, add the sources.
 
 Write the fragment in your temp folder, then:
 
