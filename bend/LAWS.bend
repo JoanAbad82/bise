@@ -1148,14 +1148,14 @@ law gate_reads_its_own_verdict:
 law gate_poll_order:
   {(Gt.found(Some{"7 a allow"}, Some{"1"}, "7", "a"), Gt.found(Some{""}, Some{"1"}, "7", "a"),
     Gt.found(None{}, Some{""}, "7", "a"))
-    == (Some{Gt.VAllow{""}}, Some{Gt.VStop{}}, None{})
+    == (Some{Gt.VAllow{""}}, Some{Gt.VStop{"the user"}}, None{})
     : Maybe<&2, Gt.Verdict> & Maybe<&2, Gt.Verdict> & Maybe<&2, Gt.Verdict>}
 
 # LAW: what the call returns: an allow runs, a denial is its reason, an
 # interrupt says so; the wire lines.
 law gate_results_and_lines:
-  {(Gt.denial(Gt.VAllow{"net"}), Gt.denial(Gt.VDeny{"no"}), Gt.denial(Gt.VStop{}),
-    Gt.ask_line("7", "bash", "ls \"x\"", "a"), Gt.done_line("7", Gt.how_of(Gt.VStop{})),
+  {(Gt.denial(Gt.VAllow{"net"}), Gt.denial(Gt.VDeny{"no"}), Gt.denial(Gt.VStop{"the user"}),
+    Gt.ask_line("7", "bash", "ls \"x\"", "a"), Gt.done_line("7", Gt.how_of(Gt.VStop{"main"})),
     Gt.poll_ms(0n), Gt.poll_ms(10n))
     == (None{}, Some{"no"}, Some{"interrupted by the user"},
         "gate 7 {\"tool\":\"bash\",\"args\":\"ls \\\"x\\\"\",\"nonce\":\"a\"}", "gate-done 7 interrupted",
@@ -2286,10 +2286,28 @@ law interrupt_flag_needs_content:
 # LAW (BR-007): an interrupted retry loop keeps the error that made it
 # retry - for every error text.
 law interrupted_keeps_last_error:
+  for +who: String
   for +n: Nat
   for +why: String
   exs head: String
-  {Pv.interrupted_text(n, why) == String.append(head, why) : String}
+  {Pv.interrupted_text(who, n, why) == String.append(head, why) : String}
+
+# LAW (interrupt-who): an interrupt names who asked for it. The hub writes the asker in
+# the flag ("user", "main", a task's name, "bise"); "1" (an older hub),
+# a blank flag or no file read as the user. The stopped call says so:
+# "interrupted by main", and a gated call's result too.
+law interrupt_names_who:
+  {(Pv.interrupter("main"), Pv.interrupter("user"), Pv.interrupter("1"),
+    Pv.interrupter(" bise\n"), Pv.interrupter_in(None{}), Pv.interrupter_in(Some{"main"}),
+    Pv.interrupted_by(Pv.interrupter("main")), Pv.interrupted_by(Pv.interrupter("user")),
+    Gt.found(None{}, Some{"main"}, "7", "a"), Gt.denial(Gt.VStop{"main"}),
+    Pv.interrupted_text("main", 2n, "x"))
+    == ("main", "the user", "the user", "bise", "the user", "main",
+        "interrupted by main", "interrupted by the user",
+        Some{Gt.VStop{"main"}}, Some{"interrupted by main"},
+        "stopped retrying (interrupted by main) after 2 failed attempts; last error: x")
+    : String & String & String & String & String & String & String & String
+      & Maybe<&2, Gt.Verdict> & Maybe<&2, String> & String}
 
 # LAW: retries exhausted: the final error ends with the last cause.
 law exhausted_keeps_last_error:
@@ -3757,6 +3775,43 @@ law interrupt_flag_semantics:
 # LAW: a streamed read waits 90 s at most (events come every few seconds).
 law provider_stream_step_timeout:
   {Pv.stream_step_ms() == 90000 : U32}
+
+# LAW: a provider with no idle_timeout_sec (or 0, or not a number) waits
+# 90 s, as before the key existed: nothing changes for who sets nothing.
+law provider_idle_timeout_default:
+  {Bool.and(U32.is_eq(Pv.wait_ms(Pv.stream_wait("", "fake", "fake/m")), 90000),
+      Bool.and(U32.is_eq(Pv.wait_ms(Pv.stream_wait(
+          "[providers.fake]\nidle_timeout_sec = 0\n", "fake", "fake/m")), 90000),
+        U32.is_eq(Pv.wait_ms(Pv.stream_wait(
+          "[providers.fake]\nidle_timeout_sec = \"soon\"\n", "fake", "fake/m")), 90000)))
+    == True{} : Bool}
+
+# LAW: idle_timeout_sec under [providers.<id>] sets the wait of its
+# models, a model's own table wins, another provider keeps 90 s, and a
+# huge value is capped at a day.
+law provider_idle_timeout_set:
+  {Bool.and(U32.is_eq(Pv.wait_ms(Pv.stream_wait(
+        "[providers.fake]\nidle_timeout_sec = 600\n", "fake", "fake/m")), 600000),
+      Bool.and(U32.is_eq(Pv.wait_ms(Pv.stream_wait(
+          "[providers.fake]\nidle_timeout_sec = 600\n[models.\"fake/m\"]\nidle_timeout_sec = 5\n",
+          "fake", "fake/m")), 5000),
+        Bool.and(U32.is_eq(Pv.wait_ms(Pv.stream_wait(
+            "[providers.fake]\nidle_timeout_sec = 600\n", "mistral", "mistral/m")), 90000),
+          U32.is_eq(Pv.wait_ms(Pv.stream_wait(
+            "[providers.fake]\nidle_timeout_sec = 99999999\n", "fake", "fake/m")), 86400000))))
+    == True{} : Bool}
+
+# LAW: a streamed call that times out still retries, and its text names
+# the host, the limit and the key to raise, under its provider's table.
+law attempt_timeout_names_the_key:
+  {Pv.attempt_err_in("127.0.0.1:8080", Pv.Wait{"ollama", 5000}, Pv.NTimeout{})
+    == Pv.ARetry{0, "no answer from 127.0.0.1:8080 in 5 s (timeout) — a slow model or gateway? raise idle_timeout_sec under [providers.ollama] in ~/.bise/config.toml"}
+    : Pv.Attempt}
+
+# LAW: the other transport failures of a streamed call read as before.
+law attempt_err_in_others:
+  {Pv.attempt_err_in("api.example.com", Pv.Wait{"x", 5000}, Pv.NDns{})
+    == Pv.attempt_err("api.example.com", Pv.NDns{}) : Pv.Attempt}
 
 # LAW: a debug event is one JSON object on one line: ts, src, kind, then
 # the fields in order; strings are JSON-escaped (a newline stays \\n).

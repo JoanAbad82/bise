@@ -693,6 +693,29 @@ def interrupt_path_of(+dir: String, +port: String) -> String:
 def interrupt_requested(+c: String) -> Bool:
   Bool.not(String.is_empty(String.trim(c)))
 
+# who an interrupt flag names: the hub writes who asked for the stop
+# ("user": Ctrl+C or esc in the TUI; "main" or a task's name: `sb
+# interrupt`; "bise": a stop of the hub's own). "1" (an older hub) and
+# an unreadable flag read as the user.
+def interrupter.of(+t: String) -> String:
+  Bool.pick(String, String.is_empty(t) || String.eq(t, "1") || String.eq(t, "user"),
+    "the user", t)
+
+def interrupter(+c: String) -> String:
+  interrupter.of(String.trim(c))
+
+# the same, from the flag file as read (no file: the user)
+def interrupter_in(m: Maybe<&2, String>) -> String:
+  match m:
+    case None{}:
+      "the user"
+    case Some{+c}:
+      interrupter(c)
+
+# the error of a call an interrupt stopped: "interrupted by main"
+def interrupted_by(+who: String) -> String:
+  String.append("interrupted by ", who)
+
 # ---- a transport failure, without the Http types ----
 
 type NetErr is Data:
@@ -1071,6 +1094,74 @@ def attempt_err.pick(retryable: Bool, +host: String, +e: NetErr) -> Attempt:
 def attempt_err(+host: String, +e: NetErr) -> Attempt:
   attempt_err.pick(retryable_err(e), host, e)
 
+# ---- a provider's own wait (slow gateways, local models) ----
+# idle_timeout_sec, under [providers.<id>] or a model's table: how long
+# one read of the streamed reply may wait for data (the response head,
+# then each gap between two events). A local model on a slow machine
+# can take minutes to read a long prompt before its first byte; a
+# gateway can hold the head while it queues. Unset, 0 or not a number:
+# stream_step_ms (90 s), as before. Capped at a day (the ms fit a U32).
+# The wait carries the provider id: the timeout text names the key.
+type Wait is Data:
+  Wait{prov: String, ms: U32}
+
+def idle_max_secs() -> U32:
+  86400
+
+def idle_ms.pick(zero: Bool, +secs: U32) -> U32:
+  match zero:
+    case True{}:
+      stream_step_ms()
+    case False{}:
+      U32.mul(U32.min(secs, idle_max_secs()), 1000)
+
+def idle_ms(+secs: U32) -> U32:
+  idle_ms.pick(U32.is_eq(secs, 0), secs)
+
+# `id` is the full "provider/model"
+def stream_wait(+file: String, +prov: String, +id: String) -> Wait:
+  Wait{prov, idle_ms(u32_or(model_key(registry(file), prov, id,
+    "idle_timeout_sec")))}
+
+def wait_ms(+w: Wait) -> U32:
+  match w:
+    case Wait{_, +ms}:
+      ms
+
+# "90 s"; under a second (never from the catalog): "0 s"
+def wait_secs(+ms: U32) -> String:
+  String.append(U32.show(U32.div(ms, 1000)), " s")
+
+# a read that waited the whole limit: the host, the limit, and the key
+# that raises it (the user can't tell a slow model from a dead link;
+# the text says what to change when it is the model)
+def timeout_cause(+host: String, +w: Wait) -> String:
+  match w:
+    case Wait{+prov, +ms}:
+      String.concat(["no answer from ", host, " in ", wait_secs(ms),
+        " (timeout) — a slow model or gateway? raise idle_timeout_sec under [providers.",
+        prov, "] in ~/.bise/config.toml"])
+
+def is_timeout(e: NetErr) -> Bool:
+  match e:
+    case NTimeout{}:
+      True{}
+    case _:
+      False{}
+
+def attempt_err_in.pick(timeout: Bool, +host: String, +w: Wait, +e: NetErr)
+    -> Attempt:
+  match timeout:
+    case True{}:
+      ARetry{0, timeout_cause(host, w)}
+    case False{}:
+      attempt_err(host, e)
+
+# a transport failure of a streamed call: a timeout names its limit and
+# idle_timeout_sec (still a retry, as before); the others as attempt_err
+def attempt_err_in(+host: String, +w: Wait, +e: NetErr) -> Attempt:
+  attempt_err_in.pick(is_timeout(e), host, w, e)
+
 # the line the client shows while the call waits (the TUI renders it
 # as a warning): "provider_retry: 2/10 · <why> · retry in 4s"
 def retry_line(+n: Nat, +why: String, +delay_ms: U32) -> String:
@@ -1089,9 +1180,10 @@ def exhausted_text(+tries: Nat, +why: String) -> String:
     " attempts: "]), why)
 
 # an interrupt during the retries stops them, and keeps the error that
-# made them necessary: the user sees both
-def interrupted_text(+tries: Nat, +why: String) -> String:
-  String.append(String.concat(["stopped retrying (interrupted by the user) after ",
+# made them necessary: the user sees both. who: interrupter's answer
+# ("the user", "main")
+def interrupted_text(+who: String, +tries: Nat, +why: String) -> String:
+  String.append(String.concat(["stopped retrying (interrupted by ", who, ") after ",
     Nat.show(tries), " failed attempts; last error: "]), why)
 
 # the pause before a retry is slept in 1 s slices, the flag read between

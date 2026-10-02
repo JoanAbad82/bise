@@ -820,7 +820,7 @@ fn land_feature_and_flow_say_not_in_a_repo_without_git() {
     let mut t = T::new();
     t.env.git = false;
     let reqs = [
-        ("land", AgentReq::Land { here: true, message: "x".into() }),
+        ("land", AgentReq::Land { here: true, message: "x".into(), add: Vec::new() }),
         ("feature", AgentReq::Feature { op: "new".into(), name: "foo".into() }),
         ("feature", AgentReq::Feature { op: "list".into(), name: String::new() }),
         ("flow", AgentReq::Flow { set: None }),
@@ -835,7 +835,7 @@ fn land_feature_and_flow_say_not_in_a_repo_without_git() {
     }
     // with git: the land goes on to the daemon
     t.env.git = true;
-    let (_, fx) = t.req(MAIN, AgentReq::Land { here: true, message: "x".into() });
+    let (_, fx) = t.req(MAIN, AgentReq::Land { here: true, message: "x".into(), add: Vec::new() });
     assert!(fx.iter().any(|e| matches!(e, Effect::Land { .. })));
 }
 
@@ -1890,6 +1890,38 @@ fn failed_turn_report_skips_main_and_user_stops() {
         "failed: stopped retrying (interrupted by the user) after 2 failed attempts; last error: x"
     )
     .is_none());
+    assert!(failed_turn_report(
+        "net",
+        "failed: stopped retrying (interrupted by main) after 2 failed attempts; last error: x"
+    )
+    .is_none());
+    assert_eq!(
+        failed_turn_report("net", "failed: interrupted by main").as_deref(),
+        Some("my turn stopped: interrupted by main — a new message continues it")
+    );
+    assert_eq!(
+        failed_turn_report("net", "failed: interrupted by the user").as_deref(),
+        Some("my turn stopped: interrupted by the user — a new message continues it")
+    );
+}
+
+// interrupt-who: the interrupt flag (Effect::Interrupt::by) names who asked, so the runtime's
+// text says "interrupted by main" for `sb interrupt` from main and
+// "by the user" for the TUI's interrupt
+#[test]
+fn an_interrupt_names_who_asked() {
+    let mut t = T::new();
+    t.spawn_task("net"); // its first turn is running
+    let by_of = |fx: &[Effect]| {
+        fx.iter().find_map(|e| match e {
+            Effect::Interrupt { agent, by } if agent == "net" => Some(by.clone()),
+            _ => None,
+        })
+    };
+    let (_, fx) = t.req(MAIN, AgentReq::Interrupt { agent: "net".into() });
+    assert_eq!(by_of(&fx).as_deref(), Some("main"), "{:?}", fx);
+    let fx = t.go(Input::ClientInterrupt { client: 1, agent: "net".into() });
+    assert_eq!(by_of(&fx).as_deref(), Some("user"), "{:?}", fx);
 }
 
 // ---- BISE-04: hub line protocol v2 (contract C2) ----

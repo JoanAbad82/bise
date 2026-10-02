@@ -138,11 +138,12 @@ pub enum AgentReq {
         agent: String,
         place: String,
     },
-    /// `sb land [--here] "<message>"` (dev-flow §5): run by the daemon,
-    /// off the hub's loop (`Effect::Land`).
+    /// `sb land [--here] [--add <path>]... "<message>"` (dev-flow §5):
+    /// run by the daemon, off the hub's loop (`Effect::Land`).
     Land {
         here: bool,
         message: String,
+        add: Vec<String>,
     },
     Interrupt {
         agent: String,
@@ -315,6 +316,11 @@ impl AgentReq {
             "land" => AgentReq::Land {
                 here: v.get("here").and_then(|x| x.as_bool()).unwrap_or(false),
                 message: jstr(v, "message"),
+                add: v
+                    .get("add")
+                    .and_then(|x| x.as_array())
+                    .map(|xs| xs.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
+                    .unwrap_or_default(),
             },
             "interrupt" => AgentReq::Interrupt {
                 agent: jstr(v, "agent"),
@@ -508,8 +514,12 @@ pub enum Effect {
         agent: String,
         line: String,
     },
+    /// `by`: who asked, written in the interrupt flag so the runtime's
+    /// text names them ("user": the TUI; "main" or a task: `sb
+    /// interrupt`; "bise": the hub itself).
     Interrupt {
         agent: String,
+        by: String,
     },
     /// Rewrite the agent's BEND_CONTEXT_FILE.
     Context {
@@ -817,6 +827,9 @@ pub struct Hub {
     revive: Option<Revive>,
     /// Lines for main's feed from a revival, out at the next input.
     revived: Vec<String>,
+    /// Who asked for the interrupt sb-core is deciding on (the user, an
+    /// agent); none: the hub's own (`Effect::Interrupt::by`).
+    interrupt_by: Option<String>,
 }
 
 /// What the hub needs to restart a dead sb-core (BISE-292): the journal
@@ -975,6 +988,7 @@ impl Hub {
             link,
             revive: None,
             revived: Vec::new(),
+            interrupt_by: None,
         };
         hub.view_all();
         hub
@@ -1320,7 +1334,7 @@ impl Hub {
 
     /// `sb land` (dev-flow §5): what the land needs from the state. The
     /// daemon adds the repo's flow and runs it (`land::run`).
-    fn land_job(&self, from: &str, here: bool, message: &str) -> Result<crate::land::Job, String> {
+    fn land_job(&self, from: &str, here: bool, message: &str, add: Vec<String>) -> Result<crate::land::Job, String> {
         let name = self.st.resolve(from).ok_or_else(|| format!("unknown agent: {}", from))?;
         let a = &self.st.agents[&name];
         let place = a.ws.place_id(&a.dir);
@@ -1342,6 +1356,8 @@ impl Hub {
             shared: std::path::PathBuf::from(&self.workspace),
             files: a.files.iter().cloned().collect(),
             others,
+            add,
+            since_ms: a.created_ms,
             flow: crate::flow::FlowConfig::default(),
             // a feature's agent lands on the feature (dev-flow §5.1)
             onto: a.ws.feature().map(|f| format!("refs/heads/{}", f)),
@@ -1922,12 +1938,11 @@ impl Hub {
                 self.clients.remove(&client);
             }
             Input::ClientConfirm { client, id, yes } => self.confirm(&mut fx, env, client, id, yes),
-            Input::ClientInterrupt { client, agent } => self.core(
-                &mut fx,
-                env,
-                Some(client),
-                json!({"t": "interrupt", "agent": agent}),
-            ),
+            Input::ClientInterrupt { client, agent } => {
+                self.interrupt_by = Some("user".into());
+                self.core(&mut fx, env, Some(client), json!({"t": "interrupt", "agent": agent}));
+                self.interrupt_by = None;
+            }
             Input::Agent { token, from, req } => self.agent_req(&mut fx, env, token, &from, req),
             Input::EveryStop { id, why } => {
                 if let Some(t) = self.every.map.get(&id).cloned() {
@@ -2059,7 +2074,10 @@ impl Hub {
                 agent,
                 line: jstr(f, "line"),
             }),
-            "interrupt" => fx.push(Effect::Interrupt { agent }),
+            "interrupt" => {
+                let by = self.interrupt_by.clone().unwrap_or_else(|| "bise".into());
+                fx.push(Effect::Interrupt { agent, by })
+            }
             "line" => {
                 // C2: a multi-field line (`answered`) comes as `fields`
                 let text = match f.get("fields") {
@@ -2358,7 +2376,9 @@ impl Hub {
                 }
             }
             UserCmd::Interrupt => {
-                self.core(fx, env, c, json!({"t": "interrupt", "agent": focus}))
+                self.interrupt_by = Some("user".into());
+                self.core(fx, env, c, json!({"t": "interrupt", "agent": focus}));
+                self.interrupt_by = None;
             }
             UserCmd::Passthrough(l) => {
                 let first = l.split_whitespace().next().unwrap_or("");
@@ -2579,8 +2599,8 @@ impl Hub {
                 Ok(ws) => json!({"cmd": "move", "agent": agent, "ws": ws}),
                 Err(e) => json!({"cmd": "move", "agent": agent, "pre_err": e}),
             },
-            AgentReq::Land { here, message } => {
-                match self.land_job(from, here, &message) {
+            AgentReq::Land { here, message, add } => {
+                match self.land_job(from, here, &message, add) {
                     Ok(job) => {
                         // pr-news: the PR's news go to the place's last lander
                         if job.worktree {
@@ -2592,7 +2612,12 @@ impl Hub {
                 }
                 return;
             }
-            AgentReq::Interrupt { agent } => json!({"cmd": "interrupt", "agent": agent}),
+            AgentReq::Interrupt { agent } => {
+                // the flag names the asker: "interrupted by main", not
+                // "by the user"
+                self.interrupt_by = Some(from.to_string());
+                json!({"cmd": "interrupt", "agent": agent})
+            }
             AgentReq::Stop { agent, reason } => {
                 json!({"cmd": "stop", "agent": agent, "reason": reason})
             }
@@ -2644,12 +2669,17 @@ fn direct_exchange(task: &str, sent: &[String], reply: &str) -> (String, String)
 
 /// BR-007: the report a failed turn of a task sends to its parent, or
 /// None when there is nothing to report: a completed or interrupted
-/// turn, main (its own view shows the failure), or a retry loop the user
-/// stopped on purpose.
+/// turn, main (its own view shows the failure), or a retry loop someone
+/// stopped on purpose. A call an interrupt stopped mid-answer says who
+/// asked (the runtime's "interrupted by main" / "by the user") and is a
+/// stop, not a failure.
 fn failed_turn_report(agent: &str, turn_done: &str) -> Option<String> {
     let why = turn_done.strip_prefix("failed: ")?;
-    if agent == "main" || why.starts_with("stopped retrying (interrupted by the user)") {
+    if agent == "main" || why.starts_with("stopped retrying (interrupted by ") {
         return None;
+    }
+    if why.starts_with("interrupted by ") {
+        return Some(format!("my turn stopped: {} — a new message continues it", why));
     }
     Some(format!(
         "my turn failed: {} — a new message retries it",

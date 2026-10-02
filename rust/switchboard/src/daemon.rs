@@ -523,6 +523,10 @@ impl Shell {
                     if let Some(e) = &o.push_error {
                         text = format!("{} ({})", text, e);
                     }
+                    let note = crate::land::left_out_note(&o.left_out);
+                    if !note.is_empty() {
+                        text = format!("{}. {}", text, note);
+                    }
                     (json!({"ok": true, "text": text}), ("info".to_string(), text))
                 }
                 Err(e) => (
@@ -1669,9 +1673,12 @@ impl Shell {
             Effect::Passthrough { agent, line } => {
                 self.repl_write(&agent, &format!("{}\n", line));
             }
-            Effect::Interrupt { agent } => {
+            Effect::Interrupt { agent, by } => {
+                // the flag's content names the asker (the runtime's
+                // "interrupted by main", provider-pure.bend interrupter;
+                // any content is a stop request)
                 if let Some(r) = self.dir_of(&agent).and_then(|d| self.repls.get(&d)) {
-                    let _ = std::fs::write(&r.interrupt, "1");
+                    let _ = std::fs::write(&r.interrupt, &by);
                 }
             }
             Effect::Context { agent, text } => {

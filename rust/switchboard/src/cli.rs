@@ -88,9 +88,9 @@ pub const COMMANDS: &[CmdDoc] = &[
         "who is who for the user (~/bise/people.md, one line each): no argument lists them; `set` adds a person or replaces what is known about them, `remove` forgets them. The only way to change that file; the about-you page follows.",
     ),
     cmd(
-        "sb land [--here] \"<message>\"",
+        "sb land [--here] [--add <path>]... \"<message>\"",
         Who::Everyone,
-        "commit the files you changed (only yours, never another agent's) with that message. `--here`: on your place's branch (the shared folder: its branch, main). Without it, from a worktree: the branch is rebased on main, checked, and main moves to it (pushed when the repo says so); from the shared folder, the same as `--here`. A file another agent also changed is refused: main decides.",
+        "commit the files you changed (only yours, never another agent's) with that message. `--here`: on your place's branch (the shared folder: its branch, main). Without it, from a worktree: the branch is rebased on main, checked, and main moves to it (pushed when the repo says so); from the shared folder, the same as `--here`. A file another agent also changed is refused: main decides. New files: in a worktree you have alone, every new file not ignored is yours and lands; elsewhere, new files you made with bash (a generator, a download) land only with `--add <file or folder>`, and the land names the new files it left out.",
     ),
     cmd(
         "sb inspect main --origin",
@@ -612,9 +612,20 @@ pub fn build(args: &[String]) -> Result<Value, String> {
         "every" => every_req(rest, &mut req)?,
         "taste" | "people" => keeps_req(cmd, rest, &mut req)?,
         "land" => {
-            let (pos, o) = parse_args(rest, &[], &["here"])?;
+            let (pos, o) = parse_args(rest, &["add"], &["here"])?;
             req.insert("here".into(), json!(o.contains_key("here")));
             req.insert("message".into(), json!(pos.join(" ")));
+            // --add paths, absolute: the hub resolves them in the place
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let add: Vec<String> = match o.get("add") {
+                Some(Value::Array(xs)) => xs.iter().filter_map(|x| x.as_str().map(str::to_string)).collect(),
+                Some(Value::String(x)) => vec![x.clone()],
+                _ => Vec::new(),
+            };
+            let add: Vec<String> = add.iter().map(|p| cwd.join(p).to_string_lossy().to_string()).collect();
+            if !add.is_empty() {
+                req.insert("add".into(), json!(add));
+            }
         }
         "interrupt" | "drop" | "restore" | "isolate" => {
             let (pos, _) = parse_args(rest, &[], &[])?;
