@@ -242,23 +242,34 @@ law("numbers: what reads as a number", () => {
 });
 
 const Q = `<section data-kit="question" data-id="q1"><p>post it now?</p><ol><li>post now</li><li>wait for <strong>Marc</strong></li></ol></section>`;
-law("question: a pick marks one option and tells notes.js; the same pick again takes it back", () => {
+law("question: a pick marks one option and says what it is; the same pick again takes it back", () => {
   const main = parse(Q);
   const q = blocks(main)[0];
   K.decorate([q], "weekly update");
   assert.equal(q.getAttribute("data-by"), "weekly update");
-  K.pick(doc, q, 2);
+  const seen = [K.pick(q, 2)];
   assert.deepEqual(K.options(q).map((li) => li.hasAttribute("data-picked")), [false, true]);
-  K.pick(doc, q, 1);
+  seen.push(K.pick(q, 1));
   assert.deepEqual(K.options(q).map((li) => li.hasAttribute("data-picked")), [true, false]);
-  K.pick(doc, q, 1);
+  seen.push(K.pick(q, 1));
   assert.deepEqual(K.options(q).map((li) => li.hasAttribute("data-picked")), [false, false]);
-  assert.deepEqual(events, [
-    { type: "bise:pick", detail: { block: "q1", option: 2, text: "wait for Marc" } },
-    { type: "bise:pick", detail: { block: "q1", option: 1, text: "post now" } },
-    { type: "bise:pick", detail: { block: "q1", option: null, text: null } },
+  assert.deepEqual(j(seen), [
+    { block: "q1", option: 2, text: "wait for Marc" },
+    { block: "q1", option: 1, text: "post now" },
+    { block: "q1", option: null, text: null },
   ]);
-  assert.equal(K.pick(doc, q, 3), null, "no option 3");
+  assert.equal(K.pick(q, 3), null, "no option 3");
+});
+
+law("question: an answer from anywhere (SSE answered) shows on the page and tells notes.js", () => {
+  const q = blocks(parse(Q))[0];
+  K.decorate([q], "weekly update");
+  K.pick(q, 1);
+  K.answered(doc, q, "2");
+  assert.equal(q.getAttribute("data-answer"), "2");
+  assert.deepEqual(K.options(q).map((li) => li.hasAttribute("data-picked")), [false, true]);
+  assert.equal(K.pick(q, 1), null, "answered: no other pick");
+  assert.deepEqual(events, [{ type: "bise:answered", detail: { block: "q1", reply: "2" } }]);
 });
 
 law("question: an answered one (data-answer, by number or by text) shows its pick and takes no other", () => {
@@ -267,7 +278,7 @@ law("question: an answered one (data-answer, by number or by text) shows its pic
     const q = blocks(parse(Q.replace('data-id="q1"', `data-id="q1" data-answer="${ans}"`)))[0];
     K.decorate([q], "a");
     assert.deepEqual(K.options(q).map((li) => li.hasAttribute("data-picked")), [false, true], ans);
-    assert.equal(K.pick(doc, q, 1), null);
+    assert.equal(K.pick(q, 1), null);
     assert.equal(events.length, 0);
   }
 });

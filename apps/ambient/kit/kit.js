@@ -5,7 +5,10 @@
 //   bise:swapped {version, changed, removed}   a new version is in (changed = new or different ids)
 //   bise:notes   {notes}                       the SSE notes event (all notes of the page)
 //   bise:state   {state}                       the SSE state event ("ready" | "updating")
-//   bise:pick    {block, option, text}         the user picked a question's option (null: took it back)
+//   bise:pick    {block, option, text}         a question's option picked as a note (null: taken
+//                                              back), when the server has no /answer route (slice 1)
+//   bise:answered {block, reply}               the question's card was answered (SSE answered)
+//   bise:voice   {phase, text}                 a voice note at the mouse (SSE voice, slice 2)
 // and the frame's [data-bise-notes-count] and [data-bise-send] (notes.js writes and binds them).
 // No style= anywhere: looks hang on data- attributes kit.css reads. The pure half (BiseKit.*) runs
 // in node for the laws (apps/ambient/kit/check.mjs) with a fake DOM.
@@ -152,8 +155,9 @@
     const list = kids(block).find((c) => /^(ol|ul)$/i.test(c.tagName));
     return list ? kids(list).filter((c) => /^li$/i.test(c.tagName)) : [];
   };
-  // pick (or take back) option n (1-based) of a question; the event goes to notes.js
-  function pick(doc, block, n) {
+  // pick (or take back) option n (1-based) of a question: marks it and says what was picked
+  // ({block, option, text}; option null: taken back), or null when there is nothing to pick
+  function pick(block, n) {
     if (block.getAttribute("data-answer") != null) return null;
     const opts = options(block);
     const li = opts[n - 1];
@@ -161,9 +165,14 @@
     const again = li.hasAttribute("data-picked");
     opts.forEach((o) => o.removeAttribute("data-picked"));
     if (!again) li.setAttribute("data-picked", "");
-    const detail = { block: idOf(block), option: again ? null : n, text: again ? null : norm(li.textContent) };
-    doc.dispatchEvent(new root.CustomEvent("bise:pick", { detail }));
-    return detail;
+    return { block: idOf(block), option: again ? null : n, text: again ? null : norm(li.textContent) };
+  }
+  // The answer reached the page (SSE `answered`, from the page, the capsule or the TUI): the
+  // question shows it, and notes.js drops any draft pick on that block.
+  function answered(doc, block, reply) {
+    block.setAttribute("data-answer", String(reply));
+    decorateQuestion(block, block.getAttribute("data-by"));
+    doc.dispatchEvent(new root.CustomEvent("bise:answered", { detail: { block: idOf(block), reply: String(reply) } }));
   }
   function decorate(blocks, agent) {
     for (const b of blocks) {
@@ -190,7 +199,7 @@
     return { ...res, marked: [...marked] };
   }
 
-  const BiseKit = { W, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, options, norm };
+  const BiseKit = { W, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, options, norm };
   root.BiseKit = BiseKit;
 
   // ---- the browser: the frame, the stream, the keys ----
@@ -304,13 +313,35 @@
       const data = (e) => { try { return JSON.parse(e.data); } catch (_) { return {}; } };
       es.addEventListener("version", (e) => { const v = data(e).n; swapping = swapping.then(() => goTo(v)).catch(() => {}); });
       es.addEventListener("state", (e) => setState(data(e).state || "ready"));
+      const relay = (ev, name) => es.addEventListener(ev, (e) => doc.dispatchEvent(new root.CustomEvent(name, { detail: data(e) })));
       es.addEventListener("notes", (e) => doc.dispatchEvent(new root.CustomEvent("bise:notes", { detail: { notes: data(e).notes || [] } })));
+      relay("voice", "bise:voice"); // slice 2 (§4.1): {phase, text}, notes.js pins it
+      es.addEventListener("answered", (e) => {
+        const d = data(e);
+        const q = blocks().find((b) => b.dataset.id === d.block && b.dataset.kit === "question");
+        if (q && d.reply != null) answered(doc, q, d.reply);
+      });
+    }
+
+    // A pick answers the question's card (§4.2: POST /answer, one card, one answer). Until the
+    // server has that route (404), or when it fails, the pick goes to notes.js as a pick note.
+    let answerRoute = true;
+    const token = (doc.querySelector('meta[name="bise-token"]') || { content: "" }).content;
+    function onPick(q, n) {
+      const d = pick(q, n);
+      if (!d) return false;
+      const asNote = () => doc.dispatchEvent(new root.CustomEvent("bise:pick", { detail: d }));
+      if (d.option == null || !answerRoute) { asNote(); return true; }
+      fetch(`/api/p/${id}/answer`, { method: "POST", headers: { "Content-Type": "application/json", "X-Bise-Token": token }, body: JSON.stringify({ block: d.block, option: d.option }) })
+        .then((r) => { if (r.status === 404) answerRoute = false; if (!r.ok) asNote(); })
+        .catch(asNote);
+      return true;
     }
 
     // questions: click an option, or its digit when nothing is being typed
     main.addEventListener("click", (e) => {
       const li = e.target.closest && e.target.closest('[data-kit="question"] li');
-      if (li) { const q = li.closest('[data-kit="question"]'); pick(doc, q, options(q).indexOf(li) + 1); return; }
+      if (li) { const q = li.closest('[data-kit="question"]'); onPick(q, options(q).indexOf(li) + 1); return; }
       const sup = e.target.closest && e.target.closest("sup");
       if (sup) showSource(parseInt(sup.textContent, 10));
     });
@@ -319,7 +350,7 @@
       const t = e.target;
       if (t && (t.isContentEditable || /^(input|textarea|select)$/i.test(t.tagName))) return;
       const q = blocks().find((b) => b.dataset.kit === "question" && !b.hasAttribute("data-answer"));
-      if (q && pick(doc, q, parseInt(e.key, 10))) e.preventDefault();
+      if (q && onPick(q, parseInt(e.key, 10))) e.preventDefault();
     });
     function showSource(k) {
       const src = blocks().find((b) => b.dataset.kit === "sources");
