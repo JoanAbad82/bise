@@ -11,8 +11,9 @@
 ::highlight(bise-note) { background-color: color-mix(in srgb, var(--pen, #c8264a) 18%, transparent); }
 ::highlight(bise-note-sent) { background-color: color-mix(in srgb, var(--pen, #c8264a) 8%, transparent); }
 #bise-page [data-kit][data-id].bn-has { box-shadow: -3px 0 0 color-mix(in srgb, var(--pen, #c8264a) 55%, transparent); }
-#bise-page [data-kit="prose"].bn-editing { outline: 1.5px dashed var(--pen, #c8264a); outline-offset: 6px; border-radius: 2px; }
-#bise-page [data-kit="prose"].bn-edited { box-shadow: -3px 0 0 var(--pen, #c8264a); }
+/* edit in place: prose, a message, an email, a review's item */
+#bise-page .bn-editing { outline: 1.5px dashed var(--pen, #c8264a); outline-offset: 6px; border-radius: 2px; }
+#bise-page .bn-edited { box-shadow: -3px 0 0 var(--pen, #c8264a); }
 html.bn-pinning #bise-page [data-kit][data-id] { cursor: crosshair; }
 
 /* the side list: `notes for weekly update · 3` */

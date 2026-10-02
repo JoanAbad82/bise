@@ -580,6 +580,29 @@ law("notes: the words (ambient's), names with spaces", () => {
   assert.equal(N.NW.drawHint, "draw on the page   d done");
   assert.equal(N.NW.replyBy(N.spaced("launch-recap")), "launch recap:");
 });
+law("notes: approve / skip (kit.js's bise:react) is one note per review item or email, the latest wins, kind null takes it back; an edit is one per item", () => {
+  const m = N.model([], counted());
+  m.react("r1", "m1", "approve", "reply to Anna", 1, 1);
+  m.react("r1", "m2", "skip", "reply to Bob", 1, 2);
+  m.react("r1", "m1", "skip", "reply to Anna", 1, 3);          // the latest wins
+  m.react("e1", null, "approve", "", 1, 4);                    // a whole email
+  eq(m.drafts().map((n) => [n.block, n.item || null, n.kind]), [["r1", "m1", "skip"], ["r1", "m2", "skip"], ["e1", null, "approve"]]);
+  m.react("r1", "m2", null, "", 1, 5);                          // taken back
+  eq(m.drafts().map((n) => n.item || n.block), ["m1", "e1"]);
+  assert.equal(N.label(m.get("n1")), "skip"); assert.equal(m.get("n1").text, "reply to Anna");
+  assert.equal(N.label({ kind: "approve" }), "approve");
+  // edits on two items of one review are two notes; a second edit of one item updates it
+  m.edit("r1", "Thanks", "Thank you", 6, "m1");
+  m.edit("r1", "see you", "talk soon", 7, "m3");
+  m.edit("r1", "Thanks", "Many thanks", 8, "m1");
+  eq(m.drafts().filter((n) => n.kind === "edit").map((n) => [n.item, n.after]), [["m1", "Many thanks"], ["m3", "talk soon"]]);
+});
+law("notes: the kit's own controls (data-kit-ui) are never in a block's text, so never in a quote or an anchor", () => {
+  const ui = { nodeType: 1, childNodes: [fakeText("approve skip")], classList: { contains: () => false }, hasAttribute: (a) => a === "data-kit-ui" };
+  const li = fakeEl(fakeText("Hi Anna, yes for tuesday."), ui);
+  const pts = BiseNotes.rawPoints(li);
+  assert.equal(pts.map(([n, i]) => n.nodeValue[i]).join(""), "Hi Anna, yes for tuesday.");
+});
 law("notes: a note's place is the quoted words or the block's name (its kicker or heading, else its section's), never a block id (ambient, m_4919)", () => {
   assert.equal(N.where({ block: "c-check", quote: "post it now" }, "check before posting"), '"post it now"');
   assert.equal(N.where({ block: "c-check" }, "check before posting"), "check before posting");

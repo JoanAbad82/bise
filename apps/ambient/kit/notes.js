@@ -27,6 +27,8 @@
     sentTag: "sent",
     changed: (before, after) => `you changed "${before}" → "${after}"`,
     marks: { keep: "♡ keep", drop: "✗ drop", unsure: "~ not sure" },
+    // approve / skip on a review's item or an email (§4.3; kit.js's buttons say the same words)
+    reacts: { approve: "approve", skip: "skip" },
     // a voice note's pin while you talk (the mocks' `you · voice`; ambient, m_4877)
     voiceBy: "you · voice",
     // a drawing in the side list, and the hint while you draw (§5.4; asked to ambient)
@@ -142,11 +144,14 @@
     if (NW.marks[n.kind]) return n.text ? `${NW.marks[n.kind]}: ${n.text}` : NW.marks[n.kind];
     if (n.kind === "pick") return NW.picked(n.option, n.text);
     if (n.kind === "draw") return n.text ? `${NW.drawing}: ${n.text}` : NW.drawing;
+    // the item's own words are long (a whole mail): its place line names it, the note says the verdict
+    if (NW.reacts[n.kind]) return NW.reacts[n.kind];
     return n.text || "";
   }
 
   // ---- the notes model: drafts are yours until `send`; the server's statuses win for the rest
   const STATUS = ["draft", "sent", "done", "answered"];
+  const REACTS = ["approve", "skip"];
   // every note gets its own id here: the server numbers id-less notes n<max+1>, so a removed
   // draft's number could come back (ambient-lead, m_4805). `n` + time + random, base 36.
   const newId = (now) => `n${Math.floor(now || Date.now()).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -212,15 +217,24 @@
         else notes.push(u.note);
         return u;
       },
-      // an edit on a block already edited: one note per block, its before kept from the first
-      edit(block, before, after, now) {
-        const prev = notes.find((n) => n.status === "draft" && n.kind === "edit" && n.block === block);
+      // an edit on a block (or a review's item) already edited: one note per block or item, its
+      // before kept from the first
+      edit(block, before, after, now, item) {
+        const prev = notes.find((n) => n.status === "draft" && n.kind === "edit" && n.block === block && (n.item || null) === (item || null));
         if (prev) {
           if (norm(prev.before) === norm(after)) { api.remove(prev.id); undo.pop(); return null; }
           return api.update(prev.id, { after, at_ms: now || prev.at_ms });
         }
         if (norm(before) === norm(after)) return null;
-        return api.add({ kind: "edit", block, before, after }, now);
+        return api.add({ kind: "edit", block, ...(item ? { item } : {}), before, after }, now);
+      },
+      // approve / skip on a review's item or an email (kit.js's bise:react, §4.3): one per item,
+      // the latest wins; kind null (the same again) takes it back
+      react(block, item, kind, text, version, now) {
+        const prev = notes.find((n) => n.status === "draft" && REACTS.includes(n.kind) && n.block === block && (n.item || null) === (item || null));
+        if (!REACTS.includes(kind)) { if (prev) notes = notes.filter((x) => x !== prev); return null; }
+        if (prev) return api.update(prev.id, { kind, text: text || undefined, at_ms: now || prev.at_ms });
+        return api.add({ version, block, ...(item ? { item } : {}), kind, text: text || undefined }, now);
       },
       // a question's option picked on the page (kit.js's bise:pick): one pick per block, the
       // latest wins; picking the same option again takes it back
@@ -293,10 +307,18 @@
     const out = [];
     const walk = (n) => {
       if (n.nodeType === 3) out.push(n);
-      else if (n.nodeType === 1 && !(n.classList && n.classList.contains("bn-ui"))) for (const c of n.childNodes) walk(c);
+      // our layer and the kit's own controls (data-kit-ui: approve / skip...) are not the agent's text
+      else if (n.nodeType === 1 && !(n.classList && n.classList.contains("bn-ui")) && !(n.hasAttribute && n.hasAttribute("data-kit-ui"))) for (const c of n.childNodes) walk(c);
     };
     walk(el);
     return out;
+  }
+  // an element's text as the agent wrote it (what anchors and quotes read)
+  const textOf = (el) => (el ? textNodes(el).map((t) => t.nodeValue).join("") : "");
+  // a fragment's text without the kit's controls (a selection's)
+  function fragText(frag) {
+    if (frag.querySelectorAll) for (const u of frag.querySelectorAll("[data-kit-ui], .bn-ui")) u.remove();
+    return frag.textContent || "";
   }
   // normalized offset -> (node, offset): walk the raw text, counting collapsed whitespace once
   function rawPoints(el) {
@@ -331,13 +353,14 @@
     const start = r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement;
     const block = start && start.closest("[data-kit][data-id]");
     if (!block || !page.contains(block) || !block.contains(r.endContainer)) return null;
-    const quote = norm(sel.toString());
+    const quote = norm(fragText(r.cloneContents()));
     if (!quote) return null;
     // the offset: the normalized text before the selection
     const pre = r.cloneRange();
     pre.selectNodeContents(block);
     pre.setEnd(r.startContainer, r.startOffset);
-    const offset = norm(pre.toString()).length + (/\s$/.test(pre.toString()) && pre.toString().trim() ? 1 : 0);
+    const before = fragText(pre.cloneContents());
+    const offset = norm(before).length + (/\s$/.test(before) && before.trim() ? 1 : 0);
     return { block: block.dataset.id, quote, offset };
   }
 
@@ -355,7 +378,7 @@
     const el = (tag, cls, text) => { const e = doc.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
     const blocks = () => [...page.querySelectorAll("[data-kit][data-id]")];
     const blockById = (id) => page.querySelector(`[data-kit][data-id="${CSS.escape(id)}"]`);
-    const blockTexts = () => Object.fromEntries(blocks().map((b) => [b.dataset.id, norm(b.textContent)]));
+    const blockTexts = () => Object.fromEntries(blocks().map((b) => [b.dataset.id, norm(textOf(b))]));
     let state = "ready";
 
     // ---- the server
@@ -409,16 +432,19 @@
     };
     // a block's name, as the page shows it (never its id)
     const heads = "h1, h2, h3, h4";
-    function nameOf(id) {
+    function nameOf(id, item) {
       const b = id && blockById(id);
       if (!b) return "";
+      // a review's item goes by its first line (the mail's sender and subject), never its id
+      const x = item && editEl(id, item);
+      if (x) { const first = x.querySelector("p, h3, h4"); return blockName(first ? textOf(first) : "", "", textOf(x)); }
       const own = b.querySelector(heads);
       let section = null;
       for (let p = b.previousElementSibling; p && !section; p = p.previousElementSibling) if (p.dataset && p.dataset.kit === "heading") section = p.querySelector(heads);
       const kit = b.dataset.kit;
       // a heading block is its own name; a callout's kicker is its first h2/h3; a table or a
       // prose block goes by its section
-      return blockName(kit === "heading" || kit === "callout" ? own && own.textContent : "", section ? section.textContent : "", b.textContent);
+      return blockName(kit === "heading" || kit === "callout" ? own && own.textContent : "", section ? section.textContent : "", textOf(b));
     }
     const frameCount = () => doc.querySelector("[data-bise-notes-count]");
     const frameSend = () => doc.querySelector("[data-bise-send]");
@@ -431,7 +457,7 @@
       for (const n of M.all()) {
         if (!n.quote || n.kind === "edit") continue;
         const b = blockById(n.block);
-        const at = b && locate(b.textContent, n.quote, n.offset);
+        const at = b && locate(textOf(b), n.quote, n.offset);
         const r = at && rangeFor(doc, b, at.start, at.end);
         if (r) (n.status === "draft" ? mine : moved).add(r);
       }
@@ -448,7 +474,7 @@
       listBody.replaceChildren(...all.map((n) => {
         const li = el("li", `bn-item bn-${n.status}${n.anchor === "moved" ? " bn-moved" : ""}`);
         li.dataset.note = n.id;
-        li.append(el("div", "bn-where", where(n, nameOf(n.block))), glyphed("div", "bn-what", label(n)));
+        li.append(el("div", "bn-where", where(n, nameOf(n.block, n.item))), glyphed("div", "bn-what", label(n)));
         const o = outcome(n);
         if (n.anchor === "moved") li.append(el("div", "bn-tag bn-tag-moved", NW.moved));
         else if (o.tag === "answer") {
@@ -512,9 +538,9 @@
     function showTools(t, rect) {
       target = t;
       const b = blockById(t.block);
-      const prose = b && b.dataset.kit === "prose";
       const btn = (k, text) => { const e = el("button", "bn-tool", text); e.type = "button"; e.dataset.tool = k; return e; };
-      tools.replaceChildren(btn("note", NW.tools.note), btn("keep", NW.tools.keep), btn("drop", NW.tools.drop), btn("unsure", NW.tools.unsure), ...(prose ? [btn("edit", NW.tools.edit)] : []));
+      // edit on prose, a review's item, an email
+      tools.replaceChildren(btn("note", NW.tools.note), btn("keep", NW.tools.keep), btn("drop", NW.tools.drop), btn("unsure", NW.tools.unsure), ...(editable(b, t.item) ? [btn("edit", NW.tools.edit)] : []));
       tools.style.left = `${rect.left + win.scrollX}px`;
       tools.style.top = `${rect.top + win.scrollY - 40}px`;
       tools.dataset.on = t.quote ? "selection" : "block";
@@ -525,7 +551,7 @@
     function compose(t) {
       target = t;
       hideTools();
-      composerWhere.textContent = t.drawing ? NW.drawing : where(t, nameOf(t.block));
+      composerWhere.textContent = t.drawing ? NW.drawing : where(t, nameOf(t.block, t.item));
       composer.classList.add("bn-on");
       input.value = "";
       render();
@@ -536,7 +562,7 @@
       if (!target) return;
       // words for a drawing just made: they go on its note
       if (target.drawing) { M.update(target.drawing, { text: text || undefined }); target = null; save(); render(); return; }
-      M.add({ version, block: target.block, quote: target.quote, offset: target.offset, pin: target.pin, kind, text: text || undefined, where: nameOf(target.block) || undefined, ...extra }, now());
+      M.add({ version, block: target.block, item: target.item, quote: target.quote, offset: target.offset, pin: target.pin, kind, text: text || undefined, where: nameOf(target.block, target.item) || undefined, ...extra }, now());
       barNote = "";
       save(); render();
     }
@@ -553,16 +579,23 @@
     // on a block under the mouse, after a short rest; a selection's toolbar stays until it goes
     let hover = null, hoverT = 0;
     const busy = () => selecting() || drawing || pinning || editing || composer.classList.contains("bn-on") || tools.dataset.on === "selection";
+    let hoverOn = null;   // the block, or a review's item under the mouse
     page.addEventListener("mouseover", (e) => {
       const b = e.target.closest && e.target.closest("[data-kit][data-id]");
-      if (b === hover) return;
+      // the kit's own buttons are not a place for a note
+      if (e.target.closest && e.target.closest("[data-kit-ui]")) return;
+      const li = b && b.dataset.kit === "review" ? e.target.closest("li[data-id]") : null;
+      const on = li || b;
       hover = b;
+      if (on === hoverOn) return;
+      hoverOn = on;
       clearTimeout(hoverT);
       if (!b) return;
-      hoverT = win.setTimeout(() => { if (hover === b && !busy()) showTools({ block: b.dataset.id }, b.getBoundingClientRect()); }, 250);
+      const t = li ? { block: b.dataset.id, item: li.dataset.id } : { block: b.dataset.id };
+      hoverT = win.setTimeout(() => { if (hoverOn === on && !busy()) showTools(t, on.getBoundingClientRect()); }, 250);
     });
     page.addEventListener("mouseleave", () => {
-      hover = null; clearTimeout(hoverT);
+      hover = null; hoverOn = null; clearTimeout(hoverT);
       hoverT = win.setTimeout(() => { if (tools.dataset.on === "block" && !tools.matches(":hover")) hideTools(); }, 300);
     });
     tools.addEventListener("mouseleave", () => { if (tools.dataset.on === "block" && !hover) hideTools(); });
@@ -573,7 +606,7 @@
       if (!k || !target) return;
       const b = blockById(target.block);
       if (k === "note") return compose(target);
-      if (k === "edit") { hideTools(); return startEdit(b); }
+      if (k === "edit") { hideTools(); return startEdit(b, target.item); }
       addNote(k);
       hideTools();
       win.getSelection().removeAllRanges();
@@ -611,46 +644,64 @@
       compose({ block: b.dataset.id, pin: { x: +((e.clientX - r.left) / r.width).toFixed(3), y: +((e.clientY - r.top) / r.height).toFixed(3) } });
     }, true);
 
-    // ---- edit in place (prose only): the block becomes editable; leaving it makes the note
-    const originals = {};   // block id -> its HTML before your first edit (undo)
-    let editing = null;
-    function startEdit(b) {
-      if (!b || b.dataset.kit !== "prose") return;
-      if (!(b.dataset.id in originals)) originals[b.dataset.id] = { html: b.innerHTML, text: norm(b.textContent) };
-      editing = { block: b, before: norm(b.textContent) };
-      b.contentEditable = "true";
-      b.classList.add("bn-editing");
-      b.focus();
+    // ---- edit in place: a prose block, a review's item (§4.3) or an email becomes editable;
+    // leaving it makes the note. A review item or an email you edited carries data-edited, so
+    // kit.js's "approve N" leaves it out (it goes with send, as your edit)
+    const originals = {};   // block id (#item) -> its HTML and text before your first edit (undo)
+    const editKey = (block, item) => (item ? `${block}#${item}` : block);
+    const editable = (b, item) => !!b && (b.dataset.kit === "prose" || b.dataset.kit === "message" || b.dataset.kit === "email" || (b.dataset.kit === "review" && !!item));
+    function editEl(block, item) {
+      const b = blockById(block);
+      if (!b || !item) return b;
+      return [...b.querySelectorAll("li[data-id]")].find((li) => li.dataset.id === item) || null;
+    }
+    function markEdited(e, on) {
+      e.classList.toggle("bn-edited", on);
+      if (e.matches("li[data-id]") || e.dataset.kit === "email") { if (on) e.setAttribute("data-edited", ""); else e.removeAttribute("data-edited"); }
+    }
+    let editing = null;   // {el, block, item}
+    function startEdit(b, item) {
+      if (!editable(b, item)) return;
+      const e = editEl(b.dataset.id, item);
+      if (!e) return;
+      const key = editKey(b.dataset.id, item);
+      if (!(key in originals)) originals[key] = { html: e.innerHTML, text: norm(textOf(e)) };
+      editing = { el: e, block: b.dataset.id, item: item || null };
+      // the kit's own buttons inside stay buttons
+      for (const u of e.querySelectorAll("[data-kit-ui]")) u.contentEditable = "false";
+      e.contentEditable = "true";
+      e.classList.add("bn-editing");
+      e.focus();
     }
     function endEdit() {
       if (!editing) return;
-      const b = editing.block;
-      b.contentEditable = "false";
-      b.classList.remove("bn-editing");
-      const first = originals[b.dataset.id].text, after = norm(b.textContent);
+      const { el: e, block, item } = editing;
+      e.contentEditable = "false";
+      e.classList.remove("bn-editing");
+      const first = originals[editKey(block, item)].text, after = norm(textOf(e));
       const d = diffWords(first, after);
-      M.edit(b.dataset.id, d.before, d.after, now());
-      b.classList.toggle("bn-edited", norm(first) !== after);
+      M.edit(block, d.before, d.after, now(), item);
+      markEdited(e, norm(first) !== after);
       editing = null;
       save(); render();
     }
-    page.addEventListener("focusout", (e) => { if (editing && e.target === editing.block) endEdit(); });
+    page.addEventListener("focusout", (e) => { if (editing && e.target === editing.el) endEdit(); });
     page.addEventListener("keydown", (e) => {
-      if (editing && e.key === "Escape") { e.preventDefault(); editing.block.blur(); }
+      if (editing && e.key === "Escape") { e.preventDefault(); editing.el.blur(); }
     });
 
     // ---- keys: t type · p pin · ⌘z undo · ⌘⏎ send
     doc.addEventListener("keydown", (e) => {
-      if (e.target === input || (editing && e.target === editing.block && !(e.metaKey && e.key === "Enter"))) return;
-      if (e.metaKey && e.key === "Enter") { e.preventDefault(); if (editing) editing.block.blur(); return send(); }
+      if (e.target === input || (editing && e.target === editing.el && !(e.metaKey && e.key === "Enter"))) return;
+      if (e.metaKey && e.key === "Enter") { e.preventDefault(); if (editing) editing.el.blur(); return send(); }
       if (e.metaKey && e.key === "z" && !e.shiftKey) {
         const u = M.undo();
         if (!u) return;
         e.preventDefault();
-        // an edit undone: the block's text as it was
+        // an edit undone: the text as it was, and no longer marked edited
         if (u.note.kind === "edit") {
-          const b = blockById(u.note.block), o = originals[u.note.block];
-          if (u.type === "add" && b && o) { b.innerHTML = o.html; b.classList.remove("bn-edited"); delete originals[u.note.block]; }
+          const key = editKey(u.note.block, u.note.item), x = editEl(u.note.block, u.note.item), o = originals[key];
+          if (u.type === "add" && x && o) { x.innerHTML = o.html; markEdited(x, false); delete originals[key]; }
         }
         save(); render();
         return;
@@ -721,9 +772,9 @@
         const pre = doc.createRange();
         pre.selectNodeContents(b);
         pre.setEnd(caret.startContainer, caret.startOffset);
-        offset = norm(pre.toString()).length;
+        offset = norm(fragText(pre.cloneContents())).length;
       }
-      const q = nearestQuote(b.textContent, offset);
+      const q = nearestQuote(textOf(b), offset);
       if (q) { at.quote = q.quote; at.offset = q.offset; }
       return at;
     }
@@ -748,6 +799,14 @@
       const d = e.detail || {};
       if (!d.block) return;
       M.pick(d.block, d.option, d.text, version, now());
+      barNote = ""; save(); render();
+    });
+    // approve / skip on a review's item or an email (kit.js's bise:react, §4.3): a note of that
+    // kind, one per item, the latest wins; kind null takes it back
+    doc.addEventListener("bise:react", (e) => {
+      const d = e.detail || {};
+      if (!d.block) return;
+      M.react(d.block, d.item || null, d.kind, d.text, version, now());
       barNote = ""; save(); render();
     });
     doc.addEventListener("bise:state", (e) => { state = (e.detail && e.detail.state) || "ready"; render(); });
@@ -868,14 +927,14 @@
       render();
     }).catch(() => render());
     function reapplyEdit(n) {
-      const b = blockById(n.block);
-      if (!b || !n.before) return;
-      for (const t of textNodes(b)) {
+      const x = editEl(n.block, n.item);
+      if (!x || !n.before) return;
+      for (const t of textNodes(x)) {
         const i = t.nodeValue.indexOf(n.before);
         if (i >= 0) {
-          originals[n.block] = { html: b.innerHTML, text: norm(b.textContent) };
+          originals[editKey(n.block, n.item)] = { html: x.innerHTML, text: norm(textOf(x)) };
           t.nodeValue = t.nodeValue.slice(0, i) + n.after + t.nodeValue.slice(i + n.before.length);
-          b.classList.add("bn-edited");
+          markEdited(x, true);
           return;
         }
       }
