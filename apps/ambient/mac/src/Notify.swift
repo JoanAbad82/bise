@@ -12,17 +12,20 @@ struct Card {
     var id: String
     var agent: String
     var text: String
-    var options: [String]
+    var options: [Option]
+    // the core's numbered choices {n, label}: the reply is n (what fn + n sends)
+    struct Option { var n: String; var label: String }
 
     static func list(_ state: [String: Any]) -> [Card] {
         guard let cards = state["cards"] as? [[String: Any]] else { return [] }
         return cards.compactMap { c in
             let id: String
             if let s = c["id"] as? String { id = s } else if let n = c["id"] as? NSNumber { id = n.stringValue } else { return nil }
-            let opts: [String] = (c["options"] as? [Any] ?? []).compactMap { o in
-                if let s = o as? String { return s }
-                if let d = o as? [String: Any] { return (d["text"] ?? d["label"]) as? String }
-                return nil
+            let opts: [Option] = (c["options"] as? [Any] ?? []).enumerated().compactMap { i, o in
+                if let s = o as? String { return Option(n: "\(i + 1)", label: s) }
+                guard let d = o as? [String: Any], let label = (d["label"] ?? d["text"]) as? String else { return nil }
+                let n = (d["n"] as? NSNumber)?.stringValue ?? (d["n"] as? String) ?? "\(i + 1)"
+                return Option(n: n, label: label)
             }
             return Card(id: id, agent: c["agent"] as? String ?? "", text: c["text"] as? String ?? "", options: opts)
         }
@@ -83,8 +86,8 @@ final class Notify: NSObject, UNUserNotificationCenterDelegate {
                                                              textInputButtonTitle: NotifyWords.replyButton,
                                                              textInputPlaceholder: NotifyWords.replyPlaceholder))
             } else {
-                for (i, o) in c.options.prefix(2).enumerated() {
-                    actions.append(UNNotificationAction(identifier: "opt.\(i + 1)", title: o, options: []))
+                for o in c.options.prefix(2) {
+                    actions.append(UNNotificationAction(identifier: "opt." + o.n, title: o.label, options: []))
                 }
             }
             self.categories[cat] = UNNotificationCategory(identifier: cat, actions: actions, intentIdentifiers: [], options: [])

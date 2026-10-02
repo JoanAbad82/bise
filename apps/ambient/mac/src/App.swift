@@ -31,6 +31,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var memory: [String: [String: Any]] = [:]
     private static let remembered: Set<String> = ["hub", "state", "phase", "main"]
     private let defaults = UserDefaults.standard
+    // the pages name macOS's settings by version ("Screen & System Audio Recording" on 15+)
+    private let macosMajor = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
 
     init(config: Config) {
         self.config = config
@@ -166,7 +168,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     private func pageReady() {
         capsule.post(["ev": "app_reduce_motion", "on": reduceMotion])
-        capsule.post(["ev": "app_settings", "edge_glow": edgeGlow])
+        capsule.post(["ev": "app_settings", "edge_glow": edgeGlow, "macos": macosMajor])
         capsule.post(["ev": "app_hidden", "on": capsule.hidden])
         capsule.post(["ev": "app_globe", "use": globeUse()])
         for k in ["hub", "state", "phase", "main"] { if let ev = memory[k] { capsule.post(ev) } }
@@ -175,7 +177,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     private func edgeSetup() {
         edge.setup(["ev": "app_reduce_motion", "on": reduceMotion])
-        edge.setup(["ev": "app_settings", "edge_glow": edgeGlow])
+        edge.setup(["ev": "app_settings", "edge_glow": edgeGlow, "macos": macosMajor])
     }
 
     private func command(_ cmd: [String: Any]) {
@@ -210,7 +212,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "edge_glow":
             edgeGlow = value as? Bool ?? true
             defaults.set(edgeGlow, forKey: "edgeGlow")
-            capsule.post(["ev": "app_settings", "edge_glow": edgeGlow])
+            capsule.post(["ev": "app_settings", "edge_glow": edgeGlow, "macos": macosMajor])
             edgeSetup()
         case "right_option":
             keys.rightOption = value as? Bool ?? true
