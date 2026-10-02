@@ -304,20 +304,43 @@ final class Capsule: NSObject, WKNavigationDelegate {
     // a show in between cancels the order out
     private var outJob: DispatchWorkItem?
 
-    func show() {
+    // fade: reduced motion (SPEC §1): the whole panel, its native glass too,
+    // fades in place in 0.2 s; never a scale, never a move
+    static let fadeTime = 0.2
+
+    func show(fade: Bool = false) {
         hidden = false
         outJob?.cancel()
         outJob = nil
+        if fade && !panel.isVisible { panel.alphaValue = 0 }
         panel.orderFrontRegardless()
+        if fade {
+            NSAnimationContext.runAnimationGroup { c in
+                c.duration = Capsule.fadeTime
+                panel.animator().alphaValue = 1
+            }
+        } else {
+            panel.alphaValue = 1
+        }
     }
 
-    func hide(after: Double = 0) {
+    func hide(after: Double = 0, fade: Bool = false) {
         hidden = true
         focus(false)
         outJob?.cancel()
-        guard after > 0 else { panel.orderOut(nil); return }
+        guard after > 0 else { panel.orderOut(nil); panel.alphaValue = 1; return }
+        if fade {
+            NSAnimationContext.runAnimationGroup { c in
+                c.duration = min(after, Capsule.fadeTime)
+                panel.animator().alphaValue = 0
+            }
+        }
         let job = DispatchWorkItem { [weak self] in
-            MainActor.assumeIsolated { guard let self, self.hidden else { return }; self.panel.orderOut(nil) }
+            MainActor.assumeIsolated {
+                guard let self, self.hidden else { return }
+                self.panel.orderOut(nil)
+                self.panel.alphaValue = 1
+            }
         }
         outJob = job
         DispatchQueue.main.asyncAfter(deadline: .now() + after, execute: job)
