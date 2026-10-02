@@ -344,7 +344,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if askBeforeTalk() { return }
         talking = true
         if edgeGlow && !reduceMotion { edge.glow(true) }
-        guard let base = pagesURL, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+        // QA never asks the user's browser anything
+        guard qa == nil, let base = pagesURL, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
               PageOpen.browsers.contains(front) else {
             beginTalk(state, page: nil)
             return
