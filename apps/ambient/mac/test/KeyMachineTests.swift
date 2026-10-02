@@ -63,6 +63,8 @@ law("right option + shift: no talk",
     run([(.roptDown, 0), (.otherModifiers, 0.1), (.roptUp, 1)]).out == [])
 law("right option off (setting): nothing",
     run([(.roptDown, 0), (.roptUp, 1)], { $0.rightOption = false }).out == [])
+let esc = run([(.keyDown(53, repeated: false), 0), (.keyUp(53), 0.1)])
+law("plain esc: passes untouched, and says plainEsc once", esc.out == [.plainEsc] && esc.swallowed == [false, false])
 law("plain keys without fn pass untouched",
     run([(.keyDown(18, repeated: false), 0), (.keyUp(18), 0.1)]).swallowed == [false, false])
 

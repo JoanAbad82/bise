@@ -72,6 +72,7 @@ private final class WeakHandler: NSObject, WKScriptMessageHandler {
 final class Capsule: NSObject, WKNavigationDelegate {
     var onCmd: (([String: Any]) -> Void)?
     var onReady: (() -> Void)?
+    var onHover: ((Bool) -> Void)?           // the mouse over the panel (holds a timed show)
 
     let panel: CapsulePanel
     private let effect: NSVisualEffectView
@@ -126,6 +127,8 @@ final class Capsule: NSObject, WKNavigationDelegate {
         panel.contentView = root
 
         super.init()
+        root.addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                            owner: self, userInfo: nil))
         conf.userContentController.add(WeakHandler(self), name: "bise")
         web.navigationDelegate = self
         place(shape.box)
@@ -140,6 +143,9 @@ final class Capsule: NSObject, WKNavigationDelegate {
       if (document.documentElement) mark(); else document.addEventListener('DOMContentLoaded', mark);
     })();
     """
+
+    @objc func mouseEntered(with e: NSEvent) { onHover?(true) }
+    @objc func mouseExited(with e: NSEvent) { onHover?(false) }
 
     // MARK: the page
 

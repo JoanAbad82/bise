@@ -35,7 +35,11 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var calendar: CalendarProbe?
     private var quietTimers: [Timer] = []
     private var agents = Set<String>()
-    private var agentWhileHidden = false   // main started an agent while bise was hidden
+    // §8 "out of the way": the one visibility state machine (Visibility.swift)
+    private var vis = Visibility()
+    private var visJob: DispatchWorkItem?
+    private var seenCards: Set<String>? = nil   // nil until the first state (no burst at launch)
+    private var working = false
     // what a page loaded later needs: the last event of each of these kinds
     private var memory: [String: [String: Any]] = [:]
     private static let remembered: Set<String> = ["hub", "state", "phase", "main"]
@@ -87,8 +91,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             if let qa = self.qa { qa.fromPage($0) } else { self.command($0) }
         }
         capsule.onReady = { [weak self] in self?.pageReady() }
+        capsule.onHover = { [weak self] in self?.visFeed(.hover($0)) }
         capsule.load(webDir: config.web)
-        capsule.show()
+        // at rest nothing on screen: the capsule shows when there is something to see
         edge.load(webDir: config.web)
         edgeSetup()
 
@@ -112,14 +117,14 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     private func statusAndKeys() {
         let st = StatusItem()
-        st.onClick = { [weak self] in self?.agentsView() }
         st.onSpotlight = { [weak self] in self?.spotlight() }
-        st.onToggle = { [weak self] in self?.toggleHidden() }
+        st.onToggle = { [weak self] in self?.visFeed(.toggle) }
+        st.onOpen = { [weak self] in self?.visFeed(.open) }
         st.onPage = { Browser.open($0) }
         st.onCard = { [weak self] id in
             // bise open on that card: the inbox (fn + i) at it
             guard let self else { return }
-            if self.capsule.hidden { self.setHidden(false) }
+            self.visFeed(.open)
             self.capsule.post(["ev": "app_key", "key": "i", "card": id])
         }
         st.pages = { [weak self] in self?.menuPages ?? [] }
@@ -129,7 +134,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
         let nt = Notify()
         nt.onAnswer = { [weak self] card, reply in self?.toCore(["cmd": "answer", "card": card, "reply": reply]) }
-        nt.onOpen = { [weak self] in self?.setHidden(false) }
+        nt.onOpen = { [weak self] in self?.visFeed(.open) }
         notify = nt
 
         keys.onOut = { [weak self] in self?.key($0) }
@@ -247,7 +252,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         let webBefore = c.web
         guard c.apply(switchFile: config.ambientDir + "/switch.json") else {
             Log.say("app: switch: nothing new")
-            setHidden(false)
+            visFeed(.open)
             return
         }
         Log.say("app: switch to \(c.workspace)")
@@ -255,8 +260,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         memory = [:]
         cards = []
         agents = []
-        agentWhileHidden = false
-        pink()
+        seenCards = nil
+        working = false
+        statusIcon()
         core.restart(config: c)
         if c.web != webBefore {
             capsule.load(webDir: c.web)
@@ -265,7 +271,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             capsule.reload()
             edge.reload()
         }
-        setHidden(false)
+        visFeed(.open)
     }
 
     // MARK: the page
@@ -293,9 +299,23 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "app_size":
             if let s = CapsuleShape.from(cmd, maxHeight: capsule.maxHeight) { capsule.apply(s) }
         case "app_focus":
-            capsule.focus(cmd["on"] as? Bool ?? false)
+            let on = cmd["on"] as? Bool ?? false
+            if on { visFeed(.typing(true)); capsule.focus(true) } else { capsule.focus(false); visFeed(.typing(false)) }
         case "app_hide":
-            setHidden(cmd["hidden"] as? Bool ?? cmd["on"] as? Bool ?? true)
+            visFeed(.dismiss)
+        case "app_content":
+            // what the page has to show (amb-web): talk, type, answer, got and
+            // needs come from the events the app sees itself; the page adds
+            // the short lines (done, failed, a page ready, a key's answer)
+            switch cmd["kind"] as? String ?? "" {
+            case "line": visFeed(.show(Visibility.line))
+            case "open": visFeed(.open)
+            case "needs": visFeed(.card)
+            default: break
+            }
+        case "app_show":
+            // the page asks: for n s, or open until dismissed
+            visFeed(.show((cmd["for"] as? NSNumber)?.doubleValue))
         case "app_open_url":
             // a page: its tab forward in a running Chromium browser, else a new tab (§2.8)
             if let s = cmd["url"] as? String, let u = URL(string: s), ["http", "https", "file", "x-apple.systempreferences"].contains(u.scheme?.lowercased() ?? "") {
@@ -346,6 +366,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         switch kind {
         case "phase":
             phase = ev["phase"] as? String ?? phase
+            visFeed(.phase(phase))
+            statusIcon()
             edge.post(ev)
         case "level":
             if talking { edge.post(ev) }
@@ -361,11 +383,20 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             if pagesURL == nil, let p = (ev["pages"] as? [[String: Any]])?.first, let u = p["url"] as? String {
                 pagesURL = PageOpen.pagesBase(fromPageURL: u)
             }
-            let names = Set((ev["agents"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String })
-            if capsule.hidden && !names.subtracting(agents).isEmpty && !agents.isEmpty { agentWhileHidden = true }
-            agents = names
-            pink()
-            notify?.cards(cards, quiet: !capsule.hidden && !locked)
+            let list = ev["agents"] as? [[String: Any]] ?? []
+            agents = Set(list.compactMap { $0["name"] as? String })
+            working = list.contains { $0["working"] as? Bool == true }
+            statusIcon()
+            // a new item that needs you: the capsule shows it for 6 s
+            let ids = Set(cards.map(\.id))
+            if let seen = seenCards, !ids.subtracting(seen).isEmpty { visFeed(.card) }
+            seenCards = ids
+            // macOS notifications: the screen locked or you away, not "hidden" (§8)
+            notify?.cards(cards, quiet: !locked && !away)
+        case "sent":
+            visFeed(.sent)
+        case "main":
+            visFeed(.mainText)
         default:
             break
         }
@@ -388,6 +419,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             toCore(["cmd": "talk_end"])
             fnEvent("up")
             edge.glow(false)
+            visFeed(.talk(false))
         case .cancel:
             guard talking else { return }
             settleTalk?()
@@ -395,18 +427,26 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             quiet.own(open: false, at: uptime)
             fnEvent("cancel")   // the page sends talk_cancel and says so
             edge.glow(false)
+            visFeed(.cancelled)
         case .tap:
             fnEvent("tap")      // the page cuts in when main speaks
         case .key(let k):
             switch k {
             case ".":
-                if capsule.hidden { setHidden(false) } else { capsule.post(["ev": "app_key", "key": k]) }
+                visFeed(.toggle)
             case "space":
                 spotlight()
+            case "i", "0":
+                visFeed(.open)
+                capsule.post(["ev": "app_key", "key": k])
             default:
-                if capsule.hidden && (k == "i" || k == "0") { setHidden(false) }
+                // fn 1…9 answers the top item even while hidden
                 capsule.post(["ev": "app_key", "key": k])
             }
+        case .plainEsc:
+            // esc while main speaks: text only (the page hushes); else it hides bise
+            guard !capsule.hidden else { return }
+            if phase == "speaking" { capsule.post(["ev": "app_key", "key": "esc"]) } else { visFeed(.dismiss) }
         }
     }
 
@@ -428,7 +468,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         talking = true
         defer { morning() }   // after the shot's front window is chosen
         quiet.own(open: true, at: uptime)
-        if edgeGlow && !reduceMotion { edge.glow(true) }
+        visFeed(.talk(true))
+        // the edge glow only while fn is held (not hands-free)
+        if state == "down" && edgeGlow && !reduceMotion { edge.glow(true) }
         // QA never asks the user's browser anything
         guard qa == nil, let base = pagesURL, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
               PageOpen.browsers.contains(front) else {
@@ -473,34 +515,73 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         // ambient: "good morning" only before 11:00 local
         let greet = Calendar.current.component(.hour, from: Date()) < 11
         capsule.post(["ev": "app_morning", "id": page.id, "title": page.title, "url": page.url, "greet": greet])
+        visFeed(.show(4))
     }
 
+    // fn space: the page opens its field and asks app_focus on (typing)
     private func spotlight() {
-        capsule.pickScreen()
         morning()
-        if capsule.hidden { setHidden(false) }
+        visFeed(.show(Visibility.brief))   // until the field takes the keys
         capsule.post(["ev": "app_key", "key": "space"])
     }
 
     // a menu-bar click: what's going on (the agents and the inbox, fn + 0)
     private func agentsView() {
         morning()
-        if capsule.hidden { setHidden(false) }
+        visFeed(.open)
         capsule.post(["ev": "app_key", "key": "0"])
     }
 
-    // the :* is pink while a card waits, or main started an agent while hidden (SPEC §1)
-    private func pink() {
-        status?.setNeedsYou(!cards.isEmpty || agentWhileHidden)
+    // the menu-bar icon is the status (§8): working (agents or main busy) and
+    // the count of items waiting for you
+    private func statusIcon() {
+        let mainBusy = ["working", "sending", "speaking"].contains(phase)
+        status?.set(working: working || mainBusy, count: cards.count)
     }
 
-    private func toggleHidden() { setHidden(!capsule.hidden) }
+    // you away: no key or mouse for 5 minutes
+    private var away: Bool {
+        CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!) > 300
+    }
 
-    private func setHidden(_ h: Bool) {
-        guard h != capsule.hidden else { return }
-        if h { capsule.hide() } else { capsule.pickScreen(); capsule.show(); agentWhileHidden = false; pink(); morning() }
-        sayVisible()
-        capsule.post(["ev": "app_hidden", "on": h])
+    // one event into the visibility machine, then the panel follows it
+    private func visFeed(_ e: VisIn) {
+        let t = uptime
+        let shown = vis.feed(e, at: t)
+        if shown == capsule.hidden {
+            if shown {
+                capsule.pickScreen()
+                capsule.show()
+                morning()
+            } else {
+                capsule.hide()
+            }
+            capsule.post(["ev": "app_hidden", "on": !shown])
+            sayVisible()
+            watchClicks(shown)
+        }
+        visJob?.cancel()
+        if let at = vis.nextTick(after: t) {
+            let job = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.visFeed(.tick) } }
+            visJob = job
+            DispatchQueue.main.asyncAfter(deadline: .now() + (at - t) + 0.01, execute: job)
+        }
+    }
+
+    // a click elsewhere hides bise (§8): a global monitor, only while it shows
+    private var clickMonitor: Any?
+    private func watchClicks(_ on: Bool) {
+        if on, clickMonitor == nil {
+            clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, !self.capsule.panel.frame.contains(NSEvent.mouseLocation) else { return }
+                    self.visFeed(.dismiss)
+                }
+            }
+        } else if !on, let m = clickMonitor {
+            NSEvent.removeMonitor(m)
+            clickMonitor = nil
+        }
     }
 
     // MARK: quiet (a call, a meeting): the core answers in text, the page holds cards

@@ -9,6 +9,11 @@
 #                                   (--home: the home workspace ~/bise, no repo)
 #                                   build if needed, open the app; when it already
 #                                   runs: switch.json + SIGUSR1 (open drops --args)
+#   scripts/ambient.sh try [--home | --workspace <ws>] [--dry-run | --build-only]
+#                                   the user's try path: bise from THIS checkout into one
+#                                   target dir (<bise dev dir>/build/ambient/target), its
+#                                   repl-live and sb-core through bins.sh, the app, then
+#                                   open it on that bise (BISE_APP_ROOT = this checkout)
 #   scripts/ambient.sh stop         quit the running app (the pid in app.pid, never by name)
 #   scripts/ambient.sh status       running or not, its pid, the built key
 #   scripts/ambient.sh logs         the app's and the core's logs (tail)
@@ -114,7 +119,7 @@ open_app() {
   mkdir -p "$RUN"
   local pid
   if pid="$(running_pid)"; then
-    printf '{"workspace": %s, "home": %s, "bise": %s, "web": %s}\n' "$(js "$ws")" "$([ "$home" = 1 ] && echo true || echo false)" "$(js "$bise")" "$(js "$web")" > "$RUN/switch.json"
+    printf '{"workspace": %s, "home": %s, "bise": %s, "web": %s, "env": {"BISE_APP_ROOT": %s}}\n' "$(js "$ws")" "$([ "$home" = 1 ] && echo true || echo false)" "$(js "$bise")" "$(js "$web")" "$(js "${BISE_APP_ROOT:-}")" > "$RUN/switch.json"
     kill -USR1 "$pid"
     say "running (pid $pid): told it the workspace ${ws:-~/bise (home)}"
     return 0
@@ -130,8 +135,103 @@ open_app() {
   say "opened $APP for ${ws:-~/bise (home)}"
 }
 
+# the try path's one bise build dir (never another copy)
+TRY_TARGET="$BUILD/target"
+TRY_BISE="$TRY_TARGET/debug/bise"
+
+# bise (cargo -p bend-harness, into TRY_TARGET) and its repl-live + sb-core
+# (bins.sh, at this checkout's root): a second run rebuilds only what
+# changed. Under a file-size cap (an agent's shell: ulimit -f), the
+# build runs as a launchd job, which has none, and this waits for it.
+try_build() {
+  local job="$RUN/try-job.sh" rc="$RUN/try.rc" log="$RUN/try.log" v
+  mkdir -p "$RUN" "$TRY_TARGET"
+  {
+    echo '#!/bin/bash'
+    for v in HOME PATH BISE_HOME SB_BUILD_DIR MACOSX_DEPLOYMENT_TARGET; do
+      [ -z "${!v:-}" ] || printf 'export %s=%q\n' "$v" "${!v}"
+    done
+    printf 'export CARGO_TARGET_DIR=%q\n' "$TRY_TARGET"
+    printf 'cd %q && nice -n 5 cargo build -p bend-harness \\\n' "$REPO/rust"
+    printf '  && cd %q && nice -n 5 scripts/bins.sh repl-live sb-core\n' "$REPO"
+    printf 'echo $? > %q\n' "$rc"
+  } > "$job"
+  rm -f "$rc"
+  if [ "$(ulimit -f)" = unlimited ]; then
+    bash "$job" 2>&1 | tee "$log" >&2
+  else
+    local label="dev.bise.ambient.try.$$"
+    say "a file-size cap here: building as a launchd job (log: $log)"
+    : > "$log"
+    launchctl submit -l "$label" -o "$log" -e "$log" -- /bin/bash "$job"
+    local last=""
+    while [ ! -s "$rc" ]; do
+      sleep 2
+      local now; now="$(tail -n 1 "$log" 2>/dev/null || true)"
+      if [ -n "$now" ] && [ "$now" != "$last" ]; then echo "  $now" >&2; last="$now"; fi
+    done
+    launchctl remove "$label" 2>/dev/null || true
+  fi
+  local code; code="$(cat "$rc" 2>/dev/null || echo 1)"
+  [ "$code" = 0 ] || { say "the build failed (exit $code): $log"; tail -n 20 "$log" >&2; exit 1; }
+  [ -x "$TRY_BISE" ] || { say "no $TRY_BISE after the build"; exit 1; }
+}
+
+what_to_try() {
+  cat >&2 <<'WORDS'
+
+bise ambient is open: top right of your screen.
+
+what to try
+  hold fn              talk to main. let go to send
+  fn fn                hands-free. tap fn to send
+  fn space             type to main
+  fn 1 … 9             answer the top question
+  fn i   fn 0          the inbox, the agents
+  fn o                 the newest page
+  fn .                 hide or show bise
+  hold fn on a page    a voice note where your mouse is
+  right-click :*       what's waiting, your pages, quit
+
+the first time, macOS asks for Accessibility; the mic and screen
+recording come on your first fn hold.
+logs: scripts/ambient.sh logs      stop: scripts/ambient.sh stop
+WORDS
+}
+
+try() {
+  local dry=0 only=0 where=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --dry-run) dry=1; shift ;;
+      --build-only) only=1; shift ;;
+      --home) where=(--home); shift ;;
+      --workspace) where=(--workspace "$2"); shift 2 ;;
+      *) say "unknown option: $1"; exit 2 ;;
+    esac
+  done
+  if [ "$dry" = 1 ]; then
+    echo "checkout     $REPO"
+    echo "bise         $TRY_BISE  (cargo build -p bend-harness, CARGO_TARGET_DIR=$TRY_TARGET)"
+    echo "repl/hub     $REPO/repl-live, $REPO/sb-core  (scripts/bins.sh)"
+    echo "app          $APP  (built if its sources changed: $(key))"
+    echo "web          ${BISE_AMBIENT_WEB:-$REPO/apps/ambient/web}"
+    echo "app root     BISE_APP_ROOT=$REPO"
+    echo "workspace    ${where[*]:-the git root of $PWD}"
+    echo "build via    $([ "$(ulimit -f)" = unlimited ] && echo "this shell (nice)" || echo "a launchd job (ulimit -f $(ulimit -f) here)")"
+    echo "then         $([ "$only" = 1 ] && echo "nothing (--build-only)" || echo "open the app")"
+    return 0
+  fi
+  try_build
+  build
+  if [ "$only" = 1 ]; then say "built: $TRY_BISE and $APP (not opened)"; return 0; fi
+  BISE_APP_ROOT="$REPO" open_app --bise "$TRY_BISE" "${where[@]}"
+  what_to_try
+}
+
 case "${1:-}" in
   build|path) build; echo "$APP" ;;
+  try) shift; try "$@" ;;
   key) key ;;
   check) "$SRC/build.sh" --check && "$SRC/build.sh" --test ;;
   open) shift; open_app "$@" ;;
@@ -141,5 +241,5 @@ case "${1:-}" in
     echo "built key $(cat "$BUILD/key" 2>/dev/null || echo none), sources key $(key)"
     ;;
   logs) tail -n 40 "$RUN/app.log" "$RUN/core.log" 2>/dev/null || say "no logs yet" ;;
-  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+  *) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

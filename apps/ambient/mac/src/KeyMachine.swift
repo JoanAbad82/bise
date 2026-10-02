@@ -25,6 +25,7 @@ enum KeyOut: Equatable {
     case tap
     case double
     case key(String)
+    case plainEsc                // esc without fn: passes, and hides bise (§8)
 }
 
 // a key event as the machine sees it
@@ -118,6 +119,7 @@ struct KeyMachine {
                     out.append(.key(name))
                 }
             } else {
+                if code == 53 && !fnIsDown && !repeated { out.append(.plainEsc) }
                 if fnIsDown && !fnSpoiled {
                     fnSpoiled = true
                     if talking == .fn { talking = nil; out.append(.cancel) }

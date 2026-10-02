@@ -55,6 +55,11 @@ struct Config {
         if let w = home ? "" : o["workspace"] as? String, w != workspace { workspace = w; changed = true }
         if let b = o["bise"] as? String, !b.isEmpty, b != bise { bise = b; changed = true }
         if let w = o["web"] as? String, !w.isEmpty, w != web { web = w; changed = true }
+        // env for the core (BISE_APP_ROOT of the try path); an empty value is no news
+        for (k, v) in o["env"] as? [String: String] ?? [:] where !v.isEmpty && childEnv[k] != v {
+            childEnv[k] = v
+            changed = true
+        }
         return changed
     }
 

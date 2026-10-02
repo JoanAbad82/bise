@@ -1,7 +1,8 @@
-// StatusItem: the menu-bar `:*` (SPEC §1), always there, accent pink while
-// something needs you (a card, or, while bise is hidden, an agent main
-// started). A click means "what's going on": bise shows, open on the
-// agents and the inbox (the fn + 0 view). A right click (or ⌃ click) opens
+// StatusItem: the menu-bar `:*` (SPEC §1, §8 "out of the way"), always
+// there and the status at a glance: still at rest, a quiet pulse while
+// agents work (until ambient's design), the count of items waiting for you
+// next to it (none at 0), accent pink while there are some. A click opens
+// the menu; an option-click shows bise (the capsule). A right click opens
 // the menu: "needs you" (the cards: a click opens bise on one), "for you"
 // (the newest pages: a click opens one), then the keys and quit.
 
@@ -19,7 +20,7 @@ enum MenuWords {
 
 @MainActor
 final class StatusItem: NSObject {
-    var onClick: (() -> Void)?
+    var onOpen: (() -> Void)?                // option-click: show bise
     var onSpotlight: (() -> Void)?
     var onToggle: (() -> Void)?
     var onPage: ((String) -> Void)?          // a page's URL
@@ -30,6 +31,10 @@ final class StatusItem: NSObject {
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var needsYou = false
+    private var working = false
+    private var count = 0
+    private var pulse: Timer?
+    private var dim = false
 
     override init() {
         super.init()
@@ -41,17 +46,38 @@ final class StatusItem: NSObject {
         draw()
     }
 
-    func setNeedsYou(_ on: Bool) {
-        guard on != needsYou else { return }
-        needsYou = on
+    func setNeedsYou(_ on: Bool) { set(working: working, count: on ? max(count, 1) : 0) }
+
+    // the status: agents working, items waiting
+    func set(working w: Bool, count c: Int) {
+        guard w != working || c != count else { return }
+        working = w
+        count = c
+        needsYou = c > 0
+        if w, pulse == nil {
+            // a quiet pulse of the glyph, ~1 s (ambient's design replaces it)
+            pulse = Timer.scheduledTimer(withTimeInterval: 0.9, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { guard let self else { return }; self.dim.toggle(); self.draw() }
+            }
+        } else if !w {
+            pulse?.invalidate()
+            pulse = nil
+            dim = false
+        }
         draw()
     }
 
     private func draw() {
         let font = NSFont(name: "JetBrains Mono", size: 13) ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold)
-        var attrs: [NSAttributedString.Key: Any] = [.font: font, .baselineOffset: 0.5]
-        if needsYou { attrs[.foregroundColor] = NSColor(srgbRed: 0xf4 / 255, green: 0xa6 / 255, blue: 0xb0 / 255, alpha: 1) }
-        item.button?.attributedTitle = NSAttributedString(string: ":*", attributes: attrs)
+        let base: NSColor = needsYou ? NSColor(srgbRed: 0xf4 / 255, green: 0xa6 / 255, blue: 0xb0 / 255, alpha: 1) : .labelColor
+        let glyph: [NSAttributedString.Key: Any] = [.font: font, .baselineOffset: 0.5,
+                                                    .foregroundColor: base.withAlphaComponent(dim ? 0.45 : 1)]
+        let title = NSMutableAttributedString(string: ":*", attributes: glyph)
+        if count > 0 {
+            let small = NSFont(name: "JetBrains Mono", size: 11) ?? NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+            title.append(NSAttributedString(string: " \(count)", attributes: [.font: small, .baselineOffset: 1, .foregroundColor: base]))
+        }
+        item.button?.attributedTitle = title
     }
 
     // "type to main      fn space": the keys right-aligned, dim
@@ -73,7 +99,9 @@ final class StatusItem: NSObject {
 
     @objc private func clicked() {
         let e = NSApp.currentEvent
-        if e?.type == .rightMouseUp || e?.modifierFlags.contains(.control) == true {
+        if e?.modifierFlags.contains(.option) == true && e?.type != .rightMouseUp {
+            onOpen?()
+        } else {
             let m = NSMenu()
             // needs you first: it is what is waiting
             let cs = cards().prefix(MenuRows.maxCards)
@@ -103,8 +131,6 @@ final class StatusItem: NSObject {
             item.menu = m
             item.button?.performClick(nil)
             item.menu = nil
-        } else {
-            onClick?()
         }
     }
 
