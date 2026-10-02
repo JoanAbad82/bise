@@ -57,6 +57,7 @@ final class QA {
     var keyOut: ((KeyOut) -> Void)?             // as if from the fn tap (App.key)
     var pageCmd: (([String: Any]) -> Void)?     // as if from the page (App.command)
     var sendCore: (([String: Any]) -> Void)?    // to the core itself (Core.send)
+    var visIn: ((VisIn) -> Void)?               // the Visibility machine's input (App.visFeed), as the real keys feed it
 
     private let capsule: Capsule
     private let edge: Edge
@@ -325,6 +326,10 @@ final class QA {
     func inject(_ ev: [String: Any]) {
         guard let kind = ev["ev"] as? String else { return }
         if kind.hasPrefix("app_") || kind.hasPrefix("ui_") {
+            // the keys also enter amb-mac's Visibility machine, as App.key
+            // feeds it (ambient's gate run 2: a hold reached the web only, so
+            // the glass never came in); what shows is then the app's own call
+            if kind == "app_fn" || kind == "app_key" { feedVisibility(ev) }
             toPage(ev)
             switch kind {
             case "app_fn":
@@ -349,6 +354,29 @@ final class QA {
             saw("qa>app", ev)
             coreEvent?(ev)
             if kind == "level", glowOn { edge.post(ev) }
+        }
+    }
+
+    // App.key's feeds: a hold or hands-free starts a talk, a cancel drops
+    // it (its end comes with the send: the core's `sent`), fn space the
+    // spotlight (brief until the field takes the keys), fn . and esc
+    // dismiss, any other key opens a view
+    private func feedVisibility(_ ev: [String: Any]) {
+        guard let visIn else { return }
+        let kind = ev["ev"] as? String ?? ""
+        if kind == "app_fn" {
+            switch ev["state"] as? String ?? "" {
+            case "down", "double": visIn(.talk(true))
+            case "cancel": visIn(.cancelled)
+            default: break
+            }
+            return
+        }
+        switch ev["key"] as? String ?? "" {
+        case "space": visIn(.show(Visibility.brief))
+        case "esc": visIn(.dismiss)
+        case ".": visIn(.toggle)
+        default: visIn(.open)
         }
     }
 
@@ -572,7 +600,13 @@ final class QA {
         voiceStop()
         voice = Voice()
         setGlow(false)
-        if capsule.hidden { pageCmd?(["cmd": "app_hide", "hidden": false]) }
+        // every scene starts at rest, out of the way (SPEC §0): the glass
+        // comes in only when the app's own Visibility says so (ambient's gate
+        // run 2: a QA show here put 'perf is done.' in a glass nobody opened)
+        if !capsule.hidden, let visIn {
+            visIn(.dismiss)
+            try? await Task.sleep(nanoseconds: 800_000_000)   // the 0.6 s back into the icon
+        }
         _ = await js(capsule.web, "window.ambient && window.ambient.reset && window.ambient.reset(); 'ok'")
         edge.reload()
     }
