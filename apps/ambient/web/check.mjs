@@ -491,6 +491,15 @@ law("notes: send makes the drafts sent; the server's outcomes win; a new version
   m.merge([{ id: "n1", status: "draft" }]);
   assert.equal(m.get("n1").status, "done");
 });
+law("notes: a pick on a question (kit.js's bise:pick) is one note per block, the latest wins, the same again takes it back", () => {
+  const m = N.model([]);
+  const p = m.pick("q1", 2, "the barn", 1, 1);
+  assert.equal(p.kind, "pick"); assert.equal(N.label(p), "you picked 2: the barn");
+  m.pick("q1", 3, "the loft", 1, 2);
+  eq(m.drafts().map((n) => [n.block, n.option]), [["q1", 3]]);
+  assert.equal(m.pick("q1", 3, "the loft", 1, 3), null);
+  assert.equal(m.drafts().length, 0);
+});
 law("notes: the words (ambient's), names with spaces", () => {
   assert.equal(N.NW.listTitle("weekly update", 3), "notes for weekly update · 3");
   assert.equal(N.NW.sendBar(3, N.spaced("weekly-update")), '3 notes for weekly update · or just say "send"');

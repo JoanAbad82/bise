@@ -26,6 +26,8 @@
     sentTag: "sent",
     changed: (before, after) => `you changed "${before}" → "${after}"`,
     marks: { keep: "♡ keep", drop: "✗ drop", unsure: "~ not sure" },
+    // a question's option you picked (not signed off yet: asked to ambient)
+    picked: (option, text) => (text ? `you picked ${option}: ${text}` : `you picked ${option}`),
     tools: { note: "note", keep: "♡", drop: "✗", unsure: "~", edit: "edit", pin: "pin" },
     placeholder: "your note",
     // signed off by ambient (m_4786): 'block' is our word, not hers; keys like the TUI's key bar
@@ -93,6 +95,7 @@
   function label(n) {
     if (n.kind === "edit") return NW.changed(n.before || "", n.after || "");
     if (NW.marks[n.kind]) return n.text ? `${NW.marks[n.kind]}: ${n.text}` : NW.marks[n.kind];
+    if (n.kind === "pick") return NW.picked(n.option, n.text);
     return n.text || "";
   }
 
@@ -141,6 +144,14 @@
         }
         if (norm(before) === norm(after)) return null;
         return api.add({ kind: "edit", block, before, after }, now);
+      },
+      // a question's option picked on the page (kit.js's bise:pick): one pick per block, the
+      // latest wins; picking the same option again takes it back
+      pick(block, option, text, version, now) {
+        const prev = notes.find((n) => n.status === "draft" && n.kind === "pick" && n.block === block);
+        if (prev && String(prev.option) === String(option)) { notes = notes.filter((x) => x !== prev); return null; }
+        if (prev) return api.update(prev.id, { option, text, at_ms: now || prev.at_ms });
+        return api.add({ version, block, kind: "pick", option, text }, now);
       },
       // the server's notes (meta, SSE): its statuses and answers win; drafts it doesn't know stay
       merge(server) {
@@ -495,6 +506,13 @@
       render();
     });
     doc.addEventListener("bise:notes", (e) => { M.merge((e.detail && e.detail.notes) || []); M.reanchor(blockTexts(), version); render(); });
+    // a question's option picked (kit.js marks it on the page; the note is ours)
+    doc.addEventListener("bise:pick", (e) => {
+      const d = e.detail || {};
+      if (!d.block) return;
+      M.pick(d.block, d.option, d.text, version, now());
+      barNote = ""; save(); render();
+    });
     doc.addEventListener("bise:state", (e) => { state = (e.detail && e.detail.state) || "ready"; render(); });
     win.addEventListener("resize", renderPins);
 

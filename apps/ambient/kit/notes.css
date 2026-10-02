@@ -1,5 +1,6 @@
 /* bise kit · the note layer's looks (notes.js). Role tokens only (docs/ambient-pages.md §3.1,
-   amb-kit's tokens.css): bise's own chrome is on --surface-talk, your marks in --pen. The
+   amb-kit's tokens.css): bise's own chrome is on --surface-talk with its --talk-ink, --talk-dim
+   and --talk-accent; your marks in --pen. The
    fallbacks after each var() only keep the layer readable before tokens.css loads. */
 
 .bn-ui { font-family: var(--font-ui, -apple-system, BlinkMacSystemFont, sans-serif); color: var(--ink, #1d1a19); box-sizing: border-box; }
@@ -17,47 +18,47 @@ html.bn-pinning #bise-page [data-kit][data-id] { cursor: crosshair; }
 /* the side list: `notes for weekly update · 3` */
 .bn-list {
   position: fixed; right: 16px; top: 72px; bottom: 84px; width: 300px; display: none; flex-direction: column;
-  background: var(--surface-talk, #1d1a19ee); color: var(--ink-talk, var(--ink, #fff));
+  background: var(--surface-talk, #1d1a19ee); color: var(--talk-ink, var(--ink, #fff));
   border-radius: var(--radius, 16px); box-shadow: inset 0 0 0 1px var(--rule, #ffffff22), 0 14px 34px -10px #0006;
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); z-index: 2147483000; overflow: hidden;
 }
 .bn-list.bn-on { display: flex; }
-.bn-head { padding: 14px 16px 8px; font: 12px var(--font-mono, ui-monospace, monospace); color: var(--dim, #ffffffa0); }
+.bn-head { padding: 14px 16px 8px; font: 12px var(--font-mono, ui-monospace, monospace); color: var(--talk-dim, #ffffffa0); }
 .bn-items { list-style: none; margin: 0; padding: 0 8px; overflow-y: auto; flex: 1; }
-.bn-item { position: relative; padding: 9px 30px 9px 10px; border-radius: calc(var(--radius, 16px) * .6); cursor: pointer; }
-.bn-item:hover { background: color-mix(in srgb, var(--ink-talk, #fff) 7%, transparent); }
-.bn-where { font: 11.5px var(--font-mono, ui-monospace, monospace); color: var(--faint, #ffffff70); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bn-item { position: relative; padding: 9px 30px 9px 10px; border-radius: var(--radius-small, 10px); cursor: pointer; }
+.bn-item:hover { background: color-mix(in srgb, var(--talk-ink, #fff) 7%, transparent); }
+.bn-where { font: 11.5px var(--font-mono, ui-monospace, monospace); color: var(--talk-dim, #ffffff70); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bn-what { font-size: 14px; line-height: 1.35; margin-top: 2px; }
 .bn-draft .bn-what { color: var(--pen, #c8264a); }
-.bn-tag { font: 11px var(--font-mono, ui-monospace, monospace); color: var(--dim, #ffffffa0); margin-top: 3px; }
-.bn-tag-done { color: var(--accent, #f4a6b0); }
-.bn-tag-answer { color: var(--ink-talk, var(--ink, #fff)); font-family: var(--font-ui, sans-serif); font-size: 12.5px; }
-.bn-tag-moved, .bn-moved .bn-where { color: var(--faint, #ffffff70); font-style: italic; }
-.bn-x { position: absolute; right: 6px; top: 7px; width: 22px; height: 22px; border: 0; background: none; color: var(--faint, #ffffff70); border-radius: 50%; }
-.bn-x:hover { color: var(--ink-talk, #fff); background: color-mix(in srgb, var(--ink-talk, #fff) 10%, transparent); }
-.bn-empty { padding: 10px; color: var(--dim, #ffffffa0); font-size: 13px; }
-.bn-keys { padding: 8px 16px 12px; font: 11px var(--font-mono, ui-monospace, monospace); color: var(--faint, #ffffff70); white-space: pre; }
+.bn-tag { font: 11px var(--font-mono, ui-monospace, monospace); color: var(--talk-dim, #ffffffa0); margin-top: 3px; }
+.bn-tag-done { color: var(--talk-accent, #f4a6b0); }
+.bn-tag-answer { color: var(--talk-ink, var(--ink, #fff)); font-family: var(--font-ui, sans-serif); font-size: 12.5px; }
+.bn-tag-moved, .bn-moved .bn-where { color: var(--talk-dim, #ffffff70); font-style: italic; }
+.bn-x { position: absolute; right: 6px; top: 7px; width: 22px; height: 22px; border: 0; background: none; color: var(--talk-dim, #ffffff70); border-radius: 50%; }
+.bn-x:hover { color: var(--talk-ink, #fff); background: color-mix(in srgb, var(--talk-ink, #fff) 10%, transparent); }
+.bn-empty { padding: 10px; color: var(--talk-dim, #ffffffa0); font-size: 13px; }
+.bn-keys { padding: 8px 16px 12px; font: 11px var(--font-mono, ui-monospace, monospace); color: var(--talk-dim, #ffffff70); white-space: pre; }
 
 /* the send bar: `3 notes for weekly update · or just say "send"` */
 .bn-bar {
   position: fixed; right: 16px; bottom: 16px; display: none; align-items: center; gap: 12px; padding: 9px 9px 9px 18px;
-  background: var(--surface-talk, #1d1a19ee); color: var(--ink-talk, var(--ink, #fff)); border-radius: 999px;
+  background: var(--surface-talk, #1d1a19ee); color: var(--talk-ink, var(--ink, #fff)); border-radius: 999px;
   box-shadow: inset 0 0 0 1px var(--rule, #ffffff22), 0 14px 34px -10px #0006; font-size: 13.5px;
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); z-index: 2147483001;
 }
 .bn-bar.bn-on { display: flex; animation: bn-rise .5s var(--ease-arrive, cubic-bezier(.16, 1, .3, 1)) both; }
-.bn-send { border: 0; border-radius: 999px; padding: 6px 16px; font-weight: 600; background: var(--accent, #f4a6b0); color: var(--on-accent, #141211); }
+.bn-send { border: 0; border-radius: 999px; padding: 6px 16px; font-weight: 600; background: var(--talk-accent, #f4a6b0); color: var(--on-accent, #141211); }
 .bn-send:disabled { opacity: .45; cursor: default; }
 .bn-bar.bn-error .bn-bar-text { color: var(--pen, #c8264a); }
 
 /* the toolbar over a selection or a block, and the composer */
-.bn-tools { position: absolute; display: none; gap: 2px; padding: 4px; border-radius: 999px; background: var(--surface-talk, #1d1a19ee); color: var(--ink-talk, #fff); box-shadow: 0 8px 24px -8px #0008; z-index: 2147483002; }
+.bn-tools { position: absolute; display: none; gap: 2px; padding: 4px; border-radius: 999px; background: var(--surface-talk, #1d1a19ee); color: var(--talk-ink, #fff); box-shadow: 0 8px 24px -8px #0008; z-index: 2147483002; }
 .bn-tools.bn-on { display: flex; animation: bn-pop .3s var(--ease-pop, cubic-bezier(.34, 1.56, .5, 1)) both; }
 .bn-tool { border: 0; background: none; padding: 4px 10px; border-radius: 999px; font-size: 13px; }
-.bn-tool:hover { background: color-mix(in srgb, var(--ink-talk, #fff) 12%, transparent); }
+.bn-tool:hover { background: color-mix(in srgb, var(--talk-ink, #fff) 12%, transparent); }
 .bn-composer { position: absolute; display: none; width: 300px; padding: 8px; border-radius: calc(var(--radius, 16px) * .75); background: var(--surface-talk, #1d1a19ee); box-shadow: 0 14px 34px -10px #0008; z-index: 2147483002; }
 .bn-composer.bn-on { display: block; animation: bn-rise .4s var(--ease-arrive, cubic-bezier(.16, 1, .3, 1)) both; }
-.bn-input { width: 100%; resize: none; border: 0; outline: 0; background: transparent; color: var(--ink-talk, #fff); font: 14px/1.4 var(--font-ui, sans-serif); caret-color: var(--pen, #c8264a); }
+.bn-input { width: 100%; resize: none; border: 0; outline: 0; background: transparent; color: var(--talk-ink, #fff); font: 14px/1.4 var(--font-ui, sans-serif); caret-color: var(--pen, #c8264a); }
 
 /* pins: your numbered marks, in pen */
 .bn-pins { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 2147482999; }
