@@ -136,7 +136,9 @@ App-only events to the web UI: `app_fn` (`state`: `down`/`up`/`double`/`tap`/`ca
 `fn`/`right_option`; the web UI turns them into `cut_in`/`hush`/`talk_cancel`), `app_globe` (`use`:
 `none`/`input`/`emoji`/`dictation`/`unknown`: macOS's "press 🌐 to"), `app_shot` (`app`, `title`,
 `skipped`, `frame: {x, y, w, h}` for the pink corners), `app_perm` (`perm`: `screen`/`mic`/
-`accessibility`, `state`: `granted`/`denied`/`ask`), `app_settings` (`edge_glow`), `app_hidden`
+`accessibility`, `state`: `granted`/`denied`/`ask`), `app_settings` (`edge_glow`, `radius`: macOS's
+own window corner radius in px, read at runtime; the capsule and the needs-you glass use it, no
+pill), `app_hidden`
 (bool), `app_reduce_motion` (bool), `app_key` (fn + key: `space`, `1`…`9`, `i`, `0`, `o`, `.`,
 `enter`, `esc`). Web UI commands `app_perm` (`perm`, `do`: `continue` opens macOS's prompt,
 `settings` opens its pane, `not_now`: the refused path, its one line once, the menu bar and the
