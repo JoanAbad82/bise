@@ -24,7 +24,7 @@ are two views of one thread.
 Three pieces, two processes, one new native binary:
 
 ```
- Bise Ambient.app (Swift, AppKit)                        bise ambient-core (Rust, in bend-tui)
+ bise ambient.app (Swift, AppKit)                        bise ambient-core (Rust, in bend-tui)
  ┌──────────────────────────────────────┐   stdio JSON  ┌─────────────────────────────────────┐
  │ capsule NSPanel ─ WKWebView (web UI) │◀─────────────▶│ hub client (hub.sock, like the TUI) │
  │ edge-glow overlay window             │   lines       │ mic + listener (voicemode: cpal,    │
@@ -51,7 +51,7 @@ Why this split:
   subcommand of the `bise` binary (`bise ambient-core`, a module of bend-tui so it reaches
   `voicemode` and the `sb` wire parsing): **no new Rust binary**.
 - **One new native binary, one stable path.** `scripts/ambient.sh build` compiles the Swift app
-  into `<bise dev dir>/build/ambient/Bise Ambient.app` (`<bise dev dir>` = bins.sh's `$STATE`), and
+  into `<bise dev dir>/build/ambient/bise ambient.app` (`<bise dev dir>` = bins.sh's `$STATE`), and
   only when its sources' hash changed (like bins.sh). Never another copy, never spawned by tests
   (the EDR deletes fresh unsigned binaries), never `pkill` by name: the app writes its pid to
   `<bise dev dir>/ambient/app.pid` and `scripts/ambient.sh stop` kills that pid. Ad-hoc signed,
@@ -179,7 +179,7 @@ Shared files nobody owns (Cargo.toml, Cargo.lock, a new crate dependency): ask a
 
 ## 7. How we work
 
-- Commit with `sb land --here "<long subject>"` from your worktree (it lands on `ambient-app`).
+- Commit with `sb land "<long subject>"` (no `--here`) from your worktree: it lands on `ambient-app`.
   Before: `tests/gate.sh quick` (Rust), `apps/ambient/mac/build.sh --check` (Swift type-check, no
   binary), the web UI's checks (`node apps/ambient/web/check.mjs`).
 - Never open the mic, play a sound, take a screenshot or start the app on the user's Mac from a test:
