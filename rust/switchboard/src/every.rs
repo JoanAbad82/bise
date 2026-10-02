@@ -69,6 +69,29 @@ pub struct Timer {
     pub until_ms: Option<u64>,
     pub times: Option<u64>,
     pub fired: u64,
+    /// `--page <id>`: the page this order refreshes (its frame says
+    /// `watching`, its `stop` ends the timer)
+    pub page: Option<String>,
+    /// when it last woke its agent (0: never)
+    pub last_ms: u64,
+}
+
+impl Timer {
+    /// The timer in the hub's state (amb-mac's menu, m_5435).
+    pub fn json(&self) -> Value {
+        let mut v = json!({"id": self.id, "agent": self.agent, "label": self.sched.label(), "text": self.text,
+                           "by": self.by, "next_ms": self.next_ms, "fired": self.fired});
+        if let Some(u) = self.until_ms {
+            v["until_ms"] = json!(u);
+        }
+        if let Some(t) = self.times {
+            v["times"] = json!(t);
+        }
+        if let Some(p) = &self.page {
+            v["page"] = json!(p);
+        }
+        v
+    }
 }
 
 /// What `add` takes: a request already parsed and checked.
@@ -80,6 +103,7 @@ pub struct New {
     pub sched: Sched,
     pub until_ms: Option<u64>,
     pub times: Option<u64>,
+    pub page: Option<String>,
 }
 
 /// What a tick asks the hub to do for one timer.
@@ -137,6 +161,8 @@ impl Timers {
                         until_ms: ev["until_ms"].as_u64(),
                         times: ev["times"].as_u64(),
                         fired: 0,
+                        page: ev["page"].as_str().map(String::from),
+                        last_ms: 0,
                     },
                 );
             }
@@ -144,6 +170,7 @@ impl Timers {
                 if let Some(t) = self.map.get_mut(&id) {
                     t.fired = ev["fired"].as_u64().unwrap_or(t.fired);
                     t.next_ms = ev["next_ms"].as_u64().unwrap_or(t.next_ms);
+                    t.last_ms = ev["at"].as_u64().unwrap_or(t.last_ms);
                 }
             }
             Some("every_stop") => {
@@ -171,6 +198,9 @@ impl Timers {
         }
         if let Some(t) = n.times {
             j["times"] = json!(t);
+        }
+        if let Some(p) = &n.page {
+            j["page"] = json!(p);
         }
         self.read(&j);
         (id, j)
@@ -230,6 +260,11 @@ impl Timers {
         self.map.values().map(|t| line(t, now)).collect::<Vec<_>>().join("\n")
     }
 
+    /// The timers that watch page `id` (`--page`).
+    pub fn of_page(&self, id: &str) -> Vec<&Timer> {
+        self.map.values().filter(|t| t.page.as_deref() == Some(id)).collect()
+    }
+
     /// The timers of `agent`, for `sb tasks`.
     pub fn of(&self, agent: &str, now: u64) -> Vec<String> {
         self.map.values().filter(|t| t.agent == agent).map(|t| line(t, now)).collect()
@@ -244,6 +279,9 @@ fn line(t: &Timer, now: u64) -> String {
     }
     if let Some(n) = t.times {
         s.push_str(&format!(" · {}/{} times", t.fired, n));
+    }
+    if let Some(p) = &t.page {
+        s.push_str(&format!(" · page {p}"));
     }
     s.push_str(&format!(" · \"{}\" (by {})", clip(&t.text, 80), t.by));
     s
@@ -429,7 +467,7 @@ mod tests {
     const NOW: u64 = 1_790_000_000_000;
 
     fn new(sched: Sched) -> New {
-        New { agent: "w".into(), by: "main".into(), text: "check HN".into(), sched, until_ms: None, times: None }
+        New { agent: "w".into(), by: "main".into(), text: "check HN".into(), sched, until_ms: None, times: None, page: None }
     }
 
     fn wakes(acts: &[Act]) -> usize {

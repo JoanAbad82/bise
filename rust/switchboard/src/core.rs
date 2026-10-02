@@ -194,7 +194,7 @@ pub enum EveryReq {
     List,
     Stop(u64),
     /// `to` "": the caller
-    Add { to: String, text: String, sched: crate::every::Sched, until_ms: Option<u64>, times: Option<u64> },
+    Add { to: String, text: String, sched: crate::every::Sched, until_ms: Option<u64>, times: Option<u64>, page: Option<String> },
 }
 
 /// `m_12` or `12`.
@@ -367,6 +367,7 @@ impl AgentReq {
                     },
                     until_ms: v["until_ms"].as_u64(),
                     times: v["times"].as_u64(),
+                    page: v["page"].as_str().filter(|p| !p.is_empty()).map(String::from),
                 },
                 o => return Err(format!("sb every: unknown step {}", o)),
             }),
@@ -429,6 +430,12 @@ pub enum Input {
         req: AgentReq,
     },
     Tick,
+    /// The user stopped timer `id` (the menu bar's `stop watching`, a
+    /// page's `stop`): its agent hears it from bise, once.
+    EveryStop {
+        id: u64,
+        why: String,
+    },
     /// The approvals gate (approvals-design.md §9): a `confirm` card for
     /// `agent`'s waiting call, in the user's inbox.
     ConfirmOpen {
@@ -1341,6 +1348,11 @@ impl Hub {
         })
     }
 
+    /// `sb every`'s timers (the state's `timers`, the pages' `watch`).
+    pub fn timers(&self) -> &crate::every::Timers {
+        &self.every
+    }
+
     /// `sb every` (every.rs): set, list or stop a timer; the reply.
     fn every_req(&mut self, fx: &mut Fx, env: &mut dyn Env, from: &str, r: EveryReq) -> Value {
         let now = env.now();
@@ -1356,7 +1368,7 @@ impl Hub {
                 }
                 None => json!({"ok": false, "error": format!("no timer #{} (`sb every` lists them)", id)}),
             },
-            EveryReq::Add { to, text, sched, until_ms, times } => {
+            EveryReq::Add { to, text, sched, until_ms, times, page } => {
                 let to = if to.is_empty() { by.clone() } else { to };
                 let agent = match self.st.resolve(&to) {
                     Some(a) if self.st.agents[&a].lifecycle == Lifecycle::Active => a,
@@ -1374,7 +1386,7 @@ impl Hub {
                 if times == Some(0) {
                     return json!({"ok": false, "error": "sb every: --times is at least 1"});
                 }
-                let n = crate::every::New { agent, by, text: text.trim().to_string(), sched, until_ms, times };
+                let n = crate::every::New { agent, by, text: text.trim().to_string(), sched, until_ms, times, page };
                 let (id, j) = self.every.add(n, now);
                 fx.push(Effect::Journal(j));
                 let line = self.every.list(now).lines().find(|l| l.starts_with(&format!("#{} ", id))).unwrap_or_default().to_string();
@@ -1917,6 +1929,16 @@ impl Hub {
                 json!({"t": "interrupt", "agent": agent}),
             ),
             Input::Agent { token, from, req } => self.agent_req(&mut fx, env, token, &from, req),
+            Input::EveryStop { id, why } => {
+                if let Some(t) = self.every.map.get(&id).cloned() {
+                    if let Some(j) = self.every.stop(id, "stopped by the user") {
+                        fx.push(Effect::Journal(j));
+                        let text = format!("the user stopped timer #{} ({}){}: don't set it again unless they ask", id, t.text, why);
+                        self.core(&mut fx, env, None, json!({"t": "hub_msg", "to": t.agent, "text": text}));
+                        self.dirty = true;
+                    }
+                }
+            }
             Input::Tick => {
                 self.core(&mut fx, env, None, json!({"t": "tick"}));
                 self.every_tick(&mut fx, env);

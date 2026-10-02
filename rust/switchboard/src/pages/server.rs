@@ -393,8 +393,13 @@ fn connect_frames(pages: &Pages, id: &str) -> String {
     for f in pages.store.agent_frames(id).values() {
         out.push_str(&format!("event: agent\ndata: {f}\n\n"));
     }
-    if let Some(m) = pages.store.meta(id).filter(|m| !m.went.is_empty()) {
-        out.push_str(&format!("event: went\ndata: {}\n\n", json!({"went": m.went})));
+    if let Some(m) = pages.store.meta(id) {
+        if !m.went.is_empty() {
+            out.push_str(&format!("event: went\ndata: {}\n\n", json!({"went": m.went})));
+        }
+        if let Some(w) = &m.watch {
+            out.push_str(&format!("event: watch\ndata: {w}\n\n"));
+        }
     }
     out
 }

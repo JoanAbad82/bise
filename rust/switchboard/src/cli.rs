@@ -73,9 +73,9 @@ pub const COMMANDS: &[CmdDoc] = &[
         "open a hit: the entry with its neighbors, the commands to move earlier/later, and the agents, messages and commits it mentions.",
     ),
     cmd(
-        "sb every <10m|1h|day 07:30> \"<message>\" [--until <18:00|tomorrow 18:00|2h>] [--times <n>] [--to <agent>] | sb every | sb every --stop <id>",
+        "sb every <10m|1h|day 07:30> \"<message>\" [--until <18:00|tomorrow 18:00|2h>] [--times <n>] [--to <agent>] [--page <id>] | sb every | sb every --stop <id>",
         Who::Everyone,
-        "a standing order: the hub wakes you (or `--to` that agent) with the message on a timer, every N (at least 1m) or every day at that time, until a time or for n times. Never sleep or loop in a turn to wait: set a timer and end your turn. A wake while busy waits for the end of the turn (one, never stacked). No argument: the timers; `--stop` ends one. A dropped agent's timers stop with it.",
+        "a standing order: the hub wakes you (or `--to` that agent) with the message on a timer, every N (at least 1m) or every day at that time, until a time or for n times. Never sleep or loop in a turn to wait: set a timer and end your turn. A wake while busy waits for the end of the turn (one, never stacked). `--page <id>`: the page it keeps fresh (its frame says `watching` and has `stop`). No argument: the timers; `--stop` ends one. A dropped agent's timers stop with it.",
     ),
     cmd(
         "sb land [--here] \"<message>\"",
@@ -305,12 +305,12 @@ fn str_of(opts: &Map<String, Value>, k: &str) -> String {
     }
 }
 
-const EVERY_USAGE: &str = "usage: sb every <10m|1h|day 07:30> \"<message>\" [--until <18:00|tomorrow 18:00|2h>] [--times <n>] [--to <agent>] | sb every | sb every --stop <id>";
+const EVERY_USAGE: &str = "usage: sb every <10m|1h|day 07:30> \"<message>\" [--until <18:00|tomorrow 18:00|2h>] [--times <n>] [--to <agent>] [--page <id>] | sb every | sb every --stop <id>";
 
 /// `sb every` (docs/ambient-roadmap.md B): the durations and times are
 /// read here, with the agent's own clock and time zone (every.rs).
 fn every_req(rest: &[String], req: &mut Map<String, Value>) -> Result<(), String> {
-    let (pos, o) = parse_args(rest, &["until", "times", "to", "stop"], &[])?;
+    let (pos, o) = parse_args(rest, &["until", "times", "to", "stop", "page"], &[])?;
     if o.contains_key("stop") {
         let id = str_of(&o, "stop").trim_start_matches('#').parse::<u64>().map_err(|_| EVERY_USAGE.to_string())?;
         req.insert("step".into(), json!("stop"));
@@ -347,6 +347,10 @@ fn every_req(rest: &[String], req: &mut Map<String, Value>) -> Result<(), String
         req.insert("times".into(), json!(n));
     }
     req.insert("to".into(), json!(str_of(&o, "to")));
+    let page = str_of(&o, "page");
+    if !page.is_empty() {
+        req.insert("page".into(), json!(page));
+    }
     Ok(())
 }
 

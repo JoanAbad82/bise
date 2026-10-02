@@ -38,6 +38,10 @@ pub struct Meta {
     /// per kind and ref, kept across publishes
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub went: Vec<Went>,
+    /// a timer keeps the page fresh (`sb every --page`, roadmap B):
+    /// {timer, every, checked_ms, until_ms}; absent when none
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub watch: Option<Value>,
 }
 
 /// One place the page's text went: `--went <kind>:<ref>[@<block>]=<url>`
@@ -287,6 +291,7 @@ impl Store {
                 ask: None,
                 opened_version: 0,
                 went: Vec::new(),
+                watch: None,
             },
         };
         for w in &p.went {
@@ -386,7 +391,7 @@ impl Store {
                 return Err(format!("{id} is {}'s page: start another --id", m.agent));
             }
             Some(m) => Meta { agent: agent.to_string(), ..m },
-            None => Meta { id: id.to_string(), title: String::new(), agent: agent.to_string(), created_ms: now, versions: Vec::new(), state: ready(), ask: None, opened_version: 0, went: Vec::new() },
+            None => Meta { id: id.to_string(), title: String::new(), agent: agent.to_string(), created_ms: now, versions: Vec::new(), state: ready(), ask: None, opened_version: 0, went: Vec::new(), watch: None },
         };
         if let Some(t) = title.map(str::trim).filter(|t| !t.is_empty()) {
             meta.title = t.to_string();
@@ -466,6 +471,31 @@ impl Store {
 
     pub fn save_agent_frames(&self, id: &str, f: &serde_json::Map<String, Value>) -> Result<(), String> {
         write_json(&self.page_dir(id).join("agents.json"), f)
+    }
+
+    /// The page's watch (meta.watch), written by the hub.
+    pub fn set_watch(&self, id: &str, w: Option<Value>) -> Result<(), String> {
+        let Some(mut m) = self.meta(id) else { return Ok(()) };
+        if m.watch == w {
+            return Ok(());
+        }
+        m.watch = w;
+        self.save_meta(&m)
+    }
+
+    /// The stop notes just sent (kind `stop`: the frame's `stop` of a
+    /// watched page): done at once, the hub ends the timers. The ones taken.
+    pub fn take_stops(&self, id: &str) -> Result<Vec<Note>, String> {
+        let mut notes = self.notes(id);
+        let mut out = Vec::new();
+        for n in notes.iter_mut().filter(|n| n.kind == "stop" && n.status == "sent") {
+            n.status = "done".into();
+            out.push(n.clone());
+        }
+        if !out.is_empty() {
+            self.save_notes(id, &notes)?;
+        }
+        Ok(out)
     }
 
     /// The start notes just sent (kind `start`, sent, not routed yet):
@@ -578,7 +608,7 @@ fn note_line(n: &Note) -> String {
 /// Start notes are not in it (main gets them, [`start_message`]): ""
 /// when every sent note is one.
 pub fn notes_message(m: &Meta, url: &str, sent: &[Note]) -> String {
-    let sent: Vec<Note> = sent.iter().filter(|n| n.kind != "start").cloned().collect();
+    let sent: Vec<Note> = sent.iter().filter(|n| n.kind != "start" && n.kind != "stop").cloned().collect();
     let sent = sent.as_slice();
     if sent.is_empty() {
         return String::new();

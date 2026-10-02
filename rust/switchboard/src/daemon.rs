@@ -296,6 +296,8 @@ struct Shell {
     /// each agent's last tool intent (an `agent` frame's note when it
     /// declared none)
     last_intent: BTreeMap<String, String>,
+    /// each watched page's last `watch` (meta.watch)
+    page_watch_sent: BTreeMap<String, Value>,
     /// The open cards of the pages' question blocks (§4.2): card →
     /// (page, block); None until read from the store.
     page_cards: Option<BTreeMap<u64, (String, String)>>,
@@ -540,6 +542,8 @@ impl Shell {
         // the features' lids and Δ (dev-flow §5.1)
         self.feature_views();
         let mut snap = self.hub.snapshot(now_ms());
+        // sb every's timers (amb-mac's menu: 'watching … · stop watching')
+        snap["timers"] = json!(self.hub.timers().map.values().map(|t| t.json()).collect::<Vec<_>>());
         // the pages (docs/ambient-pages.md §2.3), newest first
         if let Some(p) = &self.pages {
             snap["pages"] = json!(p.list_json());
@@ -805,6 +809,7 @@ impl Shell {
                         let names = crate::pages::store::data_agents_of(&p.html);
                         self.page_agents_now().insert(meta.id.clone(), names);
                         self.page_agent_push();
+                        self.page_watch_push();
                         // its question blocks: one card each (§4.2)
                         self.page_questions(&meta.id, &meta.agent, &p.html);
                         let snap = self.snapshot();
@@ -829,6 +834,17 @@ impl Shell {
             crate::pages::PageMsg::Sent { id, agent, text } => {
                 // start notes (an item the user wants an agent on): main's,
                 // never the page's agent's (ambient-lead m_5006)
+                // a stop note (the frame's 'stop' of a watched page): the hub
+                // ends the page's timers itself, no model turn
+                let stops = pages.locked(|s| s.take_stops(&id)).unwrap_or_default();
+                if !stops.is_empty() {
+                    let ids: Vec<u64> = self.hub.timers().of_page(&id).iter().map(|t| t.id).collect();
+                    for t in ids {
+                        self.step(Input::EveryStop { id: t, why: format!(" with the stop on the page {id}") });
+                    }
+                    pages.push(&id, "notes", &json!({"notes": pages.store.notes(&id)}));
+                    self.page_watch_push();
+                }
                 let starts = pages.locked(|s| s.route_starts(&id)).unwrap_or_default();
                 if let (false, Some(meta)) = (starts.is_empty(), pages.store.meta(&id)) {
                     let msg = crate::pages::store::start_message(&meta, &pages.url(&id), &starts);
@@ -936,6 +952,35 @@ impl Shell {
     /// drafts"). The approvals gate makes a draft call a card then.
     pub(crate) fn pending_review_of(&self, name: &str) -> Option<String> {
         self.pages.as_ref()?.store.pending_review(name)
+    }
+
+    /// meta.watch of each page a timer watches (`sb every --page`), and
+    /// SSE `watch` when it changes (null when its last timer ends):
+    /// {timer, every, checked_ms, until_ms} (amb-kit m_5454).
+    fn page_watch_push(&mut self) {
+        let Some(pages) = self.pages.clone() else { return };
+        let mut now: BTreeMap<String, Value> = BTreeMap::new();
+        for t in self.hub.timers().map.values() {
+            let Some(page) = &t.page else { continue };
+            if now.contains_key(page) {
+                continue;
+            }
+            let Some(m) = pages.store.meta(page) else { continue };
+            let checked = m.versions.last().map_or(0, |v| v.at_ms).max(t.last_ms);
+            now.insert(page.clone(), json!({"timer": t.id, "every": t.sched.label(), "checked_ms": checked, "until_ms": t.until_ms}));
+        }
+        let before = std::mem::take(&mut self.page_watch_sent);
+        for (id, w) in &now {
+            if before.get(id) != Some(w) {
+                let _ = pages.locked(|s| s.set_watch(id, Some(w.clone())));
+                pages.push(id, "watch", w);
+            }
+        }
+        for id in before.keys().filter(|k| !now.contains_key(*k)) {
+            let _ = pages.locked(|s| s.set_watch(id, None));
+            pages.push(id, "watch", &Value::Null);
+        }
+        self.page_watch_sent = now;
     }
 
     /// A tool intent of an agent some page names: its item's note.
@@ -1367,6 +1412,7 @@ impl Shell {
             Effect::State => {
                 self.page_answers();
                 self.page_agent_push();
+                self.page_watch_push();
                 let snap = self.snapshot();
                 self.broadcast(&snap);
             }
@@ -2209,6 +2255,11 @@ impl Shell {
                 client: id,
                 agent: s("agent"),
             }),
+            // the menu bar's 'stop watching' (amb-mac m_5435)
+            "every_stop" => self.step(Input::EveryStop {
+                id: v.get("id").and_then(|x| x.as_u64()).unwrap_or(0),
+                why: String::new(),
+            }),
             "stop_hub" => {
                 let keep = v
                     .get("keep_agents")
@@ -2707,6 +2758,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         page_agents: None,
         page_agent_sent: BTreeMap::new(),
         last_intent: BTreeMap::new(),
+        page_watch_sent: BTreeMap::new(),
         page_cards: None,
         page_replies: BTreeMap::new(),
     };

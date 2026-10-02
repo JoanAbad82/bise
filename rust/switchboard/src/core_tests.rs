@@ -845,7 +845,7 @@ fn land_feature_and_flow_say_not_in_a_repo_without_git() {
 fn every_sets_lists_and_stops_timers() {
     use crate::every::Sched;
     let mut t = T::new();
-    let add = |sched, to: &str| AgentReq::Every(EveryReq::Add { to: to.into(), text: "check HN".into(), sched, until_ms: None, times: None });
+    let add = |sched, to: &str| AgentReq::Every(EveryReq::Add { to: to.into(), text: "check HN".into(), sched, until_ms: None, times: None, page: None });
     for (req, why) in [
         (add(Sched::Every(30_000), ""), "at least 1m"),
         (add(Sched::Every(600_000), "ghost"), "no active agent @ghost"),

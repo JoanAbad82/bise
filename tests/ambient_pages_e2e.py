@@ -330,6 +330,42 @@ def main():
         c.say('[[bash: sb page publish %s --id bugs --went "gmail-draft:r-1=file:///etc/passwd"]]' % bugs)
         c.wait_line("main", "must be an http(s) link", 90)
         check(json.loads(request(port, "GET", "/p/bugs/meta")[2])["versions"][-1]["n"] == 3, "a bad --went publishes nothing")
+
+        # (amb-home) roadmap B: a watched page. sb every --page puts the
+        # timer in the state, meta.watch and SSE 'watch'; the page's stop
+        # note ends it with no model turn; the menu's every_stop op too
+        c.wait_idle("main")
+        c.say('[[bash: sb page publish %s --id launch-watch --title "the launch" && sb every 1h "check HN and republish" --page launch-watch --until 2h]]' % v1)
+        c.wait_line("main", "timer set", 90)
+        c.wait_idle("main")
+        timers = (c.state or {}).get("timers", [])
+        lw = [t for t in timers if t.get("page") == "launch-watch"]
+        check(len(lw) == 1 and lw[0]["label"] == "every 1h" and lw[0]["agent"] == "main" and "until_ms" in lw[0], "the timer in the state: %r" % timers)
+        tid = lw[0]["id"]
+        m = json.loads(request(port, "GET", "/p/launch-watch/meta")[2])
+        check(m.get("watch", {}).get("timer") == tid and m["watch"]["every"] == "every 1h" and m["watch"]["checked_ms"] > 0 and m["watch"]["until_ms"], "meta.watch: %r" % m.get("watch"))
+        ws = Sse(port, "/p/launch-watch/events")
+        c.wait(lambda: ws.seen("watch", lambda d: d and d["timer"] == tid), 15, "watch at connect")
+        st, _, _ = request(port, "POST", "/api/p/launch-watch/notes", {"notes": [{"block": "frame", "kind": "stop"}]}, {"Origin": origin, "X-Bise-Token": token})
+        check(st == 200, "a stop note: %d" % st)
+        n_main = len(c.lines("main"))
+        st, _, sent = request(port, "POST", "/api/p/launch-watch/send", {}, {"Origin": origin, "X-Bise-Token": token})
+        check(st == 200, "send the stop: %s" % sent)
+        c.wait(lambda: ws.seen("watch", lambda d: d is None), 15, "watch null after the stop")
+        c.wait(lambda: any("the user stopped timer #%d" % tid in l for l in c.lines("main")[n_main:]), 30, "main hears the stop from bise")
+        check(not any("you sent 1 note" in l for l in c.lines("main")[n_main:]), "no notes message for a stop")
+        c.wait(lambda: not any(t["id"] == tid for t in (c.state or {}).get("timers", [])), 15, "the timer gone from the state")
+        m = json.loads(request(port, "GET", "/p/launch-watch/meta")[2])
+        check("watch" not in m and [n["status"] for n in m["notes"]] == ["done"], "no watch, the stop note done: %r" % m)
+        c.wait_idle("main")
+        c.say('[[bash: sb every 1h "later" --page launch-watch]]')
+        lwt = lambda: [t for t in (c.state or {}).get("timers", []) if t.get("page") == "launch-watch"]
+        c.wait(lambda: lwt(), 90, "a second watch timer")
+        c.wait_idle("main")
+        t2 = lwt()[0]["id"]
+        c.wait(lambda: ws.seen("watch", lambda d: d and d["timer"] == t2), 15, "watching again")
+        c.send({"op": "every_stop", "id": t2})
+        c.wait(lambda: ws.seen("watch", lambda d: d is None) and not (c.state or {}).get("timers"), 15, "the menu's stop")
     except AssertionError as e:
         print("FAIL", e)
         ok = False
