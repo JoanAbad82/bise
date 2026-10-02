@@ -93,15 +93,37 @@ stop() {
 build() {
   local k; k="$(key)"
   if [ -x "$BIN" ] && [ "$(cat "$BUILD/key" 2>/dev/null || true)" = "$k" ]; then return 0; fi
+  # one build at a time at the one path: a second caller waits, then finds
+  # the app built (two at once rm -rf'ed the bundle under each other's icon)
+  mkdir -p "$BUILD"
+  local lock="$BUILD/build.lock" waited=0
+  until mkdir "$lock" 2>/dev/null; do
+    local holder; holder="$(cat "$lock/pid" 2>/dev/null || true)"
+    if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null; then rm -rf "$lock"; continue; fi
+    [ "$waited" = 0 ] && say "another build of $APP is running (pid ${holder:-?}): waiting"
+    waited=$((waited + 1))
+    if [ "$waited" -gt 600 ]; then say "still building after 10 min (pid ${holder:-?}): giving up"; exit 1; fi
+    sleep 1
+  done
+  echo $$ > "$lock/pid"
+  trap 'rm -rf "'"$lock"'"' EXIT
+  if [ -x "$BIN" ] && [ "$(cat "$BUILD/key" 2>/dev/null || true)" = "$k" ]; then rm -rf "$lock"; trap - EXIT; return 0; fi
   if running_pid >/dev/null; then say "sources changed: stopping the running app to rebuild"; stop; fi
   say "building $APP ($k)"
-  mkdir -p "$BUILD"
   rm -f "$BUILD/key"
-  # a fresh bundle: the disk is case-insensitive, so the old "Bise Ambient.app"
-  # would keep its capitals if we built into it
+  # a fresh bundle next to it, then swapped in: a half-built app never sits
+  # at the one path (and the case-insensitive disk never keeps the old
+  # "Bise Ambient.app" capitals)
+  local fresh="$BUILD/new/$(basename "$APP")"
+  rm -rf "$BUILD/new"
+  mkdir -p "$BUILD/new"
+  "$SRC/build.sh" "$fresh" >&2
   rm -rf "$APP"
-  "$SRC/build.sh" "$APP" >&2
+  mv "$fresh" "$APP"
+  rm -rf "$BUILD/new"
   echo "$k" > "$BUILD/key"
+  rm -rf "$lock"
+  trap - EXIT
 }
 
 # a JSON string

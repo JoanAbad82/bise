@@ -1,12 +1,12 @@
 import AppKit
 import ServiceManagement
 
-// the settings view's words that the app draws itself (ambient m_5330:
-// the ambient surfaces speak as bise)
+// the settings view's words that the app draws itself (ambient m_5330,
+// m_5411: the ambient surfaces speak as bise)
 enum SettingsWords {
     static let menu = "settings…"
     static let menuKeys = "fn ,"
-    static let pickTitle = "apps bise never sees"
+    static let pickTitle = "add an app bise never sees"
     static let pickAdd = "add"
 }
 
