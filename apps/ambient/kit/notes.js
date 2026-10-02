@@ -40,6 +40,9 @@
     tasteKept: "kept for next time",
     // slice C: start an agent on a review's item (main starts it; best guess, asked to ambient)
     start: "start an agent",
+    // roadmap B: the watching frame's 'stop' (best guesses, asked to ambient)
+    stop: "stop watching",
+    stopped: "stopped. bise won't check this page again.",
     marks: { keep: "♡ keep", drop: "✗ drop", unsure: "~ not sure" },
     // approve / skip on a review's item or an email (§4.3; kit.js's buttons say the same words)
     reacts: { approve: "approve", skip: "skip", pick: "picked", tick: "ticked" },
@@ -208,6 +211,7 @@
     // the item's own words are long (a whole mail): its place line names it, the note says the verdict
     if (NW.reacts[n.kind]) return NW.reacts[n.kind];
     if (n.kind === "start") return NW.start;
+    if (n.kind === "stop") return NW.stop;
     return n.text || "";
   }
 
@@ -321,6 +325,14 @@
         const prev = notes.find((n) => n.status === "draft" && n.kind === "start" && n.block === block && (n.item || null) === (item || null));
         if (prev) { notes = notes.filter((x) => x !== prev); return null; }
         return api.add({ version, block, ...(item ? { item } : {}), kind: "start", text: text || undefined }, now);
+      },
+      // stop a watching page (roadmap B, kit.js's bise:stop {page, timer}; amb-home m_5458): one
+      // stop note, to main, on any block of the page (the hub stops the page's timers); a second
+      // click while it's still a draft is the same note
+      stop(block, timer, version, now) {
+        const prev = notes.find((n) => n.status === "draft" && n.kind === "stop");
+        if (prev) return prev;
+        return api.add({ version, block, kind: "stop", ...(timer != null ? { timer } : {}) }, now);
       },
       // a question's option picked on the page (kit.js's bise:pick): one pick per block, the
       // latest wins; picking the same option again takes it back
@@ -859,12 +871,15 @@
     async function send() {
       if (!M.drafts().length || state === "updating") return;
       clearTimeout(saveT);
+      // start and stop notes go to main, never the page's agent: the page doesn't update for them
+      const toMain = M.drafts().every((n) => n.kind === "start" || n.kind === "stop");
+      const stopping = M.drafts().some((n) => n.kind === "stop");
       try {
         await api(`/api/p/${pageId}/notes`, M.payload());
         await api(`/api/p/${pageId}/send`, {});
         M.sent(now());
-        barNote = NW.sent(spaced(meta.agent || "main"));
-        state = "updating";
+        barNote = stopping && toMain ? NW.stopped : NW.sent(spaced(meta.agent || "main"));
+        if (!toMain) state = "updating";
         render();
         win.setTimeout(() => { barNote = ""; render(); }, 4000);
       } catch { barMsg(NW.failed); }
@@ -924,6 +939,15 @@
     // pick of ours on it goes (one card, one answer)
     doc.addEventListener("bise:answered", (e) => {
       if (M.answered((e.detail || {}).block)) { save(); render(); }
+    });
+    // the watching frame's 'stop' (roadmap B): a stop note to main, sent at once through the
+    // normal path (the drafts already written go with it: that's what send does)
+    doc.addEventListener("bise:stop", (e) => {
+      const d = e.detail || {};
+      const b = blocks()[0];
+      if (!b) return;
+      M.stop(b.dataset.id, d.timer, version, now());
+      save(); render(); send();
     });
     // a checklist row ticked by its agent: a draft tick of ours on that row goes
     doc.addEventListener("bise:ticked", (e) => {

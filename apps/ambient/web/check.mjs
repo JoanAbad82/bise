@@ -824,6 +824,16 @@ law("notes: kit.js's reactions: keep/drop one per variant, a pick one per block,
   m.react("k1", "t1", null, "", 1, 6);                          // unticked
   eq(m.drafts().map((n) => n.kind), ["drop", "pick"]);
 });
+law("notes: the watching frame's stop is one stop note to main with its timer, read 'stop watching' (roadmap B, amb-kit f0a88b01)", () => {
+  const m = N.model([], counted());
+  const s = m.stop("b1", 3, 1, 1);
+  eq([s.kind, s.block, s.timer, s.status], ["stop", "b1", 3, "draft"]);
+  assert.equal(m.stop("b1", 3, 1, 2), s);                       // a second click: the same note
+  assert.equal(N.label(s), "stop watching");
+  assert.equal(m.stop("b1", null, 1, 3).timer, 3);
+  m.sent(4);
+  assert.equal(m.stop("b1", null, 1, 5).timer, undefined);      // sent: a new stop is a new note
+});
 law("notes: a row its agent ticked (bise:ticked) drops our draft tick on that row only (amb-kit 74539129)", () => {
   const m = N.model([], counted());
   m.react("k1", "t1", "tick", "book the room", 1, 1);
