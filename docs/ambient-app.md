@@ -198,3 +198,36 @@ Shared files nobody owns (Cargo.toml, Cargo.lock, a new crate dependency): ask a
 - Screens go to ambient for review (a `dev.html` URL or a screenshot of the web UI); words come from
   ambient's `W`, never invented.
 - Done: `sb report done` to main and `sb send ambient-lead` the same (SHAs, what works, what not).
+
+## 8. Out of the way (the user, 2026-10-02, via main m_5029)
+
+His words: "at rest, la ui devrait carrément disparaître … une menubar icon qui nous indique si il
+y a du travail en background ou pas, le nombre d'inbox messages auquel on doit répondre … même
+quand ça travaille, il faudrait qu'on puisse cacher la UI et seulement avoir une indication que
+quelque chose se passe … out of the way … [les UI] ne doivent pas toujours être affichées".
+
+This replaces v1's "idle capsule shown by default" (SPEC §5.5). The behavior, built now; the look
+(round 6) comes through the tokens and ambient's icon when picked:
+
+- **At rest: nothing on screen.** No capsule, no edge. Only the menu-bar icon.
+- **The menu-bar icon is the status.** Three things at a glance: at rest (still), agents working
+  (a quiet sign of activity: ambient's design; until then a subtle animation of the glyph), and the
+  number of inbox items waiting for him (a count next to the icon, none at 0). Click: the menu
+  ("needs you", "for you", commands); option-click or fn + . : show the capsule.
+- **The capsule shows only when there is something to see**, then goes away by itself:
+  - while he talks (fn held, hands-free) or types (fn + space), and the edge glow while fn is held;
+  - main's answer to his own turn: it shows, then hides 4 s after the end of the turn (or after
+    the voice ends), unless the mouse is over it;
+  - `got it` / `on it` after a send: brief (2 s), then hidden: the work goes on in the menu bar;
+  - a new item that needs him: the capsule shows it for 6 s (the card, `1 yes 2 no`), then hides;
+    the count stays in the menu bar; fn + 1…9 still answers the top item while hidden;
+  - when he opens it (menu bar, fn + .), it stays until esc, fn + ., or a click elsewhere.
+- **Hide while working**: esc or fn + . hides it at any moment; nothing is lost, the menu bar
+  keeps the sign. A spoken answer keeps speaking when hidden (esc while speaking = text only, as
+  before).
+- macOS notifications stay for the screen locked or the user away (v1 rule), not for "hidden".
+
+Owners: amb-mac (the visibility policy in the app: one state machine, the menu-bar icon states and
+count), amb-web (the capsule's own timers move to the app's policy: it asks `app_hide`/`app_show`
+through the contract; no idle view), ambient (the icon and its states, words), ambient-pm (the
+vision's §3 and the QA checklist).
