@@ -647,6 +647,7 @@ law("notes: the words (ambient's), names with spaces", () => {
   assert.equal(N.NW.empty, "no notes yet. select some text, or hold fn and talk.");
   // signed by ambient (m_4926): every key hint is `<key> <word>`
   assert.equal(N.NW.drawHint, "draw on the page   d done");
+  assert.equal(N.NW.writing, "notes open with the first version");
   assert.equal(N.NW.replyBy(N.spaced("launch-recap")), "launch recap:");
 });
 law("notes: approve / skip (kit.js's bise:react) is one note per review item or email, the latest wins, kind null takes it back; an edit is one per item", () => {

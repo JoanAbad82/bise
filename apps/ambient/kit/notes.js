@@ -58,6 +58,8 @@
     placeholder: "your note",
     // signed off by ambient (m_4786): 'block' is our word, not hers; keys like the TUI's key bar
     empty: "no notes yet. select some text, or hold fn and talk.",
+    // the page is being written, no version yet (ambient, m_5095 via amb-kit m_5106)
+    writing: "notes open with the first version",
     keys: "t type   p pin   d draw   ⌘z undo   ⌘⏎ send",
     remove: "remove",
     undo: "undo",
@@ -461,7 +463,10 @@
     const blocks = () => [...page.querySelectorAll("[data-kit][data-id]")];
     const blockById = (id) => page.querySelector(`[data-kit][data-id="${CSS.escape(id)}"]`);
     const blockTexts = () => Object.fromEntries(blocks().map((b) => [b.dataset.id, norm(textOf(b))]));
-    let state = "ready";
+    // kit.js's bise:state; a page still being written (#bise-page[data-state=writing], no version
+    // yet) has the note layer off: no toolbar, no pin, no drawing, no keys (amb-kit m_5106)
+    let state = page.dataset.state || "ready";
+    const writing = () => state === "writing";
 
     // ---- the server
     const api = (path, body) => win.fetch(path, {
@@ -583,7 +588,10 @@
         return li;
       }));
       if (!all.length) listBody.replaceChildren(el("li", "bn-empty", NW.empty));
-      list.classList.toggle("bn-on", all.length > 0 || composer.classList.contains("bn-on"));
+      // the page is being written (no version yet): notes wait for the first version (ambient, m_5095)
+      if (writing()) listBody.replaceChildren(el("li", "bn-empty", NW.writing));
+      list.classList.toggle("bn-on", all.length > 0 || composer.classList.contains("bn-on") || writing());
+      list.classList.toggle("bn-writing", writing());
       const who = spaced(meta.agent || "main");
       barText.textContent = barNote || (state === "updating" ? NW.updating(who) : NW.sendBar(drafts, who));
       bar.classList.toggle("bn-on", drafts > 0 || !!barNote || state === "updating");
@@ -625,6 +633,7 @@
     // and `edit` is reachable on prose)
     let target = null;   // {block, quote?, offset?, pin?}
     function showTools(t, rect) {
+      if (writing()) return;
       target = t;
       const b = blockById(t.block);
       const btn = (k, text) => { const e = el("button", "bn-tool", text); e.type = "button"; e.dataset.tool = k; return e; };
@@ -728,7 +737,7 @@
     // ---- pin mode: p, then a click on a block places it
     let pinning = false;
     page.addEventListener("click", (e) => {
-      if (!pinning) return;
+      if (!pinning || writing()) return;
       const b = e.target.closest("[data-kit][data-id]");
       if (!b) return;
       e.preventDefault();
@@ -785,6 +794,7 @@
 
     // ---- keys: t type · p pin · ⌘z undo · ⌘⏎ send
     doc.addEventListener("keydown", (e) => {
+      if (writing()) return;
       if (e.target === input || (editing && e.target === editing.el && !(e.metaKey && e.key === "Enter"))) return;
       if (e.metaKey && e.key === "Enter") { e.preventDefault(); if (editing) editing.el.blur(); return send(); }
       if (e.metaKey && e.key === "z" && !e.shiftKey) {
@@ -905,7 +915,11 @@
       M.react(d.block, d.item || null, d.kind, d.text, version, now());
       barNote = ""; save(); render();
     });
-    doc.addEventListener("bise:state", (e) => { state = (e.detail && e.detail.state) || "ready"; render(); });
+    doc.addEventListener("bise:state", (e) => {
+      state = (e.detail && e.detail.state) || "ready";
+      if (writing()) { hideTools(); closeComposer(); }
+      render();
+    });
     win.addEventListener("resize", renderPins);
 
     // ---- drawing (§5.4): d, draw with the mouse or the pen, d or esc again: one drawing note
@@ -933,6 +947,7 @@
       ink.replaceChildren(...paths.map(([d, cls]) => { const p = doc.createElementNS(SVGNS, "path"); p.setAttribute("d", d); p.setAttribute("class", cls); return p; }));
     }
     function startDraw() {
+      if (writing()) return;
       hideTools(); closeComposer();
       drawing = { strokes: [], live: null };
       doc.documentElement.classList.add("bn-drawing");
