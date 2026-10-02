@@ -218,7 +218,7 @@ def _read(path):
 SCRIPTED_VARS = ("BEND_PROVIDER_URL", "BEND_MODEL", "MISTRAL_API_KEY", "BISE_APPROVALS")
 
 
-def hub_daemon(bise, kind="fake", connectors=False):
+def hub_daemon(bise, kind="fake", connectors=True, computer=False):
     """Runs detached (`qa.py _hub`): a throwaway hub on a fresh git repo,
     until SIGTERM. fake: tests/e2e.py's scripted provider, main answers
     "ack: <your words>" (`[[bash: ...]]` in what you say scripts it more).
@@ -240,11 +240,16 @@ def hub_daemon(bise, kind="fake", connectors=False):
         for k in SCRIPTED_VARS:
             E.env.pop(k, None)
         if connectors:
-            # the user's connectors and skills (e2e points them at empty files): main
-            # takes the paths the user takes (ambient-pm m_5169); read-only is the
-            # task's rule, the approvals mode still gates every write
+            # the user's connectors and skills, from his own bise home (e2e points
+            # them at empty files; BISE_HOME is never a throwaway, only the hub's
+            # state is): main takes the paths the user takes (ambient-pm m_5169,
+            # ambient-lead m_5174); read-only is the task's rule, the approvals
+            # mode still gates every write
             for k in ("BEND_MCP_INDEX", "BEND_SKILLS_INDEX"):
                 E.env.pop(k, None)
+    # the computer plugin is off in a QA hub unless asked (ambient-lead m_5174):
+    # its own enable state, the user's minus computer, so QA never drives his browser
+    E.env["BEND_PLUGINS_STATE"] = hub_plugins_state(E.tmp, computer)
     stop = {"now": False}
 
     def term(*_):
@@ -267,7 +272,7 @@ def hub_daemon(bise, kind="fake", connectors=False):
             time.sleep(0.1)
         c = e2e.Client(sock)
         c.wait_status("main", "idle", 120)
-        info = {"pid": os.getpid(), "kind": kind, "connectors": bool(connectors), "tmp": E.tmp, "ws": E.ws, "state": E.state, "bise": bise,
+        info = {"pid": os.getpid(), "kind": kind, "connectors": bool(connectors), "computer": bool(computer), "tmp": E.tmp, "ws": E.ws, "state": E.state, "bise": bise,
                 "env": {k: E.env[k] for k in ("SB_STATE_DIR",)}}
         with open(HUB + ".tmp", "w") as f:
             json.dump(info, f)
@@ -282,10 +287,33 @@ def hub_daemon(bise, kind="fake", connectors=False):
         E.close()
 
 
-def _start_hub(bise, root, kind="fake", connectors=False):
+def user_plugins_state():
+    """The user's plugin enable state: $BEND_PLUGINS_STATE, else his bise home's plugins.json."""
+    if os.environ.get("BEND_PLUGINS_STATE"):
+        return os.environ["BEND_PLUGINS_STATE"]
+    home = os.environ.get("BISE_HOME") or os.path.join(os.path.expanduser("~"), ".bise")
+    return os.path.join(home, "plugins.json")
+
+
+def hub_plugins_state(dir_, computer=False):
+    """A QA hub's own enable state: the user's, with the computer plugin off
+    unless `computer` (on: as the user has it). Returns the file's path."""
+    st = _read(user_plugins_state()) or {}
+    enabled = [n for n in st.get("enabled", []) if computer or n != "computer"]
+    disabled = [n for n in st.get("disabled", []) if not (computer and n == "computer")]
+    if not computer and "computer" not in disabled:
+        disabled.append("computer")
+    st = dict(st, enabled=enabled, disabled=disabled)
+    path = os.path.join(dir_, "plugins.json")
+    with open(path, "w") as f:
+        json.dump(st, f, indent=1)
+    return path
+
+
+def _start_hub(bise, root, kind="fake", connectors=True, computer=False):
     old = _read(HUB)
     if old and _pid_alive(old.get("pid")):
-        if old.get("kind", "fake") == kind and old.get("bise") == bise and bool(old.get("connectors")) == bool(connectors):
+        if (old.get("kind", "fake"), old.get("bise"), bool(old.get("connectors")), bool(old.get("computer"))) == (kind, bise, bool(connectors), bool(computer)):
             return old
         _stop_hub()
     os.makedirs(QA_DIR, exist_ok=True)
@@ -294,7 +322,8 @@ def _start_hub(bise, root, kind="fake", connectors=False):
     env = {k: v for k, v in os.environ.items() if not k.startswith("SB_") and k not in ("BISE_ROLE", "BISE_EXPORTS_FOR")}
     env["BISE_APP_ROOT"] = root    # e2e.Env passes it on to the hub: its repl-live
     env["AMBIENT_QA_DIR"] = QA_DIR  # without SB_AGENT the daemon would pick another QA dir
-    p = subprocess.Popen([sys.executable, "-u", os.path.realpath(__file__), "_hub", "--bise", bise, "--kind", kind] + (["--connectors"] if connectors else []),
+    p = subprocess.Popen([sys.executable, "-u", os.path.realpath(__file__), "_hub", "--bise", bise, "--kind", kind]
+                         + ([] if connectors else ["--no-connectors"]) + (["--computer"] if computer else []),
                          stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True, cwd=REPO, env=env)
     t0 = time.time()
     # the daemon gives the hub 60 s and main 120 s, each times the load (up to 4): wait for all of it
@@ -346,11 +375,9 @@ def app_path(force_build=False):
     return r.stdout.strip().splitlines()[-1]
 
 
-def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", force_build=False, restart=False, connectors=False):
+def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", force_build=False, restart=False, connectors=True, computer=False):
     if hub not in ("fake", "model", "real"):
         raise QAError("hub: fake (a throwaway scripted hub), model (a throwaway hub with your real model and keys) or real (your workspace, read-only)")
-    if connectors and hub != "model":
-        raise QAError("connectors: only with hub model (the fake main is scripted; the real hub has its own)")
     up = alive()
     if up and not restart:
         run = _read(RUN) or {}
@@ -363,7 +390,7 @@ def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", for
     web = web or os.environ.get("BISE_AMBIENT_WEB") or WEB
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "BISE_APP_ROOT": root}
     if hub in ("fake", "model"):
-        info = _start_hub(bise, root, hub, connectors)
+        info = _start_hub(bise, root, hub, connectors and hub == "model", computer)
         ws = info["ws"]
         env.update(info["env"])
     else:
@@ -864,7 +891,7 @@ def _cli(argv):
     import argparse
     ap = argparse.ArgumentParser(prog="qa.py", description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("launch"); p.add_argument("--hub", default="fake"); p.add_argument("--connectors", action="store_true", help="hub model: your connectors and skills"); p.add_argument("--workspace"); p.add_argument("--bise")
+    p = sub.add_parser("launch"); p.add_argument("--hub", default="fake"); p.add_argument("--no-connectors", action="store_true", help="hub model: without your connectors and skills"); p.add_argument("--computer", action="store_true", help="the QA hub may load the computer plugin (your browser)"); p.add_argument("--workspace"); p.add_argument("--bise")
     p.add_argument("--web"); p.add_argument("--backdrop", default="dark"); p.add_argument("--force-build", action="store_true"); p.add_argument("--restart", action="store_true")
     p = sub.add_parser("stop"); p.add_argument("--keep-hub", action="store_true")
     p = sub.add_parser("scenes"); p.add_argument("--only"); p.add_argument("--backdrops", default="dark"); p.add_argument("--out"); p.add_argument("--what", default="both")
@@ -884,12 +911,12 @@ def _cli(argv):
     p = sub.add_parser("fn"); p.add_argument("state"); p.add_argument("--key", default="fn")
     p = sub.add_parser("key"); p.add_argument("k")
     p = sub.add_parser("inject"); p.add_argument("ev")
-    p = sub.add_parser("_hub"); p.add_argument("--bise", required=True); p.add_argument("--kind", default="fake"); p.add_argument("--connectors", action="store_true")
+    p = sub.add_parser("_hub"); p.add_argument("--bise", required=True); p.add_argument("--kind", default="fake"); p.add_argument("--no-connectors", action="store_true"); p.add_argument("--computer", action="store_true")
     a = ap.parse_args(argv)
     if a.cmd == "_hub":
-        return hub_daemon(a.bise, a.kind, a.connectors)
+        return hub_daemon(a.bise, a.kind, not a.no_connectors, a.computer)
     if a.cmd == "launch":
-        r = launch(a.hub, a.workspace, a.bise, a.web, a.backdrop, a.force_build, a.restart, a.connectors)
+        r = launch(a.hub, a.workspace, a.bise, a.web, a.backdrop, a.force_build, a.restart, not a.no_connectors, a.computer)
     elif a.cmd == "stop":
         r = stop(a.keep_hub)
     elif a.cmd == "scenes":

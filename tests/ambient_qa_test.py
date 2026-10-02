@@ -115,6 +115,27 @@ def shot_times_rule():
 
 
 @test
+def hub_plugins_off():
+    """a QA hub's plugins: the user's state, the computer plugin off unless asked"""
+    d = tempfile.mkdtemp(prefix="aq-")
+    user = os.path.join(d, "user.json")
+    json.dump({"enabled": ["computer", "ambient-qa"], "disabled": ["x"]}, open(user, "w"))
+    old = os.environ.get("BEND_PLUGINS_STATE")
+    os.environ["BEND_PLUGINS_STATE"] = user
+    try:
+        off = json.load(open(qa.hub_plugins_state(d)))
+        check("computer" not in off["enabled"] and "computer" in off["disabled"] and "ambient-qa" in off["enabled"] and "x" in off["disabled"], off)
+        on = json.load(open(qa.hub_plugins_state(d, computer=True)))
+        check("computer" in on["enabled"] and "computer" not in on["disabled"], on)
+        check(json.load(open(user))["enabled"] == ["computer", "ambient-qa"], "the user's own state is untouched")
+    finally:
+        if old is None:
+            os.environ.pop("BEND_PLUGINS_STATE")
+        else:
+            os.environ["BEND_PLUGINS_STATE"] = old
+
+
+@test
 def client_protocol():
     """the socket client: one JSON line each way, ids matched, errors raised"""
     d = tempfile.mkdtemp(prefix="aq-", dir="/tmp" if len(tempfile.gettempdir()) > 60 else None)
