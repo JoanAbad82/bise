@@ -331,7 +331,11 @@ final class QA {
             // feeds it (ambient's gate run 2: a hold reached the web only, so
             // the glass never came in); what shows is then the app's own call
             if kind == "app_fn" || kind == "app_key" { feedVisibility(ev) }
-            toPage(ev)
+            // reduced motion is App's (amb-mac m_5564): it posts app_reduce_motion
+            // itself, keeps it across page reloads (pageReady used to post the
+            // system's false over a scene's true, so the web still grew) and fades
+            // its native panel; the page only hears it from App
+            if kind == "app_reduce_motion", reduceMotionIn != nil { saw("qa>app", ev) } else { toPage(ev) }
             switch kind {
             case "app_fn":
                 edge.post(ev)
