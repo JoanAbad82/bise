@@ -95,6 +95,8 @@ def main():
 
         # an agent: it shows in the task list
         c.wait_idle("main")
+        with core.lock:
+            mains_before = sum(1 for e in core.evs if e.get("ev") == "main")
         c.say('/new t1: {{bash: sb send main --expect-reply "keep the banner on mobile?"}}')
         core.wait(lambda e: e.get("ev") == "state" and any(a["name"] == "t1" for a in e["agents"]), 60, "t1 in the list")
 
@@ -108,6 +110,11 @@ def main():
             time.sleep(0.1)
         check(msg, "t1's question reached main")
         c.wait_idle("main", "t1")
+        # main's turn on t1's message is not for the user: no words in the
+        # capsule (ambient's review m_4672)
+        with core.lock:
+            mains_after = sum(1 for e in core.evs if e.get("ev") == "main")
+        check(mains_after == mains_before, "an agent's message to main sends no main event (%d new)" % (mains_after - mains_before))
         c.say('[[bash: sb card --for %s "keep the banner on mobile?"]]' % msg)
         core.wait(lambda e: e.get("ev") == "state" and any(cd["kind"] == "question" for cd in e["cards"]), 60, "the card")
         card = [cd for cd in core.last("state")["cards"] if cd["kind"] == "question"][0]
