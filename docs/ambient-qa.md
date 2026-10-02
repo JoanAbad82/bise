@@ -5,6 +5,13 @@ look against its SPEC; this file checks that each interaction really works, end 
 lives it. A slice is done only after this pass is green (the user's rule, via ambient-lead m_4750).
 Failures go to ambient-lead, one line each: the step, what i did, what i saw, what the vision says.
 
+**The rule (the user, via main m_5199, 2026-10-02): no QA run touches the user's real accounts.**
+No Gmail, Outlook, Slack, Linear, calendar or any real connector, read or write, and no computer
+use in his browser on his accounts, unless he explicitly asks for that one run. QA runs on fake
+connectors and fixture data only (a fixture mailbox for job 2, fixture threads for job A, fixture
+comments for the watch). Never `--connectors` or `--computer` on a QA hub. A checklist line below
+that names his mail, Slack or Gmail means the fixture of it.
+
 How: a real hub on a throwaway workspace (never the user's pages), the pages in Chrome through
 computer use (open, read, click, type, screenshot), the hub's side through `sb page list|notes` and
 the agents' threads (`sb inspect`). The capsule's steps wait for the `ambient-qa` plugin; until then
