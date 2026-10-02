@@ -61,7 +61,7 @@ As main, also:\n\
 - Show it as a page instead of a long reply when the answer is longer than a few lines or has structure (a table, options to pick, a plan, numbers), when the user will want to change it, pick from it or check its sources, or when it is a draft of something that leaves (a mail, a post, an update for others): read the `bise-pages` skill, publish with `sb page publish`, and say one line about the page, not its content. A fact, a yes or no, a status: answer in a sentence, no page. A task that makes such an answer does the same: put it in its brief.\n\
 - When a job will make a page, start the page right away so the user sees it at once: `sb page start <id> --title \"<title>\" --agent <name>` as you spawn the agent (`--agent main`, or no `--agent`, before your own work), and give the agent the id: it publishes to it.\n\
 - A message from the capsule (a `[from the capsule…]` line in it) gets ONE short line back, lowercase, agent names with spaces, no details: `launch recap is on it. you'll get a page.` The details go on a page, or wait until the user asks.\n\
-- A page note of kind `start` (\"start an agent on this\") comes to you with its item and text: start an agent with that item as its brief, the page's id and block in its context, and say it in one line.\n\
+- A page note of kind `start` (\"start an agent on this\") comes to you with its item and text: start an agent with that item as its brief, the page's id and block in its context, and say it in one line. Then the page shows it: republish the item with `data-agent=\"<the agent's name>\"` (your page), or tell the page's agent to (its page); when that agent is done, the item gets its answer and the reply to the reporter as a draft that leaves only on the user's word.\n\
 - A page's drafts stay on the page until the user's word there (`send`, `approve`, \"put it in my drafts\"): nothing goes to an account before (no draft in Gmail, no message, no post), not even while the first versions are written; the page says where a draft went only after that. Put it in the brief of a task that makes such a page.\n\
 - A job over many items (mails to answer, comments, bugs): its brief says to draft and publish as it reads: list the items first (subjects only), publish the first 2-3 drafted items within about 45 s of the ask, then a version per 2-3 items, what was skipped last; never read everything before the first items.\n\
 - When the user says a step of his is done (a page's checklist row with `data-who=\"yours\"`; his open steps come with his message), run `sb page tick <page> <item>` and say it in one line.\n\
@@ -332,6 +332,8 @@ mod tests {
         assert!(r.contains("run `sb page tick <page> <item>`"));
         // roadmap B (ambient-lead m_5446): a standing order on a timer tied to its page
         assert!(r.contains("A standing order") && r.contains("--page <id>"));
+        // roadmap C (ambient-lead m_5489): the started item carries its agent
+        assert!(r.contains("republish the item with `data-agent=\"<the agent's name>\"`"));
         let skill = include_str!("../../../prompts/skills-all/bise-pages/SKILL.md");
         assert!(skill.starts_with("---\nname: bise-pages\ndescription: "));
     }

@@ -269,6 +269,9 @@ body {
 #bise-page li[data-id] > [data-went] > a::before { content: " · "; display: inline-block; white-space: pre; text-decoration: none; }
 /* read-only places: no bulk 'open 5' (one thread at a time) */
 #bise-page [data-kit="review"][data-verb="open-reply"] > p[data-kit-ui] { display: none; }
+/* feedback into work (roadmap C): one decision per report, no bulk; 'start an agent' first */
+#bise-page [data-kit="review"][data-verb="start"] > p[data-kit-ui] { display: none; }
+#bise-page [data-kit="review"][data-verb="start"] [data-kit-ui] button[hidden] { display: none; }
 
 /* what changed: a soft wash on the blocks that differ from the version before */
 body.bise-changes [data-changed] { background: var(--changed); box-shadow: -10px 0 0 var(--changed), 10px 0 0 var(--changed); }

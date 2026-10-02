@@ -509,6 +509,21 @@ law("a watching page: 'watching · checked 3 min ago · until tomorrow 18:00'; a
   assert.equal(x.children.filter((n) => n.hasAttribute("data-went")).length, 1);
 });
 
+law("feedback into work: start an agent / answer Benjamin / skip; started, the start goes and the agent line shows", () => {
+  const r = blocks(parse(`<section data-kit="review" data-id="reports" data-verb="start"><ol><li data-id="s-101"><p>Benjamin Roy · #bise-feedback · 9:12</p><blockquote>install fails on fish</blockquote><p>i think: the installer only writes .zshrc.</p></li><li data-id="s-102" data-agent="fix-install-path"><p>Benjamin Roy · #bise-feedback · 9:40</p><blockquote>x</blockquote><p>y</p></li></ol></section>`))[0];
+  K.decorate([r], "feedback", doc);
+  const [a, b] = K.options(r);
+  const btns = (li) => li.children.filter((n) => n.hasAttribute("data-kit-ui") && !n.hasAttribute("data-agent-line")).flatMap((u) => u.children);
+  assert.deepEqual(btns(a).map((x) => x.textContent), ["start an agent", "answer Benjamin", "skip"]);
+  assert.equal(btns(a)[0].hidden, false);
+  assert.equal(btns(b)[0].hidden, true, "an agent on it: no start");
+  assert.ok(b.children.some((n) => n.hasAttribute("data-agent-line")));
+  a.setAttribute("data-starting", "");
+  K.decorate([r], "feedback", doc);
+  assert.equal(btns(a)[0].textContent, "starting…");
+  assert.equal(btns(a).length, 3, "never a second bar");
+});
+
 law("an item's agent: its name first (spaces, not hyphens), then its live status and note", () => {
   assert.equal(K.agentLine("fix-login"), "∿ fix login");
   assert.equal(K.agentLine("fix-login", { name: "fix-login", status: "working", note: "reading the Safari logs" }), "∿ fix login working · reading the Safari logs");

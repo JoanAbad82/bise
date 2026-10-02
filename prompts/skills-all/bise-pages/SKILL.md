@@ -60,13 +60,19 @@ How to write them well:
   `send`; it opens the thread with the reply ready and the item says what is left to do:
   `opened on X · your reply is in the box` (X prefilled) or `copied · paste it in the thread`
   (the others). bise never posts, the user does.
-- **Work handed to agents** (bug reports from Slack or Linear, tickets, a to-do list): one
-  `review` item per report, its id the ticket's (`ENG-412`) or the message's, a first `<p>`
-  `who · where · when`, then what is wrong in one or two sentences with its number of reports.
-  The user's "start an agent" on an item goes to main as a note; once an agent works on it, put
-  its name on the item: `<li data-id="ENG-412" data-agent="fix-login">` (review and checklist
-  items). The kit shows `∿ fix login · working · reading the logs`, live, and `needs you` when
-  it is blocked. The reply to the reporter is a `message` block (`data-to="Slack · Nina Park"`).
+- **Feedback into work** (bug reports from Slack or Linear, tickets): a `review` with
+  `data-verb="start"`, one item per report, its id the ticket's (`ENG-412`) or the message's
+  (`s-101`): a first `<p>` `who · where · when`, what they said in a `<blockquote>` (linked in
+  the sources), then what you think it is in one or two sentences. The kit gives each item
+  `start an agent`, `answer Benjamin` (the reporter's first name) and `skip`. "start an agent"
+  is a note to main, who starts the agent with the item as its brief; then the item carries the
+  agent's name, `<li data-id="s-101" data-agent="fix-install-path">` (review and checklist
+  items), and the kit shows its line live: `∿ fix install path working · reading the
+  installer`, `? … needs you`, `✓ … done`. When the agent is done, republish the item with
+  its answer (`fixed in 0.4.2`, the PR) and add the reply to the reporter as a `message` block
+  (`data-to="Slack · Benjamin Roy"`, `fixed in 0.4.2. try again?`) that leaves only on the
+  user's word. `answer Benjamin` on an item: draft that reply now, same block. See
+  `examples/feedback-bridge.html`.
 - **Drafts** (a Slack message, a post, a reply): in a `message` block with its `data-to`, as
   `<p>`s and `<ul>`, so the user reads it in the page's font, edits it in place and copies it.
   Never in `<pre>` or `<code>`: those are for code. A mail goes in an `email` block.

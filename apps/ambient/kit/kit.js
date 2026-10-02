@@ -62,6 +62,10 @@
     yours: "you",
     watching: "watching",
     stop: "stop",
+    // feedback into work (roadmap C)
+    start: "start an agent",
+    starting: "starting…",
+    answer: (who) => (who ? `answer ${who}` : "answer"),
     // a reply on a read-only place (ambient m_5493): where it goes, then what's left to do
     openReply: "open with the reply",
     openOn: (site) => `open on ${site}`,
@@ -349,8 +353,9 @@
   const ITEM_ACTS = { review: ["approve", "skip"], compare: ["keep", "drop", "pick"], checklist: ["tick"] };
   function decorateItems(doc, block, kit) {
     for (const li of items(block)) {
-      if (!kids(li).some(ui)) {
-        const bar = acts(doc, ITEM_ACTS[kit]);
+      if (!kids(li).some((c) => ui(c) && c.getAttribute("data-agent-line") == null && c.getAttribute("data-went") == null)) {
+        // feedback to act on (data-verb="start", roadmap C): start an agent / answer <who> / skip
+        const bar = acts(doc, kit === "review" && block.getAttribute("data-verb") === "start" ? ["start", "approve", "skip"] : ITEM_ACTS[kit]);
         // a checklist's tick goes first, like a box; an item the agent marked done is ticked
         if (kit === "checklist") li.insertBefore(bar, li.firstChild || (li.nodes && li.nodes[0]) || null);
         else li.append(bar);
@@ -365,12 +370,25 @@
       // and what bise keeps about the user (data-verb="keep") says 'keep' / 'strike'
       // a read-only place (data-verb="open-reply", roadmap B): 'open with the reply', never 'send'
       const verb = block.getAttribute("data-verb");
-      if (ok) ok.textContent = t ? W.openOn(t.site) : verb === "open-reply" ? W.openReply : sends(block) ? W.send : keeps(block) ? W.keepRule : W.approve;
+      if (ok) ok.textContent = t ? W.openOn(t.site) : verb === "open-reply" ? W.openReply : verb === "start" ? W.answer(reporter(li)) : sends(block) ? W.send : keeps(block) ? W.keepRule : W.approve;
+      // once an agent works on it (data-agent), 'start an agent' goes: its live line says the rest
+      const go = verb === "start" && kids(li).filter(ui).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "start");
+      if (go) {
+        go.hidden = li.getAttribute("data-agent") != null;
+        if (li.getAttribute("data-starting") != null) { go.textContent = W.starting; go.setAttribute("disabled", ""); }
+        else { go.textContent = W.start; go.removeAttribute("disabled"); }
+      }
       const no = keeps(block) && kids(li).filter(ui).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "skip");
       if (no) no.textContent = W.strike;
     }
   }
   const keeps = (block) => block.getAttribute("data-verb") === "keep";
+  // who reported it: the first words of the item's 'who · where · when' line ("Benjamin")
+  function reporter(li) {
+    const first = kids(li).find((c) => !ui(c));
+    const who = first ? textOf(first).split("·")[0].trim() : "";
+    return who.split(/\s+/)[0] || "";
+  }
   // a review whose items are drafts bise sends once the user says so (mail replies, messages)
   const sends = (block) => block.getAttribute("data-verb") === "send";
   function decorateReview(doc, block) {
@@ -893,6 +911,16 @@
     function onAct(btn) {
       const block = btn.closest("[data-kit][data-id]");
       const kind = btn.getAttribute("data-act");
+      // 'start an agent' on a feedback item: a start note to main (notes.js: bise:start), sent at
+      // once; the item says 'starting…' until its agent shows up (data-agent on the next version)
+      if (kind === "start") {
+        const li = btn.closest("li[data-id]");
+        if (!li || li.getAttribute("data-starting") != null) return;
+        li.setAttribute("data-starting", "");
+        doc.dispatchEvent(new root.CustomEvent("bise:start", { detail: { block: block.dataset.id, item: li.dataset.id, text: textOf(li) } }));
+        decorate([block], agent, doc);
+        return;
+      }
       if (kind === "copy") {
         // copied: the button says so a moment, and the block keeps "copied · open #launch" (its
         // data-open link) until the server says where it went; a refused clipboard says so too
