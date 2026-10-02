@@ -231,6 +231,11 @@ def hub_daemon(bise, kind="fake"):
     import e2e  # noqa: E402
     e2e.EXE = bise
     E = e2e.Env()
+    # the app root's own sb-core (e2e's host_env drops the caller's SB_CORE_BIN):
+    # the same tree as repl-live (ambient-lead m_4915)
+    root = os.environ.get("BISE_APP_ROOT")
+    if root and os.path.exists(os.path.join(root, "sb-core")):
+        E.env["SB_CORE_BIN"] = os.path.join(root, "sb-core")
     if kind == "model":
         for k in SCRIPTED_VARS:
             E.env.pop(k, None)
