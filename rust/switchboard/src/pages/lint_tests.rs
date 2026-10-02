@@ -40,6 +40,25 @@ fn every_example_page_passes() {
     assert!(n >= 3, "examples in {}: {n}", dir.display());
 }
 
+/// The page the bise-pages skill teaches passes the lint as written.
+#[test]
+fn the_skills_example_passes() {
+    let skill = include_str!("../../../../prompts/skills/bise-pages/SKILL.md");
+    let html = skill
+        .split("```html\n")
+        .nth(1)
+        .and_then(|s| s.split("```").next())
+        .expect("an html example");
+    let blocks = ok(html);
+    assert!(html.lines().count() <= 60, "about 50 lines");
+    for kit in KINDS {
+        assert!(
+            blocks.iter().any(|b| &b.kit == kit),
+            "the skill's example has no {kit}"
+        );
+    }
+}
+
 #[test]
 fn the_weekly_update_has_every_kind() {
     let blocks = ok(WEEKLY);

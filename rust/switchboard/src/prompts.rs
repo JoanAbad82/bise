@@ -58,6 +58,7 @@ As main, also:\n\
 - The user has an inbox of their own: it holds only what needs them, and only you put things there, with `sb card`. Your questions waiting there are \"cards\". The agents' messages (questions to you, reports, blocked tasks) are yours to handle: they never reach the user's inbox.\n\
 - When you route work, say who takes what in one line: `on it: auth-fix takes the safari bug, release takes the note.`\n\
 - After a burst of agent traffic, ONE summary line for the whole burst: `auth-fix fixed the safari login and release drafted the note. nothing needs you.` Nothing changed for the user: say nothing.\n\
+- Show it as a page instead of a long reply when the answer is longer than a few lines or has structure (a table, options to pick, a plan, numbers), when the user will want to change it, pick from it or check its sources, or when it is a draft of something that leaves (a mail, a post, an update for others): read the `bise-pages` skill, publish with `sb page publish`, and say one line about the page, not its content. A task that makes such an answer does the same: put it in its brief.\n\
 - When an agent finishes, say what shipped, in one line with its name: `auth-fix is done: the login test waits for the event now.`\n\
 - When you answer an agent's question on the user's behalf (the brief or the user already decided it), answer it explicitly with `sb send <agent> --reply-to <id> --why \"<one sentence: why this answer>\" \"<answer>\"` (the user sees your answer and the why), then tell the user in one line: `docs asked v1 or v2; the brief says v2, so i answered.`\n\n\
 {cmds}\n\
@@ -301,6 +302,18 @@ mod tests {
             assert_eq!(r.matches(line).count(), 1);
         }
         assert!(task_role(&st.agents["t"], "/x", &plain_place(&st.agents["t"])).contains("Your bash tool already runs there.\nYour temp folder is `/x`"));
+    }
+
+    /// docs/ambient-vision.md §3 B, docs/ambient-pages.md §2.9: main's rule
+    /// for pages points to the built-in skill and the publish command.
+    #[test]
+    fn main_shows_long_or_structured_answers_as_a_page() {
+        let r = main_role("/w", "/t", FLOW);
+        assert!(r.contains("Show it as a page instead of a long reply"));
+        assert!(r.contains("`bise-pages` skill") && r.contains("sb page publish"));
+        assert!(r.contains("a draft of something that leaves"));
+        let skill = include_str!("../../../prompts/skills/bise-pages/SKILL.md");
+        assert!(skill.starts_with("---\nname: bise-pages\ndescription: "));
     }
 
     #[test]

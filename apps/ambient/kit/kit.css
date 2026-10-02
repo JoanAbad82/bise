@@ -120,9 +120,8 @@ body {
 [data-kit="sources"] { counter-reset: bise-src; margin-top: 40px; border-top: 1px solid var(--rule); border-radius: 0; padding-top: var(--space-3); font-size: var(--text-small); }
 [data-kit="sources"]::before { content: "sources"; display: block; font: var(--text-kicker)/1.4 var(--font-mono); color: var(--kick); margin-bottom: 6px; }
 #bise-page [data-kit="sources"] > :is(ol, ul) { list-style: none; padding: 0; }
-#bise-page [data-kit="sources"] li { counter-increment: bise-src; display: grid; grid-template-columns: 28px 1fr; gap: var(--space-1); margin: 0 0 var(--space-1); color: var(--dim); border-radius: 4px; transition: background .6s var(--ease-arrive); }
-#bise-page [data-kit="sources"] li::before { content: counter(bise-src); font: 600 var(--text-kicker)/2 var(--font-mono); color: var(--accent); }
-#bise-page [data-kit="sources"] li > * { grid-column: 2; }
+#bise-page [data-kit="sources"] li { counter-increment: bise-src; position: relative; padding-left: 32px; margin: 0 0 var(--space-1); color: var(--dim); border-radius: 4px; transition: background .6s var(--ease-arrive); }
+#bise-page [data-kit="sources"] li::before { content: counter(bise-src); position: absolute; left: 0; top: 0; font: 600 var(--text-kicker)/2.1 var(--font-mono); color: var(--accent); }
 #bise-page [data-kit="sources"] li[data-lit] { background: var(--accent-soft); }
 
 /* what changed: a soft wash on the blocks that differ from the version before */
