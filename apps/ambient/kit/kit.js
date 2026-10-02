@@ -295,6 +295,27 @@
     if (due && due.late && li.getAttribute("data-done") == null && li.getAttribute("data-verdict") !== "tick") li.setAttribute("data-late", ""); else li.removeAttribute("data-late");
   }
 
+  // ---- an item's agent (slice C): data-agent, live from SSE 'agent' {name, status, note?} ----
+  // Before any event the item shows the name alone (the agent may not exist yet, or the stream is
+  // not up): "∿ fix login"; then "∿ fix login · working · reading the Safari logs".
+  const STATUS = { working: "working", idle: "waiting", done: "done", blocked: "needs you", failed: "▲ failed" };
+  const agents = new Map();
+  function agentLine(name, st) {
+    const parts = [`∿ ${said(name)}`];
+    if (st && STATUS[st.status]) parts.push(STATUS[st.status]);
+    if (st && st.note) parts.push(String(st.note));
+    return parts.join(" · ");
+  }
+  function decorateAgent(doc, li) {
+    const name = li.getAttribute("data-agent");
+    let tag = kids(li).find((c) => ui(c) && c.getAttribute("data-agent-line") != null);
+    if (!name) { if (tag) li.removeChild(tag); return; }
+    if (!tag) { tag = doc.createElement("span"); tag.setAttribute("data-kit-ui", ""); tag.setAttribute("data-agent-line", ""); li.append(tag); }
+    const st = agents.get(name);
+    tag.textContent = agentLine(name, st);
+    if (st && STATUS[st.status]) tag.setAttribute("data-status", st.status); else tag.removeAttribute("data-status");
+  }
+
   // the items "approve N" approves: no verdict yet, and not edited by the user (those go with send)
   const pending = (block) => items(block).filter((li) => li.getAttribute("data-verdict") == null && li.getAttribute("data-edited") == null);
   // the buttons each item kind gets (review: approve / skip; compare: ♡ ✗ pick; checklist: a tick)
@@ -309,6 +330,7 @@
       }
       if (kit === "checklist" && li.getAttribute("data-done") != null && li.getAttribute("data-verdict") == null) li.setAttribute("data-verdict", "tick");
       if (kit === "checklist") decorateWho(doc, li, Date.now());
+      decorateAgent(doc, li);
       // a reply item: its approve says what it does ('reply on X', or 'copy + open' on Hacker News)
       const t = kit === "review" && replyTarget(li.getAttribute("data-reply"), "");
       if (t) {
@@ -408,7 +430,7 @@
     return { ...res, marked: [...marked] };
   }
 
-  const BiseKit = { W, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, options, norm };
+  const BiseKit = { W, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, options, norm };
   root.BiseKit = BiseKit;
 
   // ---- the browser: the frame, the stream, the keys ----
@@ -597,6 +619,13 @@
       const relay = (ev, name) => es.addEventListener(ev, (e) => doc.dispatchEvent(new root.CustomEvent(name, { detail: data(e) })));
       es.addEventListener("notes", (e) => doc.dispatchEvent(new root.CustomEvent("bise:notes", { detail: { notes: data(e).notes || [] } })));
       relay("voice", "bise:voice"); // slice 2 (§4.1): {phase, text}, notes.js pins it
+      // slice C: an agent's live status {name, status, note?} redraws the items it works on
+      es.addEventListener("agent", (e) => {
+        const x = data(e);
+        if (!x.name) return;
+        agents.set(String(x.name), x);
+        for (const b of blocks()) for (const li of items(b)) if (li.getAttribute("data-agent") === String(x.name)) decorateAgent(doc, li);
+      });
       es.addEventListener("answered", (e) => {
         const d = data(e);
         const q = blocks().find((b) => b.dataset.id === d.block && b.dataset.kit === "question");

@@ -177,6 +177,15 @@ body {
 #bise-page [data-kit="checklist"] li[data-id] > [data-when] { display: inline; margin-left: auto; padding-left: var(--space-3); font: 12px var(--font-mono); color: var(--kick); white-space: nowrap; }
 #bise-page [data-kit="checklist"] li[data-late] > [data-when] { color: var(--risk); }
 
+/* an item's agent (slice C): '∿ fix login · working · reading the logs', live from SSE 'agent';
+   working breathes (motion, not a color), blocked asks in the accent, failed in risk, done in ok */
+#bise-page li[data-id] > [data-agent-line] { display: block; grid-column: 1 / -1; flex-basis: 100%; margin-top: 2px; font: 12px var(--font-mono); color: var(--kick); }
+#bise-page li[data-id] > [data-agent-line][data-status="working"] { color: var(--dim); animation: bise-breathe 2.4s var(--ease-arrive) infinite alternate; }
+#bise-page li[data-id] > [data-agent-line][data-status="blocked"] { color: var(--accent); }
+#bise-page li[data-id] > [data-agent-line][data-status="failed"] { color: var(--risk); }
+#bise-page li[data-id] > [data-agent-line][data-status="done"] { color: var(--ok); }
+@media (prefers-reduced-motion: reduce) { #bise-page li[data-id] > [data-agent-line] { animation: none; } }
+
 /* review: a list of items, each with its approve / skip; "approve N" at the end */
 #bise-page [data-kit="review"] > :is(ol, ul) { list-style: none; padding: 0; margin: 0 0 var(--space-3); border-top: 1.5px solid var(--rule-strong); }
 #bise-page [data-kit="review"] li[data-id] { display: grid; grid-template-columns: 1fr auto; gap: 4px var(--space-4); align-items: start; padding: var(--space-3) 0; margin: 0; border-bottom: 1px solid var(--rule); transition: opacity .3s var(--ease-arrive); }

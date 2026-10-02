@@ -360,8 +360,8 @@ impl<'a> Linter<'a> {
             && self.open.as_ref().is_some_and(|b| b.list_depth == 1)
         {
             inner = match kit.as_str() {
-                "checklist" => &["data-id", "data-done", "data-who", "data-due"],
-                "review" => &["data-id", "data-reply"],
+                "checklist" => &["data-id", "data-done", "data-who", "data-due", "data-agent"],
+                "review" => &["data-id", "data-reply", "data-agent"],
                 _ => &["data-id"],
             };
             // a reply item's thread (slice B): an https link the user opens to answer there
@@ -369,6 +369,17 @@ impl<'a> Linter<'a> {
                 let low = u.trim().to_ascii_lowercase();
                 if !low.starts_with("https://") || bad_url("href", &u).is_some() {
                     self.err(&at, format!("data-reply=\"{u}\" is not a thread link: use the comment's https:// URL"));
+                }
+            }
+            // the agent working on an item (slice C): its name, the kit shows its live status
+            if let Some(a) = get("data-agent") {
+                if a.is_empty()
+                    || a.len() > 40
+                    || !a
+                        .chars()
+                        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+                {
+                    self.err(&at, format!("data-agent=\"{a}\" is not an agent name: lowercase letters, digits and -"));
                 }
             }
             // a checklist item's due date (slice D): a calendar date the kit words ('friday', 'late')

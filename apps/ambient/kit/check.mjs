@@ -437,6 +437,26 @@ law("checklist who and when: due dates in words, late in its own state, done ite
   assert.equal(when(t3), undefined, "no who, no due: no tag");
 });
 
+law("an item's agent: its name first (spaces, not hyphens), then its live status and note", () => {
+  assert.equal(K.agentLine("fix-login"), "∿ fix login");
+  assert.equal(K.agentLine("fix-login", { name: "fix-login", status: "working", note: "reading the Safari logs" }), "∿ fix login · working · reading the Safari logs");
+  assert.equal(K.agentLine("fix-login", { name: "fix-login", status: "blocked" }), "∿ fix login · needs you");
+  assert.equal(K.agentLine("fix-login", { name: "fix-login", status: "nonsense" }), "∿ fix login");
+  const r = blocks(parse(`<section data-kit="review" data-id="bugs"><ol><li data-id="b1" data-agent="fix-login">login loops</li><li data-id="b2">typo</li></ol></section>`))[0];
+  K.agents.set("fix-login", { name: "fix-login", status: "failed" });
+  K.decorate([r], "bugs", doc);
+  const [b1, b2] = K.options(r);
+  const line = (li) => li.children.find((n) => n.hasAttribute("data-agent-line"));
+  assert.equal(line(b1).textContent, "∿ fix login · ▲ failed");
+  assert.equal(line(b1).getAttribute("data-status"), "failed");
+  assert.equal(line(b2), undefined, "no agent: no line");
+  K.agents.set("fix-login", { name: "fix-login", status: "done" });
+  K.decorate([r], "bugs", doc);
+  assert.equal(K.options(r)[0].children.filter((n) => n.hasAttribute("data-agent-line")).length, 1, "redrawn in place, never twice");
+  assert.equal(line(K.options(r)[0]).textContent, "∿ fix login · done");
+  K.agents.clear();
+});
+
 law("ago: short words", () => {
   const now = 10_000_000;
   assert.equal(K.ago(now - 5_000, now), "just now");

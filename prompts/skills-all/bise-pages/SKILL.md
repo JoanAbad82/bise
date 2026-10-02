@@ -57,6 +57,13 @@ How to write them well:
   `data-reply="<the comment's https link>"`, then `<p>who · where · when</p>`, the comment in a
   `<blockquote>`, and your drafted reply in `<p>`s. Approving it opens the thread with the reply
   ready (prefilled on X, copied for the others): bise never posts, the user does.
+- **Work handed to agents** (bug reports from Slack or Linear, tickets, a to-do list): one
+  `review` item per report, its id the ticket's (`ENG-412`) or the message's, a first `<p>`
+  `who · where · when`, then what is wrong in one or two sentences with its number of reports.
+  The user's "start an agent" on an item goes to main as a note; once an agent works on it, put
+  its name on the item: `<li data-id="ENG-412" data-agent="fix-login">` (review and checklist
+  items). The kit shows `∿ fix login · working · reading the logs`, live, and `needs you` when
+  it is blocked. The reply to the reporter is a `message` block (`data-to="Slack · Nina Park"`).
 - **Drafts** (a Slack message, a post, a reply): in a `message` block with its `data-to`, as
   `<p>`s and `<ul>`, so the user reads it in the page's font, edits it in place and copies it.
   Never in `<pre>` or `<code>`: those are for code. A mail goes in an `email` block.
@@ -191,8 +198,11 @@ Two kinds of notes ask for more than a change of the page:
 
 "watch the launch for me", "tell me when the PR is reviewed": one page you keep current, not a
 new page each time.
-- Check on a timer: `sb every 10m "<what to check>"` (it wakes you every 10 minutes with that
-  line); stop it when the user says so or the thing is over.
+- Check on a timer: `sb every 10m "<what to check>"`, written as the instruction to your future
+  self (`check the launch on HN, X and Reddit; republish launch-watch with what's new`). It
+  wakes you with `timer #3 (every 10m, …): <that line>`. Add `--until 18:00` or `--times 6` when
+  the user gave an end. `sb every` lists the timers; `sb every --stop 3` stops one: when the user
+  says so or the thing is over.
 - Each check republishes the **same page id**: what is new on top (a `callout` saying `since
   14:10` and what came), the items still to handle under it, the handled ones gone or folded into
   one line (`12 answered earlier`). Keep each item's `data-id` (the comment's id, the PR's
@@ -201,6 +211,19 @@ new page each time.
   next real change.
 - A card (`sb card`, through main) only for what the user asked to be told about, in their
   words ("tell me if Simon posts"); everything else waits on the page.
+
+**The morning page** ("a page every morning with my day"): a daily timer,
+`sb every day 07:30 "make today's morning page"`, and each morning a new page with the id
+`morning-YYYY-MM-DD` (today's date: the app opens exactly that id). In this order, each part
+left out when empty:
+1. a `heading`: `your tuesday` and the meta line (`3 meetings · 2 wait for you`);
+2. what waits for the user: a `review` of the mails and messages to answer, the questions
+   agents left open, each with its draft;
+3. today's meetings: a `table` (`time`, `what`, `with`, `prep`), the prep in words
+   (`read Camille's renewal mail`);
+4. what agents finished overnight: one line each with its page or PR, in a `prose` list;
+5. pages not opened yet: a `prose` list of links (`/p/<id>`), oldest first.
+Nothing waits and no meetings: a short page that says so, never an empty one.
 
 ## 7. When the page leaves
 

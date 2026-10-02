@@ -437,3 +437,25 @@ fn a_checklist_item_says_who_and_when() {
         "is not a date",
     );
 }
+
+#[test]
+fn an_item_names_the_agent_working_on_it() {
+    ok(
+        r#"<section data-kit="review" data-id="bugs"><ol><li data-id="b1" data-agent="fix-login"><p>login loops on Safari</p></li></ol></section>"#,
+    );
+    ok(
+        r#"<section data-kit="checklist" data-id="todo"><ol><li data-id="t1" data-agent="invite">send the invite</li></ol></section>"#,
+    );
+    has(
+        &errs(
+            r#"<section data-kit="review" data-id="bugs"><ol><li data-id="b1" data-agent="Fix Login">x</li></ol></section>"#,
+        ),
+        "bugs: data-agent=\"Fix Login\" is not an agent name",
+    );
+    has(
+        &errs(
+            r#"<section data-kit="compare" data-id="c"><ol><li data-id="a" data-agent="x">a</li><li data-id="b">b</li></ol></section>"#,
+        ),
+        "c: data-agent is not a kit attribute",
+    );
+}
