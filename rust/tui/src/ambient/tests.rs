@@ -219,7 +219,7 @@ fn hub_state_becomes_state_with_agents_and_cards_with_options() {
     assert_eq!(
         st["cards"],
         json!([{"id": 3, "kind": "question", "agent": "cookies", "text": "keep the banner on mobile?\n1. yes\n2. no",
-            "options": [{"n": 1, "label": "yes"}, {"n": 2, "label": "no"}]}])
+            "options": [{"n": 1, "label": "yes"}, {"n": 2, "label": "no"}], "urgent": false}])
     );
     // fn + 1 answers with the option's words, as the TUI's box does
     t.cmd(Cmd::Answer { card: 3, reply: "1".into() });
@@ -427,6 +427,39 @@ fn voice_out_only_after_a_voice_input() {
     t.until(|o| o.iter().filter(|v| v["ev"] == "main").count() == 2);
     t.until(|o| phase_is(o, "done"));
     assert_eq!(t_synths(&t), 1);
+}
+
+#[test]
+fn quiet_is_text_only_and_stops_the_voice() {
+    let mut t = T::new();
+    t.ready();
+    // on a call: a voice message is answered in text
+    t.cmd(Cmd::Quiet { on: true });
+    talk(&mut t, "is it green?");
+    t.main_turn("Green.");
+    t.until(|o| phase_is(o, "done"));
+    assert!(has(&t.take(), "main"));
+    assert_eq!(t_synths(&t), 0, "quiet: no voice");
+    // the call ends: aloud again; a call starting mid-voice stops it
+    t.cmd(Cmd::Quiet { on: false });
+    talk(&mut t, "and now?");
+    t.main_turn("Now aloud.");
+    t.until(|o| phase_is(o, "speaking"));
+    assert_eq!(t_synths(&t), 1);
+    t.cmd(Cmd::Quiet { on: true });
+    assert!(phase_is(&t.take(), "done"));
+    assert_eq!(Cmd::parse(r#"{"cmd":"quiet","on":true,"why":"call"}"#), Ok(Cmd::Quiet { on: true }));
+}
+
+#[test]
+fn the_state_carries_pages_url_and_urgent_cards() {
+    let mut t = T::new();
+    t.hub.say(json!({"ev": "state", "agents": [], "pages": [], "pages_url": "http://127.0.0.1:47123",
+        "cards": [{"id": 1, "kind": "confirm", "agent": "a", "text": "run rm?"}, {"id": 2, "kind": "question", "agent": "a", "text": "which?"}]}));
+    t.until(|o| has(o, "state"));
+    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    assert_eq!(st["pages_url"], "http://127.0.0.1:47123");
+    assert_eq!((st["cards"][0]["urgent"].as_bool(), st["cards"][1]["urgent"].as_bool()), (Some(true), Some(false)));
 }
 
 /// fn held, `words` heard, fn up: sent.

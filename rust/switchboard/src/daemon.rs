@@ -721,6 +721,36 @@ impl Shell {
                     None => json!({"ok": false, "error": format!("no page {id}")}),
                 }
             }
+            "page_start" => {
+                // the page shows within seconds of the ask; the first
+                // publish is v1 (ambient-lead m_5000)
+                let id = s("id").unwrap_or_default();
+                let agent = s("agent").filter(|a| !a.is_empty()).unwrap_or_else(|| from.to_string());
+                if agent != from && !self.hub.st.agents.contains_key(&agent) {
+                    return json!({"ok": false, "error": format!("no agent {agent}")});
+                }
+                let gone: Vec<String> = self.hub.st.agents.keys().filter(|n| self.page_agent_gone(n)).cloned().collect();
+                let is_gone = |n: &str| gone.iter().any(|g| g == n) || !self.hub.st.agents.contains_key(n);
+                match pages.start(&id, s("title").as_deref(), s("ask").as_deref(), &agent, now_ms(), &is_gone) {
+                    Ok(meta) => {
+                        // its writer's turn: the caller's runs now; another
+                        // agent's is the next one (its end without a
+                        // publish puts the page back to ready)
+                        let e = self.page_turns.entry(agent.clone()).or_insert_with(|| (Vec::new(), false));
+                        if !e.0.contains(&meta.id) {
+                            e.0.push(meta.id.clone());
+                        }
+                        if agent == from {
+                            e.1 = true;
+                        }
+                        self.broadcast(&pages.page_ev(&meta));
+                        let snap = self.snapshot();
+                        self.broadcast(&snap);
+                        json!({"ok": true, "id": meta.id, "version": 0, "url": pages.url(&meta.id), "state": "writing", "agent": agent})
+                    }
+                    Err(e) => json!({"ok": false, "error": e}),
+                }
+            }
             _ => {
                 let list = |k: &str| -> Vec<String> {
                     v.get(k).and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default()
@@ -799,6 +829,16 @@ impl Shell {
     /// stay sent).
     fn page_turn(&mut self, name: &str, line: &str) {
         let Some((ids, seen)) = self.page_turns.get_mut(name) else { return };
+        // what its writer does now, on the pages it writes or updates
+        // (the model's one-line intent of each bash/run_typescript call)
+        if let crate::wire::Wire::Intent(text) = crate::wire::parse(line) {
+            if let Some(p) = &self.pages {
+                for id in ids.iter() {
+                    p.push(id, "progress", &json!({"text": text}));
+                }
+            }
+            return;
+        }
         let o = line.strip_prefix("  obs: ").unwrap_or("");
         if o == "turn_started" || o.starts_with("steering_received: ") || o.starts_with("steered: ") {
             *seen = true;
@@ -807,11 +847,19 @@ impl Shell {
         if !(o.starts_with("turn_done: ") && *seen) {
             return;
         }
+        let how = o.trim_start_matches("turn_done: ").trim().to_string();
         let ids = std::mem::take(ids);
         self.page_turns.remove(name);
         let Some(pages) = self.pages.clone() else { return };
         for id in ids {
-            if let Some(meta) = pages.set_state(&id, "ready") {
+            // the page says why nothing came (amb-kit m_5105)
+            let writing = pages.store.meta(&id).is_some_and(|m| m.state == "writing");
+            let reason = match (how.as_str(), writing) {
+                ("completed", true) => "the turn ended without a page".to_string(),
+                ("completed", false) => "the turn ended without a new version".to_string(),
+                (h, _) => format!("the turn stopped: {h}"),
+            };
+            if let Some(meta) = pages.set_state_why(&id, "ready", &reason) {
                 self.broadcast(&pages.page_ev(&meta));
             }
         }
@@ -2137,7 +2185,7 @@ impl Shell {
                 let body = self.search(cmd, &v);
                 write_json(&mut stream, &body);
             }
-            "page_publish" | "page_list" | "page_notes" => {
+            "page_publish" | "page_start" | "page_list" | "page_notes" => {
                 let body = self.page_op(cmd, &from, &v);
                 write_json(&mut stream, &body);
             }

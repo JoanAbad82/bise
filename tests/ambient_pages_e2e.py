@@ -228,6 +228,30 @@ def main():
         vs = json.loads(vs)["versions"]
         check(st == 200 and [v["n"] for v in vs] == [4, 3, 2, 1] and vs[0]["latest"], "versions: %r" % vs)
         check(sorted(vs[1]["changed"]) == ["q1", "q2"] and vs[0]["changed"] == [], "what each changed: %r" % vs)
+
+        # sb page start (m_5000): the page shows at once, writing, empty
+        c.wait_idle("main")
+        c.say('[[bash: sb page start the-plan --title "the plan" --ask "plan my week"]]')
+        c.wait_line("main", "started the-plan", 90)
+        c.wait(lambda: any(e.get("ev") == "page" and e.get("id") == "the-plan" and e.get("state") == "writing" for e in c.events), 10, "a writing page event")
+        st, _, body = request(port, "GET", "/p/the-plan")
+        check(st == 200 and 'data-version="0"' in body and 'data-state="writing"' in body and 'data-agent="main"' in body, "the placeholder: %d %s" % (st, body[-400:]))
+        check('data-ask="plan my week"' in body and 'data-started="' in body, "the ask and the start: %s" % body[-400:])
+        plan = Sse(port, "/p/the-plan/events")
+        # its turn ends with no publish: ready, still no version, and why
+        c.wait_idle("main")
+        c.wait(lambda: plan.seen("state", lambda d: d == {"state": "ready", "reason": "the turn ended without a page"}), 30, "the placeholder back to ready, with its reason")
+        m = json.loads(request(port, "GET", "/p/the-plan/meta")[2])
+        check(m["versions"] == [] and m["state"] == "ready", "no version yet: %r" % m)
+        # another agent's page needs that agent; the first publish is v1
+        c.say('[[bash: sb page start x-plan --agent nobody]]')
+        c.wait_line("main", "no agent nobody", 90)
+        c.wait_idle("main")
+        c.say('[[bash: sb page start the-plan && sb page publish %s --id the-plan]]' % v1)
+        c.wait_line("main", "published the-plan v1", 90)
+        c.wait(lambda: plan.seen("state", lambda d: d["state"] == "writing") and plan.seen("version", lambda d: d["n"] == 1), 30, "writing, then v1")
+        m = json.loads(request(port, "GET", "/p/the-plan/meta")[2])
+        check([v["n"] for v in m["versions"]] == [1] and m["state"] == "ready", "the first publish is v1: %r" % m)
     except AssertionError as e:
         print("FAIL", e)
         ok = False

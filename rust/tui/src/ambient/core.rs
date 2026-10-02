@@ -72,6 +72,9 @@ pub enum Cmd {
     Answer { card: u64, reply: String },
     Hush,
     CutIn,
+    /// The user is on a call or in a meeting (the app's read): text only,
+    /// no voice (docs/ambient-app.md §4 `quiet`).
+    Quiet { on: bool },
 }
 
 impl Cmd {
@@ -99,6 +102,7 @@ impl Cmd {
             }
             "hush" => Cmd::Hush,
             "cut_in" => Cmd::CutIn,
+            "quiet" => Cmd::Quiet { on: v.get("on").and_then(Value::as_bool).unwrap_or(false) },
             other => return Err(format!("unknown cmd {other:?}")),
         })
     }
@@ -224,6 +228,10 @@ pub struct Core {
     sent_shots: Vec<Shot>,
     /// the pages of the last state: (id, title)
     page_titles: Vec<(String, String)>,
+    /// the page server's base URL, from the hub's state
+    pages_url: Option<String>,
+    /// on a call or in a meeting (the app's `quiet`): no voice
+    quiet: bool,
 }
 
 impl Core {
@@ -252,6 +260,8 @@ impl Core {
             shot: None,
             sent_shots: Vec::new(),
             page_titles: Vec::new(),
+            pages_url: None,
+            quiet: false,
         }
     }
 
@@ -313,6 +323,14 @@ impl Core {
             Cmd::CutIn => {
                 if self.stop_voice() {
                     self.set_phase(Phase::Idle, None);
+                }
+            }
+            Cmd::Quiet { on } => {
+                self.quiet = on;
+                // a call starts while main speaks: the voice stops, the
+                // text stays
+                if on && self.stop_voice() {
+                    self.set_phase(Phase::Done, None);
                 }
             }
         }
@@ -607,7 +625,11 @@ impl Core {
                     .into_iter()
                     .map(|(n, label)| json!({"n": n, "label": label}))
                     .collect();
-                let mut v = json!({"id": c.id, "kind": c.kind, "agent": c.agent, "text": c.text, "options": options});
+                // urgent: it asks even on a call or in a meeting. A
+                // tool call waiting for a yes holds an agent's work now
+                // (best guess, told to ambient-lead)
+                let urgent = c.kind == "confirm";
+                let mut v = json!({"id": c.id, "kind": c.kind, "agent": c.agent, "text": c.text, "options": options, "urgent": urgent});
                 if let Some(p) = &c.page {
                     v["page"] = p.clone();
                 }
@@ -616,7 +638,14 @@ impl Core {
             .collect();
         let pages = list("pages");
         self.page_titles = pages.iter().map(|p| (s(p, "id"), s(p, "title"))).collect();
-        self.emit(json!({"ev": "state", "agents": agents, "cards": cards, "pages": pages}));
+        if let Some(u) = v.get("pages_url").and_then(Value::as_str).filter(|u| !u.is_empty()) {
+            self.pages_url = Some(u.to_string());
+        }
+        let mut st = json!({"ev": "state", "agents": agents, "cards": cards, "pages": pages});
+        if let Some(u) = &self.pages_url {
+            st["pages_url"] = json!(u);
+        }
+        self.emit(st);
     }
 
     /// One line of main's feed (ambient's review, m_4672: only main's
@@ -744,7 +773,8 @@ impl Core {
         }
         if self.voice_out == Some(true) {
             self.voice_out = None;
-            if self.say_main() {
+            // on a call or in a meeting: text only
+            if !self.quiet && self.say_main() {
                 return self.set_phase(Phase::Speaking, None);
             }
         }

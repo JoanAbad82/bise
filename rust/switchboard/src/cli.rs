@@ -31,9 +31,9 @@ const fn cmd(syntax: &'static str, who: Who, doc: &'static str) -> CmdDoc {
 pub const COMMANDS: &[CmdDoc] = &[
     cmd("sb list", Who::Everyone, "every agent of the group, its status and what it is for."),
     cmd(
-        "sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"<answer>\"]... | sb page list | sb page notes <id>",
+        "sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"<answer>\"]... | sb page start <id> [--title <t>] [--agent <name>] | sb page list | sb page notes <id>",
         Who::Everyone,
-        "publish a page for the user (a fragment of bise kit blocks; the kit's lint checks it): its URL comes back. A new version of your page answers the user's notes: `--notes-done` the ones you did, `--note-answer` one line for the others.",
+        "publish a page for the user (a fragment of bise kit blocks; the kit's lint checks it): its URL comes back. `sb page start` shows the page at once, empty, while you (or --agent) write it; your first publish is v1. A new version of your page answers the user's notes: `--notes-done` the ones you did, `--note-answer` one line for the others.",
     ),
     cmd("sb tasks", Who::Everyone, "every task in detail: what it is doing now, its last report, its open questions."),
     cmd(
@@ -649,7 +649,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
     Ok(Value::Object(req))
 }
 
-const PAGE_USAGE: &str = "usage: sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"…\"]... | sb page list | sb page notes <id>";
+const PAGE_USAGE: &str = "usage: sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"…\"]... | sb page start <id> [--title <t>] [--agent <name>] | sb page list | sb page notes <id>";
 
 /// `sb page publish|list|notes` (docs/ambient-pages.md §2.2): the hub's
 /// `page_*` request. The file is read here (the agent's path, from its
@@ -679,6 +679,17 @@ fn page_req(rest: &[String], req: &mut Map<String, Value>) -> Result<(), String>
                 answers.insert(id.trim().to_string(), json!(text.trim().trim_matches('"')));
             }
             req.insert("answers".into(), Value::Object(answers));
+        }
+        Some("start") => {
+            let (pos, o) = parse_args(&rest[1..], &["title", "agent", "ask"], &[])?;
+            let id = pos.first().ok_or(PAGE_USAGE)?;
+            req.insert("cmd".into(), json!("page_start"));
+            req.insert("id".into(), json!(id));
+            for k in ["title", "agent", "ask"] {
+                if o.contains_key(k) {
+                    req.insert(k.into(), json!(str_of(&o, k)));
+                }
+            }
         }
         Some("list") => {
             req.insert("cmd".into(), json!("page_list"));
@@ -718,6 +729,9 @@ fn render_page(v: &Value) -> String {
     }
     if let Some(notes) = v.get("notes") {
         return serde_json::to_string_pretty(notes).unwrap_or_default();
+    }
+    if v.get("state").and_then(|x| x.as_str()) == Some("writing") {
+        return format!("started {} · {} writes it · {} (your first publish is v1)", s(v, "id"), s(v, "agent"), s(v, "url"));
     }
     let mut out = format!("published {} v{} · {}", s(v, "id"), v.get("version").and_then(|n| n.as_u64()).unwrap_or(0), s(v, "url"));
     let unknown: Vec<String> = v.get("unknown_notes").and_then(|u| u.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();

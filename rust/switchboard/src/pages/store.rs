@@ -25,9 +25,12 @@ pub struct Meta {
     pub created_ms: u64,
     #[serde(default)]
     pub versions: Vec<Version>,
-    /// "ready" | "updating"
+    /// "ready" | "updating" | "writing"
     #[serde(default = "ready")]
     pub state: String,
+    /// `sb page start --ask`: the user's words that asked for it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ask: Option<String>,
 }
 
 fn ready() -> String {
@@ -236,6 +239,7 @@ impl Store {
                 created_ms: now,
                 versions: Vec::new(),
                 state: ready(),
+                ask: None,
             },
         };
         if let Some(t) = p.title.as_ref().map(|t| t.trim()).filter(|t| !t.is_empty()) {
@@ -314,6 +318,35 @@ impl Store {
             self.save_notes(id, &notes)?;
         }
         Ok(sent)
+    }
+
+    /// `sb page start` (the page shows at once, its first publish is v1):
+    /// a page with no version yet, `agent` writing it. An existing page
+    /// of the same agent (or a gone one's, for main) is writing again.
+    pub fn start(&self, id: &str, title: Option<&str>, ask: Option<&str>, agent: &str, now: u64, gone: &dyn Fn(&str) -> bool) -> Result<Meta, String> {
+        if !valid_id(id) {
+            return Err(format!("{id:?} is not a page id: use a-z, 0-9 and -, at most 40 characters"));
+        }
+        let mut meta = match self.meta(id) {
+            Some(m) if m.agent != agent && !(agent == "main" && gone(&m.agent)) => {
+                return Err(format!("{id} is {}'s page: start another --id", m.agent));
+            }
+            Some(m) => Meta { agent: agent.to_string(), ..m },
+            None => Meta { id: id.to_string(), title: String::new(), agent: agent.to_string(), created_ms: now, versions: Vec::new(), state: ready(), ask: None },
+        };
+        if let Some(t) = title.map(str::trim).filter(|t| !t.is_empty()) {
+            meta.title = t.to_string();
+        }
+        if let Some(a) = ask.map(str::trim).filter(|a| !a.is_empty()) {
+            meta.ask = Some(a.to_string());
+        }
+        if meta.title.is_empty() {
+            meta.title = title_of(id);
+        }
+        meta.state = "writing".into();
+        std::fs::create_dir_all(self.page_dir(id)).map_err(|e| format!("{}: {e}", self.page_dir(id).display()))?;
+        self.save_meta(&meta)?;
+        Ok(meta)
     }
 
     pub fn set_state(&self, id: &str, state: &str) -> Result<Option<Meta>, String> {

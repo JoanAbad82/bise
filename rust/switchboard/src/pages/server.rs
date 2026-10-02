@@ -218,17 +218,26 @@ fn shell(pages: &Pages, title: &str, main_attrs: &str, inner: &str) -> String {
 fn page(pages: &Pages, id: &str, n: Option<u64>, body_only: bool) -> Response {
     let Some(m) = pages.store.meta(id) else { return Response::err(404, "no such page") };
     let n = n.unwrap_or(m.version());
-    let Some(html) = pages.store.html(id, n) else { return Response::err(404, "no such version") };
+    // `sb page start`'s placeholder: no version yet, an empty body (the
+    // kit shows the agent writing, with its progress lines)
+    let html = match pages.store.html(id, n) {
+        Some(h) => h,
+        None if n == 0 && m.version() == 0 => String::new(),
+        None => return Response::err(404, "no such version"),
+    };
     if body_only {
         return Response::html(html);
     }
+    // amb-kit's writing view (m_5105): when it started, what the user asked
+    let ask = m.ask.as_deref().map(|a| format!(" data-ask=\"{}\"", esc(a))).unwrap_or_default();
     let attrs = format!(
-        "id=\"bise-page\" data-page=\"{}\" data-version=\"{n}\" data-latest=\"{}\" data-agent=\"{}\" data-title=\"{}\" data-state=\"{}\"",
+        "id=\"bise-page\" data-page=\"{}\" data-version=\"{n}\" data-latest=\"{}\" data-agent=\"{}\" data-title=\"{}\" data-state=\"{}\" data-started=\"{}\"{ask}",
         esc(&m.id),
         m.version(),
         esc(&m.agent),
         esc(&m.title),
-        esc(&m.state)
+        esc(&m.state),
+        m.created_ms
     );
     Response::html(shell(pages, &m.title, &attrs, &html))
 }
@@ -385,6 +394,8 @@ fn events(w: &mut TcpStream, pages: &Pages, id: &str) {
             None => String::new(),
         }
     };
+    // the writer's last progress lines: a reload keeps the list
+    let first = first + &pages.progress_frames(id);
     pages.subscribe(id, tx);
     if w.write_all(first.as_bytes()).and_then(|_| w.flush()).is_err() {
         return;

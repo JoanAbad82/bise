@@ -42,7 +42,12 @@ pub struct Pages {
     /// SSE streams of each page id ("" = the home list)
     subs: Mutex<HashMap<String, Vec<Sender<String>>>>,
     to_hub: Mutex<Option<ToHub>>,
+    /// each page's last `progress` frames
+    progress: Mutex<HashMap<String, std::collections::VecDeque<String>>>,
 }
+
+/// The progress lines a new SSE stream replays.
+const PROGRESS_KEPT: usize = 8;
 
 /// 32 hex characters from the system's random source.
 pub fn new_token() -> String {
@@ -68,6 +73,7 @@ impl Pages {
             kit_dir,
             subs: Mutex::new(HashMap::new()),
             to_hub: Mutex::new(None),
+            progress: Mutex::new(HashMap::new()),
         }
     }
 
@@ -113,6 +119,18 @@ impl Pages {
         self.push(&meta.id, "notes", &json!({"notes": self.store.notes(&meta.id)}));
         self.push("", "pages", &json!({"pages": self.list_json()}));
         Ok((meta, unknown))
+    }
+
+    /// `sb page start`: the placeholder, `writing` (its SSE and the home
+    /// list hear it).
+    pub fn start(&self, id: &str, title: Option<&str>, ask: Option<&str>, agent: &str, now: u64, gone: &dyn Fn(&str) -> bool) -> Result<Meta, String> {
+        let meta = self.locked(|s| s.start(id, title, ask, agent, now, gone))?;
+        if let Ok(mut p) = self.progress.lock() {
+            p.remove(id);
+        }
+        self.push(id, "state", &json!({"state": "writing"}));
+        self.push("", "pages", &json!({"pages": self.list_json()}));
+        Ok(meta)
     }
 
     /// A page's state changes (`updating` at a send, `ready` after).
@@ -170,11 +188,42 @@ impl Pages {
     /// An SSE event to every stream of page `id` (a closed one is dropped).
     pub fn push(&self, id: &str, event: &str, data: &Value) {
         let frame = format!("event: {event}\ndata: {data}\n\n");
+        // the writer's progress lines, kept until the next version
+        if let Ok(mut p) = self.progress.lock() {
+            match event {
+                "progress" => {
+                    let q = p.entry(id.to_string()).or_default();
+                    q.push_back(frame.clone());
+                    while q.len() > PROGRESS_KEPT {
+                        q.pop_front();
+                    }
+                }
+                "version" => {
+                    p.remove(id);
+                }
+                _ => {}
+            }
+        }
         if let Ok(mut subs) = self.subs.lock() {
             if let Some(list) = subs.get_mut(id) {
                 list.retain(|tx| tx.send(frame.clone()).is_ok());
             }
         }
+    }
+
+    /// The last progress frames of page `id`, oldest first (a new SSE
+    /// stream gets them: a reload keeps the list).
+    pub fn progress_frames(&self, id: &str) -> String {
+        self.progress.lock().ok().and_then(|p| p.get(id).map(|q| q.iter().cloned().collect())).unwrap_or_default()
+    }
+
+    /// A page's state changes for a reason the page shows (the writer's
+    /// turn ended without a publish: its error, or that it ended).
+    pub fn set_state_why(&self, id: &str, state: &str, reason: &str) -> Option<Meta> {
+        let m = self.locked(|s| s.set_state(id, state)).ok().flatten()?;
+        self.push(id, "state", &json!({"state": state, "reason": reason}));
+        self.push("", "pages", &json!({"pages": self.list_json()}));
+        Some(m)
     }
 
     pub(crate) fn subscribe(&self, id: &str, tx: Sender<String>) {
