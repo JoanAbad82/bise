@@ -240,3 +240,20 @@ Owners: amb-mac (the visibility policy in the app: one state machine, the menu-b
 count), amb-web (the capsule's own timers move to the app's policy: it asks `app_hide`/`app_show`
 through the contract; no idle view), ambient (the icon and its states, words), ambient-pm (the
 vision's §3 and the QA checklist).
+
+## 9. The look, decided (the user validated round 8, via main m_5133)
+
+His words: "On valide http://127.0.0.1:4747/content/ambient/identity8.html". Direction A glass (dark
+smoked glass, white text, bise pink `#f4a6b0`), the pink **mist pearl** as bise's body (replaces
+the constellation orb: `marble.js` variant 1 with the bise-pink palette), out of the way (§8,
+SPEC §0), the moods and the menu-bar states. Reference: identity8.html, SPEC §0, marble.js
+(ambient's, untracked; ported, never copied whole into git).
+
+| piece | owner | what |
+|---|---|---|
+| the pearl in the capsule | amb-web | `apps/ambient/web/pearl.js`: the mist pearl (WebGL1, one context), bise pink, the moods mapped from the contract (listen + level, think, speak + main's level, need, done, away/quiet, still under reduced motion); replaces orb.js |
+| the glass | amb-web (+ amb-mac for the NSVisualEffectView tint) | round 8's capsule: dark smoked glass, light from inside, no edge stroke unless SPEC says; grows out of the pearl in the menu bar (0.75 s expo out, back 0.6 s expo in) |
+| the menu-bar pearl | amb-web renders, amb-mac plays | no WebGL in the status item: amb-web renders the pearl's states as sprite frames at 18 pt @1x/@2x/@3x (headless Chrome, a script in apps/ambient/web/tools/, output in apps/ambient/mac/Resources/pearl/), amb-mac plays them in IconLook (still, turning, glint, stopped + ▲, ember + ☾, brighter while fn; still under reduced motion), the rose count as text |
+| the app icon | amb-web renders, amb-mac packs | the pearl on round 8's glass, 1024 px → `.icns` with iconutil in build.sh |
+| tokens | amb-kit | `tokens.css` roles get round 8's values where the glass shows (the frame, notes, send bar on pages); the paper stays unless ambient says otherwise |
+| QA gate | ambient (+ amb-tools' scenes) | contact sheet of every mood and icon state in the real app, signed before it's "in" |
