@@ -175,8 +175,11 @@
       const t0 = Date.now();
       const old = { id: "grays", title: "which gray wins?", agent: "dark-mode", version: 2, url: "http://127.0.0.1:47123/p/grays", at_ms: t0 - 40 * 60000, state: "ready", open_notes: 0 };
       const wu = { id: "weekly-update", title: "weekly update", agent: "weekly-update", version: 1, url: "http://127.0.0.1:47123/p/weekly-update", at_ms: t0, state: "ready", open_notes: 0 };
+      // a page an agent watches (sb every --page), opened at v2, now at v4
+      const hn = { id: "hn-watch", title: "launch thread on HN", agent: "hn-watch", version: 4, opened_version: 2, url: "http://127.0.0.1:47123/p/hn-watch", at_ms: t0 - 3 * 60000, state: "ready", open_notes: 0 };
+      const timers = [{ id: 3, agent: "hn-watch", label: "every 15 min", text: "check the HN thread", by: "main", next_ms: t0 + 12 * 60000, fired: 4, page: "hn-watch", last_ms: t0 - 3 * 60000 }];
       return sort([
-        [0, { ev: "hub", up: true, workspace: "~/acme" }], [0, { ...state(AGENTS), pages: [old] }],
+        [0, { ev: "hub", up: true, workspace: "~/acme" }], [0, { ...state(AGENTS), pages: [old, hn], timers }],
         [900, { ev: "page", ...wu }],
         [3500, { ev: "app_key", key: "o" }],
         [5000, { ev: "app_key", key: "0" }],

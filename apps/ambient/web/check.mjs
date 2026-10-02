@@ -416,7 +416,7 @@ law("a page ready: `weekly update is ready · fn + o`; fn + o opens it (app_open
   eq(o.cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/weekly-update", page: "weekly-update" }]);
   const a = M.view(M.step(o.m, { ev: "app_key", key: "0" }, 5000).m, 5000, t0 + 5000);
   // unopened first: weekly update was just opened by fn + o, so the grays come first
-  eq(a.forYou.pages.map((p) => [p.name, p.meta, p.unopened]), [["which gray wins?", "new", true], ["weekly update", "v1 · just now", false]]);
+  eq(a.forYou.pages.map((p) => [p.name, p.meta, p.unopened, p.watch]), [["launch thread on HN", "v4 · 2 new versions", true, "watching · checked 3 min ago"], ["which gray wins?", "new", true, null], ["weekly update", "v1 · just now", false, null]]);
   // a click in for you opens that page
   eq(M.step(o.m, { ev: "ui_page", page: "grays" }, 6000).cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/grays", page: "grays" }]);
 });
