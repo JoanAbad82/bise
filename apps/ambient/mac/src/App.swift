@@ -190,8 +190,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "app_hide":
             setHidden(cmd["hidden"] as? Bool ?? cmd["on"] as? Bool ?? true)
         case "app_open_url":
-            if let s = cmd["url"] as? String, let u = URL(string: s), ["http", "https", "file", "x-apple.systempreferences"].contains(u.scheme ?? "") {
-                NSWorkspace.shared.open(u)
+            // a page: its tab forward in a running Chromium browser, else a new tab (§2.8)
+            if let s = cmd["url"] as? String, let u = URL(string: s), ["http", "https", "file", "x-apple.systempreferences"].contains(u.scheme?.lowercased() ?? "") {
+                Browser.open(s)
             }
         case "app_perm":
             permCommand(cmd["perm"] as? String ?? "", cmd["do"] as? String ?? "")
@@ -233,6 +234,11 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             edge.post(ev)
         case "level":
             if talking { edge.post(ev) }
+        case "page":
+            // a page you're waiting for opens in front, without fn + o (ambient-pages §2.8)
+            if ev["front"] as? Bool == true, let url = ev["url"] as? String, PageOpen.isWeb(url) {
+                Browser.open(url)
+            }
         case "state":
             cards = Card.list(ev)
             let names = Set((ev["agents"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String })

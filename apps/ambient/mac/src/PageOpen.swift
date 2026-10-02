@@ -1,0 +1,104 @@
+// PageOpen: the pure half of opening a page (docs/ambient-pages.md §2.8):
+// which browser, which tab is the page, and the AppleScript to say it.
+// No AppKit, no Apple Events: Browser.swift runs the scripts; the laws in
+// test/PageOpenTests.swift run in the swift interpreter.
+//
+// In a Chromium browser that runs (the default browser first, then Chrome,
+// Arc, Brave, Edge), the tab whose URL starts with the page's URL comes
+// forward with its window, else a new tab opens in the front window.
+// Otherwise (no such browser, Automation refused) the URL just opens.
+
+import Foundation
+
+enum PageOpen {
+    // the Chromium browsers we drive, in the order we pick them
+    static let browsers = ["com.google.Chrome", "company.thebrowser.Browser", "com.brave.Browser", "com.microsoft.edgemac"]
+    static let arc = "company.thebrowser.Browser"
+
+    // the browser to drive: the default browser if it's one of ours and
+    // runs, else the first of ours that runs; nil: just open the URL
+    static func pick(running: Set<String>, defaultBrowser: String?) -> String? {
+        if let d = defaultBrowser, browsers.contains(d), running.contains(d) { return d }
+        return browsers.first { running.contains($0) }
+    }
+
+    // a tab shows the page: its URL starts with the page's URL, at a
+    // boundary (/p/abc is not /p/abcd), localhost and 127.0.0.1 alike,
+    // a trailing slash on the page's URL ignored
+    static func matches(tab: String, page: String) -> Bool {
+        let t = canonical(tab)
+        var p = canonical(page)
+        while p.hasSuffix("/") { p.removeLast() }
+        guard !p.isEmpty, t.hasPrefix(p) else { return false }
+        let rest = t.dropFirst(p.count)
+        guard let c = rest.first else { return true }
+        return c == "/" || c == "?" || c == "#"
+    }
+
+    private static func canonical(_ u: String) -> String {
+        var s = u.trimmingCharacters(in: .whitespaces)
+        for (a, b) in [("://localhost:", "://127.0.0.1:"), ("://localhost/", "://127.0.0.1/")] {
+            s = s.replacingOccurrences(of: a, with: b)
+        }
+        if s.hasSuffix("://localhost") { s = String(s.dropLast("localhost".count)) + "127.0.0.1" }
+        return s
+    }
+
+    // the first tab showing the page, front window first: (window, tab), 1-based
+    static func find(_ windows: [[String]], page: String) -> (window: Int, tab: Int)? {
+        for (w, tabs) in windows.enumerated() {
+            if let t = tabs.firstIndex(where: { matches(tab: $0, page: page) }) { return (w + 1, t + 1) }
+        }
+        return nil
+    }
+
+    // an AppleScript string literal
+    static func literal(_ s: String) -> String {
+        "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+    }
+
+    // every tab's URL, window by window (front first)
+    static func listScript(_ bundle: String) -> String {
+        "tell application id \(literal(bundle)) to get URL of every tab of every window"
+    }
+
+    // bring tab t of window w forward, then the browser
+    static func focusScript(_ bundle: String, window w: Int, tab t: Int) -> String {
+        if bundle == arc {
+            return """
+            tell application id \(literal(bundle))
+              tell tab \(t) of window \(w) to select
+              activate
+            end tell
+            """
+        }
+        return """
+        tell application id \(literal(bundle))
+          set active tab index of window \(w) to \(t)
+          set index of window \(w) to 1
+          activate
+        end tell
+        """
+    }
+
+    // a new tab in the front window (a new window when there is none)
+    static func newTabScript(_ bundle: String, url: String) -> String {
+        """
+        tell application id \(literal(bundle))
+          if (count of windows) = 0 then
+            make new window
+            set URL of active tab of front window to \(literal(url))
+          else
+            tell front window to make new tab with properties {URL:\(literal(url))}
+          end if
+          activate
+        end tell
+        """
+    }
+
+    // only web pages go through a browser's tabs
+    static func isWeb(_ url: String) -> Bool {
+        let l = url.lowercased()
+        return l.hasPrefix("http://") || l.hasPrefix("https://")
+    }
+}

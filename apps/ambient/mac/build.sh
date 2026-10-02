@@ -5,7 +5,7 @@
 # deletes fresh unsigned binaries: one stable path, ad-hoc signed).
 #
 #   build.sh --check        type-check every source, no binary
-#   build.sh --test         KeyMachine's laws through the swift interpreter
+#   build.sh --test         KeyMachine's and PageOpen's laws through the swift interpreter
 #                           (JIT in memory: no binary on disk)
 #   build.sh <app dir>      build the bundle there, in place, and sign it
 #
@@ -28,8 +28,12 @@ case "${1:-}" in
     ;;
   --test)
     t="$(mktemp -d "${TMPDIR:-/tmp}/ambient-test.XXXXXX")"
-    cat "$HERE/src/KeyMachine.swift" "$HERE/test/KeyMachineTests.swift" > "$t/keys.swift"
-    swift "$t/keys.swift"; rc=$?
+    rc=0
+    # each pure source with its laws, one interpreter run each
+    for pair in KeyMachine:KeyMachineTests PageOpen:PageOpenTests; do
+      cat "$HERE/src/${pair%%:*}.swift" "$HERE/test/${pair#*:}.swift" > "$t/${pair%%:*}.swift"
+      swift "$t/${pair%%:*}.swift" || rc=1
+    done
     rm -rf "$t"
     exit $rc
     ;;
