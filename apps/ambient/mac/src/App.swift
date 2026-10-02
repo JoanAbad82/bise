@@ -31,6 +31,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var cards: [Card] = []
     private var pagesURL: String?            // the hub's page server (state.pages_url)
     private var menuPages: [MenuPage] = []   // "for you" in the :* menu (state.pages)
+    private var menuWatches: [MenuWatch] = [] // what agents watch (state.timers, roadmap B)
     private var settleTalk: (() -> Void)?    // a note-or-not decision still pending
     // it knows when not to talk: a call (the mic busy elsewhere), a meeting (the calendar, opt-in)
     private var quiet = QuietMachine()
@@ -134,6 +135,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             self.capsule.post(["ev": "app_key", "key": "i", "card": id])
         }
         st.pages = { [weak self] in self?.menuPages ?? [] }
+        st.watches = { [weak self] in self?.menuWatches ?? [] }
+        // stop watching: the core asks the hub (every_stop), the agent is told
+        st.onStopWatch = { [weak self] id in self?.toCore(["cmd": "every_stop", "id": id]) }
         st.cards = { [weak self] in self?.cards ?? [] }
         st.isHidden = { [weak self] in self?.capsule.hidden ?? false }
         status = st
@@ -458,6 +462,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "state":
             cards = Card.list(ev)
             menuPages = MenuPage.list(ev)
+            menuWatches = MenuWatch.list(ev)
             if pagesURL == nil, let p = (ev["pages"] as? [[String: Any]])?.first, let u = p["url"] as? String {
                 pagesURL = PageOpen.pagesBase(fromPageURL: u)
             }

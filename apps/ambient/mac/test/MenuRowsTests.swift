@@ -49,5 +49,33 @@ law("quiet: away, ☾, still", look(working: true, quiet: true) == IconLook(mood
 law("you hold fn: listen, faster", look(quiet: true, holding: true).mood == .listen && look(holding: true).fps == 24 && look(working: true).fps == 12)
 law("reduced motion: never moving", !look(working: true, still: true).moving && !look(holding: true, still: true).moving)
 
+// roadmap B: the standing orders (state.timers, amb-home m_5441)
+let wstate: [String: Any] = [
+    "pages": [["id": "launch-watch", "title": "the launch", "agent": "watch", "version": 5, "opened_version": 2, "url": "http://h/p/launch-watch"],
+              ["id": "seen", "title": "seen page", "agent": "w", "version": 3, "opened_version": 3, "url": "http://h/p/seen"],
+              ["id": "old", "title": "old hub", "agent": "w", "version": 4, "url": "http://h/p/old"]],
+    "timers": [["id": 3, "agent": "watch", "label": "every 10m", "text": "check HN, X and Reddit for bise", "by": "main", "fired": 2, "page": "launch-watch"],
+               ["id": 4, "agent": "w", "label": "every day 07:30", "text": "the morning page", "fired": 0, "page": "seen"],
+               ["id": 5, "agent": "w", "label": "every 1h", "text": "look at the\nCI queue", "fired": 0],
+               ["agent": "broken"]],
+]
+let wpages = MenuPage.list(wstate)
+let watches = MenuWatch.list(wstate)
+law("state.timers: the ones with an id, in order", watches.map(\.id) == [3, 4, 5])
+law("no timers in the state: no watch rows", MenuWatch.list(["pages": []]).isEmpty)
+law("a page's unopened versions: version − opened_version",
+    wpages.first { $0.id == "launch-watch" }?.unopened == 3 && wpages.first { $0.id == "seen" }?.unopened == 0)
+law("a hub without opened_version counts none", wpages.first { $0.id == "old" }?.unopened == 0)
+law("a watch with a page: its title and what's new",
+    MenuRows.watch(watches[0], pages: wpages) == "watching the launch · 3 new for you")
+law("nothing new: no count", MenuRows.watch(watches[1], pages: wpages) == "watching seen page")
+law("no page: the order's words on one line",
+    MenuRows.watch(watches[2], pages: wpages) == "watching: look at the CI queue")
+law("a page not in the state: the order's words",
+    MenuRows.watch(MenuWatch(id: 9, text: "x", page: "gone"), pages: wpages) == "watching: x")
+law("no words either: its number", MenuRows.watch(MenuWatch(id: 9, text: " ", page: nil), pages: []) == "watching: #9")
+law("a watch row opens its page; none without one",
+    MenuRows.watchURL(watches[0], pages: wpages) == "http://h/p/launch-watch" && MenuRows.watchURL(watches[2], pages: wpages) == nil)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all MenuRows laws hold")

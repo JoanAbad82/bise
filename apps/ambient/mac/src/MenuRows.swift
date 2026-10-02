@@ -10,13 +10,34 @@ struct MenuPage: Equatable {
     var agent: String
     var version: Int
     var url: String
+    var opened: Int? = nil    // the newest version the user opened (hub's opened_version)
+
+    // versions published since he last opened it (0 when the hub doesn't say)
+    var unopened: Int { opened.map { max(0, version - $0) } ?? 0 }
 
     // state.pages, newest first: the ones with a URL to open
     static func list(_ state: [String: Any]) -> [MenuPage] {
         (state["pages"] as? [[String: Any]] ?? []).compactMap { p in
             guard let id = p["id"] as? String, let url = p["url"] as? String, !url.isEmpty else { return nil }
             return MenuPage(id: id, title: p["title"] as? String ?? id, agent: p["agent"] as? String ?? "",
-                            version: (p["version"] as? NSNumber)?.intValue ?? 1, url: url)
+                            version: (p["version"] as? NSNumber)?.intValue ?? 1, url: url,
+                            opened: (p["opened_version"] as? NSNumber)?.intValue)
+        }
+    }
+}
+
+// a standing order an agent keeps (sb every, roadmap B): state.timers from
+// the hub (amb-home m_5441), the page it refreshes if any
+struct MenuWatch: Equatable {
+    var id: Int
+    var text: String
+    var page: String?
+
+    static func list(_ state: [String: Any]) -> [MenuWatch] {
+        (state["timers"] as? [[String: Any]] ?? []).compactMap { t in
+            guard let id = (t["id"] as? NSNumber)?.intValue else { return nil }
+            let page = (t["page"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            return MenuWatch(id: id, text: t["text"] as? String ?? "", page: page)
         }
     }
 }
@@ -26,6 +47,8 @@ enum MenuRows {
     static let forYou = "for you"
     static let needsYou = "needs you"
     static let maxPages = 6
+    static let maxWatches = 4
+    static let stopWatching = "stop watching"
     static let maxCards = 9
     static let titleCut = 40
     static let cardCut = 50
@@ -36,6 +59,23 @@ enum MenuRows {
         if !p.agent.isEmpty { parts.append(p.agent) }
         if p.version > 1 { parts.append("v\(p.version)") }
         return parts.joined(separator: " · ")
+    }
+
+    // "watching the launch · 3 new for you" (its page's title and the
+    // versions he hasn't opened); no page: the order's own words, clipped
+    static func watch(_ w: MenuWatch, pages: [MenuPage]) -> String {
+        if let id = w.page, let p = pages.first(where: { $0.id == id }) {
+            let head = "watching " + clip(p.title, titleCut)
+            return p.unopened > 0 ? "\(head) · \(p.unopened) new for you" : head
+        }
+        let words = w.text.split(whereSeparator: \.isNewline).joined(separator: " ").trimmingCharacters(in: .whitespaces)
+        return "watching: " + clip(words.isEmpty ? "#\(w.id)" : words, titleCut)
+    }
+
+    // the page a watch row opens, if it has one with a URL
+    static func watchURL(_ w: MenuWatch, pages: [MenuPage]) -> String? {
+        guard let id = w.page else { return nil }
+        return pages.first(where: { $0.id == id })?.url
     }
 
     // "agent: question" on one line

@@ -29,6 +29,8 @@ final class StatusItem: NSObject {
     var onCard: ((String) -> Void)?          // a card's id
     var isHidden: () -> Bool = { false }
     var pages: () -> [MenuPage] = { [] }
+    var watches: () -> [MenuWatch] = { [] }  // standing orders (state.timers)
+    var onStopWatch: ((Int) -> Void)?        // a timer's id
     var cards: () -> [Card] = { [] }
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -225,6 +227,22 @@ final class StatusItem: NSObject {
                 }
                 m.addItem(.separator())
             }
+            // roadmap B: what an agent watches, each with its stop
+            let ws = watches().prefix(MenuRows.maxWatches)
+            if !ws.isEmpty {
+                let all = pages()
+                for w in ws {
+                    let row = entry(MenuRows.watch(w, pages: all), nil, #selector(page(_:)))
+                    row.representedObject = MenuRows.watchURL(w, pages: all)
+                    if row.representedObject == nil { row.action = nil; row.isEnabled = false }
+                    m.addItem(row)
+                    let stop = entry(MenuRows.stopWatching, nil, #selector(stopWatch(_:)))
+                    stop.representedObject = w.id
+                    stop.indentationLevel = 1
+                    m.addItem(stop)
+                }
+                m.addItem(.separator())
+            }
             m.addItem(entry(MenuWords.talk, MenuWords.talkKeys, #selector(spotlight)))
             m.addItem(entry(isHidden() ? MenuWords.show : MenuWords.hide, MenuWords.hideKeys, #selector(toggle)))
             m.addItem(entry(SettingsWords.menu, SettingsWords.menuKeys, #selector(settings)))
@@ -248,6 +266,7 @@ final class StatusItem: NSObject {
     @objc private func spotlight() { onSpotlight?() }
     @objc private func toggle() { onToggle?() }
     @objc private func settings() { onSettings?() }
+    @objc private func stopWatch(_ sender: NSMenuItem) { if let id = sender.representedObject as? Int { onStopWatch?(id) } }
     @objc private func quit() { NSApp.terminate(nil) }
 }
 
