@@ -876,8 +876,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             // an ask needs him: the glass shows it (first-run walk: the launch's
             // Accessibility ask sat in a hidden panel)
             perm(p.rawValue, "ask")
+            askShown = true
             visFeed(.open)
-        case .denied(let p): perm(p.rawValue, "denied")
+        case .denied(let p):
+            // the refused line, once: 8 s on the glass, then gone (first-run
+            // walk: after 'not now' it stayed pinned)
+            perm(p.rawValue, "denied")
+            visFeed(.show(Visibility.forCard))
         case .granted(let p): perm(p.rawValue, "granted")
         case .startKeys: if qa == nil, !keys.running { keys.start() }
         case .watchTrust: if qa == nil { pollTrust() }
@@ -949,6 +954,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // the page's answer to an ask: continue, not now, settings
     private func permCommand(_ p: String, _ action: String) {
         guard let perm = Perm(rawValue: p) else { return }
+        // answered: the glass the ask opened goes (first-run walk: it stayed
+        // pinned on the last ask after every permission was granted); the
+        // next ask, if any, opens it again after macOS's prompt
+        if askShown {
+            askShown = false
+            visFeed(.dismiss)
+        }
         permStep { PermPlan.command(perm, action, &$0) }
     }
+
+    private var askShown = false   // the glass is open for a permission ask
 }
