@@ -359,6 +359,25 @@ def morning_page_laws():
 
 
 @test
+def meeting_page_laws():
+    """run meetings: the brief and the follow-ups laws of meetings.md on the kit's examples"""
+    ex = lambda n: open(os.path.join(qa.KIT_EXAMPLES, n)).read()
+    facts, fails = qa.meeting_brief_check(ex("meeting-brief.html"), "meeting-q3-renewal-2026-05-19")
+    check(not fails and facts["asks"] >= 3 and "checklist" in facts["kits"], (facts, fails))
+    _, f = qa.meeting_brief_check(ex("meeting-brief.html"), "q3-renewal")
+    check(len(f) == 1 and "brief id" in f[0], f)
+    # the kit's follow-up is Camille's renewal, not Hélène's: only the decisions differ
+    facts, fails = qa.meeting_followup_check(ex("meeting-followup.html"), "meeting-q3-renewal-2026-05-19")
+    check(facts["yours"] >= 1 and facts["drafts"] and len(fails) == 1 and "Granola's decisions" in fails[0], (facts, fails))
+    good = ex("meeting-followup.html").replace("24 months at 5 % off", "3-year renewal if SSO ships, 45 seats")
+    check(not qa.meeting_followup_check(good, "meeting-x-2026-05-19")[1], "a follow-up with the decisions passes")
+    _, f = qa.meeting_followup_check(good.replace('data-who="yours"', 'data-who="Lucas"'), "meeting-x-2026-05-19")
+    check(len(f) == 1 and "yours" in f[0], f)
+    sc = qa.SCENARIOS["meetings"]
+    check(sc["timed"] and sc["flow"] in qa.FLOWS and sc["no_writes"] and sc["set"] == "today", sc)
+
+
+@test
 def http_retries_a_reset():
     """the page server's GET: a reset connection is tried again (ambient-pm m_5709), a POST never"""
     import struct

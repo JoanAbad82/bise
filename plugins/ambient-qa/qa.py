@@ -779,7 +779,7 @@ def _hub():
     return c, info
 
 
-def _http(port, method, path, body=None, headers=None, tries=5):
+def _http(port, method, path, body=None, headers=None, tries=7):   # 7 tries: ~10 s (ambient-pm m_5763)
     """One request to the hub's page server; a GET whose connection drops
     (reset, refused, closed: the server under a republish and a timer's
     wake, ambient-pm m_5709) is tried again a few times, never a POST."""
@@ -970,6 +970,10 @@ SCENARIOS.update({
     # his domain steps, the launch watch), then the morning page from it; nothing leaves
     "morning": {"ask": "make today's morning page", "no_send": True, "no_writes": True, "notes": False,
                 "set": "today", "seed": "morning", "flow": "morning"},
+    # meetings (amb-kit m_5656): real time, about 75 min: the briefs before the renewal (+15 min)
+    # and the sync (+60), the renewal's follow-ups after Granola's notes (+47); no card, nothing leaves
+    "meetings": {"ask": "brief me before my meetings today, and do the follow-ups after", "no_send": True, "no_writes": True,
+                 "notes": False, "set": "today", "flow": "meetings", "timed": True},
 })
 
 
@@ -1247,7 +1251,104 @@ def _flow_morning(x):
     x["r"]["fails"] += fails
 
 
-FLOWS = {"newsletter": _flow_newsletter, "feedback": _flow_feedback, "checklist": _flow_checklist, "morning": _flow_morning}
+MEETING_PAGE = re.compile(r"^meeting-[a-z0-9-]+-\d{4}-\d{2}-\d{2}$")
+# the meetings of the today set the run follows (fixtures sets.today): words of their page id
+MEETINGS_RUN = {"e401": ("renewal", "northwind"), "e402": ("sync",)}
+
+
+def meeting_brief_check(body, page_id):
+    """meetings.md's brief (v1): its id, who (Hélène from people.md), last
+    time linked, what is open as a checklist, three questions. (facts, fails)"""
+    fails, secs = [], _sections(body)
+    low = (body or "").lower()
+    if not MEETING_PAGE.match(page_id or ""):
+        fails.append("brief id %s (meeting-<slug>-<YYYY-MM-DD> expected)" % page_id)
+    kits = [s["kit"] for s in secs]
+    if "checklist" not in kits:
+        fails.append("%s: no checklist of what is open" % page_id)
+    asks = max([len(re.findall(r"<li[^>]*>", s["html"])) for s in secs if s["kit"] == "prose" and "<ol" in s["html"]] or [0])
+    if asks < 3:
+        fails.append("%s: %d questions to ask (3 expected, a prose <ol>)" % (page_id, asks))
+    if not re.search(r'<a [^>]*href="(https://|/p/)', body or ""):
+        fails.append("%s: last time is not linked" % page_id)
+    return {"kits": kits, "asks": asks, "names_helene": "hélène" in low or "helene" in low}, fails
+
+
+def meeting_followup_check(body, page_id):
+    """meetings.md's follow-ups (v2): decided, who does what with his rows
+    yours, the drafts in their own blocks, Granola's decisions there. (facts, fails)"""
+    fails, secs = [], _sections(body)
+    low = (body or "").lower()
+    rows = _rows(body)
+    if not any(w["yours"] for w in rows):
+        fails.append("%s v2: no row of his (data-who=\"yours\") in who does what" % page_id)
+    drafts = [s["kit"] for s in secs if s["kit"] in ("email", "message")]
+    if not drafts:
+        fails.append("%s v2: no follow-up draft (an email or message block)" % page_id)
+    said = {"3-year": ("3-year", "3 year", "three-year", "three year", "36 month"), "SSO": ("sso",), "45 seats": ("45",)}
+    missing = [k for k, ws in said.items() if not any(w in low for w in ws)]
+    if missing:
+        fails.append("%s v2: Granola's decisions missing: %s" % (page_id, ", ".join(missing)))
+    return {"rows": len(rows), "yours": sum(w["yours"] for w in rows), "drafts": drafts, "decided": "decided" in low}, fails
+
+
+def _flow_meetings(x):
+    """Meetings (amb-kit m_5656), on real time: the today set puts the
+    Northwind renewal 15 min after the hub's start (Granola's notes 2 min
+    after its end at 45) and the team sync at 60. The ask sets the timers;
+    the brief (v1) must be there before each start, the renewal's
+    follow-ups (v2) within 30 min of its end; no card; nothing leaves."""
+    r, c = x["r"], x["c"]
+    clock = json.load(open(os.path.join(x["info"]["tmp"], "fake-clock.json")))
+    s0 = clock["start"]
+    fx = json.load(open(os.path.join(FAKE_ACCOUNTS, "fixtures.json")))["sets"]["today"]["calendar"]["events"]
+    when = {e["id"]: (s0 + e["start_in_min"] * 60, s0 + e["end_in_min"] * 60) for e in fx}
+    x["port"] = int(open(os.path.join(x["info"]["state"], "pages.port")).read().strip())
+    time.sleep(10)   # main takes the ask
+    _until(x, x["settled"], "main done with the ask")
+    timers = [l for l in c.lines() if re.search(r"\bsb every\b", l) and l.startswith(("tool #", "tool_code #"))]
+    r["flow"] = {"timers": sorted({re.sub(r"^tool(_code)? #\d+ \w+ ?: ", "", l)[:200] for l in timers}), "meetings": {}}
+    page_of = lambda words: next((p for p in (c.state or {}).get("pages", []) if p["id"].startswith("meeting-")
+                                  and any(w in p["id"] for w in words)), None)
+    pages_seen = {}
+    last_end = max(when[e][1] for e in MEETINGS_RUN) + 30 * 60
+    while time.time() < last_end:
+        x["poll"]()
+        for e, words in MEETINGS_RUN.items():
+            p = page_of(words)
+            m = r["flow"]["meetings"].setdefault(e, {})
+            if p and "v1_at" not in m and p.get("version", 0) >= 1:
+                m.update(id=p["id"], v1_at=round(time.time() - when[e][0]), v1_n=page_meta(p["id"])["versions"][-1]["n"])
+                b = _body(dict(x, page=p), m["v1_n"])
+                m["brief"], fails = meeting_brief_check(b, p["id"])
+                r["fails"].extend(fails)
+                pages_seen[e] = p["id"]
+            if e == "e401" and "v1_n" in m and "v2_at" not in m:
+                meta = page_meta(m["id"])
+                n = meta["versions"][-1]["n"]
+                if n > m["v1_n"] and time.time() > when[e][1] and x["settled"]():
+                    m.update(v2_at=round(time.time() - when[e][1]), v2_n=n)
+                    m["followups"], fails = meeting_followup_check(_body(dict(x, page={"id": m["id"]}), n), m["id"])
+                    r["fails"].extend(fails)
+        done = all("v1_at" in r["flow"]["meetings"].get(e, {}) for e in MEETINGS_RUN) and "v2_at" in r["flow"]["meetings"]["e401"]
+        if done:
+            break
+        time.sleep(5)
+    for e in MEETINGS_RUN:
+        m = r["flow"]["meetings"].get(e, {})
+        if "v1_at" not in m:
+            r["fails"].append("%s: no brief page by %s" % (e, time.strftime("%H:%M", time.localtime(when[e][0]))))
+        elif m["v1_at"] > 0:
+            r["fails"].append("%s: the brief came %d s after the start" % (e, m["v1_at"]))
+    if "v1_at" in r["flow"]["meetings"].get("e401", {}) and "v2_at" not in r["flow"]["meetings"]["e401"]:
+        r["fails"].append("e401: no follow-ups (v2) within 30 min of its end")
+    about = [cd for cd in x["cards"].values() if any(w in json.dumps(cd).lower() for ws in MEETINGS_RUN.values() for w in ws + ("meeting", "brief"))]
+    if about:
+        r["fails"].append("%d card(s) about the meetings (the page is enough)" % len(about))
+
+
+FLOWS = {"newsletter": _flow_newsletter, "feedback": _flow_feedback, "checklist": _flow_checklist, "morning": _flow_morning,
+         "meetings": _flow_meetings}
 
 
 def _covered(body, items):
@@ -1505,7 +1606,11 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
 
         core.send(sc["ask"])
         page, quiet = None, None
-        while time.time() - t0 < timeout:
+        if sc.get("timed"):
+            # pages that come later, on the hub's timers (the meetings): the flow waits for them itself
+            FLOWS[sc["flow"]](dict(r=r, c=c, page=None, body="", d=d, poll=poll, settled=settled, rel=rel, timeout=timeout,
+                                   info=info, core=core, cards=cards, before=before))
+        while not sc.get("timed") and time.time() - t0 < timeout:
             page = poll()
             if page and "page_first" not in r["t"]:
                 r["t"]["page_first"] = rel()
@@ -1517,7 +1622,9 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
                 break
             time.sleep(0.5)
         r["t"]["end"] = rel()
-        if not page or "v1" not in r["t"]:
+        if sc.get("timed"):
+            pass
+        elif not page or "v1" not in r["t"]:
             r["fails"].append("no page v1 in %.0f s" % r["t"]["end"])
         else:
             meta = page_meta(page["id"])
