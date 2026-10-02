@@ -76,5 +76,18 @@ var v = Visibility()
 _ = v.feed(.card, at: 0)
 law("nextTick: the timed show's end", v.nextTick(after: 1) == 8 && v.nextTick(after: 9) == nil)
 
+// ambient's gate run 1 (m_5333): fn held always shows the glass, also
+// right after a launch and after you hid it (fn ., esc, a click away)
+law("the first hold after a launch shows it",
+    run([(.talk(true), 0)], probe: [0, 0.5, 1.06, 7.31]) == [true, true, true, true])
+law("a hold after you hid it shows it",
+    run([(.open, 0), (.dismiss, 1), (.talk(true), 2)], probe: [1.5, 2, 7.31]) == [false, true, true])
+law("a hold after fn . (toggle) hid it shows it",
+    run([(.toggle, 0), (.toggle, 1), (.talk(true), 2)], probe: [1.5, 2.5]) == [false, true])
+law("hands-free after you hid it shows it",
+    run([(.card, 0), (.dismiss, 1), (.talk(true), 2), (.talk(false), 10)], probe: [1.5, 9, 11, 12.1]) == [false, true, true, false])
+law("hidden by you: news stays in the icon, your hold doesn't",
+    run([(.open, 0), (.dismiss, 1), (.line, 2), (.talk(true), 3)], probe: [2.5, 3.5]) == [false, true])
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Visibility laws hold")

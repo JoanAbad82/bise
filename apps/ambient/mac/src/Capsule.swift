@@ -79,7 +79,10 @@ final class Capsule: NSObject, WKNavigationDelegate {
     private let effect: NSVisualEffectView
     let web: WKWebView          // QA (--qa only) snapshots it and reads its model
     private(set) var ready = false
-    private(set) var hidden = false
+    // the panel is never ordered in at launch: hidden until the first show
+    // (false here made the first fn hold after a launch show nothing:
+    // Visibility said shown, the app saw no change, no orderFront)
+    private(set) var hidden = true
     private(set) var shape = CapsuleShape()
     private var shrink: DispatchWorkItem?
     private var webDir: String?
