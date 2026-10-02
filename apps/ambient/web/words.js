@@ -21,7 +21,9 @@
     listening: "listening",
     letGo: "let go of fn to send",
     got: ":* got it.",
-    on: "main is on it.",
+    // roadmap §3.1 'bise speaks': on the capsule the speaker is bise, never main (the TUI keeps
+    // main); best guesses, asked to ambient
+    on: "bise is on it.",
     onShort: "on it.",
     needsHint: "or hold fn and say it",
     // a card asked from a page (docs/ambient-pages.md §4.2): fn + ⏎ opens the page at the question;
@@ -29,8 +31,8 @@
     openIt: "fn ⏎ open it",
     // §3 behavior
     hush: "i'll stop talking. the rest is in text.",
-    cutIn: "main stopped. go ahead.",
-    notSeen: "main doesn't see this window",
+    cutIn: "bise stopped. go ahead.",
+    notSeen: "bise doesn't see this window",
     // §4 keys
     handsFree: "hands-free. tap fn to send.",
     cancelled: "cancelled. nothing sent.",
@@ -41,13 +43,13 @@
     perm: {
       accessibility: "to hear fn in every app, bise needs Accessibility. it only uses fn and the keys you press with it.",
       mic: "hold fn and talk. the mic is on only while you talk to bise: fn held, or hands-free until you tap fn.",
-      screen: "when you talk, main sees the window in front. it goes to your model with your words, and isn't kept.",
+      screen: "when you talk, bise sees the window in front. it goes to your model with your words, and isn't kept.",
     },
     // the refusals (ambient, m_4645); the screen's pane is named by the running macOS (screenPane)
     permDenied: {
       accessibility: "without Accessibility, bise can't hear fn. turn it on in System Settings › Privacy & Security › Accessibility.",
       mic: "without the mic, bise can't hear you. turn it on in System Settings › Privacy & Security › Microphone.",
-      screen: "without Screen Recording, main can't see the window in front. turn it on in System Settings › Privacy & Security › Screen & System Audio Recording.",
+      screen: "without Screen Recording, bise can't see the window in front. turn it on in System Settings › Privacy & Security › Screen & System Audio Recording.",
     },
     continue: "continue",
     notNow: "not now",
@@ -59,12 +61,12 @@
     light: "one question from perf. ten seconds, promise.",
     done: "perf is done: signup 4.1 s → 0.9 s.",
     doneTouch: "three seconds back, every signup.",
-    fail: "release couldn't publish: the checksum didn't match. main is on it.",
+    fail: "release couldn't publish: the checksum didn't match. bise is on it.",
     sees: "Chrome · localhost:4801/settings",
     // ambient, m_4645
-    hubDown: "can't reach main. trying again.",
-    spotHint: "type to main",
-    spotKeys: [["⏎", "send to main"], ["tab", "start an agent"], ["esc", "close"]],
+    hubDown: "can't reach bise. trying again.",
+    spotHint: "type to bise",
+    spotKeys: [["⏎", "send to bise"], ["tab", "start an agent"], ["esc", "close"]],
     // tab in the spotlight: main starts the agent (it's main's job, like the TUI's /new)
     startAgent: "start an agent: ",
   };
@@ -125,15 +127,16 @@
   const needsLine = (agent) => `${agent} needs you`;
   // `✓ cookies has it.` / with the option it took: `✓ cookies has it: yes.`
   const answeredLine = (agent, choice) => (choice ? `${agent} has it: ${choice}.` : `${agent} has it.`);
-  const seesLine = (app, title) => (title ? `main sees ${app} · ${title}` : `main sees ${app}`);
+  // the speaker on the capsule is bise (roadmap §3.1)
+  const seesLine = (app, title) => (title ? `bise sees ${app} · ${title}` : `bise sees ${app}`);
   // the chip in two parts: `head` is never cut (the app, a URL's host), `tail` may end in … (a
   // URL's path, or a window title) (designer: cut the path, never the app or the host)
   function seesParts(app, title) {
     const t = String(title || "");
-    if (!t) return { head: `main sees ${app}`, tail: "" };
+    if (!t) return { head: `bise sees ${app}`, tail: "" };
     const url = t.match(/^((?:[a-z]+:\/\/)?[^\s/]+)(\/\S*)$/i);
-    if (url) return { head: `main sees ${app} · ${url[1]}`, tail: url[2] };
-    return { head: `main sees ${app} · `, tail: t };
+    if (url) return { head: `bise sees ${app} · ${url[1]}`, tail: url[2] };
+    return { head: `bise sees ${app} · `, tail: t };
   }
   // an option, numbered: `1 yes`
   const optionLabel = (n, text) => `${n} ${text}`;

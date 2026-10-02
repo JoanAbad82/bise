@@ -142,7 +142,7 @@ law("hold fn: open, the sphere follows your voice, live words, `main sees …`, 
   assert.equal(v.state, "listening"); assert.equal(v.size, "open");
   assert.equal(v.pose, "talk"); assert.ok(v.lvl > 0);
   assert.equal(v.label.text, W.listening); assert.equal(v.label.rest, W.letGo);
-  eq(v.sees, { head: "main sees Chrome · localhost:4801", tail: "/settings" });
+  eq(v.sees, { head: "bise sees Chrome · localhost:4801", tail: "/settings" });
   assert.ok(v.words.list.length > 2 && W.said.startsWith(v.words.list.join(" ")));
   assert.ok(v.edge.on);
   // the words grow
@@ -153,17 +153,17 @@ law("a skipped window: `main doesn't see this window`", () => {
   eq(s.views[2000].sees, { head: W.notSeen, tail: "" });
 });
 law("the chip cuts the path or the title, never the app or the host", () => {
-  eq(Wd.seesParts("Chrome", "localhost:4801/settings/appearance"), { head: "main sees Chrome · localhost:4801", tail: "/settings/appearance" });
-  eq(Wd.seesParts("Chrome", "https://github.com/acme/web/pull/482"), { head: "main sees Chrome · https://github.com", tail: "/acme/web/pull/482" });
-  eq(Wd.seesParts("Ghostty", "~/acme — bise"), { head: "main sees Ghostty · ", tail: "~/acme — bise" });
-  eq(Wd.seesParts("Finder", ""), { head: "main sees Finder", tail: "" });
+  eq(Wd.seesParts("Chrome", "localhost:4801/settings/appearance"), { head: "bise sees Chrome · localhost:4801", tail: "/settings/appearance" });
+  eq(Wd.seesParts("Chrome", "https://github.com/acme/web/pull/482"), { head: "bise sees Chrome · https://github.com", tail: "/acme/web/pull/482" });
+  eq(Wd.seesParts("Ghostty", "~/acme — bise"), { head: "bise sees Ghostty · ", tail: "~/acme — bise" });
+  eq(Wd.seesParts("Finder", ""), { head: "bise sees Finder", tail: "" });
 });
 law("let go: `:* got it.`, then `on it.` under the main label, the * turning", () => {
   const evs = sceneEvents("talk");
   const sent = evs.find(([, e]) => e.ev === "sent")[0];
   const r = run(evs, [sent + 100, sent + 1200]);
   const a = r.view(sent + 100), b = r.view(sent + 1200);
-  assert.equal(a.label.text, "main"); assert.equal(a.text, W.got); assert.equal(a.pose, "think"); assert.equal(a.size, "open");
+  assert.equal(a.label.text, "bise"); assert.equal(a.text, W.got); assert.equal(a.pose, "think"); assert.equal(a.size, "open");
   assert.equal(b.text, W.onShort);
   assert.equal(b.sub, "starting dark-mode");
 });
@@ -299,14 +299,14 @@ law("fn + space: the spotlight takes the keys, ⏎ sends to main and gives them 
 });
 law("the spotlight's key bar shows `tab start an agent` only with text; tab asks main to start one", () => {
   let r = M.step(M.init(), { ev: "app_key", key: "space" }, 0);
-  eq(M.view(r.m, 1).spot.keys, [["⏎", "send to main"], ["esc", "close"]]);
+  eq(M.view(r.m, 1).spot.keys, [["⏎", "send to bise"], ["esc", "close"]]);
   r = M.step(r.m, { ev: "ui_spot_type", text: "a csv importer" }, 2);
-  eq(M.view(r.m, 3).spot.keys, [["⏎", "send to main"], ["tab", "start an agent"], ["esc", "close"]]);
+  eq(M.view(r.m, 3).spot.keys, [["⏎", "send to bise"], ["tab", "start an agent"], ["esc", "close"]]);
   r = M.step(r.m, { ev: "ui_spot_tab" }, 4);
   eq(r.cmds, [{ cmd: "app_focus", on: false }, { cmd: "send", text: "start an agent: a csv importer" }]);
 });
 law("the words ambient and designer signed (m_4645, m_4648)", () => {
-  assert.equal(W.hubDown, "can't reach main. trying again.");
+  assert.equal(W.hubDown, "can't reach bise. trying again.");
   assert.equal(Wd.permDenied("mic"), "without the mic, bise can't hear you. turn it on in System Settings › Privacy & Security › Microphone.");
   assert.ok(Wd.permDenied("screen", 15).endsWith("› Screen & System Audio Recording."));
   assert.ok(Wd.permDenied("screen", 14).endsWith("› Screen Recording."));

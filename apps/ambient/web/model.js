@@ -494,7 +494,7 @@
       v.edge = { on: m.edgeGlow && !m.reduce, lvl: you };
     } else if (m.mine && (m.phase === "sending" || m.phase === "working" || (m.phase === "idle" && now - m.sentAt < 30000 && !m.main.text))) {
       v.state = "working"; v.size = "open"; v.pose = "think";
-      v.label = { text: "main", acc: true };
+      v.label = { text: "bise", acc: true };
       if (m.main.text && !m.voice) v.words = mainWords();
       else v.text = now - m.sentAt < T.got ? W.got : W.onShort;
       if (m.line) v.sub = m.line;
@@ -503,13 +503,13 @@
       v.state = "speaking"; v.size = "open";
       v.pose = m.hushed ? "think" : "speak";
       v.lvl = m.hushed ? 0 : lv(m, "main", now);
-      v.label = { text: "main", acc: true };
+      v.label = { text: "bise", acc: true };
       v.words = mainWords();
       if (m.hushed) v.sub = W.hush;
       v.chips = m.chips;
     } else if (m.mine && m.phase === "done" && now - m.doneAt < T.endOpen) {
       v.state = "end"; v.size = "open";
-      v.label = { text: "main", acc: true };
+      v.label = { text: "bise", acc: true };
       v.words = mainWords();
       if (m.hushed) v.sub = W.hush;
       v.chips = m.chips;
