@@ -87,17 +87,12 @@
     return s;
   }
 
-  const doneLine = (name, report) => {
-    const r = firstSentence(report);
-    return r ? `${name} is done: ${r}` : `${name} is done.`;
-  };
-
-  // `release couldn't publish: the checksum didn't match. main is on it.` (no joke, glyph ▲)
-  function failLine(name, report, mainOnIt) {
-    const r = firstSentence(report, 120);
-    const head = !r ? `${name} failed.` : r.toLowerCase().startsWith(name.toLowerCase() + " ") ? r : `${name} failed: ${r}`;
-    return mainOnIt ? `${head} ${W.on}` : head;
-  }
+  // an agent's state change in the status line, without its report: the report is written to main,
+  // not to you (ambient, m_4677). The result sentence (`perf is done: signup 4.1 s → 0.9 s.`) shows
+  // only as main's own words for you.
+  const doneLine = (name) => `${name} is done.`;
+  // glyph ▲, no joke
+  const failLine = (name) => `${name} failed.`;
 
   const needsLine = (agent) => `${agent} needs you`;
   // `✓ cookies has it.` / with the option it took: `✓ cookies has it: yes.`

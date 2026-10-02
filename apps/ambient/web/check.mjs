@@ -60,10 +60,9 @@ law("the idle line counts the working agents, and goes quiet at none", () => {
   assert.equal(Wd.idleLine(0), W.quiet);
 });
 law("done and failed lines read like ambient's W", () => {
-  assert.equal(Wd.doneLine("perf", "signup 4.1 s → 0.9 s. the fonts load lazily now."), "perf is done: signup 4.1 s → 0.9 s.");
-  assert.equal(Wd.failLine("release", "release couldn't publish: the checksum didn't match.", true), "release couldn't publish: the checksum didn't match. main is on it.");
-  assert.equal(Wd.failLine("emoji-csv", "the parser crashed on row 12.", false), "emoji-csv failed: the parser crashed on row 12.");
-  assert.equal(Wd.doneLine("perf", ""), "perf is done.");
+  // never the report: it's written to main, not to you (ambient, m_4677)
+  assert.equal(Wd.doneLine("perf"), "perf is done.");
+  assert.equal(Wd.failLine("release"), "release failed.");
 });
 law("a long report is cut at its first sentence, then at the word", () => {
   assert.equal(Wd.firstSentence("one. two."), "one.");
@@ -212,14 +211,16 @@ law("a click on an option answers the same", () => {
   eq([...r.cmds], [{ cmd: "answer", card: "c1", reply: "2" }]);
   assert.equal(M.view(r.m, 20).text, "cookies has it: no.");
 });
-law("done: `perf is done: signup 4.1 s → 0.9 s.` with the kiss", () => {
-  const r = run(sceneEvents("done"), [1000, 1500]);
-  assert.equal(r.view(1000).glyph, "✓"); assert.equal(r.view(1000).text, W.done); assert.equal(r.view(1000).pose, "kiss");
+law("done: `✓ perf is done.` with the kiss, not the report; 8 s, then the count line", () => {
+  const r = run(sceneEvents("done"), [1000, 1500, 8800, 9000]);
+  assert.equal(r.view(1000).glyph, "✓"); assert.equal(r.view(1000).text, "perf is done."); assert.equal(r.view(1000).pose, "kiss");
   assert.equal(r.view(1500).pose, "kiss");
+  assert.equal(r.view(8800).text, "perf is done.");
+  assert.equal(r.view(9000).text, Wd.idleLine(2));
 });
-law("failed: ▲ and ambient's sentence, the face still, no joke", () => {
+law("failed: `▲ release failed.`, the face still, no joke, no report", () => {
   const v = run(sceneEvents("failed"), [1200]).view(1200);
-  assert.equal(v.glyph, "▲"); assert.equal(v.text, W.fail); assert.equal(v.pose, "rest"); assert.ok(v.frozen);
+  assert.equal(v.glyph, "▲"); assert.equal(v.text, "release failed."); assert.equal(v.pose, "rest"); assert.ok(v.frozen);
 });
 law("an error shows its one sentence with ▲", () => {
   const v = run(sceneEvents("error"), [900]).view(900);
@@ -262,7 +263,8 @@ law("fn + 0: the agents, with their glyphs, `? needs you` for a card's agent", (
   const v = run(sceneEvents("agents"), [600]).view(600);
   assert.equal(v.state, "agents"); assert.equal(v.size, "open");
   const by = Object.fromEntries(v.list.map((r) => [r.name, r]));
-  assert.equal(by.perf.glyph, "✓"); assert.equal(by.perf.what, "signup 4.1 s → 0.9 s", "a row is a label: no final period");
+  assert.equal(by.perf.glyph, "✓"); assert.equal(by.perf.what, "profiling signup", "its task line, never the report");
+  assert.equal(Wd.rowLabel("signup 4.1 s → 0.9 s."), "signup 4.1 s → 0.9 s", "a row is a label: no final period");
   // the menu-bar click and fn + 0: the cards first, no glass under (it would repeat)
   assert.equal(v.inbox.length, 1); assert.equal(v.inbox[0].agent, "cookies"); assert.equal(v.note, null);
   assert.equal(by["dark-mode"].glyph, "∿"); assert.equal(by["dark-mode"].age, "6m");
@@ -347,9 +349,9 @@ law("a permission ask is alone in the capsule: no agent line under it (ambient, 
   m = M.step(m, { ev: "state", agents: Fake.AGENTS.map((a) => a.name === "perf" ? { ...a, status: "done", report: "Both fixes are on `ambient-app` as 4d74d7d." } : a), cards: [] }, 20).m;
   const v = M.view(m, 30);
   assert.equal(v.state, "perm"); assert.equal(v.sub, null); assert.equal(v.text, null); assert.equal(v.words, null);
-  // once the ask is answered, the line is plain: no backticks
+  // once the ask is answered, the line shows, without the report
   m = M.step(m, { ev: "ui_perm", perm: "accessibility", do: "not_now" }, 40).m;
-  assert.equal(M.view(m, 50).text, "perf is done: Both fixes are on ambient-app as 4d74d7d.");
+  assert.equal(M.view(m, 50).text, "perf is done.");
 });
 law("not now: the refused path, sent to the app", () => {
   let r = M.step(M.init(), { ev: "app_perm", perm: "mic", state: "ask" }, 0);

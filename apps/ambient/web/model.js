@@ -20,8 +20,8 @@
     level: 250,      // a level older than this is silence
     cutIn: 1500,     // `main stopped. go ahead.` over `listening`
     answered: 4000,
-    done: 6000,
-    failed: 10000,
+    done: 8000,      // `<name> is done.`, then the count line (ambient, m_4677)
+    failed: 8000,
     error: 6000,
     key: 3000,       // a key's own line (cancelled, later, hush...)
     hide: 1500,      // fn + . : the line, then hide
@@ -114,9 +114,9 @@
           }
           const failed = (a.status === "failed" && p.status !== "failed") || (a.report_kind === "failed" && (p.report_kind !== "failed" || p.report !== a.report));
           if (failed) {
-            m2 = flashQueue(m2, { kind: "failed", glyph: "▲", text: Wd.failLine(a.name, a.report, inTurn(m2) && !m2.mine), ttl: T.failed, still: true }, now);
+            m2 = flashQueue(m2, { kind: "failed", glyph: "▲", text: Wd.failLine(a.name), ttl: T.failed, still: true }, now);
           } else if (a.status === "done" && p.status !== "done") {
-            m2 = flashQueue(m2, { kind: "done", glyph: "✓", text: Wd.doneLine(a.name, a.report), ttl: T.done, kiss: true }, now);
+            m2 = flashQueue(m2, { kind: "done", glyph: "✓", text: Wd.doneLine(a.name), ttl: T.done, kiss: true }, now);
           }
         }
         return none(m2);
@@ -368,12 +368,12 @@
       if (cards.length) v.inbox = inbox();
       v.list = m.agents.map((a) => {
         const asks = cards.some((c) => c.agent === a.name);
-        const done = a.status === "done" || a.status === "failed";
         return {
           name: a.name,
           glyph: asks ? "?" : Wd.GLYPH[a.status] || "·",
           kind: asks ? "need" : a.status,
-          what: Wd.rowLabel(asks ? "needs you" : (done && Wd.firstSentence(a.report, 60)) || a.note || a.status),
+          // short: its task line, never the report (written to main, not to you)
+          what: Wd.rowLabel(asks ? "needs you" : a.note || a.status),
           age: Wd.age(a.turn_ms),
         };
       });
