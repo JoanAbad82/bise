@@ -124,6 +124,10 @@ html:not(.app) .cap, html:not(.app) .note {
 /* a page you haven't opened yet: its name in full ink, a small dot before its meta */
 .page.new .pn { font-weight: 600; }
 .page.new .pm::before { content: "• "; color: #ffffffb3; }   /* white 70%: an unread page does not wait for you (ambient, m_5136) */
+/* the ones you've seen: dim, under the unopened ones (ambient-lead m_5515) */
+.page:not(.new) .pn { color: var(--dim); }
+/* a watched page: 'watching · checked 3 min ago' under its name, mono, dim */
+.page .pw { grid-column: 2 / -1; margin-top: -2px; font: 11px var(--mono); color: #ffffff70; }
 /* an empty section of the full view: one dim line */
 .none { padding: 7px 4px; font-size: 13px; color: var(--dim); animation: arrive .5s var(--expo) both; }
 /* the settings (fn + ,): one row per toggle, a white switch (rose stays for what waits for you),

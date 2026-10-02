@@ -416,7 +416,7 @@ law("a page ready: `weekly update is ready · fn + o`; fn + o opens it (app_open
   eq(o.cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/weekly-update", page: "weekly-update" }]);
   const a = M.view(M.step(o.m, { ev: "app_key", key: "0" }, 5000).m, 5000, t0 + 5000);
   // unopened first: weekly update was just opened by fn + o, so the grays come first
-  eq(a.forYou.pages.map((p) => [p.name, p.meta, p.unopened]), [["which gray wins?", "v2 · 40 min ago", true], ["weekly update", "v1 · just now", false]]);
+  eq(a.forYou.pages.map((p) => [p.name, p.meta, p.unopened]), [["which gray wins?", "new", true], ["weekly update", "v1 · just now", false]]);
   // a click in for you opens that page
   eq(M.step(o.m, { ev: "ui_page", page: "grays" }, 6000).cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/grays", page: "grays" }]);
 });
@@ -921,6 +921,66 @@ law("notes: a Range for a quote walks the block's text nodes, whitespace collaps
   const r = BiseNotes.rangeFor(doc, block, at.start, at.end);
   assert.equal(r.s[0], b); assert.equal(r.s[1], 0);
   assert.equal(r.e[0], c); assert.equal(c.nodeValue.slice(0, r.e[1]), " Q2");
+});
+
+law("the glass leaves with its last words: after content none, through the hide and its close (normal or reduced), until new content (ambient m_5574)", () => {
+  const evs = sceneEvents("talk");
+  for (const reduce of [false, true]) {
+    let m = reduce ? M.step(M.init(), { ev: "app_reduce_motion", on: true }, 0).m : M.init();
+    const upTo = (t) => { for (const [te, ev] of evs) if (te <= t && te > (upTo.done ?? -1)) m = M.step(m, ev, te).m; upTo.done = t; return m; };
+    let shown = null;
+    const at = (t, mm) => { const h = M.hold(shown, M.view(mm, t, 0)); shown = h.shown; return h.v; };
+    for (let t = 0; t <= 13500; t += 100) at(t, upTo(t));
+    const last = at(13500, upTo(13500));
+    assert.equal(last.state, "end"); assert.equal(last.words.lit, last.words.list.length);
+    const idle = at(17500, upTo(17500));                         // content none, still shown
+    m = upTo(Infinity);
+    eq([idle.content.kind, idle.state, idle.size, idle.words.list], ["none", "end", "open", last.words.list]);
+    assert.equal(idle.still, reduce);
+    const hidden = M.step(m, { ev: "app_hidden", on: true }, 17600).m;
+    for (const t of [17700, 17900, 19000]) {                     // the close (0.2 s or 0.6 s) and after
+      const h = at(t, hidden);
+      eq([h.hidden, h.size, h.words.list], [true, "open", last.words.list]);
+    }
+    // new content ends the hold
+    const next = at(19500, M.step(hidden, { ev: "app_key", key: "0" }, 19400).m);
+    assert.equal(next.state, "agents");
+  }
+});
+
+// ---- for you with opened_version (amb-core 03821a37) and the count shared with the menu bar
+law("for you: unopened first, newest first, 'new' or 'v3 · 2 new versions'; seen ones after; a watched page says when it was checked", () => {
+  const pages = [
+    { id: "a", title: "launch recap", version: 3, opened_version: 1, state: "ready", url: "ua", at_ms: 9000 },
+    { id: "b", title: "which gray wins?", version: 2, opened_version: 2, state: "ready", url: "ub", at_ms: 8000 },
+    { id: "c", title: "hn watch", version: 1, opened_version: 0, state: "ready", url: "uc", at_ms: 7000 },
+    { id: "d", title: "draft", version: 1, state: "writing", url: "ud", at_ms: 9500 },
+  ];
+  const timers = [{ id: 3, agent: "hn", label: "every 15 min", text: "check HN", by: "main", next_ms: 0, fired: 4, page: "c", last_ms: 1000 * 60 * 57 }, { agent: "x" }];
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages, timers }, 0).m;
+  m = M.step(m, { ev: "app_key", key: "0" }, 10).m;
+  const fy = M.view(m, 20, 1000 * 60 * 60).forYou.pages;
+  eq(fy.map((p) => [p.id, p.meta, p.unopened]), [["a", "v3 · 2 new versions", true], ["c", "new", true], ["b", "v2 · 59 min ago", false]]);
+  eq(fy.map((p) => p.watch), [null, "watching · checked 3 min ago", null]);
+  assert.equal(Wd.watching(0, 5), "watching");
+  assert.equal(Wd.pageMeta({ version: 2 }, 0, 1), "v2 · 1 new version");
+  // fn + ⏎ in the full view (no card from a page): the first unopened page, at its newest version
+  const r = M.step(m, { ev: "app_key", key: "enter" }, 30);
+  eq(r.cmds, [{ cmd: "app_open_url", url: "ua", page: "a" }]);
+  eq(M.view(r.m, 40, 1000 * 60 * 60).forYou.pages.map((p) => p.id), ["c", "a", "b"]);
+});
+law("the menu-bar count = cards waiting + ready pages with an unopened version: fixtures/count.json, shared with amb-mac", () => {
+  const fx = JSON.parse(readFileSync(join(here, "fixtures/count.json"), "utf8"));
+  assert.ok(fx.cases.length >= 4);
+  for (const c of fx.cases) {
+    const m = M.step(M.init(), { ev: "state", agents: [], ...c.state }, 0).m;
+    assert.equal(M.count(m), c.count, c.name);
+  }
+  // the list agrees: its unopened rows + the waiting cards
+  const c = fx.cases[3];
+  const m = M.step(M.step(M.init(), { ev: "state", agents: [], ...c.state }, 0).m, { ev: "app_key", key: "0" }, 10).m;
+  const v = M.view(m, 20, 100);
+  assert.equal(v.forYou.pages.filter((p) => p.unopened).length + v.inbox.length, M.count(m));
 });
 
 // ---- settings (fn + ,; amb-mac ef4dbc2e)

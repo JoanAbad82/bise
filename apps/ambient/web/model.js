@@ -57,6 +57,7 @@
       flashes: [],                  // [{ glyph, text, sub, at, ttl, kiss, still, kind }]
       turnNames: null, chips: [],   // agents that appeared during your turn
       pages: [],                    // "for you": the pages made for you, newest first (state.pages)
+      timers: [],                   // the hub's standing orders (state.timers): a page with one is watched
       lastPage: null,               // the page `is ready · fn + o` named last
       pane: null,                   // null | 'agents' | 'inbox' | 'spot'
       spotText: "",
@@ -68,7 +69,12 @@
   const names = (agents) => agents.map((a) => a.name);
   // a page you opened (from the capsule, or the core's opened_version when it says so) at its
   // current version; for you lists the ready pages, unopened first, then newest
-  const opened = (m, p) => Math.max(m.opened[p.id] || 0, p.opened_version || 0) >= (p.version || 1);
+  const openedAt = (m, p) => Math.max(m.opened[p.id] || 0, p.opened_version || 0);
+  const opened = (m, p) => openedAt(m, p) >= (p.version || 1);
+  // the number on the menu-bar icon and this list agree (vision §3 G, ambient-lead m_5515): the
+  // questions and approvals waiting + the pages with a version you haven't opened; amb-mac's
+  // MenuRows counts the same from the same state (fixtures/count.json is the shared case list)
+  const count = (m) => visibleCards(m).length + m.pages.filter((p) => p.state !== "writing" && !opened(m, p)).length;
   const forYouPages = (m) => {
     const ready = m.pages.filter((p) => p.state !== "writing");
     return [...ready.filter((p) => !opened(m, p)), ...ready.filter((p) => opened(m, p))];
@@ -122,7 +128,8 @@
       case "state": {
         const agents = Array.isArray(ev.agents) ? ev.agents : [];
         const cards = Array.isArray(ev.cards) ? ev.cards : [];
-        let m2 = { ...m, agents, cards, seen: true, pages: Array.isArray(ev.pages) ? sortPages(ev.pages) : m.pages };
+        let m2 = { ...m, agents, cards, seen: true, pages: Array.isArray(ev.pages) ? sortPages(ev.pages) : m.pages,
+          timers: Array.isArray(ev.timers) ? ev.timers.filter((t) => t && t.id != null) : m.timers };
         // the hub dropped a card: forget that it was answered here
         const ids = new Set(cards.map((c) => c.id));
         m2.answered = Object.fromEntries(Object.keys(m.answered).filter((id) => ids.has(id)).map((id) => [id, true]));
@@ -356,7 +363,13 @@
     switch (k) {
       // fn + ⏎: a card asked from a page opens that page at the question (amb-core, 7e41f98e:
       // card.page {id, block, url}, the url ending with #block)
-      case "enter": return openCard(m, cards[m.pane === "inbox" || m.pane === "agents" ? m.sel : 0]);
+      // in the full view with no card from a page to open, fn + ⏎ opens for you's first page (its
+      // newest version: the page's url is always its latest)
+      case "enter": {
+        const card = cards[m.pane === "inbox" || m.pane === "agents" ? m.sel : 0];
+        if (m.pane === "agents" && !(card && card.page && card.page.url) && forYouPages(m)[0]) return openPage(m, forYouPages(m)[0]);
+        return openCard(m, card);
+      }
       case "space": return setPane(m, m.pane === "spot" ? null : "spot");
       // fn + o: in the full view, the first page of for you (unopened first); else the page the
       // capsule named last, else the newest; the app opens it or brings its tab
@@ -413,6 +426,16 @@
   // hides the capsule. `icon` is the icon's rect in the page's CSS px (amb-mac's app_icon; above
   // the panel, so y < 0); without it, the panel's top right. Reduced motion: a plain fade.
   const GROW = { open: 750, close: 600, fade: 200, from: 0.15, easeOut: "cubic-bezier(.16, 1, .3, 1)", easeIn: "cubic-bezier(.7, 0, .84, 0)" };
+  // the glass leaves with its last words on it (ambient's gate run 3 (b), and its reduced-motion
+  // recheck m_5574): with nothing left to show (content none), the capsule keeps drawing the last
+  // view it showed (words, chips, label, width, so app_size never shrinks the panel either), with
+  // the live hidden flag, mood and settings, through the app's hide and its close (0.6 s, or the
+  // 0.2 s fade) and after it, until new content comes; it never draws the empty view in between
+  function hold(shown, v) {
+    if (v.content.kind !== "none") return { shown: v.hidden ? shown : v, v };
+    if (!shown) return { shown, v };
+    return { shown, v: { ...shown, hidden: v.hidden, content: v.content, mood: v.mood, lvl: v.lvl, still: v.still, unseen: v.unseen, icon: v.icon, radius: v.radius } };
+  }
   // reduced motion for the grow: the app's flag (app_reduce_motion) or the system's (the web
   // view's prefers-reduced-motion), either one is enough, whichever arrived first
   const reduced = (appFlag, system) => !!appFlag || !!system;
@@ -556,7 +579,12 @@
       v.empty = { running: m.agents.length || m.pages.some((p) => p.state === "writing" || p.state === "updating") ? null : W.nothingRunning, needs: cards.length ? null : W.nothingNeeds };
       if (cards.length) v.inbox = inbox();
       const ready = forYouPages(m);
-      if (ready.length) v.forYou = { title: Wd.forYou, pages: ready.map((p) => ({ id: p.id, name: pageName(p), meta: Wd.pageMeta(p, wall), unopened: !opened(m, p) })) };
+      // unopened first (newest first), each saying 'new' or how many versions came since you
+      // looked; the ones you've seen dim below; a watched page says when its agent last checked
+      if (ready.length) v.forYou = { title: Wd.forYou, pages: ready.map((p) => {
+        const t = m.timers.find((x) => x.page === p.id);
+        return { id: p.id, name: pageName(p), meta: Wd.pageMeta(p, wall, openedAt(m, p)), unopened: !opened(m, p), watch: t ? Wd.watching(+t.last_ms || 0, wall) : null };
+      }) };
       const writingRows = m.pages.filter((p) => p.state === "writing" || p.state === "updating").map((p) => ({
         name: pageName(p), glyph: "◰", kind: "page", what: Wd.rowLabel(p.state === "writing" ? W.pageWriting : W.pageUpdating), age: "", page: p.id,
       }));
@@ -625,5 +653,5 @@
     return v;
   }
 
-  root.AmbModel = { init, step, view, T, visibleCards, grow, GROW, reduced };
+  root.AmbModel = { init, step, view, T, visibleCards, grow, GROW, reduced, count, hold };
 })(typeof window !== "undefined" ? window : globalThis);

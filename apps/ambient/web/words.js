@@ -220,5 +220,5 @@
   // an agent's row is a label, not a sentence: no final period
   const rowLabel = (s) => String(s || "").replace(/\.$/, "");
 
-  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, voiceNoteOn, moodLabel, sayOf };
+  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
 })(typeof window !== "undefined" ? window : globalThis);

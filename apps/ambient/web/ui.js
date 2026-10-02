@@ -174,7 +174,7 @@
       const delay = () => `animation-delay:${(k++) * 0.06}s`;
       const rs = (v.list || []).map((r) => `<div class="row ${esc(r.kind)}" style="${delay()}"><span class="gl" aria-hidden="true">${esc(r.glyph)}</span><span class="nm">${esc(r.name)}</span><span class="wh">${esc(r.what)}</span><span class="ag">${esc(r.age)}</span></div>`);
       const qs = (v.inbox || []).map((q) => `<div class="q${q.sel ? " sel" : ""}" style="${delay()}"><div class="who">? ${esc(q.agent)}</div><div class="tq">${esc(q.text)}</div>${opts(q)}</div>`);
-      const fy = v.forYou ? v.forYou.pages.map((p) => `<button type="button" class="page${p.unopened ? " new" : ""}" data-page="${esc(p.id)}" style="${delay()}"><span class="gl" aria-hidden="true">◰</span><span class="pn">${esc(p.name)}</span><span class="pm">${esc(p.meta)}</span></button>`) : [];
+      const fy = v.forYou ? v.forYou.pages.map((p) => `<button type="button" class="page${p.unopened ? " new" : ""}" data-page="${esc(p.id)}" style="${delay()}"><span class="gl" aria-hidden="true">◰</span><span class="pn">${esc(p.name)}</span><span class="pm">${esc(p.meta)}</span>${p.watch ? `<span class="pw">${esc(p.watch)}</span>` : ""}</button>`) : [];
       const em = v.empty || {};
       const none = (s) => (s ? [`<div class="none" style="${delay()}">${esc(s)}</div>`] : []);
       el.rows.innerHTML = v.list
@@ -318,10 +318,9 @@
   // pearl keeps its own mood. new content ends the hold
   let shown = null;
   function held(v) {
-    if (v.content.kind !== "none") { if (!v.hidden) shown = v; return v; }
-    if (!shown) return v;
-    if (v.hidden && !growAnim && wasHidden) { shown = null; return v; }
-    return { ...shown, hidden: v.hidden, content: v.content, mood: v.mood, lvl: v.lvl, still: v.still, unseen: v.unseen, icon: v.icon, radius: v.radius };
+    const h = M.hold(shown, v);
+    shown = h.shown;
+    return h.v;
   }
   let laterT = 0;
   function later(ms) { if (!laterT && !raf) laterT = setTimeout(() => { laterT = 0; schedule(); }, ms); }
