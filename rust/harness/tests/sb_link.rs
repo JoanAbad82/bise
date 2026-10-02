@@ -59,6 +59,13 @@ fn cases() -> Vec<Vec<&'static str>> {
         vec!["page", "list"],
         vec!["page", "notes", "weekly-update"],
         vec!["page", "publish", "/nonexistent/page.html", "--id", "w", "--notes-done", "n1,n2", "--note-answer", "n3=kept"],
+        // standing orders (docs/ambient-roadmap.md B)
+        vec!["every"],
+        // an absolute --until: a relative one differs by the ms between two runs
+        vec!["every", "10m", "check HN", "--until", "2030-01-01 18:00", "--times", "3", "--to", "t1"],
+        vec!["every", "day", "07:30", "make the morning page"],
+        vec!["every", "--stop", "2"],
+        vec!["every", "soon", "x"],
         vec!["version"],
         vec!["version", "switch", "HEAD"],
         vec!["restart", "current"],

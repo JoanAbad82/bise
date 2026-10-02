@@ -183,6 +183,18 @@ pub enum AgentReq {
     Isolate {
         agent: String,
     },
+    /// `sb every` (docs/ambient-roadmap.md B): the hub's timers (every.rs);
+    /// the Rust side's, never sent to sb-core.
+    Every(EveryReq),
+}
+
+/// `sb every`'s three forms.
+#[derive(Clone, Debug, PartialEq)]
+pub enum EveryReq {
+    List,
+    Stop(u64),
+    /// `to` "": the caller
+    Add { to: String, text: String, sched: crate::every::Sched, until_ms: Option<u64>, times: Option<u64> },
 }
 
 /// `m_12` or `12`.
@@ -342,6 +354,22 @@ impl AgentReq {
             "isolate" => AgentReq::Isolate {
                 agent: jstr(v, "agent"),
             },
+            "every" => AgentReq::Every(match jstr(v, "step").as_str() {
+                "" | "list" => EveryReq::List,
+                "stop" => EveryReq::Stop(v["id"].as_u64().ok_or("usage: sb every --stop <id>")?),
+                "add" => EveryReq::Add {
+                    to: jstr(v, "to").trim_start_matches('@').to_string(),
+                    text: jstr(v, "text"),
+                    sched: match (v["every_ms"].as_u64(), v["daily_min"].as_u64()) {
+                        (Some(p), _) => crate::every::Sched::Every(p),
+                        (None, Some(m)) if m < 24 * 60 => crate::every::Sched::Daily(m as u32),
+                        _ => return Err("sb every: every_ms or daily_min".into()),
+                    },
+                    until_ms: v["until_ms"].as_u64(),
+                    times: v["times"].as_u64(),
+                },
+                o => return Err(format!("sb every: unknown step {}", o)),
+            }),
             other => return Err(format!("unknown command: {}", other)),
         };
         Ok(req)
@@ -767,6 +795,8 @@ pub struct Hub {
     /// checks' tries (forge/news.rs); `pr_bots`: the repo's `[pr]
     /// trusted_bots` (the daemon reads config.toml).
     pr_news: crate::forge::news::News,
+    /// `sb every`'s timers (every.rs), from the journal's own lines.
+    every: crate::every::Timers,
     pub pr_bots: Vec<String>,
     /// pr-merge (pr-design §6.3): the ready-to-merge items' runtime side
     /// (merge.rs).
@@ -930,6 +960,7 @@ impl Hub {
             pr_late: None,
             pr_done: BTreeSet::new(),
             pr_news: Default::default(),
+            every: Default::default(),
             pr_bots: Vec::new(),
             merges: merge::Merges::default(),
             updates: update_card::Updates::default(),
@@ -968,6 +999,10 @@ impl Hub {
             if crate::forge::is_pr_line(ev) {
                 crate::forge::read_line(&mut self.pr_known, ev);
                 self.pr_news.read_journal(ev);
+                continue;
+            }
+            if crate::every::is_line(ev) {
+                self.every.read(ev);
                 continue;
             }
             let out = self.raw(&json!({"t": "replay", "ev": ev}));
@@ -1304,6 +1339,75 @@ impl Hub {
             // a feature's agent lands on the feature (dev-flow §5.1)
             onto: a.ws.feature().map(|f| format!("refs/heads/{}", f)),
         })
+    }
+
+    /// `sb every` (every.rs): set, list or stop a timer; the reply.
+    fn every_req(&mut self, fx: &mut Fx, env: &mut dyn Env, from: &str, r: EveryReq) -> Value {
+        let now = env.now();
+        let Some(by) = self.st.resolve(from) else {
+            return json!({"ok": false, "error": format!("unknown agent: {}", from)});
+        };
+        match r {
+            EveryReq::List => json!({"ok": true, "text": self.every.list(now)}),
+            EveryReq::Stop(id) => match self.every.stop(id, &format!("stopped by {}", by)) {
+                Some(j) => {
+                    fx.push(Effect::Journal(j));
+                    json!({"ok": true, "text": format!("timer #{} stopped", id)})
+                }
+                None => json!({"ok": false, "error": format!("no timer #{} (`sb every` lists them)", id)}),
+            },
+            EveryReq::Add { to, text, sched, until_ms, times } => {
+                let to = if to.is_empty() { by.clone() } else { to };
+                let agent = match self.st.resolve(&to) {
+                    Some(a) if self.st.agents[&a].lifecycle == Lifecycle::Active => a,
+                    _ => return json!({"ok": false, "error": format!("sb every: no active agent @{}", to)}),
+                };
+                if matches!(sched, crate::every::Sched::Every(p) if p < crate::every::min_ms()) {
+                    return json!({"ok": false, "error": "sb every: at least 1m between two wakes"});
+                }
+                if text.trim().is_empty() {
+                    return json!({"ok": false, "error": "sb every: the message is empty"});
+                }
+                if until_ms.is_some_and(|u| u <= now) {
+                    return json!({"ok": false, "error": "sb every: --until is already past"});
+                }
+                if times == Some(0) {
+                    return json!({"ok": false, "error": "sb every: --times is at least 1"});
+                }
+                let n = crate::every::New { agent, by, text: text.trim().to_string(), sched, until_ms, times };
+                let (id, j) = self.every.add(n, now);
+                fx.push(Effect::Journal(j));
+                let line = self.every.list(now).lines().find(|l| l.starts_with(&format!("#{} ", id))).unwrap_or_default().to_string();
+                json!({"ok": true, "id": id, "text": format!("timer set: {} (stop it: sb every --stop {})", line, id)})
+            }
+        }
+    }
+
+    /// The timers due now wake their idle agents (a busy one: at its
+    /// next idle, one wake); the ended ones stop. Each change in the journal.
+    fn every_tick(&mut self, fx: &mut Fx, env: &mut dyn Env) {
+        if self.every.map.is_empty() {
+            return;
+        }
+        let st = &self.st;
+        let acts = self.every.tick(env.now(), |name| {
+            use crate::every::AgentNow;
+            match st.resolve(name).and_then(|n| st.agents.get(&n)) {
+                None => AgentNow::Gone,
+                Some(a) if a.lifecycle == Lifecycle::Archived => AgentNow::Gone,
+                Some(a) if a.lifecycle == Lifecycle::Active && a.run == Run::Idle => AgentNow::Idle,
+                Some(_) => AgentNow::Busy,
+            }
+        });
+        for a in acts {
+            match a {
+                crate::every::Act::Wake { agent, text, journal } => {
+                    fx.push(Effect::Journal(journal));
+                    self.core(fx, env, None, json!({"t": "hub_msg", "to": agent, "text": text}));
+                }
+                crate::every::Act::Stop { journal } => fx.push(Effect::Journal(journal)),
+            }
+        }
     }
 
     fn place_of(&self, a: &Agent) -> Option<String> {
@@ -1813,7 +1917,10 @@ impl Hub {
                 json!({"t": "interrupt", "agent": agent}),
             ),
             Input::Agent { token, from, req } => self.agent_req(&mut fx, env, token, &from, req),
-            Input::Tick => self.core(&mut fx, env, None, json!({"t": "tick"})),
+            Input::Tick => {
+                self.core(&mut fx, env, None, json!({"t": "tick"}));
+                self.every_tick(&mut fx, env);
+            }
             Input::ConfirmOpen { agent, text } => {
                 self.core(&mut fx, env, None, json!({"t": "confirm_open", "agent": agent, "text": text}))
             }
@@ -2350,7 +2457,13 @@ impl Hub {
                 let text = if req == AgentReq::List {
                     board::roster(&self.st, &from, env.now()).join("\n")
                 } else {
-                    board::tasks_detail(&self.st, env.now())
+                    let mut t = board::tasks_detail(&self.st, env.now());
+                    // the standing orders (sb every): what wakes whom, when
+                    let timers = self.every.list(env.now());
+                    if !self.every.map.is_empty() {
+                        t.push_str(&format!("\n\n## timers (sb every)\n{}", timers));
+                    }
+                    t
                 };
                 reply(fx, json!({"ok": true, "text": text}));
                 return;
@@ -2473,6 +2586,11 @@ impl Hub {
             }
             AgentReq::Restore { agent } => json!({"cmd": "restore", "agent": agent}),
             AgentReq::Isolate { agent } => json!({"cmd": "isolate", "agent": agent}),
+            AgentReq::Every(r) => {
+                let body = self.every_req(fx, env, from, r);
+                reply(fx, body);
+                return;
+            }
         };
         self.core(
             fx,
