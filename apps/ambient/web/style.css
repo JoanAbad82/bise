@@ -48,6 +48,14 @@ html:not(.app) .cap, html:not(.app) .note {
 .tx { flex: none; width: 310px; font-size: 16px; line-height: 1.35; padding: 4px 0; }
 .cap.small .tx { width: 236px; }
 .cap.open .tx { padding-top: 0; }
+/* one line of text (done, talk's first words): the line and the pearl share the glass's middle,
+   no empty band under them (ambient's gate run 2 (3)); from two lines on, top-aligned as above.
+   the 98 px glass's content box is 68 px: the one line's 29.6 px box sits 19 px down, the pearl
+   drops its -6 px pull, both centered 48 px from the top */
+.orbbox, .tx { transition: margin-top .4s var(--expo); }
+.cap.one .orbbox { margin-top: 0; }
+.cap.one .tx { margin-top: 19px; padding-top: 4px; }
+.still .orbbox, .still .tx { transition: none; }
 /* past 70% of the screen it scrolls inside, the last 24 px fading out; a list says `+N more` */
 .tx.scroll, .rows.fade { -webkit-mask-image: linear-gradient(#000 calc(100% - 24px), transparent); mask-image: linear-gradient(#000 calc(100% - 24px), transparent); }
 .tx.scroll, .rows { scrollbar-width: none; }

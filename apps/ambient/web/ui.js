@@ -241,6 +241,10 @@
     const rows = el.rows, list = rows.classList.contains("on");
     rows.style.maxHeight = ""; el.more.classList.remove("on");
     let want = Math.max(MIN_H[v.size], Math.ceil(tx.scrollHeight) + PAD);
+    // one line of text: centered with the pearl in the glass; two lines or more: top-aligned
+    // (ambient's gate run 2 (3)); one line is ~30 px with its padding, two are 51
+    const one = !v.hidden && tx.scrollHeight > 0 && tx.scrollHeight <= 40;
+    if (cap.classList.contains("one") !== one) cap.classList.toggle("one", one);
     let scroll = false;
     if (want > maxH && list) {
       el.more.classList.add("on");
