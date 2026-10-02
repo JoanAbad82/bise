@@ -119,8 +119,11 @@ Fail (sent to ambient-lead m_4910, m_4928; amb-web m_4929):
 7. `edit` is unreachable (only offered without a quote, but the toolbar needs a selection);
 8. nothing tells you that selecting text gives ♡ ✗ ~.
 
-Not verified yet: drafts surviving a reload, selection notes, main's rule both ways (a short ask
-gives no page), the capsule side (`qa.py launch` can't start its fake hub from an agent shell).
+Main's rule, the other way (ambient-lead on the same hub, m_4940): "how many stars do we have?" →
+one sentence in 10 s, no page; "is the HN post on the front page?" → a short answer in 12 s, no
+page. Pass, with a caveat: that build predates b1ed8fe; recheck on the next real run.
+
+Not verified yet: drafts surviving a reload, selection notes, the capsule side (`qa.py launch` can't start its fake hub from an agent shell).
 
 ## Slice 2 (outline, detailed when its plan lands)
 
