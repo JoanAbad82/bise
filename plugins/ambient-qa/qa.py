@@ -592,7 +592,7 @@ def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", for
         info = _start_hub(bise, root, hub, connectors and hub == "model", computer, user_ask)
         port = None
         try:
-            port = int(_wait(lambda: open(os.path.join(info["state"], "pages.port")).read().strip(), 30, "the page server"))
+            port = _wait(lambda: _port(info["state"]), 30, "the page server")
         except QAError:
             pass
         run = {"hub": hub, "no_app": True, "workspace": info["ws"], "bise": bise, "app_root": root, "tree": tree_info(root),
@@ -801,8 +801,33 @@ def _hub():
         raise QAError("no throwaway hub: launch() (hub fake or model) first")
     sys.path.insert(0, os.path.join(REPO, "tests"))
     import e2e  # noqa: E402
-    c = e2e.Client(os.path.join(info["state"], "hub.sock"))
+    # one client per hub socket: page_meta and the polls called this every few
+    # seconds and each call left a socket and its reader open (ambient-pm m_5837:
+    # Errno 24 under a 256-file limit)
+    sock = os.path.join(info["state"], "hub.sock")
+    c = _CLIENTS.get(sock)
+    if c is None or getattr(c, "_dead", False):
+        c = _CLIENTS[sock] = e2e.Client(sock)
     return c, info
+
+
+_CLIENTS = {}
+
+
+def _port(state):
+    with open(os.path.join(state, "pages.port")) as f:
+        return int(f.read().strip())
+
+
+def raise_file_limit(want=10240):
+    """The soft open-files limit up to `want` (a launchd shell starts at 256),
+    as amb-mac did for the hub; the hard limit caps it."""
+    import resource
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    new = want if hard == resource.RLIM_INFINITY else min(want, hard)
+    if soft < new:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (new, hard))
+    return resource.getrlimit(resource.RLIMIT_NOFILE)[0]
 
 
 def _http(port, method, path, body=None, headers=None, tries=7):   # 7 tries: ~10 s (ambient-pm m_5763)
@@ -871,7 +896,7 @@ def page_publish(file=None, id="weekly-update", title="weekly update", done=None
     c.say("[[bash: %s]]" % cmd)
     page = _wait(lambda: next((p for p in c.state.get("pages", []) if p["id"] == id and p.get("version", 0) > before.get(id, 0)), None),
                  timeout, "page %s published (main's lines: %s)" % (id, c.lines("main")[-3:]))
-    port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
+    port = _port(info["state"])
     return {"id": id, "version": page.get("version"), "url": page.get("url"), "port": port, "pages_url": "http://127.0.0.1:%d/" % port}
 
 
@@ -881,7 +906,7 @@ def page_notes(id, notes, send=False):
     the page's agent. A note: {block, kind: note|keep|drop|unsure|edit|voice|pin,
     quote?, text?, before?, after?}."""
     _, info = _hub()
-    port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
+    port = _port(info["state"])
     st, body = _http(port, "GET", "/p/%s" % id)
     if st != 200:
         raise QAError("GET /p/%s: %d" % (id, st))
@@ -903,7 +928,7 @@ def page_meta(id, tries=6):
     """A page's meta; a 404 is retried for a few seconds (ambient-pm m_5639:
     a watcher's republish made one GET miss, and the run stopped there)."""
     _, info = _hub()
-    port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
+    port = _port(info["state"])
     for k in range(tries):
         st, body = _http(port, "GET", "/p/%s/meta" % id)
         if st == 200:
@@ -924,7 +949,7 @@ def page_drive(id=None, url=None, steps=None, schemes=("light",), name=None, out
         if not id:
             raise QAError("page_drive needs a page id (on the throwaway hub) or a local url")
         _, info = _hub()
-        port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
+        port = _port(info["state"])
         url = "http://127.0.0.1:%d/p/%s" % (port, id)
     if isinstance(schemes, str):
         schemes = [x for x in schemes.split(",") if x]
@@ -1353,7 +1378,7 @@ def _flow_meetings(x):
     s0 = clock["start"]
     fx = json.load(open(os.path.join(FAKE_ACCOUNTS, "fixtures.json")))["sets"]["today"]["calendar"]["events"]
     when = {e["id"]: (s0 + e["start_in_min"] * 60, s0 + e["end_in_min"] * 60) for e in fx}
-    x["port"] = int(open(os.path.join(x["info"]["state"], "pages.port")).read().strip())
+    x["port"] = _port(x["info"]["state"])
     time.sleep(10)   # main takes the ask
     _until(x, x["settled"], "main done with the ask")
     timers = [l for l in c.lines() if re.search(r"\bsb every\b", l) and l.startswith(("tool #", "tool_code #"))]
@@ -1606,6 +1631,7 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
     if scenario not in SCENARIOS:
         raise QAError("scenario: %s" % ", ".join(SCENARIOS))
     sc = SCENARIOS[scenario]
+    raise_file_limit()   # a launchd shell's 256 files ran out mid-run (ambient-pm m_5837)
     bise, root = find_bise()
     build = require_commits(root, require)
     seeded = None
@@ -1684,7 +1710,7 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
             last = meta["versions"][-1]
             r["page"] = {"id": page["id"], "url": page.get("url"), "title": page.get("title"), "v1_n": last["n"],
                          "blocks": [{"id": b["id"], "kit": b["kit"]} for b in last.get("blocks", [])]}
-            port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
+            port = _port(info["state"])
             st, body = _http(port, "GET", "/p/%s/v/%d/body" % (page["id"], last["n"]))
             open(os.path.join(d, "v%d.body.html" % last["n"]), "w").write(body)
             if sc.get("flow") in FLOWS:
