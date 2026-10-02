@@ -74,7 +74,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 FIXTURES = os.path.join(HERE, "providers")
 LOG = os.environ.get("FAKE_LOG", "/tmp/sb-fake.log")
 FAMILIES = ("anthropic", "openai-chat", "openai-responses", "gemini")
-MARK = re.compile(r"\[\[(bash|skill|edit|write_file|apply_patch): (.*?)\]\]", re.S)
+MARK = re.compile(r"\[\[(bash|skill|edit|write_file|apply_patch|run_typescript): (.*?)\]\]", re.S)
 INNER = re.compile(r"\{\{(bash): (.*?)\}\}", re.S)
 THINK = re.compile(r"\[\[think: (.*?)\]\]", re.S)
 ERROR = re.compile(r"\[\[error: (\w+)(?: x(\d+))?(?: retry=(\d+))?\]\]")
@@ -292,6 +292,10 @@ def reply_for(conv, seen=0):
     if calls_done < len(marks):
         tool, arg = marks[calls_done]
         args = {"name": arg.strip()} if tool == "skill" else {"arg": arg.strip()}
+        # `[[run_typescript: CODE]]`: a connector call from the sandbox
+        # (tools.gmail.create_draft: the approvals gate sees gmail.create_draft)
+        if tool == "run_typescript":
+            args = {"code": arg.strip(), "description": "a scripted call"}
         # `[[edit: JSON]]`, `[[write_file: JSON]]`: Vibe's edit tools
         # take JSON args (approvals-edit)
         if tool in ("edit", "write_file"):

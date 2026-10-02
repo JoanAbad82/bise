@@ -80,7 +80,7 @@ impl Timer {
     /// The timer in the hub's state (amb-mac's menu, m_5435).
     pub fn json(&self) -> Value {
         let mut v = json!({"id": self.id, "agent": self.agent, "label": self.sched.label(), "text": self.text,
-                           "by": self.by, "next_ms": self.next_ms, "fired": self.fired});
+                           "by": self.by, "next_ms": self.next_ms, "fired": self.fired, "last_ms": self.last_ms});
         if let Some(u) = self.until_ms {
             v["until_ms"] = json!(u);
         }
