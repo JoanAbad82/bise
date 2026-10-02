@@ -145,6 +145,7 @@ state, costs credits) with the fake accounts only:
 | `inbox` | go through my mail, draft replies, don't send |
 | `offsite` | plan the offsite: the venue we decided, the budget, and an agenda for the two days, from my mail and Slack |
 | `launch-watch` | watch the launch until tomorrow, tell me what needs an answer (no notes: after v1 it ticks once, the page must republish with the new comments that need an answer; any write or a card not about such a comment fails) |
+| `morning` | make today's morning page (`--headless` only; roadmap E: first a scripted hub seeds the night with no credits: fix-csv done with PR #241, a cookie-banner question card, the inbox review with unsent replies, the domain plan with his steps, the launch watch and its 30 min timer; then the model hub reuses that state with the `today` set: meetings 15, 60 and 150 min after the hub's start, Granola notes, people.md. Checks: id `morning-<today>`, no review, question or sources, 5 headings at most, every line outside the meetings links to `/p/<page>#<item>` or https, each meeting's brief 3 lines at most, all three meetings and the night's five items there, outbox empty) |
 
 Roadmap A's inputs: a fake `tools.kit.*` (subscriber_count 1204,
 list_broadcasts, broadcast_stats, create_draft → a draft url, written to

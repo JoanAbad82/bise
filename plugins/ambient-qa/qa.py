@@ -236,7 +236,30 @@ def _read(path):
 SCRIPTED_VARS = ("BEND_PROVIDER_URL", "BEND_MODEL", "MISTRAL_API_KEY", "BISE_APPROVALS")
 
 
-def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask=""):
+class _ReusedEnv:
+    """e2e.Env's shape on an existing throwaway (its ws, st, outbox, clock):
+    no scripted provider; close() stops the hub and deletes the throwaway."""
+
+    def __init__(self, tmp, e2e):
+        self.tmp, self.ws, self.state, self.hub, self.keep = tmp, os.path.join(tmp, "ws"), os.path.join(tmp, "st"), None, False
+        self._e2e = e2e
+        self.env = {**e2e.host_env(), "SB_STATE_DIR": self.state,
+                    "BEND_MCP_INDEX": os.path.join(tmp, "mcp-index.txt"), "BEND_SKILLS_INDEX": os.path.join(tmp, "skills-index.txt"),
+                    "BEND_BG_ROOT": os.path.join(tmp, "bg"), "BEND_SESSIONS_DIR": os.path.join(tmp, "bise", "sessions"),
+                    "BEND_BG_AFTER": "30", "SB_ONBOARDING": "off"}
+
+    def close(self):
+        if self.hub:
+            try:
+                self._e2e.Client(os.path.join(self.state, "hub.sock")).send({"op": "stop_hub"})
+                self.hub.wait(timeout=20)
+            except Exception:  # noqa: BLE001
+                self.hub.kill()
+        if not self.keep:
+            shutil.rmtree(self.tmp, ignore_errors=True)
+
+
+def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="", keep=False, reuse=None):
     """Runs detached (`qa.py _hub`): a throwaway hub on a fresh git repo,
     until SIGTERM. fake: tests/e2e.py's scripted provider, main answers
     "ack: <your words>" (`[[bash: ...]]` in what you say scripts it more).
@@ -248,7 +271,22 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="")
     tempfile.tempdir = tmp
     import e2e  # noqa: E402
     e2e.EXE = bise
-    E = e2e.Env()
+    if reuse:
+        # a seeded hub's state, now on another provider (run morning: seeded
+        # scripted, asked on the model): the same workspace, state and outbox
+        E = _ReusedEnv(reuse, e2e)
+        for f in ("hub.sock", "pages.port"):   # the seeded hub's, gone with it: wait for the new ones
+            try:
+                os.unlink(os.path.join(E.state, f))
+            except OSError:
+                pass
+    else:
+        E = e2e.Env()
+    if keep:
+        # kept for the next hub (run morning reuses it): e2e.Env reads SB_KEEP at close
+        # (this daemon's own environment; E.env, the hub's, is already built without it)
+        E.keep = True
+        os.environ["SB_KEEP"] = "1"
     # the app root's own sb-core (e2e's host_env drops the caller's SB_CORE_BIN):
     # the same tree as repl-live (ambient-lead m_4915)
     root = os.environ.get("BISE_APP_ROOT")
@@ -277,8 +315,9 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="")
         E.env["FAKE_ACCOUNTS_OUTBOX"] = os.path.join(E.tmp, "outbox.jsonl")
         # the launch's clock: batch 0 now, then `qa.py tick` or every AMBIENT_QA_TICK_MIN minutes (0: ticks only)
         clock = os.path.join(E.tmp, "fake-clock.json")
-        with open(clock, "w") as f:
-            json.dump({"start": time.time(), "ticks": [], "every_min": float(os.environ.get("AMBIENT_QA_TICK_MIN") or 30)}, f)
+        if not os.path.exists(clock):   # a reused throwaway keeps its clock
+            with open(clock, "w") as f:
+                json.dump({"start": time.time(), "ticks": [], "every_min": float(os.environ.get("AMBIENT_QA_TICK_MIN") or 30)}, f)
         E.env["FAKE_ACCOUNTS_CLOCK"] = clock
         # a run's own data (fixtures' sets: today = the meetings around now, Granola's notes, people.md)
         sets = os.environ.get("AMBIENT_QA_SET") or ""
@@ -319,6 +358,7 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="")
         c = e2e.Client(sock)
         c.wait_status("main", "idle", 120)
         info = {"pid": os.getpid(), "kind": kind, "connectors": bool(connectors), "computer": bool(computer), "approved_by_user": user_ask or None, "tmp": E.tmp, "ws": E.ws, "state": E.state, "bise": bise,
+                "sets": os.environ.get("AMBIENT_QA_SET") or "", "keep": bool(keep), "reused": bool(reuse),
                 "env": {k: E.env[k] for k in ("SB_STATE_DIR",)}}
         with open(HUB + ".tmp", "w") as f:
             json.dump(info, f)
@@ -431,10 +471,11 @@ def hub_plugins_state(dir_, computer=False, keep_user=False):
     return path
 
 
-def _start_hub(bise, root, kind="fake", connectors=False, computer=False, user_ask=""):
+def _start_hub(bise, root, kind="fake", connectors=False, computer=False, user_ask="", keep=False, reuse=None, sets=""):
     old = _read(HUB)
     if old and _pid_alive(old.get("pid")):
-        if (old.get("kind", "fake"), old.get("bise"), bool(old.get("connectors")), bool(old.get("computer"))) == (kind, bise, bool(connectors), bool(computer)):
+        same = (old.get("kind", "fake"), old.get("bise"), bool(old.get("connectors")), bool(old.get("computer")), old.get("sets", "")) == (kind, bise, bool(connectors), bool(computer), sets)
+        if same and not keep and not reuse:
             return old
         _stop_hub()
     os.makedirs(QA_DIR, exist_ok=True)
@@ -443,7 +484,9 @@ def _start_hub(bise, root, kind="fake", connectors=False, computer=False, user_a
     env = {k: v for k, v in os.environ.items() if not k.startswith("SB_") and k not in ("BISE_ROLE", "BISE_EXPORTS_FOR")}
     env["BISE_APP_ROOT"] = root    # e2e.Env passes it on to the hub: its repl-live
     env["AMBIENT_QA_DIR"] = QA_DIR  # without SB_AGENT the daemon would pick another QA dir
+    env["AMBIENT_QA_SET"] = sets
     p = subprocess.Popen([sys.executable, "-u", os.path.realpath(__file__), "_hub", "--bise", bise, "--kind", kind]
+                         + (["--keep"] if keep else []) + (["--reuse", reuse] if reuse else [])
                          + (["--connectors"] if connectors else []) + (["--computer"] if computer else [])
                          + (["--real-accounts-approved-by-user", user_ask] if user_ask else []),
                          stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True, cwd=REPO, env=env)
@@ -736,7 +779,21 @@ def _hub():
     return c, info
 
 
-def _http(port, method, path, body=None, headers=None):
+def _http(port, method, path, body=None, headers=None, tries=5):
+    """One request to the hub's page server; a GET whose connection drops
+    (reset, refused, closed: the server under a republish and a timer's
+    wake, ambient-pm m_5709) is tried again a few times, never a POST."""
+    import http.client
+    for k in range(tries if method == "GET" else 1):
+        try:
+            return _http_once(port, method, path, body, headers)
+        except (ConnectionError, http.client.RemoteDisconnected, http.client.BadStatusLine, socket.timeout):
+            if method != "GET" or k == tries - 1:
+                raise
+            time.sleep(0.5 * (k + 1))
+
+
+def _http_once(port, method, path, body=None, headers=None):
     import http.client
     c = http.client.HTTPConnection("127.0.0.1", port, timeout=15)
     h = {"Host": "127.0.0.1:%d" % port}
@@ -909,6 +966,10 @@ SCENARIOS.update({
     "feedback": {"ask": "Benjamin's bug reports in #acme-feedback: handle them so adoption is easy", "no_send": True, "notes": False, "flow": "feedback"},
     # roadmap D (amb-core 527fa441): a step-by-step plan, bise ticks its own, a card per step of his when its turn comes
     "checklist": {"ask": "check my mail and give me a step by step to buy the domain", "no_send": True, "notes": False, "flow": "checklist"},
+    # roadmap E (amb-kit m_5643): a seeded night (a PR done, a question card, unsent replies,
+    # his domain steps, the launch watch), then the morning page from it; nothing leaves
+    "morning": {"ask": "make today's morning page", "no_send": True, "no_writes": True, "notes": False,
+                "set": "today", "seed": "morning", "flow": "morning"},
 })
 
 
@@ -1050,7 +1111,143 @@ def _flow_checklist(x):
         r["fails"].append("steps neither done nor ticked: %s" % ", ".join(left))
 
 
-FLOWS = {"newsletter": _flow_newsletter, "feedback": _flow_feedback, "checklist": _flow_checklist}
+COOKIE_QUESTION = """<section data-kit="heading" data-id="title">
+  <h1>the cookie banner</h1>
+  <p>one decision before the banner ships</p>
+</section>
+
+<section data-kit="question" data-id="q1">
+  <p>who sees the cookie banner?</p>
+  <ol>
+    <li>everyone, opt-in</li>
+    <li>only visitors from the EU</li>
+  </ol>
+</section>
+"""
+
+KIT_EXAMPLES = os.path.join(REPO, "apps", "ambient", "kit", "examples")
+
+
+def _seed_morning(info, timeout=600):
+    """roadmap E's night, on the scripted hub (amb-kit m_5643): an agent done
+    with its PR, an agent asking a question (a card), the inbox review with
+    replies not sent, the domain plan with his steps, the launch watch and
+    its timer. The model hub then reuses this state and makes the morning page."""
+    c, _ = _hub()
+    _wait(lambda: c.state, 30, "the seeded hub's state")
+    seed = os.path.join(info["tmp"], "seed")
+    os.makedirs(seed, exist_ok=True)
+    q = os.path.join(seed, "cookie-question.html")
+    open(q, "w").write(COOKIE_QUESTION)
+    ex = lambda n: os.path.join(KIT_EXAMPLES, n)
+    says = [
+        '/new fix-csv: {{bash: sb report done "CSV export keeps the due dates: PR https://github.test/acme/app/pull/241"}}',
+        '/new cookies: {{bash: sb page publish %s --id cookie-question --title "the cookie banner"}}' % q,
+        '[[bash: sb card "the cookie banner: everyone opt-in, or only the EU? (page cookie-question)"]]',
+        '[[bash: sb page publish %s --id inbox --title "your inbox"]]' % ex("inbox-review.html"),
+        '[[bash: sb page publish %s --id domain --title "buy the domain"]]' % ex("buy-domain.html"),
+        '[[bash: sb page publish %s --id launch-watch --title "the launch"]]' % ex("launch-watch.html"),
+        '[[bash: sb every 30m "check the launch, republish launch-watch" --page launch-watch]]',
+    ]
+    for s in says:
+        c.wait_idle("main", timeout=timeout)
+        n0 = len(c.lines("main"))
+        c.say(s)
+        if s.startswith("/new "):
+            # no turn of main's: the agent itself, then its own scripted turn
+            name = s[5:].split(":")[0]
+            _wait(lambda: c.agent(name), timeout, "agent " + name)
+            _wait(lambda: any(l.strip().startswith("obs: turn_done") for l in c.lines(name)), timeout, name + "'s turn")
+            c.wait_idle("main", timeout=timeout)
+            continue
+        _wait(lambda: any(l.strip().startswith("obs: turn_done") for l in c.lines("main")[n0:]), timeout, "main's turn on: " + s[:60])
+        # a step that fails fails the seed at once (a bise older than the kit's lint or sb every)
+        bad = [l for l in c.lines("main")[n0:] if re.match(r"tool_result #\d+ fail", l)]
+        if bad:
+            raise QAError("the seed's step failed: %s -> %s (a stale bise? pass --bise or AMBIENT_QA_BISE built at ambient-app's tip)" % (s[:80], bad[0][:300]))
+    want = {"cookie-question", "inbox", "domain", "launch-watch"}
+    pages = lambda: {p["id"] for p in (c.state or {}).get("pages", [])}
+    try:
+        _wait(lambda: want <= pages() and c.agent("fix-csv") and c.agent("cookies") and c.cards()
+              and all(a.get("status") in ("idle", "done", "blocked") for a in c.state.get("agents", [])), timeout, "the seed")
+    except QAError:
+        raise QAError("the seed didn't settle in %d s: pages %s (want %s), agents %s, %d card(s); main's last lines: %s"
+                      % (timeout, sorted(pages()), sorted(want), [(a["name"], a.get("status")) for a in (c.state or {}).get("agents", [])],
+                         len(c.cards()), " | ".join(l[:160] for l in c.lines("main")[-6:])))
+    return {"pages": sorted(pages()), "agents": [(a["name"], a.get("status")) for a in c.state.get("agents", [])],
+            "cards": [cd.get("text") for cd in c.cards()]}
+
+
+SEEDS = {"morning": _seed_morning}
+
+
+def _sections(body):
+    """A page body's sections: kit, id, inner html."""
+    out = []
+    for s in re.finditer(r"<section([^>]*)>(.*?)</section>", body or "", re.S):
+        k = re.search(r'data-kit="([^"]+)"', s.group(1))
+        i = re.search(r'data-id="([^"]+)"', s.group(1))
+        out.append({"kit": k.group(1) if k else "", "id": i.group(1) if i else "", "html": s.group(2)})
+    return out
+
+
+# what the seeded night must show on the morning page (a word of each, lower case)
+MORNING_TRUTH = {"the cookie question": ("cookie",), "the inbox replies": ("inbox",), "his domain steps": ("domain",),
+                 "the CSV PR": ("241", "fix-csv", "csv"), "the launch watch": ("launch-watch", "launch")}
+MORNING_MEETINGS = {"e401": ("renewal", "northwind"), "e402": ("sync",), "e403": ("yann", "coffee")}
+
+
+def morning_check(body, page_id, today=None):
+    """roadmap E's page laws (bise-pages morning.md) on a body: the id of
+    today, four parts at most (no review, question or sources), every line
+    outside the meetings links to its place, a meeting's brief 3 lines at
+    most, and the seeded night all there. Returns (facts, fails)."""
+    today = today or time.strftime("%Y-%m-%d")
+    fails, secs = [], _sections(body)
+    if page_id != "morning-" + today:
+        fails.append("page id %s (morning-%s expected)" % (page_id, today))
+    bad = sorted({s["kit"] for s in secs if s["kit"] in ("review", "question", "sources")})
+    if bad:
+        fails.append("blocks the morning page never has: %s" % ", ".join(bad))
+    heads = [s for s in secs if s["kit"] == "heading"]
+    if len(heads) > 5:
+        fails.append("%d headings (the title and 4 parts at most)" % len(heads))
+    meetings, unlinked = {}, []
+    for s in secs:
+        if s["kit"] != "prose":
+            continue
+        lis = re.findall(r"<li[^>]*>(.*?)</li>", s["html"], re.S)
+        if re.search(r"<p[^>]*>\s*<strong>", s["html"]):
+            low = re.sub(r"<[^>]+>", " ", s["html"]).lower()
+            ev = next((e for e, ws in MORNING_MEETINGS.items() if any(w in low for w in ws)), s["id"])
+            meetings[ev] = len(lis)
+            continue
+        unlinked += [re.sub(r"<[^>]+>", "", li).strip()[:60] for li in lis
+                     if not re.search(r'<a [^>]*href="(/p/[^"]+|https://[^"]+)"', li)]
+    if unlinked:
+        fails.append("%d line(s) without a link to their place: %s" % (len(unlinked), "; ".join(unlinked[:3])))
+    long_ = {e: n for e, n in meetings.items() if n > 3}
+    if long_:
+        fails.append("meeting briefs over 3 lines: %s" % long_)
+    missing_m = [e for e in MORNING_MEETINGS if e not in meetings]
+    if missing_m:
+        fails.append("meetings missing: %s" % ", ".join(missing_m))
+    low = (body or "").lower()
+    missing = [k for k, ws in MORNING_TRUTH.items() if not any(w in low for w in ws)]
+    if missing:
+        fails.append("the night's items missing: %s" % ", ".join(missing))
+    return {"headings": len(heads), "kits": [s["kit"] for s in secs], "meetings": meetings, "unlinked": unlinked,
+            "found": [k for k in MORNING_TRUTH if k not in missing], "missing": missing}, fails
+
+
+def _flow_morning(x):
+    """E: the morning page of the seeded night, checked against morning.md."""
+    facts, fails = morning_check(x["body"], x["page"]["id"])
+    x["r"]["flow"] = facts
+    x["r"]["fails"] += fails
+
+
+FLOWS = {"newsletter": _flow_newsletter, "feedback": _flow_feedback, "checklist": _flow_checklist, "morning": _flow_morning}
 
 
 def _covered(body, items):
@@ -1257,17 +1454,30 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
     sc = SCENARIOS[scenario]
     bise, root = find_bise()
     build = require_commits(root, require)
+    seeded = None
+    if sc.get("seed") and not headless:
+        raise QAError("run %s seeds a scripted hub first: --headless only" % scenario)
     if headless:
         if alive():
             raise QAError("a QA app is running: stop it first (qa.py stop), or run without --headless")
-        info = _start_hub(bise, root, "model")
+        if sc.get("seed"):
+            # the night on a scripted hub (no credits), kept; then the model hub on its state
+            s_info = _start_hub(bise, root, "fake", keep=True, sets=sc.get("set", ""))
+            try:
+                seeded = SEEDS[sc["seed"]](s_info)
+            finally:
+                _stop_hub()
+            info = _start_hub(bise, root, "model", reuse=s_info["tmp"], sets=sc.get("set", ""))
+        else:
+            info = _start_hub(bise, root, "model", sets=sc.get("set", ""))
     else:
         launch(hub="model", restart=True)
         info = _read(HUB)
     d = out or os.path.join(OUT, "runs", "%s-%s" % (scenario, time.strftime("%Y%m%d-%H%M%S")))
     os.makedirs(d, exist_ok=True)
     r = {"scenario": scenario, "ask": sc["ask"], "headless": headless, "at": time.strftime("%Y-%m-%d %H:%M"), "dir": d, "tree": dict(tree_info(root), required=build["required"]),
-         "t": {}, "main_lines": [], "cards": [], "page": None, "notes": [], "fails": [], "load": {"start": round(os.getloadavg()[0], 1)}}
+         "t": {}, "main_lines": [], "cards": [], "page": None, "notes": [], "fails": [], "load": {"start": round(os.getloadavg()[0], 1)},
+         "seeded": seeded}
     c, _ = _hub()
     core = None
     try:
@@ -1638,6 +1848,69 @@ def scenes(only=None, backdrops=("dark",), out=None, at=None, what="both", cols=
     return result
 
 
+QA_DEFAULTS = "dev.bise.ambient.qa"   # the QA app's own defaults (App.swift: UserDefaults(suiteName:)), never the user's
+
+
+def _qa_defaults(*args):
+    return subprocess.run(["defaults"] + list(args), capture_output=True, text=True)
+
+
+def hello(every=300, span=3000, reduce=False, backdrop="dark", out=None):
+    """The hello, once ever (amb-mac f3d076aa, amb-web 439320e9), as the app
+    really says it: the QA defaults forget 'saidHello' and ask for a first
+    run (qa.firstRun: the app says hello only then in QA), the app restarts
+    on the same hub, Accessibility is granted through the page's own
+    app_perm 'continue' (App's fake prompt: granted -> helloSoon, 0.6 s),
+    then a frame every `every` ms from app_hello for `span` ms, and a sheet.
+    After: qa.firstRun cleared and the app restarted with every permission
+    on, so the other scenes never meet the hello. Needs a launched app."""
+    if not alive():
+        raise QAError("no QA app: launch() first")
+    hub = (_read(RUN) or {}).get("hub", "fake")
+    out = out or os.path.join(OUT, "hello-%s" % time.strftime("%Y%m%d-%H%M%S"))
+    os.makedirs(out, exist_ok=True)
+    stop(keep_hub=True)
+    _qa_defaults("write", QA_DEFAULTS, "qa.firstRun", "-bool", "true")
+    for k in ["saidHello"] + ["%s.%s" % (w, p) for w in ("asked", "told") for p in ("accessibility", "mic", "screen")]:
+        _qa_defaults("delete", QA_DEFAULTS, k)
+    r = {"dir": out, "frames": [], "reduce": bool(reduce)}
+    try:
+        launch(hub=hub, backdrop=backdrop, restart=True)
+        if reduce:
+            look(reduce=True)
+        n0 = len(events(2000)["events"])
+        call("cmd", cmd={"cmd": "app_perm", "perm": "accessibility", "do": "continue"})
+        t_hello = None
+        t0 = time.time()
+        while time.time() - t0 < 10 and t_hello is None:
+            if any(e["ev"].get("ev") == "app_hello" for e in events(2000)["events"][n0:]):
+                t_hello = time.time()
+            time.sleep(0.03)
+        if t_hello is None:
+            raise QAError("no app_hello within 10 s of Accessibility granted: is the app built at f3d076aa or later? (events: %s)"
+                          % [e["ev"].get("ev") or e["ev"].get("cmd") for e in events(2000)["events"][n0:]][-12:])
+        r["hello_after_grant_ms"] = int((t_hello - t0) * 1000)
+        for k in range(int(span // every) + 1):
+            wait = t_hello + k * every / 1000.0 - time.time()
+            if wait > 0:
+                time.sleep(wait)
+            at = int((time.time() - t_hello) * 1000)
+            s = snapshot("panel", name="hello-%02d-%04dms" % (k, at), out=out)
+            r["frames"].append({"at_ms": at, "path": s.get("panel") or s.get("path")})
+        evs = events(2000)["events"][n0:]
+        r["content"] = [(e["ev"].get("kind")) for e in evs if e["ev"].get("cmd") == "app_content"]
+        tiles = [{"path": f["path"], "label": "%d ms" % f["at_ms"]} for f in r["frames"] if f["path"]]
+        if tiles:
+            r["sheet"] = os.path.join(out, "hello-sheet.png")
+            call("sheet", items=tiles, out=r["sheet"], cols=6, tile_w=320,
+                 title="bise ambient · the hello · every %d ms%s" % (every, " · reduced motion" if reduce else ""), timeout=120)
+    finally:
+        _qa_defaults("delete", QA_DEFAULTS, "qa.firstRun")
+        stop(keep_hub=True)
+        launch(hub=hub, backdrop=backdrop, restart=True)
+    return r
+
+
 def play(events, shots=(), name="play", backdrop=None, out=None, mute_core=True):
     """A custom timeline: [[ms, ev], ...], shots [{at, what}] (ms)."""
     out = out or os.path.join(OUT, "play")
@@ -1679,6 +1952,9 @@ def _cli(argv):
     p.add_argument("--states", help="menubar: a subset, comma-separated"); p.add_argument("--frames", type=int, default=1, help="menubar: successive frames of a moving mood")
     p.add_argument("--count", type=int, default=2, help="menubar: the need state's count")
     p = sub.add_parser("pearl", help="every pearl frame amb-mac plays, per mood, at 1x and 2x"); p.add_argument("--out")
+    p = sub.add_parser("hello", help="the hello as the app says it (first run, Accessibility granted): frames from app_hello, a sheet")
+    p.add_argument("--every", type=int, default=300); p.add_argument("--span", type=int, default=3000); p.add_argument("--reduce-motion", action="store_true")
+    p.add_argument("--backdrop", default="dark"); p.add_argument("--out")
     sub.add_parser("state"); sub.add_parser("reset"); sub.add_parser("ping"); sub.add_parser("outbox")
     p = sub.add_parser("ask", help="asks to main on the running throwaway hub, one after the other: its words, length, time, pages")
     p.add_argument("texts", nargs="*"); p.add_argument("--file", help="one ask per line"); p.add_argument("--no-capsule", action="store_true", help="as the TUI, not through a core")
@@ -1689,10 +1965,10 @@ def _cli(argv):
     p = sub.add_parser("key"); p.add_argument("k")
     p = sub.add_parser("inject"); p.add_argument("ev")
     p = sub.add_parser("_hub"); p.add_argument("--bise", required=True); p.add_argument("--kind", default="fake"); p.add_argument("--connectors", action="store_true"); p.add_argument("--computer", action="store_true")
-    p.add_argument("--real-accounts-approved-by-user", default="")
+    p.add_argument("--real-accounts-approved-by-user", default=""); p.add_argument("--keep", action="store_true"); p.add_argument("--reuse")
     a = ap.parse_args(argv)
     if a.cmd == "_hub":
-        return hub_daemon(a.bise, a.kind, a.connectors, a.computer, a.real_accounts_approved_by_user)
+        return hub_daemon(a.bise, a.kind, a.connectors, a.computer, a.real_accounts_approved_by_user, a.keep, a.reuse)
     if a.cmd == "launch":
         r = launch(a.hub, a.workspace, a.bise, a.web, a.backdrop, a.force_build, a.restart, a.connectors, a.computer, a.real_accounts_approved_by_user, a.no_app)
     elif a.cmd == "stop":
@@ -1727,6 +2003,8 @@ def _cli(argv):
         r = say(a.text, wait_answer=not a.no_wait)
     elif a.cmd == "pearl":
         r = pearl(a.out)
+    elif a.cmd == "hello":
+        r = hello(a.every, a.span, a.reduce_motion, a.backdrop, a.out)
     elif a.cmd == "snapshot" and a.menubar:
         r = menubar(a.states, a.frames, a.count, a.out)
     elif a.cmd == "snapshot":

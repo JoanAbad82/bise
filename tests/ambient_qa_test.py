@@ -322,6 +322,73 @@ def page_drive_local_only():
 
 
 @test
+def morning_page_laws():
+    """run morning: the page laws of morning.md, a good page passes, each law fails alone"""
+    good = """<section data-kit="heading" data-id="title"><h1>your saturday</h1><p>3 need you</p></section>
+<section data-kit="heading" data-id="h-needs"><h2>needs you</h2></section>
+<section data-kit="prose" data-id="needs"><ul>
+<li><a href="/p/cookie-question#q1">the cookie banner</a> · a card</li>
+<li><a href="/p/inbox#m2">reply to Marc</a> · inbox</li>
+<li><a href="/p/domain#s2">sign in to the registrar</a> · yours</li></ul></section>
+<section data-kit="heading" data-id="h-done"><h2>done overnight</h2></section>
+<section data-kit="prose" data-id="done"><ul><li>fix-csv: <a href="https://github.test/acme/app/pull/241">PR #241</a></li></ul></section>
+<section data-kit="heading" data-id="h-today"><h2>today</h2></section>
+<section data-kit="prose" data-id="m1"><p><strong>09:15</strong> Q3 renewal with Northwind · Hélène Roux</p><ul><li>a</li><li>b</li><li>c</li></ul></section>
+<section data-kit="prose" data-id="m2"><p><strong>10:00</strong> Team sync</p><ul><li>weekly</li></ul></section>
+<section data-kit="prose" data-id="m3"><p><strong>11:30</strong> Coffee with Yann</p><ul><li>no notes from last time</li></ul></section>
+<section data-kit="heading" data-id="h-watched"><h2>watched</h2></section>
+<section data-kit="prose" data-id="watched"><ul><li><a href="/p/launch-watch">the launch</a> · 2 need a reply</li></ul></section>"""
+    facts, fails = qa.morning_check(good, "morning-2026-10-03", today="2026-10-03")
+    check(not fails and facts["meetings"] == {"e401": 3, "e402": 1, "e403": 1}, (facts, fails))
+    _, f = qa.morning_check(good, "morning", today="2026-10-03")
+    check(len(f) == 1 and "page id" in f[0], f)
+    _, f = qa.morning_check(good.replace('<a href="/p/inbox#m2">reply to Marc</a>', "reply to Marc"), "morning-2026-10-03", today="2026-10-03")
+    check(len(f) == 1 and "without a link" in f[0], f)
+    _, f = qa.morning_check(good.replace("<li>c</li>", "<li>c</li><li>d</li>"), "morning-2026-10-03", today="2026-10-03")
+    check(len(f) == 1 and "over 3 lines" in f[0], f)
+    _, f = qa.morning_check(good + '<section data-kit="sources" data-id="s"><ol><li>x</li></ol></section>', "morning-2026-10-03", today="2026-10-03")
+    check(len(f) == 1 and "sources" in f[0], f)
+    _, f = qa.morning_check(good.replace("Coffee with Yann", "a walk"), "morning-2026-10-03", today="2026-10-03")
+    check(len(f) == 1 and "e403" in f[0], f)
+    _, f = qa.morning_check(good.replace("cookie", "banner"), "morning-2026-10-03", today="2026-10-03")
+    check(len(f) == 1 and "the cookie question" in f[0], f)
+    sc = qa.SCENARIOS["morning"]
+    check(sc["seed"] in qa.SEEDS and sc["flow"] in qa.FLOWS and sc["no_writes"] and sc["set"] == "today", sc)
+    for n in ("inbox-review.html", "buy-domain.html", "launch-watch.html"):
+        check(os.path.exists(os.path.join(qa.KIT_EXAMPLES, n)), n)
+
+
+@test
+def http_retries_a_reset():
+    """the page server's GET: a reset connection is tried again (ambient-pm m_5709), a POST never"""
+    import struct
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(4)
+    port = srv.getsockname()[1]
+    seen = []
+
+    def serve():
+        while True:
+            c, _ = srv.accept()
+            c.recv(4096)
+            seen.append(1)
+            if len(seen) in (1, 3):   # the first GET and the POST: a reset
+                c.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            else:
+                c.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+            c.close()
+    threading.Thread(target=serve, daemon=True).start()
+    check(qa._http(port, "GET", "/p/x/meta") == (200, "ok") and len(seen) == 2, seen)
+    try:
+        qa._http(port, "POST", "/p/x/notes", body={})
+        check(False, "a POST was retried or passed")
+    except ConnectionError:
+        check(len(seen) == 3, seen)
+    srv.close()
+
+
+@test
 def client_protocol():
     """the socket client: one JSON line each way, ids matched, errors raised"""
     d = tempfile.mkdtemp(prefix="aq-", dir="/tmp" if len(tempfile.gettempdir()) > 60 else None)
