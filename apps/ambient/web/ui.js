@@ -33,6 +33,7 @@
         <div class="sees" aria-hidden="true"></div>
         <div class="chips" aria-hidden="true"></div>
         <div class="rows"></div>
+        <div class="set"></div>
         <div class="more" aria-hidden="true"></div>
         <div class="spot"><input type="text" spellcheck="false" autocomplete="off"><div class="keys" aria-hidden="true"></div></div>
         <div class="perm"><p></p><button type="button" data-do="continue"></button><button type="button" class="later" data-do="not_now"></button></div>
@@ -41,7 +42,7 @@
     <div class="note" id="note"></div>`;
   const cap = $("#cap", host), note = $("#note", host), tx = $(".tx", cap);
   const sayEl = $(".say", tx), pearlCv = $(".pearl", cap);
-  const el = { lab: $(".lab", tx), line: $(".line", tx), words: $(".words", tx), ask: $(".ask", tx), sub: $(".sub", tx), sees: $(".sees", tx), chips: $(".chips", tx), rows: $(".rows", tx), more: $(".more", tx), spot: $(".spot", tx), perm: $(".perm", tx) };
+  const el = { lab: $(".lab", tx), line: $(".line", tx), words: $(".words", tx), ask: $(".ask", tx), sub: $(".sub", tx), sees: $(".sees", tx), chips: $(".chips", tx), rows: $(".rows", tx), set: $(".set", tx), more: $(".more", tx), spot: $(".spot", tx), perm: $(".perm", tx) };
   const input = $("input", el.spot);
   const pearl = AmbPearl.create($(".pearl", cap));
 
@@ -174,6 +175,18 @@
         : qs.join("");
       el.rows.scrollTop = 0;
     });
+    // fn + , : the settings, one glass row per toggle (a switch), then the windows bise never sees
+    put("set", JSON.stringify(v.settings), () => {
+      show(el.set, v.settings);
+      const s = v.settings;
+      if (!s) { el.set.innerHTML = ""; return; }
+      const tg = s.rows.map((r) => `<button type="button" class="tg${r.on ? " on" : ""}" role="switch" aria-checked="${r.on}" data-setting="${esc(r.key)}"><span class="lb">${esc(r.label)}</span><span class="sw" aria-hidden="true"></span>${r.note ? `<span class="nt">${esc(r.note)}</span>` : ""}</button>`);
+      const sk = s.skip.map((x) => `<div class="sk"><span class="nm">${esc(x.name)}</span>${x.fixed ? "" : `<button type="button" class="rm" data-skip-remove="${esc(x.bundle)}" aria-label="${esc(s.remove)} ${esc(x.name)}">${esc(s.remove)}</button>`}</div>`);
+      el.set.innerHTML = [...tg, `<div class="sec" role="heading" aria-level="2">${esc(s.skipTitle)}</div>`, ...sk,
+        `<div class="sk always"><span class="nm">${esc(s.always)}</span></div>`,
+        ...(s.empty ? [`<div class="none">${esc(s.empty)}</div>`] : []),
+        `<button type="button" class="add" data-skip-add="1">+ ${esc(s.add)}</button>`].join("");
+    });
     put("spot", v.spot ? "on" : "", () => {
       show(el.spot, v.spot);
       if (v.spot) { input.value = v.spot.text; input.placeholder = v.spot.hint; input.setAttribute("aria-label", v.spot.hint); setTimeout(() => input.focus(), 0); }
@@ -305,6 +318,11 @@
     if (b) recv({ ev: "ui_option", card: b.dataset.card, i: +b.dataset.i });
     const p = e.target.closest(".perm button");
     if (p) recv({ ev: "ui_perm", perm: p.dataset.perm, do: p.dataset.do });
+    const st = e.target.closest("button[data-setting]");
+    if (st) recv({ ev: "ui_setting", key: st.dataset.setting });
+    const rm = e.target.closest("button[data-skip-remove]");
+    if (rm) recv({ ev: "ui_setting", key: "skip_remove", value: rm.dataset.skipRemove });
+    if (e.target.closest("button[data-skip-add]")) recv({ ev: "ui_setting", key: "skip_add" });
   });
   input.addEventListener("input", () => recv({ ev: "ui_spot_type", text: input.value }));
   input.addEventListener("keydown", (e) => {

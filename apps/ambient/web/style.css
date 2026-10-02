@@ -118,6 +118,26 @@ html:not(.app) .cap, html:not(.app) .note {
 .page.new .pm::before { content: "• "; color: #ffffffb3; }   /* white 70%: an unread page does not wait for you (ambient, m_5136) */
 /* an empty section of the full view: one dim line */
 .none { padding: 7px 4px; font-size: 13px; color: var(--dim); animation: arrive .5s var(--expo) both; }
+/* the settings (fn + ,): one row per toggle, a white switch (rose stays for what waits for you),
+   then the windows bise never sees, an app's 'remove' dim until hovered, '+ add an app' */
+.set { margin-top: 6px; }
+.set > * { animation: arrive .5s var(--expo) both; }
+.tg { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; width: 100%; text-align: left; padding: 8px 2px; border: 0; border-top: 1px solid var(--line); background: none; color: #fff; font: 14px var(--sans); cursor: pointer; }
+.tg:first-child { border-top: 0; }
+.tg .sw { position: relative; width: 30px; height: 18px; border-radius: 9px; background: #ffffff1a; box-shadow: inset 0 0 0 1px #ffffff1f; transition: background .25s var(--expo); }
+.tg .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: #ffffffa0; transition: transform .25s var(--expo), background .25s var(--expo); }
+.tg.on .sw { background: #ffffffd9; }
+.tg.on .sw::after { transform: translateX(12px); background: #2a2426; }
+.tg .nt { grid-column: 1 / -1; font-size: 12.5px; color: var(--dim); }
+.tg:focus-visible, .set button:focus-visible { outline: 1px solid #ffffff60; outline-offset: 2px; border-radius: 8px; }
+.sk { display: flex; align-items: center; justify-content: space-between; padding: 5px 2px; border-top: 1px solid var(--line); font-size: 13.5px; }
+.sk.always .nm { color: var(--dim); }
+.sk .rm { border: 0; background: none; padding: 2px 4px; font: 12px var(--sans); color: #ffffff70; cursor: pointer; }
+.sk .rm:hover { color: #fff; }
+.set .add { margin-top: 6px; border: 0; background: none; padding: 5px 2px; font: 13px var(--sans); color: #ffffffc0; cursor: pointer; }
+.set .add:hover { color: #fff; }
+.still .tg .sw, .still .tg .sw::after { transition: none; }
+
 /* a page being written, in the running rows */
 .row.page .gl { color: var(--acc); }
 

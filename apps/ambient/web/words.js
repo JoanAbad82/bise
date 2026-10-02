@@ -11,6 +11,22 @@
     quiet: "all quiet. hold fn to talk.",
     // the full view's sections (vision §3 G; best guesses, asked to ambient): what's running, and a
     // page being written in it
+    // the settings view (fn + ,; amb-mac ef4dbc2e): best guesses asked to ambient, except the empty
+    // line (ambient, via amb-mac m_5375)
+    set: {
+      title: "settings",
+      edge_glow: "the screen's edge glows while you talk",
+      right_option: "right ⌥ works like fn",
+      meeting_quiet: "stay quiet in meetings and calls",
+      voice_answers: "bise answers out loud",
+      launch_at_login: "open bise when you log in",
+      approve: "waiting for your OK in System Settings › Login Items",
+      skipTitle: "windows bise never sees",
+      privateWindows: "private browser windows",
+      empty: "none yet. password managers and private windows are never seen anyway.",
+      add: "add an app",
+      remove: "remove",
+    },
     running: "running",
     agents: "agents",
     pageWriting: "writing…",

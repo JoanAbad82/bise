@@ -29,6 +29,8 @@
   };
 
   const TURN = ["listening", "sending", "working", "speaking"];
+  // the settings view's toggles, in its order (amb-mac's app_setting keys)
+  const SETTING_KEYS = ["edge_glow", "right_option", "meeting_quiet", "voice_answers", "launch_at_login"];
 
   function init() {
     return {
@@ -235,7 +237,28 @@
         return none(m2);
       }
       case "app_settings":
-        return none({ ...m, edgeGlow: ev.edge_glow !== false, macos: ev.macos || m.macos, radius: +ev.radius > 0 ? +ev.radius : m.radius });
+        return none({ ...m, edgeGlow: ev.edge_glow !== false, macos: ev.macos || m.macos, radius: +ev.radius > 0 ? +ev.radius : m.radius,
+          // the settings view's fields (amb-mac ef4dbc2e; it keeps them and sends them after every change)
+          settings: {
+            edge_glow: ev.edge_glow !== false, right_option: !!ev.right_option, meeting_quiet: !!ev.meeting_quiet,
+            voice_answers: ev.voice_answers !== false, launch_at_login: ev.launch_at_login || "off",
+            skip: Array.isArray(ev.skip) ? ev.skip.map((s) => ({ bundle: s.bundle, name: s.name || s.bundle, fixed: !!s.fixed })) : [],
+          } });
+      // the settings view: a toggle flips (optimistic; amb-mac answers with app_settings), an app
+      // added to the skip list (amb-mac opens the macOS picker) or removed
+      case "ui_setting": {
+        const s = m.settings || {};
+        if (ev.key === "skip_add") return { m, cmds: [{ cmd: "app_setting", key: "skip_add" }] };
+        if (ev.key === "skip_remove") {
+          const it = (s.skip || []).find((x) => x.bundle === ev.value);
+          if (!it || it.fixed) return none(m);
+          return { m: { ...m, settings: { ...s, skip: s.skip.filter((x) => x !== it) } }, cmds: [{ cmd: "app_setting", key: "skip_remove", value: ev.value }] };
+        }
+        if (!SETTING_KEYS.includes(ev.key)) return none(m);
+        const on = ev.key === "launch_at_login" ? s.launch_at_login !== "on" && s.launch_at_login !== "approve" : !s[ev.key];
+        const val = ev.key === "launch_at_login" ? (on ? "approve" : "off") : on;
+        return { m: { ...m, settings: { ...s, [ev.key]: val } }, cmds: [{ cmd: "app_setting", key: ev.key, value: on }] };
+      }
       case "app_hidden": {
         // hidden (esc, fn ., a click away, the app's timers: docs/ambient-app.md §8): an open pane
         // closes, so the next timed show is never stuck behind a stale full view
@@ -343,6 +366,8 @@
       }
       case "i": return setPane(m, m.pane === "inbox" ? null : "inbox");
       case "0": return setPane(m, m.pane === "agents" ? null : "agents");
+      // fn + , (and the menu's 'settings…'): the settings view (amb-mac ef4dbc2e)
+      case ",": return setPane(m, m.pane === "settings" ? null : "settings");
       case "up": return none({ ...m, sel: Math.max(0, m.sel - 1) });
       case "down": return none({ ...m, sel: Math.min(Math.max(0, cards.length - 1), m.sel + 1) });
       case "l": {
@@ -408,7 +433,7 @@
       case "spotlight": return { kind: "type" };
       case "working": return { kind: v.words ? "answer" : "got" };
       case "speaking": case "end": return { kind: "answer" };
-      case "agents": case "inbox": case "perm": return { kind: "open" };
+      case "agents": case "inbox": case "perm": case "settings": return { kind: "open" };
       case "needs": return { kind: "needs", card: asking[0] && asking[0].id };
       case "idle": return { kind: "none" };
       // SPEC §0: never for done, failed, a page ready (they live in the menu-bar marble); an
@@ -550,6 +575,24 @@
         };
       }).concat(writingRows);
       if (ordered.some((a) => !runs(a))) v.titles.running = W.agents;
+    } else if (m.pane === "settings") {
+      // fn + , : glass rows with toggles, then the windows bise never sees (amb-mac keeps them;
+      // words: best guesses, asked to ambient; the empty line is ambient's)
+      const s = m.settings || { edge_glow: m.edgeGlow, skip: [] };
+      v.state = "settings"; v.size = "open";
+      v.label = { text: W.set.title };
+      v.settings = {
+        rows: SETTING_KEYS.map((key) => ({
+          key, label: W.set[key], on: key === "launch_at_login" ? s.launch_at_login === "on" || s.launch_at_login === "approve" : !!s[key],
+          note: key === "launch_at_login" && s.launch_at_login === "approve" ? W.set.approve : null,
+        })),
+        skipTitle: W.set.skipTitle,
+        skip: (s.skip || []).map((x) => ({ bundle: x.bundle, name: x.name, fixed: x.fixed })),
+        // private windows are always skipped: said as a fixed line (amb-mac m_5326)
+        always: W.set.privateWindows,
+        empty: (s.skip || []).some((x) => !x.fixed) ? null : W.set.empty,
+        add: W.set.add, remove: W.set.remove,
+      };
     } else if (m.pane === "inbox") {
       v.state = "inbox"; v.size = "open";
       v.label = { text: cards.length ? Wd.waiting(cards.length) : W.quiet };

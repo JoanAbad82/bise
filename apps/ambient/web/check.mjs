@@ -878,6 +878,48 @@ law("notes: a Range for a quote walks the block's text nodes, whitespace collaps
   assert.equal(r.e[0], c); assert.equal(c.nodeValue.slice(0, r.e[1]), " Q2");
 });
 
+// ---- settings (fn + ,; amb-mac ef4dbc2e)
+const SETTINGS = { ev: "app_settings", edge_glow: true, right_option: false, meeting_quiet: false, voice_answers: true, launch_at_login: "off", macos: 26, radius: 26,
+  skip: [{ bundle: "com.agilebits.onepassword7", name: "1Password", fixed: true }] };
+law("settings: fn + , opens the view (content open), again closes it; rows in amb-mac's order with their state", () => {
+  let m = M.step(M.init(), SETTINGS, 0).m;
+  m = M.step(m, { ev: "app_key", key: "," }, 10).m;
+  const v = M.view(m, 20);
+  assert.equal(v.state, "settings"); assert.equal(v.size, "open"); assert.equal(v.content.kind, "open");
+  eq(v.settings.rows.map((r) => [r.key, r.on]), [["edge_glow", true], ["right_option", false], ["meeting_quiet", false], ["voice_answers", true], ["launch_at_login", false]]);
+  assert.ok(v.settings.rows.every((r) => typeof r.label === "string" && r.label));
+  assert.equal(M.view(M.step(m, { ev: "app_key", key: "," }, 30).m, 40).state, "idle");
+  assert.equal(M.view(M.step(m, { ev: "app_hidden", on: true }, 30).m, 40).settings, undefined);
+});
+law("settings: a toggle flips at once and sends app_setting {key, value}; launch at login waits for macOS's OK", () => {
+  let m = M.step(M.step(M.init(), SETTINGS, 0).m, { ev: "app_key", key: "," }, 10).m;
+  let r = M.step(m, { ev: "ui_setting", key: "right_option" }, 20);
+  eq(r.cmds, [{ cmd: "app_setting", key: "right_option", value: true }]);
+  assert.equal(M.view(r.m, 30).settings.rows[1].on, true);
+  r = M.step(r.m, { ev: "ui_setting", key: "edge_glow" }, 40);
+  eq(r.cmds, [{ cmd: "app_setting", key: "edge_glow", value: false }]);
+  r = M.step(r.m, { ev: "ui_setting", key: "launch_at_login" }, 50);
+  eq(r.cmds, [{ cmd: "app_setting", key: "launch_at_login", value: true }]);
+  let row = M.view(r.m, 60).settings.rows[4];
+  assert.equal(row.on, true); assert.equal(row.note, W.set.approve);
+  row = M.view(M.step(r.m, { ...SETTINGS, launch_at_login: "on" }, 70).m, 80).settings.rows[4];
+  assert.equal(row.on, true); assert.equal(row.note, null);
+  eq(M.step(r.m, { ev: "ui_setting", key: "nope" }, 90).cmds, []);
+});
+law("settings: the skip list: fixed apps have no remove, private windows always said, the empty line until he adds one", () => {
+  let m = M.step(M.step(M.init(), SETTINGS, 0).m, { ev: "app_key", key: "," }, 10).m;
+  let s = M.view(m, 20).settings;
+  assert.equal(s.empty, W.set.empty); assert.equal(s.always, W.set.privateWindows);
+  eq(M.step(m, { ev: "ui_setting", key: "skip_add" }, 30).cmds, [{ cmd: "app_setting", key: "skip_add" }]);
+  eq(M.step(m, { ev: "ui_setting", key: "skip_remove", value: "com.agilebits.onepassword7" }, 30).cmds, []);
+  m = M.step(m, { ...SETTINGS, skip: [...SETTINGS.skip, { bundle: "com.tinyspeck.slackmacgap", name: "Slack" }] }, 40).m;
+  s = M.view(m, 50).settings;
+  assert.equal(s.empty, null); eq(s.skip.map((x) => [x.name, x.fixed]), [["1Password", true], ["Slack", false]]);
+  const r = M.step(m, { ev: "ui_setting", key: "skip_remove", value: "com.tinyspeck.slackmacgap" }, 60);
+  eq(r.cmds, [{ cmd: "app_setting", key: "skip_remove", value: "com.tinyspeck.slackmacgap" }]);
+  assert.equal(M.view(r.m, 70).settings.empty, W.set.empty);
+});
+
 // ---- coverage: every scene plays, every SPEC §2 state shows from contract events
 law("every scene plays without throwing, and every SPEC §2 state shows", () => {
   const seen = new Set();
