@@ -552,12 +552,29 @@ law("capsule: fn held on a bise page says `voice note on weekly update`, no `mai
   const w = M.view(m, 70);
   assert.equal(w.size, "small"); assert.equal(w.text, W.idle);
 });
+law("notes: a drawing is one note: its path (near points dropped), its box, the blocks under it top to bottom; it holds while one of them is there", () => {
+  const p = N.strokePath([[10, 10], [10.5, 10.2], [20, 10], [20, 30.04]]);
+  assert.equal(p, "M10 10 L20 10 L20 30");
+  assert.equal(N.strokePath([[5, 5]]), "M5 5 L5.1 5");
+  assert.equal(N.strokePath([]), "");
+  eq(N.strokesBox([[[10, 40], [30, 45]], [[25, 90], [5, 60]]]), { x: 5, y: 40, w: 25, h: 50 });
+  const rects = { h1: { x: 0, y: 0, w: 600, h: 30 }, p2: { x: 0, y: 40, w: 600, h: 80 }, t3: { x: 0, y: 130, w: 600, h: 200 } };
+  eq(N.blocksIn({ x: 5, y: 100, w: 25, h: 50 }, rects), ["p2", "t3"]);
+  eq(N.blocksIn({ x: 700, y: 0, w: 5, h: 5 }, rects), []);
+  const d = { kind: "draw", block: "p2", blocks: ["p2", "t3"] };
+  assert.equal(N.anchorOf(d, { t3: "x" }), "ok");
+  assert.equal(N.anchorOf(d, { h1: "x" }), "moved");
+  assert.equal(N.label({ kind: "draw", text: "this one is off" }), "✎ drawing: this one is off");
+});
+law("notes: the frame's count says nothing at 0, then `1 note` / `3 notes` (ambient, m_4868)", () => {
+  eq([N.NW.count(0), N.NW.count(1), N.NW.count(3)], ["", "1 note", "3 notes"]);
+});
 law("notes: the words (ambient's), names with spaces", () => {
   assert.equal(N.NW.listTitle("weekly update", 3), "notes for weekly update · 3");
   assert.equal(N.NW.sendBar(3, N.spaced("weekly-update")), '3 notes for weekly update · or just say "send"');
   assert.equal(N.NW.sent(N.spaced("weekly-update")), "sent. weekly update is on it.");
   assert.equal(N.NW.updating("weekly update"), "weekly update is updating this page…");
-  assert.equal(N.NW.keys, "t type   p pin   ⌘z undo   ⌘⏎ send");
+  assert.equal(N.NW.keys, "t type   p pin   d draw   ⌘z undo   ⌘⏎ send");
   assert.equal(N.NW.empty, "no notes yet. select some text, or hold fn and talk.");
 });
 // a fake DOM: text nodes and elements, enough for the Range walk

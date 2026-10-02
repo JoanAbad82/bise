@@ -18,6 +18,7 @@
     listTitle: (page, n) => `notes for ${page} · ${n}`,
     sendBar: (n, agent) => `${n} ${n === 1 ? "note" : "notes"} for ${agent} · or just say "send"`,
     send: "send",
+    count: (n) => (n ? `${n} ${n === 1 ? "note" : "notes"}` : ""),
     sent: (agent) => `sent. ${agent} is on it.`,
     updating: (agent) => `${agent} is updating this page…`,
     moved: "moved",
@@ -26,15 +27,18 @@
     sentTag: "sent",
     changed: (before, after) => `you changed "${before}" → "${after}"`,
     marks: { keep: "♡ keep", drop: "✗ drop", unsure: "~ not sure" },
-    // a voice note's pin while you talk (the mocks' `you · voice`; asked to ambient)
+    // a voice note's pin while you talk (the mocks' `you · voice`; ambient, m_4877)
     voiceBy: "you · voice",
+    // a drawing in the side list, and the hint while you draw (§5.4; asked to ambient)
+    drawing: "✎ drawing",
+    drawHint: "draw on the page   d or esc done",
     // a question's option you picked (ambient, m_4795)
     picked: (option, text) => (text ? `you picked ${option}: ${text}` : `you picked ${option}`),
     tools: { note: "note", keep: "♡", drop: "✗", unsure: "~", edit: "edit", pin: "pin" },
     placeholder: "your note",
     // signed off by ambient (m_4786): 'block' is our word, not hers; keys like the TUI's key bar
     empty: "no notes yet. select some text, or hold fn and talk.",
-    keys: "t type   p pin   ⌘z undo   ⌘⏎ send",
+    keys: "t type   p pin   d draw   ⌘z undo   ⌘⏎ send",
     remove: "remove",
     undo: "undo",
     failed: "couldn't save your notes. trying again.",
@@ -61,6 +65,8 @@
   // a note against the blocks of a version ({id: text}): is it still where it was?
   function anchorOf(note, blocks) {
     if (!note.block) return "ok";                         // a page-wide note
+    // a drawing holds while one of the blocks under it is still there
+    if (note.kind === "draw") return (note.blocks || [note.block]).some((id) => id in blocks) ? "ok" : "moved";
     if (!(note.block in blocks)) return "moved";          // its block is gone
     const text = blocks[note.block];
     if (note.kind === "edit") {
@@ -121,6 +127,7 @@
     if (n.kind === "edit") return NW.changed(n.before || "", n.after || "");
     if (NW.marks[n.kind]) return n.text ? `${NW.marks[n.kind]}: ${n.text}` : NW.marks[n.kind];
     if (n.kind === "pick") return NW.picked(n.option, n.text);
+    if (n.kind === "draw") return n.text ? `${NW.drawing}: ${n.text}` : NW.drawing;
     return n.text || "";
   }
 
@@ -232,7 +239,36 @@
     return api;
   }
 
-  const core = { NW, spaced, norm, locate, anchorOf, reanchor, diffWords, outcome, label, model, nearestQuote };
+  // ---- drawing (§5.4): strokes in the page's own coordinates (from #bise-page's top left, so
+  // scrolling never moves them), one note per drawing: its path, its box, the blocks under it
+  // one stroke as an SVG path: points closer than 1.5 px to the last kept one are dropped
+  function strokePath(points) {
+    const kept = [];
+    for (const [x, y] of points || []) {
+      const l = kept[kept.length - 1];
+      if (!l || Math.hypot(x - l[0], y - l[1]) >= 1.5) kept.push([x, y]);
+    }
+    if (!kept.length) return "";
+    const f = (v) => String(Math.round(v * 10) / 10);
+    if (kept.length === 1) kept.push([kept[0][0] + 0.1, kept[0][1]]);   // a dot
+    return kept.map(([x, y], i) => `${i ? "L" : "M"}${f(x)} ${f(y)}`).join(" ");
+  }
+  // the box around every stroke
+  function strokesBox(strokes) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const s of strokes || []) for (const [x, y] of s) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    return x0 === Infinity ? null : { x: Math.round(x0), y: Math.round(y0), w: Math.round(x1 - x0), h: Math.round(y1 - y0) };
+  }
+  // the blocks a box touches ({id: {x, y, w, h}}), top to bottom
+  function blocksIn(box, rects) {
+    if (!box) return [];
+    return Object.entries(rects || {})
+      .filter(([, r]) => r.x < box.x + box.w && box.x < r.x + r.w && r.y < box.y + box.h && box.y < r.y + r.h)
+      .sort((a, b) => a[1].y - b[1].y || a[1].x - b[1].x)
+      .map(([id]) => id);
+  }
+
+  const core = { NW, spaced, norm, locate, anchorOf, reanchor, diffWords, outcome, label, model, nearestQuote, strokePath, strokesBox, blocksIn };
 
   // ======================================================================================
   // the DOM: only on a page the shell served (#bise-page)
@@ -393,7 +429,8 @@
       barText.textContent = barNote || (state === "updating" ? NW.updating(who) : NW.sendBar(drafts, who));
       bar.classList.toggle("bn-on", drafts > 0 || !!barNote || state === "updating");
       barSend.disabled = drafts === 0 || state === "updating";
-      const fc = frameCount(); if (fc) fc.textContent = String(drafts);
+      // the frame's count: nothing at 0 (a lone 0 is a riddle), else `1 note` / `3 notes` (ambient, m_4868)
+      const fc = frameCount(); if (fc) fc.textContent = NW.count(drafts);
       const fs = frameSend(); if (fs) fs.disabled = drafts === 0;
       renderPins();
       paintHighlights();
@@ -449,6 +486,8 @@
     const closeComposer = () => { composer.classList.remove("bn-on"); input.blur(); render(); };
     function addNote(kind, text) {
       if (!target) return;
+      // words for a drawing just made: they go on its note
+      if (target.drawing) { M.update(target.drawing, { text: text || undefined }); target = null; save(); render(); return; }
       M.add({ version, block: target.block, quote: target.quote, offset: target.offset, pin: target.pin, kind, text: text || undefined }, now());
       barNote = "";
       save(); render();
@@ -540,7 +579,8 @@
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "t" && hover) { e.preventDefault(); compose({ block: hover.dataset.id }, hover.getBoundingClientRect()); }
       else if (e.key === "p") { e.preventDefault(); pinning = !pinning; doc.documentElement.classList.toggle("bn-pinning", pinning); }
-      else if (e.key === "Escape") { hideTools(); pinning = false; doc.documentElement.classList.remove("bn-pinning"); }
+      else if (e.key === "d") { e.preventDefault(); drawing ? stopDraw() : startDraw(); }
+      else if (e.key === "Escape") { hideTools(); pinning = false; doc.documentElement.classList.remove("bn-pinning"); if (drawing) stopDraw(); }
     });
 
     // ---- the list's clicks: go to the note, remove a draft
@@ -634,6 +674,109 @@
     doc.addEventListener("bise:state", (e) => { state = (e.detail && e.detail.state) || "ready"; render(); });
     win.addEventListener("resize", renderPins);
 
+    // ---- drawing (§5.4): d, draw with the mouse or the pen, d or esc again: one drawing note
+    // (its path in the page's coordinates, its box, the blocks under it) and the PNG of that area
+    // the page draws itself with a canvas, sent with the note
+    const SVGNS = "http://www.w3.org/2000/svg";
+    const ink = doc.createElementNS(SVGNS, "svg");
+    ink.setAttribute("class", "bn-ui bn-ink");
+    const pad = el("div", "bn-ui bn-drawpad");
+    const hint = el("div", "bn-ui bn-drawhint", NW.drawHint);
+    doc.body.append(ink, pad, hint);
+    let drawing = null;   // {strokes: [[[x, y]...]], live: [[x, y]...] | null}
+    const pageXY = (e) => { const r = page.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    function placeInk() {
+      // the ink layer covers the page, in the page's coordinates (CSSOM, not style=)
+      const r = page.getBoundingClientRect();
+      ink.style.left = `${r.left + win.scrollX}px`; ink.style.top = `${r.top + win.scrollY}px`;
+      ink.setAttribute("width", Math.ceil(r.width)); ink.setAttribute("height", Math.ceil(r.height));
+    }
+    function renderInk() {
+      placeInk();
+      const paths = [];
+      for (const n of M.all()) if (n.kind === "draw" && n.path) paths.push([n.path, `bn-stroke bn-${n.status}`]);
+      if (drawing) for (const s of [...drawing.strokes, drawing.live || []]) if (s.length) paths.push([strokePath(s), "bn-stroke bn-live"]);
+      ink.replaceChildren(...paths.map(([d, cls]) => { const p = doc.createElementNS(SVGNS, "path"); p.setAttribute("d", d); p.setAttribute("class", cls); return p; }));
+    }
+    function startDraw() {
+      hideTools(); closeComposer();
+      drawing = { strokes: [], live: null };
+      doc.documentElement.classList.add("bn-drawing");
+    }
+    pad.addEventListener("pointerdown", (e) => {
+      if (!drawing) return;
+      pad.setPointerCapture(e.pointerId);
+      drawing.live = [pageXY(e)];
+    });
+    pad.addEventListener("pointermove", (e) => {
+      if (!drawing || !drawing.live) return;
+      for (const c of e.getCoalescedEvents ? e.getCoalescedEvents() : [e]) drawing.live.push(pageXY(c));
+      renderInk();
+    });
+    const endStroke = () => { if (drawing && drawing.live) { if (drawing.live.length) drawing.strokes.push(drawing.live); drawing.live = null; renderInk(); } };
+    pad.addEventListener("pointerup", endStroke);
+    pad.addEventListener("pointercancel", endStroke);
+    function stopDraw() {
+      endStroke();
+      const d = drawing;
+      drawing = null;
+      doc.documentElement.classList.remove("bn-drawing");
+      if (!d || !d.strokes.length) return renderInk();
+      const box = strokesBox(d.strokes);
+      const pr = page.getBoundingClientRect();
+      const rects = Object.fromEntries(blocks().map((b) => { const r = b.getBoundingClientRect(); return [b.dataset.id, { x: r.left - pr.left, y: r.top - pr.top, w: r.width, h: r.height }]; }));
+      const under = blocksIn(box, rects);
+      const note = M.add({ version, kind: "draw", block: under[0], blocks: under, box, path: d.strokes.map(strokePath).join(" ") }, now());
+      save(); render(); renderInk();
+      // words for it, if you want (Enter keeps them, Esc keeps the drawing alone)
+      target = { block: under[0], drawing: note.id };
+      compose(target, { left: pr.left + box.x, top: pr.top + box.y, bottom: pr.top + box.y + box.h });
+      areaPng(box, note.path).then((png) => { if (png && M.get(note.id)) { M.update(note.id, { png }); save(); } });
+    }
+    // the area as the page shows it, with the drawing on top: the page's HTML and CSS in an SVG
+    // foreignObject drawn on a canvas; where the browser won't let a canvas read that back, the
+    // strokes alone on the page's paper
+    async function areaPng(box, path) {
+      const m = 16, w = Math.max(1, Math.min(1600, box.w + 2 * m)), h = Math.max(1, Math.min(1600, box.h + 2 * m));
+      const x0 = box.x - m, y0 = box.y - m;
+      const cv = doc.createElement("canvas");
+      cv.width = w; cv.height = h;
+      const g = cv.getContext("2d");
+      const paper = win.getComputedStyle(doc.body).backgroundColor || "#fff";
+      const strokes = () => {
+        g.save(); g.translate(-x0, -y0);
+        g.strokeStyle = win.getComputedStyle(doc.documentElement).getPropertyValue("--pen").trim() || "#c8264a";
+        g.lineWidth = 3; g.lineCap = "round"; g.lineJoin = "round";
+        g.stroke(new win.Path2D(path));
+        g.restore();
+      };
+      try {
+        let css = "";
+        for (const s of doc.styleSheets) { try { for (const r of s.cssRules) css += r.cssText + "\n"; } catch {} }
+        const clone = page.cloneNode(true);
+        const pw = page.getBoundingClientRect().width;
+        const xhtml = new win.XMLSerializer().serializeToString(clone);
+        const svg = `<svg xmlns="${SVGNS}" width="${w}" height="${h}"><style>${css.replace(/</g, "\\3c ")}</style>` +
+          `<rect width="100%" height="100%" fill="${paper}"/><foreignObject x="${-x0}" y="${-y0}" width="${pw}" height="${y0 + h + 10}">` +
+          `<div xmlns="http://www.w3.org/1999/xhtml" class="${doc.body.className}">${xhtml}</div></foreignObject></svg>`;
+        const img = new win.Image();
+        img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+        await img.decode();
+        g.drawImage(img, 0, 0);
+        strokes();
+        return cv.toDataURL("image/png");
+      } catch {
+        g.clearRect(0, 0, w, h);
+        g.fillStyle = paper; g.fillRect(0, 0, w, h);
+        strokes();
+        try { return cv.toDataURL("image/png"); } catch { return null; }
+      }
+    }
+    const _render = render;
+    render = function () { _render(); renderInk(); };
+    win.addEventListener("resize", renderInk);
+    renderInk();
+
     // ---- the drafts and the outcomes already on the server
     api(`/p/${pageId}/meta`).then((r) => {
       // flat {id, title, agent, state, versions, url, notes} (amb-core, ecb6ff9); {meta, notes} read too
@@ -664,7 +807,8 @@
 
   root.BiseNotes = { core, mount, rangeFor, rawPoints, fromSelection };
   if (root.document && root.document.getElementById) {
-    const go = () => mount(root.document);
+    // the page's layer, kept for a look from the console (BiseNotes.live.model.all())
+    const go = () => { root.BiseNotes.live = mount(root.document); };
     if (root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", go); else go();
   }
 })(typeof window !== "undefined" ? window : globalThis);

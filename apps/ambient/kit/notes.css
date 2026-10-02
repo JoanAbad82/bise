@@ -70,6 +70,15 @@ html.bn-pinning #bise-page [data-kit][data-id] { cursor: crosshair; }
 .bn-bubble { position: absolute; width: 260px; padding: 9px 12px; border-radius: var(--radius-small, 10px); background: var(--surface-talk, #1d1a19ee); color: var(--talk-ink, #fff); box-shadow: 0 14px 34px -10px #0008; font-size: 14px; line-height: 1.4; animation: bn-rise .4s var(--ease-arrive, cubic-bezier(.16, 1, .3, 1)) both; }
 .bn-by { font: 11px var(--font-mono, ui-monospace, monospace); color: var(--pen, #c8264a); margin-bottom: 2px; }
 
+/* drawing: d, then the mouse or the pen; your strokes in pen, over the page */
+.bn-ink { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; z-index: 2147482998; }
+.bn-stroke { fill: none; stroke: var(--pen, #c8264a); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.bn-stroke.bn-sent, .bn-stroke.bn-done, .bn-stroke.bn-answered { opacity: .45; }
+.bn-drawpad { position: fixed; inset: 0; display: none; cursor: crosshair; touch-action: none; z-index: 2147482997; }
+html.bn-drawing .bn-drawpad { display: block; }
+.bn-drawhint { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); display: none; padding: 7px 14px; border-radius: 999px; background: var(--surface-talk, #1d1a19ee); color: var(--talk-dim, #ffffffa0); font: 12px var(--font-mono, ui-monospace, monospace); white-space: pre; z-index: 2147483001; }
+html.bn-drawing .bn-drawhint { display: block; }
+
 @keyframes bn-rise { from { opacity: 0; transform: translateY(8px); } }
 @keyframes bn-pop { from { opacity: 0; transform: scale(.85); } }
 @media (prefers-reduced-motion: reduce) { .bn-ui, .bn-ui * { animation: none !important; transition: none !important; } }

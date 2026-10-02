@@ -67,7 +67,7 @@
   // a page for you (docs/ambient-vision.md §3 B; signed off by ambient, m_4786)
   const pageReady = (name) => `${name} is ready · fn + o`;
   const forYou = "for you";
-  // fn held on a bise page: the words pin on the page (§4.1; asked to ambient)
+  // fn held on a bise page: the words pin on the page (§4.1; ambient, m_4877)
   const voiceNoteOn = (name) => `voice note on ${name}`;
   // a page's line in "for you": `v2 · 3 min ago`, or `updating…`
   function pageMeta(p, nowMs) {
