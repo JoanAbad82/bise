@@ -435,6 +435,19 @@ impl Store {
         Ok(Some(m))
     }
 
+    /// The page of `agent` waiting for the user's review, by its title
+    /// in quotes: its latest version has a review block or a question he
+    /// hasn't answered, and no go word of his on it ([`is_go_word`]).
+    pub fn pending_review(&self, agent: &str) -> Option<String> {
+        self.list().into_iter().filter(|m| m.agent == agent).find_map(|m| {
+            let blocks = &m.versions.last()?.blocks;
+            let review = blocks.iter().any(|b| b.kit == "review");
+            let open_q = self.questions(&m.id).iter().any(|q| q.reply.is_none() && blocks.iter().any(|b| b.id == q.block));
+            let word = self.notes(&m.id).iter().any(|n| n.status != "draft" && is_go_word(n));
+            ((review || open_q) && !word).then(|| format!("\"{}\"", m.title))
+        })
+    }
+
     /// The agents the latest version names on its items (`data-agent`),
     /// in order, once each.
     pub fn data_agents(&self, id: &str) -> Vec<String> {
@@ -479,6 +492,13 @@ impl Store {
         self.save_meta(&m)?;
         Ok(Some(m))
     }
+}
+
+/// A note that is the user's go for what leaves the page (a draft in his
+/// Gmail or Kit): an approve, a send, or words asking for his drafts.
+pub fn is_go_word(n: &Note) -> bool {
+    let text = n.text.as_deref().unwrap_or("").to_lowercase();
+    matches!(n.kind.as_str(), "approve" | "send" | "drafts") || text.contains("draft") || text.contains("brouillon")
 }
 
 /// The values of the `data-agent="…"` attributes of a fragment, once each.
@@ -713,5 +733,33 @@ mod tests {
         let h = r#"<section data-kit="review" data-id="r"><ul><li data-id="a" data-agent="fix-login">x</li><li data-agent='docs'>y</li><li data-agent="fix-login">z</li><li data-agent="">w</li></ul></section>"#;
         assert_eq!(data_agents_of(h), vec!["fix-login", "docs"]);
         assert!(data_agents_of("<p>no agent</p>").is_empty());
+    }
+
+    #[test]
+    fn a_page_waits_for_review_until_the_users_go() {
+        let d = temp();
+        let s = Store::new(&d);
+        let block = |id: &str, kit: &str| Block { id: id.into(), kit: kit.into(), hash: "h".into() };
+        // a plain page never holds drafts back
+        s.publish(&publish("t1", Some("plain"), None), vec![block("p1", "prose")], 10, &|_| false).unwrap();
+        assert_eq!(s.pending_review("t1"), None);
+        // a review: held until an approve, a send, or words asking for drafts
+        s.publish(&Publish { title: Some("replies".into()), ..publish("t1", Some("replies"), None) }, vec![block("r", "review"), block("m", "email")], 20, &|_| false).unwrap();
+        assert_eq!(s.pending_review("t1").as_deref(), Some("\"replies\""));
+        assert_eq!(s.pending_review("t2"), None, "another agent's page");
+        s.set_drafts("replies", &[json!({"block": "m", "kind": "note", "text": "shorter"})], 1, 21).unwrap();
+        s.send("replies", 22).unwrap();
+        assert!(s.pending_review("t1").is_some(), "a note is not his go");
+        s.set_drafts("replies", &[json!({"block": "m", "kind": "voice", "text": "ok put it in my drafts"})], 1, 23).unwrap();
+        assert!(s.pending_review("t1").is_some(), "a draft note is not said yet");
+        s.send("replies", 24).unwrap();
+        assert_eq!(s.pending_review("t1"), None, "his word: drafts run free");
+        // an open question holds too, until answered
+        s.publish(&publish("t3", Some("plan"), None), vec![block("q1", "question")], 30, &|_| false).unwrap();
+        s.save_questions("plan", &[super::super::questions::Question { block: "q1".into(), text: "which venue?".into(), options: vec![], card: 4, reply: None }]).unwrap();
+        assert!(s.pending_review("t3").is_some());
+        s.save_questions("plan", &[super::super::questions::Question { block: "q1".into(), text: "which venue?".into(), options: vec![], card: 4, reply: Some("Les Pins".into()) }]).unwrap();
+        assert_eq!(s.pending_review("t3"), None);
+        let _ = std::fs::remove_dir_all(d);
     }
 }

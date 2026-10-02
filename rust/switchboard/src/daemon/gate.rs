@@ -698,6 +698,7 @@ impl Shell {
         Call {
             edit_tool: edit_tool.into(),
             flow,
+            pending_review: self.pending_review_of(name),
             tool,
             args,
             agent: name.to_string(),
@@ -1056,6 +1057,7 @@ mod tests {
             bise: "/u/.bise".into(),
             edit_tool: "edit".into(),
             flow: None,
+            pending_review: None,
         }
     }
 

@@ -930,6 +930,14 @@ impl Shell {
         }
     }
 
+    /// The page of `name` waiting for the user's review, by title: its
+    /// latest version has a review block or an unanswered question, and
+    /// no word of his on it since (an approve, a send, "put it in my
+    /// drafts"). The approvals gate makes a draft call a card then.
+    pub(crate) fn pending_review_of(&self, name: &str) -> Option<String> {
+        self.pages.as_ref()?.store.pending_review(name)
+    }
+
     /// A tool intent of an agent some page names: its item's note.
     fn page_agent_line(&mut self, name: &str, line: &str) {
         if !self.page_agents_now().values().any(|ns| ns.iter().any(|n| n == name)) {

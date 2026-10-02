@@ -76,6 +76,11 @@ pub struct Call {
     /// The repo's flow (dev-flow §6's approvals rows); None: unknown,
     /// only the flow-free tiers.
     pub flow: Option<FlowRules>,
+    /// A page of this agent waits for the user's review (its latest
+    /// version has a review item or a question he hasn't answered, and no
+    /// word of his since: approve, send, "put it in my drafts"): the
+    /// page's title. A draft-making call is then a card, not free.
+    pub pending_review: Option<String>,
 }
 
 /// The repo's flow as the approvals read it (dev-flow §6, "Approvals").
@@ -208,6 +213,18 @@ pub fn makes_a_draft(tool: &str) -> bool {
     draft && makes && !leaves
 }
 
+/// Where a draft tool puts it, for the card: `gmail.create_draft` → Gmail.
+fn draft_place(tool: &str) -> String {
+    let svc = tool.split('.').next().unwrap_or(tool);
+    match svc.to_ascii_lowercase().as_str() {
+        "gmail" => "Gmail".into(),
+        "outlook" | "outlook_mail" => "Outlook".into(),
+        "kit" => "Kit".into(),
+        "slack" => "Slack".into(),
+        s => s.to_string(),
+    }
+}
+
 /// The checker is off: an open part is a card (design §3).
 pub const CHECKER_OFF: &str = "the checker is off, so commands ask first.";
 
@@ -226,7 +243,18 @@ pub fn judge_with(
     fs: &dyn Fs,
 ) -> Verdict {
     let tool = call.tool.as_str();
-    if NEVER_GATED.contains(&tool) || tool.starts_with("self.") || makes_a_draft(tool) {
+    if makes_a_draft(tool) {
+        // a draft leaves nothing, but not before his word on the page
+        // that has it (ambient-lead m_5423, after pm's 7 early drafts)
+        return match &call.pending_review {
+            None => Verdict::Allow { tier: 1 },
+            Some(page) => Verdict::Card {
+                reason: format!("{} wants to put drafts in {} before you reviewed {page}", call.agent, draft_place(tool)),
+                always: None,
+            },
+        };
+    }
+    if NEVER_GATED.contains(&tool) || tool.starts_with("self.") {
         return Verdict::Allow { tier: 1 };
     }
     let roots = call.roots();

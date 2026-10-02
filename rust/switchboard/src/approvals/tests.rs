@@ -19,6 +19,7 @@ fn call(tool: &str, args: serde_json::Value) -> Call {
         bise: "/h/.bise".into(),
         edit_tool: "edit".into(),
         flow: None,
+        pending_review: None,
     }
 }
 
@@ -941,4 +942,23 @@ fn draft_making_connector_calls_need_no_card() {
     for t in ["gmail.send_draft", "gmail.delete_draft", "gmail.send_email", "kit.publish_draft", "slack.post_message", "drafts", "gmail.list_drafts"] {
         assert!(!super::makes_a_draft(t), "{t}");
     }
+}
+
+/// ambient-lead m_5423: a draft call while one of the agent's pages waits
+/// for the user's review is a card, never free, never the checker's.
+#[test]
+fn a_draft_before_the_review_is_a_card() {
+    let mut c = call("gmail.create_draft", json!({"to": "nina@acme.test"}));
+    c.pending_review = Some("\"replies to Nina\"".into());
+    match super::judge_with(&c, &Rules::default(), &Cache::default(), false, &LexicalFs) {
+        Verdict::Card { reason, always } => {
+            assert_eq!(reason, "a wants to put drafts in Gmail before you reviewed \"replies to Nina\"");
+            assert!(always.is_none(), "no always: it holds only until his word");
+        }
+        v => panic!("{v:?}"),
+    }
+    // other calls are not held by it
+    let mut b = call("bash", json!({"arg": "ls"}));
+    b.pending_review = c.pending_review.clone();
+    assert!(matches!(super::judge_with(&b, &Rules::default(), &Cache::default(), false, &LexicalFs), Verdict::Allow { .. }));
 }
