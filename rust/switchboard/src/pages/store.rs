@@ -175,6 +175,18 @@ impl Store {
         write_json(&self.page_dir(id).join("notes.json"), &notes)
     }
 
+    /// The page's question blocks and their cards (§4.2).
+    pub fn questions(&self, id: &str) -> Vec<super::questions::Question> {
+        if !valid_id(id) {
+            return Vec::new();
+        }
+        read_json(&self.page_dir(id).join("questions.json"))
+    }
+
+    pub fn save_questions(&self, id: &str, q: &[super::questions::Question]) -> Result<(), String> {
+        write_json(&self.page_dir(id).join("questions.json"), &q)
+    }
+
     /// Version `n`'s fragment.
     pub fn html(&self, id: &str, n: u64) -> Option<String> {
         if !valid_id(id) {

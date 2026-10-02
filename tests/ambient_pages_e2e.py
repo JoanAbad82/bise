@@ -22,6 +22,12 @@ from e2e import EXE, check  # noqa: E402
 
 PAGE_V1 = '<section data-kit="prose" data-id="p1"><p>the week: dark mode shipped.</p></section>\n'
 PAGE_V2 = '<section data-kit="prose" data-id="p1"><p>the week: dark mode shipped, March numbers.</p></section>\n'
+PAGE_V3 = PAGE_V2 + (
+    '<section data-kit="question" data-id="q1"><p>post it in #team now, or wait for Marc?</p>'
+    '<ol><li>post now</li><li>wait for Marc</li></ol></section>'
+    '<section data-kit="question" data-id="q2"><p>add the March chart?</p>'
+    '<ol><li>yes</li><li>no</li></ol></section>'
+)
 
 
 def request(port, method, path, body=None, headers=None):
@@ -165,6 +171,63 @@ def main():
         c.wait_line("main", "published t1-page v2", 90)
         m = json.loads(request(port, "GET", "/p/t1-page/meta")[2])
         check(m["agent"] == "main" and m["notes"][0]["status"] == "done", "main took the page over: %r" % m)
+
+        # §4.1 a note talk's words: the page_voice op reaches the page's
+        # SSE as `voice`, never main's input
+        c.send({"op": "page_voice", "page": "weekly-update", "phase": "heard", "text": "make it shorter"})
+        c.wait(lambda: sse.seen("voice", lambda d: d == {"phase": "heard", "text": "make it shorter"}), 10, "SSE voice")
+        c.send({"op": "page_voice", "page": "weekly-update", "phase": "end", "text": "make it shorter"})
+        c.wait(lambda: sse.seen("voice", lambda d: d["phase"] == "end"), 10, "SSE voice end")
+        check(not any("make it shorter" in l for l in c.lines("main")), "a note talk never reaches main")
+
+        # §4.2 questions in two places: each question block is one card
+        # with its page link
+        c.wait_idle("main")
+        v3 = os.path.join(E.tmp, "page-v3.html")
+        open(v3, "w").write(PAGE_V3)
+        c.say('[[bash: sb page publish %s --id weekly-update]]' % v3)
+        c.wait_line("main", "published weekly-update v3", 90)
+
+        def card(block):
+            return next((x for x in c.cards() if (x.get("page") or {}).get("block") == block), None)
+
+        c.wait(lambda: card("q1") and card("q2"), 30, "the question cards")
+        q1, q2 = card("q1"), card("q2")
+        check(q1["kind"] == "question" and q1["agent"] == "main", "q1's card: %r" % q1)
+        check(q1["page"] == {"id": "weekly-update", "block": "q1", "url": "%s/p/weekly-update#q1" % origin}, "q1's link: %r" % q1["page"])
+        check("1. post now" in q1["text"] and "2. wait for Marc" in q1["text"], "q1's options: %r" % q1["text"])
+        st, _, home = request(port, "GET", "/")
+        li = [l for l in home.split("<li") if 'data-page="weekly-update"' in l]
+        check(li and "data-asking" in li[0], "for you: the page is asking: %r" % li)
+        # the same question again: the same card
+        c.wait_idle("main")
+        c.say('[[bash: sb page publish %s --id weekly-update]]' % v3)
+        c.wait_line("main", "published weekly-update v4", 90)
+        check(card("q1")["id"] == q1["id"] and len([x for x in c.cards() if x.get("page")]) == 2, "one card per question")
+
+        # answered on the page: the card closes, the page hears it
+        st, _, _ = request(port, "POST", "/api/p/weekly-update/answer", {"block": "q1", "option": 2})
+        check(st == 403, "an answer without the token: %d" % st)
+        st, _, r = request(port, "POST", "/api/p/weekly-update/answer", {"block": "q1", "option": 2}, {"Origin": origin, "X-Bise-Token": token})
+        check(st == 200 and json.loads(r)["reply"] == "wait for Marc", "the answer: %d %s" % (st, r))
+        c.wait(lambda: sse.seen("answered", lambda d: d == {"block": "q1", "reply": "wait for Marc"}), 30, "SSE answered q1")
+        c.wait(lambda: card("q1") is None, 30, "q1's card closed")
+        c.wait(lambda: any("wait for Marc" in l for l in c.lines("main")), 30, "main reads the answer")
+        st, _, _ = request(port, "POST", "/api/p/weekly-update/answer", {"block": "q1", "option": 1}, {"Origin": origin, "X-Bise-Token": token})
+        check(st == 409, "answered twice: %d" % st)
+        # answered from the capsule or the TUI (/answer N 1): its words on the page
+        c.say("/answer %d 1" % q2["id"])
+        c.wait(lambda: sse.seen("answered", lambda d: d == {"block": "q2", "reply": "yes"}), 30, "SSE answered q2")
+        c.wait(lambda: card("q2") is None, 30, "q2's card closed")
+        st, _, home = request(port, "GET", "/")
+        li = [l for l in home.split("<li") if 'data-page="weekly-update"' in l]
+        check(li and "data-asking" not in li[0], "nothing asked any more: %r" % li)
+
+        # §4.4 the frame's versions, newest first
+        st, _, vs = request(port, "GET", "/p/weekly-update/versions")
+        vs = json.loads(vs)["versions"]
+        check(st == 200 and [v["n"] for v in vs] == [4, 3, 2, 1] and vs[0]["latest"], "versions: %r" % vs)
+        check(sorted(vs[1]["changed"]) == ["q1", "q2"] and vs[0]["changed"] == [], "what each changed: %r" % vs)
     except AssertionError as e:
         print("FAIL", e)
         ok = False

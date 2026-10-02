@@ -183,6 +183,7 @@ pub fn route(pages: &Pages, req: &Request) -> Response {
         return match segs.as_slice() {
             ["api", "p", id, "notes"] if valid_id(id) => post_notes(pages, id, &req.body),
             ["api", "p", id, "send"] if valid_id(id) => post_send(pages, id),
+            ["api", "p", id, "answer"] if valid_id(id) => post_answer(pages, id, &req.body),
             _ => Response::err(404, "no such route"),
         };
     }
@@ -194,6 +195,7 @@ pub fn route(pages: &Pages, req: &Request) -> Response {
         ["kit", rest @ ..] if !rest.is_empty() => kit_file(pages, &rest.join("/")),
         ["p", id] if valid_id(id) => page(pages, id, None, false),
         ["p", id, "meta"] if valid_id(id) => meta(pages, id),
+        ["p", id, "versions"] if valid_id(id) => versions(pages, id),
         ["p", id, "v", n] if valid_id(id) => n.parse().map_or_else(|_| Response::err(404, "no such version"), |n| page(pages, id, Some(n), false)),
         ["p", id, "v", n, "body"] if valid_id(id) => n.parse().map_or_else(|_| Response::err(404, "no such version"), |n| page(pages, id, Some(n), true)),
         _ => Response::err(404, "no such page"),
@@ -239,8 +241,11 @@ fn home(pages: &Pages) -> String {
         .iter()
         .map(|m| {
             let open = pages.store.notes(&m.id).iter().filter(|n| n.open()).count();
+            // amb-kit's home list (m_4884): the meta line, an open question
+            let kicker = pages.kicker(m).map(|k| format!(" data-kicker=\"{}\"", esc(&k))).unwrap_or_default();
+            let asking = if pages.asking(&m.id) { " data-asking" } else { "" };
             format!(
-                "<li data-page=\"{}\" data-agent=\"{}\" data-version=\"{}\" data-state=\"{}\" data-at=\"{}\" data-open-notes=\"{open}\"><a href=\"/p/{}\">{}</a></li>",
+                "<li data-page=\"{}\" data-agent=\"{}\" data-version=\"{}\" data-state=\"{}\" data-at=\"{}\" data-open-notes=\"{open}\"{kicker}{asking}><a href=\"/p/{}\">{}</a></li>",
                 esc(&m.id),
                 esc(&m.agent),
                 m.version(),
@@ -262,6 +267,51 @@ fn meta(pages: &Pages, id: &str) -> Response {
     v["url"] = json!(pages.url(id));
     v["notes"] = json!(pages.store.notes(id));
     Response::json(200, &v)
+}
+
+/// The frame's version list (§4.4), newest first: each version, when,
+/// its read-only URL and the blocks it changed (their hash differs from
+/// the version before, or they are new; the first changes them all).
+fn versions(pages: &Pages, id: &str) -> Response {
+    let Some(m) = pages.store.meta(id) else { return Response::err(404, "no such page") };
+    let mut list: Vec<Value> = Vec::new();
+    for (i, v) in m.versions.iter().enumerate() {
+        let before = i.checked_sub(1).map(|j| &m.versions[j].blocks);
+        let changed: Vec<&str> = v
+            .blocks
+            .iter()
+            .filter(|b| before.is_none_or(|bs| !bs.iter().any(|o| o.id == b.id && o.hash == b.hash)))
+            .map(|b| b.id.as_str())
+            .collect();
+        list.push(json!({"n": v.n, "at_ms": v.at_ms, "url": format!("/p/{}/v/{}", m.id, v.n), "changed": changed, "latest": v.n == m.version()}));
+    }
+    list.reverse();
+    Response::json(200, &json!({"id": m.id, "versions": list}))
+}
+
+/// A pick or words on a question block (§4.2): `{block, option}` (the
+/// 1-based option) or `{block, text}`; the hub answers its card.
+fn post_answer(pages: &Pages, id: &str, body: &[u8]) -> Response {
+    if pages.store.meta(id).is_none() {
+        return Response::err(404, "no such page");
+    }
+    let Ok(v) = serde_json::from_slice::<Value>(body) else { return Response::err(400, "not JSON") };
+    let block = v.get("block").and_then(Value::as_str).unwrap_or("");
+    let qs = pages.store.questions(id);
+    let Some(q) = qs.iter().find(|q| q.block == block) else { return Response::err(404, "no such question on this page") };
+    if q.reply.is_some() {
+        return Response::err(409, "answered already");
+    }
+    let reply = match (v.get("option").and_then(Value::as_u64), v.get("text").and_then(Value::as_str)) {
+        (Some(n), _) => match q.option(n as usize) {
+            Some(o) => o.to_string(),
+            None => return Response::err(400, "no such option"),
+        },
+        (None, Some(t)) if !t.trim().is_empty() => t.trim().to_string(),
+        _ => return Response::err(400, "an option or words"),
+    };
+    pages.tell_hub(PageMsg::Answer { id: id.to_string(), block: block.to_string(), reply: reply.clone() });
+    Response::json(200, &json!({"ok": true, "reply": reply}))
 }
 
 fn kit_file(pages: &Pages, rel: &str) -> Response {
@@ -460,6 +510,42 @@ mod tests {
         assert_eq!(text(&post(&p, "/api/p/w/send", Some(&tok), Some(origin), json!({}))), "{\"sent\":0}");
         assert!(rx.try_recv().is_err());
         assert_eq!(get(&p, "/api/p/w/send").status, 405);
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn versions_list_what_changed() {
+        let (p, d) = pages();
+        let pb = |html: &str| Publish { agent: "t1".into(), id: Some("w".into()), html: html.into(), ..Default::default() };
+        let two = "<section data-kit=\"prose\" data-id=\"p1\"><p>a</p></section><section data-kit=\"prose\" data-id=\"p2\"><p>b</p></section>";
+        let two_b = "<section data-kit=\"prose\" data-id=\"p1\"><p>a</p></section><section data-kit=\"prose\" data-id=\"p2\"><p>b, changed</p></section>";
+        p.publish(&pb(two), 1, &|_| false).unwrap();
+        p.publish(&pb(two_b), 2, &|_| false).unwrap();
+        let v: Value = serde_json::from_slice(&get(&p, "/p/w/versions").body).unwrap();
+        assert_eq!(v["versions"][0], json!({"n": 2, "at_ms": 2, "url": "/p/w/v/2", "changed": ["p2"], "latest": true}));
+        assert_eq!(v["versions"][1]["changed"], json!(["p1", "p2"]));
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn an_answer_on_the_page_goes_to_the_hub() {
+        let (p, d) = pages();
+        let q = "<section data-kit=\"question\" data-id=\"q1\"><p>which one?</p><ol><li>Le Moulin</li><li>Les Pins</li></ol></section>";
+        p.publish(&Publish { agent: "t1".into(), id: Some("w".into()), html: q.into(), ..Default::default() }, 1, &|_| false).unwrap();
+        p.store.save_questions("w", &crate::pages::questions::of_fragment(q)).unwrap();
+        let (tx, rx) = mpsc::channel();
+        let tx = std::sync::Mutex::new(tx);
+        p.connect_hub(Box::new(move |m| {
+            let _ = tx.lock().unwrap().send(m);
+        }));
+        let (tok, o) = (p.token.clone(), "http://127.0.0.1:47123");
+        assert_eq!(post(&p, "/api/p/w/answer", None, Some(o), json!({"block": "q1", "option": 2})).status, 403);
+        assert_eq!(post(&p, "/api/p/w/answer", Some(&tok), Some(o), json!({"block": "q9", "option": 2})).status, 404);
+        assert_eq!(post(&p, "/api/p/w/answer", Some(&tok), Some(o), json!({"block": "q1", "option": 5})).status, 400);
+        assert_eq!(post(&p, "/api/p/w/answer", Some(&tok), Some(o), json!({"block": "q1", "option": 2})).status, 200);
+        assert_eq!(rx.try_recv().unwrap(), PageMsg::Answer { id: "w".into(), block: "q1".into(), reply: "Les Pins".into() });
+        assert_eq!(post(&p, "/api/p/w/answer", Some(&tok), Some(o), json!({"block": "q1", "text": "  neither  "})).status, 200);
+        assert_eq!(rx.try_recv().unwrap(), PageMsg::Answer { id: "w".into(), block: "q1".into(), reply: "neither".into() });
         let _ = std::fs::remove_dir_all(d);
     }
 

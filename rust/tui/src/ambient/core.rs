@@ -19,6 +19,13 @@ use std::time::{Duration, Instant};
 /// what was heard goes.
 pub const FINAL_WAIT: Duration = Duration::from_millis(1500);
 
+/// A note talk's words that send the page's notes (§4.1): the word
+/// alone, any case, its punctuation dropped.
+fn send_word(words: &str) -> bool {
+    let w = words.trim().trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+    matches!(w.as_str(), "send" | "send it" | "envoie" | "envoyer" | "envoie-le" | "envoie le")
+}
+
 /// The composer label of the shot's marker (the terminal shows
 /// `[Screen <app> · <title>]` in main's thread).
 const SHOT_NAME: &str = "[Screen]";
@@ -55,6 +62,9 @@ pub struct Ports {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Cmd {
     TalkStart,
+    /// `talk_start` with `page: {id, url}`: a note talk on that bise page
+    /// (docs/ambient-pages.md §4.1), its words to the page, never to main
+    PageTalk { page: String },
     TalkEnd,
     TalkCancel,
     Shot { path: PathBuf, app: String, title: String },
@@ -71,7 +81,10 @@ impl Cmd {
         let v: Value = serde_json::from_str(line).map_err(|e| format!("not JSON: {e}"))?;
         let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
         Ok(match s("cmd").as_str() {
-            "talk_start" => Cmd::TalkStart,
+            "talk_start" => match v.get("page").and_then(|p| p.get("id")).and_then(Value::as_str).map(str::trim) {
+                Some(id) if !id.is_empty() => Cmd::PageTalk { page: id.to_string() },
+                _ => Cmd::TalkStart,
+            },
             "talk_end" => Cmd::TalkEnd,
             "talk_cancel" => Cmd::TalkCancel,
             "shot" => Cmd::Shot { path: PathBuf::from(s("path")), app: s("app"), title: s("title") },
@@ -128,6 +141,8 @@ struct Talk {
     text: String,
     /// fn up at
     ending: Option<Instant>,
+    /// a note talk: the page its words go to (never main)
+    page: Option<String>,
 }
 
 impl Drop for Talk {
@@ -167,6 +182,8 @@ struct CardInfo {
     kind: String,
     agent: String,
     text: String,
+    /// a page question's card: {id, block, url} (docs/ambient-pages.md §4.2)
+    page: Option<Value>,
 }
 
 pub struct Core {
@@ -205,6 +222,8 @@ pub struct Core {
     shot: Option<Shot>,
     /// shots sent, forgotten (deleted) at the end of main's turn
     sent_shots: Vec<Shot>,
+    /// the pages of the last state: (id, title)
+    page_titles: Vec<(String, String)>,
 }
 
 impl Core {
@@ -232,6 +251,7 @@ impl Core {
             next_utt: 1,
             shot: None,
             sent_shots: Vec::new(),
+            page_titles: Vec::new(),
         }
     }
 
@@ -261,9 +281,14 @@ impl Core {
 
     pub fn cmd(&mut self, c: Cmd, now: Instant) {
         match c {
-            Cmd::TalkStart => self.talk_start(),
+            Cmd::TalkStart => self.talk_start(None),
+            Cmd::PageTalk { page } => self.talk_start(Some(page)),
             Cmd::TalkEnd => self.talk_end(now),
             Cmd::TalkCancel => {
+                if let Some(page) = self.talk.as_ref().and_then(|t| t.page.clone()) {
+                    self.talk = None;
+                    return self.page_voice_over(&page, "cancel", "");
+                }
                 if self.talk.take().is_some() {
                     // the shot of fn down was for these words
                     if let Some(s) = self.shot.take() {
@@ -293,7 +318,7 @@ impl Core {
         }
     }
 
-    fn talk_start(&mut self) {
+    fn talk_start(&mut self, page: Option<String>) {
         if self.talk.is_some() {
             return;
         }
@@ -319,8 +344,25 @@ impl Core {
         let (htx, heard) = mpsc::channel();
         let cancel = Arc::new(AtomicBool::new(false));
         (self.ports.listener)(&job).start(job, arx, htx, cancel.clone());
-        self.talk = Some(Talk { stream: Some(stream), blocks, audio, heard, cancel, text: String::new(), ending: None });
-        self.set_phase(Phase::Listening, None);
+        self.talk = Some(Talk { stream: Some(stream), blocks, audio, heard, cancel, text: String::new(), ending: None, page: page.clone() });
+        let Some(id) = page else { return self.set_phase(Phase::Listening, None) };
+        // a note talk: the page shows the words at its mouse, the
+        // capsule says where they go
+        self.hub.send(&json!({"op": "page_voice", "page": id, "phase": "start", "text": ""}));
+        let title = match self.page_titles.iter().find(|(i, _)| *i == id) {
+            Some((_, t)) if !t.trim().is_empty() => t.clone(),
+            _ => id.replace('-', " "),
+        };
+        self.phase = Phase::Listening;
+        self.emit(json!({"ev": "phase", "phase": "listening", "page": {"id": id, "title": title}}));
+    }
+
+    /// A note talk is over: its last words to the page, the capsule idle
+    /// (no `sent`, no main phases: main never hears a note talk).
+    fn page_voice_over(&mut self, page: &str, phase: &str, text: &str) {
+        self.hub.send(&json!({"op": "page_voice", "page": page, "phase": phase, "text": text}));
+        self.emit(json!({"ev": "level", "who": "you", "v": 0.0}));
+        self.set_phase(Phase::Idle, None);
     }
 
     fn talk_end(&mut self, now: Instant) {
@@ -335,8 +377,12 @@ impl Core {
         t.stream = None;
         let _ = t.audio.send(ListenMsg::Flush);
         t.ending = Some(now);
+        let note = t.page.is_some();
         self.emit(json!({"ev": "level", "who": "you", "v": 0.0}));
-        self.set_phase(Phase::Sending, None);
+        // a note talk never shows main's phases
+        if !note {
+            self.set_phase(Phase::Sending, None);
+        }
     }
 
     /// The talk's words are all in (or waited for long enough): to main.
@@ -344,6 +390,16 @@ impl Core {
         let Some(t) = self.talk.take() else { return };
         let words = t.text.trim().to_string();
         self.emit(json!({"ev": "heard", "text": words, "final": true}));
+        if let Some(page) = &t.page {
+            // nothing heard: no note; the word "send" alone sends the
+            // page's notes (§4.1)
+            let phase = match send_word(&words) {
+                _ if words.is_empty() => "cancel",
+                true => "send",
+                false => "end",
+            };
+            return self.page_voice_over(page, phase, &words);
+        }
         if words.is_empty() {
             if let Some(s) = self.shot.take() {
                 self.forget(vec![s]);
@@ -540,6 +596,7 @@ impl Core {
                 kind: s(c, "kind"),
                 agent: s(c, "agent"),
                 text: s(c, "text"),
+                page: c.get("page").filter(|p| p.is_object()).cloned(),
             })
             .collect();
         let cards: Vec<Value> = self
@@ -550,10 +607,15 @@ impl Core {
                     .into_iter()
                     .map(|(n, label)| json!({"n": n, "label": label}))
                     .collect();
-                json!({"id": c.id, "kind": c.kind, "agent": c.agent, "text": c.text, "options": options})
+                let mut v = json!({"id": c.id, "kind": c.kind, "agent": c.agent, "text": c.text, "options": options});
+                if let Some(p) = &c.page {
+                    v["page"] = p.clone();
+                }
+                v
             })
             .collect();
         let pages = list("pages");
+        self.page_titles = pages.iter().map(|p| (s(p, "id"), s(p, "title"))).collect();
         self.emit(json!({"ev": "state", "agents": agents, "cards": cards, "pages": pages}));
     }
 
@@ -738,10 +800,12 @@ impl Core {
         let mut evs = Vec::new();
         let mut flushed = false;
         let mut failed = None;
+        let mut words = false;
         loop {
             match t.heard.try_recv() {
                 Ok(Heard::Text(w)) => {
                     t.text.push_str(&w);
+                    words = true;
                     if t.ending.is_none() {
                         evs.push(json!({"ev": "heard", "text": t.text.trim(), "final": false}));
                     }
@@ -766,9 +830,19 @@ impl Core {
         }
         let late = t.ending.is_some_and(|e| now.duration_since(e) >= FINAL_WAIT);
         let ending = t.ending.is_some();
+        let page = t.page.clone();
+        // a note talk's words so far, live on the page
+        if let (Some(p), true, None) = (&page, words, &failed) {
+            let text = t.text.trim().to_string();
+            self.hub.send(&json!({"op": "page_voice", "page": p, "phase": "heard", "text": text}));
+        }
         self.out.extend(evs);
         if let Some(e) = failed {
             self.talk = None;
+            if let Some(p) = page {
+                self.error(&e);
+                return self.page_voice_over(&p, "cancel", "");
+            }
             if let Some(s) = self.shot.take() {
                 self.forget(vec![s]);
             }

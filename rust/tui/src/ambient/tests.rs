@@ -719,3 +719,86 @@ fn pages_ride_the_state_and_a_waited_page_comes_in_front() {
     t.hub.say(json!({"ev": "page", "id": "p", "agent": "weekly-update", "state": "updating"}));
     assert!(!front(&mut t));
 }
+
+/// A note talk on page `id`: its words, then fn up; the hub's
+/// page_voice requests, in order.
+fn note_talk(t: &mut T, id: &str, words: &[&str]) -> Vec<Value> {
+    t.cmd(Cmd::PageTalk { page: id.into() });
+    let heard = t.fakes.listen.lock().unwrap().last().unwrap().heard.clone();
+    let mut reqs = vec![t.hub.next()];
+    for w in words {
+        heard.send(Heard::Text(format!(" {w}"))).unwrap();
+        t.until(|o| o.iter().any(|v| v["ev"] == "heard" && v["final"] == false));
+        reqs.push(t.hub.next());
+        t.out.retain(|v| v["ev"] != "heard");
+    }
+    t.cmd(Cmd::TalkEnd);
+    heard.send(Heard::Flushed).unwrap();
+    t.until(|o| o.iter().any(|v| v["ev"] == "heard" && v["final"] == true));
+    reqs.push(t.hub.next());
+    reqs
+}
+
+#[test]
+fn a_note_talk_goes_to_the_page_never_to_main() {
+    let mut t = T::new();
+    t.hub.say(json!({"ev": "state", "agents": [], "cards": [],
+        "pages": [{"id": "weekly-update", "title": "Weekly update", "agent": "a", "version": 1, "url": "u", "state": "ready"}]}));
+    t.until(|o| has(o, "state"));
+    t.ready();
+    let reqs = note_talk(&mut t, "weekly-update", &["make the intro", "shorter"]);
+    let pv = |phase: &str, text: &str| json!({"op": "page_voice", "page": "weekly-update", "phase": phase, "text": text});
+    assert_eq!(reqs, vec![pv("start", ""), pv("heard", "make the intro"), pv("heard", "make the intro shorter"), pv("end", "make the intro shorter")]);
+    let out = t.take();
+    // the capsule says where the words go, then idle: no sent, no main phases
+    let first = out.iter().find(|v| v["ev"] == "phase").unwrap();
+    assert_eq!(first, &json!({"ev": "phase", "phase": "listening", "page": {"id": "weekly-update", "title": "Weekly update"}}));
+    assert_eq!(phases(&out), vec!["listening", "idle"]);
+    assert!(!has(&out, "sent"), "{out:?}");
+
+    // "send" alone sends the page's notes; a page not in the state: its id
+    let reqs = note_talk(&mut t, "q3-plan", &["Envoie."]);
+    assert_eq!(reqs[0]["page"], "q3-plan");
+    assert_eq!(reqs.last().unwrap()["phase"], "send");
+    let out = t.take();
+    assert_eq!(out.iter().find(|v| v["ev"] == "phase").unwrap()["page"]["title"], "q3 plan");
+
+    // nothing heard: cancel; talk_cancel: cancel
+    let reqs = note_talk(&mut t, "weekly-update", &[]);
+    assert_eq!(reqs.last().unwrap(), &pv("cancel", ""));
+    t.cmd(Cmd::PageTalk { page: "weekly-update".into() });
+    assert_eq!(t.hub.next(), pv("start", ""));
+    t.cmd(Cmd::TalkCancel);
+    assert_eq!(t.hub.next(), pv("cancel", ""));
+    assert!(phase_is(&t.take(), "idle"));
+
+    // never an input to main
+    t.hub.w.set_read_timeout(Some(Duration::from_millis(1))).unwrap();
+    t.hub.r.get_ref().set_read_timeout(Some(Duration::from_millis(100))).unwrap();
+    let mut more = String::new();
+    assert!(t.hub.r.read_line(&mut more).is_err() || more.is_empty(), "more: {more}");
+}
+
+#[test]
+fn a_page_question_card_carries_its_page_link() {
+    let mut t = T::new();
+    let link = json!({"id": "w", "block": "q1", "url": "http://127.0.0.1:47100/p/w#q1"});
+    t.hub.say(json!({"ev": "state", "agents": [], "pages": [],
+        "cards": [{"id": 7, "kind": "question", "agent": "a", "text": "post now?\n1. post now\n2. wait", "page": link},
+                  {"id": 8, "kind": "question", "agent": "a", "text": "plain?"}]}));
+    t.until(|o| has(o, "state"));
+    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    assert_eq!(st["cards"][0]["page"], link);
+    assert_eq!(st["cards"][0]["options"][1]["label"], "wait");
+    assert!(st["cards"][1].get("page").is_none());
+}
+
+#[test]
+fn talk_start_with_a_page_is_a_note_talk() {
+    assert_eq!(
+        Cmd::parse(r#"{"cmd":"talk_start","page":{"id":"w","url":"http://127.0.0.1:47100/p/w"}}"#),
+        Ok(Cmd::PageTalk { page: "w".into() })
+    );
+    assert_eq!(Cmd::parse(r#"{"cmd":"talk_start","page":{"id":" "}}"#), Ok(Cmd::TalkStart));
+    assert_eq!(Cmd::parse(r#"{"cmd":"talk_start","page":null}"#), Ok(Cmd::TalkStart));
+}

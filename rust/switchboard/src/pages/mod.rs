@@ -6,6 +6,7 @@
 //! from a page become the agent's input there).
 
 pub mod lint;
+pub mod questions;
 pub mod server;
 pub mod store;
 
@@ -24,6 +25,9 @@ pub enum PageMsg {
     Sent { id: String, agent: String, text: String },
     /// the drafts of page `id` changed (its open notes count)
     Notes { id: String },
+    /// the user answered question `block` of page `id` on the page
+    /// (§4.2): `reply` goes to its card, as from the capsule
+    Answer { id: String, block: String, reply: String },
 }
 
 /// How the server reaches the hub's loop.
@@ -126,10 +130,27 @@ impl Pages {
 
     pub fn page_json(&self, m: &Meta) -> Value {
         let open = self.store.notes(&m.id).iter().filter(|n| n.open()).count();
-        json!({
+        let mut v = json!({
             "id": m.id, "title": m.title, "agent": m.agent, "version": m.version(),
             "url": self.url(&m.id), "at_ms": m.at_ms(), "state": m.state, "open_notes": open,
-        })
+        });
+        if let Some(k) = self.kicker(m) {
+            v["kicker"] = json!(k);
+        }
+        if self.asking(&m.id) {
+            v["asking"] = json!(true);
+        }
+        v
+    }
+
+    /// The meta line of the latest version's first heading block.
+    pub fn kicker(&self, m: &Meta) -> Option<String> {
+        questions::kicker(&self.store.html(&m.id, m.version())?)
+    }
+
+    /// The page holds a question whose card is open (§4.2).
+    pub fn asking(&self, id: &str) -> bool {
+        self.store.questions(id).iter().any(|q| q.card != 0 && q.reply.is_none())
     }
 
     /// The hub's `page` event.

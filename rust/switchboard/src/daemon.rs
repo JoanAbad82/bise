@@ -288,6 +288,11 @@ struct Shell {
     /// whether a turn of theirs has the notes yet (started or steered
     /// since). Its end without a publish puts the pages back to ready.
     page_turns: BTreeMap<String, (Vec<String>, bool)>,
+    /// The open cards of the pages' question blocks (§4.2): card →
+    /// (page, block); None until read from the store.
+    page_cards: Option<BTreeMap<u64, (String, String)>>,
+    /// The answers given to those cards, until the hub closes them.
+    page_replies: BTreeMap<u64, String>,
 }
 
 /// What an agent whose turn was cut by a restart receives.
@@ -531,6 +536,15 @@ impl Shell {
         if let Some(p) = &self.pages {
             snap["pages"] = json!(p.list_json());
             snap["pages_url"] = json!(p.base());
+            // a page question's card links its block (fn + ⏎ opens it)
+            let p = p.clone();
+            let qs = self.page_cards().clone();
+            if let Some(cards) = snap["cards"].as_array_mut() {
+                for c in cards {
+                    let Some((id, block)) = c["id"].as_u64().and_then(|n| qs.get(&n)) else { continue };
+                    c["page"] = json!({"id": id, "block": block, "url": format!("{}#{}", p.url(id), block)});
+                }
+            }
         }
         // one gate card for several agents' identical calls: it names them all
         self.gate_card_agents(&mut snap);
@@ -736,6 +750,8 @@ impl Shell {
                             }
                         }
                         self.broadcast(&pages.page_ev(&meta));
+                        // its question blocks: one card each (§4.2)
+                        self.page_questions(&meta.id, &meta.agent, &p.html);
                         let snap = self.snapshot();
                         self.broadcast(&snap);
                         let url = pages.url(&meta.id);
@@ -767,6 +783,14 @@ impl Shell {
                 let snap = self.snapshot();
                 self.broadcast(&snap);
             }
+            crate::pages::PageMsg::Answer { id, block, reply } => {
+                // the same path as the capsule's and the TUI's answer
+                if let Some(card) = self.page_card(&id, &block) {
+                    let text = self.page_reply_text(&format!("/answer {card} {reply}")).unwrap_or_default();
+                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text });
+                }
+                self.page_answers();
+            }
         }
     }
 
@@ -793,6 +817,124 @@ impl Shell {
         }
         let snap = self.snapshot();
         self.broadcast(&snap);
+    }
+
+    /// The open cards of the pages' questions: card → (page, block),
+    /// read from the store once.
+    fn page_cards(&mut self) -> &mut BTreeMap<u64, (String, String)> {
+        let pages = self.pages.clone();
+        self.page_cards.get_or_insert_with(|| {
+            let mut m = BTreeMap::new();
+            if let Some(p) = pages {
+                for meta in p.store.list() {
+                    for q in p.store.questions(&meta.id) {
+                        if q.card != 0 && q.reply.is_none() {
+                            m.insert(q.card, (meta.id.clone(), q.block.clone()));
+                        }
+                    }
+                }
+            }
+            m
+        })
+    }
+
+    /// §4.2: after a publish of page `id`, one open card per question
+    /// block, `agent` asking: a changed question gets a new card (the
+    /// old one closes `replaced`), a question gone closes its card
+    /// (`withdrawn`), an answered one stays answered.
+    fn page_questions(&mut self, id: &str, agent: &str, html: &str) {
+        let Some(pages) = self.pages.clone() else { return };
+        let old = pages.store.questions(id);
+        let new = crate::pages::questions::of_fragment(html);
+        if old.is_empty() && new.is_empty() {
+            return;
+        }
+        let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
+        let plan = crate::pages::questions::plan(&old, new, &|c| open.contains(&c));
+        for (card, res) in &plan.close {
+            self.page_cards().remove(card);
+            self.step(Input::ConfirmClose { card: *card, res: res.to_string() });
+        }
+        let mut qs = plan.questions;
+        for q in qs.iter_mut().filter(|q| q.card == 0 && q.reply.is_none()) {
+            let before: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
+            // as the page's agent asking (no message to reply to: the
+            // answer goes to that agent, or to main when it is gone);
+            // no client waits for the reply (token 0: never a
+            // connection's; sb-core's numbers are small)
+            self.step(Input::Agent {
+                token: 0,
+                from: agent.to_string(),
+                req: crate::core::AgentReq::Card { text: q.card_text(), for_msg: None },
+            });
+            let card = self.hub.st.open_cards().filter(|c| !before.contains(&c.id) && c.kind == "question").map(|c| c.id).max();
+            match card {
+                Some(card) => {
+                    q.card = card;
+                    self.page_cards().insert(card, (id.to_string(), q.block.clone()));
+                }
+                None => log_line(&self.opts.paths, &format!("page {id}: no card opened for question {}", q.block)),
+            }
+        }
+        if let Err(e) = pages.locked(|s| s.save_questions(id, &qs)) {
+            log_line(&self.opts.paths, &format!("page {id}: questions not saved: {e}"));
+        }
+        pages.push("", "pages", &json!({"pages": pages.list_json()}));
+    }
+
+    /// The card of question `block` on page `id`, when it is still open.
+    fn page_card(&mut self, id: &str, block: &str) -> Option<u64> {
+        let card = self.page_cards().iter().find(|(_, (p, b))| p == id && b == block).map(|(c, _)| *c)?;
+        self.hub.st.open_cards().any(|c| c.id == card).then_some(card)
+    }
+
+    /// `/answer N reply` on a page question's card (from the TUI, the
+    /// capsule or the page): an option's number becomes its words (the
+    /// agent reads words), kept until the card closes.
+    fn page_reply_text(&mut self, text: &str) -> Option<String> {
+        let rest = text.trim().strip_prefix("/answer ")?;
+        let (n, reply) = rest.trim().split_once(' ')?;
+        let card: u64 = n.trim_start_matches('#').parse().ok()?;
+        let (id, block) = self.page_cards().get(&card).cloned()?;
+        let pages = self.pages.clone()?;
+        let reply = reply.trim().to_string();
+        let words = match reply.parse::<usize>() {
+            Ok(k) => pages.store.questions(&id).iter().find(|q| q.block == block).and_then(|q| q.option(k).map(String::from)),
+            Err(_) => None,
+        }
+        .unwrap_or(reply);
+        self.page_replies.insert(card, words.clone());
+        Some(format!("/answer {card} {words}"))
+    }
+
+    /// The page questions whose cards closed: the answer goes on the page
+    /// (`answered {block, reply}` on its SSE; "" when the card closed
+    /// without one: withdrawn by main, closed by the user).
+    fn page_answers(&mut self) {
+        let Some(pages) = self.pages.clone() else { return };
+        let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
+        let closed: Vec<(u64, String, String)> = self
+            .page_cards()
+            .iter()
+            .filter(|(c, _)| !open.contains(c))
+            .map(|(c, (p, b))| (*c, p.clone(), b.clone()))
+            .collect();
+        if closed.is_empty() {
+            return;
+        }
+        for (card, id, block) in closed {
+            self.page_cards().remove(&card);
+            let reply = self.page_replies.remove(&card).unwrap_or_default();
+            let mut qs = pages.store.questions(&id);
+            if let Some(q) = qs.iter_mut().find(|q| q.card == card) {
+                q.reply = Some(reply.clone());
+            }
+            if let Err(e) = pages.locked(|s| s.save_questions(&id, &qs)) {
+                log_line(&self.opts.paths, &format!("page {id}: questions not saved: {e}"));
+            }
+            pages.push(&id, "answered", &json!({"block": block, "reply": reply}));
+        }
+        pages.push("", "pages", &json!({"pages": pages.list_json()}));
     }
 
     fn step(&mut self, input: Input) {
@@ -1027,6 +1169,7 @@ impl Shell {
                 self.broadcast(&json!({"ev": "renamed", "old": old, "new": new}));
             }
             Effect::State => {
+                self.page_answers();
                 let snap = self.snapshot();
                 self.broadcast(&snap);
             }
@@ -1770,11 +1913,19 @@ impl Shell {
                 // BISE-266: a key saved since a REPL started reaches it
                 // before this message does
                 self.keys_changed();
-                self.step(Input::ClientInput {
-                    client: id,
-                    focus: s("focus"),
-                    text: s("text"),
-                })
+                // an answer to a page's question: its words, for the page
+                let text = self.page_reply_text(&s("text")).unwrap_or_else(|| s("text"));
+                self.step(Input::ClientInput { client: id, focus: s("focus"), text });
+                self.page_answers();
+            }
+            // a note talk's words (§4.1): to the page's frame, never an input
+            "page_voice" => {
+                if let Some(p) = &self.pages {
+                    let page = s("page");
+                    if p.store.meta(&page).is_some() {
+                        p.push(&page, "voice", &json!({"phase": s("phase"), "text": s("text")}));
+                    }
+                }
             }
             // older lines of a feed, before a position (the TUI scrolled
             // to the top of what it holds)
@@ -2336,6 +2487,8 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         cu: crate::computer_use::Watch::new(),
         pages: None,
         page_turns: BTreeMap::new(),
+        page_cards: None,
+        page_replies: BTreeMap::new(),
     };
     // the page server (docs/ambient-pages.md §2.4): 127.0.0.1, a stable
     // port per workspace; its notes come back to the loop
