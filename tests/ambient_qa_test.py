@@ -30,6 +30,10 @@ import qa  # noqa: E402
 sys.path.insert(0, os.path.join(PLUGIN, "fake-accounts"))
 import fake_accounts as fake  # noqa: E402
 
+
+def iso_now():
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
 SPEC_STATES = {"idle", "hold fn", "let go", "main speaks", "end of turn", "needs you", "answered", "done", "failed"}
 failures = []
 
@@ -207,7 +211,8 @@ def fake_accounts():
         m = json.load(open(os.path.join(root, svc, "plugin.json")))
         check(m["name"] == svc and m["$schema"].endswith("/1.0.0/plugin.schema.json") and "extensions" not in m, m)
         mc = json.load(open(os.path.join(root, svc, "mcp.json")))
-        check(mc["mcpServers"][svc]["args"][-1] == svc and os.path.exists(mc["mcpServers"][svc]["args"][1]), mc)
+        srv = mc["mcpServers"][qa.FAKE_SERVER_NAMES.get(svc, svc)]
+        check(srv["args"][-1] == svc and os.path.exists(srv["args"][1]), mc)
     check("/.agents/" in open(os.path.join(ws, ".git", "info", "exclude")).read(), "out of the throwaway repo's git")
 
 
@@ -244,6 +249,24 @@ def launch_grows():
     check(len(tool("hn", "comments", {"id": "41712001"})["comments"]) == 7, "every_min of hub time")
     fb = tool("slack", "read_channel", {"channel": "acme-feedback"})["messages"]
     check(len(fb) == 3 and {m["user"] for m in fb} == {"benjamin.roy"} and fb[0]["url"].startswith("https://acme.slack.com/archives/C05/p"), fb)
+    # the 'today' set (roadmap E, meetings): three meetings around the hub's now, Granola's notes once a meeting is over
+    env = dict(os.environ, FAKE_ACCOUNTS_CLOCK=clk, FAKE_ACCOUNTS_SET="today")
+
+    def tool2(svc, name, args):
+        msgs = [init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": name, "arguments": args}}]
+        p = subprocess.run([sys.executable, "-B", srv, svc], input="".join(json.dumps(m) + "\n" for m in msgs), capture_output=True, text=True, timeout=30, env=env)
+        return json.loads(json.loads(p.stdout.splitlines()[1])["result"]["content"][0]["text"])
+    json.dump({"start": time.time(), "ticks": [], "every_min": 0}, open(clk, "w"))
+    ev = tool2("calendar", "list_events", {})["events"]
+    check([e["id"] for e in ev] == ["e401", "e402", "e403"] and ev[0]["start"] > iso_now() and ev[2]["moved_from"] and ev[0]["start_local"], ev)
+    notes = tool2("granola", "list_meetings", {})["meetings"]
+    check({m["title"] for m in notes} == {"Q2 review with Northwind", "Team sync"}, notes)
+    json.dump({"start": time.time() - 50 * 60, "ticks": [], "every_min": 0}, open(clk, "w"))
+    later = tool2("granola", "list_meetings", {})["meetings"]
+    check(len(later) == 3 and later[0]["title"] == "Q3 renewal with Northwind", "today's notes once it is over")
+    full = tool2("granola", "get_meetings", {"meeting_ids": [later[0]["id"]]})["meetings"][0]
+    check(full["action_items"] and full["decisions"] and "[[0]]" in tool2("granola", "query_granola_meetings", {"query": "northwind renewal"})["response"], full)
+    check(any(m["id"] == "m130" for m in tool2("gmail", "search_messages", {"query": "renewal"})["messages"]), "the last mail with the attendee")
     truth = qa.launch_truth(batches=2)
     check(truth["needs_answer"] == 8 and len(truth["new_needs_answer"]) == 4, truth)
 

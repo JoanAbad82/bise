@@ -140,6 +140,51 @@
       {"id": 41698770, "title": "Ask HN: What do you use for team offsites?", "url": null, "by": "opsnerd", "points": 41, "comments": 58, "rank": {"front": null, "top": null, "show": null, "newest": null}, "posted": "2026-10-01T15:00:00Z"}
     ]
   },
+  "granola": {
+    "meetings": [
+      {"id": "8b1f2c3d-0001-4a5b-9c8d-000000000001", "title": "Q2 review with Northwind", "date": "2026-09-11T13:00:00Z",
+       "attendees": [{"name": "Hélène Roux", "email": "helene.roux@northwind.test"}, {"name": "Camille", "email": "camille@acme.test"}],
+       "summary": "Northwind is happy with the weekly view; usage up 30%. Hélène asked for SSO before renewing and hinted at a 3-year deal if the price holds.",
+       "decisions": ["Keep the current price until the Q3 renewal", "Acme shares the SSO timeline in writing"],
+       "action_items": [{"owner": "Camille", "text": "send Hélène the SSO timeline in writing", "due": "2026-09-25"},
+                        {"owner": "Hélène Roux", "text": "confirm the seat count for Q3 (now 42)", "due": "2026-09-30"}],
+       "transcript": "Hélène: the weekly view saved my team a meeting a week... Camille: SSO is planned for Q4..."},
+      {"id": "8b1f2c3d-0002-4a5b-9c8d-000000000002", "title": "Team sync", "date": "2026-09-25T09:30:00Z",
+       "attendees": [{"name": "Marc Dubois", "email": "marc@acme.test"}, {"name": "Nora Haddad", "email": "nora@acme.test"}, {"name": "Lucas Bernard", "email": "lucas@acme.test"}, {"name": "Camille", "email": "camille@acme.test"}],
+       "summary": "Dark mode slips a week; offsite budget to be capped; Ines starts in October.",
+       "decisions": ["Dark mode ships on the settings page first"], "action_items": [{"owner": "Nora Haddad", "text": "propose the offsite cap", "due": "2026-10-01"}]}
+    ]
+  },
+  "sets": {
+    "today": {
+      "_about": "roadmap E and the meetings (amb-kit m_5643, m_5656): three meetings around the run's own now (minutes from the hub's start): the Northwind renewal (notes from the last time, and notes of today's that appear once it is over), the team sync, a coffee with no description and no notes, moved later in the day.",
+      "calendar": {"events": [
+        {"id": "e401", "title": "Q3 renewal with Northwind", "start_in_min": 15, "end_in_min": 45, "location": "Zoom",
+         "attendees": [{"name": "Hélène Roux", "email": "helene.roux@northwind.test"}, {"name": "Camille", "email": "camille@acme.test"}],
+         "description": "Northwind's annual plan renews on Oct 31. Hélène wants a 3-year price and SSO."},
+        {"id": "e402", "title": "Team sync", "start_in_min": 60, "end_in_min": 90, "location": "Room 2",
+         "attendees": [{"name": "Marc Dubois", "email": "marc@acme.test"}, {"name": "Nora Haddad", "email": "nora@acme.test"}, {"name": "Lucas Bernard", "email": "lucas@acme.test"}, {"name": "Camille", "email": "camille@acme.test"}],
+         "description": "weekly"},
+        {"id": "e403", "title": "Coffee with Yann", "start_in_min": 150, "end_in_min": 180, "moved_from_in_min": 105, "status": "moved", "location": "",
+         "attendees": [{"name": "Yann Meyer", "email": "yann@meyer.test"}, {"name": "Camille", "email": "camille@acme.test"}], "description": ""}
+      ]},
+      "granola": {"+meetings": [
+        {"id": "8b1f2c3d-0003-4a5b-9c8d-000000000003", "title": "Q3 renewal with Northwind", "start_in_min": 15, "available_in_min": 47,
+         "attendees": [{"name": "Hélène Roux", "email": "helene.roux@northwind.test"}, {"name": "Camille", "email": "camille@acme.test"}],
+         "summary": "Northwind renews for 3 years at the current price if SSO ships by January. 45 seats.",
+         "decisions": ["3-year renewal at the current price, conditional on SSO by January", "45 seats from November"],
+         "action_items": [{"owner": "Camille", "text": "send Hélène the renewal quote for 3 years, 45 seats", "due": "tomorrow"},
+                          {"owner": "Camille", "text": "ask Lucas for a firm SSO date", "due": "Friday"},
+                          {"owner": "Hélène Roux", "text": "get the legal sign-off on the 3-year term", "due": "next week"}],
+         "transcript": "Hélène: if SSO is there by January we sign for three years..."}
+      ]},
+      "gmail": {"+messages": [
+        {"id": "m130", "thread": "t130", "from": "Hélène Roux <helene.roux@northwind.test>", "to": "camille@acme.test", "date": "2026-09-30T16:10:00Z", "labels": ["INBOX", "IMPORTANT"], "unread": false,
+         "subject": "Before our renewal call", "body": "Hi Camille, before Thursday: can you bring a 3-year price, and where SSO is? Legal will ask. Best, Hélène"}
+      ]},
+      "people": ["- Hélène Roux: buyer at Northwind, prefers mail to calls, decides with legal", "- Marc Dubois: Acme's CEO, wants numbers first"]
+    }
+  },
   "launch": {
     "_about": "Acme's launch day, seen from HN, Reddit, X and Bluesky (roadmap B's launch watch). Comments come in batches: batch 0 at the hub's start, then one more per tick (qa.py tick) or every every_min minutes of hub time. Numbers move per batch (index = batches seen - 1, the last one held). kind and needs_answer are the QA's truth: the fake tools never show them.",
     "every_min": 30,

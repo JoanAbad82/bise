@@ -280,6 +280,19 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="")
         with open(clock, "w") as f:
             json.dump({"start": time.time(), "ticks": [], "every_min": float(os.environ.get("AMBIENT_QA_TICK_MIN") or 30)}, f)
         E.env["FAKE_ACCOUNTS_CLOCK"] = clock
+        # a run's own data (fixtures' sets: today = the meetings around now, Granola's notes, people.md)
+        sets = os.environ.get("AMBIENT_QA_SET") or ""
+        if sets:
+            E.env["FAKE_ACCOUNTS_SET"] = sets
+    # the hub's ~/bise (taste.md, people.md) is the throwaway's, never the user's (amb-home m_5668)
+    home_ws = os.path.join(E.tmp, "bise")
+    os.makedirs(home_ws, exist_ok=True)
+    E.env["BISE_HOME_WORKSPACE"] = home_ws
+    fx = json.load(open(os.path.join(FAKE_ACCOUNTS, "fixtures.json")))
+    people = [l for s in (os.environ.get("AMBIENT_QA_SET") or "").split(",") if s for l in fx.get("sets", {}).get(s, {}).get("people", [])]
+    if people:
+        with open(os.path.join(home_ws, "people.md"), "w") as f:
+            f.write("# people\n\n" + "\n".join(people) + "\n")
     if not user_ask:
         computer = False
     E.env["BEND_PLUGINS_STATE"] = hub_plugins_state(E.tmp, computer, keep_user=bool(user_ask and connectors))
@@ -321,7 +334,9 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="")
 
 
 FAKE_ACCOUNTS = os.path.join(HERE, "fake-accounts")
-FAKE_SERVICES = ("gmail", "slack", "linear", "calendar", "github", "hn", "reddit", "x", "bluesky", "kit")
+FAKE_SERVICES = ("gmail", "slack", "linear", "calendar", "github", "hn", "reddit", "x", "bluesky", "kit", "granola")
+# the tools' namespace as the real connector names it (tools.Granola.*)
+FAKE_SERVER_NAMES = {"granola": "Granola"}
 
 
 def _clock_path(clock=None):
@@ -373,7 +388,7 @@ def install_fake_accounts(ws):
                        "description": "%s for this workspace: a fake QA account with fixture data (Camille at acme); writes go to a QA outbox" % svc}, f, indent=1)
         with open(os.path.join(d, "mcp.json"), "w") as f:
             json.dump({"$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
-                       "mcpServers": {svc: {"type": "stdio", "command": "python3", "args": ["-B", os.path.join(FAKE_ACCOUNTS, "fake_accounts.py"), svc]}}}, f, indent=1)
+                       "mcpServers": {FAKE_SERVER_NAMES.get(svc, svc): {"type": "stdio", "command": "python3", "args": ["-B", os.path.join(FAKE_ACCOUNTS, "fake_accounts.py"), svc]}}}, f, indent=1)
     ex = os.path.join(ws, ".git", "info", "exclude")
     if os.path.isdir(os.path.dirname(ex)):
         with open(ex, "a") as f:

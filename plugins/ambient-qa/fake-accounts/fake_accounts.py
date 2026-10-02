@@ -30,7 +30,20 @@ def load(today=None):
     delta = today - base
     if delta:
         text = ISO_DAY.sub(lambda m: (datetime.date.fromisoformat(m.group(1)) + delta).isoformat(), text)
-    return json.loads(text)
+    data = json.loads(text)
+    # a run's own data on top ($FAKE_ACCOUNTS_SET=today,...: fixtures' sets):
+    # a key replaces the service's, a '+key' appends to its list
+    for name in [s for s in (os.environ.get("FAKE_ACCOUNTS_SET") or "").split(",") if s]:
+        for svc, over in data.get("sets", {}).get(name, {}).items():
+            if not isinstance(over, dict):
+                continue   # _about, people (qa.py writes people.md)
+            base = data.setdefault(svc, {})
+            for k, v in over.items():
+                if k.startswith("+"):
+                    base.setdefault(k[1:], []).extend(v)
+                else:
+                    base[k] = v
+    return data
 
 
 DATA = load()
@@ -108,12 +121,33 @@ def linear():
     }
 
 
+def rel_time(m):
+    """Minutes from the hub's start (a run's meetings sit around its own now)."""
+    return batches()[0] + float(m) * 60
+
+
+def local(t):
+    return time.strftime("%H:%M", time.localtime(t))
+
+
 def calendar():
     c = DATA["calendar"]
+
+    def events():
+        out = []
+        for e in c["events"]:
+            e = dict(e)
+            if "start_in_min" in e:
+                s, en = rel_time(e.pop("start_in_min")), rel_time(e.pop("end_in_min"))
+                e.update(start=iso(s), end=iso(en), start_local=local(s), end_local=local(en))
+            if "moved_from_in_min" in e:
+                e["moved_from"] = local(rel_time(e.pop("moved_from_in_min")))
+            out.append(e)
+        return out
     return {
-        "list_events": ("Events between start and end (ISO), else all.", S(start="string", end="string"),
-                        lambda a: {"events": [e for e in c["events"] if (not a.get("start") or e["end"] >= a["start"]) and (not a.get("end") or e["start"] <= a["end"])]}),
-        "get_event": ("One event.", S(id="string"), lambda a: next((e for e in c["events"] if e["id"] == a.get("id")), {"error": "no event %s" % a.get("id")})),
+        "list_events": ("Events between start and end (ISO), else all; times in UTC, start_local/end_local in the user's time.", S(start="string", end="string"),
+                        lambda a: {"events": [e for e in events() if (not a.get("start") or e["end"] >= a["start"]) and (not a.get("end") or e["start"] <= a["end"])]}),
+        "get_event": ("One event.", S(id="string"), lambda a: next((e for e in events() if e["id"] == a.get("id")), {"error": "no event %s" % a.get("id")})),
         "create_event": ("Create an event.", S(title="string", start="string", end="string", attendees="array"), lambda a: write("calendar", "create_event", a)),
     }
 
@@ -129,6 +163,50 @@ def github():
         "comment_issue": ("Comment on an issue or PR.", S(number="integer", body="string"), lambda a: write("github", "comment_issue", a)),
         "list_releases": ("The repo's releases, newest first, with their notes.", S(limit="integer"),
                           lambda a: {"releases": g.get("releases", [])[: int(a.get("limit") or 10)]}),
+    }
+
+
+def granola():
+    """Granola meeting notes, like the real connector's tools: a meeting's
+    notes exist once it is over (available_in_min from the hub's start, or a
+    past date); today's meeting without notes stays without."""
+    g = DATA.get("granola", {"meetings": []})
+
+    def seen():
+        now, out = time.time(), []
+        for m in g["meetings"]:
+            m = dict(m)
+            if "available_in_min" in m:
+                at = rel_time(m.pop("available_in_min"))
+                if at > now:
+                    continue
+                m["date"] = iso(rel_time(m.pop("start_in_min", 0)))
+            m["url"] = "https://notes.granola.ai/d/%s" % m["id"]
+            out.append(m)
+        return sorted(out, key=lambda m: m["date"], reverse=True)
+
+    def short(m):
+        return {k: m[k] for k in ("id", "title", "date", "attendees", "url")}
+
+    def query(a):
+        q = [w for w in re.findall(r"\w{3,}", a.get("query", "").lower())]
+        ids = set(a.get("document_ids") or [])
+        hits = [m for m in seen() if (not ids or m["id"] in ids) and (not q or any(w in json.dumps(m, ensure_ascii=False).lower() for w in q))]
+        if not hits:
+            return {"response": "No meeting notes match."}
+        lines = ["%s (%s): %s [[%d]](%s)" % (m["title"], m["date"][:10], m["summary"], i, m["url"]) for i, m in enumerate(hits[:5])]
+        return {"response": "\n".join(lines)}
+    return {
+        "query_granola_meetings": ("Query the user's meeting notes in natural language; the answer cites the notes [[n]](url).", S(query="string", document_ids="array"), query),
+        "list_meetings": ("The user's meeting notes in a time range (this_week, last_week, last_30_days, custom): titles, dates, attendees, urls.",
+                          S(time_range="string", custom_start="string", custom_end="string", folder_id="string"),
+                          lambda a: {"meetings": [short(m) for m in seen()]}),
+        "get_meetings": ("Meetings by id: notes, AI summary, decisions, action items (owner, due), attendees.", S(meeting_ids="array"),
+                         lambda a: {"meetings": [m for m in seen() if m["id"] in (a.get("meeting_ids") or [])]}),
+        "get_meeting_transcript": ("One meeting's transcript.", S(meeting_id="string"),
+                                   lambda a: next(({"transcript": m.get("transcript", "")} for m in seen() if m["id"] == a.get("meeting_id")), {"error": "no meeting %s" % a.get("meeting_id")})),
+        "list_meeting_folders": ("The user's note folders.", S(), lambda a: {"folders": []}),
+        "get_account_info": ("The Granola account.", S(), lambda a: {"email": DATA["gmail"]["me"], "workspace": "acme", "mcp_note_access": {"scopes": ["personal"]}}),
     }
 
 
@@ -336,7 +414,7 @@ def bluesky():
 
 
 SERVICES = {"gmail": gmail, "slack": slack, "linear": linear, "calendar": calendar, "github": github, "hn": hn,
-            "reddit": reddit, "x": x, "bluesky": bluesky, "kit": kit}
+            "reddit": reddit, "x": x, "bluesky": bluesky, "kit": kit, "granola": granola}
 
 
 def main():
