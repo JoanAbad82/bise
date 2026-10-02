@@ -24,7 +24,24 @@ fn has(errs: &[String], want: &str) {
 const WEEKLY: &str = include_str!("../../../../apps/ambient/kit/examples/weekly-update.html");
 
 #[test]
-fn the_examples_pass() {
+fn every_example_page_passes() {
+    let dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/ambient/kit/examples");
+    let mut n = 0;
+    for f in std::fs::read_dir(&dir).unwrap() {
+        let p = f.unwrap().path();
+        if p.extension().is_some_and(|e| e == "html") {
+            if let Err(e) = lint(&std::fs::read_to_string(&p).unwrap()) {
+                panic!("{}: {e:#?}", p.display());
+            }
+            n += 1;
+        }
+    }
+    assert!(n >= 3, "examples in {}: {n}", dir.display());
+}
+
+#[test]
+fn the_weekly_update_has_every_kind() {
     let blocks = ok(WEEKLY);
     assert!(blocks.len() >= 5, "{blocks:#?}");
     for kit in KINDS {
