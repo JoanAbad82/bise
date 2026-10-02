@@ -21,6 +21,8 @@ pub fn min_ms() -> u64 {
 }
 const HOUR_MS: u64 = 60 * MIN_MS;
 const DAY_MS: u64 = 24 * HOUR_MS;
+/// A wake that did not reach its agent is tried again this much later.
+const RETRY_MS: u64 = MIN_MS;
 
 /// When a timer fires.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -109,8 +111,10 @@ pub struct New {
 /// What a tick asks the hub to do for one timer.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Act {
-    /// wake `agent` with `text`; `journal` records it
-    Wake { agent: String, text: String, journal: Value },
+    /// wake `agent` with `text`; `journal` records it. The hub then says
+    /// whether it reached the agent: [`Timers::delivered`] or
+    /// [`Timers::undelivered`] (a fire counts only once delivered)
+    Wake { id: u64, agent: String, text: String, journal: Value },
     /// the timer ends (`journal` records why)
     Stop { journal: Value },
 }
@@ -242,14 +246,30 @@ impl Timers {
             let fired = t.fired + 1;
             let journal = json!({"type": "every_fired", "id": id, "fired": fired, "next_ms": t.sched.next(t.next_ms, now), "at": now});
             self.read(&journal);
-            acts.push(Act::Wake { agent: t.agent.clone(), text: wake_text(&t, fired, now), journal });
-            if t.times.is_some_and(|n| fired >= n) {
-                if let Some(journal) = self.stop(id, "it ran its times") {
-                    acts.push(Act::Stop { journal });
-                }
-            }
+            acts.push(Act::Wake { id, agent: t.agent.clone(), text: wake_text(&t, fired, now), journal });
         }
         acts
+    }
+
+    /// The wake of timer `id` reached its agent: the timer ends when it
+    /// ran its times (its journal line, already read in).
+    pub fn delivered(&mut self, id: u64) -> Option<Value> {
+        let t = self.map.get(&id)?;
+        if t.times.is_some_and(|n| t.fired >= n) {
+            return self.stop(id, "it ran its times");
+        }
+        None
+    }
+
+    /// The wake of timer `id` did not reach its agent (the core dropped
+    /// it): the fire does not count and it is tried again in a minute
+    /// (amb-tools m_5822: a one-shot timer was spent on a lost wake). Its
+    /// journal line, already read in.
+    pub fn undelivered(&mut self, id: u64, now: u64) -> Option<Value> {
+        let t = self.map.get(&id)?;
+        let j = json!({"type": "every_fired", "id": id, "fired": t.fired.saturating_sub(1), "next_ms": now + RETRY_MS, "at": t.last_ms, "undelivered": true});
+        self.read(&j);
+        Some(j)
     }
 
     /// `sb every`: one line per timer, or a line saying there is none.
@@ -543,13 +563,63 @@ mod tests {
         ts.add(n, NOW);
         ts.add(New { agent: "gone".into(), ..new(Sched::Every(MIN_MS)) }, NOW);
         let st = |a: &str| if a == "gone" { AgentNow::Gone } else { AgentNow::Idle };
+        let deliver = |ts: &mut Timers, acts: Vec<Act>| {
+            for a in acts {
+                if let Act::Wake { id, .. } = a {
+                    ts.delivered(id);
+                }
+            }
+        };
         let acts = ts.tick(NOW + MIN_MS, st);
         assert_eq!(wakes(&acts), 2);
         assert!(!ts.map.contains_key(&3), "a dropped agent's timer stops");
-        ts.tick(NOW + 2 * MIN_MS, st);
+        deliver(&mut ts, acts);
+        let acts = ts.tick(NOW + 2 * MIN_MS, st);
+        assert!(ts.map.contains_key(&1), "its second fire counts once delivered");
+        deliver(&mut ts, acts);
         assert!(!ts.map.contains_key(&1), "two times: done");
         ts.tick(NOW + 3 * MIN_MS, st);
         assert!(ts.map.is_empty(), "past its end");
+    }
+
+    /// amb-tools m_5822: a one-shot day timer fired, its wake never reached
+    /// main, and `it ran its times` spent it. A fire counts only once its
+    /// wake is delivered; a lost one is tried again a minute later.
+    #[test]
+    fn a_one_shot_timer_is_spent_only_by_a_delivered_wake() {
+        let mut ts = Timers::default();
+        let mut n = new(Sched::Daily(7 * 60 + 30));
+        n.times = Some(1);
+        let (id, set) = ts.add(n, NOW);
+        let due = ts.map[&id].next_ms;
+        let mut lines = vec![set];
+        let acts = ts.tick(due, |_| AgentNow::Idle);
+        assert_eq!(wakes(&acts), 1);
+        let Act::Wake { journal, .. } = &acts[0] else { panic!() };
+        lines.push(journal.clone());
+        // lost: not spent, not counted, due again in a minute
+        let j = ts.undelivered(id, due).unwrap();
+        lines.push(j);
+        assert_eq!((ts.map[&id].fired, ts.map[&id].next_ms), (0, due + RETRY_MS));
+        assert!(ts.tick(due + 1000, |_| AgentNow::Idle).is_empty(), "no retry before the minute");
+        // the retry is delivered: now it ran its times
+        let acts = ts.tick(due + RETRY_MS, |_| AgentNow::Idle);
+        assert_eq!(wakes(&acts), 1);
+        let Act::Wake { text, journal, .. } = &acts[0] else { panic!() };
+        assert!(text.contains("1/1"), "{text}");
+        lines.push(journal.clone());
+        lines.push(ts.delivered(id).expect("ran its times"));
+        assert!(ts.map.is_empty());
+        // the journal replays to the same end
+        let mut back = Timers::default();
+        for l in &lines {
+            back.read(l);
+        }
+        assert!(back.map.is_empty());
+        // a delivered wake of a timer with times left: no stop
+        let (id2, _) = ts.add(new(Sched::Every(MIN_MS)), NOW);
+        ts.tick(NOW + MIN_MS, |_| AgentNow::Idle);
+        assert_eq!(ts.delivered(id2), None);
     }
 
     #[test]

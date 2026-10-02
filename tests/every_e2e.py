@@ -110,6 +110,19 @@ def main():
         check("#3 @t1" not in r and "#2 @main" in r, "t1's timer is gone, main's stays: %r" % r)
         journal = [json.loads(l) for l in open(os.path.join(E.state, "journal.jsonl")) if '"every_' in l]
         check(any(j.get("type") == "every_stop" and j.get("id") == 3 for j in journal), "the stop is in the journal")
+
+        # a one-shot day timer to an idle main (amb-tools m_5822): the wake
+        # reaches main as a turn, and only then has it run its times
+        at = time.strftime("%H:%M", time.localtime(time.time() + 60))
+        r = main_says(c, 'sb every day %s "ONE-SHOT brief" --times 1 --until 23:59' % at, "timer set")
+        check("#4 @main every day %s" % at in r, "the one-shot: %r" % r)
+        c.wait(lambda: any(l.startswith("sb msg-in") and "ONE-SHOT brief" in l for l in c.lines("main")), 150, "main's wake")
+        c.wait_idle("main")
+        journal = [json.loads(l) for l in open(os.path.join(E.state, "journal.jsonl"))]
+        sent = [k for k, j in enumerate(journal) if j.get("type") == "message_sent" and "ONE-SHOT" in j["msg"]["text"]]
+        stop = [k for k, j in enumerate(journal) if j.get("type") == "every_stop" and j.get("id") == 4]
+        check(sent and stop and sent[0] < stop[0] and journal[stop[0]]["why"] == "it ran its times",
+              "sent, then spent: %r %r" % (sent, stop))
     except AssertionError as e:
         print("FAIL", e)
         if os.environ.get("EVERY_DEBUG"):

@@ -1429,9 +1429,26 @@ impl Hub {
         });
         for a in acts {
             match a {
-                crate::every::Act::Wake { agent, text, journal } => {
+                crate::every::Act::Wake { id, agent, text, journal } => {
                     fx.push(Effect::Journal(journal));
+                    let n = fx.len();
                     self.core(fx, env, None, json!({"t": "hub_msg", "to": agent, "text": text}));
+                    // a fire counts once its message is sent (amb-tools
+                    // m_5822: an sb-core without hub_msg dropped it and the
+                    // one-shot timer was spent): else retried in a minute
+                    let sent = fx[n..].iter().any(|e| matches!(e, Effect::Journal(j) if j["type"] == "message_sent"));
+                    if sent {
+                        if let Some(j) = self.every.delivered(id) {
+                            fx.push(Effect::Journal(j));
+                        }
+                    } else if let Some(j) = self.every.undelivered(id, env.now()) {
+                        fx.push(Effect::Journal(j));
+                        fx.push(line(
+                            MAIN,
+                            "warn",
+                            &format!("timer #{id}: its wake did not reach @{agent}; tried again in a minute (an old sb-core? scripts/bins.sh sb-core)"),
+                        ));
+                    }
                 }
                 crate::every::Act::Stop { journal } => fx.push(Effect::Journal(journal)),
             }
