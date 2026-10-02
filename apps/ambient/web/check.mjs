@@ -844,6 +844,17 @@ law("notes: stop goes alone: the payload holds only it, and after the send his d
   eq(m.drafts().map((n) => n.kind), ["tick"]);
   assert.equal(m.get(s.id).status, "sent");
 });
+law("notes: a report's 'start an agent' (bise:start) is the toolbar's start note, sent alone, never a take-back (amb-kit d418d973)", () => {
+  const m = N.model([], counted());
+  m.react("k1", "t1", "tick", "book the room", 1, 1);
+  const s = m.startNow("r1", "i2", "the install path is wrong", 1, 2);
+  eq([s.kind, s.block, s.item, s.text], ["start", "r1", "i2", "the install path is wrong"]);
+  assert.equal(m.startNow("r1", "i2", "the install path is wrong", 1, 3), s);   // again: the same note
+  assert.equal(N.label(s), "start an agent");
+  eq(m.payload(s.id).notes.map((n) => n.kind), ["start"]);
+  m.sentOne(s.id, 4);
+  eq(m.drafts().map((n) => n.kind), ["tick"]);
+});
 law("notes: a row its agent ticked (bise:ticked) drops our draft tick on that row only (amb-kit 74539129)", () => {
   const m = N.model([], counted());
   m.react("k1", "t1", "tick", "book the room", 1, 1);

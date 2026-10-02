@@ -326,6 +326,12 @@
         if (prev) { notes = notes.filter((x) => x !== prev); return null; }
         return api.add({ version, block, ...(item ? { item } : {}), kind: "start", text: text || undefined }, now);
       },
+      // the same start note from a button that only starts (bise:start): never a take-back; a draft
+      // start already on that item is the one sent
+      startNow(block, item, text, version, now) {
+        const prev = notes.find((n) => n.status === "draft" && n.kind === "start" && n.block === block && (n.item || null) === (item || null));
+        return prev || api.add({ version, block, ...(item ? { item } : {}), kind: "start", text: text || undefined }, now);
+      },
       // stop a watching page (roadmap B, kit.js's bise:stop {page, timer}; amb-home m_5458): one
       // stop note, to main, on any block of the page (the hub stops the page's timers); a second
       // click while it's still a draft is the same note
@@ -889,13 +895,14 @@
     // the watching frame's stop goes alone (ambient-lead m_5502: a button does only what it
     // names): the server sends every draft it holds, so it holds only the stop for the send, then
     // gets his other drafts back (they never left notes.js; merge keeps drafts it doesn't know)
-    async function sendStop(id) {
+    // (the same for a report's 'start an agent', bise:start: one start note, alone, at once)
+    async function sendAlone(id, said) {
       clearTimeout(saveT);
       try {
         await api(`/api/p/${pageId}/notes`, M.payload(id));
         await api(`/api/p/${pageId}/send`, {});
         M.sentOne(id, now());
-        barNote = NW.stopped;
+        barNote = said;
         render();
         win.setTimeout(() => { barNote = ""; render(); }, 4000);
       } catch { barMsg(NW.failed); }
@@ -965,7 +972,15 @@
       const b = blocks()[0];
       if (!b) return;
       const n = M.stop(b.dataset.id, d.timer, version, now());
-      render(); sendStop(n.id);
+      render(); sendAlone(n.id, NW.stopped);
+    });
+    // a report's 'start an agent' (kit.js's bise:start {block, item, text}, amb-kit d418d973): the
+    // toolbar's start note, sent at once and alone to main; kit.js shows 'starting…' on the item
+    doc.addEventListener("bise:start", (e) => {
+      const d = e.detail || {};
+      if (!d.block) return;
+      const n = M.startNow(d.block, d.item || null, d.text, version, now());
+      render(); sendAlone(n.id, NW.sent("bise"));
     });
     // a checklist row ticked by its agent: a draft tick of ours on that row goes
     doc.addEventListener("bise:ticked", (e) => {
