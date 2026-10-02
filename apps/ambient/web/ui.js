@@ -28,6 +28,7 @@
         <div class="lab" aria-hidden="true"></div>
         <div class="line" aria-hidden="true"></div>
         <div class="words" aria-hidden="true"></div>
+        <div class="ask" role="alertdialog"></div>
         <div class="sub" aria-hidden="true"></div>
         <div class="sees" aria-hidden="true"></div>
         <div class="chips" aria-hidden="true"></div>
@@ -37,10 +38,10 @@
         <div class="perm"><p></p><button type="button" data-do="continue"></button><button type="button" class="later" data-do="not_now"></button></div>
       </div>
     </div>
-    <div class="note" id="note" role="alertdialog" aria-live="assertive"></div>`;
+    <div class="note" id="note"></div>`;
   const cap = $("#cap", host), note = $("#note", host), tx = $(".tx", cap);
   const sayEl = $(".say", tx), pearlCv = $(".pearl", cap);
-  const el = { lab: $(".lab", tx), line: $(".line", tx), words: $(".words", tx), sub: $(".sub", tx), sees: $(".sees", tx), chips: $(".chips", tx), rows: $(".rows", tx), more: $(".more", tx), spot: $(".spot", tx), perm: $(".perm", tx) };
+  const el = { lab: $(".lab", tx), line: $(".line", tx), words: $(".words", tx), ask: $(".ask", tx), sub: $(".sub", tx), sees: $(".sees", tx), chips: $(".chips", tx), rows: $(".rows", tx), more: $(".more", tx), spot: $(".spot", tx), perm: $(".perm", tx) };
   const input = $("input", el.spot);
   const pearl = AmbPearl.create($(".pearl", cap));
 
@@ -133,8 +134,8 @@
     });
     put("line", JSON.stringify([v.glyph, v.text]), () => {
       show(el.line, v.text != null);
-      const fail = v.glyph === "▲";
-      el.line.innerHTML = v.text == null ? "" : `${v.glyph ? `<span class="gl${fail ? " fail" : ""}">${esc(v.glyph)}</span>` : ""}${esc(v.text)}`;
+      const fail = v.glyph === "▲", ok = v.glyph === "✓";
+      el.line.innerHTML = v.text == null ? "" : `${v.glyph ? `<span class="gl${fail ? " fail" : ok ? " ok" : ""}">${esc(v.glyph)}</span>` : ""}${esc(v.text)}`;
       el.line.classList.remove("arrive"); void el.line.offsetWidth; el.line.classList.add("arrive");
     });
     put("words", JSON.stringify(v.words && [v.state === "listening", v.words.list, v.words.code, v.words.lit]), () => {
@@ -191,19 +192,23 @@
         go.dataset.perm = later.dataset.perm = v.perm.perm;
       }
     });
-    put("note", JSON.stringify(v.note), () => {
-      note.classList.toggle("on", !!v.note);
-      if (!v.note) { note.innerHTML = ""; return; }
-      const n = v.note;
-      note.innerHTML = `<div class="h"><span class="app">:*</span>bise${n.more > 0 ? `<span class="more">+${n.more}</span>` : ""}</div>
-        <div class="ttl"><span class="gl" aria-hidden="true">?</span>${esc(n.title)}</div><div class="qq">${esc(n.text)}</div>${opts(n)}${n.open ? `<button type="button" class="hint open" data-open="${esc(n.id)}">${esc(n.open)}</button>` : ""}<div class="hint">${esc(n.hint)}</div>`;
+    // a question: in the capsule itself, one glass (round 8, ambient m_5332 (2)); the old card
+    // under it is gone, and with it the ':*'
+    note.classList.remove("on");
+    put("ask", JSON.stringify(v.ask), () => {
+      show(el.ask, v.ask);
+      const n = v.ask;
+      el.ask.innerHTML = !n ? "" : `<div class="ttl"><span class="gl" aria-hidden="true">?</span>${esc(n.title)}${n.more > 0 ? `<span class="more">+${n.more}</span>` : ""}</div>
+        <div class="qq">${esc(n.text)}</div>${opts(n)}${n.open ? `<button type="button" class="hint open" data-open="${esc(n.id)}">${esc(n.open)}</button>` : ""}<div class="hint">${esc(n.hint)}</div>`;
     });
   }
   const opts = (c) => c.options.length ? `<div class="opts">${c.options.map((o) => `<button type="button" data-card="${esc(c.id)}" data-i="${o.i}">${esc(o.label)}</button>`).join("")}</div>` : "";
 
   // ---- the capsule's size: its height follows the words; the panel follows the capsule (app_size)
-  const MIN_H = { small: 84, open: 120 };
-  const PAD = 24, NOTE_GAP = 12;
+  // as tall as its content: the 14/16 padding around the text, never less than the 68 px pearl
+  // (round 8, ambient m_5332 (5): no empty band under one-line states)
+  const MIN_H = { small: 98, open: 98 };
+  const PAD = 30, NOTE_GAP = 12;
   // grows to its content up to 70% of the screen; past that a list scrolls inside, its last row
   // fading over 24 px, `+N more` under it (designer); other content scrolls with the same fade
   // small: as wide as its line, 360 to 470 (ambient: the idle status on one line)

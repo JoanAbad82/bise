@@ -12,6 +12,7 @@
     // the full view's sections (vision §3 G; best guesses, asked to ambient): what's running, and a
     // page being written in it
     running: "running",
+    agents: "agents",
     pageWriting: "writing…",
     pageUpdating: "updating…",
     // the full view's empty sections (best guesses, asked to ambient; 'nothing needs you.' is the
@@ -135,7 +136,7 @@
   function sayOf(v) {
     if (!v || v.content && v.content.kind === "none" && !v.inbox && !v.list) return "";
     const words = v.words ? v.words.list.slice(0, v.words.lit).join(" ") : "";
-    const parts = [v.label && [v.label.text, v.label.rest].filter(Boolean).join(", "), v.text, words, v.sub, v.sees && `${v.sees.head}${v.sees.tail}`, v.perm && v.perm.text, v.note && `${v.note.title}: ${v.note.text}`];
+    const parts = [v.label && [v.label.text, v.label.rest].filter(Boolean).join(", "), v.text, words, v.sub, v.sees && `${v.sees.head}${v.sees.tail}`, v.perm && v.perm.text, v.ask && `${v.ask.title}: ${v.ask.text}`];
     return parts.filter(Boolean).join(". ").replace(/\s+/g, " ").trim();
   }
   // the speaker on the capsule is bise (roadmap §3.1)

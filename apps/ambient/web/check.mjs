@@ -187,13 +187,14 @@ law("end of turn: the kiss once (1 s), open, then small after 4 s", () => {
   assert.equal(r.view(done + 1500).pose, "rest"); assert.equal(r.view(done + 1500).size, "open");
   assert.equal(r.view(done + 4200).size, "small");
 });
-law("needs you: small, `? 1 waiting for you`, the glass under it names the agent with `1 yes` `2 no` and the hint, the sphere breathing", () => {
+law("needs you: ONE glass (round 8, ambient m_5332): the capsule itself says '? cookies needs you', the question, `1 yes` `2 no` and the hint; no second card", () => {
   const v = run(sceneEvents("needs-wait"), [1000]).view(1000);
-  assert.equal(v.size, "small"); assert.equal(v.glyph, "?"); assert.equal(v.text, "1 waiting for you"); assert.ok(v.need);
-  assert.equal(v.note.title, "cookies needs you");
-  assert.equal(v.note.text, "keep the banner on mobile?");
-  eq(v.note.options.map((o) => o.label), W.needsOpts);
-  assert.equal(v.note.hint, W.needsHint);
+  assert.equal(v.size, "open"); assert.equal(v.state, "needs"); assert.ok(v.need); assert.equal(v.mood, "need");
+  assert.equal(v.note, null); assert.equal(v.text, null);
+  assert.equal(v.ask.title, "cookies needs you");
+  assert.equal(v.ask.text, "keep the banner on mobile?");
+  eq(v.ask.options.map((o) => o.label), W.needsOpts);
+  assert.equal(v.ask.hint, W.needsHint);
 });
 law("answered: fn + 1 sends the answer, `✓ cookies has it: yes.` with the kiss, the glass goes", () => {
   const evs = sceneEvents("needs");
@@ -263,7 +264,9 @@ law("fn + 0: the agents, with their glyphs, `? needs you` for a card's agent", (
   const v = run(sceneEvents("agents"), [600]).view(600);
   assert.equal(v.state, "agents"); assert.equal(v.size, "open");
   const by = Object.fromEntries(v.list.map((r) => [r.name, r]));
-  assert.equal(by.perf.glyph, "✓"); assert.equal(by.perf.what, "profiling signup", "its task line, never the report");
+  assert.equal(by.perf.glyph, "✓"); assert.equal(by.perf.what, "signup 4.1 s → 0.9 s", "a done agent says its done line (ambient m_5332 (6))");
+  // the running ones first, the done ones after; the title says agents when not all run
+  assert.ok(v.list.findIndex((r) => r.name === "perf") > v.list.findIndex((r) => r.name === "dark-mode")); assert.equal(v.titles.running, "agents");
   assert.equal(Wd.rowLabel("signup 4.1 s → 0.9 s."), "signup 4.1 s → 0.9 s", "a row is a label: no final period");
   // the menu-bar click and fn + 0: the cards first, no glass under (it would repeat)
   assert.equal(v.inbox.length, 1); assert.equal(v.inbox[0].agent, "cookies"); assert.equal(v.note, null);
@@ -432,13 +435,13 @@ law("in a call or a meeting (app_quiet), only urgent cards ask; the rest wait in
   let m = M.step(M.init(), { ev: "state", agents: [], cards, pages: [] }, 0).m;
   m = M.step(m, { ev: "app_quiet", on: true, why: "meeting" }, 10).m;
   let v = M.view(m, 20);
-  assert.equal(v.text, "1 waiting for you"); assert.equal(v.note.agent, "deploy"); assert.equal(v.note.more, 0);
+  assert.equal(v.state, "needs"); assert.equal(v.ask.agent, "deploy"); assert.equal(v.ask.more, 0);
   m = M.step(m, { ev: "state", agents: [], cards: [cards[0]], pages: [] }, 30).m;
   v = M.view(m, 40);
-  assert.equal(v.state, "idle"); assert.equal(v.note, null); assert.equal(v.need, false);
+  assert.equal(v.state, "idle"); assert.equal(v.ask, null); assert.equal(v.need, false);
   assert.equal(M.view(M.step(m, { ev: "app_key", key: "i" }, 50).m, 60).inbox.length, 1);   // still in the inbox
   m = M.step(m, { ev: "app_quiet", on: false, why: "" }, 70).m;
-  assert.equal(M.view(m, 80).note.agent, "cookies");
+  assert.equal(M.view(m, 80).ask.agent, "cookies");
 });
 law("a card clicked in the menu bar (app_key i + card) opens the inbox at that card", () => {
   const cards = ["a", "b", "c"].map((id) => ({ id, agent: id, text: id, options: ["yes", "no"] }));
@@ -452,7 +455,7 @@ law("a card clicked in the menu bar (app_key i + card) opens the inbox at that c
 law("a card asked from a page (card.page): the glass says `fn ⏎ open it`; fn + ⏎ or a click opens the page at the question", () => {
   const card = { id: "c1", agent: "launch-recap", text: "post now or wait?", options: ["post now", "wait"], page: { id: "recap", block: "q1", url: "http://127.0.0.1:47123/p/recap#q1" } };
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [card, { id: "c2", agent: "x", text: "y", options: [] }], pages: [] }, 0).m;
-  assert.equal(M.view(m, 10).note.open, "fn ⏎ open it");
+  assert.equal(M.view(m, 10).ask.open, "fn ⏎ open it");
   const open = [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/recap#q1", page: "recap" }];
   eq(M.step(m, { ev: "app_key", key: "enter" }, 20).cmds, open);
   eq(M.step(m, { ev: "ui_open_card", card: "c1" }, 20).cmds, open);
@@ -501,7 +504,7 @@ law("the full view (fn 0, a hand-open): running (agents + pages being written), 
   m = M.step(m, { ev: "app_key", key: "0" }, 10).m;
   const v = M.view(m, 20, 1000);
   assert.equal(v.state, "agents"); assert.equal(v.content.kind, "open");
-  eq(v.titles, { running: "running", needs: "1 waiting for you" });
+  eq(v.titles, { running: "agents", needs: "1 waiting for you" });   // docs is done: not all of them run
   eq(v.list.map((r) => [r.name, r.what]), [["perf", "needs you"], ["docs", "readme"], ["weekly update", "writing…"], ["inbox", "updating…"]]);
   eq(v.inbox.map((c) => c.id), ["c1"]);
   // a page being written is not for you yet; unopened first (b was opened at its version)
@@ -579,7 +582,7 @@ law("VoiceOver: the pearl's label says its mood; one sentence per view is read, 
   eq(["rest", "listen", "speak", "work", "need", "away"].map(Wd.moodLabel), ["bise", "bise is listening", "bise is talking", "bise is working", "bise needs you", "bise is quiet"]);
   assert.equal(Wd.sayOf(run(sceneEvents("idle"), [100]).view(100)), "");
   const n = run(sceneEvents("needs-wait"), [1000]).view(1000);
-  assert.equal(Wd.sayOf(n), "1 waiting for you. cookies needs you: keep the banner on mobile?");
+  assert.equal(Wd.sayOf(n), "cookies needs you: keep the banner on mobile?");
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
   m = M.step(m, { ev: "app_fn", state: "down", key: "fn" }, 10).m;
   m = M.step(m, { ev: "heard", text: "make it half the size", final: false }, 20).m;
@@ -884,11 +887,11 @@ law("every scene plays without throwing, and every SPEC §2 state shows", () => 
       const v = s.views[t];
       seen.add(v.state);
       if (v.state === "end" && v.pose === "kiss") seen.add("kiss");
-      if (v.note) seen.add("note");
+      if (v.ask) seen.add("ask");
       assert.ok(typeof flat(v) === "string");
     }
   }
-  for (const st of ["idle", "listening", "working", "speaking", "end", "kiss", "needs", "note", "answered", "done", "failed", "agents", "inbox", "spotlight", "cancel", "error", "perm", "hub_down"]) {
+  for (const st of ["idle", "listening", "working", "speaking", "end", "kiss", "needs", "ask", "answered", "done", "failed", "agents", "inbox", "spotlight", "cancel", "error", "perm", "hub_down"]) {
     assert.ok(seen.has(st), `no scene shows ${st} (saw ${[...seen].join(", ")})`);
   }
 });

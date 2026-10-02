@@ -441,7 +441,8 @@
       inbox: null,
       spot: null,           // { text }
       perm: null,           // { perm, text }
-      note: null,           // the needs-you glass under the capsule
+      note: null,           // (gone in round 8: a question is the capsule itself, v.ask)
+      ask: null,            // a question: { id, agent, title, text, options, hint, open, more }
       edge: { on: false, lvl: 0 },
       hidden: m.hidden,
       unseen: m.hidden || m.visible === false,   // nobody sees it: no orb frames
@@ -462,13 +463,14 @@
       if (now - at < T.kiss) { v.pose = "kiss"; v.poseMs = now - at; v.kiss = true; }
     };
 
-    // the needs-you glass, unless a view already lists the cards
-    if (need && !m.pane && !m.permAsk) {
+    // a question is ONE glass (round 8, ambient m_5332 (2)): the capsule itself, open, with the
+    // pearl, '? cookies needs you', the question, its options and the hint; no second card
+    const ask = () => {
       const c = asking[0];
-      v.note = { id: c.id, agent: c.agent, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsHint, more: asking.length - 1,
+      return { id: c.id, agent: c.agent, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsHint, more: asking.length - 1,
         open: c.page && c.page.url ? W.openIt : null,
         options: Wd.options(c).map((o) => ({ i: o.i, label: Wd.optionLabel(o.n, o.label) })) };
-    }
+    };
 
     if (m.permAsk) {
       v.state = "perm"; v.size = "open";
@@ -530,17 +532,24 @@
       const writingRows = m.pages.filter((p) => p.state === "writing" || p.state === "updating").map((p) => ({
         name: pageName(p), glyph: "◰", kind: "page", what: Wd.rowLabel(p.state === "writing" ? W.pageWriting : W.pageUpdating), age: "", page: p.id,
       }));
-      v.list = m.agents.map((a) => {
+      // the running ones first (and those asking), then the others (done, failed, idle); a done
+      // agent's row says its done line, the first sentence of its report (ambient m_5332 (6)); the
+      // title is 'running' only when every row runs, else 'agents'
+      const runs = (a) => cards.some((c) => c.agent === a.name) || a.working || ["working", "waiting", "starting", "blocked"].includes(a.status);
+      const ordered = [...m.agents.filter(runs), ...m.agents.filter((a) => !runs(a))];
+      v.list = ordered.map((a) => {
         const asks = cards.some((c) => c.agent === a.name);
+        const doneLine = a.status === "done" && a.report ? Wd.firstSentence(a.report) : "";
         return {
           name: a.name,
           glyph: asks ? "?" : Wd.GLYPH[a.status] || "·",
           kind: asks ? "need" : a.status,
-          // short: its task line, never the report (written to main, not to you)
-          what: Wd.rowLabel(asks ? "needs you" : a.note || a.status),
+          // short: its task line, or a done agent's done line
+          what: Wd.rowLabel(asks ? "needs you" : doneLine || a.note || a.status),
           age: Wd.age(a.turn_ms),
         };
       }).concat(writingRows);
+      if (ordered.some((a) => !runs(a))) v.titles.running = W.agents;
     } else if (m.pane === "inbox") {
       v.state = "inbox"; v.size = "open";
       v.label = { text: cards.length ? Wd.waiting(cards.length) : W.quiet };
@@ -553,8 +562,7 @@
     } else if (m.hub.known && !m.hub.up) {
       v.state = "hub_down"; v.text = W.hubDown; v.frozen = true;
     } else if (need) {
-      // the glass under it names the agent; the capsule counts (designer: the two never repeat)
-      v.state = "needs"; v.glyph = "?"; v.text = Wd.waiting(asking.length);
+      v.state = "needs"; v.size = "open"; v.ask = ask();
     } else {
       // at rest nothing shows (docs/ambient-app.md §8, 'out of the way'): no status line; the app
       // hides the capsule (app_content none) and the menu-bar icon carries the count

@@ -27,7 +27,7 @@ html.app, html.app body { overflow: hidden; }
   position: absolute; top: 0; right: 0;
   display: flex; align-items: flex-start; gap: 14px;
   /* the corners are macOS's window radius (app_settings.radius, the user's call), not a pill */
-  width: 470px; height: 120px; border-radius: var(--r, 16px);
+  width: 470px; height: 98px; border-radius: var(--r, 16px);
   padding: 14px 18px 16px 12px;   /* round 8 (identity8.html .gl .in) */
   background: var(--glass); box-shadow: var(--stroke);
   overflow: hidden;
@@ -47,7 +47,7 @@ html:not(.app) .cap, html:not(.app) .note {
 /* the words */
 .tx { flex: none; width: 310px; font-size: 16px; line-height: 1.35; padding: 4px 0; }
 .cap.small .tx { width: 236px; }
-.cap.open .tx { padding-top: 14px; }
+.cap.open .tx { padding-top: 0; }
 /* past 70% of the screen it scrolls inside, the last 24 px fading out; a list says `+N more` */
 .tx.scroll, .rows.fade { -webkit-mask-image: linear-gradient(#000 calc(100% - 24px), transparent); mask-image: linear-gradient(#000 calc(100% - 24px), transparent); }
 .tx.scroll, .rows { scrollbar-width: none; }
@@ -60,6 +60,8 @@ html:not(.app) .cap, html:not(.app) .note {
 .lab b { color: var(--acc); font-weight: 500; }
 .line .gl { font-family: var(--mono); color: var(--acc); margin-right: 6px; }
 .line .gl.fail { color: var(--risk); }
+/* a done or answered line's ✓ is olive: rose is only for what waits for you (ambient m_5332 (4)) */
+.line .gl.ok { color: var(--ok); }
 .words { font-size: 19px; font-weight: 500; letter-spacing: -.01em; line-height: 1.32; }
 .words.main { font-size: 17px; line-height: 1.38; font-weight: 400; letter-spacing: 0; }
 .words .w { opacity: 0; filter: blur(3px); transition: opacity .24s ease-out, filter .24s ease-out; }
@@ -149,13 +151,16 @@ html:not(.app) .cap, html:not(.app) .note {
 .note .h { display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--dim); }
 .note .h .app { width: 22px; height: 22px; border-radius: 6px; background: #141211; color: var(--acc); display: grid; place-items: center; font: 700 10px var(--mono); }
 .note .h .more { margin-left: auto; font: 11px var(--mono); color: var(--faint); }
-.note .ttl { font-weight: 600; font-size: 14.5px; margin-top: 8px; }
-.note .ttl .gl { font-family: var(--mono); color: var(--acc); margin-right: 6px; font-weight: 400; }
-.note .qq { font-size: 14px; color: #ffffffd0; margin-top: 2px; }
-.note .hint { font-size: 11.5px; color: #ffffff80; margin-top: 9px; text-align: center; }
-/* a card asked from a page: `fn + ⏎ open it`, a quiet button over the hint */
-.note button.hint.open { display: block; width: 100%; border: 0; background: none; font: inherit; font-size: 11.5px; color: #ffffffc0; cursor: pointer; }
-.note button.hint.open:hover { color: #fff; }
+/* a question, in the capsule itself (round 8: one glass): '? cookies needs you', the question,
+   its options, the hint */
+.ask .ttl { font-weight: 600; font-size: 16px; }
+.ask .ttl .gl { font-family: var(--mono); color: var(--acc); margin-right: 6px; font-weight: 400; }
+.ask .ttl .more { margin-left: 8px; font: 11px var(--mono); color: var(--faint); font-weight: 400; }
+.ask .qq { font-size: 16px; color: #ffffffd0; margin-top: 2px; }
+.ask .hint { font: 11.5px var(--mono); color: var(--faint); margin-top: 10px; }
+/* a card asked from a page: `fn ⏎ open it`, a quiet button over the hint */
+.ask button.hint.open { display: block; border: 0; background: none; padding: 0; color: #ffffffc0; cursor: pointer; }
+.ask button.hint.open:hover { color: #fff; }
 
 /* reduced motion: text appears without fades, nothing springs */
 .still *, .still *::before, .still *::after { transition: none !important; animation: none !important; }
