@@ -94,6 +94,32 @@
   }
   const start = (flow) => ({ flow: flow || 0, ...MOODS.rest });
 
+  // the shader on a canvas: draw(S, t, level) with the mood values S as they are (the capsule
+  // eases them; the sprite tool sets them, apps/ambient/web/tools/pearl-sprites.mjs)
+  function renderer(cv, opts) {
+    const gl = cv.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: false, ...(opts || {}) });
+    if (!gl) return null;
+    const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s)); return s; };
+    const prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(prog); gl.useProgram(prog);
+    const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    const U = {};
+    for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", ...Object.keys(PINK)]) U[k] = gl.getUniformLocation(prog, k);
+    for (const k in PINK) gl.uniform3fv(U[k], PINK[k]);
+    gl.uniform1f(U.variant, 1);
+    function draw(S, t, level) {
+      gl.viewport(0, 0, cv.width, cv.height);
+      gl.uniform2f(U.res, cv.width, cv.height); gl.uniform1f(U.t, t); gl.uniform1f(U.flow, S.flow);
+      gl.uniform1f(U.lvl, S.voice * (level || 0)); gl.uniform1f(U.think, S.think); gl.uniform1f(U.need, S.need);
+      gl.uniform1f(U.done, S.done); gl.uniform1f(U.away, S.away); gl.uniform1f(U.listen, S.listen); gl.uniform1f(U.still, S.still);
+      gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+    return { draw, gl };
+  }
+
   function create(cv) {
     const gl = cv.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: false });
     let S = start(Math.random() * 40), last = null, drawnAt = -1e9, settledKey = "";
@@ -141,5 +167,5 @@
     return { frame, state: () => S };
   }
 
-  root.AmbPearl = { create, ease, settled, start, MOODS, PINK, FS };
+  root.AmbPearl = { create, renderer, ease, settled, start, MOODS, PINK, FS };
 })(typeof window !== "undefined" ? window : globalThis);

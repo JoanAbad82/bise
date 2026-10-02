@@ -1,0 +1,88 @@
+<!doctype html>
+<!-- bise ambient · renders the menu-bar pearl's sprites and the app icon (pearl-sprites.mjs drives
+     it in headless Chrome and writes the PNGs). The shader is the capsule's own (../pearl.js). -->
+<html><head><meta charset="utf-8"><title>pearl sprites</title></head>
+<body style="margin:0;background:#000">
+<script src="../pearl.js"></script>
+<script>
+"use strict";
+const P = window.AmbPearl;
+const LOOP = 3;                     // seconds: every moving mood is a 3 s loop
+const SS = 2;                       // supersampling: the shader at 2× the target, scaled down
+
+// one mood's values, landed (no easing in a sprite), and its flow at time t
+function stateAt(mood, t, level, flow0) {
+  const M = P.MOODS[mood];
+  return { ...M, flow: flow0 + t * M.speed * (1 + 1.2 * M.voice * level) };
+}
+
+const gl = document.createElement("canvas");
+const R = P.renderer(gl, { preserveDrawingBuffer: true });
+
+// the shader at t into a 2D canvas of n px (premultiplied: the WebGL canvas composites as such)
+function shot(mood, t, level, n, flow0) {
+  gl.width = gl.height = n * SS;
+  R.draw(stateAt(mood, t, level, flow0), t, level);
+  const c = document.createElement("canvas"); c.width = c.height = n;
+  const g = c.getContext("2d"); g.imageSmoothingQuality = "high";
+  g.drawImage(gl, 0, 0, n, n);
+  return c;
+}
+
+// a closed loop: frame i mixes the shader at t and at t - LOOP, the weight sliding from the first
+// to the second over the loop, so the last frame runs into the first without a seam
+function loopFrame(mood, i, frames, level, n, flow0) {
+  const t = LOOP + (i / frames) * LOOP, w = i / frames;
+  const a = shot(mood, t, level, n, flow0), b = shot(mood, t - LOOP, level, n, flow0);
+  const c = document.createElement("canvas"); c.width = c.height = n;
+  const g = c.getContext("2d");
+  g.globalCompositeOperation = "lighter";
+  g.globalAlpha = 1 - w; g.drawImage(a, 0, 0);
+  g.globalAlpha = w; g.drawImage(b, 0, 0);
+  return c.toDataURL("image/png");
+}
+
+// amb-mac's list (m_5168): still/fail/away one frame; work/listen/done 36 frames of a 3 s loop;
+// listen baked brighter with a voice of ~0.5
+const PLAN = [
+  { mood: "still", frames: 1, level: 0 },
+  { mood: "work", frames: 36, level: 0 },
+  { mood: "listen", frames: 36, level: 0.5 },
+  { mood: "done", frames: 36, level: 0 },
+  { mood: "fail", frames: 1, level: 0 },
+  { mood: "away", frames: 1, level: 0 },
+];
+const SCALES = [[1, 18, ""], [2, 36, "@2x"], [3, 54, "@3x"]];
+
+window.sprites = () => {
+  const out = [];
+  for (const p of PLAN) for (const [, n, suffix] of SCALES) for (let i = 0; i < p.frames; i++) {
+    const name = `${p.mood}-${String(i).padStart(2, "0")}${suffix}.png`;
+    const url = p.frames === 1 ? (() => { const c = shot(p.mood, 0, p.level, n, 11); return c.toDataURL("image/png"); })() : loopFrame(p.mood, i, p.frames, p.level, n, 11);
+    out.push([name, url]);
+  }
+  return out;
+};
+
+// the app icon: 1024 px, the pearl at rest on the glass #1a1516 in Apple's squircle grid (an 824 px
+// rounded rect, centered, its own soft shadow, transparent outside)
+window.icon = () => {
+  const N = 1024, S = 824, x0 = (N - S) / 2, r = S * 0.2237;
+  const c = document.createElement("canvas"); c.width = c.height = N;
+  const g = c.getContext("2d");
+  const rr = () => { g.beginPath(); g.roundRect(x0, x0, S, S, r); };
+  g.save(); g.shadowColor = "rgba(0,0,0,.45)"; g.shadowBlur = 28; g.shadowOffsetY = 12; rr(); g.fillStyle = "#1a1516"; g.fill(); g.restore();
+  // the glass: a faint top light, like the capsule's
+  g.save(); rr(); g.clip();
+  const lg = g.createLinearGradient(0, x0, 0, x0 + S); lg.addColorStop(0, "#2a2224"); lg.addColorStop(0.7, "#1a1516");
+  g.fillStyle = lg; g.fillRect(x0, x0, S, S);
+  const pearl = shot("rest", 1.2, 0, 640, 11);
+  g.drawImage(pearl, (N - 640) / 2, (N - 640) / 2);
+  g.restore();
+  // the 1 px inner stroke and top highlight of SPEC's glass, at icon scale
+  g.save(); rr(); g.lineWidth = 4; g.strokeStyle = "rgba(255,255,255,.12)"; g.stroke(); g.restore();
+  return c.toDataURL("image/png");
+};
+document.title = "ready";
+</script>
+</body></html>
