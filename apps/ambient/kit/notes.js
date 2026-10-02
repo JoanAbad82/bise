@@ -67,7 +67,7 @@
     writing: "notes open with the first version",
     keys: "t type   p pin   d draw   ⌘z undo   ⌘⏎ send",
     // the same without a mouse, on the block tab reached (ambient-lead m_5651; best guess, asked to ambient)
-    keysTab: "tab a block   n note   h ♡   x ✗   e edit",
+    keysTab: "tab next block   n note   h ♡   x ✗   e edit",
     remove: "remove",
     undo: "undo",
     failed: "couldn't save your notes. trying again.",
