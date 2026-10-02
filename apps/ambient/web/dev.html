@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bise ambient · dev</title>
+<link rel="stylesheet" href="style.css">
+<style>
+/* the review page: the capsule at its real size over a desktop, a fake core playing the states */
+html, body { height: 100%; }
+body { overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, sans-serif; color: #fff;
+  background: radial-gradient(60% 70% at 85% 10%, #ff9fb2 0%, transparent 60%), radial-gradient(70% 80% at 10% 90%, #3b2a6b 0%, transparent 60%),
+    radial-gradient(50% 60% at 60% 70%, #f2a65a 0%, transparent 60%), linear-gradient(160deg, #2a1b3d, #5b2d4f 45%, #c66b5a 80%, #f1b37a); }
+body.plain { background: #6b6f76; }
+body.light { background: linear-gradient(160deg, #f4efe7, #e7d9cf 60%, #d9c3c6); }
+.menubar { position: fixed; top: 0; left: 0; right: 0; height: 30px; display: flex; align-items: center; gap: 20px; padding: 0 16px; font-size: 13.5px;
+  background: #0000002e; -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6); z-index: 5; }
+.menubar .sp { flex: 1; }
+.menubar .tray { font: 700 13px ui-monospace, Menlo, monospace; padding: 1px 7px; border-radius: 5px; }
+.menubar .tray.need { color: #f4a6b0; }
+/* the panel's place: 20 px from the screen edge, 12 px under the menu bar */
+#amb { top: 42px !important; right: 20px !important; z-index: 10; }
+/* a window in front, for the screen context */
+.win { position: fixed; left: 8vw; top: 22vh; width: 46vw; height: 52vh; border-radius: 11px; background: #fff; color: #222; box-shadow: 0 0 0 .5px #0006, 0 22px 60px -12px #0008; overflow: hidden; }
+.win .wt { height: 30px; background: #ececec; display: flex; align-items: center; gap: 8px; padding: 0 12px; font-size: 12.5px; color: #555; }
+.win .wt i { width: 12px; height: 12px; border-radius: 50%; background: #ff5f57; } .win .wt i + i { background: #febc2e; } .win .wt i + i + i { background: #28c840; }
+.win .wt span { margin-left: 24px; background: #fff; border-radius: 6px; padding: 2px 14px; min-width: 240px; }
+.win .pg { padding: 22px 26px; font-size: 14px; color: #888; line-height: 2.2; }
+/* the controls */
+.dev { position: fixed; left: 16px; bottom: 16px; width: min(760px, calc(100vw - 32px)); padding: 12px 14px; border-radius: 18px; z-index: 20;
+  background: #141011e0; box-shadow: inset 0 0 0 1px #ffffff1c, 0 20px 50px -20px #000c; font: 12px/1.5 ui-monospace, Menlo, monospace; color: #cfc7b9; }
+.dev .sc { display: flex; flex-wrap: wrap; gap: 6px; }
+.dev button { font: inherit; background: transparent; color: #cfc7b9; border: 1px solid #3a3531; border-radius: 99px; padding: 3px 11px; cursor: pointer; }
+.dev button.on { color: #141211; background: #f4a6b0; border-color: #f4a6b0; }
+.dev .row2 { display: flex; gap: 14px; align-items: center; margin-top: 10px; color: #857d72; flex-wrap: wrap; }
+.dev .row2 b { color: #f4a6b0; font-weight: 400; }
+.dev .log { margin-top: 8px; height: 3.2em; overflow: hidden; color: #857d72; white-space: pre; font-size: 11px; }
+.dev kbd { font: inherit; border: 1px solid #4a4540; border-radius: 4px; padding: 0 5px; color: #ece6da; }
+body.clean .dev { display: none; }
+</style>
+</head>
+<body>
+<div class="menubar"><b>Chrome</b><span>File</span><span>Edit</span><span>View</span><span class="sp"></span><span class="tray" id="tray">:*</span><span>wed 15 oct  17:42</span></div>
+<div class="win"><div class="wt"><i></i><i></i><i></i><span>localhost:4801/settings</span></div><div class="pg">appearance · theme · density · language<br>notifications · email me · weekly digest</div></div>
+<!-- the screen edge and the shot's corners: the app's overlay window, here a frame over the page -->
+<iframe id="edge" src="edge.html" style="position:fixed;inset:0;width:100%;height:100%;border:0;pointer-events:none;z-index:9;background:transparent" allowtransparency="true"></iframe>
+<div id="amb"></div>
+<div class="dev" id="dev">
+  <div class="sc" id="scenes"></div>
+  <div class="row2">
+    <span>hold <kbd>space</kbd> = fn</span>
+    <label><input type="checkbox" id="still"> reduced motion</label>
+    <label><input type="checkbox" id="loop" checked> loop</label>
+    <span>wall <button data-wall="">pink</button><button data-wall="plain">gray</button><button data-wall="light">light</button></span>
+    <span>orb <b id="fps">–</b> fps · state <b id="st">–</b></span>
+  </div>
+  <div class="log" id="log"></div>
+</div>
+<script src="words.js"></script>
+<script src="face.js"></script>
+<script src="model.js"></script>
+<script src="orb.js"></script>
+<script src="fakecore.js"></script>
+<script>
+// the fake core takes the capsule's cmds (ui.js posts to window.ambientDev outside the app)
+const logLines = [];
+const log = (s) => { logLines.push(s); if (logLines.length > 3) logLines.shift(); document.getElementById("log").textContent = logLines.join("\n"); };
+window.ambientDev = { cmd(c) { if (c.cmd !== "app_size") log("cmd → " + JSON.stringify(c)); P && P.cmd(c); } };
+let P = null;
+</script>
+<script src="ui.js"></script>
+<script>
+const Q = new URLSearchParams(location.search);
+// every event goes to the capsule and to the edge overlay, like the app does
+const capsuleRecv = window.ambient.recv;
+const edgeRecv = (ev) => { const w = document.getElementById("edge").contentWindow; if (w && w.ambient) w.ambient.recv(ev); };
+// the shot's frame in this page's px: the window in front
+const frameOf = () => { const r = document.querySelector(".win").getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+window.ambient.recv = (ev) => { if (ev.ev === "app_shot") ev = { ...ev, frame: frameOf() }; capsuleRecv(ev); edgeRecv(ev); };
+const recv = (ev) => { if (ev.ev !== "level" && ev.ev !== "word") log("ev ← " + JSON.stringify(ev).slice(0, 160)); window.ambient.recv(ev); };
+P = AmbFake.player(recv);
+let cur = null, loopT = 0;
+function play(id) {
+  clearTimeout(loopT);
+  cur = id; window.ambient.reset();
+  if (document.getElementById("still").checked) window.ambient.recv({ ev: "app_reduce_motion", on: true });
+  const len = P.play(id, +(Q.get("t") || 0));
+  document.querySelectorAll("#scenes button").forEach((b) => b.classList.toggle("on", b.dataset.id === id));
+  history.replaceState(null, "", "?" + new URLSearchParams({ ...Object.fromEntries(Q), s: id }).toString().replace(/&?t=[^&]*/, ""));
+  if (document.getElementById("loop").checked && id !== "needs-wait" && id !== "spot") loopT = setTimeout(() => play(id), Math.max(len + 3000, 6000));
+}
+document.getElementById("scenes").innerHTML = AmbFake.SCENES.map((s) => `<button data-id="${s.id}">${s.label}</button>`).join("");
+document.querySelectorAll("#scenes button").forEach((b) => (b.onclick = () => play(b.dataset.id)));
+document.getElementById("still").onchange = () => play(cur || "idle");
+document.querySelectorAll("[data-wall]").forEach((b) => (b.onclick = () => { document.body.className = b.dataset.wall; }));
+if (Q.has("clean")) document.body.classList.add("clean");
+if (Q.has("still")) document.getElementById("still").checked = true;
+if (Q.has("wall")) document.body.classList.add(Q.get("wall"));
+
+// hold space = fn: a live turn with the fake voice, let go to send
+let held = false, hold = null;
+addEventListener("keydown", (e) => {
+  if (e.code !== "Space" || e.target.tagName === "INPUT" || held) return;
+  e.preventDefault(); held = true; clearTimeout(loopT); P.stop();
+  const t0 = performance.now(), words = AmbFake.SAID.split(" ");
+  recv({ ev: "app_fn", state: "down", key: "fn" });
+  recv({ ev: "app_shot", app: "Chrome", title: "localhost:4801/settings", skipped: false });
+  recv({ ev: "phase", phase: "listening" });
+  hold = setInterval(() => {
+    const s = (performance.now() - t0) / 1000;
+    window.ambient.recv({ ev: "level", who: "you", v: AmbFake.voice(s, 0) });
+    const n = Math.min(words.length, Math.floor((s - 0.3) / 0.24) + 1);
+    if (n > 0) window.ambient.recv({ ev: "heard", text: words.slice(0, n).join(" "), final: false });
+  }, 33);
+});
+addEventListener("keyup", (e) => {
+  if (e.code !== "Space" || !held) return;
+  held = false; clearInterval(hold);
+  recv({ ev: "app_fn", state: "up", key: "fn" });
+  // the rest of a voice turn, from the let go
+  const sc = AmbFake.SCENES.find((s) => s.id === "talk").build();
+  const up = sc.find(([, ev]) => ev.ev === "app_fn" && ev.state === "up")[0];
+  P.stop();
+  for (const [ms, ev] of sc) if (ms > up) setTimeout(() => window.ambient.recv(ev), ms - up);
+});
+
+setInterval(() => {
+  document.getElementById("fps").textContent = window.ambient.fps();
+  const v = window.ambient.view();
+  document.getElementById("st").textContent = v ? v.state : "–";
+  document.getElementById("tray").classList.toggle("need", !!(v && v.need));
+}, 500);
+play(Q.get("s") || "idle");
+</script>
+</body>
+</html>

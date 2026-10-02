@@ -1,0 +1,127 @@
+/* bise ambient · the capsule (SPEC §1-§2). In the app (html.app) the page is transparent: the
+   panel's NSVisualEffectView blurs behind and the panel draws the shadow; the page draws the glass
+   tint and its strokes. In a browser (dev.html) the page draws the blur and the shadow too. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: transparent; -webkit-font-smoothing: antialiased; }
+html.app, html.app body { overflow: hidden; }
+:root {
+  --acc: #f4a6b0; --text: #fff; --dim: #ffffffa0; --faint: #ffffff70;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --expo: cubic-bezier(.16, 1, .3, 1);
+  --back: cubic-bezier(.34, 1.56, .5, 1);
+  --spring: cubic-bezier(.3, 1.22, .4, 1);
+  --glass: linear-gradient(180deg, #2a22248f, #1a1516b8);
+  --stroke: inset 0 0 0 1px #ffffff26, inset 0 1px 0 #ffffff38;
+}
+
+/* the capsule's box: anchored top right (the panel grows down and left) */
+.amb { position: fixed; top: 0; right: 0; font-family: var(--sans); color: var(--text); user-select: none; -webkit-user-select: none; cursor: default; }
+.amb .m { font-family: var(--mono); }
+.amb .acc { color: var(--acc); }
+
+.cap {
+  position: absolute; top: 0; right: 0;
+  display: flex; align-items: center; gap: 14px;
+  width: 470px; height: 120px; border-radius: 40px;
+  padding: 12px 24px 12px 12px;
+  background: var(--glass); box-shadow: var(--stroke);
+  overflow: hidden;
+  transition: width .6s var(--spring), height .6s var(--spring), border-radius .6s var(--spring);
+}
+.cap.small { width: 360px; border-radius: 44px; cursor: pointer; }
+.cap.open { align-items: flex-start; }
+html:not(.app) .cap, html:not(.app) .note {
+  -webkit-backdrop-filter: blur(44px) saturate(1.9); backdrop-filter: blur(44px) saturate(1.9);
+  box-shadow: var(--stroke), 0 30px 80px -24px #000b;
+}
+
+/* the orb: one 112 px canvas, scaled to 76 px when small */
+.orbbox { flex: none; width: 112px; height: 112px; margin: -8px -4px -8px -6px; position: relative; transition: width .6s var(--spring), height .6s var(--spring), margin .6s var(--spring); }
+.cap.small .orbbox { width: 76px; height: 76px; margin: -8px -4px; }
+.orbbox canvas { position: absolute; left: 50%; top: 50%; width: 112px; height: 112px; margin: -56px 0 0 -56px; transform: scale(1); transition: transform .6s var(--spring); }
+.cap.small .orbbox canvas { transform: scale(.6786); }
+
+/* the words */
+.tx { flex: none; width: 310px; font-size: 16px; line-height: 1.35; padding: 4px 0; }
+.cap.small .tx { width: 236px; }
+.cap.open .tx { padding-top: 14px; }
+/* past 70% of the screen it scrolls inside, the last line fading out */
+.tx.scroll { -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); scrollbar-width: none; }
+.tx.scroll::-webkit-scrollbar { display: none; }
+.tx > * { display: none; }
+.tx > .on { display: block; }
+.lab { font: 11.5px/1.4 var(--mono); color: #ffffff90; margin-bottom: 3px; }
+.lab b { color: var(--acc); font-weight: 400; }
+.line .gl { font-family: var(--mono); color: var(--acc); margin-right: 6px; }
+.line .gl.fail { color: #ff8a84; }
+.words { font-size: 19px; font-weight: 500; letter-spacing: -.01em; line-height: 1.32; }
+.words.main { font-size: 17px; font-weight: 400; letter-spacing: 0; }
+.words .w { opacity: 0; filter: blur(3px); transition: opacity .24s ease-out, filter .24s ease-out; }
+.words.main .w { transition-duration: .29s; }
+.words .w.on { opacity: 1; filter: none; }
+.words .w.cur::after { content: ""; display: inline-block; width: 2px; height: .9em; background: var(--acc); margin-left: 3px; vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.sub { font-size: 13px; color: var(--dim); margin-top: 4px; }
+.sees { display: none; width: max-content; max-width: 100%; margin-top: 10px; font: 11.5px/1.5 var(--mono); color: #ffffffc0; padding: 3px 10px 3px 8px; border-radius: 99px; background: #ffffff12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sees.on { display: block; }
+.sees::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 0 3px #f4a6b033; margin-right: 7px; vertical-align: 0; }
+.chips.on { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.chip { font: 12.5px var(--mono); background: #ffffff16; border-radius: 99px; padding: 4px 11px; animation: pop .5s var(--back) both, flash 1s both; }
+.chip b { color: var(--acc); font-weight: 400; margin-right: 5px; }
+@keyframes pop { from { transform: scale(.6); opacity: 0; } }
+@keyframes flash { 0% { background: var(--acc); color: #141211; } 100% { background: #ffffff16; } }
+
+/* arrivals: a line that changes lands (expo out) */
+.arrive { animation: arrive .5s var(--expo) both; }
+@keyframes arrive { from { opacity: 0; transform: translateY(6px); } }
+
+/* the agents and the inbox */
+.rows { margin-top: 6px; }
+.row { display: grid; grid-template-columns: 18px 96px 1fr auto; gap: 8px; align-items: center; padding: 7px 4px; border-top: 1px solid #ffffff14; font-size: 13.5px; animation: arrive .5s var(--expo) both; }
+.row .gl { font-family: var(--mono); color: #ffffffb0; text-align: center; }
+.row .nm { font: 12.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .wh { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .ag { font: 11px var(--mono); color: #ffffff60; }
+.row.done .gl, .row.need .gl { color: var(--acc); }
+.row.failed .gl { color: #ff8a84; }
+.row.need { background: #f4a6b01c; border-radius: 12px; border-color: transparent; }
+.q { padding: 9px 8px; border-radius: 14px; margin-top: 6px; animation: arrive .5s var(--expo) both; }
+.q.sel { background: #f4a6b01f; }
+.q .who { font: 12px var(--mono); color: var(--acc); }
+.q .tq { font-size: 14.5px; margin-top: 1px; }
+
+/* options: `1 yes` `2 no`, the first one lit */
+.opts { display: flex; gap: 8px; margin-top: 10px; }
+.opts button { flex: 1; font: 13px var(--sans); color: #fff; background: #ffffff1c; border: 0; border-radius: 10px; padding: 7px 10px; cursor: pointer; }
+.opts button:first-child { background: var(--acc); color: #141211; }
+.opts button:hover { filter: brightness(1.08); }
+
+/* the spotlight: a text field in the capsule */
+.spot input { width: 100%; font: 400 19px/1.3 var(--sans); color: #fff; background: transparent; border: 0; outline: 0; caret-color: var(--acc); padding: 2px 0; }
+.spot input::placeholder { color: #ffffff60; }
+.spot .keys { font: 11px var(--mono); color: var(--faint); margin-top: 8px; }
+
+/* a permission's sentence and its button */
+.perm p { font-size: 15px; line-height: 1.4; }
+.perm button { margin-top: 10px; font: 600 13px var(--sans); color: #141211; background: var(--acc); border: 0; border-radius: 99px; padding: 6px 16px; cursor: pointer; }
+
+/* needs you: bise's own notification, in the same glass, under the capsule */
+.note {
+  position: absolute; right: 0; top: 0; width: 360px; padding: 14px 16px; border-radius: 22px;
+  background: linear-gradient(180deg, #2a2224a6, #1a1516c4); box-shadow: var(--stroke);
+  display: none;
+}
+.note.on { display: block; animation: drop .7s cubic-bezier(.34, 1.3, .5, 1) both; }
+@keyframes drop { from { transform: translateY(-24px); opacity: 0; } }
+.note .h { display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--dim); }
+.note .h .app { width: 22px; height: 22px; border-radius: 6px; background: #141211; color: var(--acc); display: grid; place-items: center; font: 700 10px var(--mono); }
+.note .h .more { margin-left: auto; font: 11px var(--mono); color: var(--faint); }
+.note .ttl { font-weight: 600; font-size: 14.5px; margin-top: 8px; }
+.note .ttl .gl { font-family: var(--mono); color: var(--acc); margin-right: 6px; font-weight: 400; }
+.note .qq { font-size: 14px; color: #ffffffd0; margin-top: 2px; }
+.note .hint { font-size: 11.5px; color: #ffffff80; margin-top: 9px; text-align: center; }
+
+/* reduced motion: text appears without fades, nothing springs */
+.still *, .still *::before, .still *::after { transition: none !important; animation: none !important; }
+.still .words .w { filter: none; }

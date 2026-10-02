@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>bise ambient · the screen edge</title>
+<style>
+/* the screen edge (SPEC §1): a full-screen, click-through, transparent overlay, one per screen.
+   While fn is held, a glow runs along every edge: iridescent and pink, 7 + 42 × level px wide, its
+   alpha following a smoothed `listening`. Off under reduced motion and with the setting edge glow
+   off. It also draws the pink corners that frame the window main sees (app_shot.frame), 1.1 s. */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; background: transparent; overflow: hidden; pointer-events: none; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+.vf { position: fixed; pointer-events: none; animation: vf 1.1s cubic-bezier(.16, 1, .3, 1) forwards; }
+.vf i { position: absolute; width: 26px; height: 26px; border: 2px solid #f4a6b0; }
+.vf i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; border-top-left-radius: 8px; }
+.vf i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; border-top-right-radius: 8px; }
+.vf i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; border-bottom-left-radius: 8px; }
+.vf i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; border-bottom-right-radius: 8px; }
+@keyframes vf { 0% { opacity: 0; transform: scale(1.04); } 25% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1); } }
+.still .vf { animation: vfStill 1.1s steps(1) forwards; }
+@keyframes vfStill { 0% { opacity: 1; } 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+<canvas id="edge"></canvas>
+<script>
+(function () {
+  "use strict";
+  const FS = `precision highp float;
+uniform vec2 res; uniform float flow, lvl, listen;
+vec3 iri(float x){ return .5 + .5 * cos(6.2831 * (vec3(0., .33, .67) + x)); }
+const vec3 PINK = vec3(.957, .651, .69);
+void main(){
+  vec2 p = gl_FragCoord.xy, hs = res * .5; float R = 22.;
+  vec2 q = abs(p - hs) - (hs - vec2(R));
+  float d = length(max(q, 0.)) + min(max(q.x, q.y), 0.) - R;
+  float dist = max(-d, 0.);
+  float w = 7. + 42. * lvl + 8. * listen;
+  float an = atan(p.y - hs.y, (p.x - hs.x) * res.y / res.x);
+  vec3 c = mix(iri(an / 6.2831 + flow * .08), PINK, .45);
+  float band = .65 + .35 * sin(an * 3. + flow * 2.) * sin(an * 5. - flow * 1.3);
+  float g = exp(-dist / w) * listen * band;
+  g += exp(-dist / 2.5) * listen * .5;
+  gl_FragColor = vec4(c * g, g);
+}`;
+  const VS = "attribute vec2 a; void main(){ gl_Position = vec4(a, 0., 1.); }";
+  const cv = document.getElementById("edge");
+  const gl = cv.getContext("webgl", { alpha: true, premultipliedAlpha: true, antialias: false, powerPreference: "low-power" });
+  let G = null;
+  if (gl) {
+    const sh = (t, s) => { const x = gl.createShader(t); gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x)); return x; };
+    try {
+      const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(p);
+      const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      G = { p, a: gl.getAttribLocation(p, "a"), u: Object.fromEntries(["res", "flow", "lvl", "listen"].map((n) => [n, gl.getUniformLocation(p, n)])) };
+    } catch (e) { console.error("edge", e); }
+  }
+
+  // what it follows: fn held (or hands-free, or the core's listening phase), your level, the settings
+  const st = { held: false, phase: "idle", lvl: 0, lvlAt: -1e9, reduce: false, glow: true };
+  const S = { listen: 0, lvl: 0, flow: 0, last: null };
+  let raf = 0;
+  const on = () => (st.held || st.phase === "listening") && st.glow && !st.reduce;
+
+  function frame(now) {
+    raf = 0;
+    const t = now / 1000, dt = S.last == null ? 0 : Math.min(0.5, t - S.last); S.last = t;
+    const lv = now - st.lvlAt < 250 ? st.lvl : 0;
+    const k = 1 - Math.pow(0.002, dt), kl = 1 - Math.pow(0.00002, dt);
+    S.listen += ((on() ? 1 : 0) - S.listen) * k;
+    S.lvl += (lv - S.lvl) * kl;
+    S.flow += dt * (0.6 + 0.8 * S.listen + 3.2 * S.lvl);
+    const dpr = Math.min(2, devicePixelRatio || 1), w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr);
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    if (G) {
+      gl.viewport(0, 0, w, h); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+      if (S.listen > 0.002) {
+        gl.useProgram(G.p); gl.enableVertexAttribArray(G.a); gl.vertexAttribPointer(G.a, 2, gl.FLOAT, false, 0, 0);
+        gl.uniform2f(G.u.res, w, h); gl.uniform1f(G.u.flow, S.flow); gl.uniform1f(G.u.lvl, S.lvl * dpr); gl.uniform1f(G.u.listen, S.listen);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      }
+    }
+    // asleep when there is nothing to show (the overlay is always there)
+    if (on() || S.listen > 0.002) schedule(); else S.last = null;
+  }
+  function schedule() { if (!raf) raf = requestAnimationFrame(frame); }
+
+  function corners(f) {
+    if (!f || !(f.w > 0 && f.h > 0)) return;
+    const d = document.createElement("div");
+    d.className = "vf";
+    Object.assign(d.style, { left: f.x + "px", top: f.y + "px", width: f.w + "px", height: f.h + "px" });
+    d.innerHTML = "<i></i><i></i><i></i><i></i>";
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 1200);
+  }
+
+  function recv(ev) {
+    if (typeof ev === "string") { try { ev = JSON.parse(ev); } catch { return; } }
+    if (!ev) return;
+    switch (ev.ev) {
+      case "app_fn":
+        if (ev.state === "down" || ev.state === "double") st.held = true;
+        else if (ev.state === "up" || ev.state === "cancel") st.held = false;
+        break;
+      case "phase": st.phase = ev.phase; if (ev.phase !== "listening") st.held = st.held && ev.phase === "idle"; break;
+      case "level": if (ev.who !== "main") { st.lvl = Math.max(0, Math.min(1, +ev.v || 0)); st.lvlAt = performance.now(); } break;
+      case "app_reduce_motion": st.reduce = !!(ev.on ?? ev.reduce); document.documentElement.classList.toggle("still", st.reduce); break;
+      case "app_settings": st.glow = ev.edge_glow !== false; break;
+      case "app_shot": if (!ev.skipped) corners(ev.frame); break;
+    }
+    schedule();
+  }
+  window.ambient = { recv };
+})();
+</script>
+</body>
+</html>
