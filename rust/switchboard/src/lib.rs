@@ -32,6 +32,7 @@ pub mod flow;
 pub mod forge;
 pub mod land;
 pub mod model;
+pub mod pages;
 pub mod paths;
 pub mod place;
 pub mod procs;
