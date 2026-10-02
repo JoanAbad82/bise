@@ -51,7 +51,7 @@ fn the_skills_example_passes() {
         .expect("an html example");
     let blocks = ok(html);
     assert!(html.lines().count() <= 60, "about 50 lines");
-    for kit in KINDS {
+    for kit in &KINDS[..6] {
         assert!(
             blocks.iter().any(|b| &b.kit == kit),
             "the skill's example has no {kit}"
@@ -63,7 +63,7 @@ fn the_skills_example_passes() {
 fn the_weekly_update_has_every_kind() {
     let blocks = ok(WEEKLY);
     assert!(blocks.len() >= 5, "{blocks:#?}");
-    for kit in KINDS {
+    for kit in &KINDS[..6] {
         assert!(
             blocks.iter().any(|b| &b.kit == kit),
             "weekly update has no {kit}"
@@ -182,7 +182,7 @@ fn blocks_need_a_known_kind_and_one_id_each() {
 <section data-id="p2"><p>x</p></section>
 <section data-kit="prose" data-id="no spaces"><p>x</p></section>"#,
     );
-    has(&e, "c1: data-kit=\"chart\" is not a kit block: use prose, heading, callout, sources, table, question");
+    has(&e, "c1: data-kit=\"chart\" is not a kit block: use prose, heading, callout, sources, table, question, review, email");
     has(&e, "line 2: a block without data-id");
     has(&e, "p1: this data-id is used twice");
     has(&e, "p2: <section> without data-kit");
@@ -235,7 +235,7 @@ fn values_are_data_attributes_the_kit_knows() {
     );
     has(
         &errs(r#"<section data-kit="prose" data-id="c"><p data-x="1">x</p></section>"#),
-        "c: data-x is not a kit attribute: only blocks take data- attributes",
+        "c: data-x is not a kit attribute: inside a block only a review's <li data-id>",
     );
     has(
         &errs(r#"<section data-kit="prose" data-id="c" class="big"><p>x</p></section>"#),
@@ -290,4 +290,55 @@ fn one_line_per_problem() {
         r#"<section data-kit="prose" data-id="p"><p style="a">1</p><p style="b">2</p></section>"#,
     );
     assert_eq!(e.len(), 1, "{e:#?}");
+}
+
+#[test]
+fn a_review_has_items_with_their_own_ids() {
+    ok(
+        r#"<section data-kit="review" data-id="inbox"><h2>4 mails</h2><ol>
+<li data-id="m1"><p><strong>Léa</strong> asks about june.</p><p>reply: yes.</p></li>
+<li data-id="m2"><p>Marc</p></li></ol></section>"#,
+    );
+    has(
+        &errs(r#"<section data-kit="review" data-id="r"><ol><li>a</li></ol></section>"#),
+        "r: a review item without data-id",
+    );
+    has(
+        &errs(
+            r#"<section data-kit="review" data-id="r"><ol><li data-id="m1">a</li><li data-id="m1">b</li></ol></section>"#,
+        ),
+        "r: item m1: this data-id is used twice",
+    );
+    has(
+        &errs(r#"<section data-kit="review" data-id="r"><p>nothing</p></section>"#),
+        "r: a review block needs its items",
+    );
+    // only a review's items take an id
+    has(
+        &errs(
+            r#"<section data-kit="prose" data-id="p"><ol><li data-id="m1">a</li></ol></section>"#,
+        ),
+        "p: data-id is not a kit attribute",
+    );
+}
+
+#[test]
+fn an_email_has_to_and_subject() {
+    ok(
+        r#"<section data-kit="email" data-id="e1"><p data-field="to">Léa &lt;lea@acme.com&gt;</p>
+<p data-field="subject">offsite: 12-14 june</p><p>hi Léa,</p><p>booked.</p></section>"#,
+    );
+    let e = errs(r#"<section data-kit="email" data-id="e1"><p>hi</p></section>"#);
+    has(&e, "e1: an email block needs <p data-field=\"to\">");
+    has(&e, "e1: an email block needs <p data-field=\"subject\">");
+    has(
+        &errs(
+            r#"<section data-kit="email" data-id="e1"><p data-field="to">a</p><p data-field="subject">b</p><p data-field="bcc">c</p></section>"#,
+        ),
+        "data-field=\"bcc\" is not an email field",
+    );
+    has(
+        &errs(r#"<section data-kit="prose" data-id="p"><p data-field="to">a</p></section>"#),
+        "p: data-field is not a kit attribute",
+    );
 }

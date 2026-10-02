@@ -9,21 +9,31 @@
 //                                              back), when the server has no /answer route (slice 1)
 //   bise:answered {block, reply}               the question's card was answered (SSE answered)
 //   bise:voice   {phase, text}                 a voice note at the mouse (SSE voice, slice 2)
+//   bise:react   {block, item, kind, text}     approve / skip on a review item or an email
+//                                              (item null), kind null: taken back
+// The kit's own controls inside blocks carry data-kit-ui (never part of a quote or anchor).
+// notes.js marks a review item the user edited with data-edited: "approve N" leaves it out.
 // and the frame's [data-bise-notes-count] and [data-bise-send] (notes.js writes and binds them).
 // No style= anywhere: looks hang on data- attributes kit.css reads. The pure half (BiseKit.*) runs
 // in node for the laws (apps/ambient/kit/check.mjs) with a fake DOM.
 (function (root) {
   "use strict";
 
+  // an agent's id as people read it (vision §3): hyphens become spaces, the id itself never changes
+  const said = (agent) => String(agent || "").replace(/-/g, " ");
+
   // ---- the words (ambient's) ----
   const W = {
-    by: (agent) => `by ${agent}`,
-    updating: (agent) => `${agent} is updating this page…`,
+    by: (agent) => `by ${said(agent)}`,
+    updating: (agent) => `${said(agent)} is updating this page…`,
     changed: "what changed",
     send: "send",
     latest: "see the latest",
     older: (n, latest) => `v${n} of ${latest}`,
     forYou: "for you",
+    approve: "approve",
+    skip: "skip",
+    approveAll: (n) => `approve ${n}`,
   };
 
   // ---- time ----
@@ -140,7 +150,7 @@
     }
   }
   function decorateQuestion(block, agent) {
-    if (agent) block.setAttribute("data-by", agent);
+    if (agent) block.setAttribute("data-by", said(agent));
     const answer = block.getAttribute("data-answer");
     const opts = options(block);
     if (answer != null) {
@@ -174,11 +184,60 @@
     decorateQuestion(block, block.getAttribute("data-by"));
     doc.dispatchEvent(new root.CustomEvent("bise:answered", { detail: { block: idOf(block), reply: String(reply) } }));
   }
-  function decorate(blocks, agent) {
+  // ---- review and email (§4.3): approve / skip, as notes through notes.js ----
+  // The kit's own controls inside a block carry data-kit-ui: not the agent's content (notes.js
+  // leaves them out of quotes and anchors; the swap compares the agent's source, not them).
+  const items = (block) => options(block).filter((li) => li.getAttribute("data-id") != null);
+  const ui = (el) => el.getAttribute && el.getAttribute("data-kit-ui") != null;
+  function button(doc, act, text) {
+    const b = doc.createElement("button");
+    b.setAttribute("type", "button");
+    b.setAttribute("data-act", act);
+    b.textContent = text;
+    return b;
+  }
+  function acts(doc, kinds) {
+    const bar = doc.createElement("span");
+    bar.setAttribute("data-kit-ui", "");
+    for (const k of kinds) bar.append(button(doc, k, W[k]));
+    return bar;
+  }
+  // the items "approve N" approves: no verdict yet, and not edited by the user (those go with send)
+  const pending = (block) => items(block).filter((li) => li.getAttribute("data-verdict") == null && li.getAttribute("data-edited") == null);
+  function decorateReview(doc, block) {
+    for (const li of items(block)) if (!kids(li).some(ui)) li.append(acts(doc, ["approve", "skip"]));
+    let all = kids(block).find(ui);
+    if (!all) { all = doc.createElement("p"); all.setAttribute("data-kit-ui", ""); all.append(button(doc, "approve-all", "")); block.append(all); }
+    const n = pending(block).length;
+    const b = kids(all)[0];
+    b.textContent = W.approveAll(n);
+    if (n) b.removeAttribute("disabled"); else b.setAttribute("disabled", "");
+  }
+  function decorateEmail(doc, block) {
+    if (!kids(block).some(ui)) block.append(acts(doc, ["approve", "skip"]));
+  }
+  // approve or skip an item of a review (item id) or a whole email (item null); the same again
+  // takes it back. Returns {block, item, kind (null: taken back), text}, or null.
+  function react(block, item, kind) {
+    const target = item == null ? block : items(block).find((li) => li.getAttribute("data-id") === item);
+    if (!target) return null;
+    const again = target.getAttribute("data-verdict") === kind;
+    if (again) target.removeAttribute("data-verdict"); else target.setAttribute("data-verdict", kind);
+    const text = norm(kids(target).filter((c) => !ui(c)).map((c) => c.textContent).join(" "));
+    return { block: idOf(block), item: item == null ? null : item, kind: again ? null : kind, text };
+  }
+  // "approve N": every pending item, one reaction each
+  function approveAll(block) {
+    return pending(block).map((li) => react(block, li.getAttribute("data-id"), "approve"));
+  }
+
+  function decorate(blocks, agent, doc) {
     for (const b of blocks) {
       const kit = b.getAttribute("data-kit");
       if (kit === "table") decorateTable(b);
       else if (kit === "question") decorateQuestion(b, agent);
+      else if (kit === "review" && doc) decorateReview(doc, b);
+      else if (kit === "email" && doc) decorateEmail(doc, b);
     }
   }
 
@@ -192,14 +251,14 @@
     main.setAttribute("data-version", String(to));
     main.setAttribute("data-latest", String(to));
     const blocks = kids(main).filter(isBlock);
-    decorate(blocks, o.agent);
+    decorate(blocks, o.agent, doc);
     const marked = new Set(cur && versionOf(meta, to - 1) ? changedIn(meta, to) : res.changed);
     for (const b of blocks) if (marked.has(idOf(b))) b.setAttribute("data-changed", ""); else b.removeAttribute("data-changed");
     doc.dispatchEvent(new root.CustomEvent("bise:swapped", { detail: { version: to, changed: res.changed, removed: res.removed } }));
     return { ...res, marked: [...marked] };
   }
 
-  const BiseKit = { W, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, options, norm };
+  const BiseKit = { W, said, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, options, norm };
   root.BiseKit = BiseKit;
 
   // ---- the browser: the frame, the stream, the keys ----
@@ -241,26 +300,39 @@
     const st = el("span", { class: "st" }, W.updating(agent));
     const sp = el("span", { class: "sp" });
     const wc = el("button", { type: "button", disabled: "" }, W.changed);
-    const prev = el("a", { class: "b", hidden: "" });
+    // the version: "v3 ▾" opens the list of versions (ambient m_4918), older ones read-only
+    const vbox = el("span", { class: "v" });
+    const vb = el("button", { type: "button", "aria-haspopup": "true", "aria-expanded": "false" }, `v${shown}`);
+    const menu = el("span", { class: "vmenu", role: "menu", hidden: "" });
+    vbox.append(vb, menu);
     const latest = el("a", { class: "b", href: `/p/${id}`, hidden: "" }, W.latest);
     const n = el("span", { class: "n", "data-bise-notes-count": "" });
     const send = el("button", { type: "button", class: "send", "data-bise-send": "", disabled: "" }, W.send);
-    f.append(m, st, sp, wc, prev, latest, n, send);
+    f.append(m, st, sp, wc, vbox, latest, n, send);
+    const openMenu = (on) => { menu.hidden = !on; vb.setAttribute("aria-expanded", String(on)); };
+    vb.addEventListener("click", (e) => { e.stopPropagation(); if (!vb.disabled) openMenu(menu.hidden); });
+    doc.addEventListener("click", (e) => { if (!menu.hidden && !vbox.contains(e.target)) openMenu(false); });
+    doc.addEventListener("keydown", (e) => { if (e.key === "Escape" && !menu.hidden) openMenu(false); });
 
     const blocks = () => Array.from(main.querySelectorAll(":scope > [data-kit][data-id]"));
     blocks().forEach(remember);
-    decorate(blocks(), agent);
+    decorate(blocks(), agent, doc);
 
     function drawMeta() {
       const v = versionOf(meta, shown);
       const latestN = meta ? Math.max(...meta.versions.map((x) => x.n)) : latestAtLoad;
-      const parts = [W.by(agent), shown < latestN ? W.older(shown, latestN) : `v${shown}`];
+      const parts = [W.by(agent)];
       if (v && v.at_ms) parts.push(ago(v.at_ms, Date.now()));
       m.textContent = parts.join(" · ");
       latest.hidden = shown >= latestN;
-      prev.hidden = shown <= 1;
-      prev.textContent = `v${shown - 1}`;
-      prev.setAttribute("href", `/p/${id}/v/${shown - 1}`);
+      vb.textContent = (shown < latestN ? W.older(shown, latestN) : `v${shown}`) + (latestN > 1 ? " ▾" : "");
+      if (latestN > 1) vb.removeAttribute("disabled"); else vb.setAttribute("disabled", "");
+      const vs = meta ? meta.versions.slice().sort((a, b) => b.n - a.n) : [];
+      menu.replaceChildren(...vs.map((x) => {
+        const a = el("a", { role: "menuitem", href: x.n === latestN ? `/p/${id}` : `/p/${id}/v/${x.n}` }, `v${x.n}` + (x.at_ms ? ` · ${ago(x.at_ms, Date.now())}` : ""));
+        if (x.n === shown) a.setAttribute("aria-current", "page");
+        return a;
+      }));
     }
     function markChanged(ids) {
       const set = new Set(ids);
@@ -340,6 +412,8 @@
 
     // questions: click an option, or its digit when nothing is being typed
     main.addEventListener("click", (e) => {
+      const act = e.target.closest && e.target.closest("[data-kit-ui] [data-act]");
+      if (act) { onAct(act); return; }
       const li = e.target.closest && e.target.closest('[data-kit="question"] li');
       if (li) { const q = li.closest('[data-kit="question"]'); onPick(q, options(q).indexOf(li) + 1); return; }
       const sup = e.target.closest && e.target.closest("sup");
@@ -352,6 +426,16 @@
       const q = blocks().find((b) => b.dataset.kit === "question" && !b.hasAttribute("data-answer"));
       if (q && onPick(q, parseInt(e.key, 10))) e.preventDefault();
     });
+    // review and email: approve / skip (again: take it back), "approve N"; each one goes to
+    // notes.js as bise:react {block, item, kind, text} (a note of kind approve or skip)
+    function onAct(btn) {
+      const block = btn.closest("[data-kit][data-id]");
+      const kind = btn.getAttribute("data-act");
+      const li = btn.closest("li[data-id]");
+      const out = kind === "approve-all" ? approveAll(block) : [react(block, block.dataset.kit === "review" && li ? li.dataset.id : null, kind)];
+      for (const d of out) if (d) doc.dispatchEvent(new root.CustomEvent("bise:react", { detail: d }));
+      decorate([block], agent, doc);
+    }
     function showSource(k) {
       const src = blocks().find((b) => b.dataset.kit === "sources");
       const li = src && options(src)[k - 1];
@@ -371,7 +455,7 @@
       const s = li.dataset;
       // what the page is for: its heading's meta line (the server's data-kicker)
       if (s.kicker) li.append(el("span", { class: "bise-kicker" }, s.kicker));
-      const parts = [s.agent, `v${s.version}`];
+      const parts = [said(s.agent), `v${s.version}`];
       if (s.state === "updating") parts.push(W.updating(s.agent).replace(" this page…", "…"));
       else if (s.at) parts.push(ago(parseInt(s.at, 10), Date.now()));
       li.append(el("span", { class: "bise-meta" }, parts.join(" · ")));

@@ -32,6 +32,8 @@ across versions (the user's notes anchor on them): `p1`, `t1`, `q1`, `src`.
 | `callout` | one thing not to miss | a first `<h3>` (a short label: `heads-up`, `not checked`) + `<p>`; `data-tone="note"` (default), `"good"` or `"risk"` |
 | `question` | a decision the user makes | one `<p>` (the question) + `<ol>` of 2 to 4 short options; after the answer, `data-answer="2"` |
 | `sources` | where each fact comes from | `<ol>` of `<li><a href="…">name · tool</a>, when</li>`, last on the page |
+| `review` | items the user approves or skips one by one (mails to answer, tickets, expenses) | `<ol>` of `<li data-id="m1">`: a first `<p>` saying what it is (`Léa Martin · offsite dates · 9:12`), then the proposal |
+| `email` | one mail ready to send | `<p data-field="to">`, optional `<p data-field="cc">`, `<p data-field="subject">`, then the body as `<p>`s |
 
 Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
 `<img src="data:image/…" alt="…">`. Nothing else.
@@ -40,7 +42,15 @@ How to write them well:
 - **Sources:** every fact you took from somewhere gets a `<sup>n</sup>` right after it, n = its
   line in the `sources` block (the kit links them). A fact with no source says so in the text.
 - **Numbers:** write them as they read (`412`, `4.1 s`, `3.2 %`, `€12,400`): table columns of
-  numbers are aligned and set in mono by the kit. In prose, put a key number in `<code>`.
+  numbers are aligned and set in mono by the kit. One number per cell: `11 (10 new)` is not a
+  number, make it two columns (`total`, `new today`). In prose, put a key number in `<code>`.
+- **Review and email:** the kit draws `approve` / `skip` on each item and on the mail, and
+  `approve 3` for the rest; each reaction comes back to you as a note (kind `approve` or `skip`,
+  with the item's id). Item ids stay across versions like block ids. Sending or replying is
+  still your tool call, through the user's approvals, after their `send`.
+- **Drafts** (a Slack message, a post, a reply): in a `prose` block, as `<p>`s and `<ul>`, so
+  the user reads it in the page's font and edits it in place. Never in `<pre>` or `<code>`:
+  those are for code. A mail goes in an `email` block.
 - **Questions:** one per decision, options short enough for a button; the user picks on the page
   (or presses 1-3) and the pick comes back to you as a note.
 - **Words:** the user's language and voice; lowercase headings, short sentences, concrete.
@@ -103,7 +113,8 @@ network (use a `data:` src), `javascript:` links, more than 1 MB. Links to the o
 
 More examples, each one passing the lint: `apps/ambient/kit/examples/` in the bise app
 (`weekly-update.html` a doc, `offsite-venues.html` a table to choose from,
-`pricing-question.html` a decision).
+`pricing-question.html` a decision, `inbox-review.html` the inbox: replies to approve and a mail
+ready to send).
 
 ## 4. Publish fast, then fill it
 

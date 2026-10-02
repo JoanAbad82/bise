@@ -24,10 +24,13 @@ pub struct Block {
     pub hash: String,
 }
 
-/// The kinds of kit v0.
+/// The kinds of the kit: v0's six, then slice 2's review and email (docs/ambient-pages.md §4.3).
 pub const KINDS: &[&str] = &[
-    "prose", "heading", "callout", "sources", "table", "question",
+    "prose", "heading", "callout", "sources", "table", "question", "review", "email",
 ];
+
+/// `data-field` of an email's header lines.
+pub const FIELDS: &[&str] = &["to", "cc", "subject"];
 
 /// A page past this size is refused.
 pub const MAX_BYTES: usize = 1 << 20;
@@ -147,6 +150,10 @@ struct Open {
     start: usize,
     /// what the content has, for the per-kind checks
     has: Vec<&'static str>,
+    /// a review's item ids, an email's header fields, li without an id (review)
+    items: Vec<String>,
+    fields: Vec<String>,
+    bare_items: bool,
 }
 
 impl Open {
@@ -304,6 +311,11 @@ impl<'a> Linter<'a> {
                 format!("<{name}> outside a block: put it in a <section data-kit data-id>"),
             );
         }
+        let kit = self
+            .open
+            .as_ref()
+            .map(|b| b.kit.clone())
+            .unwrap_or_default();
         if let Some(b) = self.open.as_mut() {
             for k in ["ol", "ul", "li", "table", "a", "h1", "h2", "h3", "p"] {
                 if name == k && !b.has.contains(&k) {
@@ -311,7 +323,39 @@ impl<'a> Linter<'a> {
                 }
             }
         }
-        self.attrs(&at, name, &tag.attrs, false);
+        // the inner data- attributes a kind takes: a review's item ids, an email's fields
+        let get = |k: &str| {
+            tag.attrs
+                .iter()
+                .find(|(n, _)| n == k)
+                .map(|(_, v)| v.clone().unwrap_or_default())
+        };
+        let mut inner: &[&str] = &[];
+        if kit == "review" && name == "li" {
+            inner = &["data-id"];
+            match get("data-id") {
+                None => self.open.as_mut().unwrap().bare_items = true,
+                Some(v) if !valid_id(&v) => self.err(&at, format!("item data-id=\"{v}\" is not a valid id: letters, digits, - and _, 40 at most")),
+                Some(v) if self.open.as_ref().unwrap().items.contains(&v) => self.err(&at, format!("item {v}: this data-id is used twice in the review")),
+                Some(v) => self.open.as_mut().unwrap().items.push(v),
+            }
+        } else if kit == "email" && name == "p" {
+            inner = &["data-field"];
+            if let Some(v) = get("data-field") {
+                if FIELDS.contains(&v.as_str()) {
+                    self.open.as_mut().unwrap().fields.push(v);
+                } else {
+                    self.err(
+                        &at,
+                        format!(
+                            "data-field=\"{v}\" is not an email field: use {}",
+                            FIELDS.join(", ")
+                        ),
+                    );
+                }
+            }
+        }
+        self.attrs_inner(&at, name, &tag.attrs, inner);
     }
 
     fn open_block(&mut self, tag: Tag, end: usize) {
@@ -383,6 +427,9 @@ impl<'a> Linter<'a> {
             line: tag.line,
             start: end,
             has: Vec::new(),
+            items: Vec::new(),
+            fields: Vec::new(),
+            bare_items: false,
         });
     }
 
@@ -411,8 +458,25 @@ impl<'a> Linter<'a> {
                 "li",
                 "a question block needs its options as <ol><li>…</li></ol>",
             )],
+            "review" => &[(
+                "li",
+                "a review block needs its items as <ol><li data-id=\"m1\">…</li></ol>",
+            )],
             _ => &[],
         };
+        if kit == "review" && b.bare_items {
+            self.err(&at, "a review item without data-id: give each <li> its own (m1, m2) so approve and skip know which".into());
+        }
+        if kit == "email" {
+            for f in ["to", "subject"] {
+                if !b.fields.iter().any(|x| x == f) {
+                    self.err(
+                        &at,
+                        format!("an email block needs <p data-field=\"{f}\">…</p>"),
+                    );
+                }
+            }
+        }
         for (el, what) in need {
             let ok = match *el {
                 "h1" => b.has.iter().any(|h| matches!(*h, "h1" | "h2" | "h3")),
@@ -435,6 +499,22 @@ impl<'a> Linter<'a> {
                 });
             }
         }
+    }
+
+    /// Attribute checks of an element inside a block, `inner`: the data- attributes its kind takes there.
+    fn attrs_inner(
+        &mut self,
+        at: &str,
+        el: &str,
+        attrs: &[(String, Option<String>)],
+        inner: &[&str],
+    ) {
+        let (known, rest): (Vec<_>, Vec<_>) = attrs
+            .iter()
+            .cloned()
+            .partition(|(n, _)| inner.contains(&n.as_str()));
+        let _ = known;
+        self.attrs(at, el, &rest, false);
     }
 
     /// Attribute checks, shared by blocks and the elements inside.
@@ -468,7 +548,7 @@ impl<'a> Linter<'a> {
                     let hint = if block {
                         "blocks take data-kit, data-id, data-tone (callout), data-answer (question)"
                     } else {
-                        "only blocks take data- attributes"
+                        "inside a block only a review's <li data-id> and an email's <p data-field> take one"
                     };
                     self.err(at, format!("{n} is not a kit attribute: {hint}"));
                 }

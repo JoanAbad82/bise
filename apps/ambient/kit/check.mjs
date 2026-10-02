@@ -22,6 +22,7 @@ class El {
   removeAttribute(k) { this.attrs.delete(k); }
   hasAttribute(k) { return this.attrs.has(k); }
   get textContent() { return this.nodes.map((n) => n.textContent).join(""); }
+  set textContent(t) { for (const n of this.nodes) n.parent = null; this.nodes = []; this.append(new Text(String(t))); }
   get outerHTML() {
     const t = this.tagName.toLowerCase();
     const a = [...this.attrs].map(([k, v]) => (v === "" ? ` ${k}` : ` ${k}="${v}"`)).join("");
@@ -71,7 +72,7 @@ class CustomEvent { constructor(type, init) { this.type = type; this.detail = in
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Map, WeakMap, String, Number, Date, CustomEvent, parseInt });
 vm.runInContext(readFileSync(join(here, "kit.js"), "utf8"), ctx, { filename: "kit.js" });
 const K = ctx.BiseKit;
-const doc = { dispatchEvent: (e) => events.push({ type: e.type, detail: JSON.parse(JSON.stringify(e.detail)) }) };
+const doc = { dispatchEvent: (e) => events.push({ type: e.type, detail: JSON.parse(JSON.stringify(e.detail)) }), createElement: (t) => new El(t) };
 const j = (x) => JSON.parse(JSON.stringify(x));
 
 // FNV-1a 64 over the folded block source, like rust/switchboard/src/pages/lint.rs, for fake metas
@@ -283,6 +284,65 @@ law("question: an answered one (data-answer, by number or by text) shows its pic
   }
 });
 
+// ---- review and email (§4.3) ----
+const R = `<section data-kit="review" data-id="inbox"><h2>3 mails</h2><ol>
+<li data-id="m1"><p>Léa · offsite</p><p>reply: yes, booked.</p></li>
+<li data-id="m2"><p>Marc · invoice</p><p>reply: paid friday.</p></li>
+<li data-id="m3"><p>Sam · intro</p><p>reply: happy to.</p></li></ol></section>`;
+const acted = (b) => K.options(b).map((li) => li.getAttribute("data-verdict") || "-");
+const allButton = (b) => b.children.find((c) => c.hasAttribute("data-kit-ui"));
+law("review: each item gets approve / skip once, and 'approve N' counts what is left", () => {
+  const b = blocks(parse(R))[0];
+  K.decorate([b], "inbox", doc);
+  K.decorate([b], "inbox", doc);
+  for (const li of K.options(b)) assert.equal(li.children.filter((c) => c.hasAttribute("data-kit-ui")).length, 1, "one bar per item");
+  assert.equal(allButton(b).textContent, "approve 3");
+  assert.deepEqual(j(K.react(b, "m2", "skip")), { block: "inbox", item: "m2", kind: "skip", text: "Marc · invoice reply: paid friday." });
+  K.decorate([b], "inbox", doc);
+  assert.equal(allButton(b).textContent, "approve 2");
+});
+law("review: 'approve N' approves the rest, never an item you skipped or edited", () => {
+  const b = blocks(parse(R))[0];
+  K.decorate([b], "inbox", doc);
+  K.react(b, "m1", "skip");
+  K.options(b)[2].setAttribute("data-edited", ""); // notes.js: you changed m3
+  const out = K.approveAll(b);
+  assert.deepEqual(j(out).map((d) => [d.item, d.kind]), [["m2", "approve"]]);
+  assert.deepEqual(acted(b), ["skip", "approve", "-"]);
+  K.decorate([b], "inbox", doc);
+  assert.ok(allButton(b).children[0].hasAttribute("disabled"), "nothing left: disabled");
+});
+law("review and email: the same reaction again takes it back; an email reacts as a whole", () => {
+  const b = blocks(parse(R))[0];
+  K.react(b, "m1", "approve");
+  assert.deepEqual(j(K.react(b, "m1", "approve")), { block: "inbox", item: "m1", kind: null, text: "Léa · offsite reply: yes, booked." });
+  assert.deepEqual(acted(b), ["-", "-", "-"]);
+  assert.equal(K.react(b, "m9", "approve"), null);
+  const e = blocks(parse(`<section data-kit="email" data-id="e1"><p data-field="to">Léa</p><p data-field="subject">june</p><p>hi Léa,</p></section>`))[0];
+  K.decorate([e], "inbox", doc);
+  const d = K.react(e, null, "approve");
+  assert.deepEqual(j(d), { block: "e1", item: null, kind: "approve", text: "Léa june hi Léa," });
+  assert.equal(e.getAttribute("data-verdict"), "approve");
+});
+law("the kit's own controls never count as a change of the agent's block", () => {
+  const main = parse(R);
+  blocks(main).forEach(K.remember);
+  K.decorate(blocks(main), "inbox", doc);
+  const before = blocks(main)[0];
+  const res = K.swap(main, blocks(parse(R)), null, null);
+  assert.equal(blocks(main)[0], before);
+  assert.deepEqual(j(res.changed), []);
+});
+
+law("names: an agent's id reads with spaces on the page (by launch recap), the id stays", () => {
+  assert.equal(K.W.by("launch-recap"), "by launch recap");
+  assert.equal(K.W.updating("weekly-update"), "weekly update is updating this page…");
+  const q = blocks(parse(Q))[0];
+  K.decorate([q], "launch-recap", doc);
+  assert.equal(q.getAttribute("data-by"), "launch recap");
+  assert.equal(q.getAttribute("data-id"), "q1");
+});
+
 law("ago: short words", () => {
   const now = 10_000_000;
   assert.equal(K.ago(now - 5_000, now), "just now");
@@ -321,7 +381,7 @@ law("the fonts tokens.css names are in the kit (the CSP loads nothing from outsi
 });
 
 law("every example page is a fragment of known blocks with unique ids", () => {
-  const kinds = new Set(["prose", "heading", "callout", "sources", "table", "question"]);
+  const kinds = new Set(["prose", "heading", "callout", "sources", "table", "question", "review", "email"]);
   for (const f of readdirSync(join(here, "examples"))) {
     const main = parse(readFileSync(join(here, "examples", f), "utf8"));
     assert.ok(main.children.length > 0 && main.children.every((c) => c.tagName === "SECTION" && kinds.has(c.getAttribute("data-kit"))), f);

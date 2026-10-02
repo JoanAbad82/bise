@@ -42,6 +42,17 @@ body {
 .bise-frame button:hover, .bise-frame a.b:hover, .bise-frame button.on { background: var(--talk-raised-on); }
 .bise-frame button[disabled] { opacity: .4; cursor: default; background: var(--talk-raised); }
 .bise-frame [hidden] { display: none; }
+/* the version menu: "v3 ▾", a small list of versions under it */
+.bise-frame .v { position: relative; }
+.bise-frame .v > button { font-family: var(--font-mono); font-size: 12px; }
+.bise-frame .v > button[disabled] { opacity: 1; cursor: default; background: none; color: var(--talk-dim); }
+.bise-frame .vmenu { position: absolute; top: calc(100% + 8px); right: 0; min-width: 160px; display: flex; flex-direction: column; padding: 6px; border-radius: var(--radius-small);
+  background: var(--surface-talk); -webkit-backdrop-filter: var(--talk-blur); backdrop-filter: var(--talk-blur); box-shadow: var(--talk-stroke), var(--talk-shadow); }
+.bise-frame .vmenu[hidden] { display: none; }
+.bise-frame .vmenu a { font: 12px/1.2 var(--font-mono); color: var(--talk-ink); text-decoration: none; padding: 7px 10px; border-radius: 6px; }
+.bise-frame .vmenu a:hover { background: var(--talk-raised-on); }
+.bise-frame .vmenu a[aria-current] { color: var(--talk-dim); }
+.bise-frame .vmenu a[aria-current]::after { content: " ·  shown"; }
 .bise-frame .n { font: 12px var(--font-mono); color: var(--talk-dim); }
 .bise-frame .n:empty { display: none; }
 .bise-frame button.send { background: var(--talk-accent); color: var(--on-accent); font-weight: 600; }
@@ -64,7 +75,8 @@ body {
 #bise-page a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--rule); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 #bise-page a:hover { text-decoration-color: var(--ink); }
 #bise-page code, #bise-page kbd { font: 15.5px var(--font-mono); }
-#bise-page pre { font: 14.5px/1.55 var(--font-mono); background: var(--surface-card); border-radius: 10px; padding: var(--space-3) var(--space-4); overflow-x: auto; box-shadow: 3px 3px 0 var(--drop); }
+/* pre wraps and never clips (a draft in a pre is read whole, ambient m_4918) */
+#bise-page pre { font: 14.5px/1.55 var(--font-mono); background: var(--surface-card); border-radius: 10px; padding: var(--space-3) var(--space-4); white-space: pre-wrap; overflow-wrap: anywhere; box-shadow: 3px 3px 0 var(--drop); }
 #bise-page pre code { font: inherit; }
 #bise-page blockquote { color: var(--dim); padding-left: var(--space-3); border-left: 2px solid var(--rule); }
 #bise-page mark { background: var(--accent-soft); color: inherit; }
@@ -124,6 +136,36 @@ body {
 #bise-page [data-kit="sources"] li { counter-increment: bise-src; position: relative; padding-left: 32px; margin: 0 0 var(--space-1); color: var(--dim); border-radius: 4px; transition: background .6s var(--ease-arrive); }
 #bise-page [data-kit="sources"] li::before { content: counter(bise-src); position: absolute; left: 0; top: 0; font: 600 var(--text-kicker)/2.1 var(--font-mono); color: var(--accent); }
 #bise-page [data-kit="sources"] li[data-lit] { background: var(--accent-soft); }
+
+/* the kit's buttons on the page (review, email): cards like a question's options; approve is ink */
+#bise-page [data-kit-ui] { display: flex; gap: var(--space-2); margin: 0; font: 14px/1.3 var(--font-ui); }
+#bise-page [data-kit-ui] button {
+  font: inherit; color: var(--ink); background: var(--surface-card); border: 0; border-radius: var(--radius-small);
+  padding: 5px 12px; cursor: pointer; box-shadow: 3px 3px 0 var(--drop); transition: transform .5s var(--ease-pop);
+}
+#bise-page [data-kit-ui] button[data-act="approve"], #bise-page [data-kit-ui] button[data-act="approve-all"] { background: var(--ink); color: var(--surface-made); }
+#bise-page [data-kit-ui] button[disabled] { opacity: .4; cursor: default; }
+#bise-page [data-verdict="approve"] > [data-kit-ui] button[data-act="approve"],
+#bise-page [data-verdict="skip"] > [data-kit-ui] button[data-act="skip"] { box-shadow: inset 0 0 0 1.5px var(--ink); transform: translateY(-1px); }
+#bise-page [data-verdict="approve"] > [data-kit-ui] button[data-act="approve"]::before { content: "✓ "; }
+
+/* review: a list of items, each with its approve / skip; "approve N" at the end */
+#bise-page [data-kit="review"] > :is(ol, ul) { list-style: none; padding: 0; margin: 0 0 var(--space-3); border-top: 1.5px solid var(--rule-strong); }
+#bise-page [data-kit="review"] li[data-id] { display: grid; grid-template-columns: 1fr auto; gap: 4px var(--space-4); align-items: start; padding: var(--space-3) 0; margin: 0; border-bottom: 1px solid var(--rule); transition: opacity .3s var(--ease-arrive); }
+#bise-page [data-kit="review"] li[data-id] > :not([data-kit-ui]) { grid-column: 1; margin: 0; }
+#bise-page [data-kit="review"] li[data-id] > p:first-child { font-size: var(--text-small); color: var(--dim); }
+#bise-page [data-kit="review"] li[data-id] > [data-kit-ui] { grid-column: 2; grid-row: 1 / span 4; }
+#bise-page [data-kit="review"] li[data-verdict="skip"] > :not([data-kit-ui]) { opacity: .45; }
+#bise-page [data-kit="review"] li[data-verdict="approve"] { box-shadow: inset 3px 0 0 var(--ok); padding-left: var(--space-3); }
+
+/* email: a draft ready to leave, its header lines labeled, approve / skip under it */
+[data-kit="email"] { background: var(--surface-card); border-radius: 10px; padding: var(--space-4) 22px; margin: var(--space-4) 0; box-shadow: 3px 3px 0 var(--drop); }
+#bise-page [data-kit="email"] > p[data-field] { display: grid; grid-template-columns: 72px 1fr; margin: 0; padding: 4px 0; border-bottom: 1px solid var(--rule); font: var(--text-small)/1.5 var(--font-ui); }
+#bise-page [data-kit="email"] > p[data-field]::before { content: attr(data-field); font: var(--text-kicker)/2 var(--font-mono); color: var(--kick); }
+#bise-page [data-kit="email"] > p[data-field="subject"] { font-weight: 600; }
+#bise-page [data-kit="email"] > p[data-field] + p:not([data-field]) { margin-top: var(--space-4); }
+#bise-page [data-kit="email"] > [data-kit-ui] { margin-top: var(--space-4); }
+#bise-page [data-kit="email"][data-verdict="skip"] > :not([data-kit-ui]) { opacity: .45; }
 
 /* what changed: a soft wash on the blocks that differ from the version before */
 body.bise-changes [data-changed] { background: var(--changed); box-shadow: -10px 0 0 var(--changed), 10px 0 0 var(--changed); }
