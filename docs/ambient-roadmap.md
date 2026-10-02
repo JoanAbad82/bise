@@ -46,19 +46,24 @@ install bise", "the newsletter for the launch". Most of what he asks bise to wri
   person, text): a doc with a header, the same notes.
 - Voice notes at the mouse (hold fn on the page), and "send" by voice: the gesture that makes pages
   feel like talking to a person (vision §3 C). Already in the build's slice 2; this job is its first real use.
-- **The act is "put it in my drafts"**: `put in Gmail drafts` / `put in Slack drafts` / `put in Kit`
-  on the page's frame (and by voice: "put it in my drafts"). A draft doesn't leave, so it needs no
-  approval card; it says `in your Gmail drafts · open` and the link opens it there. Sending stays
-  his, in Gmail/Slack/Kit (his habit, launch#999). A send from bise is still possible later, through
-  the gate.
-- The page keeps a `where it went` line (`in your Gmail drafts since 14:02`), so a later "v3" knows
-  it must update the draft, not make a second one.
+- **The act is "put it in my drafts"**: `put in Gmail drafts` / `put in Kit` on the page's frame
+  (and by voice: "put it in my drafts"). A draft doesn't leave, so it needs no approval card (an
+  approvals-gate rule: draft-making tool calls are classified as not leaving); it says `in your
+  Gmail drafts · open` and the link opens it there. Sending stays his, in Gmail/Kit (his habit,
+  launch#999). A send from bise is still possible later, through the gate.
+- **Slack has no API for a user's drafts**, so Slack is the copy path by design: the message block
+  has `copy` and `open #team` (a `slack://` link); the frame says `copied · open #team`.
+- The page keeps a `where it went` line (`in your Gmail drafts since 14:02`), so a later "v3"
+  updates the same draft (it reads it back first), never makes a second one. Data:
+  `sb page publish … --went gmail-draft:<id>=<url>` into the page's meta.
 - When the connector fails (launch#1008): one line on the frame, `Gmail didn't take it. copy ·
   try again`, and the copy button copies the draft as rich text. Never a file path.
 
 **Proves.** The loop ends somewhere real: the page is the workshop, the tool is the shelf.
 **Done when.** "write Lélio the mail he asks for in the #rh thread" → a mail page with the thread as
-its source → 2 voice notes → v2 → "put it in my drafts" → it's in Gmail drafts, the link opens it.
+its source → 2 voice notes → v2 → "put it in my drafts" → it's in Gmail drafts, the link opens it;
+v3 updates that same draft. And "tell Benjamin on Slack how to install bise" → a message page →
+`copy` → `copied · open @benjamin` opens the DM, the text ready to paste. No card in either.
 
 ### B: watch for me (the launch desk, standing orders)
 
@@ -68,12 +73,14 @@ answer". Then the same for mail and Slack.
 **The UX.**
 - **A standing order**: "watch the launch until tomorrow" makes an agent that checks every N
   minutes and **republishes its page** (vision §4 keeps pages static: freshness comes from the agent
-  republishing, not from the page fetching; no new architecture). The frame says
+  republishing, not from the page fetching). The hub wakes it on a timer, so no agent burns turns
+  sleeping: `sb every 10m "<message>" [--until …]`, `sb every --stop`. The frame says
   `watching · checked 3 min ago · until tomorrow 18:00` and `stop`.
 - The page kind **review** (vision §4): the comments that need him, grouped (questions, bugs,
   praise), each with a drafted reply; approve / edit / skip; `approve 5`. Approve = the reply goes to
-  the place's draft or, for HN/Reddit/X (read-only plugins), **opens the thread in his browser with
-  the reply ready to paste** (computer use fills the box; he presses post). bise never posts.
+  the place's draft or, for HN/Reddit/X/Bluesky (read-only plugins), **opens the thread in his
+  browser with the reply prefilled where the site allows** (X and Bluesky compose intents, or
+  computer use typing into his tab), **else copied + opened**; he presses post. bise never posts.
 - **When it speaks first** (the always-on promise): only a card for what he asked to be told
   (`? a HN comment asks if it works with Claude Code`, `1 draft a reply` `2 later`); the rest waits
   on the page. Numbers (stars, points, rank) sit in the page's header, no card.
@@ -91,8 +98,10 @@ reply in the box.
 **The UX.**
 - A **review** page of the feedback, one item per report: what he said (quoted, linked), what bise
   thinks it is, and the proposed action: `start an agent to fix it`, `answer Benjamin`, `skip`.
-- Approve `start an agent` = main starts a dev agent on the right repo with the item as its brief;
-  the item then shows that agent's status live (`∿ fix-install-path working`, `✓ done · PR`).
+- Approve `start an agent` = a note of kind `start` sent to main (only main starts agents); main
+  starts a dev agent on the right repo with the item as its brief; the item (`data-agent`) then
+  shows that agent's status live, pushed by the page server from the hub's agent states
+  (`∿ fix-install-path working`, `✓ done · PR`).
 - When an agent finishes, the page's item gets its answer and the drafted reply to Benjamin
   (`fixed in 0.4.2. try again?`), which goes to Slack drafts (A's act).
 
@@ -122,7 +131,8 @@ status on the page → 2 replies in Slack drafts.
 **The UX.** At the first fn of the day (never on a timer while he's away): `good morning. 3 things
 need you · fn + o`. The page: what needs him (cards waiting, replies to approve, steps that are
 his), what agents finished overnight, today's meetings with a brief for each (Granola, the
-calendar), what's watched. Nothing else. One page, under a minute to read.
+calendar), what's watched. Nothing else. One page, under a minute to read. A standing order (B's
+`sb every`) prepares it at a set hour, so the first fn opens it at once: never computed on the fn.
 
 **Proves.** Always on means he starts the day already caught up.
 **Done when.** a week of mornings where the page is the first and only place he looks.
@@ -141,12 +151,14 @@ the deck or doc review someone sent; the persona's weekly update.
    a fact, a yes/no, a status. A page for "what's my next meeting" is noise. QA checks both ways.
 4. **His taste, learned.** His notes repeat (no emoji, lowercase, short, no "it's not X, it's Y").
    Every note that states a preference ("never …", "always …", "too long") is offered back once:
-   `keep this for next time?` → a line in his taste file (the bise home), which every page-making
-   agent reads. The page frame says `following your taste · 4 rules` (a link to edit them). After
+   `keep this for next time?` → main writes a line in his taste file (`~/bise/taste.md`, the home
+   workspace), which the `bise-pages` skill tells every page-making agent to read. The page frame says `following your taste · 4 rules` (a link to edit them). After
    a week, v1 already sounds like him.
 5. **Speed is the UX.** A page that takes 4 minutes is a page he stops asking for. Each slice's
    done-when gets a time: the first version in under 90 s for a draft, the next version in under
-   45 s after send; the frame shows progress (`reading the thread · writing`), never a blank wait.
+   45 s after send; the frame shows progress (`reading the thread · writing`: the page's state plus
+   the agent's current tool intent, which the hub has), never a blank wait. The guide makes agents
+   publish a skeleton (frame, headings, `writing…`) within ~10 s, then fill it through the live swap.
 
 ## 4. bise as an entity (with ambient)
 
@@ -165,7 +177,16 @@ owns the look and the words):
   joked about, and comes with what it does next.
 - **It remembers.** Your taste (§3.4), who people are (`Lélio · your manager`), what you asked it
   to watch. Shown, editable, never creepy: everything it keeps about you is one page.
-- **A little kiss.** The `:*` and the light touch when something goes well, at most once a reply.
+- **A little kiss.** The `:*` at most once, at hello, never at a failure.
+
+Agreed with ambient (m_4863), and drawn in its identity round 4 on the user's pick, lamplight
+(`site/content/ambient/identity4.html`, "who bise is: the lamp left on"): bise is the lamp someone
+leaves on in the next room. At rest it breathes slowly; when you talk it leans in; while agents
+work it flickers; when it needs you it nudges once, then holds still; done is a nod; failed goes
+still; when you're away it lowers to an ember. On ambient surfaces the speaker is bise (`release
+failed. i'm on it.`, the label `bise`, `bise sees Chrome · …`), the agents are its hands, `main`
+stays the TUI thread's name: the signed `W` lines change **only once the user says yes to round 4**.
+`keep this for next time?` is a quiet line under the note, once per preference, never a dialog.
 
 ## 5. Order and why
 
