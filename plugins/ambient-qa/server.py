@@ -53,6 +53,7 @@ TOOLS = [
      {"id": {"type": "string"}}, []),
     ("play", "A custom timeline into the app: events [[ms, ev], ...], shots [{at: ms, what}] (the core is muted while it plays). Files are named <name>@<s>s.",
      {"events": {"type": "array"}, "shots": {"type": "array"}, "name": {"type": "string"}, "backdrop": {"type": "string"}}, ["events"]),
+    ("outbox", "What the QA hub's main wrote to the fake accounts (drafts, sends, Slack posts, Linear issues, calendar events): QA hubs only have fake Gmail, Slack, Linear and calendar accounts with fixture data, never the user's.", {}, []),
     ("reset", "The pages start over (the model back to its start), the panel shown.", {}, []),
 ]
 
@@ -132,6 +133,8 @@ def run(name, a):
         r = [{"id": s["id"], "spec": s["spec"], "label": s["label"]} for s in sc]
     elif name == "play":
         r = qa.play(a["events"], a.get("shots", []), a.get("name", "play"), a.get("backdrop"))
+    elif name == "outbox":
+        r = qa.outbox()
     elif name == "reset":
         r = qa.reset()
     else:

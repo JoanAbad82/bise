@@ -10,6 +10,17 @@ built by `scripts/ambient.sh` from the repo the plugin lives in), launched
 in QA mode (`--qa fake|real`): a second instance with its own files under
 `<bise dev dir>/qa/<your agent name>/` (one QA app, hub and socket per agent: you never drive another agent's app) and a control socket. Nothing here needs the user.
 
+**The user's rule: no test, QA or demo touches his real accounts** (Gmail,
+Outlook, Slack, Linear, calendar, any connector, read or write, and his
+browser through computer use), unless he asks for that one run himself.
+Every QA hub has fake accounts instead: `tools.gmail.*`, `tools.slack.*`,
+`tools.linear.*`, `tools.calendar.*` over canned items (Camille, ops at
+acme: the weekly update, offsite venues, an invoice, a new hire), whose
+writes (drafts, sends, posts, issues, events) only land in the hub's
+outbox (`outbox()`). Real connectors and the computer plugin are refused
+unless `real_accounts_approved_by_user=<the user's own message id>`: never
+set it on your own.
+
 What QA mode never does: open the mic (the voice is faked inside the app),
 play a sound, capture the user's screen, post a macOS notification, take
 the keyboard focus, open a URL, ask a permission, listen to the real fn,
@@ -24,7 +35,7 @@ Every tool returns JSON; PNG files are written under
 
 | tool | CLI | what |
 |---|---|---|
-| `launch({hub})` | `qa.py launch [--hub fake\|model\|real]` | fake (default): a throwaway hub, tests/e2e.py's scripted provider: main answers `ack: <your words>`. model: the same throwaway hub and workspace with your configured model, keys and approvals mode (costs credits; for main's real behavior, never the real main). real: your workspace, read-only (nothing is ever sent). The result names the bise, its tree, the tree's commit and `behind_ambient_app` |
+| `launch({hub})` | `qa.py launch [--hub fake\|model\|real]` | fake (default): a throwaway hub, tests/e2e.py's scripted provider: main answers `ack: <your words>`. model: the same throwaway hub and workspace with the user's configured model and keys (costs credits; main's real behavior on the fake accounts, never the real main or his accounts). real: your workspace, read-only (nothing is ever sent). The result names the bise, its tree, the tree's commit and `behind_ambient_app` |
 | `scenes({only, backdrops, at, reduce, tokens, screen_h})` | `qa.py scenes [--only talk,needs] [--backdrops dark,bright,busy] [--reduce-motion] [--tokens f.css] [--at 400,1200]` | plays each scene in the app, shoots each moment, returns contact sheets (panel, and the screen's top 300 px; `screen_h: 0` = the whole screen) |
 | `frames({scene, every, span})` | `qa.py scenes --frames talk --every 80 [--span 0,2000]` | a strip of panel frames for the motion (springs, the lean-in, the needs-you edge); each file says when it was really taken (`taken_ms`) |
 | `look({tokens, reduce})` | `qa.py look --tokens f.json --reduce-motion on` | another look for what follows: a tokens file (`.css` as is, `.json` `{name: value}` as `:root --name`), kept across reloads; `tokens: ""` = the app's own |
@@ -38,6 +49,7 @@ Every tool returns JSON; PNG files are written under
 | `events({n})` | `qa.py events 40` | the last events in and out, levels left out |
 | `play({events, shots, name})` | - | your own timeline `[[ms, ev], ...]`, shots `[{at: ms, what}]` |
 | `reset()` | `qa.py reset` | the capsule starts over, shown |
+| `outbox()` | `qa.py outbox` | what the QA hub's main wrote to the fake accounts (drafts, sends, posts, issues, events) |
 | `page_publish({file, id, edit, done, answers})` | `qa.py page publish [--file f.html] [--id x]` | the throwaway hub's main publishes a page (`sb page publish`): your file or amb-kit's weekly-update example; returns its URL |
 | `page_notes({id, notes, send})` | `qa.py page notes --id x --notes '[...]' --send` | draft notes through the page's own API (token, origin), as notes.js does; `send` sends them to the page's agent |
 | `page_meta({id})` | `qa.py page meta --id x` | versions, state, the notes and their status |
@@ -98,8 +110,9 @@ in Chrome:
 
 1. `launch()`, then `page_fixture()` (or `page_publish(...)`): you get
    the page's URL on the throwaway hub's page server (127.0.0.1).
-2. Load the `computer:computer-use` skill. Open the URL in your own tab
-   group (never the user's tabs), at a fixed size; `/p/<id>/v/1` and
+2. Only if the user asked for this run (computer use drives his own
+   browser): load the `computer:computer-use` skill and open the URL in
+   your own tab group (never the user's tabs), at a fixed size; `/p/<id>/v/1` and
    `/p/<id>/v/2` give each version.
 3. Screenshot the page (the frame, the blocks, the notes in each state:
    open, sent, done, answered, moved); light and dark: switch with the

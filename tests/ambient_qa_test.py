@@ -149,6 +149,41 @@ def real_accounts_refused():
 
 
 @test
+def fake_accounts():
+    """the fake accounts: each service answers MCP from fixtures, writes only to the outbox, installs as valid plugins"""
+    d = tempfile.mkdtemp(prefix="aq-")
+    box = os.path.join(d, "outbox.jsonl")
+    srv = os.path.join(PLUGIN, "fake-accounts", "fake_accounts.py")
+
+    def call(svc, *msgs):
+        p = subprocess.run([sys.executable, "-B", srv, svc], input="".join(json.dumps(m) + "\n" for m in msgs),
+                           capture_output=True, text=True, timeout=30, env=dict(os.environ, FAKE_ACCOUNTS_OUTBOX=box))
+        return [json.loads(l) for l in p.stdout.splitlines() if l.strip()]
+    init = {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
+    for svc in qa.FAKE_SERVICES:
+        r = call(svc, init, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+        check(r[0]["result"]["serverInfo"]["name"] == "fake-" + svc and len(r[1]["result"]["tools"]) >= 3, (svc, r))
+        check(all("fake QA account" in t["description"] for t in r[1]["result"]["tools"]), "every tool says it's fake")
+    r = call("gmail", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "search_messages", "arguments": {"query": "offsite"}}})
+    found = json.loads(r[1]["result"]["content"][0]["text"])["messages"]
+    check({m["id"] for m in found} == {"m102", "m105", "m106"}, found)   # m105's body says "offsites"
+    r = call("gmail", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "create_draft", "arguments": {"to": "marc@acme.test", "subject": "weekly", "body": "x"}}})
+    check(json.loads(r[1]["result"]["content"][0]["text"])["fake"] is True, r)
+    r = call("slack", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "post_message", "arguments": {"channel": "team", "text": "hi"}}})
+    w = [json.loads(l) for l in open(box)]
+    check([(x["service"], x["action"]) for x in w] == [("gmail", "create_draft"), ("slack", "post_message")], w)
+    ws = os.path.join(d, "ws")
+    os.makedirs(os.path.join(ws, ".git", "info"))
+    root = qa.install_fake_accounts(ws)
+    for svc in qa.FAKE_SERVICES:
+        m = json.load(open(os.path.join(root, svc, "plugin.json")))
+        check(m["name"] == svc and m["$schema"].endswith("/1.0.0/plugin.schema.json") and "extensions" not in m, m)
+        mc = json.load(open(os.path.join(root, svc, "mcp.json")))
+        check(mc["mcpServers"][svc]["args"][-1] == svc and os.path.exists(mc["mcpServers"][svc]["args"][1]), mc)
+    check("/.agents/" in open(os.path.join(ws, ".git", "info", "exclude")).read(), "out of the throwaway repo's git")
+
+
+@test
 def client_protocol():
     """the socket client: one JSON line each way, ids matched, errors raised"""
     d = tempfile.mkdtemp(prefix="aq-", dir="/tmp" if len(tempfile.gettempdir()) > 60 else None)

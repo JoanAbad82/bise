@@ -253,6 +253,10 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="")
         empty = os.path.join(E.tmp, "no-user-plugins")
         os.makedirs(empty, exist_ok=True)
         E.env["BEND_PLUGINS_HOME"] = empty
+        # the fake accounts in their place: canned Gmail, Slack, Linear and
+        # calendar items as workspace plugins; their writes go to the outbox
+        install_fake_accounts(E.ws)
+        E.env["FAKE_ACCOUNTS_OUTBOX"] = os.path.join(E.tmp, "outbox.jsonl")
     if not user_ask:
         computer = False
     E.env["BEND_PLUGINS_STATE"] = hub_plugins_state(E.tmp, computer, keep_user=bool(user_ask and connectors))
@@ -291,6 +295,42 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="")
         except OSError:
             pass
         E.close()
+
+
+FAKE_ACCOUNTS = os.path.join(HERE, "fake-accounts")
+FAKE_SERVICES = ("gmail", "slack", "linear", "calendar")
+
+
+def install_fake_accounts(ws):
+    """One workspace plugin per fake service in <ws>/.agents/plugins (out of
+    the throwaway repo's git): tools.gmail.*, tools.slack.*, tools.linear.*,
+    tools.calendar.* over fake-accounts/fixtures.json."""
+    root = os.path.join(ws, ".agents", "plugins")
+    for svc in FAKE_SERVICES:
+        d = os.path.join(root, svc)
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "plugin.json"), "w") as f:
+            json.dump({"$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", "name": svc, "version": "0.1.0",
+                       "description": "%s for this workspace: a fake QA account with fixture data (Camille at acme); writes go to a QA outbox" % svc}, f, indent=1)
+        with open(os.path.join(d, "mcp.json"), "w") as f:
+            json.dump({"$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+                       "mcpServers": {svc: {"type": "stdio", "command": "python3", "args": ["-B", os.path.join(FAKE_ACCOUNTS, "fake_accounts.py"), svc]}}}, f, indent=1)
+    ex = os.path.join(ws, ".git", "info", "exclude")
+    if os.path.isdir(os.path.dirname(ex)):
+        with open(ex, "a") as f:
+            f.write("/.agents/\n")
+    return root
+
+
+def outbox():
+    """What the QA hub's main wrote to the fake accounts (drafts, sends, posts, issues, events)."""
+    info = _read(HUB)
+    if not info:
+        raise QAError("no throwaway hub: launch() first")
+    try:
+        return {"writes": [json.loads(l) for l in open(os.path.join(info["tmp"], "outbox.jsonl")) if l.strip()]}
+    except FileNotFoundError:
+        return {"writes": []}
 
 
 def user_plugins_state():
@@ -926,7 +966,7 @@ def _cli(argv):
     p = sub.add_parser("list")
     p = sub.add_parser("say"); p.add_argument("text"); p.add_argument("--no-wait", action="store_true")
     p = sub.add_parser("snapshot"); p.add_argument("--what", default="both"); p.add_argument("--backdrop"); p.add_argument("--name"); p.add_argument("--out")
-    sub.add_parser("state"); sub.add_parser("reset"); sub.add_parser("ping")
+    sub.add_parser("state"); sub.add_parser("reset"); sub.add_parser("ping"); sub.add_parser("outbox")
     p = sub.add_parser("events"); p.add_argument("n", nargs="?", type=int, default=40); p.add_argument("--levels", action="store_true")
     p = sub.add_parser("fn"); p.add_argument("state"); p.add_argument("--key", default="fn")
     p = sub.add_parser("key"); p.add_argument("k")
@@ -965,6 +1005,8 @@ def _cli(argv):
         r = snapshot(a.what, a.backdrop, a.name, a.out)
     elif a.cmd == "state":
         r = state()
+    elif a.cmd == "outbox":
+        r = outbox()
     elif a.cmd == "reset":
         r = reset()
     elif a.cmd == "ping":
