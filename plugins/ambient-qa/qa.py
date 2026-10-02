@@ -801,13 +801,19 @@ def page_notes(id, notes, send=False):
     return out
 
 
-def page_meta(id):
+def page_meta(id, tries=6):
+    """A page's meta; a 404 is retried for a few seconds (ambient-pm m_5639:
+    a watcher's republish made one GET miss, and the run stopped there)."""
     _, info = _hub()
     port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
-    st, body = _http(port, "GET", "/p/%s/meta" % id)
-    if st != 200:
-        raise QAError("GET /p/%s/meta: %d" % (id, st))
-    return json.loads(body)
+    for k in range(tries):
+        st, body = _http(port, "GET", "/p/%s/meta" % id)
+        if st == 200:
+            return json.loads(body)
+        if st != 404 or k == tries - 1:
+            break
+        time.sleep(0.5 * (k + 1))
+    raise QAError("GET /p/%s/meta: %d" % (id, st))
 
 
 def page_drive(id=None, url=None, steps=None, schemes=("light",), name=None, out=None, width=1400, height=900, scale=2):
@@ -1364,6 +1370,15 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
                           for n in m.get("notes", []) if n["id"] in ids]
         r["cards"] = list(cards.values())
         r["main_tail"] = c.lines("main")[-40:]
+    except Exception as e:  # noqa: BLE001
+        # a run that breaks is a FAIL in its own report, never a silent pass (ambient-pm m_5639)
+        import traceback
+        r["fails"].append("the run stopped: %s" % e)
+        r["error"] = traceback.format_exc()[-3000:]
+        try:
+            r["main_tail"] = c.lines("main")[-40:]
+        except Exception:  # noqa: BLE001
+            pass
     finally:
         r["load"]["end"] = round(os.getloadavg()[0], 1)
         if core:
