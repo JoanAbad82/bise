@@ -14,6 +14,10 @@
     running: "running",
     pageWriting: "writing…",
     pageUpdating: "updating…",
+    // the full view's empty sections (best guesses, asked to ambient; 'nothing needs you.' is the
+    // signed idle line's)
+    nothingRunning: "nothing running.",
+    nothingNeeds: "nothing needs you.",
     listening: "listening",
     letGo: "let go of fn to send",
     got: ":* got it.",

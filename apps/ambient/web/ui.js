@@ -85,10 +85,30 @@
     }));
   }
 
+  // the app shows or hides the capsule (app_hidden): it grows out of the menu-bar icon and goes
+  // back into it (SPEC §0; amb-mac keeps the panel on screen for the close), a fade under reduced motion
+  let wasHidden = null, growAnim = null;
+  function showHide(v) {
+    if (wasHidden === null) { wasHidden = v.hidden; host.style.display = v.hidden ? "none" : ""; return; }
+    const r = host.getBoundingClientRect();
+    const g = M.grow(wasHidden, v.hidden, v.still, v.icon, { x: r.left, y: r.top, w: r.width });
+    wasHidden = v.hidden;
+    if (!g) return;
+    if (growAnim) growAnim.cancel();
+    host.style.display = "";
+    const frames = g.fade ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: `scale(${g.from})` }, { opacity: 1, transform: "scale(1)" }];
+    host.style.transformOrigin = g.origin || "";
+    growAnim = host.animate(g.open ? frames : frames.slice().reverse(), { duration: g.ms, easing: g.ease, fill: "both" });
+    growAnim.onfinish = () => {
+      growAnim = null;
+      if (!g.open && wasHidden) host.style.display = "none";
+    };
+  }
+
   function render(v) {
     host.classList.toggle("still", !!v.still);
     if (host.style.getPropertyValue("--r") !== v.radius + "px") host.style.setProperty("--r", v.radius + "px");
-    host.style.display = v.hidden ? "none" : "";
+    showHide(v);
     cap.classList.toggle("small", v.size === "small");
     cap.classList.toggle("open", v.size === "open");
     cap.dataset.state = v.state;
@@ -122,7 +142,7 @@
       [...el.chips.children].forEach((c) => { if (!v.chips.includes(c.dataset.n)) c.remove(); });
       for (const n of v.chips) if (!have.has(n)) el.chips.insertAdjacentHTML("beforeend", `<span class="chip" data-n="${esc(n)}"><b>∿</b>${esc(n)}</span>`);
     });
-    put("rows", JSON.stringify([v.list, v.inbox, v.forYou, v.titles]), () => {
+    put("rows", JSON.stringify([v.list, v.inbox, v.forYou, v.titles, v.empty]), () => {
       // the full view (vision §3 G): what's running, then what needs you, then for you (unopened
       // first); the inbox alone shows only its cards
       show(el.rows, v.list || v.inbox);
@@ -133,8 +153,10 @@
       const rs = (v.list || []).map((r) => `<div class="row ${esc(r.kind)}" style="${delay()}"><span class="gl">${esc(r.glyph)}</span><span class="nm">${esc(r.name)}</span><span class="wh">${esc(r.what)}</span><span class="ag">${esc(r.age)}</span></div>`);
       const qs = (v.inbox || []).map((q) => `<div class="q${q.sel ? " sel" : ""}" style="${delay()}"><div class="who">? ${esc(q.agent)}</div><div class="tq">${esc(q.text)}</div>${opts(q)}</div>`);
       const fy = v.forYou ? v.forYou.pages.map((p) => `<button type="button" class="page${p.unopened ? " new" : ""}" data-page="${esc(p.id)}" style="${delay()}"><span class="gl">◰</span><span class="pn">${esc(p.name)}</span><span class="pm">${esc(p.meta)}</span></button>`) : [];
+      const em = v.empty || {};
+      const none = (s) => (s ? [`<div class="none" style="${delay()}">${esc(s)}</div>`] : []);
       el.rows.innerHTML = v.list
-        ? [...(rs.length ? sec(t.running) : []), ...rs, ...(qs.length ? sec(t.needs) : []), ...qs, ...(fy.length ? sec(v.forYou.title) : []), ...fy].join("")
+        ? [...sec(t.running), ...rs, ...none(em.running), ...(qs.length ? sec(t.needs) : []), ...qs, ...none(em.needs), ...(fy.length ? sec(v.forYou.title) : []), ...fy].join("")
         : qs.join("");
       el.rows.scrollTop = 0;
     });

@@ -260,6 +260,9 @@
       // the orb stops drawing until it is seen again
       case "app_visible":
         return none({ ...m, visible: ev.on !== false });
+      // the menu-bar icon's rect in the page's CSS px (the capsule grows out of it, SPEC §0)
+      case "app_icon":
+        return none({ ...m, icon: [ev.x, ev.y, ev.w, ev.h].every((n) => Number.isFinite(+n)) ? { x: +ev.x, y: +ev.y, w: +ev.w, h: +ev.h } : null });
       case "app_quiet":
         return none({ ...m, quiet: ev.on ? { why: ev.why || "" } : null });
       // today's morning page, opened in front by the app (amb-mac, 7d65d59e): the capsule names
@@ -363,6 +366,21 @@
     }
   }
 
+  // ---- it grows out of the menu-bar icon (SPEC §0): the open/close motion when the app shows or
+  // hides the capsule. `icon` is the icon's rect in the page's CSS px (amb-mac's app_icon; above
+  // the panel, so y < 0); without it, the panel's top right. Reduced motion: a plain fade.
+  const GROW = { open: 750, close: 600, fade: 200, from: 0.15, easeOut: "cubic-bezier(.16, 1, .3, 1)", easeIn: "cubic-bezier(.7, 0, .84, 0)" };
+  function grow(wasHidden, hidden, reduce, icon, box) {
+    if (wasHidden === hidden) return null;
+    const open = !hidden;
+    if (reduce) return { open, ms: GROW.fade, fade: true, ease: "linear" };
+    const b = box || { x: 0, y: 0, w: 0 };
+    // the origin, in the animated box's own px: the icon's centre, else the box's top right
+    const ox = icon ? icon.x + icon.w / 2 - b.x : b.w;
+    const oy = icon ? icon.y + icon.h / 2 - b.y : 0;
+    return { open, ms: open ? GROW.open : GROW.close, fade: false, from: GROW.from, origin: `${Math.round(ox)}px ${Math.round(oy)}px`, ease: open ? GROW.easeOut : GROW.easeIn };
+  }
+
   // ---- what the capsule has to show, for the app's show/hide policy (amb-mac, m_5073): talk,
   // type, answer, got and needs the app also derives itself; it acts on line (4 s), open (until
   // esc, fn ., a click away), needs (6 s) and none
@@ -409,6 +427,7 @@
       edge: { on: false, lvl: 0 },
       hidden: m.hidden,
       unseen: m.hidden || m.visible === false,   // nobody sees it: no orb frames
+      icon: m.icon || null,  // the menu-bar icon (the capsule grows out of it)
       radius: m.radius,     // the capsule's and the glass's corners
       kiss: false,
     };
@@ -484,7 +503,9 @@
       // opens one); esc or a click elsewhere closes it
       v.state = "agents"; v.size = "open";
       v.label = { text: `${m.hub.workspace || "agents"} · ${Wd.plural(m.agents.length, "agent", "agents")}` };
-      v.titles = { running: W.running, needs: Wd.waiting(cards.length) };
+      v.titles = { running: W.running, needs: cards.length ? Wd.waiting(cards.length) : null };
+      // the empty sections say so, in one line each (nothing running, nothing waiting)
+      v.empty = { running: m.agents.length || m.pages.some((p) => p.state === "writing" || p.state === "updating") ? null : W.nothingRunning, needs: cards.length ? null : W.nothingNeeds };
       if (cards.length) v.inbox = inbox();
       const ready = forYouPages(m);
       if (ready.length) v.forYou = { title: Wd.forYou, pages: ready.map((p) => ({ id: p.id, name: pageName(p), meta: Wd.pageMeta(p, wall), unopened: !opened(m, p) })) };
@@ -530,5 +551,5 @@
     return v;
   }
 
-  root.AmbModel = { init, step, view, T, visibleCards };
+  root.AmbModel = { init, step, view, T, visibleCards, grow, GROW };
 })(typeof window !== "undefined" ? window : globalThis);

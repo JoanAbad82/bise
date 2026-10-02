@@ -517,6 +517,30 @@ law("the full view (fn 0, a hand-open): running (agents + pages being written), 
   eq(M.step(m, { ev: "app_key", key: "1" }, 30).cmds, [{ cmd: "answer", card: "c1", reply: "1" }]);
   assert.equal(M.step(m, { ev: "app_key", key: "esc" }, 30).m.pane, null);
 });
+law("the full view's empty sections: 'nothing running.' and 'nothing needs you.', no '0 waiting' title", () => {
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [{ id: "a", title: "x", version: 1, state: "ready", url: "u", at_ms: 1 }] }, 0).m;
+  const v = M.view(M.step(m, { ev: "app_key", key: "0" }, 10).m, 20, 100);
+  eq(v.empty, { running: "nothing running.", needs: "nothing needs you." });
+  assert.equal(v.titles.needs, null); eq(v.list, []); assert.equal(v.forYou.pages.length, 1);
+  // a page being written counts as running
+  m = M.step(m, { ev: "page", id: "b", title: "y", version: 1, state: "writing", url: "u", at_ms: 2 }, 30).m;
+  assert.equal(M.view(M.step(m, { ev: "app_key", key: "0" }, 40).m, 50, 100).empty.running, null);
+});
+law("it grows out of the menu-bar icon (SPEC §0): scale + fade from the icon's centre, 0.75 s expo out; back in 0.6 s expo in (ambient m_5152); a fade under reduced motion", () => {
+  assert.equal(M.grow(true, true, false, null, null), null);                       // no change: no motion
+  const icon = { x: 300, y: -20, w: 18, h: 18 };
+  const o = M.grow(true, false, false, icon, { x: 10, y: 0, w: 360 });
+  eq([o.open, o.ms, o.fade, o.from, o.origin], [true, 750, false, 0.15, "299px -11px"]);
+  assert.equal(o.ease, "cubic-bezier(.16, 1, .3, 1)");
+  const c = M.grow(false, true, false, icon, { x: 10, y: 0, w: 360 });
+  eq([c.open, c.ms], [false, 600]); assert.equal(c.ease, "cubic-bezier(.7, 0, .84, 0)");
+  // no icon yet: from the panel's top right
+  assert.equal(M.grow(true, false, false, null, { x: 0, y: 0, w: 360 }).origin, "360px 0px");
+  eq(M.grow(true, false, true, icon, null), { open: true, ms: 200, fade: true, ease: "linear" });
+  // app_icon is kept on the model, a broken one dropped
+  assert.equal(M.view(M.step(M.init(), { ev: "app_icon", x: 1, y: -2, w: 18, h: 18 }, 0).m, 0).icon.y, -2);
+  assert.equal(M.view(M.step(M.init(), { ev: "app_icon", x: "a" }, 0).m, 0).icon, null);
+});
 law("the morning page (app_morning): 'good morning. your page is open   fn o' before 11:00 (greet), 'your page is open   fn o' after; fn + o opens it", () => {
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
   assert.equal(M.view(M.step(m, { ev: "app_morning", id: "x", title: "t", url: "u", greet: true }, 10).m, 20).text, "good morning. your page is open   fn o");
