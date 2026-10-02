@@ -6,6 +6,8 @@ html, body { background: transparent; -webkit-font-smoothing: antialiased; }
 html.app, html.app body { overflow: hidden; }
 :root {
   --acc: #f4a6b0; --text: #fff; --dim: #ffffffa0; --faint: #ffffff70;
+  /* round 8's roles (SPEC §1, dark column): rose only for what waits for you */
+  --on-accent: #2a141b; --ok: #cfe8c0; --risk: #ff9a8a; --line: #ffffff12;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --expo: cubic-bezier(.16, 1, .3, 1);
@@ -22,10 +24,10 @@ html.app, html.app body { overflow: hidden; }
 
 .cap {
   position: absolute; top: 0; right: 0;
-  display: flex; align-items: center; gap: 14px;
+  display: flex; align-items: flex-start; gap: 14px;
   /* the corners are macOS's window radius (app_settings.radius, the user's call), not a pill */
   width: 470px; height: 120px; border-radius: var(--r, 16px);
-  padding: 12px 24px 12px 12px;
+  padding: 14px 18px 16px 12px;   /* round 8 (identity8.html .gl .in) */
   background: var(--glass); box-shadow: var(--stroke);
   overflow: hidden;
   transition: width .6s var(--spring), height .6s var(--spring), border-radius .6s var(--spring);
@@ -38,7 +40,7 @@ html:not(.app) .cap, html:not(.app) .note {
 }
 
 /* the pearl (SPEC §1, round 8): 68 px at the left, its top on the first line of text */
-.orbbox { flex: none; width: 68px; height: 68px; margin: -6px 4px 0 -4px; position: relative; align-self: flex-start; }
+.orbbox { flex: none; width: 68px; height: 68px; margin: -6px -4px -6px -6px; position: relative; align-self: flex-start; }
 .orbbox canvas { position: absolute; inset: 0; width: 68px; height: 68px; }
 
 /* the words */
@@ -53,12 +55,12 @@ html:not(.app) .cap, html:not(.app) .note {
 .more { font: 11.5px var(--mono); color: var(--faint); padding: 4px 4px 0; }
 .tx > * { display: none; }
 .tx > .on { display: block; }
-.lab { font: 11.5px/1.4 var(--mono); color: #ffffff90; margin-bottom: 3px; }
-.lab b { color: var(--acc); font-weight: 400; }
+.lab { font: 500 11.5px/1.4 var(--mono); color: var(--faint); margin-bottom: 4px; }
+.lab b { color: var(--acc); font-weight: 500; }
 .line .gl { font-family: var(--mono); color: var(--acc); margin-right: 6px; }
-.line .gl.fail { color: #ff8a84; }
+.line .gl.fail { color: var(--risk); }
 .words { font-size: 19px; font-weight: 500; letter-spacing: -.01em; line-height: 1.32; }
-.words.main { font-size: 17px; font-weight: 400; letter-spacing: 0; }
+.words.main { font-size: 17px; line-height: 1.38; font-weight: 400; letter-spacing: 0; }
 .words .w { opacity: 0; filter: blur(3px); transition: opacity .24s ease-out, filter .24s ease-out; }
 .words.main .w { transition-duration: .29s; }
 .words .w.on { opacity: 1; filter: none; }
@@ -69,17 +71,17 @@ html:not(.app) .cap, html:not(.app) .note {
 .words .w.cur::after { content: ""; display: inline-block; width: 2px; height: .9em; background: var(--acc); margin-left: 3px; vertical-align: -2px; animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 .sub { font-size: 13px; color: var(--dim); margin-top: 4px; }
-.sees { display: none; width: max-content; max-width: 100%; margin-top: 10px; font: 11.5px/1.5 var(--mono); color: #ffffffc0; padding: 3px 10px 3px 8px; border-radius: 99px; background: #ffffff12; white-space: nowrap; }
+.sees { display: none; width: max-content; max-width: 100%; margin-top: 8px; font: 12px/1.5 var(--sans); color: var(--dim); padding: 2px 10px; border-radius: 99px; background: #ffffff12; white-space: nowrap; }
 .sees.on { display: flex; align-items: center; }
-.sees::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 0 3px #f4a6b033; margin-right: 7px; }
+.sees::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--acc); margin-right: 6px; }
 /* the app and the host stay whole; only the path (or a title) is cut */
 .sees .hd { flex: none; white-space: pre; }
 .sees .tl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.chips.on { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.chip { font: 12.5px var(--mono); background: #ffffff16; border-radius: 99px; padding: 4px 11px; animation: pop .5s var(--back) both, flash 1s both; }
+.chips.on { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip { font: 500 12px var(--mono); background: #f4a6b01f; color: var(--acc); border-radius: 99px; padding: 2px 10px; animation: pop .5s var(--back) both, flash 1s both; }
 .chip b { color: var(--acc); font-weight: 400; margin-right: 5px; }
 @keyframes pop { from { transform: scale(.6); opacity: 0; } }
-@keyframes flash { 0% { background: var(--acc); color: #141211; } 100% { background: #ffffff16; } }
+@keyframes flash { 0% { background: var(--acc); color: var(--on-accent); } 100% { background: #f4a6b01f; } }
 
 /* arrivals: a line that changes lands (expo out) */
 .arrive { animation: arrive .5s var(--expo) both; }
@@ -87,13 +89,14 @@ html:not(.app) .cap, html:not(.app) .note {
 
 /* the agents and the inbox */
 .rows { margin-top: 6px; }
-.row { display: grid; grid-template-columns: 18px 96px 1fr auto; gap: 8px; align-items: center; padding: 7px 4px; border-top: 1px solid #ffffff14; font-size: 13.5px; animation: arrive .5s var(--expo) both; }
-.row .gl { font-family: var(--mono); color: #ffffffb0; text-align: center; }
-.row .nm { font: 12.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row { display: grid; grid-template-columns: 14px 96px 1fr auto; gap: 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--line); font-size: 14px; animation: arrive .5s var(--expo) both; }
+.row .gl { font: 600 12px var(--mono); color: #ffffff90; text-align: center; }
+.row .nm { font: 500 12.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row .wh { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row .ag { font: 11px var(--mono); color: #ffffff60; }
-.row.done .gl, .row.need .gl { color: var(--acc); }
-.row.failed .gl { color: #ff8a84; }
+.row.need .gl { color: var(--acc); }
+.row.done .gl { color: var(--ok); }
+.row.failed .gl { color: var(--risk); }
 .row.need { background: #f4a6b01c; border-radius: 12px; border-color: transparent; }
 .q { padding: 9px 8px; border-radius: 14px; margin-top: 6px; animation: arrive .5s var(--expo) both; }
 .q.sel { background: #f4a6b01f; }
@@ -101,7 +104,7 @@ html:not(.app) .cap, html:not(.app) .note {
 .q .tq { font-size: 14.5px; margin-top: 1px; }
 
 /* "for you": the pages made for you, a click opens one (or brings its tab) */
-.sec { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); margin: 12px 4px 4px; }
+.sec { font: 500 11px var(--mono); color: #ffffff60; margin: 10px 0 2px; }
 .page { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; align-items: center; width: 100%; text-align: left; padding: 7px 4px; border: 0; border-radius: 10px; background: none; color: #fff; font: 13.5px var(--sans); cursor: pointer; animation: arrive .5s var(--expo) both; }
 .page:hover { background: #ffffff10; }
 .page .gl { font-family: var(--mono); color: var(--acc); text-align: center; }
@@ -117,15 +120,15 @@ html:not(.app) .cap, html:not(.app) .note {
 
 /* options: `1 yes` `2 no`, the first one lit */
 .opts { display: flex; gap: 8px; margin-top: 10px; }
-.opts button { flex: 1; font: 13px var(--sans); color: #fff; background: #ffffff1c; border: 0; border-radius: 10px; padding: 7px 10px; cursor: pointer; }
-.opts button:first-child { background: var(--acc); color: #141211; }
+.opts button { flex: 1; font: 500 14px var(--sans); color: #fff; background: #ffffff14; box-shadow: inset 0 0 0 1px #ffffff1a; border: 0; border-radius: 10px; padding: 5px 14px; cursor: pointer; }
+.opts button:first-child { background: var(--acc); color: var(--on-accent); box-shadow: none; }
 .opts button:hover { filter: brightness(1.08); }
 
 /* the spotlight: a text field in the capsule */
 .spot input { width: 100%; font: 400 19px/1.3 var(--sans); color: #fff; background: transparent; border: 0; outline: 0; caret-color: var(--acc); padding: 2px 0; }
 .spot input::placeholder { color: #ffffff60; }
-.spot .keys { font: 11px var(--mono); color: var(--faint); margin-top: 8px; white-space: pre; }
-.spot .keys b { font-weight: 400; color: #ffffffd0; }
+.spot .keys { font: 11.5px var(--mono); color: var(--faint); margin-top: 10px; white-space: pre; }
+.spot .keys b { font-weight: 500; color: #ffffffc0; }
 
 /* a permission's sentence and its button */
 .perm p { font-size: 15px; line-height: 1.4; }
