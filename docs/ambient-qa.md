@@ -204,6 +204,29 @@ Slice 1 holds its done-when except speed and 10-12.
 - [ ] With the extension: the page opens in the `bise` tab group of my window, reuses its tab; no
       tab in an agent's group. Without it: the AppleScript/`open` path still works.
 
+### Results: fake accounts, real model (2026-10-02, tip; amb-tools' canned Camille mailbox, Slack, Linear)
+
+Pages driven in a throwaway headless Chrome (`plugins/ambient-qa/pagedrive.mjs`), never his.
+
+- **Slice 1 done-when, "draft my weekly update from Slack and Linear": pass.** A skeleton
+  (`writing…`) ~27 s after the ask, the filled page ~77 s (target 90): a Slack message draft for
+  #team, 14 sources, a table of the OPS issues, two callouts, a question. Three notes (typed, ♡,
+  an edit) → ⌘⏎ → the next version 15 s later (target 45), all three done, the dropped line
+  really gone, my edit kept. The outbox stayed empty.
+- **Job 2, "go through my mail and draft replies, don't send": content pass, two fails.** Seven
+  replies, each with a `why` line and `[brackets]` where only he knows, plus a `skipped` table with
+  the reason for each mail, from 20 mails read. Fail 20: the agent wrote 7 Gmail drafts by itself
+  (7 × `create_draft` in the outbox) before any review. The vision's order is review on the page,
+  then `put it in my drafts` on his word (owner: the `bise-pages` guide and main's rule). Fail 21:
+  the filled page came at ~103 s (target 90).
+- Still open: 9 (main's capsule words); the page question → card wasn't checked (the app was
+  stopped to keep the run light).
+
+Kit fixtures (fake hub, headless): pass for approve and skip, `approve N` counting down, compare
+♡ ✗ pick, checklist ticks, the message block's copy. Fails 14-18 (edit on a review item edits its
+header, `approve N` counts edited items, a question option doesn't answer, ♡ copies the whole
+variant, no `open #channel`), all routed; 14, 15, 17 and 18 are fixed, 16 has a fallback note.
+
 ## The look the user validated: round 8 (main m_5134)
 
 ambient owns the pixels against `site/content/ambient/identity8.html` and its SPEC; these are the
