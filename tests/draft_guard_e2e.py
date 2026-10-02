@@ -15,6 +15,7 @@ Run: python3 -u tests/draft_guard_e2e.py
 import http.client
 import json
 import os
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -80,6 +81,15 @@ def main():
     outbox = os.path.join(E.tmp, "outbox.jsonl")
     E.env.update(HOME=home, BISE_HOME=bise, XDG_STATE_HOME=os.path.join(home, "state"), FAKE_ACCOUNTS_OUTBOX=outbox)
     E.env.pop("BISE_APPROVALS", None)
+    # run_typescript needs the V8 engine: a dev tree has none at its root,
+    # so a run from a shell without BEND_JSRT_BIN (a launchd job, a scratch
+    # worktree) failed every draft with 'program error (exit 127)' and no
+    # card; take the built one bins.sh names
+    if not os.path.exists(E.env.get("BEND_JSRT_BIN", "")):
+        out = subprocess.run([os.path.join(e2e.ROOT, "scripts", "bins.sh"), "path", "bend-jsrt"],
+                             capture_output=True, text=True).stdout.strip().splitlines()
+        if out and os.path.exists(out[-1]):
+            E.env["BEND_JSRT_BIN"] = out[-1]
     install_fake_gmail(E.ws)
     ok = True
     c = None
@@ -95,7 +105,10 @@ def main():
         # before his word: a card, nothing written
         c.say(DRAFT)
         guard = lambda: [k for k in c.cards() if "wants to put drafts in Gmail before you reviewed" in json.dumps(k)]
-        c.wait(lambda: guard(), 90, "the guard's card")
+        failed = lambda: [l for l in c.lines("main") if "tool run_typescript failed" in l]
+        c.wait(lambda: guard() or failed(), 90, "the guard's card")
+        check(not failed(), "run_typescript itself failed (no V8 engine? BEND_JSRT_BIN=%r): %r"
+              % (E.env.get("BEND_JSRT_BIN"), failed()[:1]))
         check('before you reviewed "replies"' in guard()[0]["text"], "the card names the page: %r" % guard()[0])
         check(drafts(outbox) == [], "no draft written before his word")
         c.say("/interrupt main")
