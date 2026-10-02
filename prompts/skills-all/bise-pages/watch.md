@@ -32,14 +32,4 @@ morning": one page you keep current, not a new page each time.
 
 ## The morning page
 
-"a page every morning with my day": `sb every day 07:30 "make today's morning page"`, and each
-morning a new page with the id `morning-YYYY-MM-DD` (the app opens exactly that id). In this
-order, each part left out when empty:
-1. a `heading`: `your tuesday` and the meta line (`3 meetings · 2 wait for you`);
-2. what waits for the user: a `review` of the mails and messages to answer, the questions agents
-   left open, each with its draft;
-3. today's meetings: a `table` (`time`, `what`, `with`, `prep`), the prep in words;
-4. what agents finished overnight: one line each with its page or PR, in a `prose` list;
-5. pages not opened yet: a `prose` list of links (`/p/<id>`), oldest first.
-Nothing waits and no meetings: a short page that says so, never an empty one. See
-`examples/morning.html`.
+A daily order of its own (a new page each day, `morning-YYYY-MM-DD`): read `morning.md`.

@@ -167,6 +167,8 @@ body {
 #bise-page [data-kit="sources"] li { counter-increment: bise-src; position: relative; padding-left: 32px; margin: 0 0 var(--space-1); color: var(--dim); border-radius: 4px; transition: background .6s var(--ease-arrive); }
 #bise-page [data-kit="sources"] li::before { content: counter(bise-src); position: absolute; left: 0; top: 0; font: 600 var(--text-kicker)/2.1 var(--font-mono); color: var(--accent); }
 #bise-page [data-kit="sources"] li[data-lit] { background: var(--accent-soft); }
+/* a link to an item or a block (`/p/<id>#<item>`): it opens there, washed a moment */
+#bise-page :is(li[data-id], [data-kit][data-id])[data-lit] { background: var(--changed); box-shadow: -10px 0 0 var(--changed), 10px 0 0 var(--changed); transition: background .6s var(--ease-arrive); }
 
 /* the kit's buttons on the page (review, email): cards like a question's options; approve is ink */
 #bise-page [data-kit-ui]:not(.bise-writing) { display: flex; gap: var(--space-2); margin: 0; font: 14px/1.3 var(--font-ui); }

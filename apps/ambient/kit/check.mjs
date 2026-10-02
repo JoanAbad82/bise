@@ -511,6 +511,12 @@ law("a watching page: 'watching · checked 3 min ago · until tomorrow 18:00'; a
   assert.equal(K.watchLine({ timer: 3, every: "every 10m", checked_ms: now - 3 * 60000, until_ms: at(14, 18, 0) }, now), "watching · checked 3 min ago · until tomorrow 18:00");
   assert.equal(K.watchLine({ timer: 3, every: "every 10m" }, now), "watching");
   assert.equal(K.watchLine(null, now), null);
+  // a page link's #<id> (the morning page's lines, a card's url) names an item, else a block
+  const tg = blocks(parse(`<section data-kit="checklist" data-id="todo"><ol><li data-id="t4">agenda</li></ol></section><section data-kit="prose" data-id="p1"><p>x</p></section>`));
+  assert.equal(K.targetOf(tg, "t4").getAttribute("data-id"), "t4");
+  assert.equal(K.targetOf(tg, "p1").getAttribute("data-id"), "p1");
+  assert.equal(K.targetOf(tg, "nope"), null);
+  assert.equal(K.targetOf(tg, ""), null);
   // his taste file was followed (meta.taste {rules}): the frame says so, with the count
   assert.equal(K.tasteWords({ rules: 4 }), "following your taste · 4 rules");
   assert.equal(K.tasteWords({ rules: 1 }), "following your taste · 1 rule");

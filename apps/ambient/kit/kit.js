@@ -622,6 +622,13 @@
     return line;
   }
 
+  // the element a page link's #<id> names: an item (li[data-id]) first, else a block
+  function targetOf(blocks, id) {
+    if (!id) return null;
+    for (const b of blocks) for (const li of items(b)) if (li.getAttribute("data-id") === id) return li;
+    return blocks.find((b) => idOf(b) === id) || null;
+  }
+
   // meta.taste {rules: N} (sb page publish --taste, amb-core m_5554): 'following your taste · 4 rules'
   function tasteWords(t) {
     const n = t && Number(t.rules);
@@ -652,7 +659,7 @@
     return parts.join(" · ");
   }
 
-  const BiseKit = { W, ticked, untilWords, watchLine, replyWent, tasteWords, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, wentWords, wentFor, applyWent, editableParts, options, norm };
+  const BiseKit = { W, ticked, untilWords, watchLine, replyWent, tasteWords, targetOf, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, wentWords, wentFor, applyWent, editableParts, options, norm };
   root.BiseKit = BiseKit;
 
   // ---- the browser: the frame, the stream, the keys ----
@@ -760,6 +767,14 @@
     const blocks = () => Array.from(main.querySelectorAll(":scope > [data-kit][data-id]"));
     blocks().forEach(remember);
     decorate(blocks(), agent, doc);
+    // a link to an item (`/p/<id>#<item>`: the morning page, a card's page url) opens on it,
+    // lit a moment; a block id works the same
+    const target = targetOf(blocks(), decodeURIComponent(String((root.location && root.location.hash) || "").slice(1)));
+    if (target) {
+      target.scrollIntoView({ block: "center" });
+      target.setAttribute("data-lit", "");
+      setTimeout(() => target.removeAttribute("data-lit"), 2400);
+    }
 
     function drawMeta() {
       const v = versionOf(meta, shown);

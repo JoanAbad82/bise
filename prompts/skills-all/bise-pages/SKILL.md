@@ -12,7 +12,7 @@ You never write CSS, classes, scripts or colors.
 
 This file is what every page needs. Next to it, in the same folder, read only the one you need:
 `blocks.md` (every block in detail, the lint, a full example), `leaving.md` (send, post, "put it
-in my drafts", newsletters), `watch.md` (standing orders, the launch watch, the morning page),
+in my drafts", newsletters), `watch.md` (standing orders, the launch watch), `morning.md` (the morning page),
 `feedback.md` (bug reports agents fix), `about-you.md` (what bise keeps about the user).
 
 ## Page or one line
@@ -81,7 +81,12 @@ Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kep
 - `compare`: 2 to 4 `<li data-id>` side by side: `<h3>`, `<ul>` of facts, `<p>` why.
 - `checklist`: `<li data-id data-who data-due="2026-05-20">`, `data-done` when done.
 
-Words: the user's language and voice, lowercase headings, short sentences, concrete.
+**A draft of anything that leaves goes in its own block, never in prose:** a Slack message or a
+post in a `message` block (`data-to="Slack · #team"`: `copy` and `open #team`), a mail or a
+newsletter in an `email` block. In prose it can't be copied, sent or put in his drafts.
+
+Words: the user's language and voice, lowercase headings, short sentences, concrete. Times in
+his own time zone (`tomorrow 9:30`), never UTC.
 
 ## Answer the notes
 
