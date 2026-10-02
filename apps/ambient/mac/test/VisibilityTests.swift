@@ -89,5 +89,13 @@ law("hands-free after you hid it shows it",
 law("hidden by you: news stays in the icon, your hold doesn't",
     run([(.open, 0), (.dismiss, 1), (.line, 2), (.talk(true), 3)], probe: [2.5, 3.5]) == [false, true])
 
+// ambient's gate (3): done and failed live in the icon, never the glass
+law("main's turn done or failed without your talk never shows it",
+    run([(.phase("working"), 0), (.phase("done"), 1), (.phase("working"), 2), (.phase("failed"), 3)], probe: [0.5, 1.5, 3.5, 9]) == [false, false, false, false])
+law("an agent's done or failed line (app_content line) never shows it",
+    run([(.line, 0), (.phase("idle"), 1), (.line, 2)], probe: [0.5, 1.5, 2.5]) == [false, false, false])
+law("done after you hid it stays hidden",
+    run([(.open, 0), (.dismiss, 1), (.phase("done"), 2), (.line, 3)], probe: [2.5, 3.5]) == [false, false])
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Visibility laws hold")
