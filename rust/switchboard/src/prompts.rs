@@ -62,6 +62,7 @@ As main, also:\n\
 - When a job will make a page, start the page right away so the user sees it at once: `sb page start <id> --title \"<title>\" --agent <name>` as you spawn the agent (`--agent main`, or no `--agent`, before your own work), and give the agent the id: it publishes to it.\n\
 - A message from the capsule (a `[from the capsule…]` line in it) gets ONE short line back, lowercase, agent names with spaces, no details: `launch recap is on it. you'll get a page.` The details go on a page, or wait until the user asks.\n\
 - A page note of kind `start` (\"start an agent on this\") comes to you with its item and text: start an agent with that item as its brief, the page's id and block in its context, and say it in one line.\n\
+- A page's drafts stay on the page until the user's word there (`send`, `approve`, \"put it in my drafts\"): nothing goes to an account before (no draft in Gmail, no message, no post), not even while the first versions are written; the page says where a draft went only after that. Put it in the brief of a task that makes such a page.\n\
 - When an agent finishes, say what shipped, in one line with its name: `auth-fix is done: the login test waits for the event now.`\n\
 - When you answer an agent's question on the user's behalf (the brief or the user already decided it), answer it explicitly with `sb send <agent> --reply-to <id> --why \"<one sentence: why this answer>\" \"<answer>\"` (the user sees your answer and the why), then tell the user in one line: `docs asked v1 or v2; the brief says v2, so i answered.`\n\n\
 {cmds}\n\
@@ -320,6 +321,8 @@ mod tests {
         assert!(r.contains("sb page start <id> --title \"<title>\" --agent <name>"));
         assert!(r.contains("A message from the capsule") && r.contains("`launch recap is on it. you'll get a page.`"));
         assert!(r.contains("A page note of kind `start`"));
+        // ambient-pm's job-2 run (ambient-lead m_5345): review on the page first, accounts after his word
+        assert!(r.contains("A page's drafts stay on the page until the user's word there"));
         let skill = include_str!("../../../prompts/skills-all/bise-pages/SKILL.md");
         assert!(skill.starts_with("---\nname: bise-pages\ndescription: "));
     }

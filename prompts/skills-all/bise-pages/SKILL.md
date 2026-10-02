@@ -155,6 +155,15 @@ The user should see the page within about 10 seconds of asking, then watch it fi
    swaps the new blocks in place, the user's scroll stays). Keep the ids you already used.
 3. **Last publish**: drop the `writing` callout, add the sources.
 
+**A page of items** (mails to answer, comments, bugs): don't read all 20 first. Publish each
+few items as soon as they are drafted (a version per 2 or 3 items, the newest under the others,
+`writing…` saying how many are left: `5 of 20 read`), so the user starts reviewing while you
+write the rest.
+
+**Drafts stay on the page.** While you write and until the user's word on the page (`send`,
+`approve`, "put it in my drafts"), nothing goes to their accounts: no draft in Gmail or Outlook,
+no message, no post, no label. The page is where they review; the account comes after.
+
 Write the fragment in your temp folder, then:
 
 ```
@@ -236,8 +245,11 @@ Acting on the page is a separate step the user asks for ("post it in #team", "se
   mail's to, cc, subject;
 - a whole page as a doc: headings as headings, tables as tables, each `<sup>n</sup>` as a link to
   its source (or the sources as a list at the end);
-- "put it in my drafts": a draft doesn't leave, so it needs no card. Make the draft in the user's
-  tool (Gmail, Outlook, Kit), then record where it went on the block it came from:
+- "put it in my drafts" (the user's words, or their `send` on a draft they want to finish in
+  their tool): a draft doesn't leave, so it needs no card, but it waits for that word like
+  anything else: never make drafts in their account on your own, never during the first
+  versions. Then make the draft in the user's tool (Gmail, Outlook, Kit), only the ones they
+  approved, and record where it went on the block it came from:
   `sb page publish $TMPDIR/p.html --id <id> --went gmail-draft:<draft id>@e1=<its https link>`
   (kinds: `gmail-draft`, `outlook-draft`, `kit-draft`, `slack`, `copy`). The page shows
   `in your Gmail drafts · open` under that block. A later version updates the same draft (read
