@@ -2,7 +2,7 @@
 
 Status: agreed by ambient-pm (product, owns this file), ambient-lead (tech: m_4705, m_4711,
 m_4732) and ambient (design: m_4708, m_4714, m_4736). The first slice (§8) is ambient-lead's to cut
-and staff. One question waits for the user (§10.3).
+and staff. The user's answer to §10.3: v2 is for him only, as simple as possible.
 The app it builds on: [ambient-app.md](ambient-app.md) (v1: the capsule, fn to talk, cards).
 The look: ambient's `SPEC.md` (`site/content/ambient/`, local). The brand: [brand/bise-book.md](brand/bise-book.md).
 **⚠** marks what is not built.
@@ -30,9 +30,10 @@ Gmail, Google Calendar, Slack, Notion/Google Docs, a few spreadsheets, Linear fo
 does, Granola for meeting notes, a Metabase dashboard. She writes a lot, decides a lot, and spends
 half her week moving information from one tool to another. She has no terminal and won't open one.
 
-Until bise can be installed without a terminal (§8, out), the real first user is **Gabriel on his
-non-code work** (the launch, mail, Slack, the newsletter, planning). Same tools, same jobs: we build
-for Camille and test on Gabriel.
+**v2's only user is Gabriel, on his non-code work** (the launch, mail, Slack, the newsletter,
+planning), to validate the core UX (decided by the user, §10.3). Same tools, same jobs as Camille:
+she is who we design for, he is who we build for now. bise opens to others, and becomes a product,
+only if v2 is a success for him.
 
 **Her week, and the three jobs that prove "bise for everyone":**
 
@@ -289,8 +290,9 @@ page's question answers its card; versions history.
 exporting a page (Google Doc, mail, Slack); drawing.
 
 **Out of v2:**
-- installing without a terminal (a signed, notarized app and a first run with no shell): needed for
-  the real Camille, scheduled after v2 proves the loop on Gabriel;
+- anything for a user other than Gabriel: installing without a terminal, signing and
+  notarization, packaging, onboarding for others (§10.3). v2 runs from his dev build and stays as
+  simple as possible; these come only if v2 succeeds;
 - bise's own editor or app windows: the browser is the surface, the capsule the door;
 - pages on the internet, on a phone, or shared live with others; real-time co-editing (§9);
 - pages that fetch data or call connectors at runtime (live dashboards); actions from a page outside
@@ -329,5 +331,10 @@ What v2 does not do for it: no server, no accounts, no sync, no phone.
    ambient-lead).
 2. ~~The noun on screen~~: decided, **page** for everything an agent makes for you; the list of
    pages is "for you" everywhere (ambient).
-3. For the user: is v2 for Gabriel's own non-code work first (the plan above), with the
-   no-terminal install after; or does v2 already include an install a non-developer can do?
+3. ~~Who v2 is for~~: decided by the user (via main m_4812): v2 is for Gabriel's own work only,
+   to validate the core UX; "on fait au plus simple … on le rendra disponible et commercial
+   seulement si c'est un succès". No no-terminal install, signing, notarization or packaging for
+   others until it proves itself; when a choice is between simple and ready-for-others, pick
+   simple.
+
+Nothing is open.
