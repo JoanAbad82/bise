@@ -195,6 +195,9 @@
       case "cut_in": return [[100, { ev: "phase", phase: "idle" }]];
       case "talk_cancel": return [[100, { ev: "phase", phase: "idle" }]];
       case "app_hide": return [[0, { ev: "app_hidden", on: true }], [2500, { ev: "app_hidden", on: false }]];
+      // the app's show/hide policy, roughly (amb-mac's Visibility): something to show shows the
+      // glass, nothing to show hides it (so dev.html closes the glass with its last words on it)
+      case "app_content": return [[0, { ev: "app_hidden", on: cmd.kind === "none" }]];
       case "app_perm": return cmd.do === "continue" ? [[600, { ev: "app_perm", perm: cmd.perm, state: "granted" }]] : [];
       default: return [];
     }

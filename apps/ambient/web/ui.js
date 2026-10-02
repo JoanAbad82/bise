@@ -101,6 +101,9 @@
   let wasHidden = null, growAnim = null;
   function showHide(v) {
     if (wasHidden === null) { wasHidden = v.hidden; host.style.display = v.hidden ? "none" : ""; return; }
+    // reduced motion that arrives while a grow plays (the app's app_reduce_motion after the show):
+    // never a scale under it, the box lands where it is (SPEC §1)
+    if (v.still && growAnim && growAnim.scaled) growAnim.finish();
     const r = host.getBoundingClientRect();
     const g = M.grow(wasHidden, v.hidden, v.still, v.icon, { x: r.left, y: r.top, w: r.width });
     wasHidden = v.hidden;
@@ -110,6 +113,7 @@
     const frames = g.fade ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: `scale(${g.from})` }, { opacity: 1, transform: "scale(1)" }];
     host.style.transformOrigin = g.origin || "";
     growAnim = host.animate(g.open ? frames : frames.slice().reverse(), { duration: g.ms, easing: g.ease, fill: "both" });
+    growAnim.scaled = !g.fade;
     growAnim.onfinish = () => {
       growAnim = null;
       if (!g.open && wasHidden) host.style.display = "none";
@@ -287,8 +291,9 @@
   function frame() {
     raf = 0;
     const t = now();
-    const v = M.view(model, t, Date.now());
-    lastV = v;
+    const now0 = M.view(model, t, Date.now());
+    const v = held(now0);
+    lastV = now0;
     render(v);
     layout(v);
     size();
@@ -303,6 +308,17 @@
     // motion, settled) checks again at ~15 Hz; nobody seeing the capsule (hidden, covered, locked:
     // app_visible false) keeps only the timers, at 4 Hz (amb-mac m_5014)
     if (v.unseen) later(250); else if (moving) later(33); else later(66);
+  }
+  // the glass leaves with its last words on it (ambient's gate run 3 (b)): when nothing is left to
+  // show (content none), the capsule keeps drawing the last view it showed until the app hides it
+  // and the close has played; the app still gets content none at once (it acts on that), and the
+  // pearl keeps its own mood. new content ends the hold
+  let shown = null;
+  function held(v) {
+    if (v.content.kind !== "none") { if (!v.hidden) shown = v; return v; }
+    if (!shown) return v;
+    if (v.hidden && !growAnim && wasHidden) { shown = null; return v; }
+    return { ...shown, hidden: v.hidden, content: v.content, mood: v.mood, lvl: v.lvl, still: v.still, unseen: v.unseen, icon: v.icon, radius: v.radius };
   }
   let laterT = 0;
   function later(ms) { if (!laterT && !raf) laterT = setTimeout(() => { laterT = 0; schedule(); }, ms); }
