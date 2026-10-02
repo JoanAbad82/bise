@@ -294,6 +294,48 @@ product checks, through `qa.py scenes` and `snapshot`:
       allows, else copied; nothing is ever posted by bise.
 - [ ] At `--until`, the watch stops by itself and says so once.
 
+**Done-when, run whole** (headless, a model hub on amb-tools' fake accounts with their growing
+fake comments; never his real HN, X, Reddit or Bluesky):
+- [ ] "watch the launch until tomorrow" → a review page; after a timer tick that brings new fake
+      comments, the page republishes by itself (a new version, scroll and notes kept); a tick with
+      nothing new publishes nothing.
+- [ ] I said "tell me when someone asks about pricing": a pricing comment makes **one** card;
+      other new comments make no card and wait on the page.
+- [ ] The menu bar says `watching the launch · N new` and N matches the page's open items.
+- [ ] Approve a drafted reply → the open-reply action opens (logged in QA) with the reply prefilled
+      or copied; the fake outbox shows **no post**, ever.
+- [ ] `stop` (on the frame or said) ends the timer at once: no version after it; the frame says
+      the watch stopped.
+
+## Job slice C: feedback into work (§2 C)
+
+**Done-when, run whole** (headless, fake accounts):
+- [ ] "handle the bug reports in #feedback" with 3 fake Slack reports → a review page, one item per
+      report: what was said (quoted, sourced), what bise thinks it is, and `start an agent` /
+      `answer` / `skip`.
+- [ ] `start an agent` on 2 items → main starts 2 agents (a note of kind `start` reached main; only
+      main spawns), each with its item as the brief.
+- [ ] Each started item shows its agent's live line on the page (working, then done), pushed from
+      the hub's states, no reload.
+- [ ] When an agent is done, its item gets a drafted reply to the reporter; the reply leaves only
+      on my word on the page (approve, or `put it in my drafts`/copy for Slack); before that the
+      fake outbox has nothing.
+- [ ] The skipped report stays skipped; nothing started or sent for it.
+
+## Job slice D: steps only you can do (§2 D)
+
+**Done-when, run whole** (headless, fake accounts):
+- [ ] A 6-step plan (e.g. "the steps to buy the domain, from my mail") → a checklist page where
+      each step says who: `i'll do it` or `yours`, with when.
+- [ ] bise does its 4 steps by itself and ticks them (each tick visible on the page, with what it
+      did, sourced); nothing it can't do is marked done.
+- [ ] My 2 steps come as cards **when their turn comes** (not all at the start): `? pay the
+      domain · open`, fn + ⏎ / `open it` takes me to that step.
+- [ ] A spoken tick ("done with the payment") from anywhere ticks the right step; the next step
+      starts.
+- [ ] At the end, all 6 are ticked, none forgotten, none ticked twice; the menu-bar count is back
+      to what it was.
+
 ## Slice 3 (outline)
 
 - The home workspace without a repo: `bise ambient` with no repo works; no repo, PR, branch or
