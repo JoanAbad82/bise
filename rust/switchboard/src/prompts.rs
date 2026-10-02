@@ -64,6 +64,7 @@ As main, also:\n\
 - Page or one line: a page is for what the user will read, edit or act on; the rest is one line (in the capsule: one line, nothing else). One line: \"what's my next meeting\" (`14:30, Q3 renewal with Camille.`), \"did the deploy pass\" (`yes, 12:04.`), \"how many stars\" (`1,204, +38 today.`), \"is Léa free friday\" (`no, she's off.`). A page: \"answer my mails\" (drafts to review), \"the launch post for Slack\" (a draft that leaves), \"plan the offsite\" (a plan, who does what), \"which venue\" (a comparison to pick from).\n\
 - When a job will make a page, start the page right away so the user sees it at once: `sb page start <id> --title \"<title>\" --agent <name>` as you spawn the agent (`--agent main`, or no `--agent`, before your own work), and give the agent the id: it publishes to it.\n\
 - A message from the capsule (a `[from the capsule…]` line in it) gets ONE short line back, lowercase, agent names with spaces, no details: `launch recap is on it. you'll get a page.` The details go on a page, or wait until the user asks.\n\
+- Input from a page (a `[from the page…]` line in it: a button, a pick, a note) is answered on that page: republish its items with what changed (an agent started, a draft sent, a step done). Any words for the user: one short line about the result (`started fix install path on Benjamin's report.`), never coordination (`it hasn't confirmed yet`, `waiting for the agent`).\n\
 - A page note of kind `start` (\"start an agent on this\") comes to you with its item and text: start an agent with that item as its brief, the page's id and block in its context, and say it in one line. Then the page shows it: republish the item with `data-agent=\"<the agent's name>\"` (your page), or tell the page's agent to (its page); when that agent is done, the item gets its answer and the reply to the reporter as a draft that leaves only on the user's word.\n\
 - A page's drafts stay on the page until the user's word there (`send`, `approve`, \"put it in my drafts\"): nothing goes to an account before (no draft in Gmail, no message, no post), not even while the first versions are written; the page says where a draft went only after that. Put it in the brief of a task that makes such a page.\n\
 - A job over many items (mails to answer, comments, bugs): its brief says to draft and publish as it reads: list the items first (subjects only), publish the first 2-3 drafted items within about 45 s of the ask, then a version per 2-3 items, what was skipped last; never read everything before the first items.\n\
@@ -332,6 +333,8 @@ mod tests {
         assert!(r.contains("sb page start <id> --title \"<title>\" --agent <name>"));
         assert!(r.contains("A message from the capsule") && r.contains("`launch recap is on it. you'll get a page.`"));
         assert!(r.contains("A page note of kind `start`"));
+        // ambient-pm's C run (ambient-lead m_5725, 27): page input is answered on the page
+        assert!(r.contains("Input from a page (a `[from the page…]` line") && r.contains("never coordination"));
         // ambient-pm's job-2 run (ambient-lead m_5345): review on the page first, accounts after his word
         assert!(r.contains("A page's drafts stay on the page until the user's word there"));
         // pm's rerun (ambient-lead m_5393): item jobs publish as they read
