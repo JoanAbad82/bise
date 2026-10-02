@@ -38,6 +38,7 @@
       screen: "without Screen Recording, main can't see the window in front. turn it on in System Settings › Privacy & Security › Screen & System Audio Recording.",
     },
     continue: "continue",
+    notNow: "not now",
     // the mocks' examples (the fake core plays them, check.mjs reads them back)
     said: "dark mode for the settings page. and the cookie banner hides the buy button on mobile, make it half the size",
     answer: "dark-mode started. settings page first, then the rest. cookies is on the banner.",

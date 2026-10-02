@@ -112,6 +112,9 @@ html:not(.app) .cap, html:not(.app) .note {
 /* a permission's sentence and its button */
 .perm p { font-size: 15px; line-height: 1.4; }
 .perm button { margin-top: 10px; font: 600 13px var(--sans); color: #141211; background: var(--acc); border: 0; border-radius: 99px; padding: 6px 16px; cursor: pointer; }
+/* the way out: a dim text button, no fill */
+.perm button.later { margin-left: 6px; font-weight: 400; color: var(--dim); background: none; padding: 6px 10px; }
+.perm button.later:hover { color: #fff; }
 
 /* needs you: bise's own notification, in the same glass, under the capsule */
 .note {

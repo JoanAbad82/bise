@@ -45,6 +45,16 @@ void main(){
     KIND[i] = h(4) < 0.2 ? 1 : 0;
   }
 
+  // the face's own centre: the dots sit left in their 41-wide grid (the colon at 6, the smile's
+  // tip at 26), so the face is shifted to the middle of the orb's box, the same for every pose
+  // (ambient's first-launch review: the face floated left in an empty band)
+  const FACE_DX = (() => {
+    const D = F.face("rest", 0, 0, true);
+    let lo = F.FW, hi = 0;
+    for (const row of D) for (let x = 0; x < F.FW; x++) if (row[x]) { lo = Math.min(lo, x); hi = Math.max(hi, x); }
+    return 21 - (lo + hi) / 2;   // in dots
+  })();
+
   // the smoothed state: SPEC's rates (the morph 1 - 0.02^dt, the poses 1 - 0.002^dt, the level faster)
   function smoother() {
     return { lvl: 0, listen: 0, think: 0, speak: 0, need: 0, face: 1, flow: 0, last: null };
@@ -117,7 +127,7 @@ void main(){
       stillDrawn = key;
       const g = stillCv.getContext("2d"), w = stillCv.width, h = stillCv.height;
       const D = F.face("rest", 0, 0, true);
-      const cell = Math.min(w / 45, h / 20), ox = (w - F.FW * cell) / 2, oy = (h - F.FH * cell) / 2;
+      const cell = Math.min(w / 45, h / 20), ox = (w - F.FW * cell) / 2 + FACE_DX * cell, oy = (h - F.FH * cell) / 2;
       g.clearRect(0, 0, w, h); g.fillStyle = "#f4a6b0";
       for (let y = 0; y < F.FH; y++) for (let x = 0; x < F.FW; x++) if (D[y][x]) {
         g.beginPath(); g.arc(ox + x * cell + cell / 2, oy + y * cell + cell / 2, cell * 0.42, 0, 7); g.fill();
@@ -169,7 +179,7 @@ void main(){
           const d = T[(i * 7) % T.length];
           // SPEC: each point jittered by 0.03 (±0.03 around its dot), and spread in depth so the
           // depth glow varies: a cloud of light on the face, not a grid of squares
-          fx = (d[0] + JIT[i * 3] * 0.06) * breathe; fy = (d[1] + JIT[i * 3 + 1] * 0.06) * breathe; fz = JIT[i * 3 + 2] * 0.3;
+          fx = (d[0] + FACE_DX / 19 + JIT[i * 3] * 0.06) * breathe; fy = (d[1] + JIT[i * 3 + 1] * 0.06) * breathe; fz = JIT[i * 3 + 2] * 0.3;
         }
         pos[i * 3] = x2 + (fx - x2) * m; pos[i * 3 + 1] = y2 + (fy - y2) * m; pos[i * 3 + 2] = z2 + (fz - z2) * m;
       }

@@ -229,7 +229,9 @@
         return { m: { ...r.m, mine: true, voice: false, turnNames: names(m.agents), chips: [] }, cmds: [...r.cmds, { cmd: "send", text: out }] };
       }
       case "ui_perm":
-        return { m: ev.do === "continue" ? { ...m, permAsk: null } : m, cmds: [{ cmd: "app_perm", perm: ev.perm, do: ev.do }] };
+        // continue: macOS's prompt; not now: the refused path (the app answers app_perm denied, and
+        // the refused line shows once); either way the ask leaves the capsule
+        return { m: ev.do === "continue" || ev.do === "not_now" ? { ...m, permAsk: null } : m, cmds: [{ cmd: "app_perm", perm: ev.perm, do: ev.do }] };
       default:
         return none(m);
     }
@@ -318,7 +320,7 @@
 
     if (m.permAsk) {
       v.state = "perm"; v.size = "open";
-      v.perm = { perm: m.permAsk, text: W.perm[m.permAsk] || "", button: W.continue };
+      v.perm = { perm: m.permAsk, text: W.perm[m.permAsk] || "", button: W.continue, later: W.notNow };
     } else if (m.pane === "spot") {
       v.state = "spotlight"; v.size = "open";
       // the key bar: `tab start an agent` only once there is text (designer)

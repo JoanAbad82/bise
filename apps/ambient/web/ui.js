@@ -26,7 +26,7 @@
         <div class="rows"></div>
         <div class="more"></div>
         <div class="spot"><input type="text" spellcheck="false" autocomplete="off"><div class="keys"></div></div>
-        <div class="perm"><p></p><button type="button"></button></div>
+        <div class="perm"><p></p><button type="button" data-do="continue"></button><button type="button" class="later" data-do="not_now"></button></div>
       </div>
     </div>
     <div class="note" id="note"></div>`;
@@ -138,7 +138,12 @@
     });
     put("perm", JSON.stringify(v.perm), () => {
       show(el.perm, v.perm);
-      if (v.perm) { $("p", el.perm).textContent = v.perm.text; const b = $("button", el.perm); b.textContent = v.perm.button; b.dataset.perm = v.perm.perm; }
+      if (v.perm) {
+        $("p", el.perm).textContent = v.perm.text;
+        const [go, later] = el.perm.querySelectorAll("button");
+        go.textContent = v.perm.button; later.textContent = v.perm.later;
+        go.dataset.perm = later.dataset.perm = v.perm.perm;
+      }
     });
     put("note", JSON.stringify(v.note), () => {
       note.classList.toggle("on", !!v.note);
@@ -237,7 +242,7 @@
     const b = e.target.closest("button[data-card]");
     if (b) recv({ ev: "ui_option", card: b.dataset.card, i: +b.dataset.i });
     const p = e.target.closest(".perm button");
-    if (p) recv({ ev: "ui_perm", perm: p.dataset.perm, do: "continue" });
+    if (p) recv({ ev: "ui_perm", perm: p.dataset.perm, do: p.dataset.do });
   });
   input.addEventListener("input", () => recv({ ev: "ui_spot_type", text: input.value }));
   input.addEventListener("keydown", (e) => {
