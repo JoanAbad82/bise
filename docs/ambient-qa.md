@@ -97,6 +97,31 @@ Each run writes its results under `$TMPDIR/qa/<slice>-<date>/` (screenshots, the
 - [ ] The server listens on 127.0.0.1 only; the port is the same after a hub restart.
 - [ ] The pages live in the workspace's state dir, never in the repo (`git status` clean).
 
+### Results: slice 1, pass 1 (ambient-lead's real run, `launch-recap`, Chrome via computer use)
+
+Pass: the CSP and nosniff headers; `send` without the token or from another origin: 403; "for
+you" at `/`; the frame (title, version and age, `what changed`, the previous version, `send`
+disabled at 0); `what changed` marks the changed blocks; `t` on a hovered block → note → side list
+→ send bar `1 note for launch recap · or just say "send"` → ⌘⏎ → `sent. launch recap is on it.` +
+`updating` → v3 swapped in place, scroll kept, the note `✓ done` and the table really changed;
+older versions reachable (`v2 of 3 · see the latest`); v2 18 s after send; the agent asked back on
+an ambiguous note instead of guessing.
+
+Fail (sent to ambient-lead m_4910, m_4928; amb-web m_4929):
+1. the frame and "for you" show the kebab id (`by launch-recap`, `launch-recap is updating this
+   page…`), not the name with spaces;
+2. the draft he came for is a monospace block that doesn't wrap (lines cut at the right edge) and
+   can't be edited in place;
+3. the note input opens over the next block;
+4. a bare `0` beside `send`;
+5. v1 in 100 s (target 90);
+6. the toolbar (note · ♡ · ✗ · ~ · edit) only shows on a text selection, never on block hover;
+7. `edit` is unreachable (only offered without a quote, but the toolbar needs a selection);
+8. nothing tells you that selecting text gives ♡ ✗ ~.
+
+Not verified yet: drafts surviving a reload, selection notes, main's rule both ways (a short ask
+gives no page), the capsule side (`qa.py launch` can't start its fake hub from an agent shell).
+
 ## Slice 2 (outline, detailed when its plan lands)
 
 - Voice note: hold fn on a page, the note pins at the mouse with its words (`you · voice · 0:04`);
