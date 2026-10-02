@@ -13,12 +13,17 @@ at most 5 lines per part, the rest as one line with a link (`+4 more on the laun
 Every line links to where it is handled: a page's item as `/p/<page id>#<item id>` (the page
 opens on that item), a PR or a doc by its https link.
 
-1. `heading`: `your tuesday` and the meta line in numbers (`3 need you · 2 done overnight ·
-   3 meetings`).
-2. **What needs you**, a `prose` list under `## needs you`: the cards waiting for him, the
-   replies he hasn't sent yet, his own checklist steps (`data-who="yours"`) whose turn has come.
-   One line each, the thing and where it waits: `<a href="/p/inbox-review#m2">reply to Marc
-   about invoice #2231</a> · inbox`. Never the drafts themselves: they stay on their page.
+1. `heading`: `<h1>your tuesday</h1>`, then the `<p>` meta line in numbers (`3 need you · 2 done
+   overnight · 3 meetings`): write the `<h1>` first, the kit shows the meta above it.
+2. **What needs you**, a `prose` list under `## needs you`: the cards waiting for him, and what
+   waits on him in every open page, cards or not. Run `sb page waiting`: one line per item,
+   `<page>#<item> · step|draft|question|notes · <text>` (his checklist steps not ticked, drafts
+   waiting for his word, unanswered questions, notes he left). Until your `sb` has it: `sb page
+   list`, then read each page (`curl -s <url>`). A plan waiting on him is there: his first open
+   step and each draft of bise's that waits for his word.
+   One line each, the thing and where it waits, linked to the item: `<a
+   href="/p/inbox-review#m2">reply to Marc about invoice #2231</a> · inbox`; never a bare
+   `/p/<page>`. Never the drafts themselves: they stay on their page.
 3. **Done overnight**, a `prose` list under `## done overnight`: one line per agent that
    finished, what it did and its link (`export csv: the 10,000-row cut is fixed, PR #881`).
 4. **Today's meetings**, under `## today`: one `prose` block per meeting, a first `<p>` with
