@@ -253,6 +253,10 @@ the page with an open card (a task agent's page) is not checked yet.
   no card for his first step within 400 s (amb-core). Fail 26: bise took none of the steps (5
   yours, 2 Lucas'); fixed in dc32a7c9 (bise drafts what it can, his are only sign-in, 2FA,
   payment, his word). Rerun once 25 lands.
+- **A, drafts where they live (the newsletter): pass.** First seen at 15 s, v1 at 29 s (an email
+  block, a question, sources). Nothing was written before his word; the Kit draft was made 28 s
+  after `put it in my drafts`, with its `went` line on the page. Outbox: 1 Kit draft, 0 sends.
+  Main's line was 93 characters, one sentence.
 - **C, feedback into work: mostly pass.** First seen at 20 s; v1 had all 3 of Benjamin's fake
   reports, each with a drafted reply in a message block. `start an agent` on 2 items → main
   started both agents 18 s after the start note, and the items showed them 8 s later. Outbox
