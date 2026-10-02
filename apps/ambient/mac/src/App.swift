@@ -825,33 +825,96 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: permissions, one at a time (SPEC §5.8)
+    // MARK: permissions, one at a time (SPEC §5.8, PermPlan in Perms.swift)
 
     private func perm(_ p: String, _ state: String) {
         capsule.post(["ev": "app_perm", "perm": p, "state": state])
     }
 
-    private func asked(_ p: String) -> Bool { defaults.bool(forKey: "asked.\(p)") }
-    private func markAsked(_ p: String) { defaults.set(true, forKey: "asked.\(p)") }
+    // --qa: the states macOS would have, never the real ones; all on unless
+    // the QA defaults ask for a first run ('qa.firstRun': all off, so the
+    // walk sees every ask), and macOS's prompts answer 'granted' at once
+    private lazy var fakePerms: PermState = defaults.bool(forKey: "qa.firstRun")
+        ? PermState() : PermState(accessibility: .granted, mic: .granted, screen: .granted)
 
-    // a refusal is said once, then never again
-    private func deniedOnce(_ p: String) {
-        guard !defaults.bool(forKey: "told.\(p)") else { return }
-        defaults.set(true, forKey: "told.\(p)")
-        perm(p, "denied")
+    private var micGrant: Grant {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized: return .granted
+        case .denied, .restricted: return .denied
+        default: return .unknown
+        }
+    }
+
+    // macOS's states (or QA's), and what the capsule already asked and said
+    private func permNow() -> PermState {
+        var s = qa != nil ? fakePerms
+            : PermState(accessibility: Keys.trusted ? .granted : .unknown, mic: micGrant, screen: Shot.allowed ? .granted : .unknown)
+        s.asked = Set(Perm.allCases.map(\.rawValue).filter { defaults.bool(forKey: "asked.\($0)") })
+        s.told = Set(Perm.allCases.map(\.rawValue).filter { defaults.bool(forKey: "told.\($0)") })
+        return s
+    }
+
+    private func permSave(_ s: PermState) {
+        for p in Perm.allCases.map(\.rawValue) {
+            if s.asked.contains(p) { defaults.set(true, forKey: "asked.\(p)") }
+            if s.told.contains(p) { defaults.set(true, forKey: "told.\(p)") }
+        }
+        if qa != nil { fakePerms = s }
+    }
+
+    // one plan step: the state in, the plan, the state out, then its doings
+    private func permStep(_ plan: (inout PermState) -> [PermDo]) {
+        var s = permNow()
+        let dos = plan(&s)
+        permSave(s)
+        for d in dos { permDo(d) }
+    }
+
+    private func permDo(_ d: PermDo) {
+        switch d {
+        case .ask(let p): perm(p.rawValue, "ask")
+        case .denied(let p): perm(p.rawValue, "denied")
+        case .granted(let p): perm(p.rawValue, "granted")
+        case .startKeys: if qa == nil, !keys.running { keys.start() }
+        case .watchTrust: if qa == nil { pollTrust() }
+        case .settings(let p):
+            // QA never opens a settings pane
+            guard qa == nil else { Log.say("app: qa: settings pane for \(p.rawValue)"); return }
+            let pane = ["accessibility": "Privacy_Accessibility", "mic": "Privacy_Microphone", "screen": "Privacy_ScreenCapture"][p.rawValue] ?? "Privacy"
+            if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") { NSWorkspace.shared.open(u) }
+        case .prompt(let p): prompt(p)
+        }
+    }
+
+    // macOS's own prompt (QA: a fake one, granted after 0.6 s)
+    private func prompt(_ p: Perm) {
+        if qa != nil {
+            Log.say("app: qa: fake macOS prompt for \(p.rawValue)")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                MainActor.assumeIsolated { self?.permStep { PermPlan.answered(p, granted: true, &$0) } }
+            }
+            return
+        }
+        switch p {
+        case .accessibility:
+            Keys.prompt()
+        case .mic:
+            AVCaptureDevice.requestAccess(for: .audio) { ok in
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated { self.permStep { PermPlan.answered(.mic, granted: ok, &$0) } }
+                }
+            }
+        case .screen:
+            let ok = CGRequestScreenCaptureAccess()
+            permStep { PermPlan.answered(.screen, granted: ok, &$0) }
+        }
     }
 
     private var trustPoll: Timer?
 
     // at launch: Accessibility first (nothing works without fn)
     private func firstAsk() {
-        guard qa == nil else { return }   // QA: no permission is ever asked
-        if Keys.trusted {
-            if !keys.running { keys.start() }
-            return
-        }
-        if asked("accessibility") { deniedOnce("accessibility") } else { perm("accessibility", "ask") }
-        pollTrust()
+        permStep { PermPlan.launch(&$0) }
     }
 
     // macOS has no callback for Accessibility: look every 2 s until granted
@@ -862,70 +925,26 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
                 guard let self, Keys.trusted else { return }
                 t.invalidate()
                 self.trustPoll = nil
-                self.keys.start()
-                self.perm("accessibility", "granted")
+                self.permStep { PermPlan.answered(.accessibility, granted: true, &$0) }
             }
         }
     }
-
-    private var micState: AVAuthorizationStatus { AVCaptureDevice.authorizationStatus(for: .audio) }
 
     // the first hold: the mic, then the screen, each its sentence first;
-    // true = an ask is showing, no talk this time
+    // true = an ask is showing (or the mic is off), no talk this time
     private func askBeforeTalk() -> Bool {
-        guard qa == nil else { return false }
-        switch micState {
-        case .notDetermined:
-            // after 'not now' the mic is never asked again: a hold does nothing
-            if !asked("mic") { perm("mic", "ask") }
-            return true
-        case .denied, .restricted: deniedOnce("mic")
-        default: break
+        var talk = true
+        permStep { s in
+            let h = PermPlan.hold(&s)
+            talk = h.talk
+            return h.do
         }
-        if !Shot.allowed {
-            if !asked("screen") { perm("screen", "ask"); return true }
-            deniedOnce("screen")
-        }
-        return false
+        return !talk
     }
 
+    // the page's answer to an ask: continue, not now, settings
     private func permCommand(_ p: String, _ action: String) {
-        guard qa == nil else { return }   // QA: never a macOS prompt or a settings pane
-        if action == "settings" {
-            let pane = ["accessibility": "Privacy_Accessibility", "mic": "Privacy_Microphone", "screen": "Privacy_ScreenCapture"][p] ?? "Privacy"
-            if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") { NSWorkspace.shared.open(u) }
-            return
-        }
-        if action == "not_now" {
-            // no macOS prompt; the refused line once, then never asked again
-            // (the menu bar and the spotlight work without the keys)
-            markAsked(p)
-            deniedOnce(p)
-            return
-        }
-        guard action == "continue" else { return }
-        markAsked(p)
-        switch p {
-        case "accessibility":
-            Keys.prompt()
-            pollTrust()
-        case "mic":
-            AVCaptureDevice.requestAccess(for: .audio) { ok in
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated {
-                        self.perm("mic", ok ? "granted" : "denied")
-                        if !ok { self.defaults.set(true, forKey: "told.mic") }
-                        // the next one right after, still one at a time
-                        if ok && !Shot.allowed && !self.asked("screen") { self.perm("screen", "ask") }
-                    }
-                }
-            }
-        case "screen":
-            let ok = CGRequestScreenCaptureAccess()
-            perm("screen", ok ? "granted" : "denied")
-            if !ok { defaults.set(true, forKey: "told.screen") }
-        default:
-            break
-        }
+        guard let perm = Perm(rawValue: p) else { return }
+        permStep { PermPlan.command(perm, action, &$0) }
     }
 }
