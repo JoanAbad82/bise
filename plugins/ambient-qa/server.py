@@ -18,8 +18,9 @@ TOOLS = [
     ("launch", "Start the real bise ambient.app in QA mode. hub=fake (default): a throwaway scripted hub, main answers 'ack: <your words>'; hub=real: the real workspace, read-only (nothing is ever sent). Builds the app at its one path if its sources changed (refused while the user's own app runs, unless force_build).",
      {"hub": {"type": "string", "enum": ["fake", "model", "real"]}, "workspace": {"type": "string"}, "bise": {"type": "string", "description": "a bise with ambient-core (default: found)"},
       "backdrop": {"type": "string", "description": "dark, bright, busy, none, or a picture file"}, "force_build": {"type": "boolean"}, "restart": {"type": "boolean"},
-      "connectors": {"type": "boolean", "description": "hub model: your connectors and skills (Gmail, Slack...), default true; writes still go through your approvals mode"},
-      "computer": {"type": "boolean", "description": "let the QA hub load the computer plugin (your browser); default false"}}, []),
+      "connectors": {"type": "boolean", "description": "the user's REAL connectors: refused unless real_accounts_approved_by_user"},
+      "computer": {"type": "boolean", "description": "the computer plugin (the user's browser): refused unless real_accounts_approved_by_user"},
+      "real_accounts_approved_by_user": {"type": "string", "description": "the id of the user's own message asking for this one run on his real accounts; never set it on your own"}}, []),
     ("stop", "Quit the QA app and its fake hub.", {"keep_hub": {"type": "boolean"}}, []),
     ("inject", "An event into the app as if real: a core event (hub, state, phase, heard, level, main, word, sent, error, page) or an app/web one (app_fn, app_key, app_perm, app_shot, app_hidden, app_reduce_motion, app_settings, ui_*).",
      {"ev": EV}, ["ev"]),
@@ -81,7 +82,7 @@ def run(name, a):
     images = []
     if name == "launch":
         r = qa.launch(a.get("hub", "fake"), a.get("workspace"), a.get("bise"), None, a.get("backdrop", "dark"), a.get("force_build", False), a.get("restart", False),
-                      a.get("connectors", True), a.get("computer", False))
+                      a.get("connectors", False), a.get("computer", False), a.get("real_accounts_approved_by_user", ""))
     elif name == "stop":
         r = qa.stop(a.get("keep_hub", False))
     elif name == "inject":

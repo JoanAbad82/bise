@@ -116,23 +116,36 @@ def shot_times_rule():
 
 @test
 def hub_plugins_off():
-    """a QA hub's plugins: the user's state, the computer plugin off unless asked"""
+    """a QA hub's plugins: none of the user's, the computer plugin off; his file untouched"""
     d = tempfile.mkdtemp(prefix="aq-")
     user = os.path.join(d, "user.json")
-    json.dump({"enabled": ["computer", "ambient-qa"], "disabled": ["x"]}, open(user, "w"))
+    json.dump({"enabled": ["computer", "ambient-qa", "gmail-thing"], "disabled": ["x"]}, open(user, "w"))
     old = os.environ.get("BEND_PLUGINS_STATE")
     os.environ["BEND_PLUGINS_STATE"] = user
     try:
         off = json.load(open(qa.hub_plugins_state(d)))
-        check("computer" not in off["enabled"] and "computer" in off["disabled"] and "ambient-qa" in off["enabled"] and "x" in off["disabled"], off)
-        on = json.load(open(qa.hub_plugins_state(d, computer=True)))
-        check("computer" in on["enabled"] and "computer" not in on["disabled"], on)
-        check(json.load(open(user))["enabled"] == ["computer", "ambient-qa"], "the user's own state is untouched")
+        check(off["enabled"] == [] and "computer" in off["disabled"], off)
+        asked = json.load(open(qa.hub_plugins_state(d, computer=True, keep_user=True)))
+        check("computer" in asked["enabled"] and "gmail-thing" in asked["enabled"] and "computer" not in asked["disabled"], asked)
+        check(json.load(open(user))["enabled"] == ["computer", "ambient-qa", "gmail-thing"], "the user's own state is untouched")
     finally:
         if old is None:
             os.environ.pop("BEND_PLUGINS_STATE")
         else:
             os.environ["BEND_PLUGINS_STATE"] = old
+
+
+@test
+def real_accounts_refused():
+    """real connectors and the computer plugin are refused without the user's own approval"""
+    for kw in ({"connectors": True}, {"computer": True}, {"connectors": True, "real_accounts_approved_by_user": "  "}):
+        try:
+            qa.launch("model", **kw)
+            check(False, "launched with %r" % kw)
+        except qa.QAError as e:
+            check("refused" in str(e) and "real accounts" in str(e), e)
+    r = mcp({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "launch", "arguments": {"hub": "model", "connectors": True}}})
+    check(r[0]["result"]["isError"] and "refused" in r[0]["result"]["content"][0]["text"], r)
 
 
 @test
