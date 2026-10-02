@@ -43,7 +43,7 @@ fn every_example_page_passes() {
 /// The page the bise-pages skill teaches passes the lint as written.
 #[test]
 fn the_skills_example_passes() {
-    let skill = include_str!("../../../../prompts/skills/bise-pages/SKILL.md");
+    let skill = include_str!("../../../../prompts/skills-all/bise-pages/SKILL.md");
     let html = skill
         .split("```html\n")
         .nth(1)

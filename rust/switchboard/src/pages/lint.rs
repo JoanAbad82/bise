@@ -8,7 +8,7 @@
 //! data-tone`), in document order.
 //!
 //! A small hand-written tokenizer, not a full HTML parser: it only has to
-//! accept what the kit's guide teaches (prompts/skills/bise-pages) and refuse
+//! accept what the kit's guide teaches (prompts/skills-all/bise-pages) and refuse
 //! the rest. Pure: no I/O.
 
 use serde::{Deserialize, Serialize};

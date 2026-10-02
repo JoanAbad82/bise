@@ -313,7 +313,7 @@ mod tests {
         assert!(r.contains("`bise-pages` skill") && r.contains("sb page publish"));
         assert!(r.contains("a draft of something that leaves"));
         assert!(r.contains("A fact, a yes or no, a status: answer in a sentence, no page."));
-        let skill = include_str!("../../../prompts/skills/bise-pages/SKILL.md");
+        let skill = include_str!("../../../prompts/skills-all/bise-pages/SKILL.md");
         assert!(skill.starts_with("---\nname: bise-pages\ndescription: "));
     }
 
