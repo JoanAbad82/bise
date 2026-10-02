@@ -49,12 +49,16 @@ def match(item, query):
     return all(w in json.dumps(item, ensure_ascii=False).lower() for w in q.split())
 
 
-def write(service, action, args):
-    rec = {"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "service": service, "action": action, "args": args}
+def write(service, action, args, extra=None):
+    # kind: gmail-draft, kit-draft, slack-post_message... (amb-kit m_5538 reads it)
+    kind = "%s-%s" % (service, action[len("create_"):] if action.startswith("create_") else action)
+    rid = "fake-%s-%d" % (action, int(time.time() * 1000))
+    rec = {"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "service": service, "action": action, "kind": kind, "id": rid, "args": args}
+    rec.update(extra or {})
     os.makedirs(os.path.dirname(OUTBOX) or ".", exist_ok=True)
     with open(OUTBOX, "a") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    return {"ok": True, "fake": True, "id": "fake-%s-%d" % (action, int(time.time() * 1000)), "note": NOTE}
+    return dict({"ok": True, "fake": True, "id": rid, "note": NOTE}, **(extra or {}))
 
 
 def gmail():
@@ -123,6 +127,27 @@ def github():
         "list_pulls": ("Pull requests, filtered by state (open, merged).", S(state="string"),
                        lambda a: {"pulls": [p for p in g["pulls"] if not a.get("state") or p["state"] == a["state"]]}),
         "comment_issue": ("Comment on an issue or PR.", S(number="integer", body="string"), lambda a: write("github", "comment_issue", a)),
+        "list_releases": ("The repo's releases, newest first, with their notes.", S(limit="integer"),
+                          lambda a: {"releases": g.get("releases", [])[: int(a.get("limit") or 10)]}),
+    }
+
+
+def kit():
+    """Kit (the newsletter): read the list and past broadcasts, write a draft
+    to the outbox only. No send or schedule tool, like the real one."""
+    k = DATA["kit"]
+
+    def draft(a):
+        n = int(time.time() * 1000) % 10000000
+        return write("kit", "create_draft", a, {"draft_id": n, "url": "https://app.kit.com/campaigns/%d/draft" % n})
+    return {
+        "subscriber_count": ("The newsletter's active subscribers.", S(), lambda a: {"count": k["subscribers"]}),
+        "list_broadcasts": ("Past broadcasts, newest first: id, subject, created_at, draft, published_at.", S(limit="integer"),
+                            lambda a: {"broadcasts": [{x: b[x] for x in ("id", "subject", "created_at", "draft", "published_at")} for b in k["broadcasts"]][: int(a.get("limit") or 10)]}),
+        "broadcast_stats": ("One broadcast's stats: recipients, open rate, click rate, unsubscribes.", S(id="integer"),
+                            lambda a: next((b["stats"] for b in k["broadcasts"] if str(b["id"]) == str(a.get("id"))), {"error": "no broadcast %s" % a.get("id")})),
+        "create_draft": ("Create a draft broadcast (subject, html, preview). It is never scheduled or sent: the user sends it from Kit himself.",
+                         S(subject="string", html="string", preview="string"), draft),
     }
 
 
@@ -311,7 +336,7 @@ def bluesky():
 
 
 SERVICES = {"gmail": gmail, "slack": slack, "linear": linear, "calendar": calendar, "github": github, "hn": hn,
-            "reddit": reddit, "x": x, "bluesky": bluesky}
+            "reddit": reddit, "x": x, "bluesky": bluesky, "kit": kit}
 
 
 def main():

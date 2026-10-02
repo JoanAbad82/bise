@@ -54,7 +54,8 @@
       {"id": "C02", "name": "ops", "topic": "offices, tools, people"},
       {"id": "C03", "name": "random", "topic": ""},
       {"id": "C04", "name": "launch", "topic": "dark mode launch: numbers and go/no-go"},
-      {"id": "C05", "name": "acme-feedback", "topic": "users' bug reports and requests (shared channel)"}
+      {"id": "C05", "name": "acme-feedback", "topic": "users' bug reports and requests (shared channel)"},
+      {"id": "D01", "name": "@benjamin.roy", "topic": "direct messages with Benjamin Roy", "is_im": true}
     ],
     "messages": [
       {"id": "s201", "channel": "team", "user": "marc", "ts": "2026-10-02T08:30:00Z", "text": "reminder: weekly update today please @camille"},
@@ -70,6 +71,9 @@
       {"id": "s211", "channel": "team", "user": "nora", "ts": "2026-10-02T07:00:00Z", "text": "offsite venue decided: La Grange, Nov 14-15. details from camille soon"},
       {"id": "s212", "channel": "acme-feedback", "user": "benjamin.roy", "ts": "2026-10-02T08:41:00Z", "text": "Install bug: after the install script, `acme` isn't found in fish. The script adds the PATH line to .bashrc and .zshrc only, nothing in ~/.config/fish/config.fish."},
       {"id": "s213", "channel": "acme-feedback", "user": "benjamin.roy", "ts": "2026-10-02T09:05:00Z", "text": "Second one: behind our corporate proxy (HTTPS_PROXY set) the CLI times out after 30 s on `acme sync`. curl to the API works with the same proxy."},
+      {"id": "s215", "channel": "ops", "user": "lelio", "ts": "2026-10-02T09:12:00Z", "thread": "s215", "text": "@camille can you send HR (rh@acme.test) a short written summary of Ines's onboarding plan by mail? They need it in writing for her file. cc me please."},
+      {"id": "s216", "channel": "ops", "user": "camille", "ts": "2026-10-02T09:14:00Z", "thread": "s215", "text": "sure, today"},
+      {"id": "s217", "channel": "@benjamin.roy", "user": "benjamin.roy", "ts": "2026-10-02T10:02:00Z", "text": "hey Camille, quick one: how do I install acme's CLI on a Mac? brew didn't find it."},
       {"id": "s214", "channel": "acme-feedback", "user": "benjamin.roy", "ts": "2026-10-02T09:32:00Z", "text": "Et une demande : est-ce que les réponses de l'assistant pourraient être en français quand on lui écrit en français ? Toute l'équipe est à Lyon."}
     ]
   },
@@ -108,6 +112,23 @@
     "pulls": [
       {"number": 212, "title": "Dark mode on the settings page", "state": "merged", "author": "lucas", "merged": "2026-10-01T16:02:00Z"},
       {"number": 233, "title": "Fix disabled button contrast in dark mode", "state": "open", "author": "lucas", "created": "2026-10-02T08:50:00Z", "checks": "passing"}
+    ],
+    "releases": [
+      {"tag": "v2.5.0", "name": "Dark mode, faster signup", "published_at": "2026-10-02T07:00:00Z", "url": "https://github.test/acme/app/releases/tag/v2.5.0",
+       "notes": "## What's new\n- Dark mode, starting with the settings page (Settings > Appearance)\n- Signup in 0.9 s (was 4.1 s): one round trip instead of four\n- The cookie banner no longer hides the buy button on mobile\n\n## Fixes\n- CSV export keeps the due dates (#228)\n- Safari 17 with a password manager no longer hangs at signup (#229)\n\n## Thanks\nIn the first 24 h: 312 signups, 1,284 GitHub stars."},
+      {"tag": "v2.4.0", "name": "Weekly view", "published_at": "2026-09-18T07:00:00Z", "url": "https://github.test/acme/app/releases/tag/v2.4.0",
+       "notes": "## What's new\n- The weekly view: what moved, what's stuck, who's on what\n- Linear import"}
+    ]
+  },
+  "kit": {
+    "subscribers": 1204,
+    "broadcasts": [
+      {"id": 9182, "subject": "Acme 2.4: the weekly view", "created_at": "2026-09-18T06:30:00Z", "draft": false, "published_at": "2026-09-18T08:00:00Z",
+       "stats": {"recipients": 1131, "open_rate": 0.47, "click_rate": 0.088, "unsubscribes": 3}},
+      {"id": 8977, "subject": "What we learned from 40 small teams", "created_at": "2026-09-04T06:30:00Z", "draft": false, "published_at": "2026-09-04T08:00:00Z",
+       "stats": {"recipients": 1052, "open_rate": 0.51, "click_rate": 0.061, "unsubscribes": 5}},
+      {"id": 8740, "subject": "Acme 2.3: Linear import", "created_at": "2026-08-21T06:30:00Z", "draft": false, "published_at": "2026-08-21T08:00:00Z",
+       "stats": {"recipients": 987, "open_rate": 0.44, "click_rate": 0.072, "unsubscribes": 2}}
     ]
   },
   "hn": {

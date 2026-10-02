@@ -321,7 +321,7 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="")
 
 
 FAKE_ACCOUNTS = os.path.join(HERE, "fake-accounts")
-FAKE_SERVICES = ("gmail", "slack", "linear", "calendar", "github", "hn", "reddit", "x", "bluesky")
+FAKE_SERVICES = ("gmail", "slack", "linear", "calendar", "github", "hn", "reddit", "x", "bluesky", "kit")
 
 
 def _clock_path(clock=None):

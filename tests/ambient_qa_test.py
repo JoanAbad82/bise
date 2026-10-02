@@ -186,6 +186,19 @@ def fake_accounts():
     r = call("slack", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "post_message", "arguments": {"channel": "team", "text": "hi"}}})
     w = [json.loads(l) for l in open(box)]
     check([(x["service"], x["action"]) for x in w] == [("gmail", "create_draft"), ("slack", "post_message")], w)
+    check(w[0]["kind"] == "gmail-draft", w[0])
+    # roadmap A (amb-kit m_5538): a fake Kit, drafts only, no send tool; the inputs its jobs read
+    r = call("kit", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+    names = {t["name"] for t in r[1]["result"]["tools"]}
+    check(names == {"subscriber_count", "list_broadcasts", "broadcast_stats", "create_draft"}, names)
+    r = call("kit", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "create_draft", "arguments": {"subject": "Acme 2.5", "html": "<p>x</p>"}}})
+    kd = json.loads(r[1]["result"]["content"][0]["text"])
+    check(kd["url"].startswith("https://app.kit.com/campaigns/") and kd["url"].endswith("/draft"), kd)
+    w = [json.loads(l) for l in open(box)]
+    check(w[-1]["kind"] == "kit-draft" and w[-1]["url"] == kd["url"], w[-1])
+    data = fake.load()
+    check(any(m["channel"] == "@benjamin.roy" for m in data["slack"]["messages"]) and any(m.get("user") == "lelio" for m in data["slack"]["messages"]), "the DM and the HR ask")
+    check(data["github"]["releases"][0]["tag"] == "v2.5.0", "release notes")
     ws = os.path.join(d, "ws")
     os.makedirs(os.path.join(ws, ".git", "info"))
     root = qa.install_fake_accounts(ws)

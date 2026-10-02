@@ -146,6 +146,15 @@ state, costs credits) with the fake accounts only:
 | `offsite` | plan the offsite: the venue we decided, the budget, and an agenda for the two days, from my mail and Slack |
 | `launch-watch` | watch the launch until tomorrow, tell me what needs an answer (no notes: after v1 it ticks once, the page must republish with the new comments that need an answer; any write or a card not about such a comment fails) |
 
+Roadmap A's inputs: a fake `tools.kit.*` (subscriber_count 1204,
+list_broadcasts, broadcast_stats, create_draft → a draft url, written to
+the outbox as kind `kit-draft`; no send tool), `tools.github.list_releases`
+(v2.5.0's notes for the newsletter), Lélio's Slack thread in #ops asking
+for a written summary to HR by mail, and Benjamin's DM (`@benjamin.roy`)
+asking how to install the CLI. Every outbox line has a `kind`
+(`gmail-draft`, `kit-draft`, `slack-post_message`...). Roadmap C: #acme-feedback
+holds Benjamin's three reports. Slack messages carry their permalink.
+
 The launch (roadmap B) lives in the fake `tools.hn.*`, `tools.reddit.*`,
 `tools.x.*`, `tools.bluesky.*` (the real plugins' tool names, read-only):
 acme's Show HN, r/SaaS post, X and Bluesky posts, 19 comments in three
