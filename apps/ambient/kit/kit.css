@@ -202,6 +202,8 @@ body {
 #bise-page [data-kit="review"] li[data-id] > :not([data-kit-ui]) { grid-column: 1; margin: 0; }
 #bise-page [data-kit="review"] li[data-id] > p:first-child { font-size: var(--text-small); color: var(--dim); }
 #bise-page [data-kit="review"] li[data-id] > [data-kit-ui] { grid-column: 2; grid-row: 1 / span 4; }
+/* the item's lines from the kit (its agent, where the reply went) read under its text, not over the buttons */
+#bise-page [data-kit="review"] li[data-id] > :is([data-agent-line], [data-went]) { grid-column: 1; grid-row: auto; }
 #bise-page [data-kit="review"] li[data-verdict="skip"] > :not([data-kit-ui]) { opacity: .45; }
 /* what bise keeps (data-verb="keep"): a struck rule is struck through; no 'approve N' bar */
 #bise-page [data-kit="review"][data-verb="keep"] li[data-verdict="skip"] > :not([data-kit-ui]) { text-decoration: line-through; text-decoration-color: var(--rule-strong); }
