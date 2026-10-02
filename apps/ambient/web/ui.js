@@ -155,7 +155,18 @@
   const PAD = 24, NOTE_GAP = 12;
   // grows to its content up to 70% of the screen; past that a list scrolls inside, its last row
   // fading over 24 px, `+N more` under it (designer); other content scrolls with the same fade
+  // small: as wide as its line, 360 to 470 (ambient: the idle status on one line)
+  const SMALL_W = 360, OPEN_W = 470, SIDE = SMALL_W - 236;   // the orb, the gap, the paddings
+  function width(v) {
+    if (v.size !== "small") { cap.style.width = ""; tx.style.width = ""; return; }
+    el.line.style.whiteSpace = "nowrap";
+    const need = Math.ceil(el.line.scrollWidth) + 2;
+    el.line.style.whiteSpace = "";
+    const w = Math.max(SMALL_W, Math.min(OPEN_W, SIDE + need));
+    if (cap.style.width !== w + "px") { cap.style.width = w + "px"; tx.style.width = w - SIDE + "px"; }
+  }
   function layout(v) {
+    width(v);
     const screenH = window.screen && screen.availHeight ? screen.availHeight : 900;
     // in a browser the page is the screen (headless Chrome says 300)
     const maxH = Math.round((native() || window.ambientApp ? screenH : Math.max(screenH, innerHeight)) * 0.7);
