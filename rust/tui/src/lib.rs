@@ -105,6 +105,7 @@ mod anim;
 mod zen;
 mod voice;
 mod voicemode;
+pub mod ambient;
 #[cfg(test)]
 mod voice_ui_tests;
 #[cfg(test)]

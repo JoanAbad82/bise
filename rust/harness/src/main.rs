@@ -323,6 +323,25 @@ fn sb_workspace(args: &[String]) -> std::path::PathBuf {
         .unwrap_or_else(|| std::path::PathBuf::from("."))
 }
 
+/// bise ambient's hub connection: the first call starts the hub when
+/// none runs (`client::connect`, like the TUI); later calls (after a
+/// loss) only connect and say hello: the user may have stopped bise.
+fn ambient_connector(
+    paths: switchboard::paths::Paths,
+    exe: std::path::PathBuf,
+    root: std::path::PathBuf,
+) -> bend_tui::ambient::Connect {
+    let mut first = true;
+    Box::new(move || {
+        if std::mem::take(&mut first) {
+            return switchboard::client::connect(&paths, &exe, &root);
+        }
+        let mut s = std::os::unix::net::UnixStream::connect(paths.socket())?;
+        s.write_all(b"{\"op\":\"hello\"}\n")?;
+        Ok(s)
+    })
+}
+
 fn run_sbd(args: &[String]) -> std::io::Result<()> {
     let paths = switchboard::paths::Paths::for_workspace(&sb_workspace(args));
     let root = live_app_root_or_exit();
@@ -540,6 +559,24 @@ fn main() -> std::io::Result<()> {
                 load_keys();
                 export_models_file();
                 return run_sbd(&args[1..]);
+            }
+            // bise ambient (docs/ambient-app.md): the macOS app's core, its
+            // child on stdio JSON, a client of the workspace's hub
+            Some("ambient-core") => {
+                load_keys();
+                let paths = switchboard::paths::Paths::for_workspace(&sb_workspace(&args[1..]));
+                let root = live_app_root_or_exit();
+                let exe = std::env::current_exe()?;
+                let workspace = paths.workspace.to_string_lossy().to_string();
+                let connect = ambient_connector(paths, exe, root);
+                std::process::exit(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind));
+            }
+            // bise ambient: open the app on this workspace (scripts/ambient.sh)
+            Some("ambient") => {
+                let paths = switchboard::paths::Paths::for_workspace(&sb_workspace(&args[1..]));
+                let root = live_app_root_or_exit();
+                let exe = std::env::current_exe()?;
+                std::process::exit(bend_tui::ambient::launch_main(&paths.workspace, &exe, &root));
             }
             Some("sbswitch") => {
                 // the version switcher: detached, from the old version's binary
