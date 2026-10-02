@@ -195,6 +195,13 @@ Shared files nobody owns (Cargo.toml, Cargo.lock, a new crate dependency): ask a
 
 ## 7. How we work
 
+**Hard rule (the user, 2026-10-02, via main m_5204): no test, QA or demo touches his real
+accounts.** No Gmail, Outlook, Slack, Linear, calendar, GitHub, HN/Reddit/Bluesky/X or any real
+connector, read or write, and no computer use on his browser or apps, unless he explicitly asks
+for that one run. QA hubs get fake connectors and fixture data (amb-tools' ambient-qa makes real
+connectors impossible by default). The done-when runs on fixtures; a run on his real data happens
+only when he starts it himself.
+
 - Commit with `sb land "<long subject>"` (no `--here`) from your worktree: it lands on `ambient-app`.
   Before: `tests/gate.sh quick` (Rust), `apps/ambient/mac/build.sh --check` (Swift type-check, no
   binary), the web UI's checks (`node apps/ambient/web/check.mjs`).

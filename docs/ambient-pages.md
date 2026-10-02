@@ -6,6 +6,9 @@ ambient (product design), designer (brand); ambient is exploring a new identity,
 visual goes through role tokens (§3.1) and waits for the look. v1 (the capsule):
 [ambient-app.md](ambient-app.md).
 
+(Since m_5204: proved on fixture data by QA; on his real Slack and Linear only when he runs it
+himself. See docs/ambient-app.md §7's hard rule.)
+
 Done when (vision §8): Gabriel says "draft my weekly update from Slack and Linear", gets a doc page
 with sources, leaves 3 notes, sends, and v2 lands in the same tab with the 3 notes done; no
 terminal touched, and it works with the TUI closed (the capsule only).
