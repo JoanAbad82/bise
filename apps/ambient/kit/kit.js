@@ -46,7 +46,7 @@
     forYou: "for you",
     approve: "approve",
     skip: "skip",
-    approveAll: (n) => `approve ${n}`,
+    approveAll: (n) => (n === 2 ? "approve both" : `approve ${n}`),
     keep: "♡",
     drop: "✗",
     pick: "pick",
@@ -58,7 +58,8 @@
     openIn: (ch) => `open ${ch}`,
     postedIn: (ch) => `posted in ${ch}`,
     send: "send",
-    sendAll: (n) => `send all ${n}`,
+    sendAll: (n) => (n === 2 ? "send both" : `send all ${n}`),
+    openInPlace: (place) => `open in ${place}`,
     yours: "you",
     watching: "watching",
     stop: "stop",
@@ -459,8 +460,28 @@
     }
     return out.filter(Boolean).join("\n\n");
   }
+  // a message says what happens next (ambient m_5589): bise can post it (data-verb="send"):
+  // 'send' / 'skip'; else 'copy' and, with its channel's link (data-open), 'open in Slack'
   function decorateMessage(doc, block) {
-    if (!kids(block).some((c) => ui(c) && c.getAttribute("data-went") == null)) block.append(acts(doc, ["copy"]));
+    if (kids(block).some((c) => ui(c) && c.getAttribute("data-went") == null)) return;
+    if (block.getAttribute("data-verb") === "send") {
+      const bar = acts(doc, ["approve", "skip"]);
+      kids(bar)[0].textContent = W.send;
+      block.append(bar);
+      return;
+    }
+    const bar = acts(doc, ["copy"]);
+    const href = safeLink(block.getAttribute("data-open"));
+    if (href) {
+      const a = doc.createElement("a");
+      a.setAttribute("href", href);
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener");
+      a.setAttribute("data-act-link", "");
+      a.textContent = W.openInPlace(String(block.getAttribute("data-to") || "").split("·")[0].trim() || "Slack");
+      bar.append(a);
+    }
+    block.append(bar);
   }
 
   // ---- where a draft went (slice A): meta.went [{kind, ref, url, at, block?}], from

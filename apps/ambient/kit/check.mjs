@@ -299,7 +299,7 @@ law("review: each item gets approve / skip once, and 'approve N' counts what is 
   assert.equal(allButton(b).textContent, "approve 3");
   assert.deepEqual(j(K.react(b, "m2", "skip")), { block: "inbox", item: "m2", kind: "skip", text: "Marc · invoice reply: paid friday." });
   K.decorate([b], "inbox", doc);
-  assert.equal(allButton(b).textContent, "approve 2");
+  assert.equal(allButton(b).textContent, "approve both");
 });
 law("review: 'approve N' approves the rest, never an item you skipped or edited", () => {
   const b = blocks(parse(R))[0];
@@ -475,13 +475,22 @@ law("send, not approve, when the draft leaves; the editable parts are the drafts
   K.decorate([r, b, e], "inbox", doc);
   const labels = (el) => el.children.filter((n) => n.hasAttribute("data-kit-ui")).flatMap((u) => u.children).map((x) => x.textContent);
   assert.deepEqual(labels(K.options(r)[0]), ["send", "skip"]);
-  assert.deepEqual(labels(r), ["send all 2"]);
+  assert.deepEqual(labels(r), ["send both"]);
   assert.deepEqual(labels(K.options(b)[0]), ["approve", "skip"]);
   assert.deepEqual(labels(b), ["approve 1"]);
   assert.deepEqual(labels(e), ["send", "skip"]);
   const nl = blocks(parse(`<section data-kit="email" data-id="nl" data-verb="draft"><p data-field="to">all subscribers</p><p data-field="subject">s</p><p>hi</p></section>`))[0];
   K.decorate([nl], "newsletter", doc);
   assert.deepEqual(labels(nl), ["put it in my drafts", "skip"], "a newsletter bise only drafts: never 'send'");
+  // two items: 'send both'; a message says what happens next: send / skip, or copy + open in Slack
+  const two = blocks(parse(`<section data-kit="review" data-id="r2" data-verb="send"><ol><li data-id="a"><p>x</p><p>y</p></li><li data-id="b"><p>x</p><p>y</p></li></ol></section>`))[0];
+  K.decorate([two], "inbox", doc);
+  assert.deepEqual(labels(two), ["send both"]);
+  const [ms, mc, mn] = blocks(parse(`<section data-kit="message" data-id="ms" data-to="Slack · reply to Benjamin in #bise-feedback" data-verb="send"><p>x</p></section><section data-kit="message" data-id="mc" data-to="Slack · reply to Benjamin in #bise-feedback" data-open="https://acme.slack.com/archives/C1/p1"><p>x</p></section><section data-kit="message" data-id="mn" data-to="Slack · #launch"><p>x</p></section>`));
+  K.decorate([ms, mc, mn], "feedback", doc);
+  assert.deepEqual(labels(ms), ["send", "skip"]);
+  assert.deepEqual(labels(mc), ["copy", "open in Slack"]);
+  assert.deepEqual(labels(mn), ["copy"]);
   const k = blocks(parse(`<section data-kit="review" data-id="taste" data-verb="keep"><ol><li data-id="no-emoji"><p>from your notes</p><p>no emoji</p></li></ol></section>`))[0];
   K.decorate([k], "main", doc);
   assert.deepEqual(labels(K.options(k)[0]), ["keep", "strike"], "what bise keeps: keep / strike");

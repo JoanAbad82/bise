@@ -378,6 +378,17 @@ fn a_message_says_where_it_goes() {
 }
 
 #[test]
+fn a_message_bise_can_post_says_send() {
+    ok(
+        r#"<section data-kit="message" data-id="r1" data-to="Slack · reply to Benjamin in #bise-feedback" data-verb="send"><p>x</p></section>"#,
+    );
+    has(
+        &errs(r#"<section data-kit="message" data-id="r1" data-to="Slack" data-verb="draft"><p>x</p></section>"#),
+        "r1: data-verb=\"draft\" is not a message's verb",
+    );
+}
+
+#[test]
 fn a_newsletter_is_an_email_bise_only_drafts() {
     ok(
         r#"<section data-kit="email" data-id="nl" data-to="Kit · newsletter" data-verb="draft"><p data-field="to">all subscribers</p><p data-field="subject">s</p><p data-field="preview">p</p><p>hi</p><ul><li>a</li></ul></section>"#,

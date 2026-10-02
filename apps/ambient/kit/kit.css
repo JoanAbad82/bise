@@ -170,9 +170,10 @@ body {
 
 /* the kit's buttons on the page (review, email): cards like a question's options; approve is ink */
 #bise-page [data-kit-ui]:not(.bise-writing) { display: flex; gap: var(--space-2); margin: 0; font: 14px/1.3 var(--font-ui); }
-#bise-page [data-kit-ui] button {
+#bise-page [data-kit-ui] button, #bise-page [data-kit-ui] a[data-act-link] {
   font: inherit; color: var(--ink); background: var(--surface-card); border: 0; border-radius: var(--radius-small);
   padding: 5px 12px; cursor: pointer; box-shadow: 3px 3px 0 var(--drop); transition: transform .5s var(--ease-pop);
+  text-decoration: none;
 }
 #bise-page [data-kit-ui] button[data-act="approve"], #bise-page [data-kit-ui] button[data-act="approve-all"] { background: var(--ink); color: var(--surface-made); }
 #bise-page [data-kit-ui] button[disabled] { opacity: .4; cursor: default; }

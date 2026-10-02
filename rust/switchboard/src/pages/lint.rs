@@ -511,13 +511,19 @@ impl<'a> Linter<'a> {
             ),
             // an email bise only drafts (a Kit newsletter, 'put it in my drafts'), or sends
             (Some("email"), Some(v)) if matches!(v.as_str(), "draft" | "send") => {}
+            // a message bise can post itself (a connector that sends): 'send' / 'skip'
+            (Some("message"), Some(v)) if v == "send" => {}
+            (Some("message"), Some(v)) => self.err(
+                &at,
+                format!("data-verb=\"{v}\" is not a message's verb: use send when bise can post it, else leave it out (copy + open)"),
+            ),
             (Some("email"), Some(v)) => self.err(
                 &at,
                 format!("data-verb=\"{v}\" is not an email's verb: use draft (it goes to the user's drafts, he sends it) or send"),
             ),
             _ => self.err(
                 &at,
-                "data-verb is not a kit attribute here: only a review or an email block takes it".into(),
+                "data-verb is not a kit attribute here: only a review, an email or a message block takes it".into(),
             ),
         }
         if kit.as_deref() == Some("callout") {
