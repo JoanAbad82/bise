@@ -109,6 +109,7 @@ Commands to the core (stdin):
 | `hush` | | esc while main speaks: stop the voice, keep the text |
 | `cut_in` | | tap fn while main speaks: stop the voice (then `talk_start`) |
 | `quiet` | `on` (bool), `why`: `call`/`meeting` | the user is on a call or in a meeting (the app's read): answer in text only, no TTS |
+| `voice` | `on` (bool) | the settings' "voice answers" (amb-core 03821a37): off, main's answers are text only and a voice already playing stops |
 
 Events from the core (stdout):
 
@@ -145,11 +146,17 @@ cards wait; replayed after a reload; `app_settings.meeting_quiet` off by default
 `skipped`, `frame: {x, y, w, h}` for the pink corners), `app_perm` (`perm`: `screen`/`mic`/
 `accessibility`, `state`: `granted`/`denied`/`ask`), `app_settings` (`edge_glow`, `radius`: macOS's
 own window corner radius in px, read at runtime; the capsule and the needs-you glass use it, no
-pill), `app_hidden`
+pill; slice 4, amb-mac ef4dbc2e: `meeting_quiet`, `right_option`, `voice_answers`,
+`launch_at_login`: `on`/`off`/`approve` (SMAppService; `approve` while macOS waits in Login
+Items), `skip`: `[{bundle, name, fixed}]`, the apps bise never sees, `fixed` for the built-in
+ones), `app_hidden`
 (bool), `app_reduce_motion` (bool), `app_key` (fn + key: `space`, `1`…`9`, `i`, `0`, `o`, `.`,
 `enter`, `esc`). Web UI commands `app_perm` (`perm`, `do`: `continue` opens macOS's prompt,
 `settings` opens its pane, `not_now`: the refused path, its one line once, the menu bar and the
-spotlight keep working), `app_setting` (`key`: `edge_glow`/`right_option`, `value`); `app_hide`
+spotlight keep working), `app_setting` (`key`: `edge_glow`/`right_option`/`meeting_quiet`/
+`voice_answers`/`launch_at_login`/`skip_add` (opens macOS's app picker)/`skip_remove`, `value`;
+fn + `,` or the menu's "settings…" opens the capsule with `app_key ","`; `voice_answers` makes the
+core get `cmd voice {on}`; QA never opens the picker or touches login items); `app_hide`
 takes an optional `hidden` (bool; none: toggle).
 §8's split (amb-web 375369f8, amb-mac 29c6885f): the web sends `app_content` (`kind`: `talk`,
 `type`, `got`, `answer`, `needs` (+ `card`), `open`, `line`, `none`) on every change of what it
