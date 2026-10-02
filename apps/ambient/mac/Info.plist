@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>Bise Ambient</string>
+	<key>CFBundleDisplayName</key>
+	<string>Bise Ambient</string>
+	<key>CFBundleExecutable</key>
+	<string>Bise Ambient</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.bise.ambient</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>__MINOS__</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSSupportsAutomaticGraphicsSwitching</key>
+	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>hold fn and talk. the mic is on only while you talk to bise: fn held, or hands-free until you tap fn.</string>
+	<key>NSScreenCaptureUsageDescription</key>
+	<string>when you talk, main sees the window in front. it goes to your model with your words, and isn't kept.</string>
+</dict>
+</plist>
