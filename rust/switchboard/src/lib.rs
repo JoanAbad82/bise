@@ -31,6 +31,7 @@ pub mod every;
 pub mod feature;
 pub mod flow;
 pub mod forge;
+pub mod keeps;
 pub mod land;
 pub mod model;
 pub mod pages;

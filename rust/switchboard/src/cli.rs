@@ -78,6 +78,16 @@ pub const COMMANDS: &[CmdDoc] = &[
         "a standing order: the hub wakes you (or `--to` that agent) with the message on a timer, every N (at least 1m) or every day at that time, until a time or for n times. Never sleep or loop in a turn to wait: set a timer and end your turn. A wake while busy waits for the end of the turn (one, never stacked). `--page <id>`: the page it keeps fresh (its frame says `watching` and has `stop`). No argument: the timers; `--stop` ends one. A dropped agent's timers stop with it.",
     ),
     cmd(
+        "sb taste [add \"<rule>\" [--from \"<where>\"] | remove <n|words>]",
+        Who::Everyone,
+        "the user's taste rules (~/bise/taste.md, one line each): no argument lists them numbered; `add` keeps a rule he gave (`--from`: where he said it), `remove` drops one by its number or its words. The only way to change that file; the about-you page follows.",
+    ),
+    cmd(
+        "sb people [set <name> \"<who>\" | remove <name>]",
+        Who::Everyone,
+        "who is who for the user (~/bise/people.md, one line each): no argument lists them; `set` adds a person or replaces what is known about them, `remove` forgets them. The only way to change that file; the about-you page follows.",
+    ),
+    cmd(
         "sb land [--here] \"<message>\"",
         Who::Everyone,
         "commit the files you changed (only yours, never another agent's) with that message. `--here`: on your place's branch (the shared folder: its branch, main). Without it, from a worktree: the branch is rebased on main, checked, and main moves to it (pushed when the repo says so); from the shared folder, the same as `--here`. A file another agent also changed is refused: main decides.",
@@ -303,6 +313,38 @@ fn str_of(opts: &Map<String, Value>, k: &str) -> String {
         Some(Value::Array(a)) => a.last().and_then(|x| x.as_str()).unwrap_or("").to_string(),
         _ => String::new(),
     }
+}
+
+const TASTE_USAGE: &str = "usage: sb taste | sb taste add \"<rule>\" [--from \"<where>\"] | sb taste remove <n|words>";
+const PEOPLE_USAGE: &str = "usage: sb people | sb people set <name> \"<who>\" | sb people remove <name>";
+
+/// `sb taste` and `sb people` (keeps.rs): the hub edits the files.
+fn keeps_req(cmd: &str, rest: &[String], req: &mut Map<String, Value>) -> Result<(), String> {
+    let flags: &[&str] = if cmd == "taste" { &["from"] } else { &[] };
+    let (pos, o) = parse_args(rest, flags, &[])?;
+    let usage = if cmd == "taste" { TASTE_USAGE } else { PEOPLE_USAGE };
+    let words = |w: &[String]| Some(w.join(" ")).filter(|t| !t.trim().is_empty()).ok_or_else(|| usage.to_string());
+    let step = pos.first().map(String::as_str).unwrap_or("list");
+    match (cmd, step) {
+        (_, "list") if pos.len() <= 1 => {}
+        ("taste", "add") => {
+            req.insert("rule".into(), json!(words(&pos[1..])?));
+            req.insert("source".into(), json!(str_of(&o, "from")));
+        }
+        ("taste", "remove") => {
+            req.insert("which".into(), json!(words(&pos[1..])?));
+        }
+        ("people", "set") if pos.len() >= 3 => {
+            req.insert("name".into(), json!(pos[1]));
+            req.insert("who".into(), json!(words(&pos[2..])?));
+        }
+        ("people", "remove") => {
+            req.insert("name".into(), json!(words(&pos[1..])?));
+        }
+        _ => return Err(usage.into()),
+    }
+    req.insert("step".into(), json!(step));
+    Ok(())
 }
 
 const EVERY_USAGE: &str = "usage: sb every <10m|1h|day 07:30> \"<message>\" [--until <18:00|tomorrow 18:00|2h>] [--times <n>] [--to <agent>] [--page <id>] | sb every | sb every --stop <id>";
@@ -568,6 +610,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
             }
         }
         "every" => every_req(rest, &mut req)?,
+        "taste" | "people" => keeps_req(cmd, rest, &mut req)?,
         "land" => {
             let (pos, o) = parse_args(rest, &[], &["here"])?;
             req.insert("here".into(), json!(o.contains_key("here")));
@@ -829,6 +872,7 @@ pub fn render(cmd: &str, v: &Value) -> (bool, String) {
         // the hub's line: `✓ x landed 1 commit on main (abc1234)`
         "land" => s("text"),
         "every" => s("text"),
+        "taste" | "people" => s("text"),
         "flow" => s("text"),
         "feature" => s("text"),
         "worktree" if s("path").is_empty() => "the hub knows you work in your own workspace again".to_string(),

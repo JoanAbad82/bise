@@ -146,6 +146,37 @@ def main():
         c.wait_idle("main")
         check("taste" not in json.loads(get(port, "/p/offsite/meta")[1]), "no --taste: no taste")
 
+        # sb taste / sb people (keeps.rs): one '- ' line each in the home's
+        # taste.md / people.md, the previous file as .bak, a header on first
+        # use; the about-you page is redrawn by the hub after each change
+        c.say('[[bash: sb page publish %s --id about-you --title "about you"]]' % page)
+        c.wait_line("main", "published about-you v1", 90)
+        c.wait_idle("main")
+        n0 = len(results(c, "main"))
+        cmds = ['sb taste add "headings in lowercase" --from "the offsite page"', 'sb taste remove emoji',
+                'sb taste', 'sb people set Nina "support lead"', 'sb people remove nobody', 'sb taste remove 9']
+        c.say(" ".join("[[bash: %s]]" % x for x in cmds))
+        c.wait(lambda: len(results(c, "main")) >= n0 + len(cmds), 90, "the six keeps commands")
+        c.wait_idle("main")
+        r = results(c, "main")[n0:]
+        check("kept: headings in lowercase (3 rules" in r[0] and "about-you is v2" in r[0], "taste add: %r" % r[0])
+        check("removed: no emoji" in r[1] and "about-you is v3" in r[1], "taste remove: %r" % r[1])
+        check("1. short sentences" in r[2] and "2. headings in lowercase (from the offsite page)" in r[2], "taste list: %r" % r[2])
+        check("kept: Nina (1 person" in r[3], "people set: %r" % r[3])
+        check("nobody named" in r[4] and "no rule 9" in r[5], "refusals: %r %r" % (r[4], r[5]))
+        taste = open(os.path.join(E.ws, "taste.md")).read()
+        check(taste == "# my taste\n- short sentences\n- headings in lowercase (from the offsite page)\nnot a rule\n", "taste.md: %r" % taste)
+        check("* no emoji" not in open(os.path.join(E.ws, "taste.md.bak")).read() and
+              "- no emoji" in open(os.path.join(E.ws, "taste.md.bak")).read(), "taste.md.bak: the file before the last change")
+        people = open(os.path.join(E.ws, "people.md")).read()
+        check(people.startswith("# who is who") and people.endswith("\n- Nina: support lead\n"), "people.md: %r" % people)
+        check(not os.path.exists(os.path.join(E.ws, "people.md.bak")), "no .bak of a new file")
+        m = json.loads(get(port, "/p/about-you/meta")[1])
+        body = get(port, "/p/about-you")[1]
+        v = m["versions"][-1]["n"]
+        check(v == 4 and "headings in lowercase" in body and "Nina" in body and "no emoji" not in body,
+              "about-you redrawn: v%r" % v)
+
         # a worktree task: refused in words, nothing crashes
         c.say("/new -w t2: x")
         c.wait(lambda: any("not a git repository" in json.dumps(n) for n in c.notices()) or

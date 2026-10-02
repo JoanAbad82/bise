@@ -724,6 +724,88 @@ impl Shell {
     }
 
     /// `sb page publish|list|notes`: the answer for the CLI.
+    /// `sb taste` and `sb people` (ambient-lead m_5630): the two files of
+    /// the home workspace bise keeps about the user, one `- ` line each;
+    /// after a change the `about-you` page, when there is one, is redrawn
+    /// from them and republished by its own agent (no model turn).
+    fn keeps_op(&mut self, cmd: &str, v: &Value) -> Value {
+        use crate::keeps;
+        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+        let name = if cmd == "taste" { keeps::TASTE } else { keeps::PEOPLE };
+        let path = match keeps::file(name) {
+            Ok(p) => p,
+            Err(e) => return json!({"ok": false, "error": e}),
+        };
+        let text = std::fs::read_to_string(&path).unwrap_or_default();
+        let (what, noun) = if cmd == "taste" { ("rule", "rules") } else { ("person", "people") };
+        let count = |t: &str| {
+            let n = keeps::items(t).len();
+            format!("{n} {}", if n == 1 { what } else { noun })
+        };
+        let step = s("step");
+        let changed = match (cmd, step.as_str()) {
+            (_, "list") => {
+                let items = keeps::items(&text);
+                let body = if items.is_empty() {
+                    format!("nothing kept yet ({}): sb {cmd} {}", path.display(), if cmd == "taste" { "add \"<rule>\"" } else { "set <name> \"<who>\"" })
+                } else {
+                    let lines: Vec<String> = items.iter().enumerate().map(|(k, i)| format!("{}. {i}", k + 1)).collect();
+                    format!("{} ({}):\n{}", count(&text), path.display(), lines.join("\n"))
+                };
+                return json!({"ok": true, "text": body, "items": items});
+            }
+            ("taste", "add") => keeps::taste_add(&text, &s("rule"), Some(s("source")).filter(|f| !f.trim().is_empty()).as_deref()).map(|t| {
+                let line = format!("kept: {}", s("rule").split_whitespace().collect::<Vec<_>>().join(" "));
+                (t, line)
+            }),
+            ("taste", "remove") => keeps::taste_remove(&text, &s("which")).map(|(t, gone)| (t, format!("removed: {gone}"))),
+            ("people", "set") => keeps::people_set(&text, &s("name"), &s("who")).map(|t| (t, format!("kept: {}", s("name").trim()))),
+            ("people", "remove") => keeps::people_remove(&text, &s("name")).map(|t| (t, format!("removed: {}", s("name").trim()))),
+            _ => Err(format!("sb {cmd}: unknown step {step:?}")),
+        };
+        let (new, line) = match changed {
+            Ok(x) => x,
+            Err(e) => return json!({"ok": false, "error": e}),
+        };
+        if let Err(e) = keeps::write(&path, &new) {
+            return json!({"ok": false, "error": e});
+        }
+        let mut out = format!("{line} ({} in {})", count(&new), path.display());
+        if let Some(v) = self.about_you_redraw() {
+            out.push_str(&format!("; about-you is v{v} now"));
+        }
+        json!({"ok": true, "text": out})
+    }
+
+    /// Republish the `about-you` page from the kept files, as its agent;
+    /// None when there is no such page (or it did not pass).
+    fn about_you_redraw(&mut self) -> Option<u64> {
+        use crate::keeps;
+        let pages = self.pages.clone()?;
+        let meta = pages.store.meta("about-you")?;
+        let read = |n: &str| keeps::file(n).ok().and_then(|p| std::fs::read_to_string(p).ok()).unwrap_or_default();
+        let p = crate::pages::store::Publish {
+            agent: meta.agent.clone(),
+            id: Some("about-you".into()),
+            html: keeps::about_you(&read(keeps::TASTE), &read(keeps::PEOPLE)),
+            ..Default::default()
+        };
+        let gone: Vec<String> = self.hub.st.agents.keys().filter(|n| self.page_agent_gone(n)).cloned().collect();
+        let is_gone = |n: &str| gone.iter().any(|g| g == n) || !self.hub.st.agents.contains_key(n);
+        match pages.publish(&p, now_ms(), &is_gone) {
+            Ok((meta, _)) => {
+                self.broadcast(&pages.page_ev(&meta));
+                let snap = self.snapshot();
+                self.broadcast(&snap);
+                Some(meta.version())
+            }
+            Err(lines) => {
+                eprintln!("about-you: the redraw did not pass: {}", lines.join("; "));
+                None
+            }
+        }
+    }
+
     fn page_op(&mut self, cmd: &str, from: &str, v: &Value) -> Value {
         let Some(pages) = self.pages.clone() else {
             return json!({"ok": false, "error": "the page server is not running (see the hub log)"});
@@ -2613,6 +2695,10 @@ impl Shell {
             }
             "page_publish" | "page_start" | "page_tick" | "page_list" | "page_notes" => {
                 let body = self.page_op(cmd, &from, &v);
+                write_json(&mut stream, &body);
+            }
+            "taste" | "people" => {
+                let body = self.keeps_op(cmd, &v);
                 write_json(&mut stream, &body);
             }
             _ => match AgentReq::from_json(&v) {
