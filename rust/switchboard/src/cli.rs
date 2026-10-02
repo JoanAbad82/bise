@@ -30,6 +30,11 @@ const fn cmd(syntax: &'static str, who: Who, doc: &'static str) -> CmdDoc {
 
 pub const COMMANDS: &[CmdDoc] = &[
     cmd("sb list", Who::Everyone, "every agent of the group, its status and what it is for."),
+    cmd(
+        "sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"<answer>\"]... | sb page list | sb page notes <id>",
+        Who::Everyone,
+        "publish a page for the user (a fragment of bise kit blocks; the kit's lint checks it): its URL comes back. A new version of your page answers the user's notes: `--notes-done` the ones you did, `--note-answer` one line for the others.",
+    ),
     cmd("sb tasks", Who::Everyone, "every task in detail: what it is doing now, its last report, its open questions."),
     cmd(
         "sb send <agent> \"<text>\" [--expect-reply] [--reply-to <id>] [--mode steer|queued]",
@@ -585,10 +590,90 @@ pub fn build(args: &[String]) -> Result<Value, String> {
             }
             req.insert("origin".into(), json!(o.contains_key("origin")));
         }
+        // agent-made pages (docs/ambient-pages.md §2.2)
+        "page" => page_req(rest, &mut req)?,
         "help" | "--help" | "-h" => return Err(usage()),
         other => return Err(format!("unknown command: {}\n{}", other, usage())),
     }
     Ok(Value::Object(req))
+}
+
+const PAGE_USAGE: &str = "usage: sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"…\"]... | sb page list | sb page notes <id>";
+
+/// `sb page publish|list|notes` (docs/ambient-pages.md §2.2): the hub's
+/// `page_*` request. The file is read here (the agent's path, from its
+/// cwd).
+fn page_req(rest: &[String], req: &mut Map<String, Value>) -> Result<(), String> {
+    match rest.first().map(String::as_str) {
+        Some("publish") => {
+            let (pos, o) = parse_args(&rest[1..], &["id", "title", "notes-done", "note-answer"], &[])?;
+            let file = pos.first().ok_or(PAGE_USAGE)?;
+            let html = std::fs::read_to_string(file).map_err(|e| format!("{file}: {e}"))?;
+            req.insert("cmd".into(), json!("page_publish"));
+            req.insert("html".into(), json!(html));
+            for k in ["id", "title"] {
+                if o.contains_key(k) {
+                    req.insert(k.into(), json!(str_of(&o, k)));
+                }
+            }
+            let done: Vec<String> = list_of(o.get("notes-done"))
+                .iter()
+                .flat_map(|d| d.split(',').map(|x| x.trim().to_string()).collect::<Vec<_>>())
+                .filter(|x| !x.is_empty())
+                .collect();
+            req.insert("done".into(), json!(done));
+            let mut answers = Map::new();
+            for a in list_of(o.get("note-answer")) {
+                let (id, text) = a.split_once('=').ok_or(format!("--note-answer expects <note>=\"<answer>\", got {a:?}"))?;
+                answers.insert(id.trim().to_string(), json!(text.trim().trim_matches('"')));
+            }
+            req.insert("answers".into(), Value::Object(answers));
+        }
+        Some("list") => {
+            req.insert("cmd".into(), json!("page_list"));
+        }
+        Some("notes") => {
+            let id = rest.get(1).ok_or(PAGE_USAGE)?;
+            req.insert("cmd".into(), json!("page_notes"));
+            req.insert("id".into(), json!(id));
+        }
+        _ => return Err(PAGE_USAGE.into()),
+    }
+    Ok(())
+}
+
+/// What `sb page` prints.
+fn render_page(v: &Value) -> String {
+    let s = |x: &Value, k: &str| x.get(k).and_then(|y| y.as_str()).unwrap_or("").to_string();
+    if let Some(pages) = v.get("pages").and_then(|p| p.as_array()) {
+        if pages.is_empty() {
+            return "no page yet".into();
+        }
+        return pages
+            .iter()
+            .map(|p| {
+                format!(
+                    "{} · {} · {} · v{} · {} open notes · {}",
+                    s(p, "id"),
+                    s(p, "title"),
+                    s(p, "agent"),
+                    p.get("version").and_then(|n| n.as_u64()).unwrap_or(0),
+                    p.get("open_notes").and_then(|n| n.as_u64()).unwrap_or(0),
+                    s(p, "state")
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
+    if let Some(notes) = v.get("notes") {
+        return serde_json::to_string_pretty(notes).unwrap_or_default();
+    }
+    let mut out = format!("published {} v{} · {}", s(v, "id"), v.get("version").and_then(|n| n.as_u64()).unwrap_or(0), s(v, "url"));
+    let unknown: Vec<String> = v.get("unknown_notes").and_then(|u| u.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default();
+    if !unknown.is_empty() {
+        out.push_str(&format!("\nno such note on this page: {}", unknown.join(", ")));
+    }
+    out
 }
 
 /// What the agent reads back.
@@ -650,6 +735,7 @@ pub fn render(cmd: &str, v: &Value) -> (bool, String) {
         "feature" => s("text"),
         "worktree" if s("path").is_empty() => "the hub knows you work in your own workspace again".to_string(),
         "worktree" => format!("the hub knows you work in {}", s("path")),
+        "page" => render_page(v),
         _ => "ok".to_string(),
     };
     (true, text)

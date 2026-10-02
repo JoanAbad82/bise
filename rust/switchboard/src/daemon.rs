@@ -153,6 +153,9 @@ enum Msg {
     Land {
         line: Option<(String, String)>,
     },
+    /// The page server (docs/ambient-pages.md §2.4): notes sent from a
+    /// page, or its drafts changed.
+    Page(crate::pages::PageMsg),
     /// `keep`: leave the REPLs running for the next hub to adopt.
     Shutdown {
         keep: bool,
@@ -278,6 +281,13 @@ struct Shell {
     prs: Option<crate::forge::poll::Poller>,
     /// computer use's events.jsonl: each stop, one line in main's feed
     cu: crate::computer_use::Watch,
+    /// The pages and their server (docs/ambient-pages.md); None: the
+    /// server could not start (said in the hub log).
+    pages: Option<std::sync::Arc<crate::pages::Pages>>,
+    /// Agents a page's notes were sent to: the pages they update, and
+    /// whether a turn of theirs has the notes yet (started or steered
+    /// since). Its end without a publish puts the pages back to ready.
+    page_turns: BTreeMap<String, (Vec<String>, bool)>,
 }
 
 /// What an agent whose turn was cut by a restart receives.
@@ -517,6 +527,11 @@ impl Shell {
         // the features' lids and Δ (dev-flow §5.1)
         self.feature_views();
         let mut snap = self.hub.snapshot(now_ms());
+        // the pages (docs/ambient-pages.md §2.3), newest first
+        if let Some(p) = &self.pages {
+            snap["pages"] = json!(p.list_json());
+            snap["pages_url"] = json!(p.base());
+        }
         // one gate card for several agents' identical calls: it names them all
         self.gate_card_agents(&mut snap);
         let who: Vec<(String, String, bool)> =
@@ -627,6 +642,7 @@ impl Shell {
 
     /// A line enters a feed: memory, transcript, every client.
     fn feed(&mut self, name: &str, line: &str) {
+        self.page_turn(name, line);
         let Some(dir) = self.dir_of(name) else { return };
         let path = self.transcript(&dir);
         let pos = match self.positions.get(name) {
@@ -663,6 +679,120 @@ impl Shell {
             self.clients.remove(&id);
             let _ = self.tx.send(Msg::ClientGone { id });
         }
+    }
+
+    // ---- pages (docs/ambient-pages.md §2.2-§2.6; the store and the server: pages/) ----
+
+    /// An agent that is gone for its page's notes: dropped, archived,
+    /// stopped or failed (main gets them then).
+    fn page_agent_gone(&self, name: &str) -> bool {
+        match self.hub.st.agents.get(name) {
+            Some(a) => matches!(a.status().as_str(), "archived" | "stopped" | "failed"),
+            None => true,
+        }
+    }
+
+    /// `sb page publish|list|notes`: the answer for the CLI.
+    fn page_op(&mut self, cmd: &str, from: &str, v: &Value) -> Value {
+        let Some(pages) = self.pages.clone() else {
+            return json!({"ok": false, "error": "the page server is not running (see the hub log)"});
+        };
+        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).map(String::from);
+        match cmd {
+            "page_list" => json!({"ok": true, "pages": pages.list_json()}),
+            "page_notes" => {
+                let id = s("id").unwrap_or_default();
+                match pages.store.meta(&id) {
+                    Some(_) => json!({"ok": true, "id": id, "notes": pages.store.notes(&id)}),
+                    None => json!({"ok": false, "error": format!("no page {id}")}),
+                }
+            }
+            _ => {
+                let list = |k: &str| -> Vec<String> {
+                    v.get(k).and_then(|x| x.as_array()).map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect()).unwrap_or_default()
+                };
+                let answers: Vec<(String, String)> = v
+                    .get("answers")
+                    .and_then(|x| x.as_object())
+                    .map(|o| o.iter().map(|(k, a)| (k.clone(), a.as_str().unwrap_or("").to_string())).collect())
+                    .unwrap_or_default();
+                let p = crate::pages::store::Publish {
+                    agent: from.to_string(),
+                    id: s("id").filter(|x| !x.is_empty()),
+                    title: s("title").filter(|x| !x.is_empty()),
+                    html: s("html").unwrap_or_default(),
+                    done: list("done"),
+                    answers,
+                };
+                let gone: Vec<String> = self.hub.st.agents.keys().filter(|n| self.page_agent_gone(n)).cloned().collect();
+                let is_gone = |n: &str| gone.iter().any(|g| g == n) || !self.hub.st.agents.contains_key(n);
+                match pages.publish(&p, now_ms(), &is_gone) {
+                    Ok((meta, unknown)) => {
+                        // the notes it was updating for are answered
+                        if let Some((ids, _)) = self.page_turns.get_mut(from) {
+                            ids.retain(|i| *i != meta.id);
+                            if ids.is_empty() {
+                                self.page_turns.remove(from);
+                            }
+                        }
+                        self.broadcast(&pages.page_ev(&meta));
+                        let snap = self.snapshot();
+                        self.broadcast(&snap);
+                        let url = pages.url(&meta.id);
+                        json!({"ok": true, "id": meta.id, "version": meta.version(), "url": url, "unknown_notes": unknown})
+                    }
+                    Err(lines) => json!({"ok": false, "error": lines.join("\n"), "lint": lines}),
+                }
+            }
+        }
+    }
+
+    /// The page server's news.
+    fn page_msg(&mut self, m: crate::pages::PageMsg) {
+        let Some(pages) = self.pages.clone() else { return };
+        match m {
+            crate::pages::PageMsg::Notes { .. } => {
+                let snap = self.snapshot();
+                self.broadcast(&snap);
+            }
+            crate::pages::PageMsg::Sent { id, agent, text } => {
+                // the page's agent, main when it is gone
+                let to = if self.page_agent_gone(&agent) { MAIN.to_string() } else { agent };
+                self.page_turns.entry(to.clone()).or_insert_with(|| (Vec::new(), false)).0.push(id.clone());
+                if let Some(meta) = pages.set_state(&id, "updating") {
+                    self.broadcast(&pages.page_ev(&meta));
+                }
+                // as from the user (client 0: no view of its own)
+                self.step(Input::ClientInput { client: 0, focus: to, text });
+                let snap = self.snapshot();
+                self.broadcast(&snap);
+            }
+        }
+    }
+
+    /// The turns of an agent updating pages: one that has the notes and
+    /// ends without a publish puts its pages back to ready (the notes
+    /// stay sent).
+    fn page_turn(&mut self, name: &str, line: &str) {
+        let Some((ids, seen)) = self.page_turns.get_mut(name) else { return };
+        let o = line.strip_prefix("  obs: ").unwrap_or("");
+        if o == "turn_started" || o.starts_with("steering_received: ") || o.starts_with("steered: ") {
+            *seen = true;
+            return;
+        }
+        if !(o.starts_with("turn_done: ") && *seen) {
+            return;
+        }
+        let ids = std::mem::take(ids);
+        self.page_turns.remove(name);
+        let Some(pages) = self.pages.clone() else { return };
+        for id in ids {
+            if let Some(meta) = pages.set_state(&id, "ready") {
+                self.broadcast(&pages.page_ev(&meta));
+            }
+        }
+        let snap = self.snapshot();
+        self.broadcast(&snap);
     }
 
     fn step(&mut self, input: Input) {
@@ -1594,6 +1724,7 @@ impl Shell {
             "exe": self.opts.exe.to_string_lossy(),
             "version": crate::switch::version_info(&self.opts.app_root),
             "reload": self.reload_id,
+            "pages_url": self.pages.as_ref().map(|p| p.base()),
         }));
         push(&self.snapshot());
         for name in &self.hub.st.order {
@@ -1848,6 +1979,10 @@ impl Shell {
             }
             "history" | "show" => {
                 let body = self.search(cmd, &v);
+                write_json(&mut stream, &body);
+            }
+            "page_publish" | "page_list" | "page_notes" => {
+                let body = self.page_op(cmd, &from, &v);
                 write_json(&mut stream, &body);
             }
             _ => match AgentReq::from_json(&v) {
@@ -2199,7 +2334,24 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         features: features::Features::load(&paths.state),
         prs: None,
         cu: crate::computer_use::Watch::new(),
+        pages: None,
+        page_turns: BTreeMap::new(),
     };
+    // the page server (docs/ambient-pages.md §2.4): 127.0.0.1, a stable
+    // port per workspace; its notes come back to the loop
+    match crate::pages::start(&paths.state, &crate::paths::workspace_id(&paths.workspace), sh.opts.app_root.join("apps/ambient/kit")) {
+        Ok(p) => {
+            let tx = std::sync::Mutex::new(tx.clone());
+            p.connect_hub(Box::new(move |m| {
+                if let Ok(t) = tx.lock() {
+                    let _ = t.send(Msg::Page(m));
+                }
+            }));
+            log_line(&paths, &format!("pages at {}", p.base()));
+            sh.pages = Some(p);
+        }
+        Err(e) => log_line(&paths, &format!("no page server: {}", e)),
+    }
     // the features' facts (dev-flow §5.1), off the loop
     sh.refresh_features();
     // the role lines of an earlier hub (BISE-126)
@@ -2456,6 +2608,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
                     });
                 }
             }
+            Msg::Page(m) => sh.page_msg(m),
             Msg::ClientNew { id, stream } => sh.client_hello(id, stream),
             Msg::ClientLine { id, v } => sh.client_line(id, v),
             Msg::ClientGone { id } => {

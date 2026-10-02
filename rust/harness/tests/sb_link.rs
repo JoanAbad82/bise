@@ -54,6 +54,11 @@ fn cases() -> Vec<Vec<&'static str>> {
         vec!["feature", "merge"],
         vec!["spawn", "cu-a", "--feature", "computer-use", "--objective", "do it"],
         vec!["spawn", "cu-b", "--feature", "computer-use", "--place", "new", "--objective", "do it"],
+        // agent-made pages (docs/ambient-pages.md §2.2)
+        vec!["page"],
+        vec!["page", "list"],
+        vec!["page", "notes", "weekly-update"],
+        vec!["page", "publish", "/nonexistent/page.html", "--id", "w", "--notes-done", "n1,n2", "--note-answer", "n3=kept"],
         vec!["version"],
         vec!["version", "switch", "HEAD"],
         vec!["restart", "current"],
