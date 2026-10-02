@@ -41,6 +41,24 @@ struct CapsuleShape: Equatable {
     }
 }
 
+// macOS's own window corner radius (the user: the capsule's corners match
+// the system's, idle and open alike, never a pill). Read from an offscreen
+// app window with a toolbar (the usual app window: 26 on Tahoe, where a
+// titlebar-only window is 16) through the private _cornerRadius, best
+// effort; else a table by major version.
+@MainActor
+func macWindowRadius() -> CGFloat {
+    let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+                     styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
+    w.isReleasedWhenClosed = false
+    w.toolbar = NSToolbar(identifier: "bise.radius")
+    let sel = NSSelectorFromString("_cornerRadius")
+    if w.responds(to: sel), let r = w.value(forKey: "_cornerRadius") as? NSNumber, r.doubleValue > 0, r.doubleValue < 60 {
+        return CGFloat(r.doubleValue)
+    }
+    return ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 ? 26 : 10
+}
+
 // WKUserContentController holds its handler strongly: a weak hop
 private final class WeakHandler: NSObject, WKScriptMessageHandler {
     weak var target: Capsule?
@@ -64,6 +82,8 @@ final class Capsule: NSObject, WKNavigationDelegate {
     private var shrink: DispatchWorkItem?
     private var webDir: String?
     private var watcher: DirWatcher?
+    // the corners of both boxes: macOS's window radius, not the page's
+    let radius: CGFloat = macWindowRadius()
 
     override init() {
         panel = CapsulePanel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 84),
@@ -232,12 +252,13 @@ final class Capsule: NSObject, WKNavigationDelegate {
     private func applyMask() {
         let size = panel.frame.size
         let s = shape
+        let r = radius
         let img = NSImage(size: size, flipped: true) { _ in
             NSColor.black.setFill()
             let x = size.width - s.w
-            NSBezierPath(roundedRect: NSRect(x: x, y: 0, width: s.w, height: s.h), xRadius: s.radius, yRadius: s.radius).fill()
+            NSBezierPath(roundedRect: NSRect(x: x, y: 0, width: s.w, height: s.h), xRadius: r, yRadius: r).fill()
             if let n = s.note {
-                NSBezierPath(roundedRect: NSRect(x: x, y: n.y, width: s.w, height: n.h), xRadius: n.radius, yRadius: n.radius).fill()
+                NSBezierPath(roundedRect: NSRect(x: x, y: n.y, width: s.w, height: n.h), xRadius: r, yRadius: r).fill()
             }
             return true
         }
