@@ -55,3 +55,26 @@ enum MenuRows {
         return head.trimmingCharacters(in: .whitespaces) + "…"
     }
 }
+
+// the menu-bar icon's look (ambient's SPEC §0 states), on today's glyph
+// until the marble: one state wins, the count stays beside it
+struct IconLook: Equatable {
+    enum Tint: Equatable { case dim, normal, bright, olive, ember }
+    var tint: Tint
+    var moving: Bool          // the slow turn (a pulse on the glyph for now)
+    var extra: String         // "", "▲" (failed, 8 s), "☾" (quiet)
+    var count: Int            // rose, never blinking; none at 0
+
+    static let flash = 8.0    // done / page ready glint, failed stop
+
+    static func of(working: Bool, count: Int, quiet: Bool, holding: Bool,
+                   glintUntil: Double, failedUntil: Double, now: Double, reduceMotion: Bool) -> IconLook {
+        let still = reduceMotion
+        if holding { return IconLook(tint: .bright, moving: !still, extra: "", count: count) }
+        if now < failedUntil { return IconLook(tint: .normal, moving: false, extra: "▲", count: count) }
+        if now < glintUntil { return IconLook(tint: .olive, moving: working && !still, extra: "", count: count) }
+        if quiet { return IconLook(tint: .ember, moving: false, extra: "☾", count: count) }
+        if working { return IconLook(tint: .normal, moving: !still, extra: "", count: count) }
+        return IconLook(tint: .dim, moving: false, extra: "", count: count)
+    }
+}

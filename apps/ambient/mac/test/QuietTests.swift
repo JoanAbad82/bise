@@ -50,6 +50,12 @@ law("the call ends, the meeting goes on: why meeting again", mt.on && mt.why == 
 mt.meeting(false)
 law("the meeting ends: off", mt.change().map { "\($0.on):\($0.why)" } == "false:")
 
+var fs = QuietMachine()
+fs.fullScreen(true)
+law("full screen is quiet, why full_screen", fs.change().map { "\($0.on):\($0.why)" } == "true:full_screen")
+fs.meeting(true)
+law("a meeting outranks full screen", fs.change().map { $0.why } == "meeting")
+
 var start = QuietMachine()
 law("nothing to say at start when it's not quiet", start.change() == nil)
 

@@ -1,8 +1,9 @@
 // StatusItem: the menu-bar `:*` (SPEC §1, §8 "out of the way"), always
 // there and the status at a glance: still at rest, a quiet pulse while
 // agents work (until ambient's design), the count of items waiting for you
-// next to it (none at 0), accent pink while there are some. A click opens
-// the menu; an option-click shows bise (the capsule). A right click opens
+// next to it (none at 0, rose), and SPEC §0's states (done glint, failed
+// stop, quiet ember, fn held). A click (or ⌥ click) shows bise's full view
+// (vision §3 G); a right click (or ⌃ click) opens
 // the menu: "needs you" (the cards: a click opens bise on one), "for you"
 // (the newest pages: a click opens one), then the keys and quit.
 
@@ -20,7 +21,7 @@ enum MenuWords {
 
 @MainActor
 final class StatusItem: NSObject {
-    var onOpen: (() -> Void)?                // option-click: show bise
+    var onOpen: (() -> Void)?                // a click: bise's full view (show + app_key 0)
     var onSpotlight: (() -> Void)?
     var onToggle: (() -> Void)?
     var onPage: ((String) -> Void)?          // a page's URL
@@ -30,11 +31,17 @@ final class StatusItem: NSObject {
     var cards: () -> [Card] = { [] }
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-    private var needsYou = false
+    // what the icon says (SPEC §0): the inputs, then IconLook decides
     private var working = false
     private var count = 0
+    private var quiet = false
+    private var holding = false
+    private var glintUntil = -1.0
+    private var failedUntil = -1.0
+    var reduceMotion = false { didSet { refresh() } }
     private var pulse: Timer?
     private var dim = false
+    private var later: DispatchWorkItem?
 
     override init() {
         super.init()
@@ -43,39 +50,67 @@ final class StatusItem: NSObject {
             b.action = #selector(clicked)
             b.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
-        draw()
+        refresh()
     }
 
-    func setNeedsYou(_ on: Bool) { set(working: working, count: on ? max(count, 1) : 0) }
+    private var now: Double { ProcessInfo.processInfo.systemUptime }
 
-    // the status: agents working, items waiting
-    func set(working w: Bool, count c: Int) {
-        guard w != working || c != count else { return }
-        working = w
-        count = c
-        needsYou = c > 0
-        if w, pulse == nil {
-            // a quiet pulse of the glyph, ~1 s (ambient's design replaces it)
-            pulse = Timer.scheduledTimer(withTimeInterval: 0.9, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { guard let self else { return }; self.dim.toggle(); self.draw() }
+    func set(working w: Bool, count c: Int) { working = w; count = c; refresh() }
+    func set(quiet q: Bool) { quiet = q; refresh() }
+    func set(holding h: Bool) { holding = h; refresh() }
+    // an agent done or a page ready: an olive glint, 8 s
+    func glint() { glintUntil = now + IconLook.flash; refresh() }
+    // an agent failed: the glyph stops, ▲, 8 s
+    func failed() { failedUntil = now + IconLook.flash; refresh() }
+
+    private func refresh() {
+        let look = IconLook.of(working: working, count: count, quiet: quiet, holding: holding,
+                               glintUntil: glintUntil, failedUntil: failedUntil, now: now, reduceMotion: reduceMotion)
+        if look.moving, pulse == nil {
+            // the slow turn, for now a pulse of the glyph (the marble replaces it)
+            pulse = Timer.scheduledTimer(withTimeInterval: holding ? 0.45 : 0.9, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated { guard let self else { return }; self.dim.toggle(); self.refresh() }
             }
-        } else if !w {
+        } else if !look.moving {
             pulse?.invalidate()
             pulse = nil
             dim = false
         }
-        draw()
+        draw(look)
+        // a glint or a stop ends by itself
+        later?.cancel()
+        let ends = [glintUntil, failedUntil].filter { $0 > now }.min()
+        if let e = ends {
+            let job = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.refresh() } }
+            later = job
+            DispatchQueue.main.asyncAfter(deadline: .now() + (e - now) + 0.05, execute: job)
+        }
     }
 
-    private func draw() {
+    private static let rose = NSColor(srgbRed: 0xf4 / 255, green: 0xa6 / 255, blue: 0xb0 / 255, alpha: 1)
+    private static let olive = NSColor(srgbRed: 0xb8 / 255, green: 0xc0 / 255, blue: 0x7a / 255, alpha: 1)
+    private static let ember = NSColor(srgbRed: 0xd9 / 255, green: 0x93 / 255, blue: 0x6a / 255, alpha: 0.75)
+
+    private func draw(_ look: IconLook) {
         let font = NSFont(name: "JetBrains Mono", size: 13) ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold)
-        let base: NSColor = needsYou ? NSColor(srgbRed: 0xf4 / 255, green: 0xa6 / 255, blue: 0xb0 / 255, alpha: 1) : .labelColor
-        let glyph: [NSAttributedString.Key: Any] = [.font: font, .baselineOffset: 0.5,
-                                                    .foregroundColor: base.withAlphaComponent(dim ? 0.45 : 1)]
-        let title = NSMutableAttributedString(string: ":*", attributes: glyph)
-        if count > 0 {
-            let small = NSFont(name: "JetBrains Mono", size: 11) ?? NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
-            title.append(NSAttributedString(string: " \(count)", attributes: [.font: small, .baselineOffset: 1, .foregroundColor: base]))
+        let small = NSFont(name: "JetBrains Mono", size: 11) ?? NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        var color: NSColor
+        switch look.tint {
+        case .dim: color = NSColor.labelColor.withAlphaComponent(0.6)
+        case .normal: color = .labelColor
+        case .bright: color = .labelColor
+        case .olive: color = StatusItem.olive
+        case .ember: color = StatusItem.ember
+        }
+        if dim { color = color.withAlphaComponent(color.alphaComponent * 0.5) }
+        let title = NSMutableAttributedString(string: ":*", attributes: [
+            .font: look.tint == .bright ? NSFont.monospacedSystemFont(ofSize: 13, weight: .heavy) : font,
+            .baselineOffset: 0.5, .foregroundColor: color])
+        if !look.extra.isEmpty {
+            title.append(NSAttributedString(string: " " + look.extra, attributes: [.font: small, .baselineOffset: 1, .foregroundColor: NSColor.secondaryLabelColor]))
+        }
+        if look.count > 0 {
+            title.append(NSAttributedString(string: " \(look.count)", attributes: [.font: small, .baselineOffset: 1, .foregroundColor: StatusItem.rose]))
         }
         item.button?.attributedTitle = title
     }
@@ -99,8 +134,9 @@ final class StatusItem: NSObject {
 
     @objc private func clicked() {
         let e = NSApp.currentEvent
-        if e?.modifierFlags.contains(.option) == true && e?.type != .rightMouseUp {
-            onOpen?()
+        let menu = e?.type == .rightMouseUp || e?.modifierFlags.contains(.control) == true
+        if !menu {
+            onOpen?()   // a click (or ⌥ click) on the icon: bise's full view
         } else {
             let m = NSMenu()
             // needs you first: it is what is waiting

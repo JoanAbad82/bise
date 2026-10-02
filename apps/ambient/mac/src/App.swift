@@ -40,6 +40,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var visJob: DispatchWorkItem?
     private var seenCards: Set<String>? = nil   // nil until the first state (no burst at launch)
     private var working = false
+    private var agentStatus: [String: String] = [:]
     // what a page loaded later needs: the last event of each of these kinds
     private var memory: [String: [String: Any]] = [:]
     private static let remembered: Set<String> = ["hub", "state", "phase", "main"]
@@ -131,6 +132,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         st.cards = { [weak self] in self?.cards ?? [] }
         st.isHidden = { [weak self] in self?.capsule.hidden ?? false }
         status = st
+        st.reduceMotion = reduceMotion
 
         let nt = Notify()
         nt.onAnswer = { [weak self] card, reply in self?.toCore(["cmd": "answer", "card": card, "reply": reply]) }
@@ -178,6 +180,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 guard let self else { return }
                 self.reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                self.status?.reduceMotion = self.reduceMotion
                 self.capsule.post(["ev": "app_reduce_motion", "on": self.reduceMotion])
                 self.edgeSetup()
             }
@@ -196,6 +199,12 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         for name in [NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification] {
             ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.woke() }
+            }
+        }
+        // a full-screen front app is quiet (SPEC §0): checked on app and Space changes
+        for name in [NSWorkspace.didActivateApplicationNotification, NSWorkspace.activeSpaceDidChangeNotification] {
+            ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.checkFullScreen() }
             }
         }
         // the capsule covered by a full-screen window or another Space: no drawing
@@ -308,7 +317,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             // needs come from the events the app sees itself; the page adds
             // the short lines (done, failed, a page ready, a key's answer)
             switch cmd["kind"] as? String ?? "" {
-            case "line": visFeed(.show(Visibility.line))
+            case "line": visFeed(.line)   // never shows bise by itself (SPEC §0)
             case "open": visFeed(.open)
             case "needs": visFeed(.card)
             default: break
@@ -367,11 +376,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "phase":
             phase = ev["phase"] as? String ?? phase
             visFeed(.phase(phase))
+            if phase == "failed" { status?.failed() }
             statusIcon()
             edge.post(ev)
         case "level":
             if talking { edge.post(ev) }
         case "page":
+            if ev["state"] as? String == "ready" { status?.glint() }   // a page ready: the icon only
             if pagesURL == nil, let u = ev["url"] as? String { pagesURL = PageOpen.pagesBase(fromPageURL: u) }
             // a page you're waiting for opens in front, without fn + o (ambient-pages §2.8)
             if ev["front"] as? Bool == true, let url = ev["url"] as? String, PageOpen.isWeb(url) {
@@ -385,6 +396,14 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             }
             let list = ev["agents"] as? [[String: Any]] ?? []
             agents = Set(list.compactMap { $0["name"] as? String })
+            // an agent turning done or failed: the icon's glint or stop (SPEC §0)
+            var now: [String: String] = [:]
+            for a in list { if let n = a["name"] as? String { now[n] = a["status"] as? String ?? "" } }
+            for (n, st) in now where agentStatus[n] != nil && agentStatus[n] != st {
+                if st == "done" { status?.glint() }
+                if st == "failed" { status?.failed() }
+            }
+            agentStatus = now
             working = list.contains { $0["working"] as? Bool == true }
             statusIcon()
             // a new item that needs you: the capsule shows it for 6 s
@@ -419,6 +438,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             toCore(["cmd": "talk_end"])
             fnEvent("up")
             edge.glow(false)
+            status?.set(holding: false)
             visFeed(.talk(false))
         case .cancel:
             guard talking else { return }
@@ -427,6 +447,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             quiet.own(open: false, at: uptime)
             fnEvent("cancel")   // the page sends talk_cancel and says so
             edge.glow(false)
+            status?.set(holding: false)
             visFeed(.cancelled)
         case .tap:
             fnEvent("tap")      // the page cuts in when main speaks
@@ -436,7 +457,10 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
                 toggleByHand()
             case "space":
                 spotlight()
-            case "i", "0":
+            case "0":
+                // fn 0: the full view; fn 0 again closes it (SPEC §0)
+                if !capsule.hidden && vis.pinned { visFeed(.dismiss) } else { agentsView() }
+            case "i":
                 visFeed(.open)
                 capsule.post(["ev": "app_key", "key": k])
             default:
@@ -469,6 +493,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         defer { morning() }   // after the shot's front window is chosen
         quiet.own(open: true, at: uptime)
         visFeed(.talk(true))
+        if state == "down" { status?.set(holding: true) }
         // the edge glow only while fn is held (not hands-free)
         if state == "down" && edgeGlow && !reduceMotion { edge.glow(true) }
         // QA never asks the user's browser anything
@@ -638,10 +663,32 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    // the front app's front window covers a whole screen (a video, slides, a game)
+    private func checkFullScreen() {
+        guard qa == nil, let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != getpid(),
+              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+        else { return }
+        let mainH = NSScreen.screens.first?.frame.height ?? 0
+        let screens = NSScreen.screens.map { CGRect(x: $0.frame.minX, y: mainH - $0.frame.maxY, width: $0.frame.width, height: $0.frame.height) }
+        var full = false
+        for w in list where (w[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == app.processIdentifier
+            && (w[kCGWindowLayer as String] as? NSNumber)?.intValue == 0 {
+            if let bd = w[kCGWindowBounds as String] as? NSDictionary, let b = CGRect(dictionaryRepresentation: bd) {
+                full = screens.contains { $0.equalTo(b) }
+            }
+            break   // the front window only
+        }
+        quiet.fullScreen(full)
+        sayQuiet()
+    }
+
     // a change: the page (app_quiet) and the core (quiet: text only)
     private func sayQuiet() {
         guard let c = quiet.change() else { return }
         Log.say("app: quiet \(c.on) \(c.why)")
+        visFeed(.quiet(c.on))   // quiet: bise never shows by itself
+        status?.set(quiet: c.on)
         capsule.post(["ev": "app_quiet", "on": c.on, "why": c.why])
         toCore(["cmd": "quiet", "on": c.on, "why": c.why])
     }

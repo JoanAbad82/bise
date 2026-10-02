@@ -36,8 +36,20 @@ law("the voice keeps it: hidden 4 s after the voice ends",
         == [true, true, false])
 law("main's words that aren't an answer to you: nothing",
     run([(.mainText, 0), (.phase("done"), 1)], probe: [0.5, 2]) == [false, false])
-law("a new item that needs you: 6 s, then gone",
-    run([(.card, 0)], probe: [5.9, 6.1]) == [true, false])
+law("a new question for you: 8 s, then gone",
+    run([(.card, 0)], probe: [7.9, 8.1]) == [true, false])
+law("a page's line never shows bise by itself",
+    run([(.line, 0)], probe: [1]) == [false])
+law("a page's line extends a capsule already on screen",
+    run([(.talk(true), 0), (.talk(false), 1), (.line, 2)], probe: [5.5, 6.1]) == [true, false])
+law("quiet: a question doesn't show bise (it waits in the count)",
+    run([(.quiet(true), 0), (.card, 1)], probe: [2]) == [false])
+law("quiet: main's answer doesn't show by itself",
+    run([(.quiet(true), 0), (.sent, 1), (.mainText, 4), (.phase("speaking"), 5)], probe: [4.5, 6]) == [false, false])
+law("quiet: what you do still shows (talk, open)",
+    run([(.quiet(true), 0), (.talk(true), 1), (.open, 2)], probe: [1.5, 30]) == [true, true])
+law("quiet ends: questions show again",
+    run([(.quiet(true), 0), (.quiet(false), 1), (.card, 2)], probe: [3]) == [true])
 law("opened: it stays",
     run([(.open, 0)], probe: [100, 1000]) == [true, true])
 law("opened, then esc / fn . / a click elsewhere: gone",
@@ -48,7 +60,7 @@ law("dismiss never hides you while you talk",
     run([(.talk(true), 0), (.dismiss, 1)], probe: [2]) == [true])
 law("fn . toggles: hidden -> open, open -> hidden",
     run([(.toggle, 0), (.toggle, 5)], probe: [1, 6]) == [true, false])
-law("fn . during a timed show hides it",
+law("fn . during a timed show hides it (8 s question)",
     run([(.card, 0), (.toggle, 1)], probe: [2]) == [false])
 law("the mouse over it holds a timed show, then 1 s once it leaves",
     run([(.card, 0), (.hover(true), 3), (.hover(false), 20)], probe: [10, 20.5, 21.5]) == [true, true, false])
@@ -59,10 +71,10 @@ law("the page asks to show for n s",
 law("the page asks to show, no time: open until dismissed",
     run([(.show(nil), 0), (.dismiss, 50)], probe: [40, 51]) == [true, false])
 law("a card during an answer: the later end wins",
-    run([(.sent, 0), (.mainText, 1), (.phase("done"), 2), (.card, 5)], probe: [6.5, 10.5, 11.5]) == [true, true, false])
+    run([(.sent, 0), (.mainText, 1), (.phase("done"), 2), (.card, 5)], probe: [6.5, 12.5, 13.5]) == [true, true, false])
 var v = Visibility()
 _ = v.feed(.card, at: 0)
-law("nextTick: the timed show's end", v.nextTick(after: 1) == 6 && v.nextTick(after: 7) == nil)
+law("nextTick: the timed show's end", v.nextTick(after: 1) == 8 && v.nextTick(after: 9) == nil)
 
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Visibility laws hold")

@@ -7,8 +7,12 @@
 //   - `got it` / `on it` after a send or a cancel: 2 s;
 //   - main's answer to your turn: from its words (or its voice) until 4 s
 //     after the turn or the voice ends;
-//   - a new item that needs you: 6 s (the count stays in the menu bar);
-//   - a short line the page has (done, failed, a page ready): 4 s;
+//   - a new question for you: 8 s (the count stays in the menu bar);
+//   - never by itself for done, failed, a page ready, progress (SPEC §0:
+//     those live in the icon): a page's short line only extends a capsule
+//     already on screen;
+//   - quiet (a meeting, a call, full screen): never by itself, only what
+//     you do (talk, type, open);
 //   - when you open it (option-click, fn ., the menu): until esc, fn ., or
 //     a click elsewhere;
 // and the mouse over it holds any timed show (1 s more once it leaves).
@@ -25,6 +29,8 @@ enum VisIn: Equatable {
     case mainText              // main's words of this turn (core `main`)
     case phase(String)         // core `phase`
     case card                  // a new item that needs you
+    case line                  // a short line from the page (a key's answer ...)
+    case quiet(Bool)           // a meeting, a call, full screen
     case open                  // you opened it: option-click, fn ., the menu
     case dismiss               // esc, fn ., a click elsewhere, app_hide
     case toggle                // fn . : open when hidden, dismiss when shown
@@ -36,7 +42,7 @@ enum VisIn: Equatable {
 struct Visibility {
     static let brief = 2.0         // got it, on it, cancelled
     static let afterAnswer = 4.0
-    static let forCard = 6.0
+    static let forCard = 8.0
     static let afterHover = 1.0
     static let line = 4.0          // a short line from the page: done, failed, a page ready
 
@@ -48,6 +54,7 @@ struct Visibility {
     private var until = -1.0               // a timed show's end
     private var hovered = false
     private var heldByHover = false
+    private(set) var quiet = false
 
     init() {}
 
@@ -73,11 +80,11 @@ struct Visibility {
             mine = true
             show(Visibility.brief, t)                       // got it / on it
         case .mainText:
-            if mine { answer = true }
+            if mine && !quiet { answer = true }
         case .phase(let p):
             switch p {
             case "speaking":
-                answer = true                               // the voice answers you only
+                if !quiet { answer = true }                 // the voice answers you only
             case "done", "failed", "idle":
                 if answer { answer = false; show(Visibility.afterAnswer, t) }
                 mine = false
@@ -85,7 +92,11 @@ struct Visibility {
                 break
             }
         case .card:
-            show(Visibility.forCard, t)
+            if !quiet { show(Visibility.forCard, t) }
+        case .line:
+            if visible(at: t) { show(Visibility.line, t) }
+        case .quiet(let on):
+            quiet = on
         case .open:
             pinned = true
         case .dismiss:

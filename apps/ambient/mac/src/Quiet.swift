@@ -18,6 +18,7 @@ struct QuietMachine {
 
     private(set) var call = false
     private(set) var meeting = false
+    private(set) var fullScreen = false
     private var busySince: Double? = nil
     private var freeSince: Double? = nil
     private var ownOpen = false
@@ -26,9 +27,9 @@ struct QuietMachine {
 
     init() {}
 
-    var on: Bool { call || meeting }
-    // a call wins: it's the one that's live
-    var why: String { call ? "call" : meeting ? "meeting" : "" }
+    var on: Bool { call || meeting || fullScreen }
+    // a call wins: it's the one that's live; then a meeting, then full screen
+    var why: String { call ? "call" : meeting ? "meeting" : fullScreen ? "full_screen" : "" }
 
     // bise's own mic (talk_start .. talk_end / cancel)
     mutating func own(open: Bool, at t: Double) {
@@ -53,6 +54,9 @@ struct QuietMachine {
     }
 
     mutating func meeting(_ now: Bool) { meeting = now }
+
+    // the front app fills a screen (a video, a talk, a game)
+    mutating func fullScreen(_ now: Bool) { fullScreen = now }
 
     // the app_quiet event to send, only when (on, why) changed
     mutating func change() -> (on: Bool, why: String)? {

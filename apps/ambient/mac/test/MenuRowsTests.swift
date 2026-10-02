@@ -36,5 +36,18 @@ law("state.pages: those with a URL, in order", pages.map(\.id) == ["a", "c"])
 law("a page without title shows its id", pages.last?.title == "c")
 law("no pages: empty", MenuPage.list([:]).isEmpty)
 
+func look(working: Bool = false, count: Int = 0, quiet: Bool = false, holding: Bool = false,
+          glint: Double = -1, failed: Double = -1, now: Double = 0, still: Bool = false) -> IconLook {
+    IconLook.of(working: working, count: count, quiet: quiet, holding: holding, glintUntil: glint, failedUntil: failed, now: now, reduceMotion: still)
+}
+law("at rest: dim and still, nothing beside it", look() == IconLook(tint: .dim, moving: false, extra: "", count: 0))
+law("agents working: it turns", look(working: true).moving && look(working: true).tint == .normal)
+law("things wait: the count beside it, whatever the state", look(count: 3).count == 3 && look(working: true, count: 2, quiet: true).count == 2)
+law("done or a page ready: an olive glint for 8 s", look(glint: 8, now: 1).tint == .olive && look(glint: 8, now: 9).tint == .dim)
+law("failed: it stops, ▲ for 8 s", look(working: true, failed: 8, now: 1) == IconLook(tint: .normal, moving: false, extra: "▲", count: 0))
+law("quiet: an ember and ☾, still", look(working: true, quiet: true) == IconLook(tint: .ember, moving: false, extra: "☾", count: 0))
+law("you hold fn: brighter, moving", look(quiet: true, holding: true).tint == .bright && look(holding: true).moving)
+law("reduced motion: never moving", !look(working: true, still: true).moving && !look(holding: true, still: true).moving)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all MenuRows laws hold")
