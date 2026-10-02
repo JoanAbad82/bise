@@ -834,6 +834,16 @@ law("notes: the watching frame's stop is one stop note to main with its timer, r
   m.sent(4);
   assert.equal(m.stop("b1", null, 1, 5).timer, undefined);      // sent: a new stop is a new note
 });
+law("notes: stop goes alone: the payload holds only it, and after the send his drafts stay drafts (ambient-lead m_5502)", () => {
+  const m = N.model([], counted());
+  m.react("k1", "t1", "tick", "book the room", 1, 1);
+  const s = m.stop("b1", 7, 1, 2);
+  eq(m.payload(s.id).notes.map((n) => n.kind), ["stop"]);
+  eq(m.payload().notes.map((n) => n.kind), ["tick", "stop"]);
+  m.sentOne(s.id, 3);
+  eq(m.drafts().map((n) => n.kind), ["tick"]);
+  assert.equal(m.get(s.id).status, "sent");
+});
 law("notes: a row its agent ticked (bise:ticked) drops our draft tick on that row only (amb-kit 74539129)", () => {
   const m = N.model([], counted());
   m.react("k1", "t1", "tick", "book the room", 1, 1);

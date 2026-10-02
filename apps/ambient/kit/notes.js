@@ -366,9 +366,12 @@
       },
       // sent: the drafts are now the agent's
       sent(now) { notes = notes.map((n) => (n.status === "draft" ? { ...n, status: "sent", sent_ms: now || 0 } : n)); undo.length = 0; },
+      // one note sent alone (the watching frame's stop: a button does only what it names); the
+      // other drafts stay drafts, and their undo too
+      sentOne(id, now) { notes = notes.map((n) => (n.id === id && n.status === "draft" ? { ...n, status: "sent", sent_ms: now || 0 } : n)); },
       reanchor(blocks, version) { notes = reanchor(notes, blocks).map((n) => (n.status === "sent" ? { ...n, version_seen: version } : n)); },
       // what the server keeps: the drafts, without the page's own fields
-      payload: () => ({ notes: api.drafts().map(({ anchor, version_seen, listening, ...n }) => n) }),
+      payload: (only) => ({ notes: api.drafts().filter((n) => !only || n.id === only).map(({ anchor, version_seen, listening, ...n }) => n) }),
     };
     return api;
   }
@@ -871,18 +874,33 @@
     async function send() {
       if (!M.drafts().length || state === "updating") return;
       clearTimeout(saveT);
-      // start and stop notes go to main, never the page's agent: the page doesn't update for them
+      // start notes go to main, never the page's agent: the page doesn't update for them alone
       const toMain = M.drafts().every((n) => n.kind === "start" || n.kind === "stop");
-      const stopping = M.drafts().some((n) => n.kind === "stop");
       try {
         await api(`/api/p/${pageId}/notes`, M.payload());
         await api(`/api/p/${pageId}/send`, {});
         M.sent(now());
-        barNote = stopping && toMain ? NW.stopped : NW.sent(spaced(meta.agent || "main"));
+        barNote = NW.sent(spaced(meta.agent || "main"));
         if (!toMain) state = "updating";
         render();
         win.setTimeout(() => { barNote = ""; render(); }, 4000);
       } catch { barMsg(NW.failed); }
+    }
+    // the watching frame's stop goes alone (ambient-lead m_5502: a button does only what it
+    // names): the server sends every draft it holds, so it holds only the stop for the send, then
+    // gets his other drafts back (they never left notes.js; merge keeps drafts it doesn't know)
+    async function sendStop(id) {
+      clearTimeout(saveT);
+      try {
+        await api(`/api/p/${pageId}/notes`, M.payload(id));
+        await api(`/api/p/${pageId}/send`, {});
+        M.sentOne(id, now());
+        barNote = NW.stopped;
+        render();
+        win.setTimeout(() => { barNote = ""; render(); }, 4000);
+      } catch { barMsg(NW.failed); }
+      // his drafts back on the server, sent or not
+      save();
     }
     barSend.addEventListener("click", send);
     doc.addEventListener("click", (e) => { if (e.target.closest && e.target.closest("[data-bise-send]")) send(); });
@@ -940,14 +958,14 @@
     doc.addEventListener("bise:answered", (e) => {
       if (M.answered((e.detail || {}).block)) { save(); render(); }
     });
-    // the watching frame's 'stop' (roadmap B): a stop note to main, sent at once through the
-    // normal path (the drafts already written go with it: that's what send does)
+    // the watching frame's 'stop' (roadmap B): a stop note to main, sent at once and alone; his
+    // other drafts stay drafts until he sends them (⌘⏎)
     doc.addEventListener("bise:stop", (e) => {
       const d = e.detail || {};
       const b = blocks()[0];
       if (!b) return;
-      M.stop(b.dataset.id, d.timer, version, now());
-      save(); render(); send();
+      const n = M.stop(b.dataset.id, d.timer, version, now());
+      render(); sendStop(n.id);
     });
     // a checklist row ticked by its agent: a draft tick of ours on that row goes
     doc.addEventListener("bise:ticked", (e) => {
