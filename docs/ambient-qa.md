@@ -149,15 +149,78 @@ Fail (sent to ambient-lead m_5008):
 
 Slice 1 holds its done-when except speed and 10-12.
 
-## Slice 2 (outline, detailed when its plan lands)
+## Slice 2: talk to the page, the inbox, questions in two places ([ambient-pages.md](ambient-pages.md) §4)
 
-- Voice note: hold fn on a page, the note pins at the mouse with its words (`you · voice · 0:04`);
-  main doesn't get a message; saying "send" on the page sends the notes.
-- The `bise` tab group through the extension; a page reuses its tab there.
-- Job 2, the inbox: a review page; approve / edit / skip per item; `approve 5` skips edited and
-  struck items; each sent reply went through the gate; email draft blocks.
-- A page's question answers its card, and the card's answer shows on the page: one answer, never two.
-- Versions history.
+### 0. The done-when, run whole
+
+- [ ] "go through my mail" (a throwaway mailbox or read-only on his) → a review page; I hold fn
+      over two items and say a note on each; I approve three, skip one; "send" by voice → the
+      replies go out only through the gate (a card per send in auto), the page shows each item's
+      outcome. Nothing sent without an approval.
+
+### A. Voice notes at the mouse (§4.1)
+
+- [ ] fn held with a bise page in front: the pin appears where the mouse is, `you · voice · 0:04`
+      fills live with my words; no screenshot is taken; main's thread gets **nothing**.
+- [ ] fn held with any other page or app in front: a normal talk to main (the shot, the chip).
+- [ ] The capsule says `voice note on <page>` while it listens; the edge glow stays.
+- [ ] fn + esc while holding: the pin goes away, no note.
+- [ ] Saying only "send" (or "envoie") on the page sends the notes, same as ⌘⏎; "send" inside a
+      longer sentence is a note, not a send.
+- [ ] The voice note anchors to the block under the mouse and survives v2 like a typed note.
+
+### B. Questions in two places (§4.2)
+
+- [ ] A page's `question` block makes one card in the capsule (`? <page> needs you`, `open it`).
+- [ ] Answer on the page → the card is gone from the capsule and the TUI; the page shows the answer.
+- [ ] Answer with fn + 1 in the capsule → the page shows the answer (live, no reload).
+- [ ] Answer in both places quickly: one answer wins, the other side shows it; never two answers.
+- [ ] `open it` / fn + ⏎ opens the page at that question.
+
+### C. The inbox: review and email (§4.3)
+
+- [ ] Each item: what it is, the drafted reply, approve / edit / skip; an edited reply is sent as
+      edited.
+- [ ] `approve 5` says its count and leaves out the items I edited or struck.
+- [ ] After send: each approved reply reaches the gate as a send (auto: a card each, or one card
+      for the batch, never silent); skipped items are not touched.
+- [ ] The page's v2 shows each item's outcome (`sent`, `skipped`, `draft kept`).
+
+### D. Versions (§4.4)
+
+- [ ] `v3 ▾` lists the versions with their age; an old one opens read-only with `back to the
+      latest`; notes can't be added on an old version (or they go to the latest, said so).
+- [ ] `what changed` compares with the version just before.
+
+### E. The tab group (§4.5)
+
+- [ ] With the extension: the page opens in the `bise` tab group of my window, reuses its tab; no
+      tab in an agent's group. Without it: the AppleScript/`open` path still works.
+
+## Job slice A: drafts where they live ([ambient-roadmap.md](ambient-roadmap.md) §2 A)
+
+- [ ] "write Lélio the mail he asks for in the #rh thread" → an email page with the Slack thread
+      as its source; the draft is prose, editable.
+- [ ] "put it in my drafts" (said on the page or the frame's button) → in Gmail drafts, **no card**;
+      the frame says `in your Gmail drafts · open`, the link opens that draft.
+- [ ] v3 after more notes updates **the same** Gmail draft (one draft in Gmail, not two).
+- [ ] The Gmail connector fails → one line `Gmail didn't take it. copy · try again`; copy gives
+      rich text; never a file path.
+- [ ] A Slack message page: `copy` + `open #channel` (slack:// link), the frame says `copied ·
+      open #team`; nothing posted.
+- [ ] A Kit newsletter page → `put in Kit` makes a Kit draft, never sends.
+
+## Job slice B: watch for me (§2 B)
+
+- [ ] "watch the launch until tomorrow" → a review page that updates by itself (a new version on
+      each check that found something; none when nothing changed), the frame says `watching ·
+      checked 3 min ago · until …` and `stop`.
+- [ ] No agent turn between checks (the hub timer wakes it); `stop` ends the watch at once.
+- [ ] A card only for what I asked to be told; everything else waits on the page; numbers sit in
+      the header.
+- [ ] Approve a reply → its thread opens in my browser with the reply prefilled where the site
+      allows, else copied; nothing is ever posted by bise.
+- [ ] At `--until`, the watch stops by itself and says so once.
 
 ## Slice 3 (outline)
 
