@@ -55,6 +55,9 @@ enum PermPlan {
 
     // a fn hold: what to say first; talk = false: this hold doesn't talk
     static func hold(_ s: inout PermState) -> (talk: Bool, do: [PermDo]) {
+        // without Accessibility macOS never hands bise the key: nothing
+        // (QA's fake fn too, so the walk sees what he would)
+        guard s.accessibility == .granted else { return (false, []) }
         switch s.mic {
         case .unknown:
             // asked and left at 'not now': never asked again, a hold does nothing

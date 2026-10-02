@@ -872,7 +872,11 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     private func permDo(_ d: PermDo) {
         switch d {
-        case .ask(let p): perm(p.rawValue, "ask")
+        case .ask(let p):
+            // an ask needs him: the glass shows it (first-run walk: the launch's
+            // Accessibility ask sat in a hidden panel)
+            perm(p.rawValue, "ask")
+            visFeed(.open)
         case .denied(let p): perm(p.rawValue, "denied")
         case .granted(let p): perm(p.rawValue, "granted")
         case .startKeys: if qa == nil, !keys.running { keys.start() }

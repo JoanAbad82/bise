@@ -25,6 +25,12 @@ h = PermPlan.hold(&s)
 law("all granted: a hold talks, nothing asked", h.talk && h.do.isEmpty)
 law("the next launch with everything on: no ask, keys on", PermPlan.launch(&s) == [.startKeys])
 
+// before Accessibility: fn can't reach bise
+var pre = PermState()
+_ = PermPlan.launch(&pre)
+h = PermPlan.hold(&pre)
+law("fn before Accessibility is granted: nothing, no mic ask", !h.talk && h.do.isEmpty)
+
 // never asked twice
 var t = PermState()
 _ = PermPlan.launch(&t)
