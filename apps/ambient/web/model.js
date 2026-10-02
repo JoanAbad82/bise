@@ -366,6 +366,24 @@
     }
   }
 
+  // ---- the pearl's mood (SPEC §1, round 8): listen while you talk (level = your mic), speak
+  // while bise talks (level = its voice), work while main or agents work, need for a question,
+  // done / fail for those lines, away while quiet (a call, a meeting), rest otherwise
+  function moodOf(v, m, flash, asking) {
+    switch (v.state) {
+      case "listening": case "voice_note": return "listen";
+      case "speaking": return m.hushed ? "work" : "speak";
+      case "working": return "work";
+      case "needs": case "perm": return "need";
+      case "answered": case "done": return "done";
+      case "failed": case "error": case "hub_down": return "fail";
+    }
+    if (v.state === "agents" || v.state === "inbox") return asking.length ? "need" : working(m.agents) ? "work" : m.quiet ? "away" : "rest";
+    if (m.quiet) return "away";
+    if (v.pose === "think") return "work";
+    return "rest";
+  }
+
   // ---- it grows out of the menu-bar icon (SPEC §0): the open/close motion when the app shows or
   // hides the capsule. `icon` is the icon's rect in the page's CSS px (amb-mac's app_icon; above
   // the panel, so y < 0); without it, the panel's top right. Reduced motion: a plain fade.
@@ -544,6 +562,7 @@
       if (inTurn(m)) v.pose = "think";   // main on its own turn: the * turns, the capsule stays small
     }
     v.content = contentOf(v, flash, asking);
+    v.mood = moodOf(v, m, flash, asking);
     // the open states keep the key lines too (cancelled, an error) as their sub line; a
     // permission ask stays alone in the capsule (ambient, m_4671)
     if (flash && v.size === "open" && !v.sub && v.state !== "perm" && flash.kind !== "answered") v.sub = flash.text;

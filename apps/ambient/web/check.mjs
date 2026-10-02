@@ -10,8 +10,8 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Uint8Array, Float32Array, String, Number });
-for (const f of ["words.js", "face.js", "model.js", "fakecore.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
-const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes } = ctx;
+for (const f of ["words.js", "face.js", "model.js", "pearl.js", "fakecore.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes, AmbPearl: Pearl } = ctx;
 const W = Wd.W;
 
 // the scripts run in their own realm: compare plain data
@@ -540,6 +540,37 @@ law("it grows out of the menu-bar icon (SPEC §0): scale + fade from the icon's 
   // app_icon is kept on the model, a broken one dropped
   assert.equal(M.view(M.step(M.init(), { ev: "app_icon", x: 1, y: -2, w: 18, h: 18 }, 0).m, 0).icon.y, -2);
   assert.equal(M.view(M.step(M.init(), { ev: "app_icon", x: "a" }, 0).m, 0).icon, null);
+});
+law("the pearl (SPEC §1): every mood value eases with 1 - e^(-dt/.3) (~0.9 s to land), flow = dt · speed · (1 + 1.2 · voice · level)", () => {
+  let S = Pearl.start(0);
+  S = Pearl.ease(S, "work", 0, 0.3, false);
+  assert.ok(Math.abs(S.think - (1 - Math.exp(-1))) < 1e-9, "one time constant: 63%");
+  for (let i = 0; i < 30; i++) S = Pearl.ease(S, "work", 0, 0.033, false);
+  assert.ok(S.think > 0.95, "about a second: landed");
+  // the flow follows the speed and the real level while you talk
+  let L = { ...Pearl.start(0), ...Pearl.MOODS.listen };
+  const quiet = Pearl.ease(L, "listen", 0, 0.1, false).flow, loud = Pearl.ease(L, "listen", 1, 0.1, false).flow;
+  assert.ok(Math.abs(quiet - 0.07) < 1e-9); assert.ok(Math.abs(loud - 0.07 * 2.2) < 1e-9);
+  // reduced motion: still in every mood (no flow, no breath), the tint still eases, then settled
+  let R = Pearl.start(5);
+  for (let i = 0; i < 100; i++) R = Pearl.ease(R, "need", 1, 0.05, true);
+  assert.equal(Math.round(R.flow * 1000), 5000 + Math.round((R.flow - 5) * 1000)); assert.ok(R.flow - 5 < 0.05);
+  assert.ok(R.need > 0.99 && R.still > 0.99); assert.ok(Pearl.settled(R, "need", true));
+  // bise pink, from SPEC §1
+  eq(Pearl.PINK.AMBER, [0.96, 0.56, 0.64]); eq(Pearl.PINK.EMBER, [0.58, 0.46, 0.96]);
+  assert.ok(Pearl.FS.includes("mist pearl"));
+});
+law("the pearl's mood follows the capsule: listen, speak, work, need, done, fail, away, rest", () => {
+  let m = M.step(M.init(), { ev: "state", agents: [{ name: "perf", status: "working" }], cards: [], pages: [] }, 0).m;
+  assert.equal(M.view(m, 10).mood, "rest");
+  assert.equal(M.view(M.step(m, { ev: "app_fn", state: "down", key: "fn" }, 10).m, 20).mood, "listen");
+  assert.equal(M.view(M.step(m, { ev: "app_key", key: "0" }, 10).m, 20).mood, "work");
+  assert.equal(M.view(M.step(m, { ev: "app_quiet", on: true, why: "call" }, 10).m, 20).mood, "away");
+  assert.equal(run(sceneEvents("needs-wait"), [1000]).view(1000).mood, "need");
+  assert.equal(run(sceneEvents("done"), [1000]).view(1000).mood, "done");
+  assert.equal(run(sceneEvents("failed"), [1200]).view(1200).mood, "fail");
+  const sp = sweep("talk");
+  assert.ok(sp.at.some((t) => sp.view(t).state === "speaking" && sp.view(t).mood === "speak"));
 });
 law("the morning page (app_morning): 'good morning. your page is open   fn o' before 11:00 (greet), 'your page is open   fn o' after; fn + o opens it", () => {
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;

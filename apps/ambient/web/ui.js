@@ -4,7 +4,7 @@
 // Everything that decides lives in model.js; this file only draws what view() says.
 (function () {
   "use strict";
-  const { AmbModel: M, AmbOrb } = window;
+  const { AmbModel: M, AmbPearl } = window;
   const $ = (s, r = document) => r.querySelector(s);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const native = () => !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.bise);
@@ -15,7 +15,7 @@
   host.classList.add("amb");
   host.innerHTML = `
     <div class="cap small" id="cap">
-      <div class="orbbox"><canvas class="orb-gl"></canvas><canvas class="orb-still"></canvas></div>
+      <div class="orbbox"><canvas class="pearl"></canvas></div>
       <div class="tx">
         <div class="lab"></div>
         <div class="line"></div>
@@ -33,7 +33,7 @@
   const cap = $("#cap", host), note = $("#note", host), tx = $(".tx", cap);
   const el = { lab: $(".lab", tx), line: $(".line", tx), words: $(".words", tx), sub: $(".sub", tx), sees: $(".sees", tx), chips: $(".chips", tx), rows: $(".rows", tx), more: $(".more", tx), spot: $(".spot", tx), perm: $(".perm", tx) };
   const input = $("input", el.spot);
-  const orb = AmbOrb.create($(".orb-gl", cap), $(".orb-still", cap));
+  const pearl = AmbPearl.create($(".pearl", cap));
 
   // ---- the model and the bridge
   let model = M.init();
@@ -261,15 +261,14 @@
     // what the capsule has to show, on every change: the app's show/hide policy acts on it
     const ck = JSON.stringify(v.content);
     if (ck !== contentSent) { contentSent = ck; post({ cmd: "app_content", ...v.content }); }
-    let drew = false;
-    if (!v.unseen) drew = orb.frame({ pose: v.pose, poseMs: v.poseMs, lvl: v.lvl, need: v.need, still: v.still, frozen: v.frozen }, t);
-    fps.frames++; if (drew) fps.drew++;
+    let moving = false;
+    if (!v.unseen) moving = pearl.frame({ mood: v.mood, lvl: v.lvl, still: v.still }, t);
+    fps.frames++; if (moving) fps.drew++;
     if (t - fps.since > 1000) { fps.value = Math.round((fps.frames * 1000) / (t - fps.since)); fps.frames = 0; fps.drew = 0; fps.since = t; }
-    // keep going at full rate only while the orb moves: a settled face (nothing drawn this frame)
-    // checks again at ~15 Hz (a blink or a spring starts within 66 ms, then runs at 60); nobody
-    // seeing the capsule (hidden, covered, locked: app_visible false) keeps only the timers, at 4 Hz
-    // (amb-mac m_5014: 2.31 s of CPU per idle minute, mostly frames)
-    if (v.unseen) later(250); else if (drew) schedule(); else later(66);
+    // the pearl moves at 30 Hz (SPEC §1: one small quad, at most 30 fps); a still pearl (reduced
+    // motion, settled) checks again at ~15 Hz; nobody seeing the capsule (hidden, covered, locked:
+    // app_visible false) keeps only the timers, at 4 Hz (amb-mac m_5014)
+    if (v.unseen) later(250); else if (moving) later(33); else later(66);
   }
   let laterT = 0;
   function later(ms) { if (!laterT && !raf) laterT = setTimeout(() => { laterT = 0; schedule(); }, ms); }

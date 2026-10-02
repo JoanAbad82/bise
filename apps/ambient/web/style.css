@@ -37,11 +37,9 @@ html:not(.app) .cap, html:not(.app) .note {
   box-shadow: var(--stroke), 0 30px 80px -24px #000b;
 }
 
-/* the orb: one 112 px canvas, scaled to 76 px when small */
-.orbbox { flex: none; width: 112px; height: 112px; margin: -8px -4px -8px -6px; position: relative; transition: width .6s var(--spring), height .6s var(--spring), margin .6s var(--spring); }
-.cap.small .orbbox { width: 76px; height: 76px; margin: -8px -4px; }
-.orbbox canvas { position: absolute; left: 50%; top: 50%; width: 112px; height: 112px; margin: -56px 0 0 -56px; transform: scale(1); transition: transform .6s var(--spring); }
-.cap.small .orbbox canvas { transform: scale(.6786); }
+/* the pearl (SPEC §1, round 8): 68 px at the left, its top on the first line of text */
+.orbbox { flex: none; width: 68px; height: 68px; margin: -6px 4px 0 -4px; position: relative; align-self: flex-start; }
+.orbbox canvas { position: absolute; inset: 0; width: 68px; height: 68px; }
 
 /* the words */
 .tx { flex: none; width: 310px; font-size: 16px; line-height: 1.35; padding: 4px 0; }
