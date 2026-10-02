@@ -14,7 +14,8 @@ html.app, html.app body { overflow: hidden; }
   --back: cubic-bezier(.34, 1.56, .5, 1);
   --spring: cubic-bezier(.3, 1.22, .4, 1);
   --glass: linear-gradient(180deg, #2a22248f, #1a1516b8);
-  --stroke: inset 0 0 0 1px #ffffff26, inset 0 1px 0 #ffffff38;
+  /* identity8's (validated by the user; SPEC §1 follows it, ambient m_5311) */
+  --stroke: inset 0 0 0 1px #ffffff1f, inset 0 1px 0 #ffffff33;
 }
 
 /* the capsule's box: anchored top right (the panel grows down and left) */
