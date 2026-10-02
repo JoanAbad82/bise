@@ -26,6 +26,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var reduceMotion = false
     private var edgeGlow = true
     private var cards: [Card] = []
+    private var pagesURL: String?            // the hub's page server (state.pages_url)
+    private var settleTalk: (() -> Void)?    // a note-or-not decision still pending
     private var agents = Set<String>()
     private var agentWhileHidden = false   // main started an agent while bise was hidden
     // what a page loaded later needs: the last event of each of these kinds
@@ -261,6 +263,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private func coreEvent(_ ev: [String: Any]) {
         guard let kind = ev["ev"] as? String else { return }
         if AmbientApp.remembered.contains(kind) { memory[kind] = ev }
+        if let u = ev["pages_url"] as? String, !u.isEmpty { pagesURL = u }
         switch kind {
         case "phase":
             phase = ev["phase"] as? String ?? phase
@@ -268,12 +271,16 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "level":
             if talking { edge.post(ev) }
         case "page":
+            if pagesURL == nil, let u = ev["url"] as? String { pagesURL = PageOpen.pagesBase(fromPageURL: u) }
             // a page you're waiting for opens in front, without fn + o (ambient-pages §2.8)
             if ev["front"] as? Bool == true, let url = ev["url"] as? String, PageOpen.isWeb(url) {
                 if let qa { qa.opened(url) } else { Browser.open(url) }
             }
         case "state":
             cards = Card.list(ev)
+            if pagesURL == nil, let p = (ev["pages"] as? [[String: Any]])?.first, let u = p["url"] as? String {
+                pagesURL = PageOpen.pagesBase(fromPageURL: u)
+            }
             let names = Set((ev["agents"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String })
             if capsule.hidden && !names.subtracting(agents).isEmpty && !agents.isEmpty { agentWhileHidden = true }
             agents = names
@@ -295,12 +302,14 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             startTalk("fn", state: "double")
         case .talkEnd:
             guard talking else { return }
+            settleTalk?()       // talk_start always goes before talk_end
             talking = false
             toCore(["cmd": "talk_end"])
             fnEvent("up")
             edge.glow(false)
         case .cancel:
             guard talking else { return }
+            settleTalk?()
             talking = false
             fnEvent("cancel")   // the page sends talk_cancel and says so
             edge.glow(false)
@@ -327,14 +336,42 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         edge.post(ev)
     }
 
+    // a hold: a voice note when the front window shows a bise page
+    // (ambient-pages §4.1), else a talk to main with the front window's shot.
+    // Asking the browser has ~150 ms; past that it's a talk to main.
     private func startTalk(_ key: String, state: String) {
         lastKey = key
         if askBeforeTalk() { return }
         talking = true
-        fnEvent(state)
-        toCore(["cmd": "talk_start"])
         if edgeGlow && !reduceMotion { edge.glow(true) }
-        shoot(then: nil)
+        guard let base = pagesURL, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+              PageOpen.browsers.contains(front) else {
+            beginTalk(state, page: nil)
+            return
+        }
+        let gate = Once<(id: String, url: String)?>()
+        let finish: @MainActor ((id: String, url: String)?) -> Void = { [weak self] page in
+            guard gate.settle(page), let self else { return }
+            self.settleTalk = nil
+            self.beginTalk(state, page: page)
+        }
+        settleTalk = { finish(nil) }
+        Browser.activeTab(front) { url in finish(url.flatMap { PageOpen.pageRef(tab: $0, pagesURL: base) }) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { MainActor.assumeIsolated { finish(nil) } }
+    }
+
+    private func beginTalk(_ state: String, page: (id: String, url: String)?) {
+        var ev: [String: Any] = ["ev": "app_fn", "state": state, "key": lastKey]
+        var cmd: [String: Any] = ["cmd": "talk_start"]
+        if let p = page {
+            ev["page"] = ["id": p.id, "url": p.url]
+            cmd["page"] = ["id": p.id, "url": p.url]
+            Log.say("app: voice note on \(p.id)")
+        }
+        capsule.post(ev)
+        edge.post(ev)
+        toCore(cmd)
+        if page == nil { shoot(then: nil) }   // a note: the page is the context, no shot
     }
 
     private func spotlight() {

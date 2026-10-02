@@ -24,6 +24,25 @@ enum Browser {
         }
     }
 
+    // the URL of `bundle`'s active tab, to `done` on the main thread; nil
+    // when Automation isn't granted yet (never asked from here: fn must
+    // not raise a prompt), the browser has no window, or the script fails
+    static func activeTab(_ bundle: String, done: @escaping @MainActor (String?) -> Void) {
+        queue.async {
+            var url: String? = nil
+            if allowed(bundle) { url = run(PageOpen.activeTabScript(bundle))?.stringValue }
+            DispatchQueue.main.async { MainActor.assumeIsolated { done(url) } }
+        }
+    }
+
+    // Automation already granted for `bundle` (asks nobody)
+    nonisolated private static func allowed(_ bundle: String) -> Bool {
+        let target = NSAppleEventDescriptor(bundleIdentifier: bundle)
+        guard let desc = target.aeDesc else { return false }
+        let any = AEEventClass(typeWildCard)
+        return AEDeterminePermissionToAutomateTarget(desc, any, AEEventID(typeWildCard), false) == noErr
+    }
+
     // on the script queue: the tab forward, or a new tab; false = fall back
     nonisolated private static func drive(_ bundle: String, _ url: String) -> Bool {
         guard let list = run(PageOpen.listScript(bundle)) else { return false }

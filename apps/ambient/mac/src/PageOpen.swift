@@ -96,9 +96,50 @@ enum PageOpen {
         """
     }
 
+    // MARK: voice notes at the mouse (ambient-pages §4.1)
+
+    // the page a tab shows: under the hub's pages_url, /p/<id>[/v/<n>][?…][#…]
+    // -> (id, the page's own URL pages_url/p/<id>); nil: not a bise page
+    static func pageRef(tab: String, pagesURL: String) -> (id: String, url: String)? {
+        var base = pagesURL.trimmingCharacters(in: .whitespaces)
+        while base.hasSuffix("/") { base.removeLast() }
+        guard !base.isEmpty, matches(tab: tab, page: base + "/p") else { return nil }
+        // the rest after <base>/p/, in the tab's own spelling (localhost or 127.0.0.1)
+        let t = canonical(tab), b = canonical(base) + "/p/"
+        guard t.hasPrefix(b) else { return nil }
+        let id = t.dropFirst(b.count).prefix { $0 != "/" && $0 != "?" && $0 != "#" }
+        guard !id.isEmpty else { return nil }
+        return (String(id), base + "/p/" + id)
+    }
+
+    // the hub's pages_url from a page's URL (…/p/<id>…) when the state didn't say it
+    static func pagesBase(fromPageURL u: String) -> String? {
+        guard let r = u.range(of: "/p/"), isWeb(u) else { return nil }
+        let base = String(u[..<r.lowerBound])
+        return base.isEmpty ? nil : base
+    }
+
+    // the URL of the front window's active tab (Chrome family and Arc alike)
+    static func activeTabScript(_ bundle: String) -> String {
+        "tell application id \(literal(bundle)) to get URL of active tab of front window"
+    }
+
     // only web pages go through a browser's tabs
     static func isWeb(_ url: String) -> Bool {
         let l = url.lowercased()
         return l.hasPrefix("http://") || l.hasPrefix("https://")
+    }
+}
+
+// the first of two racers settles (the browser's answer or the ~150 ms
+// timeout): fn never waits on a slow browser, a late answer is dropped
+final class Once<T> {
+    private(set) var value: T?
+    init() {}
+    // true for the first call only
+    func settle(_ v: T) -> Bool {
+        guard value == nil else { return false }
+        value = v
+        return true
     }
 }
