@@ -181,10 +181,9 @@
       const s = v.settings;
       if (!s) { el.set.innerHTML = ""; return; }
       const tg = s.rows.map((r) => `<button type="button" class="tg${r.on ? " on" : ""}" role="switch" aria-checked="${r.on}" data-setting="${esc(r.key)}"><span class="lb">${esc(r.label)}</span><span class="sw" aria-hidden="true"></span>${r.note ? `<span class="nt">${esc(r.note)}</span>` : ""}</button>`);
-      const sk = s.skip.map((x) => `<div class="sk"><span class="nm">${esc(x.name)}</span>${x.fixed ? "" : `<button type="button" class="rm" data-skip-remove="${esc(x.bundle)}" aria-label="${esc(s.remove)} ${esc(x.name)}">${esc(s.remove)}</button>`}</div>`);
-      el.set.innerHTML = [...tg, `<div class="sec" role="heading" aria-level="2">${esc(s.skipTitle)}</div>`, ...sk,
-        `<div class="sk always"><span class="nm">${esc(s.always)}</span></div>`,
-        ...(s.empty ? [`<div class="none">${esc(s.empty)}</div>`] : []),
+      const fx = s.always.map((n) => `<div class="sk always"><span class="nm">${esc(n)}</span></div>`);
+      const sk = s.skip.map((x) => `<div class="sk"><span class="nm">${esc(x.name)}</span><button type="button" class="rm" data-skip-remove="${esc(x.bundle)}" aria-label="${esc(s.remove)} ${esc(x.name)}">${esc(s.remove)}</button></div>`);
+      el.set.innerHTML = [...tg, `<div class="sec" role="heading" aria-level="2">${esc(s.skipTitle)}</div>`, ...fx, ...sk,
         `<button type="button" class="add" data-skip-add="1">+ ${esc(s.add)}</button>`].join("");
     });
     put("spot", v.spot ? "on" : "", () => {

@@ -906,18 +906,20 @@ law("settings: a toggle flips at once and sends app_setting {key, value}; launch
   assert.equal(row.on, true); assert.equal(row.note, null);
   eq(M.step(r.m, { ev: "ui_setting", key: "nope" }, 90).cmds, []);
 });
-law("settings: the skip list: fixed apps have no remove, private windows always said, the empty line until he adds one", () => {
+law("settings: 'bise never sees' starts with its two fixed rows, then his apps with remove; no empty line (ambient m_5410)", () => {
   let m = M.step(M.step(M.init(), SETTINGS, 0).m, { ev: "app_key", key: "," }, 10).m;
   let s = M.view(m, 20).settings;
-  assert.equal(s.empty, W.set.empty); assert.equal(s.always, W.set.privateWindows);
+  assert.equal(s.skipTitle, "bise never sees");
+  eq(s.always, ["private browser windows", "password managers"]); eq(s.skip, []); assert.equal(s.empty, undefined);
+  assert.equal(s.rows[2].note, "bise still shows things, it just doesn't say them.");
   eq(M.step(m, { ev: "ui_setting", key: "skip_add" }, 30).cmds, [{ cmd: "app_setting", key: "skip_add" }]);
   eq(M.step(m, { ev: "ui_setting", key: "skip_remove", value: "com.agilebits.onepassword7" }, 30).cmds, []);
   m = M.step(m, { ...SETTINGS, skip: [...SETTINGS.skip, { bundle: "com.tinyspeck.slackmacgap", name: "Slack" }] }, 40).m;
   s = M.view(m, 50).settings;
-  assert.equal(s.empty, null); eq(s.skip.map((x) => [x.name, x.fixed]), [["1Password", true], ["Slack", false]]);
+  eq(s.skip.map((x) => x.name), ["Slack"]);   // amb-mac's fixed 1Password is the 'password managers' row
   const r = M.step(m, { ev: "ui_setting", key: "skip_remove", value: "com.tinyspeck.slackmacgap" }, 60);
   eq(r.cmds, [{ cmd: "app_setting", key: "skip_remove", value: "com.tinyspeck.slackmacgap" }]);
-  assert.equal(M.view(r.m, 70).settings.empty, W.set.empty);
+  eq(M.view(r.m, 70).settings.skip, []);
 });
 
 // ---- coverage: every scene plays, every SPEC §2 state shows from contract events

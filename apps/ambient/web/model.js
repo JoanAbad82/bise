@@ -584,13 +584,14 @@
       v.settings = {
         rows: SETTING_KEYS.map((key) => ({
           key, label: W.set[key], on: key === "launch_at_login" ? s.launch_at_login === "on" || s.launch_at_login === "approve" : !!s[key],
-          note: key === "launch_at_login" && s.launch_at_login === "approve" ? W.set.approve : null,
+          note: key === "launch_at_login" && s.launch_at_login === "approve" ? W.set.approve
+            : key === "meeting_quiet" ? W.set.meeting_quiet_note : null,
         })),
         skipTitle: W.set.skipTitle,
-        skip: (s.skip || []).map((x) => ({ bundle: x.bundle, name: x.name, fixed: x.fixed })),
-        // private windows are always skipped: said as a fixed line (amb-mac m_5326)
-        always: W.set.privateWindows,
-        empty: (s.skip || []).some((x) => !x.fixed) ? null : W.set.empty,
+        // two fixed rows first (private windows, password managers: ambient m_5410), then his apps,
+        // each with 'remove'; amb-mac's fixed entries (the password managers) are in the second row
+        always: W.set.fixed,
+        skip: (s.skip || []).filter((x) => !x.fixed).map((x) => ({ bundle: x.bundle, name: x.name })),
         add: W.set.add, remove: W.set.remove,
       };
     } else if (m.pane === "inbox") {
