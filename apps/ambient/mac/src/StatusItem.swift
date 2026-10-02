@@ -55,6 +55,10 @@ final class StatusItem: NSObject {
 
     private var now: Double { ProcessInfo.processInfo.systemUptime }
 
+    // the icon's rect on screen (Cocoa coords), nil before the menu bar shows it
+    var iconRect: NSRect? { item.button?.window?.frame }
+    var iconWindow: NSWindow? { item.button?.window }
+
     func set(working w: Bool, count c: Int) { working = w; count = c; refresh() }
     func set(quiet q: Bool) { quiet = q; refresh() }
     func set(holding h: Bool) { holding = h; refresh() }

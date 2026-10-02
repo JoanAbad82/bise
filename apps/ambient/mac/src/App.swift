@@ -93,6 +93,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
         capsule.onReady = { [weak self] in self?.pageReady() }
         capsule.onHover = { [weak self] in self?.visFeed(.hover($0)) }
+        capsule.onPlaced = { [weak self] in self?.sendIcon() }
         capsule.load(webDir: config.web)
         // at rest nothing on screen: the capsule shows when there is something to see
         edge.load(webDir: config.web)
@@ -133,6 +134,10 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         st.isHidden = { [weak self] in self?.capsule.hidden ?? false }
         status = st
         st.reduceMotion = reduceMotion
+        // the icon moved (another item came, the menu bar changed screens)
+        NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: st.iconWindow, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.sendIcon() }
+        }
 
         let nt = Notify()
         nt.onAnswer = { [weak self] card, reply in self?.toCore(["cmd": "answer", "card": card, "reply": reply]) }
@@ -292,6 +297,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         capsule.post(["ev": "app_globe", "use": globeUse()])
         visibleSaid = nil
         sayVisible()
+        sendIcon()
         for k in ["hub", "state", "phase", "main"] { if let ev = memory[k] { capsule.post(ev) } }
         if quiet.on { capsule.post(["ev": "app_quiet", "on": true, "why": quiet.why]) }
         firstAsk()
@@ -563,6 +569,14 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if capsule.hidden { agentsView() } else { visFeed(.dismiss) }
     }
 
+    // app_icon: the menu-bar icon's rect in the capsule page's CSS px, from
+    // the web view's top-left (y negative: above the panel), for the grow
+    private func sendIcon() {
+        guard let r = status?.iconRect else { return }
+        let p = capsule.panel.frame
+        capsule.post(["ev": "app_icon", "x": r.minX - p.minX, "y": p.maxY - r.maxY, "w": r.width, "h": r.height])
+    }
+
     // the menu-bar icon is the status (§8): working (agents or main busy) and
     // the count of items waiting for you
     private func statusIcon() {
@@ -582,12 +596,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if shown == capsule.hidden {
             if shown {
                 capsule.pickScreen()
-                capsule.show()
+                capsule.show()                                  // in at once, then the page grows it
+                capsule.post(["ev": "app_hidden", "on": false])
                 morning()
             } else {
-                capsule.hide()
+                capsule.post(["ev": "app_hidden", "on": true])  // the page shrinks it into the icon
+                capsule.hide(after: reduceMotion ? 0.2 : 0.45)  // then out
             }
-            capsule.post(["ev": "app_hidden", "on": !shown])
             sayVisible()
             watchClicks(shown)
         }

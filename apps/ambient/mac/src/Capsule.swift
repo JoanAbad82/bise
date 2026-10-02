@@ -73,6 +73,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
     var onCmd: (([String: Any]) -> Void)?
     var onReady: (() -> Void)?
     var onHover: ((Bool) -> Void)?           // the mouse over the panel (holds a timed show)
+    var onPlaced: (() -> Void)?              // the panel moved (the icon's rect for the page)
 
     let panel: CapsulePanel
     private let effect: NSVisualEffectView
@@ -235,7 +236,10 @@ final class Capsule: NSObject, WKNavigationDelegate {
     // bar, never off the screen (Placement.frame)
     private func place(_ size: NSSize) {
         guard let s = screen else { return }
-        panel.setFrame(Placement.frame(size, on: ScreenBox(frame: s.frame, visible: s.visibleFrame)), display: true)
+        let f = Placement.frame(size, on: ScreenBox(frame: s.frame, visible: s.visibleFrame))
+        let moved = f.origin != panel.frame.origin || f.size != panel.frame.size
+        panel.setFrame(f, display: true)
+        if moved { onPlaced?() }
     }
 
     // app_size: the window grows at once, shrinks 650 ms after the last
@@ -292,15 +296,28 @@ final class Capsule: NSObject, WKNavigationDelegate {
 
     // MARK: shown, hidden, keys
 
+    // the page grows the capsule out of the icon (SPEC §0): show orders the
+    // panel in at once; hide lets the page shrink it back first (`after` s),
+    // a show in between cancels the order out
+    private var outJob: DispatchWorkItem?
+
     func show() {
         hidden = false
+        outJob?.cancel()
+        outJob = nil
         panel.orderFrontRegardless()
     }
 
-    func hide() {
+    func hide(after: Double = 0) {
         hidden = true
         focus(false)
-        panel.orderOut(nil)
+        outJob?.cancel()
+        guard after > 0 else { panel.orderOut(nil); return }
+        let job = DispatchWorkItem { [weak self] in
+            MainActor.assumeIsolated { guard let self, self.hidden else { return }; self.panel.orderOut(nil) }
+        }
+        outJob = job
+        DispatchQueue.main.asyncAfter(deadline: .now() + after, execute: job)
     }
 
     private var keysFrom: NSRunningApplication?
