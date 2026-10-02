@@ -218,7 +218,7 @@ def _read(path):
 SCRIPTED_VARS = ("BEND_PROVIDER_URL", "BEND_MODEL", "MISTRAL_API_KEY", "BISE_APPROVALS")
 
 
-def hub_daemon(bise, kind="fake"):
+def hub_daemon(bise, kind="fake", connectors=False):
     """Runs detached (`qa.py _hub`): a throwaway hub on a fresh git repo,
     until SIGTERM. fake: tests/e2e.py's scripted provider, main answers
     "ack: <your words>" (`[[bash: ...]]` in what you say scripts it more).
@@ -239,6 +239,12 @@ def hub_daemon(bise, kind="fake"):
     if kind == "model":
         for k in SCRIPTED_VARS:
             E.env.pop(k, None)
+        if connectors:
+            # the user's connectors and skills (e2e points them at empty files): main
+            # takes the paths the user takes (ambient-pm m_5169); read-only is the
+            # task's rule, the approvals mode still gates every write
+            for k in ("BEND_MCP_INDEX", "BEND_SKILLS_INDEX"):
+                E.env.pop(k, None)
     stop = {"now": False}
 
     def term(*_):
@@ -261,7 +267,7 @@ def hub_daemon(bise, kind="fake"):
             time.sleep(0.1)
         c = e2e.Client(sock)
         c.wait_status("main", "idle", 120)
-        info = {"pid": os.getpid(), "kind": kind, "tmp": E.tmp, "ws": E.ws, "state": E.state, "bise": bise,
+        info = {"pid": os.getpid(), "kind": kind, "connectors": bool(connectors), "tmp": E.tmp, "ws": E.ws, "state": E.state, "bise": bise,
                 "env": {k: E.env[k] for k in ("SB_STATE_DIR",)}}
         with open(HUB + ".tmp", "w") as f:
             json.dump(info, f)
@@ -276,10 +282,10 @@ def hub_daemon(bise, kind="fake"):
         E.close()
 
 
-def _start_hub(bise, root, kind="fake"):
+def _start_hub(bise, root, kind="fake", connectors=False):
     old = _read(HUB)
     if old and _pid_alive(old.get("pid")):
-        if old.get("kind", "fake") == kind and old.get("bise") == bise:
+        if old.get("kind", "fake") == kind and old.get("bise") == bise and bool(old.get("connectors")) == bool(connectors):
             return old
         _stop_hub()
     os.makedirs(QA_DIR, exist_ok=True)
@@ -288,7 +294,7 @@ def _start_hub(bise, root, kind="fake"):
     env = {k: v for k, v in os.environ.items() if not k.startswith("SB_") and k not in ("BISE_ROLE", "BISE_EXPORTS_FOR")}
     env["BISE_APP_ROOT"] = root    # e2e.Env passes it on to the hub: its repl-live
     env["AMBIENT_QA_DIR"] = QA_DIR  # without SB_AGENT the daemon would pick another QA dir
-    p = subprocess.Popen([sys.executable, "-u", os.path.realpath(__file__), "_hub", "--bise", bise, "--kind", kind],
+    p = subprocess.Popen([sys.executable, "-u", os.path.realpath(__file__), "_hub", "--bise", bise, "--kind", kind] + (["--connectors"] if connectors else []),
                          stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True, cwd=REPO, env=env)
     t0 = time.time()
     # the daemon gives the hub 60 s and main 120 s, each times the load (up to 4): wait for all of it
@@ -340,9 +346,11 @@ def app_path(force_build=False):
     return r.stdout.strip().splitlines()[-1]
 
 
-def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", force_build=False, restart=False):
+def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", force_build=False, restart=False, connectors=False):
     if hub not in ("fake", "model", "real"):
         raise QAError("hub: fake (a throwaway scripted hub), model (a throwaway hub with your real model and keys) or real (your workspace, read-only)")
+    if connectors and hub != "model":
+        raise QAError("connectors: only with hub model (the fake main is scripted; the real hub has its own)")
     up = alive()
     if up and not restart:
         run = _read(RUN) or {}
@@ -355,7 +363,7 @@ def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", for
     web = web or os.environ.get("BISE_AMBIENT_WEB") or WEB
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "BISE_APP_ROOT": root}
     if hub in ("fake", "model"):
-        info = _start_hub(bise, root, hub)
+        info = _start_hub(bise, root, hub, connectors)
         ws = info["ws"]
         env.update(info["env"])
     else:
@@ -856,7 +864,7 @@ def _cli(argv):
     import argparse
     ap = argparse.ArgumentParser(prog="qa.py", description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("launch"); p.add_argument("--hub", default="fake"); p.add_argument("--workspace"); p.add_argument("--bise")
+    p = sub.add_parser("launch"); p.add_argument("--hub", default="fake"); p.add_argument("--connectors", action="store_true", help="hub model: your connectors and skills"); p.add_argument("--workspace"); p.add_argument("--bise")
     p.add_argument("--web"); p.add_argument("--backdrop", default="dark"); p.add_argument("--force-build", action="store_true"); p.add_argument("--restart", action="store_true")
     p = sub.add_parser("stop"); p.add_argument("--keep-hub", action="store_true")
     p = sub.add_parser("scenes"); p.add_argument("--only"); p.add_argument("--backdrops", default="dark"); p.add_argument("--out"); p.add_argument("--what", default="both")
@@ -876,12 +884,12 @@ def _cli(argv):
     p = sub.add_parser("fn"); p.add_argument("state"); p.add_argument("--key", default="fn")
     p = sub.add_parser("key"); p.add_argument("k")
     p = sub.add_parser("inject"); p.add_argument("ev")
-    p = sub.add_parser("_hub"); p.add_argument("--bise", required=True); p.add_argument("--kind", default="fake")
+    p = sub.add_parser("_hub"); p.add_argument("--bise", required=True); p.add_argument("--kind", default="fake"); p.add_argument("--connectors", action="store_true")
     a = ap.parse_args(argv)
     if a.cmd == "_hub":
-        return hub_daemon(a.bise, a.kind)
+        return hub_daemon(a.bise, a.kind, a.connectors)
     if a.cmd == "launch":
-        r = launch(a.hub, a.workspace, a.bise, a.web, a.backdrop, a.force_build, a.restart)
+        r = launch(a.hub, a.workspace, a.bise, a.web, a.backdrop, a.force_build, a.restart, a.connectors)
     elif a.cmd == "stop":
         r = stop(a.keep_hub)
     elif a.cmd == "scenes":
