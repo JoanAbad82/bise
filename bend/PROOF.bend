@@ -725,6 +725,9 @@ def Laws.skills_escape_xml():
 def Laws.skills_entry_format():
   {==}
 
+def Laws.skills_scan_never_blocks():
+  {==}
+
 def Laws.skills_catalog_dedupes():
   {==}
 

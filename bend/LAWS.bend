@@ -606,6 +606,20 @@ law skills_entry_format:
   {Sk.skill_entry(Sk.Skill{"review", "Review code.", "/skills/review/SKILL.md"})
     == "  <skill>\n    <name>review</name>\n    <description>Review code.</description>\n    <path>/skills/review/SKILL.md</path>\n  </skill>" : String}
 
+# LAW: the startup scan never waits on one skill file: each SKILL.md is
+# read in the background under a 1 s watchdog that kills the read, the
+# fields come from that copy (never the file itself), and a skipped file
+# is named once. A link into ~/Documents with no macOS privacy grant
+# held the scan, and main's first turn waited on it forever.
+law skills_scan_never_blocks:
+  {Bool.and(
+     String.contains(Sk.scan_script(), "( sleep 1; kill -9 \"$rp\" )"),
+     Bool.and(
+       String.contains(Sk.scan_script(), "sed -n 's/^name:[[:space:]]*//p' \"$T\""),
+       Bool.and(
+         Bool.not(String.contains(Sk.scan_script(), "//p' \"$f\"")),
+         String.contains(Sk.scan_script(), ": not readable (macOS privacy?)")))) == True{} : Bool}
+
 # LAW: the catalog section wraps the entries, deduped by name, first
 # occurrence winning.
 law skills_catalog_dedupes:

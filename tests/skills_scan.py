@@ -50,6 +50,12 @@ def main():
     tmp = tempfile.mkdtemp(prefix="sb-skills-scan-")
     os.makedirs(os.path.join(tmp, ".agents", "skills", "alpha"))
     open(os.path.join(tmp, ".agents", "skills", "alpha", "SKILL.md"), "w").write(SKILL)
+    # 8. a skill file whose open never answers (a FIFO, the stand-in for a
+    # link into ~/Documents that a launchd parent has no macOS privacy
+    # grant for): the scan skips it after 1 s and names it on stderr
+    os.makedirs(os.path.join(tmp, ".agents", "skills", "gamma"))
+    stuck = os.path.join(tmp, ".agents", "skills", "gamma", "SKILL.md")
+    os.mkfifo(stuck)
     os.makedirs(os.path.join(tmp, "agent-run"))
     cache = os.path.join(tmp, "cache")
     index = os.path.join(cache, "skills-index.txt")
@@ -91,6 +97,7 @@ def main():
             if repl.poll() is not None or time.time() - t0 > 60:
                 sys.exit("FAIL no REPL banner: %s" % open(err).read()[-500:])
             time.sleep(0.1)
+        banner = time.time()
         while not os.path.exists(index) and time.time() - t0 < 30:
             time.sleep(0.1)  # the scan may end after the banner
         idx = open(index).read() if os.path.exists(index) else ""
@@ -101,6 +108,7 @@ def main():
         sidx = os.path.join(tmp, "run", str(port), "skills-index.txt")
         while not os.path.exists(sidx) and time.time() - t0 < 30:
             time.sleep(0.1)  # the scan writes it after the shared index
+        ready = time.time()  # the scan's end: the REPL serves its first turn next
         check("the session's index is under $BEND_RUN_DIR/<port>",
               os.path.exists(sidx) and not os.path.exists(os.path.join(tmp, ".bend-harness")),
               repr((os.listdir(tmp), os.listdir(os.path.dirname(sidx))
@@ -118,8 +126,22 @@ def main():
         # the harness's own files: the agent's run/ folder, never /tmp
         script = os.path.join(tmp, "agent-run", "bend-skills-scan-%s.sh" % port)
         a1, a2 = os.path.join(tmp, "a-shared.txt"), os.path.join(tmp, "a-session.txt")
-        subprocess.run(["/bin/sh", script, a1, a2, os.path.join(tmp, "none.txt")], cwd=ROOT,
-                       env={**env, "BISE_ROLE": "agent"}, check=True)
+        t1 = time.time()
+        scan = subprocess.run(["/bin/sh", script, a1, a2, os.path.join(tmp, "none.txt")], cwd=ROOT,
+                              env={**env, "BISE_ROLE": "agent"}, check=True, capture_output=True, text=True,
+                              timeout=30)
+        took = time.time() - t1
+        check("a skill file that never opens holds the scan 1 s, not forever (%.1f s)" % took, took < 2, repr(took))
+        check("the scan names it once on its output",
+              scan.stdout == "%s: not readable (macOS privacy?)\n" % stuck, repr(scan.stdout))
+        shared = open(a1).read() if os.path.exists(a1) else "<none>"
+        check("the index still builds without it", shared.startswith("alpha\t") and "gamma" not in shared,
+              repr(shared))
+        check("the REPL logs the skipped file on stderr",
+              "bise: skills scan: %s: not readable (macOS privacy?)" % stuck in open(err).read(),
+              repr(open(err).read()[-400:]))
+        check("the REPL's scan ended within 2 s of its banner, so main's first turn can start (%.1f s)"
+              % (ready - banner), ready - banner < 2, repr(ready - banner))
         adata = open(a2).read() if os.path.exists(a2) else "<none>"
         check("a task's index has no main-only built-in skill", adata.startswith("beta\t") and "bise-demo" not in adata,
               repr(adata))

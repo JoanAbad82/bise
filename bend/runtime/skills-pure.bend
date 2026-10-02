@@ -357,3 +357,49 @@ def prompt_with.pick(empty: Bool, +base: String, +content: String) -> String:
 
 def prompt_with(+base: String, +content: String) -> String:
   prompt_with.pick(String.is_empty(skills_catalog(content)), base, content)
+
+# ---- the startup scan's script (run by runtime/skills.bend) ----
+# rd reads one SKILL.md into $T in the background, with a 1 s watchdog
+# that kills the read: a file whose open never answers (a link into
+# ~/Documents when a launchd parent has no macOS privacy grant for it,
+# a FIFO) held the scan, and the scan runs before main's first turn, so
+# bise sat silent. A skipped file prints one line on fd 3 (the script's
+# stdout) and the index still builds; its stderr goes away (the shell's
+# 'Terminated' notice for each stopped watchdog). The read and the watchdog close
+# fd 3 and send their output away: a child left holding the script's
+# stdout would make its caller wait for it.
+
+def scan_script() -> String:
+  "exec 3>&1 2>/dev/null
+rd() {
+  : > \"$T\"
+  cat \"$1\" > \"$T\" 2>/dev/null 3>&- &
+  rp=$!
+  ( sleep 1; kill -9 \"$rp\" ) > /dev/null 2>&1 3>&- &
+  rw=$!
+  wait \"$rp\"; rr=$?
+  kill \"$rw\" 2>/dev/null
+  [ \"$rr\" -lt 128 ] && return 0
+  : > \"$T\"
+  printf '%s: not readable (macOS privacy?)\\n' \"$1\" >&3
+  return 1
+}
+scan() {
+  [ -d \"$1\" ] || return 0
+  for f in \"$1\"/*/SKILL.md; do
+    [ -e \"$f\" ] || continue
+    rd \"$f\" || continue
+    n=$(sed -n 's/^name:[[:space:]]*//p' \"$T\" | head -n 1)
+    s=$(sed -n 's/^description:[[:space:]]*//p' \"$T\" | head -n 1)
+    n=$(printf '%s' \"$n\" | tr -d '\\t\\r\"')
+    s=$(printf '%s' \"$s\" | tr -d '\\t\\r\"')
+    [ -n \"$n\" ] && [ -n \"$s\" ] && printf '%s\\t%s\\t%s\\n' \"$n\" \"$s\" \"$f\"
+  done
+}
+mkdir -p \"$(dirname \"$1\")\" \"$(dirname \"$2\")\"
+T=\"$2.$$.read\"
+{ scan \"$HOME/.agents/skills\"; scan \"$HOME/.vibe/skills\"; true; } > \"$1.$$\" && mv -f \"$1.$$\" \"$1\"
+w=\"${BEND_WORKDIR:-$PWD}\"
+b=\"\"; [ \"${BISE_ROLE:-}\" = main ] && b=\"$PWD/prompts/skills\"
+{ scan \"$w/.agents/skills\"; cat \"$3\" 2>/dev/null; scan \"$PWD/prompts/skills-all\"; [ -n \"$b\" ] && scan \"$b\"; true; } > \"$2.$$\" && mv -f \"$2.$$\" \"$2\"
+rm -f \"$T\""

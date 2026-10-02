@@ -63,23 +63,13 @@ def index_path() -> IO(String):
 # tab-separated line stays unambiguous; folded multi-line YAML
 # descriptions are out of scope (the Agent Skills format is one line).
 
+# The script itself is in skills-pure.bend (a law pins its guard): each
+# SKILL.md is read in the background with a 1 s watchdog, so a file
+# whose open never answers is skipped instead of holding main's first
+# turn. Its lines out ('<path>: not readable (macOS privacy?)') are the
+# skipped files; skills_scan prints them on stderr.
 def scan_script() -> String:
-  "scan() {
-  [ -d \"$1\" ] || return 0
-  for f in \"$1\"/*/SKILL.md; do
-    [ -f \"$f\" ] || continue
-    n=$(sed -n 's/^name:[[:space:]]*//p' \"$f\" | head -n 1)
-    s=$(sed -n 's/^description:[[:space:]]*//p' \"$f\" | head -n 1)
-    n=$(printf '%s' \"$n\" | tr -d '\\t\\r\"')
-    s=$(printf '%s' \"$s\" | tr -d '\\t\\r\"')
-    [ -n \"$n\" ] && [ -n \"$s\" ] && printf '%s\\t%s\\t%s\\n' \"$n\" \"$s\" \"$f\"
-  done
-}
-mkdir -p \"$(dirname \"$1\")\" \"$(dirname \"$2\")\"
-{ scan \"$HOME/.agents/skills\"; scan \"$HOME/.vibe/skills\"; true; } > \"$1.$$\" && mv -f \"$1.$$\" \"$1\"
-w=\"${BEND_WORKDIR:-$PWD}\"
-b=\"\"; [ \"${BISE_ROLE:-}\" = main ] && b=\"$PWD/prompts/skills\"
-{ scan \"$w/.agents/skills\"; cat \"$3\" 2>/dev/null; scan \"$PWD/prompts/skills-all\"; [ -n \"$b\" ] && scan \"$b\"; true; } > \"$2.$$\" && mv -f \"$2.$$\" \"$2\""
+  Skp.scan_script()
 
 def scan_path(+dir: String, +port: String) -> String:
   String.append(dir, String.append("/bend-skills-scan-", String.append(port, ".sh")))
@@ -88,6 +78,28 @@ def session_index_path() -> IO(String):
   do IO<String>:
     +r : String <- Pl.run_dir()
     IO.pure(String, String.append(r, "/skills-index.txt"))
+
+# the scan's output (Proc.run's status line, then the skill files it
+# skipped, one line each): each skipped file goes to stderr, the REPL's
+# log, never the session
+def scan_log.one(skipped: Bool, +l: String) -> IO(Unit):
+  match skipped:
+    case True{}:
+      IO.print_err(String.append("bise: skills scan: ", l))
+    case False{}:
+      IO.pure(Unit, Unit{})
+
+def scan_log.go(lines: List<&2, String>) -> IO(Unit):
+  match lines:
+    case Nil{}:
+      IO.pure(Unit, Unit{})
+    case Con{+l, rest}:
+      do IO<Unit>:
+        u : Unit <- scan_log.one(String.contains(l, ": not readable (macOS privacy?)"), l)
+        scan_log.go(rest)
+
+def scan_log(+out: String) -> IO(Unit):
+  scan_log.go(String.split(out, Tx.newline()))
 
 def skills_scan() -> IO(Unit):
   do IO<Unit>:
@@ -100,7 +112,7 @@ def skills_scan() -> IO(Unit):
     +path : String <- IO.pure(String, scan_path(side, port))
     u : Unit <- P.write_file(path, scan_script())
     out : String <- Proc.run(Con{"/bin/sh", Con{path, Con{idx, Con{sidx, Con{psk, Nil{}}}}}})
-    IO.pure(Unit, Unit{})
+    scan_log(out)
 
 # the index the catalog and the skill tool read: this session's index
 # first (workspace and plugin skills win a name clash: the first
