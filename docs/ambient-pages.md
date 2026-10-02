@@ -184,3 +184,75 @@ system. The capsule's web UI moves to the same file. An identity = another token
 A shared file (Cargo.toml, Cargo.lock, a new dependency): ask ambient-lead. Commit with `sb land`.
 Tests never open a browser, the app, the mic or the user's pages: a throwaway hub (tests/e2e.py),
 HTTP from Python, the kit's laws in node.
+
+## 4. Slice 2: talk to the page, the inbox (job 2), questions in two places
+
+Started in parallel with slice 1's end (the user's call, m_4826: never wait). Simple over ready
+for others (vision §10.3).
+
+### 4.1 Voice notes at the mouse (owners: amb-mac, amb-core, amb-web)
+
+Hold fn while the front window is a bise page: a voice note pinned where the mouse is, not a
+message to main. The page's own JS knows the mouse; nobody computes screen→page coordinates.
+
+1. amb-mac: on fn down, if the front app is a Chromium browser whose active tab URL starts with
+   the hub's `pages_url` (AppleScript, the PageOpen code), `talk_start` carries `page: {id, url}`
+   and no screenshot is taken (the page is the context). Released: `talk_end` as usual.
+2. amb-core: a talk with `page` is a **note talk**: the same mic and listener, but the words go to
+   the hub op `page_voice {page, phase: start|heard|end|cancel, text}`, never to main's input;
+   `heard` partials too. The final words alone equal to "send" (or "envoie", the user's language)
+   → `page_voice {phase: send}`. The hub relays each as an SSE event `voice` on that page's
+   `/p/<id>/events`.
+3. amb-web (notes.js): `voice start` → a pin at the last mouse position over a block (anchor:
+   block id + nearest text, like a typed note) with the listening state; `heard` fills it live;
+   `end` saves it as a `voice` note draft; `cancel` removes it; `send` = the send button.
+4. The capsule shows `voice note on <page>` while it listens (amb-web), the edge glow stays.
+
+### 4.2 Questions in two places (owners: amb-core, amb-kit)
+
+A `question` block in a published page creates (or updates) one hub card of kind `question`,
+agent = the page's agent, `text` = the question, options = its items, `page` = `{id, block, url}`.
+The page's question renders that card: a pick on the page = `POST /api/p/<id>/answer {block,
+option|text}` → the hub's `/answer <card> <reply>` (the same path as the capsule); answered in the
+capsule or the TUI → the page gets SSE `answered {block, reply}`, and shows it. One card, one
+answer. The capsule's card says `open it` (fn + ⏎ opens the page at `#<block>`).
+
+### 4.3 The inbox (job 2): review and email draft (owners: amb-kit, amb-web)
+
+Kit components `review` (items, each approve / edit / skip, `approve all`) and `email` (to,
+subject, body editable, approve / skip). Reactions are notes of kinds `approve`, `skip`, `edit`;
+`send` sends them to the agent like any notes. The agent then acts (sends the replies through its
+mail tool; the approvals gate applies as for any tool call). The guide shows job 2's page.
+
+### 4.4 Versions (owners: amb-kit, amb-core)
+
+The frame's `v3 · 2 min ago` opens a small list of versions; a version opens read-only at
+`/p/<id>/v/<n>` with `back to the latest`. `what changed` compares with the version before.
+
+### 4.5 The `bise` tab group (owners: computer-use, amb-core)
+
+§2.8's slice-2 path: ambient-core sends the broker's C3 `show`; fallback the AppleScript path.
+
+## 5. Slice 3: a home without a repo, plans with decisions (job 3), pages that leave
+
+### 5.1 The home workspace (owner: amb-home)
+
+`~/bise` (created on first use, no git): a workspace the hub runs in without git (no worktrees:
+agents work in the shared folder; `sb land`, features, PRs off). `bise ambient` with no repo
+opens the app on it; the capsule's workspace is the home by default when the app starts from the
+menu bar. The simplest version that works for Gabriel's non-code work.
+
+### 5.2 Compare and checklist (owner: amb-kit), job 3's page in the guide
+
+`compare` (2-4 variants side by side, each with facts and why; ♡ ✗, pick one), `checklist`
+(items, who, when; tick, edit, add). Reactions are notes (`pick`, `tick`).
+
+### 5.3 Pages that leave (owner: amb-kit's guide)
+
+"Make it a Google Doc / send it / post it in #team": the agent exports the page's text through
+its connectors (Gmail, Slack, Google Docs when present), after the user's word, through the
+approvals gate. Guide-only: the skill shows how (the fragment's text in order, sources as links).
+
+### 5.4 Drawing (owner: amb-web): `d` draws on the page; a drawing is a note with an SVG path and
+its blocks, and the notes message carries a screenshot of the area (the server renders nothing:
+the page sends the PNG it drew with canvas).
