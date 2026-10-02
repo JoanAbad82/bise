@@ -7,6 +7,7 @@
 
 import AppKit
 import AVFoundation
+import UniformTypeIdentifiers
 
 @MainActor
 final class AmbientApp: NSObject, NSApplicationDelegate {
@@ -24,14 +25,16 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var talking = false          // talk_start sent, no talk_end/cancel yet
     private var locked = false
     private var reduceMotion = false
-    private var edgeGlow = true
+    // slice 4: what the user set in the settings view (Settings.swift)
+    private var settings = AppSettings()
+    private var edgeGlow: Bool { settings.edgeGlow }
     private var cards: [Card] = []
     private var pagesURL: String?            // the hub's page server (state.pages_url)
     private var menuPages: [MenuPage] = []   // "for you" in the :* menu (state.pages)
     private var settleTalk: (() -> Void)?    // a note-or-not decision still pending
     // it knows when not to talk: a call (the mic busy elsewhere), a meeting (the calendar, opt-in)
     private var quiet = QuietMachine()
-    private var meetingQuiet = false
+    private var meetingQuiet: Bool { settings.meetingQuiet }
     private var calendar: CalendarProbe?
     private var quietTimers: [Timer] = []
     private var agents = Set<String>()
@@ -82,8 +85,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         Log.open(config.ambientDir + "/app.log")
         Log.say("app: up, pid \(getpid()), workspace \(config.workspace), bise \(config.bise), web \(config.web ?? "-")")
         writePid()
-        if defaults.object(forKey: "edgeGlow") != nil { edgeGlow = defaults.bool(forKey: "edgeGlow") }
-        if defaults.object(forKey: "rightOption") != nil { keys.rightOption = defaults.bool(forKey: "rightOption") }
+        settings = AppSettings.load { [defaults] in defaults.object(forKey: $0) }
+        keys.rightOption = settings.rightOption
         reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
 
         if let m = config.qa.flatMap(QA.Mode.init(rawValue:)) { qaSetup(m) }
@@ -121,6 +124,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         let st = StatusItem()
         st.onSpotlight = { [weak self] in self?.spotlight() }
         st.onToggle = { [weak self] in self?.toggleByHand() }
+        st.onSettings = { [weak self] in self?.settingsView() }
         st.onOpen = { [weak self] in self?.agentsView() }
         st.onPage = { Browser.open($0) }
         st.onCard = { [weak self] id in
@@ -352,23 +356,77 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     }
 
     private func settingsEvent() -> [String: Any] {
-        ["ev": "app_settings", "edge_glow": edgeGlow, "macos": macosMajor, "radius": capsule.radius, "meeting_quiet": meetingQuiet]
+        settings.event(macos: macosMajor, radius: Double(capsule.radius), login: qa == nil ? LoginItem.state : .off)
     }
 
+    // app_setting {key, value} from the settings view (fn + ,): app_settings
+    // goes back after every change, so the page shows what really holds
     private func setting(_ key: String, _ value: Any?) {
-        switch key {
-        case "meeting_quiet":
-            setMeetingQuiet(value as? Bool ?? false)
-        case "edge_glow":
-            edgeGlow = value as? Bool ?? true
-            defaults.set(edgeGlow, forKey: "edgeGlow")
-            capsule.post(settingsEvent())
-            edgeSetup()
-        case "right_option":
-            keys.rightOption = value as? Bool ?? true
-            defaults.set(keys.rightOption, forKey: "rightOption")
-        default:
+        guard let c = SettingChange.parse(key: key, value: value) else {
             Log.say("app: unknown setting \(key)")
+            return
+        }
+        switch c {
+        case .meetingQuiet(let on):
+            setMeetingQuiet(on)      // asks for the calendar first; posts when settled
+            return
+        case .launchAtLogin(let on):
+            if qa == nil { LoginItem.set(on) }   // QA never touches the user's login items
+        case .skipPick:
+            pickSkipApps()
+            return
+        default:
+            change(c)
+        }
+        capsule.post(settingsEvent())
+    }
+
+    // a stored setting changes: kept, then what follows from it
+    private func change(_ c: SettingChange) {
+        settings = settings.applying(c)
+        settings.store { [defaults] in defaults.set($1, forKey: $0) }
+        switch c {
+        case .edgeGlow: edgeSetup()
+        case .rightOption(let on): keys.rightOption = on
+        case .voiceAnswers: sayVoice()
+        default: break
+        }
+    }
+
+    // voice answers off: the core never speaks main's answers (text only)
+    private func sayVoice() {
+        toCore(["cmd": "voice", "on": settings.voiceAnswers])
+    }
+
+    // the macOS app picker for the never-seen list (ambient's words)
+    private func pickSkipApps() {
+        guard qa == nil else { Log.say("app: qa: no app picker"); return }
+        let p = NSOpenPanel()
+        p.title = SettingsWords.pickTitle
+        p.message = SettingsWords.pickTitle
+        p.prompt = SettingsWords.pickAdd
+        p.directoryURL = URL(fileURLWithPath: "/Applications")
+        p.allowedContentTypes = [.application]
+        p.allowsMultipleSelection = true
+        p.canChooseDirectories = false
+        p.treatsFilePackagesAsDirectories = false
+        NSApp.activate(ignoringOtherApps: true)
+        p.begin { [weak self] r in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if r == .OK {
+                    for u in p.urls {
+                        let b = Bundle(url: u)
+                        let info = b?.localizedInfoDictionary ?? [:]
+                        let app = skipApp(bundleID: b?.bundleIdentifier,
+                                          displayName: (info["CFBundleDisplayName"] ?? b?.object(forInfoDictionaryKey: "CFBundleDisplayName")) as? String,
+                                          bundleName: (info["CFBundleName"] ?? b?.object(forInfoDictionaryKey: "CFBundleName")) as? String,
+                                          file: u.path)
+                        if let app { self.change(.skipAdd(app)) }
+                    }
+                }
+                self.capsule.post(self.settingsEvent())
+            }
         }
     }
 
@@ -379,6 +437,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if AmbientApp.remembered.contains(kind) { memory[kind] = ev }
         if let u = ev["pages_url"] as? String, !u.isEmpty { pagesURL = u }
         defer { Browser.pagesURL = pagesURL }
+        // a (re)started core speaks by default: voice answers off is said again
+        if kind == "hub", ev["up"] as? Bool == true, !settings.voiceAnswers { sayVoice() }
         switch kind {
         case "phase":
             phase = ev["phase"] as? String ?? phase
@@ -467,6 +527,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             case "0":
                 // fn 0: the full view; fn 0 again closes it (SPEC §0)
                 if !capsule.hidden && vis.pinned { visFeed(.dismiss) } else { agentsView() }
+            case ",":
+                settingsView()
             case "i":
                 visFeed(.open)
                 capsule.post(["ev": "app_key", "key": k])
@@ -564,6 +626,14 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         capsule.post(["ev": "app_key", "key": "0"])
     }
 
+    // fn , or the menu's settings…: the settings view (amb-web draws it,
+    // app_settings carries what it shows)
+    private func settingsView() {
+        visFeed(.open)
+        capsule.post(settingsEvent())
+        capsule.post(["ev": "app_key", "key": ","])
+    }
+
     // fn . or the menu's show/hide: opened by hand = the full view (app_key 0,
     // amb-web's one source for "opened by hand"); shown already = hide
     private func toggleByHand() {
@@ -636,7 +706,6 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var uptime: Double { ProcessInfo.processInfo.systemUptime }
 
     private func startQuiet() {
-        if defaults.object(forKey: "meetingQuiet") != nil { meetingQuiet = defaults.bool(forKey: "meetingQuiet") }
         // the mic every second: a property read, never the mic itself
         quietTimers.append(Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -645,7 +714,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
                 self.sayQuiet()
             }
         })
-        if meetingQuiet && CalendarProbe.granted { watchMeetings() } else if meetingQuiet { meetingQuiet = false }
+        if meetingQuiet && CalendarProbe.granted { watchMeetings() } else if meetingQuiet { change(.meetingQuiet(false)) }
     }
 
     private func watchMeetings() {
@@ -664,8 +733,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private func setMeetingQuiet(_ on: Bool) {
         let done = { [weak self] (on: Bool) in
             guard let self else { return }
-            self.meetingQuiet = on
-            self.defaults.set(on, forKey: "meetingQuiet")
+            self.change(.meetingQuiet(on))
             if on { self.watchMeetings() } else { self.quiet.meeting(false); self.sayQuiet() }
             self.capsule.post(self.settingsEvent())
         }
@@ -729,8 +797,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         let finish = { if !done { done = true; then?() } }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { MainActor.assumeIsolated { finish() } }
         let dir = config.ambientDir + "/shots"
+        let skip = settings.skipBundles   // built-in + the user's never-seen apps
         Task { @MainActor [weak self] in
-            let r = await Shot.take(into: dir)
+            let r = await Shot.take(into: dir, skip: skip)
             guard let self else { return }
             self.shooting = false
             if let r {

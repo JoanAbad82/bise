@@ -24,6 +24,7 @@ final class StatusItem: NSObject {
     var onOpen: (() -> Void)?                // a click: bise's full view (show + app_key 0)
     var onSpotlight: (() -> Void)?
     var onToggle: (() -> Void)?
+    var onSettings: (() -> Void)?            // settings… (fn ,)
     var onPage: ((String) -> Void)?          // a page's URL
     var onCard: ((String) -> Void)?          // a card's id
     var isHidden: () -> Bool = { false }
@@ -206,6 +207,7 @@ final class StatusItem: NSObject {
             }
             m.addItem(entry(MenuWords.talk, MenuWords.talkKeys, #selector(spotlight)))
             m.addItem(entry(isHidden() ? MenuWords.show : MenuWords.hide, MenuWords.hideKeys, #selector(toggle)))
+            m.addItem(entry(SettingsWords.menu, SettingsWords.menuKeys, #selector(settings)))
             m.addItem(.separator())
             m.addItem(entry(MenuWords.quit, nil, #selector(quit)))
             item.menu = m
@@ -225,6 +227,7 @@ final class StatusItem: NSObject {
     @objc private func card(_ sender: NSMenuItem) { if let id = sender.representedObject as? String { onCard?(id) } }
     @objc private func spotlight() { onSpotlight?() }
     @objc private func toggle() { onToggle?() }
+    @objc private func settings() { onSettings?() }
     @objc private func quit() { NSApp.terminate(nil) }
 }
 

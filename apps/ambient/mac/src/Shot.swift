@@ -18,20 +18,15 @@ struct ShotResult {
     var bounds: CGRect?        // CG global coords (top-left origin), for the corners
 }
 
-// the default skip list (SPEC §5.2; a setting later)
+// the skip list (SPEC §5.2): the built-in apps and the user's own
+// (AppSettings.skipBundles, the settings view), plus private windows
 enum SkipList {
-    static let bundles: Set<String> = [
-        "com.1password.1password", "com.agilebits.onepassword7", "com.agilebits.onepassword-osx",
-        "com.bitwarden.desktop", "com.apple.keychainaccess", "com.apple.Passwords",
-        "com.apple.systempreferences", "com.apple.Settings", "com.apple.SystemSettings",
-        "com.dashlane.dashlanephonefinal", "com.lastpass.LastPass",
-    ]
     // a private window shows in its title (best effort: Safari's private
     // windows don't say it in the title on every version)
     static let privateMarks = ["private browsing", "incognito", "inprivate", "navigation privée", "private window"]
 
-    static func skips(bundle: String?, title: String) -> Bool {
-        if let b = bundle, bundles.contains(b) { return true }
+    static func skips(bundle: String?, title: String, apps: Set<String> = AppSettings.builtInBundles) -> Bool {
+        if let b = bundle, apps.contains(b) { return true }
         let t = title.lowercased()
         return privateMarks.contains { t.contains($0) }
     }
@@ -61,7 +56,7 @@ enum Shot {
     }
 
     // the front window as a PNG in `dir` (nil result: no front window, or not allowed)
-    static func take(into dir: String) async -> ShotResult? {
+    static func take(into dir: String, skip: Set<String> = AppSettings.builtInBundles) async -> ShotResult? {
         guard let front = frontWindow() else { return nil }
         let appName = front.app.localizedName ?? front.app.bundleIdentifier ?? "?"
         guard allowed else { return nil }
@@ -69,7 +64,7 @@ enum Shot {
             let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: true)
             guard let win = content.windows.first(where: { $0.windowID == front.id }) else { return nil }
             let title = win.title ?? front.name
-            if SkipList.skips(bundle: front.app.bundleIdentifier, title: title) {
+            if SkipList.skips(bundle: front.app.bundleIdentifier, title: title, apps: skip) {
                 return ShotResult(app: appName, title: "", skipped: true, path: nil, bounds: front.bounds)
             }
             let filter = SCContentFilter(desktopIndependentWindow: win)
