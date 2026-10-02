@@ -815,6 +815,7 @@ final class QA {
     // the states SPEC §0 gives the 18 px pearl, in an order where each one
     // wins over what is left of the one before (IconLook.of's precedence)
     static let menubarStates = ["still", "work", "need", "away", "done", "fail", "listen"]
+    private var ownStatus: StatusItem?
 
     // the item put in each state through StatusItem's own API, its button's
     // composed image (amb-mac's draw: the pearl's frame, the ▲/☾, the rose
@@ -822,7 +823,10 @@ final class QA {
     // menu-bar strip; `frames` > 1: that many successive frames of a moving
     // mood, at its own rate. The item is put back at rest after.
     private func menubar(_ q: [String: Any]) async throws -> [String: Any] {
-        guard let st = statusItem?() else { throw Failure(description: "no menu-bar item hook (App.qaSetup: q.statusItem)") }
+        // QA mode has no menu-bar item of its own (App makes it with the keys):
+        // the shots make one, amb-mac's StatusItem itself, kept until quit
+        if statusItem?() == nil && ownStatus == nil { ownStatus = StatusItem() }
+        guard let st = statusItem?() ?? ownStatus else { throw Failure(description: "no menu-bar item") }
         let dir = q["dir"] as? String ?? NSTemporaryDirectory()
         try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         let count = (q["count"] as? NSNumber)?.intValue ?? 2
