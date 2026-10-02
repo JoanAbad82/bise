@@ -301,8 +301,10 @@
         if (!ev.id) return none(m);
         const prev = m.pages.find((p) => p.id === ev.id);
         const page = { state: "ready", ...(prev || {}), id: ev.id, title: ev.title || (prev && prev.title), url: ev.url || (prev && prev.url) };
-        const m2 = { ...m, pages: sortPages([page, ...m.pages.filter((p) => p.id !== ev.id)]), lastPage: ev.id };
-        return none(flashQueue(m2, { kind: "morning", text: Wd.morning(!!ev.greet), ttl: T.page, page: ev.id }, now));
+        // the app opened it in front: it counts as opened; N = the things that need you (the
+        // morning page's 'needs you' lines are the same cards and pages: the shared count)
+        const m2 = { ...m, pages: sortPages([page, ...m.pages.filter((p) => p.id !== ev.id)]), lastPage: ev.id, opened: { ...m.opened, [ev.id]: page.version || 1 } };
+        return none(flashQueue(m2, { kind: "morning", text: Wd.morning(!!ev.greet, count(m2)), ttl: T.page, page: ev.id }, now));
       }
 
       // ---- the page's own (clicks, the spotlight field)

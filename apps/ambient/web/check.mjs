@@ -594,12 +594,19 @@ law("VoiceOver: the pearl's label says its mood; one sentence per view is read, 
   m = M.step(m, { ev: "heard", text: "make it half the size", final: false }, 20).m;
   assert.equal(Wd.sayOf(M.view(m, 30)), "listening, let go of fn to send. make it half the size");
 });
-law("the morning page (app_morning): 'good morning. your page is open   fn o' before 11:00 (greet), 'your page is open   fn o' after; fn + o opens it", () => {
+law("the morning page (app_morning, morning-<date>): 'good morning. N things need you · fn + o' (greet), the count shared with the menu bar, the page itself opened; fn + o opens it", () => {
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
-  assert.equal(M.view(M.step(m, { ev: "app_morning", id: "x", title: "t", url: "u", greet: true }, 10).m, 20).text, "good morning. your page is open   fn o");
+  assert.equal(M.view(M.step(m, { ev: "app_morning", id: "x", title: "t", url: "u", greet: true }, 10).m, 20).text, "good morning. nothing needs you · fn + o");
+  const cards = [{ id: "c1", agent: "a", text: "q?", options: ["yes"] }, { id: "c2", agent: "b", text: "r?", options: ["yes"] }];
+  const pages = [{ id: "morning-2026-10-03", title: "your morning", version: 1, opened_version: 0, state: "ready", url: "um", at_ms: 2 }, { id: "recap", title: "recap", version: 2, opened_version: 1, state: "ready", url: "ur", at_ms: 1 }];
+  const busy = M.step(M.init(), { ev: "state", agents: [], cards, pages }, 0).m;
+  const g = M.step(busy, { ev: "app_morning", id: "morning-2026-10-03", title: "your morning", url: "um", greet: true }, 10).m;
+  assert.equal(M.view(g, 20).text, "good morning. 3 things need you · fn + o");   // 2 cards + the recap's new version
+  assert.equal(M.count(g), 3);                                                     // the morning page itself is opened
+  assert.equal(Wd.morning(false, 1), "1 thing needs you · fn + o");
   m = M.step(m, { ev: "app_morning", id: "morning-0612", title: "your morning", url: "http://127.0.0.1:47123/p/morning-0612", greet: false }, 10).m;
   const v = M.view(m, 20);
-  assert.equal(v.text, "your page is open   fn o"); assert.equal(v.content.kind, "line");
+  assert.equal(v.text, "nothing needs you · fn + o"); assert.equal(v.content.kind, "line");
   eq(M.step(m, { ev: "app_key", key: "o" }, 30).cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/morning-0612", page: "morning-0612" }]);
 });
 

@@ -98,9 +98,10 @@
   // a page for you (docs/ambient-vision.md §3 B; signed off by ambient, m_4786)
   const pageReady = (name) => `${name} is ready · fn + o`;
   const forYou = "for you";
-  // today's morning page, opened in front by the app (amb-mac's app_morning {greet}: true before
-  // 11:00 local; signed by ambient with amb-mac, m_5016 / m_5067)
-  const morning = (greet) => (greet ? "good morning. your page is open   fn o" : "your page is open   fn o");
+  // today's morning page (morning-<date>, amb-kit's roadmap E), opened by the app on the first fn
+  // of the day (app_morning {greet}: true before 11:00 local): the line says how many things need
+  // you (ambient-lead m_5651; best guess, sent to ambient)
+  const morning = (greet, n) => `${greet ? "good morning. " : ""}${n > 0 ? plural(n, "thing needs you", "things need you") : "nothing needs you"} · fn + o`;
   // fn held on a bise page: the words pin on the page (§4.1; ambient, m_4877)
   const voiceNoteOn = (name) => `voice note on ${name}`;
   // a page's line in "for you": `v2 · 3 min ago`, or `updating…`
