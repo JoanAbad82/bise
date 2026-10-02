@@ -47,6 +47,10 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     init(config: Config) {
         defaults = config.qa != nil ? (UserDefaults(suiteName: "dev.bise.ambient.qa") ?? .standard) : .standard
         let c = AmbientApp.remembered(config, defaults)
+        // the computer-use broker's socket: <bise home>/run (BISE_HOME, else ~/.bise)
+        if let h = c.childEnv["BISE_HOME"] ?? ProcessInfo.processInfo.environment["BISE_HOME"], !h.isEmpty {
+            Browser.socketPath = h + "/run/computer-use.sock"
+        }
         self.config = c
         core = Core(config: c)
         super.init()
@@ -302,6 +306,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         guard let kind = ev["ev"] as? String else { return }
         if AmbientApp.remembered.contains(kind) { memory[kind] = ev }
         if let u = ev["pages_url"] as? String, !u.isEmpty { pagesURL = u }
+        defer { Browser.pagesURL = pagesURL }
         switch kind {
         case "phase":
             phase = ev["phase"] as? String ?? phase

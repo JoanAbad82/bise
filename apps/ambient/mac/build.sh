@@ -30,10 +30,14 @@ case "${1:-}" in
   --test)
     t="$(mktemp -d "${TMPDIR:-/tmp}/ambient-test.XXXXXX")"
     rc=0
-    # each pure source with its laws, one interpreter run each
-    for pair in KeyMachine:KeyMachineTests PageOpen:PageOpenTests Quiet:QuietTests MenuRows:MenuRowsTests; do
-      cat "$HERE/src/${pair%%:*}.swift" "$HERE/test/${pair#*:}.swift" > "$t/${pair%%:*}.swift"
-      swift "$t/${pair%%:*}.swift" || rc=1
+    # the pure sources (a+b: concatenated) with their laws, one interpreter run each
+    for pair in KeyMachine:KeyMachineTests PageOpen:PageOpenTests Quiet:QuietTests MenuRows:MenuRowsTests \
+                PageOpen+ShowPlan:ShowPlanTests; do
+      srcs="${pair%%:*}"; test="${pair#*:}"
+      : > "$t/$test.swift"
+      for s in ${srcs//+/ }; do cat "$HERE/src/$s.swift" >> "$t/$test.swift"; done
+      cat "$HERE/test/$test.swift" >> "$t/$test.swift"
+      swift "$t/$test.swift" || rc=1
     done
     rm -rf "$t"
     exit $rc
