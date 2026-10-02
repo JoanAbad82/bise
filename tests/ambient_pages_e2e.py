@@ -132,6 +132,8 @@ def main():
         # main's turn ends without a publish: ready again, the note stays sent
         c.wait_idle("main")
         c.wait(lambda: sse.seen("state", lambda d: d["state"] == "ready"), 30, "SSE ready again")
+        m = json.loads(request(port, "GET", "/p/weekly-update/meta")[2])
+        check([n["status"] for n in m["notes"] if n["id"] == nid] == ["sent"], "no publish: the note stays sent, never done: %r" % m["notes"])
 
         # the next version answers the note
         c.say('[[bash: sb page publish %s --id weekly-update --notes-done %s]]' % (v2, nid))
@@ -143,6 +145,26 @@ def main():
         check([n["status"] for n in m["notes"] if n["id"] == nid] == ["done"], "the note is done: %r" % m["notes"])
         st, _, body2 = request(port, "GET", "/p/weekly-update/v/2/body")
         check(body2 == PAGE_V2, "v2's fragment as published")
+
+        # the page's agent is gone: its notes go to main, main takes the page over
+        c.wait_idle("main")
+        c.say('/new t1: {{bash: sb page publish %s --id t1-page --title "t1 page"}}' % v1)
+        c.wait(lambda: any(p["id"] == "t1-page" for p in (c.state or {}).get("pages", [])), 120, "t1's page")
+        check(json.loads(request(port, "GET", "/p/t1-page/meta")[2])["agent"] == "t1", "t1 owns its page")
+        c.wait_idle("main", "t1")
+        c.say("/archive t1 --force")
+        c.wait_status("t1", ["archived", "stopped"], 60)
+        c.wait_idle("main")
+        st, _, _ = request(port, "POST", "/api/p/t1-page/notes", {"notes": [{"block": "p1", "kind": "drop"}]}, {"Origin": origin, "X-Bise-Token": token})
+        check(st == 200, "a note on t1's page: %d" % st)
+        st, _, _ = request(port, "POST", "/api/p/t1-page/send", {}, {"Origin": origin, "X-Bise-Token": token})
+        check(st == 200, "send on t1's page: %d" % st)
+        c.wait(lambda: any("you sent 1 note" in l and "t1-page v1" in l for l in c.lines("main")), 30, "t1's notes in main's feed")
+        c.wait_idle("main")
+        c.say('[[bash: sb page publish %s --id t1-page --notes-done n1]]' % v2)
+        c.wait_line("main", "published t1-page v2", 90)
+        m = json.loads(request(port, "GET", "/p/t1-page/meta")[2])
+        check(m["agent"] == "main" and m["notes"][0]["status"] == "done", "main took the page over: %r" % m)
     except AssertionError as e:
         print("FAIL", e)
         ok = False

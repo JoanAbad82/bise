@@ -259,21 +259,19 @@ impl Store {
         Ok((meta, unknown))
     }
 
-    /// The note layer's drafts: each note given is added or replaces the
-    /// draft of its id (a note without an id gets the next `n<k>`); `{id,
-    /// delete: true}` removes a draft. Sent and handled notes never
-    /// change here. The notes after.
-    pub fn upsert(&self, id: &str, given: &[Value], version: u64, now: u64) -> Result<Vec<Note>, String> {
-        let mut notes = self.notes(id);
+    /// The note layer's drafts (docs/ambient-pages.md §2.7): the list
+    /// given replaces every draft (a draft left out is deleted); sent,
+    /// done and answered notes never change here. A note without a
+    /// usable id gets the next `n<k>`. The notes after.
+    pub fn set_drafts(&self, id: &str, given: &[Value], version: u64, now: u64) -> Result<Vec<Note>, String> {
+        let mut notes: Vec<Note> = self.notes(id).into_iter().filter(|x| x.status != "draft").collect();
         for g in given {
-            let gid = g.get("id").and_then(Value::as_str).unwrap_or("").to_string();
-            if g.get("delete").and_then(Value::as_bool) == Some(true) {
-                notes.retain(|x| !(x.id == gid && x.status == "draft"));
-                continue;
-            }
             let mut n: Note = serde_json::from_value(g.clone()).map_err(|e| format!("a note: {e}"))?;
             if n.id.is_empty() || !n.id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_') || n.id.len() > 40 {
                 n.id = next_id(&notes);
+            }
+            if notes.iter().any(|x| x.id == n.id) {
+                return Err(format!("note {} is sent already, or twice in the list", n.id));
             }
             n.status = "draft".into();
             n.answer = None;
@@ -284,11 +282,7 @@ impl Store {
             if n.at_ms == 0 {
                 n.at_ms = now;
             }
-            match notes.iter_mut().find(|x| x.id == n.id) {
-                Some(x) if x.status == "draft" => *x = n,
-                Some(_) => return Err(format!("note {} is sent already", n.id)),
-                None => notes.push(n),
-            }
+            notes.push(n);
         }
         self.save_notes(id, &notes)?;
         Ok(notes)
@@ -429,18 +423,20 @@ mod tests {
         let s = Store::new(&d);
         s.publish(&publish("t1", Some("w"), None), vec![], 10, &|_| false).unwrap();
         let notes = s
-            .upsert("w", &[json!({"block": "t1", "quote": "Revenue", "kind": "note", "text": "use the March numbers"}), json!({"block": "p2", "kind": "drop", "x": 1})], 1, 11)
+            .set_drafts("w", &[json!({"block": "t1", "quote": "Revenue", "kind": "note", "text": "use the March numbers"}), json!({"block": "p2", "kind": "drop", "x": 1})], 1, 11)
             .unwrap();
         assert_eq!(notes.iter().map(|n| n.id.as_str()).collect::<Vec<_>>(), vec!["n1", "n2"]);
         assert_eq!(notes[1].extra.get("x"), Some(&json!(1)), "the layer's own fields are kept");
-        // edit a draft, delete one, add an edit
-        s.upsert("w", &[json!({"id": "n1", "block": "t1", "quote": "Revenue", "kind": "note", "text": "use March"}), json!({"id": "n2", "delete": true}), json!({"block": "p4", "kind": "edit", "before": "Q2", "after": "Q3"})], 1, 12)
+        // the whole draft list again: n1 edited, n2 left out (deleted), an edit added
+        s.set_drafts("w", &[json!({"id": "n1", "block": "t1", "quote": "Revenue", "kind": "note", "text": "use March"}), json!({"block": "p4", "kind": "edit", "before": "Q2", "after": "Q3"})], 1, 12)
             .unwrap();
         let sent = s.send("w", 13).unwrap();
         assert_eq!(sent.iter().map(|n| (n.id.as_str(), n.status.as_str())).collect::<Vec<_>>(), vec![("n1", "sent"), ("n2", "sent")]);
         assert!(s.send("w", 14).unwrap().is_empty(), "nothing left to send");
         // a sent note can't be edited as a draft
-        assert!(s.upsert("w", &[json!({"id": "n1", "text": "x"})], 1, 15).is_err());
+        assert!(s.set_drafts("w", &[json!({"id": "n1", "text": "x"})], 1, 15).is_err());
+        // an empty list clears the drafts, never the sent ones
+        assert_eq!(s.set_drafts("w", &[], 1, 16).unwrap().len(), 2);
         let m = s.meta("w").unwrap();
         let msg = notes_message(&m, "http://127.0.0.1:47100/p/w", &sent);
         assert!(msg.starts_with("you sent 2 notes on your page \"w\" (w v1, http://127.0.0.1:47100/p/w):\n1. on \"Revenue\" (t1): use March\n2. on p4, you changed \"Q2\" → \"Q3\"\nanswer with: sb page publish <file> --id w --notes-done n1,n2 (or --note-answer n1=\"…\")\n<page-notes page=\"w\" version=\"1\">[{"), "{msg}");
