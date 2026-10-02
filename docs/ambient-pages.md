@@ -143,8 +143,13 @@ The hooks between them (agreed with amb-web; amb-kit builds to them):
 fn + o or a click in "for you" → web `app_open_url {url, page}` → the app: in a Chromium browser
 that is running (Chrome, Arc, Brave, Edge), find a tab whose URL starts with the page's URL and
 bring it forward, else open a new tab (AppleScript, macOS asks once for Automation); otherwise
-`open <url>`. The `bise` tab group through the extension comes when the computer extension exposes
-it (slice 2). "A page you're waiting for opens in front": the core knows the user's last turn
+`open <url>`. The `bise` tab group through the extension comes in slice 2, by the path computer-use
+gave (m_4777): ambient-core (not the Swift app: the broker starts on demand from a bise process)
+sends `{op: "show", args: {url, url_prefix}}` to the computer-use broker (`~/.bise/run/
+computer-use.sock`, C3), which forwards it to the extension (C4); sw.js finds the tab by prefix in a
+user-facing `bise` group, else creates it active there, and focuses the window (no debugger, not in
+the agents' tools: the only op that takes focus). On `not_set_up`, `no_browser` or no socket: the
+AppleScript path above. computer-use owns the broker + sw.js side (~half a day). "A page you're waiting for opens in front": the core knows the user's last turn
 (phase `working`) and the page's agent is main or started in that turn → `page` event with
 `front: true` → the app opens it without fn + o.
 
