@@ -115,6 +115,7 @@ final class StatusItem: NSObject {
         guard let button = item.button else { return }
         if let img = StatusItem.compose(look, frame: look.moving ? frame : 0, pearl: pearl) {
             button.attributedTitle = NSAttributedString(string: "")
+            button.imageScaling = .scaleNone   // never shrunk to fit: the item widens
             button.image = img
             return
         }
@@ -133,34 +134,43 @@ final class StatusItem: NSObject {
 
     private static let pillFont = NSFont.systemFont(ofSize: 10.5, weight: .bold)
 
+    // ambient's menu-bar sizes (gate run 2, m_5438): the pearl 18 pt in every
+    // state (the item grows wider), the extra ~9 pt, the pill 13 pt tall with
+    // a 4 pt gap: a circle for one digit, a pill for two
+    static let pearlSize: CGFloat = 18
+    static let extraSize: CGFloat = 9
+    static let pillHeight: CGFloat = 13
+    static let pillGap: CGFloat = 4
+
     private static func extraText(_ look: IconLook) -> NSAttributedString {
-        let extraColor = look.extra == "▲" ? StatusItem.fail : NSColor.secondaryLabelColor
-        return NSAttributedString(string: look.extra, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold), .foregroundColor: extraColor])
+        // ▲ in the fail color; ☾ at 55 % of the menu bar's text color (resolved
+        // at draw time, so it follows light and dark)
+        let extraColor = look.extra == "▲" ? StatusItem.fail : NSColor.labelColor.withAlphaComponent(0.55)
+        return NSAttributedString(string: look.extra, attributes: [.font: NSFont.systemFont(ofSize: extraSize, weight: .semibold), .foregroundColor: extraColor])
     }
 
     // the icon's image for a look (pure: QA's menu-bar shots use it too):
     // the pearl's frame, the extra, the rose pill; nil before the frames exist
     static func compose(_ look: IconLook, frame: Int, pearl: PearlFrames) -> NSImage? {
         guard let body = pearl.image(look.mood, frame: frame) else { return nil }
-        let extra = extraText(look)
         let pillText = NSAttributedString(string: look.count > 0 ? "\(look.count)" : "", attributes: [.font: pillFont, .foregroundColor: StatusItem.onRose])
-        let h: CGFloat = 18
-        let bodyW: CGFloat = 18
-        let extraW = look.extra.isEmpty ? 0 : extra.size().width + 3
-        let pillW = look.count > 0 ? max(14, pillText.size().width + 8) : 0
-        let w = bodyW + extraW + (pillW > 0 ? pillW + 3 : 0)
+        let h = pearlSize
+        let extraW = look.extra.isEmpty ? 0 : ceil(extraText(look).size().width) + 3
+        let pillW = look.count > 0 ? max(pillHeight, ceil(pillText.size().width) + 8) : 0
+        let w = pearlSize + extraW + (pillW > 0 ? pillGap + pillW : 0)
         let img = NSImage(size: NSSize(width: w, height: h), flipped: false) { _ in
-            body.draw(in: NSRect(x: 0, y: 0, width: 18, height: 18))
-            var x = bodyW
+            body.draw(in: NSRect(x: 0, y: 0, width: pearlSize, height: pearlSize))
+            var x = pearlSize
             if extraW > 0 {
+                let extra = extraText(look)   // here: the color follows the drawing appearance
                 let sz = extra.size()
                 extra.draw(at: NSPoint(x: x + 2, y: (h - sz.height) / 2))
                 x += extraW
             }
             if pillW > 0 {
-                let r = NSRect(x: x + 3, y: (h - 14) / 2, width: pillW, height: 14)
+                let r = NSRect(x: x + pillGap, y: (h - pillHeight) / 2, width: pillW, height: pillHeight)
                 StatusItem.rose.setFill()
-                NSBezierPath(roundedRect: r, xRadius: 7, yRadius: 7).fill()
+                NSBezierPath(roundedRect: r, xRadius: pillHeight / 2, yRadius: pillHeight / 2).fill()
                 let sz = pillText.size()
                 pillText.draw(at: NSPoint(x: r.midX - sz.width / 2, y: r.midY - sz.height / 2))
             }
