@@ -2335,6 +2335,12 @@ impl Hub {
 
     fn agent_req(&mut self, fx: &mut Fx, env: &mut dyn Env, token: Token, from: &str, req: AgentReq) {
         let reply = |fx: &mut Fx, body: Value| fx.push(Effect::Reply { token, body });
+        // the home workspace (docs/ambient-pages.md §5.1): no git, so no
+        // land, feature or flow; one line that says why, never a git error
+        if let Some(cmd) = git_only(&req).filter(|_| !env.is_git()) {
+            reply(fx, json!({"ok": false, "error": not_in_a_repo(cmd)}));
+            return;
+        }
         let q = match req {
             AgentReq::List | AgentReq::Tasks => {
                 let Some(from) = self.st.resolve(from) else {
@@ -2531,6 +2537,22 @@ fn unique_name(st: &State, base: &str) -> String {
         })
         .find(|c| !taken(c))
         .unwrap_or_else(|| base.to_string())
+}
+
+/// The `sb` commands that need git: off in a workspace without it (the
+/// home workspace, docs/ambient-pages.md §5.1). Their name, else None.
+fn git_only(req: &AgentReq) -> Option<&'static str> {
+    match req {
+        AgentReq::Land { .. } => Some("land"),
+        AgentReq::Feature { .. } => Some("feature"),
+        AgentReq::Flow { .. } => Some("flow"),
+        _ => None,
+    }
+}
+
+/// The one line `sb <cmd>` answers in a workspace without git.
+pub(crate) fn not_in_a_repo(cmd: &str) -> String {
+    format!("sb {}: not in a repo (this workspace has no git): files stay as you saved them, nothing to land", cmd)
 }
 
 fn new_task(name: Option<&str>, brief: &Brief, worktree: bool, with_changes: bool) -> Result<Value, String> {

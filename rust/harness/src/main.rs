@@ -323,6 +323,29 @@ fn sb_workspace(args: &[String]) -> std::path::PathBuf {
         .unwrap_or_else(|| std::path::PathBuf::from("."))
 }
 
+/// bise ambient's workspace (docs/ambient-pages.md §5.1): `--home`, an
+/// empty `--workspace` (the app started from the menu bar) or, for
+/// `bise ambient` (`core` false), no `--workspace` outside a git repo:
+/// the home workspace `~/bise`, created on first use; else
+/// `sb_workspace`'s (the `--workspace`, the launch dir, the cwd).
+fn ambient_workspace(args: &[String], core: bool) -> std::path::PathBuf {
+    let given = args.iter().position(|a| a == "--workspace").map(|i| args.get(i + 1).cloned().unwrap_or_default());
+    let home = args.iter().any(|a| a == "--home")
+        || given.as_deref() == Some("")
+        || (given.is_none() && !core && !switchboard::worktree::is_git_dir(&sb_workspace(args)));
+    if !home {
+        return sb_workspace(args);
+    }
+    match switchboard::paths::ensure_home_workspace() {
+        Ok(d) => d,
+        Err(e) => {
+            let d = switchboard::paths::home_workspace();
+            eprintln!("bise ambient: cannot create {}: {}", d.display(), e);
+            std::process::exit(1);
+        }
+    }
+}
+
 /// bise ambient's hub connection: the first call starts the hub when
 /// none runs (`client::connect`, like the TUI); later calls (after a
 /// loss) only connect and say hello: the user may have stopped bise.
@@ -564,7 +587,7 @@ fn main() -> std::io::Result<()> {
             // child on stdio JSON, a client of the workspace's hub
             Some("ambient-core") => {
                 load_keys();
-                let paths = switchboard::paths::Paths::for_workspace(&sb_workspace(&args[1..]));
+                let paths = switchboard::paths::Paths::for_workspace(&ambient_workspace(&args[1..], true));
                 let root = live_app_root_or_exit();
                 let exe = std::env::current_exe()?;
                 let workspace = paths.workspace.to_string_lossy().to_string();
@@ -573,7 +596,7 @@ fn main() -> std::io::Result<()> {
             }
             // bise ambient: open the app on this workspace (scripts/ambient.sh)
             Some("ambient") => {
-                let paths = switchboard::paths::Paths::for_workspace(&sb_workspace(&args[1..]));
+                let paths = switchboard::paths::Paths::for_workspace(&ambient_workspace(&args[1..], false));
                 let root = live_app_root_or_exit();
                 let exe = std::env::current_exe()?;
                 std::process::exit(bend_tui::ambient::launch_main(&paths.workspace, &exe, &root));

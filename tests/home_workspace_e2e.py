@@ -1,0 +1,152 @@
+"""bise ambient's home workspace without a repo (docs/ambient-pages.md §5.1).
+
+A real hub (bise sbd, scripted model) on a throwaway folder WITHOUT git:
+main works there, its role says the workspace has no git (no Flow
+section), `sb land`, `sb land --here`, `sb feature`, `sb feature new` and
+`sb flow` each answer "not in a repo" in one line, a spawned task works in
+the same folder (no worktree), publishes a page that the page server
+serves, and its own `sb land` says why too; a worktree task (`/new -w`)
+is refused in words, nothing crashes. Then `bise ambient-core
+--workspace ""` (the app started from the menu bar) creates the home
+workspace ($BISE_HOME_WORKSPACE: a throwaway folder, never ~/bise) and
+starts a hub on it. Never the user's real ~/bise.
+
+Run: python3 -u tests/home_workspace_e2e.py
+"""
+import http.client
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import e2e  # noqa: E402
+from e2e import EXE, ROOT, check  # noqa: E402
+
+PAGE = '<section data-kit="prose" data-id="p1"><p>the week: the offsite is booked.</p></section>\n'
+
+
+def get(port, path):
+    c = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    c.request("GET", path, headers={"Host": "127.0.0.1:%d" % port})
+    r = c.getresponse()
+    out = (r.status, r.read().decode())
+    c.close()
+    return out
+
+
+def results(c, agent):
+    """The bash results of `agent`'s feed, in order."""
+    return [l for l in c.lines(agent) if l.startswith("tool_result")]
+
+
+def hub_core(E):
+    """`bise ambient-core --workspace ""`: the home workspace is created
+    and a hub starts on it; then the core's stdin closes and the hub
+    stops."""
+    home = os.path.join(E.tmp, "home-ws")
+    state = os.path.join(E.tmp, "home-st")
+    env = {**E.env, "BISE_HOME_WORKSPACE": home, "SB_STATE_DIR": state, "BISE_APP_ROOT": ROOT}
+    check(not os.path.exists(home), "no home workspace before the first use")
+    core = subprocess.Popen([EXE, "ambient-core", "--workspace", ""], cwd="/", env=env,
+                            stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                            stderr=open(os.path.join(E.tmp, "core.stderr"), "a"))
+    try:
+        sock = os.path.join(state, "hub.sock")
+        t0 = time.time()
+        while not os.path.exists(sock) and time.time() - t0 < 30 * e2e.load_factor():
+            time.sleep(0.1)
+        check(os.path.isdir(home), "the home workspace is created on first use")
+        check(not os.path.exists(os.path.join(home, ".git")), "the home workspace has no git")
+        check(os.path.exists(sock), "a hub starts on the home workspace")
+        c = e2e.Client(sock)
+        c.wait_status("main", "idle", 60)
+        check(os.path.samefile(c.agent("main")["path"], home), "main works in the home workspace: %r" % c.agent("main"))
+        c.send({"op": "stop_hub"})
+    finally:
+        core.stdin.close()
+        try:
+            core.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            core.kill()
+        # the hub the core started: gone with stop_hub; its pid file says so
+        pidf = os.path.join(state, "hub.pid")
+        t0 = time.time()
+        while os.path.exists(os.path.join(state, "hub.sock")) and time.time() - t0 < 20:
+            try:
+                socket.socket(socket.AF_UNIX).connect(os.path.join(state, "hub.sock"))
+            except OSError:
+                break
+            time.sleep(0.2)
+        if os.path.exists(pidf):
+            try:
+                os.kill(int(open(pidf).read().split()[0]), 15)
+            except (ValueError, OSError):
+                pass
+
+
+def main():
+    if not os.path.exists(EXE):
+        sys.exit("build first: cd rust && cargo build")
+    E = e2e.Env()
+    # the home workspace is a plain folder: no git at all
+    shutil.rmtree(os.path.join(E.ws, ".git"))
+    ok = True
+    try:
+        c = E.start_hub()
+        c.wait_status("main", "idle", 60)
+        check(os.path.samefile(c.agent("main")["path"], E.ws), "main works in the folder")
+        role = open(os.path.join(E.state, "agents", "main", "role.md")).read()
+        check("## Workspace" in role and "without git" in role and "## Flow" not in role,
+              "main's role: the no-git section, no Flow section")
+
+        page = os.path.join(E.tmp, "page.html")
+        open(page, "w").write(PAGE)
+        cmds = ['sb land "x"', 'sb land --here "x"', 'sb feature', 'sb feature new foo', 'sb flow',
+                'sb page publish %s --id offsite --title offsite' % page]
+        c.say(" ".join("[[bash: %s]]" % x for x in cmds))
+        c.wait_line("main", "published offsite v1", 120)
+        c.wait_idle("main")
+        r = results(c, "main")
+        for cmd, line in zip(["land", "land", "feature", "feature", "flow"], r):
+            check("sb %s: not in a repo" % cmd in line and "detached" not in line, "sb %s says why: %r" % (cmd, line))
+        port = int(open(os.path.join(E.state, "pages.port")).read().strip())
+        st, body = get(port, "/p/offsite")
+        check(st == 200 and "the offsite is booked" in body, "main's page is served: %d" % st)
+
+        # a task works in the same folder and publishes a page; its land is off too
+        c.say('/new t1: {{bash: pwd}} {{bash: sb page publish %s --id t1-page}} {{bash: sb land --here "y"}}' % page)
+        c.wait(lambda: len(results(c, "t1")) >= 3, 120, "t1's three commands")
+        c.wait_idle("t1")
+        t1 = c.agent("t1")
+        check(t1["mode"] == "shared" and os.path.samefile(t1["path"], E.ws), "t1 works in the folder: %r" % t1)
+        r = results(c, "t1")
+        check(E.ws.split("/")[-1] in r[0], "t1's pwd: %r" % r[0])
+        check("published t1-page v1" in r[1], "t1 publishes: %r" % r[1])
+        check("sb land: not in a repo" in r[2], "t1's land says why: %r" % r[2])
+        check(get(port, "/p/t1-page")[0] == 200, "t1's page is served")
+        trole = open(os.path.join(E.state, "agents", "t1", "role.md")).read()
+        check("sb land" not in trole.split("Your working directory:")[1].split("\n")[0], "t1's place line: no land")
+
+        # a worktree task: refused in words, nothing crashes
+        c.say("/new -w t2: x")
+        c.wait(lambda: any("not a git repository" in json.dumps(n) for n in c.notices()) or
+               any("not a git repository" in l for l in c.lines("main")), 30, "the worktree refusal")
+        check(c.agent("t2") is None, "no t2")
+        check(E.hub.poll() is None, "the hub still runs")
+
+        hub_core(E)
+    except AssertionError as e:
+        print("FAIL", e)
+        ok = False
+    finally:
+        E.close()
+    print("home_workspace_e2e:", "ok" if ok else "FAILED")
+    sys.exit(0 if ok else 1)
+
+
+if __name__ == "__main__":
+    main()

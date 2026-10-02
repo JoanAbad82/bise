@@ -1345,8 +1345,13 @@ impl Shell {
     /// The role of `a` (its system prompt's end), with the repo's flow
     /// (dev-flow §6).
     fn role_of(&self, a: &Agent, tmp: &str) -> String {
-        let flow = self.flow_now();
+        // the home workspace (docs/ambient-pages.md §5.1): no git, no flow
+        let git = crate::worktree::is_git_dir(&self.opts.paths.workspace);
+        let flow = self.flow_now().filter(|_| git);
         let style = self.commit_style();
+        if a.is_main && !git {
+            return prompts::main_role(&self.hub.workspace, tmp, devflow::HOME_SECTION);
+        }
         if a.is_main {
             let section = devflow::main_section(flow.as_ref(), style.as_deref());
             return prompts::main_role(&self.hub.workspace, tmp, &section);

@@ -813,6 +813,32 @@ fn worktrees_need_git() {
     assert!(!t.hub.st.agents.contains_key("x"));
 }
 
+/// The home workspace (docs/ambient-pages.md §5.1): land, feature and
+/// flow say "not in a repo" in one line, nothing goes to git.
+#[test]
+fn land_feature_and_flow_say_not_in_a_repo_without_git() {
+    let mut t = T::new();
+    t.env.git = false;
+    let reqs = [
+        ("land", AgentReq::Land { here: true, message: "x".into() }),
+        ("feature", AgentReq::Feature { op: "new".into(), name: "foo".into() }),
+        ("feature", AgentReq::Feature { op: "list".into(), name: String::new() }),
+        ("flow", AgentReq::Flow { set: None }),
+    ];
+    for (cmd, req) in reqs {
+        let (tok, fx) = t.req(MAIN, req);
+        let r = reply(&fx, tok).unwrap();
+        assert_eq!(r["ok"], false);
+        let e = r["error"].as_str().unwrap();
+        assert!(e.starts_with(&format!("sb {}: not in a repo", cmd)) && !e.contains('\n'), "{}", e);
+        assert!(!fx.iter().any(|e| matches!(e, Effect::Land { .. } | Effect::Feature { .. } | Effect::Flow { .. })));
+    }
+    // with git: the land goes on to the daemon
+    t.env.git = true;
+    let (_, fx) = t.req(MAIN, AgentReq::Land { here: true, message: "x".into() });
+    assert!(fx.iter().any(|e| matches!(e, Effect::Land { .. })));
+}
+
 #[test]
 fn shared_tasks_touching_one_file_tell_main() {
     let mut t = T::new();

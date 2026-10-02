@@ -50,6 +50,24 @@ pub fn workspace_id(workspace: &Path) -> String {
     )
 }
 
+/// The home workspace (docs/ambient-pages.md §5.1): `~/bise`, a plain
+/// folder without git for non-code work; `$BISE_HOME_WORKSPACE` when set
+/// (the tests: a throwaway folder, never the user's).
+pub fn home_workspace() -> PathBuf {
+    if let Some(d) = std::env::var_os("BISE_HOME_WORKSPACE").filter(|d| !d.is_empty()) {
+        return PathBuf::from(d);
+    }
+    let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));
+    home.join("bise")
+}
+
+/// The home workspace, created on first use (never git-initialised).
+pub fn ensure_home_workspace() -> std::io::Result<PathBuf> {
+    let d = home_workspace();
+    std::fs::create_dir_all(&d)?;
+    Ok(d)
+}
+
 impl Paths {
     pub fn for_workspace(workspace: &Path) -> Paths {
         let workspace = workspace
