@@ -262,7 +262,13 @@ the page with an open card (a task agent's page) is not checked yet.
   started both agents 18 s after the start note, and the items showed them 8 s later. Outbox
   empty. Fail 27: after the start note, main's capsule words were 356 characters in two
   capitalized paragraphs, including its own coordination (`it hasn't confirmed yet`). Fail 28: v1
-  at 88 s.
+  at 88 s. Rerun after 83c1a8af: v1 at 58 s, the line after the start still 204 characters
+  (amb-core's `via: page` tag pending), plus a fair card (`how should agents ship code here? this
+  repo has no remote`).
+- **B, a third run at 96a1769b:** the page passes again (14 s, v1 27 s, 4 of 4), then the run stops
+  at tick 1 on `GET /p/launch-watch/meta` (`Remote end closed connection`). Three runs, three errors
+  at the same moment (404, reset, closed), so the page server may drop a page's meta while it's
+  republished: sent to amb-core and amb-tools.
 
 ## The look the user validated: round 8 (main m_5134)
 
