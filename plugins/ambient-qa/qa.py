@@ -1216,10 +1216,20 @@ def morning_check(body, page_id, today=None):
     heads = [s for s in secs if s["kit"] == "heading"]
     if len(heads) > 5:
         fails.append("%d headings (the title and 4 parts at most)" % len(heads))
-    meetings, unlinked = {}, []
+    # the title: its <h1> first, then the meta line (amb-kit m_5771)
+    title = heads[0]["html"] if heads else ""
+    if "<h1" in title and "<p" in title and title.index("<p") < title.index("<h1"):
+        fails.append("the title's <p> comes before its <h1>")
+    meetings, unlinked, bare, part = {}, [], [], ""
     for s in secs:
+        if s["kit"] == "heading":
+            h2 = re.search(r"<h2[^>]*>(.*?)</h2>", s["html"], re.S)
+            part = re.sub(r"<[^>]+>", "", h2.group(1)).strip().lower() if h2 else part
         if s["kit"] != "prose":
             continue
+        if part == "needs you":
+            # a page's item, never the bare page (amb-kit m_5771): /p/<page>#<item>
+            bare += [h for h in re.findall(r'<a [^>]*href="(/p/[^"#]+)"', s["html"])]
         lis = re.findall(r"<li[^>]*>(.*?)</li>", s["html"], re.S)
         if re.search(r"<p[^>]*>\s*<strong>", s["html"]):
             low = re.sub(r"<[^>]+>", " ", s["html"]).lower()
@@ -1230,6 +1240,8 @@ def morning_check(body, page_id, today=None):
                      if not re.search(r'<a [^>]*href="(/p/[^"]+|https://[^"]+)"', li)]
     if unlinked:
         fails.append("%d line(s) without a link to their place: %s" % (len(unlinked), "; ".join(unlinked[:3])))
+    if bare:
+        fails.append("needs you links to a bare page, not its item (/p/<page>#<item>): %s" % ", ".join(bare[:4]))
     long_ = {e: n for e, n in meetings.items() if n > 3}
     if long_:
         fails.append("meeting briefs over 3 lines: %s" % long_)
@@ -1240,7 +1252,7 @@ def morning_check(body, page_id, today=None):
     missing = [k for k, ws in MORNING_TRUTH.items() if not any(w in low for w in ws)]
     if missing:
         fails.append("the night's items missing: %s" % ", ".join(missing))
-    return {"headings": len(heads), "kits": [s["kit"] for s in secs], "meetings": meetings, "unlinked": unlinked,
+    return {"headings": len(heads), "kits": [s["kit"] for s in secs], "meetings": meetings, "unlinked": unlinked, "bare": bare,
             "found": [k for k in MORNING_TRUTH if k not in missing], "missing": missing}, fails
 
 
