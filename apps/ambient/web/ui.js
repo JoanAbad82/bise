@@ -219,7 +219,7 @@
   }
 
   // ---- the frame loop: runs while something moves, sleeps when the capsule is settled
-  let raf = 0, lastV = null;
+  let raf = 0, lastV = null, contentSent = "";
   const fps = { frames: 0, since: now(), value: 0, drew: 0 };
   function schedule() { if (!raf) raf = requestAnimationFrame(frame); }
   function frame() {
@@ -230,13 +230,21 @@
     render(v);
     layout(v);
     size();
+    // what the capsule has to show, on every change: the app's show/hide policy acts on it
+    const ck = JSON.stringify(v.content);
+    if (ck !== contentSent) { contentSent = ck; post({ cmd: "app_content", ...v.content }); }
     let drew = false;
-    if (!v.hidden) drew = orb.frame({ pose: v.pose, poseMs: v.poseMs, lvl: v.lvl, need: v.need, still: v.still, frozen: v.frozen }, t);
+    if (!v.unseen) drew = orb.frame({ pose: v.pose, poseMs: v.poseMs, lvl: v.lvl, need: v.need, still: v.still, frozen: v.frozen }, t);
     fps.frames++; if (drew) fps.drew++;
     if (t - fps.since > 1000) { fps.value = Math.round((fps.frames * 1000) / (t - fps.since)); fps.frames = 0; fps.drew = 0; fps.since = t; }
-    // keep going: the orb wakes for the blink and the springs; a settled, hidden capsule idles at 4 Hz
-    if (v.hidden) setTimeout(schedule, 250); else schedule();
+    // keep going at full rate only while the orb moves: a settled face (nothing drawn this frame)
+    // checks again at ~15 Hz (a blink or a spring starts within 66 ms, then runs at 60); nobody
+    // seeing the capsule (hidden, covered, locked: app_visible false) keeps only the timers, at 4 Hz
+    // (amb-mac m_5014: 2.31 s of CPU per idle minute, mostly frames)
+    if (v.unseen) later(250); else if (drew) schedule(); else later(66);
   }
+  let laterT = 0;
+  function later(ms) { if (!laterT && !raf) laterT = setTimeout(() => { laterT = 0; schedule(); }, ms); }
 
   // ---- input: clicks, the spotlight field, plain keys inside the panel
   cap.addEventListener("click", (e) => {

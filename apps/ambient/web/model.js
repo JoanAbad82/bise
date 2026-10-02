@@ -50,6 +50,7 @@
       hidden: false, reduce: false, edgeGlow: true,
       radius: 16,                   // macOS's window radius (app_settings.radius); 16 until it comes
       quiet: null,                  // { why: 'call' | 'meeting' | '' } while in a call or a meeting (app_quiet)
+      visible: true,                // app_visible: false while nobody can see the capsule (no orb frames)
       flashes: [],                  // [{ glyph, text, sub, at, ttl, kiss, still, kind }]
       turnNames: null, chips: [],   // agents that appeared during your turn
       pages: [],                    // "for you": the pages made for you, newest first (state.pages)
@@ -223,8 +224,14 @@
       }
       case "app_settings":
         return none({ ...m, edgeGlow: ev.edge_glow !== false, macos: ev.macos || m.macos, radius: +ev.radius > 0 ? +ev.radius : m.radius });
-      case "app_hidden":
-        return none({ ...m, hidden: !!(ev.on ?? ev.hidden) });
+      case "app_hidden": {
+        // hidden (esc, fn ., a click away, the app's timers: docs/ambient-app.md §8): an open pane
+        // closes, so the next timed show is never stuck behind a stale full view
+        const hidden = !!(ev.on ?? ev.hidden);
+        if (!hidden || !m.pane) return none({ ...m, hidden });
+        const r = setPane({ ...m, hidden }, null);
+        return r;
+      }
       case "app_reduce_motion":
         return none({ ...m, reduce: !!(ev.on ?? ev.reduce) });
       case "app_key":
@@ -237,6 +244,10 @@
         return key(m, ev.key, now);
       // a call or a meeting (amb-mac, 62d2105; replayed after a reload): main answers in text only
       // and the non-urgent cards wait (no needs-you glass); the inbox still lists them
+      // nobody can see the capsule (hidden, covered, the screen locked or asleep; amb-mac e3c5dcf6):
+      // the orb stops drawing until it is seen again
+      case "app_visible":
+        return none({ ...m, visible: ev.on !== false });
       case "app_quiet":
         return none({ ...m, quiet: ev.on ? { why: ev.why || "" } : null });
       // today's morning page, opened in front by the app (amb-mac, 7d65d59e): the capsule names
@@ -246,7 +257,7 @@
         const prev = m.pages.find((p) => p.id === ev.id);
         const page = { state: "ready", ...(prev || {}), id: ev.id, title: ev.title || (prev && prev.title), url: ev.url || (prev && prev.url) };
         const m2 = { ...m, pages: sortPages([page, ...m.pages.filter((p) => p.id !== ev.id)]), lastPage: ev.id };
-        return none(flashQueue(m2, { kind: "page", text: Wd.morning, ttl: T.page, page: ev.id }, now));
+        return none(flashQueue(m2, { kind: "page", text: Wd.morning(!!ev.greet), ttl: T.page, page: ev.id }, now));
       }
 
       // ---- the page's own (clicks, the spotlight field)
@@ -337,6 +348,22 @@
     }
   }
 
+  // ---- what the capsule has to show, for the app's show/hide policy (amb-mac, m_5073): talk,
+  // type, answer, got and needs the app also derives itself; it acts on line (4 s), open (until
+  // esc, fn ., a click away), needs (6 s) and none
+  function contentOf(v, flash, asking) {
+    switch (v.state) {
+      case "listening": case "voice_note": return { kind: "talk" };
+      case "spotlight": return { kind: "type" };
+      case "working": return { kind: v.words ? "answer" : "got" };
+      case "speaking": case "end": return { kind: "answer" };
+      case "agents": case "inbox": case "perm": return { kind: "open" };
+      case "needs": return { kind: "needs", card: asking[0] && asking[0].id };
+      case "idle": return { kind: "none" };
+      default: return { kind: flash || v.state === "hub_down" ? "line" : "none" };
+    }
+  }
+
   // ---- what the capsule shows now
   // `wall`: the epoch clock (a page's age); `now` may be the page's own monotonic clock
   function view(m, now, wall = now) {
@@ -363,6 +390,7 @@
       note: null,           // the needs-you glass under the capsule
       edge: { on: false, lvl: 0 },
       hidden: m.hidden,
+      unseen: m.hidden || m.visible === false,   // nobody sees it: no orb frames
       radius: m.radius,     // the capsule's and the glass's corners
       kiss: false,
     };
@@ -464,9 +492,12 @@
       // the glass under it names the agent; the capsule counts (designer: the two never repeat)
       v.state = "needs"; v.glyph = "?"; v.text = Wd.waiting(asking.length);
     } else {
-      v.state = "idle"; v.text = Wd.idleLine(working(m.agents));
+      // at rest nothing shows (docs/ambient-app.md §8, 'out of the way'): no status line; the app
+      // hides the capsule (app_content none) and the menu-bar icon carries the count
+      v.state = "idle";
       if (inTurn(m)) v.pose = "think";   // main on its own turn: the * turns, the capsule stays small
     }
+    v.content = contentOf(v, flash, asking);
     // the open states keep the key lines too (cancelled, an error) as their sub line; a
     // permission ask stays alone in the capsule (ambient, m_4671)
     if (flash && v.size === "open" && !v.sub && v.state !== "perm" && flash.kind !== "answered") v.sub = flash.text;

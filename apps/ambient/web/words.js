@@ -15,8 +15,9 @@
     on: "main is on it.",
     onShort: "on it.",
     needsHint: "or hold fn and say it",
-    // a card asked from a page (docs/ambient-pages.md §4.2): fn + ⏎ opens the page at the question
-    openIt: "fn + ⏎ open it",
+    // a card asked from a page (docs/ambient-pages.md §4.2): fn + ⏎ opens the page at the question;
+    // key hints are `<keys> <word>`, no + (ambient, m_5067)
+    openIt: "fn ⏎ open it",
     // §3 behavior
     hush: "i'll stop talking. the rest is in text.",
     cutIn: "main stopped. go ahead.",
@@ -69,8 +70,9 @@
   // a page for you (docs/ambient-vision.md §3 B; signed off by ambient, m_4786)
   const pageReady = (name) => `${name} is ready · fn + o`;
   const forYou = "for you";
-  // today's morning page, opened in front by the app (amb-mac's app_morning; best guess, asked to ambient)
-  const morning = "your morning page · fn + o";
+  // today's morning page, opened in front by the app (amb-mac's app_morning {greet}: true before
+  // 11:00 local; signed by ambient with amb-mac, m_5016 / m_5067)
+  const morning = (greet) => (greet ? "good morning. your page is open   fn o" : "your page is open   fn o");
   // fn held on a bise page: the words pin on the page (§4.1; ambient, m_4877)
   const voiceNoteOn = (name) => `voice note on ${name}`;
   // a page's line in "for you": `v2 · 3 min ago`, or `updating…`

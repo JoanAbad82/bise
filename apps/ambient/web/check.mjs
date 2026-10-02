@@ -131,10 +131,10 @@ law("the eyes blink at rest, never while speaking, never when still", () => {
 law("idle: small, the resting face, the idle line", () => {
   const { view } = run(sceneEvents("idle"), [100]);
   const v = view(100);
-  assert.equal(v.size, "small"); assert.equal(v.pose, "rest"); assert.equal(v.text, W.idle); assert.equal(v.need, false);
+  assert.equal(v.size, "small"); assert.equal(v.pose, "rest"); assert.equal(v.text, null); assert.equal(v.content.kind, "none"); assert.equal(v.need, false);
 });
 law("all quiet: hold fn to talk", () => {
-  assert.equal(run(sceneEvents("quiet"), [100]).view(100).text, W.quiet);
+  assert.equal(run(sceneEvents("quiet"), [100]).view(100).text, null);
 });
 law("hold fn: open, the sphere follows your voice, live words, `main sees …`, the edge", () => {
   const s = sweep("talk");
@@ -202,7 +202,7 @@ law("answered: fn + 1 sends the answer, `✓ cookies has it: yes.` with the kiss
   eq(r.cmds.map(({ t, ...c }) => c), [{ cmd: "answer", card: "c1", reply: "1" }]);
   const v = r.view(k + 100);
   assert.equal(v.glyph, "✓"); assert.equal(v.text, "cookies has it: yes."); assert.equal(v.pose, "kiss"); assert.equal(v.note, null);
-  assert.equal(r.view(k + 5000).text, W.idle);
+  assert.equal(r.view(k + 5000).text, null);
 });
 law("a click on an option answers the same", () => {
   let m = M.init();
@@ -216,7 +216,7 @@ law("done: `✓ perf is done.` with the kiss, not the report; 8 s, then the coun
   assert.equal(r.view(1000).glyph, "✓"); assert.equal(r.view(1000).text, "perf is done."); assert.equal(r.view(1000).pose, "kiss");
   assert.equal(r.view(1500).pose, "kiss");
   assert.equal(r.view(8800).text, "perf is done.");
-  assert.equal(r.view(9000).text, Wd.idleLine(2));
+  assert.equal(r.view(9000).text, null); assert.equal(r.view(9000).content.kind, "none");
 });
 law("failed: `▲ release failed.`, the face still, no joke, no report", () => {
   const v = run(sceneEvents("failed"), [1200]).view(1200);
@@ -367,7 +367,7 @@ law("at launch the capsule shows the status line, never main's last reply", () =
   m = M.step(m, { ev: "main", text: "amb-web is done: **both** fixes", turn: 41 }, 10).m;
   m = M.step(m, { ev: "phase", phase: "done" }, 20).m;
   const v = M.view(m, 30);
-  assert.equal(v.size, "small"); assert.equal(v.text, W.idle); assert.equal(v.words, null);
+  assert.equal(v.size, "small"); assert.equal(v.text, null); assert.equal(v.words, null);
 });
 law("main's markdown: marks stripped, `code` flagged, one token per raw word (word.i stays right), 3 lines", () => {
   const t = Wd.mdWords("**done**: the fix is in `apps/ambient/web/ui.js` now. - next: run `node check.mjs` and see [the page](http://x).");
@@ -390,7 +390,7 @@ law("the corners follow macOS's window radius (app_settings.radius), 16 until it
 });
 law("the hub lost: one line, then back", () => {
   const r = run(sceneEvents("hub"), [1000, 5500]);
-  assert.equal(r.view(1000).text, W.hubDown); assert.equal(r.view(5500).text, W.idle);
+  assert.equal(r.view(1000).text, W.hubDown); assert.equal(r.view(5500).text, null);
 });
 law("reduced motion: every state is still (the pixel smile), no edge glow", () => {
   const s = sweep("still");
@@ -419,9 +419,9 @@ law("a page ready: `weekly update is ready · fn + o`; fn + o opens it (app_open
 law("a page updating, then its next version ready, says ready again; a page opened in front says nothing", () => {
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
   m = M.step(m, { ev: "page", id: "wu", title: "weekly update", version: 1, url: "u", at_ms: 1, state: "ready", front: true }, 10).m;
-  assert.equal(M.view(m, 20).text, Wd.idleLine(0));
+  assert.equal(M.view(m, 20).text, null);
   m = M.step(m, { ev: "page", id: "wu", version: 1, state: "updating", at_ms: 2 }, 30).m;
-  assert.equal(M.view(m, 40, 50).text, Wd.idleLine(0));
+  assert.equal(M.view(m, 40, 50).text, null);
   m = M.step(m, { ev: "page", id: "wu", version: 2, state: "ready", at_ms: 3 }, 50).m;
   assert.equal(M.view(m, 60).text, "weekly update is ready · fn + o");
   eq(M.step(M.init(), { ev: "app_key", key: "o" }, 0).cmds, []);   // no page: nothing
@@ -448,19 +448,48 @@ law("a card clicked in the menu bar (app_key i + card) opens the inbox at that c
   // again while open: it stays open (a click never closes it)
   assert.equal(M.view(M.step(r.m, { ev: "app_key", key: "i", card: "a" }, 30).m, 40).state, "inbox");
 });
-law("a card asked from a page (card.page): the glass says `fn + ⏎ open it`; fn + ⏎ or a click opens the page at the question", () => {
+law("a card asked from a page (card.page): the glass says `fn ⏎ open it`; fn + ⏎ or a click opens the page at the question", () => {
   const card = { id: "c1", agent: "launch-recap", text: "post now or wait?", options: ["post now", "wait"], page: { id: "recap", block: "q1", url: "http://127.0.0.1:47123/p/recap#q1" } };
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [card, { id: "c2", agent: "x", text: "y", options: [] }], pages: [] }, 0).m;
-  assert.equal(M.view(m, 10).note.open, "fn + ⏎ open it");
+  assert.equal(M.view(m, 10).note.open, "fn ⏎ open it");
   const open = [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/recap#q1", page: "recap" }];
   eq(M.step(m, { ev: "app_key", key: "enter" }, 20).cmds, open);
   eq(M.step(m, { ev: "ui_open_card", card: "c1" }, 20).cmds, open);
   eq(M.step(m, { ev: "ui_open_card", card: "c2" }, 20).cmds, []);   // no page: nothing
 });
-law("the morning page (app_morning): `your morning page · fn + o`, and fn + o opens it", () => {
+law("out of the way (§8): what the capsule has to show, for the app's policy: talk, type, got, answer, needs, open, line, none", () => {
+  assert.equal(run(sceneEvents("idle"), [100]).view(100).content.kind, "none");
+  const needs = run(sceneEvents("needs-wait"), [1000]).view(1000).content;
+  eq(needs, { kind: "needs", card: needs.card }); assert.ok(needs.card);
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
-  m = M.step(m, { ev: "app_morning", id: "morning-0612", title: "your morning", url: "http://127.0.0.1:47123/p/morning-0612" }, 10).m;
-  assert.equal(M.view(m, 20).text, "your morning page · fn + o");
+  assert.equal(M.view(M.step(m, { ev: "app_fn", state: "down", key: "fn" }, 10).m, 20).content.kind, "talk");
+  assert.equal(M.view(M.step(m, { ev: "app_key", key: "space" }, 10).m, 20).content.kind, "type");
+  assert.equal(M.view(M.step(m, { ev: "app_key", key: "0" }, 10).m, 20).content.kind, "open");
+  let s = M.step(m, { ev: "app_fn", state: "down", key: "fn" }, 10).m;
+  s = M.step(M.step(s, { ev: "app_fn", state: "up", key: "fn" }, 15).m, { ev: "sent", voice: false }, 20).m;
+  s = M.step(s, { ev: "phase", phase: "sending" }, 30).m;
+  assert.equal(M.view(s, 40).content.kind, "got");
+  s = M.step(M.step(s, { ev: "main", text: "done: the login test waits now.", turn: 1 }, 50).m, { ev: "phase", phase: "done" }, 60).m;
+  assert.equal(M.view(s, 70).content.kind, "answer");
+  // a line: a key's answer, done, failed, a page ready
+  assert.equal(M.view(M.step(m, { ev: "page", id: "wu", title: "weekly update", version: 1, url: "u", at_ms: 1, state: "ready" }, 10).m, 20).content.kind, "line");
+});
+law("out of the way (§8): hidden (app_hidden on) closes an open pane and the spotlight's focus; app_visible false stops the orb's frames", () => {
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
+  m = M.step(m, { ev: "app_key", key: "space" }, 10).m;
+  const r = M.step(m, { ev: "app_hidden", on: true }, 20);
+  assert.equal(r.m.pane, null); eq(r.cmds, [{ cmd: "app_focus", on: false }]);
+  assert.equal(M.view(r.m, 30).unseen, true);
+  m = M.step(M.step(m, { ev: "app_hidden", on: false }, 40).m, { ev: "app_visible", on: false }, 50).m;
+  assert.equal(M.view(m, 60).unseen, true);
+  assert.equal(M.view(M.step(m, { ev: "app_visible", on: true }, 70).m, 80).unseen, false);
+});
+law("the morning page (app_morning): 'good morning. your page is open   fn o' before 11:00 (greet), 'your page is open   fn o' after; fn + o opens it", () => {
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
+  assert.equal(M.view(M.step(m, { ev: "app_morning", id: "x", title: "t", url: "u", greet: true }, 10).m, 20).text, "good morning. your page is open   fn o");
+  m = M.step(m, { ev: "app_morning", id: "morning-0612", title: "your morning", url: "http://127.0.0.1:47123/p/morning-0612", greet: false }, 10).m;
+  const v = M.view(m, 20);
+  assert.equal(v.text, "your page is open   fn o"); assert.equal(v.content.kind, "line");
   eq(M.step(m, { ev: "app_key", key: "o" }, 30).cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/morning-0612", page: "morning-0612" }]);
 });
 
@@ -587,7 +616,7 @@ law("capsule: fn held on a bise page says `voice note on weekly update`, no `mai
   m = M.step(m, { ev: "app_fn", state: "up", key: "fn" }, 50).m;
   m = M.step(m, { ev: "phase", phase: "idle" }, 60).m;
   const w = M.view(m, 70);
-  assert.equal(w.size, "small"); assert.equal(w.text, W.idle);
+  assert.equal(w.size, "small"); assert.equal(w.text, null);
 });
 law("notes: a drawing is one note: its path (near points dropped), its box, the blocks under it top to bottom; it holds while one of them is there", () => {
   const p = N.strokePath([[10, 10], [10.5, 10.2], [20, 10], [20, 30.04]]);
