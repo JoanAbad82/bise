@@ -405,13 +405,13 @@ law("unknown events and junk change nothing", () => {
 });
 
 // ---- v2: pages for you in the capsule
-law("a page ready: `weekly update is ready · fn + o`; fn + o opens it (app_open_url); fn + 0 lists for you", () => {
+law("a page ready: `weekly update is ready   fn o`; fn + o opens it (app_open_url); fn + 0 lists for you", () => {
   const evs = sceneEvents("pages");
   const t0 = evs.find(([, e]) => e.ev === "page")[1].at_ms;
   let m = M.init();
   for (const [t, ev] of evs.filter(([t]) => t < 3500)) m = M.step(m, ev, t).m;
   const v = M.view(m, 1000, t0 + 1000);
-  assert.equal(v.text, "weekly update is ready · fn + o");
+  assert.equal(v.text, "weekly update is ready   fn o");
   const o = M.step(m, { ev: "app_key", key: "o" }, 3500);
   eq(o.cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/weekly-update", page: "weekly-update" }]);
   const a = M.view(M.step(o.m, { ev: "app_key", key: "0" }, 5000).m, 5000, t0 + 5000);
@@ -427,7 +427,7 @@ law("a page updating, then its next version ready, says ready again; a page open
   m = M.step(m, { ev: "page", id: "wu", version: 1, state: "updating", at_ms: 2 }, 30).m;
   assert.equal(M.view(m, 40, 50).text, null);
   m = M.step(m, { ev: "page", id: "wu", version: 2, state: "ready", at_ms: 3 }, 50).m;
-  assert.equal(M.view(m, 60).text, "weekly update is ready · fn + o");
+  assert.equal(M.view(m, 60).text, "weekly update is ready   fn o");
   eq(M.step(M.init(), { ev: "app_key", key: "o" }, 0).cmds, []);   // no page: nothing
 });
 law("in a call or a meeting (app_quiet), only urgent cards ask; the rest wait in the inbox; off, they ask again", () => {
@@ -596,17 +596,17 @@ law("VoiceOver: the pearl's label says its mood; one sentence per view is read, 
 });
 law("the morning page (app_morning, morning-<date>): 'good morning. N things need you · fn + o' (greet), the count shared with the menu bar, the page itself opened; fn + o opens it", () => {
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
-  assert.equal(M.view(M.step(m, { ev: "app_morning", id: "x", title: "t", url: "u", greet: true }, 10).m, 20).text, "good morning. nothing needs you · fn + o");
+  assert.equal(M.view(M.step(m, { ev: "app_morning", id: "x", title: "t", url: "u", greet: true }, 10).m, 20).text, "good morning. nothing needs you. your page is ready   fn o");
   const cards = [{ id: "c1", agent: "a", text: "q?", options: ["yes"] }, { id: "c2", agent: "b", text: "r?", options: ["yes"] }];
   const pages = [{ id: "morning-2026-10-03", title: "your morning", version: 1, opened_version: 0, state: "ready", url: "um", at_ms: 2 }, { id: "recap", title: "recap", version: 2, opened_version: 1, state: "ready", url: "ur", at_ms: 1 }];
   const busy = M.step(M.init(), { ev: "state", agents: [], cards, pages }, 0).m;
   const g = M.step(busy, { ev: "app_morning", id: "morning-2026-10-03", title: "your morning", url: "um", greet: true }, 10).m;
-  assert.equal(M.view(g, 20).text, "good morning. 3 things need you · fn + o");   // 2 cards + the recap's new version
+  assert.equal(M.view(g, 20).text, "good morning. 3 things need you   fn o");   // 2 cards + the recap's new version
   assert.equal(M.count(g), 3);                                                     // the morning page itself is opened
-  assert.equal(Wd.morning(false, 1), "1 thing needs you · fn + o");
+  assert.equal(Wd.morning(false, 1), "1 thing needs you   fn o");
   m = M.step(m, { ev: "app_morning", id: "morning-0612", title: "your morning", url: "http://127.0.0.1:47123/p/morning-0612", greet: false }, 10).m;
   const v = M.view(m, 20);
-  assert.equal(v.text, "nothing needs you · fn + o"); assert.equal(v.content.kind, "line");
+  assert.equal(v.text, "nothing needs you. your page is ready   fn o"); assert.equal(v.content.kind, "line");
   eq(M.step(m, { ev: "app_key", key: "o" }, 30).cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/morning-0612", page: "morning-0612" }]);
 });
 
