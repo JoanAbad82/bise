@@ -597,6 +597,78 @@ law("notes: approve / skip (kit.js's bise:react) is one note per review item or 
   m.edit("r1", "Thanks", "Many thanks", 8, "m1");
   eq(m.drafts().filter((n) => n.kind === "edit").map((n) => [n.item, n.after]), [["m1", "Many thanks"], ["m3", "talk soon"]]);
 });
+law("notes: an answered or done note shows its outcome even when its block is gone; `moved` only for an open one (QA m_5008 (10))", () => {
+  const gone = { anchor: "moved", version: 1, version_seen: 2 };
+  eq(N.tagOf({ ...gone, status: "answered", answer: "which one?" }), { tag: "answer", text: "which one?" });
+  eq(N.tagOf({ ...gone, status: "done" }), { tag: "done", text: "✓ done" });
+  assert.equal(N.tagOf({ ...gone, status: "sent" }).tag, "moved");
+  assert.equal(N.tagOf({ ...gone, status: "draft" }).tag, "moved");
+});
+law("notes: words only added or removed carry the words around them (QA m_5008 (11)); changed only when both sides have words (ambient m_5007)", () => {
+  const ins = N.editSpan("we start day 1 at nine", "we start day 1 (or not) at nine");
+  eq([ins.before, ins.after, ins.added, ins.ctx, ins.side], ["day 1", "day 1 (or not)", "(or not)", "day 1", "after"]);
+  assert.equal(N.label({ kind: "edit", ...ins }), 'you added "(or not)" after "day 1"');
+  const del = N.editSpan("we start day 1 at nine sharp", "we start day 1 at nine");
+  assert.equal(N.label({ kind: "edit", ...del }), 'you removed "sharp" after "at nine"');
+  const first = N.editSpan("day 1 at nine", "honestly day 1 at nine");
+  assert.equal(N.label({ kind: "edit", ...first }), 'you added "honestly" before "day 1"');
+  assert.equal(N.label({ kind: "edit", ...N.editSpan("Q2 was good", "Q3 was good") }), 'you changed "Q2" → "Q3"');
+  eq([N.NW.changed("", "x"), N.NW.changed("x", "")], ['you added "x"', 'you removed "x"']);
+  // a second edit of the block replaces the whole span (from the block's first text)
+  const m = N.model([], counted());
+  const a = N.editSpan("day 1 at nine", "day 1 (or not) at nine");
+  m.edit("p1", a.before, a.after, 1, null, a);
+  const b = N.editSpan("day 1 at nine", "day one at nine");
+  m.edit("p1", b.before, b.after, 2, null, b);
+  eq(m.drafts().map((n) => N.label(n)), ['you changed "1" → "one"']);
+});
+law("notes: an edit the new version kept is `✓ kept`, found in its block or anywhere on the page (QA m_5008 (12))", () => {
+  const m = N.model([], counted());
+  const s = N.editSpan("we start day 1 at nine", "we start day 1 (or not) at nine");
+  m.edit("p1", s.before, s.after, 1, null, { ...s, version: 1 });
+  assert.equal(m.drafts()[0].version, 1);
+  m.sent(2);
+  m.reanchor({ p7: "we start on day 1 (or not) at nine" }, 3);   // the block got a new id
+  const n = m.all()[0];
+  assert.equal(n.anchor, "ok");
+  eq(N.tagOf(n), { tag: "done", text: "✓ kept" });
+  m.reanchor({ p7: "we start on day 2" }, 4);
+  assert.equal(N.tagOf(m.all()[0]).tag, "moved");
+});
+law("notes: kit.js's reactions: keep/drop one per variant, a pick one per block, tick on an item, null takes back (amb-kit m_5018)", () => {
+  const m = N.model([], counted());
+  m.react("c1", "v1", "keep", "", 1, 1);
+  m.react("c1", "v1", "drop", "", 1, 2);                       // keep/drop replace each other
+  m.react("c1", "v1", "pick", "the barn", 1, 3);
+  m.react("c1", "v2", "pick", "the mill", 1, 4);               // one pick per block: the last wins
+  m.react("k1", "t1", "tick", "book the room", 1, 5);
+  eq(m.drafts().map((n) => [n.block, n.item, n.kind]), [["c1", "v1", "drop"], ["c1", "v2", "pick"], ["k1", "t1", "tick"]]);
+  assert.equal(N.label(m.drafts()[1]), "picked");
+  m.react("k1", "t1", null, "", 1, 6);                          // unticked
+  eq(m.drafts().map((n) => n.kind), ["drop", "pick"]);
+});
+law("notes: taste: a note that states a preference is offered once; yes marks it taste, no stops asking (roadmap §3.4)", () => {
+  for (const t of ["never use emoji", "always cite the source", "too long", "no emoji", "shorter please", "jamais de tirets", "toujours en français", "trop long"]) assert.ok(N.tastes(t), t);
+  for (const t of ["use March", "the barn", "longest day"]) assert.ok(!N.tastes(t), t);
+  const m = N.model([], counted());
+  const a = m.add({ version: 1, block: "p1", kind: "note", text: "too long, cut it in half" }, 1);
+  assert.ok(N.offerTaste(a));
+  m.update(a.id, { taste: true });
+  assert.ok(!N.offerTaste(m.get(a.id)));
+  assert.equal(m.payload().notes[0].taste, true);
+  const b = m.add({ version: 1, block: "p1", kind: "note", text: "never this" }, 2);
+  m.update(b.id, { taste: false });
+  assert.ok(!N.offerTaste(m.get(b.id)));
+  assert.equal(N.NW.taste, "keep this for next time?");
+});
+law("notes: start an agent on a review's item is a `start` note with the item's words, one per item, again takes it back (slice C)", () => {
+  const m = N.model([], counted());
+  const s = m.start("r1", "m2", "Marc · invoice #2231 paid on friday", 1, 1);
+  eq([s.kind, s.block, s.item, s.text], ["start", "r1", "m2", "Marc · invoice #2231 paid on friday"]);
+  assert.equal(N.label(s), "start an agent");
+  assert.equal(m.start("r1", "m2", "", 1, 2), null);
+  assert.equal(m.drafts().length, 0);
+});
 law("notes: the kit's own controls (data-kit-ui) are never in a block's text, so never in a quote or an anchor", () => {
   const ui = { nodeType: 1, childNodes: [fakeText("approve skip")], classList: { contains: () => false }, hasAttribute: (a) => a === "data-kit-ui" };
   const li = fakeEl(fakeText("Hi Anna, yes for tuesday."), ui);

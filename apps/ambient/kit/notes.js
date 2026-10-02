@@ -25,10 +25,24 @@
     done: "✓ done",
     open: "open",
     sentTag: "sent",
-    changed: (before, after) => `you changed "${before}" → "${after}"`,
+    // signed by ambient (m_5007): changed only when both sides have words; the place's words for
+    // an addition or a removal (QA m_5008 (11); best guess, asked to ambient)
+    changed: (before, after) => (!before ? `you added "${after}"` : !after ? `you removed "${before}"` : `you changed "${before}" → "${after}"`),
+    addedAt: (words, side, ctx) => `you added "${words}" ${side} "${ctx}"`,
+    removedAt: (words, side, ctx) => `you removed "${words}" ${side} "${ctx}"`,
+    // an edit of yours the new version kept (QA m_5008 (12))
+    kept: "✓ kept",
+    // taste (roadmap §3.4): a note that states a preference is offered once for next time
+    // (best guess, asked to ambient)
+    taste: "keep this for next time?",
+    tasteYes: "yes",
+    tasteNo: "no",
+    tasteKept: "kept for next time",
+    // slice C: start an agent on a review's item (main starts it; best guess, asked to ambient)
+    start: "start an agent",
     marks: { keep: "♡ keep", drop: "✗ drop", unsure: "~ not sure" },
     // approve / skip on a review's item or an email (§4.3; kit.js's buttons say the same words)
-    reacts: { approve: "approve", skip: "skip" },
+    reacts: { approve: "approve", skip: "skip", pick: "picked", tick: "ticked" },
     // a voice note's pin while you talk (the mocks' `you · voice`; ambient, m_4877)
     voiceBy: "you · voice",
     // a drawing in the side list, and the hint while you draw (§5.4; asked to ambient)
@@ -40,7 +54,7 @@
     replyField: "reply, or hold fn and say it",
     // a question's option you picked (ambient, m_4795)
     picked: (option, text) => (text ? `you picked ${option}: ${text}` : `you picked ${option}`),
-    tools: { note: "note", keep: "♡", drop: "✗", unsure: "~", edit: "edit", pin: "pin" },
+    tools: { note: "note", keep: "♡", drop: "✗", unsure: "~", edit: "edit", pin: "pin", start: "start an agent" },
     placeholder: "your note",
     // signed off by ambient (m_4786): 'block' is our word, not hers; keys like the TUI's key bar
     empty: "no notes yet. select some text, or hold fn and talk.",
@@ -85,7 +99,14 @@
     return "ok";
   }
   // every note, re-anchored on a new version's blocks
-  const reanchor = (notes, blocks) => notes.map((n) => ({ ...n, anchor: anchorOf(n, blocks) }));
+  // an edit is kept when its words are in the page, in its block or anywhere (the agent may have
+  // moved or renamed the block): QA m_5008 (12)
+  const keptEdit = (n, blocks) => !!(n.after && Object.values(blocks).some((t) => locate(t, n.after)));
+  const reanchor = (notes, blocks) => notes.map((n) => {
+    if (n.kind !== "edit") return { ...n, anchor: anchorOf(n, blocks) };
+    const kept = keptEdit(n, blocks);
+    return { ...n, anchor: kept ? "ok" : anchorOf(n, blocks), kept };
+  });
 
   // ---- the words nearest a point in a block's text (a voice note's or a pin's anchor): the word
   // at `offset` and its neighbours, at most `n` words, never across a sentence's end
@@ -117,15 +138,47 @@
     while (p < a.length && p < b.length && a[p] === b[p]) p++;
     let s = 0;
     while (s < a.length - p && s < b.length - p && a[a.length - 1 - s] === b[b.length - 1 - s]) s++;
-    return { before: a.slice(p, a.length - s).join(" "), after: b.slice(p, b.length - s).join(" "), at: a.slice(0, p).join(" ").length + (p ? 1 : 0) };
+    return { before: a.slice(p, a.length - s).join(" "), after: b.slice(p, b.length - s).join(" "), at: a.slice(0, p).join(" ").length + (p ? 1 : 0), p, s };
+  }
+  // an edit's note: the changed span; words only added or only removed carry the words around
+  // them (QA m_5008 (11)), so the note reads `you added "(or not)" after "day 1"` and the agent
+  // (and a new version's re-anchor) can find the place
+  function editSpan(first, edited) {
+    const d = diffWords(first, edited);
+    if (d.before && d.after) return { before: d.before, after: d.after };
+    if (!d.before && !d.after) return { before: "", after: "" };
+    const a = norm(first).split(" ").filter(Boolean), b = norm(edited).split(" ").filter(Boolean);
+    const k = 2;
+    // the words just before the change, else (at the very start) the words just after it
+    const lead = a.slice(Math.max(0, d.p - k), d.p);
+    const tail = lead.length ? [] : a.slice(a.length - d.s, a.length - d.s + k);
+    const ctx = (lead.length ? lead : tail).join(" ");
+    const wrap = (mid) => [...lead, ...(mid ? [mid] : []), ...tail].join(" ");
+    return {
+      before: wrap(d.before), after: wrap(d.after),
+      ...(d.after ? { added: d.after } : { removed: d.before }),
+      ...(ctx ? { ctx, side: lead.length ? "after" : "before" } : {}),
+    };
   }
 
   // ---- what happened to a note: the agent's outcome first, then where it sits
   function outcome(n) {
     if (n.status === "done") return { tag: "done", text: NW.done };
     if (n.status === "answered") return { tag: "answer", text: n.answer || "" };
-    if (n.status === "sent") return { tag: n.version_seen && n.version_seen > n.version ? "open" : "sent", text: n.version_seen && n.version_seen > n.version ? NW.open : NW.sentTag };
+    if (n.status === "sent") {
+      const newer = n.version_seen && n.version_seen > n.version;
+      // your edit, still in the new version: kept (QA m_5008 (12))
+      if (newer && n.kind === "edit" && n.kept) return { tag: "done", text: NW.kept };
+      return newer ? { tag: "open", text: NW.open } : { tag: "sent", text: NW.sentTag };
+    }
     return { tag: "draft", text: "" };
+  }
+  // the side list's tag: an answered or done note always shows its outcome, anchored or not;
+  // `moved` is only for a note still open that lost its place (QA m_5008 (10))
+  function tagOf(n) {
+    const o = outcome(n);
+    if (n.anchor === "moved" && (n.status === "draft" || n.status === "sent") && o.text !== NW.kept) return { tag: "moved", text: NW.moved };
+    return o;
   }
 
   // where a note sits, in the page's words, never a block id (ambient, m_4919 (2)): the quoted
@@ -140,18 +193,32 @@
 
   // a note's one line in the side list
   function label(n) {
-    if (n.kind === "edit") return NW.changed(n.before || "", n.after || "");
+    if (n.kind === "edit") {
+      if (n.added && n.ctx) return NW.addedAt(n.added, n.side || "after", n.ctx);
+      if (n.removed && n.ctx) return NW.removedAt(n.removed, n.side || "after", n.ctx);
+      return NW.changed(n.before || "", n.after || "");
+    }
     if (NW.marks[n.kind]) return n.text ? `${NW.marks[n.kind]}: ${n.text}` : NW.marks[n.kind];
-    if (n.kind === "pick") return NW.picked(n.option, n.text);
+    if (n.kind === "pick" && n.option != null) return NW.picked(n.option, n.text);
     if (n.kind === "draw") return n.text ? `${NW.drawing}: ${n.text}` : NW.drawing;
     // the item's own words are long (a whole mail): its place line names it, the note says the verdict
     if (NW.reacts[n.kind]) return NW.reacts[n.kind];
+    if (n.kind === "start") return NW.start;
     return n.text || "";
   }
 
+  // ---- taste (roadmap §3.4): a note that states a preference ('never …', 'too long', 'no emoji',
+  // 'jamais', 'trop long'...): the layer offers once to keep it for next time
+  const TASTE = /\b(never|always|too (long|short|much|many|formal|casual)|no emojis?|shorter|longer|jamais|toujours|trop (long|court|formel)|plus court|pas d'?emojis?)\b/i;
+  const tastes = (text) => TASTE.test(String(text || ""));
+  // offered under a draft whose words state a preference, until you say yes or no (taste set)
+  const offerTaste = (n) => n.status === "draft" && !n.listening && n.taste == null && tastes(n.text);
+
   // ---- the notes model: drafts are yours until `send`; the server's statuses win for the rest
   const STATUS = ["draft", "sent", "done", "answered"];
-  const REACTS = ["approve", "skip"];
+  // kit.js's reactions (bise:react) and which ones replace each other on an item
+  const GROUP = { approve: "verdict", skip: "verdict", keep: "mark", drop: "mark", pick: "pick", tick: "tick" };
+  const REACTS = Object.keys(GROUP);
   // every note gets its own id here: the server numbers id-less notes n<max+1>, so a removed
   // draft's number could come back (ambient-lead, m_4805). `n` + time + random, base 36.
   const newId = (now) => `n${Math.floor(now || Date.now()).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -219,22 +286,37 @@
       },
       // an edit on a block (or a review's item) already edited: one note per block or item, its
       // before kept from the first
-      edit(block, before, after, now, item) {
+      // `span` is editSpan's (before/after, and added/removed with the words around them): from the
+      // block's first text each time, so a later edit replaces the whole span
+      edit(block, before, after, now, item, span) {
         const prev = notes.find((n) => n.status === "draft" && n.kind === "edit" && n.block === block && (n.item || null) === (item || null));
+        const extra = span ? { added: span.added, removed: span.removed, ctx: span.ctx, side: span.side, ...(span.version ? { version: span.version } : {}) } : {};
         if (prev) {
-          if (norm(prev.before) === norm(after)) { api.remove(prev.id); undo.pop(); return null; }
-          return api.update(prev.id, { after, at_ms: now || prev.at_ms });
+          if (norm(prev.before) === norm(after) || norm(before) === norm(after)) { api.remove(prev.id); undo.pop(); return null; }
+          return api.update(prev.id, { ...(span ? { before } : {}), after, ...extra, at_ms: now || prev.at_ms });
         }
         if (norm(before) === norm(after)) return null;
-        return api.add({ kind: "edit", block, ...(item ? { item } : {}), before, after }, now);
+        return api.add({ kind: "edit", block, ...(item ? { item } : {}), before, after, ...extra }, now);
       },
       // approve / skip on a review's item or an email (kit.js's bise:react, §4.3): one per item,
       // the latest wins; kind null (the same again) takes it back
+      // (amb-kit m_5018: also keep / drop and pick on a compare's variants, tick on a checklist's
+      // items.) One reaction per item and group: approve/skip, keep/drop, tick; a pick is one per
+      // block (the last wins, on any variant). kind null takes back the item's reaction.
       react(block, item, kind, text, version, now) {
-        const prev = notes.find((n) => n.status === "draft" && REACTS.includes(n.kind) && n.block === block && (n.item || null) === (item || null));
-        if (!REACTS.includes(kind)) { if (prev) notes = notes.filter((x) => x !== prev); return null; }
-        if (prev) return api.update(prev.id, { kind, text: text || undefined, at_ms: now || prev.at_ms });
+        const same = (n) => n.status === "draft" && REACTS.includes(n.kind) && n.block === block;
+        const onItem = (n) => same(n) && (n.item || null) === (item || null);
+        if (!REACTS.includes(kind)) { notes = notes.filter((n) => !(onItem(n) && n.kind !== "pick") && !(onItem(n) && kind == null && n.kind === "pick")); return null; }
+        const prev = kind === "pick" ? notes.find((n) => same(n) && n.kind === "pick") : notes.find((n) => onItem(n) && GROUP[n.kind] === GROUP[kind]);
+        if (prev) return api.update(prev.id, { kind, ...(item ? { item } : {}), text: text || undefined, at_ms: now || prev.at_ms });
         return api.add({ version, block, ...(item ? { item } : {}), kind, text: text || undefined }, now);
+      },
+      // start an agent on a review's item (slice C): one per item, the same again takes it back;
+      // amb-core routes start notes to main, the only one that starts agents
+      start(block, item, text, version, now) {
+        const prev = notes.find((n) => n.status === "draft" && n.kind === "start" && n.block === block && (n.item || null) === (item || null));
+        if (prev) { notes = notes.filter((x) => x !== prev); return null; }
+        return api.add({ version, block, ...(item ? { item } : {}), kind: "start", text: text || undefined }, now);
       },
       // a question's option picked on the page (kit.js's bise:pick): one pick per block, the
       // latest wins; picking the same option again takes it back
@@ -296,7 +378,7 @@
       .map(([id]) => id);
   }
 
-  const core = { NW, spaced, norm, locate, anchorOf, reanchor, diffWords, outcome, label, where, blockName, model, nearestQuote, strokePath, strokesBox, blocksIn };
+  const core = { NW, spaced, norm, locate, anchorOf, reanchor, diffWords, editSpan, outcome, tagOf, label, where, blockName, tastes, offerTaste, model, nearestQuote, strokePath, strokesBox, blocksIn };
 
   // ======================================================================================
   // the DOM: only on a page the shell served (#bise-page)
@@ -475,8 +557,8 @@
         const li = el("li", `bn-item bn-${n.status}${n.anchor === "moved" ? " bn-moved" : ""}`);
         li.dataset.note = n.id;
         li.append(el("div", "bn-where", where(n, nameOf(n.block, n.item))), glyphed("div", "bn-what", label(n)));
-        const o = outcome(n);
-        if (n.anchor === "moved") li.append(el("div", "bn-tag bn-tag-moved", NW.moved));
+        const o = tagOf(n);
+        if (o.tag === "moved") li.append(el("div", "bn-tag bn-tag-moved", NW.moved));
         else if (o.tag === "answer") {
           // the agent's answer is a reply, and the note stays open: its name dim, its words, then
           // a field for yours (ambient, m_4919 (3))
@@ -486,6 +568,13 @@
           field.type = "text"; field.placeholder = NW.replyField; field.dataset.replyTo = n.id;
           li.append(rep, field);
         } else if (o.text) li.append(glyphed("div", `bn-tag bn-tag-${o.tag}`, o.text));
+        // taste: offered once under a note that states a preference; yes keeps it for next time
+        if (offerTaste(n)) {
+          const ask = el("div", "bn-taste", NW.taste);
+          const b = (v, t) => { const x = el("button", "bn-taste-btn", t); x.type = "button"; x.dataset.taste = v; x.dataset.note = n.id; return x; };
+          ask.append(" ", b("yes", NW.tasteYes), b("no", NW.tasteNo));
+          li.append(ask);
+        } else if (n.taste === true) li.append(el("div", "bn-tag", NW.tasteKept));
         if (n.status === "draft") {
           const x = el("button", "bn-x", "×");
           x.type = "button"; x.title = NW.remove; x.dataset.remove = n.id;
@@ -540,7 +629,9 @@
       const b = blockById(t.block);
       const btn = (k, text) => { const e = el("button", "bn-tool", text); e.type = "button"; e.dataset.tool = k; return e; };
       // edit on prose, a review's item, an email
-      tools.replaceChildren(btn("note", NW.tools.note), btn("keep", NW.tools.keep), btn("drop", NW.tools.drop), btn("unsure", NW.tools.unsure), ...(editable(b, t.item) ? [btn("edit", NW.tools.edit)] : []));
+      tools.replaceChildren(btn("note", NW.tools.note), btn("keep", NW.tools.keep), btn("drop", NW.tools.drop), btn("unsure", NW.tools.unsure), ...(editable(b, t.item) ? [btn("edit", NW.tools.edit)] : []),
+        // a review's item can start an agent (slice C)
+        ...(b && b.dataset.kit === "review" && t.item ? [btn("start", NW.tools.start)] : []));
       tools.style.left = `${rect.left + win.scrollX}px`;
       tools.style.top = `${rect.top + win.scrollY - 40}px`;
       tools.dataset.on = t.quote ? "selection" : "block";
@@ -607,6 +698,8 @@
       const b = blockById(target.block);
       if (k === "note") return compose(target);
       if (k === "edit") { hideTools(); return startEdit(b, target.item); }
+      // start an agent on this item (slice C): the item's words go with it; main starts it
+      if (k === "start") { const x = editEl(target.block, target.item); M.start(target.block, target.item, norm(textOf(x)), version, now()); hideTools(); barNote = ""; save(); render(); return; }
       addNote(k);
       hideTools();
       win.getSelection().removeAllRanges();
@@ -679,8 +772,8 @@
       e.contentEditable = "false";
       e.classList.remove("bn-editing");
       const first = originals[editKey(block, item)].text, after = norm(textOf(e));
-      const d = diffWords(first, after);
-      M.edit(block, d.before, d.after, now(), item);
+      const d = editSpan(first, after);
+      M.edit(block, d.before, d.after, now(), item, { ...d, version });
       markEdited(e, norm(first) !== after);
       editing = null;
       save(); render();
@@ -717,6 +810,9 @@
     list.addEventListener("click", (e) => {
       const x = e.target.dataset && e.target.dataset.remove;
       if (x) { M.remove(x); save(); render(); return; }
+      // taste: yes keeps the note for next time (taste: true, the agent appends it to taste.md); no stops asking
+      const t = e.target.dataset && e.target.dataset.taste;
+      if (t) { M.update(e.target.dataset.note, { taste: t === "yes" }); save(); render(); return; }
       const li = e.target.closest(".bn-item");
       const n = li && M.get(li.dataset.note);
       const b = n && blockById(n.block);

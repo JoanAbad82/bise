@@ -41,6 +41,10 @@ html.bn-pinning #bise-page [data-kit][data-id] { cursor: crosshair; }
 .bn-reply { margin-top: 6px; font-size: 13.5px; line-height: 1.4; color: var(--talk-ink, var(--ink, #fff)); }
 .bn-reply-by { color: var(--talk-dim, #ffffffa0); }
 .bn-reply-field { display: block; width: 100%; margin-top: 6px; padding: 5px 8px; border: 0; outline: 0; border-radius: var(--radius-small, 10px); background: color-mix(in srgb, var(--talk-ink, #fff) 8%, transparent); color: var(--talk-ink, #fff); font: 13px var(--font-ui, sans-serif); caret-color: var(--pen, #c8264a); }
+/* taste: `keep this for next time?  yes  no`, once, under a note that states a preference */
+.bn-taste { margin-top: 5px; font-size: 12.5px; color: var(--talk-dim, #ffffffa0); }
+.bn-taste-btn { border: 0; background: none; padding: 1px 6px; margin-left: 2px; border-radius: var(--radius-small, 10px); font-size: 12.5px; color: var(--talk-ink, #fff); }
+.bn-taste-btn:hover { background: color-mix(in srgb, var(--talk-ink, #fff) 10%, transparent); }
 .bn-reply-field::placeholder, .bn-input::placeholder { color: var(--talk-dim, #ffffff70); }
 .bn-tag-moved, .bn-moved .bn-where { color: var(--talk-dim, #ffffff70); font-style: italic; }
 .bn-x { position: absolute; right: 6px; top: 7px; width: 22px; height: 22px; border: 0; background: none; color: var(--talk-dim, #ffffff70); border-radius: 50%; }
