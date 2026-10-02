@@ -48,6 +48,8 @@ TOOLS = [
      {"file": {"type": "string"}, "id": {"type": "string"}, "title": {"type": "string"}, "edit": {"type": "object"}, "done": {"type": "array", "items": {"type": "string"}}, "answers": {"type": "object"}}, []),
     ("page_notes", "Draft notes on a page through its API (as notes.js would), optionally send them to the page's agent. A note: {block, kind: note|keep|drop|unsure|edit|voice|pin, quote?, text?, before?, after?}.",
      {"id": {"type": "string"}, "notes": {"type": "array"}, "send": {"type": "boolean"}}, ["id", "notes"]),
+    ("page_drive", "A page in a throwaway headless Chrome (its own profile, no logins, local URLs only; never the user's browser): steps [{eval, key, mouse: [x,y], click, type, wait, shot}] run once per color scheme, shots at 2x. The page id on the throwaway hub, or a local url.",
+     {"id": {"type": "string"}, "url": {"type": "string"}, "steps": {"type": "array"}, "schemes": {"type": "array", "items": {"type": "string"}}, "name": {"type": "string"}}, []),
     ("page_meta", "A page's meta: versions, state, notes with their status (draft, sent, done, answered).", {"id": {"type": "string"}}, ["id"]),
     ("page_fixture", "ambient's fixture: the weekly-update page at v1, four notes sent (a note, a voice note, an edit, an unsure on a block v2 renames: moved), then v2 marking one done and answering one. Returns both urls and the notes.",
      {"id": {"type": "string"}}, []),
@@ -124,6 +126,9 @@ def run(name, a):
         r = qa.page_publish(a.get("file"), a.get("id", "weekly-update"), a.get("title", "weekly update"), a.get("done"), a.get("answers"), a.get("edit"))
     elif name == "page_notes":
         r = qa.page_notes(a["id"], a["notes"], a.get("send", False))
+    elif name == "page_drive":
+        r = qa.page_drive(a.get("id"), a.get("url"), a.get("steps"), a.get("schemes") or ["light", "dark"], a.get("name"))
+        images += [x["shot"] for run in r["runs"] for x in run.get("results", []) if x.get("shot")][:2]
     elif name == "page_meta":
         r = qa.page_meta(a["id"])
     elif name == "page_fixture":

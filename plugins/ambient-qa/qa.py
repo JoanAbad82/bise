@@ -698,6 +698,38 @@ def page_meta(id):
     return json.loads(body)
 
 
+def page_drive(id=None, url=None, steps=None, schemes=("light",), name=None, out=None, width=1400, height=900, scale=2):
+    """A page in a throwaway headless Chrome (pagedrive.mjs: its own profile,
+    no logins, local URLs only), never the user's browser: the page `id` on
+    the throwaway hub (or a local `url`), `steps` run in order (eval, key,
+    mouse, type, wait, shot), once per color scheme. Returns each run's
+    results (evals, shot files) and the page's console."""
+    if not url:
+        if not id:
+            raise QAError("page_drive needs a page id (on the throwaway hub) or a local url")
+        _, info = _hub()
+        port = int(open(os.path.join(info["state"], "pages.port")).read().strip())
+        url = "http://127.0.0.1:%d/p/%s" % (port, id)
+    if isinstance(schemes, str):
+        schemes = [x for x in schemes.split(",") if x]
+    out = out or os.path.join(OUT, "pages")
+    os.makedirs(out, exist_ok=True)
+    name = name or (id or "page")
+    runs = []
+    for sc in schemes:
+        args = {"url": url, "out": os.path.join(out, "%s.%s" % (name, sc)), "steps": steps or [], "scheme": sc,
+                "width": width, "height": height, "scale": scale}
+        r = subprocess.run(["node", os.path.join(HERE, "pagedrive.mjs"), json.dumps(args)], capture_output=True, text=True, timeout=600)
+        try:
+            res = json.loads(r.stdout.strip().splitlines()[-1])
+        except (ValueError, IndexError):
+            raise QAError("pagedrive failed: " + (r.stderr or r.stdout)[-800:])
+        if res.get("error"):
+            raise QAError("pagedrive: %s" % res["error"])
+        runs.append(dict(res, scheme=sc))
+    return {"url": url, "runs": runs}
+
+
 def page_fixture(id="weekly-update"):
     """ambient's fixture (m_4872): v1, three notes sent (a note, a voice
     note, an edit), then v2 answering them: one done, one answered, the
@@ -960,7 +992,7 @@ def _cli(argv):
     p.add_argument("--span", help="from,to in ms (frames)"); p.add_argument("--at", help="ms,ms,... instead of the automatic moments")
     p = sub.add_parser("look"); p.add_argument("--tokens", help="a .css or .json tokens file ('' = the app's own)"); p.add_argument("--reduce-motion", choices=["on", "off"])
     p = sub.add_parser("page", help="pages on the throwaway hub")
-    p.add_argument("action", choices=["publish", "notes", "meta", "fixture"]); p.add_argument("--id", default="weekly-update"); p.add_argument("--file")
+    p.add_argument("action", choices=["publish", "notes", "meta", "fixture", "drive"]); p.add_argument("--url"); p.add_argument("--steps", help="a JSON file of steps (drive)"); p.add_argument("--schemes", default="light,dark"); p.add_argument("--id", default="weekly-update"); p.add_argument("--file")
     p.add_argument("--title", default="weekly update"); p.add_argument("--notes", help="JSON list of notes"); p.add_argument("--send", action="store_true")
     p.add_argument("--done", help="n1,n2"); p.add_argument("--edit", help='JSON {"old": "new"} applied to the file first')
     p = sub.add_parser("list")
@@ -994,6 +1026,8 @@ def _cli(argv):
             r = page_notes(a.id, json.loads(a.notes or "[]"), a.send)
         elif a.action == "meta":
             r = page_meta(a.id)
+        elif a.action == "drive":
+            r = page_drive(None if a.url else a.id, a.url, json.load(open(a.steps)) if a.steps else None, a.schemes)
         else:
             r = page_fixture(a.id)
     elif a.cmd == "list":

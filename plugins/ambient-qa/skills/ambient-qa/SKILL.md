@@ -53,6 +53,7 @@ Every tool returns JSON; PNG files are written under
 | `page_publish({file, id, edit, done, answers})` | `qa.py page publish [--file f.html] [--id x]` | the throwaway hub's main publishes a page (`sb page publish`): your file or amb-kit's weekly-update example; returns its URL |
 | `page_notes({id, notes, send})` | `qa.py page notes --id x --notes '[...]' --send` | draft notes through the page's own API (token, origin), as notes.js does; `send` sends them to the page's agent |
 | `page_meta({id})` | `qa.py page meta --id x` | versions, state, the notes and their status |
+| `page_drive({id, steps, schemes})` | `qa.py page drive --id x --steps f.json` | the page in a throwaway headless Chrome (no logins, local only): your steps, 2x shots in light and dark |
 | `page_fixture()` | `qa.py page fixture` | weekly-update at v1, four notes sent (note, voice, edit, unsure), then v2 marking one done, answering one, and moving the unsure one's block |
 | `stop()` | `qa.py stop` | quit the QA app and the fake hub |
 
@@ -101,27 +102,27 @@ Every tool returns JSON; PNG files are written under
 Read-only on your real work: `launch({hub: "real", workspace: ...})`
 shows your real agents and cards; nothing you do reaches main.
 
-## Pages in Chrome (with the computer plugin)
+## Pages in a throwaway Chrome
 
 The capsule's side of pages (`page-ready`, `page-updating`, `page-fn-o`,
 `page-front`, `for-you` scenes) plays here; QA mode logs the URL it would
-open (`events`: `qa_open_url`) instead of opening it. The page itself is
-in Chrome:
+open (`events`: `qa_open_url`) instead of opening it. The page itself:
 
-1. `launch()`, then `page_fixture()` (or `page_publish(...)`): you get
-   the page's URL on the throwaway hub's page server (127.0.0.1).
-2. Only if the user asked for this run (computer use drives his own
-   browser): load the `computer:computer-use` skill and open the URL in
-   your own tab group (never the user's tabs), at a fixed size; `/p/<id>/v/1` and
-   `/p/<id>/v/2` give each version.
-3. Screenshot the page (the frame, the blocks, the notes in each state:
-   open, sent, done, answered, moved); light and dark: switch with the
-   tab's color scheme emulation if the computer plugin offers it, else
-   macOS's appearance is the user's, so ask before changing it.
-4. Act like the user: select text, add a note, edit a block, send.
-   Check the result with `page_meta(id)` (the notes' status) and
-   `events()` (the core's `page` events reaching the capsule).
-5. Close your tabs at the end.
+1. `launch()`, then `page_fixture()` (or `page_publish(...)`): the page
+   on the throwaway hub's page server (127.0.0.1).
+2. `page_drive({id, steps, schemes: ["light", "dark"]})` (CLI: `qa.py page
+   drive --id weekly-update --steps steps.json`): a throwaway headless
+   Chrome (its own profile, no logins, deleted after; local URLs only,
+   never the user's browser) runs your steps: `{eval}` (read the DOM, the
+   notes' state), `{mouse: [x, y], click}`, `{key}`, `{type}` (select,
+   note, edit, send like the user), `{wait}`, `{shot: "name"}` (2x PNGs,
+   once per color scheme). `/p/<id>/v/1` and `/v/2` give each version.
+3. Check the result with `page_meta(id)` (the notes' status: open, sent,
+   done, answered, moved) and `events()` (the core's `page` events
+   reaching the capsule).
+
+The `computer` plugin (the user's own Chrome, with his logins) is not for
+QA: only when the user asks for that run himself.
 
 ## Limits
 

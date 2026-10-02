@@ -184,6 +184,17 @@ def fake_accounts():
 
 
 @test
+def page_drive_local_only():
+    """the page driver refuses any non-local URL before it starts Chrome (never a real site, never the user's browser)"""
+    for url in ("https://mail.google.com/", "http://example.com/p/x"):
+        try:
+            qa.page_drive(url=url, out=tempfile.mkdtemp(prefix="aq-"))
+            check(False, "drove %s" % url)
+        except qa.QAError as e:
+            check("local pages only" in str(e), e)
+
+
+@test
 def client_protocol():
     """the socket client: one JSON line each way, ids matched, errors raised"""
     d = tempfile.mkdtemp(prefix="aq-", dir="/tmp" if len(tempfile.gettempdir()) > 60 else None)
