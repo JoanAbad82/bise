@@ -2878,8 +2878,10 @@ fn plugins_fingerprint(ws: &Path) -> u64 {
 
 /// The skill folders a REPL's startup scan reads (runtime/skills.bend
 /// `scan_script`): `~/.agents/skills`, `~/.vibe/skills`,
-/// `<ws>/.agents/skills` and, for main, the app root's `prompts/skills`
-/// (the plugins' skills are in the plugins fingerprint).
+/// `<ws>/.agents/skills`, the app root's `prompts/skills-all` (every
+/// agent's built-ins, bise-pages) and, for main, the app root's
+/// `prompts/skills` (main's own, bise-demo; the plugins' skills are in the
+/// plugins fingerprint).
 fn skill_roots(ws: &Path, app_root: &Path, is_main: bool) -> Vec<PathBuf> {
     let mut roots = Vec::new();
     if let Some(home) = std::env::var_os("HOME").filter(|h| !h.is_empty()) {
@@ -2888,6 +2890,7 @@ fn skill_roots(ws: &Path, app_root: &Path, is_main: bool) -> Vec<PathBuf> {
         roots.push(home.join(".vibe/skills"));
     }
     roots.push(ws.join(".agents/skills"));
+    roots.push(app_root.join("prompts/skills-all"));
     if is_main {
         roots.push(app_root.join("prompts/skills"));
     }
@@ -2960,6 +2963,10 @@ mod tests {
         let ws = d.join("ws");
         assert!(skill_roots(&ws, &d, true).contains(&d.join("prompts/skills")));
         assert!(!skill_roots(&ws, &d, false).contains(&d.join("prompts/skills")));
+        // every agent reads prompts/skills-all (bise-pages)
+        for main in [true, false] {
+            assert!(skill_roots(&ws, &d, main).contains(&d.join("prompts/skills-all")));
+        }
         let _ = std::fs::remove_dir_all(&d);
     }
 

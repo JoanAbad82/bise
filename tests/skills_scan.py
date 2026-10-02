@@ -21,6 +21,8 @@ temp HOME holding one skill:
 6. main (BISE_ROLE=main, the hub sets it) gets bise's built-in skills,
    the app root's prompts/skills (bise-demo), after the others; a task
    (BISE_ROLE=agent) or a solo session does not.
+7. every agent, main and tasks, gets the app root's prompts/skills-all
+   (bise-pages: a task that makes a page loads it with the skill tool).
 """
 import os, socket, subprocess, sys, tempfile, time
 
@@ -119,8 +121,12 @@ def main():
         subprocess.run(["/bin/sh", script, a1, a2, os.path.join(tmp, "none.txt")], cwd=ROOT,
                        env={**env, "BISE_ROLE": "agent"}, check=True)
         adata = open(a2).read() if os.path.exists(a2) else "<none>"
-        check("a task's index has no built-in skill", adata.startswith("beta\t") and "bise-demo" not in adata,
+        check("a task's index has no main-only built-in skill", adata.startswith("beta\t") and "bise-demo" not in adata,
               repr(adata))
+        pages = os.path.join(ROOT, "prompts", "skills-all", "bise-pages", "SKILL.md")
+        for who, data in (("main", sdata), ("a task", adata)):
+            check("%s's index has every agent's built-ins (bise-pages)" % who,
+                  ("\nbise-pages\t" in data) and ("\t%s\n" % pages) in data, repr(data))
         sock = socket.create_connection(("127.0.0.1", port), timeout=120)
         sock.sendall(b"run [[skill: alpha]] [[skill: nope]] [[skill: bise-demo]]\n")
         f = sock.makefile("rb")

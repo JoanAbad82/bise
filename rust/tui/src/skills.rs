@@ -66,10 +66,13 @@ fn skill_dirs(workspace: &Path) -> Vec<PathBuf> {
     dirs
 }
 
-/// The app root's `prompts/skills` (main's built-in skills, bise-demo).
-fn builtin_prompts() -> Option<PathBuf> {
-    let root = bend_plugins::resolve::builtin_root()?;
-    Some(root.parent()?.join("prompts/skills")).filter(|p| p.is_dir())
+/// The app root's built-in skill folders: `prompts/skills-all` (every
+/// agent's, bise-pages) and `prompts/skills` (main's, bise-demo).
+fn builtin_prompts() -> Vec<PathBuf> {
+    let Some(app) = bend_plugins::resolve::builtin_root().and_then(|r| r.parent().map(Path::to_path_buf)) else {
+        return Vec::new();
+    };
+    ["prompts/skills-all", "prompts/skills"].iter().map(|d| app.join(d)).filter(|p| p.is_dir()).collect()
 }
 
 /// A SKILL.md's `name:` and `description:` lines, as the scan reads them
