@@ -16,7 +16,7 @@
 
   const FS = `
   precision highp float;
-  uniform vec2 res; uniform float t, flow, variant, lvl, think, need, done, away, listen, still;
+  uniform vec2 res; uniform float t, flow, variant, lvl, think, need, done, away, listen, still, gather;
   float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
   float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
     return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
@@ -56,6 +56,13 @@
     float dot_=step(.82-ring*.25,h)*smoothstep(.32,.0,length(fc))*ring*tw;
     col=mix(col,CREAM*1.1,dot_); a=max(a,dot_*.9);
     a+= (1.-a)*exp(-max(0.,r-R*.8)*5.)*halo*.6;
+    // the hello (ambient m_5702): gather 1 is a few scattered dots of pink and cream, the body not
+    // yet there; as it eases to 0 the dots close in and the mist fills in behind them
+    if(gather>0.){
+      vec2 gs=uv/(1.+gather*1.3); vec2 g2=gs*min(res.x,res.y)/7.; vec2 id2=floor(g2), f2=fract(g2)-.5;
+      float h2=hash(id2+vec2(7.,3.));
+      float d2=step(.8,h2)*smoothstep(.3,.0,length(f2))*smoothstep(R*1.05,R*.6,length(gs))*gather;
+      a*=(1.-gather); col=mix(col,mix(ROSE,CREAM,fract(h2*13.)),d2); a=max(a,d2*.95);}
     gl_FragColor=vec4(col*a,a);}`;
   const VS = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
 
@@ -107,7 +114,7 @@
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const U = {};
-    for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", ...Object.keys(PINK)]) U[k] = gl.getUniformLocation(prog, k);
+    for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", "gather", ...Object.keys(PINK)]) U[k] = gl.getUniformLocation(prog, k);
     for (const k in PINK) gl.uniform3fv(U[k], PINK[k]);
     gl.uniform1f(U.variant, 1);
     function draw(S, t, level) {
@@ -132,7 +139,7 @@
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const U = {};
-    for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", ...Object.keys(PINK)]) U[k] = gl.getUniformLocation(prog, k);
+    for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", "gather", ...Object.keys(PINK)]) U[k] = gl.getUniformLocation(prog, k);
     for (const k in PINK) gl.uniform3fv(U[k], PINK[k]);
     gl.uniform1f(U.variant, 1);
 
@@ -150,7 +157,7 @@
       last = t;
       S = ease(S, st.mood, st.lvl, dt, !!st.still);
       const resized = fit();
-      const calm = st.still && settled(S, st.mood, true);
+      const calm = st.still && settled(S, st.mood, true) && !(st.gather > 0);
       const key = calm ? `${st.mood}` : "";
       if (calm && !resized && key === settledKey) return false;
       settledKey = key;
@@ -160,6 +167,7 @@
       gl.viewport(0, 0, cv.width, cv.height);
       gl.uniform2f(U.res, cv.width, cv.height); gl.uniform1f(U.t, st.still ? 0 : t); gl.uniform1f(U.flow, S.flow);
       gl.uniform1f(U.lvl, S.voice * (st.lvl || 0)); gl.uniform1f(U.think, S.think); gl.uniform1f(U.need, S.need);
+      gl.uniform1f(U.gather, st.gather || 0);
       gl.uniform1f(U.done, S.done); gl.uniform1f(U.away, S.away); gl.uniform1f(U.listen, S.listen); gl.uniform1f(U.still, S.still);
       gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       return !calm;
