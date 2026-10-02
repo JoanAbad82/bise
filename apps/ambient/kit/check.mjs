@@ -446,6 +446,14 @@ law("checklist who and when: due dates in words, late in its own state, done ite
   assert.equal(s1.getAttribute("data-verdict"), "tick");
   assert.ok(!s1.hasAttribute("data-late"));
   assert.equal(when(s1).textContent, "you", "ticked: who, not 'late'");
+  // bise took its own step (pm's 26): it says what it did and takes you to the draft
+  const bd = blocks(parse(`<section data-kit="checklist" data-id="buy"><ol><li data-id="b1" data-who="bise" data-did="drafted" data-draft="mail-legal">the mail to legal</li><li data-id="b2" data-who="bise" data-did="checked · it loads">acme.app loads</li></ol></section>`))[0];
+  K.decorate([bd], "plan", doc);
+  const [b1, b2] = K.options(bd);
+  assert.equal(when(b1).textContent, "bise · drafted · in the page");
+  assert.equal(when(b1).getAttribute("data-goto"), "mail-legal");
+  assert.equal(when(b2).textContent, "bise · checked · it loads");
+  assert.equal(when(b2).getAttribute("data-goto"), null);
   assert.equal(K.ticked(doc, y, "nope"), false);
 });
 

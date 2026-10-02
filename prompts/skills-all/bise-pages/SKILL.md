@@ -79,7 +79,9 @@ Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kep
 - `message`: a draft for a channel, `data-to="Slack · #launch"`, `<p>`s; never `<pre>`.
 - `email`: `data-to`, `<p data-field="to">`, `subject`, the body; `data-verb="draft"` for his drafts.
 - `compare`: 2 to 4 `<li data-id>` side by side: `<h3>`, `<ul>` of facts, `<p>` why.
-- `checklist`: `<li data-id data-who data-due="2026-05-20">`, `data-done` when done.
+- `checklist`: `<li data-id data-who data-due="2026-05-20">`, `data-done` when done. A plan:
+  take every step you can (drafts wait for his word), `data-who="yours"` only for his hands or
+  his word, and say on your rows what you did (`data-did`, `data-draft`, `blocks.md`).
 
 **A draft of anything that leaves goes in its own block, never in prose:** a Slack message or a
 post in a `message` block (`data-to="Slack · #team"`: `copy` and `open #team`), a mail or a

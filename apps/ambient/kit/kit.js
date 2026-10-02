@@ -61,6 +61,7 @@
     sendAll: (n) => (n === 2 ? "send both" : `send all ${n}`),
     openInPlace: (place) => `open in ${place}`,
     yours: "you",
+    inThePage: "in the page",
     watching: "watching",
     stop: "stop",
     putInDrafts: "put it in my drafts",
@@ -319,10 +320,14 @@
     // comes); shown 'you · friday'. A done or ticked step is never late: it keeps who did it,
     // not 'late · 3 days'
     const done = li.getAttribute("data-done") != null || li.getAttribute("data-verdict") === "tick";
-    const text = [who === "yours" ? W.yours : who, due && !(done && due.late) && due.text].filter(Boolean).join(" · ");
+    // what bise did on its own step (pm's 26): 'bise · drafted · in the page', the last part
+    // taking you to the block that holds the draft (data-draft)
+    const did = li.getAttribute("data-did"), draft = li.getAttribute("data-draft");
+    const text = [who === "yours" ? W.yours : who, did, draft && W.inThePage, due && !(done && due.late) && due.text].filter(Boolean).join(" · ");
     if (!text) { if (tag) li.removeChild(tag); li.removeAttribute("data-late"); return; }
     if (!tag) { tag = doc.createElement("span"); tag.setAttribute("data-kit-ui", ""); tag.setAttribute("data-when", ""); li.append(tag); }
     tag.textContent = text;
+    if (draft) tag.setAttribute("data-goto", draft); else tag.removeAttribute("data-goto");
     if (due && due.late && li.getAttribute("data-done") == null && li.getAttribute("data-verdict") !== "tick") li.setAttribute("data-late", ""); else li.removeAttribute("data-late");
   }
 
@@ -953,6 +958,13 @@
       if (act) { onAct(act); return; }
       const li = e.target.closest && e.target.closest('[data-kit="question"] li');
       if (li) { const q = li.closest('[data-kit="question"]'); onPick(q, options(q).indexOf(li) + 1); return; }
+      // a step's 'in the page': to the block that holds its draft, lit a moment
+      const go = e.target.closest && e.target.closest("[data-goto]");
+      if (go) {
+        const t = targetOf(blocks(), go.getAttribute("data-goto"));
+        if (t) { t.scrollIntoView({ behavior: "smooth", block: "center" }); t.setAttribute("data-lit", ""); setTimeout(() => t.removeAttribute("data-lit"), 2400); }
+        return;
+      }
       const sup = e.target.closest && e.target.closest("sup");
       if (sup) showSource(parseInt(sup.textContent, 10));
     });

@@ -378,6 +378,21 @@ fn a_message_says_where_it_goes() {
 }
 
 #[test]
+fn a_step_says_what_bise_did_and_where_its_draft_is() {
+    ok(
+        r#"<section data-kit="checklist" data-id="steps"><ol><li data-id="s1" data-who="bise" data-did="drafted" data-draft="mail-legal">the mail to legal</li><li data-id="s2" data-who="yours">pay</li></ol></section><section data-kit="email" data-id="mail-legal" data-verb="draft"><p data-field="to">legal</p><p data-field="subject">s</p><p>x</p></section>"#,
+    );
+    has(
+        &errs(r#"<section data-kit="checklist" data-id="steps"><ol><li data-id="s1" data-draft="not an id!">x</li></ol></section>"#),
+        "steps: data-draft=\"not an id!\" is not a block id",
+    );
+    has(
+        &errs(r#"<section data-kit="review" data-id="r"><ol><li data-id="m1" data-did="drafted"><p>x</p></li></ol></section>"#),
+        "data-did is not a kit attribute",
+    );
+}
+
+#[test]
 fn a_message_bise_can_post_says_send() {
     ok(
         r#"<section data-kit="message" data-id="r1" data-to="Slack · reply to Benjamin in #bise-feedback" data-verb="send"><p>x</p></section>"#,

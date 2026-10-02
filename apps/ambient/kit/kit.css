@@ -258,6 +258,8 @@ body {
 #bise-page [data-kit="checklist"] li[data-verdict="tick"] [data-kit-ui] button[data-act="tick"]::before { content: "✓"; font: 600 12px/18px var(--font-ui); color: var(--surface-made); }
 #bise-page [data-kit="checklist"] li[data-verdict="tick"] { color: var(--dim); text-decoration: line-through; text-decoration-color: var(--rule-strong); }
 #bise-page [data-kit="checklist"] li[data-verdict="tick"] > [data-when] { color: var(--faint); }
+/* bise's step with its draft on the page (pm's 26): the tag takes you there */
+#bise-page [data-kit="checklist"] li[data-id] > [data-when][data-goto] { cursor: pointer; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 /* a step only the user can do (data-who="yours", roadmap D): 'you · friday' in the accent, it waits for him */
 #bise-page [data-kit="checklist"] li[data-who="yours"]:not([data-verdict="tick"]) > [data-when] { color: var(--accent); }
 

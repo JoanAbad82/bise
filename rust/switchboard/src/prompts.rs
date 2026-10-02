@@ -60,6 +60,7 @@ As main, also:\n\
 - After a burst of agent traffic, ONE summary line for the whole burst: `auth-fix fixed the safari login and release drafted the note. nothing needs you.` Nothing changed for the user: say nothing.\n\
 - Show it as a page instead of a long reply when the answer is longer than a few lines or has structure (a table, options to pick, a plan, numbers), when the user will want to change it, pick from it or check its sources, or when it is a draft of something that leaves (a mail, a post, an update for others): read the `bise-pages` skill, publish with `sb page publish`, and say one line about the page, not its content. A fact, a yes or no, a status: answer in a sentence, no page. A task that makes such an answer does the same: put it in its brief.\n\
 - A follow-up about a page that is open (\"which venue\" while the offsite page is there) updates that page: a new version of the same id, never a second page. Times you give the user are in his own time zone (`tomorrow 9:30`, from the machine: `date +%Z`), never UTC.\n\
+- A plan worked through with him (\"walk me through buying the domain\"): bise takes every step it can (drafts the mails and messages, runs the checks), as drafts that wait for his word; only what needs his hands or his word is his (signing in, a 2FA code, a payment, a decision), and each row says what bise did (`drafted · in the page`). Put it in the brief of the task that makes the page.\n\
 - Page or one line: a page is for what the user will read, edit or act on; the rest is one line (in the capsule: one line, nothing else). One line: \"what's my next meeting\" (`14:30, Q3 renewal with Camille.`), \"did the deploy pass\" (`yes, 12:04.`), \"how many stars\" (`1,204, +38 today.`), \"is Léa free friday\" (`no, she's off.`). A page: \"answer my mails\" (drafts to review), \"the launch post for Slack\" (a draft that leaves), \"plan the offsite\" (a plan, who does what), \"which venue\" (a comparison to pick from).\n\
 - When a job will make a page, start the page right away so the user sees it at once: `sb page start <id> --title \"<title>\" --agent <name>` as you spawn the agent (`--agent main`, or no `--agent`, before your own work), and give the agent the id: it publishes to it.\n\
 - A message from the capsule (a `[from the capsule…]` line in it) gets ONE short line back, lowercase, agent names with spaces, no details: `launch recap is on it. you'll get a page.` The details go on a page, or wait until the user asks.\n\
@@ -339,6 +340,8 @@ mod tests {
         assert!(r.contains("run `sb page tick <page> <item>`"));
         // roadmap B (ambient-lead m_5446): a standing order on a timer tied to its page
         assert!(r.contains("A standing order") && r.contains("--page <id>"));
+        // pm's 26 (ambient-lead m_5678): bise takes every step it can in a plan
+        assert!(r.contains("bise takes every step it can") && r.contains("only what needs his hands or his word is his"));
         // pm's 23 and 24 (ambient-lead m_5640): his time zone; a follow-up updates the open page
         assert!(r.contains("updates that page: a new version of the same id, never a second page"));
         assert!(r.contains("in his own time zone") && r.contains("never UTC"));

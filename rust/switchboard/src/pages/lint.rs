@@ -361,7 +361,8 @@ impl<'a> Linter<'a> {
             && self.open.as_ref().is_some_and(|b| b.list_depth == 1)
         {
             inner = match kit.as_str() {
-                "checklist" => &["data-id", "data-done", "data-who", "data-due", "data-agent"],
+                // data-did: what bise did on its own step ('drafted'); data-draft: the block it is in
+                "checklist" => &["data-id", "data-done", "data-who", "data-due", "data-agent", "data-did", "data-draft"],
                 "review" => &["data-id", "data-reply", "data-agent"],
                 _ => &["data-id"],
             };
@@ -382,6 +383,15 @@ impl<'a> Linter<'a> {
                 {
                     self.err(&at, format!("data-agent=\"{a}\" is not an agent name: lowercase letters, digits and -"));
                 }
+            }
+            // the block holding a step's draft: a block id on this page (checked at the end)
+            if let Some(d) = get("data-draft") {
+                if !valid_id(&d) {
+                    self.err(&at, format!("data-draft=\"{d}\" is not a block id: the data-id of the block that holds the draft"));
+                }
+            }
+            if get("data-did").is_some_and(|d| d.trim().is_empty() || d.chars().count() > 40) {
+                self.err(&at, "data-did says what bise did in a few words ('drafted', 'checked · it loads'), 40 characters at most".into());
             }
             // a checklist item's due date (slice D): a calendar date the kit words ('friday', 'late')
             if let Some(d) = get("data-due") {

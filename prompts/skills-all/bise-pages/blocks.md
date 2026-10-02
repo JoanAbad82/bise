@@ -18,6 +18,15 @@ unique, and stay the same across versions (the user's notes anchor on them): `p1
 | `compare` | 2 to 4 options side by side (venues, drafts, tools) | `<ol>` of `<li data-id="moulin">`: an `<h3>` name, a `<ul>` of facts, a `<p>` with the why |
 | `checklist` | what's left to do, who, by when | `<ol>` of `<li data-id="t1" data-who="Camille" data-due="2026-05-20">` the task `</li>`; `data-done` when done; the kit shows `Camille · friday` and what is late. `data-who="yours"`: a step only the user can do (a payment, a login): `you · friday`, and a card when every step before it is done; your own steps: `data-who="bise"` or none |
 
+**A plan you work through with him** (buy the domain, set up the offsite): take every step you
+can yourself, and mark `data-who="yours"` only what needs his hands or his word (signing in, a
+2FA code, a payment, a decision). Do your steps before you publish: a mail or a message as a
+draft in its own block (`email` / `message`, it waits for his word), a check run and its result.
+Each of your rows says what you did, `data-did="drafted"` or `data-did="checked · it loads"`,
+and where the draft is, `data-draft="<its block id>"`: the row shows `bise · drafted · in the
+page` and takes him there. Someone else's step (`data-who="Lucas"`): draft the message that
+asks them, the same way. See `examples/buy-domain.html`.
+
 Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
 `<img src="data:image/…" alt="…">`. Nothing else. Review and checklist items may carry
 `data-agent="<agent name>"` (its live line, `feedback.md`); review items `data-reply` (`watch.md`).
