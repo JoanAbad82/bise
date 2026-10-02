@@ -90,6 +90,8 @@ def main():
         core.wait(lambda e: e.get("ev") == "phase" and e.get("phase") == "done", 90, "phase done")
         check(core.seen(lambda e: e.get("ev") == "phase" and e.get("phase") == "working"), "a working phase")
         check(any("hello from the capsule" in l for l in c.lines("main")), "the hub has the message in main's feed")
+        check(any("[from the capsule: answer in one short line]" in l for l in c.lines("main")),
+              "via capsule: main's input carries the hint its rule reads")
         check(not core.seen(lambda e: e.get("ev") == "phase" and e.get("phase") == "speaking"),
               "typed: main does not speak")
 

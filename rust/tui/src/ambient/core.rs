@@ -450,7 +450,9 @@ impl Core {
             Some(s) => format!("{words}\n\n{}", s.marker()),
             None => words.clone(),
         };
-        if !self.hub.send(&json!({"op": "input", "focus": "main", "text": text})) {
+        // via: the hub tells main it came from the capsule (one short line back)
+        let input = json!({"op": "input", "focus": "main", "text": text, "via": "capsule"});
+        if !self.hub.send(&input) {
             if let Some(s) = shot {
                 self.forget(vec![s]);
             }

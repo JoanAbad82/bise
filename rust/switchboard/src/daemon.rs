@@ -1946,6 +1946,16 @@ impl Shell {
         self.step(Input::ClientHello { client: id });
     }
 
+    /// An input from bise ambient's capsule (`via: "capsule"`) carries one
+    /// more line, the one main's rule reads to answer in one short line
+    /// (prompts.rs); a slash command (`/answer N 1`) never gets it.
+    fn capsule_hint(text: String, via: &str) -> String {
+        if via != "capsule" || text.trim_start().starts_with('/') {
+            return text;
+        }
+        format!("{text}\n\n[from the capsule: answer in one short line]")
+    }
+
     fn client_line(&mut self, id: ClientId, v: Value) {
         let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
         match s("op").as_str() {
@@ -1967,7 +1977,12 @@ impl Shell {
                 // before this message does
                 self.keys_changed();
                 // an answer to a page's question: its words, for the page
-                let text = self.page_reply_text(&s("text")).unwrap_or_else(|| s("text"));
+                // from the capsule: a hint main's rule reads (one short line
+                // back); never on an answer or a slash command
+                let text = match self.page_reply_text(&s("text")) {
+                    Some(reply) => reply,
+                    None => Self::capsule_hint(s("text"), &s("via")),
+                };
                 self.step(Input::ClientInput { client: id, focus: s("focus"), text });
                 self.page_answers();
             }
@@ -3090,5 +3105,19 @@ mod tests {
             json!({"ev": "line", "agent": "main", "line": "  obs: turn_done: completed", "pos": 3, "ts": 1700000000000u64})
         );
         assert_eq!(line_event("t1", 1, 0, "x"), json!({"ev": "line", "agent": "t1", "line": "x", "pos": 1}));
+    }
+
+    /// The capsule's input carries the line main's rule reads (prompts.rs);
+    /// any other client's input, and a slash command, stay as they are.
+    #[test]
+    fn an_input_from_the_capsule_carries_the_hint_main_reads() {
+        let hinted = Shell::capsule_hint("what's running?".into(), "capsule");
+        assert!(hinted.starts_with("what's running?\n\n"));
+        assert!(hinted.ends_with("[from the capsule: answer in one short line]"));
+        // main's rule names the same line (prompts.rs)
+        assert!(crate::prompts::main_role("/w", "/t", "").contains("a `[from the capsule…]` line"));
+        assert_eq!(Shell::capsule_hint("what's running?".into(), ""), "what's running?");
+        assert_eq!(Shell::capsule_hint("hi".into(), "tui"), "hi");
+        assert_eq!(Shell::capsule_hint("/answer 3 1".into(), "capsule"), "/answer 3 1");
     }
 }
