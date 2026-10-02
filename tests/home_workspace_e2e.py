@@ -116,6 +116,12 @@ def main():
         for cmd, line in zip(["land", "land", "feature", "feature", "flow"], r):
             check("sb %s: not in a repo" % cmd in line and "detached" not in line, "sb %s says why: %r" % (cmd, line))
         port = int(open(os.path.join(E.state, "pages.port")).read().strip())
+        # the home's first run (first_run.rs): amb-kit's start-here page,
+        # published once as main, and the marker
+        m = json.loads(get(port, "/p/start-here/meta")[1])
+        check(m.get("agent") == "main" and m["versions"][-1]["n"] == 1, "start-here published as main: %r" % m)
+        check("six things to try" in get(port, "/p/start-here")[1], "start-here's words")
+        check(os.path.exists(os.path.join(E.state, "start-here.published")), "the first-run marker")
         st, body = get(port, "/p/offsite")
         check(st == 200 and "the offsite is booked" in body, "main's page is served: %d" % st)
 
@@ -183,6 +189,15 @@ def main():
                any("not a git repository" in l for l in c.lines("main")), 30, "the worktree refusal")
         check(c.agent("t2") is None, "no t2")
         check(E.hub.poll() is None, "the hub still runs")
+
+        # a second run never publishes start-here again, even with the page gone
+        E.stop_hub()
+        shutil.rmtree(os.path.join(E.state, "pages", "start-here"))
+        c = E.start_hub()
+        c.wait_status("main", "idle", 60)
+        port = int(open(os.path.join(E.state, "pages.port")).read().strip())
+        check(get(port, "/p/start-here")[0] == 404, "no start-here on the second run")
+        check(get(port, "/p/offsite")[0] == 200, "the other pages are back")
 
         hub_core(E)
     except AssertionError as e:

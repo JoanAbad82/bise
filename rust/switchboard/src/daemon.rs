@@ -785,6 +785,31 @@ impl Shell {
         json!({"ok": true, "text": out})
     }
 
+    /// The home workspace's first run: amb-kit's `start here` page,
+    /// published once as main (first_run.rs); the marker keeps it from
+    /// ever coming back.
+    fn start_here(&mut self, paths: &crate::paths::Paths) {
+        use crate::first_run;
+        let Some(pages) = self.pages.clone() else { return };
+        let Some(html) = first_run::due(&paths.state, &paths.workspace, &crate::paths::home_workspace(), &self.opts.app_root) else {
+            return;
+        };
+        let p = crate::pages::store::Publish {
+            agent: "main".into(),
+            id: Some(first_run::PAGE_ID.into()),
+            title: Some(first_run::TITLE.into()),
+            html,
+            ..Default::default()
+        };
+        match pages.publish(&p, now_ms(), &|_| false) {
+            Ok((meta, _)) => {
+                let _ = first_run::mark(&paths.state, meta.version());
+                log_line(paths, &format!("first run: {} v{} published", meta.id, meta.version()));
+            }
+            Err(lines) => log_line(paths, &format!("first run: start-here did not pass: {}", lines.join("; "))),
+        }
+    }
+
     /// Republish the `about-you` page from the kept files, as its agent;
     /// None when there is no such page (or it did not pass).
     fn about_you_redraw(&mut self) -> Option<u64> {
@@ -3131,6 +3156,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         }
         Err(e) => log_line(&paths, &format!("no page server: {}", e)),
     }
+    sh.start_here(&paths);
     // the features' facts (dev-flow §5.1), off the loop
     sh.refresh_features();
     // the role lines of an earlier hub (BISE-126)

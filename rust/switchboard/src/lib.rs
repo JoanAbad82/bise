@@ -29,6 +29,7 @@ pub mod daemon;
 pub mod devflow;
 pub mod every;
 pub mod feature;
+pub mod first_run;
 pub mod flow;
 pub mod forge;
 pub mod keeps;
