@@ -197,6 +197,24 @@ Slice 1 holds its done-when except speed and 10-12.
 - [ ] With the extension: the page opens in the `bise` tab group of my window, reuses its tab; no
       tab in an agent's group. Without it: the AppleScript/`open` path still works.
 
+## Out of the way (vision §3 G, the user's change m_5030)
+
+- [ ] At rest, after launch: nothing on screen but the menu-bar icon (no idle capsule).
+- [ ] Agents working, nothing for me: the icon moves quietly; no capsule appears by itself.
+- [ ] A question arrives: the needs-you glass shows once, then folds away; the icon shows the
+      accent and the count goes up by one; fn + 1 answers it without the capsule; the count goes
+      down.
+- [ ] A page lands that I didn't wait for: the count goes up, no capsule; fn + o opens it and the
+      count goes down.
+- [ ] Hold fn: the capsule shows; let go; bise answers; it fades a few seconds after the answer
+      ends (after the voice when it speaks).
+- [ ] fn + . (or a click on the icon) while agents work: the capsule hides and stays hidden
+      through new agents, done lines and pages; only my fn or a needs-you brings it back.
+- [ ] A click on the icon opens the full view (running, needs you, for you); esc or a click
+      elsewhere closes it.
+- [ ] The count = questions + approvals + pages not opened yet, the same number everywhere (icon,
+      full view).
+
 ## Job slice A: drafts where they live ([ambient-roadmap.md](ambient-roadmap.md) §2 A)
 
 - [ ] "write Lélio the mail he asks for in the #rh thread" → an email page with the Slack thread
