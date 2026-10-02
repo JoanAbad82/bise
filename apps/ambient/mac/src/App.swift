@@ -338,10 +338,16 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             // what the page has to show (amb-web): talk, type, answer, got and
             // needs come from the events the app sees itself; the page adds
             // the short lines (done, failed, a page ready, a key's answer)
-            switch cmd["kind"] as? String ?? "" {
+            let kind = cmd["kind"] as? String ?? ""
+            // anything else on the glass ends the hello's claim on it
+            if kind != "hello" && kind != "none" { helloOn = false }
+            switch kind {
             case "line": visFeed(.line)   // never shows bise by itself (SPEC §0)
             case "open": visFeed(.open)
             case "needs": visFeed(.card)
+            case "none":
+                // the hello is over (5 s, or fn, esc, a click): its glass goes
+                if helloOn { helloOn = false; visFeed(.dismiss) }
             default: break
             }
         case "app_show":
@@ -568,6 +574,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // Asking the browser has ~150 ms; past that it's a talk to main.
     private func startTalk(_ key: String, state: String) {
         lastKey = key
+        helloOn = false   // a hold ends the hello at once: the talk (or the mic ask) takes the glass
         if askBeforeTalk() { return }
         capsule.pickScreen()   // the mouse's screen, when displays have their own menu bars
         talking = true
@@ -788,6 +795,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         status?.set(quiet: c.on)
         capsule.post(["ev": "app_quiet", "on": c.on, "why": c.why])
         toCore(["cmd": "quiet", "on": c.on, "why": c.why])
+        if !c.on { helloSoon() }   // a hello held by quiet comes now
     }
 
     // MARK: the shot
@@ -883,7 +891,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             // walk: after 'not now' it stayed pinned)
             perm(p.rawValue, "denied")
             visFeed(.show(Visibility.forCard))
-        case .granted(let p): perm(p.rawValue, "granted")
+        case .granted(let p):
+            perm(p.rawValue, "granted")
+            if p == .accessibility { helloSoon() }
         case .startKeys: if qa == nil, !keys.running { keys.start() }
         case .watchTrust: if qa == nil { pollTrust() }
         case .settings(let p):
@@ -924,6 +934,32 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // at launch: Accessibility first (nothing works without fn)
     private func firstAsk() {
         permStep { PermPlan.launch(&$0) }
+        if permNow().accessibility == .granted { helloSoon() }
+    }
+
+    // MARK: the hello, once ever (ambient m_5701; amb-web draws it)
+
+    // QA: only on a first-run walk, so the scenes never meet it
+    private var helloSaid: Bool {
+        defaults.bool(forKey: "saidHello") || (qa != nil && !defaults.bool(forKey: "qa.firstRun"))
+    }
+    private var helloOn = false   // the glass shows the hello
+
+    private func helloSoon() {
+        guard !helloSaid else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Hello.delay) { [weak self] in
+            MainActor.assumeIsolated { self?.hello() }
+        }
+    }
+
+    // said at most once; while quiet it waits (sayQuiet asks again when it ends)
+    private func hello() {
+        guard Hello.due(said: helloSaid, accessibility: permNow().accessibility, quiet: quiet.on) else { return }
+        defaults.set(true, forKey: "saidHello")
+        Log.say("app: hello")
+        helloOn = true
+        capsule.post(["ev": "app_hello"])
+        visFeed(.show(Hello.cap))
     }
 
     // macOS has no callback for Accessibility: look every 2 s until granted

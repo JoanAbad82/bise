@@ -102,3 +102,15 @@ enum PermPlan {
         return out
     }
 }
+
+// bise's hello (ambient m_5701, roadmap §4): once ever, right after
+// Accessibility is granted (0.6 s later), never while quiet (a call, a
+// meeting, full screen): it waits for the first moment that isn't
+enum Hello {
+    static let delay = 0.6
+    static let cap = 7.0          // the glass at most this long (the web ends it ~6.5 s, 5 s reduced)
+
+    static func due(said: Bool, accessibility: Grant, quiet: Bool) -> Bool {
+        !said && accessibility == .granted && !quiet
+    }
+}

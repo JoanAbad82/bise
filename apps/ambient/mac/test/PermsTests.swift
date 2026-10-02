@@ -73,5 +73,11 @@ asks = PermPlan.hold(&all).do.filter { if case .ask = $0 { return true }; return
 law("a hold asks one thing at most", asks.count == 1)
 law("settings opens the pane, changes nothing", PermPlan.command(.screen, "settings", &all) == [.settings(.screen)])
 
+// the hello: once ever, after Accessibility, never while quiet
+law("hello: due once Accessibility is on", Hello.due(said: false, accessibility: .granted, quiet: false))
+law("hello: not before Accessibility", !Hello.due(said: false, accessibility: .unknown, quiet: false))
+law("hello: never while quiet (it waits)", !Hello.due(said: false, accessibility: .granted, quiet: true))
+law("hello: never twice", !Hello.due(said: true, accessibility: .granted, quiet: false))
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Perms laws hold")
