@@ -397,7 +397,10 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // true = an ask is showing, no talk this time
     private func askBeforeTalk() -> Bool {
         switch micState {
-        case .notDetermined: perm("mic", "ask"); return true
+        case .notDetermined:
+            // after 'not now' the mic is never asked again: a hold does nothing
+            if !asked("mic") { perm("mic", "ask") }
+            return true
         case .denied, .restricted: deniedOnce("mic")
         default: break
         }
@@ -412,6 +415,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if action == "settings" {
             let pane = ["accessibility": "Privacy_Accessibility", "mic": "Privacy_Microphone", "screen": "Privacy_ScreenCapture"][p] ?? "Privacy"
             if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") { NSWorkspace.shared.open(u) }
+            return
+        }
+        if action == "not_now" {
+            // no macOS prompt; the refused line once, then never asked again
+            // (the menu bar and the spotlight work without the keys)
+            markAsked(p)
+            deniedOnce(p)
             return
         }
         guard action == "continue" else { return }
