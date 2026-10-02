@@ -155,7 +155,7 @@
       if (!v.note) { note.innerHTML = ""; return; }
       const n = v.note;
       note.innerHTML = `<div class="h"><span class="app">:*</span>bise${n.more > 0 ? `<span class="more">+${n.more}</span>` : ""}</div>
-        <div class="ttl"><span class="gl">?</span>${esc(n.title)}</div><div class="qq">${esc(n.text)}</div>${opts(n)}<div class="hint">${esc(n.hint)}</div>`;
+        <div class="ttl"><span class="gl">?</span>${esc(n.title)}</div><div class="qq">${esc(n.text)}</div>${opts(n)}${n.open ? `<button type="button" class="hint open" data-open="${esc(n.id)}">${esc(n.open)}</button>` : ""}<div class="hint">${esc(n.hint)}</div>`;
     });
   }
   const opts = (c) => c.options.length ? `<div class="opts">${c.options.map((o) => `<button type="button" data-card="${esc(c.id)}" data-i="${o.i}">${esc(o.label)}</button>`).join("")}</div>` : "";
@@ -246,6 +246,8 @@
   host.addEventListener("click", (e) => {
     const pg = e.target.closest("button[data-page]");
     if (pg) recv({ ev: "ui_page", page: pg.dataset.page });
+    const op = e.target.closest("button[data-open]");
+    if (op) recv({ ev: "ui_open_card", card: op.dataset.open });
     const b = e.target.closest("button[data-card]");
     if (b) recv({ ev: "ui_option", card: b.dataset.card, i: +b.dataset.i });
     const p = e.target.closest(".perm button");

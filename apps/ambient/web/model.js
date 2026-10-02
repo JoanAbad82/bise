@@ -256,6 +256,8 @@
         if (!opt || m.answered[card.id]) return none(m);
         return answer(m, card, opt, now);
       }
+      case "ui_open_card":   // a click on a card's `fn + ⏎ open it`
+        return openCard(m, m.cards.find((c) => c.id === ev.card));
       case "ui_page": {      // a click on a page in "for you"
         const p = m.pages.find((x) => x.id === ev.page);
         return p ? { m: { ...m, lastPage: p.id }, cmds: [{ cmd: "app_open_url", url: p.url, page: p.id }] } : none(m);
@@ -283,6 +285,12 @@
     }
   }
 
+  function openCard(m, card) {
+    const p = card && card.page;
+    if (!p || !p.url) return { m, cmds: [] };
+    return { m: { ...m, lastPage: p.id || m.lastPage }, cmds: [{ cmd: "app_open_url", url: p.url, page: p.id }] };
+  }
+
   // fn + key (app_key), and the same keys inside the panel
   function key(m, k, now) {
     const none = (x) => ({ m: x, cmds: [] });
@@ -295,6 +303,9 @@
       return answer(m, card, opt, now);
     }
     switch (k) {
+      // fn + ⏎: a card asked from a page opens that page at the question (amb-core, 7e41f98e:
+      // card.page {id, block, url}, the url ending with #block)
+      case "enter": return openCard(m, cards[m.pane === "inbox" || m.pane === "agents" ? m.sel : 0]);
       case "space": return setPane(m, m.pane === "spot" ? null : "spot");
       // fn + o: the page the capsule named last, else the newest; the app opens it or brings its tab
       case "o": {
@@ -372,6 +383,7 @@
     if (need && !m.pane && !m.permAsk) {
       const c = asking[0];
       v.note = { id: c.id, agent: c.agent, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsHint, more: asking.length - 1,
+        open: c.page && c.page.url ? W.openIt : null,
         options: Wd.options(c).map((o) => ({ i: o.i, label: Wd.optionLabel(o.n, o.label) })) };
     }
 

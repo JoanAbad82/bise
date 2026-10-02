@@ -15,6 +15,8 @@
     on: "main is on it.",
     onShort: "on it.",
     needsHint: "or hold fn and say it",
+    // a card asked from a page (docs/ambient-pages.md §4.2): fn + ⏎ opens the page at the question
+    openIt: "fn + ⏎ open it",
     // §3 behavior
     hush: "i'll stop talking. the rest is in text.",
     cutIn: "main stopped. go ahead.",

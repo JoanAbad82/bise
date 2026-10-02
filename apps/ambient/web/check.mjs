@@ -448,6 +448,15 @@ law("a card clicked in the menu bar (app_key i + card) opens the inbox at that c
   // again while open: it stays open (a click never closes it)
   assert.equal(M.view(M.step(r.m, { ev: "app_key", key: "i", card: "a" }, 30).m, 40).state, "inbox");
 });
+law("a card asked from a page (card.page): the glass says `fn + ⏎ open it`; fn + ⏎ or a click opens the page at the question", () => {
+  const card = { id: "c1", agent: "launch-recap", text: "post now or wait?", options: ["post now", "wait"], page: { id: "recap", block: "q1", url: "http://127.0.0.1:47123/p/recap#q1" } };
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [card, { id: "c2", agent: "x", text: "y", options: [] }], pages: [] }, 0).m;
+  assert.equal(M.view(m, 10).note.open, "fn + ⏎ open it");
+  const open = [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/recap#q1", page: "recap" }];
+  eq(M.step(m, { ev: "app_key", key: "enter" }, 20).cmds, open);
+  eq(M.step(m, { ev: "ui_open_card", card: "c1" }, 20).cmds, open);
+  eq(M.step(m, { ev: "ui_open_card", card: "c2" }, 20).cmds, []);   // no page: nothing
+});
 law("the morning page (app_morning): `your morning page · fn + o`, and fn + o opens it", () => {
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;
   m = M.step(m, { ev: "app_morning", id: "morning-0612", title: "your morning", url: "http://127.0.0.1:47123/p/morning-0612" }, 10).m;
