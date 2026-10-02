@@ -382,6 +382,23 @@ fn post_send(pages: &Pages, id: &str) -> Response {
     Response::json(200, &json!({"sent": sent.len(), "agent": m.agent}))
 }
 
+/// What a new stream of page `id` gets at once besides its version and
+/// state: its items' agents (the last `agent` frame of each) and where
+/// its text went (`went`, when it went somewhere).
+fn connect_frames(pages: &Pages, id: &str) -> String {
+    if id.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    for f in pages.store.agent_frames(id).values() {
+        out.push_str(&format!("event: agent\ndata: {f}\n\n"));
+    }
+    if let Some(m) = pages.store.meta(id).filter(|m| !m.went.is_empty()) {
+        out.push_str(&format!("event: went\ndata: {}\n\n", json!({"went": m.went})));
+    }
+    out
+}
+
 /// An SSE stream: the page's version and state now, then every event of
 /// it, a ping comment every 15 s; ends when the browser goes.
 fn events(w: &mut TcpStream, pages: &Pages, id: &str) {
@@ -401,7 +418,7 @@ fn events(w: &mut TcpStream, pages: &Pages, id: &str) {
         }
     };
     // the writer's last progress lines: a reload keeps the list
-    let first = first + &pages.progress_frames(id);
+    let first = first + &pages.progress_frames(id) + &connect_frames(pages, id);
     pages.subscribe(id, tx);
     if w.write_all(first.as_bytes()).and_then(|_| w.flush()).is_err() {
         return;

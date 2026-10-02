@@ -31,7 +31,7 @@ const fn cmd(syntax: &'static str, who: Who, doc: &'static str) -> CmdDoc {
 pub const COMMANDS: &[CmdDoc] = &[
     cmd("sb list", Who::Everyone, "every agent of the group, its status and what it is for."),
     cmd(
-        "sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"<answer>\"]... | sb page start <id> [--title <t>] [--agent <name>] | sb page list | sb page notes <id>",
+        "sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"<answer>\"]... [--went <kind>:<ref>[@<block>]=<url>]... | sb page start <id> [--title <t>] [--agent <name>] | sb page list | sb page notes <id>",
         Who::Everyone,
         "publish a page for the user (a fragment of bise kit blocks; the kit's lint checks it): its URL comes back. `sb page start` shows the page at once, empty, while you (or --agent) write it; your first publish is v1. A new version of your page answers the user's notes: `--notes-done` the ones you did, `--note-answer` one line for the others.",
     ),
@@ -649,7 +649,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
     Ok(Value::Object(req))
 }
 
-const PAGE_USAGE: &str = "usage: sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"…\"]... | sb page start <id> [--title <t>] [--agent <name>] | sb page list | sb page notes <id>";
+const PAGE_USAGE: &str = "usage: sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"…\"]... [--went <kind>:<ref>[@<block>]=<url>]... | sb page start <id> [--title <t>] [--agent <name>] | sb page list | sb page notes <id>";
 
 /// `sb page publish|list|notes` (docs/ambient-pages.md §2.2): the hub's
 /// `page_*` request. The file is read here (the agent's path, from its
@@ -657,7 +657,7 @@ const PAGE_USAGE: &str = "usage: sb page publish <file> [--id <id>] [--title <t>
 fn page_req(rest: &[String], req: &mut Map<String, Value>) -> Result<(), String> {
     match rest.first().map(String::as_str) {
         Some("publish") => {
-            let (pos, o) = parse_args(&rest[1..], &["id", "title", "notes-done", "note-answer"], &[])?;
+            let (pos, o) = parse_args(&rest[1..], &["id", "title", "notes-done", "note-answer", "went"], &[])?;
             let file = pos.first().ok_or(PAGE_USAGE)?;
             let html = std::fs::read_to_string(file).map_err(|e| format!("{file}: {e}"))?;
             req.insert("cmd".into(), json!("page_publish"));
@@ -679,6 +679,14 @@ fn page_req(rest: &[String], req: &mut Map<String, Value>) -> Result<(), String>
                 answers.insert(id.trim().to_string(), json!(text.trim().trim_matches('"')));
             }
             req.insert("answers".into(), Value::Object(answers));
+            // where its text went (docs/ambient-roadmap.md A)
+            let mut went = Vec::new();
+            for w in list_of(o.get("went")) {
+                went.push(serde_json::to_value(crate::pages::store::Went::parse(&w)?).map_err(|e| e.to_string())?);
+            }
+            if !went.is_empty() {
+                req.insert("went".into(), Value::Array(went));
+            }
         }
         Some("start") => {
             let (pos, o) = parse_args(&rest[1..], &["title", "agent", "ask"], &[])?;

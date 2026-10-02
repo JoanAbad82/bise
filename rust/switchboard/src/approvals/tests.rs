@@ -928,3 +928,17 @@ fn judge_is_fast() {
         times[times.len() * 99 / 100]
     );
 }
+
+/// docs/ambient-roadmap.md A: a draft doesn't leave, so making one needs
+/// no card; sending, deleting or publishing one stays gated.
+#[test]
+fn draft_making_connector_calls_need_no_card() {
+    for t in ["gmail.create_draft", "outlook.update_draft", "kit.create_draft_broadcast", "gmail.save_draft", "slack.draft_message"] {
+        assert!(super::makes_a_draft(t), "{t}");
+        let v = super::judge_with(&call(t, serde_json::json!({"to": "x@y.z"})), &Rules::default(), &Cache::default(), false, &LexicalFs);
+        assert!(matches!(v, Verdict::Allow { tier: 1 }), "{t}: {v:?}");
+    }
+    for t in ["gmail.send_draft", "gmail.delete_draft", "gmail.send_email", "kit.publish_draft", "slack.post_message", "drafts", "gmail.list_drafts"] {
+        assert!(!super::makes_a_draft(t), "{t}");
+    }
+}

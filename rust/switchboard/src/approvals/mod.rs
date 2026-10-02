@@ -191,6 +191,23 @@ pub fn hint_for(edit_tool: &str) -> String {
     )
 }
 
+/// A connector call that only makes or changes a draft (`gmail.create_draft`,
+/// `outlook.update_draft`, `kit.create_draft_broadcast`): nothing leaves,
+/// the user sends it himself, so no card and no checker
+/// (docs/ambient-roadmap.md A). A send, a delete or a publish of a draft
+/// (`gmail.send_draft`) stays gated.
+pub fn makes_a_draft(tool: &str) -> bool {
+    let Some((_, f)) = tool.rsplit_once('.') else { return false };
+    let f = f.to_ascii_lowercase();
+    let words: Vec<&str> = f.split(|c: char| !c.is_ascii_alphanumeric()).filter(|w| !w.is_empty()).collect();
+    let draft = words.iter().any(|w| matches!(*w, "draft" | "drafts"));
+    let makes = words.iter().any(|w| matches!(*w, "create" | "save" | "update" | "edit" | "new" | "make" | "write" | "draft"));
+    let leaves = words.iter().any(|w| {
+        matches!(*w, "send" | "sends" | "delete" | "remove" | "trash" | "publish" | "post" | "schedule" | "share" | "forward" | "reply" | "submit")
+    });
+    draft && makes && !leaves
+}
+
 /// The checker is off: an open part is a card (design §3).
 pub const CHECKER_OFF: &str = "the checker is off, so commands ask first.";
 
@@ -209,7 +226,7 @@ pub fn judge_with(
     fs: &dyn Fs,
 ) -> Verdict {
     let tool = call.tool.as_str();
-    if NEVER_GATED.contains(&tool) || tool.starts_with("self.") {
+    if NEVER_GATED.contains(&tool) || tool.starts_with("self.") || makes_a_draft(tool) {
         return Verdict::Allow { tier: 1 };
     }
     let roots = call.roots();

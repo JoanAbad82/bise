@@ -22,6 +22,13 @@ from e2e import EXE, check  # noqa: E402
 
 PAGE_V1 = '<section data-kit="prose" data-id="p1"><p>the week: dark mode shipped.</p></section>\n'
 PAGE_V2 = '<section data-kit="prose" data-id="p1"><p>the week: dark mode shipped, March numbers.</p></section>\n'
+BUGS = (
+    '<section data-kit="review" data-id="bugs"><ol>'
+    '<li data-id="b1" data-agent="fixer"><p>login loops on Safari</p></li>'
+    '<li data-id="b2"><p>the CSV export drops rows</p></li>'
+    '</ol></section>\n'
+    '<section data-kit="message" data-id="reply-nina" data-to="Slack · Nina Park"><p>we can reproduce it.</p></section>\n'
+)
 PAGE_V3 = PAGE_V2 + (
     '<section data-kit="question" data-id="q1"><p>post it in #team now, or wait for Marc?</p>'
     '<ol><li>post now</li><li>wait for Marc</li></ol></section>'
@@ -274,6 +281,55 @@ def main():
         check([(n["kind"], n["block"], n["text"], n["status"]) for n in notes] == [("pick", "q1", "post now", "sent")], "the pick note: %r" % notes)
         st, _, _ = request(port, "POST", "/api/p/fixture-q/answer", {"block": "q1", "option": 2}, {"Origin": origin, "X-Bise-Token": token})
         check(st == 409, "picked twice: %d" % st)
+
+        # (amb-home) slice C: an item's agent shows live on the page
+        # ('agent' frames for each data-agent of the latest version, at
+        # connect and on each change), and start notes go to main
+        c.wait_idle("main")
+        c.say("/new fixer: stay around")
+        c.wait_status("fixer", "idle", 90)
+        bugs = os.path.join(E.tmp, "bugs.html")
+        open(bugs, "w").write(BUGS)
+        c.say('[[bash: sb page publish %s --id bugs --title "bugs today"]]' % bugs)
+        c.wait_line("main", "published bugs v1", 90)
+        c.wait_idle("main")
+        bs = Sse(port, "/p/bugs/events")
+        c.wait(lambda: bs.seen("agent", lambda d: d["name"] == "fixer" and d["status"] == "idle"), 15, "fixer idle at connect")
+        c.say("[[bash: sleep 2]]", focus="fixer")
+        c.wait(lambda: bs.seen("agent", lambda d: d["name"] == "fixer" and d["status"] == "working"), 30, "fixer working, live")
+        c.wait(lambda: bs.seen("agent", lambda d: d["name"] == "fixer" and d["status"] == "idle" and bs.frames.index(("agent", d)) > 1), 30, "fixer idle again")
+        check(not bs.seen("agent", lambda d: d["name"] != "fixer"), "only the items' agents")
+        st, _, _ = request(port, "POST", "/api/p/bugs/notes", {"notes": [{"block": "b2", "quote": "CSV export", "kind": "start"}]}, {"Origin": origin, "X-Bise-Token": token})
+        check(st == 200, "a start note: %d" % st)
+        n_main = len(c.lines("main"))
+        st, _, sent = request(port, "POST", "/api/p/bugs/send", {}, {"Origin": origin, "X-Bise-Token": token})
+        check(st == 200 and json.loads(sent)["sent"] == 1, "send the start note: %s" % sent)
+        c.wait(lambda: any("you asked for an agent on these items" in l for l in c.lines("main")[n_main:]), 30, "the start message to main")
+        check(any("page-start" in l and "b2" in l for l in c.lines("main")[n_main:]), "its <page-start> block")
+        check(not any("you sent 1 note" in l for l in c.lines("main")[n_main:]), "no notes message for a start note")
+        check(not bs.seen("state", lambda d: d["state"] == "updating"), "a start note alone never puts the page in updating")
+        c.wait_idle("main")
+        notes = json.loads(request(port, "GET", "/p/bugs/meta")[2])["notes"]
+        check([(n["kind"], n["status"], n.get("to")) for n in notes] == [("start", "sent", "main")], "the start note, routed: %r" % notes)
+
+        # (amb-home) slice A: --went, kept in the meta and pushed as 'went'
+        c.say('[[bash: sb page publish %s --id bugs --went "gmail-draft:r-1@reply-nina=https://mail.google.com/mail/#drafts/r-1"]]' % bugs)
+        c.wait_line("main", "published bugs v2", 90)
+        c.wait(lambda: bs.seen("went", lambda d: [w["ref"] for w in d["went"]] == ["r-1"]), 15, "went on the stream")
+        m = json.loads(request(port, "GET", "/p/bugs/meta")[2])
+        w = m["went"][0]
+        check((w["kind"], w["block"], w["url"]) == ("gmail-draft", "reply-nina", "https://mail.google.com/mail/#drafts/r-1") and w["at"] > 0, "meta.went: %r" % m["went"])
+        c.wait_idle("main")
+        c.say('[[bash: sb page publish %s --id bugs --went "gmail-draft:r-1=https://mail.google.com/mail/#drafts/r-1b" --went "kit-draft:42=https://app.kit.com/b/42"]]' % bugs)
+        c.wait_line("main", "published bugs v3", 90)
+        m = json.loads(request(port, "GET", "/p/bugs/meta")[2])
+        check([(w["kind"], w["url"]) for w in m["went"]] == [("gmail-draft", "https://mail.google.com/mail/#drafts/r-1b"), ("kit-draft", "https://app.kit.com/b/42")], "the same draft replaced, another added: %r" % m["went"])
+        bs2 = Sse(port, "/p/bugs/events")
+        c.wait(lambda: bs2.seen("went", lambda d: len(d["went"]) == 2) and bs2.seen("agent", lambda d: d["name"] == "fixer"), 15, "went and the agents at connect")
+        c.wait_idle("main")
+        c.say('[[bash: sb page publish %s --id bugs --went "gmail-draft:r-1=file:///etc/passwd"]]' % bugs)
+        c.wait_line("main", "must be an http(s) link", 90)
+        check(json.loads(request(port, "GET", "/p/bugs/meta")[2])["versions"][-1]["n"] == 3, "a bad --went publishes nothing")
     except AssertionError as e:
         print("FAIL", e)
         ok = False

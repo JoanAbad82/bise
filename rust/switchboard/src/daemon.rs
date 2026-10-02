@@ -288,6 +288,14 @@ struct Shell {
     /// whether a turn of theirs has the notes yet (started or steered
     /// since). Its end without a publish puts the pages back to ready.
     page_turns: BTreeMap<String, (Vec<String>, bool)>,
+    /// the agents each page's latest version names (`data-agent`):
+    /// page id -> names (None: not read from the store yet)
+    page_agents: Option<BTreeMap<String, Vec<String>>>,
+    /// the last `agent` frame pushed on each page, per agent
+    page_agent_sent: BTreeMap<(String, String), Value>,
+    /// each agent's last tool intent (an `agent` frame's note when it
+    /// declared none)
+    last_intent: BTreeMap<String, String>,
     /// The open cards of the pages' question blocks (§4.2): card →
     /// (page, block); None until read from the store.
     page_cards: Option<BTreeMap<u64, (String, String)>>,
@@ -657,6 +665,7 @@ impl Shell {
     /// A line enters a feed: memory, transcript, every client.
     fn feed(&mut self, name: &str, line: &str) {
         self.page_turn(name, line);
+        self.page_agent_line(name, line);
         let Some(dir) = self.dir_of(name) else { return };
         let path = self.transcript(&dir);
         let pos = match self.positions.get(name) {
@@ -760,6 +769,14 @@ impl Shell {
                     .and_then(|x| x.as_object())
                     .map(|o| o.iter().map(|(k, a)| (k.clone(), a.as_str().unwrap_or("").to_string())).collect())
                     .unwrap_or_default();
+                // --went (docs/ambient-roadmap.md A): the CLI read them
+                let mut went = Vec::new();
+                for w in v.get("went").and_then(|x| x.as_array()).into_iter().flatten() {
+                    match serde_json::from_value::<crate::pages::store::Went>(w.clone()) {
+                        Ok(w) => went.push(w),
+                        Err(e) => return json!({"ok": false, "error": format!("--went: {e}")}),
+                    }
+                }
                 let p = crate::pages::store::Publish {
                     agent: from.to_string(),
                     id: s("id").filter(|x| !x.is_empty()),
@@ -767,6 +784,7 @@ impl Shell {
                     html: s("html").unwrap_or_default(),
                     done: list("done"),
                     answers,
+                    went,
                 };
                 let gone: Vec<String> = self.hub.st.agents.keys().filter(|n| self.page_agent_gone(n)).cloned().collect();
                 let is_gone = |n: &str| gone.iter().any(|g| g == n) || !self.hub.st.agents.contains_key(n);
@@ -780,6 +798,13 @@ impl Shell {
                             }
                         }
                         self.broadcast(&pages.page_ev(&meta));
+                        if !p.went.is_empty() {
+                            pages.push(&meta.id, "went", &json!({"went": meta.went}));
+                        }
+                        // its items' agents: their status from now on
+                        let names = crate::pages::store::data_agents_of(&p.html);
+                        self.page_agents_now().insert(meta.id.clone(), names);
+                        self.page_agent_push();
                         // its question blocks: one card each (§4.2)
                         self.page_questions(&meta.id, &meta.agent, &p.html);
                         let snap = self.snapshot();
@@ -802,14 +827,25 @@ impl Shell {
                 self.broadcast(&snap);
             }
             crate::pages::PageMsg::Sent { id, agent, text } => {
-                // the page's agent, main when it is gone
-                let to = if self.page_agent_gone(&agent) { MAIN.to_string() } else { agent };
-                self.page_turns.entry(to.clone()).or_insert_with(|| (Vec::new(), false)).0.push(id.clone());
-                if let Some(meta) = pages.set_state(&id, "updating") {
-                    self.broadcast(&pages.page_ev(&meta));
+                // start notes (an item the user wants an agent on): main's,
+                // never the page's agent's (ambient-lead m_5006)
+                let starts = pages.locked(|s| s.route_starts(&id)).unwrap_or_default();
+                if let (false, Some(meta)) = (starts.is_empty(), pages.store.meta(&id)) {
+                    let msg = crate::pages::store::start_message(&meta, &pages.url(&id), &starts);
+                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text: msg });
+                    pages.push(&id, "notes", &json!({"notes": pages.store.notes(&id)}));
                 }
-                // as from the user (client 0: no view of its own)
-                self.step(Input::ClientInput { client: 0, focus: to, text });
+                // the other notes: the page's agent, main when it is gone
+                // (none: only start notes were sent)
+                if !text.is_empty() {
+                    let to = if self.page_agent_gone(&agent) { MAIN.to_string() } else { agent };
+                    self.page_turns.entry(to.clone()).or_insert_with(|| (Vec::new(), false)).0.push(id.clone());
+                    if let Some(meta) = pages.set_state(&id, "updating") {
+                        self.broadcast(&pages.page_ev(&meta));
+                    }
+                    // as from the user (client 0: no view of its own)
+                    self.step(Input::ClientInput { client: 0, focus: to, text });
+                }
                 let snap = self.snapshot();
                 self.broadcast(&snap);
             }
@@ -826,6 +862,82 @@ impl Shell {
                 }
                 self.page_answers();
             }
+        }
+    }
+
+    /// The agents each page's latest version names, read from the store
+    /// the first time.
+    fn page_agents_now(&mut self) -> &mut BTreeMap<String, Vec<String>> {
+        if self.page_agents.is_none() {
+            let m: BTreeMap<String, Vec<String>> = match &self.pages {
+                Some(p) => p.store.list().into_iter().map(|m| (m.id.clone(), p.store.data_agents(&m.id))).filter(|(_, n)| !n.is_empty()).collect(),
+                None => BTreeMap::new(),
+            };
+            self.page_agents = Some(m);
+        }
+        self.page_agents.get_or_insert_with(BTreeMap::new)
+    }
+
+    /// An agent's live status on a page item (kit's `agent` frame, amb-kit
+    /// m_5189): working|idle|done|blocked|failed, its status note else its
+    /// last tool intent.
+    fn page_agent_frame(&self, name: &str) -> Value {
+        use crate::model::Status;
+        let a = self.hub.st.resolve(name).and_then(|n| self.hub.st.agents.get(&n));
+        let Some(a) = a else { return json!({"name": name, "status": "done"}) };
+        let status = match a.status() {
+            Status::Starting | Status::Working | Status::Waiting => "working",
+            Status::Idle => "idle",
+            Status::Done | Status::Stopped | Status::Archived => "done",
+            Status::Blocked => "blocked",
+            Status::Failed => "failed",
+        };
+        let note = a
+            .declared
+            .as_ref()
+            .map(|(_, n)| n.trim().to_string())
+            .filter(|n| !n.is_empty())
+            .or_else(|| self.last_intent.get(&a.name).cloned());
+        let mut f = json!({"name": name, "status": status});
+        if let Some(n) = note {
+            f["note"] = json!(n);
+        }
+        f
+    }
+
+    /// Push the `agent` frames that changed, on every page naming them;
+    /// each page keeps its last frames for a new stream.
+    fn page_agent_push(&mut self) {
+        let Some(pages) = self.pages.clone() else { return };
+        let list: Vec<(String, Vec<String>)> = self.page_agents_now().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        for (id, names) in list {
+            let mut changed = false;
+            for name in names {
+                let f = self.page_agent_frame(&name);
+                let key = (id.clone(), name.clone());
+                if self.page_agent_sent.get(&key) == Some(&f) {
+                    continue;
+                }
+                pages.push(&id, "agent", &f);
+                self.page_agent_sent.insert(key, f);
+                changed = true;
+            }
+            if changed {
+                let frames: serde_json::Map<String, Value> =
+                    self.page_agent_sent.iter().filter(|((p, _), _)| *p == id).map(|((_, n), f)| (n.clone(), f.clone())).collect();
+                let _ = pages.locked(|s| s.save_agent_frames(&id, &frames));
+            }
+        }
+    }
+
+    /// A tool intent of an agent some page names: its item's note.
+    fn page_agent_line(&mut self, name: &str, line: &str) {
+        if !self.page_agents_now().values().any(|ns| ns.iter().any(|n| n == name)) {
+            return;
+        }
+        if let crate::wire::Wire::Intent(text) = crate::wire::parse(line) {
+            self.last_intent.insert(name.to_string(), crate::util::one_line(&text));
+            self.page_agent_push();
         }
     }
 
@@ -1246,6 +1358,7 @@ impl Shell {
             }
             Effect::State => {
                 self.page_answers();
+                self.page_agent_push();
                 let snap = self.snapshot();
                 self.broadcast(&snap);
             }
@@ -2583,6 +2696,9 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         cu: crate::computer_use::Watch::new(),
         pages: None,
         page_turns: BTreeMap::new(),
+        page_agents: None,
+        page_agent_sent: BTreeMap::new(),
+        last_intent: BTreeMap::new(),
         page_cards: None,
         page_replies: BTreeMap::new(),
     };

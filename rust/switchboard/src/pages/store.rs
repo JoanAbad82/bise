@@ -34,6 +34,46 @@ pub struct Meta {
     /// the newest version the user opened in a browser (0: none yet)
     #[serde(default)]
     pub opened_version: u64,
+    /// where the page's text went (docs/ambient-roadmap.md A): one entry
+    /// per kind and ref, kept across publishes
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub went: Vec<Went>,
+}
+
+/// One place the page's text went: `--went <kind>:<ref>[@<block>]=<url>`
+/// (`gmail-draft:r-123@mail=https://mail.google.com/…`); `at` the publish.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Went {
+    pub kind: String,
+    #[serde(rename = "ref")]
+    pub reference: String,
+    pub url: String,
+    #[serde(default)]
+    pub at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub block: Option<String>,
+}
+
+impl Went {
+    /// `<kind>:<ref>[@<block>]=<url>`; `at` 0 (the publish sets it).
+    pub fn parse(s: &str) -> Result<Went, String> {
+        let bad = || format!("--went {s:?}: <kind>:<ref>[@<block>]=<url> (gmail-draft:r-123@mail=https://mail.google.com/…)");
+        let (kind, rest) = s.split_once(':').ok_or_else(bad)?;
+        let (head, url) = rest.split_once('=').ok_or_else(bad)?;
+        let (reference, block) = match head.rsplit_once('@') {
+            Some((r, b)) if !b.is_empty() => (r, Some(b.to_string())),
+            _ => (head, None),
+        };
+        let word = |w: &str| !w.is_empty() && w.len() <= 200 && !w.chars().any(char::is_whitespace);
+        if !word(kind) || !word(reference) || !kind.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-') {
+            return Err(bad());
+        }
+        let url = url.trim();
+        if !(url.starts_with("https://") || url.starts_with("http://")) || url.chars().any(char::is_whitespace) {
+            return Err(format!("--went {s:?}: the url must be an http(s) link"));
+        }
+        Ok(Went { kind: kind.into(), reference: reference.into(), url: url.into(), at: 0, block })
+    }
 }
 
 fn ready() -> String {
@@ -105,6 +145,8 @@ pub struct Publish {
     pub html: String,
     pub done: Vec<String>,
     pub answers: Vec<(String, String)>,
+    /// `--went`: where its text went (replaces the entry of the same kind and ref)
+    pub went: Vec<Went>,
 }
 
 /// A page id: `[a-z0-9-]{1,40}`.
@@ -244,8 +286,16 @@ impl Store {
                 state: ready(),
                 ask: None,
                 opened_version: 0,
+                went: Vec::new(),
             },
         };
+        for w in &p.went {
+            let w = Went { at: now, ..w.clone() };
+            match meta.went.iter_mut().find(|x| x.kind == w.kind && x.reference == w.reference) {
+                Some(x) => *x = w,
+                None => meta.went.push(w),
+            }
+        }
         if let Some(t) = p.title.as_ref().map(|t| t.trim()).filter(|t| !t.is_empty()) {
             meta.title = t.to_string();
         }
@@ -336,7 +386,7 @@ impl Store {
                 return Err(format!("{id} is {}'s page: start another --id", m.agent));
             }
             Some(m) => Meta { agent: agent.to_string(), ..m },
-            None => Meta { id: id.to_string(), title: String::new(), agent: agent.to_string(), created_ms: now, versions: Vec::new(), state: ready(), ask: None, opened_version: 0 },
+            None => Meta { id: id.to_string(), title: String::new(), agent: agent.to_string(), created_ms: now, versions: Vec::new(), state: ready(), ask: None, opened_version: 0, went: Vec::new() },
         };
         if let Some(t) = title.map(str::trim).filter(|t| !t.is_empty()) {
             meta.title = t.to_string();
@@ -385,6 +435,41 @@ impl Store {
         Ok(Some(m))
     }
 
+    /// The agents the latest version names on its items (`data-agent`),
+    /// in order, once each.
+    pub fn data_agents(&self, id: &str) -> Vec<String> {
+        let Some(m) = self.meta(id) else { return Vec::new() };
+        self.html(id, m.version()).map(|h| data_agents_of(&h)).unwrap_or_default()
+    }
+
+    /// The last `agent` frame sent for each of the page's agents (an SSE
+    /// stream replays them at connect).
+    pub fn agent_frames(&self, id: &str) -> serde_json::Map<String, Value> {
+        if !valid_id(id) {
+            return Default::default();
+        }
+        read_json(&self.page_dir(id).join("agents.json"))
+    }
+
+    pub fn save_agent_frames(&self, id: &str, f: &serde_json::Map<String, Value>) -> Result<(), String> {
+        write_json(&self.page_dir(id).join("agents.json"), f)
+    }
+
+    /// The start notes just sent (kind `start`, sent, not routed yet):
+    /// marked routed to main (`to: main`); the ones marked.
+    pub fn route_starts(&self, id: &str) -> Result<Vec<Note>, String> {
+        let mut notes = self.notes(id);
+        let mut out = Vec::new();
+        for n in notes.iter_mut().filter(|n| n.kind == "start" && n.status == "sent" && !n.extra.contains_key("to")) {
+            n.extra.insert("to".into(), Value::String("main".into()));
+            out.push(n.clone());
+        }
+        if !out.is_empty() {
+            self.save_notes(id, &notes)?;
+        }
+        Ok(out)
+    }
+
     pub fn set_state(&self, id: &str, state: &str) -> Result<Option<Meta>, String> {
         let Some(mut m) = self.meta(id) else { return Ok(None) };
         if m.state == state {
@@ -394,6 +479,41 @@ impl Store {
         self.save_meta(&m)?;
         Ok(Some(m))
     }
+}
+
+/// The values of the `data-agent="…"` attributes of a fragment, once each.
+pub fn data_agents_of(html: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for part in html.split("data-agent=").skip(1) {
+        let q = part.chars().next();
+        let Some(q) = q.filter(|c| *c == '"' || *c == '\'') else { continue };
+        let Some(v) = part[1..].split(q).next() else { continue };
+        let v = v.trim();
+        if !v.is_empty() && v.len() <= 40 && !out.iter().any(|x| x == v) {
+            out.push(v.to_string());
+        }
+    }
+    out
+}
+
+/// The message main gets for the page's start notes (an item the user
+/// wants an agent on): never the page's agent's (ambient-lead m_5006).
+pub fn start_message(m: &Meta, url: &str, starts: &[Note]) -> String {
+    let mut out = format!("you asked for an agent on these items of the page \"{}\" ({} v{}, {url}):\n", m.title, m.id, m.version());
+    for (i, n) in starts.iter().enumerate() {
+        let quote = n.quote.as_deref().filter(|q| !q.trim().is_empty()).map(|q| format!(" \"{}\"", short(q))).unwrap_or_default();
+        let text = n.text.as_deref().map(str::trim).filter(|t| !t.is_empty()).map(|t| format!(": {t}")).unwrap_or_default();
+        out.push_str(&format!("{}. item {}{quote}{text}\n", i + 1, n.block));
+    }
+    let owner = if m.agent == "main" {
+        "then publish the page again with data-agent=\"<its name>\" on each item".to_string()
+    } else {
+        format!("then ask {} (the page's agent) to publish it again with data-agent=\"<its name>\" on each item", m.agent)
+    };
+    out.push_str(&format!("start an agent on each (sb spawn), {owner}: the page shows that agent's status live.\n"));
+    let data = serde_json::to_string(starts).unwrap_or_else(|_| "[]".into());
+    out.push_str(&format!("<page-start page=\"{}\" version=\"{}\">{data}</page-start>", m.id, m.version()));
+    out
 }
 
 fn next_id(notes: &[Note]) -> String {
@@ -435,7 +555,14 @@ fn note_line(n: &Note) -> String {
 }
 
 /// The message the page's agent gets on `send` (§2.6), as from the user.
+/// Start notes are not in it (main gets them, [`start_message`]): ""
+/// when every sent note is one.
 pub fn notes_message(m: &Meta, url: &str, sent: &[Note]) -> String {
+    let sent: Vec<Note> = sent.iter().filter(|n| n.kind != "start").cloned().collect();
+    let sent = sent.as_slice();
+    if sent.is_empty() {
+        return String::new();
+    }
     let count = if sent.len() == 1 { "1 note".to_string() } else { format!("{} notes", sent.len()) };
     let mut out = format!("you sent {count} on your page \"{}\" ({} v{}, {url}):\n", m.title, m.id, m.version());
     for (i, n) in sent.iter().enumerate() {
@@ -530,5 +657,61 @@ mod tests {
         assert_eq!(notes.iter().map(|n| n.status.as_str()).collect::<Vec<_>>(), vec!["done", "answered"]);
         assert_eq!(notes[1].answer.as_deref(), Some("kept: Marc asked"));
         let _ = std::fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn went_parses_and_keeps_one_entry_per_kind_and_ref() {
+        let w = Went::parse("gmail-draft:r-123@mail=https://mail.google.com/mail/#drafts?compose=r-123").unwrap();
+        assert_eq!((w.kind.as_str(), w.reference.as_str(), w.block.as_deref()), ("gmail-draft", "r-123", Some("mail")));
+        assert_eq!(w.url, "https://mail.google.com/mail/#drafts?compose=r-123");
+        assert!(Went::parse("kit-draft:42=https://app.kit.com/b/42").unwrap().block.is_none());
+        for bad in ["gmail-draft", "gmail-draft:r1", ":r1=https://x", "Gmail:r1=https://x", "gmail-draft:r1=file:///etc", "gmail-draft:r 1=https://x"] {
+            assert!(Went::parse(bad).is_err(), "{bad}");
+        }
+        let d = temp();
+        let s = Store::new(&d);
+        let pw = |went: Vec<Went>| Publish { went, ..publish("t1", Some("mail"), None) };
+        let (m, _) = s.publish(&pw(vec![w.clone()]), vec![], 10, &|_| false).unwrap();
+        assert_eq!((m.went.len(), m.went[0].at), (1, 10));
+        // no --went: kept; the same kind and ref: replaced; another: added
+        let (m, _) = s.publish(&pw(vec![]), vec![], 20, &|_| false).unwrap();
+        assert_eq!(m.went.len(), 1);
+        let w2 = Went { url: "https://mail.google.com/x".into(), ..w.clone() };
+        let k = Went::parse("kit-draft:42=https://app.kit.com/b/42").unwrap();
+        let (m, _) = s.publish(&pw(vec![w2, k]), vec![], 30, &|_| false).unwrap();
+        assert_eq!(m.went.iter().map(|x| (x.kind.as_str(), x.url.as_str(), x.at)).collect::<Vec<_>>(), vec![("gmail-draft", "https://mail.google.com/x", 30), ("kit-draft", "https://app.kit.com/b/42", 30)]);
+        let v = serde_json::to_value(s.meta("mail").unwrap()).unwrap();
+        assert_eq!(v["went"][0]["ref"], "r-123", "the meta says ref");
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn start_notes_go_to_main_not_in_the_agents_message() {
+        let d = temp();
+        let s = Store::new(&d);
+        s.publish(&publish("t1", Some("bugs"), None), vec![], 10, &|_| false).unwrap();
+        s.set_drafts("bugs", &[json!({"block": "b2", "quote": "login fails on Safari", "kind": "start"}), json!({"block": "b3", "kind": "start", "text": "this one first"})], 1, 11).unwrap();
+        let sent = s.send("bugs", 12).unwrap();
+        let m = s.meta("bugs").unwrap();
+        assert_eq!(notes_message(&m, "u", &sent), "", "only start notes: nothing for the page's agent");
+        let starts = s.route_starts("bugs").unwrap();
+        assert_eq!(starts.len(), 2);
+        assert!(s.route_starts("bugs").unwrap().is_empty(), "routed once");
+        let msg = start_message(&m, "http://127.0.0.1:47100/p/bugs", &starts);
+        assert!(msg.starts_with("you asked for an agent on these items of the page \"bugs\" (bugs v1, http://127.0.0.1:47100/p/bugs):\n1. item b2 \"login fails on Safari\"\n2. item b3: this one first\n"), "{msg}");
+        assert!(msg.contains("ask t1 (the page's agent) to publish it again with data-agent=") && msg.contains("<page-start page=\"bugs\" version=\"1\">[{"), "{msg}");
+        // a start note among others: the agent's message has the others only
+        s.set_drafts("bugs", &[json!({"block": "b4", "kind": "start"}), json!({"block": "p1", "kind": "note", "text": "shorter"})], 1, 13).unwrap();
+        let sent = s.send("bugs", 14).unwrap();
+        let text = notes_message(&m, "u", &sent);
+        assert!(text.starts_with("you sent 1 note on your page") && text.contains("shorter") && !text.contains("b4"), "{text}");
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn data_agents_are_read_from_the_fragment() {
+        let h = r#"<section data-kit="review" data-id="r"><ul><li data-id="a" data-agent="fix-login">x</li><li data-agent='docs'>y</li><li data-agent="fix-login">z</li><li data-agent="">w</li></ul></section>"#;
+        assert_eq!(data_agents_of(h), vec!["fix-login", "docs"]);
+        assert!(data_agents_of("<p>no agent</p>").is_empty());
     }
 }
