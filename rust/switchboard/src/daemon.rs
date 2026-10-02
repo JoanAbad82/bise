@@ -799,7 +799,16 @@ impl Shell {
                         Err(e) => return json!({"ok": false, "error": format!("--went: {e}")}),
                     }
                 }
+                // --taste: the rules of ~/bise/taste.md now (the frame says
+                // 'following your taste · N rules'); no file: nothing
+                let taste = v.get("taste").and_then(|x| x.as_bool()).unwrap_or(false).then(|| {
+                    std::fs::read_to_string(crate::paths::home_workspace().join("taste.md")).ok().map(|t| crate::pages::store::taste_rules(&t))
+                });
+                if taste == Some(None) {
+                    return json!({"ok": false, "error": format!("--taste: no {} (read it, or publish without --taste)", crate::paths::home_workspace().join("taste.md").display())});
+                }
                 let p = crate::pages::store::Publish {
+                    taste: taste.flatten(),
                     agent: from.to_string(),
                     id: s("id").filter(|x| !x.is_empty()),
                     title: s("title").filter(|x| !x.is_empty()),
@@ -823,6 +832,7 @@ impl Shell {
                         if !p.went.is_empty() {
                             pages.push(&meta.id, "went", &json!({"went": meta.went}));
                         }
+                        pages.push(&meta.id, "taste", &json!(meta.taste));
                         // its items' agents: their status from now on
                         let names = crate::pages::store::data_agents_of(&p.html);
                         self.page_agents_now().insert(meta.id.clone(), names);

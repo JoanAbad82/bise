@@ -31,9 +31,9 @@ const fn cmd(syntax: &'static str, who: Who, doc: &'static str) -> CmdDoc {
 pub const COMMANDS: &[CmdDoc] = &[
     cmd("sb list", Who::Everyone, "every agent of the group, its status and what it is for."),
     cmd(
-        "sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"<answer>\"]... [--went <kind>:<ref>[@<block>]=<url>]... | sb page start <id> [--title <t>] [--agent <name>] [--ask <words>] | sb page tick <page> <item> [words] | sb page list | sb page notes <id>",
+        "sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"<answer>\"]... [--went <kind>:<ref>[@<block>]=<url>]... [--taste] | sb page start <id> [--title <t>] [--agent <name>] [--ask <words>] | sb page tick <page> <item> [words] | sb page list | sb page notes <id>",
         Who::Everyone,
-        "publish a page for the user (a fragment of bise kit blocks; the kit's lint checks it): its URL comes back. `sb page start` shows the page at once, empty, while you (or --agent) write it; your first publish is v1. `sb page tick` ticks a step of the user's (a checklist row with data-who=\"yours\") when he says it's done; other words go as a note on that row. A new version of your page answers the user's notes: `--notes-done` the ones you did, `--note-answer` one line for the others.",
+        "publish a page for the user (a fragment of bise kit blocks; the kit's lint checks it): its URL comes back. `sb page start` shows the page at once, empty, while you (or --agent) write it; your first publish is v1. `sb page tick` ticks a step of the user's (a checklist row with data-who=\"yours\") when he says it's done; other words go as a note on that row. A new version of your page answers the user's notes: `--notes-done` the ones you did, `--note-answer` one line for the others. `--taste`: you followed ~/bise/taste.md (the frame says so).",
     ),
     cmd("sb tasks", Who::Everyone, "every task in detail: what it is doing now, its last report, its open questions."),
     cmd(
@@ -653,7 +653,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
     Ok(Value::Object(req))
 }
 
-const PAGE_USAGE: &str = "usage: sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"…\"]... [--went <kind>:<ref>[@<block>]=<url>]... | sb page start <id> [--title <t>] [--agent <name>] [--ask <words>] | sb page tick <page> <item> [words] | sb page list | sb page notes <id>";
+const PAGE_USAGE: &str = "usage: sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"…\"]... [--went <kind>:<ref>[@<block>]=<url>]... [--taste] | sb page start <id> [--title <t>] [--agent <name>] [--ask <words>] | sb page tick <page> <item> [words] | sb page list | sb page notes <id>";
 
 /// `sb page publish|list|notes` (docs/ambient-pages.md §2.2): the hub's
 /// `page_*` request. The file is read here (the agent's path, from its
@@ -661,7 +661,7 @@ const PAGE_USAGE: &str = "usage: sb page publish <file> [--id <id>] [--title <t>
 fn page_req(rest: &[String], req: &mut Map<String, Value>) -> Result<(), String> {
     match rest.first().map(String::as_str) {
         Some("publish") => {
-            let (pos, o) = parse_args(&rest[1..], &["id", "title", "notes-done", "note-answer", "went"], &[])?;
+            let (pos, o) = parse_args(&rest[1..], &["id", "title", "notes-done", "note-answer", "went"], &["taste"])?;
             let file = pos.first().ok_or(PAGE_USAGE)?;
             let html = std::fs::read_to_string(file).map_err(|e| format!("{file}: {e}"))?;
             req.insert("cmd".into(), json!("page_publish"));
@@ -690,6 +690,10 @@ fn page_req(rest: &[String], req: &mut Map<String, Value>) -> Result<(), String>
             }
             if !went.is_empty() {
                 req.insert("went".into(), Value::Array(went));
+            }
+            // it followed ~/bise/taste.md (the hub counts its rules)
+            if o.contains_key("taste") {
+                req.insert("taste".into(), json!(true));
             }
         }
         Some("start") => {

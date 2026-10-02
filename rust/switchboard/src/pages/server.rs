@@ -400,6 +400,9 @@ fn connect_frames(pages: &Pages, id: &str) -> String {
         if let Some(w) = &m.watch {
             out.push_str(&format!("event: watch\ndata: {w}\n\n"));
         }
+        if let Some(t) = &m.taste {
+            out.push_str(&format!("event: taste\ndata: {t}\n\n"));
+        }
     }
     out
 }

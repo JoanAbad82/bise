@@ -92,8 +92,10 @@ def main():
     if not os.path.exists(EXE):
         sys.exit("build first: cd rust && cargo build")
     E = e2e.Env()
-    # the home workspace is a plain folder: no git at all
+    # the home workspace is a plain folder: no git at all; it is the
+    # home (~/bise) of this hub: its taste.md is read there
     shutil.rmtree(os.path.join(E.ws, ".git"))
+    E.env["BISE_HOME_WORKSPACE"] = E.ws
     ok = True
     try:
         c = E.start_hub()
@@ -130,6 +132,19 @@ def main():
         check(get(port, "/p/t1-page")[0] == 200, "t1's page is served")
         trole = open(os.path.join(E.state, "agents", "t1", "role.md")).read()
         check("sb land" not in trole.split("Your working directory:")[1].split("\n")[0], "t1's place line: no land")
+
+        # sb page publish --taste (roadmap §3.4): meta.taste {rules: N}, N
+        # the '- '/'* ' lines of ~/bise/taste.md; gone on a publish without it
+        open(os.path.join(E.ws, "taste.md"), "w").write("# my taste\n- short sentences\n* no emoji\nnot a rule\n")
+        c.say("[[bash: sb page publish %s --id offsite --taste]]" % page)
+        c.wait_line("main", "published offsite v2", 90)
+        c.wait_idle("main")
+        m = json.loads(get(port, "/p/offsite/meta")[1])
+        check(m.get("taste") == {"rules": 2}, "meta.taste: %r" % m.get("taste"))
+        c.say("[[bash: sb page publish %s --id offsite]]" % page)
+        c.wait_line("main", "published offsite v3", 90)
+        c.wait_idle("main")
+        check("taste" not in json.loads(get(port, "/p/offsite/meta")[1]), "no --taste: no taste")
 
         # a worktree task: refused in words, nothing crashes
         c.say("/new -w t2: x")

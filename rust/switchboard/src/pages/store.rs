@@ -42,6 +42,10 @@ pub struct Meta {
     /// {timer, every, checked_ms, until_ms}; absent when none
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub watch: Option<Value>,
+    /// the latest publish followed the user's taste (`--taste`): {rules: N},
+    /// N the rules of ~/bise/taste.md then; absent otherwise
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub taste: Option<Value>,
 }
 
 /// One place the page's text went: `--went <kind>:<ref>[@<block>]=<url>`
@@ -151,6 +155,9 @@ pub struct Publish {
     pub answers: Vec<(String, String)>,
     /// `--went`: where its text went (replaces the entry of the same kind and ref)
     pub went: Vec<Went>,
+    /// `--taste`: the rules of the user's taste file it followed (None:
+    /// not said, meta.taste goes)
+    pub taste: Option<u64>,
 }
 
 /// A page id: `[a-z0-9-]{1,40}`.
@@ -292,8 +299,10 @@ impl Store {
                 opened_version: 0,
                 went: Vec::new(),
                 watch: None,
+                taste: None,
             },
         };
+        meta.taste = p.taste.map(|n| serde_json::json!({"rules": n}));
         for w in &p.went {
             let w = Went { at: now, ..w.clone() };
             match meta.went.iter_mut().find(|x| x.kind == w.kind && x.reference == w.reference) {
@@ -391,7 +400,7 @@ impl Store {
                 return Err(format!("{id} is {}'s page: start another --id", m.agent));
             }
             Some(m) => Meta { agent: agent.to_string(), ..m },
-            None => Meta { id: id.to_string(), title: String::new(), agent: agent.to_string(), created_ms: now, versions: Vec::new(), state: ready(), ask: None, opened_version: 0, went: Vec::new(), watch: None },
+            None => Meta { id: id.to_string(), title: String::new(), agent: agent.to_string(), created_ms: now, versions: Vec::new(), state: ready(), ask: None, opened_version: 0, went: Vec::new(), watch: None, taste: None },
         };
         if let Some(t) = title.map(str::trim).filter(|t| !t.is_empty()) {
             meta.title = t.to_string();
@@ -545,6 +554,11 @@ impl Store {
         self.save_meta(&m)?;
         Ok(Some(m))
     }
+}
+
+/// The rules of a taste file (`~/bise/taste.md`): its `- ` and `* ` lines.
+pub fn taste_rules(text: &str) -> u64 {
+    text.lines().map(str::trim_start).filter(|l| l.starts_with("- ") || l.starts_with("* ")).count() as u64
 }
 
 /// A note that is the user's go for what leaves the page (a draft in his
@@ -813,6 +827,20 @@ mod tests {
         assert!(s.pending_review("t3").is_some());
         s.save_questions("plan", &[super::super::questions::Question { block: "q1".into(), text: "which venue?".into(), options: vec![], card: 4, reply: Some("Les Pins".into()) }]).unwrap();
         assert_eq!(s.pending_review("t3"), None);
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn taste_is_counted_and_only_on_the_publish_that_said_it() {
+        assert_eq!(taste_rules("# my taste\n- short\n* no emoji\n  - lowercase\ntext - not one\n-nope\n"), 3);
+        assert_eq!(taste_rules(""), 0);
+        let d = temp();
+        let s = Store::new(&d);
+        let (m, _) = s.publish(&Publish { taste: Some(4), ..publish("t1", Some("w"), None) }, vec![], 10, &|_| false).unwrap();
+        assert_eq!(m.taste, Some(json!({"rules": 4})));
+        assert_eq!(serde_json::to_value(s.meta("w").unwrap()).unwrap()["taste"], json!({"rules": 4}));
+        let (m, _) = s.publish(&publish("t1", Some("w"), None), vec![], 20, &|_| false).unwrap();
+        assert_eq!(m.taste, None, "a publish without --taste: gone");
         let _ = std::fs::remove_dir_all(d);
     }
 }
