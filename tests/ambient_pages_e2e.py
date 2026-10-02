@@ -231,13 +231,15 @@ def main():
 
         # sb page start (m_5000): the page shows at once, writing, empty
         c.wait_idle("main")
+        # subscribed before it exists: the scripted turn ends at once
+        plan = Sse(port, "/p/the-plan/events")
         c.say('[[bash: sb page start the-plan --title "the plan" --ask "plan my week"]]')
         c.wait_line("main", "started the-plan", 90)
         c.wait(lambda: any(e.get("ev") == "page" and e.get("id") == "the-plan" and e.get("state") == "writing" for e in c.events), 10, "a writing page event")
         st, _, body = request(port, "GET", "/p/the-plan")
-        check(st == 200 and 'data-version="0"' in body and 'data-state="writing"' in body and 'data-agent="main"' in body, "the placeholder: %d %s" % (st, body[-400:]))
+        check(st == 200 and 'data-version="0"' in body and 'data-agent="main"' in body, "the placeholder: %d %s" % (st, body[-400:]))
         check('data-ask="plan my week"' in body and 'data-started="' in body, "the ask and the start: %s" % body[-400:])
-        plan = Sse(port, "/p/the-plan/events")
+        c.wait(lambda: plan.seen("state", lambda d: d["state"] == "writing"), 10, "SSE writing")
         # its turn ends with no publish: ready, still no version, and why
         c.wait_idle("main")
         c.wait(lambda: plan.seen("state", lambda d: d == {"state": "ready", "reason": "the turn ended without a page"}), 30, "the placeholder back to ready, with its reason")
@@ -252,6 +254,26 @@ def main():
         c.wait(lambda: plan.seen("state", lambda d: d["state"] == "writing") and plan.seen("version", lambda d: d["n"] == 1), 30, "writing, then v1")
         m = json.loads(request(port, "GET", "/p/the-plan/meta")[2])
         check([v["n"] for v in m["versions"]] == [1] and m["state"] == "ready", "the first publish is v1: %r" % m)
+
+        # a question with no open card (a fixture page written on disk,
+        # amb-kit m_5336): the pick still closes the loop, as a sent
+        # 'pick' note to the page's agent, and the page hears 'answered'
+        c.wait_idle("main")
+        fx = os.path.join(E.state, "pages", "fixture-q")
+        os.makedirs(fx)
+        open(os.path.join(fx, "v1.html"), "w").write(PAGE_V3)
+        json.dump({"id": "fixture-q", "title": "fixture", "agent": "main", "created_ms": 1,
+                   "versions": [{"n": 1, "at_ms": 1, "blocks": []}], "state": "ready"}, open(os.path.join(fx, "meta.json"), "w"))
+        json.dump([{"block": "q1", "text": "post now?", "options": ["post now", "wait for Marc"], "card": 0}], open(os.path.join(fx, "questions.json"), "w"))
+        fq = Sse(port, "/p/fixture-q/events")
+        st, _, r = request(port, "POST", "/api/p/fixture-q/answer", {"block": "q1", "option": 1}, {"Origin": origin, "X-Bise-Token": token})
+        check(st == 200, "a pick with no card: %d %s" % (st, r))
+        c.wait(lambda: fq.seen("answered", lambda d: d == {"block": "q1", "reply": "post now"}), 30, "SSE answered with no card")
+        c.wait(lambda: any("you sent 1 note" in l and "fixture-q" in l for l in c.lines("main")), 30, "the pick note in main's feed")
+        notes = json.loads(request(port, "GET", "/p/fixture-q/meta")[2])["notes"]
+        check([(n["kind"], n["block"], n["text"], n["status"]) for n in notes] == [("pick", "q1", "post now", "sent")], "the pick note: %r" % notes)
+        st, _, _ = request(port, "POST", "/api/p/fixture-q/answer", {"block": "q1", "option": 2}, {"Origin": origin, "X-Bise-Token": token})
+        check(st == 409, "picked twice: %d" % st)
     except AssertionError as e:
         print("FAIL", e)
         ok = False

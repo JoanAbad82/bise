@@ -452,6 +452,26 @@ fn quiet_is_text_only_and_stops_the_voice() {
 }
 
 #[test]
+fn voice_answers_off_is_text_only_until_on_again() {
+    let mut t = T::new();
+    t.ready();
+    t.cmd(Cmd::Voice { on: false });
+    talk(&mut t, "is it green?");
+    t.main_turn("Green.");
+    t.until(|o| phase_is(o, "done"));
+    assert_eq!(t_synths(&t), 0, "voice answers off: text only");
+    t.cmd(Cmd::Voice { on: true });
+    talk(&mut t, "and now?");
+    t.main_turn("Now aloud.");
+    t.until(|o| phase_is(o, "speaking"));
+    assert_eq!(t_synths(&t), 1);
+    // turned off mid-voice: it stops, the text stays
+    t.cmd(Cmd::Voice { on: false });
+    assert!(phase_is(&t.take(), "done"));
+    assert_eq!(Cmd::parse(r#"{"cmd":"voice","on":false}"#), Ok(Cmd::Voice { on: false }));
+}
+
+#[test]
 fn the_state_carries_pages_url_and_urgent_cards() {
     let mut t = T::new();
     t.hub.say(json!({"ev": "state", "agents": [], "pages": [], "pages_url": "http://127.0.0.1:47123",

@@ -797,7 +797,7 @@ impl Shell {
     fn page_msg(&mut self, m: crate::pages::PageMsg) {
         let Some(pages) = self.pages.clone() else { return };
         match m {
-            crate::pages::PageMsg::Notes { .. } => {
+            crate::pages::PageMsg::Notes { .. } | crate::pages::PageMsg::Opened { .. } => {
                 let snap = self.snapshot();
                 self.broadcast(&snap);
             }
@@ -818,6 +818,11 @@ impl Shell {
                 if let Some(card) = self.page_card(&id, &block) {
                     let text = self.page_reply_text(&format!("/answer {card} {reply}")).unwrap_or_default();
                     self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text });
+                } else {
+                    // no open card for it (it never opened, or the store
+                    // was written another way): the loop still closes,
+                    // the answer to the page's agent as from the user
+                    self.page_answer_without_card(&id, &block, &reply);
                 }
                 self.page_answers();
             }
@@ -928,6 +933,29 @@ impl Shell {
             log_line(&self.opts.paths, &format!("page {id}: questions not saved: {e}"));
         }
         pages.push("", "pages", &json!({"pages": pages.list_json()}));
+    }
+
+    /// A page question answered with no open card (amb-kit m_5336,
+    /// ambient-lead m_5343): the answer is kept, the page hears
+    /// `answered`, and the pick is a `pick` note on that block, sent to
+    /// the page's agent (main when it is gone) like any notes.
+    fn page_answer_without_card(&mut self, id: &str, block: &str, reply: &str) {
+        let Some(pages) = self.pages.clone() else { return };
+        let Some(meta) = pages.store.meta(id) else { return };
+        let mut qs = pages.store.questions(id);
+        let Some(q) = qs.iter_mut().find(|q| q.block == block && q.reply.is_none()) else { return };
+        q.reply = Some(reply.to_string());
+        if let Err(e) = pages.locked(|s| s.save_questions(id, &qs)) {
+            log_line(&self.opts.paths, &format!("page {id}: questions not saved: {e}"));
+        }
+        pages.push(id, "answered", &json!({"block": block, "reply": reply}));
+        let note = match pages.locked(|s| s.add_pick(id, block, reply, meta.version(), now_ms())) {
+            Ok(n) => n,
+            Err(e) => return log_line(&self.opts.paths, &format!("page {id}: the pick not saved: {e}")),
+        };
+        pages.push(id, "notes", &json!({"notes": pages.store.notes(id)}));
+        let text = crate::pages::store::notes_message(&meta, &pages.url(id), &[note]);
+        self.page_msg(crate::pages::PageMsg::Sent { id: id.to_string(), agent: meta.agent.clone(), text });
     }
 
     /// The card of question `block` on page `id`, when it is still open.

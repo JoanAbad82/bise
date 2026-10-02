@@ -28,6 +28,8 @@ pub enum PageMsg {
     /// the user answered question `block` of page `id` on the page
     /// (§4.2): `reply` goes to its card, as from the capsule
     Answer { id: String, block: String, reply: String },
+    /// the user opened a newer version of page `id` in a browser
+    Opened { id: String },
 }
 
 /// How the server reaches the hub's loop.
@@ -151,6 +153,7 @@ impl Pages {
         let mut v = json!({
             "id": m.id, "title": m.title, "agent": m.agent, "version": m.version(),
             "url": self.url(&m.id), "at_ms": m.at_ms(), "state": m.state, "open_notes": open,
+            "opened_version": m.opened_version,
         });
         if let Some(k) = self.kicker(m) {
             v["kicker"] = json!(k);

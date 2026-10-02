@@ -31,6 +31,9 @@ pub struct Meta {
     /// `sb page start --ask`: the user's words that asked for it
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ask: Option<String>,
+    /// the newest version the user opened in a browser (0: none yet)
+    #[serde(default)]
+    pub opened_version: u64,
 }
 
 fn ready() -> String {
@@ -240,6 +243,7 @@ impl Store {
                 versions: Vec::new(),
                 state: ready(),
                 ask: None,
+                opened_version: 0,
             },
         };
         if let Some(t) = p.title.as_ref().map(|t| t.trim()).filter(|t| !t.is_empty()) {
@@ -332,7 +336,7 @@ impl Store {
                 return Err(format!("{id} is {}'s page: start another --id", m.agent));
             }
             Some(m) => Meta { agent: agent.to_string(), ..m },
-            None => Meta { id: id.to_string(), title: String::new(), agent: agent.to_string(), created_ms: now, versions: Vec::new(), state: ready(), ask: None },
+            None => Meta { id: id.to_string(), title: String::new(), agent: agent.to_string(), created_ms: now, versions: Vec::new(), state: ready(), ask: None, opened_version: 0 },
         };
         if let Some(t) = title.map(str::trim).filter(|t| !t.is_empty()) {
             meta.title = t.to_string();
@@ -347,6 +351,38 @@ impl Store {
         std::fs::create_dir_all(self.page_dir(id)).map_err(|e| format!("{}: {e}", self.page_dir(id).display()))?;
         self.save_meta(&meta)?;
         Ok(meta)
+    }
+
+    /// A pick on question `block` with no open card (ambient-lead
+    /// m_5343): a note of kind `pick`, sent at once. The note.
+    pub fn add_pick(&self, id: &str, block: &str, reply: &str, version: u64, now: u64) -> Result<Note, String> {
+        let mut notes = self.notes(id);
+        let n = Note {
+            id: next_id(&notes),
+            version,
+            block: block.to_string(),
+            kind: "pick".into(),
+            text: Some(reply.to_string()),
+            at_ms: now,
+            status: "sent".into(),
+            sent_ms: Some(now),
+            ..Note::default()
+        };
+        notes.push(n.clone());
+        self.save_notes(id, &notes)?;
+        Ok(n)
+    }
+
+    /// The user opened version `n` in a browser: the newest he opened
+    /// goes up (an older one opened leaves it). Some: it changed.
+    pub fn opened(&self, id: &str, n: u64) -> Result<Option<Meta>, String> {
+        let Some(mut m) = self.meta(id) else { return Ok(None) };
+        if n <= m.opened_version {
+            return Ok(None);
+        }
+        m.opened_version = n;
+        self.save_meta(&m)?;
+        Ok(Some(m))
     }
 
     pub fn set_state(&self, id: &str, state: &str) -> Result<Option<Meta>, String> {

@@ -75,6 +75,9 @@ pub enum Cmd {
     /// The user is on a call or in a meeting (the app's read): text only,
     /// no voice (docs/ambient-app.md §4 `quiet`).
     Quiet { on: bool },
+    /// The settings' voice answers (amb-mac m_5327): off, main's answers
+    /// are text only; on (the default), as usual.
+    Voice { on: bool },
 }
 
 impl Cmd {
@@ -103,6 +106,7 @@ impl Cmd {
             "hush" => Cmd::Hush,
             "cut_in" => Cmd::CutIn,
             "quiet" => Cmd::Quiet { on: v.get("on").and_then(Value::as_bool).unwrap_or(false) },
+            "voice" => Cmd::Voice { on: v.get("on").and_then(Value::as_bool).unwrap_or(true) },
             other => return Err(format!("unknown cmd {other:?}")),
         })
     }
@@ -232,6 +236,8 @@ pub struct Core {
     pages_url: Option<String>,
     /// on a call or in a meeting (the app's `quiet`): no voice
     quiet: bool,
+    /// the settings' voice answers are off: no voice
+    voice_off: bool,
 }
 
 impl Core {
@@ -262,6 +268,7 @@ impl Core {
             page_titles: Vec::new(),
             pages_url: None,
             quiet: false,
+            voice_off: false,
         }
     }
 
@@ -330,6 +337,12 @@ impl Core {
                 // a call starts while main speaks: the voice stops, the
                 // text stays
                 if on && self.stop_voice() {
+                    self.set_phase(Phase::Done, None);
+                }
+            }
+            Cmd::Voice { on } => {
+                self.voice_off = !on;
+                if !on && self.stop_voice() {
                     self.set_phase(Phase::Done, None);
                 }
             }
@@ -776,7 +789,7 @@ impl Core {
         if self.voice_out == Some(true) {
             self.voice_out = None;
             // on a call or in a meeting: text only
-            if !self.quiet && self.say_main() {
+            if !self.quiet && !self.voice_off && self.say_main() {
                 return self.set_phase(Phase::Speaking, None);
             }
         }
