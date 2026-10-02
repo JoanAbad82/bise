@@ -194,12 +194,29 @@ fn read_json<T: serde::de::DeserializeOwned + Default>(p: &Path) -> T {
     std::fs::read_to_string(p).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
 }
 
-/// Write then rename: a reader never sees half a file.
+/// Write then rename: a reader never sees half a file, and the page
+/// server keeps serving the previous one until the rename (pm's B,
+/// m_5765). Each write has its own temp name (pid, a counter), so two
+/// writers never rename each other's half-written file; a failed write
+/// leaves no temp behind.
+fn write_atomic(p: &Path, bytes: &[u8]) -> Result<(), String> {
+    static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let n = N.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let name = p.file_name().and_then(|f| f.to_str()).unwrap_or("file");
+    let tmp = p.with_file_name(format!(".{name}.{}.{n}.tmp", std::process::id()));
+    if let Err(e) = std::fs::write(&tmp, bytes) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(format!("{}: {e}", tmp.display()));
+    }
+    std::fs::rename(&tmp, p).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        format!("{}: {e}", p.display())
+    })
+}
+
 fn write_json<T: Serialize>(p: &Path, v: &T) -> Result<(), String> {
-    let tmp = p.with_extension("json.tmp");
     let text = serde_json::to_string_pretty(v).map_err(|e| e.to_string())?;
-    std::fs::write(&tmp, text).map_err(|e| format!("{}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, p).map_err(|e| format!("{}: {e}", p.display()))
+    write_atomic(p, text.as_bytes())
 }
 
 impl Store {
@@ -318,7 +335,7 @@ impl Store {
         }
         let n = meta.version() + 1;
         std::fs::create_dir_all(self.page_dir(&id)).map_err(|e| format!("{}: {e}", self.page_dir(&id).display()))?;
-        std::fs::write(self.page_dir(&id).join(format!("v{n}.html")), &p.html).map_err(|e| e.to_string())?;
+        write_atomic(&self.page_dir(&id).join(format!("v{n}.html")), p.html.as_bytes())?;
         meta.versions.push(Version { n, at_ms: now, blocks });
         meta.state = ready();
         let mut notes = self.notes(&id);

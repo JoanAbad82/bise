@@ -257,8 +257,32 @@ pub fn pick_port(state: &Path, workspace_id: &str, free: &dyn Fn(u16) -> bool) -
     Some(p)
 }
 
+/// The hub's soft limit on open files up to `want` (never above the hard
+/// one): macOS gives a launchd job 256, and the hub with its agents' pipes,
+/// the page server's connections and SSE streams ran out of them during a
+/// republish (pm's B, m_5765: connections closed with no response).
+/// Returns the soft limit it has after (0: unknown).
+pub fn raise_fd_limit(want: u64) -> u64 {
+    let mut l = libc::rlimit { rlim_cur: 0, rlim_max: 0 };
+    // SAFETY: getrlimit/setrlimit only read and write the struct we own
+    unsafe {
+        if libc::getrlimit(libc::RLIMIT_NOFILE, &mut l) != 0 {
+            return 0;
+        }
+        let target = want.min(l.rlim_max);
+        if l.rlim_cur < target {
+            let n = libc::rlimit { rlim_cur: target, rlim_max: l.rlim_max };
+            if libc::setrlimit(libc::RLIMIT_NOFILE, &n) == 0 {
+                l.rlim_cur = target;
+            }
+        }
+    }
+    l.rlim_cur
+}
+
 /// Start the page server of a hub: the port, the listener, its thread.
 pub fn start(state: &Path, workspace_id: &str, kit_dir: PathBuf) -> std::io::Result<Arc<Pages>> {
+    raise_fd_limit(10240);
     let free = |p: u16| std::net::TcpListener::bind(("127.0.0.1", p)).is_ok();
     let port = pick_port(state, workspace_id, &free).ok_or_else(|| std::io::Error::other("no free port in 47100-47899"))?;
     let listener = std::net::TcpListener::bind(("127.0.0.1", port))?;
@@ -284,6 +308,14 @@ mod tests {
         let q = pick_port(&d, "harness-1234abcd", &|x| x != p).unwrap();
         assert_ne!(q, p);
         let _ = std::fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn the_hub_gets_room_for_its_connections() {
+        let n = raise_fd_limit(4096);
+        assert!(n >= 4096 || n > 256, "soft limit {n}");
+        // never lowered by a smaller ask
+        assert!(raise_fd_limit(16) >= n);
     }
 
     #[test]

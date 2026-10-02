@@ -24,7 +24,12 @@ const PING: Duration = Duration::from_secs(15);
 pub fn serve(listener: TcpListener, pages: Arc<Pages>) {
     std::thread::spawn(move || {
         for conn in listener.incoming() {
-            let Ok(stream) = conn else { continue };
+            // out of descriptors (EMFILE) or a reset before accept: wait a
+            // little instead of spinning; the connection stays queued
+            let Ok(stream) = conn else {
+                std::thread::sleep(Duration::from_millis(20));
+                continue;
+            };
             let pages = pages.clone();
             std::thread::spawn(move || handle(stream, &pages));
         }
@@ -125,10 +130,19 @@ impl Response {
 
 fn handle(stream: TcpStream, pages: &Pages) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
-    let Ok(read) = stream.try_clone() else { return };
-    let mut r = BufReader::new(read);
-    let Some(req) = read_request(&mut r) else { return };
+    // read through a borrow, no second descriptor (pm's B, m_5765: a
+    // try_clone that failed with no descriptor left closed the connection
+    // with no response while the hub was busy republishing); a request we
+    // can't read gets a 400, never a silent close
+    let req = {
+        let mut r = BufReader::new(&stream);
+        read_request(&mut r)
+    };
     let mut w = stream;
+    let Some(req) = req else {
+        let _ = w.write_all(&Response::err(400, "bad request").bytes());
+        return;
+    };
     if let Some(id) = events_route(&req) {
         if host_ok(pages, &req) {
             return events(&mut w, pages, &id);
@@ -623,6 +637,63 @@ mod tests {
         assert!(got.iter().any(|f| f.starts_with("event: state\ndata: {\"state\":\"ready\"}")));
         p.set_state("w", "updating");
         assert_eq!(rx.try_iter().next().unwrap(), "event: state\ndata: {\"state\":\"updating\"}\n\n");
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    /// pm's B (m_5765): a reader polling a page during republishes always
+    /// gets a whole answer: 200 and the meta, never a 404, a dropped
+    /// connection or half a file, through the real socket and threads.
+    #[test]
+    fn a_page_is_served_whole_while_it_is_republished() {
+        use std::io::Read;
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let d = std::env::temp_dir().join(format!("sb-srv-pub-{}", std::process::id()));
+        std::fs::create_dir_all(d.join("kit")).unwrap();
+        let p = std::sync::Arc::new(Pages::new(&d, port, d.join("kit")));
+        let pb = |n: u64| Publish {
+            agent: "watch".into(),
+            id: Some("launch-watch".into()),
+            html: format!("<section data-kit=\"prose\" data-id=\"p1\"><p>{}</p></section>", "new comment ".repeat(2000 + n as usize)),
+            ..Default::default()
+        };
+        p.publish(&pb(0), 1, &|_| false).unwrap();
+        serve(listener, p.clone());
+        let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let readers: Vec<_> = (0..3)
+            .map(|_| {
+                let done = done.clone();
+                std::thread::spawn(move || {
+                    let mut bad = Vec::new();
+                    let mut n = 0;
+                    while !done.load(std::sync::atomic::Ordering::SeqCst) || n < 20 {
+                        n += 1;
+                        for path in ["/p/launch-watch/meta", "/p/launch-watch/v/1/body", "/p/launch-watch"] {
+                            let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+                            let req = format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n");
+                            s.write_all(req.as_bytes()).unwrap();
+                            let mut out = String::new();
+                            let _ = s.read_to_string(&mut out);
+                            let ok = out.starts_with("HTTP/1.1 200")
+                                && out.split("\r\n\r\n").nth(1).is_some_and(|b| {
+                                    !path.ends_with("/meta") || serde_json::from_str::<Value>(b).is_ok_and(|v| v["id"] == "launch-watch")
+                                });
+                            if !ok {
+                                bad.push(format!("{path}: {:?}", out.chars().take(80).collect::<String>()));
+                            }
+                        }
+                    }
+                    bad
+                })
+            })
+            .collect();
+        for n in 2..=21 {
+            p.publish(&pb(n), n, &|_| false).unwrap();
+        }
+        done.store(true, std::sync::atomic::Ordering::SeqCst);
+        let bad: Vec<String> = readers.into_iter().flat_map(|r| r.join().unwrap()).collect();
+        assert!(bad.is_empty(), "{} bad answers, first: {:?}", bad.len(), bad.first());
+        assert_eq!(p.store.meta("launch-watch").unwrap().version(), 21);
         let _ = std::fs::remove_dir_all(d);
     }
 }
