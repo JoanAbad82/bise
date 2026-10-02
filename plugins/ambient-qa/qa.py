@@ -1883,7 +1883,10 @@ def hello(every=300, span=3000, reduce=False, backdrop="dark", out=None):
         t_hello = None
         t0 = time.time()
         while time.time() - t0 < 10 and t_hello is None:
-            if any(e["ev"].get("ev") == "app_hello" for e in events(2000)["events"][n0:]):
+            # App posts app_hello to the page directly (not in the QA log); the page's
+            # app_content 'hello' is the first thing logged once it shows
+            if any(e["ev"].get("ev") == "app_hello" or (e["ev"].get("cmd") == "app_content" and e["ev"].get("kind") == "hello")
+                   for e in events(2000)["events"][n0:]):
                 t_hello = time.time()
             time.sleep(0.03)
         if t_hello is None:
