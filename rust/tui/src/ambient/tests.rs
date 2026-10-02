@@ -452,6 +452,31 @@ fn quiet_is_text_only_and_stops_the_voice() {
 }
 
 #[test]
+fn only_mains_words_after_its_last_tool_call_are_its_answer() {
+    let mut t = T::new();
+    t.ready();
+    t.cmd(Cmd::Send { text: "draft the plan".into() });
+    t.hub.next();
+    t.hub.line("main", "  obs: turn_started");
+    t.hub.line("main", "  obs: assistant: Spawn first, then start the page.");
+    t.hub.line("main", "tool_intent #1 : starts the page");
+    t.hub.line("main", "  obs: assistant: The plan is on your screen.");
+    t.hub.line("main", "  obs: turn_done: completed");
+    t.until(|o| phase_is(o, "done"));
+    let mains: Vec<Value> = t.take().into_iter().filter(|v| v["ev"] == "main").collect();
+    assert_eq!(mains, vec![json!({"ev": "main", "text": "The plan is on your screen.", "turn": 1})], "planning words never reach the capsule");
+    // words then a tool call and nothing after: no main event
+    t.cmd(Cmd::Send { text: "and the rest".into() });
+    t.hub.next();
+    t.hub.line("main", "  obs: turn_started");
+    t.hub.line("main", "  obs: assistant: Let me check.");
+    t.hub.line("main", "tool #2 bash : ls");
+    t.hub.line("main", "  obs: turn_done: completed");
+    t.until(|o| phase_is(o, "done"));
+    assert!(!has(&t.take(), "main"));
+}
+
+#[test]
 fn voice_answers_off_is_text_only_until_on_again() {
     let mut t = T::new();
     t.ready();

@@ -725,19 +725,25 @@ impl Core {
         }
         match parse_line(line) {
             Some(Ev::Assistant(t)) => {
+                // kept until the turn ends: words followed by a tool call
+                // are main planning, not its answer (pm's 22)
                 let vis = crate::wire::split_thinking(&t).map(|(_, v)| v).unwrap_or(t);
                 let text = super::plain::plain(&crate::markdown::unescape_md(&vis));
                 if !text.is_empty() {
-                    self.main_text = text.clone();
-                    let turn = self.turn;
-                    self.emit(json!({"ev": "main", "text": text, "turn": turn}));
+                    self.main_text = text;
                 }
             }
-            Some(Ev::ToolIntent { text, .. }) if self.speech.is_none() => {
-                self.set_phase(Phase::Working, Some(crate::render::truncate_chars(&text, 80)));
+            Some(Ev::ToolIntent { text, .. }) => {
+                self.main_text.clear();
+                if self.speech.is_none() {
+                    self.set_phase(Phase::Working, Some(crate::render::truncate_chars(&text, 80)));
+                }
             }
-            Some(Ev::ToolInfo { name, .. }) if self.speech.is_none() => {
-                self.set_phase(Phase::Working, Some(name));
+            Some(Ev::ToolInfo { name, .. }) => {
+                self.main_text.clear();
+                if self.speech.is_none() {
+                    self.set_phase(Phase::Working, Some(name));
+                }
             }
             _ => {}
         }
@@ -775,6 +781,11 @@ impl Core {
                 self.voice_out = None;
             }
             return;
+        }
+        // main's answer: its words after its last tool call
+        if !self.main_text.is_empty() {
+            let (text, turn) = (self.main_text.clone(), self.turn);
+            self.emit(json!({"ev": "main", "text": text, "turn": turn}));
         }
         if how != "completed" {
             let why = match parse_line(line) {
