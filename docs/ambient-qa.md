@@ -125,6 +125,30 @@ page. Pass, with a caveat: that build predates b1ed8fe; recheck on the next real
 
 Not verified yet: drafts surviving a reload, selection notes, the capsule side (`qa.py launch` can't start its fake hub from an agent shell).
 
+### Results: slice 1, pass 2 (build 0bcfd610: kit 21c81232 + web 1213df8d)
+
+My own done-when run first, through amb-tools' `qa.py launch --hub model` (real model, the QA
+capsule, a fake voice): said the ask → main answered in 28 s → `launch-recap` started → the page
+event 83 s after the ask with `front: true` → opened at once; in `state.pages`. Fail (9): main's
+capsule words were 3 capitalized sentences with the kebab id (routed: amb-core tags capsule input,
+amb-kit adds the one-short-line rule). That run served an older kit (amb-home's tree).
+
+Then ambient-lead's run on the new build, in Chrome. Pass: 1-4 and 6-8 of pass 1 (names with
+spaces, the draft in prose and wrapped, the toolbar on block hover with `edit` on prose, the
+composer no longer covers a block, the empty count hidden); edit in place becomes a note; a typed
+note and an edit both survive a reload; ⌘⏎ → v3 in place with my edit kept as written and my note
+done (the line really cut).
+
+Fail (sent to ambient-lead m_5008):
+10. an answered note whose block was removed shows only `moved`: the agent's answer (a question
+    back to me) is never shown;
+11. an insertion reads `you changed "" → "(or not)"`: show the words around it;
+12. after v3, my kept edit shows `moved` instead of done;
+13. v1 in 126 s (target 90): no skeleton was published (fix: `sb page start`, `bise-pages` for
+    every agent).
+
+Slice 1 holds its done-when except speed and 10-12.
+
 ## Slice 2 (outline, detailed when its plan lands)
 
 - Voice note: hold fn on a page, the note pins at the mouse with its words (`you · voice · 0:04`);
