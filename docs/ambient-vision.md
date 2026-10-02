@@ -206,6 +206,10 @@ ambient (product look) with designer (brand); built by an implementer; agents on
 - **a check**: publishing runs the kit's lint: unknown blocks, any style, script or outside URL,
   a block without its id fail it, with one line the agent can act on; it fixes the page and
   publishes again;
+- **no `style=` anywhere, the kit's own components included**: a bar's width, a chart's size, a
+  color tag are `data-` attributes the kit's CSS and JS read (`data-value`, `data-tone`,
+  `data-size`), so agents never need a style, and stripping every `style=` never changes how a kit
+  page looks (the kit's own check proves it; ambient m_4717, ambient-lead);
 - **the agent's guide**: one short reference (the blocks, an example page per kind, the rules of
   §4) that agents get when they make a page, so a page is ~50 lines.
 
