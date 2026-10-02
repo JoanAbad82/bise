@@ -46,9 +46,12 @@ html:not(.app) .cap, html:not(.app) .note {
 .tx { flex: none; width: 310px; font-size: 16px; line-height: 1.35; padding: 4px 0; }
 .cap.small .tx { width: 236px; }
 .cap.open .tx { padding-top: 14px; }
-/* past 70% of the screen it scrolls inside, the last line fading out */
-.tx.scroll { -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent); mask-image: linear-gradient(#000 calc(100% - 28px), transparent); scrollbar-width: none; }
-.tx.scroll::-webkit-scrollbar { display: none; }
+/* past 70% of the screen it scrolls inside, the last 24 px fading out; a list says `+N more` */
+.tx.scroll, .rows.fade { -webkit-mask-image: linear-gradient(#000 calc(100% - 24px), transparent); mask-image: linear-gradient(#000 calc(100% - 24px), transparent); }
+.tx.scroll, .rows { scrollbar-width: none; }
+.tx.scroll::-webkit-scrollbar, .rows::-webkit-scrollbar { display: none; }
+.rows.on { overflow-y: auto; }
+.more { font: 11.5px var(--mono); color: var(--faint); padding: 4px 4px 0; }
 .tx > * { display: none; }
 .tx > .on { display: block; }
 .lab { font: 11.5px/1.4 var(--mono); color: #ffffff90; margin-bottom: 3px; }
@@ -63,9 +66,12 @@ html:not(.app) .cap, html:not(.app) .note {
 .words .w.cur::after { content: ""; display: inline-block; width: 2px; height: .9em; background: var(--acc); margin-left: 3px; vertical-align: -2px; animation: blink 1s steps(1) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 .sub { font-size: 13px; color: var(--dim); margin-top: 4px; }
-.sees { display: none; width: max-content; max-width: 100%; margin-top: 10px; font: 11.5px/1.5 var(--mono); color: #ffffffc0; padding: 3px 10px 3px 8px; border-radius: 99px; background: #ffffff12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sees.on { display: block; }
-.sees::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 0 3px #f4a6b033; margin-right: 7px; vertical-align: 0; }
+.sees { display: none; width: max-content; max-width: 100%; margin-top: 10px; font: 11.5px/1.5 var(--mono); color: #ffffffc0; padding: 3px 10px 3px 8px; border-radius: 99px; background: #ffffff12; white-space: nowrap; }
+.sees.on { display: flex; align-items: center; }
+.sees::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 0 3px #f4a6b033; margin-right: 7px; }
+/* the app and the host stay whole; only the path (or a title) is cut */
+.sees .hd { flex: none; white-space: pre; }
+.sees .tl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .chips.on { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .chip { font: 12.5px var(--mono); background: #ffffff16; border-radius: 99px; padding: 4px 11px; animation: pop .5s var(--back) both, flash 1s both; }
 .chip b { color: var(--acc); font-weight: 400; margin-right: 5px; }
@@ -100,7 +106,8 @@ html:not(.app) .cap, html:not(.app) .note {
 /* the spotlight: a text field in the capsule */
 .spot input { width: 100%; font: 400 19px/1.3 var(--sans); color: #fff; background: transparent; border: 0; outline: 0; caret-color: var(--acc); padding: 2px 0; }
 .spot input::placeholder { color: #ffffff60; }
-.spot .keys { font: 11px var(--mono); color: var(--faint); margin-top: 8px; }
+.spot .keys { font: 11px var(--mono); color: var(--faint); margin-top: 8px; white-space: pre; }
+.spot .keys b { font-weight: 400; color: #ffffffd0; }
 
 /* a permission's sentence and its button */
 .perm p { font-size: 15px; line-height: 1.4; }

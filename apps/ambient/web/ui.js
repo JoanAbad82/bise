@@ -24,13 +24,14 @@
         <div class="sees"></div>
         <div class="chips"></div>
         <div class="rows"></div>
-        <div class="spot"><input type="text" spellcheck="false" autocomplete="off"><div class="keys">⏎ send to main · esc</div></div>
+        <div class="more"></div>
+        <div class="spot"><input type="text" spellcheck="false" autocomplete="off"><div class="keys"></div></div>
         <div class="perm"><p></p><button type="button"></button></div>
       </div>
     </div>
     <div class="note" id="note"></div>`;
   const cap = $("#cap", host), note = $("#note", host), tx = $(".tx", cap);
-  const el = { lab: $(".lab", tx), line: $(".line", tx), words: $(".words", tx), sub: $(".sub", tx), sees: $(".sees", tx), chips: $(".chips", tx), rows: $(".rows", tx), spot: $(".spot", tx), perm: $(".perm", tx) };
+  const el = { lab: $(".lab", tx), line: $(".line", tx), words: $(".words", tx), sub: $(".sub", tx), sees: $(".sees", tx), chips: $(".chips", tx), rows: $(".rows", tx), more: $(".more", tx), spot: $(".spot", tx), perm: $(".perm", tx) };
   const input = $("input", el.spot);
   const orb = AmbOrb.create($(".orb-gl", cap), $(".orb-still", cap));
 
@@ -106,7 +107,11 @@
       else el.words.textContent = "";
     });
     put("sub", v.sub || "", () => { show(el.sub, v.sub); el.sub.textContent = v.sub || ""; });
-    put("sees", v.sees || "", () => { show(el.sees, v.sees); el.sees.textContent = v.sees || ""; });
+    // the head (app, host) never cut, the tail (path, title) ends in … when it must
+    put("sees", JSON.stringify(v.sees), () => {
+      show(el.sees, v.sees);
+      el.sees.innerHTML = v.sees ? `<span class="hd">${esc(v.sees.head)}</span><span class="tl">${esc(v.sees.tail)}</span>` : "";
+    });
     put("chips", v.chips.join(","), () => {
       show(el.chips, v.chips.length);
       const have = new Set([...el.chips.children].map((c) => c.dataset.n));
@@ -114,17 +119,22 @@
       for (const n of v.chips) if (!have.has(n)) el.chips.insertAdjacentHTML("beforeend", `<span class="chip" data-n="${esc(n)}"><b>∿</b>${esc(n)}</span>`);
     });
     put("rows", JSON.stringify([v.list, v.inbox]), () => {
+      // what waits for you first (the inbox, or the agents view's top), then the agents
       show(el.rows, v.list || v.inbox);
-      if (v.list) {
-        el.rows.innerHTML = v.list.map((r, i) => `<div class="row ${esc(r.kind)}" style="animation-delay:${i * 0.06}s"><span class="gl">${esc(r.glyph)}</span><span class="nm">${esc(r.name)}</span><span class="wh">${esc(r.what)}</span><span class="ag">${esc(r.age)}</span></div>`).join("");
-      } else if (v.inbox) {
-        el.rows.innerHTML = v.inbox.map((q, i) => `<div class="q${q.sel ? " sel" : ""}" style="animation-delay:${i * 0.06}s"><div class="who">? ${esc(q.agent)}</div><div class="tq">${esc(q.text)}</div>${opts(q)}</div>`).join("");
-      } else el.rows.innerHTML = "";
+      const qs = (v.inbox || []).map((q, i) => `<div class="q${q.sel ? " sel" : ""}" style="animation-delay:${i * 0.06}s"><div class="who">? ${esc(q.agent)}</div><div class="tq">${esc(q.text)}</div>${opts(q)}</div>`);
+      const n = qs.length;
+      const rs = (v.list || []).map((r, i) => `<div class="row ${esc(r.kind)}" style="animation-delay:${(n + i) * 0.06}s"><span class="gl">${esc(r.glyph)}</span><span class="nm">${esc(r.name)}</span><span class="wh">${esc(r.what)}</span><span class="ag">${esc(r.age)}</span></div>`);
+      el.rows.innerHTML = qs.join("") + rs.join("");
+      el.rows.scrollTop = 0;
     });
     put("spot", v.spot ? "on" : "", () => {
       show(el.spot, v.spot);
       if (v.spot) { input.value = v.spot.text; input.placeholder = v.spot.hint; setTimeout(() => input.focus(), 0); }
       else input.blur();
+    });
+    // the key bar, key then word like the TUI's, three spaces between pairs
+    put("keys", JSON.stringify(v.spot && v.spot.keys), () => {
+      $(".keys", el.spot).innerHTML = v.spot ? v.spot.keys.map(([k, w]) => `<b>${esc(k)}</b> ${esc(w)}`).join("   ") : "";
     });
     put("perm", JSON.stringify(v.perm), () => {
       show(el.perm, v.perm);
@@ -143,13 +153,33 @@
   // ---- the capsule's size: its height follows the words; the panel follows the capsule (app_size)
   const MIN_H = { small: 84, open: 120 };
   const PAD = 24, NOTE_GAP = 12;
+  // grows to its content up to 70% of the screen; past that a list scrolls inside, its last row
+  // fading over 24 px, `+N more` under it (designer); other content scrolls with the same fade
   function layout(v) {
-    const maxH = Math.round((window.screen && screen.availHeight ? screen.availHeight : 900) * 0.7);
-    const want = Math.max(MIN_H[v.size], Math.ceil(tx.scrollHeight) + PAD);
+    const screenH = window.screen && screen.availHeight ? screen.availHeight : 900;
+    // in a browser the page is the screen (headless Chrome says 300)
+    const maxH = Math.round((native() || window.ambientApp ? screenH : Math.max(screenH, innerHeight)) * 0.7);
+    const rows = el.rows, list = rows.classList.contains("on");
+    rows.style.maxHeight = ""; el.more.classList.remove("on");
+    let want = Math.max(MIN_H[v.size], Math.ceil(tx.scrollHeight) + PAD);
+    let scroll = false;
+    if (want > maxH && list) {
+      el.more.classList.add("on");
+      const over = Math.ceil(tx.scrollHeight) + PAD - maxH;
+      const rh = Math.max(60, rows.clientHeight - over);
+      rows.style.maxHeight = rh + "px";
+      // rows below the visible part
+      const bottom = rows.scrollTop + rh - 12;
+      const hidden = [...rows.children].filter((r) => r.offsetTop + r.offsetHeight > bottom).length;
+      el.more.textContent = hidden ? `+${hidden} more` : "";
+      rows.classList.toggle("fade", hidden > 0);
+      want = Math.max(MIN_H[v.size], Math.ceil(tx.scrollHeight) + PAD);
+    } else if (want > maxH) scroll = true;
+    if (!el.more.classList.contains("on")) rows.classList.remove("fade");
     const h = Math.min(want, maxH);
-    tx.style.maxHeight = want > maxH ? `${maxH - PAD}px` : "";
-    tx.style.overflowY = want > maxH ? "auto" : "";
-    tx.classList.toggle("scroll", want > maxH);
+    tx.style.maxHeight = scroll ? `${maxH - PAD}px` : "";
+    tx.style.overflowY = scroll ? "auto" : "";
+    tx.classList.toggle("scroll", scroll);
     if (cap.style.height !== h + "px") cap.style.height = h + "px";
   }
   let sent = "";
@@ -201,6 +231,7 @@
   input.addEventListener("input", () => recv({ ev: "ui_spot_type", text: input.value }));
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); recv({ ev: "ui_spot_send", text: input.value }); }
+    else if (e.key === "Tab") { e.preventDefault(); recv({ ev: "ui_spot_tab", text: input.value }); }
     else if (e.key === "Escape") { e.preventDefault(); recv({ ev: "ui_close" }); }
     e.stopPropagation();
   });

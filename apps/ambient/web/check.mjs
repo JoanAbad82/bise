@@ -143,7 +143,7 @@ law("hold fn: open, the sphere follows your voice, live words, `main sees …`, 
   assert.equal(v.state, "listening"); assert.equal(v.size, "open");
   assert.equal(v.pose, "talk"); assert.ok(v.lvl > 0);
   assert.equal(v.label.text, W.listening); assert.equal(v.label.rest, W.letGo);
-  assert.equal(v.sees, "main sees " + W.sees);
+  eq(v.sees, { head: "main sees Chrome · localhost:4801", tail: "/settings" });
   assert.ok(v.words.list.length > 2 && W.said.startsWith(v.words.list.join(" ")));
   assert.ok(v.edge.on);
   // the words grow
@@ -151,7 +151,13 @@ law("hold fn: open, the sphere follows your voice, live words, `main sees …`, 
 });
 law("a skipped window: `main doesn't see this window`", () => {
   const s = sweep("unseen", 2500);
-  assert.equal(s.views[2000].sees, W.notSeen);
+  eq(s.views[2000].sees, { head: W.notSeen, tail: "" });
+});
+law("the chip cuts the path or the title, never the app or the host", () => {
+  eq(Wd.seesParts("Chrome", "localhost:4801/settings/appearance"), { head: "main sees Chrome · localhost:4801", tail: "/settings/appearance" });
+  eq(Wd.seesParts("Chrome", "https://github.com/acme/web/pull/482"), { head: "main sees Chrome · https://github.com", tail: "/acme/web/pull/482" });
+  eq(Wd.seesParts("Ghostty", "~/acme — bise"), { head: "main sees Ghostty · ", tail: "~/acme — bise" });
+  eq(Wd.seesParts("Finder", ""), { head: "main sees Finder", tail: "" });
 });
 law("let go: `:* got it.`, then `on it.` under the main label, the * turning", () => {
   const evs = sceneEvents("talk");
@@ -182,9 +188,9 @@ law("end of turn: the kiss once (1 s), open, then small after 4 s", () => {
   assert.equal(r.view(done + 1500).pose, "rest"); assert.equal(r.view(done + 1500).size, "open");
   assert.equal(r.view(done + 4200).size, "small");
 });
-law("needs you: small, `? cookies needs you`, the glass under it with `1 yes` `2 no` and the hint, the sphere breathing", () => {
+law("needs you: small, `? 1 waiting for you`, the glass under it names the agent with `1 yes` `2 no` and the hint, the sphere breathing", () => {
   const v = run(sceneEvents("needs-wait"), [1000]).view(1000);
-  assert.equal(v.size, "small"); assert.equal(v.glyph, "?"); assert.equal(v.text, "cookies needs you"); assert.ok(v.need);
+  assert.equal(v.size, "small"); assert.equal(v.glyph, "?"); assert.equal(v.text, "1 waiting for you"); assert.ok(v.need);
   assert.equal(v.note.title, "cookies needs you");
   assert.equal(v.note.text, "keep the banner on mobile?");
   eq(v.note.options.map((o) => o.label), W.needsOpts);
@@ -256,7 +262,9 @@ law("fn + 0: the agents, with their glyphs, `? needs you` for a card's agent", (
   const v = run(sceneEvents("agents"), [600]).view(600);
   assert.equal(v.state, "agents"); assert.equal(v.size, "open");
   const by = Object.fromEntries(v.list.map((r) => [r.name, r]));
-  assert.equal(by.perf.glyph, "✓"); assert.equal(by.perf.what, "signup 4.1 s → 0.9 s.");
+  assert.equal(by.perf.glyph, "✓"); assert.equal(by.perf.what, "signup 4.1 s → 0.9 s", "a row is a label: no final period");
+  // the menu-bar click and fn + 0: the cards first, no glass under (it would repeat)
+  assert.equal(v.inbox.length, 1); assert.equal(v.inbox[0].agent, "cookies"); assert.equal(v.note, null);
   assert.equal(by["dark-mode"].glyph, "∿"); assert.equal(by["dark-mode"].age, "6m");
   assert.equal(by.cookies.glyph, "?"); assert.equal(by.cookies.what, "needs you");
   assert.equal(by.release.glyph, "…");
@@ -264,10 +272,17 @@ law("fn + 0: the agents, with their glyphs, `? needs you` for a card's agent", (
 law("fn + i: the inbox, ↓ chooses, a digit answers the chosen card", () => {
   let r = run(sceneEvents("inbox"), [600]);
   assert.equal(r.view(600).inbox.length, 2);
+  assert.equal(r.view(600).label.text, "2 waiting for you");
   let m = M.step(r.m, { ev: "app_key", key: "down" }, 700).m;
-  const a = M.step(m, { ev: "app_key", key: "2" }, 800);
-  eq([...a.cmds], [{ cmd: "answer", card: "c2", reply: "2" }]);
+  // a hard confirm's options are 1 allow / 3 no: 2 does nothing, 3 answers `3`
+  eq(M.step(m, { ev: "app_key", key: "2" }, 750).cmds, []);
+  eq(M.view(m, 760).inbox[1].options.map((o) => o.label), ["1 allow", "3 no"]);
+  const a = M.step(m, { ev: "app_key", key: "3" }, 800);
+  eq(a.cmds, [{ cmd: "answer", card: "c2", reply: "3" }]);
   assert.equal(M.view(a.m, 900).inbox.length, 1);
+});
+law("plain-string options still count 1, 2, 3", () => {
+  eq(Wd.options({ options: ["yes", "no"] }), [{ i: 0, n: 1, label: "yes" }, { i: 1, n: 2, label: "no" }]);
 });
 law("fn + space: the spotlight takes the keys, ⏎ sends to main and gives them back", () => {
   let m = M.init();
@@ -279,6 +294,21 @@ law("fn + space: the spotlight takes the keys, ⏎ sends to main and gives them 
   eq([...r.cmds], [{ cmd: "app_focus", on: false }, { cmd: "send", text: "what's perf doing?" }]);
   r = M.step(r.m, { ev: "sent", text: "what's perf doing?", voice: false, shot: true }, 40);
   assert.equal(M.view(r.m, 50).text, W.got);
+});
+law("the spotlight's key bar shows `tab start an agent` only with text; tab asks main to start one", () => {
+  let r = M.step(M.init(), { ev: "app_key", key: "space" }, 0);
+  eq(M.view(r.m, 1).spot.keys, [["⏎", "send to main"], ["esc", "close"]]);
+  r = M.step(r.m, { ev: "ui_spot_type", text: "a csv importer" }, 2);
+  eq(M.view(r.m, 3).spot.keys, [["⏎", "send to main"], ["tab", "start an agent"], ["esc", "close"]]);
+  r = M.step(r.m, { ev: "ui_spot_tab" }, 4);
+  eq(r.cmds, [{ cmd: "app_focus", on: false }, { cmd: "send", text: "start an agent: a csv importer" }]);
+});
+law("the words ambient and designer signed (m_4645, m_4648)", () => {
+  assert.equal(W.hubDown, "can't reach main. trying again.");
+  assert.equal(Wd.permDenied("mic"), "without the mic, bise can't hear you. turn it on in System Settings › Privacy & Security › Microphone.");
+  assert.ok(Wd.permDenied("screen", 15).endsWith("› Screen & System Audio Recording."));
+  assert.ok(Wd.permDenied("screen", 14).endsWith("› Screen Recording."));
+  assert.equal(Wd.waiting(1), "1 waiting for you");
 });
 law("typed: main answers in text, whole, no voice", () => {
   const evs = sceneEvents("typed");

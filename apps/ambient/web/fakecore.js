@@ -22,8 +22,9 @@
     { name: "release", status: "idle", note: "waits for the others", report: "", working: false, turn_ms: 60000 },
   ];
   const EMOJI = { name: "emoji-csv", status: "working", note: "it's always unicode", report: "", working: true, turn_ms: 540000 };
-  const CARD = { id: "c1", kind: "question", agent: "cookies", text: "keep the banner on mobile?", options: ["yes", "no"] };
-  const CARD2 = { id: "c2", kind: "confirm", agent: "perf", text: "one question from perf. ten seconds, promise: ship the lazy fonts?", options: ["ship it", "wait"] };
+  // the core's cards: options [{n, label}], n the digit (a hard confirm skips 2)
+  const CARD = { id: "c1", kind: "question", agent: "cookies", text: "keep the banner on mobile?", options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }] };
+  const CARD2 = { id: "c2", kind: "confirm", agent: "perf", text: "run the migration on the shared staging db?", options: [{ n: 1, label: "allow" }, { n: 3, label: "no" }] };
   const SAID = W.said || "dark mode for the settings page. and the cookie banner hides the buy button on mobile, make it half the size";
   const ANSWER = "dark-mode started. settings page first, then the rest. cookies is on the banner.";
 

@@ -74,8 +74,10 @@
     return { ...m, flashes: [...live, { ttl: T.key, ...f, at: last ? Math.max(now, last.at + last.ttl) : now }] };
   }
 
-  function answer(m, card, i, reply, now) {
-    const choice = i != null ? card.options && card.options[i] : null;
+  // answer a card with its option `opt` ({n, label}): the reply is the option's digit
+  function answer(m, card, opt, now) {
+    const choice = opt ? opt.label : null;
+    const reply = String(opt.n);
     const m2 = { ...m, answered: { ...m.answered, [card.id]: true }, sel: 0, pane: m.pane === "inbox" && visibleCards(m).length <= 1 ? null : m.pane };
     const f = { kind: "answered", glyph: "✓", text: Wd.answeredLine(card.agent, choice), ttl: T.answered, kiss: true };
     return { m: flashNow(m2, f, now), cmds: [{ cmd: "answer", card: card.id, reply }] };
@@ -192,12 +194,12 @@
         if (ev.state === "ask") return none({ ...m, perms, permAsk: ev.perm });
         const m2 = { ...m, perms, permAsk: m.permAsk === ev.perm ? null : m.permAsk };
         if (ev.state === "denied" && m.perms[ev.perm] !== "denied" && W.permDenied[ev.perm]) {
-          return none(flashNow(m2, { kind: "perm", glyph: "▲", text: W.permDenied[ev.perm], ttl: 8000, still: true }, now));
+          return none(flashNow(m2, { kind: "perm", glyph: "▲", text: Wd.permDenied(ev.perm, m.macos), ttl: 8000, still: true }, now));
         }
         return none(m2);
       }
       case "app_settings":
-        return none({ ...m, edgeGlow: ev.edge_glow !== false });
+        return none({ ...m, edgeGlow: ev.edge_glow !== false, macos: ev.macos || m.macos });
       case "app_hidden":
         return none({ ...m, hidden: !!(ev.on ?? ev.hidden) });
       case "app_reduce_motion":
@@ -208,8 +210,9 @@
       // ---- the page's own (clicks, the spotlight field)
       case "ui_option": {
         const card = m.cards.find((c) => c.id === ev.card);
-        if (!card || m.answered[card.id]) return none(m);
-        return answer(m, card, ev.i, String(ev.i + 1), now);
+        const opt = card && Wd.options(card)[ev.i];
+        if (!opt || m.answered[card.id]) return none(m);
+        return answer(m, card, opt, now);
       }
       case "ui_capsule":     // a click on the small capsule: the agents
         return setPane(m, m.pane ? null : visibleCards(m).length > 1 ? "inbox" : "agents");
@@ -217,11 +220,13 @@
         return setPane(m, null);
       case "ui_spot_type":
         return none({ ...m, spotText: ev.text || "" });
-      case "ui_spot_send": {
+      case "ui_spot_send":    // ⏎ send to main; tab (agent: true) start an agent, which main does
+      case "ui_spot_tab": {
         const text = (ev.text ?? m.spotText).trim();
         if (!text) return none(m);
         const r = setPane({ ...m, spotText: "" }, null);
-        return { m: { ...r.m, mine: true, voice: false, turnNames: names(m.agents), chips: [] }, cmds: [...r.cmds, { cmd: "send", text }] };
+        const out = ev.ev === "ui_spot_tab" ? W.startAgent + text : text;
+        return { m: { ...r.m, mine: true, voice: false, turnNames: names(m.agents), chips: [] }, cmds: [...r.cmds, { cmd: "send", text: out }] };
       }
       case "ui_perm":
         return { m: ev.do === "continue" ? { ...m, permAsk: null } : m, cmds: [{ cmd: "app_perm", perm: ev.perm, do: ev.do }] };
@@ -235,10 +240,11 @@
     const none = (x) => ({ m: x, cmds: [] });
     const cards = visibleCards(m);
     if (/^[1-9]$/.test(k)) {
-      const card = cards[m.pane === "inbox" ? m.sel : 0];
-      const i = +k - 1;
-      if (!card || !(card.options && i < card.options.length)) return none(m);
-      return answer(m, card, i, k, now);
+      const card = cards[m.pane === "inbox" || m.pane === "agents" ? m.sel : 0];
+      // the digit is the option's own n (a hard confirm: 1 allow, 3 no)
+      const opt = card && Wd.options(card).find((o) => o.n === +k);
+      if (!opt) return none(m);
+      return answer(m, card, opt, now);
     }
     switch (k) {
       case "space": return setPane(m, m.pane === "spot" ? null : "spot");
@@ -247,7 +253,7 @@
       case "up": return none({ ...m, sel: Math.max(0, m.sel - 1) });
       case "down": return none({ ...m, sel: Math.min(Math.max(0, cards.length - 1), m.sel + 1) });
       case "l": {
-        if (m.pane !== "inbox" || !cards[m.sel]) return none(m);
+        if ((m.pane !== "inbox" && m.pane !== "agents") || !cards[m.sel]) return none(m);
         // later: the card leaves the inbox here; the hub keeps it (bringing it back is the core's, later)
         return none(flashNow({ ...m, answered: { ...m.answered, [cards[m.sel].id]: true }, sel: 0 }, { kind: "later", text: W.later }, now));
       }
@@ -297,14 +303,17 @@
       const lit = m.voice && !m.hushed && m.phase === "speaking" && m.word.turn === m.main.turn ? Math.min(list.length, m.word.i + 1) : list.length;
       return { list, lit, per: 0.28 };
     };
+    const inbox = () => cards.map((c, i) => ({ id: c.id, agent: c.agent, text: c.text, sel: i === m.sel,
+      options: Wd.options(c).map((o) => ({ i: o.i, label: Wd.optionLabel(o.n, o.label) })) }));
     const kissAt = (at) => {
       if (now - at < T.kiss) { v.pose = "kiss"; v.poseMs = now - at; v.kiss = true; }
     };
 
-    if (need && m.pane !== "inbox" && m.pane !== "spot" && !m.permAsk) {
+    // the needs-you glass, unless a view already lists the cards
+    if (need && !m.pane && !m.permAsk) {
       const c = cards[0];
       v.note = { id: c.id, agent: c.agent, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsHint, more: cards.length - 1,
-        options: (c.options || []).slice(0, 9).map((o, i) => ({ i, label: Wd.optionLabel(i, o) })) };
+        options: Wd.options(c).map((o) => ({ i: o.i, label: Wd.optionLabel(o.n, o.label) })) };
     }
 
     if (m.permAsk) {
@@ -312,7 +321,8 @@
       v.perm = { perm: m.permAsk, text: W.perm[m.permAsk] || "", button: W.continue };
     } else if (m.pane === "spot") {
       v.state = "spotlight"; v.size = "open";
-      v.spot = { text: m.spotText, hint: W.spotHint };
+      // the key bar: `tab start an agent` only once there is text (designer)
+      v.spot = { text: m.spotText, hint: W.spotHint, keys: W.spotKeys.filter(([k]) => k !== "tab" || m.spotText.trim()) };
       if (inTurn(m)) v.pose = "think";
     } else if (listening(m)) {
       v.state = "listening"; v.size = "open";
@@ -323,7 +333,7 @@
       v.label = { text: now - m.cutAt < T.cutIn ? W.cutIn : W.listening, acc: true, rest: m.handsFree ? W.handsFree : W.letGo };
       v.words = { list: m.heard.text.split(/\s+/).filter(Boolean), per: 0.24 };
       v.words.lit = v.words.list.length;
-      if (m.shot) v.sees = m.shot.skipped ? W.notSeen : Wd.seesLine(m.shot.app, m.shot.title);
+      if (m.shot) v.sees = m.shot.skipped ? { head: W.notSeen, tail: "" } : Wd.seesParts(m.shot.app, m.shot.title);
       v.edge = { on: m.edgeGlow && !m.reduce, lvl: you };
     } else if (m.mine && (m.phase === "sending" || m.phase === "working" || (m.phase === "idle" && now - m.sentAt < 30000 && !m.main.text))) {
       v.state = "working"; v.size = "open"; v.pose = "think";
@@ -348,20 +358,25 @@
       v.chips = m.chips;
       kissAt(m.doneAt);
     } else if (m.pane === "agents") {
+      // fn + 0 and the menu-bar click: what waits for you first, then the agents
       v.state = "agents"; v.size = "open";
       v.label = { text: `${m.hub.workspace || "agents"} · ${Wd.plural(m.agents.length, "agent", "agents")}` };
-      v.list = m.agents.map((a) => ({
-        name: a.name,
-        glyph: cards.some((c) => c.agent === a.name) ? "?" : Wd.GLYPH[a.status] || "·",
-        kind: cards.some((c) => c.agent === a.name) ? "need" : a.status,
-        what: cards.some((c) => c.agent === a.name) ? "needs you" : a.status === "done" || a.status === "failed" ? Wd.firstSentence(a.report, 60) || a.note || a.status : a.note || a.status,
-        age: Wd.age(a.turn_ms),
-      }));
+      if (cards.length) v.inbox = inbox();
+      v.list = m.agents.map((a) => {
+        const asks = cards.some((c) => c.agent === a.name);
+        const done = a.status === "done" || a.status === "failed";
+        return {
+          name: a.name,
+          glyph: asks ? "?" : Wd.GLYPH[a.status] || "·",
+          kind: asks ? "need" : a.status,
+          what: Wd.rowLabel(asks ? "needs you" : (done && Wd.firstSentence(a.report, 60)) || a.note || a.status),
+          age: Wd.age(a.turn_ms),
+        };
+      });
     } else if (m.pane === "inbox") {
       v.state = "inbox"; v.size = "open";
-      v.label = { text: cards.length ? Wd.plural(cards.length, "question", "questions") : W.quiet };
-      v.inbox = cards.map((c, i) => ({ id: c.id, agent: c.agent, text: c.text, sel: i === m.sel,
-        options: (c.options || []).slice(0, 9).map((o, j) => ({ i: j, label: Wd.optionLabel(j, o) })) }));
+      v.label = { text: cards.length ? Wd.waiting(cards.length) : W.quiet };
+      v.inbox = inbox();
     } else if (flash) {
       v.state = flash.kind;
       v.glyph = flash.glyph || null; v.text = flash.text; v.sub = flash.sub || null;
@@ -370,7 +385,8 @@
     } else if (m.hub.known && !m.hub.up) {
       v.state = "hub_down"; v.text = W.hubDown; v.frozen = true;
     } else if (need) {
-      v.state = "needs"; v.glyph = "?"; v.text = Wd.needsLine(cards[0].agent);
+      // the glass under it names the agent; the capsule counts (designer: the two never repeat)
+      v.state = "needs"; v.glyph = "?"; v.text = Wd.waiting(cards.length);
     } else {
       v.state = "idle"; v.text = Wd.idleLine(working(m.agents));
       if (inTurn(m)) v.pose = "think";   // main on its own turn: the * turns, the capsule stays small

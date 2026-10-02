@@ -31,10 +31,11 @@
       mic: "hold fn and talk. the mic is on only while you talk to bise: fn held, or hands-free until you tap fn.",
       screen: "when you talk, main sees the window in front. it goes to your model with your words, and isn't kept.",
     },
+    // the refusals (ambient, m_4645); the screen's pane is named by the running macOS (screenPane)
     permDenied: {
       accessibility: "without Accessibility, bise can't hear fn. turn it on in System Settings › Privacy & Security › Accessibility.",
-      mic: "without the Microphone, bise can't hear you. turn it on in System Settings › Privacy & Security › Microphone.",
-      screen: "without Screen Recording, main can't see the window in front. turn it on in System Settings › Privacy & Security › Screen Recording.",
+      mic: "without the mic, bise can't hear you. turn it on in System Settings › Privacy & Security › Microphone.",
+      screen: "without Screen Recording, main can't see the window in front. turn it on in System Settings › Privacy & Security › Screen & System Audio Recording.",
     },
     continue: "continue",
     // the mocks' examples (the fake core plays them, check.mjs reads them back)
@@ -47,10 +48,23 @@
     doneTouch: "three seconds back, every signup.",
     fail: "release couldn't publish: the checksum didn't match. main is on it.",
     sees: "Chrome · localhost:4801/settings",
-    // not signed off yet: asked to ambient (the hub is down; the spotlight's placeholder)
-    hubDown: "bise isn't reachable. trying again.",
+    // ambient, m_4645
+    hubDown: "can't reach main. trying again.",
     spotHint: "type to main",
+    spotKeys: [["⏎", "send to main"], ["tab", "start an agent"], ["esc", "close"]],
+    // tab in the spotlight: main starts the agent (it's main's job, like the TUI's /new)
+    startAgent: "start an agent: ",
   };
+
+  // the screen recording pane's name: `Screen & System Audio Recording` since macOS 15 (Sequoia),
+  // `Screen Recording` before; the app tells the major version (app_settings.macos)
+  function permDenied(perm, macos) {
+    const s = W.permDenied[perm];
+    return perm === "screen" && macos && macos < 15 ? s.replace("Screen & System Audio Recording", "Screen Recording") : s;
+  }
+
+  // the inbox's label, the TUI's `inbox · 2 waiting for you`
+  const waiting = (n) => `${n} waiting for you`;
 
   // the glyphs of an agent's row (the TUI's)
   const GLYPH = { working: "∿", done: "✓", failed: "▲", blocked: "?", needs: "?", idle: "…", waiting: "…" };
@@ -88,8 +102,21 @@
   // `✓ cookies has it.` / with the option it took: `✓ cookies has it: yes.`
   const answeredLine = (agent, choice) => (choice ? `${agent} has it: ${choice}.` : `${agent} has it.`);
   const seesLine = (app, title) => (title ? `main sees ${app} · ${title}` : `main sees ${app}`);
+  // the chip in two parts: `head` is never cut (the app, a URL's host), `tail` may end in … (a
+  // URL's path, or a window title) (designer: cut the path, never the app or the host)
+  function seesParts(app, title) {
+    const t = String(title || "");
+    if (!t) return { head: `main sees ${app}`, tail: "" };
+    const url = t.match(/^((?:[a-z]+:\/\/)?[^\s/]+)(\/\S*)$/i);
+    if (url) return { head: `main sees ${app} · ${url[1]}`, tail: url[2] };
+    return { head: `main sees ${app} · `, tail: t };
+  }
   // an option, numbered: `1 yes`
-  const optionLabel = (i, text) => `${i + 1} ${text}`;
+  const optionLabel = (n, text) => `${n} ${text}`;
+  // a card's choices, from the core's [{n, label}] (n: the digit to press, not always i + 1:
+  // a hard confirm is `1 allow` / `3 no`); plain strings count 1, 2, 3...
+  const options = (card) => ((card && card.options) || []).slice(0, 9).map((o, i) =>
+    typeof o === "string" ? { i, n: i + 1, label: o } : { i, n: +(o.n ?? i + 1), label: String(o.label ?? "") });
 
   // how long an agent has been on its turn: `6m`, `2h`, `40s`
   function age(ms) {
@@ -100,5 +127,8 @@
     return `${Math.floor(s / 3600)}h`;
   }
 
-  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, optionLabel, age, plural };
+  // an agent's row is a label, not a sentence: no final period
+  const rowLabel = (s) => String(s || "").replace(/\.$/, "");
+
+  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel };
 })(typeof window !== "undefined" ? window : globalThis);

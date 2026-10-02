@@ -167,7 +167,9 @@ void main(){
         let fx = x2, fy = y2, fz = z2;
         if (T.length) {
           const d = T[(i * 7) % T.length];
-          fx = (d[0] + JIT[i * 3] * 0.03) * breathe; fy = (d[1] + JIT[i * 3 + 1] * 0.03) * breathe; fz = JIT[i * 3 + 2] * 0.08;
+          // SPEC: each point jittered by 0.03 (±0.03 around its dot), and spread in depth so the
+          // depth glow varies: a cloud of light on the face, not a grid of squares
+          fx = (d[0] + JIT[i * 3] * 0.06) * breathe; fy = (d[1] + JIT[i * 3 + 1] * 0.06) * breathe; fz = JIT[i * 3 + 2] * 0.3;
         }
         pos[i * 3] = x2 + (fx - x2) * m; pos[i * 3 + 1] = y2 + (fy - y2) * m; pos[i * 3 + 2] = z2 + (fz - z2) * m;
       }
