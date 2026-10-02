@@ -11,7 +11,9 @@ The look: ambient's `SPEC.md` (`site/content/ambient/`, local). The brand: [bran
 
 1. bise is an assistant that is always there, for anyone whose work is mail, docs, meetings,
    numbers and decisions, not only code. You talk to main; agents do the work.
-2. bise has almost no UI of its own: the capsule (v1) is the front door, and that's it.
+2. bise has almost no UI of its own, and none at rest: a menu-bar icon says if work is running
+   and how many things wait for you. The capsule shows only when you talk to bise, when it answers
+   you, or when something needs you, then goes away (§3 G).
 3. Everything bigger than a sentence is a **page**: the agent makes it on the fly, for this job,
    and opens it in your own browser.
 4. On a page you react the way you would on paper: point, talk, strike, edit, pick. `send`, and
@@ -59,8 +61,8 @@ live in one tab group of your own browser window, `bise` (pink), separate from t
 working groups (`bise · <agent>`, computer use's background tabs). A page reuses its own tab, so
 you never get 30 tabs.
 - You asked and you're waiting for it (main said `on it.` a minute ago): the page opens in front.
-- Anything else: it never steals your focus. The capsule says it (`your weekly update is ready ·
-  fn + o`); fn + o (or a click on it in "for you") opens it, or brings its tab forward.
+- Anything else: it never steals your focus. The menu-bar icon counts it (§3 G); fn + o (or a
+  click on it in the menu bar's "for you") opens it, or brings its tab forward.
 - **for you**: the page server's home (`/`) lists every page for you, newest first, the same list
   and the same words as the capsule's "for you" (internally: the desk).
 
@@ -99,6 +101,24 @@ replies", "make it a Google Doc". Anything that leaves your Mac goes through the
 or options becomes a **question** block on a page, and its card says `? offsite needs you` with
 `open it`, which takes you to that question on the page. Answering on the page answers the card:
 one question, two places, never two answers.
+
+**G. Out of the way** (the user, via main m_5030: "at rest, la ui devrait carrément disparaître …
+même quand ça travaille, il faudrait qu'on puisse cacher la UI et seulement avoir une indication
+que quelque chose se passe. Il faut que ce soit out of the way."). This overrides the SPEC's
+"always there: the idle capsule is shown by default".
+- **At rest, nothing on screen.** Only the menu-bar icon. It says three things at a glance:
+  work is running (it moves, quietly) or not (still); how many things wait for you (a number:
+  questions, approvals, pages you haven't opened); something needs you (the accent).
+- **The capsule appears** when you hold fn or open the spotlight, when bise answers you (it stays
+  while it speaks, then fades after a few seconds), and when something needs you (the needs-you
+  glass shows once, then folds into the icon's count after a few seconds; fn + 1…9 still answers
+  it without the capsule).
+- **While agents work, you can hide it** (fn + ., or a click on the icon): the icon keeps moving,
+  nothing else shows. bise doesn't bring it back unless you talk or something needs you.
+- **A click on the icon** opens the capsule's full view: what's running, what needs you, "for
+  you". It closes on esc or when you click elsewhere.
+- The look (ambient's lamplight) is for the moments the capsule shows; the icon is its smallest
+  form. ambient designs the icon and its states.
 
 The loop is A → B → (C → D)* → E. Most of the value is in C → D: the page is how the agent asks
 for feedback, and your notes are how you steer, without writing a prompt.

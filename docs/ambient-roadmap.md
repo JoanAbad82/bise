@@ -84,7 +84,8 @@ answer". Then the same for mail and Slack.
 - **When it speaks first** (the always-on promise): only a card for what he asked to be told
   (`? a HN comment asks if it works with Claude Code`, `1 draft a reply` `2 later`); the rest waits
   on the page. Numbers (stars, points, rank) sit in the page's header, no card.
-- The capsule's idle line can carry the watch: `watching the launch · 3 new for you`.
+- No capsule while it watches (vision §3 G): the menu-bar icon moves and its count grows with the
+  comments that wait for him; its menu says `watching the launch · 3 new for you`.
 
 **Proves.** Always on, without noise: bise works while he doesn't look, and only decisions reach him.
 **Done when.** "watch the launch until tomorrow" → a review page that updates by itself → a card
@@ -128,8 +129,8 @@ status on the page → 2 replies in Slack drafts.
 
 **The job.** Not asked yet; the natural next step of B-D: one page each morning.
 
-**The UX.** At the first fn of the day (never on a timer while he's away): `good morning. 3 things
-need you · fn + o`. The page: what needs him (cards waiting, replies to approve, steps that are
+**The UX.** No capsule pops up in the morning (vision §3 G): the menu-bar icon's count says the
+page is there; at the first fn of the day bise says `good morning. 3 things need you · fn + o`. The page: what needs him (cards waiting, replies to approve, steps that are
 his), what agents finished overnight, today's meetings with a brief for each (Granola, the
 calendar), what's watched. Nothing else. One page, under a minute to read. A standing order (B's
 `sb every`) prepares it at a set hour, so the first fn opens it at once: never computed on the fn.
