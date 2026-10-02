@@ -28,6 +28,8 @@
   const W = {
     by: (agent) => `by ${said(agent)}`,
     updating: (agent) => `${said(agent)} is updating this page…`,
+    writing: (agent) => `${said(agent)} is writing this page…`,
+    stopped: (agent) => `${said(agent)} stopped before writing anything here.`,
     changed: "what changed",
     send: "send",
     latest: "see the latest",
@@ -357,15 +359,25 @@
   function startPage(main) {
     const d = main.dataset;
     const id = d.page, agent = d.agent || "", title = d.title || id;
-    let shown = parseInt(d.version, 10) || 1;
-    const latestAtLoad = parseInt(d.latest || d.version, 10) || shown;
+    // version 0: a page started with `sb page start`, nothing published yet (state writing)
+    const num = (x, dflt) => { const v = parseInt(x, 10); return Number.isNaN(v) ? dflt : v; };
+    let shown = num(d.version, 1);
+    const latestAtLoad = num(d.latest, shown);
     const follow = shown === latestAtLoad; // an older version stays put
     let meta = null;
 
     const f = frame(title);
     f.setAttribute("data-state", d.state || "ready");
     const m = el("span", { class: "m" });
-    const st = el("span", { class: "st" }, W.updating(agent));
+    const st = el("span", { class: "st" });
+    const stWords = el("span", {}, W.updating(agent));
+    const stProgress = el("span", { class: "p" });
+    st.append(stWords, stProgress);
+    // the page before its first version: what the agent is doing, live (SSE progress)
+    const placeholder = el("div", { "data-kit-ui": "", class: "bise-writing" });
+    const phWords = el("p", { class: "w" }, W.writing(agent));
+    const phProgress = el("p", { class: "p" });
+    placeholder.append(phWords, phProgress);
     const sp = el("span", { class: "sp" });
     const wc = el("button", { type: "button", disabled: "" }, W.changed);
     // the version: "v3 ▾" opens the list of versions (ambient m_4918), older ones read-only
@@ -437,22 +449,39 @@
       const incoming = Array.from(t.content.children).filter(isBlock);
       await loadMeta();
       const res = applyVersion(doc, main, incoming, meta, shown, v, { view, agent });
+      if (placeholder.parentNode && blocks().length) placeholder.remove();
       shown = v;
       drawMeta();
       markChanged(res.marked);
     }
 
+    // the frame and the placeholder follow the state: writing (no version yet), updating (notes
+    // sent), ready; a page still at version 0 when it is ready again: its agent stopped
     function setState(s) {
       f.setAttribute("data-state", s);
       main.dataset.state = s;
+      stWords.textContent = s === "writing" ? W.writing(agent) : W.updating(agent);
+      if (s === "ready") { stProgress.textContent = ""; phProgress.textContent = ""; }
+      const empty = blocks().length === 0;
+      if (empty && !placeholder.parentNode) main.append(placeholder);
+      if (!empty && placeholder.parentNode) placeholder.remove();
+      placeholder.setAttribute("data-state", s);
+      phWords.textContent = s === "ready" ? W.stopped(agent) : W.writing(agent);
       doc.dispatchEvent(new root.CustomEvent("bise:state", { detail: { state: s } }));
     }
+    function progress(text) {
+      if (main.dataset.state === "ready") return;
+      stProgress.textContent = text ? ` · ${text}` : "";
+      phProgress.textContent = text || "";
+    }
+    if (blocks().length === 0) setState(d.state || "writing");
 
     if (typeof root.EventSource !== "undefined") {
       const es = new root.EventSource(`/p/${id}/events`);
       const data = (e) => { try { return JSON.parse(e.data); } catch (_) { return {}; } };
       es.addEventListener("version", (e) => { const v = data(e).n; swapping = swapping.then(() => goTo(v)).catch(() => {}); });
       es.addEventListener("state", (e) => setState(data(e).state || "ready"));
+      es.addEventListener("progress", (e) => progress(String(data(e).text || "")));
       const relay = (ev, name) => es.addEventListener(ev, (e) => doc.dispatchEvent(new root.CustomEvent(name, { detail: data(e) })));
       es.addEventListener("notes", (e) => doc.dispatchEvent(new root.CustomEvent("bise:notes", { detail: { notes: data(e).notes || [] } })));
       relay("voice", "bise:voice"); // slice 2 (§4.1): {phase, text}, notes.js pins it

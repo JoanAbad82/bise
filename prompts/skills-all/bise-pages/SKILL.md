@@ -126,6 +126,12 @@ venues to compare and what's left to do).
 
 The user should see the page within about 10 seconds of asking, then watch it fill in. So:
 
+0. **A page started for you:** when your brief gives you a page id (main ran `sb page start`),
+   the page is already open and says you are writing it, with your actions as its live progress
+   line (the one-line description you give each command: make them say what you do, in the user's
+   words: `reading #launch in Slack`). Publish to that id; your first publish replaces the
+   placeholder.
+
 1. **Skeleton first**, before you gather anything: the title, the section headings you expect,
    and a callout that says what you are doing. Publish it at once.
    ```html
@@ -167,6 +173,14 @@ block, quote, kind and words (an edit has its text before and after; a pick has 
    `--notes-done` for the notes you did; `--note-answer` (one per note) for a note you answer in
    words instead, or only partly did. Every note sent gets one or the other.
 3. Reply in one line: `v2 is up: 3 notes done.`
+
+Two kinds of notes ask for more than a change of the page:
+- **`taste: true`**: the user said yes to "keep this for next time?". Besides doing the note,
+  append the preference as one line to `~/bise/taste.md` (create it if needed), in general
+  words that will hold for other pages (`numbers: one per cell, the change in its own column`),
+  never the page's own content.
+- **kind `start`** ("start an agent on this", with an item and its text): it goes to main, not
+  to you; main starts an agent on it. Nothing to change on your page unless another note asks.
 
 ## 6. When the page leaves
 
