@@ -470,7 +470,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         defaults.set(due.day, forKey: "morningOpened")
         Log.say("app: the morning page \(page.id)")
         Browser.open(page.url)
-        capsule.post(["ev": "app_morning", "id": page.id, "title": page.title, "url": page.url])
+        // ambient: "good morning" only before 11:00 local
+        let greet = Calendar.current.component(.hour, from: Date()) < 11
+        capsule.post(["ev": "app_morning", "id": page.id, "title": page.title, "url": page.url, "greet": greet])
     }
 
     private func spotlight() {
