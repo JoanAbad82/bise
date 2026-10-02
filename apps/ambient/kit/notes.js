@@ -969,9 +969,8 @@
     // other drafts stay drafts until he sends them (⌘⏎)
     doc.addEventListener("bise:stop", (e) => {
       const d = e.detail || {};
-      const b = blocks()[0];
-      if (!b) return;
-      const n = M.stop(b.dataset.id, d.timer, version, now());
+      // block 'frame': amb-home's hub (3f22c3bc) ends the page's timers, marks it done, no model turn
+      const n = M.stop("frame", d.timer, version, now());
       render(); sendAlone(n.id, NW.stopped);
     });
     // a report's 'start an agent' (kit.js's bise:start {block, item, text}, amb-kit d418d973): the
