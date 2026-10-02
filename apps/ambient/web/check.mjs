@@ -560,6 +560,9 @@ law("the pearl (SPEC §1): every mood value eases with 1 - e^(-dt/.3) (~0.9 s to
   eq(Pearl.PINK.AMBER, [0.96, 0.56, 0.64]); eq(Pearl.PINK.EMBER, [0.58, 0.46, 0.96]);
   assert.ok(Pearl.FS.includes("mist pearl"));
 });
+law("the page frame's pearl is the capsule's: apps/ambient/kit/pearl.js is byte-identical to apps/ambient/web/pearl.js", () => {
+  assert.equal(readFileSync(join(here, "../kit/pearl.js"), "utf8"), readFileSync(join(here, "pearl.js"), "utf8"), "copy web/pearl.js to kit/pearl.js");
+});
 law("the pearl's mood follows the capsule: listen, speak, work, need, done, fail, away, rest", () => {
   let m = M.step(M.init(), { ev: "state", agents: [{ name: "perf", status: "working" }], cards: [], pages: [] }, 0).m;
   assert.equal(M.view(m, 10).mood, "rest");

@@ -97,3 +97,6 @@ html.bn-drawing .bn-drawhint { display: block; }
 @keyframes bn-rise { from { opacity: 0; transform: translateY(8px); } }
 @keyframes bn-pop { from { opacity: 0; transform: scale(.85); } }
 @media (prefers-reduced-motion: reduce) { .bn-ui, .bn-ui * { animation: none !important; transition: none !important; } }
+
+/* the frame's pearl (round 8): bise's body in the page's bar, drawn by notes.js with /kit/pearl.js */
+.bn-pearl { display: block; }

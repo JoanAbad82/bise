@@ -757,46 +757,62 @@
       if (!b || !item) return b;
       return [...b.querySelectorAll("li[data-id]")].find((li) => li.dataset.id === item) || null;
     }
+    // an edited review item or email carries data-edited, and kit.js hears bise:edited to recount
+    // its 'approve N' (QA m_5260 (15), agreed with amb-kit m_5284)
     function markEdited(e, on) {
       e.classList.toggle("bn-edited", on);
-      if (e.matches("li[data-id]") || e.dataset.kit === "email") { if (on) e.setAttribute("data-edited", ""); else e.removeAttribute("data-edited"); }
+      if (e.matches("li[data-id]") || e.dataset.kit === "email") {
+        if (on) e.setAttribute("data-edited", ""); else e.removeAttribute("data-edited");
+        const b = e.closest("[data-kit][data-id]");
+        doc.dispatchEvent(new win.CustomEvent("bise:edited", { detail: { block: b && b.dataset.id, item: e.matches("li[data-id]") ? e.dataset.id : null, on } }));
+      }
     }
-    let editing = null;   // {el, block, item}
+    // what you may edit (QA m_5260 (14)): the parts kit.js marks data-editable (a review item's
+    // drafted reply, an email's subject and body, a message's text), never a header line; a block
+    // with none (prose) is edited whole
+    const editRoots = (e) => { const r = [...e.querySelectorAll("[data-editable]")]; return r.length ? r : [e]; };
+    const rootsText = (roots) => norm(roots.map(textOf).join(" "));
+    let editing = null;   // {el, roots, block, item}
     function startEdit(b, item) {
       if (!editable(b, item)) return;
       const e = editEl(b.dataset.id, item);
       if (!e) return;
+      const roots = editRoots(e);
       const key = editKey(b.dataset.id, item);
-      if (!(key in originals)) originals[key] = { html: e.innerHTML, text: norm(textOf(e)) };
-      editing = { el: e, block: b.dataset.id, item: item || null };
-      // the kit's own buttons inside stay buttons
-      for (const u of e.querySelectorAll("[data-kit-ui]")) u.contentEditable = "false";
-      e.contentEditable = "true";
+      if (!(key in originals)) originals[key] = { html: e.innerHTML, text: rootsText(roots) };
+      editing = { el: e, roots, block: b.dataset.id, item: item || null };
+      for (const r of roots) {
+        // the kit's own buttons inside stay buttons
+        for (const u of r.querySelectorAll("[data-kit-ui]")) u.contentEditable = "false";
+        r.contentEditable = "true";
+      }
       e.classList.add("bn-editing");
-      e.focus();
+      roots[0].focus();
     }
     function endEdit() {
       if (!editing) return;
-      const { el: e, block, item } = editing;
-      e.contentEditable = "false";
+      const { el: e, roots, block, item } = editing;
+      for (const r of roots) r.contentEditable = "false";
       e.classList.remove("bn-editing");
-      const first = originals[editKey(block, item)].text, after = norm(textOf(e));
+      const first = originals[editKey(block, item)].text, after = rootsText(roots);
       const d = editSpan(first, after);
       M.edit(block, d.before, d.after, now(), item, { ...d, version });
       markEdited(e, norm(first) !== after);
       editing = null;
       save(); render();
     }
-    page.addEventListener("focusout", (e) => { if (editing && e.target === editing.el) endEdit(); });
+    const inEdit = (n) => !!(editing && n && editing.roots.includes(n));
+    // leaving the last editable part ends the edit (moving between the subject and the body doesn't)
+    page.addEventListener("focusout", (e) => { if (inEdit(e.target) && !inEdit(e.relatedTarget)) endEdit(); });
     page.addEventListener("keydown", (e) => {
-      if (editing && e.key === "Escape") { e.preventDefault(); editing.el.blur(); }
+      if (editing && e.key === "Escape") { e.preventDefault(); if (doc.activeElement && doc.activeElement.blur) doc.activeElement.blur(); if (editing) endEdit(); }
     });
 
     // ---- keys: t type · p pin · ⌘z undo · ⌘⏎ send
     doc.addEventListener("keydown", (e) => {
       if (writing()) return;
-      if (e.target === input || (editing && e.target === editing.el && !(e.metaKey && e.key === "Enter"))) return;
-      if (e.metaKey && e.key === "Enter") { e.preventDefault(); if (editing) editing.el.blur(); return send(); }
+      if (e.target === input || (inEdit(e.target) && !(e.metaKey && e.key === "Enter"))) return;
+      if (e.metaKey && e.key === "Enter") { e.preventDefault(); if (editing) { if (doc.activeElement && doc.activeElement.blur) doc.activeElement.blur(); if (editing) endEdit(); } return send(); }
       if (e.metaKey && e.key === "z" && !e.shiftKey) {
         const u = M.undo();
         if (!u) return;
@@ -1040,16 +1056,47 @@
     function reapplyEdit(n) {
       const x = editEl(n.block, n.item);
       if (!x || !n.before) return;
-      for (const t of textNodes(x)) {
+      const roots = editRoots(x);
+      for (const t of roots.flatMap(textNodes)) {
         const i = t.nodeValue.indexOf(n.before);
         if (i >= 0) {
-          originals[editKey(n.block, n.item)] = { html: x.innerHTML, text: norm(textOf(x)) };
+          originals[editKey(n.block, n.item)] = { html: x.innerHTML, text: rootsText(roots) };
           t.nodeValue = t.nodeValue.slice(0, i) + n.after + t.nodeValue.slice(i + n.before.length);
           markEdited(x, true);
           return;
         }
       }
     }
+    // ---- the frame's pearl (round 8; amb-kit m_5181, m_5276): kit.js's [data-bise-pearl=N] gets
+    // bise's body at N px from /kit/pearl.js (the capsule's own shader), at rest, turning while
+    // the page is being written or updated, still under reduced motion, paused in a hidden tab;
+    // the ':*' text stays as the fallback until the canvas has drawn
+    function framePearls() {
+      const P = win.AmbPearl;
+      if (!P) return;
+      const reduce = !!(win.matchMedia && win.matchMedia("(prefers-reduced-motion: reduce)").matches);
+      for (const spot of doc.querySelectorAll("[data-bise-pearl]")) {
+        if (spot.dataset.pearlOn) continue;
+        spot.dataset.pearlOn = "on";
+        const n = +spot.dataset.bisePearl || 36;
+        const cv = doc.createElement("canvas");
+        cv.className = "bn-pearl";
+        cv.style.width = cv.style.height = `${n}px`;   // CSSOM, not style= (the shell's CSP)
+        const p = P.create(cv);
+        if (p.failed) continue;
+        let shown = false;
+        const tick = () => {
+          if (!doc.contains(spot)) return;
+          const mood = state === "writing" || state === "updating" ? "work" : "rest";
+          const moving = doc.hidden ? true : p.frame({ mood, lvl: 0, still: reduce }, win.performance.now());
+          if (!shown && !doc.hidden) { spot.replaceChildren(cv); shown = true; }
+          win.setTimeout(tick, doc.hidden ? 1000 : moving ? 33 : 250);
+        };
+        tick();
+      }
+    }
+    framePearls();
+
     render();
     return { model: M, render };
   }
