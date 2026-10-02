@@ -229,6 +229,22 @@ def kit():
     }
 
 
+def registry():
+    """A domain registry / whois (roadmap D, ambient-lead m_5816): read-only,
+    the fixture's answer, so a run never asks the live web (RDAP, whois)."""
+    R = DATA["registry"]
+
+    def lookup(a):
+        d = str(a.get("domain") or "").strip().lower().rstrip(".")
+        hit = next((x for x in R["domains"] if x["domain"] == d), None)
+        return dict(hit) if hit else dict(R["default"], domain=d)
+    return {
+        "lookup": ("Is a domain free to register? Its availability, registrar, yearly price, or since when it is taken.", S(domain="string"), lookup),
+        "whois": ("A domain's whois: registered or not, since when, at which registrar.", S(domain="string"),
+                  lambda a: {k: v for k, v in lookup(a).items() if k in ("domain", "available", "registrar", "registered")}),
+    }
+
+
 # ---- the launch (roadmap B): comments that grow, numbers that move
 
 CLOCK = os.environ.get("FAKE_ACCOUNTS_CLOCK")
@@ -414,7 +430,7 @@ def bluesky():
 
 
 SERVICES = {"gmail": gmail, "slack": slack, "linear": linear, "calendar": calendar, "github": github, "hn": hn,
-            "reddit": reddit, "x": x, "bluesky": bluesky, "kit": kit, "granola": granola}
+            "reddit": reddit, "x": x, "bluesky": bluesky, "kit": kit, "granola": granola, "registry": registry}
 
 
 def main():

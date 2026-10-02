@@ -176,7 +176,7 @@ def fake_accounts():
     check({"m102", "m106", "m109", "m110", "m111"} <= {m["id"] for m in found}, found)
     data = fake.load()
     check(len(data["gmail"]["messages"]) >= 20 and {"team", "launch"} <= {c["name"] for c in data["slack"]["channels"]}, "20+ mails, #team and #launch")
-    check(any("acme.app" in m["subject"] for m in data["gmail"]["messages"]), "roadmap D's domain mails")
+    check(any("acme-team-planner-hq.app" in m["subject"] for m in data["gmail"]["messages"]), "roadmap D's domain mails")
     check(len([m for m in data["gmail"]["messages"] if m["thread"] == "t109"]) == 3, "a thread with a decision")
     today = datetime.date.today().isoformat()
     check(sum(e["start"].startswith(today) for e in data["calendar"]["events"]) >= 4, "today's meetings are on the real today")
@@ -201,6 +201,13 @@ def fake_accounts():
     check(kd["url"].startswith("https://app.kit.com/campaigns/") and kd["url"].endswith("/draft"), kd)
     w = [json.loads(l) for l in open(box)]
     check(w[-1]["kind"] == "kit-draft" and w[-1]["url"] == kd["url"], w[-1])
+    # roadmap D (ambient-lead m_5816): a fake registry, so the plan never asks the live web
+    r = call("registry", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "lookup", "arguments": {"domain": "Acme-Team-Planner-HQ.app"}}})
+    lk = json.loads(r[1]["result"]["content"][0]["text"])
+    check(lk["available"] is True and lk["price"]["per_year"] == 14.0 and lk["registrar"] == "Gandi", lk)
+    r = call("registry", init, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "lookup", "arguments": {"domain": "acme.app"}}})
+    check(json.loads(r[1]["result"]["content"][0]["text"])["available"] is False, "another domain is taken")
+    check(len([json.loads(l) for l in open(box)]) == len(w), "a lookup writes nothing")
     data = fake.load()
     check(any(m["channel"] == "@benjamin.roy" for m in data["slack"]["messages"]) and any(m.get("user") == "lelio" for m in data["slack"]["messages"]), "the DM and the HR ask")
     check(data["github"]["releases"][0]["tag"] == "v2.5.0", "release notes")

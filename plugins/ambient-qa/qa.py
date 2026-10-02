@@ -374,7 +374,7 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="",
 
 
 FAKE_ACCOUNTS = os.path.join(HERE, "fake-accounts")
-FAKE_SERVICES = ("gmail", "slack", "linear", "calendar", "github", "hn", "reddit", "x", "bluesky", "kit", "granola")
+FAKE_SERVICES = ("gmail", "slack", "linear", "calendar", "github", "hn", "reddit", "x", "bluesky", "kit", "granola", "registry")
 # the tools' namespace as the real connector names it (tools.Granola.*)
 FAKE_SERVER_NAMES = {"granola": "Granola"}
 
@@ -1089,8 +1089,20 @@ def _flow_checklist(x):
         r["fails"].append("the plan has %d steps, %d of his (a checklist with his steps expected)" % (len(rows), len(yours)))
         return
     step_card = lambda: next((cd for cd in c.cards() if (cd.get("page") or {}).get("id") == pid and (cd.get("page") or {}).get("item")), None)
+    answered = r["flow"].setdefault("questions", [])
+
+    def step_or_answer():
+        # a question card that isn't a step (bise asks first: 'that domain is taken, which one?'):
+        # answered by the scenario's pick, else its first option, then on to his steps (ambient-lead m_5816)
+        for q in c.cards():
+            if q.get("kind") == "question" and not (q.get("page") or {}).get("item") and q.get("id") not in {a["id"] for a in answered}:
+                pick = str(x.get("pick") or 1)
+                x["core"].p.stdin.write(json.dumps({"cmd": "answer", "card": q["id"], "reply": pick}) + "\n")
+                x["core"].p.stdin.flush()
+                answered.append({"id": q["id"], "text": q.get("text"), "reply": pick})
+        return step_card() is not None
     for k in range(len(yours)):
-        took = _until(x, lambda: step_card() is not None, "the card for his step %d" % (k + 1))
+        took = _until(x, step_or_answer, "the card for his step %d" % (k + 1))
         if took is None:
             return
         cd = step_card()
@@ -1649,7 +1661,7 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
             if sc.get("flow") in FLOWS:
                 # roadmap A, C, D: what the user does after v1, and what must follow
                 FLOWS[sc["flow"]](dict(r=r, c=c, page=page, port=port, last=last, body=body, d=d, poll=poll, settled=settled, rel=rel,
-                                       timeout=timeout, info=info, core=core, cards=cards))
+                                       timeout=timeout, info=info, core=core, cards=cards, pick=sc.get("pick")))
             elif not sc.get("notes", True):
                 # launch watch (roadmap B): v1 holds batch 0's needs-an-answer items;
                 # after a tick the page republishes with the new batch's

@@ -46,9 +46,9 @@
       {"id": "m120", "thread": "t120", "from": "Figma <no-reply@figma.test>", "to": "camille@acme.test", "date": "2026-09-30T18:00:00Z", "labels": ["INBOX"], "unread": true,
        "subject": "What's new in Figma this month", "body": "New: variables in prototypes, faster dev mode, and more."},
       {"id": "m121", "thread": "t121", "from": "Marc Dubois <marc@acme.test>", "to": "camille@acme.test", "date": "2026-10-02T08:50:00Z", "labels": ["INBOX", "IMPORTANT", "team"], "unread": true,
-       "subject": "Can we get acme.app before Monday?", "body": "Camille, acme.app is free on Gandi (I checked last night). Can you buy it on the company card, 2 years, and point it to our Vercel project? Lucas needs the DNS records added once it's ours. Also ask legal if the trademark search is still fine.\nMarc"},
+       "subject": "Can we get acme-team-planner-hq.app before Monday?", "body": "Camille, acme-team-planner-hq.app is free on Gandi (I checked last night). Can you buy it on the company card, 2 years, and point it to our Vercel project? Lucas needs the DNS records added once it's ours. Also ask legal if the trademark search is still fine.\nMarc"},
       {"id": "m122", "thread": "t122", "from": "Gandi <noreply@gandi.test>", "to": "camille@acme.test", "date": "2026-10-02T09:20:00Z", "labels": ["INBOX", "vendors"], "unread": true,
-       "subject": "acme.app is available: EUR 17.50 / year", "body": "The domain acme.app is available. Price: EUR 17.50 per year (EUR 35.00 for 2 years). To finish: sign in to your Gandi account (2-step verification by SMS), then pay. After purchase, add DNS records in the Gandi dashboard or delegate to your DNS host. Note: .app requires HTTPS (HSTS preloaded)."}
+       "subject": "acme-team-planner-hq.app is available: EUR 14.00 / year", "body": "The domain acme-team-planner-hq.app is available. Price: EUR 14.00 per year (EUR 28.00 for 2 years). To finish: sign in to your Gandi account (2-step verification by SMS), then pay. After purchase, add DNS records in the Gandi dashboard or delegate to your DNS host. Note: .app requires HTTPS (HSTS preloaded)."}
     ]
   },
   "slack": {
@@ -123,6 +123,13 @@
       {"tag": "v2.4.0", "name": "Weekly view", "published_at": "2026-09-18T07:00:00Z", "url": "https://github.test/acme/app/releases/tag/v2.4.0",
        "notes": "## What's new\n- The weekly view: what moved, what's stuck, who's on what\n- Linear import"}
     ]
+  },
+  "registry": {
+    "_about": "roadmap D's domain lookup (ambient-lead m_5816): a fake registry/whois so the run never depends on the live web; the fixture's domain is invented and long, free in the real world too",
+    "domains": [
+      {"domain": "acme-team-planner-hq.app", "available": true, "registrar": "Gandi", "price": {"currency": "EUR", "per_year": 14.0, "years_min": 1}, "notes": ".app requires HTTPS (HSTS preloaded)"}
+    ],
+    "default": {"available": false, "registrar": "a registrar", "registered": "2018-05-08", "notes": "taken (the fake registry knows only the fixture's domain as free)"}
   },
   "kit": {
     "subscribers": 1204,
