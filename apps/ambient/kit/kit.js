@@ -57,6 +57,7 @@
     postedIn: (ch) => `posted in ${ch}`,
     send: "send",
     sendAll: (n) => `send all ${n}`,
+    yours: "you",
     keepRule: "keep",
     strike: "strike",
     replyOn: (site) => `reply on ${site}`,
@@ -297,22 +298,30 @@
   function decorateWho(doc, li, nowMs) {
     const who = li.getAttribute("data-who"), due = dueWords(li.getAttribute("data-due"), nowMs);
     let tag = kids(li).find((c) => ui(c) && c.getAttribute("data-when") != null);
-    if (!who && !due) { if (tag) li.removeChild(tag); return; }
+    // data-who="yours": a step only the user can do (roadmap D: the hub cards it when its turn
+    // comes); shown 'you · friday'. A done or ticked step is never late: it keeps who did it,
+    // not 'late · 3 days'
+    const done = li.getAttribute("data-done") != null || li.getAttribute("data-verdict") === "tick";
+    const text = [who === "yours" ? W.yours : who, due && !(done && due.late) && due.text].filter(Boolean).join(" · ");
+    if (!text) { if (tag) li.removeChild(tag); li.removeAttribute("data-late"); return; }
     if (!tag) { tag = doc.createElement("span"); tag.setAttribute("data-kit-ui", ""); tag.setAttribute("data-when", ""); li.append(tag); }
-    tag.textContent = [who, due && due.text].filter(Boolean).join(" · ");
+    tag.textContent = text;
     if (due && due.late && li.getAttribute("data-done") == null && li.getAttribute("data-verdict") !== "tick") li.setAttribute("data-late", ""); else li.removeAttribute("data-late");
   }
 
   // ---- an item's agent (slice C): data-agent, live from SSE 'agent' {name, status, note?} ----
   // Before any event the item shows the name alone (the agent may not exist yet, or the stream is
   // not up): "∿ fix login"; then "∿ fix login · working · reading the Safari logs".
-  const STATUS = { working: "working", idle: "waiting", done: "done", blocked: "needs you", failed: "▲ failed" };
+  // a glyph per status (ambient-lead m_5424, amb-web m_5425): '∿ fix login working · <note>',
+  // '∿ fix login waiting', '✓ fix login done', '▲ fix login failed', '? fix login needs you · <note>';
+  // the note only while it works or waits for the user
+  const STATUS = { working: ["∿", "working"], idle: ["∿", "waiting"], done: ["✓", "done"], blocked: ["?", "needs you"], failed: ["▲", "failed"] };
   const agents = new Map();
   function agentLine(name, st) {
-    const parts = [`∿ ${said(name)}`];
-    if (st && STATUS[st.status]) parts.push(STATUS[st.status]);
-    if (st && st.note) parts.push(String(st.note));
-    return parts.join(" · ");
+    const s = st && STATUS[st.status];
+    if (!s) return `∿ ${said(name)}`;
+    const line = `${s[0]} ${said(name)} ${s[1]}`;
+    return st.note && (st.status === "working" || st.status === "blocked") ? `${line} · ${st.note}` : line;
   }
   function decorateAgent(doc, li) {
     const name = li.getAttribute("data-agent");
@@ -524,7 +533,19 @@
     return { ...res, marked: [...marked] };
   }
 
-  const BiseKit = { W, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, wentWords, wentFor, applyWent, editableParts, options, norm };
+  // a step ticked elsewhere (roadmap D: 'done' on its card, by voice through `sb page tick`):
+  // SSE 'ticked' {block, item}; the row shows ticked, nothing goes back as a note from here
+  function ticked(doc, block, item) {
+    const li = items(block).find((x) => x.getAttribute("data-id") === item);
+    if (!li) return false;
+    li.setAttribute("data-verdict", "tick");
+    li.setAttribute("data-ticked", "");
+    decorateWho(doc, li, Date.now());
+    doc.dispatchEvent(new root.CustomEvent("bise:ticked", { detail: { block: idOf(block), item } }));
+    return true;
+  }
+
+  const BiseKit = { W, ticked, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, wentWords, wentFor, applyWent, editableParts, options, norm };
   root.BiseKit = BiseKit;
 
   // ---- the browser: the frame, the stream, the keys ----
@@ -724,6 +745,11 @@
       const relay = (ev, name) => es.addEventListener(ev, (e) => doc.dispatchEvent(new root.CustomEvent(name, { detail: data(e) })));
       es.addEventListener("notes", (e) => doc.dispatchEvent(new root.CustomEvent("bise:notes", { detail: { notes: data(e).notes || [] } })));
       relay("voice", "bise:voice"); // slice 2 (§4.1): {phase, text}, notes.js pins it
+      es.addEventListener("ticked", (e) => {
+        const x = data(e);
+        const b = blocks().find((y) => y.dataset.id === x.block && y.dataset.kit === "checklist");
+        if (b && x.item) ticked(doc, b, String(x.item));
+      });
       es.addEventListener("went", (e) => { const x = data(e); if (Array.isArray(x.went)) { went = x.went; applyWent(doc, blocks(), went); } });
       // slice C: an agent's live status {name, status, note?} redraws the items it works on
       es.addEventListener("agent", (e) => {

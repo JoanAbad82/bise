@@ -434,7 +434,18 @@ law("checklist who and when: due dates in words, late in its own state, done ite
   const when = (li) => li.children.find((n) => n.hasAttribute("data-when"));
   assert.ok(when(t1).textContent.startsWith("Camille · late · "));
   assert.ok(t1.hasAttribute("data-late") && !t2.hasAttribute("data-late"), "a done item is never late");
+  assert.equal(when(t2), undefined, "nor says 'late' (no who, a late due: no tag at all)");
   assert.equal(when(t3), undefined, "no who, no due: no tag");
+  // roadmap D: his own step says 'you'; ticked elsewhere (SSE 'ticked'), it shows ticked, never late
+  const y = blocks(parse(`<section data-kit="checklist" data-id="steps"><ol><li data-id="s1" data-who="yours" data-due="2020-01-01">pay the deposit</li></ol></section>`))[0];
+  K.decorate([y], "plan", doc);
+  const s1 = K.options(y)[0];
+  assert.ok(when(s1).textContent.startsWith("you · late"));
+  assert.equal(K.ticked(doc, y, "s1"), true);
+  assert.equal(s1.getAttribute("data-verdict"), "tick");
+  assert.ok(!s1.hasAttribute("data-late"));
+  assert.equal(when(s1).textContent, "you", "ticked: who, not 'late'");
+  assert.equal(K.ticked(doc, y, "nope"), false);
 });
 
 law("where a draft went: the user's tool and its link on the block it came from, copied with the channel", () => {
@@ -478,21 +489,22 @@ law("send, not approve, when the draft leaves; the editable parts are the drafts
 
 law("an item's agent: its name first (spaces, not hyphens), then its live status and note", () => {
   assert.equal(K.agentLine("fix-login"), "∿ fix login");
-  assert.equal(K.agentLine("fix-login", { name: "fix-login", status: "working", note: "reading the Safari logs" }), "∿ fix login · working · reading the Safari logs");
-  assert.equal(K.agentLine("fix-login", { name: "fix-login", status: "blocked" }), "∿ fix login · needs you");
+  assert.equal(K.agentLine("fix-login", { name: "fix-login", status: "working", note: "reading the Safari logs" }), "∿ fix login working · reading the Safari logs");
+  assert.equal(K.agentLine("fix-login", { name: "fix-login", status: "blocked", note: "which branch?" }), "? fix login needs you · which branch?");
+  assert.equal(K.agentLine("fix-login", { name: "fix-login", status: "idle", note: "x" }), "∿ fix login waiting");
   assert.equal(K.agentLine("fix-login", { name: "fix-login", status: "nonsense" }), "∿ fix login");
   const r = blocks(parse(`<section data-kit="review" data-id="bugs"><ol><li data-id="b1" data-agent="fix-login">login loops</li><li data-id="b2">typo</li></ol></section>`))[0];
   K.agents.set("fix-login", { name: "fix-login", status: "failed" });
   K.decorate([r], "bugs", doc);
   const [b1, b2] = K.options(r);
   const line = (li) => li.children.find((n) => n.hasAttribute("data-agent-line"));
-  assert.equal(line(b1).textContent, "∿ fix login · ▲ failed");
+  assert.equal(line(b1).textContent, "▲ fix login failed");
   assert.equal(line(b1).getAttribute("data-status"), "failed");
   assert.equal(line(b2), undefined, "no agent: no line");
   K.agents.set("fix-login", { name: "fix-login", status: "done" });
   K.decorate([r], "bugs", doc);
   assert.equal(K.options(r)[0].children.filter((n) => n.hasAttribute("data-agent-line")).length, 1, "redrawn in place, never twice");
-  assert.equal(line(K.options(r)[0]).textContent, "∿ fix login · done");
+  assert.equal(line(K.options(r)[0]).textContent, "✓ fix login done");
   K.agents.clear();
 });
 
