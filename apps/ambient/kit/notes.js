@@ -28,8 +28,9 @@
     marks: { keep: "♡ keep", drop: "✗ drop", unsure: "~ not sure" },
     tools: { note: "note", keep: "♡", drop: "✗", unsure: "~", edit: "edit", pin: "pin" },
     placeholder: "your note",
-    empty: "no notes yet. select text, or press t on a block.",
-    keys: "t type · p pin · ⌘z undo · ⌘⏎ send",
+    // signed off by ambient (m_4786): 'block' is our word, not hers; keys like the TUI's key bar
+    empty: "no notes yet. select some text, or hold fn and talk.",
+    keys: "t type   p pin   ⌘z undo   ⌘⏎ send",
     remove: "remove",
     undo: "undo",
     failed: "couldn't save your notes. trying again.",

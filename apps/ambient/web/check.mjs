@@ -496,6 +496,8 @@ law("notes: the words (ambient's), names with spaces", () => {
   assert.equal(N.NW.sendBar(3, N.spaced("weekly-update")), '3 notes for weekly update · or just say "send"');
   assert.equal(N.NW.sent(N.spaced("weekly-update")), "sent. weekly update is on it.");
   assert.equal(N.NW.updating("weekly update"), "weekly update is updating this page…");
+  assert.equal(N.NW.keys, "t type   p pin   ⌘z undo   ⌘⏎ send");
+  assert.equal(N.NW.empty, "no notes yet. select some text, or hold fn and talk.");
 });
 // a fake DOM: text nodes and elements, enough for the Range walk
 function fakeText(s) { return { nodeType: 3, nodeValue: s }; }
