@@ -179,10 +179,23 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
         let dn = DistributedNotificationCenter.default()
         dn.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.locked = true }
+            MainActor.assumeIsolated { self?.locked = true; self?.sayVisible() }
         }
         dn.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.locked = false }
+            MainActor.assumeIsolated { self?.locked = false; self?.sayVisible() }
+        }
+        // sleep and wake: the core alive, the tap on, the capsule on a real screen
+        ws.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.asleep = true; self?.sayVisible() }
+        }
+        for name in [NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification] {
+            ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.woke() }
+            }
+        }
+        // the capsule covered by a full-screen window or another Space: no drawing
+        NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: capsule.panel, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.sayVisible() }
         }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -190,6 +203,27 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
                 self?.edge.rebuild()
             }
         }
+    }
+
+    private var asleep = false
+
+    private func woke() {
+        Log.say("app: wake")
+        asleep = false
+        if qa == nil { core.check(); keys.reenable() } else { core.check() }
+        capsule.screensChanged()
+        edge.rebuild()
+        sayVisible()
+    }
+
+    // app_visible {on}: the page stops drawing (the orb's frames) while
+    // nobody can see it: hidden, covered, the screen locked or asleep
+    private var visibleSaid: Bool?
+    private func sayVisible() {
+        let on = !capsule.hidden && !locked && !asleep && capsule.panel.occlusionState.contains(.visible)
+        guard on != visibleSaid else { return }
+        visibleSaid = on
+        capsule.post(["ev": "app_visible", "on": on])
     }
 
     // SIGTERM (scripts/ambient.sh stop): quit clean. SIGUSR1: switch.json.
@@ -241,6 +275,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         capsule.post(settingsEvent())
         capsule.post(["ev": "app_hidden", "on": capsule.hidden])
         capsule.post(["ev": "app_globe", "use": globeUse()])
+        visibleSaid = nil
+        sayVisible()
         for k in ["hub", "state", "phase", "main"] { if let ev = memory[k] { capsule.post(ev) } }
         if quiet.on { capsule.post(["ev": "app_quiet", "on": true, "why": quiet.why]) }
         firstAsk()
@@ -388,6 +424,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private func startTalk(_ key: String, state: String) {
         lastKey = key
         if askBeforeTalk() { return }
+        capsule.pickScreen()   // the mouse's screen, when displays have their own menu bars
         talking = true
         defer { morning() }   // after the shot's front window is chosen
         quiet.own(open: true, at: uptime)
@@ -437,6 +474,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     }
 
     private func spotlight() {
+        capsule.pickScreen()
         morning()
         if capsule.hidden { setHidden(false) }
         capsule.post(["ev": "app_key", "key": "space"])
@@ -458,7 +496,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     private func setHidden(_ h: Bool) {
         guard h != capsule.hidden else { return }
-        if h { capsule.hide() } else { capsule.show(); agentWhileHidden = false; pink(); morning() }
+        if h { capsule.hide() } else { capsule.pickScreen(); capsule.show(); agentWhileHidden = false; pink(); morning() }
+        sayVisible()
         capsule.post(["ev": "app_hidden", "on": h])
     }
 

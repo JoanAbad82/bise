@@ -32,7 +32,7 @@ case "${1:-}" in
     rc=0
     # the pure sources (a+b: concatenated) with their laws, one interpreter run each
     for pair in KeyMachine:KeyMachineTests PageOpen:PageOpenTests Quiet:QuietTests MenuRows:MenuRowsTests \
-                PageOpen+ShowPlan:ShowPlanTests Morning:MorningTests; do
+                PageOpen+ShowPlan:ShowPlanTests Morning:MorningTests Always:AlwaysTests; do
       srcs="${pair%%:*}"; test="${pair#*:}"
       : > "$t/$test.swift"
       for s in ${srcs//+/ }; do cat "$HERE/src/$s.swift" >> "$t/$test.swift"; done

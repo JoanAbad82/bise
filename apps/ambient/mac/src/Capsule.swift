@@ -205,17 +205,31 @@ final class Capsule: NSObject, WKNavigationDelegate {
 
     // MARK: the frame
 
-    // the screen with the menu bar
-    private var screen: NSScreen? { NSScreen.screens.first }
+    // the capsule's screen (Placement): the first one (the menu bar's),
+    // or the mouse's when each display has its own menu bar; picked again
+    // at launch, on a display change or a wake, and when you call bise
+    private var screenIndex = 0
+    private var screen: NSScreen? {
+        let all = NSScreen.screens
+        return all.indices.contains(screenIndex) ? all[screenIndex] : all.first
+    }
+
+    func pickScreen() {
+        let boxes = NSScreen.screens.map { ScreenBox(frame: $0.frame, visible: $0.visibleFrame) }
+        let i = Placement.screen(boxes, mouse: NSEvent.mouseLocation, separateSpaces: NSScreen.screensHaveSeparateSpaces) ?? 0
+        guard i != screenIndex || panel.screen == nil else { return }
+        screenIndex = i
+        place(panel.frame.size)
+        applyMask()
+    }
 
     var maxHeight: CGFloat { (screen?.frame.height ?? 900) * 0.7 }
 
-    // SPEC §1: 20 px from the screen's right edge, 12 px under the menu bar
+    // SPEC §1: 20 px from the screen's right edge, 12 px under the menu
+    // bar, never off the screen (Placement.frame)
     private func place(_ size: NSSize) {
         guard let s = screen else { return }
-        let top = s.visibleFrame.maxY - 12
-        let right = s.frame.maxX - 20
-        panel.setFrame(NSRect(x: right - size.width, y: top - size.height, width: size.width, height: size.height), display: true)
+        panel.setFrame(Placement.frame(size, on: ScreenBox(frame: s.frame, visible: s.visibleFrame)), display: true)
     }
 
     // app_size: the window grows at once, shrinks 650 ms after the last
@@ -244,6 +258,8 @@ final class Capsule: NSObject, WKNavigationDelegate {
     }
 
     func screensChanged() {
+        if !NSScreen.screens.indices.contains(screenIndex) { screenIndex = 0 }
+        pickScreen()
         place(panel.frame.size)
         applyMask()
     }

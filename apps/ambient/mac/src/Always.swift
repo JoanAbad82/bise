@@ -1,0 +1,60 @@
+// Always: the pure rules of an app that runs all day (the laws in
+// test/AlwaysTests.swift): the core's restart backoff, and which screen
+// the capsule sits on.
+
+import Foundation
+import CoreGraphics
+
+// the core's restart delays: 0.5 s doubling to 30 s; back to 0.5 s only
+// after a run that lived a minute (a core that can't even start, or dies
+// at once, never spins)
+struct Backoff {
+    static let first = 0.5
+    static let max = 30.0
+    static let healthy = 60.0
+    private(set) var next = Backoff.first
+
+    init() {}
+
+    // the delay before the next start, after a run that lived `lived`
+    // seconds (0 when it couldn't start at all)
+    mutating func after(lived: Double) -> Double {
+        if lived >= Backoff.healthy { next = Backoff.first }
+        let wait = next
+        next = min(next * 2, Backoff.max)
+        return wait
+    }
+
+    mutating func reset() { next = Backoff.first }
+}
+
+// a screen as the capsule's placement sees it (Cocoa coords: y up)
+struct ScreenBox: Equatable {
+    var frame: CGRect
+    var visible: CGRect     // without the menu bar and the Dock
+}
+
+enum Placement {
+    // the capsule's screen: the mouse's when each display has its own menu
+    // bar (System Settings › Desktop & Dock › Displays have separate
+    // Spaces), else the first screen (the one with the menu bar)
+    static func screen(_ screens: [ScreenBox], mouse: CGPoint, separateSpaces: Bool) -> Int? {
+        guard !screens.isEmpty else { return nil }
+        if separateSpaces, let i = screens.firstIndex(where: { $0.frame.contains(mouse) }) { return i }
+        return 0
+    }
+
+    // SPEC §1: 20 px from the screen's right edge, 12 px under the menu bar;
+    // never off the screen: a box taller or wider than the visible area is
+    // kept inside it, top first
+    static func frame(_ size: CGSize, on s: ScreenBox) -> CGRect {
+        let w = min(size.width, s.visible.width)
+        let h = min(size.height, s.visible.height)
+        let top = s.visible.maxY - 12
+        let right = min(s.frame.maxX - 20, s.visible.maxX)
+        var x = right - w, y = top - h
+        x = Swift.max(x, s.visible.minX)
+        y = Swift.max(y, s.visible.minY)
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+}

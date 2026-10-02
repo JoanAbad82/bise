@@ -1,6 +1,7 @@
 // Core: the child `<bise> ambient-core --workspace <ws>`, one JSON object
 // per line each way (docs/ambient-app.md §4). Restarted with a backoff
-// (0.5 s doubling to 30 s, back to 0.5 s after a minute alive). It exits
+// (Backoff: 0.5 s doubling to 30 s, back to 0.5 s only after a run that
+// lived a minute, so a core that can't start never spins). It exits
 // on stdin EOF, so closing its stdin is how we stop it (then SIGTERM).
 
 import Foundation
@@ -16,8 +17,9 @@ final class Core {
     private var lines = LineBuffer()
     private var gen = 0
     private var stopped = true
-    private var backoff = 0.5
+    private var backoff = Backoff()
     private var startedAt = Date()
+    private var lived = 0.0          // how long the last run lived (0: it couldn't start)
 
     init(config: Config) { self.config = config }
 
@@ -30,7 +32,7 @@ final class Core {
     func restart(config: Config) {
         self.config = config
         stop()
-        backoff = 0.5
+        backoff.reset()
         start()
     }
 
@@ -61,7 +63,18 @@ final class Core {
         do { try h.write(contentsOf: d) } catch { Log.say("core: write failed: \(error)") }
     }
 
+    // after a wake: a dead core starts now (not after its backoff)
+    func check() {
+        guard !stopped else { return }
+        if let p = proc, p.isRunning { return }
+        Log.say("core: not running after a wake, starting it")
+        backoff.reset()
+        launch()
+    }
+
     private func launch() {
+        startedAt = Date()
+        lived = 0
         gen += 1
         let g = gen
         let p = Process()
@@ -126,6 +139,7 @@ final class Core {
         guard g == gen else { return }
         Log.say("core: exited \(status)")
         proc = nil
+        lived = Date().timeIntervalSince(startedAt)
         try? input?.close()
         input = nil
         onExit?(status)
@@ -134,9 +148,7 @@ final class Core {
 
     private func retry(_ g: Int) {
         guard !stopped else { return }
-        if Date().timeIntervalSince(startedAt) > 60 { backoff = 0.5 }
-        let wait = backoff
-        backoff = min(backoff * 2, 30)
+        let wait = backoff.after(lived: lived)
         Log.say("core: restart in \(wait) s")
         DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
             MainActor.assumeIsolated {

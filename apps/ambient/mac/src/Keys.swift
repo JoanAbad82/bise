@@ -62,6 +62,11 @@ final class Keys {
         return true
     }
 
+    // after a wake: the tap may have been disabled while asleep
+    func reenable() {
+        if let t = tap { CGEvent.tapEnable(tap: t, enable: true) } else if Keys.trusted { start() }
+    }
+
     func stop() {
         if let t = tap { CGEvent.tapEnable(tap: t, enable: false) }
         if let s = source { CFRunLoopRemoveSource(CFRunLoopGetMain(), s, .commonModes) }
