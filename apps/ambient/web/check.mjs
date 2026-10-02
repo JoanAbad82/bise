@@ -382,6 +382,12 @@ law("main's markdown: marks stripped, `code` flagged, one token per raw word (wo
   eq(v.words.list, ["the", "fix", "is", "in"]); eq(v.words.code, [false, true, false, false]);
   assert.equal(v.words.lit, 2); assert.equal(v.words.clamp, 3);
 });
+law("the corners follow macOS's window radius (app_settings.radius), 16 until it comes", () => {
+  assert.equal(M.view(M.init(), 0).radius, 16);
+  const m = M.step(M.init(), { ev: "app_settings", edge_glow: true, macos: 26, radius: 26 }, 0).m;
+  assert.equal(M.view(m, 1).radius, 26);
+  assert.equal(M.view(M.step(m, { ev: "app_settings", edge_glow: false }, 2).m, 3).radius, 26);
+});
 law("the hub lost: one line, then back", () => {
   const r = run(sceneEvents("hub"), [1000, 5500]);
   assert.equal(r.view(1000).text, W.hubDown); assert.equal(r.view(5500).text, W.idle);

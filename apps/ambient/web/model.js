@@ -47,6 +47,7 @@
       shot: null,                   // { app, title, skipped }
       perms: {}, permAsk: null,
       hidden: false, reduce: false, edgeGlow: true,
+      radius: 16,                   // macOS's window radius (app_settings.radius); 16 until it comes
       flashes: [],                  // [{ glyph, text, sub, at, ttl, kiss, still, kind }]
       turnNames: null, chips: [],   // agents that appeared during your turn
       pane: null,                   // null | 'agents' | 'inbox' | 'spot'
@@ -199,7 +200,7 @@
         return none(m2);
       }
       case "app_settings":
-        return none({ ...m, edgeGlow: ev.edge_glow !== false, macos: ev.macos || m.macos });
+        return none({ ...m, edgeGlow: ev.edge_glow !== false, macos: ev.macos || m.macos, radius: +ev.radius > 0 ? +ev.radius : m.radius });
       case "app_hidden":
         return none({ ...m, hidden: !!(ev.on ?? ev.hidden) });
       case "app_reduce_motion":
@@ -298,6 +299,7 @@
       note: null,           // the needs-you glass under the capsule
       edge: { on: false, lvl: 0 },
       hidden: m.hidden,
+      radius: m.radius,     // the capsule's and the glass's corners
       kiss: false,
     };
     // main's reply, its markdown rendered (marks stripped, `code` flagged), one entry per raw word

@@ -87,6 +87,7 @@
 
   function render(v) {
     host.classList.toggle("still", !!v.still);
+    if (host.style.getPropertyValue("--r") !== v.radius + "px") host.style.setProperty("--r", v.radius + "px");
     host.style.display = v.hidden ? "none" : "";
     cap.classList.toggle("small", v.size === "small");
     cap.classList.toggle("open", v.size === "open");
@@ -210,7 +211,7 @@
     const msg = { cmd: "app_size", w: Math.round(r.width), h: Math.round(r.height), radius: Math.round(radius) };
     if (note.classList.contains("on")) {
       const n = note.getBoundingClientRect();
-      msg.note = { y: Math.round(n.top - r.top), h: Math.round(n.height), radius: 22 };
+      msg.note = { y: Math.round(n.top - r.top), h: Math.round(n.height), radius: Math.round(radius) };
     }
     const key = JSON.stringify(msg);
     if (key !== sent) { sent = key; post(msg); }
