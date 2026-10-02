@@ -124,6 +124,20 @@ typed note on a block or a selection (anchor: block id + quote), ♡ ✗ ~, edit
 bar, ⌘⏎; drafts saved through `/api/p/<id>/notes` (never lost on reload); on `bise:swapped` it
 re-anchors (a lost quote: `moved`) and shows outcomes (done / answer / open). Words: ambient's.
 
+The hooks between them (agreed with amb-web; amb-kit builds to them):
+- styles: `notes.css` (amb-web's) next to `notes.js`; the shell links `tokens.css`, `kit.css`,
+  `notes.css`, then `kit.js`, `notes.js` (no inline style: the CSP blocks it);
+- events on `document`, from kit.js (the one SSE client): `bise:swapped {version, changed: [ids]}`,
+  `bise:notes {notes}` (the SSE notes event), `bise:state {state}` (the SSE state event);
+- the frame (kit.js) gives `[data-bise-notes-count]` (notes.js writes the count) and a button
+  `[data-bise-send]` (notes.js binds it, disabled at 0 drafts);
+- notes.js mounts `<aside class="bise-notes">` (the side list) and `<div class="bise-sendbar">` on
+  `body`; blocks are `#bise-page [data-kit][data-id]`; the page id and version are `#bise-page`'s
+  `data-page`/`data-version`; the token is `<meta name="bise-token">`;
+- the API (amb-core): `POST /api/p/<id>/notes {notes: [...]}` = the page's whole draft list (it
+  replaces the drafts; sent/done/answered untouched; delete = leave it out); `POST
+  /api/p/<id>/send {}` → `{sent: n}`; `GET /p/<id>/meta` → `{meta, notes}`.
+
 ### 2.8 Opening a page (owners: amb-mac, amb-web, amb-core)
 
 fn + o or a click in "for you" → web `app_open_url {url, page}` → the app: in a Chromium browser
