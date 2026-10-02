@@ -389,6 +389,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         lastKey = key
         if askBeforeTalk() { return }
         talking = true
+        defer { morning() }   // after the shot's front window is chosen
         quiet.own(open: true, at: uptime)
         if edgeGlow && !reduceMotion { edge.glow(true) }
         // QA never asks the user's browser anything
@@ -422,13 +423,28 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if page == nil { shoot(then: nil) }   // a note: the page is the context, no shot
     }
 
+    // the morning page (roadmap slice E): today's morning-<date>, opened in
+    // front once a day at the first fn hold or capsule open after 05:00
+    private func morning() {
+        guard qa == nil else { return }
+        let ids = menuPages.map(\.id)
+        guard let due = Morning.due(now: Date(), tz: .current, openedOn: defaults.string(forKey: "morningOpened"), pageIDs: ids),
+              let page = menuPages.first(where: { $0.id == due.id }) else { return }
+        defaults.set(due.day, forKey: "morningOpened")
+        Log.say("app: the morning page \(page.id)")
+        Browser.open(page.url)
+        capsule.post(["ev": "app_morning", "id": page.id, "title": page.title, "url": page.url])
+    }
+
     private func spotlight() {
+        morning()
         if capsule.hidden { setHidden(false) }
         capsule.post(["ev": "app_key", "key": "space"])
     }
 
     // a menu-bar click: what's going on (the agents and the inbox, fn + 0)
     private func agentsView() {
+        morning()
         if capsule.hidden { setHidden(false) }
         capsule.post(["ev": "app_key", "key": "0"])
     }
@@ -442,7 +458,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     private func setHidden(_ h: Bool) {
         guard h != capsule.hidden else { return }
-        if h { capsule.hide() } else { capsule.show(); agentWhileHidden = false; pink() }
+        if h { capsule.hide() } else { capsule.show(); agentWhileHidden = false; pink(); morning() }
         capsule.post(["ev": "app_hidden", "on": h])
     }
 
