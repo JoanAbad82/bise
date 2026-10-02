@@ -78,6 +78,9 @@ pub enum Cmd {
     /// The settings' voice answers (amb-mac m_5327): off, main's answers
     /// are text only; on (the default), as usual.
     Voice { on: bool },
+    /// The menu bar's "stop watching" (roadmap B, amb-mac m_5475): the
+    /// standing order `id` stops (the hub's `every_stop`).
+    EveryStop { id: u64 },
 }
 
 impl Cmd {
@@ -107,6 +110,14 @@ impl Cmd {
             "cut_in" => Cmd::CutIn,
             "quiet" => Cmd::Quiet { on: v.get("on").and_then(Value::as_bool).unwrap_or(false) },
             "voice" => Cmd::Voice { on: v.get("on").and_then(Value::as_bool).unwrap_or(true) },
+            "every_stop" => {
+                let id = match v.get("id") {
+                    Some(Value::Number(n)) => n.as_u64(),
+                    Some(Value::String(t)) => t.trim().parse().ok(),
+                    _ => None,
+                };
+                Cmd::EveryStop { id: id.ok_or("every_stop: no id")? }
+            }
             other => return Err(format!("unknown cmd {other:?}")),
         })
     }
@@ -338,6 +349,11 @@ impl Core {
                 // text stays
                 if on && self.stop_voice() {
                     self.set_phase(Phase::Done, None);
+                }
+            }
+            Cmd::EveryStop { id } => {
+                if !self.hub.send(&json!({"op": "every_stop", "id": id})) {
+                    self.error("bise isn't reachable: it keeps watching. try again in a moment.");
                 }
             }
             Cmd::Voice { on } => {
@@ -659,6 +675,10 @@ impl Core {
         let mut st = json!({"ev": "state", "agents": agents, "cards": cards, "pages": pages});
         if let Some(u) = &self.pages_url {
             st["pages_url"] = json!(u);
+        }
+        // the standing orders (roadmap B), as the hub has them
+        if let Some(t) = v.get("timers").filter(|t| !t.is_null()) {
+            st["timers"] = t.clone();
         }
         self.emit(st);
     }

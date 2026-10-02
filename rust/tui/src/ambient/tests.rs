@@ -477,6 +477,20 @@ fn only_mains_words_after_its_last_tool_call_are_its_answer() {
 }
 
 #[test]
+fn stop_watching_goes_to_the_hub_and_timers_ride_the_state() {
+    let mut t = T::new();
+    t.cmd(Cmd::parse(r#"{"cmd":"every_stop","id":3}"#).unwrap());
+    assert_eq!(t.hub.next(), json!({"op": "every_stop", "id": 3}));
+    assert!(Cmd::parse(r#"{"cmd":"every_stop"}"#).is_err());
+    let timers = json!([{"id": 3, "what": "the launch", "every": "15m"}]);
+    t.hub.say(json!({"ev": "state", "agents": [], "cards": [], "pages": [{"id": "w", "opened_version": 2}], "timers": timers}));
+    t.until(|o| has(o, "state"));
+    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    assert_eq!(st["timers"], timers);
+    assert_eq!(st["pages"][0]["opened_version"], 2);
+}
+
+#[test]
 fn voice_answers_off_is_text_only_until_on_again() {
     let mut t = T::new();
     t.ready();

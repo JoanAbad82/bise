@@ -5,6 +5,7 @@
 //! subscribers of each page, and the way back to the hub (the notes sent
 //! from a page become the agent's input there).
 
+pub mod checklist;
 pub mod lint;
 pub mod questions;
 pub mod server;

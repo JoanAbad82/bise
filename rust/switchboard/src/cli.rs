@@ -31,9 +31,9 @@ const fn cmd(syntax: &'static str, who: Who, doc: &'static str) -> CmdDoc {
 pub const COMMANDS: &[CmdDoc] = &[
     cmd("sb list", Who::Everyone, "every agent of the group, its status and what it is for."),
     cmd(
-        "sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"<answer>\"]... [--went <kind>:<ref>[@<block>]=<url>]... | sb page start <id> [--title <t>] [--agent <name>] | sb page list | sb page notes <id>",
+        "sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"<answer>\"]... [--went <kind>:<ref>[@<block>]=<url>]... | sb page start <id> [--title <t>] [--agent <name>] [--ask <words>] | sb page tick <page> <item> [words] | sb page list | sb page notes <id>",
         Who::Everyone,
-        "publish a page for the user (a fragment of bise kit blocks; the kit's lint checks it): its URL comes back. `sb page start` shows the page at once, empty, while you (or --agent) write it; your first publish is v1. A new version of your page answers the user's notes: `--notes-done` the ones you did, `--note-answer` one line for the others.",
+        "publish a page for the user (a fragment of bise kit blocks; the kit's lint checks it): its URL comes back. `sb page start` shows the page at once, empty, while you (or --agent) write it; your first publish is v1. `sb page tick` ticks a step of the user's (a checklist row with data-who=\"yours\") when he says it's done; other words go as a note on that row. A new version of your page answers the user's notes: `--notes-done` the ones you did, `--note-answer` one line for the others.",
     ),
     cmd("sb tasks", Who::Everyone, "every task in detail: what it is doing now, its last report, its open questions."),
     cmd(
@@ -653,7 +653,7 @@ pub fn build(args: &[String]) -> Result<Value, String> {
     Ok(Value::Object(req))
 }
 
-const PAGE_USAGE: &str = "usage: sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"…\"]... [--went <kind>:<ref>[@<block>]=<url>]... | sb page start <id> [--title <t>] [--agent <name>] | sb page list | sb page notes <id>";
+const PAGE_USAGE: &str = "usage: sb page publish <file> [--id <id>] [--title <t>] [--notes-done n1,n3] [--note-answer n2=\"…\"]... [--went <kind>:<ref>[@<block>]=<url>]... | sb page start <id> [--title <t>] [--agent <name>] [--ask <words>] | sb page tick <page> <item> [words] | sb page list | sb page notes <id>";
 
 /// `sb page publish|list|notes` (docs/ambient-pages.md §2.2): the hub's
 /// `page_*` request. The file is read here (the agent's path, from its
@@ -703,6 +703,18 @@ fn page_req(rest: &[String], req: &mut Map<String, Value>) -> Result<(), String>
                 }
             }
         }
+        Some("tick") => {
+            // a step of the user's he says is done (roadmap D): words other
+            // than "done" go as a note on that row
+            let (pos, _) = parse_args(&rest[1..], &[], &[])?;
+            let (Some(id), Some(item)) = (pos.first(), pos.get(1)) else { return Err(PAGE_USAGE.into()) };
+            req.insert("cmd".into(), json!("page_tick"));
+            req.insert("id".into(), json!(id));
+            req.insert("item".into(), json!(item));
+            if pos.len() > 2 {
+                req.insert("text".into(), json!(pos[2..].join(" ")));
+            }
+        }
         Some("list") => {
             req.insert("cmd".into(), json!("page_list"));
         }
@@ -741,6 +753,10 @@ fn render_page(v: &Value) -> String {
     }
     if let Some(notes) = v.get("notes") {
         return serde_json::to_string_pretty(notes).unwrap_or_default();
+    }
+    if let Some(t) = v.get("ticked").and_then(|x| x.as_bool()) {
+        let what = if t { "ticked" } else { "noted on" };
+        return format!("{what} {} {} (the page and its agent know)", s(v, "id"), s(v, "item"));
     }
     if v.get("state").and_then(|x| x.as_str()) == Some("writing") {
         return format!("started {} · {} writes it · {} (your first publish is v1)", s(v, "id"), s(v, "agent"), s(v, "url"));

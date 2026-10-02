@@ -308,6 +308,9 @@ def main():
         check(any("page-start" in l and "b2" in l for l in c.lines("main")[n_main:]), "its <page-start> block")
         check(not any("you sent 1 note" in l for l in c.lines("main")[n_main:]), "no notes message for a start note")
         check(not bs.seen("state", lambda d: d["state"] == "updating"), "a start note alone never puts the page in updating")
+        # main's turn on that message is over (else the next [[bash]]
+        # steers into it and the scripted model answers the first one)
+        c.wait(lambda: any("assistant: ack: you asked for an agent" in l for l in c.lines("main")[n_main:]), 60, "main's turn on the start message")
         c.wait_idle("main")
         notes = json.loads(request(port, "GET", "/p/bugs/meta")[2])["notes"]
         check([(n["kind"], n["status"], n.get("to")) for n in notes] == [("start", "sent", "main")], "the start note, routed: %r" % notes)
@@ -366,9 +369,93 @@ def main():
         c.wait(lambda: ws.seen("watch", lambda d: d and d["timer"] == t2), 15, "watching again")
         c.send({"op": "every_stop", "id": t2})
         c.wait(lambda: ws.seen("watch", lambda d: d is None) and not (c.state or {}).get("timers"), 15, "the menu's stop")
+
+        # roadmap D: a 6-step plan, bise does 4 and asks for 2, all
+        # ticked, none forgotten (plus a second checklist answered on its card)
+        def plan_html(done):
+            rows = [("t1", ""), ("t2", "yours"), ("t3", ""), ("t4", ""), ("t5", "yours"), ("t6", "")]
+            lis = "".join('<li data-id="%s"%s%s>step %s</li>' % (i, ' data-who="yours"' if w else "", " data-done" if i in done else "", i) for i, w in rows)
+            return ('<section data-kit="checklist" data-id="steps"><ol>%s</ol></section>'
+                    '<section data-kit="checklist" data-id="other"><ol><li data-id="o1" data-who="yours">sign the form</li></ol></section>' % lis)
+
+        def publish_plan(done, n):
+            f = os.path.join(E.tmp, "plan-%d.html" % n)
+            open(f, "w").write(plan_html(done))
+            c.wait_idle("main")
+            c.say('[[bash: sb page publish %s --id plan --title "buy the domain"]]' % f)
+            c.wait_line("main", "published plan v%d" % n, 90)
+
+        def step_card(item):
+            return next((x for x in c.cards() if (x.get("page") or {}).get("item") == item), None)
+
+        ps = Sse(port, "/p/plan/events")
+        publish_plan([], 1)
+        # t1 is bise's and not done: no card for t2 yet; o1 opens its block
+        c.wait(lambda: step_card("o1"), 30, "o1's card")
+        check(step_card("t2") is None, "t2 waits for t1")
+        o1 = step_card("o1")
+        check(o1["page"]["block"] == "other" and o1["page"]["url"].endswith("/p/plan#o1") and o1["kind"] == "question", "o1's card: %r" % o1)
+        # answered 'done' on its card: ticked on the page, its agent told
+        c.say("/answer %d 1" % o1["id"])
+        c.wait(lambda: ps.seen("ticked", lambda d: d == {"block": "other", "item": "o1"}), 30, "SSE ticked o1")
+        c.wait(lambda: step_card("o1") is None, 30, "o1's card closed")
+        c.wait(lambda: any("you sent 1 note" in l and "plan v1" in l for l in c.lines("main")), 30, "the tick in main's feed")
+        # bise does t1: t2's turn comes
+        publish_plan(["t1"], 2)
+        c.wait(lambda: step_card("t2"), 30, "t2's card")
+        # ticked on the page (a draft): its card closes at once
+        st, _, _ = request(port, "POST", "/api/p/plan/notes", {"notes": [{"block": "steps", "item": "t2", "kind": "tick"}]}, {"Origin": origin, "X-Bise-Token": token})
+        check(st == 200, "a tick on the page: %d" % st)
+        c.wait(lambda: step_card("t2") is None, 30, "t2's card closed by the page's tick")
+        # bise does t3 and t4: t5's turn; 'done with the payment' from the capsule names it to main
+        publish_plan(["t1", "t3", "t4"], 3)
+        c.wait(lambda: step_card("t5"), 30, "t5's card")
+        c.wait_idle("main")
+        c.send({"op": "input", "focus": "main", "text": "done with the payment", "via": "capsule"})
+        c.wait(lambda: any("his open steps: plan t5" in l for l in c.lines("main")), 30, "the open step in main's input")
+        c.wait_idle("main")
+        c.say("[[bash: sb page tick plan t5]]")
+        c.wait_line("main", "ticked plan t5", 90)
+        c.wait(lambda: ps.seen("ticked", lambda d: d == {"block": "steps", "item": "t5"}), 30, "SSE ticked t5")
+        c.wait(lambda: step_card("t5") is None, 30, "t5's card closed")
+        # bise does t6: every row done or ticked, no card left, none forgotten
+        publish_plan(["t1", "t3", "t4", "t6"], 4)
+        notes = json.loads(request(port, "GET", "/p/plan/meta")[2])["notes"]
+        ticks = sorted(n.get("item") for n in notes if n["kind"] == "tick")
+        check(ticks == ["o1", "t2", "t5"], "his steps all ticked: %r" % notes)
+        check(not [x for x in c.cards() if (x.get("page") or {}).get("id") == "plan"], "no card left for the plan")
+
+        # a copied page whose question names a card this hub never had,
+        # read at the hub's start (pm's m_5456): the first pick is no 409,
+        # the page hears it, the pick goes as a note
+        fs = os.path.join(E.state, "pages", "fixture-stale")
+        os.makedirs(fs)
+        open(os.path.join(fs, "v1.html"), "w").write(PAGE_V3)
+        json.dump({"id": "fixture-stale", "title": "stale", "agent": "main", "created_ms": 1,
+                   "versions": [{"n": 1, "at_ms": 1, "blocks": []}], "state": "ready"}, open(os.path.join(fs, "meta.json"), "w"))
+        json.dump([{"block": "q1", "text": "post now?", "options": ["post now", "wait for Marc"], "card": 9999}], open(os.path.join(fs, "questions.json"), "w"))
+        c.wait_idle("main")
+        E.stop_hub()
+        c = E.start_hub()
+        c.wait_status("main", "idle", 60)
+        port = int(open(os.path.join(E.state, "pages.port")).read().strip())
+        origin = "http://127.0.0.1:%d" % port
+        st, _, body = request(port, "GET", "/p/fixture-stale")
+        token = body.split('<meta name="bise-token" content="')[1].split('"')[0]
+        fss = Sse(port, "/p/fixture-stale/events")
+        st, _, r = request(port, "POST", "/api/p/fixture-stale/answer", {"block": "q1", "option": 2}, {"Origin": origin, "X-Bise-Token": token})
+        check(st == 200, "the first pick on a stale card: %d %s" % (st, r))
+        c.wait(lambda: fss.seen("answered", lambda d: d == {"block": "q1", "reply": "wait for Marc"}), 30, "SSE answered on the stale page")
     except AssertionError as e:
         print("FAIL", e)
         ok = False
+        # what main and the hub said last, to see why
+        try:
+            for l in c.lines("main")[-12:]:
+                print("  main:", l[:300])
+            print(open(os.path.join(E.tmp, "hub.stderr")).read()[-1500:])
+        except Exception:
+            pass
     finally:
         E.close()
     print("ambient_pages_e2e:", "ok" if ok else "FAILED")

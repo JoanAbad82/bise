@@ -554,7 +554,11 @@ impl Shell {
             if let Some(cards) = snap["cards"].as_array_mut() {
                 for c in cards {
                     let Some((id, block)) = c["id"].as_u64().and_then(|n| qs.get(&n)) else { continue };
-                    c["page"] = json!({"id": id, "block": block, "url": format!("{}#{}", p.url(id), block)});
+                    // a step of his: its row (roadmap D)
+                    c["page"] = match block.strip_prefix("row:").and_then(|k| k.split_once('/')) {
+                        Some((b, item)) => json!({"id": id, "block": b, "item": item, "url": format!("{}#{}", p.url(id), item)}),
+                        None => json!({"id": id, "block": block, "url": format!("{}#{}", p.url(id), block)}),
+                    };
                 }
             }
         }
@@ -734,6 +738,20 @@ impl Shell {
                     None => json!({"ok": false, "error": format!("no page {id}")}),
                 }
             }
+            "page_tick" => {
+                // a step of his he says is done (by voice, through main):
+                // the same path as its card's answer (roadmap D)
+                let (id, item) = (s("id").unwrap_or_default(), s("item").unwrap_or_default());
+                let words = s("text").filter(|t| !t.trim().is_empty()).unwrap_or_else(|| "done".into());
+                if pages.store.meta(&id).is_none() {
+                    return json!({"ok": false, "error": format!("no page {id}")});
+                }
+                if self.page_tick(&id, &item, &words) {
+                    json!({"ok": true, "id": id, "item": item, "ticked": crate::pages::checklist::is_done_word(&words)})
+                } else {
+                    json!({"ok": false, "error": format!("{id} has no checklist row {item}")})
+                }
+            }
             "page_start" => {
                 // the page shows within seconds of the ask; the first
                 // publish is v1 (ambient-lead m_5000)
@@ -812,6 +830,8 @@ impl Shell {
                         self.page_watch_push();
                         // its question blocks: one card each (§4.2)
                         self.page_questions(&meta.id, &meta.agent, &p.html);
+                        // its checklists: the step of his whose turn came
+                        self.page_steps(&meta.id);
                         let snap = self.snapshot();
                         self.broadcast(&snap);
                         let url = pages.url(&meta.id);
@@ -827,7 +847,13 @@ impl Shell {
     fn page_msg(&mut self, m: crate::pages::PageMsg) {
         let Some(pages) = self.pages.clone() else { return };
         match m {
-            crate::pages::PageMsg::Notes { .. } | crate::pages::PageMsg::Opened { .. } => {
+            crate::pages::PageMsg::Notes { id } => {
+                // a tick on the page (a draft too) closes its step's card
+                self.page_steps(&id);
+                let snap = self.snapshot();
+                self.broadcast(&snap);
+            }
+            crate::pages::PageMsg::Opened { .. } => {
                 let snap = self.snapshot();
                 self.broadcast(&snap);
             }
@@ -1123,6 +1149,130 @@ impl Shell {
         self.page_msg(crate::pages::PageMsg::Sent { id: id.to_string(), agent: meta.agent.clone(), text });
     }
 
+    // ---- checklists that tick themselves (docs/ambient-roadmap.md §2 D) ----
+
+    /// The key of a step's card in `page_cards` (a question's is its block).
+    fn step_key(block: &str, item: &str) -> String {
+        format!("row:{block}/{item}")
+    }
+
+    /// Page `id`'s steps of the user's after any change (a publish, a
+    /// tick, a note): the step whose turn came gets its card (one per
+    /// checklist block), a step done or ticked closes its card.
+    fn page_steps(&mut self, id: &str) {
+        let Some(pages) = self.pages.clone() else { return };
+        let Some(meta) = pages.store.meta(id) else { return };
+        let rows = pages.store.html(id, meta.version()).map(|h| crate::pages::checklist::rows_of(&h)).unwrap_or_default();
+        let mut steps = pages.store.steps(id);
+        if steps.is_empty() && !rows.iter().any(|r| r.yours) {
+            return;
+        }
+        let notes = pages.store.notes(id);
+        let ticked = |b: &str, i: &str| {
+            notes.iter().any(|n| n.kind == "tick" && n.block == b && n.extra.get("item").and_then(|v| v.as_str()) == Some(i))
+        };
+        let due: Vec<crate::pages::checklist::Row> = crate::pages::checklist::due(&rows, &ticked).into_iter().cloned().collect();
+        let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
+        let mut changed = false;
+        for s in steps.iter_mut().filter(|s| s.reply.is_none()) {
+            let still = due.iter().any(|r| r.block == s.block && r.item == s.item);
+            if still && open.contains(&s.card) {
+                continue;
+            }
+            // done (republished, ticked on the page) or closed another way
+            s.reply = Some(if still { String::new() } else { "done".into() });
+            self.page_cards().remove(&s.card);
+            if open.contains(&s.card) {
+                self.step(Input::ConfirmClose { card: s.card, res: "ticked".into() });
+            }
+            changed = true;
+        }
+        for r in &due {
+            if steps.iter().any(|s| s.block == r.block && s.item == r.item) {
+                continue;
+            }
+            let mut s = crate::pages::checklist::Step { block: r.block.clone(), item: r.item.clone(), text: r.text.clone(), card: 0, reply: None };
+            let before: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
+            // as the page's agent asking, like a question block's card
+            self.step(Input::Agent {
+                token: 0,
+                from: meta.agent.clone(),
+                req: crate::core::AgentReq::Card { text: s.card_text(), for_msg: None },
+            });
+            match self.hub.st.open_cards().filter(|c| !before.contains(&c.id) && c.kind == "question").map(|c| c.id).max() {
+                Some(card) => {
+                    s.card = card;
+                    self.page_cards().insert(card, (id.to_string(), Self::step_key(&r.block, &r.item)));
+                }
+                None => {
+                    log_line(&self.opts.paths, &format!("page {id}: no card opened for step {}", r.item));
+                    s.reply = Some(String::new());
+                }
+            }
+            steps.push(s);
+            changed = true;
+        }
+        if changed {
+            if let Err(e) = pages.locked(|st| st.save_steps(id, &steps)) {
+                log_line(&self.opts.paths, &format!("page {id}: steps not saved: {e}"));
+            }
+            pages.push("", "pages", &json!({"pages": pages.list_json()}));
+        }
+    }
+
+    /// A step ticked from its card or by voice (`sb page tick`): a sent
+    /// tick note on its row, the page hears `ticked`, the page's agent
+    /// gets the notes message (main when it is gone), its card closes and
+    /// the next step's turn comes. `text`: the user's words when they are
+    /// not a plain "done". False: no such row.
+    fn page_tick(&mut self, id: &str, item: &str, text: &str) -> bool {
+        let Some(pages) = self.pages.clone() else { return false };
+        let Some(meta) = pages.store.meta(id) else { return false };
+        let rows = pages.store.html(id, meta.version()).map(|h| crate::pages::checklist::rows_of(&h)).unwrap_or_default();
+        let Some(row) = rows.iter().find(|r| r.item == item) else { return false };
+        let (kind, words) = if crate::pages::checklist::is_done_word(text) { ("tick", "done") } else { ("note", text.trim()) };
+        let note = match pages.locked(|s| s.add_sent(id, &row.block, Some(item), kind, words, meta.version(), now_ms())) {
+            Ok(n) => n,
+            Err(e) => {
+                log_line(&self.opts.paths, &format!("page {id}: the tick not saved: {e}"));
+                return false;
+            }
+        };
+        if kind == "tick" {
+            pages.push(id, "ticked", &json!({"block": row.block, "item": item}));
+        }
+        pages.push(id, "notes", &json!({"notes": pages.store.notes(id)}));
+        // its card: closed by this answer, never reopened for words
+        let mut steps = pages.store.steps(id);
+        let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
+        for s in steps.iter_mut().filter(|s| s.item == item && s.block == row.block && s.reply.is_none()) {
+            s.reply = Some(words.to_string());
+            self.page_cards().remove(&s.card);
+            if open.contains(&s.card) {
+                self.step(Input::ConfirmClose { card: s.card, res: "answered".into() });
+            }
+        }
+        if let Err(e) = pages.locked(|st| st.save_steps(id, &steps)) {
+            log_line(&self.opts.paths, &format!("page {id}: steps not saved: {e}"));
+        }
+        let msg = crate::pages::store::notes_message(&meta, &pages.url(id), &[note]);
+        self.page_msg(crate::pages::PageMsg::Sent { id: id.to_string(), agent: meta.agent.clone(), text: msg });
+        self.page_steps(id);
+        true
+    }
+
+    /// `/answer N reply` on a step's card: the step ticked (or the words
+    /// as a note on its row), never the hub's question path. False: not
+    /// a step's card.
+    fn page_step_answer(&mut self, text: &str) -> bool {
+        let Some(rest) = text.trim().strip_prefix("/answer ") else { return false };
+        let Some((n, reply)) = rest.trim().split_once(' ') else { return false };
+        let Ok(card) = n.trim_start_matches('#').parse::<u64>() else { return false };
+        let Some((id, key)) = self.page_cards().get(&card).cloned() else { return false };
+        let Some(item) = key.strip_prefix("row:").and_then(|k| k.split_once('/')).map(|(_, i)| i.to_string()) else { return false };
+        self.page_tick(&id, &item, reply)
+    }
+
     /// The card of question `block` on page `id`, when it is still open.
     fn page_card(&mut self, id: &str, block: &str) -> Option<u64> {
         let card = self.page_cards().iter().find(|(_, (p, b))| p == id && b == block).map(|(c, _)| *c)?;
@@ -1165,15 +1315,36 @@ impl Shell {
         }
         for (card, id, block) in closed {
             self.page_cards().remove(&card);
-            let reply = self.page_replies.remove(&card).unwrap_or_default();
+            if block.starts_with("row:") {
+                // a step's card closed another way (the user closed it):
+                // it stays closed; a tick still ticks the row
+                let mut steps = pages.store.steps(&id);
+                for s in steps.iter_mut().filter(|s| s.card == card && s.reply.is_none()) {
+                    s.reply = Some(String::new());
+                }
+                if let Err(e) = pages.locked(|s| s.save_steps(&id, &steps)) {
+                    log_line(&self.opts.paths, &format!("page {id}: steps not saved: {e}"));
+                }
+                continue;
+            }
+            let reply = self.page_replies.remove(&card);
             let mut qs = pages.store.questions(&id);
             if let Some(q) = qs.iter_mut().find(|q| q.card == card) {
-                q.reply = Some(reply.clone());
+                match &reply {
+                    Some(r) => q.reply = Some(r.clone()),
+                    // closed with no answer (withdrawn, closed by the user,
+                    // a card this hub never had: a copied page, pm's 409):
+                    // the question stays open on the page, a pick there
+                    // still goes (as a pick note), a republish opens a card
+                    None => q.card = 0,
+                }
             }
             if let Err(e) = pages.locked(|s| s.save_questions(&id, &qs)) {
                 log_line(&self.opts.paths, &format!("page {id}: questions not saved: {e}"));
             }
-            pages.push(&id, "answered", &json!({"block": block, "reply": reply}));
+            if let Some(r) = reply {
+                pages.push(&id, "answered", &json!({"block": block, "reply": r}));
+            }
         }
         pages.push("", "pages", &json!({"pages": pages.list_json()}));
     }
@@ -2151,6 +2322,29 @@ impl Shell {
         format!("{text}\n\n[from the capsule: answer in one short line]")
     }
 
+    /// The user's open steps (roadmap D) as one more line of a capsule
+    /// message to main: "done with the payment" from anywhere ticks the
+    /// right row (main runs `sb page tick`). Unchanged without any.
+    fn steps_hint(&mut self, text: String, via: &str) -> String {
+        if via != "capsule" || text.trim_start().starts_with('/') {
+            return text;
+        }
+        let Some(pages) = self.pages.clone() else { return text };
+        let keys: Vec<(String, String)> = self.page_cards().values().filter(|(_, k)| k.starts_with("row:")).cloned().collect();
+        let mut steps: Vec<String> = Vec::new();
+        for (id, key) in keys {
+            let Some((block, item)) = key.trim_start_matches("row:").split_once('/') else { continue };
+            if let Some(s) = pages.store.steps(&id).into_iter().find(|s| s.block == block && s.item == item && s.reply.is_none()) {
+                steps.push(format!("{id} {item} \"{}\"", s.text));
+            }
+        }
+        if steps.is_empty() {
+            return text;
+        }
+        format!("{text}
+[his open steps: {}; when he says one is done: sb page tick <page> <item>]", steps.join(", "))
+    }
+
     fn client_line(&mut self, id: ClientId, v: Value) {
         let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
         match s("op").as_str() {
@@ -2174,11 +2368,18 @@ impl Shell {
                 // an answer to a page's question: its words, for the page
                 // from the capsule: a hint main's rule reads (one short line
                 // back); never on an answer or a slash command
-                let text = match self.page_reply_text(&s("text")) {
-                    Some(reply) => reply,
-                    None => Self::capsule_hint(s("text"), &s("via")),
-                };
-                self.step(Input::ClientInput { client: id, focus: s("focus"), text });
+                // a step of his answered on its card (roadmap D): ticked
+                // on its page, the page's agent told there
+                if !self.page_step_answer(&s("text")) {
+                    let text = match self.page_reply_text(&s("text")) {
+                        Some(reply) => reply,
+                        None => {
+                            let t = Self::capsule_hint(s("text"), &s("via"));
+                            self.steps_hint(t, &s("via"))
+                        }
+                    };
+                    self.step(Input::ClientInput { client: id, focus: s("focus"), text });
+                }
                 self.page_answers();
             }
             // a note talk's words (§4.1): to the page's frame, never an input
@@ -2400,7 +2601,7 @@ impl Shell {
                 let body = self.search(cmd, &v);
                 write_json(&mut stream, &body);
             }
-            "page_publish" | "page_start" | "page_list" | "page_notes" => {
+            "page_publish" | "page_start" | "page_tick" | "page_list" | "page_notes" => {
                 let body = self.page_op(cmd, &from, &v);
                 write_json(&mut stream, &body);
             }

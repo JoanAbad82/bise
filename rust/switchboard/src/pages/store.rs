@@ -411,21 +411,44 @@ impl Store {
     /// A pick on question `block` with no open card (ambient-lead
     /// m_5343): a note of kind `pick`, sent at once. The note.
     pub fn add_pick(&self, id: &str, block: &str, reply: &str, version: u64, now: u64) -> Result<Note, String> {
+        self.add_sent(id, block, None, "pick", reply, version, now)
+    }
+
+    /// A note the hub makes for the user (a pick with no card, a step
+    /// ticked from its card or by voice), sent at once: `item` is the
+    /// list item it is on (a checklist row). The note.
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_sent(&self, id: &str, block: &str, item: Option<&str>, kind: &str, text: &str, version: u64, now: u64) -> Result<Note, String> {
         let mut notes = self.notes(id);
-        let n = Note {
+        let mut n = Note {
             id: next_id(&notes),
             version,
             block: block.to_string(),
-            kind: "pick".into(),
-            text: Some(reply.to_string()),
+            kind: kind.into(),
+            text: Some(text.to_string()),
             at_ms: now,
             status: "sent".into(),
             sent_ms: Some(now),
             ..Note::default()
         };
+        if let Some(i) = item {
+            n.extra.insert("item".into(), Value::String(i.to_string()));
+        }
         notes.push(n.clone());
         self.save_notes(id, &notes)?;
         Ok(n)
+    }
+
+    /// The cards the page's checklist steps opened (roadmap D).
+    pub fn steps(&self, id: &str) -> Vec<super::checklist::Step> {
+        if !valid_id(id) {
+            return Vec::new();
+        }
+        read_json(&self.page_dir(id).join("steps.json"))
+    }
+
+    pub fn save_steps(&self, id: &str, s: &[super::checklist::Step]) -> Result<(), String> {
+        write_json(&self.page_dir(id).join("steps.json"), &s)
     }
 
     /// The user opened version `n` in a browser: the newest he opened
