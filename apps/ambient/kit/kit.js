@@ -742,7 +742,6 @@
     // A pick answers the question's card (§4.2: POST /answer, one card, one answer). Until the
     // server has that route (404), or when it fails, the pick goes to notes.js as a pick note.
     let answerRoute = true;
-    const ANSWER_WAIT_MS = 4000;
     const token = (doc.querySelector('meta[name="bise-token"]') || { content: "" }).content;
     function onPick(q, n) {
       const d = pick(q, n);
@@ -752,10 +751,9 @@
       fetch(`/api/p/${id}/answer`, { method: "POST", headers: { "Content-Type": "application/json", "X-Bise-Token": token }, body: JSON.stringify({ block: d.block, option: d.option }) })
         .then((r) => {
           if (r.status === 404) answerRoute = false;
-          if (!r.ok) { asNote(); return; }
-          // the hub took it; when no card was open for it (no SSE 'answered' comes), the pick
-          // still reaches the agent as a note (notes.js drops it if 'answered' arrives later)
-          setTimeout(() => { if (!q.hasAttribute("data-answer")) asNote(); }, ANSWER_WAIT_MS);
+          // a 200: the hub answers the card, or with no open card saves the answer and sends the
+          // agent a pick note itself (amb-core 03821a37); either way SSE 'answered' follows
+          if (!r.ok) asNote();
         })
         .catch(asNote);
       return true;
