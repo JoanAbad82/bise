@@ -18,9 +18,9 @@ opens on that item), a PR or a doc by its https link.
 2. **What needs you**, a `prose` list under `## needs you`: the cards waiting for him, and what
    waits on him in every open page, cards or not. Run `sb page waiting`: one line per item,
    `<page>#<item> · step|draft|question|notes · <text>` (his checklist steps not ticked, drafts
-   waiting for his word, unanswered questions, notes he left). Until your `sb` has it: `sb page
-   list`, then read each page (`curl -s <url>`). A plan waiting on him is there: his first open
-   step and each draft of bise's that waits for his word.
+   waiting for his word, unanswered questions, notes he left; `nothing waits on him` when
+   empty). A plan waiting on him is there: his first open step and each draft of bise's that
+   waits for his word.
    One line each, the thing and where it waits, linked to the item: `<a
    href="/p/inbox-review#m2">reply to Marc about invoice #2231</a> · inbox`; never a bare
    `/p/<page>`. Never the drafts themselves: they stay on their page.
