@@ -51,6 +51,8 @@
     tick: "done",
     copy: "copy",
     copied: "copied",
+    replyOn: (site) => `reply on ${site}`,
+    copyOpen: (site) => `copy + open ${site}`,
   };
 
   // ---- the writing state: the agent's intents, newest at the bottom, the last 5 shown ----
@@ -246,6 +248,53 @@
     }).join("");
     return walk(el).replace(/\s+/g, " ").trim();
   }
+  // ---- reply items (slice B, 'watch for me'): a comment somewhere and the drafted answer ----
+  // bise never posts: approving opens the thread, with the reply prefilled where the site has an
+  // intent URL for it (X), else the reply is copied first ('copy + open').
+  const SITES = [[/(^|\.)news\.ycombinator\.com$/, "Hacker News"], [/(^|\.)reddit\.com$/, "Reddit"], [/(^|\.)(x|twitter)\.com$/, "X"], [/(^|\.)bsky\.app$/, "Bluesky"]];
+  function replyTarget(thread, text) {
+    const m = /^https:\/\/([^/?#]+)([^?#]*)/i.exec(String(thread || ""));
+    if (!m) return null;
+    const host = m[1].toLowerCase();
+    const site = (SITES.find(([re]) => re.test(host)) || [null, host])[1];
+    const tweet = site === "X" && /\/status\/(\d+)/.exec(m[2]);
+    if (tweet) return { site, open: `https://x.com/intent/post?in_reply_to=${tweet[1]}&text=${encodeURIComponent(text)}`, copy: false };
+    return { site, open: thread, copy: true };
+  }
+  // the drafted reply: the <p>s after the quoted comment (or the last <p>)
+  function replyText(li) {
+    const cs = kids(li).filter((c) => !ui(c));
+    const q = cs.findIndex((c) => /^blockquote$/i.test(c.tagName));
+    const ps = (q >= 0 ? cs.slice(q + 1) : cs.slice(-1)).filter((c) => /^p$/i.test(c.tagName));
+    return ps.map((p) => textOf(p)).join("\n\n");
+  }
+
+  // ---- checklist who and when (slice D): data-who, data-due (YYYY-MM-DD) in words ----
+  const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const MONTHS = ["jan", "feb", "march", "april", "may", "june", "july", "aug", "sept", "oct", "nov", "dec"];
+  // {text, late}: "today", "tomorrow", "friday" (this week), "20 may", "late · 3 days"
+  function dueWords(due, nowMs) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(due || ""));
+    if (!m) return null;
+    const d = new Date(+m[1], +m[2] - 1, +m[3]);
+    const now = new Date(nowMs);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const days = Math.round((d - today) / 86400000);
+    if (days < 0) return { text: `late · ${-days === 1 ? "1 day" : `${-days} days`}`, late: true };
+    if (days === 0) return { text: "today", late: false };
+    if (days === 1) return { text: "tomorrow", late: false };
+    if (days < 7) return { text: DAYS[d.getDay()], late: false };
+    return { text: `${d.getDate()} ${MONTHS[d.getMonth()]}`, late: false };
+  }
+  function decorateWho(doc, li, nowMs) {
+    const who = li.getAttribute("data-who"), due = dueWords(li.getAttribute("data-due"), nowMs);
+    let tag = kids(li).find((c) => ui(c) && c.getAttribute("data-when") != null);
+    if (!who && !due) { if (tag) li.removeChild(tag); return; }
+    if (!tag) { tag = doc.createElement("span"); tag.setAttribute("data-kit-ui", ""); tag.setAttribute("data-when", ""); li.append(tag); }
+    tag.textContent = [who, due && due.text].filter(Boolean).join(" · ");
+    if (due && due.late && li.getAttribute("data-done") == null && li.getAttribute("data-verdict") !== "tick") li.setAttribute("data-late", ""); else li.removeAttribute("data-late");
+  }
+
   // the items "approve N" approves: no verdict yet, and not edited by the user (those go with send)
   const pending = (block) => items(block).filter((li) => li.getAttribute("data-verdict") == null && li.getAttribute("data-edited") == null);
   // the buttons each item kind gets (review: approve / skip; compare: ♡ ✗ pick; checklist: a tick)
@@ -259,6 +308,13 @@
         else li.append(bar);
       }
       if (kit === "checklist" && li.getAttribute("data-done") != null && li.getAttribute("data-verdict") == null) li.setAttribute("data-verdict", "tick");
+      if (kit === "checklist") decorateWho(doc, li, Date.now());
+      // a reply item: its approve says what it does ('reply on X', or 'copy + open' on Hacker News)
+      const t = kit === "review" && replyTarget(li.getAttribute("data-reply"), "");
+      if (t) {
+        const ok = kids(li).filter(ui).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "approve");
+        if (ok) ok.textContent = t.copy ? W.copyOpen(t.site) : W.replyOn(t.site);
+      }
     }
   }
   function decorateReview(doc, block) {
@@ -352,7 +408,7 @@
     return { ...res, marked: [...marked] };
   }
 
-  const BiseKit = { W, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, options, norm };
+  const BiseKit = { W, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, options, norm };
   root.BiseKit = BiseKit;
 
   // ---- the browser: the frame, the stream, the keys ----
@@ -375,7 +431,9 @@
 
   function frame(title) {
     const f = el("header", { class: "bise-frame", role: "banner" });
-    f.append(el("span", { class: "k", "aria-hidden": "true" }, ":*"), el("span", { class: "t" }, title));
+    // the pearl at 36 px (SPEC §1, round 8): amb-web draws its shader into [data-bise-pearl]; the
+    // ':*' stays as the fallback until it does
+    f.append(el("span", { class: "k", "aria-hidden": "true", "data-bise-pearl": "36" }, ":*"), el("span", { class: "t" }, title));
     doc.body.prepend(f);
     return f;
   }
@@ -590,6 +648,16 @@
       const li = btn.closest("li[data-id]");
       const out = kind === "approve-all" ? approveAll(block) : [react(block, block.dataset.kit !== "email" && li ? li.dataset.id : null, kind)];
       for (const d of out) if (d) doc.dispatchEvent(new root.CustomEvent("bise:react", { detail: d }));
+      // a reply item approved (not taken back): open its thread, the reply prefilled or copied
+      const d0 = out[0];
+      if (kind === "approve" && li && d0 && d0.kind === "approve" && li.dataset.reply) {
+        const text = replyText(li);
+        const t = replyTarget(li.dataset.reply, text);
+        if (t) {
+          if (t.copy && root.navigator && root.navigator.clipboard) root.navigator.clipboard.writeText(text).catch(() => {});
+          root.open(t.open, "_blank", "noopener");
+        }
+      }
       decorate([block], agent, doc);
     }
     function showSource(k) {

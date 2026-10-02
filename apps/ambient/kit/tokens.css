@@ -14,41 +14,50 @@
 :root {
   color-scheme: light dark;
 
+  /* identity round 8, validated by the user (ambient m_5154, m_5166, SPEC.md §1 'tokens by
+     role'): the paper stays as it was (surface, ink, text grays, Newsreader); the role colors
+     (accent, on-accent, ok, risk, line, working) follow SPEC's light column; the frame and the
+     notes are SPEC's dark column, smoked glass floating over the paper */
+
   /* surface-made: the page, what the agents make (paper) */
   --surface-made: #f2ede2;
-  --surface-card: #faf7f0;        /* a block lifted off the page: callout, option */
+  --surface-card: #faf7f0;        /* a block lifted off the page: callout, option, card */
   --ink: #1d1a17;                 /* everything you read */
   --dim: #5a5349;                 /* secondary text */
+  --faint: #8a8174;               /* labels, keys, the quietest text */
   --kick: #8a8174;                /* kickers, captions, meta lines */
-  --faint: #8a8174;               /* the quietest text */
-  --rule: #d9d1c3;                /* lines, never text */
+  --line: #1d1a171c;              /* rules between rows, never text */
+  --rule: var(--line);
   --rule-strong: #1d1a17;         /* the rule under a table's head */
   --drop: #1d1a170c;              /* the flat offset shadow */
   --hover: #1d1a1708;
-  --accent: #b8416b;              /* attention only: a question, "needs you" */
-  --accent-soft: #f4a6b033;
-  --on-accent: #141211;
-  --pen: #c8264a;                 /* only for your notes */
-  --ok: #3f7a2a;
-  --risk: #b3261e;
-  --changed: #f4a6b026;           /* "what changed" */
-  --working: #a8741a;             /* an agent at work (writing, updating): ochre, never the accent (ambient m_5095; values amb-kit's guess) */
+  --accent: #c8264a;              /* only what waits for you; your voice */
+  --accent-soft: #c8264a1a;       /* the accent's fill (a question) */
+  --on-accent: #ffffff;
+  --pen: #c8264a;                 /* your notes */
+  --ok: #3f6b35;                  /* done ✓ */
+  --risk: #b3261e;                /* failed ▲, risk kickers */
+  --changed: #c8264a14;           /* "what changed" */
+  --working: #5a5349;             /* work in progress: shown by motion (a breathing dot), not by a color (= --dim) */
 
-  /* surface-talk: where you talk to bise (glass): the frame, the note toolbar, the side list, the send bar */
-  --surface-talk: linear-gradient(180deg, #2a2224e0, #1a1516f0);
-  --talk-ink: #fff;
+  /* surface-talk: where bise talks (glass, over the paper): the frame, the note toolbar, the side list, the send bar */
+  --surface-talk: linear-gradient(180deg, #2a2224 56%, #1a1516 72%);
+  --talk-ink: #ffffff;
   --talk-dim: #ffffffa0;
   --talk-faint: #ffffff70;
   --talk-accent: #f4a6b0;
-  --talk-pen: #ff8fa6;
-  --talk-ok: #b9d99a;
-  --talk-moved: #ffd38a;
-  --talk-working: #e0b45a;
+  --talk-on-accent: #2a141b;
+  --talk-pen: #f4a6b0;
+  --talk-ok: #cfe8c0;
+  --talk-risk: #ff9a8a;
+  --talk-line: #ffffff12;
+  --talk-moved: #ffffffa0;
+  --talk-working: #ffffffa0;
   --talk-raised: #ffffff14;
   --talk-raised-on: #ffffff2a;
-  --talk-stroke: inset 0 0 0 1px #ffffff22;
-  --talk-shadow: 0 10px 30px -14px #0008;
-  --talk-blur: blur(30px) saturate(1.6);
+  --talk-stroke: inset 0 0 0 1px #ffffff26, inset 0 1px 0 #ffffff38;
+  --talk-shadow: 0 30px 80px -24px #000b;
+  --talk-blur: blur(44px) saturate(1.9);
 
   /* type: reading, interface, code and numbers */
   --font-read: Newsreader, "Iowan Old Style", Georgia, serif;
@@ -78,25 +87,28 @@
   --time-arrive: .5s;
 }
 
+/* dark paper, when the system is dark: the brand's dark paper as before (#171513 / #ece6da),
+   with round 8's dark-column role colors */
 @media (prefers-color-scheme: dark) {
   :root {
     --surface-made: #171513;
     --surface-card: #1f1c19;
     --ink: #ece6da;
     --dim: #b8b0a3;
-    --kick: #8a8276;
     --faint: #8a8276;
-    --rule: #34302b;
+    --kick: #8a8276;
+    --line: #ece6da1c;
     --rule-strong: #ece6da;
     --drop: #00000038;
     --hover: #ece6da0a;
     --accent: #f4a6b0;
     --accent-soft: #f4a6b026;
-    --pen: #ff6b8a;
-    --ok: #b9d99a;
-    --risk: #ff5a52;
+    --on-accent: #2a141b;
+    --pen: #f4a6b0;
+    --ok: #cfe8c0;
+    --risk: #ff9a8a;
     --changed: #f4a6b01c;
-    --working: #e0b45a;
+    --working: #b8b0a3;
   }
 }
 

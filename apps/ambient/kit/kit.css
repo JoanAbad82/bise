@@ -76,7 +76,7 @@ body {
 .bise-frame .vmenu a[aria-current]::after { content: " ·  shown"; }
 .bise-frame .n { font: 12px var(--font-mono); color: var(--talk-dim); }
 .bise-frame .n:empty { display: none; }
-.bise-frame button.send { background: var(--talk-accent); color: var(--on-accent); font-weight: 600; }
+.bise-frame button.send { background: var(--talk-accent); color: var(--talk-on-accent); font-weight: 600; }
 .bise-frame button.send[disabled] { background: var(--talk-raised); color: var(--talk-dim); opacity: 1; }
 @media (max-width: 720px) { .bise-frame .m, .bise-frame .n { display: none; } }
 
@@ -169,6 +169,13 @@ body {
 #bise-page [data-verdict="approve"] > [data-kit-ui] button[data-act="approve"],
 #bise-page [data-verdict="skip"] > [data-kit-ui] button[data-act="skip"] { box-shadow: inset 0 0 0 1.5px var(--ink); transform: translateY(-1px); }
 #bise-page [data-verdict="approve"] > [data-kit-ui] button[data-act="approve"]::before { content: "✓ "; }
+
+/* a reply item (slice B): who · where · when, the comment quoted, then the drafted reply */
+#bise-page [data-kit="review"] li[data-reply] > blockquote { margin: 4px 0 6px; font-size: var(--text-small); color: var(--dim); border-left: 2px solid var(--line); padding-left: var(--space-3); }
+
+/* checklist who and when (slice D): the kit's tag at the row's end; late in the risk color */
+#bise-page [data-kit="checklist"] li[data-id] > [data-when] { display: inline; margin-left: auto; padding-left: var(--space-3); font: 12px var(--font-mono); color: var(--kick); white-space: nowrap; }
+#bise-page [data-kit="checklist"] li[data-late] > [data-when] { color: var(--risk); }
 
 /* review: a list of items, each with its approve / skip; "approve N" at the end */
 #bise-page [data-kit="review"] > :is(ol, ul) { list-style: none; padding: 0; margin: 0 0 var(--space-3); border-top: 1.5px solid var(--rule-strong); }

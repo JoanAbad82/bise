@@ -359,11 +359,27 @@ impl<'a> Linter<'a> {
             && name == "li"
             && self.open.as_ref().is_some_and(|b| b.list_depth == 1)
         {
-            inner = if kit == "checklist" {
-                &["data-id", "data-done"]
-            } else {
-                &["data-id"]
+            inner = match kit.as_str() {
+                "checklist" => &["data-id", "data-done", "data-who", "data-due"],
+                "review" => &["data-id", "data-reply"],
+                _ => &["data-id"],
             };
+            // a reply item's thread (slice B): an https link the user opens to answer there
+            if let Some(u) = get("data-reply") {
+                let low = u.trim().to_ascii_lowercase();
+                if !low.starts_with("https://") || bad_url("href", &u).is_some() {
+                    self.err(&at, format!("data-reply=\"{u}\" is not a thread link: use the comment's https:// URL"));
+                }
+            }
+            // a checklist item's due date (slice D): a calendar date the kit words ('friday', 'late')
+            if let Some(d) = get("data-due") {
+                if !valid_date(&d) {
+                    self.err(
+                        &at,
+                        format!("data-due=\"{d}\" is not a date: use YYYY-MM-DD"),
+                    );
+                }
+            }
             match get("data-id") {
                 None => self.open.as_mut().unwrap().bare_items = true,
                 Some(v) if !valid_id(&v) => self.err(&at, format!("item data-id=\"{v}\" is not a valid id: letters, digits, - and _, 40 at most")),
@@ -788,6 +804,18 @@ fn valid_id(v: &str) -> bool {
         && v.len() <= 40
         && v.chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+/// `YYYY-MM-DD` with a month 1-12 and a day 1-31.
+fn valid_date(d: &str) -> bool {
+    let p: Vec<&str> = d.split('-').collect();
+    let num = |s: &str, n: usize| s.len() == n && s.bytes().all(|b| b.is_ascii_digit());
+    p.len() == 3
+        && num(p[0], 4)
+        && num(p[1], 2)
+        && num(p[2], 2)
+        && (1..=12).contains(&p[1].parse::<u32>().unwrap_or(0))
+        && (1..=31).contains(&p[2].parse::<u32>().unwrap_or(0))
 }
 
 /// Whitespace runs folded to one space, none between two tags, ends trimmed.

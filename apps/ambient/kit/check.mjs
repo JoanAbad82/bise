@@ -397,6 +397,46 @@ law("writing: the frame's time counts up; the words are ambient's", () => {
   assert.equal(K.W.tabWriting("launch recap"), "launch recap · writing");
 });
 
+law("reply items: X gets a prefilled reply intent, the other sites 'copy + open' the thread; bise never posts", () => {
+  const x = j(K.replyTarget("https://x.com/someone/status/1842/photo/1", "thanks! it's one thread per repo"));
+  assert.deepEqual(x, { site: "X", open: "https://x.com/intent/post?in_reply_to=1842&text=thanks!%20it's%20one%20thread%20per%20repo", copy: false });
+  assert.deepEqual(j(K.replyTarget("https://news.ycombinator.com/item?id=4242", "t")), { site: "Hacker News", open: "https://news.ycombinator.com/item?id=4242", copy: true });
+  assert.equal(j(K.replyTarget("https://old.reddit.com/r/rust/comments/abc", "t")).site, "Reddit");
+  assert.equal(j(K.replyTarget("https://bsky.app/profile/a.bsky.social/post/3k", "t")).site, "Bluesky");
+  assert.equal(K.replyTarget("javascript:alert(1)", "t"), null);
+  assert.equal(K.W.replyOn("X"), "reply on X");
+  assert.equal(K.W.copyOpen("Hacker News"), "copy + open Hacker News");
+});
+
+law("reply items: the reply is what follows the quoted comment; the approve button says where it goes", () => {
+  const b = blocks(parse(`<section data-kit="review" data-id="watch"><ol><li data-id="hn1" data-reply="https://news.ycombinator.com/item?id=4242"><p>dang · Hacker News · 2 h ago</p><blockquote>how is it different from tmux?</blockquote><p>one thread per repo, and agents that <em>talk</em> to each other.</p></li>
+<li data-id="x1" data-reply="https://x.com/a/status/9"><p>@a · X</p><blockquote>nice</blockquote><p>thanks!</p></li></ol></section>`))[0];
+  K.decorate([b], "watch", doc);
+  const [hn, x] = K.options(b);
+  assert.equal(K.replyText(hn), "one thread per repo, and agents that talk to each other.");
+  const label = (li) => li.children.find((c) => c.hasAttribute("data-kit-ui")).children.find((c) => c.getAttribute("data-act") === "approve").textContent;
+  assert.equal(label(hn), "copy + open Hacker News");
+  assert.equal(label(x), "reply on X");
+});
+
+law("checklist who and when: due dates in words, late in its own state, done items never late", () => {
+  const now = new Date(2026, 4, 13, 10).getTime(); // wednesday 13 may 2026
+  assert.deepEqual(j(K.dueWords("2026-05-13", now)), { text: "today", late: false });
+  assert.deepEqual(j(K.dueWords("2026-05-14", now)), { text: "tomorrow", late: false });
+  assert.deepEqual(j(K.dueWords("2026-05-15", now)), { text: "friday", late: false });
+  assert.deepEqual(j(K.dueWords("2026-05-20", now)), { text: "20 may", late: false });
+  assert.deepEqual(j(K.dueWords("2026-05-10", now)), { text: "late · 3 days", late: true });
+  assert.deepEqual(j(K.dueWords("2026-05-12", now)), { text: "late · 1 day", late: true });
+  assert.equal(K.dueWords("friday", now), null);
+  const c = blocks(parse(`<section data-kit="checklist" data-id="todo"><ol><li data-id="t1" data-who="Camille" data-due="2020-01-01">trains</li><li data-id="t2" data-done data-due="2020-01-01">venue</li><li data-id="t3">invite</li></ol></section>`))[0];
+  K.decorate([c], "plan", doc);
+  const [t1, t2, t3] = K.options(c);
+  const when = (li) => li.children.find((n) => n.hasAttribute("data-when"));
+  assert.ok(when(t1).textContent.startsWith("Camille · late · "));
+  assert.ok(t1.hasAttribute("data-late") && !t2.hasAttribute("data-late"), "a done item is never late");
+  assert.equal(when(t3), undefined, "no who, no due: no tag");
+});
+
 law("ago: short words", () => {
   const now = 10_000_000;
   assert.equal(K.ago(now - 5_000, now), "just now");

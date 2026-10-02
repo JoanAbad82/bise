@@ -35,7 +35,7 @@ across versions (the user's notes anchor on them): `p1`, `t1`, `q1`, `src`.
 | `review` | items the user approves or skips one by one (mails to answer, tickets, expenses) | `<ol>` of `<li data-id="m1">`: a first `<p>` saying what it is (`Léa Martin · offsite dates · 9:12`), then the proposal |
 | `message` | a draft that leaves through a channel (Slack, a post) | `data-to="Slack · #launch"` (where it goes, shown above it), then `<p>`s and `<ul>`, with `<strong>`, `<em>`, `<code>`, `<a>`: the kit's `copy` turns them into Slack markup |
 | `compare` | 2 to 4 options side by side (venues, drafts, tools) | `<ol>` of `<li data-id="moulin">`: an `<h3>` name, a `<ul>` of facts, a `<p>` with the why |
-| `checklist` | what's left to do, who, by when | `<ol>` of `<li data-id="t1">` the task `<small>who · when</small></li>`; `data-done` on what is done |
+| `checklist` | what's left to do, who, by when | `<ol>` of `<li data-id="t1" data-who="Camille" data-due="2026-05-20">` the task `</li>`; `data-done` on what is done; the kit shows `Camille · friday` and what is late |
 | `email` | one mail ready to send | `<p data-field="to">`, optional `<p data-field="cc">`, `<p data-field="subject">`, then the body as `<p>`s |
 
 Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
@@ -53,6 +53,10 @@ How to write them well:
   compare `keep` (♡) / `drop` (✗) / `pick` (one per block), checklist `tick`. Mark a checklist
   item done with `data-done` when it is done. Sending, replying or booking is still your tool
   call, through the user's approvals, after their `send`.
+- **Replies to comments** (Hacker News, Reddit, X, Bluesky): a `review` item with
+  `data-reply="<the comment's https link>"`, then `<p>who · where · when</p>`, the comment in a
+  `<blockquote>`, and your drafted reply in `<p>`s. Approving it opens the thread with the reply
+  ready (prefilled on X, copied for the others): bise never posts, the user does.
 - **Drafts** (a Slack message, a post, a reply): in a `message` block with its `data-to`, as
   `<p>`s and `<ul>`, so the user reads it in the page's font, edits it in place and copies it.
   Never in `<pre>` or `<code>`: those are for code. A mail goes in an `email` block.
@@ -120,7 +124,8 @@ More examples, each one passing the lint: `apps/ambient/kit/examples/` in the bi
 (`weekly-update.html` a doc, `offsite-venues.html` a table to choose from,
 `pricing-question.html` a decision, `inbox-review.html` the inbox: replies to approve and a mail
 ready to send, `launch-post.html` a Slack post to check and copy, `offsite-plan.html` a plan:
-venues to compare and what's left to do).
+venues to compare and what's left to do, `offsite-todo.html` who does what by when,
+`launch-watch.html` a standing order: new comments with drafted replies).
 
 ## 4. Publish fast, then fill it
 
@@ -182,7 +187,22 @@ Two kinds of notes ask for more than a change of the page:
 - **kind `start`** ("start an agent on this", with an item and its text): it goes to main, not
   to you; main starts an agent on it. Nothing to change on your page unless another note asks.
 
-## 6. When the page leaves
+## 6. A standing order: one page, kept up to date
+
+"watch the launch for me", "tell me when the PR is reviewed": one page you keep current, not a
+new page each time.
+- Check on a timer: `sb every 10m "<what to check>"` (it wakes you every 10 minutes with that
+  line); stop it when the user says so or the thing is over.
+- Each check republishes the **same page id**: what is new on top (a `callout` saying `since
+  14:10` and what came), the items still to handle under it, the handled ones gone or folded into
+  one line (`12 answered earlier`). Keep each item's `data-id` (the comment's id, the PR's
+  number) so the user's notes stay on it.
+- Nothing new: don't publish; at most update the heading's meta line (`last check 14:20`) on the
+  next real change.
+- A card (`sb card`, through main) only for what the user asked to be told about, in their
+  words ("tell me if Simon posts"); everything else waits on the page.
+
+## 7. When the page leaves
 
 Acting on the page is a separate step the user asks for ("post it in #team", "send the mail",
 "make it a Google Doc"), through the usual approvals, never before their word:

@@ -393,3 +393,47 @@ fn a_checklist_has_items_and_may_mark_them_done() {
         "r: data-done is not a kit attribute",
     );
 }
+
+#[test]
+fn a_reply_item_links_its_thread() {
+    ok(
+        r#"<section data-kit="review" data-id="watch"><ol><li data-id="hn1" data-reply="https://news.ycombinator.com/item?id=4242"><p>dang · Hacker News · 2 h ago</p><blockquote>how is it different from tmux?</blockquote><p>one thread per repo, and agents that talk to each other.</p></li></ol></section>"#,
+    );
+    has(
+        &errs(
+            r#"<section data-kit="review" data-id="w"><ol><li data-id="a" data-reply="javascript:alert(1)">x</li></ol></section>"#,
+        ),
+        "w: data-reply=\"javascript:alert(1)\" is not a thread link",
+    );
+    has(
+        &errs(
+            r#"<section data-kit="review" data-id="w"><ol><li data-id="a" data-reply="http://x.com/1">x</li></ol></section>"#,
+        ),
+        "is not a thread link",
+    );
+    has(
+        &errs(
+            r#"<section data-kit="checklist" data-id="t"><ol><li data-id="a" data-reply="https://x.com">x</li></ol></section>"#,
+        ),
+        "t: data-reply is not a kit attribute",
+    );
+}
+
+#[test]
+fn a_checklist_item_says_who_and_when() {
+    ok(
+        r#"<section data-kit="checklist" data-id="todo"><ol><li data-id="t1" data-who="Camille" data-due="2026-05-20">book the trains</li></ol></section>"#,
+    );
+    has(
+        &errs(
+            r#"<section data-kit="checklist" data-id="todo"><ol><li data-id="t1" data-due="friday">x</li></ol></section>"#,
+        ),
+        "todo: data-due=\"friday\" is not a date: use YYYY-MM-DD",
+    );
+    has(
+        &errs(
+            r#"<section data-kit="checklist" data-id="todo"><ol><li data-id="t1" data-due="2026-13-01">x</li></ol></section>"#,
+        ),
+        "is not a date",
+    );
+}
