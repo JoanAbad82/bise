@@ -828,6 +828,10 @@ impl Shell {
                     None => json!({"ok": false, "error": format!("no page {id}")}),
                 }
             }
+            "page_waiting" => {
+                let items = pages.waiting();
+                json!({"ok": true, "waiting": items, "lines": items.iter().map(|w| w.line()).collect::<Vec<_>>()})
+            }
             "page_tick" => {
                 // a step of his he says is done (by voice, through main):
                 // the same path as its card's answer (roadmap D)
@@ -2746,7 +2750,7 @@ impl Shell {
                 let body = self.search(cmd, &v);
                 write_json(&mut stream, &body);
             }
-            "page_publish" | "page_start" | "page_tick" | "page_list" | "page_notes" => {
+            "page_publish" | "page_start" | "page_tick" | "page_waiting" | "page_list" | "page_notes" => {
                 let body = self.page_op(cmd, &from, &v);
                 write_json(&mut stream, &body);
             }

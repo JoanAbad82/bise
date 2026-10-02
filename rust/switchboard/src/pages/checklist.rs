@@ -67,6 +67,12 @@ fn attr(head: &str, k: &str) -> Option<String> {
 /// The rows of the checklist blocks of a fragment, in order (the lint
 /// ran: each row has its data-id).
 pub fn rows_of(html: &str) -> Vec<Row> {
+    items_of(html, "checklist")
+}
+
+/// The items (`<li data-id>`) of the blocks of kind `kit` in a fragment,
+/// in order: a checklist's rows, a review's items.
+pub fn items_of(html: &str, kit: &str) -> Vec<Row> {
     let mut out = Vec::new();
     let mut rest = html;
     while let Some(i) = rest.find("<section") {
@@ -76,7 +82,7 @@ pub fn rows_of(html: &str) -> Vec<Row> {
         rest = after;
         let head_end = block.find('>').unwrap_or(0);
         let head = &block[..head_end];
-        if attr(head, "data-kit").as_deref() != Some("checklist") {
+        if attr(head, "data-kit").as_deref() != Some(kit) {
             continue;
         }
         let Some(bid) = attr(head, "data-id") else { continue };

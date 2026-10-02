@@ -464,6 +464,11 @@ def main():
         # q2 (PAGE_V3's second question) stays asked; s1 and q1 are done
         left = lambda: sorted((x["page"].get("item") or x["page"]["block"]) for x in c.cards() if (x.get("page") or {}).get("id") == "task-plan")
         c.wait(lambda: left() == ["q2"], 30, "only q2 left on the task's page")
+        # sb page waiting (amb-kit m_5762): what waits on him, one line each
+        settle(c)
+        c.say("[[bash: sb page waiting]]")
+        c.wait_line("main", "task-plan#q2 · question · add the March chart?", 90)
+        check(not any("task-plan#s1" in l or "task-plan#q1 " in l for l in c.lines("main")[-40:]), "answered and ticked items wait no more")
 
         # a copied page whose question names a card this hub never had,
         # read at the hub's start (pm's m_5456): the first pick is no 409,

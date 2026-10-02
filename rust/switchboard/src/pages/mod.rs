@@ -10,6 +10,7 @@ pub mod lint;
 pub mod questions;
 pub mod server;
 pub mod store;
+pub mod waiting;
 
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -163,6 +164,17 @@ impl Pages {
             v["asking"] = json!(true);
         }
         v
+    }
+
+    /// `sb page waiting`: what waits on the user across every page,
+    /// newest page first.
+    pub fn waiting(&self) -> Vec<waiting::Waiting> {
+        let mut out = Vec::new();
+        for m in self.store.list() {
+            let Some(html) = self.store.html(&m.id, m.version()) else { continue };
+            out.extend(waiting::of_page(&m.id, &html, &self.store.notes(&m.id), &self.store.questions(&m.id)));
+        }
+        out
     }
 
     /// The meta line of the latest version's first heading block.
