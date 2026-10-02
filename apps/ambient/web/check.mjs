@@ -471,8 +471,11 @@ law("out of the way (§8): what the capsule has to show, for the app's policy: t
   assert.equal(M.view(s, 40).content.kind, "got");
   s = M.step(M.step(s, { ev: "main", text: "done: the login test waits now.", turn: 1 }, 50).m, { ev: "phase", phase: "done" }, 60).m;
   assert.equal(M.view(s, 70).content.kind, "answer");
-  // a line: a key's answer, done, failed, a page ready
-  assert.equal(M.view(M.step(m, { ev: "page", id: "wu", title: "weekly update", version: 1, url: "u", at_ms: 1, state: "ready" }, 10).m, 20).content.kind, "line");
+  // SPEC §0: never for done, failed, a page ready (the marble carries them); a key's answer is a line
+  assert.equal(M.view(M.step(m, { ev: "page", id: "wu", title: "weekly update", version: 1, url: "u", at_ms: 1, state: "ready" }, 10).m, 20).content.kind, "none");
+  assert.equal(run(sceneEvents("done"), [1000]).view(1000).content.kind, "none");
+  assert.equal(run(sceneEvents("failed"), [1200]).view(1200).content.kind, "none");
+  assert.equal(M.view(M.step(m, { ev: "app_fn", state: "cancel" }, 10).m, 20).content.kind, "line");
 });
 law("out of the way (§8): hidden (app_hidden on) closes an open pane and the spotlight's focus; app_visible false stops the orb's frames", () => {
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m;

@@ -257,7 +257,7 @@
         const prev = m.pages.find((p) => p.id === ev.id);
         const page = { state: "ready", ...(prev || {}), id: ev.id, title: ev.title || (prev && prev.title), url: ev.url || (prev && prev.url) };
         const m2 = { ...m, pages: sortPages([page, ...m.pages.filter((p) => p.id !== ev.id)]), lastPage: ev.id };
-        return none(flashQueue(m2, { kind: "page", text: Wd.morning(!!ev.greet), ttl: T.page, page: ev.id }, now));
+        return none(flashQueue(m2, { kind: "morning", text: Wd.morning(!!ev.greet), ttl: T.page, page: ev.id }, now));
       }
 
       // ---- the page's own (clicks, the spotlight field)
@@ -360,6 +360,9 @@
       case "agents": case "inbox": case "perm": return { kind: "open" };
       case "needs": return { kind: "needs", card: asking[0] && asking[0].id };
       case "idle": return { kind: "none" };
+      // SPEC §0: never for done, failed, a page ready (they live in the menu-bar marble); an
+      // answer's line (`cookies has it: yes.`), the morning page, a key's answer, the hub lost do
+      case "done": case "failed": case "page": return { kind: "none" };
       default: return { kind: flash || v.state === "hub_down" ? "line" : "none" };
     }
   }
