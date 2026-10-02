@@ -144,8 +144,10 @@
       if (!v.puff) return;
       const p = document.createElement("div");
       p.className = "puff"; p.setAttribute("aria-hidden", "true");
-      const DOTS = [[0, 0, 0], [7, -5, 0.08], [-4, -9, 0.15], [11, -14, 0.22], [3, -18, 0.3], [14, -4, 0.12]];
-      p.innerHTML = DOTS.map(([x, y, d], i) => `<i class="${i % 2 ? "cream" : "pink"}" style="--x:${x}px;--y:${y}px;animation-delay:${d}s"></i>`).join("");
+      // 6 dots, 2-3 px, each a cream core with a pink edge, starting in a small cluster and rising
+      // ~14 px up and to the right as they fade (ambient's nit, m_5746: a small kiss, not dust)
+      const DOTS = [[0, 0, 0, 3], [4, -3, 0.06, 2], [-2, -5, 0.1, 2.5], [6, 1, 0.14, 2], [2, -8, 0.18, 3], [8, -4, 0.22, 2.5]];
+      p.innerHTML = DOTS.map(([x, y, d, s]) => `<i style="left:${x}px;top:${y}px;width:${s}px;height:${s}px;animation-delay:${d}s"></i>`).join("");
       box.appendChild(p);
     });
     put("lab", JSON.stringify(v.label), () => {
