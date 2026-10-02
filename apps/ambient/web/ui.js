@@ -135,6 +135,19 @@
     const say = v.hidden ? "" : Wd.sayOf(v);
     if (sayEl.textContent !== say) sayEl.textContent = say;
 
+    // the hello's kiss (ambient m_5702): a small puff of 6 pink and cream dots rising off the
+    // pearl's top right, gone within 1 s; the only kiss bise ever does (never under reduced motion)
+    put("puff", v.puff ? "on" : "", () => {
+      const box = $(".orbbox", cap);
+      const old = $(".puff", box);
+      if (old) old.remove();
+      if (!v.puff) return;
+      const p = document.createElement("div");
+      p.className = "puff"; p.setAttribute("aria-hidden", "true");
+      const DOTS = [[0, 0, 0], [7, -5, 0.08], [-4, -9, 0.15], [11, -14, 0.22], [3, -18, 0.3], [14, -4, 0.12]];
+      p.innerHTML = DOTS.map(([x, y, d], i) => `<i class="${i % 2 ? "cream" : "pink"}" style="--x:${x}px;--y:${y}px;animation-delay:${d}s"></i>`).join("");
+      box.appendChild(p);
+    });
     put("lab", JSON.stringify(v.label), () => {
       show(el.lab, v.label);
       const L = v.label;
@@ -304,7 +317,7 @@
     const ck = JSON.stringify(v.content);
     if (ck !== contentSent) { contentSent = ck; post({ cmd: "app_content", ...v.content }); }
     let moving = false;
-    if (!v.unseen) moving = pearl.frame({ mood: v.mood, lvl: v.lvl, still: v.still }, t);
+    if (!v.unseen) moving = pearl.frame({ mood: v.mood, lvl: v.lvl, still: v.still, gather: v.gather || 0 }, t);
     fps.frames++; if (moving) fps.drew++;
     if (t - fps.since > 1000) { fps.value = Math.round((fps.frames * 1000) / (t - fps.since)); fps.frames = 0; fps.drew = 0; fps.since = t; }
     // the pearl moves at 30 Hz (SPEC §1: one small quad, at most 30 fps); a still pearl (reduced

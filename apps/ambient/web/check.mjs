@@ -959,6 +959,25 @@ law("the glass leaves with its last words: after content none, through the hide 
   }
 });
 
+law("the hello, once ever (app_hello): the pearl gathers 1.2 s, 'hi, i'm bise. hold fn and talk to me.', the kiss puff, 5 s; fn, esc or a click end it (ambient m_5702)", () => {
+  const m = M.step(M.init(), { ev: "app_hello" }, 1000).m;
+  const at = (t) => M.view(m, 1000 + t);
+  eq([at(0).state, at(0).content.kind, at(0).text, at(0).gather], ["hello", "hello", null, 1]);
+  assert.ok(at(600).gather > 0 && at(600).gather < 0.2);              // expo out: mostly gathered by 0.6 s
+  eq([at(1200).gather, at(400).text], [0, W.hello]);
+  eq([at(1300).puff, at(1500).puff, at(2500).puff], [false, true, false]);
+  eq([at(5700).state, at(5900).content.kind], ["hello", "none"]);   // the words land at ~0.8 s, then 5 s
+  assert.equal(at(0).mood, "rest"); assert.equal(at(0).still, false);
+  // it leaves at once on a fn hold (the talk takes over), esc, or a click
+  assert.equal(M.view(M.step(m, { ev: "app_fn", state: "down", key: "fn" }, 2000).m, 2010).state, "listening");
+  assert.equal(M.view(M.step(m, { ev: "app_key", key: "esc" }, 2000).m, 2010).content.kind, "none");
+  assert.equal(M.view(M.step(m, { ev: "ui_capsule" }, 2000).m, 2010).content.kind, "none");
+  // reduced motion: no gathering, no puff, the words at once, gone after 5.5 s
+  const r = M.step(M.step(M.init(), { ev: "app_reduce_motion", on: true }, 0).m, { ev: "app_hello" }, 1000).m;
+  const rv = (t) => M.view(r, 1000 + t);
+  eq([rv(0).gather, rv(0).text, rv(1500).puff, rv(5400).state, rv(5600).content.kind], [0, W.hello, false, "hello", "none"]);
+});
+
 // ---- for you with opened_version (amb-core 03821a37) and the count shared with the menu bar
 law("for you: unopened first, newest first, 'new' or 'v3 · 2 new versions'; seen ones after; a watched page says when it was checked", () => {
   const pages = [

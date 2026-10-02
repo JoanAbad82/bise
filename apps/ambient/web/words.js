@@ -9,6 +9,8 @@
     // §2 states
     idle: "nothing needs you. 3 agents working.",
     quiet: "all quiet. hold fn to talk.",
+    // the hello, once ever (ambient m_5702)
+    hello: "hi, i'm bise. hold fn and talk to me.",
     // the full view's sections (vision §3 G; best guesses, asked to ambient): what's running, and a
     // page being written in it
     // the settings view (fn + ,; amb-mac ef4dbc2e): signed off by ambient (m_5410)

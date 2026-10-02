@@ -44,6 +44,13 @@ html:not(.app) .cap, html:not(.app) .note {
 .orbbox { flex: none; width: 68px; height: 68px; margin: -6px -4px -6px -6px; position: relative; align-self: flex-start; }
 .orbbox canvas { position: absolute; inset: 0; width: 68px; height: 68px; }
 
+/* the hello's kiss: dots rise off the pearl's top right and fade within 1 s (ambient m_5702) */
+.puff { position: absolute; left: 50px; top: 12px; width: 0; height: 0; pointer-events: none; }
+.puff i { position: absolute; width: 4px; height: 4px; border-radius: 2px; opacity: 0; animation: puff .9s var(--expo) both; }
+.puff i.pink { background: #f4a6b0; box-shadow: 0 0 4px #f4a6b0aa; }
+.puff i.cream { background: #ffeee8; box-shadow: 0 0 4px #ffeee8aa; width: 3px; height: 3px; }
+@keyframes puff { 0% { opacity: 0; transform: translate(0, 0) scale(.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--x), calc(var(--y) - 10px)) scale(1); } }
+
 /* the words */
 .tx { flex: none; width: 310px; font-size: 16px; line-height: 1.35; padding: 4px 0; }
 .cap.small .tx { width: 236px; }

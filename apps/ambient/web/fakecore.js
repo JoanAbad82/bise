@@ -160,6 +160,7 @@
       [500, { ev: "app_key", key: "0" }],
     ]) },
     { id: "inbox", spec: ["needs you"], label: "fn + i: the inbox", build: () => sort([...base(AGENTS, [CARD, CARD2]), [500, { ev: "app_key", key: "i" }]]) },
+    { id: "hello", spec: ["idle"], label: "the hello (once ever)", build: () => sort([...base(), [300, { ev: "app_hello" }]]) },
     { id: "settings", spec: ["settings"], label: "fn + ,: settings", build: () => sort([...base(),
       [100, { ev: "app_settings", edge_glow: true, right_option: false, meeting_quiet: true, voice_answers: true, launch_at_login: "on", macos: 26, radius: 26,
         skip: [{ bundle: "com.agilebits.onepassword7", name: "1Password", fixed: true }, { bundle: "com.tinyspeck.slackmacgap", name: "Slack", fixed: false }] }],

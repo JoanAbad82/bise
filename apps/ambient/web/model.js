@@ -26,8 +26,13 @@
     key: 3000,       // a key's own line (cancelled, later, hush...)
     page: 8000,      // `<page> is ready · fn + o`
     hide: 1500,      // fn + . : the line, then hide
+    // the hello, once ever (ambient m_5702): the pearl gathers 1.2 s, the words land, the kiss
+    // puff, then 5 s; under reduced motion the words fade in and leave 5 s later
+    helloGather: 1200, helloWords: 300, helloKiss: 1400, helloKissMs: 1000, helloStay: 5000,
   };
 
+  // how long the hello stays: the words land (0.3 s + their 0.5 s arrival), then 5 s; reduced: 5.5 s
+  const helloMs = (m) => (m.reduce ? 500 : T.helloWords + 500) + T.helloStay;
   const TURN = ["listening", "sending", "working", "speaking"];
   // the settings view's toggles, in its order (amb-mac's app_setting keys)
   const SETTING_KEYS = ["edge_glow", "right_option", "meeting_quiet", "voice_answers", "launch_at_login"];
@@ -49,6 +54,7 @@
       fn: false, handsFree: false,
       shot: null,                   // { app, title, skipped }
       perms: {}, permAsk: null,
+      hello: null,                  // { at }: the hello, once ever (app_hello)
       hidden: false, reduce: false, edgeGlow: true,
       radius: 16,                   // macOS's window radius (app_settings.radius); 16 until it comes
       quiet: null,                  // { why: 'call' | 'meeting' | '' } while in a call or a meeting (app_quiet)
@@ -215,7 +221,7 @@
         const start = (x) => ({ ...x, heard: { text: "", final: false }, mine: true, hushed: false, turnNames: names(m.agents), chips: [] });
         if (st === "down" || st === "double") {
           const cmds = [];
-          let m2 = { ...m, pane: null };
+          let m2 = { ...m, pane: null, hello: null };
           if (m.pane === "spot") cmds.push({ cmd: "app_focus", on: false });
           if (m.phase === "speaking") { cmds.push({ cmd: "cut_in" }); m2.cutAt = now; }
           m2 = st === "down" ? { ...m2, fn: true } : { ...m2, handsFree: true };
@@ -293,6 +299,9 @@
       // the menu-bar icon's rect in the page's CSS px (the capsule grows out of it, SPEC §0)
       case "app_icon":
         return none({ ...m, icon: [ev.x, ev.y, ev.w, ev.h].every((n) => Number.isFinite(+n)) ? { x: +ev.x, y: +ev.y, w: +ev.w, h: +ev.h } : null });
+      // the hello, once ever (ambient m_5702; amb-mac sends it once and keeps "said hello")
+      case "app_hello":
+        return none({ ...m, hello: { at: now } });
       case "app_quiet":
         return none({ ...m, quiet: ev.on ? { why: ev.why || "" } : null });
       // today's morning page, opened in front by the app (amb-mac, 7d65d59e): the capsule names
@@ -321,6 +330,7 @@
         return p ? openPage(m, p) : none(m);
       }
       case "ui_capsule":     // a click on the small capsule: the agents
+        if (m.hello) return none({ ...m, hello: null });   // a click ends the hello
         return setPane(m, m.pane ? null : visibleCards(m).length > 1 ? "inbox" : "agents");
       case "ui_close":
         return setPane(m, null);
@@ -394,6 +404,7 @@
         if (m.hidden) return none(m);
         return { m: flashNow(m, { kind: "hide", text: W.hidden, sub: W.showAgain, ttl: T.hide + 500 }, now), cmds: [{ cmd: "app_hide", delay: T.hide }] };
       case "esc": {
+        if (m.hello) return none({ ...m, hello: null });
         if (listening(m)) {
           return { m: flashNow({ ...m, fn: false, handsFree: false, mine: false, heard: { text: "", final: false }, phase: m.phase === "listening" ? "idle" : m.phase }, { kind: "cancel", text: W.cancelled }, now), cmds: [{ cmd: "talk_cancel" }] };
         }
@@ -462,6 +473,7 @@
       case "working": return { kind: v.words ? "answer" : "got" };
       case "speaking": case "end": return { kind: "answer" };
       case "agents": case "inbox": case "settings": return { kind: "open" };
+      case "hello": return { kind: "hello" };
       // a permission ask is opened (until he answers); its refused line is a timed line, 8 s (amb-mac m_5679)
       case "perm": return { kind: v.perm ? "open" : "line" };
       case "needs": return { kind: "needs", card: asking[0] && asking[0].id };
@@ -549,6 +561,15 @@
       v.words.lit = v.words.list.length;
       if (m.shot && !np) v.sees = m.shot.skipped ? { head: W.notSeen, tail: "" } : Wd.seesParts(m.shot.app, m.shot.title);
       v.edge = { on: m.edgeGlow && !m.reduce, lvl: you };
+    } else if (m.hello && now - m.hello.at < helloMs(m)) {
+      // the hello, once ever (ambient m_5702): one line, no buttons; the pearl gathers out of a few
+      // scattered dots (gather 1 -> 0 over 1.2 s, expo out), the words land, then the kiss puff
+      // off its top right (the only kiss bise ever does); reduced motion: no gathering, no puff
+      const t = now - m.hello.at;
+      v.state = "hello"; v.size = "small"; v.glyph = null;
+      v.text = t >= (m.reduce ? 0 : T.helloWords) ? W.hello : null;
+      v.gather = m.reduce ? 0 : Math.max(0, 1 - (1 - Math.pow(1 - Math.min(1, t / T.helloGather), 3)));
+      v.puff = !m.reduce && t >= T.helloKiss && t < T.helloKiss + T.helloKissMs;
     } else if (m.mine && (m.phase === "sending" || m.phase === "working" || (m.phase === "idle" && now - m.sentAt < 30000 && !m.main.text))) {
       v.state = "working"; v.size = "open"; v.pose = "think";
       v.label = { text: "bise", acc: true };
