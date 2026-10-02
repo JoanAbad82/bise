@@ -441,7 +441,7 @@ def app_path(force_build=False):
 
 
 def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", force_build=False, restart=False, connectors=False, computer=False,
-           real_accounts_approved_by_user=""):
+           real_accounts_approved_by_user="", no_app=False):
     """connectors and computer touch the user's real accounts (his Gmail,
     Slack, Linear, calendar, his browser and its logins): never, unless
     `real_accounts_approved_by_user` names the user's own message asking for
@@ -455,6 +455,25 @@ def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", for
               % (", ".join(n for n, on in (("connectors", connectors), ("computer", computer)) if on) or "none", user_ask), file=sys.stderr)
     if hub not in ("fake", "model", "real"):
         raise QAError("hub: fake (a throwaway scripted hub), model (a throwaway hub with your real model and keys) or real (your workspace, read-only)")
+    if no_app:
+        # the hub, its page server and the fake accounts only: never builds or opens the app (ambient-lead m_5413)
+        if hub == "real":
+            raise QAError("no_app needs a throwaway hub (fake or model)")
+        bise, root = find_bise(bise)
+        require_commits(root)
+        if alive():
+            stop(keep_hub=True)
+        info = _start_hub(bise, root, hub, connectors and hub == "model", computer, user_ask)
+        port = None
+        try:
+            port = int(_wait(lambda: open(os.path.join(info["state"], "pages.port")).read().strip(), 30, "the page server"))
+        except QAError:
+            pass
+        run = {"hub": hub, "no_app": True, "workspace": info["ws"], "bise": bise, "app_root": root, "tree": tree_info(root),
+               "pages_url": "http://127.0.0.1:%d/" % port if port else None, "outbox": os.path.join(info["tmp"], "outbox.jsonl"), "out": OUT}
+        with open(RUN, "w") as f:
+            json.dump(run, f, indent=1)
+        return run
     up = alive()
     if up and not restart:
         run = _read(RUN) or {}
@@ -1265,7 +1284,7 @@ def _cli(argv):
     import argparse
     ap = argparse.ArgumentParser(prog="qa.py", description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("launch"); p.add_argument("--hub", default="fake"); p.add_argument("--connectors", action="store_true", help="hub model: the user's REAL connectors (needs --real-accounts-approved-by-user)"); p.add_argument("--computer", action="store_true", help="the QA hub may load the computer plugin: the user's browser (needs --real-accounts-approved-by-user)"); p.add_argument("--real-accounts-approved-by-user", default="", metavar="MESSAGE_ID", help="the user's own message asking for this one run"); p.add_argument("--workspace"); p.add_argument("--bise")
+    p = sub.add_parser("launch"); p.add_argument("--hub", default="fake"); p.add_argument("--no-app", action="store_true", help="the throwaway hub, its page server and the fake accounts only: never builds or opens the app"); p.add_argument("--connectors", action="store_true", help="hub model: the user's REAL connectors (needs --real-accounts-approved-by-user)"); p.add_argument("--computer", action="store_true", help="the QA hub may load the computer plugin: the user's browser (needs --real-accounts-approved-by-user)"); p.add_argument("--real-accounts-approved-by-user", default="", metavar="MESSAGE_ID", help="the user's own message asking for this one run"); p.add_argument("--workspace"); p.add_argument("--bise")
     p.add_argument("--web"); p.add_argument("--backdrop", default="dark"); p.add_argument("--force-build", action="store_true"); p.add_argument("--restart", action="store_true")
     p = sub.add_parser("stop"); p.add_argument("--keep-hub", action="store_true")
     p = sub.add_parser("scenes"); p.add_argument("--only"); p.add_argument("--backdrops", default="dark"); p.add_argument("--out"); p.add_argument("--what", default="both")
@@ -1300,7 +1319,7 @@ def _cli(argv):
     if a.cmd == "_hub":
         return hub_daemon(a.bise, a.kind, a.connectors, a.computer, a.real_accounts_approved_by_user)
     if a.cmd == "launch":
-        r = launch(a.hub, a.workspace, a.bise, a.web, a.backdrop, a.force_build, a.restart, a.connectors, a.computer, a.real_accounts_approved_by_user)
+        r = launch(a.hub, a.workspace, a.bise, a.web, a.backdrop, a.force_build, a.restart, a.connectors, a.computer, a.real_accounts_approved_by_user, a.no_app)
     elif a.cmd == "stop":
         r = stop(a.keep_hub)
     elif a.cmd == "scenes":
