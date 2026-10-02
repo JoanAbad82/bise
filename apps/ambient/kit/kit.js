@@ -876,6 +876,14 @@
       const relay = (ev, name) => es.addEventListener(ev, (e) => doc.dispatchEvent(new root.CustomEvent(name, { detail: data(e) })));
       es.addEventListener("notes", (e) => doc.dispatchEvent(new root.CustomEvent("bise:notes", { detail: { notes: data(e).notes || [] } })));
       relay("voice", "bise:voice"); // slice 2 (§4.1): {phase, text}, notes.js pins it
+      // the taste line (amb-home d75aefe4): {rules: N} or null after each publish and at connect
+      es.addEventListener("taste", (e) => {
+        let x = null;
+        try { x = JSON.parse(e.data); } catch (_) { x = null; }
+        if (!meta) meta = { versions: [] };
+        meta.taste = x && typeof x === "object" ? x : null;
+        drawMeta();
+      });
       // a watching page (amb-home m_5458): the whole watch object on each change, null when it ends
       es.addEventListener("watch", (e) => {
         let x = null;
