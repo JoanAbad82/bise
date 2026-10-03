@@ -447,6 +447,18 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    // the menu-bar menu's rows as JSON (QA reads them: in --qa there is no
+    // menu-bar item, so they're built from the same state the item uses)
+    func menuDump() -> [[String: Any]] {
+        let words = (talk: MenuWords.talk, talkKeys: MenuWords.talkKeys, show: MenuWords.show, hide: MenuWords.hide,
+                     hideKeys: MenuWords.hideKeys, settings: SettingsWords.menu, settingsKeys: SettingsWords.menuKeys, quit: MenuWords.quit)
+        return MenuRows.items(cards: cards.map { MenuCard(id: $0.id, agent: $0.agent, text: $0.text) },
+                              pages: menuPages, watches: menuWatches, hidden: capsule.hidden, words: words).map(\.json)
+    }
+
+    // QA's 'stop watching' click: what the menu's row does
+    func menuStopWatch(_ id: Int) { toCore(["cmd": "every_stop", "id": id]) }
+
     // MARK: the core's events
 
     private func coreEvent(_ ev: [String: Any]) {

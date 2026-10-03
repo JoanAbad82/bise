@@ -43,8 +43,69 @@ struct MenuWatch: Equatable {
     }
 }
 
+// one row of the menu-bar menu, as StatusItem draws it and QA reads it
+struct MenuItemOut: Equatable {
+    enum Kind: String { case header, card, page, watch, stop, talk, toggle, settings, quit, separator }
+    var kind: Kind
+    var title: String = ""
+    var keys: String? = nil
+    var ref: String? = nil          // a card id, a page URL, a timer id
+    var enabled = true
+    var indent = 0
+
+    var json: [String: Any] {
+        var d: [String: Any] = ["kind": kind.rawValue, "title": title, "enabled": enabled]
+        if let keys { d["keys"] = keys }
+        if let ref { d["ref"] = ref }
+        if indent > 0 { d["indent"] = indent }
+        return d
+    }
+}
+
+struct MenuCard: Equatable {
+    var id: String
+    var agent: String
+    var text: String
+}
+
 // the words (signed off by ambient: needs you first, then for you)
 enum MenuRows {
+    // the whole menu (right click on the icon): needs you, for you, what
+    // agents watch, then the keys and quit; the words of the fixed rows
+    // come from StatusItem's and the settings' word lists
+    static func items(cards: [MenuCard], pages: [MenuPage], watches: [MenuWatch], hidden: Bool,
+                      words: (talk: String, talkKeys: String, show: String, hide: String, hideKeys: String,
+                              settings: String, settingsKeys: String, quit: String)) -> [MenuItemOut] {
+        var out: [MenuItemOut] = []
+        let cs = cards.prefix(maxCards)
+        if !cs.isEmpty {
+            out.append(MenuItemOut(kind: .header, title: needsYou, enabled: false))
+            for c in cs { out.append(MenuItemOut(kind: .card, title: card(agent: c.agent, text: c.text), ref: c.id)) }
+            out.append(MenuItemOut(kind: .separator))
+        }
+        let ps = pages.prefix(maxPages)
+        if !ps.isEmpty {
+            out.append(MenuItemOut(kind: .header, title: forYou, enabled: false))
+            for p in ps { out.append(MenuItemOut(kind: .page, title: page(p), ref: p.url)) }
+            out.append(MenuItemOut(kind: .separator))
+        }
+        let ws = watches.prefix(maxWatches)
+        if !ws.isEmpty {
+            for w in ws {
+                let url = watchURL(w, pages: pages)
+                out.append(MenuItemOut(kind: .watch, title: watch(w, pages: pages), ref: url, enabled: url != nil))
+                out.append(MenuItemOut(kind: .stop, title: stopWatching, ref: String(w.id), indent: 1))
+            }
+            out.append(MenuItemOut(kind: .separator))
+        }
+        out.append(MenuItemOut(kind: .talk, title: words.talk, keys: words.talkKeys))
+        out.append(MenuItemOut(kind: .toggle, title: hidden ? words.show : words.hide, keys: words.hideKeys))
+        out.append(MenuItemOut(kind: .settings, title: words.settings, keys: words.settingsKeys))
+        out.append(MenuItemOut(kind: .separator))
+        out.append(MenuItemOut(kind: .quit, title: words.quit))
+        return out
+    }
+
     static let forYou = "for you"
     static let needsYou = "needs you"
     static let maxPages = 6

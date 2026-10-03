@@ -183,7 +183,7 @@ final class StatusItem: NSObject {
     }
 
     // "type to main      fn space": the keys right-aligned, dim
-    private func entry(_ title: String, _ keys: String?, _ action: Selector) -> NSMenuItem {
+    private func entry(_ title: String, _ keys: String?, _ action: Selector?) -> NSMenuItem {
         let it = NSMenuItem(title: title, action: action, keyEquivalent: "")
         it.target = self
         if let keys {
@@ -206,51 +206,45 @@ final class StatusItem: NSObject {
             onOpen?()   // a click (or ⌥ click) on the icon: bise's full view
         } else {
             let m = NSMenu()
-            // needs you first: it is what is waiting
-            let cs = cards().prefix(MenuRows.maxCards)
-            if !cs.isEmpty {
-                m.addItem(header(MenuRows.needsYou))
-                for c in cs {
-                    let it = entry(MenuRows.card(agent: c.agent, text: c.text), nil, #selector(card(_:)))
-                    it.representedObject = c.id
+            for r in rows() {
+                switch r.kind {
+                case .separator: m.addItem(.separator())
+                case .header: m.addItem(header(r.title))
+                default:
+                    let it = entry(r.title, r.keys, StatusItem.action(r.kind))
+                    it.indentationLevel = r.indent
+                    switch r.kind {
+                    case .stop: it.representedObject = Int(r.ref ?? "")
+                    default: it.representedObject = r.ref
+                    }
+                    if !r.enabled { it.action = nil; it.isEnabled = false }
                     m.addItem(it)
                 }
-                m.addItem(.separator())
             }
-            let ps = pages().prefix(MenuRows.maxPages)
-            if !ps.isEmpty {
-                m.addItem(header(MenuRows.forYou))
-                for p in ps {
-                    let it = entry(MenuRows.page(p), nil, #selector(page(_:)))
-                    it.representedObject = p.url
-                    m.addItem(it)
-                }
-                m.addItem(.separator())
-            }
-            // roadmap B: what an agent watches, each with its stop
-            let ws = watches().prefix(MenuRows.maxWatches)
-            if !ws.isEmpty {
-                let all = pages()
-                for w in ws {
-                    let row = entry(MenuRows.watch(w, pages: all), nil, #selector(page(_:)))
-                    row.representedObject = MenuRows.watchURL(w, pages: all)
-                    if row.representedObject == nil { row.action = nil; row.isEnabled = false }
-                    m.addItem(row)
-                    let stop = entry(MenuRows.stopWatching, nil, #selector(stopWatch(_:)))
-                    stop.representedObject = w.id
-                    stop.indentationLevel = 1
-                    m.addItem(stop)
-                }
-                m.addItem(.separator())
-            }
-            m.addItem(entry(MenuWords.talk, MenuWords.talkKeys, #selector(spotlight)))
-            m.addItem(entry(isHidden() ? MenuWords.show : MenuWords.hide, MenuWords.hideKeys, #selector(toggle)))
-            m.addItem(entry(SettingsWords.menu, SettingsWords.menuKeys, #selector(settings)))
-            m.addItem(.separator())
-            m.addItem(entry(MenuWords.quit, nil, #selector(quit)))
             item.menu = m
             item.button?.performClick(nil)
             item.menu = nil
+        }
+    }
+
+    // the menu's rows (pure, MenuRows.items): drawn here, read by QA
+    func rows() -> [MenuItemOut] {
+        MenuRows.items(cards: cards().map { MenuCard(id: $0.id, agent: $0.agent, text: $0.text) },
+                       pages: pages(), watches: watches(), hidden: isHidden(),
+                       words: (MenuWords.talk, MenuWords.talkKeys, MenuWords.show, MenuWords.hide, MenuWords.hideKeys,
+                               SettingsWords.menu, SettingsWords.menuKeys, MenuWords.quit))
+    }
+
+    private static func action(_ k: MenuItemOut.Kind) -> Selector? {
+        switch k {
+        case .card: return #selector(card(_:))
+        case .page, .watch: return #selector(page(_:))
+        case .stop: return #selector(stopWatch(_:))
+        case .talk: return #selector(spotlight)
+        case .toggle: return #selector(toggle)
+        case .settings: return #selector(settings)
+        case .quit: return #selector(quit)
+        case .header, .separator: return nil
         }
     }
 

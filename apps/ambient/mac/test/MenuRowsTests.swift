@@ -77,6 +77,27 @@ law("no words either: its number", MenuRows.watch(MenuWatch(id: 9, text: " ", pa
 law("a watch row opens its page; none without one",
     MenuRows.watchURL(watches[0], pages: wpages) == "http://h/p/launch-watch" && MenuRows.watchURL(watches[2], pages: wpages) == nil)
 
+// the whole menu, as StatusItem draws it and QA reads it
+let mw = (talk: "type to main", talkKeys: "fn space", show: "show bise", hide: "hide bise", hideKeys: "fn .",
+             settings: "settings…", settingsKeys: "fn ,", quit: "quit bise ambient")
+let menu = MenuRows.items(cards: [MenuCard(id: "7", agent: "cookies", text: "keep the banner?\n1. yes")],
+                          pages: wpages, watches: Array(watches.prefix(1)), hidden: true, words: mw)
+law("menu: needs you, for you, watching, then the keys and quit",
+    menu.map(\.kind.rawValue) == ["header", "card", "separator", "header", "page", "page", "page", "separator",
+                                   "watch", "stop", "separator", "talk", "toggle", "settings", "separator", "quit"])
+law("menu: the card row carries its id, the stop row its timer",
+    menu[1].ref == "7" && menu.first { $0.kind == .stop }?.ref == "3" && menu.first { $0.kind == .stop }?.indent == 1)
+law("menu: the watch row opens its page", menu.first { $0.kind == .watch }?.ref == "http://h/p/launch-watch")
+law("menu: hidden → 'show bise', shown → 'hide bise'",
+    menu.first { $0.kind == .toggle }?.title == "show bise"
+        && MenuRows.items(cards: [], pages: [], watches: [], hidden: false, words: mw).first { $0.kind == .toggle }?.title == "hide bise")
+law("menu: nothing waiting → only the keys and quit",
+    MenuRows.items(cards: [], pages: [], watches: [], hidden: false, words: mw).map(\.kind.rawValue) == ["talk", "toggle", "settings", "separator", "quit"])
+law("menu: a watch without a page can't be clicked, its stop can",
+    MenuRows.items(cards: [], pages: [], watches: [MenuWatch(id: 5, text: "x", page: nil)], hidden: false, words: mw)
+        .filter { $0.kind == .watch || $0.kind == .stop }.map(\.enabled) == [false, true])
+law("menu: rows as JSON for QA", menu[1].json["kind"] as? String == "card" && menu[1].json["ref"] as? String == "7")
+
 // the icon's number: amb-web's shared fixture (build.sh --test sets
 // AMBIENT_FIXTURES), so the app and the web never drift
 let fixtures = ProcessInfo.processInfo.environment["AMBIENT_FIXTURES"] ?? "../web/fixtures"
