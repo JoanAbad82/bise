@@ -422,6 +422,13 @@ the page with an open card (a task agent's page) is not checked yet.
   after the start, the replies waited for their fixes, and his `send all 3` (at 230 s, after the
   page was republished) posted the 3 fixed replies once (`Fixed. …`), none before. Nit for
   ambient's words: the topic `français` comes from the French reply; `French` reads right.
+- **C on the app at 87151ebf (action blocks, amb-core 9f45bc1c + amb-kit 5ecd9cae): fail 43.** Two
+  batch cards were open at once (`6 drafts … · 3 actions`, then `7 drafts … · 4 actions`); the
+  first was never closed, and his `send all 6` on it did nothing (outbox empty). A new batch card
+  must close the one it replaces, and an answer on a replaced card must never do nothing silently
+  (amb-core). The actions on that page were code work (`change the system prompt …, then land it
+  on main`): code belongs to `start an agent`, not to a send batch; the action block is for account
+  writes like closing an issue (amb-kit).
 - **F at 88044e58 (amb-tools' run, isolated fake set): pass on the product, fail 40 closed.** v1 at
   33 s, 6 items newest first, ids kept across the start and 2 ticks; 2 cards, one per batch with
   team asks (Léa's question in v1, Nora's request after a tick), none for clients or noise; outbox
