@@ -292,6 +292,11 @@ struct Shell {
     /// whether a turn of theirs has the notes yet (started or steered
     /// since). Its end without a publish puts the pages back to ready.
     page_turns: BTreeMap<String, (Vec<String>, bool)>,
+    /// Page messages sent to an agent that has not taken them yet (no
+    /// turn started or steered since): agent -> (first sent at, [(page,
+    /// text)]). Not taken in PAGE_WAIT_MS: they go to main; main's not
+    /// taken: a warn in its feed. Never silently lost (pm's D fail 37).
+    page_waits: BTreeMap<String, (u64, Vec<(String, String)>)>,
     /// the agents each page's latest version names (`data-agent`):
     /// page id -> names (None: not read from the store yet)
     page_agents: Option<BTreeMap<String, Vec<String>>>,
@@ -680,6 +685,9 @@ impl Shell {
 
     /// A line enters a feed: memory, transcript, every client.
     fn feed(&mut self, name: &str, line: &str) {
+        if self.page_waits.contains_key(name) && crate::pages::took_input(line) {
+            self.page_waits.remove(name);
+        }
         self.page_turn(name, line);
         self.page_agent_line(name, line);
         let Some(dir) = self.dir_of(name) else { return };
@@ -1015,7 +1023,10 @@ impl Shell {
                     if let Some(meta) = pages.set_state(&id, "updating") {
                         self.broadcast(&pages.page_ev(&meta));
                     }
-                    // as from the user (client 0: no view of its own)
+                    // as from the user (client 0: no view of its own);
+                    // watched until a turn of `to` takes it
+                    let w = self.page_waits.entry(to.clone()).or_insert_with(|| (now_ms(), Vec::new()));
+                    w.1.push((id.clone(), text.clone()));
                     let text = Self::page_hint(&to, text);
                     self.step(Input::ClientInput { client: 0, focus: to, text });
                 }
@@ -1147,6 +1158,47 @@ impl Shell {
         if let crate::wire::Wire::Intent(text) = crate::wire::parse(line) {
             self.last_intent.insert(name.to_string(), crate::util::one_line(&text));
             self.page_agent_push();
+        }
+    }
+
+    /// Page messages an agent has not taken (no turn started or steered)
+    /// for PAGE_WAIT_MS: a task's go to main, which acts on the page;
+    /// main's own are a warn in its feed. Never silently lost (pm's D
+    /// fail 37: five answers on a task's page woke no one).
+    fn page_waits_check(&mut self) {
+        use crate::pages::{untaken, Untaken};
+        let now = now_ms();
+        let late: Vec<(String, Untaken)> = self
+            .page_waits
+            .iter()
+            .map(|(a, (at, _))| (a.clone(), untaken(a, now.saturating_sub(*at))))
+            .filter(|(_, u)| *u != Untaken::Wait)
+            .collect();
+        for (agent, u) in late {
+            let Some((_, items)) = self.page_waits.remove(&agent) else { continue };
+            let pages: Vec<String> = items.iter().map(|(p, _)| p.clone()).collect();
+            match u {
+                Untaken::ToMain => {
+                    let body: Vec<String> = items.into_iter().map(|(_, t)| t).collect();
+                    let text = format!(
+                        "@{agent} did not take this in {} s (no turn of its own): the page {} is yours to act on now.\n\n{}",
+                        crate::pages::PAGE_WAIT_MS / 1000,
+                        pages.join(", "),
+                        body.join("\n\n")
+                    );
+                    log_line(&self.opts.paths, &format!("pages {}: @{agent} took no turn on the notes: to main", pages.join(", ")));
+                    let w = self.page_waits.entry(MAIN.to_string()).or_insert_with(|| (now, Vec::new()));
+                    w.1.extend(pages.iter().map(|p| (p.clone(), String::new())));
+                    let text = Self::page_hint(MAIN, text);
+                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text });
+                }
+                Untaken::Warn => {
+                    let text = format!("his notes on the page {} reached no one: main took no turn on them", pages.join(", "));
+                    log_line(&self.opts.paths, &text);
+                    self.feed(MAIN, &format!("sb warn : {}", crate::util::wire_escape(&text)));
+                }
+                Untaken::Wait => {}
+            }
         }
     }
 
@@ -1303,7 +1355,8 @@ impl Shell {
     fn page_steps(&mut self, id: &str) {
         let Some(pages) = self.pages.clone() else { return };
         let Some(meta) = pages.store.meta(id) else { return };
-        let rows = pages.store.html(id, meta.version()).map(|h| crate::pages::checklist::rows_of(&h)).unwrap_or_default();
+        let html = pages.store.html(id, meta.version()).unwrap_or_default();
+        let rows = crate::pages::checklist::rows_of(&html);
         let mut steps = pages.store.steps(id);
         if steps.is_empty() && !rows.iter().any(|r| r.his()) {
             return;
@@ -1335,6 +1388,11 @@ impl Shell {
                 continue;
             }
             if r.drafted && asking {
+                continue;
+            }
+            // nor while its draft cannot leave (no recipient yet): his
+            // send would do nothing (pm's D fail 37)
+            if r.drafted && r.draft.as_deref().is_some_and(|d| !crate::pages::checklist::draft_sendable(&html, d)) {
                 continue;
             }
             let mut s = crate::pages::checklist::Step {
@@ -3167,6 +3225,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         cu: crate::computer_use::Watch::new(),
         pages: None,
         page_turns: BTreeMap::new(),
+        page_waits: BTreeMap::new(),
         page_agents: None,
         page_agent_sent: BTreeMap::new(),
         last_intent: BTreeMap::new(),
@@ -3284,6 +3343,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
                 }
                 sh.step(i);
                 if tick {
+                    sh.page_waits_check();
                     sh.check_starts();
                     sh.plugins_changed(false);
                     sh.switch_idle_repls();

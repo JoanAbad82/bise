@@ -169,6 +169,36 @@ pub fn closed_by(r: &Row, notes: &[super::store::Note]) -> bool {
     })
 }
 
+/// Whether the draft in block `id` of a fragment can leave as it is: an
+/// email whose To holds an address (an `@`; "legal: address missing" is a
+/// placeholder), a message with its channel (`data-to`). A drafted step's
+/// card waits until it can (pm's D fail 37: his send on a draft with no
+/// recipient did nothing). No such block, or another kind: sendable.
+pub fn draft_sendable(html: &str, id: &str) -> bool {
+    let mut rest = html;
+    while let Some(i) = rest.find("<section") {
+        let sec = &rest[i..];
+        let end = sec.find("</section>").map_or(sec.len(), |e| e + "</section>".len());
+        let (block, after) = (&sec[..end], &sec[end..]);
+        rest = after;
+        let head = &block[..block.find('>').unwrap_or(0)];
+        if attr(head, "data-id").as_deref() != Some(id) {
+            continue;
+        }
+        return match attr(head, "data-kit").as_deref() {
+            Some("email") => {
+                let to = block.split("<p").skip(1).find(|p| attr(&p[..p.find('>').unwrap_or(0)], "data-field").as_deref() == Some("to"));
+                to.and_then(|p| p.find('>').map(|g| &p[g + 1..]))
+                    .map(|b| super::questions::text_of(&b[..b.find("</p>").unwrap_or(b.len())]))
+                    .is_some_and(|t| t.contains('@'))
+            }
+            Some("message") => attr(head, "data-to").is_some_and(|t| !t.trim().is_empty()),
+            _ => true,
+        };
+    }
+    true
+}
+
 /// Words on a step's card that tick it.
 pub fn is_done_word(reply: &str) -> bool {
     let w = reply.trim().trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
@@ -266,6 +296,20 @@ mod tests {
         assert_eq!(due(&r, &|x: &Row| x.item == "s1")[0].item, "s2", "ticked: the next step");
         let done = html.replace("data-question=\"q-tld\"", "data-question=\"q-tld\" data-done");
         assert_eq!(due(&rows_of(&done), &|_: &Row| false)[0].item, "s2", "republished done: the next step");
+    }
+
+    /// Law (pm's D fail 37): a draft with no recipient cannot leave, so
+    /// its step's card waits until the agent republishes it complete.
+    #[test]
+    fn a_draft_with_no_recipient_is_not_sendable() {
+        let mail = |to: &str| format!(r#"<section data-kit="email" data-id="m" data-to="Gmail · new mail to legal"><p data-field="to">{to}</p><p data-field="subject">s</p><p>x</p></section>"#);
+        assert!(!draft_sendable(&mail("legal: address missing"), "m"));
+        assert!(!draft_sendable(&mail(""), "m"));
+        assert!(draft_sendable(&mail("legal@acme.test"), "m"));
+        assert!(draft_sendable(&mail("Léa &lt;lea@acme.com&gt;"), "m"));
+        assert!(!draft_sendable(r#"<section data-kit="message" data-id="s" data-to=" "><p>x</p></section>"#, "s"));
+        assert!(draft_sendable(r#"<section data-kit="message" data-id="s" data-to="Slack · #launch"><p>x</p></section>"#, "s"));
+        assert!(draft_sendable("<section data-kit=\"prose\" data-id=\"p\"><p>x</p></section>", "p"));
     }
 
     #[test]

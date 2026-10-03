@@ -53,6 +53,35 @@ pub struct Pages {
 /// The progress lines a new SSE stream replays.
 const PROGRESS_KEPT: usize = 8;
 
+/// How long a page message may wait for its agent's turn before it goes
+/// to main (main's: a warn in its feed). pm's D fail 37.
+pub const PAGE_WAIT_MS: u64 = 45_000;
+
+/// A feed line that shows the agent took an input: a turn started, or a
+/// message steered into the running one.
+pub fn took_input(line: &str) -> bool {
+    let o = line.strip_prefix("  obs: ").unwrap_or("");
+    o == "turn_started" || o.starts_with("steering_received: ") || o.starts_with("steered: ")
+}
+
+/// What to do with page messages that `agent` has not taken for
+/// `waited` ms: wait more, hand them to main, or warn in main's feed (main
+/// did not take them either). Never silently lost.
+#[derive(Debug, PartialEq)]
+pub enum Untaken {
+    Wait,
+    ToMain,
+    Warn,
+}
+
+pub fn untaken(agent: &str, waited: u64) -> Untaken {
+    match (waited >= PAGE_WAIT_MS, agent == crate::model::MAIN) {
+        (false, _) => Untaken::Wait,
+        (true, false) => Untaken::ToMain,
+        (true, true) => Untaken::Warn,
+    }
+}
+
 /// 32 hex characters from the system's random source.
 pub fn new_token() -> String {
     let mut b = [0u8; 16];
@@ -306,6 +335,18 @@ pub fn start(state: &Path, workspace_id: &str, kit_dir: PathBuf) -> std::io::Res
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Law (pm's D fail 37): a page message is never silently lost. Its
+    /// agent takes it by a turn (started or steered); not taken in
+    /// PAGE_WAIT_MS, a task's goes to main, and main's is a warn.
+    #[test]
+    fn a_page_message_is_never_silently_lost() {
+        assert!(took_input("  obs: turn_started") && took_input("  obs: steered: you sent 1 note") && took_input("  obs: steering_received: x"));
+        assert!(!took_input("  obs: turn_done: completed") && !took_input("sb you : you sent 1 note"));
+        assert_eq!(untaken("buy-domain", 1_000), Untaken::Wait);
+        assert_eq!(untaken("buy-domain", PAGE_WAIT_MS), Untaken::ToMain);
+        assert_eq!(untaken(crate::model::MAIN, PAGE_WAIT_MS), Untaken::Warn);
+    }
 
     #[test]
     fn the_port_is_stable_and_kept() {

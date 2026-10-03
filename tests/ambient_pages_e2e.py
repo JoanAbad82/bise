@@ -459,8 +459,13 @@ def main():
         tps = Sse(port, "/p/task-plan/events")
         c.say("/answer %d 2" % tq["id"])
         c.wait(lambda: tps.seen("answered", lambda d: d == {"block": "q1", "reply": "wait for Marc"}), 30, "the task page's answer on the page")
+        # t4's turn ended with a plain answer (no sb report): his tick on
+        # its page still wakes it (pm's D fail 37)
+        n4 = len(c.lines("t4"))
         c.say("/answer %d done" % step_card("s1")["id"])
         c.wait(lambda: tps.seen("ticked", lambda d: d == {"block": "steps", "item": "s1"}), 30, "the task page's step ticked")
+        c.wait(lambda: any("you sent 1 note" in l for l in c.lines("t4")[n4:]) and any(l == "  obs: turn_started" for l in c.lines("t4")[n4:]),
+               60, "the tick wakes t4 after its plain answer")
         # q2 (PAGE_V3's second question) stays asked; s1 and q1 are done
         left = lambda: sorted((x["page"].get("item") or x["page"]["block"]) for x in c.cards() if (x.get("page") or {}).get("id") == "task-plan")
         c.wait(lambda: left() == ["q2"], 30, "only q2 left on the task's page")
@@ -477,7 +482,7 @@ def main():
         open(lp, "w").write('<section data-kit="checklist" data-id="plan"><ol>'
                             '<li data-id="d1" data-who="bise" data-did="drafted" data-draft="mail-legal">ask legal</li>'
                             '<li data-id="d2" data-who="yours">sign the renewal</li></ol></section>'
-                            '<section data-kit="email" data-id="mail-legal" data-verb="draft"><p data-field="to">legal</p>'
+                            '<section data-kit="email" data-id="mail-legal" data-verb="draft"><p data-field="to">legal@acme.test</p>'
                             '<p data-field="subject">the renewal</p><p>can we sign?</p></section>'
                             '<section data-kit="question" data-id="lq"><p>which legal address?</p>'
                             '<ol><li>legal@acme.test</li><li>i will write it</li></ol></section>')
@@ -499,6 +504,25 @@ def main():
         c.wait(lambda: step_card("d2") and not step_card("d1"), 30, "sent: his own step's card comes")
         notes = json.loads(request(port, "GET", "/p/legal-plan/meta")[2])["notes"]
         check(any(n["kind"] == "approve" and n["block"] == "mail-legal" for n in notes), "his send approves the draft: %r" % notes)
+
+        # a draft with no recipient yet (pm's D fail 37): its step's card
+        # waits until the agent republishes it with an address
+        sp = os.path.join(E.tmp, "send-plan.html")
+        mail = lambda to: ('<section data-kit="checklist" data-id="plan"><ol>'
+                           '<li data-id="e1" data-who="bise" data-did="drafted" data-draft="mail-x">ask legal</li></ol></section>'
+                           '<section data-kit="email" data-id="mail-x" data-verb="draft"><p data-field="to">%s</p>'
+                           '<p data-field="subject">trademark</p><p>still fine?</p></section>' % to)
+        open(sp, "w").write(mail("legal: address missing"))
+        settle(c)
+        c.say('[[bash: sb page publish %s --id send-plan --title "send plan"]]' % sp)
+        c.wait_line("main", "published send-plan v1", 90)
+        time.sleep(2)
+        check(not step_card("e1"), "no send card while the draft has no recipient")
+        open(sp, "w").write(mail("legal@acme.test"))
+        settle(c)
+        c.say('[[bash: sb page publish %s --id send-plan]]' % sp)
+        c.wait(lambda: step_card("e1"), 60, "the send card once the draft has its address")
+        settle(c)
 
         # his step answered from the capsule (pm's D fail 31): the core's
         # {cmd: answer, card, reply: '1'} (fn + digit) ticks it and closes
