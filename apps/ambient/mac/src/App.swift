@@ -191,6 +191,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         q.coreEvent = { [weak self] in self?.coreEvent($0) }
         q.keyOut = { [weak self] in self?.key($0) }
         q.keyEvent = { [weak self] t, e in self?.keys.qaEvent(t, e) ?? false }
+        // statusAndKeys() never runs with --qa (no tap, no menu-bar item): the machine's outputs
+        // still go to App.key, or a key event through qaEvent dies in KeyMachine (live, 20:47)
+        keys.onOut = { [weak self] in self?.key($0) }
         q.pageCmd = { [weak self] in self?.command($0) }
         q.sendCore = { [weak self] in self?.core.send($0) }
         q.visIn = { [weak self] in self?.visFeed($0) }
