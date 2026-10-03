@@ -278,6 +278,8 @@ body {
 #bise-page [data-kit] > p[data-went] > a::before { content: " · "; display: inline-block; white-space: pre; text-decoration: none; }
 /* a reply opened from its item (roadmap B): 'opened on X', 'copied · open the thread' */
 #bise-page li[data-id] > [data-went] { display: block; grid-column: 1 / -1; font: 12px/1.5 var(--font-mono); color: var(--ok); }
+/* a handled review item (its answer went): dim, its went line stays readable (mentions' 'earlier') */
+#bise-page [data-kit="review"] li[data-id]:has(> [data-went]) > :not([data-kit-ui]):not([data-went]) { opacity: .55; }
 #bise-page li[data-id] > [data-went] > a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 #bise-page li[data-id] > [data-went] > a::before { content: " · "; display: inline-block; white-space: pre; text-decoration: none; }
 /* read-only places: no bulk 'open 5' (one thread at a time) */

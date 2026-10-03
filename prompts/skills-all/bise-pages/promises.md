@@ -6,8 +6,9 @@ of what he said he'd do. One page a week, `promises-YYYY-wNN` (`promises-2026-w4
 
 **What a promise is:** something he said he would do, with or without a date, in his own words:
 a Granola note of a meeting (`Gabriel: i'll send the SSO timeline by friday`), his sent mail, his
-Slack messages (`i'll look at it tomorrow`). Never what others promised him, never a vague
-"let's talk".
+Slack messages (`i'll look at it tomorrow`), and the answers he sent from a mentions page (an item
+with its went line: `i'll send an invite` is a promise, its source that item). Never what others
+promised him, never a vague "let's talk".
 
 **The page:** a heading (`your promises`, meta line `3 open · 1 overdue · 1 kept this week`),
 then one `checklist` (never `data-plan`: these rows never make cards), one row per open promise:

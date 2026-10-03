@@ -19,8 +19,11 @@ a notification, a thread he is only copied on, or something already answered.
   `send` (`leaving.md`); then republish the item with where it went (`--went`).
 - `sources` last: each message's link.
 
-Each tick republishes the same id: new mentions on top (a `callout`, `since 14:10 · 2 new`),
-answered or skipped ones folded into one line (`4 answered earlier`). Nothing new: don't publish.
+Each tick republishes the same id, leading with what's new since he last looked (the version he
+last opened: `sb page list` shows `seen v3`): a `callout` (`since you looked · 2 new`), then the
+new mentions in the `reply` review, newest on top. Everything he has already seen goes under
+`<h2>earlier · 4</h2>` in a second `reply` review with the same item ids; the ones he sent or
+skipped stay there with their went line (the kit dims them). Nothing new: don't publish.
 
 **A card only for a direct question from his team:** someone `~/bise/people.md` marks as team
 (`- Léa Martin: team · design lead`). Publish the item first, then open it yourself: `sb card
