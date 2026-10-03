@@ -1722,6 +1722,7 @@ class _Core:
             threading.Thread(target=self._read, daemon=True).start()
         else:
             self.seen = len(events(2000)["events"])
+        self.start = self.seen
 
     def _read(self):
         for line in self.p.stdout:
@@ -1826,6 +1827,27 @@ def ask(texts, capsule=True, timeout=600, out=None):
     return {"file": path, "asks": results, "report": "\n".join(lines)}
 
 
+def capsule_timeline(evs):
+    """What the capsule went through after a spoken ask, from the QA log:
+    the talk (talk_start, talk_end, the words sent), the phases, main's
+    lines, the core's got/needs, and what the page showed (app_content);
+    times in seconds from the talk's start."""
+    t0 = next((e["t"] for e in evs if e["dir"].startswith("app>core") and e["ev"].get("cmd") == "talk_start"), evs[0]["t"] if evs else 0)
+    out = []
+    for e in evs:
+        ev, d = e["ev"], e["dir"]
+        what = None
+        if d.startswith("app>core") and ev.get("cmd") in ("talk_start", "talk_end", "send", "talk_cancel"):
+            what = ev["cmd"] + (": " + ev["text"] if ev.get("text") else "")
+        elif d == "core>app" and ev.get("ev") in ("phase", "main", "got", "heard", "card", "page"):
+            what = ev["ev"] + ": " + str(ev.get("phase") or ev.get("text") or ev.get("title") or ev.get("id") or "")
+        elif d == "page>app" and ev.get("cmd") == "app_content":
+            what = "shows: " + str(ev.get("kind")) + (" " + str(ev.get("text"))[:80] if ev.get("text") else "")
+        if what:
+            out.append({"at": round(e["t"] - t0, 2), "dir": d, "what": what[:160]})
+    return out
+
+
 def keep_hub_state(state, dst):
     """A copy of a QA hub's state dir for the record: journal.jsonl, hub.log,
     pages' meta and every agent's transcript, wire log, role and repl log;
@@ -1891,13 +1913,17 @@ def run_report(r):
     if r["cards"]:
         L.append("cards: " + "; ".join("#%s %s" % (c.get("id"), (c.get("text") or "")[:60]) for c in r["cards"]))
     L.append("verdict: " + ("pass" if not r["fails"] else "FAIL: " + "; ".join(r["fails"])))
+    if r.get("capsule"):
+        L.append("capsule (spoken ask, s from fn held):")
+        for k in r["capsule"][:14]:
+            L.append("  %6s  %s" % (k.get("at", ""), k.get("what") or k.get("error")))
     if r.get("hub_state"):
         L.append("hub state kept: %s" % r["hub_state"])
     L.append("files: %s" % r["dir"])
     return "\n".join(L)
 
 
-def run(scenario, headless=False, timeout=900, keep=False, out=None, require=None):
+def run(scenario, headless=False, timeout=900, keep=False, out=None, require=None, voice=False):
     """A scripted product run (ambient-lead m_5306): a model hub (the user's
     model and keys, throwaway state) with the fake accounts only; the
     scenario's ask through the core like the capsule's; times the page's
@@ -1919,13 +1945,15 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
     with open(lock, "w") as f:
         json.dump({"pid": os.getpid(), "scenario": scenario, "at": time.strftime("%H:%M:%S")}, f)
     try:
-        return _run(scenario, sc, headless, timeout, keep, out, require)
+        return _run(scenario, sc, headless, timeout, keep, out, require, voice)
     finally:
         if (_read(lock) or {}).get("pid") == os.getpid():
             os.unlink(lock)
 
 
-def _run(scenario, sc, headless, timeout, keep, out, require):
+def _run(scenario, sc, headless, timeout, keep, out, require, voice=False):
+    if voice and headless:
+        raise QAError("--voice drives the app's fn and the fake voice: run with --app, not --headless")
     bise, root = find_bise()
     build = require_commits(root, require)
     seeded = None
@@ -1980,7 +2008,14 @@ def _run(scenario, sc, headless, timeout, keep, out, require):
         def settled():
             return all(a.get("status") in ("idle", "done", "blocked") for a in (c.state or {}).get("agents", []))
 
-        core.send(sc["ask"])
+        if voice:
+            # spoken, as he would (ambient-lead m_5978): fn held, the fake mic says the ask, let go;
+            # the capsule's lines are recorded with their times next to the page's
+            r["voice"] = True
+            call("say", text=sc["ask"], per_word_ms=240, timeout=120)
+            r["t"]["said"] = rel()
+        else:
+            core.send(sc["ask"])
         page, quiet = None, None
         if sc.get("timed"):
             # pages that come later, on the hub's timers (the meetings): the flow waits for them itself
@@ -2089,6 +2124,11 @@ def _run(scenario, sc, headless, timeout, keep, out, require):
             pass
     finally:
         r["load"]["end"] = round(os.getloadavg()[0], 1)
+        if voice and core:
+            try:
+                r["capsule"] = capsule_timeline(events(2000)["events"][core.start:])
+            except Exception as e:  # noqa: BLE001
+                r["capsule"] = [{"error": str(e)}]
         if core:
             core.close()
         try:
@@ -2443,6 +2483,8 @@ def _cli(argv):
     p.add_argument("--timeout", type=int, default=900); p.add_argument("--keep", action="store_true", help="leave the hub (and app) running"); p.add_argument("--out")
     p.add_argument("--json", action="store_true", help="print run.json instead of the report")
     p.add_argument("--require", help="commits the bise tree must have (comma-separated): refused otherwise")
+    p.add_argument("--app", action="store_true", help="on the QA app (the default without --headless)")
+    p.add_argument("--voice", action="store_true", help="the ask spoken: the app's fn held, the fake voice says it; records the capsule's lines (with --app)")
     p = sub.add_parser("say"); p.add_argument("text"); p.add_argument("--no-wait", action="store_true")
     p = sub.add_parser("snapshot"); p.add_argument("--what", default="both"); p.add_argument("--backdrop"); p.add_argument("--name"); p.add_argument("--out")
     p.add_argument("--menubar", action="store_true", help="the menu-bar item in each state (still, work, need, away, done, fail, listen) at 1x and 2x, and a sheet")
@@ -2495,7 +2537,7 @@ def _cli(argv):
         sc, _ = all_scenes()
         r = [{"id": s["id"], "spec": s["spec"], "label": s["label"]} for s in sc]
     elif a.cmd == "run":
-        r = run(a.scenario, a.headless, a.timeout, a.keep, a.out, a.require)
+        r = run(a.scenario, a.headless, a.timeout, a.keep, a.out, a.require, a.voice)
         if not a.json:
             print(r["report"])
             return

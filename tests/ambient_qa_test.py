@@ -501,6 +501,25 @@ def failed_run_keeps_hub_state():
 
 
 @test
+def capsule_timeline_of_a_spoken_ask():
+    """run --voice: the capsule's lines from the QA log, timed from fn held"""
+    evs = [{"t": 9.0, "dir": "qa>app", "ev": {"ev": "app_size"}},
+           {"t": 10.0, "dir": "app>core(qa)", "ev": {"cmd": "talk_start"}},
+           {"t": 12.5, "dir": "app>core", "ev": {"cmd": "send", "text": "draft my weekly update"}},
+           {"t": 12.9, "dir": "core>app", "ev": {"ev": "phase", "phase": "thinking"}},
+           {"t": 14.0, "dir": "page>app", "ev": {"cmd": "app_content", "kind": "line", "text": "got it"}},
+           {"t": 31.0, "dir": "core>app", "ev": {"ev": "main", "text": "weekly update is on it."}}]
+    tl = qa.capsule_timeline(evs)
+    check([k["at"] for k in tl] == [0.0, 2.5, 2.9, 4.0, 21.0] and tl[1]["what"] == "send: draft my weekly update"
+          and tl[3]["what"].startswith("shows: line") and tl[4]["what"] == "main: weekly update is on it.", tl)
+    try:
+        qa._run("weekly-update", qa.SCENARIOS["weekly-update"], True, 10, False, None, None, voice=True)
+        check(False, "--voice --headless ran")
+    except qa.QAError as e:
+        check("--app" in str(e), e)
+
+
+@test
 def one_run_at_a_time():
     """qa.py run: a second run in the same QA dir is refused while one is live (ambient-pm m_5841)"""
     lock = os.path.join(qa.QA_DIR, "run.lock")
