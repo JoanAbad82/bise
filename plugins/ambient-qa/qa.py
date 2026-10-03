@@ -556,9 +556,13 @@ def _start_hub(bise, root, kind="fake", connectors=False, computer=False, user_a
     raise QAError("the %s hub didn't come up in 900 s: see %s" % (kind, os.path.join(QA_DIR, "hub.log")))
 
 
-def _stop_hub():
+def _stop_hub(only_pid=None):
+    """Stops the QA dir's hub; with `only_pid`, only when it is still that
+    hub (a run stops the hub it started, never a later run's)."""
     info = _read(HUB)
     if not info or not _pid_alive(info.get("pid")):
+        return False
+    if only_pid is not None and info.get("pid") != only_pid:
         return False
     os.kill(info["pid"], signal.SIGTERM)
     t0 = time.time()
@@ -1983,7 +1987,8 @@ def _run(scenario, sc, headless, timeout, keep, out, require):
         if r["main_lines"] and r["main_lines"][0]["len"] > 120:
             r["fails"].append("main's capsule line is %d chars (one short line)" % r["main_lines"][0]["len"])
         if not keep:
-            r["stopped"] = _stop_hub() if headless else stop()
+            # only the hub this run started: an older run ending late stopped a newer run's hub
+            r["stopped"] = _stop_hub(only_pid=info.get("pid")) if headless else stop()
         with open(os.path.join(d, "run.json"), "w") as f:
             json.dump(r, f, indent=1, ensure_ascii=False)
         r["report"] = run_report(r)
