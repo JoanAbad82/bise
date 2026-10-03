@@ -2,8 +2,14 @@
 
 Read this when a timer wakes you with "brief …" or "follow-ups for …", or the user asks for
 briefs before his meetings. One page per meeting, id `meeting-<slug>-<YYYY-MM-DD>`
-(`meeting-q3-renewal-2026-05-19`): the brief is its v1, the follow-ups its v2. No card for
-either: the menu-bar count says the page is there.
+(`meeting-q3-renewal-2026-05-19`): the brief is its v1, the follow-ups its v2. No card from
+either, nor from anything on them, overdue or not: the menu-bar count says the page is there,
+and his open rows reach the morning page through `sb page waiting`.
+
+**An overdue promise of his** (he told Hélène he would send the SSO timeline by the 26th, and
+no sent mail has it) leads the brief, right under the heading: a `callout` `data-tone="risk"`,
+`<h3>overdue</h3>` and `<p>you told Hélène the SSO timeline in writing by 26 sep.</p>`, then
+the drafted message in its own `email` or `message` block, waiting for his word.
 
 **The timers.** When you make the morning page (`morning.md`), also set, for each of today's
 meetings with other people, two one-shot timers in his time zone:
