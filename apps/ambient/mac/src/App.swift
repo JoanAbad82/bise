@@ -176,6 +176,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         let q = QA(mode: mode, dir: config.ambientDir, capsule: capsule, edge: edge)
         q.coreEvent = { [weak self] in self?.coreEvent($0) }
         q.keyOut = { [weak self] in self?.key($0) }
+        q.keyEvent = { [weak self] t, e in self?.keys.qaEvent(t, e) ?? false }
         q.pageCmd = { [weak self] in self?.command($0) }
         q.sendCore = { [weak self] in self?.core.send($0) }
         q.visIn = { [weak self] in self?.visFeed($0) }

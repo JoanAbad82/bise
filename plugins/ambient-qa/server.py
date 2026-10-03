@@ -33,6 +33,8 @@ TOOLS = [
     ("fn_hold_closed", "fn held from rest (capsule closed, bise not frontmost) through the real key path (KeyMachine via Keys.qaEvent; the QA app has no tap, never his fn): the pearl listens within within_ms, the fake voice's words reach the core on release, main's line shows; variants launch, fold (opened then folded by itself), hide (fn + .); then a tap must do nothing.",
      {"variants": {"type": "array", "items": {"type": "string", "enum": ["launch", "fold", "hide"]}}, "words": {"type": "string"}, "within_ms": {"type": "integer"}}, []),
     ("rest", "The capsule back to rest (folded into the icon) and bise not the active app.", {}, []),
+    ("keys", "Real keys into the QA app's panel: CGEvent key down/up posted to the QA app's pid (never the HID tap: nothing reaches his front app). specs: 'up', 'down', 'return', 'tab', 'esc', 'cmd+return', 'cmd+1'..'cmd+9', 'type:<words>'. Returns the panel's key state, what AppKit saw and the page's keydown/input events.",
+     {"specs": {"type": "array", "items": {"type": "string"}}, "gap_ms": {"type": "integer"}}, ["specs"]),
     ("say", "Hold fn, say the words (heard partials, a fake voice level, no mic), let go: they go to main on the fake hub; waits for main's answer, then 'speaks' it (phase speaking, word by word). Returns main's text.",
      {"text": {"type": "string"}, "per_word_ms": {"type": "number"}, "wait_answer": {"type": "boolean"}}, ["text"]),
     ("snapshot", "PNGs of the app now: panel (the capsule and its needs-you note on the backdrop, glass composited), screen (the main screen: backdrop, edge glow and corners, the capsule), web (the web view alone), both (panel + screen).",
@@ -118,6 +120,8 @@ def run(name, a):
         r = qa.fn_hold_closed(tuple(a.get("variants") or ("launch", "fold", "hide")), a.get("words", "what is on my plate today"), within_ms=a.get("within_ms", 300))
     elif name == "rest":
         r = qa.rest()
+    elif name == "keys":
+        r = qa.keys(*a["specs"], gap_ms=a.get("gap_ms", 60))
     elif name == "say":
         r = qa.say(a["text"], a.get("per_word_ms", 240), a.get("wait_answer", True))
     elif name == "snapshot":

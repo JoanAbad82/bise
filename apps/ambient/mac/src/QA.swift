@@ -610,6 +610,8 @@ final class QA {
             return try await click(q)
         case "keyev":
             return try keyev(q)
+        case "keys":
+            return try await keys(q)
         case "rest":
             await reset()
             NSApp.deactivate()
@@ -765,6 +767,66 @@ final class QA {
         ]
         saw("qa>click", ["selector": sel, "clicked": clicked])
         return r
+    }
+
+    // keys typed into the panel, as the keyboard would deliver them to this app (round 9's bar:
+    // ambient-lead m_6514): each {code, flags: [cmd, shift, alt, ctrl], text?} becomes a CGEvent
+    // key down + up posted to this QA app's own pid (never the HID tap: nothing reaches his front
+    // app). It does not focus anything itself: the panel takes keys only if the app made it key
+    // (what the user's keys would need too). Reports the panel's key state, what AppKit saw and the
+    // page's keydown/input events.
+    private func keys(_ q: [String: Any]) async throws -> [String: Any] {
+        let seq = q["seq"] as? [[String: Any]] ?? []
+        guard !seq.isEmpty else { throw Failure(description: "keys needs seq: [{code, flags?, text?}]") }
+        let panel = capsule.panel, web = capsule.web
+        _ = await js(web, """
+        (() => { window.__qaKeys = [];
+          if (!window.__qaKeysOn) { window.__qaKeysOn = true;
+            const name = g => g && g.tagName ? g.tagName.toLowerCase() + (g.id ? '#' + g.id : '') : String(g);
+            for (const t of ['keydown', 'keyup', 'input'])
+              document.addEventListener(t, e => window.__qaKeys.push({type: t, key: e.key || null, data: e.data || null,
+                meta: !!e.metaKey, target: name(e.target), trusted: e.isTrusted}), true); }
+          return 'ok'; })()
+        """)
+        final class Seen { var list: [[String: Any]] = [] }
+        let seen = Seen()
+        let mon = NSEvent.addLocalMonitorForEvents(matching: [.keyDown]) { e in
+            seen.list.append(["code": Int(e.keyCode), "chars": e.characters ?? "", "window": e.window === panel ? "panel" : (e.window.map { String(describing: type(of: $0)) } ?? "none")])
+            return e
+        }
+        defer { if let mon { NSEvent.removeMonitor(mon) } }
+        let keyBefore = panel.isKeyWindow
+        for k in seq {
+            let code = (k["code"] as? NSNumber)?.uint16Value ?? 0
+            var flags: CGEventFlags = []
+            for f in k["flags"] as? [String] ?? [] {
+                switch f {
+                case "cmd": flags.insert(.maskCommand)
+                case "shift": flags.insert(.maskShift)
+                case "alt": flags.insert(.maskAlternate)
+                case "ctrl": flags.insert(.maskControl)
+                default: break
+                }
+            }
+            let text = k["text"] as? String
+            for down in [true, false] {
+                guard let ev = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: down) else { continue }
+                ev.flags = flags
+                if let text, !text.isEmpty {
+                    let u = Array(text.utf16)
+                    ev.keyboardSetUnicodeString(stringLength: u.count, unicodeString: u)
+                }
+                ev.postToPid(getpid())
+                try? await Task.sleep(nanoseconds: 25_000_000)
+            }
+            try? await Task.sleep(nanoseconds: UInt64(((q["gap_ms"] as? NSNumber)?.doubleValue ?? 60) * 1_000_000))
+        }
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        let dom = (await js(web, "JSON.stringify(window.__qaKeys || [])"))
+            .flatMap { (try? JSONSerialization.jsonObject(with: Data($0.utf8))) as? [[String: Any]] } ?? []
+        saw("qa>keys", ["n": seq.count, "dom": dom.count])
+        return ["panel": ["visible": panel.isVisible, "key_before": keyBefore, "key": panel.isKeyWindow],
+                "app_active": NSApp.isActive, "appkit": seen.list, "dom": dom]
     }
 
     private func reset() async {

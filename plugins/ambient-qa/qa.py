@@ -791,6 +791,42 @@ def rest():
 
 KEY_SPACE, KEY_DOT = 49, 47
 
+# macOS virtual key codes (Carbon kVK_*), US layout: what `keys` posts
+KEYCODES = {"return": 36, "enter": 36, "tab": 48, "space": 49, "delete": 51, "backspace": 51, "esc": 53, "escape": 53,
+            "left": 123, "right": 124, "down": 125, "up": 126, ".": 47, ",": 43, "/": 44,
+            "1": 18, "2": 19, "3": 20, "4": 21, "5": 23, "6": 22, "7": 26, "8": 28, "9": 25, "0": 29,
+            "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9, "b": 11, "q": 12, "w": 13,
+            "e": 14, "r": 15, "y": 16, "t": 17, "o": 31, "u": 32, "i": 34, "p": 35, "l": 37, "j": 38, "k": 40,
+            "n": 45, "m": 46}
+MODS = {"cmd": "cmd", "command": "cmd", "⌘": "cmd", "shift": "shift", "alt": "alt", "option": "alt", "ctrl": "ctrl", "control": "ctrl"}
+
+
+def key_seq(specs):
+    """'cmd+return', 'up', 'cmd+1', 'esc', 'type:hello world' → the keys op's [{code, flags, text?}];
+    'type:' text goes one character per key event (its unicode string, as typed)."""
+    seq = []
+    for s in specs:
+        if s.startswith("type:"):
+            for ch in s[5:]:
+                seq.append({"code": KEYCODES.get(ch.lower(), KEYCODES["space"] if ch == " " else 0), "flags": [], "text": ch})
+            continue
+        parts = [p for p in s.replace("⌘", "cmd+").lower().split("+") if p]
+        *mods, k = parts
+        bad = [m for m in mods if m not in MODS]
+        if bad or k not in KEYCODES:
+            raise QAError("keys: unknown key %r (keys: %s; mods: cmd shift alt ctrl; text: type:<words>)" % (s, " ".join(sorted(KEYCODES))))
+        seq.append({"code": KEYCODES[k], "flags": [MODS[m] for m in mods]})
+    return seq
+
+
+def keys(*specs, gap_ms=60):
+    """Real keys into the QA app's panel (ambient-lead m_6514, round 9's bar): CGEvent key down/up
+    posted to the QA app's own pid (never the HID tap, nothing reaches his front app), e.g.
+    keys('type:what is going on', 'return'), keys('down', 'down', 'cmd+return'), keys('cmd+2'),
+    keys('esc'). Returns the panel's key state, what AppKit saw and the page's keydown/input
+    events. The panel only takes them when the app made it key, as for his keys."""
+    return call("keys", timeout=30 + len(specs), seq=key_seq(specs), gap_ms=gap_ms)
+
 
 def _new_events(mark):
     return [e for e in events(400, False).get("events", []) if e["t"] > mark]
@@ -3013,6 +3049,8 @@ def _cli(argv):
     p = sub.add_parser("fn-hold-closed", help="fn held from rest through the real key path (no tap): pearl listening within 300 ms, words to the core, main's line; a tap does nothing")
     p.add_argument("--variants", default="launch,fold,hide"); p.add_argument("--words", default="what is on my plate today"); p.add_argument("--within-ms", type=int, default=300)
     sub.add_parser("rest", help="the capsule back to rest and bise not the active app")
+    p = sub.add_parser("keys", help="real keys into the QA app's panel (CGEvent to its pid, never the HID tap): up down return tab esc cmd+return cmd+1 type:<words>")
+    p.add_argument("specs", nargs="+"); p.add_argument("--gap-ms", type=int, default=60)
     sub.add_parser("menu", help="the menu-bar menu's rows, in order (kind, title, keys, ref, enabled)")
     p = sub.add_parser("menu-click", help="click a menu row as the real one: stop <timer id>, page|watch <url>, card <id>")
     p.add_argument("kind", choices=["stop", "page", "watch", "card"]); p.add_argument("ref")
@@ -3092,6 +3130,8 @@ def _cli(argv):
         r = fn_hold_closed(tuple(v for v in a.variants.split(",") if v), a.words, within_ms=a.within_ms)
     elif a.cmd == "rest":
         r = rest()
+    elif a.cmd == "keys":
+        r = keys(*a.specs, gap_ms=a.gap_ms)
     elif a.cmd == "menu":
         r = menu()
     elif a.cmd == "menu-click":

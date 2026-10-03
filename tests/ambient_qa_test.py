@@ -495,6 +495,19 @@ def launch_watch_cards_may_be_a_teammates_question():
 
 
 @test
+def key_specs_become_key_events():
+    """keys: names, modifiers and typed text become the keys op's key codes and flags"""
+    seq = qa.key_seq(["cmd+return", "up", "⌘2", "esc", "type:hi you"])
+    check(seq[:4] == [{"code": 36, "flags": ["cmd"]}, {"code": 126, "flags": []}, {"code": 19, "flags": ["cmd"]}, {"code": 53, "flags": []}], seq)
+    check([k["text"] for k in seq[4:]] == list("hi you") and seq[6]["code"] == 49, seq[4:])
+    try:
+        qa.key_seq(["hyper+q"])
+        check(False, "an unknown modifier passed")
+    except qa.QAError:
+        pass
+
+
+@test
 def fn_hold_closed_on_a_fake_app():
     """fn-hold-closed: the pearl listening in time, the words to the core and main's line pass; an app that never listens, and a tap that opens the capsule, fail"""
     class App:
