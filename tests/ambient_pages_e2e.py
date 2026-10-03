@@ -494,6 +494,9 @@ def main():
 
         # pm's B (m_5765): a reader polling a page while its agent republishes
         # it 20 times always gets a whole answer, never a dropped connection
+        # (first the stale page's pick reaches main as a note: let that turn
+        # end, or our command lands in the same turn and is never run)
+        c.wait_line("main", 'on your page "stale"', 60)
         c.wait_idle("main")
         busy = os.path.join(E.tmp, "busy.html")
         open(busy, "w").write(PAGE_V1)
@@ -515,12 +518,18 @@ def main():
                     polls["n"] += 1
         t = threading.Thread(target=poll, daemon=True)
         t.start()
-        c.say('[[bash: for i in $(seq 2 21); do sb page publish %s --id busy-watch >/dev/null || echo FAILED; done; echo republished]]' % busy)
+        # a failed publish says which one and why (amb-core m_5830)
+        c.say('[[bash: n=0; for i in $(seq 2 21); do out=$(sb page publish %s --id busy-watch 2>&1) && n=$((n+1)) || echo "FAILED $i: $out"; done; echo "republished $n"]]' % busy)
         c.wait_line("main", "republished", 180)
         stop.set()
         t.join(20)
-        st, _, b = request(port, "GET", "/p/busy-watch/meta")
-        check(json.loads(b)["versions"][-1]["n"] == 21, "20 republishes: v21")
+        last = lambda: json.loads(request(port, "GET", "/p/busy-watch/meta")[2])["versions"][-1]["n"]
+        try:
+            c.wait(lambda: last() == 21, 15, "busy-watch at v21")
+        except AssertionError:
+            pass
+        said = [l for l in c.lines("main") if "FAILED" in l or "republished " in l]
+        check(last() == 21, "20 republishes: v%s, main's bash said: %s" % (last(), said[-4:]))
         check(polls["n"] > 20 and not polls["bad"], "%d reads during the republishes, bad: %s" % (polls["n"], polls["bad"][:3]))
     except AssertionError as e:
         print("FAIL", e)
