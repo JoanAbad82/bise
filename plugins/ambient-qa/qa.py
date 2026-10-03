@@ -807,13 +807,29 @@ def clicks(state="card", open_key="auto", selector=None, settle_s=1.0):
     if isinstance(state, str) and state not in CLICK_STATES:
         raise QAError("clicks: state %s (one of %s, or a state event)" % (state, ", ".join(sorted(CLICK_STATES))))
 
+    n = [0]
+
     def setup():
         rest()
-        inject(ev)
+        # fresh card ids every time: a card the app has seen is never pushed again (ambient-pm
+        # m_6611: --state question never showed), and the page re-renders on a new one
+        e = json.loads(json.dumps(ev))
+        n[0] += 1
+        for cd in e.get("cards", []):
+            cd["id"] = int(cd["id"]) * 1000 + n[0] if isinstance(cd["id"], int) else "%s-%d" % (cd["id"], n[0])
+        inject(e)
         if open_key:
             code = KEYCODES[open_key]
             keyev("fn_down"); keyev("down", code, fn=True); keyev("up", code, fn=True); keyev("fn_up")
-        time.sleep(0.9)
+        # the view settled: the card comes in through the app's own show (~1 s); listed before,
+        # a target was re-rendered away by the time it was clicked (ambient-pm m_6611)
+        t, last = time.time(), None
+        while time.time() - t < 4:
+            time.sleep(0.3)
+            v = _view_now()
+            if v == last and time.time() - t > 0.9:
+                break
+            last = v
         # round 9's targets (amb-web 3d99a361: [data-qa] under #amb, the glass itself excluded),
         # else whatever looks clickable on an older page
         if selector:
@@ -826,7 +842,8 @@ def clicks(state="card", open_key="auto", selector=None, settle_s=1.0):
         out["fails"].append("no clickable thing shown in state %s" % out["state"])
     for it in first:
         items = setup()
-        same = next((x for x in items if x["i"] == it["i"] and x["label"] == it["label"]), None)
+        same = next((x for x in items if it.get("qa") and x.get("qa") == it["qa"]), None) \
+            or next((x for x in items if x["i"] == it["i"] and x["label"] == it["label"]), None)
         r = {"i": it["i"], "label": it["label"], "cursor": it.get("cursor")}
         out["items"].append(r)
         if not same:
@@ -835,7 +852,8 @@ def clicks(state="card", open_key="auto", selector=None, settle_s=1.0):
         mark = _mark()
         v0 = _view_now()
         try:
-            c = click('[data-qa-i="%d"]' % it["i"])
+            # its own data-qa when it has one (stable across re-renders), else its place
+            c = click('#amb [data-qa="%s"]' % same["qa"] if same.get("qa") else '[data-qa-i="%d"]' % same["i"])
         except QAError as e:
             out["fails"].append("%r: %s" % (it["label"], e))
             continue
@@ -2975,7 +2993,7 @@ def scenes(only=None, backdrops=("dark",), out=None, at=None, what="both", cols=
                 if frames:
                     end = max((ms for ms, _ in events), default=0) + 1200
                     a, b = (span or [0, end])[:2]
-                    times = list(range(int(a), int(b) + 1, max(30, int(every))))
+                    times = list(range(int(a), int(b) + 1, max(16, int(every))))   # 16: ambient m_6592 (each shot's at_ms/taken_ms say when it really came)
                     w = "panel"
                 else:
                     times = at or shot_times(events)

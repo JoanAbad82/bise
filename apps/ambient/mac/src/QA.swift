@@ -44,6 +44,8 @@
 import AppKit
 import WebKit
 import CoreImage
+import ScreenCaptureKit
+import UniformTypeIdentifiers
 
 @MainActor
 final class QA {
@@ -612,19 +614,23 @@ final class QA {
             return try keyev(q)
         case "keys":
             return try await keys(q)
+        case "alpha":
+            return try await alpha(q)
         case "clickables":
             // every visible thing a click acts on, in the page's order, tagged data-qa-i so `click`
             // can aim at each one (ambient-pm m_6584: every button the capsule shows, once each)
             let sel = q["selector"] as? String ?? "button, [role=button], a[href], [data-act], [data-key], [onclick], li[data-n], label"
+            // info hints are text, not targets (ambient m_6608: amb-web marks them data-qa-info)
             let quoted = String(data: try JSONSerialization.data(withJSONObject: [sel]), encoding: .utf8) ?? "[\"\"]"
             let src = """
             (() => { const out = []; let i = 0;
               for (const el of document.querySelectorAll(\(quoted)[0])) {
                 const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
                 if (r.width < 2 || r.height < 2 || cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity === 0) continue;
+                if (el.hasAttribute('data-qa-info') || el.closest('[data-qa-info]')) continue;
                 if (out.some(o => o.el.contains(el))) continue;   // a row's own inner button is the row's
                 el.setAttribute('data-qa-i', String(i));
-                out.push({el, i: i++, tag: el.tagName.toLowerCase(), label: (el.getAttribute('aria-label') || el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 60),
+                out.push({el, i: i++, tag: el.tagName.toLowerCase(), qa: el.getAttribute('data-qa'), label: (el.getAttribute('aria-label') || el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 60),
                           x: r.left, y: r.top, w: r.width, h: r.height, cursor: cs.cursor});
               }
               return JSON.stringify(out.map(({el, ...o}) => o)); })()
@@ -861,6 +867,103 @@ final class QA {
                 "app_active": NSApp.isActive, "appkit": seen.list, "dom": dom]
     }
 
+    // the panel's own pixels with their alpha (ambient m_6592 (5), pm's 'the pearl floats free',
+    // and the 'no invisible margin' click check): ScreenCaptureKit's capture of this one window
+    // alone (desktop independent, no shadow), saved as a PNG, then alpha sampled at the pearl's 4
+    // corners and on a ring `ring` px outside its disc, and `outside` px outside the glass's edges
+    // and corners (alpha 0 there: the window server lets a click through to the app below).
+    private func alpha(_ q: [String: Any]) async throws -> [String: Any] {
+        let panel = capsule.panel, web = capsule.web
+        guard panel.isVisible else { throw Failure(description: "the capsule is not on screen") }
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        guard let win = content.windows.first(where: { $0.windowID == CGWindowID(panel.windowNumber) }) else {
+            throw Failure(description: "the panel is not among ScreenCaptureKit's windows (Screen Recording for this app?)")
+        }
+        let filter = SCContentFilter(desktopIndependentWindow: win)
+        let conf = SCStreamConfiguration()
+        let scale = CGFloat(filter.pointPixelScale)
+        conf.width = Int((win.frame.width * scale).rounded())
+        conf.height = Int((win.frame.height * scale).rounded())
+        conf.showsCursor = false
+        conf.ignoreShadowsSingleWindow = true
+        let img = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: conf)
+        let dir = q["dir"] as? String ?? NSTemporaryDirectory()
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let path = dir + "/" + (q["name"] as? String ?? "alpha") + ".png"
+        if let dest = CGImageDestinationCreateWithURL(URL(fileURLWithPath: path) as CFURL, UTType.png.identifier as CFString, 1, nil) {
+            CGImageDestinationAddImage(dest, img, nil)
+            _ = CGImageDestinationFinalize(dest)
+        }
+        // RGBA bytes, premultiplied: alpha is byte 3
+        let w = img.width, h = img.height
+        var px = [UInt8](repeating: 0, count: w * h * 4)
+        px.withUnsafeMutableBytes { buf in
+            if let ctx = CGContext(data: buf.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                   space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+                ctx.draw(img, in: CGRect(x: 0, y: 0, width: w, height: h))
+            }
+        }
+        let kx = CGFloat(w) / panel.frame.width, ky = CGFloat(h) / panel.frame.height
+        let zoom = web.pageZoom
+        // a page point (CSS px) → its alpha (nil: outside the window, where nothing of it can take a click)
+        func a(_ x: CGFloat, _ y: CGFloat) -> Int? {
+            let inWin = web.convert(NSPoint(x: x * zoom, y: web.isFlipped ? y * zoom : web.bounds.height - y * zoom), to: nil)
+            let ix = Int((inWin.x * kx).rounded(.down)), iy = Int(((panel.frame.height - inWin.y) * ky).rounded(.down))
+            guard ix >= 0, iy >= 0, ix < w, iy < h else { return nil }
+            return Int(px[(iy * w + ix) * 4 + 3])
+        }
+        func rect(_ sel: String) async -> CGRect? {
+            let qs = String(data: (try? JSONSerialization.data(withJSONObject: [sel])) ?? Data(), encoding: .utf8) ?? "[\"\"]"
+            guard let s = await js(web, "(() => { const e = document.querySelector(\(qs)[0]); if (!e) return null; const r = e.getBoundingClientRect(); return JSON.stringify([r.left, r.top, r.width, r.height]); })()"),
+                  let v = (try? JSONSerialization.jsonObject(with: Data(s.utf8))) as? [Double], v.count == 4, v[2] > 0, v[3] > 0 else { return nil }
+            return CGRect(x: v[0], y: v[1], width: v[2], height: v[3])
+        }
+        var out: [String: Any] = ["png": path, "size": [w, h], "scale": scale]
+        let ring = CGFloat((q["ring"] as? NSNumber)?.doubleValue ?? 6)
+        if let p = await rect(q["pearl"] as? String ?? "#amb canvas.pearl, canvas.pearl") {
+            let corners = [(p.minX + 0.5, p.minY + 0.5), (p.maxX - 0.5, p.minY + 0.5), (p.minX + 0.5, p.maxY - 0.5), (p.maxX - 0.5, p.maxY - 0.5)]
+            let r = min(p.width, p.height) / 2 + ring
+            let ringA = (0..<36).map { i -> Int? in
+                let t = CGFloat(i) * .pi / 18
+                return a(p.midX + r * cos(t), p.midY + r * sin(t))
+            }
+            out["pearl"] = ["rect": [p.minX, p.minY, p.width, p.height], "corners": corners.map { a($0.0, $0.1) as Any },
+                            "ring_px": ring, "ring_max": ringA.compactMap { $0 }.max() ?? 0, "center": a(p.midX, p.midY) as Any]
+        } else {
+            out["pearl"] = NSNull()
+        }
+        let off = CGFloat((q["outside"] as? NSNumber)?.doubleValue ?? 10)
+        if let g = await rect(q["glass"] as? String ?? "#amb [data-qa=glass]") {
+            let pts: [(String, CGFloat, CGFloat)] = [("top", g.midX, g.minY - off), ("bottom", g.midX, g.maxY + off), ("left", g.minX - off, g.midY),
+                                                    ("right", g.maxX + off, g.midY), ("top-left", g.minX - off, g.minY - off), ("top-right", g.maxX + off, g.minY - off),
+                                                    ("bottom-left", g.minX - off, g.maxY + off), ("bottom-right", g.maxX + off, g.maxY + off)]
+            var o: [String: Any] = [:]
+            for (k, x, y) in pts { o[k] = a(x, y).map { $0 as Any } ?? "outside the window" }
+            out["glass"] = ["rect": [g.minX, g.minY, g.width, g.height], "outside_px": off, "alpha_outside": o]
+        } else {
+            out["glass"] = NSNull()
+        }
+        return out
+    }
+
+    // the glass as the page draws it now, for a frame strip (ambient m_6608: no frame with a
+    // scale other than 1 or a size change on a show): its rect, transform, scale and opacity, and
+    // the rect the app blurs (Shape.glass from app_size)
+    func glassNow() async -> [String: Any] {
+        let src = """
+        (() => { const g = document.querySelector('#amb [data-qa=glass]'); if (!g) return JSON.stringify(null);
+          const r = g.getBoundingClientRect(), cs = getComputedStyle(g), m = cs.transform;
+          let sx = 1, sy = 1;
+          if (m && m !== 'none') { const v = m.match(/matrix\\(([^)]+)\\)/); if (v) { const n = v[1].split(',').map(Number); sx = Math.hypot(n[0], n[1]); sy = Math.hypot(n[2], n[3]); } }
+          return JSON.stringify({rect: [r.left, r.top, r.width, r.height], transform: m, scale: [sx, sy], opacity: +cs.opacity}); })()
+        """
+        var out: [String: Any] = [:]
+        if let s = await js(capsule.web, src), let o = JSON.object(Data(s.utf8)) { out = o }
+        if let g = capsule.shape.glass { out["app"] = [g.minX, g.minY, g.width, g.height] }
+        out["panel_visible"] = capsule.panel.isVisible
+        return out
+    }
+
     private func reset() async {
         speakStop()
         voiceStop()
@@ -957,6 +1060,7 @@ final class QA {
                 pending.append(Task { @MainActor in
                     var r: [String: Any]
                     do { r = try await self.snapshot(sq) } catch { r = ["error": "\(error)"] }
+                    r["glass"] = await self.glassNow()
                     r["at_ms"] = at
                     r["taken_ms"] = taken.rounded()
                     r["label"] = label
@@ -1077,9 +1181,10 @@ final class QA {
     private func drawPanel(_ ctx: CGContext, at r: CGRect, web: CGImage?, back: CGImage?, screen: CGSize, scale: CGFloat) {
         let s = capsule.shape
         let rad = capsule.radius
-        let x = r.maxX - s.w
-        var boxes = [CGRect(x: x, y: r.minY, width: s.w, height: s.h)]
-        if let n = s.note { boxes.append(CGRect(x: x, y: r.minY + n.y, width: s.w, height: n.h)) }
+        // only where the app blurs (amb-mac's Shape.blurRects: the glass rect from the page's
+        // app_size, then the note), never the whole box: the pearl sits on the screen itself
+        // (ambient m_6608: the composite blurred the whole 840x338 panel, a square under the pearl)
+        let boxes = s.blurRects(panel: r.size).map { $0.offsetBy(dx: r.minX, dy: r.minY) }
         let path = CGMutablePath()
         for b in boxes { path.addRoundedRect(in: b, cornerWidth: min(rad, b.height / 2), cornerHeight: min(rad, b.height / 2)) }
 
