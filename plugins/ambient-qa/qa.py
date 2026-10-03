@@ -1257,7 +1257,9 @@ def _feedback_loop_end(x, started):
     r["flow"]["reply"] = {"block": reply["id"], "kit": reply["kit"], "text": re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", reply["html"])).strip()[:200]}
     # 2+ replies waiting make ONE batch card (amb-core 7a5ebb2e: '3 drafts wait for you … 1. review /
     # 2. send all 3'): he answers 'send all' on it, and exactly that many Slack posts leave (pm m_6167)
-    batch = _soft_until(x, lambda: next((cd for cd in x["cards"].values() if not cd.get("closed") and batch_card(cd)), None), 240)
+    # the newest batch card still open (ambient-pm's C fail 43: two batch cards were open and
+    # 'send all' on the older one did nothing): the hub's open cards now, never one seen before
+    batch = _soft_until(x, lambda: max((cd for cd in x["c"].cards() if batch_card(cd)), key=lambda cd: cd.get("id") or 0, default=None), 240)
     if batch:
         n, pick = batch_card(batch)
         r["flow"]["batch_card"] = {"id": batch["id"], "drafts": n, "pick": pick, "text": (batch.get("text") or "")[:160]}
