@@ -606,6 +606,16 @@ final class QA {
             return try await menubar(q)
         case "pearl":
             return try pearlFrames(q)
+        case "click":
+            return try await click(q)
+        case "keyev":
+            return try keyev(q)
+        case "rest":
+            await reset()
+            NSApp.deactivate()
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            return ["hidden": capsule.hidden, "visible": capsule.panel.isVisible, "active": NSApp.isActive,
+                    "front_is_us": NSWorkspace.shared.frontmostApplication?.processIdentifier == getpid()]
         case "quit":
             after(0.1) { NSApp.terminate(nil) }
             return [:]
@@ -630,6 +640,131 @@ final class QA {
         }
         if hold && voice.listening { keyOut?(.talkEnd) }
         return ["said": text, "sent": !readOnly]
+    }
+
+    // MARK: the real input paths (the dogfood day: his clicks did nothing and fn from rest did
+    // nothing, while the page-JS and socket paths passed)
+
+    // a keyboard event as the tap hands it, through Keys.qaEvent (KeyMachine, its hold threshold,
+    // App.key): {kind: fn_down|fn_up|down|up, code (down/up), fn (down/up: fn held),
+    // words + per_word_ms (fn_down: what the fake mic hears once the talk starts)}
+    private func keyev(_ q: [String: Any]) throws -> [String: Any] {
+        guard let keyEvent else { throw Failure(description: "no key door in this app (QA.keyEvent, wired by amb-mac's Keys.qaEvent): rebuild it") }
+        let kind = q["kind"] as? String ?? ""
+        if kind == "fn_down", let w = q["words"] as? String, !w.isEmpty {
+            if let ms = (q["per_word_ms"] as? NSNumber)?.doubleValue { voice.perWord = max(0.05, ms / 1000) }
+            voice.words = w.split(separator: " ").map(String.init)
+        }
+        let type: CGEventType
+        let e: CGEvent?
+        switch kind {
+        case "fn_down", "fn_up":
+            e = CGEvent(keyboardEventSource: nil, virtualKey: 63, keyDown: kind == "fn_down")
+            e?.type = .flagsChanged
+            e?.flags = kind == "fn_down" ? .maskSecondaryFn : []
+            type = .flagsChanged
+        case "down", "up":
+            guard let code = (q["code"] as? NSNumber)?.uint16Value else { throw Failure(description: "keyev \(kind) needs code") }
+            e = CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: kind == "down")
+            if q["fn"] as? Bool ?? false { e?.flags = .maskSecondaryFn }
+            type = kind == "down" ? .keyDown : .keyUp
+        default:
+            throw Failure(description: "keyev kind: fn_down, fn_up, down, up")
+        }
+        guard let e else { throw Failure(description: "no CGEvent") }
+        let swallowed = keyEvent(type, e)
+        saw("qa>keys", ["kind": kind, "swallowed": swallowed])
+        return ["swallowed": swallowed]
+    }
+
+    // one click with the mouse, as the window server would deliver it: a CGEvent left down/up at
+    // the element's screen point, posted to this QA app's own pid (never the HID tap: his pointer
+    // never moves and no other app can get it). What it reports, layer by layer: the window the
+    // window server has at that point and the panel's mouse settings; whether AppKit saw the
+    // events and which view the panel hit-tests there; whether the page got pointerdown/click on
+    // that element. What it can't catch: a window of another app above the panel still lets this
+    // click through (see window_at_point), and the hover/cursor under a real moving pointer.
+    private func click(_ q: [String: Any]) async throws -> [String: Any] {
+        guard let sel = q["selector"] as? String, !sel.isEmpty else { throw Failure(description: "click needs selector") }
+        let panel = capsule.panel, web = capsule.web
+        guard panel.isVisible else { throw Failure(description: "the capsule is not on screen: nothing to click (open it first)") }
+        if q["deactivate"] as? Bool ?? true { NSApp.deactivate() }   // bise not frontmost: the first click must act
+        let quoted = String(data: try JSONSerialization.data(withJSONObject: [sel]), encoding: .utf8) ?? "[\"\"]"
+        let probe = """
+        (() => {
+          const el = document.querySelector(\(quoted)[0]);
+          window.__qaHits = [];
+          if (!window.__qaHitsOn) {
+            window.__qaHitsOn = true;
+            const name = g => g && g.tagName ? g.tagName.toLowerCase() + (g.id ? '#' + g.id : '') + (typeof g.className === 'string' && g.className.trim() ? '.' + g.className.trim().split(/\\s+/).join('.') : '') : String(g);
+            for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'])
+              document.addEventListener(t, e => window.__qaHits.push({type: t, target: name(e.target), trusted: e.isTrusted,
+                inside: !!(window.__qaEl && e.target && e.target.nodeType === 1 && (window.__qaEl.contains(e.target) || e.target.contains(window.__qaEl)))}), true);
+          }
+          if (!el) return JSON.stringify({found: false});
+          window.__qaEl = el;
+          const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+          const top = document.elementFromPoint(cx, cy), cs = getComputedStyle(el);
+          return JSON.stringify({found: true, x: cx, y: cy, w: r.width, h: r.height,
+            top_is_el: !!top && (top === el || el.contains(top)), top: top ? top.tagName.toLowerCase() + (top.id ? '#' + top.id : '') : null,
+            pointer_events: cs.pointerEvents, cursor: top ? getComputedStyle(top).cursor : cs.cursor, visibility: cs.visibility, opacity: cs.opacity});
+        })()
+        """
+        guard let s = await js(web, probe), let el = JSON.object(Data(s.utf8)) else { throw Failure(description: "click: the page didn't answer") }
+        guard el["found"] as? Bool == true else { return ["selector": sel, "found": false, "clicked": false] }
+        let zoom = web.pageZoom
+        let x = CGFloat((el["x"] as? NSNumber)?.doubleValue ?? 0) * zoom, y = CGFloat((el["y"] as? NSNumber)?.doubleValue ?? 0) * zoom
+        let inWin = web.convert(NSPoint(x: x, y: web.isFlipped ? y : web.bounds.height - y), to: nil)
+        let onScreen = panel.convertPoint(toScreen: inWin)                 // AppKit: bottom-left of the main screen
+        let mainH = NSScreen.screens.first?.frame.height ?? 0
+        let cg = CGPoint(x: onScreen.x, y: mainH - onScreen.y)              // CG: top-left
+        // the window server's view of that point
+        let topNum = NSWindow.windowNumber(at: onScreen, belowWindowWithWindowNumber: 0)
+        var atPoint = topNum == panel.windowNumber ? "panel" : "none"
+        if topNum != panel.windowNumber, topNum > 0,
+           let info = CGWindowListCopyWindowInfo([.optionIncludingWindow], CGWindowID(topNum)) as? [[String: Any]], let w = info.first {
+            let pid = (w[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value
+            atPoint = pid == getpid() ? "this app: window \(topNum)" : "another app: \(w[kCGWindowOwnerName as String] as? String ?? "?")"
+        }
+        var hitView = "none", hitInWeb = false
+        if let cv = panel.contentView, let v = cv.hitTest(cv.superview?.convert(inWin, from: nil) ?? inWin) {
+            hitView = String(describing: type(of: v))
+            hitInWeb = v === web || v.isDescendant(of: web)
+        }
+        // AppKit: what reaches the app's event loop
+        final class Seen { var list: [[String: Any]] = [] }
+        let seen = Seen()
+        let mon = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp]) { e in
+            seen.list.append(["type": e.type == .leftMouseDown ? "down" : "up",
+                              "window": e.window === panel ? "panel" : (e.window.map { String(describing: type(of: $0)) } ?? "none")])
+            return e
+        }
+        defer { if let mon { NSEvent.removeMonitor(mon) } }
+        let route = q["route"] as? String ?? "point"   // point: AppKit finds the window; window: the event names the panel
+        for (t, wait) in [(CGEventType.leftMouseDown, UInt64(0)), (.leftMouseUp, UInt64(70_000_000))] {
+            if wait > 0 { try? await Task.sleep(nanoseconds: wait) }
+            guard let ev = CGEvent(mouseEventSource: nil, mouseType: t, mouseCursorPosition: cg, mouseButton: .left) else { continue }
+            ev.setIntegerValueField(.mouseEventClickState, value: 1)
+            if route == "window" {
+                ev.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: Int64(panel.windowNumber))
+                ev.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: Int64(panel.windowNumber))
+            }
+            ev.postToPid(getpid())
+        }
+        try? await Task.sleep(nanoseconds: UInt64(((q["settle_ms"] as? NSNumber)?.doubleValue ?? 400) * 1_000_000))
+        let hits = (await js(web, "JSON.stringify(window.__qaHits || [])"))
+            .flatMap { (try? JSONSerialization.jsonObject(with: Data($0.utf8))) as? [[String: Any]] } ?? []
+        let clicked = hits.contains { ($0["type"] as? String) == "click" && ($0["inside"] as? Bool ?? false) }
+        let r: [String: Any] = [
+            "selector": sel, "found": true, "clicked": clicked, "route": route,
+            "element": el, "screen": ["x": cg.x, "y": cg.y],
+            "panel": ["window": panel.windowNumber, "visible": panel.isVisible, "key": panel.isKeyWindow,
+                      "ignores_mouse": panel.ignoresMouseEvents, "level": panel.level.rawValue, "alpha": panel.alphaValue],
+            "app_active": NSApp.isActive, "window_at_point": atPoint, "hit_view": hitView, "hit_in_web": hitInWeb,
+            "appkit": seen.list, "dom": hits,
+        ]
+        saw("qa>click", ["selector": sel, "clicked": clicked])
+        return r
     }
 
     private func reset() async {

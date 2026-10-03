@@ -756,6 +756,133 @@ def key(k):
     return call("key", k=k)
 
 
+def click(selector, route="point", deactivate=True, settle_ms=400):
+    """One real mouse click on the QA app's capsule (ambient-lead m_6481, ambient-pm's dogfood
+    check): a CGEvent left down/up at the element's screen point, posted to the QA app's own pid,
+    never the HID tap (his pointer never moves, no other app gets it), with bise not frontmost.
+    Returns, layer by layer: window_at_point (the window server's top window there), the panel's
+    mouse settings, hit_view (what the panel hit-tests there), appkit (the events AppKit saw), dom
+    (pointerdown/mousedown/click the page got, and on what), clicked. route=window names the panel
+    in the event (when 'point' fails, it tells routing from the view). It can't catch another app's
+    window above the panel taking a real click (window_at_point says it), nor hover under a moving
+    pointer."""
+    return call("click", timeout=20, selector=selector, route=route, deactivate=deactivate, settle_ms=settle_ms)
+
+
+def keyev(kind, code=None, fn=False, words=None, per_word_ms=None):
+    """A keyboard event through the app's real key path (Keys.qaEvent: KeyMachine, its hold
+    threshold, App.key) on a QA app whose tap never starts: kind fn_down|fn_up|down|up."""
+    kw = {"kind": kind}
+    if code is not None:
+        kw["code"] = code
+    if fn:
+        kw["fn"] = True
+    if words:
+        kw["words"] = words
+    if per_word_ms:
+        kw["per_word_ms"] = per_word_ms
+    return call("keyev", **kw)
+
+
+def rest():
+    """The capsule back to rest (folded into the icon) and bise not the active app."""
+    return call("rest", timeout=15)
+
+
+KEY_SPACE, KEY_DOT = 49, 47
+
+
+def _new_events(mark):
+    return [e for e in events(400, False).get("events", []) if e["t"] > mark]
+
+
+def _mark():
+    ev = events(1, True).get("events", [])
+    return ev[-1]["t"] if ev else 0.0
+
+
+def fn_hold_closed(variants=("launch", "fold", "hide"), words="what is on my plate today", per_word_ms=150,
+                   within_ms=300, answer_s=20):
+    """fn from rest (ambient-pm's dogfood check, ambient-lead m_6481): the capsule closed, bise not
+    frontmost, fn held through the real key path; the pearl must listen within `within_ms`, the
+    fake voice's words reach the core on release and main's line shows; a tap does nothing.
+    Variants: launch (as the app is now: run it right after `launch`), fold (opened with fn + space,
+    then left to fold by itself), hide (opened, then fn + . hid it). Never the real fn: the QA app
+    has no tap, the events go through Keys.qaEvent."""
+    out = {"variants": [], "fails": []}
+    for v in variants:
+        r = {"variant": v}
+        out["variants"].append(r)
+        rest()
+        if v in ("fold", "hide"):
+            keyev("fn_down"); keyev("down", KEY_SPACE, fn=True); keyev("up", KEY_SPACE, fn=True); keyev("fn_up")
+            t = time.time()
+            while time.time() - t < 3 and not state().get("app", {}).get("visible"):
+                time.sleep(0.05)
+            r["opened"] = bool(state().get("app", {}).get("visible"))
+            if v == "hide":
+                keyev("fn_down"); keyev("down", KEY_DOT, fn=True); keyev("up", KEY_DOT, fn=True); keyev("fn_up")
+            t = time.time()
+            while time.time() - t < 30 and state().get("app", {}).get("visible"):
+                time.sleep(0.2)
+            r["closed_after_s"] = round(time.time() - t, 1)
+        st = state().get("app", {})
+        r["rest"] = {"visible": st.get("visible"), "hidden": st.get("hidden")}
+        if st.get("visible"):
+            out["fails"].append("%s: the capsule is still on screen before fn" % v)
+            continue
+        mark = _mark()
+        t0 = time.time()
+        k = keyev("fn_down", words=words, per_word_ms=per_word_ms)
+        r["fn_down_swallowed"] = k.get("swallowed")
+        listen = None
+        while time.time() - t0 < 2.0:
+            a = state().get("app", {})
+            if a.get("listening") and a.get("visible"):
+                listen = round((time.time() - t0) * 1000)
+                break
+            time.sleep(0.02)
+        r["listening_ms"] = listen
+        if listen is None:
+            out["fails"].append("%s: fn held from rest: the pearl didn't listen within 2 s" % v)
+        elif listen > within_ms:
+            out["fails"].append("%s: fn held from rest: the pearl listened after %d ms (%d expected)" % (v, listen, within_ms))
+        time.sleep(len(words.split()) * per_word_ms / 1000 + 0.6)
+        keyev("fn_up")
+        sent = main = None
+        t1 = time.time()
+        while time.time() - t1 < answer_s and (sent is None or main is None):
+            for e in _new_events(mark):
+                ev = e["ev"]
+                if sent is None and e["dir"].startswith("app>core") and ev.get("cmd") == "send":
+                    sent = ev.get("text")
+                if main is None and e["dir"] == "core>app" and ev.get("ev") == "main":
+                    main = ev.get("text")
+            time.sleep(0.2)
+        r["sent"], r["main"] = sent, main
+        if not sent:
+            out["fails"].append("%s: the words never reached the core after fn up" % v)
+        elif words.split()[0].lower() not in sent.lower():
+            out["fails"].append("%s: the core got %r, not the words said" % (v, sent))
+        if sent and not main:
+            out["fails"].append("%s: no main line after the words" % v)
+    # a tap from rest does nothing visible and starts no recording
+    rest()
+    mark = _mark()
+    keyev("fn_down")
+    time.sleep(0.08)
+    keyev("fn_up")
+    time.sleep(1.0)
+    a = state().get("app", {})
+    talk = [e for e in _new_events(mark) if e["ev"].get("cmd") == "talk_start"]
+    out["tap"] = {"visible": a.get("visible"), "listening": a.get("listening"), "talk_start": len(talk)}
+    if a.get("visible") or a.get("listening") or talk:
+        out["fails"].append("a tap of fn from rest showed or started something: %s" % out["tap"])
+    rest()
+    out["verdict"] = "pass" if not out["fails"] else "FAIL"
+    return out
+
+
 def say(text, per_word_ms=240, wait_answer=True, timeout=90):
     """Hold fn, the words heard one by one (a fake level), let go: they go to
     main (the fake hub's main answers `ack: ...`); waits for main's answer
@@ -2881,6 +3008,11 @@ def _cli(argv):
     p = sub.add_parser("events"); p.add_argument("n", nargs="?", type=int, default=40); p.add_argument("--levels", action="store_true")
     p = sub.add_parser("fn"); p.add_argument("state"); p.add_argument("--key", default="fn")
     p = sub.add_parser("key"); p.add_argument("k")
+    p = sub.add_parser("click", help="one real mouse click (a CGEvent posted to the QA app's pid, never the HID tap) on a capsule element: what the window server, AppKit and the page each saw")
+    p.add_argument("selector"); p.add_argument("--route", choices=["point", "window"], default="point"); p.add_argument("--frontmost", action="store_true", help="leave bise active (default: not frontmost)")
+    p = sub.add_parser("fn-hold-closed", help="fn held from rest through the real key path (no tap): pearl listening within 300 ms, words to the core, main's line; a tap does nothing")
+    p.add_argument("--variants", default="launch,fold,hide"); p.add_argument("--words", default="what is on my plate today"); p.add_argument("--within-ms", type=int, default=300)
+    sub.add_parser("rest", help="the capsule back to rest and bise not the active app")
     sub.add_parser("menu", help="the menu-bar menu's rows, in order (kind, title, keys, ref, enabled)")
     p = sub.add_parser("menu-click", help="click a menu row as the real one: stop <timer id>, page|watch <url>, card <id>")
     p.add_argument("kind", choices=["stop", "page", "watch", "card"]); p.add_argument("ref")
@@ -2954,6 +3086,12 @@ def _cli(argv):
         r = fn(a.state, a.key)
     elif a.cmd == "key":
         r = key(a.k)
+    elif a.cmd == "click":
+        r = click(a.selector, a.route, not a.frontmost)
+    elif a.cmd == "fn-hold-closed":
+        r = fn_hold_closed(tuple(v for v in a.variants.split(",") if v), a.words, within_ms=a.within_ms)
+    elif a.cmd == "rest":
+        r = rest()
     elif a.cmd == "menu":
         r = menu()
     elif a.cmd == "menu-click":

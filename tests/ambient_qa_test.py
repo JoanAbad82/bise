@@ -495,6 +495,62 @@ def launch_watch_cards_may_be_a_teammates_question():
 
 
 @test
+def fn_hold_closed_on_a_fake_app():
+    """fn-hold-closed: the pearl listening in time, the words to the core and main's line pass; an app that never listens, and a tap that opens the capsule, fail"""
+    class App:
+        def __init__(self, listens=True, tap_opens=False):
+            self.listens, self.tap_opens = listens, tap_opens
+            self.visible = self.listening = False
+            self.ev, self.t, self.down = [], 0.0, None
+
+        def log(self, d, ev):
+            self.t += 1
+            self.ev.append({"t": self.t, "dir": d, "ev": ev})
+
+        def keyev(self, kind, code=None, fn=False, words=None, per_word_ms=None):
+            if kind == "fn_down":
+                self.down, self.words = time.time(), words
+                if self.listens and words:
+                    self.visible = self.listening = True
+                    self.log("app>core(qa)", {"cmd": "talk_start"})
+                elif self.tap_opens:
+                    self.visible = True
+            elif kind == "down" and code == qa.KEY_SPACE:
+                self.visible = True
+            elif kind == "down" and code == qa.KEY_DOT:
+                self.visible = False
+            elif kind == "fn_up" and self.listening:
+                self.listening = self.visible = False
+                self.log("app>core", {"cmd": "send", "text": self.words})
+                self.log("core>app", {"ev": "main", "text": "ack: " + self.words})
+            return {"swallowed": True}
+
+        def rest(self):
+            self.visible = self.listening = False
+            return {}
+
+        def state(self):
+            return {"app": {"visible": self.visible, "listening": self.listening, "hidden": not self.visible}}
+
+        def events(self, n, levels):
+            return {"events": self.ev[-n:]}
+
+    names = ("keyev", "rest", "state", "events")
+    saved = {k: getattr(qa, k) for k in names}
+    try:
+        for app, ok in ((App(), True), (App(listens=False), False), (App(tap_opens=True), False)):
+            for k in names:
+                setattr(qa, k, getattr(app, k))
+            r = qa.fn_hold_closed(variants=("launch", "hide"), per_word_ms=10, answer_s=2)
+            check((r["verdict"] == "pass") == ok, r)
+            if ok:
+                check(all(v["listening_ms"] is not None and v["sent"] and v["main"] for v in r["variants"]), r)
+    finally:
+        for k, f in saved.items():
+            setattr(qa, k, f)
+
+
+@test
 def a_term_stops_a_run_like_ctrl_c():
     """kill <run pid> raises KeyboardInterrupt in the run, so its finally clauses stop its hub"""
     try:
