@@ -1843,7 +1843,8 @@ def capsule_timeline(evs):
             what = ev["ev"] + ": " + str(ev.get("phase") or ev.get("text") or ev.get("title") or ev.get("id") or "")
         elif d == "page>app" and ev.get("cmd") == "app_content":
             what = "shows: " + str(ev.get("kind")) + (" " + str(ev.get("text"))[:80] if ev.get("text") else "")
-        if what:
+        # a repeat of the line just before (the core's 'working' every few seconds) is left out
+        if what and not (out and out[-1]["what"] == what[:160]):
             out.append({"at": round(e["t"] - t0, 2), "dir": d, "what": what[:160]})
     return out
 
