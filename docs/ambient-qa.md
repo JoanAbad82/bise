@@ -379,6 +379,10 @@ the page with an open card (a task agent's page) is not checked yet.
   (amb-mac); the rows say `main` (`main: watch: …`, `the launch · main · v2`) where bise should
   speak (amb-mac, ambient's words); `sb card` has no `--page`, so a watch's card can't open its
   page (amb-core). Not checked: the page frame saying the watch stopped.
+- **Job 2, the inbox, spoken on the app (`--app --voice`): pass.** fn held, the ask spoken,
+  `got` at 2.6 s, the words at the core at 2.9 s, the page at 15.9 s, main's line at 17.7 s (`mail
+  replies is on it. the drafts will show up on a page, and nothing gets sent.`, 86 characters), the
+  glass gone at 26.7 s; the 3 notes done; outbox empty.
 - **D at 435325c0: fail 39, a stall again.** After `who is legal?` was answered and the address
   reached the agent, the ready mail to legal got no `send the draft?` card: its row carried
   `data-question`, which suppresses the card even after the question is answered (amb-core).
