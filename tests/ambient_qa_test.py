@@ -446,6 +446,13 @@ def feedback_loop_end_laws():
     lang = {"id": 2, "kind": "question", "page": {"id": "benjamin-bugs", "block": "q-language"},
             "text": "the assistant answers in English only. what should it do?\n1. keep it forced to English\n2. answer in the language of the question"}
     check(qa.question_pick(lang, qa.SCENARIOS["feedback"]["picks"]) == "2" and qa.question_pick(lang) == "1", "the scenario's pick, else 1")
+    # the batch draft card (amb-core 7a5ebb2e): its count and its 'send all' option; never a plain question
+    batch = {"id": 5, "kind": "question", "page": {"id": "benjamin-bugs", "block": "replies", "item": "reply-s212", "drafts": True},
+             "batch": {"count": 3, "title": "benjamin's reports", "what": "messages"},
+             "text": "3 drafts wait for you · benjamin's reports\n1. review\n2. send all 3"}
+    check(qa.batch_card(batch) == (3, "2"), qa.batch_card(batch))
+    check(qa.batch_card({"text": "2 drafts wait for you · plan\n1. send all 2\n2. review"}) == (2, "1"), "text only, send all first")
+    check(qa.batch_card(ship) is None and qa.batch_card(lang) is None, "a question is no batch")
     sent = []
 
     class P:

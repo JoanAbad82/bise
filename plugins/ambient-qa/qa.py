@@ -1255,6 +1255,25 @@ def _feedback_loop_end(x, started):
         return
     reply = got["reply"]
     r["flow"]["reply"] = {"block": reply["id"], "kit": reply["kit"], "text": re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", reply["html"])).strip()[:200]}
+    # 2+ replies waiting make ONE batch card (amb-core 7a5ebb2e: '3 drafts wait for you … 1. review /
+    # 2. send all 3'): he answers 'send all' on it, and exactly that many Slack posts leave (pm m_6167)
+    batch = _soft_until(x, lambda: next((cd for cd in x["cards"].values() if not cd.get("closed") and batch_card(cd)), None), 240)
+    if batch:
+        n, pick = batch_card(batch)
+        r["flow"]["batch_card"] = {"id": batch["id"], "drafts": n, "pick": pick, "text": (batch.get("text") or "")[:160]}
+        answer_card(x, batch["id"], pick)
+        r["t"]["send_all"] = x["rel"]()
+        took = _until(x, lambda: len([w_ for w_ in _writes(x["info"]) if w_.get("service") == "slack"]) >= n and x["settled"](),
+                      "the %d replies posted after his 'send all'" % n)
+        w = _writes(x["info"])
+        r["flow"]["after_send"] = [w_.get("kind") for w_ in w]
+        if took is not None:
+            r["t"]["posted_after_send"] = took
+            slack = [w_ for w_ in w if w_.get("service") == "slack"]
+            if len(w) != n or len(slack) != n:
+                r["fails"].append("after his 'send all %d': %d write(s) (%s), exactly %d Slack messages expected" % (n, len(w), ", ".join(r["flow"]["after_send"]), n))
+        return
+    r["flow"]["batch_card"] = None
     page_notes(pid, [{"block": reply["id"], "kind": "send"}], send=True)
     r["t"]["send"] = x["rel"]()
     took = _until(x, lambda: _writes(x["info"]) and x["settled"](), "the reply posted after his send")
@@ -1265,6 +1284,39 @@ def _feedback_loop_end(x, started):
         slack = [w_ for w_ in w if w_.get("service") == "slack"]
         if len(w) != 1 or len(slack) != 1:
             r["fails"].append("after his send: %d write(s) (%s), exactly one Slack message expected" % (len(w), ", ".join(r["flow"]["after_send"])))
+
+
+def batch_card(card):
+    """A batch draft card (amb-core 34703bf0/7a5ebb2e: '3 drafts wait for you · <page> … 1. review /
+    2. send all 3', card.batch {count, …}, card.page.drafts): (its draft count, the 'send all'
+    option's number), else None."""
+    text = card.get("text") or ""
+    b = card.get("batch") if isinstance(card.get("batch"), dict) else {}
+    m = re.search(r"(\d+) drafts? wait for you", text)
+    if not (b or (card.get("page") or {}).get("drafts") or m):
+        return None
+    n = int(b.get("count") or (m.group(1) if m else 0) or 0)
+    opt = re.search(r"(?m)^\s*(\d+)[.)]?\s+send all", text, re.I)
+    if not n:
+        all_n = re.search(r"send all (\d+)", text, re.I)
+        n = int(all_n.group(1)) if all_n else 0
+    return (n, opt.group(1) if opt else "2") if n else None
+
+
+def _soft_until(x, get, secs):
+    """Polls the run like _until for at most `secs` and returns get()'s first truthy value, or
+    None, without recording a fail (for what may or may not come)."""
+    t = time.time()
+    while time.time() - t < secs:
+        x["poll"]()
+        try:
+            v = get()
+            if v:
+                return v
+        except Exception:  # noqa: BLE001
+            pass
+        time.sleep(2)
+    return None
 
 
 def answer_card(x, card_id, reply):
@@ -1319,7 +1371,7 @@ def answer_questions(x):
     answered = x["r"].setdefault("flow", {}).setdefault("questions", [])
     done = {a["id"] for a in answered}
     for q in x["c"].cards():
-        if q.get("kind") == "question" and not (q.get("page") or {}).get("item") and q.get("id") not in done:
+        if q.get("kind") == "question" and not (q.get("page") or {}).get("item") and q.get("id") not in done and not batch_card(q):
             pick = question_pick(q, x.get("picks"), x.get("pick") or 1)
             answer_card(x, q["id"], pick)
             answered.append({"id": q["id"], "text": (q.get("text") or "")[:160], "reply": pick})
