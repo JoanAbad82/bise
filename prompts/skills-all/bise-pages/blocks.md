@@ -31,8 +31,10 @@ page` and takes him there. Someone else's step (`data-who="Lucas"`): draft the m
 asks them, the same way. See `examples/buy-domain.html`.
 Never end with a step of yours open: what you can't finish becomes a `question` to him on the
 page (`legal's address?`) or a draft waiting for his word (`data-did="drafted"`). While the plan
-has open steps, stay on it: don't report done, wait idle, so his answers and ticks come to you;
-then do the next step and publish again.
+has open steps, stay on it: end each turn with `sb report progress "<one line>"`, never done
+and never a plain last answer, so his answers and ticks come to you; then do the next step and
+publish again. His `send` or `approve` on a row or on its draft is his word: send it now with
+the tool, then publish the row `data-done` with `--went` (`leaving.md`).
 A step that is a decision of his (how many years, which venue) is the `question` only, and its
 row points at it: `<li data-id="s2" data-who="yours" data-question="years">`; never a row and a
 question that both ask him. His answer ticks it: republish the row `data-done` with his pick
