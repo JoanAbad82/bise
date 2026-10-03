@@ -487,6 +487,19 @@ def launch_watch_cards_may_be_a_teammates_question():
 
 
 @test
+def failed_run_keeps_hub_state():
+    """a failed run keeps the hub's journal, logs and transcripts, never its sockets or binaries (ambient-lead m_5942)"""
+    d = tempfile.mkdtemp(prefix="aq-st-")
+    st = os.path.join(d, "st")
+    for f in ("journal.jsonl", "hub.log", "agents/main/transcript.log", "agents/main/wire.log", "bin/sb", "agents/main/run/x", "agents/main/session.resume.txt"):
+        os.makedirs(os.path.dirname(os.path.join(st, f)), exist_ok=True)
+        open(os.path.join(st, f), "w").write("x")
+    out = qa.keep_hub_state(st, os.path.join(d, "kept"))
+    got = sorted(os.path.relpath(os.path.join(dp, n), out) for dp, _, fs in os.walk(out) for n in fs)
+    check(got == ["agents/main/transcript.log", "agents/main/wire.log", "hub.log", "journal.jsonl"], got)
+
+
+@test
 def one_run_at_a_time():
     """qa.py run: a second run in the same QA dir is refused while one is live (ambient-pm m_5841)"""
     lock = os.path.join(qa.QA_DIR, "run.lock")

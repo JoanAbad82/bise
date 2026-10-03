@@ -1365,7 +1365,7 @@ def _flow_checklist(x):
     words = sorted(k["at"] for k in r["flow"].get("words", []))
     sends_of = lambda: sorted((w for w in _writes(x["info"]) if w["action"] in SENDS), key=lambda w: w["at"])
     if words:
-        t_end = time.time() + 120
+        t_end = time.time() + 60   # ~60 s (ambient-lead m_5942)
         while len(sends_of()) < len(words) and time.time() < t_end:
             x["poll"]()
             time.sleep(3)
@@ -1797,6 +1797,22 @@ def ask(texts, capsule=True, timeout=600, out=None):
     return {"file": path, "asks": results, "report": "\n".join(lines)}
 
 
+def keep_hub_state(state, dst):
+    """A copy of a QA hub's state dir for the record: journal.jsonl, hub.log,
+    pages' meta and every agent's transcript, wire log, role and repl log;
+    no sockets, binaries or temp dirs. Returns dst."""
+    keep = ("journal.jsonl", "hub.log", "transcript.log", "wire.log", "role.md", "repl.log", "meta.json", "notes.json")
+    for dirpath, dirs, files in os.walk(state):
+        dirs[:] = [x for x in dirs if x not in ("bin", "run", "tmp")]
+        for n in files:
+            if n in keep or n.endswith(".jsonl"):
+                src = os.path.join(dirpath, n)
+                out = os.path.join(dst, os.path.relpath(src, state))
+                os.makedirs(os.path.dirname(out), exist_ok=True)
+                shutil.copy2(src, out)
+    return dst
+
+
 def run_report(r):
     """One screen of text from a run's JSON."""
     s = lambda v: "-" if v is None else "%.1f s" % v
@@ -1846,6 +1862,8 @@ def run_report(r):
     if r["cards"]:
         L.append("cards: " + "; ".join("#%s %s" % (c.get("id"), (c.get("text") or "")[:60]) for c in r["cards"]))
     L.append("verdict: " + ("pass" if not r["fails"] else "FAIL: " + "; ".join(r["fails"])))
+    if r.get("hub_state"):
+        L.append("hub state kept: %s" % r["hub_state"])
     L.append("files: %s" % r["dir"])
     return "\n".join(L)
 
@@ -2065,6 +2083,13 @@ def _run(scenario, sc, headless, timeout, keep, out, require):
                 r["fails"].append("%d card(s) not about a comment that needs an answer or a teammate's question to him" % len(off))
         if r["main_lines"] and r["main_lines"][0]["len"] > 120:
             r["fails"].append("main's capsule line is %d chars (one short line)" % r["main_lines"][0]["len"])
+        if r["fails"]:
+            # a failed run keeps the hub's state (journal, hub.log, the agents' transcripts and
+            # wire logs) in its folder, so its owner sees whether the notes reached the agent (ambient-lead m_5942)
+            try:
+                r["hub_state"] = keep_hub_state(info["state"], os.path.join(d, "hub-state"))
+            except Exception as e:  # noqa: BLE001
+                r["hub_state"] = "not kept: %s" % e
         if not keep:
             # only the hub this run started: an older run ending late stopped a newer run's hub
             r["stopped"] = _stop_hub(only_pid=info.get("pid")) if headless else stop()
