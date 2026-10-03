@@ -118,6 +118,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             if !on && self.vis.pinned && !self.capsule.hidden { self.visFeed(.dismiss) }
         }
         capsule.watchKey()
+        // a click in another app (through the glow, or anywhere): a bar he
+        // opened closes, like Spotlight, and the click still goes through;
+        // a pushed card: nothing (ambient m_6702)
+        capsule.onClickOutside = { [weak self] in
+            guard let self, self.vis.pinned, !self.capsule.hidden else { return }
+            self.visFeed(.dismiss)
+        }
         capsule.load(webDir: config.web)
         // at rest nothing on screen: the capsule shows when there is something to see
         edge.load(webDir: config.web)

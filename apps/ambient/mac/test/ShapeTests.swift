@@ -41,6 +41,16 @@ law("glass: null → no blur at all", CapsuleShape.from(none, maxHeight: 700)!.b
 law("a glass with no height → no blur at all",
     CapsuleShape.from(["w": 840, "h": 98, "glass": ["x": 80, "y": 28, "w": 700, "h": 0]], maxHeight: 700)!.blurRects(panel: panel).isEmpty)
 law("no glass key at all (an older page) → the whole box still", !CapsuleShape.from(["w": 360, "h": 84], maxHeight: 700)!.blurRects(panel: CGSize(width: 360, height: 84)).isEmpty)
+// the mouse only inside the glass (ambient m_6702: a click 10 px outside
+// reaches the app below)
+let box = CGSize(width: 840, height: 338)
+let r9 = CapsuleShape.from(["w": 840, "h": 338, "radius": 26, "glass": ["x": 80, "y": 28, "w": 700, "h": 218]], maxHeight: 700)!
+law("mouse: inside the glass, taken", r9.takesMouse(at: CGPoint(x: 400, y: 100), panel: box))
+law("mouse: 10 px left of the glass, through", !r9.takesMouse(at: CGPoint(x: 70, y: 100), panel: box))
+law("mouse: 10 px above the glass, through", !r9.takesMouse(at: CGPoint(x: 400, y: 18), panel: box))
+law("mouse: 10 px under the glass (its drawn shadow), through", !r9.takesMouse(at: CGPoint(x: 400, y: 256), panel: box))
+law("mouse: on the pearl (x 4..68), through", !r9.takesMouse(at: CGPoint(x: 36, y: 60), panel: box))
+law("mouse: no glass shown, nothing taken", !CapsuleShape.from(none, maxHeight: 700)!.takesMouse(at: CGPoint(x: 400, y: 50), panel: panel))
 law("too small a box: no shape", CapsuleShape.from(["w": 10, "h": 98], maxHeight: 700) == nil)
 
 if failures > 0 { print("\(failures) failed"); exit(1) }

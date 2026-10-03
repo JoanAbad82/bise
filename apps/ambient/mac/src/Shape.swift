@@ -48,6 +48,14 @@ struct CapsuleShape: Equatable {
     // where the blur goes, in the panel's flipped coords (y down), the box
     // anchored at the panel's top right: the glass (the whole box without
     // one), then the note under it, as wide as the glass
+    // does the panel take the mouse at this point (the panel's flipped
+    // coords)? only inside the glass and the note (ambient m_6702): the
+    // glow and shadow pixels around them and the pearl (pointer-events
+    // none in the page) let a click through to the app below
+    func takesMouse(at p: CGPoint, panel: CGSize) -> Bool {
+        blurRects(panel: panel).contains { $0.contains(p) }
+    }
+
     func blurRects(panel: CGSize) -> [CGRect] {
         if noGlass { return [] }
         let bx = panel.width - w

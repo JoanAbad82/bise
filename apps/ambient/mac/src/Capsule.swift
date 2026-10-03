@@ -328,6 +328,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
         if !panel.isVisible { effect.alphaValue = 0 }
         panel.orderFrontRegardless()
         blur(true, over: fade ? Capsule.fadeTime : Capsule.appearTime)
+        trackMouse(true)
         if fade {
             NSAnimationContext.runAnimationGroup { c in
                 c.duration = Capsule.fadeTime
@@ -342,6 +343,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
         hidden = true
         focus(false)
         outJob?.cancel()
+        trackMouse(false)
         guard after > 0 else { panel.orderOut(nil); panel.alphaValue = 1; effect.alphaValue = 0; return }
         // the blur leaves with the page's own 0.12 s leave, never after it
         blur(false, over: after)
@@ -364,6 +366,39 @@ final class Capsule: NSObject, WKNavigationDelegate {
 
     private var keysFrom: NSRunningApplication?
     var onKeyFocus: ((Bool) -> Void)?   // the bar took the keys (true) or gave them back
+    var onClickOutside: (() -> Void)?   // a click in another app while the bar shows
+
+    // the mouse only inside the glass (ambient m_6702, CapsuleShape.takesMouse):
+    // the panel ignores the mouse wherever the page draws only glow, shadow
+    // or the pearl, so a click there reaches the app below; watched only
+    // while the panel shows (global monitors: no permission for the mouse)
+    private var mouseMonitors: [Any] = []
+
+    private func trackMouse(_ on: Bool) {
+        for m in mouseMonitors { NSEvent.removeMonitor(m) }
+        mouseMonitors = []
+        guard on else { panel.ignoresMouseEvents = false; return }
+        let moves: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
+        if let g = NSEvent.addGlobalMonitorForEvents(matching: moves, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.followMouse() }
+        }) { mouseMonitors.append(g) }
+        if let l = NSEvent.addLocalMonitorForEvents(matching: moves, handler: { [weak self] e in
+            MainActor.assumeIsolated { self?.followMouse() }
+            return e
+        }) { mouseMonitors.append(l) }
+        // a click that went to another app (through the glow, or anywhere else)
+        if let c = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.onClickOutside?() }
+        }) { mouseMonitors.append(c) }
+        followMouse()
+    }
+
+    private func followMouse() {
+        let m = NSEvent.mouseLocation, f = panel.frame
+        let p = CGPoint(x: m.x - f.minX, y: f.maxY - m.y)
+        let take = shape.takesMouse(at: p, panel: f.size)
+        if panel.ignoresMouseEvents == take { panel.ignoresMouseEvents = !take }
+    }
 
     // the panel's key state, however it came (focus(true), a click): his
     // app is remembered to get the keys back, and App hears it (app_focused)
