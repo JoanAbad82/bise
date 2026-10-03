@@ -89,7 +89,7 @@ stop() {
 }
 
 # build when the key changed or the binary is gone (the EDR ate it); a
-# running app is stopped first (its binary is replaced)
+# running app is never stopped: the build waits in new/ for try or open
 build() {
   local k; k="$(key)"
   if [ -x "$BIN" ] && [ "$(cat "$BUILD/key" 2>/dev/null || true)" = "$k" ]; then return 0; fi
@@ -108,24 +108,60 @@ build() {
   echo $$ > "$lock/pid"
   trap 'rm -rf "'"$lock"'"' EXIT
   if [ -x "$BIN" ] && [ "$(cat "$BUILD/key" 2>/dev/null || true)" = "$k" ]; then rm -rf "$lock"; trap - EXIT; return 0; fi
-  if running_pid >/dev/null; then say "sources changed: stopping the running app to rebuild"; stop; fi
-  say "building $APP ($k)"
-  rm -f "$BUILD/key"
   # a fresh bundle next to it, then swapped in: a half-built app never sits
   # at the one path (and the case-insensitive disk never keeps the old
   # "Bise Ambient.app" capitals)
-  local fresh="$BUILD/new/$(basename "$APP")"
-  rm -rf "$BUILD/new"
-  mkdir -p "$BUILD/new"
-  # its signing identity lives next to it, made once (build.sh sign_app):
-  # Accessibility and the mic survive rebuilds
-  AMBIENT_SIGN_DIR="$BUILD/sign" "$SRC/build.sh" "$fresh" >&2
-  rm -rf "$APP"
-  mv "$fresh" "$APP"
-  rm -rf "$BUILD/new"
-  echo "$k" > "$BUILD/key"
+  local fresh; fresh="$(pending_app)"
+  if [ -x "$fresh/Contents/MacOS/$(basename "$BIN")" ] && [ "$(cat "$BUILD/new.key" 2>/dev/null || true)" = "$k" ]; then
+    : # already built, waiting for its launch
+  else
+    say "building $fresh ($k)"
+    rm -rf "$BUILD/new" "$BUILD/new.key"
+    mkdir -p "$BUILD/new"
+    # its signing identity lives next to it, made once (build.sh sign_app):
+    # Accessibility and the mic survive rebuilds
+    AMBIENT_SIGN_DIR="$BUILD/sign" "$SRC/build.sh" "$fresh" >&2
+    echo "$k" > "$BUILD/new.key"
+  fi
+  # never stop his running app (lead m_6520): the build waits in new/ until
+  # his next scripts/ambient.sh try or open swaps it in (swap_new)
+  if running_pid >/dev/null; then
+    say "built; it takes effect at the next launch (scripts/ambient.sh try or open)"
+  else
+    swap_in "$k"
+  fi
   rm -rf "$lock"
   trap - EXIT
+}
+
+pending_app() { echo "$BUILD/new/$(basename "$APP")"; }
+
+# the waiting build into the one path (the app is not running)
+swap_in() {
+  rm -rf "$APP"
+  mv "$(pending_app)" "$APP"
+  rm -rf "$BUILD/new" "$BUILD/new.key"
+  echo "$1" > "$BUILD/key"
+}
+
+# try and open (only he runs them): a build waiting in new/ restarts his
+# app on it; nothing waiting, nothing stopped
+swap_new() {
+  local k; k="$(key)"
+  [ -x "$(pending_app)/Contents/MacOS/$(basename "$BIN")" ] && [ "$(cat "$BUILD/new.key" 2>/dev/null || true)" = "$k" ] || return 0
+  if running_pid >/dev/null; then say "restarting on the new build"; stop; fi
+  swap_in "$k"
+}
+
+# the app a launch runs: the one path, or the build waiting in new/ while
+# his app runs (QA's own instance can start it; his stays as it is)
+fresh_app() {
+  local k; k="$(key)"
+  if [ -x "$(pending_app)/Contents/MacOS/$(basename "$BIN")" ] && [ "$(cat "$BUILD/new.key" 2>/dev/null || true)" = "$k" ]; then
+    pending_app
+  else
+    echo "$APP"
+  fi
 }
 
 # a JSON string
@@ -153,6 +189,8 @@ open_app() {
   [ -n "$bise" ] || bise="$(command -v bise || true)"
   [ -n "$bise" ] || { say "no bise: pass --bise <exe>"; exit 2; }
   build
+  # his own launch: a build waiting in new/ restarts his app on it
+  swap_new
   mkdir -p "$RUN"
   local pid
   if pid="$(running_pid)"; then
@@ -273,7 +311,8 @@ try() {
 }
 
 case "${1:-}" in
-  build|path) build; echo "$APP" ;;
+  # the app to launch: the one path, or the build waiting while his app runs
+  build|path) build; fresh_app ;;
   try) shift; try "$@" ;;
   key) key ;;
   check) "$SRC/build.sh" --check && "$SRC/build.sh" --test ;;
