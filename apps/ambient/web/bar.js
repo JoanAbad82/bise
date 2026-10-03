@@ -21,9 +21,10 @@
   // (ambient m_6519 FOCUS AND KEYS); clicked, the plain keys
   function askFoot(n, focused) {
     const range = (pre) => [...pre, "1", "–", String(n)];
+    // a range ('fn 1 – 2 pick') is info, like '↑↓ move': the rows are its targets (ambient m_6681 (2))
     const left = focused
-      ? [item(range([]), B.pick, key("1")), item(["↑", "↓"], B.move), item(["esc"], B.later, key("esc"))]
-      : [item(range(["fn"]), B.pick, key("1")), item(["fn", "esc"], B.later, key("esc"))];
+      ? [item(range([]), B.pick), item(["↑", "↓"], B.move), item(["esc"], B.later, key("esc"))]
+      : [item(range(["fn"]), B.pick), item(["fn", "esc"], B.later, key("esc"))];
     return { left, right: [item(["fn"], B.sayIt, null, B.orHold)] };
   }
 

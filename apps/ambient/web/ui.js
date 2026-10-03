@@ -214,7 +214,9 @@
     if (gin.scrollHeight > maxH) el.body.style.maxHeight = Math.max(88, maxH - fixed) + "px";
     const h = Math.min(maxH, Math.ceil(gin.scrollHeight)) || 68;
     if (glass.style.height !== h + "px") glass.style.height = h + "px";
-    const msg = Bar.size(h, 26);
+    // the bar gone (nothing to show): no glass in the same frame, so the native blur never stays
+    // without the page's glass (ambient m_6681 (3); amb-mac reads glass null as no glass)
+    const msg = bar.classList.contains("on") ? Bar.size(h, 26) : { ...Bar.size(h, 26), glass: null };
     const key = JSON.stringify(msg);
     if (key !== sent) { sent = key; post(msg); }
   }
@@ -242,6 +244,7 @@
     if (v.state === "offline") { if (t - retryAt > 10000) { if (retryAt) recv({ ev: "ui_retry", auto: true }); retryAt = t; } } else retryAt = 0;
     let moving = false;
     if (!v.unseen) moving = pearl.frame({ mood: v.mood, lvl: v.lvl, still: v.still, gather: v.gather || 0 }, t);
+    else if (pearl.fit) pearl.fit();
     fps.frames++;
     if (t - fps.since > 1000) { fps.value = Math.round((fps.frames * 1000) / (t - fps.since)); fps.frames = 0; fps.since = t; }
     // the pearl moves at 30 Hz at most (SPEC §1); still, it checks again at ~15 Hz; nobody seeing

@@ -228,6 +228,14 @@ law("B3 rows (ambient m_6500, lead m_6487): one row per choice, the first select
   assert.equal(M.view(M.step(m, { ev: "ui_ask_more" }, 70).m, 80).ask.full, true);
   assert.equal(W.more, "… more   ⌘ ⏎");
 });
+law("a hello long over never eats the next esc (pm's fail 47: 'fn esc later' did nothing after a hello earlier in the run)", () => {
+  let m = M.step(M.init(), { ev: "app_hello" }, 0).m;
+  m = M.step(m, { ev: "state", agents: [], cards: [{ id: "q", agent: "ops", text: "ship it?", options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }] }], pages: [] }, 60000).m;
+  assert.equal(M.view(m, 60010).state, "needs");
+  const r = M.step(m, { ev: "app_key", key: "esc", local: true }, 60020).m;
+  assert.notEqual(M.view(r, 60030).state, "needs");
+  assert.ok(r.later && r.later.q);
+});
 law("B3 esc = later: the glass goes, the card keeps waiting and the count stays (ambient m_6500)", () => {
   const card = { id: "q", agent: "ops", text: "ship it?", options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }] };
   const m = M.step(M.init(), { ev: "state", agents: [], cards: [card], pages: [] }, 0).m;
@@ -349,6 +357,8 @@ law("round 9: a pushed question is one bar: '? main needs you · now', '⌘ ⏎ 
   eq(s.sections[0].rows[1].act, { ev: "ui_option", card: "q", i: 1 });
   const flat = (it) => [it.pre || "", ...it.keys, it.w || ""].join(" ").trim();
   eq(s.foot.left.map(flat), ["fn 1 – 3 pick", "fn esc later"]);
+  // a range is info, not a target: the rows are (ambient m_6681 (2)); esc later is a key
+  eq(s.foot.left.map((i) => !!i.act), [false, true]);
   eq(s.foot.right.map(flat), ["or hold fn and say it"]);
   // clicked (the panel has the keys): the plain keys
   m = M.step(m, { ev: "app_focused", on: true }, 20).m;

@@ -34,6 +34,9 @@
 
   // how long the hello stays: the words land (0.3 s + their 0.5 s arrival), then 5 s; reduced: 5.5 s
   const helloMs = (m) => (m.reduce ? 500 : T.helloWords + 500) + T.helloStay;
+  // the hello still on screen (a stale m.hello, long over, must not eat the next esc or click:
+  // pm's fail 47, 'fn esc later' did nothing)
+  const helloOn = (m, now) => !!m.hello && now - m.hello.at < helloMs(m);
   const TURN = ["listening", "sending", "working", "speaking"];
   // the settings view's toggles, in its order (amb-mac's app_setting keys)
   const SETTING_KEYS = ["edge_glow", "right_option", "meeting_quiet", "voice_answers", "sounds", "launch_at_login"];
@@ -411,7 +414,7 @@
         return none(c ? { ...m, askFull: c.id } : m);
       }
       case "ui_capsule":     // a click on the small capsule: the agents
-        if (m.hello) return none({ ...m, hello: null });   // a click ends the hello
+        if (helloOn(m, now)) return none({ ...m, hello: null });   // a click ends the hello
         return setPane(m, m.pane ? null : visibleCards(m).length > 1 ? "inbox" : "agents");
       case "ui_close":
         return setPane(m, null);
@@ -465,7 +468,7 @@
       const os = choices(asked), cur = m.optFor === asked.id ? m.optSel || 0 : 0;
       if (os[cur]) return answer({ ...m, optSel: 0, optFor: null }, asked, os[cur], now);
     }
-    if (asked && k === "esc" && !m.hello && !listening(m) && m.phase !== "speaking") {
+    if (asked && k === "esc" && !helloOn(m, now) && !listening(m) && m.phase !== "speaking") {
       return none({ ...m, later: { ...(m.later || {}), [asked.id]: true }, optSel: 0, optFor: null });
     }
     switch (k) {
@@ -513,7 +516,7 @@
         if (m.hidden) return none(m);
         return { m: flashNow(m, { kind: "hide", text: W.hidden, sub: W.showAgain, ttl: T.hide + 500 }, now), cmds: [{ cmd: "app_hide", delay: T.hide }] };
       case "esc": {
-        if (m.hello) return none({ ...m, hello: null });
+        if (helloOn(m, now)) return none({ ...m, hello: null });
         if (listening(m)) {
           return { m: flashNow({ ...m, fn: false, handsFree: false, mine: false, heard: { text: "", final: false }, phase: m.phase === "listening" ? "idle" : m.phase }, { kind: "cancel", text: W.cancelled }, now), cmds: [{ cmd: "talk_cancel" }] };
         }
