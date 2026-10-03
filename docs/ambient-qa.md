@@ -370,6 +370,18 @@ the page with an open card (a task agent's page) is not checked yet.
   cards; then `send the draft?` for Lucas's DNS and for Marc → both sent on his word. 3 sends for
   3 `send` answers, none before. Only Lucas's own step is left, waiting on him. Fails 37 and 38
   are closed.
+- **B on the app (fake hub at 46f387bc, with amb-mac's menu read): pass on the core.** The menu
+  shows `watching the launch · N new for you` and `stop watching` once the timer is set; a
+  republish raises N and never opens the capsule; a card from the watch shows the glass for ~8 s,
+  then folds into `needs you`; `stop watching` ends the timer at once (no timer, no watch rows);
+  the icon's badge reads on light and dark. To fix: N counts unopened versions (2 after v2)
+  instead of the new items for him (the page has 3), so a tick with nothing new would raise it
+  (amb-mac); the rows say `main` (`main: watch: …`, `the launch · main · v2`) where bise should
+  speak (amb-mac, ambient's words); `sb card` has no `--page`, so a watch's card can't open its
+  page (amb-core). Not checked: the page frame saying the watch stopped.
+- **D at 435325c0: fail 39, a stall again.** After `who is legal?` was answered and the address
+  reached the agent, the ready mail to legal got no `send the draft?` card: its row carried
+  `data-question`, which suppresses the card even after the question is answered (amb-core).
 - **23 and 24 rechecked at a589f9f9 (`qa.py ask`): pass.** `what's my next meeting` → `09:30,
   launch standup with Marc, Lucas and Nora` in 13 s, no page: the fixture says 07:30Z, so the time
   is in his zone (CEST). `plan the offsite` → offsite-plan; the follow-up `add a budget per person
