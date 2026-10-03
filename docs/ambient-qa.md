@@ -519,6 +519,17 @@ with the fake voice; never his real Slack or mail):
 - [ ] Spoken on the app: "what do people need from me?" → one capsule line naming how many and
       who, and the page.
 
+**Results, first run** (headless, fake accounts, 2026-10-03 05:14, build 4 behind the tip):
+- Page 12 s, v1 23 s; every direct question found (2 of 2 in v1, 4 of 4 after tick 1, 6 of 6
+  after tick 2), each with a drafted answer; the timer republished after each tick (its period,
+  ~10 min). `send` on Hugo's mail answer → exactly one send; `start an agent` on Nora's CSV
+  question → an agent with her words as the brief.
+- Fail 40: no card at all, not even for his team's direct questions (Lea, Nora). amb-tools is
+  rerunning at the tip.
+- Notes: the page grows to 14 items with yesterday's: it should lead with what's new since he
+  looked; drafts promise things in his name (`i'll look into it today`), which once sent are G's
+  promises, so G reads his sent answers from F.
+
 ## Every slice, from now on (ambient-lead m_5980)
 
 - [ ] One spoken ask on the app with the fake voice (`qa.py run <slice> --app --voice`): the
