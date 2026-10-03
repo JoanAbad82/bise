@@ -1,6 +1,7 @@
-//! `sb card --page <id>[#<item>]` (pm's B m_6008): an agent's card linked
-//! to its page, in the shape of a step card's `page`, so the capsule's
-//! fn + o opens the page at the item (a watch's own card opens its page).
+//! `sb card --page <id>[#<item>]` (pm's B m_6008): main's card linked to
+//! a page, in the shape of a step card's `page`, so the capsule's fn + o
+//! opens the page at the item. Cards are main's: a task (a watch) sends
+//! main the exact command for its page (amb-kit 78500b1b).
 
 use crate::pages::Pages;
 use serde_json::{json, Value};
