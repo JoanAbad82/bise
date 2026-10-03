@@ -534,6 +534,25 @@ the QA socket (that's how the `answer` path passed while his clicks did nothing)
 - [ ] A card from main reads as bise's question (no 'main' label). A card from a task names the
       task.
 
+### Results: real clicks, first run (ambient-app c1001d7f, QA app on a fake hub, stopped after)
+
+`qa.py clicks --state card|question|drafts|settings`, one real click per target, bise not
+frontmost:
+- **settings: pass.** All 8 toggles and `+ add an app` sent `app_setting`, and `esc close` closed
+  the panel. The two `◌ … always` rows are labels: no command, arrow cursor.
+- **drafts: pass for what shows.** The card body and `⏎ open` opened the inbox page at `#i1`.
+  `esc later` folded the card. `↑↓ move` changed the selection. **Fail 44 (product):** the
+  `3 drafts ready` card shows only `open` and `later`. It has no `send all`, so he can't send the
+  batch from the card ("Every slice" below: `send all / review`).
+- **card: fail 45.** A click on the card body ("which date works for the pricing review?") got
+  no click: no window at that point (`window None, hit None`). `⏎ open` and `esc later` on the
+  same card work. The body's hit area is not where it is drawn, or it falls outside the panel.
+- **question: no result (tool).** In that state the capsule never came on screen, so the run
+  had nothing to click. The 6 targets are listed: `⌘⏎ full text`, `1 tuesday`, `2 thursday`,
+  `fn 1–2 pick`, `fn esc later`, `fn o open the page`. Goes to amb-tools.
+- Not checked yet: a click 10 px outside the glass reaching the app below, hover under the real
+  pointer, the pearl with no background, keyboard only (amb-tools' next checks).
+
 ## Out of the way (vision §3 G, the user's change m_5030)
 
 - [ ] At rest, after launch: nothing on screen but the menu-bar icon (no idle capsule).
