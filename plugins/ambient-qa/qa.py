@@ -1063,7 +1063,7 @@ SCENARIOS.update({
     # roadmap D (amb-core 527fa441): a step-by-step plan, bise ticks its own, a card per step of his when its turn comes
     # no_send off: a send is checked against his word on its draft card by the flow (ambient-pm m_5932)
     "checklist": {"ask": "check my mail and give me a step by step to buy the domain", "no_send": False, "notes": False, "flow": "checklist",
-                  "note_texts": {"q-legal": "legal@acme.test"}},
+                  "note_texts": {"legal": "legal@acme.test"}},
     # roadmap E (amb-kit m_5643): a seeded night (a PR done, a question card, unsent replies,
     # his domain steps, the launch watch), then the morning page from it; nothing leaves
     "morning": {"ask": "make today's morning page", "no_send": True, "no_writes": True, "notes": False,
@@ -1280,9 +1280,15 @@ def answer_questions(x):
             pg = q.get("page") or {}
             label = option_label(q, pick)
             if pg.get("id") and pg.get("block") and re.search(r"\bnote\b", label, re.I):
-                text = (x.get("note_texts") or {}).get(pg["block"]) or label
-                page_notes(pg["id"], [{"block": pg["block"], "kind": "note", "text": text}], send=True)
+                # the scenario's words: a key that is in the block id or the question
+                # (ambient-pm m_5950: the block was 'legal-to', not 'q-legal', so the label went instead)
+                where = (pg["block"] + " " + (q.get("text") or "")).lower()
+                text = next((t for k, t in (x.get("note_texts") or {}).items() if k.lower() in where), None) or label
+                saved = page_notes(pg["id"], [{"block": pg["block"], "kind": "note", "text": text}], send=True)
                 answered[-1]["note"] = text
+                # in run.json's notes, so the flow's notes read apart from the product's
+                x["r"].setdefault("notes", []).append({"by": "qa flow", "page": pg["id"], "block": pg["block"], "kind": "note", "text": text,
+                                                     "for_card": q["id"], "ids": [n.get("id") for n in (saved or {}).get("saved", [])]})
 
 
 def _rows(body):

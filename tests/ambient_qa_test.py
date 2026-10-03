@@ -460,7 +460,7 @@ def feedback_loop_end_laws():
     qa.answer_questions(x)
     check([(m["card"], m["reply"]) for m in sent] == [(1, "2"), (2, "2")], sent)
     # an option that promises a note gets its note (ambient-pm m_5904: q-legal, option 1)
-    legal = {"id": 9, "kind": "question", "page": {"id": "domain", "block": "q-legal"},
+    legal = {"id": 9, "kind": "question", "page": {"id": "domain", "block": "legal-to"},
              "text": "which address for legal?\n1. i'll leave a note with the address\n2. use legal@acme.test"}
     check(qa.option_label(legal, "1") == "i'll leave a note with the address" and qa.option_label(legal, 3) == "", "option labels")
     notes = []
@@ -472,7 +472,8 @@ def feedback_loop_end_laws():
         qa.answer_questions(x)
     finally:
         qa.page_notes = real
-    check(notes == [("domain", [{"block": "q-legal", "kind": "note", "text": "legal@acme.test"}], True)], notes)
+    check(notes == [("domain", [{"block": "legal-to", "kind": "note", "text": "legal@acme.test"}], True)], notes)
+    check(x["r"]["notes"][0]["by"] == "qa flow" and x["r"]["notes"][0]["text"] == "legal@acme.test", x["r"])
 
 
 @test
