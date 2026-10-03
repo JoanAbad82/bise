@@ -183,7 +183,7 @@ impl Pages {
         let notes = self.store.notes(&m.id);
         let open = notes.iter().filter(|n| n.open()).count();
         // what on it waits for him (`sb page waiting`'s lines for this
-        // page): the menu's 'watching … · N new for you' (pm's B, m_6007),
+        // page): the menu's 'watching … · N wait for you' (pm's B, m_6007),
         // so a tick with nothing new for him doesn't raise it
         let today = crate::every::local_day(crate::util::now_ms()).unwrap_or(i64::MAX);
         let waiting = self

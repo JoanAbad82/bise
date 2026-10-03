@@ -126,7 +126,8 @@ enum MenuRows {
         return parts.joined(separator: " · ")
     }
 
-    // "watching the launch · 3 new for you" (its page's title and the
+    // "watching the launch · 3 wait for you" (ambient m_6022: the count's
+    // wording; 'new' would read like unread pages) (its page's title and the
     // items on it waiting for him, pm's B m_6007: not its versions, so a
     // tick with nothing new for him adds nothing); no page: the order's own
     // words, clipped
@@ -134,7 +135,7 @@ enum MenuRows {
         if let id = w.page, let p = pages.first(where: { $0.id == id }) {
             let head = "watching " + clip(p.title, titleCut)
             let n = p.waiting ?? 0
-            return n > 0 ? "\(head) · \(n) new for you" : head
+            return n > 0 ? "\(head) · \(n) wait for you" : head
         }
         let words = w.text.split(whereSeparator: \.isNewline).joined(separator: " ").trimmingCharacters(in: .whitespaces)
         return "watching: " + clip(words.isEmpty ? "#\(w.id)" : words, titleCut)

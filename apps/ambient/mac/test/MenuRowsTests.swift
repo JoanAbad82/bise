@@ -67,7 +67,7 @@ law("a page's unopened versions: version − opened_version",
     wpages.first { $0.id == "launch-watch" }?.unopened == 3 && wpages.first { $0.id == "seen" }?.unopened == 2)
 law("a hub without opened_version: never opened", wpages.first { $0.id == "old" }?.unopened == 4)
 law("a watch with a page: its title and its items waiting for him",
-    MenuRows.watch(watches[0], pages: wpages) == "watching the launch · 3 new for you")
+    MenuRows.watch(watches[0], pages: wpages) == "watching the launch · 3 wait for you")
 law("new versions with nothing waiting for him: no count (pm's B)",
     MenuRows.watch(watches[1], pages: wpages) == "watching seen page")
 law("a hub without 'waiting': no count, never the versions",
