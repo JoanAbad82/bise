@@ -595,15 +595,10 @@ def _sh(args, **kw):
 
 
 def app_path(force_build=False):
-    """The one app path, built by scripts/ambient.sh when its sources changed
-    (which stops the user's running app: refused unless force_build)."""
-    st = _sh(["scripts/ambient.sh", "status"]).stdout
-    running = st.startswith("running")
-    keys = st.split("built key ", 1)[-1].strip().split(", sources key ")
-    stale = len(keys) != 2 or keys[0] != keys[1]
-    if running and stale and not force_build:
-        raise QAError("the app's sources changed and your ambient app is running: building stops it. "
-                      "launch(force_build=true) to rebuild anyway (ask the user first)")
+    """The app to launch, built by scripts/ambient.sh when its sources changed. The build never
+    stops his running app (amb-mac m_6527): while it runs, the new build waits in
+    <build>/new/bise ambient.app and the script prints THAT path as its last line, which QA
+    launches. force_build is kept for old callers and does nothing."""
     r = _sh(["scripts/ambient.sh", "build"])
     if r.returncode != 0:
         raise QAError("scripts/ambient.sh build failed: " + (r.stderr or r.stdout)[-800:])
