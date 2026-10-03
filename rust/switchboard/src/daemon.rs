@@ -1130,7 +1130,15 @@ impl Shell {
             .filter(|n| matches!(self.page_agent_frame(n)["status"].as_str(), Some("working" | "idle" | "blocked")))
             .cloned()
             .collect();
-        if pages.set_busy(busy) {
+        if let Some(left) = pages.set_busy(busy) {
+            // done now: its replies stay held until the page is published
+            // again, after the fix (ambient-lead m_6187)
+            for (id, names) in &list {
+                let v = pages.store.meta(id).map_or(0, |m| m.version());
+                for a in names.iter().filter(|a| left.contains(a)) {
+                    pages.mark_done(id, a, v);
+                }
+            }
             for (id, _) in &list {
                 self.page_steps(id);
             }
@@ -1419,7 +1427,7 @@ impl Shell {
         // 42: 3 Slack replies and no card)
         let drafts = match crate::pages::drafts::carded(id) {
             // (a draft whose item's agent is still at work waits: m_6168)
-            true => crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &notes, &pages.store.questions(id)), &|a| pages.is_busy(a)),
+            true => crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &notes, &pages.store.questions(id)), &|a| pages.held(id, a, meta.version())),
             false => Vec::new(),
         };
         if steps.is_empty() && !rows.iter().any(|r| r.his() && r.plan) && drafts.len() < 2 {
@@ -1604,7 +1612,7 @@ impl Shell {
         let mut steps = pages.store.steps(id);
         let Some(keys) = steps.iter().find(|s| s.card == card && s.reply.is_none()).map(|s| s.batch.clone()) else { return false };
         let html = pages.store.html(id, meta.version()).unwrap_or_default();
-        let drafts = crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &pages.store.notes(id), &pages.store.questions(id)), &|a| pages.is_busy(a));
+        let drafts = crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &pages.store.notes(id), &pages.store.questions(id)), &|a| pages.held(id, a, meta.version()));
         let mut sent = Vec::new();
         for d in drafts.iter().filter(|d| keys.contains(&d.key())) {
             match pages.locked(|s| s.add_sent(id, &d.block, d.item.as_deref(), "approve", "send", meta.version(), now_ms())) {

@@ -51,6 +51,8 @@ pub struct Pages {
     progress: Mutex<HashMap<String, std::collections::VecDeque<String>>>,
     /// the agents at work now (the hub sets it: `set_busy`)
     busy: Mutex<std::collections::BTreeSet<String>>,
+    /// (page, agent) → the page's version when that agent became done
+    done_at: Mutex<HashMap<(String, String), u64>>,
 }
 
 /// The progress lines a new SSE stream replays.
@@ -111,22 +113,37 @@ impl Pages {
             to_hub: Mutex::new(None),
             progress: Mutex::new(HashMap::new()),
             busy: Mutex::new(std::collections::BTreeSet::new()),
+            done_at: Mutex::new(HashMap::new()),
         }
     }
 
     /// The agents at work now (working, or idle and not done): their
     /// items' drafts do not wait yet (ambient-lead m_6168). True: the set
     /// changed.
-    pub fn set_busy(&self, now: std::collections::BTreeSet<String>) -> bool {
+    /// Returns the agents no longer at work (done since the last call).
+    pub fn set_busy(&self, now: std::collections::BTreeSet<String>) -> Option<Vec<String>> {
         let mut b = self.busy.lock().unwrap_or_else(|e| e.into_inner());
-        let changed = *b != now;
+        if *b == now {
+            return None;
+        }
+        let left: Vec<String> = b.difference(&now).cloned().collect();
         *b = now;
-        changed
+        Some(left)
     }
 
-    /// Agent `name` is at work now.
-    pub fn is_busy(&self, name: &str) -> bool {
-        self.busy.lock().unwrap_or_else(|e| e.into_inner()).contains(name)
+    /// Agent `name` on page `id` became done while the page stood at
+    /// `version`: its items' replies stay held until a later version (the
+    /// one written after the fix; ambient-lead m_6187).
+    pub fn mark_done(&self, id: &str, name: &str, version: u64) {
+        self.done_at.lock().unwrap_or_else(|e| e.into_inner()).insert((id.to_string(), name.to_string()), version);
+    }
+
+    /// The replies of agent `name`'s items on page `id` (at `version`)
+    /// are held: the agent is at work, or it is done and the page has not
+    /// been published since.
+    pub fn held(&self, id: &str, name: &str, version: u64) -> bool {
+        let busy = self.busy.lock().unwrap_or_else(|e| e.into_inner()).contains(name);
+        busy || self.done_at.lock().unwrap_or_else(|e| e.into_inner()).get(&(id.to_string(), name.to_string())).is_some_and(|v| version <= *v)
     }
 
     /// Where the hub hears the server.
@@ -209,7 +226,7 @@ impl Pages {
         let waiting = self
             .store
             .html(&m.id, m.version())
-            .map_or(0, |h| waiting::of_page_on(&m.id, &h, &notes, &self.store.questions(&m.id), today, &|a| self.is_busy(a)).len());
+            .map_or(0, |h| waiting::of_page_on(&m.id, &h, &notes, &self.store.questions(&m.id), today, &|a| self.held(&m.id, a, m.version())).len());
         let mut v = json!({
             "id": m.id, "title": m.title, "agent": m.agent, "version": m.version(),
             "url": self.url(&m.id), "at_ms": m.at_ms(), "state": m.state, "open_notes": open,
@@ -231,7 +248,7 @@ impl Pages {
         let mut out = Vec::new();
         for m in self.store.list() {
             let Some(html) = self.store.html(&m.id, m.version()) else { continue };
-            out.extend(waiting::of_page_on(&m.id, &html, &self.store.notes(&m.id), &self.store.questions(&m.id), today, &|a| self.is_busy(a)));
+            out.extend(waiting::of_page_on(&m.id, &html, &self.store.notes(&m.id), &self.store.questions(&m.id), today, &|a| self.held(&m.id, a, m.version())));
         }
         // his late promises first, across every page (ambient-lead m_5982)
         out.sort_by_key(|w| w.days.is_none());
@@ -426,6 +443,28 @@ mod tests {
         let v = &p.list_json()[0];
         let theirs = p.waiting().iter().filter(|w| w.page == "w").count();
         assert_eq!(v["waiting"].as_u64(), Some(theirs as u64), "{v}");
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    /// Law (ambient-lead m_6168, m_6187): an item's agent at work holds
+    /// its reply; done, the reply stays held until the page is published
+    /// after that (the version written after the fix), so send all never
+    /// posts the old workaround.
+    #[test]
+    fn a_reply_is_held_until_the_version_after_its_agents_done() {
+        let d = std::env::temp_dir().join(format!("sb-held-{}", std::process::id()));
+        let p = Pages::new(&d, 0, d.join("kit"));
+        let busy = |names: &[&str]| names.iter().map(|n| n.to_string()).collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(p.set_busy(busy(&["fix-fish"])), Some(vec![]));
+        assert!(p.held("fb", "fix-fish", 2) && !p.held("fb", "fix-proxy", 2));
+        // unchanged: nothing to judge again
+        assert_eq!(p.set_busy(busy(&["fix-fish"])), None);
+        // done while the page stood at v2: held at v2, free from v3
+        assert_eq!(p.set_busy(busy(&[])), Some(vec!["fix-fish".to_string()]));
+        p.mark_done("fb", "fix-fish", 2);
+        assert!(p.held("fb", "fix-fish", 2) && !p.held("fb", "fix-fish", 3));
+        // another page naming it is not held by this one's version
+        assert!(!p.held("other", "fix-fish", 1));
         let _ = std::fs::remove_dir_all(d);
     }
 

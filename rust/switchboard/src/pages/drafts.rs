@@ -250,7 +250,7 @@ pub fn topics(drafts: &[Draft]) -> Vec<String> {
 }
 
 /// The card's second line (ambient m_6055, ambient-lead m_6168): one
-/// recipient: '3 replies to Benjamin: proxy · fish · French'; several:
+/// recipient: '3 replies to Benjamin: proxy, fish and French'; several:
 /// 'replies to legal, Lucas and Marc'; no recipients: the drafts' words.
 pub fn line(drafts: &[Draft]) -> String {
     let w = what(drafts);
@@ -261,7 +261,9 @@ pub fn line(drafts: &[Draft]) -> String {
     }
     let w = if w == "steps" { "drafts" } else { w };
     match (names.as_slice(), topics(drafts)) {
-        ([who], t) if drafts.len() >= 2 && !t.is_empty() => format!("{} {w} to {who}: {}", drafts.len(), t.join(" · ")),
+        // the topics read like names (ambient m_6188): 'proxy, fish and
+        // French', 'proxy, fish and 2 more'
+        ([who], t) if drafts.len() >= 2 && !t.is_empty() => format!("{} {w} to {who}: {}", drafts.len(), and_list(&t)),
         ([who], _) if drafts.len() >= 2 => format!("{} {w} to {who}", drafts.len()),
         _ if w == "drafts" => and_list(&names),
         _ => format!("{w} to {}", and_list(&names)),
@@ -413,7 +415,7 @@ emails to lucas and marc");
 <section data-kit="message" data-id="r-s214" data-to="Slack · #acme-feedback · to Benjamin, on French" data-verb="send" data-open="https://acme.slack.com/archives/C05/p3"><p>c</p></section>"#;
 
     /// Law (ambient-lead m_6168, pm's C run): one recipient's drafts are
-    /// grouped: '3 replies to Benjamin: proxy · fish · French', not the
+    /// grouped: '3 replies to Benjamin: proxy, fish and French', not the
     /// address three times; several recipients read as before.
     #[test]
     fn one_recipients_drafts_are_grouped() {
@@ -424,8 +426,10 @@ emails to lucas and marc");
             (Some("Benjamin"), Some("French")),
         ]);
         assert_eq!(batch_text(&p, "benjamin's reports"), "3 drafts wait for you · benjamin's reports
-3 replies to Benjamin: proxy · fish · French");
+3 replies to Benjamin: proxy, fish and French");
         assert_eq!(info(&p, "t")["names"], json!(["Benjamin"]));
+        let four: Vec<Draft> = p.iter().cloned().chain([Draft { topic: Some("docs".into()), ..p[0].clone() }]).collect();
+        assert_eq!(line(&four), "4 replies to Benjamin: proxy, fish and 2 more");
         // the earlier shape of address: 'reply to X in #channel (topic)'
         assert_eq!(addressee("reply to Benjamin in #acme-feedback (install bug)"), (Some("Benjamin".into()), Some("install bug".into())));
         assert_eq!(addressee("#lyon"), (Some("#lyon".into()), None));
@@ -444,7 +448,7 @@ emails to lucas and marc");
         assert_eq!(ready(FEEDBACK, p.clone(), &|_| false).len(), 3);
         let lines = |busy: &dyn Fn(&str) -> bool| super::super::waiting::of_page("fb", FEEDBACK, &[], &[], busy).iter().map(|w| w.line()).collect::<Vec<_>>();
         assert_eq!(lines(&|a| a.starts_with("fix-")), vec!["fb#r-s214 · draft · c"]);
-        assert_eq!(lines(&|_| false), vec!["fb#r-s213 · draft · 3 drafts wait for you: 3 replies to Benjamin: proxy · fish · French"]);
+        assert_eq!(lines(&|_| false), vec!["fb#r-s213 · draft · 3 drafts wait for you: 3 replies to Benjamin: proxy, fish and French"]);
     }
 
     /// Law (ambient's words, m_6055 via ambient-lead m_6058): review is

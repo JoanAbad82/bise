@@ -656,15 +656,22 @@ def main():
         fb = lambda: [x for x in c.cards() if (x.get("page") or {}).get("id") == "benjamin-bugs"]
         c.wait(fb, 90, "the feedback page's batch card")
         time.sleep(1)
-        check(len(fb()) == 1 and fb()[0]["text"] == "2 drafts wait for you · benjamin's reports\n2 replies to Benjamin: proxy · French\n1. review\n2. send both",
+        check(len(fb()) == 1 and fb()[0]["text"] == "2 drafts wait for you · benjamin's reports\n2 replies to Benjamin: proxy and French\n1. review\n2. send both",
               "fix-fish at work: its reply waits, the other 2 are one card: %r" % fb())
         settle(c)
         c.say("[[bash: sb page waiting]]")
-        c.wait_line("main", "benjamin-bugs#reply-s213 · draft · 2 drafts wait for you: 2 replies to Benjamin: proxy · French", 60)
+        c.wait_line("main", "benjamin-bugs#reply-s213 · draft · 2 drafts wait for you: 2 replies to Benjamin: proxy and French", 60)
         settle(c)
-        # fix-fish done: its reply joins, one card for the 3
-        c.wait(lambda: fb() and fb()[0]["text"].startswith("3 drafts wait for you · benjamin's reports\n3 replies to Benjamin: fish · proxy · French\n"), 90,
-               "fix-fish done, the 3 replies in one card")
+        # fix-fish done: its reply still waits for the page written after
+        # the fix (ambient-lead m_6187), never the old workaround
+        c.wait_status("fix-fish", "done", 90)
+        time.sleep(3)
+        check(fb() and fb()[0]["text"].startswith("2 drafts wait for you"), "done but not republished: still 2: %r" % fb())
+        open(fp, "w").write(fi("s212", "fish", "fix-fish").replace("thanks Benjamin, fixed", "fixed in the installer, thanks Benjamin")
+                            + fi("s213", "the proxy") + fi("s214", "French"))
+        c.say('[[bash: sb page publish %s --id benjamin-bugs]]' % fp)
+        c.wait(lambda: fb() and fb()[0]["text"].startswith("3 drafts wait for you · benjamin's reports\n3 replies to Benjamin: fish, proxy and French\n"), 90,
+               "republished after the fix: the 3 replies in one card")
         check(fb()[0]["text"].endswith("2. send all 3"), "send all 3: %r" % fb())
         check((fb()[0].get("batch") or {}).get("what") == "replies" and fb()[0]["page"].get("item") == "reply-s212", "its fields: %r" % fb()[0])
         check((fb()[0].get("batch") or {}).get("names") == ["Benjamin"] and fb()[0]["batch"].get("topics") == ["fish", "proxy", "French"], "names, topics: %r" % fb()[0])
