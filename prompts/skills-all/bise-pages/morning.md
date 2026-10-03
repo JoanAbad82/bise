@@ -6,7 +6,8 @@ his first fn of the day, so it is ready before then, never computed when he asks
 
 **The order** (once, when the user asks for it): `sb every day 07:30 "make today's morning page
 (bise-pages morning.md)"`. Each wake makes a new page with the id `morning-YYYY-MM-DD` (today,
-his time zone): the app opens exactly that id. No `--page`: it is a new page each day.
+his time zone): the app opens exactly that id. No `--page`: it is a new page each day. Each wake
+first refreshes his promises (`promises.md`), so an overdue one is there for `needs you`.
 
 **The page: four parts, nothing else, under a minute to read.** Each part left out when empty;
 at most 5 lines per part, the rest as one line with a link (`+4 more on the launch watch`).
@@ -20,7 +21,9 @@ opens on that item), a PR or a doc by its https link.
    `<page>#<item> · step|draft|question|notes · <text>` (his checklist steps not ticked, drafts
    waiting for his word, unanswered questions, notes he left; `nothing waits on him` when
    empty). A plan waiting on him is there: his first open step and each draft of bise's that
-   waits for his word.
+   waits for his word. Overdue promises come first (`· overdue 2 days ·`), linked to the row
+   whose draft is ready: `<a href="/p/promises-2026-w20#p-sso">send Hélène the SSO timeline</a>
+   · overdue 2 days, drafted`.
    One line each, the thing and where it waits, linked to the item: `<a
    href="/p/inbox-review#m2">reply to Marc about invoice #2231</a> · inbox`; never a bare
    `/p/<page>`. Never the drafts themselves: they stay on their page.
