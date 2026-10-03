@@ -110,11 +110,31 @@
   }
 
   // answer a card with its option `opt` ({n, label}): the reply is the option's digit
+  // a batch of drafts on one page (amb-core 34703bf0, card.page.drafts, card.batch {count, title,
+  // what, names}); without batch, read from its text '<n> drafts ready: a · b · c'
+  function batchOf(c) {
+    if (!c || !c.page || !c.page.drafts) return null;
+    const b = c.batch || {};
+    const tm = /^(\d+)\s+drafts?[^:]*:\s*(.*)$/.exec(String(c.text || ""));
+    const opts = Wd.options(c);
+    const review = opts.find((o) => /review/i.test(o.label)) || { i: 0, n: 1 };
+    const send = opts.find((o) => /send/i.test(o.label)) || { i: 1, n: 2 };
+    const names = Array.isArray(b.names) ? b.names.map(String) : tm ? tm[2].split(/\s*·\s*/).filter(Boolean) : [];
+    return { count: +b.count || (tm ? +tm[1] : names.length || 2), title: b.title || c.page.title || "", what: b.what || "drafts", names, review, send };
+  }
+
   function answer(m, card, opt, now) {
     const choice = opt ? opt.label : null;
     const reply = String(opt.n);
     const m2 = { ...m, answered: { ...m.answered, [card.id]: true }, sel: 0, pane: m.pane === "inbox" && visibleCards(m).length <= 1 ? null : m.pane };
     const f = { kind: "answered", glyph: "✓", text: Wd.answeredLine(card.agent, choice), ttl: T.answered, kiss: true };
+    // a batch of drafts: review opens the page at the first draft (the card stays open on the hub);
+    // send all says '∿ sending 3 replies.', dim, 4 s: nothing has left yet (ambient-lead m_6063)
+    const b = batchOf(card), p = card.page;
+    if (b) {
+      if (opt.n === b.send.n) return { m: flashNow(m2, { kind: "sending", glyph: "∿", text: Wd.drafts.sending(b.count, b.what), ttl: T.answered }, now), cmds: [{ cmd: "answer", card: card.id, reply }] };
+      return { m: { ...m2, lastPage: p.id || m.lastPage }, cmds: [{ cmd: "answer", card: card.id, reply }, ...(p.url ? [{ cmd: "app_open_url", url: p.url, page: p.id }] : [])] };
+    }
     return { m: flashNow(m2, f, now), cmds: [{ cmd: "answer", card: card.id, reply }] };
   }
 
@@ -386,6 +406,9 @@
       // fn + o: in the full view, the first page of for you (unopened first); else the page the
       // capsule named last, else the newest; the app opens it or brings its tab
       case "o": {
+        // a batch of drafts asking: fn o opens its page at the first draft (amb-core 34703bf0)
+        const ask0 = !m.pane && visibleCards(m)[0];
+        if (ask0 && ask0.page && ask0.page.drafts && ask0.page.url) return openCard(m, ask0);
         const p = (m.pane === "agents" && forYouPages(m)[0]) || m.pages.find((x) => x.id === m.lastPage) || m.pages[0];
         return p ? openPage(m, p) : none(m);
       }
@@ -534,6 +557,10 @@
     // pearl, '? cookies needs you', the question, its options and the hint; no second card
     const ask = () => {
       const c = asking[0];
+      const b = batchOf(c);
+      // a batch of drafts: one glass like a question, its own words, review first (ambient m_6056)
+      if (b) return { id: c.id, agent: c.agent, title: Wd.drafts.label(b.count, b.title), text: Wd.drafts.line(b.what, b.names), hint: W.needsHint, more: asking.length - 1, open: null, batch: true,
+        options: [{ i: b.review.i, label: Wd.optionLabel(b.review.n, Wd.drafts.review) }, { i: b.send.i, label: Wd.optionLabel(b.send.n, Wd.drafts.sendAll(b.count)) }] };
       return { id: c.id, agent: c.agent, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsHint, more: asking.length - 1,
         open: c.page && c.page.url ? W.openIt : null,
         options: Wd.options(c).map((o) => ({ i: o.i, label: Wd.optionLabel(o.n, o.label) })) };

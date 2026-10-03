@@ -75,6 +75,8 @@ html:not(.app) .cap, html:not(.app) .note {
 .line .gl.fail { color: var(--risk); }
 /* a done or answered line's ✓ is olive: rose is only for what waits for you (ambient m_5332 (4)) */
 .line .gl.ok { color: var(--ok); }
+/* ∿ sending: the working glyph, dim (nothing has left yet; ambient-lead m_6063) */
+.line .gl.work { color: var(--dim); }
 .words { font-size: 19px; font-weight: 500; letter-spacing: -.01em; line-height: 1.32; }
 .words.main { font-size: 17px; line-height: 1.38; font-weight: 400; letter-spacing: 0; }
 .words .w { opacity: 0; filter: blur(3px); transition: opacity .24s ease-out, filter .24s ease-out; }

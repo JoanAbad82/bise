@@ -157,8 +157,8 @@
     });
     put("line", JSON.stringify([v.glyph, v.text]), () => {
       show(el.line, v.text != null);
-      const fail = v.glyph === "▲", ok = v.glyph === "✓";
-      el.line.innerHTML = v.text == null ? "" : `${v.glyph ? `<span class="gl${fail ? " fail" : ok ? " ok" : ""}">${esc(v.glyph)}</span>` : ""}${esc(v.text)}`;
+      const fail = v.glyph === "▲", ok = v.glyph === "✓", work = v.glyph === "∿";
+      el.line.innerHTML = v.text == null ? "" : `${v.glyph ? `<span class="gl${fail ? " fail" : ok ? " ok" : work ? " work" : ""}">${esc(v.glyph)}</span>` : ""}${esc(v.text)}`;
       el.line.classList.remove("arrive"); void el.line.offsetWidth; el.line.classList.add("arrive");
     });
     put("words", JSON.stringify(v.words && [v.state === "listening", v.words.list, v.words.code, v.words.lit]), () => {

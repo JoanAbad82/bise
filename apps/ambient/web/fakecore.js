@@ -161,6 +161,7 @@
     ]) },
     { id: "inbox", spec: ["needs you"], label: "fn + i: the inbox", build: () => sort([...base(AGENTS, [CARD, CARD2]), [500, { ev: "app_key", key: "i" }]]) },
     { id: "hello", spec: ["idle"], label: "the hello (once ever)", build: () => sort([...base(), [300, { ev: "app_hello" }]]) },
+    { id: "drafts", spec: ["needs you"], label: "3 drafts wait for you", build: () => sort([...base(), [500, state(AGENTS, [{ id: "b1", agent: "inbox", kind: "drafts", text: "3 drafts ready: legal · Lucas · Marc", options: [{ n: 1, label: "review" }, { n: 2, label: "send all 3" }], page: { id: "inbox", block: "r1", item: "i1", drafts: true, url: "http://127.0.0.1:47123/p/inbox#i1" }, batch: { count: 3, title: "your inbox", what: "replies", names: ["legal", "Lucas", "Marc"] } }])]]) },
     { id: "settings", spec: ["settings"], label: "fn + ,: settings", build: () => sort([...base(),
       [100, { ev: "app_settings", edge_glow: true, right_option: false, meeting_quiet: true, voice_answers: true, launch_at_login: "on", macos: 26, radius: 26,
         skip: [{ bundle: "com.agilebits.onepassword7", name: "1Password", fixed: true }, { bundle: "com.tinyspeck.slackmacgap", name: "Slack", fixed: false }] }],

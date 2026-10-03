@@ -158,6 +158,23 @@
   const needsLine = (agent) => `${agent} needs you`;
   // `✓ cookies has it.` / with the option it took: `✓ cookies has it: yes.`
   const answeredLine = (agent, choice) => (choice ? `${agent} has it: ${choice}.` : `${agent} has it.`);
+  // a batch of drafts waiting on one page (amb-core 34703bf0; ambient m_6056, ambient-lead m_6063):
+  // '3 drafts wait for you · launch recap', 'replies to legal, Lucas and Marc', '1 review' first
+  // (the filled one: reading comes before sending), '2 send all 3' / 'send both', and right after
+  // send all '∿ sending 3 replies.' (nothing has left yet: the hub has only asked the agent)
+  const names = (xs) => {
+    const n = xs.filter(Boolean);
+    if (n.length <= 1) return n[0] || "";
+    if (n.length <= 3) return `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`;
+    return `${n.slice(0, 2).join(", ")} and ${n.length - 2} more`;
+  };
+  const drafts = {
+    label: (count, title) => `${count} drafts wait for you${title ? ` · ${title}` : ""}`,
+    line: (what, who) => (who.length ? `${what || "drafts"} to ${names(who)}` : what || "drafts"),
+    review: "review",
+    sendAll: (count) => (count === 2 ? "send both" : `send all ${count}`),
+    sending: (count, what) => `sending ${count === 2 ? "both" : count} ${what || "drafts"}.`,
+  };
   // VoiceOver: the pearl is an image whose label says its mood (best guesses, asked to ambient)
   const MOOD_SAYS = { rest: "bise", listen: "bise is listening", speak: "bise is talking", work: "bise is working", need: "bise needs you", done: "bise: done", fail: "bise: something failed", away: "bise is quiet", still: "bise" };
   const moodLabel = (mood) => MOOD_SAYS[mood] || "bise";
@@ -225,5 +242,5 @@
   // an agent's row is a label, not a sentence: no final period
   const rowLabel = (s) => String(s || "").replace(/\.$/, "");
 
-  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
+  root.AmbWords = { W, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
 })(typeof window !== "undefined" ? window : globalThis);

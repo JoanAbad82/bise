@@ -978,6 +978,30 @@ law("the hello, once ever (app_hello): the pearl gathers 1.2 s, 'hi, i'm bise. h
   eq([rv(0).gather, rv(0).text, rv(1500).puff, rv(5400).state, rv(5600).content.kind], [0, W.hello, false, "hello", "none"]);
 });
 
+law("a batch of drafts is one glass: '3 drafts wait for you · <page>', 'replies to …', 1 review (opens the page), 2 send all 3 ('∿ sending 3 replies.') (ambient m_6056, lead m_6063)", () => {
+  const card = { id: "b1", agent: "inbox", kind: "drafts", text: "3 drafts ready: legal · Lucas · Marc",
+    options: [{ n: 1, label: "review" }, { n: 2, label: "send all 3" }],
+    page: { id: "inbox", block: "r1", item: "i1", drafts: true, url: "http://127.0.0.1:47123/p/inbox#i1" },
+    batch: { count: 3, title: "your inbox", what: "replies", names: ["legal", "Lucas", "Marc"] } };
+  const m = M.step(M.init(), { ev: "state", agents: [], cards: [card], pages: [] }, 0).m;
+  const v = M.view(m, 10);
+  eq([v.state, v.mood, v.ask.title, v.ask.text, v.ask.hint, v.ask.open], ["needs", "need", "3 drafts wait for you · your inbox", "replies to legal, Lucas and Marc", "or hold fn and say it", null]);
+  eq(v.ask.options.map((o) => o.label), ["1 review", "2 send all 3"]);
+  // 1 review: the answer, and the page at the first draft
+  eq(M.step(m, { ev: "app_key", key: "1" }, 20).cmds, [{ cmd: "answer", card: "b1", reply: "1" }, { cmd: "app_open_url", url: "http://127.0.0.1:47123/p/inbox#i1", page: "inbox" }]);
+  // 2 send all: '∿ sending 3 replies.' (nothing has left yet), a timed line
+  const s = M.step(m, { ev: "app_key", key: "2" }, 20);
+  eq(s.cmds, [{ cmd: "answer", card: "b1", reply: "2" }]);
+  const sv = M.view(s.m, 30);
+  eq([sv.glyph, sv.text, sv.content.kind], ["∿", "sending 3 replies.", "line"]);
+  // fn o opens the batch's page too
+  eq(M.step(m, { ev: "app_key", key: "o" }, 20).cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/inbox#i1", page: "inbox" }]);
+  // two: 'send both', 'sending both replies.'; more than 3 names: 'and N more'; no batch: read from the text
+  eq([Wd.drafts.sendAll(2), Wd.drafts.sending(2, "replies"), Wd.names(["legal", "Lucas", "Marc", "Ana", "Ivo", "Zoé"])], ["send both", "sending both replies.", "legal, Lucas and 4 more"]);
+  const bare = M.view(M.step(M.init(), { ev: "state", agents: [], cards: [{ ...card, batch: undefined }], pages: [] }, 0).m, 10);
+  eq([bare.ask.title, bare.ask.text], ["3 drafts wait for you", "drafts to legal, Lucas and Marc"]);
+});
+
 // ---- for you with opened_version (amb-core 03821a37) and the count shared with the menu bar
 law("for you: unopened first, newest first, 'new' or 'v3 · 2 new versions'; seen ones after; a watched page says when it was checked", () => {
   const pages = [
