@@ -336,6 +336,13 @@ the page with an open card (a task agent's page) is not checked yet.
   empty. The run's fail is the flow handling only 2 step cards (it counts his rows, and a drafted
   step of bise's now makes a card too): amb-tools. Nit (amb-kit): the `send the draft?` card still
   said `waiting for your note: legal's address` after the note was left.
+- **D at c1dd4f9c: pass on the product, to the end.** One card for the decision (`how many
+  years?`), legal's address asked once, his `sign in` and `pay` cards each when their turn came,
+  then 3 `send the draft?` cards (legal, Lucas, Marc). The 3 mails went only after his `send`
+  (fake outbox, all accurate), and the plan ends waiting on Lucas's DNS. The run's 2 fails are
+  checks (amb-tools): sends after his word counted as sends on a "don't send" ask, and rows waiting
+  on Lucas counted as forgotten. Nits (amb-kit): v1 at 69 s (the page at 16 s), and the trademark
+  mail came after he paid while Marc asked for it before buying.
 - **23 and 24 rechecked at a589f9f9 (`qa.py ask`): pass.** `what's my next meeting` → `09:30,
   launch standup with Marc, Lucas and Nora` in 13 s, no page: the fixture says 07:30Z, so the time
   is in his zone (CEST). `plan the offsite` → offsite-plan; the follow-up `add a budget per person
