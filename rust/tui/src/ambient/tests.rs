@@ -250,6 +250,26 @@ fn a_page_cards_digit_goes_to_the_page_path() {
     assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "/answer 3 1"}));
 }
 
+/// Law (pm's C fail 36): bise's own bookkeeping (main's archive
+/// suggestion, a `drop` card) is never a card on ambient: not on the
+/// glass, not in the count, not in needs-you; it stays in the TUI.
+#[test]
+fn housekeeping_cards_stay_in_the_tui() {
+    let mut t = T::new();
+    t.hub.say(json!({"ev": "state", "agents": [], "cards": [
+        {"id": 2, "kind": "drop", "agent": "proxy-fix", "text": "main suggests: archive @proxy-fix? the agent is mid-turn. (answer yes or no)"},
+        {"id": 3, "kind": "question", "agent": "main", "text": "ship as a PR?
+1. yes
+2. no"}]}));
+    t.until(|o| has(o, "state"));
+    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    let ids: Vec<u64> = st["cards"].as_array().unwrap().iter().map(|c| c["id"].as_u64().unwrap()).collect();
+    assert_eq!(ids, vec![3]);
+    // and it cannot be answered from the capsule
+    t.cmd(Cmd::Answer { card: 2, reply: "1".into() });
+    assert!(has(&t.take(), "error"));
+}
+
 #[test]
 fn a_hub_item_digit_goes_as_the_digit() {
     let mut t = T::new();

@@ -126,6 +126,23 @@ def main():
         core.wait(lambda e: e.get("ev") == "state" and not e["cards"], 60, "the card closed")
         c.wait_line("t1", 'from="user"', 60)
 
+        # bise's bookkeeping stays in the TUI (pm's C fail 36): main's
+        # archive suggestion is a drop card for the TUI, never one in the
+        # capsule, and while it is open a second drop never acts
+        c.wait_idle("main", "t1")
+        c.say('/new -w t2: {{bash: echo wip > wip.txt}}')
+        c.wait_idle("t2")
+        c.say("[[bash: sb drop t2]]")
+        c.wait(lambda: any(x.get("kind") == "drop" and x.get("agent") == "t2" for x in c.cards()), 60, "the drop card in the TUI")
+        drop = next(x for x in c.cards() if x.get("kind") == "drop")
+        core.wait(lambda e: e.get("ev") == "state" and any(a["name"] == "t2" for a in e["agents"]), 30, "t2 in the core's list")
+        time.sleep(1)
+        check(not any(cd["id"] == drop["id"] for cd in core.last("state")["cards"]), "no drop card in the capsule: %r" % core.last("state")["cards"])
+        c.wait_idle("main")
+        c.say("[[bash: sb drop t2]]")
+        c.wait_line("main", "has not answered card #%d" % drop["id"], 60)
+        check(any(x["id"] == drop["id"] for x in c.cards()), "the card still asks him")
+
         # the app goes: the core exits on stdin EOF
         core.p.stdin.close()
         rc = core.p.wait(timeout=10)

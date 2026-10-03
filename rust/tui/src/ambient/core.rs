@@ -665,7 +665,10 @@ impl Core {
             .collect();
         self.cards = list("cards")
             .iter()
-            .filter(|c| (self.ports.user_kind)(&s(c, "kind")))
+            // bise's own bookkeeping (main's archive suggestion, a
+            // `drop` card) stays in the TUI: never on the glass, in the
+            // count or in needs-you (pm's C fail 36)
+            .filter(|c| (self.ports.user_kind)(&s(c, "kind")) && s(c, "kind") != "drop")
             .map(|c| CardInfo {
                 id: c.get("id").and_then(Value::as_u64).unwrap_or(0),
                 kind: s(c, "kind"),

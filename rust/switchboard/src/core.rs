@@ -2638,7 +2638,19 @@ impl Hub {
             AgentReq::Stop { agent, reason } => {
                 json!({"cmd": "stop", "agent": agent, "reason": reason})
             }
-            AgentReq::Drop { agent } => json!({"cmd": "drop", "agent": agent}),
+            AgentReq::Drop { agent } => {
+                // a drop the user was asked to confirm waits for his
+                // answer: a second drop never acts in his place (pm's C
+                // fail 36: main dropped @proxy-fix again once it was idle,
+                // while its card still asked him)
+                let name = self.st.resolve(&agent).unwrap_or_else(|| agent.clone());
+                if let Some(c) = self.st.open_cards().find(|c| c.kind == "drop" && c.agent == name) {
+                    let error = format!("@{name}: the user has not answered card #{} (archive it?) yet: wait for his answer", c.id);
+                    reply(fx, json!({"ok": false, "error": error}));
+                    return;
+                }
+                json!({"cmd": "drop", "agent": agent})
+            }
             AgentReq::Card { text, for_msg } => {
                 json!({"cmd": "card", "text": text, "for": for_msg})
             }

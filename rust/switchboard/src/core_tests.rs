@@ -646,6 +646,31 @@ fn main_cannot_drop_work_away() {
     assert_eq!(t.status("fix"), Status::Archived);
 }
 
+/// Law (pm's C fail 36): an archive the user was asked to confirm never
+/// happens without his answer: while its card is open, another drop of
+/// that agent by main (once nothing would ask any more) is refused.
+#[test]
+fn an_unanswered_drop_card_never_acts() {
+    let mut t = T::new();
+    t.user(MAIN, "/new -w fix: x");
+    t.go(Input::ReplReady { agent: "fix".into() });
+    t.go(Input::ReplIdle { agent: "fix".into(), leftover: false });
+    t.env.loss = Loss { dirty: 1, unpushed: 0 };
+    let (tok, fx) = t.req(MAIN, AgentReq::Drop { agent: "fix".into() });
+    assert_eq!(reply(&fx, tok).unwrap()["dropped"], false);
+    let card = t.hub.st.cards.values().find(|c| c.kind == "drop").unwrap().id;
+    // nothing to ask about any more: main drops again
+    t.env.loss = Loss { dirty: 0, unpushed: 0 };
+    let (tok, fx) = t.req(MAIN, AgentReq::Drop { agent: "fix".into() });
+    let r = reply(&fx, tok).unwrap();
+    assert_eq!(r["ok"], false, "{r}");
+    assert!(r["error"].as_str().unwrap().contains(&format!("card #{card}")), "{r}");
+    assert_ne!(t.status("fix"), Status::Archived);
+    // his yes archives it
+    t.user(MAIN, &format!("/answer {} oui", card));
+    assert_eq!(t.status("fix"), Status::Archived);
+}
+
 #[test]
 fn an_escalated_question_is_answered_by_the_user() {
     let mut t = T::new();
