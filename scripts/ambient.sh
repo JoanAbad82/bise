@@ -141,6 +141,13 @@ open_app() {
     esac
   done
   if [ "$home" = 0 ] && [ -z "$ws" ]; then ws="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"; fi
+  # no --bise: the try path's build when there is one (the dogfood's first
+  # launch took ~/.local/bin/bise, which has no ambient-core: 2 min of
+  # 'unknown command'), the PATH's bise only without it
+  if [ -z "$bise" ] && [ -x "$TRY_BISE" ]; then
+    bise="$TRY_BISE"
+    export BISE_APP_ROOT="${BISE_APP_ROOT:-$REPO}"
+  fi
   [ -n "$bise" ] || bise="$(command -v bise || true)"
   [ -n "$bise" ] || { say "no bise: pass --bise <exe>"; exit 2; }
   build

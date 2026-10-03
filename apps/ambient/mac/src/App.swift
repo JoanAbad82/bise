@@ -72,6 +72,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         let fm = FileManager.default
         if c.bise.contains("/") { d.set(c.bise, forKey: "lastBise") }
         else if let b = d.string(forKey: "lastBise"), fm.isExecutableFile(atPath: b) { c.bise = b }
+        // never the PATH's bise when the try path's build is there (it has
+        // ambient-core; ~/.local/bin/bise may not)
+        else if case let b = c.dev + "/build/ambient/target/debug/bise", fm.isExecutableFile(atPath: b) { c.bise = b }
         if let w = c.web { d.set(w, forKey: "lastWeb") }
         else if let w = d.string(forKey: "lastWeb"), fm.fileExists(atPath: w) { c.web = w }
         if c.childEnv["PATH"] != nil { d.set(c.childEnv["PATH"], forKey: "lastPath") }
