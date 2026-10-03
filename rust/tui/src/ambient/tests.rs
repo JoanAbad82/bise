@@ -284,6 +284,31 @@ b: straight to main"})])
     assert!(!has(&t.take(), "error"));
 }
 
+/// Law (pm's C fail 43): an answer on a batch card that closed (replaced
+/// by a newer one) still goes to the hub, which acts on the page's
+/// current drafts or says what changed; a closed card never seen as a
+/// batch is refused as before.
+#[test]
+fn an_answer_on_a_replaced_batch_card_reaches_the_hub() {
+    let mut t = T::new();
+    let batch = |id: u64, n: usize| json!({"id": id, "kind": "question", "agent": "main", "text": format!("{n} drafts wait for you · bugs
+{n} replies to Benjamin
+1. review
+2. send all {n}"),
+        "page": {"id": "bugs", "block": "r", "item": "r1", "drafts": true, "url": "http://x/p/bugs#r1"}});
+    t.hub.say(json!({"ev": "state", "agents": [], "pages": [], "cards": [batch(1, 6)]}));
+    t.until(|o| has(o, "state"));
+    t.take();
+    t.hub.say(json!({"ev": "state", "agents": [], "pages": [], "cards": [batch(2, 7)]}));
+    t.until(|o| has(o, "state"));
+    t.take();
+    t.cmd(Cmd::Answer { card: 1, reply: "2".into() });
+    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "/answer 1 2"}));
+    assert!(!has(&t.take(), "error"));
+    t.cmd(Cmd::Answer { card: 5, reply: "2".into() });
+    assert!(has(&t.take(), "error"));
+}
+
 /// Law (pm's C fail 36): bise's own bookkeeping (main's archive
 /// suggestion, a `drop` card) is never a card on ambient: not on the
 /// glass, not in the count, not in needs-you; it stays in the TUI.

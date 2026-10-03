@@ -106,7 +106,14 @@ pub fn pending(html: &str, notes: &[Note], questions: &[Question]) -> Vec<Draft>
                 let (to, topic) = recipient(html, &b);
                 // a message in a thread (data-open) is a reply
                 let kind = match kit_word(kit) {
-                    "message" if head_of(html, &b).is_some_and(|(h, _)| h.contains("data-open=\"")) => "reply",
+                    // (or its label says 'reply to …': amb-kit 97db3777)
+                    "message"
+                        if head_of(html, &b).is_some_and(|(h, _)| {
+                            h.contains("data-open=\"") || h.split("data-to=\"").nth(1).is_some_and(|t| t.split('"').next().unwrap_or("").rsplit(" · ").next().unwrap_or("").trim().starts_with("reply to "))
+                        }) =>
+                    {
+                        "reply"
+                    }
                     k => k,
                 };
                 out.push(Draft { block: b, item: None, text, step: None, kind, to, topic });
@@ -220,9 +227,12 @@ fn recipient(html: &str, id: &str) -> (Option<String>, Option<String>) {
 fn addressee(seg: &str) -> (Option<String>, Option<String>) {
     let s = seg.trim();
     let s = s.strip_prefix("reply to ").or_else(|| s.strip_prefix("to ")).unwrap_or(s);
-    let (who, topic) = match (s.split_once(" ("), s.split_once(", on ")) {
-        (Some((w, t)), _) => (w, Some(t.trim_end_matches(')'))),
-        (None, Some((w, t))) => (w, Some(t)),
+    let (who, topic) = match (s.split_once(" ("), s.split_once(", on "), s.split_once(", ")) {
+        (Some((w, t)), _, _) => (w, Some(t.trim_end_matches(')'))),
+        (None, Some((w, t)), _) => (w, Some(t)),
+        // 'reply to Benjamin, in French' (amb-kit 97db3777's short
+        // labels): the person before the comma, no topic
+        (None, None, Some((w, _))) => (w, None),
         _ => (s, None),
     };
     // 'Benjamin in #acme-feedback': the person
@@ -476,6 +486,11 @@ emails to lucas and marc");
         // the earlier shape of address: 'reply to X in #channel (topic)'
         assert_eq!(addressee("reply to Benjamin in #acme-feedback (install bug)"), (Some("Benjamin".into()), Some("install bug".into())));
         assert_eq!(addressee("#lyon"), (Some("#lyon".into()), None));
+        // amb-kit 97db3777's short labels (pm's C run 074425): one person
+        assert_eq!(addressee("reply to Benjamin, in French"), (Some("Benjamin".into()), None));
+        let c = r#"<section data-kit="message" data-id="r1" data-to="Slack · reply to Benjamin in #acme-feedback" data-verb="send"><p>a</p></section>
+<section data-kit="message" data-id="r2" data-to="Slack · reply to Benjamin, in French" data-verb="send"><p>b</p></section>"#;
+        assert_eq!(line(&pending(c, &[], &[])), "2 replies to Benjamin");
     }
 
     /// Law (ambient-lead m_6192, amb-kit m_6198): an account change

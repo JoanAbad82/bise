@@ -266,6 +266,10 @@ pub struct Core {
     sent_shots: Vec<Shot>,
     /// the pages of the last state: (id, title)
     page_titles: Vec<(String, String)>,
+    /// batch cards seen (page.drafts): an answer on one after it closed
+    /// still goes to the hub, which acts on the page's current drafts or
+    /// says what changed (pm's C fail 43)
+    batches_seen: Vec<u64>,
     /// the page server's base URL, from the hub's state
     pages_url: Option<String>,
     /// on a call or in a meeting (the app's `quiet`): no voice
@@ -300,6 +304,7 @@ impl Core {
             shot: None,
             sent_shots: Vec::new(),
             page_titles: Vec::new(),
+            batches_seen: Vec::new(),
             pages_url: None,
             quiet: false,
             voice_off: false,
@@ -540,6 +545,10 @@ impl Core {
                 // C fail 41)
                 None => d.to_string(),
             },
+            // a batch card replaced or closed: the hub acts on the page's
+            // current drafts, or says in one line what the card is now
+            (None, Some(d)) if self.batches_seen.contains(&id) => d.to_string(),
+            (None, None) if self.batches_seen.contains(&id) && !reply.trim().is_empty() => reply.to_string(),
             (None, _) => return self.error("that question is already closed."),
             (Some(_), None) if reply.is_empty() => return,
             (Some(_), None) => reply.to_string(),
@@ -687,6 +696,11 @@ impl Core {
                 batch: c.get("batch").filter(|b| b.is_object()).cloned(),
             })
             .collect();
+        for c in self.cards.iter().filter(|c| c.page.as_ref().is_some_and(|p| p["drafts"] == true)) {
+            if !self.batches_seen.contains(&c.id) {
+                self.batches_seen.push(c.id);
+            }
+        }
         let cards: Vec<Value> = self
             .cards
             .iter()

@@ -1579,6 +1579,21 @@ impl Shell {
         if have || !new || dismissed {
             return changed;
         }
+        // one batch card per page, ever (pm's C fail 43): any other open
+        // one of this page closes as replaced before the new one opens
+        let stale: Vec<u64> = self
+            .page_cards()
+            .iter()
+            .filter(|(c, (p, k))| p == id && k.starts_with("drafts:") && open.contains(c))
+            .map(|(c, _)| *c)
+            .collect();
+        for c in stale {
+            self.page_cards().remove(&c);
+            self.step(Input::ConfirmClose { card: c, res: "replaced".into() });
+            for s in steps.iter_mut().filter(|s| s.card == c && s.reply.is_none()) {
+                s.reply = Some(String::new());
+            }
+        }
         let first = &drafts[0];
         let mut s = Step {
             block: BATCH.into(),
@@ -1611,15 +1626,7 @@ impl Shell {
         }
         let mut steps = pages.store.steps(id);
         let Some(keys) = steps.iter().find(|s| s.card == card && s.reply.is_none()).map(|s| s.batch.clone()) else { return false };
-        let html = pages.store.html(id, meta.version()).unwrap_or_default();
-        let drafts = crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &pages.store.notes(id), &pages.store.questions(id)), &|a| pages.held(id, a, meta.version()));
-        let mut sent = Vec::new();
-        for d in drafts.iter().filter(|d| keys.contains(&d.key())) {
-            match pages.locked(|s| s.add_sent(id, &d.block, d.item.as_deref(), "approve", "send", meta.version(), now_ms())) {
-                Ok(n) => sent.push(n),
-                Err(e) => log_line(&self.opts.paths, &format!("page {id}: an approve not saved: {e}")),
-            }
-        }
+        let sent = self.page_approve_drafts(id, Some(&keys));
         for s in steps.iter_mut().filter(|s| s.card == card && s.reply.is_none()) {
             s.reply = Some("send all".into());
         }
@@ -1630,12 +1637,76 @@ impl Shell {
         if self.hub.st.open_cards().any(|c| c.id == card) {
             self.step(Input::ConfirmClose { card, res: "answered".into() });
         }
-        if !sent.is_empty() {
-            pages.push(id, "notes", &json!({"notes": pages.store.notes(id)}));
-            let msg = crate::pages::store::notes_message(&meta, &pages.url(id), &sent);
-            self.page_msg(crate::pages::PageMsg::Sent { id: id.to_string(), agent: meta.agent.clone(), text: msg });
-        }
+        self.page_send_approves(id, &meta, &sent);
         self.page_steps(id);
+        true
+    }
+
+    /// An approve note for each draft of page `id` that waits now (only
+    /// those in `keys` when given); the notes it wrote.
+    fn page_approve_drafts(&mut self, id: &str, keys: Option<&[String]>) -> Vec<crate::pages::store::Note> {
+        let Some(pages) = self.pages.clone() else { return Vec::new() };
+        let Some(meta) = pages.store.meta(id) else { return Vec::new() };
+        let html = pages.store.html(id, meta.version()).unwrap_or_default();
+        let drafts = crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &pages.store.notes(id), &pages.store.questions(id)), &|a| pages.held(id, a, meta.version()));
+        let mut sent = Vec::new();
+        for d in drafts.iter().filter(|d| keys.is_none_or(|k| k.contains(&d.key()))) {
+            match pages.locked(|s| s.add_sent(id, &d.block, d.item.as_deref(), "approve", "send", meta.version(), now_ms())) {
+                Ok(n) => sent.push(n),
+                Err(e) => log_line(&self.opts.paths, &format!("page {id}: an approve not saved: {e}")),
+            }
+        }
+        sent
+    }
+
+    /// The approves written: the page hears them, its agent (main when
+    /// gone) gets one notes message.
+    fn page_send_approves(&mut self, id: &str, meta: &crate::pages::store::Meta, sent: &[crate::pages::store::Note]) {
+        let Some(pages) = self.pages.clone() else { return };
+        if sent.is_empty() {
+            return;
+        }
+        pages.push(id, "notes", &json!({"notes": pages.store.notes(id)}));
+        let msg = crate::pages::store::notes_message(meta, &pages.url(id), sent);
+        self.page_msg(crate::pages::PageMsg::Sent { id: id.to_string(), agent: meta.agent.clone(), text: msg });
+    }
+
+    /// An answer on a batch card that was replaced or closed (pm's C fail
+    /// 43: his 'send all 6' on a replaced card did nothing): send all acts
+    /// on the page's current drafts (its open batch card, else the drafts
+    /// that wait); other words say in one line what the card is now. Never
+    /// silently nothing. False: no batch card of a page.
+    fn page_old_batch_answer(&mut self, client: ClientId, card: u64, reply: &str) -> bool {
+        use crate::pages::checklist::BATCH;
+        let Some(pages) = self.pages.clone() else { return false };
+        let Some(id) = pages.store.list().into_iter().map(|m| m.id).find(|id| pages.store.steps(id).iter().any(|s| s.block == BATCH && s.card == card)) else {
+            return false;
+        };
+        let Some(meta) = pages.store.meta(&id) else { return false };
+        let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
+        let now = pages.store.steps(&id).into_iter().find(|s| s.block == BATCH && s.reply.is_none() && open.contains(&s.card));
+        let say = match (now, crate::pages::drafts::is_send_all(reply)) {
+            (Some(s), true) => {
+                self.page_drafts_answer(&id, s.card, reply);
+                None
+            }
+            (None, true) => {
+                let sent = self.page_approve_drafts(&id, None);
+                if sent.is_empty() {
+                    Some(format!("that card is closed: nothing waits on {} now.", meta.title))
+                } else {
+                    self.page_send_approves(&id, &meta, &sent);
+                    self.page_steps(&id);
+                    None
+                }
+            }
+            (Some(s), false) => Some(format!("that card changed: {}", s.text.replace('\n', " · "))),
+            (None, false) => Some(format!("that card is closed: nothing waits on {} now.", meta.title)),
+        };
+        log_line(&self.opts.paths, &format!("page {id}: an answer on old batch card #{card}: {reply:?} → {}", say.as_deref().unwrap_or("sent the current drafts")));
+        if let (Some(text), Some(c)) = (say, self.clients.get_mut(&client)) {
+            write_json(c, &json!({"ev": "notice", "text": text}));
+        }
         true
     }
 
@@ -1694,11 +1765,11 @@ impl Shell {
     /// `/answer N reply` on a step's card: the step ticked (or the words
     /// as a note on its row), never the hub's question path. False: not
     /// a step's card.
-    fn page_step_answer(&mut self, text: &str) -> bool {
+    fn page_step_answer(&mut self, client: ClientId, text: &str) -> bool {
         let Some(rest) = text.trim().strip_prefix("/answer ") else { return false };
         let Some((n, reply)) = rest.trim().split_once(' ') else { return false };
         let Ok(card) = n.trim_start_matches('#').parse::<u64>() else { return false };
-        let Some((id, key)) = self.page_cards().get(&card).cloned() else { return false };
+        let Some((id, key)) = self.page_cards().get(&card).cloned() else { return self.page_old_batch_answer(client, card, reply) };
         if key.starts_with("drafts:") {
             return self.page_drafts_answer(&id, card, reply);
         }
@@ -2853,7 +2924,7 @@ impl Shell {
                 // back); never on an answer or a slash command
                 // a step of his answered on its card (roadmap D): ticked
                 // on its page, the page's agent told there
-                if !self.page_step_answer(&s("text")) {
+                if !self.page_step_answer(id, &s("text")) {
                     let text = match self.page_reply_text(&s("text")) {
                         Some(reply) => reply,
                         None => {

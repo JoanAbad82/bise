@@ -658,6 +658,7 @@ def main():
         time.sleep(1)
         check(len(fb()) == 1 and fb()[0]["text"] == "2 drafts wait for you · benjamin's reports\n2 replies to Benjamin: proxy and French\n1. review\n2. send both",
               "fix-fish at work: its reply waits, the other 2 are one card: %r" % fb())
+        two = fb()[0]["id"]
         settle(c)
         c.say("[[bash: sb page waiting]]")
         c.wait_line("main", "benjamin-bugs#reply-s213 · draft · 2 drafts wait for you: 2 replies to Benjamin: proxy and French", 60)
@@ -675,9 +676,13 @@ def main():
         check(fb()[0]["text"].endswith("2. send all 3"), "send all 3: %r" % fb())
         check((fb()[0].get("batch") or {}).get("what") == "replies" and fb()[0]["page"].get("item") == "reply-s212", "its fields: %r" % fb()[0])
         check((fb()[0].get("batch") or {}).get("names") == ["Benjamin"] and fb()[0]["batch"].get("topics") == ["fish", "proxy", "French"], "names, topics: %r" % fb()[0])
+        # one batch card per page: the 2-card closed when the 3-card came;
+        # his 'send both' on the old one acts on the current 3 (pm's C
+        # fail 43: it did nothing)
+        check(len(fb()) == 1 and fb()[0]["id"] != two and not any(x["id"] == two for x in c.cards()), "the old card closed: %r" % fb())
         settle(c)
-        c.say("/answer %d 2" % fb()[0]["id"])
-        c.wait(lambda: not fb(), 30, "the feedback batch closes on send all")
+        c.say("/answer %d 2" % two)
+        c.wait(lambda: not fb(), 30, "an answer on the replaced card sends the current 3")
         notes = json.loads(request(port, "GET", "/p/benjamin-bugs/meta")[2])["notes"]
         check(sorted(n["block"] for n in notes if n["kind"] == "approve") == ["reply-s212", "reply-s213", "reply-s214"], "an approve per reply: %r" % notes)
         settle(c)
