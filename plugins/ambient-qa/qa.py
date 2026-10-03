@@ -1345,7 +1345,7 @@ def _sections(body):
     for s in re.finditer(r"<section([^>]*)>(.*?)</section>", body or "", re.S):
         k = re.search(r'data-kit="([^"]+)"', s.group(1))
         i = re.search(r'data-id="([^"]+)"', s.group(1))
-        out.append({"kit": k.group(1) if k else "", "id": i.group(1) if i else "", "html": s.group(2)})
+        out.append({"kit": k.group(1) if k else "", "id": i.group(1) if i else "", "html": s.group(2), "attrs": s.group(1)})
     return out
 
 
@@ -1420,12 +1420,21 @@ def _flow_morning(x):
 MEETING_PAGE = re.compile(r"^meeting-[a-z0-9-]+-\d{4}-\d{2}-\d{2}$")
 # the meetings of the today set the run follows (fixtures sets.today): words of their page id
 MEETINGS_RUN = {"e401": ("renewal", "northwind"), "e402": ("sync",)}
+# the today set's overdue promise: Granola's last Northwind call has Camille owing Hélène the SSO
+# timeline in writing by 26 sep, and no mail sent it (the live run's brief found it)
+MEETINGS_OVERDUE = {"e401"}
 
 
-def meeting_brief_check(body, page_id):
+def meeting_brief_check(body, page_id, overdue=False):
     """meetings.md's brief (v1): its id, who (Hélène from people.md), last
-    time linked, what is open as a checklist, three questions. (facts, fails)"""
+    time linked, what is open as a checklist, three questions; with
+    `overdue` (a promise of his past due, amb-kit 4fb9c90e), a risk callout
+    right after the title heading. (facts, fails)"""
     fails, secs = [], _sections(body)
+    if overdue:
+        nxt = secs[1] if len(secs) > 1 and secs[0]["kit"] == "heading" else None
+        if not (nxt and nxt["kit"] == "callout" and 'data-tone="risk"' in nxt["attrs"]):
+            fails.append("%s: the overdue promise doesn't lead the brief (a data-tone=\"risk\" callout right after the title)" % page_id)
     low = (body or "").lower()
     if not MEETING_PAGE.match(page_id or ""):
         fails.append("brief id %s (meeting-<slug>-<YYYY-MM-DD> expected)" % page_id)
@@ -1489,7 +1498,7 @@ def _flow_meetings(x):
             if p and "v1_at" not in m and p.get("version", 0) >= 1:
                 m.update(id=p["id"], v1_at=round(time.time() - when[e][0]), v1_n=page_meta(p["id"])["versions"][-1]["n"])
                 b = _body(dict(x, page=p), m["v1_n"])
-                m["brief"], fails = meeting_brief_check(b, p["id"])
+                m["brief"], fails = meeting_brief_check(b, p["id"], overdue=(e in MEETINGS_OVERDUE))
                 r["fails"].extend(fails)
                 pages_seen[e] = p["id"]
             if e == "e401" and "v1_n" in m and "v2_at" not in m:

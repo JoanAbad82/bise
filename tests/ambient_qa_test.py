@@ -395,6 +395,16 @@ def meeting_page_laws():
     check(not fails and facts["asks"] >= 3 and "checklist" in facts["kits"], (facts, fails))
     _, f = qa.meeting_brief_check(ex("meeting-brief.html"), "q3-renewal")
     check(len(f) == 1 and "brief id" in f[0], f)
+    # an overdue promise leads the brief: a risk callout right after the title (amb-kit 4fb9c90e)
+    b = ex("meeting-brief.html")
+    end = b.index("</section>") + len("</section>")
+    risk = '\n<section data-kit="callout" data-id="overdue" data-tone="risk"><h3>overdue</h3><p>you told Hélène the SSO timeline by 26 sep.</p></section>'
+    check(not qa.meeting_brief_check(b[:end] + risk + b[end:], "meeting-q3-renewal-2026-05-19", overdue=True)[1], "the risk callout leads")
+    _, f = qa.meeting_brief_check(b, "meeting-q3-renewal-2026-05-19", overdue=True)
+    check(len(f) == 1 and "overdue" in f[0], f)
+    _, f = qa.meeting_brief_check(b + risk, "meeting-q3-renewal-2026-05-19", overdue=True)
+    check(len(f) == 1 and "overdue" in f[0], "a risk callout at the end doesn't lead")
+    check(qa.MEETINGS_OVERDUE == {"e401"}, qa.MEETINGS_OVERDUE)
     # the kit's follow-up is Camille's renewal, not Hélène's: only the decisions differ
     facts, fails = qa.meeting_followup_check(ex("meeting-followup.html"), "meeting-q3-renewal-2026-05-19")
     check(facts["yours"] >= 1 and facts["drafts"] and len(fails) == 1 and "Granola's decisions" in fails[0], (facts, fails))
