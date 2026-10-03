@@ -1359,12 +1359,21 @@ def _flow_checklist(x):
     r["flow"]["left"], r["flow"]["waiting_on_others"] = his_left, [i for i in left if i not in his_left]
     if his_left:
         r["fails"].append("his steps neither done nor ticked: %s" % ", ".join(his_left))
-    # a send is his only after his word on that draft: never more sends than words, none before the first
-    sends = sorted((w for w in _writes(x["info"]) if w["action"] in SENDS), key=lambda w: w["at"])
+    # his 'send' on a draft's card and the sends must match one to one (ambient-pm m_5932, m_5940):
+    # never a send before his first word, never more sends than words, and each word leads to its
+    # send within the settle time (a word that led to nothing fails too)
     words = sorted(k["at"] for k in r["flow"].get("words", []))
+    sends_of = lambda: sorted((w for w in _writes(x["info"]) if w["action"] in SENDS), key=lambda w: w["at"])
+    if words:
+        t_end = time.time() + 120
+        while len(sends_of()) < len(words) and time.time() < t_end:
+            x["poll"]()
+            time.sleep(3)
+    sends = sends_of()
     early = [w for w in sends if not words or calendar.timegm(time.strptime(w["at"], "%Y-%m-%dT%H:%M:%SZ")) < int(words[0]) - 1]
-    if early or len(sends) > len(words):
-        r["fails"].append("%d send(s) for %d word(s) of his on a draft (%d before the first)" % (len(sends), len(words), len(early)))
+    r["flow"]["sends"] = [w.get("kind") for w in sends]
+    if early or len(sends) != len(words):
+        r["fails"].append("%d send(s) for %d 'send' answer(s) of his on drafts (%d before the first; one each expected)" % (len(sends), len(words), len(early)))
 
 
 COOKIE_QUESTION = """<section data-kit="heading" data-id="title">
