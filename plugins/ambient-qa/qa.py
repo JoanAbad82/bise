@@ -887,7 +887,10 @@ def clicks(state="card", open_key="auto", selector=None, settle_s=1.0, then=None
         changed = _view_now() != v0
         # the page took it: its click on the target, or its pointerdown there when the target was
         # re-rendered under the pointer before the click (the fn hints act on pointerdown)
-        took = c.get("clicked") or any(d.get("inside") and d.get("type") in ("pointerdown", "mousedown") for d in c.get("dom") or [])
+        # judged by the act (ambient-pm m_6680: presses that act on release, amb-web 78e24cdf): a
+        # command left or the view changed after a press on it counts, whatever the click event did
+        pressed = c.get("clicked") or any(d.get("inside") for d in c.get("dom") or [])
+        took = pressed or bool(cmds) or changed
         r.update(clicked=bool(took), window_at_point=c.get("window_at_point"), commands=cmds, view_changed=changed)
         if c.get("window_at_point") != "panel":
             # the window server has another window there: his real click would go to it, whatever
