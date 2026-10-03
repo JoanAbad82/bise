@@ -369,7 +369,9 @@
     for (const li of items(block)) {
       if (!kids(li).some((c) => ui(c) && c.getAttribute("data-agent-line") == null && c.getAttribute("data-went") == null)) {
         // feedback to act on (data-verb="start", roadmap C): start an agent / answer <who> / skip
-        const bar = acts(doc, kit === "review" && block.getAttribute("data-verb") === "start" ? ["start", "approve", "skip"] : ITEM_ACTS[kit]);
+        // a mention to answer (data-verb="reply", mentions): send the drafted answer / start an agent / skip
+        const v = kit === "review" && block.getAttribute("data-verb");
+        const bar = acts(doc, v === "start" ? ["start", "approve", "skip"] : v === "reply" ? ["approve", "start", "skip"] : ITEM_ACTS[kit]);
         // a checklist's tick goes first, like a box; an item the agent marked done is ticked
         if (kit === "checklist") li.insertBefore(bar, li.firstChild || (li.nodes && li.nodes[0]) || null);
         else li.append(bar);
@@ -386,7 +388,7 @@
       const verb = block.getAttribute("data-verb");
       if (ok) ok.textContent = t ? W.openOn(t.site) : verb === "open-reply" ? W.openReply : verb === "start" ? W.answer(reporter(li)) : sends(block) ? W.send : keeps(block) ? W.keepRule : W.approve;
       // once an agent works on it (data-agent), 'start an agent' goes: its live line says the rest
-      const go = verb === "start" && kids(li).filter(ui).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "start");
+      const go = (verb === "start" || verb === "reply") && kids(li).filter(ui).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "start");
       if (go) {
         go.hidden = li.getAttribute("data-agent") != null;
         if (li.getAttribute("data-starting") != null) { go.textContent = W.starting; go.setAttribute("disabled", ""); }
@@ -404,7 +406,8 @@
     return who.split(/\s+/)[0] || "";
   }
   // a review whose items are drafts bise sends once the user says so (mail replies, messages)
-  const sends = (block) => block.getAttribute("data-verb") === "send";
+  // (and mentions to answer, data-verb="reply": the same 'send', plus 'start an agent')
+  const sends = (block) => ["send", "reply"].includes(block.getAttribute("data-verb"));
   function decorateReview(doc, block) {
     decorateItems(doc, block, "review");
     let all = kids(block).find(ui);

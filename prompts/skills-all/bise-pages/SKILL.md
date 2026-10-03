@@ -11,7 +11,8 @@ in place. You never write CSS, classes, scripts or colors.
 
 This file is enough for a first version: publish the skeleton before you open anything else.
 Next to it, read only what you need, when you need it: `blocks.md` (blocks, plans, the lint),
-`leaving.md` (send, post, drafts), `watch.md` (standing orders), `morning.md`, `meetings.md`,
+`leaving.md` (send, post, drafts), `watch.md` (standing orders), `mentions.md` (what's asked of
+him on Slack and mail), `morning.md`, `meetings.md`,
 `feedback.md` (bug reports), `about-you.md` (what bise keeps about the user).
 
 ## Page or one line

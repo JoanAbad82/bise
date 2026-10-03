@@ -50,7 +50,7 @@ fn the_skill_is_short_and_its_skeleton_passes() {
     let html = skill.split("```html\n").nth(1).and_then(|s| s.split("```").next()).expect("a skeleton");
     ok(html);
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../prompts/skills-all/bise-pages");
-    for f in ["blocks.md", "leaving.md", "watch.md", "morning.md", "meetings.md", "feedback.md", "about-you.md"] {
+    for f in ["blocks.md", "leaving.md", "watch.md", "mentions.md", "morning.md", "meetings.md", "feedback.md", "about-you.md"] {
         assert!(skill.contains(&format!("`{f}`")), "SKILL.md names {f}");
         assert!(dir.join(f).is_file(), "{f} sits next to SKILL.md");
     }
@@ -390,6 +390,11 @@ fn a_step_says_what_bise_did_and_where_its_draft_is() {
         &errs(r#"<section data-kit="review" data-id="r"><ol><li data-id="m1" data-did="drafted"><p>x</p></li></ol></section>"#),
         "data-did is not a kit attribute",
     );
+}
+
+#[test]
+fn mentions_to_answer_take_the_reply_verb() {
+    ok(r#"<section data-kit="review" data-id="asks" data-verb="reply"><ol><li data-id="m1"><p>Léa Martin · #design · 9:12</p><blockquote>can you check the pricing copy?</blockquote><p>yes, before noon.</p></li></ol></section>"#);
 }
 
 #[test]

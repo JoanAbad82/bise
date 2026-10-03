@@ -535,11 +535,11 @@ impl<'a> Linter<'a> {
         match (kit.as_deref(), get("data-verb")) {
             (_, None) => {}
             (Some("review"), Some(v))
-                if matches!(v.as_str(), "send" | "approve" | "keep" | "open-reply" | "start") => {}
+                if matches!(v.as_str(), "send" | "approve" | "keep" | "open-reply" | "start" | "reply") => {}
             (Some("review"), Some(v)) => self.err(
                 &at,
                 format!(
-                    "data-verb=\"{v}\" is not a verb: use send (drafts that leave), open-reply (replies on read-only places: HN, Reddit, X, Bluesky), start (feedback an agent can fix), keep (what bise keeps about the user) or approve"
+                    "data-verb=\"{v}\" is not a verb: use send (drafts that leave), reply (questions to him: send the answer or start an agent), open-reply (replies on read-only places: HN, Reddit, X, Bluesky), start (feedback an agent can fix), keep (what bise keeps about the user) or approve"
                 ),
             ),
             // an email bise only drafts (a Kit newsletter, 'put it in my drafts'), or sends

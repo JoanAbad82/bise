@@ -561,6 +561,13 @@ law("feedback into work: start an agent / answer Benjamin / skip; started, the s
   K.decorate([r], "feedback", doc);
   assert.equal(btns(a)[0].textContent, "starting…");
   assert.equal(btns(a).length, 3, "never a second bar");
+  // a mention to answer (data-verb="reply"): send the drafted answer, start an agent, skip; bulk 'send all'
+  const m = blocks(parse(`<section data-kit="review" data-id="asks" data-verb="reply"><ol><li data-id="m1"><p>Léa Martin · #design · 9:12</p><blockquote>can you check the pricing copy?</blockquote><p>yes, i'll look at it before noon.</p></li><li data-id="m2"><p>Hugo · mail · 9:40</p><blockquote>x</blockquote><p>y</p></li></ol></section>`))[0];
+  K.decorate([m], "mentions", doc);
+  const [m1] = K.options(m);
+  assert.deepEqual(btns(m1).map((x) => x.textContent), ["send", "start an agent", "skip"]);
+  assert.equal(m.children.filter((n) => n.hasAttribute("data-kit-ui")).flatMap((u) => u.children)[0].textContent, "send both");
+  assert.deepEqual(K.editableParts(m).map((e) => K.norm(e.textContent || (e.nodes || []).map((n) => n.textContent).join(""))).slice(0, 1).length, 1, "the drafted answer is editable");
 });
 
 law("an item's agent: its name first (spaces, not hyphens), then its live status and note", () => {
