@@ -62,7 +62,8 @@ prints the lint's lines: fix each, publish again.
 
 While you write and until the user's word on the page (`send`, `approve`, "put it in my
 drafts"), nothing goes to their accounts: no draft in Gmail or Outlook, no message, no post, no
-label. Then `leaving.md`.
+label. Then `leaving.md`. Any other write (close an issue, an invite) is on the page first as
+its own `action` block (`data-do="close OPS-12"`); on his word, do exactly what he approved.
 
 ## The blocks
 

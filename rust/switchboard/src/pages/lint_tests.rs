@@ -393,6 +393,23 @@ fn a_step_says_what_bise_did_and_where_its_draft_is() {
 }
 
 #[test]
+fn a_write_his_word_triggers_is_an_action_block() {
+    ok(r#"<section data-kit="action" data-id="a-ops12" data-do="close OPS-12"><p>close OPS-12 in Linear · fixed in 0.4.2</p></section>"#);
+    has(
+        &errs(r#"<section data-kit="action" data-id="a1"><p>x</p></section>"#),
+        "a1: an action block needs data-do",
+    );
+    has(
+        &errs(r#"<section data-kit="action" data-id="a1" data-do="close OPS-12"></section>"#),
+        "a1: an action block needs a <p>",
+    );
+    has(
+        &errs(r#"<section data-kit="prose" data-id="p" data-do="close OPS-12"><p>x</p></section>"#),
+        "p: data-do is not a kit attribute here: only an action block takes it",
+    );
+}
+
+#[test]
 fn a_page_only_question_takes_data_card_none_and_promises_and_meetings_need_it() {
     let q = |a: &str| format!(r#"<section data-kit="question" data-id="q-cc"{a}><p>which address for Lélio?</p><ol><li>lelio@acme.test</li><li>without the cc</li></ol></section>"#);
     ok(&q(r#" data-card="none""#));

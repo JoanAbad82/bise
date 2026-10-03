@@ -610,6 +610,16 @@ law("the kit never writes a style: no style= in kit.js, no .style in its code, n
   }
 });
 
+law("a write his word triggers is its own action block: its button says the write, skip next to it", () => {
+  const a = blocks(parse(`<section data-kit="action" data-id="a-ops12" data-do="close OPS-12"><p>close OPS-12 in Linear · fixed in 0.4.2</p></section>`))[0];
+  K.decorate([a], "feedback", doc);
+  K.decorate([a], "feedback", doc);
+  const bars = a.children.filter((n) => n.hasAttribute("data-kit-ui"));
+  assert.equal(bars.length, 1, "one bar, however often it is decorated");
+  assert.deepEqual(bars[0].children.map((b) => b.textContent), ["close OPS-12", "skip"]);
+  assert.equal(K.react(a, null, "approve").kind, "approve");
+});
+
 law("kit.css takes its colors from tokens.css only", () => {
   const css = readFileSync(join(here, "kit.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   const hex = css.match(/#[0-9a-f]{3,8}\b/gi) || [];

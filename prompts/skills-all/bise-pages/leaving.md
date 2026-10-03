@@ -12,6 +12,18 @@ before their word, never during the first versions:
 - a whole page as a doc: headings as headings, tables as tables, each `<sup>n</sup>` as a link to
   its source (or the sources as a list at the end).
 
+**Every write his word triggers is on the page first, as its own item.** Closing an issue,
+moving a card, a label, an invite: an `action` block he can see and skip, never a side effect
+of another send:
+
+```html
+<section data-kit="action" data-id="a-ops12" data-do="close OPS-12"><p>close OPS-12 in Linear · fixed in 0.4.2</p></section>
+```
+
+`data-do` is the button's words (40 characters at most), the `<p>` what and why. On his word do
+exactly what the approved items say, nothing more: a skipped action stays undone, and an action
+that isn't on the page is never done.
+
 ## Put it in my drafts
 
 A draft doesn't leave, so it needs no card, but it waits for the user's word like anything else

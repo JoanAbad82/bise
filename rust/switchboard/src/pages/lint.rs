@@ -37,6 +37,7 @@ pub const KINDS: &[&str] = &[
     "message",
     "compare",
     "checklist",
+    "action",
 ];
 
 /// The kinds whose list items are things the user reacts to, each with its own data-id.
@@ -546,6 +547,17 @@ impl<'a> Linter<'a> {
                 "data-open is not a kit attribute here: only a message block takes it".into(),
             );
         }
+        // a write his word triggers (lead m_6191): an action block says it in data-do, the button's words
+        let what = get("data-do");
+        if kit.as_deref() == Some("action") {
+            match &what {
+                None => self.err(&at, "an action block needs data-do: the write it makes, in a few words (data-do=\"close OPS-12\")".into()),
+                Some(d) if d.trim().is_empty() || d.chars().count() > 40 => self.err(&at, format!("data-do=\"{d}\" says the write in a few words, 40 characters at most (close OPS-12)")),
+                _ => {}
+            }
+        } else if what.is_some() {
+            self.err(&at, "data-do is not a kit attribute here: only an action block takes it".into());
+        }
         // an email may say where it goes too (data-to="Gmail · reply to Camille Roux")
         if get("data-to").is_some() && !matches!(kit.as_deref(), Some("message" | "email")) {
             self.err(
@@ -649,6 +661,7 @@ impl<'a> Linter<'a> {
                 "li",
                 "a question block needs its options as <ol><li>…</li></ol>",
             )],
+            "action" => &[("p", "an action block needs a <p> saying what it does and why (close OPS-12 · fixed in 0.4.2)")],
             "review" => &[(
                 "li",
                 "a review block needs its items as <ol><li data-id=\"m1\">…</li></ol>",
@@ -754,13 +767,14 @@ impl<'a> Linter<'a> {
                             | "data-verb"
                             | "data-plan"
                             | "data-card"
+                            | "data-do"
                     )
                 } else {
                     false
                 };
                 if !ok {
                     let hint = if block {
-                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message, email), data-open (message), data-verb (review), data-plan (checklist), data-card=\"none\" (question)"
+                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message, email), data-open (message), data-verb (review), data-plan (checklist), data-card=\"none\" (question), data-do (action)"
                     } else {
                         "inside a block only a review's <li data-id> and an email's <p data-field> take one"
                     };

@@ -428,6 +428,13 @@
     const ok = kids(block).filter((c) => ui(c) && c.getAttribute("data-went") == null).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "approve");
     if (ok) ok.textContent = block.getAttribute("data-verb") === "draft" ? W.putInDrafts : W.send;
   }
+  // a write his word triggers (lead m_6191: close OPS-12 in Linear): its own approve / skip, the
+  // approve saying the write (data-do), never a side effect of another send
+  function decorateAction(doc, block) {
+    if (!kids(block).some((c) => ui(c) && c.getAttribute("data-went") == null)) block.append(acts(doc, ["approve", "skip"]));
+    const ok = kids(block).filter((c) => ui(c) && c.getAttribute("data-went") == null).flatMap((b) => kids(b)).find((b) => b.getAttribute("data-act") === "approve");
+    if (ok) ok.textContent = block.getAttribute("data-do") || W.approve;
+  }
   // react to an item (review approve/skip, compare keep/drop/pick, checklist tick) or a whole
   // email (item null); the same again takes it back; a pick is one per block (the last wins).
   // Returns {block, item, kind (null: taken back), text}, or null.
@@ -582,6 +589,7 @@
       else if (kit === "review" && doc) decorateReview(doc, b);
       else if (kit === "email" && doc) decorateEmail(doc, b);
       else if (kit === "message" && doc) decorateMessage(doc, b);
+      else if (kit === "action" && doc) decorateAction(doc, b);
       else if ((kit === "compare" || kit === "checklist") && doc) decorateItems(doc, b, kit);
     }
   }

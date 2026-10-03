@@ -220,6 +220,10 @@ body {
 #bise-page [data-kit="email"] > p[data-field]::before { content: attr(data-field); font: var(--text-kicker)/2 var(--font-mono); color: var(--kick); }
 #bise-page [data-kit="email"] > p[data-field="subject"] { font-weight: 600; }
 #bise-page [data-kit="email"] > p[data-field] + p:not([data-field]) { margin-top: var(--space-4); }
+/* action: a write his word triggers (close OPS-12): a small card, its own buttons; skipped: dim */
+[data-kit="action"] { background: var(--surface-card); border-radius: 10px; padding: var(--space-3) 22px; margin: var(--space-3) 0; box-shadow: 3px 3px 0 var(--drop); }
+#bise-page [data-kit="action"] > p:not([data-kit-ui]) { margin: 0; font: var(--text-small)/1.5 var(--font-ui); }
+#bise-page [data-kit="action"][data-verdict="skip"] > :not([data-kit-ui]) { opacity: .45; }
 #bise-page [data-kit="email"] > [data-kit-ui] { margin-top: var(--space-4); }
 #bise-page [data-kit="email"][data-verdict="skip"] > :not([data-kit-ui]) { opacity: .45; }
 
