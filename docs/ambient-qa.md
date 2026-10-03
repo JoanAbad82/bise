@@ -412,6 +412,11 @@ the page with an open card (a task agent's page) is not checked yet.
   Benjamin, …`. Question: the batch came before any fix landed, so `send all` would post the
   first-version replies while agents are still fixing; a reply whose item has a working agent
   should stay out of the batch.
+- **C on the app at f0e2f115: `send all` works.** One card `6 drafts wait for you` (3 Slack replies,
+  3 Linear issue drafts); his `2` through the app's path → all 6 left once, 12 s later, none
+  before. The run's fail is its count (Slack posts only: amb-tools). Open: the same send also
+  marked 2 Linear issues done, a write no card named (amb-kit). The early batch and its wording
+  are addressed in amb-core 2e114ebe.
 - **F at d057f499 (headless): fail 40 for ticks.** Léa's direct question in v1 got its card; Nora's
   DM that arrived with tick 1 got none, though the page listed it and main started an agent on it
   (amb-kit 78500b1b since).
