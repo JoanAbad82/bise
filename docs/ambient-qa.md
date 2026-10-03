@@ -553,6 +553,22 @@ frontmost:
 - Not checked yet: a click 10 px outside the glass reaching the app below, hover under the real
   pointer, the pearl with no background, keyboard only (amb-tools' next checks).
 
+### Results: real clicks, second run (ambient-app with amb-web d16054d8, QA app, stopped after)
+
+- **card: fail 45 again.** The body's point is in no bise window: the window there is the app
+  behind (Chrome), even though the page's hit test finds the web view. The body sticks out of the
+  panel's window shape, so a real click there goes to the app below. `⏎ open` and `esc later`
+  pass.
+- **question: fail 46.** One real click on `1 tuesday` or `2 thursday` sends `answer` **twice**
+  for the same card.
+- **question: fail 47.** The footer hints `fn 1–2 pick`, `fn esc later` and `fn o open the page`
+  show a pointer cursor but take no click. A hint that is not a button keeps the arrow cursor.
+  If it looks like a button, the click does what it says.
+- **question: pass.** `⌘⏎ full text` and the question's text show the full text.
+- **drafts: pass for what shows** (body, `⏎ open`, `esc later`). Fail 44 (`send all` on the
+  batch card) is not checked yet: amb-web puts `1 review` and `2 send all 3` on the card's own
+  bar, reached from a row in fn i, and `qa.py clicks` has no state for that bar yet (amb-tools).
+
 ## Out of the way (vision §3 G, the user's change m_5030)
 
 - [ ] At rest, after launch: nothing on screen but the menu-bar icon (no idle capsule).
