@@ -62,6 +62,8 @@ final class QA {
     var menuDump: (() -> [[String: Any]])?      // the menu-bar menu's rows (App.menuDump): --qa has no menu-bar item
     var menuStopWatch: ((Int) -> Void)?         // the 'stop watching' row's action (App.menuStopWatch)
     var menuCard: ((Any) -> Void)?              // a card row's action: bise open on that card (App, as StatusItem.onCard)
+    var keyEvent: ((CGEventType, CGEvent) -> Bool)?  // an event as the tap hands it (Keys.qaEvent): the real key path,
+                                                // KeyMachine and all, without a tap (a QA app never takes his fn)
 
     private let capsule: Capsule
     private let edge: Edge
