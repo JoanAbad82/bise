@@ -42,18 +42,21 @@
     return col;}
   void main(){
     vec2 uv=(gl_FragCoord.xy-.5*res)/min(res.x,res.y)*2.;
-    float r=length(uv),an=atan(uv.y,uv.x);
+    // only well-defined GLSL below (WebKit's Metal path draws garbage where Chrome forgives:
+    // ambient's gate, the listen pearl as a streak): no atan(0,0), no pow of a negative base, no
+    // smoothstep with edge0 >= edge1 (written as 1 - smoothstep(lo, hi, x))
+    float r=length(uv),an=atan(uv.y,abs(uv.x)<1e-5?1e-5:uv.x);
     float breath=.015*sin(t*6.283/7.)*(1.-still);
     float R=.66+breath+lvl*.05*sin(an*5.+t*7.)+lvl*.025*sin(an*9.-t*5.)+need*.025*sin(t*5.)+listen*.03;
     float halo=(.16+.35*lvl+.15*listen+.22*need+.12*done)*(1.-away*.6);
     // mist pearl: no rim. the smoke thins out into the air, and the edge breaks into dots of light
     R*=1.05; float dens,z; vec3 col=smoke(uv*.95,R,dens,z);
     float edge=R+.18*(fbm(vec2(an*2.,flow*.3))-.4);
-    float a=smoothstep(edge,edge-.45,r)*(.55+.6*dens);
+    float a=(1.-smoothstep(edge-.45,edge,r))*(.55+.6*dens);
     vec2 g=uv*min(res.x,res.y)/6.; vec2 id=floor(g), fc=fract(g)-.5;
     float h=hash(id), tw=.5+.5*sin(t*(1.5+h*3.)+h*40.);
-    float ring=exp(-pow((r-R*.98)/.16,2.));
-    float dot_=step(.82-ring*.25,h)*smoothstep(.32,.0,length(fc))*ring*tw;
+    float rd=(r-R*.98)/.16; float ring=exp(-rd*rd);
+    float dot_=step(.82-ring*.25,h)*(1.-smoothstep(.0,.32,length(fc)))*ring*tw;
     col=mix(col,CREAM*1.1,dot_); a=max(a,dot_*.9);
     a+= (1.-a)*exp(-max(0.,r-R*.8)*5.)*halo*.6;
     // the hello (ambient m_5702): gather 1 is a few scattered dots of pink and cream, the body not
@@ -61,7 +64,7 @@
     if(gather>0.){
       vec2 gs=uv/(1.+gather*1.3); vec2 g2=gs*min(res.x,res.y)/7.; vec2 id2=floor(g2), f2=fract(g2)-.5;
       float h2=hash(id2+vec2(7.,3.));
-      float d2=step(.8,h2)*smoothstep(.3,.0,length(f2))*smoothstep(R*1.05,R*.6,length(gs))*gather;
+      float d2=step(.8,h2)*(1.-smoothstep(.0,.3,length(f2)))*(1.-smoothstep(R*.6,R*1.05,length(gs)))*gather;
       a*=(1.-gather); col=mix(col,mix(ROSE,CREAM,fract(h2*13.)),d2); a=max(a,d2*.95);}
     gl_FragColor=vec4(col*a,a);}`;
   const VS = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
@@ -172,7 +175,10 @@
       gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       return !calm;
     }
-    return { frame, state: () => S };
+    // fit: size the drawing buffer to the canvas without drawing (the bar keeps it right while
+    // nobody sees it, so the first frame shown is never the default 300x150 buffer squeezed into
+    // 64 px: amb-tools' read, m_6724)
+    return { frame, fit, state: () => S };
   }
 
   root.AmbPearl = { create, renderer, ease, settled, start, MOODS, PINK, FS };
