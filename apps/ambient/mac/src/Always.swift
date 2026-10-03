@@ -44,6 +44,33 @@ enum Placement {
         return 0
     }
 
+    // round 9 (ambient m_6521, the user's yes): the bar's screen is the one
+    // with the key window (his app's), else the mouse's, else the first
+    static func activeScreen(_ screens: [ScreenBox], keyWindowScreen: Int?, mouse: CGPoint) -> Int? {
+        guard !screens.isEmpty else { return nil }
+        if let k = keyWindowScreen, screens.indices.contains(k) { return k }
+        if let i = screens.firstIndex(where: { $0.frame.contains(mouse) }) { return i }
+        return 0
+    }
+
+    static let barTop: CGFloat = 170
+
+    // round 9: the glass (`glass` in the panel's box, flipped: y down from
+    // the box's top) centered on the screen, its top edge 170 px below the
+    // screen's top; the panel holds the pearl at the glass's left and grows
+    // downward only (the top never moves). Never off the visible area.
+    static func bar(_ size: CGSize, glass: CGRect?, on s: ScreenBox) -> CGRect {
+        let g = glass ?? CGRect(origin: .zero, size: size)
+        let w = min(size.width, s.visible.width)
+        let h = min(size.height, s.visible.height)
+        var x = s.frame.midX - g.midX
+        var top = s.frame.maxY - barTop + g.minY
+        x = Swift.min(Swift.max(x, s.visible.minX), s.visible.maxX - w)
+        top = Swift.min(top, s.visible.maxY)
+        let y = Swift.max(top - h, s.visible.minY)
+        return CGRect(x: x, y: y, width: w, height: h)
+    }
+
     // SPEC §1: 20 px from the screen's right edge, 12 px under the menu bar;
     // never off the screen: a box taller or wider than the visible area is
     // kept inside it, top first

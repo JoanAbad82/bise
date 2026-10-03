@@ -74,6 +74,7 @@ law("log: hands-free, release, cancel, chords",
     KeyLog.line(.double) == "keys: fn fn → hands-free" && KeyLog.line(.talkEnd) == "keys: release → talk end"
         && KeyLog.line(.cancel) == "keys: hold cancelled (another key)" && KeyLog.line(.key("o")) == "keys: fn + o")
 law("log: his own esc is not logged", KeyLog.line(.plainEsc) == nil)
+law("round 9: fn p is a bise key (your pages)", biseKeys[35] == "p")
 
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all KeyMachine laws hold")

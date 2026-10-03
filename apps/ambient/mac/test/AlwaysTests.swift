@@ -37,5 +37,26 @@ law("never off-screen: a box taller than the screen stays inside", tall.minY >= 
 let dock = ScreenBox(frame: CGRect(x: 0, y: 0, width: 1512, height: 982), visible: CGRect(x: 0, y: 0, width: 1440, height: 949))
 law("a Dock on the right: the capsule stays left of it", Placement.frame(CGSize(width: 360, height: 84), on: dock).maxX <= 1440)
 
+// round 9: the Spotlight-like bar (ambient m_6521)
+let mac = ScreenBox(frame: CGRect(x: 0, y: 0, width: 1512, height: 982), visible: CGRect(x: 0, y: 0, width: 1512, height: 949))
+let glass = CGRect(x: 76, y: 0, width: 700, height: 68)
+let bar = Placement.bar(CGSize(width: 776, height: 70), glass: glass, on: mac)
+law("bar: the glass centered on the screen", bar.minX + glass.midX == mac.frame.midX)
+law("bar: the glass's top 170 px below the screen's top", bar.maxY == 982 - 170)
+law("bar: the pearl at its left, inside the panel", bar.minX + 76 == bar.minX + glass.minX && bar.minX >= 0)
+let taller = Placement.bar(CGSize(width: 776, height: 400), glass: CGRect(x: 76, y: 0, width: 700, height: 400), on: mac)
+law("bar: it grows downward, the top never moves", taller.maxY == bar.maxY && taller.minX == bar.minX)
+let huge = Placement.bar(CGSize(width: 776, height: 2000), glass: glass, on: mac)
+law("bar: never off the screen", huge.minY >= mac.visible.minY && huge.maxY <= mac.visible.maxY)
+let side = ScreenBox(frame: CGRect(x: 1512, y: 0, width: 1920, height: 1080), visible: CGRect(x: 1512, y: 0, width: 1920, height: 1055))
+let onSide = Placement.bar(CGSize(width: 776, height: 70), glass: glass, on: side)
+law("bar: on another screen, centered on that one", onSide.minX + glass.midX == side.frame.midX && onSide.maxY == 1080 - 170)
+law("bar: an older page without glass: the whole box centered",
+    Placement.bar(CGSize(width: 400, height: 70), glass: nil, on: mac).midX == mac.frame.midX)
+law("bar's screen: the key window's", Placement.activeScreen([mac, side], keyWindowScreen: 1, mouse: .zero) == 1)
+law("bar's screen: no key window: the mouse's", Placement.activeScreen([mac, side], keyWindowScreen: nil, mouse: CGPoint(x: 2000, y: 100)) == 1)
+law("bar's screen: neither: the first", Placement.activeScreen([mac, side], keyWindowScreen: nil, mouse: CGPoint(x: -9, y: -9)) == 0)
+law("bar's screen: a stale key screen index: the mouse's", Placement.activeScreen([mac], keyWindowScreen: 3, mouse: CGPoint(x: 5, y: 5)) == 0)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Always laws hold")

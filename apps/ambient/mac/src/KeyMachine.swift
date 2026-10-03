@@ -58,7 +58,7 @@ enum KeyIn: Equatable {
 // positions: fn + 1 is the key 1 of the top row, whatever the layout)
 let biseKeys: [Int: String] = [
     49: "space", 18: "1", 19: "2", 20: "3", 21: "4", 23: "5", 22: "6", 26: "7",
-    28: "8", 25: "9", 29: "0", 34: "i", 31: "o", 47: ".", 43: ",", 36: "enter", 76: "enter",
+    28: "8", 25: "9", 29: "0", 34: "i", 31: "o", 35: "p", 47: ".", 43: ",", 36: "enter", 76: "enter",
     53: "esc",
 ]
 

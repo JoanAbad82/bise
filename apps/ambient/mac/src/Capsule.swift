@@ -16,14 +16,14 @@ final class CapsulePanel: NSPanel {
 
 // the page's boxes (app_size): CapsuleShape, Shape.swift
 
-// one click acts (the user's dogfood, B1): the panel is never key while
-// he works in his app, and WKWebView turns the first click on a non-key
-// window into a focus click; this view takes it as a click, and never asks
-// the panel to become key for it (his app keeps the keys; the spotlight's
-// field makes the panel key on purpose, Capsule.focus)
+// one click acts (the user's dogfood, B1): WKWebView turned the first click
+// on the non-key panel into a focus click; this view takes it as a click.
+// The click also gives the bar the keys (round 9, ambient m_6521: 'a click
+// on it gives it focus'), like Spotlight: the panel is non-activating, so
+// his app stays the active app and gets the keys back when the bar goes.
 final class CapsuleWebView: WKWebView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    override var needsPanelToBecomeKey: Bool { false }
+    override var needsPanelToBecomeKey: Bool { true }
 }
 
 // macOS's own window corner radius (the user: the capsule's corners match
@@ -210,8 +210,12 @@ final class Capsule: NSObject, WKNavigationDelegate {
     }
 
     func pickScreen() {
-        let boxes = NSScreen.screens.map { ScreenBox(frame: $0.frame, visible: $0.visibleFrame) }
-        let i = Placement.screen(boxes, mouse: NSEvent.mouseLocation, separateSpaces: NSScreen.screensHaveSeparateSpaces) ?? 0
+        let all = NSScreen.screens
+        let boxes = all.map { ScreenBox(frame: $0.frame, visible: $0.visibleFrame) }
+        // round 9: the screen with his key window (NSScreen.main, read before
+        // the bar takes the keys), else the mouse's
+        let keyScreen = panel.isKeyWindow ? screenIndex : NSScreen.main.flatMap { m in all.firstIndex { $0 == m } }
+        let i = Placement.activeScreen(boxes, keyWindowScreen: keyScreen, mouse: NSEvent.mouseLocation) ?? 0
         guard i != screenIndex || panel.screen == nil else { return }
         screenIndex = i
         place(panel.frame.size)
@@ -220,11 +224,12 @@ final class Capsule: NSObject, WKNavigationDelegate {
 
     var maxHeight: CGFloat { (screen?.frame.height ?? 900) * 0.7 }
 
-    // SPEC §1: 20 px from the screen's right edge, 12 px under the menu
-    // bar, never off the screen (Placement.frame)
+    // round 9 (ambient m_6521): the glass centered on the screen, its top
+    // 170 px below the screen's top, the pearl at its left, growing down;
+    // never off the screen (Placement.bar)
     private func place(_ size: NSSize) {
         guard let s = screen else { return }
-        let f = Placement.frame(size, on: ScreenBox(frame: s.frame, visible: s.visibleFrame))
+        let f = Placement.bar(size, glass: shape.glass, on: ScreenBox(frame: s.frame, visible: s.visibleFrame))
         let moved = f.origin != panel.frame.origin || f.size != panel.frame.size
         panel.setFrame(f, display: true)
         if moved { onPlaced?() }
@@ -329,8 +334,26 @@ final class Capsule: NSObject, WKNavigationDelegate {
     }
 
     private var keysFrom: NSRunningApplication?
+    var onKeyFocus: ((Bool) -> Void)?   // the bar took the keys (true) or gave them back
 
-    // app_focus: the spotlight field types; off gives the keys back
+    // the panel's key state, however it came (focus(true), a click): his
+    // app is remembered to get the keys back, and App hears it (app_focused)
+    func watchKey() {
+        let nc = NotificationCenter.default
+        nc.addObserver(forName: NSWindow.didBecomeKeyNotification, object: panel, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let front = NSWorkspace.shared.frontmostApplication
+                if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier { self.keysFrom = front }
+                self.onKeyFocus?(true)
+            }
+        }
+        nc.addObserver(forName: NSWindow.didResignKeyNotification, object: panel, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.onKeyFocus?(false) }
+        }
+    }
+
+    // what he opens takes the keys like Spotlight (round 9); off gives them back
     func focus(_ on: Bool) {
         if on {
             let front = NSWorkspace.shared.frontmostApplication

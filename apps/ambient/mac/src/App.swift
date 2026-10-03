@@ -18,6 +18,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private let core: Core
     private var notify: Notify?
     private var sounds: SoundPlayer?
+    private var askedAt = 0.0             // his last ask the core took ('sent'); its answer gets the keys
     private var status: StatusItem?
     private var signals: [DispatchSourceSignal] = []
     private var qa: QA?                  // --qa only: the QA channel (QA.swift)
@@ -104,6 +105,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         capsule.onReady = { [weak self] in self?.pageReady() }
         capsule.onHover = { [weak self] in self?.visFeed(.hover($0)) }
         capsule.onPlaced = { [weak self] in self?.sendIcon() }
+        // round 9: the bar's keys (ambient m_6521): the page hears it (its
+        // footer shows plain keys when focused, fn chords when pushed), and
+        // a click elsewhere closes a bar he opened (never a pushed card)
+        capsule.onKeyFocus = { [weak self] on in
+            guard let self else { return }
+            self.capsule.post(["ev": "app_focused", "on": on])
+            if !on && self.vis.pinned && !self.capsule.hidden { self.visFeed(.dismiss) }
+        }
+        capsule.watchKey()
         capsule.load(webDir: config.web)
         // at rest nothing on screen: the capsule shows when there is something to see
         edge.load(webDir: config.web)
@@ -547,10 +557,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             // macOS notifications: the screen locked or you away, not "hidden" (§8)
             notify?.cards(cards, quiet: !locked && !away)
         case "sent":
+            askedAt = uptime
             cue(.sent)
             visFeed(.sent)
         case "main":
             visFeed(.mainText)
+            // round 9: the answer to his own ask has the keys (he just asked)
+            if askedAt > 0, uptime - askedAt < 600 { askedAt = 0; takeKeys() }
         default:
             break
         }
@@ -601,6 +614,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             case "i":
                 visFeed(.open)
                 capsule.post(["ev": "app_key", "key": k])
+                takeKeys()
             default:
                 // fn 1…9 answers the top item even while hidden
                 capsule.post(["ev": "app_key", "key": k])
@@ -688,6 +702,16 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         morning()
         visFeed(.show(Visibility.brief))   // until the field takes the keys
         capsule.post(["ev": "app_key", "key": "space"])
+        takeKeys()
+    }
+
+    // what he opens takes the keys like Spotlight (round 9, ambient m_6521):
+    // fn space, fn 0, fn i, fn , and a click on the menu-bar pearl; what
+    // bise pushes (a question, the drafts card, an answer) never does.
+    // QA never takes his keys.
+    private func takeKeys() {
+        guard qa == nil else { return }
+        capsule.focus(true)
     }
 
     // a menu-bar click: what's going on (the agents and the inbox, fn + 0)
@@ -695,6 +719,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         morning()
         visFeed(.open)
         capsule.post(["ev": "app_key", "key": "0"])
+        takeKeys()
     }
 
     // fn , or the menu's settings…: the settings view (amb-web draws it,
@@ -703,6 +728,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         visFeed(.open)
         capsule.post(settingsEvent())
         capsule.post(["ev": "app_key", "key": ","])
+        takeKeys()
     }
 
     // fn . or the menu's show/hide: opened by hand = the full view (app_key 0,
