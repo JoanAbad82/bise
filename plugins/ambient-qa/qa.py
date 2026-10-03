@@ -920,6 +920,28 @@ def hover(selector, ms=1000):
     return call("hover", timeout=10 + ms / 1000, selector=selector, ms=ms)
 
 
+def eval_js(src, fn_held=False, settle_s=0.6):
+    """One JS expression read on the capsule's page (amb-mac m_6655), its value back (JSON
+    parsed when it is JSON). fn_held: read while fn is held through the real key path (talk
+    open), then let go with a cancel so nothing reaches the core. Reads only: never act with it."""
+    if fn_held:
+        call("fn", state="down")
+        time.sleep(settle_s)
+    try:
+        r = call("eval", js=src)
+    finally:
+        if fn_held:
+            call("fn", state="cancel")
+    v = r.get("value")
+    if isinstance(v, str):
+        try:
+            r["value"] = json.loads(v)
+        except ValueError:
+            pass
+    r["fn_held"] = fn_held
+    return r
+
+
 def alpha(name="alpha", pearl=None, glass=None, ring=6, outside=10, out=None):
     """The panel's own pixels with alpha (ScreenCaptureKit, this window alone, no shadow) and the
     verdicts ambient's gate wants: the pearl's 4 corners and a ring `ring` px outside its disc at
@@ -3246,6 +3268,7 @@ def _cli(argv):
     p = sub.add_parser("fn-hold-closed", help="fn held from rest through the real key path (no tap): pearl listening within 300 ms, words to the core, main's line; a tap does nothing")
     p.add_argument("--variants", default="launch,fold,hide"); p.add_argument("--words", default="what is on my plate today"); p.add_argument("--within-ms", type=int, default=300)
     sub.add_parser("rest", help="the capsule back to rest and bise not the active app")
+    p = sub.add_parser("eval", help="read one JS expression on the capsule's page (its value back; reads only)"); p.add_argument("js"); p.add_argument("--fn-held", action="store_true", help="read while fn is held (talk open), then cancel")
     p = sub.add_parser("hover", help="the pointer over an element (mouseMoved into the QA app's queue, his pointer never moves)"); p.add_argument("selector"); p.add_argument("--ms", type=int, default=1000)
     p = sub.add_parser("alpha", help="the panel's pixels with alpha: the pearl's corners and a ring outside it, and around the glass, must be transparent")
     p.add_argument("--name", default="alpha"); p.add_argument("--ring", type=float, default=6); p.add_argument("--outside", type=float, default=10)
@@ -3333,6 +3356,8 @@ def _cli(argv):
         r = fn_hold_closed(tuple(v for v in a.variants.split(",") if v), a.words, within_ms=a.within_ms)
     elif a.cmd == "rest":
         r = rest()
+    elif a.cmd == "eval":
+        r = eval_js(a.js, fn_held=a.fn_held)
     elif a.cmd == "hover":
         r = hover(a.selector, a.ms)
     elif a.cmd == "alpha":

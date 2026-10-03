@@ -33,6 +33,8 @@ TOOLS = [
     ("fn_hold_closed", "fn held from rest (capsule closed, bise not frontmost) through the real key path (KeyMachine via Keys.qaEvent; the QA app has no tap, never his fn): the pearl listens within within_ms, the fake voice's words reach the core on release, main's line shows; variants launch, fold (opened then folded by itself), hide (fn + .); then a tap must do nothing.",
      {"variants": {"type": "array", "items": {"type": "string", "enum": ["launch", "fold", "hide"]}}, "words": {"type": "string"}, "within_ms": {"type": "integer"}}, []),
     ("rest", "The capsule back to rest (folded into the icon) and bise not the active app.", {}, []),
+    ("eval", "Read one JS expression on the capsule's page: its value (JSON parsed), and whether the panel is visible. fn_held: read while fn is held (talk open), then cancel. Reads only: never act on the page with it.",
+     {"js": {"type": "string"}, "fn_held": {"type": "boolean"}}, ["js"]),
     ("hover", "The pointer over an element: mouseMoved events at its point into the QA app's queue for ms (his pointer never moves); over = the page saw it. Can't drive tracking areas (cursor shape).",
      {"selector": {"type": "string"}, "ms": {"type": "integer"}}, ["selector"]),
     ("alpha", "The panel's own pixels with alpha (this window alone, no shadow) as a PNG, and the verdict: the pearl's 4 corners and a ring `ring` px outside its disc at alpha 0, and `outside` px outside the glass at alpha 0 (a click there reaches the app below).",
@@ -126,6 +128,8 @@ def run(name, a):
         r = qa.fn_hold_closed(tuple(a.get("variants") or ("launch", "fold", "hide")), a.get("words", "what is on my plate today"), within_ms=a.get("within_ms", 300))
     elif name == "rest":
         r = qa.rest()
+    elif name == "eval":
+        r = qa.eval_js(a["js"], fn_held=a.get("fn_held", False))
     elif name == "hover":
         r = qa.hover(a["selector"], a.get("ms", 1000))
     elif name == "alpha":

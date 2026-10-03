@@ -505,6 +505,31 @@ def a_ghost_glass_is_blur_with_no_glass_drawn():
 
 
 @test
+def eval_reads_the_page_and_lets_fn_go():
+    """eval: the page's value comes back JSON parsed; with fn held, fn goes down before the read and is cancelled after it, even when the read fails"""
+    seen, real = [], qa.call
+
+    def fake(op, timeout=30.0, **kw):
+        seen.append((op, kw.get("state")))
+        if op == "eval" and kw["js"] == "boom":
+            raise qa.QAError("eval failed")
+        return {"value": '{"w": "26px"}', "visible": True} if op == "eval" else {}
+    qa.call = fake
+    try:
+        r = qa.eval_js("x", fn_held=True, settle_s=0)
+        check(r["value"] == {"w": "26px"} and r["fn_held"], "parsed: %r" % r)
+        check(seen == [("fn", "down"), ("eval", None), ("fn", "cancel")], "order: %r" % seen)
+        seen.clear()
+        try:
+            qa.eval_js("boom", fn_held=True, settle_s=0)
+        except qa.QAError:
+            pass
+        check(seen[-1] == ("fn", "cancel"), "fn let go after a failed read: %r" % seen)
+    finally:
+        qa.call = real
+
+
+@test
 def key_specs_become_key_events():
     """keys: names, modifiers and typed text become the keys op's key codes and flags"""
     seq = qa.key_seq(["cmd+return", "up", "⌘2", "esc", "type:hi you"])

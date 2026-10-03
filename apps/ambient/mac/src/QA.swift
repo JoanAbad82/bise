@@ -618,6 +618,13 @@ final class QA {
             return try await alpha(q)
         case "hover":
             return try await hover(q)
+        case "eval":
+            // one JS expression on the capsule's page, its value back (a string as is, anything
+            // else as JSON): to read the page (amb-mac m_6655), never to act on it
+            guard let src = q["js"] as? String, !src.isEmpty else { throw Failure(description: "eval needs js: an expression") }
+            let wrapped = "(() => { const v = (\n\(src)\n); return typeof v === 'string' ? v : JSON.stringify(v === undefined ? null : v); })()"
+            let v = await js(capsule.web, wrapped)
+            return ["value": v ?? NSNull(), "visible": capsule.panel.isVisible, "hidden": capsule.hidden]
         case "clickables":
             // every visible thing a click acts on, in the page's order, tagged data-qa-i so `click`
             // can aim at each one (ambient-pm m_6584: every button the capsule shows, once each)
