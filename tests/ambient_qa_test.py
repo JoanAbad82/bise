@@ -578,7 +578,14 @@ def mentions_page_laws():
     check(qa.mentions_cards_check(truth, [lea, nora, hugo], {}), "a card for someone outside his team")
     # his scripted send goes to a mention answered in words (Sophie's call slot), never one needing a file
     fx = json.load(open(os.path.join(qa.FAKE_ACCOUNTS, "fixtures.json")))
-    m = next(m for m in fx["sets"]["mentions"]["gmail"]["+messages"] if m["id"] == "m" + qa.SEND_ON["num"])
+    m = next(m for m in fx["sets"]["mentions"]["gmail"]["messages"] if m["id"] == "m" + qa.SEND_ON["num"])
+    # the set replaces the base Slack and Gmail messages: only its own asks and noise reach the watcher
+    s = fx["sets"]["mentions"]
+    check("+messages" not in s["slack"] and "+messages" not in s["gmail"], "the mentions set appends to the base messages")
+    env = dict(os.environ, FAKE_ACCOUNTS_SET="mentions")
+    out = subprocess.run([sys.executable, "-B", "-c", "import fake_accounts as f; print(sorted(m['id'] for m in f.DATA['gmail']['messages'] + f.DATA['slack']['messages']))"],
+                         cwd=qa.FAKE_ACCOUNTS, env=env, capture_output=True, text=True).stdout
+    check(out.strip() == str(sorted(x["id"] for x in s["gmail"]["messages"] + s["slack"]["messages"])), out)
     check(qa.SEND_ON["to"] in m["from"] and m.get("mention") and not m.get("noise")
           and not any(w in m["body"].lower() for w in ("invoice", "file", "attach", "pdf")), m)
 

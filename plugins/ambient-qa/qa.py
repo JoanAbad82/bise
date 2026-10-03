@@ -1705,7 +1705,10 @@ def mentions_truth():
     """The mentions set's truth (fixtures sets.mentions): each direct ask of
     him with its batch, whether it is from his team and is work; the noise."""
     m = json.load(open(os.path.join(FAKE_ACCOUNTS, "fixtures.json")))["sets"]["mentions"]
-    items = [dict(x, kind="slack") for x in m["slack"]["+messages"]] + [dict(x, kind="gmail") for x in m["gmail"]["+messages"]]
+    # 'messages' (not '+messages'): the set replaces the base Slack and Gmail, so the base fixtures'
+    # own asks of Camille (the offsite, the weekly update, Nora's La Grange mail…) never mix in
+    msgs = lambda svc: m[svc].get("messages") or m[svc].get("+messages") or []
+    items = [dict(x, kind="slack") for x in msgs("slack")] + [dict(x, kind="gmail") for x in msgs("gmail")]
     users = {"lea": "Léa", "nora": "Nora", "theo": "Théo", "slackbot": "Slackbot", "camille": "Camille"}
     for x in items:
         x["who"] = (x.get("from") or "").split("<")[0].strip() or users.get(x.get("user"), x.get("user", ""))
