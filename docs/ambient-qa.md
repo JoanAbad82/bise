@@ -590,6 +590,17 @@ frontmost:
   in the third run). Either the press acts before the click event, or the hints still move under
   the pointer.
 
+### Results: real clicks, fifth run (fresh launch at ambient-app with amb-web 78e24cdf)
+
+Each command now carries its route. A press acts on release (amb-web), so 47 is judged by the
+act, not by the page's click event.
+- **fail 46 closed: it was the log.** Each option click sends one `answer`, page→app. The second
+  line was the same answer going on app→core.
+- **fail 47, 2 of 3 pass by the act.** `fn 1–2 pick` answers 1, and `fn o open the page` sends
+  `app_open_url`. **`fn esc later` still does nothing seen:** no command left, while `esc later`
+  on the card sends `app_size` + `app_content`. The view changed, but nothing shows the card going
+  into the count. `qa.py clicks` should also judge by the act, not by the click event (amb-tools).
+
 ## Out of the way (vision §3 G, the user's change m_5030)
 
 - [ ] At rest, after launch: nothing on screen but the menu-bar icon (no idle capsule).
