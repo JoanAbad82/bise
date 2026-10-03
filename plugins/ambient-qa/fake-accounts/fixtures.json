@@ -214,6 +214,23 @@
         {"id": "m313", "thread": "t313", "from": "Linear <notifications@linear.test>", "to": "camille@acme.test", "batch": 0, "at_min": -15, "noise": "notification", "labels": ["INBOX", "notifications"], "unread": true, "subject": "Lucas mentioned you in ENG-412", "body": "Lucas Bernard mentioned you in ENG-412: '@camille can you look at this?' View the issue in Linear. You are receiving this because you are subscribed."}
       ]},
       "people": ["- Léa Martin: team · design lead", "- Nora Haddad: team · ops lead", "- Hugo Bernard: customer at Brightline, accounting questions"]
+    },
+    "promises": {
+      "_about": "roadmap G, his promises (ambient-lead m_6016, amb-kit 8ba1685a): what Camille said he'd do, across Granola (the Q2 review's 'send Hélène the SSO timeline in writing', due 09-25, in the base fixtures: overdue), his sent mail (the signed NDA to Paul 'tomorrow' on 09-28: overdue; the board deck to Marc 'by tomorrow noon', kept by his mail of 10-01) and Slack (the pricing copy 'on Monday': open, not due); plus others' promises that are not his (Lucas on SSO, Paul on the case study). 'promise' is the QA's truth: sso, nda, deck (kept), pricing.",
+      "gmail": {"+messages": [
+        {"id": "m401", "thread": "t401", "from": "Camille <camille@acme.test>", "to": "Paul Girard <paul@studio-girard.test>", "date": "2026-09-28T10:05:00Z", "labels": ["SENT"], "unread": false, "promise": "nda",
+         "subject": "Re: NDA for the case study", "body": "Hi Paul, thanks for the draft. I'll send you the signed NDA tomorrow. Camille"},
+        {"id": "m402", "thread": "t402", "from": "Camille <camille@acme.test>", "to": "Marc Dubois <marc@acme.test>", "date": "2026-09-30T09:10:00Z", "labels": ["SENT"], "unread": false, "promise": "deck",
+         "subject": "Board deck", "body": "Marc, I'll share the board deck by tomorrow noon. Camille"},
+        {"id": "m403", "thread": "t402", "from": "Camille <camille@acme.test>", "to": "Marc Dubois <marc@acme.test>", "date": "2026-10-01T10:40:00Z", "labels": ["SENT"], "unread": false, "promise": "deck-kept",
+         "subject": "Re: Board deck", "body": "Here's the board deck: https://docs.acme.test/board-deck-q3. Camille"},
+        {"id": "m404", "thread": "t404", "from": "Paul Girard <paul@studio-girard.test>", "to": "camille@acme.test", "date": "2026-09-29T16:00:00Z", "labels": ["INBOX"], "unread": false, "promise": "not-his",
+         "subject": "Case study draft", "body": "Camille, I'll send you the case study draft by Friday. Paul"}
+      ]},
+      "slack": {"+messages": [
+        {"id": "s401", "channel": "design", "user": "camille", "ts": "2026-10-01T15:00:00Z", "promise": "pricing", "text": "i'll look at the pricing copy on Monday and tell you what to cut"},
+        {"id": "s402", "channel": "team", "user": "lucas", "ts": "2026-10-01T11:00:00Z", "promise": "not-his", "text": "I'll have SSO login ready for the beta by January"}
+      ]}
     }
   },
   "launch": {

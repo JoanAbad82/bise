@@ -23,6 +23,7 @@ copy of the app (scripts/ambient.sh builds the one path), pkill by name
 (only the QA app's own pid).
 """
 import calendar
+import datetime
 import json
 import os
 import re
@@ -1092,6 +1093,9 @@ SCENARIOS.update({
     # not show, cards for his team's questions only; his send on Hugo's item, a start on Nora's
     "mentions": {"ask": "watch for what's asked of me on Slack and mail", "no_send": False, "notes": False,
                  "set": "mentions", "flow": "mentions", "tick_min": 0},
+    # G, his promises (ambient-lead m_6016): the promises page, sb page waiting, the morning page; no card, nothing leaves
+    "promises": {"ask": "keep track of what i promised people", "no_send": True, "no_writes": True, "notes": False,
+                 "set": "promises", "flow": "promises"},
 })
 
 
@@ -1253,6 +1257,21 @@ def _feedback_loop_end(x, started):
             r["fails"].append("after his send: %d write(s) (%s), exactly one Slack message expected" % (len(w), ", ".join(r["flow"]["after_send"])))
 
 
+def answer_card(x, card_id, reply):
+    """His answer to a card, by the run's own path: headless, the core
+    child's stdin; on the app (ambient-pm m_6034: no core child there), the
+    page's own answer cmd through the QA app ({cmd: answer, card, reply},
+    what the capsule sends for fn + a digit or a click)."""
+    cmd = {"cmd": "answer", "card": card_id, "reply": str(reply)}
+    core = x["core"]
+    if getattr(core, "p", None) is not None:
+        core.p.stdin.write(json.dumps(cmd) + "\n")
+        core.p.stdin.flush()
+    else:
+        call("cmd", cmd=cmd)
+    x["r"].setdefault("answers", []).append(dict(cmd, at=round(time.time(), 1), path="core" if getattr(core, "p", None) is not None else "app"))
+
+
 def question_pick(card, picks=None, default=1):
     """The reply the QA gives a question card: the scenario's pick for its
     page block (picks {"q-language": 2}), else the option bise marked
@@ -1292,8 +1311,7 @@ def answer_questions(x):
     for q in x["c"].cards():
         if q.get("kind") == "question" and not (q.get("page") or {}).get("item") and q.get("id") not in done:
             pick = question_pick(q, x.get("picks"), x.get("pick") or 1)
-            x["core"].p.stdin.write(json.dumps({"cmd": "answer", "card": q["id"], "reply": pick}) + "\n")
-            x["core"].p.stdin.flush()
+            answer_card(x, q["id"], pick)
             answered.append({"id": q["id"], "text": (q.get("text") or "")[:160], "reply": pick})
             # an option that promises a note ('i'll leave a note with the address'): the note
             # follows on that block, with the scenario's words for it (ambient-pm m_5904)
@@ -1364,8 +1382,7 @@ def _flow_checklist(x):
             page_notes(pid, [{"block": block, "item": item, "kind": "tick"}], send=False)   # a tick on the page, even a draft
             r["flow"]["closed_by"].append("tick note")
         else:
-            x["core"].p.stdin.write(json.dumps({"cmd": "answer", "card": cd["id"], "reply": "1"}) + "\n")
-            x["core"].p.stdin.flush()
+            answer_card(x, cd["id"], "1")
             r["flow"]["closed_by"].append("card answer")
             if not his:
                 # his word for a draft: a send may follow it, and only it
@@ -1804,8 +1821,110 @@ def _flow_mentions(x):
                 r["fails"].append("the agent's brief doesn't name Nora's ask (the export's due dates)")
 
 
+# his promises in the promises set and the base fixtures (words of each, lower case); overdue = due before today
+PROMISES = {"sso": {"words": ("sso",), "overdue": True}, "nda": {"words": ("nda",), "overdue": True},
+            "deck": {"words": ("deck",), "kept": True}, "pricing": {"words": ("pricing",), "overdue": False}}
+NOT_HIS = ("case study draft", "sso login ready")
+
+
+def promises_check(body, page_id, today=None):
+    """promises.md on a body: id promises-YYYY-wNN, titled 'your promises',
+    one checklist (never data-plan) of rows of his, each promise there, the
+    overdue ones dated in the past with a draft or a question they point
+    at, the kept one ticked (data-done) or folded as kept, sources quoted,
+    nothing others promised. (facts, fails)"""
+    d = datetime.date.fromisoformat(today) if today else datetime.date.today()
+    y, w, _ = d.isocalendar()
+    fails, secs = [], _sections(body)
+    if page_id != "promises-%d-w%02d" % (y, w):
+        fails.append("page id %s (promises-%d-w%02d expected)" % (page_id, y, w))
+    if not re.search(r"<h1[^>]*>\s*your promises\s*</h1>", body or "", re.I):
+        fails.append("the title isn't 'your promises'")
+    lists = [s for s in secs if s["kit"] == "checklist"]
+    if len(lists) != 1 or "data-plan" in (lists[0]["attrs"] if lists else ""):
+        fails.append("%d checklist(s); one without data-plan expected" % len(lists))
+    rows = re.findall(r"<li([^>]*)>(.*?)</li>", lists[0]["html"], re.S) if lists else []
+    ids = {s["id"] for s in secs}
+    facts = {"rows": len(rows)}
+    low = re.sub(r"<[^>]+>", " ", body or "").lower()
+    for k, p in PROMISES.items():
+        row = next(((a, h) for a, h in rows if any(w in h.lower() for w in p["words"])), None)
+        facts[k] = "missing"
+        if p.get("kept"):
+            if row and "data-done" in row[0] or re.search(r"kept[^.]{0,60}%s|%s[^.]{0,60}kept" % (p["words"][0], p["words"][0]), re.sub(r"\s+", " ", low)):
+                facts[k] = "kept"
+            else:
+                fails.append("the %s promise, kept by his mail, isn't ticked or folded as kept" % k)
+            continue
+        if not row:
+            fails.append("the %s promise is missing" % k)
+            continue
+        a = row[0]
+        facts[k] = "row"
+        if 'data-who="yours"' not in a:
+            fails.append("the %s row isn't his (data-who=\"yours\")" % k)
+        due = re.search(r'data-due="(\d{4}-\d{2}-\d{2})"', a)
+        if p["overdue"]:
+            if not due or due.group(1) >= d.isoformat():
+                fails.append("the %s row isn't dated in the past (data-due %s)" % (k, due.group(1) if due else "none"))
+            ref = re.search(r'data-(draft|question)="([^"]+)"', a)
+            if not ref or ref.group(2) not in ids:
+                fails.append("the overdue %s row points at no draft or question on the page" % k)
+            else:
+                facts[k] = ref.group(1)
+    src = next((s for s in secs if s["kit"] == "sources"), None)
+    if not src or not re.search(r"[\"“”'‘’]", re.sub(r"<[^>]+>", "", src["html"])):
+        fails.append("no sources with his words quoted")
+    theirs = [t for t in NOT_HIS if t in low]
+    if theirs:
+        fails.append("others' promises on his page: %s" % ", ".join(theirs))
+    return facts, fails
+
+
+def _hub_sb(info, *args):
+    """`sb <args>` as the QA hub's main would run it (its own state dir and sb)."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("SB_")}
+    env.update(SB_STATE_DIR=info["state"], SB_AGENT="main")
+    p = subprocess.run([os.path.join(info["state"], "bin", "sb")] + list(args), capture_output=True, text=True, env=env, timeout=30)
+    return p.stdout + p.stderr
+
+
+def _flow_promises(x):
+    """G (ambient-lead m_6016): the promises page held to promises.md, sb
+    page waiting listing the overdue rows first, then the morning page
+    leading with them; no card ever, nothing leaves."""
+    r, c, pid = x["r"], x["c"], x["page"]["id"]
+    facts, fails = promises_check(x["body"], pid)
+    r["flow"] = {"page": facts}
+    r["fails"] += fails
+    out = _hub_sb(x["info"], "page", "waiting")
+    lines = [l for l in out.splitlines() if l.strip()]
+    r["flow"]["waiting"] = lines[:12]
+    first = " ".join(lines[:2]).lower()
+    if not any(w in first for w in ("sso", "nda")):
+        r["fails"].append("sb page waiting doesn't list an overdue promise first: %s" % (lines[:2] or out[:200]))
+    # the morning page leads with them
+    before = {p["id"] for p in (c.state or {}).get("pages", [])}
+    x["core"].send("make today's morning page")
+    r["t"]["morning_ask"] = x["rel"]()
+    mp = lambda: next((p for p in (c.state or {}).get("pages", []) if p["id"].startswith("morning-") and p["id"] not in before and p.get("version", 0) >= 1), None)
+    if _until(x, lambda: mp() and x["settled"](), "the morning page") is None:
+        return
+    m = mp()
+    body = _body(dict(x, page=m), page_meta(m["id"])["versions"][-1]["n"])
+    needs = re.search(r"needs you</h2>.*?<section[^>]*data-kit=\"prose\"[^>]*>(.*?)</section>", body, re.S | re.I)
+    lis = re.findall(r"<li[^>]*>(.*?)</li>", needs.group(1), re.S) if needs else []
+    r["flow"]["morning_needs"] = [re.sub(r"<[^>]+>", "", l).strip()[:100] for l in lis[:4]]
+    lead = (lis[0] if lis else "").lower()
+    if not (("/p/" + pid) in lead and any(w in lead for w in ("sso", "nda", "overdue", "late"))):
+        r["fails"].append("the morning page's needs you doesn't lead with an overdue promise: %s" % r["flow"]["morning_needs"][:2])
+    cards = list(x["cards"].values())
+    if cards:
+        r["fails"].append("%d card(s): a promise never makes one" % len(cards))
+
+
 FLOWS = {"newsletter": _flow_newsletter, "feedback": _flow_feedback, "checklist": _flow_checklist, "morning": _flow_morning,
-         "meetings": _flow_meetings, "mentions": _flow_mentions}
+         "meetings": _flow_meetings, "mentions": _flow_mentions, "promises": _flow_promises}
 
 
 def _covered(body, items):

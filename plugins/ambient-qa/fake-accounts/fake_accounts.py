@@ -74,7 +74,7 @@ def write(service, action, args, extra=None):
     return dict({"ok": True, "fake": True, "id": rid, "note": NOTE}, **(extra or {}))
 
 
-TRUTH = ("batch", "at_min", "mention", "noise", "work")
+TRUTH = ("batch", "at_min", "mention", "noise", "work", "promise")
 
 
 def live(items, field):

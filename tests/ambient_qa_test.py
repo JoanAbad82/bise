@@ -549,6 +549,35 @@ def mentions_page_laws():
 
 
 @test
+def promises_page_laws():
+    """run promises: promises.md's laws on a page of his four promises (two overdue with drafts, one kept)"""
+    good = """<section data-kit="heading" data-id="title"><h1>your promises</h1><p>3 open · 2 overdue · 1 kept</p></section>
+<section data-kit="checklist" data-id="promises"><ol>
+<li data-id="p-sso" data-who="yours" data-due="2026-09-25" data-draft="mail-sso">send Hélène the SSO timeline in writing</li>
+<li data-id="p-nda" data-who="yours" data-due="2026-09-29" data-draft="mail-nda">send Paul the signed NDA</li>
+<li data-id="p-pricing" data-who="yours" data-due="2026-10-05">look at the pricing copy</li>
+<li data-id="p-deck" data-who="yours" data-due="2026-10-01" data-done>share the board deck · kept: your mail of thursday</li>
+</ol></section>
+<section data-kit="email" data-id="mail-sso"><p>hi Hélène</p></section>
+<section data-kit="email" data-id="mail-nda"><p>hi Paul</p></section>
+<section data-kit="sources" data-id="src"><ol><li><a href="https://x.test">"i'll send you the signed NDA tomorrow" · Gmail, sent</a></li></ol></section>"""
+    f, fl = qa.promises_check(good, "promises-2026-w40", today="2026-10-02")
+    check(not fl and f["sso"] == "draft" and f["deck"] == "kept", (f, fl))
+    _, fl = qa.promises_check(good.replace(' data-draft="mail-nda"', ""), "promises-2026-w40", today="2026-10-02")
+    check(len(fl) == 1 and "nda" in fl[0] and "draft" in fl[0], fl)
+    _, fl = qa.promises_check(good.replace(" data-done>share the board deck · kept: your mail of thursday", ">share the board deck"), "promises-2026-w40", today="2026-10-02")
+    check(len(fl) == 1 and "deck" in fl[0], fl)
+    _, fl = qa.promises_check(good.replace('data-id="promises"', 'data-id="promises" data-plan'), "promises-2026-w40", today="2026-10-02")
+    check(len(fl) == 1 and "data-plan" in fl[0], fl)
+    _, fl = qa.promises_check(good.replace("look at the pricing copy", "look at the pricing copy; Paul: case study draft by friday"), "promises-2026-w40", today="2026-10-02")
+    check(len(fl) == 1 and "others'" in fl[0], fl)
+    _, fl = qa.promises_check(good, "promises-2026-w41", today="2026-10-02")
+    check(len(fl) == 1 and "page id" in fl[0], fl)
+    sc = qa.SCENARIOS["promises"]
+    check(sc["flow"] == "promises" and sc["set"] == "promises" and sc["no_writes"], sc)
+
+
+@test
 def one_run_at_a_time():
     """qa.py run: a second run in the same QA dir is refused while one is live (ambient-pm m_5841)"""
     lock = os.path.join(qa.QA_DIR, "run.lock")
