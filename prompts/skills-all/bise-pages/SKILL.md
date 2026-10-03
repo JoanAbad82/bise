@@ -77,7 +77,8 @@ Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kep
 - `question`: a `<p>` + `<ol>` of 2 to 4 short options; answered: `data-answer="2"`.
 - `sources`: `<ol>` of `<li><a href="…">name · tool</a>, when</li>`, last; facts cite `<sup>n</sup>`.
 - `review`: `<ol>` of `<li data-id>` to handle one by one; `data-verb` `send`, `open-reply`,
-  `start`, `keep` (`blocks.md`).
+  `start`, `keep` (`blocks.md`). Items to handle (mails, reports, comments) are always a
+  `review`, one item each, never headings and prose.
 - `message`: a draft for a channel, `data-to="Slack · #launch"`, `<p>`s; never `<pre>`.
 - `email`: `data-to`, `<p data-field="to">`, `subject`, the body; `data-verb="draft"` for his drafts.
 - `compare`: 2 to 4 `<li data-id>` side by side: `<h3>`, `<ul>` of facts, `<p>` why.

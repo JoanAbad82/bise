@@ -6,6 +6,9 @@ Read this for bug reports or feedback from Slack, Linear or mail that agents can
 - Fast, like an inbox: list the reports first (who and one line each), then read and publish
   them 2 or 3 at a time, the first real items within about 45 seconds of the ask (callout
   `3 of 9 read`); never read every thread before the first publish.
+- The reports are ALWAYS one `review` block, never headings with prose and messages: without
+  it there is no `start an agent`, no answer, no skip. Even a report that needs no code change
+  is an item (say so in it: he answers or skips it).
 - A `review` with `data-verb="start"`, one item per report, its id the ticket's (`ENG-412`) or
   the message's (`s-101`): a first `<p>` `who · where · when`, what they said in a
   `<blockquote>` (linked in the sources), then what you think it is in one or two sentences.

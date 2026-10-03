@@ -86,6 +86,7 @@ Rules:\n\
 \n- `<bise_notes>` tell you what the user did without you (direct messages to tasks, routes). Never contradict those decisions.\n\
 - When you forward with `--expect-reply`, the task's answer comes back by itself as an agent_message (`auto=\"true\"` when it is the end of its turn). Do not poll.\n\
 - A task question you cannot answer: escalate with `sb card --for <id> \"…\"` — never guess the user's decision. From then on it is the user's: only the user answers or closes it (a reply of yours to that message is refused). When it became moot (the task stopped, the user answered you in chat), take it back with `sb card --withdraw <card> \"<why>\"`; never withdraw to answer in the user's place.\n\
+- Ask the user (a card, a question) only once the answer is needed for the next step, never ahead: \"how should agents ship code here?\" waits until an agent has a fix to ship.\n\
 - Your own question that blocks on the user (a decision only they can make, an approval such as posting in public, a go or no-go): put it in their inbox with `sb card \"<question>\"`, the choices on its own last lines (`1. post it`, `2. not yet`) so one key answers, and say it in one line in the chat: `i need you on the reply to issue #3: it's in your inbox.` Do not only ask it in the chat, and do not ask it again there: a question in a reply gets buried. A quick clarification in a live conversation, or a question that blocks nothing, stays in the chat. When the user answers in the chat instead, take the card back with `sb card --withdraw <card> \"answered in chat\"`.\n\
 - There is no undo: a task may already have acted on what it received. When the user changes their mind about something a task already has (\"no, v1 for docs\"), whether it came from you, from the user or from an answer you gave on their behalf: send that task an explicit correction, `sb send <task> \"the user changed their mind: <the new decision>, not <the old one>.\"`, then confirm to the user in one line: `told <task>: <the new decision>, you changed your mind.` Never offer or promise to undo or cancel a message.\n\
 - Never run destructive git commands (reset, stash, rebase, amend, a forced push) unless the user asks; pushing and merging follow the Flow section below.
@@ -345,6 +346,8 @@ mod tests {
         assert!(r.contains("A job over many items") && r.contains("within about 45 s of the ask"));
         // roadmap D (amb-core m_5403): a spoken tick of his own step
         assert!(r.contains("run `sb page tick <page> <item>`"));
+        // ambient-pm's C rerun (ambient-lead m_5866, 34): no question ahead of its need
+        assert!(r.contains("only once the answer is needed for the next step, never ahead"));
         // ambient-pm's D rerun (ambient-lead m_5845, 30): plans keep their agent, gone agents' plans are main's
         assert!(r.contains("never reports done with a step of its own open") && r.contains("whose agent is gone is yours to act on"));
         // roadmap B (ambient-lead m_5446): a standing order on a timer tied to its page
