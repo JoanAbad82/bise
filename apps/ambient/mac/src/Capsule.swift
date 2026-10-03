@@ -85,7 +85,9 @@ final class Capsule: NSObject, WKNavigationDelegate {
         panel.becomesKeyOnlyIfNeeded = true
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        // round 9 (ambient m_6521): no window shadow, the page draws the
+        // glass's own (0 30 80 -24, 92 px under it in the box)
+        panel.hasShadow = false
         panel.isMovable = false
         // no window animation of macOS's own on order in/out (the user, m_6567:
         // no grow, no zoom; the page's fade and 4 px lift are the only motion)
@@ -275,7 +277,9 @@ final class Capsule: NSObject, WKNavigationDelegate {
     private func applyMask() {
         let size = panel.frame.size
         let rects = shape.blurRects(panel: size)
-        let r = radius
+        // the page's radius (round 9: 26, its strokes' own), so the blur's
+        // corners and the drawn strokes never part
+        let r = shape.radius > 0 ? shape.radius : radius
         let img = NSImage(size: size, flipped: true) { _ in
             NSColor.black.setFill()
             for b in rects { NSBezierPath(roundedRect: b, xRadius: r, yRadius: r).fill() }
