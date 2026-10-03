@@ -477,6 +477,63 @@ product checks, through `qa.py scenes` and `snapshot`:
 - [ ] The pages' frame and note layer use the same pink and the same glass for bise's own chrome,
       so the capsule and a page feel like one app.
 
+## What he hit on the dogfood day: checks on every build (main m_6474, ambient-lead m_6482)
+
+His verdict at 22:26 on 2026-10-03, with a screenshot: the card layout is broken, the capsule's
+buttons can't be clicked, holding fn with the capsule closed did nothing, and the pearl sits in a
+square with a background. His direction: Spotlight-like, keyboard-first with the shortcuts shown,
+polish at the level of Siri. Every build of the app passes these before he tries it again, on the
+QA app with a model hub on fake accounts. The four checks below that run on the QA app need a
+build where no dogfood app is running (two apps would both take fn).
+
+**Real-mouse clicks.** These clicks go through the window server, never through the page's JS or
+the QA socket (that's how the `answer` path passed while his clicks did nothing):
+- [ ] Every button the capsule can show takes one real click, posted as a mouse event at the
+      button's screen point: each card option (1..n), review, send all, open the page, stop
+      watching, type to main, close. One click does it, also when bise is not the frontmost app
+      (the panel takes the first click: no click to focus first). After each click, the core gets
+      its command once (`qa.py` events), and the capsule shows the result.
+- [ ] Hover and the pressed state show under the real pointer. The pointer is an arrow or a hand
+      on a button, never the text cursor.
+- [ ] A click outside the capsule goes to the app below it: the capsule's window has no invisible
+      margin that eats clicks around it.
+- [ ] The same clicks on the menu-bar menu and on the full view.
+
+**fn from rest.** This is how he first reached for it:
+- [ ] Capsule closed, nothing on screen but the menu-bar icon, another app frontmost (TextEdit,
+      then a full-screen app, then the terminal): hold fn. The pearl appears and listens within
+      300 ms, the fake voice's words show, let go, the words reach the core, main's line shows.
+      Run it right after launch, then again after the capsule has folded away by itself, then
+      again after `fn + .` hid it.
+- [ ] fn with no hold (a tap) does nothing visible and starts no recording.
+- [ ] If the app lacks the Input Monitoring or Accessibility permission, holding fn shows one line
+      saying what to allow and where (no silent failure). Check it on a QA build without the
+      permission.
+
+**The pearl floats free.**
+- [ ] In every state (`qa.py scenes`: rest, listening, working, needs you, done, failed, reduced
+      motion), the pixels around the pearl are the screen behind it: transparent window, no
+      square, no glass, no shadow box, no border. Check it in the screen composite over a light
+      and a dark wallpaper, not only in the capsule PNG.
+- [ ] The pearl sits next to the interface (the card, the answer, the field), never inside a box
+      of it.
+
+**Keyboard first, shortcuts shown.**
+- [ ] Every action in the capsule, the full view and the cards can be done with the keyboard
+      alone, and its shortcut is shown next to it: card options (1..n), ↑↓ to move, ⏎ to pick,
+      esc to close, review, send all, open the page (fn + o), hide (fn + .), stop watching, type
+      to main. Run each slice's flow once with keys only, no mouse.
+- [ ] No action exists only on a click. No shortcut works without being shown somewhere on the
+      surface it acts on.
+
+**Cards are readable.** These come from main's read of his screenshot:
+- [ ] The question shows in full and once. The options are not repeated inside the question's
+      text.
+- [ ] Options are compact rows, one line each, with an ellipsis when long. The full text shows on
+      hover or when the row is selected. No big blocks, no labels wrapped onto several lines.
+- [ ] A card from main reads as bise's question (no 'main' label). A card from a task names the
+      task.
+
 ## Out of the way (vision §3 G, the user's change m_5030)
 
 - [ ] At rest, after launch: nothing on screen but the menu-bar icon (no idle capsule).
