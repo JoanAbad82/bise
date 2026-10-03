@@ -21,6 +21,8 @@
       meeting_quiet: "stay quiet in meetings and calls",
       meeting_quiet_note: "bise still shows things, it just doesn't say them.",
       voice_answers: "bise answers out loud",
+      // amb-mac plays them (listen, think, needs you); on by default (best guess, asked to ambient)
+      sounds: "small sounds when bise listens, thinks or needs you",
       launch_at_login: "open bise when you log in",
       approve: "waiting for your OK in System Settings › Login Items",
       skipTitle: "bise never sees",

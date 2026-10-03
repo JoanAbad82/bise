@@ -35,7 +35,7 @@
   const helloMs = (m) => (m.reduce ? 500 : T.helloWords + 500) + T.helloStay;
   const TURN = ["listening", "sending", "working", "speaking"];
   // the settings view's toggles, in its order (amb-mac's app_setting keys)
-  const SETTING_KEYS = ["edge_glow", "right_option", "meeting_quiet", "voice_answers", "launch_at_login"];
+  const SETTING_KEYS = ["edge_glow", "right_option", "meeting_quiet", "voice_answers", "sounds", "launch_at_login"];
 
   function init() {
     return {
@@ -282,7 +282,7 @@
           // the settings view's fields (amb-mac ef4dbc2e; it keeps them and sends them after every change)
           settings: {
             edge_glow: ev.edge_glow !== false, right_option: !!ev.right_option, meeting_quiet: !!ev.meeting_quiet,
-            voice_answers: ev.voice_answers !== false, launch_at_login: ev.launch_at_login || "off",
+            voice_answers: ev.voice_answers !== false, sounds: ev.sounds !== false, launch_at_login: ev.launch_at_login || "off",
             skip: Array.isArray(ev.skip) ? ev.skip.map((s) => ({ bundle: s.bundle, name: s.name || s.bundle, fixed: !!s.fixed })) : [],
           } });
       // the settings view: a toggle flips (optimistic; amb-mac answers with app_settings), an app
