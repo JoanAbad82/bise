@@ -427,7 +427,8 @@ the page with an open card (a task agent's page) is not checked yet.
   team asks (Léa's question in v1, Nora's request after a tick), none for clients or noise; outbox
   empty until his send, then exactly one Gmail send; `start an agent` on Nora's ask briefed an
   agent with her words. The run's only fail was its noise check reading the sources block
-  (amb-tools 5fbd2268).
+  (amb-tools 5fbd2268). Clean rerun at b920c95a: verdict pass (v1 36 s, the same 2 cards, both
+  main's and linked to their item, one Gmail send after his word).
 - **F at d057f499 (headless): fail 40 for ticks.** Léa's direct question in v1 got its card; Nora's
   DM that arrived with tick 1 got none, though the page listed it and main started an agent on it
   (amb-kit 78500b1b since).
