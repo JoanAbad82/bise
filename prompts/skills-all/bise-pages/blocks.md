@@ -43,6 +43,8 @@ ask it again: the row says it in one line (`waiting for your note: legal's addre
 note comes, republish in one version both the row (no more `waiting for your note`) and every
 draft it fills (the mail's To), before the next step becomes his turn: his `send the draft?`
 never asks him to send a draft that still says it's waiting.
+A draft missing what it needs to leave (no To, no channel) is not drafted: its row says
+`waiting for your note: <what>`, without `data-did`, until you republish the draft complete.
 
 Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
 `<img src="data:image/…" alt="…">`. Nothing else. Review and checklist items may carry
