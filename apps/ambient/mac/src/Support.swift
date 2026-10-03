@@ -94,6 +94,18 @@ struct Config {
         return c
     }
 
+    // 'start bise in a terminal' (app_run_bise): a .command file Terminal
+    // runs, in his workspace (none: the home workspace, ~/bise), with the
+    // try path's app root when there is one; every value shell-quoted
+    static func startBiseScript(bise: String, workspace: String, appRoot: String?) -> String {
+        func q(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+        var lines = ["#!/bin/bash", "# bise ambient: start bise (the capsule's 'can't reach bise')"]
+        if let r = appRoot, !r.isEmpty { lines.append("export BISE_APP_ROOT=\(q(r))") }
+        lines.append(workspace.isEmpty ? "cd \"$HOME/bise\" 2>/dev/null || cd \"$HOME\"" : "cd \(q(workspace))")
+        lines.append("exec \(q(bise))")
+        return lines.joined(separator: "\n") + "\n"
+    }
+
     // the line app.log says when the core exits 2 at once: its bise has no
     // ambient-core (an installed bise, older than the app)
     static func coreMissingLine(status: Int32, lived: Double, bise: String) -> String? {

@@ -402,6 +402,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             if let s = cmd["url"] as? String, let u = URL(string: s), ["http", "https", "file", "x-apple.systempreferences"].contains(u.scheme?.lowercased() ?? "") {
                 if let qa { qa.opened(s) } else { Browser.open(s) }
             }
+        case "app_copy":
+            // ⌘ C on a row or an answer (amb-web d16054d8): his pasteboard;
+            // QA never touches it
+            guard let text = cmd["text"] as? String, !text.isEmpty else { return }
+            if qa != nil { Log.say("app: qa: copy \(text.count) chars"); return }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        case "app_run_bise":
+            runBise()
         case "app_perm":
             permCommand(cmd["perm"] as? String ?? "", cmd["do"] as? String ?? "")
         case "app_setting":
@@ -452,6 +461,28 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case .voiceAnswers: sayVoice()
         default: break
         }
+    }
+
+    // 'can't reach bise' → 'start bise in a terminal' (amb-web d16054d8):
+    // the core gets a fresh start at once, and Terminal opens a .command
+    // file that runs bise in his workspace (opening a file needs no
+    // Automation permission, unlike scripting Terminal). QA logs it only.
+    private func runBise() {
+        core.restart(config: config)
+        let path = config.ambientDir + "/start-bise.command"
+        let script = Config.startBiseScript(bise: config.bise, workspace: config.workspace,
+                                            appRoot: config.childEnv["BISE_APP_ROOT"])
+        if qa != nil { Log.say("app: qa: run bise (\(path))"); return }
+        do {
+            try script.write(toFile: path, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: path)
+        } catch {
+            Log.say("app: run bise: can't write \(path): \(error)")
+            return
+        }
+        let term = URL(fileURLWithPath: "/System/Applications/Utilities/Terminal.app")
+        NSWorkspace.shared.open([URL(fileURLWithPath: path)], withApplicationAt: term, configuration: NSWorkspace.OpenConfiguration())
+        Log.say("app: run bise in Terminal: \(config.bise) in \(config.workspace.isEmpty ? "~/bise" : config.workspace)")
     }
 
     // ambient's sounds (Sounds.swift): the plan says which, the player plays

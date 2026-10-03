@@ -45,5 +45,16 @@ law("core exits 2 at once: one line naming the bise and the fix",
 law("core exits 2 after running a while: not that", Config.coreMissingLine(status: 2, lived: 60, bise: installed) == nil)
 law("other exits: not that", Config.coreMissingLine(status: 1, lived: 0.2, bise: installed) == nil)
 
+// 'start bise in a terminal' (app_run_bise, amb-web d16054d8)
+let nl = String(UnicodeScalar(10))
+let run = Config.startBiseScript(bise: devBise, workspace: "/u/lab/my repo", appRoot: "/u/lab/repo")
+law("run bise: in his workspace, quoted", run.contains("cd '/u/lab/my repo'\n"))
+law("run bise: the dev bise, exec'd last", run.hasSuffix("exec '\(devBise)'\n"))
+law("run bise: the try path's app root", run.contains("export BISE_APP_ROOT='/u/lab/repo'\n"))
+law("run bise: no workspace: the home one", Config.startBiseScript(bise: "bise", workspace: "", appRoot: nil).contains("cd \"$HOME/bise\""))
+law("run bise: a quote in a path can't break out",
+    Config.startBiseScript(bise: "/a/it's/bise", workspace: "/w", appRoot: nil).contains("exec '/a/it'\\''s/bise'"))
+law("run bise: a shell script", run.hasPrefix("#!/bin/bash\n"))
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Launch laws hold")
