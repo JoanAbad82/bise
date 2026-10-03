@@ -1885,7 +1885,10 @@ def promises_check(body, page_id, today=None):
     src = next((s for s in secs if s["kit"] == "sources"), None)
     if not src or not re.search(r"[\"“”'‘’]", re.sub(r"<[^>]+>", "", src["html"])):
         fails.append("no sources with his words quoted")
-    theirs = [t for t in NOT_HIS if t in low]
+    # others' promises must not be rows of his list; quoting one as a source (a risk callout
+    # checking his date against Lucas's 'SSO login ready for the beta by January') is fine
+    row_text = " ".join(re.sub(r"<[^>]+>", " ", h) for _, h in rows).lower()
+    theirs = [t for t in NOT_HIS if t in re.sub(r"\s+", " ", row_text)]
     if theirs:
         fails.append("others' promises on his page: %s" % ", ".join(theirs))
     return facts, fails
@@ -1894,7 +1897,9 @@ def promises_check(body, page_id, today=None):
 def _hub_sb(info, *args):
     """`sb <args>` as the QA hub's main would run it (its own state dir and sb)."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("SB_")}
-    env.update(SB_STATE_DIR=info["state"], SB_AGENT="main")
+    # sb finds its hub by SB_SOCKET + SB_AGENT (the caller's own SB_* were dropped above, so
+    # this never reaches the hub the QA tool runs in)
+    env.update(SB_STATE_DIR=info["state"], SB_SOCKET=os.path.join(info["state"], "hub.sock"), SB_AGENT="main")
     p = subprocess.run([os.path.join(info["state"], "bin", "sb")] + list(args), capture_output=True, text=True, env=env, timeout=30)
     return p.stdout + p.stderr
 

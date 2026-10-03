@@ -581,10 +581,33 @@ def promises_page_laws():
     check(len(fl) == 1 and "data-plan" in fl[0], fl)
     _, fl = qa.promises_check(good.replace("look at the pricing copy", "look at the pricing copy; Paul: case study draft by friday"), "promises-2026-w40", today="2026-10-02")
     check(len(fl) == 1 and "others'" in fl[0], fl)
+    # quoting Lucas's promise in a callout that checks his date is no row of his (live run 05:15)
+    quoted = good.replace('<section data-kit="email" data-id="mail-nda">',
+                          '<section data-kit="callout" data-id="sso-check" data-tone="risk"><p>Lucas wrote "SSO login ready for the beta by January"</p></section>\n<section data-kit="email" data-id="mail-nda">')
+    _, fl = qa.promises_check(quoted, "promises-2026-w40", today="2026-10-02")
+    check(not fl, fl)
     _, fl = qa.promises_check(good, "promises-2026-w41", today="2026-10-02")
     check(len(fl) == 1 and "page id" in fl[0], fl)
     sc = qa.SCENARIOS["promises"]
     check(sc["flow"] == "promises" and sc["set"] == "promises" and sc["no_writes"], sc)
+    # Lelio asks to be in cc: the set's people.md gives his address, so no one has to ask for it
+    fx = json.load(open(os.path.join(qa.FAKE_ACCOUNTS, "fixtures.json")))
+    check(any("lelio@acme.test" in l for l in fx["sets"]["promises"]["people"]), fx["sets"]["promises"].get("people"))
+    # `sb page waiting` reaches the QA hub by its own socket, never the caller's
+    seen = {}
+    real = qa.subprocess.run
+    qa.subprocess.run = lambda cmd, **kw: seen.update(cmd=cmd, env=kw["env"]) or type("P", (), {"stdout": "", "stderr": ""})()
+    try:
+        old = os.environ.get("SB_SOCKET")
+        os.environ["SB_SOCKET"] = "/elsewhere/hub.sock"
+        qa._hub_sb({"state": "/q/st"}, "page", "waiting")
+    finally:
+        qa.subprocess.run = real
+        if old is None:
+            os.environ.pop("SB_SOCKET", None)
+        else:
+            os.environ["SB_SOCKET"] = old
+    check(seen["cmd"][0] == "/q/st/bin/sb" and seen["env"]["SB_SOCKET"] == "/q/st/hub.sock" and seen["env"]["SB_AGENT"] == "main", seen)
 
 
 @test
