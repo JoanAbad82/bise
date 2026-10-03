@@ -230,7 +230,8 @@ def fake_accounts():
     os.makedirs(repo)
     subprocess.run("git init -q && git config user.email t@t && git config user.name t", shell=True, cwd=repo, check=True)
     qa.seed_repo(repo)
-    files = subprocess.run(["git", "ls-files"], cwd=repo, capture_output=True, text=True).stdout.split()
+    files = subprocess.run(["git", "ls-tree", "-r", "--name-only", "HEAD"], cwd=repo, capture_output=True, text=True).stdout.split()
+    check(not subprocess.run(["git", "status", "--porcelain"], cwd=repo, capture_output=True, text=True).stdout.strip(), "nothing left staged")
     check({"install.sh", "acme/http.py", "acme/assistant.py", "acme/sync.py", "bin/acme", "README.md"} <= set(files), files)
     src = {f: open(os.path.join(repo, f)).read() for f in ("install.sh", "acme/http.py", "acme/assistant.py")}
     check("fish" not in src["install.sh"] and ".zshrc" in src["install.sh"], "the fish bug (s212)")
@@ -428,8 +429,16 @@ def feedback_loop_end_laws():
     check(not f and reply["id"] == "reply-s-101" and reply["kit"] == "message", (reply, f))
     _, f = qa.feedback_done_check(b, "fix-nothing")
     check(len(f) == 1 and "data-agent" in f[0], f)
-    _, f = qa.feedback_done_check(b.replace("fixed in", "looked at"), "fix-install-path")
-    check(len(f) == 1 and "fixed" in f[0], f)
+    nofix = b.replace("fixed in", "looked at").replace("fix", "look")
+    _, f = qa.feedback_done_check(nofix, "fix-install-path".replace("fix", "look"))
+    check(len(f) == 1 and "reply draft" in f[0], f)
+    # any words for the fix, French too, or a reply new since v1 (ambient-pm m_5918)
+    for words in ("The fix is ready", "On la remplace par la langue de la question", "landed in 0.4.2"):
+        _, f = qa.feedback_done_check(b.replace("fixed in 0.4.2: the installer now sets the PATH for fish too. try again?", words), "fix-install-path")
+        check(not f, (words, f))
+    v1 = nofix.replace('data-kit="message"', 'data-kit="prose"')
+    reply, f = qa.feedback_done_check(nofix, "look-install-path", v1)
+    check(not f and reply["kit"] == "message", f)
     check(qa.SCENARIOS["feedback"]["no_send"] is False, "the flow checks the send itself")
     # the questions on the way are answered as he would (ambient-pm m_5901)
     ship = {"id": 1, "kind": "question", "text": "how should agents ship code here?\n1 a PR per task (you merge)\n2 straight to main, tested commits  ← suggested"}

@@ -451,6 +451,7 @@ def seed_repo(ws):
     code), committed: the install script that skips fish, the HTTP client
     that ignores HTTPS_PROXY, the assistant that always answers in English,
     so an agent on Benjamin's reports can decide on a code fix."""
+    ws = os.path.abspath(ws)
     for dirpath, _, files in os.walk(FAKE_REPO):
         rel = os.path.relpath(dirpath, FAKE_REPO)
         for n in files:
@@ -459,8 +460,18 @@ def seed_repo(ws):
             dst = os.path.normpath(os.path.join(ws, rel, n))
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copy2(os.path.join(dirpath, n), dst)
-    subprocess.run("git add -A . ':!.agents' && git -c commit.gpgsign=false commit -qm 'acme CLI'", shell=True, cwd=ws,
-                   capture_output=True)
+    # committed for real, never left staged (ambient-pm m_5918: install.sh and assistant.py stayed
+    # staged and the first fix commit swept them in): the files by name, then a check of HEAD
+    names = sorted(os.path.relpath(os.path.join(dp, n), FAKE_REPO) for dp, _, fs in os.walk(FAKE_REPO)
+                   for n in fs if not n.endswith(".pyc") and n != ".DS_Store")
+    env = dict(os.environ, GIT_AUTHOR_NAME="qa", GIT_AUTHOR_EMAIL="qa@acme.test", GIT_COMMITTER_NAME="qa", GIT_COMMITTER_EMAIL="qa@acme.test")
+    subprocess.run(["git", "add", "--"] + names, cwd=ws, capture_output=True, env=env)
+    c = subprocess.run(["git", "-c", "commit.gpgsign=false", "commit", "-q", "--no-verify", "-m", "acme CLI", "--"] + names,
+                       cwd=ws, capture_output=True, text=True, env=env)
+    tracked = set(subprocess.run(["git", "ls-tree", "-r", "--name-only", "HEAD"], cwd=ws, capture_output=True, text=True).stdout.split())
+    missing = [n for n in names if n not in tracked]
+    if missing:
+        raise RuntimeError("seed_repo: not committed in %s: %s (git: %s)" % (ws, ", ".join(missing), (c.stderr or c.stdout).strip()[-300:]))
 
 
 def install_fake_accounts(ws=None, root=None):
@@ -1152,16 +1163,25 @@ def _flow_feedback(x):
         _feedback_loop_end(x, [a["name"] for a in agents])
 
 
-def feedback_done_check(body, agent):
+# what a reply about a done fix says, in his words or the reporter's (Benjamin writes French)
+FIX_WORDS = r"\bfix|\blanded\b|\bready\b|\bshipped\b|\bsolved\b|\bresolved\b|corrig|résolu|réglé|\bprêt|remplac|livr"
+
+
+def feedback_done_check(body, agent, v1=None):
     """feedback.md once an agent is done: its item still carries it
-    (data-agent, the kit shows '✓ <name> done'), and a reply draft says it
-    is fixed (a message or email block). Returns (the reply block or None, fails)."""
+    (data-agent, the kit shows '✓ <name> done'), and a reply draft (a
+    message or email block) says the fix is there in any words (fix, ready,
+    landed, French too), or is new or changed since `v1` (ambient-pm m_5918:
+    'The fix is ready', 'On la remplace'). Returns (the reply block or None, fails)."""
     fails = []
     if not re.search(r'<li[^>]*data-agent="%s"' % re.escape(agent), body or ""):
         fails.append("the done item lost its agent (data-agent=\"%s\")" % agent)
-    replies = [s for s in _sections(body) if s["kit"] in ("message", "email") and "fixed" in re.sub(r"<[^>]+>", " ", s["html"]).lower()]
+    before = {s["id"]: (s["kit"], s["html"]) for s in _sections(v1)} if v1 is not None else None
+    replies = [s for s in _sections(body) if s["kit"] in ("message", "email")
+               and (re.search(FIX_WORDS, re.sub(r"<[^>]+>", " ", s["html"]).lower())
+                    or (before is not None and before.get(s["id"]) != (s["kit"], s["html"])))]
     if not replies:
-        fails.append("no reply draft saying it's fixed (a message or email block)")
+        fails.append("no reply draft about the fix (a message or email block saying it's fixed or ready, or new since v1)")
     return (replies[0] if replies else None), fails
 
 
@@ -1183,7 +1203,7 @@ def _feedback_loop_end(x, started):
     def shown():
         n = page_meta(pid)["versions"][-1]["n"]
         b = _body(x, n)
-        reply, fails = feedback_done_check(b, name)
+        reply, fails = feedback_done_check(b, name, x["body"])
         if not fails and x["settled"]():
             got.update(n=n, reply=reply)
             return True
