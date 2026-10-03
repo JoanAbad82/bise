@@ -1130,7 +1130,10 @@ def _flow_feedback(x):
     agents = new()
     briefs = {}
     for a in agents:
-        text = " ".join(c.lines(a["name"])[:40]).lower()
+        # its brief: its own first lines, and main's lines that start it ('sb spawn : main → new
+        # agent @<name> : <objective>' carries the objective, ambient-pm m_5887)
+        spawn = [l for l in c.lines("main") if ("sb spawn" in l or "new agent" in l) and a["name"] in l]
+        text = " ".join(c.lines(a["name"])[:40] + spawn).lower()
         briefs[a["name"]] = [k for k, w in words.items() if w in text]
     r["flow"] = {"items": items, "started": [a["name"] for a in agents], "briefs": briefs}
     if agents and not all(briefs.values()):
