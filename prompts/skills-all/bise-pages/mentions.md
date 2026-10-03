@@ -25,7 +25,7 @@ new mentions in the `reply` review, newest on top. Everything he has already see
 `<h2>earlier · 4</h2>` in a second `reply` review with the same item ids; the ones he sent or
 skipped stay there with their went line (the kit dims them). Nothing new: don't publish.
 
-**A card only for a direct question from his team:** someone `~/bise/people.md` marks as team
+**A card only for a direct question from his team:** someone `sb people` marks as team
 (`- Léa Martin: team · design lead`). Publish the item first, then open it yourself: `sb card
 --page mentions-2026-05-19#s-1712 "Léa asks which date works for the pricing review"` (the card
 opens the page at that item). Everything else waits on the page and in the menu-bar count. One

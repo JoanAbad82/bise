@@ -7,8 +7,7 @@ either, nor from anything on them, overdue or not: the menu-bar count says the p
 and his open rows reach the morning page through `sb page waiting`. So a meeting's checklists
 never take `data-plan` (that is for a plan worked through with him, `blocks.md`), and a doubt
 (an address, who owns an action) is a `question` with `data-card="none"` (the lint refuses one
-without it here). Read `~/bise/people.md` and the thread before asking him for an address or a
-name.
+without it here). Read `sb people` and the thread before asking him for an address or a name.
 
 **An overdue promise of his** (he told Hélène he would send the SSO timeline by the 26th, and
 no sent mail has it) leads the brief, right under the heading: a `callout` `data-tone="risk"`,
@@ -26,7 +25,7 @@ tomorrow). A meeting cancelled or moved: stop or replace its timers (`sb every`,
 ## The brief (v1), read in a minute before the meeting
 
 1. `heading`: the meeting's title, the meta line `14:30 · 30 min · Camille Roux, Léa Martin`.
-2. `## who`: a `prose` list, one line per person from `~/bise/people.md` (`Camille Roux · buyer
+2. `## who`: a `prose` list, one line per person from `sb people` (`Camille Roux · buyer
    at Northwind, prefers mail to calls`); someone not in it: their name and role from the invite.
 3. `## last time`: the last thread or meeting with them, two or three lines, linked (`<sup>`
    and `sources`): the Granola notes of the last meeting, the last mail or Slack thread.

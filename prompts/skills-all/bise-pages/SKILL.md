@@ -25,8 +25,9 @@ comparisons. A fact, a yes or no, a status, a time is one line in your reply:
 
 ## Before you write
 
-If `~/bise/taste.md` exists, read it: the user's taste rules. Follow them, and publish every
-version with `--taste` (the page says `following your taste · 4 rules`). No file: no `--taste`.
+Run `sb taste`: the user's taste rules (never a path like `~/bise/taste.md`). Follow them, and
+publish every version with `--taste` (the page says `following your taste · 4 rules`). No rules:
+no `--taste`. Who is who: `sb people`.
 
 ## Publish fast, then fill it
 

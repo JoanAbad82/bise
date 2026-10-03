@@ -1,8 +1,8 @@
 # bise pages: what bise keeps about the user
 
 Read this for "what do you know about me?", "show me my taste rules". Main publishes one page,
-id `about-you`, from `~/bise/taste.md` (the taste rules, one `- ` line each) and
-`~/bise/people.md` (who is who), when they exist:
+id `about-you`, from `sb taste` (the taste rules) and `sb people` (who is who), when they have
+any:
 - a `heading` (`what i keep about you`, meta line: `5 taste rules · 4 people · edit or strike any`);
 - `## your taste`: a `review` with `data-verb="keep"`, one item per rule, its `data-id` the
   rule's slug (`no-emoji`): a first `<p>` saying where it came from (`from your notes on the

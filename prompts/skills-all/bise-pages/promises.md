@@ -20,7 +20,7 @@ renewal`).
 
 **A draft ready when it's due:** a promise due today or overdue gets its draft in its own `email`
 or `message` block (it waits for his word, `leaving.md`), and its row points at it
-(`data-draft`). Read `~/bise/people.md` and the thread before you ask him for an address or a
+(`data-draft`). Read `sb people` and the thread before you ask him for an address or a
 name. A doubt left (the address, a cc) is a page-only `question`, `data-card="none"`, its row
 pointing at it (`data-question`): it waits on the page and in the morning, never a card (the
 lint refuses a question without it on this page).
