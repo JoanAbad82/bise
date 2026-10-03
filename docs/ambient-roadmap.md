@@ -51,8 +51,10 @@ install bise", "the newsletter for the launch". Most of what he asks bise to wri
   approvals-gate rule: draft-making tool calls are classified as not leaving); it says `in your
   Gmail drafts · open` and the link opens it there. Sending stays his, in Gmail/Kit (his habit,
   launch#999). A send from bise is still possible later, through the gate.
-- **Slack has no API for a user's drafts**, so Slack is the copy path by design: the message block
-  has `copy` and `open #team` (a `slack://` link); the frame says `copied · open #team`.
+- **Slack has no API for a user's drafts**, so a Slack message waits on the page. His explicit
+  `send` on it posts it as him (decided, ambient-lead m_6161: the same as D's mails, and the
+  button names what happens: `send` = bise sends it). For places with no send tool, the message
+  block has `copy` and `open #team` (a `slack://` link), and the frame says `copied · open #team`.
 - The page keeps a `where it went` line (`in your Gmail drafts since 14:02`), so a later "v3"
   updates the same draft (it reads it back first), never makes a second one. Data:
   `sb page publish … --went gmail-draft:<id>=<url>` into the page's meta.

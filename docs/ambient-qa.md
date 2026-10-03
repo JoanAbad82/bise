@@ -388,6 +388,39 @@ the page with an open card (a task agent's page) is not checked yet.
   Spoken on the app: `got` at 4.1 s, the page at 21 s, main's line at 22.6 s (61 characters), the
   glass gone at 30.5 s, the first card shown at 73 s; the run then stopped in the QA tool (in app
   mode it answers cards through a core that isn't there: amb-tools).
+- **D spoken on the app at 0519afbf: pass**, every card answered through the app's own path (as
+  fn + 1 sends it). `got` at 4.1 s, the page at 22.9 s, main's line at 24.9 s (68 characters), the
+  glass gone at 32.9 s; legal's and Lucas's mails sent on his word, Marc's waits on the site check.
+  Under load 53, v1 took 64 s. The batched draft card wasn't exercised: here the drafts became
+  ready one at a time.
+- **C spoken on the app at a5782b18: fail 41.** The ask passes (`got` 3.3 s, the page 20 s, main's
+  line 21.6 s, the glass gone 28.4 s, v1 46.5 s; 2 agents 24 s after the start note). Then main's
+  card `how should agents ship code here? / 1 a PR per task / 2 straight to main` was answered `2`
+  through the app's path and never reached main, so the agents waited 900 s. The card has no page,
+  and the capsule's option split wants `1. label`; main wrote `1 label`, so fn + 2 is refused as
+  `that option opens in the terminal.` (amb-core).
+- **C spoken on the app at 3572ac59 (amb-core 58b6d7ce): pass, fail 41 closed.** `got` 3.3 s, the
+  page 20 s, main's line 21.3 s, the glass gone 28 s, v1 65 s. Main's `1 a PR … / 2 straight to
+  main` card, answered `2` through the app's path, reached main; 2 agents started, one done at
+  159 s, its reply updated, his `send` → exactly one Slack post. Open: no `N drafts ready` card,
+  though 3 sendable Slack replies waited at once (amb-core, if review replies are meant to batch);
+  and a Slack reply is now posted as him on his word, where roadmap A said copy + open (main's
+  call).
+- **C on the app at 7a5ebb2e: 42 holds.** One card `3 drafts wait for you · benjamin's reports` at
+  82 s (the ship-code question stays its own card). Not yet checked: `send all 3` → 3 posts (the
+  flow didn't press it: amb-tools). Nit: its line reads `messages to to Benjamin, on the proxy, to
+  Benjamin, …`. Question: the batch came before any fix landed, so `send all` would post the
+  first-version replies while agents are still fixing; a reply whose item has a working agent
+  should stay out of the batch.
+- **F at d057f499 (headless): fail 40 for ticks.** Léa's direct question in v1 got its card; Nora's
+  DM that arrived with tick 1 got none, though the page listed it and main started an agent on it
+  (amb-kit 78500b1b since).
+- **G, promises, at d057f499 (amb-tools' run): pass.** No card (the 2 page questions stay on the
+  page), v1 at 30 s with 6 promises, the 2 overdue ones with drafts and listed first, the kept one
+  marked kept; the morning page's needs-you leads with the 2 overdue promises; outbox empty.
+- **Meetings at ad197877 (amb-tools' run #4): pass.** No card from a meeting page; the renewal's
+  brief 13.5 min before it starts and its follow-ups 15.5 min after it ends; the team sync's brief
+  10 min before; outbox empty.
 - **Job 2, the inbox, spoken on the app (`--app --voice`): pass.** fn held, the ask spoken,
   `got` at 2.6 s, the words at the core at 2.9 s, the page at 15.9 s, main's line at 17.7 s (`mail
   replies is on it. the drafts will show up on a page, and nothing gets sent.`, 86 characters), the
