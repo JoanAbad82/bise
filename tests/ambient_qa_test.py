@@ -401,6 +401,10 @@ def meeting_page_laws():
     check(not qa.meeting_followup_check(good, "meeting-x-2026-05-19")[1], "a follow-up with the decisions passes")
     _, f = qa.meeting_followup_check(good.replace('data-who="yours"', 'data-who="Lucas"'), "meeting-x-2026-05-19")
     check(len(f) == 1 and "yours" in f[0], f)
+    # a step bise took by drafting it for his word counts as his action (the live run's v2)
+    took = good.replace('data-who="yours"', 'data-who="bise" data-did="drafted" data-draft="mail-a1"')
+    facts, f = qa.meeting_followup_check(took, "meeting-x-2026-05-19")
+    check(not f and facts["bise_drafted"] == 1, (facts, f))
     sc = qa.SCENARIOS["meetings"]
     check(sc["timed"] and sc["flow"] in qa.FLOWS and sc["no_writes"] and sc["set"] == "today", sc)
 

@@ -1382,8 +1382,11 @@ def meeting_followup_check(body, page_id):
     fails, secs = [], _sections(body)
     low = (body or "").lower()
     rows = _rows(body)
-    if not any(w["yours"] for w in rows):
-        fails.append("%s v2: no row of his (data-who=\"yours\") in who does what" % page_id)
+    # his actions: his own rows, or rows bise took by drafting for his word (data-who="bise"
+    # with data-draft: amb-kit dc32a7c9 'bise takes every step it can')
+    taken = len(re.findall(r'<li[^>]*data-who="bise"[^>]*data-draft="[^"]+"', body or ""))
+    if not any(w["yours"] for w in rows) and not taken:
+        fails.append("%s v2: no action of his in who does what (a data-who=\"yours\" row, or one bise drafted for his word)" % page_id)
     drafts = [s["kit"] for s in secs if s["kit"] in ("email", "message")]
     if not drafts:
         fails.append("%s v2: no follow-up draft (an email or message block)" % page_id)
@@ -1391,7 +1394,7 @@ def meeting_followup_check(body, page_id):
     missing = [k for k, ws in said.items() if not any(w in low for w in ws)]
     if missing:
         fails.append("%s v2: Granola's decisions missing: %s" % (page_id, ", ".join(missing)))
-    return {"rows": len(rows), "yours": sum(w["yours"] for w in rows), "drafts": drafts, "decided": "decided" in low}, fails
+    return {"rows": len(rows), "yours": sum(w["yours"] for w in rows), "bise_drafted": taken, "drafts": drafts, "decided": "decided" in low}, fails
 
 
 def _flow_meetings(x):
@@ -1444,7 +1447,11 @@ def _flow_meetings(x):
             r["fails"].append("%s: the brief came %d s after the start" % (e, m["v1_at"]))
     if "v1_at" in r["flow"]["meetings"].get("e401", {}) and "v2_at" not in r["flow"]["meetings"]["e401"]:
         r["fails"].append("e401: no follow-ups (v2) within 30 min of its end")
-    about = [cd for cd in x["cards"].values() if any(w in json.dumps(cd).lower() for ws in MEETINGS_RUN.values() for w in ws + ("meeting", "brief"))]
+    # a card that stands for a brief or a follow-up (its text names the meeting or its page);
+    # the agent's name doesn't count, and every card is listed for the reader
+    about = [cd for cd in x["cards"].values() if any(w in (cd.get("text") or "").lower() + json.dumps(cd.get("page") or {}).lower()
+                                                   for ws in MEETINGS_RUN.values() for w in ws + ("meeting-", "brief", "follow-up"))]
+    r["flow"]["cards"] = [{"agent": cd.get("agent"), "text": (cd.get("text") or "")[:160]} for cd in x["cards"].values()]
     if about:
         r["fails"].append("%d card(s) about the meetings (the page is enough)" % len(about))
 
@@ -1647,6 +1654,10 @@ def run_report(r):
             L.append("notes sent at %s; v%s %s after send" % (s(r["t"].get("send")), r["t"].get("v2_n") or "2", s(r["t"].get("v2_after_send"))))
             for n in r["notes"]:
                 L.append("  %-10s %-9s %s -> %s" % (n.get("block"), n.get("status"), n.get("text", "")[:40], (n.get("answer") or "")[:60]))
+    elif (r.get("flow") or {}).get("meetings"):
+        for e, m in sorted(r["flow"]["meetings"].items()):
+            L.append("%s %s: brief %s%s" % (e, m.get("id", "-"), "%+d s from its start" % m["v1_at"] if "v1_at" in m else "none",
+                                            ", follow-ups %+d s after its end" % m["v2_at"] if "v2_at" in m else ""))
     else:
         L.append("page: none in %s" % s(r["t"].get("end")))
     ob = r["outbox"]
