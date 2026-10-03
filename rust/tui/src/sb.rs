@@ -21,7 +21,7 @@ pub(super) use mention::mentions;
 mod cards;
 pub(super) use cards::{card_choices, card_mouse, proves_ctrl_digits};
 pub(crate) use cards::{answer_by_voice, show_heard, voice_question};
-pub(crate) use cards::{ambient_options, ambient_reply};
+pub(crate) use cards::{ambient_local, ambient_options, ambient_reply};
 use cards::{Card, CardView};
 mod card_draw;
 pub(super) use card_draw::{box_height, card_frame, BoxFit, card_view_open, divider_label as card_divider_label, draw_box, draw_view as draw_card_view, fit_pairs as fit_card_pairs, key_pairs as card_key_pairs};

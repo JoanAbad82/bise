@@ -1247,7 +1247,10 @@ fn split_choices(text: &str) -> (String, Vec<String>) {
             .strip_prefix(". ")
             .or_else(|| rest.strip_prefix(") "))
             .or_else(|| rest.strip_prefix(" - "))
-            .or_else(|| rest.strip_prefix(" – "))?
+            .or_else(|| rest.strip_prefix(" – "))
+            // '1 a PR per task' (pm's C fail 41): a bare space too; only
+            // a run of 2+ such lines numbered from 1 ends a card
+            .or_else(|| rest.strip_prefix(' ').filter(|r| !r.starts_with(['-', '–', ' '])))?
             .trim();
         (!label.is_empty()).then(|| (n, label.to_string()))
     };
@@ -1397,8 +1400,13 @@ pub(crate) fn ambient_reply(kind: &str, agent: &str, text: &str, d: usize) -> Op
     if !choice_kind(kind) {
         return s.options.get(i).cloned();
     }
-    let local = matches!((kind, d), ("merge", 2) | ("update", 3) | ("feature_merge", 3));
-    (!local).then(|| d.to_string())
+    (!ambient_local(kind, d)).then(|| d.to_string())
+}
+
+/// Digit `d` of a `kind` card is one the box acts on itself (a PR or
+/// release page to open, the feature drop's second ask).
+pub(crate) fn ambient_local(kind: &str, d: usize) -> bool {
+    matches!((kind, d), ("merge", 2) | ("update", 3) | ("feature_merge", 3))
 }
 
 

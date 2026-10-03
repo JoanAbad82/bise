@@ -532,7 +532,13 @@ impl Core {
             (Some(c), Some(d)) if c.page.is_some() => d.to_string(),
             (Some(c), Some(d)) => match crate::sb::ambient_reply(&c.kind, &c.agent, &c.text, d) {
                 Some(r) => r,
-                None => return self.error("that option opens in the terminal."),
+                // a PR or release page to open, the feature drop's second
+                // ask: the box acts on those itself
+                None if crate::sb::ambient_local(&c.kind, d) => return self.error("that option opens in the terminal."),
+                // options this split can't read: the digit as is, the
+                // hub's question path resolves it; never a refusal (pm's
+                // C fail 41)
+                None => d.to_string(),
             },
             (None, _) => return self.error("that question is already closed."),
             (Some(_), None) if reply.is_empty() => return,

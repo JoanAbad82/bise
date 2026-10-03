@@ -126,6 +126,20 @@ def main():
         core.wait(lambda e: e.get("ev") == "state" and not e["cards"], 60, "the card closed")
         c.wait_line("t1", 'from="user"', 60)
 
+        # main's own card with bare numbers ('1 a PR per task', pm's C
+        # fail 41): fn + 2 from the capsule answers it, never refused
+        c.wait_idle("main", "t1")
+        c.say('''[[bash: sb card "$(printf 'how should agents ship code here?\\n1 a PR per task\\n2 straight to main')"]]''')
+        core.wait(lambda e: e.get("ev") == "state" and any("ship code" in cd["text"] for cd in e["cards"]), 60, "main's card")
+        ship = [cd for cd in core.last("state")["cards"] if "ship code" in cd["text"]][0]
+        check([o["label"] for o in ship["options"]] == ["a PR per task", "straight to main"], "its options: %r" % ship)
+        c.wait_idle("main")
+        n_err = sum(1 for e in core.evs if e.get("ev") == "error")
+        core.cmd(cmd="answer", card=ship["id"], reply="2")
+        core.wait(lambda e: e.get("ev") == "state" and not any(cd["id"] == ship["id"] for cd in e["cards"]), 60, "main's card closed by the digit")
+        check(sum(1 for e in core.evs if e.get("ev") == "error") == n_err, "no refusal")
+        c.wait_line("main", "straight to main", 60)
+
         # bise's bookkeeping stays in the TUI (pm's C fail 36): main's
         # archive suggestion is a drop card for the TUI, never one in the
         # capsule, and while it is open a second drop never acts

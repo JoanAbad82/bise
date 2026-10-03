@@ -250,6 +250,40 @@ fn a_page_cards_digit_goes_to_the_page_path() {
     assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "/answer 3 1"}));
 }
 
+/// Law (pm's C fail 41): fn + digit is never refused on a card that
+/// shows numbered options: '1 label', '1) label', '1. label', '1 -
+/// label' all map to the option's words, and options the split can't
+/// read send the digit as is (the hub's question path resolves it).
+#[test]
+fn a_digit_on_a_numbered_card_is_never_refused() {
+    let mut t = T::new();
+    let forms = ["1 a PR per task
+2 straight to main", "1) a PR per task
+2) straight to main", "1. a PR per task
+2. straight to main", "1 - a PR per task
+2 - straight to main"];
+    let cards: Vec<Value> = forms
+        .iter()
+        .enumerate()
+        .map(|(i, f)| json!({"id": i + 1, "kind": "question", "agent": "main", "text": format!("how should agents ship code here?
+{f}")}))
+        .chain([json!({"id": 9, "kind": "question", "agent": "main", "text": "ship how?
+a: a PR
+b: straight to main"})])
+        .collect();
+    t.hub.say(json!({"ev": "state", "agents": [], "cards": cards}));
+    t.until(|o| has(o, "state"));
+    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    for i in 0..forms.len() {
+        assert_eq!(st["cards"][i]["options"][1]["label"], "straight to main", "{}", forms[i]);
+        t.cmd(Cmd::Answer { card: i as u64 + 1, reply: "2".into() });
+        assert_eq!(t.hub.next()["text"], format!("/answer {} straight to main", i + 1), "{}", forms[i]);
+    }
+    t.cmd(Cmd::Answer { card: 9, reply: "2".into() });
+    assert_eq!(t.hub.next()["text"], "/answer 9 2");
+    assert!(!has(&t.take(), "error"));
+}
+
 /// Law (pm's C fail 36): bise's own bookkeeping (main's archive
 /// suggestion, a `drop` card) is never a card on ambient: not on the
 /// glass, not in the count, not in needs-you; it stays in the TUI.
