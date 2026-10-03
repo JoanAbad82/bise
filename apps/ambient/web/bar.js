@@ -67,7 +67,7 @@
         }
         s.sections = [{ rows: a.options.map((o, k) => ({
           g: String(o.n), gk: true, t: o.label, sel: o.sel, sub: a.batch ? (k === 0 ? B.reviewSub : B.sendSub) : null,
-          act: { ev: "ui_option", card: a.id, i: o.i },
+          act: { ev: "ui_option", card: a.id, i: o.i }, qa: `opt-${o.n}`,
         })) }];
         s.foot = askFoot(Math.max(...a.options.map((o) => o.n), 1), focused);
         if (a.open) s.foot.left.push(item(["fn", "o"], B.openPage, key("o")));
@@ -82,8 +82,8 @@
         const t = v.spot.text.trim();
         s.head = { h: 68, input: { text: v.spot.text, ph: B.typeHint } };
         if (t) s.sections = [{ rows: [
-          { g: "@", gc: "a", t: B.askMain(t), right: { keys: ["⌘", "⏎"] }, sel: true, act: { ev: "ui_spot_send", text: v.spot.text } },
-          { g: "+", t: B.startAgent(t), right: { keys: ["tab"] }, act: { ev: "ui_spot_tab", text: v.spot.text } },
+          { g: "@", gc: "a", t: B.askMain(t), right: { keys: ["⌘", "⏎"] }, sel: true, act: { ev: "ui_spot_send", text: v.spot.text }, qa: "ask-main" },
+          { g: "+", t: B.startAgent(t), right: { keys: ["tab"] }, act: { ev: "ui_spot_tab", text: v.spot.text }, qa: "start-agent" },
         ] }];
         s.foot = { left: [item(["⏎"], B.sendMain), ...(t ? [item(["tab"], B.startAgentKey)] : [])], right: [item(["esc"], B.close, { ev: "ui_close" })] };
         return s;
@@ -91,12 +91,12 @@
       case "agents": case "inbox": {
         const full = v.state === "agents";
         s.head = { h: 68, line: { ph: true, text: full ? B.goingOn : B.inbox }, right: full ? item(["fn", "0"]) : { text: B.mostBlocking } };
-        const cards = (v.inbox || []).map((c, k) => ({ g: "?", gc: "a", t: c.text, sub: c.agent, sel: !!c.sel, right: { keys: [String(k + 1)] }, act: { ev: "ui_open_card", card: c.id } }));
+        const cards = (v.inbox || []).map((c, k) => ({ g: "?", gc: "a", t: c.text, sub: c.agent, sel: !!c.sel, right: { keys: [String(k + 1)] }, act: { ev: "ui_open_card", card: c.id }, qa: `card-${c.id}` }));
         if (cards.length || !full) s.sections.push({ label: cards.length ? Wd.waiting(cards.length) : W.nothingNeeds, rows: cards, acc: cards.length > 0 });
         if (full) {
           const run = (v.list || []).map((r) => ({ g: r.glyph === "✓" ? "✓" : r.kind === "need" ? "?" : r.glyph, gc: r.glyph === "✓" ? "ok" : r.glyph === "▲" ? "risk" : r.kind === "need" ? "a" : null, t: r.name, sub: r.what, right: r.age ? { age: r.age } : null }));
           s.sections.push({ label: run.length ? `${v.titles.running} · ${run.length}` : W.nothingRunning, rows: run });
-          if (v.forYou) s.sections.push({ label: v.forYou.title, rows: v.forYou.pages.map((p, k) => ({ g: "◰", gc: p.unopened ? "a" : null, t: p.name, sub: p.watch ? `${p.watch} · ${p.meta}` : p.meta, seen: !p.unopened, right: k < 9 ? { keys: ["⌘", String(k + 1)] } : null, act: { ev: "ui_page", page: p.id } })) });
+          if (v.forYou) s.sections.push({ label: v.forYou.title, rows: v.forYou.pages.map((p, k) => ({ g: "◰", gc: p.unopened ? "a" : null, t: p.name, sub: p.watch ? `${p.watch} · ${p.meta}` : p.meta, seen: !p.unopened, right: k < 9 ? { keys: ["⌘", String(k + 1)] } : null, act: { ev: "ui_page", page: p.id }, qa: `page-${p.id}` })) });
         }
         s.foot = { left: [item(["↑", "↓"], B.move, key("down")), item(["⏎"], B.open, key("enter"))], right: [item(["esc"], full ? B.close : B.later, key("esc"))] };
         return s;
@@ -105,11 +105,11 @@
         const st = v.settings;
         s.head = { h: 68, line: { ph: true, text: W.set.title }, right: item(["fn", ","]) };
         s.sections = [
-          { rows: st.rows.map((r) => ({ t: r.label, sub: r.note, right: { sw: r.on }, act: { ev: "ui_setting", key: r.key } })) },
+          { rows: st.rows.map((r) => ({ t: r.label, sub: r.note, right: { sw: r.on }, act: { ev: "ui_setting", key: r.key }, qa: `set-${r.key}` })) },
           { label: B.never, rows: [
             ...st.always.map((n) => ({ g: "◌", t: n, sub: B.always, fixed: true })),
-            ...st.skip.map((x) => ({ g: "◌", t: x.name, right: { keys: ["⌫"] }, act: { ev: "ui_setting", key: "skip_remove", value: x.bundle } })),
-            { g: "+", t: st.add, act: { ev: "ui_setting", key: "skip_add" } },
+            ...st.skip.map((x) => ({ g: "◌", t: x.name, right: { keys: ["⌫"] }, act: { ev: "ui_setting", key: "skip_remove", value: x.bundle }, qa: `skip-${x.bundle}` })),
+            { g: "+", t: st.add, act: { ev: "ui_setting", key: "skip_add" }, qa: "skip-add" },
           ] },
         ];
         s.foot = { left: [item(["↑", "↓"], B.move), item(["space"], B.switch), item(["⌫"], B.remove)], right: [item(["esc"], B.close, key("esc"))] };
@@ -122,8 +122,8 @@
         s.head = { h: 52, lab: { acc: "", rest: `${B.beforeAsks} · ${B.permName[p.perm] || p.perm}` }, right: i >= 0 ? { text: B.ofN(i + 1, PERMS.length) } : null };
         s.big = p.text;
         s.sections = [{ rows: [
-          { g: "→", gc: "a", t: p.button, sub: B.asksNext, sel: true, act: { ev: "ui_perm", perm: p.perm, do: "continue" } },
-          { g: "◌", t: p.later, right: { keys: ["esc"] }, act: { ev: "ui_perm", perm: p.perm, do: "not_now" } },
+          { g: "→", gc: "a", t: p.button, sub: B.asksNext, sel: true, act: { ev: "ui_perm", perm: p.perm, do: "continue" }, qa: "perm-continue" },
+          { g: "◌", t: p.later, right: { keys: ["esc"] }, act: { ev: "ui_perm", perm: p.perm, do: "not_now" }, qa: "perm-not-now" },
         ] }];
         s.foot = { left: [item(["⏎"], p.button, { ev: "ui_perm", perm: p.perm, do: "continue" })], right: [item(["esc"], p.later, { ev: "ui_perm", perm: p.perm, do: "not_now" })] };
         return s;

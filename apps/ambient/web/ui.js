@@ -32,6 +32,8 @@
   bar.style.left = Bar.BOX.left + "px"; bar.style.top = Bar.BOX.top + "px";
   // the typed line: one field, kept across draws (its focus, its caret)
   const input = Object.assign(document.createElement("input"), { type: "text", spellcheck: false, autocomplete: "off", className: "qin" });
+  input.dataset.qa = "field";
+  glass.dataset.qa = "glass";
   const pearl = AmbPearl.create(pearlCv);
 
   // ---- the model and the bridge
@@ -64,7 +66,9 @@
   const act = (a) => (a ? ` data-act="${esc(JSON.stringify(a))}"` : "");
   const hint = (it, cls = "fi") => {
     const inner = `${it.pre ? `<span>${esc(it.pre)}</span>` : ""}${caps(it.keys)}${it.w ? `<span>${esc(it.w)}</span>` : ""}`;
-    return it.act ? `<button type="button" class="${cls}"${act(it.act)}>${inner}</button>` : `<span class="${cls}">${inner}</span>`;
+    // data-qa (amb-tools' real clicks, lead m_6586): 'full-text', else 'hint-<keys>' ('hint-fn-esc')
+    const qa = it.act && it.act.ev === "ui_ask_more" ? "full-text" : `hint-${it.keys.filter((k) => k !== "–").join("-")}`;
+    return it.act ? `<button type="button" class="${cls}" data-qa="${esc(qa)}"${act(it.act)}>${inner}</button>` : `<span class="${cls}">${inner}</span>`;
   };
 
   // words that land one by one: keep the spans that are the same, light the ones said
@@ -111,7 +115,7 @@
       const g = r.gk ? caps([r.g]) : esc(r.g || "");
       const tag = r.fixed || !r.act ? "div" : "button";
       const role = r.right && r.right.sw != null ? ` role="switch" aria-checked="${!!r.right.sw}"` : "";
-      return `<${tag}${tag === "button" ? ' type="button"' : ""} class="row${r.fixed ? " fixed" : ""}${r.seen ? " seen" : ""}" data-r="${i}"${act(r.act)}${role} style="${quiet ? "animation:none" : `animation-delay:${i * 20}ms`}"><span class="g ${r.gc || ""}" aria-hidden="true">${g}</span><span class="t">${esc(r.t)}${r.sub ? `<small>${esc(r.sub)}</small>` : ""}</span><span class="s">${right}</span></${tag}>`;
+      return `<${tag}${tag === "button" ? ' type="button"' : ""} class="row${r.fixed ? " fixed" : ""}${r.seen ? " seen" : ""}" data-r="${i}" data-qa="${esc(r.qa || `row-${i}`)}"${act(r.act)}${role} style="${quiet ? "animation:none" : `animation-delay:${i * 20}ms`}"><span class="g ${r.gc || ""}" aria-hidden="true">${g}</span><span class="t">${esc(r.t)}${r.sub ? `<small>${esc(r.sub)}</small>` : ""}</span><span class="s">${right}</span></${tag}>`;
     }).join("")).join("");
   }
   const strip = (sections) => sections.map((s) => ({ ...s, rows: s.rows.map(({ sel, ...r }) => r) }));
