@@ -19,6 +19,7 @@ struct PermState: Equatable {
     var screen = Grant.unknown            // macOS only says allowed or not: .granted or .unknown
     var asked: Set<String> = []           // the capsule asked once (continue or not now)
     var told: Set<String> = []            // the refused line was said once
+    var had: Set<String> = []             // granted once, on any build of the app
 
     func grant(_ p: Perm) -> Grant {
         switch p { case .accessibility: return accessibility; case .mic: return mic; case .screen: return screen }
@@ -48,7 +49,14 @@ enum PermPlan {
 
     // at launch (and at every launch): only Accessibility
     static func launch(_ s: inout PermState) -> [PermDo] {
-        if s.accessibility == .granted { return [.startKeys] }
+        if s.accessibility == .granted {
+            s.had.insert(Perm.accessibility.rawValue)
+            return [.startKeys]
+        }
+        // granted before, not now: a rebuilt binary (ad-hoc signed, macOS
+        // keys the grant on its hash) lost it. Not his 'not now': the line
+        // at every launch until it's back, never a silent fn (lead m_6252)
+        if s.had.contains(Perm.accessibility.rawValue) { return [.denied(.accessibility), .watchTrust] }
         if s.asked.contains(Perm.accessibility.rawValue) { return refuse(.accessibility, &s) + [.watchTrust] }
         return [.ask(.accessibility), .watchTrust]
     }
@@ -95,6 +103,7 @@ enum PermPlan {
     static func answered(_ p: Perm, granted: Bool, _ s: inout PermState) -> [PermDo] {
         s.set(p, granted ? .granted : (p == .mic ? .denied : .unknown))
         guard granted else { return refuse(p, &s) }
+        s.had.insert(p.rawValue)
         var out: [PermDo] = [.granted(p)]
         if p == .accessibility { out.append(.startKeys) }
         // the next one right after, still one at a time

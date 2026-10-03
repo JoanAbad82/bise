@@ -32,6 +32,8 @@ final class StatusItem: NSObject {
     var watches: () -> [MenuWatch] = { [] }  // standing orders (state.timers)
     var onStopWatch: ((Int) -> Void)?        // a timer's id
     var cards: () -> [Card] = { [] }
+    var noAccess: () -> Bool = { false }      // fn can't be heard: the menu's first row
+    var onAccess: (() -> Void)?               // that row: System Settings' Accessibility pane
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     // what the icon says (SPEC §0): the inputs, then IconLook decides
@@ -232,11 +234,13 @@ final class StatusItem: NSObject {
         MenuRows.items(cards: cards().map { MenuCard(id: $0.id, agent: $0.agent, text: $0.text) },
                        pages: pages(), watches: watches(), hidden: isHidden(),
                        words: (MenuWords.talk, MenuWords.talkKeys, MenuWords.show, MenuWords.hide, MenuWords.hideKeys,
-                               SettingsWords.menu, SettingsWords.menuKeys, MenuWords.quit))
+                               SettingsWords.menu, SettingsWords.menuKeys, MenuWords.quit),
+                       noAccess: noAccess())
     }
 
     private static func action(_ k: MenuItemOut.Kind) -> Selector? {
         switch k {
+        case .access: return #selector(access)
         case .card: return #selector(card(_:))
         case .page, .watch: return #selector(page(_:))
         case .stop: return #selector(stopWatch(_:))
@@ -257,6 +261,7 @@ final class StatusItem: NSObject {
 
     @objc private func page(_ sender: NSMenuItem) { if let u = sender.representedObject as? String { onPage?(u) } }
     @objc private func card(_ sender: NSMenuItem) { if let id = sender.representedObject as? String { onCard?(id) } }
+    @objc private func access() { onAccess?() }
     @objc private func spotlight() { onSpotlight?() }
     @objc private func toggle() { onToggle?() }
     @objc private func settings() { onSettings?() }

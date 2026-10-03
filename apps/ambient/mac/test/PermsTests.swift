@@ -73,6 +73,23 @@ asks = PermPlan.hold(&all).do.filter { if case .ask = $0 { return true }; return
 law("a hold asks one thing at most", asks.count == 1)
 law("settings opens the pane, changes nothing", PermPlan.command(.screen, "settings", &all) == [.settings(.screen)])
 
+// a rebuilt binary lost Accessibility (ad-hoc signed: macOS keys the grant
+// on its hash): never a silent fn (the dogfood's first launch, lead m_6252)
+var lost = PermState(accessibility: .granted)
+law("a launch with Accessibility on: remembered as had", PermPlan.launch(&lost) == [.startKeys] && lost.had.contains("accessibility"))
+lost.accessibility = .unknown
+lost.asked = ["accessibility"]
+lost.told = ["accessibility"]
+law("Accessibility lost after a rebuild: the line again, watching, even if told before",
+    PermPlan.launch(&lost) == [.denied(.accessibility), .watchTrust])
+law("and at every launch until it's back", PermPlan.launch(&lost) == [.denied(.accessibility), .watchTrust])
+law("back on: granted, keys on", PermPlan.answered(.accessibility, granted: true, &lost) == [.granted(.accessibility), .startKeys])
+var never = PermState(asked: ["accessibility"], told: ["accessibility"])
+law("his own 'not now' (never had): still said once ever, not again", PermPlan.launch(&never) == [.watchTrust])
+var first = PermState()
+_ = PermPlan.answered(.accessibility, granted: true, &first)
+law("granted by the prompt: remembered as had", first.had.contains("accessibility"))
+
 // the hello: once ever, after Accessibility, never while quiet
 law("hello: due once Accessibility is on", Hello.due(said: false, accessibility: .granted, quiet: false))
 law("hello: not before Accessibility", !Hello.due(said: false, accessibility: .unknown, quiet: false))

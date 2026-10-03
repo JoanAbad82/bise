@@ -47,7 +47,7 @@ struct MenuWatch: Equatable {
 
 // one row of the menu-bar menu, as StatusItem draws it and QA reads it
 struct MenuItemOut: Equatable {
-    enum Kind: String { case header, card, page, watch, stop, talk, toggle, settings, quit, separator }
+    enum Kind: String { case access, header, card, page, watch, stop, talk, toggle, settings, quit, separator }
     var kind: Kind
     var title: String = ""
     var keys: String? = nil
@@ -77,8 +77,14 @@ enum MenuRows {
     // come from StatusItem's and the settings' word lists
     static func items(cards: [MenuCard], pages: [MenuPage], watches: [MenuWatch], hidden: Bool,
                       words: (talk: String, talkKeys: String, show: String, hide: String, hideKeys: String,
-                              settings: String, settingsKeys: String, quit: String)) -> [MenuItemOut] {
+                              settings: String, settingsKeys: String, quit: String),
+                      noAccess: Bool = false) -> [MenuItemOut] {
         var out: [MenuItemOut] = []
+        // fn can't be heard (this binary isn't trusted): first, until it is
+        if noAccess {
+            out.append(MenuItemOut(kind: .access, title: needsAccess))
+            out.append(MenuItemOut(kind: .separator))
+        }
         let cs = cards.prefix(maxCards)
         if !cs.isEmpty {
             out.append(MenuItemOut(kind: .header, title: needsYou, enabled: false))
@@ -108,6 +114,7 @@ enum MenuRows {
         return out
     }
 
+    static let needsAccess = "fn needs Accessibility · open settings"
     static let forYou = "for you"
     static let needsYou = "needs you"
     static let maxPages = 6

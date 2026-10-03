@@ -103,6 +103,11 @@ law("menu: nothing waiting → only the keys and quit",
 law("menu: a watch without a page can't be clicked, its stop can",
     MenuRows.items(cards: [], pages: [], watches: [MenuWatch(id: 5, text: "x", page: nil)], hidden: false, words: mw)
         .filter { $0.kind == .watch || $0.kind == .stop }.map(\.enabled) == [false, true])
+let noAx = MenuRows.items(cards: [], pages: [], watches: [], hidden: false, words: mw, noAccess: true)
+law("menu: fn can't be heard → its row first, then the rest",
+    noAx.map(\.kind.rawValue) == ["access", "separator", "talk", "toggle", "settings", "separator", "quit"]
+        && noAx[0].title == "fn needs Accessibility · open settings" && noAx[0].enabled)
+law("menu: Accessibility on → no such row", !menu.contains { $0.kind == .access })
 law("menu: rows as JSON for QA", menu[1].json["kind"] as? String == "card" && menu[1].json["ref"] as? String == "7")
 
 // the icon's number: amb-web's shared fixture (build.sh --test sets

@@ -139,6 +139,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         // stop watching: the core asks the hub (every_stop), the agent is told
         st.onStopWatch = { [weak self] id in self?.toCore(["cmd": "every_stop", "id": id]) }
         st.cards = { [weak self] in self?.cards ?? [] }
+        st.noAccess = { [weak self] in self.map { $0.permNow().accessibility != .granted } ?? false }
+        st.onAccess = { [weak self] in self?.permDo(.settings(.accessibility)) }
         st.isHidden = { [weak self] in self?.capsule.hidden ?? false }
         status = st
         st.reduceMotion = reduceMotion
@@ -153,7 +155,12 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         notify = nt
 
         keys.onOut = { [weak self] in self?.key($0) }
-        if Keys.trusted { keys.start() }
+        if Keys.trusted {
+            keys.start()
+        } else {
+            // never a silent fn (the dogfood's first launch): say why in the log
+            Log.say("keys: no Accessibility for this binary (System Settings → Privacy & Security → Accessibility: remove 'bise ambient', add \(Bundle.main.bundlePath))")
+        }
     }
 
     // the QA channel's doors into the app (QA.swift; only with --qa)
@@ -879,6 +886,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             : PermState(accessibility: Keys.trusted ? .granted : .unknown, mic: micGrant, screen: Shot.allowed ? .granted : .unknown)
         s.asked = Set(Perm.allCases.map(\.rawValue).filter { defaults.bool(forKey: "asked.\($0)") })
         s.told = Set(Perm.allCases.map(\.rawValue).filter { defaults.bool(forKey: "told.\($0)") })
+        s.had = Set(Perm.allCases.map(\.rawValue).filter { defaults.bool(forKey: "had.\($0)") })
         return s
     }
 
@@ -886,6 +894,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         for p in Perm.allCases.map(\.rawValue) {
             if s.asked.contains(p) { defaults.set(true, forKey: "asked.\(p)") }
             if s.told.contains(p) { defaults.set(true, forKey: "told.\(p)") }
+            if s.had.contains(p) { defaults.set(true, forKey: "had.\(p)") }
         }
         if qa != nil { fakePerms = s }
     }
