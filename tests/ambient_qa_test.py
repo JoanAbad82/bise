@@ -495,6 +495,16 @@ def launch_watch_cards_may_be_a_teammates_question():
 
 
 @test
+def a_ghost_glass_is_blur_with_no_glass_drawn():
+    """scenes: a shot whose app blurs a glass rect while the page draws none (or at opacity ~0) is a ghost glass; a hidden panel or a drawn glass is not"""
+    check(qa.ghost_glass({"panel_visible": True, "app": [80, 28, 700, 68]}), "no page glass")
+    check(qa.ghost_glass({"panel_visible": True, "app": [80, 28, 700, 68], "rect": [80, 28, 700, 68], "opacity": 0.01}), "opacity 0")
+    check(not qa.ghost_glass({"panel_visible": True, "app": [80, 28, 700, 68], "rect": [80, 28, 700, 68], "opacity": 1}), "drawn")
+    check(not qa.ghost_glass({"panel_visible": False, "app": [80, 28, 700, 68]}), "hidden")
+    check(not qa.ghost_glass({}), "no record")
+
+
+@test
 def key_specs_become_key_events():
     """keys: names, modifiers and typed text become the keys op's key codes and flags"""
     seq = qa.key_seq(["cmd+return", "up", "⌘2", "esc", "type:hi you"])

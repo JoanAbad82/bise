@@ -3080,6 +3080,11 @@ def scenes(only=None, backdrops=("dark",), out=None, at=None, what="both", cols=
                         tiles.append({"path": sh["panel"], "label": label})
                     if sh.get("screen"):
                         screens.append({"path": sh["screen"], "label": label})
+                for sh in r.get("shots", []):
+                    g = sh.get("glass") or {}
+                    sh["shown"], sh["app_glass"] = g.get("panel_visible"), g.get("app")
+                    if ghost_glass(g):
+                        result.setdefault("ghosts", []).append({"scene": s["id"], "backdrop": bd, "at_ms": sh.get("at_ms"), "glass": g})
                 result["scenes"].append({"id": s["id"], "spec": s["spec"], "label": s["label"], "backdrop": bd, "shots": r.get("shots", [])})
                 if reduce:
                     inject({"ev": "app_reduce_motion", "on": False})
@@ -3099,9 +3104,21 @@ def scenes(only=None, backdrops=("dark",), out=None, at=None, what="both", cols=
         if tokens:
             look(tokens="")
         reset()
+    ghosts = result.get("ghosts", [])
+    result["fails"] = ["a ghost glass (the app blurs %s with no glass drawn) in %s @%s ms (%s)" % (g["glass"].get("app"), g["scene"], g["at_ms"], g["backdrop"])
+                       for g in ghosts]
     with open(os.path.join(run, "index.json"), "w") as f:
         json.dump(result, f, indent=1)
     return result
+
+
+def ghost_glass(g):
+    """A shot's glass record (QA.glassNow) shows a ghost glass (ambient m_6683): the panel shown and
+    the app blurring its glass rect while the page draws no glass there (none, or opacity under
+    0.05): blur with no content."""
+    if not g or not g.get("panel_visible") or not g.get("app"):
+        return False
+    return not g.get("rect") or (g.get("opacity") is not None and g["opacity"] < 0.05)
 
 
 QA_DEFAULTS = "dev.bise.ambient.qa"   # the QA app's own defaults (App.swift: UserDefaults(suiteName:)), never the user's
