@@ -1004,6 +1004,9 @@ law("a batch of drafts is one glass: '3 drafts wait for you · <page>', 'replies
   const v2 = M.view(M.step(M.init(), { ev: "state", agents: [], cards: [{ ...card, batch: undefined, text: "2 drafts wait for you · launch recap\nreplies to Ana and Ivo\n1. review\n2. send both" }], pages: [] }, 0).m, 10);
   eq([v2.ask.title, v2.ask.text], ["2 drafts wait for you · launch recap", "replies to Ana and Ivo"]);
   eq(Wd.drafts.line("steps", ["book the room", "send invites"]), "book the room and send invites");
+  // batch.line, when the hub writes it, is shown as is (amb-core 2e114ebe)
+  const v3 = M.view(M.step(M.init(), { ev: "state", agents: [], cards: [{ ...card, batch: { count: 3, title: "inbox", what: "replies", names: ["Benjamin"], topics: ["proxy", "fish", "French"], line: "3 replies to Benjamin: proxy · fish · French" } }], pages: [] }, 0).m, 10);
+  eq([v3.ask.title, v3.ask.text], ["3 drafts wait for you · inbox", "3 replies to Benjamin: proxy · fish · French"]);
 });
 
 // ---- for you with opened_version (amb-core 03821a37) and the count shared with the menu bar

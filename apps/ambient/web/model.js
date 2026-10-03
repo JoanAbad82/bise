@@ -125,7 +125,9 @@
     const send = opts.find((o) => /send/i.test(o.label)) || { i: 1, n: 2 };
     const names = Array.isArray(b.names) ? b.names.map(String) : tm ? tm[2].split(/\s*·\s*/).filter(Boolean) : [];
     const count = +b.count || (tm ? +tm[1] : tw ? +tw[1] : names.length || 2);
-    const line = !c.batch && tw && lines[1] && !/^\d+\./.test(lines[1]) ? lines[1] : null;
+    // the card's own second line, ready to show (amb-core 2e114ebe: '3 replies to Benjamin: proxy · fish ·
+    // French'), else read from its text
+    const line = b.line ? String(b.line) : !c.batch && tw && lines[1] && !/^\d+\./.test(lines[1]) ? lines[1] : null;
     return { count, title: b.title || (tw && tw[2]) || c.page.title || "", what: b.what || "drafts", names, line, review, send };
   }
 
