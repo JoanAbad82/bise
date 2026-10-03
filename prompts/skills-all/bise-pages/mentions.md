@@ -23,8 +23,9 @@ Each tick republishes the same id: new mentions on top (a `callout`, `since 14:1
 answered or skipped ones folded into one line (`4 answered earlier`). Nothing new: don't publish.
 
 **A card only for a direct question from his team:** someone `~/bise/people.md` marks as team
-(`- Léa Martin: team · design lead`). Ask main for it (`sb send main "card: Léa asks which date
-works for the review (mentions-2026-05-19#s-1712)"`); everything else waits on the page and in
-the menu-bar count. One card per mention, never again on the next tick.
+(`- Léa Martin: team · design lead`). Publish the item first, then open it yourself: `sb card
+--page mentions-2026-05-19#s-1712 "Léa asks which date works for the pricing review"` (the card
+opens the page at that item). Everything else waits on the page and in the menu-bar count. One
+card per mention, never again on the next tick.
 
 See `examples/mentions.html`.
