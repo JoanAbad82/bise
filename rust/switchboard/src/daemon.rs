@@ -1122,6 +1122,19 @@ impl Shell {
     fn page_agent_push(&mut self) {
         let Some(pages) = self.pages.clone() else { return };
         let list: Vec<(String, Vec<String>)> = self.page_agents_now().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        // the agents at work on page items: their drafts wait; when one
+        // is done, its page's drafts are judged again (ambient-lead m_6168)
+        let busy: std::collections::BTreeSet<String> = list
+            .iter()
+            .flat_map(|(_, names)| names.iter())
+            .filter(|n| matches!(self.page_agent_frame(n)["status"].as_str(), Some("working" | "idle" | "blocked")))
+            .cloned()
+            .collect();
+        if pages.set_busy(busy) {
+            for (id, _) in &list {
+                self.page_steps(id);
+            }
+        }
         for (id, names) in list {
             let mut changed = false;
             for name in names {
@@ -1405,7 +1418,8 @@ impl Shell {
         // card there): a feedback page's replies have no plan (pm's C fail
         // 42: 3 Slack replies and no card)
         let drafts = match crate::pages::drafts::carded(id) {
-            true => crate::pages::drafts::pending(&html, &notes, &pages.store.questions(id)),
+            // (a draft whose item's agent is still at work waits: m_6168)
+            true => crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &notes, &pages.store.questions(id)), &|a| pages.is_busy(a)),
             false => Vec::new(),
         };
         if steps.is_empty() && !rows.iter().any(|r| r.his() && r.plan) && drafts.len() < 2 {
@@ -1590,7 +1604,7 @@ impl Shell {
         let mut steps = pages.store.steps(id);
         let Some(keys) = steps.iter().find(|s| s.card == card && s.reply.is_none()).map(|s| s.batch.clone()) else { return false };
         let html = pages.store.html(id, meta.version()).unwrap_or_default();
-        let drafts = crate::pages::drafts::pending(&html, &pages.store.notes(id), &pages.store.questions(id));
+        let drafts = crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &pages.store.notes(id), &pages.store.questions(id)), &|a| pages.is_busy(a));
         let mut sent = Vec::new();
         for d in drafts.iter().filter(|d| keys.contains(&d.key())) {
             match pages.locked(|s| s.add_sent(id, &d.block, d.item.as_deref(), "approve", "send", meta.version(), now_ms())) {

@@ -49,6 +49,8 @@ pub struct Pages {
     to_hub: Mutex<Option<ToHub>>,
     /// each page's last `progress` frames
     progress: Mutex<HashMap<String, std::collections::VecDeque<String>>>,
+    /// the agents at work now (the hub sets it: `set_busy`)
+    busy: Mutex<std::collections::BTreeSet<String>>,
 }
 
 /// The progress lines a new SSE stream replays.
@@ -108,7 +110,23 @@ impl Pages {
             subs: Mutex::new(HashMap::new()),
             to_hub: Mutex::new(None),
             progress: Mutex::new(HashMap::new()),
+            busy: Mutex::new(std::collections::BTreeSet::new()),
         }
+    }
+
+    /// The agents at work now (working, or idle and not done): their
+    /// items' drafts do not wait yet (ambient-lead m_6168). True: the set
+    /// changed.
+    pub fn set_busy(&self, now: std::collections::BTreeSet<String>) -> bool {
+        let mut b = self.busy.lock().unwrap_or_else(|e| e.into_inner());
+        let changed = *b != now;
+        *b = now;
+        changed
+    }
+
+    /// Agent `name` is at work now.
+    pub fn is_busy(&self, name: &str) -> bool {
+        self.busy.lock().unwrap_or_else(|e| e.into_inner()).contains(name)
     }
 
     /// Where the hub hears the server.
@@ -191,7 +209,7 @@ impl Pages {
         let waiting = self
             .store
             .html(&m.id, m.version())
-            .map_or(0, |h| waiting::of_page_on(&m.id, &h, &notes, &self.store.questions(&m.id), today).len());
+            .map_or(0, |h| waiting::of_page_on(&m.id, &h, &notes, &self.store.questions(&m.id), today, &|a| self.is_busy(a)).len());
         let mut v = json!({
             "id": m.id, "title": m.title, "agent": m.agent, "version": m.version(),
             "url": self.url(&m.id), "at_ms": m.at_ms(), "state": m.state, "open_notes": open,
@@ -213,7 +231,7 @@ impl Pages {
         let mut out = Vec::new();
         for m in self.store.list() {
             let Some(html) = self.store.html(&m.id, m.version()) else { continue };
-            out.extend(waiting::of_page_on(&m.id, &html, &self.store.notes(&m.id), &self.store.questions(&m.id), today));
+            out.extend(waiting::of_page_on(&m.id, &html, &self.store.notes(&m.id), &self.store.questions(&m.id), today, &|a| self.is_busy(a)));
         }
         // his late promises first, across every page (ambient-lead m_5982)
         out.sort_by_key(|w| w.days.is_none());

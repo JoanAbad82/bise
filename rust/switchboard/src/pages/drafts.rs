@@ -29,6 +29,9 @@ pub struct Draft {
     /// who it goes to, when the page says: an email's To (its name, or
     /// the address before the @), a message's channel
     pub to: Option<String>,
+    /// what it is about, when its address says ('to Benjamin, on the
+    /// proxy' → proxy): the card groups one recipient's drafts by it
+    pub topic: Option<String>,
 }
 
 impl Draft {
@@ -74,11 +77,11 @@ pub fn pending(html: &str, notes: &[Note], questions: &[Question]) -> Vec<Draft>
             Some(d) => (d.clone(), None),
             None => (r.block.clone(), Some(r.item.clone())),
         };
-        let (kind, to) = match r.draft.as_deref() {
+        let (kind, (to, topic)) = match r.draft.as_deref() {
             Some(d) => (kit_of(html, d), recipient(html, d)),
-            None => ("step", None),
+            None => ("step", (None, None)),
         };
-        out.push(Draft { block, item, text: r.text.clone(), step: Some(r.item.clone()), kind, to });
+        out.push(Draft { block, item, text: r.text.clone(), step: Some(r.item.clone()), kind, to, topic });
     }
     let verdict = |b: &str, i: Option<&str>| {
         notes.iter().any(|n| n.block == b && note_item(n) == i && (matches!(n.kind.as_str(), "approve" | "skip" | "send" | "drafts") || is_go_word(n)))
@@ -94,18 +97,52 @@ pub fn pending(html: &str, notes: &[Note], questions: &[Question]) -> Vec<Draft>
     for r in items_of(html, "review") {
         if !r.done && !verdict(&r.block, Some(&r.item)) && sends(&r.block) {
             let to = reply_to(&r.text);
-            out.push(Draft { block: r.block.clone(), item: Some(r.item.clone()), text: r.text.clone(), step: None, kind: "reply", to });
+            out.push(Draft { block: r.block.clone(), item: Some(r.item.clone()), text: r.text.clone(), step: None, kind: "reply", to, topic: None });
         }
     }
     for kit in ["email", "message"] {
         for (b, text) in super::waiting::blocks_of(html, kit) {
             if !verdict(&b, None) && !of_steps.contains(&b) && draft_sendable(html, &b) {
-                let to = recipient(html, &b);
-                out.push(Draft { block: b, item: None, text, step: None, kind: kit_word(kit), to });
+                let (to, topic) = recipient(html, &b);
+                // a message in a thread (data-open) is a reply
+                let kind = match kit_word(kit) {
+                    "message" if head_of(html, &b).is_some_and(|(h, _)| h.contains("data-open=\"")) => "reply",
+                    k => k,
+                };
+                out.push(Draft { block: b, item: None, text, step: None, kind, to, topic });
             }
         }
     }
     out
+}
+
+/// The items of the fragment with an agent on them: (item id, agent).
+fn item_agents(html: &str) -> Vec<(String, String)> {
+    html.split("<li")
+        .skip(1)
+        .filter_map(|li| {
+            let head = &li[..li.find('>').unwrap_or(0)];
+            let get = |k: &str| head.split(&format!("{k}=\"")).nth(1).and_then(|r| r.split('"').next()).map(String::from);
+            Some((get("data-id")?, get("data-agent").filter(|a| !a.is_empty())?))
+        })
+        .collect()
+}
+
+/// The agent on the item draft `d` answers, if any: its own review item,
+/// or the item its block is named after ('r-s213', 'reply-s213' → s213).
+pub fn agent_of(html: &str, d: &Draft) -> Option<String> {
+    item_agents(html)
+        .into_iter()
+        .find(|(item, _)| d.item.as_deref() == Some(item) || d.block == *item || d.block.ends_with(&format!("-{item}")))
+        .map(|(_, a)| a)
+}
+
+/// The drafts that can leave now (ambient-lead m_6168): a draft whose
+/// item has an agent still at work (`busy`: working, or idle and not
+/// done) waits until that agent is done and the reply is republished,
+/// so 'send all' never posts a first reply while a fix is underway.
+pub fn ready(html: &str, drafts: Vec<Draft>, busy: &dyn Fn(&str) -> bool) -> Vec<Draft> {
+    drafts.into_iter().filter(|d| !agent_of(html, d).is_some_and(|a| busy(&a))).collect()
 }
 
 fn kit_word(kit: &str) -> &'static str {
@@ -131,22 +168,43 @@ fn kit_of(html: &str, id: &str) -> &'static str {
     kit_word(kit.as_deref().unwrap_or(""))
 }
 
-/// Who block `id` goes to: an email's To (its name, else the address
-/// before the @), a message's channel (data-to after its ' · ').
-fn recipient(html: &str, id: &str) -> Option<String> {
-    let (head, block) = head_of(html, id)?;
+/// Who block `id` goes to, and what about when its address says: an
+/// email's To (its name, else the address before the @); a message's
+/// data-to after its last ' · ' ('to Benjamin, on the proxy' → Benjamin,
+/// proxy; 'reply to Benjamin in #acme-feedback (install bug)' →
+/// Benjamin, install bug; '#lyon' → #lyon).
+fn recipient(html: &str, id: &str) -> (Option<String>, Option<String>) {
+    let Some((head, block)) = head_of(html, id) else { return (None, None) };
     if head.contains("data-kit=\"message\"") {
-        let to = head.split("data-to=\"").nth(1)?.split('"').next()?;
-        return Some(to.rsplit(" · ").next().unwrap_or(to).trim().to_string()).filter(|t| !t.is_empty());
+        let Some(to) = head.split("data-to=\"").nth(1).and_then(|r| r.split('"').next()) else { return (None, None) };
+        return addressee(to.rsplit(" · ").next().unwrap_or(to));
     }
-    let p = block.split("<p").find(|p| p.split('>').next().is_some_and(|h| h.contains("data-field=\"to\"")))?;
-    let text = super::questions::text_of(&p[p.find('>')? + 1..p.find("</p>").unwrap_or(p.len())]);
-    let first = text.split(',').next().unwrap_or("").trim();
-    let name = match first.split_once('<') {
-        Some((n, _)) if !n.trim().is_empty() => n.trim().to_string(),
-        _ => first.trim_matches(|c| c == '<' || c == '>').split('@').next().unwrap_or("").to_string(),
+    let name = (|| {
+        let p = block.split("<p").find(|p| p.split('>').next().is_some_and(|h| h.contains("data-field=\"to\"")))?;
+        let text = super::questions::text_of(&p[p.find('>')? + 1..p.find("</p>").unwrap_or(p.len())]);
+        let first = text.split(',').next().unwrap_or("").trim().to_string();
+        let name = match first.split_once('<') {
+            Some((n, _)) if !n.trim().is_empty() => n.trim().to_string(),
+            _ => first.trim_matches(|c| c == '<' || c == '>').split('@').next().unwrap_or("").to_string(),
+        };
+        Some(name).filter(|n| !n.is_empty())
+    })();
+    (name, None)
+}
+
+/// A message's addressee words → (who, about what).
+fn addressee(seg: &str) -> (Option<String>, Option<String>) {
+    let s = seg.trim();
+    let s = s.strip_prefix("reply to ").or_else(|| s.strip_prefix("to ")).unwrap_or(s);
+    let (who, topic) = match (s.split_once(" ("), s.split_once(", on ")) {
+        (Some((w, t)), _) => (w, Some(t.trim_end_matches(')'))),
+        (None, Some((w, t))) => (w, Some(t)),
+        _ => (s, None),
     };
-    Some(name).filter(|n| !n.is_empty())
+    // 'Benjamin in #acme-feedback': the person
+    let who = who.split(" in #").next().unwrap_or(who).trim();
+    let topic = topic.map(|t| t.trim().trim_start_matches("the ").to_string()).filter(|t| !t.is_empty());
+    (Some(who.to_string()).filter(|w| !w.is_empty()), topic)
 }
 
 /// A review item's addressee from its words ('reply to Nina: yes, Friday'
@@ -173,9 +231,41 @@ pub fn what(drafts: &[Draft]) -> &'static str {
     }
 }
 
-/// Each draft's name on the card: who it goes to, else its short words.
+/// The names on the card: who the drafts go to (each once, in page
+/// order), else each draft's short words.
 pub fn names(drafts: &[Draft]) -> Vec<String> {
-    drafts.iter().map(|d| d.to.clone().unwrap_or_else(|| short(&d.text))).collect()
+    let mut out: Vec<String> = Vec::new();
+    for n in drafts.iter().map(|d| d.to.clone().unwrap_or_else(|| short(&d.text))) {
+        if !out.contains(&n) {
+            out.push(n);
+        }
+    }
+    out
+}
+
+/// What each draft is about, when every one says (one recipient's
+/// drafts are told apart by it).
+pub fn topics(drafts: &[Draft]) -> Vec<String> {
+    drafts.iter().map(|d| d.topic.clone()).collect::<Option<Vec<_>>>().unwrap_or_default()
+}
+
+/// The card's second line (ambient m_6055, ambient-lead m_6168): one
+/// recipient: '3 replies to Benjamin: proxy · fish · French'; several:
+/// 'replies to legal, Lucas and Marc'; no recipients: the drafts' words.
+pub fn line(drafts: &[Draft]) -> String {
+    let w = what(drafts);
+    let names = names(drafts);
+    let addressed = drafts.iter().all(|d| d.to.is_some());
+    if !addressed {
+        return and_list(&names);
+    }
+    let w = if w == "steps" { "drafts" } else { w };
+    match (names.as_slice(), topics(drafts)) {
+        ([who], t) if drafts.len() >= 2 && !t.is_empty() => format!("{} {w} to {who}: {}", drafts.len(), t.join(" · ")),
+        ([who], _) if drafts.len() >= 2 => format!("{} {w} to {who}", drafts.len()),
+        _ if w == "drafts" => and_list(&names),
+        _ => format!("{w} to {}", and_list(&names)),
+    }
 }
 
 /// 'a', 'a and b', 'a, b and c', 'a, b and 4 more'.
@@ -190,18 +280,17 @@ pub fn and_list(names: &[String]) -> String {
 }
 
 /// The batch card's structured fields for the capsule (amb-web m_6061):
-/// {count, title, what, names}.
+/// {count, title, what, names (each recipient once), topics (one per
+/// draft, or none), line (the card's second line, as is)}.
 pub fn info(drafts: &[Draft], title: &str) -> serde_json::Value {
-    serde_json::json!({"count": drafts.len(), "title": title, "what": what(drafts), "names": names(drafts)})
+    serde_json::json!({"count": drafts.len(), "title": title, "what": what(drafts), "names": names(drafts),
+        "topics": topics(drafts), "line": line(drafts)})
 }
 
 /// The batch card's words, ambient's (m_6055 via ambient-lead m_6058):
-/// '3 drafts wait for you · <title>', then 'replies to legal, Lucas and
-/// Marc' (the names alone when they are no recipients).
+/// '3 drafts wait for you · <title>', then [`line`].
 pub fn batch_text(drafts: &[Draft], title: &str) -> String {
-    let w = what(drafts);
-    let list = and_list(&names(drafts));
-    let line = if drafts.iter().all(|d| d.to.is_some()) && w != "drafts" && w != "steps" { format!("{w} to {list}") } else { list };
+    let line = line(drafts);
     let head = if title.trim().is_empty() {
         format!("{} drafts wait for you", drafts.len())
     } else {
@@ -310,8 +399,52 @@ emails to lucas and marc");
         let html = [item("s212"), item("s213"), item("s214")].concat();
         let p = pending(&html, &[], &[]);
         assert_eq!(p.iter().map(Draft::key).collect::<Vec<_>>(), vec!["reply-s212", "reply-s213", "reply-s214"]);
-        assert_eq!(what(&p), "messages");
+        // messages in a thread (data-open) are replies
+        assert_eq!(what(&p), "replies");
         assert!(carded("benjamin-bugs") && !carded("promises-2026-w40") && !carded("meeting-renewal"));
+    }
+
+    /// The feedback page of pm's C run (feedback-20261003-065637), cut.
+    const FEEDBACK: &str = r#"<section data-kit="review" data-id="ready" data-verb="start"><ol>
+<li data-id="s213" data-agent="fix-proxy"><p>proxy</p></li><li data-id="s212" data-agent="fix-fish"><p>fish</p></li></ol></section>
+<section data-kit="message" data-id="r-s213" data-to="Slack · #acme-feedback · to Benjamin, on the proxy" data-verb="send" data-open="https://acme.slack.com/archives/C05/p1"><p>a</p></section>
+<section data-kit="message" data-id="r-s212" data-to="Slack · #acme-feedback · to Benjamin, on fish" data-verb="send" data-open="https://acme.slack.com/archives/C05/p2"><p>b</p></section>
+<section data-kit="review" data-id="reports" data-verb="start"><ol><li data-id="s214"><p>French</p></li></ol></section>
+<section data-kit="message" data-id="r-s214" data-to="Slack · #acme-feedback · to Benjamin, on French" data-verb="send" data-open="https://acme.slack.com/archives/C05/p3"><p>c</p></section>"#;
+
+    /// Law (ambient-lead m_6168, pm's C run): one recipient's drafts are
+    /// grouped: '3 replies to Benjamin: proxy · fish · French', not the
+    /// address three times; several recipients read as before.
+    #[test]
+    fn one_recipients_drafts_are_grouped() {
+        let p = pending(FEEDBACK, &[], &[]);
+        assert_eq!(p.iter().map(|d| (d.to.as_deref(), d.topic.as_deref())).collect::<Vec<_>>(), vec![
+            (Some("Benjamin"), Some("proxy")),
+            (Some("Benjamin"), Some("fish")),
+            (Some("Benjamin"), Some("French")),
+        ]);
+        assert_eq!(batch_text(&p, "benjamin's reports"), "3 drafts wait for you · benjamin's reports
+3 replies to Benjamin: proxy · fish · French");
+        assert_eq!(info(&p, "t")["names"], json!(["Benjamin"]));
+        // the earlier shape of address: 'reply to X in #channel (topic)'
+        assert_eq!(addressee("reply to Benjamin in #acme-feedback (install bug)"), (Some("Benjamin".into()), Some("install bug".into())));
+        assert_eq!(addressee("#lyon"), (Some("#lyon".into()), None));
+    }
+
+    /// Law (ambient-lead m_6168): a draft whose item has an agent still at
+    /// work (working, or idle and not done) does not wait yet: out of the
+    /// batch and of sb page waiting; the agent done, it waits again.
+    #[test]
+    fn a_draft_waits_for_its_items_agent() {
+        let p = pending(FEEDBACK, &[], &[]);
+        assert_eq!(agent_of(FEEDBACK, &p[0]).as_deref(), Some("fix-proxy"));
+        assert_eq!(agent_of(FEEDBACK, &p[2]), None);
+        let fixing = |a: &str| a == "fix-proxy";
+        assert_eq!(ready(FEEDBACK, p.clone(), &fixing).iter().map(Draft::key).collect::<Vec<_>>(), vec!["r-s212", "r-s214"]);
+        assert_eq!(ready(FEEDBACK, p.clone(), &|_| false).len(), 3);
+        let lines = |busy: &dyn Fn(&str) -> bool| super::super::waiting::of_page("fb", FEEDBACK, &[], &[], busy).iter().map(|w| w.line()).collect::<Vec<_>>();
+        assert_eq!(lines(&|a| a.starts_with("fix-")), vec!["fb#r-s214 · draft · c"]);
+        assert_eq!(lines(&|_| false), vec!["fb#r-s213 · draft · 3 drafts wait for you: 3 replies to Benjamin: proxy · fish · French"]);
     }
 
     /// Law (ambient's words, m_6055 via ambient-lead m_6058): review is
@@ -330,11 +463,12 @@ emails to lucas and marc");
         let s = |n: &[&str]| n.iter().map(|x| x.to_string()).collect::<Vec<_>>();
         assert_eq!(and_list(&s(&["legal", "Lucas", "Marc"])), "legal, Lucas and Marc");
         assert_eq!(and_list(&s(&["legal", "Lucas", "Marc", "Nina", "Ana", "Tom"])), "legal, Lucas and 4 more");
-        let reply = |to: &str| Draft { block: "r".into(), item: Some(to.into()), text: format!("reply to {to}"), step: None, kind: "reply", to: Some(to.into()) };
+        let reply = |to: &str| Draft { block: "r".into(), item: Some(to.into()), text: format!("reply to {to}"), step: None, kind: "reply", to: Some(to.into()), topic: None };
         let three = [reply("legal"), reply("Lucas"), reply("Marc")];
         assert_eq!(batch_text(&three, "inbox"), "3 drafts wait for you · inbox
 replies to legal, Lucas and Marc");
-        assert_eq!(info(&three, "inbox"), json!({"count": 3, "title": "inbox", "what": "replies", "names": ["legal", "Lucas", "Marc"]}));
+        assert_eq!(info(&three, "inbox"), json!({"count": 3, "title": "inbox", "what": "replies", "names": ["legal", "Lucas", "Marc"],
+            "topics": [], "line": "replies to legal, Lucas and Marc"}));
         let step = super::super::checklist::Step { text: batch_text(&three, "inbox"), batch: vec!["a".into(), "b".into(), "c".into()], ..Default::default() };
         assert_eq!(step.card_text(), "3 drafts wait for you · inbox
 replies to legal, Lucas and Marc

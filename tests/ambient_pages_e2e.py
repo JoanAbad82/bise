@@ -622,7 +622,8 @@ def main():
         # ambient's words (m_6055 via ambient-lead m_6058): review first
         check(len(on_page) == 1 and on_page[0]["text"].startswith("2 drafts wait for you · batch plan\nemails to lucas and marc\n1. review\n2. send both"), "one card for both drafts: %r" % on_page)
         check(on_page[0]["page"].get("drafts") is True and on_page[0]["page"].get("item") == "b1", "it opens the page at the first: %r" % on_page[0]["page"])
-        check(on_page[0].get("batch") == {"count": 2, "title": "batch plan", "what": "emails", "names": ["lucas", "marc"]}, "its fields for the capsule: %r" % on_page[0])
+        check(on_page[0].get("batch") == {"count": 2, "title": "batch plan", "what": "emails", "names": ["lucas", "marc"],
+                                          "topics": [], "line": "emails to lucas and marc"}, "its fields for the capsule: %r" % on_page[0])
         settle(c)
         # 1 = review: nothing sent, the card stays
         c.say("/answer %d 1" % on_page[0]["id"])
@@ -640,18 +641,33 @@ def main():
         # a feedback page with no plan (pm's C fail 42): a 'start' review
         # item then its Slack reply, three times: the replies are one
         # batch card ('3 drafts wait for you'), the start items no draft
+        # (ambient-lead m_6168) s212 has an agent at work, fix-fish: its
+        # reply does not wait until fix-fish is done; one recipient's
+        # replies are grouped by topic
+        c.say("/new fix-fish: {{bash: sleep 25; sb status done --note fixed}}")
+        c.wait_status("fix-fish", "working", 60)
         fp = os.path.join(E.tmp, "feedback.html")
-        fi = lambda i: ('<section data-kit="review" data-id="r-%s" data-verb="start"><ol><li data-id="%s"><p>bug %s</p></li></ol></section>'
-                        '<section data-kit="message" data-id="reply-%s" data-to="Slack · reply to Benjamin in #acme-feedback" '
-                        'data-open="https://acme.slack.com/archives/C05/p%s"><p>thanks Benjamin, fixed</p></section>' % (i, i, i, i, i))
-        open(fp, "w").write(fi("s212") + fi("s213") + fi("s214"))
+        fi = lambda i, about, agent="": ('<section data-kit="review" data-id="r-%s" data-verb="start"><ol><li data-id="%s"%s><p>bug %s</p></li></ol></section>'
+                                         '<section data-kit="message" data-id="reply-%s" data-to="Slack · #acme-feedback · to Benjamin, on %s" '
+                                         'data-open="https://acme.slack.com/archives/C05/p%s"><p>thanks Benjamin, fixed</p></section>'
+                                         % (i, i, ' data-agent="%s"' % agent if agent else "", i, i, about, i))
+        open(fp, "w").write(fi("s212", "fish", "fix-fish") + fi("s213", "the proxy") + fi("s214", "French"))
         c.say('[[bash: sb page publish %s --id benjamin-bugs --title "benjamin\'s reports"]]' % fp)
         fb = lambda: [x for x in c.cards() if (x.get("page") or {}).get("id") == "benjamin-bugs"]
         c.wait(fb, 90, "the feedback page's batch card")
         time.sleep(1)
-        check(len(fb()) == 1 and fb()[0]["text"].startswith("3 drafts wait for you · benjamin's reports\n") and fb()[0]["text"].endswith("2. send all 3"),
-              "one card for the 3 replies: %r" % fb())
-        check((fb()[0].get("batch") or {}).get("what") == "messages" and fb()[0]["page"].get("item") == "reply-s212", "its fields: %r" % fb()[0])
+        check(len(fb()) == 1 and fb()[0]["text"] == "2 drafts wait for you · benjamin's reports\n2 replies to Benjamin: proxy · French\n1. review\n2. send both",
+              "fix-fish at work: its reply waits, the other 2 are one card: %r" % fb())
+        settle(c)
+        c.say("[[bash: sb page waiting]]")
+        c.wait_line("main", "benjamin-bugs#reply-s213 · draft · 2 drafts wait for you: 2 replies to Benjamin: proxy · French", 60)
+        settle(c)
+        # fix-fish done: its reply joins, one card for the 3
+        c.wait(lambda: fb() and fb()[0]["text"].startswith("3 drafts wait for you · benjamin's reports\n3 replies to Benjamin: fish · proxy · French\n"), 90,
+               "fix-fish done, the 3 replies in one card")
+        check(fb()[0]["text"].endswith("2. send all 3"), "send all 3: %r" % fb())
+        check((fb()[0].get("batch") or {}).get("what") == "replies" and fb()[0]["page"].get("item") == "reply-s212", "its fields: %r" % fb()[0])
+        check((fb()[0].get("batch") or {}).get("names") == ["Benjamin"] and fb()[0]["batch"].get("topics") == ["fish", "proxy", "French"], "names, topics: %r" % fb()[0])
         settle(c)
         c.say("/answer %d 2" % fb()[0]["id"])
         c.wait(lambda: not fb(), 30, "the feedback batch closes on send all")
