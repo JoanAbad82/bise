@@ -19,6 +19,15 @@ pub struct Question {
     /// the user's answer (on the page, in the capsule or the TUI)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reply: Option<String>,
+    /// `data-card="none"`: a page-only question (promises, meeting
+    /// pages; ambient-lead m_6091): never a card, still in sb page
+    /// waiting and answered on the page
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub page_only: bool,
+    /// its card closed with no answer (withdrawn, dismissed): no card
+    /// again until its words or options change (ambient-lead m_6091)
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub dismissed: bool,
 }
 
 impl Question {
@@ -88,7 +97,8 @@ pub fn of_fragment(html: &str) -> Vec<Question> {
             })
             .filter(|o| !o.is_empty())
             .collect();
-        out.push(Question { block: id, text, options, card: 0, reply: None });
+        let page_only = attr("data-card").as_deref() == Some("none");
+        out.push(Question { block: id, text, options, page_only, ..Question::default() });
     }
     out
 }
@@ -123,9 +133,17 @@ pub fn plan(old: &[Question], new: Vec<Question>, open: &dyn Fn(u64) -> bool) ->
     let mut questions = Vec::new();
     for mut q in new {
         match old.iter().find(|o| o.block == q.block) {
+            // now page-only: its open card goes
+            Some(o) if q.page_only && o.card != 0 && open(o.card) => {
+                if o.text == q.text && o.options == q.options {
+                    q.reply = o.reply.clone();
+                }
+                close.push((o.card, "withdrawn"));
+            }
             Some(o) if o.text == q.text && o.options == q.options => {
                 q.card = o.card;
                 q.reply = o.reply.clone();
+                q.dismissed = o.dismissed;
             }
             Some(o) if o.card != 0 && open(o.card) => close.push((o.card, "replaced")),
             _ => {}
@@ -166,13 +184,34 @@ mod tests {
 
     #[test]
     fn a_publish_keeps_replaces_or_withdraws_cards() {
-        let q = |b: &str, t: &str, card: u64| Question { block: b.into(), text: t.into(), options: vec!["a".into(), "b".into()], card, reply: None };
+        let q = |b: &str, t: &str, card: u64| Question { block: b.into(), text: t.into(), options: vec!["a".into(), "b".into()], card, ..Question::default() };
         let old = vec![Question { reply: Some("a".into()), ..q("q1", "same?", 7) }, q("q2", "old words?", 8), q("q3", "gone?", 9)];
         let new = vec![q("q1", "same?", 0), q("q2", "new words?", 0), q("q4", "new?", 0)];
         let p = plan(&old, new, &|c| c != 7);
         assert_eq!(p.questions.iter().map(|x| (x.block.as_str(), x.card)).collect::<Vec<_>>(), vec![("q1", 7), ("q2", 0), ("q4", 0)]);
         assert_eq!(p.questions[0].reply.as_deref(), Some("a"), "the answer stays with its question");
         assert_eq!(p.close, vec![(8, "replaced"), (9, "withdrawn")]);
+    }
+
+    /// Law (ambient-lead m_6091): data-card="none" is a page-only
+    /// question (no card; an open one it had goes); a card closed with no
+    /// answer stays closed on a republish until the question's words or
+    /// options change.
+    #[test]
+    fn page_only_and_dismissed_questions_open_no_card() {
+        let h = |extra: &str, text: &str| format!(r#"<section data-kit="question" data-id="q-cc"{extra}><p>{text}</p><ol><li>lelio@acme.test</li><li>without the cc</li></ol></section>"#);
+        let q = &of_fragment(&h(r#" data-card="none""#, "which address?"))[0];
+        assert!(q.page_only && q.card == 0);
+        assert!(!of_fragment(&h("", "which address?"))[0].page_only);
+        // it had a card, now page-only: the card goes
+        let old = vec![Question { card: 3, ..of_fragment(&h("", "which address?"))[0].clone() }];
+        let p = plan(&old, of_fragment(&h(r#" data-card="none""#, "which address?")), &|_| true);
+        assert_eq!(p.close, vec![(3, "withdrawn")]);
+        assert!(p.questions[0].page_only && p.questions[0].card == 0);
+        // dismissed: the same words keep it so, new words clear it
+        let old = vec![Question { dismissed: true, ..of_fragment(&h("", "which address?"))[0].clone() }];
+        assert!(plan(&old, of_fragment(&h("", "which address?")), &|_| false).questions[0].dismissed);
+        assert!(!plan(&old, of_fragment(&h("", "which address for Lelio?")), &|_| false).questions[0].dismissed);
     }
 
     #[test]

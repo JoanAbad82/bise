@@ -549,6 +549,61 @@ def main():
         c.wait_line("main", "meeting-notes#a1 · step · send Hélène the SSO timeline", 90)
         settle(c)
 
+        # a promises page (ambient-lead m_6091, amb-tools' promises run):
+        # a carded question is refused there; data-card="none" makes no
+        # card yet waits in sb page waiting; every promise's draft waits,
+        # the first row's (d-sso) too
+        pp = os.path.join(E.tmp, "promises.html")
+        pem = lambda i, to: ('<section data-kit="email" data-id="%s" data-verb="draft"><p data-field="to">%s</p>'
+                             '<p data-field="subject">s</p><p>x</p></section>' % (i, to))
+        pq = lambda card: ('<section data-kit="question" data-id="q-cc"%s><p>which address for Lelio?</p>'
+                           '<ol><li>lelio@acme.test</li><li>without the cc</li></ol></section>' % card)
+        body = ('<section data-kit="checklist" data-id="open"><ol>'
+                '<li data-id="p-sso" data-who="yours" data-due="2026-09-26" data-draft="d-sso">send Hélène the SSO timeline</li>'
+                '<li data-id="p-nda" data-who="yours" data-due="2026-09-30" data-draft="d-nda">send Paul the NDA</li></ol></section>'
+                + pem("d-sso", "helene@northwind.test") + pem("d-nda", "paul@girard.test"))
+        open(pp, "w").write(body + pq(""))
+        c.say('[[bash: sb page publish %s --id promises-e2e --title "your promises"]]' % pp)
+        c.wait_line("main", "q-cc: a question on this page never makes a card", 90)
+        settle(c)
+        open(pp, "w").write(body + pq(' data-card="none"'))
+        c.say('[[bash: sb page publish %s --id promises-e2e --title "your promises"]]' % pp)
+        c.wait_line("main", "published promises-e2e v1", 90)
+        time.sleep(2)
+        check(not [x for x in c.cards() if (x.get("page") or {}).get("id") == "promises-e2e"], "a promises page makes no card: %r" % c.cards())
+        settle(c)
+        c.say("[[bash: sb page waiting]]")
+        for line in ("promises-e2e#d-sso · draft", "promises-e2e#d-nda · draft", "promises-e2e#q-cc · question · which address for Lelio?"):
+            c.wait_line("main", line, 90)
+        settle(c)
+
+        # a page question's card withdrawn with no answer stays closed on a
+        # republish of the same words; new words ask again (m_6091)
+        ap = os.path.join(E.tmp, "ask-cc.html")
+        aq = lambda words: ('<section data-kit="question" data-id="q-to"><p>%s</p>'
+                            '<ol><li>lelio@acme.test</li><li>without the cc</li></ol></section>' % words)
+        open(ap, "w").write(aq("which address?"))
+        c.say('[[bash: sb page publish %s --id ask-cc --title "ask"]]' % ap)
+        ask = lambda: next((x for x in c.cards() if (x.get("page") or {}).get("id") == "ask-cc"), None)
+        c.wait(ask, 90, "ask-cc's question card")
+        first = ask()["id"]
+        settle(c)
+        c.say('[[bash: sb card --withdraw %d "moot"]]' % first)
+        c.wait(lambda: not ask(), 30, "the withdrawn card closes")
+        settle(c)
+        c.say('[[bash: sb page publish %s --id ask-cc]]' % ap)
+        c.wait_line("main", "published ask-cc v2", 90)
+        time.sleep(2)
+        check(not ask(), "the same question opens no card again: %r" % c.cards())
+        settle(c)
+        open(ap, "w").write(aq("which address for Lelio's cc?"))
+        c.say('[[bash: sb page publish %s --id ask-cc]]' % ap)
+        c.wait(lambda: ask() and ask()["id"] != first, 90, "new words ask again")
+        settle(c)
+        c.say('[[bash: sb card --withdraw %d "done here"]]' % ask()["id"])
+        c.wait(lambda: not ask(), 30, "the second card closes")
+        settle(c)
+
         # drafts waiting at once are ONE card (ambient-lead m_5977): two
         # drafted steps in a row, '2 drafts ready', send all = an approve
         # per draft, and the card closes

@@ -60,7 +60,10 @@ pub fn pending(html: &str, notes: &[Note], questions: &[Question]) -> Vec<Draft>
     let closed = |r: &super::checklist::Row| closed_by(r, notes);
     let asking = questions.iter().any(|q| q.reply.is_none());
     // a step's draft is that step's, sent at its turn, never on its own
-    let of_steps: Vec<String> = rows.iter().filter(|r| !r.done).filter_map(|r| r.draft.clone()).collect();
+    // (a plan's step only: a promise's draft on a promises page waits on
+    // him now, whichever row's turn it is; ambient-lead m_6091, d-sso)
+    // (a done row's draft went with it: a promise kept)
+    let of_steps: Vec<String> = rows.iter().filter(|r| r.done || r.plan).filter_map(|r| r.draft.clone()).collect();
     // (a plan's or not: a drafted row is a draft of his like a reply; only
     // the single-step card is a plan's)
     for r in due(&rows, &closed).into_iter().filter(|r| r.drafted) {

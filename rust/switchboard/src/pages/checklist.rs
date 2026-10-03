@@ -395,6 +395,7 @@ mod tests {
             options: vec![],
             card: 1,
             reply: reply.map(String::from),
+            ..Default::default()
         };
         let open = judged(html, &[q(None)]);
         assert!(open[0].plan && !open[1].plan, "the plan's block is marked, the meeting's is not");

@@ -146,7 +146,8 @@ impl Pages {
         if p.html.len() > 1_000_000 {
             return Err(vec![format!("the page is too big ({} bytes, 1 MB at most): split it", p.html.len())]);
         }
-        let blocks = lint::lint(&p.html)?;
+        // promises and meeting pages: no carded question (amb-kit 6ce4b426)
+        let blocks = lint::lint_page(p.id.as_deref().unwrap_or(""), &p.html)?;
         let (meta, unknown) = self.locked(|s| s.publish(p, blocks, now, gone)).map_err(|e| vec![e])?;
         self.push(&meta.id, "version", &json!({"n": meta.version()}));
         self.push(&meta.id, "state", &json!({"state": meta.state}));

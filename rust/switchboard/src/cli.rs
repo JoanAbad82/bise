@@ -808,14 +808,21 @@ fn render_page(v: &Value) -> String {
         return pages
             .iter()
             .map(|p| {
+                // the version he last opened (amb-kit m_6114: mentions
+                // leads with what is new since)
+                let seen = match p.get("opened_version").and_then(|n| n.as_u64()).unwrap_or(0) {
+                    0 => "not opened".to_string(),
+                    n => format!("seen v{n}"),
+                };
                 format!(
-                    "{} · {} · {} · v{} · {} open notes · {}",
+                    "{} · {} · {} · v{} · {} open notes · {} · {}",
                     s(p, "id"),
                     s(p, "title"),
                     s(p, "agent"),
                     p.get("version").and_then(|n| n.as_u64()).unwrap_or(0),
                     p.get("open_notes").and_then(|n| n.as_u64()).unwrap_or(0),
-                    s(p, "state")
+                    s(p, "state"),
+                    seen
                 )
             })
             .collect::<Vec<_>>()

@@ -1326,7 +1326,9 @@ impl Shell {
             self.step(Input::ConfirmClose { card: *card, res: res.to_string() });
         }
         let mut qs = plan.questions;
-        for q in qs.iter_mut().filter(|q| q.card == 0 && q.reply.is_none()) {
+        // a page-only question (data-card="none") never opens one; a
+        // dismissed one not again until its words change (m_6091)
+        for q in qs.iter_mut().filter(|q| q.card == 0 && q.reply.is_none() && !q.page_only && !q.dismissed) {
             let before: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
             // sb-core opens cards for main only (a task's request is
             // refused: pm's 25), so main asks; the hub answers it itself
@@ -1764,8 +1766,12 @@ impl Shell {
                     // closed with no answer (withdrawn, closed by the user,
                     // a card this hub never had: a copied page, pm's 409):
                     // the question stays open on the page, a pick there
-                    // still goes (as a pick note), a republish opens a card
-                    None => q.card = 0,
+                    // still goes (as a pick note); a republish opens no
+                    // card until its words or options change (m_6091)
+                    None => {
+                        q.card = 0;
+                        q.dismissed = true;
+                    }
                 }
             }
             if let Err(e) = pages.locked(|s| s.save_questions(&id, &qs)) {

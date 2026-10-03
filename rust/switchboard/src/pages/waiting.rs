@@ -106,10 +106,14 @@ pub fn of_page(id: &str, html: &str, notes: &[Note], questions: &[Question]) -> 
     // drafts (drafted steps, review items, emails, messages; pages/
     // drafts.rs): two or more are one line, as they are one card
     // (ambient-lead m_5977)
+    // (a page with no plan has no card: each draft its own line, as on a
+    // promises page; m_6091)
     let drafts = super::drafts::pending(html, notes, questions);
+    let carded = rows.iter().any(|r| r.plan);
     match drafts.len() {
         0 => {}
         1 => out.push(w(drafts[0].anchor(), "draft", &drafts[0].text)),
+        _ if !carded => out.extend(drafts.iter().map(|d| w(d.anchor(), "draft", &d.text))),
         _ => out.push(w(drafts[0].anchor(), "draft", &super::drafts::batch_text(&drafts, "").replace('\n', ": "))),
     }
     // questions he has not answered (on the page: no data-answer)
@@ -134,7 +138,8 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    const PAGE: &str = r#"<section data-kit="checklist" data-id="steps"><ol>
+    // a plan (data-plan): its drafts are one card, so one line
+    const PAGE: &str = r#"<section data-kit="checklist" data-id="steps" data-plan><ol>
 <li data-id="t1" data-done>check the name</li><li data-id="t2" data-who="yours">pay the domain on Gandi</li><li data-id="t3">point the DNS</li></ol></section>
 <section data-kit="review" data-id="replies"><ol><li data-id="m1">reply to Nina: yes, Friday</li><li data-id="m2">reply to Marc: no</li></ol></section>
 <section data-kit="email" data-id="mail"><p data-field="to">team@acme.test</p><p>Subject: the offsite</p><p>Hi all, …</p></section>
@@ -151,7 +156,7 @@ mod tests {
             note(json!({"id": "n1", "block": "replies", "item": "m2", "kind": "skip", "status": "sent"})),
             note(json!({"id": "n2", "block": "mail", "kind": "note", "text": "shorter", "status": "draft"})),
         ];
-        let qs = vec![Question { block: "q1".into(), text: "post it now?".into(), options: vec!["yes".into(), "no".into()], card: 4, reply: None }];
+        let qs = vec![Question { block: "q1".into(), text: "post it now?".into(), options: vec!["yes".into(), "no".into()], card: 4, ..Default::default() }];
         let lines: Vec<String> = of_page("plan", PAGE, &notes, &qs).iter().map(Waiting::line).collect();
         // two drafts (m1, the mail) are one line, as they are one card
         // (ambient-lead m_5977)
@@ -170,6 +175,31 @@ mod tests {
         ];
         let qs = vec![Question { reply: Some("yes".into()), ..qs[0].clone() }];
         assert!(of_page("plan", PAGE, &notes, &qs).is_empty());
+    }
+
+    /// Law (ambient-lead m_6091, amb-tools' promises run): on a page with
+    /// no plan, each promise's draft (data-draft) waits on him now, the
+    /// first row's too (d-sso was left out), one line each (no card).
+    #[test]
+    fn a_promises_drafts_are_each_listed() {
+        let em = |i: &str, to: &str| format!(r#"<section data-kit="email" data-id="{i}" data-verb="draft"><p data-field="to">{to}</p><p data-field="subject">s</p><p>x</p></section>"#);
+        let page = format!(
+            r#"<section data-kit="checklist" data-id="open"><ol>
+<li data-id="p-sso" data-who="yours" data-due="2026-09-26" data-draft="d-sso">send Hélène the SSO timeline</li>
+<li data-id="p-nda" data-who="yours" data-due="2026-09-30" data-draft="d-nda">send Paul the NDA</li>
+<li data-id="p-deck" data-who="yours" data-draft="d-deck" data-done>share the deck</li></ol></section>{}{}{}
+<section data-kit="question" data-id="q-cc" data-card="none"><p>which address?</p><ol><li>a</li><li>b</li></ol></section>"#,
+            em("d-sso", "helene@northwind.test"),
+            em("d-nda", "paul@girard.test"),
+            em("d-deck", "marc@acme.test"),
+        );
+        let lines: Vec<String> = of_page("promises", &page, &[], &[]).iter().map(Waiting::line).collect();
+        assert_eq!(lines, vec![
+            "promises#p-sso · step · send Hélène the SSO timeline",
+            "promises#d-sso · draft · helene@northwind.test s x",
+            "promises#d-nda · draft · paul@girard.test s x",
+            "promises#q-cc · question · ",
+        ]);
     }
 
     /// Promises (ambient-lead m_5982): a row of his with a data-due is

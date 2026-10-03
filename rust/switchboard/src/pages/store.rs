@@ -840,9 +840,9 @@ mod tests {
         assert_eq!(s.pending_review("t1"), None, "his word: drafts run free");
         // an open question holds too, until answered
         s.publish(&publish("t3", Some("plan"), None), vec![block("q1", "question")], 30, &|_| false).unwrap();
-        s.save_questions("plan", &[super::super::questions::Question { block: "q1".into(), text: "which venue?".into(), options: vec![], card: 4, reply: None }]).unwrap();
+        s.save_questions("plan", &[super::super::questions::Question { block: "q1".into(), text: "which venue?".into(), options: vec![], card: 4, ..Default::default() }]).unwrap();
         assert!(s.pending_review("t3").is_some());
-        s.save_questions("plan", &[super::super::questions::Question { block: "q1".into(), text: "which venue?".into(), options: vec![], card: 4, reply: Some("Les Pins".into()) }]).unwrap();
+        s.save_questions("plan", &[super::super::questions::Question { block: "q1".into(), text: "which venue?".into(), options: vec![], card: 4, reply: Some("Les Pins".into()), ..Default::default() }]).unwrap();
         assert_eq!(s.pending_review("t3"), None);
         let _ = std::fs::remove_dir_all(d);
     }
