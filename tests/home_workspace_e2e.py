@@ -183,6 +183,30 @@ def main():
         check(v == 4 and "headings in lowercase" in body and "Nina" in body and "no emoji" not in body,
               "about-you redrawn: v%r" % v)
 
+        # promises (ambient-lead m_5982): a row of his whose data-due was two
+        # days ago is overdue: first in sb page waiting, counted in the
+        # state, and no card
+        day = lambda k: time.strftime("%Y-%m-%d", time.localtime(time.time() + k * 86400))
+        prom = os.path.join(E.tmp, "promises.html")
+        open(prom, "w").write(
+            '<section data-kit="heading" data-id="title"><h1>your promises</h1><p>this week</p></section>\n'
+            '<section data-kit="checklist" data-id="open"><ol>\n'
+            '<li data-id="p1" data-who="yours" data-due="%s">send Camille the pricing sheet</li>\n'
+            '<li data-id="p2" data-who="yours" data-due="%s">book the venue</li>\n'
+            '<li data-id="p3" data-who="Camille" data-due="%s">sign the order</li></ol></section>\n' % (day(-2), day(0), day(-5)))
+        cards0 = len(c.cards())
+        n0 = len(results(c, "main"))
+        c.say("[[bash: sb page publish %s --id promises-w1 --title promises]] [[bash: sb page waiting]]" % prom)
+        c.wait(lambda: len(results(c, "main")) >= n0 + 2, 90, "publish + waiting")
+        c.wait_idle("main")
+        w = results(c, "main")[n0 + 1]
+        check("promises-w1#p1 · overdue 2 days · send Camille the pricing sheet" in w, "sb page waiting: %r" % w)
+        first = w.split(":", 1)[1].strip()
+        check(first.startswith("promises-w1#p1 · overdue"), "the overdue promise comes first: %r" % w)
+        check("p3" not in w and "p2 · overdue" not in w, "not his, or due today: not overdue: %r" % w)
+        c.wait(lambda: (c.state or {}).get("overdue") == 1, 30, "state.overdue = 1")
+        check(len(c.cards()) == cards0 and not any("pricing sheet" in json.dumps(k) for k in c.cards()), "no card for it")
+
         # a worktree task: refused in words, nothing crashes
         c.say("/new -w t2: x")
         c.wait(lambda: any("not a git repository" in json.dumps(n) for n in c.notices()) or

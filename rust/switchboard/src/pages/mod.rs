@@ -198,12 +198,26 @@ impl Pages {
     /// `sb page waiting`: what waits on the user across every page,
     /// newest page first.
     pub fn waiting(&self) -> Vec<waiting::Waiting> {
+        let today = crate::every::local_day(crate::util::now_ms()).unwrap_or(i64::MAX);
         let mut out = Vec::new();
         for m in self.store.list() {
             let Some(html) = self.store.html(&m.id, m.version()) else { continue };
-            out.extend(waiting::of_page(&m.id, &html, &self.store.notes(&m.id), &self.store.questions(&m.id)));
+            out.extend(waiting::of_page_on(&m.id, &html, &self.store.notes(&m.id), &self.store.questions(&m.id), today));
         }
+        // his late promises first, across every page (ambient-lead m_5982)
+        out.sort_by_key(|w| w.days.is_none());
         out
+    }
+
+    /// How many promises of his are overdue today, across every page (the
+    /// hub's state: the morning page and the menu-bar count).
+    pub fn overdue(&self) -> usize {
+        let Some(today) = crate::every::local_day(crate::util::now_ms()) else { return 0 };
+        self.store
+            .list()
+            .iter()
+            .filter_map(|m| Some(waiting::overdue(&m.id, &self.store.html(&m.id, m.version())?, &self.store.notes(&m.id), today).len()))
+            .sum()
     }
 
     /// The meta line of the latest version's first heading block.

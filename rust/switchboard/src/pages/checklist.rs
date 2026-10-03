@@ -28,6 +28,9 @@ pub struct Row {
     /// `data-question`: a decision of his, asked by that question block:
     /// the question's card is its only card (pm's D fail 35)
     pub question: Option<String>,
+    /// `data-due="YYYY-MM-DD"`: by when (a promise of his is overdue the
+    /// day after, ambient-lead m_5982)
+    pub due: Option<String>,
 }
 
 impl Row {
@@ -126,6 +129,7 @@ pub fn items_of(html: &str, kit: &str) -> Vec<Row> {
                 drafted: !yours && attr(lhead, "data-did").is_some_and(|d| d.to_lowercase().contains("draft")),
                 draft: attr(lhead, "data-draft").filter(|d| !d.trim().is_empty()),
                 question: attr(lhead, "data-question").filter(|q| !q.trim().is_empty()),
+                due: attr(lhead, "data-due").filter(|d| !d.trim().is_empty()),
             });
         }
     }

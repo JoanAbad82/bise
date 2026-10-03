@@ -425,6 +425,33 @@ fn tm_of(ms: u64) -> Option<libc::tm> {
     (!r.is_null()).then_some(tm)
 }
 
+/// Days since 1970-01-01 of a civil date (the proleptic Gregorian
+/// calendar; H. Hinnant's days_from_civil).
+pub fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
+    let y = if m <= 2 { y - 1 } else { y };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let mp = (m as i64 + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + d as i64 - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
+}
+
+/// `YYYY-MM-DD` as days since 1970-01-01 (None: not a date).
+pub fn parse_day(s: &str) -> Option<i64> {
+    let mut it = s.trim().splitn(3, '-');
+    let y: i64 = it.next()?.parse().ok()?;
+    let m: u32 = it.next()?.parse().ok()?;
+    let d: u32 = it.next()?.parse().ok()?;
+    ((1..=12).contains(&m) && (1..=31).contains(&d)).then(|| days_from_civil(y, m, d))
+}
+
+/// The user's local date at `ms`, as days since 1970-01-01.
+pub fn local_day(ms: u64) -> Option<i64> {
+    let tm = tm_of(ms)?;
+    Some(days_from_civil(tm.tm_year as i64 + 1900, tm.tm_mon as u32 + 1, tm.tm_mday as u32))
+}
+
 fn mk(mut tm: libc::tm) -> Option<u64> {
     tm.tm_isdst = -1;
     let t = unsafe { libc::mktime(&mut tm) };

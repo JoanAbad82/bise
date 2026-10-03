@@ -12,16 +12,54 @@ use serde::Serialize;
 pub struct Waiting {
     pub page: String,
     pub item: String,
-    /// step | draft | question | notes
+    /// overdue | step | draft | question | notes
     pub kind: &'static str,
     pub text: String,
+    /// overdue: by how many days (its `data-due` was that long ago)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub days: Option<i64>,
 }
 
 impl Waiting {
-    /// `<page id>#<item id> · <kind> · <text>`
+    /// `<page id>#<item id> · <kind> · <text>`; an overdue promise says
+    /// for how long: `<page>#<item> · overdue 2 days · <text>`
     pub fn line(&self) -> String {
-        format!("{}#{} · {} · {}", self.page, self.item, self.kind, self.text)
+        match self.days {
+            Some(d) => format!("{}#{} · overdue {} day{} · {}", self.page, self.item, d, if d == 1 { "" } else { "s" }, self.text),
+            None => format!("{}#{} · {} · {}", self.page, self.item, self.kind, self.text),
+        }
     }
+}
+
+/// The promises of his in page `id` that are late on day `today` (days
+/// since 1970-01-01, his local date): checklist rows of his
+/// (`data-who="yours"`) with a `data-due` before today, not done, not
+/// ticked. Overdue the day after the due date (ambient-lead m_5982). Never
+/// a card: a list line and a count only.
+pub fn overdue(id: &str, html: &str, notes: &[Note], today: i64) -> Vec<Waiting> {
+    rows_of(html)
+        .into_iter()
+        .filter(|r| r.yours && !r.done && !closed_by(r, notes))
+        .filter_map(|r| {
+            let due = crate::every::parse_day(r.due.as_deref()?)?;
+            (today > due).then(|| Waiting { page: id.into(), item: r.item.clone(), kind: "overdue", text: cut(&r.text), days: Some(today - due) })
+        })
+        .collect()
+}
+
+/// Pages whose rows never make a step card: the weekly promises page
+/// (`promises-<week>`) and the meeting pages (`meeting-<slug>-<date>`).
+pub fn no_cards(id: &str) -> bool {
+    id.starts_with("promises-") || id.starts_with("meeting-")
+}
+
+/// [`of_page`] with page `id`'s overdue promises first (the same row is
+/// not listed again as a step).
+pub fn of_page_on(id: &str, html: &str, notes: &[Note], questions: &[Question], today: i64) -> Vec<Waiting> {
+    let mut out = overdue(id, html, notes, today);
+    let late: Vec<String> = out.iter().map(|w| w.item.clone()).collect();
+    out.extend(of_page(id, html, notes, questions).into_iter().filter(|w| !(w.kind == "step" && late.contains(&w.item))));
+    out
 }
 
 fn note_item(n: &Note) -> Option<&str> {
@@ -63,7 +101,7 @@ fn cut(t: &str) -> String {
 /// the questions he has not answered, and the notes he left unsent.
 pub fn of_page(id: &str, html: &str, notes: &[Note], questions: &[Question]) -> Vec<Waiting> {
     let mut out = Vec::new();
-    let w = |item: &str, kind: &'static str, text: &str| Waiting { page: id.into(), item: item.into(), kind, text: cut(text) };
+    let w = |item: &str, kind: &'static str, text: &str| Waiting { page: id.into(), item: item.into(), kind, text: cut(text), days: None };
     // his steps whose turn came
     // (a drafted step of bise's is a draft of his; its draft's block is
     // not listed again below)
@@ -148,5 +186,31 @@ mod tests {
         ];
         let qs = vec![Question { reply: Some("yes".into()), ..qs[0].clone() }];
         assert!(of_page("plan", PAGE, &notes, &qs).is_empty());
+    }
+
+    /// Promises (ambient-lead m_5982): a row of his with a data-due is
+    /// overdue the day after, listed first with its days, once; not a row
+    /// of someone else's, not done, not ticked.
+    #[test]
+    fn his_promises_are_overdue_the_day_after_their_due_date() {
+        let page = r#"<section data-kit="checklist" data-id="open"><ol>
+<li data-id="p1" data-who="yours" data-due="2026-05-18">send Camille the pricing sheet</li>
+<li data-id="p2" data-who="yours" data-due="2026-05-20">book the venue</li>
+<li data-id="p3" data-who="Camille" data-due="2026-05-10">sign the order</li>
+<li data-id="p4" data-who="yours" data-due="2026-05-01" data-done>call legal</li>
+<li data-id="p5" data-who="yours" data-due="2026-05-02">ask Lucas for the DNS</li></ol></section>"#;
+        let day = |s: &str| crate::every::parse_day(s).unwrap();
+        let ticked = vec![note(json!({"id": "n1", "block": "open", "item": "p5", "kind": "tick", "status": "sent"}))];
+        // on its due date: not yet
+        assert!(overdue("promises-w21", page, &ticked, day("2026-05-18")).is_empty());
+        let lines: Vec<String> = of_page_on("promises-w21", page, &ticked, &[], day("2026-05-20")).iter().map(Waiting::line).collect();
+        // p1 is also the checklist's step whose turn came: listed once
+        assert_eq!(lines, vec!["promises-w21#p1 · overdue 2 days · send Camille the pricing sheet"]);
+        assert_eq!(overdue("promises-w21", page, &ticked, day("2026-05-21")).iter().map(Waiting::line).collect::<Vec<_>>(), vec![
+            "promises-w21#p1 · overdue 3 days · send Camille the pricing sheet",
+            "promises-w21#p2 · overdue 1 day · book the venue",
+        ]);
+        assert_eq!(day("2026-05-21") - day("2026-02-28"), 82);
+        assert!(crate::every::parse_day("friday").is_none() && crate::every::parse_day("2026-13-01").is_none());
     }
 }

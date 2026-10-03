@@ -561,6 +561,9 @@ impl Shell {
         if let Some(p) = &self.pages {
             snap["pages"] = json!(p.list_json());
             snap["pages_url"] = json!(p.base());
+            // his late promises (checklist rows of his past data-due): a
+            // count for the morning page and the menu bar, never a card
+            snap["overdue"] = json!(p.overdue());
             // a page question's card links its block (fn + ⏎ opens it)
             let p = p.clone();
             let qs = self.page_cards().clone();
@@ -1353,6 +1356,13 @@ impl Shell {
     /// tick, a note): the step whose turn came gets its card (one per
     /// checklist block), a step done or ticked closes its card.
     fn page_steps(&mut self, id: &str) {
+        // a promises page or a meeting page never makes a card, nor
+        // anything on it, overdue or not: his rows there show in sb page
+        // waiting and the state's overdue count (ambient-lead m_5982, the
+        // meeting rule)
+        if crate::pages::waiting::no_cards(id) {
+            return;
+        }
         let Some(pages) = self.pages.clone() else { return };
         let Some(meta) = pages.store.meta(id) else { return };
         let html = pages.store.html(id, meta.version()).unwrap_or_default();
