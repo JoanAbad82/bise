@@ -140,6 +140,26 @@ def main():
         check(sum(1 for e in core.evs if e.get("ev") == "error") == n_err, "no refusal")
         c.wait_line("main", "straight to main", 60)
 
+        # main's real shape (ambient m_6476): options inline at the end of
+        # its question: the core's card keeps the question alone, the
+        # options as its list, the label '? main needs you'
+        c.wait_idle("main")
+        c.say('''[[bash: sb card "Que fais-tu ? 1. regarde le diff 2. arrête-le 3. laisse-le finir"]]''')
+        core.wait(lambda e: e.get("ev") == "state" and any(cd["text"] == "Que fais-tu ?" for cd in e["cards"]), 60, "main's inline card, its body alone")
+        q = [cd for cd in core.last("state")["cards"] if cd["text"] == "Que fais-tu ?"][0]
+        check([o["label"] for o in q["options"]] == ["regarde le diff", "arrête-le", "laisse-le finir"] and q.get("label") == "? main needs you", "its options and label: %r" % q)
+        c.wait_idle("main")
+        core.cmd(cmd="answer", card=q["id"], reply="3")
+        core.wait(lambda e: e.get("ev") == "state" and not any(cd["id"] == q["id"] for cd in e["cards"]), 60, "the inline card answered")
+        c.wait_line("main", "laisse-le finir", 60)
+
+        # fn space + tab (ambient-lead m_6513): main is asked to start an
+        # agent, with the hub's start hint
+        c.wait_idle("main")
+        core.cmd(cmd="start", text="fix the login loop on Safari")
+        c.wait_line("main", "start an agent for: fix the login loop on Safari", 60)
+        c.wait(lambda: any("[from the capsule: start an agent; answer in one short line]" in l for l in c.lines("main")), 60, "the start hint")
+
         # bise's bookkeeping stays in the TUI (pm's C fail 36): main's
         # archive suggestion is a drop card for the TUI, never one in the
         # capsule, and while it is open a second drop never acts

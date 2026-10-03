@@ -73,6 +73,9 @@ pub enum Cmd {
     TalkCancel,
     Shot { path: PathBuf, app: String, title: String },
     Send { text: String },
+    /// fn space's typed text sent with tab: main starts an agent on it
+    /// (only main starts agents; ambient-lead m_6513)
+    Start { text: String },
     Answer { card: u64, reply: String },
     Hush,
     CutIn,
@@ -102,6 +105,7 @@ impl Cmd {
             "talk_cancel" => Cmd::TalkCancel,
             "shot" => Cmd::Shot { path: PathBuf::from(s("path")), app: s("app"), title: s("title") },
             "send" => Cmd::Send { text: s("text") },
+            "start" => Cmd::Start { text: s("text") },
             "answer" => {
                 let card = match v.get("card") {
                     Some(Value::Number(n)) => n.as_u64(),
@@ -360,6 +364,12 @@ impl Core {
                     self.send_to_main(text, false);
                 }
             }
+            Cmd::Start { text } => {
+                let text = text.trim().to_string();
+                if !text.is_empty() {
+                    self.send_via(format!("start an agent for: {text}"), false, "capsule-start");
+                }
+            }
             Cmd::Answer { card, reply } => self.answer(card, reply.trim()),
             Cmd::Hush => {
                 if self.stop_voice() {
@@ -501,6 +511,12 @@ impl Core {
     /// The message to main's thread: the words, then the pending shot's
     /// marker.
     fn send_to_main(&mut self, words: String, voice: bool) {
+        self.send_via(words, voice, "capsule");
+    }
+
+    /// [`send_to_main`] with its `via`: "capsule" (one short line back),
+    /// "capsule-start" (start an agent; the hub's hint says so).
+    fn send_via(&mut self, words: String, voice: bool, via: &str) {
         let shot = self.shot.take();
         let text = match &shot {
             Some(s) if words.is_empty() => s.marker(),
@@ -508,7 +524,7 @@ impl Core {
             None => words.clone(),
         };
         // via: the hub tells main it came from the capsule (one short line back)
-        let input = json!({"op": "input", "focus": "main", "text": text, "via": "capsule"});
+        let input = json!({"op": "input", "focus": "main", "text": text, "via": via});
         if !self.hub.send(&input) {
             if let Some(s) = shot {
                 self.forget(vec![s]);
@@ -709,12 +725,21 @@ impl Core {
                 if options.is_empty() && c.page.is_some() {
                     options = page_options(&c.text);
                 }
+                // the body does not repeat the options (ambient m_6476):
+                // a numbered list at the end of the text that is the
+                // card's options goes, the question stays
+                let (body, listed) = crate::sb::split_choices(&c.text);
+                let text = if !listed.is_empty() && listed.iter().eq(options.iter().map(|(_, l)| l)) { body } else { c.text.clone() };
                 let options: Vec<Value> = options.into_iter().map(|(n, label)| json!({"n": n, "label": label})).collect();
                 // urgent: it asks even on a call or in a meeting. A
                 // tool call waiting for a yes holds an agent's work now
                 // (best guess, told to ambient-lead)
                 let urgent = c.kind == "confirm";
-                let mut v = json!({"id": c.id, "kind": c.kind, "agent": c.agent, "text": c.text, "options": options, "urgent": urgent});
+                let mut v = json!({"id": c.id, "kind": c.kind, "agent": c.agent, "text": text, "options": options, "urgent": urgent});
+                // main's own question (no page): its label (ambient m_6476)
+                if c.agent == "main" && c.kind == "question" && c.page.is_none() {
+                    v["label"] = json!("? main needs you");
+                }
                 if let Some(p) = &c.page {
                     v["page"] = p.clone();
                 }

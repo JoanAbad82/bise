@@ -215,10 +215,11 @@ fn hub_state_becomes_state_with_agents_and_cards_with_options() {
             {"name": "perf", "status": "done", "note": "", "report": "signup 4.1 s → 0.9 s. the rest is cleanup.", "working": false, "turn_ms": null},
         ])
     );
-    // only the user's cards (a `done` is the agents' traffic)
+    // only the user's cards (a `done` is the agents' traffic); the body
+    // without its options (ambient m_6476)
     assert_eq!(
         st["cards"],
-        json!([{"id": 3, "kind": "question", "agent": "cookies", "text": "keep the banner on mobile?\n1. yes\n2. no",
+        json!([{"id": 3, "kind": "question", "agent": "cookies", "text": "keep the banner on mobile?",
             "options": [{"n": 1, "label": "yes"}, {"n": 2, "label": "no"}], "urgent": false}])
     );
     // fn + 1 answers with the option's words, as the TUI's box does
@@ -307,6 +308,33 @@ fn an_answer_on_a_replaced_batch_card_reaches_the_hub() {
     assert!(!has(&t.take(), "error"));
     t.cmd(Cmd::Answer { card: 5, reply: "2".into() });
     assert!(has(&t.take(), "error"));
+}
+
+/// Law (ambient m_6476 via ambient-lead m_6486): a card's body does not
+/// repeat its options: a numbered list ending the text, inline (main's
+/// real shape) or on lines, that is the card's options leaves the text;
+/// main's own questions carry the label '? main needs you'.
+#[test]
+fn a_cards_body_does_not_repeat_its_options() {
+    let mut t = T::new();
+    t.hub.say(json!({"ev": "state", "agents": [], "pages": [], "cards": [
+        {"id": 1, "kind": "question", "agent": "main", "text": "Que fais-tu ? 1. regarde le diff 2. arrête-le 3. laisse-le finir"},
+        {"id": 2, "kind": "question", "agent": "t1", "text": "ship how?
+1) a PR per task
+2) straight to main"},
+        {"id": 3, "kind": "question", "agent": "main", "text": "keep the banner on mobile?"}]}));
+    t.until(|o| has(o, "state"));
+    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    let c = &st["cards"];
+    assert_eq!(c[0]["text"], "Que fais-tu ?");
+    assert_eq!(c[0]["options"], json!([{"n": 1, "label": "regarde le diff"}, {"n": 2, "label": "arrête-le"}, {"n": 3, "label": "laisse-le finir"}]));
+    assert_eq!(c[0]["label"], "? main needs you");
+    assert_eq!((c[1]["text"].as_str(), c[1]["options"][1]["label"].as_str()), (Some("ship how?"), Some("straight to main")));
+    assert!(c[1].get("label").is_none(), "an agent's card: no main label");
+    assert_eq!(c[2]["text"], "keep the banner on mobile?");
+    // fn + 2 still answers with the option's words
+    t.cmd(Cmd::Answer { card: 1, reply: "2".into() });
+    assert_eq!(t.hub.next()["text"], "/answer 1 arrête-le");
 }
 
 /// Law (pm's C fail 36): bise's own bookkeeping (main's archive
@@ -499,6 +527,25 @@ fn talk_start_heard_talk_end_is_one_input_and_main_answers_aloud() {
 
 fn t_synths(t: &T) -> usize {
     t.fakes.synth.lock().unwrap().len()
+}
+
+/// Law (ambient-lead m_6513): fn space's typed text has two sends: ⌘⏎
+/// asks main ({cmd: send}, via capsule) and tab starts an agent ({cmd:
+/// start}): main gets 'start an agent for: <text>' with via
+/// capsule-start (the hub's hint: start an agent; one short line), and
+/// only main starts it. Empty words send nothing.
+#[test]
+fn tab_asks_main_to_start_an_agent() {
+    let mut t = T::new();
+    t.ready();
+    t.cmd(Cmd::Start { text: "  fix the login loop on Safari ".into() });
+    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "start an agent for: fix the login loop on Safari", "via": "capsule-start"}));
+    assert!(has(&t.take(), "sent"));
+    t.cmd(Cmd::Start { text: "   ".into() });
+    t.cmd(Cmd::Send { text: "what's running?".into() });
+    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "what's running?", "via": "capsule"}));
+    // its parse from the app's line
+    assert!(matches!(Cmd::parse(r#"{"cmd":"start","text":"x"}"#), Ok(Cmd::Start { .. })));
 }
 
 #[test]

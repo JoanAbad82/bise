@@ -1236,7 +1236,7 @@ pub(crate) fn card_mouse(app: &mut App, m: &crossterm::event::MouseEvent) -> boo
 /// The choices an agent gives at the end of its question: its last
 /// lines `1. v1` / `1) v1` / `1 - v1`, numbered 1, 2, … (two to nine).
 /// Returns the text without them, and the choices (none: the text as is).
-fn split_choices(text: &str) -> (String, Vec<String>) {
+pub(crate) fn split_choices(text: &str) -> (String, Vec<String>) {
     let lines: Vec<&str> = text.trim_end().lines().collect();
     let choice = |l: &str| -> Option<(u32, String)> {
         let l = l.trim();
@@ -1264,12 +1264,55 @@ fn split_choices(text: &str) -> (String, Vec<String>) {
     tail.reverse();
     let numbered = tail.iter().enumerate().all(|(i, (n, _))| *n as usize == i + 1);
     if tail.len() < 2 || tail.len() > 9 || !numbered {
-        return (text.to_string(), Vec::new());
+        return split_inline(text).unwrap_or_else(|| (text.to_string(), Vec::new()));
     }
     let body = lines[..lines.len() - tail.len()].join("\n").trim_end().to_string();
     (body, tail.into_iter().map(|(_, l)| l).collect())
 }
 
+
+/// The choices written inline at the end of the last line (ambient-lead
+/// m_6486, main's real shape: 'Que fais-tu ? 1. regarde … 2. arrête …
+/// 3. laisse …'): ' 1. ' (or ' 1) ') then ' 2. ' … in order, two to
+/// nine, the question before the first. None: no such list.
+fn split_inline(text: &str) -> Option<(String, Vec<String>)> {
+    let t = text.trim_end();
+    let line_at = t.rfind('\n').map_or(0, |i| i + 1);
+    let line = &t[line_at..];
+    for sep in [". ", ") "] {
+        // the markers ' n. ' in order, each after a space (or at the start)
+        let mut at: Vec<(usize, usize)> = Vec::new();
+        let mut from = 0;
+        for n in 1..=9 {
+            let m = format!("{n}{sep}");
+            let found = line[from..].match_indices(&m).map(|(i, _)| from + i).find(|&i| i == 0 || line[..i].ends_with(' '));
+            match found {
+                Some(i) => {
+                    at.push((i, i + m.len()));
+                    from = i + m.len();
+                }
+                None => break,
+            }
+        }
+        if at.len() < 2 {
+            continue;
+        }
+        let options: Vec<String> = at
+            .iter()
+            .enumerate()
+            .map(|(k, &(_, start))| {
+                let end = at.get(k + 1).map_or(line.len(), |&(i, _)| i);
+                line[start..end].trim().trim_end_matches([',', ';']).trim().to_string()
+            })
+            .collect();
+        if options.iter().any(|o| o.is_empty()) {
+            continue;
+        }
+        let body = format!("{}{}", &t[..line_at], line[..at[0].0].trim_end()).trim_end().to_string();
+        return Some((body, options));
+    }
+    None
+}
 
 /// The open cards matching `q` (their number, kind, agent or text):
 /// the card argument of `/close` and `/answer`.

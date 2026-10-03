@@ -2857,10 +2857,16 @@ impl Shell {
     /// more line, the one main's rule reads to answer in one short line
     /// (prompts.rs); a slash command (`/answer N 1`) never gets it.
     fn capsule_hint(text: String, via: &str) -> String {
-        if via != "capsule" || text.trim_start().starts_with('/') {
+        if text.trim_start().starts_with('/') {
             return text;
         }
-        format!("{text}\n\n[from the capsule: answer in one short line]")
+        match via {
+            "capsule" => format!("{text}\n\n[from the capsule: answer in one short line]"),
+            // fn space's typed text sent with tab (ambient-lead m_6513):
+            // main starts an agent on it, only main does
+            "capsule-start" => format!("{text}\n\n[from the capsule: start an agent; answer in one short line]"),
+            _ => text,
+        }
     }
 
     /// What reaches main from a page (notes, starts, picks, ticks) carries
@@ -4121,5 +4127,10 @@ mod tests {
         assert_eq!(Shell::capsule_hint("what's running?".into(), ""), "what's running?");
         assert_eq!(Shell::capsule_hint("hi".into(), "tui"), "hi");
         assert_eq!(Shell::capsule_hint("/answer 3 1".into(), "capsule"), "/answer 3 1");
+        // fn space + tab: main starts an agent on it (ambient-lead m_6513)
+        assert_eq!(
+            Shell::capsule_hint("start an agent for: fix the login loop".into(), "capsule-start"),
+            "start an agent for: fix the login loop\n\n[from the capsule: start an agent; answer in one short line]"
+        );
     }
 }
