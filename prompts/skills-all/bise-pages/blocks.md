@@ -30,6 +30,11 @@ Never end with a step of yours open: what you can't finish becomes a `question` 
 page (`legal's address?`) or a draft waiting for his word (`data-did="drafted"`). While the plan
 has open steps, stay on it: don't report done, wait idle, so his answers and ticks come to you;
 then do the next step and publish again.
+A step that is a decision of his (how many years, which venue) is the `question` only, and its
+row points at it: `<li data-id="s2" data-who="yours" data-question="years">`; never a row and a
+question that both ask him. His answer ticks it: republish the row `data-done` with his pick
+(`2 years`). When he says he'll do something ("i'll leave a note with legal's address"), never
+ask it again: the row says it in one line (`waiting for your note: legal's address`).
 
 Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
 `<img src="data:image/…" alt="…">`. Nothing else. Review and checklist items may carry

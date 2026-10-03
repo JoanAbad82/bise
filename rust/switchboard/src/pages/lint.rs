@@ -362,7 +362,8 @@ impl<'a> Linter<'a> {
         {
             inner = match kit.as_str() {
                 // data-did: what bise did on its own step ('drafted'); data-draft: the block it is in
-                "checklist" => &["data-id", "data-done", "data-who", "data-due", "data-agent", "data-did", "data-draft"],
+                // data-question: a step that is a decision is that question (pm's 35)
+                "checklist" => &["data-id", "data-done", "data-who", "data-due", "data-agent", "data-did", "data-draft", "data-question"],
                 "review" => &["data-id", "data-reply", "data-agent"],
                 _ => &["data-id"],
             };
@@ -388,6 +389,12 @@ impl<'a> Linter<'a> {
             if let Some(d) = get("data-draft") {
                 if !valid_id(&d) {
                     self.err(&at, format!("data-draft=\"{d}\" is not a block id: the data-id of the block that holds the draft"));
+                }
+            }
+            // a step that is a decision: the question block that asks it (it ticks from the answer)
+            if let Some(q) = get("data-question") {
+                if !valid_id(&q) {
+                    self.err(&at, format!("data-question=\"{q}\" is not a block id: the data-id of the question block that asks this decision"));
                 }
             }
             if get("data-did").is_some_and(|d| d.trim().is_empty() || d.chars().count() > 40) {

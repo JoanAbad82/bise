@@ -454,6 +454,14 @@ law("checklist who and when: due dates in words, late in its own state, done ite
   assert.equal(when(b1).getAttribute("data-goto"), "mail-legal");
   assert.equal(when(b2).textContent, "bise · checked · it loads");
   assert.equal(when(b2).getAttribute("data-goto"), null);
+  // a step that is a decision (pm's 35): it points at its question until it is done
+  const dq = blocks(parse(`<section data-kit="checklist" data-id="buy"><ol><li data-id="s2" data-who="yours" data-question="years">how long</li><li data-id="s3" data-who="yours" data-question="years" data-done>how long</li></ol></section>`))[0];
+  K.decorate([dq], "plan", doc);
+  const [q1, q2] = K.options(dq);
+  assert.equal(when(q1).textContent, "you · pick in the question");
+  assert.equal(when(q1).getAttribute("data-goto"), "years");
+  assert.equal(when(q2).textContent, "you");
+  assert.equal(when(q2).getAttribute("data-goto"), null);
   assert.equal(K.ticked(doc, y, "nope"), false);
 });
 

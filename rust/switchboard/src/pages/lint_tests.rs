@@ -393,6 +393,17 @@ fn a_step_says_what_bise_did_and_where_its_draft_is() {
 }
 
 #[test]
+fn a_step_that_is_a_decision_points_at_its_question() {
+    ok(
+        r#"<section data-kit="checklist" data-id="steps"><ol><li data-id="s2" data-who="yours" data-question="years">how long to buy it for</li></ol></section><section data-kit="question" data-id="years"><p>how many years?</p><ol><li>2 years, €28</li><li>1 year, €14</li></ol></section>"#,
+    );
+    has(
+        &errs(r#"<section data-kit="checklist" data-id="steps"><ol><li data-id="s2" data-question="Years?">x</li></ol></section>"#),
+        "steps: data-question=\"Years?\" is not a block id",
+    );
+}
+
+#[test]
 fn a_message_bise_can_post_says_send() {
     ok(
         r#"<section data-kit="message" data-id="r1" data-to="Slack · reply to Benjamin in #bise-feedback" data-verb="send"><p>x</p></section>"#,

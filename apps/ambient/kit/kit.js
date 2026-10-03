@@ -62,6 +62,7 @@
     openInPlace: (place) => `open in ${place}`,
     yours: "you",
     inThePage: "in the page",
+    inTheQuestion: "pick in the question",
     versions: "versions of this page",
     watching: "watching",
     stop: "stop",
@@ -324,11 +325,15 @@
     // what bise did on its own step (pm's 26): 'bise · drafted · in the page', the last part
     // taking you to the block that holds the draft (data-draft)
     const did = li.getAttribute("data-did"), draft = li.getAttribute("data-draft");
-    const text = [who === "yours" ? W.yours : who, did, draft && W.inThePage, due && !(done && due.late) && due.text].filter(Boolean).join(" · ");
+    // a step that is a decision (pm's 35): its question asks it; 'pick in the question' takes you
+    // there until the row is done
+    const asks = !done && li.getAttribute("data-question");
+    const text = [who === "yours" ? W.yours : who, did, draft && W.inThePage, asks && W.inTheQuestion, due && !(done && due.late) && due.text].filter(Boolean).join(" · ");
     if (!text) { if (tag) li.removeChild(tag); li.removeAttribute("data-late"); return; }
     if (!tag) { tag = doc.createElement("span"); tag.setAttribute("data-kit-ui", ""); tag.setAttribute("data-when", ""); li.append(tag); }
     tag.textContent = text;
-    if (draft) tag.setAttribute("data-goto", draft); else tag.removeAttribute("data-goto");
+    const goto = draft || asks;
+    if (goto) tag.setAttribute("data-goto", goto); else tag.removeAttribute("data-goto");
     if (due && due.late && li.getAttribute("data-done") == null && li.getAttribute("data-verdict") !== "tick") li.setAttribute("data-late", ""); else li.removeAttribute("data-late");
   }
 
