@@ -15,6 +15,9 @@ unique, and stay the same across versions (the user's notes anchor on them): `p1
 | `review` | items the user handles one by one (mails to answer, tickets, comments) | `<ol>` of `<li data-id="m1">`: a first `<p>` saying what it is (`Léa Martin · offsite dates · 9:12`), then the proposal. `data-verb` on the block: `send` (drafts that leave: `send`, `send all 3`), `open-reply` (comments on read-only places, `watch.md`), `start` (feedback an agent can fix, `feedback.md`), `keep` (`about-you.md`); none: `approve` |
 | `message` | a draft that leaves through a channel (Slack, a post) | `data-to="Slack · #launch"` (where it goes, shown above it), then `<p>`s and `<ul>` with `<strong> <em> <code> <a>`: `copy` turns them into Slack markup; optional `data-open` = the channel's `slack://` or `https://` link |
 | `email` | one mail, or a newsletter | `data-to="Gmail · reply to Camille Roux"`, `data-verb="draft"` when it goes to his drafts (`leaving.md`), `<p data-field="to">`, optional `cc`, `<p data-field="subject">`, optional `preview` (a newsletter), then the body as `<p>`s and `<ul>` |
+
+A `data-to` is a short label in the user's language, whatever language the draft itself is in:
+`Slack · reply to Benjamin, on French`, never `on français` (cards and batch lines read it).
 | `compare` | 2 to 4 options side by side (venues, drafts, tools) | `<ol>` of `<li data-id="moulin">`: an `<h3>` name, a `<ul>` of facts, a `<p>` with the why |
 | `checklist` | what's left to do, who, by when | `<ol>` of `<li data-id="t1" data-who="Camille" data-due="2026-05-20">` the task `</li>`; `data-done` when done; the kit shows `Camille · friday` and what is late. `data-who="yours"`: a step only the user can do (a payment, a login): `you · friday`, and a card when every step before it is done; your own steps: `data-who="bise"` or none |
 
