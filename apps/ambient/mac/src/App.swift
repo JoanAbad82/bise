@@ -773,12 +773,12 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if shown == capsule.hidden {
             if shown {
                 capsule.pickScreen()
-                capsule.show(fade: reduceMotion)                // in at once, then the page grows it (reduced motion: a 0.2 s fade)
+                capsule.show(fade: reduceMotion)                // in at once at its size, the page fades it in (reduced motion: a 0.15 s panel fade)
                 capsule.post(["ev": "app_hidden", "on": false])
                 morning()
             } else {
                 capsule.post(["ev": "app_hidden", "on": true])  // the page shrinks it into the icon
-                capsule.hide(after: reduceMotion ? Capsule.fadeTime : 0.6, fade: reduceMotion)   // then out (ambient: 0.6 s back in)
+                capsule.hide(after: reduceMotion ? Capsule.fadeTime : Capsule.leaveTime, fade: reduceMotion)   // then out once the page's 0.12 s leave is drawn (the user, m_6567)
             }
             sayVisible()
             watchClicks(shown)

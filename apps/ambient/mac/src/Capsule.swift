@@ -87,6 +87,9 @@ final class Capsule: NSObject, WKNavigationDelegate {
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.isMovable = false
+        // no window animation of macOS's own on order in/out (the user, m_6567:
+        // no grow, no zoom; the page's fade and 4 px lift are the only motion)
+        panel.animationBehavior = .none
         panel.isReleasedWhenClosed = false
         panel.appearance = NSAppearance(named: .darkAqua)
 
@@ -293,7 +296,11 @@ final class Capsule: NSObject, WKNavigationDelegate {
 
     // fade: reduced motion (SPEC §1): the whole panel, its native glass too,
     // fades in place in 0.2 s; never a scale, never a move
-    static let fadeTime = 0.2
+    // (the user, main m_6567, ambient m_6575: no grow on appear; the page
+    // fades and lifts 4 px; reduced motion: a 0.15 s fade only)
+    static let fadeTime = 0.15
+    // the page's own leave: opacity and 4 px up in 0.12 s, then the panel goes
+    static let leaveTime = 0.12
 
     func show(fade: Bool = false) {
         hidden = false
