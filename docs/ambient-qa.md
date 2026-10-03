@@ -305,6 +305,12 @@ the page with an open card (a task agent's page) is not checked yet.
   in a repo that holds only a README (amb-kit's feedback.md; amb-tools' fixture). Fail 34: main
   asked `how should agents ship code here?` at 24 s, before any code change was known, then
   withdrew it (amb-kit).
+- **23 and 24 rechecked at a589f9f9 (`qa.py ask`): pass.** `what's my next meeting` → `09:30,
+  launch standup with Marc, Lucas and Nora` in 13 s, no page: the fixture says 07:30Z, so the time
+  is in his zone (CEST). `plan the offsite` → offsite-plan; the follow-up `add a budget per person
+  to the offsite` updated the same page (v3) in 22 s, with no new page. Same nit as D: the offsite
+  opened `who comes?` and `confirm La Grange … send the draft?` together, two cards at once where
+  the draft depends on the answer.
 
 ## The look the user validated: round 8 (main m_5134)
 
