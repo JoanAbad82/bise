@@ -579,6 +579,17 @@ frontmost:
 - **question: fail 47, partly fixed.** `fn esc later` takes the click now. `fn 1–2 pick` and
   `fn o open the page` still show a pointer cursor and take no click.
 
+### Results: real clicks, fourth run (fresh launch at ambient-app with amb-web 71df07bf)
+
+- **question: fail 46 still reads twice.** `1 tuesday`, `2 thursday` and now `fn 1–2 pick` each
+  log two identical `answer` commands for one card, with no route on them. amb-web's headless
+  test posts one answer for two click events. So either the app forwards it twice, or `clicks`
+  logs both the page→app and the app→core copy: amb-tools to tell which.
+- **question: fail 47 moved.** `fn 1–2 pick` acts now. `fn o open the page` sent `app_open_url`,
+  yet the run says the page got no click. `fn esc later` got no click and sent nothing (it passed
+  in the third run). Either the press acts before the click event, or the hints still move under
+  the pointer.
+
 ## Out of the way (vision §3 G, the user's change m_5030)
 
 - [ ] At rest, after launch: nothing on screen but the menu-bar icon (no idle capsule).
