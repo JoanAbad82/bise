@@ -85,12 +85,25 @@ pub struct Step {
     /// a drafted step of bise's: its card asks him to send the draft
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub drafted: bool,
+    /// a batch card (pages/drafts.rs): the keys of the drafts it sends
+    /// (`block` or `block/item`); `text` is its first line
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub batch: Vec<String>,
 }
+
+/// The `block` of a batch card's entry in steps.json (no block id is
+/// empty).
+pub const BATCH: &str = "";
 
 impl Step {
     /// The card's text: the step, and its one option (a drafted step:
-    /// send the draft).
+    /// send the draft; a batch: send all, or review on the page).
     pub fn card_text(&self) -> String {
+        if !self.batch.is_empty() {
+            return format!("{}
+1. send all
+2. review", self.text);
+        }
         if self.drafted {
             return format!("{}: send the draft?
 1. send", self.text);
@@ -175,12 +188,26 @@ pub fn items_of(html: &str, kit: &str) -> Vec<Row> {
 pub fn due<'a>(rows: &'a [Row], closed: &dyn Fn(&Row) -> bool) -> Vec<&'a Row> {
     let mut out: Vec<&Row> = Vec::new();
     let mut blocks: Vec<&str> = Vec::new();
+    // a run of drafted steps of bise's is one turn of his: the drafts
+    // right after the first are due with it (one batch card, ambient-lead
+    // m_5977); the run ends at the first row that is no draft
+    let mut run: Option<&str> = None;
     for r in rows {
+        if r.done || closed(r) {
+            continue;
+        }
+        if run == Some(r.block.as_str()) {
+            if r.drafted && r.question.is_none() {
+                out.push(r);
+                continue;
+            }
+            run = None;
+        }
         if blocks.contains(&r.block.as_str()) {
             continue;
         }
-        if r.done || closed(r) {
-            continue;
+        if r.drafted && r.question.is_none() {
+            run = Some(&r.block);
         }
         // the first open row of its block: its turn, the rest wait. A
         // decision asked by a question (data-question) waits there too,

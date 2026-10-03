@@ -3,9 +3,9 @@
 //! version's fragment, its notes and its questions; the store walks the
 //! pages.
 
-use super::checklist::{closed_by, due, items_of, rows_of};
+use super::checklist::{closed_by, due, rows_of};
 use super::questions::Question;
-use super::store::{is_go_word, Note};
+use super::store::Note;
 use serde::Serialize;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -56,13 +56,9 @@ pub fn of_page_on(id: &str, html: &str, notes: &[Note], questions: &[Question], 
     out
 }
 
-fn note_item(n: &Note) -> Option<&str> {
-    n.extra.get("item").and_then(|v| v.as_str())
-}
-
 /// The id and the text of each block of kind `kit` (an email, a message):
 /// the block's whole text, cut.
-fn blocks_of(html: &str, kit: &str) -> Vec<(String, String)> {
+pub(super) fn blocks_of(html: &str, kit: &str) -> Vec<(String, String)> {
     let mut out = Vec::new();
     let needle = format!("data-kit=\"{kit}\"");
     let mut rest = html;
@@ -104,27 +100,17 @@ pub fn of_page(id: &str, html: &str, notes: &[Note], questions: &[Question]) -> 
     // question is listed once, as the question)
     let rows = super::checklist::judged(html, questions);
     let closed = |r: &super::checklist::Row| closed_by(r, notes);
-    let mut covered: Vec<String> = Vec::new();
-    for r in due(&rows, &closed) {
-        out.push(w(&r.item, if r.drafted { "draft" } else { "step" }, &r.text));
-        covered.extend(r.draft.clone());
+    for r in due(&rows, &closed).into_iter().filter(|r| !r.drafted) {
+        out.push(w(&r.item, "step", &r.text));
     }
-    // drafts: review items with no verdict of his, emails and messages
-    // with no go word
-    let verdict = |b: &str, i: Option<&str>| {
-        notes.iter().any(|n| n.block == b && note_item(n) == i && (matches!(n.kind.as_str(), "approve" | "skip" | "send" | "drafts") || is_go_word(n)))
-    };
-    for r in items_of(html, "review") {
-        if !r.done && !verdict(&r.block, Some(&r.item)) {
-            out.push(w(&r.item, "draft", &r.text));
-        }
-    }
-    for kit in ["email", "message"] {
-        for (b, text) in blocks_of(html, kit) {
-            if !verdict(&b, None) && !covered.contains(&b) {
-                out.push(w(&b, "draft", &text));
-            }
-        }
+    // drafts (drafted steps, review items, emails, messages; pages/
+    // drafts.rs): two or more are one line, as they are one card
+    // (ambient-lead m_5977)
+    let drafts = super::drafts::pending(html, notes, questions);
+    match drafts.len() {
+        0 => {}
+        1 => out.push(w(drafts[0].anchor(), "draft", &drafts[0].text)),
+        _ => out.push(w(drafts[0].anchor(), "draft", &super::drafts::batch_text(&drafts))),
     }
     // questions he has not answered (on the page: no data-answer)
     for (b, _) in blocks_of(html, "question") {
@@ -151,7 +137,7 @@ mod tests {
     const PAGE: &str = r#"<section data-kit="checklist" data-id="steps"><ol>
 <li data-id="t1" data-done>check the name</li><li data-id="t2" data-who="yours">pay the domain on Gandi</li><li data-id="t3">point the DNS</li></ol></section>
 <section data-kit="review" data-id="replies"><ol><li data-id="m1">reply to Nina: yes, Friday</li><li data-id="m2">reply to Marc: no</li></ol></section>
-<section data-kit="email" data-id="mail"><p>Subject: the offsite</p><p>Hi all, …</p></section>
+<section data-kit="email" data-id="mail"><p data-field="to">team@acme.test</p><p>Subject: the offsite</p><p>Hi all, …</p></section>
 <section data-kit="question" data-id="q1"><p>post it now?</p><ol><li>yes</li><li>no</li></ol></section>
 <section data-kit="question" data-id="q2" data-answer="1"><p>done one?</p><ol><li>yes</li></ol></section>"#;
 
@@ -167,10 +153,11 @@ mod tests {
         ];
         let qs = vec![Question { block: "q1".into(), text: "post it now?".into(), options: vec!["yes".into(), "no".into()], card: 4, reply: None }];
         let lines: Vec<String> = of_page("plan", PAGE, &notes, &qs).iter().map(Waiting::line).collect();
+        // two drafts (m1, the mail) are one line, as they are one card
+        // (ambient-lead m_5977)
         assert_eq!(lines, vec![
             "plan#t2 · step · pay the domain on Gandi",
-            "plan#m1 · draft · reply to Nina: yes, Friday",
-            "plan#mail · draft · Subject: the offsite Hi all, …",
+            "plan#m1 · draft · 2 drafts ready: reply to Nina: yes, Friday · team@acme.test Subject: the offsite…",
             "plan#q1 · question · post it now?",
             "plan#n2 · notes · shorter",
         ]);

@@ -549,6 +549,30 @@ def main():
         c.wait_line("main", "meeting-notes#a1 · step · send Hélène the SSO timeline", 90)
         settle(c)
 
+        # drafts waiting at once are ONE card (ambient-lead m_5977): two
+        # drafted steps in a row, '2 drafts ready', send all = an approve
+        # per draft, and the card closes
+        bp = os.path.join(E.tmp, "batch-plan.html")
+        em = lambda i, to: ('<section data-kit="email" data-id="%s" data-verb="draft"><p data-field="to">%s</p>'
+                            '<p data-field="subject">s</p><p>x</p></section>' % (i, to))
+        open(bp, "w").write('<section data-kit="checklist" data-id="plan" data-plan><ol>'
+                            '<li data-id="b1" data-who="bise" data-did="drafted" data-draft="mail-dns">add the DNS records</li>'
+                            '<li data-id="b2" data-who="bise" data-did="drafted" data-draft="mail-marc">tell Marc</li></ol></section>'
+                            + em("mail-dns", "lucas@acme.test") + em("mail-marc", "marc@acme.test"))
+        c.say('[[bash: sb page publish %s --id batch-plan --title "batch plan"]]' % bp)
+        batch = lambda: next((x for x in c.cards() if (x.get("page") or {}).get("id") == "batch-plan"), None)
+        c.wait(batch, 90, "the batch card")
+        time.sleep(1)
+        on_page = [x for x in c.cards() if (x.get("page") or {}).get("id") == "batch-plan"]
+        check(len(on_page) == 1 and on_page[0]["text"].startswith("2 drafts ready: add the DNS records · tell Marc"), "one card for both drafts: %r" % on_page)
+        check(on_page[0]["page"].get("drafts") is True and on_page[0]["page"].get("item") == "b1", "it opens the page at the first: %r" % on_page[0]["page"])
+        settle(c)
+        c.say("/answer %d 1" % on_page[0]["id"])
+        c.wait(lambda: not batch(), 30, "the batch card closes on send all")
+        notes = json.loads(request(port, "GET", "/p/batch-plan/meta")[2])["notes"]
+        check(sorted(n["block"] for n in notes if n["kind"] == "approve") == ["mail-dns", "mail-marc"], "an approve per draft: %r" % notes)
+        settle(c)
+
         # his step answered from the capsule (pm's D fail 31): the core's
         # {cmd: answer, card, reply: '1'} (fn + digit) ticks it and closes
         # its card, the same as the TUI's /answer and the page's tick

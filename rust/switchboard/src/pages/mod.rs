@@ -6,6 +6,7 @@
 //! from a page become the agent's input there).
 
 pub mod checklist;
+pub mod drafts;
 pub mod lint;
 pub mod questions;
 pub mod server;
