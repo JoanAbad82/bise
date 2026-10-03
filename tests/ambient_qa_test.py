@@ -221,6 +221,21 @@ def fake_accounts():
         srv = mc["mcpServers"][qa.FAKE_SERVER_NAMES.get(svc, svc)]
         check(srv["args"][-1] == svc and os.path.exists(srv["args"][1]), mc)
     check("/.agents/" in open(os.path.join(ws, ".git", "info", "exclude")).read(), "out of the throwaway repo's git")
+    # every agent of the hub reads the hub's user root, a worktree too (ambient-lead m_5865)
+    home = os.path.join(d, "qa-user-plugins")
+    qa.install_fake_accounts(root=home)
+    check(sorted(os.listdir(home)) == sorted(qa.FAKE_SERVICES), os.listdir(home))
+    # acme's code where Benjamin's reports live, committed in the workspace
+    repo = os.path.join(d, "repo-ws")
+    os.makedirs(repo)
+    subprocess.run("git init -q && git config user.email t@t && git config user.name t", shell=True, cwd=repo, check=True)
+    qa.seed_repo(repo)
+    files = subprocess.run(["git", "ls-files"], cwd=repo, capture_output=True, text=True).stdout.split()
+    check({"install.sh", "acme/http.py", "acme/assistant.py", "acme/sync.py", "bin/acme", "README.md"} <= set(files), files)
+    src = {f: open(os.path.join(repo, f)).read() for f in ("install.sh", "acme/http.py", "acme/assistant.py")}
+    check("fish" not in src["install.sh"] and ".zshrc" in src["install.sh"], "the fish bug (s212)")
+    check("ProxyHandler({})" in src["acme/http.py"], "the proxy bug (s213)")
+    check("Always answer in English" in src["acme/assistant.py"], "the French ask (s214)")
 
 
 @test

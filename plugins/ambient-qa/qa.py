@@ -328,12 +328,18 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="",
             E.env.pop(k, None)
     else:
         connectors = False
-        empty = os.path.join(E.tmp, "no-user-plugins")
-        os.makedirs(empty, exist_ok=True)
-        E.env["BEND_PLUGINS_HOME"] = empty
-        # the fake accounts in their place: canned Gmail, Slack, Linear and
-        # calendar items as workspace plugins; their writes go to the outbox
+        # the hub's own user plugin root: none of his, only the fake accounts
+        # (canned Gmail, Slack, Linear, calendar...; their writes go to the outbox).
+        # There and not only in <ws>/.agents (out of git): an agent in its own
+        # worktree has no .agents of the repo's, so it had no Slack (ambient-lead m_5865)
+        home = os.path.join(E.tmp, "qa-user-plugins")
+        os.makedirs(home, exist_ok=True)
+        E.env["BEND_PLUGINS_HOME"] = home
         install_fake_accounts(E.ws)
+        install_fake_accounts(root=home)
+        if not reuse:
+            # acme's code, where Benjamin's reports live (ambient-lead m_5865, roadmap C)
+            seed_repo(E.ws)
         E.env["FAKE_ACCOUNTS_OUTBOX"] = os.path.join(E.tmp, "outbox.jsonl")
         # the launch's clock: batch 0 now, then `qa.py tick` or every AMBIENT_QA_TICK_MIN minutes (0: ticks only)
         clock = os.path.join(E.tmp, "fake-clock.json")
@@ -437,11 +443,32 @@ def launch_truth(batches=1):
             "new": [c for c in seen if c["batch"] == batches - 1]}
 
 
-def install_fake_accounts(ws):
-    """One workspace plugin per fake service in <ws>/.agents/plugins (out of
-    the throwaway repo's git): tools.gmail.*, tools.slack.*, tools.linear.*,
+FAKE_REPO = os.path.join(FAKE_ACCOUNTS, "repo")
+
+
+def seed_repo(ws):
+    """The QA hub's workspace gets acme's CLI (fake-accounts/repo: invented
+    code), committed: the install script that skips fish, the HTTP client
+    that ignores HTTPS_PROXY, the assistant that always answers in English,
+    so an agent on Benjamin's reports can decide on a code fix."""
+    for dirpath, _, files in os.walk(FAKE_REPO):
+        rel = os.path.relpath(dirpath, FAKE_REPO)
+        for n in files:
+            if n.endswith(".pyc") or n == ".DS_Store":
+                continue
+            dst = os.path.normpath(os.path.join(ws, rel, n))
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(os.path.join(dirpath, n), dst)
+    subprocess.run("git add -A . ':!.agents' && git -c commit.gpgsign=false commit -qm 'acme CLI'", shell=True, cwd=ws,
+                   capture_output=True)
+
+
+def install_fake_accounts(ws=None, root=None):
+    """One plugin per fake service in <ws>/.agents/plugins (out of the
+    throwaway repo's git), or in `root` (the QA hub's user plugin root, which
+    every agent of the hub reads): tools.gmail.*, tools.slack.*, tools.linear.*,
     tools.calendar.*, tools.github.*, tools.hn.* over fake-accounts/fixtures.json."""
-    root = os.path.join(ws, ".agents", "plugins")
+    root = root or os.path.join(ws, ".agents", "plugins")
     for svc in FAKE_SERVICES:
         d = os.path.join(root, svc)
         os.makedirs(d, exist_ok=True)
@@ -451,8 +478,8 @@ def install_fake_accounts(ws):
         with open(os.path.join(d, "mcp.json"), "w") as f:
             json.dump({"$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
                        "mcpServers": {FAKE_SERVER_NAMES.get(svc, svc): {"type": "stdio", "command": "python3", "args": ["-B", os.path.join(FAKE_ACCOUNTS, "fake_accounts.py"), svc]}}}, f, indent=1)
-    ex = os.path.join(ws, ".git", "info", "exclude")
-    if os.path.isdir(os.path.dirname(ex)):
+    ex = os.path.join(ws or "", ".git", "info", "exclude")
+    if ws and os.path.isdir(os.path.dirname(ex)):
         with open(ex, "a") as f:
             f.write("/.agents/\n")
     return root
