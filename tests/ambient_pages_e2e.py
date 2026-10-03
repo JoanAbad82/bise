@@ -623,7 +623,7 @@ def main():
         check(len(on_page) == 1 and on_page[0]["text"].startswith("2 drafts wait for you · batch plan\nemails to lucas and marc\n1. review\n2. send both"), "one card for both drafts: %r" % on_page)
         check(on_page[0]["page"].get("drafts") is True and on_page[0]["page"].get("item") == "b1", "it opens the page at the first: %r" % on_page[0]["page"])
         check(on_page[0].get("batch") == {"count": 2, "title": "batch plan", "what": "emails", "names": ["lucas", "marc"],
-                                          "topics": [], "line": "emails to lucas and marc"}, "its fields for the capsule: %r" % on_page[0])
+                                          "topics": [], "line": "emails to lucas and marc", "actions": None}, "its fields for the capsule: %r" % on_page[0])
         settle(c)
         # 1 = review: nothing sent, the card stays
         c.say("/answer %d 1" % on_page[0]["id"])
@@ -680,6 +680,26 @@ def main():
         c.wait(lambda: not fb(), 30, "the feedback batch closes on send all")
         notes = json.loads(request(port, "GET", "/p/benjamin-bugs/meta")[2])["notes"]
         check(sorted(n["block"] for n in notes if n["kind"] == "approve") == ["reply-s212", "reply-s213", "reply-s214"], "an approve per reply: %r" % notes)
+        settle(c)
+
+        # account changes (amb-kit's action block, ambient-lead m_6192):
+        # drafts his approve does, counted apart on the card; send all
+        # approves each
+        op = os.path.join(E.tmp, "ops.html")
+        act = lambda i, todo: '<section data-kit="action" data-id="%s" data-do="%s"><p>%s in Linear · fixed in 0.4.2</p></section>' % (i, todo, todo)
+        open(op, "w").write('<section data-kit="message" data-id="m-nina" data-to="Slack · #ops · to Nina, on 0.4.2" data-verb="send">'
+                            '<p>0.4.2 is out</p></section>' + act("a-ops12", "close OPS-12") + act("a-ops13", "close OPS-13"))
+        c.say('[[bash: sb page publish %s --id ops-close --title "ops"]]' % op)
+        oc = lambda: [x for x in c.cards() if (x.get("page") or {}).get("id") == "ops-close"]
+        c.wait(oc, 90, "the ops page's batch card")
+        time.sleep(1)
+        check(len(oc()) == 1 and oc()[0]["text"] == "3 drafts wait for you · ops\nmessages to Nina · 2 to close\n1. review\n2. send all 3", "actions counted apart: %r" % oc())
+        check((oc()[0].get("batch") or {}).get("actions") == "2 to close", "batch.actions: %r" % oc()[0])
+        settle(c)
+        c.say("/answer %d 2" % oc()[0]["id"])
+        c.wait(lambda: not oc(), 30, "the ops batch closes on send all")
+        notes = json.loads(request(port, "GET", "/p/ops-close/meta")[2])["notes"]
+        check(sorted(n["block"] for n in notes if n["kind"] == "approve") == ["a-ops12", "a-ops13", "m-nina"], "an approve per action and message: %r" % notes)
         settle(c)
 
         # his step answered from the capsule (pm's D fail 31): the core's

@@ -113,7 +113,31 @@ pub fn pending(html: &str, notes: &[Note], questions: &[Question]) -> Vec<Draft>
             }
         }
     }
+    // a change to one of his accounts (amb-kit m_6198: 'close OPS-12'):
+    // his approve does it, his skip drops it; its words are data-do
+    for (b, text) in super::waiting::blocks_of(html, "action") {
+        if !verdict(&b, None) {
+            let todo = head_of(html, &b).and_then(|(h, _)| h.split("data-do=\"").nth(1).and_then(|r| r.split('"').next()).map(String::from));
+            out.push(Draft { block: b, item: None, text: todo.unwrap_or(text), step: None, kind: "action", to: None, topic: None });
+        }
+    }
     out
+}
+
+/// Account changes of a batch, counted apart (amb-kit m_6198): one: its
+/// words ('close OPS-12'); 2+ whose words share the first: '2 to close';
+/// else '<n> actions'. None: no action.
+pub fn action_words(drafts: &[Draft]) -> Option<String> {
+    let acts: Vec<&Draft> = drafts.iter().filter(|d| d.kind == "action").collect();
+    let verb = |d: &Draft| d.text.split_whitespace().next().map(str::to_lowercase);
+    match acts.as_slice() {
+        [] => None,
+        [one] => Some(one.text.clone()),
+        [first, rest @ ..] if verb(first).is_some() && rest.iter().all(|d| verb(d) == verb(first)) => {
+            Some(format!("{} to {}", acts.len(), verb(first).unwrap_or_default()))
+        }
+        _ => Some(format!("{} actions", acts.len())),
+    }
 }
 
 /// The items of the fragment with an agent on them: (item id, agent).
@@ -219,8 +243,13 @@ fn reply_to(text: &str) -> Option<String> {
 /// What a batch holds, in ambient's words: replies, emails, messages,
 /// steps, or drafts when they differ.
 pub fn what(drafts: &[Draft]) -> &'static str {
-    let first = drafts.first().map_or("step", |d| d.kind);
-    if drafts.iter().any(|d| d.kind != first) {
+    // account changes are counted apart (action_words); only them: actions
+    let sends: Vec<&Draft> = drafts.iter().filter(|d| d.kind != "action").collect();
+    if sends.is_empty() && !drafts.is_empty() {
+        return "actions";
+    }
+    let first = sends.first().map_or("step", |d| d.kind);
+    if sends.iter().any(|d| d.kind != first) {
         return "drafts";
     }
     match first {
@@ -253,6 +282,19 @@ pub fn topics(drafts: &[Draft]) -> Vec<String> {
 /// recipient: '3 replies to Benjamin: proxy, fish and French'; several:
 /// 'replies to legal, Lucas and Marc'; no recipients: the drafts' words.
 pub fn line(drafts: &[Draft]) -> String {
+    // the account changes counted apart: '4 replies to Benjamin: … · 2
+    // to close' (ambient-lead m_6192)
+    let others: Vec<Draft> = drafts.iter().filter(|d| d.kind != "action").cloned().collect();
+    let acts = action_words(drafts);
+    match (others.is_empty(), acts) {
+        (true, Some(a)) => a,
+        (false, Some(a)) => format!("{} · {a}", sends_line(&others)),
+        (_, None) => sends_line(drafts),
+    }
+}
+
+/// [`line`] for the drafts that leave (no account change).
+fn sends_line(drafts: &[Draft]) -> String {
     let w = what(drafts);
     let names = names(drafts);
     let addressed = drafts.iter().all(|d| d.to.is_some());
@@ -285,8 +327,9 @@ pub fn and_list(names: &[String]) -> String {
 /// {count, title, what, names (each recipient once), topics (one per
 /// draft, or none), line (the card's second line, as is)}.
 pub fn info(drafts: &[Draft], title: &str) -> serde_json::Value {
-    serde_json::json!({"count": drafts.len(), "title": title, "what": what(drafts), "names": names(drafts),
-        "topics": topics(drafts), "line": line(drafts)})
+    let sends: Vec<Draft> = drafts.iter().filter(|d| d.kind != "action").cloned().collect();
+    serde_json::json!({"count": drafts.len(), "title": title, "what": what(drafts), "names": names(&sends),
+        "topics": topics(&sends), "line": line(drafts), "actions": action_words(drafts)})
 }
 
 /// The batch card's words, ambient's (m_6055 via ambient-lead m_6058):
@@ -435,6 +478,31 @@ emails to lucas and marc");
         assert_eq!(addressee("#lyon"), (Some("#lyon".into()), None));
     }
 
+    /// Law (ambient-lead m_6192, amb-kit m_6198): an account change
+    /// (data-kit="action", data-do) is a draft his approve does; the card
+    /// counts them apart: one → its words, 2+ with one verb → '2 to
+    /// close', else '<n> actions'; skipped or approved, it no longer waits.
+    #[test]
+    fn account_changes_are_counted_apart() {
+        let act = |id: &str, todo: &str| format!(r#"<section data-kit="action" data-id="{id}" data-do="{todo}"><p>{todo} in Linear · fixed in 0.4.2</p></section>"#);
+        let html = format!("{FEEDBACK}{}{}", act("a-ops12", "close OPS-12"), act("a-ops13", "close OPS-13"));
+        let p = pending(&html, &[], &[]);
+        assert_eq!(p.iter().filter(|d| d.kind == "action").map(|d| (d.key(), d.text.clone())).collect::<Vec<_>>(), vec![
+            ("a-ops12".to_string(), "close OPS-12".to_string()),
+            ("a-ops13".to_string(), "close OPS-13".to_string()),
+        ]);
+        assert_eq!(batch_text(&p, "t"), "5 drafts wait for you · t
+3 replies to Benjamin: proxy, fish and French · 2 to close");
+        assert_eq!(info(&p, "t")["names"], json!(["Benjamin"]));
+        assert_eq!(info(&p, "t")["actions"], json!("2 to close"));
+        assert_eq!(what(&p), "replies");
+        let one = format!("{}{}", act("a-ops12", "close OPS-12"), act("a-x", "archive the old board"));
+        assert_eq!(line(&pending(&one, &[], &[])), "2 actions");
+        let skipped = [note(json!({"id": "n1", "block": "a-x", "kind": "skip", "status": "sent"}))];
+        let left = pending(&one, &skipped, &[]);
+        assert_eq!((line(&left), what(&left)), ("close OPS-12".to_string(), "actions"));
+    }
+
     /// Law (ambient-lead m_6168): a draft whose item has an agent still at
     /// work (working, or idle and not done) does not wait yet: out of the
     /// batch and of sb page waiting; the agent done, it waits again.
@@ -472,7 +540,7 @@ emails to lucas and marc");
         assert_eq!(batch_text(&three, "inbox"), "3 drafts wait for you · inbox
 replies to legal, Lucas and Marc");
         assert_eq!(info(&three, "inbox"), json!({"count": 3, "title": "inbox", "what": "replies", "names": ["legal", "Lucas", "Marc"],
-            "topics": [], "line": "replies to legal, Lucas and Marc"}));
+            "topics": [], "line": "replies to legal, Lucas and Marc", "actions": null}));
         let step = super::super::checklist::Step { text: batch_text(&three, "inbox"), batch: vec!["a".into(), "b".into(), "c".into()], ..Default::default() };
         assert_eq!(step.card_text(), "3 drafts wait for you · inbox
 replies to legal, Lucas and Marc
