@@ -379,6 +379,15 @@ the page with an open card (a task agent's page) is not checked yet.
   (amb-mac); the rows say `main` (`main: watch: …`, `the launch · main · v2`) where bise should
   speak (amb-mac, ambient's words); `sb card` has no `--page`, so a watch's card can't open its
   page (amb-core). Not checked: the page frame saying the watch stopped.
+- **B's menu fixes rechecked on the app (762aea49, amb-mac 623473da): pass.** `watching the launch ·
+  4 new for you` counts the page's 4 waiting items and stays 4 after a version with nothing new;
+  the rows say `the launch · v2`, and main's card shows the question alone.
+- **D at 597d1136 (amb-core 8a9f7d63): fail 39 closed, pass.** Headless: page 15 s, v1 33 s,
+  `who is legal?` then `how many years?`, the mail to legal sent on his word before his sign-in
+  and pay cards, then Lucas's DNS draft; every send matches one `send` of his, none before.
+  Spoken on the app: `got` at 4.1 s, the page at 21 s, main's line at 22.6 s (61 characters), the
+  glass gone at 30.5 s, the first card shown at 73 s; the run then stopped in the QA tool (in app
+  mode it answers cards through a core that isn't there: amb-tools).
 - **Job 2, the inbox, spoken on the app (`--app --voice`): pass.** fn held, the ask spoken,
   `got` at 2.6 s, the words at the core at 2.9 s, the page at 15.9 s, main's line at 17.7 s (`mail
   replies is on it. the drafts will show up on a page, and nothing gets sent.`, 86 characters), the
