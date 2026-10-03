@@ -270,6 +270,34 @@ the page with an open card (a task agent's page) is not checked yet.
   at the same moment (404, reset, closed), so the page server may drop a page's meta while it's
   republished: sent to amb-core and amb-tools.
 
+### Results: 2026-10-03, 01:30-02:50 (headless, model hubs on fake accounts)
+
+- **B, watch for me: pass on the product** (5697cc7e, with amb-mac's page server fix 8e1cdac8).
+  First seen at 17 s, v1 at 26 s, 4 of 4 comments that need an answer. Tick 1 came at 111 s and the
+  page republished by itself with 4 of 4 of the new comments. No reset or closed connection, so
+  8e1cdac8 holds. Outbox empty, the stop ended the timer. The run's only fail is a check that is
+  too strict: the one card was Marc in #launch asking him `can the weekly update carry these
+  numbers?`. He asked "tell me what needs an answer", and a teammate's direct question needs his
+  answer, so the card is right (sent to amb-tools). Still to check: the republish came 559 s after
+  the tick, and the menu bar's `watching … N new` needs the app. An earlier run at 8e1cdac8 also
+  got past tick 1, then qa.py itself died on `Too many open files` (the runner leaks descriptors
+  under a 256 limit: amb-tools; run with `ulimit -n 10240` until then). Two runs at once from one
+  agent share one hub: never do that (amb-tools may make qa.py refuse it).
+- **D, checklists: fail, much further each time.**
+  - At 491dbee3: fail 29. The fixture's domain exists in the real world: the agent checked the
+    real .app registry, found it taken, and rightly asked first, and the flow never answered.
+    Fixed by amb-tools in 494bbd0d (a fake registry, an invented free domain, the flow answers a
+    page question).
+  - At 5697cc7e: fail 30. bise's own step `ask legal` stayed `drafted` (legal's address was
+    missing), so the plan never reached his steps, and the agent had already ended. Fixed in amb-kit
+    8ad89e55 (an agent never ends with its own step open) and amb-core 6ab4e8e4 (a drafted step of
+    bise's is his turn: `send the draft?`).
+  - At 6ab4e8e4: page 16 s, v1 25 s, outbox empty. The agent asks for legal's address as a page
+    question, the drafted step comes as `send the draft?`, then his `sign in to Gandi` card comes.
+    Fail 31 (amb-core): answering that card with `1` from the capsule's path never closes it, so the
+    plan stops there. Nits: `send the draft?` comes in the same second as the address question it
+    depends on, and has no page link.
+
 ## The look the user validated: round 8 (main m_5134)
 
 ambient owns the pixels against `site/content/ambient/identity8.html` and its SPEC; these are the
