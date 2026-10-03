@@ -488,6 +488,16 @@ def launch_watch_cards_may_be_a_teammates_question():
 
 
 @test
+def a_watcher_between_turns_is_settled():
+    """a watch declares 'working' for its whole life: between its timer turns (no turn_ms) the run counts it settled, in a turn it does not"""
+    check(qa._agent_settled({"status": "working", "note": "watching every 10m", "turn_ms": None}), "watcher between turns")
+    check(not qa._agent_settled({"status": "working", "turn_ms": 4000}), "watcher in a turn")
+    check(not qa._agent_settled({"status": "starting", "turn_ms": None}), "a starting agent")
+    check(not qa._agent_settled({"status": "waiting", "turn_ms": None}), "a waiting agent")
+    check(all(qa._agent_settled({"status": s, "turn_ms": 9}) for s in ("idle", "done", "blocked")), "idle/done/blocked")
+
+
+@test
 def failed_run_keeps_hub_state():
     """a failed run keeps the hub's journal, logs and transcripts, never its sockets or binaries (ambient-lead m_5942)"""
     d = tempfile.mkdtemp(prefix="aq-st-")

@@ -1112,6 +1112,16 @@ def _body(x, n):
     return b
 
 
+def _agent_settled(a):
+    """An agent of the run's hub is settled when it is idle, done or blocked, or when it
+    declared itself working but is between turns (no turn_ms: the hub sets it from the
+    turn's start to its end): a watch says 'working · watching every 10m' for its whole
+    life, and the mentions run waited forever for it after the watcher's republish."""
+    if a.get("status") in ("idle", "done", "blocked"):
+        return True
+    return a.get("status") == "working" and a.get("turn_ms") is None
+
+
 def _until(x, pred, what):
     """Polls the run (its main lines, cards) until pred() or the timeout; the seconds it took, or None (a fail recorded)."""
     t = time.time()
@@ -2268,7 +2278,7 @@ def _run(scenario, sc, headless, timeout, keep, out, require, voice=False):
             return pages[0] if pages else None
 
         def settled():
-            return all(a.get("status") in ("idle", "done", "blocked") for a in (c.state or {}).get("agents", []))
+            return all(_agent_settled(a) for a in (c.state or {}).get("agents", []))
 
         if voice:
             # spoken, as he would (ambient-lead m_5978): fn held, the fake mic says the ask, let go;
