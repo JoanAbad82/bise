@@ -629,6 +629,23 @@ def main():
         said = [l for l in c.lines("main") if "FAILED" in l or "republished " in l]
         check(last() == 21, "20 republishes: v%s, main's bash said: %s" % (last(), said[-4:]))
         check(polls["n"] > 20 and not polls["bad"], "%d reads during the republishes, bad: %s" % (polls["n"], polls["bad"][:3]))
+
+        # a watch's own card links its page at the item (pm's B m_6008):
+        # card.page in a step card's shape, so fn + o opens it there
+        bugs = os.path.join(E.tmp, "bugs-watch.html")
+        open(bugs, "w").write(BUGS)
+        c.say('[[bash: sb page publish %s --id bugs-watch --title "bugs watch"]]' % bugs)
+        c.wait_line("main", "published bugs-watch v1", 90)
+        c.wait_idle("main")
+        c.say('[[bash: sb card --page bugs-watch#gone "reply?" || echo "REFUSED"]]')
+        c.wait_line("main", "no block or item", 90)
+        c.wait_idle("main")
+        c.say('[[bash: sb card --page bugs-watch#b2 "reply to the CSV report?"]]')
+        linked = lambda: next((x for x in c.cards() if (x.get("page") or {}).get("id") == "bugs-watch"), None)
+        c.wait(linked, 60, "the watch's card, linked to its page")
+        want = {"id": "bugs-watch", "block": "bugs", "item": "b2", "url": "http://127.0.0.1:%d/p/bugs-watch#b2" % port}
+        check(linked()["page"] == want, "the card's page: %r" % linked())
+        check("reply to the CSV report?" in linked().get("text", ""), "the card's words: %r" % linked())
     except AssertionError as e:
         print("FAIL", e)
         ok = False

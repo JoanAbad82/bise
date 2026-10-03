@@ -668,10 +668,19 @@ pub fn build(args: &[String]) -> Result<Value, String> {
             req.insert("why".into(), json!(pos.join(" ")));
         }
         "card" => {
-            let (pos, o) = parse_args(rest, &["for"], &[])?;
+            let (pos, o) = parse_args(rest, &["for", "page"], &[])?;
             req.insert("text".into(), json!(text_of(&pos)?));
             if o.contains_key("for") {
                 req.insert("for".into(), json!(str_of(&o, "for")));
+            }
+            // `--page <id>[#<item>]`: the card opens that page at the item
+            // (fn + o in the capsule), pm's B m_6008
+            if o.contains_key("page") {
+                let page = str_of(&o, "page");
+                if page.trim().trim_start_matches('#').is_empty() || page.trim().starts_with('#') {
+                    return Err("usage: sb card [--for <msg>] [--page <id>[#<item>]] \"<question>\"".into());
+                }
+                req.insert("page".into(), json!(page.trim()));
             }
         }
         "inspect" => {
@@ -1153,6 +1162,16 @@ mod tests {
             let r = build(&a(&args)).unwrap();
             crate::core::AgentReq::from_json(&r).unwrap_or_else(|e| panic!("{:?}: {}", args, e));
         }
+    }
+
+    #[test]
+    fn a_card_can_link_its_page_and_item() {
+        let r = build(&a(&["card", "--page", "launch-watch#hn-41", "reply to tptacek?"])).unwrap();
+        assert_eq!((r["page"].as_str(), r["text"].as_str()), (Some("launch-watch#hn-41"), Some("reply to tptacek?")));
+        crate::core::AgentReq::from_json(&r).unwrap();
+        assert_eq!(build(&a(&["card", "--page", "w", "q?"])).unwrap()["page"], "w");
+        assert!(build(&a(&["card", "q?"])).unwrap().get("page").is_none());
+        assert!(build(&a(&["card", "--page", "#hn-41", "q?"])).is_err(), "an item needs its page");
     }
 
     #[test]

@@ -312,6 +312,10 @@ struct Shell {
     page_cards: Option<BTreeMap<u64, (String, String)>>,
     /// The answers given to those cards, until the hub closes them.
     page_replies: BTreeMap<u64, String>,
+    /// `sb card --page`: an agent's card → its page link (card_link.rs),
+    /// shown on the card while it is open; its answer goes to the agent
+    /// as usual (unlike `page_cards`, whose answers take the page's path)
+    card_links: BTreeMap<u64, Value>,
 }
 
 /// What an agent whose turn was cut by a restart receives.
@@ -567,8 +571,14 @@ impl Shell {
             // a page question's card links its block (fn + ⏎ opens it)
             let p = p.clone();
             let qs = self.page_cards().clone();
+            let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
+            self.card_links.retain(|c, _| open.contains(c));
             if let Some(cards) = snap["cards"].as_array_mut() {
                 for c in cards {
+                    // an agent's card linked with `sb card --page`
+                    if let Some(link) = c["id"].as_u64().and_then(|n| self.card_links.get(&n)) {
+                        c["page"] = link.clone();
+                    }
                     let Some((id, block)) = c["id"].as_u64().and_then(|n| qs.get(&n)) else { continue };
                     // a step of his: its row (roadmap D)
                     c["page"] = match block.strip_prefix("row:").and_then(|k| k.split_once('/')) {
@@ -2887,8 +2897,33 @@ impl Shell {
             }
             _ => match AgentReq::from_json(&v) {
                 Ok(req) => {
+                    // `sb card --page <id>[#<item>]`: a page that isn't there
+                    // is refused before the card opens (pm's B m_6008)
+                    let link = match (cmd, v.get("page").and_then(Value::as_str)) {
+                        ("card", Some(spec)) => match self.pages.as_ref().map(|p| crate::card_link::link(p, spec)) {
+                            Some(Ok(l)) => Some(l),
+                            Some(Err(e)) => {
+                                write_json(&mut stream, &json!({"ok": false, "error": e}));
+                                return;
+                            }
+                            None => {
+                                write_json(&mut stream, &json!({"ok": false, "error": "no pages on this hub"}));
+                                return;
+                            }
+                        },
+                        _ => None,
+                    };
+                    let before: Vec<u64> = self.hub.st.cards.keys().copied().collect();
                     self.replies.insert(token, stream);
                     self.step(Input::Agent { token, from, req });
+                    if let Some(l) = link {
+                        let new = self.hub.st.open_cards().map(|c| c.id).filter(|c| !before.contains(c)).max();
+                        if let Some(card) = new {
+                            self.card_links.insert(card, l);
+                            let snap = self.snapshot();
+                            self.broadcast(&snap);
+                        }
+                    }
                 }
                 Err(e) => {
                     write_json(&mut stream, &json!({"ok": false, "error": e}));
@@ -3243,6 +3278,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         page_watch_sent: BTreeMap::new(),
         page_cards: None,
         page_replies: BTreeMap::new(),
+        card_links: BTreeMap::new(),
     };
     // the page server (docs/ambient-pages.md §2.4): 127.0.0.1, a stable
     // port per workspace; its notes come back to the loop

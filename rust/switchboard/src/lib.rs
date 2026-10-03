@@ -21,6 +21,7 @@
 pub mod agents_md;
 pub mod approvals;
 pub mod board;
+pub mod card_link;
 pub mod cli;
 pub mod client;
 pub mod computer_use;
