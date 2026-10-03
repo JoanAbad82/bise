@@ -307,8 +307,8 @@ def run_scenarios():
     check(qa._covered(body, need)["found"] == 2, qa._covered(body, need))
     # roadmap A, C, D runs (ambient-lead m_5616)
     for k in ("newsletter", "feedback", "checklist"):
-        # feedback sends once, after his send note: its flow checks that itself
-        check(qa.SCENARIOS[k]["flow"] in qa.FLOWS and (qa.SCENARIOS[k]["no_send"] or k == "feedback") and not qa.SCENARIOS[k]["notes"], k)
+        # feedback and checklist send only after his word on a draft: their flows check that themselves
+        check(qa.SCENARIOS[k]["flow"] in qa.FLOWS and (qa.SCENARIOS[k]["no_send"] or k in ("feedback", "checklist")) and not qa.SCENARIOS[k]["notes"], k)
     plan = ('<section data-kit="checklist" data-id="buy"><ol><li data-id="s1" data-done>read the mails</li>'
             '<li data-id="s2" data-who="yours">sign in to Gandi</li><li data-id="s3" data-who="bise">check the price</li>'
             '<li data-id="s4" data-who="yours">pay</li></ol></section><section data-kit="prose" data-id="p"><p>x</p></section>')

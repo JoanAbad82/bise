@@ -22,6 +22,7 @@ scripted provider; `--hub real` is read-only: nothing is sent), a second
 copy of the app (scripts/ambient.sh builds the one path), pkill by name
 (only the QA app's own pid).
 """
+import calendar
 import json
 import os
 import re
@@ -1060,7 +1061,8 @@ SCENARIOS.update({
     "feedback": {"ask": "Benjamin's bug reports in #acme-feedback: handle them so adoption is easy", "no_send": False, "notes": False, "flow": "feedback",
                  "picks": {"q-language": 2}},
     # roadmap D (amb-core 527fa441): a step-by-step plan, bise ticks its own, a card per step of his when its turn comes
-    "checklist": {"ask": "check my mail and give me a step by step to buy the domain", "no_send": True, "notes": False, "flow": "checklist",
+    # no_send off: a send is checked against his word on its draft card by the flow (ambient-pm m_5932)
+    "checklist": {"ask": "check my mail and give me a step by step to buy the domain", "no_send": False, "notes": False, "flow": "checklist",
                   "note_texts": {"q-legal": "legal@acme.test"}},
     # roadmap E (amb-kit m_5643): a seeded night (a PR done, a question card, unsent replies,
     # his domain steps, the launch watch), then the morning page from it; nothing leaves
@@ -1339,6 +1341,9 @@ def _flow_checklist(x):
             x["core"].p.stdin.write(json.dumps({"cmd": "answer", "card": cd["id"], "reply": "1"}) + "\n")
             x["core"].p.stdin.flush()
             r["flow"]["closed_by"].append("card answer")
+            if not his:
+                # his word for a draft: a send may follow it, and only it
+                r["flow"].setdefault("words", []).append({"item": item, "at": time.time()})
         if _until(x, lambda: all(d.get("id") != cd["id"] for d in c.cards()), "the card of %s closing" % item) is None:
             return
     else:
@@ -1348,9 +1353,18 @@ def _flow_checklist(x):
     ticks = {(n["block"], n.get("item")) for n in meta.get("notes", []) if n.get("kind") == "tick"}
     final = _rows(_body(x, meta["versions"][-1]["n"]))
     left = [w["item"] for w in final if not w["done"] and (w["block"], w["item"]) not in ticks]
-    r["flow"]["left"] = left
-    if left:
-        r["fails"].append("steps neither done nor ticked: %s" % ", ".join(left))
+    # his part must be done; rows waiting on someone else after it (Lucas's DNS, bise's check
+    # after it) are the right end state (ambient-pm m_5932)
+    his_left = [w["item"] for w in final if w["yours"] and w["item"] in left]
+    r["flow"]["left"], r["flow"]["waiting_on_others"] = his_left, [i for i in left if i not in his_left]
+    if his_left:
+        r["fails"].append("his steps neither done nor ticked: %s" % ", ".join(his_left))
+    # a send is his only after his word on that draft: never more sends than words, none before the first
+    sends = sorted((w for w in _writes(x["info"]) if w["action"] in SENDS), key=lambda w: w["at"])
+    words = sorted(k["at"] for k in r["flow"].get("words", []))
+    early = [w for w in sends if not words or calendar.timegm(time.strptime(w["at"], "%Y-%m-%dT%H:%M:%SZ")) < int(words[0]) - 1]
+    if early or len(sends) > len(words):
+        r["fails"].append("%d send(s) for %d word(s) of his on a draft (%d before the first)" % (len(sends), len(words), len(early)))
 
 
 COOKIE_QUESTION = """<section data-kit="heading" data-id="title">
