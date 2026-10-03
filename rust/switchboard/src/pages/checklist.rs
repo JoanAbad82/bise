@@ -26,11 +26,41 @@ pub struct Row {
     /// `data-draft`: the block that holds that draft
     pub draft: Option<String>,
     /// `data-question`: a decision of his, asked by that question block:
-    /// the question's card is its only card (pm's D fail 35)
+    /// the question's card is its only card (pm's D fail 35), while that
+    /// question is open ([`judged`] clears it once answered: fail 39)
     pub question: Option<String>,
     /// `data-due="YYYY-MM-DD"`: by when (a promise of his is overdue the
     /// day after, ambient-lead m_5982)
     pub due: Option<String>,
+    /// its checklist block has `data-plan`: a plan he works through with
+    /// bise. Only a plan's rows get cards; other rows of his (a meeting's
+    /// actions, promises) reach him by `sb page waiting` and the count
+    /// (ambient-lead m_5988)
+    pub plan: bool,
+}
+
+/// The rows of a fragment as the cards judge them: a row's
+/// `data-question` counts only while that question is open (not answered
+/// in `questions`, no `data-answer` on its block). Once answered, the row
+/// is judged as if it had none, even when the agent forgot to drop the
+/// attribute (pm's D fail 39: the answered question held 'send the
+/// draft?' back for ever).
+pub fn judged(html: &str, questions: &[super::questions::Question]) -> Vec<Row> {
+    let answered_on_page = |q: &str| {
+        html.split("data-id=\"").any(|p| p.starts_with(&format!("{q}\"")) && p.split('>').next().is_some_and(|h| h.contains("data-answer")))
+    };
+    let open = |q: &str| {
+        let on_page = html.contains(&format!("data-id=\"{q}\""));
+        let answered = questions.iter().any(|x| x.block == q && x.reply.as_deref().is_some_and(|r| !r.trim().is_empty()));
+        on_page && !answered && !answered_on_page(q)
+    };
+    let mut rows = rows_of(html);
+    for r in rows.iter_mut() {
+        if r.question.as_deref().is_some_and(|q| !open(q)) {
+            r.question = None;
+        }
+    }
+    rows
 }
 
 impl Row {
@@ -113,6 +143,7 @@ pub fn items_of(html: &str, kit: &str) -> Vec<Row> {
             continue;
         }
         let Some(bid) = attr(head, "data-id") else { continue };
+        let plan = attr(head, "data-plan").is_some();
         for li in block[head_end..].split("<li").skip(1) {
             let Some(g) = li.find('>') else { continue };
             let lhead = &li[..g];
@@ -130,6 +161,7 @@ pub fn items_of(html: &str, kit: &str) -> Vec<Row> {
                 draft: attr(lhead, "data-draft").filter(|d| !d.trim().is_empty()),
                 question: attr(lhead, "data-question").filter(|q| !q.trim().is_empty()),
                 due: attr(lhead, "data-due").filter(|d| !d.trim().is_empty()),
+                plan,
             });
         }
     }
@@ -314,6 +346,33 @@ mod tests {
         assert!(!draft_sendable(r#"<section data-kit="message" data-id="s" data-to=" "><p>x</p></section>"#, "s"));
         assert!(draft_sendable(r#"<section data-kit="message" data-id="s" data-to="Slack · #launch"><p>x</p></section>"#, "s"));
         assert!(draft_sendable("<section data-kit=\"prose\" data-id=\"p\"><p>x</p></section>", "p"));
+    }
+
+    /// Laws (ambient-lead m_5988, pm's D fail 39): a row knows whether its
+    /// block is a plan (data-plan: only those make cards); a row's
+    /// data-question holds its card only while that question is open.
+    #[test]
+    fn a_rows_question_holds_it_only_while_open_and_plans_are_marked() {
+        let html = r#"<section data-kit="checklist" data-id="plan" data-plan><ol>
+<li data-id="s2" data-who="bise" data-did="drafted" data-draft="mail-legal" data-question="who-legal">ask legal</li></ol></section>
+<section data-kit="question" data-id="who-legal"><p>who?</p><ol><li>legal@acme.test</li><li>ask Marc</li></ol></section>
+<section data-kit="checklist" data-id="actions"><ol><li data-id="a1" data-who="yours">send Hélène the timeline</li></ol></section>"#;
+        let q = |reply: Option<&str>| super::super::questions::Question {
+            block: "who-legal".into(),
+            text: "who?".into(),
+            options: vec![],
+            card: 1,
+            reply: reply.map(String::from),
+        };
+        let open = judged(html, &[q(None)]);
+        assert!(open[0].plan && !open[1].plan, "the plan's block is marked, the meeting's is not");
+        assert!(due(&open, &|_: &Row| false).iter().all(|r| r.item != "s2"), "its question open: no card for s2");
+        let answered = judged(html, &[q(Some("legal@acme.test"))]);
+        assert_eq!(answered[0].question, None, "answered: judged as if it had no data-question");
+        assert_eq!(due(&answered, &|_: &Row| false)[0].item, "s2");
+        // answered on the page (data-answer) counts the same
+        let on_page = judged(&html.replace("data-id=\"who-legal\"", "data-id=\"who-legal\" data-answer=\"1\""), &[q(None)]);
+        assert_eq!(on_page[0].question, None);
     }
 
     #[test]

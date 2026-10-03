@@ -47,12 +47,6 @@ pub fn overdue(id: &str, html: &str, notes: &[Note], today: i64) -> Vec<Waiting>
         .collect()
 }
 
-/// Pages whose rows never make a step card: the weekly promises page
-/// (`promises-<week>`) and the meeting pages (`meeting-<slug>-<date>`).
-pub fn no_cards(id: &str) -> bool {
-    id.starts_with("promises-") || id.starts_with("meeting-")
-}
-
 /// [`of_page`] with page `id`'s overdue promises first (the same row is
 /// not listed again as a step).
 pub fn of_page_on(id: &str, html: &str, notes: &[Note], questions: &[Question], today: i64) -> Vec<Waiting> {
@@ -105,7 +99,10 @@ pub fn of_page(id: &str, html: &str, notes: &[Note], questions: &[Question]) -> 
     // his steps whose turn came
     // (a drafted step of bise's is a draft of his; its draft's block is
     // not listed again below)
-    let rows = rows_of(html);
+    // (every row of his, a plan's or not: a meeting's actions reach him
+    // here and in the count, never as cards; a row waiting on an open
+    // question is listed once, as the question)
+    let rows = super::checklist::judged(html, questions);
     let closed = |r: &super::checklist::Row| closed_by(r, notes);
     let mut covered: Vec<String> = Vec::new();
     for r in due(&rows, &closed) {

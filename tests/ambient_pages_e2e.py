@@ -394,8 +394,8 @@ def main():
         def plan_html(done):
             rows = [("t1", ""), ("t2", "yours"), ("t3", ""), ("t4", ""), ("t5", "yours"), ("t6", "")]
             lis = "".join('<li data-id="%s"%s%s>step %s</li>' % (i, ' data-who="yours"' if w else "", " data-done" if i in done else "", i) for i, w in rows)
-            return ('<section data-kit="checklist" data-id="steps"><ol>%s</ol></section>'
-                    '<section data-kit="checklist" data-id="other"><ol><li data-id="o1" data-who="yours">sign the form</li></ol></section>' % lis)
+            return ('<section data-kit="checklist" data-id="steps" data-plan><ol>%s</ol></section>'
+                    '<section data-kit="checklist" data-id="other" data-plan><ol><li data-id="o1" data-who="yours">sign the form</li></ol></section>' % lis)
 
         def publish_plan(done, n):
             f = os.path.join(E.tmp, "plan-%d.html" % n)
@@ -448,7 +448,7 @@ def main():
         # publish; a question on it gets its card too (sb-core makes cards
         # for main only: the hub asks as main, answers on the page's path)
         tp = os.path.join(E.tmp, "task-plan.html")
-        open(tp, "w").write('<section data-kit="checklist" data-id="steps"><ol>'
+        open(tp, "w").write('<section data-kit="checklist" data-id="steps" data-plan><ol>'
                             '<li data-id="s1" data-who="yours">pay the domain</li><li data-id="s2">point the DNS</li></ol></section>'
                             + PAGE_V3.split(PAGE_V2)[1])
         settle(c)
@@ -479,7 +479,7 @@ def main():
         # draft waits for his word, so it is his turn: its card comes; his
         # send approves the draft, then his own step's card comes
         lp = os.path.join(E.tmp, "legal-plan.html")
-        open(lp, "w").write('<section data-kit="checklist" data-id="plan"><ol>'
+        open(lp, "w").write('<section data-kit="checklist" data-id="plan" data-plan><ol>'
                             '<li data-id="d1" data-who="bise" data-did="drafted" data-draft="mail-legal">ask legal</li>'
                             '<li data-id="d2" data-who="yours">sign the renewal</li></ol></section>'
                             '<section data-kit="email" data-id="mail-legal" data-verb="draft"><p data-field="to">legal@acme.test</p>'
@@ -508,8 +508,10 @@ def main():
         # a draft with no recipient yet (pm's D fail 37): its step's card
         # waits until the agent republishes it with an address
         sp = os.path.join(E.tmp, "send-plan.html")
-        mail = lambda to: ('<section data-kit="checklist" data-id="plan"><ol>'
-                           '<li data-id="e1" data-who="bise" data-did="drafted" data-draft="mail-x">ask legal</li></ol></section>'
+        mail = lambda to: ('<section data-kit="checklist" data-id="plan" data-plan><ol>'
+                           '<li data-id="e1" data-who="bise" data-did="drafted" data-draft="mail-x" data-question="qx">ask legal</li></ol></section>'
+                           '<section data-kit="question" data-id="qx"><p>which address for legal?</p>'
+                           '<ol><li>legal@acme.test</li><li>ask Marc</li></ol></section>'
                            '<section data-kit="email" data-id="mail-x" data-verb="draft"><p data-field="to">%s</p>'
                            '<p data-field="subject">trademark</p><p>still fine?</p></section>' % to)
         open(sp, "w").write(mail("legal: address missing"))
@@ -521,7 +523,30 @@ def main():
         open(sp, "w").write(mail("legal@acme.test"))
         settle(c)
         c.say('[[bash: sb page publish %s --id send-plan]]' % sp)
-        c.wait(lambda: step_card("e1"), 60, "the send card once the draft has its address")
+        c.wait_line("main", "published send-plan v2", 90)
+        time.sleep(2)
+        check(not step_card("e1"), "no send card while its data-question is open")
+        # pm's D fail 39: once qx is answered the row is judged without
+        # its data-question (the agent left it on): 'send the draft?' comes
+        qx = lambda: next((x for x in c.cards() if (x.get("page") or {}).get("id") == "send-plan" and (x.get("page") or {}).get("block") == "qx"), None)
+        c.wait(qx, 30, "qx's card")
+        c.say("/answer %d 1" % qx()["id"])
+        c.wait(lambda: step_card("e1"), 60, "the send card once its question is answered and the draft has its address")
+        settle(c)
+
+        # a meeting's rows of his (no data-plan, ambient-lead m_5988): no
+        # card; they reach him by sb page waiting
+        mp = os.path.join(E.tmp, "meeting.html")
+        open(mp, "w").write('<section data-kit="checklist" data-id="actions"><ol>'
+                            '<li data-id="a1" data-who="yours">send Hélène the SSO timeline</li>'
+                            '<li data-id="a2" data-who="Marc">book the room</li></ol></section>')
+        c.say('[[bash: sb page publish %s --id meeting-notes --title "meeting"]]' % mp)
+        c.wait_line("main", "published meeting-notes v1", 90)
+        time.sleep(2)
+        check(not step_card("a1"), "a meeting's row of his makes no card: %r" % c.cards())
+        settle(c)
+        c.say("[[bash: sb page waiting]]")
+        c.wait_line("main", "meeting-notes#a1 · step · send Hélène the SSO timeline", 90)
         settle(c)
 
         # his step answered from the capsule (pm's D fail 31): the core's

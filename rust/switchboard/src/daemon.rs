@@ -1356,24 +1356,25 @@ impl Shell {
     /// tick, a note): the step whose turn came gets its card (one per
     /// checklist block), a step done or ticked closes its card.
     fn page_steps(&mut self, id: &str) {
-        // a promises page or a meeting page never makes a card, nor
-        // anything on it, overdue or not: his rows there show in sb page
-        // waiting and the state's overdue count (ambient-lead m_5982, the
-        // meeting rule)
-        if crate::pages::waiting::no_cards(id) {
-            return;
-        }
+        // one mechanism (ambient-lead m_6005): only a checklist marked
+        // data-plan makes step cards (the filter on `due` below). A
+        // promises page or a meeting page has none, so its rows of his
+        // show in sb page waiting and the state's overdue count only.
         let Some(pages) = self.pages.clone() else { return };
         let Some(meta) = pages.store.meta(id) else { return };
         let html = pages.store.html(id, meta.version()).unwrap_or_default();
-        let rows = crate::pages::checklist::rows_of(&html);
+        let rows = crate::pages::checklist::judged(&html, &pages.store.questions(id));
         let mut steps = pages.store.steps(id);
-        if steps.is_empty() && !rows.iter().any(|r| r.his()) {
+        if steps.is_empty() && !rows.iter().any(|r| r.his() && r.plan) {
             return;
         }
         let notes = pages.store.notes(id);
         let closed = |r: &crate::pages::checklist::Row| crate::pages::checklist::closed_by(r, &notes);
-        let due: Vec<crate::pages::checklist::Row> = crate::pages::checklist::due(&rows, &closed).into_iter().cloned().collect();
+        // cards only for a plan he works through with bise (data-plan):
+        // a meeting's or a promise's rows of his reach him by sb page
+        // waiting and the count (ambient-lead m_5988)
+        let due: Vec<crate::pages::checklist::Row> =
+            crate::pages::checklist::due(&rows, &closed).into_iter().filter(|r| r.plan).cloned().collect();
         let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
         let mut changed = false;
         for s in steps.iter_mut().filter(|s| s.reply.is_none()) {
