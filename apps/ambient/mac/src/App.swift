@@ -17,6 +17,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private let keys = Keys()
     private let core: Core
     private var notify: Notify?
+    private var sounds: SoundPlayer?
     private var status: StatusItem?
     private var signals: [DispatchSourceSignal] = []
     private var qa: QA?                  // --qa only: the QA channel (QA.swift)
@@ -68,13 +69,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // a launch from Finder or the menu bar has no --bise or --web: the last
     // ones scripts/ambient.sh gave (launchd's PATH doesn't find bise)
     private static func remembered(_ config: Config, _ d: UserDefaults) -> Config {
-        var c = config
         let fm = FileManager.default
+        // QA picks its own bise; a normal launch never runs the PATH's bise
+        // while a dev build is there (Config.restoring, lead m_6267)
+        var c = config.qa != nil ? config
+            : config.restoring(d.dictionary(forKey: "lastLaunch"), isExe: { fm.isExecutableFile(atPath: $0) })
+        if c.qa == nil, c.isDevBuild(c.bise) { d.set(c.saved, forKey: "lastLaunch") }
+        if c.bise != config.bise { Log.say("app: bise \(config.bise) → \(c.bise) (the last launch's dev build)") }
         if c.bise.contains("/") { d.set(c.bise, forKey: "lastBise") }
         else if let b = d.string(forKey: "lastBise"), fm.isExecutableFile(atPath: b) { c.bise = b }
-        // never the PATH's bise when the try path's build is there (it has
-        // ambient-core; ~/.local/bin/bise may not)
-        else if case let b = c.dev + "/build/ambient/target/debug/bise", fm.isExecutableFile(atPath: b) { c.bise = b }
         if let w = c.web { d.set(w, forKey: "lastWeb") }
         else if let w = d.string(forKey: "lastWeb"), fm.fileExists(atPath: w) { c.web = w }
         if c.childEnv["PATH"] != nil { d.set(c.childEnv["PATH"], forKey: "lastPath") }
@@ -108,6 +111,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
         // QA: no menu-bar item, no macOS notification, never the real fn
         if qa == nil { statusAndKeys() }
+        // QA never plays a sound on his speaker (it logs the cue)
+        if qa == nil { sounds = SoundPlayer() }
 
         core.onEvent = { [weak self] in
             guard let self else { return }
@@ -305,6 +310,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
         Log.say("app: switch to \(c.workspace)")
         config = c
+        // the next launch without scripts/ambient.sh comes back here
+        if qa == nil, c.isDevBuild(c.bise) { defaults.set(c.saved, forKey: "lastLaunch") }
         memory = [:]
         cards = []
         agents = []
@@ -428,6 +435,16 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    // ambient's sounds (Sounds.swift): the plan says which, the player plays
+    // it; QA logs the cue and never plays on his speaker
+    private func cue(_ c: SoundCue) {
+        let gate = SoundGate(setting: settings.sounds, uiSounds: SoundPlayer.uiSoundsOn, quiet: quiet.on,
+                             focus: SoundPlayer.focusOn)
+        guard let s = SoundPlan.sound(for: c, gate) else { return }
+        if qa != nil { Log.say("app: qa: sound \(s.rawValue)"); return }
+        sounds?.play(s)
+    }
+
     // voice answers off: the core never speaks main's answers (text only)
     private func sayVoice() {
         toCore(["cmd": "voice", "on": settings.voiceAnswers])
@@ -523,11 +540,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             statusIcon()
             // a new item that needs you: the capsule shows it for 6 s
             let ids = Set(cards.map(\.id))
+            cue(.cards(now: ids, seen: seenCards))
             if let seen = seenCards, !ids.subtracting(seen).isEmpty { visFeed(.card) }
             seenCards = ids
             // macOS notifications: the screen locked or you away, not "hidden" (§8)
             notify?.cards(cards, quiet: !locked && !away)
         case "sent":
+            cue(.sent)
             visFeed(.sent)
         case "main":
             visFeed(.mainText)
@@ -606,6 +625,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         lastKey = key
         helloOn = false   // a hold ends the hello at once: the talk (or the mic ask) takes the glass
         if askBeforeTalk() { return }
+        cue(.talkOpened)       // before our own mic counts as a call
         capsule.pickScreen()   // the mouse's screen, when displays have their own menu bars
         talking = true
         defer { morning() }   // after the shot's front window is chosen

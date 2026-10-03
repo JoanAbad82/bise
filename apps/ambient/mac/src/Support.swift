@@ -64,6 +64,42 @@ struct Config {
     }
 
     var ambientDir: String { dev + "/ambient" }
+
+    // the try path's bise build (scripts/ambient.sh TRY_BISE): it has
+    // ambient-core; an installed bise (~/.local/bin/bise) may not
+    var devBise: String { dev + "/build/ambient/target/debug/bise" }
+    func isDevBuild(_ exe: String) -> Bool { exe.hasPrefix(dev + "/build/") }
+
+    // what a later launch restores (UserDefaults 'lastLaunch')
+    var saved: [String: Any] { ["workspace": workspace, "bise": bise, "web": web ?? "", "env": childEnv] }
+
+    // a launch not from scripts/ambient.sh with the dev build (Finder, the
+    // login item, macOS's 'Quit & Reopen', which reuses the first launch's
+    // args: the dogfood's 06:09 and 06:19 launches with ~/.local/bin/bise,
+    // 'unknown command ambient-core' in a loop): the last launch or switch
+    // saved, when its bise is a dev build still there; else, with no bise
+    // path at all, the dev build when it's there. Never the PATH's bise
+    // while a dev build exists.
+    func restoring(_ s: [String: Any]?, isExe: (String) -> Bool) -> Config {
+        var c = self
+        guard !isDevBuild(bise) else { return c }
+        if let s, let b = s["bise"] as? String, isDevBuild(b), isExe(b) {
+            c.bise = b
+            c.workspace = s["workspace"] as? String ?? c.workspace
+            if let w = s["web"] as? String, !w.isEmpty { c.web = w }
+            for (k, v) in s["env"] as? [String: String] ?? [:] { c.childEnv[k] = v }
+            return c
+        }
+        if isExe(devBise) { c.bise = devBise }
+        return c
+    }
+
+    // the line app.log says when the core exits 2 at once: its bise has no
+    // ambient-core (an installed bise, older than the app)
+    static func coreMissingLine(status: Int32, lived: Double, bise: String) -> String? {
+        guard status == 2, lived < 5 else { return nil }
+        return "core: \(bise) has no ambient core: run scripts/ambient.sh try"
+    }
 }
 
 enum Log {

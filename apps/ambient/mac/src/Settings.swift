@@ -16,7 +16,7 @@ enum LoginState: String { case on, off, approve }
 
 // one change the page asked for (app_setting {key, value})
 enum SettingChange: Equatable {
-    case edgeGlow(Bool), rightOption(Bool), meetingQuiet(Bool), voiceAnswers(Bool), launchAtLogin(Bool)
+    case edgeGlow(Bool), rightOption(Bool), meetingQuiet(Bool), voiceAnswers(Bool), launchAtLogin(Bool), sounds(Bool)
     case skipPick                 // open the app picker
     case skipAdd(SkipApp)         // what the picker chose
     case skipRemove(String)       // a bundle id
@@ -30,6 +30,7 @@ enum SettingChange: Equatable {
         case "meeting_quiet": return on.map(SettingChange.meetingQuiet)
         case "voice_answers": return on.map(SettingChange.voiceAnswers)
         case "launch_at_login": return on.map(SettingChange.launchAtLogin)
+        case "sounds": return on.map(SettingChange.sounds)
         case "skip_add": return .skipPick
         case "skip_remove":
             guard let b = (value as? String)?.trimmingCharacters(in: .whitespaces), !b.isEmpty else { return nil }
@@ -44,6 +45,7 @@ struct AppSettings: Equatable {
     var rightOption = true
     var meetingQuiet = false      // a new permission (the calendar): off until asked
     var voiceAnswers = true
+    var sounds = true             // listen, think, need (ambient's three, Sounds.swift)
     var skip: [SkipApp] = []      // the user's own, after the built-in ones
 
     // the built-in never-seen apps (SPEC §5.2): always skipped, never removed
@@ -72,6 +74,7 @@ struct AppSettings: Equatable {
         if let v = get("rightOption") as? Bool { s.rightOption = v }
         if let v = get("meetingQuiet") as? Bool { s.meetingQuiet = v }
         if let v = get("voiceAnswers") as? Bool { s.voiceAnswers = v }
+        if let v = get("sounds") as? Bool { s.sounds = v }
         if let list = get("skipApps") as? [[String: String]] {
             for d in list {
                 if let b = d["bundle"], let n = d["name"] { s = s.adding(SkipApp(bundle: b, name: n)) }
@@ -85,6 +88,7 @@ struct AppSettings: Equatable {
         set("rightOption", rightOption)
         set("meetingQuiet", meetingQuiet)
         set("voiceAnswers", voiceAnswers)
+        set("sounds", sounds)
         set("skipApps", skip.map { ["bundle": $0.bundle, "name": $0.name] })
     }
 
@@ -107,6 +111,7 @@ struct AppSettings: Equatable {
         case .rightOption(let v): s.rightOption = v
         case .meetingQuiet(let v): s.meetingQuiet = v
         case .voiceAnswers(let v): s.voiceAnswers = v
+        case .sounds(let v): s.sounds = v
         case .skipAdd(let a): return adding(a)
         case .skipRemove(let b): s.skip.removeAll { $0.bundle == b }
         case .launchAtLogin, .skipPick: break
@@ -129,7 +134,7 @@ struct AppSettings: Equatable {
     // app_settings (docs/ambient-app.md §4)
     func event(macos: Int, radius: Double, login: LoginState) -> [String: Any] {
         ["ev": "app_settings", "edge_glow": edgeGlow, "right_option": rightOption,
-         "meeting_quiet": meetingQuiet, "voice_answers": voiceAnswers,
+         "meeting_quiet": meetingQuiet, "voice_answers": voiceAnswers, "sounds": sounds,
          "launch_at_login": login.rawValue, "skip": skipRows,
          "macos": macos, "radius": radius]
     }

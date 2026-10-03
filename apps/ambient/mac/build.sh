@@ -47,7 +47,7 @@ case "${1:-}" in
     # the pure sources (a+b: concatenated) with their laws, one interpreter run each
     for pair in KeyMachine:KeyMachineTests PageOpen:PageOpenTests Quiet:QuietTests MenuRows:MenuRowsTests \
                 PageOpen+ShowPlan:ShowPlanTests Morning:MorningTests Always:AlwaysTests \
-                Visibility:VisibilityTests Settings:SettingsTests Perms:PermsTests; do
+                Visibility:VisibilityTests Settings:SettingsTests Perms:PermsTests Sounds:SoundsTests Support:LaunchTests; do
       srcs="${pair%%:*}"; test="${pair#*:}"
       : > "$t/$test.swift"
       for s in ${srcs//+/ }; do cat "$HERE/src/$s.swift" >> "$t/$test.swift"; done
@@ -72,6 +72,12 @@ case "${1:-}" in
     rm -f "$APP/Contents/Resources/"*.png
     if [ -d "$HERE/Resources/pearl" ]; then
       find "$HERE/Resources/pearl" -name '*.png' -exec cp {} "$APP/Contents/Resources/" \;
+    fi
+    # ambient's three sounds (Sounds.swift): Resources/sounds/*.wav
+    rm -rf "$APP/Contents/Resources/sounds"
+    if [ -d "$HERE/Resources/sounds" ]; then
+      mkdir -p "$APP/Contents/Resources/sounds"
+      cp "$HERE/Resources/sounds/"*.wav "$APP/Contents/Resources/sounds/"
     fi
     # the app icon: the 1024 px render -> AppIcon.icns (sips + iconutil)
     # never fails the build: without it the app shows the generic icon

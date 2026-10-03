@@ -20,6 +20,7 @@ final class Core {
     private var backoff = Backoff()
     private var startedAt = Date()
     private var lived = 0.0          // how long the last run lived (0: it couldn't start)
+    private var saidMissing = false  // 'this bise has no ambient core', said once per bise
 
     init(config: Config) { self.config = config }
 
@@ -31,6 +32,7 @@ final class Core {
     // a new workspace or bise: stop the old core, start a fresh one now
     func restart(config: Config) {
         self.config = config
+        saidMissing = false
         stop()
         backoff.reset()
         start()
@@ -140,6 +142,11 @@ final class Core {
         Log.say("core: exited \(status)")
         proc = nil
         lived = Date().timeIntervalSince(startedAt)
+        // a bise without ambient-core: say it once, not a silent loop
+        if let line = Config.coreMissingLine(status: status, lived: lived, bise: config.bise), !saidMissing {
+            saidMissing = true
+            Log.say(line)
+        }
         try? input?.close()
         input = nil
         onExit?(status)
