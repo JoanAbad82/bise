@@ -348,6 +348,14 @@ the page with an open card (a task agent's page) is not checked yet.
   draft?` cards made no send (outbox empty at the run's end; the run before made 3 sends within
   5 s). The run said pass because its check no longer counts sends (amb-tools to fix; amb-core or
   amb-kit for the cause).
+- **D at 74df6244: pass, sends checked one for one.** Page 18 s, v1 38 s. Legal's address asked
+  once; the note with it reached the agent; `ask legal … before paying: send the draft?` → his
+  `send` → the mail to legal left at once, before his `sign in` and `pay` cards; then `send the
+  draft?` for Lucas's DNS → sent. 2 sends for 2 `send` answers, none before his word. The plan ends
+  waiting on Lucas and legal, and the mail to Marc waits for his word once they reply. Fail 37 is
+  closed for this flow. At 626e876c (without 74df6244), Lucas's and Marc's mails went but legal's
+  didn't: its `send the draft?` card opened while the draft had no address (amb-kit b12b6fde now
+  adds a line saying what's missing on such a draft; amb-core is checking the wake path).
 - **23 and 24 rechecked at a589f9f9 (`qa.py ask`): pass.** `what's my next meeting` → `09:30,
   launch standup with Marc, Lucas and Nora` in 13 s, no page: the fixture says 07:30Z, so the time
   is in his zone (CEST). `plan the offsite` → offsite-plan; the follow-up `add a budget per person
