@@ -123,6 +123,25 @@ fn element_fix(name: &str) -> String {
 
 /// Lint a page fragment.
 pub fn lint(html: &str) -> Result<Vec<Block>, Vec<String>> {
+    lint_full(html).map(|(blocks, _)| blocks)
+}
+
+/// The lint with the rules that depend on the page's id (ambient-lead m_6092): on a page that
+/// never makes cards (`promises-…`, `meeting-…`), every question is page-only,
+/// `data-card="none"`.
+pub fn lint_page(id: &str, html: &str) -> Result<Vec<Block>, Vec<String>> {
+    let (blocks, carded) = lint_full(html)?;
+    if !(id.starts_with("promises-") || id.starts_with("meeting-")) || carded.is_empty() {
+        return Ok(blocks);
+    }
+    Err(carded
+        .iter()
+        .map(|q| format!("{q}: a question on this page never makes a card: write <section data-kit=\"question\" data-id=\"{q}\" data-card=\"none\"> (it waits on the page and in sb page waiting)"))
+        .collect())
+}
+
+/// The lint, and the question blocks that make a card (no `data-card="none"`).
+fn lint_full(html: &str) -> Result<(Vec<Block>, Vec<String>), Vec<String>> {
     if html.len() > MAX_BYTES {
         return Err(vec![format!(
             "the page is {} KB, over the 1024 KB limit: split it or drop big images",
@@ -136,6 +155,7 @@ pub fn lint(html: &str) -> Result<Vec<Block>, Vec<String>> {
         open: None,
         unsendable: Vec::new(),
         drafted_rows: Vec::new(),
+        carded: Vec::new(),
     };
     l.run();
     // a step whose draft can't leave (pm's 38): what bise needs from him is a question, or the
@@ -159,7 +179,7 @@ pub fn lint(html: &str) -> Result<Vec<Block>, Vec<String>> {
         );
     }
     if l.errors.is_empty() {
-        Ok(l.blocks)
+        Ok((l.blocks, l.carded))
     } else {
         Err(l.errors)
     }
@@ -199,6 +219,8 @@ struct Linter<'a> {
     unsendable: Vec<String>,
     /// checklist rows with a data-draft and no data-question: (block, item, draft)
     drafted_rows: Vec<(String, String, String)>,
+    /// question blocks that make a card (no data-card="none")
+    carded: Vec<String>,
 }
 
 struct Tag {
@@ -532,6 +554,15 @@ impl<'a> Linter<'a> {
                     .into(),
             );
         }
+        // a page-only question (lead m_6092): data-card="none", no card, it waits on the page
+        let card = tag.attrs.iter().find(|(n, _)| n == "data-card").map(|(_, v)| v.clone().unwrap_or_default());
+        match (&card, kit.as_deref()) {
+            (None, Some("question")) => self.carded.push(at.clone()),
+            (None, _) => {}
+            (Some(c), Some("question")) if c == "none" => {}
+            (Some(c), Some("question")) => self.err(&at, format!("data-card=\"{c}\" is not a card setting: a question that waits on the page takes data-card=\"none\"; without it, it makes a card")),
+            (Some(_), _) => self.err(&at, "data-card is not a kit attribute here: only a question block takes it (data-card=\"none\")".into()),
+        }
         // a plan worked through with him (lead m_5988): its yours rows become step cards in turn;
         // a bare attribute, only on a checklist
         if let Some((_, p)) = tag.attrs.iter().find(|(n, _)| n == "data-plan") {
@@ -722,13 +753,14 @@ impl<'a> Linter<'a> {
                             | "data-open"
                             | "data-verb"
                             | "data-plan"
+                            | "data-card"
                     )
                 } else {
                     false
                 };
                 if !ok {
                     let hint = if block {
-                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message, email), data-open (message), data-verb (review), data-plan (checklist)"
+                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message, email), data-open (message), data-verb (review), data-plan (checklist), data-card=\"none\" (question)"
                     } else {
                         "inside a block only a review's <li data-id> and an email's <p data-field> take one"
                     };

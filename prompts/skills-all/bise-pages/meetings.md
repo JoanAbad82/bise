@@ -5,7 +5,10 @@ briefs before his meetings. One page per meeting, id `meeting-<slug>-<YYYY-MM-DD
 (`meeting-q3-renewal-2026-05-19`): the brief is its v1, the follow-ups its v2. No card from
 either, nor from anything on them, overdue or not: the menu-bar count says the page is there,
 and his open rows reach the morning page through `sb page waiting`. So a meeting's checklists
-never take `data-plan` (that is for a plan worked through with him, `blocks.md`).
+never take `data-plan` (that is for a plan worked through with him, `blocks.md`), and a doubt
+(an address, who owns an action) is a `question` with `data-card="none"` (the lint refuses one
+without it here). Read `~/bise/people.md` and the thread before asking him for an address or a
+name.
 
 **An overdue promise of his** (he told Hélène he would send the SSO timeline by the 26th, and
 no sent mail has it) leads the brief, right under the heading: a `callout` `data-tone="risk"`,

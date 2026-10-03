@@ -70,7 +70,8 @@ Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kep
 - `prose`: `<p>`, lists, `<blockquote>`, inline `<strong> <em> <code> <a> <sup>`.
 - `table`: one `<table>` with `<thead>`, then an optional `<p>` caption; one number per cell.
 - `callout`: an `<h3>` label + `<p>`; `data-tone` `note`, `good` or `risk`.
-- `question`: a `<p>` + `<ol>` of 2 to 4 short options; answered: `data-answer="2"`.
+- `question`: a `<p>` + `<ol>` of 2 to 4 short options; answered: `data-answer="2"`. It makes
+  a card; `data-card="none"` when it only waits on the page.
 - `sources`: `<ol>` of `<li><a href="…">name · tool</a>, when</li>`, last; facts cite `<sup>n</sup>`.
 - `review`: `<ol>` of `<li data-id>` to handle one by one; `data-verb` `send`, `open-reply`,
   `start`, `keep` (`blocks.md`). Items to handle (mails, reports, comments) are always a

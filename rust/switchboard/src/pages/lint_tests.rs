@@ -393,6 +393,26 @@ fn a_step_says_what_bise_did_and_where_its_draft_is() {
 }
 
 #[test]
+fn a_page_only_question_takes_data_card_none_and_promises_and_meetings_need_it() {
+    let q = |a: &str| format!(r#"<section data-kit="question" data-id="q-cc"{a}><p>which address for Lélio?</p><ol><li>lelio@acme.test</li><li>without the cc</li></ol></section>"#);
+    ok(&q(r#" data-card="none""#));
+    ok(&q(""));
+    has(&errs(&q(r#" data-card="all""#)), "q-cc: data-card=\"all\" is not a card setting");
+    has(
+        &errs(r#"<section data-kit="prose" data-id="p" data-card="none"><p>x</p></section>"#),
+        "p: data-card is not a kit attribute here: only a question block takes it",
+    );
+    // the page's id: promises and meeting pages never make cards
+    let page = |id: &str, a: &str| crate::pages::lint::lint_page(id, &q(a));
+    assert!(page("promises-2026-w41", r#" data-card="none""#).is_ok());
+    assert!(page("buy-domain", "").is_ok(), "a plan's question makes its card");
+    for id in ["promises-2026-w41", "meeting-q3-renewal-2026-05-19"] {
+        let e = page(id, "").unwrap_err();
+        assert!(e[0].starts_with("q-cc: a question on this page never makes a card"), "{e:?}");
+    }
+}
+
+#[test]
 fn a_plan_is_a_checklist_marked_data_plan() {
     ok(r#"<section data-kit="checklist" data-id="steps" data-plan><ol><li data-id="s1" data-who="yours">pay</li></ol></section>"#);
     has(
