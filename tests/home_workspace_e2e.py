@@ -169,6 +169,13 @@ def main():
         check("removed: no emoji" in r[1] and "about-you is v3" in r[1], "taste remove: %r" % r[1])
         check("1. short sentences" in r[2] and "2. headings in lowercase (from the offsite page)" in r[2], "taste list: %r" % r[2])
         check("kept: Nina (1 person" in r[3], "people set: %r" % r[3])
+        # the agents know where the home is (amb-tools m_6141: '~/bise' in
+        # an agent's shell is its HOME's, not this hub's home)
+        n1 = len(results(c, "main"))
+        c.say("[[bash: echo HOME_WS=$BISE_HOME_WORKSPACE]]")
+        c.wait(lambda: len(results(c, "main")) > n1, 60, "the echo")
+        c.wait_idle("main")
+        check("HOME_WS=%s" % E.ws in results(c, "main")[n1], "agents get BISE_HOME_WORKSPACE: %r" % results(c, "main")[n1])
         check("nobody named" in r[4] and "no rule 9" in r[5], "refusals: %r %r" % (r[4], r[5]))
         taste = open(os.path.join(E.ws, "taste.md")).read()
         check(taste == "# my taste\n- short sentences\n- headings in lowercase (from the offsite page)\nnot a rule\n", "taste.md: %r" % taste)

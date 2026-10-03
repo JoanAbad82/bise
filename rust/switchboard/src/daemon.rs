@@ -2518,6 +2518,10 @@ impl Shell {
             .env("SB_SOCKET", self.opts.paths.socket())
             .env("BEND_WIRE_LOG", adir.join("wire.log"))
             .env("SB_AGENT", &a.name)
+            // the hub's home workspace (taste.md, people.md): an agent's
+            // `~/bise` is its shell's HOME, not this hub's when the home
+            // is elsewhere (a QA hub, amb-tools m_6141)
+            .env("BISE_HOME_WORKSPACE", crate::paths::home_workspace())
             // which model: config.toml `model`, or `agent_model` (BISE-142)
             .env("BISE_ROLE", if a.is_main { "main" } else { "agent" })
             // its own model and effort, over both (BISE-135: /model)
