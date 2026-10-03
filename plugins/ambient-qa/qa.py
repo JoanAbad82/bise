@@ -1049,7 +1049,8 @@ SCENARIOS.update({
     "feedback": {"ask": "Benjamin's bug reports in #acme-feedback: handle them so adoption is easy", "no_send": False, "notes": False, "flow": "feedback",
                  "picks": {"q-language": 2}},
     # roadmap D (amb-core 527fa441): a step-by-step plan, bise ticks its own, a card per step of his when its turn comes
-    "checklist": {"ask": "check my mail and give me a step by step to buy the domain", "no_send": True, "notes": False, "flow": "checklist"},
+    "checklist": {"ask": "check my mail and give me a step by step to buy the domain", "no_send": True, "notes": False, "flow": "checklist",
+                  "note_texts": {"q-legal": "legal@acme.test"}},
     # roadmap E (amb-kit m_5643): a seeded night (a PR done, a question card, unsent replies,
     # his domain steps, the launch watch), then the morning page from it; nothing leaves
     "morning": {"ask": "make today's morning page", "no_send": True, "no_writes": True, "notes": False,
@@ -1227,6 +1228,18 @@ def question_pick(card, picks=None, default=1):
     return str(default)
 
 
+def option_label(card, pick):
+    """The words of option `pick` on a question card (its text lines, or its options)."""
+    for o in card.get("options") or []:
+        if str(o.get("n")) == str(pick):
+            return str(o.get("label", ""))
+    for line in (card.get("text") or "").splitlines():
+        m = re.match(r"\s*(\d+)[.)]?\s+(.*)", line)
+        if m and m.group(1) == str(pick):
+            return m.group(2)
+    return ""
+
+
 def answer_questions(x):
     """Answers every open question card that isn't one of his step cards
     (no page item) through the core, once each, as he would; recorded in
@@ -1240,6 +1253,14 @@ def answer_questions(x):
             x["core"].p.stdin.write(json.dumps({"cmd": "answer", "card": q["id"], "reply": pick}) + "\n")
             x["core"].p.stdin.flush()
             answered.append({"id": q["id"], "text": (q.get("text") or "")[:160], "reply": pick})
+            # an option that promises a note ('i'll leave a note with the address'): the note
+            # follows on that block, with the scenario's words for it (ambient-pm m_5904)
+            pg = q.get("page") or {}
+            label = option_label(q, pick)
+            if pg.get("id") and pg.get("block") and re.search(r"\bnote\b", label, re.I):
+                text = (x.get("note_texts") or {}).get(pg["block"]) or label
+                page_notes(pg["id"], [{"block": pg["block"], "kind": "note", "text": text}], send=True)
+                answered[-1]["note"] = text
 
 
 def _rows(body):
@@ -1847,7 +1868,10 @@ def _run(scenario, sc, headless, timeout, keep, out, require):
                 if e.get("ev") == "main" and e.get("text"):
                     r["main_lines"].append({"at": rel(), "text": e["text"], "len": len(e["text"])})
             for cd in c.cards():
-                cards.setdefault(cd.get("id"), dict(cd, at=rel()))
+                # the latest view of each card, kept fields it no longer shows (its page link once
+                # closed: ambient-pm m_5904), first seen time
+                old = cards.get(cd.get("id")) or {}
+                cards[cd.get("id")] = dict(old, **{k: v for k, v in cd.items() if v is not None}, at=old.get("at", rel()))
             pages = [p for p in (c.state or {}).get("pages", []) if p["id"] not in before]
             return pages[0] if pages else None
 
@@ -1887,7 +1911,7 @@ def _run(scenario, sc, headless, timeout, keep, out, require):
             if sc.get("flow") in FLOWS:
                 # roadmap A, C, D: what the user does after v1, and what must follow
                 FLOWS[sc["flow"]](dict(r=r, c=c, page=page, port=port, last=last, body=body, d=d, poll=poll, settled=settled, rel=rel,
-                                       timeout=timeout, info=info, core=core, cards=cards, pick=sc.get("pick"), picks=sc.get("picks")))
+                                       timeout=timeout, info=info, core=core, cards=cards, pick=sc.get("pick"), picks=sc.get("picks"), note_texts=sc.get("note_texts")))
             elif not sc.get("notes", True):
                 # launch watch (roadmap B): v1 holds batch 0's needs-an-answer items;
                 # after a tick the page republishes with the new batch's
