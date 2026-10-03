@@ -29,7 +29,7 @@ TOOLS = [
      {"state": {"type": "string", "enum": ["down", "up", "tap", "double", "cancel"]}, "key": {"type": "string", "enum": ["fn", "right_option"]}}, ["state"]),
     ("key", "fn + a key, through the app's real key path: space 1-9 i 0 o . enter esc.", {"k": {"type": "string"}}, ["k"]),
     ("click", "One real mouse click on a capsule element (CSS selector): a CGEvent left down/up at its screen point, posted to the QA app's own pid (never the HID tap: his pointer never moves), with bise not frontmost. Returns what each layer saw: window_at_point (the window server's top window), panel mouse settings, hit_view, appkit events, dom events (pointerdown/click and on what), clicked. Can't catch: another app's window above the panel taking a real click (window_at_point says it), hover under a moving pointer.",
-     {"selector": {"type": "string"}, "route": {"type": "string", "enum": ["point", "window"]}, "frontmost": {"type": "boolean", "description": "leave bise active (default: not frontmost)"}}, ["selector"]),
+     {"selector": {"type": "string"}, "route": {"type": "string", "enum": ["appkit", "point", "window"], "description": "appkit (default): the routed event into the app queue; point/window: a CGEvent posted to the pid (AppKit gives it no window)"}, "frontmost": {"type": "boolean", "description": "leave bise active (default: not frontmost)"}}, ["selector"]),
     ("fn_hold_closed", "fn held from rest (capsule closed, bise not frontmost) through the real key path (KeyMachine via Keys.qaEvent; the QA app has no tap, never his fn): the pearl listens within within_ms, the fake voice's words reach the core on release, main's line shows; variants launch, fold (opened then folded by itself), hide (fn + .); then a tap must do nothing.",
      {"variants": {"type": "array", "items": {"type": "string", "enum": ["launch", "fold", "hide"]}}, "words": {"type": "string"}, "within_ms": {"type": "integer"}}, []),
     ("rest", "The capsule back to rest (folded into the icon) and bise not the active app.", {}, []),
@@ -115,7 +115,7 @@ def run(name, a):
     elif name == "key":
         r = qa.key(a["k"])
     elif name == "click":
-        r = qa.click(a["selector"], a.get("route", "point"), not a.get("frontmost", False))
+        r = qa.click(a["selector"], a.get("route", "appkit"), not a.get("frontmost", False))
     elif name == "fn_hold_closed":
         r = qa.fn_hold_closed(tuple(a.get("variants") or ("launch", "fold", "hide")), a.get("words", "what is on my plate today"), within_ms=a.get("within_ms", 300))
     elif name == "rest":

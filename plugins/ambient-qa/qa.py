@@ -162,7 +162,10 @@ def find_bise(explicit=None):
             if not root:
                 raise QAError("%s has no app root with a built repl-live: set AMBIENT_QA_APP_ROOT to a tree that has one (./run.sh builds it)" % c)
             return os.path.abspath(c), root
-    if _is_exe(last.get("bise")) and last.get("app_root") and os.path.exists(os.path.join(last["app_root"], "repl-live")):
+    # the last launch's pair only while its tree is still at ambient-app's tip (ambient m_6561:
+    # a launch reused ambient-pm's tree 10 commits behind)
+    if _is_exe(last.get("bise")) and last.get("app_root") and os.path.exists(os.path.join(last["app_root"], "repl-live")) \
+            and behind(last["app_root"]) == 0:
         return last["bise"], last["app_root"]
     own = os.path.join(REPO, "rust", "target", "debug", "bise")
     if _is_exe(own) and app_root_of(own):
@@ -751,7 +754,7 @@ def key(k):
     return call("key", k=k)
 
 
-def click(selector, route="point", deactivate=True, settle_ms=400):
+def click(selector, route="appkit", deactivate=True, settle_ms=400):
     """One real mouse click on the QA app's capsule (ambient-lead m_6481, ambient-pm's dogfood
     check): a CGEvent left down/up at the element's screen point, posted to the QA app's own pid,
     never the HID tap (his pointer never moves, no other app gets it), with bise not frontmost.
@@ -3040,7 +3043,7 @@ def _cli(argv):
     p = sub.add_parser("fn"); p.add_argument("state"); p.add_argument("--key", default="fn")
     p = sub.add_parser("key"); p.add_argument("k")
     p = sub.add_parser("click", help="one real mouse click (a CGEvent posted to the QA app's pid, never the HID tap) on a capsule element: what the window server, AppKit and the page each saw")
-    p.add_argument("selector"); p.add_argument("--route", choices=["point", "window"], default="point"); p.add_argument("--frontmost", action="store_true", help="leave bise active (default: not frontmost)")
+    p.add_argument("selector"); p.add_argument("--route", choices=["appkit", "point", "window"], default="appkit"); p.add_argument("--frontmost", action="store_true", help="leave bise active (default: not frontmost)")
     p = sub.add_parser("fn-hold-closed", help="fn held from rest through the real key path (no tap): pearl listening within 300 ms, words to the core, main's line; a tap does nothing")
     p.add_argument("--variants", default="launch,fold,hide"); p.add_argument("--words", default="what is on my plate today"); p.add_argument("--within-ms", type=int, default=300)
     sub.add_parser("rest", help="the capsule back to rest and bise not the active app")

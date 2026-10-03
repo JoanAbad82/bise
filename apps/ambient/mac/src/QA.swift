@@ -742,8 +742,21 @@ final class QA {
             return e
         }
         defer { if let mon { NSEvent.removeMonitor(mon) } }
-        let route = q["route"] as? String ?? "point"   // point: AppKit finds the window; window: the event names the panel
-        for (t, wait) in [(CGEventType.leftMouseDown, UInt64(0)), (.leftMouseUp, UInt64(70_000_000))] {
+        // appkit (default): the mouse event the window server hands the app once it routed the click
+        // to the panel (window_at_point says whether it would), into the app's event queue
+        // (NSApp.postEvent: monitors, NSApplication.sendEvent, NSWindow.sendEvent with its
+        // first-click / key rules, the web view's hit test). point / window: a CGEvent posted to this
+        // pid; live (20:55) AppKit got those with no window at all, so they never reach a view.
+        let route = q["route"] as? String ?? "appkit"
+        if route == "appkit" {
+            for (t, wait) in [(NSEvent.EventType.leftMouseDown, UInt64(0)), (.leftMouseUp, UInt64(70_000_000))] {
+                if wait > 0 { try? await Task.sleep(nanoseconds: wait) }
+                guard let ev = NSEvent.mouseEvent(with: t, location: inWin, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                  windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) else { continue }
+                NSApp.postEvent(ev, atStart: false)
+            }
+        }
+        for (t, wait) in route == "appkit" ? [] : [(CGEventType.leftMouseDown, UInt64(0)), (.leftMouseUp, UInt64(70_000_000))] {
             if wait > 0 { try? await Task.sleep(nanoseconds: wait) }
             guard let ev = CGEvent(mouseEventSource: nil, mouseType: t, mouseCursorPosition: cg, mouseButton: .left) else { continue }
             ev.setIntegerValueField(.mouseEventClickState, value: 1)
