@@ -86,7 +86,10 @@
     return { ev, talkEnd, speakAt, speakEnd };
   }
 
-  const sort = (ev) => ev.slice().sort((a, b) => a[0] - b[0]);
+  // every scene's build goes through sort: the fake core answers again (the offline scene sets
+  // `down` after it, so its send is never answered)
+  let down = false;
+  const sort = (ev) => { down = false; return ev.slice().sort((a, b) => a[0] - b[0]); };
 
   // the scenes: id, the SPEC §2 state(s) it shows, its label, its events
   const SCENES = [
@@ -187,11 +190,31 @@
         [5000, { ev: "app_key", key: "0" }],
       ]);
     } },
+    // round 9: fn p, your pages (new for you, then seen); can't reach bise (a type the core never
+    // answers: no 'sent' in 3 s)
+    { id: "your-pages", spec: ["for you"], label: "fn p: your pages", build: () => {
+      const t0 = Date.now();
+      const pages = [
+        { id: "weekly-update", title: "weekly update", agent: "weekly-update", version: 4, opened_version: 2, url: "http://127.0.0.1:47123/p/weekly-update", at_ms: t0 - 60000, state: "ready" },
+        { id: "hn-watch", title: "launch thread on HN", agent: "hn-watch", version: 1, url: "http://127.0.0.1:47123/p/hn-watch", at_ms: t0 - 3 * 60000, state: "ready" },
+        { id: "grays", title: "which gray wins?", agent: "dark-mode", version: 2, opened_version: 2, url: "http://127.0.0.1:47123/p/grays", at_ms: t0 - 40 * 60000, state: "ready" },
+      ];
+      const timers = [{ id: 3, agent: "hn-watch", label: "every 15 min", text: "check the HN thread", by: "main", next_ms: t0 + 12 * 60000, fired: 4, page: "hn-watch", last_ms: t0 - 3 * 60000 }];
+      return sort([[0, { ev: "hub", up: true, workspace: "~/acme" }], [0, { ...state(AGENTS), pages, timers }], [400, { ev: "app_key", key: "p" }]]);
+    } },
+    { id: "offline", spec: ["failed"], label: "can't reach bise", build: () => {
+      const evs = sort([...base(),
+        [300, { ev: "app_key", key: "space" }], [500, { ev: "ui_spot_type", text: "dark mode for the settings page" }],
+        [700, { ev: "ui_spot_send", text: "dark mode for the settings page" }]]);
+      down = true;
+      return evs;
+    } },
     { id: "still", spec: ["reduced motion"], label: "reduced motion", build: () => sort([[0, { ev: "app_reduce_motion", on: true }], ...base(), ...talkTurn(1500).ev, [16000, state(AGENTS, [CARD])]]) },
   ];
 
   // what the core answers to the capsule's cmds (the player feeds these back)
   function respond(cmd) {
+    if (down && (cmd.cmd === "send" || cmd.cmd === "start")) return [];
     switch (cmd.cmd) {
       case "answer": return [[300, state(AGENTS, [])]];
       case "send": return [[150, { ev: "sent", text: cmd.text, voice: false, shot: true }], [250, { ev: "phase", phase: "working" }],

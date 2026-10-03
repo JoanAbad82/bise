@@ -66,6 +66,12 @@
       never: "windows bise never sees", always: "always", switch: "switch", remove: "remove",
       beforeAsks: "before macOS asks", permName: { accessibility: "Accessibility", mic: "the microphone", screen: "Screen Recording" },
       ofN: (i, n) => `${i} of ${n}`, asksNext: "macOS asks next",
+      // your pages (fn p) and can't reach bise (ambient m_6528)
+      yourPages: "your pages", newForYou: "new for you", seen: "seen", openThat: "open that one", copy: "copy",
+      offline: "can't reach bise.", kept: "your words are kept",
+      offlineText: "bise isn't running on this Mac, or it stopped. what you said waits here and goes as soon as bise is back.",
+      tryAgain: "try again", checks: "bise checks every 10 s on its own", terminal: "start bise in a terminal", runs: "runs: bise",
+      copySaid: "copy what you said", back: "bise is back · your words went to main",
     },
     // a card asked from a page (docs/ambient-pages.md §4.2): fn + o opens the page at the question
     // (⏎ picks the selected row since B3); key hints are `<keys> <word>`, no + (ambient, m_5067)

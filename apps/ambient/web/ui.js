@@ -23,7 +23,7 @@
     <div class="bar" id="bar">
       <canvas class="pearl" role="img" aria-label="bise"></canvas>
       <div class="glass" id="glass">
-        <div class="say" aria-live="polite" aria-atomic="true"></div>
+        <div class="say" aria-live="polite" aria-atomic="true" data-qa-info="1"></div>
         <div class="gin"><div class="head"></div><div class="level" aria-hidden="true"></div><div class="mid"></div><div class="body"></div><div class="foot"></div></div>
       </div>
     </div>`;
@@ -70,7 +70,7 @@
     const qa = it.act && it.act.ev === "ui_ask_more" ? "full-text" : `hint-${it.keys.filter((k) => k !== "–").join("-")}`;
     // data-key (ambient m_6592 via amb-tools m_6594): the hint's keys as shown ('fn esc', 'fn 1–3', '⌘ ⏎')
     const dk = it.keys.join(" ").replace(/ – /g, "–");
-    return it.act ? `<button type="button" class="${cls}" data-qa="${esc(qa)}" data-key="${esc(dk)}"${act(it.act)}>${inner}</button>` : `<span class="${cls}">${inner}</span>`;
+    return it.act ? `<button type="button" class="${cls}" data-qa="${esc(qa)}" data-key="${esc(dk)}"${act(it.act)}>${inner}</button>` : `<span class="${cls} info" data-qa-info="1">${inner}</span>`;   // only info ('↑↓ move'): not a target (ambient's gate (3))
   };
 
   // words that land one by one: keep the spans that are the same, light the ones said
@@ -175,8 +175,10 @@
 
     put("mid", JSON.stringify([s.big, s.text]), () => {
       const t = s.text;
-      el.mid.innerHTML = (s.big ? `<div class="big">${esc(s.big)}</div>` : "")
-        + (t ? `<div class="text${t.clamp && !t.full ? " clamp" : ""}${t.dim ? " dim" : ""}">${esc(t.s)}</div>` : "");
+      // the card's body takes a real click (pm's fail 45): the question's full text, the drafts'
+      // big line their first row (review)
+      el.mid.innerHTML = (s.big ? `<div class="big"${s.bigAct ? ` data-qa="body"${act(s.bigAct)}` : ""}>${esc(s.big)}</div>` : "")
+        + (t ? `<div class="text${t.clamp && !t.full ? " clamp" : ""}${t.dim ? " dim" : ""}"${t.act ? ` data-qa="body"${act(t.act)}` : ""}>${esc(t.s)}</div>` : "");
       show(el.mid, s.big || t);
     });
     const rowsOn = s.sections.some((x) => x.rows.length || x.label);
@@ -216,7 +218,7 @@
   }
 
   // ---- the frame loop: runs while something moves, sleeps when the bar is settled
-  let raf = 0, lastV = null, lastS = null, contentSent = "";
+  let raf = 0, lastV = null, lastS = null, contentSent = "", retryAt = 0;
   const fps = { frames: 0, since: now(), value: 0 };
   function schedule() { if (!raf) raf = requestAnimationFrame(frame); }
   function frame() {
@@ -232,6 +234,8 @@
     // what the bar has to show, on every change: the app's show/hide policy acts on it
     const ck = JSON.stringify(v.content);
     if (ck !== contentSent) { contentSent = ck; post({ cmd: "app_content", ...v.content }); }
+    // can't reach bise: try again on its own every 10 s while it shows
+    if (v.state === "offline") { if (t - retryAt > 10000) { if (retryAt) recv({ ev: "ui_retry", auto: true }); retryAt = t; } } else retryAt = 0;
     let moving = false;
     if (!v.unseen) moving = pearl.frame({ mood: v.mood, lvl: v.lvl, still: v.still, gather: v.gather || 0 }, t);
     fps.frames++;
@@ -252,10 +256,22 @@
   function later(ms) { if (!laterT && !raf) laterT = setTimeout(() => { laterT = 0; schedule(); }, ms); }
 
   // ---- input: every row and every footer hint is a real button; a click = its key
+  // ⌘ C: the answer, or what he said when bise can't be reached (the page's clipboard, and the
+  // app's too: app_copy)
+  function copy(text) {
+    if (!text) return;
+    post({ cmd: "app_copy", text });
+    try { navigator.clipboard.writeText(text).catch(() => {}); } catch { /* the app's copy stands */ }
+  }
+  function run(a) {
+    if (!a) return false;
+    if (a.ev === "ui_copy") copy(a.text); else recv(a);
+    return true;
+  }
   host.addEventListener("click", (e) => {
     const b = e.target.closest("[data-act]");
     if (!b || !host.contains(b)) return;
-    try { recv(JSON.parse(b.dataset.act)); } catch (err) { console.error("act", err); }
+    try { run(JSON.parse(b.dataset.act)); } catch (err) { console.error("act", err); }
   });
   input.addEventListener("input", () => recv({ ev: "ui_spot_type", text: input.value }));
   input.addEventListener("keydown", (e) => {
@@ -266,13 +282,38 @@
   });
   // plain keys while the bar has them (the app gives the panel the keys only when he opened it or
   // clicked a pushed card): ↑↓ ⏎ 1-9 esc, ⌘⏎ the question's full text
+  // an open bar (fn 0, fn i, fn p, settings, can't reach bise): ↑↓ over every row, ⏎ runs the
+  // selected row, ⌘ 1-9 opens that page, space flips a switch, ⌫ removes an app (ambient's keymap)
   document.addEventListener("keydown", (e) => {
     if (e.target === input || e.ctrlKey) return;
-    const asking = lastV && lastV.state === "needs" && !model.pane;
-    if (asking && e.metaKey && e.key === "Enter") { e.preventDefault(); recv({ ev: "ui_ask_more" }); return; }
-    if (e.metaKey) return;
-    const k = { Escape: "esc", ArrowUp: "up", ArrowDown: "down", Enter: "enter" }[e.key] || (/^[1-9]$/.test(e.key) ? e.key : null);
-    if (k && (model.pane || asking || k === "esc") && !(k === "enter" && !asking && !model.pane)) { e.preventDefault(); recv({ ev: "app_key", key: k, local: true }); }
+    const s = lastS, st = lastV && lastV.state;
+    const asking = st === "needs" && !model.pane;
+    const open = !!model.pane || st === "offline";
+    const stop = () => e.preventDefault();
+    if (asking && e.metaKey && e.key === "Enter") { stop(); recv({ ev: "ui_ask_more" }); return; }
+    if (e.metaKey) {
+      if (!s) return;
+      if (/^[1-9]$/.test(e.key) && open) { const r = Bar.cmdRow(s, e.key); if (r) { stop(); run(r.act); } return; }
+      if (e.key.toLowerCase() === "c") {
+        const it = (s.foot ? s.foot.left : []).concat(s.sections.flatMap((x) => x.rows)).find((x) => x.act && x.act.ev === "ui_copy");
+        if (it) { stop(); run(it.act); }
+        return;
+      }
+      if (e.key === "Enter" && st === "offline") { stop(); recv({ ev: "ui_terminal" }); }
+      return;
+    }
+    if (open && s && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      stop(); recv({ ev: "app_key", key: e.key === "ArrowUp" ? "up" : "down", local: true, n: Bar.selectable(s).length }); return;
+    }
+    if (open && s && e.key === "Enter") { const r = Bar.selRow(s); if (r) { stop(); run(r.act); return; } }
+    if (st === "settings" && s && (e.key === " " || e.key === "Backspace")) {
+      const r = Bar.selRow(s);
+      const ok = r && (e.key === " " ? r.right && "sw" in r.right : r.act.key === "skip_remove");
+      if (ok) { stop(); run(r.act); }
+      return;
+    }
+    const k = { Escape: "esc", ArrowUp: "up", ArrowDown: "down", Enter: "enter" }[e.key] || (/^[1-9p]$/.test(e.key) ? e.key : null);
+    if (k && (open || asking || k === "esc") && !(k === "enter" && !asking && !open)) { stop(); recv({ ev: "app_key", key: k, local: true }); }
   });
 
   window.ambient = {

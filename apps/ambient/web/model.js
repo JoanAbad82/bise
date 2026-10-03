@@ -26,6 +26,7 @@
     key: 3000,       // a key's own line (cancelled, later, hush...)
     page: 8000,      // `<page> is ready · fn + o`
     hide: 1500,      // fn + . : the line, then hide
+    offline: 3000,   // a talk or a type the core doesn't answer ('sent') in 3 s: can't reach bise
     // the hello, once ever (ambient m_5702): the pearl gathers 1.2 s, the words land, the kiss
     // puff, then 5 s; under reduced motion the words fade in and leave 5 s later
     helloGather: 1200, helloWords: 300, helloKiss: 1400, helloKissMs: 1000, helloStay: 5000,
@@ -96,7 +97,12 @@
   const visibleCards = (m) => m.cards.filter((c) => !m.answered[c.id]);
   // what the question glass may ask: not a card he put off with esc (it keeps waiting in the inbox
   // and the count, ambient m_6500), and in a call or a meeting only the urgent ones
-  const askable = (m) => visibleCards(m).filter((c) => !(m.later || {})[c.id] && (!m.quiet || c.urgent));
+  // the card he brought up from fn i / fn 0 (m.front) asks first, even in a call
+  const askable = (m) => {
+    const a = visibleCards(m).filter((c) => !(m.later || {})[c.id] && (c.id === m.front || !m.quiet || c.urgent));
+    const i = a.findIndex((c) => c.id === m.front);
+    return i > 0 ? [a[i], ...a.slice(0, i), ...a.slice(i + 1)] : a;
+  };
   const lv = (m, who, now) => (now - m.lvl[who].at < T.level ? m.lvl[who].v : 0);
   const listening = (m) => m.fn || m.handsFree || m.phase === "listening";
   const inTurn = (m) => TURN.includes(m.phase);
@@ -159,14 +165,18 @@
     const cmds = [];
     if (m.pane === "spot" && pane !== "spot") cmds.push({ cmd: "app_focus", on: false });
     if (pane === "spot" && m.pane !== "spot") cmds.push({ cmd: "app_focus", on: true });
-    return { m: { ...m, pane, spotText: pane === "spot" ? m.spotText : "" }, cmds };
+    return { m: { ...m, pane, spotText: pane === "spot" ? m.spotText : "", rowSel: pane === m.pane ? m.rowSel || 0 : 0 }, cmds };
   }
 
   function step(m, ev, now) {
     const none = (x) => ({ m: x, cmds: [] });
     switch (ev && ev.ev) {
-      case "hub":
-        return none({ ...m, hub: { up: !!ev.up, workspace: ev.workspace || m.hub.workspace, known: true } });
+      case "hub": {
+        const m2 = { ...m, hub: { up: !!ev.up, workspace: ev.workspace || m.hub.workspace, known: true } };
+        // bise is back while words wait: they go now (can't reach bise, round 9)
+        if (ev.up && !m.hub.up && m.pending) return { m: { ...m2, pending: { ...m.pending, at: now } }, cmds: [m.pending.cmd] };
+        return none(m2);
+      }
 
       case "state": {
         const agents = Array.isArray(ev.agents) ? ev.agents : [];
@@ -243,9 +253,19 @@
       case "word":
         return none(ev.turn === m.main.turn || m.main.turn == null ? { ...m, word: { turn: ev.turn, i: ev.i | 0 } } : m);
 
-      case "sent":
-        return none({ ...m, voice: !!ev.voice, sentAt: now, mine: true, hushed: false, shot: ev.shot ? m.shot : null,
+      case "sent": {
+        // back after can't reach bise: '✓ bise is back · your words went to main' (round 9)
+        const back = m.pending && now - m.pending.at >= T.offline;
+        return none({ ...m, backAt: back ? now : m.backAt, pending: null, voice: !!ev.voice, sentAt: now, mine: true, hushed: false, shot: ev.shot ? m.shot : null,
           turnNames: m.turnNames || names(m.agents), chips: m.turnNames ? m.chips : [], main: { text: "", turn: m.main.turn, at: now } });
+      }
+      // can't reach bise: try again (⏎, and on its own when the hub comes back), or he closes it
+      // (esc: his words stay kept, the bar goes)
+      case "ui_retry":
+        // the bar stays on can't reach bise until 'sent' (ui.js also retries every 10 s on its own)
+        return m.pending ? { m: { ...m, pending: { ...m.pending, closed: ev.auto ? m.pending.closed : false } }, cmds: [m.pending.cmd] } : none(m);
+      case "ui_terminal":   // start bise in a terminal (amb-mac runs 'bise' in Terminal)
+        return { m, cmds: [{ cmd: "app_run_bise" }] };
 
       case "error":
         return none(flashNow(m, { kind: "error", glyph: "▲", text: ev.text || "", ttl: T.error, still: true }, now));
@@ -269,7 +289,9 @@
           if (m.phase !== "speaking") return none(m);
           return { m: flashNow({ ...m, cutAt: now, hushed: true }, { kind: "cut", text: W.cutIn }, now), cmds: [{ cmd: "cut_in" }] };
         }
-        if (st === "up") return none({ ...m, fn: false, handsFree: false });
+        // let go: the app sends the talk; if the core doesn't answer 'sent' in 3 s, can't reach bise
+        // (what he said is kept: a retry sends its words as text)
+        if (st === "up") return none({ ...m, fn: false, handsFree: false, pending: m.fn || m.handsFree ? { cmd: { cmd: "send", text: m.heard.text }, text: m.heard.text, at: now, voice: true } : m.pending });
         if (st === "cancel") {
           return { m: flashNow({ ...m, fn: false, handsFree: false, mine: false, heard: { text: "", final: false }, phase: m.phase === "listening" ? "idle" : m.phase }, { kind: "cancel", text: W.cancelled }, now), cmds: [{ cmd: "talk_cancel" }] };
         }
@@ -326,7 +348,7 @@
           const r = setPane(m, "inbox");
           return { m: { ...r.m, sel: Math.max(0, i) }, cmds: r.cmds };
         }
-        return key(m, ev.key, now);
+        return key(m, ev.key, now, ev);
       // a call or a meeting (amb-mac, 62d2105; replayed after a reload): main answers in text only
       // and the non-urgent cards wait (no needs-you glass); the inbox still lists them
       // nobody can see the capsule (hidden, covered, the screen locked or asleep; amb-mac e3c5dcf6):
@@ -366,9 +388,22 @@
       }
       case "ui_open_card":   // a click on a card's `fn + ⏎ open it`
         return openCard(m, m.cards.find((c) => c.id === ev.card));
+      // a card row in fn i or fn 0 (⏎ or a click): that card comes up as the question bar with all
+      // its choices (a drafts card: review and send all; lead m_6613), even one he put off
+      case "ui_card": {
+        if (!visibleCards(m).some((c) => c.id === ev.card)) return none(m);
+        const r = setPane(m, null);
+        const later = { ...(m.later || {}) }; delete later[ev.card];
+        return { m: { ...r.m, later, front: ev.card, optFor: ev.card, optSel: 0 }, cmds: r.cmds };
+      }
       case "ui_page": {      // a click on a page in "for you"
         const p = m.pages.find((x) => x.id === ev.page);
-        return p ? openPage(m, p) : none(m);
+        if (!p) return none(m);
+        // from your pages (fn p), the page opens in the browser and the bar closes (round 9)
+        const r = openPage(m, p);
+        if (m.pane !== "pages") return r;
+        const c = setPane(r.m, null);
+        return { m: c.m, cmds: [...c.cmds, ...r.cmds] };
       }
       // '… more   ⌘ ⏎' (ambient m_6500): the whole question in place, the rows stay below
       case "ui_ask_more": {
@@ -387,8 +422,10 @@
         const text = (ev.text ?? m.spotText).trim();
         if (!text) return none(m);
         const r = setPane({ ...m, spotText: "" }, null);
-        // tab: amb-core's own cmd start (e00ad291), which answers 'sent' like send
-        return { m: { ...r.m, mine: true, voice: false, turnNames: names(m.agents), chips: [] }, cmds: [...r.cmds, { cmd: ev.ev === "ui_spot_tab" ? "start" : "send", text }] };
+        // tab: amb-core's own cmd start (e00ad291), which answers 'sent' like send; the words wait
+        // in m.pending until 'sent' (can't reach bise after 3 s)
+        const cmd = { cmd: ev.ev === "ui_spot_tab" ? "start" : "send", text };
+        return { m: { ...r.m, mine: true, voice: false, turnNames: names(m.agents), chips: [], pending: { cmd, text, at: now } }, cmds: [...r.cmds, cmd] };
       }
       case "ui_perm":
         // continue: macOS's prompt; not now: the refused path (the app answers app_perm denied, and
@@ -408,7 +445,7 @@
   }
 
   // fn + key (app_key), and the same keys inside the panel
-  function key(m, k, now) {
+  function key(m, k, now, ev = {}) {
     const none = (x) => ({ m: x, cmds: [] });
     const cards = visibleCards(m);
     if (/^[1-9]$/.test(k)) {
@@ -456,8 +493,17 @@
       case "0": return setPane(m, m.pane === "agents" ? null : "agents");
       // fn + , (and the menu's 'settings…'): the settings view (amb-mac ef4dbc2e)
       case ",": return setPane(m, m.pane === "settings" ? null : "settings");
-      case "up": return none({ ...m, sel: Math.max(0, m.sel - 1) });
-      case "down": return none({ ...m, sel: Math.min(Math.max(0, cards.length - 1), m.sel + 1) });
+      // round 9: ↑↓ move over every row of the open bar (ev.n: how many rows it can select, from
+      // the page); the cards come first in fn 0 and fn i, so the selection is also the card 1-9
+      // and ⏎ answer or open (m.sel)
+      case "up": case "down": {
+        const n = Number.isFinite(+ev.n) && +ev.n > 0 ? +ev.n : Math.max(1, cards.length);
+        const rowSel = Math.max(0, Math.min(n - 1, (m.rowSel || 0) + (k === "down" ? 1 : -1)));
+        const onCard = (m.pane === "inbox" || m.pane === "agents") && rowSel < cards.length;
+        return none({ ...m, rowSel, sel: onCard ? rowSel : m.sel });
+      }
+      // fn p: your pages, new ones first, then the ones you've seen (round 9, amb-mac a7efaa08)
+      case "p": return setPane(m, m.pane === "pages" ? null : "pages");
       case "l": {
         if ((m.pane !== "inbox" && m.pane !== "agents") || !cards[m.sel]) return none(m);
         // later: the card leaves the inbox here; the hub keeps it (bringing it back is the core's, later)
@@ -473,6 +519,8 @@
         }
         if (m.phase === "speaking" && !m.hushed) return { m: { ...m, hushed: true }, cmds: [{ cmd: "hush" }] };
         if (m.pane) return setPane(m, null);
+        // can't reach bise: esc closes the bar, his words stay kept and still go when bise is back
+        if (m.pending && !m.pending.closed && now - m.pending.at >= T.offline) return none({ ...m, pending: { ...m.pending, closed: true } });
         return none(m);
       }
       default:
@@ -535,7 +583,7 @@
       case "spotlight": return { kind: "type" };
       case "working": return { kind: v.words ? "answer" : "got" };
       case "speaking": case "end": return { kind: "answer" };
-      case "agents": case "inbox": case "settings": return { kind: "open" };
+      case "agents": case "inbox": case "settings": case "pages": case "offline": return { kind: "open" };
       case "hello": return { kind: "hello" };
       // a permission ask is opened (until he answers); its refused line is a timed line, 8 s (amb-mac m_5679)
       case "perm": return { kind: v.perm ? "open" : "line" };
@@ -580,6 +628,7 @@
       radius: m.radius,     // the capsule's and the glass's corners
       kiss: false,
       focused: !!m.focused, // the panel has the keys (app_focused)
+      rowSel: m.rowSel || 0, // the selected row of an open bar (bar.js clamps it)
       handsFree: !!m.handsFree,
     };
     // main's reply, its markdown rendered (marks stripped, `code` flagged), one entry per raw word
@@ -645,10 +694,17 @@
       v.text = t >= (m.reduce ? 0 : T.helloWords) ? W.hello : null;
       v.gather = m.reduce ? 0 : Math.max(0, 1 - (1 - Math.pow(1 - Math.min(1, t / T.helloGather), 3)));
       v.puff = !m.reduce && t >= T.helloKiss && t < T.helloKiss + T.helloKissMs;
+    } else if (m.pending && !m.pending.closed && now - m.pending.at >= T.offline) {
+      // can't reach bise (round 9): a talk or a type the core didn't answer in 3 s; his words are
+      // kept and go when it's back
+      v.state = "offline"; v.size = "open";
+      v.offline = { text: m.pending.text || "" };
     } else if (m.mine && (m.phase === "sending" || m.phase === "working" || (m.phase === "idle" && now - m.sentAt < 30000 && !m.main.text))) {
       v.state = "working"; v.size = "open"; v.pose = "think";
       v.label = { text: "bise", acc: true };
       if (m.main.text && !m.voice) v.words = mainWords();
+      // back after can't reach bise: '✓ bise is back · your words went to main' first (round 9)
+      else if (now - (m.backAt || -1e9) < T.page) { v.glyph = "✓"; v.text = W.bar.back; }
       else v.text = now - m.sentAt < T.got ? W.got : W.onShort;
       if (m.line) v.sub = m.line;
       v.chips = m.chips;
@@ -725,6 +781,14 @@
         skip: (s.skip || []).filter((x) => !x.fixed).map((x) => ({ bundle: x.bundle, name: x.name })),
         add: W.set.add, remove: W.set.remove,
       };
+    } else if (m.pane === "pages") {
+      // fn p, your pages (round 9): the unopened ones first, then the ones you've seen, each with
+      // its version line, a watched one with when its agent last checked; ⏎ or ⌘ 1-9 opens one
+      v.state = "pages"; v.size = "open";
+      v.myPages = forYouPages(m).map((p) => {
+        const t = m.timers.find((x) => x.page === p.id);
+        return { id: p.id, name: pageName(p), meta: Wd.pageMeta(p, wall, openedAt(m, p)), unopened: !opened(m, p), watch: t ? Wd.watching(+t.last_ms || 0, wall) : null };
+      });
     } else if (m.pane === "inbox") {
       v.state = "inbox"; v.size = "open";
       v.label = { text: cards.length ? Wd.waiting(cards.length) : W.quiet };

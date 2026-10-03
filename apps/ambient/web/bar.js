@@ -22,7 +22,7 @@
   function askFoot(n, focused) {
     const range = (pre) => [...pre, "1", "–", String(n)];
     const left = focused
-      ? [item(range([]), B.pick, key("1")), item(["↑", "↓"], B.move, key("down")), item(["esc"], B.later, key("esc"))]
+      ? [item(range([]), B.pick, key("1")), item(["↑", "↓"], B.move), item(["esc"], B.later, key("esc"))]
       : [item(range(["fn"]), B.pick, key("1")), item(["fn", "esc"], B.later, key("esc"))];
     return { left, right: [item(["fn"], B.sayIt, null, B.orHold)] };
   }
@@ -34,6 +34,16 @@
   // the rows of the agents an answer started (the model's chips: names)
   const started = (v) => (v.chips && v.chips.length ? [{ label: B.agentsStarted, rows: v.chips.map((n) => ({ g: "∿", t: n })) }] : []);
 
+  // the rows ↑↓ can select: the ones a click acts on (not a fixed row, not a label)
+  const selectable = (s) => s.sections.flatMap((sec) => sec.rows).filter((r) => r.act && !r.fixed);
+  // an open bar (fn 0, fn i, fn p, settings, can't reach bise): the model's rowSel, clamped
+  function markSel(s, at) {
+    const rows = selectable(s);
+    s.sections.forEach((sec) => sec.rows.forEach((r) => { r.sel = false; }));
+    if (rows.length) rows[Math.max(0, Math.min(rows.length - 1, at || 0))].sel = true;
+    return s;
+  }
+
   function spec(v) {
     const s = { kind: v.state, mood: v.mood, head: null, level: null, big: null, text: null, sections: [], foot: null };
     const focused = !!v.focused;
@@ -41,7 +51,8 @@
       case "listening": case "voice_note": {
         const said = v.words && v.words.list.length ? v.words : null;
         s.head = { h: 68, line: said ? { words: said } : { ph: true, text: v.state === "voice_note" && v.label ? v.label.text : B.listening } };
-        if (v.sees) s.head.right = { text: v.sees.tail ? B.sees(v.sees.head) : v.sees.head };
+        // seesParts already says 'bise sees <app> · <host>' (ambient's gate (1): it was doubled)
+        if (v.sees) s.head.right = { text: v.sees.head + (v.sees.tail || "") };
         s.level = v.lvl || 0;
         s.foot = v.handsFree
           ? { left: [item(["fn"], B.send, null, B.tap), item(["esc"], B.cancel, key("esc"))], right: [] }
@@ -52,7 +63,9 @@
         s.head = { h: 68, line: v.words ? { words: v.words, size: "big" } : { text: v.text, size: "big" } };
         if (v.sub) s.text = { s: v.sub, dim: true };
         s.sections = started(v);
-        s.foot = { left: [], right: [item(["esc"], v.state === "end" ? B.closeLeaves : B.close, key("esc"))] };
+        // ⌘ C copies main's answer (ui.js: act ui_copy is the page's, never the model's)
+        const said = v.words ? v.words.list.join(" ") : "";
+        s.foot = { left: said ? [item(["⌘", "C"], B.copy, { ev: "ui_copy", text: said })] : [], right: [item(["esc"], v.state === "end" ? B.closeLeaves : B.close, key("esc"))] };
         return s;
       }
       case "needs": {
@@ -60,9 +73,10 @@
         const [acc, rest] = a.batch ? a.title.split(" · ") : [a.label || B.needs(a.agent), B.now];
         const more = a.more > 0 ? ` · +${a.more}` : "";
         s.head = { h: 52, lab: { acc: a.batch ? `? ${acc}` : acc, rest: (rest || "") + more } };
-        if (a.batch) s.big = a.text;
+        // the body takes a click too (pm's fail 45): drafts -> review (row 1), a question -> its full text
+        if (a.batch) { s.big = a.text; s.bigAct = { ev: "ui_option", card: a.id, i: a.options[0].i }; }
         else {
-          s.text = { s: a.text, clamp: 4, full: !!a.full };
+          s.text = { s: a.text, clamp: 4, full: !!a.full, ...(a.full ? {} : { act: { ev: "ui_ask_more" } }) };
           if (!a.full) s.head.right = item(["⌘", "⏎"], B.fullText, { ev: "ui_ask_more" });
         }
         s.sections = [{ rows: a.options.map((o, k) => ({
@@ -91,15 +105,41 @@
       case "agents": case "inbox": {
         const full = v.state === "agents";
         s.head = { h: 68, line: { ph: true, text: full ? B.goingOn : B.inbox }, right: full ? item(["fn", "0"]) : { text: B.mostBlocking } };
-        const cards = (v.inbox || []).map((c, k) => ({ g: "?", gc: "a", t: c.text, sub: c.agent, sel: !!c.sel, right: { keys: [String(k + 1)] }, act: { ev: "ui_open_card", card: c.id }, qa: `card-${c.id}` }));
+        const cards = (v.inbox || []).map((c, k) => ({ g: "?", gc: "a", t: c.text, sub: c.agent, sel: !!c.sel, right: { keys: [String(k + 1)] }, act: { ev: "ui_card", card: c.id }, qa: `card-${c.id}` }));
         if (cards.length || !full) s.sections.push({ label: cards.length ? Wd.waiting(cards.length) : W.nothingNeeds, rows: cards, acc: cards.length > 0 });
         if (full) {
           const run = (v.list || []).map((r) => ({ g: r.glyph === "✓" ? "✓" : r.kind === "need" ? "?" : r.glyph, gc: r.glyph === "✓" ? "ok" : r.glyph === "▲" ? "risk" : r.kind === "need" ? "a" : null, t: r.name, sub: r.what, right: r.age ? { age: r.age } : null }));
           s.sections.push({ label: run.length ? `${v.titles.running} · ${run.length}` : W.nothingRunning, rows: run });
           if (v.forYou) s.sections.push({ label: v.forYou.title, rows: v.forYou.pages.map((p, k) => ({ g: "◰", gc: p.unopened ? "a" : null, t: p.name, sub: p.watch ? `${p.watch} · ${p.meta}` : p.meta, seen: !p.unopened, right: k < 9 ? { keys: ["⌘", String(k + 1)] } : null, act: { ev: "ui_page", page: p.id }, qa: `page-${p.id}` })) });
         }
-        s.foot = { left: [item(["↑", "↓"], B.move, key("down")), item(["⏎"], B.open, key("enter"))], right: [item(["esc"], full ? B.close : B.later, key("esc"))] };
-        return s;
+        s.foot = { left: [item(["↑", "↓"], B.move), item(["⏎"], B.open, key("enter"))], right: [item(["esc"], full ? B.close : B.later, key("esc"))] };
+        return markSel(s, v.rowSel);
+      }
+      case "pages": {
+        // fn p: new for you, then seen (dim), ⌘ 1-9 on the first nine (ambient m_6528)
+        s.head = { h: 68, line: { ph: true, text: B.yourPages }, right: item(["fn", "p"]) };
+        const row = (p, k) => ({ g: "◰", gc: p.unopened ? "a" : null, t: p.name, sub: p.watch ? `${p.watch} · ${p.meta}` : p.meta, seen: !p.unopened,
+          right: k < 9 ? { keys: ["⌘", String(k + 1)] } : null, act: { ev: "ui_page", page: p.id }, qa: `page-${p.id}` });
+        const all = (v.myPages || []).map(row);
+        const fresh = all.filter((r) => !r.seen), old = all.filter((r) => r.seen);
+        if (fresh.length) s.sections.push({ label: B.newForYou, rows: fresh, acc: true });
+        if (old.length) s.sections.push({ label: B.seen, rows: old });
+        if (!all.length) s.text = { s: W.nothingNeeds, dim: true };
+        s.foot = { left: [item(["↑", "↓"], B.move), item(["⏎"], B.open, key("enter")), item(["⌘", "1", "–", "9"], B.openThat)], right: [item(["esc"], B.close, key("esc"))] };
+        return markSel(s, v.rowSel);
+      }
+      case "offline": {
+        // can't reach bise (ambient m_6528): its words kept, try again (and every 10 s), start it,
+        // copy what you said
+        s.head = { h: 68, line: { text: B.offline, glyph: "▲", gc: "risk", size: "big" }, right: { text: B.kept } };
+        s.text = { s: B.offlineText, dim: true };
+        s.sections = [{ rows: [
+          { g: "↻", t: B.tryAgain, sub: B.checks, right: { keys: ["⏎"] }, act: { ev: "ui_retry" }, qa: "retry" },
+          { g: "›_", t: B.terminal, sub: B.runs, right: { keys: ["⌘", "⏎"] }, act: { ev: "ui_terminal" }, qa: "terminal" },
+          ...(v.offline.text ? [{ g: "⧉", t: B.copySaid, right: { keys: ["⌘", "C"] }, act: { ev: "ui_copy", text: v.offline.text }, qa: "copy-said" }] : []),
+        ] }];
+        s.foot = { left: [item(["⏎"], B.tryAgain, { ev: "ui_retry" })], right: [item(["esc"], B.close, key("esc"))] };
+        return markSel(s, v.rowSel);
       }
       case "settings": {
         const st = v.settings;
@@ -113,7 +153,7 @@
           ] },
         ];
         s.foot = { left: [item(["↑", "↓"], B.move), item(["space"], B.switch), item(["⌫"], B.remove)], right: [item(["esc"], B.close, key("esc"))] };
-        return s;
+        return markSel(s, v.rowSel);
       }
       case "perm": {
         // a refused permission is a flash of kind perm (no v.perm): one ▲ line, as below
@@ -146,5 +186,9 @@
   const size = (h, radius) => ({ cmd: "app_size", w: BOX.left + BOX.w + BOX.right, h: BOX.top + h + BOX.bottom, radius,
     glass: { x: BOX.left, y: BOX.top, w: BOX.w, h } });
 
-  root.AmbBar = { spec, BOX, size };
+  // the row ⌘ <d> opens (fn 0's for you, fn p), and the one ⏎ runs
+  const cmdRow = (s, d) => s.sections.flatMap((sec) => sec.rows).find((r) => r.act && r.right && r.right.keys && r.right.keys[0] === "⌘" && r.right.keys[1] === String(d)) || null;
+  const selRow = (s) => s.sections.flatMap((sec) => sec.rows).find((r) => r.sel && r.act) || null;
+
+  root.AmbBar = { spec, BOX, size, selectable, cmdRow, selRow };
 })(typeof window !== "undefined" ? window : globalThis);

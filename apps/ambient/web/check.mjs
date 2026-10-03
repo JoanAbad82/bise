@@ -344,7 +344,7 @@ law("round 9: a pushed question is one bar: '? main needs you · now', '⌘ ⏎ 
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [card], pages: [] }, 0).m;
   let s = Bar.spec(M.view(m, 10));
   eq([s.head.h, s.head.lab, s.head.right.keys, s.head.right.w], [52, { acc: "? main needs you", rest: "now" }, ["⌘", "⏎"], "full text"]);
-  eq(s.text, { s: "Que fais-tu ?", clamp: 4, full: false });
+  eq(s.text, { s: "Que fais-tu ?", clamp: 4, full: false, act: { ev: "ui_ask_more" } });   // the body takes a click (pm's fail 45)
   eq(s.sections[0].rows.map((r) => [r.g, r.gk, r.t, !!r.sel]), [["1", true, "regarde", true], ["2", true, "arrête", false], ["3", true, "laisse", false]]);
   eq(s.sections[0].rows[1].act, { ev: "ui_option", card: "q", i: 1 });
   const flat = (it) => [it.pre || "", ...it.keys, it.w || ""].join(" ").trim();
@@ -390,6 +390,83 @@ law("round 9: the panel's box holds the pearl at the glass's left (x -76, 64 px)
   eq(msg, { cmd: "app_size", w: 840, h: 320, radius: 26, glass: { x: 80, y: 28, w: 700, h: 200 } });
   assert.ok(msg.glass.x - 76 >= 0);                   // the pearl fits in the box
   assert.ok(msg.h - msg.glass.y - msg.glass.h >= 86);   // 0 30 80 -24: 86 px of shadow below
+});
+law("round 9 slice 2: ↑↓ move over every row of an open bar (n from the page, clamped), the cards first so a card row is also m.sel; ⏎ runs the selected row; ⌘ 1-9 finds that page", () => {
+  // the fn i scene (two cards), its model built by hand (run keeps views only)
+  let m = M.init(); for (const [t, ev] of sceneEvents("inbox")) m = M.step(m, ev, t).m;
+  let s = Bar.spec(M.view(m, 9000));
+  const n = Bar.selectable(s).length;
+  assert.equal(n, 2);
+  eq(Bar.selRow(s).act.ev, "ui_card");                       // the first card
+  m = M.step(m, { ev: "app_key", key: "down", local: true, n }, 9001).m;
+  s = Bar.spec(M.view(m, 9002));
+  assert.equal(Bar.selectable(s).indexOf(Bar.selRow(s)), 1);
+  for (let i = 0; i < n + 3; i++) m = M.step(m, { ev: "app_key", key: "down", local: true, n }, 9003 + i).m;
+  s = Bar.spec(M.view(m, 9100));
+  assert.equal(Bar.selectable(s).indexOf(Bar.selRow(s)), n - 1);   // clamped at the last row
+  // a pane opened again starts at the top
+  assert.equal(m.sel, 1);                                     // the card row is the card 1-9 answer
+  m = M.step(M.step(m, { ev: "app_key", key: "esc" }, 9200).m, { ev: "app_key", key: "0" }, 9300).m;
+  assert.equal(M.view(m, 9400).rowSel, 0);
+});
+law("round 9 (lead m_6613, pm's fail 44): a drafts card opened from fn i comes up as its own bar and never loses 'send all': 1 review, 2 send all 3, esc later; its big line takes a click (review)", () => {
+  const evs = sceneEvents("drafts");
+  let m = M.init(); for (const [t, ev] of evs) m = M.step(m, ev, t).m;
+  m = M.step(m, { ev: "app_key", key: "esc", local: true }, 2000).m;          // put off: into the count
+  assert.notEqual(M.view(m, 2100).state, "needs");
+  m = M.step(m, { ev: "app_key", key: "i" }, 2200).m;
+  const row = Bar.selRow(Bar.spec(M.view(m, 2300)));
+  eq(row.act, { ev: "ui_card", card: "b1" });
+  m = M.step(m, row.act, 2400).m;
+  const s = Bar.spec(M.view(m, 2500));
+  eq([s.kind, s.sections[0].rows.map((r) => `${r.g} ${r.t}`)], ["needs", ["1 review", "2 send all 3"]]);
+  eq(s.bigAct, { ev: "ui_option", card: "b1", i: 0 });
+  eq(s.foot.right.map((i) => i.w), [W.bar.sayIt]);
+  assert.ok(s.foot.left.some((i) => i.w === W.bar.later));
+});
+law("round 9 slice 2: fn p, your pages: 'new for you' then 'seen' (dim), ⌘ 1-9 on the rows, ⏎ opens the page and closes the bar", () => {
+  let m = M.init(); for (const [t, ev] of sceneEvents("your-pages")) m = M.step(m, ev, t).m;
+  const v = M.view(m, 1000, Date.now());
+  assert.equal(v.state, "pages"); eq(v.content, { kind: "open" });
+  const s = Bar.spec(v);
+  eq(s.sections.map((x) => [x.label, x.rows.map((r) => r.t)]), [["new for you", ["weekly update", "launch thread on HN"]], ["seen", ["which gray wins?"]]]);
+  assert.ok(s.sections[1].rows[0].seen);
+  eq(Bar.cmdRow(s, 2).act, { ev: "ui_page", page: "hn-watch" });
+  assert.ok(/^watching/.test(s.sections[0].rows[1].sub));
+  const r = M.step(m, Bar.selRow(s).act, 1100);
+  eq(r.cmds.map((c) => c.cmd), ["app_open_url"]); assert.equal(r.m.pane, null);
+});
+law("round 9 slice 2: can't reach bise: a type not answered with 'sent' in 3 s; rows try again (⏎), start bise in a terminal (⌘ ⏎), copy what you said (⌘ C); esc closes and keeps the words; the hub back sends them; 'sent' after it says '✓ bise is back · …'", () => {
+  let m = M.init(); for (const [t, ev] of sceneEvents("offline")) m = M.step(m, ev, t).m;
+  assert.notEqual(M.view(m, 3000).state, "offline");
+  const v = M.view(m, 3800);
+  eq([v.state, v.content.kind], ["offline", "open"]);
+  const s = Bar.spec(v);
+  eq([s.head.line.glyph, s.head.line.text, s.head.right.text], ["▲", "can't reach bise.", "your words are kept"]);
+  eq(s.sections[0].rows.map((r) => [r.t, r.right.keys.join(" "), r.act.ev]), [["try again", "⏎", "ui_retry"], ["start bise in a terminal", "⌘ ⏎", "ui_terminal"], ["copy what you said", "⌘ C", "ui_copy"]]);
+  eq(M.step(m, { ev: "ui_retry" }, 3900).cmds, [{ cmd: "send", text: "dark mode for the settings page" }]);
+  eq(M.step(m, { ev: "ui_terminal" }, 3900).cmds, [{ cmd: "app_run_bise" }]);
+  const closed = M.step(m, { ev: "app_key", key: "esc", local: true }, 3900).m;
+  assert.notEqual(M.view(closed, 4000).state, "offline");
+  eq(M.step(M.step(closed, { ev: "hub", up: false }, 4100).m, { ev: "hub", up: true }, 4200).cmds, [{ cmd: "send", text: "dark mode for the settings page" }]);
+  const back = M.step(m, { ev: "sent", voice: false }, 5000).m;
+  const bv = M.view(back, 5010);
+  eq([bv.glyph, bv.text, back.pending], ["✓", "bise is back · your words went to main", null]);
+});
+law("round 9 gate fixes (ambient m_6607): the listening hint says 'bise sees' once; '↑↓ move' and '⌘ 1–9' are info, not targets; the answer's footer has ⌘ C copy", () => {
+  let m = M.step(M.init(), { ev: "app_fn", state: "down", key: "fn" }, 0).m;
+  m = M.step(m, { ev: "app_shot", app: "Chrome", title: "localhost:4801/settings" }, 10).m;
+  const right = Bar.spec(M.view(m, 20)).head.right.text;
+  assert.equal(right, "bise sees Chrome · localhost:4801/settings");
+  for (const id of ["agents", "inbox", "settings", "your-pages"]) {
+    let x = M.init(); for (const [t, ev] of sceneEvents(id)) x = M.step(x, ev, t).m;
+    const f = Bar.spec(M.view(x, 9000, Date.now())).foot;
+    for (const it of [...f.left, ...f.right]) if (it.keys[0] === "↑" || (it.keys[0] === "⌘" && it.keys.includes("–"))) assert.equal(it.act, undefined, `${id}: ${it.keys.join(" ")}`);
+  }
+  const t = run(sceneEvents("talk"), [8000]);
+  const evs = sceneEvents("talk"); const done = evs.find(([, e]) => e.ev === "phase" && e.phase === "done")[0];
+  const sv = Bar.spec(run(evs, [done + 300]).view(done + 300));
+  eq(sv.foot.left.map((i) => [i.keys.join(" "), i.w, i.act.ev]), [["⌘ C", "copy", "ui_copy"]]);
 });
 law("round 9: settings rows are switches (white, never pink: the switch is the row's right), 'windows bise never sees' with 'private browser windows · always' not selectable, each app with ⌫, '+ add an app'", () => {
   let m = M.step(M.init(), { ev: "app_settings", edge_glow: true, sounds: true, skip: [{ bundle: "com.1password", name: "1Password" }] }, 0).m;
