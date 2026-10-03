@@ -417,6 +417,11 @@ the page with an open card (a task agent's page) is not checked yet.
   before. The run's fail is its count (Slack posts only: amb-tools). Open: the same send also
   marked 2 Linear issues done, a write no card named (amb-kit). The early batch and its wording
   are addressed in amb-core 2e114ebe.
+- **C on the app at 9e5d8a6e (amb-core's reply hold): pass, end to end.** One card `3 drafts wait
+  for you · 3 replies to Benjamin: proxy, fish and français` at 75 s, before any agent started;
+  after the start, the replies waited for their fixes, and his `send all 3` (at 230 s, after the
+  page was republished) posted the 3 fixed replies once (`Fixed. …`), none before. Nit for
+  ambient's words: the topic `français` comes from the French reply; `French` reads right.
 - **F at 88044e58 (amb-tools' run, isolated fake set): pass on the product, fail 40 closed.** v1 at
   33 s, 6 items newest first, ids kept across the start and 2 ticks; 2 cards, one per batch with
   team asks (Léa's question in v1, Nora's request after a tick), none for clients or noise; outbox
