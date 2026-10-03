@@ -231,6 +231,7 @@
     note.classList.remove("on");
     put("ask", JSON.stringify(v.ask), () => {
       show(el.ask, v.ask);
+      el.ask.classList.toggle("batch", !!(v.ask && v.ask.batch));
       const n = v.ask;
       el.ask.innerHTML = !n ? "" : `<div class="ttl"><span class="gl" aria-hidden="true">?</span>${esc(n.title)}${n.more > 0 ? `<span class="more">+${n.more}</span>` : ""}</div>
         <div class="qq">${esc(n.text)}</div>${opts(n)}${n.open ? `<button type="button" class="hint open" data-open="${esc(n.id)}">${esc(n.open)}</button>` : ""}<div class="hint">${esc(n.hint)}</div>`;

@@ -197,6 +197,13 @@ html:not(.app) .cap, html:not(.app) .note {
 .ask .ttl .more { margin-left: 8px; font: 11px var(--mono); color: var(--faint); font-weight: 400; }
 .ask .qq { font-size: 16px; color: #ffffffd0; margin-top: 2px; }
 .ask .hint { font: 11.5px var(--mono); color: var(--faint); margin-top: 10px; }
+/* a batch of drafts (ambient m_6070): the label is the small mono line in the accent, the big
+   white line says whose drafts, and the options are compact pills, not half-width buttons */
+.ask.batch .ttl { font: 500 12.5px var(--mono); color: var(--acc); }
+.ask.batch .ttl .gl { margin-right: 4px; }
+.ask.batch .qq { font-size: 16px; color: #fff; margin-top: 3px; }
+.ask.batch .opts { gap: 6px; }
+.ask.batch .opts button { flex: none; padding: 5px 14px; }
 /* a card asked from a page: `fn ⏎ open it`, a quiet button over the hint */
 .ask button.hint.open { display: block; border: 0; background: none; padding: 0; color: #ffffffc0; cursor: pointer; }
 .ask button.hint.open:hover { color: #fff; }
