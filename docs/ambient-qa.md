@@ -429,6 +429,10 @@ the page with an open card (a task agent's page) is not checked yet.
   (amb-core). The actions on that page were code work (`change the system prompt …, then land it
   on main`): code belongs to `start an agent`, not to a send batch; the action block is for account
   writes like closing an issue (amb-kit).
+- **C headless at b2137adb (amb-core 5f9a1eca, amb-kit 43e4a54e): pass, fail 43 closed.** One batch
+  card `6 drafts wait for you · 3 replies to Benjamin · 3 to create` (the actions are now Linear
+  issues to create, no code work); his `send all 6` → 3 Slack replies + 3 Linear issues, once each,
+  none before. Page 17 s, v1 36 s.
 - **F at 88044e58 (amb-tools' run, isolated fake set): pass on the product, fail 40 closed.** v1 at
   33 s, 6 items newest first, ids kept across the start and 2 ticks; 2 cards, one per batch with
   team asks (Léa's question in v1, Nora's request after a tick), none for clients or noise; outbox
