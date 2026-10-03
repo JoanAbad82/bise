@@ -25,6 +25,9 @@ pub struct Row {
     pub drafted: bool,
     /// `data-draft`: the block that holds that draft
     pub draft: Option<String>,
+    /// `data-question`: a decision of his, asked by that question block:
+    /// the question's card is its only card (pm's D fail 35)
+    pub question: Option<String>,
 }
 
 impl Row {
@@ -122,6 +125,7 @@ pub fn items_of(html: &str, kit: &str) -> Vec<Row> {
                 done: attr(lhead, "data-done").is_some(),
                 drafted: !yours && attr(lhead, "data-did").is_some_and(|d| d.to_lowercase().contains("draft")),
                 draft: attr(lhead, "data-draft").filter(|d| !d.trim().is_empty()),
+                question: attr(lhead, "data-question").filter(|q| !q.trim().is_empty()),
             });
         }
     }
@@ -142,9 +146,12 @@ pub fn due<'a>(rows: &'a [Row], closed: &dyn Fn(&Row) -> bool) -> Vec<&'a Row> {
         if r.done || closed(r) {
             continue;
         }
-        // the first open row of its block: its turn, the rest wait
+        // the first open row of its block: its turn, the rest wait. A
+        // decision asked by a question (data-question) waits there too,
+        // with no card of its own: the question's card asks it, and the
+        // row closes when the agent republishes it done (or a tick)
         blocks.push(&r.block);
-        if r.his() {
+        if r.his() && r.question.is_none() {
             out.push(r);
         }
     }
@@ -240,6 +247,25 @@ mod tests {
         assert_eq!(due_with(&[serde_json::json!({"id": "n1", "block": "other", "kind": "approve", "status": "sent"})]), vec!["s2"]);
         // republished done: the next step
         assert_eq!(due(&rows_of(&html.replace("data-did=\"drafted\"", "data-done")), &|_: &Row| false)[0].item, "s3");
+    }
+
+    /// Law (pm's D fail 35): a step of his that is a decision asked by a
+    /// question (data-question) gets no card of its own (the question's
+    /// is the only one), and the plan waits on it until it is republished
+    /// done or ticked; then the next step comes.
+    #[test]
+    fn a_decision_step_is_its_questions_card_only() {
+        let html = r#"<section data-kit="checklist" data-id="plan"><ol>
+<li data-id="s1" data-who="yours" data-question="q-tld">pick .com or .io</li>
+<li data-id="s2" data-who="yours">pay the domain</li>
+</ol></section>
+<section data-kit="question" data-id="q-tld"><p>.com or .io?</p><ol><li>.com</li><li>.io</li></ol></section>"#;
+        let r = rows_of(html);
+        assert_eq!(r[0].question.as_deref(), Some("q-tld"));
+        assert!(due(&r, &|_: &Row| false).is_empty(), "no card for s1, and s2 waits behind it");
+        assert_eq!(due(&r, &|x: &Row| x.item == "s1")[0].item, "s2", "ticked: the next step");
+        let done = html.replace("data-question=\"q-tld\"", "data-question=\"q-tld\" data-done");
+        assert_eq!(due(&rows_of(&done), &|_: &Row| false)[0].item, "s2", "republished done: the next step");
     }
 
     #[test]
