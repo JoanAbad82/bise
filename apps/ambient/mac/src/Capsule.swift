@@ -306,12 +306,28 @@ final class Capsule: NSObject, WKNavigationDelegate {
     // the page's own leave: opacity and 4 px up in 0.12 s, then the panel goes
     static let leaveTime = 0.12
 
+    // the page's appear fade (round 9: 0.16 s): the native blur fades with
+    // it, never a blurred glass with no content yet (ambient's ghost glass)
+    static let appearTime = 0.16
+
+    // the native blur follows the page's own opacity, in and out
+    private func blur(_ on: Bool, over t: Double) {
+        NSAnimationContext.runAnimationGroup { c in
+            c.duration = t
+            c.timingFunction = on ? CAMediaTimingFunction(controlPoints: 0.16, 1, 0.3, 1)
+                                  : CAMediaTimingFunction(controlPoints: 0.7, 0, 0.84, 0)
+            effect.animator().alphaValue = on ? 1 : 0
+        }
+    }
+
     func show(fade: Bool = false) {
         hidden = false
         outJob?.cancel()
         outJob = nil
         if fade && !panel.isVisible { panel.alphaValue = 0 }
+        if !panel.isVisible { effect.alphaValue = 0 }
         panel.orderFrontRegardless()
+        blur(true, over: fade ? Capsule.fadeTime : Capsule.appearTime)
         if fade {
             NSAnimationContext.runAnimationGroup { c in
                 c.duration = Capsule.fadeTime
@@ -326,7 +342,9 @@ final class Capsule: NSObject, WKNavigationDelegate {
         hidden = true
         focus(false)
         outJob?.cancel()
-        guard after > 0 else { panel.orderOut(nil); panel.alphaValue = 1; return }
+        guard after > 0 else { panel.orderOut(nil); panel.alphaValue = 1; effect.alphaValue = 0; return }
+        // the blur leaves with the page's own 0.12 s leave, never after it
+        blur(false, over: after)
         if fade {
             NSAnimationContext.runAnimationGroup { c in
                 c.duration = min(after, Capsule.fadeTime)

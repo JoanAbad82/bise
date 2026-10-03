@@ -34,6 +34,13 @@ law("an older page without glass: the whole box", old.glass == nil && old.blurRe
 law("a glass past the box is cut to it",
     CapsuleShape.from(["w": 400, "h": 98, "glass": ["x": 56, "y": 0, "w": 900, "h": 98]], maxHeight: 700)!.glass?.maxX == 400)
 law("an empty glass is ignored", CapsuleShape.from(["w": 400, "h": 98, "glass": ["x": 56, "y": 0, "w": 0, "h": 98]], maxHeight: 700)!.glass == nil)
+// ghost glass (ambient gate pass 2): the page says no glass, the blur goes
+var none = msg
+none["glass"] = NSNull()
+law("glass: null → no blur at all", CapsuleShape.from(none, maxHeight: 700)!.blurRects(panel: panel).isEmpty)
+law("a glass with no height → no blur at all",
+    CapsuleShape.from(["w": 840, "h": 98, "glass": ["x": 80, "y": 28, "w": 700, "h": 0]], maxHeight: 700)!.blurRects(panel: panel).isEmpty)
+law("no glass key at all (an older page) → the whole box still", !CapsuleShape.from(["w": 360, "h": 84], maxHeight: 700)!.blurRects(panel: CGSize(width: 360, height: 84)).isEmpty)
 law("too small a box: no shape", CapsuleShape.from(["w": 10, "h": 98], maxHeight: 700) == nil)
 
 if failures > 0 { print("\(failures) failed"); exit(1) }
