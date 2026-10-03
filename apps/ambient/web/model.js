@@ -94,6 +94,9 @@
   const pageName = (p) => p.title || String(p.id).replace(/-/g, " ");
   const working = (agents) => agents.filter((a) => a.working ?? ["working", "waiting", "starting"].includes(a.status)).length;
   const visibleCards = (m) => m.cards.filter((c) => !m.answered[c.id]);
+  // what the question glass may ask: not a card he put off with esc (it keeps waiting in the inbox
+  // and the count, ambient m_6500), and in a call or a meeting only the urgent ones
+  const askable = (m) => visibleCards(m).filter((c) => !(m.later || {})[c.id] && (!m.quiet || c.urgent));
   const lv = (m, who, now) => (now - m.lvl[who].at < T.level ? m.lvl[who].v : 0);
   const listening = (m) => m.fn || m.handsFree || m.phase === "listening";
   const inTurn = (m) => TURN.includes(m.phase);
@@ -129,6 +132,12 @@
     // French'), else read from its text
     const line = b.line ? String(b.line) : !c.batch && tw && lines[1] && !/^\d+\./.test(lines[1]) ? lines[1] : null;
     return { count, title: b.title || (tw && tw[2]) || c.page.title || "", what: b.what || "drafts", names, line, review, send };
+  }
+
+  // a card's choices in the order the glass shows them (a batch: review, then send all)
+  function choices(card) {
+    const b = batchOf(card);
+    return b ? [b.review, b.send] : Wd.options(card);
   }
 
   function answer(m, card, opt, now) {
@@ -357,6 +366,11 @@
         const p = m.pages.find((x) => x.id === ev.page);
         return p ? openPage(m, p) : none(m);
       }
+      // '… more   ⌘ ⏎' (ambient m_6500): the whole question in place, the rows stay below
+      case "ui_ask_more": {
+        const c = askable(m)[0];
+        return none(c ? { ...m, askFull: c.id } : m);
+      }
       case "ui_capsule":     // a click on the small capsule: the agents
         if (m.hello) return none({ ...m, hello: null });   // a click ends the hello
         return setPane(m, m.pane ? null : visibleCards(m).length > 1 ? "inbox" : "agents");
@@ -400,6 +414,19 @@
       if (!opt) return none(m);
       return answer(m, card, opt, now);
     }
+    // the question glass (no pane): ↑↓ move its selection, ⏎ picks it, esc puts it off (ambient's B3)
+    const asked = !m.pane && askable(m)[0];
+    if (asked && (k === "up" || k === "down")) {
+      const n = choices(asked).length, cur = m.optFor === asked.id ? m.optSel || 0 : 0;
+      return none({ ...m, optFor: asked.id, optSel: Math.max(0, Math.min(n - 1, cur + (k === "down" ? 1 : -1))) });
+    }
+    if (asked && k === "enter") {
+      const os = choices(asked), cur = m.optFor === asked.id ? m.optSel || 0 : 0;
+      if (os[cur]) return answer({ ...m, optSel: 0, optFor: null }, asked, os[cur], now);
+    }
+    if (asked && k === "esc" && !m.hello && !listening(m) && m.phase !== "speaking") {
+      return none({ ...m, later: { ...(m.later || {}), [asked.id]: true }, optSel: 0, optFor: null });
+    }
     switch (k) {
       // fn + ⏎: a card asked from a page opens that page at the question (amb-core, 7e41f98e:
       // card.page {id, block, url}, the url ending with #block)
@@ -414,9 +441,10 @@
       // fn + o: in the full view, the first page of for you (unopened first); else the page the
       // capsule named last, else the newest; the app opens it or brings its tab
       case "o": {
-        // a batch of drafts asking: fn o opens its page at the first draft (amb-core 34703bf0)
-        const ask0 = !m.pane && visibleCards(m)[0];
-        if (ask0 && ask0.page && ask0.page.drafts && ask0.page.url) return openCard(m, ask0);
+        // a card asking from a page (a batch of drafts: at the first draft, amb-core 34703bf0):
+        // fn o opens that page at the question (⏎ picks a row since B3)
+        const ask0 = !m.pane && askable(m)[0];
+        if (ask0 && ask0.page && ask0.page.url) return openCard(m, ask0);
         const p = (m.pane === "agents" && forYouPages(m)[0]) || m.pages.find((x) => x.id === m.lastPage) || m.pages[0];
         return p ? openPage(m, p) : none(m);
       }
@@ -521,7 +549,7 @@
   function view(m, now, wall = now) {
     const cards = visibleCards(m);
     // in a call or a meeting, only the urgent cards ask (the rest wait in the inbox)
-    const asking = m.quiet ? cards.filter((c) => c.urgent) : cards;
+    const asking = askable(m);
     const need = asking.length > 0;
     const flash = m.flashes.find((f) => f.at <= now && now < f.at + f.ttl) || null;
     const v = {
@@ -567,11 +595,16 @@
       const c = asking[0];
       const b = batchOf(c);
       // a batch of drafts: one glass like a question, its own words, review first (ambient m_6056)
-      if (b) return { id: c.id, agent: c.agent, title: Wd.drafts.label(b.count, b.title), text: b.line || Wd.drafts.line(b.what, b.names), hint: W.needsHint, more: asking.length - 1, open: null, batch: true,
-        options: [{ i: b.review.i, label: Wd.optionLabel(b.review.n, Wd.drafts.review) }, { i: b.send.i, label: Wd.optionLabel(b.send.n, Wd.drafts.sendAll(b.count)) }] };
-      return { id: c.id, agent: c.agent, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsHint, more: asking.length - 1,
+      // the choices are rows, Spotlight-like (ambient's B3 spec, ambient-lead m_6487): a keycap and the
+      // label on one line, the selected one soft pink (the first by default), ↑↓ moves, ⏎ picks, digits pick; the
+      // question is the body, 4 lines at most unless he asks for the rest (askFull)
+      const at = m.optFor === c.id ? m.optSel || 0 : 0;
+      const rows = (os) => os.map((o, k) => ({ i: o.i, n: o.n, label: o.label, sel: k === Math.min(at, os.length - 1) }));
+      if (b) return { id: c.id, agent: c.agent, title: Wd.drafts.label(b.count, b.title), text: b.line || Wd.drafts.line(b.what, b.names), hint: W.needsKeys, more: asking.length - 1, open: null, batch: true, full: m.askFull === c.id,
+        options: rows([{ i: b.review.i, n: b.review.n, label: Wd.drafts.review }, { i: b.send.i, n: b.send.n, label: Wd.drafts.sendAll(b.count) }]) };
+      return { id: c.id, agent: c.agent, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsKeys, more: asking.length - 1, full: m.askFull === c.id,
         open: c.page && c.page.url ? W.openIt : null,
-        options: Wd.options(c).map((o) => ({ i: o.i, label: Wd.optionLabel(o.n, o.label) })) };
+        options: rows(Wd.options(c).map((o) => ({ i: o.i, n: o.n, label: o.label }))) };
     };
 
     if (m.permAsk) {

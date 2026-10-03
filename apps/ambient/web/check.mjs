@@ -193,8 +193,8 @@ law("needs you: ONE glass (round 8, ambient m_5332): the capsule itself says '? 
   assert.equal(v.note, null); assert.equal(v.text, null);
   assert.equal(v.ask.title, "cookies needs you");
   assert.equal(v.ask.text, "keep the banner on mobile?");
-  eq(v.ask.options.map((o) => o.label), W.needsOpts);
-  assert.equal(v.ask.hint, W.needsHint);
+  eq(v.ask.options.map((o) => `${o.n} ${o.label}`), W.needsOpts);
+  assert.equal(v.ask.hint, W.needsKeys);
 });
 law("answered: fn + 1 sends the answer, `✓ cookies has it: yes.` with the kiss, the glass goes", () => {
   const evs = sceneEvents("needs");
@@ -211,6 +211,34 @@ law("a click on an option answers the same", () => {
   const r = M.step(m, { ev: "ui_option", card: "c1", i: 1 }, 10);
   eq([...r.cmds], [{ cmd: "answer", card: "c1", reply: "2" }]);
   assert.equal(M.view(r.m, 20).text, "cookies has it: no.");
+});
+law("B3 rows (ambient m_6500, lead m_6487): one row per choice, the first selected; ↑↓ move (clamped), ⏎ picks the selected one, a digit picks its own", () => {
+  const card = { id: "q", agent: "ops", text: "Que fais-tu ?", options: [{ n: 1, label: "regarde" }, { n: 2, label: "arrête" }, { n: 3, label: "laisse" }] };
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [card], pages: [] }, 0).m;
+  const sel = (x) => M.view(x, 10).ask.options.map((o) => o.sel);
+  eq(M.view(m, 10).ask.options.map((o) => [o.n, o.label]), [[1, "regarde"], [2, "arrête"], [3, "laisse"]]);
+  eq(sel(m), [true, false, false]);
+  m = M.step(m, { ev: "app_key", key: "up" }, 20).m; eq(sel(m), [true, false, false]);
+  m = M.step(m, { ev: "app_key", key: "down" }, 30).m; eq(sel(m), [false, true, false]);
+  m = M.step(m, { ev: "app_key", key: "down" }, 40).m; m = M.step(m, { ev: "app_key", key: "down" }, 50).m; eq(sel(m), [false, false, true]);
+  eq(M.step(m, { ev: "app_key", key: "enter" }, 60).cmds, [{ cmd: "answer", card: "q", reply: "3" }]);
+  eq(M.step(m, { ev: "app_key", key: "2" }, 60).cmds, [{ cmd: "answer", card: "q", reply: "2" }]);
+  // '… more   ⌘ ⏎' (or a click on it) shows the whole question in place
+  assert.equal(M.view(m, 70).ask.full, false);
+  assert.equal(M.view(M.step(m, { ev: "ui_ask_more" }, 70).m, 80).ask.full, true);
+  assert.equal(W.more, "… more   ⌘ ⏎");
+});
+law("B3 esc = later: the glass goes, the card keeps waiting and the count stays (ambient m_6500)", () => {
+  const card = { id: "q", agent: "ops", text: "ship it?", options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }] };
+  const m = M.step(M.init(), { ev: "state", agents: [], cards: [card], pages: [] }, 0).m;
+  assert.equal(M.view(m, 10).state, "needs");
+  const r = M.step(m, { ev: "app_key", key: "esc" }, 20);
+  eq(r.cmds, []);
+  const v = M.view(r.m, 30);
+  assert.notEqual(v.state, "needs"); assert.equal(v.ask, null);
+  assert.equal(M.count(r.m), M.count(m)); assert.equal(M.count(r.m), 1);
+  // still in the full view's needs-you list
+  assert.equal(M.view(M.step(r.m, { ev: "app_key", key: "0" }, 40).m, 50).inbox.length, 1);
 });
 law("done: `✓ perf is done.` with the kiss, not the report; 8 s, then the count line", () => {
   const r = run(sceneEvents("done"), [1000, 1500, 8800, 9000]);
@@ -456,12 +484,13 @@ law("a card clicked in the menu bar (app_key i + card) opens the inbox at that c
   // again while open: it stays open (a click never closes it)
   assert.equal(M.view(M.step(r.m, { ev: "app_key", key: "i", card: "a" }, 30).m, 40).state, "inbox");
 });
-law("a card asked from a page (card.page): the glass says `fn ⏎ open it`; fn + ⏎ or a click opens the page at the question", () => {
+law("a card asked from a page (card.page): the glass says `fn o open it`; fn + o or a click opens the page at the question (⏎ picks the selected row since B3)", () => {
   const card = { id: "c1", agent: "launch-recap", text: "post now or wait?", options: ["post now", "wait"], page: { id: "recap", block: "q1", url: "http://127.0.0.1:47123/p/recap#q1" } };
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [card, { id: "c2", agent: "x", text: "y", options: [] }], pages: [] }, 0).m;
-  assert.equal(M.view(m, 10).ask.open, "fn ⏎ open it");
+  assert.equal(M.view(m, 10).ask.open, "fn o open it");
   const open = [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/recap#q1", page: "recap" }];
-  eq(M.step(m, { ev: "app_key", key: "enter" }, 20).cmds, open);
+  eq(M.step(m, { ev: "app_key", key: "o" }, 20).cmds, open);
+  eq(M.step(m, { ev: "app_key", key: "enter" }, 20).cmds, [{ cmd: "answer", card: "c1", reply: "1" }]);
   eq(M.step(m, { ev: "ui_open_card", card: "c1" }, 20).cmds, open);
   eq(M.step(m, { ev: "ui_open_card", card: "c2" }, 20).cmds, []);   // no page: nothing
 });
@@ -985,8 +1014,8 @@ law("a batch of drafts is one glass: '3 drafts wait for you · <page>', 'replies
     batch: { count: 3, title: "your inbox", what: "replies", names: ["legal", "Lucas", "Marc"] } };
   const m = M.step(M.init(), { ev: "state", agents: [], cards: [card], pages: [] }, 0).m;
   const v = M.view(m, 10);
-  eq([v.state, v.mood, v.ask.title, v.ask.text, v.ask.hint, v.ask.open], ["needs", "need", "3 drafts wait for you · your inbox", "replies to legal, Lucas and Marc", "or hold fn and say it", null]);
-  eq(v.ask.options.map((o) => o.label), ["1 review", "2 send all 3"]);
+  eq([v.state, v.mood, v.ask.title, v.ask.text, v.ask.hint, v.ask.open], ["needs", "need", "3 drafts wait for you · your inbox", "replies to legal, Lucas and Marc", W.needsKeys, null]);
+  eq(v.ask.options.map((o) => `${o.n} ${o.label}`), ["1 review", "2 send all 3"]);
   // 1 review: the answer, and the page at the first draft
   eq(M.step(m, { ev: "app_key", key: "1" }, 20).cmds, [{ cmd: "answer", card: "b1", reply: "1" }, { cmd: "app_open_url", url: "http://127.0.0.1:47123/p/inbox#i1", page: "inbox" }]);
   // 2 send all: '∿ sending 3 replies.' (nothing has left yet), a timed line

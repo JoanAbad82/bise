@@ -233,10 +233,16 @@
       show(el.ask, v.ask);
       el.ask.classList.toggle("batch", !!(v.ask && v.ask.batch));
       const n = v.ask;
+      // the question (4 lines at most, then '… more   ⌘ ⏎'), then the choices as rows: a keycap and
+      // the label on one line, the selected row soft pink with its whole label (ambient's B3 spec)
       el.ask.innerHTML = !n ? "" : `<div class="ttl"><span class="gl" aria-hidden="true">?</span>${esc(n.title)}${n.more > 0 ? `<span class="more">+${n.more}</span>` : ""}</div>
-        <div class="qq">${esc(n.text)}</div>${opts(n)}${n.open ? `<button type="button" class="hint open" data-open="${esc(n.id)}">${esc(n.open)}</button>` : ""}<div class="hint">${esc(n.hint)}</div>`;
+        <div class="qq${n.full ? " full" : ""}">${esc(n.text)}</div><button type="button" class="qmore" data-ask-more="1" hidden>${esc(Wd.W.more)}</button>${askRows(n)}${n.open ? `<button type="button" class="hint open" data-open="${esc(n.id)}">${esc(n.open)}</button>` : ""}<div class="hint">${esc(n.hint)}</div>`;
+      // '… more' only when the question is cut
+      const q = n && $(".qq", el.ask);
+      if (q && !n.full) requestAnimationFrame(() => { $(".qmore", el.ask).hidden = !(q.scrollHeight > q.clientHeight + 2); });
     });
   }
+  const askRows = (c) => c.options.length ? `<div class="rowsq" role="listbox" aria-label="${esc(c.title)}">${c.options.map((o) => `<button type="button" role="option" aria-selected="${o.sel}" class="opt${o.sel ? " sel" : ""}" data-card="${esc(c.id)}" data-i="${o.i}" title="${esc(o.label)}"><span class="kc">${esc(String(o.n))}</span><span class="lb">${esc(o.label)}</span></button>`).join("")}</div>` : "";
   const opts = (c) => c.options.length ? `<div class="opts">${c.options.map((o) => `<button type="button" data-card="${esc(c.id)}" data-i="${o.i}">${esc(o.label)}</button>`).join("")}</div>` : "";
 
   // ---- the capsule's size: its height follows the words; the panel follows the capsule (app_size)
@@ -360,6 +366,7 @@
     const rm = e.target.closest("button[data-skip-remove]");
     if (rm) recv({ ev: "ui_setting", key: "skip_remove", value: rm.dataset.skipRemove });
     if (e.target.closest("button[data-skip-add]")) recv({ ev: "ui_setting", key: "skip_add" });
+    if (e.target.closest("button[data-ask-more]")) recv({ ev: "ui_ask_more" });
   });
   input.addEventListener("input", () => recv({ ev: "ui_spot_type", text: input.value }));
   input.addEventListener("keydown", (e) => {
@@ -369,9 +376,13 @@
     e.stopPropagation();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.target === input || e.metaKey || e.ctrlKey) return;
-    const k = { Escape: "esc", ArrowUp: "up", ArrowDown: "down" }[e.key] || (/^[1-9l]$/.test(e.key) ? e.key : null);
-    if (k && (model.pane || k === "esc")) { e.preventDefault(); recv({ ev: "app_key", key: k, local: true }); }
+    if (e.target === input || e.ctrlKey) return;
+    const asking = lastV && lastV.state === "needs" && !model.pane;
+    // the question glass: ⌘⏎ the whole question in place (ambient m_6500)
+    if (asking && e.metaKey && e.key === "Enter") { e.preventDefault(); recv({ ev: "ui_ask_more" }); return; }
+    if (e.metaKey) return;
+    const k = { Escape: "esc", ArrowUp: "up", ArrowDown: "down", Enter: "enter" }[e.key] || (/^[1-9l]$/.test(e.key) ? e.key : null);
+    if (k && (model.pane || asking || k === "esc") && !(k === "enter" && !asking)) { e.preventDefault(); recv({ ev: "app_key", key: k, local: true }); }
   });
 
   window.ambient = {

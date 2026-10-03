@@ -47,9 +47,12 @@
     on: "bise is on it.",
     onShort: "on it.",
     needsHint: "or hold fn and say it",
-    // a card asked from a page (docs/ambient-pages.md §4.2): fn + ⏎ opens the page at the question;
-    // key hints are `<keys> <word>`, no + (ambient, m_5067)
-    openIt: "fn ⏎ open it",
+    // the question's choices as rows (ambient's B3 spec via ambient-lead m_6487)
+    needsKeys: "↑↓ choose   ⏎ pick   esc later   or hold fn and say it",
+    more: "… more   ⌘ ⏎",
+    // a card asked from a page (docs/ambient-pages.md §4.2): fn + o opens the page at the question
+    // (⏎ picks the selected row since B3); key hints are `<keys> <word>`, no + (ambient, m_5067)
+    openIt: "fn o open it",
     // §3 behavior
     hush: "i'll stop talking. the rest is in text.",
     cutIn: "bise stopped. go ahead.",
