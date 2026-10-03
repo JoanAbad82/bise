@@ -325,6 +325,17 @@ the page with an open card (a task agent's page) is not checked yet.
   Fail 35 (amb-kit): one decision, two cards in the same second, the question `how many years?`
   and his step `pick how long … 1. done`. Nit: after he chose to leave a note, the legal question
   came back as a new card 30 s later.
+- **C to the loop's end at b90475d7: pass on the product.** 2 agents started from the page, both
+  done in ~6 min, 3 fixes landed with tests; page v9 has 3 Slack replies (one in French for the
+  Lyon team) and 3 Linear issue drafts waiting for his word; outbox empty. The run's fail is a
+  check that wants the English word `fixed` (amb-tools). Fail 36: a card `archive @proxy-fix? the
+  agent is mid-turn` reached him, and the agent was archived anyway; fixed in amb-core 19c45805
+  (housekeeping cards stay in the TUI; only his yes archives).
+- **D at 6f91aa83: 35 holds, one card per decision.** The plan ran legal's question → `send the
+  draft?` → `sign in to Gandi` → `pay … €28, company card`, each when its turn came, outbox
+  empty. The run's fail is the flow handling only 2 step cards (it counts his rows, and a drafted
+  step of bise's now makes a card too): amb-tools. Nit (amb-kit): the `send the draft?` card still
+  said `waiting for your note: legal's address` after the note was left.
 - **23 and 24 rechecked at a589f9f9 (`qa.py ask`): pass.** `what's my next meeting` → `09:30,
   launch standup with Marc, Lucas and Nora` in 13 s, no page: the fixture says 07:30Z, so the time
   is in his zone (CEST). `plan the offsite` → offsite-plan; the follow-up `add a budget per person
