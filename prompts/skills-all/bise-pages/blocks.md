@@ -26,6 +26,10 @@ Each of your rows says what you did, `data-did="drafted"` or `data-did="checked 
 and where the draft is, `data-draft="<its block id>"`: the row shows `bise · drafted · in the
 page` and takes him there. Someone else's step (`data-who="Lucas"`): draft the message that
 asks them, the same way. See `examples/buy-domain.html`.
+Never end with a step of yours open: what you can't finish becomes a `question` to him on the
+page (`legal's address?`) or a draft waiting for his word (`data-did="drafted"`). While the plan
+has open steps, stay on it: don't report done, wait idle, so his answers and ticks come to you;
+then do the next step and publish again.
 
 Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
 `<img src="data:image/…" alt="…">`. Nothing else. Review and checklist items may carry
