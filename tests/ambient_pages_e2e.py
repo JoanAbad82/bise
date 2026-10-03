@@ -470,6 +470,25 @@ def main():
         c.wait_line("main", "task-plan#q2 · question · add the March chart?", 90)
         check(not any("task-plan#s1" in l or "task-plan#q1 " in l for l in c.lines("main")[-40:]), "answered and ticked items wait no more")
 
+        # a drafted step of bise's before one of his (pm's D fail 30): the
+        # draft waits for his word, so it is his turn: its card comes; his
+        # send approves the draft, then his own step's card comes
+        lp = os.path.join(E.tmp, "legal-plan.html")
+        open(lp, "w").write('<section data-kit="checklist" data-id="plan"><ol>'
+                            '<li data-id="d1" data-who="bise" data-did="drafted" data-draft="mail-legal">ask legal</li>'
+                            '<li data-id="d2" data-who="yours">sign the renewal</li></ol></section>'
+                            '<section data-kit="email" data-id="mail-legal" data-verb="draft"><p data-field="to">legal</p>'
+                            '<p data-field="subject">the renewal</p><p>can we sign?</p></section>')
+        settle(c)
+        c.say('[[bash: sb page publish %s --id legal-plan --title "legal plan"]]' % lp)
+        c.wait(lambda: step_card("d1"), 90, "the drafted step's card")
+        check(step_card("d1")["text"].startswith("ask legal: send the draft?"), "its card asks to send: %r" % step_card("d1"))
+        check(not step_card("d2"), "his step waits for the draft")
+        c.say("/answer %d 1" % step_card("d1")["id"])
+        c.wait(lambda: step_card("d2") and not step_card("d1"), 30, "sent: his own step's card comes")
+        notes = json.loads(request(port, "GET", "/p/legal-plan/meta")[2])["notes"]
+        check(any(n["kind"] == "approve" and n["block"] == "mail-legal" for n in notes), "his send approves the draft: %r" % notes)
+
         # a copied page whose question names a card this hub never had,
         # read at the hub's start (pm's m_5456): the first pick is no 409,
         # the page hears it, the pick goes as a note

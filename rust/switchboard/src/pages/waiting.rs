@@ -3,7 +3,7 @@
 //! version's fragment, its notes and its questions; the store walks the
 //! pages.
 
-use super::checklist::{due, items_of, rows_of};
+use super::checklist::{closed_by, due, items_of, rows_of};
 use super::questions::Question;
 use super::store::{is_go_word, Note};
 use serde::Serialize;
@@ -65,10 +65,14 @@ pub fn of_page(id: &str, html: &str, notes: &[Note], questions: &[Question]) -> 
     let mut out = Vec::new();
     let w = |item: &str, kind: &'static str, text: &str| Waiting { page: id.into(), item: item.into(), kind, text: cut(text) };
     // his steps whose turn came
+    // (a drafted step of bise's is a draft of his; its draft's block is
+    // not listed again below)
     let rows = rows_of(html);
-    let ticked = |b: &str, i: &str| notes.iter().any(|n| n.kind == "tick" && n.block == b && note_item(n) == Some(i));
-    for r in due(&rows, &ticked) {
-        out.push(w(&r.item, "step", &r.text));
+    let closed = |r: &super::checklist::Row| closed_by(r, notes);
+    let mut covered: Vec<String> = Vec::new();
+    for r in due(&rows, &closed) {
+        out.push(w(&r.item, if r.drafted { "draft" } else { "step" }, &r.text));
+        covered.extend(r.draft.clone());
     }
     // drafts: review items with no verdict of his, emails and messages
     // with no go word
@@ -82,7 +86,7 @@ pub fn of_page(id: &str, html: &str, notes: &[Note], questions: &[Question]) -> 
     }
     for kit in ["email", "message"] {
         for (b, text) in blocks_of(html, kit) {
-            if !verdict(&b, None) {
+            if !verdict(&b, None) && !covered.contains(&b) {
                 out.push(w(&b, "draft", &text));
             }
         }

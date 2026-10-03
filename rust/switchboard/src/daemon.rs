@@ -1295,14 +1295,12 @@ impl Shell {
         let Some(meta) = pages.store.meta(id) else { return };
         let rows = pages.store.html(id, meta.version()).map(|h| crate::pages::checklist::rows_of(&h)).unwrap_or_default();
         let mut steps = pages.store.steps(id);
-        if steps.is_empty() && !rows.iter().any(|r| r.yours) {
+        if steps.is_empty() && !rows.iter().any(|r| r.his()) {
             return;
         }
         let notes = pages.store.notes(id);
-        let ticked = |b: &str, i: &str| {
-            notes.iter().any(|n| n.kind == "tick" && n.block == b && n.extra.get("item").and_then(|v| v.as_str()) == Some(i))
-        };
-        let due: Vec<crate::pages::checklist::Row> = crate::pages::checklist::due(&rows, &ticked).into_iter().cloned().collect();
+        let closed = |r: &crate::pages::checklist::Row| crate::pages::checklist::closed_by(r, &notes);
+        let due: Vec<crate::pages::checklist::Row> = crate::pages::checklist::due(&rows, &closed).into_iter().cloned().collect();
         let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
         let mut changed = false;
         for s in steps.iter_mut().filter(|s| s.reply.is_none()) {
@@ -1322,7 +1320,14 @@ impl Shell {
             if steps.iter().any(|s| s.block == r.block && s.item == r.item) {
                 continue;
             }
-            let mut s = crate::pages::checklist::Step { block: r.block.clone(), item: r.item.clone(), text: r.text.clone(), card: 0, reply: None };
+            let mut s = crate::pages::checklist::Step {
+                block: r.block.clone(),
+                item: r.item.clone(),
+                text: r.text.clone(),
+                card: 0,
+                reply: None,
+                drafted: r.drafted,
+            };
             let before: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
             // main asks (sb-core's cards are main's, pm's 25); its answer
             // is the hub's own path (page_card_answer → page_tick)
@@ -1362,8 +1367,19 @@ impl Shell {
         let Some(meta) = pages.store.meta(id) else { return false };
         let rows = pages.store.html(id, meta.version()).map(|h| crate::pages::checklist::rows_of(&h)).unwrap_or_default();
         let Some(row) = rows.iter().find(|r| r.item == item) else { return false };
-        let (kind, words) = if crate::pages::checklist::is_done_word(text) { ("tick", "done") } else { ("note", text.trim()) };
-        let note = match pages.locked(|s| s.add_sent(id, &row.block, Some(item), kind, words, meta.version(), now_ms())) {
+        let go = crate::pages::checklist::is_done_word(text) || text.trim().eq_ignore_ascii_case("send");
+        let (kind, words) = match (go, row.drafted) {
+            // a drafted step's "send": an approve of its draft, so the
+            // page's agent sends it (pm's D fail 30)
+            (true, true) => ("approve", "send"),
+            (true, false) => ("tick", "done"),
+            (false, _) => ("note", text.trim()),
+        };
+        let (block, on) = match (kind, row.draft.as_deref()) {
+            ("approve", Some(d)) => (d.to_string(), None),
+            _ => (row.block.clone(), Some(item)),
+        };
+        let note = match pages.locked(|s| s.add_sent(id, &block, on, kind, words, meta.version(), now_ms())) {
             Ok(n) => n,
             Err(e) => {
                 log_line(&self.opts.paths, &format!("page {id}: the tick not saved: {e}"));
