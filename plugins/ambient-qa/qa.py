@@ -1310,27 +1310,39 @@ def _flow_checklist(x):
         r["fails"].append("the plan has %d steps, %d of his (a checklist with his steps expected)" % (len(rows), len(yours)))
         return
     step_card = lambda: next((cd for cd in c.cards() if (cd.get("page") or {}).get("id") == pid and (cd.get("page") or {}).get("item")), None)
-    def step_or_answer():
-        # a question card that isn't a step (bise asks first: 'that domain is taken, which one?'):
-        # answered, then on to his steps (ambient-lead m_5816)
+    # every step card as it comes, until none is left (ambient-pm m_5925: a drafted bise step,
+    # 'send the draft?', also makes a step card, so counting his rows ended the loop too early):
+    # his own rows close by a tick note on the page and by 'done' on the card in turn, a drafted
+    # row (bise's or Lucas's 'send the draft?') by 'done' on its card; question cards are answered
+    mine = {w["item"] for w in yours}
+    handled, quiet, t0 = set(), None, time.time()
+    while time.time() - t0 < x["timeout"]:
+        x["poll"]()
         answer_questions(x)
-        return step_card() is not None
-    for k in range(len(yours)):
-        took = _until(x, step_or_answer, "the card for his step %d" % (k + 1))
-        if took is None:
-            return
-        cd = step_card()
+        cd = next((d for d in c.cards() if (d.get("page") or {}).get("id") == pid and (d.get("page") or {}).get("item")
+                   and d.get("id") not in handled), None)
+        if cd is None:
+            quiet = quiet or time.time()
+            if x["settled"]() and not step_card() and time.time() - quiet > 30:
+                break
+            time.sleep(2)
+            continue
+        quiet = None
+        handled.add(cd["id"])
         item, block = cd["page"]["item"], cd["page"]["block"]
-        r["flow"]["cards"].append({"item": item, "text": cd.get("text"), "after": took})
-        if k % 2 == 0:
+        his = item in mine
+        r["flow"]["cards"].append({"item": item, "his": his, "text": cd.get("text"), "after": round(time.time() - t0, 1)})
+        if his and sum(1 for k in r["flow"]["cards"] if k["his"]) % 2 == 1:
             page_notes(pid, [{"block": block, "item": item, "kind": "tick"}], send=False)   # a tick on the page, even a draft
             r["flow"]["closed_by"].append("tick note")
         else:
             x["core"].p.stdin.write(json.dumps({"cmd": "answer", "card": cd["id"], "reply": "1"}) + "\n")
             x["core"].p.stdin.flush()
             r["flow"]["closed_by"].append("card answer")
-        if _until(x, lambda: all((d.get("page") or {}).get("item") != item for d in c.cards()), "the card of %s closing" % item) is None:
+        if _until(x, lambda: all(d.get("id") != cd["id"] for d in c.cards()), "the card of %s closing" % item) is None:
             return
+    else:
+        r["fails"].append("step cards still coming after %d s" % x["timeout"])
     _until(x, lambda: x["settled"]() and not step_card(), "no step card left")
     meta = page_meta(pid)
     ticks = {(n["block"], n.get("item")) for n in meta.get("notes", []) if n.get("kind") == "tick"}
