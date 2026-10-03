@@ -612,6 +612,25 @@ final class QA {
             return try keyev(q)
         case "keys":
             return try await keys(q)
+        case "clickables":
+            // every visible thing a click acts on, in the page's order, tagged data-qa-i so `click`
+            // can aim at each one (ambient-pm m_6584: every button the capsule shows, once each)
+            let sel = q["selector"] as? String ?? "button, [role=button], a[href], [data-act], [data-key], [onclick], li[data-n], label"
+            let quoted = String(data: try JSONSerialization.data(withJSONObject: [sel]), encoding: .utf8) ?? "[\"\"]"
+            let src = """
+            (() => { const out = []; let i = 0;
+              for (const el of document.querySelectorAll(\(quoted)[0])) {
+                const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+                if (r.width < 2 || r.height < 2 || cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity === 0) continue;
+                if (out.some(o => o.el.contains(el))) continue;   // a row's own inner button is the row's
+                el.setAttribute('data-qa-i', String(i));
+                out.push({el, i: i++, tag: el.tagName.toLowerCase(), label: (el.getAttribute('aria-label') || el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 60),
+                          x: r.left, y: r.top, w: r.width, h: r.height, cursor: cs.cursor});
+              }
+              return JSON.stringify(out.map(({el, ...o}) => o)); })()
+            """
+            let s = await js(capsule.web, src) ?? "[]"
+            return ["items": (try? JSONSerialization.jsonObject(with: Data(s.utf8))) as? [[String: Any]] ?? []]
         case "rest":
             await reset()
             NSApp.deactivate()

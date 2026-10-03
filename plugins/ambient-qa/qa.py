@@ -767,6 +767,98 @@ def click(selector, route="appkit", deactivate=True, settle_ms=400):
     return call("click", timeout=20, selector=selector, route=route, deactivate=deactivate, settle_ms=settle_ms)
 
 
+CLICK_STATES = {
+    # a question card from main with a page link (options 1..n, open the page), and a batch of
+    # drafts (review, send all): the states pm's click check walks (ambient-pm m_6584)
+    "card": {"ev": "state", "agents": [], "pages": [], "timers": [],
+             "cards": [{"id": 901, "kind": "question", "agent": "main", "text": "which date works for the pricing review?",
+                        "options": [{"n": 1, "label": "tuesday"}, {"n": 2, "label": "thursday"}],
+                        "page": {"id": "mentions-qa", "block": "new", "item": "s-301", "url": "http://127.0.0.1:9/p/mentions-qa#s-301"}}]},
+    "drafts": {"ev": "state", "agents": [], "pages": [], "timers": [],
+               "cards": [{"id": 902, "agent": "inbox", "kind": "drafts", "text": "3 drafts ready: legal · Lucas · Marc",
+                          "options": [{"n": 1, "label": "review"}, {"n": 2, "label": "send all 3"}],
+                          "page": {"id": "inbox", "block": "r1", "item": "i1", "drafts": True, "url": "http://127.0.0.1:9/p/inbox#i1"},
+                          "batch": {"count": 3, "title": "your inbox", "what": "replies", "names": ["legal", "Lucas", "Marc"]}}]},
+}
+CLICK_STATES["settings"] = {"ev": "state", "agents": [], "pages": [], "timers": [], "cards": []}
+CLICK_STATES["question"] = CLICK_STATES["card"]
+CLICK_OPEN = {"card": "i", "drafts": "i", "settings": ",", "question": None}   # question: the card pushed by itself
+CLICK_DIRS = ("page>app", "app>core", "app>core(qa)", "app>open")
+
+
+def _view_now():
+    """The capsule's view without what moves by itself (the orb's pose, fps)."""
+    v = dict(state().get("view") or {})
+    for k in ("poseMs", "fps", "level", "t"):
+        v.pop(k, None)
+    return json.dumps(v, sort_keys=True)
+
+
+def clicks(state="card", open_key="auto", selector=None, settle_s=1.0):
+    """Every button the capsule shows in one state, clicked once each by the real mouse path
+    (ambient-pm m_6584): before each click the state is set again from rest (the fake core's
+    state event, then fn + open_key through the real key path), the element is found again by
+    its place, and one click goes in with bise not frontmost. Per button: its label, whether the
+    page got the click, and the commands that left the page/app after it (page>app, app>core):
+    exactly one expected. state: a CLICK_STATES name or a state event (dict)."""
+    ev = CLICK_STATES[state] if isinstance(state, str) else state
+    if open_key == "auto":
+        open_key = CLICK_OPEN.get(state, "i") if isinstance(state, str) else "i"
+    if isinstance(state, str) and state not in CLICK_STATES:
+        raise QAError("clicks: state %s (one of %s, or a state event)" % (state, ", ".join(sorted(CLICK_STATES))))
+
+    def setup():
+        rest()
+        inject(ev)
+        if open_key:
+            code = KEYCODES[open_key]
+            keyev("fn_down"); keyev("down", code, fn=True); keyev("up", code, fn=True); keyev("fn_up")
+        time.sleep(0.9)
+        # round 9's targets (amb-web 3d99a361: [data-qa] under #amb, the glass itself excluded),
+        # else whatever looks clickable on an older page
+        if selector:
+            return call("clickables", selector=selector).get("items", [])
+        return call("clickables", selector="#amb [data-qa]:not([data-qa=glass])").get("items", []) or call("clickables").get("items", [])
+
+    first = setup()
+    out = {"state": state if isinstance(state, str) else "custom", "items": [], "fails": []}
+    if not first:
+        out["fails"].append("no clickable thing shown in state %s" % out["state"])
+    for it in first:
+        items = setup()
+        same = next((x for x in items if x["i"] == it["i"] and x["label"] == it["label"]), None)
+        r = {"i": it["i"], "label": it["label"], "cursor": it.get("cursor")}
+        out["items"].append(r)
+        if not same:
+            out["fails"].append("%r: not shown again the same way" % it["label"])
+            continue
+        mark = _mark()
+        v0 = _view_now()
+        try:
+            c = click('[data-qa-i="%d"]' % it["i"])
+        except QAError as e:
+            out["fails"].append("%r: %s" % (it["label"], e))
+            continue
+        time.sleep(settle_s)
+        cmds = [e["ev"] for e in _new_events(mark) if e["dir"] in CLICK_DIRS]
+        changed = _view_now() != v0
+        r.update(clicked=c.get("clicked"), window_at_point=c.get("window_at_point"), commands=cmds, view_changed=changed)
+        if not c.get("clicked"):
+            out["fails"].append("%r: the page got no click (window %s, hit %s)" % (it["label"], c.get("window_at_point"), c.get("hit_view")))
+        elif not cmds and not changed:
+            # an in-page action (↑↓ moves the selection) changes the view without a command
+            out["fails"].append("%r: clicked, but nothing happened (no command, the view unchanged)" % it["label"])
+        else:
+            keys_ = [json.dumps(x, sort_keys=True) for x in cmds if x.get("cmd") not in ("app_size", "app_ready")]
+            if len(keys_) != len(set(keys_)):
+                out["fails"].append("%r: a command went twice: %s" % (it["label"], cmds))
+        if it.get("cursor") == "text":
+            out["fails"].append("%r: the text cursor on a button" % it["label"])
+    rest()
+    out["verdict"] = "pass" if not out["fails"] else "FAIL"
+    return out
+
+
 def keyev(kind, code=None, fn=False, words=None, per_word_ms=None):
     """A keyboard event through the app's real key path (Keys.qaEvent: KeyMachine, its hold
     threshold, App.key) on a QA app whose tap never starts: kind fn_down|fn_up|down|up."""
@@ -3047,6 +3139,9 @@ def _cli(argv):
     p = sub.add_parser("fn-hold-closed", help="fn held from rest through the real key path (no tap): pearl listening within 300 ms, words to the core, main's line; a tap does nothing")
     p.add_argument("--variants", default="launch,fold,hide"); p.add_argument("--words", default="what is on my plate today"); p.add_argument("--within-ms", type=int, default=300)
     sub.add_parser("rest", help="the capsule back to rest and bise not the active app")
+    p = sub.add_parser("clicks", help="every button the capsule shows in one state, one real click each (state set again before each): the page got it, one command left")
+    p.add_argument("--state", default="card", help="card, drafts, or a JSON file with a core state event"); p.add_argument("--open", default="auto", help="fn + this key opens the view (auto: i for cards, , for settings; none: no key)")
+    p.add_argument("--selector")
     p = sub.add_parser("keys", help="real keys into the QA app's panel (CGEvent to its pid, never the HID tap): up down return tab esc cmd+return cmd+1 type:<words>")
     p.add_argument("specs", nargs="+"); p.add_argument("--gap-ms", type=int, default=60)
     sub.add_parser("menu", help="the menu-bar menu's rows, in order (kind, title, keys, ref, enabled)")
@@ -3128,6 +3223,9 @@ def _cli(argv):
         r = fn_hold_closed(tuple(v for v in a.variants.split(",") if v), a.words, within_ms=a.within_ms)
     elif a.cmd == "rest":
         r = rest()
+    elif a.cmd == "clicks":
+        st = a.state if a.state in CLICK_STATES else json.load(open(a.state))
+        r = clicks(st, None if a.open == "none" else a.open, a.selector)
     elif a.cmd == "keys":
         r = keys(*a.specs, gap_ms=a.gap_ms)
     elif a.cmd == "menu":
