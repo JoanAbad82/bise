@@ -881,7 +881,9 @@ def clicks(state="card", open_key="auto", selector=None, settle_s=1.0, then=None
             continue
         time.sleep(settle_s)
         evs = [e for e in _new_events(mark) if e["dir"] in CLICK_DIRS]
-        cmds = [e["ev"] for e in evs]
+        # each with its hop: one answer shows as page>app (the page to the app) then app>core (the
+        # app to the core), one command on its way (ambient-pm m_6659)
+        cmds = [dict(e["ev"], route=e["dir"]) for e in evs]
         changed = _view_now() != v0
         # the page took it: its click on the target, or its pointerdown there when the target was
         # re-rendered under the pointer before the click (the fn hints act on pointerdown)

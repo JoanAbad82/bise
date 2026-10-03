@@ -727,11 +727,15 @@ final class QA {
             window.__qaHitsOn = true;
             const name = g => g && g.tagName ? g.tagName.toLowerCase() + (g.id ? '#' + g.id : '') + (typeof g.className === 'string' && g.className.trim() ? '.' + g.className.trim().split(/\\s+/).join('.') : '') : String(g);
             for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'])
-              document.addEventListener(t, e => window.__qaHits.push({type: t, target: name(e.target), trusted: e.isTrusted,
-                inside: !!(window.__qaEl && e.target && e.target.nodeType === 1 && (window.__qaEl.contains(e.target) || e.target.contains(window.__qaEl)))}), true);
+              document.addEventListener(t, e => { const g = e.target && e.target.nodeType === 1 ? e.target : null, q = g && g.closest('[data-qa]');
+                window.__qaHits.push({type: t, target: name(e.target), trusted: e.isTrusted, qa: q ? q.getAttribute('data-qa') : null,
+                  // on the element, or on whatever now carries its data-qa (a re-render between the
+                  // probe and the press replaced the node: ambient-pm m_6659)
+                  inside: !!(g && ((window.__qaEl && (window.__qaEl.contains(g) || g.contains(window.__qaEl))) || (window.__qaQa && q && q.getAttribute('data-qa') === window.__qaQa)))}); }, true);
           }
           if (!el) return JSON.stringify({found: false});
           window.__qaEl = el;
+          window.__qaQa = el.closest('[data-qa]') ? el.closest('[data-qa]').getAttribute('data-qa') : null;
           const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
           const top = document.elementFromPoint(cx, cy), cs = getComputedStyle(el);
           return JSON.stringify({found: true, x: cx, y: cy, w: r.width, h: r.height,
@@ -877,18 +881,48 @@ final class QA {
     private func alpha(_ q: [String: Any]) async throws -> [String: Any] {
         let panel = capsule.panel, web = capsule.web
         guard panel.isVisible else { throw Failure(description: "the capsule is not on screen") }
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
-        guard let win = content.windows.first(where: { $0.windowID == CGWindowID(panel.windowNumber) }) else {
-            throw Failure(description: "the panel is not among ScreenCaptureKit's windows (Screen Recording for this app?)")
+        var source = "screencapturekit"
+        var scale: CGFloat = panel.backingScaleFactor
+        var captured: CGImage?
+        do {
+            let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+            if let win = content.windows.first(where: { $0.windowID == CGWindowID(panel.windowNumber) }) {
+                let filter = SCContentFilter(desktopIndependentWindow: win)
+                let conf = SCStreamConfiguration()
+                scale = CGFloat(filter.pointPixelScale)
+                conf.width = Int((win.frame.width * scale).rounded())
+                conf.height = Int((win.frame.height * scale).rounded())
+                conf.showsCursor = false
+                conf.ignoreShadowsSingleWindow = true
+                captured = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: conf)
+            }
+        } catch {
+            Log.say("qa: alpha: \(error.localizedDescription)")
         }
-        let filter = SCContentFilter(desktopIndependentWindow: win)
-        let conf = SCStreamConfiguration()
-        let scale = CGFloat(filter.pointPixelScale)
-        conf.width = Int((win.frame.width * scale).rounded())
-        conf.height = Int((win.frame.height * scale).rounded())
-        conf.showsCursor = false
-        conf.ignoreShadowsSingleWindow = true
-        let img = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: conf)
+        if captured == nil {
+            // no Screen Recording for the QA app (live 23:40: 'declined TCCs'): the window's own
+            // layers instead, as the window server stacks them: the blur where the app puts it
+            // (Shape.blurRects, rounded, opaque) under the web view's own pixels (transparent
+            // page background), the shadow left out
+            source = "web view + blur mask"
+            guard let webImg = await webImage(web) else { throw Failure(description: "alpha: no capture and no web snapshot") }
+            let pw = Int((panel.frame.width * scale).rounded()), ph = Int((panel.frame.height * scale).rounded())
+            guard let ctx = CGContext(data: nil, width: pw, height: ph, bitsPerComponent: 8, bytesPerRow: pw * 4,
+                                      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { throw Failure(description: "alpha: no context") }
+            ctx.scaleBy(x: scale, y: scale)
+            let rad = capsule.radius
+            for b in capsule.shape.blurRects(panel: panel.frame.size) {
+                // flipped (y down) → the context's y up
+                let r = CGRect(x: b.minX, y: panel.frame.height - b.maxY, width: b.width, height: b.height)
+                ctx.addPath(CGPath(roundedRect: r, cornerWidth: min(rad, r.height / 2), cornerHeight: min(rad, r.height / 2), transform: nil))
+            }
+            ctx.setFillColor(CGColor(red: 0.11, green: 0.10, blue: 0.11, alpha: 1))
+            ctx.fillPath()
+            let wf = web.convert(web.bounds, to: nil)
+            ctx.draw(webImg, in: wf)
+            captured = ctx.makeImage()
+        }
+        guard let img = captured else { throw Failure(description: "alpha: nothing captured") }
         let dir = q["dir"] as? String ?? NSTemporaryDirectory()
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
         let path = dir + "/" + (q["name"] as? String ?? "alpha") + ".png"
@@ -920,7 +954,7 @@ final class QA {
                   let v = (try? JSONSerialization.jsonObject(with: Data(s.utf8))) as? [Double], v.count == 4, v[2] > 0, v[3] > 0 else { return nil }
             return CGRect(x: v[0], y: v[1], width: v[2], height: v[3])
         }
-        var out: [String: Any] = ["png": path, "size": [w, h], "scale": scale]
+        var out: [String: Any] = ["png": path, "size": [w, h], "scale": scale, "source": source]
         let ring = CGFloat((q["ring"] as? NSNumber)?.doubleValue ?? 6)
         if let p = await rect(q["pearl"] as? String ?? "#amb canvas.pearl, canvas.pearl") {
             let corners = [(p.minX + 0.5, p.minY + 0.5), (p.maxX - 0.5, p.minY + 0.5), (p.minX + 0.5, p.maxY - 0.5), (p.maxX - 0.5, p.maxY - 0.5)]
@@ -994,7 +1028,10 @@ final class QA {
             let p = NSPoint(x: base.x + CGFloat(i % 3) - 1, y: base.y)
             if let ev = NSEvent.mouseEvent(with: .mouseMoved, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                                            windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 0, pressure: 0) {
-                NSApp.postEvent(ev, atStart: false)
+                // what the panel's tracking area hands the web view under a real pointer: posted
+                // into the queue, AppKit routed none of them (live 23:40), so the view gets them
+                if i == 0 { web.mouseEntered(with: ev) }
+                web.mouseMoved(with: ev)
             }
             i += 1
             try? await Task.sleep(nanoseconds: 50_000_000)
