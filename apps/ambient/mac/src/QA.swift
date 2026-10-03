@@ -616,6 +616,8 @@ final class QA {
             return try await keys(q)
         case "alpha":
             return try await alpha(q)
+        case "hover":
+            return try await hover(q)
         case "clickables":
             // every visible thing a click acts on, in the page's order, tagged data-qa-i so `click`
             // can aim at each one (ambient-pm m_6584: every button the capsule shows, once each)
@@ -962,6 +964,45 @@ final class QA {
         if let g = capsule.shape.glass { out["app"] = [g.minX, g.minY, g.width, g.height] }
         out["panel_visible"] = capsule.panel.isVisible
         return out
+    }
+
+    // the pointer over an element without moving his pointer (ambient m_6592 (4): the pushed
+    // question stays while the pointer is over it): mouseMoved events at the element's point posted
+    // into the app's queue with the panel's window number, `ms` long; reports the page's
+    // pointerover/mouseover/pointermove on it. A real pointer also drives the window server's
+    // tracking areas (cursor shape, enter/exit), which this can't.
+    private func hover(_ q: [String: Any]) async throws -> [String: Any] {
+        guard let sel = q["selector"] as? String, !sel.isEmpty else { throw Failure(description: "hover needs selector") }
+        let panel = capsule.panel, web = capsule.web
+        guard panel.isVisible else { throw Failure(description: "the capsule is not on screen") }
+        let quoted = String(data: try JSONSerialization.data(withJSONObject: [sel]), encoding: .utf8) ?? "[\"\"]"
+        guard let s = await js(web, """
+        (() => { const el = document.querySelector(\(quoted)[0]); if (!el) return null; window.__qaHov = [];
+          if (!window.__qaHovOn) { window.__qaHovOn = true;
+            for (const t of ['pointerover', 'mouseover', 'pointermove', 'mouseenter', 'pointerleave'])
+              document.addEventListener(t, e => window.__qaHov.push({type: t, inside: !!(window.__qaHovEl && e.target && e.target.nodeType === 1 && window.__qaHovEl.contains(e.target))}), true); }
+          window.__qaHovEl = el; const r = el.getBoundingClientRect(); return JSON.stringify([r.left + r.width / 2, r.top + r.height / 2]); })()
+        """), let v = (try? JSONSerialization.jsonObject(with: Data(s.utf8))) as? [Double], v.count == 2 else {
+            return ["selector": sel, "found": false]
+        }
+        let zoom = web.pageZoom
+        let base = web.convert(NSPoint(x: v[0] * zoom, y: web.isFlipped ? v[1] * zoom : web.bounds.height - v[1] * zoom), to: nil)
+        let ms = (q["ms"] as? NSNumber)?.doubleValue ?? 1000
+        let t0 = Date()
+        var i = 0
+        while Date().timeIntervalSince(t0) * 1000 < ms {
+            let p = NSPoint(x: base.x + CGFloat(i % 3) - 1, y: base.y)
+            if let ev = NSEvent.mouseEvent(with: .mouseMoved, location: p, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                           windowNumber: panel.windowNumber, context: nil, eventNumber: 0, clickCount: 0, pressure: 0) {
+                NSApp.postEvent(ev, atStart: false)
+            }
+            i += 1
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        let dom = (await js(web, "JSON.stringify(window.__qaHov || [])"))
+            .flatMap { (try? JSONSerialization.jsonObject(with: Data($0.utf8))) as? [[String: Any]] } ?? []
+        let over = dom.contains { ($0["inside"] as? Bool ?? false) && ["pointerover", "mouseover", "pointermove"].contains($0["type"] as? String ?? "") }
+        return ["selector": sel, "found": true, "over": over, "moves": i, "dom": Array(dom.prefix(20)), "visible_after": panel.isVisible]
     }
 
     private func reset() async {

@@ -908,6 +908,42 @@ def clicks(state="card", open_key="auto", selector=None, settle_s=1.0, then=None
     return out
 
 
+def hover(selector, ms=1000):
+    """The pointer over an element without moving his pointer (ambient m_6592 (4)): mouseMoved
+    events at its point into the QA app's queue for `ms`; over = the page saw the pointer on it.
+    It can't drive the window server's tracking areas (cursor shape, enter/exit)."""
+    return call("hover", timeout=10 + ms / 1000, selector=selector, ms=ms)
+
+
+def alpha(name="alpha", pearl=None, glass=None, ring=6, outside=10, out=None):
+    """The panel's own pixels with alpha (ScreenCaptureKit, this window alone, no shadow) and the
+    verdicts ambient's gate wants: the pearl's 4 corners and a ring `ring` px outside its disc at
+    alpha 0 (the pearl floats on the screen), and `outside` px outside the glass at alpha 0 or
+    off the window (a click there reaches the app below)."""
+    kw = {"name": name, "ring": ring, "outside": outside, "dir": out or os.path.join(OUT, "alpha")}
+    if pearl:
+        kw["pearl"] = pearl
+    if glass:
+        kw["glass"] = glass
+    r = call("alpha", timeout=20, **kw)
+    fails = []
+    p = r.get("pearl")
+    if not p:
+        fails.append("no pearl on the page")
+    else:
+        if any(c for c in p.get("corners", []) if isinstance(c, int) and c > 0):
+            fails.append("the pearl's corners aren't transparent: %s" % p["corners"])
+        if p.get("ring_max", 0) > 0:
+            fails.append("a ring %s px outside the pearl has alpha up to %d" % (p.get("ring_px"), p["ring_max"]))
+    g = r.get("glass")
+    if g:
+        hot = {k: v for k, v in g.get("alpha_outside", {}).items() if isinstance(v, int) and v > 0}
+        if hot:
+            fails.append("%s px outside the glass the panel isn't transparent (a click there stays in bise): %s" % (g.get("outside_px"), hot))
+    r["fails"], r["verdict"] = fails, ("pass" if not fails else "FAIL")
+    return r
+
+
 def keyev(kind, code=None, fn=False, words=None, per_word_ms=None):
     """A keyboard event through the app's real key path (Keys.qaEvent: KeyMachine, its hold
     threshold, App.key) on a QA app whose tap never starts: kind fn_down|fn_up|down|up."""
@@ -3188,6 +3224,9 @@ def _cli(argv):
     p = sub.add_parser("fn-hold-closed", help="fn held from rest through the real key path (no tap): pearl listening within 300 ms, words to the core, main's line; a tap does nothing")
     p.add_argument("--variants", default="launch,fold,hide"); p.add_argument("--words", default="what is on my plate today"); p.add_argument("--within-ms", type=int, default=300)
     sub.add_parser("rest", help="the capsule back to rest and bise not the active app")
+    p = sub.add_parser("hover", help="the pointer over an element (mouseMoved into the QA app's queue, his pointer never moves)"); p.add_argument("selector"); p.add_argument("--ms", type=int, default=1000)
+    p = sub.add_parser("alpha", help="the panel's pixels with alpha: the pearl's corners and a ring outside it, and around the glass, must be transparent")
+    p.add_argument("--name", default="alpha"); p.add_argument("--ring", type=float, default=6); p.add_argument("--outside", type=float, default=10)
     p = sub.add_parser("clicks", help="every button the capsule shows in one state, one real click each (state set again before each): the page got it, one command left")
     p.add_argument("--state", default="card", help="card, drafts, or a JSON file with a core state event"); p.add_argument("--open", default="auto", help="fn + this key opens the view (auto: i for cards, , for settings; none: no key)")
     p.add_argument("--selector"); p.add_argument("--then", help="click the first target whose data-qa starts with this before listing (card- : a card's own bar from fn i)")
@@ -3272,6 +3311,10 @@ def _cli(argv):
         r = fn_hold_closed(tuple(v for v in a.variants.split(",") if v), a.words, within_ms=a.within_ms)
     elif a.cmd == "rest":
         r = rest()
+    elif a.cmd == "hover":
+        r = hover(a.selector, a.ms)
+    elif a.cmd == "alpha":
+        r = alpha(a.name, ring=a.ring, outside=a.outside)
     elif a.cmd == "clicks":
         st = a.state if a.state in CLICK_STATES else json.load(open(a.state))
         r = clicks(st, None if a.open == "none" else a.open, a.selector, then=a.then)

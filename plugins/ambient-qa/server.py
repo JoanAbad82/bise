@@ -33,6 +33,10 @@ TOOLS = [
     ("fn_hold_closed", "fn held from rest (capsule closed, bise not frontmost) through the real key path (KeyMachine via Keys.qaEvent; the QA app has no tap, never his fn): the pearl listens within within_ms, the fake voice's words reach the core on release, main's line shows; variants launch, fold (opened then folded by itself), hide (fn + .); then a tap must do nothing.",
      {"variants": {"type": "array", "items": {"type": "string", "enum": ["launch", "fold", "hide"]}}, "words": {"type": "string"}, "within_ms": {"type": "integer"}}, []),
     ("rest", "The capsule back to rest (folded into the icon) and bise not the active app.", {}, []),
+    ("hover", "The pointer over an element: mouseMoved events at its point into the QA app's queue for ms (his pointer never moves); over = the page saw it. Can't drive tracking areas (cursor shape).",
+     {"selector": {"type": "string"}, "ms": {"type": "integer"}}, ["selector"]),
+    ("alpha", "The panel's own pixels with alpha (this window alone, no shadow) as a PNG, and the verdict: the pearl's 4 corners and a ring `ring` px outside its disc at alpha 0, and `outside` px outside the glass at alpha 0 (a click there reaches the app below).",
+     {"name": {"type": "string"}, "ring": {"type": "number"}, "outside": {"type": "number"}}, []),
     ("clicks", "Every button the capsule shows in one state, one real click each (the state set again from rest before each, bise not frontmost): per button its label, whether the page got the click, the commands that left (exactly one expected), a text cursor flagged. state: card (a question with a page link), drafts (a batch: review, send all), settings, or a core state event; open: fn + this key opens the view (default: i for cards, , for settings). Aims at round 9's [data-qa] targets.",
      {"state": {"type": ["string", "object"]}, "open": {"type": "string"}, "selector": {"type": "string"}, "then": {"type": "string", "description": "click the first target whose data-qa starts with this before listing (card-: a card's own bar from fn i)"}}, []),
     ("keys", "Real keys into the QA app's panel: CGEvent key down/up posted to the QA app's pid (never the HID tap: nothing reaches his front app). specs: 'up', 'down', 'return', 'tab', 'esc', 'cmd+return', 'cmd+1'..'cmd+9', 'type:<words>'. Returns the panel's key state, what AppKit saw and the page's keydown/input events.",
@@ -122,6 +126,12 @@ def run(name, a):
         r = qa.fn_hold_closed(tuple(a.get("variants") or ("launch", "fold", "hide")), a.get("words", "what is on my plate today"), within_ms=a.get("within_ms", 300))
     elif name == "rest":
         r = qa.rest()
+    elif name == "hover":
+        r = qa.hover(a["selector"], a.get("ms", 1000))
+    elif name == "alpha":
+        r = qa.alpha(a.get("name", "alpha"), ring=a.get("ring", 6), outside=a.get("outside", 10))
+        if r.get("png"):
+            images.append(r["png"])
     elif name == "clicks":
         o = a.get("open", "auto")
         r = qa.clicks(a.get("state", "card"), None if o in (None, "", "none") else o, a.get("selector"), then=a.get("then"))
