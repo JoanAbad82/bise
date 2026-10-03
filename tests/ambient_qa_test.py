@@ -567,6 +567,12 @@ def mentions_page_laws():
     _, fl = qa.mentions_check(page([item("m-302", "Hugo", "x"), item("s-301", "Léa", "y"), item("m-311", "Product Weekly", "5 questions")]),
                               "mentions-2026-10-03", 1, today="2026-10-03")
     check(len(fl) == 1 and "noise" in fl[0], fl)
+    # a notification listed among the sources (every place the watcher read) is no noise item
+    src = '<section data-kit="sources" data-id="src"><ol><li><a href="https://mail.test/t313">Lucas mentioned you in ENG-412 · Gmail</a></li></ol></section>'
+    _, fl = qa.mentions_check(v1 + src, "mentions-2026-10-03", 1, today="2026-10-03")
+    check(not any("noise" in f for f in fl), fl)
+    _, fl = qa.mentions_check(v1.replace("</h1>", "</h1><p>Lucas mentioned you in ENG-412</p>", 1), "mentions-2026-10-03", 1, today="2026-10-03")
+    check(any("m313" in f for f in fl), fl)
     _, fl = qa.mentions_check(v1.replace("<p>yes, thursday.</p>", ""), "mentions-2026-10-03", 1, today="2026-10-03")
     check(len(fl) == 1 and "drafted answer" in fl[0], fl)
     _, fl = qa.mentions_check(v1.replace('data-verb="reply"', ""), "mentions-x", 1, today="2026-10-03")

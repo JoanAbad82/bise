@@ -1816,7 +1816,10 @@ def mentions_check(body, page_id, batches, prev_ids=(), today=None):
     if missing:
         fails.append("asks missing after batch %d: %s" % (batches, ", ".join(missing)))
     noise = [i["id"] for i in items if i["num"] in noise_nums]
-    low = re.sub(r"<[^>]+>", " ", body or "").lower()
+    # noise shown anywhere but the sources: the sources list every place the watcher read, a
+    # notification included ('Lucas mentioned you in ENG-412 · Gmail', live run 07:16), which is no item
+    shown = " ".join(s["html"] for s in _sections(body) if s["kit"] != "sources") if _sections(body) else (body or "")
+    low = re.sub(r"<[^>]+>", " ", shown).lower()
     noise += [n["id"] for n in truth["noise"] if n["id"] not in noise and n.get("subject") and n["subject"].lower()[:30] in low]
     if noise:
         fails.append("noise on the page: %s" % ", ".join(noise))
