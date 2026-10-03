@@ -577,6 +577,26 @@ fn the_state_carries_pages_url_and_urgent_cards() {
     assert_eq!((st["cards"][0]["urgent"].as_bool(), st["cards"][1]["urgent"].as_bool()), (Some(true), Some(false)));
 }
 
+/// A batch of drafts' card keeps the hub's fields for the capsule's
+/// words (amb-web m_6061); other cards have none.
+#[test]
+fn a_batch_card_carries_its_fields() {
+    let mut t = T::new();
+    let batch = json!({"count": 3, "title": "inbox", "what": "replies", "names": ["legal", "Lucas", "Marc"]});
+    t.hub.say(json!({"ev": "state", "agents": [], "pages": [],
+        "cards": [{"id": 4, "kind": "question", "agent": "main", "text": "3 drafts wait for you · inbox
+replies to legal, Lucas and Marc
+1. review
+2. send all 3",
+            "page": {"id": "inbox", "block": "replies", "item": "r1", "drafts": true, "url": "http://x/p/inbox#r1"}, "batch": batch},
+            {"id": 5, "kind": "question", "agent": "a", "text": "which?"}]}));
+    t.until(|o| has(o, "state"));
+    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    assert_eq!(st["cards"][0]["batch"], batch);
+    assert_eq!(st["cards"][0]["options"][1]["label"], "send all 3");
+    assert!(st["cards"][1].get("batch").is_none());
+}
+
 /// fn held, `words` heard, fn up: sent.
 fn talk(t: &mut T, words: &str) {
     t.cmd(Cmd::TalkStart);

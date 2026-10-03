@@ -110,7 +110,7 @@ pub fn of_page(id: &str, html: &str, notes: &[Note], questions: &[Question]) -> 
     match drafts.len() {
         0 => {}
         1 => out.push(w(drafts[0].anchor(), "draft", &drafts[0].text)),
-        _ => out.push(w(drafts[0].anchor(), "draft", &super::drafts::batch_text(&drafts))),
+        _ => out.push(w(drafts[0].anchor(), "draft", &super::drafts::batch_text(&drafts, "").replace('\n', ": "))),
     }
     // questions he has not answered (on the page: no data-answer)
     for (b, _) in blocks_of(html, "question") {
@@ -157,7 +157,7 @@ mod tests {
         // (ambient-lead m_5977)
         assert_eq!(lines, vec![
             "plan#t2 · step · pay the domain on Gandi",
-            "plan#m1 · draft · 2 drafts ready: reply to Nina: yes, Friday · team@acme.test Subject: the offsite…",
+            "plan#m1 · draft · 2 drafts wait for you: Nina and team",
             "plan#q1 · question · post it now?",
             "plan#n2 · notes · shorter",
         ]);

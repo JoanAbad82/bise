@@ -564,11 +564,20 @@ def main():
         c.wait(batch, 90, "the batch card")
         time.sleep(1)
         on_page = [x for x in c.cards() if (x.get("page") or {}).get("id") == "batch-plan"]
-        check(len(on_page) == 1 and on_page[0]["text"].startswith("2 drafts ready: add the DNS records · tell Marc"), "one card for both drafts: %r" % on_page)
+        # ambient's words (m_6055 via ambient-lead m_6058): review first
+        check(len(on_page) == 1 and on_page[0]["text"].startswith("2 drafts wait for you · batch plan\nemails to lucas and marc\n1. review\n2. send both"), "one card for both drafts: %r" % on_page)
         check(on_page[0]["page"].get("drafts") is True and on_page[0]["page"].get("item") == "b1", "it opens the page at the first: %r" % on_page[0]["page"])
+        check(on_page[0].get("batch") == {"count": 2, "title": "batch plan", "what": "emails", "names": ["lucas", "marc"]}, "its fields for the capsule: %r" % on_page[0])
         settle(c)
+        # 1 = review: nothing sent, the card stays
         c.say("/answer %d 1" % on_page[0]["id"])
-        c.wait(lambda: not batch(), 30, "the batch card closes on send all")
+        time.sleep(3)
+        check(batch() is not None, "review leaves the batch card open: %r" % c.cards())
+        notes = json.loads(request(port, "GET", "/p/batch-plan/meta")[2])["notes"]
+        check(not [n for n in notes if n["kind"] == "approve"], "review sends nothing: %r" % notes)
+        settle(c)
+        c.say("/answer %d 2" % on_page[0]["id"])
+        c.wait(lambda: not batch(), 30, "the batch card closes on send both")
         notes = json.loads(request(port, "GET", "/p/batch-plan/meta")[2])["notes"]
         check(sorted(n["block"] for n in notes if n["kind"] == "approve") == ["mail-dns", "mail-marc"], "an approve per draft: %r" % notes)
         settle(c)

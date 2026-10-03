@@ -223,6 +223,9 @@ struct CardInfo {
     text: String,
     /// a page question's card: {id, block, url} (docs/ambient-pages.md §4.2)
     page: Option<Value>,
+    /// a batch of drafts' card: {count, title, what, names} (amb-web
+    /// m_6061: the capsule's words)
+    batch: Option<Value>,
 }
 
 pub struct Core {
@@ -675,6 +678,7 @@ impl Core {
                 agent: s(c, "agent"),
                 text: s(c, "text"),
                 page: c.get("page").filter(|p| p.is_object()).cloned(),
+                batch: c.get("batch").filter(|b| b.is_object()).cloned(),
             })
             .collect();
         let cards: Vec<Value> = self
@@ -693,6 +697,9 @@ impl Core {
                 let mut v = json!({"id": c.id, "kind": c.kind, "agent": c.agent, "text": c.text, "options": options, "urgent": urgent});
                 if let Some(p) = &c.page {
                     v["page"] = p.clone();
+                }
+                if let Some(b) = &c.batch {
+                    v["batch"] = b.clone();
                 }
                 v
             })

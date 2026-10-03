@@ -89,6 +89,10 @@ pub struct Step {
     /// (`block` or `block/item`); `text` is its first line
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub batch: Vec<String>,
+    /// a batch card's fields for the capsule (drafts::info): {count,
+    /// title, what, names}
+    #[serde(default, skip_serializing_if = "serde_json::Value::is_null")]
+    pub info: serde_json::Value,
 }
 
 /// The `block` of a batch card's entry in steps.json (no block id is
@@ -97,12 +101,13 @@ pub const BATCH: &str = "";
 
 impl Step {
     /// The card's text: the step, and its one option (a drafted step:
-    /// send the draft; a batch: send all, or review on the page).
+    /// send the draft; a batch: review on the page first, the safe one,
+    /// then send them all; ambient's order, m_6055).
     pub fn card_text(&self) -> String {
         if !self.batch.is_empty() {
             return format!("{}
-1. send all
-2. review", self.text);
+1. review
+2. {}", self.text, super::drafts::send_label(self.batch.len()));
         }
         if self.drafted {
             return format!("{}: send the draft?

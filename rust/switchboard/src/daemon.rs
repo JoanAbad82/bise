@@ -588,6 +588,12 @@ impl Shell {
                     // first (ambient-lead m_5977)
                     if let Some((b, anchor)) = block.strip_prefix("drafts:").and_then(|k| k.split_once(':')) {
                         c["page"] = json!({"id": id, "block": b, "item": anchor, "drafts": true, "url": format!("{}#{}", p.url(id), anchor)});
+                        // its fields for the capsule's words (amb-web
+                        // m_6061): {count, title, what, names}
+                        let card = c["id"].as_u64();
+                        if let Some(s) = p.store.steps(id).into_iter().find(|s| Some(s.card) == card && !s.info.is_null()) {
+                            c["batch"] = s.info;
+                        }
                         continue;
                     }
                     // a step of his: its row (roadmap D)
@@ -1425,7 +1431,7 @@ impl Shell {
             }
             steps = kept;
         }
-        changed |= self.page_batch(id, &mut steps, &drafts, &open);
+        changed |= self.page_batch(id, &meta.title, &mut steps, &drafts, &open);
         for s in steps.iter_mut().filter(|s| s.reply.is_none() && s.block != crate::pages::checklist::BATCH) {
             let still = due.iter().any(|r| r.block == s.block && r.item == s.item);
             if still && open.contains(&s.card) {
@@ -1462,7 +1468,7 @@ impl Shell {
                 card: 0,
                 reply: None,
                 drafted: r.drafted,
-                batch: Vec::new(),
+                ..Default::default()
             };
             let before: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
             // main asks (sb-core's cards are main's, pm's 25); its answer
@@ -1507,7 +1513,7 @@ impl Shell {
     /// more drafts wait (and until its last one is sent or skipped); a
     /// draft it lacks replaces it with one for them all. True: `steps`
     /// changed.
-    fn page_batch(&mut self, id: &str, steps: &mut Vec<crate::pages::checklist::Step>, drafts: &[crate::pages::drafts::Draft], open: &[u64]) -> bool {
+    fn page_batch(&mut self, id: &str, title: &str, steps: &mut Vec<crate::pages::checklist::Step>, drafts: &[crate::pages::drafts::Draft], open: &[u64]) -> bool {
         use crate::pages::checklist::{Step, BATCH};
         let keys: Vec<String> = drafts.iter().map(|d| d.key()).collect();
         let mut changed = false;
@@ -1547,8 +1553,9 @@ impl Shell {
         let mut s = Step {
             block: BATCH.into(),
             item: "drafts".into(),
-            text: crate::pages::drafts::batch_text(drafts),
+            text: crate::pages::drafts::batch_text(drafts, title),
             batch: keys,
+            info: crate::pages::drafts::info(drafts, title),
             ..Step::default()
         };
         match self.open_page_card(id, s.card_text(), format!("drafts:{}:{}", first.block, first.anchor())) {
