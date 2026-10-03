@@ -83,8 +83,16 @@ pub fn pending(html: &str, notes: &[Note], questions: &[Question]) -> Vec<Draft>
     let verdict = |b: &str, i: Option<&str>| {
         notes.iter().any(|n| n.block == b && note_item(n) == i && (matches!(n.kind.as_str(), "approve" | "skip" | "send" | "drafts") || is_go_word(n)))
     };
+    // a review's verb says what its items are: start (feedback an agent
+    // can fix: his pick goes to main), keep (what bise keeps), open-reply
+    // (read-only places: copy + open) are nothing bise sends (pm's C
+    // fail 42)
+    let sends = |b: &str| {
+        let verb = head_of(html, b).and_then(|(h, _)| h.split("data-verb=\"").nth(1).and_then(|r| r.split('"').next()).map(String::from));
+        !matches!(verb.as_deref(), Some("start" | "keep" | "open-reply"))
+    };
     for r in items_of(html, "review") {
-        if !r.done && !verdict(&r.block, Some(&r.item)) {
+        if !r.done && !verdict(&r.block, Some(&r.item)) && sends(&r.block) {
             let to = reply_to(&r.text);
             out.push(Draft { block: r.block.clone(), item: Some(r.item.clone()), text: r.text.clone(), step: None, kind: "reply", to });
         }
@@ -220,6 +228,12 @@ fn short(t: &str) -> String {
     }
 }
 
+/// Page `id`'s drafts may make a batch card: any page but a promises or
+/// a meeting page (no card ever there; amb-kit's lint_page, m_6091).
+pub fn carded(id: &str) -> bool {
+    !(id.starts_with("promises-") || id.starts_with("meeting-"))
+}
+
 /// Words on a batch card that send them all: option 2 (1 is review, the
 /// default), 'send all <n>', 'send both', send, envoie, yes.
 pub fn is_send_all(reply: &str) -> bool {
@@ -278,6 +292,26 @@ emails to lucas and marc");
         assert_eq!(p.iter().map(Draft::key).collect::<Vec<_>>(), vec!["replies/r1", "slack-1"]);
         assert_eq!(what(&p), "drafts", "a reply and a message: mixed");
         assert_eq!(names(&p), vec!["Nina".to_string(), "#lyon".to_string()]);
+    }
+
+    /// Law (pm's C fail 42): a feedback page's Slack replies (message
+    /// blocks with data-to and data-open, one after each review item of
+    /// data-verb="start") are its drafts, and such a page (no plan) makes
+    /// a batch card; the 'start' items are no drafts (an agent on them
+    /// goes to main); promises and meeting pages never card.
+    #[test]
+    fn a_feedback_pages_replies_batch() {
+        let item = |i: &str| {
+            format!(
+                r#"<section data-kit="review" data-id="r-{i}" data-verb="start"><ol><li data-id="{i}" data-agent="fix-{i}"><p>Benjamin · bug {i}</p></li></ol></section>
+<section data-kit="message" data-id="reply-{i}" data-to="Slack · reply to Benjamin in #acme-feedback ({i})" data-open="https://acme.slack.com/archives/C05/p{i}"><p>thanks Benjamin, fixed</p></section>"#
+            )
+        };
+        let html = [item("s212"), item("s213"), item("s214")].concat();
+        let p = pending(&html, &[], &[]);
+        assert_eq!(p.iter().map(Draft::key).collect::<Vec<_>>(), vec!["reply-s212", "reply-s213", "reply-s214"]);
+        assert_eq!(what(&p), "messages");
+        assert!(carded("benjamin-bugs") && !carded("promises-2026-w40") && !carded("meeting-renewal"));
     }
 
     /// Law (ambient's words, m_6055 via ambient-lead m_6058): review is

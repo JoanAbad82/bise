@@ -106,10 +106,10 @@ pub fn of_page(id: &str, html: &str, notes: &[Note], questions: &[Question]) -> 
     // drafts (drafted steps, review items, emails, messages; pages/
     // drafts.rs): two or more are one line, as they are one card
     // (ambient-lead m_5977)
-    // (a page with no plan has no card: each draft its own line, as on a
-    // promises page; m_6091)
+    // (a promises or meeting page has no card: each draft its own line;
+    // m_6091)
     let drafts = super::drafts::pending(html, notes, questions);
-    let carded = rows.iter().any(|r| r.plan);
+    let carded = super::drafts::carded(id);
     match drafts.len() {
         0 => {}
         1 => out.push(w(drafts[0].anchor(), "draft", &drafts[0].text)),
@@ -193,12 +193,12 @@ mod tests {
             em("d-nda", "paul@girard.test"),
             em("d-deck", "marc@acme.test"),
         );
-        let lines: Vec<String> = of_page("promises", &page, &[], &[]).iter().map(Waiting::line).collect();
+        let lines: Vec<String> = of_page("promises-w40", &page, &[], &[]).iter().map(Waiting::line).collect();
         assert_eq!(lines, vec![
-            "promises#p-sso · step · send Hélène the SSO timeline",
-            "promises#d-sso · draft · helene@northwind.test s x",
-            "promises#d-nda · draft · paul@girard.test s x",
-            "promises#q-cc · question · ",
+            "promises-w40#p-sso · step · send Hélène the SSO timeline",
+            "promises-w40#d-sso · draft · helene@northwind.test s x",
+            "promises-w40#d-nda · draft · paul@girard.test s x",
+            "promises-w40#q-cc · question · ",
         ]);
     }
 

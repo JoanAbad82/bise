@@ -1400,10 +1400,17 @@ impl Shell {
         let html = pages.store.html(id, meta.version()).unwrap_or_default();
         let rows = crate::pages::checklist::judged(&html, &pages.store.questions(id));
         let mut steps = pages.store.steps(id);
-        if steps.is_empty() && !rows.iter().any(|r| r.his() && r.plan) {
+        let notes = pages.store.notes(id);
+        // drafts batch on any page but a promises or meeting page (never a
+        // card there): a feedback page's replies have no plan (pm's C fail
+        // 42: 3 Slack replies and no card)
+        let drafts = match crate::pages::drafts::carded(id) {
+            true => crate::pages::drafts::pending(&html, &notes, &pages.store.questions(id)),
+            false => Vec::new(),
+        };
+        if steps.is_empty() && !rows.iter().any(|r| r.his() && r.plan) && drafts.len() < 2 {
             return;
         }
-        let notes = pages.store.notes(id);
         let closed = |r: &crate::pages::checklist::Row| crate::pages::checklist::closed_by(r, &notes);
         // cards only for a plan he works through with bise (data-plan):
         // a meeting's or a promise's rows of his reach him by sb page
@@ -1414,7 +1421,6 @@ impl Shell {
         let mut changed = false;
         // two or more drafts waiting at once are ONE card (ambient-lead
         // m_5977): its drafted steps get no card of their own
-        let drafts = crate::pages::drafts::pending(&html, &notes, &pages.store.questions(id));
         let batch_open = steps.iter().any(|s| s.block == crate::pages::checklist::BATCH && s.reply.is_none());
         if drafts.len() >= 2 || (batch_open && !drafts.is_empty()) {
             due.retain(|r| !r.drafted);

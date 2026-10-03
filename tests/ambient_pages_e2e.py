@@ -637,6 +637,28 @@ def main():
         check(sorted(n["block"] for n in notes if n["kind"] == "approve") == ["mail-dns", "mail-marc"], "an approve per draft: %r" % notes)
         settle(c)
 
+        # a feedback page with no plan (pm's C fail 42): a 'start' review
+        # item then its Slack reply, three times: the replies are one
+        # batch card ('3 drafts wait for you'), the start items no draft
+        fp = os.path.join(E.tmp, "feedback.html")
+        fi = lambda i: ('<section data-kit="review" data-id="r-%s" data-verb="start"><ol><li data-id="%s"><p>bug %s</p></li></ol></section>'
+                        '<section data-kit="message" data-id="reply-%s" data-to="Slack · reply to Benjamin in #acme-feedback" '
+                        'data-open="https://acme.slack.com/archives/C05/p%s"><p>thanks Benjamin, fixed</p></section>' % (i, i, i, i, i))
+        open(fp, "w").write(fi("s212") + fi("s213") + fi("s214"))
+        c.say('[[bash: sb page publish %s --id benjamin-bugs --title "benjamin\'s reports"]]' % fp)
+        fb = lambda: [x for x in c.cards() if (x.get("page") or {}).get("id") == "benjamin-bugs"]
+        c.wait(fb, 90, "the feedback page's batch card")
+        time.sleep(1)
+        check(len(fb()) == 1 and fb()[0]["text"].startswith("3 drafts wait for you · benjamin's reports\n") and fb()[0]["text"].endswith("2. send all 3"),
+              "one card for the 3 replies: %r" % fb())
+        check((fb()[0].get("batch") or {}).get("what") == "messages" and fb()[0]["page"].get("item") == "reply-s212", "its fields: %r" % fb()[0])
+        settle(c)
+        c.say("/answer %d 2" % fb()[0]["id"])
+        c.wait(lambda: not fb(), 30, "the feedback batch closes on send all")
+        notes = json.loads(request(port, "GET", "/p/benjamin-bugs/meta")[2])["notes"]
+        check(sorted(n["block"] for n in notes if n["kind"] == "approve") == ["reply-s212", "reply-s213", "reply-s214"], "an approve per reply: %r" % notes)
+        settle(c)
+
         # his step answered from the capsule (pm's D fail 31): the core's
         # {cmd: answer, card, reply: '1'} (fn + digit) ticks it and closes
         # its card, the same as the TUI's /answer and the page's tick
@@ -722,6 +744,8 @@ def main():
         # card.page in a step card's shape, so fn + o opens it there
         bugs = os.path.join(E.tmp, "bugs-watch.html")
         open(bugs, "w").write(BUGS)
+        # the republishes' turn ends first (a say mid-turn is only acked)
+        settle(c)
         c.say('[[bash: sb page publish %s --id bugs-watch --title "bugs watch"]]' % bugs)
         c.wait_line("main", "published bugs-watch v1", 90)
         c.wait_idle("main")
@@ -729,7 +753,9 @@ def main():
         c.wait_line("main", "no block or item", 90)
         c.wait_idle("main")
         c.say('[[bash: sb card --page bugs-watch#b2 "reply to the CSV report?"]]')
-        linked = lambda: next((x for x in c.cards() if (x.get("page") or {}).get("id") == "bugs-watch"), None)
+        # (its 3 drafts, b1, b2 and reply-nina, are a batch card of their
+        # own since pm's C fail 42: not the one looked for here)
+        linked = lambda: next((x for x in c.cards() if (x.get("page") or {}).get("id") == "bugs-watch" and not x["page"].get("drafts")), None)
         c.wait(linked, 60, "the watch's card, linked to its page")
         want = {"id": "bugs-watch", "block": "bugs", "item": "b2", "url": "http://127.0.0.1:%d/p/bugs-watch#b2" % port}
         check(linked()["page"] == want, "the card's page: %r" % linked())
