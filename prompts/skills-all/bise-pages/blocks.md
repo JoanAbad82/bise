@@ -37,7 +37,9 @@ page (`legal's address?`) or a draft waiting for his word (`data-did="drafted"`)
 has open steps, stay on it: end each turn with `sb report progress "<one line>"`, never done
 and never a plain last answer, so his answers and ticks come to you; then do the next step and
 publish again. His `send` or `approve` on a row or on its draft is his word: send it now with
-the tool, then publish the row `data-done` with `--went` (`leaving.md`).
+the tool, then publish the row `data-done` with `--went` (`leaving.md`). His `send all` (one
+card for 2+ drafts) approves them all in one message: send each, then one publish with every row
+`data-done` and a `--went` per draft.
 A step that is a decision of his (how many years, which venue) is the `question` only, and its
 row points at it: `<li data-id="s2" data-who="yours" data-question="years">`; never a row and a
 question that both ask him. His answer ticks it: republish the row `data-done` with his pick
