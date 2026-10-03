@@ -1042,7 +1042,8 @@ SCENARIOS.update({
     "newsletter": {"ask": "write the newsletter for the launch from the release notes", "no_send": True, "notes": False, "flow": "newsletter"},
     # roadmap C: the feedback review, 'start an agent' on two items, agents with the item as brief, nothing leaves
     # no_send off: the flow checks nothing leaves before his send note, then exactly one Slack message
-    "feedback": {"ask": "Benjamin's bug reports in #acme-feedback: handle them so adoption is easy", "no_send": False, "notes": False, "flow": "feedback"},
+    "feedback": {"ask": "Benjamin's bug reports in #acme-feedback: handle them so adoption is easy", "no_send": False, "notes": False, "flow": "feedback",
+                 "picks": {"q-language": 2}},
     # roadmap D (amb-core 527fa441): a step-by-step plan, bise ticks its own, a card per step of his when its turn comes
     "checklist": {"ask": "check my mail and give me a step by step to buy the domain", "no_send": True, "notes": False, "flow": "checklist"},
     # roadmap E (amb-kit m_5643): a seeded night (a PR done, a question card, unsent replies,
@@ -1166,7 +1167,8 @@ def _feedback_loop_end(x, started):
     note on that reply, then exactly one Slack message."""
     r, c, pid = x["r"], x["c"], x["page"]["id"]
     done = lambda: next((a["name"] for a in (c.state or {}).get("agents", []) if a["name"] in started and a.get("status") == "done"), None)
-    if _until(x, lambda: done() is not None, "one started agent done") is None:
+    # main's questions on the way (how to ship code here, the page's own questions): answered as he would
+    if _until(x, lambda: answer_questions(x) or done() is not None, "one started agent done") is None:
         return
     name = done()
     r["t"]["agent_done"] = x["rel"]()
@@ -1204,6 +1206,38 @@ def _feedback_loop_end(x, started):
             r["fails"].append("after his send: %d write(s) (%s), exactly one Slack message expected" % (len(w), ", ".join(r["flow"]["after_send"])))
 
 
+def question_pick(card, picks=None, default=1):
+    """The reply the QA gives a question card: the scenario's pick for its
+    page block (picks {"q-language": 2}), else the option bise marked
+    suggested ('← suggested', 'recommended'), else `default`."""
+    block = (card.get("page") or {}).get("block")
+    if picks and block in picks:
+        return str(picks[block])
+    for line in (card.get("text") or "").splitlines():
+        m = re.match(r"\s*(\d+)[.)]?\s+(.*)", line)
+        if m and re.search(r"suggested|recommended|←", m.group(2), re.I):
+            return m.group(1)
+    for o in card.get("options") or []:
+        if re.search(r"suggested|recommended", str(o.get("label", "")), re.I):
+            return str(o.get("n"))
+    return str(default)
+
+
+def answer_questions(x):
+    """Answers every open question card that isn't one of his step cards
+    (no page item) through the core, once each, as he would; recorded in
+    flow.questions (ambient-pm m_5901: main asked how agents ship code and
+    the page asked the assistant's language, and the run never answered)."""
+    answered = x["r"].setdefault("flow", {}).setdefault("questions", [])
+    done = {a["id"] for a in answered}
+    for q in x["c"].cards():
+        if q.get("kind") == "question" and not (q.get("page") or {}).get("item") and q.get("id") not in done:
+            pick = question_pick(q, x.get("picks"), x.get("pick") or 1)
+            x["core"].p.stdin.write(json.dumps({"cmd": "answer", "card": q["id"], "reply": pick}) + "\n")
+            x["core"].p.stdin.flush()
+            answered.append({"id": q["id"], "text": (q.get("text") or "")[:160], "reply": pick})
+
+
 def _rows(body):
     """A page body's checklist rows: block, item, yours, done."""
     out = []
@@ -1231,17 +1265,10 @@ def _flow_checklist(x):
         r["fails"].append("the plan has %d steps, %d of his (a checklist with his steps expected)" % (len(rows), len(yours)))
         return
     step_card = lambda: next((cd for cd in c.cards() if (cd.get("page") or {}).get("id") == pid and (cd.get("page") or {}).get("item")), None)
-    answered = r["flow"].setdefault("questions", [])
-
     def step_or_answer():
         # a question card that isn't a step (bise asks first: 'that domain is taken, which one?'):
-        # answered by the scenario's pick, else its first option, then on to his steps (ambient-lead m_5816)
-        for q in c.cards():
-            if q.get("kind") == "question" and not (q.get("page") or {}).get("item") and q.get("id") not in {a["id"] for a in answered}:
-                pick = str(x.get("pick") or 1)
-                x["core"].p.stdin.write(json.dumps({"cmd": "answer", "card": q["id"], "reply": pick}) + "\n")
-                x["core"].p.stdin.flush()
-                answered.append({"id": q["id"], "text": q.get("text"), "reply": pick})
+        # answered, then on to his steps (ambient-lead m_5816)
+        answer_questions(x)
         return step_card() is not None
     for k in range(len(yours)):
         took = _until(x, step_or_answer, "the card for his step %d" % (k + 1))
@@ -1856,7 +1883,7 @@ def _run(scenario, sc, headless, timeout, keep, out, require):
             if sc.get("flow") in FLOWS:
                 # roadmap A, C, D: what the user does after v1, and what must follow
                 FLOWS[sc["flow"]](dict(r=r, c=c, page=page, port=port, last=last, body=body, d=d, poll=poll, settled=settled, rel=rel,
-                                       timeout=timeout, info=info, core=core, cards=cards, pick=sc.get("pick")))
+                                       timeout=timeout, info=info, core=core, cards=cards, pick=sc.get("pick"), picks=sc.get("picks")))
             elif not sc.get("notes", True):
                 # launch watch (roadmap B): v1 holds batch 0's needs-an-answer items;
                 # after a tick the page republishes with the new batch's

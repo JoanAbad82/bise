@@ -431,6 +431,25 @@ def feedback_loop_end_laws():
     _, f = qa.feedback_done_check(b.replace("fixed in", "looked at"), "fix-install-path")
     check(len(f) == 1 and "fixed" in f[0], f)
     check(qa.SCENARIOS["feedback"]["no_send"] is False, "the flow checks the send itself")
+    # the questions on the way are answered as he would (ambient-pm m_5901)
+    ship = {"id": 1, "kind": "question", "text": "how should agents ship code here?\n1 a PR per task (you merge)\n2 straight to main, tested commits  ← suggested"}
+    check(qa.question_pick(ship) == "2", "the suggested option")
+    lang = {"id": 2, "kind": "question", "page": {"id": "benjamin-bugs", "block": "q-language"},
+            "text": "the assistant answers in English only. what should it do?\n1. keep it forced to English\n2. answer in the language of the question"}
+    check(qa.question_pick(lang, qa.SCENARIOS["feedback"]["picks"]) == "2" and qa.question_pick(lang) == "1", "the scenario's pick, else 1")
+    sent = []
+
+    class P:
+        class stdin:
+            write = staticmethod(lambda s: sent.append(json.loads(s)))
+            flush = staticmethod(lambda: None)
+
+    class C:
+        cards = staticmethod(lambda: [ship, lang, {"id": 3, "kind": "question", "page": {"id": "d", "block": "steps", "item": "s2"}, "text": "your step"}])
+    x = {"r": {}, "c": C, "core": type("core", (), {"p": P}), "picks": {"q-language": 2}}
+    qa.answer_questions(x)
+    qa.answer_questions(x)
+    check([(m["card"], m["reply"]) for m in sent] == [(1, "2"), (2, "2")], sent)
 
 
 @test
