@@ -306,7 +306,8 @@ def run_scenarios():
     check(qa._covered(body, need)["found"] == 2, qa._covered(body, need))
     # roadmap A, C, D runs (ambient-lead m_5616)
     for k in ("newsletter", "feedback", "checklist"):
-        check(qa.SCENARIOS[k]["flow"] in qa.FLOWS and qa.SCENARIOS[k]["no_send"] and not qa.SCENARIOS[k]["notes"], k)
+        # feedback sends once, after his send note: its flow checks that itself
+        check(qa.SCENARIOS[k]["flow"] in qa.FLOWS and (qa.SCENARIOS[k]["no_send"] or k == "feedback") and not qa.SCENARIOS[k]["notes"], k)
     plan = ('<section data-kit="checklist" data-id="buy"><ol><li data-id="s1" data-done>read the mails</li>'
             '<li data-id="s2" data-who="yours">sign in to Gandi</li><li data-id="s3" data-who="bise">check the price</li>'
             '<li data-id="s4" data-who="yours">pay</li></ol></section><section data-kit="prose" data-id="p"><p>x</p></section>')
@@ -407,6 +408,19 @@ def meeting_page_laws():
     check(not f and facts["bise_drafted"] == 1, (facts, f))
     sc = qa.SCENARIOS["meetings"]
     check(sc["timed"] and sc["flow"] in qa.FLOWS and sc["no_writes"] and sc["set"] == "today", sc)
+
+
+@test
+def feedback_loop_end_laws():
+    """run feedback: a done agent's item keeps its name and a reply draft says fixed (the kit's feedback-bridge)"""
+    b = open(os.path.join(qa.KIT_EXAMPLES, "feedback-bridge.html")).read()
+    reply, f = qa.feedback_done_check(b, "fix-install-path")
+    check(not f and reply["id"] == "reply-s-101" and reply["kit"] == "message", (reply, f))
+    _, f = qa.feedback_done_check(b, "fix-nothing")
+    check(len(f) == 1 and "data-agent" in f[0], f)
+    _, f = qa.feedback_done_check(b.replace("fixed in", "looked at"), "fix-install-path")
+    check(len(f) == 1 and "fixed" in f[0], f)
+    check(qa.SCENARIOS["feedback"]["no_send"] is False, "the flow checks the send itself")
 
 
 @test

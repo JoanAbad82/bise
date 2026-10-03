@@ -1041,7 +1041,8 @@ SCENARIOS.update({
     # roadmap A (ambient-lead m_5616): a Kit draft only after his word, the went line, no send
     "newsletter": {"ask": "write the newsletter for the launch from the release notes", "no_send": True, "notes": False, "flow": "newsletter"},
     # roadmap C: the feedback review, 'start an agent' on two items, agents with the item as brief, nothing leaves
-    "feedback": {"ask": "Benjamin's bug reports in #acme-feedback: handle them so adoption is easy", "no_send": True, "notes": False, "flow": "feedback"},
+    # no_send off: the flow checks nothing leaves before his send note, then exactly one Slack message
+    "feedback": {"ask": "Benjamin's bug reports in #acme-feedback: handle them so adoption is easy", "no_send": False, "notes": False, "flow": "feedback"},
     # roadmap D (amb-core 527fa441): a step-by-step plan, bise ticks its own, a card per step of his when its turn comes
     "checklist": {"ask": "check my mail and give me a step by step to buy the domain", "no_send": True, "notes": False, "flow": "checklist"},
     # roadmap E (amb-kit m_5643): a seeded night (a PR done, a question card, unsent replies,
@@ -1138,6 +1139,66 @@ def _flow_feedback(x):
     took = _until(x, lambda: page_meta(pid)["versions"][-1]["n"] > x["last"]["n"]
                   and _body(x, page_meta(pid)["versions"][-1]["n"]).count("data-agent=") >= 2, "the items showing their agents (data-agent)")
     r["t"]["items_show_agents"] = took
+    if took is not None and agents:
+        _feedback_loop_end(x, [a["name"] for a in agents])
+
+
+def feedback_done_check(body, agent):
+    """feedback.md once an agent is done: its item still carries it
+    (data-agent, the kit shows '✓ <name> done'), and a reply draft says it
+    is fixed (a message or email block). Returns (the reply block or None, fails)."""
+    fails = []
+    if not re.search(r'<li[^>]*data-agent="%s"' % re.escape(agent), body or ""):
+        fails.append("the done item lost its agent (data-agent=\"%s\")" % agent)
+    replies = [s for s in _sections(body) if s["kit"] in ("message", "email") and "fixed" in re.sub(r"<[^>]+>", " ", s["html"]).lower()]
+    if not replies:
+        fails.append("no reply draft saying it's fixed (a message or email block)")
+    return (replies[0] if replies else None), fails
+
+
+def _feedback_loop_end(x, started):
+    """C's end (ambient-lead m_5877, ambient-pm m_5875): one started agent
+    finishes (a small real fix in the workspace's acme code), its item
+    shows it and its reply draft says fixed; nothing leaves until a send
+    note on that reply, then exactly one Slack message."""
+    r, c, pid = x["r"], x["c"], x["page"]["id"]
+    done = lambda: next((a["name"] for a in (c.state or {}).get("agents", []) if a["name"] in started and a.get("status") == "done"), None)
+    if _until(x, lambda: done() is not None, "one started agent done") is None:
+        return
+    name = done()
+    r["t"]["agent_done"] = x["rel"]()
+    r["flow"]["done"] = name
+    got = {}
+
+    def shown():
+        n = page_meta(pid)["versions"][-1]["n"]
+        b = _body(x, n)
+        reply, fails = feedback_done_check(b, name)
+        if not fails and x["settled"]():
+            got.update(n=n, reply=reply)
+            return True
+        got["fails"] = fails
+        return False
+    if _until(x, shown, "the done item republished with its reply draft ('fixed …')") is None:
+        r["fails"].extend(got.get("fails", []))
+        return
+    r["t"]["reply_drafted"] = x["rel"]()
+    early = _writes(x["info"])
+    if early:
+        r["fails"].append("%d write(s) before his word: %s" % (len(early), ", ".join(w.get("kind", "?") for w in early)))
+        return
+    reply = got["reply"]
+    r["flow"]["reply"] = {"block": reply["id"], "kit": reply["kit"], "text": re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", reply["html"])).strip()[:200]}
+    page_notes(pid, [{"block": reply["id"], "kind": "send"}], send=True)
+    r["t"]["send"] = x["rel"]()
+    took = _until(x, lambda: _writes(x["info"]) and x["settled"](), "the reply posted after his send")
+    w = _writes(x["info"])
+    r["flow"]["after_send"] = [w_.get("kind") for w_ in w]
+    if took is not None:
+        r["t"]["posted_after_send"] = took
+        slack = [w_ for w_ in w if w_.get("service") == "slack"]
+        if len(w) != 1 or len(slack) != 1:
+            r["fails"].append("after his send: %d write(s) (%s), exactly one Slack message expected" % (len(w), ", ".join(r["flow"]["after_send"])))
 
 
 def _rows(body):
