@@ -532,6 +532,16 @@ impl<'a> Linter<'a> {
                     .into(),
             );
         }
+        // a plan worked through with him (lead m_5988): its yours rows become step cards in turn;
+        // a bare attribute, only on a checklist
+        if let Some((_, p)) = tag.attrs.iter().find(|(n, _)| n == "data-plan") {
+            let p = p.clone().unwrap_or_default();
+            if kit.as_deref() != Some("checklist") {
+                self.err(&at, "data-plan is not a kit attribute here: only a checklist block takes it (a plan worked through with him)".into());
+            } else if !p.is_empty() {
+                self.err(&at, format!("data-plan=\"{p}\" takes no value: write <section data-kit=\"checklist\" data-id=\"…\" data-plan>"));
+            }
+        }
         match (kit.as_deref(), get("data-verb")) {
             (_, None) => {}
             (Some("review"), Some(v))
@@ -711,13 +721,14 @@ impl<'a> Linter<'a> {
                             | "data-to"
                             | "data-open"
                             | "data-verb"
+                            | "data-plan"
                     )
                 } else {
                     false
                 };
                 if !ok {
                     let hint = if block {
-                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message, email), data-open (message), data-verb (review)"
+                        "blocks take data-kit, data-id, data-tone (callout), data-answer (question), data-to (message, email), data-open (message), data-verb (review), data-plan (checklist)"
                     } else {
                         "inside a block only a review's <li data-id> and an email's <p data-field> take one"
                     };

@@ -18,7 +18,10 @@ unique, and stay the same across versions (the user's notes anchor on them): `p1
 | `compare` | 2 to 4 options side by side (venues, drafts, tools) | `<ol>` of `<li data-id="moulin">`: an `<h3>` name, a `<ul>` of facts, a `<p>` with the why |
 | `checklist` | what's left to do, who, by when | `<ol>` of `<li data-id="t1" data-who="Camille" data-due="2026-05-20">` the task `</li>`; `data-done` when done; the kit shows `Camille · friday` and what is late. `data-who="yours"`: a step only the user can do (a payment, a login): `you · friday`, and a card when every step before it is done; your own steps: `data-who="bise"` or none |
 
-**A plan you work through with him** (buy the domain, set up the offsite): take every step you
+**A plan you work through with him** (buy the domain, set up the offsite): its checklist is
+marked `data-plan` (`<section data-kit="checklist" data-id="steps" data-plan>`): only then do
+his rows become cards, each in its turn. Any other checklist (a meeting's open items, promises)
+never has it: his rows there reach him through the morning page. Take every step you
 can yourself, and mark `data-who="yours"` only what needs his hands or his word (signing in, a
 2FA code, a payment, a decision). Publish the rows first, before any draft or check: every step
 in order, who does it, a short line each, up within about 30 seconds. A check that gates a

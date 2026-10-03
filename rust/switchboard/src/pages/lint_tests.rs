@@ -393,6 +393,19 @@ fn a_step_says_what_bise_did_and_where_its_draft_is() {
 }
 
 #[test]
+fn a_plan_is_a_checklist_marked_data_plan() {
+    ok(r#"<section data-kit="checklist" data-id="steps" data-plan><ol><li data-id="s1" data-who="yours">pay</li></ol></section>"#);
+    has(
+        &errs(r#"<section data-kit="review" data-id="r" data-plan><ol><li data-id="m1"><p>x</p></li></ol></section>"#),
+        "r: data-plan is not a kit attribute here: only a checklist block takes it",
+    );
+    has(
+        &errs(r#"<section data-kit="checklist" data-id="steps" data-plan="yes"><ol><li data-id="s1">pay</li></ol></section>"#),
+        "steps: data-plan=\"yes\" takes no value",
+    );
+}
+
+#[test]
 fn mentions_to_answer_take_the_reply_verb() {
     ok(r#"<section data-kit="review" data-id="asks" data-verb="reply"><ol><li data-id="m1"><p>Léa Martin · #design · 9:12</p><blockquote>can you check the pricing copy?</blockquote><p>yes, before noon.</p></li></ol></section>"#);
 }
