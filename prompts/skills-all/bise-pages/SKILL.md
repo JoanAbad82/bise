@@ -5,17 +5,14 @@ description: Make a page for the user instead of a long reply, with the bise kit
 
 # bise pages: show it as a page
 
-A page is a short HTML fragment (about 50 lines) made of kit blocks. bise wraps it in its frame,
-draws it in the user's look, light and dark, and opens it in the user's browser. The user reads
-it, leaves notes, sends them to you; you publish the next version and the tab updates in place.
-You never write CSS, classes, scripts or colors.
+A page is a short HTML fragment (about 50 lines) of kit blocks. bise frames it, draws it in the
+user's look and opens it; the user leaves notes, you publish the next version, the tab updates
+in place. You never write CSS, classes, scripts or colors.
 
 This file is enough for a first version: publish the skeleton before you open anything else.
-Next to it, read only the one you need, when you need it: `blocks.md` (every block in detail,
-the lint, a full example), `leaving.md` (send, post, "put it in my drafts", newsletters),
-`watch.md` (standing orders, the launch watch), `morning.md` (the morning page), `meetings.md`
-(a brief before, follow-ups after), `feedback.md` (bug reports agents fix), `about-you.md`
-(what bise keeps about the user).
+Next to it, read only what you need, when you need it: `blocks.md` (blocks, plans, the lint),
+`leaving.md` (send, post, drafts), `watch.md` (standing orders), `morning.md`, `meetings.md`,
+`feedback.md` (bug reports), `about-you.md` (what bise keeps about the user).
 
 ## Page or one line
 
@@ -27,16 +24,15 @@ comparisons. A fact, a yes or no, a status, a time is one line in your reply:
 
 ## Before you write
 
-If `~/bise/taste.md` exists, read it: the user's taste rules (tone, length, what they always or
-never want). Follow them, and publish every version with `--taste` (the page says `following
-your taste · 4 rules`). No file, or not read: no `--taste`.
+If `~/bise/taste.md` exists, read it: the user's taste rules. Follow them, and publish every
+version with `--taste` (the page says `following your taste · 4 rules`). No file: no `--taste`.
 
 ## Publish fast, then fill it
 
 The user should see the page within about 10 seconds, then watch it fill in.
 - **A started page:** when your brief gives a page id (main ran `sb page start`), the page is
-  already open and shows your actions live (the one-line description of each command: say what
-  you do in the user's words, `reading #launch in Slack`). Publish to that id.
+  open and shows each command's one-line description live: say it in the user's words
+  (`reading #launch in Slack`). Publish to that id.
 - **Skeleton first**, before you gather anything: the title, the headings you expect and a
   `writing…` callout. Then publish again as each part is ready (same `--id`, same block ids:
   the tab swaps the blocks in place). Last publish: no `writing` callout, the sources added.
@@ -56,10 +52,9 @@ Write the fragment in your temp folder, then:
 sb page publish $TMPDIR/weekly-update.html --id weekly-update --title "weekly update" --taste
 ```
 
-`--id`: lowercase, digits and `-`, kept for every version. `--title`: what the user calls it,
-lowercase. It prints `published weekly-update v1 · <url>`: don't paste the HTML, say one line
-(`the weekly update is ready: check the numbers and pick when to post.`). A refusal prints the
-lint's lines (one per problem, `blocks.md`): fix each, publish again.
+`--id`: lowercase, digits and `-`, the same for every version; `--title`: lowercase. It prints
+`published weekly-update v1 · <url>`: say one line about it, never paste the HTML. A refusal
+prints the lint's lines: fix each, publish again.
 
 ## Nothing leaves before his word
 
@@ -82,14 +77,9 @@ Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kep
 - `message`: a draft for a channel, `data-to="Slack · #launch"`, `<p>`s; never `<pre>`.
 - `email`: `data-to`, `<p data-field="to">`, `subject`, the body; `data-verb="draft"` for his drafts.
 - `compare`: 2 to 4 `<li data-id>` side by side: `<h3>`, `<ul>` of facts, `<p>` why.
-- `checklist`: `<li data-id data-who data-due="2026-05-20">`, `data-done` when done. A plan:
-  publish its rows first (checks before the step they gate), then take every step you can
-  (drafts wait for his word), `data-who="yours"` only for his hands or his word, and say on your rows what you did (`data-did`, `data-draft`, `blocks.md`). Never
-  report done with a step of yours open, and stay on the plan while it has open steps (each
-  turn ends with `sb report progress`); his `send` on a draft: send it now. A
-  decision of his, or anything you need from him, is a `question` its row points at
-  (`data-question`), never row text or a callout alone. His answer
-  or note: republish the row and the drafts it fills together.
+- `checklist`: `<li data-id data-who data-due="2026-05-20">`, `data-done` when done. A plan
+  worked through with him (buy the domain, set up the offsite): read "a plan" in `blocks.md`
+  before you publish one.
 
 **A draft of anything that leaves goes in its own block, never in prose:** a Slack message or a
 post in a `message` block (`data-to="Slack · #team"`: `copy` and `open #team`), a mail or a
