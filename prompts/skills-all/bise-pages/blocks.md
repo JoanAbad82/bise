@@ -34,7 +34,10 @@ A step that is a decision of his (how many years, which venue) is the `question`
 row points at it: `<li data-id="s2" data-who="yours" data-question="years">`; never a row and a
 question that both ask him. His answer ticks it: republish the row `data-done` with his pick
 (`2 years`). When he says he'll do something ("i'll leave a note with legal's address"), never
-ask it again: the row says it in one line (`waiting for your note: legal's address`).
+ask it again: the row says it in one line (`waiting for your note: legal's address`). When his
+note comes, republish in one version both the row (no more `waiting for your note`) and every
+draft it fills (the mail's To), before the next step becomes his turn: his `send the draft?`
+never asks him to send a draft that still says it's waiting.
 
 Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
 `<img src="data:image/…" alt="…">`. Nothing else. Review and checklist items may carry
