@@ -1713,6 +1713,23 @@ def mentions_truth():
     return {"asks": [x for x in items if x.get("mention")], "noise": [x for x in items if x.get("noise") and x.get("user") != "camille"]}
 
 
+def mentions_cards_check(truth, cards, flow):
+    """mentions.md's cards (amb-kit 78500b1b): one card per batch (the start, each tick) that
+    added asks from his team, about one of that batch's team items; none about anything else
+    (people outside his team, noise), none twice for a batch. Records {batch: n} in flow."""
+    batches = {}
+    for a in truth["asks"]:
+        if a["mention"] == "team":
+            batches.setdefault(a.get("batch", 0), []).append({"id": a["id"], "author": a["who"], "text": a["text"]})
+    per = {b: [cd for cd in cards if _card_about(cd, items)] for b, items in sorted(batches.items())}
+    other = [cd for cd in cards if not any(cd in v for v in per.values())]
+    flow["cards"] = {"batch %s" % b: len(v) for b, v in per.items()}
+    if any(len(v) != 1 for v in per.values()) or other:
+        return ["cards: %s for his team's asks (one per batch expected), %d other(s): %s"
+                % (flow["cards"], len(other), "; ".join((cd.get("text") or "")[:60] for cd in other))]
+    return []
+
+
 def mentions_items(body):
     """The review's items, in order: id, its html, the truth's number its id carries."""
     rev = next((s for s in _sections(body) if s["kit"] == "review"), None)
@@ -1796,14 +1813,10 @@ def _flow_mentions(x):
         r["flow"]["tick%d" % k] = got["facts"]
         r["fails"] += got["fails"]
         prev, n = got["facts"]["items"], got["n"]
-    # cards: one per direct question from his team, never another
-    team = [a for a in truth["asks"] if a["mention"] == "team"]
-    cards = list(x["cards"].values())
-    per = {a["id"]: [cd for cd in cards if _card_about(cd, [{"id": a["id"], "author": a["who"], "text": a["text"]}])] for a in team}
-    other = [cd for cd in cards if not any(cd in v for v in per.values())]
-    r["flow"]["cards"] = {k: len(v) for k, v in per.items()}
-    if any(len(v) != 1 for v in per.values()) or other:
-        r["fails"].append("cards: %s for his team's questions (one each expected), %d other(s)" % (r["flow"]["cards"], len(other)))
+    # cards: ONE per batch that brought asks from his team (questions and requests alike, amb-kit
+    # 78500b1b: 'Nora asks: … · 1 more'), never again for an item already carded, never another
+    fails = mentions_cards_check(truth, list(x["cards"].values()), r["flow"])
+    r["fails"] += fails
     if _writes(x["info"]):
         r["fails"].append("%d write(s) before his send" % len(_writes(x["info"])))
         return

@@ -566,6 +566,16 @@ def mentions_page_laws():
     check(len(fl) == 2, fl)
     sc = qa.SCENARIOS["mentions"]
     check(sc["flow"] == "mentions" and sc["set"] == "mentions" and sc["tick_min"] == 0 and "ticks" not in sc, sc)
+    # cards: one per batch with his team's asks (Léa's question at the start, Nora's request at tick 1)
+    truth = qa.mentions_truth()
+    lea = {"id": 1, "kind": "question", "text": "Léa asks which date works for the pricing review, tuesday or thursday?"}
+    nora = {"id": 2, "kind": "question", "text": "Nora asks: why does the CSV export drop the due dates? · 1 more"}
+    hugo = {"id": 3, "kind": "question", "text": "Hugo Bernard wants the March invoice resent"}
+    flow = {}
+    check(qa.mentions_cards_check(truth, [lea, nora], flow) == [] and flow["cards"] == {"batch 0": 1, "batch 1": 1}, flow)
+    check(qa.mentions_cards_check(truth, [lea], {}), "Nora's batch has no card")
+    check(qa.mentions_cards_check(truth, [lea, nora, dict(nora, id=4)], {}), "Nora's batch carded twice")
+    check(qa.mentions_cards_check(truth, [lea, nora, hugo], {}), "a card for someone outside his team")
     # his scripted send goes to a mention answered in words (Sophie's call slot), never one needing a file
     fx = json.load(open(os.path.join(qa.FAKE_ACCOUNTS, "fixtures.json")))
     m = next(m for m in fx["sets"]["mentions"]["gmail"]["+messages"] if m["id"] == "m" + qa.SEND_ON["num"])
