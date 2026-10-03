@@ -83,8 +83,8 @@ Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kep
 - `email`: `data-to`, `<p data-field="to">`, `subject`, the body; `data-verb="draft"` for his drafts.
 - `compare`: 2 to 4 `<li data-id>` side by side: `<h3>`, `<ul>` of facts, `<p>` why.
 - `checklist`: `<li data-id data-who data-due="2026-05-20">`, `data-done` when done. A plan:
-  take every step you can (drafts wait for his word), `data-who="yours"` only for his hands or
-  his word, and say on your rows what you did (`data-did`, `data-draft`, `blocks.md`). Never
+  publish its rows first (checks before the step they gate), then take every step you can
+  (drafts wait for his word), `data-who="yours"` only for his hands or his word, and say on your rows what you did (`data-did`, `data-draft`, `blocks.md`). Never
   report done with a step of yours open, and stay on the plan while it has open steps. A
   decision of his is a `question` its row points at (`data-question`), never both. His answer
   or note: republish the row and the drafts it fills together.

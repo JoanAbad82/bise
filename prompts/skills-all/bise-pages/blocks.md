@@ -20,8 +20,11 @@ unique, and stay the same across versions (the user's notes anchor on them): `p1
 
 **A plan you work through with him** (buy the domain, set up the offsite): take every step you
 can yourself, and mark `data-who="yours"` only what needs his hands or his word (signing in, a
-2FA code, a payment, a decision). Do your steps before you publish: a mail or a message as a
-draft in its own block (`email` / `message`, it waits for his word), a check run and its result.
+2FA code, a payment, a decision). Publish the rows first, before any draft or check: every step
+in order, who does it, a short line each, up within about 30 seconds. A check that gates a
+purchase or a step you can't undo (the trademark before paying) comes before it. Then take your
+steps one by one and publish again as each is done: a mail or a message as a draft in its own
+block (`email` / `message`, it waits for his word), a check run and its result.
 Each of your rows says what you did, `data-did="drafted"` or `data-did="checked · it loads"`,
 and where the draft is, `data-draft="<its block id>"`: the row shows `bise · drafted · in the
 page` and takes him there. Someone else's step (`data-who="Lucas"`): draft the message that
