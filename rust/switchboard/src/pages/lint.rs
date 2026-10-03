@@ -553,6 +553,8 @@ impl<'a> Linter<'a> {
             match &what {
                 None => self.err(&at, "an action block needs data-do: the write it makes, in a few words (data-do=\"close OPS-12\")".into()),
                 Some(d) if d.trim().is_empty() || d.chars().count() > 40 => self.err(&at, format!("data-do=\"{d}\" says the write in a few words, 40 characters at most (close OPS-12)")),
+                // code work is never an action (pm's C, lead m_6217): it is a 'start an agent' item
+                Some(d) if is_code_work(d) => self.err(&at, format!("data-do=\"{d}\" is code work: an action is one write in his accounts (close OPS-12, label a mail); a code change is a review item with data-verb=\"start\" (start an agent)")),
                 _ => {}
             }
         } else if what.is_some() {
@@ -953,6 +955,25 @@ fn decode(s: &str) -> String {
     }
     out.push_str(rest);
     out
+}
+
+/// Whether an action's words are code work: land, commit, push, merge, main, or a file path
+/// (a `/`, or a name with an extension like `assistant.py`).
+fn is_code_work(d: &str) -> bool {
+    d.split(|c: char| c.is_whitespace() || matches!(c, ',' | ';' | ':' | '(' | ')' | '\'' | '"'))
+        .filter(|w| !w.is_empty())
+        .any(|w| {
+            let low = w.to_ascii_lowercase();
+            let low = low.trim_end_matches(['.', '!', '?']);
+            matches!(low, "land" | "commit" | "push" | "merge" | "main")
+                || low.contains('/')
+                || low.rsplit_once('.').is_some_and(|(name, ext)| {
+                    !name.is_empty()
+                        && name.chars().any(|c| c.is_ascii_alphabetic())
+                        && (1..=5).contains(&ext.len())
+                        && ext.chars().all(|c| c.is_ascii_alphabetic())
+                })
+        })
 }
 
 /// Whether an email block's `<p data-field="to">` holds an address (an `@`), tags dropped.

@@ -407,6 +407,14 @@ fn a_write_his_word_triggers_is_an_action_block() {
         &errs(r#"<section data-kit="prose" data-id="p" data-do="close OPS-12"><p>x</p></section>"#),
         "p: data-do is not a kit attribute here: only an action block takes it",
     );
+    // code work is never an action (pm's C, lead m_6217)
+    let act = |d: &str| format!(r#"<section data-kit="action" data-id="a1" data-do="{d}"><p>x</p></section>"#);
+    for d in ["land the fix on main", "merge PR #214", "commit the fix", "push it", "edit acme/assistant.py", "change assistant.py"] {
+        has(&errs(&act(d)), &format!("a1: data-do=\"{d}\" is code work"));
+    }
+    for d in ["close OPS-12", "label it invoices", "archive the thread", "close ENG-412 (fixed in 0.4.2)", "move it to Done."] {
+        ok(&act(d));
+    }
 }
 
 #[test]

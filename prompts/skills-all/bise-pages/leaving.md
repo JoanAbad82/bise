@@ -20,7 +20,10 @@ of another send:
 <section data-kit="action" data-id="a-ops12" data-do="close OPS-12"><p>close OPS-12 in Linear · fixed in 0.4.2</p></section>
 ```
 
-`data-do` is the button's words (40 characters at most), the `<p>` what and why. On his word do
+`data-do` is the button's words (40 characters at most), the `<p>` what and why. An action is
+only a write in one of his accounts that is one tool call (close OPS-12, label a mail, archive a
+thread). Code work (change a file, land, merge, push) is never an action: it is a review item
+with `data-verb="start"` (`start an agent`); the lint refuses an action that names one. On his word do
 exactly what the approved items say, nothing more: a skipped action stays undone, and an action
 that isn't on the page is never done.
 

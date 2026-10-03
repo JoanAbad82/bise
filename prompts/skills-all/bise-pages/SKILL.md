@@ -64,6 +64,7 @@ While you write and until the user's word on the page (`send`, `approve`, "put i
 drafts"), nothing goes to their accounts: no draft in Gmail or Outlook, no message, no post, no
 label. Then `leaving.md`. Any other write (close an issue, an invite) is on the page first as
 its own `action` block (`data-do="close OPS-12"`); on his word, do exactly what he approved.
+Code work is never an action: it is a `start an agent` item.
 
 ## The blocks
 
