@@ -794,7 +794,7 @@ def _view_now():
     return json.dumps(v, sort_keys=True)
 
 
-def clicks(state="card", open_key="auto", selector=None, settle_s=1.0):
+def clicks(state="card", open_key="auto", selector=None, settle_s=1.0, then=None):
     """Every button the capsule shows in one state, clicked once each by the real mouse path
     (ambient-pm m_6584): before each click the state is set again from rest (the fake core's
     state event, then fn + open_key through the real key path), the element is found again by
@@ -830,6 +830,28 @@ def clicks(state="card", open_key="auto", selector=None, settle_s=1.0):
             if v == last and time.time() - t > 0.9:
                 break
             last = v
+        items = listing()
+        if then:
+            # a view reached by a click first (ambient-pm m_6641: a card's own bar, from its row in
+            # fn i: then='card-' clicks the first row whose data-qa starts with it)
+            hit = next((x for x in items if (x.get("qa") or "").startswith(then)), None)
+            if not hit:
+                return []
+            click('#amb [data-qa="%s"]' % hit["qa"])
+            settled()
+            items = listing()
+        return items
+
+    def settled():
+        t, last = time.time(), None
+        while time.time() - t < 4:
+            time.sleep(0.3)
+            v = _view_now()
+            if v == last and time.time() - t > 0.9:
+                break
+            last = v
+
+    def listing():
         # round 9's targets (amb-web 3d99a361: [data-qa] under #amb, the glass itself excluded),
         # else whatever looks clickable on an older page
         if selector:
@@ -865,6 +887,10 @@ def clicks(state="card", open_key="auto", selector=None, settle_s=1.0):
         # re-rendered under the pointer before the click (the fn hints act on pointerdown)
         took = c.get("clicked") or any(d.get("inside") and d.get("type") in ("pointerdown", "mousedown") for d in c.get("dom") or [])
         r.update(clicked=bool(took), window_at_point=c.get("window_at_point"), commands=cmds, view_changed=changed)
+        if c.get("window_at_point") != "panel":
+            # the window server has another window there: his real click would go to it, whatever
+            # the app does with the event QA hands it (ambient-pm m_6641: the card body → Chrome)
+            out["fails"].append("%r: at its point the window server has %s, not the panel: a real click goes there" % (it["label"], c.get("window_at_point")))
         if not took:
             out["fails"].append("%r: the page got no click (window %s, hit %s)" % (it["label"], c.get("window_at_point"), c.get("hit_view")))
         elif not cmds and not changed:
@@ -3164,7 +3190,7 @@ def _cli(argv):
     sub.add_parser("rest", help="the capsule back to rest and bise not the active app")
     p = sub.add_parser("clicks", help="every button the capsule shows in one state, one real click each (state set again before each): the page got it, one command left")
     p.add_argument("--state", default="card", help="card, drafts, or a JSON file with a core state event"); p.add_argument("--open", default="auto", help="fn + this key opens the view (auto: i for cards, , for settings; none: no key)")
-    p.add_argument("--selector")
+    p.add_argument("--selector"); p.add_argument("--then", help="click the first target whose data-qa starts with this before listing (card- : a card's own bar from fn i)")
     p = sub.add_parser("keys", help="real keys into the QA app's panel (CGEvent to its pid, never the HID tap): up down return tab esc cmd+return cmd+1 type:<words>")
     p.add_argument("specs", nargs="+"); p.add_argument("--gap-ms", type=int, default=60)
     sub.add_parser("menu", help="the menu-bar menu's rows, in order (kind, title, keys, ref, enabled)")
@@ -3248,7 +3274,7 @@ def _cli(argv):
         r = rest()
     elif a.cmd == "clicks":
         st = a.state if a.state in CLICK_STATES else json.load(open(a.state))
-        r = clicks(st, None if a.open == "none" else a.open, a.selector)
+        r = clicks(st, None if a.open == "none" else a.open, a.selector, then=a.then)
     elif a.cmd == "keys":
         r = keys(*a.specs, gap_ms=a.gap_ms)
     elif a.cmd == "menu":

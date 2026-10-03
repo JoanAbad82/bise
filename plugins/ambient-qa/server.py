@@ -34,7 +34,7 @@ TOOLS = [
      {"variants": {"type": "array", "items": {"type": "string", "enum": ["launch", "fold", "hide"]}}, "words": {"type": "string"}, "within_ms": {"type": "integer"}}, []),
     ("rest", "The capsule back to rest (folded into the icon) and bise not the active app.", {}, []),
     ("clicks", "Every button the capsule shows in one state, one real click each (the state set again from rest before each, bise not frontmost): per button its label, whether the page got the click, the commands that left (exactly one expected), a text cursor flagged. state: card (a question with a page link), drafts (a batch: review, send all), settings, or a core state event; open: fn + this key opens the view (default: i for cards, , for settings). Aims at round 9's [data-qa] targets.",
-     {"state": {"type": ["string", "object"]}, "open": {"type": "string"}, "selector": {"type": "string"}}, []),
+     {"state": {"type": ["string", "object"]}, "open": {"type": "string"}, "selector": {"type": "string"}, "then": {"type": "string", "description": "click the first target whose data-qa starts with this before listing (card-: a card's own bar from fn i)"}}, []),
     ("keys", "Real keys into the QA app's panel: CGEvent key down/up posted to the QA app's pid (never the HID tap: nothing reaches his front app). specs: 'up', 'down', 'return', 'tab', 'esc', 'cmd+return', 'cmd+1'..'cmd+9', 'type:<words>'. Returns the panel's key state, what AppKit saw and the page's keydown/input events.",
      {"specs": {"type": "array", "items": {"type": "string"}}, "gap_ms": {"type": "integer"}}, ["specs"]),
     ("say", "Hold fn, say the words (heard partials, a fake voice level, no mic), let go: they go to main on the fake hub; waits for main's answer, then 'speaks' it (phase speaking, word by word). Returns main's text.",
@@ -124,7 +124,7 @@ def run(name, a):
         r = qa.rest()
     elif name == "clicks":
         o = a.get("open", "auto")
-        r = qa.clicks(a.get("state", "card"), None if o in (None, "", "none") else o, a.get("selector"))
+        r = qa.clicks(a.get("state", "card"), None if o in (None, "", "none") else o, a.get("selector"), then=a.get("then"))
     elif name == "keys":
         r = qa.keys(*a["specs"], gap_ms=a.get("gap_ms", 60))
     elif name == "say":
