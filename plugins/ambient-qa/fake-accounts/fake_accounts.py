@@ -74,8 +74,33 @@ def write(service, action, args, extra=None):
     return dict({"ok": True, "fake": True, "id": rid, "note": NOTE}, **(extra or {}))
 
 
+TRUTH = ("batch", "at_min", "mention", "noise", "work")
+
+
+def live(items, field):
+    """Items as they stand now: one with a 'batch' shows once its batch has
+    come (batches(): the hub's start, then each qa.py tick), its time set
+    to that moment plus at_min; the QA's truth fields never show."""
+    came = batches()
+    out = []
+    for m in items:
+        if "batch" in m:
+            b = int(m["batch"])
+            if b >= len(came):
+                continue
+            m = dict(m)
+            m[field] = iso(came[b] + float(m.get("at_min", 0)) * 60)
+        out.append({k: v for k, v in m.items() if k not in TRUTH})
+    return out
+
+
 def gmail():
-    g = DATA["gmail"]
+    g = dict(DATA["gmail"])
+
+    class Live(dict):
+        def __getitem__(self, k):
+            return live(DATA["gmail"]["messages"], "date") if k == "messages" else dict.__getitem__(self, k)
+    g = Live(g)
     short = lambda m: {k: m[k] for k in ("id", "thread", "from", "date", "subject", "labels", "unread")}
     return {
         "search_messages": ("Search the inbox (words, from:, label names); newest first.", S(query="string", max_results="integer"),
@@ -92,7 +117,10 @@ def gmail():
 
 
 def slack():
-    s = DATA["slack"]
+    class Live(dict):
+        def __getitem__(self, k):
+            return live(DATA["slack"]["messages"], "ts") if k == "messages" else dict.__getitem__(self, k)
+    s = Live(DATA["slack"])
     cid = {c["name"]: c["id"] for c in s["channels"]}
 
     def linked(m):

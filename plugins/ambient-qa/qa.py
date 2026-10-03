@@ -1088,6 +1088,10 @@ SCENARIOS.update({
     # and the sync (+60), the renewal's follow-ups after Granola's notes (+47); no card, nothing leaves
     "meetings": {"ask": "brief me before my meetings today, and do the follow-ups after", "no_send": True, "no_writes": True,
                  "notes": False, "set": "today", "flow": "meetings", "timed": True},
+    # F, mentions for him (amb-kit m_5997): 6 asks over 3 batches (the start, 2 ticks), noise that must
+    # not show, cards for his team's questions only; his send on Hugo's item, a start on Nora's
+    "mentions": {"ask": "watch for what's asked of me on Slack and mail", "no_send": False, "notes": False,
+                 "set": "mentions", "flow": "mentions", "tick_min": 0},
 })
 
 
@@ -1665,8 +1669,143 @@ def _flow_meetings(x):
         r["fails"].append("%d card(s) about the meetings (the page is enough)" % len(about))
 
 
+def mentions_truth():
+    """The mentions set's truth (fixtures sets.mentions): each direct ask of
+    him with its batch, whether it is from his team and is work; the noise."""
+    m = json.load(open(os.path.join(FAKE_ACCOUNTS, "fixtures.json")))["sets"]["mentions"]
+    items = [dict(x, kind="slack") for x in m["slack"]["+messages"]] + [dict(x, kind="gmail") for x in m["gmail"]["+messages"]]
+    users = {"lea": "Léa", "nora": "Nora", "theo": "Théo", "slackbot": "Slackbot", "camille": "Camille"}
+    for x in items:
+        x["who"] = (x.get("from") or "").split("<")[0].strip() or users.get(x.get("user"), x.get("user", ""))
+        x["num"] = re.sub(r"\D", "", x["id"])
+    return {"asks": [x for x in items if x.get("mention")], "noise": [x for x in items if x.get("noise") and x.get("user") != "camille"]}
+
+
+def mentions_items(body):
+    """The review's items, in order: id, its html, the truth's number its id carries."""
+    rev = next((s for s in _sections(body) if s["kit"] == "review"), None)
+    if not rev:
+        return []
+    return [{"id": i, "html": h, "num": re.sub(r"\D", "", i)} for i, h in re.findall(r'<li[^>]*\bdata-id="([^"]+)"[^>]*>(.*?)</li>', rev["html"], re.S)]
+
+
+def mentions_check(body, page_id, batches, prev_ids=(), today=None):
+    """mentions.md on a body after `batches` batches came in: id
+    mentions-<today>, titled 'for you', one review data-verb=reply, one item
+    per ask so far (newest on top, ids kept from before), each who · where ·
+    when, a blockquote and a drafted answer; no noise. (facts, fails)"""
+    today = today or time.strftime("%Y-%m-%d")
+    truth, fails, secs = mentions_truth(), [], _sections(body)
+    if page_id != "mentions-" + today:
+        fails.append("page id %s (mentions-%s expected)" % (page_id, today))
+    if not re.search(r"<h1[^>]*>\s*for you\s*</h1>", body or "", re.I):
+        fails.append("the title isn't 'for you'")
+    revs = [s for s in secs if s["kit"] == "review"]
+    if len(revs) != 1 or 'data-verb="reply"' not in revs[0]["attrs"]:
+        fails.append("%d review block(s); one with data-verb=\"reply\" expected" % len(revs))
+    items = mentions_items(body)
+    want = [a for a in truth["asks"] if a["batch"] < batches]
+    by_num = {a["num"]: a for a in truth["asks"]}
+    noise_nums = {n["num"] for n in truth["noise"]}
+    got = [by_num[i["num"]] for i in items if i["num"] in by_num]
+    missing = [a["id"] for a in want if a not in got]
+    if missing:
+        fails.append("asks missing after batch %d: %s" % (batches, ", ".join(missing)))
+    noise = [i["id"] for i in items if i["num"] in noise_nums]
+    low = re.sub(r"<[^>]+>", " ", body or "").lower()
+    noise += [n["id"] for n in truth["noise"] if n["id"] not in noise and n.get("subject") and n["subject"].lower()[:30] in low]
+    if noise:
+        fails.append("noise on the page: %s" % ", ".join(noise))
+    order = [a["batch"] for a in got]
+    if order != sorted(order, reverse=True):
+        fails.append("not newest on top (batches in order: %s)" % order)
+    lost = [i for i in prev_ids if i not in {x["id"] for x in items}]
+    if lost:
+        fails.append("item ids not kept from the version before: %s" % ", ".join(lost))
+    bad = [i["id"] for i in items if i["num"] in by_num and not (
+        re.search(r"<p[^>]*>[^<]*·[^<]*·", i["html"]) and "<blockquote" in i["html"]
+        and re.search(r"</blockquote>\s*<p[^>]*>.+?</p>", i["html"], re.S))]
+    if bad:
+        fails.append("items without who · where · when, the quote and a drafted answer: %s" % ", ".join(bad))
+    return {"items": [i["id"] for i in items], "asks": len(got), "of": len(want)}, fails
+
+
+def _flow_mentions(x):
+    """F (amb-kit m_5997): the 'for you' page after each of 3 batches (the
+    start, then two ticks: republished on the watcher's timer), cards only
+    for his team's direct questions, once each; then his send on one item:
+    exactly that item leaves and the page shows where it went; a 'start an
+    agent' on the work ask starts an agent with it."""
+    r, c, pid = x["r"], x["c"], x["page"]["id"]
+    truth = mentions_truth()
+    facts, fails = mentions_check(x["body"], pid, 1)
+    r["flow"] = {"v1": facts}
+    r["fails"] += fails
+    prev, n = facts["items"], x["last"]["n"]
+    for k in (1, 2):
+        tick()
+        r["t"]["tick%d" % k] = x["rel"]()
+        got = {}
+
+        def republished():
+            m = page_meta(pid)["versions"][-1]["n"]
+            if m <= n:
+                return False
+            b = _body(x, m)
+            f, fl = mentions_check(b, pid, k + 1, prev)
+            if f["asks"] < f["of"] or not x["settled"]():
+                return False
+            got.update(n=m, facts=f, fails=fl)
+            return True
+        took = _until(x, republished, "the page with batch %d's asks" % (k + 1))
+        if took is None:
+            return
+        r["t"]["republish%d_after_tick" % k] = took
+        r["flow"]["tick%d" % k] = got["facts"]
+        r["fails"] += got["fails"]
+        prev, n = got["facts"]["items"], got["n"]
+    # cards: one per direct question from his team, never another
+    team = [a for a in truth["asks"] if a["mention"] == "team"]
+    cards = list(x["cards"].values())
+    per = {a["id"]: [cd for cd in cards if _card_about(cd, [{"id": a["id"], "author": a["who"], "text": a["text"]}])] for a in team}
+    other = [cd for cd in cards if not any(cd in v for v in per.values())]
+    r["flow"]["cards"] = {k: len(v) for k, v in per.items()}
+    if any(len(v) != 1 for v in per.values()) or other:
+        r["fails"].append("cards: %s for his team's questions (one each expected), %d other(s)" % (r["flow"]["cards"], len(other)))
+    if _writes(x["info"]):
+        r["fails"].append("%d write(s) before his send" % len(_writes(x["info"])))
+        return
+    # his send on Hugo's mail: exactly that leaves, and the page says where it went
+    items = mentions_items(_body(x, n))
+    hugo = next((i for i in items if i["num"] == "302"), None)
+    rev = next((s for s in _sections(_body(x, n)) if s["kit"] == "review"), None)
+    if hugo and rev:
+        page_notes(pid, [{"block": rev["id"], "item": hugo["id"], "kind": "send"}], send=True)
+        r["t"]["send"] = x["rel"]()
+        took = _until(x, lambda: _writes(x["info"]) and any(g for g in page_meta(pid).get("went", [])) and x["settled"](),
+                      "Hugo's answer leaving and the page's went line")
+        w = _writes(x["info"])
+        r["flow"]["after_send"] = [(w_.get("kind"), (w_.get("args") or {}).get("to") or (w_.get("args") or {}).get("channel")) for w_ in w]
+        if took is not None and (len(w) != 1 or w[0].get("service") != "gmail" or "hugo" not in json.dumps(w[0].get("args", {})).lower()):
+            r["fails"].append("after his send on Hugo's item: %s (exactly one Gmail send to Hugo expected)" % r["flow"]["after_send"])
+    # 'start an agent' on Nora's work ask
+    nora = next((i for i in mentions_items(_body(x, page_meta(pid)["versions"][-1]["n"])) if i["num"] == "303"), None)
+    if nora and rev:
+        names0 = {a["name"] for a in (c.state or {}).get("agents", [])}
+        page_notes(pid, [{"block": rev["id"], "item": nora["id"], "kind": "start"}], send=True)
+        new = lambda: [a for a in (c.state or {}).get("agents", []) if a["name"] not in names0]
+        took = _until(x, lambda: new(), "an agent started on Nora's ask")
+        if took is not None:
+            a = new()[0]
+            spawn = [l for l in c.lines("main") if a["name"] in l and ("sb spawn" in l or "new agent" in l)]
+            text = " ".join(c.lines(a["name"])[:40] + spawn).lower()
+            r["flow"]["started"] = {"agent": a["name"], "names_ask": "due date" in text or "export" in text}
+            if not r["flow"]["started"]["names_ask"]:
+                r["fails"].append("the agent's brief doesn't name Nora's ask (the export's due dates)")
+
+
 FLOWS = {"newsletter": _flow_newsletter, "feedback": _flow_feedback, "checklist": _flow_checklist, "morning": _flow_morning,
-         "meetings": _flow_meetings}
+         "meetings": _flow_meetings, "mentions": _flow_mentions}
 
 
 def _covered(body, items):
@@ -1953,6 +2092,9 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
 
 
 def _run(scenario, sc, headless, timeout, keep, out, require, voice=False):
+    if "tick_min" in sc:
+        # the fake clock's batches only on qa.py tick (0), never on their own mid-run
+        os.environ["AMBIENT_QA_TICK_MIN"] = str(sc["tick_min"])
     if voice and headless:
         raise QAError("--voice drives the app's fn and the fake voice: run with --app, not --headless")
     bise, root = find_bise()

@@ -520,6 +520,35 @@ def capsule_timeline_of_a_spoken_ask():
 
 
 @test
+def mentions_page_laws():
+    """run mentions: the truth (6 asks in 3 batches, 2 from his team, noise), the 'for you' page laws"""
+    tr = qa.mentions_truth()
+    check(len(tr["asks"]) == 6 and [sum(a["batch"] == b for a in tr["asks"]) for b in (0, 1, 2)] == [2, 2, 2], tr["asks"])
+    check(sorted(a["id"] for a in tr["asks"] if a["mention"] == "team") == ["s301", "s303"], "team asks")
+    check({n["noise"] for n in tr["noise"]} == {"newsletter", "cc-only", "notification", "answered"}, tr["noise"])
+    item = lambda i, who, q: ('<li data-id="%s"><p>%s · Slack · 9:12</p><blockquote>%s</blockquote><p>yes, thursday.</p></li>' % (i, who, q))
+    page = lambda lis: ('<section data-kit="heading" data-id="title"><h1>for you</h1><p>2 to answer</p></section>'
+                        '<section data-kit="review" data-id="asks" data-verb="reply"><ol>%s</ol></section>' % "".join(lis))
+    v1 = page([item("m-302", "Hugo Bernard", "could you resend the March invoice?"), item("s-301", "Léa Martin", "which date works?")])
+    f, fails = qa.mentions_check(v1, "mentions-2026-10-03", 1, today="2026-10-03")
+    check(not fails and f["asks"] == 2, (f, fails))
+    v2 = page([item("s-303", "Nora", "export"), item("m-304", "Paul", "logo"), item("m-302", "Hugo", "x"), item("s-301", "Léa", "y")])
+    check(not qa.mentions_check(v2, "mentions-2026-10-03", 2, f["items"], today="2026-10-03")[1], "batch 2 on top, ids kept")
+    _, fl = qa.mentions_check(page([item("m-302", "Hugo", "x"), item("s-301", "Léa", "y"), item("s-303", "Nora", "e"), item("m-304", "Paul", "l")]),
+                              "mentions-2026-10-03", 2, today="2026-10-03")
+    check(len(fl) == 1 and "newest on top" in fl[0], fl)
+    _, fl = qa.mentions_check(page([item("m-302", "Hugo", "x"), item("s-301", "Léa", "y"), item("m-311", "Product Weekly", "5 questions")]),
+                              "mentions-2026-10-03", 1, today="2026-10-03")
+    check(len(fl) == 1 and "noise" in fl[0], fl)
+    _, fl = qa.mentions_check(v1.replace("<p>yes, thursday.</p>", ""), "mentions-2026-10-03", 1, today="2026-10-03")
+    check(len(fl) == 1 and "drafted answer" in fl[0], fl)
+    _, fl = qa.mentions_check(v1.replace('data-verb="reply"', ""), "mentions-x", 1, today="2026-10-03")
+    check(len(fl) == 2, fl)
+    sc = qa.SCENARIOS["mentions"]
+    check(sc["flow"] == "mentions" and sc["set"] == "mentions" and sc["tick_min"] == 0 and "ticks" not in sc, sc)
+
+
+@test
 def one_run_at_a_time():
     """qa.py run: a second run in the same QA dir is refused while one is live (ambient-pm m_5841)"""
     lock = os.path.join(qa.QA_DIR, "run.lock")

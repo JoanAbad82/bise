@@ -190,6 +190,30 @@
          "subject": "Before our renewal call", "body": "Hi Camille, before Thursday: can you bring a 3-year price, and where SSO is? Legal will ask. Best, Hélène"}
       ]},
       "people": ["- Hélène Roux: buyer at Northwind, prefers mail to calls, decides with legal", "- Marc Dubois: Acme's CEO, wants numbers first"]
+    },
+    "mentions": {
+      "_about": "roadmap F, mentions for him (amb-kit m_5997): 6 direct asks of Camille on Slack and mail in 3 batches (batch 0 at the hub's start, 1 after the first qa.py tick, 2 after the second), 2 of them from his team (people.md: Léa Martin, Nora Haddad), plus noise that must never show: a newsletter, a cc-only FYI, a notification, an ask already answered. 'batch' items get their time when their batch comes (at_min minutes before it); 'mention' and 'noise' are the QA's truth, never shown by the fake tools.",
+      "slack": {"+channels": [
+        {"id": "C06", "name": "design", "topic": "design reviews and the pricing page"},
+        {"id": "D02", "name": "@nora.haddad", "topic": "direct messages with Nora Haddad", "is_im": true},
+        {"id": "D03", "name": "@theo.blanc", "topic": "direct messages with Théo Blanc", "is_im": true}],
+       "+messages": [
+        {"id": "s301", "channel": "design", "user": "lea", "batch": 0, "at_min": -4, "mention": "team", "text": "@camille which date works for the pricing review, tuesday or thursday?"},
+        {"id": "s303", "channel": "@nora.haddad", "user": "nora", "batch": 1, "at_min": -3, "mention": "team", "work": true, "text": "Camille, can you check why the CSV export drops the due dates? a customer asked this morning."},
+        {"id": "s305", "channel": "@theo.blanc", "user": "theo", "batch": 2, "at_min": -2, "mention": "other", "text": "hey Camille, can you approve the launch tweet copy before 4pm? the draft is in the doc."},
+        {"id": "s311", "channel": "design", "user": "lea", "batch": 0, "at_min": -40, "noise": "answered", "text": "@camille can you share the Figma link for the onboarding screens?"},
+        {"id": "s312", "channel": "design", "user": "camille", "batch": 0, "at_min": -38, "noise": "answered", "reply_to": "s311", "text": "here it is: https://figma.test/file/onboarding (the v3 page)"},
+        {"id": "s313", "channel": "team", "user": "slackbot", "batch": 0, "at_min": -20, "noise": "notification", "text": "Reminder: @camille, your status has been set to away for 2 hours."}
+      ]},
+      "gmail": {"+messages": [
+        {"id": "m302", "thread": "t302", "from": "Hugo Bernard <hugo@brightline.test>", "to": "camille@acme.test", "batch": 0, "at_min": -6, "mention": "other", "labels": ["INBOX"], "unread": true, "subject": "March invoice", "body": "Hi Camille, could you resend the March invoice? Our accounting can't find it. Thanks, Hugo"},
+        {"id": "m304", "thread": "t304", "from": "Paul Girard <paul@studio-girard.test>", "to": "camille@acme.test", "batch": 1, "at_min": -1, "mention": "other", "labels": ["INBOX"], "unread": true, "subject": "Logo files for the case study", "body": "Hello Camille, can you send me the logo files (SVG) for the case study? We publish on Friday. Paul"},
+        {"id": "m306", "thread": "t306", "from": "Sophie Laurent <sophie@northwind.test>", "to": "camille@acme.test", "batch": 2, "at_min": -1, "mention": "other", "labels": ["INBOX"], "unread": true, "subject": "Quick call?", "body": "Hi Camille, are you free for a 20 min call on Thursday about the SSO pilot? Any time after 2pm works. Sophie"},
+        {"id": "m311", "thread": "t311", "from": "Product Weekly <news@productweekly.test>", "to": "camille@acme.test", "batch": 0, "at_min": -90, "noise": "newsletter", "labels": ["INBOX", "newsletter"], "unread": true, "subject": "Camille, 5 questions every PM should ask this week", "body": "Hi Camille! Can you answer these 5 questions about your roadmap? Read the issue online. Unsubscribe."},
+        {"id": "m312", "thread": "t312", "from": "Marc Dubois <marc@acme.test>", "to": "legal@acme.test", "cc": "camille@acme.test", "batch": 0, "at_min": -30, "noise": "cc-only", "labels": ["INBOX"], "unread": true, "subject": "FYI: Northwind contract signed", "body": "Legal, FYI the Northwind contract is signed, filed in the drive. Camille cc'd for the record, nothing to do. Marc"},
+        {"id": "m313", "thread": "t313", "from": "Linear <notifications@linear.test>", "to": "camille@acme.test", "batch": 0, "at_min": -15, "noise": "notification", "labels": ["INBOX", "notifications"], "unread": true, "subject": "Lucas mentioned you in ENG-412", "body": "Lucas Bernard mentioned you in ENG-412: '@camille can you look at this?' View the issue in Linear. You are receiving this because you are subscribed."}
+      ]},
+      "people": ["- Léa Martin: team · design lead", "- Nora Haddad: team · ops lead", "- Hugo Bernard: customer at Brightline, accounting questions"]
     }
   },
   "launch": {
