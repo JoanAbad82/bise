@@ -1610,10 +1610,15 @@ def _flow_meetings(x):
             m = r["flow"]["meetings"].setdefault(e, {})
             if p and "v1_at" not in m and p.get("version", 0) >= 1:
                 m.update(id=p["id"], v1_at=round(time.time() - when[e][0]), v1_n=page_meta(p["id"])["versions"][-1]["n"])
-                b = _body(dict(x, page=p), m["v1_n"])
-                m["brief"], fails = meeting_brief_check(b, p["id"], overdue=(e in MEETINGS_OVERDUE))
-                r["fails"].extend(fails)
                 pages_seen[e] = p["id"]
+            # the brief as it stands at the meeting's start: its latest version until then (a first
+            # publish may be the skeleton, filled a minute later)
+            if "v1_n" in m and time.time() < when[e][0]:
+                n = page_meta(m["id"])["versions"][-1]["n"]
+                if n != m.get("brief_n"):
+                    b = _body(dict(x, page={"id": m["id"]}), n)
+                    m["brief"], m["brief_fails"] = meeting_brief_check(b, m["id"], overdue=(e in MEETINGS_OVERDUE))
+                    m["brief_n"] = n
             if e == "e401" and "v1_n" in m and "v2_at" not in m:
                 meta = page_meta(m["id"])
                 n = meta["versions"][-1]["n"]
@@ -1621,12 +1626,14 @@ def _flow_meetings(x):
                     m.update(v2_at=round(time.time() - when[e][1]), v2_n=n)
                     m["followups"], fails = meeting_followup_check(_body(dict(x, page={"id": m["id"]}), n), m["id"])
                     r["fails"].extend(fails)
-        done = all("v1_at" in r["flow"]["meetings"].get(e, {}) for e in MEETINGS_RUN) and "v2_at" in r["flow"]["meetings"]["e401"]
+        done = all("v1_at" in r["flow"]["meetings"].get(e, {}) and time.time() > when[e][0] for e in MEETINGS_RUN) \
+            and "v2_at" in r["flow"]["meetings"]["e401"]
         if done:
             break
         time.sleep(5)
     for e in MEETINGS_RUN:
         m = r["flow"]["meetings"].get(e, {})
+        r["fails"].extend(m.get("brief_fails", []))
         if "v1_at" not in m:
             r["fails"].append("%s: no brief page by %s" % (e, time.strftime("%H:%M", time.localtime(when[e][0]))))
         elif m["v1_at"] > 0:
