@@ -479,6 +479,28 @@ fake comments; never his real HN, X, Reddit or Bluesky):
 - [ ] At the end, all 6 are ticked, none forgotten, none ticked twice; the menu-bar count is back
       to what it was.
 
+## Job slice F: mentions for me ([ambient-roadmap.md](ambient-roadmap.md) §2 F)
+
+**Done-when, run whole** (headless, a model hub on fake accounts, then one spoken ask on the app
+with the fake voice; never his real Slack or mail):
+- [ ] "keep an eye on what people ask me" → a `for you` page within 30 s: every direct question to
+      him in the fake Slack and mail (Marc s210, Lélio s215, the acme mail that asks), each quoted
+      and sourced, with a drafted answer; no FYI, news or comment as an item.
+- [ ] A tick adds one direct question and one FYI → the page republishes with the question only;
+      **one** card for it (a batch of several → one card naming them); the FYI makes no card.
+- [ ] `send` on a mail answer → exactly one outbox send, after his word only; a Slack answer →
+      copied + opened, no post in the outbox; `skip` → nothing leaves.
+- [ ] `stop` ends the timer, no version after it; the menu bar's count matches the open items.
+- [ ] Spoken on the app: "what do people need from me?" → one capsule line naming how many and
+      who, and the page.
+
+## Every slice, from now on (ambient-lead m_5980)
+
+- [ ] One spoken ask on the app with the fake voice (`qa.py run <slice> --app --voice`): the
+      capsule shows the talk and one short line, then hides; the page opens on fn + o.
+- [ ] Drafts ready at once make **one** card (`N drafts ready · send all / review`); `send all`
+      sends exactly N, `review` opens the page.
+
 ## Slice 3 (outline)
 
 - The home workspace without a repo: `bise ambient` with no repo works; no repo, PR, branch or

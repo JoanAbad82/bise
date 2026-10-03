@@ -141,6 +141,51 @@ calendar), what's watched. Nothing else. One page, under a minute to read. A sta
 Later, same parts: meetings (a brief before, the follow-ups after, from Granola and the calendar);
 the deck or doc review someone sent; the persona's weekly update.
 
+### F: mentions for me (B, for his own team)
+
+**The job.** In the launch watch, the cards that mattered were his team asking him something
+(Marc in #launch: `can the weekly update carry these numbers?`; Lélio). Those questions sit in
+Slack and mail until he finds them. F is B pointed at him: a standing order that collects what
+asks *him*, with an answer drafted.
+
+**The UX.** "keep an eye on what people ask me" (or on by default in the home workspace) → an
+`sb every` timer reads Slack and mail; each direct question to him (an @-mention with a question,
+a DM, a mail from his team that asks) becomes an item on one page, `for you`: who, what they
+asked (quoted, sourced), a drafted answer (A's message or email block), `send` / `edit` / `skip`.
+A card only for a direct question from his team, one card per batch (`2 questions for you ·
+Marc, Lélio`); news, FYIs and comments never make a card, they wait on the page. Nothing leaves
+without his word: Slack is copy + open (A), mail is a Gmail draft or a send on his word.
+
+**Proves.** Always on is about his people, not only his launch.
+
+**Done when** (headless, fake accounts, then one spoken ask on the app):
+- "keep an eye on what people ask me" → a `for you` page within 30 s, listing every direct
+  question in the fake Slack and mail (Marc s210, Lélio s215, the acme mail that asks), each with
+  a drafted answer; FYIs and news are not items.
+- After a tick that adds one direct question and one FYI: the page republishes with the
+  question only; one card for it; the FYI makes no card.
+- `send` on a mail answer → exactly one outbox send; on a Slack answer → copied + opened, the
+  outbox shows no post; `skip` leaves nothing.
+- `stop` ends the timer; the menu bar's count matches the page's open items.
+
+### G: promises (what he said he'd do)
+
+**The job.** From meetings (Granola), his sent mail and his Slack (`i'll send it friday`), the
+things he promised; today they live in his head. bise keeps them: D's checklist, with dates, the
+draft ready when one is due.
+
+**The UX.** No ask needed once it's on: a `promises` page (D's checklist rows, `yours`, a due
+date, the source quoted), kept by a timer. An overdue promise leads the morning page (E) with its
+draft (amb-kit's meetings rule: no card from a meeting page, overdue or not). A row ticks when
+his own sent mail or message shows it done, or when he ticks it.
+
+**Proves.** bise remembers for him.
+
+**Done when** (headless, fake accounts): the fake meetings, mail and Slack hold 4 promises, one
+overdue, one already kept → the page lists the 3 open ones with dates and sources; the overdue one
+leads the next morning page with a draft; a fake sent mail that keeps one ticks it on the next
+run; no card at any point.
+
 ## 3. Challenges to what's there
 
 1. **The capsule says `main`.** For an always-on presence, `main is on it.` reads like plumbing;
@@ -201,3 +246,11 @@ stays the TUI thread's name: the signed `W` lines change **only once the user sa
 | C | Benjamin's bug reports | feedback → agents, live status on a page | the bridge between his two worlds |
 | D | "todo list pour acheter le domaine" | checklists with who-does-what | a plan shared with bise |
 | E | (next) the morning | one page a day | always on, before he asks |
+| F | Marc's and Lélio's questions in the launch watch | a `for you` page, one card per batch | his team, not only his launch (decided, ambient-lead m_5980) |
+| G | what he said he'd do | promises kept as his checklist | bise remembers for him (after F) |
+
+Also decided (ambient-lead m_5980): consecutive drafts ready at once make **one** card (`3 drafts
+ready · send all / review`, fn + 1 sends all, fn + o opens the page); every slice's done-when has
+one spoken ask on the app with the fake voice (`qa.py run … --app --voice`). Waiting on his yes:
+a dogfood day on his real accounts, with him there, logging each ask and every time he went back
+to the terminal or the browser.
