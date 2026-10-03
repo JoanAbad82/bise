@@ -51,8 +51,8 @@ law("reduced motion: never moving", !look(working: true, still: true).moving && 
 
 // roadmap B: the standing orders (state.timers, amb-home m_5441)
 let wstate: [String: Any] = [
-    "pages": [["id": "launch-watch", "title": "the launch", "agent": "watch", "version": 5, "opened_version": 2, "url": "http://h/p/launch-watch"],
-              ["id": "seen", "title": "seen page", "agent": "w", "version": 3, "opened_version": 3, "url": "http://h/p/seen"],
+    "pages": [["id": "launch-watch", "title": "the launch", "agent": "watch", "version": 5, "opened_version": 2, "waiting": 3, "url": "http://h/p/launch-watch"],
+              ["id": "seen", "title": "seen page", "agent": "w", "version": 3, "opened_version": 1, "waiting": 0, "url": "http://h/p/seen"],
               ["id": "old", "title": "old hub", "agent": "w", "version": 4, "url": "http://h/p/old"]],
     "timers": [["id": 3, "agent": "watch", "label": "every 10m", "text": "check HN, X and Reddit for bise", "by": "main", "fired": 2, "page": "launch-watch"],
                ["id": 4, "agent": "w", "label": "every day 07:30", "text": "the morning page", "fired": 0, "page": "seen"],
@@ -64,11 +64,18 @@ let watches = MenuWatch.list(wstate)
 law("state.timers: the ones with an id, in order", watches.map(\.id) == [3, 4, 5])
 law("no timers in the state: no watch rows", MenuWatch.list(["pages": []]).isEmpty)
 law("a page's unopened versions: version − opened_version",
-    wpages.first { $0.id == "launch-watch" }?.unopened == 3 && wpages.first { $0.id == "seen" }?.unopened == 0)
+    wpages.first { $0.id == "launch-watch" }?.unopened == 3 && wpages.first { $0.id == "seen" }?.unopened == 2)
 law("a hub without opened_version: never opened", wpages.first { $0.id == "old" }?.unopened == 4)
-law("a watch with a page: its title and what's new",
+law("a watch with a page: its title and its items waiting for him",
     MenuRows.watch(watches[0], pages: wpages) == "watching the launch · 3 new for you")
-law("nothing new: no count", MenuRows.watch(watches[1], pages: wpages) == "watching seen page")
+law("new versions with nothing waiting for him: no count (pm's B)",
+    MenuRows.watch(watches[1], pages: wpages) == "watching seen page")
+law("a hub without 'waiting': no count, never the versions",
+    MenuRows.watch(MenuWatch(id: 9, text: "x", page: "old"), pages: wpages) == "watching old hub")
+law("main's page speaks as bise: no 'main'",
+    MenuRows.page(MenuPage(id: "l", title: "the launch", agent: "main", version: 2, url: "u")) == "the launch · v2")
+law("main's card speaks as bise: no 'main: '",
+    MenuRows.card(agent: "main", text: "watch: tptacek asks") == "watch: tptacek asks")
 law("no page: the order's words on one line",
     MenuRows.watch(watches[2], pages: wpages) == "watching: look at the CI queue")
 law("a page not in the state: the order's words",

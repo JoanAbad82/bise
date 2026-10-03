@@ -11,6 +11,7 @@ struct MenuPage: Equatable {
     var version: Int
     var url: String
     var opened: Int? = nil    // the newest version the user opened (hub's opened_version)
+    var waiting: Int? = nil   // its items waiting for him (hub's `waiting`: sb page waiting's lines)
 
     // versions published since he last opened it (a hub without
     // opened_version: never opened, as amb-web's fixtures/count.json says)
@@ -22,7 +23,8 @@ struct MenuPage: Equatable {
             guard let id = p["id"] as? String, let url = p["url"] as? String, !url.isEmpty else { return nil }
             return MenuPage(id: id, title: p["title"] as? String ?? id, agent: p["agent"] as? String ?? "",
                             version: (p["version"] as? NSNumber)?.intValue ?? 1, url: url,
-                            opened: (p["opened_version"] as? NSNumber)?.intValue)
+                            opened: (p["opened_version"] as? NSNumber)?.intValue,
+                            waiting: (p["waiting"] as? NSNumber)?.intValue)
         }
     }
 }
@@ -115,20 +117,24 @@ enum MenuRows {
     static let titleCut = 40
     static let cardCut = 50
 
-    // "title · agent · v2" (no version mark on a first version)
+    // "title · agent · v2" (no version mark on a first version); the
+    // ambient surfaces speak as bise, main is plumbing: never 'main'
     static func page(_ p: MenuPage) -> String {
         var parts = [clip(p.title, titleCut)]
-        if !p.agent.isEmpty { parts.append(p.agent) }
+        if !p.agent.isEmpty && p.agent != "main" { parts.append(p.agent) }
         if p.version > 1 { parts.append("v\(p.version)") }
         return parts.joined(separator: " · ")
     }
 
     // "watching the launch · 3 new for you" (its page's title and the
-    // versions he hasn't opened); no page: the order's own words, clipped
+    // items on it waiting for him, pm's B m_6007: not its versions, so a
+    // tick with nothing new for him adds nothing); no page: the order's own
+    // words, clipped
     static func watch(_ w: MenuWatch, pages: [MenuPage]) -> String {
         if let id = w.page, let p = pages.first(where: { $0.id == id }) {
             let head = "watching " + clip(p.title, titleCut)
-            return p.unopened > 0 ? "\(head) · \(p.unopened) new for you" : head
+            let n = p.waiting ?? 0
+            return n > 0 ? "\(head) · \(n) new for you" : head
         }
         let words = w.text.split(whereSeparator: \.isNewline).joined(separator: " ").trimmingCharacters(in: .whitespaces)
         return "watching: " + clip(words.isEmpty ? "#\(w.id)" : words, titleCut)
@@ -155,10 +161,10 @@ enum MenuRows {
         return cards + pages
     }
 
-    // "agent: question" on one line
+    // "agent: question" on one line (main's cards: the question alone)
     static func card(agent: String, text: String) -> String {
         let flat = text.split(whereSeparator: \.isNewline).joined(separator: " ")
-        return clip(agent.isEmpty ? flat : "\(agent): \(flat)", cardCut)
+        return clip(agent.isEmpty || agent == "main" ? flat : "\(agent): \(flat)", cardCut)
     }
 
     // at most `max` characters, cut on a word, with …

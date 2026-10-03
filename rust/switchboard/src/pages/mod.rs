@@ -180,11 +180,20 @@ impl Pages {
     }
 
     pub fn page_json(&self, m: &Meta) -> Value {
-        let open = self.store.notes(&m.id).iter().filter(|n| n.open()).count();
+        let notes = self.store.notes(&m.id);
+        let open = notes.iter().filter(|n| n.open()).count();
+        // what on it waits for him (`sb page waiting`'s lines for this
+        // page): the menu's 'watching … · N new for you' (pm's B, m_6007),
+        // so a tick with nothing new for him doesn't raise it
+        let today = crate::every::local_day(crate::util::now_ms()).unwrap_or(i64::MAX);
+        let waiting = self
+            .store
+            .html(&m.id, m.version())
+            .map_or(0, |h| waiting::of_page_on(&m.id, &h, &notes, &self.store.questions(&m.id), today).len());
         let mut v = json!({
             "id": m.id, "title": m.title, "agent": m.agent, "version": m.version(),
             "url": self.url(&m.id), "at_ms": m.at_ms(), "state": m.state, "open_notes": open,
-            "opened_version": m.opened_version,
+            "opened_version": m.opened_version, "waiting": waiting,
         });
         if let Some(k) = self.kicker(m) {
             v["kicker"] = json!(k);
@@ -383,6 +392,21 @@ mod tests {
         assert!(n >= 4096 || n > 256, "soft limit {n}");
         // never lowered by a smaller ask
         assert!(raise_fd_limit(16) >= n);
+    }
+
+    #[test]
+    fn a_page_says_how_many_of_its_items_wait_for_him() {
+        let d = std::env::temp_dir().join(format!("sb-wait-{}", std::process::id()));
+        let p = Pages::new(&d, 0, d.join("kit"));
+        let html = r#"<section data-kit="checklist" data-id="open"><ol>
+<li data-id="p1" data-who="yours">send Camille the pricing sheet</li>
+<li data-id="p2" data-who="Camille">sign the order</li></ol></section>"#;
+        let pb = store::Publish { agent: "watch".into(), id: Some("w".into()), html: html.into(), ..Default::default() };
+        p.publish(&pb, 1, &|_| false).unwrap();
+        let v = &p.list_json()[0];
+        let theirs = p.waiting().iter().filter(|w| w.page == "w").count();
+        assert_eq!(v["waiting"].as_u64(), Some(theirs as u64), "{v}");
+        let _ = std::fs::remove_dir_all(d);
     }
 
     #[test]
