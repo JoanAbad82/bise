@@ -28,6 +28,22 @@ enum KeyOut: Equatable {
     case plainEsc                // esc without fn: passes, and hides bise (§8)
 }
 
+// what app.log says for each key decision (the dogfood, B2: 'fn does
+// nothing' must show why next time); the hold's own gate logs in App
+enum KeyLog {
+    static func line(_ o: KeyOut) -> String? {
+        switch o {
+        case .talkStart(let k): return "keys: \(k == .fn ? "fn" : "right option") held past the tap threshold"
+        case .double: return "keys: fn fn → hands-free"
+        case .talkEnd: return "keys: release → talk end"
+        case .cancel: return "keys: hold cancelled (another key)"
+        case .tap: return "keys: fn tap"
+        case .key(let k): return "keys: fn + \(k)"
+        case .plainEsc: return nil   // his own esc: not ours to log
+        }
+    }
+}
+
 // a key event as the machine sees it
 enum KeyIn: Equatable {
     case fnDown, fnUp

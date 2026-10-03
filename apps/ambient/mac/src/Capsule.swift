@@ -14,31 +14,16 @@ final class CapsulePanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-// the page's boxes in CSS px (app_size): the capsule at the top right of
-// the web view, and the optional note under it, same width, same right edge
-struct CapsuleShape: Equatable {
-    var w: CGFloat = 360
-    var h: CGFloat = 84
-    var radius: CGFloat = 44
-    var note: Note? = nil
-    struct Note: Equatable { var y: CGFloat; var h: CGFloat; var radius: CGFloat }
+// the page's boxes (app_size): CapsuleShape, Shape.swift
 
-    // the window must hold both boxes
-    var box: NSSize {
-        var hh = h
-        if let n = note { hh = max(hh, n.y + n.h) }
-        return NSSize(width: w, height: hh)
-    }
-
-    static func from(_ c: [String: Any], maxHeight: CGFloat) -> CapsuleShape? {
-        func num(_ o: [String: Any], _ k: String) -> CGFloat? { (o[k] as? NSNumber).map { CGFloat($0.doubleValue) } }
-        guard let w = num(c, "w"), let h = num(c, "h"), w >= 40, h >= 20 else { return nil }
-        var s = CapsuleShape(w: min(w, 900), h: min(h, maxHeight), radius: num(c, "radius") ?? 40, note: nil)
-        if let n = c["note"] as? [String: Any], let y = num(n, "y"), let nh = num(n, "h"), nh > 0 {
-            s.note = Note(y: y, h: min(nh, max(0, maxHeight - y)), radius: num(n, "radius") ?? 24)
-        }
-        return s
-    }
+// one click acts (the user's dogfood, B1): the panel is never key while
+// he works in his app, and WKWebView turns the first click on a non-key
+// window into a focus click; this view takes it as a click, and never asks
+// the panel to become key for it (his app keeps the keys; the spotlight's
+// field makes the panel key on purpose, Capsule.focus)
+final class CapsuleWebView: WKWebView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override var needsPanelToBecomeKey: Bool { false }
 }
 
 // macOS's own window corner radius (the user: the capsule's corners match
@@ -122,7 +107,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
         conf.preferences.setValue(true, forKey: "developerExtrasEnabled")
         conf.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         conf.userContentController.addUserScript(WKUserScript(source: Capsule.bootJS, injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        web = WKWebView(frame: root.bounds, configuration: conf)
+        web = CapsuleWebView(frame: root.bounds, configuration: conf)
         web.setValue(false, forKey: "drawsBackground")
         web.underPageBackgroundColor = .clear
         web.autoresizingMask = [.width, .height]
@@ -277,18 +262,15 @@ final class Capsule: NSObject, WKNavigationDelegate {
         applyMask()
     }
 
-    // the blur only under the page's boxes (top right anchored, flipped coords)
+    // the blur only under the glass and the note (CapsuleShape.blurRects),
+    // never behind the pearl: it floats with no background (L1)
     private func applyMask() {
         let size = panel.frame.size
-        let s = shape
+        let rects = shape.blurRects(panel: size)
         let r = radius
         let img = NSImage(size: size, flipped: true) { _ in
             NSColor.black.setFill()
-            let x = size.width - s.w
-            NSBezierPath(roundedRect: NSRect(x: x, y: 0, width: s.w, height: s.h), xRadius: r, yRadius: r).fill()
-            if let n = s.note {
-                NSBezierPath(roundedRect: NSRect(x: x, y: n.y, width: s.w, height: n.h), xRadius: r, yRadius: r).fill()
-            }
+            for b in rects { NSBezierPath(roundedRect: b, xRadius: r, yRadius: r).fill() }
             return true
         }
         effect.maskImage = img

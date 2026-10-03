@@ -76,6 +76,10 @@ final class Keys {
 
     private func now() -> Double { ProcessInfo.processInfo.systemUptime }
 
+    // QA (amb-tools m_6498): a synthesized key event takes the tap's own
+    // path (handle → KeyMachine → onOut) on an instance whose tap never starts
+    func qaEvent(_ type: CGEventType, _ e: CGEvent) -> Bool { handle(type, e) }
+
     private func handle(_ type: CGEventType, _ e: CGEvent) -> Bool {
         switch type {
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
@@ -87,7 +91,10 @@ final class Keys {
             let flags = e.flags
             defer { lastFlags = flags }
             if code == kVKFunction {
-                return feed(flags.contains(.maskSecondaryFn) ? .fnDown : .fnUp)
+                let down = flags.contains(.maskSecondaryFn)
+                // every fn, so a 'fn does nothing' shows in app.log (the dogfood, B2)
+                Log.say("keys: fn \(down ? "down" : "up")")
+                return feed(down ? .fnDown : .fnUp)
             }
             if code == kVKRightOption {
                 // right option alone: its own bit, and no other modifier held

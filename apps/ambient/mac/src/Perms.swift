@@ -61,6 +61,20 @@ enum PermPlan {
         return [.ask(.accessibility), .watchTrust]
     }
 
+    // why a hold went the way it did, for app.log (the dogfood, B2): the
+    // state after PermPlan.hold and what it did
+    static func holdWhy(_ s: PermState, _ d: [PermDo]) -> String {
+        if s.accessibility != .granted { return "no Accessibility" }
+        if d.contains(.ask(.mic)) { return "asking the mic first" }
+        if d.contains(.ask(.screen)) { return "asking the screen first" }
+        switch s.mic {
+        case .denied: return "the mic is off in System Settings"
+        case .unknown: return "the mic was left at not now"
+        case .granted: break
+        }
+        return s.screen != .granted ? "without the screen shot" : ""
+    }
+
     // a fn hold: what to say first; talk = false: this hold doesn't talk
     static func hold(_ s: inout PermState) -> (talk: Bool, do: [PermDo]) {
         // without Accessibility macOS never hands bise the key: nothing

@@ -559,6 +559,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // MARK: keys
 
     private func key(_ o: KeyOut) {
+        if let line = KeyLog.line(o) { Log.say(line) }
         switch o {
         case .talkStart(let k):
             startTalk(k == .fn ? "fn" : "right_option", state: "down")
@@ -1031,11 +1032,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // true = an ask is showing (or the mic is off), no talk this time
     private func askBeforeTalk() -> Bool {
         var talk = true
+        var why = ""
         permStep { s in
             let h = PermPlan.hold(&s)
             talk = h.talk
+            why = PermPlan.holdWhy(s, h.do)
             return h.do
         }
+        // every hold's decision in app.log (the dogfood, B2)
+        Log.say(talk ? "keys: hold → talk" + (why.isEmpty ? "" : " (\(why))") : "keys: hold ignored: \(why)")
         return !talk
     }
 

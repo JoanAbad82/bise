@@ -90,6 +90,20 @@ var first = PermState()
 _ = PermPlan.answered(.accessibility, granted: true, &first)
 law("granted by the prompt: remembered as had", first.had.contains("accessibility"))
 
+// why a hold went the way it did, for app.log (the dogfood, B2)
+func why(_ st: PermState) -> (Bool, String) {
+    var s2 = st
+    let h = PermPlan.hold(&s2)
+    return (h.talk, PermPlan.holdWhy(s2, h.do))
+}
+law("hold why: no Accessibility", why(PermState()) == (false, "no Accessibility"))
+law("hold why: the first hold asks the mic", why(PermState(accessibility: .granted)) == (false, "asking the mic first"))
+law("hold why: mic off in System Settings", why(PermState(accessibility: .granted, mic: .denied)) == (false, "the mic is off in System Settings"))
+law("hold why: mic left at not now", why(PermState(accessibility: .granted, asked: ["mic"])) == (false, "the mic was left at not now"))
+law("hold why: the screen asked after the mic", why(PermState(accessibility: .granted, mic: .granted)) == (false, "asking the screen first"))
+law("hold why: talks without the shot", why(PermState(accessibility: .granted, mic: .granted, asked: ["screen"])) == (true, "without the screen shot"))
+law("hold why: all on, nothing to say", why(PermState(accessibility: .granted, mic: .granted, screen: .granted)) == (true, ""))
+
 // the hello: once ever, after Accessibility, never while quiet
 law("hello: due once Accessibility is on", Hello.due(said: false, accessibility: .granted, quiet: false))
 law("hello: not before Accessibility", !Hello.due(said: false, accessibility: .unknown, quiet: false))

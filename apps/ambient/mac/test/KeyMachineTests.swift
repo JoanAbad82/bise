@@ -68,5 +68,12 @@ law("plain esc: passes untouched, and says plainEsc once", esc.out == [.plainEsc
 law("plain keys without fn pass untouched",
     run([(.keyDown(18, repeated: false), 0), (.keyUp(18), 0.1)]).swallowed == [false, false])
 
+// app.log's key lines (the dogfood, B2)
+law("log: a hold past the threshold", KeyLog.line(.talkStart(.fn)) == "keys: fn held past the tap threshold")
+law("log: hands-free, release, cancel, chords",
+    KeyLog.line(.double) == "keys: fn fn → hands-free" && KeyLog.line(.talkEnd) == "keys: release → talk end"
+        && KeyLog.line(.cancel) == "keys: hold cancelled (another key)" && KeyLog.line(.key("o")) == "keys: fn + o")
+law("log: his own esc is not logged", KeyLog.line(.plainEsc) == nil)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all KeyMachine laws hold")
