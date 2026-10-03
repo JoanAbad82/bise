@@ -364,6 +364,12 @@ the page with an open card (a task agent's page) is not checked yet.
   stays empty. Out of the way, only cards reach him, so he'd never know. Proposed: a draft
   waiting for his note always comes with a question for what's missing, with `skip` (amb-kit),
   or such a row opens a card (amb-core).
+- **D at 60da0b05: pass, end to end.** Page 17 s, v1 31 s. What bise needs from him comes as a
+  question (`who is legal?`, then `how many years?`); the flow's note with legal's address reached
+  the agent; `ask legal (legal@acme.test) …` → his `send` → sent, before his `sign in` and `pay`
+  cards; then `send the draft?` for Lucas's DNS and for Marc → both sent on his word. 3 sends for
+  3 `send` answers, none before. Only Lucas's own step is left, waiting on him. Fails 37 and 38
+  are closed.
 - **23 and 24 rechecked at a589f9f9 (`qa.py ask`): pass.** `what's my next meeting` → `09:30,
   launch standup with Marc, Lucas and Nora` in 13 s, no page: the fixture says 07:30Z, so the time
   is in his zone (CEST). `plan the offsite` → offsite-plan; the follow-up `add a budget per person
