@@ -1782,6 +1782,13 @@ def mentions_cards_check(truth, cards, flow):
     if any(len(v) != 1 for v in per.values()) or other:
         return ["cards: %s for his team's asks (one per batch expected), %d other(s): %s"
                 % (flow["cards"], len(other), "; ".join((cd.get("text") or "")[:60] for cd in other))]
+    # each opened by main and linked to its item (amb-kit m_6156: card.page {id, item}, item = a
+    # team ask of that batch, s-301 for s301), so fn + o opens the page there
+    unlinked = [cd.get("id") for b, v in per.items() for cd in v
+                if cd.get("agent") not in (None, "main")
+                or re.sub(r"\D", "", str((cd.get("page") or {}).get("item") or "")) not in {re.sub(r"\D", "", i["id"]) for i in batches[b]}]
+    if unlinked:
+        return ["cards %s aren't main's or don't link their item (card.page.item = the batch's team ask)" % unlinked]
     return []
 
 

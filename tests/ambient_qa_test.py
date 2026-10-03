@@ -581,8 +581,12 @@ def mentions_page_laws():
     check(sc["flow"] == "mentions" and sc["set"] == "mentions" and sc["tick_min"] == 0 and "ticks" not in sc, sc)
     # cards: one per batch with his team's asks (Léa's question at the start, Nora's request at tick 1)
     truth = qa.mentions_truth()
-    lea = {"id": 1, "kind": "question", "text": "Léa asks which date works for the pricing review, tuesday or thursday?"}
-    nora = {"id": 2, "kind": "question", "text": "Nora asks: why does the CSV export drop the due dates? · 1 more"}
+    lea = {"id": 1, "kind": "question", "agent": "main", "page": {"id": "mentions-2026-10-03", "item": "s-301"},
+           "text": "Léa asks which date works for the pricing review, tuesday or thursday?"}
+    nora = {"id": 2, "kind": "question", "agent": "main", "page": {"id": "mentions-2026-10-03", "item": "s-303"},
+            "text": "Nora asks: why does the CSV export drop the due dates? · 1 more"}
+    check(qa.mentions_cards_check(qa.mentions_truth(), [lea, dict(nora, page={"id": "mentions-2026-10-03"})], {}), "a batch card without its item")
+    check(qa.mentions_cards_check(qa.mentions_truth(), [lea, dict(nora, agent="mentions")], {}), "a batch card not main's")
     hugo = {"id": 3, "kind": "question", "text": "Hugo Bernard wants the March invoice resent"}
     flow = {}
     check(qa.mentions_cards_check(truth, [lea, nora], flow) == [] and flow["cards"] == {"batch 0": 1, "batch 1": 1}, flow)
