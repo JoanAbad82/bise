@@ -380,7 +380,7 @@ fn a_message_says_where_it_goes() {
 #[test]
 fn a_step_says_what_bise_did_and_where_its_draft_is() {
     ok(
-        r#"<section data-kit="checklist" data-id="steps"><ol><li data-id="s1" data-who="bise" data-did="drafted" data-draft="mail-legal">the mail to legal</li><li data-id="s2" data-who="yours">pay</li></ol></section><section data-kit="email" data-id="mail-legal" data-verb="draft"><p data-field="to">legal</p><p data-field="subject">s</p><p>x</p></section>"#,
+        r#"<section data-kit="checklist" data-id="steps"><ol><li data-id="s1" data-who="bise" data-did="drafted" data-draft="mail-legal">the mail to legal</li><li data-id="s2" data-who="yours">pay</li></ol></section><section data-kit="email" data-id="mail-legal" data-verb="draft"><p data-field="to">legal@acme.io</p><p data-field="subject">s</p><p>x</p></section>"#,
     );
     has(
         &errs(r#"<section data-kit="checklist" data-id="steps"><ol><li data-id="s1" data-draft="not an id!">x</li></ol></section>"#),
@@ -390,6 +390,20 @@ fn a_step_says_what_bise_did_and_where_its_draft_is() {
         &errs(r#"<section data-kit="review" data-id="r"><ol><li data-id="m1" data-did="drafted"><p>x</p></li></ol></section>"#),
         "data-did is not a kit attribute",
     );
+}
+
+#[test]
+fn a_step_whose_draft_cannot_leave_asks_him_a_question() {
+    let row = |q: &str| format!(r#"<section data-kit="checklist" data-id="steps"><ol><li data-id="s3" data-who="bise" data-draft="mail-legal"{q}>ask legal about the trademark</li></ol></section>"#);
+    let mail = |to: &str| format!(r#"<section data-kit="email" data-id="mail-legal" data-verb="send"><p data-field="to">{to}</p><p data-field="subject">trademark</p><p>x</p></section>"#);
+    let ask = r#"<section data-kit="question" data-id="who-legal"><p>who is legal?</p><ol><li>i'll leave a note</li><li>skip this step</li></ol></section>"#;
+    has(
+        &errs(&format!("{}{}", row(""), mail("legal: address missing"))),
+        "steps: item s3: its draft mail-legal can't leave yet (no address in its To): say what you need from him as a question",
+    );
+    ok(&format!("{}{}{}", row(r#" data-question="who-legal""#), mail("legal: address missing"), ask));
+    ok(&format!("{}{}", row(""), mail("legal@acme.io")));
+    ok(&format!("{}{}", row(""), mail("Léa Martin &lt;<a href=\"mailto:lea@acme.io\">lea@acme.io</a>&gt;")));
 }
 
 #[test]

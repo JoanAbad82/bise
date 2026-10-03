@@ -87,7 +87,8 @@ Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kep
   (drafts wait for his word), `data-who="yours"` only for his hands or his word, and say on your rows what you did (`data-did`, `data-draft`, `blocks.md`). Never
   report done with a step of yours open, and stay on the plan while it has open steps (each
   turn ends with `sb report progress`); his `send` on a draft: send it now. A
-  decision of his is a `question` its row points at (`data-question`), never both. His answer
+  decision of his, or anything you need from him, is a `question` its row points at
+  (`data-question`), never row text or a callout alone. His answer
   or note: republish the row and the drafts it fills together.
 
 **A draft of anything that leaves goes in its own block, never in prose:** a Slack message or a

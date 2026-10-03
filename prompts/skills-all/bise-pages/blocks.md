@@ -43,8 +43,12 @@ ask it again: the row says it in one line (`waiting for your note: legal's addre
 note comes, republish in one version both the row (no more `waiting for your note`) and every
 draft it fills (the mail's To), before the next step becomes his turn: his `send the draft?`
 never asks him to send a draft that still says it's waiting.
-A draft missing what it needs to leave (no To, no channel) is not drafted: its row says
-`waiting for your note: <what>`, without `data-did`, until you republish the draft complete.
+Whatever you need from him to go on is ALWAYS a `question` (`who is legal?` · `i'll leave a
+note` · `ask Marc` · `skip this step`), its row pointing at it with `data-question`: never only
+row text or a callout, which give him no card and stall the plan. A draft missing what it needs
+to leave (no address in its To) is not drafted: no `data-did`, and its row asks that question;
+the lint refuses it otherwise. Once he answers, the row says what's next in one line (`waiting
+for your note: legal's address`) until you republish the draft complete.
 
 Also allowed inside blocks: `<br>`, `<kbd>`, `<del>`, `<ins>`, `<mark>`, `<small>`, `<sub>`,
 `<img src="data:image/…" alt="…">`. Nothing else. Review and checklist items may carry

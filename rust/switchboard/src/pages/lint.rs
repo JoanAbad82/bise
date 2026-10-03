@@ -134,8 +134,17 @@ pub fn lint(html: &str) -> Result<Vec<Block>, Vec<String>> {
         errors: Vec::new(),
         blocks: Vec::new(),
         open: None,
+        unsendable: Vec::new(),
+        drafted_rows: Vec::new(),
     };
     l.run();
+    // a step whose draft can't leave (pm's 38): what bise needs from him is a question, or the
+    // plan stalls with no card
+    for (at, item, draft) in std::mem::take(&mut l.drafted_rows) {
+        if l.unsendable.contains(&draft) {
+            l.err(&at, format!("item {item}: its draft {draft} can't leave yet (no address in its To): say what you need from him as a question (a question block, and data-question=\"<its id>\" on the row)"));
+        }
+    }
     if l.open.is_some() {
         let b = l.open.take().unwrap();
         l.err(
@@ -186,6 +195,10 @@ struct Linter<'a> {
     errors: Vec<String>,
     blocks: Vec<Block>,
     open: Option<Open>,
+    /// email blocks that can't leave yet: no address in their To (pm's 38)
+    unsendable: Vec<String>,
+    /// checklist rows with a data-draft and no data-question: (block, item, draft)
+    drafted_rows: Vec<(String, String, String)>,
 }
 
 struct Tag {
@@ -389,6 +402,9 @@ impl<'a> Linter<'a> {
             if let Some(d) = get("data-draft") {
                 if !valid_id(&d) {
                     self.err(&at, format!("data-draft=\"{d}\" is not a block id: the data-id of the block that holds the draft"));
+                } else if get("data-question").is_none() {
+                    let item = get("data-id").unwrap_or_default();
+                    self.drafted_rows.push((at.clone(), item, d));
                 }
             }
             // a step that is a decision: the question block that asks it (it ticks from the answer)
@@ -615,6 +631,11 @@ impl<'a> Linter<'a> {
                         &at,
                         format!("an email block needs <p data-field=\"{f}\">…</p>"),
                     );
+                }
+            }
+            if let Some(id) = &b.id {
+                if !to_has_address(&self.src[b.start..end]) {
+                    self.unsendable.push(id.clone());
                 }
             }
         }
@@ -875,6 +896,26 @@ fn decode(s: &str) -> String {
     }
     out.push_str(rest);
     out
+}
+
+/// Whether an email block's `<p data-field="to">` holds an address (an `@`), tags dropped.
+fn to_has_address(block: &str) -> bool {
+    let Some(at) = block.find("data-field=\"to\"") else { return false };
+    let rest = &block[at..];
+    let Some(open_end) = rest.find('>') else { return false };
+    let body = &rest[open_end + 1..];
+    let body = &body[..body.find("</p>").unwrap_or(body.len())];
+    let mut text = String::new();
+    let mut in_tag = false;
+    for c in body.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            c if !in_tag => text.push(c),
+            _ => {}
+        }
+    }
+    text.contains('@') || text.contains("&#64;")
 }
 
 fn valid_id(v: &str) -> bool {
