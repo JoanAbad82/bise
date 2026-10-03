@@ -5,6 +5,8 @@
 // blocks, this file only draws them.
 (function () {
   "use strict";
+  // one bar per page: a second run of this file (an injected copy) would answer every click twice
+  if (window.ambient && window.ambient.ui) return;
   const { AmbModel: M, AmbPearl, AmbWords: Wd, AmbBar: Bar } = window;
   const $ = (s, r = document) => r.querySelector(s);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -229,8 +231,10 @@
     lastV = now0;
     const s = Bar.spec(v);
     lastS = s;
-    render(v, s);
-    layout();
+    // while a press is down, the bar is not redrawn: a click that makes the panel key switches the
+    // footer from fn chords to plain keys, and a redraw between mouse down and up lost the click
+    // (pm's fail 47); the press's end redraws
+    if (!pressing) { render(v, s); layout(); }
     // what the bar has to show, on every change: the app's show/hide policy acts on it
     const ck = JSON.stringify(v.content);
     if (ck !== contentSent) { contentSent = ck; post({ cmd: "app_content", ...v.content }); }
@@ -263,11 +267,23 @@
     post({ cmd: "app_copy", text });
     try { navigator.clipboard.writeText(text).catch(() => {}); } catch { /* the app's copy stands */ }
   }
+  // one press, one act: the same act again within 400 ms is the same press delivered twice (pm's
+  // fail 46: one click answered twice in the app)
+  let lastAct = "", lastActAt = -1e9;
   function run(a) {
     if (!a) return false;
+    const k = JSON.stringify(a), t = now();
+    if (k === lastAct && t - lastActAt < 400) return true;
+    lastAct = k; lastActAt = t;
     if (a.ev === "ui_copy") copy(a.text); else recv(a);
     return true;
   }
+  let pressing = false;
+  host.addEventListener("pointerdown", () => { pressing = true; });
+  const release = () => { if (pressing) { pressing = false; schedule(); } };
+  window.addEventListener("pointerup", () => setTimeout(release, 0), true);
+  window.addEventListener("pointercancel", release, true);
+  window.addEventListener("blur", release);
   host.addEventListener("click", (e) => {
     const b = e.target.closest("[data-act]");
     if (!b || !host.contains(b)) return;
@@ -319,6 +335,7 @@
   window.ambient = {
     recv,
     // for dev.html and the checks: start over, read what shows
+    ui: true,
     reset() { model = M.init(); for (const k in last) delete last[k]; schedule(); },
     model: () => model,
     view: () => lastV,
