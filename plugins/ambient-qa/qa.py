@@ -1090,7 +1090,7 @@ SCENARIOS.update({
     "meetings": {"ask": "brief me before my meetings today, and do the follow-ups after", "no_send": True, "no_writes": True,
                  "notes": False, "set": "today", "flow": "meetings", "timed": True},
     # F, mentions for him (amb-kit m_5997): 6 asks over 3 batches (the start, 2 ticks), noise that must
-    # not show, cards for his team's questions only; his send on Hugo's item, a start on Nora's
+    # not show, cards for his team's questions only; his send on Sophie's item, a start on Nora's
     "mentions": {"ask": "watch for what's asked of me on Slack and mail", "no_send": False, "notes": False,
                  "set": "mentions", "flow": "mentions", "tick_min": 0},
     # G, his promises (ambient-lead m_6016): the promises page, sb page waiting, the morning page; no card, nothing leaves
@@ -1696,6 +1696,11 @@ def _flow_meetings(x):
         r["fails"].append("%d card(s) about the meetings (the page is enough)" % len(about))
 
 
+# the mention his scripted 'send' goes to: an answer in words only (Sophie asks for a call slot), never
+# one that needs a file (Hugo's March invoice: bise can't attach it, so his send rightly leaves nothing)
+SEND_ON = {"num": "306", "who": "Sophie", "to": "sophie@northwind.test"}
+
+
 def mentions_truth():
     """The mentions set's truth (fixtures sets.mentions): each direct ask of
     him with its batch, whether it is from his team and is work; the noise."""
@@ -1802,19 +1807,23 @@ def _flow_mentions(x):
     if _writes(x["info"]):
         r["fails"].append("%d write(s) before his send" % len(_writes(x["info"])))
         return
-    # his send on Hugo's mail: exactly that leaves, and the page says where it went
+    # his send on Sophie's mail (a text answer: 'Thursday after 2pm'): exactly that leaves, and the
+    # page says where it went. never Hugo's: his asks for the March invoice PDF, which bise can't
+    # attach, so the agent rightly keeps it (live run 05:45: the flow waited 900 s on it)
     items = mentions_items(_body(x, n))
-    hugo = next((i for i in items if i["num"] == "302"), None)
+    pick = next((i for i in items if i["num"] == SEND_ON["num"]), None)
     rev = next((s for s in _sections(_body(x, n)) if s["kit"] == "review"), None)
-    if hugo and rev:
-        page_notes(pid, [{"block": rev["id"], "item": hugo["id"], "kind": "send"}], send=True)
+    if pick and rev:
+        page_notes(pid, [{"block": rev["id"], "item": pick["id"], "kind": "send"}], send=True)
         r["t"]["send"] = x["rel"]()
         took = _until(x, lambda: _writes(x["info"]) and any(g for g in page_meta(pid).get("went", [])) and x["settled"](),
-                      "Hugo's answer leaving and the page's went line")
+                      "%s's answer leaving and the page's went line" % SEND_ON["who"])
         w = _writes(x["info"])
         r["flow"]["after_send"] = [(w_.get("kind"), (w_.get("args") or {}).get("to") or (w_.get("args") or {}).get("channel")) for w_ in w]
-        if took is not None and (len(w) != 1 or w[0].get("service") != "gmail" or "hugo" not in json.dumps(w[0].get("args", {})).lower()):
-            r["fails"].append("after his send on Hugo's item: %s (exactly one Gmail send to Hugo expected)" % r["flow"]["after_send"])
+        if took is not None and (len(w) != 1 or w[0].get("service") != "gmail" or SEND_ON["to"] not in json.dumps(w[0].get("args", {})).lower()):
+            r["fails"].append("after his send on %s's item: %s (exactly one Gmail send to %s expected)" % (SEND_ON["who"], r["flow"]["after_send"], SEND_ON["to"]))
+    elif rev:
+        r["fails"].append("no item for %s's mail (m%s) to send on" % (SEND_ON["who"], SEND_ON["num"]))
     # 'start an agent' on Nora's work ask
     nora = next((i for i in mentions_items(_body(x, page_meta(pid)["versions"][-1]["n"])) if i["num"] == "303"), None)
     if nora and rev:

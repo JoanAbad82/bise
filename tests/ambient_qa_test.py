@@ -556,6 +556,11 @@ def mentions_page_laws():
     check(len(fl) == 2, fl)
     sc = qa.SCENARIOS["mentions"]
     check(sc["flow"] == "mentions" and sc["set"] == "mentions" and sc["tick_min"] == 0 and "ticks" not in sc, sc)
+    # his scripted send goes to a mention answered in words (Sophie's call slot), never one needing a file
+    fx = json.load(open(os.path.join(qa.FAKE_ACCOUNTS, "fixtures.json")))
+    m = next(m for m in fx["sets"]["mentions"]["gmail"]["+messages"] if m["id"] == "m" + qa.SEND_ON["num"])
+    check(qa.SEND_ON["to"] in m["from"] and m.get("mention") and not m.get("noise")
+          and not any(w in m["body"].lower() for w in ("invoice", "file", "attach", "pdf")), m)
 
 
 @test
