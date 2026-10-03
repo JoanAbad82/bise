@@ -314,6 +314,17 @@ the page with an open card (a task agent's page) is not checked yet.
   answer (the fixture repo has no remote; his real repos do). Not yet checked: v1 at 71 s is
   slower than amb-kit's ~45 s for the first items; and the end of the loop (an agent done → the
   item's reply updated → it leaves only on his word) isn't in `qa.py run feedback`.
+- **C after amb-kit's 9b0983bd: v1 at 44 s** (each report published as an item as soon as read).
+  That run's fail was the check misreading a brief that did name s212 (amb-tools). With the
+  loop's end in the run (83038189), both agents had their fixes ready and tested, then waited on
+  main's `how should agents ship code here?` card, which the flow doesn't answer (amb-tools). The
+  question itself is right there: it comes once fixes are ready. v1 was 98 s on that run (4 items).
+- **D at dbfcfd99: fail 31 fixed.** His `sign in to Gandi` card, answered with `1`, closed and
+  ticked; the `send the draft?` card waited for the legal question. The plan then stops at s3
+  because the flow picked `i'll leave a note with legal's address` and never left it (amb-tools).
+  Fail 35 (amb-kit): one decision, two cards in the same second, the question `how many years?`
+  and his step `pick how long … 1. done`. Nit: after he chose to leave a note, the legal question
+  came back as a new card 30 s later.
 - **23 and 24 rechecked at a589f9f9 (`qa.py ask`): pass.** `what's my next meeting` → `09:30,
   launch standup with Marc, Lucas and Nora` in 13 s, no page: the fixture says 07:30Z, so the time
   is in his zone (CEST). `plan the offsite` → offsite-plan; the follow-up `add a budget per person
