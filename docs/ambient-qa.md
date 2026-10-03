@@ -357,6 +357,13 @@ the page with an open card (a task agent's page) is not checked yet.
   didn't: the flow's note carried the option's label instead of the address (amb-tools, fixed
   after 9688bc68), and the product still opened `send the draft?` on a draft with no address
   (amb-kit b12b6fde: such a draft stays `waiting for your note: <what>`, never `drafted`).
+- **D at 807ff018 (amb-core's wake fix, amb-kit b12b6fde): fail 38, the plan stalls silently.**
+  Page 16 s, v1 33 s. After his `how many years?` answer, bise's step `ask legal … · waiting for
+  your note: legal's address` is open, but the page has no question for the address (only the
+  row and a callout say it), so no card comes, his sign-in and pay never come, and the outbox
+  stays empty. Out of the way, only cards reach him, so he'd never know. Proposed: a draft
+  waiting for his note always comes with a question for what's missing, with `skip` (amb-kit),
+  or such a row opens a card (amb-core).
 - **23 and 24 rechecked at a589f9f9 (`qa.py ask`): pass.** `what's my next meeting` → `09:30,
   launch standup with Marc, Lucas and Nora` in 13 s, no page: the fixture says 07:30Z, so the time
   is in his zone (CEST). `plan the offsite` → offsite-plan; the follow-up `add a budget per person
