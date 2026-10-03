@@ -454,9 +454,15 @@ def http_retries_a_reset():
     seen = []
 
     def serve():
-        while True:
-            c, _ = srv.accept()
-            c.recv(4096)
+        for _ in range(3):   # the GET's two tries and the POST, then the thread ends
+            try:
+                c, _ = srv.accept()
+            except OSError:
+                return
+            try:
+                c.recv(4096)
+            except OSError:
+                pass
             seen.append(1)
             if len(seen) in (1, 3):   # the first GET and the POST: a reset
                 c.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
