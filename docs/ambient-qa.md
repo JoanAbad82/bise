@@ -305,6 +305,15 @@ the page with an open card (a task agent's page) is not checked yet.
   in a repo that holds only a README (amb-kit's feedback.md; amb-tools' fixture). Fail 34: main
   asked `how should agents ship code here?` at 24 s, before any code change was known, then
   withdrew it (amb-kit).
+- **C, feedback into work: pass at 713ae37e** (with amb-tools d44b566e and amb-kit 43fef68d).
+  First seen at 16 s, main's line 42 characters, v1 at 71 s with a review of Benjamin's 3 reports
+  (3 of 3) and a drafted reply each. `start an agent` on 2 items → main started fix-fish-path and
+  fix-https-proxy 24 s after the note, each with its report as the brief, and the items showed them
+  14 s later. Outbox empty. Fails 32-34 hold: the agent read the fake Slack itself. The
+  `how should agents ship code here?` card now comes at 110 s, once agents exist that need the
+  answer (the fixture repo has no remote; his real repos do). Not yet checked: v1 at 71 s is
+  slower than amb-kit's ~45 s for the first items; and the end of the loop (an agent done → the
+  item's reply updated → it leaves only on his word) isn't in `qa.py run feedback`.
 - **23 and 24 rechecked at a589f9f9 (`qa.py ask`): pass.** `what's my next meeting` → `09:30,
   launch standup with Marc, Lucas and Nora` in 13 s, no page: the fixture says 07:30Z, so the time
   is in his zone (CEST). `plan the offsite` → offsite-plan; the follow-up `add a budget per person
