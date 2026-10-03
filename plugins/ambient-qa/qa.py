@@ -816,6 +816,22 @@ def menubar(states=None, frames=1, count=2, out=None):
     return r
 
 
+def menu():
+    """The menu-bar menu as its rows, in order (amb-mac a069b924: --qa has no
+    menu-bar item): {kind: header|card|page|watch|stop|talk|toggle|settings|
+    quit|separator, title, keys?, ref? (card id, page URL, timer id), enabled, indent?}."""
+    return call("menu")
+
+
+def menu_click(kind, ref=None):
+    """A menu row clicked as the real one: stop -> the watch's timer stops
+    (every_stop), page/watch -> the URL logged as opened (never his browser),
+    card -> bise opens on that card (app_key i)."""
+    if kind == "stop" and isinstance(ref, str) and ref.isdigit():
+        ref = int(ref)
+    return call("menu_click", kind=kind, ref=ref)
+
+
 def pearl(out=None):
     """Every pearl frame amb-mac plays per mood (the bundle's <mood>-NN.png), at 1x and 2x."""
     return call("pearl", dir=out or os.path.join(OUT, "pearl"), timeout=120)
@@ -2444,6 +2460,9 @@ def _cli(argv):
     p = sub.add_parser("events"); p.add_argument("n", nargs="?", type=int, default=40); p.add_argument("--levels", action="store_true")
     p = sub.add_parser("fn"); p.add_argument("state"); p.add_argument("--key", default="fn")
     p = sub.add_parser("key"); p.add_argument("k")
+    sub.add_parser("menu", help="the menu-bar menu's rows, in order (kind, title, keys, ref, enabled)")
+    p = sub.add_parser("menu-click", help="click a menu row as the real one: stop <timer id>, page|watch <url>, card <id>")
+    p.add_argument("kind", choices=["stop", "page", "watch", "card"]); p.add_argument("ref")
     p = sub.add_parser("inject"); p.add_argument("ev")
     p = sub.add_parser("_hub"); p.add_argument("--bise", required=True); p.add_argument("--kind", default="fake"); p.add_argument("--connectors", action="store_true"); p.add_argument("--computer", action="store_true")
     p.add_argument("--real-accounts-approved-by-user", default=""); p.add_argument("--keep", action="store_true"); p.add_argument("--reuse")
@@ -2514,6 +2533,10 @@ def _cli(argv):
         r = fn(a.state, a.key)
     elif a.cmd == "key":
         r = key(a.k)
+    elif a.cmd == "menu":
+        r = menu()
+    elif a.cmd == "menu-click":
+        r = menu_click(a.kind, a.ref)
     elif a.cmd == "inject":
         r = inject(a.ev)
     print(json.dumps(r, indent=1, ensure_ascii=False))

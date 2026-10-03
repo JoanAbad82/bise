@@ -165,6 +165,14 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         q.sendCore = { [weak self] in self?.core.send($0) }
         q.visIn = { [weak self] in self?.visFeed($0) }
         q.reduceMotionIn = { [weak self] in self?.setReduceMotion($0) }
+        q.menuDump = { [weak self] in self?.menuDump() ?? [] }
+        q.menuStopWatch = { [weak self] in self?.menuStopWatch($0) }
+        q.menuCard = { [weak self] id in
+            // as the real card row (StatusItem.onCard): bise open on that card
+            guard let self else { return }
+            self.visFeed(.open)
+            self.capsule.post(["ev": "app_key", "key": "i", "card": id])
+        }
         qa = q
         q.start()
     }

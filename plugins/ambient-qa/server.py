@@ -67,6 +67,9 @@ TOOLS = [
     ("menubar", "The menu-bar item (the 18 px pearl) in each SPEC §0 state: still, work, need (+count), away ☾, done, fail ▲, listen, put there through amb-mac's StatusItem API; its own composed image at 1x and 2x, transparent and on a light and a dark menu-bar strip, and a sheet (returned as an image). frames > 1: successive frames of the moving moods.",
      {"states": {"type": "array", "items": {"type": "string"}}, "frames": {"type": "integer"}, "count": {"type": "integer"}}, []),
     ("pearl", "Every pearl frame amb-mac plays, per mood (the bundle's <mood>-NN.png), at 1x and 2x.", {}, []),
+    ("menu", "The menu-bar menu as its rows, in order (--qa has no menu-bar item): kind (header, card, page, watch, stop, talk, toggle, settings, quit, separator), title, keys, ref (card id, page URL, timer id), enabled, indent.", {}, []),
+    ("menu_click", "Click a menu row as the real one: stop (ref: the timer id) stops that watch, page or watch (ref: its URL) is logged as opened (never the user's browser), card (ref: its id) opens bise on that card.",
+     {"kind": {"type": "string", "enum": ["stop", "page", "watch", "card"]}, "ref": {"type": ["string", "integer"]}}, ["kind", "ref"]),
 ]
 
 
@@ -163,6 +166,10 @@ def run(name, a):
             images.append(r["sheet"])
     elif name == "pearl":
         r = qa.pearl()
+    elif name == "menu":
+        r = qa.menu()
+    elif name == "menu_click":
+        r = qa.menu_click(a["kind"], a.get("ref"))
     elif name == "run":
         full = qa.run(a["scenario"], bool(a.get("headless")), int(a.get("timeout") or 900), bool(a.get("keep")), require=a.get("require"))
         r = {"report": full["report"], "dir": full["dir"], "fails": full["fails"], "t": full["t"]}

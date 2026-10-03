@@ -59,6 +59,9 @@ final class QA {
     var sendCore: (([String: Any]) -> Void)?    // to the core itself (Core.send)
     var visIn: ((VisIn) -> Void)?               // the Visibility machine's input (App.visFeed), as the real keys feed it
     var reduceMotionIn: ((Bool) -> Void)?       // App's reduce motion (its native fades), as the system setting feeds it
+    var menuDump: (() -> [[String: Any]])?      // the menu-bar menu's rows (App.menuDump): --qa has no menu-bar item
+    var menuStopWatch: ((Int) -> Void)?         // the 'stop watching' row's action (App.menuStopWatch)
+    var menuCard: ((Any) -> Void)?              // a card row's action: bise open on that card (App, as StatusItem.onCard)
 
     private let capsule: Capsule
     private let edge: Edge
@@ -531,6 +534,28 @@ final class QA {
             case "cancel": keyOut?(.cancel)
             default: throw Failure(description: "fn state: down up tap double cancel")
             }
+            return [:]
+        case "menu":
+            // the menu-bar menu as its rows, in order (amb-mac a069b924)
+            return ["rows": menuDump?() ?? []]
+        case "menu_click":
+            // a row clicked: what the real row does, never the user's browser
+            guard let kind = q["kind"] as? String else { throw Failure(description: "menu_click needs kind (and ref)") }
+            let ref = q["ref"]
+            switch kind {
+            case "stop":
+                guard let id = (ref as? NSNumber)?.intValue ?? Int(ref as? String ?? "") else { throw Failure(description: "stop needs ref: the timer id") }
+                menuStopWatch?(id)
+            case "page", "watch":
+                guard let url = ref as? String, !url.isEmpty else { throw Failure(description: "\(kind) needs ref: its page URL") }
+                opened(url)
+            case "card":
+                guard let ref else { throw Failure(description: "card needs ref: its card id") }
+                menuCard?(ref)
+            default:
+                throw Failure(description: "menu_click: kind stop, page, watch or card (\(kind) is not clickable here)")
+            }
+            saw("qa", ["ev": "qa_menu_click", "kind": kind, "ref": ref ?? NSNull()])
             return [:]
         case "key":
             guard let k = q["k"] as? String ?? q["key"] as? String else { throw Failure(description: "key needs k") }
