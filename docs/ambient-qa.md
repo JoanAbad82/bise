@@ -569,6 +569,16 @@ frontmost:
   batch card) is not checked yet: amb-web puts `1 review` and `2 send all 3` on the card's own
   bar, reached from a row in fn i, and `qa.py clicks` has no state for that bar yet (amb-tools).
 
+### Results: real clicks, third run (fresh launch at ambient-app d2a47b84, QA app, stopped after)
+
+- **card: pass, fail 45 closed.** All 3 targets (the body, `⏎ open`, `esc later`) got the first
+  click in the panel. The second run had hit a stale panel or bundle (amb-mac m_6650): from now
+  on, a click run always starts on a fresh launch (`launch --restart`).
+- **question: fail 46 still there.** One click on `1 tuesday` or `2 thursday` sends `answer`
+  twice.
+- **question: fail 47, partly fixed.** `fn esc later` takes the click now. `fn 1–2 pick` and
+  `fn o open the page` still show a pointer cursor and take no click.
+
 ## Out of the way (vision §3 G, the user's change m_5030)
 
 - [ ] At rest, after launch: nothing on screen but the menu-bar icon (no idle capsule).
