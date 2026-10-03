@@ -417,6 +417,12 @@ the page with an open card (a task agent's page) is not checked yet.
   before. The run's fail is its count (Slack posts only: amb-tools). Open: the same send also
   marked 2 Linear issues done, a write no card named (amb-kit). The early batch and its wording
   are addressed in amb-core 2e114ebe.
+- **F at 88044e58 (amb-tools' run, isolated fake set): pass on the product, fail 40 closed.** v1 at
+  33 s, 6 items newest first, ids kept across the start and 2 ticks; 2 cards, one per batch with
+  team asks (Léa's question in v1, Nora's request after a tick), none for clients or noise; outbox
+  empty until his send, then exactly one Gmail send; `start an agent` on Nora's ask briefed an
+  agent with her words. The run's only fail was its noise check reading the sources block
+  (amb-tools 5fbd2268).
 - **F at d057f499 (headless): fail 40 for ticks.** Léa's direct question in v1 got its card; Nora's
   DM that arrived with tick 1 got none, though the page listed it and main started an agent on it
   (amb-kit 78500b1b since).
