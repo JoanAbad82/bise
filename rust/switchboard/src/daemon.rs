@@ -1206,6 +1206,14 @@ impl Shell {
                             m.insert(q.card, (meta.id.clone(), q.block.clone()));
                         }
                     }
+                    // the open steps' cards too: after a hub restart a
+                    // step's card lost its page link and its page path
+                    // (pm's D fail 31: card #2 with page null)
+                    for s in p.store.steps(&meta.id) {
+                        if s.card != 0 && s.reply.is_none() {
+                            m.insert(s.card, (meta.id.clone(), Self::step_key(&s.block, &s.item)));
+                        }
+                    }
                 }
             }
             m
@@ -1278,6 +1286,8 @@ impl Shell {
         pages.push(id, "notes", &json!({"notes": pages.store.notes(id)}));
         let text = crate::pages::store::notes_message(&meta, &pages.url(id), &[note]);
         self.page_msg(crate::pages::PageMsg::Sent { id: id.to_string(), agent: meta.agent.clone(), text });
+        // a drafted step that waited for this answer gets its card now
+        self.page_steps(id);
     }
 
     // ---- checklists that tick themselves (docs/ambient-roadmap.md §2 D) ----
@@ -1316,8 +1326,15 @@ impl Shell {
             }
             changed = true;
         }
+        // a drafted step's card waits while the page asks him anything:
+        // its draft may need that answer (legal's address), and two cards
+        // at once read as one muddle (pm's D fail 31, m_5870)
+        let asking = pages.store.questions(id).iter().any(|q| q.reply.is_none());
         for r in &due {
             if steps.iter().any(|s| s.block == r.block && s.item == r.item) {
+                continue;
+            }
+            if r.drafted && asking {
                 continue;
             }
             let mut s = crate::pages::checklist::Step {

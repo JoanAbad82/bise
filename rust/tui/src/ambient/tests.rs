@@ -232,6 +232,24 @@ fn hub_state_becomes_state_with_agents_and_cards_with_options() {
     assert!(has(&t.take(), "error"));
 }
 
+/// Law (pm's D fail 31): a page's card with one option (a step: "1.
+/// done") shows that option, and fn + its digit sends the digit to the
+/// hub's page path; it was refused as "opens in the terminal", so the
+/// step never closed.
+#[test]
+fn a_page_cards_digit_goes_to_the_page_path() {
+    let mut t = T::new();
+    t.hub.say(json!({"ev": "state", "agents": [], "cards": [
+        {"id": 3, "kind": "question", "agent": "main", "text": "sign in to Gandi
+1. done",
+         "page": {"id": "buy-domain", "block": "steps", "item": "signin", "url": "http://127.0.0.1:1/p/buy-domain#signin"}}]}));
+    t.until(|o| has(o, "state"));
+    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    assert_eq!(st["cards"][0]["options"], json!([{"n": 1, "label": "done"}]));
+    t.cmd(Cmd::Answer { card: 3, reply: "1".into() });
+    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "/answer 3 1"}));
+}
+
 #[test]
 fn a_hub_item_digit_goes_as_the_digit() {
     let mut t = T::new();

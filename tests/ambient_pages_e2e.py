@@ -478,16 +478,46 @@ def main():
                             '<li data-id="d1" data-who="bise" data-did="drafted" data-draft="mail-legal">ask legal</li>'
                             '<li data-id="d2" data-who="yours">sign the renewal</li></ol></section>'
                             '<section data-kit="email" data-id="mail-legal" data-verb="draft"><p data-field="to">legal</p>'
-                            '<p data-field="subject">the renewal</p><p>can we sign?</p></section>')
+                            '<p data-field="subject">the renewal</p><p>can we sign?</p></section>'
+                            '<section data-kit="question" data-id="lq"><p>which legal address?</p>'
+                            '<ol><li>legal@acme.test</li><li>i will write it</li></ol></section>')
         settle(c)
         c.say('[[bash: sb page publish %s --id legal-plan --title "legal plan"]]' % lp)
-        c.wait(lambda: step_card("d1"), 90, "the drafted step's card")
+        # the page asks first (pm's 31, m_5870): the drafted step's card
+        # waits while any question of the page is open
+        lq = lambda: next((x for x in c.cards() if (x.get("page") or {}).get("id") == "legal-plan" and (x.get("page") or {}).get("block") == "lq"), None)
+        c.wait(lq, 90, "the page's question card")
+        import time
+        time.sleep(2)
+        check(not step_card("d1"), "the drafted step waits while the page asks: %r" % c.cards())
+        c.say("/answer %d 1" % lq()["id"])
+        c.wait(lambda: step_card("d1"), 30, "the drafted step's card, once the question is answered")
+        check((step_card("d1").get("page") or {}).get("item") == "d1", "its card links its row: %r" % step_card("d1"))
         check(step_card("d1")["text"].startswith("ask legal: send the draft?"), "its card asks to send: %r" % step_card("d1"))
         check(not step_card("d2"), "his step waits for the draft")
         c.say("/answer %d 1" % step_card("d1")["id"])
         c.wait(lambda: step_card("d2") and not step_card("d1"), 30, "sent: his own step's card comes")
         notes = json.loads(request(port, "GET", "/p/legal-plan/meta")[2])["notes"]
         check(any(n["kind"] == "approve" and n["block"] == "mail-legal" for n in notes), "his send approves the draft: %r" % notes)
+
+        # his step answered from the capsule (pm's D fail 31): the core's
+        # {cmd: answer, card, reply: '1'} (fn + digit) ticks it and closes
+        # its card, the same as the TUI's /answer and the page's tick
+        from ambient_core_e2e import Core
+        core = Core(E)
+        try:
+            core.wait(lambda e: e.get("ev") == "state" and any(cd["id"] == step_card("d2")["id"] for cd in e["cards"]), 30, "d2's card in the core")
+            cd = next(cd for cd in core.last("state")["cards"] if cd["id"] == step_card("d2")["id"])
+            check((cd.get("page") or {}).get("item") == "d2", "the core's card links its row: %r" % cd)
+            lps = Sse(port, "/p/legal-plan/events")
+            core.cmd(cmd="answer", card=cd["id"], reply="1")
+            c.wait(lambda: lps.seen("ticked", lambda d: d == {"block": "plan", "item": "d2"}), 30, "d2 ticked from the capsule")
+            core.wait(lambda e: e.get("ev") == "state" and not any(x["id"] == cd["id"] for x in e["cards"]), 30, "its card closed in the core")
+        finally:
+            core.p.stdin.close()
+            core.p.wait(timeout=10)
+        # the tick's and the pick's notes reach main as turns: let them end
+        settle(c)
 
         # a copied page whose question names a card this hub never had,
         # read at the hub's start (pm's m_5456): the first pick is no 409,
@@ -516,7 +546,7 @@ def main():
         # (first the stale page's pick reaches main as a note: let that turn
         # end, or our command lands in the same turn and is never run)
         c.wait_line("main", 'on your page "stale"', 60)
-        c.wait_idle("main")
+        settle(c)
         busy = os.path.join(E.tmp, "busy.html")
         open(busy, "w").write(PAGE_V1)
         c.say('[[bash: sb page publish %s --id busy-watch --title "busy watch"]]' % busy)

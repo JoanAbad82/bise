@@ -198,6 +198,22 @@ impl Shot {
     }
 }
 
+/// A page card's numbered options, one or more (`sign in\n1. done`): the
+/// TUI's split wants two or more, and a step's card has one.
+fn page_options(text: &str) -> Vec<(usize, String)> {
+    let mut out: Vec<(usize, String)> = Vec::new();
+    for l in text.trim_end().lines().rev() {
+        let l = l.trim();
+        let digits: String = l.chars().take_while(char::is_ascii_digit).collect();
+        let Some(label) = l[digits.len()..].strip_prefix(". ").map(str::trim).filter(|x| !x.is_empty()) else { break };
+        let Ok(n) = digits.parse::<usize>() else { break };
+        out.push((n, label.to_string()));
+    }
+    out.reverse();
+    let numbered = out.iter().enumerate().all(|(i, (n, _))| *n == i + 1);
+    if numbered && out.len() <= 9 { out } else { Vec::new() }
+}
+
 /// A card of the user's inbox, as the hub's snapshot has it.
 #[derive(Clone, Debug)]
 struct CardInfo {
@@ -505,6 +521,12 @@ impl Core {
         let card = self.cards.iter().find(|c| c.id == id).cloned();
         let digit = reply.parse::<usize>().ok().filter(|d| (1..=9).contains(d));
         let reply = match (card, digit) {
+            // a page's card (a question, a step: "1. done"): the digit
+            // goes as is, the hub maps it on the page's path. The TUI's
+            // option split wants 2+ options, so a step's one option got
+            // "opens in the terminal" and its card never closed (pm's D
+            // fail 31)
+            (Some(c), Some(d)) if c.page.is_some() => d.to_string(),
             (Some(c), Some(d)) => match crate::sb::ambient_reply(&c.kind, &c.agent, &c.text, d) {
                 Some(r) => r,
                 None => return self.error("that option opens in the terminal."),
@@ -656,10 +678,11 @@ impl Core {
             .cards
             .iter()
             .map(|c| {
-                let options: Vec<Value> = crate::sb::ambient_options(&c.kind, &c.agent, &c.text)
-                    .into_iter()
-                    .map(|(n, label)| json!({"n": n, "label": label}))
-                    .collect();
+                let mut options = crate::sb::ambient_options(&c.kind, &c.agent, &c.text);
+                if options.is_empty() && c.page.is_some() {
+                    options = page_options(&c.text);
+                }
+                let options: Vec<Value> = options.into_iter().map(|(n, label)| json!({"n": n, "label": label})).collect();
                 // urgent: it asks even on a call or in a meeting. A
                 // tool call waiting for a yes holds an agent's work now
                 // (best guess, told to ambient-lead)
