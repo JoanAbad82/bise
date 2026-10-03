@@ -343,6 +343,11 @@ the page with an open card (a task agent's page) is not checked yet.
   checks (amb-tools): sends after his word counted as sends on a "don't send" ask, and rows waiting
   on Lucas counted as forgotten. Nits (amb-kit): v1 at 69 s (the page at 16 s), and the trademark
   mail came after he paid while Marc asked for it before buying.
+- **D at c02a8c56 (amb-kit 6de3d718): the nits hold, a new fail.** v1 at 48 s, and `ask legal …
+  before paying` now comes before his `sign in and pay` card. Fail 37: his `send` on 3 `send the
+  draft?` cards made no send (outbox empty at the run's end; the run before made 3 sends within
+  5 s). The run said pass because its check no longer counts sends (amb-tools to fix; amb-core or
+  amb-kit for the cause).
 - **23 and 24 rechecked at a589f9f9 (`qa.py ask`): pass.** `what's my next meeting` → `09:30,
   launch standup with Marc, Lucas and Nora` in 13 s, no page: the fixture says 07:30Z, so the time
   is in his zone (CEST). `plan the offsite` → offsite-plan; the follow-up `add a budget per person
