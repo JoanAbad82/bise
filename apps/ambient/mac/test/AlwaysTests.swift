@@ -58,5 +58,17 @@ law("bar's screen: no key window: the mouse's", Placement.activeScreen([mac, sid
 law("bar's screen: neither: the first", Placement.activeScreen([mac, side], keyWindowScreen: nil, mouse: CGPoint(x: -9, y: -9)) == 0)
 law("bar's screen: a stale key screen index: the mouse's", Placement.activeScreen([mac], keyWindowScreen: 3, mouse: CGPoint(x: 5, y: 5)) == 0)
 
+// round 9: who has his keys (KeyFocus, lead m_6551)
+var kf = KeyFocus()
+law("keys: a pushed card never takes them", kf.feed(.pushed) == .nothing && !kf.bar)
+law("keys: a click on the pushed card takes them", kf.feed(.clicked) == .take && kf.bar)
+law("keys: its close (a pick, esc, a click away) hands them back at once", kf.feed(.closed) == .giveBack && !kf.bar)
+law("keys: a second close hands back nothing", kf.feed(.closed) == .nothing)
+law("keys: what he opens takes them, once", kf.feed(.openedByHand) == .take && kf.feed(.openedByHand) == .nothing)
+law("keys: a push while he has the bar changes nothing", kf.feed(.pushed) == .nothing && kf.bar)
+_ = kf.feed(.closed)
+law("keys: the answer to his own ask takes them", kf.feed(.answerToAsk) == .take)
+law("keys: and its close hands them back", kf.feed(.closed) == .giveBack)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Always laws hold")

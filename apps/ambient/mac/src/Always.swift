@@ -28,6 +28,32 @@ struct Backoff {
     mutating func reset() { next = Backoff.first }
 }
 
+// round 9's keys (ambient m_6521, lead m_6551): who has his keystrokes.
+// What he opens, the answer to his own ask and a click on the bar take
+// them; what bise pushes never does; the bar closing (a pick, esc, a click
+// away) gives them back to his app at once, with no extra click. The
+// panel is non-activating: his app stays the active app throughout.
+struct KeyFocus: Equatable {
+    enum In { case openedByHand, answerToAsk, clicked, pushed, closed }
+    enum Out: Equatable { case take, giveBack, nothing }
+    private(set) var bar = false      // the bar has his keystrokes
+
+    mutating func feed(_ e: In) -> Out {
+        switch e {
+        case .openedByHand, .answerToAsk, .clicked:
+            if bar { return .nothing }
+            bar = true
+            return .take
+        case .pushed:
+            return .nothing
+        case .closed:
+            guard bar else { return .nothing }
+            bar = false
+            return .giveBack
+        }
+    }
+}
+
 // a screen as the capsule's placement sees it (Cocoa coords: y up)
 struct ScreenBox: Equatable {
     var frame: CGRect

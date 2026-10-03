@@ -19,6 +19,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var notify: Notify?
     private var sounds: SoundPlayer?
     private var askedAt = 0.0             // his last ask the core took ('sent'); its answer gets the keys
+    private var keyFocus = KeyFocus()     // who has his keystrokes (round 9)
     private var status: StatusItem?
     private var signals: [DispatchSourceSignal] = []
     private var qa: QA?                  // --qa only: the QA channel (QA.swift)
@@ -110,6 +111,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         // a click elsewhere closes a bar he opened (never a pushed card)
         capsule.onKeyFocus = { [weak self] on in
             guard let self else { return }
+            // a click on the bar (a pushed card too) took the keys; a resign
+            // is the bar giving them back (KeyFocus, lead m_6551)
+            _ = self.keyFocus.feed(on ? .clicked : .closed)
             self.capsule.post(["ev": "app_focused", "on": on])
             if !on && self.vis.pinned && !self.capsule.hidden { self.visFeed(.dismiss) }
         }
@@ -191,6 +195,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         q.sendCore = { [weak self] in self?.core.send($0) }
         q.visIn = { [weak self] in self?.visFeed($0) }
         q.reduceMotionIn = { [weak self] in self?.setReduceMotion($0) }
+        q.keyEvent = { [weak self] t, e in self?.keys.qaEvent(t, e) ?? false }
         q.menuDump = { [weak self] in self?.menuDump() ?? [] }
         q.menuStopWatch = { [weak self] in self?.menuStopWatch($0) }
         q.menuCard = { [weak self] id in
@@ -563,7 +568,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "main":
             visFeed(.mainText)
             // round 9: the answer to his own ask has the keys (he just asked)
-            if askedAt > 0, uptime - askedAt < 600 { askedAt = 0; takeKeys() }
+            if askedAt > 0, uptime - askedAt < 600 { askedAt = 0; takeKeys(.answerToAsk) }
         default:
             break
         }
@@ -709,9 +714,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // fn space, fn 0, fn i, fn , and a click on the menu-bar pearl; what
     // bise pushes (a question, the drafts card, an answer) never does.
     // QA never takes his keys.
-    private func takeKeys() {
+    private func takeKeys(_ why: KeyFocus.In = .openedByHand) {
         guard qa == nil else { return }
-        capsule.focus(true)
+        if keyFocus.feed(why) == .take || !capsule.panel.isKeyWindow { capsule.focus(true) }
     }
 
     // a menu-bar click: what's going on (the agents and the inbox, fn + 0)
