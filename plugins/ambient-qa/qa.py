@@ -1263,15 +1263,21 @@ def _feedback_loop_end(x, started):
         r["flow"]["batch_card"] = {"id": batch["id"], "drafts": n, "pick": pick, "text": (batch.get("text") or "")[:160]}
         answer_card(x, batch["id"], pick)
         r["t"]["send_all"] = x["rel"]()
-        took = _until(x, lambda: len([w_ for w_ in _writes(x["info"]) if w_.get("service") == "slack"]) >= n and x["settled"](),
-                      "the %d replies posted after his 'send all'" % n)
+        # the batch's drafts leave each by its own kind (ambient-pm m_6189: '6 drafts' = 3 Slack
+        # replies + 3 Linear issues → 3 slack post_message + 3 linear create_issue): n writes in all
+        took = _until(x, lambda: len(_writes(x["info"])) >= n and x["settled"](),
+                      "the %d drafts gone out after his 'send all'" % n)
         w = _writes(x["info"])
         r["flow"]["after_send"] = [w_.get("kind") for w_ in w]
         if took is not None:
             r["t"]["posted_after_send"] = took
-            slack = [w_ for w_ in w if w_.get("service") == "slack"]
-            if len(w) != n or len(slack) != n:
-                r["fails"].append("after his 'send all %d': %d write(s) (%s), exactly %d Slack messages expected" % (n, len(w), ", ".join(r["flow"]["after_send"]), n))
+            kinds = {}
+            for w_ in w:
+                kinds[w_.get("service") or "?"] = kinds.get(w_.get("service") or "?", 0) + 1
+            r["flow"]["batch_card"]["went"] = kinds
+            if len(w) != n or not kinds.get("slack"):
+                r["fails"].append("after his 'send all %d': %d write(s) (%s), exactly %d expected, the Slack replies among them"
+                                  % (n, len(w), ", ".join(r["flow"]["after_send"]), n))
         return
     r["flow"]["batch_card"] = None
     page_notes(pid, [{"block": reply["id"], "kind": "send"}], send=True)
