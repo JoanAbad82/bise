@@ -278,10 +278,21 @@
     if (a.ev === "ui_copy") copy(a.text); else recv(a);
     return true;
   }
-  let pressing = false;
-  host.addEventListener("pointerdown", () => { pressing = true; });
-  const release = () => { if (pressing) { pressing = false; schedule(); } };
-  window.addEventListener("pointerup", () => setTimeout(release, 0), true);
+  // a press acts on its release over the same target (pointerup), and the click after it is the
+  // same act (deduped above): the first click on a pushed card makes the panel key, and WebKit does
+  // not always turn that press into a click (pm's fail 47); a press longer than 1.5 s, or one that
+  // never ends, frees the redraw anyway
+  let pressing = false, pressEl = null, pressT = 0;
+  const release = () => { clearTimeout(pressT); pressEl = null; if (pressing) { pressing = false; schedule(); } };
+  host.addEventListener("pointerdown", (e) => {
+    pressing = true; pressEl = e.target.closest("[data-act]");
+    clearTimeout(pressT); pressT = setTimeout(release, 1500);
+  });
+  window.addEventListener("pointerup", (e) => {
+    const b = e.target && e.target.closest ? e.target.closest("[data-act]") : null;
+    if (b && b === pressEl && host.contains(b)) { try { run(JSON.parse(b.dataset.act)); } catch (err) { console.error("act", err); } }
+    setTimeout(release, 0);
+  }, true);
   window.addEventListener("pointercancel", release, true);
   window.addEventListener("blur", release);
   host.addEventListener("click", (e) => {
