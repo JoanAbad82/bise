@@ -1433,6 +1433,18 @@ def _covered(body, items):
     return {"found": len(hit), "of": len(items), "missing": ["%s on %s" % (c["author"], c["place"]) for c in items if c not in hit]}
 
 
+def team_asks():
+    """The fixtures' direct questions to him from his team: a Slack message
+    that @-names him with a question, a mail from acme with one. As
+    _card_about's items (id, author, text)."""
+    fx = json.load(open(os.path.join(FAKE_ACCOUNTS, "fixtures.json")))
+    out = [{"id": m["id"], "author": m.get("user") or "", "text": m["text"]} for m in fx["slack"]["messages"]
+           if "?" in m["text"] and "@camille" in m["text"].lower()]
+    out += [{"id": m["id"], "author": m["from"].split("<")[0].strip(), "text": m["subject"] + " " + m["body"]} for m in fx["gmail"]["messages"]
+            if "@acme.test" in m["from"] and "?" in m["subject"] + m["body"]]
+    return out
+
+
 def _card_about(card, items):
     """A card is about a comment when it names its author or shares its words."""
     t = json.dumps(card, ensure_ascii=False).lower()
@@ -1823,10 +1835,13 @@ def _run(scenario, sc, headless, timeout, keep, out, require):
         if sc.get("ticks"):
             # a card only for what he asked to be told: a comment that needs an answer
             need = [c for b in range(1, int(sc["ticks"]) + 2) for c in launch_truth(b)["new"] if c["needs_answer"]]
-            off = [cd for cd in r["cards"] if not _card_about(cd, need)]
+            # or a teammate's direct question to him (Marc in #launch: 'can the weekly update carry
+            # these numbers?'): it needs his answer too (ambient-pm m_5855); plain comments and news don't
+            asks = team_asks()
+            off = [cd for cd in r["cards"] if not _card_about(cd, need) and not _card_about(cd, asks)]
             r["cards_off_ask"] = off
             if off:
-                r["fails"].append("%d card(s) not about a comment that needs an answer" % len(off))
+                r["fails"].append("%d card(s) not about a comment that needs an answer or a teammate's question to him" % len(off))
         if r["main_lines"] and r["main_lines"][0]["len"] > 120:
             r["fails"].append("main's capsule line is %d chars (one short line)" % r["main_lines"][0]["len"])
         if not keep:

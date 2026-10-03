@@ -391,6 +391,17 @@ def meeting_page_laws():
 
 
 @test
+def launch_watch_cards_may_be_a_teammates_question():
+    """launch-watch: a card about a teammate's question to him passes (ambient-pm m_5855), a card about news still fails"""
+    asks = qa.team_asks()
+    check({"s210", "s215"} <= {a["id"] for a in asks} and "s217" not in {a["id"] for a in asks}, asks)
+    marc = {"id": 3, "kind": "question", "text": "Marc asks in #launch: can the weekly update carry these numbers?"}
+    check(qa._card_about(marc, asks), "Marc's question in #launch")
+    news = {"id": 4, "kind": "info", "text": "the Show HN reached the front page, rank 12"}
+    check(not qa._card_about(news, asks) and not qa._card_about(news, [c for c in qa.launch_truth(3)["new"] if c["needs_answer"]]), "news is no ask")
+
+
+@test
 def one_run_at_a_time():
     """qa.py run: a second run in the same QA dir is refused while one is live (ambient-pm m_5841)"""
     lock = os.path.join(qa.QA_DIR, "run.lock")
