@@ -1,55 +1,42 @@
-// bise ambient · the capsule on screen: the bridge to the app, the DOM, the animation frame.
-// The app calls window.ambient.recv(ev) for every core and app_* event; the page posts its cmds
-// to window.webkit.messageHandlers.bise (in a browser: to window.ambientDev, the fake core).
-// Everything that decides lives in model.js; this file only draws what view() says.
+// bise ambient · the bar on screen (round 9, ambient's identity9.html#spec): the bridge to the
+// app, the DOM, the animation frame. The app calls window.ambient.recv(ev) for every core and
+// app_* event; the page posts its cmds to window.webkit.messageHandlers.bise (in a browser: to
+// window.ambientDev, the fake core). model.js decides, bar.js turns its view into the bar's
+// blocks, this file only draws them.
 (function () {
   "use strict";
-  const { AmbModel: M, AmbPearl, AmbWords: Wd } = window;
+  const { AmbModel: M, AmbPearl, AmbWords: Wd, AmbBar: Bar } = window;
   const $ = (s, r = document) => r.querySelector(s);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const native = () => !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.bise);
   if (native() || window.ambientApp) document.documentElement.classList.add("app");
 
-  // ---- the DOM, once
+  // ---- the DOM, once: the panel's box (transparent), the pearl free at the glass's left, the
+  // glass with its header row, level line, big line or text, body of rows and footer.
+  // VoiceOver: the bar is a region named bise, the pearl an image whose label says its mood; what
+  // changes is read once from one polite live line; rows and footer hints are buttons
   const host = $("#amb") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "amb" }));
   host.classList.add("amb");
-  // VoiceOver (ambient-lead m_5313): the capsule is a region named bise; the pearl an image whose
-  // label says its mood; what changes is read once from one polite live line (the words animate
-  // word by word, so the visible text itself is hidden from the reader); glyphs are hidden (the
-  // words already say waiting, done, failed); options and pages are buttons; the full view's rows a
-  // list under headings; the spotlight's field is labelled and comes first in the focus order
   host.setAttribute("role", "region");
   host.setAttribute("aria-label", "bise");
   host.innerHTML = `
-    <div class="cap small" id="cap">
-      <div class="orbbox"><canvas class="pearl" role="img" aria-label="bise"></canvas></div>
-      <div class="tx">
+    <div class="bar" id="bar">
+      <canvas class="pearl" role="img" aria-label="bise"></canvas>
+      <div class="glass" id="glass">
         <div class="say" aria-live="polite" aria-atomic="true"></div>
-        <div class="lab" aria-hidden="true"></div>
-        <div class="line" aria-hidden="true"></div>
-        <div class="words" aria-hidden="true"></div>
-        <div class="ask" role="alertdialog"></div>
-        <div class="sub" aria-hidden="true"></div>
-        <div class="sees" aria-hidden="true"></div>
-        <div class="chips" aria-hidden="true"></div>
-        <div class="rows"></div>
-        <div class="set"></div>
-        <div class="more" aria-hidden="true"></div>
-        <div class="spot"><input type="text" spellcheck="false" autocomplete="off"><div class="keys" aria-hidden="true"></div></div>
-        <div class="perm"><p></p><button type="button" data-do="continue"></button><button type="button" class="later" data-do="not_now"></button></div>
+        <div class="gin"><div class="head"></div><div class="level" aria-hidden="true"></div><div class="mid"></div><div class="body"></div><div class="foot"></div></div>
       </div>
-    </div>
-    <div class="note" id="note"></div>`;
-  const cap = $("#cap", host), note = $("#note", host), tx = $(".tx", cap);
-  const sayEl = $(".say", tx), pearlCv = $(".pearl", cap);
-  const el = { lab: $(".lab", tx), line: $(".line", tx), words: $(".words", tx), ask: $(".ask", tx), sub: $(".sub", tx), sees: $(".sees", tx), chips: $(".chips", tx), rows: $(".rows", tx), set: $(".set", tx), more: $(".more", tx), spot: $(".spot", tx), perm: $(".perm", tx) };
-  const input = $("input", el.spot);
-  const pearl = AmbPearl.create($(".pearl", cap));
+    </div>`;
+  const bar = $(".bar", host), glass = $(".glass", bar), gin = $(".gin", glass), sayEl = $(".say", glass), pearlCv = $(".pearl", bar);
+  const el = { head: $(".head", gin), level: $(".level", gin), mid: $(".mid", gin), body: $(".body", gin), foot: $(".foot", gin) };
+  bar.style.left = Bar.BOX.left + "px"; bar.style.top = Bar.BOX.top + "px";
+  // the typed line: one field, kept across draws (its focus, its caret)
+  const input = Object.assign(document.createElement("input"), { type: "text", spellcheck: false, autocomplete: "off", className: "qin" });
+  const pearl = AmbPearl.create(pearlCv);
 
   // ---- the model and the bridge
   let model = M.init();
   const now = () => performance.now();
-
   function post(cmd) {
     if (cmd.delay) { const { delay, ...rest } = cmd; setTimeout(() => post(rest), delay); return; }
     try {
@@ -72,246 +59,159 @@
     last[part] = key; fn(); return true;
   }
   const show = (node, on) => node.classList.toggle("on", !!on);
+  // a key, or a chord as caps side by side ('–' a dash between them, never a '+')
+  const caps = (keys) => (keys || []).map((k) => (k === "–" ? `<span class="dash">–</span>` : `<kbd class="k">${esc(k)}</kbd>`)).join("");
+  const act = (a) => (a ? ` data-act="${esc(JSON.stringify(a))}"` : "");
+  const hint = (it, cls = "fi") => {
+    const inner = `${it.pre ? `<span>${esc(it.pre)}</span>` : ""}${caps(it.keys)}${it.w ? `<span>${esc(it.w)}</span>` : ""}`;
+    return it.act ? `<button type="button" class="${cls}"${act(it.act)}>${inner}</button>` : `<span class="${cls}">${inner}</span>`;
+  };
 
   // words that land one by one: keep the spans that are the same, light the ones said
-  function words(node, w, main) {
-    node.classList.toggle("main", !!main);
-    const kids = node.children;
+  function words(node, w) {
+    const kids = node.querySelectorAll(".w");
     let same = 0;
     const code = (i) => !!(w.code && w.code[i]);
     while (same < kids.length && same < w.list.length && kids[same].dataset.w === w.list[same] && kids[same].classList.contains("code") === code(same)) same++;
-    while (kids.length > same) node.removeChild(node.lastChild);
+    if (same < kids.length) { node.textContent = ""; same = 0; }
     for (let i = same; i < w.list.length; i++) {
       const s = document.createElement("span");
-      // `code` in mono, without its backticks; a word that was only a markdown mark stays empty
       s.className = code(i) ? "w code" : "w"; s.dataset.w = w.list[i]; s.textContent = w.list[i];
-      if (i > 0 || node.childNodes.length) node.appendChild(document.createTextNode(" "));
+      if (node.childNodes.length) node.appendChild(document.createTextNode(" "));
       node.appendChild(s);
     }
     const spans = node.querySelectorAll(".w");
-    // the new words need one frame unlit, then their fade starts
-    requestAnimationFrame(() => spans.forEach((s, i) => {
-      s.classList.toggle("on", i < w.lit);
-      s.classList.toggle("cur", i === w.lit - 1 && w.lit < w.list.length);
-    }));
+    const lit = w.lit == null ? w.list.length : w.lit;
+    requestAnimationFrame(() => spans.forEach((s, i) => s.classList.toggle("on", i < lit)));
   }
 
-  // the app shows or hides the capsule (app_hidden): it grows out of the menu-bar icon and goes
-  // back into it (SPEC §0; amb-mac keeps the panel on screen for the close), a fade under reduced motion
-  let wasHidden = null, growAnim = null;
-  const reduceMq = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
-  function showHide(v) {
-    if (wasHidden === null) { wasHidden = v.hidden; host.style.display = v.hidden ? "none" : ""; return; }
-    // reduced motion, whatever the order of events (ambient's recheck m_5557, ambient-lead m_5562):
-    // the app's app_reduce_motion OR the system's own setting as WebKit reads it, at show time; a
-    // grow never starts when either is on, and one that plays when reduce arrives lands at once
-    const reduce = M.reduced(v.still, !!(reduceMq && reduceMq.matches));
-    if (reduce && growAnim && growAnim.scaled) growAnim.finish();
-    const r = host.getBoundingClientRect();
-    const g = M.grow(wasHidden, v.hidden, reduce, v.icon, { x: r.left, y: r.top, w: r.width });
-    wasHidden = v.hidden;
-    if (!g) return;
-    if (growAnim) growAnim.cancel();
-    host.style.display = "";
-    const frames = g.fade ? [{ opacity: 0 }, { opacity: 1 }] : [{ opacity: 0, transform: `scale(${g.from})` }, { opacity: 1, transform: "scale(1)" }];
-    host.style.transformOrigin = g.origin || "";
-    growAnim = host.animate(g.open ? frames : frames.slice().reverse(), { duration: g.ms, easing: g.ease, fill: "both" });
-    growAnim.scaled = !g.fade;
-    growAnim.onfinish = () => {
-      growAnim = null;
-      if (!g.open && wasHidden) host.style.display = "none";
-    };
+  function head(h) {
+    if (!h) return "";
+    const right = !h.right ? "" : h.right.keys ? hint(h.right, "rk") : `<span class="rk">${esc(h.right.text)}</span>`;
+    let left;
+    if (h.lab) left = `<div class="lab">${h.lab.acc ? `<span class="a">${esc(h.lab.acc)}</span>${h.lab.rest ? " · " : ""}` : ""}${esc(h.lab.rest || "")}</div><span class="sp"></span>`;
+    else if (h.input) left = `<div class="q in"></div>`;
+    else {
+      const L = h.line;
+      left = `<div class="q${L.ph ? " ph" : ""}${L.size ? " " + L.size : ""}">${L.words ? "" : `${L.glyph ? `<span class="gl ${L.gc || ""}">${esc(L.glyph)}</span> ` : ""}${esc(L.text)}`}</div>`;
+    }
+    return `<div class="inrow h${h.h}">${left}${right}</div>`;
   }
 
-  function render(v) {
+  // the rows, without their selection (a move must not replay the rows' rise)
+  let rowRight = [];
+  // quiet: drawn as the bar appears, the rows come with it (no rise, no stagger: ambient m_6574)
+  function body(sections, quiet) {
+    rowRight = [];
+    let n = 0;
+    return sections.map((sec) => (sec.label ? `<div class="lab sec${sec.acc ? " acc" : ""}" role="heading" aria-level="2">${esc(sec.label)}</div>` : "") + sec.rows.map((r) => {
+      const i = n++;
+      const right = !r.right ? "" : r.right.sw != null ? `<span class="sw${r.right.sw ? " on" : ""}" aria-hidden="true"></span>` : r.right.age ? esc(r.right.age) : caps(r.right.keys);
+      rowRight.push({ right, sw: !!(r.right && r.right.sw != null) });
+      const g = r.gk ? caps([r.g]) : esc(r.g || "");
+      const tag = r.fixed || !r.act ? "div" : "button";
+      const role = r.right && r.right.sw != null ? ` role="switch" aria-checked="${!!r.right.sw}"` : "";
+      return `<${tag}${tag === "button" ? ' type="button"' : ""} class="row${r.fixed ? " fixed" : ""}${r.seen ? " seen" : ""}" data-r="${i}"${act(r.act)}${role} style="${quiet ? "animation:none" : `animation-delay:${i * 20}ms`}"><span class="g ${r.gc || ""}" aria-hidden="true">${g}</span><span class="t">${esc(r.t)}${r.sub ? `<small>${esc(r.sub)}</small>` : ""}</span><span class="s">${right}</span></${tag}>`;
+    }).join("")).join("");
+  }
+  const strip = (sections) => sections.map((s) => ({ ...s, rows: s.rows.map(({ sel, ...r }) => r) }));
+  const sels = (sections) => sections.flatMap((s) => s.rows.map((r) => !!r.sel));
+
+  // ---- show and hide (the user via ambient m_6574): the bar appears at its final size, already
+  // filled, with a quick fade and a 4 px drop, and leaves the same way in 0.12 s with its last
+  // words drawn (style.css); while it shows, a content change eases the height and new rows rise
+  // 20 ms apart; for the first frames of a show (.appear) neither happens
+  let appearT = 0;
+  function render(v, s) {
     host.classList.toggle("still", !!v.still);
-    if (host.style.getPropertyValue("--r") !== v.radius + "px") host.style.setProperty("--r", v.radius + "px");
-    showHide(v);
-    cap.classList.toggle("small", v.size === "small");
-    cap.classList.toggle("open", v.size === "open");
-    cap.dataset.state = v.state;
-    // VoiceOver: the pearl's mood in words, and one sentence per change read from the live line
+    bar.dataset.state = v.state;
+    const on = !v.hidden && !!s.head;
+    if (on && !bar.classList.contains("on")) {
+      bar.classList.add("appear");
+      clearTimeout(appearT);
+      appearT = setTimeout(() => bar.classList.remove("appear"), 250);
+    }
+    show(bar, on);
+    pearlCv.classList.toggle("big", v.state === "listening" || v.state === "voice_note");
     put("a11y", JSON.stringify([v.mood, v.hidden]), () => pearlCv.setAttribute("aria-label", Wd.moodLabel(v.mood)));
     const say = v.hidden ? "" : Wd.sayOf(v);
     if (sayEl.textContent !== say) sayEl.textContent = say;
 
-    // the hello's kiss (ambient m_5702): a small puff of 6 pink and cream dots rising off the
-    // pearl's top right, gone within 1 s; the only kiss bise ever does (never under reduced motion)
+    // the hello's kiss (ambient m_5702): 6 pink and cream dots rising off the pearl's top right
     put("puff", v.puff ? "on" : "", () => {
-      const box = $(".orbbox", cap);
-      const old = $(".puff", box);
+      const old = $(".puff", bar);
       if (old) old.remove();
       if (!v.puff) return;
       const p = document.createElement("div");
       p.className = "puff"; p.setAttribute("aria-hidden", "true");
-      // 6 dots, 2-3 px, each a cream core with a pink edge, starting in a small cluster and rising
-      // ~14 px up and to the right as they fade (ambient's nit, m_5746: a small kiss, not dust)
       const DOTS = [[0, 0, 0, 3], [4, -3, 0.06, 2], [-2, -5, 0.1, 2.5], [6, 1, 0.14, 2], [2, -8, 0.18, 3], [8, -4, 0.22, 2.5]];
-      p.innerHTML = DOTS.map(([x, y, d, s]) => `<i style="left:${x}px;top:${y}px;width:${s}px;height:${s}px;animation-delay:${d}s"></i>`).join("");
-      box.appendChild(p);
+      p.innerHTML = DOTS.map(([x, y, d, z]) => `<i style="left:${x}px;top:${y}px;width:${z}px;height:${z}px;animation-delay:${d}s"></i>`).join("");
+      bar.appendChild(p);
     });
-    put("lab", JSON.stringify(v.label), () => {
-      show(el.lab, v.label);
-      const L = v.label;
-      el.lab.innerHTML = L ? (L.acc ? `<b>${esc(L.text)}</b>` : esc(L.text)) + (L.rest ? ` · ${esc(L.rest)}` : "") : "";
-    });
-    put("line", JSON.stringify([v.glyph, v.text]), () => {
-      show(el.line, v.text != null);
-      const fail = v.glyph === "▲", ok = v.glyph === "✓", work = v.glyph === "∿";
-      el.line.innerHTML = v.text == null ? "" : `${v.glyph ? `<span class="gl${fail ? " fail" : ok ? " ok" : work ? " work" : ""}">${esc(v.glyph)}</span>` : ""}${esc(v.text)}`;
-      el.line.classList.remove("arrive"); void el.line.offsetWidth; el.line.classList.add("arrive");
-    });
-    put("words", JSON.stringify(v.words && [v.state === "listening", v.words.list, v.words.code, v.words.lit]), () => {
-      show(el.words, v.words);
-      el.words.classList.toggle("clamp", !!(v.words && v.words.clamp));
-      if (v.words) words(el.words, v.words, v.state !== "listening");
-      else el.words.textContent = "";
-    });
-    put("sub", v.sub || "", () => { show(el.sub, v.sub); el.sub.textContent = v.sub || ""; });
-    // the head (app, host) never cut, the tail (path, title) ends in … when it must
-    put("sees", JSON.stringify(v.sees), () => {
-      show(el.sees, v.sees);
-      el.sees.innerHTML = v.sees ? `<span class="hd">${esc(v.sees.head)}</span><span class="tl">${esc(v.sees.tail)}</span>` : "";
-    });
-    put("chips", v.chips.join(","), () => {
-      show(el.chips, v.chips.length);
-      const have = new Set([...el.chips.children].map((c) => c.dataset.n));
-      [...el.chips.children].forEach((c) => { if (!v.chips.includes(c.dataset.n)) c.remove(); });
-      for (const n of v.chips) if (!have.has(n)) el.chips.insertAdjacentHTML("beforeend", `<span class="chip" data-n="${esc(n)}"><b>∿</b>${esc(n)}</span>`);
-    });
-    put("rows", JSON.stringify([v.list, v.inbox, v.forYou, v.titles, v.empty]), () => {
-      // the full view (vision §3 G): what's running, then what needs you, then for you (unopened
-      // first); the inbox alone shows only its cards
-      show(el.rows, v.list || v.inbox);
-      const t = v.titles || {};
-      const sec = (s) => (s ? [`<div class="sec" role="heading" aria-level="2">${esc(s)}</div>`] : []);
-      let k = 0;
-      const delay = () => `animation-delay:${(k++) * 0.06}s`;
-      const rs = (v.list || []).map((r) => `<div class="row ${esc(r.kind)}" style="${delay()}"><span class="gl" aria-hidden="true">${esc(r.glyph)}</span><span class="nm">${esc(r.name)}</span><span class="wh">${esc(r.what)}</span><span class="ag">${esc(r.age)}</span></div>`);
-      const qs = (v.inbox || []).map((q) => `<div class="q${q.sel ? " sel" : ""}" style="${delay()}"><div class="who">? ${esc(q.agent)}</div><div class="tq">${esc(q.text)}</div>${opts(q)}</div>`);
-      const fy = v.forYou ? v.forYou.pages.map((p) => `<button type="button" class="page${p.unopened ? " new" : ""}" data-page="${esc(p.id)}" style="${delay()}"><span class="gl" aria-hidden="true">◰</span><span class="pn">${esc(p.name)}</span><span class="pm">${esc(p.meta)}</span>${p.watch ? `<span class="pw">${esc(p.watch)}</span>` : ""}</button>`) : [];
-      const em = v.empty || {};
-      const none = (s) => (s ? [`<div class="none" style="${delay()}">${esc(s)}</div>`] : []);
-      el.rows.innerHTML = v.list
-        ? [...sec(t.running), ...rs, ...none(em.running), ...(qs.length ? sec(t.needs) : []), ...qs, ...none(em.needs), ...(fy.length ? sec(v.forYou.title) : []), ...fy].join("")
-        : qs.join("");
-      el.rows.scrollTop = 0;
-    });
-    // fn + , : the settings, one glass row per toggle (a switch), then the windows bise never sees
-    put("set", JSON.stringify(v.settings), () => {
-      show(el.set, v.settings);
-      const s = v.settings;
-      if (!s) { el.set.innerHTML = ""; return; }
-      const tg = s.rows.map((r) => `<button type="button" class="tg${r.on ? " on" : ""}" role="switch" aria-checked="${r.on}" data-setting="${esc(r.key)}"><span class="lb">${esc(r.label)}</span><span class="sw" aria-hidden="true"></span>${r.note ? `<span class="nt">${esc(r.note)}</span>` : ""}</button>`);
-      const fx = s.always.map((n) => `<div class="sk always"><span class="nm">${esc(n)}</span></div>`);
-      const sk = s.skip.map((x) => `<div class="sk"><span class="nm">${esc(x.name)}</span><button type="button" class="rm" data-skip-remove="${esc(x.bundle)}" aria-label="${esc(s.remove)} ${esc(x.name)}">${esc(s.remove)}</button></div>`);
-      el.set.innerHTML = [...tg, `<div class="sec" role="heading" aria-level="2">${esc(s.skipTitle)}</div>`, ...fx, ...sk,
-        `<button type="button" class="add" data-skip-add="1">+ ${esc(s.add)}</button>`].join("");
-    });
-    put("spot", v.spot ? "on" : "", () => {
-      show(el.spot, v.spot);
-      if (v.spot) { input.value = v.spot.text; input.placeholder = v.spot.hint; input.setAttribute("aria-label", v.spot.hint); setTimeout(() => input.focus(), 0); }
-      else input.blur();
-    });
-    // the key bar, key then word like the TUI's, three spaces between pairs
-    put("keys", JSON.stringify(v.spot && v.spot.keys), () => {
-      $(".keys", el.spot).innerHTML = v.spot ? v.spot.keys.map(([k, w]) => `<b>${esc(k)}</b> ${esc(w)}`).join("   ") : "";
-    });
-    put("perm", JSON.stringify(v.perm), () => {
-      show(el.perm, v.perm);
-      if (v.perm) {
-        $("p", el.perm).textContent = v.perm.text;
-        const [go, later] = el.perm.querySelectorAll("button");
-        go.textContent = v.perm.button; later.textContent = v.perm.later;
-        go.dataset.perm = later.dataset.perm = v.perm.perm;
-      }
-    });
-    // a question: in the capsule itself, one glass (round 8, ambient m_5332 (2)); the old card
-    // under it is gone, and with it the ':*'
-    note.classList.remove("on");
-    put("ask", JSON.stringify(v.ask), () => {
-      show(el.ask, v.ask);
-      el.ask.classList.toggle("batch", !!(v.ask && v.ask.batch));
-      const n = v.ask;
-      // the question (4 lines at most, then '… more   ⌘ ⏎'), then the choices as rows: a keycap and
-      // the label on one line, the selected row soft pink with its whole label (ambient's B3 spec)
-      el.ask.innerHTML = !n ? "" : `<div class="ttl"><span class="gl" aria-hidden="true">?</span>${esc(n.title)}${n.more > 0 ? `<span class="more">+${n.more}</span>` : ""}</div>
-        <div class="qq${n.full ? " full" : ""}">${esc(n.text)}</div><button type="button" class="qmore" data-ask-more="1" hidden>${esc(Wd.W.more)}</button>${askRows(n)}${n.open ? `<button type="button" class="hint open" data-open="${esc(n.id)}">${esc(n.open)}</button>` : ""}<div class="hint">${esc(n.hint)}</div>`;
-      // '… more' only when the question is cut
-      const q = n && $(".qq", el.ask);
-      if (q && !n.full) requestAnimationFrame(() => { $(".qmore", el.ask).hidden = !(q.scrollHeight > q.clientHeight + 2); });
-    });
-  }
-  const askRows = (c) => c.options.length ? `<div class="rowsq" role="listbox" aria-label="${esc(c.title)}">${c.options.map((o) => `<button type="button" role="option" aria-selected="${o.sel}" class="opt${o.sel ? " sel" : ""}" data-card="${esc(c.id)}" data-i="${o.i}" title="${esc(o.label)}"><span class="kc">${esc(String(o.n))}</span><span class="lb">${esc(o.label)}</span></button>`).join("")}</div>` : "";
-  const opts = (c) => c.options.length ? `<div class="opts">${c.options.map((o) => `<button type="button" data-card="${esc(c.id)}" data-i="${o.i}">${esc(o.label)}</button>`).join("")}</div>` : "";
 
-  // ---- the capsule's size: its height follows the words; the panel follows the capsule (app_size)
-  // as tall as its content: the 14/16 padding around the text, never less than the 68 px pearl
-  // (round 8, ambient m_5332 (5): no empty band under one-line states)
-  const MIN_H = { small: 98, open: 98 };
-  const PAD = 30, NOTE_GAP = 12;
-  // grows to its content up to 70% of the screen; past that a list scrolls inside, its last row
-  // fading over 24 px, `+N more` under it (designer); other content scrolls with the same fade
-  // small: as wide as its line, 360 to 470 (ambient: the idle status on one line)
-  const SMALL_W = 360, OPEN_W = 470, SIDE = SMALL_W - 236;   // the orb, the gap, the paddings
-  function width(v) {
-    if (v.size !== "small") { cap.style.width = ""; tx.style.width = ""; return; }
-    el.line.style.whiteSpace = "nowrap";
-    const need = Math.ceil(el.line.scrollWidth) + 2;
-    el.line.style.whiteSpace = "";
-    const w = Math.max(SMALL_W, Math.min(OPEN_W, SIDE + need));
-    if (cap.style.width !== w + "px") { cap.style.width = w + "px"; tx.style.width = w - SIDE + "px"; }
+    const h = s.head;
+    const hk = h && { ...h, line: h.line && { ...h.line, words: h.line.words ? 1 : 0 }, input: h.input ? 1 : 0 };
+    if (put("head", JSON.stringify(hk), () => {
+      el.head.innerHTML = head(h);
+      const slot = $(".q.in", el.head);
+      if (slot) slot.appendChild(input);
+      last.words = null;
+    }) && h && h.input) setTimeout(() => input.focus(), 0);
+    if (h && h.input) {
+      if (input.value !== h.input.text && document.activeElement !== input) input.value = h.input.text;
+      if (input.placeholder !== h.input.ph) { input.placeholder = h.input.ph; input.setAttribute("aria-label", h.input.ph); }
+    } else if (document.activeElement === input) input.blur();
+    const w = h && h.line && h.line.words;
+    put("words", JSON.stringify(w && [w.list, w.code, w.lit]), () => { const q = $(".q", el.head); if (q && w) words(q, w); });
+
+    show(el.level, s.level != null);
+    if (s.level != null) el.level.style.transform = `scaleX(${(0.25 + 0.75 * Math.min(1, s.level)).toFixed(3)})`;
+
+    put("mid", JSON.stringify([s.big, s.text]), () => {
+      const t = s.text;
+      el.mid.innerHTML = (s.big ? `<div class="big">${esc(s.big)}</div>` : "")
+        + (t ? `<div class="text${t.clamp && !t.full ? " clamp" : ""}${t.dim ? " dim" : ""}">${esc(t.s)}</div>` : "");
+      show(el.mid, s.big || t);
+    });
+    const rowsOn = s.sections.some((x) => x.rows.length || x.label);
+    put("body", JSON.stringify(strip(s.sections)), () => { el.body.innerHTML = body(s.sections, bar.classList.contains("appear") || !on); el.body.scrollTop = 0; last.sel = null; show(el.body, rowsOn); });
+    // the selected row: soft pink, its glyph pink, a ⏎ cap on the right (a switch keeps its switch)
+    put("sel", JSON.stringify(sels(s.sections)), () => {
+      const on = sels(s.sections);
+      el.body.querySelectorAll(".row").forEach((r) => {
+        const i = +r.dataset.r, sel = !!on[i], rr = rowRight[i] || { right: "" };
+        r.classList.toggle("sel", sel);
+        if (r.tagName === "BUTTON" && !rr.sw) r.setAttribute("aria-selected", String(sel));
+        $(".s", r).innerHTML = sel && !rr.sw ? caps(["⏎"]) : rr.right;
+        if (sel) r.scrollIntoView({ block: "nearest" });
+      });
+    });
+    put("foot", JSON.stringify(s.foot), () => {
+      const f = s.foot;
+      el.foot.innerHTML = f ? f.left.map((it) => hint(it)).join("") + `<span class="sp"></span>` + f.right.map((it) => hint(it)).join("") : "";
+      show(el.foot, f);
+    });
   }
-  function layout(v) {
-    width(v);
-    const screenH = window.screen && screen.availHeight ? screen.availHeight : 900;
-    // in a browser the page is the screen (headless Chrome says 300)
-    const maxH = Math.round((native() || window.ambientApp ? screenH : Math.max(screenH, innerHeight)) * 0.7);
-    const rows = el.rows, list = rows.classList.contains("on");
-    rows.style.maxHeight = ""; el.more.classList.remove("on");
-    let want = Math.max(MIN_H[v.size], Math.ceil(tx.scrollHeight) + PAD);
-    // one line of text: centered with the pearl in the glass; two lines or more: top-aligned
-    // (ambient's gate run 2 (3)); one line is ~30 px with its padding, two are 51
-    const one = !v.hidden && tx.scrollHeight > 0 && tx.scrollHeight <= 40;
-    if (cap.classList.contains("one") !== one) cap.classList.toggle("one", one);
-    let scroll = false;
-    if (want > maxH && list) {
-      el.more.classList.add("on");
-      const over = Math.ceil(tx.scrollHeight) + PAD - maxH;
-      const rh = Math.max(60, rows.clientHeight - over);
-      rows.style.maxHeight = rh + "px";
-      // rows below the visible part
-      const bottom = rows.scrollTop + rh - 12;
-      const hidden = [...rows.children].filter((r) => r.offsetTop + r.offsetHeight > bottom).length;
-      el.more.textContent = hidden ? `+${hidden} more` : "";
-      rows.classList.toggle("fade", hidden > 0);
-      want = Math.max(MIN_H[v.size], Math.ceil(tx.scrollHeight) + PAD);
-    } else if (want > maxH) scroll = true;
-    if (!el.more.classList.contains("on")) rows.classList.remove("fade");
-    const h = Math.min(want, maxH);
-    tx.style.maxHeight = scroll ? `${maxH - PAD}px` : "";
-    tx.style.overflowY = scroll ? "auto" : "";
-    tx.classList.toggle("scroll", scroll);
-    if (cap.style.height !== h + "px") cap.style.height = h + "px";
-  }
+
+  // ---- the glass's height follows its content (0.32 s ease-out, the top fixed); past 70% of the
+  // screen the rows scroll inside; the panel follows the glass (app_size: the box and the glass)
   let sent = "";
-  function size() {
-    const r = cap.getBoundingClientRect();
-    const radius = parseFloat(getComputedStyle(cap).borderTopLeftRadius) || 0;
-    note.style.width = r.width + "px";
-    note.style.top = r.height + NOTE_GAP + "px";
-    const msg = { cmd: "app_size", w: Math.round(r.width), h: Math.round(r.height), radius: Math.round(radius) };
-    if (note.classList.contains("on")) {
-      const n = note.getBoundingClientRect();
-      msg.note = { y: Math.round(n.top - r.top), h: Math.round(n.height), radius: Math.round(radius) };
-    }
+  function layout() {
+    const screenH = window.screen && screen.availHeight ? screen.availHeight : 900;
+    const maxH = Math.round((native() || window.ambientApp ? screenH : Math.max(screenH, innerHeight)) * 0.7);
+    el.body.style.maxHeight = "";
+    const fixed = gin.scrollHeight - el.body.scrollHeight;
+    if (gin.scrollHeight > maxH) el.body.style.maxHeight = Math.max(88, maxH - fixed) + "px";
+    const h = Math.min(maxH, Math.ceil(gin.scrollHeight)) || 68;
+    if (glass.style.height !== h + "px") glass.style.height = h + "px";
+    const msg = Bar.size(h, 26);
     const key = JSON.stringify(msg);
     if (key !== sent) { sent = key; post(msg); }
   }
 
-  // ---- the frame loop: runs while something moves, sleeps when the capsule is settled
-  let raf = 0, lastV = null, contentSent = "";
-  const fps = { frames: 0, since: now(), value: 0, drew: 0 };
+  // ---- the frame loop: runs while something moves, sleeps when the bar is settled
+  let raf = 0, lastV = null, lastS = null, contentSent = "";
+  const fps = { frames: 0, since: now(), value: 0 };
   function schedule() { if (!raf) raf = requestAnimationFrame(frame); }
   function frame() {
     raf = 0;
@@ -319,25 +219,23 @@
     const now0 = M.view(model, t, Date.now());
     const v = held(now0);
     lastV = now0;
-    render(v);
-    layout(v);
-    size();
-    // what the capsule has to show, on every change: the app's show/hide policy acts on it
+    const s = Bar.spec(v);
+    lastS = s;
+    render(v, s);
+    layout();
+    // what the bar has to show, on every change: the app's show/hide policy acts on it
     const ck = JSON.stringify(v.content);
     if (ck !== contentSent) { contentSent = ck; post({ cmd: "app_content", ...v.content }); }
     let moving = false;
     if (!v.unseen) moving = pearl.frame({ mood: v.mood, lvl: v.lvl, still: v.still, gather: v.gather || 0 }, t);
-    fps.frames++; if (moving) fps.drew++;
-    if (t - fps.since > 1000) { fps.value = Math.round((fps.frames * 1000) / (t - fps.since)); fps.frames = 0; fps.drew = 0; fps.since = t; }
-    // the pearl moves at 30 Hz (SPEC §1: one small quad, at most 30 fps); a still pearl (reduced
-    // motion, settled) checks again at ~15 Hz; nobody seeing the capsule (hidden, covered, locked:
-    // app_visible false) keeps only the timers, at 4 Hz (amb-mac m_5014)
-    if (v.unseen) later(250); else if (moving) later(33); else later(66);
+    fps.frames++;
+    if (t - fps.since > 1000) { fps.value = Math.round((fps.frames * 1000) / (t - fps.since)); fps.frames = 0; fps.since = t; }
+    // the pearl moves at 30 Hz at most (SPEC §1); still, it checks again at ~15 Hz; nobody seeing
+    // the bar (hidden, covered, locked: app_visible false) keeps only the timers, at 4 Hz
+    if (v.unseen) later(250); else if (moving || s.level != null) later(33); else later(66);
   }
-  // the glass leaves with its last words on it (ambient's gate run 3 (b)): when nothing is left to
-  // show (content none), the capsule keeps drawing the last view it showed until the app hides it
-  // and the close has played; the app still gets content none at once (it acts on that), and the
-  // pearl keeps its own mood. new content ends the hold
+  // the glass leaves with its last words on it: when nothing is left to show (content none), the
+  // bar keeps drawing the last view it showed until the app hides it; new content ends the hold
   let shown = null;
   function held(v) {
     const h = M.hold(shown, v);
@@ -347,26 +245,11 @@
   let laterT = 0;
   function later(ms) { if (!laterT && !raf) laterT = setTimeout(() => { laterT = 0; schedule(); }, ms); }
 
-  // ---- input: clicks, the spotlight field, plain keys inside the panel
-  cap.addEventListener("click", (e) => {
-    if (e.target.closest("button, input, .opts")) return;
-    if (cap.classList.contains("small")) recv({ ev: "ui_capsule" });
-  });
+  // ---- input: every row and every footer hint is a real button; a click = its key
   host.addEventListener("click", (e) => {
-    const pg = e.target.closest("button[data-page]");
-    if (pg) recv({ ev: "ui_page", page: pg.dataset.page });
-    const op = e.target.closest("button[data-open]");
-    if (op) recv({ ev: "ui_open_card", card: op.dataset.open });
-    const b = e.target.closest("button[data-card]");
-    if (b) recv({ ev: "ui_option", card: b.dataset.card, i: +b.dataset.i });
-    const p = e.target.closest(".perm button");
-    if (p) recv({ ev: "ui_perm", perm: p.dataset.perm, do: p.dataset.do });
-    const st = e.target.closest("button[data-setting]");
-    if (st) recv({ ev: "ui_setting", key: st.dataset.setting });
-    const rm = e.target.closest("button[data-skip-remove]");
-    if (rm) recv({ ev: "ui_setting", key: "skip_remove", value: rm.dataset.skipRemove });
-    if (e.target.closest("button[data-skip-add]")) recv({ ev: "ui_setting", key: "skip_add" });
-    if (e.target.closest("button[data-ask-more]")) recv({ ev: "ui_ask_more" });
+    const b = e.target.closest("[data-act]");
+    if (!b || !host.contains(b)) return;
+    try { recv(JSON.parse(b.dataset.act)); } catch (err) { console.error("act", err); }
   });
   input.addEventListener("input", () => recv({ ev: "ui_spot_type", text: input.value }));
   input.addEventListener("keydown", (e) => {
@@ -375,14 +258,15 @@
     else if (e.key === "Escape") { e.preventDefault(); recv({ ev: "ui_close" }); }
     e.stopPropagation();
   });
+  // plain keys while the bar has them (the app gives the panel the keys only when he opened it or
+  // clicked a pushed card): ↑↓ ⏎ 1-9 esc, ⌘⏎ the question's full text
   document.addEventListener("keydown", (e) => {
     if (e.target === input || e.ctrlKey) return;
     const asking = lastV && lastV.state === "needs" && !model.pane;
-    // the question glass: ⌘⏎ the whole question in place (ambient m_6500)
     if (asking && e.metaKey && e.key === "Enter") { e.preventDefault(); recv({ ev: "ui_ask_more" }); return; }
     if (e.metaKey) return;
-    const k = { Escape: "esc", ArrowUp: "up", ArrowDown: "down", Enter: "enter" }[e.key] || (/^[1-9l]$/.test(e.key) ? e.key : null);
-    if (k && (model.pane || asking || k === "esc") && !(k === "enter" && !asking)) { e.preventDefault(); recv({ ev: "app_key", key: k, local: true }); }
+    const k = { Escape: "esc", ArrowUp: "up", ArrowDown: "down", Enter: "enter" }[e.key] || (/^[1-9]$/.test(e.key) ? e.key : null);
+    if (k && (model.pane || asking || k === "esc") && !(k === "enter" && !asking && !model.pane)) { e.preventDefault(); recv({ ev: "app_key", key: k, local: true }); }
   });
 
   window.ambient = {
@@ -391,6 +275,7 @@
     reset() { model = M.init(); for (const k in last) delete last[k]; schedule(); },
     model: () => model,
     view: () => lastV,
+    bar: () => lastS,
     fps: () => fps.value,
   };
   schedule();

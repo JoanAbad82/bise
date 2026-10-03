@@ -333,6 +333,10 @@
       // the orb stops drawing until it is seen again
       case "app_visible":
         return none({ ...m, visible: ev.on !== false });
+      // the panel has the keys (amb-mac a7efaa08): what he opened, or a pushed card he clicked;
+      // a pushed card's footer shows the plain keys then, fn chords before (ambient m_6519)
+      case "app_focused":
+        return none({ ...m, focused: !!ev.on });
       // the menu-bar icon's rect in the page's CSS px (the capsule grows out of it, SPEC §0)
       case "app_icon":
         return none({ ...m, icon: [ev.x, ev.y, ev.w, ev.h].every((n) => Number.isFinite(+n)) ? { x: +ev.x, y: +ev.y, w: +ev.w, h: +ev.h } : null });
@@ -383,8 +387,8 @@
         const text = (ev.text ?? m.spotText).trim();
         if (!text) return none(m);
         const r = setPane({ ...m, spotText: "" }, null);
-        const out = ev.ev === "ui_spot_tab" ? W.startAgent + text : text;
-        return { m: { ...r.m, mine: true, voice: false, turnNames: names(m.agents), chips: [] }, cmds: [...r.cmds, { cmd: "send", text: out }] };
+        // tab: amb-core's own cmd start (e00ad291), which answers 'sent' like send
+        return { m: { ...r.m, mine: true, voice: false, turnNames: names(m.agents), chips: [] }, cmds: [...r.cmds, { cmd: ev.ev === "ui_spot_tab" ? "start" : "send", text }] };
       }
       case "ui_perm":
         // continue: macOS's prompt; not now: the refused path (the app answers app_perm denied, and
@@ -575,6 +579,8 @@
       icon: m.icon || null,  // the menu-bar icon (the capsule grows out of it)
       radius: m.radius,     // the capsule's and the glass's corners
       kiss: false,
+      focused: !!m.focused, // the panel has the keys (app_focused)
+      handsFree: !!m.handsFree,
     };
     // main's reply, its markdown rendered (marks stripped, `code` flagged), one entry per raw word
     // so word.i lights the right one; the capsule shows at most 3 lines of it, then …
@@ -602,7 +608,8 @@
       const rows = (os) => os.map((o, k) => ({ i: o.i, n: o.n, label: o.label, sel: k === Math.min(at, os.length - 1) }));
       if (b) return { id: c.id, agent: c.agent, title: Wd.drafts.label(b.count, b.title), text: b.line || Wd.drafts.line(b.what, b.names), hint: W.needsKeys, more: asking.length - 1, open: null, batch: true, full: m.askFull === c.id,
         options: rows([{ i: b.review.i, n: b.review.n, label: Wd.drafts.review }, { i: b.send.i, n: b.send.n, label: Wd.drafts.sendAll(b.count) }]) };
-      return { id: c.id, agent: c.agent, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsKeys, more: asking.length - 1, full: m.askFull === c.id,
+      // card.label: main's own questions say '? main needs you' (amb-core e00ad291)
+      return { id: c.id, agent: c.agent, label: c.label || null, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsKeys, more: asking.length - 1, full: m.askFull === c.id,
         open: c.page && c.page.url ? W.openIt : null,
         options: rows(Wd.options(c).map((o) => ({ i: o.i, n: o.n, label: o.label }))) };
     };

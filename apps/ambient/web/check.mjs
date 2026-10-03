@@ -10,8 +10,8 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Uint8Array, Float32Array, String, Number });
-for (const f of ["words.js", "face.js", "model.js", "pearl.js", "fakecore.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
-const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes, AmbPearl: Pearl } = ctx;
+for (const f of ["words.js", "face.js", "model.js", "pearl.js", "bar.js", "fakecore.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes, AmbPearl: Pearl, AmbBar: Bar } = ctx;
 const W = Wd.W;
 
 // the scripts run in their own realm: compare plain data
@@ -334,7 +334,73 @@ law("the spotlight's key bar shows `tab start an agent` only with text; tab asks
   r = M.step(r.m, { ev: "ui_spot_type", text: "a csv importer" }, 2);
   eq(M.view(r.m, 3).spot.keys, [["⏎", "send to bise"], ["tab", "start an agent"], ["esc", "close"]]);
   r = M.step(r.m, { ev: "ui_spot_tab" }, 4);
-  eq(r.cmds, [{ cmd: "app_focus", on: false }, { cmd: "send", text: "start an agent: a csv importer" }]);
+  // amb-core e00ad291: tab is its own cmd start (⌘⏎ / ⏎ stays send)
+  eq(r.cmds, [{ cmd: "app_focus", on: false }, { cmd: "start", text: "a csv importer" }]);
+});
+
+// ---- round 9's bar (ambient's identity9.html#spec): bar.js turns every view into the same blocks
+law("round 9: a pushed question is one bar: '? main needs you · now', '⌘ ⏎ full text', the text clamped at 4 lines, rows with keycaps (the first selected), fn chords in the footer until he clicks it", () => {
+  const card = { id: "q", agent: "main", label: "? main needs you", text: "Que fais-tu ?", options: [{ n: 1, label: "regarde" }, { n: 2, label: "arrête" }, { n: 3, label: "laisse" }] };
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [card], pages: [] }, 0).m;
+  let s = Bar.spec(M.view(m, 10));
+  eq([s.head.h, s.head.lab, s.head.right.keys, s.head.right.w], [52, { acc: "? main needs you", rest: "now" }, ["⌘", "⏎"], "full text"]);
+  eq(s.text, { s: "Que fais-tu ?", clamp: 4, full: false });
+  eq(s.sections[0].rows.map((r) => [r.g, r.gk, r.t, !!r.sel]), [["1", true, "regarde", true], ["2", true, "arrête", false], ["3", true, "laisse", false]]);
+  eq(s.sections[0].rows[1].act, { ev: "ui_option", card: "q", i: 1 });
+  const flat = (it) => [it.pre || "", ...it.keys, it.w || ""].join(" ").trim();
+  eq(s.foot.left.map(flat), ["fn 1 – 3 pick", "fn esc later"]);
+  eq(s.foot.right.map(flat), ["or hold fn and say it"]);
+  // clicked (the panel has the keys): the plain keys
+  m = M.step(m, { ev: "app_focused", on: true }, 20).m;
+  eq(Bar.spec(M.view(m, 30)).foot.left.map(flat), ["1 – 3 pick", "↑ ↓ move", "esc later"]);
+  // ⌘ ⏎: the full text, the hint goes
+  s = Bar.spec(M.view(M.step(m, { ev: "ui_ask_more" }, 40).m, 50));
+  eq([s.text.full, s.head.right], [true, null]);
+  // without a label (an agent's card): '? cookies needs you'
+  assert.equal(Bar.spec(run(sceneEvents("needs-wait"), [1000]).view(1000)).head.lab.acc, "? cookies needs you");
+});
+law("round 9: drafts are a pushed card too: '? 3 drafts wait for you · your inbox', the big line, '1 review' and '2 send all 3' with their subs", () => {
+  const v = run(sceneEvents("drafts"), [1000]).view(1000);
+  const s = Bar.spec(v);
+  eq([s.head.lab, s.big, s.text], [{ acc: "? 3 drafts wait for you", rest: "your inbox" }, "replies to legal, Lucas and Marc", null]);
+  eq(s.sections[0].rows.map((r) => [r.g, r.t, r.sub]), [["1", "review", W.bar.reviewSub], ["2", "send all 3", W.bar.sendSub]]);
+});
+law("round 9: every state draws as a bar with a header and a footer whose items are keys (a chord is caps side by side, never a '+'); every row and every hint a click can reach acts", () => {
+  const seen = new Set();
+  for (const sc of Fake.SCENES) {
+    const evs = sceneEvents(sc.id);
+    const end = Math.max(...evs.map(([t]) => t)) + 200;
+    const ts = Array.from({ length: 30 }, (_, i) => Math.round((end * i) / 29));
+    const r = run(evs, ts);
+    for (const t of ts) {
+      const v = r.view(t), s = Bar.spec(v);
+      seen.add(v.state);
+      if (v.state === "idle") { assert.equal(s.head, null, `${sc.id}@${t}`); continue; }
+      if (!s.head) { assert.equal(v.text, null, `${sc.id}@${t} ${v.state}`); continue; }
+      assert.ok([52, 68].includes(s.head.h), `${sc.id}@${t}`);
+      const items = s.foot ? [...s.foot.left, ...s.foot.right] : [];
+      for (const it of items) for (const k of it.keys) assert.ok(!k.includes("+"), `${sc.id}: '${k}'`);
+      for (const sec of s.sections) for (const row of sec.rows) assert.ok(row.act || row.fixed || !row.sel || v.state === "spotlight", `${sc.id}: row ${row.t}`);
+    }
+  }
+  for (const st of ["needs", "listening", "agents", "inbox", "settings", "spotlight", "hello", "perm"]) assert.ok(seen.has(st), st);
+});
+law("round 9: the panel's box holds the pearl at the glass's left (x -76, 64 px) and the drawn shadow; app_size says the glass inside it", () => {
+  const msg = Bar.size(200, 26);
+  eq(msg, { cmd: "app_size", w: 840, h: 320, radius: 26, glass: { x: 80, y: 28, w: 700, h: 200 } });
+  assert.ok(msg.glass.x - 76 >= 0);                   // the pearl fits in the box
+  assert.ok(msg.h - msg.glass.y - msg.glass.h >= 86);   // 0 30 80 -24: 86 px of shadow below
+});
+law("round 9: settings rows are switches (white, never pink: the switch is the row's right), 'windows bise never sees' with 'private browser windows · always' not selectable, each app with ⌫, '+ add an app'", () => {
+  let m = M.step(M.init(), { ev: "app_settings", edge_glow: true, sounds: true, skip: [{ bundle: "com.1password", name: "1Password" }] }, 0).m;
+  m = M.step(m, { ev: "app_key", key: "," }, 10).m;
+  const s = Bar.spec(M.view(m, 20));
+  assert.ok(s.sections[0].rows.every((r) => r.right && "sw" in r.right && r.act.ev === "ui_setting"));
+  eq(s.sections[1].label, "windows bise never sees");
+  const rows = s.sections[1].rows;
+  eq([rows[0].t, rows[0].sub, !!rows[0].fixed], ["private browser windows", "always", true]);
+  eq(rows.filter((r) => r.right && r.right.keys).map((r) => [r.t, r.right.keys, r.act.value]), [["1Password", ["⌫"], "com.1password"]]);
+  eq(rows[rows.length - 1].act, { ev: "ui_setting", key: "skip_add" });
 });
 law("the words ambient and designer signed (m_4645, m_4648)", () => {
   assert.equal(W.hubDown, "can't reach bise. trying again.");

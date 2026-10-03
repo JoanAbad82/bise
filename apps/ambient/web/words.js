@@ -50,6 +50,23 @@
     // the question's choices as rows (ambient's B3 spec via ambient-lead m_6487)
     needsKeys: "↑↓ choose   ⏎ pick   esc later   or hold fn and say it",
     more: "… more   ⌘ ⏎",
+    // round 9's bar (ambient's identity9.html#spec, m_6519, m_6528): headers, row subs and the
+    // footer's words; a footer item is '<caps> <word>', a chord is caps side by side, never a '+'
+    bar: {
+      listening: "listening…", sees: (app) => `bise sees ${app}`,
+      letGo: "let go", tap: "tap", send: "send", cancel: "cancel", doubleTap: "double-tap", handsFree: "hands-free",
+      close: "close", closeLeaves: "close · it leaves on its own in 4 s", agentsStarted: "agents started",
+      needs: (who) => `? ${who} needs you`, now: "now", fullText: "full text",
+      pick: "pick", move: "move", later: "later", orHold: "or hold", sayIt: "and say it", openPage: "open the page",
+      reviewSub: "opens the page at the first draft", sendSub: "nothing leaves before this",
+      hold: "hold", talk: "talk", type: "type", goingOn: "what's going on", startHere: "start here",
+      typeHint: "ask bise, or type a command", askMain: (t) => `ask main: ${t}`, startAgent: (t) => `start an agent: ${t}`,
+      sendMain: "send to main", startAgentKey: "start an agent",
+      inbox: "inbox", mostBlocking: "most blocking first", open: "open",
+      never: "windows bise never sees", always: "always", switch: "switch", remove: "remove",
+      beforeAsks: "before macOS asks", permName: { accessibility: "Accessibility", mic: "the microphone", screen: "Screen Recording" },
+      ofN: (i, n) => `${i} of ${n}`, asksNext: "macOS asks next",
+    },
     // a card asked from a page (docs/ambient-pages.md §4.2): fn + o opens the page at the question
     // (⏎ picks the selected row since B3); key hints are `<keys> <word>`, no + (ambient, m_5067)
     openIt: "fn o open it",

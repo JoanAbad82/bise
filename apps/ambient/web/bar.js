@@ -1,0 +1,150 @@
+// bise ambient · round 9's bar (ambient's identity9.html#spec, the user's 'oui, construisez-la'):
+// one 700 px glass for every state, the pearl free to its left. This file is pure: it turns the
+// model's view into the bar's blocks (a header row, a big line or a text, sections of 44 px rows
+// with their key on the right, a footer of key hints); ui.js draws them, check.mjs reads them.
+//
+//   spec(v) -> { kind, mood, head, level, big, text, sections, foot }
+//   head:  { h: 68|52, line?: { text?, words?, ph?, size?: "big", glyph?, gc? }, input?: { text, ph },
+//            lab?: { acc, rest }, right?: item | { text } }
+//   row:   { g, gk?: true (the glyph is a keycap), gc?: "a"|"ok"|"risk", t, sub?, seen?, fixed?,
+//            right?: { keys } | { age } | { sw }, sel?, act? }
+//   item:  { pre?, keys: [...], w?, act? }   (a key '–' is drawn as a dash between caps)
+//   act:   the event a click sends to the model (a click = its key)
+(function (root) {
+  "use strict";
+  const Wd = root.AmbWords, W = Wd.W, B = W.bar;
+  const key = (k) => ({ ev: "app_key", key: k, local: true });
+  const item = (keys, w, act, pre) => ({ ...(pre ? { pre } : {}), keys, ...(w ? { w } : {}), ...(act ? { act } : {}) });
+  const PERMS = ["accessibility", "mic", "screen"];
+
+  // a pushed card (a question, drafts) never takes the keys: fn chords until he clicks it
+  // (ambient m_6519 FOCUS AND KEYS); clicked, the plain keys
+  function askFoot(n, focused) {
+    const range = (pre) => [...pre, "1", "–", String(n)];
+    const left = focused
+      ? [item(range([]), B.pick, key("1")), item(["↑", "↓"], B.move, key("down")), item(["esc"], B.later, key("esc"))]
+      : [item(range(["fn"]), B.pick, key("1")), item(["fn", "esc"], B.later, key("esc"))];
+    return { left, right: [item(["fn"], B.sayIt, null, B.orHold)] };
+  }
+
+  // the line a key's answer, a flash or an error says, its glyph colored by what it is
+  const GC = { "✓": "ok", "▲": "risk", "?": "a" };
+  const lineOf = (v) => ({ text: v.text, glyph: v.glyph || null, gc: GC[v.glyph] || null, size: "big" });
+
+  // the rows of the agents an answer started (the model's chips: names)
+  const started = (v) => (v.chips && v.chips.length ? [{ label: B.agentsStarted, rows: v.chips.map((n) => ({ g: "∿", t: n })) }] : []);
+
+  function spec(v) {
+    const s = { kind: v.state, mood: v.mood, head: null, level: null, big: null, text: null, sections: [], foot: null };
+    const focused = !!v.focused;
+    switch (v.state) {
+      case "listening": case "voice_note": {
+        const said = v.words && v.words.list.length ? v.words : null;
+        s.head = { h: 68, line: said ? { words: said } : { ph: true, text: v.state === "voice_note" && v.label ? v.label.text : B.listening } };
+        if (v.sees) s.head.right = { text: v.sees.tail ? B.sees(v.sees.head) : v.sees.head };
+        s.level = v.lvl || 0;
+        s.foot = v.handsFree
+          ? { left: [item(["fn"], B.send, null, B.tap), item(["esc"], B.cancel, key("esc"))], right: [] }
+          : { left: [item(["fn"], B.send, null, B.letGo), item(["esc"], B.cancel, key("esc"))], right: [item(["fn"], B.handsFree, null, B.doubleTap)] };
+        return s;
+      }
+      case "working": case "speaking": case "end": {
+        s.head = { h: 68, line: v.words ? { words: v.words, size: "big" } : { text: v.text, size: "big" } };
+        if (v.sub) s.text = { s: v.sub, dim: true };
+        s.sections = started(v);
+        s.foot = { left: [], right: [item(["esc"], v.state === "end" ? B.closeLeaves : B.close, key("esc"))] };
+        return s;
+      }
+      case "needs": {
+        const a = v.ask;
+        const [acc, rest] = a.batch ? a.title.split(" · ") : [a.label || B.needs(a.agent), B.now];
+        const more = a.more > 0 ? ` · +${a.more}` : "";
+        s.head = { h: 52, lab: { acc: a.batch ? `? ${acc}` : acc, rest: (rest || "") + more } };
+        if (a.batch) s.big = a.text;
+        else {
+          s.text = { s: a.text, clamp: 4, full: !!a.full };
+          if (!a.full) s.head.right = item(["⌘", "⏎"], B.fullText, { ev: "ui_ask_more" });
+        }
+        s.sections = [{ rows: a.options.map((o, k) => ({
+          g: String(o.n), gk: true, t: o.label, sel: o.sel, sub: a.batch ? (k === 0 ? B.reviewSub : B.sendSub) : null,
+          act: { ev: "ui_option", card: a.id, i: o.i },
+        })) }];
+        s.foot = askFoot(Math.max(...a.options.map((o) => o.n), 1), focused);
+        if (a.open) s.foot.left.push(item(["fn", "o"], B.openPage, key("o")));
+        return s;
+      }
+      case "hello": {
+        s.head = { h: 68, line: v.text ? { words: { list: v.text.split(" "), lit: v.text.split(" ").length }, size: "hello" } : { text: "", size: "hello" } };
+        s.foot = { left: [item(["fn"], B.talk, null, B.hold), item(["fn", "space"], B.type), item(["fn", "0"], B.goingOn), item(["fn", "o"], B.startHere)], right: [] };
+        return s;
+      }
+      case "spotlight": {
+        const t = v.spot.text.trim();
+        s.head = { h: 68, input: { text: v.spot.text, ph: B.typeHint } };
+        if (t) s.sections = [{ rows: [
+          { g: "@", gc: "a", t: B.askMain(t), right: { keys: ["⌘", "⏎"] }, sel: true, act: { ev: "ui_spot_send", text: v.spot.text } },
+          { g: "+", t: B.startAgent(t), right: { keys: ["tab"] }, act: { ev: "ui_spot_tab", text: v.spot.text } },
+        ] }];
+        s.foot = { left: [item(["⏎"], B.sendMain), ...(t ? [item(["tab"], B.startAgentKey)] : [])], right: [item(["esc"], B.close, { ev: "ui_close" })] };
+        return s;
+      }
+      case "agents": case "inbox": {
+        const full = v.state === "agents";
+        s.head = { h: 68, line: { ph: true, text: full ? B.goingOn : B.inbox }, right: full ? item(["fn", "0"]) : { text: B.mostBlocking } };
+        const cards = (v.inbox || []).map((c, k) => ({ g: "?", gc: "a", t: c.text, sub: c.agent, sel: !!c.sel, right: { keys: [String(k + 1)] }, act: { ev: "ui_open_card", card: c.id } }));
+        if (cards.length || !full) s.sections.push({ label: cards.length ? Wd.waiting(cards.length) : W.nothingNeeds, rows: cards, acc: cards.length > 0 });
+        if (full) {
+          const run = (v.list || []).map((r) => ({ g: r.glyph === "✓" ? "✓" : r.kind === "need" ? "?" : r.glyph, gc: r.glyph === "✓" ? "ok" : r.glyph === "▲" ? "risk" : r.kind === "need" ? "a" : null, t: r.name, sub: r.what, right: r.age ? { age: r.age } : null }));
+          s.sections.push({ label: run.length ? `${v.titles.running} · ${run.length}` : W.nothingRunning, rows: run });
+          if (v.forYou) s.sections.push({ label: v.forYou.title, rows: v.forYou.pages.map((p, k) => ({ g: "◰", gc: p.unopened ? "a" : null, t: p.name, sub: p.watch ? `${p.watch} · ${p.meta}` : p.meta, seen: !p.unopened, right: k < 9 ? { keys: ["⌘", String(k + 1)] } : null, act: { ev: "ui_page", page: p.id } })) });
+        }
+        s.foot = { left: [item(["↑", "↓"], B.move, key("down")), item(["⏎"], B.open, key("enter"))], right: [item(["esc"], full ? B.close : B.later, key("esc"))] };
+        return s;
+      }
+      case "settings": {
+        const st = v.settings;
+        s.head = { h: 68, line: { ph: true, text: W.set.title }, right: item(["fn", ","]) };
+        s.sections = [
+          { rows: st.rows.map((r) => ({ t: r.label, sub: r.note, right: { sw: r.on }, act: { ev: "ui_setting", key: r.key } })) },
+          { label: B.never, rows: [
+            ...st.always.map((n) => ({ g: "◌", t: n, sub: B.always, fixed: true })),
+            ...st.skip.map((x) => ({ g: "◌", t: x.name, right: { keys: ["⌫"] }, act: { ev: "ui_setting", key: "skip_remove", value: x.bundle } })),
+            { g: "+", t: st.add, act: { ev: "ui_setting", key: "skip_add" } },
+          ] },
+        ];
+        s.foot = { left: [item(["↑", "↓"], B.move), item(["space"], B.switch), item(["⌫"], B.remove)], right: [item(["esc"], B.close, key("esc"))] };
+        return s;
+      }
+      case "perm": {
+        // a refused permission is a flash of kind perm (no v.perm): one ▲ line, as below
+        if (!v.perm) { if (v.text == null) return s; s.head = { h: 68, line: lineOf(v) }; if (v.sub) s.text = { s: v.sub, dim: true }; return s; }
+        const p = v.perm, i = PERMS.indexOf(p.perm);
+        s.head = { h: 52, lab: { acc: "", rest: `${B.beforeAsks} · ${B.permName[p.perm] || p.perm}` }, right: i >= 0 ? { text: B.ofN(i + 1, PERMS.length) } : null };
+        s.big = p.text;
+        s.sections = [{ rows: [
+          { g: "→", gc: "a", t: p.button, sub: B.asksNext, sel: true, act: { ev: "ui_perm", perm: p.perm, do: "continue" } },
+          { g: "◌", t: p.later, right: { keys: ["esc"] }, act: { ev: "ui_perm", perm: p.perm, do: "not_now" } },
+        ] }];
+        s.foot = { left: [item(["⏎"], p.button, { ev: "ui_perm", perm: p.perm, do: "continue" })], right: [item(["esc"], p.later, { ev: "ui_perm", perm: p.perm, do: "not_now" })] };
+        return s;
+      }
+      case "idle": return s;
+      default: {
+        // a flash (got it, answered, sending, cancelled, an error, a page ready, hidden) or the
+        // hub down: one line, its glyph colored, the sub line dim under it
+        if (v.text == null) return s;
+        s.head = { h: 68, line: lineOf(v) };
+        if (v.sub) s.text = { s: v.sub, dim: true };
+        return s;
+      }
+    }
+  }
+
+  // the panel around the glass (amb-mac's app_size: the box, the glass inside it): room for the
+  // pearl at x -76 (64 px), the drawn shadow (0 30 80 -24) and the entry's 8 px rise
+  const BOX = { left: 80, top: 28, right: 60, bottom: 92, w: 700 };
+  const size = (h, radius) => ({ cmd: "app_size", w: BOX.left + BOX.w + BOX.right, h: BOX.top + h + BOX.bottom, radius,
+    glass: { x: BOX.left, y: BOX.top, w: BOX.w, h } });
+
+  root.AmbBar = { spec, BOX, size };
+})(typeof window !== "undefined" ? window : globalThis);

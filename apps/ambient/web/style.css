@@ -1,233 +1,123 @@
-/* bise ambient · the capsule (SPEC §1-§2). In the app (html.app) the page is transparent: the
-   panel's NSVisualEffectView blurs behind and the panel draws the shadow; the page draws the glass
-   tint and its strokes. In a browser (dev.html) the page draws the blur and the shadow too. */
+/* bise ambient · round 9's bar (ambient's identity9.html#spec): one 700 px glass for every state,
+   the pearl free to its left with nothing behind it. The page is the panel's transparent box
+   (bar.js BOX); in the app the panel blurs behind the glass rect only (app_size.glass) and the page
+   draws the tint, the strokes and the shadow; in a browser (dev.html) the page draws the blur too. */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { background: transparent; -webkit-font-smoothing: antialiased; }
 html.app, html.app body { overflow: hidden; }
 :root {
-  --acc: #f4a6b0; --text: #fff; --dim: #ffffffa0; --faint: #ffffff70;
-  /* round 8's roles (SPEC §1, dark column): rose only for what waits for you */
-  --on-accent: #2a141b; --ok: #cfe8c0; --risk: #ff9a8a; --line: #ffffff12;
+  --acc: #f4a6b0; --on-acc: #2a141b; --ink: #fff; --dim: #ffffffa6; --faint: #ffffff6e; --line: #ffffff14;
+  --ok: #cfe8c0; --risk: #ff9a8a;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --expo: cubic-bezier(.16, 1, .3, 1);
-  --back: cubic-bezier(.34, 1.56, .5, 1);
-  --spring: cubic-bezier(.3, 1.22, .4, 1);
-  --glass: linear-gradient(180deg, #2a22248f, #1a1516b8);
-  /* identity8's (validated by the user; SPEC §1 follows it, ambient m_5311) */
-  --stroke: inset 0 0 0 1px #ffffff1f, inset 0 1px 0 #ffffff33;
+  --ease-out: cubic-bezier(.16, 1, .3, 1); --spring: cubic-bezier(.2, .9, .25, 1.08); --ease-in: cubic-bezier(.7, 0, .84, 0);
 }
 
-/* the capsule's box: anchored top right (the panel grows down and left) */
-.amb { position: fixed; top: 0; right: 0; font-family: var(--sans); color: var(--text); user-select: none; -webkit-user-select: none; cursor: default; }
-.amb .m { font-family: var(--mono); }
-.amb .acc { color: var(--acc); }
+.amb { position: fixed; top: 0; left: 0; font: 15px/1.35 var(--sans); color: var(--ink); user-select: none; -webkit-user-select: none; cursor: default; }
 
-.cap {
-  position: absolute; top: 0; right: 0;
-  display: flex; align-items: flex-start; gap: 14px;
-  /* the corners are macOS's window radius (app_settings.radius, the user's call), not a pill */
-  width: 470px; height: 98px; border-radius: var(--r, 16px);
-  padding: 14px 18px 16px 12px;   /* round 8 (identity8.html .gl .in) */
-  background: var(--glass); box-shadow: var(--stroke);
-  overflow: hidden;
-  transition: width .6s var(--spring), height .6s var(--spring), border-radius .6s var(--spring);
-}
-.cap.small { width: 360px; cursor: pointer; }
-.cap.open { align-items: flex-start; }
-html:not(.app) .cap, html:not(.app) .note {
-  -webkit-backdrop-filter: blur(44px) saturate(1.9); backdrop-filter: blur(44px) saturate(1.9);
-  box-shadow: var(--stroke), 0 30px 80px -24px #000b;
-}
+/* ---- the bar: in and out (the user, main m_6567 via ambient m_6574: no grow, a quick fade and a
+   light translate). It appears at its final size, already filled: opacity in 0.16 s, -4 px -> 0 in
+   0.2 s; it leaves in 0.12 s with its last words drawn. No scale, no blur, ever */
+.bar { position: absolute; width: 700px; opacity: 0; transform: translateY(-4px); pointer-events: none;
+  transition: opacity .12s var(--ease-in), transform .12s var(--ease-in); }
+.bar.on { opacity: 1; transform: none; pointer-events: auto;
+  transition: opacity .16s var(--ease-out), transform .2s var(--ease-out); }
+.still .bar, .still .bar.on { transform: none; transition: opacity .15s linear; }
+/* the first frames of a show: the glass's height comes as it is (the rows too: ui.js draws them
+   without their rise) */
+.bar.appear .glass { transition: none; }
 
-/* the pearl (SPEC §1, round 8): 68 px at the left, its top on the first line of text */
-.orbbox { flex: none; width: 68px; height: 68px; margin: -6px -4px -6px -6px; position: relative; align-self: flex-start; }
-.orbbox canvas { position: absolute; inset: 0; width: 68px; height: 68px; }
-
-/* the hello's kiss: dots rise off the pearl's top right and fade within 1 s (ambient m_5702) */
-.puff { position: absolute; left: 50px; top: 12px; width: 0; height: 0; pointer-events: none; }
-.puff i { position: absolute; border-radius: 50%; opacity: 0; background: radial-gradient(circle, #fff4ef 0 45%, #f4a6b0 75%); box-shadow: 0 0 3px #f4a6b0cc; animation: puff .9s var(--expo) both; }
+/* the pearl: 64 px, at x -76, y +2 from the glass, transparent around it; fn held: 1.18 */
+.pearl { position: absolute; left: -76px; top: 2px; width: 64px; height: 64px; pointer-events: none; transition: transform .5s var(--spring); }
+.pearl.big { transform: scale(1.18); }
+.still .pearl { transition: none; }
+.still .pearl.big { transform: none; }
+/* the hello's kiss: off the pearl's top right */
+.puff { position: absolute; left: -24px; top: 8px; width: 0; height: 0; pointer-events: none; }
+.puff i { position: absolute; border-radius: 50%; opacity: 0; background: radial-gradient(circle, #fff4ef 0 45%, #f4a6b0 75%); box-shadow: 0 0 3px #f4a6b0cc; animation: puff .9s var(--ease-out) both; }
 @keyframes puff { 0% { opacity: 0; transform: translate(0, 0) scale(.7); } 18% { opacity: 1; } 60% { opacity: .9; } 100% { opacity: 0; transform: translate(10px, -14px) scale(1); } }
 
-/* the words */
-.tx { flex: none; width: 310px; font-size: 16px; line-height: 1.35; padding: 4px 0; }
-.cap.small .tx { width: 236px; }
-.cap.open .tx { padding-top: 0; }
-/* one line of text (done, talk's first words): the line and the pearl share the glass's middle,
-   no empty band under them (ambient's gate run 2 (3)); from two lines on, top-aligned as above.
-   the 98 px glass's content box is 68 px: the one line's 29.6 px box sits 19 px down, the pearl
-   drops its -6 px pull, both centered 48 px from the top */
-.orbbox, .tx { transition: margin-top .4s var(--expo); }
-.cap.one .orbbox { margin-top: 0; }
-.cap.one .tx { margin-top: 19px; padding-top: 4px; }
-.still .orbbox, .still .tx { transition: none; }
-/* past 70% of the screen it scrolls inside, the last 24 px fading out; a list says `+N more` */
-.tx.scroll, .rows.fade { -webkit-mask-image: linear-gradient(#000 calc(100% - 24px), transparent); mask-image: linear-gradient(#000 calc(100% - 24px), transparent); }
-.tx.scroll, .rows { scrollbar-width: none; }
-.tx.scroll::-webkit-scrollbar, .rows::-webkit-scrollbar { display: none; }
-.rows.on { overflow-y: auto; }
-.more { font: 11.5px var(--mono); color: var(--faint); padding: 4px 4px 0; }
-.tx > * { display: none; }
-.tx > .on { display: block; }
-.lab { font: 500 11.5px/1.4 var(--mono); color: var(--faint); margin-bottom: 4px; }
-.lab b { color: var(--acc); font-weight: 500; }
-.line .gl { font-family: var(--mono); color: var(--acc); margin-right: 6px; }
-.line .gl.fail { color: var(--risk); }
-/* a done or answered line's ✓ is olive: rose is only for what waits for you (ambient m_5332 (4)) */
-.line .gl.ok { color: var(--ok); }
-/* ∿ sending: the working glyph, dim (nothing has left yet; ambient-lead m_6063) */
-.line .gl.work { color: var(--dim); }
-.words { font-size: 19px; font-weight: 500; letter-spacing: -.01em; line-height: 1.32; }
-.words.main { font-size: 17px; line-height: 1.38; font-weight: 400; letter-spacing: 0; }
-.words .w { opacity: 0; filter: blur(3px); transition: opacity .24s ease-out, filter .24s ease-out; }
-.words.main .w { transition-duration: .29s; }
-.words .w.on { opacity: 1; filter: none; }
-.words .w:empty { display: none; }
-.words .w.code { font: .88em var(--mono); color: #ffe6ea; }
-/* main's reply: at most 3 lines, then … (ambient) */
-.tx > .words.clamp.on { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
-.words .w.cur::after { content: ""; display: inline-block; width: 2px; height: .9em; background: var(--acc); margin-left: 3px; vertical-align: -2px; animation: blink 1s steps(1) infinite; }
-@keyframes blink { 50% { opacity: 0; } }
-.sub { font-size: 13px; color: var(--dim); margin-top: 4px; }
-.sees { display: none; width: max-content; max-width: 100%; margin-top: 8px; font: 12px/1.5 var(--sans); color: var(--dim); padding: 2px 10px; border-radius: 99px; background: #ffffff12; white-space: nowrap; }
-.sees.on { display: flex; align-items: center; }
-.sees::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--acc); margin-right: 6px; }
-/* the app and the host stay whole; only the path (or a title) is cut */
-.sees .hd { flex: none; white-space: pre; }
-.sees .tl { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.chips.on { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.chip { font: 500 12px var(--mono); background: #f4a6b01f; color: var(--acc); border-radius: 99px; padding: 2px 10px; animation: pop .5s var(--back) both, flash 1s both; }
-.chip b { color: var(--acc); font-weight: 400; margin-right: 5px; }
-@keyframes pop { from { transform: scale(.6); opacity: 0; } }
-@keyframes flash { 0% { background: var(--acc); color: var(--on-accent); } 100% { background: #f4a6b01f; } }
+/* ---- the glass: radius 26, round 8's tint and strokes, the drawn shadow; grows down only */
+.glass { position: relative; border-radius: 26px; overflow: hidden; height: 68px;
+  background: linear-gradient(180deg, rgba(40, 33, 36, .58), rgba(24, 20, 22, .74));
+  box-shadow: inset 0 0 0 1px #ffffff1f, inset 0 1px 0 #ffffff33, 0 30px 80px -24px #000c;
+  transition: height .2s var(--ease-out); }
+html:not(.app) .glass { -webkit-backdrop-filter: blur(40px) saturate(1.8); backdrop-filter: blur(40px) saturate(1.8); }
+.still .glass { transition: none; }
+.say { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
-/* arrivals: a line that changes lands (expo out) */
-.arrive { animation: arrive .5s var(--expo) both; }
-@keyframes arrive { from { opacity: 0; transform: translateY(6px); } }
+/* ---- the header row: 68 high (52 for a card's label), the line in SF Display 23 */
+.inrow { display: flex; align-items: center; gap: 12px; height: 68px; padding: 0 20px 0 24px; }
+.inrow.h52 { height: 52px; }
+.inrow .sp { flex: 1; }
+.q { flex: 1; min-width: 0; font: 400 23px/1.25 var(--display); letter-spacing: -.01em; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q.ph { color: #ffffff59; }
+.q.big { font-size: 19px; line-height: 1.35; white-space: normal; padding: 12px 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.q.hello { font-size: 21px; }
+.q .gl { color: var(--faint); }
+.q .gl.ok { color: var(--ok); } .q .gl.risk { color: var(--risk); } .q .gl.a { color: var(--acc); }
+.q .w { display: inline-block; opacity: 0; filter: blur(4px); transform: translateY(3px); transition: opacity .32s var(--ease-out), filter .32s var(--ease-out), transform .32s var(--ease-out); }
+.q .w.on { opacity: 1; filter: none; transform: none; }
+.q .w.code { font: 500 .85em var(--mono); }
+.still .q .w { filter: none; transform: none; transition: opacity .2s linear; }
+.q.in { display: flex; }
+.qin { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: 400 23px/1.25 var(--display); letter-spacing: -.01em; caret-color: var(--acc); }
+.qin::placeholder { color: #ffffff59; }
+.rk { display: flex; gap: 6px; align-items: center; font: 12px var(--sans); color: var(--faint); white-space: nowrap; }
+button.rk, button.fi { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; border-radius: 8px; padding: 4px 6px; margin: -4px -6px; }
+button.rk:hover, button.fi:hover { color: var(--ink); background: #ffffff0c; }
 
-/* the agents and the inbox */
-.rows { margin-top: 6px; }
-.row { display: grid; grid-template-columns: 14px 96px 1fr auto; gap: 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--line); font-size: 14px; animation: arrive .5s var(--expo) both; }
-.row .gl { font: 600 12px var(--mono); color: #ffffff90; text-align: center; }
-.row .nm { font: 500 12.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row .wh { color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row .ag { font: 11px var(--mono); color: #ffffff60; }
-.row.need .gl { color: var(--acc); }
-.row.done .gl { color: var(--ok); }
-.row.failed .gl { color: var(--risk); }
-.row.need { background: #f4a6b01c; border-radius: 12px; border-color: transparent; }
-.q { padding: 9px 8px; border-radius: 14px; margin-top: 6px; animation: arrive .5s var(--expo) both; }
-.q.sel { background: #f4a6b01f; }
-.q .who { font: 12px var(--mono); color: var(--acc); }
-.q .tq { font-size: 14.5px; margin-top: 1px; }
+/* the level line while you talk: pink fading at both ends, its width follows your voice */
+.level { display: none; height: 3px; margin: -3px 24px 0; border-radius: 2px; background: linear-gradient(90deg, #f4a6b000, #f4a6b0cc, #f4a6b000); transform-origin: center; transition: transform .08s linear; }
+.level.on { display: block; }
 
-/* "for you": the pages made for you, a click opens one (or brings its tab) */
-.sec { font: 500 11px var(--mono); color: #ffffff60; margin: 10px 0 2px; }
-.page { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; align-items: center; width: 100%; text-align: left; padding: 7px 4px; border: 0; border-radius: 10px; background: none; color: #fff; font: 13.5px var(--sans); cursor: pointer; animation: arrive .5s var(--expo) both; }
-.page:hover { background: #ffffff10; }
-.page .gl { font-family: var(--mono); color: var(--acc); text-align: center; }
-.page .pn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.page .pm { font: 11px var(--mono); color: #ffffff70; }
-/* a page you haven't opened yet: its name in full ink, a small dot before its meta */
-.page.new .pn { font-weight: 600; }
-.page.new .pm::before { content: "• "; color: #ffffffb3; }   /* white 70%: an unread page does not wait for you (ambient, m_5136) */
-/* the ones you've seen: dim, under the unopened ones (ambient-lead m_5515) */
-.page:not(.new) .pn { color: var(--dim); }
-/* a watched page: 'watching · checked 3 min ago' under its name, mono, dim */
-.page .pw { grid-column: 2 / -1; margin-top: -2px; font: 11px var(--mono); color: #ffffff70; }
-/* an empty section of the full view: one dim line */
-.none { padding: 7px 4px; font-size: 13px; color: var(--dim); animation: arrive .5s var(--expo) both; }
-/* the settings (fn + ,): one row per toggle, a white switch (rose stays for what waits for you),
-   then the windows bise never sees, an app's 'remove' dim until hovered, '+ add an app' */
-.set { margin-top: 6px; }
-.set > * { animation: arrive .5s var(--expo) both; }
-.tg { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; width: 100%; text-align: left; padding: 8px 2px; border: 0; border-top: 1px solid var(--line); background: none; color: #fff; font: 14px var(--sans); cursor: pointer; }
-.tg:first-child { border-top: 0; }
-.tg .sw { position: relative; width: 30px; height: 18px; border-radius: 9px; background: #ffffff1a; box-shadow: inset 0 0 0 1px #ffffff1f; transition: background .25s var(--expo); }
-.tg .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 7px; background: #ffffffa0; transition: transform .25s var(--expo), background .25s var(--expo); }
-.tg.on .sw { background: #ffffffd9; }
-.tg.on .sw::after { transform: translateX(12px); background: #2a2426; }
-.tg .nt { grid-column: 1 / -1; font-size: 12.5px; color: var(--dim); }
-.tg:focus-visible, .set button:focus-visible { outline: 1px solid #ffffff60; outline-offset: 2px; border-radius: 8px; }
-.sk { display: flex; align-items: center; justify-content: space-between; padding: 5px 2px; border-top: 1px solid var(--line); font-size: 13.5px; }
-.sk.always .nm { color: var(--dim); }
-.sk .rm { border: 0; background: none; padding: 2px 4px; font: 12px var(--sans); color: #ffffff70; cursor: pointer; }
-.sk .rm:hover { color: #fff; }
-.set .add { margin-top: 6px; border: 0; background: none; padding: 5px 2px; font: 13px var(--sans); color: #ffffffc0; cursor: pointer; }
-.set .add:hover { color: #fff; }
-.still .tg .sw, .still .tg .sw::after { transition: none; }
+/* ---- a card's label, the big line, the question's text (4 lines, ⌘ ⏎ the rest) */
+.lab { font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.lab .a { color: var(--acc); }
+.mid { display: none; }
+.mid.on { display: block; }
+.big { font: 400 19px/1.35 var(--display); letter-spacing: -.005em; color: var(--ink); padding: 0 24px 10px; }
+.text { font: 16px/1.42 var(--sans); color: #ffffffe6; padding: 2px 24px 10px; white-space: pre-line; }
+.text.clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.text.dim { color: var(--dim); font-size: 14px; }
 
-/* a page being written, in the running rows */
-.row.page .gl { color: var(--acc); }
+/* ---- the body: 44 px rows, glyph | title + sub | its key */
+.body { display: none; border-top: 1px solid var(--line); padding: 6px 8px 8px; overflow-y: auto; }
+.body.on { display: block; }
+.mid.on + .body { border-top: 0; padding-top: 0; }
+.lab.sec { padding: 8px 12px 4px; }
+.lab.sec.acc { color: var(--acc); }
+.row { display: grid; grid-template-columns: 24px 1fr auto; gap: 12px; align-items: center; width: 100%; height: 44px; padding: 0 12px; border-radius: 12px;
+  border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; animation: rowin .36s var(--ease-out) both; }
+@keyframes rowin { from { opacity: 0; transform: translateY(4px); } }
+.still .row { animation: fade .2s linear both; animation-delay: 0s !important; }
+@keyframes fade { from { opacity: 0; } }
+.row .g { font: 600 14px var(--sans); color: var(--faint); text-align: center; display: flex; justify-content: center; }
+.row .g.a { color: var(--acc); } .row .g.ok { color: var(--ok); } .row .g.risk { color: var(--risk); }
+.row .t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; color: var(--ink); }
+.row .t small { font-size: 12.5px; color: var(--faint); margin-left: 8px; }
+.row .s { display: flex; gap: 4px; align-items: center; font: 12px var(--sans); color: var(--faint); }
+.row.sel { background: #f4a6b026; }
+.row.sel .g { color: var(--acc); }
+.row.sel .g .k { color: var(--acc); }
+.row:hover:not(.sel) { background: #ffffff0c; }
+.row.fixed, div.row { cursor: default; }
+.row.fixed .t, .row.seen .t { color: var(--dim); }
+.row:focus-visible, button.fi:focus-visible, button.rk:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
 
-/* options: `1 yes` `2 no`, the first one lit */
-.opts { display: flex; gap: 8px; margin-top: 10px; }
-.opts button { flex: 1; font: 500 14px var(--sans); color: #fff; background: #ffffff14; box-shadow: inset 0 0 0 1px #ffffff1a; border: 0; border-radius: 10px; padding: 5px 14px; cursor: pointer; }
-.opts button:first-child { background: var(--acc); color: var(--on-accent); box-shadow: none; }
-.opts button:hover { filter: brightness(1.08); }
+/* the keycap: a chord is caps side by side, never a '+' */
+kbd.k { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 6px; font: 600 11.5px/1 var(--sans); color: #ffffffd9; background: #ffffff14; box-shadow: inset 0 -1px 0 #0005, inset 0 0 0 1px #ffffff1a; }
+.dash { color: var(--faint); }
 
-/* the spotlight: a text field in the capsule */
-.spot input { width: 100%; font: 400 19px/1.3 var(--sans); color: #fff; background: transparent; border: 0; outline: 0; caret-color: var(--acc); padding: 2px 0; }
-.spot input::placeholder { color: #ffffff60; }
-.spot .keys { font: 11.5px var(--mono); color: var(--faint); margin-top: 10px; white-space: pre; }
-.spot .keys b { font-weight: 500; color: #ffffffc0; }
+/* the switch: white when on, never pink */
+.sw { position: relative; display: inline-block; width: 32px; height: 20px; border-radius: 10px; background: #ffffff24; transition: background .2s var(--ease-out); }
+.sw::after { content: ""; position: absolute; left: 2px; top: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px #0006; transition: transform .26s var(--spring), background .2s; }
+.sw.on { background: #fff; }
+.sw.on::after { transform: translateX(12px); background: #2a2326; }
 
-/* a permission's sentence and its button */
-.perm p { font-size: 15px; line-height: 1.4; }
-.perm button { margin-top: 10px; font: 600 13px var(--sans); color: #141211; background: var(--acc); border: 0; border-radius: 99px; padding: 6px 16px; cursor: pointer; }
-/* the way out: a dim text button, no fill */
-.perm button.later { margin-left: 6px; font-weight: 400; color: var(--dim); background: none; padding: 6px 10px; }
-.perm button.later:hover { color: #fff; }
-
-/* needs you: bise's own notification, in the same glass, under the capsule */
-.note {
-  position: absolute; right: 0; top: 0; width: 360px; padding: 14px 16px; border-radius: var(--r, 16px);
-  background: linear-gradient(180deg, #2a2224a6, #1a1516c4); box-shadow: var(--stroke);
-  display: none;
-}
-.note.on { display: block; animation: drop .7s cubic-bezier(.34, 1.3, .5, 1) both; }
-@keyframes drop { from { transform: translateY(-24px); opacity: 0; } }
-.note .h { display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--dim); }
-.note .h .app { width: 22px; height: 22px; border-radius: 6px; background: #141211; color: var(--acc); display: grid; place-items: center; font: 700 10px var(--mono); }
-.note .h .more { margin-left: auto; font: 11px var(--mono); color: var(--faint); }
-/* a question, in the capsule itself (round 8: one glass): '? cookies needs you', the question,
-   its options, the hint */
-.ask .ttl { font-weight: 600; font-size: 16px; }
-.ask .ttl .gl { font-family: var(--mono); color: var(--acc); margin-right: 6px; font-weight: 400; }
-.ask .ttl .more { margin-left: 8px; font: 11px var(--mono); color: var(--faint); font-weight: 400; }
-.ask .qq { font-size: 16px; color: #ffffffd0; margin-top: 2px; }
-.ask .hint { font: 11.5px var(--mono); color: var(--faint); margin-top: 10px; }
-/* the question glass's body and choices (ambient's B3 spec, round 9's Spotlight rows): the question
-   in 4 lines at most ('… more   ⌘ ⏎' opens the rest in place); each choice a row, a keycap and its
-   label on one line (cut with …, whole on hover or when selected), the selected row soft pink,
-   never a filled block; every row a real hit target (30 px tall, the whole width) */
-.ask .qq { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-.ask .qq.full { display: block; -webkit-line-clamp: unset; }
-.ask .qmore { display: block; margin-top: 2px; padding: 2px 0; border: 0; background: none; font: 11.5px var(--mono); color: var(--faint); cursor: pointer; }
-.ask .qmore[hidden] { display: none; }
-.ask .qmore:hover { color: #fff; }
-.rowsq { display: flex; flex-direction: column; gap: 2px; margin: 10px -8px 0; }
-.rowsq .opt { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 30px; padding: 4px 8px; border: 0; border-radius: 8px; background: none; color: #fff; font: 14.5px var(--sans); text-align: left; cursor: pointer; }
-.rowsq .opt .kc { flex: none; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 5px; box-shadow: inset 0 0 0 1px #ffffff38; font: 500 11px/18px var(--mono); color: #ffffffc0; text-align: center; }
-.rowsq .opt .lb { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rowsq .opt:hover { background: #ffffff0d; }
-.rowsq .opt.sel { background: #f4a6b024; }
-.rowsq .opt.sel .kc { box-shadow: inset 0 0 0 1px var(--acc); color: var(--acc); }
-.rowsq .opt.sel .lb { white-space: normal; }
-/* a batch of drafts (ambient m_6070): the label is the small mono line in the accent, the big
-   white line says whose drafts, and the options are compact pills, not half-width buttons */
-.ask.batch .ttl { font: 500 12.5px var(--mono); color: var(--acc); }
-.ask.batch .ttl .gl { margin-right: 4px; }
-.ask.batch .qq { font-size: 16px; color: #fff; margin-top: 3px; }
-.ask.batch .opts { gap: 6px; }
-.ask.batch .opts button { flex: none; padding: 5px 14px; }
-/* a card asked from a page: `fn ⏎ open it`, a quiet button over the hint */
-.ask button.hint.open { display: block; border: 0; background: none; padding: 0; color: #ffffffc0; cursor: pointer; }
-.ask button.hint.open:hover { color: #fff; }
-
-/* reduced motion: text appears without fades, nothing springs */
-.still *, .still *::before, .still *::after { transition: none !important; animation: none !important; }
-.still .words .w { filter: none; }
-
-/* VoiceOver's live line: read, never seen */
-.tx > .say { display: block; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* ---- the footer: the actions left, esc and the voice line right; every item clickable */
+.foot { display: none; gap: 16px; align-items: center; height: 36px; padding: 0 20px; border-top: 1px solid var(--line); background: #0000001a; font: 12px var(--sans); color: var(--faint); white-space: nowrap; }
+.foot.on { display: flex; }
+.foot .sp { flex: 1; }
+.foot .fi { display: flex; gap: 6px; align-items: center; }
