@@ -297,6 +297,14 @@ the page with an open card (a task agent's page) is not checked yet.
     Fail 31 (amb-core): answering that card with `1` from the capsule's path never closes it, so the
     plan stops there. Nits: `send the draft?` comes in the same second as the address question it
     depends on, and has no page link.
+- **C, feedback into work: fail at 9c83d97f.** Page 24 s, v1 33 s, the 3 reports covered, outbox
+  empty, main's line 90 characters (fail 27 holds). Fail 32: the task agent couldn't read the fake
+  Slack and asked him to connect an account; main read it and passed the reports on (amb-tools /
+  amb-core: spawned agents need the same fake connectors as main). Fail 33: no review block (each
+  report is prose + a message), so there's no `start an agent`, and the agent found no code to fix
+  in a repo that holds only a README (amb-kit's feedback.md; amb-tools' fixture). Fail 34: main
+  asked `how should agents ship code here?` at 24 s, before any code change was known, then
+  withdrew it (amb-kit).
 
 ## The look the user validated: round 8 (main m_5134)
 
