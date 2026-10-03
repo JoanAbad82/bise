@@ -391,6 +391,29 @@ def meeting_page_laws():
 
 
 @test
+def one_run_at_a_time():
+    """qa.py run: a second run in the same QA dir is refused while one is live (ambient-pm m_5841)"""
+    lock = os.path.join(qa.QA_DIR, "run.lock")
+    os.makedirs(qa.QA_DIR, exist_ok=True)
+    old = open(lock).read() if os.path.exists(lock) else None
+    if old and qa._pid_alive((json.loads(old) or {}).get("pid")):
+        return   # a real run is live here: nothing to fake
+    p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        with open(lock, "w") as f:
+            json.dump({"pid": p.pid, "scenario": "launch-watch", "at": "01:00:00"}, f)
+        try:
+            qa.run("checklist", headless=True)
+            check(False, "a second run started")
+        except qa.QAError as e:
+            check("a run is live" in str(e) and "launch-watch" in str(e), e)
+        check(json.load(open(lock))["pid"] == p.pid, "the live run's lock is kept")
+    finally:
+        p.kill()
+        os.unlink(lock)
+
+
+@test
 def http_retries_a_reset():
     """the page server's GET: a reset connection is tried again (ambient-pm m_5709), a POST never"""
     import struct

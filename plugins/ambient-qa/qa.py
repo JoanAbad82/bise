@@ -1632,6 +1632,23 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
         raise QAError("scenario: %s" % ", ".join(SCENARIOS))
     sc = SCENARIOS[scenario]
     raise_file_limit()   # a launchd shell's 256 files ran out mid-run (ambient-pm m_5837)
+    # one run at a time per QA dir: two runs shared one throwaway hub (ambient-pm m_5841)
+    lock = os.path.join(QA_DIR, "run.lock")
+    held = _read(lock)
+    if held and held.get("pid") != os.getpid() and _pid_alive(held.get("pid")):
+        raise QAError("a run is live in %s (%s, pid %s, since %s): one at a time, or another AMBIENT_QA_DIR"
+                      % (QA_DIR, held.get("scenario"), held.get("pid"), held.get("at")))
+    os.makedirs(QA_DIR, exist_ok=True)
+    with open(lock, "w") as f:
+        json.dump({"pid": os.getpid(), "scenario": scenario, "at": time.strftime("%H:%M:%S")}, f)
+    try:
+        return _run(scenario, sc, headless, timeout, keep, out, require)
+    finally:
+        if (_read(lock) or {}).get("pid") == os.getpid():
+            os.unlink(lock)
+
+
+def _run(scenario, sc, headless, timeout, keep, out, require):
     bise, root = find_bise()
     build = require_commits(root, require)
     seeded = None
