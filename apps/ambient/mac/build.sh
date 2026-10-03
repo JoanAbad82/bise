@@ -35,6 +35,56 @@ make_icns() {
   iconutil -c icns "$set" -o "$dir/AppIcon.icns"
 }
 
+# A stable signature, so macOS keeps Accessibility (and the mic, the
+# screen) across rebuilds: ad hoc, TCC keys a grant on the binary's hash
+# and every build loses it (the dogfood, lead m_6264). A self-signed
+# code-signing identity made once, in its own keychain file with its own
+# password (never his login keychain, never a prompt): the designated
+# requirement is then 'identifier dev.bise.ambient and certificate leaf =
+# H"…"', the same for every build. codesign only finds identities in the
+# search list, so the keychain joins it for the signing and leaves right
+# after. Any failure: ad hoc, as before. AMBIENT_SIGN_DIR (scripts/
+# ambient.sh: <build>/sign) keeps it; without it, ad hoc.
+SIGN_NAME="bise ambient dev"
+
+sign_identity() {
+  local dir="$1" kc="$1/sign.keychain-db"
+  if [ ! -f "$kc" ] || [ ! -f "$dir/pass" ]; then
+    rm -rf "$dir"; mkdir -p "$dir"; chmod 700 "$dir"
+    LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c 32 > "$dir/pass"; chmod 600 "$dir/pass"
+    local pw; pw="$(cat "$dir/pass")"
+    printf '[req]\ndistinguished_name=dn\nx509_extensions=ext\nprompt=no\n[dn]\nCN=%s\n[ext]\nbasicConstraints=critical,CA:false\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=critical,codeSigning\n' "$SIGN_NAME" > "$dir/cs.cnf"
+    openssl req -x509 -newkey rsa:2048 -nodes -keyout "$dir/key.pem" -out "$dir/cert.pem" -days 3650 -config "$dir/cs.cnf" >/dev/null 2>&1 || return 1
+    openssl pkcs12 -export -legacy -inkey "$dir/key.pem" -in "$dir/cert.pem" -out "$dir/id.p12" -passout "pass:$pw" -name "$SIGN_NAME" >/dev/null 2>&1 \
+      || openssl pkcs12 -export -inkey "$dir/key.pem" -in "$dir/cert.pem" -out "$dir/id.p12" -passout "pass:$pw" -name "$SIGN_NAME" >/dev/null 2>&1 \
+      || return 1
+    rm -f "$dir/key.pem"
+    security create-keychain -p "$pw" "$kc" >/dev/null 2>&1 || return 1
+    security set-keychain-settings "$kc" >/dev/null 2>&1   # no auto-lock
+    security unlock-keychain -p "$pw" "$kc" >/dev/null 2>&1 || return 1
+    security import "$dir/id.p12" -k "$kc" -P "$pw" -T /usr/bin/codesign >/dev/null 2>&1 || return 1
+    security set-key-partition-list -S apple-tool:,apple: -s -k "$pw" "$kc" >/dev/null 2>&1 || return 1
+    rm -f "$dir/id.p12"
+  fi
+  security unlock-keychain -p "$(cat "$dir/pass")" "$kc" >/dev/null 2>&1 || return 1
+  security find-identity -p codesigning "$kc" 2>/dev/null | awk -v n="\"$SIGN_NAME\"" 'index($0, n) { print $2; exit }'
+}
+
+sign_app() {
+  local app="$1" dir="${AMBIENT_SIGN_DIR:-}" id=""
+  if [ -n "$dir" ]; then id="$(sign_identity "$dir" || true)"; fi
+  if [ -n "$id" ]; then
+    local kc="$dir/sign.keychain-db" orig=() rc=0 line
+    while IFS= read -r line; do line="${line#"${line%%[![:space:]]*}"}"; orig+=("${line//\"/}"); done < <(security list-keychains -d user)
+    security list-keychains -d user -s "${orig[@]}" "$kc"
+    codesign --force --sign "$id" --keychain "$kc" --identifier dev.bise.ambient "$app" >/dev/null 2>&1 || rc=$?
+    security list-keychains -d user -s "${orig[@]}"
+    if [ "$rc" = 0 ]; then echo "ambient mac: signed as '$SIGN_NAME' (grants survive rebuilds)"; return 0; fi
+    echo "ambient mac: warning: signing as '$SIGN_NAME' failed ($rc): ad hoc" >&2
+  fi
+  codesign --force --sign - --identifier dev.bise.ambient "$app" >/dev/null
+}
+
 case "${1:-}" in
   --check)
     swiftc -typecheck "${FLAGS[@]}" "${SOURCES[@]}"
@@ -90,7 +140,7 @@ case "${1:-}" in
       fi
       rm -rf "$icon_tmp"
     fi
-    codesign --force --sign - --identifier dev.bise.ambient "$APP" >/dev/null
+    sign_app "$APP"
     echo "ambient mac: built $APP"
     ;;
 esac

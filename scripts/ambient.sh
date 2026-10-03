@@ -117,7 +117,9 @@ build() {
   local fresh="$BUILD/new/$(basename "$APP")"
   rm -rf "$BUILD/new"
   mkdir -p "$BUILD/new"
-  "$SRC/build.sh" "$fresh" >&2
+  # its signing identity lives next to it, made once (build.sh sign_app):
+  # Accessibility and the mic survive rebuilds
+  AMBIENT_SIGN_DIR="$BUILD/sign" "$SRC/build.sh" "$fresh" >&2
   rm -rf "$APP"
   mv "$fresh" "$APP"
   rm -rf "$BUILD/new"
