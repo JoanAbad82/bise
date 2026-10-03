@@ -572,7 +572,11 @@ impl Shell {
             let p = p.clone();
             let qs = self.page_cards().clone();
             let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
+            let n = self.card_links.len();
             self.card_links.retain(|c, _| open.contains(c));
+            if self.card_links.len() != n {
+                self.save_card_links();
+            }
             if let Some(cards) = snap["cards"].as_array_mut() {
                 for c in cards {
                     // an agent's card linked with `sb card --page`
@@ -1256,6 +1260,13 @@ impl Shell {
         }
         let snap = self.snapshot();
         self.broadcast(&snap);
+    }
+
+    /// `card_links` to the hub's state (card_link.rs), after each change.
+    fn save_card_links(&self) {
+        if let Err(e) = crate::card_link::save(&crate::card_link::file(&self.opts.paths.state), &self.card_links) {
+            log_line(&self.opts.paths, &format!("card links not saved: {e}"));
+        }
     }
 
     /// The open cards of the pages' questions: card → (page, block),
@@ -2920,6 +2931,7 @@ impl Shell {
                         let new = self.hub.st.open_cards().map(|c| c.id).filter(|c| !before.contains(c)).max();
                         if let Some(card) = new {
                             self.card_links.insert(card, l);
+                            self.save_card_links();
                             let snap = self.snapshot();
                             self.broadcast(&snap);
                         }
@@ -3278,7 +3290,8 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         page_watch_sent: BTreeMap::new(),
         page_cards: None,
         page_replies: BTreeMap::new(),
-        card_links: BTreeMap::new(),
+        // the cards survive a restart, so do their links (lead m_6039)
+        card_links: crate::card_link::load(&crate::card_link::file(&paths.state)),
     };
     // the page server (docs/ambient-pages.md §2.4): 127.0.0.1, a stable
     // port per workspace; its notes come back to the loop

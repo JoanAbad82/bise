@@ -4,6 +4,29 @@
 
 use crate::pages::Pages;
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+
+/// Where the hub keeps its cards' links, so they survive a restart like
+/// the cards themselves (step cards reload theirs from steps.json).
+pub fn file(state: &Path) -> PathBuf {
+    state.join("card_links.json")
+}
+
+/// The links saved by [`save`]; none when the file is missing or broken.
+pub fn load(path: &Path) -> BTreeMap<u64, Value> {
+    let Ok(text) = std::fs::read_to_string(path) else { return BTreeMap::new() };
+    let Ok(Value::Object(m)) = serde_json::from_str::<Value>(&text) else { return BTreeMap::new() };
+    m.into_iter().filter_map(|(k, v)| Some((k.parse().ok()?, v)).filter(|(_, v): &(u64, Value)| v.is_object())).collect()
+}
+
+/// Card → link, written whole (a temp file, then a rename).
+pub fn save(path: &Path, links: &BTreeMap<u64, Value>) -> Result<(), String> {
+    let m: serde_json::Map<String, Value> = links.iter().map(|(k, v)| (k.to_string(), v.clone())).collect();
+    let tmp = path.with_extension("json.tmp");
+    std::fs::write(&tmp, Value::Object(m).to_string()).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    std::fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display()))
+}
 
 /// The card's `page` for `spec` (`<id>`, `<id>#<block>` or
 /// `<id>#<item>`): {id, url} for the page, {id, block, url#block} for a
@@ -64,6 +87,28 @@ mod tests {
 <li data-id="hn-41">tptacek asks about the sandbox</li>
 <li data-id='x-7'>a quote</li></ol></section>
 <section data-kit="checklist" data-id="next"><ol><li data-id="s1">post the thread</li></ol></section>"#;
+
+    #[test]
+    fn the_links_survive_a_restart() {
+        let d = std::env::temp_dir().join(format!("sb-card-links-{}", std::process::id()));
+        std::fs::create_dir_all(&d).unwrap();
+        let f = file(&d);
+        assert!(load(&f).is_empty(), "no file: no links");
+        let links = BTreeMap::from([
+            (7, json!({"id": "launch-watch", "block": "comments", "item": "hn-41", "url": "http://h/p/launch-watch#hn-41"})),
+            (9, json!({"id": "w", "url": "http://h/p/w"})),
+        ]);
+        save(&f, &links).unwrap();
+        assert_eq!(load(&f), links);
+        assert!(!f.with_extension("json.tmp").exists(), "no temp file left");
+        save(&f, &BTreeMap::new()).unwrap();
+        assert!(load(&f).is_empty(), "all closed: none");
+        std::fs::write(&f, "{not json").unwrap();
+        assert!(load(&f).is_empty(), "a broken file: none, the hub starts");
+        std::fs::write(&f, r#"{"x": {"id": "a"}, "3": "nope", "4": {"id": "b"}}"#).unwrap();
+        assert_eq!(load(&f).keys().copied().collect::<Vec<_>>(), vec![4], "only card numbers with a link");
+        let _ = std::fs::remove_dir_all(d);
+    }
 
     #[test]
     fn an_item_is_in_the_block_around_it_a_block_is_itself() {
