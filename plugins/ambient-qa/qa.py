@@ -858,16 +858,21 @@ def clicks(state="card", open_key="auto", selector=None, settle_s=1.0):
             out["fails"].append("%r: %s" % (it["label"], e))
             continue
         time.sleep(settle_s)
-        cmds = [e["ev"] for e in _new_events(mark) if e["dir"] in CLICK_DIRS]
+        evs = [e for e in _new_events(mark) if e["dir"] in CLICK_DIRS]
+        cmds = [e["ev"] for e in evs]
         changed = _view_now() != v0
-        r.update(clicked=c.get("clicked"), window_at_point=c.get("window_at_point"), commands=cmds, view_changed=changed)
-        if not c.get("clicked"):
+        # the page took it: its click on the target, or its pointerdown there when the target was
+        # re-rendered under the pointer before the click (the fn hints act on pointerdown)
+        took = c.get("clicked") or any(d.get("inside") and d.get("type") in ("pointerdown", "mousedown") for d in c.get("dom") or [])
+        r.update(clicked=bool(took), window_at_point=c.get("window_at_point"), commands=cmds, view_changed=changed)
+        if not took:
             out["fails"].append("%r: the page got no click (window %s, hit %s)" % (it["label"], c.get("window_at_point"), c.get("hit_view")))
         elif not cmds and not changed:
             # an in-page action (↑↓ moves the selection) changes the view without a command
             out["fails"].append("%r: clicked, but nothing happened (no command, the view unchanged)" % it["label"])
         else:
-            keys_ = [json.dumps(x, sort_keys=True) for x in cmds if x.get("cmd") not in ("app_size", "app_ready")]
+            # the same command twice on one hop (page>app, then app>core is one command on its way)
+            keys_ = [e["dir"] + json.dumps(e["ev"], sort_keys=True) for e in evs if e["ev"].get("cmd") not in ("app_size", "app_ready", "app_content")]
             if len(keys_) != len(set(keys_)):
                 out["fails"].append("%r: a command went twice: %s" % (it["label"], cmds))
         if it.get("cursor") == "text":
