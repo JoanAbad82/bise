@@ -488,6 +488,16 @@ def launch_watch_cards_may_be_a_teammates_question():
 
 
 @test
+def a_term_stops_a_run_like_ctrl_c():
+    """kill <run pid> raises KeyboardInterrupt in the run, so its finally clauses stop its hub"""
+    try:
+        qa._term_to_interrupt(15, None)
+        check(False, "no interrupt")
+    except KeyboardInterrupt:
+        pass
+
+
+@test
 def a_watcher_between_turns_is_settled():
     """a watch declares 'working' for its whole life: between its timer turns (no turn_ms) the run counts it settled, in a turn it does not"""
     check(qa._agent_settled({"status": "working", "note": "watching every 10m", "turn_ms": None}), "watcher between turns")

@@ -2227,11 +2227,18 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
     os.makedirs(QA_DIR, exist_ok=True)
     with open(lock, "w") as f:
         json.dump({"pid": os.getpid(), "scenario": scenario, "at": time.strftime("%H:%M:%S")}, f)
+    # a TERM (kill <pid>) stops the run the way ^C does: the finally clauses stop its hub. before,
+    # a TERM ended the process on the spot and left its throwaway hub running (05:58, amb-tools-m)
+    signal.signal(signal.SIGTERM, _term_to_interrupt)
     try:
         return _run(scenario, sc, headless, timeout, keep, out, require, voice)
     finally:
         if (_read(lock) or {}).get("pid") == os.getpid():
             os.unlink(lock)
+
+
+def _term_to_interrupt(*_):
+    raise KeyboardInterrupt("SIGTERM")
 
 
 def _run(scenario, sc, headless, timeout, keep, out, require, voice=False):
