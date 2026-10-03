@@ -3,9 +3,11 @@
 Read this for bug reports or feedback from Slack, Linear or mail that agents can fix
 ("Benjamin's bug reports on Slack: handle them").
 
-- Fast, like an inbox: list the reports first (who and one line each), then read and publish
-  them 2 or 3 at a time, the first real items within about 45 seconds of the ask (callout
-  `3 of 9 read`); never read every thread before the first publish.
+- Fast, like an inbox: publish each report as an item as soon as you have read it, before any
+  diagnosis: who · where · when, the quote, its link, and `looking…` where the cause goes. The
+  first items are up within about 45 seconds of the ask (callout `3 of 9 read`). Only then read
+  the code, the logs or the repo, and fill in each item's cause and fix in later versions (same
+  item ids). Never read every thread, or diagnose anything, before the first items.
 - The reports are ALWAYS one `review` block, never headings with prose and messages: without
   it there is no `start an agent`, no answer, no skip. Even a report that needs no code change
   is an item (say so in it: he answers or skips it).
