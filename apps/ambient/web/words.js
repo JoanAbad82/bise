@@ -170,7 +170,8 @@
   };
   const drafts = {
     label: (count, title) => `${count} drafts wait for you${title ? ` · ${title}` : ""}`,
-    line: (what, who) => (who.length ? `${what || "drafts"} to ${names(who)}` : what || "drafts"),
+    // steps, or mixed kinds ('drafts'): the names alone (amb-core e2d256e1)
+    line: (what, who) => (!who.length ? what || "drafts" : !what || what === "steps" || what === "drafts" ? names(who) : `${what} to ${names(who)}`),
     review: "review",
     sendAll: (count) => (count === 2 ? "send both" : `send all ${count}`),
     sending: (count, what) => `sending ${count === 2 ? "both" : count} ${what || "drafts"}.`,

@@ -115,12 +115,18 @@
   function batchOf(c) {
     if (!c || !c.page || !c.page.drafts) return null;
     const b = c.batch || {};
-    const tm = /^(\d+)\s+drafts?[^:]*:\s*(.*)$/.exec(String(c.text || ""));
+    // without batch: amb-core's text, '<n> drafts wait for you · <title>\n<line>\n1. review…' (e2d256e1),
+    // or the first one's '<n> drafts ready: a · b · c'
+    const lines = String(c.text || "").split("\n");
+    const tm = /^(\d+)\s+drafts?[^:]*:\s*(.*)$/.exec(lines[0]);
+    const tw = /^(\d+)\s+drafts? wait for you(?:\s*·\s*(.*))?$/.exec(lines[0]);
     const opts = Wd.options(c);
     const review = opts.find((o) => /review/i.test(o.label)) || { i: 0, n: 1 };
     const send = opts.find((o) => /send/i.test(o.label)) || { i: 1, n: 2 };
     const names = Array.isArray(b.names) ? b.names.map(String) : tm ? tm[2].split(/\s*·\s*/).filter(Boolean) : [];
-    return { count: +b.count || (tm ? +tm[1] : names.length || 2), title: b.title || c.page.title || "", what: b.what || "drafts", names, review, send };
+    const count = +b.count || (tm ? +tm[1] : tw ? +tw[1] : names.length || 2);
+    const line = !c.batch && tw && lines[1] && !/^\d+\./.test(lines[1]) ? lines[1] : null;
+    return { count, title: b.title || (tw && tw[2]) || c.page.title || "", what: b.what || "drafts", names, line, review, send };
   }
 
   function answer(m, card, opt, now) {
@@ -559,7 +565,7 @@
       const c = asking[0];
       const b = batchOf(c);
       // a batch of drafts: one glass like a question, its own words, review first (ambient m_6056)
-      if (b) return { id: c.id, agent: c.agent, title: Wd.drafts.label(b.count, b.title), text: Wd.drafts.line(b.what, b.names), hint: W.needsHint, more: asking.length - 1, open: null, batch: true,
+      if (b) return { id: c.id, agent: c.agent, title: Wd.drafts.label(b.count, b.title), text: b.line || Wd.drafts.line(b.what, b.names), hint: W.needsHint, more: asking.length - 1, open: null, batch: true,
         options: [{ i: b.review.i, label: Wd.optionLabel(b.review.n, Wd.drafts.review) }, { i: b.send.i, label: Wd.optionLabel(b.send.n, Wd.drafts.sendAll(b.count)) }] };
       return { id: c.id, agent: c.agent, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsHint, more: asking.length - 1,
         open: c.page && c.page.url ? W.openIt : null,

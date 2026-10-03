@@ -999,7 +999,11 @@ law("a batch of drafts is one glass: '3 drafts wait for you · <page>', 'replies
   // two: 'send both', 'sending both replies.'; more than 3 names: 'and N more'; no batch: read from the text
   eq([Wd.drafts.sendAll(2), Wd.drafts.sending(2, "replies"), Wd.names(["legal", "Lucas", "Marc", "Ana", "Ivo", "Zoé"])], ["send both", "sending both replies.", "legal, Lucas and 4 more"]);
   const bare = M.view(M.step(M.init(), { ev: "state", agents: [], cards: [{ ...card, batch: undefined }], pages: [] }, 0).m, 10);
-  eq([bare.ask.title, bare.ask.text], ["3 drafts wait for you", "drafts to legal, Lucas and Marc"]);
+  eq([bare.ask.title, bare.ask.text], ["3 drafts wait for you", "legal, Lucas and Marc"]);
+  // amb-core's card text since e2d256e1, without batch: its first two lines
+  const v2 = M.view(M.step(M.init(), { ev: "state", agents: [], cards: [{ ...card, batch: undefined, text: "2 drafts wait for you · launch recap\nreplies to Ana and Ivo\n1. review\n2. send both" }], pages: [] }, 0).m, 10);
+  eq([v2.ask.title, v2.ask.text], ["2 drafts wait for you · launch recap", "replies to Ana and Ivo"]);
+  eq(Wd.drafts.line("steps", ["book the room", "send invites"]), "book the room and send invites");
 });
 
 // ---- for you with opened_version (amb-core 03821a37) and the count shared with the menu bar
