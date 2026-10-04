@@ -10,6 +10,7 @@
 //!   every line of each feed, for the views, `sb inspect` and
 //!   `sb history`.
 
+mod art;
 mod features;
 mod gate;
 mod repl;
@@ -160,6 +161,17 @@ enum Msg {
     /// The page server (docs/ambient-pages.md §2.4): notes sent from a
     /// page, or its drafts changed.
     Page(crate::pages::PageMsg),
+    /// An agent's changes, computed off the loop (`daemon/art.rs`).
+    Changes {
+        name: String,
+        v: Value,
+    },
+    /// An answer computed off the loop (a `diff`, the `branches`) for
+    /// one client.
+    ToClient {
+        id: ClientId,
+        v: Value,
+    },
     /// `keep`: leave the REPLs running for the next hub to adopt.
     Shutdown {
         keep: bool,
@@ -316,6 +328,14 @@ struct Shell {
     /// shown on the card while it is open; its answer goes to the agent
     /// as usual (unlike `page_cards`, whose answers take the page's path)
     card_links: BTreeMap<u64, Value>,
+    /// idle-exit (`idle.rs`): no UI for the grace and nothing runs, the
+    /// hub stops for good
+    idle: crate::idle::Watch,
+    /// holds on the hub besides the `hello` clients: a page server gets
+    /// a clone, and each open event stream holds one while it is open
+    holds: crate::idle::Holds,
+    /// artifacts and diffs (`daemon/art.rs`, docs/artifacts.md)
+    art: art::Art,
 }
 
 /// What an agent whose turn was cut by a restart receives.
@@ -323,6 +343,10 @@ struct Shell {
 /// shell's PATH, its AGENTS.md: seconds at most) before its start counts
 /// as failed (BISE-291).
 const START_LIMIT: Duration = Duration::from_secs(20);
+
+/// At a stop for good, how long the REPLs get to checkpoint and exit
+/// before SIGTERM.
+const REPL_QUIT: Duration = Duration::from_secs(5);
 
 /// Tests only (tui_stuck_start_tmux.py): `SB_STALL_START=<file>` holds
 /// the next REPL start before its spawn, forever, while that file
@@ -509,6 +533,152 @@ impl Shell {
         self.setup().in_use(if is_main { "main" } else { "agent" }, &choice)
     }
 
+    // ---- the model of a task, chosen at its spawn (issue #4) ----
+
+    /// Whether a provider can run a turn now: its key or its sign-in
+    /// (auth.json, the env, the .env files: the REPLs' own sources).
+    fn key_ready() -> impl Fn(&bise_catalog::Provider) -> bool {
+        let home = bise_home::Home::from_env();
+        let files = bise_catalog::auth::EnvFile::read_all(&home.env_files());
+        let store = bise_catalog::auth::Store::read(&home.auth_file()).unwrap_or_default();
+        move |p| {
+            let env = |k: &str| std::env::var(k).ok();
+            bise_catalog::auth::Keys { env: &env, store: &store, files: &files }.ready(p)
+        }
+    }
+
+    /// A line of the hub in an agent's thread (`sb info : ...`).
+    fn info_line(&mut self, agent: &str, text: &str) {
+        self.feed(agent, &format!("sb info : {}", wire_escape(text)));
+    }
+
+    /// `sb spawn ... --model/--effort/--profile`: pick what the new task
+    /// runs on (the agents default when the ask cannot run), write its
+    /// choice file before its first call, put the fallback's line at the
+    /// top of its thread. The words of main's answer (`on gpt-9 · low`).
+    fn spawn_model(&mut self, agent: &str, ask: &bise_catalog::spawn::Ask) -> String {
+        let Some(dir) = self.dir_of(agent) else { return String::new() };
+        let ready = Self::key_ready();
+        let pick = self.setup().spawn_pick(ask, &ready);
+        if let Err(e) = pick.choice.write(&self.choice_path(&dir)) {
+            log_line(&self.opts.paths, &format!("{}: its model choice is not saved: {}", agent, e));
+        }
+        if !pick.choice.model.is_empty() {
+            self.hub.model_trial.insert(agent.to_string());
+        }
+        if !pick.line.is_empty() {
+            self.info_line(agent, &pick.line);
+        }
+        log_line(&self.opts.paths, &format!("{}: spawned {}", agent, pick.answer));
+        self.refresh_models();
+        pick.answer
+    }
+
+    /// `sb send <task> --model <id> [--effort <e>]`: the task's choice
+    /// from its next turn, a line in its thread. Unlike the spawn, a model
+    /// that cannot run is refused (the task keeps its model): main asked
+    /// a running task to move, it hears why not.
+    fn switch_model(&mut self, from: &str, to: &str, model: &str, effort: &str) -> Result<String, String> {
+        let dir = self.dir_of(to).ok_or_else(|| format!("unknown agent: {}", to))?;
+        let ready = Self::key_ready();
+        let ask = bise_catalog::spawn::Ask { model: model.into(), effort: effort.into(), profile: String::new() };
+        let mut pick = self.setup().spawn_pick(&ask, &ready);
+        if !pick.choice.why.is_empty() {
+            return Err(format!("@{} stays on its model: asked {}: {}", to, pick.choice.asked, pick.choice.why));
+        }
+        let before = bise_catalog::Choice::read(&self.choice_path(&dir));
+        if model.trim().is_empty() {
+            // an effort alone: on the model it runs now
+            pick.choice.model = before.model.clone();
+            let ask2 = bise_catalog::spawn::Ask { model: before.model.clone(), effort: effort.into(), profile: String::new() };
+            if !before.model.is_empty() {
+                pick = self.setup().spawn_pick(&ask2, &ready);
+            }
+        }
+        pick.choice.by = "sb send --model".into();
+        pick.choice.write(&self.choice_path(&dir)).map_err(|e| format!("@{}'s choice is not saved: {}", to, e))?;
+        let used = self.in_use(&dir, false);
+        let on = bise_catalog::names::with_effort(&used.model.name, &used.effort);
+        let by = if from == MAIN { "main".to_string() } else { from.to_string() };
+        self.info_line(to, &format!("{} moved this agent to {}, from its next turn.", by, on));
+        if !pick.choice.model.is_empty() {
+            self.hub.model_trial.insert(to.to_string());
+        }
+        self.refresh_models();
+        if self.repls.contains_key(&dir) {
+            // another context window: the compaction threshold follows
+            self.reload_repls.insert(dir);
+        }
+        let note = if pick.choice.note.is_empty() { String::new() } else { format!(" ({})", pick.choice.note) };
+        Ok(format!("@{} moves to {}, from its next turn{}", to, on, note))
+    }
+
+    /// The provider refused the model a task was spawned on, before any
+    /// turn of it ended well: the agents default, a line in its thread,
+    /// a word to main, and its turn starts again.
+    fn model_refused(&mut self, agent: &str, why: &str) {
+        let Some(dir) = self.dir_of(agent) else { return };
+        let path = self.choice_path(&dir);
+        let before = bise_catalog::Choice::read(&path);
+        let asked = before.model.clone();
+        let choice = bise_catalog::Choice { asked: asked.clone(), why: why.to_string(), ..Default::default() };
+        if let Err(e) = choice.write(&path) {
+            log_line(&self.opts.paths, &format!("{}: its model choice is not saved: {}", agent, e));
+        }
+        let used = self.in_use(&dir, false);
+        let on = bise_catalog::names::with_effort(&used.model.name, &used.effort);
+        let short = bise_catalog::names::long_name(&asked);
+        let text = format!("asked for {}: {}. running on {}, the agents default.", short, why, on);
+        self.info_line(agent, &text);
+        log_line(&self.opts.paths, &format!("{}: {}", agent, text));
+        self.refresh_models();
+        // main hears it as a report of the task (its spawn answer named the
+        // model it asked), and the task's turn starts again on the default
+        let report = AgentReq::Report { kind: "progress".into(), summary: text.clone(), decisions: Vec::new() };
+        self.step(Input::Agent { token: 0, from: agent.to_string(), req: report });
+        self.step(Input::Agent {
+            token: 0,
+            from: MAIN.to_string(),
+            req: AgentReq::Send {
+                to: agent.to_string(),
+                text: format!("bise: {} your turn starts again on it: carry on with your task.", text),
+                expect_reply: false,
+                reply_to: None,
+                queued: true,
+                why: String::new(),
+                switch: None,
+            },
+        });
+        let snap = self.snapshot();
+        self.broadcast(&snap);
+    }
+
+    /// Each agent's model for `sb list`, `sb tasks` and the roster
+    /// (issue #4): its tag and its `model:` line, from its choice file.
+    fn refresh_models(&mut self) {
+        let who: Vec<(String, String, bool)> =
+            self.hub.st.agents.values().map(|a| (a.name.clone(), a.dir.clone(), a.is_main)).collect();
+        self.setup(); // re-read when config.toml changed
+        let setup = &self.setup.as_ref().expect("just set").1;
+        let used: Vec<(String, bise_catalog::InUse, bise_catalog::Choice)> = who
+            .iter()
+            .map(|(name, dir, main)| {
+                let c = bise_catalog::Choice::read(&self.choice_path(dir));
+                (name.clone(), setup.in_use(if *main { "main" } else { "agent" }, &c), c)
+            })
+            .collect();
+        let others: Vec<&str> = used.iter().map(|(_, u, _)| u.model.name.as_str()).collect();
+        let models: crate::board::Models = used
+            .iter()
+            .map(|(n, u, c)| {
+                // whole: the roster sizes its column (board::roster)
+                let tag = bise_catalog::names::tag(&u.model.name, &u.effort, &others, "·", usize::MAX);
+                (n.clone(), (tag, setup.model_line(c)))
+            })
+            .collect();
+        self.hub.models = models;
+    }
+
     /// The client snapshot with each agent's model and effort: its full
     /// id, the effort ("" when the model takes none), and the words it
     /// takes (the `/reasoning` list).
@@ -526,8 +696,10 @@ impl Shell {
             let res = crate::land::run(&job, &queue, &mut || {
                 let _ = txj.send(Msg::Land { line: None });
             });
+            let mut landed: Option<String> = None;
             let (body, line) = match res {
                 Ok(o) => {
+                    landed = art::landed_fields(&job.shared, &job.agent, &o.target, &o.sha, o.commits);
                     let mut text = crate::flow::land_line(&job.agent, o.commits, &o.target, &o.sha, o.pushed);
                     if let Some(e) = &o.push_error {
                         text = format!("{} ({})", text, e);
@@ -545,10 +717,16 @@ impl Shell {
             };
             write_json(&mut stream, &body);
             let _ = tx.send(Msg::Land { line: Some(line) });
+            // the ± door of the land, right after its line (docs/artifacts.md)
+            if let Some(f) = landed {
+                let _ = tx.send(Msg::Land { line: Some(("landed".to_string(), f)) });
+            }
         });
     }
 
     fn snapshot(&mut self) -> Value {
+        // issue #4: each agent's model, for sb list / sb tasks too
+        self.refresh_models();
         // the repo's flow, as config.toml says now (flow-prompts saves it)
         self.hub.flow = crate::flow::FlowConfig::load(&self.opts.paths).mode;
         // pr-news: whose bots' comments reach the agents (`[pr] trusted_bots`)
@@ -618,6 +796,9 @@ impl Shell {
                 v["effort"] = json!(u.effort);
                 v["efforts"] = json!(u.model.efforts());
                 v["model_from"] = json!(u.model_from);
+                // the "± 9 files so far" door (docs/artifacts.md)
+                let name = v["name"].as_str().unwrap_or("").to_string();
+                v["changes"] = self.art.changes.get(&name).cloned().unwrap_or(Value::Null);
             }
         }
         snap
@@ -667,6 +848,8 @@ impl Shell {
                 return format!("{} is not usable yet (needs {})", r.name, r.needs);
             }
             choice.model = r.name.clone();
+            // the user's pick: no longer the spawn's ask nor its fallback
+            choice = bise_catalog::Choice { model: choice.model, effort: choice.effort, ..Default::default() };
         }
         if let Some(e) = &effort {
             let target = match &model {
@@ -2153,6 +2336,27 @@ impl Shell {
                 self.broadcast(&snap);
                 self.switch_idle_repls();
             }
+            Effect::SpawnModel { token, agent, ask, mut body } => {
+                body["model"] = json!(self.spawn_model(&agent, &ask));
+                if let Some(mut s) = self.replies.remove(&token) {
+                    write_json(&mut s, &body);
+                }
+                let snap = self.snapshot();
+                self.broadcast(&snap);
+            }
+            Effect::Switch { token, from, to, model, effort } => {
+                let res = self.switch_model(&from, &to, &model, &effort);
+                if let Some(mut s) = token.and_then(|t| self.replies.remove(&t)) {
+                    let body = match &res {
+                        Ok(text) => json!({"ok": true, "cmd": "switch", "text": text}),
+                        Err(e) => json!({"ok": false, "error": e}),
+                    };
+                    write_json(&mut s, &body);
+                }
+                let snap = self.snapshot();
+                self.broadcast(&snap);
+            }
+            Effect::ModelRefused { agent, why } => self.model_refused(&agent, &why),
             Effect::Pr(e) => log_line(&self.opts.paths, &crate::forge::log_line(&e)),
             Effect::Merge { card, place, number, head, method } => self.merge_pr(card, place, number, head, method),
             Effect::Feature { token, op, name, agents } => self.feature(token, op, name, agents),
@@ -2524,6 +2728,60 @@ impl Shell {
         }
     }
 
+    /// What keeps a hub with no UI up (idle-exit rule 2): an agent
+    /// mid-turn (or waiting in `sb wait`), a REPL starting or switching,
+    /// a background job of an agent, a build of the hub's own.
+    fn idle_busy(&self) -> Vec<String> {
+        let mut v = Vec::new();
+        for name in &self.hub.st.order {
+            let Some(a) = self.hub.st.agents.get(name) else { continue };
+            if a.lifecycle != Lifecycle::Active {
+                continue;
+            }
+            if a.run == crate::model::Run::Busy {
+                v.push(format!("{} mid-turn", a.name));
+            }
+            let jobs = crate::idle::bg_jobs(&self.opts.paths.agent_tmp(&a.dir).join("bg"), crate::procs::alive);
+            if !jobs.is_empty() {
+                v.push(format!("{}'s background job {}", a.name, jobs.join(" ")));
+            }
+        }
+        if !self.starts.is_empty() {
+            v.push("a REPL starting".into());
+        }
+        if !self.switching.is_empty() {
+            v.push("a REPL switching".into());
+        }
+        if !self.building.is_empty() {
+            v.push("a version build".into());
+        }
+        if self.updating.is_some() {
+            v.push("the /update build".into());
+        }
+        if self.release.is_some() {
+            v.push("/release-bise".into());
+        }
+        v
+    }
+
+    /// idle-exit, at each tick: no UI for the grace and nothing runs,
+    /// the hub stops for good (the stop of `bise --stop`).
+    fn idle_check(&mut self) {
+        let uis = self.clients.len() + self.holds.count();
+        // the look reads self: the watch is taken out for it
+        let mut w = std::mem::replace(&mut self.idle, crate::idle::Watch::new(None, std::time::Instant::now()));
+        let step = w.step(std::time::Instant::now(), uis, || self.idle_busy());
+        self.idle = w;
+        match step {
+            crate::idle::Step::Stay => {}
+            crate::idle::Step::Say(s) => log_line(&self.opts.paths, &s),
+            crate::idle::Step::Stop(s) => {
+                log_line(&self.opts.paths, &s);
+                let _ = self.tx.send(Msg::Shutdown { keep: false });
+            }
+        }
+    }
+
     /// Start the REPL of `name` on a supervisor thread. `port`: the port of the process it replaces (a switch keeps the
     /// port: background commands and steer files are keyed by it).
     fn spawn_on(
@@ -2785,6 +3043,7 @@ impl Shell {
             return;
         }
         self.feed(&name, line);
+        self.art_on_line(&name, line);
         if line == "--- idle" {
             let leftover = self
                 .repls
@@ -2815,6 +3074,7 @@ impl Shell {
     /// `ready`, the versions, in one write (thousands of lines: one
     /// syscall, not one per line).
     fn client_hello(&mut self, id: ClientId, mut stream: UnixStream) {
+        let art_ev = self.artifacts_ev();
         let mut out = String::new();
         let mut push = |v: &Value| {
             out.push_str(&v.to_string());
@@ -2837,6 +3097,7 @@ impl Shell {
         }
         push(&self.approvals_ev(false));
         push(&json!({"ev": "ready"}));
+        push(&art_ev);
         push(&self.version_items());
         if let Some(r) = self.release_hello() {
             push(&r);
@@ -2979,6 +3240,10 @@ impl Shell {
                 focus: s("focus"),
             }),
             "release" => self.release_op(id, &v),
+            // artifacts and diffs (docs/artifacts.md)
+            "artifacts" => self.artifacts_op(id, &v),
+            "diff" => self.diff_op(id, &v),
+            "branches" => self.branches_op(id),
             // shift+tab, `/approvals [yolo|auto]` (approvals-design.md §8)
             "approvals" => {
                 let m = match s("mode").as_str() {
@@ -3167,6 +3432,10 @@ impl Shell {
             }
             "taste" | "people" => {
                 let body = self.keeps_op(cmd, &v);
+                write_json(&mut stream, &body);
+            }
+            "artifact" => {
+                let body = self.artifact_cmd(&from, &v);
                 write_json(&mut stream, &body);
             }
             _ => match AgentReq::from_json(&v) {
@@ -3401,6 +3670,11 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         eprintln!("a hub is already running for {}", paths.workspace.display());
         return Ok(());
     }
+    wait_previous_hub(&paths);
+    if UnixStream::connect(paths.socket()).is_ok() {
+        eprintln!("a hub is already running for {}", paths.workspace.display());
+        return Ok(());
+    }
     let _ = std::fs::remove_file(paths.socket());
     let listener = UnixListener::bind(paths.socket())?;
     std::fs::write(paths.pid_file(), std::process::id().to_string())?;
@@ -3563,6 +3837,15 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         page_replies: BTreeMap::new(),
         // the cards survive a restart, so do their links (lead m_6039)
         card_links: crate::card_link::load(&crate::card_link::file(&paths.state)),
+        idle: crate::idle::Watch::new(
+            crate::idle::grace(
+                std::env::var(crate::idle::ENV).ok().as_deref(),
+                &std::fs::read_to_string(bise_home::Home::from_env().config_file()).unwrap_or_default(),
+            ),
+            std::time::Instant::now(),
+        ),
+        holds: crate::idle::Holds::default(),
+        art: art::Art::default(),
     };
     // the page server (docs/ambient-pages.md §2.4): 127.0.0.1, a stable
     // port per workspace; its notes come back to the loop
@@ -3580,6 +3863,10 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         Err(e) => log_line(&paths, &format!("no page server: {}", e)),
     }
     sh.start_here(&paths);
+    match sh.idle.grace() {
+        Some(g) => log_line(&paths, &format!("idle exit: after {} s without a UI, once nothing runs", g.as_secs())),
+        None => log_line(&paths, "idle exit: off (the hub runs until stopped)"),
+    }
     // the features' facts (dev-flow §5.1), off the loop
     sh.refresh_features();
     // the role lines of an earlier hub (BISE-126)
@@ -3681,6 +3968,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
                     sh.announce_update();
                     sh.release_check(None);
                     sh.plan_prs();
+                    sh.idle_check();
                     // computer use (design §7.3): each stop, one line in main's feed
                     for l in sh.cu.poll() {
                         sh.feed(crate::model::MAIN, &format!("sb computer : {}", crate::util::wire_escape(&l)));
@@ -3866,6 +4154,12 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
             }
             Msg::Release { client, v } => sh.release_event(client, v),
             Msg::Update(v) => sh.update_event(v),
+            Msg::Changes { name, v } => sh.on_changes(name, v),
+            Msg::ToClient { id, v } => {
+                if let Some(c) = sh.clients.get_mut(&id) {
+                    write_json(c, &v);
+                }
+            }
             Msg::RoleLine { dir, key, line } => sh.step(Input::RoleLine { dir, key, line }),
             Msg::GateChecked { dir, n, req, out } => sh.on_checked(&dir, &n, *req, out),
             Msg::BuildEnded { rev } => {
@@ -3887,13 +4181,35 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
             }
         }
     }
+    // for good: no new client reaches a hub that is going (it would wait
+    // for a hello that never comes); a `bise` meanwhile starts the next
+    // hub, which waits for this one to be gone (`wait_previous_hub`)
+    if !keep_agents {
+        let _ = std::fs::remove_file(paths.socket());
+    }
     sh.flush_offsets();
     if keep_agents {
         log_line(&paths, "hub stop (REPLs kept for the next hub)");
     } else {
         log_line(&paths, "hub stop");
-        for (_, pid) in sh.pids.values() {
-            kill_pid(*pid);
+        // idle-exit: each idle REPL checkpoints its session and exits (the
+        // `reload` of a switch: a turn boundary, nothing lost); a busy
+        // one refuses and gets SIGTERM after, as before
+        let pids: Vec<u32> = sh.pids.values().map(|(_, p)| *p).collect();
+        for r in sh.repls.values_mut() {
+            let _ = r.stream.write_all(b"reload\n");
+        }
+        let t0 = std::time::Instant::now();
+        while pids.iter().any(|p| crate::procs::alive(*p)) && t0.elapsed() < REPL_QUIT {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let left: Vec<u32> = pids.iter().copied().filter(|p| crate::procs::alive(*p)).collect();
+        log_line(
+            &paths,
+            &format!("REPLs saved and gone: {} of {}", pids.len() - left.len(), pids.len()),
+        );
+        for pid in left {
+            kill_pid(pid);
         }
         // for good: what every agent started goes with it (BISE-243)
         let none = BTreeSet::new();
@@ -3908,9 +4224,45 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
             log_line(&paths, &format!("processes of the agents killed: {}", crate::procs::describe(&hit)));
         }
     }
-    let _ = std::fs::remove_file(paths.socket());
-    let _ = std::fs::remove_file(paths.pid_file());
+    // the next hub's socket and pid are not ours to remove
+    let ours = std::fs::read_to_string(paths.pid_file()).is_ok_and(|p| p.trim() == std::process::id().to_string());
+    if ours {
+        if keep_agents {
+            let _ = std::fs::remove_file(paths.socket());
+        }
+        let _ = std::fs::remove_file(paths.pid_file());
+    }
     Ok(())
+}
+
+/// How long a starting hub waits for the previous one of its workspace
+/// to finish stopping (its REPLs checkpoint, its agents' processes go).
+const PREVIOUS_HUB_WAIT: Duration = Duration::from_secs(15);
+
+/// A hub that stops for good removes its socket first: a `bise` launched
+/// meanwhile starts a new hub at once. That one waits here until the
+/// previous hub's process (`hub.pid`, still a `sbd`) is gone, so the two
+/// never share a REPL, a session or the reap of the agents' processes.
+fn wait_previous_hub(paths: &Paths) {
+    let Some(pid) = std::fs::read_to_string(paths.pid_file()).ok().and_then(|p| p.trim().parse::<u32>().ok()) else {
+        return;
+    };
+    if pid == std::process::id() || !crate::procs::alive(pid) {
+        return;
+    }
+    let cmd = Command::new("ps")
+        .args(["-p", &pid.to_string(), "-o", "command="])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).to_string())
+        .unwrap_or_default();
+    if !cmd.contains(" sbd") {
+        return;
+    }
+    let t0 = std::time::Instant::now();
+    while crate::procs::alive(pid) && t0.elapsed() < PREVIOUS_HUB_WAIT {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    log_line(paths, &format!("waited {} ms for the previous hub (pid {}) to stop", t0.elapsed().as_millis(), pid));
 }
 
 /// A hash of a REPL's spawn keys (never the keys themselves, kept).

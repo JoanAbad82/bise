@@ -93,14 +93,24 @@ pub const COMMANDS: &[CmdDoc] = &[
         "commit the files you changed (only yours, never another agent's) with that message. `--here`: on your place's branch (the shared folder: its branch, main). Without it, from a worktree: the branch is rebased on main, checked, and main moves to it (pushed when the repo says so); from the shared folder, the same as `--here`. A file another agent also changed is refused: main decides. New files: in a worktree you have alone, every new file not ignored is yours and lands; elsewhere, new files you made with bash (a generator, a download) land only with `--add <file or folder>`, and the land names the new files it left out.",
     ),
     cmd(
+        "sb artifact add <path or link> [--title \"<t>\"] [--kind <k>] | sb artifact list [<words>] [--agent <a>]",
+        Who::Everyone,
+        "artifacts: what you made for the user to look at (a doc, a sheet, a deck, a site, an image, a PR, a deploy), listed in the user's /artifacts with a copy of each version of a file (50 MB at most). `add` registers it, or its next version when the same path or link comes again, and prints its id; bise pages get in by themselves. Not the code you changed for a task (that's the commit), not scratch files. `list`: the ids, to link them.",
+    ),
+    cmd(
         "sb inspect main --origin",
         Who::Task,
         "the user message that led to your creation, verbatim, and main's turn up to the spawn.",
     ),
     cmd(
-        "sb spawn <name> --objective \"…\" [--context \"…\"] [--constraint \"…\"]... [--done-when \"…\"] [--report-format \"…\"] [--place new|<agent>|<branch> [--with-changes]] [--feature <name>]",
+        "sb spawn <name> --objective \"…\" [--context \"…\"] [--constraint \"…\"]... [--done-when \"…\"] [--report-format \"…\"] [--place new|<agent>|<branch> [--with-changes]] [--feature <name>] [--model <provider/id>] [--effort low|medium|high] [--profile <name>]",
         Who::Main,
-        "create a task (names: [a-z0-9-], at most 24 chars). Where it works: the shared folder by default; `--place new` a new git worktree (`--worktree` says the same); `--place <agent>` or `<branch>` the worktree of agents already on that change (they share it and its branch); `--feature <name>` its own worktree from that feature's tip, landing on the feature.",
+        "create a task (names: [a-z0-9-], at most 24 chars). Where it works: the shared folder by default; `--place new` a new git worktree (`--worktree` says the same); `--place <agent>` or `<branch>` the worktree of agents already on that change (they share it and its branch); `--feature <name>` its own worktree from that feature's tip, landing on the feature. Its model, for its whole life: `--model` the model the task runs on (default: the agents model, `bise config set agents`); `--effort` its reasoning effort (default: the model's); `--profile` a named model + effort from config.toml [profiles.<name>], e.g. fast, deep, review. A model that cannot run (unknown, no key) never fails the spawn: the task runs on the agents default and the answer says what was asked and why.",
+    ),
+    cmd(
+        "sb send <task> --model <provider/id> [--effort <e>] [\"<text>\"]",
+        Who::Main,
+        "move a task to another model (and effort), from its next turn; with a text, the message goes too.",
     ),
     cmd(
         "sb feature [new|sync|ready|merge|drop|list] <name>",
@@ -466,9 +476,20 @@ pub fn build(args: &[String]) -> Result<Value, String> {
             req.insert("context".into(), json!(n));
         }
         "send" => {
-            let (pos, o) = parse_args(rest, &["reply-to", "mode", "why"], &["expect-reply"])?;
+            let (pos, o) = parse_args(rest, &["reply-to", "mode", "why", "model", "effort"], &["expect-reply"])?;
             let to = agent_arg(&pos, "usage: sb send <agent> \"<text>\"")?;
             req.insert("to".into(), json!(to));
+            // issue #4: `--model`/`--effort` move the task from its next
+            // turn; the text is optional then (a switch alone)
+            let (model, effort) = (str_of(&o, "model"), str_of(&o, "effort"));
+            if !model.is_empty() || !effort.is_empty() {
+                req.insert("model".into(), json!(model));
+                req.insert("effort".into(), json!(effort));
+                if pos.len() < 2 {
+                    req.insert("cmd".into(), json!("switch"));
+                    return Ok(Value::Object(req));
+                }
+            }
             req.insert("text".into(), json!(text_of(&pos[1..])?));
             req.insert("expect_reply".into(), json!(o.contains_key("expect-reply")));
             if o.contains_key("mode") {
@@ -551,9 +572,16 @@ pub fn build(args: &[String]) -> Result<Value, String> {
                     "report-format",
                     "place",
                     "feature",
+                    "model",
+                    "effort",
+                    "profile",
                 ],
                 &["worktree", "with-changes"],
             )?;
+            // issue #4: the task's model, all optional (none: the agents default)
+            for k in ["model", "effort", "profile"] {
+                req.insert(k.into(), json!(str_of(&o, k)));
+            }
             // dev-flow §5.1: its own worktree from the feature's tip
             let feature = str_of(&o, "feature");
             if !feature.is_empty() && (o.contains_key("place") || o.contains_key("worktree")) {
@@ -710,6 +738,35 @@ pub fn build(args: &[String]) -> Result<Value, String> {
         }
         // agent-made pages (docs/ambient-pages.md §2.2)
         "page" => page_req(rest, &mut req)?,
+        "artifact" => {
+            let usage = "usage: sb artifact add <path or link> [--title \"<t>\"] [--kind <k>] | sb artifact list [<words>] [--agent <a>]";
+            let (pos, o) = parse_args(rest, &["title", "kind", "agent"], &[])?;
+            match pos.first().map(String::as_str) {
+                Some("add") => {
+                    let target = match &pos[1..] {
+                        [t] => t.clone(),
+                        _ => return Err(usage.into()),
+                    };
+                    req.insert("do".into(), json!("add"));
+                    req.insert("target".into(), json!(target));
+                    let cwd = std::env::current_dir().map(|d| d.to_string_lossy().to_string()).unwrap_or_default();
+                    req.insert("cwd".into(), json!(cwd));
+                    for k in ["title", "kind"] {
+                        if o.contains_key(k) {
+                            req.insert(k.into(), json!(str_of(&o, k)));
+                        }
+                    }
+                }
+                Some("list") => {
+                    req.insert("do".into(), json!("list"));
+                    req.insert("words".into(), json!(pos[1..].join(" ")));
+                    if o.contains_key("agent") {
+                        req.insert("agent".into(), json!(str_of(&o, "agent").trim_start_matches('@')));
+                    }
+                }
+                _ => return Err(usage.into()),
+            }
+        }
         "help" | "--help" | "-h" => return Err(usage()),
         other => return Err(format!("unknown command: {}\n{}", other, usage())),
     }
@@ -864,7 +921,9 @@ pub fn render(cmd: &str, v: &Value) -> (bool, String) {
         return (false, e);
     }
     let text = match cmd {
-        "list" | "tasks" | "inspect" | "history" | "show" => s("text"),
+        "list" | "tasks" | "inspect" | "history" | "show" | "artifact" => s("text"),
+        // issue #4: `sb send <task> --model <id>` alone: the hub's line
+        "send" if s("cmd") == "switch" => s("text"),
         "send" => format!("sent {} to {} ({}, thread {})", s("message_id"), s("to"), s("delivery"), s("thread")),
         "ask" | "wait" => match s("type").as_str() {
             // `answers m_8`: the question's id (BISE-110: the TUI hides
@@ -887,10 +946,13 @@ pub fn render(cmd: &str, v: &Value) -> (bool, String) {
             ),
         },
         "spawn" => format!(
-            "agent {} created{} — it starts now; its answer will come back as a message",
+            "agent {} created{}{} — it starts now; its answer will come back as a message",
             s("name"),
+            // issue #4: `on gpt-9 · low (profile fast)`, or the fallback's words
+            if s("model").is_empty() { String::new() } else { format!(" {}", s("model")) },
             v.get("branch").and_then(|b| b.as_str()).map(|b| format!(" in worktree {} (branch {})", s("path"), b)).unwrap_or_default()
         ),
+        "switch" => s("text"),
         "drop" => {
             if v.get("dropped") == Some(&json!(true)) {
                 "dropped".to_string()
