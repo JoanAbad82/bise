@@ -2761,6 +2761,8 @@ impl Shell {
         if self.release.is_some() {
             v.push("/release-bise".into());
         }
+        // a standing order (`sb every`) fires only while the hub runs
+        v.extend(crate::idle::timers_busy(self.hub.timers().map.len()));
         v
     }
 
@@ -3849,7 +3851,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     };
     // the page server (docs/ambient-pages.md §2.4): 127.0.0.1, a stable
     // port per workspace; its notes come back to the loop
-    match crate::pages::start(&paths.state, &crate::paths::workspace_id(&paths.workspace), sh.opts.app_root.join("apps/ambient/kit")) {
+    match crate::pages::start(&paths.state, &crate::paths::workspace_id(&paths.workspace), sh.opts.app_root.join("apps/ambient/kit"), sh.holds.clone()) {
         Ok(p) => {
             let tx = std::sync::Mutex::new(tx.clone());
             p.connect_hub(Box::new(move |m| {

@@ -430,6 +430,9 @@ fn events(w: &mut TcpStream, pages: &Pages, id: &str) {
     if w.write_all(head.as_bytes()).is_err() {
         return;
     }
+    // idle-exit: an open stream (a page open in a browser, the capsule's
+    // frame) keeps the hub up; dropped when the stream ends
+    let _hold = pages.holds.hold();
     let (tx, rx) = mpsc::channel::<String>();
     let first = if id.is_empty() {
         format!("event: pages\ndata: {}\n\n", json!({"pages": pages.list_json()}))
@@ -637,6 +640,54 @@ mod tests {
         assert!(got.iter().any(|f| f.starts_with("event: state\ndata: {\"state\":\"ready\"}")));
         p.set_state("w", "updating");
         assert_eq!(rx.try_iter().next().unwrap(), "event: state\ndata: {\"state\":\"updating\"}\n\n");
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    /// idle-exit (main m_7249): an open event stream holds the hub up,
+    /// its end lets go; the other routes never hold.
+    #[test]
+    fn an_open_event_stream_holds_the_hub() {
+        use std::io::Read;
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let d = std::env::temp_dir().join(format!("sb-srv-hold-{}", std::process::id()));
+        std::fs::create_dir_all(d.join("kit")).unwrap();
+        let holds = crate::idle::Holds::default();
+        let p = std::sync::Arc::new(Pages { holds: holds.clone(), ..Pages::new(&d, port, d.join("kit")) });
+        serve(listener, p.clone());
+        let get = |path: &str| {
+            let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+            s.write_all(format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n").as_bytes()).unwrap();
+            s
+        };
+        let wait = |n: usize| {
+            let t0 = std::time::Instant::now();
+            while holds.count() != n {
+                assert!(t0.elapsed() < std::time::Duration::from_secs(5), "holds {} != {n}", holds.count());
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        };
+        let mut home = get("/events");
+        let mut first = [0u8; 12];
+        home.read_exact(&mut first).unwrap();
+        wait(1);
+        let page = get("/p/none/events");
+        wait(2);
+        // a plain GET never holds
+        let mut out = String::new();
+        let _ = get("/p/none/meta").read_to_string(&mut out);
+        assert_eq!(holds.count(), 2);
+        // the browser goes: a stream finds out at its next write (a ping
+        // every 15 s, or an event: sent here), and its hold goes
+        drop(home);
+        drop(page);
+        let t0 = std::time::Instant::now();
+        while holds.count() != 0 {
+            assert!(t0.elapsed() < std::time::Duration::from_secs(5), "holds {} after close", holds.count());
+            p.push("", "pages", &json!({"pages": []}));
+            p.push("none", "state", &json!({"state": "ready"}));
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
         let _ = std::fs::remove_dir_all(d);
     }
 

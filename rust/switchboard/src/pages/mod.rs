@@ -53,6 +53,10 @@ pub struct Pages {
     busy: Mutex<std::collections::BTreeSet<String>>,
     /// (page, agent) → the page's version when that agent became done
     done_at: Mutex<HashMap<(String, String), u64>>,
+    /// the hub's idle-exit holds (docs/idle-exit.md): each open event
+    /// stream holds one while it is open, so a page open in a browser
+    /// keeps the hub up
+    pub holds: crate::idle::Holds,
 }
 
 /// The progress lines a new SSE stream replays.
@@ -114,6 +118,7 @@ impl Pages {
             progress: Mutex::new(HashMap::new()),
             busy: Mutex::new(std::collections::BTreeSet::new()),
             done_at: Mutex::new(HashMap::new()),
+            holds: crate::idle::Holds::default(),
         }
     }
 
@@ -382,12 +387,13 @@ pub fn raise_fd_limit(want: u64) -> u64 {
 }
 
 /// Start the page server of a hub: the port, the listener, its thread.
-pub fn start(state: &Path, workspace_id: &str, kit_dir: PathBuf) -> std::io::Result<Arc<Pages>> {
+/// `holds`: the hub's idle-exit holds (an open event stream holds one).
+pub fn start(state: &Path, workspace_id: &str, kit_dir: PathBuf, holds: crate::idle::Holds) -> std::io::Result<Arc<Pages>> {
     raise_fd_limit(10240);
     let free = |p: u16| std::net::TcpListener::bind(("127.0.0.1", p)).is_ok();
     let port = pick_port(state, workspace_id, &free).ok_or_else(|| std::io::Error::other("no free port in 47100-47899"))?;
     let listener = std::net::TcpListener::bind(("127.0.0.1", port))?;
-    let pages = Arc::new(Pages::new(state, port, kit_dir));
+    let pages = Arc::new(Pages { holds, ..Pages::new(state, port, kit_dir) });
     server::serve(listener, pages.clone());
     Ok(pages)
 }
