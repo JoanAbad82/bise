@@ -291,6 +291,9 @@
         return none(ev.turn === m.main.turn || m.main.turn == null ? { ...m, word: { turn: ev.turn, i: ev.i | 0 } } : m);
 
       case "sent": {
+        // a message sent to an agent from the panel (amb-core 67ba0b31: {ev:'sent', agent, mode})
+        // is not his turn with main: the bar ignores it (main's sent has no agent)
+        if (ev.agent) return none(m);
         // back after can't reach bise: '✓ bise is back · your words went to main' (round 9)
         const back = m.pending && now - m.pending.at >= T.offline;
         return none({ ...m, backAt: back ? now : m.backAt, pending: null, voice: !!ev.voice, sentAt: now, mine: true, hushed: false, shot: ev.shot ? m.shot : null,

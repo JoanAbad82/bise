@@ -1423,6 +1423,9 @@ law("round 10: ⌘D follows the selected agent (again to stop), ⌘O opens it in
   eq(M.step(m, { ev: "ui_follow", agent: "dark-mode" }, 50).cmds, [{ cmd: "follow", agent: "dark-mode", on: false }]);
   const s0 = Bar.spec(M.view(M.step(M.init(), { ev: "app_key", key: "space" }, 0).m, 10));
   eq([s0.w, s0.preview], [undefined, undefined]);
+  // an agent's sent (amb-core 67ba0b31: the panel's send) is not main's: the bar stays as it was
+  const before = R10();
+  eq(M.step(before, { ev: "sent", agent: "perf", mode: "now" }, 60).m, before);
   // fn a with no agents says what to do next (ambient m_7036)
   eq(Bar.spec(M.view(M.step(M.init(), { ev: "app_key", key: "a" }, 0).m, 10)).text, { s: "no agents yet. type what you want done, tab starts one.", dim: true });
 });
