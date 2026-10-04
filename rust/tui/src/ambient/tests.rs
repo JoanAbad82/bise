@@ -1301,3 +1301,17 @@ fn acts_send_now_queued_stop_archive_unarchive() {
     t.cmd(Cmd::AgentSend { agent: "nobody".into(), text: "hi".into(), queued: false });
     assert!(has(&t.take(), "error"));
 }
+
+#[test]
+fn a_preview_of_an_agent_the_hub_does_not_know_comes_at_once() {
+    // the QA scenes inject agents into the page only (m_7106): the core
+    // still answers, empty, so the bar never waits
+    let mut t = T::new();
+    t.ready();
+    t.cmd(Cmd::AgentPreview { agent: "cookies".into() });
+    let p = t.take().into_iter().find(|v| v["ev"] == "agent_preview").expect("a preview at once");
+    assert_eq!(p, json!({"ev": "agent_preview", "agent": "cookies", "now": "", "actions": [], "waiting": [], "last_report": null, "pages": []}));
+    // asked again (the page asks once, the app may relaunch the page): again
+    t.cmd(Cmd::AgentPreview { agent: "cookies".into() });
+    assert!(has(&t.take(), "agent_preview"));
+}
