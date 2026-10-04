@@ -54,6 +54,13 @@ html:not(.app) .glass { -webkit-backdrop-filter: blur(40px) saturate(1.8); backd
 .q.ph { color: #ffffff59; }
 .q.big { font-size: 19px; line-height: 1.35; white-space: normal; padding: 12px 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .q.hello { font-size: 21px; }
+/* his words while he talks and after he lets go (lead m_7163): wrapped to as many lines as they
+   need up to 6, the end always in view, the top fading once they pass it; never clipped on one line */
+.inrow.grow { height: auto; min-height: 68px; align-items: flex-start; }
+.q.wrap { white-space: normal; overflow: hidden; text-overflow: clip; display: flex; flex-direction: column; justify-content: flex-end;
+  max-height: calc(23px * 1.25 * 6); margin: 19px 0 17px; }
+.q.wrap .qi { display: block; }
+.q.wrap.over { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.6em); mask-image: linear-gradient(to bottom, transparent 0, #000 1.6em); }
 .q .gl { color: var(--faint); }
 .q .gl.ok { color: var(--ok); } .q .gl.risk { color: var(--risk); } .q .gl.a { color: var(--acc); }
 .q .w { display: inline-block; opacity: 0; filter: blur(4px); transform: translateY(3px); transition: opacity .32s var(--ease-out), filter .32s var(--ease-out), transform .32s var(--ease-out); }

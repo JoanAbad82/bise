@@ -14,7 +14,6 @@
 
   // how long things stay (ms)
   const T = {
-    got: 900,        // `:* got it.` before `on it.`
     endOpen: 4000,   // end of turn: open, then small
     kiss: 1000,      // the kiss, once
     level: 250,      // a level older than this is silence
@@ -331,7 +330,9 @@
         }
         // let go: the app sends the talk; if the core doesn't answer 'sent' in 3 s, can't reach bise
         // (what he said is kept: a retry sends its words as text)
-        if (st === "up") return none({ ...m, fn: false, handsFree: false, pending: m.fn || m.handsFree ? { cmd: { cmd: "send", text: m.heard.text }, text: m.heard.text, at: now, voice: true } : m.pending });
+        // his words stay on the glass after he lets go (m.said), until main's answer replaces them
+        // (the user's dogfood, lead m_7163: no 'got it' / 'on it' line)
+        if (st === "up") return none({ ...m, fn: false, handsFree: false, said: m.fn || m.handsFree ? m.heard.text : m.said, pending: m.fn || m.handsFree ? { cmd: { cmd: "send", text: m.heard.text }, text: m.heard.text, at: now, voice: true } : m.pending });
         if (st === "cancel") {
           return { m: flashNow({ ...m, fn: false, handsFree: false, mine: false, heard: { text: "", final: false }, phase: m.phase === "listening" ? "idle" : m.phase }, { kind: "cancel", text: W.cancelled }, now), cmds: [{ cmd: "talk_cancel" }] };
         }
@@ -505,7 +506,7 @@
         // tab: amb-core's own cmd start (e00ad291), which answers 'sent' like send; the words wait
         // in m.pending until 'sent' (can't reach bise after 3 s)
         const cmd = { cmd: ev.ev === "ui_spot_tab" ? "start" : "send", text };
-        return { m: { ...r.m, mine: true, voice: false, turnNames: names(m.agents), chips: [], pending: { cmd, text, at: now } }, cmds: [...r.cmds, cmd] };
+        return { m: { ...r.m, mine: true, voice: false, said: text, turnNames: names(m.agents), chips: [], pending: { cmd, text, at: now } }, cmds: [...r.cmds, cmd] };
       }
       case "ui_perm":
         // continue: macOS's prompt; not now: the refused path (the app answers app_perm denied, and
@@ -813,7 +814,9 @@
       if (m.main.text && !m.voice) v.words = mainWords();
       // back after can't reach bise: '✓ bise is back · your words went to main' first (round 9)
       else if (now - (m.backAt || -1e9) < T.page) { v.glyph = "✓"; v.text = W.bar.back; }
-      else v.text = now - m.sentAt < T.got ? W.got : W.onShort;
+      // his words, whole, while bise thinks (the pearl's work mood); no 'got it' / 'on it' line
+      // (the user's dogfood, lead m_7163): main's answer replaces them
+      else if (m.said) v.said = { list: m.said.split(/\s+/).filter(Boolean), lit: 1e9 };
       if (m.line) v.sub = m.line;
       v.chips = m.chips;
     } else if (m.mine && m.phase === "speaking") {

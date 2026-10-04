@@ -107,7 +107,9 @@
     switch (v.state) {
       case "listening": case "voice_note": {
         const said = v.words && v.words.list.length ? v.words : null;
-        s.head = { h: 68, line: said ? { words: said } : { ph: true, text: v.state === "voice_note" && v.label ? v.label.text : B.listening } };
+        // his words wrap to as many lines as they need (a cap, then a fade at the top), never
+        // clipped on one line (the user's dogfood, lead m_7163)
+        s.head = { h: 68, line: said ? { words: said, wrap: true } : { ph: true, text: v.state === "voice_note" && v.label ? v.label.text : B.listening } };
         // seesParts already says 'bise sees <app> · <host>' (ambient's gate (1): it was doubled)
         if (v.sees) s.head.right = { text: v.sees.head + (v.sees.tail || "") };
         s.level = v.lvl || 0;
@@ -117,7 +119,8 @@
         return s;
       }
       case "working": case "speaking": case "end": {
-        s.head = { h: 68, line: v.words ? { words: v.words, size: "big" } : { text: v.text, size: "big" } };
+        // after he lets go: his words stay, whole, while bise thinks; main's answer replaces them
+        s.head = { h: 68, line: v.words ? { words: v.words, size: "big" } : v.said ? { words: v.said, wrap: true } : { text: v.text, size: "big" } };
         if (v.sub) s.text = { s: v.sub, dim: true };
         s.sections = started(v);
         // ⌘ C copies main's answer (ui.js: act ui_copy is the page's, never the model's)

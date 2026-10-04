@@ -105,9 +105,12 @@
     else if (h.input) left = `<div class="q in"></div>`;
     else {
       const L = h.line;
-      left = `<div class="q${L.ph ? " ph" : ""}${L.size ? " " + L.size : ""}">${L.words ? "" : `${L.glyph ? `<span class="gl ${L.gc || ""}">${esc(L.glyph)}</span> ` : ""}${esc(L.text)}`}</div>`;
+      // his words wrap (lead m_7163): as many lines as they need up to a cap, the end always in
+      // view, a fade at the top once they pass it
+      if (L.wrap) left = `<div class="q wrap"><span class="qi"></span></div>`;
+      else left = `<div class="q${L.ph ? " ph" : ""}${L.size ? " " + L.size : ""}">${L.words ? "" : `${L.glyph ? `<span class="gl ${L.gc || ""}">${esc(L.glyph)}</span> ` : ""}${esc(L.text)}`}</div>`;
     }
-    return `<div class="inrow h${h.h}">${left}${right}</div>`;
+    return `<div class="inrow h${h.h}${h.line && h.line.wrap ? " grow" : ""}">${left}${right}</div>`;
   }
 
   // a match marked (round 10's search: [start, end] in the text)
@@ -194,7 +197,12 @@
       if (input.placeholder !== h.input.ph) { input.placeholder = h.input.ph; input.setAttribute("aria-label", h.input.ph); }
     } else if (document.activeElement === input) input.blur();
     const w = h && h.line && h.line.words;
-    put("words", JSON.stringify(w && [w.list, w.code, w.lit]), () => { const q = $(".q", el.head); if (q && w) words(q, w); });
+    put("words", JSON.stringify(w && [w.list, w.code, w.lit]), () => {
+      const q = $(".q", el.head), qi = q && $(".qi", q);
+      if (q && w) words(qi || q, w);
+      // past the cap: the top fades, the end stays in view
+      if (qi) q.classList.toggle("over", qi.scrollHeight > q.clientHeight + 2);
+    });
 
     show(el.level, s.level != null);
     if (s.level != null) el.level.style.transform = `scaleX(${(0.25 + 0.75 * Math.min(1, s.level)).toFixed(3)})`;

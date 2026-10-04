@@ -41,7 +41,6 @@
     nothingNeeds: "nothing needs you.",
     listening: "listening",
     letGo: "let go of fn to send",
-    got: ":* got it.",
     // roadmap §3.1 'bise speaks': on the capsule the speaker is bise, never main (the TUI keeps
     // main); best guesses, asked to ambient
     on: "bise is on it.",

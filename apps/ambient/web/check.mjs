@@ -158,14 +158,23 @@ law("the chip cuts the path or the title, never the app or the host", () => {
   eq(Wd.seesParts("Ghostty", "~/acme — bise"), { head: "bise sees Ghostty · ", tail: "~/acme — bise" });
   eq(Wd.seesParts("Finder", ""), { head: "bise sees Finder", tail: "" });
 });
-law("let go: `:* got it.`, then `on it.` under the main label, the * turning", () => {
+law("let go: his words stay on the glass, whole, while bise thinks (the pearl's work mood); no 'got it' / 'on it' line (the user's dogfood, lead m_7163)", () => {
   const evs = sceneEvents("talk");
   const sent = evs.find(([, e]) => e.ev === "sent")[0];
   const r = run(evs, [sent + 100, sent + 1200]);
   const a = r.view(sent + 100), b = r.view(sent + 1200);
-  assert.equal(a.label.text, "bise"); assert.equal(a.text, W.got); assert.equal(a.pose, "think"); assert.equal(a.size, "open");
-  assert.equal(b.text, W.onShort);
+  assert.equal(a.label.text, "bise"); assert.equal(a.text, null); assert.equal(a.pose, "think"); assert.equal(a.size, "open");
+  assert.equal(a.mood, "work");
+  eq(a.said.list.join(" "), W.said);
+  eq([b.text, b.said.list.join(" ")], [null, W.said]);
   assert.equal(b.sub, "starting dark-mode");
+  const s = Bar.spec(b);
+  eq([s.head.line.wrap, s.head.line.words.list.length > 8], [true, true]);
+  // while he talks, his words wrap too (never clipped on one line)
+  const listen = evs.filter(([, e]) => e.ev === "heard").at(-1)[0];
+  assert.equal(Bar.spec(run(evs, [listen + 10]).view(listen + 10)).head.line.wrap, true);
+  // nothing on any surface says ':*' any more
+  assert.ok(!JSON.stringify(W).includes(":*"));
 });
 law("main speaks: the sphere follows main's voice, its words light one by one, new agents pop in", () => {
   const evs = sceneEvents("talk");
@@ -343,7 +352,7 @@ law("fn + space: the spotlight takes the keys, ⏎ sends to main and gives them 
   r = M.step(r.m, { ev: "ui_spot_send" }, 30);
   eq([...r.cmds], [{ cmd: "app_focus", on: false }, { cmd: "send", text: "what's perf doing?" }]);
   r = M.step(r.m, { ev: "sent", text: "what's perf doing?", voice: false, shot: true }, 40);
-  assert.equal(M.view(r.m, 50).text, W.got);
+  eq([M.view(r.m, 50).text, M.view(r.m, 50).said.list], [null, ["what's", "perf", "doing?"]]);
 });
 law("the spotlight's key bar shows `tab start an agent` only with text; tab asks main to start one", () => {
   let r = M.step(M.init(), { ev: "app_key", key: "space" }, 0);
