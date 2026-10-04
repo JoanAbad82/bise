@@ -64,7 +64,7 @@
       find: {
         ph: "find an agent", spotPh: "ask bise, find an agent or a page",
         yours: "your agents", waitingOnYou: (n) => `${n} waiting on you`, agents: "agents", ask: "ask",
-        none: "no agents yet.", noMatch: "no agent matches. ⏎ asks main instead.",
+        none: "no agents yet. type what you want done, tab starts one.",   // ambient m_7036 noMatch: "no agent matches. ⏎ asks main instead.",
         status: { waiting: "needs you", working: "working", blocked: "blocked", done: "done", idle: "idle", failed: "failed" },
         needsYou: (name) => `? ${name} needs you`,
         waitsOnYou: "waits on you", lastActions: "last actions", lastReport: "last report", itsPage: "its page", itsPages: "its pages",
