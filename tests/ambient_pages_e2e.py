@@ -376,7 +376,8 @@ def main():
         c.wait(lambda: ws.seen("watch", lambda d: d is None), 15, "watch null after the stop")
         c.wait(lambda: any("the user stopped timer #%d" % tid in l for l in c.lines("main")[n_main:]), 30, "main hears the stop from bise")
         check(not any("you sent 1 note" in l for l in c.lines("main")[n_main:]), "no notes message for a stop")
-        c.wait(lambda: not any(t["id"] == tid for t in (c.state or {}).get("timers", [])), 15, "the timer gone from the state")
+        # the state keeps a week of ended timers (/scheduled): stopped = it has ended_ms
+        c.wait(lambda: not any(t["id"] == tid and t.get("ended_ms") is None for t in (c.state or {}).get("timers", [])), 15, "the timer stopped in the state")
         m = json.loads(request(port, "GET", "/p/launch-watch/meta")[2])
         check("watch" not in m and [n["status"] for n in m["notes"]] == ["done"], "no watch, the stop note done: %r" % m)
         settle(c)
