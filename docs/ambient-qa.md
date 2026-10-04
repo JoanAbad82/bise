@@ -601,6 +601,84 @@ act, not by the page's click event.
   on the card sends `app_size` + `app_content`. The view changed, but nothing shows the card going
   into the count. `qa.py clicks` should also judge by the act, not by the click event (amb-tools).
 
+## Click and key audit, round 10 (the user via main m_6963: "il manque beaucoup de click events sur beaucoup de choses; pas de ⌘Q")
+
+This audit reads the code only, at ambient-app faeb8a47: `apps/ambient/web/bar.js` + `ui.js`
+(the bar), `apps/ambient/mac/src/StatusItem.swift` + `MenuRows.swift` + `Capsule.swift` (menu bar,
+panel) and `apps/ambient/kit/kit.js` + `notes.js` (the pages' frame). No app run. "click" = a
+`data-act` button or a row that sends something. "hover" = a `:hover` style. "info" = text with
+no act, arrow cursor. The rule behind every "should": anything that shows a key or looks like a
+row does the same thing on click, and a click never does more than its key.
+
+**The bar**
+
+| element | today | should | owner |
+|---|---|---|---|
+| the pearl (any state) | no act; the panel lets the mouse through over it (`takesMouse`: glass only), so a click goes to the app below | click = talk (same as fn: listens, a 2nd click sends); hover: soft lift + "fn talk" tip | amb-mac (take the mouse on the pearl) + amb-web |
+| idle/hello foot: `fn talk`, `fn space type`, `fn 0 going on`, `fn o start here` | info only: no act on any of the 4 | each one clickable: talk, opens the field, opens going-on, opens start-here | amb-web |
+| needs head: `? main needs you · now · +2` | info | `+N` opens the inbox (fn i); the rest stays info | amb-web |
+| question text, clamped | click → full text ✓ | ✓ | - |
+| question text, full | info ✓ | ✓ | - |
+| option rows `1 tuesday`… | click ✓, hover ✓ | ✓ | - |
+| drafts big line (`3 drafts ready…`) | click → review ✓ | ✓ | - |
+| foot `fn 1–n pick`, `↑↓ move`, `fn talk / hold` | info ✓ (the rows/fn are the targets) | ✓; `fn talk` may join the pearl's click | amb-web |
+| foot `fn esc later`, `fn o open the page`, `⌘⏎ full text` | click ✓ (fail 47: `fn esc later` showed no act in the 5th run) | recheck 47 at the next build | amb-web |
+| working/speaking: main's line (the words) | info | click opens his page when the answer has one; else info | amb-web + amb-core (page id on the line) |
+| working/speaking foot `⌘C copy`, `esc close` | click ✓ | ✓ | - |
+| started agents (`∿ name` rows after an answer) | info (div) | click = what that agent made: its page if any, else its last line + "open in terminal" | amb-web + amb-core |
+| spotlight field rows `@ ask main`, `+ start an agent` | click ✓, hover ✓ | ✓ | - |
+| spotlight foot `⏎ send to main`, `tab start an agent` | info (no act) | clickable, same as the rows | amb-web |
+| spotlight foot `esc close` | click ✓ | ✓ | - |
+| inbox/going-on card rows (`? …`, 1-9) | click ✓ | ✓ | - |
+| going-on running agent rows (name · what · age) | info (div), no hover | click opens the agent's page or last report; hover shows its last report in full | amb-web + amb-core (agent → page/report) |
+| for-you page rows (◰) | click ✓, ⌘1-9 ✓ | ✓ | - |
+| section labels `waiting · 2`, `running · 3`, `for you`, head `most blocking`, `kept` | info | `for you · N` opens fn p (all pages); the others stay info | amb-web |
+| "… more" / clamp on long row text | none: rows cut at one line, no way to read more | hover or selection shows the full line (as for options) | amb-web |
+| offline rows retry / terminal / copy | click ✓ | ✓ | - |
+| refused lines (▲ 8 s flash, 37cd0aa8) | info, then gone | click = its way back (opens the System Settings pane, or settings) | amb-web + amb-mac |
+| settings switches | click ✓ (space ✓) | ✓ | - |
+| settings skipped app rows (`◌ Zoom ⌫`) | **a click removes the app** at once | click selects; removal on ⌫ or a hover `×` only | amb-web |
+| settings `◌ … always` rows | info ✓ | ✓ | - |
+| settings `+ add an app`, perm continue / not now | click ✓ | ✓ | - |
+| the glass outside any row | nothing ✓, clicks inside the glass don't reach the app below ✓ | ✓ | - |
+
+**The menu-bar menu** (StatusItem.swift): a left click on the icon opens the full view ✓; right
+or ctrl click opens the menu. Card, page, watch, stop watching, type to main, hide/show,
+settings and quit rows all act ✓ (native hover ✓).
+
+| element | today | should | owner |
+|---|---|---|---|
+| menu shortcuts | keys drawn as dim text, `keyEquivalent: ""` on every item: no ⌘ key works in the menu | real key equivalents: quit ⌘Q, settings ⌘, | amb-mac |
+| left click on the icon | full view only; the menu is right/ctrl click | keep it; say "right-click for the menu" in the full view's foot (now hidden) | amb-mac + amb-web |
+| section headers (needs you, for you) | disabled ✓ | ✓ | - |
+
+**The mac keys.** The app sets no main menu (`NSApp.mainMenu` nowhere), so AppKit's standard keys
+have nothing to go through. The panel's keydown (`ui.js`) handles only ⌘⏎, ⌘1-9 and ⌘C.
+
+| key | today | should | owner |
+|---|---|---|---|
+| ⌘Q | nothing (quit is only the menu row) | quits bise (the same as the menu's quit) | amb-mac |
+| ⌘W | nothing | closes the bar (= esc) | amb-mac |
+| ⌘, | nothing | opens settings (= fn ,) | amb-mac |
+| ⌘H | nothing | hides the bar (= fn .) | amb-mac |
+| ⌘F | nothing | in going-on / pages: opens the field to filter the list | amb-web |
+| ⌘A ⌘C ⌘V ⌘X ⌘Z ⇧⌘Z in the field | likely dead: with no Edit menu, WKWebView gets no editing commands (one short run to confirm) | all work as in any text field; pasting a long text is the main case | amb-mac (an Edit menu, hidden) |
+| ⌥←→ ⌘←→ ⌥⌫ in the field | to check in the same run | as in any text field | amb-mac |
+| ⌘C outside the field | copies main's answer or the offline line ✓ | ✓; also copies a selected row's text | amb-web |
+| ⌘⏎, ⌘1-9 | ✓ | ✓ | - |
+
+**The pages' frame** (kit.js): the version button, its menu, `latest`, `changes`, `stop`
+(watching), `send` and the taste link all act ✓, with keyboard ✓.
+
+| element | today | should | owner |
+|---|---|---|---|
+| the frame's pearl `:*` and the title | info | the pearl = talk about this page (= fn held on it); the title scrolls to the top | amb-kit + amb-web |
+| notes count (`3 notes`) | info | click opens the notes list | amb-kit |
+| `updating · <agent>` | info | the agent's name opens its last report (or stays info: product call) | amb-kit |
+
+**To prove with one short run** (only if a doubt stays): ⌘V in the field, and a click on the
+pearl reaching the app below.
+
 ## Out of the way (vision §3 G, the user's change m_5030)
 
 - [ ] At rest, after launch: nothing on screen but the menu-bar icon (no idle capsule).
