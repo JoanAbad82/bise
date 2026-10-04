@@ -306,8 +306,11 @@
         const perms = { ...m.perms, [ev.perm]: ev.state };
         if (ev.state === "ask") return none({ ...m, perms, permAsk: ev.perm });
         const m2 = { ...m, perms, permAsk: m.permAsk === ev.perm ? null : m.permAsk };
-        if (ev.state === "denied" && m.perms[ev.perm] !== "denied" && W.permDenied[ev.perm]) {
-          return none(flashNow(m2, { kind: "perm", glyph: "▲", text: Wd.permDenied(ev.perm, m.macos), ttl: 8000, still: true }, now));
+        // every refusal shows, each time the app sends one (a fn hold with the mic off, a launch
+        // without Accessibility; the user's rule via amb-mac m_6932: never a silent ignore), with
+        // the way back: ⏎ open System Settings at that pane
+        if (ev.state === "denied" && W.permDenied[ev.perm]) {
+          return none(flashNow(m2, { kind: "perm", perm: ev.perm, glyph: "▲", text: Wd.permDenied(ev.perm, m.macos), ttl: 8000, still: true }, now));
         }
         return none(m2);
       }
@@ -433,6 +436,8 @@
       case "ui_perm":
         // continue: macOS's prompt; not now: the refused path (the app answers app_perm denied, and
         // the refused line shows once); either way the ask leaves the capsule
+        // settings: the app opens that pane of System Settings; the refused line leaves
+        if (ev.do === "settings") return { m: { ...m, flashes: m.flashes.filter((f) => f.perm !== ev.perm) }, cmds: [{ cmd: "app_perm", perm: ev.perm, do: "settings" }] };
         return { m: ev.do === "continue" || ev.do === "not_now" ? { ...m, permAsk: null } : m, cmds: [{ cmd: "app_perm", perm: ev.perm, do: ev.do }] };
       default:
         return none(m);
@@ -468,6 +473,10 @@
       const os = choices(asked), cur = m.optFor === asked.id ? m.optSel || 0 : 0;
       if (os[cur]) return answer({ ...m, optSel: 0, optFor: null }, asked, os[cur], now);
     }
+    // a refused line on the glass: ⏎ opens System Settings at its pane, esc closes it
+    const refused = !m.pane && !listening(m) && m.flashes.find((f) => f.perm && f.at <= now && now < f.at + f.ttl);
+    if (refused && k === "enter") return step(m, { ev: "ui_perm", perm: refused.perm, do: "settings" }, now);
+    if (refused && k === "esc") return none({ ...m, flashes: m.flashes.filter((f) => f !== refused) });
     if (asked && k === "esc" && !helloOn(m, now) && !listening(m) && m.phase !== "speaking") {
       return none({ ...m, later: { ...(m.later || {}), [asked.id]: true }, optSel: 0, optFor: null });
     }
@@ -799,6 +808,7 @@
     } else if (flash) {
       v.state = flash.kind;
       v.glyph = flash.glyph || null; v.text = flash.text; v.sub = flash.sub || null;
+      if (flash.perm) v.denied = flash.perm;
       if (flash.kiss) kissAt(flash.at);
       if (flash.still) v.frozen = true;
     } else if (m.hub.known && !m.hub.up) {

@@ -158,7 +158,16 @@
       }
       case "perm": {
         // a refused permission is a flash of kind perm (no v.perm): one ▲ line, as below
-        if (!v.perm) { if (v.text == null) return s; s.head = { h: 68, line: lineOf(v) }; if (v.sub) s.text = { s: v.sub, dim: true }; return s; }
+        // with the way back (ambient m_6936): what he loses on the line, the exact path on its own
+        // line under it (never cut inside), ⏎ open System Settings at that pane, esc close
+        if (!v.perm) {
+          if (v.text == null) return s;
+          const first = Wd.firstSentence(v.text, 400), rest = v.text.slice(first.length).trim();
+          s.head = { h: 68, line: lineOf({ ...v, text: rest ? first : v.text }) };
+          if (rest) s.text = { s: rest, path: true };
+          if (v.denied) s.foot = { left: [item(["⏎"], B.openSystemSettings, { ev: "ui_perm", perm: v.denied, do: "settings" })], right: [item(["esc"], B.close, key("esc"))] };
+          return s;
+        }
         const p = v.perm, i = PERMS.indexOf(p.perm);
         s.head = { h: 52, lab: { acc: "", rest: `${B.beforeAsks} · ${B.permName[p.perm] || p.perm}` }, right: i >= 0 ? { text: B.ofN(i + 1, PERMS.length) } : null };
         s.big = p.text;

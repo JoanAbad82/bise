@@ -546,6 +546,30 @@ law("a permission ask is alone in the capsule: no agent line under it (ambient, 
   m = M.step(m, { ev: "ui_perm", perm: "accessibility", do: "not_now" }, 40).m;
   assert.equal(M.view(m, 50).text, "perf is done.");
 });
+law("every refusal shows with the way back (the user's rule via amb-mac m_6932, ambient m_6936): each app_perm denied flashes its line, even an old one; the path on its own line; ⏎ open System Settings sends app_perm settings and the line leaves; esc closes it", () => {
+  let m = M.step(M.init(), { ev: "app_perm", perm: "mic", state: "denied" }, 0).m;
+  m = M.step(m, { ev: "app_key", key: "esc" }, 10).m;
+  assert.equal(M.view(m, 20).text, null);                                  // esc closed it
+  m = M.step(m, { ev: "app_perm", perm: "mic", state: "denied" }, 30).m;   // the next fn hold: again
+  const v = M.view(m, 40);
+  eq([v.text, v.denied, v.content.kind], [W.permDenied.mic, "mic", "line"]);
+  const s = Bar.spec(v);
+  eq([s.head.line.text, s.head.line.glyph, s.text], ["without the mic, bise can't hear you.", "▲", { s: "turn it on in System Settings › Privacy & Security › Microphone.", path: true }]);
+  eq(s.foot.left.map((i) => [i.keys, i.w, i.act]), [[["⏎"], "open System Settings", { ev: "ui_perm", perm: "mic", do: "settings" }]]);
+  eq(s.foot.right.map((i) => i.w), ["close"]);
+  const r = M.step(m, { ev: "app_key", key: "enter" }, 50);
+  eq(r.cmds, [{ cmd: "app_perm", perm: "mic", do: "settings" }]);
+  assert.equal(M.view(r.m, 60).text, null);
+  // a click on the hint does the same
+  eq(M.step(m, s.foot.left[0].act, 50).cmds, [{ cmd: "app_perm", perm: "mic", do: "settings" }]);
+  // the two new ones: the emoji picker on fn, and refused banners
+  for (const perm of ["globe", "notifications", "accessibility", "screen"]) {
+    const sp = Bar.spec(M.view(M.step(M.init(), { ev: "app_perm", perm, state: "denied" }, 0).m, 10));
+    assert.ok(sp.text.s.includes("System Settings ›"), perm);
+    assert.ok(!sp.head.line.text.includes("›"), perm);                    // the path never on the first line
+  }
+  assert.equal(Bar.spec(M.view(M.step(M.init(), { ev: "app_perm", perm: "globe", state: "denied" }, 0).m, 10)).text.s, "set System Settings › Keyboard › Press 🌐 key to › Do Nothing.");
+});
 law("not now: the refused path, sent to the app", () => {
   let r = M.step(M.init(), { ev: "app_perm", perm: "mic", state: "ask" }, 0);
   assert.equal(M.view(r.m, 5).content.kind, "open");                 // the ask waits for him

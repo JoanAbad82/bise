@@ -55,7 +55,7 @@
     bar: {
       listening: "listening…", sees: (app) => `bise sees ${app}`,
       letGo: "let go", tap: "tap", send: "send", cancel: "cancel", doubleTap: "double-tap", handsFree: "hands-free",
-      close: "close", closeLeaves: "close · it leaves on its own in 4 s", agentsStarted: "agents started",
+      close: "close", openSystemSettings: "open System Settings", closeLeaves: "close · it leaves on its own in 4 s", agentsStarted: "agents started",
       needs: (who) => `? ${who} needs you`, now: "now", fullText: "full text",
       pick: "pick", move: "move", later: "later", orHold: "or hold", sayIt: "and say it", openPage: "open the page",
       reviewSub: "opens the page at the first draft", sendSub: "nothing leaves before this",
@@ -97,6 +97,9 @@
       accessibility: "without Accessibility, bise can't hear fn. turn it on in System Settings › Privacy & Security › Accessibility.",
       mic: "without the mic, bise can't hear you. turn it on in System Settings › Privacy & Security › Microphone.",
       screen: "without Screen Recording, bise can't see the window in front. turn it on in System Settings › Privacy & Security › Screen & System Audio Recording.",
+      // ambient m_6936 (amb-mac m_6932: macOS's 'Press 🌐 key to' still fired after a fn tap; banners refused)
+      globe: "fn also opens macOS's emoji picker. set System Settings › Keyboard › Press 🌐 key to › Do Nothing.",
+      notifications: "without notifications, bise can't reach you while the screen is locked or bise is hidden. turn them on in System Settings › Notifications › bise ambient.",
     },
     continue: "continue",
     notNow: "not now",

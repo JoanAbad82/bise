@@ -179,7 +179,7 @@
       // the card's body takes a real click (pm's fail 45): the question's full text, the drafts'
       // big line their first row (review)
       el.mid.innerHTML = (s.big ? `<div class="big"${s.bigAct ? ` data-qa="body"${act(s.bigAct)}` : ""}>${esc(s.big)}</div>` : "")
-        + (t ? `<div class="text${t.clamp && !t.full ? " clamp" : ""}${t.dim ? " dim" : ""}"${t.act ? ` data-qa="body"${act(t.act)}` : ""}>${esc(t.s)}</div>` : "");
+        + (t ? `<div class="text${t.clamp && !t.full ? " clamp" : ""}${t.dim ? " dim" : ""}${t.path ? " path" : ""}"${t.act ? ` data-qa="body"${act(t.act)}` : ""}>${esc(t.s)}</div>` : "");
       show(el.mid, s.big || t);
     });
     const rowsOn = s.sections.some((x) => x.rows.length || x.label);

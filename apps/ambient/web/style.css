@@ -80,6 +80,8 @@ button.rk:hover, button.fi:hover { color: var(--ink); background: #ffffff0c; }
 .text { font: 16px/1.42 var(--sans); color: #ffffffe6; padding: 2px 24px 10px; white-space: pre-line; }
 .text.clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
 .text.dim { color: var(--dim); font-size: 14px; }
+/* a refused line's path (System Settings › …): one line, never cut inside (ambient m_6936) */
+.text.path { white-space: nowrap; font-size: 15px; }
 
 /* ---- the body: 44 px rows, glyph | title + sub | its key */
 .body { display: none; border-top: 1px solid var(--line); padding: 6px 8px 8px; overflow-y: auto; }
