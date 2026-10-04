@@ -50,7 +50,8 @@ reads (tabs show every pane).
   inside the span: `<span class="t-b">morning        </span>`), so every column starts at the
   same cell on every row. Colors: `t-dim t-faint t-acc t-b t-ok t-err t-sel t-raised t-chip t-hl
   t-u`. A `figcaption` says what it shows. Use the TUI's real words and marks (`✓` done, `–`
-  stopped), never invented ones.
+  stopped, `◷` scheduled), never invented ones and never emoji (two cells wide); a key bar puts
+  three spaces between pairs (`⏎ open   x stop   esc back`), never ` · `.
 - `data-ui="tabs"`: a `k-tabs` bar of `<button type="button" data-tab="x">` and `k-pane`s with
   the same `data-tab`: widths, steps, before / after.
 - `k-ba`: two `figure`s, each a first `figcaption` (`<b>today</b> · …`) and its picture.
