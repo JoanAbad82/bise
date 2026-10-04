@@ -1105,9 +1105,9 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
             let branch = typed.trim_start_matches("/diff").trim();
             if branch.is_empty() {
                 let a = app.sb.focus.clone();
-                crate::diffview::request(app, crate::diffview::Ask::Agent(a));
+                crate::diffview::request(app, crate::diffview::Ask::Agent(a), crate::diffview::By::Key);
             } else {
-                crate::diffview::request(app, crate::diffview::Ask::Branch(branch.to_string()));
+                crate::diffview::request(app, crate::diffview::Ask::Branch(branch.to_string()), crate::diffview::By::Key);
             }
             return out;
         }
@@ -1569,7 +1569,7 @@ mod hub_line_tests {
         let text = draw(&evs);
         let ab = format!("{} a → b", crate::render::G_ENVELOPE);
         let why = format!("{} why", crate::theme::G_CLOSED);
-        for want in [ab.as_str(), "hello b", "docs asked: v1 or v2? i answered: v2", why.as_str()] {
+        for want in [ab.as_str(), "hello b", "docs asked: v1 or v2? · i answered: v2", why.as_str()] {
             assert!(text.contains(want), "{want:?} missing in:\n{text}");
         }
     }
