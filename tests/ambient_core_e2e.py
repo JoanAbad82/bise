@@ -177,6 +177,25 @@ def main():
         c.wait_line("main", "has not answered card #%d" % drop["id"], 60)
         check(any(x["id"] == drop["id"] for x in c.cards()), "the card still asks him")
 
+        # round 10 (identity10 #data): t1's preview and history through the
+        # hub's history op, his words to it, live in its open panel
+        c.wait_idle("main", "t1")
+        core.cmd(cmd="agent_preview", agent="t1")
+        core.wait(lambda e: e.get("ev") == "agent_preview" and e["agent"] == "t1", 30, "t1's preview")
+        pv = core.last("agent_preview")
+        check(isinstance(pv["actions"], list) and "waiting" in pv and "pages" in pv, "the preview's fields: %r" % pv)
+        core.cmd(cmd="agent_history", agent="t1")
+        core.wait(lambda e: e.get("ev") == "agent_history" and e["agent"] == "t1", 30, "t1's history")
+        h = core.last("agent_history")
+        kinds = [x["kind"] for x in h["entries"]]
+        check(kinds and set(kinds) <= {"you", "agent", "tools", "card", "page", "report", "from-agent"}, "its entries: %r" % kinds)
+        core.cmd(cmd="agent_send", agent="t1", text="e2e ping from the panel", mode="now")
+        core.wait(lambda e: e.get("ev") == "sent" and e.get("agent") == "t1" and e.get("mode") == "now", 30, "sent to t1")
+        c.wait_line("t1", "e2e ping from the panel", 60)
+        core.wait(lambda e: e.get("ev") == "agent_entry" and e["agent"] == "t1" and e["entry"]["kind"] == "you"
+                  and "e2e ping from the panel" in e["entry"]["text"], 30, "his message live in t1's panel")
+        core.cmd(cmd="agent_unwatch", agent="t1")
+
         # the app goes: the core exits on stdin EOF
         core.p.stdin.close()
         rc = core.p.wait(timeout=10)

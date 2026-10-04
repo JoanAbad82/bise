@@ -9,6 +9,7 @@
 //!
 //! `bise ambient` launches the app (`scripts/ambient.sh open`, amb-mac's).
 
+mod agents;
 mod core;
 mod hub;
 mod plain;

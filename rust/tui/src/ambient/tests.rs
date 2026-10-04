@@ -208,12 +208,17 @@ fn hub_state_becomes_state_with_agents_and_cards_with_options() {
         ]}));
     t.until(|o| has(o, "state"));
     let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    // the capsule's fields (round 10's are in their own law); an
+    // archived agent is a row too (archived: true)
+    let keep = |r: &Value| json!({"name": r["name"], "status": r["status"], "note": r["note"], "report": r["report"],
+        "working": r["working"], "turn_ms": r["turn_ms"], "archived": r["archived"]});
     assert_eq!(
-        st["agents"],
-        json!([
-            {"name": "cookies", "status": "working", "note": "the banner", "report": "", "working": true, "turn_ms": 1200},
-            {"name": "perf", "status": "done", "note": "", "report": "signup 4.1 s → 0.9 s. the rest is cleanup.", "working": false, "turn_ms": null},
-        ])
+        st["agents"].as_array().unwrap().iter().map(keep).collect::<Vec<_>>(),
+        [
+            json!({"name": "cookies", "status": "working", "note": "the banner", "report": "", "working": true, "turn_ms": 1200, "archived": false}),
+            json!({"name": "perf", "status": "done", "note": "", "report": "signup 4.1 s → 0.9 s. the rest is cleanup.", "working": false, "turn_ms": null, "archived": false}),
+            json!({"name": "old", "status": "done", "note": "", "report": "", "working": false, "turn_ms": null, "archived": true}),
+        ]
     );
     // only the user's cards (a `done` is the agents' traffic); the body
     // without its options (ambient m_6476)
@@ -1092,4 +1097,207 @@ fn what_the_capsule_sends_main_says_it_came_from_the_capsule() {
     t.until(|o| has(o, "state"));
     t.cmd(Cmd::Answer { card: 4, reply: "1".into() });
     assert!(t.hub.next().get("via").is_none());
+}
+
+// ---- round 10: the agents (identity10 #data, ambient-lead m_7026) ----
+
+fn feed(t: &mut T, agent: &str, pos: usize, line: &str) {
+    t.hub.say(json!({"ev": "line", "agent": agent, "line": line, "pos": pos, "ts": 1_000 + pos as u64}));
+}
+
+fn agents_state(perf: &str) -> Value {
+    json!({"ev": "state",
+        "agents": [
+            {"name": "main", "main": true, "status": "idle"},
+            {"name": "perf", "status": perf, "objective": "make the e2e fast\nmore", "note": "profiling the hub", "report": "", "created_ms": 5},
+            {"name": "old", "status": "archived", "objective": "an old fix", "report": "fixed in 0.4", "report_ms": 7},
+        ],
+        "cards": [{"id": 9, "kind": "question", "agent": "perf", "text": "which bench?\n1. cold\n2. warm"}],
+        "pages": [{"id": "perf-notes", "title": "Perf notes", "agent": "perf", "version": 2, "url": "http://p/perf-notes", "at_ms": 3}]})
+}
+
+#[test]
+fn agents_rows_carry_status_title_purpose_since_waits_and_archived() {
+    let mut t = T::new();
+    t.ready();
+    t.hub.say(agents_state("working"));
+    t.until(|o| has(o, "state"));
+    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    let rows = st["agents"].as_array().unwrap();
+    assert_eq!(rows.len(), 2, "main is not a row, an archived agent is: {rows:?}");
+    let (perf, old) = (&rows[0], &rows[1]);
+    assert_eq!(perf["status"], "working");
+    assert_eq!(perf["title"], "profiling the hub");
+    assert_eq!(perf["purpose"], "make the e2e fast");
+    assert_eq!(perf["waits"], 1);
+    assert_eq!(perf["archived"], false);
+    assert_eq!(perf["followed"], false);
+    assert_eq!(perf["since_ms"], 5, "first sight: its birth");
+    assert_eq!((old["status"].as_str(), old["archived"].as_bool(), old["title"].as_str()), (Some("done"), Some(true), Some("fixed in 0.4")));
+    assert_eq!(old["since_ms"], 7);
+    // the status changes: since moves; follow shows on the row
+    t.hub.say(agents_state("idle"));
+    t.until(|o| has(o, "state"));
+    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    assert_eq!(st["agents"][0]["status"], "idle");
+    assert!(st["agents"][0]["since_ms"].as_u64().unwrap() > 1_000_000);
+    t.cmd(Cmd::Follow { agent: "perf".into(), on: true });
+    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
+    assert_eq!(st["agents"][0]["followed"], true);
+}
+
+#[test]
+fn agents_cmds_parse() {
+    let p = |s: &str| Cmd::parse(s);
+    assert_eq!(p(r#"{"cmd":"agent_preview","agent":"@perf"}"#), Ok(Cmd::AgentPreview { agent: "perf".into() }));
+    assert_eq!(p(r#"{"cmd":"agent_history","agent":"perf"}"#), Ok(Cmd::AgentHistory { agent: "perf".into(), before: None, limit: 60 }));
+    assert_eq!(p(r#"{"cmd":"agent_history","agent":"perf","before":40,"limit":20}"#), Ok(Cmd::AgentHistory { agent: "perf".into(), before: Some(40), limit: 20 }));
+    assert_eq!(p(r#"{"cmd":"agent_send","agent":"perf","text":"hi","mode":"queued"}"#), Ok(Cmd::AgentSend { agent: "perf".into(), text: "hi".into(), queued: true }));
+    assert_eq!(p(r#"{"cmd":"agent_send","agent":"perf","text":"hi","mode":"now"}"#), Ok(Cmd::AgentSend { agent: "perf".into(), text: "hi".into(), queued: false }));
+    assert_eq!(p(r#"{"cmd":"archive","agent":"perf","stop_first":true}"#), Ok(Cmd::Archive { agent: "perf".into(), stop_first: true }));
+    assert_eq!(p(r#"{"cmd":"unarchive","agent":"perf"}"#), Ok(Cmd::Unarchive { agent: "perf".into() }));
+    assert_eq!(p(r#"{"cmd":"follow","agent":"perf","on":false}"#), Ok(Cmd::Follow { agent: "perf".into(), on: false }));
+    assert!(p(r#"{"cmd":"stop"}"#).is_err(), "no agent: the app's bug");
+}
+
+/// perf's feed: his message, a reply, three tool calls, a report.
+fn perf_lines() -> Vec<Value> {
+    let l = |pos: u64, line: &str| json!({"pos": pos, "ts": 1_000 + pos, "line": line});
+    vec![
+        l(1, "sb you : make it fast"),
+        l(2, "  obs: turn_started"),
+        l(3, "  obs: assistant: <think>hmm</think>on it"),
+        l(4, "tool #1 bash : cargo test -q"),
+        l(5, "tool_intent #1 : running the tests"),
+        l(6, "tool_result #1 ok : 3 failed"),
+        l(7, "tool #2 read_file : {\"path\":\"a.rs\"}"),
+        l(8, "tool #3 bash : sb land \"fast\""),
+        l(9, "tool_intent #3 : landing the fix"),
+        l(10, "sb msg-in : ambient-lead m_3 : nice\nsecond line"),
+        l(11, "tool #4 bash : sb report done \"the e2e takes 40 s\""),
+        l(12, "  obs: turn_done: completed"),
+    ]
+}
+
+#[test]
+fn a_preview_shows_now_the_last_actions_what_waits_the_report_and_pages() {
+    let mut t = T::new();
+    for (i, l) in perf_lines().iter().enumerate() {
+        feed(&mut t, "perf", i + 1, l["line"].as_str().unwrap());
+    }
+    t.ready();
+    t.hub.say(agents_state("working"));
+    t.until(|o| has(o, "state"));
+    t.take();
+    t.cmd(Cmd::AgentPreview { agent: "perf".into() });
+    assert_eq!(t.hub.next(), json!({"op": "history", "agent": "perf", "before": 13, "count": 600}));
+    t.hub.say(json!({"ev": "history", "agent": "perf", "before": 13, "lines": perf_lines()}));
+    t.until(|o| has(o, "agent_preview"));
+    let p = t.take().into_iter().find(|v| v["ev"] == "agent_preview").unwrap();
+    let acts: Vec<(&str, &str)> = p["actions"].as_array().unwrap().iter().map(|a| (a["kind"].as_str().unwrap(), a["text"].as_str().unwrap())).collect();
+    assert_eq!(acts, [("message", "on it"), ("tool", "running the tests"), ("tool", "read_file: {\"path\":\"a.rs\"}"), ("land", "landing the fix"), ("report", "the e2e takes 40 s")]);
+    assert_eq!(p["waiting"], json!([{"card_id": 9, "question": "which bench?"}]));
+    assert_eq!(p["last_report"], json!({"kind": "done", "text": "the e2e takes 40 s", "at_ms": 1011}));
+    assert_eq!(p["pages"], json!([{"id": "perf-notes", "title": "Perf notes", "v": 2, "url": "http://p/perf-notes"}]));
+    assert_eq!(p["now"], "profiling the hub");
+    // its next step re-sends the preview: now is that step
+    feed(&mut t, "perf", 13, "tool #5 bash : ls");
+    feed(&mut t, "perf", 14, "tool_intent #5 : listing the bench files");
+    t.until(|o| o.iter().any(|v| v["ev"] == "agent_preview" && v["now"] == "listing the bench files"));
+    // another agent selected: perf's lines send nothing
+    t.cmd(Cmd::AgentPreview { agent: "old".into() });
+    t.take();
+    feed(&mut t, "perf", 15, "  obs: assistant: done");
+    t.sync();
+    assert!(!t.take().iter().any(|v| v["ev"] == "agent_preview" && v["agent"] == "perf"));
+}
+
+#[test]
+fn a_history_folds_tools_pages_older_and_follows_live() {
+    let mut t = T::new();
+    feed(&mut t, "perf", 12, "  obs: turn_done: completed");
+    t.ready();
+    t.hub.say(agents_state("working"));
+    t.until(|o| has(o, "state"));
+    t.take();
+    t.cmd(Cmd::AgentHistory { agent: "perf".into(), before: None, limit: 60 });
+    assert_eq!(t.hub.next()["before"], 13);
+    // a line comes before the page: it follows the page
+    feed(&mut t, "perf", 13, "sb you : and the cold bench?");
+    t.hub.say(json!({"ev": "history", "agent": "perf", "before": 13, "lines": perf_lines()}));
+    t.until(|o| has(o, "agent_history"));
+    let h = t.take().into_iter().find(|v| v["ev"] == "agent_history").unwrap();
+    let kinds: Vec<&str> = h["entries"].as_array().unwrap().iter().map(|e| e["kind"].as_str().unwrap()).collect();
+    assert_eq!(kinds, ["you", "agent", "tools", "from-agent", "report", "you", "card"]);
+    let e = &h["entries"];
+    assert_eq!((e[0]["pos"].as_u64(), e[0]["at_ms"].as_u64(), e[0]["text"].as_str()), (Some(1), Some(1001), Some("make it fast")));
+    assert_eq!(e[1]["text"], "on it", "no thinking");
+    assert_eq!(e[2]["pos"], 4);
+    assert_eq!(e[2]["tools"]["count"], 3);
+    assert_eq!(e[2]["tools"]["items"][0]["text"], "running the tests");
+    assert_eq!(e[2]["text"], "3 steps · landing the fix");
+    assert_eq!((e[3]["text"].as_str(), e[3]["from"].as_str()), (Some("nice\nsecond line"), Some("ambient-lead")));
+    assert_eq!(e[4]["report"]["kind"], "done");
+    assert_eq!(e[6]["card"], json!({"id": 9, "question": "which bench?", "options": [{"n": 1, "label": "cold"}, {"n": 2, "label": "warm"}], "answered": false}));
+    assert_eq!((h["before"].clone(), h["more"].clone()), (Value::Null, json!(false)));
+    // live: a tool call is a new entry, its intent replaces it, the typing says the step
+    feed(&mut t, "perf", 14, "tool #6 bash : sb page publish notes.html --id perf-notes");
+    feed(&mut t, "perf", 15, "tool #7 bash : ls");
+    feed(&mut t, "perf", 16, "tool_intent #7 : listing");
+    t.until(|o| o.iter().any(|v| v["ev"] == "agent_entry" && v["entry"]["tools"]["items"][0]["text"] == "listing"));
+    let out = t.take();
+    let page = out.iter().find(|v| v["ev"] == "agent_entry" && v["entry"]["kind"] == "page").unwrap();
+    assert_eq!(page["entry"]["page"], json!({"id": "perf-notes", "title": "Perf notes", "v": 2, "url": "http://p/perf-notes"}));
+    assert!(out.iter().any(|v| v == &json!({"ev": "agent_typing", "agent": "perf", "text": "listing"})));
+    assert!(out.iter().filter(|v| v["ev"] == "agent_entry").all(|v| v["entry"]["pos"].as_u64() >= Some(14)), "only what changed: {out:?}");
+    // the card answered: its entry says so
+    t.hub.say(json!({"ev": "state", "agents": agents_state("working")["agents"], "cards": []}));
+    t.until(|o| o.iter().any(|v| v["ev"] == "agent_entry" && v["entry"]["card"]["answered"] == true));
+    // older entries: before the oldest pos, the oldest (cut) one dropped
+    t.cmd(Cmd::AgentHistory { agent: "perf".into(), before: Some(1), limit: 60 });
+    assert_eq!(t.take().into_iter().find(|v| v["ev"] == "agent_history").unwrap()["entries"], json!([]));
+    t.cmd(Cmd::AgentHistory { agent: "perf".into(), before: Some(11), limit: 2 });
+    assert_eq!(t.hub.next(), json!({"op": "history", "agent": "perf", "before": 11, "count": 600}));
+    let older: Vec<Value> = perf_lines().into_iter().take(10).skip(2).collect();
+    t.hub.say(json!({"ev": "history", "agent": "perf", "before": 11, "lines": older}));
+    t.until(|o| has(o, "agent_history"));
+    let h = t.take().into_iter().find(|v| v["ev"] == "agent_history").unwrap();
+    let kinds: Vec<&str> = h["entries"].as_array().unwrap().iter().map(|e| e["kind"].as_str().unwrap()).collect();
+    assert_eq!(kinds, ["tools", "from-agent"], "the first (cut) entry dropped, the newest 2");
+    assert_eq!((h["before"].as_u64(), h["more"].as_bool()), (Some(4), Some(true)));
+    // the panel closes: no more entries
+    t.cmd(Cmd::AgentUnwatch { agent: "perf".into() });
+    feed(&mut t, "perf", 17, "  obs: assistant: bye");
+    t.sync();
+    assert!(!has(&t.take(), "agent_entry"));
+}
+
+#[test]
+fn acts_send_now_queued_stop_archive_unarchive() {
+    let mut t = T::new();
+    t.ready();
+    t.hub.say(agents_state("working"));
+    t.until(|o| has(o, "state"));
+    t.take();
+    t.cmd(Cmd::AgentSend { agent: "perf".into(), text: " look at the cold bench ".into(), queued: false });
+    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "perf", "text": "look at the cold bench", "via": "ambient"}));
+    assert!(t.take().contains(&json!({"ev": "sent", "agent": "perf", "mode": "now"})));
+    // queued while it works: held, then sent when it's free
+    t.cmd(Cmd::AgentSend { agent: "perf".into(), text: "then the warm one".into(), queued: true });
+    let out = t.take();
+    assert!(out.contains(&json!({"ev": "agent_queued", "agent": "perf", "text": "then the warm one"})));
+    assert!(!out.iter().any(|v| v["ev"] == "phase"), "never main's orb");
+    t.hub.say(agents_state("idle"));
+    t.until(|o| has(o, "state"));
+    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "perf", "text": "then the warm one", "via": "ambient"}));
+    t.cmd(Cmd::Stop { agent: "perf".into() });
+    assert_eq!(t.hub.next(), json!({"op": "interrupt", "agent": "perf"}));
+    t.cmd(Cmd::Archive { agent: "perf".into(), stop_first: true });
+    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "/archive perf --force"}));
+    t.cmd(Cmd::Archive { agent: "perf".into(), stop_first: false });
+    assert_eq!(t.hub.next()["text"], "/archive perf");
+    t.cmd(Cmd::Unarchive { agent: "old".into() });
+    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "/restore old"}));
+    t.cmd(Cmd::AgentSend { agent: "nobody".into(), text: "hi".into(), queued: false });
+    assert!(has(&t.take(), "error"));
 }
