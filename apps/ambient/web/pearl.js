@@ -121,8 +121,8 @@
     for (const k in PINK) gl.uniform3fv(U[k], PINK[k]);
     gl.uniform1f(U.variant, 1);
     function draw(S, t, level) {
-      gl.viewport(0, 0, cv.width, cv.height);
-      gl.uniform2f(U.res, cv.width, cv.height); gl.uniform1f(U.t, t); gl.uniform1f(U.flow, S.flow);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.uniform2f(U.res, gl.drawingBufferWidth, gl.drawingBufferHeight); gl.uniform1f(U.t, t); gl.uniform1f(U.flow, S.flow);
       gl.uniform1f(U.lvl, S.voice * (level || 0)); gl.uniform1f(U.think, S.think); gl.uniform1f(U.need, S.need);
       gl.uniform1f(U.done, S.done); gl.uniform1f(U.away, S.away); gl.uniform1f(U.listen, S.listen); gl.uniform1f(U.still, S.still);
       gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
@@ -148,7 +148,12 @@
 
     function fit() {
       const dpr = Math.min(2, root.devicePixelRatio || 1);
-      const w = Math.round((cv.clientWidth || 68) * dpr), h = Math.round((cv.clientHeight || 68) * dpr);
+      // the pearl is round: one square buffer from the canvas's smaller side (a wrong width read
+      // during the hold drew the pearl into a wide buffer that the 64 px box then squeezed into a
+      // thin vertical streak: ambient's round 9 gate, WebKit and Chrome alike)
+      const cw = cv.clientWidth, chh = cv.clientHeight;
+      const side = Math.round(Math.min(cw || chh || 68, chh || cw || 68) * dpr);
+      const w = side, h = side;
       if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; return true; }
       return false;
     }
@@ -167,8 +172,9 @@
       // at most 30 draws a second
       if (!calm && !resized && nowMs - drawnAt < 30) return true;
       drawnAt = nowMs;
-      gl.viewport(0, 0, cv.width, cv.height);
-      gl.uniform2f(U.res, cv.width, cv.height); gl.uniform1f(U.t, st.still ? 0 : t); gl.uniform1f(U.flow, S.flow);
+      // the buffer the context really has (drawingBuffer*), never the attributes' idea of it
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.uniform2f(U.res, gl.drawingBufferWidth, gl.drawingBufferHeight); gl.uniform1f(U.t, st.still ? 0 : t); gl.uniform1f(U.flow, S.flow);
       gl.uniform1f(U.lvl, S.voice * (st.lvl || 0)); gl.uniform1f(U.think, S.think); gl.uniform1f(U.need, S.need);
       gl.uniform1f(U.gather, st.gather || 0);
       gl.uniform1f(U.done, S.done); gl.uniform1f(U.away, S.away); gl.uniform1f(U.listen, S.listen); gl.uniform1f(U.still, S.still);
