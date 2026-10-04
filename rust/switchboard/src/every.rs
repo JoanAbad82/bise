@@ -76,9 +76,22 @@ pub struct Timer {
     pub page: Option<String>,
     /// when it last woke its agent (0: never)
     pub last_ms: u64,
+    /// its last runs (at most [`RUNS_KEPT`], oldest first): each wake,
+    /// a run now too
+    pub runs: Vec<u64>,
 }
 
 impl Timer {
+    fn ran(&mut self, at: u64) {
+        if at == 0 || self.runs.last() == Some(&at) {
+            return;
+        }
+        self.runs.push(at);
+        if self.runs.len() > RUNS_KEPT {
+            self.runs.remove(0);
+        }
+    }
+
     /// The timer in the hub's state (amb-mac's menu, m_5435).
     pub fn json(&self) -> Value {
         let mut v = json!({"id": self.id, "agent": self.agent, "label": self.sched.label(), "text": self.text,
@@ -92,6 +105,10 @@ impl Timer {
         if let Some(p) = &self.page {
             v["page"] = json!(p);
         }
+        if let Sched::Every(ms) = self.sched {
+            v["every_ms"] = json!(ms);
+        }
+        v["runs"] = json!(self.runs);
         v
     }
 }
@@ -134,11 +151,62 @@ pub enum AgentNow {
 pub struct Timers {
     pub map: BTreeMap<u64, Timer>,
     last_id: u64,
+    /// the timers that ended, newest last (the TUI's `/scheduled`
+    /// shows a week of them; at most [`ENDED_KEPT`])
+    pub ended: Vec<Ended>,
+}
+
+/// A timer that ended: when and why (its `every_stop` line).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Ended {
+    pub timer: Timer,
+    /// 0: an old journal line without its time
+    pub ended_ms: u64,
+    pub why: String,
+}
+
+const ENDED_KEPT: usize = 200;
+/// How long `/scheduled` shows an ended timer.
+pub const ENDED_SHOWN_MS: u64 = 7 * DAY_MS;
+/// The last runs a timer keeps (its opened view: 'its runs').
+const RUNS_KEPT: usize = 5;
+
+/// How a timer ended, from its `why`: `times` (it ran its times),
+/// `until` (its end time passed), `gone` (its agent is gone), `stopped`
+/// with who stopped it (`user`, or an agent's name).
+pub fn end_of(why: &str) -> (&'static str, String) {
+    if why == "it ran its times" {
+        ("times", String::new())
+    } else if why == "its end time passed" {
+        ("until", String::new())
+    } else if why.ends_with(" is gone") {
+        ("gone", String::new())
+    } else if let Some(by) = why.strip_prefix("stopped by ") {
+        ("stopped", if by == "the user" { "user".into() } else { by.to_string() })
+    } else {
+        ("stopped", String::new())
+    }
+}
+
+impl Ended {
+    /// An ended timer in the hub's state: the timer's fields, then
+    /// `ended_ms`, `why`, `end` and `stopped_by` ([`end_of`]).
+    pub fn json(&self) -> Value {
+        let mut v = self.timer.json();
+        let (end, by) = end_of(&self.why);
+        v["ended_ms"] = json!(self.ended_ms);
+        v["why"] = json!(self.why);
+        v["end"] = json!(end);
+        if !by.is_empty() {
+            v["stopped_by"] = json!(by);
+        }
+        v
+    }
 }
 
 /// Whether a journal event is one of the timers' lines.
 pub fn is_line(ev: &Value) -> bool {
-    matches!(ev["type"].as_str(), Some("every_set" | "every_fired" | "every_stop"))
+    matches!(ev["type"].as_str(), Some("every_set" | "every_fired" | "every_stop" | "every_run"))
 }
 
 impl Timers {
@@ -167,6 +235,7 @@ impl Timers {
                         fired: 0,
                         page: ev["page"].as_str().map(String::from),
                         last_ms: 0,
+                        runs: Vec::new(),
                     },
                 );
             }
@@ -175,10 +244,33 @@ impl Timers {
                     t.fired = ev["fired"].as_u64().unwrap_or(t.fired);
                     t.next_ms = ev["next_ms"].as_u64().unwrap_or(t.next_ms);
                     t.last_ms = ev["at"].as_u64().unwrap_or(t.last_ms);
+                    if ev["undelivered"].as_bool() == Some(true) {
+                        // the lost wake was its last run: not a run
+                        let at = t.runs.pop();
+                        if at.is_some_and(|a| a != t.last_ms) {
+                            t.runs.extend(at);
+                        }
+                    } else {
+                        t.ran(t.last_ms);
+                    }
+                }
+            }
+            // a run now (`/scheduled`'s r): outside the count, the next
+            // wake unchanged
+            Some("every_run") => {
+                if let Some(t) = self.map.get_mut(&id) {
+                    t.last_ms = ev["at"].as_u64().unwrap_or(t.last_ms);
+                    t.ran(t.last_ms);
                 }
             }
             Some("every_stop") => {
-                self.map.remove(&id);
+                if let Some(timer) = self.map.remove(&id) {
+                    let why = ev["why"].as_str().unwrap_or_default().to_string();
+                    self.ended.push(Ended { timer, ended_ms: ev["at"].as_u64().unwrap_or(0), why });
+                    if self.ended.len() > ENDED_KEPT {
+                        self.ended.remove(0);
+                    }
+                }
             }
             _ => {}
         }
@@ -211,12 +303,29 @@ impl Timers {
     }
 
     /// Stop a timer: its journal line (already read in), or None.
-    pub fn stop(&mut self, id: u64, why: &str) -> Option<Value> {
+    pub fn stop(&mut self, id: u64, why: &str, now: u64) -> Option<Value> {
         self.map.contains_key(&id).then(|| {
-            let j = json!({"type": "every_stop", "id": id, "why": why});
+            let j = json!({"type": "every_stop", "id": id, "why": why, "at": now});
             self.read(&j);
             j
         })
+    }
+
+    /// `/scheduled`'s run now: one wake of timer `id` at once, outside
+    /// its count, its next wake unchanged. Its agent, the wake's text and
+    /// its journal line (already read in), or None.
+    pub fn run_now(&mut self, id: u64, now: u64) -> Option<(String, String, Value)> {
+        let t = self.map.get(&id)?.clone();
+        let j = json!({"type": "every_run", "id": id, "at": now});
+        self.read(&j);
+        Some((t.agent.clone(), wake_text(&t, Wake::Now, now), j))
+    }
+
+    /// The timers in the hub's state: the running ones, then the ones
+    /// that ended in the last [`ENDED_SHOWN_MS`] (with `ended_ms`).
+    pub fn state(&self, now: u64) -> Vec<Value> {
+        let ended = self.ended.iter().filter(|e| e.ended_ms + ENDED_SHOWN_MS > now).map(Ended::json);
+        self.map.values().map(Timer::json).chain(ended).collect()
     }
 
     /// One tick: what to do now. `agent` says how each agent is; the
@@ -235,7 +344,7 @@ impl Timers {
                 None
             };
             if let Some(why) = why {
-                if let Some(journal) = self.stop(id, &why) {
+                if let Some(journal) = self.stop(id, &why, now) {
                     acts.push(Act::Stop { journal });
                 }
                 continue;
@@ -246,17 +355,20 @@ impl Timers {
             let fired = t.fired + 1;
             let journal = json!({"type": "every_fired", "id": id, "fired": fired, "next_ms": t.sched.next(t.next_ms, now), "at": now});
             self.read(&journal);
-            acts.push(Act::Wake { id, agent: t.agent.clone(), text: wake_text(&t, fired, now), journal });
+            // due while its agent was busy: how long it waited
+            let waited = now.saturating_sub(t.next_ms);
+            let wake = Wake::Due { fired, waited_ms: if waited >= MIN_MS { waited } else { 0 } };
+            acts.push(Act::Wake { id, agent: t.agent.clone(), text: wake_text(&t, wake, now), journal });
         }
         acts
     }
 
     /// The wake of timer `id` reached its agent: the timer ends when it
     /// ran its times (its journal line, already read in).
-    pub fn delivered(&mut self, id: u64) -> Option<Value> {
+    pub fn delivered(&mut self, id: u64, now: u64) -> Option<Value> {
         let t = self.map.get(&id)?;
         if t.times.is_some_and(|n| t.fired >= n) {
-            return self.stop(id, "it ran its times");
+            return self.stop(id, "it ran its times", now);
         }
         None
     }
@@ -307,14 +419,33 @@ fn line(t: &Timer, now: u64) -> String {
     s
 }
 
-/// The message a wake carries.
-fn wake_text(t: &Timer, fired: u64, now: u64) -> String {
+/// Which wake: a due one (its count, how long it waited for its busy
+/// agent) or a run now (outside the count).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Wake {
+    Due { fired: u64, waited_ms: u64 },
+    Now,
+}
+
+/// The message a wake carries: `timer #48 (every 2m, until 18:00, 2/6,
+/// waited 4m, set by answer-line): <text>` then the stop hint; a run now
+/// says `run now by the user` in place of the count. The TUI reads it
+/// back (its ◷ line): keep the shape.
+fn wake_text(t: &Timer, wake: Wake, now: u64) -> String {
     let mut how = t.sched.label();
     if let Some(u) = t.until_ms {
         how.push_str(&format!(", until {}", when_label(u, now)));
     }
-    if let Some(n) = t.times {
-        how.push_str(&format!(", {}/{}", fired, n));
+    match wake {
+        Wake::Due { fired, waited_ms } => {
+            if let Some(n) = t.times {
+                how.push_str(&format!(", {}/{}", fired, n));
+            }
+            if waited_ms > 0 {
+                how.push_str(&format!(", waited {} for {} to finish", dur_label(waited_ms / MIN_MS * MIN_MS), t.agent));
+            }
+        }
+        Wake::Now => how.push_str(", run now by the user"),
     }
     format!("timer #{} ({}, set by {}): {}\n(stop it: sb every --stop {})", t.id, how, t.by, t.text, t.id)
 }
@@ -548,7 +679,8 @@ mod tests {
         let acts = ts.tick(NOW + 40 * MIN_MS, |_| AgentNow::Idle);
         assert_eq!(wakes(&acts), 1);
         let Act::Wake { text, journal, .. } = &acts[0] else { panic!() };
-        assert!(text.starts_with("timer #1 (every 10m, set by main): check HN"), "{}", text);
+        // due at +10m, busy until +40m: it says how long it waited
+        assert!(text.starts_with("timer #1 (every 10m, waited 30m for w to finish, set by main): check HN"), "{}", text);
         assert_eq!(journal["next_ms"], NOW + 50 * MIN_MS);
         assert!(ts.tick(NOW + 41 * MIN_MS, |_| AgentNow::Idle).is_empty());
         assert_eq!(wakes(&ts.tick(NOW + 50 * MIN_MS, |_| AgentNow::Idle)), 1);
@@ -567,7 +699,7 @@ mod tests {
                 Act::Wake { journal, .. } | Act::Stop { journal } => lines.push(journal),
             }
         }
-        lines.push(ts.stop(1, "asked").unwrap());
+        lines.push(ts.stop(1, "asked", NOW + 6 * MIN_MS).unwrap());
         let mut back = Timers::default();
         for l in lines.iter().chain(lines.iter()) {
             assert!(is_line(l));
@@ -593,7 +725,7 @@ mod tests {
         let deliver = |ts: &mut Timers, acts: Vec<Act>| {
             for a in acts {
                 if let Act::Wake { id, .. } = a {
-                    ts.delivered(id);
+                    ts.delivered(id, NOW);
                 }
             }
         };
@@ -635,7 +767,7 @@ mod tests {
         let Act::Wake { text, journal, .. } = &acts[0] else { panic!() };
         assert!(text.contains("1/1"), "{text}");
         lines.push(journal.clone());
-        lines.push(ts.delivered(id).expect("ran its times"));
+        lines.push(ts.delivered(id, due + RETRY_MS).expect("ran its times"));
         assert!(ts.map.is_empty());
         // the journal replays to the same end
         let mut back = Timers::default();
@@ -646,7 +778,53 @@ mod tests {
         // a delivered wake of a timer with times left: no stop
         let (id2, _) = ts.add(new(Sched::Every(MIN_MS)), NOW);
         ts.tick(NOW + MIN_MS, |_| AgentNow::Idle);
-        assert_eq!(ts.delivered(id2), None);
+        assert_eq!(ts.delivered(id2, NOW + MIN_MS), None);
+    }
+
+    /// `/scheduled`: a week of ended timers with why they ended, each
+    /// timer's last runs, a run now outside the count, and the wake's
+    /// text says how long a busy agent made it wait.
+    #[test]
+    fn ended_timers_runs_and_run_now() {
+        let mut ts = Timers::default();
+        let mut n = new(Sched::Every(2 * MIN_MS));
+        n.times = Some(6);
+        let (id, set) = ts.add(n, NOW);
+        let mut lines = vec![set];
+        // due at +2m, its agent busy until +6m: one wake that waited 4m
+        assert!(ts.tick(NOW + 5 * MIN_MS, |_| AgentNow::Busy).is_empty());
+        let acts = ts.tick(NOW + 6 * MIN_MS, |_| AgentNow::Idle);
+        let Act::Wake { text, journal, .. } = &acts[0] else { panic!() };
+        assert!(text.starts_with("timer #1 (every 2m, 1/6, waited 4m for w to finish, set by main): check HN"), "{text}");
+        lines.push(journal.clone());
+        // a run now: outside the count, the next wake unchanged
+        let next = ts.map[&id].next_ms;
+        let (agent, text, j) = ts.run_now(id, NOW + 7 * MIN_MS).unwrap();
+        assert_eq!(agent, "w");
+        assert!(text.starts_with("timer #1 (every 2m, run now by the user, set by main): check HN"), "{text}");
+        lines.push(j);
+        assert_eq!((ts.map[&id].fired, ts.map[&id].next_ms), (1, next));
+        assert_eq!(ts.map[&id].runs, vec![NOW + 6 * MIN_MS, NOW + 7 * MIN_MS]);
+        assert!(ts.run_now(99, NOW).is_none());
+        // stopped by the user: ended, with when and why, in the state a week
+        lines.push(ts.stop(id, "stopped by the user", NOW + 8 * MIN_MS).unwrap());
+        assert!(ts.map.is_empty());
+        let st = ts.state(NOW + 9 * MIN_MS);
+        assert_eq!(st.len(), 1);
+        assert_eq!((st[0]["end"].as_str(), st[0]["stopped_by"].as_str()), (Some("stopped"), Some("user")));
+        assert_eq!(st[0]["ended_ms"], NOW + 8 * MIN_MS);
+        assert_eq!(st[0]["runs"].as_array().unwrap().len(), 2);
+        assert!(ts.state(NOW + 8 * MIN_MS + ENDED_SHOWN_MS).is_empty(), "a week later: gone from the list");
+        // the journal gives back the same ended timer
+        let mut back = Timers::default();
+        for l in &lines {
+            back.read(l);
+        }
+        assert_eq!(back.ended, ts.ended);
+        assert_eq!(end_of("it ran its times").0, "times");
+        assert_eq!(end_of("its end time passed").0, "until");
+        assert_eq!(end_of("@w is gone").0, "gone");
+        assert_eq!(end_of("stopped by answer-line"), ("stopped", "answer-line".to_string()));
     }
 
     #[test]

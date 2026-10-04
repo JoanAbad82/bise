@@ -737,8 +737,10 @@ impl Shell {
         // the features' lids and Δ (dev-flow §5.1)
         self.feature_views();
         let mut snap = self.hub.snapshot(now_ms());
-        // sb every's timers (amb-mac's menu: 'watching … · stop watching')
-        snap["timers"] = json!(self.hub.timers().map.values().map(|t| t.json()).collect::<Vec<_>>());
+        // sb every's timers, running then a week of ended ones (/scheduled);
+        // an ended one has `ended_ms` (amb-mac's menu and the capsule's
+        // watched pages skip those)
+        snap["timers"] = json!(self.hub.timers().state(now_ms()));
         // the pages (docs/ambient-pages.md §2.3), newest first
         if let Some(p) = &self.pages {
             snap["pages"] = json!(p.list_json());
@@ -3283,10 +3285,14 @@ impl Shell {
                 client: id,
                 agent: s("agent"),
             }),
-            // the menu bar's 'stop watching' (amb-mac m_5435)
+            // the menu bar's 'stop watching' (amb-mac m_5435), `/scheduled`'s
+            // x (stop) and r (run now)
             "every_stop" => self.step(Input::EveryStop {
                 id: v.get("id").and_then(|x| x.as_u64()).unwrap_or(0),
                 why: String::new(),
+            }),
+            "every_run" => self.step(Input::EveryRun {
+                id: v.get("id").and_then(|x| x.as_u64()).unwrap_or(0),
             }),
             "stop_hub" => {
                 let keep = v

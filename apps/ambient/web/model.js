@@ -218,7 +218,8 @@
         const agents = Array.isArray(ev.agents) ? ev.agents : [];
         const cards = Array.isArray(ev.cards) ? ev.cards : [];
         let m2 = { ...m, agents, cards, seen: true, pages: Array.isArray(ev.pages) ? sortPages(ev.pages) : m.pages,
-          timers: Array.isArray(ev.timers) ? ev.timers.filter((t) => t && t.id != null) : m.timers };
+          // the hub's state also lists a week of ended timers (ended_ms, /scheduled): not watching
+          timers: Array.isArray(ev.timers) ? ev.timers.filter((t) => t && t.id != null && t.ended_ms == null) : m.timers };
         // the hub dropped a card: forget that it was answered here
         const ids = new Set(cards.map((c) => c.id));
         m2.answered = Object.fromEntries(Object.keys(m.answered).filter((id) => ids.has(id)).map((id) => [id, true]));

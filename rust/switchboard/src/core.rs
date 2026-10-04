@@ -461,11 +461,16 @@ pub enum Input {
         req: AgentReq,
     },
     Tick,
-    /// The user stopped timer `id` (the menu bar's `stop watching`, a
-    /// page's `stop`): its agent hears it from bise, once.
+    /// `/scheduled`'s stop: the user stopped timer `id`; its agent hears
+    /// it from bise, once (`why`: words after the id, may be empty).
     EveryStop {
         id: u64,
         why: String,
+    },
+    /// `/scheduled`'s run now: timer `id` wakes its agent at once,
+    /// outside its count.
+    EveryRun {
+        id: u64,
     },
     /// The approvals gate (approvals-design.md §9): a `confirm` card for
     /// `agent`'s waiting call, in the user's inbox.
@@ -1097,7 +1102,7 @@ impl Hub {
                 self.pr_news.read_journal(ev);
                 continue;
             }
-            // sb every's timers: the hub's own lines too
+            // the timers' lines (sb every): the hub's own too
             if crate::every::is_line(ev) {
                 self.every.read(ev);
                 continue;
@@ -1466,9 +1471,12 @@ impl Hub {
         };
         match r {
             EveryReq::List => json!({"ok": true, "text": self.every.list(now)}),
-            EveryReq::Stop(id) => match self.every.stop(id, &format!("stopped by {}", by)) {
+            EveryReq::Stop(id) => match self.every.stop(id, &format!("stopped by {}", by), now) {
                 Some(j) => {
                     fx.push(Effect::Journal(j));
+                    self.every_ended_lines(fx, id);
+                    // the views' state carries the timers (/scheduled, the panel's ◷)
+                    self.dirty = true;
                     json!({"ok": true, "text": format!("timer #{} stopped", id)})
                 }
                 None => json!({"ok": false, "error": format!("no timer #{} (`sb every` lists them)", id)}),
@@ -1494,9 +1502,61 @@ impl Hub {
                 let n = crate::every::New { agent, by, text: text.trim().to_string(), sched, until_ms, times, page };
                 let (id, j) = self.every.add(n, now);
                 fx.push(Effect::Journal(j));
+                self.dirty = true;
+                if let Some(t) = self.every.map.get(&id) {
+                    let mut ev = t.json();
+                    ev["ev"] = json!("set");
+                    self.every_lines(fx, &t.agent.clone(), &t.by.clone(), &ev);
+                }
                 let line = self.every.list(now).lines().find(|l| l.starts_with(&format!("#{} ", id))).unwrap_or_default().to_string();
                 json!({"ok": true, "id": id, "text": format!("timer set: {} (stop it: sb every --stop {})", line, id)})
             }
+        }
+    }
+
+    /// A timer's line in the feeds (`sb scheduled : <json>`, the TUI's ◷
+    /// line): its agent's feed, and main's when main set it for another
+    /// agent (main's thread shows the timers main sets, never another
+    /// agent's wakes). `ev`: the timer's state json with `ev` set/end.
+    fn every_lines(&self, fx: &mut Fx, agent: &str, by: &str, ev: &Value) {
+        fx.push(line(agent, "scheduled", &ev.to_string()));
+        if by == MAIN && agent != MAIN {
+            // main's copy says so: its ended line names the agent
+            let mut m = ev.clone();
+            m["in"] = json!(MAIN);
+            fx.push(line(MAIN, "scheduled", &m.to_string()));
+        }
+    }
+
+    /// The ◷ line of timer `id` that just ended (its `every_stop` read in).
+    fn every_ended_lines(&self, fx: &mut Fx, id: u64) {
+        if let Some(e) = self.every.ended.iter().rev().find(|e| e.timer.id == id) {
+            let mut ev = e.json();
+            ev["ev"] = json!("end");
+            self.every_lines(fx, &e.timer.agent, &e.timer.by, &ev);
+        }
+    }
+
+    /// `/scheduled`'s stop (the user): the timer ends, its agent hears it
+    /// from bise once, the ◷ line says so.
+    fn every_stop_by_user(&mut self, fx: &mut Fx, env: &mut dyn Env, id: u64, why: &str) {
+        let Some(t) = self.every.map.get(&id).cloned() else { return };
+        if let Some(j) = self.every.stop(id, "stopped by the user", env.now()) {
+            fx.push(Effect::Journal(j));
+            self.every_ended_lines(fx, id);
+            let text = format!("the user stopped timer #{} ({}){}: don't set it again unless they ask", id, t.text, why);
+            self.core(fx, env, None, json!({"t": "hub_msg", "to": t.agent, "text": text}));
+            self.dirty = true;
+        }
+    }
+
+    /// `/scheduled`'s run now: one wake of timer `id` at once, outside its
+    /// count (a busy agent gets it at the end of its turn).
+    fn every_run_now(&mut self, fx: &mut Fx, env: &mut dyn Env, id: u64) {
+        if let Some((agent, text, j)) = self.every.run_now(id, env.now()) {
+            fx.push(Effect::Journal(j));
+            self.core(fx, env, None, json!({"t": "hub_msg", "to": agent, "text": text}));
+            self.dirty = true;
         }
     }
 
@@ -1516,6 +1576,10 @@ impl Hub {
                 Some(_) => AgentNow::Busy,
             }
         });
+        // a run or an end changes the views' state (/scheduled, the ◷)
+        if !acts.is_empty() {
+            self.dirty = true;
+        }
         for a in acts {
             match a {
                 crate::every::Act::Wake { id, agent, text, journal } => {
@@ -1527,8 +1591,9 @@ impl Hub {
                     // one-shot timer was spent): else retried in a minute
                     let sent = fx[n..].iter().any(|e| matches!(e, Effect::Journal(j) if j["type"] == "message_sent"));
                     if sent {
-                        if let Some(j) = self.every.delivered(id) {
+                        if let Some(j) = self.every.delivered(id, env.now()) {
                             fx.push(Effect::Journal(j));
+                            self.every_ended_lines(fx, id);
                         }
                     } else if let Some(j) = self.every.undelivered(id, env.now()) {
                         fx.push(Effect::Journal(j));
@@ -1539,7 +1604,11 @@ impl Hub {
                         ));
                     }
                 }
-                crate::every::Act::Stop { journal } => fx.push(Effect::Journal(journal)),
+                crate::every::Act::Stop { journal } => {
+                    let id = journal["id"].as_u64().unwrap_or(0);
+                    fx.push(Effect::Journal(journal));
+                    self.every_ended_lines(fx, id);
+                }
             }
         }
     }
@@ -2050,20 +2119,12 @@ impl Hub {
                 self.interrupt_by = None;
             }
             Input::Agent { token, from, req } => self.agent_req(&mut fx, env, token, &from, req),
-            Input::EveryStop { id, why } => {
-                if let Some(t) = self.every.map.get(&id).cloned() {
-                    if let Some(j) = self.every.stop(id, "stopped by the user") {
-                        fx.push(Effect::Journal(j));
-                        let text = format!("the user stopped timer #{} ({}){}: don't set it again unless they ask", id, t.text, why);
-                        self.core(&mut fx, env, None, json!({"t": "hub_msg", "to": t.agent, "text": text}));
-                        self.dirty = true;
-                    }
-                }
-            }
             Input::Tick => {
                 self.core(&mut fx, env, None, json!({"t": "tick"}));
                 self.every_tick(&mut fx, env);
             }
+            Input::EveryStop { id, why } => self.every_stop_by_user(&mut fx, env, id, &why),
+            Input::EveryRun { id } => self.every_run_now(&mut fx, env, id),
             Input::ConfirmOpen { agent, text } => {
                 self.core(&mut fx, env, None, json!({"t": "confirm_open", "agent": agent, "text": text}))
             }

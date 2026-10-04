@@ -38,7 +38,8 @@ struct MenuWatch: Equatable {
 
     static func list(_ state: [String: Any]) -> [MenuWatch] {
         (state["timers"] as? [[String: Any]] ?? []).compactMap { t in
-            guard let id = (t["id"] as? NSNumber)?.intValue else { return nil }
+            // the hub's state also lists a week of ended timers (`ended_ms`, /scheduled)
+            guard let id = (t["id"] as? NSNumber)?.intValue, t["ended_ms"] == nil else { return nil }
             let page = (t["page"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             return MenuWatch(id: id, text: t["text"] as? String ?? "", page: page)
         }
