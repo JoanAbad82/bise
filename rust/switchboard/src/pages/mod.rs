@@ -200,7 +200,7 @@ impl Pages {
         let id = p.id.as_deref().unwrap_or("");
         let was = self.store.meta(id).is_some_and(|m| m.public);
         if p.public.unwrap_or(was) {
-            let refused = export::refused(id, &blocks);
+            let refused = export::refused(id, &blocks, &p.html);
             if !refused.is_empty() {
                 return Err(refused);
             }

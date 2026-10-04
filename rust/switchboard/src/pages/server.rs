@@ -258,13 +258,15 @@ fn page(pages: &Pages, id: &str, n: Option<u64>, body_only: bool) -> Response {
     // amb-kit's writing view (m_5105): when it started, what the user asked
     let ask = m.ask.as_deref().map(|a| format!(" data-ask=\"{}\"", esc(a))).unwrap_or_default();
     let attrs = format!(
-        "id=\"bise-page\" data-page=\"{}\" data-version=\"{n}\" data-latest=\"{}\" data-agent=\"{}\" data-title=\"{}\" data-state=\"{}\" data-started=\"{}\"{ask}",
+        "id=\"bise-page\" data-page=\"{}\" data-version=\"{n}\" data-latest=\"{}\" data-agent=\"{}\" data-title=\"{}\" data-state=\"{}\" data-started=\"{}\"{ask}{}",
         esc(&m.id),
         m.version(),
         esc(&m.agent),
         esc(&m.title),
         esc(&m.state),
-        m.created_ms
+        m.created_ms,
+        // --public: the frame says so before the mirror runs (ambient-lead m_7535)
+        if m.public { " data-public" } else { "" }
     );
     let head = format!("<link rel=\"stylesheet\" href=\"/p/{}/v/{n}/page.css\" data-page-css>\n", esc(&m.id));
     Response::html(shell(pages, &m.title, &head, &attrs, &html))

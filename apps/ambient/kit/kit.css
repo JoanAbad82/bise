@@ -73,6 +73,9 @@ body {
 .bise-frame a.taste:hover { color: var(--talk-ink); text-decoration: underline; text-underline-offset: 2px; }
 .bise-frame a.taste::before { content: "· "; }
 .bise-frame a.taste[hidden] { display: none; }
+/* a page published with --public (pages-ui): it goes to his public mirror, he sees it before */
+.bise-frame .pub { font: 12px var(--font-mono); color: var(--talk-ink); padding: 1px 8px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--talk-line), inset 0 0 0 1px var(--talk-dim); }
+.bise-frame .pub[hidden] { display: none; }
 /* the version menu: "v3 ▾", a small list of versions under it */
 .bise-frame .v { position: relative; }
 .bise-frame .v > button { font-family: var(--font-mono); font-size: 12px; }

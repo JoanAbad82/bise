@@ -43,8 +43,18 @@ pub const PRIVATE_KINDS: &[&str] = &["email", "message", "review", "action"];
 /// What keeps a page out of the export, one line each (empty: it may be
 /// public): his own pages (about-you, morning, promises, meetings) and the
 /// private kinds.
-pub fn refused(id: &str, blocks: &[Block]) -> Vec<String> {
+pub fn refused(id: &str, blocks: &[Block], html: &str) -> Vec<String> {
     let mut out = Vec::new();
+    // his steps' words stay his (ambient-lead m_7535)
+    if html.contains("data-who=\"yours\"") && html.contains("data-kit=\"checklist\"") {
+        out.push("a checklist row of his (data-who=\"yours\") never goes public: drop it, or publish without --public".into());
+    }
+    // links that only work on his machine (ambient-lead m_7535): relative or https only
+    for bad in ["127.0.0.1", "localhost", "file:", "href=\"/", "src=\"/"] {
+        if html.contains(bad) {
+            out.push(format!("a link to {bad}… only works on his machine: a public page links with https:// (or to nothing)"));
+        }
+    }
     if id == "about-you" || id.starts_with("morning") || id.starts_with("promises-") || id.starts_with("meeting-") {
         out.push(format!("{id}: this page is the user's own (about-you, morning, promises, meetings): it never goes public; publish without --public"));
     }
@@ -207,12 +217,18 @@ mod tests {
     #[test]
     fn his_own_pages_and_drafts_never_go_public() {
         let b = |id: &str, kit: &str| Block { id: id.into(), kit: kit.into(), hash: String::new() };
-        assert!(refused("scheduled", &[b("s", "ui"), b("q", "question"), b("t", "table")]).is_empty());
-        let e = refused("weekly", &[b("m1", "email"), b("s", "message"), b("r", "review"), b("a", "action")]);
+        assert!(refused("scheduled", &[b("s", "ui"), b("q", "question"), b("t", "table")], "<a href=\"https://bise.dev\">x</a>").is_empty());
+        let e = refused("weekly", &[b("m1", "email"), b("s", "message"), b("r", "review"), b("a", "action")], "");
         assert_eq!(e.len(), 4, "{e:#?}");
         assert!(e[0].starts_with("m1: a email block never goes public"));
         for id in ["about-you", "morning", "morning-2026-10-04", "promises-week", "meeting-q3"] {
-            assert!(!refused(id, &[]).is_empty(), "{id}");
+            assert!(!refused(id, &[], "").is_empty(), "{id}");
+        }
+        // his steps, and links that only work on his machine
+        let steps = "<section data-kit=\"checklist\" data-id=\"c\"><ol><li data-id=\"t1\" data-who=\"yours\">pay</li></ol></section>";
+        assert!(refused("plan", &[b("c", "checklist")], steps)[0].contains("data-who=\"yours\""));
+        for link in ["<a href=\"http://127.0.0.1:47438/p/x\">x</a>", "<a href=\"/p/about-you\">x</a>", "<a href=\"file:///Users/x\">x</a>", "<a href=\"http://localhost:3000\">x</a>"] {
+            assert!(!refused("plan", &[], link).is_empty(), "{link}");
         }
     }
 }

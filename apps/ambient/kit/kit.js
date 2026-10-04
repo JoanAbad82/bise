@@ -819,6 +819,7 @@
     const m = el("span", { class: "m" });
     // to the page of what bise keeps about him (about-you), where he edits the rules
     const tasteLink = el("a", { class: "taste", href: "/p/about-you", hidden: "" });
+    const publicChip = el("span", { class: "pub", title: "published with --public: copied to your public mirror", hidden: main.hasAttribute("data-public") ? null : "" }, "public");
     const st = el("span", { class: "st" });
     const stWords = el("span", {}, W.updating(agent));
     const stProgress = el("span", { class: "p" });
@@ -873,7 +874,7 @@
       wStop.disabled = true;
       doc.dispatchEvent(new root.CustomEvent("bise:stop", { detail: { page: id, timer: watch.timer == null ? null : watch.timer } }));
     });
-    f.append(m, tasteLink, st, wbox, sp, wc, vbox, latest, n, send);
+    f.append(m, tasteLink, publicChip, st, wbox, sp, wc, vbox, latest, n, send);
     // the version menu (amb-web m_5684): ↓ ⏎ space on the button open it on the shown version;
     // ↑ ↓ Home End move, ⏎ space pick, esc closes back on the button, tab closes
     const menuItems = () => Array.from(menu.querySelectorAll('[role="menuitemradio"]'));
@@ -925,6 +926,8 @@
       const tw = tasteWords(meta && meta.taste);
       tasteLink.hidden = !tw || main.dataset.state === "writing";
       tasteLink.textContent = tw || "";
+      // --public (pages-ui): a chip, so he sees it goes to his public mirror
+      publicChip.hidden = !((meta && meta.public) || main.hasAttribute("data-public"));
       doc.title = main.dataset.state === "writing" ? W.tabWriting(title) : title;
       latest.hidden = shown >= latestN;
       // at v1 there is nothing to compare or go back to: no 'what changed', no 'v1' chip

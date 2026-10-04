@@ -58,3 +58,13 @@ back first, the user may have edited it there), never a second one.
 
 Then say where it went in one line (`posted in #team.`) and, when it makes sense, publish a last
 version that says so (a `good` callout: `posted in #team, 14:02`).
+
+## A public page
+
+A page lives on his machine only. `sb page publish … --public` puts its latest version in the
+static copy his public mirror publishes (when he set one: `[pages] mirror` in his config); the
+frame shows `public`. That is a send: only on his word for that page ("make it public", "put it
+on bise.dev"), never on your own. It stays public at the next versions; `--private` takes it
+back. A public page never holds an email, message, review or action block, his own rows
+(`data-who="yours"`), or a link to his machine (127.0.0.1, localhost, `/p/…`, file:): the
+publish refuses it. Mock pages of a feature (`ui.md`) are the usual public pages.
