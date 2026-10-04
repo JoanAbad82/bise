@@ -37,6 +37,10 @@ law("hands-free: holding fn does not start a second talk, release ends it",
 let combo = run([(.fnDown, 0), (.keyDown(18, repeated: false), 0.1), (.keyUp(18), 0.15), (.fnUp, 0.2)])
 law("fn + 1: the key, swallowed down and up, no tap, no talk",
     combo.out == [.key("1")] && combo.swallowed == [true, true, true, true])
+let fnA = run([(.fnDown, 0), (.keyDown(0, repeated: false), 0.1), (.keyUp(0), 0.15), (.fnUp, 0.2)])
+law("fn + a (round 10): the key a, swallowed down and up, no tap, no talk",
+    fnA.out == [.key("a")] && fnA.swallowed == [true, true, true, true])
+law("a alone: typing, passes", run([(.keyDown(0, repeated: false), 0), (.keyUp(0), 0.1)]).swallowed == [false, false])
 let dbl = run([(.fnDown, 0), (.fnUp, 0.1), (.fnDown, 0.2), (.fnUp, 0.3)])
 law("fn alone (tap, double): its own down and up are swallowed, so macOS's 🌐 key (emoji picker) never fires",
     dbl.out == [.tap, .double] && dbl.swallowed == [true, true, true, true])

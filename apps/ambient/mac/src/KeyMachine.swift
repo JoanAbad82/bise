@@ -61,6 +61,7 @@ enum KeyIn: Equatable {
 let biseKeys: [Int: String] = [
     49: "space", 18: "1", 19: "2", 20: "3", 21: "4", 23: "5", 22: "6", 26: "7",
     28: "8", 25: "9", 29: "0", 34: "i", 31: "o", 35: "p", 47: ".", 43: ",", 36: "enter", 76: "enter",
+    0: "a",     // round 10: fn a, all your agents (the finder, like fn space)
     53: "esc",
 ]
 

@@ -70,5 +70,27 @@ _ = kf.feed(.closed)
 law("keys: the answer to his own ask takes them", kf.feed(.answerToAsk) == .take)
 law("keys: and its close hands them back", kf.feed(.closed) == .giveBack)
 
+// round 10: the side panel, docked right, full height under the menu bar
+let sbox = ScreenBox(frame: CGRect(x: 0, y: 0, width: 1512, height: 982), visible: CGRect(x: 0, y: 0, width: 1512, height: 949))
+let sglass = CGRect(x: 84, y: 0, width: Placement.sideWidth, height: Placement.sideHeight(on: sbox))
+let sf = Placement.side(CGSize(width: 84 + 440, height: sglass.height), glass: sglass, on: sbox)
+law("side panel: the glass's right edge on the screen's right edge", sf.minX + sglass.maxX == sbox.visible.maxX)
+law("side panel: its top right under the menu bar", sf.maxY == sbox.visible.maxY)
+law("side panel: full height of the visible area", sf.height == sbox.visible.height)
+law("side panel: the pearl's 84 px at the glass's left", sf.width == 524 && sf.minX == 1512 - 524)
+let sideTall = Placement.side(CGSize(width: 524, height: 5000), glass: CGRect(x: 84, y: 0, width: 440, height: 5000), on: sbox)
+law("side panel: a page taller than the screen is cut to the visible area", sideTall.minY == sbox.visible.minY && sideTall.maxY == sbox.visible.maxY)
+let r2 = ScreenBox(frame: CGRect(x: 1512, y: -200, width: 2560, height: 1440), visible: CGRect(x: 1512, y: -200, width: 2560, height: 1415))
+let sf2 = Placement.side(CGSize(width: 524, height: 1415), glass: CGRect(x: 84, y: 0, width: 440, height: 1415), on: r2)
+law("side panel on a second screen: docked to that screen's right edge", sf2.minX + 524 == r2.visible.maxX && sf2.maxY == r2.visible.maxY)
+law("side panel: no glass key (an older page): the whole box docked right", Placement.side(CGSize(width: 440, height: 949), glass: nil, on: sbox).maxX == sbox.visible.maxX)
+
+// the panel's keys (round 10): opened by hand, it takes them; esc/⌘W hands them back
+var pk = KeyFocus()
+law("panel keys: opening it takes them", pk.feed(.openedByHand) == .take)
+law("panel keys: a click in it while it has them: nothing more", pk.feed(.clicked) == .nothing)
+law("panel keys: esc or ⌘W hands them back to his app", pk.feed(.closed) == .giveBack)
+law("panel keys: a click in it later takes them again", pk.feed(.clicked) == .take)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Always laws hold")

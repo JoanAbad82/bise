@@ -28,7 +28,8 @@ struct CapsuleShape: Equatable {
     static func from(_ c: [String: Any], maxHeight: CGFloat) -> CapsuleShape? {
         func num(_ o: [String: Any], _ k: String) -> CGFloat? { (o[k] as? NSNumber).map { CGFloat($0.doubleValue) } }
         guard let w = num(c, "w"), let h = num(c, "h"), w >= 40, h >= 20 else { return nil }
-        var s = CapsuleShape(w: min(w, 900), h: min(h, maxHeight), radius: num(c, "radius") ?? 40, note: nil)
+        // round 10: the finder with a preview is 1004 wide (84 + 860 + room)
+        var s = CapsuleShape(w: min(w, 1100), h: min(h, maxHeight), radius: num(c, "radius") ?? 40, note: nil)
         if let n = c["note"] as? [String: Any], let y = num(n, "y"), let nh = num(n, "h"), nh > 0 {
             s.note = Note(y: y, h: min(nh, max(0, maxHeight - y)), radius: num(n, "radius") ?? 24)
         }

@@ -75,11 +75,18 @@ final class Capsule: NSObject, WKNavigationDelegate {
     // the corners of both boxes: macOS's window radius, not the page's
     let radius: CGFloat = macWindowRadius()
 
-    override init() {
+    // round 10: the side panel (an agent's history, docked right) is a
+    // second Capsule: the same glass, mask, mouse and keys, its own page
+    // (panel.html), its own place (Placement.side)
+    let side: Bool
+
+    init(side: Bool = false) {
+        self.side = side
         panel = CapsulePanel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 84),
                              styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isFloatingPanel = true
-        panel.level = .statusBar
+        // the side panel stays while he works in his apps: above them, under the bar
+        panel.level = side ? .floating : .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
@@ -111,7 +118,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
         conf.mediaTypesRequiringUserActionForPlayback = []
         conf.preferences.setValue(true, forKey: "developerExtrasEnabled")
         conf.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
-        conf.userContentController.addUserScript(WKUserScript(source: Capsule.bootJS, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        conf.userContentController.addUserScript(WKUserScript(source: Capsule.boot(side: side), injectionTime: .atDocumentStart, forMainFrameOnly: true))
         web = CapsuleWebView(frame: root.bounds, configuration: conf)
         web.setValue(false, forKey: "drawsBackground")
         web.underPageBackgroundColor = .clear
@@ -143,13 +150,15 @@ final class Capsule: NSObject, WKNavigationDelegate {
     }
 
     // in the page before its own scripts: the app's marks
-    static let bootJS = """
-    window.ambientApp = {mac: true};
+    static let bootJS = boot(side: false)    // the bar, the edge glow, QA's views
+
+    static func boot(side: Bool) -> String { """
+    window.ambientApp = {mac: true\(side ? ", panel: true" : "")};
     (function () {
       var mark = function () { document.documentElement && document.documentElement.classList.add('app'); };
       if (document.documentElement) mark(); else document.addEventListener('DOMContentLoaded', mark);
     })();
-    """
+    """ }
 
     @objc func mouseEntered(with e: NSEvent) { onHover?(true) }
     @objc func mouseExited(with e: NSEvent) { onHover?(false) }
@@ -161,7 +170,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
         ready = false
         watcher = nil
         guard let dir else { web.loadHTMLString(Capsule.missing("no web UI dir given (--web)"), baseURL: nil); return }
-        let index = URL(fileURLWithPath: dir).appendingPathComponent("index.html")
+        let index = URL(fileURLWithPath: dir).appendingPathComponent(side ? "panel.html" : "index.html")
         guard FileManager.default.fileExists(atPath: index.path) else {
             web.loadHTMLString(Capsule.missing("no \(index.path)"), baseURL: nil); return
         }
@@ -171,7 +180,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
     }
 
     func reload() {
-        Log.say("capsule: reload")
+        Log.say(side ? "panel: reload" : "capsule: reload")
         ready = false
         web.reload()
     }
@@ -240,14 +249,21 @@ final class Capsule: NSObject, WKNavigationDelegate {
         applyMask()
     }
 
-    var maxHeight: CGFloat { (screen?.frame.height ?? 900) * 0.7 }
+    var maxHeight: CGFloat {
+        side ? (screen.map { Placement.sideHeight(on: ScreenBox(frame: $0.frame, visible: $0.visibleFrame)) } ?? 900)
+             : (screen?.frame.height ?? 900) * 0.7
+    }
+
+    // the side panel's glass height (the page draws its glass this tall)
+    var sideHeight: CGFloat { maxHeight }
 
     // round 9 (ambient m_6521): the glass centered on the screen, its top
     // 170 px below the screen's top, the pearl at its left, growing down;
     // never off the screen (Placement.bar)
     private func place(_ size: NSSize) {
         guard let s = screen else { return }
-        let f = Placement.bar(size, glass: shape.glass, on: ScreenBox(frame: s.frame, visible: s.visibleFrame))
+        let b = ScreenBox(frame: s.frame, visible: s.visibleFrame)
+        let f = side ? Placement.side(size, glass: shape.glass, on: b) : Placement.bar(size, glass: shape.glass, on: b)
         let moved = f.origin != panel.frame.origin || f.size != panel.frame.size
         panel.setFrame(f, display: true)
         if moved { onPlaced?() }

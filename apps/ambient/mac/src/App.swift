@@ -20,6 +20,10 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var sounds: SoundPlayer?
     private var askedAt = 0.0             // his last ask the core took ('sent'); its answer gets the keys
     private var keyFocus = KeyFocus()     // who has his keystrokes (round 9)
+    private var side: Capsule?            // round 10's side panel, made at its first open
+    private var panelAgent: String?       // the agent it shows
+    private var panelKeys = KeyFocus()    // the panel's own keys (it takes them when opened)
+    private let mainMenu = MainMenuView() // the hidden main menu: ⌘Q ⌘W ⌘, ⌘H and Edit
     private var status: StatusItem?
     private var signals: [DispatchSourceSignal] = []
     private var qa: QA?                  // --qa only: the QA channel (QA.swift)
@@ -126,6 +130,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             self.visFeed(.dismiss)
         }
         capsule.load(webDir: config.web)
+        mainMenu.on = { [weak self] in self?.menuAct($0) }
+        mainMenu.install()
         // at rest nothing on screen: the capsule shows when there is something to see
         edge.load(webDir: config.web)
         edgeSetup()
@@ -253,6 +259,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         reduceMotion = on
         status?.reduceMotion = on
         capsule.post(["ev": "app_reduce_motion", "on": on])
+        side?.post(["ev": "app_reduce_motion", "on": on])
         edgeSetup()
     }
 
@@ -293,6 +300,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.capsule.screensChanged()
+                self?.side?.screensChanged()
                 self?.edge.rebuild()
             }
         }
@@ -305,6 +313,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         asleep = false
         if qa == nil { core.check(); keys.reenable() } else { core.check() }
         capsule.screensChanged()
+        side?.screensChanged()
         edge.rebuild()
         sayVisible()
     }
@@ -564,6 +573,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     private func coreEvent(_ ev: [String: Any]) {
         guard let kind = ev["ev"] as? String else { return }
+        side?.post(ev)      // the side panel's page hears every core event (it keeps its agent's)
         if AmbientApp.remembered.contains(kind) { memory[kind] = ev }
         if let u = ev["pages_url"] as? String, !u.isEmpty { pagesURL = u }
         defer { Browser.pagesURL = pagesURL }
@@ -663,6 +673,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
                 toggleByHand()
             case "space":
                 spotlight()
+            case "a":
+                agentsFinder()
             case "0":
                 // fn 0: the full view; fn 0 again closes it (SPEC §0)
                 if !capsule.hidden && vis.pinned { visFeed(.dismiss) } else { agentsView() }
@@ -760,6 +772,112 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         visFeed(.show(Visibility.brief))   // until the field takes the keys
         capsule.post(["ev": "app_key", "key": "space"])
         takeKeys()
+    }
+
+    // fn a (round 10): every agent in the finder; the page opens it at 860
+    // and asks app_focus on, like fn space
+    private func agentsFinder() {
+        visFeed(.show(Visibility.brief))   // until the field takes the keys
+        capsule.post(["ev": "app_key", "key": "a"])
+        takeKeys()
+    }
+
+    // MARK: the side panel (round 10): an agent's history, docked right
+
+    private func makeSide() -> Capsule {
+        if let s = side { return s }
+        let s = Capsule(side: true)
+        s.onCmd = { [weak self] in self?.panelCmd($0) }
+        s.onReady = { [weak self] in self?.panelReady() }
+        s.onKeyFocus = { [weak self] on in
+            guard let self else { return }
+            _ = self.panelKeys.feed(on ? .clicked : .closed)
+            self.side?.post(["ev": "app_focused", "on": on])
+        }
+        s.watchKey()
+        s.load(webDir: config.web)
+        side = s
+        return s
+    }
+
+    // the panel page's cmds: its box, its agent, its close; the rest goes
+    // the bar's way (core cmds to the core, app_* here)
+    private func panelCmd(_ cmd: [String: Any]) {
+        switch cmd["cmd"] as? String ?? "" {
+        case "app_size":
+            if let s = side, let sh = CapsuleShape.from(cmd, maxHeight: s.maxHeight) { s.apply(sh) }
+        case "app_panel":
+            openPanel(cmd["agent"] as? String)
+        case "app_panel_close", "app_hide":
+            closePanel()
+        case "app_focus":
+            if qa == nil { side?.focus(cmd["on"] as? Bool ?? false) }
+        default:
+            if let qa { qa.fromPage(cmd) } else { command(cmd) }
+        }
+    }
+
+    private func panelReady() {
+        guard let s = side else { return }
+        s.post(["ev": "app_reduce_motion", "on": reduceMotion])
+        s.post(settingsEvent())
+        for k in ["hub", "state", "phase", "main"] { if let ev = memory[k] { s.post(ev) } }
+        if let a = panelAgent { s.post(["ev": "app_panel", "agent": a, "on": true, "h": s.sideHeight]) }
+    }
+
+    // {cmd:'app_panel', agent} from the bar (⏎ on an agent) or the panel
+    // (⌘↑↓ re-points it): shown already = the same window, its new agent
+    private func openPanel(_ agent: String?) {
+        guard let agent, !agent.isEmpty else { return }
+        let s = makeSide()
+        let shown = !s.hidden
+        panelAgent = agent
+        let ev: [String: Any] = ["ev": "app_panel", "agent": agent, "on": true, "h": s.sideHeight]
+        s.post(ev)
+        capsule.post(ev)
+        guard !shown else { return }
+        Log.say("panel: open on \(agent)")
+        s.pickScreen()
+        s.show(fade: reduceMotion)
+        // it takes the keys first, then the bar goes: his app never gets them
+        // in between (QA never takes his keys)
+        if qa == nil, panelKeys.feed(.openedByHand) == .take || !s.panel.isKeyWindow { s.focus(true) }
+        if !capsule.hidden { visFeed(.dismiss) }
+    }
+
+    // esc, ⌘W, the page's close, ⌘H: both pages hear it, the keys go back
+    private func closePanel() {
+        guard let s = side, !s.hidden else { return }
+        Log.say("panel: close")
+        let off: [String: Any] = ["ev": "app_panel", "on": false]
+        s.post(off)
+        capsule.post(off)
+        panelAgent = nil
+        _ = panelKeys.feed(.closed)
+        s.hide(after: reduceMotion ? Capsule.fadeTime : Capsule.leaveTime, fade: reduceMotion)
+    }
+
+    // the hidden main menu's keys (only while bise has the keys)
+    private func menuAct(_ a: MenuAct) {
+        switch a {
+        case .quit:
+            Log.say("app: ⌘Q")
+            NSApp.terminate(nil)
+        case .settings:
+            settingsView()
+        case .hide:
+            closePanel()
+            if !capsule.hidden { visFeed(.dismiss) }
+        case .close:
+            let panelShown = side.map { !$0.hidden } ?? false
+            switch MainMenu.close(panelKey: side?.panel.isKeyWindow ?? false, panelShown: panelShown, barShown: !capsule.hidden) {
+            case .panel: closePanel()
+            case .bar: visFeed(.dismiss)
+            case .nothing: break
+            }
+        case .edit:
+            break   // the responder chain does it
+        }
     }
 
     // what he opens takes the keys like Spotlight (round 9, ambient m_6521):

@@ -213,7 +213,11 @@ final class StatusItem: NSObject {
                 case .separator: m.addItem(.separator())
                 case .header: m.addItem(header(r.title))
                 default:
-                    let it = entry(r.title, r.keys, StatusItem.action(r.kind))
+                    // real key equivalents (pm's audit): quit ⌘Q, settings ⌘,
+                    // drawn by macOS itself, so no dim text next to them
+                    let real = StatusItem.realKey(r.kind)
+                    let it = entry(r.title, real == nil ? r.keys : nil, StatusItem.action(r.kind))
+                    if let real { it.keyEquivalent = real; it.keyEquivalentModifierMask = [.command] }
                     it.indentationLevel = r.indent
                     switch r.kind {
                     case .stop: it.representedObject = Int(r.ref ?? "")
@@ -236,6 +240,15 @@ final class StatusItem: NSObject {
                        words: (MenuWords.talk, MenuWords.talkKeys, MenuWords.show, MenuWords.hide, MenuWords.hideKeys,
                                SettingsWords.menu, SettingsWords.menuKeys, MenuWords.quit),
                        noAccess: noAccess())
+    }
+
+    // the rows with a real ⌘ key (the hidden main menu's own: MainMenu)
+    static func realKey(_ k: MenuItemOut.Kind) -> String? {
+        switch k {
+        case .quit: return "q"
+        case .settings: return ","
+        default: return nil
+        }
     }
 
     private static func action(_ k: MenuItemOut.Kind) -> Selector? {

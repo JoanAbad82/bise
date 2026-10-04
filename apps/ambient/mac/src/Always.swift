@@ -97,6 +97,24 @@ enum Placement {
         return CGRect(x: x, y: y, width: w, height: h)
     }
 
+    // round 10's side panel: docked to the right edge, full height under the
+    // menu bar; the glass's right edge on the visible area's right edge, its
+    // top right under the menu bar; the pearl's room at its left. Never
+    // taller than the visible area, never above the menu bar.
+    static let sideWidth: CGFloat = 440
+
+    static func side(_ size: CGSize, glass: CGRect?, on s: ScreenBox) -> CGRect {
+        let g = glass ?? CGRect(origin: .zero, size: size)
+        let h = min(size.height, s.visible.height + g.minY)
+        let x = s.visible.maxX - g.maxX
+        let top = s.visible.maxY + g.minY
+        let y = Swift.max(top - h, s.visible.minY)
+        return CGRect(x: x, y: y, width: size.width, height: top - y)
+    }
+
+    // the glass's height the side panel page draws: the visible height
+    static func sideHeight(on s: ScreenBox) -> CGFloat { s.visible.height }
+
     // SPEC §1: 20 px from the screen's right edge, 12 px under the menu bar;
     // never off the screen: a box taller or wider than the visible area is
     // kept inside it, top first
