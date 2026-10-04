@@ -382,13 +382,15 @@ def main():
         check("watch" not in m and [n["status"] for n in m["notes"]] == ["done"], "no watch, the stop note done: %r" % m)
         settle(c)
         c.say('[[bash: sb every 1h "later" --page launch-watch]]')
-        lwt = lambda: [t for t in (c.state or {}).get("timers", []) if t.get("page") == "launch-watch"]
+        # live ones only: the first (stopped) stays in the state as ended
+        lwt = lambda: [t for t in (c.state or {}).get("timers", []) if t.get("page") == "launch-watch" and t.get("ended_ms") is None]
         c.wait(lambda: lwt(), 90, "a second watch timer")
         settle(c)
         t2 = lwt()[0]["id"]
         c.wait(lambda: ws.seen("watch", lambda d: d and d["timer"] == t2), 15, "watching again")
         c.send({"op": "every_stop", "id": t2})
-        c.wait(lambda: ws.seen("watch", lambda d: d is None) and not (c.state or {}).get("timers"), 15, "the menu's stop")
+        live = lambda: [t for t in (c.state or {}).get("timers", []) if t.get("ended_ms") is None]
+        c.wait(lambda: ws.seen("watch", lambda d: d is None) and not live(), 15, "the menu's stop")
 
         # roadmap D: a 6-step plan, bise does 4 and asks for 2, all
         # ticked, none forgotten (plus a second checklist answered on its card)
