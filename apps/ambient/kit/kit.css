@@ -8,7 +8,7 @@
 html { -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--surface-made); color: var(--ink);
-  font: 400 var(--text-read)/1.6 var(--font-read);
+  font: 400 var(--text-read)/1.55 var(--font-read);
   /* the layout: the frame on top, the page, the notes' side (notes.js puts its list in grid-area side) */
   display: grid; grid-template-columns: minmax(var(--space-5), 1fr) minmax(0, var(--measure)) 36px 300px minmax(var(--space-5), 1fr);
   grid-template-rows: auto 1fr; grid-template-areas: "frame frame frame frame frame" ". page . side .";
@@ -45,7 +45,7 @@ body {
    newest at the bottom (the current one ink with the breathing dot, done ones dim with a ✓) */
 #bise-page > .bise-writing { display: block; padding: 6px 0 0; }
 #bise-page > .bise-writing h1 { margin-bottom: var(--space-2); }
-#bise-page > .bise-writing .ask { font: italic 19px/1.5 var(--font-read); color: var(--kick); margin: 0 0 var(--space-5); }
+#bise-page > .bise-writing .ask { font: 17px/1.5 var(--font-read); color: var(--kick); margin: 0 0 var(--space-5); }
 #bise-page > .bise-writing .more { font: 13px var(--font-mono); color: var(--faint); margin: 0 0 6px; }
 #bise-page > .bise-writing .intents { list-style: none; padding: 0; margin: 0; font: var(--text-small)/1.5 var(--font-read); }
 #bise-page > .bise-writing .intents li { color: var(--dim); margin: 0 0 6px; padding-left: 22px; position: relative; }
@@ -100,8 +100,9 @@ body {
 #bise-page ul, #bise-page ol { padding-left: 1.3em; }
 #bise-page li { margin: 0 0 var(--space-1); }
 #bise-page h1, #bise-page h2, #bise-page h3 { font-family: var(--font-read); font-weight: 600; color: var(--ink); }
-#bise-page h1 { font-size: var(--text-h1); line-height: 1.05; letter-spacing: -.02em; margin: 6px 0 var(--space-4); }
-#bise-page h2 { font-size: var(--text-h2); line-height: 1.2; letter-spacing: -.01em; margin: 0 0 10px; }
+/* the serif lives only in the page's title (ambient m_7009); h2, h3 are the reading sans */
+#bise-page h1 { font-family: var(--font-display); font-size: var(--text-h1); line-height: 1.1; letter-spacing: -.01em; margin: 6px 0 var(--space-4); }
+#bise-page h2 { font-size: var(--text-h2); line-height: 1.25; letter-spacing: -.01em; margin: 0 0 10px; }
 #bise-page h3 { font-size: var(--text-h3); line-height: 1.3; margin: 0 0 var(--space-2); }
 #bise-page strong, #bise-page b { font-weight: 600; }
 #bise-page a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--rule); text-decoration-thickness: 1px; text-underline-offset: 3px; }
@@ -119,19 +120,19 @@ body {
 
 /* heading: the page's title (h1, with an optional meta line, shown above it) or a section's (h2, h3) */
 [data-kit="heading"] { display: flex; flex-direction: column; }
-[data-kit="heading"] > p { order: -1; font: italic 16px/1.5 var(--font-read); color: var(--kick); margin: 0; }
+[data-kit="heading"] > p { order: -1; font: 16px/1.5 var(--font-read); color: var(--kick); margin: 0; }
 [data-kit="heading"]:has(> h2) { margin-top: 38px; }
 [data-kit="heading"]:has(> h3) { margin-top: var(--space-5); }
 
 /* table: numbers in mono, right-aligned (kit.js marks numeric columns data-num); a p after it is the caption */
 [data-kit="table"] { overflow-x: auto; }
 [data-kit="table"] table { width: 100%; border-collapse: collapse; margin: 10px 0 6px; font-size: 17px; }
-[data-kit="table"] caption { caption-side: bottom; text-align: left; font: italic 15px var(--font-read); color: var(--kick); padding-top: 6px; }
+[data-kit="table"] caption { caption-side: bottom; text-align: left; font: 15px var(--font-read); color: var(--kick); padding-top: 6px; }
 [data-kit="table"] th { font: 400 var(--text-kicker) var(--font-mono); color: var(--kick); text-align: left; padding: 6px 10px; border-bottom: 1.5px solid var(--rule-strong); vertical-align: bottom; }
 [data-kit="table"] td { padding: 9px 10px; border-bottom: 1px solid var(--rule); vertical-align: baseline; line-height: 1.5; }
 [data-kit="table"] [data-num] { text-align: right; }
 [data-kit="table"] td[data-num] { font-family: var(--font-mono); font-size: 15px; line-height: 1.5; white-space: nowrap; }
-[data-kit="table"] > p { font: italic 15px var(--font-read); color: var(--kick); }
+[data-kit="table"] > p { font: 15px var(--font-read); color: var(--kick); }
 
 /* callout: a card off the page with a mono kicker (its first h2/h3); the tone colors the kicker only */
 [data-kit="callout"] { background: var(--surface-card); border-radius: 10px; padding: var(--space-3) var(--space-4); margin: var(--space-4) 0; box-shadow: 3px 3px 0 var(--drop); }
@@ -306,12 +307,12 @@ body.bise-changes [data-changed]::after { content: "changed"; position: absolute
 [data-kit="pages"] li { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--rule); }
 [data-kit="pages"] li > a { font: 600 22px/1.25 var(--font-read); color: var(--ink); text-decoration: none; letter-spacing: -.01em; }
 [data-kit="pages"] li > a:hover { text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 4px; }
-[data-kit="pages"] .bise-kicker { grid-column: 1; font: italic 16px/1.4 var(--font-read); color: var(--dim); }
+[data-kit="pages"] .bise-kicker { grid-column: 1; font: 16px/1.4 var(--font-read); color: var(--dim); }
 [data-kit="pages"] .bise-meta { grid-column: 1; font: 12px var(--font-mono); color: var(--kick); }
 /* a page that holds an open question: the asking dot after its title */
 [data-kit="pages"] li[data-asking] > a::after { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-left: 10px; vertical-align: .2em; box-shadow: 0 0 0 3px var(--accent-soft); }
 /* pink only for what waits for him (round 8): updating and 'open' are not */
 [data-kit="pages"] li[data-state="updating"] .bise-meta { color: var(--dim); }
 [data-kit="pages"] .bise-open { grid-column: 2; grid-row: 1 / span 2; align-self: center; font: 12px var(--font-mono); color: var(--kick); }
-[data-kit="pages"]:empty::before, [data-kit="pages"] > ul:empty::before { content: "nothing here yet. when an agent makes a page for you, it shows here."; font: italic 17px var(--font-read); color: var(--kick); }
-#bise-home::before { content: "for you"; display: block; font: 600 var(--text-h1)/1.08 var(--font-read); letter-spacing: -.02em; margin: 6px 0 var(--space-4); }
+[data-kit="pages"]:empty::before, [data-kit="pages"] > ul:empty::before { content: "nothing here yet. when an agent makes a page for you, it shows here."; font: 17px var(--font-read); color: var(--kick); }
+#bise-home::before { content: "for you"; display: block; font: 600 var(--text-h1)/1.1 var(--font-display); letter-spacing: -.01em; margin: 6px 0 var(--space-4); }

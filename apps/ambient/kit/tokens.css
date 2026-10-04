@@ -61,17 +61,19 @@
   --talk-shadow: 0 30px 80px -24px #000b;
   --talk-blur: blur(44px) saturate(1.9);
 
-  /* type: reading, interface, code and numbers */
-  --font-read: Newsreader, "Iowan Old Style", Georgia, serif;
+  /* type: reading, the page title, interface, code and numbers (ambient m_7009: sans for reading;
+     the serif only as the page's title) */
+  --font-read: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --font-display: Newsreader, "Iowan Old Style", Georgia, serif;
   --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --text-read: 19px;
-  --text-small: 15.5px;
+  --text-read: 17px;
+  --text-small: 15px;
   --text-ui: 13px;
   --text-kicker: 12px;
-  --text-h1: 46px;
-  --text-h2: 26px;
-  --text-h3: 21px;
+  --text-h1: 44px;
+  --text-h2: 23px;
+  --text-h3: 19px;
 
   /* space, shape, motion */
   --space-1: 4px;
@@ -80,7 +82,7 @@
   --space-4: 18px;
   --space-5: 28px;
   --space-6: 46px;
-  --measure: 680px;
+  --measure: 68ch;
   --radius: 12px;
   --radius-small: 9px;
   --ease-arrive: cubic-bezier(.16, 1, .3, 1);
