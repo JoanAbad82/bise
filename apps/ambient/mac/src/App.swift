@@ -434,6 +434,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             if qa != nil { Log.say("app: qa: copy \(text.count) chars"); return }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
+        case "app_quit":
+            // the panel's ⋯ menu 'quit bise ambient' (amb-web 124f6853): ⌘Q's own path
+            if let a = MainMenu.pageCmd(name) { menuAct(a) }
         case "app_run_bise":
             runBise()
         case "app_perm":

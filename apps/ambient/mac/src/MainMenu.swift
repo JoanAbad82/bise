@@ -41,6 +41,15 @@ enum MainMenu {
     ]
     static var all: [MenuKey] { app + file + edit }
 
+    // a page's cmd that is a menu key's act (the panel's ⋯ menu, amb-web
+    // 124f6853): 'quit bise ambient' takes ⌘Q's own path
+    static func pageCmd(_ cmd: String) -> MenuAct? {
+        switch cmd {
+        case "app_quit": return .quit
+        default: return nil
+        }
+    }
+
     // ⌘W: the panel when it has the keys, else the bar (esc's order)
     enum CloseWhat: Equatable { case panel, bar, nothing }
     static func close(panelKey: Bool, panelShown: Bool, barShown: Bool) -> CloseWhat {

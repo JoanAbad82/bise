@@ -24,6 +24,9 @@ law("no key twice", Set(combos).count == combos.count)
 law("the page's own keys are left to it (⌘F ⌘D ⌘O ⌘. ⌘⌫ ⌘↑↓)",
     ["f", "d", "o", ".", "\u{8}", "\u{F700}", "\u{F701}"].allSatisfy { find($0) == nil })
 
+law("the panel's ⋯ 'quit bise ambient' (app_quit): ⌘Q's own act", MainMenu.pageCmd("app_quit") == .quit)
+law("other page cmds are not menu acts", MainMenu.pageCmd("app_copy") == nil && MainMenu.pageCmd("app_hide") == nil)
+
 law("⌘W: the panel when it has the keys", MainMenu.close(panelKey: true, panelShown: true, barShown: true) == .panel)
 law("⌘W: the bar when it has them (the panel stays)", MainMenu.close(panelKey: false, panelShown: true, barShown: true) == .bar)
 law("⌘W: the panel alone shown, clicked away: the panel", MainMenu.close(panelKey: false, panelShown: true, barShown: false) == .panel)
