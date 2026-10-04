@@ -679,6 +679,124 @@ have nothing to go through. The panel's keydown (`ui.js`) handles only ⌘⏎, �
 **To prove with one short run** (only if a doubt stays): ⌘V in the field, and a click on the
 pearl reaching the app below.
 
+## Terminal parity audit (the user via main m_7003, ambient-lead m_7006)
+
+The user's goal: "je voudrais pas que les gens aient besoin du terminal pour utiliser ambiant, il
+devrait être capable de faire tout ce que tu peux faire dans le terminal à partir d'ambiant
+exclusivement."
+
+This audit reads code and docs only at ambient-app b63216d6, with no app run: the TUI's
+`rust/tui/src/commands.rs` (every /command), `help.rs`, `onboarding/`, `sb/`, and ambient's
+`rust/tui/src/ambient/core.rs` (what the app can ask the core: `main`, `answer`, `start`, `send`,
+`every_stop`, `voice`, `shot`, `quiet`, `hush`, `talk_*`, `state`), `apps/ambient/web/bar.js` and
+`apps/ambient/mac/src`.
+
+- **ok**: ambient does it in its own UI.
+- **via main**: only by asking main in words; main does it with `sb`. That works when main has
+  the command, but nothing shows it can be done, and nothing shows the result.
+- **partial**: some of it.
+- **missing**: no way without the terminal.
+- **(verify)**: what i couldn't settle from the code.
+- **⛔ first**: blocks a person with no terminal before anything else.
+
+**1. Setup and first run** (what to build first)
+
+| terminal | ambient today | status | owner |
+|---|---|---|---|
+| install bise (the CLI on PATH) | the app finds `bise` from `--bise`, `lastBise`, the dev build or PATH (App.swift); no binary in the bundle | ⛔ first · missing | amb-mac + amb-home |
+| pick where bise works (`cd` a repo, or `~/bise` home) | home workspace `~/bise` by default (amb-home); switching only by SIGUSR1, no UI | ⛔ first · partial | amb-mac + amb-home |
+| sign in: provider key or subscription (`/provider`, onboarding sign-in, ChatGPT, OpenRouter) | no view; without a provider main can't answer at all | ⛔ first · missing | amb-mac + amb-web (UI), subs-auth's `bise auth` CLI under it (amb-core) |
+| which model does what (`/models`, onboarding roles) | no view | ⛔ first · missing | amb-web + amb-core |
+| permissions (mic, accessibility, screen) | perm steps continue / not now ✓, refused lines with the way back (37cd0aa8) | ok | - |
+| welcome, tour (`/welcome`, tour) | hello + the start-here page | ok | - |
+| `/setup` (check again, offer what helps) | no "check again" | missing | amb-mac |
+| can't reach bise (offline) | retry ✓, but "run bise in Terminal" is the way out (`ui_terminal` opens Terminal.app) | ⛔ first · partial: the fix itself needs the terminal | amb-mac + amb-core (restart the core from the app, show its log line) |
+| `/voice` (model, voice, language) | settings: answers out loud on/off; no model, voice or language | partial | amb-web + amb-mac |
+| `/theme` | follows macOS | ok (n/a) | - |
+
+**2. Talking and sending**
+
+| terminal | ambient today | status | owner |
+|---|---|---|---|
+| write to main (composer) | fn hold (voice), fn space (field) ✓ | ok | - |
+| write to a given agent (`@agent`, its view) | only main | missing | amb-web + amb-core (`send` to an agent) |
+| steer vs queued (`sb send --mode`) | none | missing | amb-core + amb-web |
+| dictation / voice mode (ctrl+r, twice) | fn hold, double fn hands-free ✓ | ok | - |
+| paste text, images, files; `@file` | screen with voice (`shot`) ✓; paste in the field likely dead (round 10: no Edit menu); no files, no `@file` | partial | amb-mac (Edit menu) + amb-web |
+| copy an answer | ⌘C ✓ | ok | - |
+| read main's whole answer and the thread | one line, then the page if there is one; no thread view | partial | amb-web + amb-core |
+| `/interrupt`, `/stop <agent>` | via main | via main | amb-core + amb-web (a stop on an agent's row) |
+| `/compact` | via main | via main (rarely his) | - |
+
+**3. Agents**
+
+| terminal | ambient today | status | owner |
+|---|---|---|---|
+| `/new` start an agent | spotlight tab "start an agent" ✓ (through main) | ok | - |
+| `/agents`, the panel | fn 0 going on: name · what · age; rows take no click (round 10) | partial | amb-web + amb-core |
+| an agent's feed, its last report, its questions (`sb tasks`, `sb inspect`) | none | missing | amb-web + amb-core |
+| `/switch`, `/rename`, `/isolate` | via main | via main | amb-core |
+| `/archive`, `/restore`, `/archived`, drop | via main; archived agents not shown | via main | amb-core + amb-web |
+| `/model`, `/reasoning` of an agent | none | missing | amb-core + amb-web |
+
+**4. Inbox, cards, approvals**
+
+| terminal | ambient today | status | owner |
+|---|---|---|---|
+| question cards (pick an option) | the bar, fn 1–n, click ✓ | ok | - |
+| answer in his own words (`/answer N text`) | fn talk on a card (voice) ✓; typed free answer (verify); paste dead (round 10) | partial | amb-web + amb-mac |
+| `/close N [note]` close without answering | "later" only puts it off | missing | amb-web + amb-core |
+| `/inbox`, most blocking first | fn i ✓ | ok | - |
+| drafts cards (review / send all) | ✓ on the card's own bar (amb-web d16054d8) | ok | - |
+| plan step cards (D) | ✓ | ok | - |
+| tool approvals (the approvals screen, auto mode) | (verify) whether they reach ambient as cards with approve / deny | (verify) | amb-core |
+
+**5. Pages**
+
+| terminal | ambient today | status | owner |
+|---|---|---|---|
+| open a page, notes, versions, send | ✓ (pages in the browser, fn o, fn p) | ok | - |
+| `sb page waiting`, what waits on him across pages | in the count and the menu ✓ | ok | - |
+| stop watching | ✓ menu + frame | ok | - |
+| taste, people (about-you) | the about-you page ✓ | ok | - |
+
+**6. Features, versions, updates**
+
+| terminal | ambient today | status | owner |
+|---|---|---|---|
+| features and feature branches (try one, see its agents, merge) | none | missing | amb-core + amb-web (+ amb-home: no repo, no branch words) |
+| `/update`, the release item | none: the app never updates bise or itself | ⛔ soon · missing | amb-mac + amb-core |
+| `/version`, `/restart` | none | missing (restart: amb-mac; versions: dev only) | amb-mac |
+| PRs (`/prs`) | via main | via main | - |
+
+**7. Plugins, connectors, computer use**
+
+| terminal | ambient today | status | owner |
+|---|---|---|---|
+| `/plugins` list / enable / disable / login / logout | none | missing (Gmail, Slack, Linear can't be connected) | amb-web + amb-core |
+| `/computer-use` setup / off | none | missing | amb-mac + amb-core |
+
+**8. History, timers, help, the rest**
+
+| terminal | ambient today | status | owner |
+|---|---|---|---|
+| `sb history` (past work) | via main | via main | - |
+| `sb every` timers | watching rows ✓, stop ✓; making one via main | ok | - |
+| `/help`, `/shortcuts` | keys shown on each surface; no full list | partial | amb-web |
+| `/quit` | menu quit ✓; ⌘Q missing (round 10) | partial | amb-mac |
+| logs, crash reports (`/log`, error report) | none; offline points to the terminal | missing | amb-mac + amb-core |
+
+**What blocks a person with no terminal, in order:**
+1. bise inside the app: install with no CLI.
+2. Sign in to a provider or subscription.
+3. Pick models (or a good default with nothing to pick).
+4. Choose the workspace.
+5. Recover from "can't reach bise" without Terminal.
+6. Update.
+
+Then connectors (`/plugins`) and computer use for the job slices, and an agent's own view (feed,
+write to it, stop it) to replace the panel.
+
 ## Out of the way (vision §3 G, the user's change m_5030)
 
 - [ ] At rest, after launch: nothing on screen but the menu-bar icon (no idle capsule).
