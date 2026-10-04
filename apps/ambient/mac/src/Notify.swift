@@ -45,6 +45,9 @@ enum NotifyWords {
 final class Notify: NSObject, UNUserNotificationCenterDelegate {
     var onAnswer: ((_ card: String, _ reply: String) -> Void)?
     var onOpen: (() -> Void)?
+    // macOS said no to notifications (asked once per launch, when a card is
+    // due while hidden): App says so on the glass, with the Notifications pane
+    var onRefused: (() -> Void)?
 
     private var center: UNUserNotificationCenter { UNUserNotificationCenter.current() }
     private var known = Set<String>()       // card ids seen (notified or not)
@@ -109,7 +112,10 @@ final class Notify: NSObject, UNUserNotificationCenterDelegate {
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     self.asked = true
-                    if ok { go() } else { Log.say("notify: not allowed \(err?.localizedDescription ?? "")") }
+                    if ok { go() } else {
+                        Log.say("notify: not allowed \(err?.localizedDescription ?? "")")
+                        self.onRefused?()
+                    }
                 }
             }
         }

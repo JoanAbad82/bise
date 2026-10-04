@@ -37,7 +37,8 @@ _ = PermPlan.launch(&t)
 _ = PermPlan.command(.accessibility, "continue", &t)
 law("a relaunch before Accessibility is on: the refused line once, no second ask",
     PermPlan.launch(&t) == [.denied(.accessibility), .watchTrust])
-law("the launch after that: nothing said, still watching", PermPlan.launch(&t) == [.watchTrust])
+law("the launch after that: said again (never a silent fn), still watching",
+    PermPlan.launch(&t) == [.denied(.accessibility), .watchTrust])
 law("a second continue on an ask already answered: nothing", PermPlan.command(.mic, "continue", &s).isEmpty)
 
 // not now
@@ -45,8 +46,10 @@ var n = PermState(accessibility: .granted)
 _ = PermPlan.hold(&n)
 law("not now on the mic: the refused line once", PermPlan.command(.mic, "not_now", &n) == [.denied(.mic)])
 h = PermPlan.hold(&n)
-law("after not now: a hold neither asks nor talks", !h.talk && h.do.isEmpty)
+law("after not now: the next hold asks the mic again in the bar (never a silent hold), no talk",
+    !h.talk && h.do == [.ask(.mic)])
 law("not now twice: still one line", PermPlan.command(.mic, "not_now", &n).isEmpty)
+law("continue after a not now: macOS's mic prompt", PermPlan.command(.mic, "continue", &n) == [.prompt(.mic)])
 
 // refused in macOS's prompt
 var r = PermState(accessibility: .granted)
@@ -54,7 +57,9 @@ _ = PermPlan.hold(&r)
 _ = PermPlan.command(.mic, "continue", &r)
 law("mic refused in macOS: the line once, no screen ask", PermPlan.answered(.mic, granted: false, &r) == [.denied(.mic)])
 h = PermPlan.hold(&r)
-law("mic refused: a hold doesn't talk, says nothing again", !h.talk && h.do.isEmpty)
+law("mic refused: a hold doesn't talk, and says why at every hold", !h.talk && h.do == [.denied(.mic)])
+h = PermPlan.hold(&r)
+law("mic refused: the next hold says it again", !h.talk && h.do == [.denied(.mic)])
 
 // the screen left off: talks without the shot
 var sc = PermState(accessibility: .granted, mic: .granted)
@@ -62,7 +67,13 @@ h = PermPlan.hold(&sc)
 law("mic on, screen never asked: this hold asks the screen, no talk", !h.talk && h.do == [.ask(.screen)])
 _ = PermPlan.command(.screen, "not_now", &sc)
 h = PermPlan.hold(&sc)
-law("screen not now: holds talk without the shot, nothing said again", h.talk && h.do.isEmpty)
+law("screen not now: holds talk without the shot, nothing said again this launch", h.talk && h.do.isEmpty)
+_ = PermPlan.launch(&sc)
+h = PermPlan.hold(&sc)
+law("the next launch: its first hold says the screen's line once more (never silent for good)",
+    h.talk && h.do == [.denied(.screen)])
+h = PermPlan.hold(&sc)
+law("and not at the hold after", h.talk && h.do.isEmpty)
 
 // one at a time: an ask never comes with another
 var all = PermState()
@@ -85,7 +96,8 @@ law("Accessibility lost after a rebuild: the line again, watching, even if told 
 law("and at every launch until it's back", PermPlan.launch(&lost) == [.denied(.accessibility), .watchTrust])
 law("back on: granted, keys on", PermPlan.answered(.accessibility, granted: true, &lost) == [.granted(.accessibility), .startKeys])
 var never = PermState(asked: ["accessibility"], told: ["accessibility"])
-law("his own 'not now' (never had): still said once ever, not again", PermPlan.launch(&never) == [.watchTrust])
+law("his own 'not now' (never had): said at every launch too, with the way back",
+    PermPlan.launch(&never) == [.denied(.accessibility), .watchTrust])
 var first = PermState()
 _ = PermPlan.answered(.accessibility, granted: true, &first)
 law("granted by the prompt: remembered as had", first.had.contains("accessibility"))
@@ -99,7 +111,7 @@ func why(_ st: PermState) -> (Bool, String) {
 law("hold why: no Accessibility", why(PermState()) == (false, "no Accessibility"))
 law("hold why: the first hold asks the mic", why(PermState(accessibility: .granted)) == (false, "asking the mic first"))
 law("hold why: mic off in System Settings", why(PermState(accessibility: .granted, mic: .denied)) == (false, "the mic is off in System Settings"))
-law("hold why: mic left at not now", why(PermState(accessibility: .granted, asked: ["mic"])) == (false, "the mic was left at not now"))
+law("hold why: mic left at not now", why(PermState(accessibility: .granted, asked: ["mic"])) == (false, "asking the mic again (it was left at not now)"))
 law("hold why: the screen asked after the mic", why(PermState(accessibility: .granted, mic: .granted)) == (false, "asking the screen first"))
 law("hold why: talks without the shot", why(PermState(accessibility: .granted, mic: .granted, asked: ["screen"])) == (true, "without the screen shot"))
 law("hold why: all on, nothing to say", why(PermState(accessibility: .granted, mic: .granted, screen: .granted)) == (true, ""))
@@ -109,6 +121,17 @@ law("hello: due once Accessibility is on", Hello.due(said: false, accessibility:
 law("hello: not before Accessibility", !Hello.due(said: false, accessibility: .unknown, quiet: false))
 law("hello: never while quiet (it waits)", !Hello.due(said: false, accessibility: .granted, quiet: true))
 law("hello: never twice", !Hello.due(said: true, accessibility: .granted, quiet: false))
+
+// every problem's line has the way back (the user: never a silent ignore)
+law("settings panes: each permission and problem opens its own pane",
+    ["accessibility", "mic", "screen", "globe", "notifications"].allSatisfy { SettingsPane.url($0) != nil })
+law("settings pane: the mic is the Microphone list",
+    SettingsPane.url("mic")?.absoluteString.hasSuffix("Privacy_Microphone") == true)
+law("settings pane: the 🌐 key is in Keyboard", SettingsPane.url("globe")?.absoluteString.contains("Keyboard") == true)
+law("settings pane: an unknown problem opens nothing", SettingsPane.url("nope") == nil)
+law("🌐 fired: the emoji picker's window is on screen", Globe.fired(owners: ["Ghostty", "EmojiFunctionRowIM_Extension"]))
+law("🌐 fired: the character palette too", Globe.fired(owners: ["CharacterPalette"]))
+law("🌐 not fired: ordinary windows", !Globe.fired(owners: ["Ghostty", "Google Chrome", "bise ambient", "Window Server"]))
 
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Perms laws hold")

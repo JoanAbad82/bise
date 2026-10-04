@@ -181,6 +181,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         let nt = Notify()
         nt.onAnswer = { [weak self] card, reply in self?.toCore(["cmd": "answer", "card": card, "reply": reply]) }
         nt.onOpen = { [weak self] in self?.agentsView() }
+        // the user: never a silent ignore (a card due while hidden and no banner)
+        nt.onRefused = { [weak self] in self?.problem("notifications") }
         notify = nt
 
         keys.onOut = { [weak self] in self?.key($0) }
@@ -625,6 +627,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             startTalk(k == .fn ? "fn" : "right_option", state: "down")
         case .double:
             startTalk("fn", state: "double")
+            globeCheck()
         case .talkEnd:
             guard talking else { return }
             settleTalk?()       // talk_start always goes before talk_end
@@ -646,6 +649,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             visFeed(.cancelled)
         case .tap:
             fnEvent("tap")      // the page cuts in when main speaks
+            globeCheck()
         case .key(let k):
             switch k {
             case ".":
@@ -990,7 +994,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private func permSave(_ s: PermState) {
         for p in Perm.allCases.map(\.rawValue) {
             if s.asked.contains(p) { defaults.set(true, forKey: "asked.\(p)") }
-            if s.told.contains(p) { defaults.set(true, forKey: "told.\(p)") }
+            // told goes both ways: a refusal is said again once per launch (PermPlan.launch)
+            defaults.set(s.told.contains(p), forKey: "told.\(p)")
             if s.had.contains(p) { defaults.set(true, forKey: "had.\(p)") }
         }
         if qa != nil { fakePerms = s }
@@ -1025,8 +1030,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case .settings(let p):
             // QA never opens a settings pane
             guard qa == nil else { Log.say("app: qa: settings pane for \(p.rawValue)"); return }
-            let pane = ["accessibility": "Privacy_Accessibility", "mic": "Privacy_Microphone", "screen": "Privacy_ScreenCapture"][p.rawValue] ?? "Privacy"
-            if let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") { NSWorkspace.shared.open(u) }
+            if let u = SettingsPane.url(p.rawValue) { NSWorkspace.shared.open(u) }
         case .prompt(let p): prompt(p)
         }
     }
@@ -1119,6 +1123,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // the page's answer to an ask: continue, not now, settings
     private func permCommand(_ p: String, _ action: String) {
+        // the problems that aren't asks (the user: every error with the way
+        // back): their line's 'settings' opens the pane
+        if action == "settings", let pane = SettingsPane.url(p) {
+            if qa != nil { Log.say("app: qa: settings pane for \(p)"); return }
+            NSWorkspace.shared.open(pane)
+            return
+        }
         guard let perm = Perm(rawValue: p) else { return }
         // answered: the glass the ask opened goes (first-run walk: it stayed
         // pinned on the last ask after every permission was granted); the
@@ -1131,4 +1142,32 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     }
 
     private var askShown = false   // the glass is open for a permission ask
+
+    // MARK: problems that aren't asks (the user: never a silent ignore)
+
+    // the tap swallows fn's own events, so macOS's 🌐 action shouldn't fire;
+    // if its emoji picker still shows up after a fn tap, say so once per
+    // launch with the way back (Keyboard › Press 🌐 key to › Do Nothing)
+    private var globeSaid = false
+    private func globeCheck() {
+        guard qa == nil, !globeSaid, globeUse() != "none" else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, !self.globeSaid else { return }
+                let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+                let owners = list.compactMap { $0[kCGWindowOwnerName as String] as? String }
+                guard Globe.fired(owners: owners) else { return }
+                self.globeSaid = true
+                Log.say("keys: macOS's 🌐 key action fired (\(globeUse())): said, with the Keyboard pane")
+                self.problem("globe")
+            }
+        }
+    }
+
+    // a problem's line on the glass (the page's words; its 'settings' button
+    // sends app_perm {perm, do:'settings'})
+    private func problem(_ p: String) {
+        perm(p, "denied")
+        visFeed(.show(Visibility.forCard))
+    }
 }

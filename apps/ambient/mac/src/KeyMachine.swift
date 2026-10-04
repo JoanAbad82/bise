@@ -8,6 +8,8 @@
 //                                                `doubleWithin` -> double:
 //                                                hands-free, until the
 //                                                next tap or fn release -> talkEnd
+// fn's own flagsChanged is always swallowed (macOS's 🌐 key action never
+// fires: no emoji picker on a double fn).
 // fn + a bise key (SPEC §4) is swallowed, before or after the hold began:
 //   fn + esc while talking -> cancel; any other bise key while talking
 //   -> cancel, then the key. fn + another key (arrows, delete, F-keys)
@@ -93,8 +95,14 @@ struct KeyMachine {
         var swallow = false
         switch e {
         case .fnDown:
+            // fn's own down and up never reach macOS's 'Press 🌐 key to'
+            // (emoji, input source, dictation): bise owns fn (the dogfood:
+            // a double fn opened the emoji picker). Keys still carry the fn
+            // flag, and fn + arrows/delete/F-keys are made below us (HID)
+            swallow = true
             if !fnIsDown { fnIsDown = true; fnAt = t; fnSpoiled = false }
         case .fnUp:
+            swallow = true
             guard fnIsDown else { break }
             fnIsDown = false
             if talking == .fn {

@@ -3,7 +3,11 @@ import Foundation
 // The permission asks (SPEC §5.8), one pure plan (the laws in
 // test/PermsTests.swift): one permission at a time, each only when first
 // needed, its sentence in the capsule first ('continue' opens macOS's
-// prompt), a refusal said once, never asked twice.
+// prompt). Never a silent ignore (the user, dogfood day 2): a hold the mic
+// was left at 'not now' asks again; a mic off in System Settings says so at
+// every hold; Accessibility off says so at every launch; the screen's
+// refusal once per launch. The refused line carries the way back (the page's
+// 'settings' button opens the pane).
 //   - Accessibility at launch: fn can't be heard without it.
 //   - the mic at the first fn hold, then the screen right after the mic is
 //     granted (or at the next hold): the hold that asks doesn't talk.
@@ -39,6 +43,38 @@ enum PermDo: Equatable {
     case watchTrust           // poll Accessibility until it's granted
 }
 
+// the System Settings pane a problem's 'settings' button opens (the user:
+// every error shows the way back, a button when there is a pane):
+// app_perm {perm, do:'settings'}, perm = a Perm or one of the other problems
+enum SettingsPane {
+    static func url(_ problem: String) -> URL? {
+        let privacy = "x-apple.systempreferences:com.apple.preference.security?"
+        let s: String
+        switch problem {
+        case "accessibility": s = privacy + "Privacy_Accessibility"
+        case "mic": s = privacy + "Privacy_Microphone"
+        case "screen": s = privacy + "Privacy_ScreenCapture"
+        // 'Press 🌐 key to' (Keyboard): macOS's fn action (emoji, input, dictation)
+        case "globe": s = "x-apple.systempreferences:com.apple.Keyboard-Settings.extension"
+        case "notifications": s = "x-apple.systempreferences:com.apple.preference.notifications?id=dev.bise.ambient"
+        default: return nil
+        }
+        return URL(string: s)
+    }
+}
+
+// macOS's 🌐 key action still fired on a fn tap (the emoji picker's window
+// showed up right after): its window's owner, by name (window owner names
+// need no Screen Recording)
+enum Globe {
+    static func fired(owners: [String]) -> Bool {
+        owners.contains { o in
+            let l = o.lowercased()
+            return l.contains("emoji") || l.contains("characterpalette") || l.contains("character viewer")
+        }
+    }
+}
+
 enum PermPlan {
     // the refused line, once ever
     private static func refuse(_ p: Perm, _ s: inout PermState) -> [PermDo] {
@@ -49,6 +85,9 @@ enum PermPlan {
 
     // at launch (and at every launch): only Accessibility
     static func launch(_ s: inout PermState) -> [PermDo] {
+        // a refusal is said again once per launch (the user: never a silent
+        // ignore): the screen's line comes back at this launch's first hold
+        s.told.remove(Perm.screen.rawValue)
         if s.accessibility == .granted {
             s.had.insert(Perm.accessibility.rawValue)
             return [.startKeys]
@@ -56,8 +95,12 @@ enum PermPlan {
         // granted before, not now: a rebuilt binary (ad-hoc signed, macOS
         // keys the grant on its hash) lost it. Not his 'not now': the line
         // at every launch until it's back, never a silent fn (lead m_6252)
-        if s.had.contains(Perm.accessibility.rawValue) { return [.denied(.accessibility), .watchTrust] }
-        if s.asked.contains(Perm.accessibility.rawValue) { return refuse(.accessibility, &s) + [.watchTrust] }
+        // his own 'not now' too: without it fn is dead, so every launch says
+        // so with the way back (the user: never a silent ignore)
+        if s.had.contains(Perm.accessibility.rawValue) || s.asked.contains(Perm.accessibility.rawValue) {
+            s.told.insert(Perm.accessibility.rawValue)
+            return [.denied(.accessibility), .watchTrust]
+        }
         return [.ask(.accessibility), .watchTrust]
     }
 
@@ -65,7 +108,7 @@ enum PermPlan {
     // state after PermPlan.hold and what it did
     static func holdWhy(_ s: PermState, _ d: [PermDo]) -> String {
         if s.accessibility != .granted { return "no Accessibility" }
-        if d.contains(.ask(.mic)) { return "asking the mic first" }
+        if d.contains(.ask(.mic)) { return s.asked.contains(Perm.mic.rawValue) ? "asking the mic again (it was left at not now)" : "asking the mic first" }
         if d.contains(.ask(.screen)) { return "asking the screen first" }
         switch s.mic {
         case .denied: return "the mic is off in System Settings"
@@ -82,10 +125,15 @@ enum PermPlan {
         guard s.accessibility == .granted else { return (false, []) }
         switch s.mic {
         case .unknown:
-            // asked and left at 'not now': never asked again, a hold does nothing
-            return (false, s.asked.contains(Perm.mic.rawValue) ? [] : [.ask(.mic)])
+            // never asked, or left at 'not now': a hold is him wanting to
+            // talk, so the bar asks again (the dogfood: after 'not now'
+            // every hold did nothing, silent). macOS's prompt only on continue
+            return (false, [.ask(.mic)])
         case .denied:
-            return (false, refuse(.mic, &s))
+            // off in System Settings: every hold says so, with the way back
+            // (the user: never a silent ignore)
+            s.told.insert(Perm.mic.rawValue)
+            return (false, [.denied(.mic)])
         case .granted:
             break
         }

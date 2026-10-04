@@ -36,7 +36,12 @@ law("hands-free: holding fn does not start a second talk, release ends it",
         == [.tap, .double, .talkEnd])
 let combo = run([(.fnDown, 0), (.keyDown(18, repeated: false), 0.1), (.keyUp(18), 0.15), (.fnUp, 0.2)])
 law("fn + 1: the key, swallowed down and up, no tap, no talk",
-    combo.out == [.key("1")] && combo.swallowed == [false, true, true, false])
+    combo.out == [.key("1")] && combo.swallowed == [true, true, true, true])
+let dbl = run([(.fnDown, 0), (.fnUp, 0.1), (.fnDown, 0.2), (.fnUp, 0.3)])
+law("fn alone (tap, double): its own down and up are swallowed, so macOS's 🌐 key (emoji picker) never fires",
+    dbl.out == [.tap, .double] && dbl.swallowed == [true, true, true, true])
+law("a fn up with no fn down seen (the tap started mid-press): swallowed too",
+    run([(.fnUp, 0)]).swallowed == [true])
 law("fn + 1 late (after the hold began): cancel, then the key",
     run([(.fnDown, 0), (.keyDown(18, repeated: false), 0.5), (.fnUp, 0.6)]).out == [.talkStart(.fn), .cancel, .key("1")])
 law("fn + esc during a hold: cancel only",
@@ -44,7 +49,7 @@ law("fn + esc during a hold: cancel only",
 law("fn + esc outside a hold: the key esc",
     run([(.fnDown, 0), (.keyDown(53, repeated: false), 0.1), (.fnUp, 0.2)]).out == [.key("esc")])
 let arrow = run([(.fnDown, 0), (.keyDown(123, repeated: false), 0.1), (.fnUp, 0.2)])
-law("fn + left arrow: passes, no tap, no talk", arrow.out == [] && arrow.swallowed == [false, false, false])
+law("fn + left arrow: passes, no tap, no talk", arrow.out == [] && arrow.swallowed == [true, false, true])
 law("fn + delete after the hold began: cancel, the key passes",
     run([(.fnDown, 0), (.keyDown(51, repeated: false), 0.5), (.fnUp, 0.6)]).out == [.talkStart(.fn), .cancel])
 law("auto-repeat of a bise key: swallowed, said once",
@@ -52,7 +57,7 @@ law("auto-repeat of a bise key: swallowed, said once",
         == [.key("1")])
 law("keyUp of a swallowed key after fn was released: still swallowed",
     run([(.fnDown, 0), (.keyDown(49, repeated: false), 0.1), (.fnUp, 0.15), (.keyUp(49), 0.2)]).swallowed
-        == [false, true, false, true])
+        == [true, true, true, true])
 law("right option held alone: talkStart, release: talkEnd",
     run([(.roptDown, 0), (.roptUp, 1)]).out == [.talkStart(.rightOption), .talkEnd])
 let ropt = run([(.roptDown, 0), (.keyDown(0, repeated: false), 0.1), (.roptUp, 0.2)])
