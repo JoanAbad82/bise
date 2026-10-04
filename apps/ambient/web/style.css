@@ -60,7 +60,13 @@ html:not(.app) .glass { -webkit-backdrop-filter: blur(40px) saturate(1.8); backd
 .q.wrap { white-space: normal; overflow: hidden; text-overflow: clip; display: flex; flex-direction: column; justify-content: flex-end;
   max-height: calc(23px * 1.25 * 6); margin: 19px 0 17px; }
 .q.wrap .qi { display: block; }
-.q.wrap.over { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.6em); mask-image: linear-gradient(to bottom, transparent 0, #000 1.6em); }
+.q.wrap.over { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 24px); mask-image: linear-gradient(to bottom, transparent 0, #000 24px); }
+/* after he lets go his words go dim in 0.2 s (ambient m_7170); main's answer comes in at 19 px with
+   a 0.16 s fade, no slide */
+.q.wrap { transition: color .2s var(--ease-out); }
+.q.wrap.dim { color: var(--dim); }
+.q.big { animation: qin .16s linear; }
+@keyframes qin { from { opacity: 0; } }
 .q .gl { color: var(--faint); }
 .q .gl.ok { color: var(--ok); } .q .gl.risk { color: var(--risk); } .q .gl.a { color: var(--acc); }
 .q .w { display: inline-block; opacity: 0; filter: blur(4px); transform: translateY(3px); transition: opacity .32s var(--ease-out), filter .32s var(--ease-out), transform .32s var(--ease-out); }

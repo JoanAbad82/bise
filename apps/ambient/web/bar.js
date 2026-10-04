@@ -120,7 +120,8 @@
       }
       case "working": case "speaking": case "end": {
         // after he lets go: his words stay, whole, while bise thinks; main's answer replaces them
-        s.head = { h: 68, line: v.words ? { words: v.words, size: "big" } : v.said ? { words: v.said, wrap: true } : { text: v.text, size: "big" } };
+        // his words dim (ambient m_7170: the pearl thinking + dimmed words = heard, working)
+        s.head = { h: 68, line: v.words ? { words: v.words, size: "big" } : v.said ? { words: v.said, wrap: true, dim: true } : { text: v.text, size: "big" } };
         if (v.sub) s.text = { s: v.sub, dim: true };
         s.sections = started(v);
         // ⌘ C copies main's answer (ui.js: act ui_copy is the page's, never the model's)

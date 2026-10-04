@@ -185,7 +185,8 @@
     });
 
     const h = s.head;
-    const hk = h && { ...h, line: h.line && { ...h.line, words: h.line.words ? 1 : 0 }, input: h.input ? 1 : 0 };
+    // dim is not part of the head's key: the same words go dim in place (0.2 s) when he lets go
+    const hk = h && { ...h, line: h.line && { ...h.line, words: h.line.words ? 1 : 0, dim: 0 }, input: h.input ? 1 : 0 };
     if (put("head", JSON.stringify(hk), () => {
       el.head.innerHTML = head(h);
       const slot = $(".q.in", el.head);
@@ -203,6 +204,7 @@
       // past the cap: the top fades, the end stays in view
       if (qi) q.classList.toggle("over", qi.scrollHeight > q.clientHeight + 2);
     });
+    { const q = $(".q.wrap", el.head); if (q) q.classList.toggle("dim", !!(h && h.line && h.line.dim)); }
 
     show(el.level, s.level != null);
     if (s.level != null) el.level.style.transform = `scaleX(${(0.25 + 0.75 * Math.min(1, s.level)).toFixed(3)})`;
