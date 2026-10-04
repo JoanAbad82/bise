@@ -1493,6 +1493,12 @@ law("panel: a card inline answers with its digit (empty composer) or a click, on
   m = Pn.step(r.m, { ev: "agent_entry", agent: "cookies", entry: { pos: 1000000001, card: { id: "c1", answered: true } } }, 40).m;
   v = pv(m);
   eq([v.entries.at(-1).card.answered, v.entries.at(-1).card.question, v.hints.length], [true, "keep the banner on mobile, or only a link in the footer?", 2]);
+  // it says what he answered, the option cut at its first ' (' (ambient m_7058)
+  eq(v.entries.at(-1).card.done, "✓ you answered: only a link in the footer");
+  eq(Wd.W.panel.youAnswered("yes (and tell perf)"), "✓ you answered: yes");
+  // answered elsewhere, the core only says so
+  const other = Pn.step(PN("cookies").m, { ev: "agent_entry", agent: "cookies", entry: { pos: 1000000001, card: { id: "c1", answered: true } } }, 50).m;
+  eq(pv(other).entries.at(-1).card.done, "✓ answered");
 });
 law("panel: ⌘. asks once ('stop perf? …', ⏎ stop, esc keep it); ⌘⌫ on a working agent asks 'stop it and archive it?', on a done one archives at once with ⌘Z undo, then shows the next agent", () => {
   let { m } = PN("perf");

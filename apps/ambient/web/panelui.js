@@ -82,7 +82,7 @@
     const cls = `ev ${e.kind}${e.hit ? " hit" : ""}${e.cur ? " cur" : ""}`;
     if (e.card) {
       const c = e.card;
-      if (c.answered) return `<div class="${cls} answered" data-pos="${e.pos}"><div class="who">${esc(c.label)}</div>${mark(md(c.question), q)} <span class="dim">${esc(Wd.W.panel.answered)}${c.picked ? ` · ${esc(c.picked)}` : ""}</span></div>`;
+      if (c.answered) return `<div class="${cls} answered" data-pos="${e.pos}"><div class="who">${esc(c.label)}</div>${mark(md(c.question), q)} <div class="dim">${esc(c.done)}</div></div>`;
       return `<div class="${cls}" data-pos="${e.pos}"><div class="l">${esc(c.label)}</div>${mark(md(c.question), q)}<div class="opts">${c.options.map((o) => `<button type="button" class="opt" data-qa="opt-${esc(o.n)}"${act(o.act)}><span>${c.keys ? caps([String(o.n)]) : ""}</span><span>${esc(o.label)}</span></button>`).join("")}</div></div>`;
     }
     if (e.tools) {

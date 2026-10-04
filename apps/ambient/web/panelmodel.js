@@ -126,7 +126,8 @@
       case "ui_answer": {
         const e = m.entries.find((x) => x.card && x.card.id === ev.card);
         if (!e || e.card.answered) return none(m);
-        const entries = m.entries.map((x) => (x === e ? { ...x, card: { ...x.card, answered: true, picked: +ev.n } } : x));
+        const o = (e.card.options || []).find((x) => +x.n === +ev.n);
+        const entries = m.entries.map((x) => (x === e ? { ...x, card: { ...x.card, answered: true, picked: o ? o.label : String(ev.n) } } : x));
         return { m: { ...m, entries }, cmds: [{ cmd: "answer", card: ev.card, reply: String(ev.n) }] };
       }
       case "ui_digit": {
@@ -224,6 +225,8 @@
       if (e.card) {
         const c = e.card;
         out.card = { id: c.id, question: c.question || out.text, answered: !!c.answered, picked: c.picked || null, keys: e === first,
+          // what he answered (ambient m_7058): the option he picked here, or the core's answer when it says
+          done: c.answered ? (c.picked || c.answer || c.reply ? P.youAnswered(c.picked || c.answer || c.reply) : P.answered) : null,
           label: P.needsYou(name, out.at), options: (c.options || []).map((o) => ({ n: o.n, label: o.label, act: { ev: "ui_answer", card: c.id, n: o.n } })) };
       }
       if (e.page) out.page = { t: `${e.page.title || e.page.id} · v${e.page.v || 1}`, act: { ev: "ui_page", url: e.page.url, page: e.page.id } };
@@ -258,7 +261,7 @@
         null,
         { w: P.menu.quit, keys: ["⌘", "Q"], act: { ev: "ui_quit" } },
       ] : null,
-      find: m.find == null ? null : { text: m.find, n: hits.length, label: !m.find ? "" : hits.length ? P.found(hits.length) : P.notFound, cur },
+      find: m.find == null ? null : { text: m.find, n: hits.length, label: !m.find ? "" : P.found(hits.length), cur },
       entries, more: m.more, loading: m.loading, empty: !m.loading && !m.entries.length ? P.empty : null,
       typing: status === "working" || m.typing ? m.typing : "",
       queued: m.queued.map((t) => ({ text: t, label: P.queued })),

@@ -107,9 +107,12 @@
     panel: {
       write: (n) => `write to ${n}`, sendNow: "send now", whenFree: "when it's free", answer: "answer", close: "close",
       follow: "follow", following: "✓ following", terminal: "terminal", stop: "stop", archive: "archive",
-      find: "find in history", found: (n) => `${n} found`, notFound: "not found",
-      you: "you", needsYou: (n, at) => `? ${n} needs you${at ? ` · ${at}` : ""}`, answered: "✓ answered", report: "report",
-      queued: "when it's free", older: "older", start: "the start", empty: "nothing yet.", copy: "copy",
+      // ambient m_7058: '0 found' like 'N found'; an answered card says what he answered (the
+      // option's words, cut at its first ' ('); the empty history says what to do
+      find: "find in history", found: (n) => `${n} found`,
+      you: "you", needsYou: (n, at) => `? ${n} needs you${at ? ` · ${at}` : ""}`, answered: "✓ answered",
+      youAnswered: (o) => `✓ you answered: ${String(o).split(" (")[0]}`, report: "report",
+      queued: "when it's free", older: "older", start: "the start", empty: "nothing yet. write to it below.", copy: "copy",
       confirmStop: (n) => `stop ${n}? it drops what it's doing now; its history and its work stay.`,
       confirmArchive: (n) => `${n} is still working. stop it and archive it?`,
       yesStop: "stop", yesArchive: "stop and archive", keep: "keep it",
