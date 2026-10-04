@@ -45,7 +45,7 @@
     // only well-defined GLSL below (WebKit's Metal path draws garbage where Chrome forgives:
     // ambient's gate, the listen pearl as a streak): no atan(0,0), no pow of a negative base, no
     // smoothstep with edge0 >= edge1 (written as 1 - smoothstep(lo, hi, x))
-    float r=length(uv),an=atan(uv.y,abs(uv.x)<1e-5?1e-5:uv.x);
+    float r=length(uv),an=atan(uv.y,uv.x+1e-6);
     float breath=.015*sin(t*6.283/7.)*(1.-still);
     float R=.66+breath+lvl*.05*sin(an*5.+t*7.)+lvl*.025*sin(an*9.-t*5.)+need*.025*sin(t*5.)+listen*.03;
     float halo=(.16+.35*lvl+.15*listen+.22*need+.12*done)*(1.-away*.6);

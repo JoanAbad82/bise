@@ -228,6 +228,15 @@ law("B3 rows (ambient m_6500, lead m_6487): one row per choice, the first select
   assert.equal(M.view(M.step(m, { ev: "ui_ask_more" }, 70).m, 80).ask.full, true);
   assert.equal(W.more, "… more   ⌘ ⏎");
 });
+law("app_size keeps the glass while the app still hides the panel and the bar has something to show (fn held from rest), glass null only when nothing is left (ambient's sign-off regression, ed63487d)", () => {
+  let m = M.step(M.init(), { ev: "app_hidden", on: true }, 0).m;
+  m = M.step(m, { ev: "app_fn", state: "down", key: "fn" }, 10).m;
+  const v = M.view(m, 20), s = Bar.spec(v);
+  assert.equal(v.hidden, true); assert.ok(s.head);
+  eq(Bar.size(68, 26, !!s.head).glass, { x: 80, y: 28, w: 700, h: 68 });
+  const idle = Bar.spec(M.view(M.init(), 0));
+  assert.equal(Bar.size(68, 26, !!idle.head).glass, null);
+});
 law("a hello long over never eats the next esc (pm's fail 47: 'fn esc later' did nothing after a hello earlier in the run)", () => {
   let m = M.step(M.init(), { ev: "app_hello" }, 0).m;
   m = M.step(m, { ev: "state", agents: [], cards: [{ id: "q", agent: "ops", text: "ship it?", options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }] }], pages: [] }, 60000).m;

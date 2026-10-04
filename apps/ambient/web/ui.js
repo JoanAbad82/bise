@@ -216,7 +216,10 @@
     if (glass.style.height !== h + "px") glass.style.height = h + "px";
     // the bar gone (nothing to show): no glass in the same frame, so the native blur never stays
     // without the page's glass (ambient m_6681 (3); amb-mac reads glass null as no glass)
-    const msg = bar.classList.contains("on") ? Bar.size(h, 26) : { ...Bar.size(h, 26), glass: null };
+    // the glass is there whenever the bar has something to show, even while the app still keeps
+    // the panel hidden (the app shows it from that glass: saying null while hidden left the bar
+    // empty at ambient's sign-off, ed63487d); null only when nothing is left to show
+    const msg = Bar.size(h, 26, !!(lastS && lastS.head));
     const key = JSON.stringify(msg);
     if (key !== sent) { sent = key; post(msg); }
   }
@@ -224,9 +227,21 @@
   // ---- the frame loop: runs while something moves, sleeps when the bar is settled
   let raf = 0, lastV = null, lastS = null, contentSent = "", retryAt = 0;
   const fps = { frames: 0, since: now(), value: 0 };
-  function schedule() { if (!raf) raf = requestAnimationFrame(frame); }
+  // a frame never waits on requestAnimationFrame alone: WebKit suspends it while it thinks the page
+  // is hidden (document.hidden stayed true in the QA app with the panel shown, so the bar never
+  // drew: ambient's empty-bar sign-off); hidden, a timer runs the frame, and a 100 ms backup runs
+  // one that rAF never delivered
+  let rafBackup = 0;
+  function schedule() {
+    if (raf) return;
+    if (document.hidden) { raf = setTimeout(frame, 16); return; }
+    raf = requestAnimationFrame(frame);
+    clearTimeout(rafBackup);
+    rafBackup = setTimeout(() => { if (raf) { cancelAnimationFrame(raf); raf = 0; frame(); } }, 100);
+  }
+  document.addEventListener("visibilitychange", () => { if (raf) { cancelAnimationFrame(raf); clearTimeout(raf); raf = 0; } schedule(); });
   function frame() {
-    raf = 0;
+    raf = 0; clearTimeout(rafBackup);
     const t = now();
     const now0 = M.view(model, t, Date.now());
     const v = held(now0);

@@ -184,8 +184,10 @@
   // the panel around the glass (amb-mac's app_size: the box, the glass inside it): room for the
   // pearl at x -76 (64 px), the drawn shadow (0 30 80 -24) and the entry's 8 px rise
   const BOX = { left: 80, top: 28, right: 60, bottom: 92, w: 700 };
-  const size = (h, radius) => ({ cmd: "app_size", w: BOX.left + BOX.w + BOX.right, h: BOX.top + h + BOX.bottom, radius,
-    glass: { x: BOX.left, y: BOX.top, w: BOX.w, h } });
+  // show false (nothing left to show): glass null, the app drops its blur that frame (amb-mac
+  // 6072dcc8); a hidden panel with something to show still gets its glass
+  const size = (h, radius, show = true) => ({ cmd: "app_size", w: BOX.left + BOX.w + BOX.right, h: BOX.top + h + BOX.bottom, radius,
+    glass: show ? { x: BOX.left, y: BOX.top, w: BOX.w, h } : null });
 
   // the row ⌘ <d> opens (fn 0's for you, fn p), and the one ⏎ runs
   const cmdRow = (s, d) => s.sections.flatMap((sec) => sec.rows).find((r) => r.act && r.right && r.right.keys && r.right.keys[0] === "⌘" && r.right.keys[1] === String(d)) || null;
