@@ -41,8 +41,12 @@
   // ---- the model and the bridge
   let model = M.init();
   const now = () => performance.now();
+  // the last cmds that left the page (not app_size), for QA's eval: window.ambient.sent()
+  // (the preview ask on the QA hub, lead m_7104)
+  const trail = [];
   function post(cmd) {
     if (cmd.delay) { const { delay, ...rest } = cmd; setTimeout(() => post(rest), delay); return; }
+    if (cmd.cmd !== "app_size") { trail.push({ at: Math.round(now()), ...cmd }); if (trail.length > 30) trail.shift(); }
     try {
       if (native()) window.webkit.messageHandlers.bise.postMessage(cmd);
       else if (window.ambientDev && window.ambientDev.cmd) window.ambientDev.cmd(cmd);
@@ -426,6 +430,7 @@
     view: () => lastV,
     bar: () => lastS,
     fps: () => fps.value,
+    sent: () => trail.slice(),
   };
   schedule();
 })();
