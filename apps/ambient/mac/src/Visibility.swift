@@ -39,6 +39,14 @@ enum VisIn: Equatable {
     case tick                  // a timer: a deadline may have passed
 }
 
+// a left click on the menu-bar icon toggles (the user, main m_6965): the bar
+// shown in any state (opened by hand, a card's 8 s, an answer) → it closes;
+// hidden → the full view opens
+enum IconClick: Equatable {
+    case open, close
+    static func act(shown: Bool) -> IconClick { shown ? .close : .open }
+}
+
 struct Visibility {
     static let brief = 2.0         // got it, on it, cancelled
     static let afterAnswer = 4.0

@@ -97,5 +97,9 @@ law("an agent's done or failed line (app_content line) never shows it",
 law("done after you hid it stays hidden",
     run([(.open, 0), (.dismiss, 1), (.phase("done"), 2), (.line, 3)], probe: [2.5, 3.5]) == [false, false])
 
+// the menu-bar icon's left click toggles (the user, main m_6965)
+law("icon click with the bar hidden: the full view opens", IconClick.act(shown: false) == .open)
+law("icon click with the bar shown: it closes", IconClick.act(shown: true) == .close)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Visibility laws hold")

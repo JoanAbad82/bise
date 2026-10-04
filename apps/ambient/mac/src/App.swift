@@ -155,7 +155,14 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         st.onSpotlight = { [weak self] in self?.spotlight() }
         st.onToggle = { [weak self] in self?.toggleByHand() }
         st.onSettings = { [weak self] in self?.settingsView() }
-        st.onOpen = { [weak self] in self?.agentsView() }
+        // a left click toggles: a second click closes the bar (the user, main m_6965)
+        st.onOpen = { [weak self] in
+            guard let self else { return }
+            switch IconClick.act(shown: !self.capsule.hidden) {
+            case .close: self.visFeed(.dismiss)
+            case .open: self.agentsView()
+            }
+        }
         st.onPage = { Browser.open($0) }
         st.onCard = { [weak self] id in
             // bise open on that card: the inbox (fn + i) at it
