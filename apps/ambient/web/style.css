@@ -28,11 +28,10 @@ html.app, html.app body { overflow: hidden; }
    without their rise) */
 .bar.appear .glass { transition: none; }
 
-/* the pearl: 64 px, at x -76, y +2 from the glass, transparent around it; fn held: 1.18 */
-.pearl { position: absolute; left: -76px; top: 2px; width: 64px; height: 64px; pointer-events: none; transition: transform .5s var(--spring); }
-.pearl.big { transform: scale(1.18); }
-.still .pearl { transition: none; }
-.still .pearl.big { transform: none; }
+/* the pearl: drawn 64 px at x -76, y +2 from the glass, transparent around it; fn held: 1.18.
+   The canvas is 76 px (x -82, y -4) and never CSS-scaled: a transform on the WebGL canvas showed
+   as a thin vertical sliver in WebKit and Chrome; the shader grows the pearl (pearl.js zoom) */
+.pearl { position: absolute; left: -82px; top: -4px; width: 76px; height: 76px; pointer-events: none; }
 /* the hello's kiss: off the pearl's top right */
 .puff { position: absolute; left: -24px; top: 8px; width: 0; height: 0; pointer-events: none; }
 .puff i { position: absolute; border-radius: 50%; opacity: 0; background: radial-gradient(circle, #fff4ef 0 45%, #f4a6b0 75%); box-shadow: 0 0 3px #f4a6b0cc; animation: puff .9s var(--ease-out) both; }

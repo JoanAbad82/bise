@@ -140,7 +140,6 @@
       appearT = setTimeout(() => bar.classList.remove("appear"), 250);
     }
     show(bar, on);
-    pearlCv.classList.toggle("big", v.state === "listening" || v.state === "voice_note");
     put("a11y", JSON.stringify([v.mood, v.hidden]), () => pearlCv.setAttribute("aria-label", Wd.moodLabel(v.mood)));
     const say = v.hidden ? "" : Wd.sayOf(v);
     if (sayEl.textContent !== say) sayEl.textContent = say;
@@ -226,6 +225,9 @@
 
   // ---- the frame loop: runs while something moves, sleeps when the bar is settled
   let raf = 0, lastV = null, lastS = null, contentSent = "", retryAt = 0;
+  // the pearl's size in its 76 px canvas: 64 px at rest, 76 px (1.18) while fn is held
+  const ZOOM_REST = 64 / 76;
+  let zoom = ZOOM_REST, zoomAt = 0;
   const fps = { frames: 0, since: now(), value: 0 };
   // a frame never waits on requestAnimationFrame alone: WebKit suspends it while it thinks the page
   // is hidden (document.hidden stayed true in the QA app with the panel shown, so the bar never
@@ -257,8 +259,14 @@
     if (ck !== contentSent) { contentSent = ck; post({ cmd: "app_content", ...v.content }); }
     // can't reach bise: try again on its own every 10 s while it shows
     if (v.state === "offline") { if (t - retryAt > 10000) { if (retryAt) recv({ ev: "ui_retry", auto: true }); retryAt = t; } } else retryAt = 0;
+    // fn held: the pearl grows to 1.18 inside its 76 px canvas (the shader's zoom, never a CSS
+    // transform on the canvas: that showed as a thin vertical sliver), 0.5 s, still under reduced motion
+    const zoomTo = !v.still && (v.state === "listening" || v.state === "voice_note") ? 1 : ZOOM_REST;
+    zoom = v.still ? zoomTo : zoomTo + (zoom - zoomTo) * Math.exp(-Math.max(0, t - (zoomAt || t)) / 120);
+    if (Math.abs(zoom - zoomTo) < 0.002) zoom = zoomTo;
+    zoomAt = t;
     let moving = false;
-    if (!v.unseen) moving = pearl.frame({ mood: v.mood, lvl: v.lvl, still: v.still, gather: v.gather || 0 }, t);
+    if (!v.unseen) moving = pearl.frame({ mood: v.mood, lvl: v.lvl, still: v.still, gather: v.gather || 0, zoom }, t) || zoom !== zoomTo;
     else if (pearl.fit) pearl.fit();
     fps.frames++;
     if (t - fps.since > 1000) { fps.value = Math.round((fps.frames * 1000) / (t - fps.since)); fps.frames = 0; fps.since = t; }

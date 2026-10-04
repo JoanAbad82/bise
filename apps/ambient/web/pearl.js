@@ -16,7 +16,7 @@
 
   const FS = `
   precision highp float;
-  uniform vec2 res; uniform float t, flow, variant, lvl, think, need, done, away, listen, still, gather;
+  uniform vec2 res; uniform float t, flow, variant, lvl, think, need, done, away, listen, still, gather, zoom;
   float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
   float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
     return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
@@ -41,7 +41,10 @@
     col*=(1.-away*.45);
     return col;}
   void main(){
-    vec2 uv=(gl_FragCoord.xy-.5*res)/min(res.x,res.y)*2.;
+    // zoom: the pearl's size inside its canvas (1 fills it); the bar grows it while fn is held here,
+    // never with a CSS transform on the canvas (WebKit and Chrome showed a scaled WebGL canvas as a
+    // thin vertical sliver, round 9's gate)
+    vec2 uv=(gl_FragCoord.xy-.5*res)/min(res.x,res.y)*2./max(zoom,.01);
     // only well-defined GLSL below (WebKit's Metal path draws garbage where Chrome forgives:
     // ambient's gate, the listen pearl as a streak): no atan(0,0), no pow of a negative base, no
     // smoothstep with edge0 >= edge1 (written as 1 - smoothstep(lo, hi, x))
@@ -117,9 +120,9 @@
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const U = {};
-    for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", "gather", ...Object.keys(PINK)]) U[k] = gl.getUniformLocation(prog, k);
+    for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", "gather", "zoom", ...Object.keys(PINK)]) U[k] = gl.getUniformLocation(prog, k);
     for (const k in PINK) gl.uniform3fv(U[k], PINK[k]);
-    gl.uniform1f(U.variant, 1);
+    gl.uniform1f(U.variant, 1); gl.uniform1f(U.zoom, 1);
     function draw(S, t, level) {
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
       gl.uniform2f(U.res, gl.drawingBufferWidth, gl.drawingBufferHeight); gl.uniform1f(U.t, t); gl.uniform1f(U.flow, S.flow);
@@ -142,9 +145,9 @@
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const U = {};
-    for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", "gather", ...Object.keys(PINK)]) U[k] = gl.getUniformLocation(prog, k);
+    for (const k of ["res", "t", "flow", "variant", "lvl", "think", "need", "done", "away", "listen", "still", "gather", "zoom", ...Object.keys(PINK)]) U[k] = gl.getUniformLocation(prog, k);
     for (const k in PINK) gl.uniform3fv(U[k], PINK[k]);
-    gl.uniform1f(U.variant, 1);
+    gl.uniform1f(U.variant, 1); gl.uniform1f(U.zoom, 1);
 
     function fit() {
       const dpr = Math.min(2, root.devicePixelRatio || 1);
@@ -176,7 +179,7 @@
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
       gl.uniform2f(U.res, gl.drawingBufferWidth, gl.drawingBufferHeight); gl.uniform1f(U.t, st.still ? 0 : t); gl.uniform1f(U.flow, S.flow);
       gl.uniform1f(U.lvl, S.voice * (st.lvl || 0)); gl.uniform1f(U.think, S.think); gl.uniform1f(U.need, S.need);
-      gl.uniform1f(U.gather, st.gather || 0);
+      gl.uniform1f(U.gather, st.gather || 0); gl.uniform1f(U.zoom, st.zoom || 1);
       gl.uniform1f(U.done, S.done); gl.uniform1f(U.away, S.away); gl.uniform1f(U.listen, S.listen); gl.uniform1f(U.still, S.still);
       gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       return !calm;

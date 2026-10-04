@@ -233,7 +233,7 @@ law("app_size keeps the glass while the app still hides the panel and the bar ha
   m = M.step(m, { ev: "app_fn", state: "down", key: "fn" }, 10).m;
   const v = M.view(m, 20), s = Bar.spec(v);
   assert.equal(v.hidden, true); assert.ok(s.head);
-  eq(Bar.size(68, 26, !!s.head).glass, { x: 80, y: 28, w: 700, h: 68 });
+  eq(Bar.size(68, 26, !!s.head).glass, { x: 84, y: 28, w: 700, h: 68 });
   const idle = Bar.spec(M.view(M.init(), 0));
   assert.equal(Bar.size(68, 26, !!idle.head).glass, null);
 });
@@ -404,10 +404,10 @@ law("round 9: every state draws as a bar with a header and a footer whose items 
   }
   for (const st of ["needs", "listening", "agents", "inbox", "settings", "spotlight", "hello", "perm"]) assert.ok(seen.has(st), st);
 });
-law("round 9: the panel's box holds the pearl at the glass's left (x -76, 64 px) and the drawn shadow; app_size says the glass inside it", () => {
+law("round 9: the panel's box holds the pearl's 76 px canvas at the glass's left (x -82) and the drawn shadow; app_size says the glass inside it", () => {
   const msg = Bar.size(200, 26);
-  eq(msg, { cmd: "app_size", w: 840, h: 320, radius: 26, glass: { x: 80, y: 28, w: 700, h: 200 } });
-  assert.ok(msg.glass.x - 76 >= 0);                   // the pearl fits in the box
+  eq(msg, { cmd: "app_size", w: 844, h: 320, radius: 26, glass: { x: 84, y: 28, w: 700, h: 200 } });
+  assert.ok(msg.glass.x - 82 >= 0);                   // the pearl's canvas fits in the box
   assert.ok(msg.h - msg.glass.y - msg.glass.h >= 86);   // 0 30 80 -24: 86 px of shadow below
 });
 law("round 9 slice 2: ↑↓ move over every row of an open bar (n from the page, clamped), the cards first so a card row is also m.sel; ⏎ runs the selected row; ⌘ 1-9 finds that page", () => {
