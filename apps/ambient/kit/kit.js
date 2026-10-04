@@ -653,8 +653,10 @@
       if (!bar) { bar = doc.createElement("div"); bar.className = "k-bar"; bar.setAttribute("data-kit-ui", ""); term.insertBefore(bar, term.firstChild); }
       bar.append(sw);
     }
+    // a static copy (the public export) takes no picks: no hub hears them, so they don't look clickable
+    const still = block.closest && block.closest("[data-static]");
     for (const pick of block.querySelectorAll("[data-ui=\"pick\"]")) {
-      if (pick.hasAttribute("data-ready")) continue;
+      if (still || pick.hasAttribute("data-ready")) continue;
       pick.setAttribute("data-ready", "");
       for (const opt of pick.querySelectorAll("[data-pick]")) {
         opt.setAttribute("role", "button");
@@ -768,8 +770,22 @@
   function start() {
     const page = doc.getElementById("bise-page");
     const home = doc.getElementById("bise-home");
-    if (page) startPage(page);
-    else if (home) startHome(home);
+    // a static copy (the public export, pages-ui): no hub behind it, read-only
+    if (page && page.hasAttribute("data-static")) startStatic(page);
+    else if (page) startPage(page);
+    else if (home && !home.hasAttribute("data-static")) startHome(home);
+  }
+
+  // The public export's page: the frame says whose and which version, the blocks get their kit
+  // behaviours; no stream, no notes, no send (nothing here talks to a hub).
+  function startStatic(main) {
+    const d = main.dataset;
+    const f = frame(d.title || d.page || "");
+    f.setAttribute("data-static", "");
+    const at = parseInt(d.at, 10);
+    const words = [d.agent ? W.by(d.agent) : null, d.version ? "v" + d.version : null, at ? ago(at, Date.now()) : null].filter(Boolean);
+    f.append(el("span", { class: "m" }, words.join(" · ")));
+    decorate(Array.from(main.querySelectorAll(":scope > [data-kit][data-id]")), d.agent || "", doc);
   }
 
   function el(tag, attrs, text) {

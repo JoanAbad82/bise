@@ -1157,11 +1157,19 @@ impl Shell {
                     done: list("done"),
                     answers,
                     went,
+                    // --public / --private (pages-ui): the static export and the user's mirror
+                    public: v.get("public").and_then(Value::as_bool),
                 };
                 let gone: Vec<String> = self.hub.st.agents.keys().filter(|n| self.page_agent_gone(n)).cloned().collect();
                 let is_gone = |n: &str| gone.iter().any(|g| g == n) || !self.hub.st.agents.contains_key(n);
+                let was_public = p.id.as_deref().and_then(|i| pages.store.meta(i)).is_some_and(|m| m.public);
                 match pages.publish(&p, now_ms(), &is_gone) {
                     Ok((meta, unknown)) => {
+                        // a public page changed (or was taken back): the static export, then the
+                        // user's mirror if he set one (pages/mirror.rs); nothing else ever leaves
+                        if meta.public || was_public {
+                            crate::pages::mirror::spawn(pages.clone(), meta.id.clone(), bise_home::Home::from_env().config_file());
+                        }
                         // the notes it was updating for are answered
                         if let Some((ids, _)) = self.page_turns.get_mut(from) {
                             ids.retain(|i| *i != meta.id);
@@ -1207,6 +1215,10 @@ impl Shell {
             crate::pages::PageMsg::Opened { .. } => {
                 let snap = self.snapshot();
                 self.broadcast(&snap);
+            }
+            crate::pages::PageMsg::Mirror { id, error } => {
+                // the last good public copy stays up; main hears it once (designer m_7509)
+                self.feed(MAIN, &format!("sb warn : {}", wire_escape(&format!("▲ couldn't publish {id} to the public mirror: {error}"))));
             }
             crate::pages::PageMsg::Sent { id, agent, text } => {
                 // start notes (an item the user wants an agent on): main's,

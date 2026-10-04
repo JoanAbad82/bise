@@ -46,6 +46,10 @@ pub struct Meta {
     /// N the rules of ~/bise/taste.md then; absent otherwise
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub taste: Option<Value>,
+    /// `--public` (pages-ui, main m_7501): the page's latest version goes in
+    /// the static export the user's mirror publishes; absent: local only
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub public: bool,
 }
 
 /// One place the page's text went: `--went <kind>:<ref>[@<block>]=<url>`
@@ -158,6 +162,8 @@ pub struct Publish {
     /// `--taste`: the rules of the user's taste file it followed (None:
     /// not said, meta.taste goes)
     pub taste: Option<u64>,
+    /// `--public` Some(true), `--private` Some(false), neither None (as it was)
+    pub public: Option<bool>,
 }
 
 /// A page id: `[a-z0-9-]{1,40}`.
@@ -317,9 +323,14 @@ impl Store {
                 went: Vec::new(),
                 watch: None,
                 taste: None,
+                public: false,
             },
         };
         meta.taste = p.taste.map(|n| serde_json::json!({"rules": n}));
+        // --public / --private; neither: as it was
+        if let Some(public) = p.public {
+            meta.public = public;
+        }
         for w in &p.went {
             let w = Went { at: now, ..w.clone() };
             match meta.went.iter_mut().find(|x| x.kind == w.kind && x.reference == w.reference) {
@@ -417,7 +428,7 @@ impl Store {
                 return Err(format!("{id} is {}'s page: start another --id", m.agent));
             }
             Some(m) => Meta { agent: agent.to_string(), ..m },
-            None => Meta { id: id.to_string(), title: String::new(), agent: agent.to_string(), created_ms: now, versions: Vec::new(), state: ready(), ask: None, opened_version: 0, went: Vec::new(), watch: None, taste: None },
+            None => Meta { id: id.to_string(), title: String::new(), agent: agent.to_string(), created_ms: now, versions: Vec::new(), state: ready(), ask: None, opened_version: 0, went: Vec::new(), watch: None, taste: None, public: false },
         };
         if let Some(t) = title.map(str::trim).filter(|t| !t.is_empty()) {
             meta.title = t.to_string();

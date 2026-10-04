@@ -7,7 +7,9 @@
 
 pub mod checklist;
 pub mod drafts;
+pub mod export;
 pub mod lint;
+pub mod mirror;
 pub mod questions;
 pub mod server;
 pub mod site;
@@ -35,6 +37,9 @@ pub enum PageMsg {
     Answer { id: String, block: String, reply: String },
     /// the user opened a newer version of page `id` in a browser
     Opened { id: String },
+    /// the user's mirror of the public pages failed after a publish of `id`
+    /// (mirror.rs): one line in main's thread
+    Mirror { id: String, error: String },
 }
 
 /// How the server reaches the hub's loop.
@@ -190,6 +195,16 @@ impl Pages {
         }
         // promises and meeting pages: no carded question (amb-kit 6ce4b426)
         let blocks = lint::lint_page(p.id.as_deref().unwrap_or(""), &p.html)?;
+        // a public page (--public, or public before and not --private): never his own
+        // pages, never a draft that leaves his accounts (export.rs)
+        let id = p.id.as_deref().unwrap_or("");
+        let was = self.store.meta(id).is_some_and(|m| m.public);
+        if p.public.unwrap_or(was) {
+            let refused = export::refused(id, &blocks);
+            if !refused.is_empty() {
+                return Err(refused);
+            }
+        }
         let (meta, unknown) = self.locked(|s| s.publish(p, blocks, now, gone)).map_err(|e| vec![e])?;
         self.push(&meta.id, "version", &json!({"n": meta.version()}));
         self.push(&meta.id, "state", &json!({"state": meta.state}));

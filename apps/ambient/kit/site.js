@@ -75,8 +75,10 @@
     doc.body.removeAttribute("data-viewing");
     if (view) view.src = "about:blank";
     for (const r of rows) r.removeAttribute("aria-current");
-    if (push) history.pushState({}, "", "/");
+    if (push) history.pushState({}, "", location.pathname);
   }
+  // what the address opens: a row's own link (/p/<id> on the hub, <id>/index.html in the export)
+  const linked = (h) => rows.some((r) => !r.hasAttribute("data-outside") && r.querySelector("a").getAttribute("href") === h);
 
   side.addEventListener("click", (e) => {
     const a = e.target.closest("a");
@@ -109,10 +111,10 @@
   });
   addEventListener("popstate", () => {
     const h = decodeURIComponent(location.hash.slice(1));
-    if (h.startsWith("/p/") || h.startsWith("/a/")) open(h, false); else close(false);
+    if (h.startsWith("/p/") || linked(h)) open(h, false); else close(false);
   });
 
   draw();
   const h = decodeURIComponent(location.hash.slice(1));
-  if (h.startsWith("/p/") || h.startsWith("/a/")) open(h, false);
+  if (h.startsWith("/p/") || linked(h)) open(h, false);
 })();

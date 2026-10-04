@@ -296,7 +296,7 @@ fn home(pages: &Pages) -> String {
     let inner = format!("<section data-kit=\"pages\" data-id=\"pages\">\n<ul>\n{}\n</ul>\n</section>", items.join("\n"));
     // one site for everything agents made to look at (site.rs): the sidebar, then "for you"
     let arts = crate::artifacts::Store::new(pages.store.dir.parent().unwrap_or(&pages.store.dir)).all();
-    let aside = super::site::sidebar(&super::site::items(&pages.store.list(), &arts));
+    let aside = super::site::sidebar(&super::site::items(&pages.store.list(), &arts), "/");
     let head = "<link rel=\"stylesheet\" href=\"/kit/site.css\">\n<script src=\"/kit/site.js\" defer></script>\n";
     shell(pages, "for you", head, "id=\"bise-home\" data-home", &format!("{aside}{inner}"))
 }
@@ -574,6 +574,27 @@ mod tests {
         // an older one opened after leaves it
         get(&p, "/p/w/v/1");
         assert_eq!(opened(&p), Some(2));
+    }
+
+    /// --public sticks to the page; a public page never holds his drafts; only public pages
+    /// are in the export (pages-ui, main m_7501).
+    #[test]
+    fn only_opted_in_pages_reach_the_export() {
+        let (p, _d) = pages();
+        let pb = |id: &str, html: &str, public: Option<bool>| Publish { agent: "t1".into(), id: Some(id.into()), html: html.into(), public, ..Default::default() };
+        let mail = "<section data-kit=\"email\" data-id=\"m\"><p data-field=\"to\">a@b.c</p><p data-field=\"subject\">s</p><p>secret</p></section>";
+        p.publish(&pb("mails", mail, None), 1, &|_| false).unwrap();
+        p.publish(&pb("mock", FRAG, Some(true)), 2, &|_| false).unwrap();
+        // a draft that leaves his accounts can't go public, now or later
+        let e = p.publish(&pb("mails", mail, Some(true)), 3, &|_| false).unwrap_err();
+        assert!(e[0].contains("a email block never goes public"), "{e:?}");
+        let e = p.publish(&pb("mock", mail, None), 4, &|_| false).unwrap_err();
+        assert!(e[0].contains("never goes public"), "public sticks: {e:?}");
+        let names: Vec<String> = super::super::mirror::export_now(&p).into_iter().map(|(n, _)| n).collect();
+        assert!(names.contains(&"artifacts/mock/index.html".to_string()) && !names.iter().any(|n| n.contains("mails")), "{names:?}");
+        // --private takes it back
+        p.publish(&pb("mock", FRAG, Some(false)), 5, &|_| false).unwrap();
+        assert!(!super::super::mirror::export_now(&p).iter().any(|(n, _)| n.contains("mock")));
     }
 
     /// A ui block's <style> never reaches the page inline (the CSP is 'self'): the shell links

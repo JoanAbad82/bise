@@ -90,7 +90,8 @@ fn file_of(copy: &str) -> String {
 /// The sidebar: a search, the by day / by agent switch, the rows (site.js
 /// groups and filters them from their data- attributes; without it, the
 /// plain list reads and its links open).
-pub fn sidebar(items: &[Item]) -> String {
+/// `home`: where "for you" goes (`/` on the hub, `index.html` in the export).
+pub fn sidebar(items: &[Item], home: &str) -> String {
     let rows: Vec<String> = items
         .iter()
         .map(|i| {
@@ -108,7 +109,8 @@ pub fn sidebar(items: &[Item]) -> String {
         })
         .collect();
     format!(
-        "<aside id=\"bise-site\" aria-label=\"everything agents made\">\n<a class=\"home\" href=\"/\">for you</a>\n<input type=\"search\" placeholder=\"search  /\" aria-label=\"search\">\n<div class=\"by\" role=\"group\"><button type=\"button\" data-by=\"day\" aria-pressed=\"true\">by day</button><button type=\"button\" data-by=\"agent\" aria-pressed=\"false\">by agent</button></div>\n<ul>\n{}\n</ul>\n</aside>\n",
+        "<aside id=\"bise-site\" aria-label=\"everything agents made\">\n<a class=\"home\" href=\"{}\">for you</a>\n<input type=\"search\" placeholder=\"search  /\" aria-label=\"search\">\n<div class=\"by\" role=\"group\"><button type=\"button\" data-by=\"day\" aria-pressed=\"true\">by day</button><button type=\"button\" data-by=\"agent\" aria-pressed=\"false\">by agent</button></div>\n<ul>\n{}\n</ul>\n</aside>\n",
+        esc(home),
         rows.join("\n")
     )
 }
@@ -190,7 +192,8 @@ mod tests {
 
     #[test]
     fn the_sidebar_escapes_and_marks_outside_links() {
-        let html = sidebar(&items(&[page("w", 1)], &[art("d", "site", "https://x.dev", None, 2)]));
+        let html = sidebar(&items(&[page("w", 1)], &[art("d", "site", "https://x.dev", None, 2)]), "/");
+        assert!(html.contains("<a class=\"home\" href=\"/\">for you</a>"));
         assert!(html.contains("<span class=\"t\">w &lt;title&gt;</span>"), "{html}");
         assert!(html.contains("data-outside><a href=\"https://x.dev\" target=\"_blank\" rel=\"noopener\">"), "{html}");
         assert!(html.contains("data-kind=\"page\" data-agent=\"designer\" data-at=\"1\"><a href=\"/p/w\">"), "{html}");
