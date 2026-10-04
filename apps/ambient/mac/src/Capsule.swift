@@ -122,8 +122,13 @@ final class Capsule: NSObject, WKNavigationDelegate {
         // stopped its frames until it drew: nothing ever drew): WebKit's
         // window-occlusion detection off for the capsule (SPI, best effort;
         // the near-invisible blur at show is the fallback, Capsule.blurFloor)
-        if web.responds(to: NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")) {
-            web.setValue(false, forKey: "_windowOcclusionDetectionEnabled")
+        // called through its own method (a BOOL setter), never through KVC:
+        // the key isn't KVC-compliant and setValue(_:forKey:) threw at launch
+        // (ambient m_6810, 3ee3c710 crashed in Capsule.init)
+        let occ = NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")
+        if web.responds(to: occ), let m = class_getInstanceMethod(type(of: web), occ) {
+            typealias SetBool = @convention(c) (AnyObject, Selector, Bool) -> Void
+            unsafeBitCast(method_getImplementation(m), to: SetBool.self)(web, occ, false)
         }
         root.addSubview(web)
         panel.contentView = root
