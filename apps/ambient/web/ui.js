@@ -26,11 +26,11 @@
       <canvas class="pearl" role="img" aria-label="bise"></canvas>
       <div class="glass" id="glass">
         <div class="say" aria-live="polite" aria-atomic="true" data-qa-info="1"></div>
-        <div class="gin"><div class="head"></div><div class="level" aria-hidden="true"></div><div class="mid"></div><div class="body"></div><div class="foot"></div></div>
+        <div class="gin"><div class="head"></div><div class="level" aria-hidden="true"></div><div class="mid"></div><div class="split"><div class="body"></div><div class="pv" data-qa="preview"></div></div><div class="foot"></div></div>
       </div>
     </div>`;
   const bar = $(".bar", host), glass = $(".glass", bar), gin = $(".gin", glass), sayEl = $(".say", glass), pearlCv = $(".pearl", bar);
-  const el = { head: $(".head", gin), level: $(".level", gin), mid: $(".mid", gin), body: $(".body", gin), foot: $(".foot", gin) };
+  const el = { head: $(".head", gin), level: $(".level", gin), mid: $(".mid", gin), body: $(".body", gin), foot: $(".foot", gin), split: $(".split", gin), pv: $(".pv", gin) };
   bar.style.left = Bar.BOX.left + "px"; bar.style.top = Bar.BOX.top + "px";
   // the typed line: one field, kept across draws (its focus, its caret)
   const input = Object.assign(document.createElement("input"), { type: "text", spellcheck: false, autocomplete: "off", className: "qin" });
@@ -106,6 +106,25 @@
     return `<div class="inrow h${h.h}">${left}${right}</div>`;
   }
 
+  // a match marked (round 10's search: [start, end] in the text)
+  const marked = (s, m) => (m ? esc(s.slice(0, m[0])) + `<mark>${esc(s.slice(m[0], m[1]))}</mark>` + esc(s.slice(m[1])) : esc(s));
+
+  // round 10's preview A: the selected agent, on the right of the list
+  function previewHtml(p) {
+    if (!p) return "";
+    if (p.empty) return `<div class="pv-empty">${esc(p.empty)}</div>`;
+    const sect = (t) => `<div class="sect">${esc(t)}</div>`;
+    const F = Wd.W.bar.find;
+    return `<h3>${esc(p.name)}<span class="chip ${p.chip.gc || ""}">${esc(p.chip.text)}</span></h3>`
+      + (p.now ? `<div class="now">${esc(p.now)}</div>` : "")
+      + (p.waits.length ? sect(F.waitsOnYou) + p.waits.map((w) => `<button type="button" class="wcard" data-qa="${esc(w.qa)}"${act(w.act)}><span class="l">${esc(w.label)}</span>${esc(w.text)}</button>`).join("") : "")
+      + (p.actions.length ? sect(F.lastActions) + p.actions.map((x) => `<div class="act-l"><i>${esc(x.at)}</i><span>${esc(x.text)}</span></div>`).join("") : "")
+      + (p.report ? sect(F.lastReport) + `<div class="rep">${p.report.glyph ? `<span class="gl ${p.report.glyph === "✓" ? "ok" : "risk"}">${esc(p.report.glyph)}</span> ` : ""}${esc(p.report.text)}</div>` : "")
+      + (p.pages.length ? sect(p.pages.length > 1 ? F.itsPages : F.itsPage) + p.pages.map((pg) => `<button type="button" class="pv-page" data-qa="${esc(pg.qa)}"${act(pg.act)}><span class="g" aria-hidden="true">◰</span>${esc(pg.t)}</button>`).join("") : "")
+      + (p.loading ? `<div class="pv-wait" aria-hidden="true">${esc(F.loading)}</div>` : "")
+      + (p.ways ? `<div class="ways">${p.ways.map((it) => hint(it)).join("")}</div>` : "");
+  }
+
   // the rows, without their selection (a move must not replay the rows' rise)
   let rowRight = [];
   // quiet: drawn as the bar appears, the rows come with it (no rise, no stagger: ambient m_6574)
@@ -114,12 +133,14 @@
     let n = 0;
     return sections.map((sec) => (sec.label ? `<div class="lab sec${sec.acc ? " acc" : ""}" role="heading" aria-level="2">${esc(sec.label)}</div>` : "") + sec.rows.map((r) => {
       const i = n++;
-      const right = !r.right ? "" : r.right.sw != null ? `<span class="sw${r.right.sw ? " on" : ""}" aria-hidden="true"></span>` : r.right.age ? esc(r.right.age) : caps(r.right.keys);
+      const right = !r.right ? "" : r.right.sw != null ? `<span class="sw${r.right.sw ? " on" : ""}" aria-hidden="true"></span>`
+        : r.right.wait ? `<span class="wait">${esc(r.right.wait)}</span>` : r.right.age ? esc(r.right.age) : caps(r.right.keys);
       rowRight.push({ right, sw: !!(r.right && r.right.sw != null) });
       const g = r.gk ? caps([r.g]) : esc(r.g || "");
       const tag = r.fixed || !r.act ? "div" : "button";
       const role = r.right && r.right.sw != null ? ` role="switch" aria-checked="${!!r.right.sw}"` : "";
-      return `<${tag}${tag === "button" ? ' type="button"' : ""} class="row${r.fixed ? " fixed" : ""}${r.seen ? " seen" : ""}" data-r="${i}" data-row="${i}" data-qa="${esc(r.qa || `row-${i}`)}"${act(r.act)}${role} style="${quiet ? "animation:none" : `animation-delay:${i * 20}ms`}"><span class="g ${r.gc || ""}" aria-hidden="true">${g}</span><span class="t">${esc(r.t)}${r.sub ? `<small>${esc(r.sub)}</small>` : ""}</span><span class="s">${right}</span></${tag}>`;
+      const mk = r.mark || {};
+      return `<${tag}${tag === "button" ? ' type="button"' : ""} class="row${r.fixed ? " fixed" : ""}${r.seen ? " seen" : ""}${r.sub && mk.t !== undefined ? " two" : ""}" data-r="${i}" data-row="${i}" data-qa="${esc(r.qa || `row-${i}`)}"${act(r.act)}${role} style="${quiet ? "animation:none" : `animation-delay:${i * 20}ms`}"><span class="g ${r.gc || ""}" aria-hidden="true">${g}</span><span class="t">${marked(r.t, mk.t)}${r.sub ? `<small>${marked(r.sub, mk.sub)}</small>` : ""}</span><span class="s">${right}</span></${tag}>`;
     }).join("")).join("");
   }
   const strip = (sections) => sections.map((s) => ({ ...s, rows: s.rows.map(({ sel, ...r }) => r) }));
@@ -183,6 +204,12 @@
       show(el.mid, s.big || t);
     });
     const rowsOn = s.sections.some((x) => x.rows.length || x.label);
+    // round 10: 860 wide with the preview on the right (it opens at that width, never grows while
+    // shown); the list 360, the preview 500, one fixed height so arrowing never resizes the glass
+    const gw = s.w || Bar.BOX.w;
+    if (bar.style.width !== gw + "px") bar.style.width = gw + "px";
+    el.split.classList.toggle("two", s.preview !== undefined);
+    put("pv", JSON.stringify(s.preview || null), () => { el.pv.innerHTML = previewHtml(s.preview); el.pv.scrollTop = 0; show(el.pv, !!s.preview); });
     put("body", JSON.stringify(strip(s.sections)), () => { el.body.innerHTML = body(s.sections, bar.classList.contains("appear") || !on); el.body.scrollTop = 0; last.sel = null; show(el.body, rowsOn); });
     // the selected row: soft pink, its glyph pink, a ⏎ cap on the right (a switch keeps its switch)
     put("sel", JSON.stringify(sels(s.sections)), () => {
@@ -210,7 +237,7 @@
     const maxH = Math.round((native() || window.ambientApp ? screenH : Math.max(screenH, innerHeight)) * 0.7);
     el.body.style.maxHeight = "";
     const fixed = gin.scrollHeight - el.body.scrollHeight;
-    if (gin.scrollHeight > maxH) el.body.style.maxHeight = Math.max(88, maxH - fixed) + "px";
+    if (gin.scrollHeight > maxH && !el.split.classList.contains("two")) el.body.style.maxHeight = Math.max(88, maxH - fixed) + "px";
     const h = Math.min(maxH, Math.ceil(gin.scrollHeight)) || 68;
     if (glass.style.height !== h + "px") glass.style.height = h + "px";
     // the bar gone (nothing to show): no glass in the same frame, so the native blur never stays
@@ -218,7 +245,7 @@
     // the glass is there whenever the bar has something to show, even while the app still keeps
     // the panel hidden (the app shows it from that glass: saying null while hidden left the bar
     // empty at ambient's sign-off, ed63487d); null only when nothing is left to show
-    const msg = Bar.size(h, 26, !!(lastS && lastS.head));
+    const msg = Bar.size(h, 26, !!(lastS && lastS.head), (lastS && lastS.w) || Bar.BOX.w);
     const key = JSON.stringify(msg);
     if (key !== sent) { sent = key; post(msg); }
   }
@@ -228,6 +255,7 @@
   // the pearl's size in its 76 px canvas: 64 px at rest, 76 px (1.18) while fn is held
   const ZOOM_REST = 64 / 76;
   let zoom = ZOOM_REST, zoomAt = 0;
+  let pvWant = null, pvT = 0;
   const fps = { frames: 0, since: now(), value: 0 };
   // a frame never waits on requestAnimationFrame alone: WebKit suspends it while it thinks the page
   // is hidden (document.hidden stayed true in the QA app with the panel shown, so the bar never
@@ -254,6 +282,10 @@
     // footer from fn chords to plain keys, and a redraw between mouse down and up lost the click
     // (pm's fail 47); the press's end redraws
     if (!pressing) { render(v, s); layout(); }
+    // the selected agent's preview: asked once it stayed selected 80 ms (amb-core m_7030: then the
+    // core re-sends it on that agent's events while it stays selected)
+    const want = v.find && v.find.want;
+    if (want !== pvWant) { pvWant = want; clearTimeout(pvT); if (want) pvT = setTimeout(() => { if (pvWant === want) recv({ ev: "ui_preview_ask", agent: want }); }, 80); }
     // what the bar has to show, on every change: the app's show/hide policy acts on it
     const ck = JSON.stringify(v.content);
     if (ck !== contentSent) { contentSent = ck; post({ cmd: "app_content", ...v.content }); }
@@ -328,7 +360,20 @@
   });
   input.addEventListener("input", () => recv({ ev: "ui_spot_type", text: input.value }));
   input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); recv({ ev: "ui_spot_send", text: input.value }); }
+    const s = lastS, finding = !!(s && s.preview !== undefined);
+    // round 10's finder: ↑↓ move (the preview follows), ⏎ runs the selected row (an agent: its
+    // panel; nothing matches: ask main), ⌘⏎ always asks main, ⌘O terminal, ⌘D follow
+    if (finding && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      e.preventDefault(); recv({ ev: "app_key", key: e.key === "ArrowUp" ? "up" : "down", local: true, n: Bar.selectable(s).length });
+    } else if (finding && e.metaKey && /^[od]$/i.test(e.key)) {
+      e.preventDefault();
+      const it = s.foot.left.find((x) => x.keys[0] === "⌘" && x.keys[1] === e.key.toUpperCase());
+      if (it) run(it.act);
+    } else if (finding && e.key === "Enter" && !e.isComposing && !e.metaKey) {
+      e.preventDefault();
+      const r = Bar.selRow(s);
+      if (r) run(r.act); else if (input.value.trim()) recv({ ev: "ui_spot_send", text: input.value });
+    } else if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); recv({ ev: "ui_spot_send", text: input.value }); }
     else if (e.key === "Tab") { e.preventDefault(); recv({ ev: "ui_spot_tab", text: input.value }); }
     else if (e.key === "Escape") { e.preventDefault(); recv({ ev: "ui_close" }); }
     e.stopPropagation();

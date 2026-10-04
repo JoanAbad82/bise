@@ -21,6 +21,34 @@
     { name: "cookies", status: "working", note: "the banner, half the size", report: "", working: true, turn_ms: 240000 },
     { name: "release", status: "idle", note: "waits for the others", report: "", working: false, turn_ms: 60000 },
   ];
+  // round 10 (identity10's example world): the rows amb-core sends in state.agents (m_7030) and
+  // what agent_preview answers; times are fixed epoch ms so the checks read them back
+  const T0 = Date.UTC(2026, 9, 3, 8, 41);   // 10:41 in Paris
+  const min = (n) => T0 - n * 60000;
+  const ROSTER = [
+    { name: "perf", status: "working", title: "signup is 4.1 s → 0.9 s; checking the e2e tests", purpose: "make signup fast", since_ms: min(12), waits: 0, followed: false, working: true },
+    { name: "cookies", status: "waiting", title: "the banner, half the size on mobile", purpose: "cookie banner on mobile", since_ms: min(4), waits: 1, followed: false, working: true },
+    { name: "dark-mode", status: "working", title: "the settings page first, then the rest", purpose: "dark mode for the app", since_ms: min(6), waits: 0, followed: true, working: true },
+    { name: "emoji-csv", status: "blocked", title: "the export breaks on emoji in names", purpose: "fix the CSV export with emoji", since_ms: min(18), waits: 0, followed: false },
+    { name: "release", status: "done", title: "2.5.0 is published", purpose: "release 2.5.0", since_ms: min(60), waits: 0, followed: false },
+    { name: "weekly-update", status: "idle", title: "your weekly update, draft 2", purpose: "weekly update from Slack and Linear", since_ms: min(120), waits: 0, followed: false },
+    { name: "old-spike", status: "done", title: "tried a new router", purpose: "router spike", since_ms: min(3000), waits: 0, followed: false, archived: true },
+  ];
+  const at = (h, m) => Date.UTC(2026, 9, 3, h - 2, m);
+  const PREVIEWS = {
+    perf: { now: "signup went from 4.1 s to 0.9 s by caching the plan lookup; it's running the e2e tests before it lands.",
+      actions: [{ at_ms: at(10, 29), text: "profiled signup · 3.2 s in the plan lookup", kind: "tool" }, { at_ms: at(10, 33), text: "cached the plan lookup per request", kind: "tool" },
+        { at_ms: at(10, 36), text: "signup 4.1 s → 0.9 s on the bench", kind: "message" }, { at_ms: at(10, 40), text: "running the e2e tests · 41 of 58", kind: "tool" }],
+      waiting: [], last_report: { kind: "progress", text: "the plan lookup was 3.2 s of 4.1 s; cached, signup is 0.9 s.", at_ms: at(10, 36) },
+      pages: [{ id: "signup-perf", title: "signup perf", v: 2, url: "https://bise.dev/p/signup-perf" }] },
+    cookies: { now: "the banner is half the size on mobile; it asks you whether to keep it on small screens at all.",
+      actions: [{ at_ms: at(10, 37), text: "built the banner at 50% height under 480 px", kind: "tool" }, { at_ms: at(10, 38), text: "ran the visual tests · 2 snapshots changed", kind: "tool" },
+        { at_ms: at(10, 39), text: "asked you: keep the banner on mobile?", kind: "message" }],
+      waiting: [{ card_id: "c1", question: "keep the banner on mobile, or only a link in the footer?" }], last_report: { kind: "progress", text: "banner at 50% on mobile, snapshots updated.", at_ms: at(10, 38) }, pages: [] },
+    "emoji-csv": { now: "it found the bug (the CSV writer counts bytes, not characters) and waits for main to say which branch to use.",
+      actions: [{ at_ms: at(10, 20), text: "reproduced with a name “Zoé 🎉”", kind: "tool" }, { at_ms: at(10, 23), text: "found the byte count in csv.ts", kind: "tool" }],
+      waiting: [], last_report: { kind: "blocked", text: "needs to know: fix on main or on release-2.5?", at_ms: at(10, 23) }, pages: [] },
+  };
   const EMOJI = { name: "emoji-csv", status: "working", note: "it's always unicode", report: "", working: true, turn_ms: 540000 };
   // the core's cards: options [{n, label}], n the digit (a hard confirm skips 2)
   const CARD = { id: "c1", kind: "question", agent: "cookies", text: "keep the banner on mobile?", options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }] };
@@ -170,6 +198,9 @@
         skip: [{ bundle: "com.agilebits.onepassword7", name: "1Password", fixed: true }, { bundle: "com.tinyspeck.slackmacgap", name: "Slack", fixed: false }] }],
       [400, { ev: "app_key", key: "," }]]) },
     { id: "spot", spec: ["spotlight"], label: "fn + space: spotlight", build: () => sort([...base(), [400, { ev: "app_key", key: "space" }]]) },
+    // round 10 (identity10, preview A): fn a, your agents with the preview; fn space + 'perf'
+    { id: "find", spec: ["agents"], label: "fn a: your agents (round 10)", build: () => sort([...base(ROSTER, [CARD]), [400, { ev: "app_key", key: "a" }]]) },
+    { id: "find-type", spec: ["spotlight"], label: "fn space + 'perf' (round 10)", build: () => sort([...base(ROSTER, [CARD]), [400, { ev: "app_key", key: "space" }], [700, { ev: "ui_spot_type", text: "perf" }]]) },
     { id: "error", spec: ["failed"], label: "an error", build: () => sort([...base(), [700, { ev: "error", text: "the mic isn't answering. nothing was sent." }]]) },
     { id: "hub", spec: ["idle"], label: "the hub is down", build: () => sort([...base(), [700, { ev: "hub", up: false, workspace: "~/acme" }], [5200, { ev: "hub", up: true, workspace: "~/acme" }]]) },
     { id: "hide", spec: ["idle"], label: "fn + .: hide", build: () => sort([...base(), [600, { ev: "app_key", key: "." }]]) },
@@ -227,6 +258,8 @@
       // glass, nothing to show hides it (so dev.html closes the glass with its last words on it)
       case "app_content": return [[0, { ev: "app_hidden", on: cmd.kind === "none" }]];
       case "app_perm": return cmd.do === "continue" ? [[600, { ev: "app_perm", perm: cmd.perm, state: "granted" }]] : [];
+      // round 10: an agent's preview, amb-core's shape (m_7030)
+      case "agent_preview": return PREVIEWS[cmd.agent] ? [[120, { ev: "agent_preview", agent: cmd.agent, ...PREVIEWS[cmd.agent] }]] : [];
       default: return [];
     }
   }
@@ -251,5 +284,5 @@
     };
   }
 
-  root.AmbFake = { SCENES, respond, player, voice, AGENTS, CARD, SAID, ANSWER };
+  root.AmbFake = { SCENES, respond, player, voice, AGENTS, CARD, SAID, ANSWER, ROSTER, PREVIEWS, T0 };
 })(typeof window !== "undefined" ? window : globalThis);

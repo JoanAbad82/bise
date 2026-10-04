@@ -45,6 +45,56 @@
     return s;
   }
 
+  // ---- round 10, preview A (identity10): the bar opens at 860 for your agents, the list on the
+  // left (360), the selected agent's preview on the right (500); fn a, or fn space with agents
+  const WIDE = 860, LIST = 360;
+  const AG = { waiting: ["?", "a"], blocked: ["▲", "risk"], working: ["∿", "work"], idle: ["◌", null], done: ["✓", "ok"], failed: ["▲", "risk"] };
+  const F = B.find;
+  // a time of day, 24 h (the preview's actions: '10:37')
+  const hhmm = (ms) => { if (!(ms > 0)) return ""; const d = new Date(ms); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+  function finder(s, v) {
+    const f = v.find, spot = f.mode === "spot", q = f.q;
+    s.w = WIDE;
+    s.head = { h: 68, input: { text: v.spot ? v.spot.text : q, ph: spot ? F.spotPh : F.ph }, right: item(spot ? ["fn", "space"] : ["fn", "a"]) };
+    const rows = f.rows.map((r) => {
+      const [g, gc] = AG[r.status] || AG.idle;
+      return { g, gc, t: r.name, sub: r.title || null, mark: { t: r.marks.name, sub: r.marks.title }, seen: r.archived,
+        right: r.waits ? { wait: r.waits } : r.age ? { age: r.age } : null, act: { ev: "ui_agent", agent: r.name }, qa: `agent-${r.name}` };
+    });
+    const waiting = f.rows.filter((r) => r.waits).length;
+    s.sections = [{ label: q ? F.agents : F.yours, acc: waiting > 0 && !q ? F.waitingOnYou(waiting) : null, rows }];
+    if (spot && q) s.sections.push({ label: F.ask, rows: [
+      { g: "@", gc: "a", t: B.askMain(q), right: { keys: ["⌘", "⏎"] }, act: { ev: "ui_spot_send", text: v.spot.text }, qa: "ask-main" },
+      { g: "+", t: B.startAgent(q), right: { keys: ["tab"] }, act: { ev: "ui_spot_tab", text: v.spot.text }, qa: "start-agent" },
+    ] });
+    s.preview = preview(f, v);
+    const a = f.agent, row = a && f.rows.find((r) => r.name === a);
+    s.foot = { left: [item(["↑", "↓"], B.move), item(["⏎"], B.open, key("enter")),
+      ...(a ? [item(["⌘", "O"], F.terminal, { ev: "ui_agent_terminal", agent: a }), item(["⌘", "D"], row && row.followed ? F.following : F.follow, { ev: "ui_follow", agent: a })] : [])],
+    right: [item(["esc"], B.close, { ev: "ui_close" })] };
+    if (!f.rows.length && !q) s.text = { s: F.none, dim: true };
+    return markSel(s, f.sel);
+  }
+  // the preview of the selected agent: its status chip, what it does now, what waits on you, its
+  // last actions, its last report, its pages, and the ways in (⏎ ⌘O ⌘D); until the core's
+  // agent_preview comes, its title line stands for 'now'
+  function preview(f, v) {
+    const r = f.agent && f.rows.find((x) => x.name === f.agent);
+    if (!r) return f.q ? { empty: F.noMatch } : null;
+    const p = f.preview;
+    const [g, gc] = AG[r.status] || AG.idle;
+    const out = { name: r.name, chip: { text: `${F.status[r.status] || r.status}${r.age ? ` · ${r.age}` : ""}`, gc }, now: p && p.now ? p.now : r.title || "", loading: !p, waits: [], actions: [], report: null, pages: [] };
+    if (!p) return out;
+    out.waits = p.waiting.map((w) => ({ label: F.needsYou(r.name), text: w.question, act: { ev: "ui_card", card: w.card_id }, qa: `wait-${w.card_id}` }));
+    out.actions = p.actions.map((x) => ({ at: hhmm(x.at_ms), text: x.text }));
+    if (p.last_report) out.report = { glyph: p.last_report.kind === "done" ? "✓" : p.last_report.kind === "blocked" || p.last_report.kind === "failed" ? "▲" : "", text: p.last_report.text };
+    out.pages = p.pages.map((pg) => ({ t: `${pg.title} · v${pg.v}`, act: { ev: "ui_open_url", url: pg.url, page: pg.id }, qa: `pv-page-${pg.id}` }));
+    out.ways = [item(["⏎"], F.openHistory, { ev: "ui_agent", agent: r.name }), item(["⌘", "O"], F.terminal, { ev: "ui_agent_terminal", agent: r.name }),
+      item(["⌘", "D"], r.followed ? F.following : F.follow, { ev: "ui_follow", agent: r.name })];
+    void g;
+    return out;
+  }
+
   function spec(v) {
     const s = { kind: v.state, mood: v.mood, head: null, level: null, big: null, text: null, sections: [], foot: null };
     const focused = !!v.focused;
@@ -93,7 +143,9 @@
         s.foot = { left: [item(["fn"], B.talk, null, B.hold), item(["fn", "space"], B.type), item(["fn", "0"], B.goingOn), item(["fn", "o"], B.startHere)], right: [] };
         return s;
       }
+      case "find": return finder(s, v);
       case "spotlight": {
+        if (v.find) return finder(s, v);
         const t = v.spot.text.trim();
         s.head = { h: 68, input: { text: v.spot.text, ph: B.typeHint } };
         if (t) s.sections = [{ rows: [
@@ -196,8 +248,10 @@
   const BOX = { left: 84, top: 28, right: 60, bottom: 92, w: 700 };
   // show false (nothing left to show): glass null, the app drops its blur that frame (amb-mac
   // 6072dcc8); a hidden panel with something to show still gets its glass
-  const size = (h, radius, show = true) => ({ cmd: "app_size", w: BOX.left + BOX.w + BOX.right, h: BOX.top + h + BOX.bottom, radius,
-    glass: show ? { x: BOX.left, y: BOX.top, w: BOX.w, h } : null });
+  // w: the glass's width, 700, or 860 for round 10's lists with their preview (it opens at that
+  // width and never grows while shown)
+  const size = (h, radius, show = true, w = BOX.w) => ({ cmd: "app_size", w: BOX.left + w + BOX.right, h: BOX.top + h + BOX.bottom, radius,
+    glass: show ? { x: BOX.left, y: BOX.top, w, h } : null });
 
   // the row ⌘ <d> opens (fn 0's for you, fn p), and the one ⏎ runs
   const cmdRow = (s, d) => s.sections.flatMap((sec) => sec.rows).find((r) => r.act && r.right && r.right.keys && r.right.keys[0] === "⌘" && r.right.keys[1] === String(d)) || null;

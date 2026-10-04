@@ -1321,5 +1321,109 @@ law("every scene plays without throwing, and every SPEC §2 state shows", () => 
   }
 });
 
+// ---- round 10, preview A (identity10, lead m_7027, amb-core m_7030's shapes)
+const R10 = () => {
+  let m = M.init();
+  m = M.step(m, { ev: "hub", up: true, workspace: "~/acme" }, 0).m;
+  return M.step(m, { ev: "state", agents: Fake.ROSTER, cards: [Fake.CARD] }, 0).m;
+};
+const v10 = (m, t = 100) => M.view(m, t, Fake.T0);
+law("round 10: fn a lists your agents, waiting on you first, then blocked, working, idle, done; archived ones only in a search; the bar opens at 860 with the preview", () => {
+  const r = M.step(R10(), { ev: "app_key", key: "a" }, 10);
+  eq(r.cmds, [{ cmd: "app_focus", on: true }]);
+  const v = v10(r.m);
+  eq([v.state, v.content.kind], ["find", "type"]);
+  eq(v.find.rows.map((x) => x.name), ["cookies", "emoji-csv", "perf", "dark-mode", "weekly-update", "release"]);
+  const s = Bar.spec(v);
+  eq([s.w, s.head.input.ph, s.head.right.keys], [860, "find an agent", ["fn", "a"]]);
+  eq([s.sections[0].label, s.sections[0].acc], ["your agents", "1 waiting on you"]);
+  const rows = s.sections[0].rows;
+  eq(rows.map((x) => [x.g, x.gc]), [["?", "a"], ["▲", "risk"], ["∿", "work"], ["∿", "work"], ["◌", null], ["✓", "ok"]]);
+  eq([rows[0].right, rows[2].right, rows[2].sub], [{ wait: 1 }, { age: "12m" }, "signup is 4.1 s → 0.9 s; checking the e2e tests"]);
+  eq(rows[0].act, { ev: "ui_agent", agent: "cookies" });
+  assert.ok(rows[0].sel);
+  eq(Bar.size(420, 26, true, s.w), { cmd: "app_size", w: 1004, h: 540, radius: 26, glass: { x: 84, y: 28, w: 860, h: 420 } });
+  // fn a again closes it
+  eq(M.step(r.m, { ev: "app_key", key: "a" }, 20).cmds, [{ cmd: "app_focus", on: false }]);
+});
+law("round 10: the preview follows ↑↓; it's asked once per agent (the page waits 80 ms), the core's agent_preview fills it: now, waits on you, last actions, last report, its pages, ⏎ ⌘O ⌘D", () => {
+  let m = M.step(R10(), { ev: "app_key", key: "a" }, 10).m;
+  let v = v10(m);
+  eq([v.find.agent, v.find.want], ["cookies", "cookies"]);
+  // before it comes: the title line stands for now
+  let p = Bar.spec(v).preview;
+  eq([p.name, p.chip, p.now, p.loading], ["cookies", { text: "needs you · 4m", gc: "a" }, "the banner, half the size on mobile", true]);
+  let r = M.step(m, { ev: "ui_preview_ask", agent: "cookies" }, 20);
+  eq(r.cmds, [{ cmd: "agent_preview", agent: "cookies" }]);
+  eq(M.step(r.m, { ev: "ui_preview_ask", agent: "cookies" }, 30).cmds, []);   // asked once: the core re-sends on its events
+  m = M.step(r.m, { ev: "agent_preview", agent: "cookies", ...Fake.PREVIEWS.cookies }, 40).m;
+  v = v10(m);
+  assert.equal(v.find.want, null);
+  p = Bar.spec(v).preview;
+  eq([p.now, p.loading], [Fake.PREVIEWS.cookies.now, false]);
+  eq(p.waits, [{ label: "? cookies needs you", text: "keep the banner on mobile, or only a link in the footer?", act: { ev: "ui_card", card: "c1" }, qa: "wait-c1" }]);
+  eq(p.actions.map((a) => a.text), ["built the banner at 50% height under 480 px", "ran the visual tests · 2 snapshots changed", "asked you: keep the banner on mobile?"]);
+  assert.ok(p.actions.every((a) => /^\d\d:\d\d$/.test(a.at)));
+  eq(p.report, { glyph: "", text: "banner at 50% on mobile, snapshots updated." });
+  eq(p.ways.map((w) => [w.keys.join(" "), w.w]), [["⏎", "open its history"], ["⌘ O", "terminal"], ["⌘ D", "follow"]]);
+  // ↓: the next agent, its preview asked in turn
+  m = M.step(m, { ev: "app_key", key: "down", local: true, n: 6 }, 50).m;
+  v = v10(m);
+  eq([v.find.agent, v.find.want, Bar.selRow(Bar.spec(v)).t], ["emoji-csv", "emoji-csv", "emoji-csv"]);
+  m = M.step(m, { ev: "agent_preview", agent: "emoji-csv", ...Fake.PREVIEWS["emoji-csv"] }, 60).m;
+  eq(Bar.spec(v10(m)).preview.report, { glyph: "▲", text: "needs to know: fix on main or on release-2.5?" });
+  // a page in the preview opens in the browser
+  m = M.step(m, { ev: "agent_preview", agent: "perf", ...Fake.PREVIEWS.perf }, 70).m;
+  m = M.step(m, { ev: "app_key", key: "down", local: true, n: 6 }, 80).m;
+  const pg = Bar.spec(v10(m)).preview.pages[0];
+  eq(pg.t, "signup perf · v2");
+  eq(M.step(m, pg.act, 90).cmds, [{ cmd: "app_open_url", url: "https://bise.dev/p/signup-perf", page: "signup-perf" }]);
+  // the fake core answers the ask the same way (dev.html)
+  eq(Fake.respond({ cmd: "agent_preview", agent: "perf" })[0][1].ev, "agent_preview");
+});
+law("round 10: fn space + typing filters agents by name, title and purpose, the match marked; ⏎ opens the selected agent (its panel, the bar goes); ⌘⏎ and no match ask main; an archived agent comes back in a search", () => {
+  let m = M.step(R10(), { ev: "app_key", key: "space" }, 10).m;
+  let s = Bar.spec(v10(m));
+  eq([s.kind, s.w, s.head.input.ph, s.head.right.keys], ["spotlight", 860, "ask bise, find an agent or a page", ["fn", "space"]]);
+  m = M.step(m, { ev: "ui_spot_type", text: "perf" }, 20).m;
+  s = Bar.spec(v10(m));
+  eq(s.sections.map((x) => [x.label, x.rows.map((r) => r.t)]), [["agents", ["perf"]], ["ask", ["ask main: perf", "start an agent: perf"]]]);
+  eq(s.sections[0].rows[0].mark, { t: [0, 4], sub: null });
+  const row = Bar.selRow(s);
+  eq(row.act, { ev: "ui_agent", agent: "perf" });
+  const r = M.step(m, row.act, 30);
+  eq(r.cmds, [{ cmd: "app_focus", on: false }, { cmd: "app_panel", agent: "perf" }]);
+  assert.equal(r.m.pane, null);
+  // the title and the purpose match too
+  m = M.step(m, { ev: "ui_spot_type", text: "banner" }, 40).m;
+  eq(Bar.spec(v10(m)).sections[0].rows.map((x) => [x.t, x.mark.sub]), [["cookies", [4, 10]]]);
+  m = M.step(m, { ev: "ui_spot_type", text: "emoji" }, 45).m;
+  eq(v10(m).find.rows.map((x) => x.name), ["emoji-csv"]);
+  m = M.step(m, { ev: "ui_spot_type", text: "router" }, 50).m;
+  eq(v10(m).find.rows.map((x) => x.name), ["old-spike"]);
+  // nothing matches: the preview says ⏎ asks main, and ⏎ (the selected row) does
+  m = M.step(m, { ev: "ui_spot_type", text: "dark theme for billing" }, 60).m;
+  s = Bar.spec(v10(m));
+  eq([s.sections[0].rows.length, s.preview], [0, { empty: "no agent matches. ⏎ asks main instead." }]);
+  eq(Bar.selRow(s).act, { ev: "ui_spot_send", text: "dark theme for billing" });
+  // typing puts the selection back on the first row
+  m = M.step(M.step(m, { ev: "app_key", key: "down", local: true, n: 2 }, 70).m, { ev: "ui_spot_type", text: "dark" }, 80).m;
+  eq(v10(m).find.sel, 0);
+});
+law("round 10: ⌘D follows the selected agent (again to stop), ⌘O opens it in the terminal; fn space with no agents stays round 9's 700 px field", () => {
+  let m = M.step(R10(), { ev: "app_key", key: "a" }, 10).m;
+  const s = Bar.spec(v10(m));
+  const fol = s.foot.left.find((x) => x.keys.join(" ") === "⌘ D"), term = s.foot.left.find((x) => x.keys.join(" ") === "⌘ O");
+  let r = M.step(m, fol.act, 20);
+  eq(r.cmds, [{ cmd: "follow", agent: "cookies", on: true }]);
+  eq(Bar.spec(v10(r.m)).foot.left.find((x) => x.keys.join(" ") === "⌘ D").w, "following");
+  eq(M.step(r.m, fol.act, 30).cmds, [{ cmd: "follow", agent: "cookies", on: false }]);
+  eq(M.step(m, term.act, 40).cmds, [{ cmd: "open_terminal", agent: "cookies" }]);
+  // dark-mode is followed already (state.followed): ⌘D stops it
+  eq(M.step(m, { ev: "ui_follow", agent: "dark-mode" }, 50).cmds, [{ cmd: "follow", agent: "dark-mode", on: false }]);
+  const s0 = Bar.spec(M.view(M.step(M.init(), { ev: "app_key", key: "space" }, 0).m, 10));
+  eq([s0.w, s0.preview], [undefined, undefined]);
+});
+
 console.log(`${fail ? "✗" : "✓"} ambient web: ${pass} passed${fail ? `, ${fail} failed` : ""}`);
 process.exit(fail ? 1 : 0);

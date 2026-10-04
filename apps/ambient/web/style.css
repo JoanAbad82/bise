@@ -107,6 +107,37 @@ button.rk:hover, button.fi:hover { color: var(--ink); background: #ffffff0c; }
 .row.fixed .t, .row.seen .t { color: var(--dim); }
 .row:focus-visible, button.fi:focus-visible, button.rk:focus-visible { outline: 2px solid var(--acc); outline-offset: -2px; }
 
+/* ---- round 10, preview A (identity10): the list 360 | the preview 500, one fixed height */
+.split.two { display: grid; grid-template-columns: 360px 1fr; height: 420px; border-top: 1px solid var(--line); }
+.split.two .body { display: block; border-top: 0; overflow-y: auto; scrollbar-width: none; }
+.split.two .body .row .t { display: flex; flex-direction: column; line-height: 1.2; }
+.split.two .body .row .t small { margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; }
+.split.two .lab.sec.acc { color: var(--faint); }
+.row .wait { color: var(--acc); font-weight: 600; }
+mark { background: #f4a6b040; color: #fff; border-radius: 3px; padding: 0 1px; }
+.pv { display: none; }
+.split.two .pv.on { display: block; border-left: 1px solid var(--line); padding: 16px 20px; overflow-y: auto; scrollbar-width: none; animation: pvin .18s var(--ease-out); }
+@keyframes pvin { from { opacity: 0; } }
+.still .pv.on { animation: none; }
+.pv h3 { margin: 0; font: 600 19px/1.25 var(--display); letter-spacing: -.005em; display: flex; align-items: center; gap: 8px; color: var(--ink); }
+.chip { font: 500 12px var(--sans); padding: 2px 9px; border-radius: 99px; background: #ffffff14; color: var(--dim); white-space: nowrap; }
+.chip.a { background: #f4a6b026; color: var(--acc); } .chip.ok { background: #cfe8c01f; color: var(--ok); } .chip.risk { background: #ff9a8a1f; color: var(--risk); }
+.pv .now { font: 15px/1.42 var(--sans); color: #ffffffe6; margin: 8px 0 2px; }
+.pv .sect { font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--faint); margin: 16px 0 6px; }
+.pv .wcard { display: block; width: 100%; text-align: left; border: 0; border-radius: 14px; background: #f4a6b014; box-shadow: inset 0 0 0 1px #f4a6b033; padding: 10px 12px; font: 14px/1.4 var(--sans); color: #fff; cursor: pointer; margin-bottom: 6px; }
+.pv .wcard:hover { background: #f4a6b01f; }
+.pv .wcard .l { display: block; font: 600 11px var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--acc); margin-bottom: 3px; }
+.pv .act-l { display: grid; grid-template-columns: 44px 1fr; gap: 8px; font: 13.5px/1.45 var(--sans); color: var(--dim); padding: 3px 0; }
+.pv .act-l i { font-style: normal; color: var(--faint); font-size: 12px; }
+.pv .rep { font: 13.5px/1.45 var(--sans); color: var(--dim); }
+.pv .rep .gl.ok { color: var(--ok); } .pv .rep .gl.risk { color: var(--risk); }
+.pv .pv-page { display: flex; gap: 10px; align-items: center; width: 100%; height: 36px; padding: 0 12px; margin: 0 -12px; border: 0; border-radius: 12px; background: none; color: var(--ink); font: 500 14px var(--sans); text-align: left; cursor: pointer; }
+.pv .pv-page:hover { background: #ffffff0c; }
+.pv .pv-page .g { color: var(--faint); }
+.pv .pv-wait { color: var(--faint); margin-top: 12px; }
+.pv .pv-empty { color: var(--faint); font: 14px/1.4 var(--sans); }
+.pv .ways { margin-top: 16px; display: flex; gap: 16px; }
+
 /* the keycap: a chord is caps side by side, never a '+' */
 kbd.k { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 6px; font: 600 11.5px/1 var(--sans); color: #ffffffd9; background: #ffffff14; box-shadow: inset 0 -1px 0 #0005, inset 0 0 0 1px #ffffff1a; }
 .dash { color: var(--faint); }

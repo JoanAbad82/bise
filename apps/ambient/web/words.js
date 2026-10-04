@@ -60,6 +60,16 @@
       pick: "pick", move: "move", later: "later", orHold: "or hold", sayIt: "and say it", openPage: "open the page",
       reviewSub: "opens the page at the first draft", sendSub: "nothing leaves before this",
       hold: "hold", talk: "talk", type: "type", goingOn: "what's going on", startHere: "start here",
+      // round 10 (identity10, ambient): your agents in the bar, preview A
+      find: {
+        ph: "find an agent", spotPh: "ask bise, find an agent or a page",
+        yours: "your agents", waitingOnYou: (n) => `${n} waiting on you`, agents: "agents", ask: "ask",
+        none: "no agents yet.", noMatch: "no agent matches. ⏎ asks main instead.",
+        status: { waiting: "needs you", working: "working", blocked: "blocked", done: "done", idle: "idle", failed: "failed" },
+        needsYou: (name) => `? ${name} needs you`,
+        waitsOnYou: "waits on you", lastActions: "last actions", lastReport: "last report", itsPage: "its page", itsPages: "its pages",
+        openHistory: "open its history", terminal: "terminal", follow: "follow", following: "following", loading: "…",
+      },
       typeHint: "ask bise, or type a command", askMain: (t) => `ask main: ${t}`, startAgent: (t) => `start an agent: ${t}`,
       sendMain: "send to main", startAgentKey: "start an agent",
       inbox: "inbox", mostBlocking: "most blocking first", open: "open",

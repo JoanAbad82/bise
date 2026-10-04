@@ -69,8 +69,11 @@
       pages: [],                    // "for you": the pages made for you, newest first (state.pages)
       timers: [],                   // the hub's standing orders (state.timers): a page with one is watched
       lastPage: null,               // the page `is ready · fn + o` named last
-      pane: null,                   // null | 'agents' | 'inbox' | 'spot'
-      spotText: "",
+      pane: null,                   // null | 'agents' | 'inbox' | 'spot' | 'find' | 'settings' | 'pages'
+      spotText: "",                 // the typed field (fn space, and fn a's filter)
+      previews: {},                 // agent -> its preview (agent_preview, round 10)
+      previewAsked: {},             // agent -> true once asked (the core re-sends while it stays selected)
+      follows: {},                  // agent -> on, his follow toggles until the state says so
       answered: {},                 // card id -> true, until the hub drops the card
       sel: 0,                       // the inbox's chosen card
     };
@@ -164,11 +167,42 @@
     return { m: flashNow(m2, f, now), cmds: [{ cmd: "answer", card: card.id, reply }] };
   }
 
+  // the panes with the typed field (fn space, fn a): they take the keys
+  const TYPED = ["spot", "find"];
   function setPane(m, pane) {
     const cmds = [];
-    if (m.pane === "spot" && pane !== "spot") cmds.push({ cmd: "app_focus", on: false });
-    if (pane === "spot" && m.pane !== "spot") cmds.push({ cmd: "app_focus", on: true });
-    return { m: { ...m, pane, spotText: pane === "spot" ? m.spotText : "", rowSel: pane === m.pane ? m.rowSel || 0 : 0 }, cmds };
+    const was = TYPED.includes(m.pane), will = TYPED.includes(pane);
+    if (was && !will) cmds.push({ cmd: "app_focus", on: false });
+    if (will && !was) cmds.push({ cmd: "app_focus", on: true });
+    return { m: { ...m, pane, spotText: will && was ? m.spotText : "", rowSel: pane === m.pane ? m.rowSel || 0 : 0 }, cmds };
+  }
+
+  // ---- round 10 (identity10, preview A): your agents in the bar. fn a lists them all, fn space
+  // + typing filters them (name, title, purpose; amb-core m_7030: archived rows come too, search
+  // only); waiting on you first, then blocked, working, idle, done, failed. Pure: the view and
+  // check.mjs read it.
+  const ROSTER_ORDER = { waiting: 0, blocked: 1, working: 2, starting: 2, idle: 3, done: 4, failed: 5 };
+  const match = (s, q) => {
+    const i = q ? String(s || "").toLowerCase().indexOf(q) : -1;
+    return i < 0 ? null : [i, i + q.length];
+  };
+  function roster(m, text, wall) {
+    const q = String(text || "").trim().toLowerCase();
+    const cards = visibleCards(m);
+    const rows = m.agents.map((a, i) => {
+      const waits = cards.filter((c) => c.agent === a.name).length || Math.max(0, +a.waits || 0);
+      const status = waits ? "waiting" : a.status === "starting" ? "working" : a.status || "idle";
+      const title = a.title || a.note || "";
+      const sinceMs = +a.since_ms > 0 ? Math.max(0, wall - a.since_ms) : +a.turn_ms >= 0 && a.turn_ms != null ? +a.turn_ms : null;
+      const followed = a.name in m.follows ? m.follows[a.name] : !!a.followed;
+      return { name: a.name, status, title, purpose: a.purpose || "", waits, followed, archived: !!a.archived, age: sinceMs == null ? "" : Wd.age(sinceMs), i,
+        marks: { name: match(a.name, q), title: match(title, q) } };
+    });
+    const hit = (r) => !q || r.marks.name || r.marks.title || (r.purpose && r.purpose.toLowerCase().includes(q));
+    // archived ones only when he searches for them
+    return rows.filter((r) => (q ? hit(r) : !r.archived))
+      .sort((a, b) => (ROSTER_ORDER[a.status] ?? 3) - (ROSTER_ORDER[b.status] ?? 3) || a.i - b.i)
+      .map(({ i, ...r }) => r);
   }
 
   function step(m, ev, now) {
@@ -421,8 +455,45 @@
         return setPane(m, m.pane ? null : visibleCards(m).length > 1 ? "inbox" : "agents");
       case "ui_close":
         return setPane(m, null);
-      case "ui_spot_type":
-        return none({ ...m, spotText: ev.text || "" });
+      case "ui_spot_type":   // typing filters the agents: the selection goes back to the first row
+        return none({ ...m, spotText: ev.text || "", rowSel: (ev.text || "") === m.spotText ? m.rowSel : 0 });
+
+      // ---- round 10: the agents in the bar and their preview (amb-core m_7030's shapes)
+      // the page asks for the selected agent's preview once it stayed selected 80 ms (ui.js);
+      // while it stays selected, the core re-sends it on that agent's events
+      case "ui_preview_ask":
+        if (!ev.agent || m.previewAsked[ev.agent]) return none(m);
+        return { m: { ...m, previewAsked: { ...m.previewAsked, [ev.agent]: true } }, cmds: [{ cmd: "agent_preview", agent: ev.agent }] };
+      case "agent_preview": {
+        if (!ev.agent) return none(m);
+        const p = {
+          now: String(ev.now || ""),
+          actions: (Array.isArray(ev.actions) ? ev.actions : []).slice(-5).map((a) => ({ at_ms: +a.at_ms || 0, text: String(a.text || ""), kind: a.kind || "tool" })),
+          waiting: (Array.isArray(ev.waiting) ? ev.waiting : []).map((w) => ({ card_id: w.card_id, question: String(w.question || "") })),
+          last_report: ev.last_report && ev.last_report.text ? { kind: ev.last_report.kind || "progress", text: String(ev.last_report.text), at_ms: +ev.last_report.at_ms || 0 } : null,
+          pages: (Array.isArray(ev.pages) ? ev.pages : []).map((p) => ({ id: p.id, title: p.title || String(p.id).replace(/-/g, " "), v: p.v || 1, url: p.url || "" })),
+        };
+        return none({ ...m, previews: { ...m.previews, [ev.agent]: p } });
+      }
+      // ⏎ or a click on an agent row: its side panel (slice 2, with amb-mac); the bar goes
+      case "ui_agent": {
+        if (!m.agents.some((a) => a.name === ev.agent)) return none(m);
+        const r = setPane(m, null);
+        return { m: r.m, cmds: [...r.cmds, { cmd: "app_panel", agent: ev.agent }] };
+      }
+      // a page line in the preview: that page in the browser (amb-core gives its url)
+      case "ui_open_url":
+        return ev.url ? { m: { ...m, lastPage: ev.page || m.lastPage }, cmds: [{ cmd: "app_open_url", url: ev.url, page: ev.page }] } : none(m);
+      // ⌘ O: the agent in the terminal (bise's TUI on it; the app's, amb-core m_7030)
+      case "ui_agent_terminal":
+        return ev.agent ? { m, cmds: [{ cmd: "open_terminal", agent: ev.agent }] } : none(m);
+      // ⌘ D: follow it (its reports and questions reach you), again to stop
+      case "ui_follow": {
+        const a = m.agents.find((x) => x.name === ev.agent);
+        if (!a) return none(m);
+        const on = !(ev.agent in m.follows ? m.follows[ev.agent] : !!a.followed);
+        return { m: { ...m, follows: { ...m.follows, [ev.agent]: on } }, cmds: [{ cmd: "follow", agent: ev.agent, on }] };
+      }
       case "ui_spot_send":    // ⏎ send to main; tab (agent: true) start an agent, which main does
       case "ui_spot_tab": {
         const text = (ev.text ?? m.spotText).trim();
@@ -503,6 +574,8 @@
       }
       case "i": return setPane(m, m.pane === "inbox" ? null : "inbox");
       case "0": return setPane(m, m.pane === "agents" ? null : "agents");
+      // fn a (round 10, the only new fn key): your agents, the preview on the right
+      case "a": return setPane(m, m.pane === "find" ? null : "find");
       // fn + , (and the menu's 'settings…'): the settings view (amb-mac ef4dbc2e)
       case ",": return setPane(m, m.pane === "settings" ? null : "settings");
       // round 9: ↑↓ move over every row of the open bar (ev.n: how many rows it can select, from
@@ -552,7 +625,7 @@
       case "answered": case "done": return "done";
       case "failed": case "error": case "hub_down": return "fail";
     }
-    if (v.state === "agents" || v.state === "inbox") return asking.length ? "need" : working(m.agents) ? "work" : m.quiet ? "away" : "rest";
+    if (v.state === "agents" || v.state === "inbox" || v.state === "find") return asking.length ? "need" : working(m.agents) ? "work" : m.quiet ? "away" : "rest";
     if (m.quiet) return "away";
     if (v.pose === "think") return "work";
     return "rest";
@@ -592,7 +665,7 @@
   function contentOf(v, flash, asking) {
     switch (v.state) {
       case "listening": case "voice_note": return { kind: "talk" };
-      case "spotlight": return { kind: "type" };
+      case "spotlight": case "find": return { kind: "type" };
       case "working": return { kind: v.words ? "answer" : "got" };
       case "speaking": case "end": return { kind: "answer" };
       case "agents": case "inbox": case "settings": case "pages": case "offline": return { kind: "open" };
@@ -652,6 +725,16 @@
     };
     const inbox = () => cards.map((c, i) => ({ id: c.id, agent: c.agent, text: c.text, sel: i === m.sel,
       options: Wd.options(c).map((o) => ({ i: o.i, label: Wd.optionLabel(o.n, o.label) })) }));
+    // round 10's finder (fn a, fn space): the agents' rows, the selected one (the bar's rowSel:
+    // the agents come first, then fn space's ask rows), its preview, and which preview to ask for
+    const findView = (mode) => {
+      const q = m.spotText.trim();
+      const rows = roster(m, q, wall);
+      const extra = mode === "spot" && q ? 2 : 0;   // ask main, start an agent
+      const sel = Math.max(0, Math.min(rows.length + extra - 1, m.rowSel || 0));
+      const agent = sel < rows.length ? rows[sel].name : null;
+      return { mode, q, rows, sel, agent, preview: agent ? m.previews[agent] || null : null, want: agent && !m.previewAsked[agent] ? agent : null };
+    };
     const kissAt = (at) => {
       if (now - at < T.kiss) { v.pose = "kiss"; v.poseMs = now - at; v.kiss = true; }
     };
@@ -682,7 +765,12 @@
       v.state = "spotlight"; v.size = "open";
       // the key bar: `tab start an agent` only once there is text (designer)
       v.spot = { text: m.spotText, hint: W.spotHint, keys: W.spotKeys.filter(([k]) => k !== "tab" || m.spotText.trim()) };
+      // round 10: with agents, fn space is also their finder (preview A, 860 wide)
+      if (m.agents.length) v.find = findView("spot");
       if (inTurn(m)) v.pose = "think";
+    } else if (m.pane === "find") {
+      v.state = "find"; v.size = "open";
+      v.find = findView("find");
     } else if (listening(m)) {
       v.state = "listening"; v.size = "open";
       const you = lv(m, "you", now);
