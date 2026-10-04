@@ -72,7 +72,7 @@
       pane: null,                   // null | 'agents' | 'inbox' | 'spot' | 'find' | 'settings' | 'pages'
       spotText: "",                 // the typed field (fn space, and fn a's filter)
       previews: {},                 // agent -> its preview (agent_preview, round 10)
-      previewAsked: {},             // agent -> true once asked (the core re-sends while it stays selected)
+      previewAsked: {},             // agent -> when it was asked (the core re-sends while it stays selected)
       follows: {},                  // agent -> on, his follow toggles until the state says so
       answered: {},                 // card id -> true, until the hub drops the card
       sel: 0,                       // the inbox's chosen card
@@ -466,7 +466,7 @@
       // while it stays selected, the core re-sends it on that agent's events
       case "ui_preview_ask":
         if (!ev.agent || m.previewAsked[ev.agent]) return none(m);
-        return { m: { ...m, previewAsked: { ...m.previewAsked, [ev.agent]: true } }, cmds: [{ cmd: "agent_preview", agent: ev.agent }] };
+        return { m: { ...m, previewAsked: { ...m.previewAsked, [ev.agent]: now || 1 } }, cmds: [{ cmd: "agent_preview", agent: ev.agent }] };
       case "agent_preview": {
         if (!ev.agent) return none(m);
         const p = {
@@ -736,7 +736,12 @@
       const extra = mode === "spot" && q ? 2 : 0;   // ask main, start an agent
       const sel = Math.max(0, Math.min(rows.length + extra - 1, m.rowSel || 0));
       const agent = sel < rows.length ? rows[sel].name : null;
-      return { mode, q, rows, sel, agent, preview: agent ? m.previews[agent] || null : null, want: agent && !m.previewAsked[agent] ? agent : null };
+      // no preview ~1 s after the ask (ambient's gate m_7074): the row's own words stand (its title as
+      // now, its cards as what waits on you), never a '…' that stays
+      const asked = agent ? m.previewAsked[agent] : null;
+      const cards = agent ? visibleCards(m).filter((c) => c.agent === agent).map((c) => ({ id: c.id, text: c.text })) : [];
+      return { mode, q, rows, sel, agent, preview: agent ? m.previews[agent] || null : null, want: agent && !asked ? agent : null,
+        late: !!asked && now - asked >= 1000, cards };
     };
     const kissAt = (at) => {
       if (now - at < T.kiss) { v.pose = "kiss"; v.poseMs = now - at; v.kiss = true; }

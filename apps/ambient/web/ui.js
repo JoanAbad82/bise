@@ -255,7 +255,7 @@
   // the pearl's size in its 76 px canvas: 64 px at rest, 76 px (1.18) while fn is held
   const ZOOM_REST = 64 / 76;
   let zoom = ZOOM_REST, zoomAt = 0;
-  let pvWant = null, pvT = 0;
+  let pvWant = null, pvT = 0, pvSince = 0;
   const fps = { frames: 0, since: now(), value: 0 };
   // a frame never waits on requestAnimationFrame alone: WebKit suspends it while it thinks the page
   // is hidden (document.hidden stayed true in the QA app with the panel shown, so the bar never
@@ -281,11 +281,14 @@
     // while a press is down, the bar is not redrawn: a click that makes the panel key switches the
     // footer from fn chords to plain keys, and a redraw between mouse down and up lost the click
     // (pm's fail 47); the press's end redraws
-    if (!pressing) { render(v, s); layout(); }
     // the selected agent's preview: asked once it stayed selected 80 ms (amb-core m_7030: then the
-    // core re-sends it on that agent's events while it stays selected)
-    const want = v.find && v.find.want;
-    if (want !== pvWant) { pvWant = want; clearTimeout(pvT); if (want) pvT = setTimeout(() => { if (pvWant === want) recv({ ev: "ui_preview_ask", agent: want }); }, 80); }
+    // core re-sends it on that agent's events while it stays selected). Decided here, before the
+    // drawing and by the frame's own clock: ambient's gate (m_7074) saw no ask ever leave the app
+    // with a lone timer that a redraw could clear or a throw could skip; a timer only wakes a frame
+    const want = (v.find && v.find.want) || null;
+    if (want !== pvWant) { pvWant = want; pvSince = t; clearTimeout(pvT); if (want) pvT = setTimeout(schedule, 90); }
+    else if (want && t - pvSince >= 80) { pvWant = null; recv({ ev: "ui_preview_ask", agent: want }); }
+    if (!pressing) { try { render(v, s); layout(); } catch (e) { console.error("render", e); } }
     // what the bar has to show, on every change: the app's show/hide policy acts on it
     const ck = JSON.stringify(v.content);
     if (ck !== contentSent) { contentSent = ck; post({ cmd: "app_content", ...v.content }); }

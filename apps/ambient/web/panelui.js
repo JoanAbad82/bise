@@ -65,7 +65,9 @@
   };
 
   function head(v) {
-    const tools = v.tools.map((t) => `<button type="button" class="tb2${t.on ? " on" : ""}${t.risk ? " stop" : ""}" data-qa="tool-${t.id}" title="${esc(t.keys.join(" "))}"${act(t.act)}>${esc(t.w)} ${caps(t.keys)}</button>`);
+    // four words, no keycaps inside (ambient's gate m_7074: 'archive ⌘⌫' was cut at 440 px); their
+    // keys stay in the tooltip and the ⋯ menu
+    const tools = v.tools.map((t) => `<button type="button" class="tb2${t.on ? " on" : ""}${t.risk ? " stop" : ""}" data-qa="tool-${t.id}" data-key="${esc(t.keys.join(" "))}" title="${esc(`${t.w} · ${t.keys.join(" ")}`)}"${act(t.act)}>${esc(t.w)}</button>`);
     const stopAt = v.tools.findIndex((t) => t.id === "stop" || t.id === "archive");
     tools.splice(stopAt, 0, `<span class="sp"></span>`);
     return `<div class="t1"><h3>${esc(v.name)}</h3><span class="chip ${v.chip.gc || ""}">${esc(v.chip.text)}</span>`

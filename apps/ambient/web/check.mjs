@@ -1380,6 +1380,14 @@ law("round 10: the preview follows ↑↓; it's asked once per agent (the page w
   eq(M.step(m, pg.act, 90).cmds, [{ cmd: "app_open_url", url: "https://bise.dev/p/signup-perf", page: "signup-perf" }]);
   // the fake core answers the ask the same way (dev.html)
   eq(Fake.respond({ cmd: "agent_preview", agent: "perf" })[0][1].ev, "agent_preview");
+  // ambient's gate (m_7074): no preview ~1 s after the ask: no '…' that stays; the row's title as
+  // now, its cards as what waits on you, and the ways in
+  let n = M.step(R10(), { ev: "app_key", key: "a" }, 10).m;
+  n = M.step(n, { ev: "ui_preview_ask", agent: "cookies" }, 100).m;
+  let q = Bar.spec(v10(n, 500)).preview;
+  eq([q.loading, q.waits.map((w) => w.text)], [true, ["keep the banner on mobile?"]]);
+  q = Bar.spec(v10(n, 1100)).preview;
+  eq([q.loading, q.now, q.waits[0].act, q.ways.map((w) => w.w)], [false, "the banner, half the size on mobile", { ev: "ui_card", card: "c1" }, ["open its history", "terminal", "follow"]]);
 });
 law("round 10: fn space + typing filters agents by name, title and purpose, the match marked; ⏎ opens the selected agent (its panel, the bar goes); ⌘⏎ and no match ask main; an archived agent comes back in a search", () => {
   let m = M.step(R10(), { ev: "app_key", key: "space" }, 10).m;

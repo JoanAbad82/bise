@@ -83,14 +83,20 @@
     if (!r) return f.q ? { empty: F.noMatch } : null;
     const p = f.preview;
     const [g, gc] = AG[r.status] || AG.idle;
-    const out = { name: r.name, chip: { text: `${F.status[r.status] || r.status}${r.age ? ` · ${r.age}` : ""}`, gc }, now: p && p.now ? p.now : r.title || "", loading: !p, waits: [], actions: [], report: null, pages: [] };
-    if (!p) return out;
+    const out = { name: r.name, chip: { text: `${F.status[r.status] || r.status}${r.age ? ` · ${r.age}` : ""}`, gc }, now: p && p.now ? p.now : r.title || "", loading: !p && !f.late, waits: [], actions: [], report: null, pages: [] };
+    const ways = [item(["⏎"], F.openHistory, { ev: "ui_agent", agent: r.name }), item(["⌘", "O"], F.terminal, { ev: "ui_agent_terminal", agent: r.name }),
+      item(["⌘", "D"], r.followed ? F.following : F.follow, { ev: "ui_follow", agent: r.name })];
+    // no preview yet: what the row has (its cards wait on you); after ~1 s, no '…' either
+    if (!p) {
+      out.waits = (f.cards || []).map((c) => ({ label: F.needsYou(r.name), text: c.text, act: { ev: "ui_card", card: c.id }, qa: `wait-${c.id}` }));
+      if (f.late) out.ways = ways;
+      return out;
+    }
     out.waits = p.waiting.map((w) => ({ label: F.needsYou(r.name), text: w.question, act: { ev: "ui_card", card: w.card_id }, qa: `wait-${w.card_id}` }));
     out.actions = p.actions.map((x) => ({ at: hhmm(x.at_ms), text: x.text }));
     if (p.last_report) out.report = { glyph: p.last_report.kind === "done" ? "✓" : p.last_report.kind === "blocked" || p.last_report.kind === "failed" ? "▲" : "", text: p.last_report.text };
     out.pages = p.pages.map((pg) => ({ t: `${pg.title} · v${pg.v}`, act: { ev: "ui_open_url", url: pg.url, page: pg.id }, qa: `pv-page-${pg.id}` }));
-    out.ways = [item(["⏎"], F.openHistory, { ev: "ui_agent", agent: r.name }), item(["⌘", "O"], F.terminal, { ev: "ui_agent_terminal", agent: r.name }),
-      item(["⌘", "D"], r.followed ? F.following : F.follow, { ev: "ui_follow", agent: r.name })];
+    out.ways = ways;
     void g;
     return out;
   }
