@@ -3471,3 +3471,7 @@ fn a_batched_replay_builds_the_same_state_as_one_event_at_a_time() {
     assert_eq!(batched.st.agents["a"].ws, one.st.agents["a"].ws);
     assert_eq!(batched.raw(&json!({"t": "view_all"})), one.raw(&json!({"t": "view_all"})));
 }
+
+/// `sb every`'s timers on sb-core (every_tests.rs).
+#[path = "every_tests.rs"]
+mod every_tests;
