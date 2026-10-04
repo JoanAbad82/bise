@@ -103,6 +103,23 @@
       mic: "hold fn and talk. the mic is on only while you talk to bise: fn held, or hands-free until you tap fn.",
       screen: "when you talk, bise sees the window in front. it goes to your model with your words, and isn't kept.",
     },
+    // round 10's side panel (identity10): one agent's history, live, where he answers and writes
+    panel: {
+      write: (n) => `write to ${n}`, sendNow: "send now", whenFree: "when it's free", answer: "answer", close: "close",
+      follow: "follow", following: "✓ following", terminal: "terminal", stop: "stop", archive: "archive",
+      find: "find in history", found: (n) => `${n} found`, notFound: "not found",
+      you: "you", needsYou: (n, at) => `? ${n} needs you${at ? ` · ${at}` : ""}`, answered: "✓ answered", report: "report",
+      queued: "when it's free", older: "older", start: "the start", empty: "nothing yet.", copy: "copy",
+      confirmStop: (n) => `stop ${n}? it drops what it's doing now; its history and its work stay.`,
+      confirmArchive: (n) => `${n} is still working. stop it and archive it?`,
+      yesStop: "stop", yesArchive: "stop and archive", keep: "keep it",
+      stopped: (n) => `stopped ${n}`, archived: (n) => `archived ${n}`, undo: "undo", back: (n) => `${n} is back in your list`,
+      followOn: (n) => `following ${n}: its reports and questions reach you`, followOff: (n) => `stopped following ${n}`,
+      copied: (n) => `copied ${n}`,
+      menu: { follow: "follow", unfollow: "stop following", terminal: "open in the terminal", find: "find in its history", copyName: "copy its name",
+        stop: "stop", archive: "archive", quit: "quit bise ambient" },
+      more: "more",
+    },
     // the refusals (ambient, m_4645); the screen's pane is named by the running macOS (screenPane)
     permDenied: {
       accessibility: "without Accessibility, bise can't hear fn. turn it on in System Settings › Privacy & Security › Accessibility.",

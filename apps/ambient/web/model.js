@@ -921,5 +921,6 @@
     return v;
   }
 
-  root.AmbModel = { init, step, view, T, visibleCards, grow, GROW, reduced, count, hold };
+  // roster: the side panel (panelmodel.js) walks the same order for ⌘↑↓ and draws the same chip
+  root.AmbModel = { init, step, view, T, visibleCards, grow, GROW, reduced, count, hold, roster };
 })(typeof window !== "undefined" ? window : globalThis);

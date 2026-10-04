@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bise ambient · agent</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<!-- round 10's side panel: Bise Ambient.app loads this page in its second window (amb-mac
+     m_7040), docked to the screen's right edge; in a browser, the fake core plays perf's history -->
+<div id="amb"></div>
+<script src="words.js"></script>
+<script src="model.js"></script>
+<script src="pearl.js"></script>
+<script src="panelmodel.js"></script>
+<script>
+  // a browser without the app: the fake core answers (panel.html?agent=cookies)
+  if (!window.ambientApp && !(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.bise)) {
+    document.write('<script src="fakecore.js"><\/script>');
+    window.ambientDev = { cmd(c) { for (const [ms, ev] of window.AmbFake.respond(c)) setTimeout(() => window.ambient.recv(ev), ms); } };
+    window.addEventListener("load", () => {
+      const agent = new URLSearchParams(location.search).get("agent") || "perf";
+      window.ambient.recv({ ev: "state", agents: window.AmbFake.ROSTER, cards: [window.AmbFake.CARD] });
+      window.ambient.recv({ ev: "app_panel", agent, on: true, h: innerHeight });
+    });
+  }
+</script>
+<script src="panelui.js"></script>
+</body>
+</html>

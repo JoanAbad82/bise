@@ -49,6 +49,28 @@
       actions: [{ at_ms: at(10, 20), text: "reproduced with a name “Zoé 🎉”", kind: "tool" }, { at_ms: at(10, 23), text: "found the byte count in csv.ts", kind: "tool" }],
       waiting: [], last_report: { kind: "blocked", text: "needs to know: fix on main or on release-2.5?", at_ms: at(10, 23) }, pages: [] },
   };
+  // the side panel's histories (identity10's perf and cookies), amb-core's entry shape
+  const HISTORY = {
+    perf: [
+      { pos: 1, at_ms: at(10, 24), kind: "you", text: "signup feels slow, 4 seconds on my machine. find why and fix it." },
+      { pos: 2, at_ms: at(10, 25), kind: "agent", text: "on it. i'll profile signup first, then fix the slowest step." },
+      { pos: 3, at_ms: at(10, 29), kind: "tools", text: "ran 4 commands · read 6 files", tools: { count: 4, summary: "ran 4 commands · read 6 files",
+        items: [{ pos: 3, text: "$ pnpm bench signup" }, { pos: 4, text: "$ node --cpu-prof scripts/signup.mjs" }, { pos: 5, text: "read src/plans/lookup.ts" }, { pos: 6, text: "read src/signup/route.ts" }] } },
+      { pos: 7, at_ms: at(10, 30), kind: "agent", text: "3.2 s of the 4.1 s is the plan lookup: it fetches every plan on each request. i'll cache it per request." },
+      { pos: 8, at_ms: at(10, 34), kind: "tools", text: "edited 2 files · ran the bench", tools: { count: 3, summary: "edited 2 files · ran the bench",
+        items: [{ pos: 8, text: "edit src/plans/lookup.ts" }, { pos: 9, text: "edit src/signup/route.ts" }, { pos: 10, text: "$ pnpm bench signup  → 0.9 s" }] } },
+      { pos: 11, at_ms: at(10, 36), kind: "page", text: "signup perf", page: { id: "signup-perf", title: "signup perf", v: 2, url: "https://bise.dev/p/signup-perf" } },
+      { pos: 12, at_ms: at(10, 36), kind: "report", text: "signup is 0.9 s now (was 4.1 s). running the e2e tests before i land it.", report: { kind: "progress" } },
+    ],
+    cookies: [
+      { pos: 1, at_ms: at(10, 30), kind: "you", text: "the cookie banner takes half the screen on mobile. make it smaller." },
+      { pos: 2, at_ms: at(10, 37), kind: "tools", text: "edited 1 file · ran the visual tests", tools: { count: 2, summary: "edited 1 file · ran the visual tests",
+        items: [{ pos: 2, text: "edit src/ui/CookieBanner.tsx" }, { pos: 3, text: "$ pnpm test:visual  → 2 snapshots changed" }] } },
+      { pos: 4, at_ms: at(10, 38), kind: "agent", text: "the banner is 50% of its height under 480 px now." },
+      { pos: 1000000001, at_ms: at(10, 39), kind: "card", text: "keep the banner on mobile, or only a link in the footer?",
+        card: { id: "c1", question: "keep the banner on mobile, or only a link in the footer?", options: [{ n: 1, label: "keep it, half the size" }, { n: 2, label: "only a link in the footer" }], answered: false } },
+    ],
+  };
   const EMOJI = { name: "emoji-csv", status: "working", note: "it's always unicode", report: "", working: true, turn_ms: 540000 };
   // the core's cards: options [{n, label}], n the digit (a hard confirm skips 2)
   const CARD = { id: "c1", kind: "question", agent: "cookies", text: "keep the banner on mobile?", options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }] };
@@ -260,6 +282,16 @@
       case "app_perm": return cmd.do === "continue" ? [[600, { ev: "app_perm", perm: cmd.perm, state: "granted" }]] : [];
       // round 10: an agent's preview, amb-core's shape (m_7030)
       case "agent_preview": return PREVIEWS[cmd.agent] ? [[120, { ev: "agent_preview", agent: cmd.agent, ...PREVIEWS[cmd.agent] }]] : [];
+      // the side panel: its history, its live entries, his send (amb-core 67ba0b31's shapes)
+      case "agent_history": return [[150, { ev: "agent_history", agent: cmd.agent, entries: HISTORY[cmd.agent] || [], before: null, more: false }],
+        ...(cmd.agent === "perf" ? [[1500, { ev: "agent_typing", agent: "perf", text: "running the e2e tests · 44 of 58" }]] : [])];
+      case "agent_send": {
+        const pos = 900 + Math.floor(cmd.text.length);
+        const you = { pos, at_ms: T0, kind: "you", text: cmd.text };
+        if (cmd.mode === "queued") return [[100, { ev: "agent_queued", agent: cmd.agent, text: cmd.text }], [2500, { ev: "agent_entry", agent: cmd.agent, entry: you }]];
+        return [[100, { ev: "sent", agent: cmd.agent, mode: "now" }], [150, { ev: "agent_entry", agent: cmd.agent, entry: you }],
+          [1200, { ev: "agent_entry", agent: cmd.agent, entry: { pos: pos + 1, at_ms: T0, kind: "agent", text: "ok, on it." } }]];
+      }
       default: return [];
     }
   }
@@ -284,5 +316,5 @@
     };
   }
 
-  root.AmbFake = { SCENES, respond, player, voice, AGENTS, CARD, SAID, ANSWER, ROSTER, PREVIEWS, T0 };
+  root.AmbFake = { SCENES, respond, player, voice, AGENTS, CARD, SAID, ANSWER, ROSTER, PREVIEWS, HISTORY, T0 };
 })(typeof window !== "undefined" ? window : globalThis);
