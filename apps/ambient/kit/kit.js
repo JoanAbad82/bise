@@ -110,7 +110,11 @@
     const h = Math.round(m / 60);
     if (h < 24) return `${h} h ago`;
     const d = Math.round(h / 24);
-    return d === 1 ? "yesterday" : `${d} days ago`;
+    if (d < 7) return d === 1 ? "yesterday" : `${d} days ago`;
+    // past a week the date ('3 oct'), past a year with its year ('3 oct 2025') (designer m_7475)
+    const at = new Date(atMs), now = new Date(nowMs);
+    const day = `${at.getDate()} ${MONTHS[at.getMonth()]}`;
+    return at.getFullYear() === now.getFullYear() && d < 365 ? day : `${day} ${at.getFullYear()}`;
   }
 
   // ---- what changed: blocks of version n whose hash differs from version n-1 (new ones too) ----
@@ -591,6 +595,75 @@
       else if (kit === "message" && doc) decorateMessage(doc, b);
       else if (kit === "action" && doc) decorateAction(doc, b);
       else if ((kit === "compare" || kit === "checklist") && doc) decorateItems(doc, b, kit);
+      else if (kit === "ui" && doc) decorateUi(doc, b);
+    }
+  }
+
+  // ---- ui blocks (pages-ui): the kit's behaviours, named by data-ui; a page carries no code ----
+  // tabs: buttons in a .k-tabs bar (data-tab="x") show the pane .k-pane[data-tab="x"] of the same
+  // data-ui="tabs" element (the n-th pane when they have no data-tab); without kit.js every pane shows
+  const own = (root0, el, sel) => Array.from(el.querySelectorAll(sel)).filter((x) => x.closest("[data-ui=\"tabs\"]") === root0);
+  function showTab(tabs, i) {
+    const bs = own(tabs, tabs, ".k-tabs > button"), ps = own(tabs, tabs, ".k-pane");
+    const key = bs[i] && bs[i].getAttribute("data-tab");
+    bs.forEach((b, j) => b.setAttribute("aria-selected", String(j === i)));
+    ps.forEach((p, j) => { if ((key ? p.getAttribute("data-tab") === key : j === i)) p.setAttribute("data-on", ""); else p.removeAttribute("data-on"); });
+  }
+  // term: the frame's own light/dark switch (a mock is read in both); system until one is picked
+  const TERM = ["dark", "light"];
+  // pick: rich options (.k-option or [data-pick]); a click picks it, again takes it back, one per
+  // block: the same reaction and note as a compare's pick (bise:react {block, item, kind, text})
+  function pickOption(block, opt) {
+    const opts = Array.from(block.querySelectorAll("[data-pick]"));
+    const again = opt.getAttribute("data-verdict") === "pick";
+    opts.forEach((o) => { o.removeAttribute("data-verdict"); o.setAttribute("aria-pressed", "false"); });
+    if (!again) { opt.setAttribute("data-verdict", "pick"); opt.setAttribute("aria-pressed", "true"); }
+    const head = opt.querySelector("h3, b, strong");
+    const text = norm((head || opt).textContent || "").replace(/<[^>]*>/g, "");
+    return { block: idOf(block), item: opt.getAttribute("data-pick"), kind: again ? null : "pick", text };
+  }
+  function decorateUi(doc, block) {
+    if (!block.querySelectorAll) return;
+    for (const tabs of block.querySelectorAll("[data-ui=\"tabs\"]")) {
+      if (tabs.hasAttribute("data-ready")) continue;
+      tabs.setAttribute("data-ready", "");
+      const bs = own(tabs, tabs, ".k-tabs > button");
+      bs.forEach((b, i) => { b.setAttribute("type", "button"); b.setAttribute("role", "tab"); b.addEventListener("click", () => showTab(tabs, i)); });
+      const on = bs.findIndex((b) => b.getAttribute("aria-selected") === "true");
+      showTab(tabs, on < 0 ? 0 : on);
+    }
+    for (const term of block.querySelectorAll("[data-ui=\"term\"]")) {
+      if (term.querySelector("[data-kit-ui] > [data-act^=\"term-\"]")) continue;
+      const sw = doc.createElement("span");
+      sw.setAttribute("data-kit-ui", "");
+      // a two-state toggle: the system's scheme until one is picked
+      const sys = root.matchMedia && root.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      const now = () => term.getAttribute("data-term") || sys;
+      for (const t of TERM) {
+        const b = button(doc, "term-" + t, t);
+        b.setAttribute("aria-pressed", String(now() === t));
+        b.addEventListener("click", () => {
+          term.setAttribute("data-term", t);
+          for (const x of sw.children) x.setAttribute("aria-pressed", String(x.textContent === t));
+        });
+        sw.append(b);
+      }
+      // in the frame's bar or its first tab bar (made when the mock has none), right of its tabs
+      let bar = term.querySelector(".k-bar, .k-tabs");
+      if (!bar) { bar = doc.createElement("div"); bar.className = "k-bar"; bar.setAttribute("data-kit-ui", ""); term.insertBefore(bar, term.firstChild); }
+      bar.append(sw);
+    }
+    for (const pick of block.querySelectorAll("[data-ui=\"pick\"]")) {
+      if (pick.hasAttribute("data-ready")) continue;
+      pick.setAttribute("data-ready", "");
+      for (const opt of pick.querySelectorAll("[data-pick]")) {
+        opt.setAttribute("role", "button");
+        opt.setAttribute("tabindex", "0");
+        if (!opt.hasAttribute("aria-pressed")) opt.setAttribute("aria-pressed", String(opt.getAttribute("data-verdict") === "pick"));
+        const go = () => doc.dispatchEvent(new root.CustomEvent("bise:react", { detail: pickOption(block, opt) }));
+        opt.addEventListener("click", (e) => { if (!(e.target.closest && e.target.closest("a"))) go(); });
+        opt.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+      }
     }
   }
 
@@ -603,6 +676,10 @@
     const res = swap(main, incoming, cur && was ? diffBlocks(was.blocks, cur.blocks).changed : null, o.view);
     main.setAttribute("data-version", String(to));
     main.setAttribute("data-latest", String(to));
+    // the ui blocks' rules of the version on screen (the server serves them, scoped, as page.css)
+    const css = doc && doc.querySelector && doc.querySelector("link[data-page-css]");
+    const page = main.getAttribute("data-page");
+    if (css && page) css.setAttribute("href", "/p/" + encodeURIComponent(page) + "/v/" + to + "/page.css");
     const blocks = kids(main).filter(isBlock);
     decorate(blocks, o.agent, doc);
     const marked = new Set(cur && versionOf(meta, to - 1) ? changedIn(meta, to) : res.changed);

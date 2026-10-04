@@ -38,6 +38,8 @@ pub const KINDS: &[&str] = &[
     "compare",
     "checklist",
     "action",
+    // pages-ui: custom UI in bise's look (ui.rs)
+    "ui",
 ];
 
 /// The kinds whose list items are things the user reacts to, each with its own data-id.
@@ -122,6 +124,15 @@ fn element_fix(name: &str) -> String {
     }
 }
 
+/// Outside a ui block, an element a ui block would take says so (a mock, a terminal, a picker).
+fn ui_hint(name: &str) -> String {
+    if super::ui::ELEMENTS.contains(&name) {
+        format!("<{name}> is not allowed in a text block: draw UI (a mock, terminal cells, a picker) in <section data-kit=\"ui\" data-id=\"…\">")
+    } else {
+        element_fix(name)
+    }
+}
+
 /// Lint a page fragment.
 pub fn lint(html: &str) -> Result<Vec<Block>, Vec<String>> {
     lint_full(html).map(|(blocks, _)| blocks)
@@ -157,6 +168,7 @@ fn lint_full(html: &str) -> Result<(Vec<Block>, Vec<String>), Vec<String>> {
         unsendable: Vec::new(),
         drafted_rows: Vec::new(),
         carded: Vec::new(),
+        raw: None,
     };
     l.run();
     // a step whose draft can't leave (pm's 38): what bise needs from him is a question, or the
@@ -200,6 +212,8 @@ struct Open {
     bare_items: bool,
     /// how deep in ol/ul the reader is (an item kind's items are the li of its first list)
     list_depth: usize,
+    /// a ui block's <style> elements (one at most)
+    styles: usize,
 }
 
 impl Open {
@@ -222,6 +236,8 @@ struct Linter<'a> {
     drafted_rows: Vec<(String, String, String)>,
     /// question blocks that make a card (no data-card="none")
     carded: Vec<String>,
+    /// the text of the raw element just read (a ui block's <style>)
+    raw: Option<String>,
 }
 
 struct Tag {
@@ -306,6 +322,8 @@ impl<'a> Linter<'a> {
                 // skip to its end tag: what is inside is not ours to read
                 let close = format!("</{}", tag.name);
                 let low = src[i..].to_ascii_lowercase();
+                let body_end = low.find(&close).map_or(bytes.len(), |e| i + e);
+                self.raw = Some(src[i..body_end].to_string());
                 i = match low.find(&close) {
                     Some(e) => src[i + e..]
                         .find('>')
@@ -364,8 +382,23 @@ impl<'a> Linter<'a> {
         if tag.close {
             return;
         }
-        if !ELEMENTS.contains(&name) {
-            self.err(&at, element_fix(name));
+        let in_ui = self.open.as_ref().is_some_and(|b| b.kit == "ui");
+        let raw = self.raw.take();
+        if in_ui && super::ui::ELEMENTS.contains(&name) {
+            // a ui block: its own elements, one <style> whose rules stay in the block
+            if name == "style" {
+                let b = self.open.as_mut().unwrap();
+                b.styles += 1;
+                if b.styles > 1 {
+                    self.err(&at, "one <style> per ui block: put every rule of the block in it".into());
+                }
+                for why in super::ui::check_css(raw.as_deref().unwrap_or("")) {
+                    self.err(&at, why);
+                }
+            }
+        } else if !ELEMENTS.contains(&name) {
+            let fix = if in_ui { element_fix(name) } else { ui_hint(name) };
+            self.err(&at, fix);
         } else if self.open.is_none() {
             self.err(
                 &at,
@@ -635,6 +668,7 @@ impl<'a> Linter<'a> {
             fields: Vec::new(),
             bare_items: false,
             list_depth: 0,
+            styles: 0,
         });
     }
 
@@ -727,11 +761,22 @@ impl<'a> Linter<'a> {
         attrs: &[(String, Option<String>)],
         inner: &[&str],
     ) {
-        let (known, rest): (Vec<_>, Vec<_>) = attrs
+        let (known, mut rest): (Vec<_>, Vec<_>) = attrs
             .iter()
             .cloned()
             .partition(|(n, _)| inner.contains(&n.as_str()));
         let _ = known;
+        if self.open.as_ref().is_some_and(|b| b.kit == "ui") {
+            let mut left = Vec::new();
+            for (n, v) in rest {
+                match super::ui::attr(el, &n, v.as_deref().unwrap_or("")) {
+                    Some(Ok(())) => {}
+                    Some(Err(why)) => self.err(at, why),
+                    None => left.push((n, v)),
+                }
+            }
+            rest = left;
+        }
         self.attrs(at, el, &rest, false);
     }
 

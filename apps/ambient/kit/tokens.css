@@ -89,6 +89,23 @@
   --ease-pop: cubic-bezier(.34, 1.56, .5, 1);
   --ease-spring: cubic-bezier(.3, 1.22, .4, 1);
   --time-arrive: .5s;
+  --page-wide: 1120px;            /* a page with a ui block: how wide its mocks may go */
+
+  /* the TUI, for mocks in real terminal cells (pages-ui; designer's site/m mocks, the TUI's
+     theme.rs): a k-term follows the system, or its own switch (data-term="dark" | "light") */
+  --term-bg: #fdfbf7; --term-text: #1b1917; --term-dim: #6b645a; --term-faint: #7d766c; --term-rule: #cfc8bd;
+  --term-accent: #b8416b; --term-err: #b3261e; --term-ok: #3f7a2a; --term-raised: #f4f0e8; --term-sel: #fdeef2;
+  --term-chip: #efe9df; --term-frame: #e2dcd2;
+}
+:root [data-term="light"] {
+  --term-bg: #fdfbf7; --term-text: #1b1917; --term-dim: #6b645a; --term-faint: #7d766c; --term-rule: #cfc8bd;
+  --term-accent: #b8416b; --term-err: #b3261e; --term-ok: #3f7a2a; --term-raised: #f4f0e8; --term-sel: #fdeef2;
+  --term-chip: #efe9df; --term-frame: #e2dcd2;
+}
+:root [data-term="dark"] {
+  --term-bg: #141211; --term-text: #ece6da; --term-dim: #a39c90; --term-faint: #857d72; --term-rule: #4a4540;
+  --term-accent: #f4a6b0; --term-err: #ff5a52; --term-ok: #b9d99a; --term-raised: #1f1c1a; --term-sel: #33292c;
+  --term-chip: #231f1d; --term-frame: #2a2623;
 }
 
 /* dark paper, when the system is dark: the brand's dark paper as before (#171513 / #ece6da),
@@ -113,6 +130,9 @@
     --risk: #ff9a8a;
     --changed: #f4a6b01c;
     --working: #b8b0a3;
+    --term-bg: #141211; --term-text: #ece6da; --term-dim: #a39c90; --term-faint: #857d72; --term-rule: #4a4540;
+    --term-accent: #f4a6b0; --term-err: #ff5a52; --term-ok: #b9d99a; --term-raised: #1f1c1a; --term-sel: #33292c;
+    --term-chip: #231f1d; --term-frame: #2a2623;
   }
 }
 

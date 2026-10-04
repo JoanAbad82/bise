@@ -10,7 +10,9 @@ pub mod drafts;
 pub mod lint;
 pub mod questions;
 pub mod server;
+pub mod site;
 pub mod store;
+pub mod ui;
 pub mod waiting;
 
 use serde_json::{json, Value};

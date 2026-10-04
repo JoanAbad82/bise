@@ -89,6 +89,8 @@ pub struct Response {
     pub status: u16,
     pub ctype: &'static str,
     pub body: Vec<u8>,
+    /// the response's CSP: [`CSP`], or a site artifact's sandbox (site.rs)
+    pub csp: &'static str,
 }
 
 fn reason(status: u16) -> &'static str {
@@ -105,10 +107,10 @@ fn reason(status: u16) -> &'static str {
 
 impl Response {
     fn json(status: u16, v: &Value) -> Response {
-        Response { status, ctype: "application/json", body: v.to_string().into_bytes() }
+        Response { status, ctype: "application/json", body: v.to_string().into_bytes(), csp: CSP }
     }
     fn html(body: String) -> Response {
-        Response { status: 200, ctype: "text/html; charset=utf-8", body: body.into_bytes() }
+        Response { status: 200, ctype: "text/html; charset=utf-8", body: body.into_bytes(), csp: CSP }
     }
     fn err(status: u16, why: &str) -> Response {
         Response::json(status, &json!({"error": why}))
@@ -116,11 +118,12 @@ impl Response {
 
     pub fn bytes(&self) -> Vec<u8> {
         let mut out = format!(
-            "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nContent-Security-Policy: {CSP}\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+            "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nContent-Security-Policy: {}\r\nX-Content-Type-Options: nosniff\r\nReferrer-Policy: no-referrer\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
             self.status,
             reason(self.status),
             self.ctype,
-            self.body.len()
+            self.body.len(),
+            self.csp
         )
         .into_bytes();
         out.extend_from_slice(&self.body);
@@ -207,11 +210,13 @@ pub fn route(pages: &Pages, req: &Request) -> Response {
     match segs.as_slice() {
         [""] => Response::html(home(pages)),
         ["kit", rest @ ..] if !rest.is_empty() => kit_file(pages, &rest.join("/")),
+        ["a", id, v, rest @ ..] if valid_id(id) => artifact_file(pages, id, v, rest),
         ["p", id] if valid_id(id) => page(pages, id, None, false),
         ["p", id, "meta"] if valid_id(id) => meta(pages, id),
         ["p", id, "versions"] if valid_id(id) => versions(pages, id),
         ["p", id, "v", n] if valid_id(id) => n.parse().map_or_else(|_| Response::err(404, "no such version"), |n| page(pages, id, Some(n), false)),
         ["p", id, "v", n, "body"] if valid_id(id) => n.parse().map_or_else(|_| Response::err(404, "no such version"), |n| page(pages, id, Some(n), true)),
+        ["p", id, "v", n, "page.css"] if valid_id(id) => n.parse().map_or_else(|_| Response::err(404, "no such version"), |n| page_css(pages, id, n)),
         _ => Response::err(404, "no such page"),
     }
 }
@@ -221,9 +226,9 @@ pub fn esc(s: &str) -> String {
 }
 
 /// The shell around a fragment (§2.5): the kit, the token, the page's ids.
-fn shell(pages: &Pages, title: &str, main_attrs: &str, inner: &str) -> String {
+fn shell(pages: &Pages, title: &str, head: &str, main_attrs: &str, inner: &str) -> String {
     format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<meta name=\"bise-token\" content=\"{}\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/kit/tokens.css\">\n<link rel=\"stylesheet\" href=\"/kit/kit.css\">\n<link rel=\"stylesheet\" href=\"/kit/notes.css\">\n<script src=\"/kit/kit.js\" defer></script>\n<script src=\"/kit/pearl.js\" defer></script>\n<script src=\"/kit/notes.js\" defer></script>\n</head>\n<body>\n<main {main_attrs}>\n{inner}\n</main>\n</body>\n</html>\n",
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<meta name=\"bise-token\" content=\"{}\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/kit/tokens.css\">\n<link rel=\"stylesheet\" href=\"/kit/kit.css\">\n<link rel=\"stylesheet\" href=\"/kit/notes.css\">\n<script src=\"/kit/kit.js\" defer></script>\n<script src=\"/kit/pearl.js\" defer></script>\n<script src=\"/kit/notes.js\" defer></script>\n{head}</head>\n<body>\n<main {main_attrs}>\n{inner}\n</main>\n</body>\n</html>\n",
         pages.token,
         esc(title)
     )
@@ -239,6 +244,8 @@ fn page(pages: &Pages, id: &str, n: Option<u64>, body_only: bool) -> Response {
         None if n == 0 && m.version() == 0 => String::new(),
         None => return Response::err(404, "no such version"),
     };
+    // a ui block's <style> is served as the version's page.css (the CSP is 'self')
+    let html = super::ui::strip_styles(&html);
     if body_only {
         return Response::html(html);
     }
@@ -259,7 +266,8 @@ fn page(pages: &Pages, id: &str, n: Option<u64>, body_only: bool) -> Response {
         esc(&m.state),
         m.created_ms
     );
-    Response::html(shell(pages, &m.title, &attrs, &html))
+    let head = format!("<link rel=\"stylesheet\" href=\"/p/{}/v/{n}/page.css\" data-page-css>\n", esc(&m.id));
+    Response::html(shell(pages, &m.title, &head, &attrs, &html))
 }
 
 /// "for you": the list of pages, newest first.
@@ -286,7 +294,40 @@ fn home(pages: &Pages) -> String {
         })
         .collect();
     let inner = format!("<section data-kit=\"pages\" data-id=\"pages\">\n<ul>\n{}\n</ul>\n</section>", items.join("\n"));
-    shell(pages, "for you", "id=\"bise-home\" data-home", &inner)
+    // one site for everything agents made to look at (site.rs): the sidebar, then "for you"
+    let arts = crate::artifacts::Store::new(pages.store.dir.parent().unwrap_or(&pages.store.dir)).all();
+    let aside = super::site::sidebar(&super::site::items(&pages.store.list(), &arts));
+    let head = "<link rel=\"stylesheet\" href=\"/kit/site.css\">\n<script src=\"/kit/site.js\" defer></script>\n";
+    shell(pages, "for you", head, "id=\"bise-home\" data-home", &format!("{aside}{inner}"))
+}
+
+/// A site artifact's file, from bise's copy (`/a/<id>/<v>/<path>`), in its sandbox (site.rs).
+fn artifact_file(pages: &Pages, id: &str, v: &str, rest: &[&str]) -> Response {
+    let state = pages.store.dir.parent().unwrap_or(&pages.store.dir);
+    let store = crate::artifacts::Store::new(state);
+    let Some(m) = store.get(id).filter(|m| m.kind == "site" && m.by != "page") else { return Response::err(404, "no such artifact") };
+    let Some(ver) = v.parse::<u64>().ok().and_then(|n| m.versions.iter().find(|x| x.v == n)) else { return Response::err(404, "no such version") };
+    let Some(copy) = &ver.copy else { return Response::err(404, "no copy of it") };
+    let base = state.join("artifacts").join(&m.id).join(copy);
+    let rest: Vec<&str> = rest.iter().copied().filter(|s| !s.is_empty()).collect();
+    let path = if base.is_file() {
+        // a copied file: only itself, by its name (or no name)
+        let name = base.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        if !(rest.is_empty() || rest == [name]) {
+            return Response::err(404, "no such file");
+        }
+        base.clone()
+    } else {
+        let Some(rel) = super::site::safe_rel(&rest) else {
+            return if rest.is_empty() { artifact_file(pages, id, v, &["index.html"]) } else { Response::err(404, "no such file") };
+        };
+        base.join(rel)
+    };
+    let Some(ctype) = super::site::ctype(&path.to_string_lossy()) else { return Response::err(404, "not served") };
+    match std::fs::read(&path) {
+        Ok(body) => Response { status: 200, ctype, body, csp: super::site::ARTIFACT_CSP },
+        Err(_) => Response::err(404, "no such file"),
+    }
 }
 
 fn meta(pages: &Pages, id: &str) -> Response {
@@ -343,6 +384,16 @@ fn post_answer(pages: &Pages, id: &str, body: &[u8]) -> Response {
     Response::json(200, &json!({"ok": true, "reply": reply}))
 }
 
+/// A version's ui blocks' rules, each scoped to its block (ui.rs); empty for a page without.
+fn page_css(pages: &Pages, id: &str, n: u64) -> Response {
+    let html = match pages.store.html(id, n) {
+        Some(h) => h,
+        None if n == 0 && pages.store.meta(id).is_some() => String::new(),
+        None => return Response::err(404, "no such version"),
+    };
+    Response { status: 200, ctype: "text/css; charset=utf-8", body: super::ui::page_css(&html).into_bytes(), csp: CSP }
+}
+
 fn kit_file(pages: &Pages, rel: &str) -> Response {
     let ok = !rel.split('/').any(|s| s.is_empty() || s.starts_with('.'))
         && rel.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b'_' | b'/'));
@@ -360,7 +411,7 @@ fn kit_file(pages: &Pages, rel: &str) -> Response {
         _ => return Response::err(404, "no such file"),
     };
     match std::fs::read(pages.kit_dir.join(rel)) {
-        Ok(body) => Response { status: 200, ctype, body },
+        Ok(body) => Response { status: 200, ctype, body, csp: CSP },
         Err(_) => Response::err(404, "no such file"),
     }
 }
@@ -523,6 +574,23 @@ mod tests {
         // an older one opened after leaves it
         get(&p, "/p/w/v/1");
         assert_eq!(opened(&p), Some(2));
+    }
+
+    /// A ui block's <style> never reaches the page inline (the CSP is 'self'): the shell links
+    /// the version's page.css, where the rules are scoped to their block.
+    #[test]
+    fn a_ui_blocks_style_is_served_as_the_versions_page_css() {
+        let (p, _d) = pages();
+        let ui = "<section data-kit=\"ui\" data-id=\"mock\"><style>.row { color: var(--term-dim) }</style><div class=\"row\">x</div></section>";
+        p.publish(&Publish { agent: "t1".into(), id: Some("w".into()), html: ui.into(), ..Default::default() }, 1, &|_| false).unwrap();
+        let t = text(&get(&p, "/p/w"));
+        assert!(t.contains("<link rel=\"stylesheet\" href=\"/p/w/v/1/page.css\" data-page-css>"), "{t}");
+        assert!(!t.contains("<style>") && t.contains("<div class=\"row\">x</div>"));
+        assert!(!text(&get(&p, "/p/w/v/1/body")).contains("<style>"));
+        let css = get(&p, "/p/w/v/1/page.css");
+        assert_eq!((css.status, css.ctype), (200, "text/css; charset=utf-8"));
+        assert!(text(&css).contains("[data-id=\"mock\"] .row { color: var(--term-dim) }"), "{}", text(&css));
+        assert_eq!(get(&p, "/p/w/v/9/page.css").status, 404);
     }
 
     #[test]

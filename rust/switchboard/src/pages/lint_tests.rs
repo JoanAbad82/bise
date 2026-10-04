@@ -50,7 +50,7 @@ fn the_skill_is_short_and_its_skeleton_passes() {
     let html = skill.split("```html\n").nth(1).and_then(|s| s.split("```").next()).expect("a skeleton");
     ok(html);
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../prompts/skills-all/bise-pages");
-    for f in ["blocks.md", "leaving.md", "watch.md", "mentions.md", "promises.md", "morning.md", "meetings.md", "feedback.md", "about-you.md"] {
+    for f in ["ui.md", "blocks.md", "leaving.md", "watch.md", "mentions.md", "promises.md", "morning.md", "meetings.md", "feedback.md", "about-you.md"] {
         assert!(skill.contains(&format!("`{f}`")), "SKILL.md names {f}");
         assert!(dir.join(f).is_file(), "{f} sits next to SKILL.md");
     }

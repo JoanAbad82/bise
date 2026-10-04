@@ -7,10 +7,12 @@ description: Make a page for the user instead of a long reply, with the bise kit
 
 A page is a short HTML fragment (about 50 lines) of kit blocks. bise frames it, draws it in the
 user's look and opens it; the user leaves notes, you publish the next version, the tab updates
-in place. You never write CSS, classes, scripts or colors.
+in place. Text blocks need no CSS. When the page is about something to see (a feature proposal,
+a screen, its states, looks side by side), draw it: a `ui` block with the kit's components, real
+terminal cells for the TUI (`ui.md`). Never scripts.
 
 This file is enough for a first version: publish the skeleton before you open anything else.
-Next to it, read only what you need, when you need it: `blocks.md` (blocks, plans, the lint),
+Next to it, read only what you need, when you need it: `ui.md` (mocks, states, pickers), `blocks.md` (blocks, plans, the lint),
 `leaving.md` (send, post, drafts), `watch.md` (standing orders), `mentions.md` (what's asked of
 him on Slack and mail), `promises.md` (what he said he'd do), `morning.md`, `meetings.md`,
 `feedback.md` (bug reports), `about-you.md` (what bise keeps about the user).
@@ -82,6 +84,7 @@ Each block is a `<section data-kit="…" data-id="…">`; ids short, unique, kep
 - `message`: a draft for a channel, `data-to="Slack · #launch"`, `<p>`s; never `<pre>`.
 - `email`: `data-to`, `<p data-field="to">`, `subject`, the body; `data-verb="draft"` for his drafts.
 - `compare`: 2 to 4 `<li data-id>` side by side: `<h3>`, `<ul>` of facts, `<p>` why.
+- `ui`: a mock, terminal cells, states side by side, a rich picker, a timeline: `ui.md`.
 - `checklist`: `<li data-id data-who data-due="2026-05-20">`, `data-done` when done. A plan
   worked through with him (buy the domain, set up the offsite): read "a plan" in `blocks.md`
   before you publish one.

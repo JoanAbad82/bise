@@ -598,6 +598,11 @@ law("ago: short words", () => {
   assert.equal(K.ago(now - 2 * 3_600_000, now), "2 h ago");
   assert.equal(K.ago(now - 26 * 3_600_000, now), "yesterday");
   assert.equal(K.ago(now - 72 * 3_600_000, now), "3 days ago");
+  // past a week: the date; past a year: with its year (designer m_7475)
+  const local = (y, mo, d) => new Date(y, mo, d, 12).getTime();
+  assert.equal(K.ago(local(2026, 9, 3), local(2026, 9, 20)), "3 oct");
+  assert.equal(K.ago(local(2025, 9, 3), local(2026, 9, 4)), "3 oct 2025");
+  assert.equal(K.ago(local(2025, 11, 20), local(2026, 0, 5)), "20 dec 2025");
 });
 
 // ---- no style anywhere ----
@@ -639,7 +644,7 @@ law("the fonts tokens.css names are in the kit (the CSP loads nothing from outsi
 });
 
 law("every example page is a fragment of known blocks with unique ids", () => {
-  const kinds = new Set(["prose", "heading", "callout", "sources", "table", "question", "review", "email", "message", "compare", "checklist"]);
+  const kinds = new Set(["prose", "heading", "callout", "sources", "table", "question", "review", "email", "message", "compare", "checklist", "ui"]);
   for (const f of readdirSync(join(here, "examples"))) {
     const main = parse(readFileSync(join(here, "examples", f), "utf8"));
     assert.ok(main.children.length > 0 && main.children.every((c) => c.tagName === "SECTION" && kinds.has(c.getAttribute("data-kit"))), f);

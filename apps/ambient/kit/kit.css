@@ -316,3 +316,91 @@ body.bise-changes [data-changed]::after { content: "changed"; position: absolute
 [data-kit="pages"] .bise-open { grid-column: 2; grid-row: 1 / span 2; align-self: center; font: 12px var(--font-mono); color: var(--kick); }
 [data-kit="pages"]:empty::before, [data-kit="pages"] > ul:empty::before { content: "nothing here yet. when an agent makes a page for you, it shows here."; font: 17px var(--font-read); color: var(--kick); }
 #bise-home::before { content: "for you"; display: block; font: 600 var(--text-h1)/1.1 var(--font-display); letter-spacing: -.01em; margin: 6px 0 var(--space-4); }
+
+/* ---- ui: what a page draws beyond text (pages-ui; designer's site/m mocks). A page with a ui block
+   takes more room: its column widens to --page-wide, its text blocks keep the reading measure. The
+   gallery below is the main road (k-term, k-ba, k-states, k-pick, k-timeline); a ui block's own
+   <style> comes as the version's page.css, scoped to the block by the server. */
+body:has(#bise-page > [data-kit="ui"]) { grid-template-columns: minmax(var(--space-5), 1fr) minmax(0, var(--page-wide)) 36px 300px minmax(var(--space-5), 1fr); }
+@media (max-width: 1500px) {
+  body:has(#bise-page > [data-kit="ui"]) { grid-template-columns: minmax(var(--space-5), 1fr) minmax(0, var(--page-wide)) minmax(var(--space-5), 1fr); grid-template-areas: "frame frame frame" ". page ." ". side ."; }
+}
+body:has(#bise-page > [data-kit="ui"]) #bise-page > [data-kit]:not([data-kit="ui"], [data-kit="compare"], [data-kit="table"]) { max-width: var(--measure); }
+[data-kit="ui"] { margin: var(--space-5) 0; font-size: var(--text-small); }
+#bise-page [data-kit="ui"] :is(button, [data-pick]) { font: inherit; color: inherit; }
+
+/* k-term: a terminal frame with real cells (one character per cell, the TUI's palette); tabs over
+   widths or states (data-ui="tabs"), its own light/dark switch (data-ui="term", kit.js adds it) */
+.k-term { margin: 0 0 var(--space-3); border-radius: 10px; overflow: hidden; background: var(--term-bg); color: var(--term-text); box-shadow: 0 0 0 1px var(--term-frame), 3px 3px 0 var(--drop); }
+.k-term > .k-bar, .k-term > .k-tabs { display: flex; align-items: center; gap: 2px; padding: 6px 10px 0; border-bottom: 1px solid var(--term-frame); }
+.k-term > .k-bar > .k-tabs { display: flex; gap: 2px; flex: 1; }
+/* the left of the bar: the tabs (widths, steps); its right end: the frame's dark | light toggle */
+#bise-page .k-tabs > button { font: var(--text-ui) var(--font-ui); color: var(--term-dim); background: none; border: 0; border-radius: 0; box-shadow: none; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 5px 10px 7px; cursor: pointer; transition: color .2s; }
+#bise-page .k-tabs > button:hover, #bise-page .k-term [data-kit-ui] > button:hover { color: var(--term-text); }
+#bise-page .k-term [data-kit-ui] > button { font: var(--text-ui) var(--font-ui); color: var(--term-dim); background: none; border: 0; border-radius: 6px; box-shadow: none; padding: 2px 10px; cursor: pointer; transform: none; transition: color .2s, background .2s; }
+.k-term [data-kit-ui] { margin: 0 0 6px auto; display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--term-raised); box-shadow: inset 0 0 0 1px var(--term-frame); align-self: center; }
+.k-tabs { display: flex; align-items: center; gap: 2px; }
+.k-term .k-tabs { padding: 6px 10px 0; border-bottom: 1px solid var(--term-frame); }
+.k-tabs > button:focus-visible, .k-term [data-kit-ui] > button:focus-visible, .k-option:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+#bise-page .k-tabs > button[aria-selected="true"] { color: var(--term-text); border-bottom-color: var(--term-text); }
+#bise-page .k-term [data-kit-ui] > button[aria-pressed="true"] { color: var(--term-text); background: var(--term-bg); box-shadow: 0 1px 0 var(--term-frame); }
+/* the cells: each line keeps its spaces (one character per cell); the newlines between lines don't count */
+.k-cells { font: 13px/1.5 var(--font-mono); white-space: normal; overflow-x: auto; padding: var(--space-3) var(--space-4); color: var(--term-text); tab-size: 4; }
+.k-cells .k-ln { min-height: 1.5em; white-space: pre; width: max-content; min-width: 100%; }
+.k-term > figcaption, .k-term figcaption { padding: var(--space-2) var(--space-4); border-top: 1px solid var(--term-frame); font: var(--text-kicker)/1.5 var(--font-ui); color: var(--term-dim); white-space: normal; }
+.t-dim { color: var(--term-dim); } .t-faint { color: var(--term-faint); } .t-rule { color: var(--term-rule); }
+.t-acc { color: var(--term-accent); } .t-b { font-weight: 700; } .t-ok { color: var(--term-ok); } .t-err { color: var(--term-err); }
+.t-sel { background: var(--term-sel); } .t-raised { background: var(--term-raised); } .t-chip { background: var(--term-chip); color: var(--term-accent); border-radius: 3px; }
+.t-hl { background: var(--term-accent); color: var(--term-bg); } .t-u { text-decoration: underline; text-decoration-color: var(--term-accent); text-underline-offset: 3px; }
+/* tabs: without kit.js every pane shows, one under the other (readable without JS) */
+[data-ui="tabs"][data-ready] .k-pane:not([data-on]) { display: none; }
+.k-pane + .k-pane { border-top: 1px dashed var(--term-frame); }
+[data-ui="tabs"][data-ready] .k-pane + .k-pane { border-top: 0; }
+
+/* k-ba: before and after, side by side (stacked when narrow) */
+.k-ba { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin: 0 0 var(--space-3); }
+.k-ba > figure, .k-states > figure { margin: 0; min-width: 0; }
+.k-ba > figure > figcaption:first-child, .k-states > figure > figcaption:first-child { font: var(--text-kicker)/1.4 var(--font-mono); color: var(--kick); margin: 0 0 var(--space-2); }
+.k-ba > figure > figcaption:first-child b, .k-ba > figure > figcaption:first-child strong { color: var(--ink); font-weight: 600; }
+.k-ba .k-cells, .k-states .k-cells { font-size: 12px; }
+
+/* k-states: one thing in each of its states, a grid of small frames */
+.k-states { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: var(--space-3); margin: 0 0 var(--space-3); }
+.k-states .k-cells { padding: var(--space-2) var(--space-3); }
+
+/* k-pick (data-ui="pick"): rich options, one pick per block, the pick is a note (compare's pick);
+   the picked one is drawn in ink, never the accent (the accent is what waits on him) */
+.k-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--space-3); margin: 0 0 var(--space-3); }
+.k-option { position: relative; display: flex; flex-direction: column; gap: var(--space-1); background: var(--surface-card); border-radius: 10px; padding: var(--space-3) var(--space-4); box-shadow: 0 0 0 1px var(--line), 3px 3px 0 var(--drop); color: var(--dim); }
+#bise-page .k-option > h3 { font-size: var(--text-read); margin: 0; color: var(--ink); }
+#bise-page .k-option ul { margin: var(--space-1) 0 0; }
+[data-ui="pick"][data-ready] .k-option { cursor: pointer; transition: box-shadow .2s var(--ease-arrive); }
+[data-ui="pick"][data-ready] .k-option:hover { box-shadow: 0 0 0 1px var(--faint), 3px 3px 0 var(--drop); }
+.k-option[data-verdict="pick"] { box-shadow: inset 0 0 0 1.5px var(--ink), 3px 3px 0 var(--drop); color: var(--ink); }
+/* 'my pick': a small ink label at the card's top right, read at a glance (never the accent) */
+.k-option > .k-mark { position: absolute; top: var(--space-3); right: var(--space-3); font: 600 var(--text-kicker)/1.5 var(--font-ui); color: var(--ink); padding: 0 7px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--ink); }
+#bise-page .k-option:has(> .k-mark) > h3 { padding-right: 8ch; }
+.k-mine { font: var(--text-kicker) var(--font-mono); color: var(--kick); }
+
+/* k-timeline: steps in order; data-state done, now, next */
+.k-timeline { list-style: none; padding: 0 0 0 26px !important; margin: 0 0 var(--space-3); position: relative; }
+.k-timeline::before { content: ""; position: absolute; left: 7px; top: 8px; bottom: 8px; width: 2px; background: var(--line); }
+.k-timeline > li { position: relative; margin: 0 0 var(--space-3) !important; color: var(--dim); }
+.k-timeline > li::before { content: ""; position: absolute; left: -24px; top: .45em; width: 12px; height: 12px; border-radius: 50%; background: var(--surface-made); box-shadow: inset 0 0 0 2px var(--faint); }
+.k-timeline > li[data-state="done"]::before { background: var(--faint); }
+.k-timeline > li[data-state="now"]::before { background: var(--ink); box-shadow: 0 0 0 3px var(--surface-made), 0 0 0 4px var(--ink); animation: bise-breathe 2.4s ease-in-out infinite; }
+/* a step that waits on him (data-who="yours") takes the accent, like his checklist steps */
+.k-timeline > li[data-who="yours"]::before { box-shadow: inset 0 0 0 2px var(--accent); }
+.k-timeline > li[data-who="yours"][data-state="now"]::before { background: var(--accent); box-shadow: 0 0 0 3px var(--surface-made), 0 0 0 4px var(--accent); }
+.k-timeline > li[data-who="yours"] .k-who { color: var(--accent); }
+.k-timeline > li > b, .k-timeline > li > strong { color: var(--ink); font-weight: 600; }
+.k-timeline .k-who { font: var(--text-kicker) var(--font-mono); color: var(--kick); margin-left: 1ch; }
+
+/* small parts: a grid of cards, a card, a kicker, a tag */
+.k-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-3); margin: 0 0 var(--space-3); }
+.k-card { background: var(--surface-card); border-radius: 10px; padding: var(--space-3) var(--space-4); box-shadow: 3px 3px 0 var(--drop); min-width: 0; }
+.k-kicker { font: var(--text-kicker)/1.4 var(--font-mono); color: var(--kick); }
+.k-tag { display: inline-block; font: var(--text-kicker)/1.6 var(--font-mono); color: var(--dim); background: var(--hover); box-shadow: inset 0 0 0 1px var(--line); border-radius: 4px; padding: 0 6px; margin: 0 4px 4px 0; }
+.k-big { font: 600 30px/1.1 var(--font-mono); color: var(--ink); }
+@media (max-width: 760px) { .k-ba { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .k-timeline > li[data-state="now"]::before { animation: none; } [data-ui="pick"] .k-option { transition: none; } }
