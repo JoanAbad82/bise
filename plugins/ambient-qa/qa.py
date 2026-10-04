@@ -149,6 +149,23 @@ def require_commits(root, require=None):
     return {"required": req, "behind_ambient_app": b}
 
 
+def stale_bise(bise, root, slack_s=1800):
+    """Why this bise build is older than its tree's Rust (None when it isn't): a bise built before
+    the tree's last rust/ commit (a merge brings one) talks to the tree's fresh sb-core with an old
+    hub, and main never shows (ambient-lead m_7069: amb-mac's bise of Oct 3 05:05 in a tree at
+    4aefdbac: 'main never appears'). slack_s: an agent builds a little before it commits."""
+    try:
+        built = os.path.getmtime(bise)
+        last = int(_git(root, "log", "-1", "--format=%ct", "--", "rust/") or 0)
+    except (OSError, ValueError):
+        return None
+    if last and built < last - slack_s:
+        return "%s was built %s, before its tree's last rust/ commit (%s, %s)" % (
+            bise, time.strftime("%m-%d %H:%M", time.localtime(built)), _git(root, "log", "-1", "--format=%h", "--", "rust/"),
+            time.strftime("%m-%d %H:%M", time.localtime(last)))
+    return None
+
+
 def find_bise(explicit=None):
     """A bise with `ambient-core` and its app root (a tree with a built
     repl-live): --bise, $AMBIENT_QA_BISE, the last launch's pair, the repo's
@@ -165,11 +182,15 @@ def find_bise(explicit=None):
     # the last launch's pair only while its tree is still at ambient-app's tip (ambient m_6561:
     # a launch reused ambient-pm's tree 10 commits behind)
     if _is_exe(last.get("bise")) and last.get("app_root") and os.path.exists(os.path.join(last["app_root"], "repl-live")) \
-            and behind(last["app_root"]) == 0:
+            and behind(last["app_root"]) == 0 and not stale_bise(last["bise"], last["app_root"]):
         return last["bise"], last["app_root"]
+    skipped = []
     own = os.path.join(REPO, "rust", "target", "debug", "bise")
     if _is_exe(own) and app_root_of(own):
-        return own, app_root_of(own)
+        why = stale_bise(own, app_root_of(own))
+        if not why:
+            return own, app_root_of(own)
+        skipped.append(why)
     found = []
     wt = os.path.dirname(os.path.dirname(REPO))     # .../worktrees/<hub>/<task>/harness -> .../worktrees/<hub>
     if os.path.basename(os.path.dirname(wt)) == "worktrees":
@@ -179,11 +200,19 @@ def find_bise(explicit=None):
                 if _is_exe(p) and os.path.isdir(os.path.join(wt, task, "harness", "rust", "tui", "src", "ambient")):
                     root = app_root_of(p)
                     if root:
-                        found.append((os.path.getmtime(p), p, root))
+                        why = stale_bise(p, root)
+                        if why:
+                            skipped.append(why)
+                        else:
+                            found.append((os.path.getmtime(p), p, root))
     if found:
         # the tree closest to ambient-app's tip (fewest of its commits missing), then the newest build
         _, _, p, root = min((behind(root), -mt, p, root) for mt, p, root in found)
         return p, root
+    if skipped:
+        raise QAError("every bise found is older than its tree's Rust (an old hub with a fresh sb-core: main never shows): %s; "
+                      "build one at ambient-app's tip (cargo build -p bend-harness, then scripts/bins.sh repl-live repl-scripted sb-core)"
+                      % "; ".join(skipped))
     raise QAError("no bise with ambient-core next to a built repl-live: pass bise=<exe> (a debug build of the ambient-app branch, "
                   "its tree built with ./run.sh) or set AMBIENT_QA_BISE and AMBIENT_QA_APP_ROOT")
 
@@ -389,7 +418,17 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="",
                 raise RuntimeError("the hub did not start in %.0f s (exit %s); its stderr:\n%s" % (limit, E.hub.poll(), tail))
             time.sleep(0.1)
         c = e2e.Client(sock)
-        c.wait_status("main", "idle", 120)
+        try:
+            c.wait_status("main", "idle", 120)
+        except AssertionError:
+            # say why, from the hub's own state: no agent at all is an old hub (bise) with a
+            # fresh sb-core (ambient-lead m_7069), else main's own last lines
+            names = [(a.get("name"), a.get("status")) for a in (c.state or {}).get("agents", [])]
+            repl = os.path.join(E.state, "agents", "main", "repl.log")
+            tail = open(repl, errors="replace").read()[-800:] if os.path.exists(repl) else "(no repl.log)"
+            hint = ("the hub lists no agent at all: its bise (%s) and the sb-core it runs don't match; build both at ambient-app's tip"
+                    % bise) if not names else "agents: %s" % names
+            raise RuntimeError("main never went idle in 120 s: %s; main's repl.log ends:\n%s" % (hint, tail))
         info = {"pid": os.getpid(), "kind": kind, "connectors": bool(connectors), "computer": bool(computer), "approved_by_user": user_ask or None, "tmp": E.tmp, "ws": E.ws, "state": E.state, "bise": bise,
                 "sets": os.environ.get("AMBIENT_QA_SET") or "", "keep": bool(keep), "reused": bool(reuse),
                 "env": {k: E.env[k] for k in ("SB_STATE_DIR",)}}
