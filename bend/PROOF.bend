@@ -659,6 +659,9 @@ def Laws.steering_survives_interrupt():
 def Laws.steering_survives_fail():
   {==}
 
+def Laws.size_refusal_compacts():
+  {==}
+
 def Laws.steering_arrival_order():
   {==}
 
@@ -1211,6 +1214,64 @@ def Laws.resp_status_error():
 def Laws.resp_usage():
   {==}
 
+# the ChatGPT plan route (core/oai-resp.bend, runtime/provider-pure.bend)
+def Laws.resp_plan_body_maps():
+  {==}
+
+def Laws.resp_plan_streams_unstored():
+  {==}
+
+def Laws.resp_plan_no_refused_fields():
+  {==}
+
+def Laws.resp_plan_no_system_item_no_bare_tool():
+  {==}
+
+def Laws.resp_plan_namespaced_call_back():
+  {==}
+
+def Laws.resp_no_shape_items_unchanged(xs):
+  {==}
+
+def Laws.resp_no_shape_tools_unchanged(ts):
+  {==}
+
+def Laws.resp_no_shape_no_namespace():
+  {==}
+
+def Laws.plan_shape_from_models_file():
+  {==}
+
+def Laws.plan_limit_mid_stream():
+  {==}
+
+def Laws.plan_limit_429():
+  {==}
+
+def Laws.plan_usage_unavailable_mid_stream():
+  {==}
+
+def Laws.plan_usage_unavailable_503():
+  {==}
+
+def Laws.plan_usage_unavailable_exhausted():
+  {==}
+
+def Laws.plan_not_eligible():
+  {==}
+
+def Laws.plan_401_expired():
+  {==}
+
+def Laws.plan_key_command_failed():
+  {==}
+
+def Laws.plan_other_attempts_unchanged(a):
+  {==}
+
+def Laws.plan_no_shape_unchanged(s, c, a):
+  {==}
+
 def Laws.refusal_quotes_the_provider():
   {==}
 
@@ -1221,6 +1282,12 @@ def Laws.refusal_without_a_name_or_json():
   {==}
 
 def Laws.refusal_without_words():
+  {==}
+
+def Laws.refusal_for_size():
+  {==}
+
+def Laws.size_refused_cases():
   {==}
 
 def Laws.attempt_for_names_the_calls():
@@ -2751,7 +2818,7 @@ def hub_str_cmp_refl(+s: String) -> {String.cmp(s, s) == ((s, s), EQ{}) : (Strin
 
 # every string equals itself
 def hub_str_eq_refl(+s: String) -> {String.eq(s, s) == True{} : Bool}:
-  %Equal.sym((String & String) & Cmp, String.cmp(s, s), ((s, s), EQ{}), hub_str_cmp_refl(s)) : {String.eq.fin(_) == True{} : Bool}
+  %Equal.sym((String & String) & Cmp, String.cmp(s, s), ((s, s), EQ{}), hub_str_cmp_refl(s)) : {Cmp.is_eq(Pair.snd(String & String, Cmp, _)) == True{} : Bool}
   {==}
 
 # ---- L4 support: a delivery attempt never leaves its agent stuck ----
@@ -3252,7 +3319,7 @@ def hub_cmpc_sound(+a: String, +b: String, +e: {Cmp.is_eq(hub_cmpc(a, b)) == Tru
       {==}
 
 def hub_str_eq_sound.k(+a: String, +b: String, e: {String.eq(a, b) == True{} : Bool}) -> {Cmp.is_eq(hub_cmpc(a, b)) == True{} : Bool}:
-  %hub_scmp_shape(a, b) : {String.eq.fin(_) == True{} : Bool}
+  %hub_scmp_shape(a, b) : {Cmp.is_eq(Pair.snd(String & String, Cmp, _)) == True{} : Bool}
   e
 
 # String.eq is sound: strings it finds equal are the same string
@@ -4535,6 +4602,21 @@ def Laws.image_part_filled():
   {==}
 
 def Laws.image_part_cap():
+  {==}
+
+def Laws.image_part_fit_bytes():
+  {==}
+
+def Laws.image_part_fit_count_then_bytes():
+  {==}
+
+def Laws.image_part_fit_under_limit():
+  {==}
+
+def Laws.image_part_fit_none():
+  {==}
+
+def Laws.image_fill_fit_weighs():
   {==}
 
 def Laws.image_why_checks():

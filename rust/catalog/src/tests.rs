@@ -67,11 +67,44 @@ fn no_model_by_default_and_opus_alias_still_goes_to_foundry() {
 const ANTH_BETAS: &str = "interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14";
 
 #[test]
+fn gateway_headers_inherit_and_survive_the_runtime_handoff() {
+    let setup = Setup::from_text(Some(r#"
+[providers.gateway]
+base_url = "https://gateway.test/v1"
+headers = { Source = "bise", "x-team" = "platform", "x-quoted" = 'hello "world"' }
+[models."gateway/small"]
+headers = { source = "small" }
+"#), &|_| None);
+    assert!(setup.catalog.warnings.is_empty(), "{:?}", setup.catalog.warnings);
+    let headers = setup.catalog.resolve("gateway/small").caps.headers;
+    assert_eq!(headers.get("source").map(String::as_str), Some("small"));
+    assert_eq!(headers.get("x-team").map(String::as_str), Some("platform"));
+    assert_eq!(headers.get("x-quoted").map(String::as_str), Some("hello \"world\""));
+    let handoff = Setup::from_text(Some(&setup.handoff_toml()), &|_| None);
+    assert_eq!(handoff.catalog.resolve("gateway/small").caps.headers, headers);
+    assert_eq!(handoff.catalog.resolve("gateway/other").caps.headers.get("source").map(String::as_str), Some("bise"));
+}
+
+#[test]
+fn invalid_gateway_headers_are_reported_without_their_values() {
+    for headers in [
+        r#"{ "bad name" = "private-value" }"#,
+        r#"{ source = "private-value\r\ninjected: true" }"#,
+        r#"{ source = 12 }"#,
+        r#"{ source = "one", SOURCE = "private-value" }"#,
+    ] {
+        let setup = Setup::from_text(Some(&format!("[providers.gateway]\nbase_url = \"https://gateway.test\"\nheaders = {headers}")), &|_| None);
+        assert!(!setup.catalog.warnings.is_empty());
+        assert!(setup.catalog.warnings.iter().all(|w| !w.contains("private-value")));
+    }
+}
+
+#[test]
 fn a_listed_model_takes_its_own_fields_then_its_providers() {
     let c = Catalog::builtin();
     let r = c.resolve("anthropic/claude-haiku-4-5");
     assert_eq!(r.known, Known::Listed);
-    assert_eq!(r.caps, Caps { context: 200_000, max_output: 64_000, vision: true, reasoning: true, tools: true, thinking: "budget".into(), betas: ANTH_BETAS.into(), efforts: String::new(), effort: String::new(), cache_key: String::new(), cache_header: String::new(), headers_env: String::new(), key_command: String::new(), idle_timeout_sec: 0 });
+    assert_eq!(r.caps, Caps { context: 200_000, max_output: 64_000, vision: true, reasoning: true, tools: true, thinking: "budget".into(), betas: ANTH_BETAS.into(), efforts: String::new(), effort: String::new(), cache_key: String::new(), cache_header: String::new(), headers_env: String::new(), headers: Default::default(), key_command: String::new(), idle_timeout_sec: 0 });
     let r = c.resolve("mistral/mistral-large-latest");
     assert_eq!((r.caps.context, r.caps.reasoning, r.caps.vision), (262_144, false, true));
     let r = c.resolve("openai/gpt-6-astra");
@@ -197,7 +230,7 @@ key_env = "MY_KEY"
     assert_eq!(s.catalog.resolve("anthropic/claude-haiku-4-5").caps.max_output, 64_000);
     // the order of the list is kept (models.toml's, not alphabetical)
     let ids: Vec<&str> = s.catalog.providers.iter().map(|p| p.id.as_str()).collect();
-    assert_eq!(&ids[..4], ["anthropic", "foundry", "openai", "google"]);
+    assert_eq!(&ids[..5], ["anthropic", "foundry", "openai", "chatgpt", "google"]);
 }
 
 #[test]
@@ -295,12 +328,24 @@ fast = "groq/openai/gpt-oss-120b"
     let text = s.handoff_toml();
     let back = Setup::from_text(Some(&text), &no_env);
     assert!(back.catalog.warnings.iter().all(|w| !w.contains("unknown key")), "{:?}", back.catalog.warnings);
+    // a provider that signs in gets its token command in the file only
+    // (this binary's path: `'<bise>' auth token chatgpt`)
+    let read_back = |n: &str| {
+        let mut r = back.catalog.resolve(n);
+        if s.catalog.provider(&r.provider).is_some_and(|p| p.signs_in()) {
+            assert!(r.caps.key_command.ends_with("' auth token chatgpt") && r.caps.key_command.starts_with("'/"), "{}", r.caps.key_command);
+            r.caps.key_command.clear();
+        }
+        r
+    };
     for m in &s.catalog.models {
-        assert_eq!(back.catalog.resolve(&m.name()), s.catalog.resolve(&m.name()), "{}", m.name());
+        assert_eq!(read_back(&m.name()), s.catalog.resolve(&m.name()), "{}", m.name());
     }
     for p in &s.catalog.providers {
         let n = format!("{}/unlisted", p.id);
-        assert_eq!(back.catalog.resolve(&n), s.catalog.resolve(&n));
+        assert_eq!(read_back(&n), s.catalog.resolve(&n));
+        let b = back.catalog.provider(&p.id).unwrap();
+        assert_eq!((&b.auth, &b.shape), (&p.auth, &p.shape), "{}", p.id);
     }
     assert_eq!(back.catalog.canonical("fast"), "groq/openai/gpt-oss-120b");
     assert_eq!(back.catalog.default_model, s.catalog.default_model);
@@ -311,7 +356,7 @@ fast = "groq/openai/gpt-oss-120b"
 #[test]
 fn the_handoff_is_small_and_flat_for_the_bend_reader() {
     let text = Setup::from_text(None, &no_env).handoff_toml();
-    assert!(text.lines().count() < 400, "{} lines", text.lines().count());
+    assert!(text.lines().count() < 500, "{} lines", text.lines().count());
     // core/config.bend: one `key = value` per line, [section] headers,
     // # comments; no inline tables, arrays or multi-line strings
     for l in text.lines() {

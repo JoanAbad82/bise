@@ -22,6 +22,11 @@ pub(crate) struct Call {
     pub base_url: String,
     pub model: String,
     pub key: String,
+    pub key_command: String,
+    /// config.toml's `headers` (provider, then model), sent before
+    /// `headers_env`'s, which win by name like the runtime's
+    pub headers: Vec<(String, String)>,
+    pub headers_env: String,
     /// a voice model (BISE-298): the call transcribes [`SILENCE_MS`] of
     /// silence, which proves the key and the model at once
     pub voice: bool,
@@ -65,6 +70,8 @@ pub(crate) enum Why {
     /// nothing was called: the provider has no base URL; what to set
     /// (bise_catalog::Catalog::no_base_url)
     NoUrl(String),
+    /// A local gateway setting or a required request header is invalid.
+    Configuration(String),
 }
 
 /// The check's answer before any call: the model's provider has no base
@@ -82,6 +89,9 @@ impl Fail {
         Fail { why, said: String::new() }
     }
 }
+
+/// The plan's usage couldn't be checked (`usage_unavailable`, transient).
+pub(crate) const USAGE_UNCHECKED: &str = "the plan's usage wasn't checked";
 
 /// The longest provider message kept.
 const SAID_MAX: usize = 200;
@@ -122,6 +132,19 @@ pub(crate) fn request(c: &Call, env: &dyn Fn(&str) -> Option<String>) -> crate::
                 "messages": [{ "role": "user", "content": "hi" }],
             }),
         )
+    } else if c.provider == crate::onboarding::PLAN_PROVIDER {
+        // the ChatGPT plan's route (subscriptions design): store false,
+        // always streamed, no output cap nor sampling field
+        (
+            format!("{base}/responses"),
+            vec![("Authorization".to_string(), format!("Bearer {}", c.key))],
+            serde_json::json!({
+                "model": c.model,
+                "input": [{ "type": "message", "role": "user", "content": [{ "type": "input_text", "text": "hi" }] }],
+                "store": false,
+                "stream": true,
+            }),
+        )
     } else if c.api == "openai-responses" {
         // BISE-147: OpenAI's Responses API (16: its smallest output cap)
         (
@@ -140,6 +163,21 @@ pub(crate) fn request(c: &Call, env: &dyn Fn(&str) -> Option<String>) -> crate::
         (format!("{base}/chat/completions"), vec![("Authorization".to_string(), format!("Bearer {}", c.key))], b)
     };
     headers.push(("Content-Type".into(), "application/json".into()));
+    if !c.key_command.is_empty() {
+        headers.retain(|(name, _)| !name.eq_ignore_ascii_case("Authorization"));
+        headers.push(("Authorization".into(), format!("Bearer {}", c.key)));
+    }
+    let from_env = env(&c.headers_env).unwrap_or_default();
+    let env_headers = from_env.lines().filter_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        let name = name.trim();
+        (!name.is_empty()).then(|| (name.to_string(), value.trim().to_string()))
+    });
+    // the runtime's order: config.toml's headers, then headers_env's
+    for (name, value) in c.headers.iter().cloned().chain(env_headers) {
+        headers.retain(|(old, _)| !old.eq_ignore_ascii_case(&name));
+        headers.push((name, value));
+    }
     let url = env("BEND_PROVIDER_URL").filter(|u| !u.trim().is_empty()).unwrap_or(endpoint);
     crate::voice::http::Request { url, headers, body: body.to_string().into_bytes() }
 }
@@ -174,10 +212,22 @@ pub(crate) fn verdict(status: u16, body: &[u8], key: &str) -> Result<(), Fail> {
 /// first (Anthropic's `error.type`, OpenAI's `error.code`), then the
 /// status and the words of the body.
 fn why(status: u16, body: &[u8]) -> Result<(), Why> {
+    let text = String::from_utf8_lossy(body).to_ascii_lowercase();
+    // the ChatGPT plan's own refusals, in an error body or mid-stream
+    // (`response.failed`, a 200; OpenAI's error table): its limit is
+    // reached, plan use is off, or its usage couldn't be checked
+    if text.contains("usage_limit_exceeded") {
+        return Err(Why::NoCredit);
+    }
+    if text.contains("user_not_eligible") {
+        return Err(Why::NoAccess);
+    }
+    if text.contains("usage_unavailable") {
+        return Err(Why::Unreachable(USAGE_UNCHECKED.into()));
+    }
     if (200..300).contains(&status) {
         return Ok(());
     }
-    let text = String::from_utf8_lossy(body).to_ascii_lowercase();
     let about = |words: &[&str]| words.iter().any(|w| text.contains(w));
     let money = ["credit", "quota", "billing", "balance", "insufficient", "payment", "purchase", "funds"];
     if status == 402 {
@@ -203,6 +253,9 @@ fn why(status: u16, body: &[u8]) -> Result<(), Why> {
         // some providers say a bad key with a 400
         400 if about(&["api key", "api_key", "apikey", "authentication", "unauthorized"]) => Err(Why::WrongKey),
         400 | 422 if about(&["model"]) => Err(Why::Model),
+        400 | 422 if about(&["missing required header", "missing header"]) => {
+            Err(Why::Configuration("the provider requires a request header; check headers_env in config.toml".into()))
+        }
         // past the key and the model: a 400 about the small request itself
         400 | 422 => Ok(()),
         s => Err(Why::Unreachable(format!("it answered {}", s))),
@@ -314,6 +367,12 @@ fn check_with(c: &Call, env: &dyn Fn(&str) -> Option<String>, retry_after: Durat
 }
 
 fn check_once(c: &Call, env: &dyn Fn(&str) -> Option<String>) -> Result<(), Fail> {
+    let mut call = c.clone();
+    if !call.key_command.is_empty() {
+        call.key = bise_catalog::auth::command_key(&call.key_command, Duration::from_secs(60))
+            .map_err(|e| Fail::of(Why::Configuration(e)))?;
+    }
+    let c = &call;
     let req = request(c, env);
     match crate::voice::http::send(&req, Duration::from_secs(20)) {
         Ok(r) => verdict(r.status, &r.body, &c.key),
@@ -325,6 +384,12 @@ fn check_once(c: &Call, env: &dyn Fn(&str) -> Option<String>) -> Result<(), Fail
 /// BISE-273): `model` ("provider/id") resolved in `setup`'s catalog,
 /// called with `key`; Err = why, the provider's words kept (never the
 /// key). The command says it (bise_catalog::auth_cli::check_lines).
+/// The line when `headers_env` names an unset or blank variable: the
+/// runtime's words (runtime/provider-pure.bend `headers_why`).
+fn headers_env_missing(name: &str) -> String {
+    format!("{} (headers_env in config.toml) is not set or is blank: set it before starting bise, or use headers in config.toml", name)
+}
+
 pub fn check_model(
     setup: &bise_catalog::Setup,
     model: &str,
@@ -336,7 +401,23 @@ pub fn check_model(
     if r.known == bise_catalog::Known::NoProvider {
         return Err(CheckFail { kind: CheckKind::Other(format!("unknown provider '{}' in {}", r.provider, model)), said: String::new() });
     }
-    let call = Call { provider: r.provider.clone(), api: r.api.clone(), base_url: r.base_url.clone(), model: r.id.clone(), key: key.to_string(), voice: false };
+    // the runtime's rule (Pvp.headers_why): a named headers variable that
+    // is unset or blank stops the call before the key and the network
+    let hvar = &r.caps.headers_env;
+    if !hvar.is_empty() && env(hvar).filter(|v| !v.trim().is_empty()).is_none() {
+        return Err(CheckFail { kind: CheckKind::Other(headers_env_missing(hvar)), said: String::new() });
+    }
+    let call = Call {
+        provider: r.provider.clone(),
+        api: r.api.clone(),
+        base_url: r.base_url.clone(),
+        model: r.id.clone(),
+        key: key.to_string(),
+        key_command: r.caps.key_command.clone(),
+        headers: r.caps.headers.clone().into_iter().collect(),
+        headers_env: r.caps.headers_env.clone(),
+        voice: false,
+    };
     let answer = match no_url(&call, &setup.catalog, env("BEND_PROVIDER_URL").as_deref()) {
         Some(f) => Err(f),
         None => check(&call, env),
@@ -348,7 +429,7 @@ pub fn check_model(
             Why::Model => CheckKind::Model,
             Why::NoAccess => CheckKind::NoAccess,
             Why::Unreachable(e) => CheckKind::Unreachable(e),
-            Why::NoUrl(e) => CheckKind::Other(e),
+            Why::NoUrl(e) | Why::Configuration(e) => CheckKind::Other(e),
         },
         said: f.said,
     })
@@ -359,7 +440,7 @@ mod tests {
     use super::*;
 
     fn call(api: &str, provider: &str) -> Call {
-        Call { provider: provider.into(), api: api.into(), base_url: "https://x.test/v1/".into(), model: "m1".into(), key: "k-secret".into(), voice: false }
+        Call { provider: provider.into(), api: api.into(), base_url: "https://x.test/v1/".into(), model: "m1".into(), key: "k-secret".into(), key_command: String::new(), headers: Vec::new(), headers_env: String::new(), voice: false }
     }
 
     /// Ben's first run (2026-10-01): the foundry key found, no URL. No
@@ -565,5 +646,84 @@ mod tests {
         let env = move |k: &str| (k == "BEND_PROVIDER_URL").then(|| url.clone());
         assert_eq!(check_with(&call("anthropic", "anthropic"), &env, Duration::from_millis(10)), Ok(()));
         assert_eq!(server.join().unwrap(), 2);
+    }
+
+    #[test]
+    fn a_gateway_check_sends_the_command_key_and_custom_headers() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let setup = bise_catalog::Setup::from_text(Some(&format!(r#"
+[providers.gateway]
+api = "anthropic"
+base_url = "http://{}/v1"
+key_env = ""
+key_command = "printf fresh-token"
+headers_env = "GATEWAY_HEADERS"
+"#, listener.local_addr().unwrap())), &|_| None);
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            let mut bytes = Vec::new();
+            let mut buf = [0; 4096];
+            while !bytes.windows(4).any(|s| s == b"\r\n\r\n") {
+                let n = stream.read(&mut buf).unwrap();
+                assert!(n > 0);
+                bytes.extend_from_slice(&buf[..n]);
+            }
+            write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{{}}").unwrap();
+            String::from_utf8(bytes).unwrap().to_ascii_lowercase()
+        });
+        let env = |k: &str| (k == "GATEWAY_HEADERS").then(|| "source: gateway-test\nx-team: platform".into());
+        assert_eq!(check_model(&setup, "gateway/model", "stale-token", &env), Ok(()));
+        let sent = server.join().unwrap();
+        for header in ["authorization: bearer fresh-token", "x-api-key: fresh-token", "source: gateway-test", "x-team: platform"] {
+            assert!(sent.contains(header), "missing {header}");
+        }
+        assert!(!sent.contains("stale-token"));
+    }
+
+    #[test]
+    fn missing_gateway_headers_do_not_pass_the_key_check() {
+        let failure = verdict(400, br#"{"error":{"message":"Missing required header: source"}}"#, "secret").unwrap_err();
+        assert!(matches!(failure.why, Why::Configuration(_)));
+        assert!(failure.said.contains("Missing required header"));
+    }
+
+    /// PR #6 (main m_6508): an unset or blank headers_env fails the check
+    /// like a turn, before the key_command and before any request.
+    #[test]
+    fn an_unset_or_blank_headers_env_fails_the_check_before_any_call() {
+        use bise_catalog::auth_cli::CheckKind;
+        let dir = std::env::temp_dir().join(format!("keycheck-hdrs-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let marker = dir.join("ran");
+        let setup = bise_catalog::Setup::from_text(Some(&format!(r#"
+[providers.gateway]
+api = "openai-chat"
+base_url = "http://127.0.0.1:9/v1"
+key_env = ""
+key_command = "touch {}; printf tok"
+headers_env = "GW_HEADERS"
+"#, marker.display())), &|_| None);
+        for value in [None, Some("   ")] {
+            let env = |k: &str| (k == "GW_HEADERS").then(|| value.map(str::to_string)).flatten();
+            let f = check_model(&setup, "gateway/m", "", &env).unwrap_err();
+            match &f.kind {
+                CheckKind::Other(e) => assert!(e.contains("GW_HEADERS") && e.contains("not set or is blank") && !e.contains("hub"), "{e}"),
+                k => panic!("{k:?}"),
+            }
+        }
+        assert!(!marker.exists(), "the key_command must not run");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn the_key_check_sends_static_gateway_headers() {
+        let mut c = call("openai-chat", "gateway");
+        c.headers = vec![("source".into(), "bise".into()), ("x-team".into(), "platform".into())];
+        let request = request(&c, &|_| None);
+        assert!(request.headers.contains(&("source".into(), "bise".into())));
+        assert!(request.headers.contains(&("x-team".into(), "platform".into())));
+        assert!(request.headers.contains(&("Authorization".into(), "Bearer k-secret".into())));
     }
 }

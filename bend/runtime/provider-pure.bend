@@ -9,6 +9,8 @@ import ../core/api.bend as Api
 import ../core/wire.bend as W
 import ../core/text.bend as Tx
 import ../core/config.bend as Cf
+import ../core/image.bend as Im
+import ../vendor/json.bend as J
 
 # ---- the provider registry ----
 # A model id is "provider/model" (the model may hold '/' itself:
@@ -200,6 +202,40 @@ def cache_header(+c: CNames) -> String:
 # "provider/model"
 def headers_env(+file: String, +prov: String, +id: String) -> String:
   Cf.cfg_or(model_key(registry(file), prov, id, "headers_env"), "")
+
+# Rust writes each header as a quoted TOML value. Its escapes are also
+# valid JSON escapes. Decode them before constructing the HTTP headers.
+def header_value(+raw: String) -> String:
+  Maybe.default(&2, String,
+    J.as_str(W.parse_json(String.concat(["\"", raw, "\""]))), "")
+
+def header_row(hit: Bool, +key: String, +value: String, +prefix: String) -> String:
+  match hit:
+    case True{}:
+      String.concat([Cf.cfg_val(String.drop(key, String.length(prefix))),
+        ": ", header_value(value), "\n"])
+    case False{}:
+      ""
+
+def header_rows(kvs: List<&2, Cf.KV>, +prefix: String) -> String:
+  match kvs:
+    case Nil{}:
+      ""
+    case Con{Cf.KV{+key, +value}, +rest}:
+      String.append(header_row(String.starts_with(key, prefix), key, value, prefix),
+        header_rows(rest, prefix))
+
+def headers(+file: String, +prov: String, +id: String) -> String:
+  +reg = registry(file)
+  String.append(header_rows(reg, String.concat(["providers.", prov, ".headers."])),
+    header_rows(reg, String.concat(["models.\"", id, "\".headers."])))
+
+def headers_missing(+name: String, +value: String) -> Bool:
+  Bool.and(Bool.not(String.is_empty(name)), String.is_empty(String.trim(value)))
+
+def headers_why(+name: String) -> String:
+  String.concat([name,
+    " (headers_env in config.toml) is not set or is blank: set it before starting bise, or use headers in config.toml"])
 
 def key_command(+file: String, +prov: String, +id: String) -> String:
   Cf.cfg_or(model_key(registry(file), prov, id, "key_command"), "")
@@ -396,6 +432,12 @@ def effort_of(+reg: List<&2, Cf.KV>, +prov: String, +id: String,
   effort_pick(has_word(xs, asked), asked,
     effort_default(xs, Cf.cfg_or(model_key(reg, prov, id, "effort"), "")))
 
+# the request rules of a provider (`shape`, the catalog's: subs-auth
+# writes providers.chatgpt.shape = "chatgpt-plan"): only that exact
+# word is the ChatGPT plan route; absent or anything else, today's body
+def is_plan_shape(+shape: String) -> Bool:
+  String.eq(shape, "chatgpt-plan")
+
 def facts(+reg: List<&2, Cf.KV>, +prov: String, +id: String, +asked: String)
     -> Api.MFacts:
   Api.MFacts{String.eq(Cf.cfg_or(model_key(reg, prov, id, "reasoning"), ""),
@@ -404,7 +446,8 @@ def facts(+reg: List<&2, Cf.KV>, +prov: String, +id: String, +asked: String)
     max_key.pick(String.eq(prov, "openai")),
     Cf.cfg_or(model_key(reg, prov, id, "thinking"), ""),
     Cf.cfg_or(model_key(reg, prov, id, "betas"), ""),
-    effort_of(reg, prov, id, asked)}
+    effort_of(reg, prov, id, asked),
+    is_plan_shape(Cf.cfg_or(model_key(reg, prov, id, "shape"), ""))}
 
 def resolve.family(m: Maybe<&2, Api.Style>, +api: String, +prov: String,
     +model: String, +id: String, +base: String, +key_env: String,
@@ -997,17 +1040,25 @@ def refusal.who(+name: String) -> String:
 
 # bise's line of a refused request: who refused, the status, what to
 # check (the designer's words, BISE-282's pattern)
-def refusal.head(+who: String, +status: U32) -> String:
+# (big: a refusal for size, W.size_refused: a 413 or a 400 that says so;
+# its line carries W.too_large_mark, which the Core reads to compact)
+def refusal.head(+who: String, +status: U32, big: Bool) -> String:
   +s = U32.show(status)
   Bool.pick(String, Bool.or(U32.is_eq(status, 401), U32.is_eq(status, 403)),
     String.concat([who, " refused the key (", s, "). check it with /setup."]),
     Bool.pick(String, U32.is_eq(status, 404),
       String.concat([who, " refused the request (", s,
         "). check the model name and the provider URL."]),
-      Bool.pick(String, U32.is_eq(status, 413),
-        String.concat([who, " refused the request (", s,
-          "). the request is too large."]),
+      Bool.pick(String, big,
+        String.concat([who, " refused the request (", s, "). ",
+          W.too_large_mark(), "."]),
         String.concat([who, " refused the request (", s, ")."]))))
+
+# the retry line of a request refused for its size (model_call.sized)
+def size_retry_why(+name: String, +status: U32, +half: Nat) -> String:
+  String.concat([refusal.who(name), " refused the request for its size (",
+    U32.show(status), "): sending it again with fewer images, under ",
+    Im.bytes_text(half)])
 
 # the key, if the provider echoed it, as ...<last 4>
 def mask.at(fuel: Nat, m: Maybe<&2, Nat>, +s: String, +key: String)
@@ -1056,7 +1107,7 @@ def refusal(+name: String, +status: U32, +body: String, +key: String)
     -> String:
   +who = refusal.who(name)
   +said = said_cut(mask(W.err_said(body), key))
-  String.append(refusal.head(who, status),
+  String.append(refusal.head(who, status, W.size_refused(status, body)),
     refusal.said(String.is_empty(said), who, said))
 
 def attempt_for.fail(refused: Bool, +why: String, +name: String,
@@ -1080,6 +1131,105 @@ def attempt_for(+tools: List<&2, W.WTool>, +name: String, +key: String,
           Bool.not(U32.is_eq(status, 200))), why, name, status, body, key)
     case ARetry{+ms, +why}:
       ARetry{ms, why}
+
+# ---- the ChatGPT plan's failures (shape = "chatgpt-plan") ----
+# The designer's lines (docs/subscriptions-design.md, final words §5).
+# OpenAI's plan route says a usage limit with a code, in a non-200 JSON
+# body (429, 503) or mid-stream in response.failed (a 200): either way
+# the turn stops on bise's line, never a retry loop on a limit nor an
+# "OpenAI refused the key" on a sign-in that expired.
+
+# subscription_sharing_usage_limit_exceeded: OpenAI says not to infer a
+# reset time from it, so the line points at the usage page
+def PLAN_LIMIT() -> String:
+  "your ChatGPT plan's limit for bise is reached. your usage is at chatgpt.com/settings/usage, or switch model with /model."
+
+# subscription_sharing_user_not_eligible (403): final, no retry
+def PLAN_OFF() -> String:
+  "ChatGPT plan use is off for bise. turn it on in your ChatGPT settings, or pick another provider in /provider."
+
+# subscription_sharing_usage_unavailable, once the retries are spent
+def PLAN_UNCHECKED_LINE() -> String:
+  "ChatGPT couldn't check your plan's usage. try again in a moment, or switch model with /model."
+
+def PLAN_EXPIRED() -> String:
+  "your ChatGPT sign-in expired. sign in again in /provider, or run bise login chatgpt."
+
+# the retries' cause while ChatGPT cannot check the plan's usage
+# (subscription_sharing_usage_unavailable: OpenAI's errors-and-recovery
+# says retry later with a bounded backoff); PLAN_UNCHECKED_LINE is said
+# only once the retries are spent (exhausted_for)
+def PLAN_UNCHECKED() -> String:
+  "ChatGPT could not check your plan's usage (subscription_sharing_usage_unavailable)"
+
+# the final line for a reply's status and error code, None: not one of
+# the plan's final failures (a usage limit, plan use not allowed, a
+# sign-in refused)
+def plan_line(+status: U32, +code: String) -> Maybe<&2, String>:
+  Bool.pick(Maybe<&2, String>,
+    String.eq(code, "subscription_sharing_usage_limit_exceeded"),
+    Some{PLAN_LIMIT()},
+    Bool.pick(Maybe<&2, String>,
+      String.eq(code, "subscription_sharing_user_not_eligible"),
+      Some{PLAN_OFF()},
+      Bool.pick(Maybe<&2, String>, U32.is_eq(status, 401),
+        Some{PLAN_EXPIRED()}, None{})))
+
+def attempt_plan.line(m: Maybe<&2, String>, a: Attempt) -> Attempt:
+  match m:
+    case Some{+l}:
+      AFail{l}
+    case None{}:
+      a
+
+# usage unavailable: a transient failure, retried with the usual policy
+# (the server's Retry-After when the attempt had one, else the backoff)
+def plan_retry(a: Attempt) -> Attempt:
+  match a:
+    case ARetry{+ms, _}:
+      ARetry{ms, PLAN_UNCHECKED()}
+    case _:
+      ARetry{0, PLAN_UNCHECKED()}
+
+def attempt_plan.pick(unchecked: Bool, +status: U32, +code: String,
+    a: Attempt) -> Attempt:
+  match unchecked:
+    case True{}:
+      plan_retry(a)
+    case False{}:
+      attempt_plan.line(plan_line(status, code), a)
+
+# a call's attempt on a plan provider: a usage limit or a refused
+# sign-in ends the turn on its line; usage unavailable is retried; any
+# other attempt (or provider) unchanged
+def attempt_plan(plan: Bool, +status: U32, +code: String, a: Attempt)
+    -> Attempt:
+  match plan:
+    case True{}:
+      attempt_plan.pick(String.eq(code, "subscription_sharing_usage_unavailable"),
+        status, code, a)
+    case False{}:
+      a
+
+# the missing key's line: a plan's token command failed (signed out, the
+# refresh refused): its sign-in expired; else the key_command's, else
+# the key_env's
+def key_why.cmd(plan: Bool, +prov: String) -> String:
+  match plan:
+    case True{}:
+      PLAN_EXPIRED()
+    case False{}:
+      String.concat(["no ", prov,
+        " key: its key_command failed or printed nothing (config.toml)"])
+
+def key_why(has_cmd: Bool, plan: Bool, +prov: String, +key_env: String)
+    -> String:
+  match has_cmd:
+    case True{}:
+      key_why.cmd(plan, prov)
+    case False{}:
+      String.concat(["no ", prov, " key yet (", key_env,
+        " is not set): /provider sets it up"])
 
 def attempt_err.pick(retryable: Bool, +host: String, +e: NetErr) -> Attempt:
   match retryable:
@@ -1178,6 +1328,12 @@ def retry_line(+n: Nat, +why: String, +delay_ms: U32) -> String:
 def exhausted_text(+tries: Nat, +why: String) -> String:
   String.append(String.concat(["provider failed after ", Nat.show(tries),
     " attempts: "]), why)
+
+# the same, but a ChatGPT plan whose usage could never be checked ends
+# on the designer's line alone
+def exhausted_for(+tries: Nat, +why: String) -> String:
+  Bool.pick(String, String.eq(why, PLAN_UNCHECKED()), PLAN_UNCHECKED_LINE(),
+    exhausted_text(tries, why))
 
 # an interrupt during the retries stops them, and keeps the error that
 # made them necessary: the user sees both. who: interrupter's answer

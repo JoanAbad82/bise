@@ -12,6 +12,7 @@
 //! ([`Setup::handoff_toml`], the path in `BISE_MODELS_FILE`); the format
 //! and the per-call rule are in docs/research/providers.md §7.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 // the tests run on a temp HOME, never the user's (bise_home::test_home)
@@ -19,13 +20,21 @@ bise_home::test_home!();
 
 pub mod auth;
 pub mod auth_cli;
+pub mod chatgpt;
 pub mod cli;
 pub mod config_cli;
+pub mod detect;
+pub mod openrouter_login;
 pub mod roles;
 pub mod voice;
 
 /// The command's name in messages and usages (BISE-165: was `bend-harness`).
 pub const CLI: &str = "bise";
+
+/// A provider's state when its key comes from `key_command`: listings,
+/// doctor and `/provider` never run the command, so it is not checked
+/// (`bise auth check` runs it).
+pub const KEY_COMMAND_STATE: &str = "key from key_command · not checked";
 
 /// The built-in list, shipped in the binary.
 pub const BUILTIN: &str = include_str!("../models.toml");
@@ -68,6 +77,8 @@ pub struct Caps {
     /// headers, one `Name: value` per line (Claude Code's
     /// `ANTHROPIC_CUSTOM_HEADERS`); "" = none
     pub headers_env: String,
+    /// Static gateway headers, normalized to lowercase names.
+    pub headers: BTreeMap<String, String>,
     /// the command whose stdout is the key, run before every call
     /// (Claude Code's `apiKeyHelper`: a short-lived token); "" = none,
     /// the key comes from `key_env`
@@ -125,6 +136,7 @@ pub const DEFAULT_CAPS: Caps = Caps {
     cache_key: String::new(),
     cache_header: String::new(),
     headers_env: String::new(),
+    headers: BTreeMap::new(),
     key_command: String::new(),
     idle_timeout_sec: 0,
 };
@@ -145,6 +157,7 @@ pub struct PartialCaps {
     pub cache_key: Option<String>,
     pub cache_header: Option<String>,
     pub headers_env: Option<String>,
+    pub headers: Option<BTreeMap<String, String>>,
     pub key_command: Option<String>,
     pub idle_timeout_sec: Option<u64>,
     /// prices (BISE-150), in [`Price`]'s unit
@@ -198,6 +211,13 @@ impl PartialCaps {
             cache_key: self.cache_key.clone().unwrap_or_else(|| base.cache_key.clone()),
             cache_header: self.cache_header.clone().unwrap_or_else(|| base.cache_header.clone()),
             headers_env: self.headers_env.clone().unwrap_or_else(|| base.headers_env.clone()),
+            headers: {
+                let mut headers = base.headers.clone();
+                if let Some(own) = &self.headers {
+                    headers.extend(own.clone());
+                }
+                headers
+            },
             key_command: self.key_command.clone().unwrap_or_else(|| base.key_command.clone()),
             idle_timeout_sec: self.idle_timeout_sec.unwrap_or(base.idle_timeout_sec),
         }
@@ -223,6 +243,9 @@ impl PartialCaps {
         self.cache_key = o.cache_key.clone().or(self.cache_key.take());
         self.cache_header = o.cache_header.clone().or(self.cache_header.take());
         self.headers_env = o.headers_env.clone().or(self.headers_env.take());
+        if let Some(headers) = &o.headers {
+            self.headers.get_or_insert_with(BTreeMap::new).extend(headers.clone());
+        }
         self.key_command = o.key_command.clone().or(self.key_command.take());
         self.idle_timeout_sec = o.idle_timeout_sec.or(self.idle_timeout_sec);
         self.input_price = o.input_price.or(self.input_price);
@@ -289,16 +312,55 @@ pub struct Provider {
     /// its recommended voice model (the voice screen's pick, BISE-298),
     /// its id without the provider; "" = its first listed one
     pub voice_model: String,
+    /// how it logs in, one of [`AUTHS`]: "" or "api" = a key
+    /// (`key_env`, auth.json); "chatgpt" = the ChatGPT sign-in
+    /// ([`chatgpt`]: `bise login chatgpt`, its token printed by
+    /// `bise auth token <id>`, its `key_command` in the models file)
+    pub auth: String,
+    /// the request rules of its models for the runtime, one of
+    /// [`SHAPES`] ("" = the family's own; "chatgpt-plan": the ChatGPT
+    /// plan's Responses body, runtime/provider-pure.bend)
+    pub shape: String,
     /// the defaults of its models
     pub caps: PartialCaps,
     pub source: Source,
 }
 
+/// How a provider logs in ([`Provider::auth`]); "" means "api".
+pub const AUTHS: [&str; 2] = ["api", "chatgpt"];
+
+/// The request shapes the runtime knows ([`Provider::shape`]).
+pub const SHAPES: [&str; 1] = ["chatgpt-plan"];
+
 impl Provider {
+    /// The configured key source. Reading it does not run the command.
+    pub fn key_command(&self) -> &str {
+        self.caps.key_command.as_deref().unwrap_or("")
+    }
+
     /// It runs chats: not voice only (`stt`), not decisions only.
     pub fn chats(&self) -> bool {
         !self.stt_only && !self.decides
     }
+
+    /// It logs in with the ChatGPT sign-in (`auth = "chatgpt"`), not a key.
+    pub fn signs_in(&self) -> bool {
+        self.auth == "chatgpt"
+    }
+}
+
+/// The `key_command` of a provider that signs in (`auth = "chatgpt"`):
+/// this very binary, single-quoted, `auth token <id>` (the runtime runs
+/// it before every call; it prints the access token, refreshed under
+/// the lock). None when the binary's path cannot be single-quoted in the
+/// models file (a `'`, `"`, `\` or a line break in it).
+pub fn self_token_command(id: &str) -> Option<String> {
+    let exe = std::env::current_exe().ok()?;
+    let exe = exe.to_str()?;
+    if exe.contains(['\'', '"', '\\', '\n', '\r']) {
+        return None;
+    }
+    Some(format!("'{}' auth token {}", exe, id))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -641,6 +703,8 @@ impl Catalog {
                                 voice_model: String::new(),
                                 model: String::new(),
                                 hidden: false,
+                                auth: String::new(),
+                                shape: String::new(),
                                 caps: PartialCaps::default(),
                                 source: src,
                             });
@@ -681,6 +745,16 @@ impl Catalog {
                                     "billing_url" => set_str(&mut p.billing_url, s(), &where_, fk, &mut warn),
                                     "model" => set_str(&mut p.model, s(), &where_, fk, &mut warn),
                                     "voice_model" => set_str(&mut p.voice_model, s(), &where_, fk, &mut warn),
+                                    "auth" => match s() {
+                                        Some(a) if a.is_empty() || AUTHS.contains(&a.as_str()) => {
+                                            p.auth = if a == "api" { String::new() } else { a }
+                                        }
+                                        _ => warn(format!("{}.auth: one of {}", where_, AUTHS.join(", "))),
+                                    },
+                                    "shape" => match s() {
+                                        Some(a) if a.is_empty() || SHAPES.contains(&a.as_str()) => p.shape = a,
+                                        _ => warn(format!("{}.shape: \"\" or one of {}", where_, SHAPES.join(", "))),
+                                    },
                                     "hidden" => match fv.as_bool() {
                                         Some(b) => p.hidden = b,
                                         None => warn(format!("{}.hidden: true or false", where_)),
@@ -926,6 +1000,22 @@ fn cap_field(caps: &mut PartialCaps, k: &str, v: &toml::Value, where_: &str, war
                 }
             }
             _ => warn(bad("a field or header name (letters, digits, - and _)")),
+        },
+        "headers" => match v.as_table() {
+            Some(table) => {
+                let mut headers = BTreeMap::new();
+                for (name, value) in table {
+                    let valid_name = !name.is_empty() && name.bytes().all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b));
+                    match value.as_str().filter(|v| v.bytes().all(|b| b == b'\t' || (0x20..=0x7e).contains(&b))) {
+                        Some(value) if valid_name && !headers.contains_key(&name.to_ascii_lowercase()) => {
+                            headers.insert(name.to_ascii_lowercase(), value.trim().to_string());
+                        }
+                        _ => warn(bad("unique HTTP header names with string values and no control characters")),
+                    }
+                }
+                caps.headers = Some(headers);
+            }
+            None => warn(bad("a table of HTTP header names and string values")),
         },
         // a gateway: the variable of its extra headers, the command of its key
         "headers_env" => match v.as_str().map(str::trim) {
@@ -1329,13 +1419,27 @@ impl Setup {
             }
             o.push_str(&format!("key_env = {}\n", q(&p.key_env)));
             o.push_str(&format!("needs = {}\n", q(&p.needs)));
-            caps_lines(&mut o, &c.provider_caps(p));
+            if !p.auth.is_empty() {
+                o.push_str(&format!("auth = {}\n", q(&p.auth)));
+            }
+            if !p.shape.is_empty() {
+                o.push_str(&format!("shape = {}\n", q(&p.shape)));
+            }
+            let mut caps = c.provider_caps(p);
+            // a provider that signs in: its token comes from this binary
+            // (`bise auth token <id>`), unless config.toml names a command
+            if p.signs_in() && caps.key_command.is_empty() {
+                caps.key_command = self_token_command(&p.id).unwrap_or_default();
+            }
+            caps_lines(&mut o, &caps);
+            headers_table(&mut o, &format!("providers.{}", key(&p.id)), &caps.headers);
         }
         for m in c.models.iter().filter(|m| !m.stt) {
             let r = c.resolve(&m.name());
             o.push_str(&format!("\n[models.{}]\n", q(&m.name())));
             let Some(p) = c.provider(&m.provider) else {
                 caps_lines(&mut o, &r.caps); // no provider to fall back to
+                headers_table(&mut o, &format!("models.{}", q(&m.name())), &r.caps.headers);
                 continue;
             };
             if r.api != p.api {
@@ -1374,6 +1478,9 @@ impl Setup {
                 if x != y {
                     o.push_str(&format!("{} = {}\n", k, q(&x)));
                 }
+            }
+            if a.headers != b.headers {
+                headers_table(&mut o, &format!("models.{}", q(&m.name())), &a.headers);
             }
         }
         o
@@ -1485,6 +1592,15 @@ pub fn set_config_key(text: &str, key: &str, value: &str) -> String {
     let mut s = out.join("\n");
     s.push('\n');
     s
+}
+
+fn headers_table(o: &mut String, section: &str, headers: &BTreeMap<String, String>) {
+    if !headers.is_empty() {
+        o.push_str(&format!("\n[{}.headers]\n", section));
+        for (name, value) in headers {
+            o.push_str(&format!("{} = {}\n", q(name), q(value)));
+        }
+    }
 }
 
 fn caps_lines(o: &mut String, c: &Caps) {

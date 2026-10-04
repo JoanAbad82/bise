@@ -18,6 +18,7 @@
 //!
 //! A pick is written at once (`set_role`), then `/models` flashes its row.
 
+use super::signin::Kind;
 use super::*;
 use bise_catalog::roles::{self as r, Source};
 use std::sync::Mutex;
@@ -289,7 +290,9 @@ impl Onb {
             let ready = |p: &bise_catalog::Provider| self.ready(&Provider::of(p));
             let (offered, others) = provider::all_providers(&self.setup, &ready);
             let more = self.pn().more;
-            let chat = |p: &Provider| self.chats(p) && !(checker && p.id == "openrouter");
+            // the checker: the ChatGPT plan only once signed in (its
+            // sign-in is not a step of the checker's picker)
+            let chat = |p: &Provider| self.chats(p) && !(checker && p.id == "openrouter") && !(checker && p.plan && !self.ready(p));
             let (shown, rest): (Vec<Provider>, Vec<Provider>) =
                 others.into_iter().filter(|p| chat(p)).partition(|p| more || self.ready(p));
             (offered.into_iter().filter(|p| chat(p)).chain(shown).collect(), rest)
@@ -587,6 +590,11 @@ impl Onb {
                         Sub::List
                     }
                     Some(PRow::Provider(p)) if self.ready(&p) => self.models_step(id, p, env),
+                    // the plan: its sign-in, then its models
+                    Some(PRow::Provider(p)) if p.plan => {
+                        self.pn_mut().key_first = true;
+                        self.sign_in(Kind::ChatGpt)
+                    }
                     // not set up: its key, checked with its first model, then its models
                     Some(PRow::Provider(p)) => {
                         self.pn_mut().key_first = true;
@@ -702,7 +710,7 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
             }
             said(&mut v);
             blanks(&mut v, gap);
-            v.push(keyline("{↑↓} choose · {enter} change · {esc} back"));
+            v.push(keybar("↑↓ choose   ⏎ change   esc back"));
             Some(v)
         }
         (Screen::Pick(id, _), Sub::List) => Some(provider_lines(o, id, w, gap, &said)),
@@ -719,7 +727,7 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
                 option(&mut v, k == *i, name, "", w);
             }
             blanks(&mut v, gap);
-            v.push(keyline("{↑↓} choose · {enter} ok · {esc} back"));
+            v.push(keybar("↑↓ choose   ⏎ ok   esc back"));
             Some(v)
         }
         _ => None,
@@ -974,7 +982,9 @@ fn provider_lines(o: &Onb, id: &'static str, w: u16, gap: usize, said: &dyn Fn(&
                     [one] => format!("{} uses it", one),
                     many => format!("{} use it", many.join(", ")),
                 };
-                if p.key_env.is_empty() {
+                if p.plan {
+                    name.extend(provider::plan_spans(o));
+                } else if p.key_env.is_empty() {
                     // a local server: nothing checked it runs (designer)
                     name.push(s("no key needed", theme::dim()));
                 } else if o.ready(p) {
@@ -1011,7 +1021,7 @@ fn provider_lines(o: &Onb, id: &'static str, w: u16, gap: usize, said: &dyn Fn(&
         Screen::Pick(_, Back::Close) if id == r::VOICE => "not now",
         _ => "back",
     };
-    v.push(keyline(&format!("{{↑↓}} choose · {{enter}} ok · {{esc}} {}", esc)));
+    v.push(keybar(&format!("↑↓ choose   ⏎ ok   esc {}", esc)));
     v
 }
 
@@ -1070,11 +1080,21 @@ fn model_lines(
                 if rec.as_deref() == Some(m.as_str()) {
                     tags.push("recommended".into());
                 }
-                if tags.is_empty() {
+                let mut n = if tags.is_empty() {
                     vec![s(short_model(m), theme::text())]
                 } else {
                     vec![s(pad(&short_model(m), mw), theme::text()), s(tags.join(" "), theme::accent())]
+                };
+                // what pays (designer): the plan, dim, in the right column
+                if p.plan {
+                    let used: usize = 2 + n.iter().map(|x| x.content.width()).sum::<usize>();
+                    let pays = "your ChatGPT plan";
+                    let at = (2 + mw + 14).max(used + 3);
+                    if at + pays.width() <= w as usize {
+                        n.push(s(format!("{}{}", " ".repeat(at - used), pays), theme::dim()));
+                    }
                 }
+                n
             }
             // designer (BISE-289): '+' accent, the tail when it fits
             ModelRow::Typed(m) => {
@@ -1096,6 +1116,6 @@ fn model_lines(
     }
     said(&mut v);
     blanks(&mut v, gap);
-    v.push(keyline("{↑↓} choose · {enter} ok · {esc} back"));
+    v.push(keybar("↑↓ choose   ⏎ ok   esc back"));
     v
 }

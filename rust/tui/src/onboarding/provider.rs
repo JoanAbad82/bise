@@ -16,6 +16,7 @@
 //! for it runs ([`take_line`]).
 
 use super::*;
+use super::signin::PLAN_USAGE_URL;
 use bise_catalog::auth::{EnvFile, From, Keys, Store};
 use std::sync::Mutex;
 
@@ -132,13 +133,17 @@ pub(crate) fn key_states(env: Env, home: &bise_home::Home, setup: &bise_catalog:
 /// The providers of the list: those the first run offers, then the
 /// others that run chats (hidden ones, local servers), in catalog order.
 pub(crate) fn all_providers(setup: &bise_catalog::Setup, ready: &dyn Fn(&bise_catalog::Provider) -> bool) -> (Vec<Provider>, Vec<Provider>) {
-    let offered = key_providers(setup);
+    // the ChatGPT plan first (subscriptions design), then the keys
+    let mut offered: Vec<Provider> = setup.catalog.providers.iter().filter(|p| p.signs_in() && p.needs.is_empty()).map(Provider::of).collect();
+    offered.extend(key_providers(setup));
     let others = setup
         .catalog
         .providers
         .iter()
         // voice-only ones (ElevenLabs) once they have a key (BISE-298)
         .filter(|p| p.needs.is_empty() && (!p.stt_only || ready(p)) && !offered.iter().any(|o| o.id == p.id))
+        // a sign-in (chatgpt) is no key and no local server: first, above
+        .filter(|p| !p.signs_in())
         // a private proxy (no keys page: foundry) only once it has a key
         .filter(|p| p.key_env.is_empty() || !p.keys_url.is_empty() || ready(p))
         .map(Provider::of)
@@ -161,6 +166,12 @@ pub(crate) enum Item {
     Keys,
     Billing,
     Remove,
+    /// the plan: `sign in again or switch account`
+    SignIn,
+    /// the plan: `sign out`
+    SignOut,
+    /// the plan: `your plan's usage on chatgpt.com ↗`
+    Usage,
 }
 
 impl Onb {
@@ -185,6 +196,7 @@ impl Onb {
             key_first: false,
             checked: None,
         });
+        o.fetch_plan_models();
         match ask.open {
             super::roles::Open::Providers => {}
             super::roles::Open::Roles => {
@@ -232,6 +244,9 @@ impl Onb {
 
     /// `p` can run a turn: a key found, or none needed.
     pub(crate) fn ready(&self, p: &Provider) -> bool {
+        if p.plan {
+            return matches!(self.plan, PlanState::SignedIn(_));
+        }
         p.key_env.is_empty() || self.key_state(&p.id).is_some_and(|k| k.from.is_some())
     }
 
@@ -250,7 +265,7 @@ impl Onb {
                 .map(Row::P)
                 .collect();
         }
-        let keyed = |p: &Provider| !p.key_env.is_empty() && self.ready(p) || p.id == self.mine;
+        let keyed = |p: &Provider| (!p.key_env.is_empty() || p.plan) && self.ready(p) || p.id == self.mine;
         let (shown, rest): (Vec<Provider>, Vec<Provider>) = others.into_iter().partition(keyed);
         let mut v: Vec<Row> = offered.into_iter().chain(shown).map(Row::P).collect();
         if pn.is_some_and(|p| p.more) {
@@ -263,6 +278,9 @@ impl Onb {
 
     /// A provider's menu rows: a keyless one has none (its roles line).
     pub(crate) fn items(&self, p: &Provider) -> Vec<Item> {
+        if p.plan {
+            return vec![Item::SignIn, Item::SignOut, Item::Usage];
+        }
         if p.key_env.is_empty() {
             return Vec::new();
         }
@@ -281,7 +299,7 @@ impl Onb {
 
     /// The model a key check of `p` runs with: the one asked for, main's
     /// when it is of `p`, `p`'s pick, else its first listed.
-    fn check_model(&self, p: &Provider, asked: Option<String>) -> Option<String> {
+    pub(super) fn check_model(&self, p: &Provider, asked: Option<String>) -> Option<String> {
         asked
             .or_else(|| (self.mine == p.id && !self.model.is_empty()).then(|| self.model.clone()))
             .or_else(|| self.models_of(p).into_iter().next())
@@ -291,6 +309,15 @@ impl Onb {
     fn open(&mut self, p: Provider, asked: Option<String>) -> Sub {
         if self.ready(&p) && asked.is_none() {
             return Sub::Menu(p, 0);
+        }
+        // the plan: its sign-in (not set up, signed out, expired)
+        if p.plan {
+            return self.sign_in(Kind::ChatGpt);
+        }
+        // OpenRouter: sign in, or paste its key
+        if p.id == Kind::OpenRouter.provider() && asked.is_none() {
+            self.note = None;
+            return Sub::OpenRouter(0);
         }
         self.paste_for(p, asked)
     }
@@ -457,6 +484,17 @@ impl Onb {
         let _ = env;
         match self.items(&p).get(i).copied() {
             Some(Item::Paste) => self.paste_for(p, None),
+            Some(Item::SignIn) => self.sign_in(Kind::ChatGpt),
+            Some(Item::SignOut) => {
+                self.say("signing out…".into());
+                self.sign_out();
+                Sub::Menu(p, i)
+            }
+            Some(Item::Usage) => {
+                let open = self.panel.as_ref().map_or(crate::links::open as fn(&str) -> bool, |pn| pn.opener);
+                self.say(if open(PLAN_USAGE_URL) { format!("opening {}", PLAN_USAGE_URL) } else { format!("could not open {}", PLAN_USAGE_URL) });
+                Sub::Menu(p, i)
+            }
             Some(Item::Keys) | Some(Item::Billing) => {
                 let url = if self.items(&p)[i] == Item::Keys { p.keys_url.clone() } else { p.billing_url.clone() };
                 let open = self.panel.as_ref().map_or(crate::links::open as fn(&str) -> bool, |pn| pn.opener);
@@ -480,7 +518,7 @@ pub(super) fn sub_provider(s: &Sub) -> Option<Provider> {
         | Sub::Works(p, ..)
         | Sub::Menu(p, _)
         | Sub::Remove(p) => Some(p.clone()),
-        Sub::List | Sub::Which(_) | Sub::Effort(..) => None,
+        Sub::List | Sub::Which(_) | Sub::Effort(..) | Sub::OpenRouter(_) | Sub::SignIn(..) => None,
     }
 }
 
@@ -504,13 +542,38 @@ fn from_words(o: &Onb, f: &From) -> String {
 /// A provider's state: `✓ saved in bise`, `✓ from OPENAI_API_KEY`, `✓ no key needed`,
 /// `not set up` (the roles it runs follow: [`role_tags`]).
 fn state_spans(o: &Onb, p: &Provider) -> Vec<Span<'static>> {
+    if p.plan {
+        return plan_spans(o);
+    }
     let v = match o.key_state(&p.id).and_then(|k| k.from.clone()) {
+        _ if o.setup.catalog.provider(&p.id).is_some_and(|p| !p.key_command().is_empty()) => vec![s(bise_catalog::KEY_COMMAND_STATE, theme::text())],
         _ if p.key_env.is_empty() => vec![s("✓ ", theme::accent()), s("no key needed", theme::text())],
         // the ✓ says ready (designer, BISE-298)
         Some(f) => vec![s("✓ ", theme::accent()), s(from_words(o, &f), theme::text())],
         None => vec![s("not set up", theme::dim())],
     };
     v
+}
+
+/// The ChatGPT row's state (designer): `✓ signed in · you@example.com ·
+/// Plus`, `signed out`, `not set up`, `▲ sign-in expired · ⏎ sign in again`.
+pub(super) fn plan_spans(o: &Onb) -> Vec<Span<'static>> {
+    match &o.plan {
+        PlanState::SignedIn(a) => {
+            let mut t = "signed in".to_string();
+            if !a.email.is_empty() {
+                t.push_str(&format!(" · {}", a.email));
+            }
+            if let Some(pl) = a.plan.as_deref().filter(|x| !x.trim().is_empty()) {
+                t.push_str(&format!(" · {}", pl.trim()));
+            }
+            vec![s("✓ ", theme::accent()), s(t, theme::text())]
+        }
+        PlanState::SignedOut => vec![s("signed out", theme::dim())],
+        PlanState::NotSetUp => vec![s("not set up", theme::dim())],
+        // designer: a failure is ▲, never ✗
+        PlanState::Expired => vec![s("▲ ", theme::error()), s("sign-in expired · ⏎ sign in again", theme::text())],
+    }
 }
 
 /// BISE-298: the roles `p` runs, by their names: `main · small jobs ·
@@ -559,7 +622,7 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
     let said = |v: &mut Vec<Line<'static>>| {
         if let Some(t) = &pn.said {
             v.push(Line::raw(""));
-            let c = if t.starts_with('✓') || t.starts_with("opening") { theme::text() } else { theme::error() };
+            let c = if t.starts_with('✓') || t.starts_with("opening") || t.starts_with("signing") { theme::text() } else { theme::error() };
             v.push(Line::from(s(t.clone(), c)));
         }
     };
@@ -639,13 +702,15 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
             }
             said(&mut v);
             blanks(&mut v, gap);
-            v.push(keyline("{↑↓} choose · {enter} open · {esc} back"));
+            v.push(keybar("↑↓ choose   ⏎ open   esc back"));
             v
         }
         Sub::Menu(p, i) => {
             let ks = o.key_state(&p.id);
             let mut v = vec![title(p.name.clone())];
             let head = match ks.and_then(|k| k.from.clone()) {
+                _ if p.plan => plan_spans(o).iter().map(|x| x.content.to_string()).collect(),
+                _ if o.setup.catalog.provider(&p.id).is_some_and(|p| !p.key_command().is_empty()) => bise_catalog::KEY_COMMAND_STATE.to_string(),
                 _ if p.key_env.is_empty() => "✓ no key needed".to_string(),
                 Some(f) => format!("✓ ready · {}", from_words(o, &f)),
                 None => "not set up".to_string(),
@@ -673,6 +738,9 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
                             Item::Keys => "open the keys page",
                             Item::Billing => "open billing",
                             Item::Remove => "remove the key",
+                            Item::SignIn => "sign in again or switch account",
+                            Item::SignOut => "sign out",
+                            Item::Usage => "your plan's usage on chatgpt.com ↗",
                         }
                     ),
                     theme::text(),
@@ -681,7 +749,7 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
             }
             said(&mut v);
             blanks(&mut v, gap);
-            v.push(keyline(if items.is_empty() { "{esc} back" } else { "{↑↓} choose · {enter} ok · {esc} back" }));
+            v.push(keybar(if items.is_empty() { "esc back" } else { "↑↓ choose   ⏎ ok   esc back" }));
             v
         }
         Sub::Remove(p) => {
@@ -697,7 +765,18 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
                 v.push(dim(format!("{} still gives me a key.", n)));
             }
             blanks(&mut v, gap);
-            v.push(keyline("{enter} remove · {esc} keep it"));
+            v.push(keybar("⏎ remove   esc keep it"));
+            v
+        }
+        // the plan signed in from here: who, and where its roles are picked
+        Sub::Works(p, _) if p.plan => {
+            let mut v = match &o.plan {
+                PlanState::SignedIn(a) => super::signed_in(a),
+                _ => vec![title("ChatGPT answered.")],
+            };
+            v.push(dim("your ChatGPT plan is ready. /models picks the roles it runs.".into()));
+            blanks(&mut v, gap);
+            v.push(super::keybar("⏎ ok"));
             v
         }
         Sub::Works(p, m) => {
@@ -713,7 +792,7 @@ pub(super) fn lines(o: &Onb, w: u16, gap: usize) -> Option<Vec<Line<'static>>> {
                 v.push(dim(format!("{} in your environment holds another key: i use this one.", n)));
             }
             blanks(&mut v, gap);
-            v.push(keyline("{enter} ok"));
+            v.push(keybar("⏎ ok"));
             v
         }
         _ => return None,
