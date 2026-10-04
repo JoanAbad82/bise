@@ -117,6 +117,14 @@ final class Capsule: NSObject, WKNavigationDelegate {
         web.underPageBackgroundColor = .clear
         web.autoresizingMask = [.width, .height]
         web.isInspectable = true
+        // the page never goes 'hidden' while the panel shows (amb-web m_6775:
+        // a transparent panel read as occluded, WebKit hid the page and
+        // stopped its frames until it drew: nothing ever drew): WebKit's
+        // window-occlusion detection off for the capsule (SPI, best effort;
+        // the near-invisible blur at show is the fallback, Capsule.blurFloor)
+        if web.responds(to: NSSelectorFromString("_setWindowOcclusionDetectionEnabled:")) {
+            web.setValue(false, forKey: "_windowOcclusionDetectionEnabled")
+        }
         root.addSubview(web)
         panel.contentView = root
 
@@ -310,13 +318,18 @@ final class Capsule: NSObject, WKNavigationDelegate {
     // it, never a blurred glass with no content yet (ambient's ghost glass)
     static let appearTime = 0.16
 
+    // the blur's lowest alpha while the panel is ordered in: never a fully
+    // transparent window, which macOS calls occluded (WebKit then hides the
+    // page); 0.01 draws nothing anyone can see (the ghost-glass rule holds)
+    static let blurFloor: CGFloat = 0.01
+
     // the native blur follows the page's own opacity, in and out
     private func blur(_ on: Bool, over t: Double) {
         NSAnimationContext.runAnimationGroup { c in
             c.duration = t
             c.timingFunction = on ? CAMediaTimingFunction(controlPoints: 0.16, 1, 0.3, 1)
                                   : CAMediaTimingFunction(controlPoints: 0.7, 0, 0.84, 0)
-            effect.animator().alphaValue = on ? 1 : 0
+            effect.animator().alphaValue = on ? 1 : Capsule.blurFloor
         }
     }
 
@@ -325,7 +338,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
         outJob?.cancel()
         outJob = nil
         if fade && !panel.isVisible { panel.alphaValue = 0 }
-        if !panel.isVisible { effect.alphaValue = 0 }
+        if !panel.isVisible { effect.alphaValue = Capsule.blurFloor }
         panel.orderFrontRegardless()
         blur(true, over: fade ? Capsule.fadeTime : Capsule.appearTime)
         trackMouse(true)
