@@ -1006,7 +1006,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // you away: no key or mouse for 5 minutes
     private var away: Bool {
         if harnessMode { return false }   // no session-event read (a TCC preflight) in harness mode
-        CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!) > 300
+        return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!) > 300
     }
 
     // one event into the visibility machine, then the panel follows it
