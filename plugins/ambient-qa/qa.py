@@ -3302,6 +3302,104 @@ HIS_BISE = os.path.expanduser("~/.bise/dev/build/ambient/target/debug/bise")
 LAUNCHD_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"   # what launchd gives an app opened from the Finder or a login item
 
 
+WINS_JS = os.path.join(HERE, "wins.js")
+# his own state: a harness path must never point there (ambient-lead m_8004)
+HIS_STATE = [os.path.expanduser(p) for p in ("~/.bise/hubs", "~/.bise/run", "~/.bise/dev/ambient", "~/.bise/sessions",
+                                              "~/.local/state/switchboard", "~/bise")]
+
+
+def real_windows(pid):
+    """The pid's windows and the online screens, from the window server (wins.js: bounds only)."""
+    r = subprocess.run(["osascript", "-l", "JavaScript", WINS_JS, str(pid)], capture_output=True, text=True, timeout=10)
+    if r.returncode != 0:
+        raise QAError("wins.js: %s" % r.stderr.strip()[-300:])
+    return json.loads(r.stdout)
+
+
+def _touches(w, screens):
+    """Does a window's rect share any area with a screen's (global top-left coords)?"""
+    return [s["id"] for s in screens
+            if w["x"] < s["x"] + s["w"] and s["x"] < w["x"] + w["w"] and w["y"] < s["y"] + s["h"] and s["y"] < w["y"] + w["h"]
+            and w["w"] > 0 and w["h"] > 0]
+
+
+def _app_type(pid):
+    """lsappinfo's ApplicationType for a pid: Foreground (Dock icon), UIElement (accessory), BackgroundOnly."""
+    r = subprocess.run(["lsappinfo", "info", "-only", "applicationtype", str(pid)], capture_output=True, text=True)
+    m = re.search(r'"ApplicationType"="([^"]+)"', r.stdout)
+    return m.group(1) if m else None
+
+
+def _front():
+    """The frontmost app: name and pid (lsappinfo, no permission)."""
+    asn = subprocess.run(["lsappinfo", "front"], capture_output=True, text=True).stdout.strip()
+    r = subprocess.run(["lsappinfo", "info", "-only", "name", "-only", "pid", asn], capture_output=True, text=True).stdout
+    name = re.search(r'"LSDisplayName"="([^"]*)"', r)
+    pid = re.search(r'"pid"\s*=\s*(\d+)', r)
+    return {"name": name.group(1) if name else None, "pid": int(pid.group(1)) if pid else None}
+
+
+def real_violations(pid):
+    """What breaks 'nothing in his face' right now: a window of the app touching a screen, the
+    app with a Dock icon, the app in front."""
+    v = []
+    try:
+        ws = real_windows(pid)
+    except (QAError, subprocess.TimeoutExpired, ValueError) as e:
+        return ["can't read the windows: %s" % e]
+    for w in ws["wins"]:
+        hit = _touches(w, ws["screens"])
+        if hit:
+            v.append("window %s at (%d,%d %dx%d) touches screen %s" % (w["n"], w["x"], w["y"], w["w"], w["h"], hit))
+    t = _app_type(pid)
+    if t == "Foreground":
+        v.append("the app has a Dock icon (ApplicationType Foreground)")
+    if _front().get("pid") == pid:
+        v.append("the app is frontmost")
+    return v
+
+
+def real_watch(pid, every=0.25):
+    """The independent guard (`qa.py _real_watch`, detached at launch): while the harness app
+    lives, every `every` s, a window touching a screen, a Dock icon or the app in front kills
+    it at once (SIGKILL) and writes why to <app dir>/watch.log."""
+    log = open(os.path.join(REAL_APP_DIR, "watch.log"), "a")
+    log.write("%s watching pid %d\n" % (time.strftime("%T"), pid))
+    log.flush()
+    while _pid_alive(pid):
+        v = real_violations(pid)
+        if v and not v[0].startswith("can't read"):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+            log.write("%s KILLED pid %d: %s\n" % (time.strftime("%T"), pid, "; ".join(v)))
+            log.flush()
+            return v
+        time.sleep(every)
+    log.write("%s pid %d gone\n" % (time.strftime("%T"), pid))
+    return []
+
+
+def _real_guard(argv, env):
+    """Refuse a launch whose paths reach his own state (his hubs, his app's socket and pid, his
+    sessions, his home workspace): the harness has its own HOME, BISE_HOME, state and hub."""
+    gate = os.path.realpath(os.path.expanduser("~/.bise/gate")) + "/"
+    if not os.path.realpath(REAL_HOME).startswith(gate):
+        raise QAError("refused: the harness HOME %s is not under ~/.bise/gate" % REAL_HOME)
+    vals = list(argv[1:]) + list(env.values())
+    for v in vals:
+        for part in re.split(r"[:=]", str(v)):
+            if not part.startswith("/"):
+                continue
+            rp = os.path.realpath(part)
+            if os.path.isfile(rp) and os.access(rp, os.X_OK) and not rp.endswith((".sock", ".pid")):
+                continue   # a program (his bise: ~/.bise/dev/build links into ~/.local/state/switchboard/build), never state
+            for his in HIS_STATE:
+                if rp == os.path.realpath(his) or rp.startswith(os.path.realpath(his) + "/"):
+                    raise QAError("refused: %r reaches his own state (%s)" % (v, his))
+
+
 def _prepare_home(home):
     """The isolated HOME laid out like his Mac: ~/.bise with migrated.json, so a process that
     gets no BISE_HOME (the env registry strips BISE_*/SB_* from children, 2eab3e15) still
@@ -3337,6 +3435,17 @@ def _bundle_exe(app):
     return exe
 
 
+def his_app_path():
+    """The PATH his running app hands its core (--env PATH=..., from ps), else this shell's."""
+    r = subprocess.run(["ps", "-axo", "args="], capture_output=True, text=True)
+    for line in r.stdout.splitlines():
+        if "/Contents/MacOS/bise ambient" in line and "--env PATH=" in line and REAL_DIR not in line:
+            m = re.search(r"--env PATH=(\S+)", line)
+            if m:
+                return m.group(1)
+    return os.environ.get("PATH", LAUNCHD_PATH)
+
+
 def _user_tmp():
     r = subprocess.run(["getconf", "DARWIN_USER_TEMP_DIR"], capture_output=True, text=True)
     return r.stdout.strip() or "/tmp/"
@@ -3360,7 +3469,7 @@ def real_alive():
         return None
 
 
-def real_launch(app=None, bise=None, root=None, args=None, timeout=40):
+def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None, path=None):
     """His real app (no --qa) on an isolated HOME and a throwaway fake-provider hub, as launchd
     would start it: PATH=/usr/bin:/bin:/usr/sbin:/sbin, HOME, his args (--workspace, --bise).
     bise: his (~/.bise/dev/build/ambient/target/debug/bise) unless given; root: the tree whose
@@ -3390,13 +3499,25 @@ def real_launch(app=None, bise=None, root=None, args=None, timeout=40):
            "USER": os.environ.get("USER", ""), "LOGNAME": os.environ.get("LOGNAME", os.environ.get("USER", "")),
            "SHELL": os.environ.get("SHELL", "/bin/zsh"), "LANG": os.environ.get("LANG", "en_US.UTF-8"),
            "AMBIENT_HARNESS": REAL_APP_DIR, "BISE_AMBIENT_TEST_INPUT": REAL_SOCK}
-    argv = [exe] + (list(args) if args is not None else ["--workspace", info["ws"], "--bise", bise])
+    # his own launch's args (amb-mac m_7974, from ps on his running app): --bise --web --workspace
+    # and --env BISE_APP_ROOT / PATH (what the core spawn gets); never --dev (his ~/.bise/dev):
+    # without it the app's dev dir is <BISE_HOME>/dev
+    web = web or os.path.join(root, "apps", "ambient", "web")
+    argv = [exe] + (list(args) if args is not None else
+                    ["--bise", bise, "--web", web, "--workspace", info["ws"],
+                     "--env", "BISE_APP_ROOT=%s" % root, "--env", "PATH=%s" % (path or his_app_path())])
+    _real_guard(argv, env)
     out = open(os.path.join(REAL_APP_DIR, "app.out"), "a")
     out.write("\n--- %s %s\n" % (time.strftime("%F %T"), " ".join(argv)))
     out.flush()
     p = subprocess.Popen(argv, env=env, cwd=REAL_HOME, stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True)
     with open(os.path.join(REAL_APP_DIR, "app.pid"), "w") as f:
         f.write(str(p.pid))
+    # the independent guard, from the first instant: a window on his screens, a Dock icon or the
+    # app in front kills it (the app's own frame guard quits it too, amb-mac's side)
+    subprocess.Popen([sys.executable, "-B", os.path.realpath(__file__), "_real_watch", str(p.pid)], cwd=REPO,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
+                     env=dict(os.environ, AMBIENT_REAL_DIR=REAL_DIR))
     t0, ping = time.time(), None
     while time.time() - t0 < timeout:
         if p.poll() is not None:
@@ -3410,6 +3531,13 @@ def real_launch(app=None, bise=None, root=None, args=None, timeout=40):
            "ping": ping, "logs": real_logs()}
     with open(REAL_RUN, "w") as f:
         json.dump(run, f, indent=1)
+    if ping:
+        # it reached only its own: its core's workspace is the throwaway one, its hub under the harness HOME
+        core_ws = ((real_call("state").get("core") or {}).get("workspace"))
+        hub = (real_feed().get("hub") or "")
+        if core_ws and os.path.realpath(core_ws) != os.path.realpath(info["ws"]) or not os.path.realpath(hub).startswith(os.path.realpath(REAL_HOME) + "/"):
+            real_stop()
+            raise QAError("refused after launch: the core's workspace %s or the hub %s is not the harness's own" % (core_ws, hub))
     if not ping:
         tail = open(os.path.join(REAL_APP_DIR, "app.out"), errors="replace").read()[-1500:]
         alive_now = p.poll() is None
@@ -3500,6 +3628,8 @@ def real_op(op, **kw):
     ping = real_alive()
     if not ping:
         raise QAError("the harness app isn't running: qa.py real launch first")
+    if op == "shot" and kw.get("window") not in ("bar", "side"):
+        raise QAError("shot: window bar or side only (the web view's own snapshot); never a display (ambient-lead m_8004)")
     ops = ping.get("ops")
     if ops and op not in ops and op != "ping":
         raise QAError("the harness app has no op %r (it has: %s)" % (op, ", ".join(ops)))
@@ -3507,13 +3637,130 @@ def real_op(op, **kw):
     return real_call(op, timeout=timeout, **kw)
 
 
+def real_click(selector, window="bar"):
+    """A click on a page element of a harness panel: its rect from the page (eval), the panel's
+    frame from state, to the virtual display's points (what mouse takes), then mouse click there
+    (AppKit's own hit test: ignoresMouseEvents and first-click rules apply)."""
+    sel = json.dumps(selector)
+    r = real_op("eval", window=window, js="(() => { const e = document.querySelector(%s); if (!e) return null; const b = e.getBoundingClientRect(); "
+                "return JSON.stringify({x: b.left, y: b.top, w: b.width, h: b.height}); })()" % sel)
+    v = r.get("value")
+    rect = json.loads(v) if isinstance(v, str) else v
+    if not rect:
+        raise QAError("click: no %s in the %s page" % (selector, window))
+    st = real_op("state")
+    w = st.get(window) or {}
+    f = w.get("frame_display") or w.get("frame")
+    if not f:
+        raise QAError("click: no frame for the %s panel in state: %s" % (window, list(st)))
+    x = f["x"] + rect["x"] + rect["w"] / 2
+    y = f["y"] + rect["y"] + rect["h"] / 2
+    out = real_op("mouse", x=x, y=y, kind="click")
+    out["at"] = {"x": x, "y": y, "element": rect, "panel": f}
+    return out
+
+
 def real_keys(*specs, window=None):
-    """Key presses into the harness app, as qa.py keys names them ('up', 'esc', 'return',
-    'cmd+w', 'type:hello'), delivered the way NSApp would to the window that has the keys."""
-    kw = {"seq": key_seq(specs)}
-    if window:
-        kw["window"] = window
-    return real_op("key", **kw)
+    """Key presses into the harness app ('up', 'esc', 'return', 'cmd+w', 'type:hello'), one key
+    op each in the app's format {key, mods} (amb-mac's: left right up down esc enter tab space
+    delete <char>), delivered the way NSApp would to the window that has the keys."""
+    names = {"return": "enter", "escape": "esc", "backspace": "delete"}
+    out = []
+    for spec in specs:
+        if spec.startswith("type:"):
+            out.append(real_op("type", text=spec[5:]))
+            continue
+        parts = [p for p in spec.replace("⌘", "cmd+").lower().split("+") if p]
+        *mods, k = parts
+        bad = [m for m in mods if m not in MODS]
+        if bad:
+            raise QAError("keys: unknown modifier in %r (cmd shift alt ctrl)" % spec)
+        kw = {"key": names.get(k, k), "mods": [MODS[m] for m in mods]}
+        if window:
+            kw["window"] = window
+        r = real_op("key", **kw)
+        r["spec"] = spec
+        out.append(r)
+    return out[0] if len(out) == 1 else {"keys": out}
+
+
+def real_proof(seconds=8.0):
+    """ONE short run that proves harness A stays out of his face (ambient-lead m_8004): sampled
+    every 0.5 s from launch to stop, at rest and while the bar shows (fn tap, fn hold, esc):
+    every window of the app vs every screen (none may touch one), the app never active and never
+    frontmost, his front app the same before, during and after, no Dock icon (ApplicationType),
+    no audio device or mic opened by the app's pid (coreaudiod's and TCC's logs over the run)."""
+    since = time.strftime("%Y-%m-%d %H:%M:%S")
+    out = {"front_before": _front(), "samples": 0, "violations": [], "windows_seen": {}, "screens": None,
+           "app_types": [], "app_active": [], "fronts": [], "steps": []}
+    pid = None
+    try:
+        run = real_launch()
+        pid = run["pid"]
+        out["pid"] = pid
+
+        def sample():
+            out["samples"] += 1
+            for v in real_violations(pid):
+                if v not in out["violations"]:
+                    out["violations"].append(v)
+            ws = real_windows(pid)
+            out["screens"] = ws["screens"]
+            for w in ws["wins"]:
+                out["windows_seen"][str(w["n"])] = {k: w[k] for k in ("x", "y", "w", "h", "onscreen")}
+            t = _app_type(pid)
+            if t not in out["app_types"]:
+                out["app_types"].append(t)
+            ping = real_alive() or {}
+            if ping.get("app_active") not in out["app_active"]:
+                out["app_active"].append(ping.get("app_active"))
+            f = _front().get("name")
+            if f not in out["fronts"]:
+                out["fronts"].append(f)
+
+        steps = [("rest", None), ("fn tap", lambda: real_op("fn", kind="tap")), ("esc", lambda: real_keys("esc")),
+                 ("fn hold 1 s", lambda: real_op("fn", kind="hold", ms=1000)), ("esc", lambda: real_keys("esc"))]
+        per = max(1.0, seconds / len(steps))
+        for name, act in steps:
+            if not _pid_alive(pid):
+                out["steps"].append({"name": name, "error": "the app is gone (a guard quit it?)"})
+                break
+            r = {"name": name}
+            try:
+                if act:
+                    act()
+            except QAError as e:
+                r["error"] = str(e)[:300]
+            t1 = time.time() + per
+            while time.time() < t1 and _pid_alive(pid):
+                sample()
+                time.sleep(0.5)
+            out["steps"].append(r)
+    finally:
+        out["stop"] = real_stop()
+        out["front_after"] = _front()
+    if pid:
+        lg = subprocess.run(["log", "show", "--style", "compact", "--start", since, "--predicate",
+                             'process == "coreaudiod" OR subsystem == "com.apple.TCC"'], capture_output=True, text=True, timeout=120).stdout
+        out["audio_or_tcc_lines"] = [l[:240] for l in lg.splitlines() if re.search(r"\b%d\b" % pid, l)][:20]
+        try:
+            out["watch_log"] = open(os.path.join(REAL_APP_DIR, "watch.log")).read().splitlines()[-4:]
+        except OSError:
+            pass
+    fails = list(out["violations"])
+    if True in out["app_active"]:
+        fails.append("the app said it was active")
+    if out["front_before"].get("name") != out["front_after"].get("name") or len(out["fronts"]) > 1:
+        fails.append("his front app changed: %s -> %s -> %s" % (out["front_before"].get("name"), out["fronts"], out["front_after"].get("name")))
+    if "Foreground" in out["app_types"]:
+        fails.append("a Dock icon")
+    if out.get("audio_or_tcc_lines"):
+        fails.append("coreaudiod/TCC logged the app's pid (see audio_or_tcc_lines)")
+    if not out["samples"]:
+        fails.append("no sample taken")
+    out["fails"] = fails
+    out["verdict"] = "pass" if not fails else "FAIL"
+    return out
 
 
 def _real_cli(a):
@@ -3529,15 +3776,12 @@ def _real_cli(a):
     if c == "keys":
         return real_keys(*a.specs, window=a.window)
     if c == "click":
-        kw = {"window": a.window}
         if a.at:
             x, y = (float(v) for v in a.at.split(","))
-            kw.update(x=x, y=y)
-        elif a.selector:
-            kw["selector"] = a.selector
-        else:
-            raise QAError("click: a selector or --at x,y")
-        return real_op("click", **kw)
+            return real_op("mouse", x=x, y=y, kind="click")
+        if a.selector:
+            return real_click(a.selector, a.window)
+        raise QAError("click: a selector or --at x,y (points from the virtual display's top-left)")
     if c == "type":
         return real_op("type", text=a.text)
     if c == "fn":
@@ -3557,6 +3801,8 @@ def _real_cli(a):
         return real_feed(a.agent, a.count)
     if c == "logs":
         return real_tail(a.n)
+    if c == "proof":
+        return real_proof(a.seconds)
     raise QAError("real: unknown %s" % c)
 
 
@@ -3567,6 +3813,7 @@ def _cli(argv):
     p = sub.add_parser("launch"); p.add_argument("--hub", default="fake"); p.add_argument("--no-app", action="store_true", help="the throwaway hub, its page server and the fake accounts only: never builds or opens the app"); p.add_argument("--connectors", action="store_true", help="hub model: the user's REAL connectors (needs --real-accounts-approved-by-user)"); p.add_argument("--computer", action="store_true", help="the QA hub may load the computer plugin: the user's browser (needs --real-accounts-approved-by-user)"); p.add_argument("--real-accounts-approved-by-user", default="", metavar="MESSAGE_ID", help="the user's own message asking for this one run"); p.add_argument("--workspace"); p.add_argument("--bise")
     p.add_argument("--web"); p.add_argument("--backdrop", default="dark"); p.add_argument("--force-build", action="store_true"); p.add_argument("--restart", action="store_true")
     p = sub.add_parser("stop"); p.add_argument("--keep-hub", action="store_true")
+    p = sub.add_parser("_real_watch"); p.add_argument("pid")
     p = sub.add_parser("real", help="harness A: his real app (no --qa) on an isolated HOME, a throwaway hub and an off-screen display, driven by its test socket")
     rs = p.add_subparsers(dest="rcmd", required=True)
     q = rs.add_parser("launch"); q.add_argument("--app"); q.add_argument("--bise"); q.add_argument("--root")
@@ -3577,7 +3824,8 @@ def _cli(argv):
     q = rs.add_parser("click", help="a click on a selector, or --at x,y (page CSS px)"); q.add_argument("selector", nargs="?"); q.add_argument("--at"); q.add_argument("--window", default="bar")
     q = rs.add_parser("type"); q.add_argument("text")
     q = rs.add_parser("fn"); q.add_argument("kind", choices=["down", "up", "tap", "hold"]); q.add_argument("--ms", type=int); q.add_argument("--words")
-    q = rs.add_parser("shot"); q.add_argument("--window", default="display")
+    q = rs.add_parser("shot"); q.add_argument("--window", default="bar", choices=["bar", "side"])
+    q = rs.add_parser("proof", help="one short run: no window on his screens, never active, his front app unchanged, no Dock icon, no audio"); q.add_argument("--seconds", type=float, default=8)
     q = rs.add_parser("eval"); q.add_argument("js"); q.add_argument("--window", default="bar")
     q = rs.add_parser("events"); q.add_argument("--since")
     q = rs.add_parser("feed", help="the hub's last lines of an agent: did his words reach main?"); q.add_argument("--agent", default="main"); q.add_argument("--count", type=int, default=40)
@@ -3639,6 +3887,8 @@ def _cli(argv):
     a = ap.parse_args(argv)
     if a.cmd == "_hub":
         return hub_daemon(a.bise, a.kind, a.connectors, a.computer, a.real_accounts_approved_by_user, a.keep, a.reuse, a.home)
+    if a.cmd == "_real_watch":
+        return real_watch(int(a.pid))
     if a.cmd == "real":
         print(json.dumps(_real_cli(a), indent=1, ensure_ascii=False))
         return

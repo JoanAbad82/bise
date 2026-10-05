@@ -550,6 +550,36 @@ def real_harness_hub_finds_its_hub_by_his_rules():
 
 
 @test
+def real_harness_stays_out_of_his_face_and_his_state():
+    """qa.py real: a window sharing any area with a screen is caught, one at -30000 is not; a launch whose args or env reach his hubs, his app's dev dir or his home workspace is refused; a display shot is refused"""
+    scr = [{"id": 1, "x": 0, "y": 0, "w": 1512, "h": 982}]
+    check(qa._touches({"x": 500, "y": 900, "w": 844, "h": 224}, scr) == [1], "a panel on his screen")
+    check(qa._touches({"x": -30000, "y": -30000, "w": 844, "h": 224}, scr) == [], "off every screen")
+    check(qa._touches({"x": 1512, "y": 0, "w": 10, "h": 10}, scr) == [], "edge only")
+    for bad in (["x", "--workspace", os.path.expanduser("~/bise")], ["x", "--dev", os.path.expanduser("~/.bise/dev")+"/ambient"]):
+        try:
+            qa._real_guard(bad, {})
+            check(False, "refused: %r" % bad)
+        except qa.QAError:
+            pass
+    try:
+        qa._real_guard(["x"], {"SB_STATE_DIR": os.path.expanduser("~/.bise/hubs/harness-1")})
+        check(False, "refused: his hub in env")
+    except qa.QAError:
+        pass
+    qa._real_guard(["x", "--bise", os.path.expanduser("~/.bise/dev/build/ambient/target/debug/bise")], {"HOME": qa.REAL_HOME})
+    real = qa.real_alive
+    qa.real_alive = lambda: {"ops": ["shot"]}
+    try:
+        qa.real_op("shot", window="display")
+        check(False, "a display shot must be refused")
+    except qa.QAError:
+        pass
+    finally:
+        qa.real_alive = real
+
+
+@test
 def key_specs_become_key_events():
     """keys: names, modifiers and typed text become the keys op's key codes and flags"""
     seq = qa.key_seq(["cmd+return", "up", "⌘2", "esc", "type:hi you"])
