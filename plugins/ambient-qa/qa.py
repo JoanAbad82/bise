@@ -3360,11 +3360,26 @@ def real_violations(pid):
     return v
 
 
+def _exe_pid(exe):
+    """The pid running exactly this executable (the harness bundle's own path), or None."""
+    r = subprocess.run(["pgrep", "-f", "^" + re.escape(exe)], capture_output=True, text=True)
+    pids = [int(x) for x in r.stdout.split()]
+    return pids[0] if pids else None
+
+
 def real_watch(pid, every=0.25):
     """The independent guard (`qa.py _real_watch`, detached at launch): while the harness app
     lives, every `every` s, a window touching a screen, a Dock icon or the app in front kills
     it at once (SIGKILL) and writes why to <app dir>/watch.log."""
     log = open(os.path.join(REAL_APP_DIR, "watch.log"), "a")
+    if isinstance(pid, str) and pid.startswith("exe:"):
+        exe, t0, pid = pid[4:], time.time(), None
+        while pid is None and time.time() - t0 < 60:
+            pid = _exe_pid(exe)
+            time.sleep(0.02)
+        if pid is None:
+            log.write("%s no process of %s in 60 s\n" % (time.strftime("%T"), exe))
+            return []
     log.write("%s watching pid %d\n" % (time.strftime("%T"), pid))
     log.flush()
     while _pid_alive(pid):
@@ -3519,23 +3534,36 @@ def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None,
     out = open(os.path.join(REAL_APP_DIR, "app.out"), "a")
     out.write("\n--- %s %s\n" % (time.strftime("%F %T"), " ".join(argv)))
     out.flush()
-    p = subprocess.Popen(argv, env=env, cwd=REAL_HOME, stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True)
-    with open(os.path.join(REAL_APP_DIR, "app.pid"), "w") as f:
-        f.write(str(p.pid))
-    # the independent guard, from the first instant: a window on his screens, a Dock icon or the
-    # app in front kills it (the app's own frame guard quits it too, amb-mac's side)
-    subprocess.Popen([sys.executable, "-B", os.path.realpath(__file__), "_real_watch", str(p.pid)], cwd=REPO,
+    # the independent guard first, watching for the harness executable's process: a window on his
+    # screens, a Dock icon or the app in front kills it (amb-mac's own guard quits it too)
+    subprocess.Popen([sys.executable, "-B", os.path.realpath(__file__), "_real_watch", "exe:" + exe], cwd=REPO,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
                      env=dict(os.environ, AMBIENT_REAL_DIR=REAL_DIR))
-    t0, ping = time.time(), None
+    # launched by launchd through open (-g: never to the front; -n: a new instance), so the app is
+    # its own responsible process: a TCC check is never attributed to the agent's terminal
+    # (the first proof: Ghostty), and its env is launchd's plus ours, like his own app's
+    out.close()
+    cmd = ["open", "-g", "-n", "-a", app, "--stdout", os.path.join(REAL_APP_DIR, "app.out"), "--stderr", os.path.join(REAL_APP_DIR, "app.out")]
+    for k, v in env.items():
+        cmd += ["--env", "%s=%s" % (k, v)]
+    cmd += ["--args"] + argv[1:]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if r.returncode != 0:
+        raise QAError("open failed: %s" % (r.stderr or r.stdout)[-500:])
+    t0, ping, pid = time.time(), None, None
     while time.time() - t0 < timeout:
-        if p.poll() is not None:
+        pid = pid or _exe_pid(exe)
+        if pid and not _pid_alive(pid):
             break
         ping = real_alive()
         if ping:
+            pid = ping.get("pid") or pid
             break
         time.sleep(0.25)
-    run = {"app": app, "exe": exe, "pid": p.pid, "argv": argv, "env": env, "bise": bise, "root": root, "tree": tree_info(root),
+    if pid:
+        with open(os.path.join(REAL_APP_DIR, "app.pid"), "w") as f:
+            f.write(str(pid))
+    run = {"app": app, "exe": exe, "pid": pid, "argv": argv, "env": env, "bise": bise, "root": root, "tree": tree_info(root),
            "home": REAL_HOME, "hub": {"state": info["state"], "ws": info["ws"], "tmp": info["tmp"]}, "socket": REAL_SOCK,
            "ping": ping, "logs": real_logs()}
     with open(REAL_RUN, "w") as f:
@@ -3549,10 +3577,14 @@ def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None,
             raise QAError("refused after launch: the core's workspace %s or the hub %s is not the harness's own" % (core_ws, hub))
     if not ping:
         tail = open(os.path.join(REAL_APP_DIR, "app.out"), errors="replace").read()[-1500:]
-        alive_now = p.poll() is None
+        alive_now = bool(pid and _pid_alive(pid))
         real_stop()
-        raise QAError("the harness app %s its test socket in %d s (exit %s); its output ends:\n%s"
-                      % ("didn't open" if alive_now else "quit before opening", timeout, p.poll(), tail))
+        try:
+            watch = open(os.path.join(REAL_APP_DIR, "watch.log")).read().splitlines()[-2:]
+        except OSError:
+            watch = []
+        raise QAError("the harness app %s its test socket in %d s; watch.log: %s; its output ends:\n%s"
+                      % ("didn't open" if alive_now else "quit before opening", timeout, watch, tail))
     return run
 
 
@@ -3907,7 +3939,7 @@ def _cli(argv):
     if a.cmd == "_hub":
         return hub_daemon(a.bise, a.kind, a.connectors, a.computer, a.real_accounts_approved_by_user, a.keep, a.reuse, a.home)
     if a.cmd == "_real_watch":
-        return real_watch(int(a.pid))
+        return real_watch(a.pid if a.pid.startswith("exe:") else int(a.pid))
     if a.cmd == "real":
         print(json.dumps(_real_cli(a), indent=1, ensure_ascii=False))
         return
