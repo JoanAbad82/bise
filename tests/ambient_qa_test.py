@@ -16,6 +16,7 @@ Run: python3 -u tests/ambient_qa_test.py [--live]
 import datetime
 import json
 import os
+import shutil
 import socket
 import subprocess
 import sys
@@ -527,6 +528,25 @@ def eval_reads_the_page_and_lets_fn_go():
         check(seen[-1] == ("fn", "cancel"), "fn let go after a failed read: %r" % seen)
     finally:
         qa.call = real
+
+
+@test
+def real_harness_hub_finds_its_hub_by_his_rules():
+    """qa.py real: the hub's env gets the isolated HOME and none of the overrides that would tell it where its state is; the home has ~/.bise/migrated.json like his Mac; the sockets fit"""
+    home = tempfile.mkdtemp(prefix="rh-")
+    env = {"SB_STATE_DIR": "/x", "BEND_SESSIONS_DIR": "/y", "BISE_HOME": "/z", "BISE_EXPORTS_FOR": "s", "BEND_PROVIDER_URL": "http://f"}
+    qa.real_home_env(env, home)
+    check(env == {"HOME": home, "BEND_PROVIDER_URL": "http://f"}, "env: %r" % env)
+    check(os.path.exists(os.path.join(home, ".bise", "migrated.json")), "migrated.json")
+    # <home>/.bise/hubs/<name>-<16 hex>/hub.sock under the 104-byte unix socket limit
+    check(len(os.path.join(qa.REAL_HOME, ".bise", "hubs", "ws-" + "0" * 16, "hub.sock")) < 100, "hub socket path too long: %s" % qa.REAL_HOME)
+    check(len(qa.REAL_SOCK) < 100, "test socket path too long")
+    try:
+        qa._bundle_exe(os.path.join(home, "none.app"))
+        check(False, "a missing app must be refused")
+    except qa.QAError:
+        pass
+    shutil.rmtree(home, ignore_errors=True)
 
 
 @test

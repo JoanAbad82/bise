@@ -24,6 +24,7 @@ copy of the app (scripts/ambient.sh builds the one path), pkill by name
 """
 import calendar
 import datetime
+import glob
 import json
 import os
 import re
@@ -315,7 +316,7 @@ class _ReusedEnv:
             shutil.rmtree(self.tmp, ignore_errors=True)
 
 
-def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="", keep=False, reuse=None):
+def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="", keep=False, reuse=None, home=None):
     """Runs detached (`qa.py _hub`): a throwaway hub on a fresh git repo,
     until SIGTERM. fake: tests/e2e.py's scripted provider, main answers
     "ack: <your words>" (`[[bash: ...]]` in what you say scripts it more).
@@ -366,11 +367,11 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="",
         # (canned Gmail, Slack, Linear, calendar...; their writes go to the outbox).
         # There and not only in <ws>/.agents (out of git): an agent in its own
         # worktree has no .agents of the repo's, so it had no Slack (ambient-lead m_5865)
-        home = os.path.join(E.tmp, "qa-user-plugins")
-        os.makedirs(home, exist_ok=True)
-        E.env["BEND_PLUGINS_HOME"] = home
+        plugins_home = os.path.join(E.tmp, "qa-user-plugins")
+        os.makedirs(plugins_home, exist_ok=True)
+        E.env["BEND_PLUGINS_HOME"] = plugins_home
         install_fake_accounts(E.ws)
-        install_fake_accounts(root=home)
+        install_fake_accounts(root=plugins_home)
         if not reuse:
             # acme's code, where Benjamin's reports live (ambient-lead m_5865, roadmap C)
             seed_repo(E.ws)
@@ -407,16 +408,34 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="",
         # e2e's start_hub waits 20 s: a loaded machine (5 agents building) needs more
         err_path = os.path.join(E.tmp, "hub.stderr")
         err = open(err_path, "a")
+        if home:
+            # harness A (qa.py real): the hub where his own rules put it for this HOME
+            # (<HOME>/.bise/hubs/<name>-<hash>, migrated.json present like on his Mac), never
+            # told by SB_STATE_DIR, so the app and its core find it the way they find his
+            real_home_env(E.env, home)
         E.hub = subprocess.Popen([bise, "sbd", "--workspace", E.ws], cwd=e2e.ROOT, env=E.env,
                                  stdin=subprocess.DEVNULL, stdout=err, stderr=err)
-        sock = os.path.join(E.state, "hub.sock")
+
+        def hub_sock():
+            if not home:
+                return os.path.join(E.state, "hub.sock")
+            found = sorted(glob.glob(os.path.join(home, ".bise", "hubs", "*", "hub.sock")))
+            return found[0] if found else os.path.join(home, ".bise", "hubs", "(none yet)", "hub.sock")
+        sock = hub_sock()
         t0 = time.time()
-        limit = 60 * e2e.load_factor()
+        # load_factor moved from e2e.py to tests/wait.py (1d0021ee); an older tree still has it in e2e
+        try:
+            from wait import load_factor
+        except ImportError:
+            load_factor = getattr(e2e, "load_factor", lambda: 1.0)
+        limit = 60 * load_factor()
         while not os.path.exists(sock):
+            sock = hub_sock()
             if E.hub.poll() is not None or time.time() - t0 > limit:
                 tail = open(err_path, errors="replace").read()[-3000:]
                 raise RuntimeError("the hub did not start in %.0f s (exit %s); its stderr:\n%s" % (limit, E.hub.poll(), tail))
             time.sleep(0.1)
+        E.state = os.path.dirname(sock)
         c = e2e.Client(sock)
         try:
             c.wait_status("main", "idle", 120)
@@ -431,7 +450,7 @@ def hub_daemon(bise, kind="fake", connectors=False, computer=False, user_ask="",
             raise RuntimeError("main never went idle in 120 s: %s; main's repl.log ends:\n%s" % (hint, tail))
         info = {"pid": os.getpid(), "kind": kind, "connectors": bool(connectors), "computer": bool(computer), "approved_by_user": user_ask or None, "tmp": E.tmp, "ws": E.ws, "state": E.state, "bise": bise,
                 "sets": os.environ.get("AMBIENT_QA_SET") or "", "keep": bool(keep), "reused": bool(reuse),
-                "env": {k: E.env[k] for k in ("SB_STATE_DIR",)}}
+                "env": {k: E.env[k] for k in ("SB_STATE_DIR",) if k in E.env}, "home": home}
         with open(HUB + ".tmp", "w") as f:
             json.dump(info, f)
         os.replace(HUB + ".tmp", HUB)
@@ -575,11 +594,11 @@ def hub_plugins_state(dir_, computer=False, keep_user=False):
     return path
 
 
-def _start_hub(bise, root, kind="fake", connectors=False, computer=False, user_ask="", keep=False, reuse=None, sets=""):
+def _start_hub(bise, root, kind="fake", connectors=False, computer=False, user_ask="", keep=False, reuse=None, sets="", home=None):
     old = _read(HUB)
     if old and _pid_alive(old.get("pid")):
         same = (old.get("kind", "fake"), old.get("bise"), bool(old.get("connectors")), bool(old.get("computer")), old.get("sets", "")) == (kind, bise, bool(connectors), bool(computer), sets)
-        if same and not keep and not reuse:
+        if same and not keep and not reuse and not home and not old.get("home"):
             return old
         _stop_hub()
     # never a hub on stale helpers: the tree's own bins.sh first (ambient-lead m_5829)
@@ -594,7 +613,7 @@ def _start_hub(bise, root, kind="fake", connectors=False, computer=False, user_a
     env["AMBIENT_QA_DIR"] = QA_DIR  # without SB_AGENT the daemon would pick another QA dir
     env["AMBIENT_QA_SET"] = sets
     p = subprocess.Popen([sys.executable, "-u", os.path.realpath(__file__), "_hub", "--bise", bise, "--kind", kind]
-                         + (["--keep"] if keep else []) + (["--reuse", reuse] if reuse else [])
+                         + (["--keep"] if keep else []) + (["--reuse", reuse] if reuse else []) + (["--home", home] if home else [])
                          + (["--connectors"] if connectors else []) + (["--computer"] if computer else [])
                          + (["--real-accounts-approved-by-user", user_ask] if user_ask else []),
                          stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True, cwd=REPO, env=env)
@@ -3261,6 +3280,286 @@ def play(events, shots=(), name="play", backdrop=None, out=None, mute_core=True)
 
 # ---------------------------------------------------------------- the CLI
 
+# ---------------------------------------------------------------- harness A: the real app
+
+# `qa.py real` (ambient-lead m_7961): his REAL app build (no --qa), its normal path (core spawn
+# with --bise and the env launchd gives, focus logic, main menu), on an isolated HOME with a
+# throwaway fake-provider hub found by his own rules, its panels on an off-screen virtual
+# display, driven through amb-mac's test input socket (NSEvents into the app's own queue,
+# never HID). The app side honors the socket only when BISE_HOME is set and isn't ~/.bise.
+
+def _short_agent():
+    return re.sub(r"[^a-z0-9]", "", (os.environ.get("SB_AGENT") or "me").lower())[:10] or "me"
+
+
+REAL_DIR = os.environ.get("AMBIENT_REAL_DIR") or os.path.join(os.path.expanduser("~/.bise/gate"), "ra-" + _short_agent())
+REAL_HOME = os.path.join(REAL_DIR, "h")         # the isolated HOME: short, the hub's socket lives under it
+REAL_APP_DIR = os.path.join(REAL_DIR, "app")    # AMBIENT_HARNESS: the app's test.sock and its output
+REAL_SOCK = os.path.join(REAL_APP_DIR, "test.sock")
+REAL_RUN = os.path.join(REAL_DIR, "run.json")
+REAL_APP = os.path.expanduser("~/.bise/dev/build/ambient/harness/bise ambient.app")
+HIS_BISE = os.path.expanduser("~/.bise/dev/build/ambient/target/debug/bise")
+LAUNCHD_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"   # what launchd gives an app opened from the Finder or a login item
+
+
+def _prepare_home(home):
+    """The isolated HOME laid out like his Mac: ~/.bise with migrated.json, so a process that
+    gets no BISE_HOME (the env registry strips BISE_*/SB_* from children, 2eab3e15) still
+    resolves <HOME>/.bise, as his core does."""
+    b = os.path.join(home, ".bise")
+    os.makedirs(b, exist_ok=True)
+    m = os.path.join(b, "migrated.json")
+    if not os.path.exists(m):
+        with open(m, "w") as f:
+            json.dump({"first": False, "copied": [], "moved": [], "by": "ambient-qa real"}, f)
+    os.makedirs(os.path.join(home, "Library", "Logs"), exist_ok=True)
+
+
+def real_home_env(env, home):
+    """A hub's env for harness A: HOME = the isolated one, and none of the overrides that would
+    tell the hub (or anyone it starts) where its state is: his rules find it."""
+    env["HOME"] = home
+    for k in ("SB_STATE_DIR", "BEND_SESSIONS_DIR", "BISE_HOME", "BISE_EXPORTS_FOR"):
+        env.pop(k, None)
+    _prepare_home(home)
+    return env
+
+
+def _bundle_exe(app):
+    plist = os.path.join(app, "Contents", "Info.plist")
+    name = None
+    if os.path.exists(plist):
+        r = subprocess.run(["/usr/libexec/PlistBuddy", "-c", "Print :CFBundleExecutable", plist], capture_output=True, text=True)
+        name = r.stdout.strip() or None
+    exe = os.path.join(app, "Contents", "MacOS", name or os.path.splitext(os.path.basename(app))[0])
+    if not _is_exe(exe):
+        raise QAError("no app at %s (amb-mac's harness build: ~/.bise/dev/build/ambient/harness/; or pass app=)" % exe)
+    return exe
+
+
+def _user_tmp():
+    r = subprocess.run(["getconf", "DARWIN_USER_TEMP_DIR"], capture_output=True, text=True)
+    return r.stdout.strip() or "/tmp/"
+
+
+def real_call(op, timeout=30.0, **kw):
+    try:
+        c = Client(REAL_SOCK)
+    except QAError:
+        raise QAError("the harness app isn't running (no %s): qa.py real launch first" % REAL_SOCK)
+    try:
+        return c.call(op, timeout=timeout, **kw)
+    finally:
+        c.close()
+
+
+def real_alive():
+    try:
+        return real_call("ping", timeout=3)
+    except (QAError, OSError, ValueError):
+        return None
+
+
+def real_launch(app=None, bise=None, root=None, args=None, timeout=40):
+    """His real app (no --qa) on an isolated HOME and a throwaway fake-provider hub, as launchd
+    would start it: PATH=/usr/bin:/bin:/usr/sbin:/sbin, HOME, his args (--workspace, --bise).
+    bise: his (~/.bise/dev/build/ambient/target/debug/bise) unless given; root: the tree whose
+    repl-live and sb-core the hub runs (bins.sh makes them current), default this tree.
+    One harness at a time: a QA app of this agent and an older harness are stopped first."""
+    app = os.path.abspath(app or os.environ.get("AMBIENT_REAL_APP") or REAL_APP)
+    exe = _bundle_exe(app)
+    bise = os.path.abspath(bise or os.environ.get("AMBIENT_QA_BISE") or HIS_BISE)
+    if not _is_exe(bise):
+        raise QAError("no bise at %s: pass bise=" % bise)
+    root = root or os.environ.get("AMBIENT_QA_APP_ROOT") or app_root_of(bise) or REPO
+    if alive():
+        stop()
+    real_stop()
+    if os.path.isdir(REAL_HOME):
+        if not os.path.realpath(REAL_HOME).startswith(os.path.realpath(os.path.expanduser("~/.bise/gate")) + "/"):
+            raise QAError("refusing to clear %s: not under ~/.bise/gate" % REAL_HOME)
+        shutil.rmtree(REAL_HOME, ignore_errors=True)
+    _prepare_home(REAL_HOME)
+    os.makedirs(REAL_APP_DIR, exist_ok=True)
+    try:
+        os.unlink(REAL_SOCK)
+    except OSError:
+        pass
+    info = _start_hub(bise, root, "fake", home=REAL_HOME)
+    env = {"HOME": REAL_HOME, "BISE_HOME": os.path.join(REAL_HOME, ".bise"), "PATH": LAUNCHD_PATH, "TMPDIR": _user_tmp(),
+           "USER": os.environ.get("USER", ""), "LOGNAME": os.environ.get("LOGNAME", os.environ.get("USER", "")),
+           "SHELL": os.environ.get("SHELL", "/bin/zsh"), "LANG": os.environ.get("LANG", "en_US.UTF-8"),
+           "AMBIENT_HARNESS": REAL_APP_DIR, "BISE_AMBIENT_TEST_INPUT": REAL_SOCK}
+    argv = [exe] + (list(args) if args is not None else ["--workspace", info["ws"], "--bise", bise])
+    out = open(os.path.join(REAL_APP_DIR, "app.out"), "a")
+    out.write("\n--- %s %s\n" % (time.strftime("%F %T"), " ".join(argv)))
+    out.flush()
+    p = subprocess.Popen(argv, env=env, cwd=REAL_HOME, stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True)
+    with open(os.path.join(REAL_APP_DIR, "app.pid"), "w") as f:
+        f.write(str(p.pid))
+    t0, ping = time.time(), None
+    while time.time() - t0 < timeout:
+        if p.poll() is not None:
+            break
+        ping = real_alive()
+        if ping:
+            break
+        time.sleep(0.25)
+    run = {"app": app, "exe": exe, "pid": p.pid, "argv": argv, "env": env, "bise": bise, "root": root, "tree": tree_info(root),
+           "home": REAL_HOME, "hub": {"state": info["state"], "ws": info["ws"], "tmp": info["tmp"]}, "socket": REAL_SOCK,
+           "ping": ping, "logs": real_logs()}
+    with open(REAL_RUN, "w") as f:
+        json.dump(run, f, indent=1)
+    if not ping:
+        tail = open(os.path.join(REAL_APP_DIR, "app.out"), errors="replace").read()[-1500:]
+        alive_now = p.poll() is None
+        real_stop()
+        raise QAError("the harness app %s its test socket in %d s (exit %s); its output ends:\n%s"
+                      % ("didn't open" if alive_now else "quit before opening", timeout, p.poll(), tail))
+    return run
+
+
+def real_logs():
+    """Where each layer of harness A writes: the app's output, its own logs under the isolated
+    HOME (<HOME>/.bise/ambient/*.log: app.log, core.log), the hub's dir."""
+    logs = [os.path.join(REAL_APP_DIR, "app.out")]
+    logs += sorted(glob.glob(os.path.join(REAL_HOME, ".bise", "ambient", "*.log")))
+    logs += sorted(glob.glob(os.path.join(REAL_HOME, ".bise", "dev", "ambient", "*.log")))
+    logs += sorted(glob.glob(os.path.join(REAL_HOME, ".bise", "hubs", "*", "hub.log")))
+    return logs
+
+
+def real_tail(n=40):
+    """The last n lines of every log of harness A, by file."""
+    out = {}
+    for p in real_logs():
+        try:
+            out[p] = open(p, errors="replace").read().splitlines()[-n:]
+        except OSError:
+            pass
+    return out
+
+
+def real_feed(agent="main", count=40):
+    """What the hub holds for an agent (main: did his words arrive?): its last lines, read
+    from the throwaway hub's own socket ({op:history})."""
+    socks = sorted(glob.glob(os.path.join(REAL_HOME, ".bise", "hubs", "*", "hub.sock")))
+    if not socks:
+        raise QAError("no harness hub under %s" % REAL_HOME)
+    s = socket.socket(socket.AF_UNIX)
+    s.settimeout(8)
+    s.connect(socks[0])
+    try:
+        s.sendall(b'{"op":"hello"}\n')
+        s.sendall((json.dumps({"op": "history", "agent": agent, "before": 10 ** 9, "count": count}) + "\n").encode())
+        f = s.makefile("r")
+        state = None
+        while True:
+            line = f.readline()
+            if not line:
+                raise QAError("the hub closed the socket")
+            v = json.loads(line)
+            if v.get("ev") == "state":
+                state = v
+            if v.get("ev") == "history" and v.get("agent") == agent:
+                agents = [(a.get("name"), a.get("status")) for a in (state or {}).get("agents", [])]
+                return {"agent": agent, "lines": v.get("lines", []), "agents": agents, "hub": socks[0]}
+    finally:
+        s.close()
+
+
+def real_stop():
+    """Quit the harness app (its own pid only: a normal terminate, then SIGTERM) and its hub."""
+    out = {"app": "not running", "hub": "not running"}
+    pid = None
+    try:
+        pid = int(open(os.path.join(REAL_APP_DIR, "app.pid")).read().strip())
+    except (OSError, ValueError):
+        pass
+    if real_alive():
+        try:
+            real_call("quit", timeout=3)
+        except (QAError, OSError):
+            pass
+    if pid and _pid_alive(pid):
+        t0 = time.time()
+        while _pid_alive(pid) and time.time() - t0 < 5:
+            time.sleep(0.1)
+        if _pid_alive(pid):
+            os.kill(pid, signal.SIGTERM)
+        out["app"] = "stopped pid %d" % pid
+    info = _read(HUB)
+    if info and info.get("home") and _stop_hub():
+        out["hub"] = "stopped"
+    return out
+
+
+def real_op(op, **kw):
+    """One op on the harness app's test socket (amb-mac's: ping state click key type fn shot
+    eval events quit), checked against the ops its ping lists."""
+    ping = real_alive()
+    if not ping:
+        raise QAError("the harness app isn't running: qa.py real launch first")
+    ops = ping.get("ops")
+    if ops and op not in ops and op != "ping":
+        raise QAError("the harness app has no op %r (it has: %s)" % (op, ", ".join(ops)))
+    timeout = 30 + float(kw.get("ms", 0) or 0) / 1000
+    return real_call(op, timeout=timeout, **kw)
+
+
+def real_keys(*specs, window=None):
+    """Key presses into the harness app, as qa.py keys names them ('up', 'esc', 'return',
+    'cmd+w', 'type:hello'), delivered the way NSApp would to the window that has the keys."""
+    kw = {"seq": key_seq(specs)}
+    if window:
+        kw["window"] = window
+    return real_op("key", **kw)
+
+
+def _real_cli(a):
+    c = a.rcmd
+    if c == "launch":
+        return real_launch(a.app, a.bise, a.root)
+    if c == "stop":
+        return real_stop()
+    if c in ("ping", "state"):
+        return real_op(c)
+    if c == "op":
+        return real_op(a.name, **json.loads(a.args))
+    if c == "keys":
+        return real_keys(*a.specs, window=a.window)
+    if c == "click":
+        kw = {"window": a.window}
+        if a.at:
+            x, y = (float(v) for v in a.at.split(","))
+            kw.update(x=x, y=y)
+        elif a.selector:
+            kw["selector"] = a.selector
+        else:
+            raise QAError("click: a selector or --at x,y")
+        return real_op("click", **kw)
+    if c == "type":
+        return real_op("type", text=a.text)
+    if c == "fn":
+        kw = {"kind": a.kind}
+        if a.ms:
+            kw["ms"] = a.ms
+        if a.words:
+            kw["words"] = a.words
+        return real_op("fn", **kw)
+    if c == "shot":
+        return real_op("shot", window=a.window)
+    if c == "eval":
+        return real_op("eval", window=a.window, js=a.js)
+    if c == "events":
+        return real_op("events", **({"since": a.since} if a.since else {}))
+    if c == "feed":
+        return real_feed(a.agent, a.count)
+    if c == "logs":
+        return real_tail(a.n)
+    raise QAError("real: unknown %s" % c)
+
+
 def _cli(argv):
     import argparse
     ap = argparse.ArgumentParser(prog="qa.py", description=__doc__.split("\n\n")[0])
@@ -3268,6 +3567,21 @@ def _cli(argv):
     p = sub.add_parser("launch"); p.add_argument("--hub", default="fake"); p.add_argument("--no-app", action="store_true", help="the throwaway hub, its page server and the fake accounts only: never builds or opens the app"); p.add_argument("--connectors", action="store_true", help="hub model: the user's REAL connectors (needs --real-accounts-approved-by-user)"); p.add_argument("--computer", action="store_true", help="the QA hub may load the computer plugin: the user's browser (needs --real-accounts-approved-by-user)"); p.add_argument("--real-accounts-approved-by-user", default="", metavar="MESSAGE_ID", help="the user's own message asking for this one run"); p.add_argument("--workspace"); p.add_argument("--bise")
     p.add_argument("--web"); p.add_argument("--backdrop", default="dark"); p.add_argument("--force-build", action="store_true"); p.add_argument("--restart", action="store_true")
     p = sub.add_parser("stop"); p.add_argument("--keep-hub", action="store_true")
+    p = sub.add_parser("real", help="harness A: his real app (no --qa) on an isolated HOME, a throwaway hub and an off-screen display, driven by its test socket")
+    rs = p.add_subparsers(dest="rcmd", required=True)
+    q = rs.add_parser("launch"); q.add_argument("--app"); q.add_argument("--bise"); q.add_argument("--root")
+    for n in ("stop", "ping", "state"):
+        rs.add_parser(n)
+    q = rs.add_parser("op", help="any op of the test socket: op <name> '<json args>'"); q.add_argument("name"); q.add_argument("args", nargs="?", default="{}")
+    q = rs.add_parser("keys", help="up esc return cmd+w type:<text> ..."); q.add_argument("specs", nargs="+"); q.add_argument("--window")
+    q = rs.add_parser("click", help="a click on a selector, or --at x,y (page CSS px)"); q.add_argument("selector", nargs="?"); q.add_argument("--at"); q.add_argument("--window", default="bar")
+    q = rs.add_parser("type"); q.add_argument("text")
+    q = rs.add_parser("fn"); q.add_argument("kind", choices=["down", "up", "tap", "hold"]); q.add_argument("--ms", type=int); q.add_argument("--words")
+    q = rs.add_parser("shot"); q.add_argument("--window", default="display")
+    q = rs.add_parser("eval"); q.add_argument("js"); q.add_argument("--window", default="bar")
+    q = rs.add_parser("events"); q.add_argument("--since")
+    q = rs.add_parser("feed", help="the hub's last lines of an agent: did his words reach main?"); q.add_argument("--agent", default="main"); q.add_argument("--count", type=int, default=40)
+    q = rs.add_parser("logs"); q.add_argument("--n", type=int, default=40)
     p = sub.add_parser("scenes"); p.add_argument("--only"); p.add_argument("--backdrops", default="dark"); p.add_argument("--out"); p.add_argument("--what", default="both")
     p.add_argument("--reduce-motion", action="store_true"); p.add_argument("--tokens"); p.add_argument("--screen-h", type=int, default=300)
     p.add_argument("--frames", help="a scene id: a strip of frames"); p.add_argument("--every", type=int, default=80)
@@ -3321,10 +3635,13 @@ def _cli(argv):
     p.add_argument("kind", choices=["stop", "page", "watch", "card"]); p.add_argument("ref")
     p = sub.add_parser("inject"); p.add_argument("ev")
     p = sub.add_parser("_hub"); p.add_argument("--bise", required=True); p.add_argument("--kind", default="fake"); p.add_argument("--connectors", action="store_true"); p.add_argument("--computer", action="store_true")
-    p.add_argument("--real-accounts-approved-by-user", default=""); p.add_argument("--keep", action="store_true"); p.add_argument("--reuse")
+    p.add_argument("--real-accounts-approved-by-user", default=""); p.add_argument("--keep", action="store_true"); p.add_argument("--reuse"); p.add_argument("--home")
     a = ap.parse_args(argv)
     if a.cmd == "_hub":
-        return hub_daemon(a.bise, a.kind, a.connectors, a.computer, a.real_accounts_approved_by_user, a.keep, a.reuse)
+        return hub_daemon(a.bise, a.kind, a.connectors, a.computer, a.real_accounts_approved_by_user, a.keep, a.reuse, a.home)
+    if a.cmd == "real":
+        print(json.dumps(_real_cli(a), indent=1, ensure_ascii=False))
+        return
     if a.cmd == "launch":
         r = launch(a.hub, a.workspace, a.bise, a.web, a.backdrop, a.force_build, a.restart, a.connectors, a.computer, a.real_accounts_approved_by_user, a.no_app)
     elif a.cmd == "stop":

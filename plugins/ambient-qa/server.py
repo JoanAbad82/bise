@@ -33,6 +33,8 @@ TOOLS = [
     ("fn_hold_closed", "fn held from rest (capsule closed, bise not frontmost) through the real key path (KeyMachine via Keys.qaEvent; the QA app has no tap, never his fn): the pearl listens within within_ms, the fake voice's words reach the core on release, main's line shows; variants launch, fold (opened then folded by itself), hide (fn + .); then a tap must do nothing.",
      {"variants": {"type": "array", "items": {"type": "string", "enum": ["launch", "fold", "hide"]}}, "words": {"type": "string"}, "within_ms": {"type": "integer"}}, []),
     ("rest", "The capsule back to rest (folded into the icon) and bise not the active app.", {}, []),
+    ("real", "Harness A: his REAL app build (no --qa) on an isolated HOME, a throwaway fake-provider hub found by his own rules, its panels on an off-screen virtual display, driven through the app's test socket (NSEvents into its own queue, never HID, never his screen, focus or keyboard). do: launch (app?, bise? default his ~/.bise/dev/build/ambient/target/debug/bise), stop (always, right after a run), feed (the hub's last lines of main: did his words arrive), logs (the tail of the app's, core's and hub's logs), keys (specs like up esc return cmd+w type:hello), or any test-socket op (ping state click key type fn shot eval events) with args.",
+     {"do": {"type": "string"}, "args": {"type": "object"}, "specs": {"type": "array", "items": {"type": "string"}}}, ["do"]),
     ("eval", "Read one JS expression on the capsule's page: its value (JSON parsed), and whether the panel is visible. fn_held: read while fn is held (talk open), then cancel. Reads only: never act on the page with it.",
      {"js": {"type": "string"}, "fn_held": {"type": "boolean"}}, ["js"]),
     ("hover", "The pointer over an element: mouseMoved events at its point into the QA app's queue for ms (his pointer never moves); over = the page saw it. Can't drive tracking areas (cursor shape).",
@@ -128,6 +130,22 @@ def run(name, a):
         r = qa.fn_hold_closed(tuple(a.get("variants") or ("launch", "fold", "hide")), a.get("words", "what is on my plate today"), within_ms=a.get("within_ms", 300))
     elif name == "rest":
         r = qa.rest()
+    elif name == "real":
+        d, kw = a["do"], dict(a.get("args") or {})
+        if d == "launch":
+            r = qa.real_launch(kw.get("app"), kw.get("bise"), kw.get("root"))
+        elif d == "stop":
+            r = qa.real_stop()
+        elif d == "feed":
+            r = qa.real_feed(kw.get("agent", "main"), kw.get("count", 40))
+        elif d == "logs":
+            r = qa.real_tail(kw.get("n", 40))
+        elif d == "keys":
+            r = qa.real_keys(*(a.get("specs") or []), window=kw.get("window"))
+        else:
+            r = qa.real_op(d, **kw)
+        if d == "shot" and r.get("png"):
+            images.append(r["png"])
     elif name == "eval":
         r = qa.eval_js(a["js"], fn_held=a.get("fn_held", False))
     elif name == "hover":
