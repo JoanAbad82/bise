@@ -23,6 +23,18 @@ MainActor.assumeIsolated {
     law("launch smoke: nothing on screen at launch", !c.panel.isVisible && c.hidden)
     law("launch smoke: the panel never animates or casts a shadow",
         c.panel.animationBehavior == .none && !c.panel.hasShadow)
+
+    // harness A (card #428): made far off every screen, from init
+    let screens = NSScreen.screens.map(\.frame)
+    let before = Set(NSApp.windows.map { ObjectIdentifier($0) })
+    let off = Capsule(side: true, offScreen: true)
+    law("harness smoke: the panel is made off every screen", !Placement.touches(off.panel.frame, screens: screens))
+    law("harness smoke: invisible until placed and shown", off.panel.alphaValue == 0 && !off.panel.isVisible)
+    let made = NSApp.windows.filter { !before.contains(ObjectIdentifier($0)) }
+    law("harness smoke: no other window made on a screen (no radius probe)",
+        made.allSatisfy { !Placement.touches($0.frame, screens: screens) })
+    off.apply(CapsuleShape(w: 524, h: 900, radius: 26, note: nil, glass: CGRect(x: 84, y: 0, width: 440, height: 900)))
+    law("harness smoke: placed by its first app_size, still off every screen", !Placement.touches(off.panel.frame, screens: screens))
 }
 
 if failures > 0 { print("\(failures) failed"); exit(1) }

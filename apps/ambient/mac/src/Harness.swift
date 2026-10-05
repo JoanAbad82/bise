@@ -452,16 +452,37 @@ final class Harness {
         exit(3)
     }
 
-    func checkAll() { for w in NSApp.windows where w.isVisible { _ = check(w) } }
+    // every window AppKit has, shown or not, and every window the window
+    // server has for this pid (on screen or not), against every display
+    func checkAll() {
+        for w in NSApp.windows { _ = check(w) }
+        var n: UInt32 = 0
+        CGGetActiveDisplayList(0, nil, &n)
+        var ids = [CGDirectDisplayID](repeating: 0, count: Int(n))
+        CGGetActiveDisplayList(n, &ids, &n)
+        let displays = ids.map { CGDisplayBounds($0) }      // CG global coords, like the list's bounds
+        let me = getpid()
+        let list = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] ?? []
+        for w in list where (w[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == me {
+            guard let b = w[kCGWindowBounds as String] as? NSDictionary, let r = CGRect(dictionaryRepresentation: b) else { continue }
+            if Placement.touches(r, screens: displays) {
+                let num = (w[kCGWindowNumber as String] as? NSNumber)?.intValue ?? -1
+                let on = (w[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue ?? false
+                Log.say("harness: GUARD: window server window #\(num) bounds \(r) onscreen \(on) touches a display \(displays): quitting now")
+                for x in NSApp.windows where x.windowNumber == num { x.orderOut(nil) }
+                exit(3)
+            }
+        }
+    }
 
-    // every 0.25 s, on a screen change, and when any window moves or shows
+    // every 50 ms from the first run-loop tick, on a screen change, and when any window moves or shows
     func startGuard() {
         let nc = NotificationCenter.default
         for n in [NSWindow.didMoveNotification, NSWindow.didResizeNotification, NSWindow.didChangeScreenNotification,
                   NSWindow.didChangeOcclusionStateNotification, NSApplication.didChangeScreenParametersNotification] {
             nc.addObserver(forName: n, object: nil, queue: .main) { [weak self] _ in MainActor.assumeIsolated { self?.checkAll() } }
         }
-        guardTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.checkAll() } }
+        guardTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.checkAll() } }
         checkAll()
     }
 

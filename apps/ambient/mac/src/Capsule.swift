@@ -43,8 +43,12 @@ final class CapsuleWebView: WKWebView {
 // titlebar-only window is 16) through the private _cornerRadius, best
 // effort; else a table by major version.
 @MainActor
-func macWindowRadius() -> CGFloat {
-    let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+func macWindowRadius(offScreen: Bool = false) -> CGFloat {
+    let table: CGFloat = ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 ? 26 : 10
+    // harness A: no probe window at all (the table)
+    if offScreen { return table }
+    // far off every screen, never ordered in (only its corner radius is read)
+    let w = NSWindow(contentRect: NSRect(x: -30000, y: -30000, width: 400, height: 300),
                      styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
     w.isReleasedWhenClosed = false
     w.toolbar = NSToolbar(identifier: "bise.radius")
@@ -52,7 +56,7 @@ func macWindowRadius() -> CGFloat {
     if w.responds(to: sel), let r = w.value(forKey: "_cornerRadius") as? NSNumber, r.doubleValue > 0, r.doubleValue < 60 {
         return CGFloat(r.doubleValue)
     }
-    return ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 26 ? 26 : 10
+    return table
 }
 
 // WKUserContentController holds its handler strongly: a weak hop
@@ -84,17 +88,24 @@ final class Capsule: NSObject, WKNavigationDelegate {
     private var webDir: String?
     private var watcher: DirWatcher?
     // the corners of both boxes: macOS's window radius, not the page's
-    let radius: CGFloat = macWindowRadius()
+    let radius: CGFloat
 
     // round 10: the side panel (an agent's history, docked right) is a
     // second Capsule: the same glass, mask, mouse and keys, its own page
     // (panel.html), its own place (Placement.side)
     let side: Bool
 
-    init(side: Bool = false) {
+    // harness A (card #428): made far off every screen, deferred, invisible
+    let offScreen: Bool
+
+    init(side: Bool = false, offScreen: Bool = false) {
         self.side = side
-        panel = CapsulePanel(contentRect: NSRect(x: 0, y: 0, width: 360, height: 84),
-                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        self.offScreen = offScreen
+        radius = macWindowRadius(offScreen: offScreen)
+        let o = Placement.offScreen.frame.origin
+        panel = CapsulePanel(contentRect: NSRect(x: offScreen ? o.x : 0, y: offScreen ? o.y : 0, width: 360, height: 84),
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: offScreen)
+        if offScreen { panel.alphaValue = 0 }
         panel.isFloatingPanel = true
         // the side panel stays while he works in his apps: above them, under the bar
         panel.level = side ? .floating : .statusBar
@@ -152,6 +163,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
         panel.contentView = root
 
         super.init()
+        if offScreen { pinnedScreen = { nil } }
         root.addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
                                             owner: self, userInfo: nil))
         conf.userContentController.add(WeakHandler(self), name: "bise")
@@ -446,6 +458,8 @@ final class Capsule: NSObject, WKNavigationDelegate {
         for m in mouseMonitors { NSEvent.removeMonitor(m) }
         mouseMonitors = []
         guard on else { panel.ignoresMouseEvents = false; return }
+        // harness A: no global monitor (no Input Monitoring read): its socket sets the mouse (mouseAt)
+        if offScreen { return }
         let moves: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
         if let g = NSEvent.addGlobalMonitorForEvents(matching: moves, handler: { [weak self] _ in
             MainActor.assumeIsolated { self?.followMouse() }

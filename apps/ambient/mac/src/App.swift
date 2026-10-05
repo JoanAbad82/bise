@@ -12,7 +12,10 @@ import UniformTypeIdentifiers
 @MainActor
 final class AmbientApp: NSObject, NSApplicationDelegate {
     private var config: Config
-    private let capsule = Capsule()
+    private let capsule: Capsule
+    // harness A (Harness.swift), known from the first line of init: every
+    // window is made far off his screens and nothing reads TCC (card #428)
+    private let harnessMode: Bool
     private let edge = Edge()
     private let keys = Keys()
     private let core: Core
@@ -30,7 +33,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var harness: Harness?        // harness A only: the real app's test input (Harness.swift)
     // never the user's things: QA or harness A (his browser, Terminal,
     // pasteboard, sounds, prompts, login items, settings panes, his screen)
-    private var sandbox: Bool { qa != nil || harness != nil }
+    private var sandbox: Bool { qa != nil || harnessMode }
 
     private var phase = "idle"
     private var talking = false          // talk_start sent, no talk_end/cancel yet
@@ -65,6 +68,18 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private let macosMajor = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
 
     init(config: Config) {
+        harnessMode = config.harness != nil
+        if harnessMode {
+            // never with his own home: refused before a single window exists
+            let env = ProcessInfo.processInfo.environment
+            guard HarnessEnv.isolated(env: env, home: NSHomeDirectoryForUser(NSUserName()) ?? NSHomeDirectory()) else {
+                FileHandle.standardError.write(Data("bise ambient: harness refused: BISE_HOME must be a throwaway home, not ~/.bise (got \(env["BISE_HOME"] ?? "none"))\n".utf8))
+                exit(2)
+            }
+            CapsulePanel.simulatedKeys = true
+            Browser.blocked = true
+        }
+        capsule = Capsule(offScreen: config.harness != nil)
         if config.harness != nil {
             // harness A: a fresh suite each run, never his marks
             UserDefaults.standard.removePersistentDomain(forName: "dev.bise.ambient.harness")
@@ -80,6 +95,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         self.config = c
         core = Core(config: c)
         super.init()
+        if let h = c.harness {
+            // the guard from the first run-loop tick, before anything shows
+            edge.pinnedScreen = { nil }
+            let hs = Harness(sock: h.sock, dir: h.dir)
+            harness = hs
+            hs.startGuard()
+        }
     }
 
     // a launch from Finder or the menu bar has no --bise or --web: the last
@@ -109,7 +131,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         try? FileManager.default.createDirectory(atPath: config.ambientDir, withIntermediateDirectories: true)
         Log.open(config.ambientDir + "/app.log")
         Log.say("app: up, pid \(getpid()), workspace \(config.workspace), bise \(config.bise), web \(config.web ?? "-")")
-        if let h = config.harness { harnessSetup(h) }
+        if harnessMode { harnessSetup() }
         writePid()
         settings = AppSettings.load { [defaults] in defaults.object(forKey: $0) }
         keys.rightOption = settings.rightOption
@@ -815,17 +837,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // MARK: harness A (Harness.swift): the real app, driven by a socket
 
-    private func harnessSetup(_ h: (sock: String, dir: String)) {
-        let env = ProcessInfo.processInfo.environment
-        guard HarnessEnv.isolated(env: env, home: NSHomeDirectoryForUser(NSUserName()) ?? NSHomeDirectory()) else {
-            Log.say("harness: refused: BISE_HOME must be a throwaway home, not ~/.bise (got \(env["BISE_HOME"] ?? "none"))")
-            exit(2)
-        }
-        // never really key, never active, never on his screens (card #428)
-        CapsulePanel.simulatedKeys = true
-        Browser.blocked = true
-        let hs = Harness(sock: h.sock, dir: h.dir)
-        harness = hs
+    private func harnessSetup() {
+        guard let hs = harness else { return }
         hs.bar = { [unowned self] in self.capsule }
         hs.side = { [weak self] in self?.side }
         hs.keyEvent = { [weak self] t, e in self?.keys.qaEvent(t, e) ?? false }
@@ -833,12 +846,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         Log.tap = { [weak hs] line in MainActor.assumeIsolated { hs?.note("log", line) } }
         Capsule.tap = { [weak hs] who, ev in hs?.note(who, ev) }
         Capsule.frameGuard = { [weak hs] w in hs?.check(w) ?? true }
-        // no screen at all: every panel at Placement.offScreen, the edge glow nowhere
-        capsule.pinnedScreen = { nil }
-        edge.pinnedScreen = { nil }
-        capsule.screensChanged()
         hs.start()
-        hs.startGuard()
     }
 
     private func harnessState() -> [String: Any] {
@@ -852,8 +860,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     private func makeSide() -> Capsule {
         if let s = side { return s }
-        let s = Capsule(side: true)
-        if harness != nil { s.pinnedScreen = { nil } }
+        let s = Capsule(side: true, offScreen: harnessMode)
+
         s.onCmd = { [weak self] in self?.harness?.note("panel>app", $0); self?.panelCmd($0) }
         s.onReady = { [weak self] in self?.panelReady() }
         s.onKeyFocus = { [weak self] on in
@@ -997,6 +1005,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // you away: no key or mouse for 5 minutes
     private var away: Bool {
+        if harnessMode { return false }   // no session-event read (a TCC preflight) in harness mode
         CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!) > 300
     }
 
