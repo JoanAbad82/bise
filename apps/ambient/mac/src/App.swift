@@ -27,6 +27,10 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var status: StatusItem?
     private var signals: [DispatchSourceSignal] = []
     private var qa: QA?                  // --qa only: the QA channel (QA.swift)
+    private var harness: Harness?        // harness A only: the real app's test input (Harness.swift)
+    // never the user's things: QA or harness A (his browser, Terminal,
+    // pasteboard, sounds, prompts, login items, settings panes, his screen)
+    private var sandbox: Bool { qa != nil || harness != nil }
 
     private var phase = "idle"
     private var talking = false          // talk_start sent, no talk_end/cancel yet
@@ -61,7 +65,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private let macosMajor = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
 
     init(config: Config) {
-        defaults = config.qa != nil ? (UserDefaults(suiteName: "dev.bise.ambient.qa") ?? .standard) : .standard
+        if config.harness != nil {
+            // harness A: a fresh suite each run, never his marks
+            UserDefaults.standard.removePersistentDomain(forName: "dev.bise.ambient.harness")
+            defaults = UserDefaults(suiteName: "dev.bise.ambient.harness") ?? .standard
+        } else {
+            defaults = config.qa != nil ? (UserDefaults(suiteName: "dev.bise.ambient.qa") ?? .standard) : .standard
+        }
         let c = AmbientApp.remembered(config, defaults)
         // the computer-use broker's socket: <bise home>/run (BISE_HOME, else ~/.bise)
         if let h = c.childEnv["BISE_HOME"] ?? ProcessInfo.processInfo.environment["BISE_HOME"], !h.isEmpty {
@@ -78,6 +88,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         let fm = FileManager.default
         // QA picks its own bise; a normal launch never runs the PATH's bise
         // while a dev build is there (Config.restoring, lead m_6267)
+        // QA and harness A pick their own bise (harness A: his launch's --bise as given)
+        if config.harness != nil { return config }
         var c = config.qa != nil ? config
             : config.restoring(d.dictionary(forKey: "lastLaunch"), isExe: { fm.isExecutableFile(atPath: $0) })
         if c.qa == nil, c.isDevBuild(c.bise) { d.set(c.saved, forKey: "lastLaunch") }
@@ -97,6 +109,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         try? FileManager.default.createDirectory(atPath: config.ambientDir, withIntermediateDirectories: true)
         Log.open(config.ambientDir + "/app.log")
         Log.say("app: up, pid \(getpid()), workspace \(config.workspace), bise \(config.bise), web \(config.web ?? "-")")
+        if let h = config.harness { harnessSetup(h) }
         writePid()
         settings = AppSettings.load { [defaults] in defaults.object(forKey: $0) }
         keys.rightOption = settings.rightOption
@@ -105,6 +118,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if let m = config.qa.flatMap(QA.Mode.init(rawValue:)) { qaSetup(m) }
         capsule.onCmd = { [weak self] in
             guard let self else { return }
+            self.harness?.note("page>app", $0)
             if let qa = self.qa { qa.fromPage($0) } else { self.command($0) }
         }
         capsule.onReady = { [weak self] in self?.pageReady() }
@@ -137,12 +151,16 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         edgeSetup()
 
         // QA: no menu-bar item, no macOS notification, never the real fn
-        if qa == nil { statusAndKeys() }
+        if qa == nil && harness == nil { statusAndKeys() }
+        // harness A: no status item, no banner, never the real fn tap; the
+        // socket's keys take the tap's path (Keys.qaEvent → KeyMachine → key)
+        if harness != nil { keys.onOut = { [weak self] in self?.key($0) } }
         // QA never plays a sound on his speaker (it logs the cue)
-        if qa == nil { sounds = SoundPlayer() }
+        if !sandbox { sounds = SoundPlayer() }
 
         core.onEvent = { [weak self] in
             guard let self else { return }
+            self.harness?.note("core>app", $0)
             if let qa = self.qa { qa.fromCore($0) } else { self.coreEvent($0) }
         }
         core.onExit = { [weak self] _ in
@@ -153,7 +171,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
         observe()
         handleSignals()
-        if qa == nil { startQuiet() }   // QA never reads the user's mic state or calendar
+        if !sandbox { startQuiet() }   // QA and the harness never read the user's mic state or calendar
     }
 
     private func statusAndKeys() {
@@ -236,6 +254,14 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // every cmd for the core: QA mode fakes the voice and drops writes when read-only
     private func toCore(_ cmd: [String: Any]) {
         if let qa, !qa.allow(cmd) { return }
+        if let h = harness {
+            h.note("app>core", cmd)
+            // harness A: the core would open the real mic (no fake listener yet)
+            if let c = cmd["cmd"] as? String, ["talk_start", "talk_end", "talk_cancel"].contains(c) {
+                Log.say("harness: \(c) not sent to the core (no mic in harness mode)")
+                return
+            }
+        }
         core.send(cmd)
     }
 
@@ -243,6 +269,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         core.kill()
         keys.stop()
         qa?.stop()
+        harness?.stop()
         try? FileManager.default.removeItem(atPath: pidPath)
         Log.say("app: quit")
     }
@@ -311,7 +338,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private func woke() {
         Log.say("app: wake")
         asleep = false
-        if qa == nil { core.check(); keys.reenable() } else { core.check() }
+        if !sandbox { core.check(); keys.reenable() } else { core.check() }
         capsule.screensChanged()
         side?.screensChanged()
         edge.rebuild()
@@ -355,7 +382,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         Log.say("app: switch to \(c.workspace)")
         config = c
         // the next launch without scripts/ambient.sh comes back here
-        if qa == nil, c.isDevBuild(c.bise) { defaults.set(c.saved, forKey: "lastLaunch") }
+        if !sandbox, c.isDevBuild(c.bise) { defaults.set(c.saved, forKey: "lastLaunch") }
         memory = [:]
         cards = []
         agents = []
@@ -431,7 +458,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             // ⌘ C on a row or an answer (amb-web d16054d8): his pasteboard;
             // QA never touches it
             guard let text = cmd["text"] as? String, !text.isEmpty else { return }
-            if qa != nil { Log.say("app: qa: copy \(text.count) chars"); return }
+            if sandbox { Log.say("app: qa: copy \(text.count) chars"); return }
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
         case "app_quit":
@@ -454,7 +481,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     }
 
     private func settingsEvent() -> [String: Any] {
-        settings.event(macos: macosMajor, radius: Double(capsule.radius), login: qa == nil ? LoginItem.state : .off)
+        settings.event(macos: macosMajor, radius: Double(capsule.radius), login: !sandbox ? LoginItem.state : .off)
     }
 
     // app_setting {key, value} from the settings view (fn + ,): app_settings
@@ -469,7 +496,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             setMeetingQuiet(on)      // asks for the calendar first; posts when settled
             return
         case .launchAtLogin(let on):
-            if qa == nil { LoginItem.set(on) }   // QA never touches the user's login items
+            if !sandbox { LoginItem.set(on) }   // QA never touches the user's login items
         case .skipPick:
             pickSkipApps()
             return
@@ -500,7 +527,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         let path = config.ambientDir + "/start-bise.command"
         let script = Config.startBiseScript(bise: config.bise, workspace: config.workspace,
                                             appRoot: config.childEnv["BISE_APP_ROOT"])
-        if qa != nil { Log.say("app: qa: run bise (\(path))"); return }
+        if sandbox { Log.say("app: qa: run bise (\(path))"); return }
         do {
             try script.write(toFile: path, atomically: true, encoding: .utf8)
             try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: path)
@@ -519,7 +546,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         let gate = SoundGate(setting: settings.sounds, uiSounds: SoundPlayer.uiSoundsOn, quiet: quiet.on,
                              focus: SoundPlayer.focusOn)
         guard let s = SoundPlan.sound(for: c, gate) else { return }
-        if qa != nil { Log.say("app: qa: sound \(s.rawValue)"); return }
+        if sandbox { Log.say("app: qa: sound \(s.rawValue)"); return }
         sounds?.play(s)
     }
 
@@ -530,7 +557,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // the macOS app picker for the never-seen list (ambient's words)
     private func pickSkipApps() {
-        guard qa == nil else { Log.say("app: qa: no app picker"); return }
+        guard !sandbox else { Log.say("app: qa: no app picker"); return }
         let p = NSOpenPanel()
         p.title = SettingsWords.pickTitle
         p.message = SettingsWords.pickTitle
@@ -723,7 +750,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         // the edge glow only while fn is held (not hands-free)
         if state == "down" && edgeGlow && !reduceMotion { edge.glow(true) }
         // QA never asks the user's browser anything
-        guard qa == nil, let base = pagesURL, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+        guard !sandbox, let base = pagesURL, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
               PageOpen.browsers.contains(front) else {
             beginTalk(state, page: nil)
             return
@@ -756,7 +783,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // the morning page (roadmap slice E): today's morning-<date>, opened in
     // front once a day at the first fn hold or capsule open after 05:00
     private func morning() {
-        guard qa == nil else { return }
+        guard !sandbox else { return }
         let ids = menuPages.map(\.id)
         guard let due = Morning.due(now: Date(), tz: .current, openedOn: defaults.string(forKey: "morningOpened"), pageIDs: ids),
               let page = menuPages.first(where: { $0.id == due.id }) else { return }
@@ -785,12 +812,52 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         takeKeys()
     }
 
+    // MARK: harness A (Harness.swift): the real app, driven by a socket
+
+    private func harnessSetup(_ h: (sock: String, dir: String)) {
+        let env = ProcessInfo.processInfo.environment
+        guard HarnessEnv.isolated(env: env, home: NSHomeDirectoryForUser(NSUserName()) ?? NSHomeDirectory()) else {
+            Log.say("harness: refused: BISE_HOME must be a throwaway home, not ~/.bise (got \(env["BISE_HOME"] ?? "none"))")
+            exit(2)
+        }
+        let realFocus = env["AMBIENT_HARNESS_REAL_FOCUS"] == "1"
+        CapsulePanel.simulatedKeys = !realFocus
+        Browser.blocked = true
+        let hs = Harness(sock: h.sock, dir: h.dir, realFocus: realFocus)
+        harness = hs
+        hs.bar = { [unowned self] in self.capsule }
+        hs.side = { [weak self] in self?.side }
+        hs.keyEvent = { [weak self] t, e in self?.keys.qaEvent(t, e) ?? false }
+        hs.appState = { [weak self] in self?.harnessState() ?? [:] }
+        Log.tap = { [weak hs] line in MainActor.assumeIsolated { hs?.note("log", line) } }
+        Capsule.tap = { [weak hs] who, ev in hs?.note(who, ev) }
+        let pin: () -> NSScreen? = { [weak hs] in hs?.display.screen }
+        capsule.pinnedScreen = pin
+        edge.pinnedScreen = pin
+        hs.start()
+        hs.display.make { [weak self] screen in
+            guard let self else { return }
+            Log.say(screen != nil ? "harness: virtual display \(hs.display.displayID)" : "harness: no virtual display (\(hs.display.why)): panels stay off every screen")
+            self.capsule.screensChanged()
+            self.side?.screensChanged()
+            self.edge.rebuild()
+        }
+    }
+
+    private func harnessState() -> [String: Any] {
+        ["vis": ["pinned": vis.pinned, "hidden": capsule.hidden], "talking": talking, "phase": phase,
+         "panel_agent": panelAgent ?? NSNull(), "keys": ["bar": keyFocus.bar, "panel": panelKeys.bar],
+         "core": ["bise": config.bise, "workspace": config.workspace],
+         "hub": memory["hub"] ?? NSNull()]
+    }
+
     // MARK: the side panel (round 10): an agent's history, docked right
 
     private func makeSide() -> Capsule {
         if let s = side { return s }
         let s = Capsule(side: true)
-        s.onCmd = { [weak self] in self?.panelCmd($0) }
+        if let hs = harness { s.pinnedScreen = { [weak hs] in hs?.display.screen } }
+        s.onCmd = { [weak self] in self?.harness?.note("panel>app", $0); self?.panelCmd($0) }
         s.onReady = { [weak self] in self?.panelReady() }
         s.onKeyFocus = { [weak self] on in
             guard let self else { return }
@@ -1013,7 +1080,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             if on { self.watchMeetings() } else { self.quiet.meeting(false); self.sayQuiet() }
             self.capsule.post(self.settingsEvent())
         }
-        guard on, qa == nil else { done(false); return }
+        guard on, !sandbox else { done(false); return }
         if CalendarProbe.granted { done(true); return }
         let cal = calendar ?? CalendarProbe()
         calendar = cal
@@ -1025,7 +1092,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // the front app's front window covers a whole screen (a video, slides, a game)
     private func checkFullScreen() {
-        guard qa == nil, let app = NSWorkspace.shared.frontmostApplication,
+        guard !sandbox, let app = NSWorkspace.shared.frontmostApplication,
               app.processIdentifier != getpid(),
               let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
         else { return }
@@ -1068,6 +1135,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             then?()
             return
         }
+        // harness A: never his screen
+        if harness != nil { Log.say("harness: no shot"); then?(); return }
         guard Shot.allowed, !shooting else { then?(); return }
         shooting = true
         var done = false
@@ -1111,7 +1180,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // macOS's states (or QA's), and what the capsule already asked and said
     private func permNow() -> PermState {
-        var s = qa != nil ? fakePerms
+        var s = sandbox ? fakePerms
             : PermState(accessibility: Keys.trusted ? .granted : .unknown, mic: micGrant, screen: Shot.allowed ? .granted : .unknown)
         s.asked = Set(Perm.allCases.map(\.rawValue).filter { defaults.bool(forKey: "asked.\($0)") })
         s.told = Set(Perm.allCases.map(\.rawValue).filter { defaults.bool(forKey: "told.\($0)") })
@@ -1126,7 +1195,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             defaults.set(s.told.contains(p), forKey: "told.\(p)")
             if s.had.contains(p) { defaults.set(true, forKey: "had.\(p)") }
         }
-        if qa != nil { fakePerms = s }
+        if sandbox { fakePerms = s }
     }
 
     // one plan step: the state in, the plan, the state out, then its doings
@@ -1153,11 +1222,11 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case .granted(let p):
             perm(p.rawValue, "granted")
             if p == .accessibility { helloSoon() }
-        case .startKeys: if qa == nil, !keys.running { keys.start() }
-        case .watchTrust: if qa == nil { pollTrust() }
+        case .startKeys: if !sandbox, !keys.running { keys.start() }
+        case .watchTrust: if !sandbox { pollTrust() }
         case .settings(let p):
             // QA never opens a settings pane
-            guard qa == nil else { Log.say("app: qa: settings pane for \(p.rawValue)"); return }
+            guard !sandbox else { Log.say("app: qa: settings pane for \(p.rawValue)"); return }
             if let u = SettingsPane.url(p.rawValue) { NSWorkspace.shared.open(u) }
         case .prompt(let p): prompt(p)
         }
@@ -1165,7 +1234,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // macOS's own prompt (QA: a fake one, granted after 0.6 s)
     private func prompt(_ p: Perm) {
-        if qa != nil {
+        if sandbox {
             Log.say("app: qa: fake macOS prompt for \(p.rawValue)")
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                 MainActor.assumeIsolated { self?.permStep { PermPlan.answered(p, granted: true, &$0) } }
@@ -1254,7 +1323,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         // the problems that aren't asks (the user: every error with the way
         // back): their line's 'settings' opens the pane
         if action == "settings", let pane = SettingsPane.url(p) {
-            if qa != nil { Log.say("app: qa: settings pane for \(p)"); return }
+            if sandbox { Log.say("app: qa: settings pane for \(p)"); return }
             NSWorkspace.shared.open(pane)
             return
         }
@@ -1278,7 +1347,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // launch with the way back (Keyboard › Press 🌐 key to › Do Nothing)
     private var globeSaid = false
     private func globeCheck() {
-        guard qa == nil, !globeSaid, globeUse() != "none" else { return }
+        guard !sandbox, !globeSaid, globeUse() != "none" else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, !self.globeSaid else { return }

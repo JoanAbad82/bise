@@ -56,5 +56,16 @@ law("run bise: a quote in a path can't break out",
     Config.startBiseScript(bise: "/a/it's/bise", workspace: "/w", appRoot: nil).contains("exec '/a/it'\\''s/bise'"))
 law("run bise: a shell script", run.hasPrefix("#!/bin/bash\n"))
 
+// harness A's switch: off by default, only with a throwaway home
+law("harness: off without its env", HarnessEnv.from(env: ["BISE_HOME": "/tmp/h"]) == nil)
+law("harness: AMBIENT_HARNESS=<dir> → <dir>/test.sock",
+    HarnessEnv.from(env: ["AMBIENT_HARNESS": "/tmp/a"]).map { $0.sock == "/tmp/a/test.sock" && $0.dir == "/tmp/a" } == true)
+law("harness: BISE_AMBIENT_TEST_INPUT=<socket> wins for the socket",
+    HarnessEnv.from(env: ["AMBIENT_HARNESS": "/tmp/a", "BISE_AMBIENT_TEST_INPUT": "/tmp/b/x.sock"]).map { $0.sock == "/tmp/b/x.sock" } == true)
+law("harness: isolated = BISE_HOME set and not his ~/.bise", HarnessEnv.isolated(env: ["BISE_HOME": "/tmp/h/home"], home: "/Users/g"))
+law("harness: his own ~/.bise is never isolated", !HarnessEnv.isolated(env: ["BISE_HOME": "/Users/g/.bise"], home: "/Users/g"))
+law("harness: his ~/.bise written another way neither", !HarnessEnv.isolated(env: ["BISE_HOME": "/Users/g/./.bise/"], home: "/Users/g"))
+law("harness: no BISE_HOME = not isolated", !HarnessEnv.isolated(env: [:], home: "/Users/g"))
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Launch laws hold")

@@ -22,6 +22,7 @@ final class Edge: NSObject, WKNavigationDelegate {
     private var until = Date.distantPast   // keep shown until (fades, corners)
     private var hideJob: DispatchWorkItem?
     private var lastSetup: [[String: Any]] = []   // replayed into a page once loaded
+    var pinnedScreen: (() -> NSScreen?)?          // harness A: only the virtual display
 
     func load(webDir dir: String?) {
         webDir = dir
@@ -38,7 +39,8 @@ final class Edge: NSObject, WKNavigationDelegate {
             Log.say("edge: no \(page.path), no glow")
             return
         }
-        for s in NSScreen.screens {
+        // harness A: only the virtual display, none when there is none
+        for s in pinnedScreen.map({ $0().map { [$0] } ?? [] }) ?? NSScreen.screens {
             let w = NSWindow(contentRect: s.frame, styleMask: .borderless, backing: .buffered, defer: false)
             w.setFrame(s.frame, display: false)
             w.isOpaque = false

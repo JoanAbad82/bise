@@ -16,7 +16,11 @@ enum Browser {
     // <bise home>/run/computer-use.sock: BISE_HOME, else ~/.bise
     nonisolated(unsafe) static var socketPath = NSHomeDirectory() + "/.bise/run/computer-use.sock"
 
+    // harness A: never his browser
+    nonisolated(unsafe) static var blocked = false
+
     static func open(_ url: String) {
+        if blocked { Log.say("browser: harness: not opened \(url)"); return }
         guard let u = URL(string: url) else { Log.say("browser: bad url \(url)"); return }
         guard PageOpen.isWeb(url) else { NSWorkspace.shared.open(u); return }
         let prefix = ShowPlan.prefix(for: url, pagesURL: pagesURL)

@@ -18,6 +18,7 @@ struct Config {
     var dev = ""
     var childEnv: [String: String] = [:]   // --env K=V: for the core (open drops the shell's env)
     var qa: String? = nil                  // --qa fake|real: the QA channel (QA.swift, plugins/ambient-qa); nil = a normal launch
+    var harness: (sock: String, dir: String)? = nil   // harness A (Harness.swift): AMBIENT_HARNESS / BISE_AMBIENT_TEST_INPUT
 
     // --workspace <ws> --bise <exe> [--web <dir>] [--dev <dir>] [--env K=V]...
     // BISE_AMBIENT_WEB (live dev) wins over --web.
@@ -41,6 +42,7 @@ struct Config {
             i += 1
         }
         if let w = env["BISE_AMBIENT_WEB"], !w.isEmpty { c.web = w }
+        c.harness = HarnessEnv.from(env: env)
         if c.dev.isEmpty { c.dev = defaultDevDir(env: env.merging(c.childEnv) { _, b in b }) }
         return c
     }
@@ -125,9 +127,33 @@ enum Log {
         _ = try? handle?.seekToEnd()
     }
 
+    nonisolated(unsafe) static var tap: ((String) -> Void)?   // harness A's events
+
     static func say(_ s: String) {
+        tap?(s)
         let line = "\(ISO8601DateFormatter().string(from: Date())) \(s)\n"
         if let h = handle { try? h.write(contentsOf: Data(line.utf8)) } else { FileHandle.standardError.write(Data(line.utf8)) }
+    }
+}
+
+// harness A's switch (Harness.swift): AMBIENT_HARNESS=<dir> or
+// BISE_AMBIENT_TEST_INPUT=<socket>; honored only with a throwaway home
+enum HarnessEnv {
+    static func from(env: [String: String]) -> (sock: String, dir: String)? {
+        var sock = env["BISE_AMBIENT_TEST_INPUT"] ?? ""
+        var dir = env["AMBIENT_HARNESS"] ?? ""
+        if sock.isEmpty && dir.isEmpty { return nil }
+        if sock.isEmpty { sock = dir + "/test.sock" }
+        if dir.isEmpty { dir = (sock as NSString).deletingLastPathComponent }
+        return (sock, dir)
+    }
+
+    // BISE_HOME set and not his own ~/.bise (`home`: his real home dir)
+    static func isolated(env: [String: String], home: String) -> Bool {
+        guard let h = env["BISE_HOME"], !h.isEmpty else { return false }
+        let a = URL(fileURLWithPath: h).standardizedFileURL.resolvingSymlinksInPath().path
+        let b = URL(fileURLWithPath: home + "/.bise").standardizedFileURL.resolvingSymlinksInPath().path
+        return a != b
     }
 }
 

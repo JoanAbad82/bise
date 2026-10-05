@@ -12,6 +12,12 @@ import WebKit
 final class CapsulePanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    // harness A (Harness.swift): bise 'has the keys' without the window
+    // becoming really key, so his keyboard stays his; off = AppKit's own
+    nonisolated(unsafe) static var simulatedKeys = false
+    var testKey = false
+    override var isKeyWindow: Bool { CapsulePanel.simulatedKeys ? testKey : super.isKeyWindow }
 }
 
 // the page's boxes (app_size): CapsuleShape, Shape.swift
@@ -191,7 +197,11 @@ final class Capsule: NSObject, WKNavigationDelegate {
     }
 
     // an event for the page (dropped until it's loaded: App replays what matters)
+    // harness A: every event a page gets (who: app>page or app>panel)
+    static var tap: ((String, [String: Any]) -> Void)?
+
     func post(_ ev: [String: Any]) {
+        Capsule.tap?(side ? "app>panel" : "app>page", ev)
         guard ready, let s = JSON.string(ev) else { return }
         web.evaluateJavaScript("window.ambient && window.ambient.recv(\(s))", completionHandler: nil)
     }
@@ -231,12 +241,21 @@ final class Capsule: NSObject, WKNavigationDelegate {
     // or the mouse's when each display has its own menu bar; picked again
     // at launch, on a display change or a wake, and when you call bise
     private var screenIndex = 0
+    // harness A: every panel on the virtual display
+    var pinnedScreen: (() -> NSScreen?)?
+
     private var screen: NSScreen? {
+        if let pin = pinnedScreen { return pin() }
         let all = NSScreen.screens
         return all.indices.contains(screenIndex) ? all[screenIndex] : all.first
     }
 
     func pickScreen() {
+        if pinnedScreen != nil {
+            place(panel.frame.size)
+            applyMask()
+            return
+        }
         let all = NSScreen.screens
         let boxes = all.map { ScreenBox(frame: $0.frame, visible: $0.visibleFrame) }
         // round 9: the screen with his key window (NSScreen.main, read before
@@ -261,8 +280,12 @@ final class Capsule: NSObject, WKNavigationDelegate {
     // 170 px below the screen's top, the pearl at its left, growing down;
     // never off the screen (Placement.bar)
     private func place(_ size: NSSize) {
-        guard let s = screen else { return }
-        let b = ScreenBox(frame: s.frame, visible: s.visibleFrame)
+        // harness A without its virtual display: far off every screen
+        let off = NSRect(x: -30000, y: -30000, width: 1920, height: 1200)
+        let b: ScreenBox
+        if let s = screen { b = ScreenBox(frame: s.frame, visible: s.visibleFrame) }
+        else if pinnedScreen != nil { b = ScreenBox(frame: off, visible: off) }
+        else { return }
         let f = side ? Placement.side(size, glass: shape.glass, on: b) : Placement.bar(size, glass: shape.glass, on: b)
         let moved = f.origin != panel.frame.origin || f.size != panel.frame.size
         panel.setFrame(f, display: true)
@@ -402,6 +425,9 @@ final class Capsule: NSObject, WKNavigationDelegate {
     var onKeyFocus: ((Bool) -> Void)?   // the bar took the keys (true) or gave them back
     var onClickOutside: (() -> Void)?   // a click in another app while the bar shows
 
+    // harness A: a click that would land in another app (no global monitor sees a posted one)
+    func clickedOutside() { if !mouseMonitors.isEmpty { onClickOutside?() } }
+
     // the mouse only inside the glass (ambient m_6702, CapsuleShape.takesMouse):
     // the panel ignores the mouse wherever the page draws only glow, shadow
     // or the pearl, so a click there reaches the app below; watched only
@@ -427,8 +453,12 @@ final class Capsule: NSObject, WKNavigationDelegate {
         followMouse()
     }
 
-    private func followMouse() {
-        let m = NSEvent.mouseLocation, f = panel.frame
+    private func followMouse() { mouseAt(NSEvent.mouseLocation) }
+
+    // the panel takes the mouse at that screen point only inside the glass
+    // (the real pointer's moves call it; harness A calls it before a click)
+    func mouseAt(_ m: NSPoint) {
+        let f = panel.frame
         let p = CGPoint(x: m.x - f.minX, y: f.maxY - m.y)
         let take = shape.takesMouse(at: p, panel: f.size)
         if panel.ignoresMouseEvents == take { panel.ignoresMouseEvents = !take }
@@ -457,8 +487,23 @@ final class Capsule: NSObject, WKNavigationDelegate {
             let front = NSWorkspace.shared.frontmostApplication
             if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier { keysFrom = front }
             if hidden { show() }
+            if CapsulePanel.simulatedKeys {
+                // harness A: the keys are bise's without leaving his app
+                panel.orderFrontRegardless()
+                panel.makeFirstResponder(web)
+                if !panel.testKey {
+                    panel.testKey = true
+                    NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: panel)
+                }
+                return
+            }
             panel.makeKeyAndOrderFront(nil)
             panel.makeFirstResponder(web)
+        } else if CapsulePanel.simulatedKeys {
+            if panel.testKey {
+                panel.testKey = false
+                NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: panel)
+            }
         } else if panel.isKeyWindow {
             panel.resignKey()
             keysFrom?.activate()
