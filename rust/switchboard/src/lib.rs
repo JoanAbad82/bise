@@ -41,6 +41,7 @@ pub mod forge;
 pub mod idle;
 pub mod keeps;
 pub mod land;
+pub mod land_pick;
 pub mod model;
 pub mod pages;
 pub mod paths;
