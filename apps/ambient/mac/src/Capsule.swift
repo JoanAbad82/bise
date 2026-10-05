@@ -18,6 +18,11 @@ final class CapsulePanel: NSPanel {
     nonisolated(unsafe) static var simulatedKeys = false
     var testKey = false
     override var isKeyWindow: Bool { CapsulePanel.simulatedKeys ? testKey : super.isKeyWindow }
+
+    // harness A: AppKit never moves a frame back onto a screen
+    override func constrainFrameRect(_ r: NSRect, to s: NSScreen?) -> NSRect {
+        CapsulePanel.simulatedKeys ? r : super.constrainFrameRect(r, to: s)
+    }
 }
 
 // the page's boxes (app_size): CapsuleShape, Shape.swift
@@ -241,8 +246,10 @@ final class Capsule: NSObject, WKNavigationDelegate {
     // or the mouse's when each display has its own menu bar; picked again
     // at launch, on a display change or a wake, and when you call bise
     private var screenIndex = 0
-    // harness A: every panel on the virtual display
+    // harness A: set = every panel far off his screens (Placement.offScreen)
     var pinnedScreen: (() -> NSScreen?)?
+    // harness A's guard: false = a frame touches a real screen (the app quits)
+    static var frameGuard: ((NSWindow) -> Bool)?
 
     private var screen: NSScreen? {
         if let pin = pinnedScreen { return pin() }
@@ -269,8 +276,8 @@ final class Capsule: NSObject, WKNavigationDelegate {
     }
 
     var maxHeight: CGFloat {
-        side ? (screen.map { Placement.sideHeight(on: ScreenBox(frame: $0.frame, visible: $0.visibleFrame)) } ?? 900)
-             : (screen?.frame.height ?? 900) * 0.7
+        let b = pinnedScreen != nil ? Placement.offScreen : screen.map { ScreenBox(frame: $0.frame, visible: $0.visibleFrame) }
+        return side ? (b.map { Placement.sideHeight(on: $0) } ?? 900) : (b?.frame.height ?? 900) * 0.7
     }
 
     // the side panel's glass height (the page draws its glass this tall)
@@ -280,11 +287,10 @@ final class Capsule: NSObject, WKNavigationDelegate {
     // 170 px below the screen's top, the pearl at its left, growing down;
     // never off the screen (Placement.bar)
     private func place(_ size: NSSize) {
-        // harness A without its virtual display: far off every screen
-        let off = NSRect(x: -30000, y: -30000, width: 1920, height: 1200)
+        // harness A: far off every screen (Placement.offScreen)
         let b: ScreenBox
-        if let s = screen { b = ScreenBox(frame: s.frame, visible: s.visibleFrame) }
-        else if pinnedScreen != nil { b = ScreenBox(frame: off, visible: off) }
+        if pinnedScreen != nil { b = Placement.offScreen }
+        else if let s = screen { b = ScreenBox(frame: s.frame, visible: s.visibleFrame) }
         else { return }
         let f = side ? Placement.side(size, glass: shape.glass, on: b) : Placement.bar(size, glass: shape.glass, on: b)
         let moved = f.origin != panel.frame.origin || f.size != panel.frame.size
@@ -378,6 +384,8 @@ final class Capsule: NSObject, WKNavigationDelegate {
     }
 
     func show(fade: Bool = false) {
+        // harness A: never ordered in where he could see it
+        if let g = Capsule.frameGuard, !g(panel) { return }
         hidden = false
         outJob?.cancel()
         outJob = nil

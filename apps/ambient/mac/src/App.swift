@@ -552,7 +552,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // voice answers off: the core never speaks main's answers (text only)
     private func sayVoice() {
-        toCore(["cmd": "voice", "on": settings.voiceAnswers])
+        // harness A: never his speaker
+        toCore(["cmd": "voice", "on": harness == nil && settings.voiceAnswers])
     }
 
     // the macOS app picker for the never-seen list (ambient's words)
@@ -608,7 +609,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if let u = ev["pages_url"] as? String, !u.isEmpty { pagesURL = u }
         defer { Browser.pagesURL = pagesURL }
         // a (re)started core speaks by default: voice answers off is said again
-        if kind == "hub", ev["up"] as? Bool == true, !settings.voiceAnswers { sayVoice() }
+        if kind == "hub", ev["up"] as? Bool == true, !settings.voiceAnswers || harness != nil { sayVoice() }
         switch kind {
         case "phase":
             phase = ev["phase"] as? String ?? phase
@@ -820,10 +821,10 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             Log.say("harness: refused: BISE_HOME must be a throwaway home, not ~/.bise (got \(env["BISE_HOME"] ?? "none"))")
             exit(2)
         }
-        let realFocus = env["AMBIENT_HARNESS_REAL_FOCUS"] == "1"
-        CapsulePanel.simulatedKeys = !realFocus
+        // never really key, never active, never on his screens (card #428)
+        CapsulePanel.simulatedKeys = true
         Browser.blocked = true
-        let hs = Harness(sock: h.sock, dir: h.dir, realFocus: realFocus)
+        let hs = Harness(sock: h.sock, dir: h.dir)
         harness = hs
         hs.bar = { [unowned self] in self.capsule }
         hs.side = { [weak self] in self?.side }
@@ -831,17 +832,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         hs.appState = { [weak self] in self?.harnessState() ?? [:] }
         Log.tap = { [weak hs] line in MainActor.assumeIsolated { hs?.note("log", line) } }
         Capsule.tap = { [weak hs] who, ev in hs?.note(who, ev) }
-        let pin: () -> NSScreen? = { [weak hs] in hs?.display.screen }
-        capsule.pinnedScreen = pin
-        edge.pinnedScreen = pin
+        Capsule.frameGuard = { [weak hs] w in hs?.check(w) ?? true }
+        // no screen at all: every panel at Placement.offScreen, the edge glow nowhere
+        capsule.pinnedScreen = { nil }
+        edge.pinnedScreen = { nil }
+        capsule.screensChanged()
         hs.start()
-        hs.display.make { [weak self] screen in
-            guard let self else { return }
-            Log.say(screen != nil ? "harness: virtual display \(hs.display.displayID)" : "harness: no virtual display (\(hs.display.why)): panels stay off every screen")
-            self.capsule.screensChanged()
-            self.side?.screensChanged()
-            self.edge.rebuild()
-        }
+        hs.startGuard()
     }
 
     private func harnessState() -> [String: Any] {
@@ -856,7 +853,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private func makeSide() -> Capsule {
         if let s = side { return s }
         let s = Capsule(side: true)
-        if let hs = harness { s.pinnedScreen = { [weak hs] in hs?.display.screen } }
+        if harness != nil { s.pinnedScreen = { nil } }
         s.onCmd = { [weak self] in self?.harness?.note("panel>app", $0); self?.panelCmd($0) }
         s.onReady = { [weak self] in self?.panelReady() }
         s.onKeyFocus = { [weak self] on in

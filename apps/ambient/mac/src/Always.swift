@@ -97,6 +97,18 @@ enum Placement {
         return CGRect(x: x, y: y, width: w, height: h)
     }
 
+    // harness A (the user: 'nothing in his face, ever', card #428): the
+    // screen the harness app places its panels on, far off every real one
+    static let offScreen = ScreenBox(frame: CGRect(x: -30000, y: -30000, width: 1920, height: 1200),
+                                     visible: CGRect(x: -30000, y: -30000, width: 1920, height: 1200))
+
+    // the harness guard: a frame that touches (or comes within 1 pt of) any
+    // real screen; the harness app quits at once on one
+    static func touches(_ frame: CGRect, screens: [CGRect]) -> Bool {
+        guard !frame.isNull, !frame.isEmpty else { return false }
+        return screens.contains { $0.insetBy(dx: -1, dy: -1).intersects(frame) }
+    }
+
     // round 10's side panel: docked to the right edge, full height under the
     // menu bar; the glass's right edge on the visible area's right edge, its
     // top right under the menu bar; the pearl's room at its left. Never

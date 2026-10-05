@@ -85,6 +85,19 @@ let sf2 = Placement.side(CGSize(width: 524, height: 1415), glass: CGRect(x: 84, 
 law("side panel on a second screen: docked to that screen's right edge", sf2.minX + 524 == r2.visible.maxX && sf2.maxY == r2.visible.maxY)
 law("side panel: no glass key (an older page): the whole box docked right", Placement.side(CGSize(width: 440, height: 949), glass: nil, on: sbox).maxX == sbox.visible.maxX)
 
+// harness A: nothing on his screens, ever (card #428)
+let builtin = CGRect(x: 0, y: 0, width: 1512, height: 982)
+let ext = CGRect(x: 1512, y: -200, width: 2560, height: 1440)
+let offBar = Placement.bar(CGSize(width: 1004, height: 600), glass: CGRect(x: 84, y: 28, width: 860, height: 500), on: Placement.offScreen)
+law("harness: the bar placed off-screen touches no screen", !Placement.touches(offBar, screens: [builtin, ext]))
+let offSide = Placement.side(CGSize(width: 524, height: 5000), glass: CGRect(x: 84, y: 0, width: 440, height: 5000), on: Placement.offScreen)
+law("harness: the side panel placed off-screen touches no screen", !Placement.touches(offSide, screens: [builtin, ext]))
+law("harness guard: a panel on the built-in screen", Placement.touches(CGRect(x: 400, y: 300, width: 700, height: 100), screens: [builtin, ext]))
+law("harness guard: a panel 1 pt over the edge", Placement.touches(CGRect(x: -699, y: 300, width: 700, height: 100), screens: [builtin]))
+law("harness guard: a panel on a second screen", Placement.touches(CGRect(x: 3000, y: 0, width: 524, height: 900), screens: [builtin, ext]))
+law("harness guard: an empty frame is nothing", !Placement.touches(.zero, screens: [builtin]))
+law("harness guard: no screens, nothing touches", !Placement.touches(CGRect(x: 0, y: 0, width: 10, height: 10), screens: []))
+
 // the panel's keys (round 10): opened by hand, it takes them; esc/⌘W hands them back
 var pk = KeyFocus()
 law("panel keys: opening it takes them", pk.feed(.openedByHand) == .take)

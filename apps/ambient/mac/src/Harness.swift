@@ -6,7 +6,9 @@
 // main menu, KeyMachine); only what would touch the user goes: no fn tap,
 // no sound, no mic (talk_* never reach the core), no notification, no
 // status item, no browser/Terminal/pasteboard/System Settings, and the
-// panels sit on an off-screen virtual display (VirtualDisplay).
+// panels sit far off every screen (Placement.offScreen), a guard quits the
+// app if any of its windows touches a real screen (the user: 'nothing in
+// his face, ever', card #428), and it never activates or takes focus.
 //
 // The socket: one JSON line each way, {id, op, ...} → {id, ok, ...|error}
 // (qa.sock's framing). Mouse events go through NSApp.postEvent with the
@@ -33,8 +35,7 @@ final class Harness {
 
     let sockPath: String
     let dir: String
-    let display = VirtualDisplay()
-    let realFocus: Bool
+    private var guardTimer: Timer?
     private var listenFD: Int32 = -1
     private var acceptSrc: DispatchSourceRead?
     private struct Client { let src: DispatchSourceRead; var buf = Data() }
@@ -45,10 +46,9 @@ final class Harness {
     private var seq = 0
     private let started = ProcessInfo.processInfo.systemUptime
 
-    init(sock: String, dir: String, realFocus: Bool) {
+    init(sock: String, dir: String) {
         sockPath = sock
         self.dir = dir
-        self.realFocus = realFocus
     }
 
     // MARK: what happened (events)
@@ -188,9 +188,9 @@ final class Harness {
 
     private func ping() -> [String: Any] {
         let b = bar?()
-        return ["pid": Int(getpid()), "mode": "test", "ops": Harness.ops, "display": display.info,
+        return ["pid": Int(getpid()), "mode": "test", "ops": Harness.ops, "offscreen": true,
                 "bundle": Bundle.main.bundlePath, "argv": CommandLine.arguments,
-                "home": ProcessInfo.processInfo.environment["BISE_HOME"] ?? "", "real_focus": realFocus,
+                "home": ProcessInfo.processInfo.environment["BISE_HOME"] ?? "", "screens": NSScreen.screens.map { r($0.frame) }, "windows": NSApp.windows.map { ["frame": r($0.frame), "visible": $0.isVisible, "class": String(describing: type(of: $0))] as [String: Any] },
                 "status_item": false, "bar": windowInfo(b), "side": windowInfo(sidePanel()),
                 "app_active": NSApp.isActive,
                 "key_window": NSApp.keyWindow.map { String(describing: type(of: $0)) as Any } ?? NSNull(),
@@ -214,13 +214,17 @@ final class Harness {
 
     // MARK: the mouse
 
-    // the screen point (Cocoa) of {x, y}: points from the virtual display's
-    // top-left (its frame when there is no virtual display: the first screen)
+    private func r(_ f: CGRect) -> [String: Any] { ["x": f.minX, "y": f.minY, "w": f.width, "h": f.height] }
+
+    // the screen point (Cocoa, far off his screens) of {window, x, y}: points
+    // from that window's top-left (the page's CSS px)
     private func point(_ q: [String: Any]) throws -> NSPoint {
         guard let x = (q["x"] as? NSNumber)?.doubleValue, let y = (q["y"] as? NSNumber)?.doubleValue else {
-            throw Failure(description: "mouse needs x, y (points from the display's top-left)")
+            throw Failure(description: "mouse needs window: bar|side, x, y (points from that window's top-left)")
         }
-        let f = display.screen?.frame ?? NSScreen.screens.first?.frame ?? .zero
+        let c = (q["window"] as? String) == "side" ? sidePanel() : bar?()
+        guard let c else { throw Failure(description: "mouse: no such window yet") }
+        let f = c.panel.frame
         return NSPoint(x: f.minX + x, y: f.maxY - y)
     }
 
@@ -350,9 +354,7 @@ final class Harness {
                                             timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: w.windowNumber,
                                             context: nil, characters: shown, charactersIgnoringModifiers: chars,
                                             isARepeat: false, keyCode: code) else { continue }
-            if realFocus {
-                NSApp.postEvent(ev, atStart: false)
-            } else if down && f.contains(.command) {
+            if down && f.contains(.command) {
                 // NSApplication's order: the key window's key equivalents (the page first), then the main menu
                 if !w.performKeyEquivalent(with: ev) {
                     out["menu_took"] = NSApp.mainMenu?.performKeyEquivalent(with: ev) ?? false
@@ -425,34 +427,42 @@ final class Harness {
 
     // MARK: shots and the page
 
+    // the web views' own snapshots only: never a screen or window capture
     private func shot(_ q: [String: Any]) async throws -> [String: Any] {
-        let what = q["what"] as? String ?? "display"
+        let what = q["what"] as? String ?? "bar"
+        let c = what == "side" ? sidePanel() : bar?()
+        guard let c else { throw Failure(description: "shot what: bar (= panel), side; that one doesn't exist yet") }
         let shots = dir + "/shots"
         try? FileManager.default.createDirectory(atPath: shots, withIntermediateDirectories: true)
         let path = shots + "/\(what)-\(ms()).png"
-        var img: CGImage?
-        var how = what
-        switch what {
-        case "display":
-            if display.displayID != 0 { img = CGDisplayCreateImage(display.displayID) }
-        case "panel", "bar", "side":
-            let c = what == "side" ? sidePanel() : bar?()
-            if let c, c.panel.isVisible {
-                img = CGWindowListCreateImage(.null, .optionIncludingWindow, CGWindowID(c.panel.windowNumber), [.boundsIgnoreFraming, .bestResolution])
-                if img == nil {
-                    // no Screen Recording for this app: the page alone (no native blur)
-                    how = what + " (page only: no Screen Recording)"
-                    let snap: NSImage? = await withCheckedContinuation { k in c.web.takeSnapshot(with: nil) { i, _ in k.resume(returning: i) } }
-                    img = snap?.cgImage(forProposedRect: nil, context: nil, hints: nil)
-                }
-            }
-        default: throw Failure(description: "shot what: display, bar (= panel), side")
-        }
-        guard let img else { throw Failure(description: "shot \(what): nothing to capture (not shown, no display, or no Screen Recording)") }
-        let rep = NSBitmapImageRep(cgImage: img)
-        guard let png = rep.representation(using: .png, properties: [:]) else { throw Failure(description: "shot: no PNG") }
+        let snap: NSImage? = await withCheckedContinuation { k in c.web.takeSnapshot(with: nil) { i, _ in k.resume(returning: i) } }
+        guard let img = snap?.cgImage(forProposedRect: nil, context: nil, hints: nil) else { throw Failure(description: "shot \(what): the page gave no snapshot") }
+        guard let png = NSBitmapImageRep(cgImage: img).representation(using: .png, properties: [:]) else { throw Failure(description: "shot: no PNG") }
         try png.write(to: URL(fileURLWithPath: path))
-        return ["png": path, "how": how, "w": img.width, "h": img.height]
+        return ["png": path, "how": "page snapshot (no native glass)", "w": img.width, "h": img.height, "visible": c.panel.isVisible]
+    }
+
+    // MARK: the guard (card #428): no window of this app on any real screen
+
+    // false = this window touches a real screen: said, then the app quits at once
+    func check(_ w: NSWindow) -> Bool {
+        guard Placement.touches(w.frame, screens: NSScreen.screens.map(\.frame)) else { return true }
+        Log.say("harness: GUARD: window \(String(describing: type(of: w))) #\(w.windowNumber) frame \(w.frame) touches a real screen \(NSScreen.screens.map(\.frame)): quitting now")
+        if w.isVisible { w.orderOut(nil) }
+        exit(3)
+    }
+
+    func checkAll() { for w in NSApp.windows where w.isVisible { _ = check(w) } }
+
+    // every 0.25 s, on a screen change, and when any window moves or shows
+    func startGuard() {
+        let nc = NotificationCenter.default
+        for n in [NSWindow.didMoveNotification, NSWindow.didResizeNotification, NSWindow.didChangeScreenNotification,
+                  NSWindow.didChangeOcclusionStateNotification, NSApplication.didChangeScreenParametersNotification] {
+            nc.addObserver(forName: n, object: nil, queue: .main) { [weak self] _ in MainActor.assumeIsolated { self?.checkAll() } }
+        }
+        guardTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.checkAll() } }
+        checkAll()
     }
 
     private func js(_ web: WKWebView, _ src: String) async -> String? {
