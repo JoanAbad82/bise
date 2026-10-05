@@ -21,6 +21,7 @@ MainActor.assumeIsolated {
     law("launch smoke: Capsule() builds without throwing", c.panel.contentView != nil)
     law("launch smoke: the web view is the first-click one", c.web is CapsuleWebView)
     law("launch smoke: nothing on screen at launch", !c.panel.isVisible && c.hidden)
+    law("launch smoke: made invisible (alpha 0) until its first show (main m_8012)", c.panel.alphaValue == 0)
     law("launch smoke: the panel never animates or casts a shadow",
         c.panel.animationBehavior == .none && !c.panel.hasShadow)
 

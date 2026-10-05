@@ -78,6 +78,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             }
             CapsulePanel.simulatedKeys = true
             Browser.blocked = true
+            Capsule.blockLinks = true
         }
         capsule = Capsule(offScreen: config.harness != nil)
         if config.harness != nil {
@@ -137,7 +138,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         keys.rightOption = settings.rightOption
         reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
 
-        if let m = config.qa.flatMap(QA.Mode.init(rawValue:)) { qaSetup(m) }
+        // QA and harness A never together: the harness keeps the app's own paths
+        if !harnessMode, let m = config.qa.flatMap(QA.Mode.init(rawValue:)) { qaSetup(m) }
         capsule.onCmd = { [weak self] in
             guard let self else { return }
             self.harness?.note("page>app", $0)

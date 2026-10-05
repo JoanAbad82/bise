@@ -246,7 +246,9 @@ final class Harness {
     private func mouse(_ q: [String: Any]) async throws -> [String: Any] {
         let p = try point(q)
         let kind = q["kind"] as? String ?? "click"
-        let right = (q["button"] as? String) == "right"
+        // no right click: a context menu is a window macOS keeps on a real screen
+        if (q["button"] as? String) == "right" { throw Failure(description: "no right click in harness mode: its context menu would open on a real screen") }
+        let right = false
         let clicks = (q["clicks"] as? NSNumber)?.intValue ?? 1
         let mods = flags(q["mods"] as? [String] ?? [])
         guard let (w, name) = windowAt(p) else {
@@ -270,8 +272,7 @@ final class Harness {
         case "click": steps = right ? [.rightMouseDown, .rightMouseUp] : [.leftMouseDown, .leftMouseUp]
         case "down": steps = [right ? .rightMouseDown : .leftMouseDown]
         case "up": steps = [right ? .rightMouseUp : .leftMouseUp]
-        case "move": steps = [.mouseMoved]
-        default: throw Failure(description: "mouse kind: click, down, up, move")
+        default: throw Failure(description: "mouse kind: click, down, up (no move: a hover tooltip is a window macOS may put on a real screen)")
         }
         for (i, t) in steps.enumerated() {
             if i > 0 { try? await Task.sleep(nanoseconds: 60_000_000) }

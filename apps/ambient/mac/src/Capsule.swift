@@ -51,6 +51,7 @@ func macWindowRadius(offScreen: Bool = false) -> CGFloat {
     let w = NSWindow(contentRect: NSRect(x: -30000, y: -30000, width: 400, height: 300),
                      styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: true)
     w.isReleasedWhenClosed = false
+    w.alphaValue = 0
     w.toolbar = NSToolbar(identifier: "bise.radius")
     let sel = NSSelectorFromString("_cornerRadius")
     if w.responds(to: sel), let r = w.value(forKey: "_cornerRadius") as? NSNumber, r.doubleValue > 0, r.doubleValue < 60 {
@@ -102,10 +103,12 @@ final class Capsule: NSObject, WKNavigationDelegate {
         self.side = side
         self.offScreen = offScreen
         radius = macWindowRadius(offScreen: offScreen)
+        // every launch (main m_8012): made far off every screen, deferred and
+        // invisible; place() puts it where it belongs, show() orders it in
         let o = Placement.offScreen.frame.origin
-        panel = CapsulePanel(contentRect: NSRect(x: offScreen ? o.x : 0, y: offScreen ? o.y : 0, width: 360, height: 84),
-                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: offScreen)
-        if offScreen { panel.alphaValue = 0 }
+        panel = CapsulePanel(contentRect: NSRect(x: o.x, y: o.y, width: 360, height: 84),
+                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+        panel.alphaValue = 0
         panel.isFloatingPanel = true
         // the side panel stays while he works in his apps: above them, under the bar
         panel.level = side ? .floating : .statusBar
@@ -245,7 +248,8 @@ final class Capsule: NSObject, WKNavigationDelegate {
     // links leave the capsule: the browser opens them
     func webView(_ w: WKWebView, decidePolicyFor a: WKNavigationAction, decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
         if let url = a.request.url, a.navigationType == .linkActivated || a.targetFrame == nil, !url.isFileURL {
-            NSWorkspace.shared.open(url)
+            // harness A: never his browser
+            if Capsule.blockLinks { Log.say("capsule: harness: link not opened \(url)") } else { NSWorkspace.shared.open(url) }
             decisionHandler(.cancel)
             return
         }
@@ -262,6 +266,8 @@ final class Capsule: NSObject, WKNavigationDelegate {
     var pinnedScreen: (() -> NSScreen?)?
     // harness A's guard: false = a frame touches a real screen (the app quits)
     static var frameGuard: ((NSWindow) -> Bool)?
+    // harness A: a link in a page never opens his browser
+    nonisolated(unsafe) static var blockLinks = false
 
     private var screen: NSScreen? {
         if let pin = pinnedScreen { return pin() }

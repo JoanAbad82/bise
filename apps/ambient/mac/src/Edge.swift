@@ -41,8 +41,11 @@ final class Edge: NSObject, WKNavigationDelegate {
         }
         // harness A: none at all (nothing on his screens)
         for s in pinnedScreen.map({ $0().map { [$0] } ?? [] }) ?? NSScreen.screens {
-            let w = NSWindow(contentRect: s.frame, styleMask: .borderless, backing: .buffered, defer: false)
-            w.setFrame(s.frame, display: false)
+            // made far off every screen, deferred and invisible (main m_8012);
+            // show() puts it on its screen right before ordering it in
+            let o = Placement.offScreen.frame.origin
+            let w = NSWindow(contentRect: NSRect(origin: o, size: s.frame.size), styleMask: .borderless, backing: .buffered, defer: true)
+            w.alphaValue = 0
             w.isOpaque = false
             w.backgroundColor = .clear
             w.hasShadow = false
@@ -129,12 +132,16 @@ final class Edge: NSObject, WKNavigationDelegate {
         guard !overlays.isEmpty else { return }
         let end = Date().addingTimeInterval(seconds)
         if end > until { until = end }
-        for o in overlays where !o.window.isVisible { o.window.orderFrontRegardless() }
+        for o in overlays where !o.window.isVisible {
+            o.window.setFrame(o.screen.frame, display: false)
+            o.window.alphaValue = 1
+            o.window.orderFrontRegardless()
+        }
         hideJob?.cancel()
         let job = DispatchWorkItem { [weak self] in
             MainActor.assumeIsolated {
                 guard let self, !self.glowing, Date() >= self.until else { return }
-                for o in self.overlays { o.window.orderOut(nil) }
+                for o in self.overlays { o.window.orderOut(nil); o.window.alphaValue = 0 }
             }
         }
         hideJob = job
