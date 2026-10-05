@@ -399,6 +399,27 @@ body:has(#bise-page > [data-kit="ui"]) #bise-page > [data-kit]:not([data-kit="ui
 .k-timeline > li > b, .k-timeline > li > strong { color: var(--ink); font-weight: 600; }
 .k-timeline .k-who { font: var(--text-kicker) var(--font-mono); color: var(--kick); margin-left: 1ch; }
 
+/* k-diff (page-notes): a diff the kit draws, like a review on GitHub. Rows .k-dl carry their line
+   numbers as data-old / data-new and the kit writes them (and the − / + mark) in the gutter, so a
+   number is never in a quote: a row with only data-old went, only data-new came, both is unchanged.
+   .k-hunk a hunk's head, details.k-fold a folded run. A click on a row's numbers picks it for a
+   note, shift-click or a drag a run (notelines.js); notes.css marks the picked rows. */
+.k-diff { margin: 0 0 var(--space-3); font: 12.5px/1.6 var(--font-mono); color: var(--ink); background: var(--surface-card); border-radius: 10px; overflow: hidden; box-shadow: 0 0 0 1px var(--line), 3px 3px 0 var(--drop); }
+.k-diff .k-hunk, .k-diff .k-fold > summary { color: var(--dim); background: var(--hover); padding: 2px var(--space-3); border-block: 1px solid var(--line); margin-top: -1px; overflow-wrap: anywhere; }
+.k-diff .k-fold > summary { cursor: pointer; list-style: none; }
+.k-diff .k-fold > summary::-webkit-details-marker { display: none; }
+.k-diff .k-fold > summary::before { content: "▸ "; color: var(--faint); }
+.k-diff .k-fold[open] > summary::before { content: "▾ "; }
+.k-dl { position: relative; min-height: 1.6em; padding: 0 var(--space-3) 0 13ch; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 4; }
+.k-dl::before, .k-dl::after { position: absolute; top: 0; white-space: pre; text-align: right; color: var(--faint); user-select: none; cursor: pointer; }
+.k-dl::before { left: 0; width: 5ch; content: attr(data-old); }
+.k-dl::after { left: 5ch; width: 7ch; content: attr(data-new) "   "; }
+.k-dl[data-old]:not([data-new]) { background: color-mix(in srgb, var(--term-err) 9%, transparent); box-shadow: inset 3px 0 0 var(--term-err); }
+.k-dl[data-old]:not([data-new])::after { content: " − "; color: var(--term-err); }
+.k-dl[data-new]:not([data-old]) { background: color-mix(in srgb, var(--term-ok) 11%, transparent); box-shadow: inset 3px 0 0 var(--term-ok); }
+.k-dl[data-new]:not([data-old])::after { content: attr(data-new) " + "; color: var(--term-ok); }
+.k-dl:hover::before, .k-dl:hover::after { color: var(--ink); }
+
 /* small parts: a grid of cards, a card, a kicker, a tag */
 .k-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-3); margin: 0 0 var(--space-3); }
 .k-card { background: var(--surface-card); border-radius: 10px; padding: var(--space-3) var(--space-4); box-shadow: 3px 3px 0 var(--drop); min-width: 0; }

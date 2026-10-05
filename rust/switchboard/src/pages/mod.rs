@@ -10,6 +10,7 @@ pub mod drafts;
 pub mod export;
 pub mod lint;
 pub mod mirror;
+pub mod notelines;
 pub mod questions;
 pub mod server;
 pub mod site;

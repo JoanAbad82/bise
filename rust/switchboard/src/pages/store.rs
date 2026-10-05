@@ -663,6 +663,10 @@ fn note_line(n: &Note) -> String {
         "voice" => format!("(said) {}", n.text.as_deref().unwrap_or("")),
         _ => n.text.clone().unwrap_or_default(),
     };
+    // on a ui block's rows (a k-diff, a k-term): the lines, numbers and text, under the note
+    if let Some(l) = super::notelines::of(n) {
+        return format!("on {}: {}\n{}", super::notelines::place(&n.block, &l), what.trim(), super::notelines::listing(&l).trim_end_matches('\n'));
+    }
     match n.quote.as_deref().filter(|q| !q.trim().is_empty()) {
         Some(q) => format!("on \"{}\" ({}): {}", short(q), n.block, what.trim()),
         None => format!("on {}: {}", n.block, what.trim()),
@@ -771,6 +775,25 @@ mod tests {
         let notes = s.notes("w");
         assert_eq!(notes.iter().map(|n| n.status.as_str()).collect::<Vec<_>>(), vec!["done", "answered"]);
         assert_eq!(notes[1].answer.as_deref(), Some("kept: Marc asked"));
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    /// page-notes: a note on 3 rows of a k-diff reaches the agent with
+    /// the block, the tab, the lines' numbers and text, and the note.
+    #[test]
+    fn a_note_on_a_diffs_lines_quotes_the_block_the_numbers_and_the_text() {
+        let d = temp();
+        let s = Store::new(&d);
+        s.publish(&publish("t1", Some("w"), None), vec![], 10, &|_| false).unwrap();
+        let lines = json!([{"old": 34, "text": "Skills contain"}, {"old": 35, "text": ""}, {"new": 34, "text": "Skills below"}]);
+        s.set_drafts("w", &[json!({"block": "diff", "quote": "Skills contain Skills below", "kind": "note", "text": "keep the old line", "lines": lines, "part": "main"})], 1, 11).unwrap();
+        let sent = s.send("w", 12).unwrap();
+        let msg = notes_message(&s.meta("w").unwrap(), "http://127.0.0.1:47100/p/w", &sent);
+        assert!(
+            msg.contains("1. on diff main, old 34–35 → new 34: keep the old line\n     −34       │ Skills contain\n     −35       │ \n           +34 │ Skills below\nanswer with:"),
+            "{msg}"
+        );
+        assert!(msg.contains("\"lines\":[{"), "the JSON keeps the lines: {msg}");
         let _ = std::fs::remove_dir_all(d);
     }
 

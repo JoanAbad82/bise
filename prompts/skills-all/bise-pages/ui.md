@@ -15,6 +15,7 @@ better there.
 | a TUI feature or change | the screen in a `k-term`, tabs for 150 / 80 columns or for the steps |
 | a thing with states (empty, working, failed, done) | a `k-states` grid, one small frame per state |
 | a change to something that exists | a `k-ba`: today, proposed |
+| a change to code, a prompt, a config: lines that go and come | a `k-diff`: a diff on a page is a k-diff, never drawn by hand, so readers can note its lines |
 | a choice between designs | a `k-pick`: each option with its picture and its trade-off; the pick is a note |
 | a plan with steps and owners | a `k-timeline` |
 
@@ -37,7 +38,9 @@ A text heading, a callout `in short`, then the drawings, each under its own `h2`
 ```
 
 A ui block is a block like the others: its `data-id` stays across versions, the user's notes
-and quotes anchor on it, a new version swaps it in place. Inside it you may use `div span figure
+and quotes anchor on it, a new version swaps it in place. A note on the lines of a `k-diff` or a
+`k-term` comes to you with those lines: `on diff main, old 34–36 → new 34: …` and, under it,
+each line's numbers and text. Inside it you may use `div span figure
 figcaption button details summary`, `svg` (`path rect circle line polyline polygon text g`),
 `class`, any `data-` name of yours (not `data-id`, `data-kit`), `aria-*`, `role`. Behaviour comes
 from the kit, never from you: `data-ui="tabs"`, `"term"`, `"pick"`. Without JS everything still
@@ -54,6 +57,22 @@ reads (tabs show every pane).
   three spaces between pairs (`⏎ open   x stop   esc back`), never ` · `.
 - `data-ui="tabs"`: a `k-tabs` bar of `<button type="button" data-tab="x">` and `k-pane`s with
   the same `data-tab`: widths, steps, before / after.
+- `k-diff`: a diff, drawn by the kit like a review on GitHub. One `div class="k-dl"` per line
+  with its numbers: `data-old="34" data-new="34"` unchanged, only `data-old` a line that goes,
+  only `data-new` a line that comes; the kit writes the numbers and the `−` `+` marks, so you
+  write only the line's text (escaped: `&lt;`). `<div class="k-hunk">@@ -1,40 +1,36 @@ what</div>`
+  heads a hunk; a long unchanged run goes in `<details class="k-fold"><summary>30 unchanged
+  lines</summary>…rows…</details>`. Tabs for several files. The user picks lines by their
+  numbers (click, shift-click) and leaves a note; you get the block, the tab, the numbers and the
+  lines' text. Keep the real numbers: they are how the user's note finds the line.
+  ```html
+  <div class="k-diff">
+  <div class="k-hunk">@@ -4,4 +4,3 @@ main's prompt</div>
+  <div class="k-dl" data-old="4" data-new="4">## Skills</div>
+  <div class="k-dl" data-old="5">Call `skill` before the task.</div>
+  <div class="k-dl" data-new="5">Call `skill` with a name listed below.</div>
+  </div>
+  ```
 - `k-ba`: two `figure`s, each a first `figcaption` (`<b>today</b> · …`) and its picture.
 - `k-states`: `figure`s, each a `figcaption` with the state's name and a small `k-term`.
 - `k-pick` with `data-ui="pick"`: `k-option`s with `data-pick="a"`, each an `h3`, a `p`, a

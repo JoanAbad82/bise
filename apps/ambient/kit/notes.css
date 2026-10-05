@@ -15,6 +15,15 @@
 #bise-page .bn-editing { outline: 1.5px dashed var(--pen, #c8264a); outline-offset: 6px; border-radius: 2px; }
 #bise-page .bn-edited { box-shadow: -3px 0 0 var(--pen, #c8264a); }
 html.bn-pinning #bise-page [data-kit][data-id] { cursor: crosshair; }
+/* a diff's rows picked by their numbers (notelines.js), while the toolbar or the note is open */
+/* each row keeps its own diff tint (red −, green +): the pick is the pen's rail, a 1 px pen outline
+   around the run (data-bn-line="first" / "last" on its ends) and the numbers in the pen (designer
+   m_7870, ambient m_7871: a pen veil turned the + row grey) */
+#bise-page .k-dl[data-bn-line] { box-shadow: inset 3px 0 0 var(--pen, #c8264a), inset -1px 0 0 var(--pen, #c8264a); }
+#bise-page .k-dl[data-bn-line~="first"] { box-shadow: inset 3px 0 0 var(--pen, #c8264a), inset -1px 0 0 var(--pen, #c8264a), inset 0 1px 0 var(--pen, #c8264a); }
+#bise-page .k-dl[data-bn-line~="last"] { box-shadow: inset 3px 0 0 var(--pen, #c8264a), inset -1px 0 0 var(--pen, #c8264a), inset 0 -1px 0 var(--pen, #c8264a); }
+#bise-page .k-dl[data-bn-line="first last"] { box-shadow: inset 3px 0 0 var(--pen, #c8264a), inset 0 0 0 1px var(--pen, #c8264a); }
+#bise-page .k-dl[data-bn-line]::before, #bise-page .k-dl[data-bn-line]::after { color: var(--pen, #c8264a); }
 
 /* the side list: `notes for weekly update · 3` */
 .bn-list {
@@ -50,7 +59,10 @@ html.bn-pinning #bise-page [data-kit][data-id] { cursor: crosshair; }
 .bn-x { position: absolute; right: 6px; top: 7px; width: 22px; height: 22px; border: 0; background: none; color: var(--talk-dim, #ffffff70); border-radius: 50%; }
 .bn-x:hover { color: var(--talk-ink, #fff); background: color-mix(in srgb, var(--talk-ink, #fff) 10%, transparent); }
 .bn-empty { padding: 10px; color: var(--talk-dim, #ffffffa0); font-size: 13px; }
-.bn-keys { padding: 8px 16px 12px; font: 11px var(--font-mono, ui-monospace, monospace); color: var(--talk-dim, #ffffff70); white-space: pre; }
+.bn-keys { padding: 8px 16px 12px; font: 11px var(--font-mono, ui-monospace, monospace); color: var(--talk-dim, #ffffff70); }
+/* a row of keys wraps between pairs, a pair never breaks (ambient m_7871: it was clipped) */
+.bn-keyrow { display: flex; flex-wrap: wrap; column-gap: 3ch; }
+.bn-key { white-space: pre; }
 
 /* the send bar: `3 notes for weekly update · or just say "send"` */
 .bn-bar {

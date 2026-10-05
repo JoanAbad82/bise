@@ -10,8 +10,8 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Uint8Array, Float32Array, String, Number });
-for (const f of ["words.js", "face.js", "model.js", "pearl.js", "bar.js", "panelmodel.js", "fakecore.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
-const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes, AmbPearl: Pearl, AmbBar: Bar, AmbPanel: Pn } = ctx;
+for (const f of ["words.js", "face.js", "model.js", "pearl.js", "bar.js", "panelmodel.js", "fakecore.js", "../kit/notelines.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes, BiseLines, AmbPearl: Pearl, AmbBar: Bar, AmbPanel: Pn } = ctx;
 const W = Wd.W;
 
 // the scripts run in their own realm: compare plain data
@@ -1131,6 +1131,29 @@ law("notes: the kit's own controls (data-kit-ui) are never in a block's text, so
   const li = fakeEl(fakeText("Hi Anna, yes for tuesday."), ui);
   const pts = BiseNotes.rawPoints(li);
   assert.equal(pts.map(([n, i]) => n.nodeValue[i]).join(""), "Hi Anna, yes for tuesday.");
+});
+law("notes: a note on a ui block's rows keeps each line's numbers and text, and its place says the lines and the tab (page-notes)", () => {
+  const L = BiseLines.core;
+  // a diff's row: old and/or new number; a terminal's line: its n; numbers only from digits
+  eq(L.line({ old: "34", new: null, n: 2, text: "Skills contain   " }), { old: 34, text: "Skills contain" });
+  eq(L.line({ old: "39", new: "35", n: 9, text: "<skills>" }), { old: 39, new: 35, text: "<skills>" });
+  eq(L.line({ old: null, new: null, n: 3, text: "/scheduled" }), { n: 3, text: "/scheduled" });
+  eq(L.line({ old: "x", new: "", n: 1, text: "" }), { n: 1, text: "" });
+  assert.equal(L.line({ n: 1, text: "y".repeat(400) }).text.length, L.CUT);
+  const many = L.linesOf(Array.from({ length: 45 }, (_, i) => ({ n: i + 1, text: "z" })));
+  eq([many.lines.length, many.more], [L.MAX, 5]);
+  const diff = [{ old: 34, text: "a" }, { old: 35, text: "" }, { new: 34, text: "b" }];
+  // in words, never '-5-7' (mono reads it as hyphens: ambient m_7871)
+  assert.equal(L.label(diff), "old 34–35 · new 34");
+  assert.equal(L.label(diff.slice(0, 2)), "old 34–35");
+  assert.equal(L.label(diff.slice(2)), "new 34");
+  assert.equal(L.label([{ n: 3, text: "x" }]), "line 3");
+  assert.equal(L.label(many.lines, many.more), "lines 1–40");
+  // the side list's place: the lines and the tab, before any quote
+  assert.equal(N.where({ block: "diff", quote: "a b", lines: diff, part: "main" }, "the diff"), "old 34–35 · new 34 · main");
+  assert.equal(N.NW.emptyLines, "no notes yet. select some text, click a line's number, or hold fn and talk.");
+  assert.equal(N.where({ block: "screen", quote: "x", lines: [{ n: 3, text: "x" }] }, ""), "line 3");
+  assert.equal(N.where({ block: "diff", quote: "a b", lines: [] }, ""), '"a b"');
 });
 law("notes: a note's place is the quoted words or the block's name (its kicker or heading, else its section's), never a block id (ambient, m_4919)", () => {
   assert.equal(N.where({ block: "c-check", quote: "post it now" }, "check before posting"), '"post it now"');

@@ -228,7 +228,8 @@ pub fn esc(s: &str) -> String {
 /// The shell around a fragment (§2.5): the kit, the token, the page's ids.
 fn shell(pages: &Pages, title: &str, head: &str, main_attrs: &str, inner: &str) -> String {
     format!(
-        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<meta name=\"bise-token\" content=\"{}\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/kit/tokens.css\">\n<link rel=\"stylesheet\" href=\"/kit/kit.css\">\n<link rel=\"stylesheet\" href=\"/kit/notes.css\">\n<script src=\"/kit/kit.js\" defer></script>\n<script src=\"/kit/pearl.js\" defer></script>\n<script src=\"/kit/notes.js\" defer></script>\n{head}</head>\n<body>\n<main {main_attrs}>\n{inner}\n</main>\n</body>\n</html>\n",
+        "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<meta name=\"bise-token\" content=\"{}\">\n<title>{}</title>\n<link rel=\"stylesheet\" href=\"/kit/tokens.css\">\n<link rel=\"stylesheet\" href=\"/kit/kit.css\">\n<link rel=\"stylesheet\" href=\"/kit/notes.css\">\n<script src=\"/kit/kit.js\" defer></script>\n<script src=\"/kit/pearl.js\" defer></script>\n<script src=\"/kit/notelines.js\" defer></script>
+<script src=\"/kit/notes.js\" defer></script>\n{head}</head>\n<body>\n<main {main_attrs}>\n{inner}\n</main>\n</body>\n</html>\n",
         pages.token,
         esc(title)
     )
@@ -627,8 +628,8 @@ mod tests {
         assert!(t.contains("<title>weekly &lt;update&gt;</title>"));
         assert!(t.contains("<main id=\"bise-page\" data-page=\"w\" data-version=\"1\" data-latest=\"1\" data-agent=\"t1\""));
         assert!(t.contains(FRAG) && t.contains("/kit/kit.js") && t.contains("/kit/notes.js") && t.contains("/kit/tokens.css"));
-        let order: Vec<usize> = ["tokens.css", "kit.css", "notes.css", "kit.js", "pearl.js", "notes.js"].iter().map(|f| t.find(f).unwrap()).collect();
-        assert!(order.windows(2).all(|w| w[0] < w[1]), "the shell's order: tokens, kit, notes css, then kit.js, pearl.js, notes.js");
+        let order: Vec<usize> = ["tokens.css", "kit.css", "notes.css", "kit.js", "pearl.js", "notelines.js", "notes.js"].iter().map(|f| t.find(f).unwrap()).collect();
+        assert!(order.windows(2).all(|w| w[0] < w[1]), "the shell's order: tokens, kit, notes css, then kit.js, pearl.js, notelines.js, notes.js");
         assert!(String::from_utf8_lossy(&r.bytes()).contains(&format!("Content-Security-Policy: {CSP}\r\n")));
         assert_eq!(text(&get(&p, "/p/w/v/1/body")), FRAG);
         assert_eq!(get(&p, "/p/w/v/2").status, 404);

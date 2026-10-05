@@ -63,6 +63,8 @@
     placeholder: "your note",
     // signed off by ambient (m_4786): 'block' is our word, not hers; keys like the TUI's key bar
     empty: "no notes yet. select some text, or hold fn and talk.",
+    // on a page with a k-diff, the new gesture too (ambient m_7871)
+    emptyLines: "no notes yet. select some text, click a line's number, or hold fn and talk.",
     // the page is being written, no version yet (ambient, m_5095 via amb-kit m_5106)
     writing: "notes open with the first version",
     keys: "t type   p pin   d draw   ⌘z undo   ⌘⏎ send",
@@ -192,7 +194,9 @@
 
   // where a note sits, in the page's words, never a block id (ambient, m_4919 (2)): the quoted
   // words when there was a selection, else the block's name (its kicker or heading)
-  const where = (n, name) => (n.quote ? `"${n.quote}"` : name || n.where || "");
+  // words when there was a selection, else the block's name (its kicker or heading); on a ui
+  // block's rows, the lines (`lines −34–36 +34 · main`, notelines.js)
+  const where = (n, name) => (root.BiseLines && root.BiseLines.where(n)) || (n.quote ? `"${n.quote}"` : name || n.where || "");
   // a block's name from what it shows: its own heading or kicker (a heading, a callout's h3), else
   // the heading of its section (the heading block above it), else its first words
   function blockName(own, section, text) {
@@ -465,22 +469,27 @@
     r.setEnd(b[0], b[1] + 1);
     return r;
   }
-  // a selection inside one block -> {block, quote, offset}
+  // a selection inside one block -> {block, quote, offset}, and on a ui block's rows (a k-diff,
+  // a k-term) the lines and the part they are in (notelines.js: {lines, more, part})
   function fromSelection(sel, page) {
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
-    const r = sel.getRangeAt(0);
+    return fromRange(sel.getRangeAt(0), page);
+  }
+  function fromRange(r, page) {
     const start = r.startContainer.nodeType === 1 ? r.startContainer : r.startContainer.parentElement;
     const block = start && start.closest("[data-kit][data-id]");
     if (!block || !page.contains(block) || !block.contains(r.endContainer)) return null;
     const quote = norm(fragText(r.cloneContents()));
-    if (!quote) return null;
+    const lines = block.dataset.kit === "ui" && root.BiseLines ? root.BiseLines.at(r, block, textOf) : {};
+    // an empty line picked by its number has no words: its line is the place
+    if (!quote && !(lines.lines && lines.lines.length)) return null;
     // the offset: the normalized text before the selection
     const pre = r.cloneRange();
     pre.selectNodeContents(block);
     pre.setEnd(r.startContainer, r.startOffset);
     const before = fragText(pre.cloneContents());
     const offset = norm(before).length + (/\s$/.test(before) && before.trim() ? 1 : 0);
-    return { block: block.dataset.id, quote, offset };
+    return { block: block.dataset.id, quote, offset, ...lines };
   }
 
   function mount(doc) {
@@ -527,7 +536,11 @@
     const list = el("aside", "bn-ui bn-list");
     const listHead = el("div", "bn-head");
     const listBody = el("ol", "bn-items");
-    const listKeys = el("div", "bn-keys", `${NW.keys}\n${NW.keysTab}`);
+    // the keys, each pair whole, flowing in rows: they wrap between pairs, never clipped (ambient m_7871)
+    const listKeys = el("div", "bn-keys");
+    const keyRow = el("div", "bn-keyrow");
+    for (const p of `${NW.keys}   ${NW.keysTab}`.split(/ {3}/)) keyRow.append(el("span", "bn-key", p));
+    listKeys.append(keyRow);
     // the composer is the list's last row: a note you type never covers the page (QA m_4929: it
     // opened over the next block)
     const composer = el("form", "bn-composer");
@@ -627,7 +640,7 @@
         }
         return li;
       }));
-      if (!all.length) listBody.replaceChildren(el("li", "bn-empty", NW.empty));
+      if (!all.length) listBody.replaceChildren(el("li", "bn-empty", page.querySelector(".k-dl") ? NW.emptyLines : NW.empty));
       // the page is being written (no version yet): notes wait for the first version (ambient, m_5095)
       if (writing()) listBody.replaceChildren(el("li", "bn-empty", NW.writing));
       list.classList.toggle("bn-on", all.length > 0 || composer.classList.contains("bn-on") || writing());
@@ -684,26 +697,39 @@
         ...(b && b.dataset.kit === "review" && t.item ? [btn("start", NW.tools.start)] : []));
       tools.style.left = `${rect.left + win.scrollX}px`;
       tools.style.top = `${rect.top + win.scrollY - 40}px`;
-      tools.dataset.on = t.quote ? "selection" : "block";
+      tools.dataset.on = t.picked ? "lines" : t.quote || t.lines ? "selection" : "block";
       tools.classList.add("bn-on");
     }
-    const hideTools = () => { tools.classList.remove("bn-on"); delete tools.dataset.on; };
+    // a diff's rows picked by their numbers (notelines.js) stay marked until the toolbar goes
+    const hideTools = () => { tools.classList.remove("bn-on"); delete tools.dataset.on; if (gutter && !composer.classList.contains("bn-on")) gutter.clear(); };
+    const gutter = root.BiseLines ? root.BiseLines.bindGutter(doc, page, (rows, b) => {
+      const r = doc.createRange();
+      r.setStartBefore(rows[0]); r.setEndAfter(rows[rows.length - 1]);
+      const t = fromRange(r, page);
+      if (!t) return;
+      clearTimeout(hoverT);
+      // above the run's first row, at the diff's right end: never over the lines (ambient m_7871)
+      const box = (rows[0].closest(".k-diff") || b).getBoundingClientRect(), top = rows[0].getBoundingClientRect().top;
+      showTools({ ...t, picked: true }, { left: box.right, top });
+      tools.style.left = `${box.right + win.scrollX - tools.offsetWidth}px`;
+    }, writing) : null;
+    doc.addEventListener("mousedown", (e) => { if (tools.dataset.on === "lines" && !tools.contains(e.target) && !(e.target.closest && e.target.closest(".k-dl"))) hideTools(); });
     // the note you type: in the list's last row, under where it goes
     function compose(t) {
       target = t;
+      composer.classList.add("bn-on");   // first: the picked rows stay marked while you type
       hideTools();
       composerWhere.textContent = t.drawing ? NW.drawing : where(t, nameOf(t.block, t.item));
-      composer.classList.add("bn-on");
       input.value = "";
       render();
       input.focus();
     }
-    const closeComposer = () => { composer.classList.remove("bn-on"); input.blur(); render(); };
+    const closeComposer = () => { composer.classList.remove("bn-on"); if (gutter) gutter.clear(); input.blur(); render(); };
     function addNote(kind, text, extra) {
       if (!target) return;
       // words for a drawing just made: they go on its note
       if (target.drawing) { M.update(target.drawing, { text: text || undefined }); target = null; save(); render(); return; }
-      M.add({ version, block: target.block, item: target.item, quote: target.quote, offset: target.offset, pin: target.pin, kind, text: text || undefined, where: nameOf(target.block, target.item) || undefined, ...extra }, now());
+      M.add({ version, block: target.block, item: target.item, quote: target.quote, offset: target.offset, pin: target.pin, lines: target.lines, more: target.more, part: target.part, kind, text: text || undefined, where: nameOf(target.block, target.item) || undefined, ...extra }, now());
       barNote = "";
       save(); render();
     }
@@ -719,7 +745,7 @@
     });
     // on a block under the mouse, after a short rest; a selection's toolbar stays until it goes
     let hover = null, hoverT = 0;
-    const busy = () => selecting() || drawing || pinning || editing || composer.classList.contains("bn-on") || tools.dataset.on === "selection";
+    const busy = () => selecting() || drawing || pinning || editing || composer.classList.contains("bn-on") || tools.dataset.on === "selection" || tools.dataset.on === "lines";
     let hoverOn = null;   // the block, or a review's item under the mouse
     page.addEventListener("mouseover", (e) => {
       const b = e.target.closest && e.target.closest("[data-kit][data-id]");
@@ -1242,7 +1268,7 @@
     return { model: M, render };
   }
 
-  root.BiseNotes = { core, mount, rangeFor, rawPoints, fromSelection };
+  root.BiseNotes = { core, mount, rangeFor, rawPoints, fromSelection, fromRange };
   if (root.document && root.document.getElementById) {
     // the page's layer, kept for a look from the console (BiseNotes.live.model.all())
     const go = () => { root.BiseNotes.live = mount(root.document); };
