@@ -3350,7 +3350,8 @@ def real_violations(pid):
     for w in ws["wins"]:
         hit = _touches(w, ws["screens"])
         if hit:
-            v.append("window %s at (%d,%d %dx%d) touches screen %s" % (w["n"], w["x"], w["y"], w["w"], w["h"], hit))
+            v.append("window %s at (%d,%d %dx%d) touches screen %s (onscreen %s, alpha %s, layer %s)"
+                     % (w["n"], w["x"], w["y"], w["w"], w["h"], hit, w.get("onscreen"), w.get("alpha"), w.get("layer")))
     t = _app_type(pid)
     if t == "Foreground":
         v.append("the app has a Dock icon (ApplicationType Foreground)")
@@ -3437,13 +3438,19 @@ def _bundle_exe(app):
 
 def his_app_path():
     """The PATH his running app hands its core (--env PATH=..., from ps), else this shell's."""
-    r = subprocess.run(["ps", "-axo", "args="], capture_output=True, text=True)
+    r = subprocess.run(["ps", "-axww", "-o", "args="], capture_output=True, text=True)
     for line in r.stdout.splitlines():
         if "/Contents/MacOS/bise ambient" in line and "--env PATH=" in line and REAL_DIR not in line:
             m = re.search(r"--env PATH=(\S+)", line)
             if m:
                 return m.group(1)
-    return os.environ.get("PATH", LAUNCHD_PATH)
+    # his app isn't running: his login shell's PATH from a clean env (what the app's launcher
+    # hands it, amb-mac m_7974), never this agent's PATH (it carries the hub's bin)
+    sh = os.environ.get("SHELL", "/bin/zsh")
+    r = subprocess.run(["/usr/bin/env", "-i", "HOME=%s" % os.path.expanduser("~"), "USER=%s" % os.environ.get("USER", ""),
+                        "LOGNAME=%s" % os.environ.get("USER", ""), "SHELL=%s" % sh, "TERM=dumb", sh, "-l", "-c", 'printf %s "$PATH"'],
+                       capture_output=True, text=True, timeout=20, stdin=subprocess.DEVNULL)
+    return r.stdout.strip().splitlines()[-1] if r.returncode == 0 and r.stdout.strip() else LAUNCHD_PATH
 
 
 def _user_tmp():
@@ -3494,6 +3501,8 @@ def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None,
         os.unlink(REAL_SOCK)
     except OSError:
         pass
+    path = path or his_app_path()
+    _real_guard(["x", "--bise", bise, "--env", "PATH=%s" % path, "--env", "BISE_APP_ROOT=%s" % root], {"HOME": REAL_HOME})
     info = _start_hub(bise, root, "fake", home=REAL_HOME)
     env = {"HOME": REAL_HOME, "BISE_HOME": os.path.join(REAL_HOME, ".bise"), "PATH": LAUNCHD_PATH, "TMPDIR": _user_tmp(),
            "USER": os.environ.get("USER", ""), "LOGNAME": os.environ.get("LOGNAME", os.environ.get("USER", "")),
@@ -3505,7 +3514,7 @@ def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None,
     web = web or os.path.join(root, "apps", "ambient", "web")
     argv = [exe] + (list(args) if args is not None else
                     ["--bise", bise, "--web", web, "--workspace", info["ws"],
-                     "--env", "BISE_APP_ROOT=%s" % root, "--env", "PATH=%s" % (path or his_app_path())])
+                     "--env", "BISE_APP_ROOT=%s" % root, "--env", "PATH=%s" % path])
     _real_guard(argv, env)
     out = open(os.path.join(REAL_APP_DIR, "app.out"), "a")
     out.write("\n--- %s %s\n" % (time.strftime("%F %T"), " ".join(argv)))
@@ -3628,7 +3637,7 @@ def real_op(op, **kw):
     ping = real_alive()
     if not ping:
         raise QAError("the harness app isn't running: qa.py real launch first")
-    if op == "shot" and kw.get("window") not in ("bar", "side"):
+    if op == "shot" and kw.get("what", kw.get("window")) not in ("bar", "side"):
         raise QAError("shot: window bar or side only (the web view's own snapshot); never a display (ambient-lead m_8004)")
     ops = ping.get("ops")
     if ops and op not in ops and op != "ping":
@@ -3638,9 +3647,9 @@ def real_op(op, **kw):
 
 
 def real_click(selector, window="bar"):
-    """A click on a page element of a harness panel: its rect from the page (eval), the panel's
-    frame from state, to the virtual display's points (what mouse takes), then mouse click there
-    (AppKit's own hit test: ignoresMouseEvents and first-click rules apply)."""
+    """A click on a page element of a harness panel: its rect from the page (eval), then mouse
+    at its center in that window's own points from its top-left (the page's CSS px; amb-mac
+    m_8006), so AppKit's own hit test, ignoresMouseEvents and first-click rules apply."""
     sel = json.dumps(selector)
     r = real_op("eval", window=window, js="(() => { const e = document.querySelector(%s); if (!e) return null; const b = e.getBoundingClientRect(); "
                 "return JSON.stringify({x: b.left, y: b.top, w: b.width, h: b.height}); })()" % sel)
@@ -3648,15 +3657,9 @@ def real_click(selector, window="bar"):
     rect = json.loads(v) if isinstance(v, str) else v
     if not rect:
         raise QAError("click: no %s in the %s page" % (selector, window))
-    st = real_op("state")
-    w = st.get(window) or {}
-    f = w.get("frame_display") or w.get("frame")
-    if not f:
-        raise QAError("click: no frame for the %s panel in state: %s" % (window, list(st)))
-    x = f["x"] + rect["x"] + rect["w"] / 2
-    y = f["y"] + rect["y"] + rect["h"] / 2
-    out = real_op("mouse", x=x, y=y, kind="click")
-    out["at"] = {"x": x, "y": y, "element": rect, "panel": f}
+    x, y = rect["x"] + rect["w"] / 2, rect["y"] + rect["h"] / 2
+    out = real_op("mouse", window=window, x=x, y=y)
+    out["at"] = {"x": x, "y": y, "element": rect}
     return out
 
 
@@ -3712,6 +3715,7 @@ def real_proof(seconds=8.0):
             if t not in out["app_types"]:
                 out["app_types"].append(t)
             ping = real_alive() or {}
+            out["app_says"] = {k: ping.get(k) for k in ("offscreen", "screens", "windows", "front_app", "status_item")}
             if ping.get("app_active") not in out["app_active"]:
                 out["app_active"].append(ping.get("app_active"))
             f = _front().get("name")
@@ -3742,7 +3746,19 @@ def real_proof(seconds=8.0):
     if pid:
         lg = subprocess.run(["log", "show", "--style", "compact", "--start", since, "--predicate",
                              'process == "coreaudiod" OR subsystem == "com.apple.TCC"'], capture_output=True, text=True, timeout=120).stdout
-        out["audio_or_tcc_lines"] = [l[:240] for l in lg.splitlines() if re.search(r"\b%d\b" % pid, l)][:20]
+        mine = [l for l in lg.splitlines() if re.search(r"\b%d\b" % pid, l)]
+        # coreaudiod lines about the pid = an audio device used; TCC: which services it asked and how
+        # (preflight=yes is a silent check; a real request could prompt, attributed to whoever launched it)
+        out["audio_lines"] = [l[:240] for l in mine if "coreaudiod" in l][:10]
+        msgs = {}
+        for l in lg.splitlines():
+            m = re.search(r"msgID=(%d\.\d+), function=\S+, service=(\w+), preflight=(\w+)" % pid, l)
+            if m:
+                msgs[m.group(1)] = {"service": m.group(2), "preflight": m.group(3)}
+            r = re.search(r"AUTHREQ_ATTRIBUTION: msgID=(%d\.\d+).*?identifier=([\w.]+)" % pid, l)
+            if r and r.group(1) in msgs:
+                msgs[r.group(1)]["responsible"] = r.group(2)
+        out["tcc"] = list(msgs.values())
         try:
             out["watch_log"] = open(os.path.join(REAL_APP_DIR, "watch.log")).read().splitlines()[-4:]
         except OSError:
@@ -3754,8 +3770,11 @@ def real_proof(seconds=8.0):
         fails.append("his front app changed: %s -> %s -> %s" % (out["front_before"].get("name"), out["fronts"], out["front_after"].get("name")))
     if "Foreground" in out["app_types"]:
         fails.append("a Dock icon")
-    if out.get("audio_or_tcc_lines"):
-        fails.append("coreaudiod/TCC logged the app's pid (see audio_or_tcc_lines)")
+    if out.get("audio_lines"):
+        fails.append("coreaudiod logged the app's pid: an audio device (see audio_lines)")
+    asked = [t for t in out.get("tcc", []) if t.get("preflight") != "yes"]
+    if asked:
+        fails.append("a TCC request that may prompt: %s" % asked)
     if not out["samples"]:
         fails.append("no sample taken")
     out["fails"] = fails
@@ -3778,10 +3797,10 @@ def _real_cli(a):
     if c == "click":
         if a.at:
             x, y = (float(v) for v in a.at.split(","))
-            return real_op("mouse", x=x, y=y, kind="click")
+            return real_op("mouse", window=a.window, x=x, y=y)
         if a.selector:
             return real_click(a.selector, a.window)
-        raise QAError("click: a selector or --at x,y (points from the virtual display's top-left)")
+        raise QAError("click: a selector or --at x,y (points from the window's top-left)")
     if c == "type":
         return real_op("type", text=a.text)
     if c == "fn":
@@ -3792,7 +3811,7 @@ def _real_cli(a):
             kw["words"] = a.words
         return real_op("fn", **kw)
     if c == "shot":
-        return real_op("shot", window=a.window)
+        return real_op("shot", what=a.window)
     if c == "eval":
         return real_op("eval", window=a.window, js=a.js)
     if c == "events":
@@ -3821,7 +3840,7 @@ def _cli(argv):
         rs.add_parser(n)
     q = rs.add_parser("op", help="any op of the test socket: op <name> '<json args>'"); q.add_argument("name"); q.add_argument("args", nargs="?", default="{}")
     q = rs.add_parser("keys", help="up esc return cmd+w type:<text> ..."); q.add_argument("specs", nargs="+"); q.add_argument("--window")
-    q = rs.add_parser("click", help="a click on a selector, or --at x,y (page CSS px)"); q.add_argument("selector", nargs="?"); q.add_argument("--at"); q.add_argument("--window", default="bar")
+    q = rs.add_parser("click", help="a click on a selector, or --at x,y (points from the window's top-left)"); q.add_argument("selector", nargs="?"); q.add_argument("--at"); q.add_argument("--window", default="bar")
     q = rs.add_parser("type"); q.add_argument("text")
     q = rs.add_parser("fn"); q.add_argument("kind", choices=["down", "up", "tap", "hold"]); q.add_argument("--ms", type=int); q.add_argument("--words")
     q = rs.add_parser("shot"); q.add_argument("--window", default="bar", choices=["bar", "side"])
