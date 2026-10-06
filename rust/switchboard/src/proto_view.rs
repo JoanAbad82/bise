@@ -4,7 +4,7 @@
 //! to `bise_proto` rows, and the live fold of a subscribed thread (only
 //! the entries that changed go out).
 
-use bise_proto::rows::{question, Agent, Card, CardPage, Report, ReportKind, Status};
+use bise_proto::rows::{question, Agent, Artifact, Card, CardPage, Report, ReportKind, Status};
 use bise_proto::thread::{self, Ctx, Entry, Line};
 use bise_proto::Pos;
 use serde_json::Value;
@@ -107,6 +107,35 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
                 options,
                 since_ms: now.saturating_sub(c.get("age_ms").and_then(Value::as_u64).unwrap_or(0)),
                 page,
+            }
+        })
+        .collect()
+}
+
+/// The art store's `artifacts` event (daemon/art.rs `artifacts_ev`:
+/// rows + `seen_ms`) as rows. `url`: a page's the page server gives
+/// (`page_url`), else its link or its file (its kept copy first); `new`:
+/// not his own, changed since he last looked.
+pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>) -> Vec<Artifact> {
+    let seen = ev.get("seen_ms").and_then(Value::as_u64).unwrap_or(0);
+    let rows = ev.get("rows").and_then(Value::as_array).cloned().unwrap_or_default();
+    rows.iter()
+        .map(|r| {
+            let (id, kind) = (s(r, "id"), s(r, "kind"));
+            let at_ms = r.get("ts_ms").and_then(Value::as_u64).unwrap_or(0);
+            let url = match page_url(&id).filter(|_| s(r, "by") == "page") {
+                Some(u) => u,
+                None => Some(s(r, "copy")).filter(|c| !c.is_empty() && !s(r, "target").contains("://")).unwrap_or_else(|| s(r, "target")),
+            };
+            Artifact {
+                title: s(r, "title"),
+                agent: s(r, "agent"),
+                version: r.get("v").and_then(Value::as_u64).unwrap_or(0) as u32,
+                new: s(r, "by") != "you" && at_ms > seen,
+                at_ms,
+                url,
+                kind,
+                id,
             }
         })
         .collect()
@@ -230,6 +259,25 @@ mod tests {
         assert_eq!(c.iter().map(|c| c.id).collect::<Vec<_>>(), [9, 10], "his kinds, no drop");
         assert_eq!((c[0].question.as_str(), c[0].options.len(), c[0].since_ms, c[0].urgent), ("which bench?", 2, 4_000, false));
         assert!(c[1].urgent && c[1].page.as_ref().is_some_and(|p| p.block.as_deref() == Some("q1")));
+    }
+
+    #[test]
+    fn the_art_store_rows_become_artifacts() {
+        let ev = json!({"ev": "artifacts", "seen_ms": 100, "rows": [
+            {"id": "perf-notes", "kind": "page", "title": "Perf notes", "agent": "perf", "by": "page", "ts_ms": 150, "v": 2,
+             "target": "/st/pages/perf-notes", "copy": null},
+            {"id": "deck", "kind": "file", "title": "Deck", "agent": "main", "by": "agent", "ts_ms": 90, "v": 1,
+             "target": "/w/deck.pdf", "copy": "/st/art/deck/1.pdf"},
+            {"id": "site", "kind": "site", "title": "Site", "agent": "web", "by": "agent", "ts_ms": 200, "v": 3,
+             "target": "https://x.dev", "copy": "/st/art/site/3"},
+            {"id": "mine", "kind": "file", "title": "Mine", "agent": "main", "by": "you", "ts_ms": 300, "v": 1,
+             "target": "/w/m.txt", "copy": null}]});
+        let a = artifacts(&ev, |id| (id == "perf-notes").then(|| "http://127.0.0.1:1/p/perf-notes".to_string()));
+        let row = |i: usize| (a[i].id.as_str(), a[i].url.as_str(), a[i].version, a[i].new);
+        assert_eq!(row(0), ("perf-notes", "http://127.0.0.1:1/p/perf-notes", 2, true), "a page: its server url");
+        assert_eq!(row(1), ("deck", "/st/art/deck/1.pdf", 1, false), "a file: its kept copy, seen before");
+        assert_eq!(row(2), ("site", "https://x.dev", 3, true), "a link: the link");
+        assert_eq!(row(3), ("mine", "/w/m.txt", 1, false), "his own is never new");
     }
 
     #[test]

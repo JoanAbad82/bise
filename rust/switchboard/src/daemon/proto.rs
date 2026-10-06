@@ -33,6 +33,15 @@ pub(super) struct Proto {
 struct Conn {
     /// its subscribed threads, by agent
     subs: BTreeMap<String, Live>,
+    /// it said `typed_only`: the hub's older events skip it
+    only: bool,
+}
+
+impl Proto {
+    /// The connection wants typed events only (`broadcast` skips it).
+    pub(super) fn typed_only(&self, id: ClientId) -> bool {
+        self.conns.get(&id).is_some_and(|c| c.only)
+    }
 }
 
 /// What the fold needs from the hub, owned (taken before the conns are
@@ -91,11 +100,11 @@ impl Shell {
             Ok(c) => c,
             Err(e) => return self.proto_error(id, &tag, &e),
         };
-        if let HubCmd::Hello { proto } = cmd {
+        if let HubCmd::Hello { proto, typed_only } = cmd {
             if proto != PROTO {
                 return self.proto_error(id, &tag, &format!("this hub speaks proto {PROTO}, not {proto}"));
             }
-            self.proto.conns.entry(id).or_default();
+            self.proto.conns.entry(id).or_default().only = typed_only;
             let ws = self.opts.paths.workspace.clone();
             let name = ws.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
             let welcome = HubEv::Welcome { project: self.project(), proto: PROTO, workspace: ws.to_string_lossy().to_string(), name };
@@ -104,6 +113,9 @@ impl Shell {
             let (agents, cards) = self.proto_rows(&snap);
             self.proto_send(id, &agents);
             self.proto_send(id, &cards);
+            let arts = self.artifacts_ev();
+            let arts = self.proto_artifacts(&arts);
+            self.proto_send(id, &arts);
             return;
         }
         if !self.proto.conns.contains_key(&id) {
@@ -117,7 +129,8 @@ impl Shell {
             | HubCmd::Answer { project, .. }
             | HubCmd::Stop { project, .. }
             | HubCmd::Archive { project, .. }
-            | HubCmd::Unarchive { project, .. } => project.clone(),
+            | HubCmd::Unarchive { project, .. }
+            | HubCmd::ArtifactsSeen { project } => project.clone(),
             HubCmd::Hello { .. } => unreachable!(),
             HubCmd::Unknown { tag, .. } => return self.proto_error(id, tag, &format!("unknown command: {tag}")),
         };
@@ -195,8 +208,17 @@ impl Shell {
                 }
                 self.client_line(id, json!({"op": "input", "focus": MAIN, "text": format!("/restore {agent}")}));
             }
+            // the TUI's own `seen`: the clock moves, the list comes again
+            HubCmd::ArtifactsSeen { .. } => self.artifacts_op(id, &json!({"do": "seen"})),
             HubCmd::Hello { .. } | HubCmd::Unknown { .. } => {}
         }
+    }
+
+    /// The art store's event as the typed `artifacts`.
+    fn proto_artifacts(&self, ev: &Value) -> HubEv {
+        let pages = self.pages.clone();
+        let page_url = |id: &str| pages.as_ref().filter(|p| p.store.meta(id).is_some()).map(|p| p.url(id));
+        HubEv::Artifacts { project: self.project(), items: proto_view::artifacts(ev, page_url) }
     }
 
     /// An event the hub broadcasts, for the typed connections: `state` →
@@ -226,6 +248,13 @@ impl Shell {
                 }
                 if new.1 {
                     self.proto_live(|l, ctx| l.refold(ctx));
+                }
+            }
+            // the art store changed (artifacts_refresh broadcasts it)
+            Some("artifacts") => {
+                let arts = self.proto_artifacts(v);
+                for id in &ids {
+                    self.proto_send(*id, &arts);
                 }
             }
             Some("line") => {

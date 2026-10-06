@@ -17,13 +17,15 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "error")
+TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "error")
 FIXTURES = os.path.join(e2e.ROOT, "rust", "proto", "fixtures", "hub_ev.jsonl")
 
 
 def typed(c, ev=None):
+    """The typed events (they carry their project; the hub's older
+    `artifacts` on this mixed connection doesn't)."""
     with c.lock:
-        return [e for e in c.events if e.get("ev") in TYPED and (ev is None or e["ev"] == ev)]
+        return [e for e in c.events if e.get("ev") in TYPED and "project" in e and (ev is None or e["ev"] == ev)]
 
 
 def required_keys():
@@ -68,6 +70,8 @@ def main():
         main_row = [a for a in agents["agents"] if a["name"] == "main"]
         check(agents["project"] == project and main_row and main_row[0]["main"], "agents: %r" % agents)
         check(typed(c, "cards")[0]["cards"] == [], "no cards yet")
+        c.wait(lambda: typed(c, "artifacts"), 20, "the artifacts at hello")
+        check(typed(c, "artifacts")[0]["items"] == [] and typed(c, "artifacts")[0]["project"] == project, "no artifact yet")
 
         def errors():
             return typed(c, "error")[2:]
@@ -149,6 +153,32 @@ def main():
         check("/archive t3 --force" in tr and "v2 --force" in tr, "t3 got the whole reply: %s" % tr[-800:])
         check(c.agent("t3")["status"] != "archived", "the reply archived nothing: %r" % c.agent("t3"))
         check(typed(c, "cards")[-1]["cards"] == [], "the typed cards are empty again")
+
+        # an artifact made by main comes typed, new; artifacts_seen clears new
+        c.say('[[bash: echo notes > "$TMPDIR/notes.md" && sb artifact add "$TMPDIR/notes.md" --title "Notes"]]')
+        c.wait(lambda: any(i["title"] == "Notes" and i["new"] for x in typed(c, "artifacts") for i in x["items"]), 90, "a new artifact")
+        art = [i for x in typed(c, "artifacts") for i in x["items"] if i["title"] == "Notes"][0]
+        check(art["agent"] == "main" and art["version"] == 1 and art["url"], "its row: %r" % art)
+        c.send({"cmd": "artifacts_seen", "project": project})
+        c.wait(lambda: any(i["title"] == "Notes" and not i["new"] for i in typed(c, "artifacts")[-1]["items"]), 20, "seen: not new")
+        c.wait_idle("main", timeout=90)
+
+        # a typed-only connection (a window's): after its hello, only typed
+        # events, never the hub's older ones (state, line, artifacts rows)
+        w = e2e.Client(os.path.join(E.state, "hub.sock"))
+        w.wait(lambda: w.state is not None, 20, "the second client's replay")
+        w.send({"cmd": "hello", "proto": 1, "typed_only": True})
+        w.wait(lambda: typed(w, "artifacts"), 20, "its welcome, agents, cards, artifacts")
+        with w.lock:
+            mark = len(w.events)
+        c.say("one more for the typed-only client")
+        c.wait_line("main", "one more for the typed-only client", 30)
+        c.wait_idle("main", timeout=90)
+        w.wait(lambda: any(e.get("ev") == "agents" for e in w.events[mark:]), 30, "typed agents after the turn")
+        with w.lock:
+            after = w.events[mark:]
+        check(all(e.get("ev") in TYPED and "project" in e for e in after),
+              "only typed events after typed_only: %r" % sorted({e.get("ev") for e in after}))
 
         # stop and archive: reach the hub's own paths (an unknown agent: an error)
         c.send({"cmd": "stop", "project": project, "agent": "main"})

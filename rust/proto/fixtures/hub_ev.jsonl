@@ -9,3 +9,4 @@
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":""}
 {"ev":"error","project":"acme-1a2b3c4d","cmd":"send","text":"send: context isn't supported yet"}
 {"ev":"error","text":"not JSON: expected value at line 1 column 1"}
+{"ev":"artifacts","project":"acme-1a2b3c4d","items":[{"id":"perf-notes","kind":"page","title":"Perf notes","agent":"perf","version":2,"at_ms":1791100014000,"url":"http://127.0.0.1:47123/p/perf-notes","new":true}]}

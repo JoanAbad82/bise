@@ -102,7 +102,7 @@ impl World {
             e.r.read_line(&mut l).expect("the typed hello");
             let v: Value = serde_json::from_str(l.trim()).unwrap();
             if v["cmd"] == "hello" {
-                assert_eq!(v, json!({"cmd": "hello", "proto": 1}));
+                assert_eq!(v, json!({"cmd": "hello", "proto": 1, "typed_only": true}), "a window's connection: typed only");
                 break;
             }
             assert_eq!(v["op"], "hello", "only the connector's hello before it: {v}");

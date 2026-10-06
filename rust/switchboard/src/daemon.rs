@@ -911,6 +911,9 @@ impl Shell {
         let line = v.to_string();
         let mut dead: Vec<ClientId> = Vec::new();
         for (id, s) in self.clients.iter_mut() {
+            if self.proto.typed_only(*id) {
+                continue;
+            }
             if !write_line(s, &line) {
                 dead.push(*id);
             }

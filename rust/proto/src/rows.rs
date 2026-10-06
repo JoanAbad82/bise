@@ -203,6 +203,21 @@ pub fn question(text: &str) -> (String, Vec<Opt>) {
     (body.trim().to_string(), opts)
 }
 
+/// An artifact of a project (what an agent made for him), the
+/// `artifacts` event's row.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Artifact {
+    pub id: String,
+    pub kind: String,
+    pub title: String,
+    pub agent: String,
+    pub version: u32,
+    pub at_ms: u64,
+    pub url: String,
+    /// made or changed since he last looked
+    pub new: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

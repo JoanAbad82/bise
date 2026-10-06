@@ -4,7 +4,7 @@
 //! When a stream ships one, it moves to [`crate::hub`] (or stays here for
 //! the core's own messages) and its fixture joins the frozen ones.
 //!
-//! - [`DraftHubEv`]: diffs and worktrees (S7), artifacts (S7, from
+//! - [`DraftHubEv`]: diffs and worktrees (S7), (artifacts shipped: hub.rs, from
 //!   art-core's list), dev servers (S7), followed jobs (S10), routing
 //!   "→ project" (S2);
 //! - [`DraftHubCmd`]: follow (S10);
@@ -75,19 +75,6 @@ pub struct Series {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Artifact {
-    pub id: String,
-    pub kind: String,
-    pub title: String,
-    pub agent: String,
-    pub version: u32,
-    pub at_ms: u64,
-    pub url: String,
-    /// made or changed since he last looked
-    pub new: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Worktree {
     pub path: String,
     pub branch: String,
@@ -141,7 +128,6 @@ pub enum DraftHubEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         result: Option<DiffResult>,
     },
-    Artifacts { project: Project, items: Vec<Artifact> },
     Worktrees { project: Project, items: Vec<Worktree> },
     DevServers { project: Project, items: Vec<DevServer> },
     Jobs { project: Project, jobs: Vec<Job> },
@@ -160,7 +146,7 @@ pub enum DraftHubEv {
 }
 
 impl DraftHubEv {
-    pub const TAGS: &'static [&'static str] = &["diff", "artifacts", "worktrees", "dev_servers", "jobs", "route"];
+    pub const TAGS: &'static [&'static str] = &["diff", "worktrees", "dev_servers", "jobs", "route"];
 
     pub fn decode(line: &str) -> Result<DraftHubEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| DraftHubEv::Unknown { tag, raw })
@@ -193,15 +179,12 @@ pub enum DraftHubCmd {
     Follow { project: Project, agent: String, on: bool },
     /// a send with quoted lines (the window's ❝)
     SendQuote { project: Project, agent: String, text: String, quote: Quote },
-    /// he opened the artifacts screen: their `new` clears, `artifacts`
-    /// comes again (amb-web m_8346)
-    ArtifactsSeen { project: Project },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl DraftHubCmd {
-    pub const TAGS: &'static [&'static str] = &["follow", "send_quote", "artifacts_seen"];
+    pub const TAGS: &'static [&'static str] = &["follow", "send_quote"];
 
     pub fn decode(line: &str) -> Result<DraftHubCmd, String> {
         decode(parse(line)?, "cmd", Self::TAGS, |tag, raw| DraftHubCmd::Unknown { tag, raw })

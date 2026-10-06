@@ -4,7 +4,7 @@
 //! (projects, open, project_add) are other types ([`crate::draft`]), so
 //! they can't reach a hub or come from one.
 
-use crate::rows::{Agent, Card};
+use crate::rows::{Agent, Artifact, Card};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
@@ -29,6 +29,9 @@ pub enum HubEv {
     Entry { project: Project, agent: String, entry: Box<Entry> },
     /// a subscribed agent's current step ("" when its turn ends)
     Typing { project: Project, agent: String, text: String },
+    /// every artifact of the project, at hello and on change; `new`: made
+    /// or changed since he last looked (`artifacts_seen` clears it)
+    Artifacts { project: Project, items: Vec<Artifact> },
     /// an unknown or refused command, never silence
     Error {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -43,7 +46,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -91,7 +94,17 @@ pub enum Mode {
 pub enum HubCmd {
     /// this connection speaks v`proto`: the hub answers `welcome`, then
     /// sends `agents` and `cards` now and on each change
-    Hello { proto: u32 },
+    Hello {
+        proto: u32,
+        /// typed events only on this connection: the hub's older events
+        /// (`state`, `line`, its own `artifacts`...) stop after this
+        /// hello (a window's connection; the capsule's mixed one says
+        /// false until S8). When S8 moves the capsule to typed events,
+        /// every typed connection is typed_only: S8 removes the mixed
+        /// case (and this flag's false)
+        #[serde(default, skip_serializing_if = "crate::is_false")]
+        typed_only: bool,
+    },
     /// a thread's newest page (`thread`), then its `entry`/`typing` live
     Subscribe {
         project: Project,
@@ -127,13 +140,16 @@ pub enum HubCmd {
     /// out of his list (`force`: a working one is stopped first)
     Archive { project: Project, agent: String, force: bool },
     Unarchive { project: Project, agent: String },
+    /// he opened the artifacts screen: their `new` clears, `artifacts`
+    /// comes again
+    ArtifactsSeen { project: Project },
     /// a tag this version doesn't know: answered with `error`
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)

@@ -13,3 +13,5 @@
 {"cmd":"archive","project":"acme-1a2b3c4d","agent":"perf","force":true}
 {"cmd":"archive","project":"acme-1a2b3c4d","agent":"old-fix","force":false}
 {"cmd":"unarchive","project":"acme-1a2b3c4d","agent":"old-fix"}
+{"cmd":"artifacts_seen","project":"acme-1a2b3c4d"}
+{"cmd":"hello","proto":1,"typed_only":true}

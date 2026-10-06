@@ -190,7 +190,7 @@ impl Core {
         match h {
             HubIn::Up => {
                 c.welcomed = false;
-                c.hub.send(&json!({"cmd": "hello", "proto": bise_proto::PROTO}));
+                c.hub.send(&json!({"cmd": "hello", "proto": bise_proto::PROTO, "typed_only": true}));
             }
             HubIn::Down => {
                 c.welcomed = false;
