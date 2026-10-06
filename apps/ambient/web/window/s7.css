@@ -25,3 +25,14 @@
 .w7-tile .w7-tt b{font-weight:600;font-size:var(--t-13);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .w7-tile .w7-tm{padding:2px 10px 9px;color:var(--c-text-3);font-size:var(--t-11);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .w7-tile.is-static{cursor:default}
+
+/* review: the result first (the number, then a small before/after graph), the files, the diff */
+.w7-result{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:var(--r-3);background:var(--c-raised);box-shadow:var(--e-1)}
+.w7-rl{display:flex;gap:8px;align-items:baseline}
+.w7-rl .lb{font-weight:600;font-size:var(--t-13);color:var(--c-text)}
+.w7-rl .sb{font-size:var(--t-12);color:var(--c-text-3)}
+.w7-rn{font:650 28px/1.15 var(--font-ui);color:var(--c-text);letter-spacing:-.01em}
+.w7-rn.ok{color:var(--c-ok)}
+.w7-graph{display:block;width:100%;height:56px;margin-top:6px}
+.w7-graph polyline{fill:none;stroke-width:1.6;vector-effect:non-scaling-stroke}
+.w7-rv .b-diff{min-width:0}

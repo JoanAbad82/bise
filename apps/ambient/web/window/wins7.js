@@ -1,12 +1,12 @@
 // bise desktop · S7's screens in the window: review, artifacts, environments (amb-web). One
 // extension object for amb-win's model and drawing (m_8307); each screen is its own module
-// (winenv.js, then winarts.js, winreview.js) with init/owns/step/view/draw, composed here.
+// (winenv.js, winarts.js, winreview.js) with init/owns/step/view/draw, composed here.
 // Load after the screens' modules, before winmodel.js.
 //
 //   AmbWinS7.init() -> s7                       the screens' state (s.s7)
 //   AmbWinS7.owns(ev) -> bool                   core events and ui_* events a screen handles
 //   AmbWinS7.enter(s7, route, s) -> {s7, cmds}  a screen's route opens (subscribe what it needs)
-//   AmbWinS7.step(s7, ev, s) -> {s7, cmds, route?, eat?}
+//   AmbWinS7.step(s7, ev, s) -> {s7, cmds, route?, eat?, quote?}  (quote: a review's lines ❝)
 //   AmbWinS7.view(s) -> d                       the screen of s.route (d.head: amb-win's header)
 //   AmbWinS7.tab(s, project, 'changes'|'artifacts') -> d | null
 //   AmbWinS7.draw(d, UI) -> Element             drawn in the main column, above the composer
@@ -16,7 +16,7 @@
 (function (root) {
   "use strict";
   // screen name -> its module, and the key of its state in s7
-  const parts = () => ({ environments: [root.AmbWinEnv, "env"], artifacts: [root.AmbWinArts, "arts"] });
+  const parts = () => ({ environments: [root.AmbWinEnv, "env"], artifacts: [root.AmbWinArts, "arts"], review: [root.AmbWinReview, "rv"] });
 
   function init() {
     const s7 = {};
@@ -33,7 +33,7 @@
   }
 
   function step(s7, ev, s) {
-    let cmds = [], route, eat;
+    let cmds = [], route, eat, quote;
     for (const [m, k] of Object.values(parts())) {
       if (!m || !m.owns(ev)) continue;
       const r = m.step(s7[k], ev, s);
@@ -41,8 +41,9 @@
       cmds = cmds.concat(r.cmds || []);
       if (r.route) route = r.route;
       if (r.eat) eat = true;
+      if (r.quote) quote = r.quote;
     }
-    return { s7, cmds, ...(route ? { route } : {}), ...(eat ? { eat } : {}) };
+    return { s7, cmds, ...(route ? { route } : {}), ...(eat ? { eat } : {}), ...(quote ? { quote } : {}) };
   }
 
   function view(s) {

@@ -13,7 +13,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Map, String, Number, Date, Intl, RegExp });
 // the window as index.html loads it, S7's screens included (amb-web's files, when they are there)
 import { existsSync } from "node:fs";
-for (const f of ["winfake.js", "winfake7.js", "windock.js", "winfind.js", "winenv.js", "winarts.js", "wins7.js", "winmodel.js", "winview.js"].filter((f) => existsSync(join(here, f)))) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+for (const f of ["winfake.js", "winfake7.js", "windock.js", "winfind.js", "winenv.js", "winarts.js", "winreview.js", "wins7.js", "winmodel.js", "winview.js"].filter((f) => existsSync(join(here, f)))) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
 const { AmbWinFake: F, AmbWinModel: M, AmbWinView: V, AmbWinDock: D } = ctx;
 const j = (x) => (x === undefined ? x : JSON.parse(JSON.stringify(x)));
 const eq = (a, b, msg) => assert.deepStrictEqual(j(a), j(b), msg);
