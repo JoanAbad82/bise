@@ -1,0 +1,6 @@
+/* the first launch (src/setup, amb-home): the ds's .b-onb centered, its foot under it; ds tokens only */
+.setup { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-4); height: 100%; min-height: 0; overflow-y: auto; padding: var(--s-6); outline: none; }
+.setup .b-onb { max-width: 560px; width: 100%; }
+.setup .b-onb .b-group, .setup .b-onb .b-help { text-align: left; }
+.setup-acts { display: inline-flex; align-items: center; gap: var(--s-1); }
+.setup-foot { display: flex; gap: var(--s-2); }
