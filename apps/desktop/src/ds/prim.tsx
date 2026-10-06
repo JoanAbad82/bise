@@ -118,9 +118,16 @@ export function Help({ children, err }: { children: ReactNode; err?: boolean }) 
   return <div className={cx("b-help", err && "err")}>{children}</div>;
 }
 
-/** a status dot: working, needs you, done, error, off; `lg` 16 px */
+/** a dot state in words: its accessible name and tooltip (never by color alone, bar N2) */
+export const DOT_WORDS: Record<DotState | "idle", string> = { wk: "working", nd: "needs you", ok: "done", er: "error", off: "offline", idle: "idle" };
+
+/**
+ * a status dot: working, needs you, done, error, off (idle without a state); `lg` 16 px. Its state
+ * is also a word (aria-label, title) and, with increase contrast, a glyph in a ring (css/live.css).
+ */
 export function Dot({ state, lg }: { state?: DotState | undefined; lg?: boolean }) {
-  return <i className={cx("b-dot", state, lg && "lg")} aria-hidden="true" />;
+  const word = DOT_WORDS[state ?? "idle"];
+  return <i className={cx("b-dot", state, lg && "lg")} role="img" aria-label={word} title={word} />;
 }
 
 export type PearlSize = 22 | 40 | 56 | 120;

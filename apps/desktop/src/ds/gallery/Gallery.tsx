@@ -13,6 +13,25 @@ import {
 const OUT = ["13  workers: [Worker; 4],", "14  queue: Bounded<64>,"].join(String.fromCharCode(10));
 const OPTS: Opt[] = [{ n: 1, text: "keep 4 workers", on: true }, { n: 2, text: "go to 8" }, { n: 3, text: "ask me later", state: "hover" }];
 
+/** every color cue of the design system, by group: the same words, one state per entry */
+export const CONTRAST: Record<string, Record<string, ReactNode>> = {
+  dot: { idle: <Dot lg />, wk: <Dot state="wk" lg />, nd: <Dot state="nd" lg />, ok: <Dot state="ok" lg />, er: <Dot state="er" lg />, off: <Dot state="off" lg /> },
+  chip: { plain: <Chip>state</Chip>, acc: <Chip tone="acc">state</Chip>, err: <Chip tone="err">state</Chip>, ok: <Chip tone="ok">state</Chip> },
+  bar: { run: <Bar pct={60} />, done: <Bar pct={60} state="done" />, err: <Bar pct={60} state="err" /> },
+  help: { plain: <Help>check the key</Help>, err: <Help err>check the key</Help> },
+  field: { plain: <Field defaultValue="sk-test" readOnly />, error: <Field defaultValue="sk-test" readOnly state="error" /> },
+  msg: { plain: <Msg from="agent" name="search" time="10:43">the build ran</Msg>, error: <Msg from="agent" name="search" time="10:43" state="error">the build ran</Msg> },
+  dock: { question: <Dock head="search" q="the build ran" />, plain: <Dock kind="plain" head="search" q="the build ran" />, err: <Dock kind="err" head="search" q="the build ran" /> },
+  toast: { plain: <Toast>the build ran</Toast>, err: <Toast err>the build ran</Toast> },
+  tool: { plain: <Tool>cargo build</Tool>, err: <Tool state="err">cargo build</Tool> },
+  job: {
+    wk: <Job state="wk" name="index" what="the build" />, nd: <Job state="nd" name="index" what="the build" />,
+    ok: <Job state="ok" name="index" what="the build" />, er: <Job state="er" name="index" what="the build" />,
+  },
+  route: { wk: <Route state="wk" p1="main → index" pct={50} />, ok: <Route state="ok" p1="main → index" />, er: <Route state="er" p1="main → index" /> },
+  diff: { plain: <Diff file="a.rs" lines={[{ old: 1, new: 1, text: "x" }]} />, add: <Diff file="a.rs" lines={[{ new: 1, sign: "+", text: "x" }]} />, rm: <Diff file="a.rs" lines={[{ old: 1, sign: "-", text: "x" }]} /> },
+};
+
 /** the sections, in the reference's order; each draws in one theme */
 export const SECTIONS: Record<string, () => ReactNode> = {
   buttons: () => (
@@ -135,7 +154,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
       </ComposerFrame>
       <Dock head="the review asks you to approve" q="merge flash-sale into main?" opts={[{ n: 1, text: "merge" }, { n: 2, text: "not yet", picked: true }]} typeHint="pick 1 or 2" />
       <Dock kind="plain" head="alerts reports" q="8 workers: 1.9× faster, no drops." />
-      <Dock kind="err" head="▲ search failed" q="out of disk on /var: 0 B free." />
+      <Dock kind="err" head="search failed" q="out of disk on /var: 0 B free." />
       <Opts items={OPTS} />
     </div>
   ),
@@ -223,6 +242,20 @@ export const SECTIONS: Record<string, () => ReactNode> = {
         chips={<><Chip>Chrome · grafana</Chip><Chip tone="acc">telemetry</Chip></>} hint="release fn to send   fn esc cancel" testId="ds.capsule" />
       <Capsule words="sending to telemetry…" countdown />
       <Capsule lead="off" words={<span className="lo">offline: what you say waits</span>} wave="off" />
+    </div>
+  ),
+  // never by color alone (bar N2): each group draws the same words in each of its color states;
+  // shoot.mjs checks that, with increase contrast, every state of a group reads differently without
+  // its color (a glyph, a word or a shape), items `ds.contrast.<group>.<state>`
+  contrast: () => (
+    <div className="g-col">
+      {Object.entries(CONTRAST).map(([group, states]) => (
+        <div key={group} className="g-row" data-testid={"ds.contrast." + group}>
+          {Object.entries(states).map(([state, node]) => (
+            <div key={state} className="g-cell" data-testid={"ds.contrast." + group + "." + state}>{node}</div>
+          ))}
+        </div>
+      ))}
     </div>
   ),
   window: () => (

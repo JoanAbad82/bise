@@ -3,7 +3,7 @@
 // re-render never replaces the editor in its slot, nor the rows of a list).
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ComposerFrame, Dock, Field, Msg, Opts, Row, Seg, Spot, SpotRow, Tabs, Toggle } from "./index";
+import { ComposerFrame, Dock, Dot, Field, Msg, Opts, Row, Seg, Spot, SpotRow, Tabs, Toggle } from "./index";
 
 afterEach(cleanup);
 
@@ -71,6 +71,12 @@ describe("src/ds", () => {
     expect(input.tagName).toBe("INPUT");
     fireEvent.change(input, { target: { value: "acme/x" } });
     expect(input.value).toBe("acme/x");
+  });
+
+  it("a dot says its state in words, an error dock carries ▲ (never by color alone)", () => {
+    const { getAllByRole, getByTestId } = render(<><Dot state="er" /><Dot state="nd" /><Dot /><Dock kind="err" head="search failed" q="x" testId="dock" /></>);
+    expect(getAllByRole("img").map((e) => e.getAttribute("aria-label"))).toEqual(["error", "needs you", "idle"]);
+    expect(getByTestId("dock").textContent).toContain("▲ search failed");
   });
 
   it("a message shows words from data as text, never markup", () => {

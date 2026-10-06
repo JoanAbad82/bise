@@ -71,7 +71,7 @@ export interface DockProps {
 export function Dock({ kind, head, keys, ctx, q, opts, onPick, typeHint, testId }: DockProps) {
   return (
     <div className={cx("b-dock", kind)} role="group" data-testid={testId}>
-      <div className="h">{head}{keys != null && <span className="k">{keys}</span>}</div>
+      <div className="h">{kind === "err" && <>▲ </>}{head}{keys != null && <span className="k">{keys}</span>}</div>
       {ctx && (
         <div className="ctx">
           {ctx.shot}

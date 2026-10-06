@@ -9,6 +9,8 @@ html,body{margin:0;background:#777}
 .g-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .g-row+.g-row{margin-top:10px}
 .g-top{align-items:flex-start}
+.g-cell{min-width:90px}
+.g-cell>.b-bar{width:90px}
 .g-col{display:flex;flex-direction:column;gap:10px}
 .g-side{display:flex;width:var(--sidebar);min-height:300px}
 .g-side>.b-side{flex:1}

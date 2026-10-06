@@ -50,6 +50,28 @@ law("live.css shows focus with real selectors (:focus-within on the field and th
   assert.ok(/caret-color:var\(--c-text\)/.test(live));
 });
 
+law("never by color alone (bar N2): increase contrast gives every color cue of css/ a glyph or a shape", () => {
+  const live = noComments(css["live.css"]);
+  const at = live.indexOf("@media (prefers-contrast: more), (forced-colors: active)");
+  assert.ok(at >= 0, "live.css has no increase-contrast block");
+  const block = live.slice(at);
+  // each color cue: the selector that must get a stand-in inside the block
+  const cues = {
+    ".b-dot.wk::after{content:": "a working dot", ".b-dot.nd::after{content:": "a needs-you dot", ".b-dot.ok::after{content:": "a done dot",
+    ".b-dot.er::after{content:": "an error dot", ".b-dot.off::after{content:": "an offline dot", ".b-chip.err::before{content:": "an error chip",
+    ".b-chip.ok::before{content:": "an ok chip", ".b-chip.acc{box-shadow:": "an accent chip", ".b-bar.err>i{background:repeating-linear-gradient": "an error bar",
+    ".b-help.err::before{content:": "an error help line", ".b-field.is-error::after{content:": "a field in error", ".b-msg.is-error .b-text::before{content:": "a message in error",
+  };
+  for (const [sel, what] of Object.entries(cues)) assert.ok(block.includes(sel), `${what} has no stand-in (${sel})`);
+  // and the reference's color-only rules are all covered: every tone/state class with a color in prim.css,
+  // but a done bar, which already reads by its shape (solid and still, where a running bar is dashed and moves)
+  const byShape = new Set([".b-bar.done"]);
+  for (const m of noComments(css["prim.css"]).matchAll(/\.(b-(?:chip|dot|bar|help))\.(\w+)[^{]*\{[^}]*var\(--c-(?:err|ok|accent)/g)) {
+    const sel = `.${m[1]}.${m[2]}`;
+    assert.ok(byShape.has(sel) || block.includes(sel), `${sel} is colored in prim.css but has no stand-in`);
+  }
+});
+
 const tsx = readdirSync(here).filter((f) => f.endsWith(".tsx"));
 // the code without its comments (a comment may name window.html or document the DOM)
 const src = Object.fromEntries(tsx.map((f) => [f, noComments(read(join(here, f))).replace(/^\s*\/\/.*$/gm, "")]));

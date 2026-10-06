@@ -23,6 +23,31 @@
    spotlight (the reference nested a .b-composer .in there, which .b-spot .in turns into a flex row) */
 .b-spot .in .tx>.cur{display:inline-block;width:2px;height:1.1em;margin-right:2px;background:var(--c-text);vertical-align:-.2em;animation:b-blink 1s steps(1) infinite}
 
+/* never by color alone (bar N2, NO_COLOR's stand-in): with macOS increase contrast (prefers-contrast:
+   more) or forced colors, every color cue also gets a glyph or a shape. Always on, without the media:
+   a dot's state word (aria-label, title), ▲ on Err, Toast err, Tool err and Dock err, the diff's
+   +/− column, the picked lines' outline, the keyboard's ring on options and rows. */
+@media (prefers-contrast: more), (forced-colors: active) {
+  /* a dot: a ring with its state's glyph, in its state's color */
+  .b-dot{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:none;box-shadow:inset 0 0 0 1.5px currentColor;color:var(--c-text-2);font:700 9px/1 var(--font-ui);animation:none;opacity:1}
+  .b-dot.lg{width:16px;height:16px;font-size:10px}
+  .b-dot.wk{color:var(--c-text)}.b-dot.wk::after{content:"▸"}
+  .b-dot.nd{color:var(--c-accent);box-shadow:inset 0 0 0 1.5px currentColor}.b-dot.nd::after{content:"?"}
+  .b-dot.ok{color:var(--c-ok)}.b-dot.ok::after{content:"✓"}
+  .b-dot.er{color:var(--c-err)}.b-dot.er::after{content:"!"}
+  .b-dot.off{color:var(--c-text-3);box-shadow:inset 0 0 0 1.5px currentColor}.b-dot.off::after{content:"–"}
+  /* chips: a glyph for a tone that means something, an outline for the accent */
+  .b-chip.err::before{content:"▲"}
+  .b-chip.ok::before{content:"✓"}
+  .b-chip.acc{box-shadow:inset 0 0 0 1px currentColor}
+  /* bars: done is solid, an error is struck through with stripes, a known end runs dashed */
+  .b-bar.err>i{background:repeating-linear-gradient(135deg,var(--c-err) 0 3px,transparent 3px 6px)}
+  /* the error words */
+  .b-help.err::before{content:"▲ "}
+  .b-field.is-error::after{content:"▲";margin-left:auto;color:var(--c-err)}
+  .b-msg.is-error .b-text::before{content:"▲ ";color:var(--c-err)}
+}
+
 /* keyboard focus on the parts that take it */
 .b-opt:focus-visible,.b-row:focus-visible,.b-mi:focus-visible,.b-task:focus-visible{outline:0;box-shadow:inset 0 0 0 2px var(--c-focus)}
 .b-toggle:focus-visible,.b-check:focus-visible{outline:0;box-shadow:0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}

@@ -6,6 +6,7 @@
 //   node src/ds/gallery/shoot.mjs <out dir> [section,section…]
 //
 // Stills: ?motion=0 stops every animation and transition. Exit 1 on a failed pane.
+/* global getComputedStyle -- used inside page.$$eval, which runs in the page */
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "@playwright/test";
@@ -56,6 +57,47 @@ try {
     console.log(`  ${ok ? "✓" : "✗"} ${name}: dark ${s.dark.mean.toFixed(0)}±${s.dark.sd.toFixed(0)}, light ${s.light.mean.toFixed(0)}±${s.light.sd.toFixed(0)}`);
   }
   await page.screenshot({ path: join(out, "gallery.png"), fullPage: true });
+
+  // never by color alone (bar N2): with increase contrast, the states of each contrast group must
+  // differ by something that isn't a color: words, ::before/::after glyphs, a background pattern's
+  // geometry, an outline. Colors are stripped from the signature. Without the media, the chip
+  // group must NOT pass (the check sees color-only cues), else it proves nothing.
+  if (sections.includes("ds.gallery.contrast")) {
+    const signatures = () => page.$$eval("[data-testid^='ds.contrast.']", (els) => {
+      const strip = (s) => s.replace(/(rgba?|hsla?|color|oklch|oklab|lab|lch|color-mix)\([^()]*(\([^()]*\)[^()]*)*\)/g, "C").replace(/#[0-9a-f]{3,8}\b/gi, "C");
+      const sig = (el) => {
+        const parts = [el.textContent ?? ""];
+        for (const n of [el, ...el.querySelectorAll("*")]) {
+          for (const pseudo of ["::before", "::after"]) {
+            const c = getComputedStyle(n, pseudo).content;
+            if (c && c !== "none" && c !== "normal") parts.push(pseudo + c);
+          }
+          const cs = getComputedStyle(n);
+          if (cs.backgroundImage !== "none") parts.push("bg:" + strip(cs.backgroundImage));
+          if (cs.boxShadow !== "none") parts.push("sh:" + strip(cs.boxShadow));
+        }
+        return parts.join("|");
+      };
+      return els.filter((e) => (e.getAttribute("data-testid") ?? "").split(".").length === 4 && e.closest("[data-theme='dark']"))
+        .map((e) => { const [, , group, state] = (e.getAttribute("data-testid") ?? "").split("."); return { group, state, sig: sig(e) }; });
+    });
+    const clashes = (items) => {
+      const out = [];
+      for (const a of items) for (const b of items) if (a.group === b.group && a.state < b.state && a.sig === b.sig) out.push(`${a.group}: ${a.state} = ${b.state}`);
+      return out;
+    };
+    const plain = clashes(await signatures());
+    if (!plain.some((c) => c.startsWith("chip:"))) { failed++; console.log("  ✗ contrast: without the media the chips already differ: the check can't see color-only cues"); }
+    await page.emulateMedia({ contrast: "more" });
+    const items = await signatures();
+    const bad = clashes(items);
+    if (bad.length) failed++;
+    console.log(`  ${bad.length ? "✗" : "✓"} never by color alone (increase contrast): ${items.length} states in ${new Set(items.map((i) => i.group)).size} groups${bad.length ? ", same without color: " + bad.join("; ") : ""} (without it: ${plain.length} clashes)`);
+    for (const theme of ["dark", "light"]) {
+      await page.locator(`[data-testid='ds.gallery.contrast.${theme}']`).screenshot({ path: join(out, `contrast-more-${theme}.png`) });
+    }
+    await page.emulateMedia({ contrast: null });
+  }
   console.log(`${failed ? "✗" : "✓"} gallery: ${sections.length - failed}/${sections.length} sections, shots in ${out}`);
 } finally {
   await browser?.close();
