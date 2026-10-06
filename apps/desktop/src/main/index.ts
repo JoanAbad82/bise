@@ -18,7 +18,8 @@ import { IPC, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
 import { Capsule, installCapsuleIpc } from './capsule';
 import { installGuard } from './guard';
 import { startHelper } from './helper/run';
-import { startCore, stopCore } from './core/ipc';
+import { onCoreEvent, startCore, stopCore } from './core/ipc';
+import { configOfPrefs } from './helper/config';
 import { installIpc, sendClip, sendMenu } from './ipc';
 import { menuTemplate } from './menu';
 import { startTray } from './tray';
@@ -51,7 +52,13 @@ installGuard(
 
 void app.whenReady().then(() => {
   installIpc(testMode);
-  startHelper(testMode);
+  const helper = startHelper(testMode);
+  // his prefs (excluded apps...) reach the helper now and on every change
+  if (helper !== null) {
+    onCoreEvent((ev) => {
+      if (ev['ev'] === 'prefs') helper.config(configOfPrefs(ev['prefs']));
+    });
+  }
   startCore();
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
