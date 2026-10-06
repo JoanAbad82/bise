@@ -7,6 +7,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
 import { IPC, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type Surface } from '../shared/api';
 import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
+import { coreBridge } from './core/bridge';
 
 const test = process.env[TEST_ENV] === '1';
 const surface: Surface = process.argv.includes(`${SURFACE_ARG}capsule`) ? 'capsule' : 'window';
@@ -72,6 +73,7 @@ const api: BiseApi = {
     ipcRenderer.send(IPC.openWindow, route);
   },
   onRoute: (listener) => listen(IPC.route, listener),
+  core: coreBridge(ipcRenderer),
 };
 
 contextBridge.exposeInMainWorld('bise', api);

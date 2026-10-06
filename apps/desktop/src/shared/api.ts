@@ -4,7 +4,7 @@
 // the two can't drift. Owner: amb-core (the core channel lands here next);
 // other chunks ask amb-core to add a member.
 
-import type { HelperCmd, HelperEv } from '../proto';
+import type { AppCmd, DraftHubCmd, HelperCmd, HelperEv, HubCmd } from '../proto';
 
 export interface BiseApi {
   /** process.platform of the main process ('darwin', 'win32', 'linux'). */
@@ -42,7 +42,38 @@ export interface BiseApi {
   readonly openWindow: (route?: string) => void;
   /** Main asks this window to go to a route (openWindow while it was open); returns the unsubscribe. */
   readonly onRoute: (listener: (route: string) => void) => () => void;
+  /** `bise ambient-core`, run by main (src/main/core): its events in, typed commands out. */
+  readonly core: CorePort;
 }
+
+/** The core child as main sees it: starting, up (writes go through), down (restarting, or no bise). */
+export type CoreState = 'starting' | 'up' | 'down';
+
+/** What the window sends the core: bise-proto's typed commands only (a HubCmd carries its project). */
+export type CoreCmd = AppCmd | HubCmd | DraftHubCmd;
+
+/**
+ * The core channel (owner: amb-core; main's side src/main/core/ipc.ts, the
+ * preload's src/main/core/bridge.ts). Events come as the core wrote them,
+ * any JSON object with a string `ev`: the store (src/store) narrows them to
+ * bise-proto's HubEv | CoreEv and ignores unknown tags.
+ */
+export interface CorePort {
+  /** One command to the core; dropped (with a log line in main) when the core is down. */
+  readonly send: (cmd: CoreCmd) => void;
+  readonly onEvent: (listener: (ev: Record<string, unknown>) => void) => () => void;
+  readonly onState: (listener: (state: CoreState) => void) => () => void;
+  /** The state now (a window that loads late asks once, then follows onState). */
+  readonly state: () => Promise<CoreState>;
+}
+
+/** The core channel's IPC names (amb-core). */
+export const CORE_IPC = {
+  cmd: 'bise:core-cmd',
+  ev: 'bise:core-ev',
+  state: 'bise:core-state',
+  stateNow: 'bise:core-state-now',
+} as const;
 
 export type Surface = 'window' | 'capsule';
 

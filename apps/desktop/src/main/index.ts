@@ -18,6 +18,7 @@ import { IPC, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
 import { Capsule, installCapsuleIpc } from './capsule';
 import { installGuard } from './guard';
 import { startHelper } from './helper/run';
+import { startCore, stopCore } from './core/ipc';
 import { installIpc, sendClip, sendMenu } from './ipc';
 import { menuTemplate } from './menu';
 import { startTray } from './tray';
@@ -47,6 +48,7 @@ installGuard(
 void app.whenReady().then(() => {
   installIpc(testMode);
   startHelper(testMode);
+  startCore();
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       menuTemplate({
@@ -71,6 +73,10 @@ void app.whenReady().then(() => {
   app.on('activate', () => {
     main.open();
   });
+});
+
+app.on('will-quit', () => {
+  stopCore();
 });
 
 app.on('window-all-closed', () => {

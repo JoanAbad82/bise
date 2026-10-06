@@ -1,0 +1,32 @@
+// The preload's side of the core channel: window.bise.core (CorePort) over
+// ipcRenderer. Sandbox-safe (electron's ipcRenderer only). Owner: amb-core;
+// src/main/preload.ts puts it on window.bise.
+import type { IpcRenderer, IpcRendererEvent } from 'electron';
+import { CORE_IPC, type CorePort, type CoreState } from '../../shared/api';
+
+export function coreBridge(ipc: IpcRenderer): CorePort {
+  return {
+    send: (cmd) => {
+      ipc.send(CORE_IPC.cmd, cmd);
+    },
+    onEvent: (listener) => {
+      const on = (_e: IpcRendererEvent, ev: Record<string, unknown>): void => {
+        listener(ev);
+      };
+      ipc.on(CORE_IPC.ev, on);
+      return () => {
+        ipc.removeListener(CORE_IPC.ev, on);
+      };
+    },
+    onState: (listener) => {
+      const on = (_e: IpcRendererEvent, s: CoreState): void => {
+        listener(s);
+      };
+      ipc.on(CORE_IPC.state, on);
+      return () => {
+        ipc.removeListener(CORE_IPC.state, on);
+      };
+    },
+    state: async () => (await ipc.invoke(CORE_IPC.stateNow)) as CoreState,
+  };
+}
