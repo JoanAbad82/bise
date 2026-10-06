@@ -12,8 +12,10 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { app, BrowserWindow, Menu } from 'electron';
 import { READY_LINE, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
+import { installGuard } from './guard';
 import { startHelper } from './helper/run';
 import { installIpc, sendClip, sendMenu } from './ipc';
 import { menuTemplate } from './menu';
@@ -68,6 +70,15 @@ if (testMode) {
     app.dock?.hide();
   }
 }
+
+// every page guarded from birth: no new window, no navigation away (guard.ts)
+installGuard(
+  {
+    file: pathToFileURL(join(__dirname, '../renderer/index.html')).href,
+    ...(!app.isPackaged && process.env['ELECTRON_RENDERER_URL'] ? { dev: process.env['ELECTRON_RENDERER_URL'] } : {}),
+  },
+  testMode,
+);
 
 void app.whenReady().then(() => {
   installIpc(testMode);

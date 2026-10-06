@@ -21,16 +21,7 @@ export function installIpc(testMode: boolean): void {
       done(!CLIPBOARD_PERMS.has(permission));
     });
   }
-  ipcMain.handle(IPC.openExternal, async (_e, raw: unknown): Promise<boolean> => {
-    const url = externalUrl(raw);
-    if (url === null) return false;
-    if (testMode) {
-      process.stdout.write(`${EXTERNAL_LINE} ${url}\n`);
-      return true;
-    }
-    await shell.openExternal(url);
-    return true;
-  });
+  ipcMain.handle(IPC.openExternal, (_e, raw: unknown): Promise<boolean> => openLink(raw, testMode));
   ipcMain.handle(IPC.copy, async (_e, text: unknown): Promise<void> => {
     if (typeof text !== 'string' || text.length > MAX_COPY) return;
     if (testMode) {
@@ -39,6 +30,22 @@ export function installIpc(testMode: boolean): void {
     }
     await clipboard.writeText(text);
   });
+}
+
+/**
+ * A link out of the app: http, https or mailto in his browser or mail app
+ * (externalUrl), refused otherwise; in test mode only EXTERNAL_LINE on stdout.
+ * The one path for window.bise.openExternal and the guard's links.
+ */
+export async function openLink(raw: unknown, testMode: boolean): Promise<boolean> {
+  const url = externalUrl(raw);
+  if (url === null) return false;
+  if (testMode) {
+    process.stdout.write(`${EXTERNAL_LINE} ${url}\n`);
+    return true;
+  }
+  await shell.openExternal(url);
+  return true;
 }
 
 /** Test mode: a clipboard item of the menu, played in the focused window's fence. */
