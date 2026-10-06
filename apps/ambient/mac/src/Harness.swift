@@ -26,13 +26,14 @@ import WebKit
 @MainActor
 final class Harness {
     static let ops = ["ping", "state", "mouse", "key", "type", "fn", "voice", "shot", "eval", "events", "quit",
-                      "win_open", "win_close", "win_restore", "deeplink", "status_click", "front"]
+                      "win_open", "win_close", "win_restore", "deeplink", "status_click", "front", "drop"]
 
     // the app's doors, wired by App
     var bar: (() -> Capsule)?
     var win: (() -> DesktopWindow?)?                    // bise's window (S4), made at its first open
     var winOp: ((String, [String: Any]) -> Void)?      // App: win_open {route?}, win_close, deeplink {open|route}
     var statusClick: ((String, Bool?) -> [String: Any])?   // App: the pearl's click path (left: dropdown, right: fallback rows; page_up false: as if the page were down)
+    var drop: (([String: Any]) -> [String: Any])?       // App: a drop on the pearl {paths, url?} (S9; fixture paths)
     var front: (([String: Any]) -> [String: Any])?      // App: the front-app fixture for the fn context (S9; never his apps)
     var keyEvent: ((CGEventType, CGEvent) -> Bool)?    // Keys.qaEvent: the tap's own path
     var appState: (() -> [String: Any])?
@@ -184,6 +185,10 @@ final class Harness {
             winOp?(op, q)
             try? await Task.sleep(nanoseconds: 150_000_000)
             return ["win": winInfo()]
+        case "drop":
+            // {paths:[...], url?}: the pearl's drop path with fixture paths; answers the page's app_drop
+            guard let r = drop?(q) else { throw Failure(description: "drop: not wired") }
+            return r
         case "front":
             // {app, bundle, title?, document?, url?, tab_url?, selection?, texts?} or {clear:true}:
             // what the next fn reads instead of a front app; answers what it would send

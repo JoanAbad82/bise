@@ -273,6 +273,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         st.onAccess = { [weak self] in self?.permDo(.settings(.accessibility)) }
         st.isHidden = { [weak self] in self?.capsule.hidden ?? false }
         st.onWindow = { [weak self] in self?.openWindow(nil) }
+        st.onDrop = { [weak self] items, link, png in self?.dropped(items, link: link, png: png) }
         st.onQuietHour = { [weak self] in self?.quietHour() }
         st.quietHourEnds = { [weak self] in self?.quietHourEnds }
         status = st

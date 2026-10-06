@@ -20,6 +20,14 @@ extension AmbientApp {
         }
         DesktopWindow.tap = { [weak hs] who, ev in hs?.note(who, ev) }
         hs.statusClick = { [weak self] button, pageUp in self?.harnessStatusClick(button, pageUp: pageUp) ?? [:] }
+        hs.drop = { [weak self] q in
+            let items = (q["paths"] as? [String] ?? []).map { p -> DropItem in
+                var dir: ObjCBool = false
+                _ = FileManager.default.fileExists(atPath: p, isDirectory: &dir)
+                return DropItem(path: p, isDir: dir.boolValue)
+            }
+            return ["app_drop": self?.dropped(items, link: q["url"] as? String, png: nil) ?? NSNull()]
+        }
         hs.front = { [weak self] q in
             guard let self else { return [:] }
             if q["clear"] as? Bool == true { self.harnessFront = nil; return ["front": NSNull()] }

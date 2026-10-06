@@ -25,7 +25,7 @@ enum MenuWords {
 }
 
 @MainActor
-final class StatusItem: NSObject {
+final class StatusItem: NSObject, NSWindowDelegate, NSDraggingDestination {
     var onOpen: (() -> Void)?                // a click: bise's full view (show + app_key 0)
     var onSpotlight: (() -> Void)?
     var onToggle: (() -> Void)?
@@ -42,6 +42,7 @@ final class StatusItem: NSObject {
     var onWindow: (() -> Void)?               // open bise (the window, ⌘0)
     var onQuietHour: (() -> Void)?            // quiet for 1 h, or its end
     var quietHourEnds: () -> Date? = { nil }
+    var onDrop: (([DropItem], String?, Data?) -> Void)?   // S9: files, a link, an image's PNG (DropRules)
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     // what the icon says (SPEC §0): the inputs, then IconLook decides
@@ -64,11 +65,32 @@ final class StatusItem: NSObject {
             b.target = self
             b.action = #selector(clicked)
             b.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            // S9: a drop on the pearl (its window forwards the drag to its delegate)
+            b.window?.registerForDraggedTypes([.fileURL, .URL, .png, .tiff])
+            b.window?.delegate = self
         }
         refresh()
     }
 
     private var now: Double { ProcessInfo.processInfo.systemUptime }
+
+    // MARK: a drop on the pearl (S9): copied, never moved
+    func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }
+    func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { .copy }
+    func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let pb = sender.draggingPasteboard
+        let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] ?? []
+        let items = urls.filter(\.isFileURL).map { u in
+            DropItem(path: u.path, isDir: (try? u.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true)
+        }
+        let link = urls.first { !$0.isFileURL }?.absoluteString
+        // an image with no file (from a browser): its PNG, written by App
+        var png: Data? = nil
+        if items.isEmpty, let data = pb.data(forType: .png) ?? pb.data(forType: .tiff),
+           let rep = NSBitmapImageRep(data: data) { png = rep.representation(using: .png, properties: [:]) }
+        onDrop?(items, link, png)
+        return !items.isEmpty || link != nil || png != nil
+    }
 
     // the icon's rect on screen (Cocoa coords), nil before the menu bar shows it
     var iconRect: NSRect? { item.button?.window?.frame }

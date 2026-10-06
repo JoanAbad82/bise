@@ -70,6 +70,25 @@ extension AmbientApp {
         capsule.post(c.front)
     }
 
+    // S9: a drop on the pearl (StatusItem, or the harness's 'drop' op): the
+    // spotlight opens with it (amb-web 2d87bf28); his ⏎ sends it like any
+    // typed message. An image with no file is written to <ambient>/drops first.
+    @discardableResult
+    func dropped(_ items: [DropItem], link: String?, png: Data?) -> [String: Any]? {
+        var all = items
+        if let png {
+            let dir = config.ambientDir + "/drops"
+            try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            let path = dir + "/drop-\(Int(Date().timeIntervalSince1970 * 1000)).png"
+            if FileManager.default.createFile(atPath: path, contents: png) { all.append(DropItem(path: path, isDir: false)) }
+        }
+        guard let ev = DropRules.event(all, url: link) else { Log.say("drop: nothing usable"); return nil }
+        Log.say("drop: \((ev["files"] as? [Any])?.count ?? 0) files\(ev["url"] == nil ? "" : " and a link") on the pearl")
+        spotlight()
+        capsule.post(ev)
+        return ev
+    }
+
     // a Chromium browser's active tab, one AppleScript at a time: the voice
     // note's check and the context share the answer
     func askTab(_ bundle: String, _ done: @escaping @MainActor (String?) -> Void) {
