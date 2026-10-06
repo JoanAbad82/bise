@@ -60,9 +60,15 @@ def main():
         core = Core(E)
         core.wait(lambda e: e.get("ev") == "hub" and e.get("up") is True, 60, "the target's hub up")
 
-        # no window yet: refused, nothing held
+        # no window yet: shop refused and not held; bise's home hub held
+        # from the start (bar ⛔3, architect m_9864), welcomed before shown
+        home_id = [r["id"] for r in rows if r.get("home")][0]
         core.cmd(cmd="send", project=shop_id, agent="main", text="hi", mode="now")
         core.wait(lambda e: e.get("ev") == "error" and e.get("project") == shop_id, 20, "refused before shown")
+        core.wait(lambda e: e.get("ev") == "welcome" and e.get("project") == home_id, 60, "home's welcome before shown")
+        with core.lock:
+            check(not any(e.get("ev") == "projects" for e in core.evs), "no rows before shown")
+            check(not any(e.get("ev") == "welcome" and e.get("project") == shop_id for e in core.evs), "shop not held before shown")
 
         core.cmd(cmd="shown", projects=[shop_id])
         core.wait(lambda e: e.get("ev") == "projects" and any(r["project"] == shop_id and r["running"] for r in e["projects"]),

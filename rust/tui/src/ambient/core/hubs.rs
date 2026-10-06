@@ -6,9 +6,16 @@
 //! and the other hubs' `view.json`.
 //!
 //! Held (one rule, `projects::wanted`): bise's home hub, the projects the
-//! window shows (`shown`), the ones with a subscribed thread. Nothing is
-//! held before the window's first `shown`: the capsule alone opens no
-//! connection of this kind. A project not held is listed from its files,
+//! window shows (`shown`), the ones with a subscribed thread. Before the
+//! window's first `shown`, only bise's home hub is held, and only when the
+//! core runs for a window (with `ProjectPorts`; the capsule alone opens no
+//! connection of this kind): the registry is read once at start (no poll,
+//! no `projects` out) and home's hub is connected, started if needed, so
+//! his first send right after the window shows goes at once instead of
+//! waiting ~2 s for its welcome (bar ⛔3, architect m_9864). Starting it is
+//! allowed: that window exists to talk to it, this is not starting a hub
+//! just to read. A command to home before its welcome waits for it and
+//! goes once; any other project still waits for `shown`. A project not held is listed from its files,
 //! never started to be listed; the files are read at most every 2 s, and
 //! only while the window has said what it shows.
 //!
@@ -106,11 +113,12 @@ pub(super) struct Hubs {
     polled: Option<Instant>,
 }
 
-/// The projects to hold: none before the window says what it shows; then
-/// `projects::wanted` (home, shown, subscribed), as ids of known rows.
+/// The projects to hold: bise's home alone before the window says what it
+/// shows; then `projects::wanted` (home, shown, subscribed), as ids of
+/// known rows.
 pub fn held(rows: &[Row], shown: Option<&[String]>, subs: &BTreeMap<String, BTreeSet<String>>) -> BTreeSet<String> {
-    let Some(shown) = shown else { return BTreeSet::new() };
     let Some(home) = rows.iter().find(|r| r.home) else { return BTreeSet::new() };
+    let Some(shown) = shown else { return BTreeSet::from([home.id.clone()]) };
     let path = |id: &String| rows.iter().find(|r| &r.id == id).map(|r| r.path.clone());
     let shown: Vec<PathBuf> = shown.iter().filter_map(path).collect();
     let subscribed: Vec<PathBuf> = subs.iter().filter(|(_, a)| !a.is_empty()).filter_map(|(id, _)| path(id)).collect();
@@ -146,8 +154,12 @@ fn live_view(project: &str, agents: &[Agent], cards: &[Card]) -> ProjectView {
 impl Core {
     /// The projects' ports (`bise ambient-core`, a test): without them a
     /// command with a project is refused.
+    /// For a window: the registry read once and bise's home hub held now
+    /// (see the header), before the window loads.
     pub fn set_projects(&mut self, p: ProjectPorts) {
+        self.hubs.rows = (p.facts.rows)();
         self.hubs.ports = Some(p);
+        self.hold();
     }
 
     fn project_error(&mut self, project: &str, cmd: &str, text: &str) {
@@ -170,6 +182,11 @@ impl Core {
         let Some(row) = self.hubs.rows.iter().find(|r| r.id == project).cloned() else {
             return self.project_error(&project, &cmd, &format!("there's no project {project}"));
         };
+        // before shown, home only (architect m_10133: its own words, so a
+        // window that sends too early reads plainly in the logs)
+        if !row.home && self.hubs.shown.is_none() {
+            return self.project_error(&project, &cmd, &format!("project {project} isn't shown yet"));
+        }
         // never a hub for a folder that is gone (its hub would start on a
         // missing workspace)
         if cmd != "unsubscribe" && !self.folder_exists(&row.path) {
@@ -359,6 +376,11 @@ impl Core {
 
     /// `projects` when the rows changed.
     fn emit_projects(&mut self) {
+        // no rows before the window says what it shows (home's early
+        // welcome, agents or cards say nothing yet)
+        if self.hubs.shown.is_none() {
+            return;
+        }
         let Some(p) = self.hubs.ports.as_ref() else { return };
         let conns = &self.hubs.conns;
         let facts: Vec<Facts> = projects::facts(
@@ -427,8 +449,9 @@ mod tests {
     fn the_held_hubs_are_home_shown_and_subscribed_once_a_window_shows() {
         let rows = [row("home", true), row("a", false), row("b", false), row("c", false)];
         let mut subs = BTreeMap::new();
-        assert!(held(&rows, None, &subs).is_empty(), "no window: nothing held");
         let ids = |s: BTreeSet<String>| s.into_iter().collect::<Vec<_>>();
+        assert_eq!(ids(held(&rows, None, &subs)), ["home"], "no window yet: bise's home alone");
+        assert!(held(&rows[1..], None, &subs).is_empty(), "no home row: nothing");
         assert_eq!(ids(held(&rows, Some(&[]), &subs)), ["home"]);
         assert_eq!(ids(held(&rows, Some(&["a".into(), "zz".into()]), &subs)), ["a", "home"], "an unknown id is not held");
         assert!(track(&mut subs, "subscribe", "b", "main"));

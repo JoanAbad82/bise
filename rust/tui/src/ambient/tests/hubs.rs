@@ -138,12 +138,14 @@ fn the_window_reaches_every_projects_hub_through_the_core() {
     let mut t = T::new();
     t.ready();
     let mut w = world(&mut t);
-    // no window yet: nothing held, a project command is refused
+    // no window yet: bise's home alone is held (bar ⛔3), no rows go out,
+    // a command to another project is refused
     typed(&mut t, json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now"}));
     let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("refused");
-    assert_eq!((e["project"].as_str(), e["cmd"].as_str()), (Some("shop"), Some("send")));
-    w.until(&mut t, |_| true);
-    assert!(w.open.is_empty(), "the capsule alone opens nothing");
+    assert_eq!((e["project"].as_str(), e["cmd"].as_str(), e["text"].as_str()), (Some("shop"), Some("send"), Some("project shop isn't shown yet")));
+    w.opened(&mut t, &["home"]);
+    assert_eq!(w.open.keys().collect::<Vec<_>>(), ["home"], "home only before shown");
+    assert!(!has(&t.take(), "projects"), "no rows before shown");
     // the window shows shop: home and shop are held, the rows come
     typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
     w.until(&mut t, |o| has(o, "projects"));
@@ -242,6 +244,49 @@ fn a_folder_gone_makes_its_row_missing_and_not_running() {
     assert_eq!((r["missing"].as_bool(), r["running"].as_bool()), (Some(true), Some(false)), "{r}");
     let mut l = String::new();
     assert_eq!(w.end("shop").r.read_line(&mut l).unwrap(), 0, "its connection closed: {l}");
+}
+
+/// Bar ⛔3 (architect m_9864): a window's core holds bise's home hub from
+/// its start, so a send as the window shows goes at once; one sent before
+/// home's welcome goes exactly once at it, never an error.
+#[test]
+fn bise_s_home_hub_is_held_from_start_and_an_early_send_goes_once() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    w.opened(&mut t, &["home"]);
+    let early = json!({"cmd": "send", "project": "home", "agent": "main", "text": "first", "mode": "now"});
+    typed(&mut t, early.clone());
+    assert!(!has(&t.take(), "error"), "it waits for home's welcome");
+    w.welcome(&mut t, "home");
+    assert_eq!(w.end("home").next(), early, "sent at the welcome");
+    // its rows before the window shows: no 'projects' yet
+    w.end("home").say(json!({"ev": "agents", "project": "home", "agents": []}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "agents"));
+    assert!(!has(&t.take(), "projects"), "no rows before shown, even after home's welcome and agents");
+    // the window shows now: home is already welcomed, a send goes at once
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    w.until(&mut t, |o| has(o, "projects"));
+    let now = json!({"cmd": "send", "project": "home", "agent": "main", "text": "second", "mode": "now"});
+    typed(&mut t, now.clone());
+    assert_eq!(w.end("home").next(), now, "no wait once the window shows");
+    let mut l = String::new();
+    assert!(w.end("home").r.read_line(&mut l).is_err(), "each once: {l}");
+    assert!(!has(&t.take(), "error"));
+}
+
+/// Capsule-only (no ProjectPorts): nothing held before or after shown,
+/// a project command refused, no rows.
+#[test]
+fn a_core_without_projects_holds_nothing() {
+    let mut t = T::new();
+    t.ready();
+    typed(&mut t, json!({"cmd": "send", "project": "home", "agent": "main", "text": "hi", "mode": "now"}));
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("refused");
+    assert_eq!(e["text"], "this core has no projects");
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    t.out.extend(t.core.take_out());
+    assert!(!has(&t.take(), "projects"));
 }
 
 #[test]
