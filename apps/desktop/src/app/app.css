@@ -1,0 +1,20 @@
+/* The shell's layout (amb-win): the window fills the Electron window; the
+   look is desktop-ds v5's (src/ds, amb-kit), never forked here. */
+.app-shell {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-shell > .b-win {
+  height: 100%;
+}
+
+.app-notyet,
+.app-notfound {
+  margin: auto;
+  text-align: center;
+}
+
+.app-dim {
+  color: var(--ink-2);
+}
