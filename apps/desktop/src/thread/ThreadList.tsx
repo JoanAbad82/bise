@@ -17,6 +17,9 @@ import './thread.css';
 const NONE = {};
 // Virtuoso measures its own box: it must fill the list's flex area
 const FILL = { height: '100%' };
+// it opens on the newest row's end (a long answer's last line, not its
+// first): at the bottom, so new rows follow
+const LAST = { index: 'LAST', align: 'end' } as const;
 
 /** Far from 0: room for every older row that may come in front. */
 const START = 1_000_000_000;
@@ -92,7 +95,7 @@ export function ThreadList({ keys, row, more, onOlder, head, testId, ref }: Thre
         style={FILL}
         data={keys}
         firstItemIndex={next.index}
-        initialTopMostItemIndex={Math.max(0, keys.length - 1)}
+        initialTopMostItemIndex={LAST}
         computeItemKey={(_, key) => key}
         itemContent={(_, key) => row(key)}
         followOutput={(atBottom) => (atBottom ? 'auto' : false)}

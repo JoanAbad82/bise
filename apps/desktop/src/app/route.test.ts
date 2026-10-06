@@ -95,3 +95,14 @@ describe('the core line (bar S.5)', () => {
     expect(coreLine('starting', { wasUp: false, slow: true })).toBe('starting bise…');
   });
 });
+
+describe("the projects the window shows (the core's 'shown')", () => {
+  it('home first, then the route project, deduped; empty until one is known', async () => {
+    const { shownOf } = await import('./App');
+    expect(shownOf('home-1', { screen: 'thread', project: 'shop', agent: 'perf' })).toEqual(['home-1', 'shop']);
+    expect(shownOf('home-1', { screen: 'bise' })).toEqual(['home-1']);
+    expect(shownOf('home-1', { screen: 'thread', project: 'home-1', agent: 'main' })).toEqual(['home-1']);
+    expect(shownOf(undefined, { screen: 'review', project: 'shop', agent: 'a' })).toEqual(['shop']);
+    expect(shownOf(undefined, { screen: 'inbox' })).toEqual([]);
+  });
+});

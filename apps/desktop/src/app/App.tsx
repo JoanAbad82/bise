@@ -8,11 +8,11 @@
 // touches, never the shell, the sidebar or the composer.
 import { useEffect, useState, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
-import { formatRoute, startRouteOf, type Route } from './route';
+import { formatRoute, projectOf, startRouteOf, type Route } from './route';
 import { useMainRoutes, useMenuRouting } from './menu';
 import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { ThreadScreen } from '@/thread/ThreadScreen';
-import { useProjects } from '@/store';
+import { useProjects, useStore } from '@/store';
 import { InboxScreen } from '@/inbox';
 import { SettingsScreen } from '@/settings';
 import { OnboardingScreen, useFirstLaunch } from '@/setup';
@@ -52,6 +52,7 @@ function Shell() {
   useMainRoutes(router);
   // a home not onboarded opens on the onboarding once (amb-home c44c926d)
   useFirstLaunch();
+  useShown();
   return (
     <div className="app-shell" data-testid="app.root">
       <Win side={<Sidebar />} main={<Current />} />
@@ -99,6 +100,33 @@ function ScreenOf({ route }: { route: Route }) {
     default:
       return <NotYet route={route} />;
   }
+}
+
+/**
+ * The projects this window shows, said to the core on load and on each
+ * route change (store.shown sends only a changed set, and says it again to
+ * a core that comes back up): bise's own (home) and the route's project.
+ * The core holds those hubs, so subscribe, send and answer reach them
+ * (qa-flows: without it a send on the real core did nothing, his bug 5).
+ */
+function useShown() {
+  const store = useStore();
+  const route = useRoute();
+  const home = useProjects().find((p) => p.home)?.project;
+  const set = shownOf(home, route);
+  const key = set.join('\n');
+  // said even empty: the core sends the projects rows (bise's home among
+  // them) only after a first shown, so waiting for home would wait forever
+  useEffect(() => {
+    store.shown(key === '' ? [] : key.split('\n'));
+  }, [store, key]);
+}
+
+/** The shown set: home first, then the route's project, deduped (empty before the first rows). Pure. */
+export function shownOf(home: string | undefined, route: Route): string[] {
+  const out: string[] = [];
+  for (const p of [home, projectOf(route)]) if (p !== undefined && !out.includes(p)) out.push(p);
+  return out;
 }
 
 /** bise's own thread: the home project's main, once the core said which it is. */
