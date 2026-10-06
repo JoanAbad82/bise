@@ -106,7 +106,7 @@ def main():
         c.wait_status("main", "idle", 60)
         check(os.path.samefile(c.agent("main")["path"], E.ws), "main works in the folder")
         role = open(os.path.join(E.state, "agents", "main", "role.md")).read()
-        check("## Workspace" in role and "without git" in role and "## Flow" not in role,
+        check("## Workspace" in role and "without git" in role and "## Flow" not in role and "On this hub you are **bise**" in role,
               "main's role: the no-git section, no Flow section")
 
         page = os.path.join(E.tmp, "page.html")

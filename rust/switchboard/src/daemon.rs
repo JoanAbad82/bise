@@ -1372,8 +1372,11 @@ impl Shell {
         let git = crate::worktree::is_git_dir(&self.opts.paths.workspace);
         let flow = self.flow_now().filter(|_| git);
         let style = self.commit_style();
+        if a.is_main && crate::paths::is_home(&self.opts.paths.workspace) {
+            return prompts::bise_role(&self.hub.workspace, tmp);
+        }
         if a.is_main && !git {
-            return prompts::main_role(&self.hub.workspace, tmp, devflow::HOME_SECTION);
+            return prompts::main_role(&self.hub.workspace, tmp, devflow::NO_GIT_SECTION);
         }
         if a.is_main {
             let section = devflow::main_section(flow.as_ref(), style.as_deref());

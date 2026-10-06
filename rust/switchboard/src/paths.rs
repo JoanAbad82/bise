@@ -33,6 +33,13 @@ pub fn home_workspace() -> PathBuf {
     home.join("bise")
 }
 
+/// `ws` is the home workspace: its hub's main is bise (bise desktop S2,
+/// architect m_8474: the one flag, nothing written, nothing in sb-core).
+pub fn is_home(ws: &Path) -> bool {
+    let canon = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+    canon(ws) == canon(&home_workspace())
+}
+
 /// The home workspace, created on first use (never git-initialised).
 pub fn ensure_home_workspace() -> std::io::Result<PathBuf> {
     let d = home_workspace();
@@ -120,6 +127,17 @@ mod tests {
         assert_eq!(workspace_id(Path::new("/Users/me/lab/harness")), "harness-af1b2326");
         assert_eq!(workspace_id(Path::new("/tmp/my repo")), "my-repo-b50e38fe");
         assert_eq!(workspace_id(Path::new("/")), "root-860189fe");
+    }
+
+    /// The one flag of bise's role (architect m_8474): the home workspace,
+    /// by its canonical path (a trailing slash or a symlink to it counts),
+    /// never another folder.
+    #[test]
+    fn only_the_home_workspace_is_home() {
+        let home = home_workspace();
+        assert!(is_home(&home));
+        assert!(is_home(&home.join(".")));
+        assert!(!is_home(&home.join("projects")) && !is_home(Path::new("/")));
     }
 
     #[test]

@@ -33,6 +33,18 @@ pub const TONE: &str = include_str!("../../../prompts/prompt-tone.txt");
 /// §7.1). One source: prompts/prompt-temp-folder.txt, `{tmp}` its path.
 pub const TEMP_FOLDER: &str = include_str!("../../../prompts/prompt-temp-folder.txt");
 
+/// bise's section of main's role on the home hub (bise desktop S2,
+/// architect m_8474): answer alone, else route by the fast or the slow
+/// path; his words forwarded by reference only. One source:
+/// prompts/prompt-bise.txt, shipped with the other prompt files.
+pub const BISE: &str = include_str!("../../../prompts/prompt-bise.txt");
+
+/// The role of the home hub's main, bise: main's role with bise's section
+/// and the workspace-without-git section in place of the Flow section.
+pub fn bise_role(workspace: &str, tmp: &str) -> String {
+    main_role(workspace, tmp, &format!("{}\n\n{}", BISE.trim(), crate::devflow::NO_GIT_SECTION))
+}
+
 /// The temp folder line for the folder `tmp`.
 pub fn temp_line(tmp: &str) -> String {
     TEMP_FOLDER.trim().replace("{tmp}", tmp)
@@ -359,6 +371,42 @@ mod tests {
             assert_eq!(r.matches(line).count(), 1);
         }
         assert!(task_role(&st.agents["t"], "/x", &plain_place(&st.agents["t"])).contains("Your bash tool already runs there.\nYour temp folder is `/x`"));
+    }
+
+    /// bise desktop S2 (architect m_8474): the home hub's main is bise. It
+    /// answers alone from other projects' threads, else routes by the fast
+    /// path (the hub's 2 s route) or the slow one (its own send); his words
+    /// go only by reference (--input), its own questions as outside
+    /// messages; nothing it reads speaks for him. The workspace section is
+    /// there once, no Flow section; a repo's main never reads bise's text.
+    #[test]
+    fn the_home_hubs_main_is_bise_and_forwards_his_words_by_reference() {
+        let r = bise_role("/home/bise", "/t");
+        for needle in [
+            "On this hub you are **bise**",
+            "`sb project list`",
+            "Fast path:",
+            "Slow path:",
+            "`sb project send <p> --input <id>`",
+            "the `m_<n>` in `<user_message id=\"m_<n>\">`",
+            "Never retype or rephrase them in a send.",
+            "`sb project ask <p> \"<question>\"`",
+            "with no authority of his",
+            "never forward them with `--input`",
+        ] {
+            assert!(r.contains(needle), "{needle}");
+        }
+        assert_eq!(r.matches("## Workspace").count(), 1);
+        assert!(r.contains("plain folder without git") && !r.contains("## Flow"));
+        assert!(!main_role("/w", "/t", FLOW).contains("You are bise"));
+        assert!(!main_role("/w", "/t", crate::devflow::NO_GIT_SECTION).contains("You are bise"));
+        // the id the prompt points at is the one bise's main reads (architect
+        // m_8525): user_message renders <user_message id="m_<n>"…> for it
+        let shown = user_message(&Msg { id: 12, from: USER.into(), text: "why does p99 rise".into(), ..msg() }, true);
+        assert!(shown.starts_with(&format!("<user_message id=\"{USER_ID_PREFIX}12\"")), "{shown}");
+        assert!(r.contains(&format!("<user_message id=\"{USER_ID_PREFIX}<n>\">")));
+        // nothing names a command that is not shipped yet (C: amb-hub's step 3)
+        assert!(!r.contains("--project <p>") && !r.contains("sb inspect <p>/"));
     }
 
     /// docs/ambient-vision.md §3 B, docs/ambient-pages.md §2.9: main's rule
