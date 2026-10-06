@@ -14,8 +14,9 @@ import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app, ipcMain, Menu } from 'electron';
-import { IPC, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
+import { BADGE_LINE, IPC, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
 import { Capsule, installCapsuleIpc } from './capsule';
+import { badgeOf, CountKeeper, titleOf } from './counts';
 import { installGuard } from './guard';
 import { startHelper } from './helper/run';
 import { onCoreEvent, startCore, stopCore } from './core/ipc';
@@ -98,6 +99,17 @@ void app.whenReady().then(() => {
     main.open(typeof route === 'string' ? route : undefined);
   });
   if (!testMode) startTray(capsule, main);
+  // the counts outside the app (counts.ts): the Dock's badge, the window's title
+  const counts = new CountKeeper();
+  onCoreEvent((ev) => {
+    const c = counts.apply(ev);
+    if (c === null) return;
+    main.setTitle(titleOf(c));
+    // test mode has no Dock icon: the badge is a stdout line the harness reads
+    if (testMode) process.stdout.write(`${BADGE_LINE} ${JSON.stringify(badgeOf(c))}
+`);
+    else app.dock?.setBadge(badgeOf(c));
+  });
   main.create();
   app.on('activate', () => {
     main.open();

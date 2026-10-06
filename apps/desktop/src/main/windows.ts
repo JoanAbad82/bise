@@ -50,11 +50,18 @@ export function loadRenderer(win: BrowserWindow, surface: Surface, route: string
 
 export class MainWindow {
   private win: BrowserWindow | null = null;
+  private title = 'bise';
 
   constructor(private readonly testMode: boolean) {}
 
   get window(): BrowserWindow | null {
     return this.win;
+  }
+
+  /** The window's title (counts.ts: 'bise · 2 waiting'), kept for the next window too. */
+  setTitle(title: string): void {
+    this.title = title;
+    this.win?.setTitle(title);
   }
 
   create(route?: string): BrowserWindow {
@@ -66,11 +73,15 @@ export class MainWindow {
       // focusable false: a stray focus() can never activate the app over his;
       // the harness draws the caret with CDP focus emulation.
       ...(test ? { x: OFF, y: OFF, focusable: false } : {}),
-      title: 'bise',
+      title: this.title,
       ...glassOf('window', process.platform, test),
       webPreferences: webPreferences('window', test),
     });
     this.win = win;
+    // the title is main's (the counts), never the page's <title>
+    win.on('page-title-updated', (e) => {
+      e.preventDefault();
+    });
     win.on('closed', () => {
       if (this.win === win) this.win = null;
     });

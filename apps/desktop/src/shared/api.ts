@@ -162,6 +162,8 @@ export const CAPSULE_LINE = 'bise-desktop: capsule';
 /** Test mode's stdout lines for effects that would leave the app. */
 export const EXTERNAL_LINE = 'bise-desktop: external';
 export const OPEN_PATH_LINE = 'bise-desktop: open-path';
+/** Test mode (no Dock icon): the Dock's badge as `BADGE_LINE "2"` ("" = none); the window's title is main's getTitle(). */
+export const BADGE_LINE = 'bise-desktop: badge';
 export const COPY_LINE = 'bise-desktop: copy';
 
 /** The environment variable that turns test mode on. */
