@@ -8,6 +8,7 @@ import { Answered, Art, Button, Chip, Fold, Marker, Msg, Opts, Tool } from '@/ds
 import type { Entry } from '@/proto';
 import { useEntry, usePending, useProjects, useStore } from '@/store';
 import { useHoldOf, type Hold } from './routes';
+import { useFold } from './folds';
 import { Markdown } from './Markdown';
 import { clock, whoOf } from './entry';
 import { useIsCurrent } from './findmark';
@@ -67,7 +68,7 @@ function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 
 /** Its tool calls in a row: one counted line, open to the steps. */
 function ToolsRow({ e }: { e: Entry }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useFold();
   const items = e.tools?.items ?? [];
   return (
     <Tool

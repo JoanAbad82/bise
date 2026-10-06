@@ -39,3 +39,19 @@
   border-bottom: 1px solid var(--c-line);
   color: var(--c-text-2);
 }
+
+/* ⌘K's palette: over the window, the spotlight's look */
+.app-palette {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+  background: rgba(0, 0, 0, 0.12);
+  z-index: 20;
+}
+
+.app-palette .b-spot {
+  width: min(640px, 90vw);
+}

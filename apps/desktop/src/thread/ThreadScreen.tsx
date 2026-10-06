@@ -20,6 +20,7 @@ import { entryKey, pendingKey, posOfKey } from './entry';
 import { FindBar } from './FindBar';
 import { createFindMark, FindMarkContext } from './findmark';
 import { trackRoutes, useHeld } from './routes';
+import { createFolds, FoldsContext } from './folds';
 
 export interface ThreadScreenProps {
   project: string;
@@ -62,9 +63,22 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
 
   const [findOpen, setFindOpen] = useState(false);
   const [mark] = useState(createFindMark);
+  const [folds] = useState(createFolds);
   const list = useRef<ThreadListHandle>(null);
   useMenuAction('find', () => {
     setFindOpen(true);
+  });
+  // the window's keys (app/keys.ts): ⌘E everything folded, ⌘. stop,
+  // end back to the bottom, ctrl+y copy a code block
+  useMenuAction('fold-all', () => {
+    folds.toggle();
+  });
+  useMenuAction('to-end', () => {
+    list.current?.scrollToEnd();
+  });
+  useMenuAction('copy-code', () => {
+    const code = codeToCopy(document);
+    if (code !== undefined) void (window as Partial<Window>).bise?.copy(code);
   });
 
   // ⛔6: a stop he asked, shown until the turn's end or a new entry
@@ -74,6 +88,9 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     setStopping(true);
   }, [store, project, agent]);
   if (stopping && !busy) setStopping(false);
+  useMenuAction('stop', () => {
+    if (busy) stop();
+  });
 
   const onKeyDown = (e: KeyboardEvent) => {
     // esc while bise holds his words: keep them with bise (route_cancel)
@@ -95,6 +112,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   const sub = bise ? 'every project' : [agent === 'main' ? 'main' : (projectName ?? project), me ? lineOf(me) : ''].filter(Boolean).join(' · ');
 
   return (
+    <FoldsContext value={folds}>
     <FindMarkContext value={mark}>
       <section className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} onKeyDown={onKeyDown}>
         <Head title={title} sub={sub} pearl={bise ? 22 : undefined} dot={bise || !me ? undefined : dotOf(me.status)} />
@@ -116,7 +134,20 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         <ThreadComposer project={project} agent={agent} busy={busy} to={`you → ${title}`} onStop={stop} />
       </section>
     </FindMarkContext>
+    </FoldsContext>
   );
+}
+
+/**
+ * ctrl+y's block (the TUI's codeblock.rs): the code block under the mouse,
+ * else the newest one drawn in the thread. Its text, as written.
+ */
+export function codeToCopy(doc: Document): string | undefined {
+  const hovered = doc.querySelector('.th-list pre:hover code, .th-list pre:hover');
+  if (hovered !== null) return hovered.textContent;
+  const all = doc.querySelectorAll('.th-list pre code');
+  const last = all.item(all.length - 1) as Element | null;
+  return last === null ? undefined : last.textContent;
 }
 
 /** The list: entries by pos, then his sends not confirmed yet. */

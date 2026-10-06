@@ -8,9 +8,18 @@ import { useEffect, useRef } from 'react';
 import type { MenuAction } from '@/shared/api';
 import type { Router } from './router';
 import { parseRoute } from './route';
+import type { ScreenAction } from './keys';
 
-type Listener = (action: MenuAction) => void;
+/** What a screen may be asked: a menu item's ('find') or a window key's ('fold-all', 'stop'...). */
+export type AppAction = MenuAction | ScreenAction;
+
+type Listener = (action: AppAction) => void;
 const listeners = new Set<Listener>();
+
+/** Ask the shown screens (the shell's keys call it). */
+export function emitAction(action: AppAction): void {
+  for (const l of [...listeners]) l(action);
+}
 
 /** The route a menu action opens, if it is one. Pure. */
 export function routeOfMenu(action: MenuAction): 'inbox' | 'settings' | undefined {
@@ -26,7 +35,7 @@ export function useMenuRouting(router: Router) {
     return bise.onMenu((action) => {
       const screen = routeOfMenu(action);
       if (screen !== undefined) router.go({ screen });
-      else for (const l of [...listeners]) l(action);
+      else emitAction(action);
     });
   }, [router]);
 }
@@ -47,7 +56,7 @@ export function useMainRoutes(router: Router) {
 }
 
 /** In a screen: `handler` runs on that menu action while the screen is shown. */
-export function useMenuAction(action: MenuAction, handler: () => void) {
+export function useMenuAction(action: AppAction, handler: () => void) {
   const latest = useRef(handler);
   useEffect(() => {
     latest.current = handler;

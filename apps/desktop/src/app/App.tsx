@@ -23,6 +23,9 @@ import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
 import { Sidebar } from './Sidebar';
 import { CoreLine } from './CoreLine';
+import { Palette } from './Palette';
+import { keyAction, typingIn } from './keys';
+import { emitAction } from './menu';
 import '@/ds/index.css';
 import './app.css';
 
@@ -47,6 +50,10 @@ function testMode(): boolean {
 
 function Shell() {
   useHistoryKeys();
+  const [palette, setPalette] = useState(false);
+  useWindowKeys(() => {
+    setPalette(true);
+  });
   const router = useRouter();
   useMenuRouting(router);
   useMainRoutes(router);
@@ -56,6 +63,13 @@ function Shell() {
   return (
     <div className="app-shell" data-testid="app.root">
       <Win side={<Sidebar />} main={<Current />} />
+      {palette && (
+        <Palette
+          onClose={() => {
+            setPalette(false);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -169,6 +183,37 @@ function NotFound({ path }: { path: string }) {
       <p className="app-dim">nothing here at {path}</p>
     </section>
   );
+}
+
+/**
+ * The window's own keys (app/keys.ts decides): a route goes to the router,
+ * ⌘K opens the palette, the rest go to the shown screens. Capture phase, by
+ * key code: the composer never types ⌥1's '¡'.
+ */
+function useWindowKeys(openPalette: () => void) {
+  const router = useRouter();
+  const store = useStore();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.repeat) return;
+      const act = keyAction(e, {
+        route: router.get(),
+        projects: store.projects(),
+        agents: (p) => store.agents(p),
+        typing: typingIn(document.activeElement),
+      });
+      if (act === undefined) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if ('go' in act) router.go(act.go);
+      else if ('palette' in act) openPalette();
+      else emitAction(act.screen);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [router, store, openPalette]);
 }
 
 /** ⌘[ back, ⌘] forward (the menu items are amb-mac's; the keys work without them). */
