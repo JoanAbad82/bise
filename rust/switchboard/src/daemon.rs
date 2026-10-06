@@ -22,6 +22,7 @@ mod release;
 mod session_log;
 mod versions;
 mod dev_servers;
+mod merged;
 mod worktrees;
 mod xhub;
 

@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "diff", "error")
+TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "diff", "error")
 FIXTURES = os.path.join(e2e.ROOT, "rust", "proto", "fixtures", "hub_ev.jsonl")
 
 
@@ -241,6 +241,17 @@ def main():
         finally:
             os.killpg(server.pid, signal.SIGTERM)
             server.wait(timeout=10)
+
+        # merged today: his own commit on the trunk comes, without a lander
+        check(typed(c, "merged"), "merged at hello")
+        subprocess.run("echo more >> README && git commit -qam 'docs: a line for today'", shell=True, cwd=E.ws, check=True)
+        n = len(typed(c, "merged"))
+        c.send({"cmd": "merged", "project": project})
+        c.wait(lambda: len(typed(c, "merged")) > n, 30, "merged again")
+        today = typed(c, "merged")[-1]["items"]
+        mine = [m for m in today if m["title"] == "docs: a line for today"]
+        check(mine and len(mine[0]["sha"]) == 40 and "by" not in mine[0] and mine[0]["at_ms"] > 0, "his commit: %r" % today)
+        check(today[0]["title"] == "docs: a line for today", "newest first: %r" % today)
 
         # stop and archive: reach the hub's own paths (an unknown agent: an error)
         c.send({"cmd": "stop", "project": project, "agent": "main"})

@@ -13,8 +13,10 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 mod dev_servers;
+mod merged;
 mod worktrees;
 pub use dev_servers::{dev_servers, lsof_ports, server_name, Job};
+pub use merged::{landed_line, merged, LOG_FORMAT as MERGED_LOG_FORMAT};
 pub use worktrees::{left_right, worktree_list, worktrees};
 
 /// The entries of the newest lines a subscription keeps, so a live line

@@ -168,6 +168,7 @@ impl Shell {
             self.proto_send(id, &arts);
             self.worktrees_typed(vec![id]);
             self.dev_servers_typed(vec![id]);
+            self.merged_typed(vec![id]);
             return;
         }
         if !self.proto.conns.contains_key(&id) {
@@ -185,6 +186,7 @@ impl Shell {
             | HubCmd::ArtifactsSeen { project }
             | HubCmd::Worktrees { project }
             | HubCmd::DevServers { project }
+            | HubCmd::Merged { project }
             | HubCmd::RouteCorrect { project, .. }
             | HubCmd::RouteCancel { project, .. }
             | HubCmd::Diff { project, .. } => project.clone(),
@@ -281,6 +283,8 @@ impl Shell {
             HubCmd::Worktrees { .. } => self.worktrees_typed(vec![id]),
             // jobs and lsof in a thread (dev_servers.rs), to this client
             HubCmd::DevServers { .. } => self.dev_servers_typed(vec![id]),
+            // git and main's transcript in a thread (merged.rs)
+            HubCmd::Merged { .. } => self.merged_typed(vec![id]),
             // the 2 s hold (sb-core's routing hold): a route that ended
             // already gets sb-core's notice, as an error (step_typed); an
             // unknown target never reaches sb-core
@@ -357,6 +361,10 @@ impl Shell {
                     for id in sent {
                         self.proto_send(id, &HubEv::Typing { project: project.clone(), agent: agent.clone(), text: text.clone() });
                     }
+                }
+                // a land reached main's feed: today's merged list again
+                if agent == MAIN && line.starts_with("sb landed : ") {
+                    self.merged_typed(ids.clone());
                 }
             }
             _ => {}

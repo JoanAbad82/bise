@@ -138,6 +138,22 @@ impl Card {
     }
 }
 
+/// A commit that reached the project's trunk today (the changes tab's
+/// "merged today", amb-web m_8974).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Merged {
+    /// the full sha
+    pub sha: String,
+    /// its subject line
+    pub title: String,
+    /// the agent whose land brought it (sb land, the merge path); absent:
+    /// not landed through bise (his own commit), or not known
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub by: Option<String>,
+    /// its commit time
+    pub at_ms: u64,
+}
+
 /// A server an agent runs in the background (`pnpm dev`, a local
 /// grafana): its job listening on a port, or a known server command not
 /// listening yet (no port, no url).

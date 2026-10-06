@@ -5,7 +5,7 @@
 //! they can't reach a hub or come from one.
 
 use crate::diff::{DiffFile, DiffResult};
-use crate::rows::{Agent, Artifact, Card, DevServer, Worktree};
+use crate::rows::{Agent, Artifact, Card, DevServer, Merged, Worktree};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
@@ -40,6 +40,9 @@ pub enum HubEv {
     /// the agents' background servers, with `worktrees` (same moments)
     /// and on `dev_servers`
     DevServers { project: Project, items: Vec<DevServer> },
+    /// the commits that reached the trunk today, newest first: at hello,
+    /// after each land and on `merged`
+    Merged { project: Project, items: Vec<Merged> },
     /// an agent's change (the answer to `diff`): its checkout or branch
     /// vs `base`; `head` its branch (none: the shared folder)
     Diff {
@@ -95,7 +98,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "diff", "route", "route_done", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "diff", "route", "route_done", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -204,6 +207,8 @@ pub enum HubCmd {
     Worktrees { project: Project },
     /// the environments screen opened: `dev_servers` comes again
     DevServers { project: Project },
+    /// the changes tab opened: `merged` comes again
+    Merged { project: Project },
     /// a held route goes to project `to` instead (a hub id of the
     /// registry, else an error; "bise": his words stay with bise's main,
     /// a cancel); a route that ended already: an error
@@ -217,7 +222,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "route_correct", "route_cancel"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "route_correct", "route_cancel"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
