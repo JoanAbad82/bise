@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { MenuAction } from '../shared/api';
 import type { ClipOp } from './clipfence';
 import { externalUrl } from './external';
-import { menuTemplate } from './menu';
+import { menuTarget, menuTemplate } from './menu';
 
 function flat(items: readonly MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
   return items.flatMap((i) => [i, ...(Array.isArray(i.submenu) ? flat(i.submenu) : [])]);
@@ -74,6 +74,18 @@ describe('the application menu (bar ⛔2)', () => {
   it('the devtools only in dev builds', () => {
     expect(roles(build('darwin').items)).not.toContain('toggleDevTools');
     expect(roles(build('darwin', true).items)).toContain('toggleDevTools');
+  });
+});
+
+describe('menuTarget (qa-native m_9724)', () => {
+  it('settings and the inbox open the main window when it has no keys (closed, or the capsule has them)', () => {
+    expect(menuTarget('settings', false)).toEqual({ open: 'settings' });
+    expect(menuTarget('inbox', false)).toEqual({ open: 'inbox' });
+  });
+
+  it('the main window with the keys gets them itself; find always goes to the focused page', () => {
+    expect(menuTarget('settings', true)).toEqual({ send: 'focused' });
+    expect(menuTarget('find', false)).toEqual({ send: 'focused' });
   });
 });
 

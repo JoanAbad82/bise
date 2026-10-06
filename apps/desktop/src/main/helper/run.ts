@@ -2,7 +2,8 @@
 // typed lines (lines.ts) on stdin/stdout, its log on stderr (prefixed into
 // main's). Every event goes to every window (IPC.helperEv) and the state ones
 // are kept, so a window that opens later asks helperState() for the last of
-// each. A window's command goes to its stdin (never quit). It is restarted
+// each. A window's command goes to its stdin (never quit). His prefs
+// reach it as {cmd:'config'} at every hello and on every change. It is restarted
 // with a backoff when it dies, and told to quit (then its stdin closes) when
 // the app quits.
 //
@@ -17,6 +18,7 @@ import { dirname, join } from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import type { HelperCmd, HelperEv } from '../../proto';
 import { IPC } from '../../shared/api';
+import type { HelperConfig } from './config';
 import { decodeEv, encodeCmd, HelperState, LineSplitter, restartDelay, windowMaySend } from './lines';
 
 export const HELPER_ENV = 'BISE_DESKTOP_HELPER';
@@ -40,6 +42,10 @@ export class Helper {
   private readonly crashes: number[] = [];
   private readonly listeners = new Set<Listener>();
   private quitting = false;
+  // his prefs as the helper's config: sent at every hello (a restarted helper
+  // starts from nothing) and whenever they change (qa-native m_9724); none
+  // before his prefs are known (the helper keeps its built-in floor until then)
+  private conf: HelperConfig | null = null;
 
   constructor(private readonly path: string) {}
 
@@ -78,6 +84,12 @@ export class Helper {
     });
   }
 
+  /** His prefs changed (or arrived): the helper's config now, and at every restart. */
+  config(c: HelperConfig): void {
+    this.conf = c;
+    this.send(c);
+  }
+
   send(c: HelperCmd): void {
     this.child?.stdin.write(encodeCmd(c));
   }
@@ -101,6 +113,7 @@ export class Helper {
       return;
     }
     this.state.take(d.ev);
+    if (d.ev.ev === 'hello' && this.conf !== null) this.send(this.conf);
     for (const l of this.listeners) l(d.ev);
     for (const w of BrowserWindow.getAllWindows()) w.webContents.send(IPC.helperEv, d.ev);
   }

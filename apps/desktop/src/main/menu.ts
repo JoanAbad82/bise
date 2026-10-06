@@ -111,3 +111,17 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
 
   return [...appMenu, file, edit, go, ...view, window];
 }
+
+export type MenuTarget = { readonly send: 'focused' } | { readonly open: string };
+
+/**
+ * Pure: where a bise item of the menu goes (qa-native m_9724). Settings and
+ * the inbox are screens of the main window: to it when it has the keys, else
+ * it opens on that route (closed with ⌘W, the capsule or another app has the
+ * keys, a test run). Find is the focused page's (the capsule's own search
+ * included), else the main window's (qa-flows m_9739: never dropped).
+ */
+export function menuTarget(action: MenuAction, mainFocused: boolean): MenuTarget {
+  if (action === 'find' || mainFocused) return { send: 'focused' };
+  return { open: action };
+}

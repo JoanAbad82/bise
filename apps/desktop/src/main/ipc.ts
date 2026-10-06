@@ -7,6 +7,7 @@ import { basename, extname } from 'node:path';
 import { BrowserWindow, clipboard, ipcMain, session, shell } from 'electron';
 import { COPY_LINE, EXTERNAL_LINE, IPC, TEST_CLIP_FILE_ENV, TEST_CLIP_TEXT_ENV, type MenuAction } from '../shared/api';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
+import { menuTarget } from './menu';
 import { externalUrl } from './external';
 
 // the page's async clipboard API (navigator.clipboard): its permissions
@@ -86,7 +87,11 @@ export function sendClip(op: ClipOp): void {
   BrowserWindow.getFocusedWindow()?.webContents.send(IPC.clip, op);
 }
 
-/** A bise item of the menu: to the focused window's renderer (none focused: nobody). */
-export function sendMenu(action: MenuAction): void {
-  BrowserWindow.getFocusedWindow()?.webContents.send(IPC.menu, action);
+/** A bise item of the menu, sent where menuTarget says. */
+export function sendMenu(action: MenuAction, main: { readonly window: BrowserWindow | null; open: (route?: string) => void }): void {
+  const focused = BrowserWindow.getFocusedWindow();
+  const t = menuTarget(action, focused !== null && focused === main.window);
+  if ('open' in t) main.open(t.open);
+  // nothing of bise's has the keys (his app does, or a test run): the main window's
+  else (focused ?? main.window)?.webContents.send(IPC.menu, action);
 }

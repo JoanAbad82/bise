@@ -26,6 +26,10 @@ import { MainWindow } from './windows';
 
 const testMode = process.env[TEST_ENV] === '1';
 
+// the menu bar says 'bise' (Quit bise, Hide bise, About bise), not the
+// package's name (qa-native m_9724)
+app.setName('bise');
+
 if (testMode) {
   // never his ~/Library/Application Support: the harness's folder, else a fresh temp one
   const userData = process.env[TEST_USER_DATA_ENV] ?? mkdtempSync(join(tmpdir(), 'bise-desktop-test-'));
@@ -56,7 +60,7 @@ void app.whenReady().then(() => {
         appName: app.name,
         dev: !app.isPackaged,
         send: (action) => {
-          sendMenu(action);
+          sendMenu(action, main);
         },
         ...(testMode ? { clip: sendClip } : {}),
       }),
