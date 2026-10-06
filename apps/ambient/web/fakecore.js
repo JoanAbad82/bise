@@ -262,6 +262,12 @@
       // a long deadline here so the line stays to look at; the core's is 2 s
       [1450, { ev: "route", project: "home", rid: "r1", to: "telemetry-8e02", name: "telemetry", text: "pourquoi le p99 d'ingest monte à 14 h", correct_until_ms: Date.now() + 1450 + 10000, why: "ingest is telemetry's" }]]) },
     { id: "s8-menu", spec: ["menu"], label: "S8: the pearl's dropdown", build: () => sort([...s8(), [200, { ev: "app_anchor", at: "menu" }], [300, { ev: "app_menu", on: true }]]) },
+    // S9: the quiet batch (cards that came in a call come together), while you were away, a drop on the pearl
+    { id: "s9-batch", spec: ["needs you"], label: "S9: 2 questions after a call", build: () => sort([...s8(), [0, { ev: "state", agents: AG8, cards: [], projects: PROJ }],
+      [100, { ev: "app_quiet", on: true, why: "call" }], [200, { ev: "state", agents: AG8, cards: CARDS8, projects: PROJ }], [400, { ev: "app_quiet", on: false }]]) },
+    { id: "s9-away", spec: ["needs you"], label: "S9: while you were away", build: () => sort([...s8(), [300, { ev: "away_summary", since_ms: Date.now() - 95 * 60e3, done: 3, questions: 1, failed: 0,
+      projects: [{ project: PROJ[1].project, done: 2, questions: 1, failed: 0 }, { project: PROJ[2].project, done: 1, questions: 0, failed: 0 }] }]]) },
+    { id: "s9-drop", spec: ["spotlight"], label: "S9: a file dropped on the pearl", build: () => sort([...s8(), [300, { ev: "app_drop", files: [{ name: "forest.ktx", path: "/Users/you/Desktop/forest.ktx", kind: "file" }] }]]) },
     { id: "still", spec: ["reduced motion"], label: "reduced motion", build: () => sort([[0, { ev: "app_reduce_motion", on: true }], ...base(), ...talkTurn(1500).ev, [16000, state(AGENTS, [CARD])]]) },
   ];
 
