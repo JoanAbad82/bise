@@ -50,16 +50,22 @@ class Core:
         with self.lock:
             return next((e for e in reversed(self.evs) if e.get("ev") == ev), None)
 
-    def seen(self, pred):
+    def mark(self):
+        """A cursor: the events from now on (a wait 'since' it never takes an older state)."""
         with self.lock:
-            return any(pred(e) for e in self.evs)
+            return len(self.evs)
 
-    def wait(self, pred, timeout=90, what="event"):
+    def seen(self, pred, since=0):
+        with self.lock:
+            return any(pred(e) for e in self.evs[since:])
+
+    def wait(self, pred, timeout=90, what="event", since=0):
+        """pred true on an event after `since` (mark()); the timeout scales with the load (wait.until)."""
         def said():
             with self.lock:
-                tail = [e for e in self.evs if e.get("ev") != "level"][-12:]
+                tail = [e for e in self.evs[since:] if e.get("ev") != "level"][-12:]
             return "%s; last events: %s" % (what, json.dumps(tail))
-        wait.until(lambda: self.seen(pred), timeout, said, poll=0.05)
+        wait.until(lambda: self.seen(pred, since), timeout, said, poll=0.05)
 
 
 def main():
@@ -113,8 +119,9 @@ def main():
         card = [cd for cd in core.last("state")["cards"] if cd["kind"] == "question"][0]
         check(card["agent"] == "t1", "t1's card: %r" % card)
         c.wait_idle("main")
+        at = core.mark()
         core.cmd(cmd="answer", card=card["id"], reply="yes")
-        core.wait(lambda e: e.get("ev") == "state" and not e["cards"], 60, "the card closed")
+        core.wait(lambda e: e.get("ev") == "state" and not e["cards"], 60, "the card closed", since=at)
         c.wait_line("t1", 'from="user"', 60)
 
         # main's own card with bare numbers ('1 a PR per task', pm's C
@@ -126,8 +133,9 @@ def main():
         check([o["label"] for o in ship["options"]] == ["a PR per task", "straight to main"], "its options: %r" % ship)
         c.wait_idle("main")
         n_err = sum(1 for e in core.evs if e.get("ev") == "error")
+        at = core.mark()
         core.cmd(cmd="answer", card=ship["id"], reply="2")
-        core.wait(lambda e: e.get("ev") == "state" and not any(cd["id"] == ship["id"] for cd in e["cards"]), 60, "main's card closed by the digit")
+        core.wait(lambda e: e.get("ev") == "state" and not any(cd["id"] == ship["id"] for cd in e["cards"]), 60, "main's card closed by the digit", since=at)
         check(sum(1 for e in core.evs if e.get("ev") == "error") == n_err, "no refusal")
         c.wait_line("main", "straight to main", 60)
 
@@ -136,12 +144,15 @@ def main():
         # options as its list, the label '? main needs you'
         c.wait_idle("main")
         c.say('''[[bash: sb card "Que fais-tu ? 1. regarde le diff 2. arrête-le 3. laisse-le finir"]]''')
+        # the hub's card first (main's turn under load is the slow part), then the core's view of it
+        c.wait(lambda: any("Que fais-tu" in (cd.get("text") or "") for cd in c.cards()), 120, "main's inline card in the hub")
         core.wait(lambda e: e.get("ev") == "state" and any(cd["text"] == "Que fais-tu ?" for cd in e["cards"]), 60, "main's inline card, its body alone")
         q = [cd for cd in core.last("state")["cards"] if cd["text"] == "Que fais-tu ?"][0]
         check([o["label"] for o in q["options"]] == ["regarde le diff", "arrête-le", "laisse-le finir"] and q.get("label") == "? main needs you", "its options and label: %r" % q)
         c.wait_idle("main")
+        at = core.mark()
         core.cmd(cmd="answer", card=q["id"], reply="3")
-        core.wait(lambda e: e.get("ev") == "state" and not any(cd["id"] == q["id"] for cd in e["cards"]), 60, "the inline card answered")
+        core.wait(lambda e: e.get("ev") == "state" and not any(cd["id"] == q["id"] for cd in e["cards"]), 60, "the inline card answered", since=at)
         c.wait_line("main", "laisse-le finir", 60)
 
         # fn space + tab (ambient-lead m_6513): main is asked to start an
