@@ -123,6 +123,18 @@
     return { ...s, agents, cards, projects, stateKeys: [...keys], picked: s.picked && ids.has(String(s.picked.card)) ? s.picked : null };
   }
 
+  // a project whose hub the core doesn't hold still has its open cards: its projects row carries
+  // them (ProjectView.cards from its view.json, architect m_8726, lead m_8721), so bise's
+  // 'waiting for you' and its dock answer them; a hub's own cards event wins over its row's
+  function rowCards(s, rows) {
+    let cards = s.cards;
+    for (const p of rows || []) {
+      if (p.home || !Array.isArray(p.cards) || (s.live || {})[p.project]) continue;
+      cards = set(cards, p.project, p.cards.map((c) => ({ ...c, project: p.project })));
+    }
+    return cards === s.cards ? s : { ...s, cards };
+  }
+
   // the core's error {project?, cmd?, text} (S3b: a command to a hub not welcomed yet, an unknown
   // project, a hub's own refusal): a thread that was opening says it didn't, a message on its way
   // says it wasn't sent, an answer he gave puts its card back; the line shows over the window
@@ -140,12 +152,17 @@
       threads[k] = u;
     }
     let answered = s.answered, picked = s.picked;
+    let cards = s.cards;
     if (ev.cmd === "answer" && ev.project) {
-      const ids = new Set((s.cards[ev.project] || []).map((c) => String(c.id)));
+      const list = s.cards[ev.project] || [];
+      const ids = new Set(list.map((c) => String(c.id)));
+      const mineAnswered = new Set(Object.keys(s.answered).filter((id) => ids.has(String(id))));
       answered = Object.fromEntries(Object.entries(s.answered).filter(([id]) => !ids.has(String(id))));
       if (picked && ids.has(String(picked.card))) picked = null;
+      // a card that isn't open any more (a stale row's card, lead m_8728): it goes, not back
+      if (/isn't open|not open/.test(text)) cards = set(cards, ev.project, list.filter((c) => !mineAnswered.has(String(c.id))));
     }
-    return { ...s, threads, answered, picked, toast: { project: ev.project || null, cmd: ev.cmd || null, text, at: s.now } };
+    return { ...s, threads, answered, picked, cards, toast: { project: ev.project || null, cmd: ev.cmd || null, text, at: s.now } };
   }
 
   // a deep link from the shell, the capsule or a card: bise · project/<p> · agent/<p>/<a> · inbox
@@ -183,7 +200,7 @@
   function core(s, ev, cmds) {
     switch (ev.ev) {
       case "welcome": case "hello": return { ...s, user: ev.user || s.user, now: ev.now_ms || s.now, offline: false };
-      case "projects": return { ...s, projects: ev.projects, projSeen: true };
+      case "projects": return rowCards({ ...s, projects: ev.projects, projSeen: true }, ev.projects);
       // the single-hub core's snapshot (the bar's state: agents, cards, maybe projects): until
       // S3b's typed per-project events it is the only place the window learns of them
       case "state": return fromState(s, ev);
@@ -193,7 +210,7 @@
         // a card he answered stays hidden until the core drops it (ids are numbers in S3a v1)
         // (`answered` keeps his words for the thread's line: "you answered: ...")
         const ids = new Set(Object.values({ ...s.cards, [ev.project]: ev.cards }).flat().map((c) => String(c.id)));
-        return { ...s, cards: set(s.cards, ev.project, ev.cards), picked: s.picked && ids.has(String(s.picked.card)) ? s.picked : null };
+        return { ...s, cards: set(s.cards, ev.project, ev.cards), live: set(s.live || {}, ev.project, true), picked: s.picked && ids.has(String(s.picked.card)) ? s.picked : null };
       }
       case "jobs": return set(s, "jobs", set(s.jobs, ev.project, ev.jobs));
       case "artifacts": return set(s, "arts", set(s.arts, ev.project, ev.items));

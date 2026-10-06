@@ -527,6 +527,30 @@ law("the core's errors: a thread that didn't open says so, a message not sent sa
   void before;
 });
 
+law("an unheld project's open cards come on its projects row: bise's waiting list and dock answer them; a hub's own cards win; a stale one ('card isn't open') goes", () => {
+  const ACME = "acme-1a2b3c4d";
+  let s = { ...M.init(F.NOW), tz: "Europe/Paris" };
+  const sent = [];
+  const feed = (ev) => { const r = M.step(s, ev); s = r.s; sent.push(...r.cmds); return r; };
+  const q = (id, question) => ({ id, project: ACME, kind: "question", agent: "perf", question, options: [{ n: 1, label: "cold" }, { n: 2, label: "warm" }], urgent: false, since_ms: F.NOW - id * 1000 });
+  const rows = (cards) => [{ project: F.HOME, name: "bise", path: "~/bise", home: true, order: 0, agents: 1, working: 0, waits: 0, git: false, running: true },
+    { project: ACME, name: "acme", path: "~/acme", home: false, order: 1, agents: 3, working: 0, waits: cards.length, git: true, branch: "main", running: false, cards }];
+  feed({ ev: "projects", projects: rows([q(9, "which bench?"), q(10, "keep the cache?")]) });
+  let v = V.view(s);
+  eq([v.board.sections[0].items.map((i) => [i.who, i.text]), v.composer.dock.q], [[["acme · perf", "which bench?"], ["acme · perf", "keep the cache?"]], "which bench?"]);
+  // an answer to a row's card is a normal answer to that project (the core delivers it)
+  feed({ ev: "ui_pick", card: 9, n: 2 });
+  eq(sent.filter((c) => c.cmd === "answer").pop(), { cmd: "answer", project: ACME, card: 9, reply: "2" });
+  // the hub said it wasn't open any more: it goes from the list and the dock
+  feed({ ev: "error", project: ACME, cmd: "answer", text: "card isn't open" });
+  v = V.view(s);
+  eq([v.board.sections[0].items.map((i) => i.text), v.composer.dock.q], [["keep the cache?"], "keep the cache?"]);
+  // once acme's hub speaks for itself (held), its cards event wins over the row's
+  feed({ ev: "cards", project: ACME, cards: [q(11, "ship it?")] });
+  feed({ ev: "projects", projects: rows([q(10, "keep the cache?")]) });
+  eq(V.view(s).board.sections[0].items.map((i) => i.text), ["ship it?"]);
+});
+
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {
   const dir = join(here, "../../../../rust/proto/fixtures");
   if (!existsSync(dir)) return;
