@@ -10,8 +10,8 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Uint8Array, Float32Array, String, Number });
-for (const f of ["words.js", "face.js", "policy.js", "spotlist.js", "model.js", "pearl.js", "bar.js", "panelmodel.js", "fakecore.js", "../kit/notelines.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
-const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes, BiseLines, AmbPearl: Pearl, AmbBar: Bar, AmbPanel: Pn } = ctx;
+for (const f of ["words.js", "face.js", "policy.js", "spotlist.js", "model.js", "pearl.js", "bar.js", "fakecore.js", "../kit/notelines.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes, BiseLines, AmbPearl: Pearl, AmbBar: Bar } = ctx;
 const W = Wd.W;
 
 // the scripts run in their own realm: compare plain data
@@ -1687,131 +1687,6 @@ law("round 2 (6): main's answer and a card never hide each other: a pane he open
   const v = M.view(m, 230);
   eq([v.state, v.words.list.join(" ")], ["end", "on it. the banner is half the size now."]);
   assert.notEqual(M.view(m, 230 + M.T.endOpen).state, "end");
-});
-
-// ---- round 10's side panel (panelmodel.js; amb-mac m_7040/m_7042, amb-core m_7030/m_7043)
-const PN = (agent = "perf") => {
-  let m = Pn.init();
-  m = Pn.step(m, { ev: "state", agents: Fake.ROSTER, cards: [Fake.CARD] }, 0, Fake.T0).m;
-  const r = Pn.step(m, { ev: "app_panel", agent, on: true, h: 900 }, 0, Fake.T0);
-  return { m: Pn.step(r.m, { ev: "agent_history", agent, entries: Fake.HISTORY[agent] || [], before: null, more: false }, 10, Fake.T0).m, cmds: r.cmds };
-};
-const pv = (m, t = 100) => Pn.view(m, t, Fake.T0);
-law("panel: app_panel opens it on an agent and asks its last 60 entries; the head is its name, status chip, title, follow · terminal · stop · archive; app_panel on:false unwatches it", () => {
-  const { m, cmds } = PN("perf");
-  eq(cmds, [{ cmd: "agent_history", agent: "perf", limit: 60 }]);
-  const v = pv(m);
-  eq([v.on, v.name, v.chip, v.title], [true, "perf", { text: "working · 12m", gc: null }, "signup is 4.1 s → 0.9 s; checking the e2e tests"]);
-  eq(v.tools.map((t) => [t.id, t.keys.join(" ")]), [["follow", "⌘ D"], ["terminal", "⌘ O"], ["stop", "⌘ ."], ["archive", "⌘ ⌫"]]);
-  eq(v.size, { w: 524, h: 900, radius: 26 });
-  eq(v.entries.map((e) => e.kind), ["you", "agent", "tools", "agent", "tools", "page", "report"]);
-  eq([v.entries[0].who, v.entries[1].who, v.entries[6].who], ["you", "perf", "perf · report"]);
-  eq(v.entries[2].tools.items.length, 4);
-  assert.equal(v.entries[2].tools.open, false);
-  assert.equal(pv(Pn.step(m, { ev: "ui_fold", pos: 3 }, 20).m).entries[2].tools.open, true);
-  eq(Pn.step(m, v.entries[5].page.act, 20).cmds, [{ cmd: "app_open_url", url: "https://bise.dev/p/signup-perf", page: "signup-perf" }]);
-  const off = Pn.step(m, { ev: "app_panel", on: false }, 30);
-  eq([off.cmds, pv(off.m).on], [[{ cmd: "agent_unwatch", agent: "perf" }], false]);
-  // a done agent has no stop
-  assert.ok(!pv(PN("release").m).tools.some((t) => t.id === "stop"));
-});
-law("panel: the composer: ⏎ send now, tab when it's free (queued shows until it lands), live entries append or replace by pos, its typing line", () => {
-  let { m } = PN("perf");
-  m = Pn.step(m, { ev: "ui_type", text: "also check the mobile signup" }, 20).m;
-  let r = Pn.step(m, { ev: "ui_send", mode: "now" }, 30);
-  eq(r.cmds, [{ cmd: "agent_send", agent: "perf", text: "also check the mobile signup", mode: "now" }]);
-  assert.equal(r.m.comp, "");
-  eq(Pn.step(r.m, { ev: "ui_send", mode: "now" }, 31).cmds, []);   // nothing to send
-  m = Pn.step(r.m, { ev: "ui_type", text: "then land it" }, 40).m;
-  r = Pn.step(m, { ev: "ui_send", mode: "queued" }, 50);
-  eq(r.cmds, [{ cmd: "agent_send", agent: "perf", text: "then land it", mode: "queued" }]);
-  m = Pn.step(r.m, { ev: "agent_queued", agent: "perf", text: "then land it" }, 60).m;
-  eq(pv(m).queued, [{ text: "then land it", label: "when it's free" }]);
-  m = Pn.step(m, { ev: "agent_entry", agent: "perf", entry: { pos: 13, at_ms: Fake.T0, kind: "you", text: "then land it" } }, 70).m;
-  eq([pv(m).queued, pv(m).entries.at(-1).text], [[], "then land it"]);
-  // a tools entry growing: the same pos replaces it
-  m = Pn.step(m, { ev: "agent_entry", agent: "perf", entry: { pos: 8, kind: "tools", text: "edited 3 files", tools: { count: 4, summary: "edited 3 files · ran the bench", items: [] } } }, 80).m;
-  eq([pv(m).entries.length, pv(m).entries.find((e) => e.pos === 8).tools.summary], [8, "edited 3 files · ran the bench"]);
-  // another agent's entries never land here
-  eq(Pn.step(m, { ev: "agent_entry", agent: "cookies", entry: { pos: 99, kind: "agent", text: "x" } }, 90).m.entries.length, 8);
-  m = Pn.step(m, { ev: "agent_typing", agent: "perf", text: "running the e2e tests · 44 of 58" }, 100).m;
-  assert.equal(pv(m).typing, "running the e2e tests · 44 of 58");
-  eq(pv(m).hints.map((h) => h.w), ["send now", "when it's free"]);
-});
-law("panel: a card inline answers with its digit (empty composer) or a click, once; its answer comes back as the same pos", () => {
-  let { m } = PN("cookies");
-  let v = pv(m);
-  const card = v.entries.at(-1).card;
-  eq([card.label.startsWith("? cookies needs you"), card.keys, card.options.map((o) => o.label)], [true, true, ["keep it, half the size", "only a link in the footer"]]);
-  eq(v.hints.map((h) => [h.keys.join(""), h.w]), [["⏎", "send now"], ["tab", "when it's free"], ["1–2", "answer"]]);
-  // with words in the composer the digits are words
-  eq(Pn.step(Pn.step(m, { ev: "ui_type", text: "1" }, 10).m, { ev: "ui_digit", n: 1 }, 20).cmds, []);
-  const r = Pn.step(m, { ev: "ui_digit", n: 2 }, 20);
-  eq(r.cmds, [{ cmd: "answer", card: "c1", reply: "2" }]);
-  eq(Pn.step(r.m, card.options[0].act, 30).cmds, []);   // once
-  m = Pn.step(r.m, { ev: "agent_entry", agent: "cookies", entry: { pos: 1000000001, card: { id: "c1", answered: true } } }, 40).m;
-  v = pv(m);
-  eq([v.entries.at(-1).card.answered, v.entries.at(-1).card.question, v.hints.length], [true, "keep the banner on mobile, or only a link in the footer?", 2]);
-  // it says what he answered, the option cut at its first ' (' (ambient m_7058)
-  eq(v.entries.at(-1).card.done, "✓ you answered: only a link in the footer");
-  eq(Wd.W.panel.youAnswered("yes (and tell perf)"), "✓ you answered: yes");
-  // answered elsewhere, the core only says so
-  const other = Pn.step(PN("cookies").m, { ev: "agent_entry", agent: "cookies", entry: { pos: 1000000001, card: { id: "c1", answered: true } } }, 50).m;
-  eq(pv(other).entries.at(-1).card.done, "✓ answered");
-});
-law("panel: ⌘. asks once ('stop perf? …', ⏎ stop, esc keep it); ⌘⌫ on a working agent asks 'stop it and archive it?', on a done one archives at once with ⌘Z undo, then shows the next agent", () => {
-  let { m } = PN("perf");
-  m = Pn.step(m, { ev: "ui_stop" }, 10).m;
-  eq(pv(m).confirm, { text: "stop perf? it drops what it's doing now; its history and its work stay.", yes: "stop" });
-  eq(Pn.step(m, { ev: "ui_esc" }, 20).m.confirm, null);
-  let r = Pn.step(m, { ev: "ui_yes" }, 20);
-  eq([r.cmds, pv(r.m, 30).toast.text], [[{ cmd: "stop", agent: "perf" }], "stopped perf"]);
-  m = Pn.step(PN("perf").m, { ev: "ui_archive" }, 10).m;
-  eq(pv(m).confirm.text, "perf is still working. stop it and archive it?");
-  r = Pn.step(m, { ev: "ui_yes" }, 20);
-  eq(r.cmds[0], { cmd: "archive", agent: "perf", stop_first: true });
-  // done: at once, then the next agent in the bar's order, the window re-pointed
-  r = Pn.step(PN("release").m, { ev: "ui_archive" }, 10);
-  eq(r.cmds, [{ cmd: "archive", agent: "release", stop_first: false }, { cmd: "agent_unwatch", agent: "release" }, { cmd: "agent_history", agent: "weekly-update", limit: 60 }, { cmd: "app_panel", agent: "weekly-update" }]);
-  const t = pv(r.m, 20).toast;
-  eq([t.text, t.undo.keys], ["archived release", ["⌘", "Z"]]);
-  eq(Pn.step(r.m, { ev: "ui_undo" }, 30).cmds, [{ cmd: "unarchive", agent: "release" }]);
-  eq(Pn.step(r.m, { ev: "ui_undo" }, 30 + Pn.T.undo).cmds, []);   // only while its line shows
-});
-law("panel: ⌘↑⌘↓ walk the bar's order in the same window; ⌘D follow, ⌘O terminal, ⌘F find (n found, ⏎ next), esc leaves find then closes; ⋯ has them all plus copy its name and quit", () => {
-  let { m } = PN("perf");
-  let r = Pn.step(m, { ev: "ui_step", d: -1 }, 10, Fake.T0);
-  eq(r.cmds.at(-1), { cmd: "app_panel", agent: "emoji-csv" });
-  eq(r.cmds[0], { cmd: "agent_unwatch", agent: "perf" });
-  r = Pn.step(m, { ev: "ui_step", d: 1 }, 10, Fake.T0);
-  eq(r.cmds.at(-1), { cmd: "app_panel", agent: "dark-mode" });
-  // the app's app_panel for the same agent then changes nothing
-  eq(Pn.step(r.m, { ev: "app_panel", agent: "dark-mode", on: true, h: 900 }, 20).cmds, []);
-  r = Pn.step(m, { ev: "ui_follow" }, 10, Fake.T0);
-  eq([r.cmds, pv(r.m).tools[0].w, pv(r.m).toast.text], [[{ cmd: "follow", agent: "perf", on: true }], "✓ following", "following perf: its reports and questions reach you"]);
-  eq(Pn.step(m, { ev: "ui_terminal" }, 10).cmds, [{ cmd: "open_terminal", agent: "perf" }]);
-  m = Pn.step(Pn.step(m, { ev: "ui_find_open" }, 10).m, { ev: "ui_find", text: "plan lookup" }, 20).m;
-  let f = pv(m).find;
-  eq([f.n, f.label, f.cur], [1, "1 found", 7]);
-  m = Pn.step(m, { ev: "ui_find", text: "signup" }, 30).m;
-  f = pv(m).find;
-  eq([f.n, f.cur], [4, 1]);
-  eq(pv(Pn.step(m, { ev: "ui_find_next" }, 40).m).find.cur, 2);   // you (1), perf (2), its page (11), its report (12)
-  m = Pn.step(m, { ev: "ui_esc" }, 50).m;
-  eq([pv(m).find, Pn.step(m, { ev: "ui_esc" }, 60).cmds], [null, [{ cmd: "app_panel_close" }]]);
-  // ⌘W from the app's menu closes it too
-  eq(Pn.step(m, { ev: "app_menu", key: "close" }, 60).cmds, [{ cmd: "app_panel_close" }]);
-  m = Pn.step(m, { ev: "ui_menu" }, 70).m;
-  eq(pv(m).menu.filter(Boolean).map((i) => i.w), ["follow", "open in the terminal", "find in its history", "copy its name", "stop", "archive", "quit bise ambient"]);
-  eq(Pn.step(m, { ev: "ui_copy_name" }, 80).cmds, [{ cmd: "app_copy", text: "perf" }]);
-  eq(Pn.step(m, { ev: "ui_quit" }, 80).cmds, [{ cmd: "app_quit" }]);
-  // older entries: asked with the oldest pos, once at a time
-  m = Pn.step(PN("perf").m, { ev: "agent_history", agent: "perf", entries: [], before: 1, more: true }, 90).m;
-  r = Pn.step(m, { ev: "ui_older" }, 100);
-  eq(r.cmds, [{ cmd: "agent_history", agent: "perf", before: 1, limit: 60 }]);
-  eq(Pn.step(r.m, { ev: "ui_older" }, 110).cmds, []);
-  // the fake core answers the panel's cmds (panel.html in a browser)
-  eq(Fake.respond({ cmd: "agent_history", agent: "perf" })[0][1].entries.length, 7);
 });
 
 law("desktop S8: ⏎ on an agent opens its thread in bise's window (app_window with amb-win's route), its project named on the row; fn ⏎ on a card does the same", () => {

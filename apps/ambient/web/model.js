@@ -944,6 +944,6 @@
     return v;
   }
 
-  // roster: the side panel (panelmodel.js) walks the same order for ⌘↑↓ and draws the same chip
+  // roster: the bar's agents in their order (check.mjs reads it)
   root.AmbModel = { init, step, view, T, visibleCards, grow, GROW, reduced, count, hold, roster };
 })(typeof window !== "undefined" ? window : globalThis);
