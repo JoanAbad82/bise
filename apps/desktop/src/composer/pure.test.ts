@@ -7,6 +7,7 @@ import TUI_EMOJI from '../../../../rust/tui/src/emoji.tsv?raw';
 import DESKTOP_EMOJI from './emoji.tsv?raw';
 import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, TIP_EVERY_MS } from './keybar';
 import { noVisionLine } from './message';
+import { codeRuns, colorLines, proseRuns } from './mdcolor';
 import { loadRecent, picked, recentFirst, RECENT_MAX } from './recent';
 import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Segment } from './message';
 import { enqueue, load, popNewest, remember, save, takeOldest, HISTORY_MAX, type Store } from './drafts';
@@ -326,5 +327,25 @@ describe('sending: no-vision line and prefixes (attach.rs, sb.rs)', () => {
     expect(buildMessage([{ kind: 'text', text: 'steer go on' }]).text).toBe('go on');
     expect(buildMessage([{ kind: 'text', text: 'sayonara' }]).text).toBe('sayonara');
     expect(buildMessage([{ kind: 'text', text: 'they say hello' }]).text).toBe('they say hello');
+  });
+});
+
+describe('live markdown colors (B9/W8)', () => {
+  const cls = (runs: readonly { text: string; cls: string | null }[]) => runs.map((r) => `${r.cls ?? '-'}:${r.text}`);
+  it('code: keywords, strings, numbers, comments, types; # comments by the fence tag', () => {
+    expect(cls(codeRuns('fn main() { let x = 1; }', 'rust'))).toEqual(['kw:fn', '-: main() { ', 'kw:let', '-: x = ', 'num:1', '-:; }']);
+    expect(cls(codeRuns('const s = "a // b"; // note', 'ts'))).toEqual(['kw:const', '-: s = ', 'str:"a // b"', '-:; ', 'com:// note']);
+    expect(cls(codeRuns('x = 2 # why', 'py'))).toEqual(['-:x = ', 'num:2', '-: ', 'com:# why']);
+    expect(cls(codeRuns('let v: Vec<u8>', 'rust'))).toEqual(['kw:let', '-: v: ', 'type:Vec', '-:<u8>']);
+    expect(cls(codeRuns('a2b', 'rust'))).toEqual(['-:a2b']);
+  });
+  it('prose: list markers, headings, inline code; plain words stay one run', () => {
+    expect(cls(proseRuns('- [ ] do `this` now'))).toEqual(['mark:- [ ] ', '-:do ', 'code:`this`', '-: now']);
+    expect(cls(proseRuns('## Plan'))).toEqual(['head:## Plan']);
+    expect(cls(proseRuns("salut, je regarde ça ce soir : «on garde la file d'attente» ou pas ?"))).toEqual(["-:salut, je regarde ça ce soir : «on garde la file d'attente» ou pas ?"]);
+  });
+  it('fences dim, the block between them is code, after it prose again', () => {
+    const lines = colorLines('```rust\nfn x\n```\n- a');
+    expect(lines.map(cls)).toEqual([['fence:```rust'], ['kw:fn', '-: x'], ['fence:```'], ['mark:- ', '-:a']]);
   });
 });

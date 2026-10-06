@@ -28,6 +28,7 @@ import {
   KEY_ESCAPE_COMMAND,
   KEY_TAB_COMMAND,
   HISTORIC_TAG,
+  HISTORY_MERGE_TAG,
   PASTE_COMMAND,
   PASTE_TAG,
   UNDO_COMMAND,
@@ -45,6 +46,7 @@ import { isImagePath, type ComposerSources, type PickFile } from './sources';
 import { argAt, browseText, parentQuery, triggerAt, type Trigger } from './tokens';
 import { loadRecent, picked, recentFirst } from './recent';
 import { emojiToken, typedEmoji } from './emoji';
+import { $colorsUpToDate, $recolor } from './highlight';
 import { Picker } from './Picker';
 
 /** What the screen around a composer may ask of it (dictation, the send button, focus). */
@@ -78,6 +80,9 @@ export interface FieldBar {
   readonly images: boolean;
   readonly typing: boolean;
 }
+
+/** The tag of the colors' own update (it never triggers another pass). */
+const RECOLOR_TAG = 'bise-recolor';
 
 /** The draft is written this long after the last change (never on each key of a burst). */
 const DRAFT_DEBOUNCE_MS = 400;
@@ -418,6 +423,16 @@ export function Brain(p: BrainProps): JSX.Element | null {
           $replaceBeforeCaret(n, em.glyph);
         });
         return;
+      }
+      // live markdown colors (B9/W8): only when a line's colors changed, never mid-composition
+      // (an accent or an IME word), merged into his edit's undo step
+      if (!tags.has(RECOLOR_TAG) && !editor.isComposing() && !editorState.read(() => $colorsUpToDate())) {
+        editor.update(
+          () => {
+            $recolor();
+          },
+          { tag: [RECOLOR_TAG, HISTORY_MERGE_TAG] },
+        );
       }
       props.current.onCanSend(!r.blank);
       pushBar({ selected: r.selected, typing: !r.blank, images: r.segs.some((x) => x.kind === 'chip' && x.chip.kind === 'image') });

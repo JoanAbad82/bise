@@ -34,6 +34,26 @@ interface LineAt {
 const FENCE = /^\s*(```|~~~)/u;
 const BARE_FENCE = /^\s*(```|~~~)\s*$/u;
 
+/** Each line's kind and, in a code block, the fence's tag (`rust`): mdlive.rs's Walk. */
+export function lineKinds(lines: readonly string[]): { readonly kind: Kind; readonly lang: string }[] {
+  let open: string | null = null;
+  return lines.map((line) => {
+    if (open === null) {
+      if (!FENCE.test(line)) return { kind: 'prose', lang: '' };
+      open = line.replace(FENCE, '').trim().split(/\s/u)[0]?.toLowerCase() ?? '';
+      return { kind: 'open', lang: open };
+    }
+    if (BARE_FENCE.test(line)) {
+      const lang = open;
+      open = null;
+      return { kind: 'close', lang };
+    }
+    return { kind: 'code', lang: open };
+  });
+}
+
+export type { Kind as LineKind };
+
 function lineAt(text: string, cursor: number): LineAt {
   const lines = text.split('\n');
   let at = 0;

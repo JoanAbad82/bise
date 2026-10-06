@@ -63,6 +63,29 @@ describe('the composer', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
+  it('colors a code block as he types, keeps the caret and the text (B9/W8)', async () => {
+    const { getByTestId, onSend, act: a } = await mount();
+    const field = getByTestId('composer.field');
+    await act(async () => {
+      a.insertText('- a\n```rust\nfn main');
+      await Promise.resolve();
+    });
+    const styleOf = (word: string): string | null =>
+      Array.from(field.querySelectorAll('span')).find((s) => s.textContent === word)?.getAttribute('style') ?? null;
+    expect(styleOf('fn')).toContain('--c-accent');
+    expect(styleOf(' main')).toBeNull();
+    // the caret stayed at the end through the redraw: more words land after 'main'
+    await act(async () => {
+      a.insertText('() {}\n```');
+      await Promise.resolve();
+    });
+    await act(async () => {
+      a.submit();
+      await Promise.resolve();
+    });
+    expect(onSend).toHaveBeenCalledWith({ text: '- a\n```rust\nfn main() {}\n```', files: [] });
+  });
+
   it('keeps the draft of each target across a remount', async () => {
     const store = memStore();
     const first = await mount({ store });
