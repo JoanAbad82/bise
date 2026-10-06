@@ -19,6 +19,8 @@ const ids = {
   chipPaste: '[data-testid^="composer.chip."][data-kind="paste"]',
   /** the rows under the field, one per chip ('▤ 1 “first words…” · 240 lines') */
   strip: '[data-testid="composer.strip"]',
+  /** the composer's one-line note in the strip ('no undo: …') */
+  note: '[data-testid="composer.note"]',
   /** the voice key while the window is in front: the terminal's ctrl+r (amb-web may pick another) */
   dictateKey: ['Control', 'r'] as const,
 };
@@ -69,4 +71,30 @@ export async function onTarget(body: (s: Session) => Promise<void>, launch: () =
   } finally {
     await s.close();
   }
+}
+
+/** The caret's offset in the field's text and the selected text (a textarea or a contenteditable). */
+export const caretOf = (f: Element): { caret: number; selected: string } => {
+  if (f instanceof HTMLTextAreaElement) return { caret: f.selectionEnd, selected: f.value.slice(f.selectionStart, f.selectionEnd) };
+  const s = window.getSelection();
+  if (!s || !s.rangeCount) return { caret: -1, selected: '' };
+  const r = s.getRangeAt(0).cloneRange();
+  r.selectNodeContents(f);
+  r.setEnd(s.getRangeAt(0).endContainer, s.getRangeAt(0).endOffset);
+  return { caret: r.toString().length, selected: s.toString() };
+};
+
+/** What the lab's log says left, one text per send. */
+export const sentTexts = async (page: import('@playwright/test').Page): Promise<string[]> =>
+  (await page.locator(T.sent).allInnerTexts()).map((t) => {
+    try { return (JSON.parse(t) as { text?: string }).text ?? t; } catch { return t; }
+  });
+
+/**
+ * A key at a person's pace: the browser reports a caret move (selectionchange) a task later, so a
+ * key pressed the same millisecond would act on the old caret; no hand is that fast.
+ */
+export async function press(page: import('@playwright/test').Page, key: string, settleMs = 40): Promise<void> {
+  await page.keyboard.press(key);
+  await page.waitForTimeout(settleMs);
 }

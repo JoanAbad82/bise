@@ -39,3 +39,21 @@ test("composer/slash: / lists the terminal's commands, filters, tab completes", 
     expect(missing, "the terminal's commands missing from the picker").toEqual([]);
   });
 });
+
+// bar T B21 (on purpose, the same as the terminal): esc clears the /query; the @ and $ popups keep
+// the text
+test('composer/slash: esc clears the / query; esc in the @ popup keeps "@ap"', async () => {
+  await onTarget(async ({ page }) => {
+    const field = page.locator(T.field);
+    await field.click();
+    await page.keyboard.type('/arch');
+    await expect(page.locator(T.picker)).toBeVisible({ timeout: 1500 });
+    await page.keyboard.press('Escape');
+    expect((await field.evaluate(fieldText)).trim(), 'esc in the / popup clears the query').toBe('');
+    await page.keyboard.type('@ap');
+    await expect(page.locator(T.picker)).toBeVisible({ timeout: 1500 });
+    await page.keyboard.press('Escape');
+    await expect(page.locator(T.picker), 'esc closes the @ popup').toBeHidden();
+    expect((await field.evaluate(fieldText)).trim(), 'and keeps "@ap"').toBe('@ap');
+  });
+});
