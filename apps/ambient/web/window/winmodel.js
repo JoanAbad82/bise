@@ -421,7 +421,11 @@
         const i = ev.card ? Math.max(0, list.findIndex((c) => c.id === ev.card)) : 0;
         return { ...s, inbox: ev.close ? null : { i } };
       }
-      case "ui_tab": return set(s, "tab", set(s.tab, s.route.project, ev.tab));
+      case "ui_tab": {
+        // opening a project's changes asks for a fresh list (a merge made seconds ago, amb-web m_9241)
+        if (ev.tab === "changes" && s.route.project) cmds.push({ cmd: "merged", project: s.route.project }, { cmd: "worktrees", project: s.route.project });
+        return set(s, "tab", set(s.tab, s.route.project, ev.tab));
+      }
       case "ui_fold": {
         // `open` lists the entries flipped by hand from the default (folded, or unfolded under ⌘E)
         const id = `${k}#${ev.pos}`;

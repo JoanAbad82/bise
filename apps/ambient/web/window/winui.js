@@ -216,6 +216,8 @@
       case "ui_add_toggle": return `add-choice:${a.key}`;
       case "ui_set_move": return `move:${a.project}`;
       case "ui_set_remove": return `remove:${a.project}`;
+      // merged-today rows and changes rows open a route (commit/<p>/<sha>, review/<p>/<agent>)
+      case "win_open": return `route:${a.route}`;
       default: return String(a.ev || "").replace(/^ui_/, "").replace(/_/g, "-");
     }
   }

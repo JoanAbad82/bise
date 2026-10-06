@@ -373,14 +373,19 @@ law("a project's changes tab lists its agents' branches, its artifacts tab what 
   const w = win();
   w.go(P.storefront);
   assert.equal(w.v.tab, null);
+  const before = w.sent.length;
   w.feed({ ev: "ui_tab", tab: "changes" });
+  // opening changes asks for a fresh merged list and worktrees (a merge made seconds ago, amb-web m_9241)
+  eq(w.sent.slice(before).filter((c) => c.cmd === "merged" || c.cmd === "worktrees"), [{ cmd: "merged", project: P.storefront }, { cmd: "worktrees", project: P.storefront }]);
   // changes is amb-web's list (bc626197, lead m_8971): agents ahead of main, then merged today;
   // a row opens the agent's review
   const ch = w.v.s7;
   eq([w.v.tab, ch.screen, ch.rows.map((x) => [x.name, x.branch, x.end, x.what]), ch.rows[0].act],
     [null, "changes", [["checkout", "sb/checkout", "2 ahead", "at work"], ["search", "sb/search", "1 ahead", "needs you"]], { ev: "win_open", route: `review/${P.storefront}/checkout` }]);
   eq(w.v.head.seg.map((x) => x.on), [false, true, false]);
+  const n = w.sent.length;
   w.feed({ ev: "ui_tab", tab: "artifacts" });
+  assert.equal(w.sent.slice(n).filter((c) => c.cmd === "merged" || c.cmd === "worktrees").length, 0);
   eq(w.v.tab.items.map((x) => [x.title, x.meta, x.new]), [["flash sale replay", "stock · 10:40", true], ["3-D Secure timeouts", "checkout · 09:50", true]]);
   w.go(P.telemetry); w.feed({ ev: "ui_tab", tab: "artifacts" });
   eq(w.v.tab.empty.b, "nothing made yet");
