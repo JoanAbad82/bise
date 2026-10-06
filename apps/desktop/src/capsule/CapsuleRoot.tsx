@@ -131,9 +131,10 @@ export function CapsuleRoot(): JSX.Element {
       if (fx.fx === 'show') bise?.capsule.show(fx.at, fx.keys);
       else if (fx.fx === 'hide') bise?.capsule.hide();
       else if (fx.fx === 'mic') bise?.helper({ cmd: 'own_mic', open: fx.open });
+      else if (fx.fx === 'talk') store.command({ cmd: fx.cmd });
       else bise?.openWindow(fx.route);
     }
-  }, [m.fx, bise]);
+  }, [m.fx, bise, store]);
 
   useEffect(() => {
     if (bise === undefined) return;
@@ -156,6 +157,14 @@ export function CapsuleRoot(): JSX.Element {
       offState();
     };
   }, [bise]);
+
+  // the projects this window shows: all of them (the spotlight lists every project's agents and
+  // cards, a push may come from any); the core sends their rows, agents and cards only after a
+  // 'shown' (amb-core 932b7186), the store dedupes and re-says it to a core that comes back
+  const shownKey = projects.map((p) => p.project).join('|');
+  useEffect(() => {
+    store.shown(shownKey === '' ? [] : shownKey.split('|'));
+  }, [store, shownKey]);
 
   // a card bise pushes: new in a project whose cards had loaded (newCards)
   const loaded = useRef(new Map<string, Loaded>());

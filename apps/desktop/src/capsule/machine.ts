@@ -42,7 +42,9 @@ export type Fx =
   | { readonly fx: 'show'; readonly at: 'top' | 'bottom' | 'menu'; readonly keys: boolean }
   | { readonly fx: 'hide' }
   | { readonly fx: 'open'; readonly route?: string }
-  | { readonly fx: 'mic'; readonly open: boolean };
+  | { readonly fx: 'mic'; readonly open: boolean }
+  /** the core listens: talk_start on a hold or fn fn, talk_end on the release or the next tap, talk_cancel */
+  | { readonly fx: 'talk'; readonly cmd: 'talk_start' | 'talk_end' | 'talk_cancel' };
 
 export interface Step {
   readonly state: State;
@@ -69,6 +71,7 @@ function go(s: State, view: View, ...fx: Fx[]): Step {
 }
 
 const stay = (s: State): Step => ({ state: s, fx: [] });
+const cancelTalk = (s: State): Step => go(s, NONE, { fx: 'hide' }, ...(talking(s.view) ? [{ fx: 'talk', cmd: 'talk_cancel' } as const] : []));
 const close = (s: State): Step => (s.view.kind === 'none' ? stay(s) : go(s, NONE, { fx: 'hide' }));
 
 export function step(s: State, e: CapEvent): Step {
@@ -81,17 +84,17 @@ export function step(s: State, e: CapEvent): Step {
           if (e.key === 'i') return v.kind === 'none' ? { state: s, fx: [{ fx: 'open', route: 'inbox' }] } : go(s, NONE, { fx: 'hide' }, { fx: 'open', route: 'inbox' });
           return stay(s);
         case 'talk_start':
-          return go(s, { kind: 'talk', phase: 'listen', handsFree: false }, { fx: 'show', at: 'bottom', keys: false });
+          return go(s, { kind: 'talk', phase: 'listen', handsFree: false }, { fx: 'show', at: 'bottom', keys: false }, { fx: 'talk', cmd: 'talk_start' });
         case 'double':
-          return go(s, { kind: 'talk', phase: 'listen', handsFree: true }, { fx: 'show', at: 'bottom', keys: false });
+          return go(s, { kind: 'talk', phase: 'listen', handsFree: true }, { fx: 'show', at: 'bottom', keys: false }, { fx: 'talk', cmd: 'talk_start' });
         case 'talk_end':
-          return v.kind === 'talk' && !v.handsFree ? go(s, { kind: 'talk', phase: 'think', handsFree: false }) : stay(s);
+          return v.kind === 'talk' && !v.handsFree && v.phase === 'listen' ? go(s, { kind: 'talk', phase: 'think', handsFree: false }, { fx: 'talk', cmd: 'talk_end' }) : stay(s);
         case 'tap':
-          return v.kind === 'talk' && v.handsFree && v.phase === 'listen' ? go(s, { kind: 'talk', phase: 'think', handsFree: true }) : stay(s);
+          return v.kind === 'talk' && v.handsFree && v.phase === 'listen' ? go(s, { kind: 'talk', phase: 'think', handsFree: true }, { fx: 'talk', cmd: 'talk_end' }) : stay(s);
         case 'cancel':
-          return v.kind === 'talk' ? close(s) : stay(s);
+          return v.kind === 'talk' ? cancelTalk(s) : stay(s);
         case 'esc':
-          return close(s);
+          return talking(v) ? cancelTalk(s) : close(s);
       }
       return stay(s);
     case 'window':

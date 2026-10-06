@@ -30,7 +30,11 @@ describe('the capsule machine', () => {
   });
   it('hold fn talks at the bottom without the keys, release thinks, the answer replaces it', () => {
     const r = run([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'talk_end' }]);
-    expect(r).toEqual({ view: { kind: 'talk', phase: 'think', handsFree: false }, fx: [{ fx: 'show', at: 'bottom', keys: false }, { fx: 'mic', open: true }, { fx: 'mic', open: false }] });
+    expect(r).toEqual({
+      view: { kind: 'talk', phase: 'think', handsFree: false },
+      fx: [{ fx: 'show', at: 'bottom', keys: false }, { fx: 'talk', cmd: 'talk_start' }, { fx: 'mic', open: true }, { fx: 'talk', cmd: 'talk_end' }, { fx: 'mic', open: false }],
+    });
+    expect(run([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'cancel' }]).fx).toContainEqual({ fx: 'talk', cmd: 'talk_cancel' });
     expect(run([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'talk_end' }, { ev: 'answer' }]).view).toEqual({ kind: 'answer' });
   });
   it('a pushed card waits while he is in the spotlight; alone it shows at the bottom', () => {
