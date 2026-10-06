@@ -19,6 +19,7 @@ use std::time::{Duration, Instant};
 const WS: &str = "/w/repo";
 
 mod hubs;
+mod setup;
 
 /// The hub's `user_kind` (switchboard::model), as main.rs hands it in.
 fn user_kind(kind: &str) -> bool {

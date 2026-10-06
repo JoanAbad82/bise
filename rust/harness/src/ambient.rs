@@ -14,7 +14,7 @@ pub fn core(args: &[String]) -> std::io::Result<i32> {
     let workspace = paths.workspace.to_string_lossy().to_string();
     let projects = ambient_projects(exe.clone(), root.clone());
     let connect = ambient_connector(paths, exe, root);
-    Ok(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects)))
+    Ok(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects), Some(ambient_setup())))
 }
 
 /// `bise ambient`: open the app on this workspace (scripts/ambient.sh).
@@ -101,4 +101,15 @@ fn ambient_projects(exe: std::path::PathBuf, root: std::path::PathBuf) -> (bend_
         }),
     };
     (connect_for, facts)
+}
+
+/// The window's setup commands' live ports (bise desktop S11): bend-tui's,
+/// with devflow's flow writer (`[flow] mode` in the repo's
+/// .switchboard/config.toml, architect m_9130): the add sheet's 'agents
+/// land their work' is trunk, else pr.
+fn ambient_setup() -> bend_tui::ambient::setup::SetupPorts {
+    bend_tui::ambient::setup::live(Box::new(|path, trunk| {
+        let mode = if trunk { switchboard::flow::FlowMode::Trunk } else { switchboard::flow::FlowMode::Pr };
+        switchboard::flow::save_mode(&switchboard::paths::Paths::for_workspace(path), mode)
+    }))
 }

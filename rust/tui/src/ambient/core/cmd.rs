@@ -58,6 +58,8 @@ pub enum Cmd {
     /// The window: a command for a project's hub (bise-proto's `HubCmd`
     /// with its `project`), routed as is.
     Typed(Value),
+    /// The window's setup commands (S11, core/setup.rs).
+    App(bise_proto::draft::AppCmd),
     /// Harness A: the words the fake voice hears at the next talk (only
     /// with the fake voice on; an error otherwise).
     FakeWords { text: String },
@@ -73,6 +75,9 @@ impl Cmd {
         // a hub's command with its project: the window's (bise-proto)
         if v.get("project").is_some() && cmd != "hello" && bise_proto::hub::HubCmd::TAGS.contains(&cmd.as_str()) {
             return Ok(Cmd::Typed(v));
+        }
+        if super::setup::TAGS.contains(&cmd.as_str()) {
+            return bise_proto::draft::AppCmd::decode(line).map(Cmd::App).map_err(|e| format!("{cmd}: {e}"));
         }
         Ok(match cmd.as_str() {
             "talk_start" => match v.get("page").and_then(|p| p.get("id")).and_then(Value::as_str).map(str::trim) {

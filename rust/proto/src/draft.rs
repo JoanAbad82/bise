@@ -201,17 +201,17 @@ pub enum AppCmd {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
     },
-    /// add a folder to his projects (S1's registry); the add sheet's two
-    /// choices: agents in worktrees, agents land their work
+    /// add a folder to his projects (S1's registry); `land`: the add
+    /// sheet's 'agents land their work', the repo's flow mode (true trunk,
+    /// false pr, absent: devflow decides; architect m_9130)
     ProjectAdd {
         path: String,
-        #[serde(default, skip_serializing_if = "crate::is_false")]
-        worktrees: bool,
-        #[serde(default, skip_serializing_if = "crate::is_false")]
-        land: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        land: Option<bool>,
     },
     ProjectRemove { project: Project },
     ProjectMove { project: Project, order: u32 },
+    ProjectRename { project: Project, name: String },
     /// one preference by its dotted key (`quiet.call`)
     PrefsSet { key: String, value: Value },
     /// opens his browser for that account, then `accounts` again
@@ -233,6 +233,7 @@ impl AppCmd {
         "project_add",
         "project_remove",
         "project_move",
+        "project_rename",
         "prefs_set",
         "sign_in",
         "key_set",

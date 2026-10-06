@@ -16,6 +16,8 @@ mod hub;
 mod plain;
 /// the projects' holds and sidebar rows (bise desktop S1), wired by S3b
 pub mod projects;
+/// the window's setup commands' port (S11)
+pub mod setup;
 mod speech;
 #[cfg(test)]
 mod tests;
@@ -126,7 +128,7 @@ pub fn run(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write) {
                 }
                 match Cmd::parse(&l) {
                     Ok(c) => core.cmd(c, Instant::now()),
-                    Err(e) => eprintln!("ambient-core: {e}: {l}"),
+                    Err(e) => eprintln!("ambient-core: {e}: {}", setup::redact(&l)),
                 }
             }
             Ok(In::Hub(h)) => core.hub(h),
@@ -153,7 +155,15 @@ pub fn run(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write) {
 /// in `bise ambient-core`: it may start that hub).
 pub type ConnectFor = Box<dyn Fn(&std::path::Path) -> Connect>;
 
-pub fn core_main(workspace: String, connect: Connect, user_kind: fn(&str) -> bool, projects: Option<(ConnectFor, ProjectFacts)>) -> i32 {
+/// `setup`: the window's setup commands' ports (S11; the binary's live
+/// ones, `setup::live`), prefs and accounts said at the start.
+pub fn core_main(
+    workspace: String,
+    connect: Connect,
+    user_kind: fn(&str) -> bool,
+    projects: Option<(ConnectFor, ProjectFacts)>,
+    setup: Option<setup::SetupPorts>,
+) -> i32 {
     let (tx, rx) = mpsc::channel::<In>();
     let hub = Hub::start(connect, tx.clone(), In::Hub, RETRY);
     let projects = projects.map(|(connect_for, facts)| {
@@ -176,6 +186,10 @@ pub fn core_main(workspace: String, connect: Connect, user_kind: fn(&str) -> boo
     let mut core = Core::new(workspace, hub, ports);
     if let Some(p) = projects {
         core.set_projects(p);
+    }
+    if let Some(s) = setup {
+        core.set_setup(s);
+        core.app_start();
     }
     let mut out = io::stdout().lock();
     if !write_out(&mut out, fake_ev.into_iter().collect()) {

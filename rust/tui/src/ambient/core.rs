@@ -7,6 +7,7 @@
 mod agents_view;
 mod cmd;
 mod hubs;
+mod setup;
 mod voice;
 
 pub use self::cmd::Cmd;
@@ -237,6 +238,8 @@ pub struct Core {
     hub_pages: Vec<Value>,
     /// every project's typed connection, for the window (core/hubs.rs)
     hubs: hubs::Hubs,
+    /// the window's setup commands (S11, core/setup.rs)
+    setup: Option<setup::Setup>,
     /// the agents shown (round 10): a history panel open, a preview
     feeds: Vec<agents_view::Feed>,
     /// the typed `subscribe`/`page` sent, answered in order
@@ -291,6 +294,7 @@ impl Core {
             hub_pages: Vec::new(),
             feeds: Vec::new(),
             hubs: Default::default(),
+            setup: None,
             pending: std::collections::VecDeque::new(),
             target: None,
             last_state: None,
@@ -412,8 +416,12 @@ impl Core {
                 self.slash(&format!("/archive {agent}{force}"));
             }
             Cmd::Unarchive { agent } => self.slash(&format!("/restore {agent}")),
-            Cmd::Shown { projects } => self.shown(projects),
+            Cmd::Shown { projects } => {
+                self.shown(projects);
+                self.app_start();
+            }
             Cmd::Typed(v) => self.typed_cmd(v),
+            Cmd::App(c) => self.app_cmd(c),
             Cmd::FakeWords { text } => match &self.ports.fake_words {
                 Some(w) => w.set(&text),
                 None => self.error("fake_words: the fake voice is off (harness A only)."),

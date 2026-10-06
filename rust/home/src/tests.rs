@@ -447,3 +447,27 @@ fn excluded_apps_start_from_the_seed_and_then_are_his() {
     slot.set(serde_json::json!([])).unwrap();
     assert!(prefs::excluded_apps(slot.get()).is_empty(), "he cleared it: nothing excluded, not the seed again");
 }
+
+#[test]
+fn the_window_sets_known_prefs_by_dotted_key_and_keeps_their_types() {
+    use serde_json::json;
+    let o = json!({"theme": "dark", "quiet": {"call": true, "batch_min": 20}});
+    let v = prefs::set_dotted(&o, "quiet.call", json!(false)).unwrap();
+    assert_eq!(v, json!({"theme": "dark", "quiet": {"call": false, "batch_min": 20}}));
+    assert_eq!(prefs::set_dotted(&o, "context.url", json!(true)).unwrap()["context"], json!({"url": true}));
+    assert_eq!(prefs::set_dotted(&json!({"voice": "old"}), "voice.fn_hold", json!(true)).unwrap()["voice"], json!({"fn_hold": true}));
+    assert_eq!(prefs::set_dotted(&o, "quiet.call", Value::Null).unwrap()["quiet"], json!({"batch_min": 20}), "null takes it out");
+    assert!(prefs::set_dotted(&o, "hints", json!({})).is_err(), "not the window's");
+    assert!(prefs::set_dotted(&o, "setup.asked", json!(true)).is_err());
+    assert!(prefs::set_dotted(&o, "quiet..call", json!(true)).is_err());
+    assert!(prefs::set_dotted(&o, "shots_keep_days", json!("7")).is_err(), "a number stays a number");
+    assert!(prefs::set_dotted(&o, "excluded_apps", json!(["a", 1])).is_err());
+    assert!(prefs::set_dotted(&o, "onboarded", json!("yes")).is_err());
+    assert!(prefs::set_dotted(&o, "theme", json!("purple")).is_err());
+    assert!(prefs::set_dotted(&o, "shots_keep_days.x", json!(1)).is_err());
+    assert_eq!(prefs::set_dotted(&o, "shots_keep_days", json!(14)).unwrap()["shots_keep_days"], json!(14));
+    let w = prefs::for_window(Some(json!({"theme": "dark"})));
+    assert_eq!(w["theme"], json!("dark"));
+    assert!(w["excluded_apps"].as_array().is_some_and(|a| a.contains(&json!("com.apple.MobileSMS"))), "the seed, resolved");
+    assert_eq!(prefs::for_window(Some(json!({"excluded_apps": []})))["excluded_apps"], json!([]));
+}

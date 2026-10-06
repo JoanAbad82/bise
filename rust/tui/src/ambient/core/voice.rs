@@ -45,6 +45,7 @@ impl Core {
         self.tick_speech();
         self.tick_projects(now);
         self.poll_projects(false);
+        self.setup_tick();
     }
 
     fn tick_talk(&mut self, now: Instant) {

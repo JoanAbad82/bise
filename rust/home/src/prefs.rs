@@ -52,6 +52,72 @@ pub fn excluded_apps(v: Option<Value>) -> Vec<String> {
     }
 }
 
+/// The top keys of `prefs.json` the window may set (`prefs_set`,
+/// architect m_9130): anything else is refused, never written.
+pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days"];
+
+/// The type a typed key keeps (a wrong one is refused).
+fn typed(key: &str, v: &Value) -> Result<(), String> {
+    let ok = match key {
+        "onboarded" => v.is_boolean(),
+        "theme" => v.as_str().is_some_and(|t| ["auto", "light", "dark", "system"].contains(&t)),
+        "shots_keep_days" => v.as_u64().is_some(),
+        "excluded_apps" => v.as_array().is_some_and(|a| a.iter().all(Value::is_string)),
+        _ => true,
+    };
+    if ok {
+        Ok(())
+    } else {
+        Err(format!("{key} can't be {v}"))
+    }
+}
+
+/// `obj` with the dotted `key` (`quiet.call`) set to `value` (null: taken
+/// out). Its top key must be one of [`WINDOW_KEYS`]; a typed key keeps
+/// its type; a path through a non-object replaces it with an object.
+pub fn set_dotted(obj: &Value, key: &str, value: Value) -> Result<Value, String> {
+    let parts: Vec<&str> = key.split('.').collect();
+    if parts.iter().any(|p| p.is_empty()) {
+        return Err(format!("{key:?} is not a preference"));
+    }
+    let top = parts[0];
+    if !WINDOW_KEYS.contains(&top) {
+        return Err(format!("{top} is not a preference the window sets"));
+    }
+    if parts.len() == 1 {
+        if !value.is_null() {
+            typed(top, &value)?;
+        }
+    } else if ["onboarded", "theme", "shots_keep_days", "excluded_apps"].contains(&top) {
+        return Err(format!("{top} has no {}", parts[1..].join(".")));
+    }
+    let mut out = if obj.is_object() { obj.clone() } else { Value::Object(Default::default()) };
+    let mut at = &mut out;
+    for p in &parts[..parts.len() - 1] {
+        if !at.get(*p).is_some_and(Value::is_object) {
+            at[*p] = Value::Object(Default::default());
+        }
+        at = &mut at[*p];
+    }
+    let last = parts[parts.len() - 1];
+    match (value.is_null(), at.as_object_mut()) {
+        (true, Some(m)) => {
+            m.remove(last);
+        }
+        _ => at[last] = value,
+    }
+    Ok(out)
+}
+
+/// What the window reads of `prefs.json` (`ev: prefs`): its object as is,
+/// with `excluded_apps` resolved ([`excluded_apps`]: the seed when unset).
+pub fn for_window(obj: Option<Value>) -> Value {
+    let mut v = obj.filter(Value::is_object).unwrap_or_else(|| Value::Object(Default::default()));
+    let apps = excluded_apps(v.get(Pref::ExcludedApps.key()).cloned());
+    v[Pref::ExcludedApps.key()] = Value::from(apps);
+    v
+}
+
 impl Pref {
     /// Its key in `prefs.json` (and `tui.json` for voice and theme).
     pub fn key(self) -> &'static str {
