@@ -335,20 +335,7 @@ impl Core {
             Cmd::TalkStart => self.talk_start(None),
             Cmd::PageTalk { page } => self.talk_start(Some(page)),
             Cmd::TalkEnd => self.talk_end(now),
-            Cmd::TalkCancel => {
-                if let Some(page) = self.talk.as_ref().and_then(|t| t.page.clone()) {
-                    self.talk = None;
-                    return self.page_voice_over(&page, "cancel", "");
-                }
-                if self.talk.take().is_some() {
-                    // the shot and context of fn down were for these words
-                    self.fn_ctx = None;
-                    if let Some(s) = self.shot.take() {
-                        self.forget(vec![s]);
-                    }
-                    self.set_phase(Phase::Idle, None);
-                }
-            }
+            Cmd::TalkCancel => self.talk_cancel(),
             Cmd::Shot { path, app, title } => self.take_shot(&path, app, title),
             // the latest fn wins; an excluded app's `{}` clears
             Cmd::AwayBack { away_ms } => self.away_back(away_ms),
@@ -445,112 +432,6 @@ impl Core {
     fn slash(&mut self, text: &str) {
         if !self.hub.send(&json!({"op": "input", "focus": "main", "text": text})) {
             self.error("bise isn't reachable: nothing changed. try again in a moment.");
-        }
-    }
-
-    fn talk_start(&mut self, page: Option<String>) {
-        if self.talk.is_some() {
-            return;
-        }
-        // fn down while main speaks: the voice stops (the app sends
-        // cut_in first; a talk_start alone does the same)
-        self.stop_voice();
-        let job = match (self.ports.listen_job)() {
-            Ok(j) => j,
-            Err(e) => {
-                self.error(&e);
-                return self.set_phase(Phase::Failed, None);
-            }
-        };
-        let (btx, blocks) = mpsc::channel();
-        let stream = match self.ports.mic.open(btx) {
-            Ok(s) => s,
-            Err(e) => {
-                self.error(&e);
-                return self.set_phase(Phase::Failed, None);
-            }
-        };
-        let (audio, arx) = mpsc::channel();
-        let (htx, heard) = mpsc::channel();
-        let cancel = Arc::new(AtomicBool::new(false));
-        (self.ports.listener)(&job).start(job, arx, htx, cancel.clone());
-        self.talk = Some(Talk { stream: Some(stream), blocks, audio, heard, cancel, text: String::new(), ending: None, page: page.clone() });
-        let Some(id) = page else { return self.set_phase(Phase::Listening, None) };
-        // a note talk: the page shows the words at its mouse, the
-        // capsule says where they go
-        self.hub.send(&json!({"op": "page_voice", "page": id, "phase": "start", "text": ""}));
-        let title = match self.page_titles.iter().find(|(i, _)| *i == id) {
-            Some((_, t)) if !t.trim().is_empty() => t.clone(),
-            _ => id.replace('-', " "),
-        };
-        self.phase = Phase::Listening;
-        self.emit(json!({"ev": "phase", "phase": "listening", "page": {"id": id, "title": title}}));
-    }
-
-    /// A note talk is over: its last words to the page, the capsule idle
-    /// (no `sent`, no main phases: main never hears a note talk).
-    fn page_voice_over(&mut self, page: &str, phase: &str, text: &str) {
-        self.hub.send(&json!({"op": "page_voice", "page": page, "phase": phase, "text": text}));
-        self.emit(json!({"ev": "level", "who": "you", "v": 0.0}));
-        self.set_phase(Phase::Idle, None);
-    }
-
-    fn talk_end(&mut self, now: Instant) {
-        let Some(t) = self.talk.as_mut() else { return };
-        if t.ending.is_some() {
-            return;
-        }
-        while let Ok(b) = t.blocks.try_recv() {
-            let _ = t.audio.send(ListenMsg::Audio(b.pcm));
-        }
-        // the mic goes off now (the macOS mic indicator too)
-        t.stream = None;
-        let _ = t.audio.send(ListenMsg::Flush);
-        t.ending = Some(now);
-        let note = t.page.is_some();
-        self.emit(json!({"ev": "level", "who": "you", "v": 0.0}));
-        // a note talk never shows main's phases
-        if !note {
-            self.set_phase(Phase::Sending, None);
-        }
-    }
-
-    /// The talk's words are all in (or waited for long enough): to main.
-    fn finish_talk(&mut self) {
-        let Some(t) = self.talk.take() else { return };
-        let words = t.text.trim().to_string();
-        self.emit(json!({"ev": "heard", "text": words, "final": true}));
-        if let Some(page) = &t.page {
-            // nothing heard: no note; the word "send" alone sends the
-            // page's notes (§4.1)
-            let phase = match send_word(&words) {
-                _ if words.is_empty() => "cancel",
-                true => "send",
-                false => "end",
-            };
-            return self.page_voice_over(page, phase, &words);
-        }
-        if words.is_empty() {
-            self.fn_ctx = None;
-            if let Some(s) = self.shot.take() {
-                self.forget(vec![s]);
-            }
-            return self.set_phase(Phase::Idle, None);
-        }
-        self.send_to_main(words, true);
-    }
-
-    fn take_shot(&mut self, path: &Path, app: String, title: String) {
-        let stored = (self.ports.store_image)(path);
-        // the app's PNG goes at once, stored or not
-        let _ = std::fs::remove_file(path);
-        match stored {
-            Ok(stored) => {
-                if let Some(old) = self.shot.replace(Shot { stored, app, title, reached: false }) {
-                    self.forget(vec![old]);
-                }
-            }
-            Err(_) => self.error("main can't see this window: the screenshot didn't save."),
         }
     }
 
