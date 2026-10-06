@@ -105,5 +105,14 @@ law("build dir: the old state dir's copy is a stray",
 law("build dir: an unmigrated home's state dir is its one path",
     BuildDir.kind(bundle: "/Users/g/.local/state/switchboard/build/ambient/bise ambient.app", devDir: "/Users/g/.local/state/switchboard") == "the one path")
 
+// harness A's click (amb-tools m_8085, lead m_8087): the named window, its local point
+func at(_ p: CGPoint, _ x: CGFloat, _ y: CGFloat) -> Bool { p.x == x && p.y == y }
+law("click: the page's top-left is the window's top-left", at(HarnessClick.local(css: CGPoint(x: 0, y: 0), windowHeight: 600), 0, 600))
+law("click: CSS y grows down, AppKit's up", at(HarnessClick.local(css: CGPoint(x: 120, y: 40), windowHeight: 600), 120, 560))
+law("click: wherever the window sits (off-screen at -30000), the point is the window's own",
+    at(HarnessClick.local(css: CGPoint(x: 10, y: 10), windowHeight: 100), 10, 90))
+law("click: in the glass, the window gets it", HarnessClick.route(takesMouse: true) == .window)
+law("click: outside the glass, it goes through (to the app below)", HarnessClick.route(takesMouse: false) == .through)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Launch laws hold")

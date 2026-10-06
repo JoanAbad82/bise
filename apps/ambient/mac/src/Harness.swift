@@ -225,73 +225,74 @@ final class Harness {
 
     private func r(_ f: CGRect) -> [String: Any] { ["x": f.minX, "y": f.minY, "w": f.width, "h": f.height] }
 
-    // the screen point (Cocoa, far off his screens) of {window, x, y}: points
-    // from that window's top-left (the page's CSS px)
-    private func point(_ q: [String: Any]) throws -> NSPoint {
+    // {window: bar|side, x, y}: the named window and its point (the page's CSS
+    // px from its top-left). No screen-point lookup: the panels sit at -30000,
+    // where nothing that looks windows up by screen point finds them (amb-tools
+    // m_8085: every click came back window: none)
+    private func target(_ q: [String: Any]) throws -> (Capsule, String, NSPoint) {
         guard let x = (q["x"] as? NSNumber)?.doubleValue, let y = (q["y"] as? NSNumber)?.doubleValue else {
-            throw Failure(description: "mouse needs window: bar|side, x, y (points from that window's top-left)")
+            throw Failure(description: "mouse needs window: bar|side, x, y (the page's CSS px from that window's top-left)")
         }
-        let c = (q["window"] as? String) == "side" ? sidePanel() : bar?()
-        guard let c else { throw Failure(description: "mouse: no such window yet") }
-        let f = c.panel.frame
-        return NSPoint(x: f.minX + x, y: f.maxY - y)
+        let name = (q["window"] as? String) == "side" ? "side" : "bar"
+        guard let c = name == "side" ? sidePanel() : bar?() else { throw Failure(description: "mouse: no \(name) window yet") }
+        let local = HarnessClick.local(css: CGPoint(x: x, y: y), windowHeight: c.panel.frame.height)
+        return (c, name, local)
     }
 
-    // the window AppKit would get the click in: ours, front to back, that
-    // contains the point and takes the mouse there (Capsule.mouseAt first,
-    // as the real pointer's moves would have set it)
-    private func windowAt(_ p: NSPoint) -> (NSWindow, String)? {
-        for c in [sidePanel(), bar?()].compactMap({ $0 }) where c.panel.isVisible { c.mouseAt(p) }
-        var mine: [(NSWindow, String)] = []
-        if let sc = sidePanel() { mine.append((sc.panel, "side")) }
-        if let bc = bar?() { mine.append((bc.panel, "bar")) }
-        for w in NSApp.orderedWindows where w.isVisible && w.frame.contains(p) && !w.ignoresMouseEvents {
-            if let m = mine.first(where: { $0.0 === w }) { return m }
-            return (w, String(describing: type(of: w)))
-        }
-        return nil
-    }
-
+    // a click as AppKit takes it: the panel's mouse rule at that point first
+    // (glass only, Capsule.mouseAt, what the real pointer's moves set), then
+    // the NSEvent with the window's number and its local point straight into
+    // NSApp.sendEvent: NSWindow.sendEvent, its first-click and key rules, the
+    // content view's hitTest, the web view. Never HID, never a screen lookup.
     private func mouse(_ q: [String: Any]) async throws -> [String: Any] {
-        let p = try point(q)
+        let (c, name, local) = try target(q)
+        let w: NSWindow = c.panel
         let kind = q["kind"] as? String ?? "click"
         // no right click: a context menu is a window macOS keeps on a real screen
         if (q["button"] as? String) == "right" { throw Failure(description: "no right click in harness mode: its context menu would open on a real screen") }
-        let right = false
         let clicks = (q["clicks"] as? NSNumber)?.intValue ?? 1
         let mods = flags(q["mods"] as? [String] ?? [])
-        guard let (w, name) = windowAt(p) else {
-            // nothing of bise there: on his screen the click would reach the app below
-            if kind == "click" || kind == "down" { for c in [bar?(), sidePanel()].compactMap({ $0 }) { c.clickedOutside() } }
-            note("harness>mouse", ["kind": kind, "window": "none"])
-            return ["window": "none", "outside": true]
+        guard w.isVisible else { throw Failure(description: "mouse: the \(name) is not shown (open it first)") }
+        c.mouseAt(w.convertPoint(toScreen: local))
+        let takes = !w.ignoresMouseEvents
+        guard HarnessClick.route(takesMouse: takes) == .window else {
+            // outside the glass: on his screen the click goes through to the app below
+            if kind == "click" || kind == "down" { for x in [bar?(), sidePanel()].compactMap({ $0 }) { x.clickedOutside() } }
+            note("harness>mouse", ["kind": kind, "window": name, "through": true])
+            return ["window": name, "ignores_mouse": true, "through": true]
         }
-        let inWin = w.convertPoint(fromScreen: p)
         var hit = "none"
-        if let cv = w.contentView, let v = cv.hitTest(cv.superview?.convert(inWin, from: nil) ?? inWin) { hit = String(describing: type(of: v)) }
-        final class Seen { var list: [[String: Any]] = [] }
-        let seen = Seen()
-        let mon = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp]) { e in
-            seen.list.append(["type": "\(e.type.rawValue)", "window": e.window === w ? name : "other"])
-            return e
-        }
-        defer { if let mon { NSEvent.removeMonitor(mon) } }
+        if let cv = w.contentView, let v = cv.hitTest(cv.superview?.convert(local, from: nil) ?? local) { hit = String(describing: type(of: v)) }
+        // the page's reaction: what its document got
+        _ = await js(c.web, """
+        (() => { window.__hz = [];
+          if (!window.__hzOn) { window.__hzOn = true;
+            const n = g => g && g.tagName ? g.tagName.toLowerCase() + (g.id ? '#' + g.id : '') : String(g);
+            for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'])
+              document.addEventListener(t, e => { const q = e.target && e.target.closest ? e.target.closest('[data-qa]') : null;
+                window.__hz.push({type: t, target: n(e.target), qa: q ? q.getAttribute('data-qa') : null, trusted: e.isTrusted}); }, true); }
+          return 'ok'; })()
+        """)
         var steps: [NSEvent.EventType] = []
         switch kind {
-        case "click": steps = right ? [.rightMouseDown, .rightMouseUp] : [.leftMouseDown, .leftMouseUp]
-        case "down": steps = [right ? .rightMouseDown : .leftMouseDown]
-        case "up": steps = [right ? .rightMouseUp : .leftMouseUp]
+        case "click": steps = [.leftMouseDown, .leftMouseUp]
+        case "down": steps = [.leftMouseDown]
+        case "up": steps = [.leftMouseUp]
         default: throw Failure(description: "mouse kind: click, down, up (no move: a hover tooltip is a window macOS may put on a real screen)")
         }
         for (i, t) in steps.enumerated() {
             if i > 0 { try? await Task.sleep(nanoseconds: 60_000_000) }
-            guard let ev = NSEvent.mouseEvent(with: t, location: inWin, modifierFlags: mods, timestamp: ProcessInfo.processInfo.systemUptime,
+            guard let ev = NSEvent.mouseEvent(with: t, location: local, modifierFlags: mods, timestamp: ProcessInfo.processInfo.systemUptime,
                                               windowNumber: w.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1) else { continue }
-            NSApp.postEvent(ev, atStart: false)
+            NSApp.sendEvent(ev)
         }
         try? await Task.sleep(nanoseconds: UInt64(((q["settle_ms"] as? NSNumber)?.doubleValue ?? 250) * 1_000_000))
-        note("harness>mouse", ["kind": kind, "window": name, "hit_view": hit])
-        return ["window": name, "hit_view": hit, "appkit": seen.list]
+        let dom = (await js(c.web, "JSON.stringify(window.__hz || [])"))
+            .flatMap { (try? JSONSerialization.jsonObject(with: Data($0.utf8))) as? [[String: Any]] } ?? []
+        note("harness>mouse", ["kind": kind, "window": name, "hit_view": hit, "dom": dom.count])
+        return ["window": name, "window_number": w.windowNumber, "local": ["x": local.x, "y": local.y], "ignores_mouse": false,
+                "hit_view": hit, "dom": dom, "clicked": dom.contains { $0["type"] as? String == "click" },
+                "key": w.isKeyWindow, "first_responder": w.firstResponder.map { String(describing: type(of: $0)) as Any } ?? NSNull()]
     }
 
     // MARK: keys

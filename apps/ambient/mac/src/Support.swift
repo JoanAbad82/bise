@@ -182,6 +182,15 @@ enum BuildDir {
     }
 }
 
+// harness A's click (Harness.mouse): a named window, its local point
+enum HarnessClick {
+    enum Route: Equatable { case window, through }
+    // the page's CSS px (top-left origin) → AppKit's window point (bottom-left)
+    static func local(css p: CGPoint, windowHeight h: CGFloat) -> CGPoint { CGPoint(x: p.x, y: h - p.y) }
+    // the panel takes the mouse only in its glass; elsewhere the click goes through
+    static func route(takesMouse: Bool) -> Route { takesMouse ? .window : .through }
+}
+
 // harness A's switch (Harness.swift): AMBIENT_HARNESS=<dir> or
 // BISE_AMBIENT_TEST_INPUT=<socket>; honored only with a throwaway home
 enum HarnessEnv {
