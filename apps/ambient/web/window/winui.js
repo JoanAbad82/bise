@@ -222,7 +222,7 @@
   }
 
   // ---- mount: the static frame, then regions redrawn when their HTML changes
-  function mount(el, { post, recv: hook }) {
+  function mount(el, { post, recv: hook, wire = false }) {
     el.innerHTML = `<div class="w-app b-ui"><aside class="w-side"></aside><main class="b-main w-main"><div class="w-head"></div><div class="w-jobs"></div>` +
       `<div class="w-scroll"><div class="w-thread"></div></div><div class="w-full" hidden></div><div class="w-over" hidden></div><div class="w-find" hidden><div class="b-spot"><div class="in"><input class="tx w-findq" placeholder="find an agent or a project" spellcheck="false"></div><div class="w-findrows"></div></div></div><div class="b-composer w-composer"><div class="w-dock"></div><div class="w-quotes"></div><div class="div"></div>` +
       `<div class="box"><textarea class="in w-field" rows="1" spellcheck="false"></textarea><span class="send off" data-act='{"ev":"ui_send"}'>↑</span></div><div class="keys"></div></div></main><aside class="w-board b-board"></aside></div>`;
@@ -235,6 +235,8 @@
     const api = {};
     let s = M.init(Date.now());
     if (root.AMB_WIN_TZ) s = { ...s, tz: root.AMB_WIN_TZ };
+    // the real core (S3b): the window says what it shows, bise's hub travels under its id
+    if (wire) s = { ...s, wire: true };
     const last = {};
     let lastRoute = "";
     let lastTitle = "";
@@ -398,7 +400,7 @@
     const app = !!(root.ambientApp && root.ambientApp.window && wk) && !opts.fake;
     if (app) {
       const post = (cmd) => wk.postMessage(cmd);
-      const w = mount(el, { post });
+      const w = mount(el, { post, wire: true });
       root.ambient = { recv: (ev) => w.feed(typeof ev === "string" ? JSON.parse(ev) : ev) };
       // the title bar is the page's: the sidebar's width (the native vibrancy under it) and the
       // rects that move the window (the lights' strip, the thread's head), in CSS px

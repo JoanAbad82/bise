@@ -31,8 +31,11 @@
   const DOT = { working: "wk", waiting: "nd", done: "ok", blocked: "er", failed: "er", idle: "" };
   const agentDot = (s, project, a) => (openCardsOf(s, project, a.name).length ? "nd" : DOT[a.status] || "");
   const openCardsOf = (s, project, agent) => D.allCards(s).filter((c) => c.project === project && (agent == null || c.agent === agent));
-  const projectWaits = (s, project) => openCardsOf(s, project).length;
-  const projectWorking = (s, project) => M.agentsOf(s, project).filter((a) => a.status === "working").length;
+  // a project whose hub the core doesn't hold (S3b: only home, the one in view and subscribed
+  // ones) has no agents or cards here: its projects row's counts stand in
+  const rowOf = (s, project) => s.projects.find((p) => p.project === project) || {};
+  const projectWaits = (s, project) => (s.cards[project] ? openCardsOf(s, project).length : rowOf(s, project).waits || 0);
+  const projectWorking = (s, project) => (s.agents[project] ? M.agentsOf(s, project).filter((a) => a.status === "working").length : rowOf(s, project).working || 0);
 
   function sidebar(s) {
     const r = s.route;
@@ -45,13 +48,14 @@
     rows.push({ kind: "sh", text: T(s, "projects") });
     M.projectsInOrder(s).forEach((p, i) => {
       const waits = projectWaits(s, p.project), working = projectWorking(s, p.project);
-      rows.push({ kind: "pj", name: p.name, dot: p.offline ? "off" : waits ? "nd" : working ? "wk" : "",
-        end: p.offline ? T(s, "offline") : waits ? String(waits) : i < 9 ? `⌘${i + 1}` : "", nd: waits > 0,
+      const off = p.offline || p.missing;
+      rows.push({ kind: "pj", name: p.name, dot: off ? "off" : waits ? "nd" : working ? "wk" : "",
+        end: off ? T(s, p.missing ? "missing" : "offline") : waits ? String(waits) : i < 9 ? `⌘${i + 1}` : "", nd: waits > 0,
         on: r.project === p.project && r.agent === "main", act: { ev: "ui_route", project: p.project, agent: "main" } });
       // a project's agents show under it on bise's view, and under the project in view
       if (r.project === HOME || r.project === p.project) {
         const list = M.agentsOf(s, p.project);
-        if (!list.length) rows[rows.length - 1].end = rows[rows.length - 1].end || T(s, "no_agent");
+        if (!list.length && s.agents[p.project]) rows[rows.length - 1].end = rows[rows.length - 1].end || T(s, "no_agent");
         for (const a of list) {
           const dot = agentDot(s, p.project, a);
           rows.push({ kind: "ag", name: a.name, dot, end: dot === "nd" ? "?" : dot === "er" ? "▲" : "",

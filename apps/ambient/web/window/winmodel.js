@@ -374,7 +374,51 @@
     return s;
   }
 
+  // ---- the wire (S3b step 2, amb-core m_8689 / m_8712). bise's own hub travels as its hub id
+  // (the projects row with home:true); inside the window it is HOME, so routes, links and the
+  // fake core keep one name. Events come in renamed, commands go out renamed. The window tells
+  // the core which project it shows ({cmd:'shown'}: the core holds home + these + any project
+  // with a subscribed thread; it refuses a command before the first shown).
+  const WIRE = ["project", "from_project"];
+  function rename(x, from, to, depth = 0) {
+    if (depth > 5 || x == null || typeof x !== "object") return x;
+    if (Array.isArray(x)) return x.map((y) => rename(y, from, to, depth + 1));
+    const out = {};
+    for (const k of Object.keys(x)) out[k] = WIRE.includes(k) && x[k] === from ? to : rename(x[k], from, to, depth + 1);
+    return out;
+  }
+  const MAPS = ["agents", "cards", "jobs", "arts", "sched"];
+  // the first projects list names bise's hub: what came under its id before moves to HOME, and
+  // the threads asked under HOME (refused: the core knew no 'home') are asked again
+  function learnHome(s, id, cmds) {
+    const out = { ...s, homeId: id };
+    for (const m of MAPS) if (s[m] && id in s[m]) { const { [id]: v, ...rest } = s[m]; out[m] = { ...rest, [HOME]: v }; }
+    const threads = {};
+    for (const [k, t] of Object.entries(s.threads)) threads[k.startsWith(`${id}/`) ? `${HOME}/${k.slice(id.length + 1)}` : k] = t;
+    out.threads = threads;
+    for (const k of Object.keys(threads)) if (k.startsWith(`${HOME}/`)) cmds.push({ cmd: "subscribe", project: id, agent: k.slice(HOME.length + 1), limit: 60 });
+    return out;
+  }
+  const shownOf = (s) => (s.route.project && s.route.project !== HOME ? [s.route.project] : []);
   function step(s, ev) {
+    const pre = [];
+    if (ev.ev === "projects" && Array.isArray(ev.projects)) {
+      const h = ev.projects.find((p) => p.home);
+      if (h && h.project !== HOME && h.project !== s.homeId) s = learnHome(s, h.project, pre);
+    }
+    if (s.homeId && s.homeId !== HOME && !String(ev.ev || "").startsWith("ui_")) ev = rename(ev, s.homeId, HOME);
+    const r = step0(s, ev);
+    let out = r.s;
+    const cmds = [...pre.filter(Boolean), ...r.cmds];
+    // what the window shows: sent when it changes (the first one opens the core's projects)
+    const shown = shownOf(out);
+    const key = shown.join(",");
+    if (out.shownKey !== key && out.wire) { out = { ...out, shownKey: key }; cmds.unshift({ cmd: "shown", projects: shown }); }
+    const home = out.homeId && out.homeId !== HOME ? out.homeId : null;
+    return { ...r, s: out, cmds: home ? cmds.map((c) => (c.project === HOME ? { ...c, project: home } : c)) : cmds };
+  }
+
+  function step0(s, ev) {
     const cmds = [];
     for (const [key, name] of EXTS) {
       const x = root[name];
@@ -405,6 +449,8 @@
   // the first route: bise's thread, subscribed
   function start(s) {
     const cmds = [];
+    // the real core refuses every command before the window's first shown: it goes first
+    if (s.wire) { s = { ...s, shownKey: shownOf(s).join(",") }; cmds.push({ cmd: "shown", projects: shownOf(s) }); }
     const out = needThread(s, s.route, cmds);
     cmds.push({ cmd: "win_title", text: "bise", route: "bise" });
     return { s: out, cmds };

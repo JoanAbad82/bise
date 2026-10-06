@@ -456,6 +456,44 @@ law("the single-hub core's state (the bar's {agents, cards}) reaches the window:
   eq([w.v.composer.dock, w.v.board.sections[0].items.length, w.v.side.rows.filter((r) => r.kind === "ag").length], [null, 0, 0]);
 });
 
+law("the real core (S3b): shown goes first and follows the project in view; bise's hub travels as its hub id (the home:true row), HOME inside; unheld projects show their row's counts", () => {
+  const HID = "bise-1a2b3c4d", ACME = "acme-1a2b3c4d";
+  let s = { ...M.init(F.NOW), tz: "Europe/Paris", wire: true };
+  const sent = [];
+  const feed = (ev) => { const r = M.step(s, ev); s = r.s; sent.push(...r.cmds); return r; };
+  const st = M.start(s); s = st.s; sent.push(...st.cmds);
+  // shown before anything else, then bise's thread asked under 'home' (the core knows no id yet)
+  eq(sent.slice(0, 2), [{ cmd: "shown", projects: [] }, { cmd: "subscribe", project: F.HOME, agent: "main", limit: 60 }]);
+  // events of bise's hub before the projects list are kept under its id, then move to HOME
+  feed({ ev: "agents", project: HID, agents: [{ name: "main", main: true, status: "idle" }, { name: "perf", status: "working" }] });
+  feed({ ev: "projects", projects: [
+    { project: HID, name: "bise", path: "/Users/you/bise", home: true, git: false, order: 0, agents: 1, working: 1, waits: 0, running: true },
+    { project: ACME, name: "acme", path: "/Users/you/acme", home: false, git: true, branch: "main", order: 1, agents: 3, working: 1, waits: 2, running: false },
+    { project: "old-9", name: "old", path: "/Users/you/old", home: false, git: true, order: 2, agents: 0, working: 0, waits: 0, missing: true }] });
+  eq([s.homeId, s.agents[HID], M.agentsOf(s, F.HOME).map((a) => a.name)], [HID, undefined, ["perf"]]);
+  // bise's thread is asked again under its real id
+  eq(sent.filter((c) => c.cmd === "subscribe").pop(), { cmd: "subscribe", project: HID, agent: "main", limit: 60 });
+  // its events come in as HOME: a card of bise's hub lands above bise's composer
+  feed({ ev: "cards", project: HID, cards: [{ id: 4, project: HID, kind: "question", agent: "main", question: "ship it?", options: [{ n: 1, label: "yes" }] }] });
+  const v = V.view(s);
+  eq([v.composer.dock.q, v.board.sections[0].items.map((i) => i.text)], ["ship it?", ["ship it?"]]);
+  // acme isn't held: no agents of its own here, its row's counts stand in; old's folder is gone
+  const side = v.side.rows.filter((r) => r.kind === "pj").map((r) => [r.name, r.dot, r.end]);
+  eq(side, [["acme", "nd", "2"], ["old", "off", "folder gone"]]);
+  // he answers bise's card: out under the hub id
+  feed({ ev: "ui_pick", card: 4, n: 1 });
+  eq(sent.filter((c) => c.cmd === "answer").pop(), { cmd: "answer", project: HID, card: 4, reply: "1" });
+  // he opens acme: shown follows, then acme's main is asked
+  const n = sent.length;
+  feed({ ev: "ui_route", project: ACME, agent: "main" });
+  eq(sent.slice(n).filter((c) => c.cmd === "shown" || c.cmd === "subscribe"), [{ cmd: "shown", projects: [ACME] }, { cmd: "subscribe", project: ACME, agent: "main", limit: 60 }]);
+  // back to bise: shown [] (the core keeps acme while its thread is subscribed)
+  feed({ ev: "ui_route", project: F.HOME, agent: "main" });
+  eq(sent.filter((c) => c.cmd === "shown").pop(), { cmd: "shown", projects: [] });
+  // the fake core (no wire) never gets shown
+  eq(win().sent.filter((c) => c.cmd === "shown"), []);
+});
+
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {
   const dir = join(here, "../../../../rust/proto/fixtures");
   if (!existsSync(dir)) return;
