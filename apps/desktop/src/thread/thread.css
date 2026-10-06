@@ -1,0 +1,77 @@
+/* The thread's own layout (amb-win): the list's scroll area and the
+   markdown inside desktop-ds's .b-text. Type sizes and colors are the ds
+   tokens (src/ds/tokens.css); the body stays at the ds's reading size
+   (bar ⛔4: never under 13 pt). */
+.th-list {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.th-md > :first-child {
+  margin-top: 0;
+}
+
+.th-md > :last-child {
+  margin-bottom: 0;
+}
+
+.th-md p,
+.th-md ul,
+.th-md ol,
+.th-md blockquote {
+  margin: 0 0 0.6em;
+}
+
+.th-md ul,
+.th-md ol {
+  padding-left: 1.4em;
+}
+
+.th-md a {
+  color: var(--c-acc, inherit);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* a block keeps its shape: no wrap, its own scroll, selectable for ⌘C */
+.th-pre {
+  margin: 0 0 0.6em;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--c-sunken);
+  overflow-x: auto;
+  white-space: pre;
+  user-select: text;
+}
+
+.th-pre code {
+  padding: 0;
+  background: none;
+}
+
+.th-table {
+  overflow-x: auto;
+  margin: 0 0 0.6em;
+}
+
+.th-table table {
+  border-collapse: collapse;
+}
+
+.th-table th,
+.th-table td {
+  padding: 3px 10px;
+  border-bottom: 1px solid var(--c-line, rgba(127, 127, 127, 0.2));
+  text-align: left;
+}
+
+.th-md blockquote {
+  padding-left: 10px;
+  border-left: 2px solid var(--c-line, rgba(127, 127, 127, 0.3));
+  color: var(--c-text-2);
+}
+
+.th-img {
+  color: var(--c-text-2);
+}

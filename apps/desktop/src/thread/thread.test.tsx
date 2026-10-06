@@ -1,0 +1,63 @@
+// @vitest-environment happy-dom
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render } from '@testing-library/react';
+import { Markdown, openable } from './Markdown';
+import { nextFirstIndex } from './ThreadList';
+
+afterEach(cleanup);
+
+describe('the list keeps what he reads when an older page comes in front', () => {
+  it('firstItemIndex goes down by the rows added in front, nothing else moves it', () => {
+    const a = { first: 'e:10', index: 1000 };
+    expect(nextFirstIndex(a, ['e:10', 'e:12', 'p:1'])).toBe(a);
+    expect(nextFirstIndex(a, ['e:4', 'e:7', 'e:10', 'e:12'])).toEqual({ first: 'e:4', index: 998 });
+    // a first page into an empty list: the index stays
+    expect(nextFirstIndex({ first: undefined, index: 1000 }, ['e:1'])).toEqual({ first: 'e:1', index: 1000 });
+  });
+});
+
+const answer = [
+  'here is the plan:',
+  '',
+  '- one',
+  '- two',
+  '',
+  '```rust',
+  'fn main() {',
+  '    println!("hi");',
+  '}',
+  '```',
+  '',
+  '| a | b |',
+  '|---|---|',
+  '| 1 | 2 |',
+  '',
+  'see [the docs](https://bise.dev/docs), [a file](file:///etc/passwd) and <b>raw</b>.',
+].join('\n');
+
+describe('answers in markdown', () => {
+  it('lists, a code block that keeps its shape, a table, links that never navigate', () => {
+    const onLink = vi.fn();
+    const { container } = render(<Markdown text={answer} onLink={onLink} />);
+    expect(container.querySelectorAll('li')).toHaveLength(2);
+    expect(container.querySelector('pre.th-pre code')?.textContent).toBe('fn main() {\n    println!("hi");\n}\n');
+    expect(container.querySelector('.th-table td')?.textContent).toBe('1');
+    const a = container.querySelector('a');
+    expect(a?.getAttribute('href')).toBe('https://bise.dev/docs');
+    if (a === null) throw new Error('no link');
+    const click = fireEvent.click(a);
+    expect(click).toBe(false); // default prevented: the window stays
+    expect(onLink).toHaveBeenCalledWith('https://bise.dev/docs');
+    // file: is not a link; raw HTML is not rendered as HTML
+    expect(container.querySelectorAll('a')).toHaveLength(1);
+    expect(container.querySelector('b')).toBeNull();
+  });
+
+  it('only http(s) and mailto open', () => {
+    expect(openable('https://x')).toBe(true);
+    expect(openable('mailto:a@b.c')).toBe(true);
+    expect(openable('javascript:alert(1)')).toBe(false);
+    expect(openable('file:///x')).toBe(false);
+    expect(openable(undefined)).toBe(false);
+  });
+});
