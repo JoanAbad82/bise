@@ -6,19 +6,20 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Agent, Card, ProjectRow } from '@/proto';
 import { Capsule, type CapsuleProps } from './Capsule';
 import { cardKind, toSpotData } from './data';
-import { NONE, step, type CapEvent, type View } from './machine';
+import { NONE, START, step, type CapEvent, type View } from './machine';
+import { newCards, type Loaded } from './CapsuleRoot';
 
 afterEach(cleanup);
 
 const run = (events: CapEvent[]): { view: View; fx: unknown[] } => {
-  let view: View = NONE;
+  let state = START;
   const fx: unknown[] = [];
   for (const e of events) {
-    const s = step(view, e);
-    view = s.view;
+    const s = step(state, e);
+    state = s.state;
     fx.push(...s.fx);
   }
-  return { view, fx };
+  return { view: state.view, fx };
 };
 
 describe('the capsule machine', () => {
@@ -29,13 +30,37 @@ describe('the capsule machine', () => {
   });
   it('hold fn talks at the bottom without the keys, release thinks, the answer replaces it', () => {
     const r = run([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'talk_end' }]);
-    expect(r).toEqual({ view: { kind: 'talk', phase: 'think' }, fx: [{ fx: 'show', at: 'bottom', keys: false }] });
+    expect(r).toEqual({ view: { kind: 'talk', phase: 'think', handsFree: false }, fx: [{ fx: 'show', at: 'bottom', keys: false }, { fx: 'mic', open: true }, { fx: 'mic', open: false }] });
     expect(run([{ ev: 'fn', act: 'talk_start' }, { ev: 'fn', act: 'talk_end' }, { ev: 'answer' }]).view).toEqual({ kind: 'answer' });
   });
   it('a pushed card waits while he is in the spotlight; alone it shows at the bottom', () => {
     expect(run([{ ev: 'fn', act: 'key', key: 'space' }, { ev: 'card', id: 'p.1' }]).view).toEqual({ kind: 'spot' });
     expect(run([{ ev: 'card', id: 'p.1' }])).toEqual({ view: { kind: 'card', id: 'p.1' }, fx: [{ fx: 'show', at: 'bottom', keys: false }] });
     expect(run([{ ev: 'card', id: 'p.1' }, { ev: 'card_done', id: 'p.1' }]).view).toEqual(NONE);
+  });
+  it('fn fn talks hands-free until the next tap', () => {
+    const r = run([{ ev: 'fn', act: 'double' }]);
+    expect(r.view).toEqual({ kind: 'talk', phase: 'listen', handsFree: true });
+    expect(run([{ ev: 'fn', act: 'double' }, { ev: 'fn', act: 'talk_end' }]).view).toMatchObject({ phase: 'listen' });
+    expect(run([{ ev: 'fn', act: 'double' }, { ev: 'fn', act: 'tap' }]).view).toMatchObject({ phase: 'think' });
+  });
+  it('a pushed card waits through a quiet moment and shows when it ends; fn space is never held', () => {
+    const quiet: CapEvent[] = [{ ev: 'quiet', on: true }, { ev: 'card', id: 'p.9' }];
+    expect(run(quiet)).toEqual({ view: NONE, fx: [] });
+    expect(run([...quiet, { ev: 'quiet', on: false }])).toEqual({ view: { kind: 'card', id: 'p.9' }, fx: [{ fx: 'show', at: 'bottom', keys: false }] });
+    expect(run([...quiet, { ev: 'fn', act: 'key', key: 'space' }]).view).toEqual({ kind: 'spot' });
+    expect(run([{ ev: 'fn', act: 'key', key: 'space' }, { ev: 'card', id: 'p.9' }, { ev: 'fn', act: 'esc' }]).view).toEqual({ kind: 'card', id: 'p.9' });
+  });
+  it('a push is a card new in a project whose cards had loaded', () => {
+    const loaded = new Map<string, Loaded>();
+    const projects = [{ project: 'tel', waits: 2 }];
+    const two = [{ id: 'tel.1', project: 'tel' }, { id: 'tel.2', project: 'tel' }];
+    expect(newCards(loaded, projects, [], 0)).toEqual([]);
+    expect(newCards(loaded, projects, two, 10)).toEqual([]);
+    // the hub's own cards right after the row's: still the load
+    expect(newCards(loaded, projects, [...two, { id: 'tel.3', project: 'tel' }], 100)).toEqual([]);
+    expect(newCards(loaded, projects, [...two, { id: 'tel.3', project: 'tel' }, { id: 'tel.9', project: 'tel' }], 1100)).toEqual(['tel.9']);
+    expect(newCards(new Map(), [{ project: 'shop', waits: 0 }], [], 0)).toEqual([]);
   });
   it('the tray click opens the dropdown; a blur that hid the window closes the view; fn i opens the inbox', () => {
     expect(run([{ ev: 'window', shown: true, why: 'tray' }]).view).toEqual({ kind: 'menu' });
@@ -71,7 +96,7 @@ describe('the capsule', () => {
     };
     const ui = render(<Capsule {...base} />);
     const pearl = ui.getByTestId('capsule.pearl');
-    ui.rerender(<Capsule {...base} view={{ kind: 'talk', phase: 'listen' }} />);
+    ui.rerender(<Capsule {...base} view={{ kind: 'talk', phase: 'listen', handsFree: false }} />);
     expect(ui.getByTestId('capsule.talk').textContent).toBe('listening…');
     ui.rerender(<Capsule {...base} view={{ kind: 'answer' }} answer={{ text: 'yes', done: true }} />);
     expect(ui.getByTestId('capsule.pearl')).toBe(pearl);

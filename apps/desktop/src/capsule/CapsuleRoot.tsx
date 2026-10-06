@@ -10,17 +10,56 @@ import type { SpotFront, SpotItem } from '@/spotlight';
 import '@/ds/index.css';
 import { Capsule } from './Capsule';
 import { useSpotData } from './data';
-import { NONE, step, type CapEvent, type Fx, type View } from './machine';
+import { START, step, type CapEvent, type Fx, type State } from './machine';
 
 interface Model {
-  readonly view: View;
+  readonly state: State;
   readonly fx: readonly Fx[];
 }
 
 const reduce = (m: Model, e: CapEvent): Model => {
-  const s = step(m.view, e);
-  return { view: s.view, fx: s.fx };
+  const s = step(m.state, e);
+  return { state: s.state, fx: s.fx };
 };
+
+/** Cards that come this soon after a project's cards first loaded are still its load (the row's
+ *  view.json cards, then the hub's own, arrive one after the other), not a push. */
+export const SETTLE_MS = 400;
+
+export interface Loaded {
+  readonly at: number;
+  readonly ids: Set<string>;
+}
+
+/**
+ * The cards bise pushes: a project's cards are its inbox until its slice has caught up with its row
+ * (`waits`, the hub's count) and settled for SETTLE_MS; after that a card that wasn't there is a
+ * push (qa-native: a 'seen' set taken at the first render made the load's last card look pushed and
+ * then held the real push behind it).
+ */
+export function newCards(
+  loaded: Map<string, Loaded>,
+  projects: readonly { readonly project: string; readonly waits: number }[],
+  cards: readonly { readonly id: string; readonly project: string }[],
+  now: number,
+): string[] {
+  const out: string[] = [];
+  for (const p of projects) {
+    const ids = cards.filter((c) => c.project === p.project).map((c) => c.id);
+    const l = loaded.get(p.project);
+    if (l === undefined) {
+      if (ids.length >= p.waits) loaded.set(p.project, { at: now, ids: new Set(ids) });
+      continue;
+    }
+    const settling = now - l.at < SETTLE_MS;
+    for (const id of ids) {
+      if (l.ids.has(id)) continue;
+      l.ids.add(id);
+      if (!settling) out.push(id);
+    }
+  }
+  return out;
+}
 
 /** The window route for a spotlight row (amb-win's route strings). */
 export function routeOf(item: SpotItem): string | undefined {
@@ -42,29 +81,48 @@ const frontOf = (ev: Extract<HelperEv, { ev: 'front' }>): SpotFront | null =>
 export function CapsuleRoot(): JSX.Element {
   const store = useStore();
   const bise = (window as Partial<Window>).bise;
-  const [m, dispatch] = useReducer(reduce, { view: NONE, fx: [] });
+  const [m, dispatch] = useReducer(reduce, { state: START, fx: [] });
+  const view = m.state.view;
   const [front, setFront] = useState<SpotFront | null>(null);
   const spot = useSpotData(front);
   const projects = useProjects();
   const home = projects.find((p) => p.home)?.project ?? null;
   const still = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, []);
 
-  // bise's answer: what main is writing now, kept once it stops until the next question
+  // bise's answer to what he asked: main's thread, subscribed in this window too (qa-flows: the
+  // capsule's store never had it), streamed (typing) or arriving whole (a new agent entry after
+  // his question)
   const [last, setLast] = useState<{ text: string; done: boolean } | null>(null);
+  const asked = useRef<{ after: number; started: boolean } | null>(null);
   useEffect(() => {
     if (home === null) return;
     const key = threadKey(home, 'main');
-    let was = store.typing(key);
-    return store.subscribe(`typing:${key}`, () => {
-      const now = store.typing(key);
-      if (now !== '') {
-        if (was === '') dispatch({ ev: 'answer' });
-        setLast({ text: now, done: false });
-      } else if (was !== '') {
-        setLast((l) => (l === null ? null : { text: l.text, done: true }));
+    store.subscribeThread(home, 'main', 20);
+    const read = (): void => {
+      const a = asked.current;
+      if (a === null) return;
+      const typing = store.typing(key);
+      const reply = store
+        .threadOrder(key)
+        .order.filter((pos) => pos > a.after)
+        .map((pos) => store.entry(key, pos))
+        .filter((e) => e?.kind === 'agent')
+        .at(-1);
+      const next = typing !== '' ? { text: typing, done: false } : reply !== undefined ? { text: reply.text, done: true } : null;
+      if (next === null) return;
+      if (!a.started) {
+        a.started = true;
+        dispatch({ ev: 'answer' });
       }
-      was = now;
-    });
+      setLast(next);
+    };
+    const offs = [store.subscribe(`typing:${key}`, read), store.subscribe(`order:${key}`, read)];
+    return () => {
+      offs.forEach((off) => {
+        off();
+      });
+      store.unsubscribeThread(home, 'main');
+    };
   }, [store, home]);
 
   // the effects of each step, once
@@ -72,6 +130,7 @@ export function CapsuleRoot(): JSX.Element {
     for (const fx of m.fx) {
       if (fx.fx === 'show') bise?.capsule.show(fx.at, fx.keys);
       else if (fx.fx === 'hide') bise?.capsule.hide();
+      else if (fx.fx === 'mic') bise?.helper({ cmd: 'own_mic', open: fx.open });
       else bise?.openWindow(fx.route);
     }
   }, [m.fx, bise]);
@@ -81,12 +140,16 @@ export function CapsuleRoot(): JSX.Element {
     const offHelper = bise.onHelper((ev) => {
       if (ev.ev === 'fn') dispatch({ ev: 'fn', act: ev.act, key: ev.key });
       else if (ev.ev === 'front') setFront(frontOf(ev));
+      else if (ev.ev === 'quiet') dispatch({ ev: 'quiet', on: ev.on });
     });
     const offState = bise.capsule.onState((s) => {
       dispatch({ ev: 'window', shown: s.shown, why: s.why });
     });
     void bise.helperState().then((evs) => {
-      for (const ev of evs) if (ev.ev === 'front') setFront(frontOf(ev));
+      for (const ev of evs) {
+        if (ev.ev === 'front') setFront(frontOf(ev));
+        else if (ev.ev === 'quiet') dispatch({ ev: 'quiet', on: ev.on });
+      }
     });
     return () => {
       offHelper();
@@ -94,22 +157,12 @@ export function CapsuleRoot(): JSX.Element {
     };
   }, [bise]);
 
-  // a new card bise pushes (one he hasn't seen in this run)
-  const seen = useRef<Set<string> | null>(null);
+  // a card bise pushes: new in a project whose cards had loaded (newCards)
+  const loaded = useRef(new Map<string, Loaded>());
   useEffect(() => {
-    const ids = spot.cards.map((c) => c.id);
-    if (seen.current === null) {
-      seen.current = new Set(ids); // the cards already open at start are the inbox's, not a push
-      return;
-    }
-    for (const id of ids) {
-      if (!seen.current.has(id)) {
-        seen.current.add(id);
-        dispatch({ ev: 'card', id });
-      }
-    }
-    if (m.view.kind === 'card' && !ids.includes(m.view.id)) dispatch({ ev: 'card_done', id: m.view.id });
-  }, [spot.cards, m.view]);
+    for (const id of newCards(loaded.current, projects, spot.cards, performance.now())) dispatch({ ev: 'card', id });
+    if (view.kind === 'card' && !spot.cards.some((c) => c.id === view.id)) dispatch({ ev: 'card_done', id: view.id });
+  }, [spot.cards, projects, view]);
 
   const cardOf = useCallback(
     (id: string) => {
@@ -144,7 +197,7 @@ export function CapsuleRoot(): JSX.Element {
 
   return (
     <Capsule
-      view={m.view}
+      view={view}
       spot={spot}
       answer={last}
       heard=""
@@ -152,7 +205,10 @@ export function CapsuleRoot(): JSX.Element {
       still={still}
       card={cardOf}
       onAsk={(text) => {
-        if (home !== null) store.send({ project: home, agent: 'main', text });
+        if (home === null) return;
+        const order = store.threadOrder(threadKey(home, 'main')).order;
+        asked.current = { after: order.length === 0 ? -1 : Math.max(...order), started: false };
+        store.send({ project: home, agent: 'main', text });
         setLast(null);
       }}
       onOpen={(item) => {
@@ -173,8 +229,8 @@ export function CapsuleRoot(): JSX.Element {
               bise.quit();
             }
       }
-      onSize={(w, h) => {
-        bise?.capsule.size(w, h);
+      onSize={(w, h, glass) => {
+        bise?.capsule.size(w, h, glass);
       }}
     />
   );

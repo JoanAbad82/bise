@@ -37,7 +37,8 @@ export interface CapsuleProps {
   readonly onClose: () => void;
   /** null: the app can't quit from a page yet (the row shows greyed). */
   readonly onQuit: (() => void) | null;
-  readonly onSize: (width: number, height: number) => void;
+  /** The page's size (the glass plus its shadow's margin) and the glass inside it. */
+  readonly onSize: (width: number, height: number, glass: { x: number; y: number; width: number; height: number }) => void;
 }
 
 const moodOf = (v: View, answering: boolean): Mood => {
@@ -55,13 +56,18 @@ export function Capsule(p: CapsuleProps): JSX.Element {
   useEffect(() => {
     const el = box.current;
     if (el === null) return;
-    const ro = new ResizeObserver(() => {
+    const measure = (): void => {
       const r = el.getBoundingClientRect();
-      size.current(Math.ceil(r.width), Math.ceil(r.height));
-    });
+      const g = el.querySelector('[data-glass]')?.getBoundingClientRect() ?? r;
+      size.current(Math.ceil(r.width), Math.ceil(r.height), { x: Math.round(g.x - r.x), y: Math.round(g.y - r.y), width: Math.round(g.width), height: Math.round(g.height) });
+    };
+    const ro = new ResizeObserver(measure);
     ro.observe(el);
+    const mo = new MutationObserver(measure); // a view change swaps the glass without resizing the page
+    mo.observe(el, { childList: true });
     return () => {
       ro.disconnect();
+      mo.disconnect();
     };
   }, []);
 
@@ -73,14 +79,14 @@ export function Capsule(p: CapsuleProps): JSX.Element {
       <div className={`b-cap-pearl${pearl ? '' : ' off'}`}>
         <LivePearl mood={moodOf(v, answering)} level={p.level} still={p.still} size={40} testId="capsule.pearl" />
       </div>
-      {v.kind === 'spot' && <Spotlight data={p.spot} answer={p.answer} pearl={<span className="b-cap-hole" />} onAsk={p.onAsk} onOpen={p.onOpen} onOpenAnswer={() => { p.onOpenWindow('bise'); }} onClose={p.onClose} testId="spot" />}
+      {v.kind === 'spot' && <div data-glass className="b-cap-glass"><Spotlight data={p.spot} answer={p.answer} pearl={<span className="b-cap-hole" />} onAsk={p.onAsk} onOpen={p.onOpen} onOpenAnswer={() => { p.onOpenWindow('bise'); }} onClose={p.onClose} testId="spot" /></div>}
       {v.kind === 'talk' && (
-        <div className="b-cap-talk" data-testid="capsule.talk">
+        <div className="b-cap-talk" data-testid="capsule.talk" data-glass>
           {p.heard !== '' ? p.heard : v.phase === 'listen' ? W.listening : W.thinking}
         </div>
       )}
       {v.kind === 'answer' && <Answer answer={p.answer} onOpen={() => { p.onOpenWindow('bise'); }} />}
-      {v.kind === 'card' && <div className="b-cap-card" data-testid="capsule.card">{p.card(v.id)}</div>}
+      {v.kind === 'card' && <div className="b-cap-card" data-testid="capsule.card" data-glass>{p.card(v.id)}</div>}
       {v.kind === 'menu' && <TrayMenu spot={p.spot} onOpenWindow={p.onOpenWindow} onQuit={p.onQuit} />}
     </div>
   );
@@ -89,7 +95,7 @@ export function Capsule(p: CapsuleProps): JSX.Element {
 function Answer({ answer, onOpen }: { answer: SpotAnswer | null; onOpen: () => void }): JSX.Element {
   const a = answer === null ? null : answerLines(answer.text);
   return (
-    <div className="b-cap-answer" data-testid="capsule.answer" aria-live="polite">
+    <div className="b-cap-answer" data-testid="capsule.answer" aria-live="polite" data-glass>
       <div className="t">
         {a?.shown ?? ''}
         {answer?.done === false && <span className="cur" />}
@@ -106,7 +112,7 @@ function Answer({ answer, onOpen }: { answer: SpotAnswer | null; onOpen: () => v
 function TrayMenu({ spot, onOpenWindow, onQuit }: { spot: SpotData; onOpenWindow: (route?: string) => void; onQuit: (() => void) | null }): JSX.Element {
   const work = spot.agents.filter((a) => a.status === 'working').length;
   return (
-    <div className="b-cap-menu">
+    <div className="b-cap-menu" data-glass>
       <Menu testId="capsule.menu">
         <div className="b-cap-menu-head" data-testid="capsule.menu.head">{W.head(work, spot.cards.length)}</div>
         <MenuSep />

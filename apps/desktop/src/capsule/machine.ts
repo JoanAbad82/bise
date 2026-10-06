@@ -1,28 +1,39 @@
 // What the capsule shows and when (pure, for the checks): fn space opens the spotlight at the top
-// with the keys; holding fn talks (the talk at the bottom, never the keys), its release thinks,
-// bise's answer replaces the talk; a pushed card shows at the bottom only when nothing else is up
-// (his action first); esc or fn esc closes; the tray's click opens the dropdown; a blur that hid
-// the window closes the view. The effects are the capsule window's (window.bise.capsule) and the
-// main window's (openWindow); CapsuleRoot runs them.
+// with the keys; holding fn talks (the talk at the bottom, never the keys, bise holds the mic), its
+// release thinks; fn fn talks hands-free until the next tap; bise's answer replaces the talk; a
+// card bise pushes shows at the bottom only when nothing else is up (his action first) and waits
+// through a quiet moment (a call, sharing, full screen), then shows when it ends; his own action
+// (fn space, fn talk) is never held. esc or fn esc closes; the tray's click opens the dropdown; a
+// blur that hid the window closes the view. Effects: the capsule window (show, hide), the main
+// window (open), the helper's mic (own_mic, so its quiet sampling skips bise's own use).
 import type { FnAct } from '@/proto';
 
 export type View =
   | { readonly kind: 'none' }
   | { readonly kind: 'spot' }
-  | { readonly kind: 'talk'; readonly phase: 'listen' | 'think' }
+  | { readonly kind: 'talk'; readonly phase: 'listen' | 'think'; readonly handsFree: boolean }
   | { readonly kind: 'answer' }
   | { readonly kind: 'card'; readonly id: string }
   | { readonly kind: 'menu' };
+
+export interface State {
+  readonly view: View;
+  /** a quiet moment: pushed cards wait */
+  readonly quiet: boolean;
+  /** the cards pushed while something was up or quiet, oldest first */
+  readonly held: readonly string[];
+}
 
 export type CapEvent =
   | { readonly ev: 'fn'; readonly act: FnAct; readonly key?: string | null }
   /** the capsule window's state changed (src/main/capsule.ts) */
   | { readonly ev: 'window'; readonly shown: boolean; readonly why: 'asked' | 'tray' | 'blur' }
+  | { readonly ev: 'quiet'; readonly on: boolean }
   /** bise's answer to what he said or typed started */
   | { readonly ev: 'answer' }
   /** bise pushes a card (a question or an approval while he's elsewhere) */
   | { readonly ev: 'card'; readonly id: string }
-  /** the shown card was answered or put off */
+  /** a card was answered or went away */
   | { readonly ev: 'card_done'; readonly id: string }
   /** esc, a close, or an 'open in bise' that moved him to the window */
   | { readonly ev: 'close' };
@@ -30,51 +41,77 @@ export type CapEvent =
 export type Fx =
   | { readonly fx: 'show'; readonly at: 'top' | 'bottom' | 'menu'; readonly keys: boolean }
   | { readonly fx: 'hide' }
-  | { readonly fx: 'open'; readonly route?: string };
+  | { readonly fx: 'open'; readonly route?: string }
+  | { readonly fx: 'mic'; readonly open: boolean };
 
 export interface Step {
-  readonly view: View;
+  readonly state: State;
   readonly fx: readonly Fx[];
 }
 
 export const NONE: View = { kind: 'none' };
+export const START: State = { view: NONE, quiet: false, held: [] };
 
-const to = (view: View, ...fx: Fx[]): Step => ({ view, fx });
-const stay = (view: View): Step => ({ view, fx: [] });
-const close = (view: View): Step => (view.kind === 'none' ? stay(view) : to(NONE, { fx: 'hide' }));
+const talking = (v: View): boolean => v.kind === 'talk' && v.phase === 'listen';
 
-export function step(view: View, e: CapEvent): Step {
+/** The view goes to `view`; the mic follows the talk; when nothing is up, a held card shows. */
+function go(s: State, view: View, ...fx: Fx[]): Step {
+  const out: Fx[] = [...fx];
+  if (talking(s.view) && !talking(view)) out.push({ fx: 'mic', open: false });
+  if (!talking(s.view) && talking(view)) out.push({ fx: 'mic', open: true });
+  const next: State = { ...s, view };
+  const [id, ...rest] = next.held;
+  if (view.kind === 'none' && !next.quiet && id !== undefined) {
+    const kept = out.filter((f) => f.fx !== 'hide');
+    return { state: { ...next, view: { kind: 'card', id }, held: rest }, fx: [...kept, { fx: 'show', at: 'bottom', keys: false }] };
+  }
+  return { state: next, fx: out };
+}
+
+const stay = (s: State): Step => ({ state: s, fx: [] });
+const close = (s: State): Step => (s.view.kind === 'none' ? stay(s) : go(s, NONE, { fx: 'hide' }));
+
+export function step(s: State, e: CapEvent): Step {
+  const v = s.view;
   switch (e.ev) {
     case 'fn':
       switch (e.act) {
         case 'key':
-          if (e.key === 'space') return view.kind === 'spot' ? close(view) : to({ kind: 'spot' }, { fx: 'show', at: 'top', keys: true });
-          if (e.key === 'i') return to(NONE, ...(view.kind === 'none' ? [] : [{ fx: 'hide' } as const]), { fx: 'open', route: 'inbox' });
-          return stay(view);
+          if (e.key === 'space') return v.kind === 'spot' ? close(s) : go(s, { kind: 'spot' }, { fx: 'show', at: 'top', keys: true });
+          if (e.key === 'i') return v.kind === 'none' ? { state: s, fx: [{ fx: 'open', route: 'inbox' }] } : go(s, NONE, { fx: 'hide' }, { fx: 'open', route: 'inbox' });
+          return stay(s);
         case 'talk_start':
-          return to({ kind: 'talk', phase: 'listen' }, { fx: 'show', at: 'bottom', keys: false });
-        case 'talk_end':
-          return view.kind === 'talk' ? stay({ kind: 'talk', phase: 'think' }) : stay(view);
-        case 'cancel':
-          return view.kind === 'talk' ? close(view) : stay(view);
-        case 'esc':
-          return close(view);
-        case 'tap':
+          return go(s, { kind: 'talk', phase: 'listen', handsFree: false }, { fx: 'show', at: 'bottom', keys: false });
         case 'double':
-          return stay(view);
+          return go(s, { kind: 'talk', phase: 'listen', handsFree: true }, { fx: 'show', at: 'bottom', keys: false });
+        case 'talk_end':
+          return v.kind === 'talk' && !v.handsFree ? go(s, { kind: 'talk', phase: 'think', handsFree: false }) : stay(s);
+        case 'tap':
+          return v.kind === 'talk' && v.handsFree && v.phase === 'listen' ? go(s, { kind: 'talk', phase: 'think', handsFree: true }) : stay(s);
+        case 'cancel':
+          return v.kind === 'talk' ? close(s) : stay(s);
+        case 'esc':
+          return close(s);
       }
-      return stay(view);
+      return stay(s);
     case 'window':
-      if (e.why === 'tray' && e.shown) return stay({ kind: 'menu' });
-      if (!e.shown) return stay(NONE);
-      return stay(view);
+      if (e.why === 'tray' && e.shown) return go(s, { kind: 'menu' });
+      if (!e.shown && v.kind !== 'none') return go(s, NONE);
+      return stay(s);
+    case 'quiet':
+      if (e.on) return stay({ ...s, quiet: true });
+      return v.kind === 'none' ? go({ ...s, quiet: false }, NONE) : stay({ ...s, quiet: false });
     case 'answer':
-      return view.kind === 'talk' ? stay({ kind: 'answer' }) : stay(view);
+      return v.kind === 'talk' ? go(s, { kind: 'answer' }) : stay(s);
     case 'card':
-      return view.kind === 'none' ? to({ kind: 'card', id: e.id }, { fx: 'show', at: 'bottom', keys: false }) : stay(view);
-    case 'card_done':
-      return view.kind === 'card' && view.id === e.id ? close(view) : stay(view);
+      if (s.held.includes(e.id) || (v.kind === 'card' && v.id === e.id)) return stay(s);
+      if (v.kind === 'none' && !s.quiet) return go(s, { kind: 'card', id: e.id }, { fx: 'show', at: 'bottom', keys: false });
+      return stay({ ...s, held: [...s.held, e.id] });
+    case 'card_done': {
+      const held = s.held.filter((h) => h !== e.id);
+      return v.kind === 'card' && v.id === e.id ? close({ ...s, held }) : stay({ ...s, held });
+    }
     case 'close':
-      return close(view);
+      return close(s);
   }
 }

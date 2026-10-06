@@ -1,8 +1,11 @@
 /* The capsule surface: transparent around the glass (L1: the pearl floats free, never in a square);
    one live pearl at a fixed place for every view. Tokens only. */
-html:has(.b-capsule), body:has(.b-capsule) { background: transparent; }
-.b-capsule { position: relative; width: 640px; }
-.b-cap-pearl { position: absolute; left: 18px; top: 14px; width: 40px; height: 40px; z-index: 2; pointer-events: none; }
+html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent; overflow: hidden; }
+/* the page = the glass plus a margin its shadow draws in (the window is sized to it, the glass
+   rect goes to main: qa-native's placement) */
+.b-capsule { position: relative; width: 640px; padding: 24px; box-sizing: content-box; }
+.b-cap-card, .b-cap-menu { width: fit-content; margin: 0 auto; }
+.b-cap-pearl { position: absolute; left: 42px; top: 38px; width: 40px; height: 40px; z-index: 2; pointer-events: none; }
 .b-cap-pearl.off { visibility: hidden; }
 .b-cap-hole { display: inline-block; width: 40px; height: 40px; flex: none; }
 .b-cap-talk, .b-cap-answer { min-height: 68px; padding: 22px 22px 18px 76px; border-radius: var(--r-5); background: var(--c-overlay); backdrop-filter: var(--glass); box-shadow: var(--e-3); font: var(--t-17)/1.45 var(--font-read); color: var(--c-text); }

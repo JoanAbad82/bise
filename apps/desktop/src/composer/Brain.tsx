@@ -289,9 +289,19 @@ export function Brain(p: BrainProps): JSX.Element | null {
     props.current.onActions(actions);
   });
 
+  // ---- the strip above the box: the chips and the queue, re-drawn only when they change ----
+  const lastStrip = useRef('');
+  const pushStrip = (chips: readonly Chip[]): void => {
+    const q = saved.current.queue;
+    const key = JSON.stringify([chips, q]);
+    if (key === lastStrip.current) return;
+    lastStrip.current = key;
+    props.current.onStrip(chips.length === 0 && q.length === 0 ? null : <Strip chips={chips} queued={q.map((e) => preview(buildMessage(segmentsOf(editor, e)).text, 48))} testId={props.current.testId} />);
+  };
+  const chipsNow = (): Chip[] => editor.getEditorState().read(() => $readSegments().flatMap((x) => (x.kind === 'chip' ? [x.chip] : [])));
+
   // ---- the editor's updates: what he typed, read (never written back) ----
   useEffect(() => {
-    let lastStrip = '';
     let lastTrigger = '';
     return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
       const r = editorState.read(() => ({ blank: $isBlank(), segs: $readSegments(), before: $textBeforeCaret() }));
@@ -302,13 +312,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
         lastTrigger = k;
         setTrigger(t);
       }
-      const chips = r.segs.flatMap((s) => (s.kind === 'chip' ? [s.chip] : []));
-      const q = saved.current.queue;
-      const stripKey = JSON.stringify([chips, q]);
-      if (stripKey !== lastStrip) {
-        lastStrip = stripKey;
-        props.current.onStrip(chips.length === 0 && q.length === 0 ? null : <Strip chips={chips} queued={q.map((e) => preview(buildMessage(segmentsOf(editor, e)).text, 48))} testId={props.current.testId} />);
-      }
+      pushStrip(r.segs.flatMap((x) => (x.kind === 'chip' ? [x.chip] : [])));
       if (dirtyElements.size > 0 || dirtyLeaves.size > 0) {
         if (timer.current !== null) window.clearTimeout(timer.current);
         timer.current = window.setTimeout(writeNow, DRAFT_DEBOUNCE_MS);
@@ -508,9 +512,11 @@ export function Brain(p: BrainProps): JSX.Element | null {
         saved.current = taken.rest;
         save(p.store, p.target, saved.current);
         p.send(buildMessage(segmentsOf(editor, taken.entry)));
+        pushStrip(chipsNow()); // the sent one leaves the strip (qa-type's queue-steer)
       }
     }
     wasBusy.current = p.busy;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pushStrip/chipsNow read refs and the editor
   }, [p, editor]);
 
   return open ? (
