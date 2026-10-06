@@ -42,6 +42,18 @@ const P = F.P;
 const btnOf = (c) => c.btn || ((c.chips || []).map((x) => x.btn).find(Boolean));
 const ok = (text) => ({ chip: { text, tone: "ok" } });
 
+law("a home with no onboarded pref (a fresh home has no prefs.json) opens on the first launch too; a deep link to onboarding opens it", () => {
+  F11.fresh(); delete F11.world().prefs.onboarded;
+  let s = { ...M.init(F.NOW), tz: "Europe/Paris" };
+  for (const ev of [...F.boot(), { ev: "prefs", prefs: { excluded_apps: [] } }]) s = M.step(s, ev).s;
+  eq(s.route.screen, "onboarding");
+  F11.reset();
+  const w = win();
+  eq(w.s.route.screen, undefined);
+  w.feed({ ev: "win_open", route: "onboarding" });
+  eq([w.s.route.screen, w.v.setup.kind, w.cmds("win_title").at(-1)], ["onboarding", "onboarding", { cmd: "win_title", text: "welcome to bise", route: "onboarding" }]);
+});
+
 law("a fresh install opens on the first launch: hello, then the permissions with their live state as chips", () => {
   const w = win({ fresh: true });
   eq(w.s.route.screen, "onboarding");

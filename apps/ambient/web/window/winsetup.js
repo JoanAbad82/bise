@@ -42,8 +42,10 @@
     switch (ev.ev) {
       case "prefs": {
         const nx = { ...x, prefs: ev.prefs };
-        // a fresh install opens on the first launch's first step, wherever the window was
-        if (ev.prefs && ev.prefs.onboarded === false && !x.prefs && !(s.route && s.route.screen === "onboarding"))
+        // a fresh install opens on the first launch's first step, wherever the window was: only
+        // the finished onboarding writes onboarded true, so absent (a fresh home has no
+        // prefs.json, amb-tools m_9344) counts as not onboarded
+        if (ev.prefs && ev.prefs.onboarded !== true && !x.prefs && !(s.route && s.route.screen === "onboarding"))
           return out({ ...nx, step: 0 }, { route: { screen: "onboarding", project: HOME, agent: "main" } });
         return out(nx);
       }
