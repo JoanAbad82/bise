@@ -163,6 +163,31 @@ def main_script(world, project):
     return "\n".join(out) + "\n"
 
 
+FEATURE_FILE = ("FEATURE.md", "# %s\n\nwhat this feature adds, for the review.\n")
+
+
+def feature_script(world, ws, name):
+    """The bash a project's fake main runs for `world feature`: the real dev-flow feature
+    (sb feature new), one commit on its branch made in a throwaway worktree of the project's own
+    checkout (removed after), then `sb feature ready`, which opens the user's feature_try card
+    (an approval kind: Card.approval). Answering it 1 (try it) opens feature_merge, the second."""
+    tmp = os.path.join(world, "feature", "%s-%s" % (os.path.basename(ws), name))
+    rel, text = FEATURE_FILE
+    q = shlex.quote
+    return "\n".join([
+        "set -eu",
+        "sb feature new %s" % q(name),
+        "rm -rf %s" % q(tmp),
+        "git -C %s worktree add -q %s %s" % (q(ws), q(tmp), q(name)),
+        "printf %%s %s > %s" % (q(text % name), q(os.path.join(tmp, rel))),
+        "git -C %s add -A" % q(tmp),
+        "git -C %s -c commit.gpgsign=false commit -q --no-verify -m %s" % (q(tmp), q("%s: what it adds" % name)),
+        "git -C %s worktree remove --force %s" % (q(ws), q(tmp)),
+        "sb feature ready %s" % q(name),
+        "echo seeded feature %s" % q(name),
+    ]) + "\n"
+
+
 def write_seeds(world, projects):
     """The scripts on disk; returns the markers to wait for."""
     want = []
@@ -277,6 +302,10 @@ def daemon(bise, root, n):
                 E.env["SB_CORE_BIN"] = sb_core
             E.env["BISE_HOME_WORKSPACE"] = home_ws
             qa.real_home_env(E.env, home)
+            # the caller's shell folders are stale here (the hub runs in e2e.ROOT) and may be an
+            # agent's tmp under his ~/.bise/hubs: never handed on
+            for k in ("PWD", "OLDPWD"):
+                E.env.pop(k, None)
             guard(world, dict(E.env, _ws=ws, _home_ws=home_ws))
             before = set(glob.glob(os.path.join(home, ".bise", "hubs", "*", "hub.sock")))
             err = open(os.path.join(E.tmp, "hub.stderr"), "a")
@@ -455,7 +484,8 @@ def state():
                 row["diff"] = _git(a["path"], "diff", "--shortstat", "main...HEAD")
                 row["dirty"] = (_git(a["path"], "status", "--porcelain") or "").splitlines()
             agents.append(row)
-        cards = [{"id": c.get("id"), "text": (c.get("text") or c.get("question") or "")[:160]} for c in st.get("cards", [])]
+        cards = [{"id": c.get("id"), "kind": c.get("kind"), "place": c.get("place"),
+                  "text": (c.get("text") or c.get("question") or "")[:160]} for c in st.get("cards", [])]
         out.append({"project": h["project"], "home": h["home"], "ws": h["ws"], "sock": h["sock"], "hub_pid": h["hub_pid"],
                     "alive": _alive(h["hub_pid"]), "agents": agents, "cards": cards})
     return {"world": info["world"], "home": info["home"], "pid": info["pid"], "bise": info["bise"],
@@ -480,3 +510,32 @@ def say(project, text):
     finally:
         c.s.close()
     return {"sent": text, "project": h[0]["project"]}
+
+
+def feature(project, name, timeout=120):
+    """A real approval card in that project: its fake main runs feature_script, then this waits
+    on the hub's state for the feature_try card of `feature:<name>` and returns it."""
+    import qa
+    info = _read(_paths(world_dir())["json"])
+    if not info:
+        raise qa.QAError("no world up")
+    h = [h for h in info["hubs"] if h["project"] == project and not h["home"]]
+    if not h:
+        raise qa.QAError("no project %r with a git checkout in the world (%s)" % (project, ", ".join(x["project"] for x in info["hubs"] if not x["home"])))
+    h = h[0]
+    guard(info["world"], [h["ws"]])
+    path = os.path.join(info["world"], "seed", project, "feature-%s.sh" % name)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write(feature_script(info["world"], h["ws"], name))
+    say(project, "[[bash: bash %s]]" % path)
+    want = "feature:%s" % name
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        cards = [c for c in _hub_state(h["sock"]).get("cards", []) if c.get("kind") == "feature_try" and c.get("place") == want]
+        if cards:
+            c = cards[-1]
+            return {"project": project, "feature": name, "card": {"id": c.get("id"), "kind": c.get("kind"), "place": c.get("place"),
+                                                                   "text": c.get("text") or c.get("question")}, "script": path}
+        time.sleep(0.5)
+    raise qa.QAError("no feature_try card for %s in %s after %d s: see %s and the hub's main" % (want, project, timeout, path))

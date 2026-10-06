@@ -633,6 +633,12 @@ def world_fixtures_seed_every_desktop_shape():
             check(mk in s, "%s marks itself seeded" % a["name"])
             if any("work" in st for st in a["steps"]):
                 check(s.index(mk) < s.index("sleep "), "marked before its long work")
+    fs = world.feature_script(w, os.path.join(w, "h", "code", "shop"), "try me")
+    r = subprocess.run(["bash", "-n"], input=fs, capture_output=True, text=True)
+    check(r.returncode == 0, "feature script, bash -n: %s" % r.stderr)
+    order = [fs.index(x) for x in ("sb feature new 'try me'", "worktree add", "commit -q", "worktree remove", "sb feature ready 'try me'")]
+    check(order == sorted(order), "feature: new, a commit in a throwaway worktree, removed, then ready: %s" % fs)
+    check(os.path.join(w, "feature", "shop-try me") in fs and "~" not in fs, "the feature's worktree is in the world, by absolute path")
     try:
         world.guard("/tmp/w")
         check(False, "a world outside ~/.bise/gate")

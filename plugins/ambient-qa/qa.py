@@ -4052,6 +4052,7 @@ def _cli(argv):
     q = ws.add_parser("up"); q.add_argument("--projects", type=int, default=3); q.add_argument("--bise"); q.add_argument("--root")
     ws.add_parser("down"); ws.add_parser("state")
     q = ws.add_parser("say"); q.add_argument("project"); q.add_argument("text")
+    q = ws.add_parser("feature"); q.add_argument("project"); q.add_argument("name")
     p = sub.add_parser("_world"); p.add_argument("--bise", required=True); p.add_argument("--root", required=True); p.add_argument("--projects", type=int, default=3)
     a = ap.parse_args(argv)
     if a.cmd in ("world", "_world"):
@@ -4059,7 +4060,7 @@ def _cli(argv):
         if a.cmd == "_world":
             return world.daemon(a.bise, a.root, a.projects)
         r = {"up": lambda: world.up(a.projects, a.bise, a.root), "down": world.down, "state": world.state,
-             "say": lambda: world.say(a.project, a.text)}[a.wcmd]()
+             "say": lambda: world.say(a.project, a.text), "feature": lambda: world.feature(a.project, a.name)}[a.wcmd]()
         print(json.dumps(r, indent=1, ensure_ascii=False))
         return
     if a.cmd == "_hub":
