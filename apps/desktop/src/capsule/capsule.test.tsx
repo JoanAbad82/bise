@@ -45,7 +45,11 @@ describe('the capsule machine', () => {
   it('fn fn talks hands-free until the next tap', () => {
     const r = run([{ ev: 'fn', act: 'double' }]);
     expect(r.view).toEqual({ kind: 'talk', phase: 'listen', handsFree: true });
-    expect(run([{ ev: 'fn', act: 'double' }, { ev: 'fn', act: 'talk_end' }]).view).toMatchObject({ phase: 'listen' });
+    // the helper reports the ending tap as talk_end (qa-native's VM pass, m_9998): it ends
+    // hands-free and the core gets talk_end once, even if a tap follows
+    const ended = run([{ ev: 'fn', act: 'double' }, { ev: 'fn', act: 'talk_end' }, { ev: 'fn', act: 'tap' }]);
+    expect(ended.view).toEqual({ kind: 'talk', phase: 'think', handsFree: true });
+    expect(ended.fx.filter((f) => JSON.stringify(f) === JSON.stringify({ fx: 'talk', cmd: 'talk_end' }))).toHaveLength(1);
     expect(run([{ ev: 'fn', act: 'double' }, { ev: 'fn', act: 'tap' }]).view).toMatchObject({ phase: 'think' });
   });
   it('a pushed card waits through a quiet moment and shows when it ends; fn space is never held', () => {

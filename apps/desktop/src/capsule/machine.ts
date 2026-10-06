@@ -1,6 +1,7 @@
 // What the capsule shows and when (pure, for the checks): fn space opens the spotlight at the top
 // with the keys; holding fn talks (the talk at the bottom, never the keys, bise holds the mic), its
-// release thinks; fn fn talks hands-free until the next tap; bise's answer replaces the talk; a
+// release thinks; fn fn talks hands-free until the next tap (the helper reports that tap as
+// talk_end, its one meaning: ambient-lead m_9998; a 'tap' event ends it too); bise's answer replaces the talk; a
 // card bise pushes shows at the bottom only when nothing else is up (his action first) and waits
 // through a quiet moment (a call, sharing, full screen), then shows when it ends; his own action
 // (fn space, fn talk) is never held. esc or fn esc closes; the tray's click opens the dropdown; a
@@ -88,7 +89,7 @@ export function step(s: State, e: CapEvent): Step {
         case 'double':
           return go(s, { kind: 'talk', phase: 'listen', handsFree: true }, { fx: 'show', at: 'bottom', keys: false }, { fx: 'talk', cmd: 'talk_start' });
         case 'talk_end':
-          return v.kind === 'talk' && !v.handsFree && v.phase === 'listen' ? go(s, { kind: 'talk', phase: 'think', handsFree: false }, { fx: 'talk', cmd: 'talk_end' }) : stay(s);
+          return v.kind === 'talk' && v.phase === 'listen' ? go(s, { kind: 'talk', phase: 'think', handsFree: v.handsFree }, { fx: 'talk', cmd: 'talk_end' }) : stay(s);
         case 'tap':
           return v.kind === 'talk' && v.handsFree && v.phase === 'listen' ? go(s, { kind: 'talk', phase: 'think', handsFree: true }, { fx: 'talk', cmd: 'talk_end' }) : stay(s);
         case 'cancel':
