@@ -30,6 +30,7 @@
     "@lexical/utils": "0.52.0",
     "@tanstack/react-virtual": "3.14.13",
     "lexical": "0.52.0",
+    "prism-react-renderer": "2.4.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-markdown": "10.1.0",
