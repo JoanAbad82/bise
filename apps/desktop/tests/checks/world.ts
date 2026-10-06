@@ -1,10 +1,12 @@
 // The new app on the REAL core and a throwaway world (qa-flows): no scripted core, no hooks.
 // The world is ambient-qa's (plugins/ambient-qa/world.py): an isolated HOME under ~/.bise/gate
 // with bise's home hub and 2 seeded projects, every hub on tests/fake_provider.py's scripted
-// model. `realWorld()` reads it (`qa.py world state`) and brings one up when none is (it takes
-// the heavy lock itself, ~1-2 min). `launchReal()` starts the built app (out/) with
+// model. tests/checks/real.sh brings it up, runs the checks, and takes it down; `realWorld()` only
+// reads it (`qa.py world state`). `launchReal()` starts the built app (out/) with
 // BISE_DESKTOP_BISE = the world's bise, so main's process runs `bise ambient-core` exactly as
-// for him, with HOME = the world's: the core finds the world's hubs by his own rules, never his.
+// for him, in the world's home given to the harness (launchDesktop's `home`: the harness sets HOME
+// and BISE_HOME there and keeps its sentinel on): the core finds the world's hubs by his own
+// rules, never his.
 // `hub(project)` reads that hub straight from its socket (the effect outside the app), and
 // `tui(project)` opens the terminal's own view of the same hub in a detached tmux session, the
 // reference for every parity row (docs/desktop-bar.md).
@@ -27,22 +29,23 @@ const qa = (args: string[], timeout: number): string =>
 
 const parse = (out: string): World => JSON.parse(out.slice(out.indexOf('{'))) as World;
 
-/** The world (brought up when none is). Refuses anything outside ~/.bise/gate. */
+/**
+ * The world that tests/checks/real.sh brought up for this run (it takes it down after the run:
+ * no world is left behind, and a test never starts or stops one: Playwright restarts its worker
+ * after a failed test, so a worker-exit hook took the world down mid-run). Refuses anything
+ * outside ~/.bise/gate, a dead hub, or a world whose bise build is gone.
+ */
 export function realWorld(): World {
-  let w: World | undefined;
+  let w: World;
   try {
     w = parse(qa(['world', 'state'], 60_000));
-    // a dead hub, or a world whose bise build is gone (an agent cleaned its target): a new world
-    if (!w.hubs.every((h) => h.alive) || !existsSync(w.bise)) {
-      qa(['world', 'down'], 120_000);
-      w = undefined;
-    }
-  } catch {
-    w = undefined;
+  } catch (e) {
+    throw new Error(`no world up: run the real-core checks through tests/checks/real.sh (${String(e).split('\n')[0] ?? ''})`);
   }
-  w ??= parse(qa(['world', 'up', '--projects', '2'], 900_000));
   if (!path.resolve(w.home).startsWith(GATE)) throw new Error(`refused: the world's home ${w.home} is not under ~/.bise/gate`);
-  if (!existsSync(w.bise)) throw new Error(`the world's bise is gone: ${w.bise}`);
+  if (!existsSync(w.bise)) throw new Error(`the world's bise is gone: ${w.bise} (rerun tests/checks/real.sh)`);
+  const dead = w.hubs.filter((h) => !h.alive).map((h) => h.project);
+  if (dead.length) throw new Error(`the world's hubs are down: ${dead.join(', ')} (rerun tests/checks/real.sh)`);
   return w;
 }
 
@@ -63,17 +66,16 @@ export function worldEnv(w: World): Record<string, string> {
   };
 }
 
-/** The new app on the real core of the world; workspace '' = bise's home (--home), as he starts it. */
+/** The new app on the real core of the world; workspace '' = bise's home (--home), as he starts it.
+ * The harness runs it in the world's home (launchDesktop's `home`, amb-tools 9c85cc18): it sets
+ * HOME and BISE_HOME itself, keeps its sentinel on, and never deletes the world. */
 export function launchReal(w: World, o: LaunchOptions & { workspace?: string } = {}): Promise<Session> {
-  const env: Record<string, string> = {
-    ...worldEnv(w),
-    BISE_DESKTOP_BISE: w.bise,
-    BISE_DESKTOP_WORKSPACE: o.workspace ?? '',
-    ...(o.env ?? {}),
-  };
-  // the launcher's agent plumbing never reaches the app (its core drops it too: src/main/core/env.ts)
-  for (const k of Object.keys(process.env)) if (k.startsWith('SB_') || k === 'BISE_ROLE') env[k] = '';
-  return launchDesktop({ ...o, env });
+  const { workspace, ...rest } = o;
+  return launchDesktop({
+    ...rest,
+    home: w.home,
+    env: { BISE_DESKTOP_BISE: w.bise, BISE_DESKTOP_WORKSPACE: workspace ?? '', ...(o.env ?? {}) },
+  });
 }
 
 /**
