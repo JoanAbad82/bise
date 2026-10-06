@@ -41,11 +41,11 @@ type Tms is Data:
 
 # an act (bise desktop S2): an internal step sb-core takes at a time, on
 # the same clock and the same due rule as the wake timers (the tick's
-# now): send a held route (RouteSend, its message's id) or try a cross-
+# now): send a held route (RouteSend, the route's id) or try a cross-
 # hub delivery again (Retry, the outbox's xid). Journal: act_set, act_done
 # (laws act_fires_once, act_due_only).
 type What is Data:
-  RouteSend{msg: Nat}
+  RouteSend{rid: Nat}
   Retry{xid: Nat}
 
 type Act is Data:
@@ -373,7 +373,7 @@ def acts_due(xs: List<&2, Act>, +now: Nat) -> List<&2, Act>:
 def what_json(w: What) -> J.Json:
   match w:
     case RouteSend{+m}:
-      J.obj([J.kv("kind", J.JStr{"route_send"}), J.kv("msg", J.JNum{m})])
+      J.obj([J.kv("kind", J.JStr{"route_send"}), J.kv("rid", J.JNum{m})])
     case Retry{+x}:
       J.obj([J.kv("kind", J.JStr{"retry"}), J.kv("xid", J.JNum{x})])
 

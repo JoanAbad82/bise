@@ -4511,6 +4511,58 @@ law xhub_xin_replied_once:
   for +i: HXH.XIn
   {HXB.reply.of(Some{HXH.XIn.done(i)}) == None{} : Maybe<&2, HXH.XIn>}
 
+# ---- the routing hold (desktop S2 step 2, xhub.bend + core's `routing
+# hold` section) ----
+
+# LAW: a route has one outcome: once it ended (sent or cancelled), it is
+# never held again, so no fire, correction or cancel acts on it twice.
+law route_one_outcome:
+  for +r: HXH.Route
+  for s: HXH.RSt
+  for e: {HXB.is_held(s) == False{} : Bool}
+  {HXB.held.of(Some{HXH.route_op(HXH.REnd{s}, r)}) == None{} : Maybe<&2, HXH.Route>}
+
+# LAW: a correction acts only on a held route: one that went or was
+# cancelled gets a notice, nothing else.
+law route_correct_only_held:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +rid: Nat
+  for +to: String
+  for +name: String
+  {HC.route_correct.go(o, None{}, cx, rid, to, name) == HC.route_gone(o, cx, rid) : HX.Cx<o>}
+
+# LAW: a correction changes the project only: its due time stays (his 2 s
+# don't start again).
+law route_correct_keeps_due:
+  for +r: HXH.Route
+  for +to: String
+  for +name: String
+  {HXH.Route.due(HXH.route_op(HXH.RTo{to, name}, r)) == HXH.Route.due(r) : Nat}
+
+# LAW: a held route's act is due HOLD_MS (2 s) after the hold, so with
+# act_due_only it fires at that tick or later, never before.
+law route_fires_at_due_only:
+  for +x: HXH.Xs
+  for +tm: HTM.Tms
+  for +text: String
+  for +via: String
+  for +to: String
+  for +name: String
+  for +why: String
+  for +now: Nat
+  {HTM.Act.due(HXB.route_act(HXB.new_route(x, tm, text, via, to, name, why, now))) == Nat.add(now, 2000n) : Nat}
+
+# LAW (architect m_8883): a fire makes no turn: his message is journaled
+# (an id for the history and `--input`) by route_said, never by a send
+# (which pumps main), then delivered, settled and forwarded; main reads
+# it in a note at its next turn.
+law route_fire_makes_no_turn:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +r: HXH.Route
+  {HC.route_fire(o, Some{r}, cx) == HC.route_fire.sent(o, HC.route_said(o, cx, r), r, HM.St.next_msg(HC.st(o, cx))) : HX.Cx<o>}
+
 # LAW (one clock): an act fires once: after its act_done, it is gone.
 law act_fires_once:
   for +tm: HTM.Tms

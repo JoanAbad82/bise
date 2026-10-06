@@ -5126,7 +5126,7 @@ def hub_x_settled(+xs: List<&2, HXH.Out>, +xid: Nat) -> {HXB.open.of(HXH.out_of(
 
 def Laws.xhub_outbox_settles_once(x, xid):
   match x:
-    case HXH.Xs{ob, n, xi}:
+    case HXH.Xs{ob, n, xi, rs, nr}:
       hub_x_settled(ob, xid)
 
 def hub_x_seen.go(c: Bool, +h: HXH.XIn, +t: List<&2, HXH.XIn>, +i: HXH.XIn,
@@ -5153,13 +5153,38 @@ def hub_x_seen(+xs: List<&2, HXH.XIn>, +i: HXH.XIn) -> {HXB.seen.of(HXH.xin_of(L
 
 def Laws.xhub_xin_delivered_once(x, i):
   match x:
-    case HXH.Xs{ob, n, xi}:
+    case HXH.Xs{ob, n, xi, rs, nr}:
       hub_x_seen(xi, i)
 
 def Laws.xhub_xin_replied_once(i):
   match i:
     case HXH.XIn{h, x, m, k, r}:
       {==}
+
+def Laws.route_one_outcome(r, s, e):
+  match r:
+    case HXH.Route{a, b, c, d, f, g, h, i, j}:
+      match s:
+        case HXH.RHeld{}:
+          hub_absurd_eq(hub_tf_absurd(e), Maybe<&2, HXH.Route>, Some{HXH.Route{a, b, c, d, f, g, h, i, HXH.RHeld{}}}, None{})
+        case HXH.RSent{}:
+          {==}
+        case HXH.RCancelled{}:
+          {==}
+
+def Laws.route_correct_only_held(o, cx, rid, to, name):
+  {==}
+
+def Laws.route_correct_keeps_due(r, to, name):
+  match r:
+    case HXH.Route{a, b, c, d, f, g, h, i, j}:
+      {==}
+
+def Laws.route_fires_at_due_only(x, tm, text, via, to, name, why, now):
+  {==}
+
+def Laws.route_fire_makes_no_turn(o, cx, r):
+  {==}
 
 def hub_act_gone.go(c: Bool, +h: HTM.Act, +t: List<&2, HTM.Act>, +id: Nat, +e: {Nat.is_eq(HTM.Act.id(h), id) == c : Bool},
     ih: {HTM.act_find(HTM.act_drop(t, id), id) == None{} : Maybe<&2, HTM.Act>})

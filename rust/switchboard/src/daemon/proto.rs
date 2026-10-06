@@ -82,6 +82,29 @@ impl Shell {
         }
     }
 
+    /// desktop S2 step 2: sb-core's `route`/`route_done` effects, to every
+    /// typed connection (the window and the capsule show the held route).
+    pub(super) fn proto_route(&mut self, ev: HubEv) {
+        let ids: Vec<ClientId> = self.proto.conns.keys().copied().collect();
+        for id in ids {
+            self.proto_send(id, &ev);
+        }
+    }
+
+    /// `route_correct`'s `to`, checked in the registry before sb-core is
+    /// stepped (architect m_8883): "bise" keeps his words here (a cancel),
+    /// a known project gives its name, anything else an error.
+    fn route_to(&self, to: &str) -> Result<Option<(String, String)>, String> {
+        if to == "bise" {
+            return Ok(None);
+        }
+        let home = bise_home::Home::from_env();
+        let rows = bise_home::projects::list(&home, &crate::paths::home_workspace());
+        let hub = bise_home::projects::target(&rows, to, &self.project())?;
+        let name = rows.iter().find(|r| r.id == hub).map_or_else(|| hub.clone(), |r| r.name.clone());
+        Ok(Some((hub, name)))
+    }
+
     fn proto_error(&mut self, id: ClientId, cmd: &str, text: &str) {
         let project = Some(self.project());
         let cmd = Some(cmd.to_string()).filter(|c| !c.is_empty());
@@ -139,6 +162,8 @@ impl Shell {
             | HubCmd::ArtifactsSeen { project }
             | HubCmd::Worktrees { project }
             | HubCmd::DevServers { project }
+            | HubCmd::RouteCorrect { project, .. }
+            | HubCmd::RouteCancel { project, .. }
             | HubCmd::Diff { project, .. } => project.clone(),
             HubCmd::Hello { .. } => unreachable!(),
             HubCmd::Unknown { tag, .. } => return self.proto_error(id, tag, &format!("unknown command: {tag}")),
@@ -233,6 +258,15 @@ impl Shell {
             HubCmd::Worktrees { .. } => self.worktrees_typed(vec![id]),
             // jobs and lsof in a thread (dev_servers.rs), to this client
             HubCmd::DevServers { .. } => self.dev_servers_typed(vec![id]),
+            // the 2 s hold (sb-core's routing hold): a route that went
+            // already gets sb-core's notice; an unknown target never
+            // reaches sb-core
+            HubCmd::RouteCorrect { rid, to, .. } => match self.route_to(&to) {
+                Err(e) => self.proto_error(id, &tag, &e),
+                Ok(None) => self.step(Input::RouteCancel { rid }),
+                Ok(Some((to, name))) => self.step(Input::RouteCorrect { rid, to, name }),
+            },
+            HubCmd::RouteCancel { rid, .. } => self.step(Input::RouteCancel { rid }),
             HubCmd::Hello { .. } | HubCmd::Unknown { .. } => {}
         }
     }

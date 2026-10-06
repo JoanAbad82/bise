@@ -3664,6 +3664,116 @@ fn a_project_says_bise_message_once_and_answers_it_once() {
     assert!(xreplies(&t.turn(MAIN, "done")).is_empty());
 }
 
+// ---- desktop S2 step 2: the routing hold (core.bend's `routing hold`) ----
+
+fn routes(fx: &[Effect]) -> Vec<(u64, String, String, u64)> {
+    fx.iter()
+        .filter_map(|e| match e {
+            Effect::Route { rid, to, name, due_ms, .. } => Some((*rid, to.clone(), name.clone(), *due_ms)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn route_dones(fx: &[Effect]) -> Vec<(u64, String, String, Option<u64>)> {
+    fx.iter()
+        .filter_map(|e| match e {
+            Effect::RouteDone { rid, state, to, xid } => Some((*rid, state.clone(), to.clone(), *xid)),
+            _ => None,
+        })
+        .collect()
+}
+
+fn hold(t: &mut T, text: &str) -> Vec<Effect> {
+    t.go(Input::RouteHold { text: text.into(), via: String::new(), to: "shop-1".into(), name: "shop".into(), why: "Safari: shop.test".into() })
+}
+
+// his words wait 2 s on the timers' clock, then go once: his message to
+// main is recorded (an id, never a turn: law route_fire_makes_no_turn),
+// forwarded by the outbox, and main gets a note with the id
+#[test]
+fn a_held_route_goes_at_two_seconds_once_with_no_turn() {
+    let mut t = T::new();
+    let now = t.env.now;
+    let n = t.hub.st.msgs.len();
+    let fx = hold(&mut t, "why does p99 rise");
+    assert_eq!(routes(&fx), vec![(1, "shop-1".into(), "shop".into(), now + 2000)]);
+    assert!(xdelivers(&fx).is_empty() && say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none());
+    assert_eq!(t.hub.st.msgs.len(), n, "no message while held");
+    t.env.now += 1_500;
+    assert!(xdelivers(&t.go(Input::Tick)).is_empty());
+    t.env.now += 600;
+    let fx = t.go(Input::Tick);
+    assert_eq!(xdelivers(&fx), vec![(1, "shop-1".into(), "input".into(), "why does p99 rise".into())]);
+    assert_eq!(route_dones(&fx), vec![(1, "sent".into(), "shop-1".into(), Some(1))]);
+    assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none(), "no turn: {:?}", fx);
+    let his = last_msg(&t);
+    let m = &t.hub.st.msgs[&his];
+    assert_eq!((m.from.as_str(), m.to.as_str(), m.text.as_str()), (crate::model::USER, MAIN, "why does p99 rise"));
+    let note = t.hub.st.main_notes.last().expect("a note for main");
+    assert!(note.contains(&format!("m_{his}")) && note.contains("shop"), "{note}");
+    // forwarded already: main can't send it a second time
+    let (tok, fx) = t.req(MAIN, AgentReq::ProjectSend { project: "shop".into(), msg: his });
+    assert!(reply(&fx, tok).unwrap()["error"].as_str().unwrap().contains("already forwarded"), "{:?}", fx);
+    // once: no second fire, and a late correction or cancel changes nothing
+    t.env.now += 10_000;
+    assert!(xdelivers(&t.go(Input::Tick)).is_empty());
+    let fx = t.go(Input::RouteCorrect { rid: 1, to: "docs-2".into(), name: "docs".into() });
+    assert!(routes(&fx).is_empty() && xdelivers(&fx).is_empty());
+    let fx = t.go(Input::RouteCancel { rid: 1 });
+    assert!(route_dones(&fx).is_empty() && say_to(&fx, MAIN).is_none());
+}
+
+// a correction changes the project, not the time; `bise` is a cancel
+#[test]
+fn a_corrected_route_goes_to_the_new_project_at_the_same_time() {
+    let mut t = T::new();
+    let now = t.env.now;
+    hold(&mut t, "update the docs");
+    t.env.now += 1_000;
+    let fx = t.go(Input::RouteCorrect { rid: 1, to: "docs-2".into(), name: "docs".into() });
+    assert_eq!(routes(&fx), vec![(1, "docs-2".into(), "docs".into(), now + 2000)]);
+    t.env.now += 1_100;
+    let fx = t.go(Input::Tick);
+    assert_eq!(xdelivers(&fx), vec![(1, "docs-2".into(), "input".into(), "update the docs".into())]);
+    assert_eq!(route_dones(&fx), vec![(1, "sent".into(), "docs-2".into(), Some(1))]);
+}
+
+// a cancel: no delivery ever, his words reach bise's main as today
+#[test]
+fn a_cancelled_route_is_said_to_main_and_never_sent() {
+    for how in ["cancel", "correct to bise"] {
+        let mut t = T::new();
+        hold(&mut t, "never mind, for you");
+        let fx = match how {
+            "cancel" => t.go(Input::RouteCancel { rid: 1 }),
+            _ => t.go(Input::RouteCorrect { rid: 1, to: "bise".into(), name: "bise".into() }),
+        };
+        assert_eq!(route_dones(&fx), vec![(1, "cancelled".into(), "shop-1".into(), None)], "{how}");
+        let said = say_to(&fx, MAIN).or_else(|| steer_to(&fx, MAIN)).expect("main hears his words");
+        assert!(said.contains("never mind, for you"), "{how}: {said}");
+        t.env.now += 5_000;
+        assert!(xdelivers(&t.go(Input::Tick)).is_empty(), "{how}");
+    }
+}
+
+// a restart mid-hold: the act is in the journal, it fires once after
+#[test]
+fn a_route_held_across_a_restart_goes_once() {
+    let mut t = T::new();
+    hold(&mut t, "after the restart");
+    let journal = t.journal.borrow().clone();
+    let mut h = Hub::new("/w");
+    h.replay(&journal);
+    let mut env = FakeEnv::new();
+    env.now = t.env.now;
+    assert!(xdelivers(&h.handle(Input::Boot, &mut env)).is_empty());
+    env.now += 2_500;
+    assert_eq!(xdelivers(&h.handle(Input::Tick, &mut env)).len(), 1);
+    env.now += 2_500;
+    assert!(xdelivers(&h.handle(Input::Tick, &mut env)).is_empty());
+}
+
 // ---- the composer rule (lead m_8777, architect m_8801) ----
 
 fn open_card(t: &mut T, kind: &str, text: &str) -> u64 {

@@ -168,3 +168,50 @@ def reply_due(+x: XH.Xs, +msg: Nat) -> Maybe<&2, XH.XIn>:
 # the act of a retry of `xid` after `tries` failures, due from `now`
 def retry_act(+tm: TM.Tms, +xid: Nat, +tries: Nat, +now: Nat) -> TM.Act:
   TM.Act{TM.Tms.next_act(tm), Nat.add(now, backoff(tries)), TM.Retry{xid}}
+
+# ---- the routing hold (home side, step 2) ----
+
+# how long his words wait before they go to the project the shell picked:
+# his time to correct or cancel them (`route_correct`, `route_cancel`)
+def HOLD_MS() -> Nat:
+  2000n
+
+# a new held route: the next rid, due HOLD_MS from `now`, its act the
+# clock's next one
+def new_route(+x: XH.Xs, +tm: TM.Tms, +text: String, +via: String, +to: String, +name: String, +why: String, +now: Nat) -> XH.Route:
+  XH.Route{XH.Xs.next_rid(x), text, via, to, name, Nat.add(now, HOLD_MS()), TM.Tms.next_act(tm), why, XH.RHeld{}}
+
+# the act that sends a held route at its due time (law
+# route_fires_at_due_only: timers.bend's acts_due)
+def route_act(+r: XH.Route) -> TM.Act:
+  TM.Act{XH.Route.act(r), XH.Route.due(r), TM.RouteSend{XH.Route.rid(r)}}
+
+def is_held(s: XH.RSt) -> Bool:
+  match s:
+    case XH.RHeld{}:
+      True{}
+    case _:
+      False{}
+
+def held.go(+r: XH.Route, s: XH.RSt) -> Maybe<&2, XH.Route>:
+  match s:
+    case XH.RHeld{}:
+      Some{r}
+    case _:
+      None{}
+
+def held.of(m: Maybe<&2, XH.Route>) -> Maybe<&2, XH.Route>:
+  match m:
+    case None{}:
+      None{}
+    case Some{+r}:
+      held.go(r, XH.Route.st(r))
+
+# the route a fire, a correction or a cancel acts on: one still held
+# (laws route_one_outcome, route_correct_only_held)
+def held(+x: XH.Xs, +rid: Nat) -> Maybe<&2, XH.Route>:
+  held.of(XH.route_of(XH.Xs.routes(x), rid))
+
+# the view a routed message carries ("" none)
+def via_of(+v: String) -> Maybe<&2, String>:
+  Bool.pick(Maybe<&2, String>, String.is_empty(v), None{}, Some{v})

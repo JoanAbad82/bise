@@ -4,8 +4,8 @@
 //! When a stream ships one, it moves to [`crate::hub`] (or stays here for
 //! the core's own messages) and its fixture joins the frozen ones.
 //!
-//! - [`DraftHubEv`]: followed jobs (S10), routing "→ project" (S2) (S7's
-//!   artifacts, diffs, worktrees and dev servers shipped: hub.rs);
+//! - [`DraftHubEv`]: followed jobs (S10) (S7's artifacts, diffs,
+//!   worktrees and dev servers and S2's routing "→ project" shipped: hub.rs);
 //! - [`DraftHubCmd`]: follow (S10);
 //! - [`CoreEv`] (core -> app: the projects list, an app-side open) and
 //!   [`AppCmd`] (app -> core: open, project_add): never a hub's (S3b);
@@ -38,22 +38,12 @@ pub struct Job {
 #[serde(tag = "ev", rename_all = "snake_case")]
 pub enum DraftHubEv {
     Jobs { project: Project, jobs: Vec<Job> },
-    /// "→ telemetry": bise routes his words to a project's main; tab
-    /// corrects it until `correct_until_ms` (decision B's 2 s timer)
-    Route {
-        project: Project,
-        to: Project,
-        text: String,
-        correct_until_ms: u64,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        card: Option<u64>,
-    },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl DraftHubEv {
-    pub const TAGS: &'static [&'static str] = &["jobs", "route"];
+    pub const TAGS: &'static [&'static str] = &["jobs"];
 
     pub fn decode(line: &str) -> Result<DraftHubEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| DraftHubEv::Unknown { tag, raw })

@@ -96,6 +96,13 @@ def op_type(op: XH.OutOp) -> String:
     case XH.OpSettled{}:
       "x_settled"
 
+def route_op_json(+rid: Nat, op: XH.RouteOp) -> J.Json:
+  match op:
+    case XH.RTo{+to, +name}:
+      J.obj([ty("route_set"), J.kv("rid", J.JNum{rid}), J.kv("to", J.JStr{to}), J.kv("name", J.JStr{name})])
+    case XH.REnd{+s}:
+      J.obj([ty(String.append("route_", XH.rst_str(s))), J.kv("rid", J.JNum{rid})])
+
 def x_json(e: XH.XEv) -> J.Json:
   match e:
     case XH.XOut{+o}:
@@ -106,6 +113,10 @@ def x_json(e: XH.XEv) -> J.Json:
       J.obj([ty("x_in"), J.kv("in", XH.xin_json(i))])
     case XH.XReplied{+h, +xid}:
       J.obj([ty("x_replied"), J.kv("hub", J.JStr{h}), J.kv("xid", J.JNum{xid})])
+    case XH.XRouteHeld{+r}:
+      J.obj([ty("route_held"), J.kv("route", XH.route_json(r))])
+    case XH.XRoute{+rid, +op}:
+      route_op_json(rid, op)
 
 def act_ev_json(e: TM.ActEv) -> J.Json:
   match e:
@@ -256,6 +267,10 @@ type EvK is Data:
   KXReplied{}
   KActSet{}
   KActDone{}
+  KRouteHeld{}
+  KRouteSet{}
+  KRouteSent{}
+  KRouteCancelled{}
   KUnknown{}
 
 def ev_kind.x(+t: String) -> EvK:
@@ -267,7 +282,11 @@ def ev_kind.x(+t: String) -> EvK:
   Bool.pick(EvK, String.eq(t, "x_replied"), KXReplied{},
   Bool.pick(EvK, String.eq(t, "act_set"), KActSet{},
   Bool.pick(EvK, String.eq(t, "act_done"), KActDone{},
-  KUnknown{}))))))))
+  Bool.pick(EvK, String.eq(t, "route_held"), KRouteHeld{},
+  Bool.pick(EvK, String.eq(t, "route_set"), KRouteSet{},
+  Bool.pick(EvK, String.eq(t, "route_sent"), KRouteSent{},
+  Bool.pick(EvK, String.eq(t, "route_cancelled"), KRouteCancelled{},
+  KUnknown{}))))))))))))
 
 def ev_kind(+t: String) -> EvK:
   Bool.pick(EvK, String.eq(t, "task_created"), KTaskCreated{},
@@ -302,8 +321,12 @@ def out_of(+j: J.Json) -> XH.Out:
 def xin_of(+j: J.Json) -> XH.XIn:
   XH.XIn{get_s(j, "hub"), get_nat(j, "xid"), get_nat(j, "msg"), XH.kind_of(get_s(j, "kind")), get_b(j, "replied")}
 
+def route_of(+j: J.Json) -> XH.Route:
+  XH.Route{get_nat(j, "rid"), get_s(j, "text"), get_s(j, "via"), get_s(j, "to"), get_s(j, "name"), get_nat(j, "due_ms"),
+    get_nat(j, "act"), get_s(j, "why"), XH.rst_of(get_s(j, "state"))}
+
 def what_of(+j: J.Json) -> TM.What:
-  Bool.pick(TM.What, String.eq(get_s(j, "kind"), "retry"), TM.Retry{get_nat(j, "xid")}, TM.RouteSend{get_nat(j, "msg")})
+  Bool.pick(TM.What, String.eq(get_s(j, "kind"), "retry"), TM.Retry{get_nat(j, "xid")}, TM.RouteSend{get_nat(j, "rid")})
 
 def act_of(+j: J.Json) -> TM.Act:
   TM.Act{get_nat(j, "id"), get_nat(j, "due"), what_of(get_j(j, "what"))}
@@ -384,6 +407,14 @@ def ev_of.kind(k: EvK, +j: J.Json, +n: String) -> Maybe<&2, M.Ev>:
       Some{M.EAct{TM.ActSet{act_of(get_j(j, "act"))}}}
     case KActDone{}:
       Some{M.EAct{TM.ActDone{get_nat(j, "id")}}}
+    case KRouteHeld{}:
+      Some{M.EX{XH.XRouteHeld{route_of(get_j(j, "route"))}}}
+    case KRouteSet{}:
+      Some{M.EX{XH.XRoute{get_nat(j, "rid"), XH.RTo{get_s(j, "to"), get_s(j, "name")}}}}
+    case KRouteSent{}:
+      Some{M.EX{XH.XRoute{get_nat(j, "rid"), XH.REnd{XH.RSent{}}}}}
+    case KRouteCancelled{}:
+      Some{M.EX{XH.XRoute{get_nat(j, "rid"), XH.REnd{XH.RCancelled{}}}}}
     case KUnknown{}:
       None{}
 

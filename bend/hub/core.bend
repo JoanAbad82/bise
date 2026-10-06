@@ -83,6 +83,9 @@ type In is Data:
   IXAck{}
   IXFail{}
   IXReply{}
+  IRouteHold{}
+  IRouteCorrect{}
+  IRouteCancel{}
   INone{}
 
 type CardK is Data:
@@ -2204,13 +2207,97 @@ def xretry(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
     case Some{+ob}:
       xdeliver(o, cx, ob)
 
+# ---- the routing hold (S2 step 2) ----
+# His words to bise's main that the shell's route.rs sends to a project
+# (input route_hold) wait HOLD_MS on the one clock (a RouteSend act): the
+# window shows them (fx route) and he may correct the target or cancel.
+# At the fire they become his message to main (an id, recorded, never a
+# turn: law route_fire_makes_no_turn) forwarded by the outbox, and main
+# gets a note with the id. A cancel says them to main as today.
+
+def route_ev(-o: M.St, +cx: X.Cx<o>, +r: XH.Route) -> X.Cx<o>:
+  out(o, cx, [J.kv("fx", J.JStr{"route"}), J.kv("rid", J.JNum{XH.Route.rid(r)}),
+    J.kv("to", J.JStr{XH.Route.to(r)}), J.kv("name", J.JStr{XH.Route.name(r)}),
+    J.kv("text", J.JStr{XH.Route.text(r)}), J.kv("due_ms", J.JNum{XH.Route.due(r)}),
+    J.kv("why", J.JStr{XH.Route.why(r)})])
+
+def route_done(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +state: String, +to: String, +xid: J.Json) -> X.Cx<o>:
+  out(o, cx, [J.kv("fx", J.JStr{"route_done"}), J.kv("rid", J.JNum{rid}), J.kv("state", J.JStr{state}),
+    J.kv("to", J.JStr{to}), J.kv("xid", xid)])
+
+# home: the input route_hold (the shell's route.rs picked `to`, a project
+# hub id, `name` its name): held, its act set, the window told
+def route_hold(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +to: String, +name: String, +why: String) -> X.Cx<o>:
+  +r = XB.new_route(xst(o, cx), tms(o, cx), text, via, to, name, why, now(o, cx))
+  +cx2 = xemit(o, cx, XH.XRouteHeld{r})
+  route_ev(o, aemit(o, cx2, TM.ActSet{XB.route_act(r)}), r)
+
+def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: XH.Route, +id: Nat) -> X.Cx<o>:
+  +cx2 = emit(o, mark_delivered(o, cx, id), M.ESettled{id}, Unit{}, Unit{}, Unit{})
+  +ob = XB.new_out(xst(o, cx2), XH.Route.to(r), XH.KInput{}, id, XH.Route.text(r))
+  +cx3 = xdeliver(o, xemit(o, cx2, XH.XOut{ob}), ob)
+  +cx4 = xemit(o, cx3, XH.XRoute{XH.Route.rid(r), XH.REnd{XH.RSent{}}})
+  +cx5 = route_done(o, cx4, XH.Route.rid(r), "sent", XH.Route.to(r), J.JNum{XH.Out.xid(ob)})
+  note_main(o, cx5, cat(["the user's words went to the project ", XH.Route.name(r), " (", mid(id), ", routed by bise): \"",
+    M.clip(M.one_line(XH.Route.text(r)), 300n), "\"; its answer comes back to you from @", XH.Route.name(r)]))
+
+# his routed words as his message to main, journaled only: no send (a
+# send would pump main, a turn), no waiter, no card (law
+# route_fire_makes_no_turn)
+def route_said(-o: M.St, +cx: X.Cx<o>, +r: XH.Route) -> X.Cx<o>:
+  +msg = {M.Msg{M.St.next_msg(st(o, cx)), M.St.next_msg(st(o, cx)), M.USER(), M.MAIN(), None{}, False{}, False{}, XH.Route.text(r), now(o, cx), True{}, False{}, XB.via_of(XH.Route.via(r))} : M.Msg}
+  emit(o, cx, M.EMsgSent{msg}, {==}, quiet_ok(False{}, False{}), Unit{})
+
+# home: a held route's act fired: his message to main is created now (an
+# id for the history and `--input`), delivered and settled at once with
+# no turn (law route_fire_makes_no_turn), then forwarded once
+def route_fire(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
+  match m:
+    case None{}:
+      cx
+    case Some{+r}:
+      route_fire.sent(o, route_said(o, cx, r), r, M.St.next_msg(st(o, cx)))
+
+def route_gone(-o: M.St, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
+  notice(o, cx, cat(["route ", Nat.show(rid), " already went or was cancelled"]))
+
+# home: the input route_cancel: a held route ends, its act with it, and
+# his words reach main as a plain message (today's path)
+def route_cancel.go(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
+  match m:
+    case None{}:
+      route_gone(o, cx, rid)
+    case Some{+r}:
+      +cx2 = aemit(o, cx, TM.ActDone{XH.Route.act(r)})
+      +cx3 = xemit(o, cx2, XH.XRoute{rid, XH.REnd{XH.RCancelled{}}})
+      +cx4 = route_done(o, cx3, rid, "cancelled", XH.Route.to(r), J.JNull{})
+      says.sent(o, send(o, cx4, Snd{M.USER(), M.MAIN(), XH.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(XH.Route.via(r))}), M.MAIN(), XH.Route.text(r))
+
+def route_cancel(-o: M.St, +cx: X.Cx<o>, +rid: Nat) -> X.Cx<o>:
+  route_cancel.go(o, XB.held(xst(o, cx), rid), cx, rid)
+
+def route_correct.go(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String) -> X.Cx<o>:
+  match m:
+    case None{}:
+      route_gone(o, cx, rid)
+    case Some{+r}:
+      route_ev(o, xemit(o, cx, XH.XRoute{rid, XH.RTo{to, name}}), XH.Route.with_to(r, to, name))
+
+# home: the input route_correct (the shell checked `to` in the registry):
+# a held route gets its new project, same due time; `bise` keeps his
+# words here (a cancel); a route not held: a notice (law
+# route_correct_only_held)
+def route_correct(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String) -> X.Cx<o>:
+  pick_lazy(X.Cx<o>, String.eq(to, XB.VIA_BISE()),
+    u => route_cancel(o, cx, rid),
+    u => route_correct.go(o, XB.held(xst(o, cx), rid), cx, rid, to, name))
+
 def act_fire(-o: M.St, w: TM.What, +cx: X.Cx<o>) -> X.Cx<o>:
   match w:
     case TM.Retry{+xid}:
       xretry(o, XB.pending(xst(o, cx), xid), cx)
-    case TM.RouteSend{_}:
-      # the 2 s routing hold: step 2
-      cx
+    case TM.RouteSend{+rid}:
+      route_fire(o, XB.held(xst(o, cx), rid), cx)
 
 def acts_tick.each(-o: M.St, xs: List<&2, TM.Act>, +cx: X.Cx<o>) -> X.Cx<o>:
   match xs:
@@ -3091,7 +3178,12 @@ def in_tag(+t: String) -> In:
   Bool.pick(In, String.eq(t, "x_ack"), IXAck{},
   Bool.pick(In, String.eq(t, "x_fail"), IXFail{},
   Bool.pick(In, String.eq(t, "x_reply"), IXReply{},
-  INone{})))))))))))))))))))))))))))))))))))))))
+  # the routing hold (S2 step 2, the `routing hold` section): his words
+  # held for a project (route_hold), its correction or cancel
+  Bool.pick(In, String.eq(t, "route_hold"), IRouteHold{},
+  Bool.pick(In, String.eq(t, "route_correct"), IRouteCorrect{},
+  Bool.pick(In, String.eq(t, "route_cancel"), IRouteCancel{},
+  INone{}))))))))))))))))))))))))))))))))))))))))))
 
 # `/close N`: the user files a card without answering it
 def close_by_user(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
@@ -3195,6 +3287,12 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
       xfail(o, XB.pending(xst(o, cx), C.get_nat(i, "xid")), cx, C.get_nat(i, "xid"))
     case IXReply{}:
       xanswer(o, XB.open(xst(o, cx), C.get_nat(i, "xid")), cx, C.get_nat(i, "xid"), C.get_s(i, "name"), C.get_s(i, "text"))
+    case IRouteHold{}:
+      route_hold(o, cx, C.get_s(i, "text"), C.get_s(i, "via"), C.get_s(i, "to"), C.get_s(i, "name"), C.get_s(i, "why"))
+    case IRouteCorrect{}:
+      route_correct(o, cx, C.get_nat(i, "rid"), C.get_s(i, "to"), C.get_s(i, "name"))
+    case IRouteCancel{}:
+      route_cancel(o, cx, C.get_nat(i, "rid"))
     case INone{}:
       cx
 

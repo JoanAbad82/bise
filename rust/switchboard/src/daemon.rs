@@ -1232,6 +1232,14 @@ impl Shell {
             Effect::UpdateLater { id } => versions::update_later(&id),
             Effect::XDeliver { xid, project, kind, text } => self.xdeliver(xid, project, kind, text),
             Effect::XReply { hub, xid, text } => self.xreply_back(hub, xid, text),
+            Effect::Route { rid, to, name, text, due_ms, why } => {
+                let project = self.project();
+                self.proto_route(bise_proto::hub::HubEv::Route { project, rid, to, name, text, correct_until_ms: due_ms, why })
+            }
+            Effect::RouteDone { rid, state, to, xid } => {
+                let project = self.project();
+                self.proto_route(bise_proto::hub::HubEv::RouteDone { project, rid, state, to, xid })
+            }
         }
     }
 

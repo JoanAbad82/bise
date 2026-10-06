@@ -568,6 +568,27 @@ pub enum Input {
         name: String,
         text: String,
     },
+    /// desktop S2 step 2, bise's home hub: his words to bise's main that
+    /// route.rs sends to project `to` (a hub id, `name` its name, `why`
+    /// the guess's reason, `via` his view): held 2 s, then forwarded.
+    RouteHold {
+        text: String,
+        via: String,
+        to: String,
+        name: String,
+        why: String,
+    },
+    /// A held route goes to `to` instead (the shell checked it in the
+    /// registry; `bise`: a cancel).
+    RouteCorrect {
+        rid: u64,
+        to: String,
+        name: String,
+    },
+    /// A held route doesn't go: his words reach main as today.
+    RouteCancel {
+        rid: u64,
+    },
     Updated {
         card: u64,
         version: String,
@@ -758,6 +779,23 @@ pub enum Effect {
         hub: String,
         xid: u64,
         text: String,
+    },
+    /// desktop S2 step 2: a route held (or corrected: same `rid`), for
+    /// the typed clients (`route`).
+    Route {
+        rid: u64,
+        to: String,
+        name: String,
+        text: String,
+        due_ms: u64,
+        why: String,
+    },
+    /// Its end: `state` "sent" (`xid` its delivery) or "cancelled".
+    RouteDone {
+        rid: u64,
+        state: String,
+        to: String,
+        xid: Option<u64>,
     },
 }
 
@@ -2215,6 +2253,14 @@ impl Hub {
             Input::XReply { xid, name, text } => {
                 self.core(&mut fx, env, None, json!({"t": "x_reply", "xid": xid, "name": name, "text": text}))
             }
+            Input::RouteHold { text, via, to, name, why } => {
+                let i = json!({"t": "route_hold", "text": text, "via": via, "to": to, "name": name, "why": why});
+                self.core(&mut fx, env, None, i)
+            }
+            Input::RouteCorrect { rid, to, name } => {
+                self.core(&mut fx, env, None, json!({"t": "route_correct", "rid": rid, "to": to, "name": name}))
+            }
+            Input::RouteCancel { rid } => self.core(&mut fx, env, None, json!({"t": "route_cancel", "rid": rid})),
         }
         self.refresh_contexts(&mut fx, env.now());
         if self.dirty {
@@ -2363,6 +2409,20 @@ impl Hub {
                 text: jstr(f, "text"),
             }),
             "xreply" => fx.push(Effect::XReply { hub: jstr(f, "hub"), xid: f["xid"].as_u64().unwrap_or(0), text: jstr(f, "text") }),
+            "route" => fx.push(Effect::Route {
+                rid: f["rid"].as_u64().unwrap_or(0),
+                to: jstr(f, "to"),
+                name: jstr(f, "name"),
+                text: jstr(f, "text"),
+                due_ms: f["due_ms"].as_u64().unwrap_or(0),
+                why: jstr(f, "why"),
+            }),
+            "route_done" => fx.push(Effect::RouteDone {
+                rid: f["rid"].as_u64().unwrap_or(0),
+                state: jstr(f, "state"),
+                to: jstr(f, "to"),
+                xid: f["xid"].as_u64(),
+            }),
             // not the client's `confirm` (a yes/no in the status row): a card's
             // the user's digit on a hub item (merge.rs)
             "card_choice" => self.card_choice(fx, env, f),

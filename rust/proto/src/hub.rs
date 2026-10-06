@@ -65,6 +65,22 @@ pub enum HubEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         note: Option<String>,
     },
+    /// bise's home hub holds his words for a project's main (desktop S2,
+    /// decision B): `to` the project picked (its hub id), `name` its name,
+    /// `why` the guess's reason; until `correct_until_ms` (2 s after) a
+    /// `route_correct` or `route_cancel` with this `rid` still changes it;
+    /// `route` comes again after a correction (same rid, same time)
+    Route { project: Project, rid: u64, to: Project, name: String, text: String, correct_until_ms: u64, why: String },
+    /// the route's end: `state` "sent" (forwarded: `xid` its delivery) or
+    /// "cancelled" (his words stayed with bise's main)
+    RouteDone {
+        project: Project,
+        rid: u64,
+        state: String,
+        to: Project,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        xid: Option<u64>,
+    },
     /// an unknown or refused command, never silence
     Error {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -79,7 +95,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "diff", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "diff", "route", "route_done", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -188,13 +204,21 @@ pub enum HubCmd {
     Worktrees { project: Project },
     /// the environments screen opened: `dev_servers` comes again
     DevServers { project: Project },
+    /// a held route goes to project `to` instead (a hub id of the
+    /// registry, else an error; "bise": his words stay with bise's main,
+    /// a cancel); a route that ended already: nothing (its `route_done`
+    /// came)
+    RouteCorrect { project: Project, rid: u64, to: String },
+    /// a held route doesn't go: his words reach bise's main as a plain
+    /// message (a route that ended already: nothing)
+    RouteCancel { project: Project, rid: u64 },
     /// a tag this version doesn't know: answered with `error`
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "route_correct", "route_cancel"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -222,9 +246,9 @@ mod tests {
 
     #[test]
     fn unknown_tags_are_kept_and_bad_fields_are_errors() {
-        let e = HubEv::decode(r#"{"ev":"route","project":"p","to":"q"}"#).unwrap();
-        assert!(matches!(&e, HubEv::Unknown { tag, .. } if tag == "route"));
-        assert_eq!(e.encode(), r#"{"ev":"route","project":"p","to":"q"}"#);
+        let e = HubEv::decode(r#"{"ev":"jobs","project":"p","to":"q"}"#).unwrap();
+        assert!(matches!(&e, HubEv::Unknown { tag, .. } if tag == "jobs"));
+        assert_eq!(e.encode(), r#"{"ev":"jobs","project":"p","to":"q"}"#);
         assert!(HubEv::decode(r#"{"ev":"typing","project":"p"}"#).is_err(), "a known tag without its fields");
         assert!(HubEv::decode(r#"{"project":"p"}"#).is_err());
         let c = HubCmd::decode(r#"{"cmd":"approve","project":"p","card":3}"#).unwrap();
