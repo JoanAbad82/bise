@@ -3362,9 +3362,14 @@ def real_violations(pid):
 
 def _exe_pid(exe):
     """The pid running exactly this executable (the harness bundle's own path), or None."""
-    r = subprocess.run(["pgrep", "-f", "^" + re.escape(exe)], capture_output=True, text=True)
-    pids = [int(x) for x in r.stdout.split()]
-    return pids[0] if pids else None
+    # ps, not pgrep: the path has spaces, and pgrep's regex missed it in proof run #2 (the watchdog
+    # never attached; amb-mac's own guard did the job)
+    r = subprocess.run(["ps", "-axww", "-o", "pid=,args="], capture_output=True, text=True)
+    for line in r.stdout.splitlines():
+        pid, _, args = line.strip().partition(" ")
+        if args == exe or args.startswith(exe + " "):
+            return int(pid)
+    return None
 
 
 def real_watch(pid, every=0.25):
