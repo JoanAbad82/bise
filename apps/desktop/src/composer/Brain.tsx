@@ -38,7 +38,7 @@ import { mergeRegister } from '@lexical/utils';
 import { $applyOp, $caretOffset, $insertAtCaret, $insertChip, $replaceBeforeCaret, $selectRange } from './edit';
 import { $caretOnFirstLine, $isBlank, $plainText, $readSegments, $textBeforeCaret } from './read';
 import { enterMakesNewline, indent, newline, outdentAtStart, subwordLeft, subwordRight, NO_UNDO, type Op } from './mdlive';
-import { buildMessage, chars, chipStrip, isLongPaste, nextChipNumber, preview, type Chip, type Outgoing, type Segment } from './message';
+import { buildMessage, chars, chipStrip, isLongPaste, nextChipNumber, noVisionLine, preview, type Chip, type Outgoing, type Segment } from './message';
 import { enqueue, historyAt, load, popNewest, remember, save, takeOldest, type Saved, type Store } from './drafts';
 import { agentRows, argRows, artifactRows, commandLine, commandRows, completion, emojiRows, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
 import { isImagePath, type ComposerSources, type PickFile } from './sources';
@@ -65,8 +65,18 @@ interface BrainProps {
   readonly command: (name: string, args: string) => void;
   readonly onCanSend: (on: boolean) => void;
   readonly onStrip: (strip: JSX.Element | null) => void;
+  /** The field's part of the key bar's mode, on transitions only (keybar.ts). */
+  readonly onBar: (bar: FieldBar) => void;
   /** Hands the screen its actions once mounted (Composer keeps them for the send button). */
   readonly onActions: (a: ComposerActions) => void;
+}
+
+/** What the field tells the key bar: a list open, text selected, images, text in it. */
+export interface FieldBar {
+  readonly fileList: boolean;
+  readonly selected: boolean;
+  readonly images: boolean;
+  readonly typing: boolean;
 }
 
 /** The draft is written this long after the last change (never on each key of a burst). */
@@ -187,6 +197,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
   const open = trigger !== null && rows.length > 0 && dismissed !== `${trigger.kind}:${trigger.start}`;
   const index = sel.key === tkey ? Math.min(sel.i, Math.max(0, rows.length - 1)) : 0;
   const live = useRef({ open, rows, index, trigger, tkey });
+  const fileList = open && trigger.kind === 'at';
   useEffect(() => {
     live.current = { open, rows, index, trigger, tkey };
   });
@@ -211,6 +222,11 @@ export function Brain(p: BrainProps): JSX.Element | null {
     const entry = json(editor);
     const only = segs.length === 1 && segs[0]?.kind === 'text' ? segs[0].text : null;
     const cmd = only === null ? null : commandLine(only, props.current.sources.commands);
+    const model = props.current.sources.noVision;
+    if (cmd === null && model !== undefined && segs.some((s) => s.kind === 'chip' && s.chip.kind === 'image')) {
+      say(noVisionLine(model)); // K4: nothing sent, the draft and its chips stay
+      return;
+    }
     if (cmd !== null) {
       if (!cmd.ready) return; // shown greyed as `not yet` in the list; the line stays his to change
       props.current.command(cmd.name, cmd.args);
@@ -362,13 +378,35 @@ export function Brain(p: BrainProps): JSX.Element | null {
     );
   };
   const chipsNow = (): Chip[] => editor.getEditorState().read(() => $readSegments().flatMap((x) => (x.kind === 'chip' ? [x.chip] : [])));
+  /** One line for him in the strip, until his next edit. */
+  const say = (text: string): void => {
+    note.current = text;
+    pushStrip(chipsNow());
+  };
+
+  // ---- the key bar's mode: reported when it changes, never per keystroke ----
+  const bar = useRef<FieldBar>({ fileList: false, selected: false, images: false, typing: false });
+  const lastBar = useRef('');
+  const pushBar = (part: Partial<FieldBar>): void => {
+    bar.current = { ...bar.current, ...part };
+    const key = JSON.stringify(bar.current);
+    if (key === lastBar.current) return;
+    lastBar.current = key;
+    props.current.onBar(bar.current);
+  };
+  useEffect(() => {
+    pushBar({ fileList });
+  }, [fileList]);
 
   // ---- the editor's updates: what he typed, read (never written back) ----
   useEffect(() => {
     let lastTrigger = '';
     let lastBefore: string | null = null;
     return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves, tags }) => {
-      const r = editorState.read(() => ({ blank: $isBlank(), segs: $readSegments(), before: $textBeforeCaret() }));
+      const r = editorState.read(() => {
+        const sel = $getSelection();
+        return { blank: $isBlank(), segs: $readSegments(), before: $textBeforeCaret(), selected: $isRangeSelection(sel) && !sel.isCollapsed() };
+      });
       // a `:` he just typed closes a known `:name:`: the emoji takes its place (emoji.rs
       // replace_typed); never on a paste or an undo (⌘Z brings `:clap:` back and it stays)
       const typedColon = r.before !== null && lastBefore !== null && r.before.text === `${lastBefore}:` && !tags.has(HISTORIC_TAG) && !tags.has(PASTE_TAG);
@@ -382,6 +420,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
         return;
       }
       props.current.onCanSend(!r.blank);
+      pushBar({ selected: r.selected, typing: !r.blank, images: r.segs.some((x) => x.kind === 'chip' && x.chip.kind === 'image') });
       const emojiTrigger = (before: string): Trigger | null => {
         const e = emojiToken(before);
         return e === null ? null : { kind: 'emoji', query: e.query, start: e.start, quoted: false };
@@ -429,10 +468,6 @@ export function Brain(p: BrainProps): JSX.Element | null {
         $applyOp(op);
       });
       return true;
-    };
-    const say = (text: string): void => {
-      note.current = text;
-      pushStrip(chipsNow());
     };
     return mergeRegister(
       // ctrl+⌥←/→ subword moves, ctrl+⌥⌫/⌦ subword deletes (editor.rs); ctrl+z / ⌘Z with nothing

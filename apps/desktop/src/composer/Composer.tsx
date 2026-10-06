@@ -15,7 +15,8 @@ import { ContentEditable } from '@lexical/react/LexicalContentEditable';
 import { ComposerFrame } from '@/ds';
 import './composer.css';
 import { ChipNode } from './ChipNode';
-import { Brain, type ComposerActions } from './Brain';
+import { Brain, type ComposerActions, type FieldBar } from './Brain';
+import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, type TipClock } from './keybar';
 import type { Outgoing } from './message';
 import { NO_SOURCES, type ComposerSources } from './sources';
 import type { Store } from './drafts';
@@ -31,7 +32,12 @@ export interface ComposerProps {
   /** "you → bise · opus · high" */
   readonly to?: string;
   readonly placeholder?: string;
+  /** A fixed key bar (a screen of its own); unset: the bar follows the composer's mode (W9). */
   readonly keys?: string;
+  /** Voice in this composer: recording, then transcribing (the key bar's voice keys). */
+  readonly voice?: 'recording' | 'transcribing' | null;
+  /** Text is selected in the thread: typing asks about it (the key bar says so). */
+  readonly quoting?: boolean;
   readonly onSend: (out: Outgoing) => void;
   /** A command line he ran (`/model opus`): the screen runs it (a core cmd or a screen). */
   readonly onCommand?: (name: string, args: string) => void;
@@ -41,6 +47,9 @@ export interface ComposerProps {
   readonly onReady?: (a: ComposerActions) => void;
   readonly testId?: string;
 }
+
+/** The last tip shown (keybar.rs keeps it in the `tip` preference): the next session starts after it. */
+const TIP_KEY = 'bise.composer.v1.tip';
 
 function onError(error: Error): void {
   // an editor error must not take the screen down; it is logged, and the text stays
@@ -58,7 +67,7 @@ const EXTENSION = defineExtension({
 });
 
 export const Composer = memo(function Composer(props: ComposerProps): JSX.Element {
-  const { target, busy = false, sources = NO_SOURCES, to, placeholder = 'write to bise', keys = '@ file   $ skills   / commands', testId = 'composer' } = props;
+  const { target, busy = false, sources = NO_SOURCES, to, placeholder = 'write to bise', keys, voice = null, quoting = false, testId = 'composer' } = props;
   const store = useMemo<Store>(() => props.store ?? window.localStorage, [props.store]);
   // the latest callbacks, read by the editor's handlers without re-creating them
   const cb = useRef(props);
@@ -68,12 +77,55 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
   const actions = useRef<ComposerActions | null>(null);
   const [canSend, setCanSend] = useState(false);
   const [strip, setStrip] = useState<JSX.Element | null>(null);
+  const [field, setField] = useState<FieldBar>({ fileList: false, selected: false, images: false, typing: false });
+  const mode = barMode({ ...field, voice, quoting, busy });
+
+  // the tip: the one after the last session's, the next every 5 minutes, never while he types
+  const [tip, setTip] = useState<TipClock | null>(null);
+  const typing = useRef(false);
+  useEffect(() => {
+    typing.current = field.typing;
+  });
+  useEffect(() => {
+    const raw = store.getItem(TIP_KEY);
+    const saved = raw === null ? null : Number(raw);
+    let clock = startTip(Number.isInteger(saved) ? saved : null, Date.now());
+    setTip(clock);
+    store.setItem(TIP_KEY, String(clock.index));
+    const timer = window.setInterval(() => {
+      const next = tickTip(clock, Date.now(), typing.current);
+      if (next === clock) return;
+      clock = next;
+      setTip(next);
+      store.setItem(TIP_KEY, String(next.index));
+    }, 30_000);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [store]);
+  const tipText = tip !== null && tipShown(mode, field.typing) ? TIPS[tip.index] : undefined;
 
   return (
     <ComposerFrame
       testId={testId}
       to={to}
-      keys={keys}
+      keys={
+        <>
+          <span className="pairs" data-testid={`${testId}.keys`} data-mode={keys === undefined ? mode : 'fixed'}>
+            {keys ??
+              barPairs(mode, field.typing).map(([k, l]) => (
+                <span key={k + l} className="pair">
+                  {k !== '' && <span className="kk">{k}</span>} {l}
+                </span>
+              ))}
+          </span>
+          {keys === undefined && tipText !== undefined && (
+            <span className="tip" data-testid={`${testId}.tip`}>
+              tip · {tipText}
+            </span>
+          )}
+        </>
+      }
       quote={strip}
       send={busy && !canSend ? 'stop' : canSend ? 'on' : 'off'}
       onSend={() => {
@@ -105,6 +157,7 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
           }}
           onCanSend={setCanSend}
           onStrip={setStrip}
+          onBar={setField}
           onActions={(a) => {
             if (actions.current === null) cb.current.onReady?.(a);
             actions.current = a;

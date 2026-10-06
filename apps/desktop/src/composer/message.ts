@@ -112,10 +112,14 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
       if (!files.includes(c.path)) files.push(c.path);
     }
   }
-  const words = body.trim();
+  // `say …` and `steer …` go out without their word (sb.rs, C45)
+  const words = body.trim().replace(/^(?:steer|say) /u, '').trim();
   const text = [...quotes, words].filter((x) => x !== '').join('\n');
   return { text, files };
 }
+
+/** The line a message with images gets when the model reads none (attach.rs no_vision_error). */
+export const noVisionLine = (model: string): string => `${model} does not support image input (bise's model catalog): not sent`;
 
 /** Nothing to send: no words, no chip. */
 export const isEmpty = (segments: readonly Segment[]): boolean =>

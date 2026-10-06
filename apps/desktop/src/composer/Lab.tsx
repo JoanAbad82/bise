@@ -89,7 +89,14 @@ const SOURCES: ComposerSources = {
   },
   files: (q) => Promise.resolve(prefixFirst(FILES, q.replace(/^"/u, ''), (f) => f.path.split('/').at(-1) ?? f.path).slice(0, 20)),
   saveImage: (f) => Promise.resolve({ path: `/tmp/bise-lab/${f.name || 'pasted.png'}`, name: f.name || 'pasted.png' }),
+  artifacts: [
+    { id: 'perf-notes', title: 'Perf notes', kind: 'page', agent: 'perf', url: 'http://127.0.0.1:47123/p/perf-notes', atMs: 1_791_100_014_000 },
+    { id: 'pricing-draft', title: 'Pricing draft', kind: 'doc', agent: 'docs', url: 'http://127.0.0.1:47123/a/pricing-draft', atMs: 1_791_090_000_000 },
+  ],
 };
+
+/** The lab's model when its 'the model reads images' box is unticked (K4). */
+const TEXT_ONLY = { ...SOURCES, noVision: 'lab-text-model' };
 
 const SPOT: SpotData = {
   projects: [
@@ -125,16 +132,25 @@ function SentLog({ log }: { log: Log }): JSX.Element {
 export function ComposerLab(): JSX.Element {
   const [log, setLog] = useState<Log>([]);
   const [busy, setBusy] = useState(false);
+  const [vision, setVision] = useState(true);
+  const [voice, setVoice] = useState(false);
   return (
     <section className="lab" data-testid="lab.composer">
       <label>
         <input type="checkbox" checked={busy} onChange={(e) => { setBusy(e.currentTarget.checked); }} data-testid="lab.busy" /> a turn runs
       </label>
+      <label>
+        <input type="checkbox" checked={vision} onChange={(e) => { setVision(e.currentTarget.checked); }} data-testid="lab.vision" /> the model reads images
+      </label>
+      <label>
+        <input type="checkbox" checked={voice} onChange={(e) => { setVoice(e.currentTarget.checked); }} data-testid="lab.voice" /> voice mode
+      </label>
       <SentLog log={log} />
       <Composer
         target="lab/main"
         busy={busy}
-        sources={SOURCES}
+        sources={vision ? SOURCES : TEXT_ONLY}
+        voice={voice ? 'recording' : null}
         to="you → bise · lab"
         onSend={(o) => { setLog((l) => [...l, JSON.stringify(o)]); }}
         onCommand={(name, args) => { setLog((l) => [...l, JSON.stringify({ command: name, args })]); }}

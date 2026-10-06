@@ -78,6 +78,9 @@ export interface ComposerSources {
   readonly files: (query: string) => Promise<readonly PickFile[]>;
   /** A pasted or dropped image saved to a file the core can send; null when it can't be. */
   readonly saveImage: (file: File) => Promise<SavedImage | null>;
+  /** The model in view reads no images (its name, for the refusal line); unset: it does or we
+   *  don't know, and nothing is refused on a guess (attach.rs refused_images, K4). */
+  readonly noVision?: string;
   /** The values of a listed argument kind matching `query` (the screen's lists); none: no popup. */
   readonly choices?: (kind: Exclude<ArgKind, 'text' | { readonly words: readonly Choice[] }>, query: string) => readonly Choice[];
 }

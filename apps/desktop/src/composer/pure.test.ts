@@ -5,6 +5,8 @@ import { emojiToken, filterEmoji, get, typedEmoji, all as allEmoji, EMOJI_MAX } 
 import { agoWords, artifactRows, emojiRows } from './pick';
 import TUI_EMOJI from '../../../../rust/tui/src/emoji.tsv?raw';
 import DESKTOP_EMOJI from './emoji.tsv?raw';
+import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, TIP_EVERY_MS } from './keybar';
+import { noVisionLine } from './message';
 import { loadRecent, picked, recentFirst, RECENT_MAX } from './recent';
 import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Segment } from './message';
 import { enqueue, load, popNewest, remember, save, takeOldest, HISTORY_MAX, type Store } from './drafts';
@@ -281,5 +283,48 @@ describe('artifacts in the @ list (commands.rs, W11)', () => {
     ];
     expect(buildMessage(segs)).toEqual({ text: 'see [Pricing draft](http://h/a/pricing) and fix it', files: [] });
     expect(chipStrip({ kind: 'artifact', n: 1, id: 'p', title: 'Perf notes', url: 'http://h/p' })).toBe('↗ Perf notes  http://h/p');
+  });
+});
+
+describe('the key bar (keybar.rs, W9)', () => {
+  const st = { voice: null, fileList: false, quoting: false, selected: false, images: false, busy: false, typing: false } as const;
+  const line = (m: Parameters<typeof barPairs>[0], typing = false) => barPairs(m, typing).map(([k, l]) => `${k} ${l}`).join('   ');
+  it('one set of keys per mode, in the TUI\'s order', () => {
+    expect(line(barMode(st))).toBe('@ file   $ skills   / commands');
+    expect(barMode({ ...st, voice: 'recording', fileList: true })).toBe('recording');
+    expect(line('recording')).toBe('any key stop   esc cancel');
+    expect(barMode({ ...st, fileList: true, selected: true })).toBe('file');
+    expect(line('file')).toContain('→ open a folder');
+    expect(barMode({ ...st, quoting: true })).toBe('quote');
+    expect(line('quote')).toBe('type to ask about it   ⌘C copy   esc drop');
+    expect(barMode({ ...st, selected: true, busy: true })).toBe('selection');
+    expect(barMode({ ...st, busy: true, images: true })).toBe('steer');
+    expect(line('steer', true)).toBe('tab queue   ⏎ steer   esc stop');
+    expect(line('steer', false)).toBe('esc stop');
+    expect(line(barMode({ ...st, images: true }))).toBe('⌘V paste image   @ file   $ skills   / commands');
+  });
+  it('a tip every 5 minutes, never while he types, only at rest', () => {
+    const c = startTip(null, 0);
+    expect(c.index).toBe(0);
+    expect(startTip(TIPS.length - 1, 0).index).toBe(0);
+    expect(startTip(2, 0).index).toBe(3);
+    expect(tickTip(c, TIP_EVERY_MS - 1, false)).toBe(c);
+    expect(tickTip(c, TIP_EVERY_MS, true)).toBe(c);
+    expect(tickTip(c, TIP_EVERY_MS, false)).toEqual({ index: 1, since: TIP_EVERY_MS });
+    expect(tipShown('rest', false)).toBe(true);
+    expect(tipShown('rest', true)).toBe(false);
+    expect(tipShown('steer', false)).toBe(false);
+  });
+});
+
+describe('sending: no-vision line and prefixes (attach.rs, sb.rs)', () => {
+  it('the no-vision line names the model and says image', () => {
+    expect(noVisionLine('mistral-small')).toBe("mistral-small does not support image input (bise's model catalog): not sent");
+  });
+  it('say and steer go out without their word', () => {
+    expect(buildMessage([{ kind: 'text', text: 'say hello' }]).text).toBe('hello');
+    expect(buildMessage([{ kind: 'text', text: 'steer go on' }]).text).toBe('go on');
+    expect(buildMessage([{ kind: 'text', text: 'sayonara' }]).text).toBe('sayonara');
+    expect(buildMessage([{ kind: 'text', text: 'they say hello' }]).text).toBe('they say hello');
   });
 });

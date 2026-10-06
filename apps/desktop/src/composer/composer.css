@@ -13,3 +13,8 @@
 .b-composer-pick .b-menu { width: min(520px, 90vw); }
 .b-composer-pick .b-mi .k { overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
 .b-composer { position: relative; }
+/* the key bar (keybar.ts): keys in the text color, what they do dim, 3 spaces between pairs; the tip dim on the right */
+.b-composer .keys { display: flex; gap: 3ch; }
+.b-composer .keys .pairs { display: flex; gap: 3ch; min-width: 0; overflow: hidden; }
+.b-composer .keys .kk { color: var(--c-text-2); }
+.b-composer .keys .tip { margin-left: auto; overflow: hidden; text-overflow: ellipsis; }
