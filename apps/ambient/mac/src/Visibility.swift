@@ -47,6 +47,14 @@ struct CardPush: Equatable {
     private(set) var last: String?
     init() {}
 
+    // a card's key: its id within its project (card ids are per hub, so
+    // home's #4 and a project's #4 are two cards: amb-tools m_8858, the world run)
+    static func key(card: String?, project: String?) -> String? {
+        guard let c = card, !c.isEmpty else { return nil }
+        guard let p = project, !p.isEmpty else { return c }
+        return "\(p)#\(c)"
+    }
+
     mutating func shows(card: String?) -> Bool {
         guard let c = card, !c.isEmpty else { return true }
         if c == last { return false }

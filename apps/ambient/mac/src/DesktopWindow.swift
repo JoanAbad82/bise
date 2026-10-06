@@ -309,7 +309,8 @@ final class DesktopWindow: NSObject, WKNavigationDelegate, NSWindowDelegate {
     // ⌘W, the red button, the page's win_close: hidden (never released), the
     // frame kept, the app back to a menu-bar app
     func close() {
-        guard !hidden else { return }
+        guard !hidden else { Log.say("window: close (already hidden)"); return }
+        Log.say("window: close")
         hidden = true
         saveFrame()
         SimKeys.give(window)

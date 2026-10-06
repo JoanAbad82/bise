@@ -42,20 +42,37 @@ extension AmbientApp {
     // bise's window holds this card: no bar for it, and the bar's page is told
     // so a bar already up (the hello) doesn't turn into the card (amb-tools m_8716, A)
     func holdCard(_ id: String) {
-        if heldCard == nil { capsule.post(["ev": "app_card_seat", "at": "window"]) }
+        sayCardSeat(.window)
         heldCard = id
         Log.say("app: card \(id) stays in the window (it's in front)")
+    }
+
+    // the bar's page is told each change of seat, once (amb-tools m_8858: a
+    // page left at 'window' shows no card, so 'bar' goes even with no card held)
+    func sayCardSeat(_ s: CardSeat) {
+        guard s != cardSeatSaid else { return }
+        cardSeatSaid = s
+        capsule.post(["ev": "app_card_seat", "at": s == .window ? "window" : "bar"])
     }
 
     // the window closed, lost the keys, or another app came in front (lead
     // m_8679, B): a card it held comes to the bar now, bottom centre
     func cardSeatChanged() {
-        guard let c = heldCard, cardSeat() == .bar else { return }
+        let seat = cardSeat()
+        Log.say("app: card seat \(seat == .window ? "window" : "bar"), held \(heldCard ?? "none")")
+        guard seat == .bar else { return }
+        sayCardSeat(.bar)
+        guard let c = heldCard else { return }
         heldCard = nil
-        capsule.post(["ev": "app_card_seat", "at": "bar"])
-        guard content == "needs" else { return }   // the page shows something else: its next needs pushes it
-        Log.say("app: card \(c) comes to the bar (the window isn't in front)")
-        if cardPush.shows(card: c == "?" ? nil : c) { visFeed(.card) }
+        // pushed now, whatever the page showed while the window held it (amb-tools
+        // m_8858: the page shows no card while at:'window', so waiting for its
+        // needs dropped the card silently); at:'bar' brings the card back on it
+        if cardPush.shows(card: c == "?" ? nil : c) {
+            Log.say("app: card \(c) comes to the bar (the window isn't in front)")
+            visFeed(.card)
+        } else {
+            Log.say("app: card \(c) already shown once: it stays in the icon")
+        }
     }
 
     // a normal app (Dock icon, ⌘Tab) only while the window shows (WinPolicy)

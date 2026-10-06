@@ -43,6 +43,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     var quietHourEnds: Date?              // App+Quiet: when it ends (app_quiet until_ms)
     var routeJob: DispatchWorkItem?       // App+Talk: the route line's tab, 4 s at most
     var heldCard: String?                 // a card bise's window holds (CardSeat), not yet in the bar
+    var cardSeatSaid: CardSeat = .bar     // the last app_card_seat the bar's page got
     var askedAnchor: BarAnchor?           // where the next show puts the bar (S8; none = bottom centre)
     let mainMenu = MainMenuView() // the hidden main menu: ⌘Q ⌘W ⌘, ⌘H and Edit
     var status: StatusItem?
@@ -519,13 +520,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             case "open": visFeed(.open)
             case "needs":
                 // once per card: the same card said again after a dismiss stays in the icon
-                let card = cmd["card"].flatMap { $0 is NSNull ? nil : "\($0)" }
+                let card = CardPush.key(card: cmd["card"].flatMap { $0 is NSNull ? nil : "\($0)" },
+                                        project: cmd["project"] as? String)
                 // bise's window in front and key holds it above its composer (CardSeat);
                 // a held card isn't counted as shown: it comes to the bar when the window goes
                 if cardSeat() == .window {
                     holdCard(card ?? "?")
                 } else {
                     heldCard = nil
+                    sayCardSeat(.bar)
                     if cardPush.shows(card: card) { visFeed(.card) } else { capsule.refreshMouse() }
                 }
             case "none":

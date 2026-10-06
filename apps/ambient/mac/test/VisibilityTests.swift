@@ -122,5 +122,12 @@ let laterSeat = CardSeat.seat(windowShown: false, windowKey: false, appFront: tr
 law("card seat B: the window closed: the held card goes to the bar and shows", laterSeat == .bar && held.shows(card: "1"))
 law("card seat B: and only once", !held.shows(card: "1"))
 
+// card ids are per hub: the same id in two projects is two cards (amb-tools m_8858)
+var many = CardPush()
+law("card key: home's #4 and acme's #4 each show the bar",
+    many.shows(card: CardPush.key(card: "4", project: "acme")) && many.shows(card: CardPush.key(card: "4", project: "bise")))
+law("card key: a page that names no project keys by id alone", CardPush.key(card: "4", project: nil) == "4")
+law("card key: no card, no key (an older page: shows each time)", CardPush.key(card: nil, project: "acme") == nil)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Visibility laws hold")
