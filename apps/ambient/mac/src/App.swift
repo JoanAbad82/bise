@@ -169,7 +169,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         try? FileManager.default.createDirectory(atPath: config.ambientDir, withIntermediateDirectories: true)
         Log.open(config.ambientDir + "/app.log")
         // line 1 says which build runs and which bise (lead m_8079, one build dir)
-        Log.say("app: up, pid \(getpid()), app \(Bundle.main.bundlePath) (\(BuildDir.kind(bundle: Bundle.main.bundlePath, devDir: config.dev))), bise \(config.bise.isEmpty ? "none (no --bise)" : config.bise), workspace \(config.workspace), web \(config.web ?? "-")")
+        Log.say("app: up, pid \(getpid()), app \(Bundle.main.bundlePath) (\(BuildDir.kind(bundle: Bundle.main.bundlePath, devDir: config.dev, resolve: { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }))), bise \(config.bise.isEmpty ? "none (no --bise)" : config.bise), workspace \(config.workspace), web \(config.web ?? "-")")
         if harnessMode { harnessSetup() }
         writePid()
         settings = AppSettings.load { [defaults] in defaults.object(forKey: $0) }

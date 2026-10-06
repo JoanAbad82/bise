@@ -102,6 +102,14 @@ law("build dir: the try's new/ is the one path too", BuildDir.kind(bundle: "/Use
 law("build dir: the harness build", BuildDir.kind(bundle: "/Users/g/.bise/dev/build/ambient/harness/bise ambient.app", devDir: "/Users/g/.bise/dev") == "harness")
 law("build dir: the old state dir's copy is a stray",
     BuildDir.kind(bundle: "/Users/g/.local/state/switchboard/build/ambient/bise ambient.app", devDir: "/Users/g/.bise/dev").hasPrefix("a stray copy"))
+// ~/.bise/dev/build is a symlink to the state dir's build (lead m_8905)
+let linked: (String) -> String = { $0.replacingOccurrences(of: "/Users/g/.bise/dev/build", with: "/Users/g/.local/state/switchboard/build") }
+law("build dir: the harness build by the symlink's other path is the harness build, not a stray",
+    BuildDir.kind(bundle: "/Users/g/.local/state/switchboard/build/ambient/harness/bise ambient.app", devDir: "/Users/g/.bise/dev", resolve: linked) == "harness")
+law("build dir: the one path by the symlink's other path is the one path",
+    BuildDir.kind(bundle: "/Users/g/.local/state/switchboard/build/ambient/bise ambient.app", devDir: "/Users/g/.bise/dev", resolve: linked) == "the one path")
+law("build dir: a copy elsewhere is still a stray once resolved",
+    BuildDir.kind(bundle: "/Users/g/Downloads/bise ambient.app", devDir: "/Users/g/.bise/dev", resolve: linked).hasPrefix("a stray copy"))
 law("build dir: an unmigrated home's state dir is its one path",
     BuildDir.kind(bundle: "/Users/g/.local/state/switchboard/build/ambient/bise ambient.app", devDir: "/Users/g/.local/state/switchboard") == "the one path")
 

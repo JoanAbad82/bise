@@ -173,9 +173,12 @@ enum BisePick {
 // where this app runs from (lead m_8079, one build dir): the one path is
 // <bise dev dir>/build/ambient (scripts/ambient.sh's rule); anything else is
 // a stray copy (an old SB_BUILD_DIR or state dir), said in app.log's line 1
+// both sides go through resolve (realpath at the call) first: ~/.bise/dev/build
+// is a symlink to ~/.local/state/switchboard/build, the same folder (lead m_8905)
 enum BuildDir {
-    static func kind(bundle: String, devDir: String) -> String {
-        let one = devDir + "/build/ambient/"
+    static func kind(bundle raw: String, devDir: String, resolve: (String) -> String = { $0 }) -> String {
+        let bundle = resolve(raw)
+        let one = resolve(devDir + "/build/ambient") + "/"
         if bundle.hasPrefix(one + "harness/") { return "harness" }
         if bundle.hasPrefix(one) { return "the one path" }
         return "a stray copy (not \(one))"
