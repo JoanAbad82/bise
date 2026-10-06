@@ -12,6 +12,7 @@
 // keys never reach the native menu). That the key itself reaches the menu is qa-native's
 // native/mac-keys, in the macOS VM.
 // The acts (↑↓, ⏎, 1–n, a typed answer, close) on cards of its own: inbox/acts (next).
+import { writeFileSync } from 'node:fs';
 import { test, expect } from '../../harness';
 import { hubOf, hubState, launchReal, realWorld, tui, tuiInbox, tuiReady } from '../world';
 
@@ -42,7 +43,9 @@ test('inbox/cmd-i: ⌘I opens the inbox with every hub card, in the TUI order, e
         await expect.poll(() => tuiInbox(t.screen()).length, { timeout: 10_000, message: `the TUI's inbox on ${p}` }).toBeGreaterThanOrEqual(cards.length);
       } finally {
         // the TUI's screen as the check read it: what it drew, for whoever reads the failure
-        await test.info().attach(`tui-${p}.txt`, { body: t.screen(), contentType: 'text/plain' });
+        const file = test.info().outputPath(`tui-${p}.txt`);
+        writeFileSync(file, t.screen());
+        await test.info().attach(`tui-${p}.txt`, { path: file, contentType: 'text/plain' });
       }
       const listed = tuiInbox(t.screen());
       const order = (c: string): number => listed.findIndex((r) => c.startsWith(r.text) || r.text.startsWith(c));

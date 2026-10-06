@@ -74,14 +74,26 @@ test('thread/send: cold, his words show at once, every wait is named, main works
     }
     await field.click();
     await page.keyboard.type(words);
+    // the clock starts at his ⏎ as the page gets it (its event time), not when the test asks: the
+    // listener is in place before the key is pressed (a listener added by the sampler itself raced
+    // the key, and a sampler that never saw it never ended)
+    await page.evaluate(() => {
+      const g = window as unknown as { __qaEnterAt?: number };
+      delete g.__qaEnterAt;
+      window.addEventListener('keydown', (e) => { if (e.key === 'Enter' && g.__qaEnterAt === undefined) g.__qaEnterAt = e.timeStamp; }, { capture: true });
+    });
     // what is drawn, every frame from ⏎ until main works (or 15 s): read in the page, from the DOM
     const timeline = page.evaluate(({ thread, n: nonce }) => new Promise<Sample[]>((done) => {
       const out: Sample[] = [];
-      // the clock starts at his ⏎ as the page gets it (its event time), not when the test asks
-      let t0 = Infinity;
-      window.addEventListener('keydown', (e) => { if (e.key === 'Enter' && t0 === Infinity) t0 = e.timeStamp; }, { capture: true });
+      const g = window as unknown as { __qaEnterAt?: number };
+      const started = performance.now();
       const tick = (): void => {
-        if (t0 === Infinity) { requestAnimationFrame(tick); return; }
+        const t0 = g.__qaEnterAt;
+        if (t0 === undefined) {
+          if (performance.now() - started > 5000) { done(out); return; } // ⏎ never reached the page
+          requestAnimationFrame(tick);
+          return;
+        }
         const list = document.querySelector(thread);
         const rows = Array.from(document.querySelectorAll('[data-testid^="thread.pending."]')).filter((r) => r.textContent.includes(nonce));
         const row = rows.map((r) => `${r.getAttribute('data-state') ?? ''}:${r.querySelector('.th-hold') ? 'hold' : (r.textContent.match(/sending…|connecting[^·]*…|sent to \S+|not sent/)?.[0] ?? '')}`).join(',');

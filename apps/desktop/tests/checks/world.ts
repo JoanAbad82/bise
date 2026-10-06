@@ -143,15 +143,16 @@ export function tui(w: World, project: string, size = '160x50'): Tui {
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 /**
- * The TUI ready on its feed: the world's home is fresh, so it opens on the provider step of its
- * onboarding (esc leaves it, as a person who signs in later would); ready once its side panel
- * shows its agents.
+ * The TUI ready on its feed: the world's home is fresh, so it opens on its first-run pages (the
+ * splash, the provider step: esc leaves them, as a person who signs in later would); ready once its
+ * side panel shows its agents.
  */
 export async function tuiReady(t: Tui, timeoutMs = 20_000): Promise<void> {
   const t0 = Date.now();
   for (;;) {
     const s = t.screen();
-    if (/how do you want to pay/.test(s)) t.keys('Escape');
+    // its first-run pages: the 'hi, i'm bise … any key' splash, the provider step: esc leaves each
+    if (/how do you want to pay|any key/.test(s)) t.keys('Escape');
     else if (/│\s+agents\s+│/.test(s)) return;
     if (Date.now() - t0 > timeoutMs) throw new Error(`the TUI isn't ready after ${timeoutMs} ms:\n${s}`);
     await sleep(300);
