@@ -119,7 +119,7 @@ add("spotlight","la spotlight de fn espace","l'exception à la règle du compose
 
 # 8 side views
 DIFF=('<div class="b-diff"><div class="fh">decode_pool.rs <span class="ok">+61</span></div>'
-  '<div class="b-dl ad"><i></i><i>12</i><i>+</i>pub struct DecodePool {</div><div class="b-dl ad pk"><i></i><i>13</i><i>+</i>    workers: [Worker; 4],</div><div class="b-dl ad pk"><i></i><i>14</i><i>+</i>    queue: Arc&lt;SegQueue&lt;Job&gt;&gt;,</div>'
+  '<div class="b-dl ad"><i></i><i>12</i><i>+</i>pub struct DecodePool {</div><div class="b-dl ad pk first"><i></i><i>13</i><i>+</i>    workers: [Worker; 4],</div><div class="b-dl ad pk last"><i></i><i>14</i><i>+</i>    queue: Arc&lt;SegQueue&lt;Job&gt;&gt;,</div>'
   '<div class="b-quotepop">type ask streaming about it · ⌘C copy</div><div class="b-dl rm"><i>40</i><i></i><i>−</i>let tex = decode(&amp;bytes); // on the frame</div></div>')
 def sv(title,end,body): return f'<div class="b-sideview"><div class="sh2">{title}<span class="end">{end}</span></div><div class="b-files">{body}</div></div>'
 add("sideviews","les vues latérales : le diff, l'artefact","elles s'ouvrent à droite du fil, sans le remplacer : le composer reste là, et ce que tu sélectionnes dedans devient une citation. une seule à la fois ; ⌘D le diff, ⏎ sur un artefact.",

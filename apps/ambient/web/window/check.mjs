@@ -74,7 +74,7 @@ law("the markup is the design system's (components/*.html)", () => {
     `<div class="b-route"><i class="b-dot wk"></i><span><span class="p1">telemetry · main → alerts</span> <span class="p2">p99</span></span><span class="p3">4 min</span><div class="b-bar"><i class="w45"></i></div></div>`);
   assert.equal(html(UI.tool({ text: "ran 4 commands" })), `<div class="b-tool"><span class="chev">▸</span><span class="lbl">ran 4 commands</span></div>`);
   assert.equal(html(UI.diff({ file: "a.json", add: 1, lines: [{ new: 15, sign: "+", text: "x", sel: true }] })),
-    `<div class="b-diff"><div class="fh">a.json <span class="ok">+1</span></div><div class="b-dl ad pk"><i></i><i>15</i><i>+</i>x</div></div>`);
+    `<div class="b-diff"><div class="fh">a.json <span class="ok">+1</span></div><div class="b-dl ad pk first last"><i></i><i>15</i><i>+</i>x</div></div>`);
   assert.equal(html(UI.opts({ items: [{ n: 1, text: "tonight", on: true }], typeHint: "or type" })),
     `<div class="b-opts"><span class="b-opt on"><b>1</b>tonight</span><span class="b-opt ty">or type</span></div>`);
   assert.equal(html(UI.composer({ to: "you → bise", placeholder: "talk to bise", send: "off", keys: "⌘I inbox" })),

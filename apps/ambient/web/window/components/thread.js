@@ -57,10 +57,12 @@
     h("span", null, h("span", "an", d.title), d.isNew ? [" ", UI.chip.render({ text: "new", tone: "acc" })] : null, h("span", "am", d.meta))), d.act));
 
   // a diff: {file, add, rm, lines: [{old, new, sign: "+" | "-" | "", text, sel, act}]}; a selected
-  // line (sel) is the reference's picked line (.pk), the quote pop follows it ({pop: text})
+  // line (sel) is the reference's picked line (.pk), the quote pop follows it ({pop: text}); a run
+  // of picked lines is outlined as one block: .first on its top line, .last on its bottom one
   define("diff", (d) => h("div", "b-diff",
     h("div", "fh", d.file, d.add ? [" ", h("span", "ok", "+" + d.add)] : null, d.rm ? [" ", h("span", "er", "−" + d.rm)] : null),
-    (d.lines || []).map((l) => act(h("div", ["b-dl", l.sign === "+" && "ad", l.sign === "-" && "rm", l.sel && "pk"],
+    (d.lines || []).map((l, i, all) => act(h("div", ["b-dl", l.sign === "+" && "ad", l.sign === "-" && "rm", l.sel && "pk",
+      l.sel && !(all[i - 1] && all[i - 1].sel) && "first", l.sel && !(all[i + 1] && all[i + 1].sel) && "last"],
       h("i", null, l.old == null ? "" : String(l.old)), h("i", null, l.new == null ? "" : String(l.new)), h("i", null, l.sign || ""), l.text), l.act)),
     d.pop ? h("div", "b-quotepop", d.pop) : null));
 })(typeof window !== "undefined" ? window : globalThis);

@@ -34,7 +34,7 @@
   --c-err: var(--p-err);
   --c-err-soft: color-mix(in srgb, var(--p-err) 12%, transparent);
   --c-shadow: color-mix(in srgb, var(--p-shadow) 55%, transparent);
-  --t-11: .6875rem; --t-12: .75rem; --t-13: .8125rem; --t-14: .875rem; --t-15: .9375rem; --t-17: 1.0625rem; --t-22: 1.375rem; --t-30: 1.875rem;
+  --t-11: .71875rem; /* the floor: 11.5 px, nothing smaller (ambient m_8298) */ --t-12: .75rem; --t-13: .8125rem; --t-14: .875rem; --t-15: .9375rem; --t-17: 1.0625rem; --t-22: 1.375rem; --t-30: 1.875rem;
   --lh-ui: 1.35; --lh-read: 1.55;
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
   --r-1: 6px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 22px; --r-pill: 999px;
@@ -85,7 +85,7 @@
   --c-err: var(--p-err);
   --c-err-soft: color-mix(in srgb, var(--p-err) 12%, transparent);
   --c-shadow: color-mix(in srgb, var(--p-shadow) 55%, transparent);
-  --t-11: .6875rem; --t-12: .75rem; --t-13: .8125rem; --t-14: .875rem; --t-15: .9375rem; --t-17: 1.0625rem; --t-22: 1.375rem; --t-30: 1.875rem;
+  --t-11: .71875rem; /* the floor: 11.5 px, nothing smaller (ambient m_8298) */ --t-12: .75rem; --t-13: .8125rem; --t-14: .875rem; --t-15: .9375rem; --t-17: 1.0625rem; --t-22: 1.375rem; --t-30: 1.875rem;
   --lh-ui: 1.35; --lh-read: 1.55;
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
   --r-1: 6px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 22px; --r-pill: 999px;
@@ -100,10 +100,12 @@
 @media (prefers-reduced-motion: reduce) { :root { --d-fast: 0ms; --d-base: 120ms; --d-slow: 160ms; } }
 /* light: softer raised surfaces and shadows (amb-win's S6 review) */
 @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --c-accent-soft: color-mix(in srgb, var(--p-accent) 7%, var(--p-bg));
   --c-shadow: color-mix(in srgb, var(--p-shadow) 30%, transparent);
   --c-raised: color-mix(in srgb, var(--p-raised) 60%, transparent);
 } }
 [data-theme="light"] {
+  --c-accent-soft: color-mix(in srgb, var(--p-accent) 7%, var(--p-bg));
   --c-shadow: color-mix(in srgb, var(--p-shadow) 30%, transparent);
   --c-raised: color-mix(in srgb, var(--p-raised) 60%, transparent);
 }

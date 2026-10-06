@@ -31,7 +31,7 @@
 .b-opt.ty{background:none;box-shadow:none;color:var(--c-text-3)}
 .b-tabs{display:flex;gap:6px;margin-bottom:6px;overflow:hidden}
 .b-tabs>span{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:var(--r-2);font-size:var(--t-12);color:var(--c-text-2);background:var(--c-hover);white-space:nowrap}
-.b-tabs>span.on{color:var(--c-text);background:color-mix(in srgb,var(--c-accent) 15%,transparent)}
+.b-tabs>span.on{color:var(--c-text);background:none;box-shadow:inset 0 0 0 1px var(--c-ink)}
 .b-dock .ctx{display:flex;gap:10px;align-items:flex-start;margin:6px 0 2px}
 .b-dock .ctx .b-text{font:var(--t-15)/var(--lh-read) var(--font-read);color:var(--c-text-2)}
 .b-dock .ctx .b-help{margin-top:2px;color:var(--c-text-3)}
