@@ -6,8 +6,10 @@
 //   - alerts' row opens alerts' thread, which has its brief as the TUI's view of alerts does;
 //   - a line sent there streams: alerts at work in the window, then its answer in the window
 //     and in the TUI's view of alerts (the same words), and alerts' transcript has the line.
-// Not covered: an agent's own open question (the world seeds none on an agent; main's card is
-// inbox/cmd-i's).
+// Its second test: an agent's own open question (amb-tools 7d361b6e: shop's gift-ui asks main,
+// main escalates it as a card tied to gift-ui's message, gift-ui reports blocked). Passes when
+// gift-ui's row says it needs him (blocked, with a waiting count) as the TUI's panel does ('?'),
+// and gift-ui's view shows the question, as the TUI's view of gift-ui does.
 import path from 'node:path';
 import { test, expect } from '../../harness';
 import { hubAgents, hubOf, launchReal, realWorld, transcriptHas, tui, tuiAgents, tuiReady, type Tui } from '../world';
@@ -64,6 +66,45 @@ test("agents/view: an agent's report shows, its view has its feed, and a turn st
     await expect(page.locator(T.list).getByText(words).last(), 'the answer quotes his line').toBeVisible({ timeout: 30_000 });
     await expect.poll(() => (flat(t?.screen() ?? '').match(new RegExp(`ack:[^]*?${words}`)) ?? []).length, { timeout: 15_000, message: "the TUI's view of alerts has the same answer" }).toBeGreaterThan(0);
     await page.screenshot({ path: test.info().outputPath('answered.png') });
+  } finally {
+    if (t) {
+      test.info().attachments.push({ name: 'tui', contentType: 'text/plain', body: Buffer.from(t.screen()) });
+      t.keys('Escape');
+      t.close();
+    }
+    await s.close();
+  }
+});
+
+test("agents/view: an agent's own question shows on its row and in its view, as in the TUI", async () => {
+  test.setTimeout(150_000);
+  const w = realWorld();
+  const project = path.basename(path.dirname(hubOf(w, 'shop').sock));
+  const ask = 'show the balance on the cart page, or only at checkout?';
+  let t: Tui | undefined;
+  const s = await launchReal(w, { route: `agents/${project}` });
+  try {
+    const { page } = s;
+    t = tui(w, 'shop');
+    await tuiReady(t);
+    const panel = tuiAgents(t.screen()).find((a) => a.name === 'gift-ui');
+    expect(panel, "the TUI's panel lists gift-ui (the world seeds it: amb-tools 7d361b6e)").toBeTruthy();
+    expect(panel?.glyph, "the TUI's panel has gift-ui needing him").toBe('?');
+    const row = page.locator('[data-testid="agents.row.gift-ui"]');
+    await expect(row).toBeVisible({ timeout: 15_000 });
+    await expect(row, "gift-ui's row says it needs him").toHaveAttribute('data-status', /blocked|waiting/);
+    await expect(row.locator('.needs, [data-needs="true"]').or(row.getByText(/^\d+$/)).first(), "gift-ui's row shows what waits on him").toBeVisible({ timeout: 3000 });
+    await page.screenshot({ path: test.info().outputPath('row.png') });
+    t.keys(`M-${String(panel?.n ?? 4)}`);
+    await sleep(1500);
+    expect(flat(t.screen()), "the TUI's view of gift-ui has its question").toContain(ask);
+    await page.locator(T.open('gift-ui')).click();
+    await expect(page.locator(T.thread)).toHaveAttribute('data-agent', 'gift-ui', { timeout: 5000 });
+    try {
+      await expect(page.locator(T.screen.replace('agents.screen', 'thread.screen')), "gift-ui's view shows its question").toContainText(ask, { timeout: 10_000 });
+    } finally {
+      await page.screenshot({ path: test.info().outputPath('question.png') });
+    }
   } finally {
     if (t) {
       test.info().attachments.push({ name: 'tui', contentType: 'text/plain', body: Buffer.from(t.screen()) });

@@ -192,7 +192,9 @@ export function tuiAgents(screen: string): { n: number; glyph: string; name: str
   if (at < 0) return [];
   const out: { n: number; glyph: string; name: string }[] = [];
   for (const row of panel.slice(at + 1)) {
-    if (row === '') { if (out.length === 0) continue; break; }
+    // a feature's agents come under its own head ('ψ gift-cards'), after a blank line
+    if (row === '' || row.startsWith('ψ ')) continue;
+    if (row === 'inbox') break;
     const m = /^(\d+) (\S) (\S+)/.exec(row);
     if (!m) break;
     out.push({ n: Number(m[1]), glyph: m[2] ?? '', name: m[3] ?? '' });
