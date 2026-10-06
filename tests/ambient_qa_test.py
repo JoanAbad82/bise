@@ -597,6 +597,23 @@ def real_harness_stays_out_of_his_face_and_his_state():
 
 
 @test
+def t1_report_is_one_line_per_step():
+    """qa.py real t1: the report has the proof line, one verdict line per step and the pass count"""
+    import t1
+    r = t1.Run.__new__(t1.Run)
+    r.out = tempfile.mkdtemp(prefix="t1-")
+    r.R = {"started": "now", "launch": {"web": "abc1234", "pid": 1}, "front_start": {"name": "Chrome"}, "front_end": {"name": "Chrome"},
+           "violations": [], "stop": {"app": "stopped pid 1"},
+           "steps": [{"n": 1, "name": "pearl", "verdict": "pass", "why": "window up", "s": 1.0},
+                     {"n": 2, "name": "⌘0", "verdict": "fail", "why": "no window", "s": 2.0}]}
+    txt = r.report()
+    lines = txt.splitlines()
+    check(lines[1].startswith("proof: front Chrome -> Chrome"), lines[1])
+    check(lines[3].startswith("PASS  1 pearl") and lines[4].startswith("FAIL  2 ⌘0"), lines[3:5])
+    check("1/2 pass" in txt and os.path.exists(os.path.join(r.out, "report.txt")), txt)
+
+
+@test
 def world_fixtures_seed_every_desktop_shape():
     """qa.py world: 2 or 3 projects; together they hold a committed diff ready to merge, an agent at work in a dirty
     worktree, a blocked agent, a merge question and a question with options, an artifact; every seed script is valid

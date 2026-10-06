@@ -3926,6 +3926,11 @@ def _real_cli(a):
     c = a.rcmd
     if c == "launch":
         return real_launch(a.app, a.bise, a.root)
+    if c == "t1":
+        import t1
+        txt = t1.run(a.out, a.bise)
+        sys.stderr.write(txt)
+        return {"report": txt}
     if c == "stop":
         return real_stop()
     if c in ("ping", "state"):
@@ -3993,6 +3998,8 @@ def _cli(argv):
     q = rs.add_parser("events"); q.add_argument("--since")
     q = rs.add_parser("feed", help="the hub's last lines of an agent: did his words reach main?"); q.add_argument("--agent", default="main"); q.add_argument("--count", type=int, default=40)
     q = rs.add_parser("logs"); q.add_argument("--n", type=int, default=40)
+    q = rs.add_parser("t1", help="the first-try scenario on the running world (t1.py): a verdict per step, shots, report.txt")
+    q.add_argument("--out"); q.add_argument("--bise")
     p = sub.add_parser("scenes"); p.add_argument("--only"); p.add_argument("--backdrops", default="dark"); p.add_argument("--out"); p.add_argument("--what", default="both")
     p.add_argument("--reduce-motion", action="store_true"); p.add_argument("--tokens"); p.add_argument("--screen-h", type=int, default=300)
     p.add_argument("--frames", help="a scene id: a strip of frames"); p.add_argument("--every", type=int, default=80)
