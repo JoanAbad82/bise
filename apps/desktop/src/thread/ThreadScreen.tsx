@@ -1,0 +1,148 @@
+// One agent's thread: its head, its entries, its current step, ⌘F, and
+// amb-web's composer. Owner: amb-win. Bar ⛔3 (a send shows at once),
+// ⛔4 (readable answers), ⛔6 (esc stops the turn), 3.3 (writing to one
+// agent: the composer's target is this agent), 3.4 (⌘F).
+//
+// What re-renders what (the reset's flicker rule): the list re-renders
+// when its keys change (an entry or a send comes or goes); each row reads
+// its own data; the composer is memo'd with stable props, so neither an
+// entry, a step nor a send ever re-renders it.
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { Head, Marker } from '@/ds';
+import { Composer } from '@/composer';
+import type { Outgoing } from '@/composer/message';
+import { threadKey, useAgents, usePending, useStore, useThreadOrder, useTyping } from '@/store';
+import { useMenuAction } from '@/app/menu';
+import { dotOf, lineOf } from '@/agents/model';
+import { ThreadList, type ThreadListHandle } from './ThreadList';
+import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
+import { entryKey, pendingKey, posOfKey } from './entry';
+import { FindBar } from './FindBar';
+import { createFindMark, FindMarkContext } from './findmark';
+
+export interface ThreadScreenProps {
+  project: string;
+  agent: string;
+  /** bise's own main: 'bise' with its pearl */
+  bise?: boolean;
+  /** the project's name for the head and the composer's 'you → …' */
+  projectName?: string;
+}
+
+/** A link from an answer: his browser, through main (http/https/mailto only). */
+function openLink(url: string) {
+  const bise = (window as Partial<Window>).bise;
+  void bise?.openExternal(url);
+}
+
+export function ThreadScreen({ project, agent, bise = false, projectName }: ThreadScreenProps) {
+  const store = useStore();
+  const tkey = threadKey(project, agent);
+
+  // the thread's pages and live entries while it is shown
+  useEffect(() => {
+    store.subscribeThread(project, agent);
+    return () => {
+      store.unsubscribeThread(project, agent);
+    };
+  }, [store, project, agent]);
+
+  const me = useAgents(project).find((a) => a.name === agent);
+  const typing = useTyping(tkey);
+  const busy = me?.status === 'working' || typing !== '';
+
+  const [findOpen, setFindOpen] = useState(false);
+  const [mark] = useState(createFindMark);
+  const list = useRef<ThreadListHandle>(null);
+  useMenuAction('find', () => {
+    setFindOpen(true);
+  });
+
+  // ⛔6: a stop he asked, shown until the turn's end or a new entry
+  const [stopping, setStopping] = useState(false);
+  const stop = useCallback(() => {
+    store.stop(project, agent);
+    setStopping(true);
+  }, [store, project, agent]);
+  if (stopping && !busy) setStopping(false);
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    // the composer leaves a plain esc unhandled while busy (amb-web m_9540)
+    if (e.key === 'Escape' && !e.defaultPrevented && busy && !findOpen) {
+      e.preventDefault();
+      stop();
+    } else if (e.key === 'f' && e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {
+      e.preventDefault();
+      setFindOpen(true);
+    }
+  };
+
+  const title = bise ? 'bise' : agent === 'main' ? (projectName ?? project) : agent;
+  const sub = bise ? 'every project' : [agent === 'main' ? 'main' : (projectName ?? project), me ? lineOf(me) : ''].filter(Boolean).join(' · ');
+
+  return (
+    <FindMarkContext value={mark}>
+      <section className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} onKeyDown={onKeyDown}>
+        <Head title={title} sub={sub} pearl={bise ? 22 : undefined} dot={bise || !me ? undefined : dotOf(me.status)} />
+        {findOpen && (
+          <FindBar
+            tkey={tkey}
+            project={project}
+            agent={agent}
+            mark={mark}
+            onGo={(pos) => list.current?.scrollTo(entryKey(pos))}
+            onClose={() => {
+              setFindOpen(false);
+            }}
+          />
+        )}
+        <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} />
+        {stopping && <Marker>stopping {agent}…</Marker>}
+        <TypingLine text={typing} />
+        <ThreadComposer project={project} agent={agent} busy={busy} to={`you → ${title}`} onStop={stop} />
+      </section>
+    </FindMarkContext>
+  );
+}
+
+/** The list: entries by pos, then his sends not confirmed yet. */
+const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey: string; project: string; agent: string; bise: boolean; listRef: RefObject<ThreadListHandle | null> }) {
+  const store = useStore();
+  const view = useThreadOrder(tkey);
+  const pending = usePending(tkey);
+  const keys = useMemo(() => [...view.order.map(entryKey), ...pending.map((p) => pendingKey(String(p.cid)))], [view, pending]);
+  const ctx = useMemo<RowCtx>(() => ({ tkey, project, agent, bise, onLink: openLink }), [tkey, project, agent, bise]);
+  const row = useCallback(
+    (key: string) => {
+      const pos = posOfKey(key);
+      return pos === undefined ? <PendingRow ctx={ctx} cid={Number(key.slice(2))} /> : <EntryRow ctx={ctx} pos={pos} />;
+    },
+    [ctx],
+  );
+  const onOlder = useCallback(() => {
+    store.olderPage(project, agent);
+  }, [store, project, agent]);
+  // his own send goes to the bottom even when he had scrolled up
+  const sent = pending.length;
+  const last = useRef(sent);
+  useEffect(() => {
+    if (sent > last.current) listRef.current?.scrollToEnd();
+    last.current = sent;
+  }, [sent, listRef]);
+  if (!view.loaded && keys.length === 0) return <div className="th-list th-loading" data-testid="thread.loading" />;
+  return <ThreadList ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} testId="thread.list" />;
+});
+
+/** amb-web's composer, aimed at this agent; its props stay stable while the thread moves. */
+const ThreadComposer = memo(function ThreadComposer({ project, agent, busy, to, onStop }: { project: string; agent: string; busy: boolean; to: string; onStop: () => void }) {
+  const store = useStore();
+  const onSend = useCallback(
+    (out: Outgoing) => {
+      // ⏎ while a turn runs steers it ('now', as the TUI); files are @paths
+      // in the words already. Tab's queue: amb-web's next step (mode on Outgoing)
+      store.send({ project, agent, text: out.text, mode: 'now' });
+    },
+    [store, project, agent],
+  );
+  return <Composer target={`${project}/${agent}`} busy={busy} to={to} onSend={onSend} onStop={onStop} testId="composer" />;
+});

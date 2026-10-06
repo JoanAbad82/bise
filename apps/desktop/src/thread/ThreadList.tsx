@@ -13,6 +13,9 @@ import { useCallback, useImperativeHandle, useRef, useState, type ReactNode, typ
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import './thread.css';
 
+// no extra parts (Virtuoso reads its `components` object: never undefined)
+const NONE = {};
+
 /** Far from 0: room for every older row that may come in front. */
 const START = 1_000_000_000;
 
@@ -92,7 +95,7 @@ export function ThreadList({ keys, row, more, onOlder, head, testId, ref }: Thre
         followOutput={(atBottom) => (atBottom ? 'auto' : false)}
         alignToBottom
         startReached={startReached}
-        components={head !== undefined && more ? { Header: () => head } : undefined}
+        components={head !== undefined && more ? { Header: () => head } : NONE}
         increaseViewportBy={{ top: 600, bottom: 300 }}
       />
     </div>

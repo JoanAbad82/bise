@@ -11,6 +11,11 @@ import { createRouter, RouterContext, useRoute, useRouter } from './router';
 import { formatRoute, startRouteOf, type Route } from './route';
 import { useMainRoutes, useMenuRouting } from './menu';
 import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
+import { ThreadScreen } from '@/thread/ThreadScreen';
+import { useProjects } from '@/store';
+import { InboxScreen } from '@/inbox';
+import { SettingsScreen } from '@/settings';
+import { Skel } from '@/ds';
 import { Main, Row, Side, Win } from '@/ds';
 import '@/ds/index.css';
 import './app.css';
@@ -81,12 +86,35 @@ function ScreenOf({ route }: { route: Route }) {
   switch (route.screen) {
     case 'notfound':
       return <NotFound path={route.path} />;
+    case 'bise':
+      return <BiseThread />;
+    case 'thread':
+      return <ProjectThread project={route.project} agent={route.agent} />;
+    case 'inbox':
+      return <InboxScreen />;
+    case 'settings':
+      return <SettingsScreen page={route.page} />;
     case 'lab':
       if (!testMode()) return <NotFound path={formatRoute(route)} />;
       return route.lab === 'composer' ? <ComposerLab /> : route.lab === 'spotlight' ? <SpotlightLab /> : <PearlLab />;
     default:
       return <NotYet route={route} />;
   }
+}
+
+/** bise's own thread: the home project's main, once the core said which it is. */
+function BiseThread() {
+  const home = useProjects().find((p) => p.home);
+  if (home === undefined) return <Skel />;
+  return <ThreadScreen project={home.project} agent="main" bise />;
+}
+
+/** A project's thread: its name from the core's rows; an unknown project says so. */
+function ProjectThread({ project, agent }: { project: string; agent: string }) {
+  const projects = useProjects();
+  const row = projects.find((p) => p.project === project);
+  if (row === undefined) return projects.length === 0 ? <Skel /> : <NotFound path={formatRoute({ screen: 'thread', project, agent })} />;
+  return <ThreadScreen project={project} agent={agent} bise={row.home && agent === 'main'} projectName={row.name} />;
 }
 
 /** A screen not built yet says so, never a blank or a silent gap. */

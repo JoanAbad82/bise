@@ -75,3 +75,58 @@
 .th-img {
   color: var(--c-text-2);
 }
+
+/* the screen: head, find, the list (fills), the step line, the composer */
+.th-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.th-loading {
+  flex: 1 1 auto;
+}
+
+.th-row {
+  padding: 0 0 2px;
+}
+
+.th-hit {
+  outline: 2px solid var(--c-acc, currentColor);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.th-pending .b-msg {
+  opacity: 0.6;
+}
+
+.th-failed .b-msg {
+  opacity: 1;
+}
+
+.th-failed-acts {
+  display: flex;
+  gap: 6px;
+  padding-left: 40px;
+}
+
+.th-steps {
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.th-find {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.th-find-count {
+  min-width: 4em;
+  color: var(--c-text-2);
+  font-variant-numeric: tabular-nums;
+}
