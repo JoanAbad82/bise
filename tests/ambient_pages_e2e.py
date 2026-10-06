@@ -18,6 +18,7 @@ import threading
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
+import wait  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
 PAGE_V1 = '<section data-kit="prose" data-id="p1"><p>the week: dark mode shipped.</p></section>\n'
@@ -38,22 +39,21 @@ PAGE_V3 = PAGE_V2 + (
 
 
 def settle(c, timeout=120):
-    """main is idle and no turn of its runs, twice 2 s apart: a message
-    the hub sent main (a notes message, a tick) has had its turn. Else
-    the next [[bash]] steers into that turn and the scripted model answers
-    the first message instead (a race on a loaded machine)."""
-    import time
-
+    """main is idle, no turn of its runs, and its lines have not moved for
+    2 s: a message the hub sent main (a notes message, a tick) has had its
+    turn. Else the next [[bash]] steers into that turn and the scripted
+    model answers the first message instead (a race on a loaded machine)."""
     def quiet():
         lines = c.lines("main")
         started = max((i for i, l in enumerate(lines) if l.strip() == "obs: turn_started"), default=-1)
         idle = max((i for i, l in enumerate(lines) if l == "--- idle"), default=-1)
         return idle >= started
 
-    for _ in range(2):
-        c.wait_idle("main", timeout=timeout)
-        c.wait(quiet, timeout, "main's turn over")
-        time.sleep(2)
+    def snap():
+        return len(c.lines("main")), quiet() and (c.agent("main") or {}).get("status") == "idle"
+
+    c.wait_idle("main", timeout=timeout)
+    wait.until(lambda: wait.stable(snap, timeout, "main's lines", quiet=2)[1], timeout, "main idle, its turn over, quiet for 2 s")
 
 
 def request(port, method, path, body=None, headers=None):
@@ -495,9 +495,7 @@ def main():
         # waits while any question of the page is open
         lq = lambda: next((x for x in c.cards() if (x.get("page") or {}).get("id") == "legal-plan" and (x.get("page") or {}).get("block") == "lq"), None)
         c.wait(lq, 90, "the page's question card")
-        import time
-        time.sleep(2)
-        check(not step_card("d1"), "the drafted step waits while the page asks: %r" % c.cards())
+        wait.holds(lambda: not step_card("d1"), 2, lambda: "the drafted step waits while the page asks: %r" % c.cards())
         c.say("/answer %d 1" % lq()["id"])
         c.wait(lambda: step_card("d1"), 30, "the drafted step's card, once the question is answered")
         check((step_card("d1").get("page") or {}).get("item") == "d1", "its card links its row: %r" % step_card("d1"))
@@ -521,14 +519,12 @@ def main():
         settle(c)
         c.say('[[bash: sb page publish %s --id send-plan --title "send plan"]]' % sp)
         c.wait_line("main", "published send-plan v1", 90)
-        time.sleep(2)
-        check(not step_card("e1"), "no send card while the draft has no recipient")
+        wait.holds(lambda: not step_card("e1"), 2, "no send card while the draft has no recipient")
         open(sp, "w").write(mail("legal@acme.test"))
         settle(c)
         c.say('[[bash: sb page publish %s --id send-plan]]' % sp)
         c.wait_line("main", "published send-plan v2", 90)
-        time.sleep(2)
-        check(not step_card("e1"), "no send card while its data-question is open")
+        wait.holds(lambda: not step_card("e1"), 2, "no send card while its data-question is open")
         # pm's D fail 39: once qx is answered the row is judged without
         # its data-question (the agent left it on): 'send the draft?' comes
         qx = lambda: next((x for x in c.cards() if (x.get("page") or {}).get("id") == "send-plan" and (x.get("page") or {}).get("block") == "qx"), None)
@@ -545,8 +541,7 @@ def main():
                             '<li data-id="a2" data-who="Marc">book the room</li></ol></section>')
         c.say('[[bash: sb page publish %s --id meeting-notes --title "meeting"]]' % mp)
         c.wait_line("main", "published meeting-notes v1", 90)
-        time.sleep(2)
-        check(not step_card("a1"), "a meeting's row of his makes no card: %r" % c.cards())
+        wait.holds(lambda: not step_card("a1"), 2, lambda: "a meeting's row of his makes no card: %r" % c.cards())
         settle(c)
         c.say("[[bash: sb page waiting]]")
         c.wait_line("main", "meeting-notes#a1 · step · send Hélène the SSO timeline", 90)
@@ -572,8 +567,8 @@ def main():
         open(pp, "w").write(body + pq(' data-card="none"'))
         c.say('[[bash: sb page publish %s --id promises-e2e --title "your promises"]]' % pp)
         c.wait_line("main", "published promises-e2e v1", 90)
-        time.sleep(2)
-        check(not [x for x in c.cards() if (x.get("page") or {}).get("id") == "promises-e2e"], "a promises page makes no card: %r" % c.cards())
+        wait.holds(lambda: not [x for x in c.cards() if (x.get("page") or {}).get("id") == "promises-e2e"], 2,
+                   lambda: "a promises page makes no card: %r" % c.cards())
         settle(c)
         c.say("[[bash: sb page waiting]]")
         for line in ("promises-e2e#d-sso · draft", "promises-e2e#d-nda · draft", "promises-e2e#q-cc · question · which address for Lelio?"):
@@ -596,8 +591,7 @@ def main():
         settle(c)
         c.say('[[bash: sb page publish %s --id ask-cc]]' % ap)
         c.wait_line("main", "published ask-cc v2", 90)
-        time.sleep(2)
-        check(not ask(), "the same question opens no card again: %r" % c.cards())
+        wait.holds(lambda: not ask(), 2, lambda: "the same question opens no card again: %r" % c.cards())
         settle(c)
         open(ap, "w").write(aq("which address for Lelio's cc?"))
         c.say('[[bash: sb page publish %s --id ask-cc]]' % ap)
@@ -620,7 +614,7 @@ def main():
         c.say('[[bash: sb page publish %s --id batch-plan --title "batch plan"]]' % bp)
         batch = lambda: next((x for x in c.cards() if (x.get("page") or {}).get("id") == "batch-plan"), None)
         c.wait(batch, 90, "the batch card")
-        time.sleep(1)
+        wait.stable(lambda: [x["text"] for x in c.cards() if (x.get("page") or {}).get("id") == "batch-plan"], 30, "the batch-plan cards", quiet=1)
         on_page = [x for x in c.cards() if (x.get("page") or {}).get("id") == "batch-plan"]
         # ambient's words (m_6055 via ambient-lead m_6058): review first
         check(len(on_page) == 1 and on_page[0]["text"].startswith("2 drafts wait for you · batch plan\nemails to lucas and marc\n1. review\n2. send both"), "one card for both drafts: %r" % on_page)
@@ -630,8 +624,7 @@ def main():
         settle(c)
         # 1 = review: nothing sent, the card stays
         c.say("/answer %d 1" % on_page[0]["id"])
-        time.sleep(3)
-        check(batch() is not None, "review leaves the batch card open: %r" % c.cards())
+        wait.holds(lambda: batch() is not None, 3, lambda: "review leaves the batch card open: %r" % c.cards())
         notes = json.loads(request(port, "GET", "/p/batch-plan/meta")[2])["notes"]
         check(not [n for n in notes if n["kind"] == "approve"], "review sends nothing: %r" % notes)
         settle(c)
@@ -658,7 +651,7 @@ def main():
         c.say('[[bash: sb page publish %s --id benjamin-bugs --title "benjamin\'s reports"]]' % fp)
         fb = lambda: [x for x in c.cards() if (x.get("page") or {}).get("id") == "benjamin-bugs"]
         c.wait(fb, 90, "the feedback page's batch card")
-        time.sleep(1)
+        wait.stable(lambda: [x["text"] for x in fb()], 30, "the feedback page's cards", quiet=1)
         check(len(fb()) == 1 and fb()[0]["text"] == "2 drafts wait for you · benjamin's reports\n2 replies to Benjamin: proxy and French\n1. review\n2. send both",
               "fix-fish at work: its reply waits, the other 2 are one card: %r" % fb())
         two = fb()[0]["id"]
@@ -669,8 +662,7 @@ def main():
         # fix-fish done: its reply still waits for the page written after
         # the fix (ambient-lead m_6187), never the old workaround
         c.wait_status("fix-fish", "done", 90)
-        time.sleep(3)
-        check(fb() and fb()[0]["text"].startswith("2 drafts wait for you"), "done but not republished: still 2: %r" % fb())
+        wait.holds(lambda: fb() and fb()[0]["text"].startswith("2 drafts wait for you"), 3, lambda: "done but not republished: still 2: %r" % fb())
         open(fp, "w").write(fi("s212", "fish", "fix-fish").replace("thanks Benjamin, fixed", "fixed in the installer, thanks Benjamin")
                             + fi("s213", "the proxy") + fi("s214", "French"))
         c.say('[[bash: sb page publish %s --id benjamin-bugs]]' % fp)
@@ -700,7 +692,7 @@ def main():
         c.say('[[bash: sb page publish %s --id ops-close --title "ops"]]' % op)
         oc = lambda: [x for x in c.cards() if (x.get("page") or {}).get("id") == "ops-close"]
         c.wait(oc, 90, "the ops page's batch card")
-        time.sleep(1)
+        wait.stable(lambda: [x["text"] for x in oc()], 30, "the ops page's cards", quiet=1)
         check(len(oc()) == 1 and oc()[0]["text"] == "3 drafts wait for you · ops\nmessages to Nina · 2 to close\n1. review\n2. send all 3", "actions counted apart: %r" % oc())
         check((oc()[0].get("batch") or {}).get("actions") == "2 to close", "batch.actions: %r" % oc()[0])
         settle(c)

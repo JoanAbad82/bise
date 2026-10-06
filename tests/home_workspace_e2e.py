@@ -24,6 +24,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
+import wait  # noqa: E402
 from e2e import EXE, ROOT, check  # noqa: E402
 
 PAGE = '<section data-kit="prose" data-id="p1"><p>the week: the offsite is booked.</p></section>\n'
@@ -56,9 +57,7 @@ def hub_core(E):
                             stderr=open(os.path.join(E.tmp, "core.stderr"), "a"))
     try:
         sock = os.path.join(state, "hub.sock")
-        t0 = time.time()
-        while not os.path.exists(sock) and time.time() - t0 < 30 * e2e.load_factor():
-            time.sleep(0.1)
+        wait.until(lambda: os.path.exists(sock), 30, "a hub starts on the home workspace (%s)" % sock)
         check(os.path.isdir(home), "the home workspace is created on first use")
         check(not os.path.exists(os.path.join(home, ".git")), "the home workspace has no git")
         check(os.path.exists(sock), "a hub starts on the home workspace")
@@ -74,13 +73,18 @@ def hub_core(E):
             core.kill()
         # the hub the core started: gone with stop_hub; its pid file says so
         pidf = os.path.join(state, "hub.pid")
-        t0 = time.time()
-        while os.path.exists(os.path.join(state, "hub.sock")) and time.time() - t0 < 20:
+        def hub_gone():
+            if not os.path.exists(os.path.join(state, "hub.sock")):
+                return True
             try:
                 socket.socket(socket.AF_UNIX).connect(os.path.join(state, "hub.sock"))
             except OSError:
-                break
-            time.sleep(0.2)
+                return True
+            return False
+        try:
+            wait.until(hub_gone, 20, "the core's hub gone after stop_hub", poll=0.2)
+        except AssertionError:
+            pass   # its pid file below stops it
         if os.path.exists(pidf):
             try:
                 os.kill(int(open(pidf).read().split()[0]), 15)

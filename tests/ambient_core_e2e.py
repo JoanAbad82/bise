@@ -13,10 +13,10 @@ import queue
 import subprocess
 import sys
 import threading
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
+import wait  # noqa: E402
 from e2e import EXE, ROOT, check  # noqa: E402
 
 
@@ -55,14 +55,11 @@ class Core:
             return any(pred(e) for e in self.evs)
 
     def wait(self, pred, timeout=90, what="event"):
-        t0 = time.time()
-        while time.time() - t0 < timeout:
-            if self.seen(pred):
-                return
-            time.sleep(0.05)
-        with self.lock:
-            tail = [e for e in self.evs if e.get("ev") != "level"][-12:]
-        raise AssertionError("timeout waiting for %s; last events: %s" % (what, json.dumps(tail)))
+        def said():
+            with self.lock:
+                tail = [e for e in self.evs if e.get("ev") != "level"][-12:]
+            return "%s; last events: %s" % (what, json.dumps(tail))
+        wait.until(lambda: self.seen(pred), timeout, said, poll=0.05)
 
 
 def main():
@@ -103,14 +100,8 @@ def main():
         core.wait(lambda e: e.get("ev") == "state" and any(a["name"] == "t1" for a in e["agents"]), 60, "t1 in the list")
 
         # a question card, answered by digit from the capsule
-        msg = None
-        t0 = time.time()
-        while not msg and time.time() - t0 < 90:
-            for l in c.lines("main"):
-                if l.startswith("sb msg-in : t1 m_") and "banner" in l:
-                    msg = l.split()[4]
-            time.sleep(0.1)
-        check(msg, "t1's question reached main")
+        msg = wait.until(lambda: next((l.split()[4] for l in c.lines("main") if l.startswith("sb msg-in : t1 m_") and "banner" in l), None),
+                         90, "t1's question reached main")
         c.wait_idle("main", "t1")
         # main's turn on t1's message is not for the user: no words in the
         # capsule (ambient's review m_4672)
@@ -170,8 +161,8 @@ def main():
         c.wait(lambda: any(x.get("kind") == "drop" and x.get("agent") == "t2" for x in c.cards()), 60, "the drop card in the TUI")
         drop = next(x for x in c.cards() if x.get("kind") == "drop")
         core.wait(lambda e: e.get("ev") == "state" and any(a["name"] == "t2" for a in e["agents"]), 30, "t2 in the core's list")
-        time.sleep(1)
-        check(not any(cd["id"] == drop["id"] for cd in core.last("state")["cards"]), "no drop card in the capsule: %r" % core.last("state")["cards"])
+        wait.holds(lambda: not any(cd["id"] == drop["id"] for cd in core.last("state")["cards"]), 1,
+                   lambda: "no drop card in the capsule: %r" % core.last("state")["cards"])
         c.wait_idle("main")
         c.say("[[bash: sb drop t2]]")
         c.wait_line("main", "has not answered card #%d" % drop["id"], 60)

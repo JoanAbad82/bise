@@ -324,15 +324,21 @@ def daemon(bise, root, n):
 def register(bise, home, workspaces):
     """`bise project add` for each project once S1 has it (amb-hub); until then the hubs are
     independent and this says so."""
-    env = {"HOME": home, "PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+    import qa
+    env = {"HOME": home, "BISE_HOME_WORKSPACE": os.path.join(home, HOME_NAME), "PATH": qa.own_path(os.environ.get("PATH", "/usr/bin:/bin"))}
     h = subprocess.run([bise, "project", "--help"], capture_output=True, text=True, env=env, timeout=20)
     if h.returncode != 0 or "add" not in (h.stdout + h.stderr):
-        return "no `bise project` in this bise yet (S1): the hubs are independent"
+        return "no `bise project` in this bise yet (S1, f1e91b82): the hubs are independent"
     out = []
     for ws in workspaces:
         r = subprocess.run([bise, "project", "add", ws], capture_output=True, text=True, env=env, timeout=30)
         out.append({"ws": ws, "rc": r.returncode, "out": (r.stdout + r.stderr).strip()[-300:]})
-    return out
+    r = subprocess.run([bise, "project", "list", "--json"], capture_output=True, text=True, env=env, timeout=30)
+    try:
+        listed = json.loads(r.stdout)
+    except ValueError:
+        listed = (r.stdout + r.stderr).strip()[-300:]
+    return {"added": out, "list": listed}
 
 
 # ---------------------------------------------------------------- the commands

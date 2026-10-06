@@ -28,6 +28,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN = os.path.join(HERE, "..", "plugins", "ambient-qa")
 sys.path.insert(0, PLUGIN)
 import qa  # noqa: E402
+sys.path.insert(0, HERE)
+import wait  # noqa: E402
 sys.path.insert(0, os.path.join(PLUGIN, "fake-accounts"))
 import fake_accounts as fake  # noqa: E402
 
@@ -534,9 +536,14 @@ def eval_reads_the_page_and_lets_fn_go():
 def real_harness_hub_finds_its_hub_by_his_rules():
     """qa.py real: the hub's env gets the isolated HOME and none of the overrides that would tell it where its state is; the home has ~/.bise/migrated.json like his Mac; the sockets fit"""
     home = tempfile.mkdtemp(prefix="rh-")
-    env = {"SB_STATE_DIR": "/x", "BEND_SESSIONS_DIR": "/y", "BISE_HOME": "/z", "BISE_EXPORTS_FOR": "s", "BEND_PROVIDER_URL": "http://f"}
+    his_bin = os.path.expanduser("~/.bise/hubs/harness-1/bin")
+    env = {"SB_STATE_DIR": "/x", "BEND_SESSIONS_DIR": "/y", "BISE_HOME": "/z", "BISE_EXPORTS_FOR": "s", "BEND_PROVIDER_URL": "http://f",
+           "BEND_RUN_DIR": os.path.expanduser("~/.bise/run"), "BEND_STDIN": "/f", "TMPDIR": "/agent/tmp", "PATH": his_bin + ":/usr/bin:/bin"}
     qa.real_home_env(env, home)
-    check(env == {"HOME": home, "BEND_PROVIDER_URL": "http://f"}, "env: %r" % env)
+    t = os.path.join(home, "tmp")
+    check(env == {"HOME": home, "BEND_PROVIDER_URL": "http://f", "BEND_RUN_DIR": os.path.join(home, ".bise", "run"),
+                  "TMPDIR": t, "TMP": t, "TEMP": t, "TMUX_TMPDIR": t, "PATH": "/usr/bin:/bin"},
+          "env: his run dir, an agent's tmp and his hub's bin never reach a throwaway hub: %r" % env)
     check(os.path.exists(os.path.join(home, ".bise", "migrated.json")), "migrated.json")
     # <home>/.bise/hubs/<name>-<16 hex>/hub.sock under the 104-byte unix socket limit
     check(len(os.path.join(qa.REAL_HOME, ".bise", "hubs", "ws-" + "0" * 16, "hub.sock")) < 100, "hub socket path too long: %s" % qa.REAL_HOME)
@@ -982,17 +989,11 @@ def live():
         print("ok   say: main answered %r" % s["main"])
         qa.inject({"ev": "state", "agents": [], "cards": [{"id": "c1", "kind": "question", "agent": "cookies", "text": "keep it?",
                                                             "options": [{"n": 1, "label": "yes"}, {"n": 2, "label": "no"}]}]})
-        time.sleep(0.5)
+        wait.until(lambda: "keep it?" in json.dumps(qa.state()), 10, "the injected card on the page")
         qa.key("1")
         # the page answers through its message handler, a beat later
-        answered = False
-        for _ in range(30):
-            evs = qa.events(60)["events"]
-            answered = any(e["ev"].get("cmd") == "answer" and e["dir"] == "app>core" and e["ev"].get("reply") == "1" for e in evs)
-            if answered:
-                break
-            time.sleep(0.1)
-        check(answered, "fn + 1 answered the card")
+        wait.until(lambda: any(e["ev"].get("cmd") == "answer" and e["dir"] == "app>core" and e["ev"].get("reply") == "1"
+                               for e in qa.events(60)["events"]), 3, "fn + 1 answered the card")
         print("ok   fn + 1 answers a card")
     finally:
         qa.stop()
