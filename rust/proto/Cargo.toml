@@ -8,3 +8,9 @@ description = "bise's typed client protocol: the hub's events and the clients' c
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+ts-rs = { version = "12.0.1", optional = true, features = ["serde-json-impl", "no-serde-warnings"] }
+
+[features]
+# TypeScript types for apps/desktop/src/proto (tests/ts.rs writes and checks
+# them); off by default so bise and sb never compile ts-rs
+ts = ["dep:ts-rs"]

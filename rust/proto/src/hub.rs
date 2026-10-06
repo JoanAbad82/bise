@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum JobState {
     Running,
@@ -24,6 +25,7 @@ pub enum JobState {
 /// objective), `step` of `of` when it reports them (`sb report progress
 /// --step n/m`), since when it is at this step.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Job {
     pub agent: String,
     pub label: String,
@@ -37,6 +39,7 @@ pub struct Job {
 
 /// What a hub sends a client that said `hello {proto: 1}`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "ev", rename_all = "snake_case")]
 pub enum HubEv {
     /// the answer to `hello`: who this hub is (its tag is `welcome`: the
@@ -161,6 +164,7 @@ impl HubEv {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     /// steered into its running turn (or a turn of its own)
@@ -171,6 +175,7 @@ pub enum Mode {
 
 /// What a client asks a hub.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum HubCmd {
     /// this connection speaks v`proto`: the hub answers `welcome`, then

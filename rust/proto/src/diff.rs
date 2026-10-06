@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum LineKind {
     Ctx,
@@ -12,6 +13,7 @@ pub enum LineKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct DiffLine {
     pub kind: LineKind,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -22,12 +24,14 @@ pub struct DiffLine {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Hunk {
     pub header: String,
     pub lines: Vec<DiffLine>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct DiffFile {
     pub path: String,
     /// added, modified, deleted, renamed
@@ -61,6 +65,7 @@ pub struct DiffFile {
 /// What a change measured, before and after (the review's result line,
 /// amb-web m_8304): "worst frame, PS5 replay · forest level 40 → 15 ms".
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct DiffResult {
     pub label: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -73,6 +78,7 @@ pub struct DiffResult {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Series {
     pub before: Vec<f64>,
     pub after: Vec<f64>,

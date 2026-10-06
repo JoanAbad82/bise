@@ -18,6 +18,7 @@ use serde_json::Value;
 
 /// Selected lines of a thread quoted in a message (❝).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Quote {
     pub agent: String,
     pub pos: Pos,
@@ -28,6 +29,7 @@ pub struct Quote {
 /// holds it, amb-hub m_8281): an [`Agent`] row's `queued`, draft until the
 /// hub's mirror sends them.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Queued {
     pub id: u64,
     pub text: String,
@@ -36,6 +38,7 @@ pub struct Queued {
 
 /// Hub commands whose stream hasn't shipped.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum DraftHubCmd {
     /// a send with quoted lines (the window's ❝)
@@ -54,6 +57,7 @@ impl DraftHubCmd {
 
 /// One project in the window's sidebar.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ProjectRow {
     pub project: Project,
     pub name: String,
@@ -87,6 +91,7 @@ pub struct ProjectRow {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum OpenWhat {
     Thread,
@@ -97,6 +102,7 @@ pub enum OpenWhat {
 
 /// A model account of his (S11's settings, amb-win m_8382).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Account {
     /// chatgpt, claude, anthropic-key, ...
     pub id: String,
@@ -111,6 +117,7 @@ pub struct Account {
 
 /// A folder found by `found_scan` that could be a project.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Found {
     pub path: String,
     pub name: String,
@@ -123,6 +130,7 @@ pub struct Found {
 /// One project's part of `away_summary` (only a project where something
 /// happened while he was away).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct AwayProject {
     pub project: Project,
     pub done: u32,
@@ -132,6 +140,7 @@ pub struct AwayProject {
 
 /// What the core sends the app besides the hubs' events (S3b).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "ev", rename_all = "snake_case")]
 pub enum CoreEv {
     /// every registered project (bise's first), on change
@@ -170,6 +179,7 @@ impl CoreEv {
 
 /// What the app asks the core itself (never forwarded to a hub).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum AppCmd {
     Open {
@@ -232,6 +242,7 @@ impl AppCmd {
 /// `hubs/<id>/view.json` (S1, written only by that hub): what the sidebar
 /// and bise read of a project without its hub.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ProjectView {
     pub v: u32,
     pub project: Project,

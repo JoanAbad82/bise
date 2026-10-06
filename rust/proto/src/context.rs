@@ -8,6 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct FnContext {
     /// the front app's name (`Safari`, `Code`)
     #[serde(default, skip_serializing_if = "Option::is_none")]

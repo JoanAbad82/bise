@@ -11,6 +11,7 @@ use crate::{is_false, Pos};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum EntryKind {
     /// his message
@@ -28,6 +29,7 @@ pub enum EntryKind {
 
 /// What a tool call did, for the counted summary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum ToolKind {
     Read,
@@ -50,6 +52,7 @@ impl ToolKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ToolItem {
     pub pos: Pos,
     pub at_ms: u64,
@@ -62,6 +65,7 @@ pub struct ToolItem {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Tools {
     pub count: u32,
     /// counted words: "read 6 files, ran 4 commands"
@@ -70,6 +74,7 @@ pub struct Tools {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct EntryCard {
     pub id: u64,
     pub question: String,
@@ -78,6 +83,7 @@ pub struct EntryCard {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct PageRef {
     pub id: String,
     pub title: String,
@@ -87,12 +93,14 @@ pub struct PageRef {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ReportRef {
     pub kind: ReportKind,
 }
 
 /// One entry of a thread.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Entry {
     /// its first line's transcript position (`<agent>#<pos>`)
     pub pos: Pos,

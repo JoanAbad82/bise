@@ -25,6 +25,7 @@ use serde_json::Value;
 
 /// What the helper says.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "ev", rename_all = "snake_case")]
 pub enum HelperEv {
     /// at start, once
@@ -104,12 +105,14 @@ pub enum HelperEv {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Responsible {
     pub pid: u32,
     pub path: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum FnAct {
     /// held past the tap threshold: talk
@@ -128,6 +131,7 @@ pub enum FnAct {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum TalkKey {
     Fn,
@@ -138,6 +142,7 @@ pub enum TalkKey {
 /// Accessibility and the screen, which macOS never calls refused: not
 /// granted)
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum Grant {
     Allowed,
@@ -146,6 +151,7 @@ pub enum Grant {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum QuietWhy {
     /// the mic or a camera runs somewhere (not bise's)
@@ -162,6 +168,7 @@ pub enum QuietWhy {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum Perm {
     Accessibility,
@@ -171,6 +178,7 @@ pub enum Perm {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum PermAction {
     /// macOS's own prompt when it can (else its pane)
@@ -196,6 +204,7 @@ impl HelperEv {
 
 /// What Electron's main asks the helper.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "cmd", rename_all = "snake_case")]
 pub enum HelperCmd {
     /// at start and when his prefs change: the apps never read (bundle

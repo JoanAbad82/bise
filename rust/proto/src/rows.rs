@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 /// An agent's status as every view shows it (the hub's words mapped:
 /// starting is working, stopped is done; archived is a flag).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum Status {
     Working,
@@ -35,6 +36,7 @@ impl Status {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum ReportKind {
     Progress,
@@ -44,6 +46,7 @@ pub enum ReportKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Report {
     pub kind: ReportKind,
     pub text: String,
@@ -52,6 +55,7 @@ pub struct Report {
 
 /// One agent of a hub.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Agent {
     pub name: String,
     pub main: bool,
@@ -94,6 +98,7 @@ pub struct Agent {
 
 /// A numbered option of a card.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Opt {
     pub n: u32,
     pub label: String,
@@ -101,6 +106,7 @@ pub struct Opt {
 
 /// Where a card points on a page (a question block, a step of a plan).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct CardPage {
     pub id: String,
     pub url: String,
@@ -112,6 +118,7 @@ pub struct CardPage {
 
 /// One open card: what waits on him.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Card {
     pub id: u64,
     pub project: Project,
@@ -149,6 +156,7 @@ impl Card {
 /// A commit that reached the project's trunk today (the changes tab's
 /// "merged today", amb-web m_8974).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Merged {
     /// the full sha
     pub sha: String,
@@ -166,6 +174,7 @@ pub struct Merged {
 /// grafana): its job listening on a port, or a known server command not
 /// listening yet (no port, no url).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct DevServer {
     pub agent: String,
     /// what it is ("dev server", "http server")
@@ -185,6 +194,7 @@ pub struct DevServer {
 /// A worktree of the project's repo: an agent's, or one of his own (the
 /// main checkout included).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Worktree {
     pub path: String,
     /// its branch ("" when detached)
@@ -288,6 +298,7 @@ pub fn question(text: &str) -> (String, Vec<Opt>) {
 /// An artifact of a project (what an agent made for him), the
 /// `artifacts` event's row.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Artifact {
     pub id: String,
     pub kind: String,
