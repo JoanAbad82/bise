@@ -30,6 +30,16 @@ describe('binPath', () => {
     expect(binPath(where({ env: { BISE_DESKTOP_BISE: 'bise' } }))).toBeNull();
   });
 
+  it('test mode: only BISE_DESKTOP_BISE, never the repo build or the shipped one (his real home)', () => {
+    const dbg = `${repo}/rust/target/debug/bise`;
+    const shipped = `${app}/bin/bise`;
+    expect(binPath(where({ test: true }, [dbg, shipped]))).toBeNull();
+    expect(binPath(where({ test: true, packaged: true }, [shipped]))).toBeNull();
+    expect(binPath(where({ test: true, env: { BISE_DESKTOP_BISE: '/gate/w/bise' } }, [dbg]))).toBe('/gate/w/bise');
+    // the env's BISE_DESKTOP_TEST is enough (main passes its env as is)
+    expect(binPath(where({ env: { BISE_DESKTOP_TEST: '1' } }, [dbg]))).toBeNull();
+  });
+
   it("dev: else the repo's release build, then its debug build", () => {
     const rel = `${repo}/rust/target/release/bise`;
     const dbg = `${repo}/rust/target/debug/bise`;
