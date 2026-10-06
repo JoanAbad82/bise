@@ -34,12 +34,15 @@ const KEYS: readonly { path: string; role?: string; key: RegExp }[] = [
 test('native/mac-keys: the menu bar is bise\'s, with every mac key and its standard action', async () => {
   await onWorld(async ({ s }) => {
     const menu = await appMenu(s);
-    expect(menu[0]?.label, "the app's menu is named bise (today: the package's name)").toBe('bise');
+    expect.soft(menu[0]?.label, "the app's menu is named bise (today: the package's name)").toBe('bise');
     const all = flat(menu);
     const named = all.filter((e) => /bise-desktop/.test(e.label)).map((e) => e.path);
     expect.soft(named, 'no item says bise-desktop').toEqual([]);
-    // the paths with the app's menu called bise, whatever it is called today
-    const byPath = new Map(all.map((e) => [e.path.replace(/^[^/]+(?=\/)/, menu[0]?.label === undefined ? '' : 'bise').replace(/bise-desktop/g, 'bise'), e]));
+    // the paths with the app's menu called bise, whatever it is called today (only the app menu's
+    // first segment is renamed: File/Edit/Go/Window keep theirs)
+    const appLabel = menu[0]?.label ?? '';
+    const asBise = (p: string): string => (p === appLabel || p.startsWith(`${appLabel}/`) ? `bise${p.slice(appLabel.length)}` : p).replace(/bise-desktop/g, 'bise');
+    const byPath = new Map(all.map((e) => [asBise(e.path), e]));
     for (const k of KEYS) {
       const e = byPath.get(k.path);
       expect.soft(e, `${k.path} is in the menu bar`).toBeDefined();
