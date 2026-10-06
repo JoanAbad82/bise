@@ -1,12 +1,12 @@
 // The harness checks itself: every detector passes on the fixture's good half and fails on its
 // bad half, and every launch stays out of his sight (the proof). If one of these fails, no check
 // built on the harness can be trusted.
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { PNG } from 'pngjs';
 import {
-  caretBlinks, changedOutside, dropFiles, expect, flashes, fps, launchPage, maxJump, prove, Recorder, replacedNodes, test, textProblems, typeAndWatch,
+  caretBlinks, changedOutside, dropFiles, expect, FakeCore, FakeHelper, flashes, fps, launchDesktop, launchPage, maxJump, prove, Recorder, replacedNodes, test, textProblems, typeAndWatch,
 } from '../index';
 
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'typing.html');
@@ -104,6 +104,24 @@ test('guards: a PNG dropped on today\'s old window opens nothing (the exact qa-t
   expect(await oldWindow.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
   expect(oldWindow.page.url()).toContain('window/index.html');
   test.info().annotations.push({ type: 'blocked', description: (await oldWindow.blocked()).join(' | ') });
+});
+
+test('desktop: the new app runs on the scripted core and helper, out of sight (needs pnpm build)', async () => {
+  test.skip(!existsSync(path.join(__dirname, '..', '..', '..', 'out', 'main', 'index.js')), 'no build in out/: pnpm build');
+  const core = new FakeCore(), helper = new FakeHelper();
+  const s = await launchDesktop({ core, helper });
+  try {
+    expect(s.proof.violations).toEqual([]);
+    // the window reads both through window.bise (src/shared/api.ts): the stubs really ran
+    type Bise = { core: { state: () => Promise<unknown> }; helperState: () => Promise<{ ev: string }[]> };
+    await expect.poll(() => s.page.evaluate(async () => JSON.stringify(await (window as unknown as { bise: Bise }).bise.core.state())), { timeout: 5000 }).toContain('up');
+    await expect.poll(() => s.page.evaluate(async () => (await (window as unknown as { bise: Bise }).bise.helperState()).map((e) => e.ev)), { timeout: 5000 }).toContain('hello');
+    test.info().annotations.push({ type: 'core cmds', description: JSON.stringify(core.cmds()) }, { type: 'helper cmds', description: JSON.stringify(helper.cmds()) });
+  } finally {
+    await s.close();
+    core.dispose();
+    helper.dispose();
+  }
 });
 
 test('old UI: the window and the capsule load on their fake cores, out of sight', async ({ oldWindow, oldCapsule }) => {

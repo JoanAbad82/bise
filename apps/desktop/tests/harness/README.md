@@ -23,6 +23,12 @@ Run: `pnpm test:e2e` (self-tests + `tests/checks/**`), one worker. Ask amb-tools
 | the new app (`apps/desktop/out`, `BISE_DESKTOP_TEST=1`) | `launchDesktop()`, fixture `desktop` |
 | any HTML file | `launchPage(file)` |
 | fake microphone | `launch*({ micWav: 'x.wav' })` (Chromium's fake capture device) |
+| the scripted core | `launchDesktop({ core: new FakeCore() })`: its start world is every fixture of `rust/proto/fixtures` (or `new FakeCore([...events])`, or `'none'`). `core.send(ev)` sends more events, and `core.cmds()` / `core.waitCmd(pred)` read what the app sent the core (`fakes/core-stub.mjs`). Without it, the core stays `down`. |
+| the scripted Mac helper | `launchDesktop({ helper: new FakeHelper() })`: hello at start. `helper.send({ev:'fn',act:'talk_start',by:'fn'})` sends events, and `helper.cmds()` / `waitCmd` read the app's commands (`fakes/helper-stub.mjs`). Without it, there is no helper. |
+| a start screen | `launchDesktop({ route: 'inbox' })` (`#route=…`, read by the window in test mode) |
+
+The session's `page` is the app's main window (its largest). The other windows (the panel) are in `session.app.windows()`.
+`session.blocked()` lists what the guards stopped: new windows, navigations, windows that weren't offscreen.
 
 Focus emulation is on, so the caret is drawn even though the window is never focused.
 
@@ -63,8 +69,9 @@ in one state, out of his sight. It writes `shot.png` and `meta.json` (with the p
 drawn frame (`frames/NNNN.png`, `frames.json`: times and change per frame).
 - `old-window <hash>`: `inbox`, `agent/storefront/search`, `light`, `fresh`
 - `old-capsule <scene>[@ms]`: a `fakecore.js` scene id: `talk@1500`, `spot`, `needs`, `s9-away`, ...
-- `desktop [route]`: the new app from `out/` (`pnpm build` first). The route goes in as `BISE_DESKTOP_ROUTE`.
+- `desktop [route]`: the new app from `out/` (`pnpm build` first), on the scripted core (the fixture world) and
+  the scripted helper, opened on that route (`agent/acme-1a2b3c4d/perf`, `inbox`, ...).
 - `<file.html> [query]`: any page.
 
 ## Coming
-fixture states for `desktop` (replaying `@/proto/fixtures.gen` through the store) · (any screen, any fixture state, to PNGs and frames) · the macOS VM pass for qa-native.
+named fixture worlds (more than "every fixture") as the screens need them · the macOS VM pass for qa-native.

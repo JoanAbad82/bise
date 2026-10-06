@@ -13,7 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, type CDPSession, type ElectronApplication, type Page } from '@playwright/test';
 import { DESKTOP_DIR, harnessElectron } from './electron';
-import type { FakeHelper } from './fakes/helper';
+import type { FakeCore, FakeHelper } from './fakes/helper';
 import { prove, Watch, watcherBinary, type Proof } from './proof';
 
 export const OLD_WEB = path.resolve(DESKTOP_DIR, '..', 'ambient', 'web');
@@ -32,6 +32,8 @@ export type LaunchOptions = {
   env?: Record<string, string>;
   /** the scripted bise-mac-helper (fakes/helper.ts); without it a test run has no helper (desktop only) */
   helper?: FakeHelper;
+  /** the scripted bise ambient-core (fakes/helper.ts: FakeCore); without it the core stays 'down' (desktop only) */
+  core?: FakeCore;
   /** the screen to start on, a route string (bise, inbox, agent/<p>/<a>, ...) (desktop only) */
   route?: string;
 };
@@ -86,6 +88,27 @@ const killTree = (pid: number | undefined): void => {
   try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
 };
 
+/**
+ * The app's main window: the largest of its windows once they stop appearing (the new app also
+ * opens a 640x120 panel, and firstWindow() may give either). Other windows: session.app.windows().
+ */
+async function mainWindow(app: ElectronApplication): Promise<Page> {
+  await app.firstWindow();
+  let n = -1;
+  for (let i = 0; i < 10 && app.windows().length !== n; i++) {
+    n = app.windows().length;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  let best: Page | undefined, area = -1;
+  for (const p of app.windows()) {
+    await p.waitForLoadState('load');
+    const a = await p.evaluate(() => window.innerWidth * window.innerHeight);
+    if (a > area) { area = a; best = p; }
+  }
+  if (!best) throw new Error('the app opened no window');
+  return best;
+}
+
 async function start(args: string[], env: Record<string, string>, o: LaunchOptions): Promise<Session> {
   watcherBinary(); // compiled before the app starts, so the watch starts within ms of the launch
   const userData = mkdtempSync(path.join(os.tmpdir(), 'bise-harness-'));
@@ -101,8 +124,7 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
     const pid = app.process().pid;
     watch = new Watch(pid ?? -1, (why) => { stopped = why; killTree(pid); });
     await installGuards(app);
-    const page = await app.firstWindow();
-    await page.waitForLoadState('load');
+    const page = await mainWindow(app);
     if (o.route !== undefined) {
       // the window reads its start route from '#route=…' at start (amb-win fd85a165)
       await page.evaluate((r) => { location.hash = `route=${encodeURIComponent(r)}`; location.reload(); }, o.route);
@@ -150,7 +172,7 @@ export function launchOld(surface: OldSurface, o: LaunchOptions = {}): Promise<S
 
 /** The new app, from its build (apps/desktop/out), in its test mode. */
 export function launchDesktop(o: LaunchOptions = {}): Promise<Session> {
-  const env: Record<string, string> = { BISE_DESKTOP_TEST: '1', ...(o.helper?.env() ?? {}) };
+  const env: Record<string, string> = { BISE_DESKTOP_TEST: '1', ...(o.helper?.env() ?? {}), ...(o.core?.env() ?? {}) };
   if (o.route !== undefined) env['BISE_DESKTOP_ROUTE'] = o.route;
   return start([DESKTOP_DIR], env, o);
 }

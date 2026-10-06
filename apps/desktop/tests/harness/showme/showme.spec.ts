@@ -2,7 +2,8 @@
 // env var SHOWME (JSON): { surface, state, framesMs, out, size }.
 //   surface  old-window   today's old window; state = its address hash (inbox, agent/storefront/search, light, fresh)
 //            old-capsule  today's old capsule (dev.html, clean); state = a fakecore scene id, '@<ms>' to jump in it
-//            desktop      the new app (apps/desktop/out); state = a route (bise, inbox, agent/<p>/<a>, ...),
+//            desktop      the new app (apps/desktop/out) on the scripted core (fixture world) and helper;
+//                         state = a route (bise, inbox, agent/<p>/<a>, ...),
 //                         passed as BISE_DESKTOP_ROUTE
 //            <file.html>  any page; state = its query string
 //   framesMs record that long after the state settles: every drawn frame to frames/NNNN.png + frames.json
@@ -10,7 +11,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { changeSeries, fps, launchDesktop, launchPage, OLD_WEB, pngBytes, Recorder, test, type Session } from '../index';
+import { changeSeries, FakeCore, FakeHelper, fps, launchDesktop, launchPage, OLD_WEB, pngBytes, Recorder, test, type Session } from '../index';
 
 type Ask = { surface: string; state?: string; framesMs?: number; out: string; size?: string };
 
@@ -29,7 +30,10 @@ async function open(a: Ask): Promise<Session> {
     await s.page.goto(`${pathToFileURL(path.join(OLD_WEB, 'dev.html')).href}?clean&s=${scene ?? 'idle'}${at ? `&t=${at}` : ''}`);
     return s;
   }
-  if (a.surface === 'desktop') return launchDesktop({ ...o, env: a.state ? { BISE_DESKTOP_ROUTE: a.state } : {} });
+  if (a.surface === 'desktop') {
+    // the fixture world (every event of rust/proto/fixtures) from the scripted core, and the scripted helper
+    return launchDesktop({ ...o, core: new FakeCore(), helper: new FakeHelper(), ...(a.state ? { route: a.state } : {}) });
+  }
   const s = await launchPage(a.surface, o);
   if (a.state) await s.page.goto(`${pathToFileURL(path.resolve(a.surface)).href}?${a.state}`);
   return s;
