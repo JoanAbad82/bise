@@ -236,6 +236,31 @@ pub enum OpenWhat {
     Worktree,
 }
 
+/// A model account of his (S11's settings, amb-win m_8382).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Account {
+    /// chatgpt, claude, anthropic-key, ...
+    pub id: String,
+    pub label: String,
+    /// subscription | key
+    pub kind: String,
+    /// signed_in | signed_out | expired
+    pub state: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub who: Option<String>,
+}
+
+/// A folder found by `found_scan` that could be a project.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Found {
+    pub path: String,
+    pub name: String,
+    pub git: bool,
+    pub last_ms: u64,
+    /// already one of his projects
+    pub known: bool,
+}
+
 /// What the core sends the app besides the hubs' events (S3b).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "ev", rename_all = "snake_case")]
@@ -251,12 +276,18 @@ pub enum CoreEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
     },
+    /// his preferences (`bise_home::prefs`, its one owner): kept as JSON
+    /// here until that module types them
+    Prefs { prefs: Value },
+    Accounts { items: Vec<Account> },
+    /// the answer to `found_scan`
+    Found { dir: String, items: Vec<Found> },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -275,14 +306,44 @@ pub enum AppCmd {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         id: Option<String>,
     },
-    /// add a folder to his projects (S1's registry)
-    ProjectAdd { path: String },
+    /// add a folder to his projects (S1's registry); the add sheet's two
+    /// choices: agents in worktrees, agents land their work
+    ProjectAdd {
+        path: String,
+        #[serde(default, skip_serializing_if = "crate::is_false")]
+        worktrees: bool,
+        #[serde(default, skip_serializing_if = "crate::is_false")]
+        land: bool,
+    },
+    ProjectRemove { project: Project },
+    ProjectMove { project: Project, order: u32 },
+    /// one preference by its dotted key (`quiet.call`)
+    PrefsSet { key: String, value: Value },
+    /// opens his browser for that account, then `accounts` again
+    SignIn { id: String },
+    KeySet { id: String, key: String },
+    KeyRemove { id: String },
+    /// folders that could be projects (none: his home folder, depth 2)
+    FoundScan {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dir: Option<String>,
+    },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl AppCmd {
-    pub const TAGS: &'static [&'static str] = &["open", "project_add"];
+    pub const TAGS: &'static [&'static str] = &[
+        "open",
+        "project_add",
+        "project_remove",
+        "project_move",
+        "prefs_set",
+        "sign_in",
+        "key_set",
+        "key_remove",
+        "found_scan",
+    ];
 
     pub fn decode(line: &str) -> Result<AppCmd, String> {
         decode(parse(line)?, "cmd", Self::TAGS, |tag, raw| AppCmd::Unknown { tag, raw })

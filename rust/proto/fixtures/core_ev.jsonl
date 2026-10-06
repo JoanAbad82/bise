@@ -1,3 +1,6 @@
 {"ev":"projects","projects":[{"project":"bise-home-00000000","name":"bise","path":"/Users/camille/bise","home":true,"order":0,"agents":1,"working":0,"waits":0,"git":false},{"project":"acme-1a2b3c4d","name":"acme","path":"/Users/camille/acme","home":false,"order":1,"agents":3,"working":1,"waits":2,"git":true,"branch":"main"}]}
 {"ev":"open","project":"acme-1a2b3c4d","what":"thread","agent":"perf"}
 {"ev":"open","project":"acme-1a2b3c4d","what":"artifact","id":"perf-notes"}
+{"ev":"prefs","prefs":{"onboarded":true,"theme":"system","context":{"shot":true,"url":true,"file":true,"window_text":false},"excluded_apps":["1Password"],"quiet":{"call":true,"share":true,"fullscreen":true,"focus":true,"batch_min":20,"away_card":true},"voice":{"fn_hold":true,"fn_twice":"spotlight","language":"auto"},"shots_keep_days":7}}
+{"ev":"accounts","items":[{"id":"chatgpt","label":"ChatGPT","kind":"subscription","state":"signed_in","who":"camille@example.com"},{"id":"anthropic-key","label":"Anthropic key","kind":"key","state":"signed_out"}]}
+{"ev":"found","dir":"/Users/camille/code","items":[{"path":"/Users/camille/code/shop","name":"shop","git":true,"last_ms":1791100000000,"known":false},{"path":"/Users/camille/acme","name":"acme","git":true,"last_ms":1791000000000,"known":true}]}

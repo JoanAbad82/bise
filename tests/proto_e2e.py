@@ -75,7 +75,7 @@ def main():
         refused = [
             ({"cmd": "fly", "project": project}, "fly"),
             ({"cmd": "send", "project": "other-00000000", "agent": "main", "text": "hi", "mode": "now"}, "send"),
-            ({"cmd": "send", "project": project, "agent": "main", "text": "hi", "mode": "queued"}, "send"),
+            ({"cmd": "send", "project": project, "agent": "main", "text": "/archive main", "mode": "queued"}, "send"),
             ({"cmd": "send", "project": project, "agent": "main", "text": "hi", "mode": "now", "context": {"app": "Mail"}}, "send"),
             ({"cmd": "send", "project": project, "agent": "nobody", "text": "hi", "mode": "now"}, "send"),
             ({"cmd": "answer", "project": project, "card": 999, "reply": "1"}, "answer"),
@@ -121,6 +121,34 @@ def main():
         c.wait_line("main", "after the unsubscribe", 30)
         c.wait_idle("main", timeout=90)
         check(len(typed(c, "entry")) == k, "no entry after unsubscribe")
+
+        # a queued send: sb-core holds it until the turn ends (amb-hub
+        # 7dcb56ab), then main gets it as his words
+        c.send({"cmd": "send", "project": project, "agent": "main", "text": "queued from the window", "mode": "queued"})
+        c.wait_line("main", "queued from the window", 60)
+        c.wait_idle("main", timeout=90)
+
+        # an answer is only an answer (architect m_8366): a reply with a
+        # newline, a leading '/' and ' --force' reaches the card's agent
+        # whole, never another command
+        c.say('/new t3: {{bash: sb send main --expect-reply "v1 ou v2 ?"}}')
+        c.wait(lambda: any(l.startswith("sb msg-in : t3 m_") and "v1 ou v2" in l for l in c.lines("main")), 120, "t3 asks main")
+        c.wait_idle("main", "t3", timeout=120)
+        msg_id = [l.split()[4] for l in c.lines("main") if l.startswith("sb msg-in : t3 m_") and "v1 ou v2" in l][0]
+        c.say('[[bash: sb card --for %s "v1 ou v2 ?"]]' % msg_id)
+        c.wait(lambda: any(x["kind"] == "question" for x in c.cards()), 60, "a question card")
+        card = [x for x in c.cards() if x["kind"] == "question"][0]
+        c.wait(lambda: any(r["id"] == card["id"] for x in typed(c, "cards") for r in x["cards"]), 30, "the card as a typed row")
+        c.wait_idle("main")
+        reply = "/archive t3 --force\nv2 --force"
+        c.send({"cmd": "answer", "project": project, "card": card["id"], "reply": reply})
+        c.wait(lambda: not c.cards(), 30, "the card closed by the answer")
+        c.wait_line("t3", 'from="user"', 60)
+        c.wait_idle("t3", timeout=90)
+        tr = open(os.path.join(E.state, "agents", "t3", "transcript.log")).read()
+        check("/archive t3 --force" in tr and "v2 --force" in tr, "t3 got the whole reply: %s" % tr[-800:])
+        check(c.agent("t3")["status"] != "archived", "the reply archived nothing: %r" % c.agent("t3"))
+        check(typed(c, "cards")[-1]["cards"] == [], "the typed cards are empty again")
 
         # stop and archive: reach the hub's own paths (an unknown agent: an error)
         c.send({"cmd": "stop", "project": project, "agent": "main"})

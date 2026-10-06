@@ -68,8 +68,8 @@ pub fn agents(snap: &Value, since: &mut Since, now: u64, user_kind: fn(&str) -> 
             worktree: Some(s(&a, "path")).filter(|p| worktree && !p.is_empty()),
             turn_ms: a.get("turn_ms").and_then(Value::as_u64).filter(|_| status == Status::Working),
             report,
-            // the snapshot's queued inputs when the hub has them (amb-hub)
-            queued: a.get("queued").cloned().and_then(|q| serde_json::from_value(q).ok()).unwrap_or_default(),
+            // his queued inputs (sb-core holds them, amb-hub 7dcb56ab)
+            queued: a.get("queued_inputs").cloned().and_then(|q| serde_json::from_value(q).ok()).unwrap_or_default(),
             name,
         });
     }
@@ -194,7 +194,8 @@ mod tests {
                 {"name": "main", "main": true, "status": "idle", "objective": "", "created_ms": 5},
                 {"name": "perf", "main": false, "status": "working", "objective": "make the e2e fast\nmore", "note": "",
                  "role": "profiling the hub", "mode": "worktree", "branch": "sb/perf", "path": "/w/perf", "parent": "main",
-                 "turn_ms": 4200, "created_ms": 7},
+                 "turn_ms": 4200, "created_ms": 7, "queued": 1,
+                 "queued_inputs": [{"id": 3, "text": "then the cold run", "created_ms": 8}]},
                 {"name": "old", "main": false, "status": "archived", "objective": "an old fix", "report": "fixed in 0.4",
                  "report_ms": 9, "mode": "shared", "branch": "main", "path": "/w"},
             ],
@@ -218,6 +219,8 @@ mod tests {
         let o = &a[2];
         assert_eq!((o.archived, o.status, o.branch.as_deref(), o.since_ms), (true, Status::Done, None, 9));
         assert_eq!(o.report.as_ref().map(|r| r.kind), Some(ReportKind::Done));
+        assert_eq!(p.queued.iter().map(|q| (q.id, q.text.as_str())).collect::<Vec<_>>(), [(3, "then the cold run")]);
+        assert!(o.queued.is_empty());
         // a status change moves since; the same keeps it
         let mut s2 = snap();
         s2["agents"][1]["status"] = json!("idle");

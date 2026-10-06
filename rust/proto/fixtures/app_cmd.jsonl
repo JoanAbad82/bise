@@ -1,2 +1,11 @@
 {"cmd":"open","project":"acme-1a2b3c4d","what":"review","agent":"perf"}
 {"cmd":"project_add","path":"/Users/camille/telemetry"}
+{"cmd":"project_add","path":"/Users/camille/shop","worktrees":true}
+{"cmd":"project_remove","project":"shop-0badc0de"}
+{"cmd":"project_move","project":"acme-1a2b3c4d","order":2}
+{"cmd":"prefs_set","key":"quiet.call","value":true}
+{"cmd":"sign_in","id":"chatgpt"}
+{"cmd":"key_set","id":"anthropic-key","key":"sk-fake-0000"}
+{"cmd":"key_remove","id":"anthropic-key"}
+{"cmd":"found_scan","dir":"/Users/camille/code"}
+{"cmd":"found_scan"}

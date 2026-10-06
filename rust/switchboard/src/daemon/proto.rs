@@ -156,13 +156,19 @@ impl Shell {
                 if context.is_some() {
                     return self.proto_error(id, &tag, "send's context isn't taken yet: send the words alone");
                 }
-                if mode == Mode::Queued {
-                    return self.proto_error(id, &tag, "a queued send isn't taken yet: send it now");
-                }
                 if !known(self, &agent) {
                     return self.proto_error(id, &tag, &format!("no agent {agent}"));
                 }
-                self.client_line(id, json!({"op": "input", "focus": agent, "text": text}));
+                // queued: sb-core holds it until the agent's turn ends
+                // (amb-hub 7dcb56ab), never the client. A command never
+                // waits: the same rule as core.rs user_input's notice
+                // ("commands run now, not queued"), early and typed here;
+                // change both together
+                let queued = mode == Mode::Queued;
+                if queued && text.trim_start().starts_with('/') {
+                    return self.proto_error(id, &tag, "a command can't wait in the queue: send it now");
+                }
+                self.client_line(id, json!({"op": "input", "focus": agent, "text": text, "queued": queued}));
             }
             HubCmd::Answer { card, reply, .. } => {
                 if !self.hub.st.open_cards().any(|c| c.id == card) {
