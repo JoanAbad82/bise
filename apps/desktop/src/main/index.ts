@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { app, BrowserWindow, Menu } from 'electron';
 import { READY_LINE, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
-import { installIpc, sendMenu } from './ipc';
+import { installIpc, sendClip, sendMenu } from './ipc';
 import { menuTemplate } from './menu';
 
 const testMode = process.env[TEST_ENV] === '1';
@@ -79,6 +79,7 @@ void app.whenReady().then(() => {
         send: (action) => {
           sendMenu(action);
         },
+        ...(testMode ? { clip: sendClip } : {}),
       }),
     ),
   );

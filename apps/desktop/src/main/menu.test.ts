@@ -1,6 +1,7 @@
 import type { MenuItemConstructorOptions } from 'electron';
 import { describe, expect, it } from 'vitest';
 import type { MenuAction } from '../shared/api';
+import type { ClipOp } from './clipfence';
 import { externalUrl } from './external';
 import { menuTemplate } from './menu';
 
@@ -12,6 +13,12 @@ function build(platform: NodeJS.Platform, dev = false): { items: MenuItemConstru
   const sent: MenuAction[] = [];
   const t = menuTemplate({ platform, appName: 'bise', dev, send: (a) => sent.push(a) });
   return { items: flat(t), sent };
+}
+
+function buildTest(): { items: MenuItemConstructorOptions[]; ops: ClipOp[] } {
+  const ops: ClipOp[] = [];
+  const t = menuTemplate({ platform: 'darwin', appName: 'bise', dev: false, send: () => undefined, clip: (op) => ops.push(op) });
+  return { items: flat(t), ops };
 }
 
 const roles = (items: MenuItemConstructorOptions[]): Set<string> =>
@@ -50,6 +57,18 @@ describe('the application menu (bar ⛔2)', () => {
   it('no accelerator twice', () => {
     const acc = build('darwin', true).items.flatMap((i) => (typeof i.accelerator === 'string' ? [i.accelerator] : []));
     expect(new Set(acc).size).toBe(acc.length);
+  });
+
+  it('test mode: no clipboard role at all, the items play on the private buffer', () => {
+    const { items, ops } = buildTest();
+    const r = roles(items);
+    for (const role of ['cut', 'copy', 'paste', 'pasteAndMatchStyle']) expect(r).not.toContain(role);
+    for (const role of ['undo', 'redo', 'selectAll', 'delete']) expect(r).toContain(role);
+    for (const k of ['CmdOrCtrl+X', 'CmdOrCtrl+C', 'CmdOrCtrl+V', 'Shift+CmdOrCtrl+V']) {
+      const click = items.find((i) => i.accelerator === k)?.click as (() => void) | undefined;
+      click?.();
+    }
+    expect(ops).toEqual(['cut', 'copy', 'paste', 'paste']);
   });
 
   it('the devtools only in dev builds', () => {

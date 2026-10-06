@@ -7,6 +7,7 @@
 // renderer, which decides what it means (src/shared/api.ts onMenu).
 import type { MenuItemConstructorOptions } from 'electron';
 import type { MenuAction } from '../shared/api';
+import type { ClipOp } from './clipfence';
 
 export interface MenuOptions {
   readonly platform: NodeJS.Platform;
@@ -14,6 +15,12 @@ export interface MenuOptions {
   /** dev builds and tests: reload and the devtools in a View menu */
   readonly dev: boolean;
   readonly send: (action: MenuAction) => void;
+  /**
+   * Test mode: copy, cut and paste never use the system pasteboard (his
+   * clipboard): their items play the op on the window's private buffer
+   * (src/main/clipfence.ts) instead of being Electron roles.
+   */
+  readonly clip?: (op: ClipOp) => void;
 }
 
 export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
@@ -25,6 +32,22 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
       o.send(action);
     },
   });
+  const clipItem = (label: string, accelerator: string, op: ClipOp): MenuItemConstructorOptions => ({
+    label,
+    accelerator,
+    click: () => {
+      o.clip?.(op);
+    },
+  });
+  const clipboardItems: MenuItemConstructorOptions[] =
+    o.clip === undefined
+      ? [{ role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'pasteAndMatchStyle' }]
+      : [
+          clipItem('Cut', 'CmdOrCtrl+X', 'cut'),
+          clipItem('Copy', 'CmdOrCtrl+C', 'copy'),
+          clipItem('Paste', 'CmdOrCtrl+V', 'paste'),
+          clipItem('Paste and Match Style', 'Shift+CmdOrCtrl+V', 'paste'),
+        ];
   const settings = item(mac ? 'Settings…' : 'Settings', 'CmdOrCtrl+,', 'settings');
 
   const appMenu: MenuItemConstructorOptions[] = mac
@@ -59,10 +82,7 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
       { role: 'undo' },
       { role: 'redo' },
       { type: 'separator' },
-      { role: 'cut' },
-      { role: 'copy' },
-      { role: 'paste' },
-      { role: 'pasteAndMatchStyle' },
+      ...clipboardItems,
       { role: 'delete' },
       { role: 'selectAll' },
       { type: 'separator' },

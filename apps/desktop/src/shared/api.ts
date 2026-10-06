@@ -15,7 +15,10 @@ export interface BiseApi {
    * opens: main prints `EXTERNAL_LINE <url>` on stdout instead.
    */
   readonly openExternal: (url: string) => Promise<boolean>;
-  /** Puts text on the clipboard. In test mode: `COPY_LINE <text as JSON>` on stdout, never his clipboard. */
+  /**
+   * Puts text on the clipboard. In test mode: the window's private buffer
+   * (⌘V pastes it) and `COPY_LINE <text as JSON>` on stdout, never his clipboard.
+   */
   readonly copy: (text: string) => Promise<void>;
   /** The menu's own keys (⌘, ⌘I ⌘F) for this window; returns the unsubscribe. */
   readonly onMenu: (listener: (action: MenuAction) => void) => () => void;
@@ -29,6 +32,8 @@ export const IPC = {
   openExternal: 'bise:open-external',
   copy: 'bise:copy',
   menu: 'bise:menu',
+  /** test mode: a clipboard item of the menu, played on the window's private buffer */
+  clip: 'bise:clip',
 } as const;
 
 /** Test mode's stdout lines for effects that would leave the app. */
