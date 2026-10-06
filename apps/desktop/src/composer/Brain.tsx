@@ -209,6 +209,17 @@ export function Brain(p: BrainProps): JSX.Element | null {
   const setIndex = (i: number): void => {
     setSel({ key: live.current.tkey, i });
   };
+  // after ← / ⌫ up a folder: the keyboard's row goes to the folder he came from once its row shows
+  // (→ goes back in), as a file browser does
+  const leftFolder = useRef<string | null>(null);
+  useEffect(() => {
+    const from = leftFolder.current;
+    if (from === null || trigger?.kind !== 'at') return;
+    const i = rows.findIndex((r) => r.id === `file.${from}` || r.id === `file.${from}/`);
+    if (i < 0) return;
+    leftFolder.current = null;
+    setSel({ key: tkey, i });
+  }, [rows, trigger, tkey]);
 
   // ---- his actions ----
   const clear = (): void => {
@@ -275,23 +286,29 @@ export function Brain(p: BrainProps): JSX.Element | null {
     });
   };
 
-  /** ← or ⌫ on `@dir/`: one folder up (files.rs parent_query, input.rs at_nav); false elsewhere. */
+  /** ← or ⌫ on `@dir/`: one folder up (files.rs parent_query, input.rs at_nav); false elsewhere.
+   *  Decided by a read now (inside a key command an editor.update only runs after the handler, so
+   *  its result can't say whether the key was taken), then the edit. */
   const folderUp = (): boolean => {
-    let done = false;
-    editor.update(
-      () => {
-        const before = $textBeforeCaret();
-        if (before === null) return;
-        const t = triggerAt(before.text, before.messageStart);
-        if (t?.kind !== 'at') return;
-        const up = parentQuery(t.query);
-        if (up === null) return;
-        $replaceBeforeCaret(chars(before.text.slice(t.start)).length, browseText(up));
-        done = true;
-      },
-      { discrete: true },
-    );
-    return done;
+    const plan = editor.getEditorState().read(() => {
+      const before = $textBeforeCaret();
+      const caret = $caretOffset();
+      if (before === null || caret === null) return null;
+      const t = triggerAt(before.text, before.messageStart);
+      if (t?.kind !== 'at') return null;
+      const up = parentQuery(t.query);
+      if (up === null) return null;
+      const word = before.text.slice(t.start);
+      return { word, next: browseText(up), caret, from: t.query.slice(0, -1) };
+    });
+    if (plan === null) return false;
+    leftFolder.current = plan.from; // the list one level up lands on the folder he left
+    editor.update(() => {
+      $replaceBeforeCaret(chars(plan.word).length, plan.next);
+      const at = plan.caret - plan.word.length + plan.next.length;
+      $selectRange(at, at);
+    });
+    return true;
   };
 
   const queue = (): void => {

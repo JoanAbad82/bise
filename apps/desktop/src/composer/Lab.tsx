@@ -20,6 +20,18 @@ const FILES: readonly PickFile[] = [
   { path: 'shots/screen.png', dir: false },
 ];
 
+/** The fake core's file search, files.rs's shape: `src/` lists that folder's children, `src/ma`
+ *  searches inside it, a bare word searches every name (prefix first). */
+function labFiles(q: string): readonly PickFile[] {
+  const cut = q.lastIndexOf('/');
+  const dir = cut < 0 ? '' : q.slice(0, cut + 1);
+  const name = q.slice(cut + 1);
+  const parent = (f: PickFile): string => f.path.slice(0, f.path.lastIndexOf('/') + 1);
+  const inDir = dir === '' ? FILES : FILES.filter((f) => f.path.startsWith(dir) && f.path !== dir.slice(0, -1));
+  const pool = name === '' ? inDir.filter((f) => parent(f) === dir) : inDir;
+  return prefixFirst(pool, name, (f) => f.path.split('/').at(-1) ?? f.path).slice(0, 20);
+}
+
 /** The commands of bar 2.1 (with the /shortcuts alias /keys); the ones without a screen or a cmd yet are greyed. */
 const COMMANDS = [
   ['new', 'start an agent: /new [-w] [name:] objective', true, true],
@@ -87,7 +99,7 @@ const SOURCES: ComposerSources = {
     };
     return prefixFirst(lists[kind] ?? [], q, (c) => c.value);
   },
-  files: (q) => Promise.resolve(prefixFirst(FILES, q.replace(/^"/u, ''), (f) => f.path.split('/').at(-1) ?? f.path).slice(0, 20)),
+  files: (q) => Promise.resolve(labFiles(q.replace(/^"/u, ''))),
   saveImage: (f) => Promise.resolve({ path: `/tmp/bise-lab/${f.name || 'pasted.png'}`, name: f.name || 'pasted.png' }),
   artifacts: [
     { id: 'perf-notes', title: 'Perf notes', kind: 'page', agent: 'perf', url: 'http://127.0.0.1:47123/p/perf-notes', atMs: 1_791_100_014_000 },
