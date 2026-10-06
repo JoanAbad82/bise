@@ -43,6 +43,55 @@ enum KeepOff {
         swap("orderWindow:relativeTo:", "bise_keepOffOrderWindow:relativeTo:")
     }
 
+    // harness A (lead m_8679: the harness app became frontmost after a second
+    // win_open + fn space, the watchdog killed it): activation made
+    // impossible whatever the path. NSApplication's activate(ignoringOtherApps:),
+    // activate(), unhide(_:) and unhideWithoutActivation, NSRunningApplication's
+    // activate(options:) and activate(from:options:) (his apps too: the harness
+    // never moves his focus) and NSWindow's makeKeyAndOrderFront(_:) and
+    // makeKey() are refused with 'harness: activation refused <where>';
+    // setActivationPolicy keeps only what ActivationRule allows (accessory,
+    // prohibited). The guard (Harness.checkAll) still quits if the app is
+    // ever active. Never installed in a normal launch.
+    private(set) static var activationGuarded = false
+    // the selectors replaced, by class (the smoke laws check each was)
+    static let refused: [(AnyClass, String)] = [
+        (NSApplication.self, "activateIgnoringOtherApps:"), (NSApplication.self, "activate"),
+        (NSApplication.self, "unhide:"), (NSApplication.self, "unhideWithoutActivation"),
+        (NSRunningApplication.self, "activateWithOptions:"), (NSRunningApplication.self, "activateFromApplication:options:"),
+        (NSWindow.self, "makeKeyAndOrderFront:"), (NSWindow.self, "makeKeyWindow"),
+    ]
+
+    static func installActivationGuard() {
+        guard !activationGuarded else { return }
+        activationGuarded = true
+        for (cls, name) in refused {
+            let sel = NSSelectorFromString(name)
+            guard let m = class_getInstanceMethod(cls, sel) else { continue }
+            let say = "harness: activation refused \(String(describing: cls)).\(name)"
+            // every one of them takes self (+ one object or integer at most) and
+            // returns void or a BOOL: answer NO and do nothing
+            let block: @convention(block) (AnyObject) -> Bool = { _ in
+                Log.say(say)
+                return false
+            }
+            method_setImplementation(m, imp_implementationWithBlock(block))
+        }
+        let polSel = NSSelectorFromString("setActivationPolicy:")
+        if let m = class_getInstanceMethod(NSApplication.self, polSel) {
+            typealias SetPolicy = @convention(c) (AnyObject, Selector, Int) -> Bool
+            let orig = unsafeBitCast(method_getImplementation(m), to: SetPolicy.self)
+            let block: @convention(block) (AnyObject, Int) -> Bool = { me, raw in
+                guard ActivationRule.allows(policy: raw) else {
+                    Log.say("harness: activation refused NSApplication.setActivationPolicy(\(raw))")
+                    return false
+                }
+                return orig(me, polSel, raw)
+            }
+            method_setImplementation(m, imp_implementationWithBlock(block))
+        }
+    }
+
     private static func swap(_ a: String, _ b: String) {
         guard let ma = class_getInstanceMethod(NSWindow.self, NSSelectorFromString(a)),
               let mb = class_getInstanceMethod(NSWindow.self, NSSelectorFromString(b)) else { return }

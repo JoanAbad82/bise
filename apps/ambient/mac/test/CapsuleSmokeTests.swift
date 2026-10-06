@@ -6,6 +6,7 @@
 // no page, and never starts the app itself.
 
 import AppKit
+import ObjectiveC
 import WebKit
 
 var failures = 0
@@ -59,6 +60,25 @@ MainActor.assumeIsolated {
     law("sim keys: the bar closing gives them back to the window", win2.window.isKeyWindow && !bar2.panel.isKeyWindow)
     win2.window.orderOut(nil)
     bar2.panel.orderOut(nil)
+    CapsulePanel.simulatedKeys = false
+
+    // harness A: activation impossible (lead m_8679): every path replaced,
+    // a regular policy refused (nothing is activated by these laws)
+    var impsBefore: [String: IMP] = [:]
+    for (cls, name) in KeepOff.refused {
+        if let m = class_getInstanceMethod(cls, NSSelectorFromString(name)) { impsBefore[name] = method_getImplementation(m) }
+    }
+    KeepOff.installActivationGuard()
+    let replaced = KeepOff.refused.allSatisfy { cls, name in
+        guard let m = class_getInstanceMethod(cls, NSSelectorFromString(name)) else { return true }   // not on this macOS
+        return method_getImplementation(m) != impsBefore[name]
+    }
+    law("activation guard: activate, unhide, NSRunningApplication.activate, makeKey all replaced", replaced)
+    let policyBefore = NSApp.activationPolicy()
+    law("activation guard: setActivationPolicy(.regular) refused", !NSApp.setActivationPolicy(.regular) && NSApp.activationPolicy() == policyBefore)
+    CapsulePanel.simulatedKeys = true
+    law("activation guard: the bar and the window can't become key or main in harness mode",
+        !Capsule(offScreen: true).panel.canBecomeKey && !win2.window.canBecomeKey && !win2.window.canBecomeMain)
     CapsulePanel.simulatedKeys = false
 
     // KeepOff (proof run #2: AppKit's TUINSWindow made at 0,0,500,500): every

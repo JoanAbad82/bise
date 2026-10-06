@@ -25,8 +25,9 @@ import WebKit
 
 final class DesktopNSWindow: NSWindow, SimKeyWindow {
     var testKey = false
-    override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
+    // harness A: never really key or main (simulated keys, lead m_8679)
+    override var canBecomeKey: Bool { !CapsulePanel.simulatedKeys }
+    override var canBecomeMain: Bool { !CapsulePanel.simulatedKeys }
     override var isKeyWindow: Bool { CapsulePanel.simulatedKeys ? testKey : super.isKeyWindow }
     // harness A: AppKit never moves the frame back onto a screen
     override func constrainFrameRect(_ r: NSRect, to s: NSScreen?) -> NSRect {
@@ -103,6 +104,7 @@ final class DesktopWindow: NSObject, WKNavigationDelegate, NSWindowDelegate {
     var onDrop: (([String]) -> Void)?        // folders dropped: add them as projects
     var onShown: ((Bool) -> Void)?           // shown / closed (the activation policy)
     var onReady: (() -> Void)?
+    var onKey: ((Bool) -> Void)?             // it took or lost the keys (CardSeat)
 
     let window: DesktopNSWindow
     let web: DesktopWebView
@@ -327,8 +329,8 @@ final class DesktopWindow: NSObject, WKNavigationDelegate, NSWindowDelegate {
         return false
     }
 
-    func windowDidBecomeKey(_ n: Notification) { post(["ev": "win_focused", "on": true]) }
-    func windowDidResignKey(_ n: Notification) { post(["ev": "win_focused", "on": false]) }
+    func windowDidBecomeKey(_ n: Notification) { post(["ev": "win_focused", "on": true]); onKey?(true) }
+    func windowDidResignKey(_ n: Notification) { post(["ev": "win_focused", "on": false]); onKey?(false) }
     func windowDidMove(_ n: Notification) { saveFrame() }
     func windowDidEndLiveResize(_ n: Notification) { saveFrame() }
 }

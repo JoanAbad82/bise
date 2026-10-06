@@ -10,7 +10,9 @@ import AppKit
 import WebKit
 
 final class CapsulePanel: NSPanel {
-    override var canBecomeKey: Bool { true }
+    // harness A: never really key (its keys are simulated): no path, ours,
+    // AppKit's or WebKit's focus, can make it key and bring the app forward
+    override var canBecomeKey: Bool { !CapsulePanel.simulatedKeys }
     override var canBecomeMain: Bool { false }
 
     // harness A (Harness.swift): bise 'has the keys' without the window

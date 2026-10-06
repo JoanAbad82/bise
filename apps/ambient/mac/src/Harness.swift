@@ -511,6 +511,11 @@ final class Harness {
     // every window AppKit has, shown or not, and every window the window
     // server has for this pid (on screen or not), against every display
     func checkAll() {
+        // never in front of his apps (lead m_8679): active = quit at once
+        if NSApp.isActive || NSWorkspace.shared.frontmostApplication?.processIdentifier == getpid() {
+            Log.say("harness: GUARD: the app is active / frontmost (key window \(NSApp.keyWindow.map { String(describing: type(of: $0)) } ?? "none")): quitting now")
+            exit(3)
+        }
         for w in NSApp.windows { _ = check(w) }
         var n: UInt32 = 0
         CGGetActiveDisplayList(0, nil, &n)
@@ -538,7 +543,8 @@ final class Harness {
     func startGuard() {
         let nc = NotificationCenter.default
         for n in [NSWindow.didMoveNotification, NSWindow.didResizeNotification, NSWindow.didChangeScreenNotification,
-                  NSWindow.didChangeOcclusionStateNotification, NSApplication.didChangeScreenParametersNotification] {
+                  NSWindow.didChangeOcclusionStateNotification, NSApplication.didChangeScreenParametersNotification,
+                  NSApplication.didBecomeActiveNotification, NSWindow.didBecomeKeyNotification, NSWindow.didBecomeMainNotification] {
             nc.addObserver(forName: n, object: nil, queue: .main) { [weak self] _ in MainActor.assumeIsolated { self?.checkAll() } }
         }
         guardTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in MainActor.assumeIsolated { self?.checkAll() } }

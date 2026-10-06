@@ -42,6 +42,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     var quietHourJob: DispatchWorkItem?   // App+Quiet: the end of his quiet hour
     var quietHourEnds: Date?              // App+Quiet: when it ends (app_quiet until_ms)
     var routeJob: DispatchWorkItem?       // App+Talk: the route line's tab, 4 s at most
+    var heldCard: String?                 // a card bise's window holds (CardSeat), not yet in the bar
     var askedAnchor: BarAnchor?           // where the next show puts the bar (S8; none = bottom centre)
     let mainMenu = MainMenuView() // the hidden main menu: ⌘Q ⌘W ⌘, ⌘H and Edit
     var status: StatusItem?
@@ -99,6 +100,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             // every window of the process, AppKit's own too (its text-input
             // indicator, proof run #2), made and kept off his screens
             KeepOff.install()
+            // and never in front of his apps (lead m_8679): every activation path refused
+            KeepOff.installActivationGuard()
             // and ask the text input system not to show its language indicator
             // at all (this process's registration domain only, never his prefs)
             UserDefaults.standard.register(defaults: ["TSMLanguageIndicatorEnabled": false])
@@ -390,6 +393,10 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: capsule.panel, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.sayVisible() }
         }
+        // another app came in front of bise's window: a card it held comes to the bar (CardSeat)
+        NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.cardSeatChanged() }
+        }
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.capsule.screensChanged()
@@ -513,12 +520,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             case "needs":
                 // once per card: the same card said again after a dismiss stays in the icon
                 let card = cmd["card"].flatMap { $0 is NSNull ? nil : "\($0)" }
-                // bise's window in front and key holds it above its composer (CardSeat)
-                let w = desktop
-                let seat = CardSeat.seat(windowShown: w.map { !$0.hidden } ?? false, windowKey: w?.window.isKeyWindow ?? false,
-                                         appFront: NSApp.isActive || CapsulePanel.simulatedKeys)
-                if seat == .window { Log.say("app: card \(card ?? "?") stays in the window (it's in front)") }
-                else if cardPush.shows(card: card) { visFeed(.card) } else { capsule.refreshMouse() }
+                // bise's window in front and key holds it above its composer (CardSeat);
+                // a held card isn't counted as shown: it comes to the bar when the window goes
+                if cardSeat() == .window {
+                    heldCard = card ?? "?"
+                    Log.say("app: card \(card ?? "?") stays in the window (it's in front)")
+                } else {
+                    heldCard = nil
+                    if cardPush.shows(card: card) { visFeed(.card) } else { capsule.refreshMouse() }
+                }
             case "none":
                 // the hello is over (5 s, or fn, esc, a click): its glass goes
                 if helloOn { helloOn = false; visFeed(.dismiss) }

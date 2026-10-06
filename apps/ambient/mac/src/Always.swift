@@ -106,6 +106,13 @@ enum KeyBack: Equatable {
     }
 }
 
+// harness A: the activation policies the app may take (KeepOff's guard):
+// accessory (1, the menu-bar app) and prohibited (2); never regular (0),
+// which gives it a Dock icon and lets it come in front of his apps
+enum ActivationRule {
+    static func allows(policy raw: Int) -> Bool { raw == 1 || raw == 2 }
+}
+
 // a screen as the capsule's placement sees it (Cocoa coords: y up)
 struct ScreenBox: Equatable {
     var frame: CGRect

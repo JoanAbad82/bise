@@ -16,7 +16,11 @@ extension AmbientApp {
                 for p in paths { self?.toCore(["cmd": "project_add", "path": p]) }
                 self?.desktop?.post(["ev": "win_drop", "paths": paths])
             }
-            d.onShown = { [weak self] on in self?.windowPolicy(on) }
+            d.onShown = { [weak self] on in
+                self?.windowPolicy(on)
+                if !on { self?.cardSeatChanged() }
+            }
+            d.onKey = { [weak self] on in if !on { self?.cardSeatChanged() } }
             d.onReady = { [weak self, weak d] in
                 for k in ["hub", "state", "phase", "main"] { if let ev = self?.memory[k] { d?.post(ev) } }
             }
@@ -26,6 +30,23 @@ extension AmbientApp {
         }()
         Log.say("window: open \(route ?? "where he left it")")
         d.open(route)
+    }
+
+    // where a card shows now (CardSeat): the window in front and key, else the bar
+    func cardSeat() -> CardSeat {
+        let w = desktop
+        return CardSeat.seat(windowShown: w.map { !$0.hidden } ?? false, windowKey: w?.window.isKeyWindow ?? false,
+                             appFront: NSApp.isActive || CapsulePanel.simulatedKeys)
+    }
+
+    // the window closed, lost the keys, or another app came in front (lead
+    // m_8679, B): a card it held comes to the bar now, bottom centre
+    func cardSeatChanged() {
+        guard let c = heldCard, cardSeat() == .bar else { return }
+        heldCard = nil
+        guard content == "needs" else { return }   // the page shows something else: its next needs pushes it
+        Log.say("app: card \(c) comes to the bar (the window isn't in front)")
+        if cardPush.shows(card: c == "?" ? nil : c) { visFeed(.card) }
     }
 
     // a normal app (Dock icon, ⌘Tab) only while the window shows (WinPolicy)

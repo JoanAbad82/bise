@@ -114,5 +114,13 @@ law("card seat: the window hidden: the bar", CardSeat.seat(windowShown: false, w
 law("card seat: the window shown but not key (the bar or another panel has the keys): the bar", CardSeat.seat(windowShown: true, windowKey: false, appFront: true) == .bar)
 law("card seat: another app in front (the window behind it): the bar", CardSeat.seat(windowShown: true, windowKey: true, appFront: false) == .bar)
 
+// a card the window held comes to the bar when the window goes (lead m_8679, B)
+var held = CardPush()
+let heldSeat = CardSeat.seat(windowShown: true, windowKey: true, appFront: true)
+law("card seat B: held by the window, not counted as shown", heldSeat == .window && held.last == nil)
+let laterSeat = CardSeat.seat(windowShown: false, windowKey: false, appFront: true)
+law("card seat B: the window closed: the held card goes to the bar and shows", laterSeat == .bar && held.shows(card: "1"))
+law("card seat B: and only once", !held.shows(card: "1"))
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Visibility laws hold")

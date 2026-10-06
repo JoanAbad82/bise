@@ -142,5 +142,9 @@ law("keys back: the window had them but closed since: his app", KeyBack.after(fr
 law("keys back: his app had them: his app", KeyBack.after(fromWindow: false, windowShown: true, fromApp: true) == .app)
 law("keys back: nobody to give them to: nothing", KeyBack.after(fromWindow: false, windowShown: false, fromApp: false) == .nothing)
 
+// harness A: never in front of his apps (lead m_8679)
+law("activation: accessory and prohibited allowed", ActivationRule.allows(policy: 1) && ActivationRule.allows(policy: 2))
+law("activation: regular (a Dock icon, in front of his apps) refused", !ActivationRule.allows(policy: 0))
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Always laws hold")
