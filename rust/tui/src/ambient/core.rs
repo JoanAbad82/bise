@@ -359,6 +359,16 @@ impl Core {
                     self.send_to_main(text, false);
                 }
             }
+            // the files as their paths after his words: main reads them
+            // with its tools (the page names them, run 5 step 18)
+            Cmd::SendFiles { text, files } => {
+                let list = files.join("\n");
+                let text = match text.trim() {
+                    "" => format!("[files he dropped on bise:]\n{list}"),
+                    t => format!("{t}\n\n[files he dropped on bise:]\n{list}"),
+                };
+                self.send_to_main(text, false);
+            }
             Cmd::Start { text } => {
                 let text = text.trim().to_string();
                 if !text.is_empty() {

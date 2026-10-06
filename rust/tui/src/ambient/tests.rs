@@ -478,6 +478,23 @@ fn the_fn_context_rides_the_next_message_once() {
     assert!(Cmd::parse(r#"{"cmd":"fn_context"}"#).is_err());
 }
 
+/// T1 run 5 step 18 (amb-web m_9242): a drop sent from the spotlight,
+/// {cmd:'send', text, files}, reaches bise's main with the files' paths
+/// after his words (alone when he typed nothing); a relative path is
+/// refused, never sent.
+#[test]
+fn a_dropped_file_reaches_main_with_his_words() {
+    let mut t = T::new();
+    t.ready();
+    let cmd = Cmd::parse(r#"{"cmd":"send","text":" summarize this ","files":["/w/q3-notes.md","/w/b.png"]}"#).unwrap();
+    t.cmd(cmd);
+    assert_eq!(t.hub.next()["text"], "summarize this\n\n[files he dropped on bise:]\n/w/q3-notes.md\n/w/b.png");
+    t.cmd(Cmd::parse(r#"{"cmd":"send","text":"","files":["/w/q3-notes.md"]}"#).unwrap());
+    assert_eq!(t.hub.next()["text"], "[files he dropped on bise:]\n/w/q3-notes.md");
+    assert_eq!(Cmd::parse(r#"{"cmd":"send","text":"hi","files":[]}"#), Ok(Cmd::Send { text: "hi".into() }));
+    assert!(Cmd::parse(r#"{"cmd":"send","text":"hi","files":["notes.md"]}"#).is_err());
+}
+
 #[test]
 fn a_shot_steered_into_a_running_turn_is_forgotten_at_its_end() {
     let mut t = T::new();

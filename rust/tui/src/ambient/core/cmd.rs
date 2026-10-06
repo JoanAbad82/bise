@@ -20,6 +20,10 @@ pub enum Cmd {
     /// He's back after `away_ms` (amb-mac m_9038): `away_summary` answers.
     AwayBack { away_ms: u64 },
     Send { text: String },
+    /// A drop on the pearl sent from the spotlight (amb-web m_9242):
+    /// `send` with `files` (absolute paths): his words and the files' paths
+    /// to bise's main.
+    SendFiles { text: String, files: Vec<String> },
     /// fn space's typed text sent with tab: main starts an agent on it
     /// (only main starts agents; ambient-lead m_6513)
     Start { text: String },
@@ -94,7 +98,16 @@ impl Cmd {
                 _ => return Err("fn_context: no context object".into()),
             },
             "shot" => Cmd::Shot { path: PathBuf::from(s("path")), app: s("app"), title: s("title") },
-            "send" => Cmd::Send { text: s("text") },
+            "send" => {
+                let files: Vec<String> = v.get("files").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).map(str::trim).filter(|f| !f.is_empty()).map(str::to_string).collect();
+                if let Some(f) = files.iter().find(|f| !f.starts_with('/')) {
+                    return Err(format!("send: a file must be an absolute path: {f:?}"));
+                }
+                match files.is_empty() {
+                    true => Cmd::Send { text: s("text") },
+                    false => Cmd::SendFiles { text: s("text"), files },
+                }
+            }
             "start" => Cmd::Start { text: s("text") },
             "answer" => {
                 let card = match v.get("card") {
