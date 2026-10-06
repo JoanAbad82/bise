@@ -238,7 +238,7 @@
     put("pv", JSON.stringify(s.preview || null), () => {
       el.pv.innerHTML = previewHtml(s.preview); el.pv.scrollTop = 0; show(el.pv, !!s.preview);
       // a click on the preview = its ⏎: the agent's side panel (lead m_8108 (3)); its own buttons act first
-      if (s.preview && s.preview.name) el.pv.dataset.act = JSON.stringify({ ev: "ui_agent", agent: s.preview.name });
+      if (s.preview && s.preview.act) el.pv.dataset.act = JSON.stringify(s.preview.act);
       else delete el.pv.dataset.act;
     });
     put("body", JSON.stringify(strip(s.sections)), () => { el.body.innerHTML = body(s.sections, bar.classList.contains("appear") || !on); el.body.scrollTop = 0; last.sel = null; show(el.body, rowsOn); });

@@ -1386,6 +1386,7 @@ law("round 10: the preview follows ↑↓; it's asked once per agent (the page w
   // before it comes: the title line stands for now
   let p = Bar.spec(v).preview;
   eq([p.name, p.chip, p.now, p.loading], ["cookies", { text: "needs you · 4m", gc: "a" }, "the banner, half the size on mobile", true]);
+  eq(p.act, { ev: "ui_agent", agent: "cookies" });   // a click on the preview = its ⏎: the side panel
   let r = M.step(m, { ev: "ui_preview_ask", agent: "cookies" }, 20);
   eq(r.cmds, [{ cmd: "agent_preview", agent: "cookies" }]);
   eq(M.step(r.m, { ev: "ui_preview_ask", agent: "cookies" }, 30).cmds, []);   // asked once: the core re-sends on its events
@@ -1445,8 +1446,10 @@ law("round 10: fn space + typing filters agents by name, title and purpose, the 
   // nothing matches: the preview says ⏎ asks main, and ⏎ (the selected row) does
   m = M.step(m, { ev: "ui_spot_type", text: "dark theme for billing" }, 60).m;
   s = Bar.spec(v10(m));
-  eq([s.sections[0].rows.length, s.preview], [0, { empty: "no agent matches. ⏎ asks main instead." }]);
+  eq([s.sections[0].rows.length, s.preview.empty], [0, "no agent matches. ⏎ asks main instead."]);
   eq(Bar.selRow(s).act, { ev: "ui_spot_send", text: "dark theme for billing" });
+  // a click on that preview does what its ⏎ does: asks main (lead m_8123)
+  eq(s.preview.act, { ev: "ui_spot_send", text: "dark theme for billing" });
   // typing puts the selection back on the first row
   m = M.step(M.step(m, { ev: "app_key", key: "down", local: true, n: 2 }, 70).m, { ev: "ui_spot_type", text: "dark" }, 80).m;
   eq(v10(m).find.sel, 0);

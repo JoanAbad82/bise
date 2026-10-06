@@ -76,7 +76,11 @@
       ...(a ? [item(["⌘", "O"], F.terminal, { ev: "ui_agent_terminal", agent: a }), item(["⌘", "D"], row && row.followed ? F.following : F.follow, { ev: "ui_follow", agent: a })] : [])],
     right: [item(["esc"], B.close, { ev: "ui_close" })] };
     if (!f.rows.length && !q) s.text = { s: F.none, dim: true };
-    return markSel(s, f.sel);
+    markSel(s, f.sel);
+    // a click on the preview does what its ⏎ does (lead m_8123): an agent's side panel, or, when
+    // no agent matches ('⏎ asks main instead'), the selected row (ask main)
+    if (s.preview) { const r = selRow(s); s.preview.act = s.preview.name ? { ev: "ui_agent", agent: s.preview.name } : r ? r.act : { ev: "ui_spot_send" }; }
+    return s;
   }
   // the preview of the selected agent: its status chip, what it does now, what waits on you, its
   // last actions, its last report, its pages, and the ways in (⏎ ⌘O ⌘D); until the core's
