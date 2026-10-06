@@ -436,6 +436,26 @@ law("bise's own agents (every agent on the single-hub core): agent/home/<a> open
   eq([w.s.route, w.v.head.t1], [{ project: F.HOME, agent: "main" }, "bise"]);
 });
 
+law("the single-hub core's state (the bar's {agents, cards}) reaches the window: main's card above the composer and in 'waiting for you', its agents under bise", () => {
+  const w = win();
+  // a window that only ever gets the single-hub core: no projects, no typed cards
+  w.feed({ ev: "projects", projects: [] });
+  for (const p of Object.keys(w.s.cards)) w.feed({ ev: "cards", project: p, cards: [] });
+  eq(w.v.board.sections[0].items.length, 0);
+  w.feed({ ev: "state", agents: [{ name: "main", status: "waiting" }, { name: "perf", status: "working", title: "profile the replay" }],
+    cards: [{ id: 1, agent: "main", text: "compaction at 03:00?", options: ["yes", "not yet"], urgent: false }] });
+  const d = w.v.composer.dock;
+  eq([d.q, d.opts.map((o) => [o.n, o.label])], ["compaction at 03:00?", [[1, "yes"], [2, "not yet"]]]);
+  eq(w.v.board.sections[0].items.map((i) => i.text), ["compaction at 03:00?"]);
+  eq(w.v.side.rows.filter((r) => r.kind === "ag").map((r) => r.name), ["perf"]);
+  // he answers it: the S3a answer for bise's own hub (the option's digit)
+  w.feed({ ev: "ui_pick", card: d.card, n: 1 });
+  eq(w.sent.filter((c) => c.cmd === "answer").pop(), { cmd: "answer", project: F.HOME, card: 1, reply: "1" });
+  // the next state drops the card: nothing waits any more
+  w.feed({ ev: "state", agents: [{ name: "main", status: "idle" }], cards: [] });
+  eq([w.v.composer.dock, w.v.board.sections[0].items.length, w.v.side.rows.filter((r) => r.kind === "ag").length], [null, 0, 0]);
+});
+
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {
   const dir = join(here, "../../../../rust/proto/fixtures");
   if (!existsSync(dir)) return;

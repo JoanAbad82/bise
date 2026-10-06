@@ -16,7 +16,9 @@
   // he answered a moment ago (the core's next `cards` drops them; until then they stay hidden)
   function allCards(s) {
     const out = [];
-    for (const p of s.projects) for (const c of s.cards[p.project] || []) if (!(c.id in s.answered)) out.push({ ...c, project: c.project || p.project });
+    // bise's own hub counts even when no projects list names it (the single-hub core sends none)
+    const ids = [...new Set([HOME, ...s.projects.map((p) => p.project)])];
+    for (const id of ids) for (const c of s.cards[id] || []) if (!(c.id in s.answered)) out.push({ ...c, project: c.project || id });
     return out.sort((a, b) => (b.since_ms || 0) - (a.since_ms || 0) || String(a.id).localeCompare(String(b.id)));
   }
 

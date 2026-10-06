@@ -98,6 +98,31 @@
     : r.screen === "settings" && r.page ? `settings/${r.page}` : r.screen ? r.screen
     : r.project === HOME && r.agent === "main" ? "bise" : r.agent === "main" ? `project/${r.project}` : `agent/${r.project}/${r.agent}`);
 
+  // the single-hub core's state (the bar's: {agents, cards, projects?}): agents and cards go to
+  // their project (bise's own hub when they name none), in the window's S3a shapes; a project
+  // listed there before (and gone now) is emptied. Typed projects (S3b) win over state's.
+  function fromState(s, ev) {
+    const by = (list) => {
+      const out = {};
+      for (const x of Array.isArray(list) ? list : []) (out[x.project || HOME] = out[x.project || HOME] || []).push(x);
+      return out;
+    };
+    const ag = by(ev.agents), cd = by(ev.cards);
+    const keys = new Set([HOME, ...(s.stateKeys || []), ...Object.keys(ag), ...Object.keys(cd)]);
+    let agents = s.agents, cards = s.cards;
+    for (const k of keys) {
+      const list = (ag[k] || []).map((a) => ({ ...a, project: k, main: !!(a.main || a.name === "main") }));
+      // bise's main is always there, even when the state lists only the other agents
+      if (k === HOME && !list.some((a) => a.main)) list.unshift({ name: "main", main: true, status: "idle", project: HOME });
+      agents = set(agents, k, list);
+      cards = set(cards, k, (cd[k] || []).map((c) => ({ ...c, project: k, kind: c.kind || "question", question: c.question || c.text || c.title || "",
+        options: (c.options || []).map((o, i) => (typeof o === "string" ? { n: i + 1, label: o } : o)) })));
+    }
+    const projects = Array.isArray(ev.projects) && ev.projects.length && !s.projSeen ? ev.projects : s.projects;
+    const ids = new Set(Object.values(cards).flat().map((c) => String(c.id)));
+    return { ...s, agents, cards, projects, stateKeys: [...keys], picked: s.picked && ids.has(String(s.picked.card)) ? s.picked : null };
+  }
+
   // a deep link from the shell, the capsule or a card: bise · project/<p> · agent/<p>/<a> · inbox
   // (<p> is the project's id or its name)
   function resolve(s, route) {
@@ -133,7 +158,10 @@
   function core(s, ev, cmds) {
     switch (ev.ev) {
       case "welcome": case "hello": return { ...s, user: ev.user || s.user, now: ev.now_ms || s.now, offline: false };
-      case "projects": return { ...s, projects: ev.projects };
+      case "projects": return { ...s, projects: ev.projects, projSeen: true };
+      // the single-hub core's snapshot (the bar's state: agents, cards, maybe projects): until
+      // S3b's typed per-project events it is the only place the window learns of them
+      case "state": return fromState(s, ev);
       case "agents": return set(s, "agents", set(s.agents, ev.project, ev.agents));
       case "cards": {
         // a card he answered stays hidden until the core drops it (ids are numbers in S3a v1)
