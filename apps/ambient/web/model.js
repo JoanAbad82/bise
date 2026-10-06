@@ -201,7 +201,7 @@
       const title = a.title || a.note || "";
       const sinceMs = +a.since_ms > 0 ? Math.max(0, wall - a.since_ms) : +a.turn_ms >= 0 && a.turn_ms != null ? +a.turn_ms : null;
       const followed = a.name in m.follows ? m.follows[a.name] : !!a.followed;
-      return { name: a.name, status, title, purpose: a.purpose || "", waits, followed, archived: !!a.archived, age: sinceMs == null ? "" : Wd.age(sinceMs), i,
+      return { name: a.name, project: a.project || null, pname: a.project_name || null, status, title, purpose: a.purpose || "", waits, followed, archived: !!a.archived, age: sinceMs == null ? "" : Wd.age(sinceMs), i,
         marks: { name: match(a.name, q), title: match(title, q) } };
     });
     const hit = (r) => !q || r.marks.name || r.marks.title || (r.purpose && r.purpose.toLowerCase().includes(q));
@@ -524,11 +524,13 @@
         };
         return none({ ...m, previews: { ...m.previews, [ev.agent]: p } });
       }
-      // ⏎ or a click on an agent row: its side panel (slice 2, with amb-mac); the bar goes
+      // ⏎ or a click on an agent row: its thread in bise's window (desktop S8, v9 'pas dans un
+      // panneau'; amb-mac's {cmd:'app_window', route} dismisses the bar as the window opens)
       case "ui_agent": {
-        if (!m.agents.some((a) => a.name === ev.agent)) return none(m);
+        const a = m.agents.find((x) => x.name === ev.agent && (ev.project == null || projOf(x) === ev.project));
+        if (!a) return none(m);
         const r = setPane(m, null);
-        return { m: r.m, cmds: [...r.cmds, { cmd: "app_panel", agent: ev.agent }] };
+        return { m: r.m, cmds: [...r.cmds, { cmd: "app_window", route: agentRoute(projOf(a), a.name) }] };
       }
       // a page line in the preview: that page in the browser (amb-core gives its url)
       case "ui_open_url":
@@ -564,8 +566,17 @@
     }
   }
 
+  // the window's deep link for an agent's thread (amb-win's routes): a project's main is its project
+  const projOf = (x) => (x && x.project) || "home";
+  const agentRoute = (project, agent) => (agent && agent !== "main" ? `agent/${project}/${agent}` : project === "home" ? "bise" : `project/${project}`);
+  // fn + ⏎ on a card: a card asked from a page opens that page at the question; any other card
+  // opens in bise's window, on the thread it waits in (desktop S8: 'fn+⏎ open in bise')
   function openCard(m, card) {
     const p = card && card.page;
+    if (card && (!p || !p.url)) {
+      const r = setPane(m, null);
+      return { m: r.m, cmds: [...r.cmds, { cmd: "app_window", route: agentRoute(projOf(card), card.agent) }] };
+    }
     if (!p || !p.url) return { m, cmds: [] };
     const known = m.pages.find((x) => x.id === p.id);
     if (known) return openPage(m, known, p.url);
@@ -589,7 +600,9 @@
       const n = choices(asked).length, cur = m.optFor === asked.id ? m.optSel || 0 : 0;
       return none({ ...m, optFor: asked.id, optSel: Math.max(0, Math.min(n - 1, cur + (k === "down" ? 1 : -1))) });
     }
-    if (asked && k === "enter") {
+    // ⏎ in the glass (a plain key, local) picks; fn + ⏎ (the chord, from any app) opens the card
+    // in bise's window (desktop S8, v9's 'fn+⏎ open in bise')
+    if (asked && k === "enter" && ev.local) {
       const os = choices(asked), cur = m.optFor === asked.id ? m.optSel || 0 : 0;
       if (os[cur]) return answer({ ...m, optSel: 0, optFor: null }, asked, os[cur], now);
     }
@@ -887,7 +900,7 @@
         const asks = cards.some((c) => c.agent === a.name);
         const doneLine = a.status === "done" && a.report ? Wd.firstSentence(a.report) : "";
         return {
-          name: a.name, agent: a.name,
+          name: a.name, agent: a.name, project: a.project || null, pname: a.project_name || null,
           glyph: asks ? "?" : Wd.GLYPH[a.status] || "·",
           kind: asks ? "need" : a.status,
           // short: its task line, or a done agent's done line

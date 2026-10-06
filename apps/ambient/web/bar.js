@@ -24,7 +24,7 @@
     // a range ('fn 1 – 2 pick') is info, like '↑↓ move': the rows are its targets (ambient m_6681 (2))
     const left = focused
       ? [item(range([]), B.pick), item(["↑", "↓"], B.move), item(["esc"], B.later, key("esc"))]
-      : [item(range(["fn"]), B.pick), item(["fn", "esc"], B.later, key("esc"))];
+      : [item(range(["fn"]), B.pick), item(["fn", "⏎"], B.openInBise, key("enter")), item(["fn", "esc"], B.later, key("esc"))];
     return { left, right: [item(["fn"], B.sayIt, null, B.orHold)] };
   }
 
@@ -61,8 +61,8 @@
     s.head = { h: 68, input: { text: v.spot ? v.spot.text : q, ph: spot ? F.spotPh : F.ph }, right: item(spot ? ["fn", "space"] : ["fn", "a"]) };
     const rows = f.rows.map((r) => {
       const [g, gc] = AG[r.status] || AG.idle;
-      return { g, gc, t: r.name, sub: r.title || null, mark: { t: r.marks.name, sub: r.marks.title }, seen: r.archived,
-        right: r.waits ? { wait: r.waits } : r.age ? { age: r.age } : null, act: { ev: "ui_agent", agent: r.name }, qa: `agent-${r.name}` };
+      return { g, gc, t: r.name, p: r.pname, sub: r.title || null, mark: { t: r.marks.name, sub: r.marks.title }, seen: r.archived,
+        right: r.waits ? { wait: r.waits } : r.age ? { age: r.age } : null, act: { ev: "ui_agent", agent: r.name, ...(r.project ? { project: r.project } : {}) }, qa: `agent-${r.name}` };
     });
     const waiting = f.rows.filter((r) => r.waits).length;
     s.sections = [{ label: q ? F.agents : F.yours, acc: waiting > 0 && !q ? F.waitingOnYou(waiting) : null, rows }];
@@ -192,10 +192,10 @@
         const cards = (v.inbox || []).map((c, k) => ({ g: "?", gc: "a", t: c.text, sub: c.agent, sel: !!c.sel, right: { keys: [String(k + 1)] }, act: { ev: "ui_card", card: c.id }, qa: `card-${c.id}` }));
         if (cards.length || !full) s.sections.push({ label: cards.length ? Wd.waiting(cards.length) : W.nothingNeeds, rows: cards, acc: cards.length > 0 });
         if (full) {
-          // every row acts (lead m_8108 (3)): an agent opens its side panel (space or ⏎), a page
+          // every row acts (lead m_8108 (3)): an agent opens its thread in bise's window (desktop S8), a page
           // being written opens in the browser
-          const run = (v.list || []).map((r) => ({ g: r.glyph === "✓" ? "✓" : r.kind === "need" ? "?" : r.glyph, gc: r.glyph === "✓" ? "ok" : r.glyph === "▲" ? "risk" : r.kind === "need" ? "a" : null, t: r.name, sub: r.what, right: r.age ? { age: r.age } : null,
-            act: r.agent ? { ev: "ui_agent", agent: r.agent } : r.page ? { ev: "ui_page", page: r.page } : null, qa: r.agent ? `agent-${r.agent}` : r.page ? `page-${r.page}` : undefined }));
+          const run = (v.list || []).map((r) => ({ g: r.glyph === "✓" ? "✓" : r.kind === "need" ? "?" : r.glyph, gc: r.glyph === "✓" ? "ok" : r.glyph === "▲" ? "risk" : r.kind === "need" ? "a" : null, t: r.name, p: r.pname, sub: r.what, right: r.age ? { age: r.age } : null,
+            act: r.agent ? { ev: "ui_agent", agent: r.agent, ...(r.project ? { project: r.project } : {}) } : r.page ? { ev: "ui_page", page: r.page } : null, qa: r.agent ? `agent-${r.agent}` : r.page ? `page-${r.page}` : undefined }));
           s.sections.push({ label: run.length ? `${v.titles.running} · ${run.length}` : W.nothingRunning, rows: run });
           // main's last answer, back on the glass by hand (lead m_8108 (6): a card or a pane may cover it)
           if (v.answer) s.sections.push({ label: B.biseSaid, rows: [{ g: "*", t: v.answer, act: { ev: "ui_reanswer" }, qa: "answer" }] });

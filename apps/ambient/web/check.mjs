@@ -230,7 +230,7 @@ law("B3 rows (ambient m_6500, lead m_6487): one row per choice, the first select
   m = M.step(m, { ev: "app_key", key: "up" }, 20).m; eq(sel(m), [true, false, false]);
   m = M.step(m, { ev: "app_key", key: "down" }, 30).m; eq(sel(m), [false, true, false]);
   m = M.step(m, { ev: "app_key", key: "down" }, 40).m; m = M.step(m, { ev: "app_key", key: "down" }, 50).m; eq(sel(m), [false, false, true]);
-  eq(M.step(m, { ev: "app_key", key: "enter" }, 60).cmds, [{ cmd: "answer", card: "q", reply: "3" }]);
+  eq(M.step(m, { ev: "app_key", key: "enter", local: true }, 60).cmds, [{ cmd: "answer", card: "q", reply: "3" }]);
   eq(M.step(m, { ev: "app_key", key: "2" }, 60).cmds, [{ cmd: "answer", card: "q", reply: "2" }]);
   // '… more   ⌘ ⏎' (or a click on it) shows the whole question in place
   assert.equal(M.view(m, 70).ask.full, false);
@@ -375,9 +375,9 @@ law("round 9: a pushed question is one bar: '? main needs you · now', '⌘ ⏎ 
   eq(s.sections[0].rows.map((r) => [r.g, r.gk, r.t, !!r.sel]), [["1", true, "regarde", true], ["2", true, "arrête", false], ["3", true, "laisse", false]]);
   eq(s.sections[0].rows[1].act, { ev: "ui_option", card: "q", i: 1 });
   const flat = (it) => [it.pre || "", ...it.keys, it.w || ""].join(" ").trim();
-  eq(s.foot.left.map(flat), ["fn 1 – 3 pick", "fn esc later"]);
+  eq(s.foot.left.map(flat), ["fn 1 – 3 pick", "fn ⏎ open in bise", "fn esc later"]);
   // a range is info, not a target: the rows are (ambient m_6681 (2)); esc later is a key
-  eq(s.foot.left.map((i) => !!i.act), [false, true]);
+  eq(s.foot.left.map((i) => !!i.act), [false, true, true]);   // fn ⏎ opens it in bise (desktop S8)
   eq(s.foot.right.map(flat), ["or hold fn and say it"]);
   // clicked (the panel has the keys): the plain keys
   m = M.step(m, { ev: "app_focused", on: true }, 20).m;
@@ -686,9 +686,10 @@ law("a card asked from a page (card.page): the glass says `fn o open it`; fn + o
   assert.equal(M.view(m, 10).ask.open, "fn o open it");
   const open = [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/recap#q1", page: "recap" }];
   eq(M.step(m, { ev: "app_key", key: "o" }, 20).cmds, open);
-  eq(M.step(m, { ev: "app_key", key: "enter" }, 20).cmds, [{ cmd: "answer", card: "c1", reply: "1" }]);
+  eq(M.step(m, { ev: "app_key", key: "enter", local: true }, 20).cmds, [{ cmd: "answer", card: "c1", reply: "1" }]);
   eq(M.step(m, { ev: "ui_open_card", card: "c1" }, 20).cmds, open);
-  eq(M.step(m, { ev: "ui_open_card", card: "c2" }, 20).cmds, []);   // no page: nothing
+  // no page: fn ⏎ opens it in bise's window, on the thread it waits in (desktop S8)
+  eq(M.step(m, { ev: "ui_open_card", card: "c2" }, 20).cmds, [{ cmd: "app_window", route: "agent/home/x" }]);
 });
 law("out of the way (§8): what the capsule has to show, for the app's policy: talk, type, got, answer, needs, open, line, none", () => {
   assert.equal(run(sceneEvents("idle"), [100]).view(100).content.kind, "none");
@@ -1434,7 +1435,7 @@ law("round 10: fn space + typing filters agents by name, title and purpose, the 
   const row = Bar.selRow(s);
   eq(row.act, { ev: "ui_agent", agent: "perf" });
   const r = M.step(m, row.act, 30);
-  eq(r.cmds, [{ cmd: "app_focus", on: false }, { cmd: "app_panel", agent: "perf" }]);
+  eq(r.cmds, [{ cmd: "app_focus", on: false }, { cmd: "app_window", route: "agent/home/perf" }]);   // desktop S8: its thread in the window
   assert.equal(r.m.pane, null);
   // the title and the purpose match too
   m = M.step(m, { ev: "ui_spot_type", text: "banner" }, 40).m;
@@ -1538,7 +1539,7 @@ law("hints (lead m_8094 (3), amb-mac m_8112): one source for which keys a card s
   let v = M.view(m, 50);
   eq([v.state, v.focused], ["needs", false]);
   const keys = (s) => s.foot.left.map((i) => i.keys.join(" "));
-  eq(keys(Bar.spec(v)), ["fn 1 – 2", "fn esc"]);
+  eq(keys(Bar.spec(v)), ["fn 1 – 2", "fn ⏎", "fn esc"]);
   // he clicked it: the app gives the keys for this card: plain keys
   m = M.step(m, { ev: "app_focused", on: true }, 60).m;
   v = M.view(m, 70);
@@ -1579,7 +1580,7 @@ law("round 2 (3)(5): no dead clicks: fn 0's agent rows open the side panel (⏎,
   const ag = s.sections.flatMap((x) => x.rows).filter((r) => r.qa && r.qa.startsWith("agent-"));
   assert.ok(ag.length >= 6);
   eq(ag[0].act.ev, "ui_agent");
-  eq(M.step(m, ag[0].act, 30).cmds.at(-1), { cmd: "app_panel", agent: ag[0].act.agent });
+  eq(M.step(m, ag[0].act, 30).cmds.at(-1), { cmd: "app_window", route: `agent/home/${ag[0].act.agent}` });
   // ⏎ hint = the selected row (the card first), then an agent row once ↓ reaches it
   eq(s.foot.left.find((i) => i.keys.join("") === "⏎").act, { ev: "ui_card", card: "c1" });
   m = M.step(m, { ev: "app_key", key: "down", local: true, n: Bar.selectable(s).length }, 40).m;
@@ -1749,6 +1750,24 @@ law("panel: ⌘↑⌘↓ walk the bar's order in the same window; ⌘D follow, �
   eq(Pn.step(r.m, { ev: "ui_older" }, 110).cmds, []);
   // the fake core answers the panel's cmds (panel.html in a browser)
   eq(Fake.respond({ cmd: "agent_history", agent: "perf" })[0][1].entries.length, 7);
+});
+
+law("desktop S8: ⏎ on an agent opens its thread in bise's window (app_window with amb-win's route), its project named on the row; fn ⏎ on a card does the same", () => {
+  const agents = [{ name: "alerts", status: "waiting", title: "compaction at 03:00?", project: "telemetry-8e02", project_name: "telemetry" },
+    { name: "alerts", status: "idle", title: "old alerts", project: "storefront-5c1d", project_name: "storefront" }];
+  const cards = [{ id: "c-alerts", agent: "alerts", project: "telemetry-8e02", text: "passer la compaction à 03:00 ?", options: ["move it to 03:00", "leave it"] }];
+  let m = M.step(M.init(), { ev: "state", agents, cards }, 0).m;
+  m = M.step(m, { ev: "app_key", key: "0" }, 10).m;
+  const rows = Bar.spec(M.view(m, 20, Fake.T0)).sections.flatMap((x) => x.rows).filter((r) => r.qa && r.qa.startsWith("agent-"));
+  eq(rows.map((r) => [r.t, r.p, r.act]), [["alerts", "telemetry", { ev: "ui_agent", agent: "alerts", project: "telemetry-8e02" }],
+    ["alerts", "storefront", { ev: "ui_agent", agent: "alerts", project: "storefront-5c1d" }]]);
+  // two agents of the same name in two projects: the row's project picks the right thread
+  eq(M.step(m, rows[1].act, 30).cmds.at(-1), { cmd: "app_window", route: "agent/storefront-5c1d/alerts" });
+  // a card (no page): fn ⏎ opens the thread it waits in; a project's main opens its project
+  m = M.step(M.init(), { ev: "state", agents, cards }, 0).m;
+  eq(M.step(m, { ev: "app_key", key: "enter" }, 10).cmds.at(-1), { cmd: "app_window", route: "agent/telemetry-8e02/alerts" });
+  m = M.step(M.init(), { ev: "state", agents: [], cards: [{ ...cards[0], agent: "main" }] }, 0).m;
+  eq(M.step(m, { ev: "ui_open_card", card: "c-alerts" }, 10).cmds.at(-1), { cmd: "app_window", route: "project/telemetry-8e02" });
 });
 
 // the desktop window's laws (window/check-win.mjs) run with the capsule's

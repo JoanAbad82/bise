@@ -111,6 +111,7 @@ button.rk:hover, button.fi:hover { color: var(--ink); background: #ffffff0c; }
 .row .g.a { color: var(--acc); } .row .g.ok { color: var(--ok); } .row .g.risk { color: var(--risk); }
 .row .t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 15px; color: var(--ink); }
 .row .t small { font-size: 12.5px; color: var(--faint); margin-left: 8px; }
+.row .t em.p { font-style: normal; color: var(--faint); }   /* the agent's project (desktop S8) */
 .row .s { display: flex; gap: 4px; align-items: center; font: 12px var(--sans); color: var(--faint); }
 .row.sel { background: #f4a6b026; }
 .row.sel .g { color: var(--acc); }

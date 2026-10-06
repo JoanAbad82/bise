@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Map, String, Number, Date, Intl, RegExp });
-for (const f of ["winfake.js", "winfake7.js", "windock.js", "winenv.js", "winarts.js", "winreview.js", "wins7.js", "winmodel.js", "winview.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+for (const f of ["winwords.js", "winfake.js", "winfake7.js", "windock.js", "winenv.js", "winarts.js", "winreview.js", "wins7.js", "winmodel.js", "winview.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
 const { AmbWinFake: F, AmbWinFake7: F7, AmbWinModel: M, AmbWinView: V, AmbWinS7: S7 } = ctx;
 const j = (x) => (x === undefined ? x : JSON.parse(JSON.stringify(x)));
 const eq = (a, b, msg) => assert.deepStrictEqual(j(a), j(b), msg);

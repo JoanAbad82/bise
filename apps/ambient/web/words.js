@@ -56,7 +56,7 @@
       letGo: "let go", tap: "tap", send: "send", cancel: "cancel", doubleTap: "double-tap", handsFree: "hands-free",
       close: "close", openSystemSettings: "open System Settings", closeLeaves: "close · it leaves on its own in 4 s", agentsStarted: "agents started",
       needs: (who) => `? ${who} needs you`, now: "now", fullText: "full text",
-      pick: "pick", move: "move", later: "later", orHold: "or hold", sayIt: "and say it", openPage: "open the page",
+      pick: "pick", move: "move", later: "later", openInBise: "open in bise", orHold: "or hold", sayIt: "and say it", openPage: "open the page",
       reviewSub: "opens the page at the first draft", sendSub: "nothing leaves before this",
       hold: "hold", talk: "talk", type: "type", goingOn: "what's going on", startHere: "start here",
       // round 10 (identity10, ambient): your agents in the bar, preview A

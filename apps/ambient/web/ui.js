@@ -148,7 +148,7 @@
       const tag = r.fixed || !r.act ? "div" : "button";
       const role = r.right && r.right.sw != null ? ` role="switch" aria-checked="${!!r.right.sw}"` : "";
       const mk = r.mark || {};
-      return `<${tag}${tag === "button" ? ' type="button"' : ""} class="row${r.fixed ? " fixed" : ""}${r.seen ? " seen" : ""}${r.sub && mk.t !== undefined ? " two" : ""}" data-r="${i}" data-row="${i}" data-qa="${esc(r.qa || `row-${i}`)}"${act(r.act)}${role} style="${quiet ? "animation:none" : `animation-delay:${i * 20}ms`}"><span class="g ${r.gc || ""}" aria-hidden="true">${g}</span><span class="t">${marked(r.t, mk.t)}${r.sub ? `<small>${marked(r.sub, mk.sub)}</small>` : ""}</span><span class="s">${right}</span></${tag}>`;
+      return `<${tag}${tag === "button" ? ' type="button"' : ""} class="row${r.fixed ? " fixed" : ""}${r.seen ? " seen" : ""}${r.sub && mk.t !== undefined ? " two" : ""}" data-r="${i}" data-row="${i}" data-qa="${esc(r.qa || `row-${i}`)}"${act(r.act)}${role} style="${quiet ? "animation:none" : `animation-delay:${i * 20}ms`}"><span class="g ${r.gc || ""}" aria-hidden="true">${g}</span><span class="t">${marked(r.t, mk.t)}${r.p ? `<em class="p"> · ${esc(r.p)}</em>` : ""}${r.sub ? `<small>${marked(r.sub, mk.sub)}</small>` : ""}</span><span class="s">${right}</span></${tag}>`;
     }).join("")).join("");
   }
   const strip = (sections) => sections.map((s) => ({ ...s, rows: s.rows.map(({ sel, ...r }) => r) }));
