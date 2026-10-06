@@ -22,10 +22,12 @@ pub const WORD_EVERY: Duration = Duration::from_millis(150);
 const SAID_WORD: f32 = 0.29;
 
 /// Where the fake voice's words come from, if it is on: Ok(None) off (no
-/// variable), Err the reason it is refused (said in core.log).
-pub fn words_file(get: &dyn Fn(&str) -> Option<String>) -> Result<Option<PathBuf>, String> {
+/// variable), Err the reason it is refused (said in core.log). `file`:
+/// the test setting BISE_AMBIENT_FAKE_VOICE (bise_home::env::test_setting);
+/// `get` reads AMBIENT_HARNESS, BISE_HOME and HOME.
+pub fn words_file(file: Option<String>, get: &dyn Fn(&str) -> Option<String>) -> Result<Option<PathBuf>, String> {
     let val = |k: &str| get(k).filter(|v| !v.trim().is_empty());
-    let file = match (val("BISE_AMBIENT_FAKE_VOICE"), val("AMBIENT_HARNESS")) {
+    let file = match (file.filter(|f| !f.trim().is_empty()), val("AMBIENT_HARNESS")) {
         (Some(f), _) => PathBuf::from(f),
         (None, Some(d)) => Path::new(&d).join("voice.txt"),
         (None, None) => return Ok(None),
@@ -304,17 +306,19 @@ mod tests {
     #[test]
     fn the_fake_voice_is_never_on_in_his_normal_run() {
         // no variable: off
-        assert_eq!(words_file(&env(&[("HOME", "/Users/g")])), Ok(None));
+        assert_eq!(words_file(None, &env(&[("HOME", "/Users/g")])), Ok(None));
+        assert_eq!(words_file(Some(" ".into()), &env(&[("HOME", "/Users/g")])), Ok(None));
         // harness A: its home under ~/.bise/gate, HOME the isolated one
         let h = "/Users/g/.bise/gate/ra-amb-tools/h";
         let gate = [("AMBIENT_HARNESS", "/tmp/hx"), ("BISE_HOME", "/Users/g/.bise/gate/ra-amb-tools/h/.bise"), ("HOME", h)];
-        assert_eq!(words_file(&env(&gate)), Ok(Some(PathBuf::from("/tmp/hx/voice.txt"))));
-        let file = [("BISE_AMBIENT_FAKE_VOICE", "/tmp/w.txt"), ("BISE_HOME", "/tmp/bh"), ("HOME", "/Users/g")];
-        assert_eq!(words_file(&env(&file)), Ok(Some(PathBuf::from("/tmp/w.txt"))));
+        assert_eq!(words_file(None, &env(&gate)), Ok(Some(PathBuf::from("/tmp/hx/voice.txt"))));
+        // the test setting's file wins
+        let other = [("BISE_HOME", "/tmp/bh"), ("HOME", "/Users/g")];
+        assert_eq!(words_file(Some("/tmp/w.txt".into()), &env(&other)), Ok(Some(PathBuf::from("/tmp/w.txt"))));
         // his own ~/.bise, or none: refused, said why
-        assert!(words_file(&env(&[("AMBIENT_HARNESS", "/tmp/hx"), ("HOME", "/Users/g")])).is_err());
-        assert!(words_file(&env(&[("AMBIENT_HARNESS", "/tmp/hx"), ("BISE_HOME", "/Users/g/.bise"), ("HOME", "/Users/g")])).is_err());
-        assert!(words_file(&env(&[("AMBIENT_HARNESS", "/tmp/hx"), ("BISE_HOME", "/tmp/bh")])).is_err());
+        assert!(words_file(None, &env(&[("AMBIENT_HARNESS", "/tmp/hx"), ("HOME", "/Users/g")])).is_err());
+        assert!(words_file(None, &env(&[("AMBIENT_HARNESS", "/tmp/hx"), ("BISE_HOME", "/Users/g/.bise"), ("HOME", "/Users/g")])).is_err());
+        assert!(words_file(None, &env(&[("AMBIENT_HARNESS", "/tmp/hx"), ("BISE_HOME", "/tmp/bh")])).is_err());
     }
 
     #[test]

@@ -84,7 +84,8 @@ fn fake_ports(user_kind: fn(&str) -> bool, words: fake::Words) -> Ports {
 /// it and BISE_HOME is isolated (fake::words_file), else the real ones;
 /// the event that says which (the app forwards talks only to a fake).
 fn ports_for_env(user_kind: fn(&str) -> bool) -> (Ports, Option<serde_json::Value>) {
-    match fake::words_file(&|k| std::env::var(k).ok()) {
+    let file = bise_home::env::test_setting("BISE_AMBIENT_FAKE_VOICE");
+    match fake::words_file(file, &|k| std::env::var(k).ok()) {
         Ok(Some(file)) => {
             eprintln!("ambient-core: fake voice on: words from {} (or fake_words), no mic, no sound", file.display());
             let ev = serde_json::json!({"ev": "fake_voice", "on": true, "words": file.to_string_lossy()});
