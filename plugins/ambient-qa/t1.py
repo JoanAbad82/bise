@@ -235,6 +235,11 @@ class Run:
             def act():
                 qa.real_win("deeplink", route=route)
                 time.sleep(1.2)
+                # a card in the dock makes the composer answer it ('answering … esc write a plain
+                # message'): plain words to main need that esc first, as he would press it
+                if "esc write a plain message" in self.text():
+                    qa.real_keys("esc", window="win")
+                    time.sleep(0.4)
                 qa.real_op("type", window="win", text=words)
                 time.sleep(0.2)
                 return qa.real_keys("enter", window="win")
@@ -284,8 +289,12 @@ class Run:
                     keyed.append("%s: 1 decided" % kind)
                 else:
                     keyed.append("%s: 1 did NOTHING, clicked opt:1" % kind)
-                    qa.real_op("eval", window="win", js="(() => { const f = document.querySelector('.w-composer textarea, .w-composer input'); if (f) f.value = ''; })()")
-                    self.click(self.find(lambda k, t: k == "opt:1"))
+                    qa.real_keys("delete", window="win")     # the '1' may have gone into the composer
+                    time.sleep(0.5)
+                    opt = self.wait(lambda: self.find(lambda k, t: k == "opt:1"), 5)
+                    if not opt:
+                        self.R["approval_qa"] = self.qas()
+                    self.click(opt)
             self.R["approval_keys"] = keyed
             return keyed
 
