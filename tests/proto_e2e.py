@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "error")
+TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "diff", "error")
 FIXTURES = os.path.join(e2e.ROOT, "rust", "proto", "fixtures", "hub_ev.jsonl")
 
 
@@ -84,6 +84,7 @@ def main():
             ({"cmd": "send", "project": project, "agent": "nobody", "text": "hi", "mode": "now"}, "send"),
             ({"cmd": "answer", "project": project, "card": 999, "reply": "1"}, "answer"),
             ({"cmd": "subscribe", "project": project}, "subscribe"),
+            ({"cmd": "diff", "project": project, "agent": "nobody"}, "diff"),
         ]
         for i, (cmd, tag) in enumerate(refused):
             c.send(cmd)
@@ -179,6 +180,19 @@ def main():
             after = w.events[mark:]
         check(all(e.get("ev") in TYPED and "project" in e for e in after),
               "only typed events after typed_only: %r" % sorted({e.get("ev") for e in after}))
+
+        # diff: a worktree agent's commit, typed, line by line
+        c.say('/new -w t5: {{bash: seq 1 2 > f5.txt && git add f5.txt && git commit -qm f5 && echo done}}')
+        c.wait(lambda: c.agent("t5") is not None, 60, "t5")
+        c.wait_idle("t5", timeout=120)
+        c.send({"cmd": "diff", "project": project, "agent": "t5"})
+        c.wait(lambda: typed(c, "diff"), 60, "t5's diff")
+        d = typed(c, "diff")[-1]
+        f5 = [f for f in d["files"] if f["path"] == "f5.txt"]
+        check(d["agent"] == "t5" and d["base"] and f5, "t5's diff has f5.txt: %r" % d)
+        check(f5[0]["status"] == "added" and f5[0]["add"] == 2 and not f5[0].get("truncated"), "its row: %r" % f5[0])
+        lines = [(l["kind"], l.get("new"), l["text"]) for h in f5[0]["hunks"] for l in h["lines"]]
+        check(lines == [("add", 1, "1"), ("add", 2, "2")], "its lines, numbered: %r" % lines)
 
         # stop and archive: reach the hub's own paths (an unknown agent: an error)
         c.send({"cmd": "stop", "project": project, "agent": "main"})

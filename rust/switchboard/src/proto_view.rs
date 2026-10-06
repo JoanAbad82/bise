@@ -5,6 +5,8 @@
 //! the entries that changed go out).
 
 use bise_proto::rows::{question, Agent, Artifact, Card, CardPage, Report, ReportKind, Status};
+use bise_proto::diff::{DiffFile, DiffLine, Hunk, LineKind};
+use bise_proto::hub::HubEv;
 use bise_proto::thread::{self, Ctx, Entry, Line};
 use bise_proto::Pos;
 use serde_json::Value;
@@ -139,6 +141,82 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>) -> Vec<A
             }
         })
         .collect()
+}
+
+/// The hub's `diff` answer (daemon/art.rs `diff_answer`: files of
+/// `diff::file_json`) as the typed `diff`, or its error. A generated
+/// file's hunks are left out and a file cut for its length keeps what it
+/// has: both say `truncated`, as a binary file (no text to show).
+pub fn diff(ev: &Value, project: &str, agent: &str) -> HubEv {
+    if let Some(e) = ev.get("error").and_then(Value::as_str) {
+        return HubEv::Error { project: Some(project.into()), cmd: Some("diff".into()), text: e.into() };
+    }
+    let files = ev.get("files").and_then(Value::as_array).cloned().unwrap_or_default();
+    let flag = |f: &Value, k: &str| f.get(k).and_then(Value::as_bool).unwrap_or(false);
+    let files = files
+        .iter()
+        .map(|f| {
+            let generated = flag(f, "generated");
+            let hunks: Vec<Hunk> = if generated { Vec::new() } else { f.get("hunks").and_then(Value::as_array).into_iter().flatten().map(hunk).collect() };
+            let had = f.get("hunks").and_then(Value::as_array).is_some_and(|h| !h.is_empty());
+            DiffFile {
+                path: s(f, "path"),
+                status: match s(f, "status").as_str() {
+                    "A" => "added",
+                    "D" => "deleted",
+                    "R" => "renamed",
+                    _ => "modified",
+                }
+                .into(),
+                add: f.get("add").and_then(Value::as_u64).unwrap_or(0) as u32,
+                del: f.get("del").and_then(Value::as_u64).unwrap_or(0) as u32,
+                truncated: flag(f, "cut") || flag(f, "binary") || (generated && had),
+                hunks,
+                note: None,
+            }
+        })
+        .collect();
+    HubEv::Diff {
+        project: project.into(),
+        agent: agent.into(),
+        base: s(ev, "base"),
+        head: Some(s(ev, "branch")).filter(|b| !b.is_empty()),
+        files,
+        result: None,
+        merged: None,
+        note: Some(s(ev, "note")).filter(|n| !n.is_empty()),
+    }
+}
+
+/// One hunk of `diff::file_json` (`old`/`new` its first lines, `lines`
+/// prefixed ' ', '-', '+'), each line numbered on its side.
+fn hunk(h: &Value) -> Hunk {
+    let (mut o, mut n) = (h.get("old").and_then(Value::as_u64).unwrap_or(0) as u32, h.get("new").and_then(Value::as_u64).unwrap_or(0) as u32);
+    let head = s(h, "head");
+    let header = format!("@@ -{o} +{n} @@ {head}").trim_end().to_string();
+    let mut lines = Vec::new();
+    for l in h.get("lines").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str) {
+        let text = l.get(1..).unwrap_or("").to_string();
+        let line = match l.chars().next() {
+            Some('+') => {
+                n += 1;
+                DiffLine { kind: LineKind::Add, old: None, new: Some(n - 1), text }
+            }
+            Some('-') => {
+                o += 1;
+                DiffLine { kind: LineKind::Del, old: Some(o - 1), new: None, text }
+            }
+            Some(' ') => {
+                o += 1;
+                n += 1;
+                DiffLine { kind: LineKind::Ctx, old: Some(o - 1), new: Some(n - 1), text }
+            }
+            // `\ No newline at end of file` and the like
+            _ => continue,
+        };
+        lines.push(line);
+    }
+    Hunk { header, lines }
 }
 
 /// An agent's current step from one feed line: its tool intent, "" at
@@ -278,6 +356,33 @@ mod tests {
         assert_eq!(row(1), ("deck", "/st/art/deck/1.pdf", 1, false), "a file: its kept copy, seen before");
         assert_eq!(row(2), ("site", "https://x.dev", 3, true), "a link: the link");
         assert_eq!(row(3), ("mine", "/w/m.txt", 1, false), "his own is never new");
+    }
+
+    #[test]
+    fn the_hubs_diff_becomes_the_typed_diff() {
+        let ev = json!({"ev": "diff", "base": "main", "branch": "sb/perf", "files": [
+            {"path": "src/q.rs", "status": "M", "add": 2, "del": 1, "binary": false, "generated": false, "cut": false,
+             "hunks": [{"old": 10, "new": 10, "head": "fn slow()", "lines": [" let r = q();", "-r.sort();", "+r.sort_unstable();", "+r.dedup();", "\\ No newline at end of file"]}]},
+            {"path": "Cargo.lock", "status": "M", "add": 9, "del": 9, "binary": false, "generated": true, "cut": false,
+             "hunks": [{"old": 1, "new": 1, "head": "", "lines": ["-a", "+b"]}]},
+            {"path": "big.rs", "status": "A", "add": 9000, "del": 0, "binary": false, "generated": false, "cut": true, "hunks": []},
+            {"path": "logo.png", "status": "A", "add": 0, "del": 0, "binary": true, "generated": false, "cut": false, "hunks": []}]});
+        let HubEv::Diff { files, head, base, .. } = diff(&ev, "acme", "perf") else { panic!("a diff") };
+        assert_eq!((base.as_str(), head.as_deref()), ("main", Some("sb/perf")));
+        let h = &files[0].hunks[0];
+        assert_eq!(h.header, "@@ -10 +10 @@ fn slow()");
+        let l = |i: usize| (h.lines[i].kind, h.lines[i].old, h.lines[i].new, h.lines[i].text.as_str());
+        assert_eq!(l(0), (LineKind::Ctx, Some(10), Some(10), "let r = q();"));
+        assert_eq!(l(1), (LineKind::Del, Some(11), None, "r.sort();"));
+        assert_eq!(l(2), (LineKind::Add, None, Some(11), "r.sort_unstable();"));
+        assert_eq!(l(3), (LineKind::Add, None, Some(12), "r.dedup();"));
+        assert_eq!(h.lines.len(), 4, "no-newline markers dropped");
+        assert_eq!((files[0].status.as_str(), files[0].truncated), ("modified", false));
+        assert!(files[1].truncated && files[1].hunks.is_empty(), "a generated file: counts only, said cut");
+        assert!(files[2].truncated && files[2].status == "added", "too long: said cut");
+        assert!(files[3].truncated, "binary: nothing to show, said so");
+        let e = diff(&json!({"error": "no agent x", "files": []}), "acme", "x");
+        assert!(matches!(e, HubEv::Error { cmd: Some(ref c), .. } if c == "diff"));
     }
 
     #[test]

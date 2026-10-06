@@ -71,6 +71,7 @@ pub fn row(f: &Facts, order: u32, branch: Option<String>, git: bool) -> ProjectR
         waits: f.view.as_ref().map_or(0, |v| v.cards.len() as u32),
         running: f.running,
         missing: f.missing,
+        cards: f.view.as_ref().map(|v| v.cards.clone()).unwrap_or_default(),
     }
 }
 

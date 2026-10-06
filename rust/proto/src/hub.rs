@@ -4,6 +4,7 @@
 //! (projects, open, project_add) are other types ([`crate::draft`]), so
 //! they can't reach a hub or come from one.
 
+use crate::diff::{DiffFile, DiffResult};
 use crate::rows::{Agent, Artifact, Card};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
@@ -32,6 +33,26 @@ pub enum HubEv {
     /// every artifact of the project, at hello and on change; `new`: made
     /// or changed since he last looked (`artifacts_seen` clears it)
     Artifacts { project: Project, items: Vec<Artifact> },
+    /// an agent's change (the answer to `diff`): its checkout or branch
+    /// vs `base`; `head` its branch (none: the shared folder)
+    Diff {
+        project: Project,
+        agent: String,
+        base: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        head: Option<String>,
+        files: Vec<DiffFile>,
+        /// what the change measured (none: nothing measured; boxed: the
+        /// enum stays small, the wire is the same)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        result: Option<Box<DiffResult>>,
+        /// its land on the trunk, once merged (the merge path sets it)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        merged: Option<String>,
+        /// why there are no files to show (its folder is gone...)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        note: Option<String>,
+    },
     /// an unknown or refused command, never silence
     Error {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -46,7 +67,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "diff", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -143,13 +164,15 @@ pub enum HubCmd {
     /// he opened the artifacts screen: their `new` clears, `artifacts`
     /// comes again
     ArtifactsSeen { project: Project },
+    /// an agent's change, once (`diff` answers)
+    Diff { project: Project, agent: String },
     /// a tag this version doesn't know: answered with `error`
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)

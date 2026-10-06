@@ -19,6 +19,12 @@ fn rows() -> Vec<Row> {
     vec![r("home", true), r("shop", false), r("docs", false)]
 }
 
+/// docs' open card in its view.json (docs' hub is stopped).
+fn docs_card() -> Value {
+    json!({"id": 4, "project": "docs", "kind": "question", "agent": "main", "question": "publish?",
+        "options": [{"n": 1, "label": "yes"}, {"n": 2, "label": "no"}], "urgent": false, "since_ms": 1})
+}
+
 fn world(t: &mut T) -> World {
     let (etx, ends) = mpsc::channel::<(String, HubEnd)>();
     let (ptx, rx) = mpsc::channel::<(String, HubIn)>();
@@ -44,7 +50,7 @@ fn world(t: &mut T) -> World {
             stopped_ms: Some(2),
             last_activity_ms: 1,
             agents: vec![],
-            cards: vec![],
+            cards: vec![serde_json::from_value(docs_card()).unwrap()],
         })),
         running: Box::new(|_| false),
         exists: Box::new(|p| p != Path::new("/p/docs")),
@@ -193,4 +199,46 @@ fn the_window_reaches_every_projects_hub_through_the_core() {
     assert!(shop[0].contains("unsubscribe"));
     let docs = closed(w.end("docs"));
     assert!(docs.iter().all(|l| l.contains("\"hello\"")), "docs never welcomed: only the hellos went: {docs:?}");
+}
+
+#[test]
+fn the_rows_carry_the_open_cards_of_every_project() {
+    // lead m_8769 (b): bise's "waiting for you" answers an unheld
+    // project's cards from its row: a held hub's own cards, else its
+    // view.json's
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    let card = json!({"id": 7, "project": "shop", "kind": "question", "agent": "perf", "question": "which bench?",
+        "options": [{"n": 1, "label": "cold"}], "urgent": false, "since_ms": 2});
+    w.end("shop").say(json!({"ev": "cards", "project": "shop", "cards": [card]}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "projects" && v["projects"][1]["waits"] == 1));
+    let p = t.take().into_iter().filter(|v| v["ev"] == "projects").next_back().unwrap();
+    assert_eq!(p["projects"][1]["cards"], json!([card]), "held: its hub's own cards");
+    assert_eq!(p["projects"][2]["cards"], json!([docs_card()]), "not held: its view.json's");
+    assert_eq!(p["projects"][2]["waits"], 1);
+    assert!(p["projects"][0].get("cards").is_none(), "none: no field");
+}
+
+#[test]
+fn a_send_to_a_hub_that_went_away_is_refused_at_once() {
+    // lead m_8769 (a), amb-win m_8774 (5): never silence, never held
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    w.end("shop").w.shutdown(std::net::Shutdown::Both).unwrap();
+    w.open.remove("shop");
+    // the core hears it went away, then the hub is down a while
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "projects" && v["projects"][1]["running"] == false));
+    t.take();
+    typed(&mut t, json!({"cmd": "send", "project": "shop", "agent": "main", "text": "still there?", "mode": "now"}));
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("an error at once");
+    assert_eq!((e["project"].as_str(), e["cmd"].as_str()), (Some("shop"), Some("send")));
+    assert!(e["text"].as_str().unwrap().contains("nothing sent"), "{e}");
 }

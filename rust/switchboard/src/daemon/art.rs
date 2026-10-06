@@ -256,13 +256,38 @@ impl Shell {
     /// The `diff` op: an agent's changes, a branch, a range or a PR,
     /// answered with a `diff` event to that client.
     pub(super) fn diff_op(&mut self, id: ClientId, v: &Value) {
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
         let req = v.get("req").cloned().unwrap_or(Value::Null);
+        let shared = PathBuf::from(&self.hub.workspace);
+        let ask = self.diff_ask(v);
+        let tx = self.tx.clone();
+        std::thread::spawn(move || {
+            let ev = diff_answer(ask, &shared, req);
+            let _ = tx.send(Msg::ToClient { id, v: ev });
+        });
+    }
+
+    /// The typed `diff {project, agent}` (desktop S7): the same answer as
+    /// the op, in bise-proto's shape (`proto_view::diff`), to that client.
+    pub(super) fn diff_typed(&mut self, id: ClientId, project: String, agent: String) {
+        let shared = PathBuf::from(&self.hub.workspace);
+        let ask = self.diff_ask(&json!({"agent": agent}));
+        let tx = self.tx.clone();
+        std::thread::spawn(move || {
+            let ev = diff_answer(ask, &shared, Value::Null);
+            let v = crate::proto_view::diff(&ev, &project, &agent).to_value();
+            let _ = tx.send(Msg::ToClient { id, v });
+        });
+    }
+
+    /// What a diff request asks: an agent's changes, a branch, a range or
+    /// a PR.
+    fn diff_ask(&self, v: &Value) -> Ask {
+        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
         let shared = PathBuf::from(&self.hub.workspace);
         // a range first: the door under a landed line names its agent
         // too (for the title), and must show that land, never the
         // agent's branch vs today's main (empty once landed)
-        let ask = if !s("range").is_empty() {
+        if !s("range").is_empty() {
             Ask::Range(s("range"), s("agent"))
         } else if !s("agent").is_empty() {
             match self.hub.st.agents.get(&s("agent")).or_else(|| {
@@ -288,12 +313,7 @@ impl Shell {
             Ask::Pr(n)
         } else {
             Ask::Bad("diff: agent, branch, range or pr".into())
-        };
-        let tx = self.tx.clone();
-        std::thread::spawn(move || {
-            let ev = diff_answer(ask, &shared, req);
-            let _ = tx.send(Msg::ToClient { id, v: ev });
-        });
+        }
     }
 
     /// The `branches` op: the /diff picker's rows.

@@ -32,6 +32,7 @@
 //! tests, the web's fake core (apps/ambient/web) and the Python e2e.
 
 pub mod context;
+pub mod diff;
 pub mod draft;
 pub mod hub;
 pub mod rows;

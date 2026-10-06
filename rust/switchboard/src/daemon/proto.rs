@@ -130,7 +130,8 @@ impl Shell {
             | HubCmd::Stop { project, .. }
             | HubCmd::Archive { project, .. }
             | HubCmd::Unarchive { project, .. }
-            | HubCmd::ArtifactsSeen { project } => project.clone(),
+            | HubCmd::ArtifactsSeen { project }
+            | HubCmd::Diff { project, .. } => project.clone(),
             HubCmd::Hello { .. } => unreachable!(),
             HubCmd::Unknown { tag, .. } => return self.proto_error(id, tag, &format!("unknown command: {tag}")),
         };
@@ -210,6 +211,13 @@ impl Shell {
             }
             // the TUI's own `seen`: the clock moves, the list comes again
             HubCmd::ArtifactsSeen { .. } => self.artifacts_op(id, &json!({"do": "seen"})),
+            // git in a thread (art.rs), the typed answer to this client
+            HubCmd::Diff { project, agent } => {
+                if !known(self, &agent) {
+                    return self.proto_error(id, &tag, &format!("no agent {agent}"));
+                }
+                self.diff_typed(id, project, agent);
+            }
             HubCmd::Hello { .. } | HubCmd::Unknown { .. } => {}
         }
     }

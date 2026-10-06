@@ -17,63 +17,6 @@ use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum LineKind {
-    Ctx,
-    Add,
-    Del,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct DiffLine {
-    pub kind: LineKind,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub old: Option<u32>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub new: Option<u32>,
-    pub text: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Hunk {
-    pub header: String,
-    pub lines: Vec<DiffLine>,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct DiffFile {
-    pub path: String,
-    /// added, modified, deleted, renamed
-    pub status: String,
-    pub add: u32,
-    pub del: u32,
-    pub hunks: Vec<Hunk>,
-    /// the agent's word on this file ("new: 4 workers"), from its summary
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub note: Option<String>,
-}
-
-/// What a change measured, before and after (the review's result line,
-/// amb-web m_8304): "worst frame, PS5 replay · forest level 40 → 15 ms".
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct DiffResult {
-    pub label: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sub: Option<String>,
-    pub before: f64,
-    pub after: f64,
-    pub unit: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub series: Option<Series>,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Series {
-    pub before: Vec<f64>,
-    pub after: Vec<f64>,
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Worktree {
     pub path: String,
@@ -118,16 +61,6 @@ pub struct Job {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "ev", rename_all = "snake_case")]
 pub enum DraftHubEv {
-    Diff {
-        project: Project,
-        agent: String,
-        base: String,
-        head: String,
-        files: Vec<DiffFile>,
-        /// what the change measured (none: nothing measured)
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        result: Option<DiffResult>,
-    },
     Worktrees { project: Project, items: Vec<Worktree> },
     DevServers { project: Project, items: Vec<DevServer> },
     Jobs { project: Project, jobs: Vec<Job> },
@@ -146,7 +79,7 @@ pub enum DraftHubEv {
 }
 
 impl DraftHubEv {
-    pub const TAGS: &'static [&'static str] = &["diff", "worktrees", "dev_servers", "jobs", "route"];
+    pub const TAGS: &'static [&'static str] = &["worktrees", "dev_servers", "jobs", "route"];
 
     pub fn decode(line: &str) -> Result<DraftHubEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| DraftHubEv::Unknown { tag, raw })
@@ -214,6 +147,11 @@ pub struct ProjectRow {
     /// its folder is gone (moved or deleted)
     #[serde(default, skip_serializing_if = "crate::is_false")]
     pub missing: bool,
+    /// his open cards (`waits` of them): a held hub's own `cards`, else
+    /// its `view.json`'s, so bise's "waiting for you" lists and answers
+    /// the cards of a project it doesn't hold (lead m_8769)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cards: Vec<Card>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
