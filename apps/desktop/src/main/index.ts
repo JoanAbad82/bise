@@ -1,0 +1,81 @@
+// Electron's main process, minimal: one window on the renderer, the preload as
+// its only bridge. Owner: amb-mac (windows, panel, tray, menus, helper);
+// src/main/core (spawning `bise ambient-core`) is amb-core's.
+//
+// Test mode (BISE_DESKTOP_TEST=1), for the harness: nothing ever in his face.
+// The window is placed off-display (-30000, -30000), not focusable, and shown
+// with showInactive (never activates the app), the app is an accessory with no
+// Dock icon, userData is BISE_DESKTOP_USER_DATA or a temp folder (never his
+// Application Support), and main prints READY_LINE on stdout once the page
+// has loaded.
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { app, BrowserWindow } from 'electron';
+import { READY_LINE, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
+
+const testMode = process.env[TEST_ENV] === '1';
+const OFF_DISPLAY = -30000;
+
+function createWindow(): BrowserWindow {
+  const win = new BrowserWindow({
+    width: 1100,
+    height: 720,
+    show: false,
+    // focusable false: a stray focus()/show() can never activate the app
+    // over his; the harness draws the caret with CDP focus emulation.
+    ...(testMode ? { x: OFF_DISPLAY, y: OFF_DISPLAY, focusable: false } : {}),
+    title: 'bise',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+    },
+  });
+
+  win.once('ready-to-show', () => {
+    if (testMode) {
+      // ready-to-show may recenter on some setups: pin it off-display again.
+      win.setPosition(OFF_DISPLAY, OFF_DISPLAY);
+      win.showInactive();
+    } else {
+      win.show();
+    }
+  });
+
+  if (testMode) {
+    win.webContents.once('did-finish-load', () => {
+      process.stdout.write(`${READY_LINE}\n`);
+    });
+  }
+
+  const devUrl = process.env['ELECTRON_RENDERER_URL'];
+  if (!app.isPackaged && devUrl) {
+    void win.loadURL(devUrl);
+  } else {
+    void win.loadFile(join(__dirname, '../renderer/index.html'));
+  }
+  return win;
+}
+
+if (testMode) {
+  // never his ~/Library/Application Support: the harness's folder, else a fresh temp one
+  const userData = process.env[TEST_USER_DATA_ENV] ?? mkdtempSync(join(tmpdir(), 'bise-desktop-test-'));
+  app.setPath('userData', userData);
+  if (process.platform === 'darwin') {
+    app.setActivationPolicy('accessory');
+    app.dock?.hide();
+  }
+}
+
+void app.whenReady().then(() => {
+  createWindow();
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin' || testMode) app.quit();
+});
