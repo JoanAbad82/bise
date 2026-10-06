@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { ago, archivedOf, dotOf, endOf, lineOf, liveOf } from './model';
+import { ago, archivedOf, assign, dotOf, endOf, lineOf, liveOf, numbersOf } from './model';
 
 const T = 1_791_100_000_000;
 const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, main: false, status: 'idle', archived: false, title: '', purpose: '', since_ms: T, waits: 0, ...over });
 
 describe('the agents list', () => {
-  it("the fixture's agents: main first, then by need", () => {
+  it("the fixture's agents: main first, then the hub's order", () => {
     const ev = hub_ev.find((e) => e.ev === 'agents');
     if (ev?.ev !== 'agents') throw new Error('no agents fixture');
     const names = liveOf(ev.agents).map((a) => a.name);
@@ -15,7 +15,7 @@ describe('the agents list', () => {
     expect(new Set(names)).toEqual(new Set(ev.agents.filter((a) => !a.archived).map((a) => a.name)));
   });
 
-  it('main, then cards and blocked, failed, at work, done, at rest; newest change first; archived apart', () => {
+  it("main, then the hub's (start) order as the TUI's panel: a status never moves a row; archived apart", () => {
     const list = [
       ag('rest', { since_ms: T + 9 }),
       ag('done', { status: 'done' }),
@@ -27,7 +27,7 @@ describe('the agents list', () => {
       ag('gone', { archived: true }),
       ag('main', { main: true }),
     ];
-    expect(liveOf(list).map((a) => a.name)).toEqual(['main', 'asks', 'stuck', 'broke', 'work-new', 'work-old', 'done', 'rest']);
+    expect(liveOf(list).map((a) => a.name)).toEqual(['main', 'rest', 'done', 'work-old', 'work-new', 'asks', 'stuck', 'broke']);
     expect(archivedOf(list).map((a) => a.name)).toEqual(['gone']);
   });
 
@@ -43,5 +43,23 @@ describe('the agents list', () => {
     expect(ago(T, T + 50 * 3_600_000)).toBe('2d');
     expect(lineOf(ag('a', { purpose: 'make it fast' }))).toBe('make it fast');
     expect(lineOf(ag('a', { title: 'profiling', purpose: 'x' }))).toBe('profiling');
+  });
+
+  it("⌥ numbers as the TUI's (sb/panel.rs assign): start order, kept while alive, the smallest free one for a newcomer", () => {
+    const main = ag('main', { main: true });
+    const [p99, alerts, docs] = [ag('p99'), ag('alerts', { status: 'blocked', waits: 1 }), ag('docs')];
+    const first = assign(new Map(), [main, p99, alerts]);
+    expect([...first]).toEqual([['main', 0], ['p99', 1], ['alerts', 2]]);
+    // p99 archived: alerts keeps 2, nobody is renumbered
+    const after = assign(first, [main, alerts]);
+    expect([...after]).toEqual([['main', 0], ['alerts', 2]]);
+    // a newcomer takes the free 1
+    expect(assign(after, [main, alerts, docs]).get('docs')).toBe(1);
+  });
+
+  it('numbersOf keeps a project\'s numbers between calls', () => {
+    const main = ag('main', { main: true });
+    expect(numbersOf('p-num', [main, ag('a'), ag('b')]).get('b')).toBe(2);
+    expect(numbersOf('p-num', [main, ag('b')]).get('b')).toBe(2);
   });
 });

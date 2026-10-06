@@ -23,6 +23,7 @@ import { EnvironmentsScreen } from '@/review/EnvironmentsScreen';
 import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
 import { Sidebar } from './Sidebar';
+import { numbersOf } from '@/agents/model';
 import { CoreLine } from './CoreLine';
 import { Palette } from './Palette';
 import { keyAction, typingIn } from './keys';
@@ -238,6 +239,7 @@ function useWindowKeys(openPalette: () => void) {
         projects: store.projects(),
         agents: (p) => store.agents(p),
         typing: typingIn(document.activeElement),
+        numbers: (p) => numbersOf(p, store.agents(p)),
       });
       if (act === undefined) return;
       e.preventDefault();

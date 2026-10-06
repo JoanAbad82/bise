@@ -50,22 +50,54 @@ export function endOf(a: Agent, now: number): { text: string; needs: boolean } {
   }
 }
 
-const rank: Record<Status, number> = { blocked: 0, waiting: 0, failed: 1, working: 2, done: 3, idle: 4 };
-
 /**
- * The live list: main first, then what needs him (cards, blocked, failed),
- * then at work, done, at rest; within a group the newest change first.
- * Archived agents are not in it (`archivedOf`).
+ * The live list in the TUI's panel order (qa-flows 5ee10a00): main first,
+ * then the hub's order, which is start order; a status never moves a row
+ * (the dot and the end say what needs him). Archived agents are not in it
+ * (`archivedOf`).
  */
 export function liveOf(agents: readonly Agent[]): Agent[] {
-  return agents
-    .filter((a) => !a.archived)
-    .sort((a, b) => {
-      if (a.main !== b.main) return a.main ? -1 : 1;
-      const ra = a.waits > 0 ? -1 : rank[a.status];
-      const rb = b.waits > 0 ? -1 : rank[b.status];
-      return ra - rb || b.since_ms - a.since_ms || a.name.localeCompare(b.name);
-    });
+  return agents.filter((a) => !a.archived && a.main).concat(agents.filter((a) => !a.archived && !a.main));
+}
+
+/** An agent's ⌥ number: main 0, the others from 1. */
+export type Slots = ReadonlyMap<string, number>;
+
+/**
+ * The TUI's numbers (sb/panel.rs assign): `slots` brought up to date with
+ * the `live` agents in panel order; a gone agent frees its number, one that
+ * stays keeps it (an archive never renumbers the others), a newcomer takes
+ * the smallest free number from 1, main is 0. Pure.
+ */
+export function assign(slots: Slots, live: readonly Agent[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const [name, n] of slots) {
+    if (live.some((a) => a.name === name && a.main === (n === 0))) out.set(name, n);
+  }
+  const used = new Set(out.values());
+  for (const a of live) {
+    if (out.has(a.name)) continue;
+    let n = 0;
+    if (!a.main) {
+      n = 1;
+      while (used.has(n)) n += 1;
+    }
+    used.add(n);
+    out.set(a.name, n);
+  }
+  return out;
+}
+
+const kept = new Map<string, Map<string, number>>();
+
+/**
+ * The project's ⌥ numbers now, kept for the window's life as the TUI keeps
+ * them for its session: the sidebar shows them, ⌥1-9 reads them.
+ */
+export function numbersOf(project: string, agents: readonly Agent[]): ReadonlyMap<string, number> {
+  const next = assign(kept.get(project) ?? new Map(), liveOf(agents));
+  kept.set(project, next);
+  return next;
 }
 
 /** The archived ones, newest first (/archived). */

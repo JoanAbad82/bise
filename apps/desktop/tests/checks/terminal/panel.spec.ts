@@ -5,17 +5,12 @@
 // with /bin/sh in test mode; main's stdout line 'bise-desktop: term "<id>" open' read outside
 // the page. Needs a built bise with `pty`: BISE_CHECK_BISE=<abs path>, else this repo's
 // rust/target/{debug,release}/bise; none: skipped (said why).
-import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdtempSync } from 'node:fs';
 import path from 'node:path';
 import { FakeCore, FakeHelper, launchDesktop, test, expect } from '../../harness';
 import { Lines } from '../native/world';
 
 const HOME = 'bise-home-00000000';
-const SCRATCH = mkdtempSync(path.join(tmpdir(), 'term-panel-'));
-test.afterAll(() => {
-  rmSync(SCRATCH, { recursive: true, force: true });
-});
 const OPEN = 'bise-desktop: term';
 
 function bise(): string | undefined {
@@ -56,13 +51,8 @@ test('terminal/panel: ⌃` opens a shell under the thread, hide and show keep th
   test.setTimeout(60_000);
   const helper = new FakeHelper();
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
-  // main runs both the core and the shells from BISE_DESKTOP_BISE: one bise that is the
-  // scripted core for 'ambient-core' and the real one for 'pty'
-  const stub = core.env()['BISE_DESKTOP_BISE'] ?? '';
-  const wrap = path.join(SCRATCH, 'bise');
-  writeFileSync(wrap, `#!/bin/sh\nif [ "$1" = pty ]; then exec '${bin ?? ''}' "$@"; fi\nexec '${stub}' "$@"\n`);
-  chmodSync(wrap, 0o755);
-  const s = await launchDesktop({ helper, core, env: { BISE_DESKTOP_BISE: wrap } });
+  // the scripted core runs from BISE_DESKTOP_BISE, the shells from a real bise (BISE_DESKTOP_PTY, amb-mac 93e1b19f)
+  const s = await launchDesktop({ helper, core, env: { BISE_DESKTOP_PTY: bin ?? '' } });
   const out = new Lines();
   s.app.process().stdout?.setEncoding('utf8');
   s.app.process().stdout?.on('data', (d: string) => {

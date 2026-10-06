@@ -9,7 +9,7 @@ import { memo } from 'react';
 import { Row, SectionHead, Side, type DotState } from '@/ds';
 import type { ProjectRow } from '@/proto';
 import { useAgents, useProjects } from '@/store';
-import { dotOf, endOf, liveOf } from '@/agents/model';
+import { dotOf, endOf, liveOf, numbersOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
 import { useRoute, useRouter } from './router';
 import { useNow } from './clock';
@@ -96,21 +96,25 @@ const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow;
 /** The live agents of the project in view, main out (it is the project's row). */
 function Agents({ project, route }: { project: string; route: Route }) {
   const router = useRouter();
-  const agents = liveOf(useAgents(project)).filter((a) => !a.main);
+  const all = useAgents(project);
+  const agents = liveOf(all).filter((a) => !a.main);
+  // the TUI's numbers: kept while an agent lives, a newcomer takes the smallest free one
+  const nums = numbersOf(project, all);
   const now = useNow();
   return (
     <>
-      {agents.map((a, i) => {
+      {agents.map((a) => {
         const end = endOf(a, now);
+        const n = nums.get(a.name) ?? 0;
         return (
           <Row
             key={a.name}
             kind="ag"
             name={
               // its ⌥ number (tui-parity W4: the panel's numbers for ⌥1-9)
-              i < 9 ? (
+              n >= 1 && n <= 9 ? (
                 <>
-                  <span className="app-n">{i + 1}</span>
+                  <span className="app-n">{n}</span>
                   {a.name}
                 </>
               ) : (
