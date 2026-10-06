@@ -212,11 +212,14 @@ impl Shell {
             // the TUI's own `seen`: the clock moves, the list comes again
             HubCmd::ArtifactsSeen { .. } => self.artifacts_op(id, &json!({"do": "seen"})),
             // git in a thread (art.rs), the typed answer to this client
-            HubCmd::Diff { project, agent } => {
+            HubCmd::Diff { project, agent, commit } => {
                 if !known(self, &agent) {
                     return self.proto_error(id, &tag, &format!("no agent {agent}"));
                 }
-                self.diff_typed(id, project, agent);
+                if commit.as_deref().is_some_and(|c| !crate::proto_view::is_sha(c)) {
+                    return self.proto_error(id, &tag, "a commit is its sha (4 to 40 hex digits)");
+                }
+                self.diff_typed(id, project, agent, commit);
             }
             HubCmd::Hello { .. } | HubCmd::Unknown { .. } => {}
         }

@@ -103,6 +103,7 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
                 id: c.get("id").and_then(Value::as_u64).unwrap_or(0),
                 project: project.to_string(),
                 urgent: kind == "confirm",
+                approval: Card::approval_kind(&kind),
                 kind,
                 agent: s(c, "agent"),
                 question: q,
@@ -147,6 +148,12 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>) -> Vec<A
 /// `diff::file_json`) as the typed `diff`, or its error. A generated
 /// file's hunks are left out and a file cut for its length keeps what it
 /// has: both say `truncated`, as a binary file (no text to show).
+/// A commit's sha as a client may name one: 4 to 40 hex digits (never an
+/// option or a range for git).
+pub fn is_sha(c: &str) -> bool {
+    (4..=40).contains(&c.len()) && c.chars().all(|ch| ch.is_ascii_hexdigit())
+}
+
 pub fn diff(ev: &Value, project: &str, agent: &str) -> HubEv {
     if let Some(e) = ev.get("error").and_then(Value::as_str) {
         return HubEv::Error { project: Some(project.into()), cmd: Some("diff".into()), text: e.into() };
@@ -171,6 +178,10 @@ pub fn diff(ev: &Value, project: &str, agent: &str) -> HubEv {
                 add: f.get("add").and_then(Value::as_u64).unwrap_or(0) as u32,
                 del: f.get("del").and_then(Value::as_u64).unwrap_or(0) as u32,
                 truncated: flag(f, "cut") || flag(f, "binary") || (generated && had),
+                from: Some(s(f, "old_path")).filter(|p| !p.is_empty() && *p != s(f, "path")),
+                binary: flag(f, "binary"),
+                generated,
+                size: f.get("size").and_then(Value::as_u64),
                 hunks,
                 note: None,
             }
@@ -366,7 +377,8 @@ mod tests {
             {"path": "Cargo.lock", "status": "M", "add": 9, "del": 9, "binary": false, "generated": true, "cut": false,
              "hunks": [{"old": 1, "new": 1, "head": "", "lines": ["-a", "+b"]}]},
             {"path": "big.rs", "status": "A", "add": 9000, "del": 0, "binary": false, "generated": false, "cut": true, "hunks": []},
-            {"path": "logo.png", "status": "A", "add": 0, "del": 0, "binary": true, "generated": false, "cut": false, "hunks": []}]});
+            {"path": "logo.png", "status": "A", "add": 0, "del": 0, "binary": true, "generated": false, "cut": false, "hunks": [], "size": 2100000},
+            {"path": "src/codec.rs", "old_path": "src/decode.rs", "status": "R", "add": 0, "del": 0, "binary": false, "generated": false, "cut": false, "hunks": []}]});
         let HubEv::Diff { files, head, base, .. } = diff(&ev, "acme", "perf") else { panic!("a diff") };
         assert_eq!((base.as_str(), head.as_deref()), ("main", Some("sb/perf")));
         let h = &files[0].hunks[0];
@@ -381,6 +393,13 @@ mod tests {
         assert!(files[1].truncated && files[1].hunks.is_empty(), "a generated file: counts only, said cut");
         assert!(files[2].truncated && files[2].status == "added", "too long: said cut");
         assert!(files[3].truncated, "binary: nothing to show, said so");
+        // amb-web m_8827: each cut says why, a rename its old path
+        assert_eq!((files[1].generated, files[1].binary, files[2].generated, files[2].binary), (true, false, false, false), "a plain cut is neither");
+        assert_eq!((files[3].binary, files[3].size), (true, Some(2_100_000)));
+        assert_eq!((files[4].status.as_str(), files[4].from.as_deref()), ("renamed", Some("src/decode.rs")));
+        assert_eq!(files[0].from, None, "not renamed: no from");
+        assert!(is_sha("e0f3df5") && is_sha(&"a".repeat(40)));
+        assert!(!is_sha("abc") && !is_sha("--output=x") && !is_sha("a..b") && !is_sha("HEAD") && !is_sha(&"a".repeat(41)));
         let e = diff(&json!({"error": "no agent x", "files": []}), "acme", "x");
         assert!(matches!(e, HubEv::Error { cmd: Some(ref c), .. } if c == "diff"));
     }

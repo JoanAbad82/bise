@@ -91,10 +91,13 @@ fn ambient_projects(exe: std::path::PathBuf, root: std::path::PathBuf) -> (bend_
                 // a worktree: `.git` is a file naming its git dir
                 std::fs::read_to_string(&dot).ok().and_then(|t| t.trim().strip_prefix("gitdir: ").map(|d| path.join(d)))
             };
-            match dir {
-                Some(d) => (std::fs::read_to_string(d.join("HEAD")).ok().and_then(|h| bend_tui::ambient::branch_of_head(&h)), true),
-                None => (None, false),
-            }
+            use bend_tui::ambient::projects::{github_web, origin_url, Checkout};
+            let Some(d) = dir else { return Checkout::default() };
+            // a worktree's config is its main repo's (`commondir`)
+            let common = std::fs::read_to_string(d.join("commondir")).ok().map(|c| d.join(c.trim())).unwrap_or_else(|| d.clone());
+            let web = std::fs::read_to_string(common.join("config")).ok().and_then(|c| origin_url(&c)).and_then(|u| github_web(&u));
+            let branch = std::fs::read_to_string(d.join("HEAD")).ok().and_then(|h| bend_tui::ambient::branch_of_head(&h));
+            Checkout { branch, git: true, web }
         }),
     };
     (connect_for, facts)

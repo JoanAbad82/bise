@@ -268,12 +268,26 @@ impl Shell {
 
     /// The typed `diff {project, agent}` (desktop S7): the same answer as
     /// the op, in bise-proto's shape (`proto_view::diff`), to that client.
-    pub(super) fn diff_typed(&mut self, id: ClientId, project: String, agent: String) {
+    pub(super) fn diff_typed(&mut self, id: ClientId, project: String, agent: String, commit: Option<String>) {
         let shared = PathBuf::from(&self.hub.workspace);
-        let ask = self.diff_ask(&json!({"agent": agent}));
+        // one commit: the range ask the TUI's door under a land uses
+        let ask = match &commit {
+            Some(c) => self.diff_ask(&json!({"agent": agent, "range": format!("{c}^..{c}")})),
+            None => self.diff_ask(&json!({"agent": agent})),
+        };
         let tx = self.tx.clone();
         std::thread::spawn(move || {
-            let ev = diff_answer(ask, &shared, Value::Null);
+            let mut ev = diff_answer(ask, &shared, Value::Null);
+            // a binary file's size, read here (the mapper stays pure):
+            // its file in the agent's checkout, when it is still there
+            for f in ev.get_mut("files").and_then(Value::as_array_mut).into_iter().flatten() {
+                let abs = f.get("abs").and_then(Value::as_str).map(PathBuf::from);
+                if f["binary"] == true {
+                    if let Some(m) = abs.and_then(|p| std::fs::metadata(p).ok()).filter(|m| m.is_file()) {
+                        f["size"] = json!(m.len());
+                    }
+                }
+            }
             let v = crate::proto_view::diff(&ev, &project, &agent).to_value();
             let _ = tx.send(Msg::ToClient { id, v });
         });

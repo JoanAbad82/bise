@@ -53,10 +53,56 @@ pub fn facts(
         .collect()
 }
 
-/// The sidebar's row of `f`, at position `order`. `branch`/`git`: the
-/// checkout's (the core reads git). Counts from the view: agents (main
-/// and archived ones aside), the working ones, his open cards.
-pub fn row(f: &Facts, order: u32, branch: Option<String>, git: bool) -> ProjectRow {
+/// What the core reads of a project's checkout (its files, never a git
+/// process).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Checkout {
+    /// its current branch (None: detached, or not a repo)
+    pub branch: Option<String>,
+    /// a git repo (bise's home is not)
+    pub git: bool,
+    /// its GitHub remote's web page (`origin`)
+    pub web: Option<String>,
+}
+
+/// The `url` of `[remote "origin"]` in a git config file.
+pub fn origin_url(config: &str) -> Option<String> {
+    let mut inside = false;
+    for l in config.lines().map(str::trim) {
+        if l.starts_with('[') {
+            inside = l.replace(' ', "") == "[remote\"origin\"]";
+        } else if inside {
+            if let Some((k, v)) = l.split_once('=') {
+                if k.trim() == "url" {
+                    return Some(v.trim().to_string()).filter(|u| !u.is_empty());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// A GitHub remote's web page (`https://github.com/<owner>/<repo>`) from
+/// its url in any form git takes (https, `git@github.com:`, ssh://);
+/// None for any other host (ambient m_8830: no GitHub, copy the sha).
+pub fn github_web(url: &str) -> Option<String> {
+    let u = url.trim();
+    let rest = ["https://github.com/", "http://github.com/", "ssh://git@github.com/", "git@github.com:", "git://github.com/"]
+        .iter()
+        .find_map(|p| u.strip_prefix(p))?;
+    let rest = rest.trim_end_matches('/');
+    let rest = rest.strip_suffix(".git").unwrap_or(rest);
+    let mut parts = rest.split('/');
+    let (owner, repo) = (parts.next()?, parts.next()?);
+    let ok = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c));
+    (ok(owner) && ok(repo) && parts.next().is_none()).then(|| format!("https://github.com/{owner}/{repo}"))
+}
+
+/// The sidebar's row of `f`, at position `order`, with its checkout `c`
+/// (the core reads it). Counts from the view: agents (main and archived
+/// ones aside), the working ones, his open cards.
+pub fn row(f: &Facts, order: u32, c: &Checkout) -> ProjectRow {
+    let Checkout { branch, git, web } = c.clone();
     let agents = f.view.as_ref().map(|v| v.agents.iter().filter(|a| !a.main && !a.archived).collect::<Vec<_>>()).unwrap_or_default();
     ProjectRow {
         project: f.row.id.clone(),
@@ -72,6 +118,7 @@ pub fn row(f: &Facts, order: u32, branch: Option<String>, git: bool) -> ProjectR
         running: f.running,
         missing: f.missing,
         cards: f.view.as_ref().map(|v| v.cards.clone()).unwrap_or_default(),
+        web,
     }
 }
 
@@ -151,11 +198,28 @@ mod tests {
             |p| p != Path::new("/c/old"),
         );
         assert_eq!(f.iter().map(|x| (x.running, x.missing, x.view.is_some())).collect::<Vec<_>>(), [(true, false, false), (false, false, true), (false, true, false)]);
-        let p = row(&f[1], 1, Some("main".into()), true);
+        let api = Checkout { branch: Some("main".into()), git: true, web: Some("https://github.com/acme/api".into()) };
+        let p = row(&f[1], 1, &api);
         assert_eq!((p.name.as_str(), p.home, p.order, p.agents, p.working, p.waits), ("api", false, 1, 2, 1, 0));
         assert_eq!(p.project, rows[1].id);
-        let h = row(&f[0], 0, None, false);
-        assert!(h.home && h.agents == 0 && !h.git);
+        assert_eq!(p.web.as_deref(), Some("https://github.com/acme/api"));
+        let h = row(&f[0], 0, &Checkout::default());
+        assert!(h.home && h.agents == 0 && !h.git && h.web.is_none());
+    }
+
+    #[test]
+    fn a_github_remote_gives_the_projects_web_page() {
+        // amb-web m_8831: the merged sha opens <web>/commit/<sha>
+        let web = Some("https://github.com/acme/engine".to_string());
+        for u in ["https://github.com/acme/engine", "https://github.com/acme/engine.git", "git@github.com:acme/engine.git", "ssh://git@github.com/acme/engine.git", "https://github.com/acme/engine/"] {
+            assert_eq!(github_web(u), web, "{u}");
+        }
+        for u in ["https://gitlab.com/acme/engine.git", "git@example.com:acme/engine.git", "/srv/git/engine.git", "https://github.com/acme", "https://github.com/acme/engine/tree/x", "https://github.com/acme/en gine"] {
+            assert_eq!(github_web(u), None, "{u}");
+        }
+        let config = "[core]\n\tbare = false\n[remote \"upstream\"]\n\turl = git@github.com:other/engine.git\n[remote \"origin\"]\n\turl = git@github.com:acme/engine.git\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n";
+        assert_eq!(origin_url(config).as_deref(), Some("git@github.com:acme/engine.git"), "origin's, not another remote's");
+        assert_eq!(origin_url("[core]\n\tbare = false\n"), None);
     }
 
     #[test]

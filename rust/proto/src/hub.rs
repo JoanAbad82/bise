@@ -46,7 +46,8 @@ pub enum HubEv {
         /// enum stays small, the wire is the same)
         #[serde(default, skip_serializing_if = "Option::is_none")]
         result: Option<Box<DiffResult>>,
-        /// its land on the trunk, once merged (the merge path sets it)
+        /// its land on the trunk, once merged: the full sha (the merge
+        /// path sets it; the review shows 7 and opens it on GitHub)
         #[serde(default, skip_serializing_if = "Option::is_none")]
         merged: Option<String>,
         /// why there are no files to show (its folder is gone...)
@@ -164,8 +165,14 @@ pub enum HubCmd {
     /// he opened the artifacts screen: their `new` clears, `artifacts`
     /// comes again
     ArtifactsSeen { project: Project },
-    /// an agent's change, once (`diff` answers)
-    Diff { project: Project, agent: String },
+    /// an agent's change, once (`diff` answers); `commit`: one commit of
+    /// it instead (a landed one: the review's "merged · e0f3df5")
+    Diff {
+        project: Project,
+        agent: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        commit: Option<String>,
+    },
     /// a tag this version doesn't know: answered with `error`
     #[serde(skip)]
     Unknown { tag: String, raw: Value },

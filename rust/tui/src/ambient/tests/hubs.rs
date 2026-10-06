@@ -54,7 +54,14 @@ fn world(t: &mut T) -> World {
         })),
         running: Box::new(|_| false),
         exists: Box::new(|p| p != Path::new("/p/docs")),
-        git: Box::new(|p| if p == Path::new("/p/shop") { (Some("main".into()), true) } else { (None, false) }),
+        git: Box::new(|p| {
+            let shop = p == Path::new("/p/shop");
+            crate::ambient::projects::Checkout {
+                branch: shop.then(|| "main".into()),
+                git: shop,
+                web: shop.then(|| "https://github.com/acme/shop".into()),
+            }
+        }),
     };
     t.core.set_projects(ProjectPorts { spawn, facts });
     World { ends, rx, open: HashMap::new() }
@@ -216,7 +223,7 @@ fn the_rows_carry_the_open_cards_of_every_project() {
         "options": [{"n": 1, "label": "cold"}], "urgent": false, "since_ms": 2});
     w.end("shop").say(json!({"ev": "cards", "project": "shop", "cards": [card]}));
     w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "projects" && v["projects"][1]["waits"] == 1));
-    let p = t.take().into_iter().filter(|v| v["ev"] == "projects").next_back().unwrap();
+    let p = t.take().into_iter().rfind(|v| v["ev"] == "projects").unwrap();
     assert_eq!(p["projects"][1]["cards"], json!([card]), "held: its hub's own cards");
     assert_eq!(p["projects"][2]["cards"], json!([docs_card()]), "not held: its view.json's");
     assert_eq!(p["projects"][2]["waits"], 1);

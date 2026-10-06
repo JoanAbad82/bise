@@ -22,7 +22,7 @@
 //! are kept (state, not commands) and sent again at each `welcome`.
 
 use super::*;
-use crate::ambient::projects::{self, Facts};
+use crate::ambient::projects::{self, Checkout, Facts};
 use bise_home::projects::Row;
 use bise_proto::draft::{ProjectRow, ProjectView};
 use bise_proto::hub::HubEv;
@@ -38,7 +38,7 @@ pub type Spawn = Box<dyn FnMut(&Path, &str) -> Hub>;
 /// A hub's `view.json` by hub id.
 pub type ViewOf = Box<dyn Fn(&str) -> Option<ProjectView>>;
 /// A checkout's branch and whether it is a git repo.
-pub type GitOf = Box<dyn Fn(&Path) -> (Option<String>, bool)>;
+pub type GitOf = Box<dyn Fn(&Path) -> Checkout>;
 
 /// What the core reads of the projects, real in `bise ambient-core`,
 /// fakes in tests.
@@ -78,7 +78,7 @@ pub(super) struct Hubs {
     /// each project's subscribed agents (kept across reconnections)
     subs: BTreeMap<String, BTreeSet<String>>,
     /// each row's (branch, git), read at each poll
-    git: BTreeMap<String, (Option<String>, bool)>,
+    git: BTreeMap<String, Checkout>,
     last: String,
     polled: Option<Instant>,
 }
@@ -267,8 +267,8 @@ impl Core {
             .map(|(i, mut f)| {
                 let held = conns.get(&f.row.id).is_some_and(|c| c.welcomed);
                 f.running = held || (p.facts.running)(&f.row.path);
-                let (branch, git) = self.hubs.git.get(&f.row.id).cloned().unwrap_or((None, false));
-                projects::row(&f, i as u32, branch, git)
+                let c = self.hubs.git.get(&f.row.id).cloned().unwrap_or_default();
+                projects::row(&f, i as u32, &c)
             })
             .collect();
         let ev = json!({"ev": "projects", "projects": rows});

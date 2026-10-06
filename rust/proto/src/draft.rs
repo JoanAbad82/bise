@@ -152,6 +152,10 @@ pub struct ProjectRow {
     /// the cards of a project it doesn't hold (lead m_8769)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cards: Vec<Card>,
+    /// its GitHub remote's web page (`https://github.com/acme/engine`):
+    /// the review opens `<web>/commit/<sha>`; absent: no GitHub remote
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub web: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

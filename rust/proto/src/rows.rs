@@ -118,6 +118,21 @@ pub struct Card {
     pub since_ms: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page: Option<CardPage>,
+    /// it acts or leaves (a tool call's yes, a merge, a release...): only
+    /// one of its options answers it, never typed words (the composer
+    /// rule, lead m_8777); false: a question, words answer it
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub approval: bool,
+}
+
+impl Card {
+    /// A kind answered only by one of its options: every kind but
+    /// `question` (the hub's `confirm`, `merge`, `feature_try`,
+    /// `feature_merge`, `update`, `signin`, and any newer one: a kind
+    /// nobody taught the clients is safer picked than typed).
+    pub fn approval_kind(kind: &str) -> bool {
+        kind != "question"
+    }
 }
 
 /// A question and its options: the trailing numbered lines (`1. v1`,

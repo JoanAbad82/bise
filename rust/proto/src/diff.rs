@@ -39,6 +39,20 @@ pub struct DiffFile {
     /// so, never shows it as complete
     #[serde(default, skip_serializing_if = "crate::is_false")]
     pub truncated: bool,
+    /// a renamed file's old path ("renamed from decode.rs")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    /// a binary file: no lines (`truncated` too), its words are its own
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub binary: bool,
+    /// a generated file (a lock file, a build output): its lines are
+    /// left out (`truncated` too when it had some)
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub generated: bool,
+    /// its size in bytes after the change, for a binary file still there
+    /// ("a binary file, 2.1 MB")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
     /// the agent's word on this file ("new: 4 workers"), from its summary
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
