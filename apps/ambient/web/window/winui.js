@@ -284,7 +284,7 @@
       // the core's error: one line over the window, gone after 6 s or with 'close'
       put("toast", v.toast ? UI.toast.render({ text: v.toast.text, err: true, action: v.toast.close }) : null);
       if (v.toast && v.toast.at !== toastAt && root.setTimeout) { const at = (toastAt = v.toast.at); root.setTimeout(() => feed({ ev: "ui_toast_close", at }), 6000); }
-      const keyin = el.querySelector(".w-keyin");
+      const keyin = el.querySelector(".w-keyin, .w-renamein");
       if (keyin && doc.activeElement !== keyin) keyin.focus();
       const routeKey = `${v.route.screen || ""}${v.route.project}/${v.route.agent}`;
       const atEnd = R.scroll.scrollHeight - R.scroll.scrollTop - R.scroll.clientHeight < 40;
@@ -361,6 +361,7 @@
       const c = e.target.classList;
       if (c && c.contains("w-keyin")) feed({ ev: "ui_key_type", text: e.target.value });
       if (c && c.contains("w-pathin")) feed({ ev: "ui_add_type", text: e.target.value });
+      if (c && c.contains("w-renamein")) feed({ ev: "ui_set_rename_type", text: e.target.value });
     });
     // settings › projects: a row's handle drags it, a drop on another row takes that row's place
     // (the order of ⌘1-9)

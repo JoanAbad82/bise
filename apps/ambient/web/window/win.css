@@ -103,7 +103,7 @@ body { background: var(--c-canvas); overflow: hidden; }
 .w-onb .b-btn.ghost { margin-top: 6px; }
 .w-hint { margin-top: 10px; font: var(--t-11) var(--font-mono); color: var(--c-text-3); }
 .w-keyfield { width: min(480px, 90vw); box-sizing: border-box; margin-top: 8px; }
-.w-keyin, .w-pathin { flex: 1; border: 0; outline: 0; background: none; color: var(--c-text); font: inherit; padding: 0; }
+.w-keyin, .w-pathin, .w-renamein { flex: 1; border: 0; outline: 0; background: none; color: var(--c-text); font: inherit; padding: 0; }
 .b-gi > .b-check { margin-right: -2px; }
 .b-gi .b-kbd { margin-left: 4px; }
 .w-btns { display: inline-flex; gap: 6px; }

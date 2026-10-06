@@ -7,7 +7,7 @@
 // What it reads from the core and the shell (drafts sent to amb-core m_8382, amb-mac m_8383):
 // prefs {prefs}, accounts {items}, found {dir, items}, perms {mic, accessibility, screen},
 // win_folder {path}, win_drop {paths}, app_fn {state}. What it sends: prefs_set {key, value},
-// sign_in {id}, key_set {id, key}, found_scan {dir}, project_add {path, land?} (land true = the repo's flow mode trunk, absent = its flow decides; amb-home m_9135),
+// sign_in {id}, key_set {id, key}, found_scan {dir?} (none: his home folder, depth 2), project_rename {project, name}, open_in {project, app, path}, project_add {path, land?} (land true = the repo's flow mode trunk, absent = its flow decides; amb-home m_9135),
 // project_remove {project}, project_move {project, order}, app_perm {perm, do: continue|settings}
 // (the bar's own, amb-mac m_8388), win_pick_folder.
 (function (root) {
@@ -19,7 +19,8 @@
 
   function init() {
     return { perms: { mic: "ask", accessibility: "ask", screen: "ask" }, accounts: [], found: { dir: "", items: [] }, prefs: null,
-      step: 0, picks: {}, fn: "up", tried: false, heard: "", keyFor: null, keyText: "", page: "general", sheet: null, adding: null, menu: null, confirm: null };
+      step: 0, picks: {}, fn: "up", tried: false, heard: "", keyFor: null, keyText: "", page: "general", sheet: null, adding: null, menu: null, confirm: null,
+      renaming: null, renameText: "" };
   }
 
   const CORE = ["prefs", "accounts", "found", "perms", "win_folder", "win_drop", "app_fn", "heard"];
@@ -90,11 +91,27 @@
       case "ui_set_confirm": return out({ ...x, confirm: ev.project || null, menu: null });
       case "ui_set_remove": cmds.push({ cmd: "project_remove", project: ev.project }); return out({ ...x, confirm: null, menu: null });
       case "ui_set_menu": return out({ ...x, menu: ev.id || null });
-      case "ui_set_open": cmds.push({ cmd: "open", project: ev.project, what: ev.what }); return out({ ...x, menu: null });
+      // open in Terminal / the editor: the same command as S7's review (amb-web's open_in, the shell's)
+      case "ui_set_open": {
+        const p = s.projects.find((q) => q.project === ev.project);
+        cmds.push({ cmd: "open_in", project: ev.project, app: ev.what, ...(p && p.path ? { path: p.path } : {}) });
+        return out({ ...x, menu: null });
+      }
+      // rename: its name in bise (project_rename {project, name}; the folder keeps its own)
+      case "ui_set_rename": {
+        const p = s.projects.find((q) => q.project === ev.project);
+        return out({ ...x, menu: null, renaming: ev.project, renameText: p ? p.name : "" });
+      }
+      case "ui_set_rename_type": return out({ ...x, renameText: String(ev.text || "") });
+      case "ui_set_rename_save": {
+        const name = x.renameText.trim();
+        if (x.renaming && name) cmds.push({ cmd: "project_rename", project: x.renaming, name });
+        return out({ ...x, renaming: null, renameText: "" });
+      }
       case "ui_set_move": cmds.push({ cmd: "project_move", project: ev.project, order: ev.order }); return out(x);
       // the add-a-project sheet
       case "ui_add_open": {
-        if (!x.found.items.length) cmds.push({ cmd: "found_scan", dir: "~" });
+        if (!x.found.items.length) cmds.push({ cmd: "found_scan" });
         return out({ ...x, sheet: sheet(ev.path || null) });
       }
       // a path typed in the sheet's field counts like a ticked one
@@ -128,7 +145,7 @@
     if (at === "fn") return finish(x, cmds);
     const nx = { ...x, step: x.step + 1 };
     // the projects step scans his folder when it comes up
-    if (STEPS[nx.step] === "projects" && !x.found.items.length) cmds.push({ cmd: "found_scan", dir: "~" });
+    if (STEPS[nx.step] === "projects" && !x.found.items.length) cmds.push({ cmd: "found_scan" });
     return { s11: nx, cmds };
   }
   function finish(x, cmds) {
@@ -160,6 +177,8 @@
       if (x.confirm && ev.key === "Enter") return { ...step(x, { ev: "ui_set_remove", project: x.confirm }, s), eat: true };
       if (x.confirm && ev.key === "Escape") return { s11: { ...x, confirm: null }, cmds, eat: true };
       if (x.menu && ev.key === "Escape") return { s11: { ...x, menu: null }, cmds, eat: true };
+      if (x.renaming && ev.key === "Enter") return { ...step(x, { ev: "ui_set_rename_save" }, s), eat: true };
+      if (x.renaming && ev.key === "Escape") return { s11: { ...x, renaming: null, renameText: "" }, cmds, eat: true };
       if (x.keyFor && ev.key === "Enter") return { ...step(x, { ev: "ui_key_save" }, s), eat: true };
       if (ev.key === "Escape") return x.keyFor ? { s11: { ...x, keyFor: null }, cmds, eat: true } : { s11: x, cmds, back: true, eat: true };
       return ev.meta ? null : keep;
@@ -171,7 +190,7 @@
     const cmds = [];
     if (route.screen === "settings" && route.page) x = { ...x, page: route.page };
     if (route.screen === "settings") x = { ...x, menu: null, confirm: null };
-    if (route.screen === "settings" && !x.found.items.length) cmds.push({ cmd: "found_scan", dir: "~" });
+    if (route.screen === "settings" && !x.found.items.length) cmds.push({ cmd: "found_scan" });
     return { s11: x, cmds };
   }
 
@@ -296,9 +315,10 @@
       sub = T(s, "projects_page_s");
       const ps = s.projects.filter((p) => !p.home).sort((a, b) => (a.order || 0) - (b.order || 0));
       // a drag handle orders them (the order of ⌘1-9); '…' holds the rest, remove last, in red
-      groups = [{ items: ps.map((p, i) => ({ label: p.name, sub: p.path, drag: { project: p.project, order: i + 1, tip: T(s, "drag") }, key: i < 9 ? `⌘${i + 1}` : "",
+      groups = [{ items: ps.map((p, i) => ({ label: p.name, sub: p.path, rename: x.renaming === p.project ? { text: x.renameText, ph: T(s, "rename_ph") } : null, drag: { project: p.project, order: i + 1, tip: T(s, "drag") }, key: i < 9 ? `⌘${i + 1}` : "",
         control: { menu: { id: `p:${p.project}`, text: T(s, "more"), open: x.menu === `p:${p.project}`, act: { ev: "ui_set_menu", id: x.menu === `p:${p.project}` ? null : `p:${p.project}` },
           items: [{ text: T(s, "open_terminal"), act: { ev: "ui_set_open", project: p.project, what: "terminal" } }, { text: T(s, "open_editor"), act: { ev: "ui_set_open", project: p.project, what: "editor" } },
+            { text: T(s, "rename"), act: { ev: "ui_set_rename", project: p.project } },
             { sep: true }, { text: T(s, "remove_from"), danger: true, act: { ev: "ui_set_confirm", project: p.project } }] } } })) }];
     } else if (page === "keys") {
       sub = T(s, "keys_s");

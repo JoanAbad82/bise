@@ -100,7 +100,7 @@ law("an API key: its field takes every key (a digit never answers a card), ⏎ s
 law("the projects step scans his folder: recent repos come checked, old ones not; ⏎ adds the checked ones", () => {
   const w = win({ fresh: true });
   w.key("Enter"); w.key("Enter"); w.feed({ ev: "ui_acct_sign_in", id: "chatgpt" }); w.key("Enter");
-  eq(w.cmds("found_scan"), [{ cmd: "found_scan", dir: "~" }]);
+  eq(w.cmds("found_scan"), [{ cmd: "found_scan" }]);
   const o = w.v.setup;
   eq(o.sub, "i found these repos in your folder. each gets its main; bise coordinates them.");
   // storefront … are already his in the fake world: only the new ones show
@@ -188,12 +188,24 @@ law("settings › projects: a drag handle orders ⌘1-9; '…' opens it in Termi
   // '…'
   w.feed(w.v.setup.groups[0].items[0].control.menu.act);
   const items = w.v.setup.groups[0].items[0].control.menu.items;
-  eq(items.map((i) => (i.sep ? "—" : `${i.text}${i.danger ? " (red)" : ""}`)), ["open in Terminal", "open in editor", "—", "remove from bise (red)"]);
+  eq(items.map((i) => (i.sep ? "—" : `${i.text}${i.danger ? " (red)" : ""}`)), ["open in Terminal", "open in editor", "rename", "—", "remove from bise (red)"]);
   w.feed(items[0].act);
-  eq([w.cmds("open"), w.v.setup.groups[0].items[0].control.menu.open], [[{ cmd: "open", project: P.storefront, what: "terminal" }], false]);
+  // the shell's open_in, as S7's review uses it
+  eq([w.cmds("open_in"), w.v.setup.groups[0].items[0].control.menu.open], [[{ cmd: "open_in", project: P.storefront, app: "terminal", path: "~/storefront" }], false]);
+  // rename: its name becomes a field, ⏎ sends project_rename and the list follows; esc keeps it
+  w.feed(w.v.setup.groups[0].items[1].control.menu.act);
+  w.feed(w.v.setup.groups[0].items[1].control.menu.items[2].act);
+  eq(w.v.setup.groups[0].items[1].rename, { text: "engine", ph: "its name in bise, then ⏎" });
+  w.feed({ ev: "ui_set_rename_type", text: "game engine " });
+  w.key("Enter");
+  eq([w.cmds("project_rename"), w.v.setup.groups[0].items[1].label, w.v.setup.groups[0].items[1].rename], [[{ cmd: "project_rename", project: P.engine, name: "game engine" }], "game engine", null]);
+  w.feed(w.v.setup.groups[0].items[2].control.menu.act);
+  w.feed(w.v.setup.groups[0].items[2].control.menu.items[2].act);
+  w.key("Escape");
+  eq([w.cmds("project_rename").length, w.v.setup.groups[0].items[2].rename, w.v.setup.kind], [1, null, "settings"]);
   // remove: asks, esc keeps it
   w.feed(w.v.setup.groups[0].items[3].control.menu.act);
-  w.feed(w.v.setup.groups[0].items[3].control.menu.items[3].act);
+  w.feed(w.v.setup.groups[0].items[3].control.menu.items[4].act);
   eq([w.v.setup.confirm.text, w.v.setup.confirm.keys, w.v.setup.confirm.yes.text, w.v.setup.confirm.no.text],
     ["remove evals from bise? its folder and its git history stay.", "⏎ remove · esc keep", "remove", "keep"]);
   w.key("Escape");
@@ -202,7 +214,7 @@ law("settings › projects: a drag handle orders ⌘1-9; '…' opens it in Termi
   w.feed({ ev: "ui_set_confirm", project: P.evals });
   w.key("Enter");
   eq(w.cmds("project_remove"), [{ cmd: "project_remove", project: P.evals }]);
-  eq(w.v.side.rows.filter((r) => r.kind === "pj").map((r) => r.name), ["storefront", "engine", "telemetry"]);
+  eq(w.v.side.rows.filter((r) => r.kind === "pj").map((r) => r.name), ["storefront", "game engine", "telemetry"]);
   w.feed(w.v.setup.add.act);
   assert.ok(w.v.sheet);
 });

@@ -69,6 +69,12 @@
         C.PROJECTS.forEach((p, n) => { p.order = n; });
         return [[200, C.projectsEv()], [220, foundEv(C)]];
       }
+      case "project_rename": {
+        const p = C.PROJECTS.find((q) => q.project === cmd.project);
+        if (!p) return [];
+        p.name = cmd.name;
+        return [[100, C.projectsEv()]];
+      }
       case "project_move": {
         const i = C.PROJECTS.findIndex((p) => p.project === cmd.project);
         if (i < 1) return [];

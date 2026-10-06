@@ -47,7 +47,9 @@
       const el = act(h("div", "b-gi",
         it.drag ? handle(it.drag) : null,
         it.check ? UI.check.render(it.check) : null,
-        h("span", "l", it.label, it.sub ? h("span", null, it.sub) : null),
+        // a project being renamed: its name becomes a field (⏎ saves, esc keeps it)
+        it.rename ? h("span", "l", field("w-renamefield", it.rename, "text", "w-renamein"), it.sub ? h("span", null, it.sub) : null)
+          : h("span", "l", it.label, it.sub ? h("span", null, it.sub) : null),
         it.key ? UI.kbd.render({ text: it.key }) : null,
         control(it.control)), it.act);
       if (it.drag) el.setAttribute("data-order", String(it.drag.order));
@@ -55,10 +57,10 @@
     }
     const group = (g) => h("div", null, g.title ? h("div", "b-gt", g.title) : null, h("div", "b-group", (g.items || []).map(item)));
     // a text field with the DS field's look: the API key (password) or the sheet's path
-    function field(cls, k, type) {
+    function field(cls, k, type, inCls) {
       const box = h("div", ["b-field", "is-focus", cls]);
       const input = doc.createElement("input");
-      input.className = type === "password" ? "w-keyin" : "w-pathin";
+      input.className = inCls || (type === "password" ? "w-keyin" : "w-pathin");
       input.type = type;
       input.placeholder = k.ph;
       input.value = k.text || "";
