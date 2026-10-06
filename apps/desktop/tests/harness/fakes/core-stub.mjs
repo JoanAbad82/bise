@@ -24,4 +24,5 @@ const start = world === 'none' ? []
   : world ? jsonl(world)
   : [...jsonl(path.join(FIXTURES, 'core_ev.jsonl')), ...jsonl(path.join(FIXTURES, 'hub_ev.jsonl'))];
 
-runStub({ start, sock: process.env.BISE_HARNESS_CORE_SOCK, log: process.env.BISE_HARNESS_CORE_LOG });
+// BISE_HARNESS_CORE_HOLD=1: the start world waits for the test's {"harness":"start"} (stub-lib.mjs)
+runStub({ start, sock: process.env.BISE_HARNESS_CORE_SOCK, log: process.env.BISE_HARNESS_CORE_LOG, hold: process.env.BISE_HARNESS_CORE_HOLD === '1' });

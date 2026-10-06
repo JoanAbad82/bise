@@ -27,15 +27,26 @@ function lines(on) {
   };
 }
 
-export function runStub({ start = [], sock, log, quitCmd }) {
+/**
+ * hold: keep the start lines until the test asks for them with the control line
+ * {"harness":"start"} on the socket (FakeCore does, once the main window has loaded: the app's
+ * main forwards core events to the windows open at that moment and keeps none for later, so a
+ * world sent at spawn was lost when the window loaded after it, amb-win m_9694).
+ */
+export function runStub({ start = [], sock, log, quitCmd, hold = false }) {
   const out = (line) => process.stdout.write(line + NL);
-  for (const l of start) out(typeof l === 'string' ? l : JSON.stringify(l));
+  const emitStart = () => { for (const l of start) out(typeof l === 'string' ? l : JSON.stringify(l)); };
+  if (!hold) emitStart();
+  const relay = (line) => {
+    if (line === '{"harness":"start"}') emitStart();
+    else out(line);
+  };
   let server;
   if (sock) {
     rmSync(sock, { force: true });
     server = net.createServer((c) => {
       c.setEncoding('utf8');
-      const s = lines(out);
+      const s = lines(relay);
       c.on('data', (d) => s.push(d));
       c.on('end', () => s.end());
     });

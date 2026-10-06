@@ -137,6 +137,7 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
     watch = new Watch(pid ?? -1, (why) => { stopped = why; killTree(pid); });
     await installGuards(app);
     const page = await mainWindow(app);
+    if (o.core) await o.core.start();
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     const proof = await prove(app, watch);

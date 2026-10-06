@@ -29,10 +29,14 @@ class Stub<Ev, Cmd> {
 
   /** Sends events as the stubbed process (each becomes one line on its stdout). */
   async send(...evs: Ev[]): Promise<void> {
+    await this.raw(evs.map((e) => JSON.stringify(e)));
+  }
+
+  protected async raw(lines: string[]): Promise<void> {
     for (let i = 0; i < 50 && !existsSync(this.sock); i++) await sleep(100);
     await new Promise<void>((resolve, reject) => {
       const c = net.createConnection(this.sock, () => {
-        c.end(evs.map((e) => JSON.stringify(e)).join(NL) + NL, () => { resolve(); });
+        c.end(lines.join(NL) + NL, () => { resolve(); });
       });
       c.on('error', reject);
     });
@@ -87,12 +91,22 @@ export class FakeCore extends Stub<CoreEv | HubEv, AppCmd | HubCmd> {
     }
   }
 
+  /**
+   * Sends the start world. launchDesktop calls it once the main window has loaded: the app's main
+   * forwards core events only to the windows open at that moment, so a world written at the
+   * core's spawn was lost when the window loaded after it (amb-win m_9694; told amb-core).
+   */
+  async start(): Promise<void> {
+    await this.raw(['{"harness":"start"}']);
+  }
+
   env(): Record<string, string> {
     return {
       BISE_DESKTOP_BISE: this.stub,
       BISE_DESKTOP_WORKSPACE: '',
       BISE_HARNESS_CORE_SOCK: this.sock,
       BISE_HARNESS_CORE_LOG: this.log,
+      BISE_HARNESS_CORE_HOLD: '1',
       ...(this.world ? { BISE_HARNESS_CORE_EVENTS: this.world } : {}),
     };
   }
