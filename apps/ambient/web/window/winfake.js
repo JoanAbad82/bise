@@ -182,6 +182,7 @@
     }
     // S7's worlds (amb-web's winfake7.js: worktrees, dev servers, diffs), when loaded
     if (root.AmbWinFake7) evs.push(...root.AmbWinFake7.boot());
+    if (root.AmbWinFake11) evs.push(...root.AmbWinFake11.boot());
     return evs;
   }
 
@@ -198,16 +199,25 @@
   // the world as it starts: respond() changes AGENTS and CARDS (an answer drops its card, a stop
   // idles its agent); reset() puts them back (check-win.mjs, between laws)
   const SAVED = JSON.stringify({ AGENTS, CARDS });
+  // the projects themselves stay the same objects (winfake7.js adds their git fields): a reset
+  // drops the ones added since and puts the first ones back in their order
+  const FIRST = PROJECTS.slice();
   let seq = 2000;
   function reset() {
+    if (root.AmbWinFake11) root.AmbWinFake11.reset();
     const o = JSON.parse(SAVED);
-    for (const k of Object.keys(AGENTS)) AGENTS[k] = o.AGENTS[k];
-    for (const k of Object.keys(CARDS)) CARDS[k] = o.CARDS[k];
+    for (const k of Object.keys(o.AGENTS)) AGENTS[k] = o.AGENTS[k];
+    for (const k of Object.keys(AGENTS)) if (!(k in o.AGENTS)) delete AGENTS[k];
+    for (const k of Object.keys(CARDS)) if (k in o.CARDS) CARDS[k] = o.CARDS[k]; else delete CARDS[k];
+    PROJECTS.splice(0, PROJECTS.length, ...FIRST);
+    FIRST.forEach((p, i) => { p.order = i; });
     seq = 2000;
   }
   function respond(cmd) {
     const s7 = root.AmbWinFake7 && root.AmbWinFake7.respond(cmd);
     if (s7) return s7;
+    const s11 = root.AmbWinFake11 && root.AmbWinFake11.respond(cmd, { PROJECTS, AGENTS, CARDS, projectsEv });
+    if (s11) return s11;
     const out = [];
     const { project, agent } = cmd;
     if (cmd.cmd === "subscribe" || cmd.cmd === "page") {

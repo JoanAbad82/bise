@@ -47,7 +47,7 @@
   function side(v) {
     const rows = v.side.rows.map((r) => (r.kind === "sh" ? { sh: r.text }
       : { kind: r.kind, name: r.name, sub: r.sub, dot: r.kind === "me" ? null : { state: r.dot }, end: r.end, needs: r.nd || r.end === "?", on: r.on, act: r.act }));
-    const el = UI.side.render({ rows, foot: { text: v.side.foot } });
+    const el = UI.side.render({ rows, foot: { text: v.side.foot, act: { ev: "ui_add_open" } } });
     el.querySelector(".b-lights").classList.add("w-drag");
     return pearlsIn(el, v.mood);
   }
@@ -193,12 +193,12 @@
   // ---- mount: the static frame, then regions redrawn when their HTML changes
   function mount(el, { post, recv: hook }) {
     el.innerHTML = `<div class="w-app b-ui"><aside class="w-side"></aside><main class="b-main w-main"><div class="w-head"></div><div class="w-jobs"></div>` +
-      `<div class="w-scroll"><div class="w-thread"></div></div><div class="w-find" hidden><div class="b-spot"><div class="in"><input class="tx w-findq" placeholder="find an agent or a project" spellcheck="false"></div><div class="w-findrows"></div></div></div><div class="b-composer w-composer"><div class="w-dock"></div><div class="w-quotes"></div><div class="div"></div>` +
+      `<div class="w-scroll"><div class="w-thread"></div></div><div class="w-full" hidden></div><div class="w-over" hidden></div><div class="w-find" hidden><div class="b-spot"><div class="in"><input class="tx w-findq" placeholder="find an agent or a project" spellcheck="false"></div><div class="w-findrows"></div></div></div><div class="b-composer w-composer"><div class="w-dock"></div><div class="w-quotes"></div><div class="div"></div>` +
       `<div class="box"><textarea class="in w-field" rows="1" spellcheck="false"></textarea><span class="send off" data-act='{"ev":"ui_send"}'>↑</span></div><div class="keys"></div></div></main><aside class="w-board b-board"></aside></div>`;
     const $ = (sel) => el.querySelector(sel);
     const R = { side: $(".w-side"), head: $(".w-head"), jobs: $(".w-jobs"), thread: $(".w-thread"), scroll: $(".w-scroll"), dock: $(".w-dock"), quotes: $(".w-quotes"),
       div: $(".w-composer .div"), field: $(".w-field"), box: $(".w-composer .box"), send: $(".w-composer .send"), keys: $(".w-composer .keys"), board: $(".w-board"), app: $(".w-app"),
-      find: $(".w-find"), findq: $(".w-findq"), findrows: $(".w-findrows") };
+      full: $(".w-full"), over: $(".w-over"), find: $(".w-find"), findq: $(".w-findq"), findrows: $(".w-findrows") };
     const api = {};
     let s = M.init(Date.now());
     if (root.AMB_WIN_TZ) s = { ...s, tz: root.AMB_WIN_TZ };
@@ -225,7 +225,16 @@
       put("side", side(v));
       put("head", head(v));
       put("jobs", jobs(v));
-      const routeKey = `${v.route.project}/${v.route.agent}`;
+      // the setup screens (S11): onboarding and settings take the whole window, the add sheet
+      // sits over it
+      const SC = root.AmbWinScreens && root.AmbWinScreens.make(UI);
+      R.full.hidden = !v.setup;
+      if (SC) put("full", v.setup ? (v.setup.kind === "onboarding" ? pearlsIn(SC.onboarding(v.setup), v.mood) : SC.settings(v.setup)) : null);
+      R.over.hidden = !v.sheet;
+      if (SC) put("over", v.sheet ? SC.sheet(v.sheet) : null);
+      const keyin = el.querySelector(".w-keyin");
+      if (keyin && doc.activeElement !== keyin) keyin.focus();
+      const routeKey = `${v.route.screen || ""}${v.route.project}/${v.route.agent}`;
       const atEnd = R.scroll.scrollHeight - R.scroll.scrollTop - R.scroll.clientHeight < 40;
       const changed = put("thread", v.s7 && root.AmbWinS7 ? root.AmbWinS7.draw(v.s7, UI) : v.tab ? tabList(v) : thread(v));
       // ⌘K's finder: shown over the window, its field takes the keys while it is open
@@ -272,8 +281,9 @@
       // a diff line: shift extends the selection; the header's segmented control names its tab
       if (ev.ev === "ui_line") ev.shift = e.shiftKey;
       if (ev.ev === "ui_tab_i") { ev.ev = "ui_tab"; ev.tab = ["thread", "changes", "artifacts"][ev.i]; }
+      if (ev.values && ev.i != null) { ev.value = ev.values[ev.i]; delete ev.values; delete ev.i; }
       feed(ev);
-      if (!e.target.closest("textarea") && R.find.hidden) R.field.focus();
+      if (!e.target.closest("textarea") && R.find.hidden && R.full.hidden && R.over.hidden) R.field.focus();
     });
     // a sentence selected in a message becomes a quote when he lets go
     el.addEventListener("mouseup", () => {
@@ -289,6 +299,8 @@
     });
     R.field.addEventListener("input", () => { feed({ ev: "ui_type", text: R.field.value }); });
     R.findq.addEventListener("input", () => { feed({ ev: "ui_find_type", text: R.findq.value }); });
+    // an API key's field (the setup screens) reports its words
+    el.addEventListener("input", (e) => { if (e.target.classList && e.target.classList.contains("w-keyin")) feed({ ev: "ui_key_type", text: e.target.value }); });
     R.find.addEventListener("mousedown", (e) => { if (e.target === R.find) feed({ ev: "ui_find_close" }); });
     R.scroll.addEventListener("scroll", () => { if (R.scroll.scrollTop < 20) feed({ ev: "ui_older" }); });
     // keys: e.code gives the digit under ⌥ (macOS turns ⌥1 into ¡)
@@ -340,12 +352,15 @@
     const queue = [];
     const post = (cmd) => { if (opts.log) opts.log(cmd); if (player) player.post(cmd); else queue.push(cmd); };
     const w = mount(el, { post, recv: opts.recv });
+    // #fresh: a first install (the onboarding's world: nothing signed in, nothing allowed)
+    if (/fresh/.test((root.location && root.location.hash) || "") && root.AmbWinFake11) root.AmbWinFake11.fresh();
     player = F.player((ev) => w.feed(ev));
     for (const c of queue.splice(0)) player.post(c);
     root.ambient = { recv: (ev) => w.feed(ev) };
     // a plain browser opens a screen from the address: #agent/storefront/search, #inbox, #light
     const hash = decodeURIComponent((root.location && root.location.hash) || "").slice(1);
     for (const part of hash.split("&").filter(Boolean)) {
+      if (part === "fresh") continue;
       if (part === "light" || part === "dark") w.feed({ ev: "win_theme", dark: part === "dark" });
       else w.feed({ ev: "win_open", route: part });
     }

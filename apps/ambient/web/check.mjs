@@ -1753,6 +1753,7 @@ law("panel: ⌘↑⌘↓ walk the bar's order in the same window; ⌘D follow, �
 
 // the desktop window's laws (window/check-win.mjs) run with the capsule's
 { const w = (await import("./window/check-win.mjs")).results(); pass += w.pass; fail += w.fail; }
+{ const w = (await import("./window/check-setup.mjs")).results(); pass += w.pass; fail += w.fail; }
 // and S7's screens (window/check-s7.mjs: review, artifacts, environments)
 { const w = (await import("./window/check-s7.mjs")).results(); pass += w.pass; fail += w.fail; }
 

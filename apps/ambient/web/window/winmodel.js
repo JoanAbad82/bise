@@ -46,13 +46,34 @@
     cmds.push({ cmd: "subscribe", project: r.project, agent: r.agent, limit: 60 });
     return set(s, "threads", set(s.threads, k, { entries: [], before: null, more: false, loading: true, typing: "" }));
   }
-  // S7's screens (amb-web: review, artifacts, environments) plug in as one extension object,
-  // root.AmbWinS7 = { init(), owns(ev), enter(s7, route, s), step(s7, ev, s), view(s), tab(s,
-  // project, tab), draw(d, UI) }: its state lives in s.s7, its events and cmds pass through here
+  // screens that plug in as extensions, each with its state under its own key: S7 (amb-web:
+  // review, artifacts, environments) as root.AmbWinS7 in s.s7, S11 (winsetup.js: onboarding,
+  // settings, the add-a-project sheet) as root.AmbWinS11 in s.s11. An extension is { init(),
+  // owns(ev), enter(x, route, s), step(x, ev, s) -> {x, cmds, route?, quote?, back?, eat?}, view(s),
+  // tab?(s, project, tab), draw?(d, UI), key?(x, ev, s), wantsKeys?(x, s) }
+  const EXTS = [["s7", "AmbWinS7", ["review", "artifacts", "environments"]], ["s11", "AmbWinS11", ["onboarding", "settings"]]];
   const S7 = () => root.AmbWinS7 || null;
-  const SCREENS = ["review", "artifacts", "environments"];
+  const SCREENS = EXTS.flatMap((e) => e[2]);
+  const extOf = (screen) => EXTS.find((e) => e[2].includes(screen) && root[e[1]]);
+  // an extension's result: its state back in place, its cmds, then a quote, a back or a route
+  function applyExt(s, key, r, cmds) {
+    let out = { ...s, [key]: r.s7 !== undefined ? r.s7 : r.s11 !== undefined ? r.s11 : r[key] };
+    cmds.push(...(r.cmds || []));
+    // a quote ❝ from S7's lines (review): {agent, pos, text, file, lines, n}, one per pos like ui_line
+    if (r.quote) { const k = keyOf(out.route); out = { ...out, quotes: set(out.quotes, k, [...(out.quotes[k] || []).filter((q) => q.pos !== r.quote.pos), r.quote]) }; }
+    if (r.back) out = back(out, cmds);
+    if (r.route) out = go(out, r.route, cmds);
+    return out;
+  }
+  function back(s, cmds) {
+    if (!s.back.length) return go(s, { project: HOME, agent: "main" }, cmds);
+    const r = s.back[s.back.length - 1];
+    return { ...go(s, r, cmds, { history: false }), back: s.back.slice(0, -1), fwd: [...s.fwd, s.route] };
+  }
+
   function titleOf(s, r) {
     if (r.screen === "review") return `review · ${r.agent} · ${D.pname(s, r.project)}`;
+    if (r.screen === "onboarding") return "welcome to bise";
     if (r.screen) return r.screen;
     if (r.project === HOME) return "bise";
     const p = D.pname(s, r.project);
@@ -63,8 +84,9 @@
     if (history) s = { ...s, back: [...s.back, s.route].slice(-50), fwd: [] };
     s = { ...s, route: r, inbox: null, sel: null, picked: null, finder: null };
     if (r.screen) {
-      const x = S7();
-      if (x && x.enter) { const e = x.enter(s.s7 || (x.init && x.init()), r, s); s = { ...s, s7: e.s7 }; cmds.push(...(e.cmds || [])); }
+      const e = extOf(r.screen);
+      const x = e && root[e[1]];
+      if (x && x.enter) { const out = x.enter(s[e[0]] || (x.init && x.init()), r, s); s = { ...s, [e[0]]: out[e[0]] !== undefined ? out[e[0]] : out.s7 }; cmds.push(...(out.cmds || [])); }
     } else s = needThread(s, r, cmds);
     cmds.push({ cmd: "win_title", text: titleOf(s, r), route: routeOf(r) });
     return s;
@@ -82,6 +104,7 @@
     if (parts[0] === "project" && proj(parts[1])) return { project: proj(parts[1]), agent: "main" };
     if (parts[0] === "agent" && proj(parts[1]) && parts[2]) return { project: proj(parts[1]), agent: parts[2] };
     if (parts[0] === "review" && proj(parts[1]) && parts[2]) return { screen: "review", project: proj(parts[1]), agent: parts[2] };
+    if (parts[0] === "settings") return { screen: "settings", project: HOME, agent: "main", ...(parts[1] ? { page: parts.slice(1).join("/") } : {}) };
     if (SCREENS.includes(parts[0]) && parts[0] !== "review") return { screen: parts[0], project: HOME, agent: "main" };
     return null;
   }
@@ -232,6 +255,7 @@
     }
     if (meta && lower === "i") return eat(s.inbox ? { ...s, inbox: null } : D.allCards(s).length ? { ...s, inbox: { i: 0 } } : s);
     if (meta && lower === "e") return eat({ ...s, all: !s.all, open: {} });
+    if (meta && ev.key === ",") return eat(go(s, { screen: "settings", project: HOME, agent: "main" }, cmds));
     // ⌘D the agent's review (S7), ⌘⇧A every artifact
     if (meta && lower === "d") return eat(s.route.project !== HOME && s.route.agent !== "main" ? go(s, { screen: "review", project: s.route.project, agent: s.route.agent }, cmds) : s);
     if (meta && ev.shift && lower === "a") return eat(go(s, { screen: "artifacts", project: HOME, agent: "main" }, cmds));
@@ -298,6 +322,7 @@
         return set(s, "threads", set(s.threads, k, { ...t, paging: true }));
       }
       case "ui_theme": return { ...s, theme: s.theme === "dark" ? "light" : "dark" };
+      case "ui_back": return back(s, cmds);
       case "ui_find_type": return s.finder ? { ...s, finder: { q: ev.text, i: 0 } } : s;
       case "ui_find_open": {
         const row = root.AmbWinFind.rows(s, s.finder ? s.finder.q : "")[ev.i];
@@ -310,17 +335,25 @@
 
   function step(s, ev) {
     const cmds = [];
-    const x = S7();
-    if (x && x.owns && x.owns(ev)) {
-      const r = x.step(s.s7 || (x.init && x.init()), ev, s);
-      let out = { ...s, s7: r.s7 };
-      cmds.push(...(r.cmds || []));
-      // a quote ❝ from S7's lines (review): {agent, pos, text, file, lines, n}, one per pos like ui_line
-      if (r.quote) { const k = keyOf(out.route); out = { ...out, quotes: set(out.quotes, k, [...(out.quotes[k] || []).filter((q) => q.pos !== r.quote.pos), r.quote]) }; }
-      if (r.route) out = go(out, r.route, cmds);
-      return { s: out, cmds, eat: !!r.eat };
+    for (const [key, name] of EXTS) {
+      const x = root[name];
+      if (x && x.owns && x.owns(ev)) {
+        const r = x.step(s[key] || (x.init && x.init()), ev, s);
+        return { s: applyExt(s, key, r, cmds), cmds, eat: !!r.eat };
+      }
     }
-    if (ev.ev === "ui_key") { const r = key(s, ev, cmds); return { s: r.s, cmds, eat: r.eat }; }
+    if (ev.ev === "ui_key") {
+      // an extension that holds the keys now (onboarding, settings, the add sheet) sees them first
+      for (const [key, name] of EXTS) {
+        const x = root[name];
+        if (x && x.wantsKeys && x.wantsKeys(s[key], s)) {
+          const r = x.key(s[key], ev, s);
+          if (r) return { s: applyExt(s, key, r, cmds), cmds, eat: !!r.eat };
+        }
+      }
+      const r = key(s, ev, cmds);
+      return { s: r.s, cmds, eat: r.eat };
+    }
     const out = ev.ev && ev.ev.startsWith("ui_") ? ui(s, ev, cmds) : core(s, ev, cmds);
     return { s: out, cmds, eat: false };
   }

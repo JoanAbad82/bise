@@ -272,14 +272,15 @@
     const x = root.AmbWinS7;
     if (!x) return null;
     const r = s.route;
-    if (r.screen) return x.view ? x.view(s) : null;
+    if (r.screen) return ["review", "artifacts", "environments"].includes(r.screen) && x.view ? x.view(s) : null;
     const t = r.project !== HOME && r.agent === "main" ? s.tab[r.project] || "thread" : "thread";
     return t !== "thread" && x.tab ? x.tab(s, r.project, t) : null;
   }
 
   function view(s) {
     const x = s7(s);
-    return { s7: x, finder: finder(s), tab: x ? null : tab(s), theme: s.theme, focused: s.focused, route: s.route, title: M.titleOf(s, s.route), mood: mood(s),
+    const S11 = root.AmbWinS11;
+    return { setup: S11 ? S11.view(s) : null, sheet: S11 ? S11.overlay(s) : null, s7: x, finder: finder(s), tab: x ? null : tab(s), theme: s.theme, focused: s.focused, route: s.route, title: M.titleOf(s, s.route), mood: mood(s),
       side: sidebar(s), head: x && x.head ? x.head : header(s), jobs: jobs(s), thread: thread(s), composer: composer(s), board: board(s), inbox: !!s.inbox };
   }
 
