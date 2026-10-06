@@ -5,6 +5,8 @@
 // picker, the strip, send on/off) changes on transitions only, never per keystroke.
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import { useExtensionDependency } from '@lexical/react/useExtensionComponent';
+import { HistoryExtension } from '@lexical/history';
 import {
   $createParagraphNode,
   $getRoot,
@@ -17,16 +19,20 @@ import {
   HISTORY_PUSH_TAG,
   KEY_ARROW_DOWN_COMMAND,
   KEY_ARROW_UP_COMMAND,
+  KEY_BACKSPACE_COMMAND,
+  KEY_DOWN_COMMAND,
   KEY_ENTER_COMMAND,
   KEY_ESCAPE_COMMAND,
   KEY_TAB_COMMAND,
   PASTE_COMMAND,
+  UNDO_COMMAND,
   type LexicalEditor,
   type SerializedLexicalNode,
 } from 'lexical';
 import { mergeRegister } from '@lexical/utils';
-import { $caretOffset, $insertAtCaret, $insertChip, $replaceBeforeCaret, $selectRange } from './edit';
-import { $caretOnFirstLine, $isBlank, $readSegments, $textBeforeCaret } from './read';
+import { $applyOp, $caretOffset, $insertAtCaret, $insertChip, $replaceBeforeCaret, $selectRange } from './edit';
+import { $caretOnFirstLine, $isBlank, $plainText, $readSegments, $textBeforeCaret } from './read';
+import { enterMakesNewline, indent, newline, outdentAtStart, subwordLeft, subwordRight, NO_UNDO, type Op } from './mdlive';
 import { buildMessage, chars, chipStrip, isLongPaste, nextChipNumber, preview, type Chip, type Outgoing, type Segment } from './message';
 import { enqueue, historyAt, load, popNewest, remember, save, takeOldest, type Saved, type Store } from './drafts';
 import { agentRows, argRows, commandLine, commandRows, completion, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
@@ -291,12 +297,19 @@ export function Brain(p: BrainProps): JSX.Element | null {
 
   // ---- the strip above the box: the chips and the queue, re-drawn only when they change ----
   const lastStrip = useRef('');
+  // one line the composer says to him (ctrl+z with nothing to undo), until his next edit
+  const note = useRef<string | null>(null);
   const pushStrip = (chips: readonly Chip[]): void => {
     const q = saved.current.queue;
-    const key = JSON.stringify([chips, q]);
+    const n = note.current;
+    const key = JSON.stringify([chips, q, n]);
     if (key === lastStrip.current) return;
     lastStrip.current = key;
-    props.current.onStrip(chips.length === 0 && q.length === 0 ? null : <Strip chips={chips} queued={q.map((e) => preview(buildMessage(segmentsOf(editor, e)).text, 48))} testId={props.current.testId} />);
+    props.current.onStrip(
+      chips.length === 0 && q.length === 0 && n === null ? null : (
+        <Strip chips={chips} queued={q.map((e) => preview(buildMessage(segmentsOf(editor, e)).text, 48))} note={n} testId={props.current.testId} />
+      ),
+    );
   };
   const chipsNow = (): Chip[] => editor.getEditorState().read(() => $readSegments().flatMap((x) => (x.kind === 'chip' ? [x.chip] : [])));
 
@@ -312,8 +325,10 @@ export function Brain(p: BrainProps): JSX.Element | null {
         lastTrigger = k;
         setTrigger(t);
       }
+      const edited = dirtyElements.size > 0 || dirtyLeaves.size > 0;
+      if (edited) note.current = null;
       pushStrip(r.segs.flatMap((x) => (x.kind === 'chip' ? [x.chip] : [])));
-      if (dirtyElements.size > 0 || dirtyLeaves.size > 0) {
+      if (edited) {
         if (timer.current !== null) window.clearTimeout(timer.current);
         timer.current = window.setTimeout(writeNow, DRAFT_DEBOUNCE_MS);
       }
@@ -322,9 +337,71 @@ export function Brain(p: BrainProps): JSX.Element | null {
   }, [editor]);
 
   // ---- the keys ----
+  const history = useExtensionDependency(HistoryExtension).output;
   useEffect(() => {
     const blank = (): boolean => editor.getEditorState().read(() => $isBlank());
+    /** The field's text and a collapsed caret's offset in it, or null (a selection, no caret). */
+    const at = (): { text: string; caret: number } | null =>
+      editor.getEditorState().read(() => {
+        const sel = $getSelection();
+        if (!$isRangeSelection(sel) || !sel.isCollapsed()) return null;
+        const caret = $caretOffset();
+        return caret === null ? null : { text: $plainText(), caret };
+      });
+    /** Run a markdown key's edit when it has one; true when it did. */
+    const run = (e: KeyboardEvent | null, make: (text: string, caret: number) => Op | null): boolean => {
+      const a = at();
+      const op = a === null ? null : make(a.text, a.caret);
+      if (op === null) return false;
+      e?.preventDefault();
+      editor.update(() => {
+        $applyOp(op);
+      });
+      return true;
+    };
+    const say = (text: string): void => {
+      note.current = text;
+      pushStrip(chipsNow());
+    };
     return mergeRegister(
+      // ctrl+⌥←/→ subword moves, ctrl+⌥⌫/⌦ subword deletes (editor.rs); ctrl+z / ⌘Z with nothing
+      // left to undo says so (sb.rs NO_UNDO) instead of doing nothing
+      editor.registerCommand(
+        KEY_DOWN_COMMAND,
+        (e) => {
+          if (e.isComposing) return false;
+          const k = e.key;
+          if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && k.toLowerCase() === 'z') {
+            if (history.canUndo.peek()) {
+              if (!e.ctrlKey) return false; // ⌘Z: the history's own key
+              e.preventDefault();
+              editor.dispatchCommand(UNDO_COMMAND, undefined);
+              return true;
+            }
+            e.preventDefault();
+            say(NO_UNDO);
+            return true;
+          }
+          if (!(e.ctrlKey && e.altKey) || e.metaKey) return false;
+          if (k !== 'ArrowLeft' && k !== 'ArrowRight' && k !== 'Backspace' && k !== 'Delete') return false;
+          const a = at();
+          if (a === null) return false;
+          e.preventDefault();
+          const left = k === 'ArrowLeft' || k === 'Backspace';
+          const to = left ? subwordLeft(a.text, a.caret) : subwordRight(a.text, a.caret);
+          editor.update(() => {
+            if (k === 'ArrowLeft' || k === 'ArrowRight') $selectRange(to, to);
+            else $applyOp({ from: Math.min(to, a.caret), to: Math.max(to, a.caret), insert: '', caret: Math.min(to, a.caret) });
+          });
+          return true;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
+      editor.registerCommand(
+        KEY_BACKSPACE_COMMAND,
+        (e) => (e.altKey || e.metaKey || e.ctrlKey ? false : run(e, outdentAtStart)),
+        COMMAND_PRIORITY_HIGH,
+      ),
       editor.registerCommand(
         KEY_ENTER_COMMAND,
         (e) => {
@@ -336,7 +413,10 @@ export function Brain(p: BrainProps): JSX.Element | null {
             if (row !== undefined && !row.off) apply(row.pick);
             return true;
           }
-          if (e?.shiftKey === true) return false; // a new line
+          // ⇧⏎ a new line, a list item continued; ⏎ in a ``` block a new line too (mdlive.rs)
+          if (e?.shiftKey === true) return run(e, newline);
+          const a = at();
+          if (a !== null && enterMakesNewline(a.text, a.caret)) return run(e, newline);
           e?.preventDefault();
           submit();
           return true;
@@ -353,6 +433,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
             if (row !== undefined && !row.off) apply(completion(row));
             return true;
           }
+          if (!e.shiftKey && run(e, indent)) return true; // a list item one level in
           if (props.current.busy && !blank()) {
             e.preventDefault();
             queue();
@@ -368,6 +449,12 @@ export function Brain(p: BrainProps): JSX.Element | null {
           const l = live.current;
           if (l.open && l.trigger !== null) {
             e.preventDefault();
+            if (l.trigger.kind === 'slash') {
+              // the / popup: esc clears the /query (the TUI's), the @ and $ popups keep his text
+              clear();
+              writeNow();
+              return true;
+            }
             setDismissed(`${l.trigger.kind}:${l.trigger.start}`);
             return true;
           }
@@ -550,9 +637,14 @@ async function thumbnail(f: File, side = 48): Promise<string | null> {
 }
 
 /** Above the box: the chips' strip (`▤ 1 “first words…”  240 lines · 9.8 kB`) and the queue. */
-function Strip({ chips, queued, testId }: { chips: readonly Chip[]; queued: readonly string[]; testId: string }): JSX.Element {
+function Strip({ chips, queued, note, testId }: { chips: readonly Chip[]; queued: readonly string[]; note: string | null; testId: string }): JSX.Element {
   return (
     <div className="b-composer-strip" data-testid={`${testId}.strip`}>
+      {note !== null && (
+        <div className="n" data-testid={`${testId}.note`}>
+          {note}
+        </div>
+      )}
       {queued.map((q, i) => (
         <div key={`q${i}`} className="q" data-testid={`${testId}.queued.${i + 1}`}>
           {q}

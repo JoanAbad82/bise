@@ -8,6 +8,7 @@
 .b-composer .b-chip.image .thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; margin-right: 5px; }
 .b-composer-strip { display: flex; flex-direction: column; gap: 2px; padding: 0 4px 6px; font: var(--t-12) var(--font-mono); color: var(--c-text-3); }
 .b-composer-strip .k { margin-left: 10px; }
+.b-composer-strip .n { color: var(--c-text-2); }
 .b-composer-pick { position: absolute; left: 22px; bottom: calc(100% - 6px); z-index: 10; max-height: 280px; overflow-y: auto; }
 .b-composer-pick .b-menu { width: min(520px, 90vw); }
 .b-composer-pick .b-mi .k { overflow: hidden; text-overflow: ellipsis; max-width: 60%; }

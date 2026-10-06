@@ -78,3 +78,14 @@ export function $caretOnFirstLine(): boolean {
   }
   return true;
 }
+
+/** The first paragraph as plain text with the caret's offset in it (mdlive.ts reads this): a line
+ * break is '\n', a chip one U+FFFC; the same offsets as edit.ts's $caretOffset / $selectRange. */
+export function $plainText(): string {
+  const para = $getRoot().getFirstChild();
+  if (!$isElementNode(para)) return '';
+  return para
+    .getChildren()
+    .map((c) => ($isChipNode(c) ? '\uFFFC' : $isLineBreakNode(c) ? '\n' : $isTextNode(c) ? c.getTextContent() : '\uFFFC'))
+    .join('');
+}

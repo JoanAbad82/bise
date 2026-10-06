@@ -4,6 +4,7 @@ import { argAt, filePick, prefixFirst, triggerAt } from './tokens';
 import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Segment } from './message';
 import { enqueue, load, popNewest, remember, save, takeOldest, HISTORY_MAX, type Store } from './drafts';
 import { argRows, commandLine, commandRows, completion, move } from './pick';
+import { enterMakesNewline, indent, item, newline, outdentAtStart, subwordLeft, subwordRight, type Op } from './mdlive';
 
 const memStore = (): Store & { m: Map<string, string> } => {
   const m = new Map<string, string>();
@@ -130,5 +131,48 @@ describe('the / list', () => {
     expect(commandLine('/model opus ', cmds)).toEqual({ name: '/model', args: 'opus', ready: true });
     expect(commandLine('/usr/bin is odd', cmds)).toBeNull();
     expect(move(0, -1, 3)).toBe(2);
+  });
+});
+
+const applied = (text: string, op: Op | null): [string, number] | null =>
+  op === null ? null : [text.slice(0, op.from) + op.insert + text.slice(op.to), op.caret];
+
+describe('live markdown keys (mdlive.rs)', () => {
+  it('⏎ in a ``` block is a newline that keeps the indentation; outside it sends', () => {
+    const t = '```\n  let x = 1';
+    expect(enterMakesNewline(t, t.length)).toBe(true);
+    expect(applied(t, newline(t, t.length))).toEqual(['```\n  let x = 1\n  ', t.length + 3]);
+    expect(enterMakesNewline('```\nx\n```', 9)).toBe(false);
+    expect(enterMakesNewline('plain', 5)).toBe(false);
+  });
+  it('⇧⏎ continues a list, numbers count up, a checkbox comes back empty', () => {
+    expect(applied('- one', newline('- one', 5))).toEqual(['- one\n- ', 8]);
+    expect(applied('3. three', newline('3. three', 8))?.[0]).toBe('3. three\n4. ');
+    expect(applied('- [x] done', newline('- [x] done', 10))?.[0]).toBe('- [x] done\n- [ ] ');
+    expect(newline('just words', 10)).toBeNull();
+  });
+  it('an empty item steps out a level, or ends the list at the top', () => {
+    expect(applied('- a\n  - ', newline('- a\n  - ', 8))?.[0]).toBe('- a\n- ');
+    expect(applied('- a\n- ', newline('- a\n- ', 6))).toEqual(['- a\n', 4]);
+  });
+  it('tab indents an item by its marker width; backspace at its text start outdents, then drops the bullet', () => {
+    expect(applied('- a\n- b', indent('- a\n- b', 7))).toEqual(['- a\n  - b', 9]);
+    expect(applied('1. a\n1. b', indent('1. a\n1. b', 9))?.[0]).toBe('1. a\n   1. b');
+    expect(indent('no list', 3)).toBeNull();
+    expect(applied('- a\n  - b', outdentAtStart('- a\n  - b', 8))).toEqual(['- a\n- b', 6]);
+    expect(applied('- b', outdentAtStart('- b', 2))).toEqual(['b', 0]);
+    expect(outdentAtStart('- b', 3)).toBeNull();
+    expect(item('* [ ] x')).toMatchObject({ indent: 0, bullet: '*', check: false, content: 6 });
+  });
+  it('subword moves stop at camelCase, snake_case, digits', () => {
+    const t = 'parseHTTPHeader_v2';
+    expect(subwordLeft(t, t.length)).toBe(17);
+    expect(subwordLeft(t, 17)).toBe(16);
+    expect(subwordLeft(t, 16)).toBe(9);
+    expect(subwordLeft(t, 9)).toBe(5);
+    expect(subwordLeft(t, 5)).toBe(0);
+    expect(subwordRight(t, 0)).toBe(5);
+    expect(subwordRight(t, 5)).toBe(9);
+    expect(subwordRight(t, 9)).toBe(15);
   });
 });

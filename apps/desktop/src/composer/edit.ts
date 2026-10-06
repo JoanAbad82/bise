@@ -122,3 +122,14 @@ export function $selectRange(from: number, to: number): boolean {
 
 /** Whether a node is a line break (the composer's newline). */
 export const $isNewline = (n: LexicalNode | null): boolean => $isLineBreakNode(n);
+
+/** Apply a markdown key's edit (mdlive.ts Op): replace [from, to) by its text, the caret after. */
+export function $applyOp(op: { from: number; to: number; insert: string; caret: number }): boolean {
+  if (!$selectRange(op.from, op.to)) return false;
+  const sel = $getSelection();
+  if (!$isRangeSelection(sel)) return false;
+  if (!sel.isCollapsed()) sel.removeText();
+  if (op.insert !== '') sel.insertNodes(textNodes(op.insert));
+  $selectRange(op.caret, op.caret);
+  return true;
+}
