@@ -58,5 +58,6 @@ pub mod tools_env;
 pub mod transcript;
 pub mod trunk;
 pub mod util;
+pub mod view;
 pub mod wire;
 pub mod worktree;

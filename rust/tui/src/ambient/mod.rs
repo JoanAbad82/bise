@@ -14,6 +14,8 @@ mod core;
 mod fake;
 mod hub;
 mod plain;
+/// the projects' holds and sidebar rows (bise desktop S1), wired by S3b
+pub mod projects;
 mod speech;
 #[cfg(test)]
 mod tests;
