@@ -34,6 +34,7 @@
   bar.style.left = Bar.BOX.left + "px"; bar.style.top = Bar.BOX.top + "px";
   // the typed line: one field, kept across draws (its focus, its caret)
   const input = Object.assign(document.createElement("input"), { type: "text", spellcheck: false, autocomplete: "off", className: "qin" });
+  let fieldOpen = false;   // the field shows (a typed pane): its text is reset on each open and close
   input.dataset.qa = "field";
   glass.dataset.qa = "glass";
   const pearl = AmbPearl.create(pearlCv);
@@ -193,10 +194,17 @@
       if (slot) slot.appendChild(input);
       last.words = null;
     }) && h && h.input) setTimeout(() => input.focus(), 0);
+    // the field: a fresh open takes the model's text (empty after a close), its caret at the end;
+    // a close empties it, so nothing typed before comes back on the next open (the user's bug:
+    // 'plan the offsiteplan the offsite…' after five reopenings, lead m_8094 (2))
     if (h && h.input) {
-      if (input.value !== h.input.text && document.activeElement !== input) input.value = h.input.text;
+      if (!fieldOpen) { fieldOpen = true; input.value = h.input.text; input.setSelectionRange(input.value.length, input.value.length); }
+      else if (input.value !== h.input.text && document.activeElement !== input) input.value = h.input.text;
       if (input.placeholder !== h.input.ph) { input.placeholder = h.input.ph; input.setAttribute("aria-label", h.input.ph); }
-    } else if (document.activeElement === input) input.blur();
+    } else {
+      if (fieldOpen) { fieldOpen = false; input.value = ""; }
+      if (document.activeElement === input) input.blur();
+    }
     const w = h && h.line && h.line.words;
     put("words", JSON.stringify(w && [w.list, w.code, w.lit]), () => {
       const q = $(".q", el.head), qi = q && $(".qi", q);
@@ -378,15 +386,21 @@
   input.addEventListener("input", () => recv({ ev: "ui_spot_type", text: input.value }));
   input.addEventListener("keydown", (e) => {
     const s = lastS, finding = !!(s && s.preview !== undefined);
-    // round 10's finder: ↑↓ move (the preview follows), ⏎ runs the selected row (an agent: its
-    // panel; nothing matches: ask main), ⌘⏎ always asks main, ⌘O terminal, ⌘D follow
-    if (finding && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
-      e.preventDefault(); recv({ ev: "app_key", key: e.key === "ArrowUp" ? "up" : "down", local: true, n: Bar.selectable(s).length });
+    const rows = s ? Bar.selectable(s).length : 0;
+    // ↑ in an empty field on the first row: his last message comes back to edit (SPEC §4)
+    if (e.key === "ArrowUp" && !input.value.trim() && !(model.rowSel > 0) && model.lastSent) {
+      e.preventDefault(); recv({ ev: "ui_spot_last" }); input.value = model.spotText;
+      input.setSelectionRange(input.value.length, input.value.length); recv({ ev: "ui_spot_type", text: input.value });
+    // round 10's finder and the spotlight's rows: ↑↓ move (the preview follows; ↓ reaches 'start an
+    // agent'), ⏎ runs the selected row (an agent: its panel; nothing matches: ask main), ⌘⏎ always
+    // asks main, ⌘O terminal, ⌘D follow
+    } else if ((finding || rows > 1) && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      e.preventDefault(); recv({ ev: "app_key", key: e.key === "ArrowUp" ? "up" : "down", local: true, n: rows });
     } else if (finding && e.metaKey && /^[od]$/i.test(e.key)) {
       e.preventDefault();
       const it = s.foot.left.find((x) => x.keys[0] === "⌘" && x.keys[1] === e.key.toUpperCase());
       if (it) run(it.act);
-    } else if (finding && e.key === "Enter" && !e.isComposing && !e.metaKey) {
+    } else if ((finding || rows > 1) && e.key === "Enter" && !e.isComposing && !e.metaKey) {
       e.preventDefault();
       const r = Bar.selRow(s);
       if (r) run(r.act); else if (input.value.trim()) recv({ ev: "ui_spot_send", text: input.value });

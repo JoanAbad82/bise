@@ -28,6 +28,9 @@
     return { left, right: [item(["fn"], B.sayIt, null, B.orHold)] };
   }
 
+  // a path under his home, as ~/…
+  const home = (p) => String(p).replace(/^\/Users\/[^/]+(?=\/|$)/, "~");
+
   // the line a key's answer, a flash or an error says, its glyph colored by what it is
   const GC = { "✓": "ok", "▲": "risk", "?": "a" };
   const lineOf = (v) => ({ text: v.text, glyph: v.glyph || null, gc: GC[v.glyph] || null, size: "big" });
@@ -159,11 +162,12 @@
         const t = v.spot.text.trim();
         s.head = { h: 68, input: { text: v.spot.text, ph: B.typeHint } };
         if (t) s.sections = [{ rows: [
-          { g: "@", gc: "a", t: B.askMain(t), right: { keys: ["⌘", "⏎"] }, sel: true, act: { ev: "ui_spot_send", text: v.spot.text }, qa: "ask-main" },
+          { g: "@", gc: "a", t: B.askMain(t), right: { keys: ["⌘", "⏎"] }, act: { ev: "ui_spot_send", text: v.spot.text }, qa: "ask-main" },
           { g: "+", t: B.startAgent(t), right: { keys: ["tab"] }, act: { ev: "ui_spot_tab", text: v.spot.text }, qa: "start-agent" },
         ] }];
         s.foot = { left: [item(["⏎"], B.sendMain), ...(t ? [item(["tab"], B.startAgentKey)] : [])], right: [item(["esc"], B.close, { ev: "ui_close" })] };
-        return s;
+        // ↓ moves to 'start an agent', ⏎ runs the selected row (SPEC §4, lead m_8094)
+        return t ? markSel(s, v.rowSel) : s;
       }
       case "agents": case "inbox": {
         const full = v.state === "agents";
@@ -198,7 +202,9 @@
         s.text = { s: B.offlineText, dim: true };
         s.sections = [{ rows: [
           { g: "↻", t: B.tryAgain, sub: B.checks, right: { keys: ["⏎"] }, act: { ev: "ui_retry" }, qa: "retry" },
-          { g: "›_", t: B.terminal, sub: B.runs, right: { keys: ["⌘", "⏎"] }, act: { ev: "ui_terminal" }, qa: "terminal" },
+          // the bise the app runs, by its path (amb-mac m_8082: app_bise; null: none found, no row)
+          ...(v.offline.bise === null ? [] : [{ g: "›_", t: v.offline.bise ? B.terminalAt(home(v.offline.bise)) : B.terminal,
+            sub: v.offline.bise ? B.runsAt(home(v.offline.bise)) : B.runs, right: { keys: ["⌘", "⏎"] }, act: { ev: "ui_terminal" }, qa: "terminal" }]),
           ...(v.offline.text ? [{ g: "⧉", t: B.copySaid, right: { keys: ["⌘", "C"] }, act: { ev: "ui_copy", text: v.offline.text }, qa: "copy-said" }] : []),
         ] }];
         s.foot = { left: [item(["⏎"], B.tryAgain, { ev: "ui_retry" })], right: [item(["esc"], B.close, key("esc"))] };

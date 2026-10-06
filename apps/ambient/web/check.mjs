@@ -1470,6 +1470,85 @@ law("round 10: ⌘D follows the selected agent (again to stop), ⌘O opens it in
   eq(Bar.spec(M.view(M.step(M.init(), { ev: "app_key", key: "a" }, 0).m, 10)).text, { s: "no agents yet. type what you want done, tab starts one.", dim: true });
 });
 
+// ---- the user's bugs, web side (lead m_8094)
+const talked = (m, t, text = "") => {
+  m = M.step(m, { ev: "app_fn", state: "down" }, t).m;
+  if (text) m = M.step(m, { ev: "heard", text, final: false }, t + 100).m;
+  return M.step(m, { ev: "app_fn", state: "up" }, t + 500).m;
+};
+law("bug 2/4: a talk the core heard nothing in never ends in 'can't reach bise': an empty final heard, or idle/cancelled without 'sent', says 'i didn't hear anything.' and drops it; any word from the core keeps it off the offline view; a new talk clears a stale one", () => {
+  const up = M.step(M.init(), { ev: "hub", up: true }, 0).m;
+  // the core's final heard is empty
+  let m = M.step(talked(up, 100), { ev: "heard", text: "", final: true }, 900).m;
+  let v = M.view(m, 900);
+  eq([v.text, m.pending, v.mine], ["i didn't hear anything.", null, undefined]);
+  assert.notEqual(M.view(m, 6000).state, "offline");
+  // idle (or cancelled) without 'sent'
+  for (const phase of ["idle", "cancelled"]) {
+    m = M.step(talked(up, 100, "hello"), { ev: "phase", phase }, 900).m;
+    eq([M.view(m, 950).text, m.pending, M.view(m, 6000).state !== "offline"], ["i didn't hear anything.", null, true]);
+  }
+  // the core is there (sending, working) but 'sent' never came: no 'can't reach' either
+  m = M.step(talked(up, 100, "hello"), { ev: "phase", phase: "sending" }, 900).m;
+  assert.notEqual(M.view(m, 6000).state, "offline");
+  // nothing at all from the core for 3 s: can't reach bise, as before
+  m = talked(up, 100, "hello");
+  assert.equal(M.view(m, 3700).state, "offline");
+  // the next talk never carries it
+  m = M.step(m, { ev: "app_fn", state: "down" }, 4000).m;
+  eq([m.pending, M.view(m, 8000).state === "offline"], [null, false]);
+});
+law("spotlight (bug, lead m_8094 (2)): a close (esc or send) empties the field; ↑ in an empty field edits the last message; with text, ↓ moves to 'start an agent' and ⏎ runs it", () => {
+  let m = M.step(M.init(), { ev: "app_key", key: "space" }, 0).m;
+  m = M.step(m, { ev: "ui_spot_type", text: "plan the offsite" }, 10).m;
+  m = M.step(m, { ev: "app_key", key: "esc", local: true }, 20).m;
+  for (let i = 0; i < 5; i++) m = M.step(M.step(m, { ev: "app_key", key: "space" }, 30 + i).m, { ev: "app_key", key: "esc", local: true }, 31 + i).m;
+  m = M.step(m, { ev: "app_key", key: "space" }, 50).m;
+  eq([m.spotText, Bar.spec(M.view(m, 60)).head.input.text], ["", ""]);
+  m = M.step(m, { ev: "ui_spot_type", text: "plan the offsite" }, 70).m;
+  const r = M.step(m, { ev: "ui_spot_send" }, 80);
+  eq([r.m.spotText, r.m.lastSent], ["", "plan the offsite"]);
+  m = M.step(r.m, { ev: "app_key", key: "space" }, 90).m;
+  eq(M.view(m, 95).spot.text, "");
+  m = M.step(m, { ev: "ui_spot_last" }, 100).m;
+  eq(M.view(m, 110).spot.text, "plan the offsite");
+  let s = Bar.spec(M.view(m, 110));
+  eq(Bar.selRow(s).qa, "ask-main");
+  m = M.step(m, { ev: "app_key", key: "down", local: true, n: Bar.selectable(s).length }, 120).m;
+  s = Bar.spec(M.view(m, 130));
+  eq(Bar.selRow(s).act, { ev: "ui_spot_tab", text: "plan the offsite" });
+  // a said message is the last one too
+  m = M.step(talked(M.init(), 200, "book the train"), { ev: "sent", voice: true }, 900).m;
+  assert.equal(m.lastSent, "book the train");
+});
+law("hints (lead m_8094 (3)): one source for which keys a pushed card shows: plain keys only when the app gave the panel the keys for that card; a card pushed later, or a hidden bar, shows fn chords", () => {
+  const card = { id: "c9", kind: "question", agent: "cookies", text: "keep it?", options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }] };
+  let m = M.step(M.init(), { ev: "state", agents: Fake.AGENTS, cards: [] }, 0).m;
+  // he had the spotlight (the keys), closed it; the app still says focused; then a card is pushed
+  m = M.step(M.step(m, { ev: "app_key", key: "space" }, 10).m, { ev: "app_focused", on: true }, 20).m;
+  m = M.step(m, { ev: "app_key", key: "esc", local: true }, 30).m;
+  m = M.step(m, { ev: "state", agents: Fake.AGENTS, cards: [card] }, 40).m;
+  let v = M.view(m, 50);
+  eq([v.state, v.focused], ["needs", false]);
+  const keys = (s) => s.foot.left.map((i) => i.keys.join(" "));
+  eq(keys(Bar.spec(v)), ["fn 1 – 2", "fn esc"]);
+  // he clicked it: the app gives the keys for this card: plain keys
+  m = M.step(m, { ev: "app_focused", on: true }, 60).m;
+  v = M.view(m, 70);
+  eq([v.focused, keys(Bar.spec(v))], [true, ["1 – 2", "↑ ↓", "esc"]]);
+  // hidden: no keys reach it
+  m = M.step(m, { ev: "app_hidden", on: true }, 80).m;
+  assert.equal(M.view(m, 90).focused, false);
+});
+law("can't reach bise names the bise the app runs (amb-mac m_8082: app_bise {path}); none found: no terminal row", () => {
+  let m = M.init(); for (const [t, ev] of sceneEvents("offline")) m = M.step(m, ev, t).m;
+  const term = (mm) => Bar.spec(M.view(mm, 3800)).sections[0].rows.find((r) => r.qa === "terminal");
+  eq([term(m).t, term(m).sub], ["start bise in a terminal", "runs: bise"]);
+  const at = M.step(m, { ev: "app_bise", path: "/Users/gabriel/.local/bin/bise" }, 3700).m;
+  eq([term(at).t, term(at).sub], ["start ~/.local/bin/bise in a terminal", "runs: ~/.local/bin/bise"]);
+  assert.equal(term(M.step(m, { ev: "app_bise", path: null }, 3700).m), undefined);
+});
+
 // ---- round 10's side panel (panelmodel.js; amb-mac m_7040/m_7042, amb-core m_7030/m_7043)
 const PN = (agent = "perf") => {
   let m = Pn.init();

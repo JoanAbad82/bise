@@ -55,6 +55,9 @@
       sentAt: -1e9, doneAt: -1e9, cutAt: -1e9,
       hushed: false,
       fn: false, handsFree: false,
+      lastSent: "",                 // his last message (typed or said): ↑ in an empty spotlight edits it
+      focusAsk: null,               // the card in front when the app gave the panel the keys
+      bisePath: undefined,          // the bise the app runs (app_bise; null: none found)
       shot: null,                   // { app, title, skipped }
       perms: {}, permAsk: null,
       hello: null,                  // { at }: the hello, once ever (app_hello)
@@ -110,6 +113,10 @@
   };
   const lv = (m, who, now) => (now - m.lvl[who].at < T.level ? m.lvl[who].v : 0);
   const listening = (m) => m.fn || m.handsFree || m.phase === "listening";
+  // can't reach bise: only a send the core never answered at all, 3 s on (lead m_8094)
+  const offline = (m, now) => !!m.pending && !m.pending.closed && !m.pending.acked && now - m.pending.at >= T.offline;
+  // the core heard nothing in his talk: no pending, no turn, one short line
+  const heardNothing = (m, now) => flashNow({ ...m, pending: null, said: "", mine: false }, { kind: "cancel", text: W.heardNothing }, now);
   const inTurn = (m) => TURN.includes(m.phase);
 
   // a line now, over the queue (a key's answer)
@@ -245,6 +252,14 @@
       case "phase": {
         const phase = ev.phase || "idle";
         let m2 = { ...m, phase, phaseAt: now, line: ev.line || "" };
+        // after he let go: idle or cancelled without 'sent' = the core heard nothing (a voice talk
+        // says so; a typed one just goes); any other phase = the core has it, no 'can't reach'
+        if (m.pending && !m.fn && !m.handsFree && phase !== "listening") {
+          if (phase === "idle" || phase === "cancelled") {
+            if (m.pending.voice) return none(heardNothing({ ...m2, phase: "idle" }, now));
+            m2 = { ...m2, pending: null };
+          } else m2 = { ...m2, pending: { ...m.pending, acked: true } };
+        }
         // a note talk (fn held on a bise page, §4.1): its words go to the page, not to main
         m2.notePage = phase === "listening" ? ev.page || m.notePage || null : null;
         if (phase === "listening" && m.phase !== "listening") {
@@ -274,8 +289,16 @@
         return none(flashQueue({ ...m2, lastPage: ev.id }, { kind: "page", text: Wd.pageReady(pageName(page)), ttl: T.page, page: ev.id }, now));
       }
 
-      case "heard":
-        return none({ ...m, heard: { text: ev.text || "", final: !!ev.final } });
+      case "heard": {
+        const m2 = { ...m, heard: { text: ev.text || "", final: !!ev.final } };
+        // the user's bug 2/4 (lead m_8094): a talk where the core heard nothing ends here, never in
+        // 'can't reach bise'; any word from the core about it means it is there
+        if (m.pending && !m.fn && !m.handsFree) {
+          if (ev.final && !String(ev.text || "").trim() && m.pending.voice) return none(heardNothing(m2, now));
+          return none({ ...m2, pending: { ...m.pending, acked: true } });
+        }
+        return none(m2);
+      }
 
       case "level": {
         const who = ev.who === "main" ? "main" : "you";
@@ -318,7 +341,8 @@
         const start = (x) => ({ ...x, heard: { text: "", final: false }, mine: true, hushed: false, turnNames: names(m.agents), chips: [] });
         if (st === "down" || st === "double") {
           const cmds = [];
-          let m2 = { ...m, pane: null, hello: null };
+          // a new talk: a stale pending never outlives it (lead m_8094)
+          let m2 = { ...m, pane: null, hello: null, pending: null };
           if (m.pane === "spot") cmds.push({ cmd: "app_focus", on: false });
           if (m.phase === "speaking") { cmds.push({ cmd: "cut_in" }); m2.cutAt = now; }
           m2 = st === "down" ? { ...m2, fn: true } : { ...m2, handsFree: true };
@@ -333,7 +357,9 @@
         // (what he said is kept: a retry sends its words as text)
         // his words stay on the glass after he lets go (m.said), until main's answer replaces them
         // (the user's dogfood, lead m_7163: no 'got it' / 'on it' line)
-        if (st === "up") return none({ ...m, fn: false, handsFree: false, said: m.fn || m.handsFree ? m.heard.text : m.said, pending: m.fn || m.handsFree ? { cmd: { cmd: "send", text: m.heard.text }, text: m.heard.text, at: now, voice: true } : m.pending });
+        // a voice note on a page (§4.1) goes to the page, never to main: nothing waits for 'sent'
+        if (st === "up" && m.notePage) return none({ ...m, fn: false, handsFree: false });
+        if (st === "up") return none({ ...m, fn: false, handsFree: false, lastSent: (m.fn || m.handsFree) && m.heard.text.trim() ? m.heard.text.trim() : m.lastSent, said: m.fn || m.handsFree ? m.heard.text : m.said, pending: m.fn || m.handsFree ? { cmd: { cmd: "send", text: m.heard.text }, text: m.heard.text, at: now, voice: true } : m.pending });
         if (st === "cancel") {
           return { m: flashNow({ ...m, fn: false, handsFree: false, mine: false, heard: { text: "", final: false }, phase: m.phase === "listening" ? "idle" : m.phase }, { kind: "cancel", text: W.cancelled }, now), cmds: [{ cmd: "talk_cancel" }] };
         }
@@ -380,8 +406,8 @@
         // hidden (esc, fn ., a click away, the app's timers: docs/ambient-app.md §8): an open pane
         // closes, so the next timed show is never stuck behind a stale full view
         const hidden = !!(ev.on ?? ev.hidden);
-        if (!hidden || !m.pane) return none({ ...m, hidden });
-        const r = setPane({ ...m, hidden }, null);
+        if (!hidden || !m.pane) return none({ ...m, hidden, focused: hidden ? false : m.focused });
+        const r = setPane({ ...m, hidden, focused: false }, null);
         return r;
       }
       case "app_reduce_motion":
@@ -402,8 +428,11 @@
         return none({ ...m, visible: ev.on !== false });
       // the panel has the keys (amb-mac a7efaa08): what he opened, or a pushed card he clicked;
       // a pushed card's footer shows the plain keys then, fn chords before (ambient m_6519)
-      case "app_focused":
-        return none({ ...m, focused: !!ev.on });
+      case "app_focused": {
+        // which card was in front when the keys came: a card pushed later has not got them
+        const front = askable(m)[0];
+        return none({ ...m, focused: !!ev.on, focusAsk: ev.on && front ? front.id : null });
+      }
       // the menu-bar icon's rect in the page's CSS px (the capsule grows out of it, SPEC §0)
       case "app_icon":
         return none({ ...m, icon: [ev.x, ev.y, ev.w, ev.h].every((n) => Number.isFinite(+n)) ? { x: +ev.x, y: +ev.y, w: +ev.w, h: +ev.h } : null });
@@ -460,6 +489,12 @@
         return setPane(m, m.pane ? null : visibleCards(m).length > 1 ? "inbox" : "agents");
       case "ui_close":
         return setPane(m, null);
+      // ↑ in an empty spotlight: his last message comes back to edit (SPEC §4)
+      case "ui_spot_last":
+        return m.lastSent ? none({ ...m, spotText: m.lastSent, rowSel: 0 }) : none(m);
+      // the bise the app runs for 'start bise in a terminal' (amb-mac m_8082; null: none found)
+      case "app_bise":
+        return none({ ...m, bisePath: ev.path == null ? null : String(ev.path) });
       case "ui_spot_type":   // typing filters the agents: the selection goes back to the first row
         return none({ ...m, spotText: ev.text || "", rowSel: (ev.text || "") === m.spotText ? m.rowSel : 0 });
 
@@ -507,7 +542,7 @@
         // tab: amb-core's own cmd start (e00ad291), which answers 'sent' like send; the words wait
         // in m.pending until 'sent' (can't reach bise after 3 s)
         const cmd = { cmd: ev.ev === "ui_spot_tab" ? "start" : "send", text };
-        return { m: { ...r.m, mine: true, voice: false, said: text, turnNames: names(m.agents), chips: [], pending: { cmd, text, at: now } }, cmds: [...r.cmds, cmd] };
+        return { m: { ...r.m, mine: true, voice: false, said: text, lastSent: text, turnNames: names(m.agents), chips: [], pending: { cmd, text, at: now } }, cmds: [...r.cmds, cmd] };
       }
       case "ui_perm":
         // continue: macOS's prompt; not now: the refused path (the app answers app_perm denied, and
@@ -610,7 +645,7 @@
         if (m.phase === "speaking" && !m.hushed) return { m: { ...m, hushed: true }, cmds: [{ cmd: "hush" }] };
         if (m.pane) return setPane(m, null);
         // can't reach bise: esc closes the bar, his words stay kept and still go when bise is back
-        if (m.pending && !m.pending.closed && now - m.pending.at >= T.offline) return none({ ...m, pending: { ...m.pending, closed: true } });
+        if (offline(m, now)) return none({ ...m, pending: { ...m.pending, closed: true } });
         return none(m);
       }
       default:
@@ -717,7 +752,9 @@
       icon: m.icon || null,  // the menu-bar icon (the capsule grows out of it)
       radius: m.radius,     // the capsule's and the glass's corners
       kiss: false,
-      focused: !!m.focused, // the panel has the keys (app_focused)
+      // the panel has the keys (app_focused), one source for every footer: not while hidden, and a
+      // card pushed after the keys came never shows plain keys (lead m_8094 (3))
+      focused: !!m.focused && !m.hidden && (!!m.pane || !askable(m)[0] || askable(m)[0].id === m.focusAsk),
       rowSel: m.rowSel || 0, // the selected row of an open bar (bar.js clamps it)
       handsFree: !!m.handsFree,
     };
@@ -804,11 +841,11 @@
       v.text = t >= (m.reduce ? 0 : T.helloWords) ? W.hello : null;
       v.gather = m.reduce ? 0 : Math.max(0, 1 - (1 - Math.pow(1 - Math.min(1, t / T.helloGather), 3)));
       v.puff = !m.reduce && t >= T.helloKiss && t < T.helloKiss + T.helloKissMs;
-    } else if (m.pending && !m.pending.closed && now - m.pending.at >= T.offline) {
+    } else if (offline(m, now)) {
       // can't reach bise (round 9): a talk or a type the core didn't answer in 3 s; his words are
       // kept and go when it's back
       v.state = "offline"; v.size = "open";
-      v.offline = { text: m.pending.text || "" };
+      v.offline = { text: m.pending.text || "", bise: m.bisePath };
     } else if (m.mine && (m.phase === "sending" || m.phase === "working" || (m.phase === "idle" && now - m.sentAt < 30000 && !m.main.text))) {
       v.state = "working"; v.size = "open"; v.pose = "think";
       v.label = { text: "bise", acc: true };

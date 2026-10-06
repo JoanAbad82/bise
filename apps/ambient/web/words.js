@@ -81,6 +81,7 @@
       offline: "can't reach bise.", kept: "your words are kept",
       offlineText: "bise isn't running on this Mac, or it stopped. what you said waits here and goes as soon as bise is back.",
       tryAgain: "try again", checks: "bise checks every 10 s on its own", terminal: "start bise in a terminal", runs: "runs: bise",
+      terminalAt: (p) => `start ${p} in a terminal`, runsAt: (p) => `runs: ${p}`,
       copySaid: "copy what you said", back: "bise is back · your words went to main",
     },
     // a card asked from a page (docs/ambient-pages.md §4.2): fn + o opens the page at the question
@@ -93,6 +94,7 @@
     // §4 keys
     handsFree: "hands-free. tap fn to send.",
     cancelled: "cancelled. nothing sent.",
+    heardNothing: "i didn't hear anything.",   // a talk the core heard nothing in (lead m_8094)
     later: "later. it comes back in an hour.",
     hidden: "quiet. i'm still here.",
     showAgain: "fn . to show me again",
