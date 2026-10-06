@@ -1242,7 +1242,7 @@ impl Shell {
                 if let (false, Some(meta)) = (starts.is_empty(), pages.store.meta(&id)) {
                     let msg = crate::pages::store::start_message(&meta, &pages.url(&id), &starts);
                     let msg = Self::page_hint(MAIN, msg);
-                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text: msg });
+                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text: msg, queued: false });
                     pages.push(&id, "notes", &json!({"notes": pages.store.notes(&id)}));
                 }
                 // the other notes: the page's agent, main when it is gone
@@ -1258,7 +1258,7 @@ impl Shell {
                     let w = self.page_waits.entry(to.clone()).or_insert_with(|| (now_ms(), Vec::new()));
                     w.1.push((id.clone(), text.clone()));
                     let text = Self::page_hint(&to, text);
-                    self.step(Input::ClientInput { client: 0, focus: to, text });
+                    self.step(Input::ClientInput { client: 0, focus: to, text, queued: false });
                 }
                 let snap = self.snapshot();
                 self.broadcast(&snap);
@@ -1441,7 +1441,7 @@ impl Shell {
                     let w = self.page_waits.entry(MAIN.to_string()).or_insert_with(|| (now, Vec::new()));
                     w.1.extend(pages.iter().map(|p| (p.clone(), String::new())));
                     let text = Self::page_hint(MAIN, text);
-                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text });
+                    self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text, queued: false });
                 }
                 Untaken::Warn => {
                     let text = format!("his notes on the page {} reached no one: main took no turn on them", pages.join(", "));
@@ -3223,7 +3223,7 @@ impl Shell {
                             self.steps_hint(t, &s("via"))
                         }
                     };
-                    self.step(Input::ClientInput { client: id, focus: s("focus"), text });
+                    self.step(Input::ClientInput { client: id, focus: s("focus"), text, queued: v.get("queued").and_then(|x| x.as_bool()).unwrap_or(false) });
                 }
                 self.page_answers();
             }

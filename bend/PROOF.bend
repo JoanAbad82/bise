@@ -5035,3 +5035,27 @@ def Laws.stop_leaves_no_timer(o, cx, n, why):
   hub_tnone_tr(HTM.Tms.live(HM.St.tm(HX.d(o, st))), HTM.keep_out(xs, ids), n,
     Equal.trans(List<&2, HTM.Timer>, HTM.Tms.live(HM.St.tm(HX.d(o, st))), HTM.Tms.live(HM.St.tm(HX.d(o, tg))), HTM.keep_out(xs, ids), e1, e2),
     hub_none_keep(xs, ids, ns, n, hub_all_self(ids), hub_str_in_head(n, HM.names_of.go(HM.get_agent(HX.d(o, g), n)))))
+
+# ---- queued user input (the window's "send queued") ----
+
+def Laws.user_queued_never_answers_a_card(o, cx, to, text):
+  {==}
+
+def Laws.user_queued_waits_for_turn_end(o, cx, name, q, m):
+  {==}
+
+def Laws.user_queued_said_at_idle(o, cx, name, q, m):
+  {==}
+
+def Laws.busy_batch_has_no_queued(xs):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      match h:
+        case HM.Msg{i, th, f, to, r, e, a, tx, c, p, q, v}:
+          match q:
+            case True{}:
+              Laws.busy_batch_has_no_queued(t)
+            case False{}:
+              Laws.busy_batch_has_no_queued(t)

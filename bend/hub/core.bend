@@ -1907,16 +1907,19 @@ def says.sent(-o: M.St, p: X.Cx<o> & SendR, +to: String, +text: String) -> X.Cx<
     case (+cx, SOk{_}):
       pick_lazy(X.Cx<o>, String.eq(to, M.MAIN()), u => cx, u => user_sent(o, cx, text))
 
-def says.card(-o: M.St, card: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String) -> X.Cx<o>:
+def says.card(-o: M.St, card: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool) -> X.Cx<o>:
   match card:
     case Some{+id}:
       answer_card(o, user_sent(o, cx, text), id, text)
     case None{}:
-      says.sent(o, send(o, cx, msg(M.USER(), to, text, False{}, None{}, True{}, False{})), to, text)
+      says.sent(o, send(o, cx, Snd{M.USER(), to, text, False{}, None{}, True{}, False{}, queued, None{}}), to, text)
 
-# plain text from the user to the agent in focus
-def user_says(-o: M.St, +cx: X.Cx<o>, +to: String, +text: String) -> X.Cx<o>:
-  says.card(o, Bool.pick(Maybe<&2, Nat>, String.eq(to, M.MAIN()), None{}, question_card(M.St.cards(st(o, cx)), st(o, cx), to)), cx, to, text)
+# plain text from the user to the agent in focus. `queued` (the window's
+# "send queued"): a queued-mode message, held while the agent is busy and
+# said at its turn's end (law user_queued_waits_for_turn_end); it never
+# answers a question card (law user_queued_never_answers_a_card)
+def user_says(-o: M.St, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool) -> X.Cx<o>:
+  says.card(o, Bool.pick(Maybe<&2, Nat>, queued || String.eq(to, M.MAIN()), None{}, question_card(M.St.cards(st(o, cx)), st(o, cx), to)), cx, to, text, queued)
 
 def close_names(xs: List<&2, String>, +target: String) -> List<&2, String>:
   match xs:
@@ -1938,7 +1941,7 @@ def route.sent(-o: M.St, p: X.Cx<o> & SendR, +name: String, +text: String, +focu
         u => note_main(o, cx2, cat(["the user wrote directly to @", name, ": \"", M.one_line(text), "\""])), u => cx2)
       cx3
 
-def route.target(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +target: String, +text: String, +focus: String) -> X.Cx<o>:
+def route.target(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool) -> X.Cx<o>:
   match m:
     case None{}:
       +close = close_names(M.St.order(st(o, cx)), target)
@@ -1948,13 +1951,13 @@ def route.target(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +target: String, 
       # RFC 0003 §5.1: from another view, the task reads it tagged and
       # its answer comes back to that view
       +elsewhere = Bool.not(String.eq(name, focus))
-      route.sent(o, send(o, cx, Snd{M.USER(), name, text, elsewhere, None{}, Bool.not(elsewhere), False{}, False{},
+      route.sent(o, send(o, cx, Snd{M.USER(), name, text, elsewhere, None{}, Bool.not(elsewhere), False{}, queued,
         Bool.pick(Maybe<&2, String>, elsewhere, Some{focus}, None{})}), name, text, focus)
 
-# `@task text`: a direct message, without main
-def route(-o: M.St, +cx: X.Cx<o>, +target: String, +text: String, +focus: String) -> X.Cx<o>:
-  pick_lazy(X.Cx<o>, String.eq(target, M.MAIN()), u => user_says(o, cx, M.MAIN(), text),
-    u => route.target(o, M.resolve(st(o, cx), target), cx, target, text, focus))
+# `@task text`: a direct message, without main; `queued` as user_says
+def route(-o: M.St, +cx: X.Cx<o>, +target: String, +text: String, +focus: String, +queued: Bool) -> X.Cx<o>:
+  pick_lazy(X.Cx<o>, String.eq(target, M.MAIN()), u => user_says(o, cx, M.MAIN(), text, queued),
+    u => route.target(o, M.resolve(st(o, cx), target), cx, target, text, focus, queued))
 
 def user_new.res(-o: M.St, p: X.Cx<o> & TaskR) -> X.Cx<o>:
   match p:
@@ -2890,9 +2893,9 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
     case IBoot{}:
       boot(o, cx)
     case ISay{}:
-      user_says(o, cx, C.get_s(i, "focus"), C.get_s(i, "text"))
+      user_says(o, cx, C.get_s(i, "focus"), C.get_s(i, "text"), C.get_b(i, "queued"))
     case IRoute{}:
-      route(o, cx, C.get_s(i, "target"), C.get_s(i, "text"), C.get_s(i, "focus"))
+      route(o, cx, C.get_s(i, "target"), C.get_s(i, "text"), C.get_s(i, "focus"), C.get_b(i, "queued"))
     case INew{}:
       user_new.res(o, create_task(o, cx, new_task(M.USER(), i)))
     case IDrop{}:

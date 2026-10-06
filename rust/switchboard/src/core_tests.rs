@@ -119,6 +119,17 @@ impl T {
             client: 1,
             focus: focus.into(),
             text: text.into(),
+            queued: false,
+        })
+    }
+
+    /// The window's "send queued".
+    fn user_queued(&mut self, focus: &str, text: &str) -> Vec<Effect> {
+        self.go(Input::ClientInput {
+            client: 1,
+            focus: focus.into(),
+            text: text.into(),
+            queued: true,
         })
     }
 
@@ -1341,6 +1352,45 @@ fn a_queued_message_waits_for_the_end_of_the_turn() {
     assert_eq!(t.hub.st.msg_state[&id], MsgState::Delivered);
 }
 
+/// The window's "send queued": the user's queued inputs wait for the end of
+/// the turn (laws user_queued_*); a plain input meanwhile goes first; the
+/// snapshot lists the pending ones for the window.
+#[test]
+fn the_users_queued_inputs_wait_for_the_end_of_the_turn() {
+    let mut t = T::new();
+    t.spawn_task("a");
+    // `a` is busy: neither steered nor said, in the snapshot's agent row
+    let fx = t.user_queued("a", "first later");
+    assert!(steer_to(&fx, "a").is_none() && say_to(&fx, "a").is_none(), "{:?}", fx);
+    t.user_queued("a", "@a second later");
+    let ids: Vec<u64> = ["first later", "second later"]
+        .iter()
+        .map(|x| t.hub.st.msgs.values().find(|m| m.text == *x).unwrap().id)
+        .collect();
+    assert!(ids.iter().all(|i| t.hub.st.msgs[i].queued && t.hub.st.msgs[i].from == USER));
+    let rows = crate::board::queued_inputs(&t.hub.st, "a");
+    assert_eq!(rows.iter().map(|r| r["text"].as_str().unwrap()).collect::<Vec<_>>(), ["first later", "second later"]);
+    // a plain input meanwhile is steered in at once, alone
+    let fx = t.user("a", "now");
+    let s = steer_to(&fx, "a").expect("steered");
+    assert!(s.contains("now") && !s.contains("later"), "{}", s);
+    // a command is never queued
+    let fx = t.user_queued("a", "/tasks");
+    assert!(fx.iter().any(|e| matches!(e, Effect::ToClient { body, .. } if body["text"] == "commands run now, not queued")), "{:?}", fx);
+    // the turn ends: both in one new turn, in order, once
+    let fx = t.go(Input::ReplIdle { agent: "a".into(), leftover: false });
+    let s = say_to(&fx, "a").expect("a new turn");
+    let (i1, i2) = (s.find("first later").expect("first"), s.find("second later").expect("second"));
+    assert!(i1 < i2, "{}", s);
+    assert!(ids.iter().all(|i| t.hub.st.msg_state[i] == MsgState::Delivered));
+    assert!(crate::board::queued_inputs(&t.hub.st, "a").is_empty());
+    let fx = t.turn("a", "done");
+    assert!(say_to(&fx, "a").is_none(), "delivered once: {:?}", fx);
+    // an idle agent gets a queued input at once
+    let fx = t.user_queued("a", "right away");
+    assert!(say_to(&fx, "a").is_some_and(|s| s.contains("right away")), "{:?}", fx);
+}
+
 #[test]
 fn a_queued_message_to_an_idle_agent_is_delivered_at_once() {
     let mut t = T::new();
@@ -2533,6 +2583,7 @@ fn bench_step() {
         client: 1,
         focus: MAIN.into(),
         text: "hello".into(),
+        queued: false,
     });
     let t0 = std::time::Instant::now();
     for _ in 0..10 {

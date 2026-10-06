@@ -4375,6 +4375,55 @@ law stop_leaves_no_queue:
   for u: HI.Unique(HX.d(o, cx))
   {HM.queued_for(HX.d(o, HC.stop_task(o, cx, n, life, why)), n) == Nil{} : List<&2, HM.Msg>}
 
+# ---- queued user input (the window's "send queued", bise desktop) ----
+# The user's `input {queued: true}` is a queued-mode message (Msg.queued),
+# the path `sb send --mode queued` already takes. An older sb-core ignores
+# the field and delivers at once (a safe degrade, no journal change).
+
+# LAW: a queued input never answers a question card, at send: it is a
+# message for the next turn. A card still open at the turn's end stays
+# open; the input arrives as a message (says.card with no card).
+law user_queued_never_answers_a_card:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +to: String
+  for +text: String
+  {HC.user_says(o, cx, to, text, True{}) == HC.says.card(o, None{}, cx, to, text, True{}) : HX.Cx<o>}
+
+def any_queued(xs: List<&2, HM.Msg>) -> Bool:
+  match xs:
+    case Nil{}:
+      False{}
+    case Con{+h, +t}:
+      HM.Msg.queued(h) || any_queued(t)
+
+# LAW: what a busy agent is handed (steered) holds no queued-mode message:
+# a queued input waits for the turn's end. So a plain input sent while
+# queued ones wait goes first (steered); the queued ones follow at idle,
+# in id order (queued_for), in one say batch (user_queued_said_at_idle),
+# each once (delivered_once).
+law user_queued_waits_for_turn_end:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +name: String
+  for +q: List<&2, HM.Msg>
+  for +m: Bool
+  {HC.pump.run(o, HM.RBusy{}, cx, name, q, m) == HC.pump.batch(o, HC.not_queued_mode(q), cx, name, True{}, m) : HX.Cx<o>}
+
+law busy_batch_has_no_queued:
+  for +xs: List<&2, HM.Msg>
+  {any_queued(HC.not_queued_mode(xs)) == False{} : Bool}
+
+# LAW: at idle, everything queued for the agent goes in one say batch, in
+# its order (queued and plain alike).
+law user_queued_said_at_idle:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +name: String
+  for +q: List<&2, HM.Msg>
+  for +m: Bool
+  {HC.pump.run(o, HM.RIdle{}, cx, name, q, m) == HC.pump.batch(o, q, cx, name, False{}, m) : HX.Cx<o>}
+
 # LAW (L12): stopping or dropping a task, in any state where no two open
 # cards share an id (every state the hub reaches: cards_unique), leaves no
 # open card of it.

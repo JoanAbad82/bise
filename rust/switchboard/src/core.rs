@@ -446,6 +446,9 @@ pub enum Input {
         client: ClientId,
         focus: String,
         text: String,
+        /// The window's "send queued": a plain text or `@agent` text waits
+        /// for the end of the agent's turn (sb-core's queued-mode path).
+        queued: bool,
     },
     ClientFocus {
         client: ClientId,
@@ -1912,6 +1915,9 @@ impl Hub {
                     // when it last reported (an archived task: about when it stopped)
                     "report_ms": a.last_report.as_ref().map(|r| r.at_ms),
                     "queued": board::queued_count(&self.st, &a.name),
+                    // the user's queued inputs waiting for the turn's end
+                    // (the window's "send queued"): [{id, text, created_ms}]
+                    "queued_inputs": board::queued_inputs(&self.st, &a.name),
                     // BISE-299: main's inbox, the agents' questions waiting
                     // for main (the user sees a quiet count, never asked)
                     "inbox": if a.is_main { self.st.unanswered_for(&a.name).len() } else { 0 },
@@ -2103,7 +2109,8 @@ impl Hub {
                 client,
                 focus,
                 text,
-            } => self.user_input(&mut fx, env, client, &focus, &text),
+                queued,
+            } => self.user_input(&mut fx, env, client, &focus, &text, queued),
             Input::ClientFocus { client, focus } => self.set_focus(&mut fx, env, client, &focus),
             Input::ClientGone { client } => {
                 self.set_focus(&mut fx, env, client, MAIN);
@@ -2478,6 +2485,7 @@ impl Hub {
         client: ClientId,
         focus: &str,
         text: &str,
+        queued: bool,
     ) {
         let focus = self.st.resolve(focus).unwrap_or_else(|| MAIN.to_string());
         if let Some(v) = self.clients.get_mut(&client) {
@@ -2486,17 +2494,22 @@ impl Hub {
             }
         }
         let c = Some(client);
-        match router::parse(text, &focus) {
+        // only words wait for the turn's end: a command runs now
+        let cmd = router::parse(text, &focus);
+        if queued && !matches!(cmd, UserCmd::Say(_) | UserCmd::To { .. }) {
+            fx.push(notice(client, "commands run now, not queued"));
+        }
+        match cmd {
             UserCmd::Say(t) => {
                 if !t.is_empty() {
-                    self.core(fx, env, c, json!({"t": "say", "focus": focus, "text": t}));
+                    self.core(fx, env, c, json!({"t": "say", "focus": focus, "text": t, "queued": queued}));
                 }
             }
             UserCmd::To { target, text } => self.core(
                 fx,
                 env,
                 c,
-                json!({"t": "route", "target": target, "text": text, "focus": focus}),
+                json!({"t": "route", "target": target, "text": text, "focus": focus, "queued": queued}),
             ),
             UserCmd::New {
                 name,
