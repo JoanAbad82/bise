@@ -739,24 +739,22 @@ impl Sb {
     }
 }
 
-/// A card kind: its rank in reading order (what blocks an agent first),
-/// its glyph and its color. Color means attention (book §5): needs you
-/// in accent, failures in error, the rest plain text.
+/// A card kind: its rank in reading order (what blocks an agent first:
+/// bise-proto's `card_rank`, the one table, which the desktop's inbox
+/// reads too), its glyph and its color. Color means attention (book §5):
+/// needs you in accent, failures in error, the rest plain text.
 pub(super) fn kind_look(kind: &str) -> (u8, &'static str, Color) {
-    match kind {
-        "approval" | "confirm" => (0, theme::G_NEEDS_YOU, theme::accent()),
+    let (glyph, color) = match kind {
         // a PR ready to merge (pr-design §6.3): yours to act on, pink
-        "question" | "merge" | "feature_try" | "feature_merge" | "signin" => (1, theme::G_NEEDS_YOU, theme::accent()),
-        "blocked" => (2, theme::G_NEEDS_YOU, theme::accent()),
-        "failed" => (3, theme::G_FAILED, theme::error()),
-        "restart" => (3, theme::G_RESTART_FAILED, theme::error()),
-        "drop" => (4, theme::G_STOPPED, theme::text()),
-        "overlap" => (5, theme::G_OVERLAP, theme::text()),
-        "done" => (6, theme::done_glyph(), theme::text()),
-        // the setup card and its offers (BISE-245): they block nothing
-        "setup" => (7, theme::G_NEEDS_YOU, theme::accent()),
-        _ => (6, theme::G_CARD, theme::accent()),
-    }
+        "approval" | "confirm" | "question" | "merge" | "feature_try" | "feature_merge" | "signin" | "blocked" | "setup" => (theme::G_NEEDS_YOU, theme::accent()),
+        "failed" => (theme::G_FAILED, theme::error()),
+        "restart" => (theme::G_RESTART_FAILED, theme::error()),
+        "drop" => (theme::G_STOPPED, theme::text()),
+        "overlap" => (theme::G_OVERLAP, theme::text()),
+        "done" => (theme::done_glyph(), theme::text()),
+        _ => (theme::G_CARD, theme::accent()),
+    };
+    (bise_proto::rows::card_rank(kind), glyph, color)
 }
 
 /// The color of a card kind's glyph: its hue, except done's check, in

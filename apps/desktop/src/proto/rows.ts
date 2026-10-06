@@ -90,7 +90,14 @@ urgent: boolean, since_ms: number, page?: CardPage | null,
  * one of its options answers it, never typed words (the composer
  * rule, lead m_8777); false: a question, words answer it
  */
-approval?: boolean, };
+approval?: boolean, 
+/**
+ * its place in reading order, [`card_rank`] of its kind (0 = the most
+ * blocking): the inbox sorts on (rank, id) inside one hub, as the
+ * TUI's, and has no table of its own (architect m_9549). Absent from
+ * an older hub: a reader ranks it as `card_rank("")`
+ */
+rank?: number | null, };
 
 /**
  * A commit that reached the project's trunk today (the changes tab's

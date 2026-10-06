@@ -138,6 +138,31 @@ pub struct Card {
     /// rule, lead m_8777); false: a question, words answer it
     #[serde(default, skip_serializing_if = "crate::is_false")]
     pub approval: bool,
+    /// its place in reading order, [`card_rank`] of its kind (0 = the most
+    /// blocking): the inbox sorts on (rank, id) inside one hub, as the
+    /// TUI's, and has no table of its own (architect m_9549). Absent from
+    /// an older hub: a reader ranks it as `card_rank("")`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rank: Option<u8>,
+}
+
+/// A card kind's rank in reading order, what blocks an agent first: an
+/// approval, then what only he decides (a question, a merge, a sign-in),
+/// blocked, failed, drop, overlap, done (and any kind nobody taught us),
+/// the setup offers last. The one table: the TUI's inbox (`kind_look`)
+/// and the hub's `Card.rank` read it.
+pub fn card_rank(kind: &str) -> u8 {
+    match kind {
+        "approval" | "confirm" => 0,
+        "question" | "merge" | "feature_try" | "feature_merge" | "signin" => 1,
+        "blocked" => 2,
+        "failed" | "restart" => 3,
+        "drop" => 4,
+        "overlap" => 5,
+        // the setup card and its offers (BISE-245): they block nothing
+        "setup" => 7,
+        _ => 6,
+    }
 }
 
 impl Card {
@@ -332,5 +357,14 @@ mod tests {
         let (q, o) = question("how should agents ship?\n1 a PR per task\n2 straight to main");
         assert_eq!((q.as_str(), o[0].label.as_str()), ("how should agents ship?", "a PR per task"));
         assert_eq!(question("plain"), ("plain".to_string(), vec![]));
+    }
+
+    #[test]
+    fn what_blocks_an_agent_ranks_first() {
+        let order = ["confirm", "question", "merge", "signin", "blocked", "failed", "drop", "overlap", "done", "newer_kind", "setup"];
+        let ranks: Vec<u8> = order.iter().map(|k| card_rank(k)).collect();
+        assert_eq!(ranks, [0, 1, 1, 1, 2, 3, 4, 5, 6, 6, 7]);
+        assert_eq!(card_rank("approval"), card_rank("confirm"));
+        assert_eq!(card_rank("restart"), card_rank("failed"));
     }
 }

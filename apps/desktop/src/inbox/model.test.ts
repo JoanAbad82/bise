@@ -1,0 +1,110 @@
+import { describe, expect, it } from 'vitest';
+import type { Card } from '@/proto';
+import { hub_ev } from '@/proto/fixtures.gen';
+import { cardKey, sortCards } from './order';
+import { current, prune, START, step, visible, type InboxState, type Key } from './model';
+
+const card = (id: number, kind: string, rank: number | undefined, since_ms: number, project = 'acme', extra: Partial<Card> = {}): Card => ({
+  id,
+  project,
+  kind,
+  agent: 'perf',
+  question: `q${String(id)}`,
+  options: [
+    { n: 1, label: 'yes' },
+    { n: 2, label: 'no' },
+  ],
+  urgent: false,
+  since_ms,
+  ...(rank === undefined ? {} : { rank }),
+  ...extra,
+});
+
+/** The hub fixture's cards (a question, a confirm, a question with a page). */
+const fixture = (): Card[] => {
+  const ev = hub_ev.find((e) => e.ev === 'cards');
+  if (ev?.ev !== 'cards') throw new Error('no cards fixture');
+  return ev.cards;
+};
+
+describe('order', () => {
+  it("is the TUI's on one hub: the approval first, then the questions by id", () => {
+    expect(sortCards(fixture()).map((c) => c.id)).toEqual([10, 9, 11]);
+  });
+
+  it('ranks on the hub-sent rank, then the oldest, across projects', () => {
+    const cs = [card(3, 'done', 6, 10, 'b'), card(1, 'question', 1, 30, 'a'), card(7, 'question', 1, 20, 'b'), card(2, 'confirm', 0, 99, 'a')];
+    expect(sortCards(cs).map(cardKey)).toEqual(['a-2', 'b-7', 'a-1', 'b-3']);
+  });
+
+  it("a card from an older hub without rank sorts as an unknown kind (done's)", () => {
+    const cs = [card(1, 'mystery', undefined, 1), card(2, 'failed', 3, 2), card(3, 'setup', 7, 0)];
+    expect(sortCards(cs).map((c) => c.id)).toEqual([2, 1, 3]);
+  });
+});
+
+describe('keys', () => {
+  const list = sortCards([card(1, 'confirm', 0, 1, 'a', { approval: true }), card(2, 'question', 1, 2), card(3, 'done', 6, 3)]);
+  const run = (keys: Key[], text = '', s0: InboxState = START) => {
+    let s = s0;
+    const acts = [];
+    for (const k of keys) {
+      const r = step(s, visible(list, s), k, text);
+      s = r.s;
+      if (r.act) acts.push(r.act);
+    }
+    return { s, acts };
+  };
+
+  it('opens on the top item with no option on: a reflex ⏎ never answers', () => {
+    const { s, acts } = run([{ k: 'enter' }]);
+    expect(current(visible(list, s), s)?.id).toBe(1);
+    expect(acts).toEqual([]);
+  });
+
+  it('←→ walk the options, ⏎ picks the one on', () => {
+    const { acts } = run([{ k: 'right' }, { k: 'right' }, { k: 'enter' }]);
+    expect(acts).toEqual([{ t: 'answer', project: 'a', card: 1, reply: '2' }]);
+  });
+
+  it('a digit picks at once; the next item becomes current and the answered one leaves', () => {
+    const { s, acts } = run([{ k: 'digit', n: 1 }]);
+    expect(acts).toEqual([{ t: 'answer', project: 'a', card: 1, reply: '1' }]);
+    const v = visible(list, s);
+    expect(v.map((c) => c.id)).toEqual([2, 3]);
+    expect(current(v, s)?.id).toBe(2);
+  });
+
+  it('a digit that is no option does nothing; with text, digits and arrows belong to the text', () => {
+    expect(run([{ k: 'digit', n: 5 }]).acts).toEqual([]);
+    const { s, acts } = run([{ k: 'down' }, { k: 'digit', n: 1 }], 'a 1');
+    expect(acts).toEqual([]);
+    expect(s.cur).toBeNull();
+  });
+
+  it('typed words answer a question, never an approval', () => {
+    expect(run([{ k: 'enter' }], ' cold, then warm ').acts).toEqual([]);
+    const { acts } = run([{ k: 'down' }, { k: 'enter' }], '');
+    expect(acts).toEqual([]);
+    const words = step({ ...START, cur: 'acme-2' }, visible(list, START), { k: 'enter' }, ' cold, then warm ');
+    expect(words.act).toEqual({ t: 'answer', project: 'acme', card: 2, reply: 'cold, then warm' });
+  });
+
+  it('↑↓ move between items and stop at the ends; done takes ⏎ with no words', () => {
+    const { s, acts } = run([{ k: 'down' }, { k: 'down' }, { k: 'down' }, { k: 'enter' }]);
+    expect(acts).toEqual([{ t: 'answer', project: 'acme', card: 3, reply: '' }]);
+    expect(current(visible(list, s), s)?.id).toBe(2);
+  });
+
+  it('close leaves without an answer; esc goes back', () => {
+    expect(run([{ k: 'close' }]).acts).toEqual([{ t: 'close', project: 'a', card: 1 }]);
+    expect(run([{ k: 'esc' }]).acts).toEqual([{ t: 'back' }]);
+  });
+
+  it('an acted-on item stays out until the core drops it, then is forgotten', () => {
+    const { s } = run([{ k: 'digit', n: 1 }]);
+    expect(prune(s, list)).toBe(s);
+    const later = prune(s, list.slice(1));
+    expect(later.gone.size).toBe(0);
+  });
+});

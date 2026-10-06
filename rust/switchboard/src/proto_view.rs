@@ -137,6 +137,7 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
                 project: project.to_string(),
                 urgent: kind == "confirm",
                 approval: Card::approval_kind(&kind),
+                rank: Some(bise_proto::rows::card_rank(&kind)),
                 kind,
                 agent: s(c, "agent"),
                 question: q,
