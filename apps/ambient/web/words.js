@@ -156,13 +156,19 @@
 
   // desktop S8, the spotlight (designer's v9 'fn espace, la spotlight'; ambient signs)
   const spot = {
-    ph: "ask bise, or find an agent", to: "to bise",
+    ph: "ask bise, or find an agent", to: "to bise", holdFn: "hold fn to talk",
     waiting: "waiting for you", atWork: "at work", envs: "environments", found: "found",
     inFront: (what) => (what ? `in front: ${what}` : "in front"),
     envSub: (branch, n) => `${branch} · ${n} agent${n === 1 ? "" : "s"}`,
     askBise: "ask bise", openInBise: "open in bise", sendToBise: "send to bise",
-    open: (name) => `open ${name}`, sendQ: (q) => `send « ${q} » to bise`, thenOpen: (name) => `then ⏎ open ${name}`,
+    open: (name) => `open ${name}`, sendQ: (q) => `send “${q}” to bise`, thenOpen: (name) => `then ⏎ open ${name}`,
     startAgent: "start an agent", close: "close",
+  };
+
+  // desktop S8: where bise sent his words, 2 s to correct (v9)
+  const route = {
+    line: (name, agent, followed) => `→ ${name} · ${agent || "main"}${followed ? " · following" : ""}`,
+    another: "another project", cancel: "cancel",
   };
 
   // the screen recording pane's name: `Screen & System Audio Recording` since macOS 15 (Sequoia),
@@ -318,5 +324,5 @@
   // an agent's row is a label, not a sentence: no final period
   const rowLabel = (s) => String(s || "").replace(/\.$/, "");
 
-  root.AmbWords = { W, spot, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
+  root.AmbWords = { W, spot, route, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
 })(typeof window !== "undefined" ? window : globalThis);

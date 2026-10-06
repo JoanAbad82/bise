@@ -55,6 +55,8 @@
   }
   function recv(ev) {
     if (typeof ev === "string") { try { ev = JSON.parse(ev); } catch { return; } }
+    // the route's deadline is the core's wall clock: the model needs when it came here
+    if (ev && ev.ev === "route" && ev.at_wall == null) ev = { ...ev, at_wall: Date.now() };
     const r = M.step(model, ev, now());
     model = r.m;
     for (const c of r.cmds) post(c);

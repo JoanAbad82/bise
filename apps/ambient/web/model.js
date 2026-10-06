@@ -16,6 +16,7 @@
   const T = {
     endOpen: 4000,   // end of turn: open, then small
     kiss: 1000,      // the kiss, once
+    route: 2000,     // '→ telemetry · main': tab corrects it (when the event names no deadline)
     level: 250,      // a level older than this is silence
     cutIn: 1500,     // `main stopped. go ahead.` over `listening`
     answered: 4000,
@@ -47,6 +48,7 @@
       agents: [], cards: [],
       projects: [],                 // desktop S8: every project (core's state.projects), bise's own aside
       front: null,                  // the front app's facts (amb-mac's app_front, S9's fn context)
+      route: null,                  // bise's '→ project' after a talk: { to, agent, followed, until }
       phase: "idle", phaseAt: 0, line: "",
       heard: { text: "", final: false },
       lvl: { you: { v: 0, at: -1e9 }, main: { v: 0, at: -1e9 } },
@@ -103,7 +105,7 @@
   const sortPages = (pages) => pages.slice().sort((a, b) => (b.at_ms || 0) - (a.at_ms || 0));
   // a page's name on your surfaces: its title, else its id with spaces (vision §3 B)
   const pageName = (p) => p.title || String(p.id).replace(/-/g, " ");
-  const working = (agents) => agents.filter((a) => a.working ?? ["working", "waiting", "starting"].includes(a.status)).length;
+  const working = root.AmbPolicy.working;
   const visibleCards = (m) => m.cards.filter((c) => !m.answered[c.id]);
   // what the question glass may ask: not a card he put off with esc (it keeps waiting in the inbox
   // and the count, ambient m_6500), and in a call or a meeting only the urgent ones
@@ -479,6 +481,24 @@
       // ↑ in an empty spotlight: his last message comes back to edit (SPEC §4)
       case "ui_spot_last":
         return m.lastSent ? none({ ...m, spotText: m.lastSent, rowSel: 0 }) : none(m);
+      // desktop S8: bise routes his words to a project (S3a draft route {project, to, text,
+      // correct_until_ms}; ui.js stamps at_wall, the page's clock when it came): the capsule says
+      // '→ telemetry · main' until then; tab = the next project, fn esc = cancel (the core decides)
+      case "route": {
+        if (!ev.to) return none({ ...m, route: null });
+        const left = ev.correct_until_ms != null && ev.at_wall != null ? Math.max(0, ev.correct_until_ms - ev.at_wall) : T.route;
+        return none({ ...m, route: { to: ev.to, agent: ev.agent || null, followed: !!ev.followed, until: now + left } });
+      }
+      case "ui_route_next": {
+        const r = m.route;
+        const ps = m.projects.filter((p) => !p.home).sort((a, b) => (a.order || 0) - (b.order || 0));
+        if (!r || now >= r.until || ps.length < 2) return none(m);
+        const next = ps[(ps.findIndex((p) => p.project === r.to) + 1) % ps.length];
+        return { m: { ...m, route: { ...r, to: next.project, agent: null } }, cmds: [{ cmd: "route_correct", project: "home", to: next.project }] };
+      }
+      case "ui_route_cancel":
+        if (!m.route || now >= m.route.until) return none(m);
+        return { m: { ...m, route: null }, cmds: [{ cmd: "route_cancel", project: "home" }] };
       // the front app (amb-mac's app_front, m_8448): app null = an excluded app, nothing known
       case "app_front":
         return none({ ...m, front: ev.app ? { app: String(ev.app), url: ev.url || "", path: ev.path || "", title: ev.title || "" } : null });
@@ -573,6 +593,8 @@
   // fn + key (app_key), and the same keys inside the panel
   function key(m, k, now, ev = {}) {
     const none = (x) => ({ m: x, cmds: [] });
+    // the 2 s after bise names the project: tab corrects it, fn esc cancels (v9)
+    if (m.route && now < m.route.until && (k === "tab" || k === "esc")) return step(m, { ev: k === "tab" ? "ui_route_next" : "ui_route_cancel" }, now);
     const cards = visibleCards(m);
     if (/^[1-9]$/.test(k)) {
       const card = cards[m.pane === "inbox" || m.pane === "agents" ? m.sel : 0];
@@ -662,76 +684,9 @@
     }
   }
 
-  // ---- the pearl's mood (SPEC §1, round 8): listen while you talk (level = your mic), speak
-  // while bise talks (level = its voice), work while main or agents work, need for a question,
-  // done / fail for those lines, away while quiet (a call, a meeting), rest otherwise
-  function moodOf(v, m, flash, asking) {
-    switch (v.state) {
-      case "listening": case "voice_note": return "listen";
-      case "speaking": return m.hushed ? "work" : "speak";
-      case "working": return "work";
-      case "needs": case "perm": return "need";
-      case "answered": case "done": return "done";
-      case "failed": case "error": case "hub_down": return "fail";
-    }
-    if (v.state === "agents" || v.state === "inbox" || v.state === "find") return asking.length ? "need" : working(m.agents) ? "work" : m.quiet ? "away" : "rest";
-    if (m.quiet) return "away";
-    if (v.pose === "think") return "work";
-    return "rest";
-  }
+  // the mood, the content kinds, the grow and the hold: policy.js (pure)
+  const { moodOf, hold, reduced, grow, contentOf, GROW } = root.AmbPolicy;
 
-  // ---- it grows out of the menu-bar icon (SPEC §0): the open/close motion when the app shows or
-  // hides the capsule. `icon` is the icon's rect in the page's CSS px (amb-mac's app_icon; above
-  // the panel, so y < 0); without it, the panel's top right. Reduced motion: a plain fade.
-  const GROW = { open: 750, close: 600, fade: 200, from: 0.15, easeOut: "cubic-bezier(.16, 1, .3, 1)", easeIn: "cubic-bezier(.7, 0, .84, 0)" };
-  // the glass leaves with its last words on it (ambient's gate run 3 (b), and its reduced-motion
-  // recheck m_5574): with nothing left to show (content none), the capsule keeps drawing the last
-  // view it showed (words, chips, label, width, so app_size never shrinks the panel either), with
-  // the live hidden flag, mood and settings, through the app's hide and its close (0.6 s, or the
-  // 0.2 s fade) and after it, until new content comes; it never draws the empty view in between
-  function hold(shown, v) {
-    if (v.content.kind !== "none") return { shown: v.hidden ? shown : v, v };
-    if (!shown) return { shown, v };
-    return { shown, v: { ...shown, hidden: v.hidden, content: v.content, mood: v.mood, lvl: v.lvl, still: v.still, unseen: v.unseen, icon: v.icon, radius: v.radius } };
-  }
-  // reduced motion for the grow: the app's flag (app_reduce_motion) or the system's (the web
-  // view's prefers-reduced-motion), either one is enough, whichever arrived first
-  const reduced = (appFlag, system) => !!appFlag || !!system;
-  function grow(wasHidden, hidden, reduce, icon, box) {
-    if (wasHidden === hidden) return null;
-    const open = !hidden;
-    if (reduce) return { open, ms: GROW.fade, fade: true, ease: "linear" };
-    const b = box || { x: 0, y: 0, w: 0 };
-    // the origin, in the animated box's own px: the icon's centre, else the box's top right
-    const ox = icon ? icon.x + icon.w / 2 - b.x : b.w;
-    const oy = icon ? icon.y + icon.h / 2 - b.y : 0;
-    return { open, ms: open ? GROW.open : GROW.close, fade: false, from: GROW.from, origin: `${Math.round(ox)}px ${Math.round(oy)}px`, ease: open ? GROW.easeOut : GROW.easeIn };
-  }
-
-  // ---- what the capsule has to show, for the app's show/hide policy (amb-mac, m_5073): talk,
-  // type, answer, got and needs the app also derives itself; it acts on line (4 s), open (until
-  // esc, fn ., a click away), needs (6 s) and none
-  function contentOf(v, flash, asking) {
-    switch (v.state) {
-      case "listening": case "voice_note": return { kind: "talk" };
-      case "spotlight": case "find": return { kind: "type" };
-      case "working": return { kind: v.words ? "answer" : "got" };
-      case "speaking": case "end": return { kind: "answer" };
-      case "agents": case "inbox": case "settings": case "pages": case "offline": return { kind: "open" };
-      case "hello": return { kind: "hello" };
-      // a permission ask is opened (until he answers); its refused line is a timed line, 8 s (amb-mac m_5679)
-      case "perm": return { kind: v.perm ? "open" : "line" };
-      case "needs": return { kind: "needs", card: asking[0] && asking[0].id };
-      case "idle": return { kind: "none" };
-      // SPEC §0: never for done, failed, a page ready (they live in the menu-bar marble); an
-      // answer's line (`cookies has it: yes.`), the morning page, a key's answer, the hub lost do
-      case "done": case "failed": case "page": return { kind: "none" };
-      default: return { kind: flash || v.state === "hub_down" ? "line" : "none" };
-    }
-  }
-
-  // ---- what the capsule shows now
-  // `wall`: the epoch clock (a page's age); `now` may be the page's own monotonic clock
   function view(m, now, wall = now) {
     const cards = visibleCards(m);
     // in a call or a meeting, only the urgent cards ask (the rest wait in the inbox)
@@ -930,6 +885,10 @@
       v.state = "inbox"; v.size = "open";
       v.label = { text: cards.length ? Wd.waiting(cards.length) : W.quiet };
       v.inbox = inbox();
+    } else if (m.route && now < m.route.until && !listening(m)) {
+      v.state = "route"; v.size = "open"; v.pose = "think";
+      const p = m.projects.find((x) => x.project === m.route.to);
+      v.route = { line: Wd.route.line(p ? p.name : m.route.to, m.route.agent, m.route.followed), until: m.route.until };
     } else if (m.mine && (m.phase === "sending" || m.phase === "working" || (m.phase === "idle" && now - m.sentAt < 30000 && !m.main.text))) {
       v.state = "working"; v.size = "open"; v.pose = "think";
       v.label = { text: "bise", acc: true };

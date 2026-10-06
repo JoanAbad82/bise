@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Uint8Array, Float32Array, String, Number });
-for (const f of ["words.js", "face.js", "spotlist.js", "model.js", "pearl.js", "bar.js", "panelmodel.js", "fakecore.js", "../kit/notelines.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+for (const f of ["words.js", "face.js", "policy.js", "spotlist.js", "model.js", "pearl.js", "bar.js", "panelmodel.js", "fakecore.js", "../kit/notelines.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
 const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes, BiseLines, AmbPearl: Pearl, AmbBar: Bar, AmbPanel: Pn } = ctx;
 const W = Wd.W;
 
@@ -1427,14 +1427,15 @@ law("round 10: the preview follows ↑↓; it's asked once per agent (the page w
 law("desktop S8 spotlight (v9): fn space asks bise or finds an agent; 1-2 words naming an agent list it and ⏎ opens it in the window; a sentence puts 'ask bise' first, the agents it names at ↓", () => {
   let m = M.step(R10(), { ev: "app_key", key: "space" }, 10).m;
   let s = Bar.spec(v10(m));
-  eq([s.kind, s.head.input.ph, s.head.right.text], ["spotlight", "ask bise, or find an agent", "to bise"]);
+  eq([s.kind, s.head.input.ph, s.head.right.text], ["spotlight", "ask bise, or find an agent", "hold fn to talk"]);
   const foot = (x) => x.foot.left.map((i) => `${i.keys.join(" ")} ${i.w}`);
   // v9's example 1: a name -> that agent, ⏎ opens it, ⌘⏎ still sends the words to bise
   m = M.step(m, { ev: "ui_spot_type", text: "perf" }, 20).m;
   s = Bar.spec(v10(m));
   eq(s.sections.map((x) => [x.label, x.rows.map((r) => r.t)]), [["found", ["perf"]]]);
   eq(s.sections[0].rows[0].mark, { t: [0, 4], sub: null });
-  eq(foot(s), ["⏎ open perf", "⌘ ⏎ send « perf » to bise", "tab start an agent"]);
+  eq(foot(s), ["⏎ open perf", "⌘ ⏎ send “perf” to bise", "tab start an agent"]);
+  eq(s.head.right.text, "to bise");   // once he has typed (ambient m_8498 (4))
   const row = Bar.selRow(s);
   eq(row.act, { ev: "ui_agent", agent: "perf" });
   const r = M.step(m, row.act, 30);
@@ -1490,6 +1491,31 @@ law("desktop S8 spotlight empty (v9): waiting for you, at work, environments wit
   // a project's name finds it and its agents ("eng" in v9: engine's agents, then engine)
   m = M.step(m, { ev: "ui_spot_type", text: "store" }, 80).m;
   eq(Bar.spec(M.view(m, 90, Fake.T0)).sections[0].rows.map((r) => r.t), ["stock", "wallet", "storefront"]);
+});
+law("desktop S8 route line (v9): after a talk, '→ telemetry · main' for 2 s; tab = the next project (route_correct), fn esc = cancel (route_cancel); then bise's usual 'working'", () => {
+  const projects = [{ project: "home", name: "bise", home: true, order: 0 }, { project: "storefront-5c1d", name: "storefront", order: 1 },
+    { project: "telemetry-8e02", name: "telemetry", order: 2 }, { project: "engine-31aa", name: "engine", order: 3 }];
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [], projects }, 0).m;
+  m = M.step(M.step(m, { ev: "app_fn", state: "down", key: "fn" }, 10).m, { ev: "app_fn", state: "up", key: "fn" }, 20).m;
+  m = M.step(M.step(m, { ev: "sent", voice: true }, 30).m, { ev: "phase", phase: "sending" }, 40).m;
+  // the core's deadline is its wall clock: 1.8 s left when it came (at_wall, stamped by ui.js)
+  m = M.step(m, { ev: "route", project: "home", to: "telemetry-8e02", text: "pourquoi le p99 monte à 14 h", correct_until_ms: 1800, at_wall: 0 }, 50).m;
+  let v = M.view(m, 60), s = Bar.spec(v);
+  eq([v.state, v.mood, v.content, s.head.line.text], ["route", "work", { kind: "got", route: true }, "→ telemetry · main"]);
+  eq(s.foot.left.map((i) => `${i.keys.join(" ")} ${i.w}`), ["tab another project", "fn esc cancel"]);
+  // tab: the next project in order (wraps), the line follows
+  let r = M.step(m, { ev: "app_key", key: "tab" }, 100);
+  eq([r.cmds, Bar.spec(M.view(r.m, 110)).head.line.text], [[{ cmd: "route_correct", project: "home", to: "engine-31aa" }], "→ engine · main"]);
+  r = M.step(r.m, { ev: "app_key", key: "tab" }, 120);
+  eq(r.cmds, [{ cmd: "route_correct", project: "home", to: "storefront-5c1d" }]);
+  // fn esc: cancelled, the line goes
+  const c = M.step(m, { ev: "app_key", key: "esc" }, 100);
+  eq([c.cmds, M.view(c.m, 110).state], [[{ cmd: "route_cancel", project: "home" }], "working"]);
+  // after the deadline: no line, tab and esc are the usual keys again
+  eq([M.view(m, 1900).state, M.step(m, { ev: "app_key", key: "tab" }, 1900).cmds], ["working", []]);
+  // a followed job's agent: '→ storefront · stock · following'
+  m = M.step(m, { ev: "route", project: "home", to: "storefront-5c1d", agent: "stock", followed: true, text: "relance le replay", correct_until_ms: 2000, at_wall: 0 }, 2000).m;
+  eq(Bar.spec(M.view(m, 2010)).head.line.text, "→ storefront · stock · following");
 });
 law("round 10: ⌘D follows the selected agent (again to stop), ⌘O opens it in the terminal; fn space with no agents stays round 9's 700 px field", () => {
   let m = M.step(R10(), { ev: "app_key", key: "a" }, 10).m;

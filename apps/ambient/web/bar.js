@@ -86,7 +86,8 @@
   const SP = Wd.spot;
   function spotlight(s, v) {
     const L = v.spot.list, q = L.q;
-    s.head = { h: 68, input: { text: v.spot.text, ph: SP.ph }, right: { text: SP.to } };
+    // 'to bise' names where ⌘⏎ sends, once he has typed; empty, the voice way (ambient m_8498 (4))
+    s.head = { h: 68, input: { text: v.spot.text, ph: SP.ph }, right: { text: q ? SP.to : SP.holdFn } };
     let envN = 0;
     const row = (r) => {
       if (r.kind === "card") return { g: "?", gc: "a", t: r.agent, p: r.pname, sub: r.text, right: { keys: ["⏎"] }, act: { ev: "ui_open_card", card: r.id }, qa: `card-${r.id}` };
@@ -163,6 +164,11 @@
           : { left: [item(["fn"], B.send, null, B.letGo), item(["esc"], B.cancel, key("esc"))], right: [item(["fn"], B.handsFree, null, B.doubleTap)] };
         return s;
       }
+      // desktop S8: '→ telemetry · main', 2 s to correct with tab, fn esc cancels (v9)
+      case "route":
+        s.head = { h: 68, line: { text: v.route.line, size: "big" } };
+        s.foot = { left: [item(["tab"], Wd.route.another, { ev: "ui_route_next" }), item(["fn", "esc"], Wd.route.cancel, { ev: "ui_route_cancel" })], right: [] };
+        return s;
       case "working": case "speaking": case "end": {
         // after he lets go: his words stay, whole, while bise thinks; main's answer replaces them
         // his words dim (ambient m_7170: the pearl thinking + dimmed words = heard, working)
