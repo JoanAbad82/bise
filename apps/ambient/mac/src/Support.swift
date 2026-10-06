@@ -136,6 +136,52 @@ enum Log {
     }
 }
 
+// the core's environment (lead m_8079, the user's 'can't reach bise'):
+// whatever launched the app (an agent's shell, Ghostty, bise-ambient), the
+// core never gets the launcher's agent plumbing: SB_*, BISE_ROLE,
+// BISE_AGENT*, BEND_STDIN, BEND_*SOCKET, Ghostty's vars. What it needs
+// stays: PATH, HOME, BISE_HOME, BISE_APP_ROOT, the harness switch, keys.
+enum CoreEnv {
+    static func dropped(_ k: String, _ v: String) -> Bool {
+        if k.hasPrefix("SB_") || k.hasPrefix("BISE_AGENT") || k.hasPrefix("GHOSTTY_") { return true }
+        if k == "BISE_ROLE" || k == "BEND_STDIN" { return true }
+        if k.hasPrefix("BEND_") && k.hasSuffix("SOCKET") { return true }
+        if ["TERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION"].contains(k) { return true }   // a terminal's, never the core's
+        return false
+    }
+
+    // the app's own env, then the launch's --env K=V, both filtered
+    static func make(base: [String: String], launch: [String: String]) -> [String: String] {
+        var env = base.filter { !dropped($0.key, $0.value) }
+        for (k, v) in launch where !dropped(k, v) { env[k] = v }
+        return env
+    }
+}
+
+// which bise the core runs (lead m_8079): never PATH's 'bise'. A path given
+// (--bise, switch.json, the last launch's) if it is an executable; else the
+// bise inside or next to the app bundle; else none (a clear 'no bise' state)
+enum BisePick {
+    static func resolve(_ given: String, bundle: String, isExe: (String) -> Bool) -> String? {
+        if given.contains("/") { return isExe(given) ? given : nil }
+        let dir = (bundle as NSString).deletingLastPathComponent
+        for c in [bundle + "/Contents/MacOS/bise", bundle + "/Contents/Resources/bise", dir + "/bise"] where isExe(c) { return c }
+        return nil
+    }
+}
+
+// where this app runs from (lead m_8079, one build dir): the one path is
+// <bise dev dir>/build/ambient (scripts/ambient.sh's rule); anything else is
+// a stray copy (an old SB_BUILD_DIR or state dir), said in app.log's line 1
+enum BuildDir {
+    static func kind(bundle: String, devDir: String) -> String {
+        let one = devDir + "/build/ambient/"
+        if bundle.hasPrefix(one + "harness/") { return "harness" }
+        if bundle.hasPrefix(one) { return "the one path" }
+        return "a stray copy (not \(one))"
+    }
+}
+
 // harness A's switch (Harness.swift): AMBIENT_HARNESS=<dir> or
 // BISE_AMBIENT_TEST_INPUT=<socket>; honored only with a throwaway home
 enum HarnessEnv {

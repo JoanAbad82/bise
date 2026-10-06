@@ -118,7 +118,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         // QA picks its own bise; a normal launch never runs the PATH's bise
         // while a dev build is there (Config.restoring, lead m_6267)
         // QA and harness A pick their own bise (harness A: his launch's --bise as given)
-        if config.harness != nil { return config }
+        if config.harness != nil { return AmbientApp.ownBise(config) }
         var c = config.qa != nil ? config
             : config.restoring(d.dictionary(forKey: "lastLaunch"), isExe: { fm.isExecutableFile(atPath: $0) })
         if c.qa == nil, c.isDevBuild(c.bise) { d.set(c.saved, forKey: "lastLaunch") }
@@ -129,6 +129,16 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         else if let w = d.string(forKey: "lastWeb"), fm.fileExists(atPath: w) { c.web = w }
         if c.childEnv["PATH"] != nil { d.set(c.childEnv["PATH"], forKey: "lastPath") }
         else if let p = d.string(forKey: "lastPath") { c.childEnv["PATH"] = p }
+        return AmbientApp.ownBise(c)
+    }
+
+    // the core's bise is a path, never PATH's 'bise' (lead m_8079): the one
+    // given (or the last launch's), else the bise in or next to the bundle,
+    // else "" = no bise (Core says so and doesn't start)
+    private static func ownBise(_ config: Config) -> Config {
+        var c = config
+        let fm = FileManager.default
+        c.bise = BisePick.resolve(c.bise, bundle: Bundle.main.bundlePath, isExe: { fm.isExecutableFile(atPath: $0) }) ?? ""
         return c
     }
 
@@ -137,7 +147,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
         try? FileManager.default.createDirectory(atPath: config.ambientDir, withIntermediateDirectories: true)
         Log.open(config.ambientDir + "/app.log")
-        Log.say("app: up, pid \(getpid()), workspace \(config.workspace), bise \(config.bise), web \(config.web ?? "-")")
+        // line 1 says which build runs and which bise (lead m_8079, one build dir)
+        Log.say("app: up, pid \(getpid()), app \(Bundle.main.bundlePath) (\(BuildDir.kind(bundle: Bundle.main.bundlePath, devDir: config.dev))), bise \(config.bise.isEmpty ? "none (no --bise)" : config.bise), workspace \(config.workspace), web \(config.web ?? "-")")
         if harnessMode { harnessSetup() }
         writePid()
         settings = AppSettings.load { [defaults] in defaults.object(forKey: $0) }
@@ -415,8 +426,10 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             visFeed(.open)
             return
         }
-        Log.say("app: switch to \(c.workspace)")
+        c = AmbientApp.ownBise(c)   // a switch's bise is a path too, never PATH's
+        Log.say("app: switch to \(c.workspace), bise \(c.bise.isEmpty ? "none" : c.bise)")
         config = c
+        capsule.post(["ev": "app_bise", "path": c.bise.isEmpty ? NSNull() : c.bise as Any])
         // the next launch without scripts/ambient.sh comes back here
         if !sandbox, c.isDevBuild(c.bise) { defaults.set(c.saved, forKey: "lastLaunch") }
         memory = [:]
@@ -443,6 +456,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         capsule.post(settingsEvent())
         capsule.post(["ev": "app_hidden", "on": capsule.hidden])
         capsule.post(["ev": "app_globe", "use": globeUse()])
+        // the bise the 'start bise in a terminal' row names and runs (lead m_8079)
+        capsule.post(["ev": "app_bise", "path": config.bise.isEmpty ? NSNull() : config.bise as Any])
         visibleSaid = nil
         sayVisible()
         sendIcon()
@@ -559,6 +574,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // file that runs bise in his workspace (opening a file needs no
     // Automation permission, unlike scripting Terminal). QA logs it only.
     private func runBise() {
+        // the app's own bise, never PATH's (lead m_8079)
+        guard !config.bise.isEmpty else { Log.say("app: run bise: no bise (launch the app with --bise <path>)"); return }
         core.restart(config: config)
         let path = config.ambientDir + "/start-bise.command"
         let script = Config.startBiseScript(bise: config.bise, workspace: config.workspace,

@@ -75,6 +75,14 @@ final class Core {
     }
 
     private func launch() {
+        // never PATH's 'bise' (lead m_8079): no bise path = a clear 'no bise'
+        // state, said once, no retry loop
+        guard config.bise.contains("/") else {
+            Log.say("core: no bise: launch the app with --bise <path to bise> (never PATH's 'bise')")
+            stopped = true
+            DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.onExit?(127) } }
+            return
+        }
         startedAt = Date()
         lived = 0
         gen += 1
@@ -82,16 +90,10 @@ final class Core {
         let p = Process()
         // no workspace (launched from Finder or the menu bar): the home workspace, ~/bise
         let args = config.workspace.isEmpty ? ["ambient-core", "--home"] : ["ambient-core", "--workspace", config.workspace]
-        if config.bise.contains("/") {
-            p.executableURL = URL(fileURLWithPath: config.bise)
-            p.arguments = args
-        } else {   // a bare name: through PATH
-            p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            p.arguments = [config.bise] + args
-        }
-        var env = ProcessInfo.processInfo.environment
-        for (k, v) in config.childEnv { env[k] = v }
-        p.environment = env
+        p.executableURL = URL(fileURLWithPath: config.bise)
+        p.arguments = args
+        // never the launcher's agent plumbing (SB_*, BISE_ROLE, Ghostty's...)
+        p.environment = CoreEnv.make(base: ProcessInfo.processInfo.environment, launch: config.childEnv)
         if !config.workspace.isEmpty { p.currentDirectoryURL = URL(fileURLWithPath: config.workspace) }
 
         let inPipe = Pipe(), outPipe = Pipe()

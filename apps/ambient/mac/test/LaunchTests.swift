@@ -73,5 +73,37 @@ law("harness: with the core's fake voice on, talk_start/end/cancel go to the cor
     HarnessEnv.forward("talk_start", fakeVoice: true) && HarnessEnv.forward("talk_end", fakeVoice: true) && HarnessEnv.forward("talk_cancel", fakeVoice: true))
 law("harness: every other cmd always goes", HarnessEnv.forward("send", fakeVoice: false) && HarnessEnv.forward("answer", fakeVoice: true))
 
+// the core's env (lead m_8079): never the launcher's agent plumbing
+let agentShell = ["PATH": "/usr/bin:/bin", "HOME": "/Users/g", "BISE_HOME": "/Users/g/.bise", "SB_SOCKET": "/x.sock", "SB_BUILD_DIR": "/b",
+                  "BISE_ROLE": "task", "BISE_AGENT": "amb-mac", "BISE_AGENT_ID": "7", "BEND_STDIN": "/fifo", "BEND_HUB_SOCKET": "/h.sock",
+                  "GHOSTTY_RESOURCES_DIR": "/g", "TERM_PROGRAM": "ghostty", "TERM": "xterm-ghostty", "OPENAI_API_KEY": "k", "LANG": "fr_FR.UTF-8"]
+let ce = CoreEnv.make(base: agentShell, launch: ["BISE_APP_ROOT": "/repo", "PATH": "/opt/homebrew/bin:/usr/bin:/bin", "SB_HUB": "/x"])
+law("core env: no SB_*, even from --env", !ce.keys.contains { $0.hasPrefix("SB_") })
+law("core env: no BISE_ROLE, no BISE_AGENT*", ce["BISE_ROLE"] == nil && !ce.keys.contains { $0.hasPrefix("BISE_AGENT") })
+law("core env: no BEND_STDIN, no BEND_*SOCKET", ce["BEND_STDIN"] == nil && ce["BEND_HUB_SOCKET"] == nil)
+law("core env: no Ghostty or terminal vars", ce["GHOSTTY_RESOURCES_DIR"] == nil && ce["TERM_PROGRAM"] == nil && ce["TERM"] == nil)
+law("core env: keeps BISE_HOME, HOME, LANG and the provider keys", ce["BISE_HOME"] == "/Users/g/.bise" && ce["HOME"] == "/Users/g" && ce["LANG"] != nil && ce["OPENAI_API_KEY"] == "k")
+law("core env: the launch's --env wins (PATH, BISE_APP_ROOT)", ce["PATH"] == "/opt/homebrew/bin:/usr/bin:/bin" && ce["BISE_APP_ROOT"] == "/repo")
+law("core env: the harness switch reaches the core (its fake voice)", CoreEnv.make(base: ["AMBIENT_HARNESS": "/h"], launch: [:])["AMBIENT_HARNESS"] == "/h")
+
+// the core's bise (lead m_8079): never PATH's 'bise'
+let exes: Set<String> = ["/b/bise", "/Apps/bise ambient.app/Contents/MacOS/bise", "/Other/bise"]
+let isExe: (String) -> Bool = { exes.contains($0) }
+law("bise: a given path that runs is the one", BisePick.resolve("/b/bise", bundle: "/Apps/bise ambient.app", isExe: isExe) == "/b/bise")
+law("bise: a given path that doesn't run: none, never another", BisePick.resolve("/gone/bise", bundle: "/Apps/bise ambient.app", isExe: isExe) == nil)
+law("bise: no path given: the one inside the bundle", BisePick.resolve("bise", bundle: "/Apps/bise ambient.app", isExe: isExe) == "/Apps/bise ambient.app/Contents/MacOS/bise")
+law("bise: no path given, none in the bundle: the one next to it", BisePick.resolve("bise", bundle: "/Other/bise ambient.app", isExe: isExe) == "/Other/bise")
+law("bise: nothing: none (a clear no-bise state), never PATH", BisePick.resolve("bise", bundle: "/Nowhere/bise ambient.app", isExe: isExe) == nil)
+law("bise: an empty given: same rule", BisePick.resolve("", bundle: "/Nowhere/bise ambient.app", isExe: isExe) == nil)
+
+// one build dir (lead m_8079): which copy runs, said in app.log's line 1
+law("build dir: the one path", BuildDir.kind(bundle: "/Users/g/.bise/dev/build/ambient/bise ambient.app", devDir: "/Users/g/.bise/dev") == "the one path")
+law("build dir: the try's new/ is the one path too", BuildDir.kind(bundle: "/Users/g/.bise/dev/build/ambient/new/bise ambient.app", devDir: "/Users/g/.bise/dev") == "the one path")
+law("build dir: the harness build", BuildDir.kind(bundle: "/Users/g/.bise/dev/build/ambient/harness/bise ambient.app", devDir: "/Users/g/.bise/dev") == "harness")
+law("build dir: the old state dir's copy is a stray",
+    BuildDir.kind(bundle: "/Users/g/.local/state/switchboard/build/ambient/bise ambient.app", devDir: "/Users/g/.bise/dev").hasPrefix("a stray copy"))
+law("build dir: an unmigrated home's state dir is its one path",
+    BuildDir.kind(bundle: "/Users/g/.local/state/switchboard/build/ambient/bise ambient.app", devDir: "/Users/g/.local/state/switchboard") == "the one path")
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Launch laws hold")
