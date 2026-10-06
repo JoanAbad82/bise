@@ -45,6 +45,19 @@ export function clampSize(cols: unknown, rows: unknown): { cols: number; rows: n
   return { cols: Math.min(500, Math.max(2, Math.floor(cols))), rows: Math.min(200, Math.max(1, Math.floor(rows))) };
 }
 
+/** Test mode: the bise that runs `bise pty` when it isn't the core's (a FakeCore run still gets a real pty). */
+export const PTY_ENV = 'BISE_DESKTOP_PTY';
+
+/**
+ * The bise that runs the shells: in test mode BISE_DESKTOP_PTY when it is an
+ * absolute path, else the core's (`core`: paths.ts's binPath). Never in a
+ * normal run: there the app's own bise runs both.
+ */
+export function ptyBin(env: Readonly<Record<string, string | undefined>>, testMode: boolean, core: string | null): string | null {
+  const set = env[PTY_ENV] ?? '';
+  return testMode && set.startsWith('/') ? set : core;
+}
+
 /** At most this many shells at once. */
 export const MAX_SHELLS = 8;
 /** At most this many bytes a write. */

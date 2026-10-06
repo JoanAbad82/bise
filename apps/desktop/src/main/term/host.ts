@@ -11,7 +11,8 @@
 // window in 16 ms batches (IPC.termData {id, bytes}); its end as
 // IPC.termExit {id, code}.
 //
-// Test mode: the harness's own bise only (paths.ts), a clean /bin/sh, the
+// Test mode: the harness's own bise only (paths.ts; BISE_DESKTOP_PTY when the
+// harness runs a FakeCore and gives the shells a real bise), a clean /bin/sh, the
 // folder jailed by `bise pty` itself (BISE_TEST_HOME), and a stdout line
 // `TERM_LINE <id> open|exit <code>` for the harness.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -22,7 +23,7 @@ import { IPC, TERM_LINE, type TermOpened } from '../../shared/api';
 import { onCoreEvent } from '../core/ipc';
 import { LineSplitter } from '../helper/lines';
 import { binPath } from '../paths';
-import { Batcher, clampSize, decodePtyEv, encodePtyCmd, evictee, folderOf, MAX_SHELLS, MAX_WRITE } from './lines';
+import { Batcher, clampSize, decodePtyEv, encodePtyCmd, evictee, folderOf, MAX_SHELLS, MAX_WRITE, ptyBin } from './lines';
 
 interface Shell {
   readonly id: string;
@@ -72,7 +73,8 @@ export class TermHost {
     // room for this one: the least recently used of the others ends
     const drop = evictee(new Map([...this.lastUse].filter(([k]) => k !== id && this.shells.has(k))), MAX_SHELLS);
     if (drop !== null) this.kill(drop);
-    const bise = binPath({ env: process.env, packaged: app.isPackaged, resourcesPath: process.resourcesPath, appPath: app.getAppPath(), exists: existsSync });
+    const core = binPath({ env: process.env, packaged: app.isPackaged, resourcesPath: process.resourcesPath, appPath: app.getAppPath(), exists: existsSync });
+    const bise = ptyBin(process.env, this.testMode, core);
     if (bise === null) return { error: 'no bise to run the shell' };
     const args = ['pty', '--cwd', folder, '--cols', String(size.cols), '--rows', String(size.rows), ...(this.testMode ? ['--shell', '/bin/sh'] : [])];
     const child = spawn(bise, args, { stdio: ['pipe', 'pipe', 'pipe'] });

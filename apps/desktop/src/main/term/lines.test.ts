@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Batcher, clampSize, decodePtyEv, encodePtyCmd, evictee, folderOf } from './lines';
+import { Batcher, clampSize, decodePtyEv, encodePtyCmd, evictee, folderOf, ptyBin } from './lines';
 
 describe('pty lines', () => {
   it('decodes known events, drops the rest', () => {
@@ -74,5 +74,16 @@ describe('Batcher', () => {
       ['b', [9]],
       ['a', [1, 2, 3]],
     ]);
+  });
+});
+
+describe('ptyBin', () => {
+  it("test mode: BISE_DESKTOP_PTY when it is an absolute path, else the core's bise", () => {
+    expect(ptyBin({ BISE_DESKTOP_PTY: '/gate/bise' }, true, '/fake/core')).toBe('/gate/bise');
+    expect(ptyBin({ BISE_DESKTOP_PTY: 'bise' }, true, '/fake/core')).toBe('/fake/core');
+    expect(ptyBin({}, true, null)).toBeNull();
+  });
+  it('a normal run never reads it: the app\'s own bise runs the shells', () => {
+    expect(ptyBin({ BISE_DESKTOP_PTY: '/elsewhere/bise' }, false, '/app/bin/bise')).toBe('/app/bin/bise');
   });
 });
