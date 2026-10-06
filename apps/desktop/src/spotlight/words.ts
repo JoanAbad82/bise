@@ -18,6 +18,11 @@ export const W = {
   keysEmpty: '⏎ open in bise   esc close',
   keysAsk: '⏎ send to bise   ↑↓ move   esc close',
   answerMore: 'the rest in bise   ⏎ open',
+  // the routing hold (bar ⛔3, lead m_9855): bise picked the project, he has 2 s to change it
+  routeTo: (name: string, s: number): string => (s > 0 ? `to ${name} · ${s} s to change` : `to ${name} · sending`),
+  keepWithBise: 'keep it with bise',
+  anotherProject: 'another project',
+  keysRoute: 'esc keep it with bise   ↑↓ ⏎ another project',
 } as const;
 
 /** One line of text: tags out, whitespace runs as one space, cut at a word past `max` with `…`. */

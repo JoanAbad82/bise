@@ -96,7 +96,7 @@ describe('the capsule', () => {
   it('keeps one live pearl node from the spotlight to the talk to the answer', () => {
     const base: CapsuleProps = {
       view: { kind: 'spot' }, spot: { agents: [], projects: [], cards: [] }, answer: null, heard: '', level: 0, still: true,
-      card: () => null, onAsk: vi.fn(), onOpen: vi.fn(), onOpenWindow: vi.fn(), onClose: vi.fn(), onQuit: null, onSize: vi.fn(),
+      card: () => null, route: null, onRouteKeep: vi.fn(), onRouteTo: vi.fn(), onAsk: vi.fn(), onOpen: vi.fn(), onOpenWindow: vi.fn(), onClose: vi.fn(), onQuit: null, onSize: vi.fn(),
     };
     const ui = render(<Capsule {...base} />);
     const pearl = ui.getByTestId('capsule.pearl');

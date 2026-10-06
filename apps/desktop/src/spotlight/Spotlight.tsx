@@ -7,7 +7,7 @@
 import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent, type ReactNode } from 'react';
 import { Spot, SpotGroup, SpotRow, type DotState } from '@/ds';
 import { LivePearl, type Mood } from '@/pearl';
-import { flat, spotList, type AgentStatus, type SpotData, type SpotItem } from './list';
+import { flat, routeList, spotList, type AgentStatus, type SpotData, type SpotItem } from './list';
 import { W } from './words';
 import './spotlight.css';
 
@@ -15,6 +15,14 @@ export interface SpotAnswer {
   readonly text: string;
   /** bise is still writing it. */
   readonly done: boolean;
+}
+
+/** A routing hold on what he just sent: bise picked `to`, he can change it until `until` (epoch ms). */
+export interface SpotRoute {
+  readonly rid: number;
+  readonly to: string;
+  readonly name: string;
+  readonly until: number;
 }
 
 export interface SpotlightProps {
@@ -26,6 +34,12 @@ export interface SpotlightProps {
   /** The pearl's place: the capsule passes a hole and keeps its one live pearl over it (never
    *  re-mounted when the capsule changes view); alone, the spotlight draws its own. */
   readonly pearl?: ReactNode;
+  /** A routing hold running on his last send: shown at once, with its countdown (bar ⛔3). */
+  readonly route?: SpotRoute | null;
+  /** esc or a click on the hold: keep it with bise (route_cancel). */
+  readonly onRouteKeep?: () => void;
+  /** ⏎ on another project during the hold (route_correct). */
+  readonly onRouteTo?: (project: string) => void;
   /** A sentence for bise (⏎ on 'ask bise', or ⏎ with nothing picked). */
   readonly onAsk: (text: string) => void;
   /** Open a card, an agent or an environment in bise's window. */
@@ -62,6 +76,30 @@ const Row = memo(function Row({ item, on, testId, onPick }: { item: SpotItem; on
   }
 });
 
+/** 'to telemetry · 2 s to change', counting down on its own (the list and the input don't re-render). */
+export function RouteLine({ route, onKeep, testId }: { route: SpotRoute; onKeep?: (() => void) | undefined; testId: string }): JSX.Element {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      setNow(Date.now());
+    }, 250);
+    return () => {
+      window.clearInterval(t);
+    };
+  }, []);
+  const left = Math.max(0, Math.ceil((route.until - now) / 1000));
+  return (
+    <div className="b-spot-route" data-testid={testId} data-left={left}>
+      <span className="to">{W.routeTo(route.name, left)}</span>
+      {onKeep !== undefined && (
+        <button type="button" className="keep" onClick={onKeep} data-testid={`${testId}.keep`}>
+          {W.keepWithBise}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function answerLines(text: string): { readonly shown: string; readonly cut: boolean } {
   const lines = text.split('\n');
   return lines.length <= ANSWER_MAX_LINES ? { shown: text, cut: false } : { shown: lines.slice(0, ANSWER_MAX_LINES).join('\n'), cut: true };
@@ -74,7 +112,8 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
   const [text, setText] = useState('');
   // the list follows the words at React's pace; the input itself is never re-rendered by it
   const query = useDeferredValue(text);
-  const list = useMemo(() => spotList(p.data, query), [p.data, query]);
+  const route = p.route ?? null;
+  const list = useMemo(() => (route === null ? spotList(p.data, query) : routeList(p.data, route.to)), [p.data, query, route]);
   const items = useMemo(() => flat(list), [list]);
   const [sel, setSel] = useState({ q: '', i: 0 });
   const index = sel.q === query ? Math.min(sel.i, Math.max(0, items.length - 1)) : 0;
@@ -107,6 +146,10 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
   };
 
   const pick = (item: SpotItem): void => {
+    if (props.current.route != null) {
+      if (item.kind === 'env') props.current.onRouteTo?.(item.project);
+      return;
+    }
     if (item.kind === 'ask') send(item.text);
     else if (item.kind !== 'front') props.current.onOpen(item);
   };
@@ -125,11 +168,16 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
         return;
       }
       const item = items[index];
+      if (route !== null) {
+        if (item !== undefined) pick(item);
+        return;
+      }
       if (item !== undefined && text === query) pick(item);
       else send(text);
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      p.onClose();
+      if (route !== null) p.onRouteKeep?.();
+      else p.onClose();
     } else if (e.metaKey && /^[1-9]$/u.test(e.key)) {
       const env = items.find((x) => x.kind === 'env' && x.n === Number(e.key));
       if (env !== undefined) {
@@ -140,7 +188,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
   };
 
   const ans = p.answer ? answerLines(p.answer.text) : null;
-  const keys = list.mode === 'ask' ? W.keysAsk : W.keysEmpty;
+  const keys = route !== null ? W.keysRoute : list.mode === 'ask' ? W.keysAsk : W.keysEmpty;
 
   return (
     <div ref={box} className="b-spotlight" data-testid={testId}>
@@ -165,6 +213,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
         }
         keys={ans?.cut === true ? W.answerMore : keys}
       >
+        {route !== null && <RouteLine route={route} onKeep={p.onRouteKeep} testId={`${testId}.route`} />}
         {ans !== null && (
           <div className="b-spot-answer" data-testid={`${testId}.answer`} aria-live="polite">
             {ans.shown}

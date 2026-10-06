@@ -6,7 +6,7 @@
 import { useEffect, useRef, type JSX, type ReactNode } from 'react';
 import { Menu, MenuItem, MenuSep } from '@/ds';
 import { LivePearl, type Mood } from '@/pearl';
-import { Spotlight, answerLines, type SpotAnswer, type SpotData, type SpotItem } from '@/spotlight';
+import { RouteLine, Spotlight, answerLines, type SpotAnswer, type SpotData, type SpotItem, type SpotRoute } from '@/spotlight';
 import type { View } from './machine';
 import './capsule.css';
 
@@ -29,6 +29,10 @@ export interface CapsuleProps {
   readonly heard: string;
   readonly level: number;
   readonly still: boolean;
+  /** A routing hold on what he just sent (bar ⛔3): shown at once, in the spotlight or the talk. */
+  readonly route: SpotRoute | null;
+  readonly onRouteKeep: () => void;
+  readonly onRouteTo: (project: string) => void;
   /** amb-home's card for a pushed card, by id. */
   readonly card: (id: string) => ReactNode;
   readonly onAsk: (text: string) => void;
@@ -79,10 +83,11 @@ export function Capsule(p: CapsuleProps): JSX.Element {
       <div className={`b-cap-pearl${pearl ? '' : ' off'}`}>
         <LivePearl mood={moodOf(v, answering)} level={p.level} still={p.still} size={40} testId="capsule.pearl" />
       </div>
-      {v.kind === 'spot' && <div data-glass className="b-cap-glass"><Spotlight data={p.spot} answer={p.answer} pearl={<span className="b-cap-hole" />} onAsk={p.onAsk} onOpen={p.onOpen} onOpenAnswer={() => { p.onOpenWindow('bise'); }} onClose={p.onClose} testId="spot" /></div>}
+      {v.kind === 'spot' && <div data-glass className="b-cap-glass"><Spotlight data={p.spot} answer={p.answer} route={p.route} onRouteKeep={p.onRouteKeep} onRouteTo={p.onRouteTo} pearl={<span className="b-cap-hole" />} onAsk={p.onAsk} onOpen={p.onOpen} onOpenAnswer={() => { p.onOpenWindow('bise'); }} onClose={p.onClose} testId="spot" /></div>}
       {v.kind === 'talk' && (
         <div className="b-cap-talk" data-testid="capsule.talk" data-glass>
           {p.heard !== '' ? p.heard : v.phase === 'listen' ? W.listening : W.thinking}
+          {p.route !== null && <RouteLine route={p.route} onKeep={p.onRouteKeep} testId="capsule.route" />}
         </div>
       )}
       {v.kind === 'answer' && <Answer answer={p.answer} onOpen={() => { p.onOpenWindow('bise'); }} />}

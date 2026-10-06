@@ -4,3 +4,5 @@
 .b-spot-answer { padding: 4px 20px 12px 70px; font: var(--t-15)/1.5 var(--font-read); color: var(--c-text); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .b-spot-answer .cur { display: inline-block; width: 2px; height: 1.1em; margin-left: 2px; background: var(--c-text); vertical-align: -.2em; animation: b-blink 1s steps(1) infinite; }
 .b-live-pearl { flex: none; }
+.b-spot-route { display: flex; align-items: baseline; gap: 14px; padding: 4px 20px 10px 70px; font: var(--t-15)/1.4 var(--font-read); color: var(--c-text); }
+.b-spot-route .keep { margin-left: auto; padding: 0; border: 0; background: none; font: var(--t-12) var(--font-mono); color: var(--c-text-3); cursor: default; }

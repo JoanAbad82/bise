@@ -156,5 +156,13 @@ export function spotList(d: SpotData, text: string): SpotList {
   return { mode: 'ask', sections: [{ label: null, items: [{ kind: 'ask', id: 'ask', text: q }, ...named] }] };
 }
 
+/** While a routing hold runs: the other projects he can send it to instead (⏎ corrects the route). */
+export function routeList(d: SpotData, to: string): SpotList {
+  const items: SpotItem[] = d.projects
+    .filter((p) => p.id !== to)
+    .map((p, i) => ({ kind: 'env', id: `env.${p.id}`, project: p.id, name: p.name, front: false, n: i < 9 ? i + 1 : null, sub: shortPath(p.path) }));
+  return { mode: 'names', sections: items.length === 0 ? [] : [{ label: W.anotherProject, items }] };
+}
+
 /** The list's items in keyboard order. */
 export const flat = (l: SpotList): SpotItem[] => l.sections.flatMap((s) => s.items);

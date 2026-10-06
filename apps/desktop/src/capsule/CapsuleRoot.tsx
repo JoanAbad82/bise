@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type JSX
 import { InboxCard } from '@/inbox';
 import type { Card, HelperEv } from '@/proto';
 import { threadKey, useProjects, useStore } from '@/store';
-import type { SpotFront, SpotItem } from '@/spotlight';
+import type { SpotFront, SpotItem, SpotRoute } from '@/spotlight';
 import '@/ds/index.css';
 import { Capsule } from './Capsule';
 import { useSpotData } from './data';
@@ -125,6 +125,35 @@ export function CapsuleRoot(): JSX.Element {
     };
   }, [store, home]);
 
+  // the routing hold on his send (bar ⛔3, lead m_9855): shown from the hub's route event at once,
+  // gone on its route_done; esc (or fn esc) keeps it with bise, another project corrects it
+  const [route, setRoute] = useState<(SpotRoute & { readonly project: string }) | null>(null);
+  const routeRef = useRef(route);
+  useEffect(() => {
+    routeRef.current = route;
+  });
+  useEffect(
+    () =>
+      store.onEvent((ev) => {
+        if (ev.ev === 'route') setRoute({ project: ev.project, rid: ev.rid, to: ev.to, name: ev.name, until: ev.correct_until_ms });
+        else if (ev.ev === 'route_done') setRoute((r) => (r !== null && r.rid === ev.rid && r.project === ev.project ? null : r));
+      }),
+    [store],
+  );
+  const keepWithBise = useCallback((): void => {
+    const r = routeRef.current;
+    if (r === null) return;
+    store.command({ cmd: 'route_cancel', project: r.project, rid: r.rid });
+    setRoute(null);
+  }, [store]);
+  const routeTo = (to: string): void => {
+    const r = routeRef.current;
+    if (r === null) return;
+    store.command({ cmd: 'route_correct', project: r.project, rid: r.rid, to });
+    const name = store.projects().find((p) => p.project === to)?.name ?? to;
+    setRoute({ ...r, to, name });
+  };
+
   // the effects of each step, once
   useEffect(() => {
     for (const fx of m.fx) {
@@ -139,7 +168,8 @@ export function CapsuleRoot(): JSX.Element {
   useEffect(() => {
     if (bise === undefined) return;
     const offHelper = bise.onHelper((ev) => {
-      if (ev.ev === 'fn') dispatch({ ev: 'fn', act: ev.act, key: ev.key });
+      if (ev.ev === 'fn' && ev.act === 'esc' && routeRef.current !== null) keepWithBise();
+      else if (ev.ev === 'fn') dispatch({ ev: 'fn', act: ev.act, key: ev.key });
       else if (ev.ev === 'front') setFront(frontOf(ev));
       else if (ev.ev === 'quiet') dispatch({ ev: 'quiet', on: ev.on });
     });
@@ -156,7 +186,7 @@ export function CapsuleRoot(): JSX.Element {
       offHelper();
       offState();
     };
-  }, [bise]);
+  }, [bise, keepWithBise]);
 
   // the projects this window shows: all of them (the spotlight lists every project's agents and
   // cards, a push may come from any); the core sends their rows, agents and cards only after a
@@ -213,6 +243,9 @@ export function CapsuleRoot(): JSX.Element {
       level={0}
       still={still}
       card={cardOf}
+      route={route}
+      onRouteKeep={keepWithBise}
+      onRouteTo={routeTo}
       onAsk={(text) => {
         if (home === null) return;
         const order = store.threadOrder(threadKey(home, 'main')).order;

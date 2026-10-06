@@ -84,3 +84,25 @@ describe('the spotlight rows', () => {
     expect(ui.getByTestId('spot.row.agent.tel.perf')).toBe(perf);
   });
 });
+
+describe('the routing hold', () => {
+  it('shows "to <project> · N s to change" at once; esc keeps it with bise, ⏎ on another project corrects it', async () => {
+    const onRouteKeep = vi.fn();
+    const onRouteTo = vi.fn();
+    const route = { rid: 7, to: 'tel', name: 'telemetry', until: Date.now() + 2000 };
+    const ui = render(<Spotlight data={D} route={route} onRouteKeep={onRouteKeep} onRouteTo={onRouteTo} onAsk={vi.fn()} onOpen={vi.fn()} onClose={vi.fn()} />);
+    expect(ui.getByTestId('spot.route').textContent).toMatch(/^to telemetry · 2 s to change/u);
+    expect(ui.queryByTestId('spot.row.env.tel')).toBeNull();
+    const input = ui.getByTestId('spot.input');
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter' });
+      await Promise.resolve();
+    });
+    expect(onRouteTo).toHaveBeenCalledWith('shop');
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Escape' });
+      await Promise.resolve();
+    });
+    expect(onRouteKeep).toHaveBeenCalledTimes(1);
+  });
+});
