@@ -106,6 +106,7 @@ export const app_cmd: readonly AppCmd[] = [
   {"act":"fix","cmd":"computer_use","fix":"add_extension"},
   {"act":"leave","cmd":"computer_use"},
   {"act":"uninstall","cmd":"computer_use"},
+  {"cmd":"shown","projects":["bise-home-00000000","acme-1a2b3c4d"]},
 ];
 
 /** rust/proto/fixtures/draft_hub_cmd.jsonl */

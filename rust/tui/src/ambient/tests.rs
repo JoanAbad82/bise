@@ -767,6 +767,18 @@ fn voice_answers_off_is_text_only_until_on_again() {
     assert_eq!(Cmd::parse(r#"{"cmd":"voice","on":false}"#), Ok(Cmd::Voice { on: false }));
 }
 
+// the window's shown is bise-proto's AppCmd (qa-flows m_9714): the
+// fixture line parses to the projects it names; a bad one is an error
+#[test]
+fn shown_is_the_proto_app_cmd() {
+    assert_eq!(
+        Cmd::parse(r#"{"cmd":"shown","projects":["bise-home-00000000","acme-1a2b3c4d"]}"#),
+        Ok(Cmd::Shown { projects: vec!["bise-home-00000000".into(), "acme-1a2b3c4d".into()] })
+    );
+    assert_eq!(Cmd::parse(r#"{"cmd":"shown","projects":[]}"#), Ok(Cmd::Shown { projects: vec![] }));
+    assert!(Cmd::parse(r#"{"cmd":"shown"}"#).is_err());
+}
+
 #[test]
 fn the_state_carries_pages_url_and_urgent_cards() {
     let mut t = T::new();

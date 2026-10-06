@@ -324,6 +324,10 @@ pub enum AppCmd {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         fix: Option<String>,
     },
+    /// the projects the window shows now (replaces the set; on load and on
+    /// each route change): the core holds their hubs and sends their
+    /// `projects`/`agents`/`cards` only after the first one (core/hubs.rs)
+    Shown { projects: Vec<Project> },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
@@ -346,6 +350,7 @@ impl AppCmd {
         "plugin_login",
         "plugin_logout",
         "computer_use",
+        "shown",
     ];
 
     pub fn decode(line: &str) -> Result<AppCmd, String> {

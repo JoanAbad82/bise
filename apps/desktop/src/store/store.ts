@@ -122,6 +122,8 @@ export class Store {
   private readonly evListeners = new Set<(ev: Ev) => void>();
   private coreState: CoreState = 'down';
   private cid = 0;
+  /** the last shown set sent (null: none yet); said again to a core that comes back up */
+  private shownSet: readonly string[] | null = null;
   private readonly now: () => number;
 
   constructor(
@@ -323,6 +325,8 @@ export class Store {
     if (state === this.coreState) return;
     this.coreState = state;
     this.emit('core');
+    // a new core knows nothing of the window: what it shows is said again
+    if (state === 'up' && this.shownSet !== null) this.command({ cmd: 'shown', projects: [...this.shownSet] });
     if (state !== 'down') return;
     for (const [key, t] of this.threads) {
       if (!t.pending.some((p) => p.state === 'sending')) continue;
@@ -444,6 +448,18 @@ export class Store {
     this.emit(`pending:${key}`);
   }
 
+  /**
+   * The projects the window shows now (on load and each route change, amb-win
+   * m_9717): the core holds their hubs and sends their rows, agents and cards
+   * only after the first one. Sent only when the set changed.
+   */
+  shown(projects: readonly string[]): void {
+    const set = [...new Set(projects)];
+    if (this.shownSet !== null && sameStrings(this.shownSet, set)) return;
+    this.shownSet = set;
+    this.command({ cmd: 'shown', projects: set });
+  }
+
   subscribeThread(project: string, agent: string, limit?: number): void {
     this.command({ cmd: 'subscribe', project, agent, ...(limit === undefined ? {} : { limit }) });
   }
@@ -467,6 +483,10 @@ export class Store {
 /** The listener key of a diff slice (hooks.ts subscribes with it). */
 export function diffKey(project: string, agent: string, commit?: string): string {
   return commit === undefined ? `diff:${project}/${agent}` : `diff:${project}/@${commit}`;
+}
+
+function sameStrings(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((x, i) => x === b[i]);
 }
 
 function sameOrder(a: readonly number[], b: readonly number[]): boolean {

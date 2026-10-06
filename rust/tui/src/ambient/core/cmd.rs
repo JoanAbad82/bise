@@ -130,8 +130,10 @@ impl Cmd {
                 Cmd::EveryStop { id: id.ok_or("every_stop: no id")? }
             }
             "fake_words" => Cmd::FakeWords { text: s("text") },
-            "shown" => Cmd::Shown {
-                projects: v.get("projects").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect(),
+            // bise-proto's AppCmd shown: its shape is the one parsed
+            "shown" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("shown: {e}"))? {
+                bise_proto::draft::AppCmd::Shown { projects } => Cmd::Shown { projects },
+                other => return Err(format!("shown: decoded as {other:?}")),
             },
             c @ ("agent_preview" | "agent_history" | "agent_unwatch" | "agent_send" | "follow" | "stop" | "archive" | "unarchive") => {
                 let agent = s("agent").trim().trim_start_matches('@').to_string();

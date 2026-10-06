@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { core_ev, hub_cmd, hub_ev } from '@/proto/fixtures.gen';
+import { app_cmd, core_ev, hub_cmd, hub_ev } from '@/proto/fixtures.gen';
 import type { Entry } from '@/proto';
 import type { CoreCmd } from '@/shared/api';
 import { allFixtureEvents, replay } from './replay';
@@ -152,6 +152,22 @@ describe('store', () => {
     store.answer(P, 9, '1');
     store.stop(P, 'perf');
     for (const c of sent) expect(hub_cmd.map((h) => h.cmd)).toContain(c.cmd);
+  });
+
+  it('shown is sent deduped, only when the set changes, and again to a core that comes back up', () => {
+    const { store, sent } = fake();
+    store.shown(['home', P, 'home']);
+    store.shown(['home', P]);
+    store.shown(['home']);
+    expect(sent).toEqual([
+      { cmd: 'shown', projects: ['home', P] },
+      { cmd: 'shown', projects: ['home'] },
+    ]);
+    store.setCore('down');
+    store.setCore('starting');
+    store.setCore('up');
+    expect(sent[2]).toEqual({ cmd: 'shown', projects: ['home'] });
+    expect(app_cmd.map((c) => c.cmd)).toContain('shown');
   });
 
   it('olderPage asks for the page before the oldest entry, only when there is more', () => {
