@@ -384,6 +384,22 @@ law("a project with no agent says so in the sidebar and its thread; a failed age
   eq(w.v.head.t2.slice(-1), ["failed"]);
 });
 
+law("⌥⏎ queues his words for the end of a working agent's turn; the line says so until the agent gets it", () => {
+  const w = win();
+  w.go(P.storefront, "checkout");
+  assert.match(w.v.composer.keys, /⌥⏎ after its turn/);
+  w.type("et ajoute un test");
+  let s = w.s;
+  const r = M.step(s, { ev: "ui_key", key: "Enter", alt: true });
+  eq([r.eat, r.cmds], [true, [{ cmd: "send", project: P.storefront, agent: "checkout", text: "et ajoute un test", mode: "queued" }]]);
+  const line = V.view(r.s).thread.rows.filter((x) => x.t === "msg").pop();
+  eq([line.text, line.meta], ["et ajoute un test", "14:33 · queued · goes at the end of its turn"]);
+  // the fake core delivers it at the turn's end
+  eq(F.respond(r.cmds[0])[0][0], 2500);
+  w.go(P.storefront, "promo");
+  assert.doesNotMatch(w.v.composer.keys, /⌥⏎/);
+});
+
 // ---- the core's pages and live entries
 law("older messages page in once at a time, before the first one; a live entry with a known pos replaces it", () => {
   const w = win();

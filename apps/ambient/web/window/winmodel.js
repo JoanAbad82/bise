@@ -156,7 +156,9 @@
     return s;
   }
 
-  function send(s, cmds) {
+  // ⏎ sends now (a working agent reads it as a steer); ⌥⏎ queues it for the end of its turn
+  // (S3a's send mode; the hub's side comes with amb-hub's queued input, lead m_8258)
+  function send(s, cmds, mode = "now") {
     const k = keyOf(s.route);
     const text = (s.drafts[k] || "").trim();
     const quotes = s.quotes[k] || [];
@@ -164,9 +166,9 @@
     const d = D.dock(s);
     if (d && !quotes.length) return answer(s, d, { text }, cmds);
     const q = quotes.length ? quotes.map(({ agent, pos, text: t, file, lines }) => ({ agent, pos, text: t, ...(file ? { file, lines } : {}) })) : null;
-    cmds.push({ cmd: "send", project: s.route.project, agent: s.route.agent, text, mode: "now", ...(q ? { quote: q.length === 1 ? q[0] : q } : {}) });
+    cmds.push({ cmd: "send", project: s.route.project, agent: s.route.agent, text, mode, ...(q ? { quote: q.length === 1 ? q[0] : q } : {}) });
     const t = s.threads[k] || { entries: [] };
-    const pending = { pos: Number.MAX_SAFE_INTEGER, at_ms: s.now, kind: "you", text, via: "typed", pending: true, ...(q ? { quote: q[0] } : {}) };
+    const pending = { pos: Number.MAX_SAFE_INTEGER, at_ms: s.now, kind: "you", text, via: "typed", pending: true, ...(mode === "queued" ? { queued: true } : {}), ...(q ? { quote: q[0] } : {}) };
     return { ...s, drafts: set(s.drafts, k, ""), quotes: set(s.quotes, k, []), sel: null,
       threads: set(s.threads, k, { ...t, entries: [...t.entries, pending] }) };
   }
@@ -239,6 +241,7 @@
       return eat(s);
     }
     if (ev.key === "Escape") return eat(esc(s, cmds));
+    if (ev.key === "Enter" && alt && !meta && !ctrl && !ev.shift) return eat(send(s, cmds, "queued"));
     if (meta || ctrl || alt) return { s, eat: false };
     const d = D.dock(s);
     if (d && empty && (ev.key === "ArrowLeft" || ev.key === "ArrowRight")) return eat(moveDock(s, ev.key === "ArrowLeft" ? -1 : 1));

@@ -218,7 +218,10 @@
       out.push([cmd.cmd === "page" ? 150 : 0, { ev: "thread", project, agent, entries: page, before: page.length ? page[0].pos : null, more: older.length > page.length }]);
     } else if (cmd.cmd === "send") {
       const pos = ++seq;
-      out.push([0, { ev: "entry", project, agent, entry: { pos, at_ms: NOW, kind: "you", text: cmd.text, via: "typed", ...(cmd.quote ? { quote: cmd.quote } : {}) } }]);
+      // a queued message reaches the agent when its turn ends (here: 2.5 s later)
+      const later = cmd.mode === "queued" ? 2500 : 0;
+      out.push([later, { ev: "entry", project, agent, entry: { pos, at_ms: NOW, kind: "you", text: cmd.text, via: "typed", ...(cmd.quote ? { quote: cmd.quote } : {}) } }]);
+      if (later) { out.push([later + 900, { ev: "entry", project, agent, entry: { pos: ++seq, at_ms: NOW, kind: "agent", text: "vu à la fin de mon tour : je m'y mets." } }]); return out; }
       out.push([300, { ev: "typing", project, agent, text: "reading the thread" }]);
       if (project === HOME) {
         const to = guess(cmd.text);

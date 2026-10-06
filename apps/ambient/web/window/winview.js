@@ -110,7 +110,7 @@
     const bits = [hm(s, e.at_ms)];
     if (e.via && VIA[e.via]) bits.push(`${VIA[e.via]}${e.context && e.context.app ? `, from ${e.context.app}` : ""}`);
     else if (e.context && e.context.app) bits.push(`from ${e.context.app}`);
-    if (e.pending) bits.push("sending…");
+    if (e.pending) bits.push(e.queued ? "queued · goes at the end of its turn" : "sending…");
     return bits.join(" · ");
   }
   function ctx(e) {
@@ -198,7 +198,7 @@
     const working = a && a.status === "working" && s.route.agent !== "main";
     return { dock: D.dockWords(s, d), div: D.divider(s, d, a), ph: D.placeholder(s, d, a), text, quotes,
       send: text.trim() ? "on" : working ? "stop" : "off", disabled: !!s.offline,
-      keys: `@ file   $ skills   / commands   ⌘I inbox` };
+      keys: `@ file   $ skills   / commands${working ? "   ⌥⏎ after its turn" : ""}   ⌘I inbox` };
   }
 
   // ---- the right column: bise = waiting + made today; a project = its agents + scheduled
