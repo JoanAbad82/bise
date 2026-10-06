@@ -17,13 +17,17 @@
 //!   redraws it whatever runs (vim's alternate screen, htop, less), not a
 //!   tail of raw bytes.
 //!
+//! [`spawn`] is bise's one pty spawn: `bise pty` and the TUI's own
+//! terminal panel (term.rs) both run their shell through it, so both get
+//! the same environment rule.
+//!
 //! Pure parts (tested): [`parse_args`], [`clamp`], [`shell_env`],
 //! [`snapshot`], [`exit_code`]. The rest is the pty plumbing.
 
 use base64::Engine;
 use bise_home::env::{Child as EnvChild, ChildEnv};
 use bise_proto::pty::{PtyCmd, PtyEv};
-use portable_pty::{native_pty_system, CommandBuilder, ExitStatus, PtySize};
+use portable_pty::{native_pty_system, Child as PtyChild, CommandBuilder, ExitStatus, MasterPty, PtySize};
 use std::ffi::OsString;
 use std::io::{BufRead, Read, Write};
 use std::path::{Path, PathBuf};
@@ -132,25 +136,41 @@ pub fn main(args: &[String]) -> i32 {
     }
 }
 
-fn run(a: Args) -> Result<(), String> {
-    let shell = a.shell.clone().or_else(|| std::env::var("SHELL").ok().filter(|s| !s.is_empty())).unwrap_or_else(|| "/bin/zsh".into());
+/// A shell on a new pty: what [`spawn`] gives.
+pub(crate) struct Spawned {
+    pub master: Box<dyn MasterPty + Send>,
+    pub child: Box<dyn PtyChild + Send + Sync>,
+}
+
+/// `argv` on a new pty of `rows` × `cols`, in `cwd` when it is a folder,
+/// with exactly [`shell_env`] of this process's environment: the one pty
+/// spawn of bise, for `bise pty` and the TUI's own panel (term.rs).
+pub(crate) fn spawn(argv: &[&str], cwd: &Path, rows: u16, cols: u16) -> Result<Spawned, String> {
+    let Some(prog) = argv.first() else { return Err("nothing to run".into()) };
     let pair = native_pty_system()
-        .openpty(PtySize { rows: a.rows, cols: a.cols, pixel_width: 0, pixel_height: 0 })
+        .openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 })
         .map_err(|e| e.to_string())?;
-    let mut cmd = CommandBuilder::new(&shell);
-    // a login shell, as Terminal.app opens one
-    cmd.arg("-l");
-    cmd.cwd(&a.cwd);
+    let mut cmd = CommandBuilder::new(prog);
+    cmd.args(&argv[1..]);
+    if cwd.is_dir() {
+        cmd.cwd(cwd);
+    }
     cmd.env_clear();
     for (k, v) in shell_env(std::env::vars_os()).iter() {
         cmd.env(k, v);
     }
-    let mut child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
+    let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
+    Ok(Spawned { master: pair.master, child })
+}
+
+fn run(a: Args) -> Result<(), String> {
+    let shell = a.shell.clone().or_else(|| std::env::var("SHELL").ok().filter(|s| !s.is_empty())).unwrap_or_else(|| "/bin/zsh".into());
+    // a login shell, as Terminal.app opens one
+    let Spawned { master, mut child } = spawn(&[&shell, "-l"], &a.cwd, a.rows, a.cols)?;
     let pid = child.process_id().unwrap_or(0);
-    let mut reader = pair.master.try_clone_reader().map_err(|e| e.to_string())?;
-    let mut writer = pair.master.take_writer().map_err(|e| e.to_string())?;
-    let master = pair.master;
+    let mut reader = master.try_clone_reader().map_err(|e| e.to_string())?;
+    let mut writer = master.take_writer().map_err(|e| e.to_string())?;
     let out = Out(Arc::new(Mutex::new(std::io::stdout())));
     let parser = Arc::new(Mutex::new(vt100::Parser::new(a.rows, a.cols, SCROLLBACK)));
     out.send(&PtyEv::Started { pid, shell, cwd: a.cwd.display().to_string(), cols: a.cols, rows: a.rows });
