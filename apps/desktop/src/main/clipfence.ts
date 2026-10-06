@@ -12,6 +12,10 @@
 //     never touches the clipboard).
 //   paste: a paste ClipboardEvent carrying the buffer's formats; nobody took
 //     it: execCommand('insertText').
+// Each op first sends a selectionchange: the editor's view of the selection
+// follows those events, which a fast key sequence (⌘A ⌘C → ⌘V) can outrun.
+// Lexical fills a copy in its own update, possibly after the dispatch: the
+// selected text goes in at once, its formats replace it when they arrive.
 // Untrusted clipboard events have no default action, so nothing reaches the
 // system pasteboard. Never installed outside test mode.
 
@@ -85,6 +89,7 @@ interface KeyEventLike extends KeyLike {
   stopImmediatePropagation(): void;
 }
 interface DocLike {
+  dispatchEvent?: (e: unknown) => boolean;
   readonly activeElement: ElLike | null;
   readonly body: ElLike;
   getSelection(): { toString(): string } | null;
@@ -93,6 +98,7 @@ interface DocLike {
 type KeyListener = (e: KeyEventLike) => void;
 export interface WinLike {
   readonly document: DocLike;
+  readonly Event: new (type: string) => unknown;
   readonly File: new (bits: Uint8Array[], name: string, options: { type: string }) => unknown;
   readonly DataTransfer: new () => DataLike;
   readonly ClipboardEvent: new (
@@ -120,7 +126,10 @@ function selectedText(doc: DocLike): string {
   return doc.getSelection()?.toString() ?? '';
 }
 
-export function installClipFence(win: WinLike, mac: boolean): ClipFence {
+/** Runs `f` after the events already queued (the default: a 0 ms timer). */
+export type Defer = (f: () => void) => void;
+
+export function installClipFence(win: WinLike, mac: boolean, defer: Defer = (f) => void setTimeout(f, 0)): ClipFence {
   const doc = win.document;
   let buffer = new Map<string, string>();
   let files: readonly ClipFile[] = [];
@@ -128,39 +137,56 @@ export function installClipFence(win: WinLike, mac: boolean): ClipFence {
     doc.execCommand?.(command, false, value);
   };
 
-  const fire = (op: ClipOp, data: DataLike): boolean => {
+  const fire = (op: ClipOp, data: DataLike): ClipEventLike => {
     const target = doc.activeElement ?? doc.body;
     const ev = new win.ClipboardEvent(op, { clipboardData: data, bubbles: true, cancelable: true, composed: true });
     target.dispatchEvent(ev);
-    return ev.defaultPrevented;
+    return ev;
+  };
+  const formatsOf = (dt: DataLike): Map<string, string> => {
+    const m = new Map<string, string>();
+    for (const type of dt.types) m.set(type, dt.getData(type));
+    return m;
   };
 
   const run = (op: ClipOp): void => {
+    // the editor first learns where the caret is: an arrow just pressed has
+    // moved it, but the editor hears it from a selectionchange event that may
+    // still wait in the queue (qa-type m_9698: ⌘A ⌘C → ⌘V pasted over the
+    // old selection); an extra one is harmless
+    doc.dispatchEvent?.(new win.Event('selectionchange'));
     if (op === 'paste') {
       const dt = new win.DataTransfer();
       for (const [type, value] of buffer) dt.setData(type, value);
       for (const f of files) dt.items.add(new win.File([f.bytes], f.name, { type: f.type }));
-      if (!fire('paste', dt)) {
+      if (!fire('paste', dt).defaultPrevented) {
         const text = buffer.get('text/plain');
         if (text !== undefined) exec('insertText', text);
       }
       return;
     }
+    // the selection before anyone acts on it (a cut removes it)
+    const text = selectedText(doc);
     const dt = new win.DataTransfer();
-    if (fire(op, dt)) {
-      const next = new Map<string, string>();
-      for (const type of dt.types) next.set(type, dt.getData(type));
+    const ev = fire(op, dt);
+    if (ev.defaultPrevented) {
+      const next = formatsOf(dt);
       if (next.size > 0) {
         buffer = next;
         files = [];
       }
       return;
     }
-    const text = selectedText(doc);
     if (text === '') return;
     buffer = new Map([['text/plain', text]]);
     files = [];
     if (op === 'cut') exec('delete');
+    // Lexical fills the event in its update, after the dispatch returned:
+    // its formats replace the plain text once they're there
+    defer(() => {
+      const next = formatsOf(dt);
+      if (ev.defaultPrevented && next.size > 0) buffer = next;
+    });
   };
 
   const onKey = (e: KeyEventLike): void => {

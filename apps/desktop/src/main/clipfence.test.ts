@@ -61,7 +61,9 @@ describe('the fence', () => {
     field = dom.document.getElementById('f');
     field.focus();
     seen = [];
-    fence = installClipFence(win, true);
+    fence = installClipFence(win, true, (f) => {
+      f();
+    });
   });
 
   afterEach(() => {
