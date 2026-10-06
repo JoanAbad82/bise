@@ -14,17 +14,32 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "eslint --max-warnings 0 .",
-    "check": "pnpm typecheck && pnpm lint && pnpm build",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build",
     "smoke": "node scripts/smoke.mjs",
-    "test:e2e": "playwright test -c tests/harness/playwright.config.ts"
+    "test:e2e": "playwright test -c tests/harness/playwright.config.ts",
+    "test": "vitest run",
+    "gallery": "vite src/ds/gallery"
   },
   "dependencies": {
+    "@lexical/clipboard": "0.52.0",
+    "@lexical/history": "0.52.0",
+    "@lexical/plain-text": "0.52.0",
+    "@lexical/react": "0.52.0",
+    "@lexical/selection": "0.52.0",
+    "@lexical/utils": "0.52.0",
+    "@tanstack/react-virtual": "3.14.13",
+    "lexical": "0.52.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "react-markdown": "10.1.0",
+    "react-virtuoso": "4.18.16",
+    "remark-gfm": "4.0.1"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
     "@playwright/test": "1.63.0",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
     "@types/node": "22.20.5",
     "@types/pngjs": "6.0.5",
     "@types/react": "19.3.0",
@@ -35,10 +50,13 @@
     "eslint": "9.39.5",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "16.5.0",
+    "happy-dom": "20.14.5",
+    "jsdom": "30.1.2",
     "pngjs": "7.0.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.71.0",
-    "vite": "7.3.6"
+    "vite": "7.3.6",
+    "vitest": "3.2.7"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

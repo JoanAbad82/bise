@@ -3,8 +3,9 @@
 // src/main/core (spawning `bise ambient-core`) is amb-core's.
 //
 // Test mode (BISE_DESKTOP_TEST=1), for the harness: nothing ever in his face.
-// The window is placed off-display (-30000, -30000), not focusable, and shown
-// with showInactive (never activates the app), the app is an accessory with no
+// The page renders offscreen (webPreferences.offscreen) in a window that is
+// never shown (also placed at -30000 and not focusable: a shown window there
+// is clamped back onto his display), the app is an accessory with no
 // Dock icon, userData is BISE_DESKTOP_USER_DATA or a temp folder (never his
 // Application Support), and main prints READY_LINE on stdout once the page
 // has loaded.
@@ -22,8 +23,8 @@ function createWindow(): BrowserWindow {
     width: 1100,
     height: 720,
     show: false,
-    // focusable false: a stray focus()/show() can never activate the app
-    // over his; the harness draws the caret with CDP focus emulation.
+    // focusable false: a stray focus() can never activate the app over his;
+    // the harness draws the caret with CDP focus emulation.
     ...(testMode ? { x: OFF_DISPLAY, y: OFF_DISPLAY, focusable: false } : {}),
     title: 'bise',
     webPreferences: {
@@ -31,18 +32,14 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      // test mode renders offscreen and the window is never shown: macOS
+      // clamps a shown window at -30000 back to a strip on his display
+      // (qa-type m_9500, measured with CGWindowList), offscreen never is.
+      ...(testMode ? { offscreen: true } : {}),
     },
   });
 
-  win.once('ready-to-show', () => {
-    if (testMode) {
-      // ready-to-show may recenter on some setups: pin it off-display again.
-      win.setPosition(OFF_DISPLAY, OFF_DISPLAY);
-      win.showInactive();
-    } else {
-      win.show();
-    }
-  });
+  if (!testMode) win.once('ready-to-show', () => { win.show(); });
 
   if (testMode) {
     win.webContents.once('did-finish-load', () => {
