@@ -9,3 +9,4 @@ export { PAGES, KeyList, type Page } from './pages';
 export { Accounts, signedIn } from './accounts';
 export { onboarded, type Prefs } from './prefs';
 export { KEY_SECTIONS } from './keys';
+export { SettingsScreen, prefsOf } from './screen';

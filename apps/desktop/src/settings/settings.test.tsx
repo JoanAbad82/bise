@@ -22,7 +22,7 @@ const prefs = (): Prefs => {
 };
 const accounts = (): Account[] => ev('accounts').items;
 const projects = (): ProjectRow[] => ev('projects').projects;
-const found = (): { dir: string; items: Found[] } => ({ dir: ev('found').dir, items: ev('found').items });
+const found = (): Found[] => ev('found').items;
 
 const ports = (): SettingsPorts & { sent: AppCmd[]; went: string[] } => {
   const sent: AppCmd[] = [];
@@ -59,7 +59,7 @@ describe('prefs', () => {
 describe('projects', () => {
   it('orders his projects without bise, offers found repos not his yet, adds the typed path once', () => {
     expect(ordered(projects()).map((p) => p.name)).toEqual(['acme']);
-    expect(offers(found().items, projects()).map((f) => f.name)).toEqual(['shop']);
+    expect(offers(found(), projects()).map((f) => f.name)).toEqual(['shop']);
     expect(addPaths(['/a'], ' /b ')).toEqual(['/a', '/b']);
     expect(addPaths(['/a'], '/a')).toEqual(['/a']);
   });

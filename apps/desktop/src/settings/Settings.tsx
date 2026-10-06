@@ -17,7 +17,8 @@ export interface SettingsData {
   prefs: Prefs | null;
   accounts: readonly Account[];
   projects: readonly ProjectRow[];
-  found: { dir: string; items: readonly Found[] } | null;
+  /** the repos found_scan found in his folders (none yet: empty) */
+  found: readonly Found[];
 }
 
 export interface SettingsPorts {

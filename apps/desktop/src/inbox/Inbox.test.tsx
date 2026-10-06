@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Card } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
 import { Inbox, keyOf, type InboxPorts } from './Inbox';
+import { InboxCard } from './InboxCard';
 
 afterEach(cleanup);
 
@@ -49,8 +50,8 @@ describe('Inbox', () => {
   it('a click on an option picks it; close and esc', () => {
     const p = ports();
     render(<Inbox cards={cards()} names={{}} ports={p} now={1791100400000} />);
-    fireEvent.click(screen.getByTestId('inbox.opt.2'));
-    fireEvent.click(screen.getByTestId('inbox.close'));
+    fireEvent.click(screen.getByTestId('inbox.card.acme-1a2b3c4d-10.opt.2'));
+    fireEvent.click(screen.getByTestId('inbox.card.acme-1a2b3c4d-9.close'));
     fireEvent.keyDown(screen.getByTestId('inbox.root'), { key: 'Escape' });
     expect(p.calls).toEqual(['answer acme-1a2b3c4d 10 2', 'close acme-1a2b3c4d 9', 'back']);
   });
@@ -87,5 +88,18 @@ describe('Inbox', () => {
     expect(keyOf(k('Backspace', { metaKey: true }), '')).toEqual({ k: 'close' });
     expect(keyOf(k('Backspace', { metaKey: true }), 'x')).toBeNull();
     expect(keyOf(k('x', { ctrlKey: true }), 'x')).toEqual({ k: 'close' });
+  });
+
+  it('InboxCard alone: a card with its options and the acts it is given, no list', () => {
+    const picked: number[] = [];
+    const c = cards()[2];
+    if (!c) throw new Error('fixture');
+    render(<InboxCard card={c} project="acme" now={1791100400000} acts={{ pick: (n) => picked.push(n), open: () => picked.push(0), openPage: () => picked.push(-1) }} testId="capsule.card" />);
+    fireEvent.click(screen.getByTestId('capsule.card.opt.1'));
+    fireEvent.click(screen.getByTestId('capsule.card.open'));
+    fireEvent.click(screen.getByTestId('capsule.card.page'));
+    expect(picked).toEqual([1, 0, -1]);
+    expect(screen.queryByTestId('capsule.card.close')).toBeNull();
+    expect(screen.getByTestId('capsule.card').textContent).toContain('main asks');
   });
 });

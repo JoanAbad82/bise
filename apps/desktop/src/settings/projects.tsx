@@ -28,7 +28,7 @@ export function offers(found: readonly Found[], projects: readonly ProjectRow[])
   return found.filter((f) => !f.known && !known.has(f.path)).sort((a, b) => b.last_ms - a.last_ms).slice(0, 8);
 }
 
-export function Projects({ projects, found, ports }: { projects: readonly ProjectRow[]; found: { dir: string; items: readonly Found[] } | null; ports: SettingsPorts }) {
+export function Projects({ projects, found, ports }: { projects: readonly ProjectRow[]; found: readonly Found[]; ports: SettingsPorts }) {
   const ps = ordered(projects);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -101,7 +101,7 @@ export function Projects({ projects, found, ports }: { projects: readonly Projec
         <Button
           kind="pri"
           onClick={() => {
-            if (found === null) ports.send({ cmd: 'found_scan' });
+            if (found.length === 0) ports.send({ cmd: 'found_scan' });
             setSheet(true);
           }}
           testId="settings.project.add"
@@ -113,11 +113,11 @@ export function Projects({ projects, found, ports }: { projects: readonly Projec
   );
 }
 
-function AddSheet({ found, projects, ports, onDone }: { found: { dir: string; items: readonly Found[] } | null; projects: readonly ProjectRow[]; ports: SettingsPorts; onDone: () => void }) {
+function AddSheet({ found, projects, ports, onDone }: { found: readonly Found[]; projects: readonly ProjectRow[]; ports: SettingsPorts; onDone: () => void }) {
   const [ticked, setTicked] = useState<readonly string[]>([]);
   const [typed, setTyped] = useState('');
   const [land, setLand] = useState(false);
-  const list = offers(found?.items ?? [], projects);
+  const list = offers(found, projects);
   const all = addPaths(ticked, typed);
   const go = () => {
     if (all.length === 0) return;
@@ -165,7 +165,7 @@ function AddSheet({ found, projects, ports, onDone }: { found: { dir: string; it
         )}
       </div>
       <Group
-        title={found === null ? 'looking in your folders…' : 'found in your folders'}
+        title={found.length === 0 ? 'looking in your folders…' : 'found in your folders'}
         testId="settings.add.found"
         items={list.map((f) => ({
           id: f.path,

@@ -12,14 +12,16 @@
 // the two rows that change.
 import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Card as CardRow } from '@/proto';
-import { Card, Empty, Head, Kbd, Opts, Row, type DotState } from '@/ds';
+import { Empty, Head, Row } from '@/ds';
+import { dotOf, InboxCard, kindTitle, takesWords } from './InboxCard';
 import { cardKey } from './order';
-import { current, prune, START, step, takesWords, visible, type Act, type Key } from './model';
+import { current, prune, START, step, visible, type Act, type Key } from './model';
 import './inbox.css';
 
 export interface InboxPorts {
   answer: (project: string, card: number, reply: string) => void;
-  close: (project: string, card: number) => void;
+  /** close without answering (none yet: no close key, no button) */
+  close?: (project: string, card: number) => void;
   /** esc: back where he was */
   back: () => void;
   /** a card that points at a page block: open it */
@@ -55,7 +57,7 @@ export function Inbox({ cards, names, ports, now: pinned }: InboxProps) {
 
   const run = (a: Act) => {
     if (a.t === 'answer') ports.answer(a.project, a.card, a.reply);
-    else if (a.t === 'close') ports.close(a.project, a.card);
+    else if (a.t === 'close') ports.close?.(a.project, a.card);
     else ports.back();
   };
 
@@ -75,7 +77,7 @@ export function Inbox({ cards, names, ports, now: pinned }: InboxProps) {
 
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
     const k = keyOf(e, field.current?.value ?? '');
-    if (k === null) return;
+    if (k === null || (k.k === 'close' && !ports.close)) return;
     e.preventDefault();
     key(k);
   };
@@ -93,29 +95,25 @@ export function Inbox({ cards, names, ports, now: pinned }: InboxProps) {
             ))}
           </div>
           <div className="inbox-open">
-            <Card
-              lead="nd"
-              who={kindTitle(c0(cur).kind, cur.agent)}
-              rest={` · ${names[cur.project] ?? cur.project}`}
-              k={age(now - cur.since_ms)}
-              q={cur.question}
-              keys={hints(cur)}
-              testId={`inbox.card.${cardKey(cur)}`}
+            <InboxCard
+              card={cur}
+              project={names[cur.project]}
+              on={s.hl}
+              now={now}
+              acts={{
+                pick: (n) => {
+                  key({ k: 'pick', n });
+                },
+                ...(ports.close
+                  ? {
+                      close: () => {
+                        key({ k: 'close' });
+                      },
+                    }
+                  : {}),
+                ...(ports.openPage ? { openPage: ports.openPage } : {}),
+              }}
             >
-              {cur.options.length > 0 && (
-                <Opts
-                  items={cur.options.map((o) => ({ n: o.n, text: o.label, on: o.n === s.hl }))}
-                  onPick={(n) => {
-                    key({ k: 'pick', n });
-                  }}
-                  testId="inbox.opt"
-                />
-              )}
-              {cur.page != null && ports.openPage && (
-                <button type="button" className="inbox-page" data-testid="inbox.page" onClick={() => ports.openPage?.(c0(cur).page?.url ?? '')}>
-                  open its page
-                </button>
-              )}
               {takesWords(cur) && (
                 <textarea
                   key={cardKey(cur)}
@@ -128,12 +126,7 @@ export function Inbox({ cards, names, ports, now: pinned }: InboxProps) {
                   data-testid="inbox.answer"
                 />
               )}
-              <div className="inbox-acts">
-                <button type="button" data-testid="inbox.close" onClick={() => { key({ k: 'close' }); }}>
-                  close without answering
-                </button>
-              </div>
-            </Card>
+            </InboxCard>
           </div>
         </div>
       )}
@@ -141,16 +134,11 @@ export function Inbox({ cards, names, ports, now: pinned }: InboxProps) {
   );
 }
 
-/** the card itself (the narrowing helper for closures) */
-function c0(c: CardRow): CardRow {
-  return c;
-}
-
 const Item = memo(function Item({ c, n, on, name, onSelect }: { c: CardRow; n: number; on: boolean; name: string; onSelect: (k: Key) => void }) {
   return (
     <Row
       kind="ag"
-      dot={c.approval === true || c.urgent ? 'nd' : dotOf(c.kind)}
+      dot={c.approval === true || c.urgent ? 'nd' : dotOf(c)}
       name={`${String(n)}  ${kindTitle(c.kind, c.agent)}: ${firstLine(c.question)}`}
       end={name}
       needs={c.approval === true}
@@ -186,61 +174,7 @@ export function keyOf(e: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'al
   return null;
 }
 
-/** An item's title (the TUI's kind_title, copy deck §17). */
-export function kindTitle(kind: string, agent: string): string {
-  switch (kind) {
-    case 'question':
-      return `${agent} asks`;
-    case 'blocked':
-      return `${agent} is blocked`;
-    case 'failed':
-      return `${agent} failed`;
-    case 'restart':
-      return 'restart failed';
-    case 'drop':
-      return `drop ${agent}?`;
-    case 'overlap':
-      return 'overlap';
-    case 'done':
-      return `${agent} is done`;
-    default:
-      return `${agent}: ${kind}`;
-  }
-}
-
-function dotOf(kind: string): DotState {
-  if (kind === 'failed' || kind === 'restart') return 'er';
-  if (kind === 'done') return 'ok';
-  return 'nd';
-}
-
 function firstLine(q: string): string {
   const l = q.split('\n')[0] ?? '';
   return l.length > 80 ? `${l.slice(0, 79)}…` : l;
-}
-
-function hints(c: CardRow) {
-  const n = c.options.length;
-  return (
-    <>
-      {n > 0 && (
-        <>
-          <Kbd>1</Kbd>–<Kbd>{String(n)}</Kbd> pick <Kbd>←</Kbd>
-          <Kbd>→</Kbd> <Kbd>⏎</Kbd>{' '}
-        </>
-      )}
-      {takesWords(c) && <>type, then <Kbd>⏎</Kbd> answer </>}
-      <Kbd>↑</Kbd>
-      <Kbd>↓</Kbd> next <Kbd>⌘⌫</Kbd> close <Kbd>esc</Kbd> back
-    </>
-  );
-}
-
-/** "now", "4 min", "2 h", "3 d" */
-export function age(ms: number): string {
-  const m = Math.floor(Math.max(0, ms) / 60_000);
-  if (m < 1) return 'now';
-  if (m < 60) return `${String(m)} min`;
-  const h = Math.floor(m / 60);
-  return h < 24 ? `${String(h)} h` : `${String(Math.floor(h / 24))} d`;
 }
