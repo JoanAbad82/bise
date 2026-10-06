@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TODAY's capsule, a long answer (qa-type)</title>
+<link rel="stylesheet" href="../../../../ambient/web/style.css">
+<style>html, body { height: 100%; margin: 0; background: #6b6f76; } #amb { top: 142px !important; left: calc(50% - 430px) !important; }</style>
+</head>
+<body>
+<!-- TODAY's capsule (apps/ambient/web) on its fake core, which opens the spotlight (fn + space) and
+     answers whatever he sends with a 20-line answer: the check types and sends with real keys. -->
+<div id="amb"></div>
+<script src="../../../../ambient/web/words.js"></script>
+<script src="../../../../ambient/web/face.js"></script>
+<script src="../../../../ambient/web/policy.js"></script>
+<script src="../../../../ambient/web/cards.js"></script>
+<script src="../../../../ambient/web/spotlist.js"></script>
+<script src="../../../../ambient/web/model.js"></script>
+<script src="../../../../ambient/web/pearl.js"></script>
+<script src="../../../../ambient/web/bar.js"></script>
+<script src="../../../../ambient/web/fakecore.js"></script>
+<script>
+const LONG = Array.from({ length: 20 }, (_, i) => `line ${i + 1} of 20: step ${i + 1} of the release plan, with its owner and its date.`).join("\n");
+let P = null;
+window.ambientDev = { cmd(c) {
+  if (c.cmd === "send") {
+    const r = (ms, ev) => setTimeout(() => window.ambient.recv(ev), ms);
+    r(50, { ev: "sent", text: c.text, voice: false, shot: false });
+    r(150, { ev: "phase", phase: "working" });
+    r(900, { ev: "main", text: LONG, turn: 9 });
+    r(1000, { ev: "phase", phase: "done" });
+    return;
+  }
+  P && P.cmd(c);
+} };
+</script>
+<script src="../../../../ambient/web/ui.js"></script>
+<script>P = AmbFake.player((ev) => window.ambient.recv(ev)); P.play("spot");</script>
+</body>
+</html>
