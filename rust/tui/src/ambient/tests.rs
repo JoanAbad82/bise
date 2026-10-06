@@ -83,6 +83,15 @@ fn fake_store(dir: PathBuf) -> impl Fn(&Path) -> Result<bend_images::Stored, Str
 
 impl T {
     fn new() -> T {
+        T::make(None)
+    }
+
+    /// harness A's ports (mod.rs fake_ports): the fake voice's words.
+    fn fake_voice(words: super::fake::Words) -> T {
+        T::make(Some(words))
+    }
+
+    fn make(fake: Option<super::fake::Words>) -> T {
         let (etx, ends) = mpsc::channel::<HubEnd>();
         let connect: super::hub::Connect = Box::new(move || {
             let (mut core_end, hub_end) = UnixStream::pair()?;
@@ -117,6 +126,15 @@ impl T {
             language: None,
             store_image: Box::new(fake_store(dir.clone())),
             user_kind,
+            fake_words: None,
+        };
+        let ports = match fake {
+            Some(w) => {
+                let mut p = super::fake_ports(user_kind, w);
+                p.store_image = Box::new(fake_store(dir.clone()));
+                p
+            }
+            None => ports,
         };
         let core = Core::new(WS.into(), hub, ports);
         let hub = ends.recv_timeout(Duration::from_secs(3)).expect("the core never connected");
@@ -865,6 +883,7 @@ fn a_send_while_the_hub_is_away_is_an_error() {
         language: None,
         store_image: Box::new(|_| Err("no store".into())),
         user_kind,
+        fake_words: None,
     };
     let mut core = Core::new(WS.into(), hub, ports);
     core.cmd(Cmd::Send { text: "hello".into() }, Instant::now());
@@ -903,6 +922,7 @@ fn the_run_loop_writes_lines_and_ends_with_stdin() {
         language: None,
         store_image: Box::new(|_| Err("no store".into())),
         user_kind,
+        fake_words: None,
     };
     let mut core = Core::new(WS.into(), hub, ports);
     tx.send(super::In::Hub(HubIn::Down)).unwrap();
@@ -1314,4 +1334,44 @@ fn a_preview_of_an_agent_the_hub_does_not_know_comes_at_once() {
     // asked again (the page asks once, the app may relaunch the page): again
     t.cmd(Cmd::AgentPreview { agent: "cookies".into() });
     assert!(has(&t.take(), "agent_preview"));
+}
+
+#[test]
+fn the_fake_voice_talks_to_main_through_the_real_talk_path() {
+    // harness A (lead m_7976): no mic, no STT, no sound; the same events
+    // and the same input to main as his voice
+    let dir = temp_dir();
+    let words = super::fake::Words::new(dir.join("voice.txt"));
+    std::fs::write(words.file(), "what is running now").unwrap();
+    let mut t = T::fake_voice(words.clone());
+    t.ready();
+    t.cmd(Cmd::TalkStart);
+    assert!(!words.file().exists(), "read and removed at talk_start");
+    t.until(|o| o.iter().any(|v| v["ev"] == "level" && v["who"] == "you" && v["v"].as_f64().unwrap_or(0.0) > 0.2));
+    t.until(|o| o.iter().any(|v| v["ev"] == "heard" && v["final"] == false && v["text"] == "what"));
+    t.cmd(Cmd::TalkEnd);
+    t.until(|o| o.iter().any(|v| v["ev"] == "heard" && v["final"] == true));
+    let out = t.take();
+    assert!(out.iter().any(|v| v["ev"] == "heard" && v["final"] == true && v["text"] == "what is running now"), "{out:?}");
+    assert!(out.iter().any(|v| v["ev"] == "sent" && v["voice"] == true));
+    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "what is running now", "via": "capsule"}));
+    // main answers: said through the silent speaker, word by word, done
+    t.main_turn("two agents work.");
+    t.until(|o| phase_is(o, "speaking"));
+    t.until(|o| has(o, "word") && phase_is(o, "done"));
+    // the fake_words cmd: the next talk's words, the file not needed
+    t.cmd(Cmd::FakeWords { text: "stop perf".into() });
+    t.cmd(Cmd::TalkStart);
+    t.cmd(Cmd::TalkEnd);
+    t.until(|o| o.iter().any(|v| v["ev"] == "heard" && v["final"] == true && v["text"] == "stop perf"));
+    assert_eq!(t.hub.next()["text"], "stop perf");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn fake_words_is_refused_in_his_normal_run() {
+    let mut t = T::new();
+    t.ready();
+    t.cmd(Cmd::parse(r#"{"cmd":"fake_words","text":"hi"}"#).unwrap());
+    assert!(has(&t.take(), "error"));
 }

@@ -11,6 +11,7 @@
 
 mod agents;
 mod core;
+mod fake;
 mod hub;
 mod plain;
 mod speech;
@@ -56,6 +57,44 @@ fn live_ports(user_kind: fn(&str) -> bool) -> Ports {
         language,
         store_image: Box::new(bend_images::store_file),
         user_kind,
+        fake_words: None,
+    }
+}
+
+/// Harness A's ports (fake.rs): the words file instead of the mic and
+/// the listener, silence instead of the TTS and the speaker. Nothing
+/// opens a device or reaches the network.
+fn fake_ports(user_kind: fn(&str) -> bool, words: fake::Words) -> Ports {
+    let w = words.clone();
+    Ports {
+        mic: Box::new(fake::FakeMic),
+        listener: Box::new(move |_| Box::new(fake::FakeListener(w.clone()))),
+        synth: Box::new(fake::SilentSynth),
+        open_speaker: Box::new(|| Ok(Box::new(fake::FakeSpeaker::new()) as Box<dyn crate::voicemode::Speaker>)),
+        listen_job: Box::new(|| Ok(fake::listen_job())),
+        say_job: Box::new(|| Ok(fake::say_job())),
+        language: None,
+        store_image: Box::new(bend_images::store_file),
+        user_kind,
+        fake_words: Some(words),
+    }
+}
+
+/// The ports of this run: harness A's fake voice when its env asks for
+/// it and BISE_HOME is isolated (fake::words_file), else the real ones;
+/// the event that says which (the app forwards talks only to a fake).
+fn ports_for_env(user_kind: fn(&str) -> bool) -> (Ports, Option<serde_json::Value>) {
+    match fake::words_file(&|k| std::env::var(k).ok()) {
+        Ok(Some(file)) => {
+            eprintln!("ambient-core: fake voice on: words from {} (or fake_words), no mic, no sound", file.display());
+            let ev = serde_json::json!({"ev": "fake_voice", "on": true, "words": file.to_string_lossy()});
+            (fake_ports(user_kind, fake::Words::new(file)), Some(ev))
+        }
+        Ok(None) => (live_ports(user_kind), None),
+        Err(e) => {
+            eprintln!("ambient-core: {e}");
+            (live_ports(user_kind), None)
+        }
     }
 }
 
@@ -115,8 +154,13 @@ pub fn core_main(workspace: String, connect: Connect, user_kind: fn(&str) -> boo
         }
         let _ = tx.send(In::Eof);
     });
-    let mut core = Core::new(workspace, hub, live_ports(user_kind));
-    run(&mut core, rx, &mut io::stdout().lock());
+    let (ports, fake_ev) = ports_for_env(user_kind);
+    let mut core = Core::new(workspace, hub, ports);
+    let mut out = io::stdout().lock();
+    if !write_out(&mut out, fake_ev.into_iter().collect()) {
+        return 0;
+    }
+    run(&mut core, rx, &mut out);
     0
 }
 

@@ -60,6 +60,9 @@ pub struct Ports {
     /// the hub's `switchboard::model::user_kind` (the user's inbox),
     /// handed in by the binary: bend-tui does not link switchboard
     pub user_kind: fn(&str) -> bool,
+    /// harness A's fake voice (fake.rs): the next talk's words, set by
+    /// the `fake_words` cmd; None in his normal run (the cmd is refused)
+    pub fake_words: Option<super::fake::Words>,
 }
 
 /// A command of the app (stdin), §4.
@@ -107,6 +110,9 @@ pub enum Cmd {
     Archive { agent: String, stop_first: bool },
     /// `/restore <agent>`: back in his list.
     Unarchive { agent: String },
+    /// Harness A: the words the fake voice hears at the next talk (only
+    /// with the fake voice on; an error otherwise).
+    FakeWords { text: String },
 }
 
 impl Cmd {
@@ -145,6 +151,7 @@ impl Cmd {
                 };
                 Cmd::EveryStop { id: id.ok_or("every_stop: no id")? }
             }
+            "fake_words" => Cmd::FakeWords { text: s("text") },
             c @ ("agent_preview" | "agent_history" | "agent_unwatch" | "agent_send" | "follow" | "stop" | "archive" | "unarchive") => {
                 let agent = s("agent").trim().trim_start_matches('@').to_string();
                 if agent.is_empty() {
@@ -539,6 +546,10 @@ impl Core {
                 self.slash(&format!("/archive {agent}{force}"));
             }
             Cmd::Unarchive { agent } => self.slash(&format!("/restore {agent}")),
+            Cmd::FakeWords { text } => match &self.ports.fake_words {
+                Some(w) => w.set(&text),
+                None => self.error("fake_words: the fake voice is off (harness A only)."),
+            },
         }
     }
 
