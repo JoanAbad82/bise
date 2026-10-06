@@ -126,6 +126,34 @@ describe('the fence', () => {
     expect(fence.formats().get('text/plain')).toBe('kept');
   });
 
+  it('a seeded text and image paste with ⌘V alone (qa-type 2.4, 2.7)', () => {
+    const lines = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join('\n');
+    fence.seed({ text: lines, files: [{ name: 'shot.png', type: 'image/png', bytes: new Uint8Array([137, 80, 78, 71]) }] });
+    let text: string | undefined;
+    let file: { name: string; type: string; size: number } | undefined;
+    field.addEventListener('paste', (e) => {
+      const d = e.clipboardData as unknown as { getData(t: string): string; files: ArrayLike<{ name: string; type: string; size: number }> };
+      text = d.getData('text/plain');
+      file = d.files[0];
+      e.preventDefault();
+    });
+    press('v');
+    expect(text?.split('\n')).toHaveLength(200);
+    expect(file).toMatchObject({ name: 'shot.png', type: 'image/png', size: 4 });
+  });
+
+  it('a copy replaces the seeded files', () => {
+    fence.seed({ files: [{ name: 'a.png', type: 'image/png', bytes: new Uint8Array([1]) }] });
+    fence.put('just text');
+    let count = -1;
+    field.addEventListener('paste', (e) => {
+      count = (e.clipboardData as unknown as { files: ArrayLike<unknown> }).files.length;
+      e.preventDefault();
+    });
+    press('v');
+    expect(count).toBe(0);
+  });
+
   it('other keys pass untouched', () => {
     field.addEventListener('keydown', () => seen.push('page keydown'));
     const e = new dom.KeyboardEvent('keydown', { key: 'a', metaKey: true, bubbles: true, cancelable: true });

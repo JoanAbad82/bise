@@ -37,6 +37,18 @@ export function clipKey(e: KeyLike, mac: boolean): ClipOp | null {
   return null;
 }
 
+/** A file in the buffer: what a Finder copy or a screenshot puts on the clipboard. */
+export interface ClipFile {
+  readonly name: string;
+  readonly type: string;
+  readonly bytes: Uint8Array;
+}
+
+export interface ClipSeed {
+  readonly text?: string;
+  readonly files?: readonly ClipFile[];
+}
+
 export interface ClipFence {
   /** The buffer's formats (MIME type -> data), for tests and the harness. */
   readonly formats: () => ReadonlyMap<string, string>;
@@ -44,6 +56,12 @@ export interface ClipFence {
   readonly run: (op: ClipOp) => void;
   /** window.bise.copy in test mode: the text goes into the buffer. */
   readonly put: (text: string) => void;
+  /**
+   * Test mode at launch (qa-type m_9600): the buffer as if he had copied this
+   * text and/or these files (a Finder copy, a screenshot), so a check presses
+   * ⌘V and nothing else.
+   */
+  readonly seed: (s: ClipSeed) => void;
   /** Takes the key listener off (tests). */
   readonly remove: () => void;
 }
@@ -57,6 +75,7 @@ interface DataLike {
   setData(type: string, value: string): void;
   getData(type: string): string;
   readonly types: readonly string[];
+  readonly items: { add(file: unknown): unknown };
 }
 interface ClipEventLike {
   readonly defaultPrevented: boolean;
@@ -74,6 +93,7 @@ interface DocLike {
 type KeyListener = (e: KeyEventLike) => void;
 export interface WinLike {
   readonly document: DocLike;
+  readonly File: new (bits: Uint8Array[], name: string, options: { type: string }) => unknown;
   readonly DataTransfer: new () => DataLike;
   readonly ClipboardEvent: new (
     type: string,
@@ -103,6 +123,7 @@ function selectedText(doc: DocLike): string {
 export function installClipFence(win: WinLike, mac: boolean): ClipFence {
   const doc = win.document;
   let buffer = new Map<string, string>();
+  let files: readonly ClipFile[] = [];
   const exec = (command: string, value?: string): void => {
     doc.execCommand?.(command, false, value);
   };
@@ -118,6 +139,7 @@ export function installClipFence(win: WinLike, mac: boolean): ClipFence {
     if (op === 'paste') {
       const dt = new win.DataTransfer();
       for (const [type, value] of buffer) dt.setData(type, value);
+      for (const f of files) dt.items.add(new win.File([f.bytes], f.name, { type: f.type }));
       if (!fire('paste', dt)) {
         const text = buffer.get('text/plain');
         if (text !== undefined) exec('insertText', text);
@@ -128,12 +150,16 @@ export function installClipFence(win: WinLike, mac: boolean): ClipFence {
     if (fire(op, dt)) {
       const next = new Map<string, string>();
       for (const type of dt.types) next.set(type, dt.getData(type));
-      if (next.size > 0) buffer = next;
+      if (next.size > 0) {
+        buffer = next;
+        files = [];
+      }
       return;
     }
     const text = selectedText(doc);
     if (text === '') return;
     buffer = new Map([['text/plain', text]]);
+    files = [];
     if (op === 'cut') exec('delete');
   };
 
@@ -151,6 +177,11 @@ export function installClipFence(win: WinLike, mac: boolean): ClipFence {
     run,
     put: (text) => {
       buffer = new Map([['text/plain', text]]);
+      files = [];
+    },
+    seed: (seed) => {
+      buffer = new Map<string, string>(seed.text === undefined ? [] : [['text/plain', seed.text]]);
+      files = seed.files ?? [];
     },
     remove: () => {
       win.removeEventListener('keydown', onKey, { capture: true });

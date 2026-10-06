@@ -90,6 +90,8 @@ export const IPC = {
   capsuleState: 'bise:capsule-state',
   openWindow: 'bise:open-window',
   route: 'bise:route',
+  /** test mode: the preload asks main for the clipboard's seed (the env's files) */
+  clipSeed: 'bise:clip-seed',
 } as const;
 
 /** The preload's argument naming its window: `--bise-surface=window|capsule`. */
@@ -97,6 +99,11 @@ export const SURFACE_ARG = '--bise-surface=';
 
 /** Test mode: the main window's first screen (amb-tools' 'show me', the checks). */
 export const ROUTE_ENV = 'BISE_DESKTOP_ROUTE';
+
+/** Test mode: the private clipboard starts with this text file's content (qa-type m_9600). */
+export const TEST_CLIP_TEXT_ENV = 'BISE_DESKTOP_TEST_CLIPBOARD';
+/** Test mode: the private clipboard starts with this file as a file item (a Finder copy, a screenshot). */
+export const TEST_CLIP_FILE_ENV = 'BISE_DESKTOP_TEST_CLIPBOARD_FILE';
 
 /** Test mode: the capsule's changes as stdout lines: `CAPSULE_LINE show top keys` / `CAPSULE_LINE hide`. */
 export const CAPSULE_LINE = 'bise-desktop: capsule';

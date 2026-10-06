@@ -6,7 +6,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
 import { IPC, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type Surface } from '../shared/api';
-import { installClipFence, type ClipOp, type WinLike } from './clipfence';
+import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
 
 const test = process.env[TEST_ENV] === '1';
 const surface: Surface = process.argv.includes(`${SURFACE_ARG}capsule`) ? 'capsule' : 'window';
@@ -34,6 +34,10 @@ const fence = test ? installClipFence(globalThis as unknown as WinLike, process.
 if (fence !== null) {
   ipcRenderer.on(IPC.clip, (_e: IpcRendererEvent, op: ClipOp) => {
     fence.run(op);
+  });
+  // the env's seed (BISE_DESKTOP_TEST_CLIPBOARD[_FILE]): main reads the files
+  void ipcRenderer.invoke(IPC.clipSeed).then((seed: ClipSeed) => {
+    if (seed.text !== undefined || (seed.files ?? []).length > 0) fence.seed(seed);
   });
 }
 
