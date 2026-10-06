@@ -11,64 +11,77 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class AmbientApp: NSObject, NSApplicationDelegate {
-    private var config: Config
-    private let capsule: Capsule
+    var config: Config
+    let capsule: Capsule
     // harness A (Harness.swift), known from the first line of init: every
     // window is made far off his screens and nothing reads TCC (card #428)
-    private let harnessMode: Bool
-    private let edge = Edge()
-    private let keys = Keys()
-    private let core: Core
-    private var notify: Notify?
-    private var sounds: SoundPlayer?
-    private var askedAt = 0.0             // his last ask the core took ('sent'); its answer gets the keys
-    private var keyFocus = KeyFocus()     // who has his keystrokes (round 9)
-    private var content = "none"          // the page's last app_content kind (EscRoute)
-    private var cardPush = CardPush()     // a card shows the bar once (lead m_8105)
-    private var side: Capsule?            // round 10's side panel, made at its first open
-    private var panelAgent: String?       // the agent it shows
-    private var panelKeys = KeyFocus()    // the panel's own keys (it takes them when opened)
-    private var desktop: DesktopWindow?   // bise's window (S4, DesktopWindow.swift), made at its first open
-    private let mainMenu = MainMenuView() // the hidden main menu: ⌘Q ⌘W ⌘, ⌘H and Edit
-    private var status: StatusItem?
-    private var signals: [DispatchSourceSignal] = []
-    private var qa: QA?                  // --qa only: the QA channel (QA.swift)
-    private var harness: Harness?        // harness A only: the real app's test input (Harness.swift)
+    let harnessMode: Bool
+    let edge = Edge()
+    let keys = Keys()
+    let core: Core
+    var notify: Notify?
+    var sounds: SoundPlayer?
+    var askedAt = 0.0             // his last ask the core took ('sent'); its answer gets the keys
+    var keyFocus = KeyFocus()     // who has his keystrokes (round 9)
+    var content = "none"          // the page's last app_content kind (EscRoute)
+    var cardPush = CardPush()     // a card shows the bar once (lead m_8105)
+    var side: Capsule?            // round 10's side panel, made at its first open
+    var panelAgent: String?       // the agent it shows
+    var panelKeys = KeyFocus()    // the panel's own keys (it takes them when opened)
+    var desktop: DesktopWindow?   // bise's window (S4, DesktopWindow.swift), made at its first open
+
+    // the state of the split-out parts (App+*.swift: extensions hold no stored properties)
+    var lastKey = "fn"                    // App+Talk: the key of the talk (fn, right option)
+    var shooting = false                  // App+Talk: a shot is being taken
+    // App+Perms, --qa: the states macOS would have, never the real ones; all on unless
+    // the QA defaults ask for a first run ('qa.firstRun': all off, so the
+    // walk sees every ask), and macOS's prompts answer 'granted' at once
+    lazy var fakePerms: PermState = defaults.bool(forKey: "qa.firstRun")
+        ? PermState() : PermState(accessibility: .granted, mic: .granted, screen: .granted)
+    var trustPoll: Timer?                 // App+Perms
+    var helloOn = false                   // App+Perms: the glass shows the hello
+    var askShown = false                  // App+Perms: the glass is open for a permission ask
+    var globeSaid = false                 // App+Perms: the emoji picker line, once per launch
+    let mainMenu = MainMenuView() // the hidden main menu: ⌘Q ⌘W ⌘, ⌘H and Edit
+    var status: StatusItem?
+    var signals: [DispatchSourceSignal] = []
+    var qa: QA?                  // --qa only: the QA channel (QA.swift)
+    var harness: Harness?        // harness A only: the real app's test input (Harness.swift)
     // never the user's things: QA or harness A (his browser, Terminal,
     // pasteboard, sounds, prompts, login items, settings panes, his screen)
-    private var sandbox: Bool { qa != nil || harnessMode }
+    var sandbox: Bool { qa != nil || harnessMode }
 
-    private var phase = "idle"
-    private var talking = false          // talk_start sent, no talk_end/cancel yet
-    private var locked = false
-    private var reduceMotion = false
+    var phase = "idle"
+    var talking = false          // talk_start sent, no talk_end/cancel yet
+    var locked = false
+    var reduceMotion = false
     // slice 4: what the user set in the settings view (Settings.swift)
-    private var settings = AppSettings()
-    private var edgeGlow: Bool { settings.edgeGlow }
-    private var cards: [Card] = []
-    private var pagesURL: String?            // the hub's page server (state.pages_url)
-    private var menuPages: [MenuPage] = []   // "for you" in the :* menu (state.pages)
-    private var menuWatches: [MenuWatch] = [] // what agents watch (state.timers, roadmap B)
-    private var settleTalk: (() -> Void)?    // a note-or-not decision still pending
+    var settings = AppSettings()
+    var edgeGlow: Bool { settings.edgeGlow }
+    var cards: [Card] = []
+    var pagesURL: String?            // the hub's page server (state.pages_url)
+    var menuPages: [MenuPage] = []   // "for you" in the :* menu (state.pages)
+    var menuWatches: [MenuWatch] = [] // what agents watch (state.timers, roadmap B)
+    var settleTalk: (() -> Void)?    // a note-or-not decision still pending
     // it knows when not to talk: a call (the mic busy elsewhere), a meeting (the calendar, opt-in)
-    private var quiet = QuietMachine()
-    private var meetingQuiet: Bool { settings.meetingQuiet }
-    private var calendar: CalendarProbe?
-    private var quietTimers: [Timer] = []
-    private var agents = Set<String>()
+    var quiet = QuietMachine()
+    var meetingQuiet: Bool { settings.meetingQuiet }
+    var calendar: CalendarProbe?
+    var quietTimers: [Timer] = []
+    var agents = Set<String>()
     // §8 "out of the way": the one visibility state machine (Visibility.swift)
-    private var vis = Visibility()
-    private var visJob: DispatchWorkItem?
-    private var seenCards: Set<String>? = nil   // nil until the first state (no burst at launch)
-    private var working = false
-    private var agentStatus: [String: String] = [:]
+    var vis = Visibility()
+    var visJob: DispatchWorkItem?
+    var seenCards: Set<String>? = nil   // nil until the first state (no burst at launch)
+    var working = false
+    var agentStatus: [String: String] = [:]
     // what a page loaded later needs: the last event of each of these kinds
-    private var memory: [String: [String: Any]] = [:]
-    private static let remembered: Set<String> = ["hub", "state", "phase", "main"]
+    var memory: [String: [String: Any]] = [:]
+    static let remembered: Set<String> = ["hub", "state", "phase", "main"]
     // QA keeps its own settings: never the user's asked/told marks or edge glow
-    private let defaults: UserDefaults
+    let defaults: UserDefaults
     // the pages name macOS's settings by version ("Screen & System Audio Recording" on 15+)
-    private let macosMajor = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+    let macosMajor = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
 
     init(config: Config) {
         harnessMode = config.harness != nil
@@ -116,7 +129,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // a launch from Finder or the menu bar has no --bise or --web: the last
     // ones scripts/ambient.sh gave (launchd's PATH doesn't find bise)
-    private static func remembered(_ config: Config, _ d: UserDefaults) -> Config {
+    static func remembered(_ config: Config, _ d: UserDefaults) -> Config {
         let fm = FileManager.default
         // QA picks its own bise; a normal launch never runs the PATH's bise
         // while a dev build is there (Config.restoring, lead m_6267)
@@ -138,7 +151,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // the core's bise is a path, never PATH's 'bise' (lead m_8079): the one
     // given (or the last launch's), else the bise in or next to the bundle,
     // else "" = no bise (Core says so and doesn't start)
-    private static func ownBise(_ config: Config) -> Config {
+    static func ownBise(_ config: Config) -> Config {
         var c = config
         let fm = FileManager.default
         c.bise = BisePick.resolve(c.bise, bundle: Bundle.main.bundlePath, isExe: { fm.isExecutableFile(atPath: $0) }) ?? ""
@@ -224,7 +237,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if !sandbox { startQuiet() }   // QA and the harness never read the user's mic state or calendar
     }
 
-    private func statusAndKeys() {
+    func statusAndKeys() {
         let st = StatusItem()
         st.onSpotlight = { [weak self] in self?.spotlight() }
         st.onToggle = { [weak self] in self?.toggleByHand() }
@@ -276,7 +289,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     }
 
     // the QA channel's doors into the app (QA.swift; only with --qa)
-    private func qaSetup(_ mode: QA.Mode) {
+    func qaSetup(_ mode: QA.Mode) {
         let q = QA(mode: mode, dir: config.ambientDir, capsule: capsule, edge: edge)
         q.coreEvent = { [weak self] in self?.coreEvent($0) }
         q.keyOut = { [weak self] in self?.key($0) }
@@ -302,7 +315,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     }
 
     // every cmd for the core: QA mode fakes the voice and drops writes when read-only
-    private func toCore(_ cmd: [String: Any]) {
+    func toCore(_ cmd: [String: Any]) {
         if let qa, !qa.allow(cmd) { return }
         if let h = harness {
             h.note("app>core", cmd)
@@ -324,9 +337,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         Log.say("app: quit")
     }
 
-    private var pidPath: String { config.ambientDir + "/app.pid" }
+    var pidPath: String { config.ambientDir + "/app.pid" }
 
-    private func writePid() {
+    func writePid() {
         try? "\(getpid())\n".write(toFile: pidPath, atomically: true, encoding: .utf8)
     }
 
@@ -340,7 +353,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         edgeSetup()
     }
 
-    private func observe() {
+    func observe() {
         let ws = NSWorkspace.shared.notificationCenter
         ws.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
@@ -383,9 +396,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    private var asleep = false
+    var asleep = false
 
-    private func woke() {
+    func woke() {
         Log.say("app: wake")
         asleep = false
         if !sandbox { core.check(); keys.reenable() } else { core.check() }
@@ -397,8 +410,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // app_visible {on}: the page stops drawing (the orb's frames) while
     // nobody can see it: hidden, covered, the screen locked or asleep
-    private var visibleSaid: Bool?
-    private func sayVisible() {
+    var visibleSaid: Bool?
+    func sayVisible() {
         let on = !capsule.hidden && !locked && !asleep && capsule.panel.occlusionState.contains(.visible)
         guard on != visibleSaid else { return }
         visibleSaid = on
@@ -406,7 +419,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     }
 
     // SIGTERM (scripts/ambient.sh stop): quit clean. SIGUSR1: switch.json.
-    private func handleSignals() {
+    func handleSignals() {
         for sig in [SIGTERM, SIGINT, SIGUSR1] {
             signal(sig, SIG_IGN)
             let s = DispatchSource.makeSignalSource(signal: sig, queue: .main)
@@ -421,7 +434,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func switchWorkspace() {
+    func switchWorkspace() {
         var c = config
         let webBefore = c.web
         guard c.apply(switchFile: config.ambientDir + "/switch.json") else {
@@ -454,7 +467,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // MARK: the page
 
-    private func pageReady() {
+    func pageReady() {
         capsule.post(["ev": "app_reduce_motion", "on": reduceMotion])
         capsule.post(settingsEvent())
         capsule.post(["ev": "app_hidden", "on": capsule.hidden])
@@ -469,12 +482,12 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         firstAsk()
     }
 
-    private func edgeSetup() {
+    func edgeSetup() {
         edge.setup(["ev": "app_reduce_motion", "on": reduceMotion])
         edge.setup(settingsEvent())
     }
 
-    private func command(_ cmd: [String: Any]) {
+    func command(_ cmd: [String: Any]) {
         guard let name = cmd["cmd"] as? String else { return }
         switch name {
         case "app_size":
@@ -553,13 +566,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func settingsEvent() -> [String: Any] {
+    func settingsEvent() -> [String: Any] {
         settings.event(macos: macosMajor, radius: Double(capsule.radius), login: !sandbox ? LoginItem.state : .off)
     }
 
     // app_setting {key, value} from the settings view (fn + ,): app_settings
     // goes back after every change, so the page shows what really holds
-    private func setting(_ key: String, _ value: Any?) {
+    func setting(_ key: String, _ value: Any?) {
         guard let c = SettingChange.parse(key: key, value: value) else {
             Log.say("app: unknown setting \(key)")
             return
@@ -580,7 +593,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     }
 
     // a stored setting changes: kept, then what follows from it
-    private func change(_ c: SettingChange) {
+    func change(_ c: SettingChange) {
         settings = settings.applying(c)
         settings.store { [defaults] in defaults.set($1, forKey: $0) }
         switch c {
@@ -595,7 +608,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // the core gets a fresh start at once, and Terminal opens a .command
     // file that runs bise in his workspace (opening a file needs no
     // Automation permission, unlike scripting Terminal). QA logs it only.
-    private func runBise() {
+    func runBise() {
         // the app's own bise, never PATH's (lead m_8079)
         guard !config.bise.isEmpty else { Log.say("app: run bise: no bise (launch the app with --bise <path>)"); return }
         core.restart(config: config)
@@ -617,7 +630,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // ambient's sounds (Sounds.swift): the plan says which, the player plays
     // it; QA logs the cue and never plays on his speaker
-    private func cue(_ c: SoundCue) {
+    func cue(_ c: SoundCue) {
         let gate = SoundGate(setting: settings.sounds, uiSounds: SoundPlayer.uiSoundsOn, quiet: quiet.on,
                              focus: SoundPlayer.focusOn)
         guard let s = SoundPlan.sound(for: c, gate) else { return }
@@ -626,13 +639,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     }
 
     // voice answers off: the core never speaks main's answers (text only)
-    private func sayVoice() {
+    func sayVoice() {
         // harness A: never his speaker
         toCore(["cmd": "voice", "on": harness == nil && settings.voiceAnswers])
     }
 
     // the macOS app picker for the never-seen list (ambient's words)
-    private func pickSkipApps() {
+    func pickSkipApps() {
         guard !sandbox else { Log.say("app: qa: no app picker"); return }
         let p = NSOpenPanel()
         p.title = SettingsWords.pickTitle
@@ -677,7 +690,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // MARK: the core's events
 
-    private func coreEvent(_ ev: [String: Any]) {
+    func coreEvent(_ ev: [String: Any]) {
         guard let kind = ev["ev"] as? String else { return }
         side?.post(ev)      // the side panel's page hears every core event (it keeps its agent's)
         desktop?.post(ev)   // and bise's window's
@@ -742,307 +755,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         capsule.post(ev)
     }
 
-    // MARK: keys
-
-    private func key(_ o: KeyOut) {
-        if let line = KeyLog.line(o) { Log.say(line) }
-        switch o {
-        case .talkStart(let k):
-            startTalk(k == .fn ? "fn" : "right_option", state: "down")
-        case .double:
-            startTalk("fn", state: "double")
-            globeCheck()
-        case .talkEnd:
-            guard talking else { return }
-            settleTalk?()       // talk_start always goes before talk_end
-            talking = false
-            quiet.own(open: false, at: uptime)
-            toCore(["cmd": "talk_end"])
-            fnEvent("up")
-            edge.glow(false)
-            status?.set(holding: false)
-            visFeed(.talk(false))
-        case .cancel:
-            guard talking else { return }
-            settleTalk?()
-            talking = false
-            quiet.own(open: false, at: uptime)
-            fnEvent("cancel")   // the page sends talk_cancel and says so
-            edge.glow(false)
-            status?.set(holding: false)
-            visFeed(.cancelled)
-        case .tap:
-            fnEvent("tap")      // the page cuts in when main speaks
-            globeCheck()
-        case .key(let k):
-            switch k {
-            case ".":
-                toggleByHand()
-            case "space":
-                spotlight()
-            case "a":
-                agentsFinder()
-            case "0":
-                // fn 0: the full view; fn 0 again closes it (SPEC §0)
-                if !capsule.hidden && vis.pinned { visFeed(.dismiss) } else { agentsView() }
-            case ",":
-                settingsView()
-            case "i":
-                visFeed(.open)
-                capsule.post(["ev": "app_key", "key": k])
-                takeKeys()
-            default:
-                // fn 1…9 answers the top item even while hidden
-                capsule.post(["ev": "app_key", "key": k])
-            }
-        case .plainEsc:
-            // EscRoute (lead m_8105): while the bar has the keys the page acts
-            // on the esc it gets (a pane steps back, a card is put off); else
-            // main speaking: the page hushes; else it hides bise
-            switch EscRoute.route(barShown: !capsule.hidden, barHasKeys: capsule.panel.isKeyWindow,
-                                  pageReady: capsule.ready, speaking: phase == "speaking", content: content) {
-            case .page, .nothing: break
-            case .post: capsule.post(["ev": "app_key", "key": "esc"])
-            case .dismiss: visFeed(.dismiss)
-            }
-        }
-    }
-
-    private var lastKey = "fn"
-
-    private func fnEvent(_ state: String) {
-        let ev: [String: Any] = ["ev": "app_fn", "state": state, "key": lastKey]
-        capsule.post(ev)
-        edge.post(ev)
-    }
-
-    // a hold: a voice note when the front window shows a bise page
-    // (ambient-pages §4.1), else a talk to main with the front window's shot.
-    // Asking the browser has ~150 ms; past that it's a talk to main.
-    private func startTalk(_ key: String, state: String) {
-        lastKey = key
-        helloOn = false   // a hold ends the hello at once: the talk (or the mic ask) takes the glass
-        if askBeforeTalk() { return }
-        cue(.talkOpened)       // before our own mic counts as a call
-        capsule.pickScreen()   // the mouse's screen, when displays have their own menu bars
-        talking = true
-        defer { morning() }   // after the shot's front window is chosen
-        quiet.own(open: true, at: uptime)
-        visFeed(.talk(true))
-        if state == "down" { status?.set(holding: true) }
-        // the edge glow only while fn is held (not hands-free)
-        if state == "down" && edgeGlow && !reduceMotion { edge.glow(true) }
-        // QA never asks the user's browser anything
-        guard !sandbox, let base = pagesURL, let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
-              PageOpen.browsers.contains(front) else {
-            beginTalk(state, page: nil)
-            return
-        }
-        let gate = Once<(id: String, url: String)?>()
-        let finish: @MainActor ((id: String, url: String)?) -> Void = { [weak self] page in
-            guard gate.settle(page), let self else { return }
-            self.settleTalk = nil
-            self.beginTalk(state, page: page)
-        }
-        settleTalk = { finish(nil) }
-        Browser.activeTab(front) { url in finish(url.flatMap { PageOpen.pageRef(tab: $0, pagesURL: base) }) }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { MainActor.assumeIsolated { finish(nil) } }
-    }
-
-    private func beginTalk(_ state: String, page: (id: String, url: String)?) {
-        var ev: [String: Any] = ["ev": "app_fn", "state": state, "key": lastKey]
-        var cmd: [String: Any] = ["cmd": "talk_start"]
-        if let p = page {
-            ev["page"] = ["id": p.id, "url": p.url]
-            cmd["page"] = ["id": p.id, "url": p.url]
-            Log.say("app: voice note on \(p.id)")
-        }
-        capsule.post(ev)
-        edge.post(ev)
-        toCore(cmd)
-        if page == nil { shoot(then: nil) }   // a note: the page is the context, no shot
-    }
-
-    // the morning page (roadmap slice E): today's morning-<date>, opened in
-    // front once a day at the first fn hold or capsule open after 05:00
-    private func morning() {
-        guard !sandbox else { return }
-        let ids = menuPages.map(\.id)
-        guard let due = Morning.due(now: Date(), tz: .current, openedOn: defaults.string(forKey: "morningOpened"), pageIDs: ids),
-              let page = menuPages.first(where: { $0.id == due.id }) else { return }
-        defaults.set(due.day, forKey: "morningOpened")
-        Log.say("app: the morning page \(page.id)")
-        Browser.open(page.url)
-        // ambient: "good morning" only before 11:00 local
-        let greet = Calendar.current.component(.hour, from: Date()) < 11
-        capsule.post(["ev": "app_morning", "id": page.id, "title": page.title, "url": page.url, "greet": greet])
-        visFeed(.show(4))
-    }
-
-    // fn space: the page opens its field and asks app_focus on (typing)
-    private func spotlight() {
-        morning()
-        visFeed(.show(Visibility.brief))   // until the field takes the keys
-        capsule.post(["ev": "app_key", "key": "space"])
-        takeKeys()
-    }
-
-    // fn a (round 10): every agent in the finder; the page opens it at 860
-    // and asks app_focus on, like fn space
-    private func agentsFinder() {
-        visFeed(.show(Visibility.brief))   // until the field takes the keys
-        capsule.post(["ev": "app_key", "key": "a"])
-        takeKeys()
-    }
-
-    // MARK: harness A (Harness.swift): the real app, driven by a socket
-
-    private func harnessSetup() {
-        guard let hs = harness else { return }
-        hs.bar = { [unowned self] in self.capsule }
-        hs.side = { [weak self] in self?.side }
-        hs.win = { [weak self] in self?.desktop }
-        hs.winOp = { [weak self] op, q in
-            guard let self else { return }
-            switch op {
-            case "win_open": self.openWindow((q["route"] as? String).flatMap(WinRoute.valid))
-            case "win_close": self.desktop?.close()
-            default: self.command(["cmd": "app_window", "route": q["route"] ?? NSNull(), "open": q["open"] ?? NSNull()])   // deeplink: the bar's own path
-            }
-        }
-        DesktopWindow.tap = { [weak hs] who, ev in hs?.note(who, ev) }
-        hs.keyEvent = { [weak self] t, e in self?.keys.qaEvent(t, e) ?? false }
-        hs.appState = { [weak self] in self?.harnessState() ?? [:] }
-        Log.tap = { [weak hs] line in MainActor.assumeIsolated { hs?.note("log", line) } }
-        Capsule.tap = { [weak hs] who, ev in hs?.note(who, ev) }
-        Capsule.frameGuard = { [weak hs] w in hs?.check(w) ?? true }
-        hs.start()
-    }
-
-    private func harnessState() -> [String: Any] {
-        ["vis": ["pinned": vis.pinned, "hidden": capsule.hidden], "talking": talking, "phase": phase,
-         "panel_agent": panelAgent ?? NSNull(), "keys": ["bar": keyFocus.bar, "panel": panelKeys.bar],
-         "win_route": desktop?.route ?? NSNull(),
-         "core": ["bise": config.bise, "workspace": config.workspace],
-         "hub": memory["hub"] ?? NSNull()]
-    }
-
-    // MARK: bise's window (S4, DesktopWindow.swift): never at launch, made at its first open
-
-    private func openWindow(_ route: String?) {
-        let d = desktop ?? {
-            let d = DesktopWindow(offScreen: harnessMode, defaults: defaults)
-            d.onCmd = { [weak self] in self?.command($0) }
-            d.onDrop = { [weak self] paths in
-                // a folder dropped on it = add a project (the core's; S1 owns the registry)
-                for p in paths { self?.toCore(["cmd": "project_add", "path": p]) }
-                self?.desktop?.post(["ev": "win_drop", "paths": paths])
-            }
-            d.onShown = { [weak self] on in self?.windowPolicy(on) }
-            d.onReady = { [weak self, weak d] in
-                for k in ["hub", "state", "phase", "main"] { if let ev = self?.memory[k] { d?.post(ev) } }
-            }
-            d.load(webDir: config.web)
-            desktop = d
-            return d
-        }()
-        Log.say("window: open \(route ?? "where he left it")")
-        d.open(route)
-    }
-
-    // a normal app (Dock icon, ⌘Tab) only while the window shows (WinPolicy)
-    private func windowPolicy(_ shown: Bool) {
-        switch WinPolicy.policy(windowShown: shown, harness: harnessMode) {
-        case .regular: NSApp.setActivationPolicy(.regular)
-        case .accessory: NSApp.setActivationPolicy(.accessory)
-        case .unchanged: break
-        }
-    }
-
-    // the Dock icon (while the window is open) clicked: the window again
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        if !harnessMode { openWindow(nil) }
-        return false
-    }
-
-    // MARK: the side panel (round 10): an agent's history, docked right
-
-    private func makeSide() -> Capsule {
-        if let s = side { return s }
-        let s = Capsule(side: true, offScreen: harnessMode)
-
-        s.onCmd = { [weak self] in self?.harness?.note("panel>app", $0); self?.panelCmd($0) }
-        s.onReady = { [weak self] in self?.panelReady() }
-        s.onKeyFocus = { [weak self] on in
-            guard let self else { return }
-            _ = self.panelKeys.feed(on ? .clicked : .closed)
-            self.side?.post(["ev": "app_focused", "on": on])
-        }
-        s.watchKey()
-        s.load(webDir: config.web)
-        side = s
-        return s
-    }
-
-    // the panel page's cmds: its box, its agent, its close; the rest goes
-    // the bar's way (core cmds to the core, app_* here)
-    private func panelCmd(_ cmd: [String: Any]) {
-        switch cmd["cmd"] as? String ?? "" {
-        case "app_size":
-            if let s = side, let sh = CapsuleShape.from(cmd, maxHeight: s.maxHeight) { s.apply(sh) }
-        case "app_panel":
-            if case .open(let a) = PanelCmd.from(cmd) { openPanel(a) }
-        case "app_panel_close", "app_hide":
-            closePanel()
-        case "app_focus":
-            if qa == nil { side?.focus(cmd["on"] as? Bool ?? false) }
-        default:
-            if let qa { qa.fromPage(cmd) } else { command(cmd) }
-        }
-    }
-
-    private func panelReady() {
-        guard let s = side else { return }
-        s.post(["ev": "app_reduce_motion", "on": reduceMotion])
-        s.post(settingsEvent())
-        for k in ["hub", "state", "phase", "main"] { if let ev = memory[k] { s.post(ev) } }
-        if let a = panelAgent { s.post(["ev": "app_panel", "agent": a, "on": true, "h": s.sideHeight]) }
-    }
-
-    // {cmd:'app_panel', agent} from the bar (⏎ on an agent) or the panel
-    // (⌘↑↓ re-points it): shown already = the same window, its new agent
-    private func openPanel(_ agent: String?) {
-        guard let agent, !agent.isEmpty else { return }
-        let s = makeSide()
-        let shown = !s.hidden
-        panelAgent = agent
-        let ev: [String: Any] = ["ev": "app_panel", "agent": agent, "on": true, "h": s.sideHeight]
-        s.post(ev)
-        capsule.post(ev)
-        guard !shown else { return }
-        Log.say("panel: open on \(agent)")
-        s.pickScreen()
-        s.show(fade: reduceMotion)
-        // it takes the keys first, then the bar goes: his app never gets them
-        // in between (QA never takes his keys)
-        if qa == nil, panelKeys.feed(.openedByHand) == .take || !s.panel.isKeyWindow { s.focus(true) }
-        if !capsule.hidden { visFeed(.dismiss) }
-    }
-
-    // esc, ⌘W, the page's close, ⌘H: both pages hear it, the keys go back
-    private func closePanel() {
-        guard let s = side, !s.hidden else { return }
-        Log.say("panel: close")
-        let off: [String: Any] = ["ev": "app_panel", "on": false]
-        s.post(off)
-        capsule.post(off)
-        panelAgent = nil
-        _ = panelKeys.feed(.closed)
-        s.hide(after: reduceMotion ? Capsule.fadeTime : Capsule.leaveTime, fade: reduceMotion)
-    }
-
-    // the hidden main menu's keys (only while bise has the keys)
-    private func menuAct(_ a: MenuAct) {
+    func menuAct(_ a: MenuAct) {
         switch a {
         case .quit:
             Log.say("app: ⌘Q")
@@ -1071,13 +784,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // fn space, fn 0, fn i, fn , and a click on the menu-bar pearl; what
     // bise pushes (a question, the drafts card, an answer) never does.
     // QA never takes his keys.
-    private func takeKeys(_ why: KeyFocus.In = .openedByHand) {
+    func takeKeys(_ why: KeyFocus.In = .openedByHand) {
         guard qa == nil else { return }
         if keyFocus.feed(why) == .take || !capsule.panel.isKeyWindow { capsule.focus(true) }
     }
 
     // a menu-bar click: what's going on (the agents and the inbox, fn + 0)
-    private func agentsView() {
+    func agentsView() {
         morning()
         visFeed(.open)
         capsule.post(["ev": "app_key", "key": "0"])
@@ -1086,7 +799,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // fn , or the menu's settings…: the settings view (amb-web draws it,
     // app_settings carries what it shows)
-    private func settingsView() {
+    func settingsView() {
         visFeed(.open)
         capsule.post(settingsEvent())
         capsule.post(["ev": "app_key", "key": ","])
@@ -1095,13 +808,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // fn . or the menu's show/hide: opened by hand = the full view (app_key 0,
     // amb-web's one source for "opened by hand"); shown already = hide
-    private func toggleByHand() {
+    func toggleByHand() {
         if capsule.hidden { agentsView() } else { visFeed(.dismiss) }
     }
 
     // app_icon: the menu-bar icon's rect in the capsule page's CSS px, from
     // the web view's top-left (y negative: above the panel), for the grow
-    private func sendIcon() {
+    func sendIcon() {
         guard let r = status?.iconRect else { return }
         let p = capsule.panel.frame
         capsule.post(["ev": "app_icon", "x": r.minX - p.minX, "y": p.maxY - r.maxY, "w": r.width, "h": r.height])
@@ -1109,20 +822,20 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // the menu-bar icon is the status (§8): working (agents or main busy) and
     // the count of items waiting for you
-    private func statusIcon() {
+    func statusIcon() {
         let mainBusy = ["working", "sending", "speaking"].contains(phase)
         // the cards waiting + the ready pages he hasn't opened (count.json, shared with the web)
         status?.set(working: working || mainBusy, count: MenuRows.count(memory["state"] ?? [:]))
     }
 
     // you away: no key or mouse for 5 minutes
-    private var away: Bool {
+    var away: Bool {
         if harnessMode { return false }   // no session-event read (a TCC preflight) in harness mode
         return CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!) > 300
     }
 
     // one event into the visibility machine, then the panel follows it
-    private func visFeed(_ e: VisIn) {
+    func visFeed(_ e: VisIn) {
         let t = uptime
         let shown = vis.feed(e, at: t)
         if shown == capsule.hidden {
@@ -1148,8 +861,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     }
 
     // a click elsewhere hides bise (§8): a global monitor, only while it shows
-    private var clickMonitor: Any?
-    private func watchClicks(_ on: Bool) {
+    var clickMonitor: Any?
+    func watchClicks(_ on: Bool) {
         if on, clickMonitor == nil {
             clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
                 MainActor.assumeIsolated {
@@ -1163,327 +876,4 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: quiet (a call, a meeting): the core answers in text, the page holds cards
-
-    private var uptime: Double { ProcessInfo.processInfo.systemUptime }
-
-    private func startQuiet() {
-        // the mic every second: a property read, never the mic itself
-        quietTimers.append(Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated {
-                guard let self, let running = MicProbe.running() else { return }
-                self.quiet.mic(running: running, at: self.uptime)
-                self.sayQuiet()
-            }
-        })
-        if meetingQuiet && CalendarProbe.granted { watchMeetings() } else if meetingQuiet { change(.meetingQuiet(false)) }
-    }
-
-    private func watchMeetings() {
-        let cal = calendar ?? CalendarProbe()
-        calendar = cal
-        let look = { [weak self] in
-            guard let self, self.meetingQuiet else { return }
-            self.quiet.meeting(CalendarEvent.meetingNow(cal.around(Date()), now: Date()))
-            self.sayQuiet()
-        }
-        look()
-        quietTimers.append(Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in MainActor.assumeIsolated { look() } })
-    }
-
-    // the setting (default off): turning it on asks macOS for the calendar, once
-    private func setMeetingQuiet(_ on: Bool) {
-        let done = { [weak self] (on: Bool) in
-            guard let self else { return }
-            self.change(.meetingQuiet(on))
-            if on { self.watchMeetings() } else { self.quiet.meeting(false); self.sayQuiet() }
-            self.capsule.post(self.settingsEvent())
-        }
-        guard on, !sandbox else { done(false); return }
-        if CalendarProbe.granted { done(true); return }
-        let cal = calendar ?? CalendarProbe()
-        calendar = cal
-        cal.ask { [weak self] ok in
-            if !ok { self?.perm("calendar", "denied") }
-            done(ok)
-        }
-    }
-
-    // the front app's front window covers a whole screen (a video, slides, a game)
-    private func checkFullScreen() {
-        guard !sandbox, let app = NSWorkspace.shared.frontmostApplication,
-              app.processIdentifier != getpid(),
-              let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
-        else { return }
-        let mainH = NSScreen.screens.first?.frame.height ?? 0
-        let screens = NSScreen.screens.map { CGRect(x: $0.frame.minX, y: mainH - $0.frame.maxY, width: $0.frame.width, height: $0.frame.height) }
-        var full = false
-        for w in list where (w[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == app.processIdentifier
-            && (w[kCGWindowLayer as String] as? NSNumber)?.intValue == 0 {
-            if let bd = w[kCGWindowBounds as String] as? NSDictionary, let b = CGRect(dictionaryRepresentation: bd) {
-                full = screens.contains { $0.equalTo(b) }
-            }
-            break   // the front window only
-        }
-        quiet.fullScreen(full)
-        sayQuiet()
-    }
-
-    // a change: the page (app_quiet) and the core (quiet: text only)
-    private func sayQuiet() {
-        guard let c = quiet.change() else { return }
-        Log.say("app: quiet \(c.on) \(c.why)")
-        visFeed(.quiet(c.on))   // quiet: bise never shows by itself
-        status?.set(quiet: c.on)
-        capsule.post(["ev": "app_quiet", "on": c.on, "why": c.why])
-        toCore(["cmd": "quiet", "on": c.on, "why": c.why])
-        if !c.on { helloSoon() }   // a hello held by quiet comes now
-    }
-
-    // MARK: the shot
-
-    private var shooting = false
-
-    // the front window to the core (shot), its chip and corners to the
-    // pages, then `then` (a send waits for it, at most 1.5 s)
-    private func shoot(then: (() -> Void)?) {
-        if let qa {   // QA: a fake shot, never the user's screen
-            let (ev, bounds) = qa.fakeShot()
-            capsule.post(ev)
-            if let b = bounds { edge.corners(ev, cgBounds: b) }
-            then?()
-            return
-        }
-        // harness A: never his screen
-        if harness != nil { Log.say("harness: no shot"); then?(); return }
-        guard Shot.allowed, !shooting else { then?(); return }
-        shooting = true
-        var done = false
-        let finish = { if !done { done = true; then?() } }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { MainActor.assumeIsolated { finish() } }
-        let dir = config.ambientDir + "/shots"
-        let skip = settings.skipBundles   // built-in + the user's never-seen apps
-        Task { @MainActor [weak self] in
-            let r = await Shot.take(into: dir, skip: skip)
-            guard let self else { return }
-            self.shooting = false
-            if let r {
-                if let p = r.path { self.toCore(["cmd": "shot", "path": p, "app": r.app, "title": r.title]) }
-                let ev: [String: Any] = ["ev": "app_shot", "app": r.app, "title": r.title, "skipped": r.skipped]
-                self.capsule.post(ev)
-                if let b = r.bounds, !r.skipped { self.edge.corners(ev, cgBounds: b) }
-            }
-            finish()
-        }
-    }
-
-    // MARK: permissions, one at a time (SPEC §5.8, PermPlan in Perms.swift)
-
-    private func perm(_ p: String, _ state: String) {
-        capsule.post(["ev": "app_perm", "perm": p, "state": state])
-    }
-
-    // --qa: the states macOS would have, never the real ones; all on unless
-    // the QA defaults ask for a first run ('qa.firstRun': all off, so the
-    // walk sees every ask), and macOS's prompts answer 'granted' at once
-    private lazy var fakePerms: PermState = defaults.bool(forKey: "qa.firstRun")
-        ? PermState() : PermState(accessibility: .granted, mic: .granted, screen: .granted)
-
-    private var micGrant: Grant {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized: return .granted
-        case .denied, .restricted: return .denied
-        default: return .unknown
-        }
-    }
-
-    // macOS's states (or QA's), and what the capsule already asked and said
-    private func permNow() -> PermState {
-        var s = sandbox ? fakePerms
-            : PermState(accessibility: Keys.trusted ? .granted : .unknown, mic: micGrant, screen: Shot.allowed ? .granted : .unknown)
-        s.asked = Set(Perm.allCases.map(\.rawValue).filter { defaults.bool(forKey: "asked.\($0)") })
-        s.told = Set(Perm.allCases.map(\.rawValue).filter { defaults.bool(forKey: "told.\($0)") })
-        s.had = Set(Perm.allCases.map(\.rawValue).filter { defaults.bool(forKey: "had.\($0)") })
-        return s
-    }
-
-    private func permSave(_ s: PermState) {
-        for p in Perm.allCases.map(\.rawValue) {
-            if s.asked.contains(p) { defaults.set(true, forKey: "asked.\(p)") }
-            // told goes both ways: a refusal is said again once per launch (PermPlan.launch)
-            defaults.set(s.told.contains(p), forKey: "told.\(p)")
-            if s.had.contains(p) { defaults.set(true, forKey: "had.\(p)") }
-        }
-        if sandbox { fakePerms = s }
-    }
-
-    // one plan step: the state in, the plan, the state out, then its doings
-    private func permStep(_ plan: (inout PermState) -> [PermDo]) {
-        var s = permNow()
-        let dos = plan(&s)
-        permSave(s)
-        for d in dos { permDo(d) }
-    }
-
-    private func permDo(_ d: PermDo) {
-        switch d {
-        case .ask(let p):
-            // an ask needs him: the glass shows it (first-run walk: the launch's
-            // Accessibility ask sat in a hidden panel)
-            perm(p.rawValue, "ask")
-            askShown = true
-            visFeed(.open)
-        case .denied(let p):
-            // the refused line, once: 8 s on the glass, then gone (first-run
-            // walk: after 'not now' it stayed pinned)
-            perm(p.rawValue, "denied")
-            visFeed(.show(Visibility.forCard))
-        case .granted(let p):
-            perm(p.rawValue, "granted")
-            if p == .accessibility { helloSoon() }
-        case .startKeys: if !sandbox, !keys.running { keys.start() }
-        case .watchTrust: if !sandbox { pollTrust() }
-        case .settings(let p):
-            // QA never opens a settings pane
-            guard !sandbox else { Log.say("app: qa: settings pane for \(p.rawValue)"); return }
-            if let u = SettingsPane.url(p.rawValue) { NSWorkspace.shared.open(u) }
-        case .prompt(let p): prompt(p)
-        }
-    }
-
-    // macOS's own prompt (QA: a fake one, granted after 0.6 s)
-    private func prompt(_ p: Perm) {
-        if sandbox {
-            Log.say("app: qa: fake macOS prompt for \(p.rawValue)")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-                MainActor.assumeIsolated { self?.permStep { PermPlan.answered(p, granted: true, &$0) } }
-            }
-            return
-        }
-        switch p {
-        case .accessibility:
-            Keys.prompt()
-        case .mic:
-            AVCaptureDevice.requestAccess(for: .audio) { ok in
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated { self.permStep { PermPlan.answered(.mic, granted: ok, &$0) } }
-                }
-            }
-        case .screen:
-            let ok = CGRequestScreenCaptureAccess()
-            permStep { PermPlan.answered(.screen, granted: ok, &$0) }
-        }
-    }
-
-    private var trustPoll: Timer?
-
-    // at launch: Accessibility first (nothing works without fn)
-    private func firstAsk() {
-        permStep { PermPlan.launch(&$0) }
-        if permNow().accessibility == .granted { helloSoon() }
-    }
-
-    // MARK: the hello, once ever (ambient m_5701; amb-web draws it)
-
-    // QA: only on a first-run walk, so the scenes never meet it
-    private var helloSaid: Bool {
-        defaults.bool(forKey: "saidHello") || (qa != nil && !defaults.bool(forKey: "qa.firstRun"))
-    }
-    private var helloOn = false   // the glass shows the hello
-
-    private func helloSoon() {
-        guard !helloSaid else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + Hello.delay) { [weak self] in
-            MainActor.assumeIsolated { self?.hello() }
-        }
-    }
-
-    // said at most once; while quiet it waits (sayQuiet asks again when it ends)
-    private func hello() {
-        guard Hello.due(said: helloSaid, accessibility: permNow().accessibility, quiet: quiet.on) else { return }
-        defaults.set(true, forKey: "saidHello")
-        Log.say("app: hello")
-        helloOn = true
-        capsule.post(["ev": "app_hello"])
-        visFeed(.show(Hello.cap))
-    }
-
-    // macOS has no callback for Accessibility: look every 2 s until granted
-    private func pollTrust() {
-        guard trustPoll == nil else { return }
-        trustPoll = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] t in
-            MainActor.assumeIsolated {
-                guard let self, Keys.trusted else { return }
-                t.invalidate()
-                self.trustPoll = nil
-                self.permStep { PermPlan.answered(.accessibility, granted: true, &$0) }
-            }
-        }
-    }
-
-    // the first hold: the mic, then the screen, each its sentence first;
-    // true = an ask is showing (or the mic is off), no talk this time
-    private func askBeforeTalk() -> Bool {
-        var talk = true
-        var why = ""
-        permStep { s in
-            let h = PermPlan.hold(&s)
-            talk = h.talk
-            why = PermPlan.holdWhy(s, h.do)
-            return h.do
-        }
-        // every hold's decision in app.log (the dogfood, B2)
-        Log.say(talk ? "keys: hold → talk" + (why.isEmpty ? "" : " (\(why))") : "keys: hold ignored: \(why)")
-        return !talk
-    }
-
-    // the page's answer to an ask: continue, not now, settings
-    private func permCommand(_ p: String, _ action: String) {
-        // the problems that aren't asks (the user: every error with the way
-        // back): their line's 'settings' opens the pane
-        if action == "settings", let pane = SettingsPane.url(p) {
-            if sandbox { Log.say("app: qa: settings pane for \(p)"); return }
-            NSWorkspace.shared.open(pane)
-            return
-        }
-        guard let perm = Perm(rawValue: p) else { return }
-        // answered: the glass the ask opened goes (first-run walk: it stayed
-        // pinned on the last ask after every permission was granted); the
-        // next ask, if any, opens it again after macOS's prompt
-        if askShown {
-            askShown = false
-            visFeed(.dismiss)
-        }
-        permStep { PermPlan.command(perm, action, &$0) }
-    }
-
-    private var askShown = false   // the glass is open for a permission ask
-
-    // MARK: problems that aren't asks (the user: never a silent ignore)
-
-    // the tap swallows fn's own events, so macOS's 🌐 action shouldn't fire;
-    // if its emoji picker still shows up after a fn tap, say so once per
-    // launch with the way back (Keyboard › Press 🌐 key to › Do Nothing)
-    private var globeSaid = false
-    private func globeCheck() {
-        guard !sandbox, !globeSaid, globeUse() != "none" else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self, !self.globeSaid else { return }
-                let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
-                let owners = list.compactMap { $0[kCGWindowOwnerName as String] as? String }
-                guard Globe.fired(owners: owners) else { return }
-                self.globeSaid = true
-                Log.say("keys: macOS's 🌐 key action fired (\(globeUse())): said, with the Keyboard pane")
-                self.problem("globe")
-            }
-        }
-    }
-
-    // a problem's line on the glass (the page's words; its 'settings' button
-    // sends app_perm {perm, do:'settings'})
-    private func problem(_ p: String) {
-        perm(p, "denied")
-        visFeed(.show(Visibility.forCard))
-    }
 }
