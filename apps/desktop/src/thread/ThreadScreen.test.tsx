@@ -65,6 +65,10 @@ describe('the thread screen', () => {
       composer.props?.onSend({ text: 'hi there', files: [] });
     });
     expect(cmds.at(-1)).toEqual({ cmd: 'send', project: P, agent: 'perf', text: 'hi there', mode: 'now' });
+    act(() => {
+      composer.props?.onSend({ text: 'look', files: ['/tmp/shot.png'] });
+    });
+    expect(cmds.at(-1)).toMatchObject({ cmd: 'send', project: P, agent: 'perf', text: 'look', files: ['/tmp/shot.png'] });
     const [p] = store.pending(K);
     if (p === undefined) throw new Error('no pending send');
     const row = render(

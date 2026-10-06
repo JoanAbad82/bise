@@ -219,9 +219,10 @@ const ThreadComposer = memo(function ThreadComposer({ project, agent, busy, to, 
   const sources = useComposerSources(project);
   const onSend = useCallback(
     (out: Outgoing) => {
-      // ⏎ while a turn runs steers it ('now', as the TUI); files are @paths
-      // in the words already. Tab's queue: amb-web's next step (mode on Outgoing)
-      store.send({ project, agent, text: out.text, mode: 'now' });
+      // ⏎ while a turn runs steers it ('now', as the TUI); the files he
+      // attached or dropped go with it (amb-core item H: the hub renders them
+      // once, an image as a marker the model sees). Tab's queue: amb-web's
+      store.send({ project, agent, text: out.text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}) });
     },
     [store, project, agent],
   );
