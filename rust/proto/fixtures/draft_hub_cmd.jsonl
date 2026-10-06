@@ -1,0 +1,2 @@
+{"cmd":"follow","project":"acme-1a2b3c4d","agent":"perf","on":true}
+{"cmd":"send_quote","project":"acme-1a2b3c4d","agent":"perf","text":"why this line?","quote":{"agent":"perf","pos":13,"text":"rows.sort();"}}

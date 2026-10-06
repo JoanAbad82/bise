@@ -1,0 +1,15 @@
+{"cmd":"hello","proto":1}
+{"cmd":"subscribe","project":"acme-1a2b3c4d","agent":"perf"}
+{"cmd":"subscribe","project":"acme-1a2b3c4d","agent":"perf","limit":60}
+{"cmd":"unsubscribe","project":"acme-1a2b3c4d","agent":"perf"}
+{"cmd":"page","project":"acme-1a2b3c4d","agent":"perf","before":200,"limit":60}
+{"cmd":"page","project":"acme-1a2b3c4d","agent":"perf","before":4}
+{"cmd":"send","project":"acme-1a2b3c4d","agent":"perf","text":"look at the cold bench","mode":"now"}
+{"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"then the warm one","mode":"queued"}
+{"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"why is this slow?","mode":"now","context":{"app":"Safari","url":"https://grafana.acme.test/d/p99","title":"p99 latency"}}
+{"cmd":"answer","project":"acme-1a2b3c4d","card":9,"reply":"1"}
+{"cmd":"answer","project":"acme-1a2b3c4d","card":10,"reply":"yes"}
+{"cmd":"stop","project":"acme-1a2b3c4d","agent":"perf"}
+{"cmd":"archive","project":"acme-1a2b3c4d","agent":"perf","force":true}
+{"cmd":"archive","project":"acme-1a2b3c4d","agent":"old-fix","force":false}
+{"cmd":"unarchive","project":"acme-1a2b3c4d","agent":"old-fix"}
