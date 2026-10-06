@@ -104,7 +104,20 @@
     return out;
   }
 
+  // every '⏎' hint does what ⏎ does (lead m_8108 (3)): runs the selected row; the spotlight's
+  // sends what he typed
   function spec(v) {
+    const s = specOf(v);
+    if (s.foot) {
+      const r = selRow(s);
+      for (const it of s.foot.left) if (it.keys.length === 1 && it.keys[0] === "⏎") {
+        if (r) it.act = r.act;
+        else if (!it.act && (v.state === "spotlight" || v.state === "find")) it.act = { ev: "ui_spot_send" };
+      }
+    }
+    return s;
+  }
+  function specOf(v) {
     const s = { kind: v.state, mood: v.mood, head: null, level: null, big: null, text: null, sections: [], foot: null };
     const focused = !!v.focused;
     switch (v.state) {
@@ -175,8 +188,13 @@
         const cards = (v.inbox || []).map((c, k) => ({ g: "?", gc: "a", t: c.text, sub: c.agent, sel: !!c.sel, right: { keys: [String(k + 1)] }, act: { ev: "ui_card", card: c.id }, qa: `card-${c.id}` }));
         if (cards.length || !full) s.sections.push({ label: cards.length ? Wd.waiting(cards.length) : W.nothingNeeds, rows: cards, acc: cards.length > 0 });
         if (full) {
-          const run = (v.list || []).map((r) => ({ g: r.glyph === "✓" ? "✓" : r.kind === "need" ? "?" : r.glyph, gc: r.glyph === "✓" ? "ok" : r.glyph === "▲" ? "risk" : r.kind === "need" ? "a" : null, t: r.name, sub: r.what, right: r.age ? { age: r.age } : null }));
+          // every row acts (lead m_8108 (3)): an agent opens its side panel (space or ⏎), a page
+          // being written opens in the browser
+          const run = (v.list || []).map((r) => ({ g: r.glyph === "✓" ? "✓" : r.kind === "need" ? "?" : r.glyph, gc: r.glyph === "✓" ? "ok" : r.glyph === "▲" ? "risk" : r.kind === "need" ? "a" : null, t: r.name, sub: r.what, right: r.age ? { age: r.age } : null,
+            act: r.agent ? { ev: "ui_agent", agent: r.agent } : r.page ? { ev: "ui_page", page: r.page } : null, qa: r.agent ? `agent-${r.agent}` : r.page ? `page-${r.page}` : undefined }));
           s.sections.push({ label: run.length ? `${v.titles.running} · ${run.length}` : W.nothingRunning, rows: run });
+          // main's last answer, back on the glass by hand (lead m_8108 (6): a card or a pane may cover it)
+          if (v.answer) s.sections.push({ label: B.biseSaid, rows: [{ g: "*", t: v.answer, act: { ev: "ui_reanswer" }, qa: "answer" }] });
           if (v.forYou) s.sections.push({ label: v.forYou.title, rows: v.forYou.pages.map((p, k) => ({ g: "◰", gc: p.unopened ? "a" : null, t: p.name, sub: p.watch ? `${p.watch} · ${p.meta}` : p.meta, seen: !p.unopened, right: k < 9 ? { keys: ["⌘", String(k + 1)] } : null, act: { ev: "ui_page", page: p.id }, qa: `page-${p.id}` })) });
         }
         s.foot = { left: [item(["↑", "↓"], B.move), item(["⏎"], B.open, key("enter"))], right: [item(["esc"], full ? B.close : B.later, key("esc"))] };
@@ -244,6 +262,17 @@
           { g: "◌", t: p.later, right: { keys: ["esc"] }, act: { ev: "ui_perm", perm: p.perm, do: "not_now" }, qa: "perm-not-now" },
         ] }];
         s.foot = { left: [item(["⏎"], p.button, { ev: "ui_perm", perm: p.perm, do: "continue" })], right: [item(["esc"], p.later, { ev: "ui_perm", perm: p.perm, do: "not_now" })] };
+        return s;
+      }
+      case "hub_down": {
+        // can't reach bise, trying again: start it from here too, naming the bise the app runs
+        // (lead m_8108 (2); null: none found, no row)
+        s.head = { h: 68, line: lineOf({ text: v.text, glyph: "▲" }) };
+        if (v.bise !== null) {
+          s.sections = [{ rows: [{ g: "›_", t: v.bise ? B.terminalAt(home(v.bise)) : B.terminal, sub: v.bise ? B.runsAt(home(v.bise)) : B.runs,
+            right: { keys: ["⌘", "⏎"] }, act: { ev: "ui_terminal" }, qa: "terminal" }] }];
+          s.foot = { left: [item(["⌘", "⏎"], B.startIt, { ev: "ui_terminal" })], right: [] };
+        }
         return s;
       }
       case "idle": return s;

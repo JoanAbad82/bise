@@ -56,7 +56,7 @@
       hushed: false,
       fn: false, handsFree: false,
       lastSent: "",                 // his last message (typed or said): ↑ in an empty spotlight edits it
-      focusAsk: null,               // the card in front when the app gave the panel the keys
+      replayAt: -1e9,               // main's last answer brought back by hand (fn 0's 'bise said' row)
       bisePath: undefined,          // the bise the app runs (app_bise; null: none found)
       shot: null,                   // { app, title, skipped }
       perms: {}, permAsk: null,
@@ -419,7 +419,13 @@
           const r = setPane(m, "inbox");
           return { m: { ...r.m, sel: Math.max(0, i) }, cmds: r.cmds };
         }
-        return key(m, ev.key, now, ev);
+        {
+          const r = key(m, ev.key, now, ev);
+          // esc that leaves nothing to show: the page asks the app to hide the bar (amb-mac m_8112:
+          // while the bar has the keys, esc is the page's)
+          if (ev.key === "esc" && contentOf(view(r.m, now), null, []).kind === "none" && view(m, now).content.kind !== "none") return { m: r.m, cmds: [...r.cmds, { cmd: "app_hide" }] };
+          return r;
+        }
       // a call or a meeting (amb-mac, 62d2105; replayed after a reload): main answers in text only
       // and the non-urgent cards wait (no needs-you glass); the inbox still lists them
       // nobody can see the capsule (hidden, covered, the screen locked or asleep; amb-mac e3c5dcf6):
@@ -428,11 +434,8 @@
         return none({ ...m, visible: ev.on !== false });
       // the panel has the keys (amb-mac a7efaa08): what he opened, or a pushed card he clicked;
       // a pushed card's footer shows the plain keys then, fn chords before (ambient m_6519)
-      case "app_focused": {
-        // which card was in front when the keys came: a card pushed later has not got them
-        const front = askable(m)[0];
-        return none({ ...m, focused: !!ev.on, focusAsk: ev.on && front ? front.id : null });
-      }
+      case "app_focused":
+        return none({ ...m, focused: !!ev.on });
       // the menu-bar icon's rect in the page's CSS px (the capsule grows out of it, SPEC §0)
       case "app_icon":
         return none({ ...m, icon: [ev.x, ev.y, ev.w, ev.h].every((n) => Number.isFinite(+n)) ? { x: +ev.x, y: +ev.y, w: +ev.w, h: +ev.h } : null });
@@ -489,6 +492,12 @@
         return setPane(m, m.pane ? null : visibleCards(m).length > 1 ? "inbox" : "agents");
       case "ui_close":
         return setPane(m, null);
+      // fn 0's 'bise said' row: main's last answer back on the glass for 4 s
+      case "ui_reanswer": {
+        if (!m.main.text) return none(m);
+        const r = setPane(m, null);
+        return { m: { ...r.m, replayAt: now }, cmds: r.cmds };
+      }
       // ↑ in an empty spotlight: his last message comes back to edit (SPEC §4)
       case "ui_spot_last":
         return m.lastSent ? none({ ...m, spotText: m.lastSent, rowSel: 0 }) : none(m);
@@ -752,9 +761,9 @@
       icon: m.icon || null,  // the menu-bar icon (the capsule grows out of it)
       radius: m.radius,     // the capsule's and the glass's corners
       kiss: false,
-      // the panel has the keys (app_focused), one source for every footer: not while hidden, and a
-      // card pushed after the keys came never shows plain keys (lead m_8094 (3))
-      focused: !!m.focused && !m.hidden && (!!m.pane || !askable(m)[0] || askable(m)[0].id === m.focusAsk),
+      // the panel has the keys, one source for every footer: the app sends app_focused exactly when
+      // the bar takes or gives back the keys (amb-mac m_8112), and none reach it while hidden
+      focused: !!m.focused && !m.hidden,
       rowSel: m.rowSel || 0, // the selected row of an open bar (bar.js clamps it)
       handsFree: !!m.handsFree,
     };
@@ -846,32 +855,8 @@
       // kept and go when it's back
       v.state = "offline"; v.size = "open";
       v.offline = { text: m.pending.text || "", bise: m.bisePath };
-    } else if (m.mine && (m.phase === "sending" || m.phase === "working" || (m.phase === "idle" && now - m.sentAt < 30000 && !m.main.text))) {
-      v.state = "working"; v.size = "open"; v.pose = "think";
-      v.label = { text: "bise", acc: true };
-      if (m.main.text && !m.voice) v.words = mainWords();
-      // back after can't reach bise: '✓ bise is back · your words went to main' first (round 9)
-      else if (now - (m.backAt || -1e9) < T.page) { v.glyph = "✓"; v.text = W.bar.back; }
-      // his words, whole, while bise thinks (the pearl's work mood); no 'got it' / 'on it' line
-      // (the user's dogfood, lead m_7163): main's answer replaces them
-      else if (m.said) v.said = { list: m.said.split(/\s+/).filter(Boolean), lit: 1e9 };
-      if (m.line) v.sub = m.line;
-      v.chips = m.chips;
-    } else if (m.mine && m.phase === "speaking") {
-      v.state = "speaking"; v.size = "open";
-      v.pose = m.hushed ? "think" : "speak";
-      v.lvl = m.hushed ? 0 : lv(m, "main", now);
-      v.label = { text: "bise", acc: true };
-      v.words = mainWords();
-      if (m.hushed) v.sub = W.hush;
-      v.chips = m.chips;
-    } else if (m.mine && m.phase === "done" && now - m.doneAt < T.endOpen) {
-      v.state = "end"; v.size = "open";
-      v.label = { text: "bise", acc: true };
-      v.words = mainWords();
-      if (m.hushed) v.sub = W.hush;
-      v.chips = m.chips;
-      kissAt(m.doneAt);
+    // a pane he opened by hand (fn 0, fn ,, fn p, fn i) stays in front of main's turn: he is busy
+    // in it; main's answer waits behind it and stays reachable (lead m_8108 (6))
     } else if (m.pane === "agents") {
       // the full view (vision §3 G, SPEC §0: fn 0, a hand-open of the app): what's running (each
       // agent with its live line, the pages being written), what needs you (the inbox, 1-9 answer
@@ -902,7 +887,7 @@
         const asks = cards.some((c) => c.agent === a.name);
         const doneLine = a.status === "done" && a.report ? Wd.firstSentence(a.report) : "";
         return {
-          name: a.name,
+          name: a.name, agent: a.name,
           glyph: asks ? "?" : Wd.GLYPH[a.status] || "·",
           kind: asks ? "need" : a.status,
           // short: its task line, or a done agent's done line
@@ -911,6 +896,8 @@
         };
       }).concat(writingRows);
       if (ordered.some((a) => !runs(a))) v.titles.running = W.agents;
+      // main's last answer, reachable after a card or a pane covered it (lead m_8108 (6))
+      if (m.main.text) v.answer = Wd.firstSentence(Wd.plain(m.main.text), 120);
     } else if (m.pane === "settings") {
       // fn + , : glass rows with toggles, then the windows bise never sees (amb-mac keeps them;
       // words: best guesses, asked to ambient; the empty line is ambient's)
@@ -942,6 +929,34 @@
       v.state = "inbox"; v.size = "open";
       v.label = { text: cards.length ? Wd.waiting(cards.length) : W.quiet };
       v.inbox = inbox();
+    } else if (m.mine && (m.phase === "sending" || m.phase === "working" || (m.phase === "idle" && now - m.sentAt < 30000 && !m.main.text))) {
+      v.state = "working"; v.size = "open"; v.pose = "think";
+      v.label = { text: "bise", acc: true };
+      if (m.main.text && !m.voice) v.words = mainWords();
+      // back after can't reach bise: '✓ bise is back · your words went to main' first (round 9)
+      else if (now - (m.backAt || -1e9) < T.page) { v.glyph = "✓"; v.text = W.bar.back; }
+      // his words, whole, while bise thinks (the pearl's work mood); no 'got it' / 'on it' line
+      // (the user's dogfood, lead m_7163): main's answer replaces them
+      else if (m.said) v.said = { list: m.said.split(/\s+/).filter(Boolean), lit: 1e9 };
+      if (m.line) v.sub = m.line;
+      v.chips = m.chips;
+    } else if (m.mine && m.phase === "speaking") {
+      v.state = "speaking"; v.size = "open";
+      v.pose = m.hushed ? "think" : "speak";
+      v.lvl = m.hushed ? 0 : lv(m, "main", now);
+      v.label = { text: "bise", acc: true };
+      v.words = mainWords();
+      if (m.hushed) v.sub = W.hush;
+      v.chips = m.chips;
+    } else if ((m.mine && m.phase === "done" && now - m.doneAt < T.endOpen && !need) || (m.main.text && now - m.replayAt < T.endOpen)) {
+      // main's answer lingers 4 s, unless a card waits (then the card first: lead m_8108 (6)); the
+      // answer comes back by hand from fn 0's 'bise said' row
+      v.state = "end"; v.size = "open";
+      v.label = { text: "bise", acc: true };
+      v.words = mainWords();
+      if (m.hushed) v.sub = W.hush;
+      v.chips = m.chips;
+      kissAt(m.doneAt);
     } else if (flash) {
       v.state = flash.kind;
       v.glyph = flash.glyph || null; v.text = flash.text; v.sub = flash.sub || null;
@@ -950,6 +965,8 @@
       if (flash.still) v.frozen = true;
     } else if (m.hub.known && !m.hub.up) {
       v.state = "hub_down"; v.text = W.hubDown; v.frozen = true;
+      // start bise from here too, naming the bise the app runs (lead m_8108 (2); null: no row)
+      v.bise = m.bisePath;
     } else if (need) {
       v.state = "needs"; v.size = "open"; v.ask = ask();
     } else {

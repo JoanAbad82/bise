@@ -259,7 +259,8 @@ law("B3 esc = later: the glass goes, the card keeps waiting and the count stays 
   const m = M.step(M.init(), { ev: "state", agents: [], cards: [card], pages: [] }, 0).m;
   assert.equal(M.view(m, 10).state, "needs");
   const r = M.step(m, { ev: "app_key", key: "esc" }, 20);
-  eq(r.cmds, []);
+  // the last card put off leaves nothing to show: the page asks the app to hide (amb-mac m_8112)
+  eq(r.cmds, [{ cmd: "app_hide" }]);
   const v = M.view(r.m, 30);
   assert.notEqual(v.state, "needs"); assert.equal(v.ask, null);
   assert.equal(M.count(r.m), M.count(m)); assert.equal(M.count(r.m), 1);
@@ -1521,12 +1522,15 @@ law("spotlight (bug, lead m_8094 (2)): a close (esc or send) empties the field; 
   m = M.step(talked(M.init(), 200, "book the train"), { ev: "sent", voice: true }, 900).m;
   assert.equal(m.lastSent, "book the train");
 });
-law("hints (lead m_8094 (3)): one source for which keys a pushed card shows: plain keys only when the app gave the panel the keys for that card; a card pushed later, or a hidden bar, shows fn chords", () => {
+law("hints (lead m_8094 (3), amb-mac m_8112): one source for which keys a card shows: the app's app_focused (sent exactly when the bar takes or gives back the keys), never while hidden", () => {
   const card = { id: "c9", kind: "question", agent: "cookies", text: "keep it?", options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }] };
   let m = M.step(M.init(), { ev: "state", agents: Fake.AGENTS, cards: [] }, 0).m;
-  // he had the spotlight (the keys), closed it; the app still says focused; then a card is pushed
+  // he had the spotlight (the keys), closed it: the page sends app_focus off, the app answers
+  // app_focused off; then a card is pushed
   m = M.step(M.step(m, { ev: "app_key", key: "space" }, 10).m, { ev: "app_focused", on: true }, 20).m;
-  m = M.step(m, { ev: "app_key", key: "esc", local: true }, 30).m;
+  const closed = M.step(m, { ev: "app_key", key: "esc", local: true }, 30);
+  assert.ok(closed.cmds.some((c) => c.cmd === "app_focus" && c.on === false));
+  m = M.step(closed.m, { ev: "app_focused", on: false }, 35).m;
   m = M.step(m, { ev: "state", agents: Fake.AGENTS, cards: [card] }, 40).m;
   let v = M.view(m, 50);
   eq([v.state, v.focused], ["needs", false]);
@@ -1539,6 +1543,10 @@ law("hints (lead m_8094 (3)): one source for which keys a pushed card shows: pla
   // hidden: no keys reach it
   m = M.step(m, { ev: "app_hidden", on: true }, 80).m;
   assert.equal(M.view(m, 90).focused, false);
+  // a card that comes while the bar has the keys shows the plain keys that reach it
+  let k = M.step(M.step(M.init(), { ev: "app_key", key: "i" }, 0).m, { ev: "app_focused", on: true }, 10).m;
+  k = M.step(M.step(k, { ev: "app_key", key: "esc", local: true }, 20).m, { ev: "state", agents: Fake.AGENTS, cards: [card] }, 30).m;
+  eq([M.view(k, 40).state, keys(Bar.spec(M.view(k, 40)))], ["needs", ["1 – 2", "↑ ↓", "esc"]]);
 });
 law("can't reach bise names the bise the app runs (amb-mac m_8082: app_bise {path}); none found: no terminal row", () => {
   let m = M.init(); for (const [t, ev] of sceneEvents("offline")) m = M.step(m, ev, t).m;
@@ -1547,6 +1555,72 @@ law("can't reach bise names the bise the app runs (amb-mac m_8082: app_bise {pat
   const at = M.step(m, { ev: "app_bise", path: "/Users/gabriel/.local/bin/bise" }, 3700).m;
   eq([term(at).t, term(at).sub], ["start ~/.local/bin/bise in a terminal", "runs: ~/.local/bin/bise"]);
   assert.equal(term(M.step(m, { ev: "app_bise", path: null }, 3700).m), undefined);
+});
+
+// ---- fix round 2 (lead m_8108)
+law("round 2 (2): can't reach bise, trying again (hub down) offers the start row naming app_bise.path; null: no row", () => {
+  let m = M.step(M.init(), { ev: "hub", up: true }, 0).m;
+  m = M.step(m, { ev: "hub", up: false }, 10).m;
+  let s = Bar.spec(M.view(m, 20));
+  eq([s.kind, s.head.line.text, s.sections[0].rows[0].t, s.sections[0].rows[0].act], ["hub_down", "can't reach bise. trying again.", "start bise in a terminal", { ev: "ui_terminal" }]);
+  s = Bar.spec(M.view(M.step(m, { ev: "app_bise", path: "/Users/g/.local/bin/bise" }, 15).m, 20));
+  eq([s.sections[0].rows[0].t, s.foot.left[0].act], ["start ~/.local/bin/bise in a terminal", { ev: "ui_terminal" }]);
+  assert.equal(Bar.spec(M.view(M.step(m, { ev: "app_bise", path: null }, 15).m, 20)).sections.length, 0);
+  eq(M.step(m, { ev: "ui_terminal" }, 30).cmds, [{ cmd: "app_run_bise" }]);
+});
+law("round 2 (3)(5): no dead clicks: fn 0's agent rows open the side panel (⏎, space or a click), every '⏎' hint runs what ⏎ runs (agents, inbox, spotlight)", () => {
+  const cards = [Fake.CARD];
+  let m = M.step(M.init(), { ev: "state", agents: Fake.ROSTER, cards }, 0).m;
+  m = M.step(m, { ev: "app_key", key: "0" }, 10).m;
+  let s = Bar.spec(M.view(m, 20, Fake.T0));
+  const ag = s.sections.flatMap((x) => x.rows).filter((r) => r.qa && r.qa.startsWith("agent-"));
+  assert.ok(ag.length >= 6);
+  eq(ag[0].act.ev, "ui_agent");
+  eq(M.step(m, ag[0].act, 30).cmds.at(-1), { cmd: "app_panel", agent: ag[0].act.agent });
+  // ⏎ hint = the selected row (the card first), then an agent row once ↓ reaches it
+  eq(s.foot.left.find((i) => i.keys.join("") === "⏎").act, { ev: "ui_card", card: "c1" });
+  m = M.step(m, { ev: "app_key", key: "down", local: true, n: Bar.selectable(s).length }, 40).m;
+  s = Bar.spec(M.view(m, 50, Fake.T0));
+  eq(s.foot.left.find((i) => i.keys.join("") === "⏎").act, Bar.selRow(s).act);
+  eq(Bar.selRow(s).act.ev, "ui_agent");
+  // inbox: the ⏎ hint opens the selected card
+  const ib = Bar.spec(M.view(M.step(M.step(M.init(), { ev: "state", agents: [], cards }, 0).m, { ev: "app_key", key: "i" }, 10).m, 20));
+  eq(ib.foot.left.find((i) => i.keys.join("") === "⏎").act, { ev: "ui_card", card: "c1" });
+  // spotlight: the ⏎ hint sends (with text: the selected row)
+  let sp = M.step(M.init(), { ev: "app_key", key: "space" }, 0).m;
+  eq(Bar.spec(M.view(sp, 10)).foot.left[0].act, { ev: "ui_spot_send" });
+  sp = M.step(sp, { ev: "ui_spot_type", text: "hello main" }, 20).m;
+  eq(Bar.spec(M.view(sp, 30)).foot.left[0].act, { ev: "ui_spot_send", text: "hello main" });
+});
+law("round 2 (4): in the inbox ↑ moves up a row (never leaves the list for the pushed card)", () => {
+  const three = ["a", "b", "c"].map((id) => ({ id, agent: "ops", text: `q ${id}?`, options: [{ n: 1, label: "yes" }] }));
+  let m = M.step(M.step(M.init(), { ev: "state", agents: [], cards: three }, 0).m, { ev: "app_key", key: "i" }, 10).m;
+  for (const k of ["down", "down", "up"]) m = M.step(m, { ev: "app_key", key: k, local: true, n: 3 }, 20).m;
+  const v = M.view(m, 30);
+  eq([v.state, Bar.selRow(Bar.spec(v)).qa], ["inbox", "card-b"]);
+  m = M.step(M.step(m, { ev: "app_key", key: "up", local: true, n: 3 }, 40).m, { ev: "app_key", key: "up", local: true, n: 3 }, 50).m;
+  eq([M.view(m, 60).state, Bar.selRow(Bar.spec(M.view(m, 60))).qa], ["inbox", "card-a"]);
+});
+law("round 2 (6): main's answer and a card never hide each other: a pane he opened stays over main's turn; after main speaks a waiting card shows at once (no 4 s behind the line); fn 0's 'bise said' brings the answer back", () => {
+  const card = { id: "q", agent: "ops", text: "ship it?", options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }] };
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [] }, 0).m;
+  m = M.step(m, { ev: "sent", text: "hi", voice: false }, 10).m;
+  m = M.step(m, { ev: "phase", phase: "working" }, 20).m;
+  // fn i during main's turn: the inbox, not the working line
+  assert.equal(M.view(M.step(m, { ev: "app_key", key: "i" }, 30).m, 40).state, "inbox");
+  m = M.step(m, { ev: "main", text: "on it. the banner is half the size now.", turn: 1 }, 50).m;
+  m = M.step(M.step(m, { ev: "phase", phase: "speaking" }, 60).m, { ev: "state", agents: [], cards: [card] }, 70).m;
+  assert.equal(M.view(m, 80).state, "speaking");            // his turn while main talks
+  m = M.step(m, { ev: "phase", phase: "done" }, 100).m;
+  assert.equal(M.view(m, 110).state, "needs");              // then the card, at once
+  // the answer is reachable from fn 0
+  m = M.step(m, { ev: "app_key", key: "0" }, 200).m;
+  const row = Bar.spec(M.view(m, 210)).sections.flatMap((x) => x.rows).find((r) => r.qa === "answer");
+  eq(row.t, "on it.");
+  m = M.step(m, row.act, 220).m;
+  const v = M.view(m, 230);
+  eq([v.state, v.words.list.join(" ")], ["end", "on it. the banner is half the size now."]);
+  assert.notEqual(M.view(m, 230 + M.T.endOpen).state, "end");
 });
 
 // ---- round 10's side panel (panelmodel.js; amb-mac m_7040/m_7042, amb-core m_7030/m_7043)

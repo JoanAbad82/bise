@@ -197,14 +197,18 @@
     // the field: a fresh open takes the model's text (empty after a close), its caret at the end;
     // a close empties it, so nothing typed before comes back on the next open (the user's bug:
     // 'plan the offsiteplan the offsite…' after five reopenings, lead m_8094 (2))
-    if (h && h.input) {
-      if (!fieldOpen) { fieldOpen = true; input.value = h.input.text; input.setSelectionRange(input.value.length, input.value.length); }
-      else if (input.value !== h.input.text && document.activeElement !== input) input.value = h.input.text;
-      if (input.placeholder !== h.input.ph) { input.placeholder = h.input.ph; input.setAttribute("aria-label", h.input.ph); }
-    } else {
-      if (fieldOpen) { fieldOpen = false; input.value = ""; }
-      if (document.activeElement === input) input.blur();
+    // the model's pane decides (never the held view, which keeps drawing the closed spotlight while
+    // the app hides it: lead m_8108 (1), 'first words' were still there on reopen)
+    const typed = model.pane === "spot" || model.pane === "find";
+    if (typed !== fieldOpen) {
+      fieldOpen = typed;
+      input.value = typed ? model.spotText : "";
+      try { input.setSelectionRange(input.value.length, input.value.length); } catch { /* not focusable yet */ }
     }
+    if (h && h.input) {
+      if (typed && input.value !== h.input.text && document.activeElement !== input) input.value = h.input.text;
+      if (input.placeholder !== h.input.ph) { input.placeholder = h.input.ph; input.setAttribute("aria-label", h.input.ph); }
+    } else if (document.activeElement === input) input.blur();
     const w = h && h.line && h.line.words;
     put("words", JSON.stringify(w && [w.list, w.code, w.lit]), () => {
       const q = $(".q", el.head), qi = q && $(".qi", q);
@@ -231,7 +235,12 @@
     const gw = s.w || Bar.BOX.w;
     if (bar.style.width !== gw + "px") bar.style.width = gw + "px";
     el.split.classList.toggle("two", s.preview !== undefined);
-    put("pv", JSON.stringify(s.preview || null), () => { el.pv.innerHTML = previewHtml(s.preview); el.pv.scrollTop = 0; show(el.pv, !!s.preview); });
+    put("pv", JSON.stringify(s.preview || null), () => {
+      el.pv.innerHTML = previewHtml(s.preview); el.pv.scrollTop = 0; show(el.pv, !!s.preview);
+      // a click on the preview = its ⏎: the agent's side panel (lead m_8108 (3)); its own buttons act first
+      if (s.preview && s.preview.name) el.pv.dataset.act = JSON.stringify({ ev: "ui_agent", agent: s.preview.name });
+      else delete el.pv.dataset.act;
+    });
     put("body", JSON.stringify(strip(s.sections)), () => { el.body.innerHTML = body(s.sections, bar.classList.contains("appear") || !on); el.body.scrollTop = 0; last.sel = null; show(el.body, rowsOn); });
     // the selected row: soft pink, its glyph pink, a ⏎ cap on the right (a switch keeps its switch)
     put("sel", JSON.stringify(sels(s.sections)), () => {
@@ -428,13 +437,15 @@
         if (it) { stop(); run(it.act); }
         return;
       }
-      if (e.key === "Enter" && st === "offline") { stop(); recv({ ev: "ui_terminal" }); }
+      if (e.key === "Enter" && (st === "offline" || st === "hub_down")) { stop(); recv({ ev: "ui_terminal" }); }
       return;
     }
     if (open && s && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
       stop(); recv({ ev: "app_key", key: e.key === "ArrowUp" ? "up" : "down", local: true, n: Bar.selectable(s).length }); return;
     }
     if (open && s && e.key === "Enter") { const r = Bar.selRow(s); if (r) { stop(); run(r.act); return; } }
+    // fn 0: space on an agent = its preview, the side panel (SPEC §4, lead m_8108 (5))
+    if (st === "agents" && s && e.key === " ") { const r = Bar.selRow(s); if (r && r.act.ev === "ui_agent") { stop(); run(r.act); } return; }
     if (st === "settings" && s && (e.key === " " || e.key === "Backspace")) {
       const r = Bar.selRow(s);
       const ok = r && (e.key === " " ? r.right && "sw" in r.right : r.act.key === "skip_remove");
