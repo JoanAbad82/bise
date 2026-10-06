@@ -26,7 +26,10 @@ import { Sidebar } from './Sidebar';
 import { CoreLine } from './CoreLine';
 import { Palette } from './Palette';
 import { keyAction, typingIn } from './keys';
-import { emitAction } from './menu';
+import { emitAction, useMenuAction } from './menu';
+import { TerminalPanel } from '@/terminal/Terminal';
+import { isToggleKey, shellProject, shellTakes } from '@/terminal/model';
+import { panel } from '@/terminal/panel';
 import '@/ds/index.css';
 import './app.css';
 
@@ -39,10 +42,20 @@ export function App() {
   );
 }
 
-/** bise's thread, or in test mode the run's start route (`#route=…`, amb-tools m_9577). */
+/**
+ * bise's thread, or in test mode the run's start route (`#route=…`, amb-tools
+ * m_9577). The window opened on 'terminal' (View > Terminal with the window
+ * closed, amb-mac 339d3e5e) is bise's thread with the panel shown.
+ */
 function firstRoute(): Route {
+  if (TERMINAL.test(window.location.hash)) {
+    panel.show();
+    return { screen: 'bise' };
+  }
   return (testMode() ? startRouteOf(window.location.hash) : undefined) ?? { screen: 'bise' };
 }
+
+const TERMINAL = /^#?route=terminal$/;
 
 /** The app runs under the test harness (the preload's flag; false outside Electron). */
 function testMode(): boolean {
@@ -58,6 +71,10 @@ function Shell() {
   const router = useRouter();
   useMenuRouting(router);
   useMainRoutes(router);
+  // View > Terminal (⌃`): the panel under the screen (the key's own echo is dropped)
+  useMenuAction('terminal', () => {
+    panel.toggleByMenu(Date.now());
+  });
   // a home not onboarded opens on the onboarding once (amb-home c44c926d)
   useFirstLaunch();
   useShown();
@@ -83,8 +100,15 @@ function Current() {
     <Main testId="app.main">
       <CoreLine />
       <ScreenOf key={formatRoute(route)} route={route} />
+      <RouteTerminal route={route} />
     </Main>
   );
+}
+
+/** The terminal panel of the project in view (bise's own on bise, the inbox, settings). */
+function RouteTerminal({ route }: { route: Route }) {
+  const home = useProjects().find((p) => p.home)?.project;
+  return <TerminalPanel project={shellProject(projectOf(route), home)} />;
 }
 
 function ScreenOf({ route }: { route: Route }) {
@@ -198,7 +222,17 @@ function useWindowKeys(openPalette: () => void) {
   const store = useStore();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || e.repeat) return;
+      if (e.repeat) return;
+      // ⌃`: the terminal panel, wherever the focus is (xterm leaves it unhandled)
+      if (isToggleKey(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        panel.toggleByKey(Date.now());
+        return;
+      }
+      if (e.defaultPrevented) return;
+      // the shell has the focus: every key but ⌘ ones is its own (⌥1, ctrl+y, End...)
+      if (inTerminal(document.activeElement) && shellTakes(e)) return;
       const act = keyAction(e, {
         route: router.get(),
         projects: store.projects(),
@@ -217,6 +251,10 @@ function useWindowKeys(openPalette: () => void) {
       window.removeEventListener('keydown', onKey, true);
     };
   }, [router, store, openPalette]);
+}
+
+function inTerminal(el: Element | null): boolean {
+  return el?.closest('[data-testid="terminal.panel"]') != null;
 }
 
 /** ⌘[ back, ⌘] forward (the menu items are amb-mac's; the keys work without them). */

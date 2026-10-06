@@ -1,0 +1,57 @@
+/* The terminal panel under the screen (amb-win): the ds palette, the shell's mono. */
+.term-panel {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 80px;
+  /* a smaller window never hides the screen above it (model.ts KEEP_ABOVE) */
+  max-height: calc(100% - 200px);
+  border-top: 1px solid var(--c-line-strong);
+  background: var(--p-bg);
+}
+
+.term-panel[hidden] {
+  display: none;
+}
+
+/* its top edge: drag it to resize (M16) */
+.term-grip {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: row-resize;
+  z-index: 1;
+}
+
+.term-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0 0 10px;
+}
+
+.term-host {
+  flex: 1;
+  min-height: 0;
+}
+
+.term-line {
+  margin: 0;
+  padding: 4px 0;
+  color: var(--c-text-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.term-again {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--c-accent);
+  font: inherit;
+  cursor: pointer;
+}

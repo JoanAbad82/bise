@@ -9,6 +9,7 @@ import type { MenuAction } from '@/shared/api';
 import type { Router } from './router';
 import { parseRoute } from './route';
 import type { ScreenAction } from './keys';
+import { panel } from '@/terminal/panel';
 
 /** What a screen may be asked: a menu item's ('find') or a window key's ('fold-all', 'stop'...). */
 export type AppAction = MenuAction | ScreenAction;
@@ -50,7 +51,9 @@ export function useMainRoutes(router: Router) {
     const bise = (window as Partial<Window>).bise;
     if (bise === undefined) return;
     return bise.onRoute((route) => {
-      router.go(parseRoute(route));
+      // View > Terminal while another window had the keys: show the panel here
+      if (route === 'terminal') panel.show();
+      else router.go(parseRoute(route));
     });
   }, [router]);
 }
