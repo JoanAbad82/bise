@@ -3556,7 +3556,12 @@ def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None,
     for k, v in env.items():
         cmd += ["--env", "%s=%s" % (k, v)]
     cmd += ["--args"] + argv[1:]
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    # open hands the app the CALLER's environment plus --env: from an agent shell that was the
+    # agent's whole env (SB_SOCKET = the real hub's socket, SB_AGENT, BISE_ROLE...; the bug 2/4
+    # run's core had them). So open runs with a clean env: the app gets only this and our --env.
+    clean = {"PATH": LAUNCHD_PATH, "HOME": os.path.expanduser("~"), "USER": os.environ.get("USER", ""),
+             "LOGNAME": os.environ.get("USER", ""), "TMPDIR": _user_tmp(), "LANG": os.environ.get("LANG", "en_US.UTF-8")}
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=clean)
     if r.returncode != 0:
         raise QAError("open failed: %s" % (r.stderr or r.stdout)[-500:])
     t0, ping, pid = time.time(), None, None
@@ -3578,6 +3583,22 @@ def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None,
     with open(REAL_RUN, "w") as f:
         json.dump(run, f, indent=1)
     if ping:
+        # first: the independent watchdog is attached to this pid, else nothing runs (ambient-lead m_8061)
+        t1, attached = time.time(), False
+        while time.time() - t1 < 5 and not attached:
+            try:
+                attached = ("watching pid %d" % pid) in open(os.path.join(REAL_APP_DIR, "watch.log")).read()
+            except OSError:
+                pass
+            time.sleep(0.1)
+        if not attached:
+            real_stop()
+            raise QAError("stopped: the watchdog did not attach to pid %s in 5 s (watch.log)" % pid)
+        # the app and its core carry nothing of the agent's or the real hub's (SB_SOCKET, SB_AGENT...)
+        leaked = real_env_leaks(pid)
+        if leaked:
+            real_stop()
+            raise QAError("stopped: the harness app carries the agent's env: %s" % leaked)
         # it reached only its own: its core's workspace is the throwaway one, its hub under the harness HOME
         core_ws = ((real_call("state").get("core") or {}).get("workspace"))
         hub = (real_feed().get("hub") or "")
@@ -3619,31 +3640,41 @@ def real_tail(n=40):
 
 
 def real_feed(agent="main", count=40):
-    """What the hub holds for an agent (main: did his words arrive?): its last lines, read
-    from the throwaway hub's own socket ({op:history})."""
+    """What the harness hub holds for an agent (main: did his words arrive, what did it answer):
+    the last lines of its transcript.log in the hub's own folder under the harness HOME (the
+    hub's {op:history} answered nothing for a 'before' past the end)."""
+    hubs = sorted(glob.glob(os.path.join(REAL_HOME, ".bise", "hubs", "*")))
+    if not hubs:
+        raise QAError("no harness hub under %s" % REAL_HOME)
+    t = os.path.join(hubs[0], "agents", agent, "transcript.log")
+    lines = open(t, errors="replace").read().splitlines() if os.path.exists(t) else []
+    keep = [l for l in lines if "\tsb you : " in l or "obs: assistant: " in l or "\tsb card : " in l]
+    return {"agent": agent, "lines": keep[-count:], "hub": os.path.join(hubs[0], "hub.sock")}
+
+
+def real_env_leaks(pid):
+    """The agent-only or real-hub variables in a process's env (ps eww): any is a leak."""
+    envl = subprocess.run(["ps", "eww", "-o", "command=", "-p", str(pid)], capture_output=True, text=True).stdout
+    bad = ("SB_SOCKET", "SB_AGENT", "SB_TASK", "SB_STATE_DIR", "BISE_ROLE", "BEND_STDIN", "GHOSTTY_RESOURCES_DIR")
+    return [k for k in bad if re.search(r"\s%s=" % k, envl)]
+
+
+def real_hub_send(text, focus="main"):
+    """Words into the harness hub as its user would type them in the TUI (the throwaway hub only):
+    the fake main runs the [[bash: ...]] in them, e.g. [[bash: sb card "which date?"]] raises a card."""
     socks = sorted(glob.glob(os.path.join(REAL_HOME, ".bise", "hubs", "*", "hub.sock")))
     if not socks:
         raise QAError("no harness hub under %s" % REAL_HOME)
     s = socket.socket(socket.AF_UNIX)
-    s.settimeout(8)
+    s.settimeout(5)
     s.connect(socks[0])
     try:
         s.sendall(b'{"op":"hello"}\n')
-        s.sendall((json.dumps({"op": "history", "agent": agent, "before": 10 ** 9, "count": count}) + "\n").encode())
-        f = s.makefile("r")
-        state = None
-        while True:
-            line = f.readline()
-            if not line:
-                raise QAError("the hub closed the socket")
-            v = json.loads(line)
-            if v.get("ev") == "state":
-                state = v
-            if v.get("ev") == "history" and v.get("agent") == agent:
-                agents = [(a.get("name"), a.get("status")) for a in (state or {}).get("agents", [])]
-                return {"agent": agent, "lines": v.get("lines", []), "agents": agents, "hub": socks[0]}
+        s.sendall((json.dumps({"op": "input", "focus": focus, "text": text}) + "\n").encode())
+        time.sleep(0.3)
     finally:
         s.close()
+    return {"sent": text, "hub": socks[0]}
 
 
 def real_stop():
