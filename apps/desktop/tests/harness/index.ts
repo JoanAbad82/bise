@@ -17,6 +17,7 @@ export * from './caret';
 export * from './text';
 export * from './perf';
 export * from './inputs';
+export { FakeHelper } from './fakes/helper';
 export { prove, violationsIn, type Proof, type Sample } from './proof';
 
 const session = (open: () => Promise<Session>) =>

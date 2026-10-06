@@ -13,6 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron, type CDPSession, type ElectronApplication, type Page } from '@playwright/test';
 import { DESKTOP_DIR, harnessElectron } from './electron';
+import type { FakeHelper } from './fakes/helper';
 import { prove, Watch, watcherBinary, type Proof } from './proof';
 
 export const OLD_WEB = path.resolve(DESKTOP_DIR, '..', 'ambient', 'web');
@@ -29,7 +30,39 @@ export type LaunchOptions = {
   micWav?: string;
   /** extra environment for the app */
   env?: Record<string, string>;
+  /** the scripted bise-mac-helper (fakes/helper.ts); without it a test run has no helper (desktop only) */
+  helper?: FakeHelper;
+  /** the screen to start on, a route string (bise, inbox, agent/<p>/<a>, ...) (desktop only) */
+  route?: string;
 };
+
+/**
+ * Installed in the app's main process right after launch (and in oldapp/main.js before its first
+ * window): nothing may open a window or navigate away from the page. A file dropped on a page that
+ * doesn't handle drops made Chromium open it in a new, shown window on his screen (qa-type m_9582).
+ * New windows are denied, navigations the page starts are cancelled, a window created without
+ * offscreen rendering is destroyed at once; each is noted in __biseHarnessBlocked (Session.blocked()).
+ */
+async function installGuards(app: ElectronApplication): Promise<void> {
+  await app.evaluate(({ app: a, BrowserWindow, webContents }) => {
+    const g = globalThis as unknown as { __biseHarnessBlocked?: string[] };
+    if (g.__biseHarnessBlocked) return;
+    const blocked: string[] = [];
+    g.__biseHarnessBlocked = blocked;
+    const guard = (wc: Electron.WebContents): void => {
+      wc.setWindowOpenHandler((d) => { blocked.push(`window.open ${d.url}`); return { action: 'deny' }; });
+      wc.on('will-navigate', (e, url) => { blocked.push(`navigate ${url}`); e.preventDefault(); });
+    };
+    webContents.getAllWebContents().forEach(guard);
+    a.on('web-contents-created', (_e, wc) => { guard(wc); });
+    a.on('browser-window-created', (_e, w) => {
+      if (!w.webContents.isOffscreen()) { blocked.push('a window without offscreen rendering (destroyed)'); w.destroy(); }
+    });
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.webContents.isOffscreen()) { blocked.push('a window without offscreen rendering (destroyed)'); w.destroy(); }
+    }
+  });
+}
 
 export type Session = {
   app: ElectronApplication;
@@ -39,6 +72,8 @@ export type Session = {
   watch: Watch;
   /** proves again, stops the watch, closes the app; throws on a rule broken during the run */
   close: () => Promise<Proof>;
+  /** what the guards stopped so far: windows opened, navigations, non-offscreen windows (installGuards) */
+  blocked: () => Promise<string[]>;
 };
 
 const chromiumArgs = (o: LaunchOptions): string[] =>
@@ -65,8 +100,14 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
     });
     const pid = app.process().pid;
     watch = new Watch(pid ?? -1, (why) => { stopped = why; killTree(pid); });
+    await installGuards(app);
     const page = await app.firstWindow();
     await page.waitForLoadState('load');
+    if (o.route !== undefined) {
+      // the window reads its start route from '#route=…' at start (amb-win fd85a165)
+      await page.evaluate((r) => { location.hash = `route=${encodeURIComponent(r)}`; location.reload(); }, o.route);
+      await page.waitForLoadState('load');
+    }
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     const proof = await prove(app, watch);
@@ -82,7 +123,9 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
       if (broken.length) throw new Error(`harness rule broken during the run: ${broken.join('; ')}`);
       return end ?? { ...proof, violations: [] };
     };
-    return { app, page, cdp, proof, watch, close };
+    const blocked = (): Promise<string[]> =>
+      opened.evaluate(() => [...((globalThis as unknown as { __biseHarnessBlocked?: string[] }).__biseHarnessBlocked ?? [])]);
+    return { app, page, cdp, proof, watch, close, blocked };
   } catch (e) {
     watch?.stop();
     await app?.close().catch(() => undefined);
@@ -107,5 +150,7 @@ export function launchOld(surface: OldSurface, o: LaunchOptions = {}): Promise<S
 
 /** The new app, from its build (apps/desktop/out), in its test mode. */
 export function launchDesktop(o: LaunchOptions = {}): Promise<Session> {
-  return start([DESKTOP_DIR], { BISE_DESKTOP_TEST: '1' }, o);
+  const env: Record<string, string> = { BISE_DESKTOP_TEST: '1', ...(o.helper?.env() ?? {}) };
+  if (o.route !== undefined) env['BISE_DESKTOP_ROUTE'] = o.route;
+  return start([DESKTOP_DIR], env, o);
 }

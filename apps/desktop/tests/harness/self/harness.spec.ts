@@ -1,9 +1,12 @@
 // The harness checks itself: every detector passes on the fixture's good half and fails on its
 // bad half, and every launch stays out of his sight (the proof). If one of these fails, no check
 // built on the harness can be trusted.
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { PNG } from 'pngjs';
 import {
-  caretBlinks, changedOutside, expect, flashes, fps, launchPage, maxJump, Recorder, replacedNodes, test, textProblems, typeAndWatch,
+  caretBlinks, changedOutside, dropFiles, expect, flashes, fps, launchPage, maxJump, prove, Recorder, replacedNodes, test, textProblems, typeAndWatch,
 } from '../index';
 
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'typing.html');
@@ -70,6 +73,37 @@ test('caret: drawn and blinking in a window that is never focused', async () => 
   } finally {
     await s.close();
   }
+});
+
+test('guards: a file dropped on a page without a drop handler and a window.open open nothing (qa-type m_9582)', async () => {
+  const s = await launchPage(FIXTURE);
+  try {
+    await dropFiles(s.page, '#echo', [FIXTURE]);
+    await s.page.evaluate(() => { window.open('https://example.com', '_blank'); });
+    await s.page.waitForTimeout(800);
+    const end = await prove(s.app, s.watch);
+    expect(end.violations).toEqual([]);
+    const windows = await s.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
+    expect(windows).toBe(1);
+    expect(s.page.url()).toContain('typing.html');
+    test.info().annotations.push({ type: 'blocked', description: (await s.blocked()).join(' | ') });
+  } finally {
+    await s.close();
+  }
+});
+
+test('guards: a PNG dropped on today\'s old window opens nothing (the exact qa-type m_9582 case)', async ({ oldWindow }) => {
+  const png = new PNG({ width: 8, height: 8 });
+  png.data.fill(200);
+  const file = path.join(mkdtempSync(path.join(os.tmpdir(), 'bh-png-')), 'shot.png');
+  writeFileSync(file, PNG.sync.write(png));
+  await dropFiles(oldWindow.page, '#win', [file]);
+  await oldWindow.page.waitForTimeout(800);
+  const end = await prove(oldWindow.app, oldWindow.watch);
+  expect(end.violations).toEqual([]);
+  expect(await oldWindow.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+  expect(oldWindow.page.url()).toContain('window/index.html');
+  test.info().annotations.push({ type: 'blocked', description: (await oldWindow.blocked()).join(' | ') });
 });
 
 test('old UI: the window and the capsule load on their fake cores, out of sight', async ({ oldWindow, oldCapsule }) => {

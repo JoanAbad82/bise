@@ -22,6 +22,17 @@ if (process.platform === 'darwin') {
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
+// Nothing may open a window or leave the page: a file dropped on a page that doesn't handle drops
+// made Chromium open it in a NEW, shown window on his screen (qa-type m_9582). Every new window is
+// denied, every navigation the page starts is cancelled, and a window that isn't offscreen is
+// destroyed as it is created. launch.ts installs the same guards in the new app.
+app.on('web-contents-created', (_e, wc) => {
+  wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+  wc.on('will-navigate', (e) => e.preventDefault());
+  wc.on('will-frame-navigate', (e) => { if (e.isMainFrame) e.preventDefault(); });
+});
+app.on('browser-window-created', (_e, w) => { if (!w.webContents.isOffscreen()) w.destroy(); });
+
 app.whenReady().then(() => {
   const win = new BrowserWindow({
     x: -30000, y: -30000, width, height, show: false, frame: false, focusable: false,
