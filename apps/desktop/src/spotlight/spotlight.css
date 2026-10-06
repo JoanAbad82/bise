@@ -1,0 +1,6 @@
+/* The spotlight's own parts in amb-kit's Spot: bise's answer, readable (his bug 6: too small to
+   read). Tokens only. The panel grows with the content (Spotlight's onHeight). */
+.b-spotlight { width: 100%; }
+.b-spot-answer { padding: 4px 20px 12px 70px; font: var(--t-15)/1.5 var(--font-read); color: var(--c-text); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.b-spot-answer .cur { display: inline-block; width: 2px; height: 1.1em; margin-left: 2px; background: var(--c-text); vertical-align: -.2em; animation: b-blink 1s steps(1) infinite; }
+.b-live-pearl { flex: none; }

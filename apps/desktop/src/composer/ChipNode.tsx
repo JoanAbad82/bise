@@ -63,7 +63,7 @@ export class ChipNode extends DecoratorNode<JSX.Element> {
   override decorate(): JSX.Element {
     const c = this.__chip;
     return (
-      <span className={`b-chip ${c.kind}`} data-testid={`composer.chip.${c.n}`} title={c.kind === 'image' ? c.name : undefined} contentEditable={false}>
+      <span className={`b-chip ${c.kind}`} data-testid={`composer.chip.${c.n}`} data-kind={c.kind} title={c.kind === 'image' ? c.name : undefined} contentEditable={false}>
         {chipLabel(c)}
       </span>
     );

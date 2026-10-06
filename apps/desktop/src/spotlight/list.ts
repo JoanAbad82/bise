@@ -1,0 +1,160 @@
+// The spotlight's list (desktop S8, v9; the capsule's spotlist.js, ported in behavior). Pure.
+// Empty: waiting for you (the cards), at work (working agents), environments (the projects, the
+// one in front first; what's in front with no project gets its own dim row, no ⌘ number).
+// Typed: 1-2 words that name an agent or a project list those (⏎ opens the first); a sentence puts
+// 'ask bise' first and keeps the agents it names below.
+// The inputs are this module's own view types: the screen maps the store's (generated) shapes to
+// them, so a protocol change doesn't reach the list's rules.
+import { W, cardLine, hostOf, oneLine, shortPath, words } from './words';
+
+export type AgentStatus = 'waiting' | 'blocked' | 'working' | 'idle' | 'done' | 'failed';
+
+export interface SpotAgent {
+  readonly name: string;
+  readonly project: string;
+  readonly status: AgentStatus;
+  readonly title: string;
+  readonly purpose?: string;
+  readonly archived?: boolean;
+}
+
+export interface SpotProject {
+  readonly id: string;
+  readonly name: string;
+  readonly path: string;
+  readonly branch: string;
+  readonly agents: number;
+  readonly hosts?: readonly string[];
+}
+
+export interface SpotCard {
+  readonly id: string;
+  readonly agent: string;
+  readonly project: string;
+  readonly text: string;
+  /** ? a question, ! an approval, ✉ drafts to send (ambient m_8793) */
+  readonly kind: 'question' | 'approval' | 'drafts';
+}
+
+export interface SpotFront {
+  readonly app: string;
+  readonly title?: string;
+  readonly url?: string;
+  readonly path?: string;
+}
+
+export interface SpotData {
+  readonly agents: readonly SpotAgent[];
+  readonly projects: readonly SpotProject[];
+  readonly cards: readonly SpotCard[];
+  readonly front?: SpotFront | null;
+}
+
+export type SpotItem =
+  | { readonly kind: 'card'; readonly id: string; readonly mark: '?' | '!' | '✉'; readonly agent: string; readonly pname: string; readonly text: string }
+  | { readonly kind: 'agent'; readonly id: string; readonly name: string; readonly project: string; readonly pname: string; readonly status: AgentStatus; readonly title: string }
+  | { readonly kind: 'env'; readonly id: string; readonly project: string; readonly name: string; readonly sub: string; readonly front: boolean; readonly n: number | null }
+  | { readonly kind: 'front'; readonly id: string; readonly name: string; readonly sub: string }
+  | { readonly kind: 'ask'; readonly id: string; readonly text: string };
+
+export interface SpotSection {
+  readonly label: string | null;
+  readonly items: readonly SpotItem[];
+}
+
+export interface SpotList {
+  readonly mode: 'empty' | 'names' | 'ask';
+  readonly sections: readonly SpotSection[];
+}
+
+const ORDER: Record<AgentStatus, number> = { waiting: 0, blocked: 1, working: 2, idle: 3, done: 4, failed: 5 };
+const MARK = { question: '?', approval: '!', drafts: '✉' } as const;
+
+/** The project in front: his front app's folder or host names it. */
+export function frontProject(front: SpotFront | null | undefined, projects: readonly SpotProject[]): SpotProject | null {
+  if (!front) return null;
+  const host = hostOf(front.url ?? '');
+  const path = front.path ?? '';
+  return (
+    projects.find((p) => p.path !== '' && path !== '' && (path === p.path || path.startsWith(`${p.path.replace(/\/$/u, '')}/`))) ??
+    projects.find((p) => host !== '' && (p.hosts ?? []).includes(host)) ??
+    projects.find((p) => p.name !== '' && ((host !== '' && host.includes(p.name)) || words(front.title ?? '').includes(p.name.toLowerCase()))) ??
+    null
+  );
+}
+
+export function spotList(d: SpotData, text: string): SpotList {
+  const q = text.trim();
+  const ql = q.toLowerCase();
+  const ws = words(q);
+  const pname = (id: string): string => d.projects.find((p) => p.id === id)?.name ?? id;
+  const waits = new Set(d.cards.map((c) => `${c.project}/${c.agent}`));
+  const live = d.agents
+    .map((a, i) => ({ a, i, status: waits.has(`${a.project}/${a.name}`) ? ('waiting' as const) : a.status }))
+    .sort((x, y) => ORDER[x.status] - ORDER[y.status] || x.i - y.i);
+  const agentItem = (a: SpotAgent, status: AgentStatus): SpotItem => ({
+    kind: 'agent',
+    id: `agent.${a.project}.${a.name}`,
+    name: a.name,
+    project: a.project,
+    pname: pname(a.project),
+    status,
+    title: oneLine(a.title),
+  });
+  const front = frontProject(d.front, d.projects);
+  const ordered = front ? [front, ...d.projects.filter((p) => p !== front)] : [...d.projects];
+  // ⌘1-9 follow the projects' own order, whatever app is in front (ambient m_9196)
+  const envs: SpotItem[] = ordered.map((p) => {
+    const n = d.projects.indexOf(p) + 1;
+    return {
+      kind: 'env',
+      id: `env.${p.id}`,
+      project: p.id,
+      name: p.name,
+      front: p === front,
+      n: n <= 9 ? n : null,
+      sub: p === front ? W.inFront(hostOf(d.front?.url ?? '') || shortPath(d.front?.path ?? '') || (d.front?.app ?? '')) : `${shortPath(p.path)} · ${W.envSub(p.branch, p.agents)}`,
+    };
+  });
+
+  if (q === '') {
+    const cards: SpotItem[] = d.cards.map((c) => ({
+      kind: 'card',
+      id: `card.${c.id}`,
+      mark: MARK[c.kind],
+      agent: c.agent,
+      pname: pname(c.project),
+      text: c.kind === 'question' ? oneLine(c.text) : cardLine(c.text),
+    }));
+    const f = d.front;
+    const fhost = hostOf(f?.url ?? '');
+    const frontRow: SpotItem[] =
+      f && !front
+        ? [{ kind: 'front', id: 'front', name: f.title ?? f.app, sub: W.inFront([fhost || shortPath(f.path ?? ''), f.title ? f.app : ''].filter((x) => x !== '').join(' · ')) }]
+        : [];
+    const work = live.filter((x) => x.status === 'working' && x.a.archived !== true).map((x) => agentItem(x.a, x.status));
+    const sections: SpotSection[] = [];
+    if (cards.length > 0) sections.push({ label: W.waiting, items: cards });
+    if (work.length > 0) sections.push({ label: W.atWork, items: work });
+    if (frontRow.length + envs.length > 0) sections.push({ label: W.envs, items: [...frontRow, ...envs] });
+    return { mode: 'empty', sections };
+  }
+
+  // 1-2 words: names (an agent's name, title or purpose, or its project's name; archived ones too)
+  const hit = (a: SpotAgent): boolean =>
+    a.name.toLowerCase().includes(ql) || a.title.toLowerCase().includes(ql) || (a.purpose ?? '').toLowerCase().includes(ql) || pname(a.project).toLowerCase().startsWith(ql);
+  const byName = live.filter((x) => hit(x.a)).map((x) => agentItem(x.a, x.status));
+  const envHit = envs.filter((e) => e.kind === 'env' && (e.name.toLowerCase().startsWith(ql) || (d.projects.find((p) => p.id === e.project)?.path ?? '').toLowerCase().includes(ql)));
+  if (ws.length <= 2 && byName.length + envHit.length > 0) {
+    return { mode: 'names', sections: [{ label: W.found, items: [...byName, ...envHit] }] };
+  }
+  // a sentence: bise first; the agents it names (a word is its name, or 2 of its title's long words)
+  const big = new Set(ws.filter((w) => w.length >= 4));
+  const named = live
+    .filter((x) => x.a.archived !== true && (ws.includes(x.a.name.toLowerCase()) || words(x.a.title).filter((w) => big.has(w)).length >= 2))
+    .map((x) => agentItem(x.a, x.status));
+  return { mode: 'ask', sections: [{ label: null, items: [{ kind: 'ask', id: 'ask', text: q }, ...named] }] };
+}
+
+/** The list's items in keyboard order. */
+export const flat = (l: SpotList): SpotItem[] => l.sections.flatMap((s) => s.items);

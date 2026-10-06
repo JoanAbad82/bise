@@ -428,6 +428,27 @@ export function Brain(p: BrainProps): JSX.Element | null {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- registered once per editor; reads refs
   }, [editor]);
 
+  // ---- a file dropped anywhere in the window is the composer's, never a navigation (qa-type
+  // m_9587: an unhandled drop opened the file as a page, a window on his screen in test mode) ----
+  useEffect(() => {
+    const over = (e: DragEvent): void => {
+      e.preventDefault();
+    };
+    const drop = (e: DragEvent): void => {
+      e.preventDefault();
+      if (editor.getRootElement()?.contains(e.target as Node) === true) return; // DROP_COMMAND has it
+      const images = Array.from(e.dataTransfer?.files ?? []).filter((f) => f.type.startsWith('image/') || isImagePath(f.name));
+      if (images.length > 0) addImages(images);
+    };
+    window.addEventListener('dragover', over);
+    window.addEventListener('drop', drop);
+    return () => {
+      window.removeEventListener('dragover', over);
+      window.removeEventListener('drop', drop);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- registered once per editor; reads refs
+  }, [editor]);
+
   // ---- the turn ended: the oldest queued message leaves (queue.rs) ----
   const wasBusy = useRef(p.busy);
   useEffect(() => {
