@@ -12,7 +12,10 @@ fake provider) and a throwaway BISE_HOME (never ~/.bise, never ~/bise).
 - a second forward of the same message is refused;
 - `sb project ask <p> "..."`: the project's main hears `@bise`, its answer
   settles the second send;
-- `sb project send` to bise's own home is refused (never its own socket).
+- `sb project send` to bise's own home is refused (never its own socket);
+- C (S2 step 3): a project hub refuses `sb history --project`; with the
+  project's hub stopped, bise's main reads it on disk (`--project`, `--all`,
+  `sb show <p>/main#n`, `sb inspect <p>/main`), never starting it.
 
 Run: python3 -u tests/xhub_e2e.py
 """
@@ -120,6 +123,30 @@ def main():
         wait.until(lambda: len(of_type(hstate, "x_settled")) == 2, 90, "the question's answer")
         q = [m["msg"] for m in of_type(pstate, "message_sent") if m["msg"]["from"] == "@bise"]
         check(len(q) == 1 and q[0]["to"] == "main", "the project's main heard @bise: %r" % q)
+
+        # S2 step 3 (C): only bise reads other projects; a project's agent
+        # is refused
+        psock = os.path.join(pstate, "hub.sock")
+        r = sb_as_main(E.env, psock, "history", "login", "--project", "bise")
+        check(r.returncode != 0 and "only bise reads other projects" in (r.stdout + r.stderr), "a project hub refuses: %s %s" % (r.stdout, r.stderr))
+        # the project's hub stopped: bise reads its threads on disk, never
+        # starting it
+        e2e.Client(psock).send({"op": "stop_hub"})
+        wait.until(lambda: not os.path.exists(os.path.join(pstate, "hub.pid")), 30, "the project's hub stopped", poll=0.2)
+        r = sb_as_main(E.env, hsock, "history", "the login is broken", "--project", name)
+        check(r.returncode == 0 and ("%s/main#" % name) in r.stdout and "--project " + name in r.stdout, "history --project: %s %s" % (r.stdout, r.stderr))
+        pos = r.stdout.split("%s/main#" % name)[1].split(" ")[0]
+        r = sb_as_main(E.env, hsock, "show", "%s/main#%s" % (name, pos))
+        check(r.returncode == 0 and "login is broken" in r.stdout, "show <p>/main#n: %s %s" % (r.stdout, r.stderr))
+        r = sb_as_main(E.env, hsock, "inspect", "%s/main" % name, "--last", "5")
+        check(r.returncode == 0 and r.stdout.strip(), "inspect <p>/main: %s %s" % (r.stdout, r.stderr))
+        r = sb_as_main(E.env, hsock, "history", "login", "--all")
+        check(r.returncode == 0 and ("%s/main#" % name) in r.stdout and "bise/main#" in r.stdout, "history --all ranks both: %s %s" % (r.stdout, r.stderr))
+        r = sb_as_main(E.env, hsock, "inspect", "%s/.." % name)
+        check(r.returncode != 0, "a path in the agent part is refused: %s %s" % (r.stdout, r.stderr))
+        r = sb_as_main(E.env, hsock, "history", "login", "--project", "nope")
+        check(r.returncode != 0 and "no project named nope" in (r.stdout + r.stderr), "an unknown project: %s %s" % (r.stdout, r.stderr))
+        check(not os.path.exists(psock) and not os.path.exists(os.path.join(pstate, "hub.pid")), "the project's hub was never started to read")
     except AssertionError as e:
         print("FAIL", e)
         ok = False

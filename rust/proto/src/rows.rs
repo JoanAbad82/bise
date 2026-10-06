@@ -82,6 +82,14 @@ pub struct Agent {
     /// his messages waiting for its turn to end, oldest first
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub queued: Vec<crate::draft::Queued>,
+    /// its folder in the hub's `agents/` (its name but after a rename):
+    /// where `sb history --project` reads its thread on disk (S2 C);
+    /// none in a view written before this field (read as the name)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dir: Option<String>,
+    /// its former names (a rename), which `sb history --agent` takes too
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
 }
 
 /// A numbered option of a card.

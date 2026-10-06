@@ -79,6 +79,9 @@ pub fn agents(snap: &Value, since: &mut Since, now: u64, user_kind: fn(&str) -> 
             report,
             // his queued inputs (sb-core holds them, amb-hub 7dcb56ab)
             queued: a.get("queued_inputs").cloned().and_then(|q| serde_json::from_value(q).ok()).unwrap_or_default(),
+            // where its thread is on disk, for stream C's readers (S2 step 3)
+            dir: Some(s(&a, "dir")).filter(|d| !d.is_empty()),
+            aliases: a.get("aliases").cloned().and_then(|x| serde_json::from_value(x).ok()).unwrap_or_default(),
             name,
         });
     }

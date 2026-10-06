@@ -2020,6 +2020,10 @@ impl Hub {
                     // feature's agent: its feature's, dev-flow §5.1)
                     "place_id": crate::place::view_id(a),
                     "created_ms": a.created_ms,
+                    // its folder under agents/ and its former names (S2 C:
+                    // view.json carries them for sb history --project)
+                    "dir": a.dir,
+                    "aliases": a.aliases,
                     "note": a.declared.as_ref().map(|(_, n)| n.clone()).unwrap_or_default(),
                     "report": a.last_report.as_ref().map(|r| clip(&one_line(&r.summary), 200)),
                     // when it last reported (an archived task: about when it stopped)

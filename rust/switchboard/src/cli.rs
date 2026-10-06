@@ -416,10 +416,21 @@ pub fn build(args: &[String]) -> Result<Value, String> {
         "history" => {
             let (pos, o) = parse_args(
                 rest,
-                &["agent", "role", "since", "until", "limit", "page"],
-                &["archived", "live"],
+                &["agent", "role", "since", "until", "limit", "page", "project"],
+                &["archived", "live", "all"],
             )?;
             req.insert("query".into(), json!(text_of(&pos)?));
+            // S2 C: another project's threads, or every project's (bise's
+            // home hub only)
+            if o.contains_key("project") && o.contains_key("all") {
+                return Err("--project and --all exclude each other".into());
+            }
+            if o.contains_key("project") {
+                req.insert("project".into(), json!(str_of(&o, "project")));
+            }
+            if o.contains_key("all") {
+                req.insert("all".into(), json!(true));
+            }
             let list = |k: &str| -> Vec<String> {
                 match o.get(k) {
                     Some(Value::String(s)) => vec![s.clone()],

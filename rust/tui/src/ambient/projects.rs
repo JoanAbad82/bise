@@ -154,6 +154,8 @@ mod tests {
             turn_ms: None,
             report: None,
             queued: vec![],
+            dir: None,
+            aliases: vec![],
         }
     }
 

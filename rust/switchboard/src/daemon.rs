@@ -26,6 +26,7 @@ mod dev_servers;
 mod merged;
 mod worktrees;
 mod xhub;
+mod xread;
 
 use history::{history_line, transcript_page};
 use repl::{adopt, adoptable, busy_at, kill_pid, supervise};
@@ -231,6 +232,9 @@ struct Shell {
     positions: BTreeMap<String, usize>,
     /// Every thread, indexed for `sb history` (built at the first search).
     search: search::Index,
+    /// The other projects' threads (and bise's under `bise/`), for `sb
+    /// history --project|--all` (xread.rs; refreshed only by a query).
+    xsearch: search::Index,
     /// Wire-log offsets processed since the last flush to `wire.offset`.
     offsets: BTreeMap<String, u64>,
     /// True while `Input::Boot` runs: its spawns may adopt a REPL.
@@ -2208,6 +2212,13 @@ impl Shell {
             .to_string();
         let cmd = v.get("cmd").and_then(|x| x.as_str()).unwrap_or("");
         match cmd {
+            // another project's thread (S2 C, xread.rs): `<p>/<agent>`
+            "inspect" if xread::wanted(cmd, &v) => {
+                write_json(&mut stream, &self.xinspect(&v));
+            }
+            "history" | "show" if xread::wanted(cmd, &v) => {
+                write_json(&mut stream, &self.xsearch(cmd, &v));
+            }
             "inspect" => {
                 let body = self.inspect(&from, &v);
                 write_json(&mut stream, &body);
@@ -2586,6 +2597,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         projects: projects::Projects::boot(&paths),
         routing: routing::Routing::default(),
         search: search::Index::default(),
+        xsearch: search::Index::default(),
         offsets: BTreeMap::new(),
         booting: false,
         bins: BTreeMap::new(),
