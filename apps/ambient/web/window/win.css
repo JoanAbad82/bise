@@ -1,0 +1,71 @@
+/* bise desktop · the window's layout (amb-win, S6). Colors, type and every component come from
+   the design system (../ds/tokens.css + ../ds/ds.css, then amb-kit's window/components): this
+   file only places them in a full-size window (sidebar · main · board) and adds the few pieces
+   the DS reference draws as static mocks (a scroll area, the composer's real textarea). Reads
+   only roles (--c-*, --t-*, --s-*, --r-*). */
+html, body { height: 100%; margin: 0; }
+body { background: var(--c-canvas); overflow: hidden; }
+/* in the app the native window gives the corners and the sidebar's vibrancy (amb-mac's
+   win_size); in a browser the page draws a window of its own */
+.w-app { position: fixed; inset: 0; display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr) var(--board); background: var(--c-window); }
+.w-app.w-two { grid-template-columns: var(--sidebar) minmax(0, 1fr) 0; }
+.w-app.w-two .w-board { display: none; }
+.w-side { overflow-y: auto; overflow-x: hidden; min-height: 0; }
+.w-side .b-row { cursor: default; }
+.w-main { min-height: 0; }
+.w-board { width: auto; overflow-y: auto; min-height: 0; padding-top: 14px; }
+.w-board .b-sh { padding-left: 4px; }
+.w-board .b-task { cursor: default; }
+.w-head .b-head { padding-top: 16px; }
+.w-head .t2 .w-acc { color: var(--c-accent); }
+.w-head .b-seg > span, .w-head .b-btn { cursor: default; }
+/* what runs now (bise's view): the followed jobs, one card each */
+.w-now { display: flex; gap: 8px; padding: 0 22px 10px; }
+.w-now .b-task { flex: 1; min-width: 0; }
+.w-now .b-task .w { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--t-12); color: var(--c-text-2); }
+/* the thread scrolls; its column stays readable, centred under a wide window */
+.w-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+.w-thread .b-thread { margin: 0 auto; padding-top: 10px; padding-bottom: 18px; }
+.w-day { align-self: center; font-size: var(--t-11); color: var(--c-text-3); letter-spacing: .06em; text-transform: uppercase; }
+.w-in { margin-left: 36px; }
+.b-route.w-in, .b-art.w-in, .b-diff.w-in, .b-tool.w-in { margin-top: -6px; }
+.b-msg.in .b-av .b-dot { width: 14px; height: 14px; }
+.b-msg.w-pending { opacity: .6; }
+.b-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.w-folded { margin-left: 36px; }
+.w-why { color: var(--c-text-3); }
+.w-whytext { color: var(--c-text-3); }
+.b-fold, .b-answered, .b-marker, .b-tool, .b-route, .b-art, .w-tn { cursor: default; }
+.b-dl { cursor: text; }
+.b-out { white-space: pre-wrap; }
+.w-skel2 { width: 60%; }
+/* the capture and the tab's context under his message */
+.w-ctx { display: flex; gap: 8px; margin-top: 7px; align-items: stretch; }
+.w-chips { display: flex; flex-direction: column; gap: 5px; justify-content: center; align-items: flex-start; }
+.w-shot { width: 150px; height: 84px; border-radius: var(--r-2); overflow: hidden; box-shadow: 0 0 0 1px var(--c-line-strong); background: var(--c-raised); flex: none; }
+.w-shot svg { display: block; width: 100%; height: 100%; }
+.w-gr { stroke: var(--c-line-strong); stroke-dasharray: 3 3; }
+.w-fa { fill: color-mix(in srgb, var(--c-accent) 30%, transparent); }
+.w-svt { fill: var(--c-text-2); font: 7px var(--font-mono); }
+/* the inbox's card carries its whole context: the capture, what the agent says, who asked */
+.w-dctx { display: flex; gap: 10px; margin: 6px 0 2px; }
+.w-dctx .b-text { font-size: var(--t-13); color: var(--c-text-2); }
+/* the composer: a real field where the DS draws a mock line */
+.w-composer { flex: none; max-width: 760px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.w-composer .box { align-items: flex-end; }
+.w-field { flex: 1; border: 0; outline: 0; resize: none; background: none; color: var(--c-text); padding: 0; margin: 0; min-height: 22px; font: var(--t-15)/1.45 var(--font-read); }
+.w-field::placeholder { color: var(--c-text-3); }
+.w-composer .send { cursor: default; }
+.w-quotes:empty { display: none; }
+.w-quotes { display: flex; flex-wrap: wrap; gap: 6px; }
+.w-quotes .b-quote { cursor: default; }
+.b-opt { cursor: default; }
+.b-tabs > span { cursor: default; }
+/* made today: two thumbnails a row */
+.w-thumbs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.w-tn { border-radius: var(--r-2); overflow: hidden; background: var(--c-raised); box-shadow: var(--e-1); font-size: var(--t-11); }
+.w-tn svg { display: block; width: 100%; height: 52px; background: var(--c-solid); }
+.w-tn span { display: block; padding: 3px 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-pearl { width: 100%; height: 100%; }
+/* the window's top strip drags it (the app reads -webkit-app-region through amb-mac's shell) */
+.w-drag { -webkit-user-select: none; user-select: none; }

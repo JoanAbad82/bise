@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>bise</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components/all.css">
+<link rel="stylesheet" href="win.css">
+</head>
+<body class="b-ui">
+<!-- the window: Bise Ambient.app's NSWindow loads this page in its web view (S4, amb-mac); in a
+     plain browser it runs on the fake core (winfake.js) -->
+<div id="win"></div>
+<script src="../ds/pearl.js"></script>
+<script src="components/core.js"></script>
+<script src="components/prim.js"></script>
+<script src="components/window.js"></script>
+<script src="components/thread.js"></script>
+<script src="components/composer.js"></script>
+<script src="components/board.js"></script>
+<script src="winfake.js"></script>
+<script src="windock.js"></script>
+<script src="winmodel.js"></script>
+<script src="winview.js"></script>
+<script src="winui.js"></script>
+<script>window.amb = AmbWinUI.boot(document.getElementById("win"));</script>
+</body>
+</html>

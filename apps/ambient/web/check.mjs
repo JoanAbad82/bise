@@ -1751,5 +1751,8 @@ law("panel: ⌘↑⌘↓ walk the bar's order in the same window; ⌘D follow, �
   eq(Fake.respond({ cmd: "agent_history", agent: "perf" })[0][1].entries.length, 7);
 });
 
+// the desktop window's laws (window/check-win.mjs) run with the capsule's
+{ const w = (await import("./window/check-win.mjs")).results(); pass += w.pass; fail += w.fail; }
+
 console.log(`${fail ? "✗" : "✓"} ambient web: ${pass} passed${fail ? `, ${fail} failed` : ""}`);
 process.exit(fail ? 1 : 0);

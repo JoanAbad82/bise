@@ -1,0 +1,360 @@
+// bise desktop · the window's laws (node, no deps): the fake core's world played through the
+// model, then the view read back. The sidebar, the three threads (bise, a project's main, an
+// agent), the rule "everything waiting for you sits above the composer" (questions, approvals,
+// the inbox, ← →, 1-9, ⏎, esc), quotes ❝ from diff lines, the keys of desktop-app v9.
+//   node apps/ambient/web/window/check-win.mjs     (check.mjs runs it too)
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import vm from "node:vm";
+import assert from "node:assert/strict";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Map, String, Number, Date, Intl, RegExp });
+for (const f of ["winfake.js", "windock.js", "winmodel.js", "winview.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+const { AmbWinFake: F, AmbWinModel: M, AmbWinView: V, AmbWinDock: D } = ctx;
+const j = (x) => (x === undefined ? x : JSON.parse(JSON.stringify(x)));
+const eq = (a, b, msg) => assert.deepStrictEqual(j(a), j(b), msg);
+
+let pass = 0, fail = 0;
+export const results = () => ({ pass, fail });
+function law(name, fn) {
+  try { F.reset(); fn(); pass++; } catch (e) { fail++; console.log(`✗ window: ${name}\n  ${String(e.stack || e.message).split("\n").slice(0, 16).join("\n  ")}`); }
+}
+
+// a window on the fake core: every cmd answered at once, in order (delays ignored)
+function win() {
+  let s = { ...M.init(F.NOW), tz: "Europe/Paris" };
+  const sent = [];
+  const pump = (cmds) => { for (const c of cmds) { sent.push(c); for (const [, ev] of F.respond(c)) s = M.step(s, ev).s; } };
+  for (const ev of F.boot()) s = M.step(s, ev).s;
+  const st = M.start(s); s = st.s; pump(st.cmds);
+  const w = {
+    sent,
+    get s() { return s; },
+    feed(ev) { const r = M.step(s, ev); s = r.s; pump(r.cmds); return r; },
+    key(key, mods = {}) { return w.feed({ ev: "ui_key", key, digit: /^[0-9]$/.test(key) ? +key : null, ...mods }); },
+    type(text) { return w.feed({ ev: "ui_type", text }); },
+    go(project, agent = "main") { return w.feed({ ev: "ui_route", project, agent }); },
+    get v() { return V.view(s); },
+  };
+  return w;
+}
+const P = F.P;
+const sideNames = (v) => v.side.rows.filter((r) => r.kind !== "sh").map((r) => `${r.kind}:${r.name}${r.end ? `(${r.end})` : ""}${r.on ? "*" : ""}`);
+const rowsOf = (v, t) => v.thread.rows.filter((r) => r.t === t);
+
+// ---- the sidebar
+law("bise's view: bise on top with every card's count, each project with its waits or its ⌘ key, every project's agents", () => {
+  const w = win();
+  eq(sideNames(w.v), ["me:bise(3)*", "pj:storefront(1)", "ag:checkout", "ag:search(?)", "ag:stock", "ag:promo", "ag:wallet",
+    "pj:telemetry(1)", "ag:alerts(?)", "ag:sampling", "pj:engine(1)", "ag:streaming", "ag:netcode(?)", "pj:evals(⌘4)", "ag:rag", "ag:cache"]);
+  eq(w.v.side.foot, "+ add a project");
+  const dots = Object.fromEntries(w.v.side.rows.filter((r) => r.kind === "ag").map((r) => [r.name, r.dot]));
+  eq([dots.checkout, dots.search, dots.streaming, dots.promo], ["wk", "nd", "ok", ""]);
+});
+law("in a project, only that project's agents unfold; the row in view is marked", () => {
+  const w = win();
+  w.key("1", { meta: true, digit: 1 });
+  eq(sideNames(w.v).slice(0, 9), ["me:bise(3)", "pj:storefront(1)*", "ag:checkout", "ag:search(?)", "ag:stock", "ag:promo", "ag:wallet", "pj:telemetry(1)", "pj:engine(1)"]);
+});
+
+// ---- the keys of the map
+law("⌘0 bise, ⌘1-9 the projects in the sidebar's order, ⌥0 the main, ⌥1-9 the agents, ⌘[ ⌘] back and forward", () => {
+  const w = win();
+  const at = () => `${w.s.route.project}/${w.s.route.agent}`;
+  assert.equal(w.key("2", { meta: true, digit: 2 }).eat, true);
+  assert.equal(at(), `${P.telemetry}/main`);
+  w.key("1", { alt: true, key: "¡", digit: 1 });
+  assert.equal(at(), `${P.telemetry}/alerts`);
+  w.key("0", { alt: true, digit: 0 });
+  assert.equal(at(), `${P.telemetry}/main`);
+  w.key("[", { meta: true });
+  assert.equal(at(), `${P.telemetry}/alerts`);
+  w.key("[", { meta: true });
+  assert.equal(at(), `${P.telemetry}/main`);
+  w.key("]", { meta: true });
+  assert.equal(at(), `${P.telemetry}/alerts`);
+  w.key("0", { meta: true, digit: 0 });
+  assert.equal(at(), `${F.HOME}/main`);
+  // a key past the list does nothing, but stays the window's
+  assert.equal(w.key("9", { meta: true, digit: 9 }).eat, true);
+  assert.equal(at(), `${F.HOME}/main`);
+  // plain letters and the system's ⌘ keys stay the field's
+  eq([w.key("a").eat, w.key("c", { meta: true }).eat, w.key("v", { meta: true }).eat], [false, false, false]);
+});
+law("a route subscribes to its thread once, with its project, and names the window", () => {
+  const w = win();
+  w.go(P.storefront, "search"); w.go(F.HOME); w.go(P.storefront, "search");
+  eq(w.sent.filter((c) => c.cmd === "subscribe"), [
+    { cmd: "subscribe", project: F.HOME, agent: "main", limit: 60 }, { cmd: "subscribe", project: P.storefront, agent: "search", limit: 60 }]);
+  eq(w.sent.filter((c) => c.cmd === "win_title").map((c) => c.text), ["bise", "search · storefront", "bise", "search · storefront"]);
+  // every cmd to the core carries its project (S3a)
+  for (const c of w.sent) if (!c.cmd.startsWith("win_")) assert.ok(c.project, JSON.stringify(c));
+});
+law("deep links from the shell: project/<name>, agent/<name>/<agent>, inbox", () => {
+  const w = win();
+  w.feed({ ev: "win_open", route: "agent/storefront/search" });
+  eq(w.s.route, { project: P.storefront, agent: "search" });
+  w.feed({ ev: "win_open", route: `project/${P.engine}` });
+  eq(w.s.route, { project: P.engine, agent: "main" });
+  w.feed({ ev: "win_open", route: "inbox" });
+  assert.equal(w.v.composer.dock.mode, "inbox");
+  w.feed({ ev: "win_open", route: "nowhere/at/all" });
+  eq(w.s.route, { project: P.engine, agent: "main" });
+});
+
+// ---- bise's thread
+law("bise's thread: his words with the capture and the tab's context, bise's routing line, the project's answer, one line for the question", () => {
+  const v = win().v;
+  const m = rowsOf(v, "msg");
+  eq([m[0].who.name, m[0].meta, m[0].ctx], ["you", "14:21 · by voice, from Chrome", { shot: "p99", chips: ["grafana · ingest p99", "13:00–15:00 · last 7 days"] }]);
+  eq([m[1].who.name, m[1].who.pearl], ["bise", true]);
+  eq([m[2].who.name, m[2].who.in], ["telemetry · main", true]);
+  const r = rowsOf(v, "route");
+  eq(r.map((x) => [x.p1, x.p2, x.p3, x.bar]), [["telemetry · main → alerts", "p99 d'ingest à 14 h, avec ta capture", "done 14:25", null],
+    ["storefront · main → stock", "flash sale replay · following", "62%", 62]]);
+  eq(rowsOf(v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · it waits above the composer"]);
+  eq(v.thread.rows[0], { t: "day", text: "today" });
+  eq(v.head.t1, "bise");
+  eq(v.head.t2, ["every project", "5 at work", "3 wait for you"]);
+});
+law("bise's view: what runs now (the followed job first) and the right column (waiting for you, made today)", () => {
+  const v = win().v;
+  eq(v.jobs.map((x) => [x.title, x.s, x.pct, x.following]), [["storefront · stock", "flash sale replay · 6 200 / 10 000 orders", 62, true],
+    ["engine · netcode", "co-op at 150 ms, 2% loss · 3 / 8 runs", 38, false], ["evals · cache", "prompt cache · 1 400 / 2 000 prompts", 70, false]]);
+  eq(v.board.sections.map((x) => x.sh), ["waiting for you · 3", "made today"]);
+  eq(v.board.sections[0].items.map((x) => `${x.who}: ${x.text}`), ["telemetry · alerts: compaction at 03:00?", "engine · netcode: merge the rollback fix?", "storefront · search: reindex tonight 02:00?"]);
+  eq(v.board.sections[1].items.map((x) => x.title), ["frame times, before and after", "flash sale replay", "eval report", "3-D Secure timeouts"]);
+  assert.equal(v.mood, "need");
+});
+
+// ---- the rule: everything waiting for you sits above the composer
+law("above bise's composer: the newest card, '1 of 3 ← →'; ← → walk the others; the divider says who he answers", () => {
+  const w = win();
+  let c = w.v.composer;
+  eq([c.dock.h, c.dock.k, c.dock.q, c.dock.opts.map((o) => o.label)], ["? telemetry · alerts needs you", "1 of 3   ← →", "passer la compaction de 14:00 à 03:00 ?", ["move it to 03:00", "leave it"]]);
+  eq([c.div, c.ph], ["you → bise · answering alerts", "or type your answer, then ⏎"]);
+  assert.equal(w.key("ArrowRight").eat, true);
+  c = w.v.composer;
+  eq([c.dock.h, c.dock.k], ["? engine · netcode · merge the rollback fix?", "approval · 2 of 3   ← →"]);
+  w.key("ArrowLeft"); w.key("ArrowLeft");
+  eq(w.v.composer.dock.h, "? storefront · search needs you");
+  // with words in the field, the arrows are the field's
+  w.type("hm");
+  assert.equal(w.key("ArrowLeft").eat, false);
+  eq(w.v.composer.dock.h, "? storefront · search needs you");
+});
+law("1-9 in an empty field answers the card above; it leaves at once, the thread's line says what he answered", () => {
+  const w = win();
+  w.key("1");
+  eq(w.sent.filter((c) => c.cmd === "answer"), [{ cmd: "answer", project: P.telemetry, card: "c-alerts", reply: "1" }]);
+  eq(w.v.composer.dock.h, "? engine · netcode · merge the rollback fix?");
+  eq(w.v.composer.dock.k, "approval · 1 of 2   ← →");
+  eq(rowsOf(w.v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · you answered: move it to 03:00"]);
+  eq(w.v.side.rows[0].end, "2");
+  // a digit with no such option does nothing, and is still eaten (it is not his text)
+  w.key("7");
+  eq(w.sent.filter((c) => c.cmd === "answer").length, 1);
+  // a digit in a field with words is text
+  w.type("a 1");
+  assert.equal(w.key("1").eat, false);
+});
+law("words then ⏎ answer the card above; with no card, ⏎ sends to the thread", () => {
+  const w = win();
+  w.type("attends le test à 150 ms");
+  w.key("Enter");
+  eq(w.sent.filter((c) => c.cmd === "answer"), [{ cmd: "answer", project: P.telemetry, card: "c-alerts", reply: "attends le test à 150 ms" }]);
+  eq(w.v.composer.text, "");
+  w.go(P.evals);
+  assert.equal(w.v.composer.dock, null);
+  eq([w.v.composer.div, w.v.composer.ph], ["you → evals · main", "talk to evals’s main, or hold fn"]);
+  w.type("relance l'eval rag"); w.key("Enter");
+  eq(w.sent.filter((c) => c.cmd === "send"), [{ cmd: "send", project: P.evals, agent: "main", text: "relance l'eval rag", mode: "now" }]);
+  // the core's echo replaces the line he sent
+  eq(rowsOf(w.v, "msg").filter((m) => m.you && m.text === "relance l'eval rag").map((m) => m.pending), [false]);
+  // shift+⏎ is a new line
+  w.type("a"); assert.equal(w.key("Enter", { shift: true }).eat, false);
+});
+law("esc puts the card off (the line says ⌘I), opens nothing; ⌘I opens every card above the composer, esc goes back to the thread", () => {
+  const w = win();
+  w.key("Escape");
+  eq(w.v.composer.dock.h, "? engine · netcode · merge the rollback fix?");
+  w.key("Escape"); w.key("Escape");
+  eq(w.v.composer.dock, null);
+  eq(rowsOf(w.v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · in the inbox, ⌘I"]);
+  eq(w.v.composer.ph, "talk to bise, or hold fn");
+  w.key("i", { meta: true });
+  const d = w.v.composer.dock;
+  eq([d.mode, d.h, d.k], ["inbox", "? telemetry · alerts needs you", "1 of 3   ← → the others   esc back to the thread"]);
+  eq(d.tabs.map((t) => [t.text, t.on]), [["alerts · compaction at 03:00?", true], ["netcode · merge the rollback fix?", false], ["search · reindex tonight 02:00?", false]]);
+  assert.match(d.body, /^la compaction de 14:00/);
+  eq([d.origin, d.shot], ["asked by you, via bise", "p99"]);
+  eq(rowsOf(w.v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · open below"]);
+  w.key("ArrowRight");
+  eq(w.v.composer.dock.tabs.map((t) => t.on), [false, true, false]);
+  w.key("Escape");
+  eq(w.v.composer.dock, null);
+});
+law("ctrl+1-9 opens the inbox at that card, from any thread; an answer moves to the next, the last one closes it", () => {
+  const w = win();
+  w.go(P.evals);
+  w.key("3", { ctrl: true, digit: 3 });
+  eq([w.v.composer.dock.mode, w.v.composer.dock.h], ["inbox", "? storefront · search needs you"]);
+  w.key("2");
+  eq(w.sent.filter((c) => c.cmd === "answer"), [{ cmd: "answer", project: P.storefront, card: "c-search", reply: "2" }]);
+  eq(w.v.composer.dock.tabs.length, 2);
+  w.key("1"); w.key("1");
+  assert.equal(w.s.inbox, null);
+  eq(w.v.side.rows[0].end, "");
+  // ⌘I with nothing waiting does nothing
+  w.key("i", { meta: true });
+  assert.equal(w.s.inbox, null);
+});
+law("each thread's composer answers its own cards: a project's main its project's, an agent its own", () => {
+  const w = win();
+  w.go(P.storefront);
+  eq([w.v.composer.dock.h, w.v.composer.dock.k, w.v.composer.div], ["? search needs you", "1 of 1", "you → storefront · main · answering search"]);
+  w.go(P.storefront, "checkout");
+  eq(w.v.composer.dock, null);
+  eq(w.v.composer.ph, "steer checkout while it works");
+  eq(w.v.composer.send, "stop");
+  w.go(P.storefront, "search");
+  eq(w.v.composer.dock.h, "? search needs you");
+});
+law("the thread never holds an open question: one line, never its text", () => {
+  const w = win();
+  for (const [p, a] of [[F.HOME, "main"], [P.storefront, "main"], [P.storefront, "search"], [P.telemetry, "main"], [P.engine, "main"]]) {
+    w.go(p, a);
+    const qs = D.allCards(w.s).map((c) => c.question);
+    for (const r of w.v.thread.rows) if (r.t === "msg") assert.ok(!qs.includes(r.text), `${p}/${a}: ${r.text}`);
+    assert.ok(rowsOf(w.v, "marker").length >= 1, `${p}/${a} has its line`);
+  }
+});
+
+// ---- a project's main
+law("a project's main: its header, the folded messages between agents, 'asked · i answered ▸ why', the artifact; its agents on the right", () => {
+  const w = win();
+  w.go(P.storefront);
+  const v = w.v;
+  eq([v.head.t1, v.head.t2, v.head.seg.map((x) => x.text)], ["storefront", ["~/storefront", "main", "5 agents", "1 waits for you"], ["thread", "changes", "artifacts"]]);
+  const f = rowsOf(v, "fold")[0];
+  eq([f.text, f.items.length], ["▸ 4 messages between 2 agents", 0]);
+  w.feed({ ev: "ui_fold", pos: f.pos });
+  const f2 = rowsOf(w.v, "fold")[0];
+  eq([f2.text, f2.items.map((x) => x.who.name)], ["▾ 4 messages between 2 agents", ["promo", "checkout", "promo", "checkout"]]);
+  const a = rowsOf(w.v, "answered")[0];
+  eq(a.text, "promo asked: on garde le cumul pour les cartes cadeaux ? · i answered: non, une carte cadeau est un paiement, pas une remise");
+  eq(rowsOf(w.v, "art").map((x) => [x.title, x.meta, x.new]), [["flash sale replay", "stock · 10:40", true]]);
+  const b = w.v.board.sections;
+  eq(b[0].items.map((x) => `${x.key} ${x.name}${x.psi ? " ψ" : ""} ${x.dot}`), ["⌥1 checkout ψ wk", "⌥2 search ψ nd", "⌥3 stock wk", "⌥4 promo ", "⌥5 wallet ψ "]);
+  eq(b[1], { sh: "scheduled", kind: "sched", items: [{ text: "◷ search reindex", when: "tonight 02:00" }] });
+  eq(w.v.jobs, []);
+});
+law("⌘E unfolds everything; a fold clicked by hand folds back under it", () => {
+  const w = win();
+  w.go(P.storefront, "search");
+  eq(rowsOf(w.v, "tool")[0].items, []);
+  w.key("e", { meta: true });
+  eq(rowsOf(w.v, "tool")[0].items.length, 10);
+  w.feed({ ev: "ui_fold", pos: rowsOf(w.v, "tool")[0].pos });
+  eq(rowsOf(w.v, "tool")[0].open, false);
+  w.key("e", { meta: true });
+  eq(rowsOf(w.v, "tool")[0].open, false);
+});
+
+// ---- an agent's thread
+law("an agent's thread: main's brief, its folded work, the inline diff; header with ψ worktree, who started it, back to the project", () => {
+  const w = win();
+  w.go(P.storefront, "search");
+  const v = w.v;
+  eq([v.head.t1, v.head.t2, v.head.acc], ["search", ["storefront", "ψ sb/search", "started by main 09:20", "waits for you"], 3]);
+  eq(v.head.end.map((e) => e.text), ["± 1 file", "← storefront"]);
+  eq(rowsOf(v, "msg")[0].who.name, "main → search");
+  eq(rowsOf(v, "tool")[0].label, "read 6 files, ran 4 commands · 2 files changed");
+  const d = rowsOf(v, "diff")[0];
+  eq([d.file, d.lines.map((l) => `${l.o}|${l.n}|${l.sign}|${l.cls}`)], ["search/synonyms.json", ["14|14||", "|15|+|ad", "15|16||"]]);
+  assert.equal(v.board, null);
+  // a working agent has stop (⌘.) in its header
+  w.go(P.storefront, "checkout");
+  eq(w.v.head.end.map((e) => e.text), ["stop", "← storefront"]);
+  w.key(".", { meta: true });
+  eq(w.sent.filter((c) => c.cmd === "stop"), [{ cmd: "stop", project: P.storefront, agent: "checkout" }]);
+});
+law("esc in an agent's thread with nothing above the composer goes back to its project's main (the terminal's esc)", () => {
+  const w = win();
+  w.go(P.storefront, "checkout");
+  w.key("Escape");
+  eq(w.s.route, { project: P.storefront, agent: "main" });
+  // bise's thread has nowhere to go back to
+  w.key("0", { meta: true, digit: 0 }); w.key("Escape"); w.key("Escape"); w.key("Escape"); w.key("Escape");
+  eq(w.s.route, { project: F.HOME, agent: "main" });
+});
+law("quotes ❝: diff lines selected (shift extends) become a quote above the field; ⏎ sends it with the question, not as an answer", () => {
+  const w = win();
+  w.go(P.storefront, "search");
+  const pos = rowsOf(w.v, "diff")[0].pos;
+  w.feed({ ev: "ui_line", pos, i: 1 });
+  w.feed({ ev: "ui_line", pos, i: 2, shift: true });
+  eq(rowsOf(w.v, "diff")[0].lines.map((l) => l.sel), [false, true, true]);
+  eq(w.v.composer.quotes.map((q) => q.text), ["❝ 1 “\"tshirt, t-shirt, tee\",”  synonyms.json:15-16 · 2 lines"]);
+  w.type("pourquoi tee ?");
+  w.key("Enter");
+  const s = w.sent.filter((c) => c.cmd === "send");
+  eq(s, [{ cmd: "send", project: P.storefront, agent: "search", text: "pourquoi tee ?", mode: "now",
+    quote: { agent: "search", pos, text: "  \"tshirt, t-shirt, tee\",\n  \"sneakers, trainers\"", file: "search/synonyms.json", lines: [15, 16] } }]);
+  eq(w.sent.filter((c) => c.cmd === "answer"), []);
+  eq(w.v.composer.quotes, []);
+  // the line he sent shows its quote
+  assert.match(rowsOf(w.v, "msg").find((m) => m.text === "pourquoi tee ?").quote, /^❝ “"tshirt/);
+});
+law("a sentence selected in a message is a quote too; esc drops the last quote first", () => {
+  const w = win();
+  w.go(P.storefront, "search");
+  const m = rowsOf(w.v, "msg").find((x) => /second index/.test(x.text));
+  w.feed({ ev: "ui_quote_text", pos: m.pos, text: "20 min de build" });
+  eq(w.v.composer.quotes.map((q) => q.text), ["❝ 1 “20 min de build”  search 09:45"]);
+  w.key("Escape");
+  eq(w.v.composer.quotes, []);
+  eq(w.v.composer.dock.h, "? search needs you");
+});
+
+// ---- the core's pages and live entries
+law("older messages page in once at a time, before the first one; a live entry with a known pos replaces it", () => {
+  const w = win();
+  w.go(P.storefront);
+  // the fake's storefront thread has 15 entries; ask a 5-entry page to see paging
+  const k = `${P.storefront}/main`;
+  let s = w.s;
+  s = M.step(s, { ev: "thread", project: P.storefront, agent: "main", entries: F.thread(P.storefront, "main").slice(-5), before: 16, more: true }).s;
+  let r = M.step(s, { ev: "ui_older" });
+  eq(r.cmds, [{ cmd: "page", project: P.storefront, agent: "main", before: 16, limit: 60 }]);
+  eq(M.step(r.s, { ev: "ui_older" }).cmds, []);
+  s = r.s;
+  for (const [, ev] of F.respond(r.cmds[0])) s = M.step(s, ev).s;
+  eq(s.threads[k].entries.map((e) => e.pos), F.thread(P.storefront, "main").map((e) => e.pos));
+  eq(s.threads[k].more, false);
+  const e = { ...F.thread(P.storefront, "main")[0], text: "edited" };
+  s = M.step(s, { ev: "entry", project: P.storefront, agent: "main", entry: e }).s;
+  eq(s.threads[k].entries[0].text, "edited");
+  eq(s.threads[k].entries.length, F.thread(P.storefront, "main").length);
+});
+law("the theme follows the shell; offline greys the composer and says the message waits", () => {
+  const w = win();
+  w.feed({ ev: "win_theme", dark: false });
+  eq(w.v.theme, "light");
+  w.feed({ ev: "hub", up: false });
+  eq([w.v.composer.disabled, w.v.composer.ph], [true, "offline · your message waits and goes when you're back"]);
+});
+law("the fake core speaks S3a v1: welcome, number-free ids aside, every event names its project", () => {
+  const evs = F.boot();
+  eq(evs[0].ev, "welcome");
+  for (const ev of evs) if (ev.ev !== "projects") assert.ok(ev.project, JSON.stringify(ev).slice(0, 80));
+  for (const p of F.PROJECTS) assert.ok(evs.some((e) => e.ev === "agents" && e.project === p.project));
+});
+
+const direct = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+if (direct) {
+  console.log(`${fail ? "✗" : "✓"} ambient window: ${pass} passed${fail ? `, ${fail} failed` : ""}`);
+  process.exit(fail ? 1 : 0);
+}

@@ -1,0 +1,326 @@
+// bise desktop · the window's DOM: draws AmbWinView's data with the design system's markup
+// (apps/ambient/web/ds/ds.css: b-side, b-row, b-head, b-thread, b-msg, b-route, b-dock, b-composer,
+// b-board...), turns clicks and keys into ui_* events for AmbWinModel, and talks to the shell.
+// It decides nothing: every key goes through the model, which says whether it ate it.
+//
+// Bridge (amb-mac's S4 window, m_8199): in = window.ambient.recv(ev); out =
+// window.webkit.messageHandlers.bise.postMessage(cmd). With no app around (a plain browser:
+// screens.html, the harness's headless shots) the fake core answers instead (winfake.js).
+(function (root) {
+  "use strict";
+  const M = root.AmbWinModel, V = root.AmbWinView;
+  const doc = root.document;
+
+  const esc = (t) => String(t == null ? "" : t).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+  // ---- small drawings: the capture and the artifacts' thumbnails (svg, no data)
+  const SVG = {
+    p99: `<svg viewBox="0 0 150 84" preserveAspectRatio="none"><line x1="0" y1="29" x2="150" y2="29" class="w-gr"/><line x1="0" y1="60" x2="150" y2="60" class="w-gr"/><rect x="64" y="0" width="17" height="84" class="w-fa"/><polyline class="sv-err" points="0,60 9,63 15,60 21,58 28,65 34,55 41,66 47,56 54,63 60,60 64,58 66,44 69,31 71,22 73,18 75,22 77,31 79,44 81,60 88,65 94,55 101,66 107,55 114,64 120,60 126,59 133,65 139,55 146,66 150,59"/><text x="4" y="25" class="w-svt">2 s</text><text x="4" y="56" class="w-svt">300 ms</text><text x="68" y="78" class="w-svt">14:00</text></svg>`,
+    chart: `<svg viewBox="0 0 300 52" preserveAspectRatio="none"><polyline class="sv-err" points="0,46 30,44 45,10 55,45 100,46 130,43 145,8 155,44 200,46 230,44 245,14 255,45 300,46"/><polyline class="sv-ok" points="0,48 50,47 100,46 150,48 200,47 250,46 300,47"/></svg>`,
+    bars: `<svg viewBox="0 0 300 52" preserveAspectRatio="none">${[20, 34, 44, 40, 26, 27, 41, 44, 34, 21, 35, 44, 40, 25, 27, 41, 44, 34, 22, 35].map((h, i) => `<rect x="${2 + i * 15}" y="${52 - h}" width="10" height="${h}" class="${i < 12 ? "sv-f" : "sv-f sv-dim"}"/>`).join("")}</svg>`,
+    report: `<svg viewBox="0 0 300 52" preserveAspectRatio="none"><rect x="20" y="8" width="110" height="7" class="sv-f"/>${[0, 1, 2, 3].map((i) => `<rect x="20" y="${22 + i * 7}" width="${240 - i * 23}" height="3" class="sv-f sv-dim"/>`).join("")}</svg>`,
+    table: `<svg viewBox="0 0 300 52" preserveAspectRatio="none">${[0, 1, 2, 3, 4].map((i) => `<rect x="10" y="${6 + i * 9}" width="280" height="1" class="sv-f sv-dim"/><rect x="14" y="${9 + i * 9}" width="${50 + (i * 37) % 60}" height="3" class="sv-f"/>`).join("")}</svg>`,
+  };
+  const thumb = (k) => SVG[k] || SVG.report;
+
+  // ---- regions, drawn with amb-kit's components (window/components: BiseUI.<name>.render(data)
+  // -> Element, the design system's markup); the few parts the kit has no component for yet (the
+  // day line, the context under his message, the inbox card's context, the thumbnails' grid) are
+  // plain markup with DS classes. No `on` is handed to the components: the window's one click
+  // listener reads data-act (it adds the shift key to a diff line's act).
+  const UI = root.BiseUI;
+  const h = (...a) => UI.core.h(...a);
+  const svg = (k) => { const t = doc.createElement("template"); t.innerHTML = thumb(k); return t.content.firstChild; };
+  const withAct = (el, a) => UI.core.act(el, a);
+  // the kit's pearl span ([data-bise-pearl]) gets the window's shared canvas, with the mood
+  function pearlsIn(el, mood) {
+    for (const p of el.querySelectorAll ? el.querySelectorAll("[data-bise-pearl]") : []) {
+      const n = +p.getAttribute("data-bise-pearl") || 22;
+      p.replaceChildren(Object.assign(doc.createElement("canvas"), { className: "w-pearl", width: n * 2, height: n * 2 }));
+      p.firstChild.dataset.mood = p.getAttribute("data-mood") || mood || "rest";
+    }
+    return el;
+  }
+
+  function side(v) {
+    const rows = v.side.rows.map((r) => (r.kind === "sh" ? { sh: r.text }
+      : { kind: r.kind, name: r.name, sub: r.sub, dot: r.kind === "me" ? null : { state: r.dot }, end: r.end, needs: r.nd || r.end === "?", on: r.on, act: r.act }));
+    const el = UI.side.render({ rows, foot: { text: v.side.foot } });
+    el.querySelector(".b-lights").classList.add("w-drag");
+    return pearlsIn(el, v.mood);
+  }
+
+  function head(v) {
+    const d = v.head;
+    const sub = d.t2.map((x, i) => [i ? " · " : "", i === d.acc ? h("span", "w-acc", x) : x]);
+    const end = [
+      ...(d.seg ? [UI.seg.render({ items: d.seg.map((x) => x.text), on: d.seg.findIndex((x) => x.on), act: { ev: "ui_tab_i" } })] : []),
+      ...(d.end || []).map((e) => e.kind === "chip" ? h("span", "b-chip", e.text, e.kbd ? [" ", UI.kbd.render({ text: e.kbd })] : null)
+        : withAct(h("button", "b-btn ghost", e.text, e.kbd ? [" ", UI.kbd.render({ text: e.kbd })] : null), e.act)),
+    ];
+    const el = UI.head.render({ title: d.t1, sub, pearl: d.pearl ? 40 : null, dot: !d.pearl && d.dot != null ? { state: d.dot } : null, end });
+    el.classList.add("w-drag");
+    return pearlsIn(el, v.mood);
+  }
+
+  function jobs(v) {
+    if (!v.jobs.length) return null;
+    return h("div", "w-now", v.jobs.map((j) => UI.job.render({ state: j.failed ? "er" : "wk", name: j.title, end: j.following ? "following" : "", what: j.s, pct: j.pct, act: j.act })));
+  }
+
+  function msg(r) {
+    const w = r.who;
+    const from = w.pearl ? "bise" : r.you ? "you" : "agent";
+    const [time, ...via] = r.meta.split(" · ");
+    const children = [
+      r.ctx ? h("div", "w-ctx", r.ctx.shot ? h("div", "w-shot", svg(r.ctx.shot)) : null, h("div", "w-chips", r.ctx.chips.map((c) => UI.chip.render({ text: c })))) : null,
+      r.quote ? h("div", "b-quote", r.quote) : null,
+      r.page ? UI.art.render({ title: `↗ ${r.page.title}`, meta: "page", thumb: svg("report") }) : null,
+    ];
+    const el = UI.msg.render({ from, name: w.name, time, via: via.join(" · "), text: r.text, av: w.av, dot: from === "agent" ? { state: w.dot || "" } : null, in: w.in, children });
+    if (r.pending) el.classList.add("w-pending");
+    el.setAttribute("data-pos", String(r.pos));
+    el.querySelector(".b-text").setAttribute("data-quote", String(r.pos));
+    return pearlsIn(el, "rest");
+  }
+
+  function row(r) {
+    const fold = { ev: "ui_fold", pos: r.pos };
+    switch (r.t) {
+      case "day": return h("div", "w-day", r.text);
+      case "msg": return msg(r);
+      case "route": { const el = UI.route.render({ state: r.dot, p1: r.p1, p2: r.p2, p3: r.p3, pct: r.bar != null && r.bar >= 0 ? r.bar : null, act: r.act }); el.classList.add("w-in"); return el; }
+      case "fold": {
+        const el = UI.fold.render({ text: r.text.replace(/^[▸▾] /, ""), act: fold });
+        if (r.open) el.textContent = r.text;
+        return [el, r.items.map((x) => h("div", "w-folded", row(x)))];
+      }
+      case "tool": { const el = UI.tool.render({ text: r.label, state: r.open ? "open" : r.run ? "run" : "", out: r.items.join("\n"), act: fold }); el.classList.add("w-in"); return el; }
+      case "answered": return [UI.answered.render({ text: r.why ? `${r.text} ${r.open ? "▾" : "▸"} why` : r.text, act: fold }), r.open && r.why ? h("div", "b-answered w-whytext", r.why) : null];
+      case "marker": return withAct(UI.marker.render({ text: r.text }), r.act);
+      case "diff": {
+        const el = UI.diff.render({ file: r.file, add: r.add, rm: r.del, lines: r.lines.map((l) => ({ old: l.o, new: l.n, sign: l.sign === "−" ? "-" : l.sign, text: l.text, sel: l.sel, act: { ev: "ui_line", pos: r.pos, i: l.i } })) });
+        el.classList.add("w-in");
+        return el;
+      }
+      case "art": { const el = UI.art.render({ title: `↗ ${r.title}`, meta: r.meta, isNew: r.new, thumb: svg(r.kind) }); el.classList.add("w-in"); return el; }
+    }
+    return null;
+  }
+
+  function thread(v) {
+    const t = v.thread;
+    if (t.loading) return UI.thread.render({ children: [UI.skel.render({}), h("span", "b-skel w-skel2")] });
+    if (t.empty) return UI.thread.render({ children: [UI.empty.render({ title: t.empty.b, text: t.empty.s })] });
+    const more = t.more ? withAct(h("div", "w-day", t.paging ? "loading…" : "earlier messages ↑"), { ev: "ui_older" }) : null;
+    const typing = t.typing ? (() => { const el = UI.tool.render({ text: `${t.typing.who} · ${t.typing.text}`, state: "run" }); el.classList.add("w-in"); return el; })() : null;
+    return UI.thread.render({ children: [more, t.rows.map(row), typing] });
+  }
+
+  function dock(v) {
+    const d = v.composer.dock;
+    if (!d) return null;
+    const tabs = d.tabs ? UI.tabs.render({ items: d.tabs.map((x) => ({ text: x.text, dot: { state: "nd" }, on: x.on, act: { ev: "ui_inbox", card: x.id } })) }) : null;
+    const el = UI.dock.render({ head: d.h, keys: d.k, q: d.q, typeHint: d.ty,
+      opts: d.opts.map((o) => ({ n: o.n, text: o.label, picked: o.picked, act: { ev: "ui_pick", card: d.card, n: o.n } })) });
+    if (d.body || d.shot) el.insertBefore(h("div", "w-dctx", d.shot ? h("div", "w-shot", svg(d.shot)) : null,
+      h("div", null, h("div", "b-text", d.body), d.origin ? UI.help.render({ text: d.origin }) : null)), el.querySelector(".q"));
+    return [tabs, el];
+  }
+
+  function board(v) {
+    const b = v.board;
+    if (!b) return null;
+    return b.sections.map((sec) => {
+      const items = sec.items.map((it) => {
+        if (sec.kind === "cards") return UI.job.render({ state: "nd", name: it.who, what: it.text, act: it.act });
+        if (sec.kind === "thumbs") return withAct(h("div", "w-tn", svg(it.kind), h("span", null, it.title)), it.act);
+        if (sec.kind === "agents") return UI.job.render({ state: it.dot, name: it.name, key: it.key, psi: it.psi, what: it.w, act: it.act });
+        return UI.job.render({ state: "sched", name: it.text.replace(/^◷ /, ""), end: it.when });
+      });
+      return [UI.sh.render({ text: sec.sh }), sec.kind === "thumbs" ? h("div", "w-thumbs", items) : items];
+    });
+  }
+
+  // ---- the pearls: one WebGL renderer per mood, copied into each slot's 2D canvas (a thread
+  // has a pearl per bise message; WebKit allows only a few GL contexts)
+  const gls = {};
+  function glFor(mood) {
+    if (gls[mood] !== undefined) return gls[mood];
+    const P = root.AmbPearl;
+    const cv = doc.createElement("canvas");
+    cv.style.cssText = "position:fixed;left:-200px;top:0;width:80px;height:80px;visibility:hidden";
+    doc.body.appendChild(cv);
+    const p = P && P.create(cv);
+    gls[mood] = p && !p.failed ? { p, cv } : null;
+    return gls[mood];
+  }
+  const still = root.matchMedia ? root.matchMedia("(prefers-reduced-motion: reduce)").matches : false;
+  function pearls(now) {
+    const slots = doc.querySelectorAll("canvas.w-pearl");
+    const moods = new Set([...slots].map((c) => c.dataset.mood));
+    for (const mood of moods) {
+      const g = glFor(mood);
+      if (!g) continue;
+      g.p.frame({ mood, lvl: 0, still }, now);
+      for (const c of slots) if (c.dataset.mood === mood) {
+        const x = c.getContext("2d");
+        x.clearRect(0, 0, c.width, c.height);
+        x.drawImage(g.cv, 0, 0, c.width, c.height);
+      }
+    }
+  }
+
+  // ---- mount: the static frame, then regions redrawn when their HTML changes
+  function mount(el, { post, recv: hook }) {
+    el.innerHTML = `<div class="w-app b-ui"><aside class="b-side w-side"></aside><main class="b-main w-main"><div class="w-head"></div><div class="w-jobs"></div>` +
+      `<div class="w-scroll"><div class="w-thread"></div></div><div class="b-composer w-composer"><div class="w-dock"></div><div class="w-quotes"></div><div class="div"></div>` +
+      `<div class="box"><textarea class="in w-field" rows="1" spellcheck="false"></textarea><span class="send off" data-act='{"ev":"ui_send"}'>↑</span></div><div class="keys"></div></div></main><aside class="w-board b-board"></aside></div>`;
+    const $ = (sel) => el.querySelector(sel);
+    const R = { side: $(".w-side"), head: $(".w-head"), jobs: $(".w-jobs"), thread: $(".w-thread"), scroll: $(".w-scroll"), dock: $(".w-dock"), quotes: $(".w-quotes"),
+      div: $(".w-composer .div"), field: $(".w-field"), box: $(".w-composer .box"), send: $(".w-composer .send"), keys: $(".w-composer .keys"), board: $(".w-board"), app: $(".w-app") };
+    const api = {};
+    let s = M.init(Date.now());
+    if (root.AMB_WIN_TZ) s = { ...s, tz: root.AMB_WIN_TZ };
+    const last = {};
+    let lastRoute = "";
+    let lastTitle = "";
+
+    // a region is redrawn only when its markup changes (the pearls' canvases and the scroll stay)
+    function put(name, content) {
+      const box = doc.createElement("div");
+      UI.core.add(box, [content]);
+      const html = box.innerHTML;
+      if (last[name] === html) return false;
+      last[name] = html;
+      R[name].replaceChildren(...box.childNodes);
+      return true;
+    }
+
+    function draw() {
+      const v = V.view(s);
+      doc.documentElement.dataset.theme = v.theme;
+      R.app.classList.toggle("is-inactive", !v.focused);
+      R.app.classList.toggle("w-two", !v.board);
+      put("side", side(v));
+      put("head", head(v));
+      put("jobs", jobs(v));
+      const routeKey = `${v.route.project}/${v.route.agent}`;
+      const atEnd = R.scroll.scrollHeight - R.scroll.scrollTop - R.scroll.clientHeight < 40;
+      const changed = put("thread", thread(v));
+      if (routeKey !== lastRoute || (changed && atEnd)) R.scroll.scrollTop = R.scroll.scrollHeight;
+      put("dock", dock(v));
+      put("quotes", v.composer.quotes.map((q) => UI.quote.render({ text: q.text.replace(/^❝ /, ""), act: { ev: "ui_unquote", i: q.i } })));
+      R.div.textContent = v.composer.div;
+      R.field.placeholder = v.composer.ph;
+      if (R.field.value !== v.composer.text) R.field.value = v.composer.text;
+      R.send.className = `send ${v.composer.send}`;
+      R.send.textContent = v.composer.send === "stop" ? "■" : "↑";
+      R.send.dataset.act = JSON.stringify(v.composer.send === "stop" ? { ev: "ui_stop" } : { ev: "ui_send" });
+      el.querySelector(".w-composer").classList.toggle("is-disabled", v.composer.disabled);
+      R.keys.textContent = v.composer.keys;
+      put("board", board(v));
+      if (routeKey !== lastRoute) { lastRoute = routeKey; R.field.focus(); }
+      if (v.title !== lastTitle) { lastTitle = v.title; doc.title = v.title; }
+      fit();
+    }
+    function fit() { R.field.style.height = "auto"; R.field.style.height = `${Math.min(160, R.field.scrollHeight)}px`; }
+
+    function feed(ev) {
+      const r = M.step(s, ev);
+      s = r.s;
+      for (const c of r.cmds) post(c);
+      draw();
+      if (hook) hook(ev, s, r);
+      if (api.onDraw) api.onDraw();
+      return r;
+    }
+
+    // clicks: the nearest data-act; a diff line selects (shift extends)
+    el.addEventListener("click", (e) => {
+      const a = e.target.closest("[data-act]");
+      if (!a) return;
+      const ev = JSON.parse(a.dataset.act);
+      // a diff line: shift extends the selection; the header's segmented control names its tab
+      if (ev.ev === "ui_line") ev.shift = e.shiftKey;
+      if (ev.ev === "ui_tab_i") { ev.ev = "ui_tab"; ev.tab = ["thread", "changes", "artifacts"][ev.i]; }
+      feed(ev);
+      if (!e.target.closest("textarea")) R.field.focus();
+    });
+    // a sentence selected in a message becomes a quote when he lets go
+    el.addEventListener("mouseup", () => {
+      const sel = root.getSelection && root.getSelection();
+      const text = sel && String(sel);
+      if (!text || !text.trim()) return;
+      const node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+      const host = node && node.closest("[data-quote]");
+      if (!host) return;
+      feed({ ev: "ui_quote_text", pos: +host.dataset.quote, text });
+      sel.removeAllRanges();
+      R.field.focus();
+    });
+    R.field.addEventListener("input", () => { feed({ ev: "ui_type", text: R.field.value }); });
+    R.scroll.addEventListener("scroll", () => { if (R.scroll.scrollTop < 20) feed({ ev: "ui_older" }); });
+    // keys: e.code gives the digit under ⌥ (macOS turns ⌥1 into ¡)
+    doc.addEventListener("keydown", (e) => {
+      if (e.isComposing) return;
+      const m = /^Digit([0-9])$/.exec(e.code || "");
+      const r = feed({ ev: "ui_key", key: e.key, digit: m ? +m[1] : null, meta: e.metaKey, alt: e.altKey, ctrl: e.ctrlKey, shift: e.shiftKey });
+      if (r.eat) e.preventDefault();
+    }, true);
+
+    // the pearls breathe; the clock ticks once a minute
+    let raf = 0;
+    const loop = (t) => { pearls(t); raf = root.requestAnimationFrame(loop); };
+    if (root.requestAnimationFrame) raf = root.requestAnimationFrame(loop);
+
+    const st = M.start(s);
+    s = st.s;
+    draw();
+    for (const c of st.cmds) post(c);
+    Object.assign(api, { feed, state: () => s, view: () => V.view(s), stop: () => root.cancelAnimationFrame(raf), draw });
+    return api;
+  }
+
+  // the page's entry: the app's bridge when the app booted us (amb-mac's mark window.ambientApp =
+  // {mac, window}, and webkit's handler), else the fake core
+  function boot(el, opts = {}) {
+    const wk = root.webkit && root.webkit.messageHandlers && root.webkit.messageHandlers.bise;
+    const app = !!(root.ambientApp && root.ambientApp.window && wk) && !opts.fake;
+    if (app) {
+      const post = (cmd) => wk.postMessage(cmd);
+      const w = mount(el, { post });
+      root.ambient = { recv: (ev) => w.feed(typeof ev === "string" ? JSON.parse(ev) : ev) };
+      // the title bar is the page's: the sidebar's width (the native vibrancy under it) and the
+      // rects that move the window (the lights' strip, the thread's head), in CSS px
+      let sent = "";
+      const size = () => {
+        const r = (q) => { const b = el.querySelector(q); if (!b) return null; const x = b.getBoundingClientRect(); return [Math.round(x.left), Math.round(x.top), Math.round(x.width), Math.round(x.height)]; };
+        const cmd = { cmd: "win_size", sidebar: Math.round(el.querySelector(".w-side").getBoundingClientRect().width), drag: [r(".w-side .b-lights"), r(".w-head .b-head")].filter(Boolean) };
+        const k = JSON.stringify(cmd);
+        if (k !== sent) { sent = k; post(cmd); }
+      };
+      size();
+      root.addEventListener("resize", size);
+      w.onDraw = size;
+      return w;
+    }
+    const F = root.AmbWinFake;
+    let player = null;
+    const queue = [];
+    const post = (cmd) => { if (opts.log) opts.log(cmd); if (player) player.post(cmd); else queue.push(cmd); };
+    const w = mount(el, { post, recv: opts.recv });
+    player = F.player((ev) => w.feed(ev));
+    for (const c of queue.splice(0)) player.post(c);
+    root.ambient = { recv: (ev) => w.feed(ev) };
+    // a plain browser opens a screen from the address: #agent/storefront/search, #inbox, #light
+    const hash = decodeURIComponent((root.location && root.location.hash) || "").slice(1);
+    for (const part of hash.split("&").filter(Boolean)) {
+      if (part === "light" || part === "dark") w.feed({ ev: "win_theme", dark: part === "dark" });
+      else w.feed({ ev: "win_open", route: part });
+    }
+    return w;
+  }
+
+  root.AmbWinUI = { mount, boot, esc };
+})(typeof window !== "undefined" ? window : globalThis);
