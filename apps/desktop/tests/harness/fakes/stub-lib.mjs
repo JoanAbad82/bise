@@ -27,20 +27,11 @@ function lines(on) {
   };
 }
 
-/**
- * hold: keep the start lines until the test asks for them with the control line
- * {"harness":"start"} on the socket (FakeCore does, once the main window has loaded: the app's
- * main forwards core events to the windows open at that moment and keeps none for later, so a
- * world sent at spawn was lost when the window loaded after it, amb-win m_9694).
- */
-export function runStub({ start = [], sock, log, quitCmd, hold = false }) {
+/** answer(cmd): the lines to write back for a command the app sent (a fake core answering a subscribe). */
+export function runStub({ start = [], sock, log, quitCmd, answer }) {
   const out = (line) => process.stdout.write(line + NL);
-  const emitStart = () => { for (const l of start) out(typeof l === 'string' ? l : JSON.stringify(l)); };
-  if (!hold) emitStart();
-  const relay = (line) => {
-    if (line === '{"harness":"start"}') emitStart();
-    else out(line);
-  };
+  for (const l of start) out(typeof l === 'string' ? l : JSON.stringify(l));
+  const relay = out;
   let server;
   if (sock) {
     rmSync(sock, { force: true });
@@ -59,7 +50,10 @@ export function runStub({ start = [], sock, log, quitCmd, hold = false }) {
   };
   const s = lines((line) => {
     if (log) appendFileSync(log, line + NL);
-    try { if (quitCmd && JSON.parse(line).cmd === quitCmd) quit(); } catch { /* not JSON: logged as is */ }
+    let cmd;
+    try { cmd = JSON.parse(line); } catch { return; /* not JSON: logged as is */ }
+    if (quitCmd && cmd.cmd === quitCmd) quit();
+    if (answer) for (const l of answer(cmd)) out(typeof l === 'string' ? l : JSON.stringify(l));
   });
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (d) => s.push(d));

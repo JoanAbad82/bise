@@ -24,5 +24,20 @@ const start = world === 'none' ? []
   : world ? jsonl(world)
   : [...jsonl(path.join(FIXTURES, 'core_ev.jsonl')), ...jsonl(path.join(FIXTURES, 'hub_ev.jsonl'))];
 
-// BISE_HARNESS_CORE_HOLD=1: the start world waits for the test's {"harness":"start"} (stub-lib.mjs)
-runStub({ start, sock: process.env.BISE_HARNESS_CORE_SOCK, log: process.env.BISE_HARNESS_CORE_LOG, hold: process.env.BISE_HARNESS_CORE_HOLD === '1' });
+// The world is written at spawn: the app's main keeps the newest state events and replays them to
+// a window that loads later (amb-core 162ec18b). A thread's lines aren't state: like the real core,
+// the stub sends them when the window asks (subscribe, page) and answers the per-project asks
+// (diff, worktrees, dev_servers, merged) from the same world.
+const evs = start.map((l) => JSON.parse(l));
+const same = (ev, cmd) => ev.project === cmd.project && (cmd.agent === undefined || ev.agent === undefined || ev.agent === cmd.agent);
+function answer(cmd) {
+  const of = (kinds, more = () => true) => evs.filter((ev) => kinds.includes(ev.ev) && same(ev, cmd) && more(ev));
+  switch (cmd.cmd) {
+    case 'subscribe': return of(['thread', 'entry', 'typing'], (ev) => ev.ev !== 'thread' || ev.before === null || ev.before === undefined);
+    case 'page': return of(['thread'], (ev) => ev.before !== null && ev.before !== undefined);
+    case 'diff': return of(['diff'], (ev) => (cmd.commit ? ev.merged === cmd.commit : !ev.merged));
+    case 'worktrees': case 'dev_servers': case 'merged': return of([cmd.cmd]);
+    default: return [];
+  }
+}
+runStub({ start, sock: process.env.BISE_HARNESS_CORE_SOCK, log: process.env.BISE_HARNESS_CORE_LOG, answer });

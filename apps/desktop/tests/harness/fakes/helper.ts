@@ -91,22 +91,12 @@ export class FakeCore extends Stub<CoreEv | HubEv, AppCmd | HubCmd> {
     }
   }
 
-  /**
-   * Sends the start world. launchDesktop calls it once the main window has loaded: the app's main
-   * forwards core events only to the windows open at that moment, so a world written at the
-   * core's spawn was lost when the window loaded after it (amb-win m_9694; told amb-core).
-   */
-  async start(): Promise<void> {
-    await this.raw(['{"harness":"start"}']);
-  }
-
   env(): Record<string, string> {
     return {
       BISE_DESKTOP_BISE: this.stub,
       BISE_DESKTOP_WORKSPACE: '',
       BISE_HARNESS_CORE_SOCK: this.sock,
       BISE_HARNESS_CORE_LOG: this.log,
-      BISE_HARNESS_CORE_HOLD: '1',
       ...(this.world ? { BISE_HARNESS_CORE_EVENTS: this.world } : {}),
     };
   }
