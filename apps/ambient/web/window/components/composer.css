@@ -32,3 +32,5 @@
 .b-tabs{display:flex;gap:6px;margin-bottom:6px;overflow:hidden}
 .b-tabs>span{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:var(--r-2);font-size:var(--t-12);color:var(--c-text-2);background:var(--c-hover);white-space:nowrap}
 .b-tabs>span.on{color:var(--c-text);background:color-mix(in srgb,var(--c-accent) 15%,transparent)}
+.b-dock .ctx{display:flex;gap:10px;align-items:flex-start;margin:6px 0 2px}
+.b-dock .ctx .b-text{font-size:var(--t-13);color:var(--c-text-2)}

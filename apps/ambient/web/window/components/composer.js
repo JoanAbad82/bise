@@ -16,9 +16,12 @@
     d.typeHint ? h("span", "b-opt ty", d.typeHint) : null));
 
   // what waits above the composer, one at a time: {kind: "" | "plain" | "err", head ("? search needs
-  // you"), keys ("1 of 3   ← →   esc back"), q (the question), opts: [option], typeHint}
+  // you"), keys ("1 of 3   ← →   esc back"), ctx: {shot (Element), body, origin} (the inbox card's
+  // context, above the question), q (the question), opts: [option], typeHint}
   define("dock", (d) => h("div", ["b-dock", d.kind],
     h("div", "h", d.head, d.keys ? h("span", "k", d.keys) : null),
+    d.ctx && (d.ctx.body || d.ctx.shot) ? h("div", "ctx", d.ctx.shot || null,
+      h("div", null, h("div", "b-text", d.ctx.body), d.ctx.origin ? UI.help.render({ text: d.ctx.origin }) : null)) : null,
     h("div", "q", d.q),
     d.opts && d.opts.length ? UI.opts.render({ items: d.opts, typeHint: d.typeHint }) : null));
 

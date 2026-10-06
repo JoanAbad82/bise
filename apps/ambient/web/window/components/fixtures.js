@@ -110,5 +110,85 @@
   };
   // the board: a column of the jobs above (working, needs you, done, failed)
   UI.fixtures.board = [["a project's board", { jobs: [0, 2, 3, 4].map((i) => UI.fixtures.job[i][1]) }]];
+
+  Object.assign(UI.fixtures, {
+    wave: [["listening", {}], ["off", { off: true }]],
+    shot: [["a capture", {}]],
+    capsule: [
+      ["you hold fn and talk", { words: ["why does ingest p99 climb at 14:00"], typing: true, wave: "on", shotBelow: true, shot: true, chips: [{ text: "grafana · ingest p99" }, { text: "13:00–15:00" }, { text: "to bise" }], hint: "release fn to send   fn esc cancel   fn fn hands-free" }],
+      ["you let go: the route", { words: [{ lo: "→" }, " ", { b: "telemetry" }, " ", { lo: "· main" }, { br: true }, { lo: "why does ingest p99 climb at 14:00?" }], shot: true, countdown: true, hint: "tab another project   fn esc cancel" }],
+      ["bise answers itself", { words: ["telemetry changed nothing since yesterday. the 14:00 peak comes back every day.", { br: true }, { lo: "bise · from telemetry's history" }], hint: "fn+⏎ open in bise   esc close" }],
+      ["hands-free", { words: [{ lo: "listening… say “that's all” or press fn" }], wave: "on" }],
+      ["no microphone", { words: ["bise can't use the microphone.", { br: true }, { lo: "system settings · privacy · microphone" }], hint: "⏎ open settings   esc close" }],
+      ["offline", { lead: "off", words: ["offline. your question waits and goes when you're back.", { br: true }, { lo: "why does ingest p99 climb at 14:00?" }], wave: "off" }],
+    ],
+    spot: [
+      ["empty", { placeholder: "ask bise, or find an agent", keys: "⏎ open   ⌘⏎ send to bise   tab start an agent   esc close", groups: [
+        { title: "waiting for you", rows: [{ lead: "nd", name: "alerts", where: "telemetry", what: "compaction at 03:00?", key: "⏎", on: true, act: { ev: "ui_open", to: "alerts" } }, { lead: "nd", name: "search", where: "storefront", what: "reindex tonight?" }] },
+        { title: "at work", rows: [{ lead: "wk", name: "stock", where: "storefront", what: "replay · 62%" }] },
+        { title: "environments", rows: [{ lead: "", name: "telemetry", where: "~/telemetry", what: "in front: grafana", key: "⌘1" }] }] }],
+      ["a name", { text: "eng", keys: "⏎ open streaming   ⌘⏎ send to bise   esc close", groups: [
+        { title: "agents", rows: [{ lead: "ok", name: "streaming", where: "engine", what: "ready to merge", key: "⏎", on: true }, { lead: "wk", name: "netcode", where: "engine", what: "desync at 150 ms" }] }] }],
+      ["a sentence", { text: "rerun the flash sale replay", keys: "⏎ send to bise   ↓ then ⏎ open stock   esc close", rows: [
+        { lead: "bise", name: "ask bise", what: "rerun the flash sale replay", key: "⏎", on: true }, { lead: "ok", name: "stock", where: "storefront", what: "flash sale replay" }] }],
+    ],
+    card: [
+      ["a question", { who: "telemetry · alerts", rest: " needs you", k: "4 min", q: "p99 climbs when the 14:00 compaction runs. move it to 03:00?", opts: [{ n: 1, text: "move it to 03:00" }, { n: 2, text: "leave it" }], keys: "fn+1 · fn+2   hold fn to answer   fn+⏎ open in bise" }],
+      ["a batch, after a call", { who: "2 questions", rest: " · about 1 min", k: "1 of 2", q: "search · reindex tonight at 02:00, or now?", opts: [{ n: 1, text: "tonight 02:00" }, { n: 2, text: "now" }], stacked: true }],
+      ["a followed job, done", { plain: true, lead: "ok", who: "storefront · stock", rest: " is done", k: "now", q: "500 sold out of 500, no oversell.", art: { title: "↗ flash sale replay", meta: "the report" } }],
+      ["while you were away", { plain: true, who: "while you were away", k: "08:52", q: "3 done · 1 question · nothing broken", keys: "⏎ open in bise   esc close" }],
+    ],
+    menu: [
+      ["an agent", { items: [{ text: "open", key: "⏎", on: true, act: { ev: "ui_open" } }, { text: "preview", key: "space" }, { text: "show its diff", key: "⌘D" }, { text: "copy the branch", key: "⌘⇧C" }, { sep: true }, { text: "stop its turn", key: "⌘." }, { text: "archive", key: "⌘⌫", danger: true }] }],
+      ["the pearl, in the menu bar", { items: [{ text: "3 wait for you", key: "fn+1" }, { text: "following · stock 62%" }, { sep: true }, { text: "open bise", key: "⌘0" }, { text: "quiet for 1 h", key: "fn+." }, { text: "settings…", key: "⌘," }] }],
+      ["an entry you can't use", { items: [{ text: "merge into main", dis: true, act: { ev: "ui_merge" } }, { text: "not ready: tests are running" }, { sep: true }, { text: "open the thread", key: "⏎" }] }],
+    ],
+    toast: [
+      ["copied", { text: "copied 3 lines" }],
+      ["undo", { text: "search archived", action: { text: "undo", act: { ev: "ui_undo" } } }],
+      ["done", { text: "sb/streaming merged into main", dot: { state: "ok" }, action: { text: "show" } }],
+      ["error", { text: "couldn't open ~/engine: no such folder", err: true, action: { text: "locate…" } }],
+    ],
+    sideview: [
+      ["the diff", { title: "streaming vs main", actions: [{ text: "open in editor" }, { text: "✕", act: { ev: "ui_close" } }], files: [{ name: "decode_pool.rs", end: "+61", on: true }, { name: "streamer.rs", end: "+19 −17" }] }],
+      ["nothing to show", { title: "wallet vs main", actions: [{ text: "✕" }], empty: { title: "no changes", text: "wallet changed nothing against main." } }],
+      ["loading", { title: "streaming vs main", loading: true }],
+    ],
+    group: [
+      ["a group", { items: [
+        { label: "during a call", sub: "Zoom, Meet, FaceTime: the pearl blushes, nothing shows", control: { toggle: { on: true, act: { ev: "ui_set", k: "calls" } } } },
+        { label: "while you share your screen", sub: "never a card during a share", control: { toggle: { on: true } } },
+        { label: "at most every", sub: "to batch the rest", control: { btn: { text: "30 min ▾" } } }] }],
+      ["focus, disabled", { items: [{ label: "the text of the window", sub: "bise sees what you see", control: { toggle: { on: true, state: "focus" } } }, { label: "in focus mode", sub: "follows macOS focus · set in macOS", control: { toggle: { on: true, state: "disabled" } } }] }],
+      ["a field in error", { items: [{ label: "API key", sub: "Anthropic", control: { field: { value: "sk-ant-…3f9", state: "error" } } }], help: { text: "that key was refused: check it in your Anthropic console", err: true } }],
+      ["projects found", { title: "your projects", items: [{ label: "storefront", sub: "~/storefront", check: { on: true } }, { label: "dotfiles", sub: "~/dotfiles", check: {} }] }],
+    ],
+    check: [["off", {}], ["on", { on: true }]],
+    set: [["the settings page", { nav: [{ kind: "ag", name: "general", on: true }, { kind: "ag", name: "voice and fn" }, { kind: "ag", name: "quiet moments" }], title: "quiet moments", sub: "when bise holds its cards" }]],
+    onb: [
+      ["hello", { pearl: true, title: "hi. i'm bise.", sub: "hold fn and talk to me, from any app.", cta: { text: "start", kind: "pri" }, steps: 5, step: 0 }],
+      ["try fn", { pearl: true, title: "try it: hold fn", sub: "“what moved in storefront this week?”", fn: "down", steps: 5, step: 4 }],
+    ],
+    fnkey: [["up", {}], ["down", { down: true }]],
+  });
   if (typeof module !== "undefined" && module.exports) module.exports = UI.fixtures;
+})(typeof window !== "undefined" ? window : globalThis);
+
+// amb-win's asks (m_8284): a quote above his words, an open fold, the inbox card's context in the
+// dock, a job ending on a chip, the day line, the thumbnails of what was made today
+(function (root) {
+  const UI = root.BiseUI;
+  const F = UI.fixtures;
+  F.msg.push(["yours, quoting lines", { from: "you", name: "you", av: "G", time: "14:30", quote: { text: "1 “workers: [Worker; 4],”  decode_pool.rs:13-14 · 2 lines" }, text: "why a pool of 4?" }]);
+  F.fold.push(["open", { text: "4 messages between 2 agents", open: true, act: { ev: "ui_fold", id: "f1" } }]);
+  F.dock.push(["the inbox card, with its context", { head: "? telemetry · alerts needs you", keys: "1 of 3   ← →",
+    ctx: { body: "p99 climbs when the 14:00 compaction runs, every day since Monday.", origin: "from grafana · ingest p99" },
+    q: "move the compaction from 14:00 to 03:00?", opts: [{ n: 1, text: "move it to 03:00" }, { n: 2, text: "leave it" }] }]);
+  F.job.push(["followed", { state: "wk", name: "stock", key: "⌥3", end: { text: "following" }, what: "rerun the flash sale replay", pct: 62 }]);
+  F.day = [["today", { text: "today" }]];
+  F.thumbs = [["made today", { items: [
+    { title: "flash sale replay", act: { ev: "ui_open_art", id: "a1" } },
+    { title: "p99 before / after", act: { ev: "ui_open_art", id: "a2" } },
+    { title: "decode_pool.rs diff", states: ["hover"] },
+  ] }]];
 })(typeof window !== "undefined" ? window : globalThis);

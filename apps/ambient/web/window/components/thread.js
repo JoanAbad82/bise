@@ -17,13 +17,13 @@
   // av ("G": your initial; bise gets the pearl, an agent its dot), dot: {state} (an agent's), in
   // (indented: an agent's message to another), chips: [chip data] (the context it came with), shot
   // (Element: a screenshot thumb), state: "streaming" | "error", children: [Element] (tool, route,
-  // art, diff under the words)}
+  // art, diff under the words), quote: {text} (the lines he quoted, above his words)}
   define("msg", (d) => {
     const av = h("div", "b-av", d.from === "bise" ? UI.pearl.render({ size: 22 }) : d.dot ? UI.dot.render({ lg: true, ...d.dot }) : d.av || "");
     const who = h("div", "b-who", h("b", null, d.name || d.from), [d.time, d.via].filter(Boolean).join(" · "));
     const words = h("div", "b-text", d.state === "error" ? h("span", null, text(d.text)) : text(d.text));
     const ctx = (d.chips && d.chips.length) || d.shot ? h("div", "b-who", d.shot, (d.chips || []).map((c) => [" ", UI.chip.render(c)])) : null;
-    return h("div", ["b-msg", d.from === "you" && "you", d.in && "in", ...st(d)], av, h("div", null, who, ctx, words, d.children));
+    return h("div", ["b-msg", d.from === "you" && "you", d.in && "in", ...st(d)], av, h("div", null, who, ctx, d.quote ? UI.quote.render(d.quote) : null, words, d.children));
   });
 
   // folded work: {text, state: "open" | "run" | "err", out (the output, shown when open), act}
@@ -34,8 +34,10 @@
     return head;
   });
 
-  // {text, act}: "▸ 4 messages between 2 agents"
-  define("fold", (d) => act(h("div", "b-fold", "▸ " + d.text), d.act));
+  // {text, open, act}: "▸ 4 messages between 2 agents" (▾ once open)
+  define("fold", (d) => act(h("div", ["b-fold", d.open && "open"], (d.open ? "▾ " : "▸ ") + d.text), d.act));
+  // a day line in the thread: {text: "today"}
+  define("day", (d) => h("div", "b-day", d.text));
   // {text, act}: what main answered for you
   define("answered", (d) => act(h("div", "b-answered", d.text), d.act));
   // {text}: "? search asked you · it waits above the composer"

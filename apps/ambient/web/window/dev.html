@@ -25,14 +25,22 @@
 <script src="components/thread.js"></script>
 <script src="components/composer.js"></script>
 <script src="components/board.js"></script>
+<script src="components/capsule.js"></script>
+<script src="components/spotlight.js"></script>
+<script src="components/cards.js"></script>
+<script src="components/menus.js"></script>
+<script src="components/sideviews.js"></script>
+<script src="components/settings.js"></script>
 <script src="components/fixtures.js"></script>
 <script>
 // every component in every state (components/fixtures.js), dark on the left, light on the right.
-// a click on a part logs its act. ?only=<name> shows one component.
+// a click on a part logs its act. ?only=<name>[,<name>…] shows only those components.
 (function () {
   const UI = window.BiseUI;
-  const only = new URLSearchParams(location.search).get("only");
-  const WIDE = ["side", "msg", "route", "tool", "diff", "dock", "composer", "head", "tabs"];
+  const only = (new URLSearchParams(location.search).get("only") || "").split(",").filter(Boolean);
+  const WIDE = ["side", "msg", "route", "tool", "diff", "dock", "composer", "head", "tabs",
+    // the floating surfaces are 380-640 px wide: one per row, or they spill over their neighbor
+    "capsule", "spot", "card", "toast", "sideview"];
   const PANE = ["msg", "route", "tool", "fold", "answered", "marker", "art", "diff", "empty", "err"];
   const { h } = UI.core;
   const on = (act) => console.log("act", JSON.stringify(act));
@@ -40,7 +48,7 @@
     const col = h("section", null, h("h1", null, "window components · " + theme));
     col.setAttribute("data-theme", theme);
     for (const [name, states] of Object.entries(UI.fixtures)) {
-      if (only && only !== name) continue;
+      if (only.length && !only.includes(name)) continue;
       const grid = h("div", "b-grid", states.map(([label, data]) => {
         const el = UI[name](data, on);
         return h("div", "b-state", h("div", "b-lab", label), PANE.includes(name) ? h("div", "b-pane", el) : el);

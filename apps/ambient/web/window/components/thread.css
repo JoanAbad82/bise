@@ -40,3 +40,5 @@
 .b-dl.rm{background:color-mix(in srgb,var(--c-err) 12%,transparent)}
 .b-dl.pk{box-shadow:inset 3px 0 0 var(--c-ink)}
 .b-quotepop{display:inline-flex;margin:4px 0 4px 6.4em;padding:3px 10px;border-radius:var(--r-2);background:var(--c-ink);color:var(--c-on-ink);font:var(--t-12) var(--font-ui)}
+.b-day{align-self:center;text-align:center;font-size:var(--t-11);color:var(--c-text-3);letter-spacing:.06em;text-transform:uppercase}
+.b-msg .b-quote{display:flex;width:fit-content;margin:2px 0 6px}

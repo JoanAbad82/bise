@@ -33,7 +33,8 @@ const html = (n) => n.nodeType === 3 ? esc(n.data)
 // ---- load the components like the page does ----
 globalThis.BiseUI = undefined;
 const UI = require("./components/core.js");
-for (const f of ["prim", "window", "thread", "composer", "board", "fixtures"]) require(`./components/${f}.js`);
+const SCRIPTS = ["prim", "window", "thread", "composer", "board", "capsule", "spotlight", "cards", "menus", "sideviews", "settings", "fixtures"];
+for (const f of SCRIPTS) require(`./components/${f}.js`);
 UI.use(doc);
 
 let pass = 0, fail = 0;
@@ -57,7 +58,7 @@ law("every fixture renders, twice the same (no state kept), and every class it u
 });
 
 law("every component has fixtures, except the frames that only hold children", () => {
-  const frames = ["win", "main", "thread"];
+  const frames = ["win", "main", "thread", "edge"];
   const defined = Object.keys(UI).filter((k) => typeof UI[k] === "function" && UI[k].render && !frames.includes(k));
   for (const k of defined) assert.ok(UI.fixtures[k], `${k} has no fixtures (dev.html wouldn't show it)`);
 });
@@ -116,6 +117,14 @@ law("components read roles only: no palette (--p-*) and no raw color in componen
 law("all.css imports every component css, and tokens.css is the design system's", () => {
   for (const f of Object.keys(css)) if (f !== "all.css") assert.ok(css["all.css"].includes(`@import url("${f}")`), `all.css misses ${f}`);
   assert.equal(readFileSync(join(here, "tokens.css"), "utf8"), readFileSync(join(here, "..", "ds", "tokens.css"), "utf8"));
+});
+
+law("dev.html loads every component script, core first and fixtures last", () => {
+  const dev = readFileSync(join(here, "dev.html"), "utf8");
+  const order = [...dev.matchAll(/<script src="components\/(\w+)\.js">/g)].map((m) => m[1]);
+  assert.deepEqual(order, ["core", ...SCRIPTS]);
+  const files = readdirSync(join(here, "components")).filter((f) => f.endsWith(".js")).map((f) => f.slice(0, -3)).sort();
+  assert.deepEqual(files, ["core", ...SCRIPTS].sort(), "a component script dev.html doesn't load");
 });
 
 law("the split css holds every rule of the design system's ds.css", () => {
