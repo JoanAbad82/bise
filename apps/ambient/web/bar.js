@@ -21,13 +21,14 @@
 
   // a pushed card (a question, drafts) never takes the keys: fn chords until he clicks it
   // (ambient m_6519 FOCUS AND KEYS); clicked, the plain keys
-  function askFoot(n, focused) {
+  // an approval (ambient m_8772): words never act on it, so no 'or hold fn and say it': 'pick 1 or 2'
+  function askFoot(n, focused, pick) {
     const range = (pre) => [...pre, "1", "–", String(n)];
     // a range ('fn 1 – 2 pick') is info, like '↑↓ move': the rows are its targets (ambient m_6681 (2))
     const left = focused
       ? [item(range([]), B.pick), item(["↑", "↓"], B.move), item(["esc"], B.later, key("esc"))]
       : [item(range(["fn"]), B.pick), item(["fn", "⏎"], B.openInBise, key("enter")), item(["fn", "esc"], B.later, key("esc"))];
-    return { left, right: [item(["fn"], B.sayIt, null, B.orHold)] };
+    return { left, right: [pick ? item([], pick) : item(["fn"], B.sayIt, null, B.orHold)] };
   }
 
   // a path under his home, as ~/…
@@ -200,7 +201,7 @@
           g: String(o.n), gk: true, t: o.label, sel: o.sel, sub: a.batch ? (k === 0 ? B.reviewSub : B.sendSub) : null,
           act: { ev: "ui_option", card: a.id, i: o.i }, qa: `opt-${o.n}`,
         })) }];
-        s.foot = askFoot(Math.max(...a.options.map((o) => o.n), 1), focused);
+        s.foot = askFoot(Math.max(...a.options.map((o) => o.n), 1), focused, a.approval ? Wd.card.pick(a.options.map((o) => o.n)) : null);
         if (a.open) s.foot.left.push(item(["fn", "o"], B.openPage, key("o")));
         return s;
       }

@@ -256,6 +256,17 @@
   const needsLine = (agent) => `${agent} needs you`;
   // `✓ cookies has it.` / with the option it took: `✓ cookies has it: yes.`
   const answeredLine = (agent, choice) => (choice ? `${agent} has it: ${choice}.` : `${agent} has it.`);
+  // a card says its kind (ambient's composer rule m_8772 via lead m_8776): a question is answered
+  // by voice ('answering checkout · which date works?', then '✓ answered: <words>'); an approval
+  // (merge, send, run...) only by 1/2: what he says goes to the agent as a message, the card stays
+  const or = (ns) => (ns.length > 1 ? `${ns.slice(0, -1).join(", ")} or ${ns.at(-1)}` : String(ns[0] || 1));
+  const NOUN = { merge: "the merge", feature_merge: "the merge", feature_try: "the try", update: "the update", signin: "the sign-in", drafts: "the drafts" };
+  const card = {
+    pick: (ns) => `pick ${or(ns)}`,
+    answering: (who, q) => `answering ${who}${q ? ` · ${q}` : ""}`,
+    to: (who, kind, ns) => `to ${who} · ${NOUN[kind] || "the card"} waits for ${or(ns)}`,
+    answered: (words) => `answered: ${words}`,
+  };
   // a batch of drafts waiting on one page (amb-core 34703bf0; ambient m_6056, ambient-lead m_6063):
   // '3 drafts wait for you · launch recap', 'replies to legal, Lucas and Marc', '1 review' first
   // (the filled one: reading comes before sending), '2 send all 3' / 'send both', and right after
@@ -341,5 +352,5 @@
   // an agent's row is a label, not a sentence: no final period
   const rowLabel = (s) => String(s || "").replace(/\.$/, "");
 
-  root.AmbWords = { W, spot, route, menu, GLYPH, idleLine, firstSentence, oneLine, doneLine, failLine, needsLine, answeredLine, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
+  root.AmbWords = { W, spot, route, menu, GLYPH, idleLine, firstSentence, oneLine, doneLine, failLine, needsLine, answeredLine, card, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
 })(typeof window !== "undefined" ? window : globalThis);

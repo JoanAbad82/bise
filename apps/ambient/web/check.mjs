@@ -450,8 +450,38 @@ law("round 9 (lead m_6613, pm's fail 44): a drafts card opened from fn i comes u
   const s = Bar.spec(M.view(m, 2500));
   eq([s.kind, s.sections[0].rows.map((r) => `${r.g} ${r.t}`)], ["needs", ["1 review", "2 send all 3"]]);
   eq(s.bigAct, { ev: "ui_option", card: "b1", i: 0 });
-  eq(s.foot.right.map((i) => i.w), [W.bar.sayIt]);
+  // drafts to send are an approval: words never send them, so 'pick 1 or 2', no 'or hold fn' (ambient m_8772)
+  eq(s.foot.right.map((i) => i.w), ["pick 1 or 2"]);
   assert.ok(s.foot.left.some((i) => i.w === W.bar.later));
+});
+
+law("a card says its kind (ambient m_8772, lead m_8776): a question is answered by voice ('answering checkout · …', '✓ answered: <words>'); an approval says 'pick 1 or 2', and a held fn on it sends his words to its agent as a message, never an answer, the card stays", () => {
+  const q = { id: "q1", kind: "question", agent: "checkout", text: "which date works?", options: [{ n: 1, label: "monday" }, { n: 2, label: "friday" }] };
+  const a = { id: "a1", kind: "merge", agent: "checkout", text: "merge sb/checkout into main?", options: [{ n: 1, label: "merge" }, { n: 2, label: "not now" }] };
+  const talk = (card, words) => {
+    let m = M.step(M.init(), { ev: "state", agents: [{ name: "checkout", status: "waiting" }], cards: [card], pages: [] }, 0).m;
+    m = M.step(m, { ev: "app_fn", state: "down", key: "fn" }, 100).m;
+    m = M.step(m, { ev: "heard", text: words, final: true }, 200).m;
+    return { during: M.view(m, 300), r: M.step(m, { ev: "app_fn", state: "up", key: "fn" }, 400) };
+  };
+  // the glass: a question keeps 'or hold fn and say it'; an approval says 'pick 1 or 2'
+  const glass = (card) => Bar.spec(M.view(M.step(M.init(), { ev: "state", agents: [], cards: [card], pages: [] }, 0).m, 10)).foot.right.map((i) => i.w);
+  eq([glass(q), glass(a), glass({ ...a, kind: "confirm" })], [[W.bar.sayIt], ["pick 1 or 2"], ["pick 1 or 2"]]);
+  // a question: the label says whom he answers; his words are the answer, '✓ answered: friday please'
+  const tq = talk(q, "friday please");
+  eq(tq.during.label.text, "answering checkout · which date works?");
+  eq(tq.r.cmds, [{ cmd: "answer", card: "q1", reply: "friday please" }]);
+  eq([M.view(tq.r.m, 500).text, M.view(tq.r.m, 500).glyph], ["answered: friday please", "✓"]);
+  // an approval: 'to checkout · the merge waits for 1 or 2'; 'merge it' goes to checkout as a message, the card stays
+  const ta = talk(a, "merge it");
+  eq(ta.during.label.text, "to checkout · the merge waits for 1 or 2");
+  eq(ta.r.cmds, [{ cmd: "agent_send", agent: "checkout", text: "merge it", mode: "now" }]);
+  eq(M.view(ta.r.m, 10000).ask.id, "a1");
+  // main's approval: bise's usual send (main reads it), never an answer
+  const tm = talk({ ...a, agent: "main" }, "merge it");
+  eq([tm.during.label.text, tm.r.cmds.some((c) => c.cmd === "answer")], ["to bise · the merge waits for 1 or 2", false]);
+  // fn 2 still picks it
+  eq(M.step(talk(a, "").r.m, { ev: "app_key", key: "2" }, 600).cmds, [{ cmd: "answer", card: "a1", reply: "2" }]);
 });
 law("round 9 slice 2: fn p, your pages: 'new for you' then 'seen' (dim), ⌘ 1-9 on the rows, ⏎ opens the page and closes the bar", () => {
   let m = M.init(); for (const [t, ev] of sceneEvents("your-pages")) m = M.step(m, ev, t).m;

@@ -79,5 +79,46 @@
 
   // ---- what the capsule shows now
   // `wall`: the epoch clock (a page's age); `now` may be the page's own monotonic clock
-  root.AmbPolicy = { moodOf, hold, reduced, grow, contentOf, GROW, working };
+  // ---- a card's kind (ambient's composer rule m_8772): an approval acts or leaves (a confirm, a
+  // merge, a try, an update, a sign-in, drafts to send); words never approve it, only 1/2. A
+  // question (or a card with no kind, the fake core's) takes words.
+  const approval = (c) => !!c && (!!c.batch || !!(c.page && c.page.drafts) || (!!c.kind && c.kind !== "question"));
+  const approvalKind = (c) => (c.batch || (c.page && c.page.drafts) ? "drafts" : c.kind);
+  // his talk on the card the glass asks: a question gets it as its answer; an approval's agent gets
+  // it as a plain message (main's: bise's usual send) and the card stays. null: the usual send.
+  function talkOnCard(c, text) {
+    if (!c || !text) return null;
+    if (!approval(c)) return { answer: true, cmd: { cmd: "answer", card: c.id, reply: text } };
+    if (!c.agent || c.agent === "main") return null;
+    return { answer: false, cmd: { cmd: "agent_send", agent: c.agent, text, mode: "now" } };
+  }
+
+  // a batch of drafts on one page (amb-core 34703bf0, card.page.drafts, card.batch {count, title,
+  // what, names}); without batch, read from its text '<n> drafts ready: a · b · c'
+  function batchOf(c) {
+    if (!c || !c.page || !c.page.drafts) return null;
+    const b = c.batch || {};
+    // without batch: amb-core's text, '<n> drafts wait for you · <title>\n<line>\n1. review…' (e2d256e1),
+    // or the first one's '<n> drafts ready: a · b · c'
+    const lines = String(c.text || "").split("\n");
+    const tm = /^(\d+)\s+drafts?[^:]*:\s*(.*)$/.exec(lines[0]);
+    const tw = /^(\d+)\s+drafts? wait for you(?:\s*·\s*(.*))?$/.exec(lines[0]);
+    const opts = root.AmbWords.options(c);
+    const review = opts.find((o) => /review/i.test(o.label)) || { i: 0, n: 1 };
+    const send = opts.find((o) => /send/i.test(o.label)) || { i: 1, n: 2 };
+    const names = Array.isArray(b.names) ? b.names.map(String) : tm ? tm[2].split(/\s*·\s*/).filter(Boolean) : [];
+    const count = +b.count || (tm ? +tm[1] : tw ? +tw[1] : names.length || 2);
+    // the card's own second line, ready to show (amb-core 2e114ebe: '3 replies to Benjamin: proxy · fish ·
+    // French'), else read from its text
+    const line = b.line ? String(b.line) : !c.batch && tw && lines[1] && !/^\d+\./.test(lines[1]) ? lines[1] : null;
+    return { count, title: b.title || (tw && tw[2]) || c.page.title || "", what: b.what || "drafts", names, line, review, send };
+  }
+
+  // a card's choices in the order the glass shows them (a batch: review, then send all)
+  function choices(card) {
+    const b = batchOf(card);
+    return b ? [b.review, b.send] : root.AmbWords.options(card);
+  }
+
+  root.AmbPolicy = { moodOf, hold, reduced, grow, contentOf, GROW, working, approval, approvalKind, talkOnCard, batchOf, choices };
 })(typeof window !== "undefined" ? window : globalThis);

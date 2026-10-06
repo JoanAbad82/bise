@@ -139,33 +139,12 @@
   }
 
   // answer a card with its option `opt` ({n, label}): the reply is the option's digit
-  // a batch of drafts on one page (amb-core 34703bf0, card.page.drafts, card.batch {count, title,
-  // what, names}); without batch, read from its text '<n> drafts ready: a · b · c'
-  function batchOf(c) {
-    if (!c || !c.page || !c.page.drafts) return null;
-    const b = c.batch || {};
-    // without batch: amb-core's text, '<n> drafts wait for you · <title>\n<line>\n1. review…' (e2d256e1),
-    // or the first one's '<n> drafts ready: a · b · c'
-    const lines = String(c.text || "").split("\n");
-    const tm = /^(\d+)\s+drafts?[^:]*:\s*(.*)$/.exec(lines[0]);
-    const tw = /^(\d+)\s+drafts? wait for you(?:\s*·\s*(.*))?$/.exec(lines[0]);
-    const opts = Wd.options(c);
-    const review = opts.find((o) => /review/i.test(o.label)) || { i: 0, n: 1 };
-    const send = opts.find((o) => /send/i.test(o.label)) || { i: 1, n: 2 };
-    const names = Array.isArray(b.names) ? b.names.map(String) : tm ? tm[2].split(/\s*·\s*/).filter(Boolean) : [];
-    const count = +b.count || (tm ? +tm[1] : tw ? +tw[1] : names.length || 2);
-    // the card's own second line, ready to show (amb-core 2e114ebe: '3 replies to Benjamin: proxy · fish ·
-    // French'), else read from its text
-    const line = b.line ? String(b.line) : !c.batch && tw && lines[1] && !/^\d+\./.test(lines[1]) ? lines[1] : null;
-    return { count, title: b.title || (tw && tw[2]) || c.page.title || "", what: b.what || "drafts", names, line, review, send };
-  }
+  // a batch of drafts and a card's choices in the glass's order: policy.js (pure)
+  const { batchOf, choices } = root.AmbPolicy;
 
-  // a card's choices in the order the glass shows them (a batch: review, then send all)
-  function choices(card) {
-    const b = batchOf(card);
-    return b ? [b.review, b.send] : Wd.options(card);
-  }
-
+  // who asks, on ambient surfaces (main is bise), and an approval's 'to checkout · the merge waits for 1 or 2'
+  const who = (c) => (!c.agent || c.agent === "main" ? "bise" : c.agent);
+  const cardTo = (c) => Wd.card.to(who(c), root.AmbPolicy.approvalKind(c), choices(c).map((o) => o.n));
   function answer(m, card, opt, now) {
     const choice = opt ? opt.label : null;
     const reply = String(opt.n);
@@ -343,6 +322,12 @@
         // (the user's dogfood, lead m_7163: no 'got it' / 'on it' line)
         // a voice note on a page (§4.1) goes to the page, never to main: nothing waits for 'sent'
         if (st === "up" && m.notePage) return none({ ...m, fn: false, handsFree: false });
+        // on the card the glass asks: a question takes his words as its answer, an approval's agent
+        // gets them as a message, the card stays (ambient m_8772; policy.js talkOnCard)
+        const said = (m.fn || m.handsFree) && m.heard.text.trim(), onCard = st === "up" && said && !m.pane ? askable(m)[0] : null;
+        const t = onCard && root.AmbPolicy.talkOnCard(onCard, said);
+        if (t) return { m: flashNow({ ...m, fn: false, handsFree: false, heard: { text: "", final: false }, ...(t.answer ? { answered: { ...m.answered, [onCard.id]: true } } : {}) },
+          t.answer ? { kind: "answered", glyph: "✓", text: Wd.card.answered(said), ttl: T.answered, kiss: true } : { kind: "answered", glyph: "→", text: cardTo(onCard), ttl: T.answered }, now), cmds: [t.cmd] };
         if (st === "up") return none({ ...m, fn: false, handsFree: false, lastSent: (m.fn || m.handsFree) && m.heard.text.trim() ? m.heard.text.trim() : m.lastSent, said: m.fn || m.handsFree ? m.heard.text : m.said, pending: m.fn || m.handsFree ? { cmd: { cmd: "send", text: m.heard.text }, text: m.heard.text, at: now, voice: true } : m.pending });
         if (st === "cancel") {
           return { m: flashNow({ ...m, fn: false, handsFree: false, mine: false, heard: { text: "", final: false }, phase: m.phase === "listening" ? "idle" : m.phase }, { kind: "cancel", text: W.cancelled }, now), cmds: [{ cmd: "talk_cancel" }] };
@@ -789,10 +774,10 @@
       // question is the body, 4 lines at most unless he asks for the rest (askFull)
       const at = m.optFor === c.id ? m.optSel || 0 : 0;
       const rows = (os) => os.map((o, k) => ({ i: o.i, n: o.n, label: o.label, sel: k === Math.min(at, os.length - 1) }));
-      if (b) return { id: c.id, agent: c.agent, title: Wd.drafts.label(b.count, b.title), text: b.line || Wd.drafts.line(b.what, b.names), hint: W.needsKeys, more: asking.length - 1, open: null, batch: true, full: m.askFull === c.id,
+      if (b) return { id: c.id, agent: c.agent, title: Wd.drafts.label(b.count, b.title), text: b.line || Wd.drafts.line(b.what, b.names), hint: W.needsKeys, more: asking.length - 1, open: null, batch: true, approval: true, full: m.askFull === c.id,
         options: rows([{ i: b.review.i, n: b.review.n, label: Wd.drafts.review }, { i: b.send.i, n: b.send.n, label: Wd.drafts.sendAll(b.count) }]) };
       // card.label: main's own questions say '? main needs you' (amb-core e00ad291)
-      return { id: c.id, agent: c.agent, label: c.label || null, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsKeys, more: asking.length - 1, full: m.askFull === c.id,
+      return { id: c.id, agent: c.agent, label: c.label || null, title: Wd.needsLine(c.agent), text: c.text || "", hint: W.needsKeys, more: asking.length - 1, full: m.askFull === c.id, approval: root.AmbPolicy.approval(c),
         open: c.page && c.page.url ? W.openIt : null,
         options: rows(Wd.options(c).map((o) => ({ i: o.i, n: o.n, label: o.label }))) };
     };
@@ -819,7 +804,9 @@
       // `listening · let go of fn to send` on the label's line, the words under it; on a page,
       // `voice note on weekly update` (the words pin on the page, main sees nothing)
       const np = m.notePage;
-      v.label = { text: np ? Wd.voiceNoteOn(np.title || pageName(np)) : now - m.cutAt < T.cutIn ? W.cutIn : W.listening, acc: true, rest: m.handsFree ? W.handsFree : W.letGo };
+      // on a card: 'answering checkout · which date works?' / 'to checkout · the merge waits for 1 or 2'
+      const oc = !np && !m.pane && asking[0], ocText = oc && (root.AmbPolicy.approval(oc) ? cardTo(oc) : Wd.card.answering(who(oc), Wd.oneLine(oc.text || "")));
+      v.label = { text: np ? Wd.voiceNoteOn(np.title || pageName(np)) : ocText || (now - m.cutAt < T.cutIn ? W.cutIn : W.listening), acc: true, rest: m.handsFree ? W.handsFree : W.letGo };
       if (np) v.state = "voice_note";
       v.words = { list: m.heard.text.split(/\s+/).filter(Boolean), per: 0.24 };
       v.words.lit = v.words.list.length;
