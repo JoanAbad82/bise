@@ -38,7 +38,12 @@ test('inbox/cmd-i: ⌘I opens the inbox with every hub card, in the TUI order, e
     try {
       await tuiReady(t);
       // its panel lists the inbox a moment after the agents: wait for the hub's cards to be drawn
-      await expect.poll(() => tuiInbox(t.screen()).length, { timeout: 10_000, message: `the TUI's inbox on ${p}` }).toBeGreaterThanOrEqual(cards.length);
+      try {
+        await expect.poll(() => tuiInbox(t.screen()).length, { timeout: 10_000, message: `the TUI's inbox on ${p}` }).toBeGreaterThanOrEqual(cards.length);
+      } finally {
+        // the TUI's screen as the check read it: what it drew, for whoever reads the failure
+        await test.info().attach(`tui-${p}.txt`, { body: t.screen(), contentType: 'text/plain' });
+      }
       const listed = tuiInbox(t.screen());
       const order = (c: string): number => listed.findIndex((r) => c.startsWith(r.text) || r.text.startsWith(c));
       for (const c of cards) expect(order(c), `the TUI lists ${p}'s card "${c}"`).toBeGreaterThanOrEqual(0);
