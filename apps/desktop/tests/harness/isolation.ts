@@ -6,12 +6,14 @@
 //     allowlist plus that home: the caller's HOME, BISE_HOME, TMPDIR, SB_*, XDG_* never pass,
 //     and a caller env that tries to set them (or a workspace outside the home) is refused;
 //   - Sentinel: from launch to close it reads the process table (ps, with each process's own
-//     environment, of which it keeps only HOME and BISE_HOME and never prints anything else):
-//       a process of the app's tree that runs sbd or launchctl without pointing into the test
-//       home, or ANY new hub (sbd) whose bise home is his real ~/.bise, is a breach: the app is
-//       killed at once and the run fails;
-//     at close it kills what the run left whose HOME or BISE_HOME is the test home (a hub started
-//     through launchd) and removes the launchd jobs that ran them, then deletes the home.
+//     environment, of which it keeps only HOME, BISE_HOME, BISE_TEST_HOME and SB_STATE_DIR and
+//     never prints anything else). It judges only the run's own processes (main m_10044): under
+//     the app's pid, or carrying the run's home in their env. One of them on his real ~/.bise
+//     (outside the run's home and the test worlds ~/.bise/gate/w-*), or running sbd or launchctl
+//     that doesn't point into the run's home, is a breach: the app is killed at once and the run
+//     fails. His processes and other agents' are never judged, signalled or killed;
+//     at close it kills what the run left (its tree, and what it started that carries its home: a
+//     hub started through launchd) and removes the launchd jobs that ran them, then deletes the home.
 import { execFile, execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import os from 'node:os';
@@ -39,10 +41,10 @@ export const realHome = (): string => os.userInfo().homedir;
  */
 export function homeProblem(dir: string, real: string): string | null {
   const gate = path.join(real, '.bise', 'gate');
-  if (path.relative(gate, dir) !== '' && inside(dir, gate)) return null;
+  if (inTestWorld(dir, real)) return null;
   const tmp = path.relative('/private/tmp', dir).split(path.sep)[0] ?? '';
   if (inside(dir, '/private/tmp') && tmp.startsWith('bh-')) return null;
-  return `${dir} is neither an ambient-qa world's home (under ${gate}/) nor a /tmp/bh-* home`;
+  return `${dir} is neither an ambient-qa world's home (under ${gate}/w-*) nor a /tmp/bh-* home`;
 }
 
 /**
@@ -84,8 +86,9 @@ export function harnessEnv(h: TestHome, harness: Record<string, string>, caller:
   return { ...env, HOME: h.home, BISE_HOME: h.biseHome, TMPDIR: h.tmp, ...harness, ...caller };
 }
 
-/** stateDir: SB_STATE_DIR, the hub state folder a test hub (a gate's e2e) points elsewhere than ~/.bise */
-type Proc = { pid: number; ppid: number; command: string; home?: string; biseHome?: string; stateDir?: string };
+/** stateDir: SB_STATE_DIR, the hub state folder a test hub (a gate's e2e) points elsewhere than ~/.bise;
+ * testHome: BISE_TEST_HOME, the jail the app sets for every bise it starts */
+type Proc = { pid: number; ppid: number; command: string; home?: string; biseHome?: string; testHome?: string; stateDir?: string };
 
 /** The process table with each process's HOME and BISE_HOME (ps -E); nothing else of the env is kept. */
 function processes(): Promise<Proc[]> {
@@ -102,7 +105,9 @@ function processes(): Promise<Proc[]> {
         const home = / HOME=(\S+)/.exec(rest)?.[1];
         const biseHome = / BISE_HOME=(\S+)/.exec(rest)?.[1];
         const stateDir = / SB_STATE_DIR=(\S+)/.exec(rest)?.[1];
-        procs.push({ pid: Number(m[1]), ppid: Number(m[2]), command, ...(home ? { home } : {}), ...(biseHome ? { biseHome } : {}), ...(stateDir ? { stateDir } : {}) });
+        const testHome = / BISE_TEST_HOME=(\S+)/.exec(rest)?.[1];
+        procs.push({ pid: Number(m[1]), ppid: Number(m[2]), command, ...(home ? { home } : {}), ...(biseHome ? { biseHome } : {}),
+          ...(testHome ? { testHome } : {}), ...(stateDir ? { stateDir } : {}) });
       }
       resolve(procs);
     });
@@ -112,32 +117,46 @@ function processes(): Promise<Proc[]> {
 const isHub = (c: string): boolean => /(^|\/)(bise|sb)\s+sbd\b/.test(c) || /(^|\/)sbd(\s|$)/.test(c);
 const isLaunchctl = (c: string): boolean => /(^|\/)launchctl(\s|$)/.test(c);
 
-/** What breaks the isolation in one table (pure: self/isolation.spec.ts). */
-export function breaches(procs: Proc[], baseline: Set<number>, appPid: number, h: TestHome, real: string): string[] {
+/** An ambient-qa test world (~/.bise/gate/w-*, world.py): not his, whoever runs in it. Pure. */
+export function inTestWorld(p: string, real: string): boolean {
+  const gate = path.join(real, '.bise', 'gate');
+  const first = path.relative(gate, path.resolve(p)).split(path.sep)[0] ?? '';
+  return inside(p, gate) && first.startsWith('w-');
+}
+
+/** The process carries the run's own home in its env (HOME, BISE_HOME or BISE_TEST_HOME). Pure. */
+export const carriesRun = (p: Proc, h: TestHome): boolean =>
+  [p.home, p.biseHome, p.testHome].some((v) => v !== undefined && inside(v, h.home));
+
+/**
+ * What breaks the isolation in one table (pure: self/isolation.spec.ts). Only the run's own processes
+ * are judged (main m_10044, lead m_10046): those under the app's pid (now, or `seen` there earlier)
+ * and those carrying the run's home in their env. His processes (his TUI starting a hub, his app)
+ * and other agents' (their worlds, gates) are never the run's, whatever they do. A run's process
+ * breaks it when it names his real ~/.bise in its env (outside the run's home and the test worlds),
+ * or runs sbd or launchctl that doesn't point into the run's home.
+ */
+export function breaches(procs: Proc[], baseline: Set<number>, appPid: number, h: TestHome, real: string, seen: Set<number> = new Set()): string[] {
   const parent = new Map(procs.map((p) => [p.pid, p.ppid]));
-  const ours = (pid: number): boolean => {
+  const underApp = (pid: number): boolean => {
+    if (seen.has(pid)) return true;
     for (let p = pid, i = 0; p > 1 && i < 64; i++) { if (p === appPid) return true; p = parent.get(p) ?? 0; }
     return false;
   };
   const out: string[] = [];
   const realBise = path.join(real, '.bise');
+  const his = (v: string | undefined): boolean => v !== undefined && inside(v, realBise) && !inside(v, h.home) && !inTestWorld(v, real);
   for (const p of procs) {
-    if (baseline.has(p.pid)) continue;
-    const hub = isHub(p.command), lctl = isLaunchctl(p.command);
-    if (!hub && !lctl) continue;
-    const biseHome = p.biseHome ?? (p.home ? path.join(p.home, '.bise') : undefined);
-    // a gate's test hub keeps its state in SB_STATE_DIR (not his hubs) even with his HOME: not his hub
-    const testState = p.stateDir !== undefined && !inside(p.stateDir, path.join(realBise, 'hubs'));
-    // the test home itself may sit under ~/.bise (an ambient-qa world's, ~/.bise/gate/<w>/h)
-    const inTest = biseHome !== undefined && inside(biseHome, h.home);
-    if (hub && biseHome !== undefined && inside(biseHome, realBise) && !testState && !inTest) {
-      out.push(`a hub on his real bise home started during the run (pid ${p.pid}: ${p.command.slice(0, 120)})`);
+    if (baseline.has(p.pid) || !(underApp(p.pid) || carriesRun(p, h))) continue;
+    const line = `pid ${p.pid}: ${p.command.slice(0, 120)}`;
+    if (his(p.biseHome) || (p.biseHome === undefined && p.home !== undefined && his(path.join(p.home, '.bise')))) {
+      out.push(`a process of the run on his real bise home (${line})`);
       continue;
     }
-    if (ours(p.pid)) {
-      const pointsHome = p.command.includes(h.root) || p.command.includes(h.home) || (p.home !== undefined && inside(p.home, h.home)) || (p.biseHome !== undefined && inside(p.biseHome, h.home));
-      if (!pointsHome) out.push(`the app ran ${hub ? 'sbd' : 'launchctl'} outside the test home (pid ${p.pid}: ${p.command.slice(0, 120)})`);
-    }
+    const hub = isHub(p.command), lctl = isLaunchctl(p.command);
+    if (!hub && !lctl) continue;
+    const pointsHome = p.command.includes(h.root) || p.command.includes(h.home) || carriesRun(p, h);
+    if (!pointsHome) out.push(`the run ran ${hub ? 'sbd' : 'launchctl'} outside the test home (${line})`);
   }
   return out;
 }
@@ -162,8 +181,9 @@ export class Sentinel {
   private baseline = new Set<number>();
   private appPid = -1;
   private busy = false;
-  /** every pid ever seen under the app's pid: an orphan (ppid 1 once the app is gone) is still the run's */
-  private readonly seen = new Set<number>();
+  /** every pid ever seen under the app's pid, with its command then: an orphan (ppid 1 once the
+   * app is gone) is still the run's, a pid reused since by another command is not */
+  private readonly seen = new Map<number, string>();
 
   constructor(private readonly h: TestHome, private readonly onBreach: (why: string) => void) {}
 
@@ -177,13 +197,18 @@ export class Sentinel {
     this.appPid = pid;
   }
 
+  private note(procs: Proc[]): void {
+    const cmd = new Map(procs.map((p) => [p.pid, p.command]));
+    for (const pid of descendants(procs, this.appPid)) if (!this.seen.has(pid)) this.seen.set(pid, cmd.get(pid) ?? '');
+  }
+
   async scan(): Promise<void> {
     if (this.busy) return;
     this.busy = true;
     try {
       const procs = await processes();
-      for (const pid of descendants(procs, this.appPid)) this.seen.add(pid);
-      const found = breaches(procs, this.baseline, this.appPid, this.h, realHome());
+      this.note(procs);
+      const found = breaches(procs, this.baseline, this.appPid, this.h, realHome(), new Set(this.ours(procs)));
       const fresh = found.filter((b) => !this.breaches.includes(b));
       if (fresh.length && !this.breaches.length) this.onBreach(fresh.join('; '));
       this.breaches.push(...fresh);
@@ -192,28 +217,48 @@ export class Sentinel {
     }
   }
 
-  /**
-   * Every process ever seen under the app's pid (its core, helper, their children), scans and a fresh
-   * table: still right after the app is gone (its orphans have ppid 1 by then).
-   */
-  async tree(): Promise<number[]> {
-    for (const pid of descendants(await processes(), this.appPid)) this.seen.add(pid);
-    return [...this.seen];
+  /** The seen pids still running the command they ran under the app (never a reused pid). */
+  private ours(procs: Proc[]): number[] {
+    return procs.filter((p) => this.seen.get(p.pid) === p.command).map((p) => p.pid);
   }
 
   /**
-   * Last scan, then kills what the run left: the app's tree as read before it was killed (`tree`),
-   * and anything whose HOME or BISE_HOME is the test home (a hub started through launchd), removing
-   * the launchd jobs that ran them. Returns what was left in the test home.
+   * The run's processes now: under the app's pid, or seen there and still running the same command
+   * (its core, helper, their children; orphans have ppid 1 once the app is gone).
+   */
+  async tree(): Promise<number[]> {
+    const procs = await processes();
+    this.note(procs);
+    return this.ours(procs);
+  }
+
+  /**
+   * Last scan, then kills what the run left, and only that (main m_10044: never a process outside
+   * the run, whatever it is): the run's tree (`tree`, read before the app was closed, checked again
+   * against the table now) and the processes the run started that carry its home in their env (a
+   * hub started through launchd), not those of an adopted world (up before the run, or under a
+   * process that was), removing the launchd jobs that ran them. Returns what was left.
    */
   async stop(tree: number[] = []): Promise<string[]> {
     if (this.timer) clearInterval(this.timer);
     await this.scan();
-    // the final scan's table too: a child the periodic scans never saw (a launch under 1 s)
-    for (const pid of new Set([...tree, ...(await this.tree())])) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
-    // only what the run started: an adopted world's hubs were up before it (baseline) and stay
-    const left = (await processes()).filter((p) =>
-      p.pid !== process.pid && !this.baseline.has(p.pid) && ((p.home !== undefined && inside(p.home, this.h.home)) || (p.biseHome !== undefined && inside(p.biseHome, this.h.home))));
+    const now = await processes();
+    this.note(now);
+    const mine = new Set(this.ours(now));
+    for (const pid of tree) if (mine.has(pid) || !now.some((p) => p.pid === pid)) mine.add(pid);
+    for (const pid of mine) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
+    const after = await processes();
+    const parent = new Map(after.map((p) => [p.pid, p.ppid]));
+    const byPid = new Map(after.map((p) => [p.pid, p]));
+    const worlds = (pid: number): boolean => {
+      for (let q = parent.get(pid) ?? 0, i = 0; q > 1 && i < 64; i++) {
+        const a = byPid.get(q);
+        if (this.baseline.has(q) && a && carriesRun(a, this.h)) return true;
+        q = parent.get(q) ?? 0;
+      }
+      return false;
+    };
+    const left = after.filter((p) => p.pid !== process.pid && !this.baseline.has(p.pid) && carriesRun(p, this.h) && !worlds(p.pid));
     const cleaned: string[] = [];
     if (left.length) {
       const pids = new Set(left.map((p) => p.pid));

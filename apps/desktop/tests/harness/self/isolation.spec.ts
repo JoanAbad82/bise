@@ -26,26 +26,36 @@ test('harnessEnv: the test home always wins, a caller can\'t pick a home or a wo
   rmSync(h.root, { recursive: true, force: true });
 });
 
-test('breaches: his real hub from anywhere, sbd/launchctl of the app outside the test home', () => {
+test('breaches: only the run is judged; his processes and other agents\' never are (main m_10044, lead m_10046)', () => {
   const h = testHome();
   const app = 100;
   const table = [
     { pid: 100, ppid: 50, command: 'Electron .' },
     { pid: 101, ppid: 100, command: '/x/bise ambient-core --home', home: h.home, biseHome: h.biseHome },
-    { pid: 102, ppid: 1, command: '/x/bise sbd --workspace /Users/u/bise', biseHome: `${REAL}/.bise` },
-    { pid: 103, ppid: 101, command: 'launchctl bootstrap gui/501 /x/dev.bise.hub.plist', home: REAL },
+    // his own TUI (from his zsh) starting a hub in ~/Documents/ai-docs during the run: not the run's
+    { pid: 102, ppid: 7, command: `/x/bise sbd --workspace ${REAL}/Documents/ai-docs`, home: REAL },
+    { pid: 103, ppid: 101, command: 'launchctl bootstrap gui/501 /x/dev.bise.hub.plist', home: h.home },
     { pid: 104, ppid: 101, command: `/x/bise sbd --workspace ${h.home}/bise`, home: h.home, biseHome: h.biseHome },
     { pid: 105, ppid: 1, command: '/y/bise sbd --workspace /tmp/gate', home: REAL, biseHome: '/tmp/gate/.bise' },
     // another agent's gate e2e (seen live: interrupt's): his HOME, no BISE_HOME, its own SB_STATE_DIR
     { pid: 106, ppid: 1, command: `/z/bise sbd --workspace ${REAL}/.bise/gate/1/ws`, home: REAL, stateDir: `${REAL}/.bise/gate/1/state` },
+    // another agent's leftover world (amb-win's): not the run's
+    { pid: 107, ppid: 1, command: `/w/bise sbd --workspace ${REAL}/.bise/gate/w-ambwin/h/bise`, home: `${REAL}/.bise/gate/w-ambwin/h` },
+    // the run's core starting sbd on his real ~/.bise (the 22:33 case): a breach
+    { pid: 108, ppid: 101, command: `/x/bise sbd --workspace ${REAL}/bise`, home: h.home, biseHome: `${REAL}/.bise` },
+    // a hub the run started through launchd (ppid 1) that carries the run's home: judged, fine
+    { pid: 109, ppid: 1, command: `/x/bise sbd --workspace ${h.home}/bise`, testHome: h.home, home: h.home },
+    // an orphan of the run (seen under the app earlier) on his real home: a breach
+    { pid: 110, ppid: 1, command: '/x/bise sbd --workspace /Users/u/bise', home: REAL },
   ];
-  const found = breaches(table, new Set([50]), app, h, REAL);
-  expect(found.some((b) => b.includes('pid 102') && b.includes('real bise home'))).toBe(true);
-  expect(found.some((b) => b.includes('pid 103') && b.includes('launchctl outside'))).toBe(true);
-  expect(found.some((b) => b.includes('pid 104'))).toBe(false);
-  expect(found.some((b) => b.includes('pid 105'))).toBe(false); // another agent's throwaway hub
-  expect(found.some((b) => b.includes('pid 106'))).toBe(false); // a gate's test hub
-  expect(breaches(table, new Set([50, 102, 103]), app, h, REAL)).toEqual([]); // there before the run
+  const found = breaches(table, new Set([50]), app, h, REAL, new Set([110]));
+  for (const pid of [102, 104, 105, 106, 107, 109]) expect(found.some((b) => b.includes(`pid ${pid}:`)), `pid ${pid}`).toBe(false);
+  expect(found.some((b) => b.includes('pid 103:') && b.includes('launchctl outside'))).toBe(false); // carries the run's home
+  expect(found.some((b) => b.includes('pid 108:') && b.includes('real bise home'))).toBe(true);
+  expect(found.some((b) => b.includes('pid 110:') && b.includes('real bise home'))).toBe(true);
+  const lctl = breaches([...table.slice(0, 2), { pid: 111, ppid: 101, command: 'launchctl bootstrap gui/501 /x/dev.bise.hub.plist' }], new Set([50]), app, h, REAL);
+  expect(lctl.some((b) => b.includes('pid 111:') && b.includes('launchctl outside'))).toBe(true);
+  expect(breaches(table, new Set([50, 108, 110]), app, h, REAL)).toEqual([]); // there before the run
   rmSync(h.root, { recursive: true, force: true });
 });
 
@@ -53,12 +63,13 @@ test('an adopted home (qa-flows m_9931): only a world\'s under ~/.bise/gate/ or 
   const real = '/Users/u';
   expect(homeProblem('/Users/u/.bise/gate/w-qaflows/h', real)).toBeNull();
   expect(homeProblem('/private/tmp/bh-abc/home', real)).toBeNull();
+  expect(homeProblem('/Users/u/.bise/gate/1/ws', real)).not.toBeNull(); // a gate's, not a test world
   for (const bad of ['/Users/u', '/Users/u/.bise', '/Users/u/.bise/gate', '/Users/u/bise', '/Users/u/.bise/hubs/x', '/private/tmp/other', '/Users/u/.bise/gate/../hubs'])
     expect(homeProblem(path.resolve(bad), real)).not.toBeNull();
   expect(() => adoptHome(REAL)).toThrow(/refused home/);
   expect(() => adoptHome(path.join(REAL, 'bise'))).toThrow(/refused home|doesn't exist/);
   // a world's home under his ~/.bise: its hub is the test home's, not his
-  const h = { root: '/tmp/bh-r', home: `${REAL}/.bise/gate/w/h`, biseHome: `${REAL}/.bise/gate/w/h/.bise`, tmp: '/tmp/bh-r/tmp' };
+  const h = { root: '/tmp/bh-r', home: `${REAL}/.bise/gate/w-x/h`, biseHome: `${REAL}/.bise/gate/w-x/h/.bise`, tmp: '/tmp/bh-r/tmp' };
   const table = [
     { pid: 100, ppid: 50, command: 'Electron .' },
     { pid: 101, ppid: 100, command: `/x/bise sbd --workspace ${h.home}/bise`, home: h.home, biseHome: h.biseHome },
