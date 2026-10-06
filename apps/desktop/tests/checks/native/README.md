@@ -26,7 +26,22 @@ config. They run offscreen through `tests/harness` like every check: `pnpm test:
   proven where a real window is shown.
 - **The tray.** A test run has no tray (it would sit in his menu bar).
 
-## The macOS VM pass (planned with amb-tools; nothing downloaded yet)
+## The macOS VM pass (vm/vm-pass.spec.ts, on amb-tools' tests/harness/vm)
+
+Run (opt-in, ~5 min, the VM up only during the run, 4 GB, 2 cores, headless, refused under 8 GB free):
+
+    # the guest kit: biseqa (vm/biseqa.swift, swiftc -O), node (cp -c of yours), stub/{core-stub,stub-lib}.mjs,
+    # world.jsonl (rust/proto/fixtures core_ev + hub_ev), black.png and white.png
+    # the app: pnpm dist with BISE_PACK_BISE=<a wrapper running the core stub on the kit's node>,
+    # BISE_PACK_HELPER, BISE_PACK_SIGN_DIR, then ditto -c -k --keepParent bise.app <zipdir>/bise.zip
+    # (a shared folder loses the app's framework symlinks: the zip keeps them), from a launchd job
+    BISE_HARNESS_VM=1 QA_KIT=<kit> QA_APP_ZIP_DIR=<zipdir> QA_FRAMES_DIR=<frames> \
+      pnpm exec playwright test -c tests/harness/playwright.config.ts checks/native/vm/vm-pass
+
+Inside the guest: the app in /Applications, the kit in /Users/admin/bise-qa, the grants written to
+TCC.db (SIP is off in the image), bise opened by LaunchServices. Input: VNC keys and clicks, fn from
+biseqa. Read: VNC frames + Vision's text in them, biseqa windows/front, launchctl procinfo, the
+scripted core's log. One row per item below, soft, in tally.json beside the frames.
 
 What only a real, shown app with real keys can prove, run in a macOS VM (Apple's
 Virtualization.framework, through `tart`), never on his screen:
