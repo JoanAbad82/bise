@@ -9,6 +9,8 @@ description = "Switchboard: one main agent that routes to task sub-agents (hub, 
 bend-plugins = { path = "../plugins" }
 bise-catalog = { path = "../catalog" }
 bise-home = { path = "../home" }
+# the typed client protocol (bise desktop S3a, daemon/proto.rs)
+bise-proto = { path = "../proto" }
 bise-session = { path = "../session" }
 # `sb every day 07:30`: local time (localtime_r/mktime)
 libc = "0.2"

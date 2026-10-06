@@ -47,6 +47,7 @@ pub mod pages;
 pub mod paths;
 pub mod place;
 pub mod procs;
+pub mod proto_view;
 pub mod prompts;
 pub mod role;
 pub mod router;

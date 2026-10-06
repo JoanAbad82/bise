@@ -49,6 +49,29 @@ pub struct DiffFile {
     pub add: u32,
     pub del: u32,
     pub hunks: Vec<Hunk>,
+    /// the agent's word on this file ("new: 4 workers"), from its summary
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+/// What a change measured, before and after (the review's result line,
+/// amb-web m_8304): "worst frame, PS5 replay · forest level 40 → 15 ms".
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DiffResult {
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub: Option<String>,
+    pub before: f64,
+    pub after: f64,
+    pub unit: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub series: Option<Series>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Series {
+    pub before: Vec<f64>,
+    pub after: Vec<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -78,6 +101,9 @@ pub struct Worktree {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DevServer {
     pub agent: String,
+    /// what it is ("dev server", "grafana (local)")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     pub url: String,
     pub port: u16,
     pub cmd: String,
@@ -105,7 +131,16 @@ pub struct Job {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "ev", rename_all = "snake_case")]
 pub enum DraftHubEv {
-    Diff { project: Project, agent: String, base: String, head: String, files: Vec<DiffFile> },
+    Diff {
+        project: Project,
+        agent: String,
+        base: String,
+        head: String,
+        files: Vec<DiffFile>,
+        /// what the change measured (none: nothing measured)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        result: Option<DiffResult>,
+    },
     Artifacts { project: Project, items: Vec<Artifact> },
     Worktrees { project: Project, items: Vec<Worktree> },
     DevServers { project: Project, items: Vec<DevServer> },
@@ -140,6 +175,16 @@ pub struct Quote {
     pub text: String,
 }
 
+/// One of his messages queued for an agent until its turn ends (sb-core
+/// holds it, amb-hub m_8281): an [`Agent`] row's `queued`, draft until the
+/// hub's mirror sends them.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Queued {
+    pub id: u64,
+    pub text: String,
+    pub created_ms: u64,
+}
+
 /// Hub commands whose stream hasn't shipped.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "cmd", rename_all = "snake_case")]
@@ -148,12 +193,15 @@ pub enum DraftHubCmd {
     Follow { project: Project, agent: String, on: bool },
     /// a send with quoted lines (the window's ❝)
     SendQuote { project: Project, agent: String, text: String, quote: Quote },
+    /// he opened the artifacts screen: their `new` clears, `artifacts`
+    /// comes again (amb-web m_8346)
+    ArtifactsSeen { project: Project },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl DraftHubCmd {
-    pub const TAGS: &'static [&'static str] = &["follow", "send_quote"];
+    pub const TAGS: &'static [&'static str] = &["follow", "send_quote", "artifacts_seen"];
 
     pub fn decode(line: &str) -> Result<DraftHubCmd, String> {
         decode(parse(line)?, "cmd", Self::TAGS, |tag, raw| DraftHubCmd::Unknown { tag, raw })
@@ -166,6 +214,11 @@ pub struct ProjectRow {
     pub project: Project,
     pub name: String,
     pub path: String,
+    /// its checkout's current branch (none: not a git repo, or detached)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    /// a git repo (bise's home is not)
+    pub git: bool,
     /// bise's own (the home workspace)
     pub home: bool,
     pub order: u32,

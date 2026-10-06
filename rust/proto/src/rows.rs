@@ -78,6 +78,10 @@ pub struct Agent {
     pub turn_ms: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub report: Option<Report>,
+    /// draft (not frozen until the hub sends it, amb-hub's queued inputs):
+    /// his messages waiting for its turn to end, oldest first
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub queued: Vec<crate::draft::Queued>,
 }
 
 /// A numbered option of a card.

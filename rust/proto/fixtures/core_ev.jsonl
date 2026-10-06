@@ -1,3 +1,3 @@
-{"ev":"projects","projects":[{"project":"bise-home-00000000","name":"bise","path":"/Users/camille/bise","home":true,"order":0,"agents":1,"working":0,"waits":0},{"project":"acme-1a2b3c4d","name":"acme","path":"/Users/camille/acme","home":false,"order":1,"agents":3,"working":1,"waits":2}]}
+{"ev":"projects","projects":[{"project":"bise-home-00000000","name":"bise","path":"/Users/camille/bise","home":true,"order":0,"agents":1,"working":0,"waits":0,"git":false},{"project":"acme-1a2b3c4d","name":"acme","path":"/Users/camille/acme","home":false,"order":1,"agents":3,"working":1,"waits":2,"git":true,"branch":"main"}]}
 {"ev":"open","project":"acme-1a2b3c4d","what":"thread","agent":"perf"}
 {"ev":"open","project":"acme-1a2b3c4d","what":"artifact","id":"perf-notes"}

@@ -13,6 +13,7 @@
 mod art;
 mod features;
 mod gate;
+mod proto;
 mod repl;
 mod release;
 mod session_log;
@@ -304,6 +305,8 @@ struct Shell {
     /// The pages and their server (docs/ambient-pages.md); None: the
     /// server could not start (said in the hub log).
     pages: Option<std::sync::Arc<crate::pages::Pages>>,
+    /// the typed protocol's connections (bise desktop S3a, daemon/proto.rs)
+    proto: proto::Proto,
     /// Agents a page's notes were sent to: the pages they update, and
     /// whether a turn of theirs has the notes yet (started or steered
     /// since). Its end without a publish puts the pages back to ready.
@@ -933,6 +936,7 @@ impl Shell {
 
     /// One event to every client (serialized once).
     fn broadcast(&mut self, v: &Value) {
+        self.proto_on(v);
         let line = v.to_string();
         let mut dead: Vec<ClientId> = Vec::new();
         for (id, s) in self.clients.iter_mut() {
@@ -3191,6 +3195,9 @@ impl Shell {
     }
 
     fn client_line(&mut self, id: ClientId, v: Value) {
+        if v.get("cmd").is_some() {
+            return self.proto_cmd(id, v);
+        }
         let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
         match s("op").as_str() {
             "version" if s("do") == "items" => {
@@ -3813,6 +3820,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         replies: BTreeMap::new(),
         buffers: BTreeMap::new(),
         positions: BTreeMap::new(),
+        proto: proto::Proto::default(),
         search: search::Index::default(),
         offsets: BTreeMap::new(),
         booting: false,
