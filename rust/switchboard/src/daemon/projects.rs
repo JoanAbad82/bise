@@ -72,7 +72,10 @@ impl Shell {
     fn view_write(&mut self, snap: &Value, stopped_ms: Option<u64>) {
         let now = now_ms();
         let project = crate::paths::workspace_id(&self.opts.paths.workspace);
-        let v = view::of(snap, &project, now, self.projects.writer.last_activity_ms, stopped_ms, &mut self.projects.since);
+        self.setup();
+        let cat = self.setup.as_ref().map(|(_, s)| &s.catalog);
+        let vision = |m: &str| cat.and_then(|c| c.vision(m));
+        let v = view::of(snap, &project, now, self.projects.writer.last_activity_ms, stopped_ms, &mut self.projects.since, &vision);
         let paths = self.opts.paths.clone();
         let (tmp, file) = (paths.state.join("view.json.tmp"), paths.state.join(view::FILE));
         if write_logged(&paths, &tmp, &view::render(&v)) {

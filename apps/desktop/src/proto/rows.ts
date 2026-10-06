@@ -57,7 +57,19 @@ dir?: string | null,
 /**
  * its former names (a rename), which `sb history --agent` takes too
  */
-aliases?: Array<string>, };
+aliases?: Array<string>, 
+/**
+ * draft (bise desktop K4): the model it runs with, the full id as
+ * `sb list` shows it
+ */
+model?: string | null, 
+/**
+ * draft (K4): whether that model reads images, from bise's model
+ * catalog (`bise_catalog::Catalog::vision`): false only for a listed
+ * model without vision, none when the catalog doesn't know it (the
+ * window never refuses on a guess)
+ */
+vision?: boolean | null, };
 
 /**
  * A numbered option of a card.

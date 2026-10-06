@@ -94,6 +94,16 @@ pub struct Agent {
     /// its former names (a rename), which `sb history --agent` takes too
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
+    /// draft (bise desktop K4): the model it runs with, the full id as
+    /// `sb list` shows it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// draft (K4): whether that model reads images, from bise's model
+    /// catalog (`bise_catalog::Catalog::vision`): false only for a listed
+    /// model without vision, none when the catalog doesn't know it (the
+    /// window never refuses on a guess)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vision: Option<bool>,
 }
 
 /// A numbered option of a card.

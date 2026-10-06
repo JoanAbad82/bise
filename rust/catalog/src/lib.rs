@@ -586,6 +586,20 @@ impl Catalog {
         p.caps.over(&DEFAULT_CAPS)
     }
 
+    /// Whether a model reads images, as far as the catalog knows: Some
+    /// only for a listed model (its `vision` cap); None for an empty name,
+    /// an unlisted model or an unknown provider (the provider decides, so
+    /// nothing is refused on a guess). The one rule for the TUI's
+    /// refusal and the hub's agent rows (bise desktop K4).
+    pub fn vision(&self, model: &str) -> Option<bool> {
+        let m = model.trim();
+        if m.is_empty() {
+            return None;
+        }
+        let r = self.resolve(m);
+        (r.known == Known::Listed).then_some(r.caps.vision)
+    }
+
     /// Resolve any name. Never fails: see [`Known`].
     pub fn resolve(&self, name: &str) -> Resolved {
         let full = self.canonical(name);

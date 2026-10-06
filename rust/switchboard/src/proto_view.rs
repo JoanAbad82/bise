@@ -36,8 +36,10 @@ fn ms(v: &Value, k: &str) -> Option<u64> {
 pub type Since = BTreeMap<String, (Status, u64)>;
 
 /// The snapshot's agents as rows. `cards`: the snapshot's open cards (an
-/// agent's `waits`); `user_kind`: the hub's (his cards).
-pub fn agents(snap: &Value, since: &mut Since, now: u64, user_kind: fn(&str) -> bool) -> Vec<Agent> {
+/// agent's `waits`); `user_kind`: the hub's (his cards); `vision`: the
+/// hub's model catalog's rule (`bise_catalog::Catalog::vision`, K4), read
+/// at each call so a /model change shows on the next agents event.
+pub fn agents(snap: &Value, since: &mut Since, now: u64, user_kind: fn(&str) -> bool, vision: &dyn Fn(&str) -> Option<bool>) -> Vec<Agent> {
     let list = |k: &str| snap.get(k).and_then(Value::as_array).cloned().unwrap_or_default();
     let cards = list("cards");
     let mut out = Vec::new();
@@ -82,6 +84,10 @@ pub fn agents(snap: &Value, since: &mut Since, now: u64, user_kind: fn(&str) -> 
             // where its thread is on disk, for stream C's readers (S2 step 3)
             dir: Some(s(&a, "dir")).filter(|d| !d.is_empty()),
             aliases: a.get("aliases").cloned().and_then(|x| serde_json::from_value(x).ok()).unwrap_or_default(),
+            // K4: its model and whether it reads images (the composer
+            // refuses an image when false)
+            vision: Some(s(&a, "model")).filter(|m| !m.is_empty()).and_then(|m| vision(&m)),
+            model: Some(s(&a, "model")).filter(|m| !m.is_empty()),
             name,
         });
     }
@@ -361,10 +367,30 @@ mod tests {
             ]})
     }
 
+    /// K4 (architect m_10064): an agent's row carries its model and
+    /// whether it reads images from the hub's catalog, read fresh, so a
+    /// /model change shows on the next agents event.
+    #[test]
+    fn an_agent_row_says_its_model_and_whether_it_reads_images() {
+        let cat = bise_catalog::Catalog::builtin();
+        let vision = |m: &str| cat.vision(m);
+        let mut since = Since::new();
+        let mut s = snap();
+        s["agents"][1]["model"] = json!("mistral/codestral-latest");
+        s["agents"][2]["model"] = json!("ollama/llava");
+        let a = agents(&s, &mut since, 100, uk, &vision);
+        assert_eq!((a[1].model.as_deref(), a[1].vision), (Some("mistral/codestral-latest"), Some(false)), "listed, no vision");
+        assert_eq!((a[2].model.as_deref(), a[2].vision), (Some("ollama/llava"), None), "unlisted: never a guess");
+        assert_eq!((a[0].model.as_deref(), a[0].vision), (None, None), "no model in the snapshot");
+        // his /model switch: the next rows follow
+        s["agents"][1]["model"] = json!("anthropic/claude-haiku-4-5");
+        assert_eq!(agents(&s, &mut since, 200, uk, &vision)[1].vision, Some(true));
+    }
+
     #[test]
     fn the_snapshot_becomes_rows() {
         let mut since = Since::new();
-        let a = agents(&snap(), &mut since, 100, uk);
+        let a = agents(&snap(), &mut since, 100, uk, &|_| None);
         assert_eq!(a.len(), 3);
         let p = &a[1];
         assert_eq!((p.status, p.title.as_str(), p.purpose.as_str(), p.waits), (Status::Working, "profiling the hub", "make the e2e fast", 2));
@@ -377,8 +403,8 @@ mod tests {
         // a status change moves since; the same keeps it
         let mut s2 = snap();
         s2["agents"][1]["status"] = json!("idle");
-        assert_eq!(agents(&s2, &mut since, 200, uk)[1].since_ms, 200);
-        assert_eq!(agents(&s2, &mut since, 300, uk)[1].since_ms, 200);
+        assert_eq!(agents(&s2, &mut since, 200, uk, &|_| None)[1].since_ms, 200);
+        assert_eq!(agents(&s2, &mut since, 300, uk, &|_| None)[1].since_ms, 200);
         let c = cards(&snap(), "acme", 5_000, uk);
         assert_eq!(c.iter().map(|c| c.id).collect::<Vec<_>>(), [9, 10], "his kinds, no drop");
         assert_eq!((c[0].question.as_str(), c[0].options.len(), c[0].since_ms, c[0].urgent), ("which bench?", 2, 4_000, false));

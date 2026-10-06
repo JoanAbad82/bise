@@ -145,6 +145,25 @@ fn an_unknown_provider_resolves_without_failing() {
     }
 }
 
+/// bise desktop K4 (architect m_10064): the one vision rule, moved from
+/// the TUI's models.rs lacks_vision (its asserts with it).
+#[test]
+fn only_a_listed_model_says_whether_it_reads_images() {
+    let c = Catalog::builtin();
+    assert_eq!(c.vision("mistral/codestral-latest"), Some(false));
+    assert_eq!(c.vision("mistral/mistral-medium-latest"), Some(true));
+    assert_eq!(c.vision("anthropic/claude-haiku-4-5"), Some(true));
+    // unlisted or unknown: the provider decides, never a guess
+    assert_eq!(c.vision("ollama/llava"), None);
+    assert_eq!(c.vision("nowhere/m"), None);
+    assert_eq!(c.vision(""), None);
+    // a model he lists in config.toml with vision: his catalog says so
+    let s = setup("[models.\"ollama/llava\"]
+vision = true
+");
+    assert_eq!(s.catalog.vision("ollama/llava"), Some(true));
+}
+
 #[test]
 fn model_ids_may_hold_slashes() {
     let c = Catalog::builtin();

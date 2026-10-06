@@ -151,7 +151,12 @@ impl Shell {
     fn proto_rows(&mut self, snap: &Value) -> (HubEv, HubEv) {
         let project = self.project();
         let now = now_ms();
-        let agents = proto_view::agents(snap, &mut self.proto.since, now, crate::model::user_kind);
+        // K4: each agent's model read against the hub's catalog (his
+        // config.toml merged, re-read when it changes), fresh each time
+        self.setup();
+        let cat = self.setup.as_ref().map(|(_, s)| &s.catalog);
+        let vision = |m: &str| cat.and_then(|c| c.vision(m));
+        let agents = proto_view::agents(snap, &mut self.proto.since, now, crate::model::user_kind, &vision);
         let cards = proto_view::cards(snap, &project, now, crate::model::user_kind);
         (HubEv::Agents { project: project.clone(), agents }, HubEv::Cards { project, cards })
     }

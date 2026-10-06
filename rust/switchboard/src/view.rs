@@ -26,14 +26,15 @@ pub const DEBOUNCE_MS: u64 = 2_000;
 
 /// The view of the hub of `project` (its hub id) from its client
 /// snapshot (`core::Hub::snapshot`).
-pub fn of(snap: &Value, project: &str, now: u64, last_activity_ms: u64, stopped_ms: Option<u64>, since: &mut Since) -> ProjectView {
+/// `vision`: the hub's model catalog's rule (K4, see `proto_view::agents`).
+pub fn of(snap: &Value, project: &str, now: u64, last_activity_ms: u64, stopped_ms: Option<u64>, since: &mut Since, vision: &dyn Fn(&str) -> Option<bool>) -> ProjectView {
     ProjectView {
         v: V,
         project: project.to_string(),
         written_ms: now,
         stopped_ms,
         last_activity_ms,
-        agents: proto_view::agents(snap, since, now, crate::model::user_kind),
+        agents: proto_view::agents(snap, since, now, crate::model::user_kind, vision),
         cards: proto_view::cards(snap, project, now, crate::model::user_kind),
     }
 }
@@ -120,7 +121,7 @@ mod tests {
     #[test]
     fn the_view_has_the_windows_rows_and_no_running_flag() {
         let mut since = Since::new();
-        let v = of(&snap(), "api-12345678", 100, 90, None, &mut since);
+        let v = of(&snap(), "api-12345678", 100, 90, None, &mut since, &|_| None);
         assert_eq!((v.v, v.project.as_str(), v.written_ms, v.last_activity_ms, v.stopped_ms), (1, "api-12345678", 100, 90, None));
         assert_eq!(v.agents.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["main", "p99"]);
         assert_eq!(v.agents[1].branch.as_deref(), Some("sb/p99"));
@@ -131,7 +132,7 @@ mod tests {
         assert!(!text.contains("running"), "{text}");
         assert!(!text.contains("stopped_ms"), "absent while it runs: {text}");
         assert_eq!(parse(&text), Some(v.clone()));
-        let stopped = of(&snap(), "api-12345678", 200, 90, Some(200), &mut since);
+        let stopped = of(&snap(), "api-12345678", 200, 90, Some(200), &mut since, &|_| None);
         assert!(render(&stopped).contains("\"stopped_ms\": 200"));
     }
 
@@ -140,7 +141,7 @@ mod tests {
         assert_eq!(parse(""), None);
         assert_eq!(parse("{not json"), None);
         assert_eq!(parse(r#"{"v":1}"#), None);
-        let mut v = of(&snap(), "x-1", 1, 1, None, &mut Since::new());
+        let mut v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None);
         v.v = 2;
         assert_eq!(parse(&render(&v)), None);
     }

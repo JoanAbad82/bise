@@ -156,6 +156,8 @@ mod tests {
             queued: vec![],
             dir: None,
             aliases: vec![],
+            model: None,
+            vision: None,
         }
     }
 

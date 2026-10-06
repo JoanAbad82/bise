@@ -51,8 +51,10 @@ pub(crate) fn model_for(main: bool) -> String {
 /// A listed model the catalog says cannot read images. An unlisted one
 /// is not refused here: the provider says (the no-vision line then
 /// comes from its error).
+/// The rule is bise_catalog's `Catalog::vision` (shared with the hub's
+/// agent rows, bise desktop K4).
 pub(crate) fn lacks_vision(model: &str) -> bool {
-    resolve(model).is_some_and(|r| r.known == Known::Listed && !r.caps.vision)
+    setup().catalog.vision(model) == Some(false)
 }
 
 // ---- the model and effort shown (BISE-135) ----
@@ -353,16 +355,5 @@ mod tests {
         assert_eq!(free_id_of("openai/gpt-6-astra", "openrouter").as_deref(), Some("openrouter/openai/gpt-6-astra"));
         assert_eq!(free_id_of("openrouter/x/y", "openrouter").as_deref(), Some("openrouter/x/y"));
         assert_eq!(free_id_of("openai", "openai").as_deref(), Some("openai/openai"));
-    }
-
-    #[test]
-    fn only_a_listed_model_without_vision_is_refused() {
-        assert!(lacks_vision("mistral/codestral-latest"));
-        assert!(!lacks_vision("mistral/mistral-medium-latest"));
-        assert!(!lacks_vision("anthropic/claude-haiku-4-5"));
-        // unlisted or unknown: the provider decides
-        assert!(!lacks_vision("ollama/llava"));
-        assert!(!lacks_vision("nowhere/m"));
-        assert!(!lacks_vision(""));
     }
 }
