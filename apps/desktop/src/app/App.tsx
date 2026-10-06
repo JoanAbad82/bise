@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
 import { formatRoute, startRouteOf, type Route } from './route';
 import { useMenuRouting } from './menu';
+import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { Main, Row, Side, Win } from '@/ds';
 import '@/ds/index.css';
 import './app.css';
@@ -25,8 +26,12 @@ export function App() {
 
 /** bise's thread, or in test mode the run's start route (`#route=…`, amb-tools m_9577). */
 function firstRoute(): Route {
-  const test = (window as Partial<Window>).bise?.test === true;
-  return (test ? startRouteOf(window.location.hash) : undefined) ?? { screen: 'bise' };
+  return (testMode() ? startRouteOf(window.location.hash) : undefined) ?? { screen: 'bise' };
+}
+
+/** The app runs under the test harness (the preload's flag; false outside Electron). */
+function testMode(): boolean {
+  return (window as Partial<Window>).bise?.test === true;
 }
 
 function Shell() {
@@ -74,6 +79,9 @@ function ScreenOf({ route }: { route: Route }) {
   switch (route.screen) {
     case 'notfound':
       return <NotFound path={route.path} />;
+    case 'lab':
+      if (!testMode()) return <NotFound path={formatRoute(route)} />;
+      return route.lab === 'composer' ? <ComposerLab /> : route.lab === 'spotlight' ? <SpotlightLab /> : <PearlLab />;
     default:
       return <NotYet route={route} />;
   }

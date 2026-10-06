@@ -17,6 +17,8 @@ const every: Route[] = [
   { screen: 'settings' },
   { screen: 'settings', page: 'projects' },
   { screen: 'onboarding' },
+  { screen: 'lab', lab: 'composer' },
+  { screen: 'lab', lab: 'pearl' },
 ];
 
 describe('routes', () => {
@@ -31,7 +33,7 @@ describe('routes', () => {
   });
 
   it('a wrong link is notfound with its words, never bise', () => {
-    for (const p of ['', 'telemetry/p99', 'agent/x', 'agent/x/y/z', 'commit/p/not-a-sha', 'bise/more', 'project/a b'])
+    for (const p of ['', 'telemetry/p99', 'agent/x', 'agent/x/y/z', 'commit/p/not-a-sha', 'bise/more', 'project/a b', 'lab/other', 'lab'])
       expect(parseRoute(p)).toEqual({ screen: 'notfound', path: p });
   });
 

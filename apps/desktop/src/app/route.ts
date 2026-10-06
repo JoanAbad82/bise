@@ -15,6 +15,7 @@
 //   artifacts/<p>[/<id>]       a project's artifacts (one opened)
 //   environments/<p>           its worktrees and dev servers
 //   inbox | settings[/<page>] | onboarding    amb-home's screens
+//   lab/<composer|spotlight|pearl>             amb-web's labs, test mode only
 // Anything else parses to `notfound` with the string kept, never to bise:
 // a wrong link says so.
 
@@ -30,7 +31,13 @@ export type Route =
   | { screen: 'inbox' }
   | { screen: 'settings'; page?: string }
   | { screen: 'onboarding' }
+  | { screen: 'lab'; lab: Lab }
   | { screen: 'notfound'; path: string };
+
+/** amb-web's test-only labs (qa-type m_9587): drawn in test mode only. */
+export const LABS = ['composer', 'spotlight', 'pearl'] as const;
+export type Lab = (typeof LABS)[number];
+const isLab = (x: string | undefined): x is Lab => LABS.some((l) => l === x);
 
 export type Screen = Route['screen'];
 
@@ -62,6 +69,8 @@ export function formatRoute(r: Route): string {
       return r.id === undefined ? `artifacts/${r.project}` : `artifacts/${r.project}/${r.id}`;
     case 'settings':
       return r.page === undefined ? 'settings' : `settings/${r.page}`;
+    case 'lab':
+      return `lab/${r.lab}`;
     case 'notfound':
       return r.path;
   }
@@ -100,6 +109,8 @@ export function parseRoute(path: string): Route {
     case 'settings':
       if (args.length === 0) return { screen: 'settings' };
       return one !== undefined ? { screen: 'settings', page: one } : nf;
+    case 'lab':
+      return isLab(one) ? { screen: 'lab', lab: one } : nf;
     default:
       return nf;
   }
