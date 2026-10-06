@@ -263,13 +263,22 @@ def ask_quit(pid, replace, stdin=None):
     return stdin.readline().strip().lower() in ("y", "yes")
 
 
-def open_app(app, bise, tryh, env):
-    """The one app path on the try home's bise, as a normal app (it's his run, not a test)."""
-    args = ["--bise", bise, "--web", os.path.join(REPO, "apps", "ambient", "web"), "--dev", os.path.join(tryh, "dev"),
+def app_args(bise, tryh, env):
+    """The app's args for the try: the try's bise, its dev dir, and the env its core needs."""
+    return ["--bise", bise, "--web", os.path.join(REPO, "apps", "ambient", "web"), "--dev", os.path.join(tryh, "dev"),
             "--env", "BISE_HOME=%s" % tryh, "--env", "BISE_HOME_WORKSPACE=%s" % os.path.join(tryh, "bise"),
             "--env", "BISE_APP_ROOT=%s" % REPO, "--env", "PATH=%s" % env.get("PATH", "/usr/bin:/bin")]
+
+
+def open_app(app, bise, tryh, env):
+    """The one app path on the try home's bise, as a normal app (it's his run, not a test).
+    BISE_TRY_OPEN (tests, gate only): that command gets the same args instead."""
     os.makedirs(os.path.join(tryh, "dev", "ambient"), exist_ok=True)
-    run(["open", "-a", app, "--args"] + args, env)
+    hook = os.environ.get("BISE_TRY_OPEN")
+    if hook:
+        run([hook] + app_args(bise, tryh, env), env)
+        return
+    run(["open", "-a", app, "--args"] + app_args(bise, tryh, env), env)
 
 
 def hub_socks(tryh):
@@ -348,10 +357,15 @@ def main(argv):
         raise TryError("your bise ambient app is running (pid %d): the try didn't open" % pid)
     if "--no-build" not in flags:
         build(mine)
-    # a test names its bise and never opens an app (ambient.sh path would build one)
+    # tests only (a try home under ~/.bise/gate): BISE_TRY_BISE names the bise (ambient.sh path
+    # would build an app), BISE_TRY_OPEN a command that gets the app's args instead of 'open -a'
+    # (ambient-qa's off-screen harness app: never on his screen)
+    hooks = [k for k in ("BISE_TRY_BISE", "BISE_TRY_OPEN") if os.environ.get(k)]
+    if hooks and not under(tryh, GATE):
+        raise TryError("%s: for tests on a try home under ~/.bise/gate only" % ", ".join(hooks))
     app, bise = (None, os.environ["BISE_TRY_BISE"]) if os.environ.get("BISE_TRY_BISE") else app_and_bise(mine)
-    if app is None and "--no-open" not in flags:
-        raise TryError("BISE_TRY_BISE is for tests: with --no-open only")
+    if app is None and "--no-open" not in flags and not os.environ.get("BISE_TRY_OPEN"):
+        raise TryError("BISE_TRY_BISE is for tests: with --no-open or BISE_TRY_OPEN only")
     if not os.access(bise, os.X_OK):
         raise TryError("no bise at %s: build first" % bise)
     if "--fresh" in flags and os.path.isdir(tryh):

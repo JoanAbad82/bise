@@ -113,7 +113,14 @@ class Run:
         return open(p, errors="replace").read() if os.path.exists(p) else ""
 
     def cards(self, project):
-        return world._hub_state(self.hub(project)["sock"]).get("cards", [])
+        # a hub the run stopped (step 15's folder gone) has no socket: no cards
+        sock = self.hub(project)["sock"]
+        if not os.path.exists(sock):
+            return []
+        try:
+            return world._hub_state(sock).get("cards", [])
+        except OSError:
+            return []
 
     def applog(self):
         p = os.path.join(self.W["home"], ".bise", "dev", "ambient", "app.log")
@@ -517,10 +524,15 @@ class Run:
             rest()
             time.sleep(0.5)
             return qa.real_op("away", away_ms=45 * 60 * 1000)
-        S(19, "back after 45 min away: the away card first", away,
-          lambda: (bool(wait(lambda: self.st()["bar"]["visible"] and "while you were away" in self.text("bar"), 15)),
-                   "bar %s; 'while you were away' %s" % (self.st()["bar"]["visible"], "shown" if "while you were away" in self.text("bar") else "NOT shown")),
-          window="bar", settle=1.5)
+        def away_ok():
+            # the away card lets go after 5 s without an away_summary: read it at once, and from
+            # the page's own app_content {kind:'away'} (the step's events)
+            seen = self.wait(lambda: "while you were away" in self.text("bar").lower(), 6)
+            evs = self.events()
+            self.R["away_events"] = evs[-8:]
+            kind = any(isinstance(e[1], dict) and e[1].get("cmd") == "app_content" and e[1].get("kind") == "away" for e in evs)
+            return bool(seen) or kind, "'while you were away' %s; app_content away %s" % ("shown" if seen else "not caught on screen", kind)
+        S(19, "back after 45 min away: the away card first", away, away_ok, window="bar", settle=0.3)
 
         def empty_spot():
             rest()
@@ -553,7 +565,7 @@ class Run:
         def quiet_ok():
             d = self.R.get("quiet_during") or {}
             t = wait(lambda: self.st()["bar"]["visible"] and "question" in self.text("bar") and self.text("bar"), 15) or self.text("bar")
-            batch = "questions · about" in t or "question · about" in t
+            batch = "questions · about" in t.lower() or "question · about" in t.lower()
             return (d.get("bar") is False) and batch, "during the call: bar %s, pearl %s; after: %s" % (
                 "hidden" if d.get("bar") is False else "SHOWN", json.dumps(d.get("icon"))[:80], "one batch '%s'" % t[:60] if batch else "NO batch (%s)" % t[:80])
         S(21, "quiet (a call): cards wait, the pearl counts, then one batch", quiet, quiet_ok, window="bar", settle=1.5)

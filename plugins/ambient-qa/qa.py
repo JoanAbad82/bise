@@ -3926,6 +3926,14 @@ def _real_cli(a):
     c = a.rcmd
     if c == "launch":
         return real_launch(a.app, a.bise, a.root)
+    if c == "try-proof":
+        import tryproof
+        R = tryproof.run(a.out)
+        sys.stderr.write(tryproof.report(R))
+        return {"report": tryproof.report(R), "steps": R["steps"]}
+    if c == "_try_open":
+        import tryproof
+        return tryproof.try_open(a.args)
     if c == "t1":
         import t1
         txt = t1.run(a.out, a.bise)
@@ -3998,6 +4006,9 @@ def _cli(argv):
     q = rs.add_parser("events"); q.add_argument("--since")
     q = rs.add_parser("feed", help="the hub's last lines of an agent: did his words reach main?"); q.add_argument("--agent", default="main"); q.add_argument("--count", type=int, default=40)
     q = rs.add_parser("logs"); q.add_argument("--n", type=int, default=40)
+    q = rs.add_parser("try-proof", help="the user's 'bise-ambient --try' through ~/.local/bin/bise-ambient on a throwaway home, the app off-screen (tryproof.py)")
+    q.add_argument("--out")
+    q = rs.add_parser("_try_open"); q.add_argument("args", nargs=argparse.REMAINDER)
     q = rs.add_parser("t1", help="the first-try scenario on the running world (t1.py): a verdict per step, shots, report.txt")
     q.add_argument("--out"); q.add_argument("--bise")
     p = sub.add_parser("scenes"); p.add_argument("--only"); p.add_argument("--backdrops", default="dark"); p.add_argument("--out"); p.add_argument("--what", default="both")
