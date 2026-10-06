@@ -76,8 +76,9 @@
     if (r.screen === "onboarding") return "welcome to bise";
     if (r.screen === "notfound") return "not found";
     if (r.screen) return r.screen;
-    if (r.project === HOME) return "bise";
-    const p = D.pname(s, r.project);
+    if (r.project === HOME && r.agent === "main") return "bise";
+    // bise's own agents (the single-hub core puts every agent there)
+    const p = r.project === HOME ? "bise" : D.pname(s, r.project);
     return r.agent === "main" ? p : `${r.agent} · ${p}`;
   }
   function go(s, r, cmds, { history = true } = {}) {
@@ -95,7 +96,7 @@
   // the route as the shell keeps it for restore (win_title's route, win_open's)
   const routeOf = (r) => (r.screen === "review" ? `review/${r.project}/${r.agent}` : r.screen === "notfound" ? r.want
     : r.screen === "settings" && r.page ? `settings/${r.page}` : r.screen ? r.screen
-    : r.project === HOME ? "bise" : r.agent === "main" ? `project/${r.project}` : `agent/${r.project}/${r.agent}`);
+    : r.project === HOME && r.agent === "main" ? "bise" : r.agent === "main" ? `project/${r.project}` : `agent/${r.project}/${r.agent}`);
 
   // a deep link from the shell, the capsule or a card: bise · project/<p> · agent/<p>/<a> · inbox
   // (<p> is the project's id or its name)
@@ -217,7 +218,7 @@
     if (s.sel) return { ...s, sel: null };
     const d = D.dock(s);
     if (d) return { ...s, dockOff: set(s.dockOff, k, [...(s.dockOff[k] || []), d.card.id]) };
-    if (s.route.project !== HOME && s.route.agent !== "main") return go(s, { project: s.route.project, agent: "main" }, cmds);
+    if (s.route.agent !== "main") return go(s, { project: s.route.project, agent: "main" }, cmds);
     return s;
   }
 
@@ -249,7 +250,6 @@
       return eat(p ? go(s, { project: p.project, agent: "main" }, cmds) : s);
     }
     if (alt && !meta && !ctrl && digit != null) {
-      if (s.route.project === HOME) return eat(s);
       if (digit === 0) return eat(go(s, { project: s.route.project, agent: "main" }, cmds));
       const a = agentsOf(s, s.route.project)[digit - 1];
       return eat(a ? go(s, { project: s.route.project, agent: a.name }, cmds) : s);
@@ -270,10 +270,10 @@
     if (meta && lower === "e") return eat({ ...s, all: !s.all, open: {} });
     if (meta && ev.key === ",") return eat(go(s, { screen: "settings", project: HOME, agent: "main" }, cmds));
     // ⌘D the agent's review (S7), ⌘⇧A every artifact
-    if (meta && lower === "d") return eat(s.route.project !== HOME && s.route.agent !== "main" ? go(s, { screen: "review", project: s.route.project, agent: s.route.agent }, cmds) : s);
+    if (meta && lower === "d") return eat(s.route.agent !== "main" ? go(s, { screen: "review", project: s.route.project, agent: s.route.agent }, cmds) : s);
     if (meta && ev.shift && lower === "a") return eat(go(s, { screen: "artifacts", project: HOME, agent: "main" }, cmds));
     if (meta && ev.key === ".") {
-      if (s.route.project === HOME) return eat(s);
+      if (s.route.project === HOME && s.route.agent === "main") return eat(s);
       cmds.push({ cmd: "stop", project: s.route.project, agent: s.route.agent });
       return eat(s);
     }
@@ -327,7 +327,7 @@
       }
       case "ui_unquote": return set(s, "quotes", set(s.quotes, k, (s.quotes[k] || []).filter((_, i) => i !== ev.i)));
       case "ui_send": return send(s, cmds);
-      case "ui_stop": if (s.route.project !== HOME) cmds.push({ cmd: "stop", project: s.route.project, agent: s.route.agent }); return s;
+      case "ui_stop": if (!(s.route.project === HOME && s.route.agent === "main")) cmds.push({ cmd: "stop", project: s.route.project, agent: s.route.agent }); return s;
       case "ui_older": {
         const t = s.threads[k];
         if (!t || !t.more || t.paging) return s;

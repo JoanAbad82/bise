@@ -417,6 +417,25 @@ law("every route change names the window with its route; a link to a place that 
   eq(w.sent.filter((c) => c.cmd === "subscribe" && c.agent === "p99"), []);
 });
 
+law("bise's own agents (every agent on the single-hub core): agent/home/<a> opens its thread, named '<a> · bise', under bise's row; esc goes back to bise", () => {
+  const w = win();
+  w.feed({ ev: "agents", project: F.HOME, agents: [{ name: "main", main: true, status: "idle" }, { name: "perf", status: "idle", title: "profile the replay" }] });
+  w.feed({ ev: "win_open", route: "agent/home/perf" });
+  eq(w.s.route, { project: F.HOME, agent: "perf" });
+  eq(w.sent.filter((c) => c.cmd === "win_title").pop(), { cmd: "win_title", text: "perf · bise", route: "agent/home/perf" });
+  eq(w.sent.filter((c) => c.cmd === "subscribe").pop().agent, "perf");
+  eq([w.v.head.t1, w.v.head.pearl || false, w.v.jobs.length], ["perf", false, 0]);
+  const rows = w.v.side.rows;
+  eq([rows[0].on, rows[1].kind, rows[1].name, rows[1].on], [false, "ag", "perf", true]);
+  // already there: the same link changes nothing; esc goes back to bise
+  const n = w.sent.length;
+  w.feed({ ev: "win_open", route: "agent/home/perf" });
+  eq(w.sent.length, n);
+  // esc puts away what sits above the composer first (the fake world's waiting cards), then leaves
+  for (let i = 0; i < 4 && w.s.route.agent !== "main"; i++) w.key("Escape");
+  eq([w.s.route, w.v.head.t1], [{ project: F.HOME, agent: "main" }, "bise"]);
+});
+
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {
   const dir = join(here, "../../../../rust/proto/fixtures");
   if (!existsSync(dir)) return;
