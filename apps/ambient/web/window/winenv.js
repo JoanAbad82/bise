@@ -4,7 +4,8 @@
 // draw() builds it from amb-kit's components. wins7.js wires it into the window (AmbWinS7).
 //
 // Core events (S3a drafts): worktrees {project, items: [{path, branch, agent?, dirty, ahead,
-// behind}]}, dev_servers {project, items: [{agent, name?, url, port, cmd, up}]}.
+// behind}]} (frozen in bise-proto, amb-core e4160bd6: branch '' when detached, dirty a bool or a
+// count of untracked files, no agent = his own checkout), dev_servers {project, items: [{agent, name?, url, port, cmd, up}]}.
 // Cmds: {cmd:'open_in', project, app:'terminal'|'editor', path} and {cmd:'app_open_url',
 // project, url} go to the app (amb-mac); a worktree's row opens its agent's thread.
 (function (root) {
@@ -36,7 +37,7 @@
     const what = a.status === "done" && w.ahead > 0 ? "ready to merge" : a.title || "";
     const end = w.ahead > 0 ? `${w.ahead} ahead` : w.behind > 0 ? `${w.behind} behind` : a.status === "working" ? "working" : "idle";
     const dot = a.status === "working" ? "wk" : a.status === "done" ? "ok" : a.status === "waiting" ? "nd" : "";
-    return { kind: "wt", branch: w.branch, agent: w.agent, what, end, dot, dirty: !!w.dirty,
+    return { kind: "wt", branch: w.branch || "detached", agent: w.agent, what, end, dot, dirty: !!w.dirty,
       act: { ev: "ui_route", project: p.project, agent: w.agent } };
   }
   function serverRow(p, d) {

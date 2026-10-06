@@ -282,6 +282,21 @@ law("review on bise-proto's own fixture lines (amb-core ce8ecd24): binary/genera
   eq(w.feed({ ev: "ui_rv_sha" }).cmds.filter((c) => c.cmd === "app_open_url"), [{ cmd: "app_open_url", url: `${acme.web}/commit/${old.merged}`, project: old.project }]);
 });
 
+law("environments on bise-proto's worktrees fixture (amb-core e4160bd6): the agent's worktree is a row with its branch, ahead and dirty; his own checkout isn't a row; a detached one says so", () => {
+  const fx = (f) => readFileSync(join(here, "../../../../rust/proto/fixtures", f), "utf8").split(String.fromCharCode(10)).filter(Boolean).map((l) => JSON.parse(l));
+  const wt = fx("hub_ev.jsonl").find((e) => e.ev === "worktrees");
+  const acme = fx("core_ev.jsonl").find((e) => e.ev === "projects").projects.find((p) => p.project === wt.project);
+  const w = win();
+  w.feed({ ev: "projects", projects: [...w.s.projects, acme] });
+  w.open("environments");
+  w.feed(wt);
+  const g = () => w.v.groups.find((x) => x.project === wt.project);
+  eq(g().rows.map((r) => [r.branch, r.agent, r.end, r.dirty]), [["sb/perf", "perf", "2 ahead", true]]);
+  // a detached worktree (branch ''), dirty as a count of untracked files
+  w.feed({ ...wt, items: [{ ...wt.items[0], branch: "", dirty: 3, ahead: 0 }, wt.items[1]] });
+  eq(g().rows.map((r) => [r.branch, r.dirty]), [["detached", true]]);
+});
+
 law("the fake S7 world speaks S3a's drafts: every event names its project, no event for bise's own", () => {
   const evs = F7.boot();
   eq([...new Set(evs.map((e) => e.ev))], ["worktrees", "dev_servers"]);
