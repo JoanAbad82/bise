@@ -133,3 +133,41 @@ export function tui(w: World, project: string, size = '160x50'): Tui {
     close: () => { try { tm(['kill-server']); } catch { /* gone */ } },
   };
 }
+
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * The TUI ready on its feed: the world's home is fresh, so it opens on the provider step of its
+ * onboarding (esc leaves it, as a person who signs in later would); ready once its side panel
+ * shows its agents.
+ */
+export async function tuiReady(t: Tui, timeoutMs = 20_000): Promise<void> {
+  const t0 = Date.now();
+  for (;;) {
+    const s = t.screen();
+    if (/how do you want to pay/.test(s)) t.keys('Escape');
+    else if (/│\s+agents\s+│/.test(s)) return;
+    if (Date.now() - t0 > timeoutMs) throw new Error(`the TUI isn't ready after ${timeoutMs} ms:\n${s}`);
+    await sleep(300);
+  }
+}
+
+/**
+ * The TUI's inbox, from its side panel (`inbox`, then rows `N ? <agent>  <text…>`), in its order:
+ * [{ n, agent, text }] with the text as drawn (cut with … at the panel's width).
+ */
+export function tuiInbox(screen: string): { n: number; agent: string; text: string }[] {
+  const panel = screen.split('\n').map((l) => {
+    const cells = l.split('│');
+    return (cells.length >= 3 ? (cells[cells.length - 2] ?? '') : '').trim();
+  });
+  const at = panel.indexOf('inbox');
+  if (at < 0) return [];
+  const out: { n: number; agent: string; text: string }[] = [];
+  for (const row of panel.slice(at + 1)) {
+    const m = /^(\d+) \S (\S+)\s+(.*)$/.exec(row);
+    if (!m) break;
+    out.push({ n: Number(m[1]), agent: m[2] ?? '', text: (m[3] ?? '').replace(/…$/, '').trim() });
+  }
+  return out;
+}
