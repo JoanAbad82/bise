@@ -176,7 +176,7 @@
     head: (work, waits) => `${work ? `${work} at work` : "nobody at work"}${waits ? ` · ${waits} wait${waits === 1 ? "s" : ""} for you` : ""}`,
     calm: "all quiet.", broke: (n) => `▲ ${n} failed`,
     following: "following", job: (j) => `${j.label || ""} · ${num(j.step)} / ${num(j.steps)}${j.unit ? ` ${j.unit}` : ""}`.replace(/^ · /, ""),
-    openBise: "open bise", quietHour: "quiet for 1 h", quietUntil: (hm) => `quiet until ${hm} · end it`, settings: "settings…",
+    openBise: "open bise", quietHour: "quiet for 1 h", quietUntil: (hm) => `quiet until ${hm} · end it`, settings: "settings…", quit: "quit bise ambient",
     nothingWaits: "nothing waits for you",
   };
   function num(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }

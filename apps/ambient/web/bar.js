@@ -283,6 +283,8 @@
           { g: "☾", t: u.quiet ? MN.quietUntil(hm(u.quiet.until)) : MN.quietHour, act: { ev: "ui_quiet_hour" }, qa: "quiet-hour" },
           { g: "⚙", t: MN.settings, right: { keys: ["⌘", ","] }, act: { ev: "app_key", key: "," }, qa: "settings" },
         ] });
+        // last, after a separator (ambient m_8618 via amb-mac m_8639)
+        s.sections.push({ rows: [{ g: "", t: MN.quit, right: { keys: ["⌘", "Q"] }, act: { ev: "ui_quit" }, qa: "quit" }] });
         return markSel(s, v.rowSel);
       }
       case "settings": {

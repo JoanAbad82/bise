@@ -1721,12 +1721,14 @@ law("desktop S8 menu-bar dropdown (v9): app_menu on opens it under the pearl: '3
   eq(s.sections.map((x) => x.rows.map((r) => [r.t, r.p || "", r.sub || "", r.right && r.right.keys ? r.right.keys.join("") : ""])), [
     [["alerts", "telemetry", "compaction at 03:00?", "fn1"], ["search", "storefront", "reindex tonight?", ""]],
     [["storefront · stock · following", "", "flash sale replay · 6 200 / 10 000 orders", ""]],
-    [["open bise", "", "", "⌘0"], ["quiet for 1 h", "", "", ""], ["settings…", "", "", "⌘,"]]]);
+    [["open bise", "", "", "⌘0"], ["quiet for 1 h", "", "", ""], ["settings…", "", "", "⌘,"]],
+    [["quit bise ambient", "", "", "⌘Q"]]]);
   const row = (qa) => s.sections.flatMap((x) => x.rows).find((r) => r.qa === qa);
   eq(M.step(m, row("open-bise").act, 30).cmds.at(-1), { cmd: "app_window", route: "bise" });
   eq(M.step(m, row("quiet-hour").act, 30).cmds, [{ cmd: "app_quiet_hour", on: true }]);
   eq(M.step(m, row("job-stock").act, 30).cmds.at(-1), { cmd: "app_window", route: "agent/storefront-5c1d/stock" });
   eq(M.step(m, row("settings").act, 30).m.pane, "settings");
+  eq(M.step(m, row("quit").act, 30).cmds, [{ cmd: "app_quit" }]);
   // paused: the row ends it; off leaves the pane
   const q = M.step(m, { ev: "app_quiet", on: true, why: "paused", until_ms: new Date(2026, 9, 3, 15, 21).getTime() }, 40).m;
   eq(Bar.spec(M.view(q, 50)).sections[2].rows[1].t, "quiet until 15:21 · end it");

@@ -435,6 +435,9 @@
       // its 'quiet for 1 h' row: the app pauses bise for an hour (app_quiet {why:'paused'} comes back)
       case "ui_quiet_hour":
         return { m, cmds: [{ cmd: "app_quiet_hour", on: !(m.quiet && m.quiet.why === "paused") }] };
+      // 'quit bise ambient ⌘Q' (the dropdown's last row): the app quits
+      case "ui_quit":
+        return { m, cmds: [{ cmd: "app_quit" }] };
       // 'open bise ⌘0': bise's own thread in the window
       case "ui_open_bise": {
         const r = setPane(m, null);
