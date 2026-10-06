@@ -580,6 +580,56 @@ def real_harness_stays_out_of_his_face_and_his_state():
 
 
 @test
+def world_fixtures_seed_every_desktop_shape():
+    """qa.py world: 2 or 3 projects; together they hold a committed diff ready to merge, an agent at work in a dirty
+    worktree, a blocked agent, a merge question and a question with options, an artifact; every seed script is valid
+    bash with absolute paths, each agent marks itself seeded (before a long work); a world outside ~/.bise/gate or a
+    value reaching his hubs is refused"""
+    import world
+    check([p["name"] for p in world.plan(2)] == ["telemetry", "shop"], "2 projects")
+    for bad in (1, 4):
+        try:
+            world.plan(bad)
+            check(False, "plan(%d) refused" % bad)
+        except ValueError:
+            pass
+    steps = [s for p in world.plan(3) for a in p["agents"] for s in a["steps"]]
+    kinds = {k for s in steps for k in s}
+    check({"write", "commit", "report", "artifact", "work"} <= kinds, "every step kind used: %s" % kinds)
+    check({s["report"] for s in steps if "report" in s} >= {"done", "blocked", "progress"}, "done, blocked and progress reports")
+    check(any(a["place"] == "new" for p in world.plan(3) for a in p["agents"]) and any(not a["place"] for p in world.plan(3) for a in p["agents"]),
+          "worktree agents and a shared-folder one")
+    cards = [c for p in world.plan(3) for c in p["cards"]]
+    check(any("merge" in c and "\n1. " in c for c in cards) and len(cards) >= 2, "a merge question and a question with options")
+    w = os.path.join(world.GATE, "w-test")
+    for p in world.plan(3):
+        m = world.main_script(w, p)
+        check(m.count("sb spawn ") == len(p["agents"]) and m.count("sb card ") == len(p["cards"]), "main's script: %s" % p["name"])
+        check("{{bash: bash %s/seed/%s/" % (w, p["name"]) in m, "the brief carries the agent's script by absolute path")
+        scripts = [m] + [world.agent_script(w, p["name"], a) for a in p["agents"]]
+        for s in scripts:
+            r = subprocess.run(["bash", "-n"], input=s, capture_output=True, text=True)
+            check(r.returncode == 0, "bash -n: %s" % r.stderr)
+        for a in p["agents"]:
+            s = world.agent_script(w, p["name"], a)
+            mk = world.marker(w, p["name"], a["name"])
+            check(mk in s, "%s marks itself seeded" % a["name"])
+            if any("work" in st for st in a["steps"]):
+                check(s.index(mk) < s.index("sleep "), "marked before its long work")
+    try:
+        world.guard("/tmp/w")
+        check(False, "a world outside ~/.bise/gate")
+    except qa.QAError:
+        pass
+    try:
+        world.guard(w, [os.path.expanduser("~/.bise/hubs/harness-1/hub.sock")])
+        check(False, "his hub's socket")
+    except qa.QAError:
+        pass
+    world.guard(w, [os.path.join(w, "h")])
+
+
+@test
 def key_specs_become_key_events():
     """keys: names, modifiers and typed text become the keys op's key codes and flags"""
     seq = qa.key_seq(["cmd+return", "up", "⌘2", "esc", "type:hi you"])

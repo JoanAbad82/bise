@@ -3412,17 +3412,36 @@ def _real_guard(argv, env):
     gate = os.path.realpath(os.path.expanduser("~/.bise/gate")) + "/"
     if not os.path.realpath(REAL_HOME).startswith(gate):
         raise QAError("refused: the harness HOME %s is not under ~/.bise/gate" % REAL_HOME)
-    vals = list(argv[1:]) + list(env.values())
+    refuse_his_state(list(argv[1:]) + list(env.values()))
+
+
+def refuse_his_state(vals):
+    """Refuse any value (an arg, an env value, a PATH-like list) whose path reaches his own state;
+    programs are fine (his bise binary links into ~/.local/state/switchboard/build)."""
     for v in vals:
         for part in re.split(r"[:=]", str(v)):
-            if not part.startswith("/"):
-                continue
-            rp = os.path.realpath(part)
-            if os.path.isfile(rp) and os.access(rp, os.X_OK) and not rp.endswith((".sock", ".pid")):
-                continue   # a program (his bise: ~/.bise/dev/build links into ~/.local/state/switchboard/build), never state
-            for his in HIS_STATE:
-                if rp == os.path.realpath(his) or rp.startswith(os.path.realpath(his) + "/"):
-                    raise QAError("refused: %r reaches his own state (%s)" % (v, his))
+            his = reaches_his_state(part)
+            if his:
+                raise QAError("refused: %r reaches his own state (%s)" % (v, his))
+
+
+def reaches_his_state(path):
+    """The part of his state this path is in (None: not his, or a program, or not a path)."""
+    if not path.startswith("/"):
+        return None
+    rp = os.path.realpath(path)
+    if os.path.isfile(rp) and os.access(rp, os.X_OK) and not rp.endswith((".sock", ".pid")):
+        return None   # a program (his bise: ~/.bise/dev/build links into ~/.local/state/switchboard/build), never state
+    for his in HIS_STATE:
+        if rp == os.path.realpath(his) or rp.startswith(os.path.realpath(his) + "/"):
+            return his
+    return None
+
+
+def own_path(path):
+    """A PATH without the folders in his state: an agent's PATH starts with its real hub's bin
+    (~/.bise/hubs/<hub>/bin: that hub's sb), which a throwaway hub must never find."""
+    return ":".join(p for p in (path or "").split(":") if p and not reaches_his_state(p))
 
 
 def _prepare_home(home):
@@ -3442,8 +3461,16 @@ def real_home_env(env, home):
     """A hub's env for harness A: HOME = the isolated one, and none of the overrides that would
     tell the hub (or anyone it starts) where its state is: his rules find it."""
     env["HOME"] = home
-    for k in ("SB_STATE_DIR", "BEND_SESSIONS_DIR", "BISE_HOME", "BISE_EXPORTS_FOR"):
+    for k in ("SB_STATE_DIR", "BEND_SESSIONS_DIR", "BISE_HOME", "BISE_EXPORTS_FOR", "BEND_STDIN"):
         env.pop(k, None)
+    # the caller's own run and temp folders (clean_env keeps them: BEND_RUN_DIR is his ~/.bise/run,
+    # the plugins' per-session side channels; TMPDIR an agent's tmp) become the isolated HOME's
+    env["BEND_RUN_DIR"] = os.path.join(home, ".bise", "run")
+    tmp = os.path.join(home, "tmp")
+    os.makedirs(tmp, exist_ok=True)
+    for k in ("TMPDIR", "TMP", "TEMP", "TMUX_TMPDIR"):
+        env[k] = tmp
+    env["PATH"] = own_path(env.get("PATH"))
     _prepare_home(home)
     return env
 
@@ -3983,7 +4010,21 @@ def _cli(argv):
     p = sub.add_parser("inject"); p.add_argument("ev")
     p = sub.add_parser("_hub"); p.add_argument("--bise", required=True); p.add_argument("--kind", default="fake"); p.add_argument("--connectors", action="store_true"); p.add_argument("--computer", action="store_true")
     p.add_argument("--real-accounts-approved-by-user", default=""); p.add_argument("--keep", action="store_true"); p.add_argument("--reuse"); p.add_argument("--home")
+    p = sub.add_parser("world", help="bise desktop: one throwaway HOME, bise's home hub + 2-3 seeded projects (world.py)")
+    ws = p.add_subparsers(dest="wcmd", required=True)
+    q = ws.add_parser("up"); q.add_argument("--projects", type=int, default=3); q.add_argument("--bise"); q.add_argument("--root")
+    ws.add_parser("down"); ws.add_parser("state")
+    q = ws.add_parser("say"); q.add_argument("project"); q.add_argument("text")
+    p = sub.add_parser("_world"); p.add_argument("--bise", required=True); p.add_argument("--root", required=True); p.add_argument("--projects", type=int, default=3)
     a = ap.parse_args(argv)
+    if a.cmd in ("world", "_world"):
+        import world
+        if a.cmd == "_world":
+            return world.daemon(a.bise, a.root, a.projects)
+        r = {"up": lambda: world.up(a.projects, a.bise, a.root), "down": world.down, "state": world.state,
+             "say": lambda: world.say(a.project, a.text)}[a.wcmd]()
+        print(json.dumps(r, indent=1, ensure_ascii=False))
+        return
     if a.cmd == "_hub":
         return hub_daemon(a.bise, a.kind, a.connectors, a.computer, a.real_accounts_approved_by_user, a.keep, a.reuse, a.home)
     if a.cmd == "_real_watch":

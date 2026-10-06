@@ -1,0 +1,469 @@
+"""ambient-qa world: a throwaway bise with several projects, for bise desktop (S12).
+
+One isolated HOME under ~/.bise/gate holds bise's home workspace (<HOME>/bise,
+no git) and 2 or 3 projects (<HOME>/code/<name>, git repos). Each runs its
+own hub with tests/e2e.py's scripted provider. The hubs find their state by
+the user's own rules (<HOME>/.bise/hubs/<name>-<hash>), the way the app's
+core finds his, never through SB_STATE_DIR. The fake mains then seed each
+project through their own `sb`: agents in worktrees, a committed diff
+ready for review, a dirty worktree with an agent at work, cards with
+options, a merge question, a blocked agent, an artifact.
+
+  qa.py world up [--projects 2|3] [--bise EXE]  the hubs, seeded; returns the world
+  qa.py world state                             what each hub holds: agents, cards, diffs
+  qa.py world say <project|bise> "<words>"      words to that project's main (the fake one)
+  qa.py world down                              stops every hub of the world by its pid
+
+`up` takes the heavy lock itself (/usr/bin/lockf -k ~/.bise/run/heavy.lock
+nice -n 10): it may rebuild the tree's helpers (scripts/bins.sh). The hubs
+then idle until `down`; a daemon holds a `hello` on each, so none of them
+stops through idle-exit. `world.json` (in the world's folder) names every hub:
+its workspace, socket, state folder and pid. Nothing here touches the user's
+hubs, app or accounts: every path is under ~/.bise/gate, checked before start.
+
+The fixtures (PROJECTS, main_script, agent_script) are pure, tested in
+tests/ambient_qa_test.py; the daemon only runs them.
+"""
+import glob
+import json
+import os
+import shlex
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+GATE = os.path.expanduser("~/.bise/gate")
+LOCK = os.path.expanduser("~/.bise/run/heavy.lock")
+HOME_NAME = "bise"     # bise's own hub: the home workspace, its main is bise
+
+
+# ---------------------------------------------------------------- the fixtures (pure)
+
+LATENCY_BEFORE = '''"""request latency percentiles for the dashboard"""
+
+
+def p99(samples):
+    # the mean of the slowest 10%: rises with every slow outlier
+    slow = sorted(samples)[int(len(samples) * 0.9):]
+    return sum(slow) / len(slow)
+'''
+
+LATENCY_AFTER = '''"""request latency percentiles for the dashboard"""
+
+
+def percentile(samples, q):
+    s = sorted(samples)
+    return s[min(len(s) - 1, int(len(s) * q))]
+
+
+def p99(samples):
+    # the real 99th percentile: one slow outlier no longer moves it
+    return percentile(samples, 0.99)
+'''
+
+PROJECTS = [
+    {"name": "telemetry",
+     "files": {"README.md": "# telemetry\n\nlatency and error dashboards.\n", "src/latency.py": LATENCY_BEFORE,
+               "src/alerts.py": "ALERTS = []\n"},
+     "cards": ["which window for the p99 alert?\n1. 5 min\n2. 15 min"],
+     "agents": [
+         {"name": "p99", "place": "new", "objective": "p99 rises since tuesday: find why and fix it",
+          "steps": [{"write": "src/latency.py", "text": LATENCY_AFTER},
+                    {"commit": "latency: p99 is the real 99th percentile, not the mean of the slowest 10%"},
+                    {"report": "done", "text": "p99 rose because it averaged the slowest 10%; it is the real percentile now (src/latency.py). ready to merge."}]},
+         {"name": "alerts", "place": "new", "objective": "page on-call when p99 stays above 800 ms",
+          "steps": [{"write": "src/alerts.py", "text": "ALERTS = [{'metric': 'p99', 'above_ms': 800, 'for': '5m'}]\n"},
+                    {"report": "progress", "text": "wiring the p99 alert", "step": "2/4"},
+                    {"work": 3600}]},
+     ]},
+    {"name": "shop",
+     "files": {"README.md": "# shop\n\nthe store front.\n", "search/index.py": "def find(q, items):\n    return [i for i in items if q == i['name']]\n",
+               "checkout/cart.py": "def total(items):\n    return sum(i['price'] for i in items)\n"},
+     "cards": ["merge checkout into main? (2 files, tests pass)\n1. merge\n2. not yet"],
+     "agents": [
+         {"name": "checkout", "place": "new", "objective": "apply the discount codes at checkout",
+          "steps": [{"write": "checkout/cart.py", "text": "def total(items, discount=0):\n    return round(sum(i['price'] for i in items) * (1 - discount), 2)\n"},
+                    {"write": "checkout/codes.py", "text": "CODES = {'SPRING10': 0.10}\n"},
+                    {"commit": "checkout: discount codes (SPRING10) applied to the total"},
+                    {"report": "done", "text": "discount codes work at checkout (checkout/cart.py, checkout/codes.py). waiting for your merge."}]},
+         {"name": "search", "place": "", "objective": "search doesn't find tshirt",
+          "steps": [{"report": "blocked", "text": "search ne trouve pas tshirt: the index matches whole names only. fuzzy match or a synonym list?"}]},
+     ]},
+    {"name": "docs",
+     "files": {"README.md": "# docs\n\nthe user guide.\n", "guide/start.md": "# getting started\n\nInstal the app, then run it.\n"},
+     "cards": [],
+     "agents": [
+         {"name": "typos", "place": "new", "objective": "fix the typos in the guide",
+          "steps": [{"write": "guide/start.md", "text": "# getting started\n\nInstall the app, then run it.\n"},
+                    {"commit": "guide: install, not instal"},
+                    {"write": "notes.md", "text": "# style notes\n\n- one idea per sentence\n- say install, never setup\n"},
+                    {"artifact": "notes.md", "title": "style notes"},
+                    {"report": "done", "text": "one typo fixed in guide/start.md; style notes for the next pass."}]},
+     ]},
+]
+
+
+def plan(n=3):
+    """The projects of a world of n (2 or 3)."""
+    if n not in (2, 3):
+        raise ValueError("a world has 2 or 3 projects, not %r" % (n,))
+    return PROJECTS[:n]
+
+
+def marker(world, project, agent):
+    return os.path.join(world, "seeded", "%s.%s" % (project, agent))
+
+
+def agent_script(world, project, agent):
+    """The bash an agent runs in its own folder (worktree or the shared one): its steps, then the
+    seeded marker (before a long `work`, so an agent at work counts as seeded)."""
+    out = ["set -u", "cd \"$PWD\""]
+    done = "mkdir -p %s && touch %s" % (shlex.quote(os.path.join(world, "seeded")), shlex.quote(marker(world, project, agent["name"])))
+    marked = False
+    for s in agent["steps"]:
+        if "write" in s:
+            d = os.path.dirname(s["write"])
+            if d:
+                out.append("mkdir -p %s" % shlex.quote(d))
+            out.append("printf %%s %s > %s" % (shlex.quote(s["text"]), shlex.quote(s["write"])))
+        elif "commit" in s:
+            out.append("git add -A && git -c commit.gpgsign=false commit -q --no-verify -m %s" % shlex.quote(s["commit"]))
+        elif "report" in s:
+            out.append("sb report %s %s%s" % (s["report"], shlex.quote(s["text"]),
+                                              " --step %s" % shlex.quote(s["step"]) if s.get("step") else ""))
+        elif "artifact" in s:
+            out.append("sb artifact add %s --title %s" % (shlex.quote(s["artifact"]), shlex.quote(s["title"])))
+        elif "work" in s:
+            out.append(done)
+            marked = True
+            out.append("sleep %d" % int(s["work"]))
+        else:
+            raise ValueError("unknown step %r" % (s,))
+    if not marked:
+        out.append(done)
+    out.append("echo seeded %s" % agent["name"])
+    return "\n".join(out) + "\n"
+
+
+def main_script(world, project):
+    """The bash the project's fake main runs: its agents (each with its script as the brief's
+    {{bash:}}), then its cards."""
+    out = ["set -u"]
+    for a in project["agents"]:
+        script = os.path.join(world, "seed", project["name"], a["name"] + ".sh")
+        brief = "%s {{bash: bash %s}}" % (a["objective"], script)
+        out.append("sb spawn %s%s --objective %s" % (a["name"], " --place %s" % a["place"] if a["place"] else "", shlex.quote(brief)))
+    for c in project["cards"]:
+        out.append("sb card %s" % shlex.quote(c))
+    out.append("echo seeded main")
+    return "\n".join(out) + "\n"
+
+
+def write_seeds(world, projects):
+    """The scripts on disk; returns the markers to wait for."""
+    want = []
+    for p in projects:
+        d = os.path.join(world, "seed", p["name"])
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "main.sh"), "w") as f:
+            f.write(main_script(world, p))
+        for a in p["agents"]:
+            with open(os.path.join(d, a["name"] + ".sh"), "w") as f:
+                f.write(agent_script(world, p["name"], a))
+            want.append(marker(world, p["name"], a["name"]))
+    return want
+
+
+def make_repo(ws, files):
+    """A project's git repo on main, its files committed."""
+    os.makedirs(ws, exist_ok=True)
+    for rel, text in files.items():
+        p = os.path.join(ws, rel)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w") as f:
+            f.write(text)
+    env = dict(os.environ, GIT_AUTHOR_NAME="qa", GIT_AUTHOR_EMAIL="qa@world.test", GIT_COMMITTER_NAME="qa", GIT_COMMITTER_EMAIL="qa@world.test")
+    for cmd in (["git", "init", "-q", "-b", "main"], ["git", "config", "user.email", "qa@world.test"], ["git", "config", "user.name", "qa"],
+                ["git", "config", "commit.gpgsign", "false"], ["git", "add", "-A"], ["git", "commit", "-q", "--no-verify", "-m", "init"]):
+        r = subprocess.run(cmd, cwd=ws, capture_output=True, text=True, env=env)
+        if r.returncode != 0:
+            raise RuntimeError("make_repo %s: %s: %s" % (ws, " ".join(cmd), (r.stderr or r.stdout).strip()))
+
+
+# ---------------------------------------------------------------- where
+
+def world_dir():
+    import qa
+    return os.environ.get("AMBIENT_WORLD_DIR") or os.path.join(GATE, "w-" + qa._short_agent())
+
+
+def _paths(world):
+    return {"home": os.path.join(world, "h"), "json": os.path.join(world, "world.json"), "log": os.path.join(world, "world.log")}
+
+
+def guard(world, values=()):
+    """Refuse a world outside ~/.bise/gate, or any value that reaches his own state."""
+    import qa
+    gate = os.path.realpath(GATE) + "/"
+    if not os.path.realpath(world).startswith(gate):
+        raise qa.QAError("refused: the world %s is not under ~/.bise/gate" % world)
+    qa.refuse_his_state(values)
+
+
+def _read(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def _alive(pid):
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+# ---------------------------------------------------------------- the daemon
+
+def daemon(bise, root, n):
+    """Detached (`qa.py _world`): the hubs, seeded, held until SIGTERM, then stopped."""
+    import qa
+    world = world_dir()
+    P = _paths(world)
+    sys.path.insert(0, os.path.join(qa.REPO, "tests"))
+    tmp = os.path.join(world, "t")
+    os.makedirs(tmp, exist_ok=True)
+    tempfile.tempdir = tmp
+    os.environ["BISE_APP_ROOT"] = root    # e2e.Env passes it on: the hubs' repl-live
+    import e2e  # noqa: E402
+    e2e.EXE = bise
+    try:
+        from wait import load_factor
+    except ImportError:
+        load_factor = getattr(e2e, "load_factor", lambda: 1.0)
+    home = P["home"]
+    qa._prepare_home(home)
+    home_ws = os.path.join(home, HOME_NAME)
+    os.makedirs(home_ws, exist_ok=True)
+    projects = plan(n)
+    stop = {"now": False}
+    signal.signal(signal.SIGTERM, lambda *_: stop.update(now=True))
+    signal.signal(signal.SIGINT, lambda *_: stop.update(now=True))
+    hubs, envs, holds = [], [], []
+    try:
+        for name, files in [(HOME_NAME, None)] + [(p["name"], p["files"]) for p in projects]:
+            ws = home_ws if files is None else os.path.join(home, "code", name)
+            if files is not None:
+                make_repo(ws, files)
+            E = e2e.Env()
+            envs.append(E)
+            E.ws = ws
+            sb_core = os.path.join(root, "sb-core")
+            if os.path.exists(sb_core):
+                E.env["SB_CORE_BIN"] = sb_core
+            E.env["BISE_HOME_WORKSPACE"] = home_ws
+            qa.real_home_env(E.env, home)
+            guard(world, [ws, home_ws] + list(E.env.values()))
+            before = set(glob.glob(os.path.join(home, ".bise", "hubs", "*", "hub.sock")))
+            err = open(os.path.join(E.tmp, "hub.stderr"), "a")
+            E.hub = subprocess.Popen([bise, "sbd", "--workspace", ws], cwd=e2e.ROOT, env=E.env,
+                                     stdin=subprocess.DEVNULL, stdout=err, stderr=err)
+            t0, limit, sock = time.time(), 60 * load_factor(), None
+            while not sock:
+                new = set(glob.glob(os.path.join(home, ".bise", "hubs", "*", "hub.sock"))) - before
+                sock = sorted(new)[0] if new else None
+                if not sock and (E.hub.poll() is not None or time.time() - t0 > limit):
+                    raise RuntimeError("the %s hub did not start in %.0f s (exit %s): %s" % (
+                        name, limit, E.hub.poll(), open(os.path.join(E.tmp, "hub.stderr"), errors="replace").read()[-2000:]))
+                time.sleep(0.1)
+            E.state = os.path.dirname(sock)
+            c = e2e.Client(sock)     # the world's hold: its hello keeps idle-exit away
+            holds.append(c)
+            hubs.append({"project": name, "ws": ws, "sock": sock, "state": E.state, "hub_pid": E.hub.pid,
+                         "fake_pid": E.fake.pid, "fake_log": E.fake_log, "home": files is None})
+        for h, c in zip(hubs, holds):
+            c.wait_status("main", "idle", 120 * load_factor())
+        want = write_seeds(world, projects)
+        for p in projects:
+            c = holds[[h["project"] for h in hubs].index(p["name"])]
+            c.say("[[bash: bash %s]]" % os.path.join(world, "seed", p["name"], "main.sh"))
+        t0 = time.time()
+        while [m for m in want if not os.path.exists(m)]:
+            if stop["now"] or time.time() - t0 > 300 * load_factor():
+                raise RuntimeError("not seeded in time: %s" % [os.path.basename(m) for m in want if not os.path.exists(m)])
+            time.sleep(0.3)
+        info = {"pid": os.getpid(), "world": world, "home": home, "bise": bise, "root": root, "projects": n,
+                "hubs": hubs, "registry": register(bise, home, [h["ws"] for h in hubs if not h["home"]]),
+                "up_ms": int(time.time() * 1000)}
+        with open(P["json"] + ".tmp", "w") as f:
+            json.dump(info, f, indent=1)
+        os.replace(P["json"] + ".tmp", P["json"])
+        while not stop["now"]:
+            time.sleep(0.3)
+    finally:
+        for E in envs:
+            E.keep = True        # the world's files stay for reading; `up` clears them
+            os.environ["SB_KEEP"] = "1"
+            try:
+                E.close()
+            except Exception:  # noqa: BLE001
+                pass
+        try:
+            os.unlink(P["json"])
+        except OSError:
+            pass
+
+
+def register(bise, home, workspaces):
+    """`bise project add` for each project once S1 has it (amb-hub); until then the hubs are
+    independent and this says so."""
+    env = {"HOME": home, "PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+    h = subprocess.run([bise, "project", "--help"], capture_output=True, text=True, env=env, timeout=20)
+    if h.returncode != 0 or "add" not in (h.stdout + h.stderr):
+        return "no `bise project` in this bise yet (S1): the hubs are independent"
+    out = []
+    for ws in workspaces:
+        r = subprocess.run([bise, "project", "add", ws], capture_output=True, text=True, env=env, timeout=30)
+        out.append({"ws": ws, "rc": r.returncode, "out": (r.stdout + r.stderr).strip()[-300:]})
+    return out
+
+
+# ---------------------------------------------------------------- the commands
+
+def up(n=3, bise=None, root=None):
+    """Clear the old world, start the daemon (under the heavy lock), wait until seeded."""
+    import qa
+    if os.environ.get("AMBIENT_WORLD_LOCKED") != "1":
+        args = [sys.executable, "-B", os.path.join(HERE, "qa.py"), "world", "up", "--projects", str(n)] \
+            + (["--bise", bise] if bise else []) + (["--root", root] if root else [])
+        os.makedirs(os.path.dirname(LOCK), exist_ok=True)
+        r = subprocess.run(["/usr/bin/lockf", "-k", LOCK, "nice", "-n", "10"] + args, capture_output=True, text=True,
+                           env=dict(os.environ, AMBIENT_WORLD_LOCKED="1"))
+        try:
+            return json.loads(r.stdout)
+        except ValueError:
+            raise qa.QAError("world up failed (%s): %s" % (r.returncode, (r.stderr or r.stdout)[-2000:]))
+    world = world_dir()
+    P = _paths(world)
+    guard(world)
+    old = _read(P["json"])
+    if old and _alive(old.get("pid")):
+        raise qa.QAError("a world is up (pid %s): `qa.py world down` first" % old["pid"])
+    plan(n)
+    if bise:
+        bise, root = os.path.abspath(bise), root or qa.app_root_of(bise)
+    else:
+        bise, root2 = qa.find_bise()
+        root = root or root2
+    if not root:
+        raise qa.QAError("%s has no app root with a built repl-live (--root)" % bise)
+    qa.ensure_helpers(root)
+    if os.path.exists(world):
+        shutil.rmtree(world)
+    os.makedirs(world)
+    log = open(P["log"], "a")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("SB_") and k not in ("BISE_ROLE", "BISE_EXPORTS_FOR", "AMBIENT_WORLD_LOCKED")}
+    env["AMBIENT_WORLD_DIR"] = world     # the daemon has no SB_AGENT: same folder as this caller's
+    p = subprocess.Popen([sys.executable, "-u", "-B", os.path.join(HERE, "qa.py"), "_world", "--bise", bise, "--root", root, "--projects", str(n)],
+                         stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True, cwd=qa.REPO, env=env)
+    t0 = time.time()
+    while time.time() - t0 < 900:
+        info = _read(P["json"])
+        if info and info.get("pid") == p.pid:
+            return dict(state(), log=P["log"])
+        if p.poll() is not None:
+            raise qa.QAError("the world's daemon exited (%s): %s" % (p.returncode, open(P["log"], errors="replace").read()[-2500:]))
+        time.sleep(0.3)
+    p.terminate()
+    raise qa.QAError("the world didn't come up in 900 s: see %s" % P["log"])
+
+
+def down():
+    """SIGTERM the daemon (it stops each hub), then make sure every recorded pid is gone."""
+    P = _paths(world_dir())
+    info = _read(P["json"])
+    if not info:
+        return {"down": "no world up"}
+    pids = [info["pid"]] + [h[k] for h in info["hubs"] for k in ("hub_pid", "fake_pid")]
+    if _alive(info["pid"]):
+        os.kill(info["pid"], signal.SIGTERM)
+    t0 = time.time()
+    while any(_alive(p) for p in pids) and time.time() - t0 < 60:
+        time.sleep(0.3)
+    killed = [p for p in pids if _alive(p)]
+    for p in killed:
+        os.kill(p, signal.SIGKILL)
+    left = subprocess.run(["ps", "-axww", "-o", "pid=,args="], capture_output=True, text=True).stdout
+    left = [l.strip() for l in left.splitlines() if info["world"] in l]
+    return {"down": True, "killed": killed, "left": left}
+
+
+def _hub_state(sock, timeout=10):
+    import qa
+    sys.path.insert(0, os.path.join(qa.REPO, "tests"))
+    import e2e  # noqa: E402
+    c = e2e.Client(sock)
+    try:
+        t0 = time.time()
+        while c.state is None and time.time() - t0 < timeout:
+            time.sleep(0.05)
+        return c.state or {}
+    finally:
+        c.s.close()
+
+
+def _git(path, *args):
+    r = subprocess.run(["git", "-C", path] + list(args), capture_output=True, text=True)
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def state():
+    """Each hub's agents (status, place, branch, commits ahead of main, dirty files) and cards."""
+    import qa
+    info = _read(_paths(world_dir())["json"])
+    if not info:
+        raise qa.QAError("no world up: `qa.py world up`")
+    out = []
+    for h in info["hubs"]:
+        st = _hub_state(h["sock"])
+        agents = []
+        for a in st.get("agents", []):
+            row = {"name": a.get("name"), "status": a.get("status"), "mode": a.get("mode"), "branch": a.get("branch")}
+            if a.get("mode") == "worktree" and a.get("path") and os.path.isdir(a["path"]):
+                row["path"] = a["path"]
+                row["commits"] = (_git(a["path"], "log", "--format=%s", "main..HEAD") or "").splitlines()
+                row["diff"] = _git(a["path"], "diff", "--shortstat", "main...HEAD")
+                row["dirty"] = (_git(a["path"], "status", "--porcelain") or "").splitlines()
+            agents.append(row)
+        cards = [{"id": c.get("id"), "text": (c.get("text") or c.get("question") or "")[:160]} for c in st.get("cards", [])]
+        out.append({"project": h["project"], "home": h["home"], "ws": h["ws"], "sock": h["sock"], "hub_pid": h["hub_pid"],
+                    "alive": _alive(h["hub_pid"]), "agents": agents, "cards": cards})
+    return {"world": info["world"], "home": info["home"], "pid": info["pid"], "bise": info["bise"],
+            "registry": info.get("registry"), "hubs": out}
+
+
+def say(project, text):
+    """Words to that project's main (bise = the home hub), as typed in its TUI."""
+    import qa
+    info = _read(_paths(world_dir())["json"])
+    if not info:
+        raise qa.QAError("no world up")
+    h = [h for h in info["hubs"] if h["project"] == project or (project == HOME_NAME and h["home"])]
+    if not h:
+        raise qa.QAError("no project %r in the world (%s)" % (project, ", ".join(x["project"] for x in info["hubs"])))
+    sys.path.insert(0, os.path.join(qa.REPO, "tests"))
+    import e2e  # noqa: E402
+    c = e2e.Client(h[0]["sock"])
+    try:
+        c.say(text)
+        time.sleep(0.3)
+    finally:
+        c.s.close()
+    return {"sent": text, "project": h[0]["project"]}

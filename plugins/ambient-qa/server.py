@@ -35,6 +35,9 @@ TOOLS = [
     ("rest", "The capsule back to rest (folded into the icon) and bise not the active app.", {}, []),
     ("real", "Harness A: his REAL app build (no --qa) on an isolated HOME, a throwaway fake-provider hub found by his own rules, its panels on an off-screen virtual display, driven through the app's test socket (NSEvents into its own queue, never HID, never his screen, focus or keyboard). do: launch (app?, bise? default his ~/.bise/dev/build/ambient/target/debug/bise), stop (always, right after a run), feed (the hub's last lines of main: did his words arrive), logs (the tail of the app's, core's and hub's logs), keys (specs like up esc return cmd+w type:hello), or any test-socket op (ping state click key type fn shot eval events) with args.",
      {"do": {"type": "string"}, "args": {"type": "object"}, "specs": {"type": "array", "items": {"type": "string"}}}, ["do"]),
+    ("world", "bise desktop's throwaway world (world.py): one isolated HOME under ~/.bise/gate with bise's home hub and 2-3 projects (telemetry, shop, docs), each its own fake-provider hub, seeded by its fake main: agents in worktrees, a committed diff ready to merge, an agent at work in a dirty worktree, cards with options, a merge question, a blocked agent, an artifact. do: up (projects 2|3, bise?, root?; takes the heavy lock itself), state (each hub's agents, commits, diffs, cards, socket), say (project or 'bise', text: words to that project's fake main; [[bash: ...]] scripts it), down (always, when done: stops every hub by pid).",
+     {"do": {"type": "string", "enum": ["up", "state", "say", "down"]}, "projects": {"type": "integer"}, "bise": {"type": "string"}, "root": {"type": "string"},
+      "project": {"type": "string"}, "text": {"type": "string"}}, ["do"]),
     ("eval", "Read one JS expression on the capsule's page: its value (JSON parsed), and whether the panel is visible. fn_held: read while fn is held (talk open), then cancel. Reads only: never act on the page with it.",
      {"js": {"type": "string"}, "fn_held": {"type": "boolean"}}, ["js"]),
     ("hover", "The pointer over an element: mouseMoved events at its point into the QA app's queue for ms (his pointer never moves); over = the page saw it. Can't drive tracking areas (cursor shape).",
@@ -146,6 +149,17 @@ def run(name, a):
             r = qa.real_op(d, **kw)
         if d == "shot" and r.get("png"):
             images.append(r["png"])
+    elif name == "world":
+        import world
+        d = a["do"]
+        if d == "up":
+            r = world.up(a.get("projects", 3), a.get("bise"), a.get("root"))
+        elif d == "say":
+            r = world.say(a["project"], a["text"])
+        elif d in ("down", "state"):
+            r = getattr(world, d)()
+        else:
+            raise qa.QAError("world: do up|state|say|down")
     elif name == "eval":
         r = qa.eval_js(a["js"], fn_held=a.get("fn_held", False))
     elif name == "hover":
