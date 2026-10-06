@@ -294,7 +294,17 @@ law("environments on bise-proto's worktrees fixture (amb-core e4160bd6): the age
   eq(g().rows.map((r) => [r.branch, r.agent, r.end, r.dirty]), [["sb/perf", "perf", "2 ahead", true]]);
   // a detached worktree (branch ''), dirty as a count of untracked files
   w.feed({ ...wt, items: [{ ...wt.items[0], branch: "", dirty: 3, ahead: 0 }, wt.items[1]] });
-  eq(g().rows.map((r) => [r.branch, r.dirty]), [["detached", true]]);
+  eq(g().rows.map((r) => [r.branch, r.sha, r.dirty]), [["detached", null, true]]);
+  // with its commit (head): 'detached at e0f3df5', the sha opens it on GitHub (acme has a GitHub remote, ambient m_8946)
+  const head = "e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e";
+  w.feed({ ...wt, items: [{ ...wt.items[0], branch: "", head }, wt.items[1]] });
+  const r = g().rows[0];
+  eq([r.branch, r.sha.text, r.sha.tip], ["detached at ", "e0f3df5", "open on GitHub"]);
+  eq(w.feed(r.sha.act).cmds.filter((c) => c.cmd === "app_open_url"), [{ cmd: "app_open_url", project: wt.project, url: `${acme.web}/commit/${head}` }]);
+  // no GitHub remote: the click copies it, 'copied e0f3df5'
+  w.feed({ ev: "projects", projects: w.s.projects.map((p) => (p.project === wt.project ? { ...p, web: undefined } : p)) });
+  eq(w.feed(g().rows[0].sha.act).cmds.filter((c) => c.cmd === "app_copy"), [{ cmd: "app_copy", text: head }]);
+  eq([g().rows[0].sha.text, g().rows[0].sha.tip], ["copied e0f3df5", "copy"]);
 });
 
 law("the fake S7 world speaks S3a's drafts: every event names its project, no event for bise's own", () => {
