@@ -45,7 +45,13 @@ impl Shell {
             "xin" => {
                 // sb-core answers through the token (Effect::Reply)
                 self.replies.insert(token, stream);
-                self.step(Input::XIn { token, hub: s("hub"), xid, kind: s("kind"), text: s("text") });
+                // a routed message's fn context (S2, 9dc23d9c): rendered
+                // here once, the same block as a direct input's (S9)
+                let text = match crate::fn_context::of(v.get("context")) {
+                    Some(ctx) => crate::fn_context::with_context(&s("text"), &ctx),
+                    None => s("text"),
+                };
+                self.step(Input::XIn { token, hub: s("hub"), xid, kind: s("kind"), text });
             }
             _ => {
                 self.step(Input::XReply { xid, name: s("name"), text: s("text") });

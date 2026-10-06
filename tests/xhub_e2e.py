@@ -22,6 +22,7 @@ Run: python3 -u tests/xhub_e2e.py
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -124,9 +125,25 @@ def main():
         q = [m["msg"] for m in of_type(pstate, "message_sent") if m["msg"]["from"] == "@bise"]
         check(len(q) == 1 and q[0]["to"] == "main", "the project's main heard @bise: %r" % q)
 
+        psock = os.path.join(pstate, "hub.sock")
+        # a routed message's fn context (9dc23d9c + S9): the project renders
+        # it once, the same <screen_context> block as a direct input's
+        one = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        one.settimeout(30)
+        one.connect(psock)
+        one.sendall((json.dumps({"op": "xin", "hub": home_row["id"], "xid": 99, "kind": "input", "text": "why does p99 rise",
+                                 "context": {"app": "Safari", "url": "https://grafana.shop.test/d/p99", "title": "p99"}}) + "\n").encode())
+        got = one.makefile().readline()
+        one.close()
+        check(json.loads(got).get("ok") is True, "the xin is acked: %r" % got)
+        wait.until(lambda: [x for x in of_type(pstate, "x_in") if x["in"]["xid"] == 99], 30, "the routed input with its context")
+        xin = [x for x in of_type(pstate, "x_in") if x["in"]["xid"] == 99][0]["in"]
+        said = [m["msg"] for m in of_type(pstate, "message_sent") if m["msg"]["id"] == xin["msg"]][0]
+        check(said["text"].startswith("why does p99 rise") and "<screen_context" in said["text"] and "grafana.shop.test" in said["text"],
+              "the context rendered on the project: %r" % said["text"])
+
         # S2 step 3 (C): only bise reads other projects; a project's agent
         # is refused
-        psock = os.path.join(pstate, "hub.sock")
         r = sb_as_main(E.env, psock, "history", "login", "--project", "bise")
         check(r.returncode != 0 and "only bise reads other projects" in (r.stdout + r.stderr), "a project hub refuses: %s %s" % (r.stdout, r.stderr))
         # the project's hub stopped: bise reads its threads on disk, never
