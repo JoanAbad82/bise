@@ -375,7 +375,7 @@
       const parts = [x.done ? `${x.done} done` : "", x.questions ? plural(x.questions, "question", "questions") : "", x.failed ? `${x.failed} failed` : ""].filter(Boolean);
       return [...parts, ...(row || x.failed ? [] : ["nothing broke"])].join(" · ");
     },
-    drop: (name) => `→ bise · ${name}`, with: "with",
+    drop: (name) => `→ bise · ${name}`, with: "with", send: "send to bise",
   };
   root.AmbWords = { s9, W, spot, route, menu, GLYPH, idleLine, firstSentence, oneLine, doneLine, failLine, needsLine, answeredLine, card, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -227,8 +227,10 @@
           const d = v.spot.drop, r = v.spot.list ? spotlight(s, v) : v.find ? finder(s, v) : s;
           r.head = { h: 68, input: { text: v.spot.text, ph: SP.ph }, right: { text: SP.to } };
           r.sections = [{ label: Wd.s9.with, rows: [...d.files.map((f) => ({ g: f.kind === "folder" ? "▤" : f.kind === "image" ? "▣" : "▢", t: f.name, sub: f.path, fixed: true })),
-            ...(d.url ? [{ g: "↗", t: d.url, fixed: true }] : [])] }, ...(r.sections || [])];
-          return r;
+            ...(d.url ? [{ g: "↗", t: d.url, fixed: true }] : []),
+            // enter sends the drop (with his words if any), never the first card below
+            { g: "@", gc: "a", t: Wd.s9.send, act: { ev: "ui_spot_send", text: v.spot.text }, qa: "drop-send" }] }, ...(r.sections || [])];
+          return markSel(r, 0);   // the files are fixed: 'send to bise' is the first selectable row
         }
         if (v.spot.list) return spotlight(s, v);
         if (v.find) return finder(s, v);

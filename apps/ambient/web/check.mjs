@@ -1354,7 +1354,8 @@ law("S9 a drop on the pearl (amb-mac m_9037): app_drop opens the spotlight with 
   let r = M.step(M.init(), { ev: "app_drop", files }, 0);
   eq(r.cmds, [{ cmd: "app_focus", on: true }]);
   let s = Bar.spec(M.view(r.m, 10));
-  eq([s.kind, s.sections[0].label, s.sections[0].rows.map((x) => [x.g, x.t])], ["spotlight", "with", [["▢", "forest.ktx"], ["▤", "shots"]]]);
+  eq([s.kind, s.sections[0].label, s.sections[0].rows.map((x) => [x.g, x.t])], ["spotlight", "with", [["▢", "forest.ktx"], ["▤", "shots"], ["@", "send to bise"]]]);
+  eq(Bar.selRow(s).qa, "drop-send");   // enter sends the drop, never the first card
   const sent = M.step(r.m, { ev: "ui_spot_send" }, 20);
   eq(sent.cmds.filter((c) => c.cmd === "send"), [{ cmd: "send", text: "", files: ["/Users/you/Desktop/forest.ktx", "/Users/you/shots"] }]);
   eq(M.view(M.step(sent.m, { ev: "sent" }, 30).m, 40).sub, "→ bise · forest.ktx +1");
