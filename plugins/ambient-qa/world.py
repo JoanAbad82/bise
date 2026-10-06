@@ -211,6 +211,13 @@ def guard(world, values=()):
     gate = os.path.realpath(GATE) + "/"
     if not os.path.realpath(world).startswith(gate):
         raise qa.QAError("refused: the world %s is not under ~/.bise/gate" % world)
+    if isinstance(values, dict):
+        for k, v in values.items():
+            try:
+                qa.refuse_his_state([v])
+            except qa.QAError as e:
+                raise qa.QAError("%s (env %s)" % (e, k))
+        return
     qa.refuse_his_state(values)
 
 
@@ -270,7 +277,7 @@ def daemon(bise, root, n):
                 E.env["SB_CORE_BIN"] = sb_core
             E.env["BISE_HOME_WORKSPACE"] = home_ws
             qa.real_home_env(E.env, home)
-            guard(world, [ws, home_ws] + list(E.env.values()))
+            guard(world, dict(E.env, _ws=ws, _home_ws=home_ws))
             before = set(glob.glob(os.path.join(home, ".bise", "hubs", "*", "hub.sock")))
             err = open(os.path.join(E.tmp, "hub.stderr"), "a")
             E.hub = subprocess.Popen([bise, "sbd", "--workspace", ws], cwd=e2e.ROOT, env=E.env,
