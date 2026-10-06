@@ -165,7 +165,12 @@ export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev"
 /**
  * What the app asks the core itself (never forwarded to a hub).
  */
-export type AppCmd = { "cmd": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "cmd": "project_add", path: string, land?: boolean | null, } | { "cmd": "project_remove", project: string, } | { "cmd": "project_move", project: string, order: number, } | { "cmd": "project_rename", project: string, name: string, } | { "cmd": "prefs_set", key: string, value: JsonValue, } | { "cmd": "sign_in", id: string, } | { "cmd": "key_set", id: string, key: string, } | { "cmd": "key_remove", id: string, } | { "cmd": "found_scan", dir?: string | null, } | { "cmd": "away_back", away_ms: number, } | { "cmd": "plugins", project?: string | null, } | { "cmd": "plugin_set", project?: string | null, name: string, on: boolean, } | { "cmd": "plugin_login", project?: string | null, name: string, } | { "cmd": "plugin_logout", project?: string | null, name: string, } | { "cmd": "computer_use", act: string, fix?: string | null, } | { "cmd": "shown", projects: Array<string>, };
+export type AppCmd = { "cmd": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "cmd": "project_add", path: string, land?: boolean | null, } | { "cmd": "project_remove", project: string, } | { "cmd": "project_move", project: string, order: number, } | { "cmd": "project_rename", project: string, name: string, } | { "cmd": "prefs_set", key: string, value: JsonValue, } | { "cmd": "sign_in", id: string, } | { "cmd": "key_set", id: string, key: string, } | { "cmd": "key_remove", id: string, } | { "cmd": "found_scan", dir?: string | null, } | { "cmd": "away_back", away_ms: number, } | { "cmd": "plugins", project?: string | null, } | { "cmd": "plugin_set", project?: string | null, name: string, on: boolean, } | { "cmd": "plugin_login", project?: string | null, name: string, } | { "cmd": "plugin_logout", project?: string | null, name: string, } | { "cmd": "computer_use", act: string, fix?: string | null, } | { "cmd": "shown", projects: Array<string>, } | { "cmd": "talk_start", page?: TalkPage | null, } | { "cmd": "talk_end" } | { "cmd": "talk_cancel" };
+
+/**
+ * The bise page a note talk is about (`talk_start {page}`).
+ */
+export type TalkPage = { id: string, url?: string | null, };
 
 /**
  * `hubs/<id>/view.json` (S1, written only by that hub): what the sidebar

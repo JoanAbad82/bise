@@ -86,12 +86,16 @@ impl Cmd {
             return bise_proto::draft::AppCmd::decode(line).map(Cmd::App).map_err(|e| format!("{cmd}: {e}"));
         }
         Ok(match cmd.as_str() {
-            "talk_start" => match v.get("page").and_then(|p| p.get("id")).and_then(Value::as_str).map(str::trim) {
-                Some(id) if !id.is_empty() => Cmd::PageTalk { page: id.to_string() },
-                _ => Cmd::TalkStart,
+            // bise-proto's AppCmd talk_* (qa-native m_9726): the proto's shapes are the ones parsed
+            "talk_start" | "talk_end" | "talk_cancel" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+                bise_proto::draft::AppCmd::TalkStart { page } => match page.as_ref().map(|p| p.id.trim()) {
+                    Some(id) if !id.is_empty() => Cmd::PageTalk { page: id.to_string() },
+                    _ => Cmd::TalkStart,
+                },
+                bise_proto::draft::AppCmd::TalkEnd => Cmd::TalkEnd,
+                bise_proto::draft::AppCmd::TalkCancel => Cmd::TalkCancel,
+                other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
-            "talk_end" => Cmd::TalkEnd,
-            "talk_cancel" => Cmd::TalkCancel,
             "away_back" => Cmd::AwayBack { away_ms: v.get("away_ms").and_then(Value::as_u64).ok_or("away_back: no away_ms")? },
             "fn_context" => match v.get("context") {
                 Some(c) if c.is_object() => Cmd::FnContext(serde_json::from_value(c.clone()).map_err(|e| format!("fn_context: {e}"))?),

@@ -124,6 +124,8 @@ export class Store {
   private cid = 0;
   /** the last shown set sent (null: none yet); said again to a core that comes back up */
   private shownSet: readonly string[] | null = null;
+  /** the threads this window follows (subscribeThread), said again to a core that comes back up */
+  private readonly subs = new Map<string, { project: string; agent: string; limit: number | undefined }>();
   private readonly now: () => number;
 
   constructor(
@@ -326,12 +328,24 @@ export class Store {
     this.coreState = state;
     this.emit('core');
     // a new core knows nothing of the window: what it shows is said again
-    if (state === 'up' && this.shownSet !== null) this.command({ cmd: 'shown', projects: [...this.shownSet] });
+    if (state === 'up') this.sayAgain();
     if (state !== 'down') return;
     for (const [key, t] of this.threads) {
       if (!t.pending.some((p) => p.state === 'sending')) continue;
       t.pending = t.pending.map((p) => (p.state === 'sending' ? { ...p, state: 'failed', why: 'not sent' } : p));
       this.emit(`pending:${key}`);
+    }
+  }
+
+  /**
+   * A (re)started core knows nothing of this window (qa-native m_9736): what it
+   * shows, then every thread it follows, are said again (their pages come back
+   * and merge: an entry already held is replaced only if it changed).
+   */
+  private sayAgain(): void {
+    if (this.shownSet !== null) this.command({ cmd: 'shown', projects: [...this.shownSet] });
+    for (const s of this.subs.values()) {
+      this.command({ cmd: 'subscribe', project: s.project, agent: s.agent, ...(s.limit === undefined ? {} : { limit: s.limit }) });
     }
   }
 
@@ -460,10 +474,13 @@ export class Store {
     this.command({ cmd: 'shown', projects: set });
   }
 
+  /** A thread's newest page then its live entries; kept, and asked again of a core that comes back up. */
   subscribeThread(project: string, agent: string, limit?: number): void {
+    this.subs.set(threadKey(project, agent), { project, agent, limit });
     this.command({ cmd: 'subscribe', project, agent, ...(limit === undefined ? {} : { limit }) });
   }
   unsubscribeThread(project: string, agent: string): void {
+    this.subs.delete(threadKey(project, agent));
     this.command({ cmd: 'unsubscribe', project, agent });
   }
   /** The page before the oldest entry held (nothing when there is no more). */

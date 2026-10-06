@@ -328,8 +328,28 @@ pub enum AppCmd {
     /// each route change): the core holds their hubs and sends their
     /// `projects`/`agents`/`cards` only after the first one (core/hubs.rs)
     Shown { projects: Vec<Project> },
+    /// fn held (the helper's talk): the core opens the mic and starts a
+    /// talk to main; `page`: a note talk on that bise page instead, its
+    /// words to the page, never to main (docs/ambient-pages.md §4.1)
+    TalkStart {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        page: Option<TalkPage>,
+    },
+    /// fn released: the talk's words go
+    TalkEnd,
+    /// the talk is dropped, nothing sent
+    TalkCancel,
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
+}
+
+/// The bise page a note talk is about (`talk_start {page}`).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct TalkPage {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
 }
 
 impl AppCmd {
@@ -351,6 +371,9 @@ impl AppCmd {
         "plugin_logout",
         "computer_use",
         "shown",
+        "talk_start",
+        "talk_end",
+        "talk_cancel",
     ];
 
     pub fn decode(line: &str) -> Result<AppCmd, String> {

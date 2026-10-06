@@ -107,6 +107,10 @@ export const app_cmd: readonly AppCmd[] = [
   {"act":"leave","cmd":"computer_use"},
   {"act":"uninstall","cmd":"computer_use"},
   {"cmd":"shown","projects":["bise-home-00000000","acme-1a2b3c4d"]},
+  {"cmd":"talk_start"},
+  {"cmd":"talk_start","page":{"id":"q3-notes","url":"http://127.0.0.1:47438/p/q3-notes"}},
+  {"cmd":"talk_end"},
+  {"cmd":"talk_cancel"},
 ];
 
 /** rust/proto/fixtures/draft_hub_cmd.jsonl */

@@ -12,6 +12,22 @@ import { Latest } from '../../shared/latest';
 import { CoreProcess } from './process';
 
 let core: CoreProcess | null = null;
+// the last state events, for a window or a main-side listener that comes after they went out
+const latest = new Latest();
+const listeners = new Set<(ev: Record<string, unknown>) => void>();
+
+/**
+ * Main's own listener on the core's events (amb-mac m_9733: the helper's
+ * config follows the core's prefs). The kept state events are replayed to it
+ * first, so a listener added late misses nothing. Returns the unsubscribe.
+ */
+export function onCoreEvent(listener: (ev: Record<string, unknown>) => void): () => void {
+  for (const ev of latest.snapshot()) listener(ev);
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
 
 function broadcast(channel: string, payload: unknown): void {
   for (const w of BrowserWindow.getAllWindows()) {
@@ -31,8 +47,6 @@ function log(line: string): void {
  */
 export function startCore(env: Readonly<Record<string, string | undefined>> = process.env): void {
   let state: CoreState = 'down';
-  // the last state events, for a window that loads after they went out
-  const latest = new Latest();
   ipcMain.on(CORE_IPC.cmd, (_e, cmd: unknown) => {
     core?.send(cmd);
   });
@@ -49,6 +63,7 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
     {
       onEvent: (ev) => {
         latest.keep(ev);
+        for (const l of [...listeners]) l(ev);
         broadcast(CORE_IPC.ev, ev);
       },
       onState: (s) => {

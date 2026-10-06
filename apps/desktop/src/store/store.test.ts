@@ -170,6 +170,25 @@ describe('store', () => {
     expect(app_cmd.map((c) => c.cmd)).toContain('shown');
   });
 
+  it('a core that comes back up gets shown and every followed thread again, not the dropped ones (qa-native m_9736)', () => {
+    const { store, sent } = fake();
+    store.shown(['home', P]);
+    store.subscribeThread(P, 'perf', 60);
+    store.subscribeThread(P, 'main');
+    store.subscribeThread(P, 'old');
+    store.unsubscribeThread(P, 'old');
+    sent.length = 0;
+    store.setCore('down');
+    store.setCore('starting');
+    expect(sent).toEqual([]);
+    store.setCore('up');
+    expect(sent).toEqual([
+      { cmd: 'shown', projects: ['home', P] },
+      { cmd: 'subscribe', project: P, agent: 'perf', limit: 60 },
+      { cmd: 'subscribe', project: P, agent: 'main' },
+    ]);
+  });
+
   it('olderPage asks for the page before the oldest entry, only when there is more', () => {
     const { store, sent } = fake();
     store.olderPage(P, 'perf');

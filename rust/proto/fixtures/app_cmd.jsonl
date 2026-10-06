@@ -22,3 +22,7 @@
 {"cmd":"computer_use","act":"leave"}
 {"cmd":"computer_use","act":"uninstall"}
 {"cmd":"shown","projects":["bise-home-00000000","acme-1a2b3c4d"]}
+{"cmd":"talk_start"}
+{"cmd":"talk_start","page":{"id":"q3-notes","url":"http://127.0.0.1:47438/p/q3-notes"}}
+{"cmd":"talk_end"}
+{"cmd":"talk_cancel"}
