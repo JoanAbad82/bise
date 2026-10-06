@@ -26,6 +26,14 @@
   // its agent the one 'merged today' names (else main, who lands his own and the features)
   const byOf = (e, project, sha) => { const c = (((e && e.merged) || {})[project] || []).find((x) => x.sha === sha); return c && c.by && c.by !== "you" ? c.by : "main"; };
   const norm = (e, r) => (r && r.screen === "commit" ? { ...r, agent: byOf(e, r.project, r.sha), commit: r.sha } : r);
+  // a route's merged sha: the diff's merged (a branch just merged), or the commit itself (screen
+  // 'commit' opens a commit already on main: read-only, never 'merge into main', lead m_9357)
+  const mergedOf = (d, r) => (d && d.merged) || (r && r.screen === "commit" ? r.sha : null);
+  // when that commit landed, from 'merged today' (its at_ms), as hh:mm in his time zone
+  const whenOf = (s, e, r, sha) => {
+    const c = sha && (((e && e.merged) || {})[r.project] || []).find((x) => x.sha === sha || short(x.sha) === short(sha));
+    return c && c.at_ms ? new Date(c.at_ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, ...(s.tz ? { timeZone: s.tz } : {}) }) : "";
+  };
   const base = (p) => String(p || "").split("/").pop();
 
   function enter(e, route0) {
@@ -75,10 +83,10 @@
       // the merged sha (ambient m_8830, identity10's click audit): the commit on GitHub when the
       // project has a GitHub remote (its row's web url), else the sha copied ('copied e0f3df5')
       case "ui_rv_sha": {
-        const d = e.diffs[rk(r)], web = webOf(s, r.project);
-        if (!d || !d.merged) return { e, cmds: [] };
-        if (web) return { e, cmds: [{ cmd: "app_open_url", url: `${web}/commit/${d.merged}`, project: r.project }] };
-        return { e: { ...e, copied: d.merged }, cmds: [{ cmd: "app_copy", text: d.merged }] };
+        const sha = mergedOf(e.diffs[rk(r)], r), web = webOf(s, r.project);
+        if (!sha) return { e, cmds: [] };
+        if (web) return { e, cmds: [{ cmd: "app_open_url", url: `${web}/commit/${sha}`, project: r.project }] };
+        return { e: { ...e, copied: sha }, cmds: [{ cmd: "app_copy", text: sha }] };
       }
       case "ui_rv_file": return { e: { ...e, pick: { ...e.pick, [rk(r)]: ev.i }, sel: null }, cmds: [] };
       case "ui_rv_line": {
@@ -96,6 +104,8 @@
       // merge into main: the agent's approval card when it has one (its "merge" option), else the
       // merge cmd (S3a draft); the core answers with the diff carrying merged: <sha>
       case "ui_rv_merge": {
+        // a commit already on main has nothing to merge (⌘⏎ there does nothing)
+        if (mergedOf(e.diffs[rk(r)], r)) return { e, cmds: [] };
         const c = approval(s, r.project, r.agent);
         if (c) {
           const o = (c.options || []).find((x) => /merge/i.test(x.label)) || (c.options || [])[0];
@@ -148,8 +158,12 @@
     const p = s.projects.find((x) => x.project === r.project) || { name: r.project };
     const a = (s.agents[r.project] || []).find((x) => x.name === r.agent) || { status: "idle", title: "" };
     const dot = a.status === "working" ? "wk" : a.status === "done" ? "ok" : a.status === "waiting" ? "nd" : "";
-    const merged = d && d.merged;
-    const head = { t1: r.agent, dot: merged ? "ok" : dot, t2: [p.name, ...(a.branch || (d && d.head) ? [`ψ ${a.branch || d.head}`] : []), ...(a.title ? [a.title] : []), merged ? `merged · ${merged}` : a.status], acc: -1,
+    const merged = mergedOf(d, r);
+    const landed = r.screen === "commit";
+    const when = merged ? whenOf(s, e, r, merged) : "";
+    // a landed commit's header says what it is (merged · e0f3df5 · 10:40), not its agent's live branch
+    const head = { t1: r.agent, dot: merged ? "ok" : dot, t2: [p.name, ...(!landed && (a.branch || (d && d.head)) ? [`ψ ${a.branch || d.head}`] : []), ...(!landed && a.title ? [a.title] : []),
+      merged ? [`merged · ${short(merged)}`, when].filter(Boolean).join(" · ") : a.status], acc: -1,
       end: [{ kind: "btn", text: "thread", act: { ev: "ui_route", project: r.project, agent: r.agent } }] };
     // an error keeps the way back (ambient m_8820): '▲ can't show the changes.', the core's text (one line, ▸ the rest), '↻ try again'
     if (!d && e.err && e.err.key === rk(r)) return { screen: "review", head, err: { title: "can't show the changes.", text: e.err.text, more: e.err.more } };

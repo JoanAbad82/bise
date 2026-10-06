@@ -241,6 +241,11 @@ law("a project's changes tab (lead m_8972): agents ahead with their branch, file
   w.feed({ ev: "diff", project: P.engine, agent: "streaming", commit: sha, base: "main", files: [{ path: "a.rs", status: "modified", add: 1, del: 0, hunks: [] }] });
   eq(S7.tab(w.s, P.engine, "changes").rows[0].end, "3 files · +84 −21");
   eq(S7.view({ ...w.s, route: { screen: "commit", project: P.engine, sha } }).changed, "1 file · +1 −0");
+  // a commit already on main is read-only (lead m_9357): 'merged · e0f3df5 · 14:05' in the header, no
+  // 'merge into main' or 'ask for changes', and ⌘⏎ sends nothing (the diff carries no merged flag)
+  const cv = S7.view({ ...w.s, route: { screen: "commit", project: P.engine, sha } });
+  eq([cv.head.dot, cv.head.t2.at(-1), cv.actions], ["ok", "merged · e0f3df5 · 14:05", []]);
+  eq(S7.step(w.s.s7, { ev: "ui_rv_merge" }, { ...w.s, route: { screen: "commit", project: P.engine, sha } }).cmds || [], []);
   // nothing ahead, nothing merged: says so
   eq(S7.tab(w.s, P.storefront, "changes").empty === null, true);
   eq(S7.tab({ ...w.s, s7: { ...w.s.s7, env: { ...w.s.s7.env, wt: {} } } }, P.home || "nowhere", "changes").empty.title, "nothing waiting to merge into main");
