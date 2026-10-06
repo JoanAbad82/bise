@@ -18,7 +18,7 @@
       case "answered": case "done": return "done";
       case "failed": case "error": case "hub_down": return "fail";
     }
-    if (v.state === "agents" || v.state === "inbox" || v.state === "find") return asking.length ? "need" : working(m.agents) ? "work" : m.quiet ? "away" : "rest";
+    if (v.state === "agents" || v.state === "inbox" || v.state === "find" || v.state === "menu") return asking.length ? "need" : working(m.agents) ? "work" : m.quiet ? "away" : "rest";
     if (m.quiet) return "away";
     if (v.pose === "think") return "work";
     return "rest";
@@ -64,7 +64,7 @@
       // to the page until then (desktop S8)
       case "route": return { kind: "got", route: true };
       case "speaking": case "end": return { kind: "answer" };
-      case "agents": case "inbox": case "settings": case "pages": case "offline": return { kind: "open" };
+      case "agents": case "inbox": case "settings": case "pages": case "offline": case "menu": return { kind: "open" };
       case "hello": return { kind: "hello" };
       // a permission ask is opened (until he answers); its refused line is a timed line, 8 s (amb-mac m_5679)
       case "perm": return { kind: v.perm ? "open" : "line" };

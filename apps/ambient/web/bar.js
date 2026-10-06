@@ -264,6 +264,24 @@
         s.foot = { left: [item(["⏎"], B.tryAgain, { ev: "ui_retry" })], right: [item(["esc"], B.close, key("esc"))] };
         return markSel(s, v.rowSel);
       }
+      // desktop S8: the menu-bar pearl's dropdown (amb-mac places it under the icon; app_menu)
+      case "menu": {
+        const u = v.menu, MN = Wd.menu;
+        const hm = (ms) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+        s.head = { h: 52, lab: { acc: u.waits ? MN.head(u.working, u.waits) : "", rest: u.waits ? "" : MN.head(u.working, 0) } };
+        s.text = { s: u.failed ? MN.broke(u.failed) : MN.calm, dim: !u.failed };
+        if (u.cards.length) s.sections.push({ rows: u.cards.map((c, k) => ({ g: "?", gc: "a", t: c.agent, p: c.pname, sub: c.text,
+          right: k === 0 ? { keys: ["fn", "1"] } : null, act: { ev: "ui_open_card", card: c.id }, qa: `card-${c.id}` })) });
+        if (u.followed.length) s.sections.push({ rows: u.followed.map((a) => ({ g: a.failed ? "▲" : "∿", gc: a.failed ? "risk" : "work",
+          t: [a.pname, a.name, MN.following].filter(Boolean).join(" · "), sub: a.job ? MN.job(a.job) : a.title || null,
+          act: { ev: "ui_agent", agent: a.name, ...(a.project ? { project: a.project } : {}) }, qa: `job-${a.name}` })) });
+        s.sections.push({ rows: [
+          { g: ":*", t: MN.openBise, right: { keys: ["⌘", "0"] }, act: { ev: "ui_open_bise" }, qa: "open-bise" },
+          { g: "☾", t: u.quiet ? MN.quietUntil(hm(u.quiet.until)) : MN.quietHour, act: { ev: "ui_quiet_hour" }, qa: "quiet-hour" },
+          { g: "⚙", t: MN.settings, right: { keys: ["⌘", ","] }, act: { ev: "app_key", key: "," }, qa: "settings" },
+        ] });
+        return markSel(s, v.rowSel);
+      }
       case "settings": {
         const st = v.settings;
         s.head = { h: 68, line: { ph: true, text: W.set.title }, right: item(["fn", ","]) };

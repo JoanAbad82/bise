@@ -171,6 +171,16 @@
     another: "another project", cancel: "cancel",
   };
 
+  // desktop S8: the menu-bar pearl's dropdown (v9 'la perle dans la barre de menus')
+  const menu = {
+    head: (work, waits) => `${work} at work${waits ? ` · ${waits} wait${waits === 1 ? "s" : ""} for you` : ""}`,
+    calm: "nothing broke today", broke: (n) => `▲ ${n} failed`,
+    following: "following", job: (j) => `${j.label || ""} · ${num(j.step)} / ${num(j.steps)}${j.unit ? ` ${j.unit}` : ""}`.replace(/^ · /, ""),
+    openBise: "open bise", quietHour: "quiet for 1 h", quietUntil: (hm) => `quiet until ${hm} · end it`, settings: "settings…",
+    nothingWaits: "nothing waits for you",
+  };
+  function num(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+
   // the screen recording pane's name: `Screen & System Audio Recording` since macOS 15 (Sequoia),
   // `Screen Recording` before; the app tells the major version (app_settings.macos)
   function permDenied(perm, macos) {
@@ -324,5 +334,5 @@
   // an agent's row is a label, not a sentence: no final period
   const rowLabel = (s) => String(s || "").replace(/\.$/, "");
 
-  root.AmbWords = { W, spot, route, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
+  root.AmbWords = { W, spot, route, menu, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
 })(typeof window !== "undefined" ? window : globalThis);

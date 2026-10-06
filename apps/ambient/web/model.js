@@ -423,7 +423,19 @@
       case "app_hello":
         return none({ ...m, hello: { at: now } });
       case "app_quiet":
-        return none({ ...m, quiet: ev.on ? { why: ev.why || "" } : null });
+        return none({ ...m, quiet: ev.on ? { why: ev.why || "", until: +ev.until_ms || 0 } : null });
+      // desktop S8: the menu-bar pearl's dropdown is this page (amb-mac m_8489/m_8514): app_menu
+      // on places the bar under the icon; off (a click away, esc, a second click) leaves
+      case "app_menu":
+        return ev.on ? setPane(m, "menu") : m.pane === "menu" ? setPane(m, null) : none(m);
+      // its 'quiet for 1 h' row: the app pauses bise for an hour (app_quiet {why:'paused'} comes back)
+      case "ui_quiet_hour":
+        return { m, cmds: [{ cmd: "app_quiet_hour", on: !(m.quiet && m.quiet.why === "paused") }] };
+      // 'open bise ⌘0': bise's own thread in the window
+      case "ui_open_bise": {
+        const r = setPane(m, null);
+        return { m: r.m, cmds: [...r.cmds, { cmd: "app_window", route: "bise" }] };
+      }
       // today's morning page, opened in front by the app (amb-mac, 7d65d59e): the capsule names
       // it, fn + o brings it back
       case "app_morning": {
@@ -854,6 +866,18 @@
       if (ordered.some((a) => !runs(a))) v.titles.running = W.agents;
       // main's last answer, reachable after a card or a pane covered it (lead m_8108 (6))
       if (m.main.text) v.answer = Wd.firstSentence(Wd.plain(m.main.text), 120);
+    } else if (m.pane === "menu") {
+      // desktop S8, v9 'la perle dans la barre de menus': what waits (fn 1 answers the first), the
+      // jobs he follows with their progress, open bise, quiet for 1 h, settings
+      v.state = "menu"; v.size = "open";
+      const pname = (id) => (m.projects.find((p) => p.project === id) || {}).name || null;
+      v.menu = {
+        working: working(m.agents), waits: cards.length, failed: m.agents.filter((a) => a.status === "failed").length,
+        cards: cards.map((c) => ({ id: c.id, agent: c.agent, pname: pname(c.project), text: c.title || c.text || "" })),
+        followed: m.agents.filter((a) => (a.name in m.follows ? m.follows[a.name] : a.followed) && a.status !== "done").map((a) => ({
+          name: a.name, project: a.project || null, pname: pname(a.project) || a.project_name || null, job: a.job || null, title: a.title || "", failed: a.status === "failed" })),
+        quiet: m.quiet && m.quiet.why === "paused" ? { until: m.quiet.until } : null,
+      };
     } else if (m.pane === "settings") {
       // fn + , : glass rows with toggles, then the windows bise never sees (amb-mac keeps them;
       // words: best guesses, asked to ambient; the empty line is ambient's)
