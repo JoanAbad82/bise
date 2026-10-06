@@ -4,6 +4,11 @@
 //! [`Core::tick`] (~30 Hz), then [`Core::take_out`]. Its ports (mic,
 //! listener, synthesizer, speaker, the voice jobs) are fakes in tests.
 
+mod agents_view;
+mod cmd;
+mod voice;
+
+pub use self::cmd::Cmd;
 use super::hub::{Hub, HubIn};
 use super::speech::{Speech, Step};
 use crate::voicemode::{Heard, ListenJob, ListenMsg, Listener, Mic, MicBlock, MicStream, SayJob, Speaker, Synthesizer, UttId};
@@ -63,119 +68,6 @@ pub struct Ports {
     /// harness A's fake voice (fake.rs): the next talk's words, set by
     /// the `fake_words` cmd; None in his normal run (the cmd is refused)
     pub fake_words: Option<super::fake::Words>,
-}
-
-/// A command of the app (stdin), §4.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Cmd {
-    TalkStart,
-    /// `talk_start` with `page: {id, url}`: a note talk on that bise page
-    /// (docs/ambient-pages.md §4.1), its words to the page, never to main
-    PageTalk { page: String },
-    TalkEnd,
-    TalkCancel,
-    Shot { path: PathBuf, app: String, title: String },
-    Send { text: String },
-    /// fn space's typed text sent with tab: main starts an agent on it
-    /// (only main starts agents; ambient-lead m_6513)
-    Start { text: String },
-    Answer { card: u64, reply: String },
-    Hush,
-    CutIn,
-    /// The user is on a call or in a meeting (the app's read): text only,
-    /// no voice (docs/ambient-app.md §4 `quiet`).
-    Quiet { on: bool },
-    /// The settings' voice answers (amb-mac m_5327): off, main's answers
-    /// are text only; on (the default), as usual.
-    Voice { on: bool },
-    /// The menu bar's "stop watching" (roadmap B, amb-mac m_5475): the
-    /// standing order `id` stops (the hub's `every_stop`).
-    EveryStop { id: u64 },
-    /// Round 10 (identity10 #data): an agent's preview (now, its last
-    /// actions, what waits on him, its last report, its pages), re-sent
-    /// on its events while it stays selected.
-    AgentPreview { agent: String },
-    /// An agent's history panel: the newest entries (before: None, the
-    /// panel opens and its live entries follow) or the ones before a pos.
-    AgentHistory { agent: String, before: Option<usize>, limit: usize },
-    /// The panel closed: no more live entries.
-    AgentUnwatch { agent: String },
-    /// His words to an agent: now (steered into its turn) or queued
-    /// (held by the core until the agent is free).
-    AgentSend { agent: String, text: String, queued: bool },
-    Follow { agent: String, on: bool },
-    /// Stop an agent's turn (the hub's interrupt; the web asks first).
-    Stop { agent: String },
-    /// `/archive <agent>` (stop_first: `--force`, a working agent).
-    Archive { agent: String, stop_first: bool },
-    /// `/restore <agent>`: back in his list.
-    Unarchive { agent: String },
-    /// Harness A: the words the fake voice hears at the next talk (only
-    /// with the fake voice on; an error otherwise).
-    FakeWords { text: String },
-}
-
-impl Cmd {
-    /// One stdin line; Err: the line to say back as `error` (a bad line
-    /// from the app is a bug, never the user's).
-    pub fn parse(line: &str) -> Result<Cmd, String> {
-        let v: Value = serde_json::from_str(line).map_err(|e| format!("not JSON: {e}"))?;
-        let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
-        Ok(match s("cmd").as_str() {
-            "talk_start" => match v.get("page").and_then(|p| p.get("id")).and_then(Value::as_str).map(str::trim) {
-                Some(id) if !id.is_empty() => Cmd::PageTalk { page: id.to_string() },
-                _ => Cmd::TalkStart,
-            },
-            "talk_end" => Cmd::TalkEnd,
-            "talk_cancel" => Cmd::TalkCancel,
-            "shot" => Cmd::Shot { path: PathBuf::from(s("path")), app: s("app"), title: s("title") },
-            "send" => Cmd::Send { text: s("text") },
-            "start" => Cmd::Start { text: s("text") },
-            "answer" => {
-                let card = match v.get("card") {
-                    Some(Value::Number(n)) => n.as_u64(),
-                    Some(Value::String(t)) => t.trim().trim_start_matches('#').parse().ok(),
-                    _ => None,
-                };
-                Cmd::Answer { card: card.ok_or("answer: no card id")?, reply: s("reply") }
-            }
-            "hush" => Cmd::Hush,
-            "cut_in" => Cmd::CutIn,
-            "quiet" => Cmd::Quiet { on: v.get("on").and_then(Value::as_bool).unwrap_or(false) },
-            "voice" => Cmd::Voice { on: v.get("on").and_then(Value::as_bool).unwrap_or(true) },
-            "every_stop" => {
-                let id = match v.get("id") {
-                    Some(Value::Number(n)) => n.as_u64(),
-                    Some(Value::String(t)) => t.trim().parse().ok(),
-                    _ => None,
-                };
-                Cmd::EveryStop { id: id.ok_or("every_stop: no id")? }
-            }
-            "fake_words" => Cmd::FakeWords { text: s("text") },
-            c @ ("agent_preview" | "agent_history" | "agent_unwatch" | "agent_send" | "follow" | "stop" | "archive" | "unarchive") => {
-                let agent = s("agent").trim().trim_start_matches('@').to_string();
-                if agent.is_empty() {
-                    return Err(format!("{c}: no agent"));
-                }
-                let flag = |k: &str| v.get(k).and_then(Value::as_bool).unwrap_or(false);
-                match c {
-                    "agent_preview" => Cmd::AgentPreview { agent },
-                    "agent_history" => Cmd::AgentHistory {
-                        agent,
-                        before: v.get("before").and_then(Value::as_u64).map(|b| b as usize),
-                        limit: v.get("limit").and_then(Value::as_u64).map_or(60, |l| (l as usize).clamp(1, 200)),
-                    },
-                    "agent_unwatch" => Cmd::AgentUnwatch { agent },
-                    "agent_send" => Cmd::AgentSend { agent, text: s("text"), queued: s("mode") == "queued" },
-                    "follow" => Cmd::Follow { agent, on: v.get("on").and_then(Value::as_bool).unwrap_or(true) },
-                    "stop" => Cmd::Stop { agent },
-                    "archive" => Cmd::Archive { agent, stop_first: flag("stop_first") },
-                    _ => Cmd::Unarchive { agent },
-                }
-            }
-            other => return Err(format!("unknown cmd {other:?}")),
-        })
-    }
 }
 
 /// One phase of main's turn, for the orb (§4 `phase`).
@@ -279,39 +171,6 @@ struct CardInfo {
     batch: Option<Value>,
 }
 
-/// An agent shown on the app (round 10): its history panel open, its
-/// preview, or both. Holds the feed's newest lines (a few entries), so a
-/// live line folds into the entry it belongs to.
-struct Feed {
-    agent: String,
-    history: bool,
-    preview: bool,
-    /// the first page came (until then live lines wait in `lines`)
-    loaded: bool,
-    lines: Vec<super::agents::Raw>,
-    /// what was sent of each entry (pos → its JSON): only changes go
-    emitted: std::collections::HashMap<usize, String>,
-    /// the open cards sent as entries of their own (not in the feed)
-    cards: Vec<u64>,
-    /// the last preview sent
-    shown: String,
-}
-
-/// A hub `history` request: for the panel's first page, an older page,
-/// or a preview.
-struct Pending {
-    agent: String,
-    /// the panel asked for entries before this pos (None: the newest)
-    before: Option<usize>,
-    limit: usize,
-}
-
-/// The lines asked for one page of a history (tool calls take ~4 lines
-/// each; the hub gives at most 2000).
-const HISTORY_LINES: usize = 600;
-/// The entries of the newest lines a feed keeps for live lines.
-const FEED_KEEP: usize = 8;
-
 /// Milliseconds since the epoch.
 fn now_ms() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64)
@@ -370,15 +229,15 @@ pub struct Core {
     /// the hub's pages as last seen
     hub_pages: Vec<Value>,
     /// the agents shown (round 10): a history panel open, a preview
-    feeds: Vec<Feed>,
-    /// the hub `history` requests sent, answered in order
-    pending: std::collections::VecDeque<Pending>,
-    /// each agent's last feed position (the hub's `line` events)
-    last_pos: std::collections::HashMap<String, usize>,
+    feeds: Vec<agents_view::Feed>,
+    /// the typed `subscribe`/`page` sent, answered in order
+    pending: std::collections::VecDeque<agents_view::Pending>,
+    /// the voice target's project id (its hub's `welcome`): the hub the
+    /// capsule talks to and the agents view reads, `--workspace`'s until
+    /// S2 makes it bise's home hub (one value, architect m_8433)
+    target: Option<String>,
     /// the hub's last state, for a row change of the core's (follow)
     last_state: Option<Value>,
-    /// messages held for an agent until it is free (send mode queued)
-    queued: Vec<(String, String)>,
     /// each agent's current step (its last tool intent) for `agent_typing`
     typing: std::collections::HashMap<String, String>,
     /// the page server's base URL, from the hub's state
@@ -422,9 +281,8 @@ impl Core {
             hub_pages: Vec::new(),
             feeds: Vec::new(),
             pending: std::collections::VecDeque::new(),
-            last_pos: std::collections::HashMap::new(),
+            target: None,
             last_state: None,
-            queued: Vec::new(),
             typing: std::collections::HashMap::new(),
             pages_url: None,
             quiet: false,
@@ -519,13 +377,7 @@ impl Core {
             }
             Cmd::AgentPreview { agent } => self.agent_preview(agent),
             Cmd::AgentHistory { agent, before, limit } => self.agent_history(agent, before, limit),
-            Cmd::AgentUnwatch { agent } => {
-                if let Some(f) = self.feeds.iter_mut().find(|f| f.agent == agent) {
-                    f.history = false;
-                    f.cards.clear();
-                }
-                self.feeds.retain(|f| f.history || f.preview);
-            }
+            Cmd::AgentUnwatch { agent } => self.agent_unwatch(&agent),
             Cmd::AgentSend { agent, text, queued } => self.agent_send(agent, text, queued),
             Cmd::Follow { agent, on } => {
                 self.followed.retain(|a| *a != agent);
@@ -557,323 +409,6 @@ impl Core {
     fn slash(&mut self, text: &str) {
         if !self.hub.send(&json!({"op": "input", "focus": "main", "text": text})) {
             self.error("bise isn't reachable: nothing changed. try again in a moment.");
-        }
-    }
-
-    // ---- round 10: the agents (identity10 #data) ----
-
-    fn hub_agent(&self, name: &str) -> Option<&Value> {
-        self.hub_agents.iter().find(|a| a.get("name").and_then(Value::as_str) == Some(name))
-    }
-
-    /// The agent is in a turn (or starting one): a queued message waits.
-    fn busy(&self, name: &str) -> bool {
-        self.hub_agent(name)
-            .and_then(|a| a.get("status").and_then(Value::as_str))
-            .is_some_and(|s| matches!(s, "working" | "starting" | "waiting"))
-    }
-
-    fn agent_send(&mut self, agent: String, text: String, queued: bool) {
-        let text = text.trim().to_string();
-        if text.is_empty() {
-            return;
-        }
-        if self.hub_agent(&agent).is_none() {
-            return self.error(&format!("there's no agent named {agent}."));
-        }
-        let mode = if queued { "queued" } else { "now" };
-        if queued && self.busy(&agent) {
-            self.queued.push((agent.clone(), text.clone()));
-            self.emit(json!({"ev": "sent", "agent": agent, "mode": mode}));
-            return self.emit(json!({"ev": "agent_queued", "agent": agent, "text": text}));
-        }
-        if self.deliver(&agent, &text) {
-            self.emit(json!({"ev": "sent", "agent": agent, "mode": mode}));
-        }
-    }
-
-    /// His message into the agent's thread, as the TUI sends it (a busy
-    /// agent gets it steered into its turn).
-    fn deliver(&mut self, agent: &str, text: &str) -> bool {
-        let ok = self.hub.send(&json!({"op": "input", "focus": agent, "text": text, "via": "ambient"}));
-        if !ok {
-            self.error(&format!("{agent} didn't get it: bise isn't reachable. try again in a moment."));
-        }
-        ok
-    }
-
-    /// The held messages of agents now free go, in order.
-    fn deliver_queued(&mut self) {
-        let held = std::mem::take(&mut self.queued);
-        for (agent, text) in held {
-            if self.busy(&agent) || !self.deliver(&agent, &text) {
-                self.queued.push((agent, text));
-            }
-        }
-    }
-
-    fn feed(&mut self, agent: &str) -> &mut Feed {
-        if let Some(i) = self.feeds.iter().position(|f| f.agent == agent) {
-            return &mut self.feeds[i];
-        }
-        self.feeds.push(Feed {
-            agent: agent.to_string(),
-            history: false,
-            preview: false,
-            loaded: false,
-            lines: Vec::new(),
-            emitted: Default::default(),
-            cards: Vec::new(),
-            shown: String::new(),
-        });
-        self.feeds.last_mut().expect("pushed")
-    }
-
-    /// The hub's lines of an agent before `before` (a transcript pos);
-    /// false: nothing to ask (no line yet, the hub away).
-    fn ask_lines(&mut self, agent: &str, before: usize, p: Pending) -> bool {
-        let ok = before > 1 && self.hub.send(&json!({"op": "history", "agent": agent, "before": before, "count": HISTORY_LINES}));
-        if ok {
-            self.pending.push_back(p);
-        }
-        ok
-    }
-
-    fn agent_preview(&mut self, agent: String) {
-        for f in &mut self.feeds {
-            f.preview = false;
-            f.shown.clear();
-        }
-        self.feeds.retain(|f| f.history || f.agent == agent);
-        let f = self.feed(&agent);
-        f.preview = true;
-        if f.loaded {
-            return self.refresh(&agent);
-        }
-        let first = !self.pending.iter().any(|p| p.agent == agent && p.before.is_none());
-        let before = self.last_pos.get(&agent).map_or(0, |p| p + 1);
-        if first && !self.ask_lines(&agent, before, Pending { agent: agent.clone(), before: None, limit: 0 }) {
-            self.feed(&agent).loaded = true;
-            self.refresh(&agent);
-        }
-    }
-
-    fn agent_history(&mut self, agent: String, before: Option<usize>, limit: usize) {
-        if let Some(b) = before {
-            let p = Pending { agent: agent.clone(), before: Some(b), limit };
-            if !self.ask_lines(&agent, b, p) {
-                self.emit(json!({"ev": "agent_history", "agent": agent, "entries": [], "before": null, "more": false}));
-            }
-            return;
-        }
-        let f = self.feed(&agent);
-        f.history = true;
-        f.emitted.clear();
-        f.cards.clear();
-        let at = self.last_pos.get(&agent).map_or(0, |p| p + 1);
-        if !self.ask_lines(&agent, at, Pending { agent: agent.clone(), before: None, limit }) {
-            self.feed(&agent).loaded = true;
-            self.first_page(&agent, Vec::new(), limit, false);
-        }
-    }
-
-    /// The hub's `history` reply: a panel's page, or a feed's first lines.
-    fn history_reply(&mut self, v: &Value) {
-        let agent = v.get("agent").and_then(Value::as_str).unwrap_or("").to_string();
-        let Some(i) = self.pending.iter().position(|p| p.agent == agent) else { return };
-        let p = self.pending.remove(i).expect("found");
-        let lines: Vec<super::agents::Raw> = v
-            .get("lines")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(|l| {
-                let pos = l.get("pos").and_then(Value::as_u64)? as usize;
-                Some((pos, l.get("ts").and_then(Value::as_u64).unwrap_or(0), l.get("line").and_then(Value::as_str)?.to_string()))
-            })
-            .collect();
-        let older = lines.first().is_some_and(|l| l.0 > 1);
-        if let Some(b) = p.before {
-            let (entries, before, more) = self.page_of(&lines, older, p.limit);
-            let _ = b;
-            return self.emit(json!({"ev": "agent_history", "agent": agent, "entries": entries, "before": before, "more": more}));
-        }
-        let Some(f) = self.feeds.iter_mut().find(|f| f.agent == agent) else { return };
-        // the live lines that came meanwhile follow the page
-        let top = lines.last().map_or(0, |l| l.0);
-        let mut all = lines;
-        all.extend(f.lines.drain(..).filter(|l| l.0 > top));
-        f.loaded = true;
-        if f.history && p.limit > 0 {
-            return self.first_page(&agent, all, p.limit, older);
-        }
-        f.lines = all;
-        self.refresh(&agent);
-    }
-
-    /// A page's entries, newest `limit`: the oldest is dropped when the
-    /// lines don't start the feed (it may be cut); (entries, before, more).
-    fn page_of(&self, lines: &[super::agents::Raw], older: bool, limit: usize) -> (Vec<Value>, Option<usize>, bool) {
-        let mut entries = super::agents::fold(lines, &self.open_cards(), &self.hub_pages);
-        if older && entries.len() > 1 {
-            entries.remove(0);
-        }
-        let more = older || entries.len() > limit;
-        let skip = entries.len().saturating_sub(limit);
-        let entries = entries.split_off(skip);
-        let before = entries.first().and_then(|e| e["pos"].as_u64()).filter(|_| more);
-        (entries, before.map(|b| b as usize), more)
-    }
-
-    fn first_page(&mut self, agent: &str, lines: Vec<super::agents::Raw>, limit: usize, older: bool) {
-        let (mut entries, before, more) = self.page_of(&lines, older, limit);
-        let cards = self.agent_cards(agent, &entries);
-        let Some(f) = self.feeds.iter_mut().find(|f| f.agent == agent) else { return };
-        for e in &entries {
-            f.emitted.insert(e["pos"].as_u64().unwrap_or(0) as usize, e.to_string());
-        }
-        f.cards = cards.iter().filter_map(|c| c["card"]["id"].as_u64()).collect();
-        f.lines = lines;
-        entries.extend(cards);
-        self.emit(json!({"ev": "agent_history", "agent": agent, "entries": entries, "before": before, "more": more}));
-        self.refresh(agent);
-    }
-
-    /// The open cards' ids (his: on the glass).
-    fn open_cards(&self) -> Vec<u64> {
-        self.cards.iter().map(|c| c.id).collect()
-    }
-
-    /// The agent's open cards not in its feed, as entries after it.
-    fn agent_cards(&self, agent: &str, entries: &[Value]) -> Vec<Value> {
-        let shown: Vec<u64> = entries.iter().filter_map(|e| e["card"]["id"].as_u64()).collect();
-        self.cards
-            .iter()
-            .filter(|c| c.agent == agent && !shown.contains(&c.id))
-            .map(|c| {
-                let card = super::agents::card_ref(c.id, &c.kind, &c.agent, &c.text, true);
-                json!({"pos": super::agents::CARD_POS + c.id as usize, "at_ms": 0, "kind": "card",
-                       "text": card["question"], "card": card})
-            })
-            .collect()
-    }
-
-    /// A feed changed (a line, the state): its changed entries to the
-    /// panel, its preview if it differs.
-    fn refresh(&mut self, agent: &str) {
-        let Some(i) = self.feeds.iter().position(|f| f.agent == agent && f.loaded) else { return };
-        let entries = super::agents::fold(&self.feeds[i].lines, &self.open_cards(), &self.hub_pages);
-        let preview = self.feeds[i].preview.then(|| self.preview(agent, &entries));
-        let history = self.feeds[i].history;
-        let cards = if history { self.agent_cards(agent, &entries) } else { Vec::new() };
-        let f = &mut self.feeds[i];
-        let mut out = Vec::new();
-        if history {
-            for e in &entries {
-                let pos = e["pos"].as_u64().unwrap_or(0) as usize;
-                let s = e.to_string();
-                if f.emitted.get(&pos) != Some(&s) {
-                    f.emitted.insert(pos, s);
-                    out.push(json!({"ev": "agent_entry", "agent": agent, "entry": e}));
-                }
-            }
-            // its own cards: a new one comes, an answered one says so
-            let now: Vec<u64> = cards.iter().filter_map(|c| c["card"]["id"].as_u64()).collect();
-            for c in &cards {
-                if !f.cards.contains(&c["card"]["id"].as_u64().unwrap_or(0)) {
-                    out.push(json!({"ev": "agent_entry", "agent": agent, "entry": c}));
-                }
-            }
-            for id in f.cards.iter().filter(|id| !now.contains(id)) {
-                let mut e = json!({"pos": super::agents::CARD_POS + *id as usize, "at_ms": 0, "kind": "card", "text": ""});
-                e["card"] = json!({"id": id, "answered": true});
-                out.push(json!({"ev": "agent_entry", "agent": agent, "entry": e}));
-            }
-            f.cards = now;
-        }
-        // the lines of the newest entries stay, for the next live line
-        if entries.len() > FEED_KEEP {
-            let cut = entries[entries.len() - FEED_KEEP]["pos"].as_u64().unwrap_or(0) as usize;
-            f.lines.retain(|l| l.0 >= cut);
-            f.emitted.retain(|p, _| *p >= cut);
-        }
-        if let Some(p) = preview {
-            let s = p.to_string();
-            if f.shown != s {
-                f.shown = s;
-                out.push(p);
-            }
-        }
-        self.out.extend(out);
-    }
-
-    /// The preview (identity10 #data): what it does now, its last
-    /// actions, what waits on him, its last report, its pages.
-    fn preview(&self, agent: &str, entries: &[Value]) -> Value {
-        let a = self.hub_agent(agent).cloned().unwrap_or(Value::Null);
-        let s = |k: &str| a.get(k).and_then(Value::as_str).unwrap_or("").to_string();
-        let (status, _) = super::agents::status(&s("status"));
-        let now = match self.typing.get(agent) {
-            Some(t) if status == "working" && !t.is_empty() => t.clone(),
-            _ => super::agents::title(&a),
-        };
-        let waiting: Vec<Value> = self
-            .cards
-            .iter()
-            .filter(|c| c.agent == agent)
-            .map(|c| json!({"card_id": c.id, "question": super::agents::card_ref(c.id, &c.kind, &c.agent, &c.text, true)["question"]}))
-            .collect();
-        let last_report = match entries.iter().rev().find(|e| e["kind"] == "report") {
-            Some(e) => json!({"kind": e["report"]["kind"], "text": e["text"], "at_ms": e["at_ms"]}),
-            None if !s("report").is_empty() => {
-                let kind = match status {
-                    "done" | "failed" | "blocked" => status,
-                    _ => "progress",
-                };
-                json!({"kind": kind, "text": s("report"), "at_ms": a.get("report_ms")})
-            }
-            None => Value::Null,
-        };
-        let mut pages: Vec<&Value> = self.hub_pages.iter().filter(|p| p.get("agent").and_then(Value::as_str) == Some(agent)).collect();
-        pages.sort_by_key(|p| std::cmp::Reverse(p.get("at_ms").and_then(Value::as_u64).unwrap_or(0)));
-        let pages: Vec<Value> = pages
-            .into_iter()
-            .take(3)
-            .map(|p| super::agents::page_ref(p.get("id").and_then(Value::as_str).unwrap_or(""), &self.hub_pages))
-            .collect();
-        json!({"ev": "agent_preview", "agent": agent, "now": now, "actions": super::agents::actions(entries, 5),
-               "waiting": waiting, "last_report": last_report, "pages": pages})
-    }
-
-    /// A live line of any agent's feed: its last pos, its current step,
-    /// and the entry it changes in a panel or a preview.
-    fn feed_line(&mut self, agent: &str, pos: usize, ts: u64, line: &str) {
-        if pos > 0 {
-            let p = self.last_pos.entry(agent.to_string()).or_insert(0);
-            *p = (*p).max(pos);
-        }
-        let step = match parse_line(line) {
-            Some(Ev::ToolIntent { text, .. }) => Some(crate::render::truncate_chars(&text, 80)),
-            Some(Ev::TurnDone | Ev::Turn) => Some(String::new()),
-            _ if line.starts_with("  obs: turn_done") => Some(String::new()),
-            _ => None,
-        };
-        if let Some(t) = step {
-            if self.typing.get(agent) != Some(&t) {
-                self.typing.insert(agent.to_string(), t.clone());
-                if self.ready && self.feeds.iter().any(|f| f.agent == agent && f.history) {
-                    self.emit(json!({"ev": "agent_typing", "agent": agent, "text": t}));
-                }
-            }
-        }
-        let Some(f) = self.feeds.iter_mut().find(|f| f.agent == agent) else { return };
-        // the hello replay after a reconnection: lines it has
-        if pos == 0 || f.lines.last().is_some_and(|l| l.0 >= pos) {
-            return;
-        }
-        f.lines.push((pos, ts, line.to_string()));
-        if f.loaded {
-            self.refresh(agent);
         }
     }
 
@@ -1093,6 +628,12 @@ impl Core {
         match h {
             HubIn::Up => {
                 self.ready = false;
+                // the typed protocol on the same connection (S3b): its
+                // `welcome` names the target; the feed lines stay the
+                // capsule's until S8
+                self.target = None;
+                self.pending.clear();
+                self.hub.send(&json!({"cmd": "hello", "proto": bise_proto::PROTO}));
                 self.hub_up = Some(true);
                 let ws = self.workspace.clone();
                 self.emit(json!({"ev": "hub", "up": true, "workspace": ws}));
@@ -1111,7 +652,11 @@ impl Core {
     fn hub_line(&mut self, raw: &str) {
         let Ok(v) = serde_json::from_str::<Value>(raw) else { return };
         let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
-        match s("ev").as_str() {
+        let ev = s("ev");
+        if bise_proto::hub::HubEv::TAGS.contains(&ev.as_str()) {
+            return self.typed_ev(v);
+        }
+        match ev.as_str() {
             "state" => self.state(&v),
             "ready" => {
                 self.ready = true;
@@ -1123,12 +668,8 @@ impl Core {
                 }
             }
             "page" if self.ready => self.page(v),
-            "history" => self.history_reply(&v),
             "line" => {
                 let line = s("line");
-                let pos = v.get("pos").and_then(Value::as_u64).unwrap_or(0) as usize;
-                let ts = v.get("ts").and_then(Value::as_u64).unwrap_or(0);
-                self.feed_line(&s("agent"), pos, ts, &line);
                 if self.ready && line.starts_with("sb msg-you : ") {
                     self.msg_you(&line);
                 } else if s("agent") == "main" {
@@ -1268,13 +809,9 @@ impl Core {
             st["timers"] = t.clone();
         }
         self.emit(st);
-        // round 10: a held message goes once its agent is free; what is
-        // shown of an agent follows its status, its cards, its pages
-        self.deliver_queued();
-        let shown: Vec<String> = self.feeds.iter().map(|f| f.agent.clone()).collect();
-        for a in shown {
-            self.refresh(&a);
-        }
+        // round 10: what is shown of an agent follows its status, its
+        // cards, its pages
+        self.refresh_shown();
     }
 
     /// One line of main's feed (ambient's review, m_4672: only main's
@@ -1422,138 +959,5 @@ impl Core {
             }
         }
         self.set_phase(Phase::Done, None);
-    }
-
-    /// Main's message aloud. False: no voice (no TTS, no speaker,
-    /// nothing to say); the text shows anyway.
-    fn say_main(&mut self) -> bool {
-        if self.main_text.is_empty() {
-            return false;
-        }
-        let job = match (self.ports.say_job)() {
-            Ok(j) => j,
-            Err(_) => {
-                self.error("main can't speak: no voice model is set up.");
-                return false;
-            }
-        };
-        if self.speaker.is_none() {
-            match (self.ports.open_speaker)() {
-                Ok(s) => self.speaker = Some(s),
-                Err(e) => {
-                    self.error(&e);
-                    return false;
-                }
-            }
-        }
-        self.stop_voice();
-        let lang = self.ports.language.clone();
-        let Some(sp) = Speech::new(self.turn, &self.main_text, lang.as_deref(), job, self.next_utt) else {
-            return false;
-        };
-        self.next_utt += sp.utts();
-        self.speech = Some(sp);
-        true
-    }
-
-    // ---- the clock ----
-
-    /// ~30 Hz: the mic to the listener, its words, the voice and its
-    /// words, the levels.
-    pub fn tick(&mut self, now: Instant) {
-        self.tick_talk(now);
-        self.tick_speech();
-    }
-
-    fn tick_talk(&mut self, now: Instant) {
-        let Some(t) = self.talk.as_mut() else { return };
-        while let Ok(b) = t.blocks.try_recv() {
-            let _ = t.audio.send(ListenMsg::Audio(b.pcm));
-        }
-        let mut evs = Vec::new();
-        let mut flushed = false;
-        let mut failed = None;
-        let mut words = false;
-        loop {
-            match t.heard.try_recv() {
-                Ok(Heard::Text(w)) => {
-                    t.text.push_str(&w);
-                    words = true;
-                    if t.ending.is_none() {
-                        evs.push(json!({"ev": "heard", "text": t.text.trim(), "final": false}));
-                    }
-                }
-                Ok(Heard::Flushed) => {
-                    flushed = true;
-                    break;
-                }
-                Ok(Heard::Failed(e)) => {
-                    failed = Some(e);
-                    break;
-                }
-                Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => {
-                    flushed = t.ending.is_some();
-                    break;
-                }
-            }
-        }
-        if let Some(s) = &t.stream {
-            evs.push(json!({"ev": "level", "who": "you", "v": s.level()}));
-        }
-        let late = t.ending.is_some_and(|e| now.duration_since(e) >= FINAL_WAIT);
-        let ending = t.ending.is_some();
-        let page = t.page.clone();
-        // a note talk's words so far, live on the page
-        if let (Some(p), true, None) = (&page, words, &failed) {
-            let text = t.text.trim().to_string();
-            self.hub.send(&json!({"op": "page_voice", "page": p, "phase": "heard", "text": text}));
-        }
-        self.out.extend(evs);
-        if let Some(e) = failed {
-            self.talk = None;
-            if let Some(p) = page {
-                self.error(&e);
-                return self.page_voice_over(&p, "cancel", "");
-            }
-            if let Some(s) = self.shot.take() {
-                self.forget(vec![s]);
-            }
-            self.error(&e);
-            return self.set_phase(Phase::Failed, None);
-        }
-        if ending && (flushed || late) {
-            self.finish_talk();
-        }
-    }
-
-    fn tick_speech(&mut self) {
-        let (Some(sp), Some(spk)) = (self.speech.as_mut(), self.speaker.as_mut()) else { return };
-        let step = sp.step(self.ports.synth.as_ref(), spk.as_mut());
-        let (turn, level) = (sp.turn, spk.level());
-        match step {
-            Step::Playing { word } => {
-                if let Some(i) = word {
-                    self.emit(json!({"ev": "word", "turn": turn, "i": i}));
-                }
-                self.emit(json!({"ev": "level", "who": "main", "v": level}));
-            }
-            Step::Over { word } => {
-                self.speech = None;
-                if let Some(i) = word {
-                    self.emit(json!({"ev": "word", "turn": turn, "i": i}));
-                }
-                self.emit(json!({"ev": "level", "who": "main", "v": 0.0}));
-                if self.talk.is_none() {
-                    self.set_phase(Phase::Done, None);
-                }
-            }
-            Step::Failed(e) => {
-                self.speech = None;
-                self.emit(json!({"ev": "level", "who": "main", "v": 0.0}));
-                self.error(&e);
-                self.set_phase(Phase::Done, None);
-            }
-        }
     }
 }
