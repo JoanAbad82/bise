@@ -83,7 +83,10 @@
   function markerText(s, e) {
     const c = e.card || {};
     const project = e.from_project || s.route.project;
-    const who = s.route.project === HOME ? `${pname(s, project)} · ${e.from}` : e.from;
+    // the asker: the entry's sender, else the card's agent, else the thread's own agent (a hub's
+    // card entry carries only the card: amb-tools' run read '? undefined asked you')
+    const from = e.from || c.agent || s.route.agent;
+    const who = s.route.project === HOME ? `${project === HOME ? "bise" : pname(s, project)} · ${from}` : from;
     if (c.answered && c.by && c.by !== "you") return null; // main answered it: an "asked · i answered" line
     if (c.id in s.answered) return T(s, "asked_answered_you", { who, a: s.answered[c.id] });
     const open = allCards(s).some((x) => x.id === c.id);

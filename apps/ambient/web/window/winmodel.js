@@ -171,7 +171,7 @@
     const parts = String(route || "").split("/");
     // bise's own hub is always there, even before a projects list comes (the single-hub core
     // sends none until S3b; amb-tools m_8543: agent/home/perf was 'not found')
-    const proj = (x) => (x === HOME ? HOME : (s.projects.find((p) => p.project === x || p.name === x) || {}).project);
+    const proj = (x) => (x === HOME || (s.homeId && x === s.homeId) ? HOME : (s.projects.find((p) => p.project === x || p.name === x) || {}).project);
     // an agent we know isn't in its project (its list came, the name isn't there) is not found
     const has = (p, a) => !s.agents[p] || s.agents[p].some((x) => x.name === a);
     if (parts[0] === "bise" || parts[0] === "") return { project: HOME, agent: "main" };
@@ -219,8 +219,12 @@
         const k = `${ev.project}/${ev.agent}`;
         const t = s.threads[k] || { entries: [], typing: "" };
         const older = t.paging && t.entries.length;
-        const entries = older ? [...ev.entries.filter((e) => !t.entries.some((x) => x.pos === e.pos)), ...t.entries] : ev.entries;
-        return set(s, "threads", set(s.threads, k, { ...t, entries, before: ev.before, more: !!ev.more, loading: false, paging: false }));
+        // his messages still on their way stay (a page can land between his ⏎ and the hub's echo)
+        const mine = t.entries.filter((e) => e.pending && !ev.entries.some((x) => x.kind === "you" && x.text === e.text));
+        const entries = older ? [...ev.entries.filter((e) => !t.entries.some((x) => x.pos === e.pos)), ...t.entries] : [...ev.entries, ...mine];
+        // it opened after all: no error left on it, nor over the window
+        const toast = s.toast && s.toast.project === ev.project && (s.toast.cmd === "subscribe" || s.toast.cmd === "page") ? null : s.toast;
+        return { ...set(s, "threads", set(s.threads, k, { ...t, entries, before: ev.before, more: !!ev.more, loading: false, paging: false, error: undefined })), toast };
       }
       case "entry": {
         const k = `${ev.project}/${ev.agent}`;
@@ -435,7 +439,9 @@
   // the first projects list names bise's hub: what came under its id before moves to HOME, and
   // the threads asked under HOME (refused: the core knew no 'home') are asked again
   function learnHome(s, id, cmds) {
-    const out = { ...s, homeId: id };
+    const out = { ...s, homeId: id, homeQ: [] };
+    // what waited for the id (a send, an answer: never a subscribe, asked again below) goes now
+    for (const c of s.homeQ || []) cmds.push({ ...c, project: id });
     for (const m of MAPS) if (s[m] && id in s[m]) { const { [id]: v, ...rest } = s[m]; out[m] = { ...rest, [HOME]: v }; }
     const threads = {};
     for (const [k, t] of Object.entries(s.threads)) threads[k.startsWith(`${id}/`) ? `${HOME}/${k.slice(id.length + 1)}` : k] = t;
@@ -458,6 +464,13 @@
     const shown = shownOf(out);
     const key = shown.join(",");
     if (out.shownKey !== key && out.wire) { out = { ...out, shownKey: key }; cmds.unshift({ cmd: "shown", projects: shown }); }
+    // on the real core, before the projects list names bise's hub, a command for HOME waits (the
+    // core knows no 'home': it would refuse it); its threads are asked again by learnHome
+    if (out.wire && !out.homeId) {
+      const held = cmds.filter((c) => c.project === HOME);
+      if (held.length) out = { ...out, homeQ: [...(out.homeQ || []), ...held.filter((c) => c.cmd !== "subscribe" && c.cmd !== "page")] };
+      return { ...r, s: out, cmds: cmds.filter((c) => c.project !== HOME) };
+    }
     const home = out.homeId && out.homeId !== HOME ? out.homeId : null;
     return { ...r, s: out, cmds: home ? cmds.map((c) => (c.project === HOME ? { ...c, project: home } : c)) : cmds };
   }
@@ -497,7 +510,8 @@
     if (s.wire) { s = { ...s, shownKey: shownOf(s).join(",") }; cmds.push({ cmd: "shown", projects: shownOf(s) }); }
     const out = needThread(s, s.route, cmds);
     cmds.push({ cmd: "win_title", text: "bise", route: "bise" });
-    return { s: out, cmds };
+    // bise's thread is asked once the projects list names its hub (learnHome)
+    return { s: out, cmds: s.wire ? cmds.filter((c) => c.project !== HOME) : cmds };
   }
 
   // is this entry unfolded (a fold, a tools group, an "asked · i answered" why)?

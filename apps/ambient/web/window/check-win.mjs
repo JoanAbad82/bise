@@ -462,8 +462,9 @@ law("the real core (S3b): shown goes first and follows the project in view; bise
   const sent = [];
   const feed = (ev) => { const r = M.step(s, ev); s = r.s; sent.push(...r.cmds); return r; };
   const st = M.start(s); s = st.s; sent.push(...st.cmds);
-  // shown before anything else, then bise's thread asked under 'home' (the core knows no id yet)
-  eq(sent.slice(0, 2), [{ cmd: "shown", projects: [] }, { cmd: "subscribe", project: F.HOME, agent: "main", limit: 60 }]);
+  // shown before anything else; nothing for bise's hub until the projects list names it (the
+  // core knows no 'home': it would refuse it, amb-tools' world run m_8767)
+  eq([sent[0], sent.filter((c) => c.project === F.HOME)], [{ cmd: "shown", projects: [] }, []]);
   // events of bise's hub before the projects list are kept under its id, then move to HOME
   feed({ ev: "agents", project: HID, agents: [{ name: "main", main: true, status: "idle" }, { name: "perf", status: "working" }] });
   feed({ ev: "projects", projects: [
@@ -549,6 +550,36 @@ law("an unheld project's open cards come on its projects row: bise's waiting lis
   feed({ ev: "cards", project: ACME, cards: [q(11, "ship it?")] });
   feed({ ev: "projects", projects: rows([q(10, "keep the cache?")]) });
   eq(V.view(s).board.sections[0].items.map((i) => i.text), ["ship it?"]);
+});
+
+law("amb-tools' world run (m_8767): an error clears when the thread opens; his message on its way survives a page; a hub's card entry names its asker; bise's hub id works in links", () => {
+  const HID = "bise-5f15b45e", SHOP = "shop-ab9f3c3b";
+  let s = { ...M.init(F.NOW), tz: "Europe/Paris", wire: true };
+  const sent = [];
+  const feed = (ev) => { const r = M.step(s, ev); s = r.s; sent.push(...r.cmds); return r; };
+  s = M.start(s).s;
+  feed({ ev: "projects", projects: [{ project: HID, name: "bise", path: "~/bise", home: true, order: 0, agents: 1, working: 0, waits: 0, git: false, running: true },
+    { project: SHOP, name: "shop", path: "~/shop", home: false, order: 1, agents: 2, working: 0, waits: 1, git: true, branch: "main", running: true }] });
+  feed({ ev: "agents", project: HID, agents: [{ name: "main", main: true, status: "idle" }, { name: "helper", status: "idle" }] });
+  // a refused thread that opens later: no error left, no line over the window
+  feed({ ev: "ui_route", project: SHOP, agent: "main" });
+  feed({ ev: "error", project: SHOP, cmd: "subscribe", text: "shop isn't welcomed yet" });
+  eq(V.view(s).toast != null, true);
+  // he types while it opens; the page lands before the hub's echo: his message stays, sending
+  feed({ ev: "ui_type", text: "please check the cart totals" });
+  feed({ ev: "ui_key", key: "Escape" });
+  feed({ ev: "ui_send" });
+  feed({ ev: "thread", project: SHOP, agent: "main", entries: [
+    { pos: 12, at_ms: F.NOW - 60000, kind: "card", text: "merge checkout into main?", card: { id: 1, question: "merge checkout into main? (2 files, tests pass)", options: [{ n: 1, label: "merge" }, { n: 2, label: "not yet" }], answered: false } }], before: null, more: false });
+  feed({ ev: "cards", project: SHOP, cards: [{ id: 1, project: SHOP, kind: "approval", agent: "main", question: "merge checkout into main? (2 files, tests pass)", options: [{ n: 1, label: "merge" }, { n: 2, label: "not yet" }] }] });
+  const v = V.view(s);
+  eq([v.toast, v.thread.empty, v.thread.rows.filter((r) => r.t === "msg" && r.you).map((r) => [r.text, r.pending])], [null, null, [["please check the cart totals", true]]]);
+  // the card's line names main, not 'undefined'
+  eq(v.thread.rows.filter((r) => /asked you/.test(r.text || "")).map((r) => r.text), ["? main asked you · below"]);
+  // bise's hub id in a link means bise
+  feed({ ev: "win_open", route: `agent/${HID}/helper` });
+  eq(s.route, { project: F.HOME, agent: "helper" });
+  eq(sent.filter((c) => c.cmd === "win_title").pop(), { cmd: "win_title", text: "helper · bise", route: "agent/home/helper" });
 });
 
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {
