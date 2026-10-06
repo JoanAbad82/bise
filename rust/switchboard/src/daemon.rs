@@ -194,6 +194,12 @@ enum Msg {
         id: ClientId,
         v: Value,
     },
+    /// S2 step 5: BISE_ROUTE_MODEL's answer for the unclear route `rid`
+    /// (a project name, or None), from its thread (`daemon/routing.rs`).
+    RoutePick {
+        rid: u64,
+        pick: Option<String>,
+    },
     /// `keep`: leave the REPLs running for the next hub to adopt.
     Shutdown {
         keep: bool,
@@ -1236,6 +1242,7 @@ impl Shell {
             }
             Effect::JobEnd { agent, state, label, summary } => self.job_end(agent, &state, label, summary),
             Effect::MergedChanged => self.merged_all(),
+            Effect::RouteAsk { rid, text } => self.route_ask(rid, text),
             Effect::RouteDone { rid, state, to, xid } => {
                 let project = self.project();
                 self.proto_route(bise_proto::hub::HubEv::RouteDone { project, rid, state, to, xid })
@@ -2955,6 +2962,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
             Msg::Release { client, v } => sh.release_event(client, v),
             Msg::Update(v) => sh.update_event(v),
             Msg::Changes { name, v } => sh.on_changes(name, v),
+            Msg::RoutePick { rid, pick } => sh.route_picked(rid, pick),
             Msg::ToClient { id, v } => {
                 if let Some(c) = sh.clients.get_mut(&id) {
                     write_json(c, &v);

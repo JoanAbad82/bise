@@ -612,6 +612,16 @@ pub enum Input {
         client: Option<ClientId>,
         rid: u64,
     },
+    /// S2 step 5: BISE_ROUTE_MODEL picked project `to` (checked in the
+    /// registry by the shell, `name` its name) for the unclear route
+    /// `rid`; sb-core holds it 2 s for `to` if it still waits, else
+    /// nothing.
+    RoutePick {
+        rid: u64,
+        to: String,
+        name: String,
+        why: String,
+    },
     /// S10: follow a task (the typed `follow`; `client` gets the refusal).
     Follow {
         client: Option<ClientId>,
@@ -820,6 +830,14 @@ pub enum Effect {
         text: String,
         due_ms: u64,
         why: String,
+    },
+    /// S2 step 5: his unclear words, held as route `rid` with no target
+    /// (1.5 s), wait for BISE_ROUTE_MODEL's pick (`route_ask`): the shell
+    /// asks it and steps `Input::RoutePick`, or nothing (then they go
+    /// plain to bise's main).
+    RouteAsk {
+        rid: u64,
+        text: String,
     },
     /// Its end: `state` "sent" (`xid` its delivery) or "cancelled".
     RouteDone {
@@ -2318,6 +2336,9 @@ impl Hub {
                 self.core(&mut fx, env, client, json!({"t": "route_correct", "rid": rid, "to": to, "name": name}))
             }
             Input::RouteCancel { client, rid } => self.core(&mut fx, env, client, json!({"t": "route_cancel", "rid": rid})),
+            Input::RoutePick { rid, to, name, why } => {
+                self.core(&mut fx, env, None, json!({"t": "route_pick", "rid": rid, "to": to, "name": name, "why": why}))
+            }
             Input::Follow { client, agent, on } => self.core(&mut fx, env, client, json!({"t": "follow", "agent": agent, "on": on})),
         }
         self.refresh_contexts(&mut fx, env.now());
@@ -2476,6 +2497,7 @@ impl Hub {
                 due_ms: f["due_ms"].as_u64().unwrap_or(0),
                 why: jstr(f, "why"),
             }),
+            "route_ask" => fx.push(Effect::RouteAsk { rid: f["rid"].as_u64().unwrap_or(0), text: jstr(f, "text") }),
             "job_end" => fx.push(Effect::JobEnd { agent: jstr(f, "agent"), state: jstr(f, "state"), label: jstr(f, "label"), summary: jstr(f, "summary") }),
             "route_done" => fx.push(Effect::RouteDone {
                 rid: f["rid"].as_u64().unwrap_or(0),

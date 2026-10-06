@@ -231,6 +231,9 @@ def agent_of(conv):
             # auto mode's checker as a chat model (approvals, design §4.2)
             if m["text"].startswith("# bise checker"):
                 return "(checker)"
+            # bise's route model (desktop S2 step 5, daemon/routing.rs)
+            if m["text"].startswith("# bise route pick"):
+                return "(route pick)"
             g = re.search(r"# Your role: task `([^`]+)`", m["text"])
             if g:
                 return g.group(1)
@@ -278,6 +281,14 @@ def reply_for(conv, seen=0):
         state = " ".join(m["text"] for m in conv if m["role"] == "user")
         risky = "--force" in state or "rm -rf" in state
         turn["text"] = json.dumps({"contained": not risky, "serves_task": True, "secrets": False})
+        return turn
+    if agent_of(conv) == "(route pick)":
+        # `[[route: N]]` in his words: the N-th project listed; else none
+        text = " ".join(m["text"] for m in conv if m["role"] == "user")
+        n = re.search(r"\[\[route: (\d+)\]\]", text)
+        names = re.findall(r"project: ([^\n]+)", text.replace("\\n", "\n"))
+        k = int(n.group(1)) - 1 if n else -1
+        turn["text"] = names[k].strip() if 0 <= k < len(names) else "none"
         return turn
     idx = last_user(conv)
     if idx is None:

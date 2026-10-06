@@ -86,6 +86,7 @@ type In is Data:
   IRouteHold{}
   IRouteCorrect{}
   IRouteCancel{}
+  IRoutePick{}
   IFollow{}
   INone{}
 
@@ -2229,10 +2230,52 @@ def route_done(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +state: String, +to: String, +
 
 # home: the input route_hold (the shell's route.rs picked `to`, a project
 # hub id, `name` its name): held, its act set, the window told
-def route_hold(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +to: String, +name: String, +why: String, +context: String) -> X.Cx<o>:
+def route_hold.to(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +to: String, +name: String, +why: String, +context: String) -> X.Cx<o>:
   +r = XB.new_route(xst(o, cx), tms(o, cx), text, via, to, name, why, now(o, cx), context)
   +cx2 = xemit(o, cx, XH.XRouteHeld{r})
   route_ev(o, aemit(o, cx2, TM.ActSet{XB.route_act(r)}), r)
+
+# S2 step 5: his unclear words (no `to`: the shell asks BISE_ROUTE_MODEL):
+# held PICK_MS with no target, the shell asked for a pick (fx route_ask),
+# the window told nothing until a project is picked
+def route_unclear(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +context: String) -> X.Cx<o>:
+  +r = XB.new_route_at(xst(o, cx), tms(o, cx), text, via, "", "", "", Nat.add(now(o, cx), XB.PICK_MS()), context)
+  +cx2 = aemit(o, xemit(o, cx, XH.XRouteHeld{r}), TM.ActSet{XB.route_act(r)})
+  out(o, cx2, [J.kv("fx", J.JStr{"route_ask"}), J.kv("rid", J.JNum{XH.Route.rid(r)}), J.kv("text", J.JStr{text})])
+
+def route_hold(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +to: String, +name: String, +why: String, +context: String) -> X.Cx<o>:
+  pick_lazy(X.Cx<o>, String.is_empty(to),
+    u => route_unclear(o, cx, text, via, context),
+    u => route_hold.to(o, cx, text, via, to, name, why, context))
+
+# his plain words to main behind an unclear route: held with no target,
+# due `d` (the latest unclear due), never asked about: at its fire it goes
+# plain to main like the unclear one before it
+def route_behind(-o: M.St, +cx: X.Cx<o>, +text: String, +d: Nat) -> X.Cx<o>:
+  +r = XB.new_route_at(xst(o, cx), tms(o, cx), text, "", "", "", "", d, "")
+  aemit(o, xemit(o, cx, XH.XRouteHeld{r}), TM.ActSet{XB.route_act(r)})
+
+def user_input.behind(-o: M.St, m: Maybe<&2, Nat>, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool) -> X.Cx<o>:
+  match m:
+    case None{}:
+      user_says(o, cx, to, text, queued)
+    case Some{+d}:
+      route_behind(o, cx, text, d)
+
+# his plain words (inputs say, and route to main): to bise's main while an
+# unclear route of his waits for the model's pick, held behind it, due at
+# the latest unclear due, so both reach main in order (law
+# route_plain_waits_behind_unclear); else user_says. A queued input waits
+# for main's turn end already: never held here.
+def user_input(-o: M.St, +cx: X.Cx<o>, +to: String, +text: String, +queued: Bool) -> X.Cx<o>:
+  user_input.behind(o, Bool.pick(Maybe<&2, Nat>, Bool.not(queued) && String.eq(to, M.MAIN()), XB.unclear_due(XH.Xs.routes(xst(o, cx))), None{}), cx, to, text, queued)
+
+# an unclear route's act fired with no target: it ends, and his words
+# reach bise's main as a plain message (the cancel path, no route_done:
+# the window never saw it)
+def route_plain(-o: M.St, +cx: X.Cx<o>, +r: XH.Route) -> X.Cx<o>:
+  +cx2 = xemit(o, cx, XH.XRoute{XH.Route.rid(r), XH.REnd{XH.RCancelled{}}})
+  says.sent(o, send(o, cx2, Snd{M.USER(), M.MAIN(), XH.Route.text(r), False{}, None{}, True{}, False{}, False{}, XB.via_of(XH.Route.via(r))}), M.MAIN(), XH.Route.text(r))
 
 def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: XH.Route, +id: Nat) -> X.Cx<o>:
   +cx2 = emit(o, mark_delivered(o, cx, id), M.ESettled{id}, Unit{}, Unit{}, Unit{})
@@ -2294,12 +2337,40 @@ def route_correct(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String)
     u => route_cancel(o, cx, rid),
     u => route_correct.go(o, XB.held(xst(o, cx), rid), cx, rid, to, name))
 
+# a held route's act fired: with no target, plain to main (law
+# route_unclear_goes_plain); else forwarded (route_fire)
+def route_go(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>) -> X.Cx<o>:
+  match m:
+    case None{}:
+      cx
+    case Some{+r}:
+      pick_lazy(X.Cx<o>, XB.is_unclear(r),
+        u => route_plain(o, cx, r),
+        u => route_fire(o, Some{r}, cx))
+
+# the model's pick (the shell checked `to` in the registry) for an unclear
+# route still held: it ends, its act with it, and a held route to that
+# project starts (his 2 s to correct start now); a route that already
+# went or got a target: nothing (law route_pick_only_unclear)
+def route_pick.go(-o: M.St, m: Maybe<&2, XH.Route>, +cx: X.Cx<o>, +to: String, +name: String, +why: String) -> X.Cx<o>:
+  match m:
+    case None{}:
+      cx
+    case Some{+r}:
+      pick_lazy(X.Cx<o>, XB.is_unclear(r) && Bool.not(String.is_empty(to)),
+        u => route_hold.to(o, xemit(o, aemit(o, cx, TM.ActDone{XH.Route.act(r)}), XH.XRoute{XH.Route.rid(r), XH.REnd{XH.RCancelled{}}}),
+          XH.Route.text(r), XH.Route.via(r), to, name, why, XH.Route.context(r)),
+        u => cx)
+
+def route_pick(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +to: String, +name: String, +why: String) -> X.Cx<o>:
+  route_pick.go(o, XB.held(xst(o, cx), rid), cx, to, name, why)
+
 def act_fire(-o: M.St, w: TM.What, +cx: X.Cx<o>) -> X.Cx<o>:
   match w:
     case TM.Retry{+xid}:
       xretry(o, XB.pending(xst(o, cx), xid), cx)
     case TM.RouteSend{+rid}:
-      route_fire(o, XB.held(xst(o, cx), rid), cx)
+      route_go(o, XB.held(xst(o, cx), rid), cx)
 
 def acts_tick.each(-o: M.St, xs: List<&2, TM.Act>, +cx: X.Cx<o>) -> X.Cx<o>:
   match xs:
@@ -3277,9 +3348,11 @@ def in_tag(+t: String) -> In:
   Bool.pick(In, String.eq(t, "route_hold"), IRouteHold{},
   Bool.pick(In, String.eq(t, "route_correct"), IRouteCorrect{},
   Bool.pick(In, String.eq(t, "route_cancel"), IRouteCancel{},
+  # S2 step 5: the model's pick for his unclear words
+  Bool.pick(In, String.eq(t, "route_pick"), IRoutePick{},
   # S10: follow a task (the window's typed command, bise's sb follow)
   Bool.pick(In, String.eq(t, "follow"), IFollow{},
-  INone{})))))))))))))))))))))))))))))))))))))))))))
+  INone{}))))))))))))))))))))))))))))))))))))))))))))
 
 # `/close N`: the user files a card without answering it
 def close_by_user(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
@@ -3328,9 +3401,11 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
     case IBoot{}:
       xboot(o, boot(o, cx))
     case ISay{}:
-      user_says(o, cx, C.get_s(i, "focus"), C.get_s(i, "text"), C.get_b(i, "queued"))
+      user_input(o, cx, C.get_s(i, "focus"), C.get_s(i, "text"), C.get_b(i, "queued"))
     case IRoute{}:
-      route(o, cx, C.get_s(i, "target"), C.get_s(i, "text"), C.get_s(i, "focus"), C.get_b(i, "queued"))
+      pick_lazy(X.Cx<o>, String.eq(C.get_s(i, "target"), M.MAIN()),
+        u => user_input(o, cx, M.MAIN(), C.get_s(i, "text"), C.get_b(i, "queued")),
+        u => route(o, cx, C.get_s(i, "target"), C.get_s(i, "text"), C.get_s(i, "focus"), C.get_b(i, "queued")))
     case INew{}:
       user_new.res(o, create_task(o, cx, new_task(M.USER(), i)))
     case IDrop{}:
@@ -3389,6 +3464,8 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
       route_correct(o, cx, C.get_nat(i, "rid"), C.get_s(i, "to"), C.get_s(i, "name"))
     case IRouteCancel{}:
       route_cancel(o, cx, C.get_nat(i, "rid"))
+    case IRoutePick{}:
+      route_pick(o, cx, C.get_nat(i, "rid"), C.get_s(i, "to"), C.get_s(i, "name"), C.get_s(i, "why"))
     case IFollow{}:
       follow_in(o, follow_err(st(o, cx), C.get_s(i, "agent")), cx, C.get_s(i, "agent"), C.get_b(i, "on"))
     case INone{}:

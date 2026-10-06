@@ -5204,6 +5204,31 @@ def Laws.route_fires_at_due_only(x, tm, text, via, to, name, why, now, context):
 def Laws.route_fire_makes_no_turn(o, cx, r):
   {==}
 
+def Laws.route_unclear_goes_plain(o, cx, r, e):
+  %Equal.sym(Bool, HXB.is_unclear(r), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.route_plain(o, cx, r), u => HC.route_fire(o, Some{r}, cx)) == HC.route_plain(o, cx, r) : HX.Cx<o>}
+  {==}
+
+def Laws.route_unclear_waits_pick_ms(x, tm, text, via, now, context):
+  {==}
+
+def Laws.route_pick_only_unclear(o, cx, to, name, why):
+  {==}
+
+def Laws.route_plain_waits_behind_unclear(o, cx, d, to, text, queued):
+  {==}
+
+# the latest unclear due with `d` folded in is no earlier than `d`
+def hub_unclear_max_ge(+d: Nat, m: Maybe<&2, Nat>) -> {Nat.is_ge(Maybe.default(&2, Nat, HXB.unclear_due.max(d, m), 0n), d) == True{} : Bool}:
+  match m:
+    case None{}:
+      Nat.ge_refl(d)
+    case Some{e}:
+      Nat.max_ge_l(d, e)
+
+def Laws.route_behind_is_latest(r, t, e):
+  %Equal.sym(Bool, HXB.is_unclear(r), True{}, e) : {Nat.is_ge(Maybe.default(&2, Nat, HXB.unclear_due.add(_, HXH.Route.due(r), HXB.unclear_due(t)), 0n), HXH.Route.due(r)) == True{} : Bool}
+  hub_unclear_max_ge(HXH.Route.due(r), HXB.unclear_due(t))
+
 def Laws.follow_quiet_before_end(o, cx, from, summary):
   {==}
 

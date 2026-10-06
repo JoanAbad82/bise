@@ -68,6 +68,8 @@ def main():
     E.env.pop("SB_STATE_DIR")
     E.env["BISE_HOME"] = os.path.join(home, "b")
     E.env["BISE_HOME_WORKSPACE"] = home_ws
+    # S2 step 5: unclear words ask the route model (the fake provider)
+    E.env["BISE_ROUTE_MODEL"] = "mistral/mistral-small-latest"
     hubs_dir = os.path.join(E.env["BISE_HOME"], "hubs")
     hubs = []
     ok = True
@@ -119,7 +121,23 @@ def main():
         c.say("what is on my list today?")
         wait.until(lambda: [m for m in of_type(hstate, "message_sent")
                             if m["msg"]["from"] == "user" and "on my list today" in m["msg"]["text"]], 20, "his message home")
-        check(len(of_type(hstate, "route_held")) == 1, "no route for it: %r" % of_type(hstate, "route_held"))
+        targeted = [e for e in of_type(hstate, "route_held") if e["route"]["to"]]
+        check(len(targeted) == 1, "no route for it: %r" % of_type(hstate, "route_held"))
+        # S2 step 5: unclear words waited 1.5 s for BISE_ROUTE_MODEL (the
+        # fake answered none), then went plain to bise's main
+        unclear = [e for e in of_type(hstate, "route_held") if not e["route"]["to"]]
+        check(len(unclear) == 1 and "on my list today" in unclear[0]["route"]["text"], "held unclear first: %r" % unclear)
+
+        # S2 step 5: unclear words the route model places (the fake picks
+        # the 2nd project listed): held 2 s for it, then sent there
+        c.wait_idle("main")
+        c.say("the build is red again [[route: 2]]")
+        wait.until(lambda: [e for e in of_type(hstate, "route_held") if e["route"]["to"] == by_name["atlas"]["id"]], 15, "the model's pick held")
+        picked = [e["route"] for e in of_type(hstate, "route_held") if e["route"]["to"] == by_name["atlas"]["id"]][0]
+        check(picked["name"] == "atlas" and "bise's model picked atlas" in picked["why"], "picked atlas: %r" % picked)
+        wait.until(lambda: len(of_type(hstate, "route_sent")) >= 2, 15, "sent to atlas at 2 s")
+        outs = [e["out"] for e in of_type(hstate, "x_out") if "build is red" in e["out"]["text"]]
+        check(len(outs) == 1 and outs[0]["project"] == by_name["atlas"]["id"], "forwarded once, to atlas: %r" % outs)
     except AssertionError as e:
         print("FAIL", e)
         ok = False

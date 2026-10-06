@@ -3980,3 +3980,88 @@ fn a_feature_merge_refreshes_merged_today() {
         assert!(!fx.contains(&Effect::MergedChanged), "{close:?}: {:?}", fx);
     }
 }
+
+// ---- desktop S2 step 5: unclear routes (BISE_ROUTE_MODEL's pick) ----
+
+fn asks(fx: &[Effect]) -> Vec<(u64, String)> {
+    fx.iter()
+        .filter_map(|e| match e {
+            Effect::RouteAsk { rid, text } => Some((*rid, text.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+fn unclear(t: &mut T, text: &str) -> Vec<Effect> {
+    t.go(Input::RouteHold { text: text.into(), via: String::new(), to: String::new(), name: String::new(), why: String::new(), context: None })
+}
+
+// held 1.5 s with no target, the shell asked; the window sees nothing;
+// with no pick his words reach bise's main as a plain message at the due
+#[test]
+fn an_unclear_route_with_no_pick_goes_plain_to_main_at_its_due() {
+    let mut t = T::new();
+    let fx = unclear(&mut t, "fix it please");
+    assert_eq!(asks(&fx), vec![(1, "fix it please".into())]);
+    assert!(routes(&fx).is_empty() && say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none(), "{:?}", fx);
+    t.env.now += 1_400;
+    let fx = t.go(Input::Tick);
+    assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none());
+    t.env.now += 200;
+    let fx = t.go(Input::Tick);
+    let said = say_to(&fx, MAIN).or_else(|| steer_to(&fx, MAIN)).expect("main hears his words");
+    assert!(said.contains("fix it please"), "{said}");
+    assert!(xdelivers(&fx).is_empty() && route_dones(&fx).is_empty(), "{:?}", fx);
+    // once: a late pick changes nothing
+    let fx = t.go(Input::RoutePick { rid: 1, to: "shop-1".into(), name: "shop".into(), why: "bise's model picked shop".into() });
+    assert!(routes(&fx).is_empty() && xdelivers(&fx).is_empty(), "{:?}", fx);
+}
+
+// a pick in time: a held route to that project, his 2 s from the pick,
+// then forwarded like any route; the unclear one never goes plain
+#[test]
+fn a_picked_route_is_held_two_seconds_for_that_project() {
+    let mut t = T::new();
+    unclear(&mut t, "is the checkout still slow");
+    t.env.now += 900;
+    let picked = t.env.now;
+    let fx = t.go(Input::RoutePick { rid: 1, to: "shop-1".into(), name: "shop".into(), why: "bise's model picked shop".into() });
+    assert_eq!(routes(&fx), vec![(2, "shop-1".into(), "shop".into(), picked + 2000)]);
+    t.env.now += 1_000;
+    let fx = t.go(Input::Tick);
+    assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none() && xdelivers(&fx).is_empty(), "the unclear act is gone: {:?}", fx);
+    t.env.now += 1_100;
+    let fx = t.go(Input::Tick);
+    assert_eq!(xdelivers(&fx), vec![(1, "shop-1".into(), "input".into(), "is the checkout still slow".into())]);
+    assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none());
+    // a second pick for it: nothing
+    assert!(routes(&t.go(Input::RoutePick { rid: 1, to: "docs-2".into(), name: "docs".into(), why: String::new() })).is_empty());
+}
+
+// law route_plain_waits_behind_unclear: a plain input to bise's main
+// while an unclear route waits is held behind it, and both reach main
+// in order; a queued input isn't held (it waits for the turn end)
+#[test]
+fn a_plain_input_waits_behind_an_unclear_route() {
+    let mut t = T::new();
+    unclear(&mut t, "first words");
+    t.env.now += 500;
+    let fx = t.user(MAIN, "second words");
+    assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none() && asks(&fx).is_empty(), "held behind: {:?}", fx);
+    t.env.now += 1_100;
+    let fx = t.go(Input::Tick);
+    let said: Vec<String> = fx
+        .iter()
+        .filter_map(|e| match e {
+            Effect::Say { agent, text } | Effect::Steer { agent, text } if agent == MAIN => Some(text.clone()),
+            _ => None,
+        })
+        .collect();
+    let all = said.join("
+");
+    let (a, b) = (all.find("first words"), all.find("second words"));
+    assert!(a.is_some() && b.is_some() && a < b, "both, in order: {:?}", fx);
+    // nothing waits now: the next input goes at once
+    let fx = t.user(MAIN, "third words");
+    assert!(say_to(&fx, MAIN).or_else(|| steer_to(&fx, MAIN)).is_some_and(|s| s.contains("third words")), "{:?}", fx);
+}

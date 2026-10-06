@@ -139,6 +139,7 @@ pub const VARS: &[Var] = &[
     test("BISE_RELEASE_CHECK_SECS", "how often the hub checks for a release (tests)"),
     test("BISE_RELEASE_SCRIPT", "the release script the hub runs (tests)"),
     internal("BISE_ROLE", "main or agent, for a REPL's model"),
+    user("BISE_ROUTE_MODEL", "the model that picks a project for unclear words to bise (unset: no pick, they stay with bise)"),
     user("BISE_SANDBOX", "0: no sandbox for the agents' commands"),
     internal("BISE_SESSION_CHOICE", "an agent's own model and effort file"),
     user("BISE_SMALL_MODEL", "the small model"),
