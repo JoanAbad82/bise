@@ -148,6 +148,14 @@ enum HarnessEnv {
         return (sock, dir)
     }
 
+    // talk_start/end/cancel reach the core in harness mode only when the core
+    // said {ev:'fake_voice', on:true} (amb-core a7332576: words from a file,
+    // no mic, no speaker); every other cmd always goes
+    static func forward(_ cmd: String, fakeVoice: Bool) -> Bool {
+        guard ["talk_start", "talk_end", "talk_cancel"].contains(cmd) else { return true }
+        return fakeVoice
+    }
+
     // BISE_HOME set and not his own ~/.bise (`home`: his real home dir)
     static func isolated(env: [String: String], home: String) -> Bool {
         guard let h = env["BISE_HOME"], !h.isEmpty else { return false }

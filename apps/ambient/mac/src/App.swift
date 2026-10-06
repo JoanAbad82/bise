@@ -191,10 +191,16 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         core.onEvent = { [weak self] in
             guard let self else { return }
             self.harness?.note("core>app", $0)
+            // amb-core a7332576: its first line in harness mode, words from a file, no mic or speaker
+            if $0["ev"] as? String == "fake_voice", let hs = self.harness {
+                hs.fakeVoice = $0["on"] as? Bool == true ? ($0["words"] as? String ?? "") : nil
+                Log.say("harness: core fake voice \(hs.fakeVoice.map { "on (\($0))" } ?? "off")")
+            }
             if let qa = self.qa { qa.fromCore($0) } else { self.coreEvent($0) }
         }
         core.onExit = { [weak self] _ in
             guard let self else { return }
+            self.harness?.fakeVoice = nil   // a restarted core says it again (or not)
             self.coreEvent(["ev": "hub", "up": false, "workspace": self.config.workspace])
         }
         core.start()
@@ -286,9 +292,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         if let qa, !qa.allow(cmd) { return }
         if let h = harness {
             h.note("app>core", cmd)
-            // harness A: the core would open the real mic (no fake listener yet)
-            if let c = cmd["cmd"] as? String, ["talk_start", "talk_end", "talk_cancel"].contains(c) {
-                Log.say("harness: \(c) not sent to the core (no mic in harness mode)")
+            // harness A: talk_* only to a core with a fake voice (it never opens the mic)
+            if let c = cmd["cmd"] as? String, !HarnessEnv.forward(c, fakeVoice: h.fakeVoice != nil) {
+                Log.say("harness: \(c) not sent to the core (no fake voice: it would open the mic)")
                 return
             }
         }

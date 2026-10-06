@@ -66,6 +66,12 @@ law("harness: isolated = BISE_HOME set and not his ~/.bise", HarnessEnv.isolated
 law("harness: his own ~/.bise is never isolated", !HarnessEnv.isolated(env: ["BISE_HOME": "/Users/g/.bise"], home: "/Users/g"))
 law("harness: his ~/.bise written another way neither", !HarnessEnv.isolated(env: ["BISE_HOME": "/Users/g/./.bise/"], home: "/Users/g"))
 law("harness: no BISE_HOME = not isolated", !HarnessEnv.isolated(env: [:], home: "/Users/g"))
+// bug 4's path: the core's fake voice (amb-core a7332576)
+law("harness: talk_start is dropped while the core has no fake voice (it would open the mic)", !HarnessEnv.forward("talk_start", fakeVoice: false))
+law("harness: talk_end and talk_cancel too", !HarnessEnv.forward("talk_end", fakeVoice: false) && !HarnessEnv.forward("talk_cancel", fakeVoice: false))
+law("harness: with the core's fake voice on, talk_start/end/cancel go to the core",
+    HarnessEnv.forward("talk_start", fakeVoice: true) && HarnessEnv.forward("talk_end", fakeVoice: true) && HarnessEnv.forward("talk_cancel", fakeVoice: true))
+law("harness: every other cmd always goes", HarnessEnv.forward("send", fakeVoice: false) && HarnessEnv.forward("answer", fakeVoice: true))
 
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Launch laws hold")

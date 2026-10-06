@@ -32,6 +32,8 @@ final class Harness {
     var side: (() -> Capsule?)?
     var keyEvent: ((CGEventType, CGEvent) -> Bool)?    // Keys.qaEvent: the tap's own path
     var appState: (() -> [String: Any])?
+    // the core's fake voice (its words file) once it said {ev:'fake_voice', on:true}; nil = none
+    var fakeVoice: String?
 
     let sockPath: String
     let dir: String
@@ -161,7 +163,14 @@ final class Harness {
         case "type": return try await typeText(q)
         case "fn": return try await fn(q)
         case "voice":
-            throw Failure(description: "no voice boundary in this core: the core opens the mic itself (talk_* never leave the app in harness mode); waits for amb-core's fake listener")
+            // the words the core's fake voice hears at the next talk (its file); then fn hold
+            guard let file = fakeVoice, !file.isEmpty else {
+                throw Failure(description: "the core has no fake voice (no {ev:'fake_voice', on:true} yet): talk_* stay in the app")
+            }
+            let words = q["words"] as? String ?? ""
+            try words.write(toFile: file, atomically: true, encoding: .utf8)
+            note("harness>voice", ["file": file, "chars": words.count])
+            return ["file": file, "chars": words.count]
         case "shot": return try await shot(q)
         case "eval": return try await eval(q)
         case "events":
@@ -191,7 +200,7 @@ final class Harness {
         return ["pid": Int(getpid()), "mode": "test", "ops": Harness.ops, "offscreen": true,
                 "bundle": Bundle.main.bundlePath, "argv": CommandLine.arguments,
                 "home": ProcessInfo.processInfo.environment["BISE_HOME"] ?? "", "screens": NSScreen.screens.map { r($0.frame) }, "windows": NSApp.windows.map { ["frame": r($0.frame), "visible": $0.isVisible, "class": String(describing: type(of: $0))] as [String: Any] },
-                "status_item": false, "bar": windowInfo(b), "side": windowInfo(sidePanel()),
+                "status_item": false, "fake_voice": fakeVoice ?? NSNull(), "bar": windowInfo(b), "side": windowInfo(sidePanel()),
                 "app_active": NSApp.isActive,
                 "key_window": NSApp.keyWindow.map { String(describing: type(of: $0)) as Any } ?? NSNull(),
                 "front_app": NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? NSNull()]
