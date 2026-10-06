@@ -14,6 +14,8 @@
   "use strict";
   const Wd = root.AmbWords, W = Wd.W, B = W.bar;
   const key = (k) => ({ ev: "app_key", key: k, local: true });
+  // who asks, on a card row: the global main is called bise on ambient surfaces (v9; ambient m_8725)
+  const asker = (agent) => (!agent || agent === "main" ? "bise" : agent);
   const item = (keys, w, act, pre) => ({ ...(pre ? { pre } : {}), keys, ...(w ? { w } : {}), ...(act ? { act } : {}) });
   const PERMS = ["accessibility", "mic", "screen"];
 
@@ -90,7 +92,7 @@
     s.head = { h: 68, input: { text: v.spot.text, ph: SP.ph }, right: { text: q ? SP.to : SP.holdFn } };
     let envN = 0;
     const row = (r) => {
-      if (r.kind === "card") return { g: "?", gc: "a", t: r.agent, p: r.pname, sub: r.text, right: { keys: ["⏎"] }, act: { ev: "ui_open_card", card: r.id }, qa: `card-${r.id}` };
+      if (r.kind === "card") return { g: "?", gc: "a", t: asker(r.agent), p: r.pname, sub: r.text, right: { keys: ["⏎"] }, act: { ev: "ui_open_card", card: r.id }, qa: `card-${r.id}` };
       if (r.kind === "env") { envN++; return { g: "ψ", t: r.name, sub: `${r.path}${r.sub ? `  ·  ${r.sub}` : ""}`, right: envN <= 9 ? { keys: ["⌘", String(envN)] } : null, act: { ev: "ui_project", project: r.project }, qa: `env-${r.name}` }; }
       if (r.kind === "ask") return { g: "@", gc: "a", t: SP.askBise, sub: r.text, act: { ev: "ui_spot_send", text: v.spot.text }, qa: "ask-bise" };
       const [g, gc] = AG[r.status] || AG.idle;
@@ -274,7 +276,7 @@
         s.head = { h: 52, lab: { acc: u.waits ? MN.head(u.working, u.waits) : "", rest: u.waits ? "" : MN.head(u.working, 0) } };
         // 'all quiet.' only when nothing waits and nothing failed (ambient m_8653 (2))
         s.text = u.failed ? { s: MN.broke(u.failed), dim: false } : u.waits ? null : { s: MN.calm, dim: true };
-        if (u.cards.length) s.sections.push({ rows: u.cards.map((c, k) => ({ g: "?", gc: "a", t: c.agent, p: c.pname, sub: c.text,
+        if (u.cards.length) s.sections.push({ rows: u.cards.map((c, k) => ({ g: "?", gc: "a", t: asker(c.agent), p: c.pname, sub: c.text,
           right: k === 0 ? { keys: ["fn", "1"] } : null, act: { ev: "ui_open_card", card: c.id }, qa: `card-${c.id}` })) });
         if (u.followed.length) s.sections.push({ rows: u.followed.map((a) => ({ g: a.failed ? "▲" : "∿", gc: a.failed ? "risk" : "work",
           t: [a.pname, a.name, MN.following].filter(Boolean).join(" · "), sub: a.job ? MN.job(a.job) : a.title || null,

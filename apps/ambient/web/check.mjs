@@ -1492,6 +1492,11 @@ law("desktop S8 spotlight empty (v9): waiting for you, at work, environments wit
   // a project's name finds it and its agents ("eng" in v9: engine's agents, then engine)
   m = M.step(m, { ev: "ui_spot_type", text: "store" }, 80).m;
   eq(Bar.spec(M.view(m, 90, Fake.T0)).sections[0].rows.map((r) => r.t), ["stock", "wallet", "storefront"]);
+  // main's card is bise's on ambient surfaces, in the spotlight and the dropdown; an agent keeps its name (ambient m_8725)
+  const both = [{ id: "c-main", agent: "main", project: "telemetry-8e02", title: "compaction at 03:00?", options: ["move", "leave"] }, cards[0]];
+  let mm = M.step(M.init(), { ev: "state", agents, cards: both, projects }, 0).m;
+  eq(Bar.spec(M.view(M.step(mm, { ev: "app_key", key: "space" }, 10).m, 20, Fake.T0)).sections[0].rows.map((r) => r.t).sort(), ["alerts", "bise"]);
+  eq(Bar.spec(M.view(M.step(mm, { ev: "app_menu", on: true }, 10).m, 20)).sections[0].rows.map((r) => r.t).sort(), ["alerts", "bise"]);
 });
 law("desktop S8 route line (v9): after a talk, '→ telemetry · main' for 2 s; tab = the next project (route_correct), fn esc = cancel (route_cancel); then bise's usual 'working'", () => {
   const projects = [{ project: "home", name: "bise", home: true, order: 0 }, { project: "storefront-5c1d", name: "storefront", order: 1 },
