@@ -46,6 +46,7 @@ const api: BiseApi = {
   platform: process.platform,
   test,
   openExternal: async (url) => (await ipcRenderer.invoke(IPC.openExternal, url)) === true,
+  openPath: async (path, opts) => (await ipcRenderer.invoke(IPC.openPath, path, opts)) === true,
   copy: async (text) => {
     fence?.put(text);
     await ipcRenderer.invoke(IPC.copy, text);

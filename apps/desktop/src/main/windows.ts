@@ -14,6 +14,7 @@
 import { join } from 'node:path';
 import { app, BrowserWindow, type BrowserWindowConstructorOptions } from 'electron';
 import { IPC, READY_LINE, ROUTE_ENV, SURFACE_ARG, type Surface } from '../shared/api';
+import { glassOf } from './glass';
 
 export const OFF = -30000;
 
@@ -66,6 +67,7 @@ export class MainWindow {
       // the harness draws the caret with CDP focus emulation.
       ...(test ? { x: OFF, y: OFF, focusable: false } : {}),
       title: 'bise',
+      ...glassOf('window', process.platform, test),
       webPreferences: webPreferences('window', test),
     });
     this.win = win;

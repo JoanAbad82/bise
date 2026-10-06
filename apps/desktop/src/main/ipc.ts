@@ -2,10 +2,11 @@
 // links he opens, the clipboard, the menu's own keys. In test mode nothing
 // leaves the app: a link and a copy become stdout lines the harness reads
 // (EXTERNAL_LINE, COPY_LINE), never his browser or his clipboard.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { basename, extname } from 'node:path';
-import { BrowserWindow, clipboard, ipcMain, session, shell } from 'electron';
-import { COPY_LINE, EXTERNAL_LINE, IPC, TEST_CLIP_FILE_ENV, TEST_CLIP_TEXT_ENV, type MenuAction } from '../shared/api';
+import { app, BrowserWindow, clipboard, ipcMain, session, shell } from 'electron';
+import { COPY_LINE, EXTERNAL_LINE, IPC, OPEN_PATH_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_TEXT_ENV, type MenuAction } from '../shared/api';
+import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
 import { menuTarget } from './menu';
 import { externalUrl } from './external';
@@ -56,6 +57,7 @@ export function installIpc(testMode: boolean): void {
     });
   }
   ipcMain.handle(IPC.openExternal, (_e, raw: unknown): Promise<boolean> => openLink(raw, testMode));
+  ipcMain.handle(IPC.openPath, (_e, raw: unknown, opts: unknown): Promise<boolean> => openFile(raw, opts, testMode));
   ipcMain.handle(IPC.copy, async (_e, text: unknown): Promise<void> => {
     if (typeof text !== 'string' || text.length > MAX_COPY) return;
     if (testMode) {
@@ -79,6 +81,28 @@ export async function openLink(raw: unknown, testMode: boolean): Promise<boolean
     return true;
   }
   await shell.openExternal(url);
+  return true;
+}
+
+/**
+ * A file or folder of an answer in his editor at its line, else in Finder
+ * (openpath.ts); refused when not absolute or missing. In test mode only
+ * OPEN_PATH_LINE on stdout (the plan as if his machine had no editor
+ * installed: the harness's machine says nothing about his).
+ */
+export async function openFile(raw: unknown, opts: unknown, testMode: boolean): Promise<boolean> {
+  const path = cleanPath(raw);
+  if (path === null || !existsSync(path)) return false;
+  const line = cleanLine(opts);
+  if (testMode) {
+    const plan = openPlan(path, line, process.env, () => false);
+    process.stdout.write(`${OPEN_PATH_LINE} ${JSON.stringify({ ...plan, ...(line === undefined ? {} : { line }) })}
+`);
+    return true;
+  }
+  const plan = openPlan(path, line, process.env, (scheme) => app.getApplicationNameForProtocol(`${scheme}://`) !== '');
+  if (plan.how === 'editor') await shell.openExternal(plan.url);
+  else shell.showItemInFolder(plan.path);
   return true;
 }
 

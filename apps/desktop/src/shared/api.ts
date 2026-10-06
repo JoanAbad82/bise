@@ -18,6 +18,14 @@ export interface BiseApi {
    */
   readonly openExternal: (url: string) => Promise<boolean>;
   /**
+   * Opens a file or folder named in an answer (an absolute path) in his
+   * editor, at `line` when given; with no editor bise knows, Finder shows it
+   * (src/main/openpath.ts). Resolves false when refused (not absolute) or
+   * missing. In test mode nothing opens: main prints
+   * `OPEN_PATH_LINE <{path, line?, how, url?} as JSON>` on stdout instead.
+   */
+  readonly openPath: (path: string, opts?: { line?: number }) => Promise<boolean>;
+  /**
    * Puts text on the clipboard. In test mode: the window's private buffer
    * (⌘V pastes it) and `COPY_LINE <text as JSON>` on stdout, never his clipboard.
    */
@@ -118,6 +126,7 @@ export type MenuAction = 'settings' | 'inbox' | 'find';
 /** The IPC channels between the preload and main (owner: amb-mac). */
 export const IPC = {
   openExternal: 'bise:open-external',
+  openPath: 'bise:open-path',
   copy: 'bise:copy',
   menu: 'bise:menu',
   /** test mode: a clipboard item of the menu, played on the window's private buffer */
@@ -152,6 +161,7 @@ export const CAPSULE_LINE = 'bise-desktop: capsule';
 
 /** Test mode's stdout lines for effects that would leave the app. */
 export const EXTERNAL_LINE = 'bise-desktop: external';
+export const OPEN_PATH_LINE = 'bise-desktop: open-path';
 export const COPY_LINE = 'bise-desktop: copy';
 
 /** The environment variable that turns test mode on. */

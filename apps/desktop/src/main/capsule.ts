@@ -15,6 +15,7 @@
 // only change its state and print CAPSULE_LINE on stdout.
 import { BrowserWindow, ipcMain, screen, type Tray } from 'electron';
 import { CAPSULE_LINE, IPC, type CapsuleAt, type CapsuleState } from '../shared/api';
+import { glassOf } from './glass';
 import { capsuleBounds, OFF_DISPLAY, type Anchor, type DisplayBox, type Rect } from './place';
 import { loadRenderer, OFF, webPreferences } from './windows';
 
@@ -44,6 +45,8 @@ export class Capsule {
       hasShadow: false,
       alwaysOnTop: true,
       ...(mac ? { type: 'panel' } : { type: 'toolbar' }),
+      // macOS: the vibrancy is the glass (glass.ts), the window is the glass
+      ...glassOf('capsule', process.platform, testMode),
       title: 'bise capsule',
       webPreferences: webPreferences('capsule', testMode),
     });
