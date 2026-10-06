@@ -39,6 +39,22 @@ enum VisIn: Equatable {
     case tick                  // a timer: a deadline may have passed
 }
 
+// a card shows the bar by itself (8 s) once per card (lead m_8105, harness A
+// bug 1c): after a dismiss the page clears its pane and says needs again for
+// the same card, which brought the bar back, pushed, with the keys in his
+// app. A card the page doesn't name (an older page) still shows each time.
+struct CardPush: Equatable {
+    private(set) var last: String?
+    init() {}
+
+    mutating func shows(card: String?) -> Bool {
+        guard let c = card, !c.isEmpty else { return true }
+        if c == last { return false }
+        last = c
+        return true
+    }
+}
+
 // a left click on the menu-bar icon toggles (the user, main m_6965): the bar
 // shown in any state (opened by hand, a card's 8 s, an answer) → it closes;
 // hidden → the full view opens

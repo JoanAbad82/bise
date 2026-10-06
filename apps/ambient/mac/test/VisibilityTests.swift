@@ -101,5 +101,12 @@ law("done after you hid it stays hidden",
 law("icon click with the bar hidden: the full view opens", IconClick.act(shown: false) == .open)
 law("icon click with the bar shown: it closes", IconClick.act(shown: true) == .close)
 
+// a card shows the bar once (lead m_8105, harness A bug 1c)
+var cp = CardPush()
+law("card: a new card shows the bar", cp.shows(card: "c1"))
+law("card: the same card said again after a dismiss doesn't", !cp.shows(card: "c1"))
+law("card: the next card does", cp.shows(card: "c2"))
+law("card: an older page that names no card shows each time", cp.shows(card: nil) && cp.shows(card: nil))
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Visibility laws hold")

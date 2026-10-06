@@ -113,5 +113,21 @@ law("panel keys: a click in it while it has them: nothing more", pk.feed(.clicke
 law("panel keys: esc or ⌘W hands them back to his app", pk.feed(.closed) == .giveBack)
 law("panel keys: a click in it later takes them again", pk.feed(.clicked) == .take)
 
+// esc without fn (lead m_8105, harness A bug 1c)
+func esc(_ shown: Bool, keys: Bool, ready: Bool = true, speaking: Bool = false, _ content: String) -> EscRoute {
+    EscRoute.route(barShown: shown, barHasKeys: keys, pageReady: ready, speaking: speaking, content: content)
+}
+law("esc: fn 0 / fn i open with the keys: the page's (steps back, the app keeps the bar and the keys)", esc(true, keys: true, "open") == .page)
+law("esc: a card with the keys: the page's (puts it off)", esc(true, keys: true, "needs") == .page)
+law("esc: the spotlight field, a talk, the hello with the keys: the page's",
+    [esc(true, keys: true, "type"), esc(true, keys: true, "talk"), esc(true, keys: true, "hello")] == [.page, .page, .page])
+law("esc: a pushed card without the keys: the app hides the bar", esc(true, keys: false, "needs") == .dismiss)
+law("esc: nothing to step back from (none, a line, got, an answer) even with the keys: the app hides it",
+    [esc(true, keys: true, "none"), esc(true, keys: true, "line"), esc(true, keys: true, "got"), esc(true, keys: true, "answer")] == [.dismiss, .dismiss, .dismiss, .dismiss])
+law("esc: main speaks with the keys: the page hushes on its own key", esc(true, keys: true, speaking: true, "answer") == .page)
+law("esc: main speaks without the keys: the app tells the page", esc(true, keys: false, speaking: true, "answer") == .post)
+law("esc: the page not loaded: the app hides the bar", esc(true, keys: true, ready: false, "open") == .dismiss)
+law("esc: the bar hidden: his esc only", esc(false, keys: false, "none") == .nothing)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Always laws hold")

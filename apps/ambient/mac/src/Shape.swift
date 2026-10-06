@@ -57,6 +57,18 @@ struct CapsuleShape: Equatable {
         blurRects(panel: panel).contains { $0.contains(p) }
     }
 
+    // does the panel let the mouse through, the pointer at this screen point
+    // (Cocoa coords, y up) and the panel at this frame (lead m_8105: since
+    // 5cfda0e5 only a real mouse move set it, so a bar shown under a still
+    // pointer, or with a new glass, kept the last answer and every click went
+    // to the app below). Asked on every show, app_size, place and state
+    // change. No pointer known = in doubt: the glass takes the click.
+    func ignoresMouse(pointer: CGPoint?, frame f: CGRect) -> Bool {
+        guard let m = pointer else { return false }
+        let p = CGPoint(x: m.x - f.minX, y: f.maxY - m.y)
+        return !takesMouse(at: p, panel: f.size)
+    }
+
     func blurRects(panel: CGSize) -> [CGRect] {
         if noGlass { return [] }
         let bx = panel.width - w

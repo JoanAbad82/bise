@@ -313,6 +313,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
         let f = side ? Placement.side(size, glass: shape.glass, on: b) : Placement.bar(size, glass: shape.glass, on: b)
         let moved = f.origin != panel.frame.origin || f.size != panel.frame.size
         panel.setFrame(f, display: true)
+        refreshMouse()
         if moved { onPlaced?() }
     }
 
@@ -327,6 +328,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
             place(NSSize(width: max(want.width, cur.width), height: max(want.height, cur.height)))
         }
         applyMask()
+        refreshMouse()   // a new glass under a still pointer (lead m_8105)
         shrink?.cancel()
         if abs(want.width - panel.frame.width) > 0.5 || abs(want.height - panel.frame.height) > 0.5 {
             let job = DispatchWorkItem { [weak self] in
@@ -465,7 +467,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
         mouseMonitors = []
         guard on else { panel.ignoresMouseEvents = false; return }
         // harness A: no global monitor (no Input Monitoring read): its socket sets the mouse (mouseAt)
-        if offScreen { return }
+        if offScreen { refreshMouse(); return }
         let moves: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
         if let g = NSEvent.addGlobalMonitorForEvents(matching: moves, handler: { [weak self] _ in
             MainActor.assumeIsolated { self?.followMouse() }
@@ -478,18 +480,33 @@ final class Capsule: NSObject, WKNavigationDelegate {
         if let c = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
             MainActor.assumeIsolated { self?.onClickOutside?() }
         }) { mouseMonitors.append(c) }
-        followMouse()
+        refreshMouse()
     }
 
     private func followMouse() { mouseAt(NSEvent.mouseLocation) }
 
+    // harness A: the last point its socket clicked (there is no pointer of
+    // its own; the real one is on his screens, never over the panel)
+    private var harnessPointer: NSPoint?
+    private var pointer: NSPoint? { offScreen ? harnessPointer : NSEvent.mouseLocation }
+
     // the panel takes the mouse at that screen point only inside the glass
     // (the real pointer's moves call it; harness A calls it before a click)
     func mouseAt(_ m: NSPoint) {
-        let f = panel.frame
-        let p = CGPoint(x: m.x - f.minX, y: f.maxY - m.y)
-        let take = shape.takesMouse(at: p, panel: f.size)
-        if panel.ignoresMouseEvents == take { panel.ignoresMouseEvents = !take }
+        if offScreen { harnessPointer = m }
+        setIgnoresMouse(shape.ignoresMouse(pointer: m, frame: panel.frame))
+    }
+
+    // the same answer from where the pointer is now (lead m_8105), on every
+    // show, app_size, place and state change, never only on a mouse move:
+    // a bar shown under a still pointer or with a new glass takes its clicks
+    func refreshMouse() {
+        guard !hidden else { return }
+        setIgnoresMouse(shape.ignoresMouse(pointer: pointer, frame: panel.frame))
+    }
+
+    private func setIgnoresMouse(_ ignore: Bool) {
+        if panel.ignoresMouseEvents != ignore { panel.ignoresMouseEvents = ignore }
     }
 
     // the panel's key state, however it came (focus(true), a click): his

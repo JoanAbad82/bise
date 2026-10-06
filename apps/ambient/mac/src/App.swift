@@ -23,6 +23,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var sounds: SoundPlayer?
     private var askedAt = 0.0             // his last ask the core took ('sent'); its answer gets the keys
     private var keyFocus = KeyFocus()     // who has his keystrokes (round 9)
+    private var content = "none"          // the page's last app_content kind (EscRoute)
+    private var cardPush = CardPush()     // a card shows the bar once (lead m_8105)
     private var side: Capsule?            // round 10's side panel, made at its first open
     private var panelAgent: String?       // the agent it shows
     private var panelKeys = KeyFocus()    // the panel's own keys (it takes them when opened)
@@ -486,12 +488,16 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             // needs come from the events the app sees itself; the page adds
             // the short lines (done, failed, a page ready, a key's answer)
             let kind = cmd["kind"] as? String ?? ""
+            content = kind
             // anything else on the glass ends the hello's claim on it
             if kind != "hello" && kind != "none" { helloOn = false }
             switch kind {
             case "line": visFeed(.line)   // never shows bise by itself (SPEC §0)
             case "open": visFeed(.open)
-            case "needs": visFeed(.card)
+            case "needs":
+                // once per card: the same card said again after a dismiss stays in the icon
+                let card = cmd["card"].flatMap { $0 is NSNull ? nil : "\($0)" }
+                if cardPush.shows(card: card) { visFeed(.card) } else { capsule.refreshMouse() }
             case "none":
                 // the hello is over (5 s, or fn, esc, a click): its glass goes
                 if helloOn { helloOn = false; visFeed(.dismiss) }
@@ -773,9 +779,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
                 capsule.post(["ev": "app_key", "key": k])
             }
         case .plainEsc:
-            // esc while main speaks: text only (the page hushes); else it hides bise
-            guard !capsule.hidden else { return }
-            if phase == "speaking" { capsule.post(["ev": "app_key", "key": "esc"]) } else { visFeed(.dismiss) }
+            // EscRoute (lead m_8105): while the bar has the keys the page acts
+            // on the esc it gets (a pane steps back, a card is put off); else
+            // main speaking: the page hushes; else it hides bise
+            switch EscRoute.route(barShown: !capsule.hidden, barHasKeys: capsule.panel.isKeyWindow,
+                                  pageReady: capsule.ready, speaking: phase == "speaking", content: content) {
+            case .page, .nothing: break
+            case .post: capsule.post(["ev": "app_key", "key": "esc"])
+            case .dismiss: visFeed(.dismiss)
+            }
         }
     }
 
@@ -1057,6 +1069,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             sayVisible()
             watchClicks(shown)
         }
+        capsule.refreshMouse()   // every state change (lead m_8105)
         visJob?.cancel()
         if let at = vis.nextTick(after: t) {
             let job = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.visFeed(.tick) } }

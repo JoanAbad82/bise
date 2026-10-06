@@ -51,6 +51,18 @@ law("mouse: 10 px above the glass, through", !r9.takesMouse(at: CGPoint(x: 400, 
 law("mouse: 10 px under the glass (its drawn shadow), through", !r9.takesMouse(at: CGPoint(x: 400, y: 256), panel: box))
 law("mouse: on the pearl (x 4..68), through", !r9.takesMouse(at: CGPoint(x: 36, y: 60), panel: box))
 law("mouse: no glass shown, nothing taken", !CapsuleShape.from(none, maxHeight: 700)!.takesMouse(at: CGPoint(x: 400, y: 50), panel: panel))
+// lead m_8105: the pass-through from where the pointer is now (screen
+// coords, y up), whatever moved last; the panel at (100, 500), 840 x 338
+let fr = CGRect(x: 100, y: 500, width: 840, height: 338)
+law("pointer over the glass: the panel takes the click (no move needed)",
+    !r9.ignoresMouse(pointer: CGPoint(x: 100 + 400, y: 500 + 338 - 100), frame: fr))
+law("pointer left of the glass: through", r9.ignoresMouse(pointer: CGPoint(x: 100 + 70, y: 500 + 338 - 100), frame: fr))
+law("pointer elsewhere on the screen: through", r9.ignoresMouse(pointer: CGPoint(x: 5, y: 5), frame: fr))
+law("no pointer known: in doubt the glass takes the click", !r9.ignoresMouse(pointer: nil, frame: fr))
+law("a new glass under the same still pointer changes the answer",
+    !CapsuleShape.from(["w": 840, "h": 338, "glass": ["x": 0, "y": 0, "w": 840, "h": 338]], maxHeight: 700)!
+        .ignoresMouse(pointer: CGPoint(x: 100 + 70, y: 500 + 338 - 100), frame: fr))
+law("the page says no glass: through", CapsuleShape.from(none, maxHeight: 700)!.ignoresMouse(pointer: CGPoint(x: 500, y: 700), frame: fr))
 law("too small a box: no shape", CapsuleShape.from(["w": 10, "h": 98], maxHeight: 700) == nil)
 
 if failures > 0 { print("\(failures) failed"); exit(1) }

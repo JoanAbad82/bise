@@ -54,6 +54,32 @@ struct KeyFocus: Equatable {
     }
 }
 
+// esc without fn (lead m_8105, harness A bug 1c): who acts on it. The key
+// tap sees every esc first; it used to hide the bar even while the bar had
+// his keys, so an esc from fn 0 or fn i gave the keys back to his app and
+// the page then showed the card again, pushed, keys elsewhere. One rule:
+// while the bar has the keys the esc is the page's (the panel gets the key
+// itself: a pane steps back to its card, a card is put off, a talk is
+// cancelled, the field closes; the page asks app_hide when nothing is
+// left), except where the page shows nothing to step back from (none, a
+// line, got, an answer not spoken): the app hides the bar as before.
+enum EscRoute: Equatable {
+    case page       // the page acts on the key it gets; the app does nothing
+    case post       // main speaks, the bar without the keys: the app tells the page (hush)
+    case dismiss    // the app hides the bar (his esc still reaches his app when the bar hasn't the keys)
+    case nothing    // the bar hidden: his esc only
+
+    // kinds of app_content where the page has something to step back from
+    static let pageKinds: Set<String> = ["open", "needs", "type", "talk", "hello"]
+
+    static func route(barShown: Bool, barHasKeys: Bool, pageReady: Bool, speaking: Bool, content: String) -> EscRoute {
+        guard barShown else { return .nothing }
+        if barHasKeys && pageReady && (speaking || pageKinds.contains(content)) { return .page }
+        if speaking { return .post }
+        return .dismiss
+    }
+}
+
 // a screen as the capsule's placement sees it (Cocoa coords: y up)
 struct ScreenBox: Equatable {
     var frame: CGRect
