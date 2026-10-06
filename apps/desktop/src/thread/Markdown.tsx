@@ -29,7 +29,7 @@ export const Markdown = memo(function Markdown({ text, onLink }: { text: string;
         onLink?.(href);
       };
       return (
-        <a href={href} onClick={open} title={href} rel="noreferrer">
+        <a href={href} onClick={open} title={href} rel="noreferrer" data-testid="thread.link">
           {children}
         </a>
       );

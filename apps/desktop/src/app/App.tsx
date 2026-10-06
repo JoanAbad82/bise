@@ -47,7 +47,7 @@ function Sidebar() {
         onClick={() => {
           router.go({ screen: 'bise' });
         }}
-        testId="route:bise"
+        testId="app.sidebar.bise"
       />
     </Side>
   );
