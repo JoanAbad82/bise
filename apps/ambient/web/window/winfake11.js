@@ -8,7 +8,7 @@
   const at = (h, m, daysAgo = 0) => Date.UTC(2026, 9, 3, h - 2, m) - daysAgo * 86400000;
   const START = () => ({
     prefs: { onboarded: true, theme: "system", login: true, menubar_count: true, voice: { fn_hold: true, fn_twice: true, language: "auto" },
-      context: { shot: true, url: true, file: true, window_text: true }, excluded_apps: ["1Password", "Messages"], shots_keep_days: 7,
+      context: { shot: true, url: true, file: true, window_text: true }, excluded_apps: ["com.1password.1password", "com.apple.MobileSMS"], shots_keep_days: 7,
       quiet: { call: true, share: true, fullscreen: true, focus: true, batch_min: 30, away_card: true } },
     accounts: [{ id: "chatgpt", label: "ChatGPT plan", kind: "subscription", state: "signed_in", who: "you@example.com" },
       { id: "claude", label: "Claude plan", kind: "subscription", state: "signed_out" },

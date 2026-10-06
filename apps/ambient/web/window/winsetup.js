@@ -250,7 +250,13 @@
   }
   const KEYS = [["k_talk", "k_hold_fn"], ["k_free", "fn fn"], ["k_spot", "k_fn_space"], ["k_bise", "⌘0"], ["k_project", "⌘1 … ⌘9"], ["k_agent", "⌥0 / ⌥1 … ⌥9"],
     ["k_find", "⌘K"], ["k_back", "⌘[ / ⌘]"], ["k_inbox", "⌘I, ctrl+1-9"], ["k_diff", "⌘D"], ["k_arts", "⌘⇧A"], ["k_fold", "⌘E"], ["k_stop", "⌘."], ["k_queue", "⌥⏎"], ["k_settings", "⌘,"]];
-  const APPS = ["1Password", "Messages", "Mail", "Slack", "Signal"];
+  // the apps fn never reads, by bundle id (prefs.excluded_apps, bise_home Pref::ExcludedApps, amb-home
+  // m_9073): the seed, the same table as bise_home::prefs::EXCLUDED_APPS_SEED; he toggles ids, he
+  // reads names; an id outside the table shows its last part
+  const APPS = [["com.agilebits.onepassword7", "1Password 7"], ["com.1password.1password", "1Password"], ["com.bitwarden.desktop", "Bitwarden"],
+    ["com.dashlane.dashlanephone", "Dashlane"], ["com.apple.keychainaccess", "Keychain Access"], ["com.apple.Passwords", "Passwords"],
+    ["com.apple.systempreferences", "System Settings"], ["com.apple.MobileSMS", "Messages"]];
+  const appName = (id) => (APPS.find(([i]) => i === id) || [id, String(id).split(".").pop()])[1];
 
   function settings(x, s) {
     const nav = PAGES.map((p, i) => ({ kind: "ag", name: T(s, PAGE_W[i]), on: p === x.page, act: { ev: "ui_set_page", page: p } }));
@@ -270,11 +276,12 @@
           [[T(s, "auto"), "voice.language", "auto"], ["English", "voice.language", "en"], ["Français", "voice.language", "fr"]])] }];
     } else if (page === "context and privacy") {
       sub = T(s, "privacy_s");
-      const days = get(x.prefs, "shots_keep_days") || 7, apps = get(x.prefs, "excluded_apps") || ["1Password", "Messages"];
+      const days = get(x.prefs, "shots_keep_days") || 7, apps = get(x.prefs, "excluded_apps") || APPS.map(([id]) => id);
+      const known = [...APPS, ...apps.filter((id) => !APPS.some(([i]) => i === id)).map((id) => [id, appName(id)])];
       groups = [{ title: T(s, "when_fn"), items: [tg(x, s, "context.shot", "ctx_shot"), tg(x, s, "context.url", "ctx_url"), tg(x, s, "context.file", "ctx_file"), tg(x, s, "context.window_text", "ctx_text")] },
       { title: T(s, "kept"), items: [choice(x, s, "shots", "shots_kept", T(s, "days_n", { n: days }), [1, 7, 30].map((n) => [T(s, "days_n", { n }), "shots_keep_days", n, n === days])),
-        { label: T(s, "excluded"), sub: `${T(s, "excluded_s")} · ${apps.join(", ")}`, control: { menu: { id: "apps", text: T(s, "edit"), open: x.menu === "apps", act: { ev: "ui_set_menu", id: x.menu === "apps" ? null : "apps" },
-          items: APPS.map((a) => ({ text: `${apps.includes(a) ? "✓ " : ""}${a}`, act: { ev: "ui_set_pref", key: "excluded_apps", value: apps.includes(a) ? apps.filter((z) => z !== a) : [...apps, a] } })) } } }] }];
+        { label: T(s, "excluded"), sub: `${T(s, "excluded_s")} · ${apps.map(appName).join(", ")}`, control: { menu: { id: "apps", text: T(s, "edit"), open: x.menu === "apps", act: { ev: "ui_set_menu", id: x.menu === "apps" ? null : "apps" },
+          items: known.map(([id, name]) => ({ text: `${apps.includes(id) ? "✓ " : ""}${name}`, act: { ev: "ui_set_pref", key: "excluded_apps", value: apps.includes(id) ? apps.filter((z) => z !== id) : [...apps, id] } })) } } }] }];
     } else if (page === "quiet moments") {
       sub = T(s, "quiet_s");
       const batch = get(x.prefs, "quiet.batch") !== false, every = get(x.prefs, "quiet.batch_min") || 30;

@@ -273,6 +273,20 @@ law("one language per screen: his setting, else macOS's (win_lang), else English
   eq(w.v.setup.navTitle, "settings");
 });
 
+law("excluded apps are bundle ids (amb-home b0c2ff17): he reads names, the setting keeps ids; an unknown id shows its last part", () => {
+  const w = win();
+  w.feed({ ev: "win_open", route: "settings/context and privacy" });
+  let it = w.v.setup.groups[1].items[1];
+  eq(it.sub, "the excluded apps · 1Password, Messages");
+  w.feed(it.control.menu.act);
+  it = w.v.setup.groups[1].items[1];
+  eq(it.control.menu.items.map((m) => m.text), ["1Password 7", "✓ 1Password", "Bitwarden", "Dashlane", "Keychain Access", "Passwords", "System Settings", "✓ Messages"]);
+  w.feed(it.control.menu.items[2].act);
+  eq(w.cmds("prefs_set").pop(), { cmd: "prefs_set", key: "excluded_apps", value: ["com.1password.1password", "com.apple.MobileSMS", "com.bitwarden.desktop"] });
+  w.feed({ ev: "prefs", prefs: { ...w.s.s11.prefs, excluded_apps: ["org.example.Vault"] } });
+  eq(w.v.setup.groups[1].items[1].sub, "the excluded apps · Vault");
+});
+
 const direct = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (direct) {
   console.log(`${fail ? "✗" : "✓"} ambient window setup: ${pass} passed${fail ? `, ${fail} failed` : ""}`);
