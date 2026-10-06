@@ -406,7 +406,7 @@ mod tests {
         assert!(shown.starts_with(&format!("<user_message id=\"{USER_ID_PREFIX}12\"")), "{shown}");
         assert!(r.contains(&format!("<user_message id=\"{USER_ID_PREFIX}<n>\">")));
         // it reads the projects' threads with amb-hub's step 3 (C, 175eb516)
-        for needle in ["`sb history \"<words>\" --project <p>`", "`--all`", "`sb show <p>/<agent>#<pos>`", "`sb inspect <p>/<agent>`"] {
+        for needle in ["`sb history \"<words>\" --project <p>`", "`--all`", "`sb show <p>/<agent>#<pos>`", "`sb inspect <p>/<agent>`", "`sb follow <p>/<agent>`"] {
             assert!(r.contains(needle), "{needle}");
         }
     }
