@@ -128,7 +128,7 @@
       case "you": case "agent": case "from_agent": case "report": case "page": {
         const w = who(s, e);
         return { t: "msg", pos: e.pos, you: e.kind === "you", who: w, meta: meta(s, e), text: e.text, ctx: ctx(e),
-          quote: e.quote ? D.quoteChip(e.quote, 0, (ms) => hm(s, ms)).replace(/^❝ 1 /, "❝ ") : null,
+          quote: e.quote ? D.quoteChip(e.quote, 0, (ms) => hm(s, ms), s).replace(/^❝ 1 /, "❝ ") : null,
           page: e.page ? { title: e.page.title, url: e.page.url } : null, pending: !!e.pending,
           error: e.kind === "report" && e.report && e.report.kind === "failed" };
       }
@@ -196,7 +196,7 @@
     const d = D.dock(s);
     const a = M.agentRow(s);
     const text = s.drafts[k] || "";
-    const quotes = (s.quotes[k] || []).map((q, i) => ({ i, text: D.quoteChip(q, i, (ms) => hm(s, ms)) }));
+    const quotes = (s.quotes[k] || []).map((q, i) => ({ i, text: D.quoteChip(q, i, (ms) => hm(s, ms), s) }));
     const working = a && a.status === "working" && s.route.agent !== "main";
     return { dock: D.dockWords(s, d), div: D.divider(s, d, a), ph: D.placeholder(s, d, a), text, quotes,
       send: text.trim() ? "on" : working ? "stop" : "off", disabled: !!s.offline,

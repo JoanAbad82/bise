@@ -352,10 +352,13 @@
     }
     if (ev.ev === "ui_key") {
       // an extension that holds the keys now (onboarding, settings, the add sheet) sees them first
-      for (const [key, name] of EXTS) {
+      // (S7's key() gets the keys of its own screens: review's ⌘⏎ merge, ⌘O open in editor;
+      // amb-web m_8453)
+      for (const [key, name, screens] of EXTS) {
         const x = root[name];
-        if (x && x.wantsKeys && x.wantsKeys(s[key], s)) {
-          const r = x.key(s[key], ev, s);
+        const holds = x && x.key && (x.wantsKeys ? x.wantsKeys(s[key], s) : !!s.route.screen && screens.includes(s.route.screen));
+        if (holds) {
+          const r = x.key(s[key] || (x.init && x.init()), ev, s);
           if (r) return { s: applyExt(s, key, r, cmds), cmds, eat: !!r.eat };
         }
       }

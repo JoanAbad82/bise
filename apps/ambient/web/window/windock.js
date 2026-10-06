@@ -7,6 +7,8 @@
   "use strict";
 
   const HOME = "home";
+  // the words (winwords.js): one table, en + fr; English when the table isn't loaded
+  const T = (s, k, v) => (root.AmbWinWords ? root.AmbWinWords.t(s, k, v) : k);
   // a thread's key; a screen (S7's review, artifacts, environments) keys its own composer
   const keyOf = (r) => `${r.screen ? `${r.screen}${r.want ? `=${r.want}` : ""}:` : ""}${r.project}/${r.agent}`;
 
@@ -58,18 +60,18 @@
     const wide = d.mode === "inbox" || s.route.project === HOME;
     const who = asker(s, c, wide);
     const approval = c.kind === "approval" || c.kind === "merge" || c.kind === "confirm";
-    const nav = d.list.length > 1 ? `${d.i + 1} of ${d.list.length}   ← →` : `1 of 1`;
-    const k = d.mode === "inbox" ? `${nav}${d.list.length > 1 ? " the others" : ""}   esc back to the thread` : approval ? `approval · ${nav}` : nav;
+    const nav = d.list.length > 1 ? `${T(s, "n_of", { i: d.i + 1, n: d.list.length })}   ← →` : T(s, "n_of", { i: 1, n: 1 });
+    const k = d.mode === "inbox" ? `${nav}${d.list.length > 1 ? T(s, "the_others") : ""}   ${T(s, "esc_back")}` : approval ? `${T(s, "approval")} · ${nav}` : nav;
     return {
       mode: d.mode,
-      h: approval ? `? ${who} · ${c.title || "approve it?"}` : `? ${who} needs you`,
+      h: approval ? `? ${who} · ${c.title || T(s, "approve_it")}` : T(s, "needs_you", { who }),
       k,
       body: d.mode === "inbox" ? c.body || "" : "",
       origin: d.mode === "inbox" && c.origin ? `asked by ${c.origin.by}${c.origin.via ? `, via ${c.origin.via}` : ""}` : "",
       shot: d.mode === "inbox" && c.origin ? c.origin.shot || "" : "",
       q: c.question,
       opts: (c.options || []).map((o) => ({ n: o.n, label: o.label, picked: s.picked && s.picked.card === c.id && s.picked.n === o.n })),
-      ty: "or type your answer below",
+      ty: T(s, "type_below"),
       tabs: d.mode === "inbox" ? d.list.map((x, i) => ({ id: x.id, text: `${x.agent} · ${x.title || x.question}`, on: i === d.i })) : null,
       card: c.id,
     };
@@ -81,12 +83,12 @@
     const project = e.from_project || s.route.project;
     const who = s.route.project === HOME ? `${pname(s, project)} · ${e.from}` : e.from;
     if (c.answered && c.by && c.by !== "you") return null; // main answered it: an "asked · i answered" line
-    if (c.id in s.answered) return `? ${who} asked you · you answered: ${s.answered[c.id]}`;
+    if (c.id in s.answered) return T(s, "asked_answered_you", { who, a: s.answered[c.id] });
     const open = allCards(s).some((x) => x.id === c.id);
-    if (!open) return c.answered && c.answer ? `? ${who} asked you · you answered: ${c.answer}` : `? ${who} asked you · answered`;
+    if (!open) return c.answered && c.answer ? T(s, "asked_answered_you", { who, a: c.answer }) : T(s, "asked_done", { who });
     // two forms only (ambient m_8298): its card is above the composer now, or ⌘I brings it
     const d = dock(s);
-    return d && d.list.some((x) => x.id === c.id) ? `? ${who} asked you · below` : `? ${who} asked you · ⌘I`;
+    return d && d.list.some((x) => x.id === c.id) ? T(s, "asked_below", { who }) : T(s, "asked_cmd_i", { who });
   }
 
   // the composer's line above the field, and its placeholder
@@ -94,17 +96,17 @@
     const r = s.route;
     const to = r.project === HOME ? "bise" : r.agent === "main" ? `${pname(s, r.project)} · main` : r.agent;
     const model = agentRow && agentRow.model ? ` · ${agentRow.model}` : "";
-    const answering = d ? ` · answering ${d.card.agent}` : "";
-    return `you → ${to}${answering}${model}`;
+    const answering = d ? T(s, "answering", { who: d.card.agent }) : "";
+    return `${T(s, "you_to", { to })}${answering}${model}`;
   }
   function placeholder(s, d, agentRow) {
     const r = s.route;
-    if (s.offline) return "offline · your message waits and goes when you're back";
-    if (d) return "your answer, then ⏎";
-    if (r.project === HOME) return "write to bise, then ⏎";
-    if (r.agent === "main") return `write to ${pname(s, r.project)}’s main, then ⏎`;
-    if (agentRow && agentRow.status === "working") return `steer ${r.agent} while it works, then ⏎`;
-    return `write to ${r.agent}, then ⏎`;
+    if (s.offline) return T(s, "ph_offline");
+    if (d) return T(s, "ph_answer");
+    if (r.project === HOME) return T(s, "ph_write", { to: "bise" });
+    if (r.agent === "main") return T(s, "ph_main", { p: pname(s, r.project) });
+    if (agentRow && agentRow.status === "working") return T(s, "ph_steer", { a: r.agent });
+    return T(s, "ph_write", { to: r.agent });
   }
 
   // ---- quotes ❝ (selected diff lines or a selected sentence of a message)
@@ -121,11 +123,11 @@
     return { agent, pos: e.pos, text: String(text).trim(), who: e.kind === "you" ? "you" : e.from || agent, at_ms: e.at_ms };
   }
   // the chip: ❝ 1 “workers: [Worker; 4],”  decode_pool.rs:13-14 · 2 lines
-  function quoteChip(q, i, fmt) {
+  function quoteChip(q, i, fmt, s) {
     const first = (q.text.split("\n").find((l) => l.trim()) || "").trim();
     if (q.file) {
       const where = q.lines[0] === q.lines[1] ? `${q.lines[0]}` : `${q.lines[0]}-${q.lines[1]}`;
-      return `❝ ${i + 1} “${clip(first, 48)}”  ${base(q.file)}:${where} · ${q.n} line${q.n > 1 ? "s" : ""}`;
+      return `❝ ${i + 1} “${clip(first, 48)}”  ${base(q.file)}:${where} · ${s && root.AmbWinWords ? T(s, "lines_n", { n: q.n }) : `${q.n} line${q.n > 1 ? "s" : ""}`}`;
     }
     return `❝ ${i + 1} “${clip(first, 48)}”  ${q.who}${q.at_ms && fmt ? ` ${fmt(q.at_ms)}` : ""}`;
   }

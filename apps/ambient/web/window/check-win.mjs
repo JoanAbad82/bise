@@ -13,7 +13,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Map, String, Number, Date, Intl, RegExp });
 // the window as index.html loads it, S7's screens included (amb-web's files, when they are there)
 import { existsSync } from "node:fs";
-for (const f of ["winfake.js", "winfake7.js", "windock.js", "winfind.js", "winenv.js", "winarts.js", "winreview.js", "wins7.js", "winmodel.js", "winview.js"].filter((f) => existsSync(join(here, f)))) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+for (const f of ["winwords.js", "winfake.js", "winfake7.js", "windock.js", "winfind.js", "winenv.js", "winarts.js", "winreview.js", "wins7.js", "winmodel.js", "winview.js"].filter((f) => existsSync(join(here, f)))) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
 const { AmbWinFake: F, AmbWinModel: M, AmbWinView: V, AmbWinDock: D } = ctx;
 const j = (x) => (x === undefined ? x : JSON.parse(JSON.stringify(x)));
 const eq = (a, b, msg) => assert.deepStrictEqual(j(a), j(b), msg);
@@ -415,6 +415,36 @@ law("every route change names the window with its route; a link to a place that 
   eq(w.sent.filter((c) => c.cmd === "win_title").map((c) => c.route), ["bise", "telemetry/p99", `agent/${P.telemetry}/alerts`, `project/${P.storefront}`, "settings"]);
   // no cmd for a place that isn't there: nothing to subscribe
   eq(w.sent.filter((c) => c.cmd === "subscribe" && c.agent === "p99"), []);
+});
+
+law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {
+  const dir = join(here, "../../../../rust/proto/fixtures");
+  if (!existsSync(dir)) return;
+  const lines = (f) => (existsSync(join(dir, f)) ? readFileSync(join(dir, f), "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l)) : []);
+  let s = { ...M.init(F.NOW), tz: "Europe/Paris" };
+  const evs = [...lines("core_ev.jsonl"), ...lines("hub_ev.jsonl"), ...lines("draft_hub_ev.jsonl")];
+  assert.ok(evs.length > 10);
+  const acme = (evs.find((e) => e.ev === "projects").projects.find((p) => !p.home) || {}).project;
+  s = M.step(s, { ev: "ui_route", project: acme, agent: "perf" }).s;
+  // the first page is the newest; the fixture's second page answers a `page` (older) cmd
+  let v = null;
+  for (const ev of evs) {
+    // an older page lands only when the window asked for it (paging's own law covers that)
+    if (ev.ev === "thread" && v) s = { ...s, threads: { ...s.threads, [`${ev.project}/${ev.agent}`]: { ...s.threads[`${ev.project}/${ev.agent}`], paging: true } } };
+    s = M.step(s, ev).s;
+    if (ev.ev === "thread" && !v) v = V.view(s);
+    V.view(s);
+  }
+  const rows = v.thread.rows.filter((r) => r.t !== "day");
+  assert.ok(rows.length >= 3, JSON.stringify(rows).slice(0, 200));
+  // their entry kinds all have a row: you, agent, tools, from_agent, report, card
+  const kinds = new Set(rows.map((r) => r.t));
+  for (const k of ["msg", "tool"]) assert.ok(kinds.has(k), k);
+  assert.ok(rows.some((r) => r.t === "msg" && r.who.name === "ambient-lead"), "a from_agent entry draws as its sender's message");
+  // after the older page and the live entries, the thread holds all of them in pos order
+  const all = s.threads[`${acme}/perf`].entries.map((e) => e.pos);
+  eq(all, all.slice().sort((a, b) => a - b));
+  assert.ok(all.includes(200) && all.includes(16) && all.includes(10));
 });
 
 // ---- the core's pages and live entries

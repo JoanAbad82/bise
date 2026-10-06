@@ -9,7 +9,7 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Map, String, Number, Date, Intl, RegExp });
-for (const f of ["winfake.js", "winfake7.js", "winfake11.js", "windock.js", "winfind.js", "winenv.js", "winarts.js", "wins7.js", "winsetup.js", "winmodel.js", "winview.js"].filter((f) => existsSync(join(here, f))))
+for (const f of ["winwords.js", "winfake.js", "winfake7.js", "winfake11.js", "windock.js", "winfind.js", "winenv.js", "winarts.js", "wins7.js", "winsetup.js", "winmodel.js", "winview.js"].filter((f) => existsSync(join(here, f))))
   vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
 const { AmbWinFake: F, AmbWinFake11: F11, AmbWinModel: M, AmbWinView: V } = ctx;
 const j = (x) => (x === undefined ? x : JSON.parse(JSON.stringify(x)));
