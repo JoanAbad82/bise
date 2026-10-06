@@ -390,6 +390,23 @@ impl Core {
         }
     }
 
+    /// Each registered project's (id, agents, cards), in his order: a held
+    /// hub's own rows, else its `view.json` (none: empty).
+    pub(super) fn project_rows(&self) -> Vec<(String, Vec<Agent>, Vec<Card>)> {
+        let Some(p) = self.hubs.ports.as_ref() else { return Vec::new() };
+        self.hubs
+            .rows
+            .iter()
+            .map(|r| match self.hubs.conns.get(&r.id).and_then(|c| c.rows.as_ref()) {
+                Some((a, c)) => (r.id.clone(), a.clone(), c.clone()),
+                None => match (p.facts.view)(&r.id) {
+                    Some(v) => (r.id.clone(), v.agents, v.cards),
+                    None => (r.id.clone(), Vec::new(), Vec::new()),
+                },
+            })
+            .collect()
+    }
+
     /// Every project connection closed (the core's end).
     pub(super) fn close_projects(&mut self) {
         for (_, c) in std::mem::take(&mut self.hubs.conns) {

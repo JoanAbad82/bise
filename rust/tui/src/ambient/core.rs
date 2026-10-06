@@ -5,6 +5,7 @@
 //! listener, synthesizer, speaker, the voice jobs) are fakes in tests.
 
 mod agents_view;
+mod away;
 mod cmd;
 mod hubs;
 mod setup;
@@ -350,6 +351,7 @@ impl Core {
             }
             Cmd::Shot { path, app, title } => self.take_shot(&path, app, title),
             // the latest fn wins; an excluded app's `{}` clears
+            Cmd::AwayBack { away_ms } => self.away_back(away_ms),
             Cmd::FnContext(c) => self.fn_ctx = Some(c).filter(|c| *c != bise_proto::context::FnContext::default()),
             Cmd::Send { text } => {
                 let text = text.trim().to_string();

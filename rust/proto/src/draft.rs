@@ -156,6 +156,16 @@ pub struct Found {
     pub known: bool,
 }
 
+/// One project's part of `away_summary` (only a project where something
+/// happened while he was away).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AwayProject {
+    pub project: Project,
+    pub done: u32,
+    pub questions: u32,
+    pub failed: u32,
+}
+
 /// What the core sends the app besides the hubs' events (S3b).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "ev", rename_all = "snake_case")]
@@ -177,12 +187,17 @@ pub enum CoreEv {
     Accounts { items: Vec<Account> },
     /// the answer to `found_scan`
     Found { dir: String, items: Vec<Found> },
+    /// the answer to `away_back` (S9, amb-mac m_9038): what happened while
+    /// he was away, since `since_ms`: agents that turned done or failed,
+    /// his cards (questions and approvals) that came; `projects`: each
+    /// project where one of those happened, in his projects' order
+    AwaySummary { since_ms: u64, done: u32, questions: u32, failed: u32, projects: Vec<AwayProject> },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -223,6 +238,9 @@ pub enum AppCmd {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         dir: Option<String>,
     },
+    /// he's back at his Mac after `away_ms` (the app's read): the core
+    /// answers `away_summary`
+    AwayBack { away_ms: u64 },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
@@ -239,6 +257,7 @@ impl AppCmd {
         "key_set",
         "key_remove",
         "found_scan",
+        "away_back",
     ];
 
     pub fn decode(line: &str) -> Result<AppCmd, String> {

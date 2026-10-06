@@ -10,3 +10,4 @@
 {"cmd":"key_remove","id":"anthropic-key"}
 {"cmd":"found_scan","dir":"/Users/camille/code"}
 {"cmd":"found_scan"}
+{"cmd":"away_back","away_ms":1800000}

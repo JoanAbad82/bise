@@ -306,6 +306,39 @@ fn a_command_to_a_project_not_held_connects_delivers_then_lets_go() {
     assert_eq!((e["project"].as_str(), e["cmd"].as_str()), (Some("shop"), Some("answer")));
 }
 
+/// away_back (amb-mac m_9038): the summary counts a held hub's own cards
+/// and an unheld project's view.json's, and leaves out the projects where
+/// nothing happened.
+#[test]
+fn away_back_sums_up_every_project_since_he_left() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    let card = json!({"id": 7, "project": "shop", "kind": "merge", "agent": "perf", "question": "merge?",
+        "options": [{"n": 1, "label": "merge"}], "urgent": false, "since_ms": 2});
+    w.end("shop").say(json!({"ev": "cards", "project": "shop", "cards": [card]}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "projects" && v["projects"][1]["waits"] == 1));
+    // away since the epoch: every card counts
+    typed(&mut t, json!({"cmd": "away_back", "away_ms": 1u64 << 62}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "away_summary"));
+    let s = t.take().into_iter().rfind(|v| v["ev"] == "away_summary").unwrap();
+    assert_eq!(s["questions"], 2, "{s}");
+    assert_eq!(
+        s["projects"],
+        json!([{"project": "shop", "done": 0, "questions": 1, "failed": 0}, {"project": "docs", "done": 0, "questions": 1, "failed": 0}]),
+        "{s}"
+    );
+    // back from a short break: nothing since
+    typed(&mut t, json!({"cmd": "away_back", "away_ms": 1000}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "away_summary"));
+    let s = t.take().into_iter().rfind(|v| v["ev"] == "away_summary").unwrap();
+    assert_eq!((s["done"].clone(), s["questions"].clone(), s["projects"].clone()), (json!(0), json!(0), json!([])));
+    assert!(Cmd::parse(r#"{"cmd":"away_back"}"#).is_err());
+}
+
 #[test]
 fn the_rows_carry_the_open_cards_of_every_project() {
     // lead m_8769 (b): bise's "waiting for you" answers an unheld

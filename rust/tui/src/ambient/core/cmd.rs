@@ -17,6 +17,8 @@ pub enum Cmd {
     /// (talk or spotlight), sent apart from talk_start; `{}` (an excluded
     /// app) clears it. The next turn to main carries it, then it's gone.
     FnContext(bise_proto::context::FnContext),
+    /// He's back after `away_ms` (amb-mac m_9038): `away_summary` answers.
+    AwayBack { away_ms: u64 },
     Send { text: String },
     /// fn space's typed text sent with tab: main starts an agent on it
     /// (only main starts agents; ambient-lead m_6513)
@@ -86,6 +88,7 @@ impl Cmd {
             },
             "talk_end" => Cmd::TalkEnd,
             "talk_cancel" => Cmd::TalkCancel,
+            "away_back" => Cmd::AwayBack { away_ms: v.get("away_ms").and_then(Value::as_u64).ok_or("away_back: no away_ms")? },
             "fn_context" => match v.get("context") {
                 Some(c) if c.is_object() => Cmd::FnContext(serde_json::from_value(c.clone()).map_err(|e| format!("fn_context: {e}"))?),
                 _ => return Err("fn_context: no context object".into()),
