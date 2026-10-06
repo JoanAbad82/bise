@@ -31,9 +31,10 @@ describe('lines', () => {
 
 describe('env', () => {
   it('never runs PATH\'s bise: a path or nothing', () => {
-    expect(configOf({ BISE_DESKTOP_BISE: 'bise' })).toBeNull();
-    expect(configOf({})).toBeNull();
-    expect(configOf({ BISE_DESKTOP_BISE: '/opt/bise', BISE_DESKTOP_WORKSPACE: '/w' })).toEqual({ bise: '/opt/bise', workspace: '/w' });
+    expect(configOf('bise', {})).toBeNull();
+    expect(configOf(null, {})).toBeNull();
+    expect(configOf('/opt/bise', { BISE_DESKTOP_WORKSPACE: '/w' })).toEqual({ bise: '/opt/bise', workspace: '/w' });
+    expect(configOf('/opt/bise', {})).toEqual({ bise: '/opt/bise', workspace: '' });
   });
 
   it('runs ambient-core on the workspace, or --home', () => {

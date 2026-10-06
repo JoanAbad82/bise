@@ -4,8 +4,7 @@
 // (a path or nothing: lead m_8079); the env without the launcher's agent
 // plumbing; a restart backoff that resets after a healthy run.
 
-/** Where main reads its config (set by the launcher, or the harness in test mode). */
-export const BISE_ENV = 'BISE_DESKTOP_BISE';
+/** The workspace the core runs on (set by the launcher, or the harness in test mode); '' or unset = home. */
 export const WORKSPACE_ENV = 'BISE_DESKTOP_WORKSPACE';
 
 export interface CoreConfig {
@@ -15,10 +14,12 @@ export interface CoreConfig {
   readonly workspace: string;
 }
 
-/** The config from main's env; null when no usable bise path was given. */
-export function configOf(env: Readonly<Record<string, string | undefined>>): CoreConfig | null {
-  const bise = env[BISE_ENV] ?? '';
-  if (!bise.includes('/')) return null;
+/**
+ * The config from the bise path (src/main/paths.ts binPath: shipped, BISE_DESKTOP_BISE,
+ * or the repo's build) and main's env; null when there is no usable bise path.
+ */
+export function configOf(bise: string | null, env: Readonly<Record<string, string | undefined>>): CoreConfig | null {
+  if (bise === null || !bise.includes('/')) return null;
   return { bise, workspace: env[WORKSPACE_ENV] ?? '' };
 }
 
