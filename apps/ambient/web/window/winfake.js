@@ -180,6 +180,8 @@
       evs.push({ ev: "artifacts", project: p.project, items: ARTIFACTS[p.project] || [] });
       if (SCHEDULED[p.project]) evs.push({ ev: "scheduled", project: p.project, items: SCHEDULED[p.project] });
     }
+    // S7's worlds (amb-web's winfake7.js: worktrees, dev servers, diffs), when loaded
+    if (root.AmbWinFake7) evs.push(...root.AmbWinFake7.boot());
     return evs;
   }
 
@@ -204,6 +206,8 @@
     seq = 2000;
   }
   function respond(cmd) {
+    const s7 = root.AmbWinFake7 && root.AmbWinFake7.respond(cmd);
+    if (s7) return s7;
     const out = [];
     const { project, agent } = cmd;
     if (cmd.cmd === "subscribe" || cmd.cmd === "page") {

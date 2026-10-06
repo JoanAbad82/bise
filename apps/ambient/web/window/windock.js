@@ -7,7 +7,8 @@
   "use strict";
 
   const HOME = "home";
-  const keyOf = (r) => `${r.project}/${r.agent}`;
+  // a thread's key; a screen (S7's review, artifacts, environments) keys its own composer
+  const keyOf = (r) => `${r.screen ? `${r.screen}:` : ""}${r.project}/${r.agent}`;
 
   // every open card, newest first (the inbox's order: "la plus récente en haut"), minus the ones
   // he answered a moment ago (the core's next `cards` drops them; until then they stay hidden)
@@ -83,9 +84,9 @@
     if (c.id in s.answered) return `? ${who} asked you · you answered: ${s.answered[c.id]}`;
     const open = allCards(s).some((x) => x.id === c.id);
     if (!open) return c.answered && c.answer ? `? ${who} asked you · you answered: ${c.answer}` : `? ${who} asked you · answered`;
-    if (s.inbox) return `? ${who} asked you · open below`;
-    if ((s.dockOff[keyOf(s.route)] || []).includes(c.id)) return `? ${who} asked you · in the inbox, ⌘I`;
-    return `? ${who} asked you · it waits above the composer`;
+    // two forms only (ambient m_8298): its card is above the composer now, or ⌘I brings it
+    const d = dock(s);
+    return d && d.list.some((x) => x.id === c.id) ? `? ${who} asked you · below` : `? ${who} asked you · ⌘I`;
   }
 
   // the composer's line above the field, and its placeholder
@@ -99,11 +100,11 @@
   function placeholder(s, d, agentRow) {
     const r = s.route;
     if (s.offline) return "offline · your message waits and goes when you're back";
-    if (d) return "or type your answer, then ⏎";
-    if (r.project === HOME) return "talk to bise, or hold fn";
-    if (r.agent === "main") return `talk to ${pname(s, r.project)}’s main, or hold fn`;
-    if (agentRow && agentRow.status === "working") return `steer ${r.agent} while it works`;
-    return `talk to ${r.agent}, or hold fn`;
+    if (d) return "your answer, then ⏎";
+    if (r.project === HOME) return "write to bise, then ⏎";
+    if (r.agent === "main") return `write to ${pname(s, r.project)}’s main, then ⏎`;
+    if (agentRow && agentRow.status === "working") return `steer ${r.agent} while it works, then ⏎`;
+    return `write to ${r.agent}, then ⏎`;
   }
 
   // ---- quotes ❝ (selected diff lines or a selected sentence of a message)

@@ -59,7 +59,7 @@
     if (r.project === HOME) {
       const working = s.projects.reduce((n, p) => n + projectWorking(s, p.project), 0);
       const fresh = Object.values(s.arts).flat().filter((a) => a.new).length;
-      return { pearl: true, t1: "bise", t2: ["every project", `${working} at work`, ...(all ? [`${all} wait${all > 1 ? "" : "s"} for you`] : [])], acc: all ? 2 : -1,
+      return { pearl: true, t1: "bise", t2: ["every project", `${working} at work`, ...(all ? [`${all} waiting for you`] : [])], acc: all ? 2 : -1,
         end: [...(fresh ? [{ kind: "chip", text: `↗ ${fresh} new` }] : []), { kind: "chip", text: "⌕", kbd: "⌘K" }] };
     }
     const p = s.projects.find((x) => x.project === r.project) || { name: r.project, path: "" };
@@ -67,7 +67,7 @@
     if (r.agent === "main") {
       const n = M.agentsOf(s, r.project).length;
       const tab = s.tab[r.project] || "thread";
-      return { t1: p.name, t2: [p.path, p.branch || "main", `${n} agent${n === 1 ? "" : "s"}`, ...(waits ? [`${waits} wait${waits > 1 ? "" : "s"} for you`] : [])], acc: waits ? 3 : -1,
+      return { t1: p.name, dot: waits ? "nd" : projectWorking(s, r.project) ? "wk" : "", t2: [p.path, p.branch || "main", `${n} agent${n === 1 ? "" : "s"}`, ...(waits ? [`${waits} waiting for you`] : [])], acc: waits ? 3 : -1,
         seg: ["thread", "changes", "artifacts"].map((t) => ({ text: t, on: t === tab, act: { ev: "ui_tab", tab: t } })) };
     }
     const a = M.agentRow(s) || { name: r.agent, status: "idle" };
@@ -75,11 +75,11 @@
     const t = s.threads[keyOf(r)];
     const files = t ? new Set(t.entries.filter((e) => e.kind === "diff").map((e) => e.diff.path)).size : 0;
     const t2 = [p.name, ...(a.branch ? [`ψ ${a.branch}`] : []), ...(a.started_ms ? [`started by ${a.parent || "main"} ${hm(s, a.started_ms)}`] : []),
-      mine ? "waits for you" : a.status === "working" ? "working" : a.status];
+      mine ? "waiting for you" : a.status === "working" ? "working" : a.status];
     return { t1: r.agent, dot: agentDot(s, r.project, a), t2, acc: mine ? t2.length - 1 : -1,
       end: [...(files ? [{ kind: "chip", text: `± ${files} file${files > 1 ? "s" : ""}` }] : []),
         ...(a.status === "working" ? [{ kind: "btn", text: "stop", kbd: "⌘.", act: { ev: "ui_stop" } }] : []),
-        { kind: "btn", text: `← ${p.name}`, act: { ev: "ui_route", project: r.project, agent: "main" } }] };
+        { kind: "btn", text: `← ${p.name}`, tip: "back to the project · ⌘[", act: { ev: "ui_route", project: r.project, agent: "main" } }] };
   }
 
   // what runs now, on bise's view: every running job, the followed ones first
@@ -88,7 +88,7 @@
     const out = [];
     for (const p of M.projectsInOrder(s)) for (const j of s.jobs[p.project] || []) if (j.state === "running" || j.state === "failed")
       out.push({ title: `${p.name} · ${j.agent}`, following: !!j.followed, failed: j.state === "failed",
-        s: `${j.label} · ${num(j.step)} / ${num(j.steps)}${j.unit ? ` ${j.unit}` : ""}`, pct: pct(j.step, j.steps), act: { ev: "ui_route", project: p.project, agent: j.agent } });
+        s: `${j.label} · ${num(j.step)} / ${num(j.steps)}${j.unit ? ` ${j.unit}` : ""} · ${pct(j.step, j.steps)}%`, pct: pct(j.step, j.steps), act: { ev: "ui_route", project: p.project, agent: j.agent } });
     return out.sort((a, b) => (b.following ? 1 : 0) - (a.following ? 1 : 0)).slice(0, 3);
   }
 
@@ -96,12 +96,14 @@
   function who(s, e) {
     const r = s.route;
     if (e.kind === "you") return { name: "you", av: (s.user.name || "you")[0].toUpperCase() };
-    if (e.kind === "agent") return r.project === HOME ? { name: "bise", pearl: true } : { name: r.agent, dot: r.agent === "main" ? "" : "" };
+    // an agent's avatar takes its own state (pink only while it waits on him); a main is plain
+    const dotOf = (project, name) => { const a = (s.agents[project] || []).find((x) => x.name === name && !x.main); return a ? agentDot(s, project, a) : ""; };
+    if (e.kind === "agent") return r.project === HOME ? { name: "bise", pearl: true } : { name: r.agent, dot: dotOf(r.project, r.agent) };
     // from_agent: a project's main in bise's thread, main's brief in an agent's, an agent in main's
-    if (e.from_project && r.project === HOME) return { name: `${D.pname(s, e.from_project)} · ${e.from}`, dot: "nd", in: true };
+    if (e.from_project && r.project === HOME) return { name: `${D.pname(s, e.from_project)} · ${e.from}`, dot: dotOf(e.from_project, e.from), in: true };
     if (e.from === "bise") return { name: "bise", pearl: true };
-    if (e.to && r.agent !== "main") return { name: `${e.from} → ${e.to}` };
-    return { name: e.from || "", in: r.agent === "main" && r.project !== HOME };
+    if (e.to && r.agent !== "main") return { name: `${e.from} → ${e.to}`, dot: dotOf(r.project, e.from) };
+    return { name: e.from || "", dot: dotOf(r.project, e.from), in: r.agent === "main" && r.project !== HOME };
   }
   const VIA = { voice: "by voice", capsule: "from the capsule", page: "from a page", bise: "via bise" };
   function meta(s, e) {
@@ -126,7 +128,8 @@
         const w = who(s, e);
         return { t: "msg", pos: e.pos, you: e.kind === "you", who: w, meta: meta(s, e), text: e.text, ctx: ctx(e),
           quote: e.quote ? D.quoteChip(e.quote, 0, (ms) => hm(s, ms)).replace(/^❝ 1 /, "❝ ") : null,
-          page: e.page ? { title: e.page.title, url: e.page.url } : null, pending: !!e.pending };
+          page: e.page ? { title: e.page.title, url: e.page.url } : null, pending: !!e.pending,
+          error: e.kind === "report" && e.report && e.report.kind === "failed" };
       }
       case "delegation": {
         const d = e.delegation || {};
@@ -207,7 +210,7 @@
       const made = Object.entries(s.arts).flatMap(([project, list]) => list.map((a) => ({ ...a, project })))
         .filter((a) => dayLabel(s, a.at_ms) === day).sort((a, b) => b.at_ms - a.at_ms).slice(0, 4)
         .map((a) => ({ title: a.title, kind: a.kind, new: !!a.new, act: { ev: "ui_route", project: a.project, agent: a.agent } }));
-      return { sections: [{ sh: `waiting for you · ${waiting.length}`, kind: "cards", items: waiting }, { sh: "made today", kind: "thumbs", items: made }] };
+      return { sections: [{ sh: `${waiting.length} waiting for you`, kind: "cards", items: waiting }, { sh: "made today", kind: "thumbs", items: made }] };
     }
     if (r.agent !== "main") return null;
     const list = M.agentsOf(s, r.project).map((a, i) => {
@@ -232,10 +235,50 @@
     return "rest";
   }
 
-  function view(s) {
-    return { theme: s.theme, focused: s.focused, route: s.route, title: M.titleOf(s, s.route), mood: mood(s),
-      side: sidebar(s), head: header(s), jobs: jobs(s), thread: thread(s), composer: composer(s), board: board(s), inbox: !!s.inbox };
+  // ⌘K's finder: its field and its rows, the selected one marked
+  function finder(s) {
+    if (!s.finder) return null;
+    const list = root.AmbWinFind.rows(s, s.finder.q);
+    const i = Math.min(s.finder.i, Math.max(0, list.length - 1));
+    return { q: s.finder.q, rows: list.slice(0, 12).map((r, n) => ({ kind: r.kind, name: r.name, where: r.where, note: r.note || "",
+      dot: r.kind === "ag" ? (openCardsOf(s, r.route.project, r.name).length ? "nd" : DOT[r.status] || "") : "", on: n === i, act: { ev: "ui_find_open", i: n } })),
+      empty: list.length ? "" : "no agent or project by that name", keys: "⏎ open   ↑ ↓ move   esc close" };
   }
 
-  root.AmbWinView = { view, sidebar, header, jobs, thread, composer, board, mood, hm, dayLabel };
+  // a project's other tabs: its changes (the agents' branches, S7 opens their review) and its
+  // artifacts
+  function tab(s) {
+    const r = s.route;
+    const t = r.project !== HOME && r.agent === "main" ? s.tab[r.project] || "thread" : "thread";
+    if (t === "changes") {
+      const items = M.agentsOf(s, r.project).filter((a) => a.branch).map((a) => ({ name: a.name, branch: a.branch, ahead: a.ahead || 0, dot: agentDot(s, r.project, a),
+        what: a.ahead ? `${a.ahead} commit${a.ahead > 1 ? "s" : ""} ahead · ${a.title}` : `nothing to merge · ${a.title}`, act: { ev: "ui_route", project: r.project, agent: a.name } }));
+      return { tab: t, items, empty: items.length ? null : { b: "no branch yet", s: "agents that work in their own worktree (ψ) show their changes here" } };
+    }
+    if (t === "artifacts") {
+      const items = (s.arts[r.project] || []).slice().sort((a, b) => b.at_ms - a.at_ms).map((a) => ({ title: a.title, kind: a.kind, new: !!a.new,
+        meta: `${a.agent} · ${dayLabel(s, a.at_ms) === "today" ? hm(s, a.at_ms) : dayLabel(s, a.at_ms)}`, act: { ev: "ui_route", project: r.project, agent: a.agent } }));
+      return { tab: t, items, empty: items.length ? null : { b: "nothing made yet", s: "pages, reports and charts the agents make land here" } };
+    }
+    return null;
+  }
+
+  // S7's part (amb-web): its screen's view, or a project's changes/artifacts tab when it draws
+  // them; null leaves the window's own
+  function s7(s) {
+    const x = root.AmbWinS7;
+    if (!x) return null;
+    const r = s.route;
+    if (r.screen) return x.view ? x.view(s) : null;
+    const t = r.project !== HOME && r.agent === "main" ? s.tab[r.project] || "thread" : "thread";
+    return t !== "thread" && x.tab ? x.tab(s, r.project, t) : null;
+  }
+
+  function view(s) {
+    const x = s7(s);
+    return { s7: x, finder: finder(s), tab: x ? null : tab(s), theme: s.theme, focused: s.focused, route: s.route, title: M.titleOf(s, s.route), mood: mood(s),
+      side: sidebar(s), head: x && x.head ? x.head : header(s), jobs: jobs(s), thread: thread(s), composer: composer(s), board: board(s), inbox: !!s.inbox };
+  }
+
+  root.AmbWinView = { view, sidebar, header, jobs, thread, composer, board, mood, finder, tab, hm, dayLabel };
 })(typeof window !== "undefined" ? window : globalThis);

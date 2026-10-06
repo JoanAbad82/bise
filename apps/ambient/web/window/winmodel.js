@@ -30,6 +30,7 @@
       all: false,                  // ⌘E: everything unfolded
       answered: {},                // card id -> what he answered (hidden at once, named in the thread)
       picked: null,                // { card, n }: the option on its way
+      finder: null,                // { q, i } while ⌘K's finder is open
     };
   }
 
@@ -45,21 +46,32 @@
     cmds.push({ cmd: "subscribe", project: r.project, agent: r.agent, limit: 60 });
     return set(s, "threads", set(s.threads, k, { entries: [], before: null, more: false, loading: true, typing: "" }));
   }
+  // S7's screens (amb-web: review, artifacts, environments) plug in as one extension object,
+  // root.AmbWinS7 = { init(), owns(ev), enter(s7, route, s), step(s7, ev, s), view(s), tab(s,
+  // project, tab), draw(d, UI) }: its state lives in s.s7, its events and cmds pass through here
+  const S7 = () => root.AmbWinS7 || null;
+  const SCREENS = ["review", "artifacts", "environments"];
   function titleOf(s, r) {
+    if (r.screen === "review") return `review · ${r.agent} · ${D.pname(s, r.project)}`;
+    if (r.screen) return r.screen;
     if (r.project === HOME) return "bise";
     const p = D.pname(s, r.project);
     return r.agent === "main" ? p : `${r.agent} · ${p}`;
   }
   function go(s, r, cmds, { history = true } = {}) {
-    if (!r || (r.project === s.route.project && r.agent === s.route.agent)) return s;
+    if (!r || keyOf(r) === keyOf(s.route)) return s;
     if (history) s = { ...s, back: [...s.back, s.route].slice(-50), fwd: [] };
-    s = { ...s, route: r, inbox: null, sel: null, picked: null };
-    s = needThread(s, r, cmds);
+    s = { ...s, route: r, inbox: null, sel: null, picked: null, finder: null };
+    if (r.screen) {
+      const x = S7();
+      if (x && x.enter) { const e = x.enter(s.s7 || (x.init && x.init()), r, s); s = { ...s, s7: e.s7 }; cmds.push(...(e.cmds || [])); }
+    } else s = needThread(s, r, cmds);
     cmds.push({ cmd: "win_title", text: titleOf(s, r), route: routeOf(r) });
     return s;
   }
   // the route as the shell keeps it for restore (win_title's route, win_open's)
-  const routeOf = (r) => (r.project === HOME ? "bise" : r.agent === "main" ? `project/${r.project}` : `agent/${r.project}/${r.agent}`);
+  const routeOf = (r) => (r.screen === "review" ? `review/${r.project}/${r.agent}` : r.screen ? r.screen
+    : r.project === HOME ? "bise" : r.agent === "main" ? `project/${r.project}` : `agent/${r.project}/${r.agent}`);
 
   // a deep link from the shell, the capsule or a card: bise · project/<p> · agent/<p>/<a> · inbox
   // (<p> is the project's id or its name)
@@ -69,6 +81,8 @@
     if (parts[0] === "bise" || parts[0] === "") return { project: HOME, agent: "main" };
     if (parts[0] === "project" && proj(parts[1])) return { project: proj(parts[1]), agent: "main" };
     if (parts[0] === "agent" && proj(parts[1]) && parts[2]) return { project: proj(parts[1]), agent: parts[2] };
+    if (parts[0] === "review" && proj(parts[1]) && parts[2]) return { screen: "review", project: proj(parts[1]), agent: parts[2] };
+    if (SCREENS.includes(parts[0]) && parts[0] !== "review") return { screen: parts[0], project: HOME, agent: "main" };
     return null;
   }
 
@@ -183,6 +197,14 @@
     const digit = ev.digit != null ? ev.digit : /^[0-9]$/.test(ev.key) ? +ev.key : null;
     const meta = !!ev.meta, alt = !!ev.alt, ctrl = !!ev.ctrl;
     const eat = (x) => ({ s: x, eat: true });
+    const lower = String(ev.key).toLowerCase();
+    if (meta && lower === "k") return eat({ ...s, finder: s.finder ? null : { q: "", i: 0 } });
+    // ⌘K's finder has the keys while it is open: ↑ ↓ ⏎ esc; the rest types into its field
+    if (s.finder && !meta && !ctrl && !alt) {
+      const r = root.AmbWinFind.key(s, s.finder, ev.key);
+      if (r.eat) return eat(r.route ? go({ ...s, finder: null }, r.route, cmds) : { ...s, finder: r.f });
+      return { s, eat: false };
+    }
     if (meta && !alt && !ctrl && digit != null) {
       if (digit === 0) return eat(go(s, { project: HOME, agent: "main" }, cmds));
       const p = projectsInOrder(s)[digit - 1];
@@ -206,9 +228,11 @@
       const t = go(s, r, cmds, { history: false });
       return eat(ev.key === "[" ? { ...t, back: rest, fwd: [...s.fwd, s.route] } : { ...t, fwd: rest, back: [...s.back, s.route] });
     }
-    const lower = String(ev.key).toLowerCase();
     if (meta && lower === "i") return eat(s.inbox ? { ...s, inbox: null } : D.allCards(s).length ? { ...s, inbox: { i: 0 } } : s);
     if (meta && lower === "e") return eat({ ...s, all: !s.all, open: {} });
+    // ⌘D the agent's review (S7), ⌘⇧A every artifact
+    if (meta && lower === "d") return eat(s.route.project !== HOME && s.route.agent !== "main" ? go(s, { screen: "review", project: s.route.project, agent: s.route.agent }, cmds) : s);
+    if (meta && ev.shift && lower === "a") return eat(go(s, { screen: "artifacts", project: HOME, agent: "main" }, cmds));
     if (meta && ev.key === ".") {
       if (s.route.project === HOME) return eat(s);
       cmds.push({ cmd: "stop", project: s.route.project, agent: s.route.agent });
@@ -271,12 +295,26 @@
         return set(s, "threads", set(s.threads, k, { ...t, paging: true }));
       }
       case "ui_theme": return { ...s, theme: s.theme === "dark" ? "light" : "dark" };
+      case "ui_find_type": return s.finder ? { ...s, finder: { q: ev.text, i: 0 } } : s;
+      case "ui_find_open": {
+        const row = root.AmbWinFind.rows(s, s.finder ? s.finder.q : "")[ev.i];
+        return row ? go({ ...s, finder: null }, row.route, cmds) : s;
+      }
+      case "ui_find_close": return { ...s, finder: null };
     }
     return s;
   }
 
   function step(s, ev) {
     const cmds = [];
+    const x = S7();
+    if (x && x.owns && x.owns(ev)) {
+      const r = x.step(s.s7 || (x.init && x.init()), ev, s);
+      let out = { ...s, s7: r.s7 };
+      cmds.push(...(r.cmds || []));
+      if (r.route) out = go(out, r.route, cmds);
+      return { s: out, cmds, eat: !!r.eat };
+    }
     if (ev.ev === "ui_key") { const r = key(s, ev, cmds); return { s: r.s, cmds, eat: r.eat }; }
     const out = ev.ev && ev.ev.startsWith("ui_") ? ui(s, ev, cmds) : core(s, ev, cmds);
     return { s: out, cmds, eat: false };

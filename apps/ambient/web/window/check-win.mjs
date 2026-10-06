@@ -11,7 +11,9 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Map, String, Number, Date, Intl, RegExp });
-for (const f of ["winfake.js", "windock.js", "winmodel.js", "winview.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+// the window as index.html loads it, S7's screens included (amb-web's files, when they are there)
+import { existsSync } from "node:fs";
+for (const f of ["winfake.js", "winfake7.js", "windock.js", "winfind.js", "winenv.js", "wins7.js", "winmodel.js", "winview.js"].filter((f) => existsSync(join(here, f)))) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
 const { AmbWinFake: F, AmbWinModel: M, AmbWinView: V, AmbWinDock: D } = ctx;
 const j = (x) => (x === undefined ? x : JSON.parse(JSON.stringify(x)));
 const eq = (a, b, msg) => assert.deepStrictEqual(j(a), j(b), msg);
@@ -114,16 +116,16 @@ law("bise's thread: his words with the capture and the tab's context, bise's rou
   const r = rowsOf(v, "route");
   eq(r.map((x) => [x.p1, x.p2, x.p3, x.bar]), [["telemetry · main → alerts", "p99 d'ingest à 14 h, avec ta capture", "done 14:25", null],
     ["storefront · main → stock", "flash sale replay · following", "62%", 62]]);
-  eq(rowsOf(v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · it waits above the composer"]);
+  eq(rowsOf(v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · below"]);
   eq(v.thread.rows[0], { t: "day", text: "today" });
   eq(v.head.t1, "bise");
-  eq(v.head.t2, ["every project", "5 at work", "3 wait for you"]);
+  eq(v.head.t2, ["every project", "5 at work", "3 waiting for you"]);
 });
 law("bise's view: what runs now (the followed job first) and the right column (waiting for you, made today)", () => {
   const v = win().v;
-  eq(v.jobs.map((x) => [x.title, x.s, x.pct, x.following]), [["storefront · stock", "flash sale replay · 6 200 / 10 000 orders", 62, true],
-    ["engine · netcode", "co-op at 150 ms, 2% loss · 3 / 8 runs", 38, false], ["evals · cache", "prompt cache · 1 400 / 2 000 prompts", 70, false]]);
-  eq(v.board.sections.map((x) => x.sh), ["waiting for you · 3", "made today"]);
+  eq(v.jobs.map((x) => [x.title, x.s, x.pct, x.following]), [["storefront · stock", "flash sale replay · 6 200 / 10 000 orders · 62%", 62, true],
+    ["engine · netcode", "co-op at 150 ms, 2% loss · 3 / 8 runs · 38%", 38, false], ["evals · cache", "prompt cache · 1 400 / 2 000 prompts · 70%", 70, false]]);
+  eq(v.board.sections.map((x) => x.sh), ["3 waiting for you", "made today"]);
   eq(v.board.sections[0].items.map((x) => `${x.who}: ${x.text}`), ["telemetry · alerts: compaction at 03:00?", "engine · netcode: merge the rollback fix?", "storefront · search: reindex tonight 02:00?"]);
   eq(v.board.sections[1].items.map((x) => x.title), ["frame times, before and after", "flash sale replay", "eval report", "3-D Secure timeouts"]);
   assert.equal(v.mood, "need");
@@ -134,7 +136,7 @@ law("above bise's composer: the newest card, '1 of 3 ← →'; ← → walk the 
   const w = win();
   let c = w.v.composer;
   eq([c.dock.h, c.dock.k, c.dock.q, c.dock.opts.map((o) => o.label)], ["? telemetry · alerts needs you", "1 of 3   ← →", "passer la compaction de 14:00 à 03:00 ?", ["move it to 03:00", "leave it"]]);
-  eq([c.div, c.ph], ["you → bise · answering alerts", "or type your answer, then ⏎"]);
+  eq([c.div, c.ph], ["you → bise · answering alerts", "your answer, then ⏎"]);
   assert.equal(w.key("ArrowRight").eat, true);
   c = w.v.composer;
   eq([c.dock.h, c.dock.k], ["? engine · netcode · merge the rollback fix?", "approval · 2 of 3   ← →"]);
@@ -168,7 +170,7 @@ law("words then ⏎ answer the card above; with no card, ⏎ sends to the thread
   eq(w.v.composer.text, "");
   w.go(P.evals);
   assert.equal(w.v.composer.dock, null);
-  eq([w.v.composer.div, w.v.composer.ph], ["you → evals · main", "talk to evals’s main, or hold fn"]);
+  eq([w.v.composer.div, w.v.composer.ph], ["you → evals · main", "write to evals’s main, then ⏎"]);
   w.type("relance l'eval rag"); w.key("Enter");
   eq(w.sent.filter((c) => c.cmd === "send"), [{ cmd: "send", project: P.evals, agent: "main", text: "relance l'eval rag", mode: "now" }]);
   // the core's echo replaces the line he sent
@@ -182,15 +184,15 @@ law("esc puts the card off (the line says ⌘I), opens nothing; ⌘I opens every
   eq(w.v.composer.dock.h, "? engine · netcode · merge the rollback fix?");
   w.key("Escape"); w.key("Escape");
   eq(w.v.composer.dock, null);
-  eq(rowsOf(w.v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · in the inbox, ⌘I"]);
-  eq(w.v.composer.ph, "talk to bise, or hold fn");
+  eq(rowsOf(w.v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · ⌘I"]);
+  eq(w.v.composer.ph, "write to bise, then ⏎");
   w.key("i", { meta: true });
   const d = w.v.composer.dock;
   eq([d.mode, d.h, d.k], ["inbox", "? telemetry · alerts needs you", "1 of 3   ← → the others   esc back to the thread"]);
   eq(d.tabs.map((t) => [t.text, t.on]), [["alerts · compaction at 03:00?", true], ["netcode · merge the rollback fix?", false], ["search · reindex tonight 02:00?", false]]);
   assert.match(d.body, /^la compaction de 14:00/);
   eq([d.origin, d.shot], ["asked by you, via bise", "p99"]);
-  eq(rowsOf(w.v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · open below"]);
+  eq(rowsOf(w.v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · below"]);
   w.key("ArrowRight");
   eq(w.v.composer.dock.tabs.map((t) => t.on), [false, true, false]);
   w.key("Escape");
@@ -217,7 +219,7 @@ law("each thread's composer answers its own cards: a project's main its project'
   eq([w.v.composer.dock.h, w.v.composer.dock.k, w.v.composer.div], ["? search needs you", "1 of 1", "you → storefront · main · answering search"]);
   w.go(P.storefront, "checkout");
   eq(w.v.composer.dock, null);
-  eq(w.v.composer.ph, "steer checkout while it works");
+  eq(w.v.composer.ph, "steer checkout while it works, then ⏎");
   eq(w.v.composer.send, "stop");
   w.go(P.storefront, "search");
   eq(w.v.composer.dock.h, "? search needs you");
@@ -237,7 +239,7 @@ law("a project's main: its header, the folded messages between agents, 'asked ·
   const w = win();
   w.go(P.storefront);
   const v = w.v;
-  eq([v.head.t1, v.head.t2, v.head.seg.map((x) => x.text)], ["storefront", ["~/storefront", "main", "5 agents", "1 waits for you"], ["thread", "changes", "artifacts"]]);
+  eq([v.head.t1, v.head.t2, v.head.seg.map((x) => x.text)], ["storefront", ["~/storefront", "main", "5 agents", "1 waiting for you"], ["thread", "changes", "artifacts"]]);
   const f = rowsOf(v, "fold")[0];
   eq([f.text, f.items.length], ["▸ 4 messages between 2 agents", 0]);
   w.feed({ ev: "ui_fold", pos: f.pos });
@@ -268,7 +270,7 @@ law("an agent's thread: main's brief, its folded work, the inline diff; header w
   const w = win();
   w.go(P.storefront, "search");
   const v = w.v;
-  eq([v.head.t1, v.head.t2, v.head.acc], ["search", ["storefront", "ψ sb/search", "started by main 09:20", "waits for you"], 3]);
+  eq([v.head.t1, v.head.t2, v.head.acc], ["search", ["storefront", "ψ sb/search", "started by main 09:20", "waiting for you"], 3]);
   eq(v.head.end.map((e) => e.text), ["± 1 file", "← storefront"]);
   eq(rowsOf(v, "msg")[0].who.name, "main → search");
   eq(rowsOf(v, "tool")[0].label, "read 6 files, ran 4 commands · 2 files changed");
@@ -317,6 +319,69 @@ law("a sentence selected in a message is a quote too; esc drops the last quote f
   w.key("Escape");
   eq(w.v.composer.quotes, []);
   eq(w.v.composer.dock.h, "? search needs you");
+});
+
+// ---- ⌘K and a project's tabs
+law("⌘K finds an agent or a project by its name: starts-with first, ↑ ↓ move, ⏎ opens, esc closes; other keys type", () => {
+  const w = win();
+  assert.equal(w.key("k", { meta: true }).eat, true);
+  eq(w.v.finder.rows.length, 12);
+  w.feed({ ev: "ui_find_type", text: "s" });
+  eq(w.v.finder.rows.map((r) => `${r.name}·${r.where}`), ["storefront·~/storefront", "search·storefront", "stock·storefront", "sampling·telemetry", "streaming·engine",
+    "bise·every project", "alerts·telemetry", "evals·~/evals"]);
+  assert.ok(!w.v.finder.rows.some((r) => r.name === "netcode"));
+  w.feed({ ev: "ui_find_type", text: "st" });
+  eq(w.v.finder.rows.map((r) => r.name), ["storefront", "stock", "streaming"]);
+  // a letter is the finder field's, not a 1-9 answer nor a send
+  eq([w.key("r").eat, w.key("1").eat], [false, false]);
+  w.key("ArrowDown"); w.key("ArrowDown");
+  eq(w.v.finder.rows.filter((r) => r.on).map((r) => r.name), ["streaming"]);
+  w.key("Enter");
+  eq([w.s.route, w.s.finder], [{ project: P.engine, agent: "streaming" }, null]);
+  w.key("k", { meta: true }); w.feed({ ev: "ui_find_type", text: "zzz" });
+  eq([w.v.finder.rows, w.v.finder.empty], [[], "no agent or project by that name"]);
+  w.key("Escape");
+  eq([w.s.finder, w.s.route], [null, { project: P.engine, agent: "streaming" }]);
+  w.key("k", { meta: true }); w.feed({ ev: "ui_find_open", i: 0 });
+  eq(w.s.route, { project: F.HOME, agent: "main" });
+});
+law("a project's changes tab lists its agents' branches, its artifacts tab what they made; thread comes back", () => {
+  const w = win();
+  w.go(P.storefront);
+  assert.equal(w.v.tab, null);
+  w.feed({ ev: "ui_tab", tab: "changes" });
+  eq(w.v.tab.items.map((x) => [x.name, x.branch, x.what]), [["checkout", "sb/checkout", "2 commits ahead · one idempotency key per order (#812)"],
+    ["search", "sb/search", "1 commit ahead · reindex tonight 02:00?"], ["wallet", "sb/wallet", "nothing to merge · Apple Pay at checkout"]]);
+  eq(w.v.head.seg.map((x) => x.on), [false, true, false]);
+  w.feed({ ev: "ui_tab", tab: "artifacts" });
+  eq(w.v.tab.items.map((x) => [x.title, x.meta, x.new]), [["flash sale replay", "stock · 10:40", true], ["3-D Secure timeouts", "checkout · 09:50", true]]);
+  w.go(P.telemetry); w.feed({ ev: "ui_tab", tab: "artifacts" });
+  eq(w.v.tab.empty.b, "nothing made yet");
+  w.go(P.storefront);
+  eq(w.v.tab.tab, "artifacts");
+  w.feed({ ev: "ui_tab", tab: "thread" });
+  assert.equal(w.v.tab, null);
+  // the composer above stays: the card still waits there on every tab
+  eq(w.v.composer.dock.h, "? search needs you");
+});
+
+// ---- the states the DS draws: a project with no agent, an agent that failed, a hub offline
+law("a project with no agent says so in the sidebar and its thread; a failed agent is ▲ in red, its report an error line", () => {
+  const w = win();
+  w.feed({ ev: "projects", projects: [...w.s.projects, { project: "docs-11aa", name: "docs", path: "~/docs", home: false, order: 5, agents: 0, working: 0, waits: 0 }] });
+  w.feed({ ev: "agents", project: "docs-11aa", agents: [{ name: "main", main: true, status: "idle", title: "", since_ms: F.NOW, waits: 0 }] });
+  w.feed({ ev: "agents", project: P.engine, agents: F.AGENTS[P.engine].map((a) => (a.name === "netcode" ? { ...a, status: "failed" } : a)) });
+  eq(sideNames(w.v).filter((x) => /docs|netcode/.test(x)), ["ag:netcode(?)", "pj:docs(⌘5)"]);
+  w.go("docs-11aa");
+  eq(sideNames(w.v).filter((x) => /docs/.test(x)), ["pj:docs(⌘5)*"]);
+  eq(w.v.thread.empty, { b: "docs has no agent yet", s: "ask its main below, or ask bise from anywhere" });
+  w.feed({ ev: "cards", project: P.engine, cards: [] });
+  w.go(P.engine);
+  eq(w.v.side.rows.filter((r) => r.name === "netcode").map((r) => [r.dot, r.end]), [["er", "▲"]]);
+  w.go(P.engine, "netcode");
+  w.feed({ ev: "entry", project: P.engine, agent: "netcode", entry: { pos: 50, at_ms: F.NOW, kind: "report", text: "your ChatGPT sign-in expired", report: { kind: "failed" } } });
+  eq(rowsOf(w.v, "msg").filter((m) => m.error).map((m) => m.text), ["your ChatGPT sign-in expired"]);
+  eq(w.v.head.t2.slice(-1), ["failed"]);
 });
 
 // ---- the core's pages and live entries

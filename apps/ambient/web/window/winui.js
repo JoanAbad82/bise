@@ -33,7 +33,9 @@
   const svg = (k) => { const t = doc.createElement("template"); t.innerHTML = thumb(k); return t.content.firstChild; };
   const withAct = (el, a) => UI.core.act(el, a);
   // the kit's pearl span ([data-bise-pearl]) gets the window's shared canvas, with the mood
+  // without WebGL (a headless shot, a GPU-less VM) the span keeps its ':*' (designer m_8292)
   function pearlsIn(el, mood) {
+    if (!glFor(mood || "rest")) return el;
     for (const p of el.querySelectorAll ? el.querySelectorAll("[data-bise-pearl]") : []) {
       const n = +p.getAttribute("data-bise-pearl") || 22;
       p.replaceChildren(Object.assign(doc.createElement("canvas"), { className: "w-pearl", width: n * 2, height: n * 2 }));
@@ -56,7 +58,7 @@
     const end = [
       ...(d.seg ? [UI.seg.render({ items: d.seg.map((x) => x.text), on: d.seg.findIndex((x) => x.on), act: { ev: "ui_tab_i" } })] : []),
       ...(d.end || []).map((e) => e.kind === "chip" ? h("span", "b-chip", e.text, e.kbd ? [" ", UI.kbd.render({ text: e.kbd })] : null)
-        : withAct(h("button", "b-btn ghost", e.text, e.kbd ? [" ", UI.kbd.render({ text: e.kbd })] : null), e.act)),
+        : (() => { const b = withAct(h("button", "b-btn ghost", e.text, e.kbd ? [" ", UI.kbd.render({ text: e.kbd })] : null), e.act); if (e.tip) b.title = e.tip; return b; })()),
     ];
     const el = UI.head.render({ title: d.t1, sub, pearl: d.pearl ? 40 : null, dot: !d.pearl && d.dot != null ? { state: d.dot } : null, end });
     el.classList.add("w-drag");
@@ -65,7 +67,7 @@
 
   function jobs(v) {
     if (!v.jobs.length) return null;
-    return h("div", "w-now", v.jobs.map((j) => UI.job.render({ state: j.failed ? "er" : "wk", name: j.title, end: j.following ? "following" : "", what: j.s, pct: j.pct, act: j.act })));
+    return h("div", "w-now", v.jobs.map((j) => UI.job.render({ state: j.failed ? "er" : "wk", name: j.title, end: j.following ? { text: "following" } : "", what: j.s, pct: j.pct, act: j.act })));
   }
 
   function msg(r) {
@@ -74,10 +76,10 @@
     const [time, ...via] = r.meta.split(" · ");
     const children = [
       r.ctx ? h("div", "w-ctx", r.ctx.shot ? h("div", "w-shot", svg(r.ctx.shot)) : null, h("div", "w-chips", r.ctx.chips.map((c) => UI.chip.render({ text: c })))) : null,
-      r.quote ? h("div", "b-quote", r.quote) : null,
       r.page ? UI.art.render({ title: `↗ ${r.page.title}`, meta: "page", thumb: svg("report") }) : null,
     ];
-    const el = UI.msg.render({ from, name: w.name, time, via: via.join(" · "), text: r.text, av: w.av, dot: from === "agent" ? { state: w.dot || "" } : null, in: w.in, children });
+    const el = UI.msg.render({ from, name: w.name, time, via: via.join(" · "), text: r.error ? `▲ ${r.text}` : r.text, av: w.av, quote: r.quote ? { text: r.quote.replace(/^❝ /, "") } : null,
+      dot: from === "agent" ? { state: r.error ? "er" : w.dot || "" } : null, in: w.in, state: r.error ? "error" : null, children });
     if (r.pending) el.classList.add("w-pending");
     el.setAttribute("data-pos", String(r.pos));
     el.querySelector(".b-text").setAttribute("data-quote", String(r.pos));
@@ -87,12 +89,11 @@
   function row(r) {
     const fold = { ev: "ui_fold", pos: r.pos };
     switch (r.t) {
-      case "day": return h("div", "w-day", r.text);
+      case "day": return UI.day.render({ text: r.text });
       case "msg": return msg(r);
       case "route": { const el = UI.route.render({ state: r.dot, p1: r.p1, p2: r.p2, p3: r.p3, pct: r.bar != null && r.bar >= 0 ? r.bar : null, act: r.act }); el.classList.add("w-in"); return el; }
       case "fold": {
-        const el = UI.fold.render({ text: r.text.replace(/^[▸▾] /, ""), act: fold });
-        if (r.open) el.textContent = r.text;
+        const el = UI.fold.render({ text: r.text.replace(/^[▸▾] /, ""), open: r.open, act: fold });
         return [el, r.items.map((x) => h("div", "w-folded", row(x)))];
       }
       case "tool": { const el = UI.tool.render({ text: r.label, state: r.open ? "open" : r.run ? "run" : "", out: r.items.join("\n"), act: fold }); el.classList.add("w-in"); return el; }
@@ -112,7 +113,7 @@
     const t = v.thread;
     if (t.loading) return UI.thread.render({ children: [UI.skel.render({}), h("span", "b-skel w-skel2")] });
     if (t.empty) return UI.thread.render({ children: [UI.empty.render({ title: t.empty.b, text: t.empty.s })] });
-    const more = t.more ? withAct(h("div", "w-day", t.paging ? "loading…" : "earlier messages ↑"), { ev: "ui_older" }) : null;
+    const more = t.more ? withAct(UI.day.render({ text: t.paging ? "loading…" : "earlier messages ↑" }), { ev: "ui_older" }) : null;
     const typing = t.typing ? (() => { const el = UI.tool.render({ text: `${t.typing.who} · ${t.typing.text}`, state: "run" }); el.classList.add("w-in"); return el; })() : null;
     return UI.thread.render({ children: [more, t.rows.map(row), typing] });
   }
@@ -122,10 +123,28 @@
     if (!d) return null;
     const tabs = d.tabs ? UI.tabs.render({ items: d.tabs.map((x) => ({ text: x.text, dot: { state: "nd" }, on: x.on, act: { ev: "ui_inbox", card: x.id } })) }) : null;
     const el = UI.dock.render({ head: d.h, keys: d.k, q: d.q, typeHint: d.ty,
+      ctx: d.body || d.shot ? { shot: d.shot ? h("div", "w-shot", svg(d.shot)) : null, body: d.body, origin: d.origin } : null,
       opts: d.opts.map((o) => ({ n: o.n, text: o.label, picked: o.picked, act: { ev: "ui_pick", card: d.card, n: o.n } })) });
-    if (d.body || d.shot) el.insertBefore(h("div", "w-dctx", d.shot ? h("div", "w-shot", svg(d.shot)) : null,
-      h("div", null, h("div", "b-text", d.body), d.origin ? UI.help.render({ text: d.origin }) : null)), el.querySelector(".q"));
     return [tabs, el];
+  }
+
+  // ⌘K: the spotlight's look (DS .b-spot) over the window; the field is the page's own
+  function findRows(v) {
+    const f = v.finder;
+    if (!f) return null;
+    const rows = f.rows.map((r) => withAct(h("div", ["r", r.on && "on"],
+      r.kind === "me" ? UI.pearl.render({ size: 22 }) : UI.dot.render({ state: r.dot, lg: r.kind === "pj" }),
+      h("span", null, r.name), h("span", "pp", r.where), h("span", "dm", r.note), h("span", "ky", r.on ? "⏎" : "")), r.act));
+    return pearlsIn(h("div", null, f.empty ? h("div", "g", f.empty) : rows, h("div", "keys", f.keys)), v.mood);
+  }
+
+  // a project's changes and artifacts tabs (S7 opens the review and the artifact itself)
+  function tabList(v) {
+    const t = v.tab;
+    if (!t) return null;
+    if (t.empty) return UI.thread.render({ children: [UI.empty.render({ title: t.empty.b, text: t.empty.s })] });
+    if (t.tab === "changes") return UI.thread.render({ children: t.items.map((it) => UI.job.render({ state: it.dot, name: it.name, psi: true, end: it.branch, what: it.what, act: it.act })) });
+    return h("div", "w-grid", t.items.map((it) => withAct(h("div", "w-ac", svg(it.kind), h("div", "ai", h("b", null, it.title), it.new ? [" ", UI.chip.render({ text: "new", tone: "acc" })] : null, h("span", null, it.meta))), it.act)));
   }
 
   function board(v) {
@@ -134,11 +153,11 @@
     return b.sections.map((sec) => {
       const items = sec.items.map((it) => {
         if (sec.kind === "cards") return UI.job.render({ state: "nd", name: it.who, what: it.text, act: it.act });
-        if (sec.kind === "thumbs") return withAct(h("div", "w-tn", svg(it.kind), h("span", null, it.title)), it.act);
+        if (sec.kind === "thumbs") return { title: it.title, thumb: svg(it.kind), act: it.act };
         if (sec.kind === "agents") return UI.job.render({ state: it.dot, name: it.name, key: it.key, psi: it.psi, what: it.w, act: it.act });
         return UI.job.render({ state: "sched", name: it.text.replace(/^◷ /, ""), end: it.when });
       });
-      return [UI.sh.render({ text: sec.sh }), sec.kind === "thumbs" ? h("div", "w-thumbs", items) : items];
+      return [UI.sh.render({ text: sec.sh }), sec.kind === "thumbs" ? UI.thumbs.render({ items }) : items];
     });
   }
 
@@ -173,12 +192,13 @@
 
   // ---- mount: the static frame, then regions redrawn when their HTML changes
   function mount(el, { post, recv: hook }) {
-    el.innerHTML = `<div class="w-app b-ui"><aside class="b-side w-side"></aside><main class="b-main w-main"><div class="w-head"></div><div class="w-jobs"></div>` +
-      `<div class="w-scroll"><div class="w-thread"></div></div><div class="b-composer w-composer"><div class="w-dock"></div><div class="w-quotes"></div><div class="div"></div>` +
+    el.innerHTML = `<div class="w-app b-ui"><aside class="w-side"></aside><main class="b-main w-main"><div class="w-head"></div><div class="w-jobs"></div>` +
+      `<div class="w-scroll"><div class="w-thread"></div></div><div class="w-find" hidden><div class="b-spot"><div class="in"><input class="tx w-findq" placeholder="find an agent or a project" spellcheck="false"></div><div class="w-findrows"></div></div></div><div class="b-composer w-composer"><div class="w-dock"></div><div class="w-quotes"></div><div class="div"></div>` +
       `<div class="box"><textarea class="in w-field" rows="1" spellcheck="false"></textarea><span class="send off" data-act='{"ev":"ui_send"}'>↑</span></div><div class="keys"></div></div></main><aside class="w-board b-board"></aside></div>`;
     const $ = (sel) => el.querySelector(sel);
     const R = { side: $(".w-side"), head: $(".w-head"), jobs: $(".w-jobs"), thread: $(".w-thread"), scroll: $(".w-scroll"), dock: $(".w-dock"), quotes: $(".w-quotes"),
-      div: $(".w-composer .div"), field: $(".w-field"), box: $(".w-composer .box"), send: $(".w-composer .send"), keys: $(".w-composer .keys"), board: $(".w-board"), app: $(".w-app") };
+      div: $(".w-composer .div"), field: $(".w-field"), box: $(".w-composer .box"), send: $(".w-composer .send"), keys: $(".w-composer .keys"), board: $(".w-board"), app: $(".w-app"),
+      find: $(".w-find"), findq: $(".w-findq"), findrows: $(".w-findrows") };
     const api = {};
     let s = M.init(Date.now());
     if (root.AMB_WIN_TZ) s = { ...s, tz: root.AMB_WIN_TZ };
@@ -207,7 +227,14 @@
       put("jobs", jobs(v));
       const routeKey = `${v.route.project}/${v.route.agent}`;
       const atEnd = R.scroll.scrollHeight - R.scroll.scrollTop - R.scroll.clientHeight < 40;
-      const changed = put("thread", thread(v));
+      const changed = put("thread", v.s7 && root.AmbWinS7 ? root.AmbWinS7.draw(v.s7, UI) : v.tab ? tabList(v) : thread(v));
+      // ⌘K's finder: shown over the window, its field takes the keys while it is open
+      const wasOpen = !R.find.hidden;
+      R.find.hidden = !v.finder;
+      put("findrows", findRows(v));
+      if (v.finder && R.findq.value !== v.finder.q) R.findq.value = v.finder.q;
+      if (v.finder && !wasOpen) R.findq.focus();
+      if (!v.finder && wasOpen) R.field.focus();
       if (routeKey !== lastRoute || (changed && atEnd)) R.scroll.scrollTop = R.scroll.scrollHeight;
       put("dock", dock(v));
       put("quotes", v.composer.quotes.map((q) => UI.quote.render({ text: q.text.replace(/^❝ /, ""), act: { ev: "ui_unquote", i: q.i } })));
@@ -224,7 +251,8 @@
       if (v.title !== lastTitle) { lastTitle = v.title; doc.title = v.title; }
       fit();
     }
-    function fit() { R.field.style.height = "auto"; R.field.style.height = `${Math.min(160, R.field.scrollHeight)}px`; }
+    // the field grows a line at a time, up to 40% of the window (DS composer)
+    function fit() { R.field.style.height = "auto"; R.field.style.height = `${Math.min(Math.round((root.innerHeight || 800) * 0.4), R.field.scrollHeight)}px`; }
 
     function feed(ev) {
       const r = M.step(s, ev);
@@ -245,7 +273,7 @@
       if (ev.ev === "ui_line") ev.shift = e.shiftKey;
       if (ev.ev === "ui_tab_i") { ev.ev = "ui_tab"; ev.tab = ["thread", "changes", "artifacts"][ev.i]; }
       feed(ev);
-      if (!e.target.closest("textarea")) R.field.focus();
+      if (!e.target.closest("textarea") && R.find.hidden) R.field.focus();
     });
     // a sentence selected in a message becomes a quote when he lets go
     el.addEventListener("mouseup", () => {
@@ -260,6 +288,8 @@
       R.field.focus();
     });
     R.field.addEventListener("input", () => { feed({ ev: "ui_type", text: R.field.value }); });
+    R.findq.addEventListener("input", () => { feed({ ev: "ui_find_type", text: R.findq.value }); });
+    R.find.addEventListener("mousedown", (e) => { if (e.target === R.find) feed({ ev: "ui_find_close" }); });
     R.scroll.addEventListener("scroll", () => { if (R.scroll.scrollTop < 20) feed({ ev: "ui_older" }); });
     // keys: e.code gives the digit under ⌥ (macOS turns ⌥1 into ¡)
     doc.addEventListener("keydown", (e) => {

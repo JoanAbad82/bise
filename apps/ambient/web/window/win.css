@@ -10,23 +10,27 @@ body { background: var(--c-canvas); overflow: hidden; }
 .w-app { position: fixed; inset: 0; display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr) var(--board); background: var(--c-window); }
 .w-app.w-two { grid-template-columns: var(--sidebar) minmax(0, 1fr) 0; }
 .w-app.w-two .w-board { display: none; }
-.w-side { overflow-y: auto; overflow-x: hidden; min-height: 0; }
+.w-side { overflow-y: auto; overflow-x: hidden; min-height: 0; display: flex; flex-direction: column; }
+.w-side > .b-side { flex: 1 0 auto; }
 .w-side .b-row { cursor: default; }
 .w-main { min-height: 0; }
 .w-board { width: auto; overflow-y: auto; min-height: 0; padding-top: 14px; }
 .w-board .b-sh { padding-left: 4px; }
 .w-board .b-task { cursor: default; }
+/* one column, the same left edge for the header, what runs now, the thread, the dock and the
+   composer (designer m_8292): 760 px at most, centred in the main column */
+.w-head .b-head, .w-now, .w-thread .b-thread, .w-thread .w-grid, .w-composer { width: 100%; max-width: 760px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
 .w-head .b-head { padding-top: 16px; }
 .w-head .t2 .w-acc { color: var(--c-accent); }
 .w-head .b-seg > span, .w-head .b-btn { cursor: default; }
 /* what runs now (bise's view): the followed jobs, one card each */
 .w-now { display: flex; gap: 8px; padding: 0 22px 10px; }
+.w-now .b-task .a .end .b-chip { height: 20px; }
 .w-now .b-task { flex: 1; min-width: 0; }
 .w-now .b-task .w { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--t-12); color: var(--c-text-2); }
 /* the thread scrolls; its column stays readable, centred under a wide window */
-.w-scroll { flex: 1; min-height: 0; overflow-y: auto; }
-.w-thread .b-thread { margin: 0 auto; padding-top: 10px; padding-bottom: 18px; }
-.w-day { align-self: center; font-size: var(--t-11); color: var(--c-text-3); letter-spacing: .06em; text-transform: uppercase; }
+.w-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 16px); mask-image: linear-gradient(to bottom, transparent 0, #000 16px); }
+.w-thread .b-thread { padding-top: 14px; padding-bottom: 18px; }
 .w-in { margin-left: 36px; }
 .b-route.w-in, .b-art.w-in, .b-diff.w-in, .b-tool.w-in { margin-top: -6px; }
 .b-msg.in .b-av .b-dot { width: 14px; height: 14px; }
@@ -35,7 +39,7 @@ body { background: var(--c-canvas); overflow: hidden; }
 .w-folded { margin-left: 36px; }
 .w-why { color: var(--c-text-3); }
 .w-whytext { color: var(--c-text-3); }
-.b-fold, .b-answered, .b-marker, .b-tool, .b-route, .b-art, .w-tn { cursor: default; }
+.b-fold, .b-answered, .b-marker, .b-tool, .b-route, .b-art { cursor: default; }
 .b-dl { cursor: text; }
 .b-out { white-space: pre-wrap; }
 .w-skel2 { width: 60%; }
@@ -47,13 +51,11 @@ body { background: var(--c-canvas); overflow: hidden; }
 .w-gr { stroke: var(--c-line-strong); stroke-dasharray: 3 3; }
 .w-fa { fill: color-mix(in srgb, var(--c-accent) 30%, transparent); }
 .w-svt { fill: var(--c-text-2); font: 7px var(--font-mono); }
-/* the inbox's card carries its whole context: the capture, what the agent says, who asked */
-.w-dctx { display: flex; gap: 10px; margin: 6px 0 2px; }
-.w-dctx .b-text { font-size: var(--t-13); color: var(--c-text-2); }
 /* the composer: a real field where the DS draws a mock line */
 .w-composer { flex: none; max-width: 760px; width: 100%; margin: 0 auto; box-sizing: border-box; }
-.w-composer .box { align-items: flex-end; }
-.w-field { flex: 1; border: 0; outline: 0; resize: none; background: none; color: var(--c-text); padding: 0; margin: 0; min-height: 22px; font: var(--t-15)/1.45 var(--font-read); }
+/* 48 px at rest, one line centred; it grows a line at a time (winui.js fit: 40% of the window) */
+.w-composer .box { align-items: center; min-height: 48px; box-sizing: border-box; padding-top: 10px; padding-bottom: 10px; }
+.w-field { flex: 1; display: block; border: 0; outline: 0; resize: none; background: none; color: var(--c-text); padding: 0; margin: 0; height: 22px; font: var(--t-15)/22px var(--font-read); overflow-y: auto; }
 .w-field::placeholder { color: var(--c-text-3); }
 .w-composer .send { cursor: default; }
 .w-quotes:empty { display: none; }
@@ -61,11 +63,21 @@ body { background: var(--c-canvas); overflow: hidden; }
 .w-quotes .b-quote { cursor: default; }
 .b-opt { cursor: default; }
 .b-tabs > span { cursor: default; }
-/* made today: two thumbnails a row */
-.w-thumbs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.w-tn { border-radius: var(--r-2); overflow: hidden; background: var(--c-raised); box-shadow: var(--e-1); font-size: var(--t-11); }
-.w-tn svg { display: block; width: 100%; height: 52px; background: var(--c-solid); }
-.w-tn span { display: block; padding: 3px 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .w-pearl { width: 100%; height: 100%; }
 /* the window's top strip drags it (the app reads -webkit-app-region through amb-mac's shell) */
 .w-drag { -webkit-user-select: none; user-select: none; }
+/* ⌘K: the finder over the window, the spotlight's look, near the top */
+.w-find { position: fixed; inset: 0; z-index: 20; background: color-mix(in srgb, var(--c-canvas) 30%, transparent); }
+.w-find[hidden] { display: none; }
+.w-find .b-spot { position: absolute; left: 50%; top: 72px; transform: translateX(-50%); width: min(640px, 80vw); padding-bottom: 0; }
+.w-find .in input { flex: 1; border: 0; outline: 0; background: none; color: var(--c-text); font: inherit; padding: 0; }
+.w-find .in input::placeholder { color: var(--c-text-3); }
+.w-find .r { cursor: default; }
+.w-find .r .b-pearl, .w-find .r .b-dot { justify-self: center; }
+/* a project's artifacts tab: thumbnails, three a row */
+.w-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; padding: 10px 22px 18px; }
+.w-ac { border-radius: var(--r-3); overflow: hidden; background: var(--c-raised); box-shadow: var(--e-1); cursor: default; }
+.w-ac svg { display: block; width: 100%; height: 110px; background: var(--c-solid); }
+.w-ac .ai { padding: 8px 11px; }
+.w-ac .ai b { font-weight: 600; }
+.w-ac .ai span { display: block; font-size: var(--t-12); color: var(--c-text-3); }
