@@ -28,6 +28,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private var side: Capsule?            // round 10's side panel, made at its first open
     private var panelAgent: String?       // the agent it shows
     private var panelKeys = KeyFocus()    // the panel's own keys (it takes them when opened)
+    private var desktop: DesktopWindow?   // bise's window (S4, DesktopWindow.swift), made at its first open
     private let mainMenu = MainMenuView() // the hidden main menu: ⌘Q ⌘W ⌘, ⌘H and Edit
     private var status: StatusItem?
     private var signals: [DispatchSourceSignal] = []
@@ -532,6 +533,13 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "send":
             // a spotlight send: the front window goes with it (SPEC §3)
             shoot { [weak self] in self?.toCore(cmd) }
+        case "app_window":
+            // ⏎ in the bar, a card, the spotlight: open it in bise's window (S4)
+            guard let r = WinRoute.from(route: cmd["route"] as? String, open: cmd["open"] as? [String: Any], current: config.workspace) else {
+                Log.say("app: app_window: no route in \(cmd)"); return
+            }
+            openWindow(r)
+            if !capsule.hidden { visFeed(.dismiss) }
         case "app_panel", "app_panel_close":
             // ⏎ or a click on an agent row (amb-web d4b74f38): the side panel
             // (lead m_8122: this switch had no case, so it never opened)
@@ -672,6 +680,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private func coreEvent(_ ev: [String: Any]) {
         guard let kind = ev["ev"] as? String else { return }
         side?.post(ev)      // the side panel's page hears every core event (it keeps its agent's)
+        desktop?.post(ev)   // and bise's window's
         if AmbientApp.remembered.contains(kind) { memory[kind] = ev }
         if let u = ev["pages_url"] as? String, !u.isEmpty { pagesURL = u }
         defer { Browser.pagesURL = pagesURL }
@@ -892,6 +901,16 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         guard let hs = harness else { return }
         hs.bar = { [unowned self] in self.capsule }
         hs.side = { [weak self] in self?.side }
+        hs.win = { [weak self] in self?.desktop }
+        hs.winOp = { [weak self] op, q in
+            guard let self else { return }
+            switch op {
+            case "win_open": self.openWindow((q["route"] as? String).flatMap(WinRoute.valid))
+            case "win_close": self.desktop?.close()
+            default: self.command(["cmd": "app_window", "route": q["route"] ?? NSNull(), "open": q["open"] ?? NSNull()])   // deeplink: the bar's own path
+            }
+        }
+        DesktopWindow.tap = { [weak hs] who, ev in hs?.note(who, ev) }
         hs.keyEvent = { [weak self] t, e in self?.keys.qaEvent(t, e) ?? false }
         hs.appState = { [weak self] in self?.harnessState() ?? [:] }
         Log.tap = { [weak hs] line in MainActor.assumeIsolated { hs?.note("log", line) } }
@@ -903,8 +922,47 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     private func harnessState() -> [String: Any] {
         ["vis": ["pinned": vis.pinned, "hidden": capsule.hidden], "talking": talking, "phase": phase,
          "panel_agent": panelAgent ?? NSNull(), "keys": ["bar": keyFocus.bar, "panel": panelKeys.bar],
+         "win_route": desktop?.route ?? NSNull(),
          "core": ["bise": config.bise, "workspace": config.workspace],
          "hub": memory["hub"] ?? NSNull()]
+    }
+
+    // MARK: bise's window (S4, DesktopWindow.swift): never at launch, made at its first open
+
+    private func openWindow(_ route: String?) {
+        let d = desktop ?? {
+            let d = DesktopWindow(offScreen: harnessMode, defaults: defaults)
+            d.onCmd = { [weak self] in self?.command($0) }
+            d.onDrop = { [weak self] paths in
+                // a folder dropped on it = add a project (the core's; S1 owns the registry)
+                for p in paths { self?.toCore(["cmd": "project_add", "path": p]) }
+                self?.desktop?.post(["ev": "win_drop", "paths": paths])
+            }
+            d.onShown = { [weak self] on in self?.windowPolicy(on) }
+            d.onReady = { [weak self, weak d] in
+                for k in ["hub", "state", "phase", "main"] { if let ev = self?.memory[k] { d?.post(ev) } }
+            }
+            d.load(webDir: config.web)
+            desktop = d
+            return d
+        }()
+        Log.say("window: open \(route ?? "where he left it")")
+        d.open(route)
+    }
+
+    // a normal app (Dock icon, ⌘Tab) only while the window shows (WinPolicy)
+    private func windowPolicy(_ shown: Bool) {
+        switch WinPolicy.policy(windowShown: shown, harness: harnessMode) {
+        case .regular: NSApp.setActivationPolicy(.regular)
+        case .accessory: NSApp.setActivationPolicy(.accessory)
+        case .unchanged: break
+        }
+    }
+
+    // the Dock icon (while the window is open) clicked: the window again
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !harnessMode { openWindow(nil) }
+        return false
     }
 
     // MARK: the side panel (round 10): an agent's history, docked right
@@ -990,13 +1048,16 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             Log.say("app: ⌘Q")
             NSApp.terminate(nil)
         case .settings:
-            settingsView()
+            if let d = desktop, d.window.isKeyWindow { d.open("settings") } else { settingsView() }
         case .hide:
+            if let d = desktop, !d.hidden, d.window.isKeyWindow, !harnessMode { NSApp.hide(nil) }
             closePanel()
             if !capsule.hidden { visFeed(.dismiss) }
         case .close:
             let panelShown = side.map { !$0.hidden } ?? false
-            switch MainMenu.close(panelKey: side?.panel.isKeyWindow ?? false, panelShown: panelShown, barShown: !capsule.hidden) {
+            switch MainMenu.close(windowKey: desktop?.window.isKeyWindow ?? false, windowShown: desktop.map { !$0.hidden } ?? false,
+                                  panelKey: side?.panel.isKeyWindow ?? false, panelShown: panelShown, barShown: !capsule.hidden) {
+            case .window: desktop?.close()
             case .panel: closePanel()
             case .bar: visFeed(.dismiss)
             case .nothing: break

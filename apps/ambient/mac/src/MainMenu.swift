@@ -39,7 +39,11 @@ enum MainMenu {
         MenuKey(title: "paste", key: "v", act: .edit("paste:")),
         MenuKey(title: "select all", key: "a", act: .edit("selectAll:")),
     ]
-    static var all: [MenuKey] { app + file + edit }
+    // bise's window (S4): ⌘M, down the responder chain to the key window
+    static let window: [MenuKey] = [
+        MenuKey(title: "minimize", key: "m", act: .edit("performMiniaturize:")),
+    ]
+    static var all: [MenuKey] { app + file + edit + window }
 
     // a page's cmd that is a menu key's act (the panel's ⋯ menu, amb-web
     // 124f6853): 'quit bise ambient' takes ⌘Q's own path
@@ -50,12 +54,15 @@ enum MainMenu {
         }
     }
 
-    // ⌘W: the panel when it has the keys, else the bar (esc's order)
-    enum CloseWhat: Equatable { case panel, bar, nothing }
-    static func close(panelKey: Bool, panelShown: Bool, barShown: Bool) -> CloseWhat {
+    // ⌘W: bise's window when it has the keys (S4: hidden, the app stays),
+    // the panel when it has them, else the bar (esc's order)
+    enum CloseWhat: Equatable { case window, panel, bar, nothing }
+    static func close(windowKey: Bool = false, windowShown: Bool = false, panelKey: Bool, panelShown: Bool, barShown: Bool) -> CloseWhat {
+        if windowShown && windowKey { return .window }
         if panelShown && panelKey { return .panel }
         if barShown { return .bar }
         if panelShown { return .panel }
+        if windowShown { return .window }
         return .nothing
     }
 }
@@ -70,6 +77,7 @@ final class MainMenuView: NSObject {
         bar.addItem(submenu("bise ambient", MainMenu.app))
         bar.addItem(submenu("File", MainMenu.file))
         bar.addItem(submenu("Edit", MainMenu.edit))
+        bar.addItem(submenu("Window", MainMenu.window))
         NSApp.mainMenu = bar
     }
 

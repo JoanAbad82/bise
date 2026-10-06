@@ -37,6 +37,15 @@ MainActor.assumeIsolated {
     off.apply(CapsuleShape(w: 524, h: 900, radius: 26, note: nil, glass: CGRect(x: 84, y: 0, width: 440, height: 900)))
     law("harness smoke: placed by its first app_size, still off every screen", !Placement.touches(off.panel.frame, screens: screens))
 
+    // bise's window (S4): never shown at launch, made off every screen
+    let dw = DesktopWindow(offScreen: true, defaults: UserDefaults(suiteName: "dev.bise.ambient.smoke") ?? .standard)
+    law("window smoke: built, not shown at launch, invisible", dw.window.contentView != nil && !dw.window.isVisible && dw.hidden && dw.window.alphaValue == 0)
+    law("window smoke: made off every screen", !Placement.touches(dw.window.frame, screens: screens))
+    law("window smoke: a normal window: titled, hidden title bar, full-size content",
+        dw.window.styleMask.contains(.titled) && dw.window.styleMask.contains(.fullSizeContentView) && dw.window.titlebarAppearsTransparent && dw.window.titleVisibility == .hidden)
+    law("window smoke: its web view routes the ⌘ keys (DesktopWebView), never released on close", dw.web.superview != nil && !dw.window.isReleasedWhenClosed)
+    law("window smoke: no route before the page says one: bise's thread", dw.lastRoute == "bise")
+
     // KeepOff (proof run #2: AppKit's TUINSWindow made at 0,0,500,500): every
     // window of the process, any class, made, moved or ordered in, stays off
     KeepOff.install()

@@ -98,7 +98,8 @@ case "${1:-}" in
     for pair in KeyMachine:KeyMachineTests PageOpen:PageOpenTests Quiet:QuietTests MenuRows:MenuRowsTests \
                 PageOpen+ShowPlan:ShowPlanTests Morning:MorningTests Always:AlwaysTests \
                 Visibility:VisibilityTests Settings:SettingsTests Perms:PermsTests Sounds:SoundsTests Support:LaunchTests Shape:ShapeTests MainMenu:MainMenuTests \
-                Support+Shape+Always+Visibility+Capsule+KeepOff:CapsuleSmokeTests; do
+                Always+WinRules:WinTests \
+                Support+Shape+Always+Visibility+Capsule+KeepOff+WinRules+DesktopWindow:CapsuleSmokeTests; do
       srcs="${pair%%:*}"; test="${pair#*:}"
       : > "$t/$test.swift"
       for s in ${srcs//+/ }; do cat "$HERE/src/$s.swift" >> "$t/$test.swift"; done

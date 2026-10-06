@@ -25,11 +25,14 @@ import WebKit
 
 @MainActor
 final class Harness {
-    static let ops = ["ping", "state", "mouse", "key", "type", "fn", "voice", "shot", "eval", "events", "quit"]
+    static let ops = ["ping", "state", "mouse", "key", "type", "fn", "voice", "shot", "eval", "events", "quit",
+                      "win_open", "win_close", "win_restore", "deeplink"]
 
     // the app's doors, wired by App
     var bar: (() -> Capsule)?
     var side: (() -> Capsule?)?
+    var win: (() -> DesktopWindow?)?                    // bise's window (S4), made at its first open
+    var winOp: ((String, [String: Any]) -> Void)?      // App: win_open {route?}, win_close, deeplink {open|route}
     var keyEvent: ((CGEventType, CGEvent) -> Bool)?    // Keys.qaEvent: the tap's own path
     var appState: (() -> [String: Any])?
     // the core's fake voice (its words file) once it said {ev:'fake_voice', on:true}; nil = none
@@ -176,6 +179,17 @@ final class Harness {
         case "events":
             let since = (q["since"] as? NSNumber)?.intValue ?? 0
             return ["events": lines.filter { ($0["n"] as? Int ?? 0) > since }, "last": seq]
+        case "win_open", "win_close", "deeplink":
+            winOp?(op, q)
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            return ["win": winInfo()]
+        case "win_restore":
+            // close, then open where he left it: the route and frame come back
+            winOp?("win_close", [:])
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            winOp?("win_open", [:])
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            return ["win": winInfo()]
         case "quit":
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { NSApp.terminate(nil) }
             return [:]
@@ -185,14 +199,34 @@ final class Harness {
     }
 
     private func sidePanel() -> Capsule? { side.flatMap { $0() } }
+    private func desktop() -> DesktopWindow? { win.flatMap { $0() } }
 
-    private func windowInfo(_ c: Capsule?) -> Any {
+    // a window by its name: bar (default), side, win
+    private func view(_ name: String?) -> (any HarnessView, String)? {
+        switch name {
+        case "side": return sidePanel().map { ($0, "side") }
+        case "win": return desktop().map { ($0, "win") }
+        default: return (bar?()).map { ($0, "bar") }
+        }
+    }
+
+    private func windowInfo(_ c: (any HarnessView)?) -> Any {
         guard let c else { return NSNull() }
-        let f = c.panel.frame
-        return ["frame": ["x": f.minX, "y": f.minY, "w": f.width, "h": f.height], "visible": c.panel.isVisible,
-                "hidden": c.hidden, "test_key": c.panel.testKey, "key": c.panel.isKeyWindow,
-                "real_key": NSApp.keyWindow === c.panel, "ignores_mouse": c.panel.ignoresMouseEvents,
-                "window": c.panel.windowNumber, "first_responder": c.panel.firstResponder.map { String(describing: type(of: $0)) as Any } ?? NSNull()]
+        let w = c.hwin
+        let f = w.frame
+        return ["frame": ["x": f.minX, "y": f.minY, "w": f.width, "h": f.height], "visible": w.isVisible,
+                "hidden": c.hidden, "test_key": c.hTestKey, "key": w.isKeyWindow,
+                "real_key": NSApp.keyWindow === w, "ignores_mouse": w.ignoresMouseEvents,
+                "window": w.windowNumber, "first_responder": w.firstResponder.map { String(describing: type(of: $0)) as Any } ?? NSNull()]
+    }
+
+    // the window's: windowInfo + the route its page shows + light/dark
+    private func winInfo() -> Any {
+        guard let d = desktop(), var i = windowInfo(d) as? [String: Any] else { return NSNull() }
+        i["route"] = d.route ?? NSNull()
+        i["title"] = d.title
+        i["appearance"] = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? "dark" : "light"
+        return i
     }
 
     private func ping() -> [String: Any] {
@@ -200,15 +234,15 @@ final class Harness {
         return ["pid": Int(getpid()), "mode": "test", "ops": Harness.ops, "offscreen": true,
                 "bundle": Bundle.main.bundlePath, "argv": CommandLine.arguments,
                 "home": ProcessInfo.processInfo.environment["BISE_HOME"] ?? "", "screens": NSScreen.screens.map { r($0.frame) }, "windows": NSApp.windows.map { ["frame": r($0.frame), "visible": $0.isVisible, "class": String(describing: type(of: $0))] as [String: Any] },
-                "status_item": false, "fake_voice": fakeVoice ?? NSNull(), "bar": windowInfo(b), "side": windowInfo(sidePanel()),
+                "status_item": false, "fake_voice": fakeVoice ?? NSNull(), "bar": windowInfo(b), "side": windowInfo(sidePanel()), "win": winInfo(),
                 "app_active": NSApp.isActive,
                 "key_window": NSApp.keyWindow.map { String(describing: type(of: $0)) as Any } ?? NSNull(),
                 "front_app": NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? NSNull()]
     }
 
-    private func model(_ c: Capsule?) async -> Any {
+    private func model(_ c: (any HarnessView)?) async -> Any {
         guard let c else { return NSNull() }
-        let s = await js(c.web, "(() => { const a = window.ambient; const m = a && a.model ? a.model() : null; return JSON.stringify(m); })()")
+        let s = await js(c.hweb, "(() => { const a = window.ambient; const m = a && a.model ? a.model() : null; return JSON.stringify(m); })()")
         return s.flatMap { (try? JSONSerialization.jsonObject(with: Data($0.utf8), options: [.fragmentsAllowed])) } ?? NSNull()
     }
 
@@ -218,6 +252,8 @@ final class Harness {
         r["side"] = windowInfo(sidePanel())
         r["bar_model"] = await model(bar?())
         r["side_model"] = await model(sidePanel())
+        r["win"] = winInfo()
+        r["win_model"] = await model(desktop())
         return r
     }
 
@@ -229,13 +265,14 @@ final class Harness {
     // px from its top-left). No screen-point lookup: the panels sit at -30000,
     // where nothing that looks windows up by screen point finds them (amb-tools
     // m_8085: every click came back window: none)
-    private func target(_ q: [String: Any]) throws -> (Capsule, String, NSPoint) {
+    private func target(_ q: [String: Any]) throws -> (any HarnessView, String, NSPoint) {
         guard let x = (q["x"] as? NSNumber)?.doubleValue, let y = (q["y"] as? NSNumber)?.doubleValue else {
-            throw Failure(description: "mouse needs window: bar|side, x, y (the page's CSS px from that window's top-left)")
+            throw Failure(description: "mouse needs window: bar|side|win, x, y (the page's CSS px from that window's top-left)")
         }
-        let name = (q["window"] as? String) == "side" ? "side" : "bar"
-        guard let c = name == "side" ? sidePanel() : bar?() else { throw Failure(description: "mouse: no \(name) window yet") }
-        let local = HarnessClick.local(css: CGPoint(x: x, y: y), windowHeight: c.panel.frame.height)
+        let want = q["window"] as? String
+        guard let (c, name) = view(want) else { throw Failure(description: "mouse: no \(want ?? "bar") window yet") }
+        // the window's content: the web view's own height (its title bar is the page's)
+        let local = HarnessClick.local(css: CGPoint(x: x, y: y), windowHeight: c.hwin.contentView?.frame.height ?? c.hwin.frame.height)
         return (c, name, local)
     }
 
@@ -246,7 +283,7 @@ final class Harness {
     // content view's hitTest, the web view. Never HID, never a screen lookup.
     private func mouse(_ q: [String: Any]) async throws -> [String: Any] {
         let (c, name, local) = try target(q)
-        let w: NSWindow = c.panel
+        let w: NSWindow = c.hwin
         let kind = q["kind"] as? String ?? "click"
         // no right click: a context menu is a window macOS keeps on a real screen
         if (q["button"] as? String) == "right" { throw Failure(description: "no right click in harness mode: its context menu would open on a real screen") }
@@ -264,7 +301,7 @@ final class Harness {
         var hit = "none"
         if let cv = w.contentView, let v = cv.hitTest(cv.superview?.convert(local, from: nil) ?? local) { hit = String(describing: type(of: v)) }
         // the page's reaction: what its document got
-        _ = await js(c.web, """
+        _ = await js(c.hweb, """
         (() => { window.__hz = [];
           if (!window.__hzOn) { window.__hzOn = true;
             const n = g => g && g.tagName ? g.tagName.toLowerCase() + (g.id ? '#' + g.id : '') : String(g);
@@ -287,7 +324,7 @@ final class Harness {
             NSApp.sendEvent(ev)
         }
         try? await Task.sleep(nanoseconds: UInt64(((q["settle_ms"] as? NSNumber)?.doubleValue ?? 250) * 1_000_000))
-        let dom = (await js(c.web, "JSON.stringify(window.__hz || [])"))
+        let dom = (await js(c.hweb, "JSON.stringify(window.__hz || [])"))
             .flatMap { (try? JSONSerialization.jsonObject(with: Data($0.utf8))) as? [[String: Any]] } ?? []
         note("harness>mouse", ["kind": kind, "window": name, "hit_view": hit, "dom": dom.count])
         return ["window": name, "window_number": w.windowNumber, "local": ["x": local.x, "y": local.y], "ignores_mouse": false,
@@ -332,9 +369,9 @@ final class Harness {
 
     // the window that has bise's keys: the test-key one (or the real key one)
     private func keyTarget() -> (NSWindow, String)? {
-        for (c, name) in [(sidePanel(), "side"), (bar?(), "bar")] {
-            guard let c, c.panel.isVisible else { continue }
-            if c.panel.isKeyWindow { return (c.panel, name) }
+        for name in ["win", "side", "bar"] {
+            guard let (c, _) = view(name), c.hwin.isVisible else { continue }
+            if c.hwin.isKeyWindow { return (c.hwin, name) }
         }
         return nil
     }
@@ -441,16 +478,15 @@ final class Harness {
     // the web views' own snapshots only: never a screen or window capture
     private func shot(_ q: [String: Any]) async throws -> [String: Any] {
         let what = q["what"] as? String ?? "bar"
-        let c = what == "side" ? sidePanel() : bar?()
-        guard let c else { throw Failure(description: "shot what: bar (= panel), side; that one doesn't exist yet") }
+        guard let (c, _) = view(what) else { throw Failure(description: "shot what: bar (= panel), side, win; that one doesn't exist yet") }
         let shots = dir + "/shots"
         try? FileManager.default.createDirectory(atPath: shots, withIntermediateDirectories: true)
         let path = shots + "/\(what)-\(ms()).png"
-        let snap: NSImage? = await withCheckedContinuation { k in c.web.takeSnapshot(with: nil) { i, _ in k.resume(returning: i) } }
+        let snap: NSImage? = await withCheckedContinuation { k in c.hweb.takeSnapshot(with: nil) { i, _ in k.resume(returning: i) } }
         guard let img = snap?.cgImage(forProposedRect: nil, context: nil, hints: nil) else { throw Failure(description: "shot \(what): the page gave no snapshot") }
         guard let png = NSBitmapImageRep(cgImage: img).representation(using: .png, properties: [:]) else { throw Failure(description: "shot: no PNG") }
         try png.write(to: URL(fileURLWithPath: path))
-        return ["png": path, "how": "page snapshot (no native glass)", "w": img.width, "h": img.height, "visible": c.panel.isVisible]
+        return ["png": path, "how": "page snapshot (no native glass)", "w": img.width, "h": img.height, "visible": c.hwin.isVisible]
     }
 
     // MARK: the guard (card #428): no window of this app on any real screen
@@ -508,9 +544,34 @@ final class Harness {
 
     private func eval(_ q: [String: Any]) async throws -> [String: Any] {
         guard let src = q["js"] as? String, !src.isEmpty else { throw Failure(description: "eval needs js") }
-        let c = (q["window"] as? String) == "side" ? sidePanel() : bar?()
-        guard let c else { throw Failure(description: "eval: no such window yet") }
+        guard let (c, _) = view(q["window"] as? String) else { throw Failure(description: "eval: no such window yet") }
         let wrapped = "(() => { const v = (\n\(src)\n); return typeof v === 'string' ? v : JSON.stringify(v === undefined ? null : v); })()"
-        return ["value": await js(c.web, wrapped) ?? NSNull()]
+        return ["value": await js(c.hweb, wrapped) ?? NSNull()]
     }
+}
+
+// a window the harness drives (the bar, the side panel, bise's window)
+@MainActor
+protocol HarnessView: AnyObject {
+    var hwin: NSWindow { get }
+    var hweb: WKWebView { get }
+    var hidden: Bool { get }
+    var hTestKey: Bool { get }
+    func mouseAt(_ m: NSPoint)       // the window's mouse rule at that screen point
+    func clickedOutside()            // a click that would land in another app
+}
+
+extension Capsule: HarnessView {
+    var hwin: NSWindow { panel }
+    var hweb: WKWebView { web }
+    var hTestKey: Bool { panel.testKey }
+}
+
+// the whole window takes the mouse (no glass rule), and a click elsewhere changes nothing
+extension DesktopWindow: HarnessView {
+    var hwin: NSWindow { window }
+    var hweb: WKWebView { web }
+    var hTestKey: Bool { window.testKey }
+    func mouseAt(_ m: NSPoint) {}
+    func clickedOutside() {}
 }
