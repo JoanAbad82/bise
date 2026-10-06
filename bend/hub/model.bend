@@ -87,6 +87,11 @@ type Ev is Data:
   # the acts' (timers.bend): one constructor each, their kinds inside
   EX{e: XH.XEv}
   EAct{e: TM.ActEv}
+  # bise desktop S10: someone follows the agent (or stops), and the end of
+  # a followed job (done or failed), journaled once: it turns follow off
+  # (one job per follow, law follow_one_shot)
+  EFollow{name: String, on: Bool}
+  EJobEnd{name: String, state: String}
 
 type AgentOp is Data:
   OLife{life: Life, reason: Maybe<&2, String>}
@@ -96,6 +101,7 @@ type AgentOp is Data:
   ODeclared{d: Maybe<&2, Decl>, note: String}
   OFile{path: String}
   ORename{new_name: String}
+  OFollow{on: Bool}
 
 type MsgOp is Data:
   OSt{st: MSt}
@@ -408,6 +414,8 @@ def agent_op(+a: Agent, op: AgentOp) -> Agent:
           Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, sn, follow}
         case OReport{+rp}:
           Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, rp, snap, follow}
+        case OFollow{+f}:
+          Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, snap, f}
 
 # apply an operation to the agent named `n` (no agent: nothing changes)
 def map_agent(xs: List<&2, Agent>, +n: String, +op: AgentOp) -> List<&2, Agent>:
@@ -568,6 +576,10 @@ def apply(+st: St, e: Ev) -> St:
           St{agents, order, msgs, cards, notes, nm, nc, tm, XH.apply(xs, xe)}
         case EAct{+ae}:
           St{agents, order, msgs, cards, notes, nm, nc, TM.act_apply(tm, ae), xs}
+        case EFollow{+name, +on}:
+          St{map_agent(agents, name, OFollow{on}), order, msgs, cards, notes, nm, nc, tm, xs}
+        case EJobEnd{+name, _}:
+          St{map_agent(agents, name, OFollow{False{}}), order, msgs, cards, notes, nm, nc, tm, xs}
 
 # the state after a journal: the replay of a list of events
 def apply_all(evs: List<&2, Ev>, +st: St) -> St:

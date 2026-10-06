@@ -130,6 +130,15 @@ pub enum AgentReq {
         kind: String,
         summary: String,
         decisions: Vec<String>,
+        /// S10: `--step n/m` (n, m)
+        step: Option<(u32, u32)>,
+        /// emitter 5: `--result` (proto's DiffResult, checked by the CLI)
+        result: Option<Value>,
+    },
+    /// S10: `sb follow <agent> [--off]` (main only, sb-core decides).
+    Follow {
+        agent: String,
+        on: bool,
     },
     Spawn {
         name: String,
@@ -321,12 +330,19 @@ impl AgentReq {
                         kind
                     ));
                 }
+                let n = |k: &str| v.get(k).and_then(Value::as_u64).and_then(|x| u32::try_from(x).ok());
                 AgentReq::Report {
                     kind,
                     summary: jstr(v, "summary"),
                     decisions: jstrs(v, "decisions"),
+                    step: n("step").zip(n("of")),
+                    result: v.get("result").filter(|r| r.is_object()).cloned(),
                 }
             }
+            "follow" => AgentReq::Follow {
+                agent: jstr(v, "agent").trim_start_matches('@').to_string(),
+                on: !v.get("off").and_then(Value::as_bool).unwrap_or(false),
+            },
             "spawn" => AgentReq::Spawn {
                 name: jstr(v, "name"),
                 brief: Brief {
@@ -596,6 +612,12 @@ pub enum Input {
         client: Option<ClientId>,
         rid: u64,
     },
+    /// S10: follow a task (the typed `follow`; `client` gets the refusal).
+    Follow {
+        client: Option<ClientId>,
+        agent: String,
+        on: bool,
+    },
     Updated {
         card: u64,
         version: String,
@@ -805,6 +827,13 @@ pub enum Effect {
         state: String,
         to: String,
         xid: Option<u64>,
+    },
+    /// S10: a followed task ended (done or failed), once: his notification.
+    JobEnd {
+        agent: String,
+        state: String,
+        label: String,
+        summary: String,
     },
 }
 
@@ -1370,6 +1399,7 @@ impl Hub {
                 aliases: parse(&a["aliases"]).unwrap_or_default(),
                 files: parse(&a["files"]).unwrap_or_default(),
                 snapshot_ref: a["snapshot_ref"].as_str().map(|x| x.to_string()),
+                follow: a["follow"].as_bool().unwrap_or(false),
                 run: run_of(&jstr(a, "run")),
                 waiting: a["waiting"].as_bool().unwrap_or(false),
                 waiting_on: a["waiting_on"].as_str().map(|x| x.to_string()),
@@ -2034,6 +2064,11 @@ impl Hub {
                     "report": a.last_report.as_ref().map(|r| clip(&one_line(&r.summary), 200)),
                     // when it last reported (an archived task: about when it stopped)
                     "report_ms": a.last_report.as_ref().map(|r| r.at_ms),
+                    // S10: followed, and its progress step (`--step n/m`)
+                    "follow": a.follow,
+                    "report_kind": a.last_report.as_ref().map(|r| r.kind.clone()),
+                    "step": a.last_report.as_ref().and_then(|r| r.step),
+                    "of": a.last_report.as_ref().and_then(|r| r.of),
                     "queued": board::queued_count(&self.st, &a.name),
                     // the user's queued inputs waiting for the turn's end
                     // (the window's "send queued"): [{id, text, created_ms}]
@@ -2275,6 +2310,7 @@ impl Hub {
                 self.core(&mut fx, env, client, json!({"t": "route_correct", "rid": rid, "to": to, "name": name}))
             }
             Input::RouteCancel { client, rid } => self.core(&mut fx, env, client, json!({"t": "route_cancel", "rid": rid})),
+            Input::Follow { client, agent, on } => self.core(&mut fx, env, client, json!({"t": "follow", "agent": agent, "on": on})),
         }
         self.refresh_contexts(&mut fx, env.now());
         if self.dirty {
@@ -2432,6 +2468,7 @@ impl Hub {
                 due_ms: f["due_ms"].as_u64().unwrap_or(0),
                 why: jstr(f, "why"),
             }),
+            "job_end" => fx.push(Effect::JobEnd { agent: jstr(f, "agent"), state: jstr(f, "state"), label: jstr(f, "label"), summary: jstr(f, "summary") }),
             "route_done" => fx.push(Effect::RouteDone {
                 rid: f["rid"].as_u64().unwrap_or(0),
                 state: jstr(f, "state"),
@@ -2969,7 +3006,20 @@ impl Hub {
                 kind,
                 summary,
                 decisions,
-            } => json!({"cmd": "report", "kind": kind, "summary": summary, "decisions": decisions}),
+                step,
+                result,
+            } => {
+                let mut q = json!({"cmd": "report", "kind": kind, "summary": summary, "decisions": decisions});
+                if let Some((n, of)) = step {
+                    q["step"] = json!(n);
+                    q["of"] = json!(of);
+                }
+                if let Some(r) = result {
+                    q["result"] = r;
+                }
+                q
+            }
+            AgentReq::Follow { agent, on } => json!({"cmd": "follow", "agent": agent, "off": !on}),
             AgentReq::Spawn {
                 name,
                 brief,

@@ -951,6 +951,8 @@ fn a_done_report_updates_the_board_and_wakes_main() {
             kind: "done".into(),
             summary: "fini".into(),
             decisions: vec!["API v2".into()],
+            step: None,
+            result: None,
         },
     );
     assert_eq!(reply(&fx, tok).unwrap()["ok"], true);
@@ -1054,6 +1056,8 @@ fn a_report_answers_the_parent_and_no_auto_reply_repeats_it() {
             kind: "done".into(),
             summary: "fait".into(),
             decisions: vec![],
+            step: None,
+            result: None,
         },
     );
     assert_eq!(reply(&fx, tok).unwrap()["ok"], true);
@@ -1583,7 +1587,7 @@ fn agent_traffic_never_reaches_the_user_inbox() {
     ask(&mut t, "a", "b");
     t.req("a", AgentReq::Status { status: Declared::Blocked, note: "need a key".into() });
     for kind in ["blocked", "done", "failed"] {
-        t.req("b", AgentReq::Report { kind: kind.into(), summary: format!("{} summary", kind), decisions: vec![] });
+        t.req("b", AgentReq::Report { kind: kind.into(), summary: format!("{} summary", kind), decisions: vec![], step: None, result: None });
     }
     assert!(t.hub.st.cards.is_empty(), "{:?}", t.hub.st.cards);
     assert_eq!(t.hub.snapshot(t.env.now)["cards"].as_array().unwrap().len(), 0);
@@ -1980,6 +1984,8 @@ fn a_restored_idle_task_gets_its_queued_mail() {
             kind: "failed".into(),
             summary: "bloqué".into(),
             decisions: vec![],
+            step: None,
+            result: None,
         },
     );
     let fx = t.go(Input::ReplIdle {
@@ -3808,6 +3814,86 @@ fn a_route_held_across_a_restart_goes_once() {
     assert_eq!(xdelivers(&h.handle(Input::Tick, &mut env)).len(), 1);
     env.now += 2_500;
     assert!(xdelivers(&h.handle(Input::Tick, &mut env)).is_empty());
+}
+
+// ---- desktop S10: followed jobs (core.bend's `followed jobs`) ----
+
+fn job_ends(fx: &[Effect]) -> Vec<(String, String)> {
+    fx.iter()
+        .filter_map(|e| match e {
+            Effect::JobEnd { agent, state, .. } => Some((agent.clone(), state.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+fn report(t: &mut T, from: &str, kind: &str, summary: &str, step: Option<(u32, u32)>) -> Vec<Effect> {
+    t.req(from, AgentReq::Report { kind: kind.into(), summary: summary.into(), decisions: vec![], step, result: None }).1
+}
+
+// main follows a task: its progress says nothing, its done ends the job
+// once and the follow with it (one job per follow)
+#[test]
+fn a_followed_task_ends_once_and_the_follow_with_it() {
+    let mut t = T::new();
+    t.spawn_task("perf");
+    let (tok, fx) = t.req(MAIN, AgentReq::Follow { agent: "perf".into(), on: true });
+    assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "{:?}", fx);
+    assert!(t.hub.st.agents["perf"].follow);
+    let fx = report(&mut t, "perf", "progress", "bench 3 of 7", Some((3, 7)));
+    assert!(job_ends(&fx).is_empty());
+    let r = t.hub.st.agents["perf"].last_report.clone().unwrap();
+    assert_eq!((r.step, r.of), (Some(3), Some(7)));
+    let fx = report(&mut t, "perf", "done", "p99 down 31%", None);
+    assert_eq!(job_ends(&fx), vec![("perf".into(), "done".into())]);
+    assert!(!t.hub.st.agents["perf"].follow, "one job per follow");
+    assert!(job_ends(&report(&mut t, "perf", "done", "again", None)).is_empty());
+    // a replay of the journal never says it again
+    let journal = t.journal.borrow().clone();
+    let mut h = Hub::new("/w");
+    h.replay(&journal);
+    assert!(!h.st.agents["perf"].follow);
+}
+
+// a failure ends the job at once, in the same step; unfollowed: nothing
+#[test]
+fn a_followed_task_that_fails_ends_at_once() {
+    let mut t = T::new();
+    t.spawn_task("perf");
+    t.go(Input::Follow { client: None, agent: "perf".into(), on: true });
+    let fx = report(&mut t, "perf", "failed", "oom", None);
+    assert_eq!(job_ends(&fx), vec![("perf".into(), "failed".into())]);
+    t.spawn_task("docs");
+    t.go(Input::Follow { client: None, agent: "docs".into(), on: true });
+    t.go(Input::Follow { client: None, agent: "docs".into(), on: false });
+    assert!(job_ends(&report(&mut t, "docs", "done", "done", None)).is_empty());
+}
+
+// who may follow what: main only, a task of this hub, not archived
+#[test]
+fn only_main_follows_a_live_task() {
+    let mut t = T::new();
+    t.spawn_task("perf");
+    let err = |fx: &[Effect], tok| reply(fx, tok).unwrap()["error"].as_str().unwrap_or("").to_string();
+    let (tok, fx) = t.req("perf", AgentReq::Follow { agent: "perf".into(), on: true });
+    assert!(err(&fx, tok).contains("only main follows"), "{:?}", fx);
+    let (tok, fx) = t.req(MAIN, AgentReq::Follow { agent: MAIN.into(), on: true });
+    assert!(err(&fx, tok).contains("main isn't a job"), "{:?}", fx);
+    let (tok, fx) = t.req(MAIN, AgentReq::Follow { agent: "nope".into(), on: true });
+    assert!(err(&fx, tok).contains("no agent named @nope"), "{:?}", fx);
+    // the typed command's refusal is a notice to the connection that asked
+    let fx = t.go(Input::Follow { client: Some(7), agent: "nope".into(), on: true });
+    assert!(fx.iter().any(|e| matches!(e, Effect::ToClient { client: 7, body } if body["ev"] == "notice")), "{:?}", fx);
+}
+
+// emitter 5: --result rides the report, as proto's DiffResult
+#[test]
+fn a_reports_result_is_kept_with_it() {
+    let mut t = T::new();
+    t.spawn_task("perf");
+    let res = json!({"label": "p99", "before": 420.0, "after": 290.0, "unit": "ms"});
+    t.req("perf", AgentReq::Report { kind: "done".into(), summary: "faster".into(), decisions: vec![], step: None, result: Some(res.clone()) });
+    assert_eq!(t.hub.st.agents["perf"].last_report.clone().unwrap().result, Some(res));
 }
 
 // ---- the composer rule (lead m_8777, architect m_8801) ----

@@ -12,6 +12,29 @@ use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum JobState {
+    Running,
+    Done,
+    Failed,
+}
+
+/// A followed task (S10): its job's name (its last progress, else its
+/// objective), `step` of `of` when it reports them (`sb report progress
+/// --step n/m`), since when it is at this step.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Job {
+    pub agent: String,
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub of: Option<u32>,
+    pub state: JobState,
+    pub since_ms: u64,
+}
+
 /// What a hub sends a client that said `hello {proto: 1}`.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "ev", rename_all = "snake_case")]
@@ -85,6 +108,11 @@ pub enum HubEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         xid: Option<u64>,
     },
+    /// the followed tasks (S10), at hello and on change: a follow ends
+    /// with its job (`job_end`), so every row runs
+    Jobs { project: Project, items: Vec<Job> },
+    /// a followed task ended (done or failed), once: his notification
+    JobEnd { project: Project, agent: String, state: JobState, label: String, summary: String },
     /// an unknown or refused command, never silence
     Error {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -99,7 +127,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "diff", "route", "route_done", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "diff", "route", "route_done", "jobs", "job_end", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -218,13 +246,16 @@ pub enum HubCmd {
     /// a held route doesn't go: his words reach bise's main as a plain
     /// message (a route that ended already: an error)
     RouteCancel { project: Project, rid: u64 },
+    /// tell me when it's done (S10, decision E): a flag on the task, one
+    /// job (off again at its `job_end`); `on: false` stops following
+    Follow { project: Project, agent: String, on: bool },
     /// a tag this version doesn't know: answered with `error`
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "route_correct", "route_cancel"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "route_correct", "route_cancel", "follow"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
@@ -252,9 +283,9 @@ mod tests {
 
     #[test]
     fn unknown_tags_are_kept_and_bad_fields_are_errors() {
-        let e = HubEv::decode(r#"{"ev":"jobs","project":"p","to":"q"}"#).unwrap();
-        assert!(matches!(&e, HubEv::Unknown { tag, .. } if tag == "jobs"));
-        assert_eq!(e.encode(), r#"{"ev":"jobs","project":"p","to":"q"}"#);
+        let e = HubEv::decode(r#"{"ev":"weather","project":"p","to":"q"}"#).unwrap();
+        assert!(matches!(&e, HubEv::Unknown { tag, .. } if tag == "weather"));
+        assert_eq!(e.encode(), r#"{"ev":"weather","project":"p","to":"q"}"#);
         assert!(HubEv::decode(r#"{"ev":"typing","project":"p"}"#).is_err(), "a known tag without its fields");
         assert!(HubEv::decode(r#"{"project":"p"}"#).is_err());
         let c = HubCmd::decode(r#"{"cmd":"approve","project":"p","card":3}"#).unwrap();

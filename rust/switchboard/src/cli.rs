@@ -53,9 +53,14 @@ pub const COMMANDS: &[CmdDoc] = &[
         "declare your state (shown to everyone).",
     ),
     cmd(
-        "sb report progress|done|failed|blocked \"<summary>\" [--decision \"<text>\"]...",
+        "sb report progress|done|failed|blocked \"<summary>\" [--decision \"<text>\"]... [--step <n>/<m>] [--result '<json>']",
         Who::Everyone,
-        "tell main.",
+        "tell main. `--step 3/7`: where a long job is (shown live when someone follows you); `--result`: what your change measured, as {\"label\",\"before\",\"after\",\"unit\"} (the review shows it).",
+    ),
+    cmd(
+        "sb follow <agent> [--off]",
+        Who::Main,
+        "tell the user when that task ends (done or failed), once: he asked \"tell me when it's done\". `--off`: stop.",
     ),
     cmd(
         "sb inspect <agent> [--query <text>] [--before|--after|--around|--at #<pos>] [--limit <n>]",
@@ -305,6 +310,24 @@ fn agent_arg(pos: &[String], usage: impl Into<String>) -> Result<String, String>
     pos.first()
         .map(|a| a.trim_start_matches('@').to_string())
         .ok_or_else(|| usage.into())
+}
+
+/// `--step 3/7`: (3, 7), 1 <= n <= m.
+fn step_of(s: &str) -> Result<(u32, u32), String> {
+    let bad = || format!("--step expects <n>/<m>, like 3/7 (not {s})");
+    let (n, m) = s.trim().split_once('/').ok_or_else(bad)?;
+    let (n, m): (u32, u32) = (n.trim().parse().map_err(|_| bad())?, m.trim().parse().map_err(|_| bad())?);
+    if n == 0 || m == 0 || n > m {
+        return Err(bad());
+    }
+    Ok((n, m))
+}
+
+/// `--result '<json>'`: proto's DiffResult, one shape for the review.
+fn result_of(s: &str) -> Result<Value, String> {
+    let ex = r#"--result '{"label":"p99","before":420,"after":290,"unit":"ms"}'"#;
+    let r: bise_proto::diff::DiffResult = serde_json::from_str(s).map_err(|e| format!("--result: {e}; like {ex}"))?;
+    serde_json::to_value(r).map_err(|e| e.to_string())
 }
 
 /// `--timeout <s>`, 20 s by default.
@@ -585,8 +608,22 @@ pub fn build(args: &[String]) -> Result<Value, String> {
             worktree_exists(p)?;
             req.insert("path".into(), json!(p));
         }
+        "follow" => {
+            let (pos, o) = parse_args(rest, &[], &["off"])?;
+            req.insert("agent".into(), json!(agent_arg(&pos, "usage: sb follow <agent> [--off]")?));
+            req.insert("off".into(), json!(o.contains_key("off")));
+        }
         "report" => {
-            let (pos, o) = parse_args(rest, &["decision"], &[])?;
+            let (pos, o) = parse_args(rest, &["decision", "step", "result"], &[])?;
+            // S10: --step n/m; emitter 5: --result, proto's DiffResult
+            if o.contains_key("step") {
+                let (n, m) = step_of(&str_of(&o, "step"))?;
+                req.insert("step".into(), json!(n));
+                req.insert("of".into(), json!(m));
+            }
+            if o.contains_key("result") {
+                req.insert("result".into(), result_of(&str_of(&o, "result"))?);
+            }
             req.insert(
                 "kind".into(),
                 json!(pos.first().ok_or("usage: sb report <kind> \"<summary>\"")?),
@@ -1011,6 +1048,8 @@ pub fn render(cmd: &str, v: &Value) -> (bool, String) {
         }
         "card" => format!("card #{} opened for the user", v.get("card").and_then(|c| c.as_u64()).unwrap_or(0)),
         "report" => format!("reported ({})", s("message_id")),
+        "follow" if v.get("on") == Some(&json!(false)) => format!("@{} no longer followed", s("agent")),
+        "follow" => format!("following @{}: the user hears once when it ends", s("agent")),
         "close" => format!("card #{} closed", v.get("card").and_then(|c| c.as_u64()).unwrap_or(0)),
         "withdraw" => format!("card #{} withdrawn: the user sees why; the question is yours again", v.get("card").and_then(|c| c.as_u64()).unwrap_or(0)),
         "rename" => format!("renamed: now @{} (the old name still works)", s("name")),

@@ -2,7 +2,7 @@
 //! known message and encodes back to the same JSON value, every known tag
 //! of every type appears in a fixture, and the unknown ones stay unknown.
 
-use bise_proto::draft::{AppCmd, CoreEv, DraftHubCmd, DraftHubEv, ProjectView};
+use bise_proto::draft::{AppCmd, CoreEv, DraftHubCmd, ProjectView};
 use bise_proto::hub::{HubCmd, HubEv};
 use serde_json::Value;
 use std::path::Path;
@@ -54,8 +54,6 @@ fn hub_commands_round_trip_and_cover_every_tag() {
 #[test]
 fn drafts_round_trip_and_cover_every_tag() {
     let enc = |v: &dyn erased::Enc| v.value();
-    let t = round_trip("draft_hub_ev.jsonl", "ev", DraftHubEv::decode, |m| !matches!(m, DraftHubEv::Unknown { .. }), |m| enc(m));
-    covers(&t, DraftHubEv::TAGS, "draft_hub_ev.jsonl");
     let t = round_trip("draft_hub_cmd.jsonl", "cmd", DraftHubCmd::decode, |m| !matches!(m, DraftHubCmd::Unknown { .. }), |m| enc(m));
     covers(&t, DraftHubCmd::TAGS, "draft_hub_cmd.jsonl");
     let t = round_trip("core_ev.jsonl", "ev", CoreEv::decode, |m| !matches!(m, CoreEv::Unknown { .. }), |m| enc(m));

@@ -142,6 +142,13 @@ def main():
         check(said["text"].startswith("why does p99 rise") and "<screen_context" in said["text"] and "grafana.shop.test" in said["text"],
               "the context rendered on the project: %r" % said["text"])
 
+        # S10: bise's `sb follow <p>/<agent>` is a command on the project's
+        # hub: its answer comes back at once (main isn't a job there)
+        r = sb_as_main(E.env, hsock, "follow", "%s/main" % name)
+        check(r.returncode != 0 and "main isn't a job" in (r.stdout + r.stderr), "follow <p>/main answered by the project: %s %s" % (r.stdout, r.stderr))
+        r = sb_as_main(E.env, hsock, "follow", "nope/perf")
+        check(r.returncode != 0 and "no project named nope" in (r.stdout + r.stderr), "follow on an unknown project: %s %s" % (r.stdout, r.stderr))
+
         # S2 step 3 (C): only bise reads other projects; a project's agent
         # is refused
         r = sb_as_main(E.env, psock, "history", "login", "--project", "bise")

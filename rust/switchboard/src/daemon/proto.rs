@@ -9,7 +9,7 @@
 
 use super::*;
 use crate::proto_view::{self, Live, Since};
-use bise_proto::hub::{HubCmd, HubEv, Mode};
+use bise_proto::hub::{HubCmd, HubEv, JobState, Mode};
 use bise_proto::thread::{self as pthread, Ctx, Line, PageRef};
 use bise_proto::PROTO;
 
@@ -31,6 +31,8 @@ pub(super) struct Proto {
     worktrees: String,
     /// the background jobs' ports once found (dev_servers.rs)
     pub(super) dev_ports: super::dev_servers::Ports,
+    /// the last `jobs` sent (S10: sent again only when changed)
+    jobs: String,
     /// the typed command being stepped (its connection, its tag): a
     /// notice sb-core sends that connection meanwhile becomes its error
     stepping: Option<(ClientId, String)>,
@@ -92,6 +94,12 @@ impl Shell {
         for id in ids {
             self.proto_send(id, &ev);
         }
+    }
+
+    /// S10: a followed task ended: `job_end` to every typed connection.
+    pub(super) fn job_end(&mut self, agent: String, state: &str, label: String, summary: String) {
+        let state = if state == "failed" { JobState::Failed } else { JobState::Done };
+        self.proto_route(HubEv::JobEnd { project: self.project(), agent, state, label, summary });
     }
 
     /// `route_correct`'s `to`, checked in the registry before sb-core is
@@ -163,6 +171,8 @@ impl Shell {
             let (agents, cards) = self.proto_rows(&snap);
             self.proto_send(id, &agents);
             self.proto_send(id, &cards);
+            let jobs = HubEv::Jobs { project: self.project(), items: proto_view::jobs(&snap) };
+            self.proto_send(id, &jobs);
             let arts = self.artifacts_ev();
             let arts = self.proto_artifacts(&arts);
             self.proto_send(id, &arts);
@@ -189,6 +199,7 @@ impl Shell {
             | HubCmd::Merged { project }
             | HubCmd::RouteCorrect { project, .. }
             | HubCmd::RouteCancel { project, .. }
+            | HubCmd::Follow { project, .. }
             | HubCmd::Diff { project, .. } => project.clone(),
             HubCmd::Hello { .. } => unreachable!(),
             HubCmd::Unknown { tag, .. } => return self.proto_error(id, tag, &format!("unknown command: {tag}")),
@@ -293,6 +304,9 @@ impl Shell {
                 Ok(Some((to, name))) => self.step_typed(id, &tag, Input::RouteCorrect { client: Some(id), rid, to, name }),
             },
             HubCmd::RouteCancel { rid, .. } => self.step_typed(id, &tag, Input::RouteCancel { client: Some(id), rid }),
+            // S10: sb-core refuses main, an archived or unknown agent: the
+            // notice comes back as the error (step_typed)
+            HubCmd::Follow { agent, on, .. } => self.step_typed(id, &tag, Input::Follow { client: Some(id), agent, on }),
             HubCmd::Hello { .. } | HubCmd::Unknown { .. } => {}
         }
     }
@@ -331,6 +345,15 @@ impl Shell {
                 }
                 if new.1 {
                     self.proto_live(|l, ctx| l.refold(ctx));
+                }
+                // S10: the followed jobs, when they changed
+                let jobs = HubEv::Jobs { project: self.project(), items: proto_view::jobs(v) };
+                let j = jobs.encode();
+                if j != self.proto.jobs {
+                    self.proto.jobs = j;
+                    for id in &ids {
+                        self.proto_send(*id, &jobs);
+                    }
                 }
                 // an agent came, went, started or ended a turn: its
                 // worktree may have changed (commits, files)

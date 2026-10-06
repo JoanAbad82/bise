@@ -1,7 +1,7 @@
 """A version rollback after bise desktop S2 (architect m_8524 c.): an older
 sb-core replays a journal that a newer one wrote, with the cross-hub kinds
-(x_out, x_acked, x_failed, x_settled, x_in, x_replied) and the timers'
-acts (act_set, act_done) in it. It skips each of them (they are reported
+(x_out, x_acked, x_failed, x_settled, x_in, x_replied), the timers'
+acts (act_set, act_done) and S10's follow and job_end in it. It skips each of them (they are reported
 as skipped, never misread) and rebuilds the rest of the state.
 
     python3 -u tests/old_core_replay.py [<base sha>]   (default: HEAD~1)
@@ -41,8 +41,11 @@ FIXTURE = [
     msg(3, "@bise", "main"),
     {"type": "x_replied", "hub": "home-1", "xid": 7},
     {"type": "message_settled", "id": 3},
+    # bise desktop S10: a follow and its job's end
+    {"type": "follow", "name": "perf", "on": True},
+    {"type": "job_end", "name": "perf", "state": "done"},
 ]
-NEW = [i for i, e in enumerate(FIXTURE) if e["type"].startswith(("x_", "act_"))]
+NEW = [i for i, e in enumerate(FIXTURE) if e["type"].startswith(("x_", "act_")) or e["type"] in ("follow", "job_end")]
 
 
 def main():

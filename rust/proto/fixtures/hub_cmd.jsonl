@@ -22,3 +22,5 @@
 {"cmd":"route_correct","project":"bise-home-00000000","rid":3,"to":"shop-5e6f7a8b"}
 {"cmd":"route_cancel","project":"bise-home-00000000","rid":3}
 {"cmd":"merged","project":"acme-1a2b3c4d"}
+{"cmd":"follow","project":"acme-1a2b3c4d","agent":"perf","on":true}
+{"cmd":"follow","project":"acme-1a2b3c4d","agent":"perf","on":false}

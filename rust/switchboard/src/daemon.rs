@@ -635,7 +635,7 @@ impl Shell {
         self.refresh_models();
         // main hears it as a report of the task (its spawn answer named the
         // model it asked), and the task's turn starts again on the default
-        let report = AgentReq::Report { kind: "progress".into(), summary: text.clone(), decisions: Vec::new() };
+        let report = AgentReq::Report { kind: "progress".into(), summary: text.clone(), decisions: Vec::new(), step: None, result: None };
         self.step(Input::Agent { token: 0, from: agent.to_string(), req: report });
         self.step(Input::Agent {
             token: 0,
@@ -1263,6 +1263,7 @@ impl Shell {
                 let project = self.project();
                 self.proto_route(bise_proto::hub::HubEv::Route { project, rid, to, name, text, correct_until_ms: due_ms, why })
             }
+            Effect::JobEnd { agent, state, label, summary } => self.job_end(agent, &state, label, summary),
             Effect::RouteDone { rid, state, to, xid } => {
                 let project = self.project();
                 self.proto_route(bise_proto::hub::HubEv::RouteDone { project, rid, state, to, xid })
@@ -2233,6 +2234,10 @@ impl Shell {
             "inspect" if xread::wanted(cmd, &v) => {
                 write_json(&mut stream, &self.xinspect(&v));
             }
+            // S10: bise's `sb follow <p>/<agent>`: on that project's hub
+            "follow" if crate::paths::is_home(&self.opts.paths.workspace) && v["agent"].as_str().is_some_and(|a| a.contains('/')) => {
+                self.xfollow(stream, &v);
+            }
             "history" | "show" if xread::wanted(cmd, &v) => {
                 write_json(&mut stream, &self.xsearch(cmd, &v));
             }
@@ -2344,7 +2349,7 @@ fn accept_loop(listener: UnixListener, tx: Sender<Msg>) {
                 Some("version") => {
                     let _ = tx.send(Msg::Version { stream, v });
                 }
-                Some("xin" | "xreply") => {
+                Some("xin" | "xreply" | "xfollow") => {
                     let _ = tx.send(Msg::XHub { token: id, stream, v });
                 }
                 Some("notice") => {

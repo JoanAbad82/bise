@@ -4564,6 +4564,49 @@ law route_fire_makes_no_turn:
   for +r: HXH.Route
   {HC.route_fire(o, Some{r}, cx) == HC.route_fire.sent(o, HC.route_said(o, cx, r), r, HM.St.next_msg(HC.st(o, cx))) : HX.Cx<o>}
 
+# ---- followed jobs (desktop S10, core.bend's `followed jobs`) ----
+
+# LAW: before its end a followed task's progress makes no job_end: a
+# progress report changes nothing but the report itself.
+law follow_quiet_before_end:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +from: String
+  for +summary: String
+  {HC.req_report.kind(o, cx, from, "progress", summary) == cx : HX.Cx<o>}
+
+# LAW: its done ends the job in the same step (job_end when followed).
+law follow_done_at_its_report:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +from: String
+  for +summary: String
+  {HC.req_report.kind(o, cx, from, "done", summary) == HC.job_end(o, HC.report_done(o, cx, from), from, "done", summary) : HX.Cx<o>}
+
+# LAW: a failure ends it at once, in the same step as the failure.
+law follow_failed_at_once:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +from: String
+  for +summary: String
+  {HC.req_report.kind(o, cx, from, "failed", summary) == HC.job_end(o, HC.report_failed(o, cx, from, summary), from, "failed", summary) : HX.Cx<o>}
+
+# LAW: an agent not followed has no job_end (so a second end of the same
+# job, after the first turned follow off, says nothing).
+law follow_done_once:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +name: String
+  for +state: String
+  for +summary: String
+  for +label: String
+  {HC.job_end.go(o, False{}, cx, name, state, summary, label) == cx : HX.Cx<o>}
+
+# LAW (architect m_9154): one job per follow: job_end turns follow off.
+law follow_one_shot:
+  for +a: HM.Agent
+  {HM.Agent.follow(HM.agent_op(a, HM.OFollow{False{}})) == False{} : Bool}
+
 # LAW (one clock): an act fires once: after its act_done, it is gone.
 law act_fires_once:
   for +tm: HTM.Tms

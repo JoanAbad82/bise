@@ -53,6 +53,13 @@ impl Shell {
                 };
                 self.step(Input::XIn { token, hub: s("hub"), xid, kind: s("kind"), text });
             }
+            // S10: bise's `sb follow <p>/<agent>`: main's follow here, its
+            // answer (ok or why not) back to bise's hub at once
+            "xfollow" => {
+                self.replies.insert(token, stream);
+                let req = crate::core::AgentReq::Follow { agent: s("agent"), on: v.get("on").and_then(Value::as_bool).unwrap_or(true) };
+                self.step(Input::Agent { token, from: crate::model::MAIN.into(), req });
+            }
             _ => {
                 self.step(Input::XReply { xid, name: s("name"), text: s("text") });
                 write_json(&mut stream, &json!({"ok": true}));
@@ -80,6 +87,46 @@ impl Shell {
                 }
             };
             let _ = tx.send(Msg::In(input));
+        });
+    }
+
+    /// S10, bise's home hub: `sb follow <p>/<agent> [--off]` (main only):
+    /// the project's hub follows its task (started first when stopped);
+    /// a command, not a message: no outbox, its answer or its failure
+    /// comes back to main at once (on a thread: the hub never waits).
+    pub(super) fn xfollow(&mut self, mut stream: UnixStream, v: &Value) {
+        let from = v.get("from").and_then(Value::as_str).unwrap_or("");
+        let target = v.get("agent").and_then(Value::as_str).unwrap_or("");
+        let on = !v.get("off").and_then(Value::as_bool).unwrap_or(false);
+        if from != crate::model::MAIN {
+            write_json(&mut stream, &json!({"ok": false, "error": "only main follows a task: ask main"}));
+            return;
+        }
+        let (p, agent) = match super::xread::split_ref(target) {
+            Ok(x) => x,
+            Err(e) => {
+                write_json(&mut stream, &json!({"ok": false, "error": e}));
+                return;
+            }
+        };
+        let own = crate::paths::workspace_id(&self.opts.paths.workspace);
+        let home = bise_home::Home::from_env();
+        let rows = bise_home::projects::list(&home, &crate::paths::home_workspace());
+        let id = match bise_home::projects::target(&rows, &p, &own) {
+            Ok(id) => id,
+            Err(e) => {
+                write_json(&mut stream, &json!({"ok": false, "error": e}));
+                return;
+            }
+        };
+        let (exe, root) = (self.opts.exe.clone(), self.opts.app_root.clone());
+        std::thread::spawn(move || {
+            let req = json!({"op": "xfollow", "agent": agent, "on": on});
+            let body = match hub_paths(&id).and_then(|paths| call(&paths, &exe, &root, &req)) {
+                Ok(_) => json!({"ok": true, "agent": format!("{p}/{agent}"), "on": on}),
+                Err(e) => json!({"ok": false, "error": format!("{p}: {e}")}),
+            };
+            write_json(&mut stream, &body);
         });
     }
 

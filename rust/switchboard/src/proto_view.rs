@@ -6,7 +6,7 @@
 
 use bise_proto::rows::{question, Agent, Artifact, Card, CardPage, Report, ReportKind, Status};
 use bise_proto::diff::{DiffFile, DiffLine, Hunk, LineKind};
-use bise_proto::hub::HubEv;
+use bise_proto::hub::{HubEv, Job as Followed, JobState};
 use bise_proto::thread::{self, Ctx, Entry, Line};
 use bise_proto::Pos;
 use serde_json::Value;
@@ -87,6 +87,29 @@ pub fn agents(snap: &Value, since: &mut Since, now: u64, user_kind: fn(&str) -> 
     }
     since.retain(|n, _| out.iter().any(|a| &a.name == n));
     out
+}
+
+/// S10: the followed agents of a hub snapshot, each a running job: its
+/// last progress (else its objective), `--step n/m`, since its last
+/// report (else its creation). A follow ends with its job (job_end), so
+/// every row runs.
+pub fn jobs(snap: &Value) -> Vec<Followed> {
+    let list = snap.get("agents").and_then(Value::as_array).cloned().unwrap_or_default();
+    let n = |a: &Value, k: &str| a.get(k).and_then(Value::as_u64).and_then(|x| u32::try_from(x).ok());
+    list.iter()
+        .filter(|a| a.get("follow").and_then(Value::as_bool).unwrap_or(false))
+        .map(|a| {
+            let progress = Some(s(a, "report")).filter(|r| !r.is_empty() && s(a, "report_kind") == "progress");
+            Followed {
+                agent: s(a, "name"),
+                label: thread::one_line(&progress.unwrap_or_else(|| s(a, "objective")), 120),
+                step: n(a, "step"),
+                of: n(a, "of"),
+                state: JobState::Running,
+                since_ms: ms(a, "report_ms").or(ms(a, "created_ms")).unwrap_or(0),
+            }
+        })
+        .collect()
 }
 
 /// His cards: the user's kinds, bise's own bookkeeping (a `drop`) left

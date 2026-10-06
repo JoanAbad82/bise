@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "diff", "error")
+TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "diff", "jobs", "job_end", "error")
 FIXTURES = os.path.join(e2e.ROOT, "rust", "proto", "fixtures", "hub_ev.jsonl")
 
 
@@ -72,6 +72,9 @@ def main():
         main_row = [a for a in agents["agents"] if a["name"] == "main"]
         check(agents["project"] == project and main_row and main_row[0]["main"], "agents: %r" % agents)
         check(typed(c, "cards")[0]["cards"] == [], "no cards yet")
+        # S10: the followed jobs at hello: none yet
+        c.wait(lambda: typed(c, "jobs"), 20, "jobs at hello")
+        check(typed(c, "jobs")[0]["items"] == [] and typed(c, "jobs")[0]["project"] == project, "no job yet: %r" % typed(c, "jobs"))
         c.wait(lambda: typed(c, "artifacts"), 20, "the artifacts at hello")
         check(typed(c, "artifacts")[0]["items"] == [] and typed(c, "artifacts")[0]["project"] == project, "no artifact yet")
 
@@ -90,6 +93,9 @@ def main():
             # error), a target not in the registry (never stepped)
             ({"cmd": "route_cancel", "project": project, "rid": 99}, "route_cancel"),
             ({"cmd": "route_correct", "project": project, "rid": 99, "to": "nope-00000000"}, "route_correct"),
+            # S10: main isn't a job, an unknown agent can't be followed
+            ({"cmd": "follow", "project": project, "agent": "main", "on": True}, "follow"),
+            ({"cmd": "follow", "project": project, "agent": "nobody", "on": True}, "follow"),
         ]
         for i, (cmd, tag) in enumerate(refused):
             c.send(cmd)

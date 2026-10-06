@@ -1956,6 +1956,10 @@ def hub_apply_unique(s: HM.St, e: HM.Ev, u: HI.Unique(s), k: HX.FreshEv(s, e)) -
           u
         case HM.EAct{a}:
           u
+        case HM.EFollow{a, b}:
+          u
+        case HM.EJobEnd{a, b}:
+          u
 
 def hub_apply_all_unique(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.Unique(s), f: HX.Fresh(evs, s)) -> HI.Unique(HM.apply_all(evs, s)):
   match evs:
@@ -2070,6 +2074,10 @@ def hub_apply_kept(s: HM.St, e: HM.Ev) -> HI.Kept(s, HM.apply(s, e)):
         case HM.EX{a}:
           hub_prefix_refl(HI.ids(ms))
         case HM.EAct{a}:
+          hub_prefix_refl(HI.ids(ms))
+        case HM.EFollow{a, b}:
+          hub_prefix_refl(HI.ids(ms))
+        case HM.EJobEnd{a, b}:
           hub_prefix_refl(HI.ids(ms))
 
 def hub_apply_all_kept(+evs: List<&2, HM.Ev>, +s: HM.St) -> HI.Kept(s, HM.apply_all(evs, s)):
@@ -2895,6 +2903,10 @@ def hub_apply_ucards(s: HM.St, e: HM.Ev, u: HI.UniqueCards(s), k: HX.FreshEv(s, 
         case HM.EX{a}:
           u
         case HM.EAct{a}:
+          u
+        case HM.EFollow{a, b}:
+          u
+        case HM.EJobEnd{a, b}:
           u
 
 def hub_apply_all_ucards(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.UniqueCards(s), f: HX.Fresh(evs, s)) -> HI.UniqueCards(HM.apply_all(evs, s)):
@@ -3916,6 +3928,8 @@ def hub_names_op(h: HM.Agent, op: HM.AgentOp, nr: {hub_is_rename(op) == False{} 
           {==}
         case HM.OReport{x}:
           {==}
+        case HM.OFollow{x}:
+          {==}
 
 def hub_prof_map.pick(c: Bool, +h: HM.Agent, +t: List<&2, HM.Agent>, +n: String, +op: HM.AgentOp, +e: {String.eq(HM.Agent.name(h), n) == c : Bool},
     +nr: {hub_is_rename(op) == False{} : Bool}, ih: {HI.profile(HM.map_agent(t, n, op)) == HI.profile(t) : List<&2, List<&2, String>>})
@@ -4267,6 +4281,10 @@ def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e
           u
         case HM.EAct{a}:
           u
+        case HM.EFollow{+x, +f}:
+          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OFollow{f})), HI.profile(ag), hub_prof_map(ag, x, HM.OFollow{f}, {==}), u)
+        case HM.EJobEnd{+x, b}:
+          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OFollow{False{}})), HI.profile(ag), hub_prof_map(ag, x, HM.OFollow{False{}}, {==}), u)
 
 def hub_apply_all_names(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.NamesApart(s), f: HX.Fresh(evs, s)) -> HI.NamesApart(HM.apply_all(evs, s)):
   match evs:
@@ -5185,6 +5203,23 @@ def Laws.route_fires_at_due_only(x, tm, text, via, to, name, why, now, context):
 
 def Laws.route_fire_makes_no_turn(o, cx, r):
   {==}
+
+def Laws.follow_quiet_before_end(o, cx, from, summary):
+  {==}
+
+def Laws.follow_done_at_its_report(o, cx, from, summary):
+  {==}
+
+def Laws.follow_failed_at_once(o, cx, from, summary):
+  {==}
+
+def Laws.follow_done_once(o, cx, name, state, summary, label):
+  {==}
+
+def Laws.follow_one_shot(a):
+  match a:
+    case HM.Agent{n, im, pa, li, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
+      {==}
 
 def hub_act_gone.go(c: Bool, +h: HTM.Act, +t: List<&2, HTM.Act>, +id: Nat, +e: {Nat.is_eq(HTM.Act.id(h), id) == c : Bool},
     ih: {HTM.act_find(HTM.act_drop(t, id), id) == None{} : Maybe<&2, HTM.Act>})

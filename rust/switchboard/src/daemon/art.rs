@@ -275,6 +275,9 @@ impl Shell {
             Some(c) => self.diff_ask(&json!({"agent": agent, "range": format!("{c}^..{c}")})),
             None => self.diff_ask(&json!({"agent": agent})),
         };
+        // emitter 5: what its change measured (`sb report --result`), from
+        // its latest report
+        let result = self.hub.st.agents.get(&agent).and_then(|a| a.last_report.as_ref()).and_then(|r| r.result.clone());
         let tx = self.tx.clone();
         std::thread::spawn(move || {
             let mut ev = diff_answer(ask, &shared, Value::Null);
@@ -290,8 +293,9 @@ impl Shell {
             }
             let mut typed = crate::proto_view::diff(&ev, &project, &agent);
             // the answer says which commit it is (not the live change)
-            if let bise_proto::hub::HubEv::Diff { commit: c, .. } = &mut typed {
+            if let bise_proto::hub::HubEv::Diff { commit: c, result: r, .. } = &mut typed {
                 *c = commit;
+                *r = result.and_then(|v| serde_json::from_value(v).ok()).map(Box::new);
             }
             let _ = tx.send(Msg::ToClient { id, v: typed.to_value() });
         });

@@ -86,6 +86,7 @@ type In is Data:
   IRouteHold{}
   IRouteCorrect{}
   IRouteCancel{}
+  IFollow{}
   INone{}
 
 type CardK is Data:
@@ -101,6 +102,7 @@ type Cmd is Data:
   CAsk{}
   CStatus{}
   CReport{}
+  CFollow{}
   CSpawn{}
   CInterrupt{}
   CStop{}
@@ -2531,6 +2533,91 @@ def req_status(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +is_main: Boo
     u => notify_main(o, cx2, cat(["@", from, " is blocked: ", Bool.pick(String, String.is_empty(note), "(no note)", note)])), u => cx2)
   reply(o, cx3, token, ok_body(Nil{}))
 
+# ---- followed jobs (bise desktop S10) ----
+# Someone (his main, the window) follows a task: when it ends, done or
+# failed, the hub says so once (fx job_end, for his notification) and the
+# follow ends with it (one job per follow: law follow_one_shot). Before
+# its end, a followed task's reports make no job_end (law
+# follow_quiet_before_end); its progress (`sb report progress --step n/m`)
+# only moves the `jobs` rows.
+
+# the job's name: the task's objective, one line
+def job_label(+a: M.Agent) -> String:
+  M.clip(M.one_line(J.get_str_or(M.Agent.brief(a), "objective", "")), 120n)
+
+def job_end.go(-o: M.St, f: Bool, +cx: X.Cx<o>, +name: String, +state: String, +summary: String, +label: String) -> X.Cx<o>:
+  match f:
+    case True{}:
+      +cx2 = emit(o, cx, M.EJobEnd{name, state}, Unit{}, Unit{}, Unit{})
+      out(o, cx2, [J.kv("fx", J.JStr{"job_end"}), J.kv("agent", J.JStr{name}), J.kv("state", J.JStr{state}),
+        J.kv("label", J.JStr{label}), J.kv("summary", J.JStr{summary})])
+    case False{}:
+      cx
+
+def job_end.of(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String, +state: String, +summary: String) -> X.Cx<o>:
+  match m:
+    case None{}:
+      cx
+    case Some{+a}:
+      job_end.go(o, M.Agent.follow(a), cx, name, state, summary, job_label(a))
+
+# a task's end (done, failed): its job_end when followed, once (laws
+# follow_done_once, follow_failed_at_once)
+def job_end(-o: M.St, +cx: X.Cx<o>, +name: String, +state: String, +summary: String) -> X.Cx<o>:
+  job_end.of(o, M.get_agent(st(o, cx), name), cx, name, state, summary)
+
+def is_archived_life(l: M.Life) -> Bool:
+  match l:
+    case M.LArchived{}:
+      True{}
+    case _:
+      False{}
+
+def follow_err.of(m: Maybe<&2, M.Agent>, +name: String) -> Maybe<&2, String>:
+  match m:
+    case None{}:
+      Some{cat(["no agent named @", name])}
+    case Some{+a}:
+      Bool.pick(Maybe<&2, String>, M.Agent.is_main(a), Some{"main isn't a job: follow one of its tasks"},
+        Bool.pick(Maybe<&2, String>, is_archived_life(M.Agent.life(a)), Some{cat(["@", name, " is archived"])}, None{}))
+
+# who can be followed: a task of this hub, not main, not archived
+def follow_err(+s: M.St, +name: String) -> Maybe<&2, String>:
+  follow_err.of(M.get_agent(s, name), name)
+
+def follow_set(-o: M.St, +cx: X.Cx<o>, +name: String, +on: Bool) -> X.Cx<o>:
+  emit(o, cx, M.EFollow{name, on}, Unit{}, Unit{}, Unit{})
+
+# the input follow (the window's typed command, or bise's `sb follow
+# <p>/<agent>` on this hub's socket): an error is the asker's notice
+def follow_in(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +on: Bool) -> X.Cx<o>:
+  match err:
+    case Some{+e}:
+      notice(o, cx, e)
+    case None{}:
+      follow_set(o, cx, name, on)
+
+def req_follow.go(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +name: String, +on: Bool) -> X.Cx<o>:
+  match err:
+    case Some{+e}:
+      reply_err(o, cx, token, e)
+    case None{}:
+      reply(o, follow_set(o, cx, name, on), token, ok_body([J.kv("agent", J.JStr{name}), J.kv("on", J.JBool{on})]))
+
+# `sb follow <agent> [--off]`: main only (his say-so goes through main)
+def req_follow(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
+  +name = C.get_s(q, "agent")
+  req_follow.go(o,
+    Bool.pick(Maybe<&2, String>, String.eq(from, M.MAIN()), follow_err(st(o, cx), name), Some{"only main follows a task: ask main"}),
+    cx, token, name, Bool.not(C.get_b(q, "off")))
+
+# the report's done and failed: their state change, then the job's end
+def report_done(-o: M.St, +cx: X.Cx<o>, +from: String) -> X.Cx<o>:
+  emit(o, cx, M.EDeclared{from, Some{M.DDone{}}, ""}, Unit{}, Unit{}, Unit{})
+
+def report_failed(-o: M.St, +cx: X.Cx<o>, +from: String, +summary: String) -> X.Cx<o>:
+  emit(o, cx, M.ELifecycle{from, M.LFailed{}, Some{summary}}, Unit{}, Unit{}, Unit{})
+
 def report_lines(xs: List<&2, String>) -> List<&2, String>:
   match xs:
     case Nil{}:
@@ -2552,11 +2639,11 @@ def req_report.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat) -> X.Cx<o>:
 
 def req_report.kind(-o: M.St, +cx: X.Cx<o>, +from: String, +kind: String, +summary: String) -> X.Cx<o>:
   pick_lazy(X.Cx<o>, String.eq(kind, "done"),
-    u => emit(o, cx, M.EDeclared{from, Some{M.DDone{}}, ""}, Unit{}, Unit{}, Unit{}),
+    u => job_end(o, report_done(o, cx, from), from, "done", summary),
     u => pick_lazy(X.Cx<o>, String.eq(kind, "blocked"),
       u => emit(o, cx, M.EDeclared{from, Some{M.DBlocked{}}, summary}, Unit{}, Unit{}, Unit{}),
       u => pick_lazy(X.Cx<o>, String.eq(kind, "failed"),
-        u => emit(o, cx, M.ELifecycle{from, M.LFailed{}, Some{summary}}, Unit{}, Unit{}, Unit{}),
+        u => job_end(o, report_failed(o, cx, from, summary), from, "failed", summary),
         u => cx)))
 
 def req_report.go(-o: M.St, is_main: Bool, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
@@ -2567,8 +2654,12 @@ def req_report.go(-o: M.St, is_main: Bool, +cx: X.Cx<o>, +token: Nat, +from: Str
       +kind = C.get_s(q, "kind")
       +summary = C.get_s(q, "summary")
       +decisions = jstr_list(Maybe.default(&2, List<&2, J.Json>, J.get_arr(q, "decisions"), Nil{}))
+      # S10: a progress's --step n/m; emitter 5: its --result (proto's
+      # DiffResult, checked by the CLI); null when absent
       +cx2 = emit(o, cx, M.EReported{from, J.obj([J.kv("at_ms", J.JNum{now(o, cx)}), J.kv("kind", J.JStr{kind}),
-        J.kv("summary", J.JStr{summary}), J.kv("decisions", J.JArr{jstrs(decisions)}), J.kv("auto", J.JBool{False{}})])}, Unit{}, Unit{}, Unit{})
+        J.kv("summary", J.JStr{summary}), J.kv("decisions", J.JArr{jstrs(decisions)}), J.kv("auto", J.JBool{False{}}),
+        J.kv("step", Maybe.default(&2, J.Json, J.get(q, "step"), J.JNull{})), J.kv("of", Maybe.default(&2, J.Json, J.get(q, "of"), J.JNull{})),
+        J.kv("result", Maybe.default(&2, J.Json, J.get(q, "result"), J.JNull{}))])}, Unit{}, Unit{}, Unit{})
       +cx3 = req_report.kind(o, cx2, from, kind, summary)
       +parent = Maybe.default(&2, String, parent_of(M.get_agent(st(o, cx3), from)), M.MAIN())
       +to = Bool.pick(String, String.eq(parent, M.USER()), M.MAIN(), parent)
@@ -2728,6 +2819,7 @@ def cmd_tag(+c: String) -> Cmd:
   Bool.pick(Cmd, String.eq(c, "ask"), CAsk{},
   Bool.pick(Cmd, String.eq(c, "status"), CStatus{},
   Bool.pick(Cmd, String.eq(c, "report"), CReport{},
+  Bool.pick(Cmd, String.eq(c, "follow"), CFollow{},
   Bool.pick(Cmd, String.eq(c, "spawn"), CSpawn{},
   Bool.pick(Cmd, String.eq(c, "interrupt"), CInterrupt{},
   Bool.pick(Cmd, String.eq(c, "stop"), CStop{},
@@ -2739,7 +2831,7 @@ def cmd_tag(+c: String) -> Cmd:
   Bool.pick(Cmd, String.eq(c, "move"), CMove{},
   Bool.pick(Cmd, String.eq(c, "withdraw"), CWithdraw{},
   Bool.pick(Cmd, String.eq(c, "project_send"), CProjectSend{},
-  Bool.pick(Cmd, String.eq(c, "project_ask"), CProjectAsk{}, CCard{})))))))))))))))))
+  Bool.pick(Cmd, String.eq(c, "project_ask"), CProjectAsk{}, CCard{}))))))))))))))))))
 
 def req.main.go(-o: M.St, c: Cmd, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
   match c:
@@ -2789,6 +2881,8 @@ def req.go(-o: M.St, c: Cmd, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Jso
       req_status(o, cx, token, from, String.eq(from, M.MAIN()), q)
     case CReport{}:
       req_report.go(o, String.eq(from, M.MAIN()), cx, token, from, q)
+    case CFollow{}:
+      req_follow(o, cx, token, from, q)
     case other:
       req.main(o, String.eq(from, M.MAIN()), cx, token, other, q)
 
@@ -2932,7 +3026,7 @@ def crash.restart(-o: M.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: Stri
 
 def crash.fail(-o: M.St, +cx: X.Cx<o>, +agent: String, +n: Nat, +reason: String) -> X.Cx<o>:
   +why = cat(["the REPL crashed ", ns(n), " times: ", reason])
-  +cx2 = emit(o, cx, M.ELifecycle{agent, M.LFailed{}, Some{why}}, Unit{}, Unit{}, Unit{})
+  +cx2 = job_end(o, emit(o, cx, M.ELifecycle{agent, M.LFailed{}, Some{why}}, Unit{}, Unit{}, Unit{}), agent, "failed", why)
   +cx3 = line(o, cx2, M.MAIN(), "warn", cat(["@", agent, " failed: ", why]))
   pick_lazy(X.Cx<o>, String.eq(agent, M.MAIN()), u => cx3,
     u => notify_main(o, cx3, cat(["agent @", agent, " failed: ", why, ". It is not restarted anymore. A new message from you or the user restarts it; otherwise tell the user."])))
@@ -3183,7 +3277,9 @@ def in_tag(+t: String) -> In:
   Bool.pick(In, String.eq(t, "route_hold"), IRouteHold{},
   Bool.pick(In, String.eq(t, "route_correct"), IRouteCorrect{},
   Bool.pick(In, String.eq(t, "route_cancel"), IRouteCancel{},
-  INone{}))))))))))))))))))))))))))))))))))))))))))
+  # S10: follow a task (the window's typed command, bise's sb follow)
+  Bool.pick(In, String.eq(t, "follow"), IFollow{},
+  INone{})))))))))))))))))))))))))))))))))))))))))))
 
 # `/close N`: the user files a card without answering it
 def close_by_user(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
@@ -3293,6 +3389,8 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
       route_correct(o, cx, C.get_nat(i, "rid"), C.get_s(i, "to"), C.get_s(i, "name"))
     case IRouteCancel{}:
       route_cancel(o, cx, C.get_nat(i, "rid"))
+    case IFollow{}:
+      follow_in(o, follow_err(st(o, cx), C.get_s(i, "agent")), cx, C.get_s(i, "agent"), C.get_b(i, "on"))
     case INone{}:
       cx
 

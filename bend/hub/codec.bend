@@ -181,6 +181,11 @@ def ev_json(e: M.Ev) -> J.Json:
       x_json(xe)
     case M.EAct{+ae}:
       act_ev_json(ae)
+    # bise desktop S10 (an older sb-core reads these as unknown: skipped)
+    case M.EFollow{+name, +on}:
+      J.obj([ty("follow"), J.kv("name", J.JStr{name}), J.kv("on", J.JBool{on})])
+    case M.EJobEnd{+name, +state}:
+      J.obj([ty("job_end"), J.kv("name", J.JStr{name}), J.kv("state", J.JStr{state})])
 
 # ---- decoding (the journal replayed at boot) ----
 
@@ -271,6 +276,8 @@ type EvK is Data:
   KRouteSet{}
   KRouteSent{}
   KRouteCancelled{}
+  KFollow{}
+  KJobEnd{}
   KUnknown{}
 
 def ev_kind.x(+t: String) -> EvK:
@@ -286,7 +293,9 @@ def ev_kind.x(+t: String) -> EvK:
   Bool.pick(EvK, String.eq(t, "route_set"), KRouteSet{},
   Bool.pick(EvK, String.eq(t, "route_sent"), KRouteSent{},
   Bool.pick(EvK, String.eq(t, "route_cancelled"), KRouteCancelled{},
-  KUnknown{}))))))))))))
+  Bool.pick(EvK, String.eq(t, "follow"), KFollow{},
+  Bool.pick(EvK, String.eq(t, "job_end"), KJobEnd{},
+  KUnknown{}))))))))))))))
 
 def ev_kind(+t: String) -> EvK:
   Bool.pick(EvK, String.eq(t, "task_created"), KTaskCreated{},
@@ -407,6 +416,10 @@ def ev_of.kind(k: EvK, +j: J.Json, +n: String) -> Maybe<&2, M.Ev>:
       Some{M.EAct{TM.ActSet{act_of(get_j(j, "act"))}}}
     case KActDone{}:
       Some{M.EAct{TM.ActDone{get_nat(j, "id")}}}
+    case KFollow{}:
+      Some{M.EFollow{get_s(j, "name"), get_b(j, "on")}}
+    case KJobEnd{}:
+      Some{M.EJobEnd{get_s(j, "name"), get_s(j, "state")}}
     case KRouteHeld{}:
       Some{M.EX{XH.XRouteHeld{route_of(get_j(j, "route"))}}}
     case KRouteSet{}:
