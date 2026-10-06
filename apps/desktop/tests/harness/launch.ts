@@ -88,26 +88,38 @@ const killTree = (pid: number | undefined): void => {
   try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
 };
 
+/** A window's surface: its URL's ?surface= (amb-mac 968e69a9), else window.bise.surface (b9f1fc04), '' elsewhere. */
+const surfaceOf = (p: Page): Promise<string> => {
+  const fromUrl = /[?&]surface=([a-z]+)/.exec(p.url())?.[1];
+  if (fromUrl) return Promise.resolve(fromUrl);
+  return p.evaluate(() => (window as unknown as { bise?: { surface?: string } }).bise?.surface ?? '').catch(() => '');
+};
+
 /**
- * The app's main window: the largest of its windows once they stop appearing (the new app also
- * opens a 640x120 panel, and firstWindow() may give either). Other windows: session.app.windows().
+ * The page of one surface ('window' = the main window, 'capsule'), waiting up to `timeoutMs` for
+ * it: the new app opens both, and app.firstWindow() may give either (a 666x24 capsule shot,
+ * amb-win m_9672). Pages without window.bise (the old UI) fall back to the largest window.
  */
-async function mainWindow(app: ElectronApplication): Promise<Page> {
+export async function surfacePage(app: ElectronApplication, surface = 'window', timeoutMs = 5000): Promise<Page> {
   await app.firstWindow();
-  let n = -1;
-  for (let i = 0; i < 10 && app.windows().length !== n; i++) {
-    n = app.windows().length;
-    await new Promise((r) => setTimeout(r, 150));
+  const end = Date.now() + timeoutMs;
+  for (;;) {
+    let largest: Page | undefined, area = -1, anyBise = false;
+    for (const p of app.windows()) {
+      await p.waitForLoadState('load').catch(() => undefined);
+      const s = await surfaceOf(p);
+      if (s === surface) return p;
+      if (s) anyBise = true;
+      const a = await p.evaluate(() => window.innerWidth * window.innerHeight).catch(() => -1);
+      if (a > area) { area = a; largest = p; }
+    }
+    if (!anyBise && largest && surface === 'window' && Date.now() > end - timeoutMs + 600) return largest;
+    if (Date.now() > end) throw new Error(`no '${surface}' window in ${timeoutMs} ms`);
+    await new Promise((r) => setTimeout(r, 100));
   }
-  let best: Page | undefined, area = -1;
-  for (const p of app.windows()) {
-    await p.waitForLoadState('load');
-    const a = await p.evaluate(() => window.innerWidth * window.innerHeight);
-    if (a > area) { area = a; best = p; }
-  }
-  if (!best) throw new Error('the app opened no window');
-  return best;
 }
+
+const mainWindow = (app: ElectronApplication): Promise<Page> => surfacePage(app, 'window');
 
 async function start(args: string[], env: Record<string, string>, o: LaunchOptions): Promise<Session> {
   watcherBinary(); // compiled before the app starts, so the watch starts within ms of the launch
@@ -125,11 +137,6 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
     watch = new Watch(pid ?? -1, (why) => { stopped = why; killTree(pid); });
     await installGuards(app);
     const page = await mainWindow(app);
-    if (o.route !== undefined) {
-      // the window reads its start route from '#route=…' at start (amb-win fd85a165)
-      await page.evaluate((r) => { location.hash = `route=${encodeURIComponent(r)}`; location.reload(); }, o.route);
-      await page.waitForLoadState('load');
-    }
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     const proof = await prove(app, watch);

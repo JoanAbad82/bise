@@ -17,17 +17,22 @@
 /** The first part of every id: the screen or chunk it belongs to (the src/ folders, plus shared parts). */
 export const AREAS = [
   'app', 'composer', 'spotlight', 'pearl', 'thread', 'inbox', 'agents', 'review', 'setup', 'settings',
-  'ds', 'sidebar', 'panel', 'menu', 'find', 'keys', 'capsule', 'card', 'fixture',
+  'ds', 'sidebar', 'panel', 'menu', 'find', 'keys', 'capsule', 'card', 'fixture', 'lab',
 ];
 
-const PART = '[a-z0-9]+(?:-[a-z0-9]+)*';
-export const ID_RE = new RegExp(`^${PART}(?:\\.${PART})+$`);
-const PREFIX_RE = new RegExp(`^${PART}(?:\\.${PART})*\\.?$`);
+// the area: lowercase kebab-case; the parts after it may also hold '_' (a pref key, an id from data)
+const AREA = '[a-z0-9]+(?:-[a-z0-9]+)*';
+const PART = '[a-z0-9_]+(?:-[a-z0-9_]+)*';
+export const ID_RE = new RegExp(`^${AREA}(?:\\.${PART})*$`);
+const PREFIX_RE = new RegExp(`^${AREA}(?:\\.${PART})*\\.?$`);
 
-/** Why a literal id is wrong, or null when it's fine (pure: unit-tested in lint/testid.test.mjs). */
+/**
+ * Why a literal id is wrong, or null when it's fine (pure; self/lint.spec.ts). A known area alone
+ * names a surface's root (testId="composer": its parts become composer.<x> through sub()).
+ */
 export function badId(id, { prefix = false } = {}) {
-  const ok = prefix ? PREFIX_RE.test(id) && id.includes('.') : ID_RE.test(id);
-  if (!ok) return `'${id}' is not <area>.<thing>[.<id>] (lowercase, kebab-case parts, dots between)`;
+  const ok = prefix ? PREFIX_RE.test(id) : ID_RE.test(id);
+  if (!ok) return `'${id}' is not <area>.<thing>[.<id>] (lowercase parts, dots between, '-' or '_' inside a part after the area)`;
   const area = id.split('.')[0];
   if (!AREAS.includes(area)) return `'${id}': unknown area '${area}' (one of ${AREAS.join(', ')}; ask amb-tools to add one)`;
   return null;
@@ -72,10 +77,19 @@ const nameRule = {
 const presentRule = {
   meta: { type: 'problem', docs: { description: 'what a person can act on carries a test id' }, schema: [] },
   create(context) {
+    // components imported from a package (Lexical, a virtual list...) can't take testId: the
+    // element our code wraps around them carries it
+    const foreign = new Set();
     return {
+      ImportDeclaration(node) {
+        const from = String(node.source.value);
+        if (from.startsWith('.') || from.startsWith('@/')) return;
+        for (const s of node.specifiers) foreign.add(s.local.name);
+      },
       JSXOpeningElement(node) {
         if (node.name.type !== 'JSXIdentifier' && node.name.type !== 'JSXMemberExpression') return;
         const tag = node.name.type === 'JSXIdentifier' ? node.name.name : '';
+        if (node.name.type === 'JSXMemberExpression' || foreign.has(tag)) return;
         const native = /^[a-z]/.test(tag);
         const attrs = node.attributes;
         if (attrs.some((a) => a.type === 'JSXSpreadAttribute')) return;

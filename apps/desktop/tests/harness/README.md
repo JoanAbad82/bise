@@ -25,9 +25,9 @@ Run: `pnpm test:e2e` (self-tests + `tests/checks/**`), one worker. Ask amb-tools
 | fake microphone | `launch*({ micWav: 'x.wav' })` (Chromium's fake capture device) |
 | the scripted core | `launchDesktop({ core: new FakeCore() })`: its start world is every fixture of `rust/proto/fixtures` (or `new FakeCore([...events])`, or `'none'`). `core.send(ev)` sends more events, and `core.cmds()` / `core.waitCmd(pred)` read what the app sent the core (`fakes/core-stub.mjs`). Without it, the core stays `down`. |
 | the scripted Mac helper | `launchDesktop({ helper: new FakeHelper() })`: hello at start. `helper.send({ev:'fn',act:'talk_start',by:'fn'})` sends events, and `helper.cmds()` / `waitCmd` read the app's commands (`fakes/helper-stub.mjs`). Without it, there is no helper. |
-| a start screen | `launchDesktop({ route: 'inbox' })` (`#route=…`, read by the window in test mode) |
+| a start screen | `launchDesktop({ route: 'inbox' })` (BISE_DESKTOP_ROUTE, read by amb-mac's main in test mode) |
 
-The session's `page` is the app's main window (its largest). The other windows (the panel) are in `session.app.windows()`.
+The session's `page` is the app's main window (`window.bise.surface === 'window'`). Use `surfacePage(app, 'capsule')` for the capsule; any window is in `session.app.windows()`.
 `session.blocked()` lists what the guards stopped: new windows, navigations, windows that weren't offscreen.
 
 Focus emulation is on, so the caret is drawn even though the window is never focused.
