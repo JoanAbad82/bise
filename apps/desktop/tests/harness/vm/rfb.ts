@@ -4,7 +4,7 @@
 // menus' key equivalents and the key window see them), its frames are the guest's framebuffer.
 //   const v = await Rfb.connect(port, password);
 //   const png = await v.shot();              // the whole screen, a PNG
-//   await v.keys('Meta+Q');                  // ⌘Q: Meta = ⌘, Alt = ⌥, Control, Shift
+//   await v.keys('Meta+q');                  // ⌘Q: Meta (or Cmd) = ⌘, Alt (or Option) = ⌥, Control, Shift
 //   await v.type('hello');                   // characters, one key each
 //   await v.click(400, 300);                 // a left click at screen pixels
 // RFB 3.8, security None or VNC auth (des.ts), Raw encoding (+ DesktopSize), 32-bit BGRX.
@@ -16,7 +16,10 @@ import { vncAuthResponse } from './des';
 export const KEYSYMS: Record<string, number> = {
   Enter: 0xff0d, Return: 0xff0d, Tab: 0xff09, Escape: 0xff1b, Backspace: 0xff08, Delete: 0xffff, Space: 0x20,
   ArrowLeft: 0xff51, ArrowUp: 0xff52, ArrowRight: 0xff53, ArrowDown: 0xff54, Home: 0xff50, End: 0xff57, PageUp: 0xff55, PageDown: 0xff56,
-  Shift: 0xffe1, Control: 0xffe3, Alt: 0xffe9, Meta: 0xffe7, Super: 0xffeb,
+  // Virtualization's VNC server reads Alt_L (0xffe9) as ⌘ and Meta_L (0xffe7) as ⌥, the reverse of
+  // X11's names (probed on the tahoe guest: Meta_L+q typed 'œ', Alt_L+q quit TextEdit, Super_L is
+  // ignored). Our names follow the Mac: Meta = Cmd = ⌘, Alt = Option = ⌥.
+  Shift: 0xffe1, Control: 0xffe3, Meta: 0xffe9, Cmd: 0xffe9, Alt: 0xffe7, Option: 0xffe7,
   F1: 0xffbe, F2: 0xffbf, F3: 0xffc0, F4: 0xffc1, F5: 0xffc2, F6: 0xffc3, F7: 0xffc4, F8: 0xffc5, F9: 0xffc6, F10: 0xffc7, F11: 0xffc8, F12: 0xffc9,
 };
 
