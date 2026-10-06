@@ -51,6 +51,26 @@ export type LaunchOptions = {
  * offscreen rendering is destroyed at once; each is noted in __biseHarnessBlocked (Session.blocked()).
  */
 async function installGuards(app: ElectronApplication): Promise<void> {
+  // qa-type m_10036: 2 of ~10 launches failed here with Playwright's 'Cannot read properties of
+  // undefined (reading _object)'. A failed try is tried again while the app runs (up to 5, 0.1-0.5 s
+  // apart), and the last failure says whether the app was still alive or exited (and how).
+  for (let i = 1; ; i++) {
+    try {
+      await guardsOnce(app);
+      return;
+    } catch (e) {
+      const proc = app.process();
+      const gone = proc.exitCode !== null || proc.signalCode !== null;
+      if (gone || i >= 5) {
+        const state = gone ? `exited (code ${String(proc.exitCode)}, signal ${String(proc.signalCode)})` : 'still running';
+        throw new Error(`harness: the window guards didn't install (try ${i}, the app ${state}): ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
+      }
+      await new Promise((r) => setTimeout(r, 100 * i));
+    }
+  }
+}
+
+async function guardsOnce(app: ElectronApplication): Promise<void> {
   await app.evaluate(({ app: a, BrowserWindow, webContents }) => {
     const g = globalThis as unknown as { __biseHarnessBlocked?: string[] };
     if (g.__biseHarnessBlocked) return;
