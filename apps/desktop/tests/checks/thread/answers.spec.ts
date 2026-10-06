@@ -67,8 +67,11 @@ test('thread/answers: a 40-line markdown answer is drawn whole and readable', as
     // the answer's body (its markdown), not the author line and time above it; 12.95: a 13 px
     // font measures 12.99 after the box's scale
     const problems = await textProblems(page, `[data-testid="${id ?? ''}"] .th-md`, 12.95);
-    // offscreen is scrolling's business (checked above); clipped and tiny are not
-    const bad = problems.filter((p) => p.kind !== 'offscreen');
+    // offscreen is scrolling's business (checked above); clipped and tiny are not. A code block's
+    // head (its language label, copy) is chrome at desktop-ds' caption size, not body text
+    // (ambient-lead m_10059): the 13 px rule is for the prose, lists, code and links
+    const chrome = new Set((await entry.locator('.th-code-head').allInnerTexts()).flatMap((t) => t.split('\n').map((x) => x.trim()).filter(Boolean)));
+    const bad = problems.filter((p) => p.kind !== 'offscreen' && !(p.kind === 'tiny' && chrome.has(p.text)));
     if (bad.length) test.info().annotations.push({ type: 'problems', description: JSON.stringify(bad.slice(0, 10)) });
     expect.soft(bad, 'the answer: nothing clipped or under 13 px').toEqual([]);
   } finally {
