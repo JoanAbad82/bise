@@ -14,11 +14,14 @@
 
   // every open card, newest first (the inbox's order: "la plus récente en haut"), minus the ones
   // he answered a moment ago (the core's next `cards` drops them; until then they stay hidden)
+  // what he answered, by project and card: card ids are per hub (shop's #2 is not telemetry's #2;
+  // T1 run 4: answering telemetry #2 hid shop's approval #2 from its own dock)
+  const ak = (project, id) => `${project}#${id}`;
   function allCards(s) {
     const out = [];
     // bise's own hub counts even when no projects list names it (the single-hub core sends none)
     const ids = [...new Set([HOME, ...s.projects.map((p) => p.project)])];
-    for (const id of ids) for (const c of s.cards[id] || []) if (!(c.id in s.answered)) out.push({ ...c, project: c.project || id });
+    for (const id of ids) for (const c of s.cards[id] || []) if (!(ak(c.project || id, c.id) in s.answered)) out.push({ ...c, project: c.project || id });
     return out.sort((a, b) => (b.since_ms || 0) - (a.since_ms || 0) || String(a.id).localeCompare(String(b.id)));
   }
 
@@ -84,7 +87,7 @@
     const c = d.card;
     const wide = d.mode === "inbox" || s.route.project === HOME;
     const who = asker(s, c, wide);
-    const approval = c.kind === "approval" || c.kind === "merge" || c.kind === "confirm";
+    const approval = isApproval(c);
     const nav = d.list.length > 1 ? `${T(s, "n_of", { i: d.i + 1, n: d.list.length })}   ← →` : T(s, "n_of", { i: 1, n: 1 });
     const k = d.mode === "inbox" ? `${nav}${d.list.length > 1 ? T(s, "the_others") : ""}   ${T(s, "esc_back")}` : approval ? `${T(s, "approval")} · ${nav}` : nav;
     return {
@@ -113,8 +116,8 @@
     const from = e.from || c.agent || s.route.agent;
     const who = s.route.project === HOME ? `${project === HOME ? "bise" : pname(s, project)} · ${from}` : from;
     if (c.answered && c.by && c.by !== "you") return null; // main answered it: an "asked · i answered" line
-    if (c.id in s.answered) return T(s, "asked_answered_you", { who, a: s.answered[c.id] });
-    const open = allCards(s).some((x) => x.id === c.id);
+    if (ak(project, c.id) in s.answered) return T(s, "asked_answered_you", { who, a: s.answered[ak(project, c.id)] });
+    const open = allCards(s).some((x) => x.id === c.id && x.project === project);
     if (!open) return c.answered && c.answer ? T(s, "asked_answered_you", { who, a: c.answer }) : T(s, "asked_done", { who });
     // two forms only (ambient m_8298): its card is above the composer now, or ⌘I brings it
     const d = dock(s);
@@ -173,5 +176,5 @@
     return `❝ ${i + 1} “${clip(first, 48)}”  ${q.who}${q.at_ms && fmt ? ` ${fmt(q.at_ms)}` : ""}`;
   }
 
-  root.AmbWinDock = { HOME, keyOf, gone, allCards, scopeCards, dock, dockWords, markerText, divider, dividerParts, isApproval, answers, oneLine, placeholder, quoteLines, quoteText, quoteChip, pname };
+  root.AmbWinDock = { HOME, keyOf, gone, ak, allCards, scopeCards, dock, dockWords, markerText, divider, dividerParts, isApproval, answers, oneLine, placeholder, quoteLines, quoteText, quoteChip, pname };
 })(typeof window !== "undefined" ? window : globalThis);

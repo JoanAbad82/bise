@@ -157,8 +157,9 @@
     if (ev.cmd === "answer" && ev.project) {
       const list = s.cards[ev.project] || [];
       const ids = new Set(list.map((c) => String(c.id)));
-      const mineAnswered = new Set(Object.keys(s.answered).filter((id) => ids.has(String(id))));
-      answered = Object.fromEntries(Object.entries(s.answered).filter(([id]) => !ids.has(String(id))));
+      const mine = (key) => ids.has(key.slice(ev.project.length + 1)) && key.startsWith(`${ev.project}#`);
+      const mineAnswered = new Set(Object.keys(s.answered).filter(mine).map((key) => key.slice(ev.project.length + 1)));
+      answered = Object.fromEntries(Object.entries(s.answered).filter(([key]) => !mine(key)));
       if (picked && ids.has(String(picked.card))) picked = null;
       // a card that isn't open any more (a stale row's card, lead m_8728): it goes, not back
       if (/isn't open|not open/.test(text)) cards = set(cards, ev.project, list.filter((c) => !mineAnswered.has(String(c.id))));
@@ -271,7 +272,7 @@
     const said = opt ? opt.label : how.text;
     const k = keyOf(s.route);
     // after one answer bise's composer goes back to a plain message by itself
-    s = { ...s, answered: set(s.answered, c.id, said), picked: opt ? { card: c.id, n: opt.n } : null, chosen: set(s.chosen || {}, keyOf(s.route), null), optSel: null };
+    s = { ...s, answered: set(s.answered, D.ak(c.project, c.id), said), picked: opt ? { card: c.id, n: opt.n } : null, chosen: set(s.chosen || {}, keyOf(s.route), null), optSel: null };
     if (how.text != null) s = { ...s, drafts: set(s.drafts, k, "") };
     // the inbox stays open on the next card; it closes with the last one
     if (s.inbox && !D.allCards(s).length) s = { ...s, inbox: null };

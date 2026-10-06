@@ -710,6 +710,29 @@ law("T1 run 3 step 8: a digit over an empty composer picks the card's option, ev
   eq(w2.sent.filter((c) => c.cmd === "answer").pop(), { cmd: "answer", project: P.telemetry, card: "c-alerts", reply: "2" });
 });
 
+law("T1 run 4 step 8: shop's feature_try approval (id 2, like telemetry's answered #2) shows in shop's dock and bise's, every option clickable as opt:<n>, 1 over an empty composer answers it", () => {
+  const ft = (project) => ({ id: 2, project, kind: "feature_try", approval: true, agent: "main", question: "tryme is ready to try\n1 commit on tryme · +3 −0",
+    options: [{ n: 1, label: "try it" }, { n: 2, label: "show the diff" }, { n: 3, label: "not yet" }], urgent: false, since_ms: F.NOW });
+  const w = win();
+  // telemetry's card #2 is answered first: card ids are per hub, shop's #2 must not hide
+  w.feed({ ev: "cards", project: P.telemetry, cards: [{ ...ft(P.telemetry), kind: "question", approval: undefined, question: "which bench?" }] });
+  w.go(P.telemetry);
+  w.key("1");
+  eq(w.sent.filter((c) => c.cmd === "answer").pop(), { cmd: "answer", project: P.telemetry, card: 2, reply: "1" });
+  w.feed({ ev: "cards", project: P.storefront, cards: [ft(P.storefront)] });
+  // on the project's own main: the approval is above the composer, its options are opt:1-3
+  w.go(P.storefront);
+  let d = w.v.composer.dock;
+  eq([d.card, d.q.split("\n")[0], d.ty, d.opts.map((o) => o.n), w.v.composer.div], [2, "tryme is ready to try", "pick 1 – 3", [1, 2, 3], "you → storefront · main · the approval waits for 1 or 2"]);
+  // and on bise's view too
+  w.go(F.HOME);
+  eq(w.v.composer.dock.tabs ? true : D.allCards(w.s).some((c) => c.project === P.storefront && c.id === 2), true);
+  // its own approval takes 1 with the composer empty
+  w.go(P.storefront);
+  w.key("1");
+  eq(w.sent.filter((c) => c.cmd === "answer").pop(), { cmd: "answer", project: P.storefront, card: 2, reply: "1" });
+});
+
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {
   const dir = join(here, "../../../../rust/proto/fixtures");
   if (!existsSync(dir)) return;

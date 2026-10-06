@@ -171,7 +171,7 @@
           return { t: "answered", pos: e.pos, text: T(s, "asked_answered", { who: e.from, q: c.question, by: c.by === "main" ? T(s, "i") : c.by, a: c.answer }), why: c.why || "", open };
         const text = D.markerText(s, e);
         // '✓ answered: <his words>' holds one line; ▸ opens the rest (designer DS v5, as the TUI's)
-        const done = (c.id in s.answered) || (c.answered && c.answer && (!c.by || c.by === "you"));
+        const done = (D.ak(e.from_project || s.route.project, c.id) in s.answered) || (c.answered && c.answer && (!c.by || c.by === "you"));
         if (done && text && (text.length > 90 || text.includes("\n")) && !open)
           return { t: "marker", pos: e.pos, text: `${D.oneLine(text, 88)} ▸`, card: c.id, act: { ev: "ui_fold", pos: e.pos } };
         if (done) return { t: "marker", pos: e.pos, text, card: c.id, act: text && text.length > 90 ? { ev: "ui_fold", pos: e.pos } : null };
