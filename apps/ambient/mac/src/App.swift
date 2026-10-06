@@ -513,7 +513,12 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             case "needs":
                 // once per card: the same card said again after a dismiss stays in the icon
                 let card = cmd["card"].flatMap { $0 is NSNull ? nil : "\($0)" }
-                if cardPush.shows(card: card) { visFeed(.card) } else { capsule.refreshMouse() }
+                // bise's window in front and key holds it above its composer (CardSeat)
+                let w = desktop
+                let seat = CardSeat.seat(windowShown: w.map { !$0.hidden } ?? false, windowKey: w?.window.isKeyWindow ?? false,
+                                         appFront: NSApp.isActive || CapsulePanel.simulatedKeys)
+                if seat == .window { Log.say("app: card \(card ?? "?") stays in the window (it's in front)") }
+                else if cardPush.shows(card: card) { visFeed(.card) } else { capsule.refreshMouse() }
             case "none":
                 // the hello is over (5 s, or fn, esc, a click): its glass goes
                 if helloOn { helloOn = false; visFeed(.dismiss) }

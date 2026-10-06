@@ -108,5 +108,11 @@ law("card: the same card said again after a dismiss doesn't", !cp.shows(card: "c
 law("card: the next card does", cp.shows(card: "c2"))
 law("card: an older page that names no card shows each time", cp.shows(card: nil) && cp.shows(card: nil))
 
+// where a card shows (desktop v9, lead m_8658)
+law("card seat: the window in front and key: above its composer, no bar", CardSeat.seat(windowShown: true, windowKey: true, appFront: true) == .window)
+law("card seat: the window hidden: the bar", CardSeat.seat(windowShown: false, windowKey: false, appFront: false) == .bar)
+law("card seat: the window shown but not key (the bar or another panel has the keys): the bar", CardSeat.seat(windowShown: true, windowKey: false, appFront: true) == .bar)
+law("card seat: another app in front (the window behind it): the bar", CardSeat.seat(windowShown: true, windowKey: true, appFront: false) == .bar)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Visibility laws hold")

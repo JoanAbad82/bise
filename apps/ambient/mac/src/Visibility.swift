@@ -55,6 +55,17 @@ struct CardPush: Equatable {
     }
 }
 
+// where a card shows (desktop v9, lead m_8658): bise's window in front and
+// key = above its composer (the window's page has it: its 'waiting' line and
+// the inbox), the bar doesn't show; the window hidden, not key, or another
+// app in front = the bar, bottom centre
+enum CardSeat: Equatable {
+    case bar, window
+    static func seat(windowShown: Bool, windowKey: Bool, appFront: Bool) -> CardSeat {
+        windowShown && windowKey && appFront ? .window : .bar
+    }
+}
+
 // a left click on the menu-bar icon toggles (the user, main m_6965): the bar
 // shown in any state (opened by hand, a card's 8 s, an answer) → it closes;
 // hidden → the full view opens
