@@ -1708,7 +1708,7 @@ law("desktop S8: ⏎ on an agent opens its thread in bise's window (app_window w
   eq(M.step(m, { ev: "ui_open_card", card: "c-alerts" }, 10).cmds.at(-1), { cmd: "app_window", route: "project/telemetry-8e02" });
 });
 
-law("desktop S8 menu-bar dropdown (v9): app_menu on opens it under the pearl: '3 at work · 2 wait for you', what waits (fn 1 on the first), followed jobs with progress, open bise ⌘0, quiet for 1 h, settings… ⌘,; off leaves", () => {
+law("desktop S8 menu-bar dropdown (v9): app_menu on opens it under the pearl: '3 at work · 2 waiting for you' (no calm line while something waits), what waits (fn 1 on the first), followed jobs with progress, open bise ⌘0, quiet for 1 h, settings… ⌘,; off leaves", () => {
   const projects = [{ project: "telemetry-8e02", name: "telemetry", order: 1 }, { project: "storefront-5c1d", name: "storefront", order: 2 }];
   const agents = [{ name: "alerts", status: "waiting", project: "telemetry-8e02" }, { name: "stock", status: "working", project: "storefront-5c1d", followed: true,
     job: { label: "flash sale replay", step: 6200, steps: 10000, unit: "orders" } }, { name: "search", status: "working", project: "storefront-5c1d" }];
@@ -1717,7 +1717,7 @@ law("desktop S8 menu-bar dropdown (v9): app_menu on opens it under the pearl: '3
   let m = M.step(M.init(), { ev: "state", agents, cards, projects }, 0).m;
   m = M.step(m, { ev: "app_menu", on: true }, 10).m;
   const v = M.view(m, 20), s = Bar.spec(v);
-  eq([v.state, v.content.kind, s.head.lab.acc, s.text.s], ["menu", "open", "3 at work · 2 wait for you", "all quiet."]);
+  eq([v.state, v.content.kind, s.head.lab.acc, s.text], ["menu", "open", "3 at work · 2 waiting for you", null]);
   eq(s.sections.map((x) => x.rows.map((r) => [r.t, r.p || "", r.sub || "", r.right && r.right.keys ? r.right.keys.join("") : ""])), [
     [["alerts", "telemetry", "compaction at 03:00?", "fn1"], ["search", "storefront", "reindex tonight?", ""]],
     [["storefront · stock · following", "", "flash sale replay · 6 200 / 10 000 orders", ""]],
@@ -1729,14 +1729,18 @@ law("desktop S8 menu-bar dropdown (v9): app_menu on opens it under the pearl: '3
   eq(M.step(m, row("job-stock").act, 30).cmds.at(-1), { cmd: "app_window", route: "agent/storefront-5c1d/stock" });
   eq(M.step(m, row("settings").act, 30).m.pane, "settings");
   eq(M.step(m, row("quit").act, 30).cmds, [{ cmd: "app_quit" }]);
-  // paused: the row ends it; off leaves the pane
+  // paused: 'quiet until 15:21' said (not selectable), then 'resume' ends it (ambient m_8653 (3)); off leaves the pane
   const q = M.step(m, { ev: "app_quiet", on: true, why: "paused", until_ms: new Date(2026, 9, 3, 15, 21).getTime() }, 40).m;
-  eq(Bar.spec(M.view(q, 50)).sections[2].rows[1].t, "quiet until 15:21 · end it");
-  eq(M.step(q, { ev: "ui_quiet_hour" }, 60).cmds, [{ cmd: "app_quiet_hour", on: false }]);
+  const qs = Bar.spec(M.view(q, 50)).sections[2].rows;
+  eq(qs.map((r) => [r.t, !!r.fixed, !!r.act]), [["open bise", false, true], ["quiet until 15:21", true, false], ["resume", false, true], ["settings…", false, true]]);
+  eq(M.step(q, qs[2].act, 60).cmds, [{ cmd: "app_quiet_hour", on: false }]);
   eq(M.step(m, { ev: "app_menu", on: false }, 70).m.pane, null);
   // nobody working, nothing waiting: no zero as a label (ambient m_8617 (3))
   const idle = M.step(M.step(M.init(), { ev: "state", agents: [], cards: [], projects }, 0).m, { ev: "app_menu", on: true }, 10).m;
-  eq(Bar.spec(M.view(idle, 20)).head.lab.rest, "nobody at work");
+  eq([Bar.spec(M.view(idle, 20)).head.lab.rest, Bar.spec(M.view(idle, 20)).text.s], ["nobody at work", "all quiet."]);
+  // one waits: '1 waiting for you'; a failure says itself instead of the calm line (ambient m_8653 (1) (2))
+  const one = M.step(M.step(M.init(), { ev: "state", agents: [agents[0]], cards: [cards[0]], projects }, 0).m, { ev: "app_menu", on: true }, 10).m;
+  eq([Bar.spec(M.view(one, 20)).head.lab.acc, Bar.spec(M.view(one, 20)).text], ["1 at work · 1 waiting for you", null]);
 });
 
 law("desktop S8: app_anchor says where the bar sits (top, bottom, menu); the view carries it so the bar rises from the bottom", () => {

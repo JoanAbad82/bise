@@ -173,10 +173,10 @@
 
   // desktop S8: the menu-bar pearl's dropdown (v9 'la perle dans la barre de menus')
   const menu = {
-    head: (work, waits) => `${work ? `${work} at work` : "nobody at work"}${waits ? ` · ${waits} wait${waits === 1 ? "s" : ""} for you` : ""}`,
+    head: (work, waits) => `${work ? `${work} at work` : "nobody at work"}${waits ? ` · ${waits} waiting for you` : ""}`,
     calm: "all quiet.", broke: (n) => `▲ ${n} failed`,
     following: "following", job: (j) => `${j.label || ""} · ${num(j.step)} / ${num(j.steps)}${j.unit ? ` ${j.unit}` : ""}`.replace(/^ · /, ""),
-    openBise: "open bise", quietHour: "quiet for 1 h", quietUntil: (hm) => `quiet until ${hm} · end it`, settings: "settings…", quit: "quit bise ambient",
+    openBise: "open bise", quietHour: "quiet for 1 h", quietUntil: (hm) => `quiet until ${hm}`, resume: "resume", settings: "settings…", quit: "quit bise ambient",
     nothingWaits: "nothing waits for you",
   };
   function num(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }

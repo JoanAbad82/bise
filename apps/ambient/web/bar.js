@@ -272,7 +272,8 @@
         const u = v.menu, MN = Wd.menu;
         const hm = (ms) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
         s.head = { h: 52, lab: { acc: u.waits ? MN.head(u.working, u.waits) : "", rest: u.waits ? "" : MN.head(u.working, 0) } };
-        s.text = { s: u.failed ? MN.broke(u.failed) : MN.calm, dim: !u.failed };
+        // 'all quiet.' only when nothing waits and nothing failed (ambient m_8653 (2))
+        s.text = u.failed ? { s: MN.broke(u.failed), dim: false } : u.waits ? null : { s: MN.calm, dim: true };
         if (u.cards.length) s.sections.push({ rows: u.cards.map((c, k) => ({ g: "?", gc: "a", t: c.agent, p: c.pname, sub: c.text,
           right: k === 0 ? { keys: ["fn", "1"] } : null, act: { ev: "ui_open_card", card: c.id }, qa: `card-${c.id}` })) });
         if (u.followed.length) s.sections.push({ rows: u.followed.map((a) => ({ g: a.failed ? "▲" : "∿", gc: a.failed ? "risk" : "work",
@@ -280,7 +281,10 @@
           act: { ev: "ui_agent", agent: a.name, ...(a.project ? { project: a.project } : {}) }, qa: `job-${a.name}` })) });
         s.sections.push({ rows: [
           { g: "", t: MN.openBise, right: { keys: ["⌘", "0"] }, act: { ev: "ui_open_bise" }, qa: "open-bise" },
-          { g: "☾", t: u.quiet ? MN.quietUntil(hm(u.quiet.until)) : MN.quietHour, act: { ev: "ui_quiet_hour" }, qa: "quiet-hour" },
+          // paused: 'quiet until 11:41' said, then its own 'resume' row, as amb-mac's native menu (ambient m_8653 (3))
+          ...(u.quiet ? [{ g: "☾", t: MN.quietUntil(hm(u.quiet.until)), fixed: true, qa: "quiet-until" },
+            { g: "", t: MN.resume, act: { ev: "ui_quiet_hour" }, qa: "resume" }]
+            : [{ g: "☾", t: MN.quietHour, act: { ev: "ui_quiet_hour" }, qa: "quiet-hour" }]),
           { g: "⚙", t: MN.settings, right: { keys: ["⌘", ","] }, act: { ev: "app_key", key: "," }, qa: "settings" },
         ] });
         // last, after a separator (ambient m_8618 via amb-mac m_8639)
