@@ -18,6 +18,8 @@ export * from './text';
 export * from './perf';
 export * from './inputs';
 export { FakeCore, FakeHelper } from './fakes/helper';
+export { Vm, freeBytes, FLOOR_BYTES, type VmOptions, type ExecResult } from './vm/vm';
+export { Rfb, parseCombo } from './vm/rfb';
 export { prove, violationsIn, type Proof, type Sample } from './proof';
 
 const session = (open: () => Promise<Session>) =>

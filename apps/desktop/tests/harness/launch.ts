@@ -8,12 +8,12 @@
 // focus emulation on (the caret is drawn in a window that is never focused), the window-server
 // watch (proof.ts) from the first moment: its first violation kills the app at once, and the test
 // fails on it. close() proves again, stops the watch and kills what is left by pid.
-import { mkdtempSync, rmSync } from 'node:fs';
-import os from 'node:os';
+import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { _electron as electron, type CDPSession, type ElectronApplication, type Page } from '@playwright/test';
 import { DESKTOP_DIR, harnessElectron } from './electron';
 import type { FakeCore, FakeHelper } from './fakes/helper';
+import { harnessEnv, Sentinel, testHome } from './isolation';
 import { prove, Watch, watcherBinary, type Proof } from './proof';
 
 export const OLD_WEB = path.resolve(DESKTOP_DIR, '..', 'ambient', 'web');
@@ -123,17 +123,20 @@ const mainWindow = (app: ElectronApplication): Promise<Page> => surfacePage(app,
 
 async function start(args: string[], env: Record<string, string>, o: LaunchOptions): Promise<Session> {
   watcherBinary(); // compiled before the app starts, so the watch starts within ms of the launch
-  const userData = mkdtempSync(path.join(os.tmpdir(), 'bise-harness-'));
+  // every launch's own throwaway home, made here and never taken from the caller (isolation.ts)
+  const h = testHome();
+  const userData = path.join(h.root, 'userdata');
+  mkdirSync(userData, { recursive: true });
+  const appEnv = harnessEnv(h, { ...env, BISE_HARNESS_USER_DATA: userData, BISE_DESKTOP_USER_DATA: userData }, o.env);
   let app: ElectronApplication | undefined;
   let watch: Watch | undefined;
   let stopped = '';
+  const sentinel = new Sentinel(h, (why) => { stopped = why; killTree(app?.process().pid); });
+  await sentinel.start();
   try {
-    app = await electron.launch({
-      executablePath: harnessElectron(),
-      args: [...chromiumArgs(o), ...args],
-      env: { ...process.env, ...env, ...o.env, BISE_HARNESS_USER_DATA: userData, BISE_DESKTOP_USER_DATA: userData },
-    });
+    app = await electron.launch({ executablePath: harnessElectron(), args: [...chromiumArgs(o), ...args], env: appEnv });
     const pid = app.process().pid;
+    if (pid !== undefined) sentinel.follow(pid);
     watch = new Watch(pid ?? -1, (why) => { stopped = why; killTree(pid); });
     await installGuards(app);
     const page = await mainWindow(app);
@@ -145,10 +148,12 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
     const close = async (): Promise<Proof> => {
       const end = await prove(opened, w).catch(() => undefined);
       w.stop();
+      const tree = await sentinel.tree();
       await opened.close().catch(() => undefined);
       killTree(pid);
-      rmSync(userData, { recursive: true, force: true });
-      const broken = [...new Set([...(end?.violations ?? []), ...w.violations])];
+      const cleaned = await sentinel.stop(tree);
+      const broken = [...new Set([...(end?.violations ?? []), ...w.violations, ...sentinel.breaches])];
+      if (cleaned.length) broken.push(`the run left processes in its test home (killed: ${cleaned.join(', ')})`);
       if (broken.length) throw new Error(`harness rule broken during the run: ${broken.join('; ')}`);
       return end ?? { ...proof, violations: [] };
     };
@@ -157,9 +162,10 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
     return { app, page, cdp, proof, watch, close, blocked };
   } catch (e) {
     watch?.stop();
+    const tree = await sentinel.tree();
     await app?.close().catch(() => undefined);
     killTree(app?.process().pid);
-    rmSync(userData, { recursive: true, force: true });
+    await sentinel.stop(tree);
     if (stopped) throw new Error(`run stopped by the watch: ${stopped}`);
     throw e;
   }

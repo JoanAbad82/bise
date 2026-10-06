@@ -12,8 +12,16 @@ Run: `pnpm test:e2e` (self-tests + `tests/checks/**`), one worker. Ask amb-tools
   and fails the test. A Dock icon or a focused window fails it too. This runs at launch and at close.
 - **No Dock icon, ever.** The harness's Electron is a clone of `node_modules/electron/dist` marked
   `LSUIElement=1` and re-signed ad hoc, in `.harness-cache/` (`electron.ts`).
-- **Throwaway.** Every launch gets a temp `userData`, and nothing reads his Library. The mic is a wav file and
-  the clipboard is never his.
+- **Its own home (main m_9882).** Every launch gets a throwaway `HOME`, with `BISE_HOME` and `~/bise` inside it, a
+  `TMPDIR` and a `userData`, all made by the harness (`isolation.ts`). The app's whole environment is a short
+  allowlist plus that home. A caller's `env` can't set HOME, BISE_HOME, TMPDIR, SB_* or XDG_*, and a
+  `BISE_DESKTOP_WORKSPACE` outside the home is refused.
+- **The sentinel.** It reads the process table every second, from launch to close. Two things kill the run:
+  sbd or launchctl in the app's process tree not pointing into the test home, and any new hub on his real
+  `~/.bise` (a gate's hub with its own `SB_STATE_DIR` isn't his). At close it kills everything the run started,
+  orphans included, plus anything living in the test home (hubs started through launchd, with their launchd
+  jobs). Self-test: `self/isolation.spec.ts`, which includes amb-mac's 22:33 case on a fake bise.
+- **Nothing of his.** The mic is a wav file, the clipboard is never his, and his Library is never read.
 
 ## Launch (`launch.ts`): each returns a Session `{ app, page, cdp, proof, watch, close }`
 | what | how |
