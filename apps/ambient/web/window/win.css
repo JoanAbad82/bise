@@ -23,6 +23,10 @@ body { background: var(--c-canvas); overflow: hidden; }
 .w-head .b-head, .w-now, .w-thread .b-thread, .w-thread .w-grid, .w-composer { width: 100%; max-width: 760px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
 .w-head .b-head { padding-top: 16px; }
 .w-head .t2 .w-acc { color: var(--c-accent); }
+/* the composer's line says what his words will do: answering a question in the accent, its esc hint at the right */
+.w-composer .div { display: flex; gap: 12px; }
+.w-composer .div .w-acc { color: var(--c-accent); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-divhint { margin-left: auto; white-space: nowrap; }
 .w-head .b-seg > span, .w-head .b-btn { cursor: default; }
 /* what runs now (bise's view): the followed jobs, one card each */
 .w-now { display: flex; gap: 8px; padding: 0 22px 10px; }

@@ -169,7 +169,13 @@
         const c = e.card || {};
         if (c.answered && c.by && c.by !== "you")
           return { t: "answered", pos: e.pos, text: T(s, "asked_answered", { who: e.from, q: c.question, by: c.by === "main" ? T(s, "i") : c.by, a: c.answer }), why: c.why || "", open };
-        return { t: "marker", pos: e.pos, text: D.markerText(s, e), card: c.id, act: { ev: "ui_inbox", card: c.id } };
+        const text = D.markerText(s, e);
+        // '✓ answered: <his words>' holds one line; ▸ opens the rest (designer DS v5, as the TUI's)
+        const done = (c.id in s.answered) || (c.answered && c.answer && (!c.by || c.by === "you"));
+        if (done && text && (text.length > 90 || text.includes("\n")) && !open)
+          return { t: "marker", pos: e.pos, text: `${D.oneLine(text, 88)} ▸`, card: c.id, act: { ev: "ui_fold", pos: e.pos } };
+        if (done) return { t: "marker", pos: e.pos, text, card: c.id, act: text && text.length > 90 ? { ev: "ui_fold", pos: e.pos } : null };
+        return { t: "marker", pos: e.pos, text, card: c.id, act: { ev: "ui_inbox", card: c.id } };
       }
       case "diff": {
         const d = e.diff;
@@ -212,7 +218,8 @@
     const text = s.drafts[k] || "";
     const quotes = (s.quotes[k] || []).map((q, i) => ({ i, text: D.quoteChip(q, i, (ms) => hm(s, ms), s) }));
     const working = a && a.status === "working" && s.route.agent !== "main";
-    return { dock: D.dockWords(s, d), div: D.divider(s, d, a), ph: D.placeholder(s, d, a), text, quotes,
+    const div = D.dividerParts(s, d, a);
+    return { dock: D.dockWords(s, d), div: div.text, divAcc: div.acc, divHint: div.hint, ph: D.placeholder(s, d, a), text, quotes,
       send: text.trim() ? "on" : working ? "stop" : "off", disabled: !!s.offline,
       keys: T(s, "keys", { working }) };
   }

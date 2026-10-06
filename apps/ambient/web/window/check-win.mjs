@@ -136,7 +136,8 @@ law("above bise's composer: the newest card, '1 of 3 ← →'; ← → walk the 
   const w = win();
   let c = w.v.composer;
   eq([c.dock.h, c.dock.k, c.dock.q, c.dock.opts.map((o) => o.label)], ["? telemetry · alerts needs you", "1 of 3   ← →", "passer la compaction de 14:00 à 03:00 ?", ["move it to 03:00", "leave it"]]);
-  eq([c.div, c.ph], ["you → bise · answering alerts", "your answer, then ⏎"]);
+  // the line says what his words will do: answer this question (accent), esc for a plain message
+  eq([c.div, c.divAcc, c.divHint, c.ph], ["answering telemetry · alerts · passer la compaction de 14:00 à 03:00 ?", true, "esc write a plain message", "your answer, then ⏎"]);
   assert.equal(w.key("ArrowRight").eat, true);
   c = w.v.composer;
   eq([c.dock.h, c.dock.k], ["? engine · netcode · merge the rollback fix?", "approval · 2 of 3   ← →"]);
@@ -153,7 +154,7 @@ law("1-9 in an empty field answers the card above; it leaves at once, the thread
   eq(w.sent.filter((c) => c.cmd === "answer"), [{ cmd: "answer", project: P.telemetry, card: "c-alerts", reply: "1" }]);
   eq(w.v.composer.dock.h, "? engine · netcode · merge the rollback fix?");
   eq(w.v.composer.dock.k, "approval · 1 of 2   ← →");
-  eq(rowsOf(w.v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · you answered: move it to 03:00"]);
+  eq(rowsOf(w.v, "marker").map((x) => x.text), ["✓ answered: move it to 03:00"]);
   eq(w.v.side.rows[0].end, "2");
   // a digit with no such option does nothing, and is still eaten (it is not his text)
   w.key("7");
@@ -178,11 +179,14 @@ law("words then ⏎ answer the card above; with no card, ⏎ sends to the thread
   // shift+⏎ is a new line
   w.type("a"); assert.equal(w.key("Enter", { shift: true }).eat, false);
 });
-law("esc puts the card off (the line says ⌘I), opens nothing; ⌘I opens every card above the composer, esc goes back to the thread", () => {
+law("esc on a question: a plain message first (the card stays), esc again puts it off (the line says ⌘I); ⌘I opens every card above the composer, esc goes back to the thread", () => {
   const w = win();
   w.key("Escape");
+  eq([w.v.composer.dock.h, w.v.composer.div, w.v.composer.divAcc, w.v.composer.ph], ["? telemetry · alerts needs you", "you → bise", false, "write to bise, then ⏎"]);
+  w.key("Escape");
   eq(w.v.composer.dock.h, "? engine · netcode · merge the rollback fix?");
-  w.key("Escape"); w.key("Escape");
+  // an approval: esc puts it off at once (his words never answered it)
+  w.key("Escape"); w.key("Escape"); w.key("Escape");
   eq(w.v.composer.dock, null);
   eq(rowsOf(w.v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · ⌘I"]);
   eq(w.v.composer.ph, "write to bise, then ⏎");
@@ -216,7 +220,7 @@ law("ctrl+1-9 opens the inbox at that card, from any thread; an answer moves to 
 law("each thread's composer answers its own cards: a project's main its project's, an agent its own", () => {
   const w = win();
   w.go(P.storefront);
-  eq([w.v.composer.dock.h, w.v.composer.dock.k, w.v.composer.div], ["? search needs you", "1 of 1", "you → storefront · main · answering search"]);
+  eq([w.v.composer.dock.h, w.v.composer.dock.k, w.v.composer.div], ["? search needs you", "1 of 1", "answering search · réindexer ce soir à 02:00, ou maintenant avec le second index ?"]);
   w.go(P.storefront, "checkout");
   eq(w.v.composer.dock, null);
   eq(w.v.composer.ph, "steer checkout while it works, then ⏎");
@@ -580,6 +584,43 @@ law("amb-tools' world run (m_8767): an error clears when the thread opens; his m
   feed({ ev: "win_open", route: `agent/${HID}/helper` });
   eq(s.route, { project: F.HOME, agent: "helper" });
   eq(sent.filter((c) => c.cmd === "win_title").pop(), { cmd: "win_title", text: "helper · bise", route: "agent/home/helper" });
+});
+
+law("the composer rule (ambient m_8771): words answer a question and say so first; esc makes them a plain message; an approval takes only 1 / 2, words go to the agent and the card stays", () => {
+  const w = win();
+  w.go(P.telemetry, "alerts");
+  // a question: the line says it, his words answer it, the line in the thread reads ✓ answered
+  let c = w.v.composer;
+  eq([c.dock.ty, c.divAcc, c.divHint], ["or type your answer below", true, "esc write a plain message"]);
+  w.type("move it to 03:00 but only on weekdays, the weekday traffic peaks between 13:00 and 15:00 and that is exactly when the compaction hurts");
+  w.key("Enter");
+  const ans = w.sent.filter((x) => x.cmd === "answer").pop();
+  eq([ans.project, ans.reply.slice(0, 16)], [P.telemetry, "move it to 03:00"]);
+  const line = rowsOf(w.v, "marker").find((r) => /answered/.test(r.text));
+  eq([line.text.startsWith("✓ answered: move it to 03:00"), line.text.endsWith(" ▸"), line.act.ev], [true, true, "ui_fold"]);
+  w.feed(line.act);
+  eq(rowsOf(w.v, "marker").find((r) => /answered/.test(r.text)).text.endsWith("compaction hurts"), true);
+  // esc first: a plain message, the card stays and isn't answered (a fresh fake world: w answered it)
+  F.reset();
+  const w2 = win();
+  w2.go(P.telemetry, "alerts");
+  w2.key("Escape");
+  eq([w2.v.composer.div, w2.v.composer.divAcc, !!w2.v.composer.dock], ["you → alerts", false, true]);
+  w2.type("why 03:00?");
+  w2.key("Enter");
+  eq([w2.sent.filter((x) => x.cmd === "answer").length, w2.sent.filter((x) => x.cmd === "send").pop().text, !!w2.v.composer.dock], [0, "why 03:00?", true]);
+  // an approval: the line says it waits for 1 or 2, the card says pick; words never decide
+  F.reset();
+  const w3 = win();
+  w3.go(P.engine, "netcode");
+  c = w3.v.composer;
+  eq([c.div, c.divAcc, c.dock.ty, c.ph], ["you → netcode · the merge waits for 1 or 2", false, "pick 1 or 2", "steer netcode while it works, then ⏎"]);
+  w3.type("no, wait for the soak test");
+  w3.key("Enter");
+  eq([w3.sent.filter((x) => x.cmd === "answer").length, w3.sent.filter((x) => x.cmd === "send").pop().text, w3.v.composer.dock.q], [0, "no, wait for the soak test", c.dock.q]);
+  // only a digit (or a click) decides
+  w3.key("1");
+  eq(w3.sent.filter((x) => x.cmd === "answer").pop().reply, "1");
 });
 
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {

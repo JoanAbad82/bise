@@ -26,7 +26,8 @@
   // project's; an agent = its own
   function scopeCards(s, route) {
     const all = allCards(s);
-    if (route.project === HOME) return all;
+    // bise's thread answers every project's; bise's other agents answer only their own
+    if (route.project === HOME && route.agent === "main") return all;
     if (route.agent === "main") return all.filter((c) => c.project === route.project);
     return all.filter((c) => c.project === route.project && c.agent === route.agent);
   }
@@ -55,6 +56,14 @@
     return wide ? `${pname(s, c.project)} · ${c.agent}` : c.agent;
   }
 
+  // the card's kind decides what typed words do (ambient m_8771, lead m_8775): a question is
+  // answered by his words; an approval (merge, send, publish, run, delete: anything that acts or
+  // leaves) only by 1 / 2 or a click, his words go to the agent as a plain message
+  const isApproval = (c) => !!c && ["approval", "merge", "confirm"].includes(c.kind);
+  // the composer answers the card above it: a question, unless he chose a plain message (esc)
+  const answers = (s, d) => !!d && !isApproval(d.card) && !((s.plain || {})[keyOf(s.route)] === d.card.id);
+  const oneLine = (t, n = 64) => { const l = String(t || "").split("\n")[0].trim(); return l.length > n ? `${l.slice(0, n - 1)}…` : l; };
+
   // the dock's words (DS composer "dock · une question" / "dock · l'inbox" / "dock · la revue")
   function dockWords(s, d) {
     if (!d) return null;
@@ -73,7 +82,8 @@
       shot: d.mode === "inbox" && c.origin ? c.origin.shot || "" : "",
       q: c.question,
       opts: (c.options || []).map((o) => ({ n: o.n, label: o.label, picked: s.picked && s.picked.card === c.id && s.picked.n === o.n })),
-      ty: T(s, "type_below"),
+      // a question keeps 'or type your answer below'; an approval says to pick
+      ty: approval ? T(s, "pick_n", { n: (c.options || []).length || 2 }) : T(s, "type_below"),
       tabs: d.mode === "inbox" ? d.list.map((x, i) => ({ id: x.id, text: `${x.agent} · ${x.title || x.question}`, on: i === d.i })) : null,
       card: c.id,
     };
@@ -96,18 +106,28 @@
     return d && d.list.some((x) => x.id === c.id) ? T(s, "asked_below", { who }) : T(s, "asked_cmd_i", { who });
   }
 
-  // the composer's line above the field, and its placeholder
-  function divider(s, d, agentRow) {
+  // the composer's line above the field, and its placeholder: it says before he types what his
+  // words will do: answer the question (in the accent, with 'esc write a plain message'), or go
+  // to the agent while an approval waits for 1 or 2
+  function dividerParts(s, d, agentRow) {
     const r = s.route;
     const to = r.project === HOME ? "bise" : r.agent === "main" ? `${pname(s, r.project)} · main` : r.agent;
     const model = agentRow && agentRow.model ? ` · ${agentRow.model}` : "";
-    const answering = d ? T(s, "answering", { who: d.card.agent }) : "";
-    return `${T(s, "you_to", { to })}${answering}${model}`;
+    if (answers(s, d)) {
+      const who = asker(s, d.card, d.mode === "inbox" || r.project === HOME);
+      return { text: T(s, "answering_q", { who, q: oneLine(d.card.question) }), acc: true, hint: T(s, "esc_plain") };
+    }
+    if (d && isApproval(d.card)) {
+      const what = d.card.kind === "merge" || /\bmerge\b/i.test(`${d.card.title || ""} ${d.card.question || ""}`) ? T(s, "the_merge") : T(s, "the_approval");
+      return { text: `${T(s, "you_to", { to })} · ${T(s, "waits_pick", { what })}`, acc: false, hint: "" };
+    }
+    return { text: `${T(s, "you_to", { to })}${model}`, acc: false, hint: "" };
   }
+  const divider = (s, d, agentRow) => dividerParts(s, d, agentRow).text;
   function placeholder(s, d, agentRow) {
     const r = s.route;
     if (s.offline) return T(s, "ph_offline");
-    if (d) return T(s, "ph_answer");
+    if (answers(s, d)) return T(s, "ph_answer");
     if (r.project === HOME) return T(s, "ph_write", { to: "bise" });
     if (r.agent === "main") return T(s, "ph_main", { p: pname(s, r.project) });
     if (agentRow && agentRow.status === "working") return T(s, "ph_steer", { a: r.agent });
@@ -137,5 +157,5 @@
     return `❝ ${i + 1} “${clip(first, 48)}”  ${q.who}${q.at_ms && fmt ? ` ${fmt(q.at_ms)}` : ""}`;
   }
 
-  root.AmbWinDock = { HOME, keyOf, allCards, scopeCards, dock, dockWords, markerText, divider, placeholder, quoteLines, quoteText, quoteChip, pname };
+  root.AmbWinDock = { HOME, keyOf, allCards, scopeCards, dock, dockWords, markerText, divider, dividerParts, isApproval, answers, oneLine, placeholder, quoteLines, quoteText, quoteChip, pname };
 })(typeof window !== "undefined" ? window : globalThis);

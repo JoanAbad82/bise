@@ -276,7 +276,9 @@
     const quotes = s.quotes[k] || [];
     if (!text) return s;
     const d = D.dock(s);
-    if (d && !quotes.length) return answer(s, d, { text }, cmds);
+    // his words answer a question above the composer; an approval only takes 1 / 2 (its card
+    // stays, his words go to the agent as a plain message)
+    if (d && !quotes.length && D.answers(s, d)) return answer(s, d, { text }, cmds);
     const q = quotes.length ? quotes.map(({ agent, pos, text: t, file, lines }) => ({ agent, pos, text: t, ...(file ? { file, lines } : {}) })) : null;
     cmds.push({ cmd: "send", project: s.route.project, agent: s.route.agent, text, mode, ...(q ? { quote: q.length === 1 ? q[0] : q } : {}) });
     const t = s.threads[k] || { entries: [] };
@@ -292,6 +294,9 @@
     if ((s.quotes[k] || []).length) return { ...s, quotes: set(s.quotes, k, s.quotes[k].slice(0, -1)), sel: null };
     if (s.sel) return { ...s, sel: null };
     const d = D.dock(s);
+    // esc on a question he'd answer: write a plain message instead (the card stays); again: put
+    // the card away
+    if (d && D.answers(s, d)) return { ...s, plain: set(s.plain || {}, k, d.card.id) };
     if (d) return { ...s, dockOff: set(s.dockOff, k, [...(s.dockOff[k] || []), d.card.id]) };
     if (s.route.agent !== "main") return go(s, { project: s.route.project, agent: "main" }, cmds);
     return s;

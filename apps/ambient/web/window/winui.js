@@ -296,7 +296,8 @@
       if (routeKey !== lastRoute || (changed && atEnd)) R.scroll.scrollTop = R.scroll.scrollHeight;
       put("dock", dock(v));
       put("quotes", v.composer.quotes.map((q) => UI.quote.render({ text: q.text.replace(/^❝ /, ""), act: { ev: "ui_unquote", i: q.i } })));
-      R.div.textContent = v.composer.div;
+      // the line says what his words will do: answering a question in the accent, its esc hint
+      R.div.replaceChildren(h("span", v.composer.divAcc ? "w-acc" : null, v.composer.div), v.composer.divHint ? h("span", "w-divhint", v.composer.divHint) : "");
       R.field.placeholder = v.composer.ph;
       if (R.field.value !== v.composer.text) R.field.value = v.composer.text;
       R.send.className = `send ${v.composer.send}`;
