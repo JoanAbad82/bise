@@ -41,7 +41,8 @@ export interface CapsuleProps {
   readonly onClose: () => void;
   /** null: the app can't quit from a page yet (the row shows greyed). */
   readonly onQuit: (() => void) | null;
-  /** The page's size (the glass plus its shadow's margin) and the glass inside it. */
+  /** The page's size and the glass inside it: the page is the glass now (macOS vibrancy fills the
+   *  window, glass.ts), so the rect is {0, 0, width, height}. */
   readonly onSize: (width: number, height: number, glass: { x: number; y: number; width: number; height: number }) => void;
 }
 

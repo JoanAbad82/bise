@@ -1,14 +1,20 @@
 /* The capsule surface: transparent around the glass (L1: the pearl floats free, never in a square);
    one live pearl at a fixed place for every view. Tokens only. */
 html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent; overflow: hidden; }
-/* the page = the glass plus a margin its shadow draws in (the window is sized to it, the glass
-   rect goes to main: qa-native's placement) */
-.b-capsule { position: relative; width: 640px; padding: 24px; box-sizing: content-box; }
-.b-cap-card, .b-cap-menu { width: fit-content; margin: 0 auto; }
-.b-cap-pearl { position: absolute; left: 42px; top: 38px; width: 40px; height: 40px; z-index: 2; pointer-events: none; }
+/* the page IS the glass (amb-mac a0b3ebce, glass.ts): macOS draws the capsule window as a
+   'popover' vibrancy panel with its own shadow and rounded corners, filling the whole window, so
+   the page has no margin, sizes itself to the view (the window follows it: onSize, the glass rect
+   = the page), and paints no background, blur, shadow or big corner of its own: the real glass
+   shows through (a CSS backdrop-filter sees nothing of the apps behind a window anyway). */
+.b-capsule { position: relative; width: fit-content; padding: 0; }
+.b-cap-glass, .b-cap-talk, .b-cap-answer { width: 640px; box-sizing: border-box; }
+.b-capsule .b-spot, .b-capsule .b-card, .b-capsule .b-menu { background: transparent; backdrop-filter: none; box-shadow: none; border-radius: 0; }
+.b-capsule .b-spot { width: 640px; }
+.b-capsule .b-card { width: 560px; }
+.b-cap-pearl { position: absolute; left: 18px; top: 14px; width: 40px; height: 40px; z-index: 2; pointer-events: none; }
 .b-cap-pearl.off { visibility: hidden; }
 .b-cap-hole { display: inline-block; width: 40px; height: 40px; flex: none; }
-.b-cap-talk, .b-cap-answer { min-height: 68px; padding: 22px 22px 18px 76px; border-radius: var(--r-5); background: var(--c-overlay); backdrop-filter: var(--glass); box-shadow: var(--e-3); font: var(--t-17)/1.45 var(--font-read); color: var(--c-text); }
+.b-cap-talk, .b-cap-answer { min-height: 68px; padding: 22px 22px 18px 76px; font: var(--t-17)/1.45 var(--font-read); color: var(--c-text); }
 .b-cap-talk { color: var(--c-text-2); }
 .b-cap-answer .t { white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
 .b-cap-answer .cur { display: inline-block; width: 2px; height: 1.1em; margin-left: 2px; background: var(--c-text); vertical-align: -.2em; animation: b-blink 1s steps(1) infinite; }
