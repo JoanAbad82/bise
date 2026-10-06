@@ -63,7 +63,7 @@ fn bise_home_moves_everything() {
     assert_eq!(h.drafts_dir(), p("/b/drafts"));
     assert_eq!(h.versions_dir(), p("/b/dev/versions"));
     assert_eq!(h.build_dir(), p("/b/dev/build"));
-    for pref in [Pref::Voice, Pref::Theme, Pref::Hints, Pref::Tip, Pref::Onboarded, Pref::Setup] {
+    for pref in [Pref::Voice, Pref::Theme, Pref::Hints, Pref::Tip, Pref::Onboarded, Pref::Setup, Pref::ExcludedApps] {
         assert_eq!(h.pref(pref), Slot::key("/b/prefs.json", pref.key()));
     }
 }
@@ -432,4 +432,18 @@ fn the_tests_run_on_a_temp_home() {
     let h = Home::from_env();
     assert!(h.config_file().starts_with(std::env::temp_dir()), "{:?}", h.config_file());
     assert!(crate::test_home::is_place_var("BEND_SKILLS_INDEX") && !crate::test_home::is_place_var("PATH"));
+}
+
+#[test]
+fn excluded_apps_start_from_the_seed_and_then_are_his() {
+    let d = tmp("excluded");
+    let h = Home::at(&d);
+    let slot = h.pref(Pref::ExcludedApps);
+    assert_eq!(slot, Slot::key(h.prefs_file(), "excluded_apps"));
+    let seed = prefs::excluded_apps(slot.get());
+    assert!(seed.contains(&"com.1password.1password".to_string()) && seed.contains(&"com.apple.MobileSMS".to_string()));
+    slot.set(serde_json::json!(["com.apple.MobileSMS", "com.example.bank"])).unwrap();
+    assert_eq!(prefs::excluded_apps(slot.get()), vec!["com.apple.MobileSMS", "com.example.bank"]);
+    slot.set(serde_json::json!([])).unwrap();
+    assert!(prefs::excluded_apps(slot.get()).is_empty(), "he cleared it: nothing excluded, not the seed again");
 }

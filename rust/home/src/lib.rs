@@ -345,7 +345,8 @@ impl Home {
         self.tui_state().join("drafts")
     }
 
-    /// `prefs.json` (bise layout): voice, theme, hints, tip, onboarded.
+    /// `prefs.json` (bise layout): voice, theme, hints, tip, onboarded,
+    /// setup, excluded_apps.
     pub fn prefs_file(&self) -> PathBuf {
         self.root.join("prefs.json")
     }
@@ -363,6 +364,7 @@ impl Home {
             Pref::Tip => Slot::file(self.legacy_state().join("tip")),
             Pref::Onboarded => Slot::file(self.legacy_state().join("onboarded")),
             Pref::Setup => Slot::file(self.legacy_state().join("setup.json")),
+            Pref::ExcludedApps => Slot::file(self.legacy_state().join("excluded_apps.json")),
         }
     }
 

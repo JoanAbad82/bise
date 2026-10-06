@@ -23,6 +23,33 @@ pub enum Pref {
     /// `setup`: `{"asked": true, "repos": [root, …]}`, the setup card's
     /// answers (BISE-245: once per user, the repo part once per repo).
     Setup,
+    /// `excluded_apps`: `[bundle id, …]`, the apps the Mac app never reads
+    /// at fn (no title, URL, file, selection, text or shot; bise desktop
+    /// S9, architect F). Unset: [`EXCLUDED_APPS_SEED`] ([`excluded_apps`]).
+    ExcludedApps,
+}
+
+/// The apps never read at fn until he changes the list (bundle id, the
+/// name the window shows): password managers, Keychain, Passwords,
+/// System Settings, Messages. An id not here shows its last part.
+pub const EXCLUDED_APPS_SEED: &[(&str, &str)] = &[
+    ("com.agilebits.onepassword7", "1Password 7"),
+    ("com.1password.1password", "1Password"),
+    ("com.bitwarden.desktop", "Bitwarden"),
+    ("com.dashlane.dashlanephone", "Dashlane"),
+    ("com.apple.keychainaccess", "Keychain Access"),
+    ("com.apple.Passwords", "Passwords"),
+    ("com.apple.systempreferences", "System Settings"),
+    ("com.apple.MobileSMS", "Messages"),
+];
+
+/// The `excluded_apps` value as read from its slot: his list when set
+/// (an empty list included: he cleared it), else the seed.
+pub fn excluded_apps(v: Option<Value>) -> Vec<String> {
+    match v.as_ref().and_then(|v| v.as_array()) {
+        Some(a) => a.iter().filter_map(|x| x.as_str().map(String::from)).collect(),
+        None => EXCLUDED_APPS_SEED.iter().map(|(id, _)| id.to_string()).collect(),
+    }
 }
 
 impl Pref {
@@ -35,6 +62,7 @@ impl Pref {
             Pref::Tip => "tip",
             Pref::Onboarded => "onboarded",
             Pref::Setup => "setup",
+            Pref::ExcludedApps => "excluded_apps",
         }
     }
 }
