@@ -375,7 +375,9 @@ impl Core {
             .enumerate()
             .map(|(i, mut f)| {
                 let held = conns.get(&f.row.id).is_some_and(|c| c.welcomed);
-                f.running = held || (p.facts.running)(&f.row.path);
+                // a folder gone: missing and never running, whatever its
+                // old hub process still does (lead m_8979)
+                f.running = !f.missing && (held || (p.facts.running)(&f.row.path));
                 let c = self.hubs.git.get(&f.row.id).cloned().unwrap_or_default();
                 projects::row(&f, i as u32, &c)
             })

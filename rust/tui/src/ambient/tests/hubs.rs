@@ -12,6 +12,8 @@ struct World {
     ends: Receiver<(String, HubEnd)>,
     rx: Receiver<(String, HubIn)>,
     open: HashMap<String, HubEnd>,
+    /// the folders gone (docs' from the start)
+    gone: std::sync::Arc<std::sync::Mutex<Vec<PathBuf>>>,
 }
 
 fn rows() -> Vec<Row> {
@@ -26,6 +28,8 @@ fn docs_card() -> Value {
 }
 
 fn world(t: &mut T) -> World {
+    let gone = std::sync::Arc::new(std::sync::Mutex::new(vec![PathBuf::from("/p/docs")]));
+    let gone2 = gone.clone();
     let (etx, ends) = mpsc::channel::<(String, HubEnd)>();
     let (ptx, rx) = mpsc::channel::<(String, HubIn)>();
     let spawn: crate::ambient::core::Spawn = Box::new(move |_path, id| {
@@ -53,7 +57,7 @@ fn world(t: &mut T) -> World {
             cards: vec![serde_json::from_value(docs_card()).unwrap()],
         })),
         running: Box::new(|_| false),
-        exists: Box::new(|p| p != Path::new("/p/docs")),
+        exists: Box::new(move |p| !gone2.lock().unwrap().iter().any(|g| g == p)),
         git: Box::new(|p| {
             let shop = p == Path::new("/p/shop");
             crate::ambient::projects::Checkout {
@@ -64,7 +68,7 @@ fn world(t: &mut T) -> World {
         }),
     };
     t.core.set_projects(ProjectPorts { spawn, facts });
-    World { ends, rx, open: HashMap::new() }
+    World { ends, rx, open: HashMap::new(), gone }
 }
 
 impl World {
@@ -216,6 +220,28 @@ fn the_window_reaches_every_projects_hub_through_the_core() {
     let mail = closed(w.end("mail"));
     assert!(mail.iter().all(|l| l.contains("\"hello\"")), "mail never welcomed: only the hellos went: {mail:?}");
     assert!(!w.open.contains_key("docs"), "a folder gone: never a connection");
+}
+
+#[test]
+fn a_folder_gone_makes_its_row_missing_and_not_running() {
+    // lead m_8979: the sidebar knows without a subscribe
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    let row = |o: &[Value]| o.iter().rev().find(|v| v["ev"] == "projects").map(|v| v["projects"][1].clone());
+    w.until(&mut t, |o| row(o).is_some_and(|r| r["running"] == true));
+    // shop's folder is renamed while its hub runs: the next poll says so
+    // (a `shown` polls at once, as the 2 s tick does)
+    w.gone.lock().unwrap().push(PathBuf::from("/p/shop"));
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.until(&mut t, |o| row(o).is_some_and(|r| r["missing"] == true));
+    let r = row(&t.take()).unwrap();
+    assert_eq!((r["missing"].as_bool(), r["running"].as_bool()), (Some(true), Some(false)), "{r}");
+    let mut l = String::new();
+    assert_eq!(w.end("shop").r.read_line(&mut l).unwrap(), 0, "its connection closed: {l}");
 }
 
 #[test]
