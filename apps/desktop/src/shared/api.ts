@@ -40,6 +40,8 @@ export interface BiseApi {
   readonly capsule: CapsuleApi;
   /** Opens the main window, on `route` when given (the capsule's ⏎, a card's 'open'). */
   readonly openWindow: (route?: string) => void;
+  /** Quits bise (the tray dropdown's last row, ⌘Q's twin). */
+  readonly quit: () => void;
   /** Main asks this window to go to a route (openWindow while it was open); returns the unsubscribe. */
   readonly onRoute: (listener: (route: string) => void) => () => void;
   /** `bise ambient-core`, run by main (src/main/core): its events in, typed commands out. */
@@ -121,6 +123,7 @@ export const IPC = {
   capsuleState: 'bise:capsule-state',
   openWindow: 'bise:open-window',
   route: 'bise:route',
+  quit: 'bise:quit',
   /** test mode: the preload asks main for the clipboard's seed (the env's files) */
   clipSeed: 'bise:clip-seed',
 } as const;

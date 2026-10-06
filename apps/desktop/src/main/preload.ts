@@ -69,6 +69,9 @@ const api: BiseApi = {
     },
     onState: (listener) => listen(IPC.capsuleState, listener),
   },
+  quit: () => {
+    ipcRenderer.send(IPC.quit);
+  },
   openWindow: (route) => {
     ipcRenderer.send(IPC.openWindow, route);
   },

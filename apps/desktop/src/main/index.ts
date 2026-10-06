@@ -65,6 +65,9 @@ void app.whenReady().then(() => {
   const main = new MainWindow(testMode);
   const capsule = new Capsule(testMode);
   installCapsuleIpc(capsule);
+  ipcMain.on(IPC.quit, () => {
+    app.quit();
+  });
   ipcMain.on(IPC.openWindow, (_e, route: unknown) => {
     main.open(typeof route === 'string' ? route : undefined);
   });
