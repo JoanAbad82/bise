@@ -7,7 +7,7 @@
 // wait on typed commands from amb-core).
 import path from 'node:path';
 import { test, expect } from '../../harness';
-import { hubAgents, hubOf, launchReal, realWorld, tui, tuiAgents, tuiReady, type Tui } from '../world';
+import { hubAgents, hubOf, launchOn, realWorld, tui, tuiAgents, tuiReady, type Tui } from '../world';
 
 const T = {
   screen: '[data-testid="agents.screen"]',
@@ -19,7 +19,7 @@ test("agents/settings: an agent's rename and model from the window, as /rename a
   const w = realWorld();
   const project = path.basename(path.dirname(hubOf(w, 'telemetry').sock));
   let t: Tui | undefined;
-  const s = await launchReal(w, { route: `agents/${project}` });
+  const s = await launchOn(w, `agents/${project}`, T.screen);
   try {
     const { page } = s;
     t = tui(w, 'telemetry');

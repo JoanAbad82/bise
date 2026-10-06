@@ -32,4 +32,6 @@ if [ ${#specs[@]} -eq 0 ]; then
          tests/checks/agents tests/checks/review tests/checks/spotlight/answer.spec.ts)
 fi
 cd "$desktop" || exit 1
-pnpm exec playwright test -c tests/harness/playwright.config.ts "${specs[@]}" -g 'real core|thread/|inbox/cmd-i|agents/|review/' --reporter=list
+# the list on stdout, and every annotation (the checks' measured times) in a JSON beside it
+export PLAYWRIGHT_JSON_OUTPUT_NAME="${TMPDIR:-/tmp}/qa-flows-real.json"
+pnpm exec playwright test -c tests/harness/playwright.config.ts "${specs[@]}" -g 'real core|thread/|inbox/cmd-i|agents/|review/' --reporter=list,json

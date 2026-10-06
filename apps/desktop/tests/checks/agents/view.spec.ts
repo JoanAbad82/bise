@@ -12,7 +12,7 @@
 // and gift-ui's view shows the question, as the TUI's view of gift-ui does.
 import path from 'node:path';
 import { test, expect } from '../../harness';
-import { hubAgents, hubOf, launchReal, realWorld, transcriptHas, tui, tuiAgents, tuiReady, type Tui } from '../world';
+import { hubAgents, hubOf, launchOn, realWorld, transcriptHas, tui, tuiAgents, tuiReady, type Tui } from '../world';
 
 const T = {
   screen: '[data-testid="agents.screen"]',
@@ -31,7 +31,7 @@ test("agents/view: an agent's report shows, its view has its feed, and a turn st
   const w = realWorld();
   const project = path.basename(path.dirname(hubOf(w, 'telemetry').sock));
   let t: Tui | undefined;
-  const s = await launchReal(w, { route: `agents/${project}` });
+  const s = await launchOn(w, `agents/${project}`, T.screen);
   try {
     const { page } = s;
     t = tui(w, 'telemetry');
@@ -82,7 +82,7 @@ test("agents/view: an agent's own question shows on its row and in its view, as 
   const project = path.basename(path.dirname(hubOf(w, 'shop').sock));
   const ask = 'show the balance on the cart page, or only at checkout?';
   let t: Tui | undefined;
-  const s = await launchReal(w, { route: `agents/${project}` });
+  const s = await launchOn(w, `agents/${project}`, T.screen);
   try {
     const { page } = s;
     t = tui(w, 'shop');

@@ -7,7 +7,7 @@
 // /new from amb-core). The spotlight's /new is not covered here.
 import path from 'node:path';
 import { test, expect } from '../../harness';
-import { hubAgents, hubOf, launchReal, realWorld, tui, tuiAgents, tuiReady, type Tui } from '../world';
+import { hubAgents, hubOf, launchOn, realWorld, tui, tuiAgents, tuiReady, type Tui } from '../world';
 
 const T = {
   screen: '[data-testid="agents.screen"]',
@@ -21,7 +21,7 @@ test('agents/new: + new agent starts an agent that shows in the list, the hub an
   const project = path.basename(path.dirname(hubOf(w, 'telemetry').sock));
   const name = `qa${String(Date.now() % 100_000)}`;
   let t: Tui | undefined;
-  const s = await launchReal(w, { route: `agents/${project}` });
+  const s = await launchOn(w, `agents/${project}`, T.screen);
   try {
     const { page } = s;
     t = tui(w, 'telemetry');

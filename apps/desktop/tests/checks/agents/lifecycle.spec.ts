@@ -4,13 +4,13 @@
 // the TUI starts a slow turn on it, then the window stops it, archives it and restores it.
 // Passes when:
 //   - stop: the window's stop on a working agent ends its turn (the hub and the TUI's panel leave
-//     working within 3 s, and its report says the user interrupted it, as after the TUI's /stop);
+//     working within 3 s, well before the turn's [[slow: 20]] runs out);
 //   - archive: the agent leaves the hub's live agents and the TUI's panel, the window lists it
 //     under 'archived', and the TUI's /archived lists it too;
 //   - restore: it is back in the hub, the TUI's panel and the window's live list.
 import path from 'node:path';
 import { test, expect } from '../../harness';
-import { hubAgents, hubOf, launchReal, realWorld, tui, tuiAgents, tuiReady, tuiSay, type Tui } from '../world';
+import { hubAgents, hubOf, launchOn, realWorld, tui, tuiAgents, tuiReady, tuiSay, type Tui } from '../world';
 
 const T = {
   screen: '[data-testid="agents.screen"]',
@@ -33,7 +33,7 @@ test('agents/lifecycle: stop, archive and restore from the window act as in the 
   const live = async () => (await hubAgents(w, 'shop')).filter((a) => !a.dropped && a.status !== 'archived');
   const status = async () => (await live()).find((a) => a.name === AG)?.status;
   let t: Tui | undefined;
-  const s = await launchReal(w, { route: `agents/${project}` });
+  const s = await launchOn(w, `agents/${project}`, T.screen);
   try {
     const { page } = s;
     t = tui(w, 'shop');
@@ -61,8 +61,9 @@ test('agents/lifecycle: stop, archive and restore from the window act as in the 
     // issue-13 fix, main c4768dee + 0041ef46, is not in ambient-app yet; the 3 s bar above is red with it)
     await expect.poll(status, { timeout: 30_000, intervals: [200], message: 'the hub ends its turn after the stop' }).not.toBe('working');
     test.info().annotations.push({ type: 'stop', description: `hub left working ${String(Date.now() - t0)} ms after the click` });
-    const rep = (await live()).find((a) => a.name === AG)?.report ?? '';
-    expect(rep, "the stop reached the hub: the turn's report says the user interrupted it, as after the TUI's /stop").toMatch(/interrupted by the user/);
+    // the stop reached the hub: the turn ended before its [[slow: 20]] ran out (the report keeps the
+    // last finished turn's words, so it can't tell)
+    expect(Date.now() - t0, 'the turn ended by the stop, well before its 20 s slow ran out').toBeLessThan(15_000);
     await expect.poll(() => tuiAgents(t?.screen() ?? '').find((a) => a.name === AG)?.glyph, { timeout: 3000, message: "the TUI's panel has it at rest" }).not.toBe('∿');
     await expect(page.locator(T.row(AG)), 'the window has it at rest').not.toHaveAttribute('data-status', 'working', { timeout: 3000 });
     await page.screenshot({ path: test.info().outputPath('stopped.png') });

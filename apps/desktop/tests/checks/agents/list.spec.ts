@@ -11,7 +11,7 @@
 //   - a row opens its agent's thread.
 import path from 'node:path';
 import { test, expect } from '../../harness';
-import { hubAgents, hubOf, launchReal, realWorld, tui, tuiAgents, tuiReady, tuiSay, TUI_STATUS, type Tui } from '../world';
+import { hubAgents, hubOf, launchOn, launchReal, realWorld, tui, tuiAgents, tuiReady, tuiSay, TUI_STATUS, type Tui } from '../world';
 
 const T = {
   screen: '[data-testid="agents.screen"]',
@@ -67,7 +67,7 @@ test('agents/list: the same agents and statuses as the TUI panel and the hub, li
   const w = realWorld();
   const project = path.basename(path.dirname(hubOf(w, 'telemetry').sock));
   let t: Tui | undefined;
-  const s = await launchReal(w, { route: `agents/${project}` });
+  const s = await launchOn(w, `agents/${project}`, T.screen);
   try {
     const { page } = s;
     t = tui(w, 'telemetry');
@@ -80,7 +80,10 @@ test('agents/list: the same agents and statuses as the TUI panel and the hub, li
       const panel = tuiAgents(t?.screen() ?? '');
       const hub = (await hubAgents(w, 'telemetry')).filter((a) => !a.dropped);
       test.info().annotations.push({ type: when, description: JSON.stringify({ app, panel, hub: hub.map((a) => [a.name, a.status]) }) });
-      expect(app.map((a) => a.name), `${when}: the same agents in the same order as the TUI's panel`).toEqual(panel.map((p) => p.name));
+      expect([...app.map((a) => a.name)].sort(), `${when}: the same agents as the TUI's panel`).toEqual(panel.map((p) => p.name).sort());
+      // the order is the panel's numbering for ⌥1-9 in both (src/app/keys.ts panelAgents): the TUI keeps
+      // its agents in their start order, the app sorts them by status, so ⌥2 can open another agent
+      expect.soft(app.map((a) => a.name), `${when}: the same order as the TUI's panel (⌥N opens the same agent)`).toEqual(panel.map((p) => p.name));
       for (const p of panel) {
         const a = app.find((x) => x.name === p.name);
         expect(TUI_STATUS[p.glyph] ?? [], `${when}: ${p.name} is '${a?.status ?? '?'}' in the app, '${p.glyph}' in the TUI`).toContain(a?.status);

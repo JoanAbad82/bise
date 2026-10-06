@@ -217,6 +217,53 @@ export async function hubAgents(w: World, project: string): Promise<HubAgent[]> 
   return (s['agents'] as HubAgent[] | undefined) ?? [];
 }
 
+/**
+ * A line to a project's fake main from outside the app and the TUI (`qa.py world say`): the agents'
+ * side of a flow, e.g. '[[bash: sb feature ready gift-cards]]' opens the feature's try card.
+ */
+export function worldSay(project: string, text: string): void {
+  qa(['world', 'say', project, text], 120_000);
+}
+
+/**
+ * An app-menu key (⌘I: 'CmdOrCtrl+I') as NSMenu does it: the item's click with the focused window
+ * (none: the harness never focuses one, so main's own lookup decides where it goes). A menu key
+ * never reaches the page's keyboard, so page.keyboard.press can't stand for it. Returns its label.
+ */
+export async function menuKey(s: Session, accelerator: string): Promise<string> {
+  return s.app.evaluate(({ Menu, BrowserWindow }, acc) => {
+    const find = (items: Electron.MenuItem[]): Electron.MenuItem | undefined => {
+      for (const it of items) {
+        if (it.accelerator === acc) return it;
+        const sub = it.submenu ? find(it.submenu.items) : undefined;
+        if (sub) return sub;
+      }
+      return undefined;
+    };
+    const it = find(Menu.getApplicationMenu()?.items ?? []);
+    if (!it) return '';
+    const click = it.click as unknown as (e: unknown, w: Electron.BrowserWindow | null, c: unknown) => void;
+    click.call(it, {}, BrowserWindow.getFocusedWindow(), undefined);
+    return it.label;
+  }, accelerator);
+}
+
+/**
+ * The app started on a route (the harness's start screen). A fresh world's first launch shows the
+ * first-run setup instead ('hi. i'm bise … start / skip for now'), whatever the route: skip it by
+ * its button, close, and launch again on the route (the skip is kept in the world's home).
+ */
+export async function launchOn(w: World, route: string, screen: string): Promise<Session> {
+  const s = await launchReal(w, { route });
+  const skip = s.page.locator('[data-testid="setup.skip"]');
+  await s.page.locator(`${screen}, [data-testid="setup.skip"]`).first().waitFor({ timeout: 15_000 }).catch(() => undefined);
+  if (!(await skip.isVisible())) return s;
+  await skip.click();
+  await s.page.waitForTimeout(500);
+  await s.close();
+  return launchReal(w, { route });
+}
+
 /** The TUI's prompt: type these words (literally) and Enter. */
 export function tuiSay(t: Tui, words: string): void {
   t.keys('-l', words);
