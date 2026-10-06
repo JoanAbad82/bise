@@ -9,7 +9,7 @@
 // One number sequence per draft for images, pastes and quotes (a number points at one chip).
 
 export type Chip =
-  | { readonly kind: 'image'; readonly n: number; readonly path: string; readonly name: string }
+  | { readonly kind: 'image'; readonly n: number; readonly path: string; readonly name: string; readonly thumb?: string }
   | { readonly kind: 'paste'; readonly n: number; readonly text: string }
   | { readonly kind: 'quote'; readonly n: number; readonly text: string; readonly from: string };
 

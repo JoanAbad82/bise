@@ -171,14 +171,17 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
             {p.answer?.done === false && <span className="cur" />}
           </div>
         )}
-        {list.sections.map((s) => (
-          <div key={s.label ?? 'ask'} role="group" data-testid={`${testId}.group.${s.label ?? 'ask'}`}>
-            {s.label !== null && <SpotGroup>{s.label}</SpotGroup>}
-            {s.items.map((item) => (
-              <Row key={item.id} item={item} on={items[index]?.id === item.id} testId={testId} onPick={pick} />
-            ))}
-          </div>
-        ))}
+        {/* one flat keyed list, the group heads as items: a row that stays listed keeps its element
+            when it changes group or place (qa-type's spotlight/typing: rows keyed inside their group
+            were rebuilt when typing moved them, bug 7's blink) */}
+        {list.sections.flatMap((s) => [
+          s.label === null ? null : (
+            <div key={`group.${s.label}`} data-testid={`${testId}.group.${s.label}`}>
+              <SpotGroup>{s.label}</SpotGroup>
+            </div>
+          ),
+          ...s.items.map((item) => <Row key={item.id} item={item} on={items[index]?.id === item.id} testId={testId} onPick={pick} />),
+        ])}
       </Spot>
     </div>
   );

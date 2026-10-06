@@ -20,7 +20,7 @@ const FILES: readonly PickFile[] = [
   { path: 'shots/screen.png', dir: false },
 ];
 
-/** The 32 commands of bar 2.1; the ones without a screen or a cmd yet are greyed. */
+/** The commands of bar 2.1 (with the /shortcuts alias /keys); the ones without a screen or a cmd yet are greyed. */
 const COMMANDS = [
   ['new', 'start an agent: /new [-w] [name:] objective', true, true],
   ['archive', 'archive an agent', true, true],
@@ -53,6 +53,8 @@ const COMMANDS = [
   ['welcome', 'welcome', false, false],
   ['setup', 'check the setup again', false, false],
   ['help', 'the key list', false, false],
+  ['shortcuts', 'the key list', false, false],
+  ['keys', 'the key list', false, false],
   ['theme', 'auto, light or dark', true, false],
 ] as const;
 

@@ -70,3 +70,17 @@ describe('the spotlight', () => {
     expect(input.value).toBe('');
   });
 });
+
+describe('the spotlight rows', () => {
+  it('a row that stays listed keeps its element when typing moves it to another group', async () => {
+    const ui = render(<Spotlight data={D} onAsk={vi.fn()} onOpen={vi.fn()} onClose={vi.fn()} />);
+    const input = ui.getByTestId('spot.input') as HTMLInputElement;
+    const perf = ui.getByTestId('spot.row.agent.tel.perf');
+    await act(async () => {
+      fireEvent.input(input, { target: { value: 'p' } });
+      await Promise.resolve();
+    });
+    expect(ui.getByTestId('spot.group.found')).toBeTruthy();
+    expect(ui.getByTestId('spot.row.agent.tel.perf')).toBe(perf);
+  });
+});

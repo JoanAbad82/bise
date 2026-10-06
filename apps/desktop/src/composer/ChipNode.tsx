@@ -64,6 +64,7 @@ export class ChipNode extends DecoratorNode<JSX.Element> {
     const c = this.__chip;
     return (
       <span className={`b-chip ${c.kind}`} data-testid={`composer.chip.${c.n}`} data-kind={c.kind} title={c.kind === 'image' ? c.name : undefined} contentEditable={false}>
+        {c.kind === 'image' && c.thumb !== undefined && <img className="thumb" src={c.thumb} alt="" draggable={false} />}
         {chipLabel(c)}
       </span>
     );

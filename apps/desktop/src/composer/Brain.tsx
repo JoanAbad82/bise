@@ -8,9 +8,11 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import {
   $createParagraphNode,
   $getRoot,
+  $parseSerializedNode,
   $getSelection,
   $isRangeSelection,
   COMMAND_PRIORITY_HIGH,
+  COPY_COMMAND,
   DROP_COMMAND,
   HISTORY_PUSH_TAG,
   KEY_ARROW_DOWN_COMMAND,
@@ -20,6 +22,7 @@ import {
   KEY_TAB_COMMAND,
   PASTE_COMMAND,
   type LexicalEditor,
+  type SerializedLexicalNode,
 } from 'lexical';
 import { mergeRegister } from '@lexical/utils';
 import { $caretOffset, $insertAtCaret, $insertChip, $replaceBeforeCaret, $selectRange } from './edit';
@@ -69,6 +72,16 @@ function slotOf(text: string, messageStart: boolean, sources: ComposerSources): 
   );
 }
 
+/** The root's children of a saved editor state (drafts.ts entries); [] when unreadable. */
+function serializedChildren(entry: string): SerializedLexicalNode[] {
+  try {
+    const v = JSON.parse(entry) as { root?: { children?: SerializedLexicalNode[] } };
+    return Array.isArray(v.root?.children) ? v.root.children : [];
+  } catch {
+    return [];
+  }
+}
+
 const json = (editor: LexicalEditor): string => JSON.stringify(editor.getEditorState().toJSON());
 
 const segmentsOf = (editor: LexicalEditor, entry: string): Segment[] => editor.parseEditorState(entry).read(() => $readSegments());
@@ -93,20 +106,21 @@ export function Brain(p: BrainProps): JSX.Element | null {
     save(props.current.store, props.current.target, saved.current);
   };
 
+  // the field's content replaced by a draft (or emptied), the caret at its end (input.rs): one
+  // update that works inside a key command's own update too (qa-type's drafts and queue-steer: a
+  // setEditorState there left the caret at the start)
   const setContent = (entry: string | null): void => {
-    if (entry === null) {
-      editor.update(() => {
+    editor.update(
+      () => {
         const root = $getRoot();
         root.clear();
-        root.append($createParagraphNode());
+        const kids = entry === null ? [] : serializedChildren(entry);
+        if (kids.length === 0) root.append($createParagraphNode());
+        for (const k of kids) root.append($parseSerializedNode(k));
         root.selectEnd();
-      });
-    } else {
-      editor.setEditorState(editor.parseEditorState(entry));
-      editor.update(() => {
-        $getRoot().selectEnd();
-      });
-    }
+      },
+      { discrete: true },
+    );
   };
 
   useEffect(() => {
@@ -224,8 +238,8 @@ export function Brain(p: BrainProps): JSX.Element | null {
 
   const addImages = (list: readonly File[]): void => {
     for (const f of list) {
-      void props.current.sources.saveImage(f).then((img) => {
-        if (img !== null) addChip((n) => ({ kind: 'image', n, path: img.path, name: img.name }));
+      void Promise.all([props.current.sources.saveImage(f), thumbnail(f)]).then(([img, thumb]) => {
+        if (img !== null) addChip((n) => ({ kind: 'image', n, path: img.path, name: img.name, ...(thumb === null ? {} : { thumb }) }));
       });
     }
   };
@@ -234,22 +248,26 @@ export function Brain(p: BrainProps): JSX.Element | null {
   const longPaste = (raw: string): void => {
     const text = raw.replace(/\r\n?/gu, '\n');
     let start: number | null = null;
-    editor.update(
-      () => {
-        const sel = $getSelection();
-        if ($isRangeSelection(sel) && !sel.isCollapsed()) sel.removeText();
-        start = $caretOffset();
-        $insertAtCaret(text);
-      },
-      { tag: HISTORY_PUSH_TAG, discrete: true },
-    );
-    editor.update(
-      () => {
-        if (start === null || !$selectRange(start, start + text.length)) return;
-        $insertChip({ kind: 'paste', n: nextChipNumber($readSegments()), text });
-      },
-      { tag: HISTORY_PUSH_TAG },
-    );
+    // outside the paste command's own update (a nested update merges into it, and the two steps
+    // would be one undo entry: qa-type's composer/long-paste, ⌘Z emptied the field)
+    window.setTimeout(() => {
+      editor.update(
+        () => {
+          const sel = $getSelection();
+          if ($isRangeSelection(sel) && !sel.isCollapsed()) sel.removeText();
+          start = $caretOffset();
+          $insertAtCaret(text);
+        },
+        { tag: HISTORY_PUSH_TAG, discrete: true },
+      );
+      editor.update(
+        () => {
+          if (start === null || !$selectRange(start, start + text.length)) return;
+          $insertChip({ kind: 'paste', n: nextChipNumber($readSegments()), text });
+        },
+        { tag: HISTORY_PUSH_TAG, discrete: true },
+      );
+    }, 0);
   };
 
   const actions: ComposerActions = {
@@ -408,6 +426,25 @@ export function Brain(p: BrainProps): JSX.Element | null {
         },
         COMMAND_PRIORITY_HIGH,
       ),
+      // ⌘C: the selection's text always goes on the clipboard, chips as their labels (qa-type's
+      // composer/edit-keys: after ⌘A, Lexical's own copy put an empty text/plain)
+      editor.registerCommand(
+        COPY_COMMAND,
+        (e) => {
+          if (!(e instanceof ClipboardEvent) || e.clipboardData === null) return false;
+          const text = editor.getEditorState().read(() => {
+            const sel = $getSelection();
+            return sel === null ? '' : sel.getTextContent();
+          });
+          const dom = window.getSelection()?.toString() ?? '';
+          const out = text !== '' ? text : dom;
+          if (out === '') return false;
+          e.preventDefault();
+          e.clipboardData.setData('text/plain', out);
+          return true;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
       editor.registerCommand(
         PASTE_COMMAND,
         (e) => {
@@ -488,6 +525,22 @@ export function Brain(p: BrainProps): JSX.Element | null {
       }}
     />
   ) : null;
+}
+
+/** A small thumbnail of an image file as a data URL (the chip's), or null when it can't be read. */
+async function thumbnail(f: File, side = 48): Promise<string | null> {
+  try {
+    const bmp = await createImageBitmap(f);
+    const k = Math.min(1, side / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(bmp.width * k));
+    c.height = Math.max(1, Math.round(bmp.height * k));
+    c.getContext('2d')?.drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close();
+    return c.toDataURL('image/png');
+  } catch {
+    return null;
+  }
 }
 
 /** Above the box: the chips' strip (`▤ 1 “first words…”  240 lines · 9.8 kB`) and the queue. */
