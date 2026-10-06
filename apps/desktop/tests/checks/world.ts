@@ -32,7 +32,11 @@ export function realWorld(): World {
   let w: World | undefined;
   try {
     w = parse(qa(['world', 'state'], 60_000));
-    if (!w.hubs.every((h) => h.alive)) w = undefined;
+    // a dead hub, or a world whose bise build is gone (an agent cleaned its target): a new world
+    if (!w.hubs.every((h) => h.alive) || !existsSync(w.bise)) {
+      qa(['world', 'down'], 120_000);
+      w = undefined;
+    }
   } catch {
     w = undefined;
   }
