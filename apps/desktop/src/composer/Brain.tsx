@@ -26,7 +26,9 @@ import {
   KEY_ENTER_COMMAND,
   KEY_ESCAPE_COMMAND,
   KEY_TAB_COMMAND,
+  HISTORIC_TAG,
   PASTE_COMMAND,
+  PASTE_TAG,
   UNDO_COMMAND,
   type LexicalEditor,
   type SerializedLexicalNode,
@@ -37,10 +39,11 @@ import { $caretOnFirstLine, $isBlank, $plainText, $readSegments, $textBeforeCare
 import { enterMakesNewline, indent, newline, outdentAtStart, subwordLeft, subwordRight, NO_UNDO, type Op } from './mdlive';
 import { buildMessage, chars, chipStrip, isLongPaste, nextChipNumber, preview, type Chip, type Outgoing, type Segment } from './message';
 import { enqueue, historyAt, load, popNewest, remember, save, takeOldest, type Saved, type Store } from './drafts';
-import { agentRows, argRows, commandLine, commandRows, completion, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
+import { agentRows, argRows, commandLine, commandRows, completion, emojiRows, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
 import { isImagePath, type ComposerSources, type PickFile } from './sources';
 import { argAt, browseText, parentQuery, triggerAt, type Trigger } from './tokens';
 import { loadRecent, picked, recentFirst } from './recent';
+import { emojiToken, typedEmoji } from './emoji';
 import { Picker } from './Picker';
 
 /** What the screen around a composer may ask of it (dictation, the send button, focus). */
@@ -171,7 +174,9 @@ export function Brain(p: BrainProps): JSX.Element | null {
           ? skillRows(trigger, p.sources.skills)
           : trigger.kind === 'arg'
             ? argRows(trigger, p.sources.commands, p.sources)
-            : commandRows(trigger, p.sources.commands);
+            : trigger.kind === 'emoji'
+              ? emojiRows(trigger)
+              : commandRows(trigger, p.sources.commands);
     return all.slice(0, MAX_ROWS);
   }, [trigger, tkey, files, p.sources, p.store]);
 
@@ -339,10 +344,30 @@ export function Brain(p: BrainProps): JSX.Element | null {
   // ---- the editor's updates: what he typed, read (never written back) ----
   useEffect(() => {
     let lastTrigger = '';
-    return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
+    let lastBefore: string | null = null;
+    return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves, tags }) => {
       const r = editorState.read(() => ({ blank: $isBlank(), segs: $readSegments(), before: $textBeforeCaret() }));
+      // a `:` he just typed closes a known `:name:`: the emoji takes its place (emoji.rs
+      // replace_typed); never on a paste or an undo (⌘Z brings `:clap:` back and it stays)
+      const typedColon = r.before !== null && lastBefore !== null && r.before.text === `${lastBefore}:` && !tags.has(HISTORIC_TAG) && !tags.has(PASTE_TAG);
+      lastBefore = r.before?.text ?? null;
+      const em = typedColon && r.before !== null ? typedEmoji(r.before.text) : null;
+      if (em !== null && r.before !== null) {
+        const n = chars(r.before.text.slice(em.start)).length;
+        editor.update(() => {
+          $replaceBeforeCaret(n, em.glyph);
+        });
+        return;
+      }
       props.current.onCanSend(!r.blank);
-      const t = r.before === null ? null : (slotOf(r.before.text, r.before.messageStart, props.current.sources) ?? triggerAt(r.before.text, r.before.messageStart));
+      const emojiTrigger = (before: string): Trigger | null => {
+        const e = emojiToken(before);
+        return e === null ? null : { kind: 'emoji', query: e.query, start: e.start, quoted: false };
+      };
+      const t =
+        r.before === null
+          ? null
+          : (slotOf(r.before.text, r.before.messageStart, props.current.sources) ?? triggerAt(r.before.text, r.before.messageStart) ?? emojiTrigger(r.before.text));
       const k = triggerKey(t);
       if (k !== lastTrigger) {
         lastTrigger = k;

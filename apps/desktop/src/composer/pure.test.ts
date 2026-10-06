@@ -1,6 +1,10 @@
 // The composer's pure parts: triggers, the send's text, drafts, the picker's rows.
 import { describe, expect, it } from 'vitest';
 import { argAt, browseText, filePick, parentQuery, prefixFirst, triggerAt } from './tokens';
+import { emojiToken, filterEmoji, get, typedEmoji, all as allEmoji, EMOJI_MAX } from './emoji';
+import { emojiRows } from './pick';
+import TUI_EMOJI from '../../../../rust/tui/src/emoji.tsv?raw';
+import DESKTOP_EMOJI from './emoji.tsv?raw';
 import { loadRecent, picked, recentFirst, RECENT_MAX } from './recent';
 import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Segment } from './message';
 import { enqueue, load, popNewest, remember, save, takeOldest, HISTORY_MAX, type Store } from './drafts';
@@ -202,5 +206,46 @@ describe('@ folders and recent picks (files.rs)', () => {
     expect(recentFirst(m, 'mention', loadRecent(s))[0]?.path).toBe('rust/tui/src/sb/mention.rs');
     for (let i = 0; i < RECENT_MAX + 5; i += 1) picked(s, `f${i}`);
     expect(loadRecent(s)).toHaveLength(RECENT_MAX);
+  });
+});
+
+describe('emoji (emoji.rs)', () => {
+  it('the table is the TUI\'s, with its standard names', () => {
+    expect(DESKTOP_EMOJI).toBe(TUI_EMOJI);
+    expect(allEmoji().length).toBeGreaterThan(1500);
+    expect(get('clap')).toBe('👏');
+    expect(get('CLAP')).toBe('👏');
+    expect(get('+1')).toBe('👍');
+    expect(get('tada')).toBe('🎉');
+    expect(get('aplause')).toBeNull();
+  });
+  it('the list opens at a word start with two letters, never in urls, times or paths', () => {
+    expect(emojiToken(':cl')).toEqual({ start: 0, query: 'cl' });
+    expect(emojiToken('bravo :cla')).toEqual({ start: 6, query: 'cla' });
+    expect(emojiToken('(:cl')).toEqual({ start: 1, query: 'cl' });
+    expect(emojiToken('👏:ta')).toEqual({ start: 2, query: 'ta' });
+    for (const no of [':c', 'at :30', ':-D', ':)', 'http://ex', 'see https:', '12:30', '12:ab', 'note:todo', 'a: b', 'std::vec']) expect(emojiToken(no)).toBeNull();
+  });
+  it('a typed closing colon replaces a known name only', () => {
+    expect(typedEmoji(':clap:')).toEqual({ start: 0, glyph: '👏' });
+    expect(typedEmoji('bravo :clap:')).toEqual({ start: 6, glyph: '👏' });
+    expect(typedEmoji(':+1:')).toEqual({ start: 0, glyph: '👍' });
+    expect(typedEmoji('👏:tada:')).toEqual({ start: 2, glyph: '🎉' });
+    for (const no of [':aplause:', ':nope:', 'a:clap:', 'http://', '12:30:', '::', ':clap']) expect(typedEmoji(no)).toBeNull();
+  });
+  it('ranks exact, prefix, substring, tags, then misspellings', () => {
+    const cl = filterEmoji('cl');
+    expect(cl[0]?.name).toBe('cl');
+    expect(cl.findIndex((h) => h.emoji.glyph === '👏')).toBeLessThan(8);
+    const g = (q: string) => filterEmoji(q).map((h) => h.emoji.glyph);
+    expect(g('clap')[0]).toBe('👏');
+    expect(g('applause')).toContain('👏');
+    expect(g('aplause')).toContain('👏');
+    expect(g('aplau')).toContain('👏');
+    expect(g('tdaa')).toContain('🎉');
+    expect(filterEmoji('zzzzqq')).toEqual([]);
+    expect(filterEmoji('')).toEqual([]);
+    expect(filterEmoji('e').length).toBeLessThanOrEqual(EMOJI_MAX);
+    expect(emojiRows({ kind: 'emoji', query: 'tada', start: 0, quoted: false })[0]).toMatchObject({ label: '🎉  :tada:', pick: { kind: 'insert', text: '🎉' } });
   });
 });

@@ -1,5 +1,6 @@
 // The picker's rows for a trigger, and what picking one does. Pure: the plugin (Picker.tsx) asks
 // for the rows when the trigger changes and applies the pick to the editor.
+import { filterEmoji } from './emoji';
 import type { ComposerSources, PickAgent, PickCommand, PickFile, PickSkill } from './sources';
 import { agentPick, filePick, prefixFirst, skillPick, type Trigger } from './tokens';
 
@@ -8,8 +9,8 @@ export interface Row {
   readonly id: string;
   readonly label: string;
   readonly desc: string;
-  /** A tag in front: `agent`, `dir`, `file`, `skill`, `cmd`. */
-  readonly tag: 'agent' | 'dir' | 'file' | 'skill' | 'cmd';
+  /** A tag in front: `agent`, `dir`, `file`, `skill`, `cmd`, `emoji`. */
+  readonly tag: 'agent' | 'dir' | 'file' | 'skill' | 'cmd' | 'emoji';
   /** Greyed, `not yet`: shown, picking it does nothing (bar 2.1). */
   readonly off: boolean;
   readonly pick: Pick;
@@ -41,6 +42,19 @@ export function fileRows(files: readonly PickFile[]): Row[] {
     const p = filePick(f.path, f.dir);
     return { id: `file.${f.path}`, label: f.dir && !f.path.endsWith('/') ? `${f.path}/` : f.path, desc: '', tag: f.dir ? 'dir' : 'file', off: false, pick: { kind: 'insert', text: p.text, browse: p.browse, path: f.path } };
   });
+}
+
+/** The emoji list for `:cl` (emoji.rs filter): `👏 :clap:`, picking puts the emoji in place. */
+export function emojiRows(t: Trigger): Row[] {
+  if (t.kind !== 'emoji') return [];
+  return filterEmoji(t.query).map(({ emoji, name }) => ({
+    id: `emoji.${name}`,
+    label: `${emoji.glyph}  :${name}:`,
+    desc: emoji.desc,
+    tag: 'emoji',
+    off: false,
+    pick: { kind: 'insert', text: emoji.glyph, browse: false },
+  }));
 }
 
 export function skillRows(t: Trigger, skills: readonly PickSkill[]): Row[] {

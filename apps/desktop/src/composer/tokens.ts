@@ -5,7 +5,7 @@
 // carry over: a trigger opens a word (paragraph start or after a space) and the word has no
 // space yet, except `@"` which opens a quoted path (a folder with a space) until a closing `"`.
 
-export type TriggerKind = 'at' | 'skill' | 'slash' | 'arg';
+export type TriggerKind = 'at' | 'skill' | 'slash' | 'arg' | 'emoji';
 
 export interface Trigger {
   readonly kind: TriggerKind;
