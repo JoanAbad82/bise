@@ -123,6 +123,31 @@
     return { ...s, agents, cards, projects, stateKeys: [...keys], picked: s.picked && ids.has(String(s.picked.card)) ? s.picked : null };
   }
 
+  // the core's error {project?, cmd?, text} (S3b: a command to a hub not welcomed yet, an unknown
+  // project, a hub's own refusal): a thread that was opening says it didn't, a message on its way
+  // says it wasn't sent, an answer he gave puts its card back; the line shows over the window
+  function onError(s, ev) {
+    const text = String(ev.text || "");
+    const mine = (k) => !ev.project || k.startsWith(`${ev.project}/`);
+    const threads = {};
+    for (const [k, t] of Object.entries(s.threads)) {
+      let u = t;
+      if (mine(k) && (ev.cmd === "subscribe" || ev.cmd === "page") && (t.loading || t.paging)) u = { ...u, loading: false, paging: false, error: text };
+      if (mine(k) && ev.cmd === "send") {
+        const i = u.entries.map((e) => !!e.pending).lastIndexOf(true);
+        if (i >= 0) u = { ...u, entries: u.entries.map((e, j) => (j === i ? { ...e, pending: false, failed: text } : e)) };
+      }
+      threads[k] = u;
+    }
+    let answered = s.answered, picked = s.picked;
+    if (ev.cmd === "answer" && ev.project) {
+      const ids = new Set((s.cards[ev.project] || []).map((c) => String(c.id)));
+      answered = Object.fromEntries(Object.entries(s.answered).filter(([id]) => !ids.has(String(id))));
+      if (picked && ids.has(String(picked.card))) picked = null;
+    }
+    return { ...s, threads, answered, picked, toast: { project: ev.project || null, cmd: ev.cmd || null, text, at: s.now } };
+  }
+
   // a deep link from the shell, the capsule or a card: bise · project/<p> · agent/<p>/<a> · inbox
   // (<p> is the project's id or its name)
   function resolve(s, route) {
@@ -162,6 +187,7 @@
       // the single-hub core's snapshot (the bar's state: agents, cards, maybe projects): until
       // S3b's typed per-project events it is the only place the window learns of them
       case "state": return fromState(s, ev);
+      case "error": return onError(s, ev);
       case "agents": return set(s, "agents", set(s.agents, ev.project, ev.agents));
       case "cards": {
         // a card he answered stays hidden until the core drops it (ids are numbers in S3a v1)
@@ -200,7 +226,7 @@
       // unless his setting says otherwise (winwords.lang)
       case "win_lang": return { ...s, lang: String(ev.lang || "").slice(0, 2).toLowerCase() || null };
       case "win_focused": return { ...s, focused: !!ev.on };
-      case "tick": return { ...s, now: ev.now };
+      case "tick": return { ...s, now: ev.now, toast: s.toast && ev.now - s.toast.at > 8000 ? null : s.toast };
     }
     return s;
   }
@@ -364,6 +390,7 @@
       }
       case "ui_theme": return { ...s, theme: s.theme === "dark" ? "light" : "dark" };
       case "ui_back": return back(s, cmds);
+      case "ui_toast_close": return s.toast && (ev.at == null || ev.at === s.toast.at) ? { ...s, toast: null } : s;
       case "ui_find_type": return s.finder ? { ...s, finder: { q: ev.text, i: 0 } } : s;
       case "ui_find_open": {
         const row = root.AmbWinFind.rows(s, s.finder ? s.finder.q : "")[ev.i];

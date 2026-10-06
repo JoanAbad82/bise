@@ -125,6 +125,7 @@
     if (e.via && VIA[e.via]) bits.push(`${T(s, VIA[e.via])}${e.context && e.context.app ? `, ${T(s, "from_app", { app: e.context.app })}` : ""}`);
     else if (e.context && e.context.app) bits.push(T(s, "from_app", { app: e.context.app }));
     if (e.pending) bits.push(e.queued ? T(s, "queued") : T(s, "sending"));
+    if (e.failed) bits.push(`${T(s, "not_sent")}: ${e.failed}`);
     return bits.join(" · ");
   }
   function ctx(e) {
@@ -143,7 +144,7 @@
         return { t: "msg", pos: e.pos, you: e.kind === "you", who: w, meta: meta(s, e), text: e.text, ctx: ctx(e),
           quote: e.quote ? D.quoteChip(e.quote, 0, (ms) => hm(s, ms), s).replace(/^❝ 1 /, "❝ ") : null,
           page: e.page ? { title: e.page.title, url: e.page.url } : null, pending: !!e.pending,
-          error: e.kind === "report" && e.report && e.report.kind === "failed" };
+          error: (e.kind === "report" && e.report && e.report.kind === "failed") || !!e.failed };
       }
       case "delegation": {
         const d = e.delegation || {};
@@ -197,7 +198,7 @@
       rows.push(row(s, e));
     }
     const a = M.agentRow(s);
-    const empty = !t.entries.length ? (isBise(s.route) ? { b: T(s, "empty_bise"), s: T(s, "empty_bise_s") }
+    const empty = !t.entries.length && t.error ? { b: T(s, "thread_err"), s: t.error, err: true } : !t.entries.length ? (isBise(s.route) ? { b: T(s, "empty_bise"), s: T(s, "empty_bise_s") }
       : s.route.agent === "main" && !M.agentsOf(s, s.route.project).length ? { b: T(s, "empty_project", { p: D.pname(s, s.route.project) }), s: T(s, "empty_project_s") }
       : { b: T(s, "empty_agent"), s: "" }) : null;
     return { rows, more: !!t.more, paging: !!t.paging, typing: t.typing ? { who: isBise(s.route) ? "bise" : s.route.agent, text: t.typing } : null, empty, working: !!(a && a.status === "working") };
@@ -292,11 +293,19 @@
     return t !== "thread" && x.tab ? x.tab(s, r.project, t) : null;
   }
 
+  // the core's error, one line over the window (the toast's one action closes it)
+  function toast(s) {
+    const t = s.toast;
+    if (!t) return null;
+    const where = t.project ? (t.project === HOME ? "bise" : D.pname(s, t.project)) : "";
+    return { text: where ? T(s, "err_line", { p: where, text: t.text }) : t.text, at: t.at, close: { text: T(s, "close"), act: { ev: "ui_toast_close", at: t.at } } };
+  }
+
   function view(s) {
     const x = s7(s);
     const S11 = root.AmbWinS11;
     return { setup: S11 ? S11.view(s) : null, sheet: S11 ? S11.overlay(s) : null, s7: x, finder: finder(s), tab: x ? null : tab(s), theme: s.theme, focused: s.focused, route: s.route, title: M.titleOf(s, s.route), mood: mood(s),
-      side: sidebar(s), head: x && x.head ? x.head : header(s), jobs: jobs(s), thread: thread(s), composer: composer(s), board: board(s), inbox: !!s.inbox };
+      side: sidebar(s), head: x && x.head ? x.head : header(s), jobs: jobs(s), thread: thread(s), composer: composer(s), board: board(s), inbox: !!s.inbox, toast: toast(s) };
   }
 
   root.AmbWinView = { view, sidebar, header, jobs, thread, composer, board, mood, finder, tab, hm, dayLabel };

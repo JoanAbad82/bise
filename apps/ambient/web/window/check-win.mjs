@@ -494,6 +494,39 @@ law("the real core (S3b): shown goes first and follows the project in view; bise
   eq(win().sent.filter((c) => c.cmd === "shown"), []);
 });
 
+law("the core's errors: a thread that didn't open says so, a message not sent says so, an answer refused puts its card back, one line over the window that closes", () => {
+  const w = win();
+  // a thread asked in a project whose hub isn't welcomed yet
+  w.feed({ ev: "agents", project: P.telemetry, agents: [...w.s.agents[P.telemetry], { name: "fresh", status: "idle" }] });
+  const before = w.sent.length;
+  w.s.threads; // nothing yet
+  const s0 = M.step(w.s, { ev: "ui_route", project: P.telemetry, agent: "fresh" });
+  let s = s0.s;
+  eq(s0.cmds.filter((c) => c.cmd === "subscribe").map((c) => c.agent), ["fresh"]);
+  s = M.step(s, { ev: "error", project: P.telemetry, cmd: "subscribe", text: "telemetry's hub isn't up yet" }).s;
+  let v = V.view(s);
+  eq([v.thread.loading || false, v.thread.empty, v.toast.text], [false, { b: "this thread didn't open", s: "telemetry's hub isn't up yet", err: true }, "telemetry · telemetry's hub isn't up yet"]);
+  // a message on its way, refused: it stays, marked not sent
+  s = M.step(s, { ev: "ui_type", text: "hello?" }).s;
+  s = M.step(s, { ev: "ui_send" }).s;
+  s = M.step(s, { ev: "error", project: P.telemetry, cmd: "send", text: "send: context isn't supported yet" }).s;
+  v = V.view(s);
+  const mine = v.thread.rows.filter((r) => r.t === "msg" && r.you).pop();
+  eq([mine.text, mine.pending, mine.error, /not sent: send: context isn't supported yet/.test(mine.meta)], ["hello?", false, true, true]);
+  // an answer refused: the card comes back above the composer
+  s = M.step(s, { ev: "ui_route", project: P.telemetry, agent: "alerts" }).s;
+  const card = D.dock(s).card;
+  s = M.step(s, { ev: "ui_pick", card: card.id, n: 1 }).s;
+  eq(!!(D.dock(s) && D.dock(s).card.id === card.id), false);
+  s = M.step(s, { ev: "error", project: P.telemetry, cmd: "answer", text: "card gone" }).s;
+  eq([D.dock(s).card.id, s.picked], [card.id, null]);
+  // the line closes (its act), and an old timer never closes a newer one
+  const at = V.view(s).toast.at;
+  eq(M.step(s, { ev: "ui_toast_close", at: at - 1 }).s.toast != null, true);
+  eq(M.step(s, V.view(s).toast.close.act).s.toast, null);
+  void before;
+});
+
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {
   const dir = join(here, "../../../../rust/proto/fixtures");
   if (!existsSync(dir)) return;

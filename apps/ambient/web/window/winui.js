@@ -224,14 +224,14 @@
   // ---- mount: the static frame, then regions redrawn when their HTML changes
   function mount(el, { post, recv: hook, wire = false }) {
     el.innerHTML = `<div class="w-app b-ui"><aside class="w-side"></aside><main class="b-main w-main"><div class="w-head"></div><div class="w-jobs"></div>` +
-      `<div class="w-scroll"><div class="w-thread"></div></div><div class="w-full" hidden></div><div class="w-over" hidden></div><div class="w-find" hidden><div class="b-spot"><div class="in"><input class="tx w-findq" placeholder="find an agent or a project" spellcheck="false"></div><div class="w-findrows"></div></div></div><div class="b-composer w-composer"><div class="w-dock"></div><div class="w-quotes"></div><div class="div"></div>` +
+      `<div class="w-scroll"><div class="w-thread"></div></div><div class="w-full" hidden></div><div class="w-over" hidden></div><div class="w-toast"></div><div class="w-find" hidden><div class="b-spot"><div class="in"><input class="tx w-findq" placeholder="find an agent or a project" spellcheck="false"></div><div class="w-findrows"></div></div></div><div class="b-composer w-composer"><div class="w-dock"></div><div class="w-quotes"></div><div class="div"></div>` +
       `<div class="box"><textarea class="in w-field" rows="1" spellcheck="false"></textarea><span class="send off" data-act='{"ev":"ui_send"}'>↑</span></div><div class="keys"></div></div></main><aside class="w-board b-board"></aside></div>`;
     const $ = (sel) => el.querySelector(sel);
     el.querySelector(".w-field").setAttribute("data-qa", "composer");
     el.querySelector(".w-findq").setAttribute("data-qa", "finder");
     const R = { side: $(".w-side"), head: $(".w-head"), jobs: $(".w-jobs"), thread: $(".w-thread"), scroll: $(".w-scroll"), dock: $(".w-dock"), quotes: $(".w-quotes"),
       div: $(".w-composer .div"), field: $(".w-field"), box: $(".w-composer .box"), send: $(".w-composer .send"), keys: $(".w-composer .keys"), board: $(".w-board"), app: $(".w-app"),
-      full: $(".w-full"), over: $(".w-over"), find: $(".w-find"), findq: $(".w-findq"), findrows: $(".w-findrows") };
+      full: $(".w-full"), over: $(".w-over"), toast: $(".w-toast"), find: $(".w-find"), findq: $(".w-findq"), findrows: $(".w-findrows") };
     const api = {};
     let s = M.init(Date.now());
     if (root.AMB_WIN_TZ) s = { ...s, tz: root.AMB_WIN_TZ };
@@ -240,6 +240,7 @@
     const last = {};
     let lastRoute = "";
     let lastTitle = "";
+    let toastAt = null;
 
     // a region is redrawn only when its markup changes (the pearls' canvases and the scroll stay)
     function put(name, content) {
@@ -276,6 +277,9 @@
       if (SC) put("full", v.setup ? (v.setup.kind === "onboarding" ? pearlsIn(SC.onboarding(v.setup), v.mood) : SC.settings(v.setup)) : null);
       R.over.hidden = !v.sheet;
       if (SC) put("over", v.sheet ? SC.sheet(v.sheet) : null);
+      // the core's error: one line over the window, gone after 6 s or with 'close'
+      put("toast", v.toast ? UI.toast.render({ text: v.toast.text, err: true, action: v.toast.close }) : null);
+      if (v.toast && v.toast.at !== toastAt && root.setTimeout) { const at = (toastAt = v.toast.at); root.setTimeout(() => feed({ ev: "ui_toast_close", at }), 6000); }
       const keyin = el.querySelector(".w-keyin");
       if (keyin && doc.activeElement !== keyin) keyin.focus();
       const routeKey = `${v.route.screen || ""}${v.route.project}/${v.route.agent}`;

@@ -85,6 +85,8 @@ body { background: var(--c-canvas); overflow: hidden; }
 /* the setup screens (S11): onboarding and settings take the whole window, the add sheet sits over it */
 .w-full { position: fixed; inset: 0; z-index: 15; background: var(--c-solid); overflow-y: auto; }
 .w-full[hidden], .w-over[hidden] { display: none; }
+.w-toast { position: fixed; left: calc(var(--sidebar) + (100% - var(--sidebar) - var(--board)) / 2); bottom: 132px; transform: translateX(-50%); z-index: 20; }
+.w-two .w-toast, .w-app.w-two ~ .w-toast { left: calc(var(--sidebar) + (100% - var(--sidebar)) / 2); }
 .w-onb { min-height: 100%; display: flex; flex-direction: column; }
 .w-onb .b-onb { flex: 1; }
 .w-onbtop { display: flex; justify-content: space-between; padding: 14px 18px 0 90px; }
