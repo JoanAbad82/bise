@@ -1,16 +1,15 @@
 // pearl/frames · bar ⛔1p (docs/desktop-bar.md) · his bug 2: "the pearl animation flickers".
-// Two places draw a pearl. The window: real clicks move between threads while its pearls breathe.
-// The capsule: the fake core plays listen -> think -> answer -> rest. Passes when no pearl canvas
-// is ever replaced (a new canvas restarts the animation: a jump), no pearl frame goes blank or
-// flashes, and no frame-to-frame jump is larger than the animation's own steps.
-// Red on today's window: every redraw of the sidebar or the head gives each pearl a new canvas
-// (winui.js pearlsIn); today's capsule keeps its one canvas (green there: a guard for the new app).
-import path from 'node:path';
+// Red first on today's window (set 1, d38f2df9: its 4 pearl canvases were rebuilt on every thread
+// switch, winui.js pearlsIn). Now on the new app's labs (test mode): the pearl lab, real clicks
+// through the moods (rest -> listen -> work -> speak -> done -> rest), and the spotlight lab's
+// pearl while he types. Passes when the pearl's canvas is never replaced (a new canvas restarts
+// the animation: a jump), no pearl frame flashes, and no frame-to-frame jump is larger than the
+// animation's own steps.
 import type { Page } from '@playwright/test';
-import { test, expect, launchOld, launchPage, Recorder, flashes, maxJump, type Session } from '../../harness';
+import { test, expect, launchDesktop, Recorder, flashes, maxJump, type Session } from '../../harness';
 
-const W = { launch: (): Promise<Session> => launchOld('window'), pearl: '.w-side canvas.w-pearl', pearls: 'canvas.w-pearl', row: '.w-side .b-row', visits: ['checkout', 'telemetry', 'bise'] };
-const C = { launch: (): Promise<Session> => launchPage(path.join(__dirname, 'old-talk.html'), { size: '1200x800' }), pearl: '#amb canvas.pearl', watchMs: 6000 };
+const L = { launch: (): Promise<Session> => launchDesktop({ route: 'lab/pearl' }), pearl: '[data-testid="lab.pearl.canvas"]', mood: (m: string) => `[data-testid="lab.mood.${m}"]`, moods: ['listen', 'work', 'speak', 'done', 'rest'], dwellMs: 900 };
+const SP = { launch: (): Promise<Session> => launchDesktop({ route: 'lab/spotlight' }), pearl: '[data-testid="spot.pearl"]', field: '[data-testid="spot.input"]' };
 /** a frame-to-frame jump (mean change per pixel, 0..765) the breathing never reaches */
 const JUMP = 60;
 
@@ -36,41 +35,45 @@ async function onIt(launch: () => Promise<Session>, body: (s: Session) => Promis
   try { await body(s); } finally { await s.close(); }
 }
 
-test("pearl/frames: the window's pearls keep their canvas and never blank while he moves between threads", async () => {
-  await onIt(W.launch, async ({ page, cdp }) => {
-    const pearl = page.locator(W.pearl).first();
+test('pearl/frames: the pearl keeps its canvas and never jumps through every mood', async () => {
+  await onIt(L.launch, async ({ page, cdp }) => {
+    const pearl = page.locator(L.pearl);
     await expect(pearl).toBeVisible();
     const box = await pearl.boundingBox();
     if (!box) throw new Error('no pearl box');
     const rec = new Recorder(cdp, page);
     await rec.start();
-    const r = await canvasesReplaced(page, W.pearls, async () => {
-      for (const name of W.visits) {
-        await page.waitForTimeout(1000);
-        const b = await page.locator(W.row).filter({ hasText: name }).first().boundingBox({ timeout: 2000 });
-        if (b) await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+    const r = await canvasesReplaced(page, L.pearl, async () => {
+      for (const m of L.moods) {
+        await page.waitForTimeout(L.dwellMs);
+        await page.locator(L.mood(m)).click();
       }
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(L.dwellMs);
     });
     const frames = await rec.stop();
-    expect.soft(r.replaced, `pearl canvases replaced (of ${r.before}) while he moved between threads`).toBe(0);
+    test.info().annotations.push({ type: 'frames', description: `${frames.length} frames, max jump ${maxJump(frames, box).toFixed(1)}` });
+    expect.soft(frames.length, 'the pearl was drawn while it moved').toBeGreaterThan(20);
+    expect.soft(r.replaced, "the pearl's canvas is never replaced").toBe(0);
     expect.soft(flashes(frames, box), 'frames where the pearl flashed').toEqual([]);
     expect.soft(maxJump(frames, box), 'the largest frame-to-frame jump in the pearl').toBeLessThan(JUMP);
   });
 });
 
-test("pearl/frames: the capsule's pearl through listen, think, answer, rest", async () => {
-  await onIt(C.launch, async ({ page, cdp }) => {
-    await page.waitForURL(/dev\.html/);
-    const pearl = page.locator(C.pearl);
+test("pearl/frames: the spotlight's pearl keeps its canvas while he types", async () => {
+  await onIt(SP.launch, async ({ page, cdp }) => {
+    const pearl = page.locator(SP.pearl);
     await expect(pearl).toBeVisible();
     const box = await pearl.boundingBox();
     if (!box) throw new Error('no pearl box');
+    await page.locator(SP.field).click();
     const rec = new Recorder(cdp, page);
     await rec.start();
-    const r = await canvasesReplaced(page, C.pearl, () => page.waitForTimeout(C.watchMs));
+    const r = await canvasesReplaced(page, SP.pearl, async () => {
+      await page.keyboard.type('perf alerts', { delay: 60 });
+      await page.waitForTimeout(400);
+    });
     const frames = await rec.stop();
-    expect.soft(r.replaced, "the pearl's canvas is never replaced").toBe(0);
+    expect.soft(r.replaced, "the spotlight's pearl canvas is never replaced while typing").toBe(0);
     expect.soft(flashes(frames, box), 'frames where the pearl flashed').toEqual([]);
     expect.soft(maxJump(frames, box), 'the largest frame-to-frame jump in the pearl').toBeLessThan(JUMP);
   });

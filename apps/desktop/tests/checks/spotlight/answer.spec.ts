@@ -1,10 +1,11 @@
 // spotlight/answer · bar ⛔4 (docs/desktop-bar.md, fn + space part) · his bug 6: "bise's answer to
 // fn+space lands in a panel too small to read". First cut by qa-type, handed to qa-flows.
+// Target: today's capsule until the new spotlight lab answers long (asked of amb-win/amb-web).
 // Real keys: type a question in the spotlight, ⏎; the fake core answers with 20 lines. Passes when
 // all 20 lines are drawn: nothing clipped, offscreen or tiny (the harness's textProblems, from
 // layout), and the last line is on screen in a frame (or reachable by scrolling the answer).
 import { test, expect, textProblems } from '../../harness';
-import { S, onScene } from './target';
+import { SO as S, onScene } from './target';
 
 test('spotlight/answer: a 20-line answer is readable whole', async () => {
   await onScene(S.launchLong, async ({ page }) => {
