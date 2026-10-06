@@ -15,6 +15,8 @@ import './thread.css';
 
 // no extra parts (Virtuoso reads its `components` object: never undefined)
 const NONE = {};
+// Virtuoso measures its own box: it must fill the list's flex area
+const FILL = { height: '100%' };
 
 /** Far from 0: room for every older row that may come in front. */
 const START = 1_000_000_000;
@@ -87,6 +89,7 @@ export function ThreadList({ keys, row, more, onOlder, head, testId, ref }: Thre
     <div className="th-list" data-testid={testId}>
       <Virtuoso
         ref={virtuoso}
+        style={FILL}
         data={keys}
         firstItemIndex={next.index}
         initialTopMostItemIndex={Math.max(0, keys.length - 1)}

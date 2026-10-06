@@ -9,6 +9,20 @@
   height: 100%;
 }
 
+/* the ds frame's columns fill the window (its own min-height is a mockup's) */
+.app-shell > .b-win > .cols {
+  height: 100%;
+}
+
+.app-shell .b-side,
+.app-shell .b-main {
+  min-height: 0;
+}
+
+.app-shell .b-side {
+  overflow: auto;
+}
+
 .app-notyet,
 .app-notfound {
   margin: auto;
