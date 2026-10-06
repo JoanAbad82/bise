@@ -5,7 +5,7 @@
 // go in at the caret after what was typed, stay editable, and nothing is sent by itself.
 import path from 'node:path';
 import { test, expect, launchOld } from '../../harness';
-import { T, fieldText, onTarget } from './target';
+import { TW as T, fieldText, onTarget } from './target';
 
 const WAV = path.join(__dirname, '../fixtures/said.wav');
 const SAID = "on garde la file d'attente";

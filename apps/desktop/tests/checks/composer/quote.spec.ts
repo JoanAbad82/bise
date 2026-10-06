@@ -3,12 +3,13 @@
 // quote chip goes in the field at the caret (before the words typed after it), naming where the
 // passage comes from, and the typed words follow it.
 import { test, expect } from '../../harness';
-import { T, fieldText, onTarget } from './target';
+import { TW as T, fieldText, onTarget } from './target';
 
 // an answer in the fake world's thread (today's window: telemetry · main's answer on the p99)
 const ANSWER = { hasText: 'compaction de 14 h', from: 'telemetry' };
 
 test('composer/quote: select an answer, type: a quote chip at the caret, then the words', async () => {
+  // the lab has no thread to quote from: today's window until amb-win's thread mounts the composer
   await onTarget(async ({ page }) => {
     const text = page.locator(T.thread).locator(T.message).filter({ hasText: ANSWER.hasText }).last().locator(T.messageText).first();
     const b = await text.boundingBox();
@@ -32,5 +33,5 @@ test('composer/quote: select an answer, type: a quote chip at the caret, then th
     }, T.chipQuote);
     expect(chipFirst, 'the chip sits at the caret, before the words typed after it').toBe(true);
     expect(await page.locator(T.field).evaluate(fieldText)).toContain('pourquoi 03:00 ?');
-  });
+  }, T.launch);
 });

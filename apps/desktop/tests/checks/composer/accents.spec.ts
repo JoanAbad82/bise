@@ -17,8 +17,11 @@ test('composer/accents: é ç « » and dead keys ´ ^ ¨ ` land exactly, caret 
   await onTarget(async ({ page, cdp }) => {
     const field = page.locator(T.field);
     await field.click();
+    // the first letter turns the empty line into text (Lexical drops its placeholder <br>): allowed
+    await page.keyboard.type(DIRECT.slice(0, 1));
+    await page.waitForTimeout(150);
     await watchMutations(page, [T.composer, ...T.lists]);
-    await page.keyboard.type(DIRECT, { delay: 30 });
+    await page.keyboard.type(DIRECT.slice(1), { delay: 30 });
     for (const [mark, letter] of DEAD) {
       await cdp.send('Input.imeSetComposition', { text: mark, selectionStart: 1, selectionEnd: 1 });
       await page.waitForTimeout(40);
