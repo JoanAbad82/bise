@@ -181,6 +181,16 @@ screen), the page bodies. It stops the hub (and app) it started unless
 WARNING (a fail may be the stale build); `--require <sha>,<sha>` refuses
 a tree that lacks those commits. One run at a time: it uses your QA dir's hub.
 
+## The heavy lock
+
+`qa.py world up` takes `~/.bise/run/heavy.lock` itself (for its bins
+build and the hubs' start), and skips it when it already runs under a
+`lockf ... heavy.lock` of its own ancestry. Never wrap a command that
+takes the lock in a second take of it: before that check, a
+`lockf -k heavy.lock qa.py world up` waited on itself and held the lock
+for everyone (main m_9310). `qa.py real t1`, `t1-setup` and `try-proof`
+do not take it: the caller wraps them, once.
+
 ## Limits
 
 - Main never really speaks: the voice out is played by the app from

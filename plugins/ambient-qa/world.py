@@ -400,10 +400,30 @@ def register(bise, home, workspaces):
 
 # ---------------------------------------------------------------- the commands
 
+def under_heavy_lock(pid=None):
+    """True when this process (or the given one) runs under a `lockf ... heavy.lock` of its own
+    ancestry: taking the lock again would wait on itself."""
+    pid = pid or os.getpid()
+    for _ in range(32):
+        r = subprocess.run(["ps", "-o", "ppid=,command=", "-p", str(pid)], capture_output=True, text=True)
+        line = r.stdout.strip()
+        if not line:
+            return False
+        ppid, _, cmd = line.partition(" ")
+        if "lockf" in cmd.split(" ", 1)[0] and LOCK in cmd:
+            return True
+        pid = int(ppid.strip() or 0)
+        if pid <= 1:
+            return False
+    return False
+
+
 def up(n=3, bise=None, root=None):
     """Clear the old world, start the daemon (under the heavy lock), wait until seeded."""
     import qa
-    if os.environ.get("AMBIENT_WORLD_LOCKED") != "1":
+    # one take of the lock, never two: `lockf -k heavy.lock qa.py world up` from a caller that
+    # already holds it waited on itself forever (main m_9310); an ancestor lockf on it counts
+    if os.environ.get("AMBIENT_WORLD_LOCKED") != "1" and not under_heavy_lock():
         args = [sys.executable, "-B", os.path.join(HERE, "qa.py"), "world", "up", "--projects", str(n)] \
             + (["--bise", bise] if bise else []) + (["--root", root] if root else [])
         os.makedirs(os.path.dirname(LOCK), exist_ok=True)
