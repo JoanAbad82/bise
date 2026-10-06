@@ -45,6 +45,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     var heldCard: String?                 // a card bise's window holds (CardSeat), not yet in the bar
     var cardSeatSaid: CardSeat = .bar     // the last app_card_seat the bar's page got
     var tabWaiters: [@MainActor (String?) -> Void]?   // App+Front: one active-tab ask at a time
+    var awayClock = Away()                // App+Front: while you were away (S9)
     var harnessFront: FrontRaw?           // App+Front: the harness's front-app fixture (never his apps)
     var askedAnchor: BarAnchor?           // where the next show puts the bar (S8; none = bottom centre)
     let mainMenu = MainMenuView() // the hidden main menu: ⌘Q ⌘W ⌘, ⌘H and Edit
@@ -373,14 +374,14 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         }
         let dn = DistributedNotificationCenter.default()
         dn.addObserver(forName: .init("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.locked = true; self?.sayVisible() }
+            MainActor.assumeIsolated { self?.locked = true; self?.sayVisible(); self?.awayLeft() }
         }
         dn.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.locked = false; self?.sayVisible() }
+            MainActor.assumeIsolated { self?.locked = false; self?.sayVisible(); self?.awayBack(unlock: true) }
         }
         // sleep and wake: the core alive, the tap on, the capsule on a real screen
         ws.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.asleep = true; self?.sayVisible() }
+            MainActor.assumeIsolated { self?.asleep = true; self?.sayVisible(); self?.awayLeft() }
         }
         for name in [NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification] {
             ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
@@ -423,6 +424,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         capsule.screensChanged()
         edge.rebuild()
         sayVisible()
+        awayBack(unlock: false)
     }
 
     // app_visible {on}: the page stops drawing (the orb's frames) while
@@ -547,6 +549,10 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
                     sayCardSeat(.bar)
                     if cardPush.shows(card: key) { Log.say("app: \(cards.count) cards held while quiet come to the bar"); visFeed(.card) }
                 }
+            case "away":
+                // the away card (S9, amb-web 2d87bf28): the bar once for it, before any list
+                let since = cmd["since"].map { "\($0)" } ?? ""
+                if cardPush.shows(card: "away:" + since) { Log.say("app: the away card"); visFeed(.card) }
             case "none":
                 // the hello is over (5 s, or fn, esc, a click): its glass goes
                 if helloOn { helloOn = false; visFeed(.dismiss) }

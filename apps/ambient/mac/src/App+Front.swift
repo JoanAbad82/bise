@@ -89,6 +89,27 @@ extension AmbientApp {
         return ev
     }
 
+    // S9 'while you were away': he left at a lock or sleep (minus his idle
+    // time then); back at unlock, or at wake when the screen wasn't locked.
+    // Never in QA or the harness (his session's events): the 'away' op instead
+    func awayLeft() {
+        guard !sandbox else { return }
+        let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: CGEventType(rawValue: ~0)!)
+        awayClock.left(at: Date(), idle: idle)
+    }
+
+    func awayBack(unlock: Bool) {
+        guard !sandbox, Away.isBack(unlock: unlock, wake: !unlock, locked: locked),
+              let ms = awayClock.back(at: Date()) else { return }
+        sayAway(ms)
+    }
+
+    func sayAway(_ ms: Int) {
+        Log.say("app: back after \(ms / 60000) min away")
+        toCore(["cmd": "away_back", "away_ms": ms])
+        capsule.post(["ev": "app_away", "away_ms": ms])
+    }
+
     // a Chromium browser's active tab, one AppleScript at a time: the voice
     // note's check and the context share the answer
     func askTab(_ bundle: String, _ done: @escaping @MainActor (String?) -> Void) {
