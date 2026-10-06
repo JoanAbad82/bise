@@ -36,20 +36,21 @@
   const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
   const bare = (url) => String(url || "").replace(/^https?:\/\//, "").replace(/\/$/, "");
 
-  // the worktrees an agent works in (the project's own folder is the project's line, not a row)
-  const agentTrees = (e, p) => (e.wt[p.project] || []).filter((w) => w.agent && w.path !== p.path);
+  // the worktrees besides the project's own folder (that one is the project's line, not a row): an
+  // agent's, and his own extra ones (no agent: 'ψ detached at e0f3df5 · 3 behind', opens in his editor)
+  const agentTrees = (e, p) => (e.wt[p.project] || []).filter((w) => w.path !== p.path);
 
   function treeRow(s, p, w) {
     const a = (s.agents[p.project] || []).find((x) => x.name === w.agent) || { status: "idle", title: "" };
-    const what = a.status === "done" && w.ahead > 0 ? "ready to merge" : a.title || "";
-    const end = w.ahead > 0 ? `${w.ahead} ahead` : w.behind > 0 ? `${w.behind} behind` : a.status === "working" ? "working" : "idle";
+    const what = !w.agent ? "" : a.status === "done" && w.ahead > 0 ? "ready to merge" : a.title || "";
+    const end = w.ahead > 0 ? `${w.ahead} ahead` : w.behind > 0 ? `${w.behind} behind` : !w.agent ? "" : a.status === "working" ? "working" : "idle";
     const dot = a.status === "working" ? "wk" : a.status === "done" ? "ok" : a.status === "waiting" ? "nd" : "";
     // detached: git's own words with its commit, 'detached at e0f3df5' (ambient m_8946); 'detached' with no sha
     const web = /^https:\/\/github\.com\//.test(p.web || "");
     const sha = !w.branch && w.head ? { text: s.s7.env.copied === w.head ? `copied ${w.head.slice(0, 7)}` : w.head.slice(0, 7), tip: web ? "open on GitHub" : "copy",
       act: { ev: "ui_env_sha", project: p.project, sha: w.head } } : null;
     return { kind: "wt", branch: w.branch || (sha ? "detached at " : "detached"), sha, agent: w.agent, what, end, dot, dirty: !!w.dirty,
-      act: { ev: "ui_route", project: p.project, agent: w.agent } };
+      act: w.agent ? { ev: "ui_route", project: p.project, agent: w.agent } : { ev: "ui_env_open", project: p.project, app: "editor", path: w.path } };
   }
   function serverRow(p, d) {
     return { kind: "dev", name: d.name || d.cmd || "dev server", url: bare(d.url), end: d.up ? "running" : "stopped", up: !!d.up,

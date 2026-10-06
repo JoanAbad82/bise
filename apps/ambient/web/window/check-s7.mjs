@@ -291,9 +291,11 @@ law("environments on bise-proto's worktrees fixture (amb-core e4160bd6): the age
   w.open("environments");
   w.feed(wt);
   const g = () => w.v.groups.find((x) => x.project === wt.project);
-  eq(g().rows.map((r) => [r.branch, r.agent, r.end, r.dirty]), [["sb/perf", "perf", "2 ahead", true]]);
+  // perf's worktree, and his own detached one at e0f3df5 (no agent: opens in his editor)
+  eq(g().rows.map((r) => [r.branch, r.sha && r.sha.text, r.agent || null, r.end, r.dirty]), [["sb/perf", null, "perf", "2 ahead", true], ["detached at ", "e0f3df5", null, "3 behind", false]]);
+  eq(g().rows[1].act, { ev: "ui_env_open", project: wt.project, app: "editor", path: "/Users/camille/acme-try" });
   // a detached worktree (branch ''), dirty as a count of untracked files
-  w.feed({ ...wt, items: [{ ...wt.items[0], branch: "", dirty: 3, ahead: 0 }, wt.items[1]] });
+  w.feed({ ...wt, items: [{ ...wt.items[0], branch: "", head: undefined, dirty: 3, ahead: 0 }, wt.items[1]] });
   eq(g().rows.map((r) => [r.branch, r.sha, r.dirty]), [["detached", null, true]]);
   // with its commit (head): 'detached at e0f3df5', the sha opens it on GitHub (acme has a GitHub remote, ambient m_8946)
   const head = "e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e";
