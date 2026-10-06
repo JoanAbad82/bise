@@ -128,14 +128,44 @@ state: string,
 tools?: number | null, };
 
 /**
+ * A step of computer use's setup (P.2, the TUI's `/computer-use`
+ * screen as data: rust/tui/src/computer_use.rs rows).
+ */
+export type CuRow = { 
+/**
+ * browser | extension | live_test | accessibility | screen_recording
+ */
+id: string, label: string, 
+/**
+ * done | waits | checking | failed | not_yet
+ */
+state: string, detail: string, 
+/**
+ * the lines under it while it waits on him
+ */
+help?: Array<string>, 
+/**
+ * what its button does ("open chrome://extensions"); none: no button
+ */
+action?: string | null, 
+/**
+ * what `computer_use {act: fix, fix}` takes for that button
+ */
+fix?: string | null, 
+/**
+ * under "for apps" (the helper app's permissions)
+ */
+apps?: boolean, };
+
+/**
  * What the core sends the app besides the hubs' events (S3b).
  */
-export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, };
+export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, } | { "ev": "computer_use", on: boolean, ready: boolean, rows: Array<CuRow>, said?: string | null, flash?: string | null, };
 
 /**
  * What the app asks the core itself (never forwarded to a hub).
  */
-export type AppCmd = { "cmd": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "cmd": "project_add", path: string, land?: boolean | null, } | { "cmd": "project_remove", project: string, } | { "cmd": "project_move", project: string, order: number, } | { "cmd": "project_rename", project: string, name: string, } | { "cmd": "prefs_set", key: string, value: JsonValue, } | { "cmd": "sign_in", id: string, } | { "cmd": "key_set", id: string, key: string, } | { "cmd": "key_remove", id: string, } | { "cmd": "found_scan", dir?: string | null, } | { "cmd": "away_back", away_ms: number, } | { "cmd": "plugins", project?: string | null, } | { "cmd": "plugin_set", project?: string | null, name: string, on: boolean, } | { "cmd": "plugin_login", project?: string | null, name: string, } | { "cmd": "plugin_logout", project?: string | null, name: string, };
+export type AppCmd = { "cmd": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "cmd": "project_add", path: string, land?: boolean | null, } | { "cmd": "project_remove", project: string, } | { "cmd": "project_move", project: string, order: number, } | { "cmd": "project_rename", project: string, name: string, } | { "cmd": "prefs_set", key: string, value: JsonValue, } | { "cmd": "sign_in", id: string, } | { "cmd": "key_set", id: string, key: string, } | { "cmd": "key_remove", id: string, } | { "cmd": "found_scan", dir?: string | null, } | { "cmd": "away_back", away_ms: number, } | { "cmd": "plugins", project?: string | null, } | { "cmd": "plugin_set", project?: string | null, name: string, on: boolean, } | { "cmd": "plugin_login", project?: string | null, name: string, } | { "cmd": "plugin_logout", project?: string | null, name: string, } | { "cmd": "computer_use", act: string, fix?: string | null, };
 
 /**
  * `hubs/<id>/view.json` (S1, written only by that hub): what the sidebar

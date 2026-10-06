@@ -9,11 +9,12 @@ import { Button, Chip, Field, Group, Kbd, Seg, Toggle, type GroupItem } from '@/
 import { Accounts } from './accounts';
 import { Projects } from './projects';
 import { Plugins } from './plugins';
+import { Computer } from './computer';
 import { KEY_SECTIONS } from './keys';
 import { appName, excludedApps, flag, knownApps, num, str, type Prefs } from './prefs';
 import type { SettingsData, SettingsPorts } from './Settings';
 
-export type Page = 'general' | 'voice' | 'privacy' | 'quiet' | 'models' | 'projects' | 'plugins' | 'keys';
+export type Page = 'general' | 'voice' | 'privacy' | 'quiet' | 'models' | 'projects' | 'plugins' | 'computer' | 'keys';
 
 export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
   { id: 'general', title: 'general', sub: 'bise on your Mac.' },
@@ -23,6 +24,7 @@ export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
   { id: 'models', title: 'models', sub: 'your subscription is enough; an API key works too. /models and /provider in the terminal.' },
   { id: 'projects', title: 'projects', sub: "one main per project; yours, bise, coordinates them. the order is ⌘1 … ⌘9's." },
   { id: 'plugins', title: 'plugins', sub: 'what your agents can use besides the repo: skills, tools, servers. /plugins in the terminal.' },
+  { id: 'computer', title: 'computer use', sub: 'agents drive Chrome and your apps, step by step. /computer-use in the terminal.' },
   { id: 'keys', title: 'keys', sub: "every terminal key works here too; ⌘ adds a Mac app's gestures. /help in the terminal." },
 ];
 
@@ -166,6 +168,8 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
       return <Projects projects={data.projects} found={data.found} ports={ports} />;
     case 'plugins':
       return <PluginsPage items={data.plugins} send={ports.send} />;
+    case 'computer':
+      return <Computer cu={data.computerUse} send={ports.send} />;
     case 'keys':
       return <KeyList />;
   }

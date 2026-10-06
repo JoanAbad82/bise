@@ -32,6 +32,11 @@ pub enum Done {
     SignedIn { id: String, res: Result<(), String> },
     /// a plugin server's login ended (P.1; Err: its reason)
     LoggedIn { name: String, project: Option<String>, res: Result<(), String> },
+    /// computer use's setup check answered (P.2, once a second while its
+    /// page is open)
+    CuCheck(Value),
+    /// a computer-use fix went wrong later (its line)
+    CuSaid(String),
 }
 
 /// A repo the walk found.
@@ -63,6 +68,29 @@ pub type PluginSetFn = Box<dyn Fn(&str, bool) -> Result<(), String>>;
 /// (workspace, server name, the project it was asked for, the channel of its end)
 pub type PluginLoginFn = Box<dyn Fn(&Path, &str, Option<String>, Sender<Done>) -> Result<(), String>>;
 pub type PluginLogoutFn = Box<dyn Fn(&Path, &str) -> Result<(), String>>;
+/// What runs now from computer use's page (the live test, a helper that reopens).
+pub type CuBusy = std::sync::Arc<std::sync::Mutex<crate::computer_use::Busy>>;
+/// The poll's start: its channel and its stop flag.
+pub type CuPollFn = Box<dyn Fn(Sender<Done>, std::sync::Arc<std::sync::atomic::AtomicBool>)>;
+/// (the last setup check, the fix, what runs, the channel of a later failure) -> its flash
+pub type CuFixFn = Box<dyn Fn(&Value, &str, CuBusy, Sender<Done>) -> Option<String>>;
+
+/// Computer use's I/O (P.2): the TUI's /computer-use functions
+/// (crate::computer_use), a fake in tests.
+pub struct CuPorts {
+    /// the built-in `computer` plugin is on
+    pub is_on: Box<dyn Fn() -> bool>,
+    pub set_on: Box<dyn Fn(bool)>,
+    /// off (true: uninstall too): the line to show
+    pub off: Box<dyn Fn(bool) -> String>,
+    /// one setup check a second on a thread until the flag, each as `Done::CuCheck`
+    pub poll: CuPollFn,
+    /// a row's fix (his click only, never a test's real one): its flash;
+    /// a later failure as `Done::CuSaid`
+    pub fix: CuFixFn,
+    /// the live test, once at a time
+    pub live_test: Box<dyn Fn(&CuBusy)>,
+}
 
 /// Everything the setup commands read or write.
 pub struct SetupPorts {
@@ -92,6 +120,7 @@ pub struct SetupPorts {
     /// run by a test)
     pub plugin_login: PluginLoginFn,
     pub plugin_logout: PluginLogoutFn,
+    pub cu: CuPorts,
 }
 
 /// A catalog provider's status as the window's account: a subscription
@@ -274,6 +303,16 @@ pub fn live(flow: FlowFn) -> SetupPorts {
             Ok(())
         }),
         plugin_logout: Box::new(|ws, name| crate::plugins::logout(ws, name).map(|_| ())),
+        cu: CuPorts {
+            is_on: Box::new(crate::computer_use::is_on),
+            set_on: Box::new(crate::computer_use::set_on),
+            off: Box::new(crate::computer_use::turn_off),
+            poll: Box::new(|tx, stop| {
+                crate::computer_use::poll(move |v| drop(tx.send(Done::CuCheck(v))), stop);
+            }),
+            fix: Box::new(|check, fix, busy, tx| crate::computer_use::fix(check, fix, busy, move |t| drop(tx.send(Done::CuSaid(t))))),
+            live_test: Box::new(crate::computer_use::live_test),
+        },
     }
 }
 

@@ -158,6 +158,31 @@ pub struct PluginLogin {
     pub tools: Option<u32>,
 }
 
+/// A step of computer use's setup (P.2, the TUI's `/computer-use`
+/// screen as data: rust/tui/src/computer_use.rs rows).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CuRow {
+    /// browser | extension | live_test | accessibility | screen_recording
+    pub id: String,
+    pub label: String,
+    /// done | waits | checking | failed | not_yet
+    pub state: String,
+    pub detail: String,
+    /// the lines under it while it waits on him
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub help: Vec<String>,
+    /// what its button does ("open chrome://extensions"); none: no button
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
+    /// what `computer_use {act: fix, fix}` takes for that button
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix: Option<String>,
+    /// under "for apps" (the helper app's permissions)
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub apps: bool,
+}
+
 /// One project's part of `away_summary` (only a project where something
 /// happened while he was away).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -204,12 +229,25 @@ pub enum CoreEv {
         project: Option<Project>,
         items: Vec<Plugin>,
     },
+    /// computer use (P.2): on (the built-in `computer` plugin), its setup's
+    /// steps while the window's page checks them (none until a check
+    /// came), ready (browser, extension and live test done), `said`: what
+    /// went wrong with a fix, `flash`: what a fix just did
+    ComputerUse {
+        on: bool,
+        ready: bool,
+        rows: Vec<CuRow>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        said: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        flash: Option<String>,
+    },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins", "computer_use"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -278,6 +316,14 @@ pub enum AppCmd {
         project: Option<Project>,
         name: String,
     },
+    /// computer use (P.2): `act` on | off | uninstall | check (its page is
+    /// open: the setup check runs, once a second, until leave or 2 min
+    /// without a check) | leave | fix (`fix`: a row's fix, his click only)
+    ComputerUse {
+        act: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fix: Option<String>,
+    },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
@@ -299,6 +345,7 @@ impl AppCmd {
         "plugin_set",
         "plugin_login",
         "plugin_logout",
+        "computer_use",
     ];
 
     pub fn decode(line: &str) -> Result<AppCmd, String> {

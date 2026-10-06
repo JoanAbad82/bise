@@ -61,6 +61,7 @@ export const TAGS = {
   found: true,
   away_summary: true,
   plugins: true,
+  computer_use: true,
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */
@@ -188,6 +189,10 @@ export class Store {
   found(): readonly Found[] {
     return this.slice('found', EMPTY);
   }
+  /** computer use's state (P.2); null until the core sent it */
+  computerUse(): EvOf<'computer_use'> | null {
+    return this.slice<EvOf<'computer_use'> | null>('computer_use', null);
+  }
   /** a workspace's agent plugins (none: bise's home's); null until the core sent them */
   plugins(project?: string): readonly Plugin[] | null {
     return this.slice<readonly Plugin[] | null>(`plugins:${project ?? ''}`, null);
@@ -293,6 +298,9 @@ export class Store {
         return;
       case 'plugins':
         this.put(`plugins:${ev.project ?? ''}`, ev.items);
+        return;
+      case 'computer_use':
+        this.put('computer_use', ev);
         return;
       case 'away_summary':
         this.put('away', ev);

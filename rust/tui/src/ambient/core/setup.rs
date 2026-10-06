@@ -5,16 +5,23 @@
 //! `AppCmd`), answered by `prefs`, `accounts`, `found`, the projects list
 //! read again, or `error {cmd, text}`; and the agent plugins (P.1):
 //! `plugins`, `plugin_set`, `plugin_login`, `plugin_logout`, answered by
-//! `plugins` (the TUI's /plugins functions, crate::plugins). All I/O through
+//! `plugins` (the TUI's /plugins functions, crate::plugins); and computer
+//! use (P.2): `computer_use {act}` answered by `computer_use` (the TUI's
+//! /computer-use functions: its setup check runs on its own thread only
+//! while the window's page is open, stops at `leave` or [`CU_IDLE`] after
+//! the last `check`, never on the tick). All I/O through
 //! [`crate::ambient::setup::SetupPorts`]; the jobs that end later (a walk,
 //! a sign-in) come back on the tick. A key is never in an event.
 
 use super::Core;
-use crate::ambient::setup::{rank, Done, RegistryOp, SetupPorts};
+use crate::ambient::setup::{rank, CuBusy, Done, RegistryOp, SetupPorts};
 use bise_proto::draft::AppCmd;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
+use std::time::Instant;
 
 /// The commands this file answers (never a hub's, never another of the
 /// core's own).
@@ -32,7 +39,31 @@ pub const TAGS: &[&str] = &[
     "plugin_set",
     "plugin_login",
     "plugin_logout",
+    "computer_use",
 ];
+
+/// Computer use's setup check stops this long after the page's last
+/// `check` (a lost `leave`, a hidden window: it never polls forever).
+pub(crate) const CU_IDLE: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// Computer use's page is open: its poll, what runs, what it last said.
+struct CuLive {
+    stop: Arc<AtomicBool>,
+    last_check: Instant,
+    check: Value,
+    busy: CuBusy,
+    said: Option<String>,
+    flash: Option<String>,
+    /// the live test ran by itself once (never again on its own)
+    auto_ran: bool,
+    /// the last event sent (only a change goes out)
+    sent: Value,
+}
+
+/// The poll has run long enough without a `check`.
+pub(crate) fn cu_idle(last_check: Instant, now: Instant) -> bool {
+    now.saturating_duration_since(last_check) >= CU_IDLE
+}
 
 pub(crate) struct Setup {
     ports: SetupPorts,
@@ -42,13 +73,15 @@ pub(crate) struct Setup {
     signing: Option<String>,
     /// the plugin servers whose login runs (their browser is open)
     logins: Vec<String>,
+    /// computer use's page while it is open
+    cu: Option<CuLive>,
 }
 
 impl Core {
     /// The setup's ports (the binary's live ones, or a test's).
     pub fn set_setup(&mut self, ports: SetupPorts) {
         let (tx, rx) = channel();
-        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new() });
+        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), cu: None });
     }
 
     /// What the window needs first: his preferences and his accounts (at
@@ -172,11 +205,95 @@ impl Core {
                 let shown = self.emit_plugins(project);
                 ("plugin_logout", res.and(shown))
             }
+            AppCmd::ComputerUse { act, fix } => ("computer_use", self.computer_use(&act, fix.as_deref())),
             other => return self.setup_error("setup", &format!("not a setup command: {other:?}")),
         };
         if let Err(e) = res {
             self.setup_error(cmd, &e);
         }
+    }
+
+    /// One act of computer use's page: on, off, uninstall, check (start
+    /// or keep its poll), leave (stop it), fix (a row's button).
+    fn computer_use(&mut self, act: &str, fix: Option<&str>) -> Result<(), String> {
+        let s = self.setup.as_mut().ok_or("this core has no setup")?;
+        match act {
+            "on" => (s.ports.cu.set_on)(true),
+            "off" | "uninstall" => {
+                let line = (s.ports.cu.off)(act == "uninstall");
+                if let Some(c) = s.cu.as_mut() {
+                    c.flash = Some(line);
+                }
+            }
+            "check" => match s.cu.as_mut() {
+                Some(c) => c.last_check = Instant::now(),
+                None => {
+                    let stop = Arc::new(AtomicBool::new(false));
+                    (s.ports.cu.poll)(s.tx.clone(), stop.clone());
+                    s.cu = Some(CuLive {
+                        stop,
+                        last_check: Instant::now(),
+                        check: Value::Null,
+                        busy: CuBusy::default(),
+                        said: None,
+                        flash: None,
+                        auto_ran: false,
+                        sent: Value::Null,
+                    });
+                }
+            },
+            "leave" => {
+                if let Some(c) = s.cu.take() {
+                    c.stop.store(true, Ordering::SeqCst);
+                }
+                return Ok(());
+            }
+            "fix" => {
+                let f = fix.ok_or("computer_use fix: which fix?")?;
+                let c = s.cu.as_mut().ok_or("computer use's page isn't open")?;
+                c.said = None;
+                c.flash = (s.ports.cu.fix)(&c.check, f, c.busy.clone(), s.tx.clone());
+            }
+            other => return Err(format!("computer_use: no act {other}")),
+        }
+        self.emit_cu(true);
+        Ok(())
+    }
+
+    /// `computer_use` now (`always`: even when nothing changed).
+    fn emit_cu(&mut self, always: bool) {
+        let Some(s) = self.setup.as_mut() else { return };
+        let on = (s.ports.cu.is_on)();
+        let (rows, said, flash) = match s.cu.as_mut() {
+            Some(c) => {
+                crate::computer_use::settle(&mut c.busy.lock().unwrap_or_else(|e| e.into_inner()), &c.check);
+                let busy = c.busy.lock().unwrap_or_else(|e| e.into_inner()).clone();
+                let rows = crate::computer_use::rows(&c.check, &busy);
+                // the live test runs by itself once, as soon as it can (the TUI's rule)
+                if !c.auto_ran && rows.iter().any(|r| r.id == "live_test" && r.st == crate::computer_use::St::Waits) {
+                    c.auto_ran = true;
+                    (s.ports.cu.live_test)(&c.busy);
+                }
+                (rows, c.said.clone(), c.flash.clone())
+            }
+            None => (Vec::new(), None, None),
+        };
+        let ready = crate::computer_use::ready(&rows);
+        let rows: Vec<_> = rows.iter().map(crate::computer_use::row_data).collect();
+        let mut ev = json!({"ev": "computer_use", "on": on, "ready": ready, "rows": rows});
+        if let Some(t) = said {
+            ev["said"] = json!(t);
+        }
+        if let Some(t) = flash {
+            ev["flash"] = json!(t);
+        }
+        if let Some(c) = s.cu.as_mut() {
+            if !always && c.sent == ev {
+                return;
+            }
+            c.sent = ev.clone();
+        }
+        self.emit(ev);
     }
 
     /// The folder whose plugins a command means: the project's, else bise's home.
@@ -215,6 +332,13 @@ impl Core {
     /// The jobs that ended: `found` for a walk, `accounts` (or an error)
     /// for a sign-in.
     pub(super) fn setup_tick(&mut self) {
+        if let Some(s) = self.setup.as_mut() {
+            if s.cu.as_ref().is_some_and(|c| cu_idle(c.last_check, Instant::now())) {
+                if let Some(c) = s.cu.take() {
+                    c.stop.store(true, Ordering::SeqCst);
+                }
+            }
+        }
         let Some(s) = &self.setup else { return };
         let done: Vec<Done> = s.rx.try_iter().collect();
         for d in done {
@@ -233,6 +357,18 @@ impl Core {
                     }
                     self.emit_accounts();
                 }
+                Done::CuCheck(v) => {
+                    if let Some(c) = self.setup.as_mut().and_then(|s| s.cu.as_mut()) {
+                        c.check = v;
+                    }
+                    self.emit_cu(false);
+                }
+                Done::CuSaid(t) => {
+                    if let Some(c) = self.setup.as_mut().and_then(|s| s.cu.as_mut()) {
+                        c.said = Some(t);
+                    }
+                    self.emit_cu(false);
+                }
                 Done::LoggedIn { name, project, res } => {
                     if let Some(s) = self.setup.as_mut() {
                         s.logins.retain(|n| *n != name);
@@ -244,5 +380,18 @@ impl Core {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_computer_use_poll_stops_two_minutes_after_the_last_check() {
+        let t0 = Instant::now();
+        assert!(!cu_idle(t0, t0 + CU_IDLE - std::time::Duration::from_secs(1)));
+        assert!(cu_idle(t0, t0 + CU_IDLE));
+        assert!(!cu_idle(t0 + CU_IDLE, t0), "a clock that went back: not idle");
     }
 }

@@ -77,6 +77,8 @@ export const core_ev: readonly CoreEv[] = [
   {"done":3,"ev":"away_summary","failed":0,"projects":[{"done":2,"failed":0,"project":"acme-1a2b3c4d","questions":1},{"done":1,"failed":0,"project":"shop-0badc0de","questions":0}],"questions":1,"since_ms":1791100000000},
   {"ev":"plugins","items":[{"logins":[{"host":"mcp.linear.app","name":"linear","state":"needs"}],"name":"linear","scope":"user","state":"loaded","what":"Linear issues and projects"},{"name":"computer","scope":"built-in","state":"disabled","what":"drive Chrome and your apps"},{"logins":[{"host":"notes.example.com","name":"notes","state":"in","tools":4}],"name":"notes","scope":"workspace","state":"loaded"}]},
   {"ev":"plugins","items":[],"project":"acme-1a2b3c4d"},
+  {"ev":"computer_use","flash":"opened · path copied","on":true,"ready":false,"rows":[{"detail":"Chrome 131","id":"browser","label":"Chrome","state":"done"},{"action":"open chrome://extensions","detail":"add bise to Chrome","fix":"add_extension","help":["1  ⏎ opens chrome://extensions · turn on Developer mode, top right","2  Load unpacked, then pick bise's extension folder","3  i'll see it here, no key needed"],"id":"extension","label":"Chrome extension","state":"waits"},{"detail":"last","id":"live_test","label":"live test","state":"not_yet"},{"action":"open System Settings","apps":true,"detail":"bise can click and type in apps","fix":"request_accessibility","help":["turn on bise Computer Use in the list. i'll see it"],"id":"accessibility","label":"accessibility","state":"waits"}]},
+  {"ev":"computer_use","on":false,"ready":false,"rows":[]},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */
@@ -99,6 +101,11 @@ export const app_cmd: readonly AppCmd[] = [
   {"cmd":"plugin_set","name":"computer","on":true},
   {"cmd":"plugin_login","name":"linear"},
   {"cmd":"plugin_logout","name":"notes","project":"acme-1a2b3c4d"},
+  {"act":"on","cmd":"computer_use"},
+  {"act":"check","cmd":"computer_use"},
+  {"act":"fix","cmd":"computer_use","fix":"add_extension"},
+  {"act":"leave","cmd":"computer_use"},
+  {"act":"uninstall","cmd":"computer_use"},
 ];
 
 /** rust/proto/fixtures/draft_hub_cmd.jsonl */

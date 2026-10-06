@@ -11,6 +11,7 @@ import type { Account, AppCmd, Found, JsonValue, Plugin, ProjectRow } from '@/pr
 import { Row, Settings as Frame } from '@/ds';
 import { putPref, type Prefs } from './prefs';
 import { PAGES, PageBody, pageOf, type Page } from './pages';
+import type { ComputerUse } from './computer';
 import './settings.css';
 
 export interface SettingsData {
@@ -21,6 +22,8 @@ export interface SettingsData {
   found: readonly Found[];
   /** bise's home's agent plugins (none yet: null, the page asks) */
   plugins: readonly Plugin[] | null;
+  /** computer use's state (none yet: null) */
+  computerUse: ComputerUse | null;
 }
 
 export interface SettingsPorts {

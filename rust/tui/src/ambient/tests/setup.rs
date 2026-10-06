@@ -2,7 +2,7 @@
 //! a fake world behind the Setup port, no HOME, no browser, no key store.
 
 use super::*;
-use crate::ambient::setup::{Done, Entry, RegistryOp, SetupPorts};
+use crate::ambient::setup::{CuPorts, Done, Entry, RegistryOp, SetupPorts};
 use bise_home::projects::Row;
 use bise_proto::draft::{Account, Plugin, PluginLogin};
 use std::cell::RefCell;
@@ -23,6 +23,12 @@ struct World {
     plugin_logins: Vec<(PathBuf, String)>,
     plugin_logouts: Vec<(PathBuf, String)>,
     logging_in: Option<std::sync::mpsc::Sender<Done>>,
+    /// computer use: on, the poll's channel and stop flag, fixes, live tests, offs
+    cu_on: bool,
+    cu_poll: Option<(std::sync::mpsc::Sender<Done>, std::sync::Arc<std::sync::atomic::AtomicBool>)>,
+    cu_fixes: Vec<String>,
+    cu_live_tests: usize,
+    cu_offs: Vec<bool>,
 }
 
 fn rows() -> Vec<Row> {
@@ -34,6 +40,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
     let w = Rc::new(RefCell::new(World::default()));
     let (a, b, c, d, e, f, g, h, i) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
     let (j, k, l, m) = (w.clone(), w.clone(), w.clone(), w.clone());
+    let (n, o, q, r, u, v) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
     t.core.set_setup(SetupPorts {
         prefs: Box::new(move || a.borrow().prefs.clone()),
         write_prefs: Box::new(move |v| {
@@ -111,6 +118,25 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             m.borrow_mut().plugin_logouts.push((ws.into(), name.into()));
             Ok(())
         }),
+        cu: CuPorts {
+            is_on: Box::new(move || n.borrow().cu_on),
+            set_on: Box::new(move |on| o.borrow_mut().cu_on = on),
+            off: Box::new(move |un| {
+                let mut w = q.borrow_mut();
+                w.cu_on = false;
+                w.cu_offs.push(un);
+                "computer use is off".into()
+            }),
+            poll: Box::new(move |tx, stop| r.borrow_mut().cu_poll = Some((tx, stop))),
+            fix: Box::new(move |_check, f, _busy, tx| {
+                u.borrow_mut().cu_fixes.push(f.into());
+                if f == "repair" {
+                    let _ = tx.send(Done::CuSaid("repair failed".into()));
+                }
+                (f == "add_extension").then(|| "opened · path copied".to_string())
+            }),
+            live_test: Box::new(move |_| v.borrow_mut().cu_live_tests += 1),
+        },
     });
     w
 }
@@ -281,4 +307,64 @@ fn the_window_lists_toggles_and_logs_in_to_plugins() {
     let out = t.take();
     assert!(evs(&out, "error")[0]["text"].as_str().is_some_and(|e| e.contains("linear: the browser closed")));
     assert_eq!(evs(&out, "plugins")[0]["items"][0]["logins"][0]["state"], "needs", "no longer pending");
+}
+
+/// P.2: computer use's page polls only while open (check), its rows are
+/// the TUI's, the live test runs by itself once, a fix runs on his act
+/// and its later failure is said; leave stops the poll; on/off/uninstall.
+#[test]
+fn computer_use_polls_while_its_page_is_open_and_fixes_on_his_act() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    app(&mut t, r#"{"cmd":"computer_use","act":"on"}"#);
+    let out = t.take();
+    assert!(w.borrow().cu_on);
+    assert_eq!((evs(&out, "computer_use")[0]["on"].as_bool(), evs(&out, "computer_use")[0]["rows"].as_array().map(Vec::len)), (Some(true), Some(0)));
+    assert!(w.borrow().cu_poll.is_none(), "no poll before the page checks");
+
+    app(&mut t, r#"{"cmd":"computer_use","act":"check"}"#);
+    t.take();
+    let (tx, stop) = w.borrow_mut().cu_poll.take().unwrap();
+    app(&mut t, r#"{"cmd":"computer_use","act":"check"}"#);
+    assert!(w.borrow().cu_poll.is_none(), "one poll, kept alive by later checks");
+    t.take();
+
+    let check = json!({"browser": "Chrome", "rows": [
+        {"id": "browser", "state": "done", "detail": "Chrome 131"},
+        {"id": "extension", "state": "waits", "fix": "add_extension"},
+        {"id": "live_test", "state": "waits", "fix": "run_live_test"}
+    ]});
+    tx.send(Done::CuCheck(check.clone())).unwrap();
+    t.until(|o| !evs(o, "computer_use").is_empty());
+    let out = t.take();
+    let ev = evs(&out, "computer_use")[0];
+    let ids: Vec<&str> = ev["rows"].as_array().unwrap().iter().map(|r| r["id"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["browser", "extension", "live_test"]);
+    assert_eq!(ev["rows"][1]["fix"], "add_extension");
+    assert_eq!(ev["ready"], false);
+    assert_eq!(w.borrow().cu_live_tests, 1, "the live test ran by itself once");
+    tx.send(Done::CuCheck(check)).unwrap();
+    t.core.tick(std::time::Instant::now());
+    t.out.extend(t.core.take_out());
+    assert!(evs(&t.take(), "computer_use").is_empty(), "the same check: nothing new to say");
+    assert_eq!(w.borrow().cu_live_tests, 1, "never again on its own");
+
+    app(&mut t, r#"{"cmd":"computer_use","act":"fix","fix":"add_extension"}"#);
+    assert_eq!(evs(&t.take(), "computer_use")[0]["flash"], "opened · path copied");
+    app(&mut t, r#"{"cmd":"computer_use","act":"fix","fix":"repair"}"#);
+    t.until(|o| evs(o, "computer_use").iter().any(|e| e["said"] == "repair failed"));
+    assert_eq!(w.borrow().cu_fixes, ["add_extension", "repair"]);
+    t.take();
+
+    app(&mut t, r#"{"cmd":"computer_use","act":"leave"}"#);
+    assert!(stop.load(std::sync::atomic::Ordering::SeqCst), "leave stops the poll");
+    app(&mut t, r#"{"cmd":"computer_use","act":"fix","fix":"repair"}"#);
+    assert!(evs(&t.take(), "error")[0]["text"].as_str().is_some_and(|e| e.contains("isn't open")));
+
+    app(&mut t, r#"{"cmd":"computer_use","act":"uninstall"}"#);
+    let out = t.take();
+    assert_eq!(w.borrow().cu_offs, [true]);
+    assert_eq!(evs(&out, "computer_use")[0]["on"], false);
+    app(&mut t, r#"{"cmd":"computer_use","act":"dance"}"#);
+    assert!(evs(&t.take(), "error")[0]["text"].as_str().is_some_and(|e| e.contains("no act dance")));
 }

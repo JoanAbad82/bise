@@ -16,3 +16,8 @@
 {"cmd":"plugin_set","name":"computer","on":true}
 {"cmd":"plugin_login","name":"linear"}
 {"cmd":"plugin_logout","project":"acme-1a2b3c4d","name":"notes"}
+{"cmd":"computer_use","act":"on"}
+{"cmd":"computer_use","act":"check"}
+{"cmd":"computer_use","act":"fix","fix":"add_extension"}
+{"cmd":"computer_use","act":"leave"}
+{"cmd":"computer_use","act":"uninstall"}

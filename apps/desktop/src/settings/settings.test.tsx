@@ -31,7 +31,7 @@ const ports = (): SettingsPorts & { sent: AppCmd[]; went: string[] } => {
 };
 
 const view = (page: string, p = ports(), extra: Partial<Parameters<typeof Settings>[0]> = {}) =>
-  render(<Settings page={page} prefs={prefs()} accounts={accounts()} projects={projects()} found={found()} plugins={null} ports={p} {...extra} />);
+  render(<Settings page={page} prefs={prefs()} accounts={accounts()} projects={projects()} found={found()} plugins={null} computerUse={null} ports={p} {...extra} />);
 
 describe('prefs', () => {
   it('reads and puts dotted keys without touching the rest', () => {
@@ -177,5 +177,38 @@ describe('plugins', () => {
     const pending = plugins().map((x) => ({ ...x, logins: (x.logins ?? []).map((l) => ({ ...l, state: 'pending' })) }));
     view('plugins', ports(), { plugins: pending });
     expect(screen.getByTestId('settings.login.linear').getAttribute('aria-busy')).toBe('true');
+  });
+});
+
+describe('computer use', () => {
+  const cu = () => {
+    const e = core_ev.find((x) => x.ev === 'computer_use' && x.on);
+    if (e?.ev !== 'computer_use') throw new Error('fixture');
+    return e;
+  };
+
+  it('checks while open, leaves when closed; a fix only on his click; on and off', () => {
+    const p = ports();
+    const { unmount } = view('computer', p, { computerUse: cu() });
+    expect(p.sent).toEqual([{ cmd: 'computer_use', act: 'check' }]);
+    expect(screen.getByTestId('settings.cu.web').textContent).toContain('add bise to Chrome');
+    expect(screen.getByTestId('settings.cu.apps').textContent).toContain('accessibility');
+    expect(screen.queryByTestId('settings.cu.browser')).toBeNull();
+    fireEvent.click(screen.getByTestId('settings.cu.extension'));
+    fireEvent.click(screen.getByTestId('settings.cu.switch'));
+    unmount();
+    expect(p.sent.slice(1)).toEqual([
+      { cmd: 'computer_use', act: 'fix', fix: 'add_extension' },
+      { cmd: 'computer_use', act: 'off' },
+      { cmd: 'computer_use', act: 'leave' },
+    ]);
+  });
+
+  it('off: no steps, the switch turns it on', () => {
+    const p = ports();
+    view('computer', p, { computerUse: { ev: 'computer_use', on: false, ready: false, rows: [] } });
+    expect(screen.queryByTestId('settings.cu.web')).toBeNull();
+    fireEvent.click(screen.getByTestId('settings.cu.switch'));
+    expect(p.sent.at(-1)).toEqual({ cmd: 'computer_use', act: 'on' });
   });
 });

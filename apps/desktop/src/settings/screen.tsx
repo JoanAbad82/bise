@@ -2,7 +2,7 @@
 // by the store (the core's prefs, accounts, projects, found) and sending
 // through it (store.command: the core's AppCmd). Owner: amb-home.
 import type { JsonValue } from '@/proto';
-import { useAccounts, useFound, usePlugins, usePrefs, useProjects, useStore } from '@/store';
+import { useAccounts, useComputerUse, useFound, usePlugins, usePrefs, useProjects, useStore } from '@/store';
 import { useRouter } from '@/app/router';
 import { Settings } from './Settings';
 import type { Prefs } from './prefs';
@@ -24,6 +24,7 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
       projects={useProjects()}
       found={useFound()}
       plugins={usePlugins()}
+      computerUse={useComputerUse()}
       ports={{
         send: (cmd) => {
           store.command(cmd);
