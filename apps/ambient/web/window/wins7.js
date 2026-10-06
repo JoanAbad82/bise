@@ -7,6 +7,7 @@
 //   AmbWinS7.owns(ev) -> bool                   core events and ui_* events a screen handles
 //   AmbWinS7.enter(s7, route, s) -> {s7, cmds}  a screen's route opens (subscribe what it needs)
 //   AmbWinS7.step(s7, ev, s) -> {s7, cmds, route?, eat?, quote?}  (quote: a review's lines ❝)
+//   AmbWinS7.key(s7, ev, s) -> {s7, cmds, eat} | null   a ui_key while a screen shows
 //   AmbWinS7.view(s) -> d                       the screen of s.route (d.head: amb-win's header)
 //   AmbWinS7.tab(s, project, 'changes'|'artifacts') -> d | null
 //   AmbWinS7.draw(d, UI) -> Element             drawn in the main column, above the composer
@@ -46,6 +47,14 @@
     return { s7, cmds, ...(route ? { route } : {}), ...(eat ? { eat } : {}), ...(quote ? { quote } : {}) };
   }
 
+  // keys while a screen shows (amb-win forwards ui_key first; null = not ours)
+  function key(s7, ev, s) {
+    const p = parts()[s.route && s.route.screen];
+    if (!p || !p[0] || !p[0].key) return null;
+    const r = p[0].key(s7[p[1]], ev, s);
+    return r ? { s7: { ...s7, [p[1]]: r.e }, cmds: r.cmds || [], eat: r.eat !== false } : null;
+  }
+
   function view(s) {
     const p = parts()[s.route && s.route.screen];
     return p && p[0] ? p[0].view(s) : null;
@@ -58,5 +67,5 @@
     return p && p[0] ? p[0].draw(d, UI) : null;
   }
 
-  root.AmbWinS7 = { init, owns, enter, step, view, tab, draw };
+  root.AmbWinS7 = { init, owns, enter, step, key, view, tab, draw };
 })(typeof window !== "undefined" ? window : globalThis);

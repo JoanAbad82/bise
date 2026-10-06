@@ -187,6 +187,33 @@ law("review: the merge decision is the agent's approval card above the composer;
   const r = w.feed({ ev: "ui_pick", card: dock.card, n: 1 });
   eq(r.cmds.filter((c) => c.cmd === "answer"), [{ cmd: "answer", project: P.engine, card: "c-netcode", reply: "1" }]);
 });
+law("review: one action row under the result (ambient m_8443): merge into main ⌘⏎, ask for changes (the composer, addressed), open in editor ⌘O; merging says 'merged · <sha>' and the row goes", () => {
+  const w = win();
+  w.open("review", P.engine, "streaming");
+  eq(w.v.actions.map((a) => [a.text, a.kbd || "", a.kind || ""]), [["merge into main", "⌘⏎", "pri"], ["ask for changes", "", ""], ["open in editor", "⌘O", ""]]);
+  w.feed(w.v.actions[1].act);
+  eq(w.win.composer.text, "streaming, ");
+  w.feed({ ev: "ui_type", text: "" });
+  eq(w.feed(w.v.actions[2].act).cmds, [{ cmd: "open_in", project: P.engine, app: "editor", path: F7.WORKTREES[P.engine][0].path }]);
+  // ⌘O and ⌘⏎ on the screen (an empty composer): the same acts
+  const kO = S7.key(w.s.s7, { ev: "ui_key", key: "o", meta: true }, w.s);
+  eq([kO.cmds[0].cmd, kO.eat], ["open_in", true]);
+  // no approval card for streaming: the merge cmd; the core answers merged
+  const r = w.feed(w.v.actions[0].act);
+  eq(r.cmds, [{ cmd: "merge", project: P.engine, agent: "streaming" }]);
+  eq([w.v.head.t2[3], w.v.actions], ["merged · 4f2a9c1", []]);
+  // with words in the composer, ⌘⏎ is the composer's
+  w.feed({ ev: "ui_type", text: "attends" });
+  eq(S7.key(w.s.s7, { ev: "ui_key", key: "Enter", meta: true }, w.s), null);
+});
+law("review: an agent with an approval card merges by answering it (its 'merge' option); the graph has its legend", () => {
+  const w = win();
+  w.open("review", P.engine, "netcode");
+  const k = S7.key(w.s.s7, { ev: "ui_key", key: "Enter", meta: true }, w.s);
+  eq(k.cmds, [{ cmd: "answer", project: P.engine, card: "c-netcode", reply: "1" }]);
+  // netcode has no worktree path known to the review? it has one: open in editor is offered
+  eq(w.v.actions.map((a) => a.text), ["merge into main", "ask for changes", "open in editor"]);
+});
 law("review: loading until the diff comes; an agent with nothing ahead says so", () => {
   const w = win();
   // the fake answers at once; a review whose diff hasn't come shows the skeleton

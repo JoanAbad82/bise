@@ -78,6 +78,11 @@
       const d = DIFFS[`${cmd.project}/${cmd.agent}`] || { base: "main", head: `sb/${cmd.agent}`, files: [] };
       return [[0, { ev: "diff", project: cmd.project, agent: cmd.agent, ...d }]];
     }
+    // merge into main: the diff comes back merged (the agent's branch is in main now)
+    if (cmd.cmd === "merge") {
+      const d = DIFFS[`${cmd.project}/${cmd.agent}`] || { base: "main", head: `sb/${cmd.agent}`, files: [] };
+      return [[0, { ev: "diff", project: cmd.project, agent: cmd.agent, ...d, merged: "4f2a9c1" }]];
+    }
     if (cmd.cmd === "artifacts_seen") return [[0, { ev: "artifacts", project: cmd.project, items: (F.ARTIFACTS[cmd.project] || []).map((a) => ({ ...a, new: false })) }]];
     return null;
   }
