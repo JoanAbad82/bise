@@ -26,7 +26,7 @@ pub fn workspace_id(workspace: &Path) -> String {
 /// folder without git for non-code work; `$BISE_HOME_WORKSPACE` when set
 /// (the tests: a throwaway folder, never the user's).
 pub fn home_workspace() -> PathBuf {
-    if let Some(d) = std::env::var_os("BISE_HOME_WORKSPACE").filter(|d| !d.is_empty()) {
+    if let Some(d) = bise_home::env::test_setting("BISE_HOME_WORKSPACE") {
         return PathBuf::from(d);
     }
     let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("."));

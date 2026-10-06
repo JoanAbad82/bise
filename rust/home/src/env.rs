@@ -119,7 +119,10 @@ pub const VARS: &[Var] = &[
     internal("BISE_EXPORTS_FOR", "the stamp of the exported Home paths"),
     test("BISE_GITHUB_API", "the GitHub API base (tests: a stub server)"),
     user("BISE_HOME", "where bise keeps its state (~/.bise)"),
-    internal("BISE_HOME_WORKSPACE", "ambient's home workspace, for its agents"),
+    // a test's: a hub started by the CLI or the ambient core keeps it, or
+    // its home check takes the real $HOME/bise (amb-core m_8700); the hub
+    // sets it for its agents itself
+    test("BISE_HOME_WORKSPACE", "bise's home workspace (tests); a hub passes it to its agents"),
     user("BISE_HYPERLINKS", "terminal hyperlinks on or off"),
     user("BISE_IDLE_EXIT", "how long a hub without a UI waits before it quits"),
     user("BISE_MODEL", "the main model"),
