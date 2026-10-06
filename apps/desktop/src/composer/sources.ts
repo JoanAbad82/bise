@@ -45,6 +45,16 @@ export interface PickCommand {
   readonly ready: boolean;
 }
 
+/** Something an agent made for him (a page, a doc, a link): the `@` list offers it by name. */
+export interface PickArtifact {
+  readonly id: string;
+  readonly title: string;
+  readonly kind: string;
+  readonly agent: string;
+  readonly url: string;
+  readonly atMs: number;
+}
+
 export interface PickFile {
   /** Relative to the workspace, `/`-separated. */
   readonly path: string;
@@ -62,6 +72,8 @@ export interface ComposerSources {
   readonly agents: readonly PickAgent[];
   readonly skills: readonly PickSkill[];
   readonly commands: readonly PickCommand[];
+  /** The project's artifacts for the `@` list, after the agents (none: no rows). */
+  readonly artifacts?: readonly PickArtifact[];
   /** The workspace's files for an `@` query, ranked by the core (files.rs's ranking). */
   readonly files: (query: string) => Promise<readonly PickFile[]>;
   /** A pasted or dropped image saved to a file the core can send; null when it can't be. */

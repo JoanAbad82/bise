@@ -4,6 +4,7 @@
 // exactly like a TUI one:
 //   a long paste  `<pasted n="1" lines="240">\n…\n</pasted>` where the chip was (pasted.rs);
 //   a quote       `<selection from="main">\n…\n</selection>` in front of the words (quote.rs);
+//   an artifact   `[title](url)` where the chip was (attach.rs insert_artifact);
 //   an image      `[Image #1]` where the chip was, its file in `files` (the core's send takes
 //                 absolute paths: run 5's shape; docs/images.md).
 // One number sequence per draft for images, pastes and quotes (a number points at one chip).
@@ -11,7 +12,8 @@
 export type Chip =
   | { readonly kind: 'image'; readonly n: number; readonly path: string; readonly name: string; readonly thumb?: string }
   | { readonly kind: 'paste'; readonly n: number; readonly text: string }
-  | { readonly kind: 'quote'; readonly n: number; readonly text: string; readonly from: string };
+  | { readonly kind: 'quote'; readonly n: number; readonly text: string; readonly from: string }
+  | { readonly kind: 'artifact'; readonly n: number; readonly id: string; readonly title: string; readonly url: string };
 
 export type Segment = { readonly kind: 'text'; readonly text: string } | { readonly kind: 'chip'; readonly chip: Chip };
 
@@ -51,6 +53,8 @@ export function chipLabel(c: Chip): string {
       return `▤ ${c.n}`;
     case 'quote':
       return `❝ ${c.n}`;
+    case 'artifact':
+      return `↗ ${c.title}`;
   }
 }
 
@@ -74,6 +78,8 @@ export function chipStrip(c: Chip): string {
       const n = lineCount(c.text);
       return `${chipLabel(c)} “${preview(c.text, 32)}”  ${c.from} · ${n} ${n === 1 ? 'line' : 'lines'}`;
     }
+    case 'artifact':
+      return `${chipLabel(c)}  ${c.url}`;
   }
 }
 
@@ -99,6 +105,8 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
       if (quotes.length < QUOTE_MAX) quotes.push(quoteTag(c.from, c.text));
     } else if (c.kind === 'paste') {
       body += pasteTag(c.n, c.text);
+    } else if (c.kind === 'artifact') {
+      body += `[${c.title.replace(/[[\]]/gu, '')}](${c.url})`;
     } else {
       body += chipLabel(c);
       if (!files.includes(c.path)) files.push(c.path);

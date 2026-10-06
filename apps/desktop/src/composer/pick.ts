@@ -1,7 +1,7 @@
 // The picker's rows for a trigger, and what picking one does. Pure: the plugin (Picker.tsx) asks
 // for the rows when the trigger changes and applies the pick to the editor.
 import { filterEmoji } from './emoji';
-import type { ComposerSources, PickAgent, PickCommand, PickFile, PickSkill } from './sources';
+import type { ComposerSources, PickAgent, PickArtifact, PickCommand, PickFile, PickSkill } from './sources';
 import { agentPick, filePick, prefixFirst, skillPick, type Trigger } from './tokens';
 
 export interface Row {
@@ -10,7 +10,7 @@ export interface Row {
   readonly label: string;
   readonly desc: string;
   /** A tag in front: `agent`, `dir`, `file`, `skill`, `cmd`, `emoji`. */
-  readonly tag: 'agent' | 'dir' | 'file' | 'skill' | 'cmd' | 'emoji';
+  readonly tag: 'agent' | 'artifact' | 'dir' | 'file' | 'skill' | 'cmd' | 'emoji';
   /** Greyed, `not yet`: shown, picking it does nothing (bar 2.1). */
   readonly off: boolean;
   readonly pick: Pick;
@@ -20,7 +20,8 @@ export interface Row {
  *  or run the command now. */
 export type Pick =
   | { readonly kind: 'insert'; readonly text: string; readonly browse: boolean; readonly path?: string }
-  | { readonly kind: 'run'; readonly name: string };
+  | { readonly kind: 'run'; readonly name: string }
+  | { readonly kind: 'artifact'; readonly id: string; readonly title: string; readonly url: string };
 
 /** At most this many rows in a list (the TUI's popup shows fewer; the rest is a query away). */
 export const MAX_ROWS = 50;
@@ -35,6 +36,39 @@ export function agentRows(t: Trigger, agents: readonly PickAgent[]): Row[] {
     off: false,
     pick: { kind: 'insert', text: agentPick(a.name), browse: false },
   }));
+}
+
+/** At most this many artifacts in the `@` list (commands.rs ARTIFACT_ROWS). */
+export const ARTIFACT_ROWS = 8;
+
+/** `a few seconds ago`-style words for a time (artifacts.rs ago_words, short). */
+export function agoWords(ms: number, now: number): string {
+  const s = Math.max(0, Math.round((now - ms) / 1000));
+  if (s < 60) return 'just now';
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} h ago`;
+  const d = Math.round(h / 24);
+  return d === 1 ? 'yesterday' : `${d} days ago`;
+}
+
+/** The `@` list's artifacts (commands.rs): by title, agent, kind or id, never in a path query; a
+ *  pick puts a `↗ title` chip in the message, never `@name`. */
+export function artifactRows(t: Trigger, artifacts: readonly PickArtifact[], now: number): Row[] {
+  if (t.kind !== 'at' || t.quoted || t.query.includes('/')) return [];
+  const q = t.query.toLowerCase();
+  return artifacts
+    .filter((a) => q === '' || [a.title, a.agent, a.kind, a.id].some((f) => f.toLowerCase().includes(q)))
+    .slice(0, ARTIFACT_ROWS)
+    .map((a) => ({
+      id: `artifact.${a.id}`,
+      label: `↗ ${a.title}`,
+      desc: `${a.kind} · ${a.agent} · ${agoWords(a.atMs, now)}`,
+      tag: 'artifact',
+      off: false,
+      pick: { kind: 'artifact', id: a.id, title: a.title, url: a.url },
+    }));
 }
 
 export function fileRows(files: readonly PickFile[]): Row[] {

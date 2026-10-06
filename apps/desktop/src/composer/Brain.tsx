@@ -13,6 +13,7 @@ import {
   $parseSerializedNode,
   $getSelection,
   $isRangeSelection,
+  CLEAR_HISTORY_COMMAND,
   COMMAND_PRIORITY_HIGH,
   COPY_COMMAND,
   DROP_COMMAND,
@@ -39,7 +40,7 @@ import { $caretOnFirstLine, $isBlank, $plainText, $readSegments, $textBeforeCare
 import { enterMakesNewline, indent, newline, outdentAtStart, subwordLeft, subwordRight, NO_UNDO, type Op } from './mdlive';
 import { buildMessage, chars, chipStrip, isLongPaste, nextChipNumber, preview, type Chip, type Outgoing, type Segment } from './message';
 import { enqueue, historyAt, load, popNewest, remember, save, takeOldest, type Saved, type Store } from './drafts';
-import { agentRows, argRows, commandLine, commandRows, completion, emojiRows, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
+import { agentRows, argRows, artifactRows, commandLine, commandRows, completion, emojiRows, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
 import { isImagePath, type ComposerSources, type PickFile } from './sources';
 import { argAt, browseText, parentQuery, triggerAt, type Trigger } from './tokens';
 import { loadRecent, picked, recentFirst } from './recent';
@@ -139,6 +140,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
     saved.current = load(p.store, p.target);
     browsing.current = -1;
     setContent(saved.current.draft);
+    editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined); // another target's text never comes back
     return () => {
       writeNow(); // the target changes or the screen goes: the draft is kept at once
     };
@@ -147,6 +149,8 @@ export function Brain(p: BrainProps): JSX.Element | null {
 
   // ---- the picker ----
   const [trigger, setTrigger] = useState<Trigger | null>(null);
+  // when the trigger last changed: the artifacts' `5 min ago` (read in the listener, not in render)
+  const [openedAt, setOpenedAt] = useState(0);
   const [files, setFiles] = useState<{ key: string; items: readonly PickFile[] }>({ key: '', items: [] });
   // the keyboard's row, for one trigger: a new trigger starts at the first row
   const [sel, setSel] = useState({ key: '', i: 0 });
@@ -169,7 +173,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
     if (trigger === null) return [];
     const all =
       trigger.kind === 'at'
-        ? [...agentRows(trigger, p.sources.agents), ...(files.key === tkey ? fileRows(recentFirst(files.items, trigger.query, loadRecent(p.store))) : [])]
+        ? [...agentRows(trigger, p.sources.agents), ...artifactRows(trigger, p.sources.artifacts ?? [], openedAt), ...(files.key === tkey ? fileRows(recentFirst(files.items, trigger.query, loadRecent(p.store))) : [])]
         : trigger.kind === 'skill'
           ? skillRows(trigger, p.sources.skills)
           : trigger.kind === 'arg'
@@ -178,7 +182,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
               ? emojiRows(trigger)
               : commandRows(trigger, p.sources.commands);
     return all.slice(0, MAX_ROWS);
-  }, [trigger, tkey, files, p.sources, p.store]);
+  }, [trigger, tkey, files, p.sources, p.store, openedAt]);
 
   const open = trigger !== null && rows.length > 0 && dismissed !== `${trigger.kind}:${trigger.start}`;
   const index = sel.key === tkey ? Math.min(sel.i, Math.max(0, rows.length - 1)) : 0;
@@ -195,6 +199,11 @@ export function Brain(p: BrainProps): JSX.Element | null {
     setContent(null);
     browsing.current = -1;
   };
+  /** What he sent is gone from the field's undo too (editor_undo_tests.rs sending_clears_both_stacks):
+   *  ⌘Z then says NO_UNDO instead of bringing it back. */
+  const forget = (): void => {
+    editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined);
+  };
 
   const submit = (): void => {
     const segs = editor.getEditorState().read(() => $readSegments());
@@ -210,6 +219,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
     }
     saved.current = remember(saved.current, entry);
     clear();
+    forget();
     writeNow();
   };
 
@@ -222,7 +232,18 @@ export function Brain(p: BrainProps): JSX.Element | null {
       saved.current = remember(saved.current, json(editor));
       props.current.command(pick.name, '');
       clear();
+      forget();
       writeNow();
+      return;
+    }
+    if (pick.kind === 'artifact') {
+      // W11: the @word goes, the artifact's chip comes (attach.rs insert_artifact)
+      editor.update(() => {
+        const before = $textBeforeCaret();
+        if (before === null) return;
+        $replaceBeforeCaret(chars(before.text.slice(t.start)).length, '');
+        $insertChip({ kind: 'artifact', n: nextChipNumber($readSegments()), id: pick.id, title: pick.title, url: pick.url });
+      });
       return;
     }
     if (pick.path !== undefined && !pick.browse) picked(props.current.store, pick.path); // B8
@@ -255,6 +276,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
   const queue = (): void => {
     saved.current = enqueue(saved.current, json(editor));
     clear();
+    forget();
     writeNow();
   };
 
@@ -372,6 +394,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
       if (k !== lastTrigger) {
         lastTrigger = k;
         setTrigger(t);
+        setOpenedAt(Date.now());
       }
       const edited = dirtyElements.size > 0 || dirtyLeaves.size > 0;
       if (edited) note.current = null;

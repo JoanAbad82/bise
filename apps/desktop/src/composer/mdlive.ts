@@ -19,7 +19,9 @@ export interface Op {
   readonly caret: number;
 }
 
-type Kind = 'prose' | 'code' | 'fence';
+/** `open`: the fence that opens a block (its line is code: ⏎ there is a newline); `close`: the
+ *  bare fence that closes it (a fence with a tag inside a block is code, as in CommonMark). */
+type Kind = 'prose' | 'code' | 'open' | 'close';
 
 interface LineAt {
   readonly k: number;
@@ -30,6 +32,7 @@ interface LineAt {
 }
 
 const FENCE = /^\s*(```|~~~)/u;
+const BARE_FENCE = /^\s*(```|~~~)\s*$/u;
 
 function lineAt(text: string, cursor: number): LineAt {
   const lines = text.split('\n');
@@ -37,11 +40,10 @@ function lineAt(text: string, cursor: number): LineAt {
   let open = false;
   for (let k = 0; k < lines.length; k += 1) {
     const line = lines[k] ?? '';
-    const fence = FENCE.test(line);
-    if (cursor <= at + line.length || k === lines.length - 1) {
-      return { k, at, line, kind: fence ? 'fence' : open ? 'code' : 'prose' };
-    }
-    if (fence) open = !open;
+    const kind: Kind = open ? (BARE_FENCE.test(line) ? 'close' : 'code') : FENCE.test(line) ? 'open' : 'prose';
+    if (cursor <= at + line.length || k === lines.length - 1) return { k, at, line, kind };
+    if (kind === 'open') open = true;
+    if (kind === 'close') open = false;
     at += line.length + 1;
   }
   return { k: 0, at: 0, line: '', kind: 'prose' };
@@ -73,7 +75,8 @@ const nextMarker = (it: Item): string =>
 
 /** ⏎ makes a newline here (in a code block) instead of sending. */
 export function enterMakesNewline(text: string, cursor: number): boolean {
-  return lineAt(text, cursor).kind === 'code';
+  const k = lineAt(text, cursor).kind;
+  return k === 'code' || k === 'open';
 }
 
 /** The nearest item above line k in its list (no blank line or fence between) with indent < max. */
@@ -91,7 +94,7 @@ function parentIndent(lines: readonly string[], k: number, max: number): number 
 export function newline(text: string, cursor: number): Op | null {
   const l = lineAt(text, cursor);
   const col = cursor - l.at;
-  if (l.kind === 'code') {
+  if (l.kind === 'code' || l.kind === 'open') {
     const ws = /^[ \t]*/u.exec(l.line.slice(0, col))?.[0] ?? '';
     return { from: cursor, to: cursor, insert: `\n${ws}`, caret: cursor + 1 + ws.length };
   }

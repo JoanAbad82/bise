@@ -114,7 +114,7 @@ function SentLog({ log }: { log: Log }): JSX.Element {
   return (
     <ol className="lab-sent" data-testid="lab.sent">
       {log.map((l, i) => (
-        <li key={i} data-testid={`lab.sent.${i + 1}`}>
+        <li key={i} data-testid={`lab.sent.${i + 1}`} style={{ whiteSpace: 'pre-wrap' }}>
           {l}
         </li>
       ))}

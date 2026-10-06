@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { argAt, browseText, filePick, parentQuery, prefixFirst, triggerAt } from './tokens';
 import { emojiToken, filterEmoji, get, typedEmoji, all as allEmoji, EMOJI_MAX } from './emoji';
-import { emojiRows } from './pick';
+import { agoWords, artifactRows, emojiRows } from './pick';
 import TUI_EMOJI from '../../../../rust/tui/src/emoji.tsv?raw';
 import DESKTOP_EMOJI from './emoji.tsv?raw';
 import { loadRecent, picked, recentFirst, RECENT_MAX } from './recent';
@@ -149,6 +149,12 @@ describe('live markdown keys (mdlive.rs)', () => {
     expect(applied(t, newline(t, t.length))).toEqual(['```\n  let x = 1\n  ', t.length + 3]);
     expect(enterMakesNewline('```\nx\n```', 9)).toBe(false);
     expect(enterMakesNewline('plain', 5)).toBe(false);
+    // the opening fence's line is code too (mdlive.rs enter_makes_newline('```ts', 5)); a tagged
+    // fence inside a block is code, a bare one closes it
+    expect(enterMakesNewline('```ts', 5)).toBe(true);
+    expect(applied('  ```rust', newline('  ```rust', 9))?.[0]).toBe('  ```rust\n  ');
+    expect(enterMakesNewline('```\n```py\nx', 12)).toBe(true);
+    expect(enterMakesNewline('```\nx\n```\nafter', 15)).toBe(false);
   });
   it('⇧⏎ continues a list, numbers count up, a checkbox comes back empty', () => {
     expect(applied('- one', newline('- one', 5))).toEqual(['- one\n- ', 8]);
@@ -247,5 +253,33 @@ describe('emoji (emoji.rs)', () => {
     expect(filterEmoji('')).toEqual([]);
     expect(filterEmoji('e').length).toBeLessThanOrEqual(EMOJI_MAX);
     expect(emojiRows({ kind: 'emoji', query: 'tada', start: 0, quoted: false })[0]).toMatchObject({ label: '🎉  :tada:', pick: { kind: 'insert', text: '🎉' } });
+  });
+});
+
+describe('artifacts in the @ list (commands.rs, W11)', () => {
+  const now = 1_791_100_100_000;
+  const made = [
+    { id: 'perf-notes', title: 'Perf notes', kind: 'page', agent: 'perf', url: 'http://127.0.0.1:47123/p/perf-notes', atMs: now - 5 * 60_000 },
+    { id: 'pricing', title: 'Pricing [draft]', kind: 'doc', agent: 'pm', url: 'http://127.0.0.1:47123/a/pricing', atMs: now - 3 * 3_600_000 },
+  ];
+  const at = (query: string, quoted = false) => ({ kind: 'at' as const, query, start: 0, quoted });
+  it('by title, agent, kind or id, never in a path query, 8 at most', () => {
+    expect(artifactRows(at(''), made, now).map((r) => r.id)).toEqual(['artifact.perf-notes', 'artifact.pricing']);
+    expect(artifactRows(at('PERF'), made, now)[0]).toMatchObject({ label: '↗ Perf notes', desc: 'page · perf · 5 min ago', tag: 'artifact' });
+    expect(artifactRows(at('doc'), made, now).map((r) => r.id)).toEqual(['artifact.pricing']);
+    expect(artifactRows(at('src/'), made, now)).toEqual([]);
+    expect(artifactRows(at('perf', true), made, now)).toEqual([]);
+    const many = Array.from({ length: 12 }, (_, i) => ({ id: `a${i}`, title: 'Perf notes', kind: 'page', agent: 'perf', url: 'http://h', atMs: now }));
+    expect(artifactRows(at(''), many, now)).toHaveLength(8);
+    expect(agoWords(now - 3 * 3_600_000, now)).toBe('3 h ago');
+  });
+  it('its chip sends as a markdown link where it was, brackets out of the title', () => {
+    const segs: Segment[] = [
+      { kind: 'text', text: 'see ' },
+      { kind: 'chip', chip: { kind: 'artifact', n: 1, id: 'pricing', title: 'Pricing [draft]', url: 'http://h/a/pricing' } },
+      { kind: 'text', text: ' and fix it' },
+    ];
+    expect(buildMessage(segs)).toEqual({ text: 'see [Pricing draft](http://h/a/pricing) and fix it', files: [] });
+    expect(chipStrip({ kind: 'artifact', n: 1, id: 'p', title: 'Perf notes', url: 'http://h/p' })).toBe('↗ Perf notes  http://h/p');
   });
 });
