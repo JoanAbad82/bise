@@ -178,3 +178,45 @@ export function tuiInbox(screen: string): { n: number; agent: string; text: stri
   }
   return out;
 }
+
+/**
+ * The TUI's agents, from its side panel (`agents`, then rows `N <glyph> <name> …`), in its order:
+ * [{ n, glyph, name }]. The glyph is its status (rust/tui/src/theme.rs, TUI_STATUS).
+ */
+export function tuiAgents(screen: string): { n: number; glyph: string; name: string }[] {
+  const panel = screen.split('\n').map((l) => {
+    const cells = l.split('│');
+    return (cells.length >= 3 ? (cells[cells.length - 2] ?? '') : '').trim();
+  });
+  const at = panel.indexOf('agents');
+  if (at < 0) return [];
+  const out: { n: number; glyph: string; name: string }[] = [];
+  for (const row of panel.slice(at + 1)) {
+    if (row === '') { if (out.length === 0) continue; break; }
+    const m = /^(\d+) (\S) (\S+)/.exec(row);
+    if (!m) break;
+    out.push({ n: Number(m[1]), glyph: m[2] ?? '', name: m[3] ?? '' });
+  }
+  return out;
+}
+
+/** The statuses a TUI panel glyph stands for (rust/tui/src/theme.rs: G_WORKING …). */
+export const TUI_STATUS: Readonly<Record<string, readonly string[]>> = {
+  '∿': ['working'], '·': ['working'], '?': ['blocked', 'waiting'], '…': ['waiting'],
+  '✓': ['done'], '✗': ['failed'], '○': ['idle'], '–': ['idle'],
+};
+
+/** One agent as the hub's socket state has it (the fields the A rows read). */
+export type HubAgent = { name: string; status: string; main: boolean; dropped: boolean; branch: string | null; report: string | null; model: string; changes: { add: number; del: number; files: number } | null };
+
+/** The hub's agents, read straight from its socket (`hubState`). */
+export async function hubAgents(w: World, project: string): Promise<HubAgent[]> {
+  const s = await hubState(hubOf(w, project).sock);
+  return (s['agents'] as HubAgent[] | undefined) ?? [];
+}
+
+/** The TUI's prompt: type these words (literally) and Enter. */
+export function tuiSay(t: Tui, words: string): void {
+  t.keys('-l', words);
+  t.keys('Enter');
+}

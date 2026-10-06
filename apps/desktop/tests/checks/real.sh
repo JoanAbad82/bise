@@ -29,7 +29,7 @@ for a in "$@"; do specs+=("tests/checks/$a"); done
 if [ ${#specs[@]} -eq 0 ]; then
   specs=(tests/checks/thread/send.spec.ts tests/checks/thread/answers.spec.ts tests/checks/thread/send-offline.spec.ts
          tests/checks/thread/interrupt.spec.ts tests/checks/thread/find.spec.ts tests/checks/inbox/cmd-i.spec.ts
-         tests/checks/agents tests/checks/spotlight/answer.spec.ts)
+         tests/checks/agents tests/checks/review tests/checks/spotlight/answer.spec.ts)
 fi
 cd "$desktop" || exit 1
-pnpm exec playwright test -c tests/harness/playwright.config.ts "${specs[@]}" -g 'real core|thread/|inbox/cmd-i|agents/' --reporter=list
+pnpm exec playwright test -c tests/harness/playwright.config.ts "${specs[@]}" -g 'real core|thread/|inbox/cmd-i|agents/|review/' --reporter=list
