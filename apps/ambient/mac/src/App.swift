@@ -523,8 +523,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
                 // bise's window in front and key holds it above its composer (CardSeat);
                 // a held card isn't counted as shown: it comes to the bar when the window goes
                 if cardSeat() == .window {
-                    heldCard = card ?? "?"
-                    Log.say("app: card \(card ?? "?") stays in the window (it's in front)")
+                    holdCard(card ?? "?")
                 } else {
                     heldCard = nil
                     if cardPush.shows(card: card) { visFeed(.card) } else { capsule.refreshMouse() }
@@ -750,7 +749,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             // a new item that needs you: the capsule shows it for 6 s
             let ids = Set(cards.map(\.id))
             cue(.cards(now: ids, seen: seenCards))
-            if let seen = seenCards, !ids.subtracting(seen).isEmpty { visFeed(.card) }
+            // (amb-tools m_8716, D: this path showed the bar for a new card while
+            // bise's window was in front and key; the card's seat decides here too)
+            if let seen = seenCards, let fresh = cards.last(where: { !seen.contains($0.id) }) {
+                if cardSeat() == .window {
+                    holdCard(fresh.id)
+                } else {
+                    visFeed(.card)
+                }
+            }
             seenCards = ids
             // macOS notifications: the screen locked or you away, not "hidden" (§8)
             notify?.cards(cards, quiet: !locked && !away)

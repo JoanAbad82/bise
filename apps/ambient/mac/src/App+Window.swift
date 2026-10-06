@@ -39,11 +39,20 @@ extension AmbientApp {
                              appFront: NSApp.isActive || CapsulePanel.simulatedKeys)
     }
 
+    // bise's window holds this card: no bar for it, and the bar's page is told
+    // so a bar already up (the hello) doesn't turn into the card (amb-tools m_8716, A)
+    func holdCard(_ id: String) {
+        if heldCard == nil { capsule.post(["ev": "app_card_seat", "at": "window"]) }
+        heldCard = id
+        Log.say("app: card \(id) stays in the window (it's in front)")
+    }
+
     // the window closed, lost the keys, or another app came in front (lead
     // m_8679, B): a card it held comes to the bar now, bottom centre
     func cardSeatChanged() {
         guard let c = heldCard, cardSeat() == .bar else { return }
         heldCard = nil
+        capsule.post(["ev": "app_card_seat", "at": "bar"])
         guard content == "needs" else { return }   // the page shows something else: its next needs pushes it
         Log.say("app: card \(c) comes to the bar (the window isn't in front)")
         if cardPush.shows(card: c == "?" ? nil : c) { visFeed(.card) }
