@@ -253,7 +253,15 @@
 
     function draw() {
       const v = V.view(s);
-      doc.documentElement.dataset.theme = v.theme;
+      const html = doc.documentElement;
+      if (html.dataset.theme !== v.theme) {
+        // a theme change is instant, as macOS's: no 140 ms fade of every card (and a fade
+        // that never runs, in a page with no frames, leaves the old theme's colors)
+        html.classList.add("w-theme-switch");
+        html.dataset.theme = v.theme;
+        if (doc.defaultView && doc.body) doc.defaultView.getComputedStyle(doc.body).color;
+        html.classList.remove("w-theme-switch");
+      }
       R.app.classList.toggle("is-inactive", !v.focused);
       R.app.classList.toggle("w-two", !v.board);
       put("side", side(v));
@@ -276,6 +284,7 @@
       R.find.hidden = !v.finder;
       put("findrows", findRows(v));
       if (v.finder && R.findq.value !== v.finder.q) R.findq.value = v.finder.q;
+      if (v.finder && v.finder.ph && R.findq.placeholder !== v.finder.ph) R.findq.placeholder = v.finder.ph;
       if (v.finder && !wasOpen) R.findq.focus();
       if (!v.finder && wasOpen) R.field.focus();
       if (routeKey !== lastRoute || (changed && atEnd)) R.scroll.scrollTop = R.scroll.scrollHeight;
@@ -335,7 +344,30 @@
     R.field.addEventListener("input", () => { feed({ ev: "ui_type", text: R.field.value }); });
     R.findq.addEventListener("input", () => { feed({ ev: "ui_find_type", text: R.findq.value }); });
     // an API key's field (the setup screens) reports its words
-    el.addEventListener("input", (e) => { if (e.target.classList && e.target.classList.contains("w-keyin")) feed({ ev: "ui_key_type", text: e.target.value }); });
+    el.addEventListener("input", (e) => {
+      const c = e.target.classList;
+      if (c && c.contains("w-keyin")) feed({ ev: "ui_key_type", text: e.target.value });
+      if (c && c.contains("w-pathin")) feed({ ev: "ui_add_type", text: e.target.value });
+    });
+    // settings › projects: a row's handle drags it, a drop on another row takes that row's place
+    // (the order of ⌘1-9)
+    let dragged = null;
+    el.addEventListener("dragstart", (e) => {
+      const g = e.target.closest && e.target.closest("[data-drag]");
+      if (!g) return;
+      dragged = JSON.parse(g.getAttribute("data-drag")).project;
+      if (e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", dragged); }
+    });
+    el.addEventListener("dragover", (e) => { if (dragged && e.target.closest && e.target.closest("[data-order]")) e.preventDefault(); });
+    el.addEventListener("drop", (e) => {
+      const row = dragged && e.target.closest && e.target.closest("[data-order]");
+      const project = dragged;
+      dragged = null;
+      if (!row) return;
+      e.preventDefault();
+      feed({ ev: "ui_set_move", project, order: +row.getAttribute("data-order") });
+    });
+    el.addEventListener("dragend", () => { dragged = null; });
     R.find.addEventListener("mousedown", (e) => { if (e.target === R.find) feed({ ev: "ui_find_close" }); });
     R.scroll.addEventListener("scroll", () => { if (R.scroll.scrollTop < 20) feed({ ev: "ui_older" }); });
     // keys: e.code gives the digit under ⌥ (macOS turns ⌥1 into ¡)

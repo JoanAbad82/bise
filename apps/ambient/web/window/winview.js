@@ -6,6 +6,7 @@
   "use strict";
   const D = root.AmbWinDock, M = root.AmbWinModel;
   const { HOME, keyOf } = D;
+  const T = (s, k, v) => (root.AmbWinWords ? root.AmbWinWords.t(s, k, v) : k);
 
   // ---- time, in his timezone (s.tz; undefined = the machine's)
   const fmts = {};
@@ -15,9 +16,10 @@
   function dayLabel(s, ms) {
     const f = dayf(s.tz);
     const d = f.format(new Date(ms)), today = f.format(new Date(s.now)), yest = f.format(new Date(s.now - 86400000));
-    if (d === today) return "today";
-    if (d === yest) return "yesterday";
-    return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: s.tz }).format(new Date(ms));
+    if (d === today) return T(s, "today");
+    if (d === yest) return T(s, "yesterday");
+    const loc = root.AmbWinWords && root.AmbWinWords.lang(s) === "fr" ? "fr-FR" : "en-GB";
+    return new Intl.DateTimeFormat(loc, { weekday: "short", day: "numeric", month: "short", timeZone: s.tz }).format(new Date(ms));
   }
   const mins = (ms) => { const m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60 ? `${m % 60} min` : ""}`.trim(); };
   const num = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
@@ -32,17 +34,17 @@
 
   function sidebar(s) {
     const r = s.route;
-    const rows = [{ kind: "me", name: "bise", sub: "every project", end: String(D.allCards(s).length || ""), nd: D.allCards(s).length > 0, on: r.project === HOME, act: { ev: "ui_route", project: HOME, agent: "main" } }];
-    rows.push({ kind: "sh", text: "projects" });
+    const rows = [{ kind: "me", name: "bise", sub: T(s, "every_project"), end: String(D.allCards(s).length || ""), nd: D.allCards(s).length > 0, on: r.project === HOME, act: { ev: "ui_route", project: HOME, agent: "main" } }];
+    rows.push({ kind: "sh", text: T(s, "projects") });
     M.projectsInOrder(s).forEach((p, i) => {
       const waits = projectWaits(s, p.project), working = projectWorking(s, p.project);
       rows.push({ kind: "pj", name: p.name, dot: p.offline ? "off" : waits ? "nd" : working ? "wk" : "",
-        end: p.offline ? "offline" : waits ? String(waits) : i < 9 ? `⌘${i + 1}` : "", nd: waits > 0,
+        end: p.offline ? T(s, "offline") : waits ? String(waits) : i < 9 ? `⌘${i + 1}` : "", nd: waits > 0,
         on: r.project === p.project && r.agent === "main", act: { ev: "ui_route", project: p.project, agent: "main" } });
       // a project's agents show under it on bise's view, and under the project in view
       if (r.project === HOME || r.project === p.project) {
         const list = M.agentsOf(s, p.project);
-        if (!list.length) rows[rows.length - 1].end = rows[rows.length - 1].end || "no agent";
+        if (!list.length) rows[rows.length - 1].end = rows[rows.length - 1].end || T(s, "no_agent");
         for (const a of list) {
           const dot = agentDot(s, p.project, a);
           rows.push({ kind: "ag", name: a.name, dot, end: dot === "nd" ? "?" : dot === "er" ? "▲" : "",
@@ -50,37 +52,37 @@
         }
       }
     });
-    return { rows, foot: "+ add a project" };
+    return { rows, foot: T(s, "add_project"), sh: T(s, "projects") };
   }
 
   function header(s) {
     const r = s.route;
     const all = D.allCards(s).length;
-    if (r.screen === "notfound") return { t1: "not found", t2: [r.want], acc: -1, end: [] };
+    if (r.screen === "notfound") return { t1: T(s, "notfound"), t2: [r.want], acc: -1, end: [] };
     if (r.project === HOME) {
       const working = s.projects.reduce((n, p) => n + projectWorking(s, p.project), 0);
       const fresh = Object.values(s.arts).flat().filter((a) => a.new).length;
-      return { pearl: true, t1: "bise", t2: ["every project", `${working} at work`, ...(all ? [`${all} waiting for you`] : [])], acc: all ? 2 : -1,
-        end: [...(fresh ? [{ kind: "chip", text: `↗ ${fresh} new` }] : []), { kind: "chip", text: "⌕", kbd: "⌘K" }] };
+      return { pearl: true, t1: "bise", t2: [T(s, "every_project"), T(s, "at_work", { n: working }), ...(all ? [T(s, "waiting", { n: all })] : [])], acc: all ? 2 : -1,
+        end: [...(fresh ? [{ kind: "chip", text: T(s, "n_new", { n: fresh }) }] : []), { kind: "chip", text: "⌕", kbd: "⌘K" }] };
     }
     const p = s.projects.find((x) => x.project === r.project) || { name: r.project, path: "" };
     const waits = projectWaits(s, r.project);
     if (r.agent === "main") {
       const n = M.agentsOf(s, r.project).length;
       const tab = s.tab[r.project] || "thread";
-      return { t1: p.name, dot: waits ? "nd" : projectWorking(s, r.project) ? "wk" : "", t2: [p.path, p.branch || "main", `${n} agent${n === 1 ? "" : "s"}`, ...(waits ? [`${waits} waiting for you`] : [])], acc: waits ? 3 : -1,
-        seg: ["thread", "changes", "artifacts"].map((t) => ({ text: t, on: t === tab, act: { ev: "ui_tab", tab: t } })) };
+      return { t1: p.name, dot: waits ? "nd" : projectWorking(s, r.project) ? "wk" : "", t2: [p.path, p.branch || "main", T(s, "agents_n", { n }), ...(waits ? [T(s, "waiting", { n: waits })] : [])], acc: waits ? 3 : -1,
+        seg: ["thread", "changes", "artifacts"].map((t) => ({ text: T(s, `tab_${t}`), on: t === tab, act: { ev: "ui_tab", tab: t } })) };
     }
     const a = M.agentRow(s) || { name: r.agent, status: "idle" };
     const mine = openCardsOf(s, r.project, r.agent).length;
     const t = s.threads[keyOf(r)];
     const files = t ? new Set(t.entries.filter((e) => e.kind === "diff").map((e) => e.diff.path)).size : 0;
-    const t2 = [p.name, ...(a.branch ? [`ψ ${a.branch}`] : []), ...(a.started_ms ? [`started by ${a.parent || "main"} ${hm(s, a.started_ms)}`] : []),
-      mine ? "waiting for you" : a.status === "working" ? "working" : a.status];
+    const t2 = [p.name, ...(a.branch ? [`ψ ${a.branch}`] : []), ...(a.started_ms ? [T(s, "started_by", { who: a.parent || "main", at: hm(s, a.started_ms) })] : []),
+      mine ? T(s, "waiting_for_you") : a.status === "working" ? T(s, "working") : T(s, `status_${a.status}`)];
     return { t1: r.agent, dot: agentDot(s, r.project, a), t2, acc: mine ? t2.length - 1 : -1,
-      end: [...(files ? [{ kind: "chip", text: `± ${files} file${files > 1 ? "s" : ""}` }] : []),
-        ...(a.status === "working" ? [{ kind: "btn", text: "stop", kbd: "⌘.", act: { ev: "ui_stop" } }] : []),
-        { kind: "btn", text: `← ${p.name}`, tip: "back to the project · ⌘[", act: { ev: "ui_route", project: r.project, agent: "main" } }] };
+      end: [...(files ? [{ kind: "chip", text: T(s, "files_n", { n: files }) }] : []),
+        ...(a.status === "working" ? [{ kind: "btn", text: T(s, "stop"), kbd: "⌘.", act: { ev: "ui_stop" } }] : []),
+        { kind: "btn", text: T(s, "back_to", { p: p.name }), tip: T(s, "back_tip"), act: { ev: "ui_route", project: r.project, agent: "main" } }] };
   }
 
   // what runs now, on bise's view: every running job, the followed ones first
@@ -96,7 +98,7 @@
   // ---- the thread's rows
   function who(s, e) {
     const r = s.route;
-    if (e.kind === "you") return { name: "you", av: (s.user.name || "you")[0].toUpperCase() };
+    if (e.kind === "you") return { name: T(s, "you"), av: (s.user.name || "you")[0].toUpperCase() };
     // an agent's avatar takes its own state (pink only while it waits on him); a main is plain
     const dotOf = (project, name) => { const a = (s.agents[project] || []).find((x) => x.name === name && !x.main); return a ? agentDot(s, project, a) : ""; };
     if (e.kind === "agent") return r.project === HOME ? { name: "bise", pearl: true } : { name: r.agent, dot: dotOf(r.project, r.agent) };
@@ -106,12 +108,12 @@
     if (e.to && r.agent !== "main") return { name: `${e.from} → ${e.to}`, dot: dotOf(r.project, e.from) };
     return { name: e.from || "", dot: dotOf(r.project, e.from), in: r.agent === "main" && r.project !== HOME };
   }
-  const VIA = { voice: "by voice", capsule: "from the capsule", page: "from a page", bise: "via bise" };
+  const VIA = { voice: "by_voice", capsule: "from_capsule", page: "from_page", bise: "via_bise" };
   function meta(s, e) {
     const bits = [hm(s, e.at_ms)];
-    if (e.via && VIA[e.via]) bits.push(`${VIA[e.via]}${e.context && e.context.app ? `, from ${e.context.app}` : ""}`);
-    else if (e.context && e.context.app) bits.push(`from ${e.context.app}`);
-    if (e.pending) bits.push(e.queued ? "queued · goes at the end of its turn" : "sending…");
+    if (e.via && VIA[e.via]) bits.push(`${T(s, VIA[e.via])}${e.context && e.context.app ? `, ${T(s, "from_app", { app: e.context.app })}` : ""}`);
+    else if (e.context && e.context.app) bits.push(T(s, "from_app", { app: e.context.app }));
+    if (e.pending) bits.push(e.queued ? T(s, "queued") : T(s, "sending"));
     return bits.join(" · ");
   }
   function ctx(e) {
@@ -138,13 +140,13 @@
         const p1 = d.agent ? `${to} · main → ${d.agent}` : `${to} · main`;
         const running = d.state === "running";
         const steps = d.steps ? pct(d.step, d.steps) : null;
-        return { t: "route", pos: e.pos, dot: running ? "wk" : d.state === "failed" ? "er" : "ok", p1, p2: `${e.text}${d.followed ? " · following" : ""}`,
-          p3: running ? (steps != null ? `${steps}%` : mins(s.now - e.at_ms)) : d.state === "failed" ? hm(s, e.at_ms) : d.done_ms ? `done ${hm(s, d.done_ms)}` : "done",
+        return { t: "route", pos: e.pos, dot: running ? "wk" : d.state === "failed" ? "er" : "ok", p1, p2: `${e.text}${d.followed ? ` · ${T(s, "following")}` : ""}`,
+          p3: running ? (steps != null ? `${steps}%` : mins(s.now - e.at_ms)) : d.state === "failed" ? hm(s, e.at_ms) : d.done_ms ? T(s, "done_at", { at: hm(s, d.done_ms) }) : T(s, "done"),
           bar: running ? (steps != null ? steps : -1) : null, act: { ev: "ui_route", project: d.project_to, agent: d.agent || "main" } };
       }
       case "agents": {
         const a = e.agents || { items: [], count: 0, names: [] };
-        return { t: "fold", pos: e.pos, text: `${open ? "▾" : "▸"} ${a.count} messages between ${a.names.length} agents`, open,
+        return { t: "fold", pos: e.pos, text: `${open ? "▾" : "▸"} ${T(s, "fold", { n: a.count, k: a.names.length })}`, open,
           items: open ? a.items.map((x) => row(s, { ...x, kind: "from_agent", to: undefined })) : [] };
       }
       case "tools": {
@@ -154,7 +156,7 @@
       case "card": {
         const c = e.card || {};
         if (c.answered && c.by && c.by !== "you")
-          return { t: "answered", pos: e.pos, text: `${e.from} asked: ${c.question} · ${c.by === "main" ? "i" : c.by} answered: ${c.answer}`, why: c.why || "", open };
+          return { t: "answered", pos: e.pos, text: T(s, "asked_answered", { who: e.from, q: c.question, by: c.by === "main" ? T(s, "i") : c.by, a: c.answer }), why: c.why || "", open };
         return { t: "marker", pos: e.pos, text: D.markerText(s, e), card: c.id, act: { ev: "ui_inbox", card: c.id } };
       }
       case "diff": {
@@ -173,7 +175,7 @@
   }
 
   function thread(s) {
-    if (s.route.screen === "notfound") return { rows: [], empty: { b: "nothing here", s: `no project or agent at “${s.route.want}”. ⌘K finds one by its name; ⌘0 goes back to bise.` } };
+    if (s.route.screen === "notfound") return { rows: [], empty: { b: T(s, "notfound_b"), s: T(s, "notfound_s", { want: s.route.want }) } };
     const t = s.threads[keyOf(s.route)];
     if (!t || (t.loading && !t.entries.length)) return { loading: true, rows: [] };
     const rows = [];
@@ -184,9 +186,9 @@
       rows.push(row(s, e));
     }
     const a = M.agentRow(s);
-    const empty = !t.entries.length ? (s.route.project === HOME ? { b: "nothing here yet", s: "hold fn and ask bise anything, from any app" }
-      : s.route.agent === "main" && !M.agentsOf(s, s.route.project).length ? { b: `${D.pname(s, s.route.project)} has no agent yet`, s: "ask its main below, or ask bise from anywhere" }
-      : { b: "no message yet", s: "" }) : null;
+    const empty = !t.entries.length ? (s.route.project === HOME ? { b: T(s, "empty_bise"), s: T(s, "empty_bise_s") }
+      : s.route.agent === "main" && !M.agentsOf(s, s.route.project).length ? { b: T(s, "empty_project", { p: D.pname(s, s.route.project) }), s: T(s, "empty_project_s") }
+      : { b: T(s, "empty_agent"), s: "" }) : null;
     return { rows, more: !!t.more, paging: !!t.paging, typing: t.typing ? { who: s.route.project === HOME ? "bise" : s.route.agent, text: t.typing } : null, empty, working: !!(a && a.status === "working") };
   }
 
@@ -200,7 +202,7 @@
     const working = a && a.status === "working" && s.route.agent !== "main";
     return { dock: D.dockWords(s, d), div: D.divider(s, d, a), ph: D.placeholder(s, d, a), text, quotes,
       send: text.trim() ? "on" : working ? "stop" : "off", disabled: !!s.offline,
-      keys: `@ file   $ skills   / commands${working ? "   ⌥⏎ after its turn" : ""}   ⌘I inbox` };
+      keys: T(s, "keys", { working }) };
   }
 
   // ---- the right column: bise = waiting + made today; a project = its agents + scheduled
@@ -212,7 +214,7 @@
       const made = Object.entries(s.arts).flatMap(([project, list]) => list.map((a) => ({ ...a, project })))
         .filter((a) => dayLabel(s, a.at_ms) === day).sort((a, b) => b.at_ms - a.at_ms).slice(0, 4)
         .map((a) => ({ title: a.title, kind: a.kind, new: !!a.new, act: { ev: "ui_route", project: a.project, agent: a.agent } }));
-      return { sections: [{ sh: `${waiting.length} waiting for you`, kind: "cards", items: waiting }, { sh: "made today", kind: "thumbs", items: made }] };
+      return { sections: [{ sh: T(s, "board_waiting", { n: waiting.length }), kind: "cards", items: waiting }, { sh: T(s, "made_today"), kind: "thumbs", items: made }] };
     }
     if (r.agent !== "main") return null;
     const list = M.agentsOf(s, r.project).map((a, i) => {
@@ -222,14 +224,14 @@
       return { name: a.name, key: i < 9 ? `⌥${i + 1}` : "", psi: !!a.branch, dot, w: a.title, pct: job ? pct(job.step, job.steps) : null, nd: dot === "nd", er: dot === "er", done: a.status === "done", act: { ev: "ui_route", project: r.project, agent: a.name } };
     });
     const sched = (s.sched[r.project] || []).map((x) => ({ text: `◷ ${x.label}`, when: whenText(s, x.at_ms) }));
-    return { sections: [{ sh: `agents · ${list.length}`, kind: "agents", items: list }, ...(sched.length ? [{ sh: "scheduled", kind: "sched", items: sched }] : [])] };
+    return { sections: [{ sh: T(s, "board_agents", { n: list.length }), kind: "agents", items: list }, ...(sched.length ? [{ sh: T(s, "scheduled"), kind: "sched", items: sched }] : [])] };
   }
   function whenText(s, ms) {
     const d = dayLabel(s, ms);
     const f = dayf(s.tz).format(new Date(s.now + 86400000)) === dayf(s.tz).format(new Date(ms));
     const h = +fmt(s.tz).format(new Date(ms)).slice(0, 2);
-    if (f && h < 6) return `tonight ${hm(s, ms)}`;
-    return d === "today" ? hm(s, ms) : f ? `tomorrow ${hm(s, ms)}` : `${d} ${hm(s, ms)}`;
+    if (f && h < 6) return T(s, "tonight", { at: hm(s, ms) });
+    return d === T(s, "today") ? hm(s, ms) : f ? T(s, "tomorrow", { at: hm(s, ms) }) : `${d} ${hm(s, ms)}`;
   }
 
   // the pearl's mood (pearl.js MOODS): pink when someone waits, whirling while agents work
@@ -247,7 +249,7 @@
     return { q: s.finder.q, rows: list.slice(0, 12).map((r, n) => ({ kind: r.kind, name: r.name, where: r.where, note: r.note || "",
       dot: r.kind === "ag" ? (openCardsOf(s, r.route.project, r.name).length ? "nd" : DOT[r.status] || "")
         : r.kind === "pj" ? (projectWaits(s, r.route.project) ? "nd" : projectWorking(s, r.route.project) ? "wk" : "") : "", on: n === i, act: { ev: "ui_find_open", i: n } })),
-      empty: list.length ? "" : "no agent or project by that name", keys: "⏎ open   ↑ ↓ move   esc close" };
+      empty: list.length ? "" : T(s, "find_none"), keys: T(s, "find_keys"), ph: T(s, "find_ph") };
   }
 
   // a project's other tabs: its changes (the agents' branches, S7 opens their review) and its
@@ -257,13 +259,13 @@
     const t = r.project !== HOME && r.agent === "main" ? s.tab[r.project] || "thread" : "thread";
     if (t === "changes") {
       const items = M.agentsOf(s, r.project).filter((a) => a.branch).map((a) => ({ name: a.name, branch: a.branch, ahead: a.ahead || 0, dot: agentDot(s, r.project, a),
-        what: a.ahead ? `${a.ahead} commit${a.ahead > 1 ? "s" : ""} ahead · ${a.title}` : `nothing to merge · ${a.title}`, act: { ev: "ui_route", project: r.project, agent: a.name } }));
-      return { tab: t, items, empty: items.length ? null : { b: "no branch yet", s: "agents that work in their own worktree (ψ) show their changes here" } };
+        what: a.ahead ? T(s, "changes_ahead", { n: a.ahead, t: a.title }) : T(s, "changes_none", { t: a.title }), act: { ev: "ui_route", project: r.project, agent: a.name } }));
+      return { tab: t, items, empty: items.length ? null : { b: T(s, "no_branch"), s: T(s, "no_branch_s") } };
     }
     if (t === "artifacts") {
       const items = (s.arts[r.project] || []).slice().sort((a, b) => b.at_ms - a.at_ms).map((a) => ({ title: a.title, kind: a.kind, new: !!a.new,
-        meta: `${a.agent} · ${dayLabel(s, a.at_ms) === "today" ? hm(s, a.at_ms) : dayLabel(s, a.at_ms)}`, act: { ev: "ui_route", project: r.project, agent: a.agent } }));
-      return { tab: t, items, empty: items.length ? null : { b: "nothing made yet", s: "pages, reports and charts the agents make land here" } };
+        meta: `${a.agent} · ${dayLabel(s, a.at_ms) === T(s, "today") ? hm(s, a.at_ms) : dayLabel(s, a.at_ms)}`, act: { ev: "ui_route", project: r.project, agent: a.agent } }));
+      return { tab: t, items, empty: items.length ? null : { b: T(s, "nothing_made"), s: T(s, "nothing_made_s") } };
     }
     return null;
   }

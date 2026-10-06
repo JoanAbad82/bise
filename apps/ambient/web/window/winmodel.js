@@ -101,7 +101,9 @@
   // (<p> is the project's id or its name)
   function resolve(s, route) {
     const parts = String(route || "").split("/");
-    const proj = (x) => (s.projects.find((p) => p.project === x || p.name === x) || {}).project;
+    // bise's own hub is always there, even before a projects list comes (the single-hub core
+    // sends none until S3b; amb-tools m_8543: agent/home/perf was 'not found')
+    const proj = (x) => (x === HOME ? HOME : (s.projects.find((p) => p.project === x || p.name === x) || {}).project);
     // an agent we know isn't in its project (its list came, the name isn't there) is not found
     const has = (p, a) => !s.agents[p] || s.agents[p].some((x) => x.name === a);
     if (parts[0] === "bise" || parts[0] === "") return { project: HOME, agent: "main" };
@@ -165,6 +167,9 @@
         return go(s, resolve(s, ev.route), cmds);
       }
       case "win_theme": return { ...s, theme: ev.dark ? "dark" : "light" };
+      // macOS's language (the shell's win_lang {lang: "fr" | "en" | ...}): the words follow it
+      // unless his setting says otherwise (winwords.lang)
+      case "win_lang": return { ...s, lang: String(ev.lang || "").slice(0, 2).toLowerCase() || null };
       case "win_focused": return { ...s, focused: !!ev.on };
       case "tick": return { ...s, now: ev.now };
     }
