@@ -2,7 +2,7 @@
 // up within the limits, the guest agent answers, the screen comes as pixels, a ⌘Q typed through
 // VNC reaches a real app's menu (TextEdit quits), and tart never showed a window or came to the
 // front on his Mac. down() stops the VM.
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { PNG } from 'pngjs';
 import { expect, test } from '@playwright/test';
@@ -14,6 +14,7 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 
 test('vm: up within the limits, real keys reach a real menu, down', async () => {
   test.setTimeout(600_000);
+  mkdirSync(test.info().outputDir, { recursive: true });
   const vm = await Vm.up();
   try {
     const os = await vm.exec(['sw_vers', '-productVersion']);

@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:f
 import os from 'node:os';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
-import { breaches, harnessEnv, realHome, testHome } from '../isolation';
+import { adoptHome, breaches, harnessEnv, homeProblem, realHome, testHome } from '../isolation';
 import { launchDesktop } from '../launch';
 
 const REAL = realHome();
@@ -47,6 +47,26 @@ test('breaches: his real hub from anywhere, sbd/launchctl of the app outside the
   expect(found.some((b) => b.includes('pid 106'))).toBe(false); // a gate's test hub
   expect(breaches(table, new Set([50, 102, 103]), app, h, REAL)).toEqual([]); // there before the run
   rmSync(h.root, { recursive: true, force: true });
+});
+
+test('an adopted home (qa-flows m_9931): only a world\'s under ~/.bise/gate/ or a /tmp/bh-*; its hubs are the run\'s own', () => {
+  const real = '/Users/u';
+  expect(homeProblem('/Users/u/.bise/gate/w-qaflows/h', real)).toBeNull();
+  expect(homeProblem('/private/tmp/bh-abc/home', real)).toBeNull();
+  for (const bad of ['/Users/u', '/Users/u/.bise', '/Users/u/.bise/gate', '/Users/u/bise', '/Users/u/.bise/hubs/x', '/private/tmp/other', '/Users/u/.bise/gate/../hubs'])
+    expect(homeProblem(path.resolve(bad), real)).not.toBeNull();
+  expect(() => adoptHome(REAL)).toThrow(/refused home/);
+  expect(() => adoptHome(path.join(REAL, 'bise'))).toThrow(/refused home|doesn't exist/);
+  // a world's home under his ~/.bise: its hub is the test home's, not his
+  const h = { root: '/tmp/bh-r', home: `${REAL}/.bise/gate/w/h`, biseHome: `${REAL}/.bise/gate/w/h/.bise`, tmp: '/tmp/bh-r/tmp' };
+  const table = [
+    { pid: 100, ppid: 50, command: 'Electron .' },
+    { pid: 101, ppid: 100, command: `/x/bise sbd --workspace ${h.home}/bise`, home: h.home, biseHome: h.biseHome },
+    { pid: 102, ppid: 100, command: '/x/bise sbd --workspace /Users/u/bise', home: h.home, biseHome: `${REAL}/.bise` },
+  ];
+  const found = breaches(table, new Set([50]), 100, h, REAL);
+  expect(found.some((b) => b.includes('pid 101'))).toBe(false);
+  expect(found.some((b) => b.includes('pid 102') && b.includes('real bise home'))).toBe(true);
 });
 
 test.describe('the app on a fake bise (needs pnpm build)', () => {

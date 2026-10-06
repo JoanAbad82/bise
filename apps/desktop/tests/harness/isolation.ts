@@ -13,7 +13,7 @@
 //     at close it kills what the run left whose HOME or BISE_HOME is the test home (a hub started
 //     through launchd) and removes the launchd jobs that ran them, then deletes the home.
 import { execFile, execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -31,6 +31,35 @@ export function testHome(): TestHome {
 
 /** His real home, from the user database (never $HOME, which a caller can set). */
 export const realHome = (): string => os.userInfo().homedir;
+
+/**
+ * Why `dir` can't be a launch's home, or null (pure: self/isolation.spec.ts). `dir` is a realpath.
+ * Only an ambient-qa world's home (a folder under ~/.bise/gate/) or another launch's /tmp/bh-* home:
+ * never his home, his ~/.bise or ~/bise, nor anything else.
+ */
+export function homeProblem(dir: string, real: string): string | null {
+  const gate = path.join(real, '.bise', 'gate');
+  if (path.relative(gate, dir) !== '' && inside(dir, gate)) return null;
+  const tmp = path.relative('/private/tmp', dir).split(path.sep)[0] ?? '';
+  if (inside(dir, '/private/tmp') && tmp.startsWith('bh-')) return null;
+  return `${dir} is neither an ambient-qa world's home (under ${gate}/) nor a /tmp/bh-* home`;
+}
+
+/**
+ * An existing home (qa-flows m_9931: an ambient-qa world's, its hubs already up) used as a launch's
+ * test home: same env, same sentinel, but never deleted (the world owns it); the run's own tmp and
+ * userdata go in a fresh /tmp/bh-* root, which is.
+ */
+export function adoptHome(dir: string): TestHome {
+  let home: string;
+  try { home = realpathSync(dir); } catch { throw new Error(`harness: home ${dir} doesn't exist`); }
+  const why = homeProblem(home, realpathSync(realHome()));
+  if (why) throw new Error(`harness: refused home: ${why}`);
+  const root = mkdtempSync(path.join('/tmp', 'bh-'));
+  const tmp = path.join(root, 'tmp');
+  mkdirSync(tmp, { recursive: true });
+  return { root, home, biseHome: path.join(home, '.bise'), tmp };
+}
 
 const KEEP = ['PATH', 'LANG', 'LC_ALL', 'LC_CTYPE', 'USER', 'LOGNAME', 'SHELL', 'TERM', '__CF_USER_TEXT_ENCODING'];
 const FORBIDDEN = /^(HOME|BISE_HOME|BISE_HOME_WORKSPACE|TMPDIR|XDG_.*|SB_.*|BISE_AGENT.*|BISE_ROLE|BEND_.*|CODEX_HOME|CLAUDE_CONFIG_DIR)$/;
@@ -99,12 +128,14 @@ export function breaches(procs: Proc[], baseline: Set<number>, appPid: number, h
     const biseHome = p.biseHome ?? (p.home ? path.join(p.home, '.bise') : undefined);
     // a gate's test hub keeps its state in SB_STATE_DIR (not his hubs) even with his HOME: not his hub
     const testState = p.stateDir !== undefined && !inside(p.stateDir, path.join(realBise, 'hubs'));
-    if (hub && biseHome !== undefined && inside(biseHome, realBise) && !testState) {
+    // the test home itself may sit under ~/.bise (an ambient-qa world's, ~/.bise/gate/<w>/h)
+    const inTest = biseHome !== undefined && inside(biseHome, h.home);
+    if (hub && biseHome !== undefined && inside(biseHome, realBise) && !testState && !inTest) {
       out.push(`a hub on his real bise home started during the run (pid ${p.pid}: ${p.command.slice(0, 120)})`);
       continue;
     }
     if (ours(p.pid)) {
-      const pointsHome = p.command.includes(h.root) || (p.home !== undefined && inside(p.home, h.home)) || (p.biseHome !== undefined && inside(p.biseHome, h.home));
+      const pointsHome = p.command.includes(h.root) || p.command.includes(h.home) || (p.home !== undefined && inside(p.home, h.home)) || (p.biseHome !== undefined && inside(p.biseHome, h.home));
       if (!pointsHome) out.push(`the app ran ${hub ? 'sbd' : 'launchctl'} outside the test home (pid ${p.pid}: ${p.command.slice(0, 120)})`);
     }
   }
@@ -180,8 +211,9 @@ export class Sentinel {
     await this.scan();
     // the final scan's table too: a child the periodic scans never saw (a launch under 1 s)
     for (const pid of new Set([...tree, ...(await this.tree())])) { try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ } }
+    // only what the run started: an adopted world's hubs were up before it (baseline) and stay
     const left = (await processes()).filter((p) =>
-      p.pid !== process.pid && ((p.home !== undefined && inside(p.home, this.h.home)) || (p.biseHome !== undefined && inside(p.biseHome, this.h.home))));
+      p.pid !== process.pid && !this.baseline.has(p.pid) && ((p.home !== undefined && inside(p.home, this.h.home)) || (p.biseHome !== undefined && inside(p.biseHome, this.h.home))));
     const cleaned: string[] = [];
     if (left.length) {
       const pids = new Set(left.map((p) => p.pid));

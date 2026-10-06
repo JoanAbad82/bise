@@ -13,7 +13,7 @@ import path from 'node:path';
 import { _electron as electron, type CDPSession, type ElectronApplication, type Page } from '@playwright/test';
 import { DESKTOP_DIR, harnessElectron } from './electron';
 import type { FakeCore, FakeHelper } from './fakes/helper';
-import { harnessEnv, Sentinel, testHome } from './isolation';
+import { adoptHome, harnessEnv, Sentinel, testHome } from './isolation';
 import { prove, Watch, watcherBinary, type Proof } from './proof';
 
 export const OLD_WEB = path.resolve(DESKTOP_DIR, '..', 'ambient', 'web');
@@ -36,6 +36,11 @@ export type LaunchOptions = {
   core?: FakeCore;
   /** the screen to start on, a route string (bise, inbox, agent/<p>/<a>, ...) (desktop only) */
   route?: string;
+  /**
+   * An existing home to run in instead of a fresh one (qa-flows m_9931): an ambient-qa world's home
+   * (under ~/.bise/gate/) or a /tmp/bh-* home, nothing else; same env and sentinel, never deleted.
+   */
+  home?: string;
 };
 
 /**
@@ -124,7 +129,7 @@ const mainWindow = (app: ElectronApplication): Promise<Page> => surfacePage(app,
 async function start(args: string[], env: Record<string, string>, o: LaunchOptions): Promise<Session> {
   watcherBinary(); // compiled before the app starts, so the watch starts within ms of the launch
   // every launch's own throwaway home, made here and never taken from the caller (isolation.ts)
-  const h = testHome();
+  const h = o.home !== undefined ? adoptHome(o.home) : testHome();
   const userData = path.join(h.root, 'userdata');
   mkdirSync(userData, { recursive: true });
   const appEnv = harnessEnv(h, { ...env, BISE_HARNESS_USER_DATA: userData, BISE_DESKTOP_USER_DATA: userData }, o.env);
