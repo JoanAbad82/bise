@@ -33,7 +33,7 @@ TOOLS = [
     ("fn_hold_closed", "fn held from rest (capsule closed, bise not frontmost) through the real key path (KeyMachine via Keys.qaEvent; the QA app has no tap, never his fn): the pearl listens within within_ms, the fake voice's words reach the core on release, main's line shows; variants launch, fold (opened then folded by itself), hide (fn + .); then a tap must do nothing.",
      {"variants": {"type": "array", "items": {"type": "string", "enum": ["launch", "fold", "hide"]}}, "words": {"type": "string"}, "within_ms": {"type": "integer"}}, []),
     ("rest", "The capsule back to rest (folded into the icon) and bise not the active app.", {}, []),
-    ("real", "Harness A: his REAL app build (no --qa) on an isolated HOME, a throwaway fake-provider hub found by his own rules, its panels on an off-screen virtual display, driven through the app's test socket (NSEvents into its own queue, never HID, never his screen, focus or keyboard). do: launch (app?, bise? default his ~/.bise/dev/build/ambient/target/debug/bise), stop (always, right after a run), feed (the hub's last lines of main: did his words arrive), logs (the tail of the app's, core's and hub's logs), keys (specs like up esc return cmd+w type:hello), or any test-socket op (ping state click key type fn shot eval events) with args.",
+    ("real", "Harness A: his REAL app build (no --qa) on an isolated HOME, a throwaway fake-provider hub found by his own rules, its panels on an off-screen virtual display, driven through the app's test socket (NSEvents into its own queue, never HID, never his screen, focus or keyboard). do: launch (app?, bise? default his ~/.bise/dev/build/ambient/target/debug/bise), stop (always, right after a run), feed (the hub's last lines of main: did his words arrive), logs (the tail of the app's, core's and hub's logs), keys (specs like up esc return cmd+w type:hello; args.window bar|side|win), win (bise desktop's window, off-screen like the panels: args.do open|close|restore|deeplink, args.route, args.open {project?, agent?}; returns state.win after), or any test-socket op (ping state mouse key type fn shot eval events; window/what: bar, side or win) with args.",
      {"do": {"type": "string"}, "args": {"type": "object"}, "specs": {"type": "array", "items": {"type": "string"}}}, ["do"]),
     ("world", "bise desktop's throwaway world (world.py): one isolated HOME under ~/.bise/gate with bise's home hub and 2-3 projects (telemetry, shop, docs), each its own fake-provider hub, seeded by its fake main: agents in worktrees, a committed diff ready to merge, an agent at work in a dirty worktree, cards with options, a merge question, a blocked agent, an artifact. do: up (projects 2|3, bise?, root?; takes the heavy lock itself), state (each hub's agents, commits, diffs, cards, socket), say (project or 'bise', text: words to that project's fake main; [[bash: ...]] scripts it), down (always, when done: stops every hub by pid).",
      {"do": {"type": "string", "enum": ["up", "state", "say", "down"]}, "projects": {"type": "integer"}, "bise": {"type": "string"}, "root": {"type": "string"},
@@ -145,6 +145,8 @@ def run(name, a):
             r = qa.real_tail(kw.get("n", 40))
         elif d == "keys":
             r = qa.real_keys(*(a.get("specs") or []), window=kw.get("window"))
+        elif d == "win":
+            r = qa.real_win(kw.get("do", "open"), kw.get("route"), kw.get("open"))
         else:
             r = qa.real_op(d, **kw)
         if d == "shot" and r.get("png"):

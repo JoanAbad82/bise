@@ -575,15 +575,25 @@ def real_harness_stays_out_of_his_face_and_his_state():
     except qa.QAError:
         pass
     qa._real_guard(["x", "--bise", os.path.expanduser("~/.bise/dev/build/ambient/target/debug/bise")], {"HOME": qa.REAL_HOME})
-    real = qa.real_alive
-    qa.real_alive = lambda: {"ops": ["shot"]}
+    real, call = qa.real_alive, qa.real_call
+    qa.real_alive = lambda: {"ops": ["shot", "state", "win_open"]}
+    qa.real_call = lambda op, timeout=30, **kw: {"op": op, **kw}
     try:
-        qa.real_op("shot", window="display")
-        check(False, "a display shot must be refused")
-    except qa.QAError:
-        pass
+        try:
+            qa.real_op("shot", window="display")
+            check(False, "a display shot must be refused")
+        except qa.QAError:
+            pass
+        # bise desktop's window (S4): its web view's own snapshot is a shot like the panels'
+        check(qa.real_op("shot", what="win") == {"op": "shot", "what": "win"}, "a shot of the window")
+        check(qa.real_win("open", route="bise")["reply"] == {"op": "win_open", "route": "bise"}, "win open with a route")
+        try:
+            qa.real_win("deeplink")
+            check(False, "a deeplink with no route or open must be refused")
+        except qa.QAError:
+            pass
     finally:
-        qa.real_alive = real
+        qa.real_alive, qa.real_call = real, call
 
 
 @test

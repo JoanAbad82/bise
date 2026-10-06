@@ -3738,14 +3738,38 @@ def real_stop():
     return out
 
 
+# the harness app's web views: the capsule's bar, the side panel, and bise desktop's window
+# (S4, amb-mac m_8218: window:'win' on mouse/key/type/eval, shot what:'win', win_open/close/restore, deeplink)
+WINDOWS = ("bar", "side", "win")
+
+
+def real_win(do, route=None, open=None):
+    """bise desktop's window, off-screen like the panels: open (a route, none = the last one),
+    close, restore (close then open: the route and frame come back), or a deep link exactly as a
+    capsule/card/spotlight ⏎ hands it ({open: {project?, agent?}} or {route}). The reply plus
+    the window's state after it (state.win: frame, visible, test_key, route, appearance)."""
+    if do == "open":
+        r = real_op("win_open", **({"route": route} if route else {}))
+    elif do in ("close", "restore"):
+        r = real_op("win_" + do)
+    elif do == "deeplink":
+        if not (route or open):
+            raise QAError("deeplink: a route or open {project?, agent?}")
+        r = real_op("deeplink", **({"open": open} if open else {"route": route}))
+    else:
+        raise QAError("win: open, close, restore or deeplink")
+    st = real_op("state")
+    return {"reply": r, "win": st.get("win"), "win_model": st.get("win_model")}
+
+
 def real_op(op, **kw):
     """One op on the harness app's test socket (amb-mac's: ping state click key type fn shot
     eval events quit), checked against the ops its ping lists."""
     ping = real_alive()
     if not ping:
         raise QAError("the harness app isn't running: qa.py real launch first")
-    if op == "shot" and kw.get("what", kw.get("window")) not in ("bar", "side"):
-        raise QAError("shot: window bar or side only (the web view's own snapshot); never a display (ambient-lead m_8004)")
+    if op == "shot" and kw.get("what", kw.get("window")) not in WINDOWS:
+        raise QAError("shot: window bar, side or win only (the web view's own snapshot); never a display (ambient-lead m_8004)")
     ops = ping.get("ops")
     if ops and op not in ops and op != "ping":
         raise QAError("the harness app has no op %r (it has: %s)" % (op, ", ".join(ops)))
@@ -3919,6 +3943,8 @@ def _real_cli(a):
         return real_op("fn", **kw)
     if c == "shot":
         return real_op("shot", what=a.window)
+    if c == "win":
+        return real_win(a.do, a.route, json.loads(a.open) if a.open else None)
     if c == "eval":
         return real_op("eval", window=a.window, js=a.js)
     if c == "events":
@@ -3946,13 +3972,15 @@ def _cli(argv):
     for n in ("stop", "ping", "state"):
         rs.add_parser(n)
     q = rs.add_parser("op", help="any op of the test socket: op <name> '<json args>'"); q.add_argument("name"); q.add_argument("args", nargs="?", default="{}")
-    q = rs.add_parser("keys", help="up esc return cmd+w type:<text> ..."); q.add_argument("specs", nargs="+"); q.add_argument("--window")
-    q = rs.add_parser("click", help="a click on a selector, or --at x,y (points from the window's top-left)"); q.add_argument("selector", nargs="?"); q.add_argument("--at"); q.add_argument("--window", default="bar")
+    q = rs.add_parser("keys", help="up esc return cmd+w type:<text> ..."); q.add_argument("specs", nargs="+"); q.add_argument("--window", choices=WINDOWS)
+    q = rs.add_parser("click", help="a click on a selector, or --at x,y (points from the window's top-left)"); q.add_argument("selector", nargs="?"); q.add_argument("--at"); q.add_argument("--window", default="bar", choices=WINDOWS)
+    q = rs.add_parser("win", help="bise desktop's window (off-screen): open [--route r], close, restore, deeplink --route r | --open '{\"project\":..,\"agent\":..}'")
+    q.add_argument("do", choices=["open", "close", "restore", "deeplink"]); q.add_argument("--route"); q.add_argument("--open")
     q = rs.add_parser("type"); q.add_argument("text")
     q = rs.add_parser("fn"); q.add_argument("kind", choices=["down", "up", "tap", "hold"]); q.add_argument("--ms", type=int); q.add_argument("--words")
-    q = rs.add_parser("shot"); q.add_argument("--window", default="bar", choices=["bar", "side"])
+    q = rs.add_parser("shot"); q.add_argument("--window", default="bar", choices=WINDOWS)
     q = rs.add_parser("proof", help="one short run: no window on his screens, never active, his front app unchanged, no Dock icon, no audio"); q.add_argument("--seconds", type=float, default=8)
-    q = rs.add_parser("eval"); q.add_argument("js"); q.add_argument("--window", default="bar")
+    q = rs.add_parser("eval"); q.add_argument("js"); q.add_argument("--window", default="bar", choices=WINDOWS)
     q = rs.add_parser("events"); q.add_argument("--since")
     q = rs.add_parser("feed", help="the hub's last lines of an agent: did his words reach main?"); q.add_argument("--agent", default="main"); q.add_argument("--count", type=int, default=40)
     q = rs.add_parser("logs"); q.add_argument("--n", type=int, default=40)
