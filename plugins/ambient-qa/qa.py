@@ -3740,7 +3740,7 @@ def real_stop():
 
 # the harness app's web views: the capsule's bar, the side panel, and bise desktop's window
 # (S4, amb-mac m_8218: window:'win' on mouse/key/type/eval, shot what:'win', win_open/close/restore, deeplink)
-WINDOWS = ("bar", "side", "win")
+WINDOWS = ("bar", "win")      # the side panel is gone since S8 (amb-mac m_8516, harness app 79a14b8c)
 
 
 def real_win(do, route=None, open=None):
@@ -3769,7 +3769,7 @@ def real_op(op, **kw):
     if not ping:
         raise QAError("the harness app isn't running: qa.py real launch first")
     if op == "shot" and kw.get("what", kw.get("window")) not in WINDOWS:
-        raise QAError("shot: window bar, side or win only (the web view's own snapshot); never a display (ambient-lead m_8004)")
+        raise QAError("shot: window bar or win only (the web view's own snapshot); never a display (ambient-lead m_8004)")
     ops = ping.get("ops")
     if ops and op not in ops and op != "ping":
         raise QAError("the harness app has no op %r (it has: %s)" % (op, ", ".join(ops)))
