@@ -22,6 +22,8 @@ export const T = {
   chipImage: '[data-testid^="composer.chip."][data-kind="image"]',
   chipQuote: '[data-testid^="composer.chip."][data-kind="quote"]',
   chipPaste: '[data-testid^="composer.chip."][data-kind="paste"]',
+  /** amb-mac's private clipboard (BISE_DESKTOP_TEST only): without it ⌘C/⌘X/⌘V reach his pasteboard */
+  clipboardFenced: false,
   /** the voice key while the window is in front: the terminal's ctrl+r (amb-web may pick another) */
   dictateKey: ['Control', 'r'] as const,
 };
