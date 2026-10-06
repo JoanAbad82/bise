@@ -34,6 +34,41 @@ export interface BiseApi {
   readonly helperState: () => Promise<HelperEv[]>;
   /** A command to the helper (read_context, perm, shot, route, own_mic, config; never quit). */
   readonly helper: (cmd: HelperCmd) => void;
+  /** Which window this page is: the main window or the capsule. */
+  readonly surface: Surface;
+  /** The capsule's window (src/main/capsule.ts): where it shows, its size. */
+  readonly capsule: CapsuleApi;
+  /** Opens the main window, on `route` when given (the capsule's ⏎, a card's 'open'). */
+  readonly openWindow: (route?: string) => void;
+  /** Main asks this window to go to a route (openWindow while it was open); returns the unsubscribe. */
+  readonly onRoute: (listener: (route: string) => void) => () => void;
+}
+
+export type Surface = 'window' | 'capsule';
+
+/**
+ * Where the capsule shows: 'top' (the spotlight he opened), 'bottom' (what
+ * bise brings: a card, the talk, an answer), 'menu' (under the tray's pearl).
+ */
+export type CapsuleAt = 'top' | 'bottom' | 'menu';
+
+export interface CapsuleState {
+  readonly shown: boolean;
+  readonly at: CapsuleAt;
+  /** it has the keys (he types in it) */
+  readonly keys: boolean;
+  /** why it changed: asked by a page, the tray's click, it lost the keys (blur) */
+  readonly why: 'asked' | 'tray' | 'blur';
+}
+
+export interface CapsuleApi {
+  /** Shows it at `at`; `keys`: he types in it (the spotlight), else it never takes them (a card). */
+  readonly show: (at: CapsuleAt, keys: boolean) => void;
+  readonly hide: () => void;
+  /** Its content's size, and the glass inside a transparent margin when there is one. */
+  readonly size: (width: number, height: number, glass?: { x: number; y: number; width: number; height: number }) => void;
+  /** Every change (shown, hidden, the tray's click, a blur); returns the unsubscribe. */
+  readonly onState: (listener: (s: CapsuleState) => void) => () => void;
 }
 
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */
@@ -49,7 +84,22 @@ export const IPC = {
   helperEv: 'bise:helper-ev',
   helperState: 'bise:helper-state',
   helperCmd: 'bise:helper-cmd',
+  capsuleShow: 'bise:capsule-show',
+  capsuleHide: 'bise:capsule-hide',
+  capsuleSize: 'bise:capsule-size',
+  capsuleState: 'bise:capsule-state',
+  openWindow: 'bise:open-window',
+  route: 'bise:route',
 } as const;
+
+/** The preload's argument naming its window: `--bise-surface=window|capsule`. */
+export const SURFACE_ARG = '--bise-surface=';
+
+/** Test mode: the main window's first screen (amb-tools' 'show me', the checks). */
+export const ROUTE_ENV = 'BISE_DESKTOP_ROUTE';
+
+/** Test mode: the capsule's changes as stdout lines: `CAPSULE_LINE show top keys` / `CAPSULE_LINE hide`. */
+export const CAPSULE_LINE = 'bise-desktop: capsule';
 
 /** Test mode's stdout lines for effects that would leave the app. */
 export const EXTERNAL_LINE = 'bise-desktop: external';

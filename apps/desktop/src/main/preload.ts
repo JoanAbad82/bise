@@ -5,10 +5,30 @@
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
-import { IPC, TEST_ENV, type BiseApi, type MenuAction } from '../shared/api';
+import { IPC, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type Surface } from '../shared/api';
 import { installClipFence, type ClipOp, type WinLike } from './clipfence';
 
 const test = process.env[TEST_ENV] === '1';
+const surface: Surface = process.argv.includes(`${SURFACE_ARG}capsule`) ? 'capsule' : 'window';
+
+// what main sends on each channel a page listens to
+interface Pushed {
+  [IPC.menu]: MenuAction;
+  [IPC.helperEv]: HelperEv;
+  [IPC.capsuleState]: CapsuleState;
+  [IPC.route]: string;
+}
+
+// one listener on a channel, its unsubscribe
+function listen<K extends keyof Pushed>(channel: K, listener: (v: Pushed[K]) => void): () => void {
+  const on = (_e: IpcRendererEvent, v: Pushed[K]): void => {
+    listener(v);
+  };
+  ipcRenderer.on(channel, on);
+  return () => {
+    ipcRenderer.removeListener(channel, on);
+  };
+}
 // the page's window (src/main has no DOM types: the fence names what it uses)
 const fence = test ? installClipFence(globalThis as unknown as WinLike, process.platform === 'darwin') : null;
 if (fence !== null) {
@@ -25,28 +45,29 @@ const api: BiseApi = {
     fence?.put(text);
     await ipcRenderer.invoke(IPC.copy, text);
   },
-  onMenu: (listener) => {
-    const on = (_e: IpcRendererEvent, action: MenuAction): void => {
-      listener(action);
-    };
-    ipcRenderer.on(IPC.menu, on);
-    return () => {
-      ipcRenderer.removeListener(IPC.menu, on);
-    };
-  },
-  onHelper: (listener) => {
-    const on = (_e: IpcRendererEvent, ev: HelperEv): void => {
-      listener(ev);
-    };
-    ipcRenderer.on(IPC.helperEv, on);
-    return () => {
-      ipcRenderer.removeListener(IPC.helperEv, on);
-    };
-  },
+  onMenu: (listener) => listen(IPC.menu, listener),
+  onHelper: (listener) => listen(IPC.helperEv, listener),
   helperState: async () => (await ipcRenderer.invoke(IPC.helperState)) as HelperEv[],
   helper: (cmd) => {
     ipcRenderer.send(IPC.helperCmd, cmd);
   },
+  surface,
+  capsule: {
+    show: (at, keys) => {
+      ipcRenderer.send(IPC.capsuleShow, at, keys);
+    },
+    hide: () => {
+      ipcRenderer.send(IPC.capsuleHide);
+    },
+    size: (width, height, glass) => {
+      ipcRenderer.send(IPC.capsuleSize, width, height, glass);
+    },
+    onState: (listener) => listen(IPC.capsuleState, listener),
+  },
+  openWindow: (route) => {
+    ipcRenderer.send(IPC.openWindow, route);
+  },
+  onRoute: (listener) => listen(IPC.route, listener),
 };
 
 contextBridge.exposeInMainWorld('bise', api);

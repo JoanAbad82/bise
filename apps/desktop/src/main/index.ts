@@ -13,53 +13,17 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, BrowserWindow, Menu } from 'electron';
-import { READY_LINE, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
+import { app, ipcMain, Menu } from 'electron';
+import { IPC, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
+import { Capsule, installCapsuleIpc } from './capsule';
 import { installGuard } from './guard';
 import { startHelper } from './helper/run';
 import { installIpc, sendClip, sendMenu } from './ipc';
 import { menuTemplate } from './menu';
+import { startTray } from './tray';
+import { MainWindow } from './windows';
 
 const testMode = process.env[TEST_ENV] === '1';
-const OFF_DISPLAY = -30000;
-
-function createWindow(): BrowserWindow {
-  const win = new BrowserWindow({
-    width: 1100,
-    height: 720,
-    show: false,
-    // focusable false: a stray focus() can never activate the app over his;
-    // the harness draws the caret with CDP focus emulation.
-    ...(testMode ? { x: OFF_DISPLAY, y: OFF_DISPLAY, focusable: false } : {}),
-    title: 'bise',
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      // test mode renders offscreen and the window is never shown: macOS
-      // clamps a shown window at -30000 back to a strip on his display
-      // (qa-type m_9500, measured with CGWindowList), offscreen never is.
-      ...(testMode ? { offscreen: true } : {}),
-    },
-  });
-
-  if (!testMode) win.once('ready-to-show', () => { win.show(); });
-
-  if (testMode) {
-    win.webContents.once('did-finish-load', () => {
-      process.stdout.write(`${READY_LINE}\n`);
-    });
-  }
-
-  const devUrl = process.env['ELECTRON_RENDERER_URL'];
-  if (!app.isPackaged && devUrl) {
-    void win.loadURL(devUrl);
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'));
-  }
-  return win;
-}
 
 if (testMode) {
   // never his ~/Library/Application Support: the harness's folder, else a fresh temp one
@@ -96,9 +60,16 @@ void app.whenReady().then(() => {
       }),
     ),
   );
-  createWindow();
+  const main = new MainWindow(testMode);
+  const capsule = new Capsule(testMode);
+  installCapsuleIpc(capsule);
+  ipcMain.on(IPC.openWindow, (_e, route: unknown) => {
+    main.open(typeof route === 'string' ? route : undefined);
+  });
+  if (!testMode) startTray(capsule, main);
+  main.create();
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    main.open();
   });
 });
 
