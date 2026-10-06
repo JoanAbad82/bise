@@ -975,6 +975,12 @@ fn pick(app: &mut App, id: u64, i: usize) -> bool {
     let Some(c) = app.sb.card_by_id(id).cloned() else { return false };
     let s = shape(&c);
     let (Some(reply), Some(said)) = (s.options.get(i), s.short.get(i)) else { return false };
+    // an approval answers with its digit (the composer rule: sb-core takes
+    // only 1, 2 or 3 on it, never words), the history says the option's
+    if matches!(c.kind.as_str(), "confirm" | "approval") {
+        answer(app, id, &s.num(i).to_string(), Some(said));
+        return true;
+    }
     if !choice_kind(&c.kind) {
         answer(app, id, reply, Some(said));
         return true;

@@ -1848,10 +1848,49 @@ def is_number(+t: String) -> Bool:
   +s = String.trim(t)
   Bool.pick(Bool, String.is_empty(s), False{}, digits(String.to_list(s)))
 
-# a hub item's answer (M.choice_kind): a number goes to the hub's Rust
-# side (the `card_choice` effect), which acts and closes the item (a merge
-# runs `gh pr merge`: the item stays open meanwhile); words go to main,
-# and close it
+def opt_line(+l: String, +n: String) -> Bool:
+  String.starts_with(l, String.append(n, ".")) || String.starts_with(l, String.append(n, ")"))
+
+def any_opt(xs: List<&2, String>, +n: String) -> Bool:
+  match xs:
+    case Nil{}:
+      False{}
+    case Con{+h, +t}:
+      opt_line(String.trim(h), n) || any_opt(t, n)
+
+# one of the card's options: a number with its line (`2.` or `2)`) in the
+# card's text
+def is_option(+card: String, +t: String) -> Bool:
+  is_number(t) && any_opt(String.lines(card), String.trim(t))
+
+# an approval card's answer (the composer rule, lead m_8777): its options
+# 1 allow, 2 always, 3 no, or the TUI's explicit deny action (`deny:
+# <why>`, a refusal with its note); typed words never answer it
+def confirm_ok(+t: String) -> Bool:
+  +s = String.trim(t)
+  String.eq(s, "1") || String.eq(s, "2") || String.eq(s, "3") || String.starts_with(String.to_lower(s), "deny:")
+
+# typed words on an approval card: the card stays open, nothing wakes
+def words_refused(-o: M.St, +cx: X.Cx<o>, +c: M.Card, +opts: String) -> X.Cx<o>:
+  notice(o, cx, cat(["card #", ns(M.Card.id(c)), " waits for ", opts, ": typed words don't answer it"]))
+
+def answer.confirm(-o: M.St, ok: Bool, +cx: X.Cx<o>, +c: M.Card, +text: String) -> X.Cx<o>:
+  match ok:
+    case True{}:
+      # the approvals gate (approvals-design.md §9): the answer is the
+      # verdict of the waiting call, written to its gate by the hub's
+      # Rust side (the `confirm` effect), never a message to the agent
+      +cx2 = out(o, cx, [J.kv("fx", J.JStr{"confirm"}), J.kv("card", J.JNum{M.Card.id(c)}),
+        J.kv("agent", J.JStr{M.Card.agent(c)}), J.kv("text", J.JStr{text})])
+      close_card(o, cx2, M.Card.id(c), "answered")
+    case False{}:
+      words_refused(o, cx, c, "1, 2 or 3")
+
+# a hub item's answer (M.choice_kind): one of its numbers goes to the
+# hub's Rust side (the `card_choice` effect), which acts and closes the
+# item (a merge runs `gh pr merge`: the item stays open meanwhile); typed
+# words don't answer it (the composer rule: the window sends them to the
+# agent as a message)
 def answer.choice(-o: M.St, num: Bool, +cx: X.Cx<o>, +c: M.Card, +text: String) -> X.Cx<o>:
   match num:
     case True{}:
@@ -1860,10 +1899,7 @@ def answer.choice(-o: M.St, num: Bool, +cx: X.Cx<o>, +c: M.Card, +text: String) 
         J.kv("place", C.jmaybe_str(M.Card.place(c))), J.kv("pr", C.jmaybe_nat(M.Card.pr(c))),
         J.kv("text", J.JStr{String.trim(text)})])
     case False{}:
-      # words are for main: they wake it (answer.q.main)
-      +id = M.Card.id(c)
-      +cx2 = notify_main(o, cx, cat(["the user answered card #", ns(id), " (\"", M.one_line(M.Card.text(c)), "\") in words: \"", M.one_line(text), "\""]))
-      close_card(o, cx2, id, "answered")
+      words_refused(o, cx, c, "one of its numbers")
 
 def answer.kind(-o: M.St, k: CardK, +cx: X.Cx<o>, +c: M.Card, +text: String) -> X.Cx<o>:
   match k:
@@ -1872,14 +1908,9 @@ def answer.kind(-o: M.St, k: CardK, +cx: X.Cx<o>, +c: M.Card, +text: String) -> 
     case KDrop{}:
       answer.drop(o, is_yes(text), cx, c)
     case KConfirm{}:
-      # the approvals gate (approvals-design.md §9): the answer is the
-      # verdict of the waiting call, written to its gate by the hub's
-      # Rust side (the `confirm` effect), never a message to the agent
-      +cx2 = out(o, cx, [J.kv("fx", J.JStr{"confirm"}), J.kv("card", J.JNum{M.Card.id(c)}),
-        J.kv("agent", J.JStr{M.Card.agent(c)}), J.kv("text", J.JStr{text})])
-      close_card(o, cx2, M.Card.id(c), "answered")
+      answer.confirm(o, confirm_ok(text), cx, c, text)
     case KChoice{}:
-      answer.choice(o, is_number(text), cx, c, text)
+      answer.choice(o, is_option(M.Card.text(c), text), cx, c, text)
     case KOther{}:
       close_card(o, cx, M.Card.id(c), "vue")
 

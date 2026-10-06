@@ -1083,6 +1083,13 @@ mod tests {
 
     #[test]
     fn what_the_answer_says() {
+        // the composer rule: what sb-core lets through to the gate, the
+        // options' digits and the TUI's explicit deny, each one answer
+        assert_eq!(answer_of("1"), Answer::Allow);
+        assert_eq!(answer_of(" 2 "), Answer::Always);
+        assert_eq!(answer_of("3"), Answer::No(String::new()));
+        assert_eq!(answer_of("deny: not on friday"), Answer::No("not on friday".into()));
+        assert_eq!(answer_of("DENY: later"), Answer::No("later".into()));
         assert_eq!(answer_of("allow"), Answer::Allow);
         assert_eq!(answer_of(sandbox::CARD_YES), Answer::Allow);
         assert_eq!(answer_of("run again"), Answer::Allow);

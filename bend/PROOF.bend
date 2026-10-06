@@ -5207,3 +5207,13 @@ def Laws.act_due_only(xs, now):
 
 def Laws.unknown_kind_skipped(j, n):
   {==}
+
+# ---- the composer rule ----
+
+def Laws.card_confirm_words_refused(o, cx, c, text, e):
+  %Equal.sym(Bool, HC.confirm_ok(text), False{}, e) : {HC.answer.confirm(o, _, cx, c, text) == HC.words_refused(o, cx, c, "1, 2 or 3") : HX.Cx<o>}
+  {==}
+
+def Laws.card_choice_words_refused(o, cx, c, text, e):
+  %Equal.sym(Bool, HC.is_option(HM.Card.text(c), text), False{}, e) : {HC.answer.choice(o, _, cx, c, text) == HC.words_refused(o, cx, c, "one of its numbers") : HX.Cx<o>}
+  {==}

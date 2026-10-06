@@ -4427,6 +4427,32 @@ law user_queued_said_at_idle:
   for +m: Bool
   {HC.pump.run(o, HM.RIdle{}, cx, name, q, m) == HC.pump.batch(o, q, cx, name, False{}, m) : HX.Cx<o>}
 
+# ---- the composer rule (lead m_8777, architect m_8801) ----
+# An approval card takes one of its options, never typed words: the TUI's
+# /answer and the window share it. The words leave the card open and wake
+# nobody (the window sends them to the agent as a message).
+
+# LAW: typed words on a confirm card (not 1, 2, 3 nor the TUI's explicit
+# `deny: <why>`) are refused: no verdict, the card stays open.
+law card_confirm_words_refused:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +c: HM.Card
+  for +text: String
+  for e: {HC.confirm_ok(text) == False{} : Bool}
+  {HC.answer.kind(o, HC.KConfirm{}, cx, c, text) == HC.words_refused(o, cx, c, "1, 2 or 3") : HX.Cx<o>}
+
+# LAW: a hub item (merge, feature_*, update, signin) takes only one of its
+# options' numbers: other words are refused, the item stays open, main is
+# not woken.
+law card_choice_words_refused:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +c: HM.Card
+  for +text: String
+  for e: {HC.is_option(HM.Card.text(c), text) == False{} : Bool}
+  {HC.answer.kind(o, HC.KChoice{}, cx, c, text) == HC.words_refused(o, cx, c, "one of its numbers") : HX.Cx<o>}
+
 # ---- bise's cross-hub messages (desktop S2, hub/xhub.bend) ----
 # Local laws on xhub.bend's decisions and xhub-model.bend's state: the
 # core's `cross-hub` section only wires them (it decides nothing).

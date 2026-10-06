@@ -3063,16 +3063,21 @@ mod prs {
     }
 
     #[test]
-    fn a_merge_item_goes_when_github_merges_it_and_words_go_to_main() {
+    fn a_merge_item_goes_when_github_merges_it_and_words_never_answer_it() {
         let mut t = T::new();
         spawn_wt(&mut t, "dark");
         t.go(report(1_000, Ok(vec![ready_pr("tip1", &[])]), None));
         let id = merge_cards(&t)[0].id;
-        // words, not a digit: main gets them in a turn, the item closes
-        let fx = t.user(MAIN, &format!("/answer {} wait for the release", id));
-        assert_eq!(closed_as(&t, id).as_deref(), Some("answered"));
-        let said = say_to(&fx, MAIN).unwrap_or_default();
-        assert!(said.contains("in words") && said.contains("wait for the release"), "{:?}", fx);
+        // words, not one of its numbers (the composer rule): refused, the
+        // item stays open, main is not woken; a number it doesn't list too
+        for words in ["wait for the release", "7"] {
+            let fx = t.user(MAIN, &format!("/answer {} {}", id, words));
+            assert!(t.hub.st.cards.contains_key(&id), "still open after {words:?}");
+            assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none(), "{:?}", fx);
+            assert!(format!("{:?}", fx).contains("typed words don't answer it"), "{:?}", fx);
+        }
+        // `3 not yet` closes it
+        t.user(MAIN, &format!("/answer {} 3", id));
         // a new review opens it again; merged on GitHub: withdrawn
         t.go(report(2_000, Ok(vec![ready_pr("tip1", &["alice"])]), None));
         let id = merge_cards(&t)[0].id;
@@ -3657,4 +3662,61 @@ fn a_project_says_bise_message_once_and_answers_it_once() {
     assert!(xreplies(&fx).is_empty());
     // and its end of turn sends nothing more
     assert!(xreplies(&t.turn(MAIN, "done")).is_empty());
+}
+
+// ---- the composer rule (lead m_8777, architect m_8801) ----
+
+fn open_card(t: &mut T, kind: &str, text: &str) -> u64 {
+    match kind {
+        "question" => {
+            t.req(MAIN, AgentReq::Card { text: text.into(), for_msg: None });
+        }
+        "confirm" => {
+            t.go(Input::ConfirmOpen { agent: MAIN.into(), text: text.into() });
+        }
+        _ => {
+            let mut fx = Vec::new();
+            t.hub.core(&mut fx, &mut t.env, None, json!({"t": "card_open", "kind": kind, "agent": MAIN, "text": text}));
+            t.hub.view_all();
+        }
+    }
+    *t.hub.st.cards.keys().max().unwrap_or_else(|| panic!("a {kind} card"))
+}
+
+// an approval card takes one of its options, never typed words: they leave
+// it open and wake nobody; the TUI's explicit deny (`deny: <why>`) refuses
+#[test]
+fn an_approval_card_takes_its_options_never_words() {
+    let mut t = T::new();
+    t.go(Input::ConfirmOpen { agent: MAIN.into(), text: "main wants to run rm -rf build".into() });
+    let id = *t.hub.st.cards.keys().max().unwrap();
+    for words in ["yes", "allow", "ok go", "4", "1 please"] {
+        let fx = t.user(MAIN, &format!("/answer {} {}", id, words));
+        assert!(t.hub.st.cards.contains_key(&id), "open after {words:?}");
+        assert!(!fx.iter().any(|e| matches!(e, Effect::Confirm { .. })), "no verdict for {words:?}: {:?}", fx);
+        assert!(format!("{:?}", fx).contains("waits for 1, 2 or 3: typed words don't answer it"), "{:?}", fx);
+    }
+    let fx = t.user(MAIN, &format!("/answer {} 1", id));
+    assert!(fx.iter().any(|e| matches!(e, Effect::Confirm { text, .. } if text == "1")), "{:?}", fx);
+    assert!(!t.hub.st.cards.contains_key(&id));
+    // the TUI's deny with its note
+    t.go(Input::ConfirmOpen { agent: MAIN.into(), text: "main wants to push".into() });
+    let id = *t.hub.st.cards.keys().max().unwrap();
+    let fx = t.user(MAIN, &format!("/answer {} deny: not on friday", id));
+    assert!(fx.iter().any(|e| matches!(e, Effect::Confirm { text, .. } if text == "deny: not on friday")), "{:?}", fx);
+}
+
+// one answer on both sides: the kinds whose card refuses typed words are
+// the ones bise-proto calls approvals (the window and the capsule show
+// them with options only). drop: approval_kind becomes false with
+// amb-core's next commit (sb-core keeps yes/no words there); add it then.
+#[test]
+fn approval_kinds_agree_with_proto() {
+    for kind in ["question", "confirm", "merge", "feature_try", "feature_merge", "update", "signin"] {
+        let mut t = T::new();
+        let id = open_card(&mut t, kind, "go on?\n\n1. yes\n2. no");
+        t.user(MAIN, &format!("/answer {} some typed words", id));
+        let refused = t.hub.st.cards.contains_key(&id);
+        assert_eq!(refused, bise_proto::rows::Card::approval_kind(kind), "{kind}");
+    }
 }
