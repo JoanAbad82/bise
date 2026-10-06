@@ -7,7 +7,7 @@
 // What it reads from the core and the shell (drafts sent to amb-core m_8382, amb-mac m_8383):
 // prefs {prefs}, accounts {items}, found {dir, items}, perms {mic, accessibility, screen},
 // win_folder {path}, win_drop {paths}, app_fn {state}. What it sends: prefs_set {key, value},
-// sign_in {id}, key_set {id, key}, found_scan {dir}, project_add {path, worktrees, land},
+// sign_in {id}, key_set {id, key}, found_scan {dir}, project_add {path, land?} (land true = the repo's flow mode trunk, absent = its flow decides; amb-home m_9135),
 // project_remove {project}, project_move {project, order}, app_perm {perm, do: continue|settings}
 // (the bar's own, amb-mac m_8388), win_pick_folder.
 (function (root) {
@@ -106,14 +106,14 @@
       case "ui_add_go": {
         const paths = x.sheet ? goPaths(x.sheet) : [];
         if (!paths.length) return out(x);
-        for (const path of paths) cmds.push({ cmd: "project_add", path, worktrees: x.sheet.worktrees, land: x.sheet.land });
+        for (const path of paths) cmds.push({ cmd: "project_add", path, ...(x.sheet.land ? { land: true } : {}) });
         return out({ ...x, sheet: null, adding: paths[0] });
       }
     }
     return out(x);
   }
   const base = (p) => String(p || "").replace(/\/$/, "").split("/").pop();
-  const sheet = (path) => ({ paths: path ? [path] : [], worktrees: true, land: false });
+  const sheet = (path) => ({ paths: path ? [path] : [], land: false });
   // what 'add' adds: the ticked paths, plus the one typed in the field
   const goPaths = (sh) => { const t = String(sh.typed || "").trim(); return t && !sh.paths.includes(t) ? [...sh.paths, t] : sh.paths; };
   const toggleIn = (list, v) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -123,7 +123,7 @@
     const at = STEPS[x.step];
     if (at === "model" && !signedIn(x)) return { s11: x, cmds };
     if (at === "projects") {
-      for (const it of x.found.items) if (x.picks[it.path] && !it.known) cmds.push({ cmd: "project_add", path: it.path, worktrees: true, land: false });
+      for (const it of x.found.items) if (x.picks[it.path] && !it.known) cmds.push({ cmd: "project_add", path: it.path });
     }
     if (at === "fn") return finish(x, cmds);
     const nx = { ...x, step: x.step + 1 };
@@ -333,8 +333,9 @@
       path: { text: sh.typed != null ? sh.typed : extra[extra.length - 1] || "", ph: T(s, "add_path"), choose: { text: T(s, "choose"), act: { ev: "ui_add_choose" } } },
       foundTitle: T(s, "found_in"),
       items: list.map((i) => ({ label: i.name, sub: i.path, check: { on: sh.paths.includes(i.path) }, control: { value: T(s, "git_ago", { ago: ago(s, i.last_ms) }) }, act: { ev: "ui_add_pick", path: i.path } })),
-      choices: [{ label: T(s, "wt"), sub: T(s, "wt_s"), control: { toggle: { on: sh.worktrees, act: { ev: "ui_add_toggle", key: "worktrees" } } } },
-        { label: T(s, "land"), sub: sh.land ? T(s, "land_on") : T(s, "land_off"), control: { toggle: { on: sh.land, act: { ev: "ui_add_toggle", key: "land" } } } }],
+      // one choice (amb-home m_9135: no worktrees setting in v1): main lands his work on main, or
+      // his repo's own flow decides (a pull request or an approval)
+      choices: [{ label: T(s, "land"), sub: sh.land ? T(s, "land_on") : T(s, "land_off"), control: { toggle: { on: sh.land, act: { ev: "ui_add_toggle", key: "land" } } } }],
       cancel: { text: T(s, "cancel"), tip: T(s, "cancel_tip"), act: { ev: "ui_add_close" } },
       go: { text: n === 1 ? T(s, "add_one", { p: base(all[0]) }) : n ? T(s, "add_n", { n }) : T(s, "add"), tip: T(s, "add_tip"), kind: "pri", state: n ? "" : "disabled", act: { ev: "ui_add_go" } } };
   }

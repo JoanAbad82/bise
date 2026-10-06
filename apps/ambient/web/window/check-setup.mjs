@@ -109,7 +109,7 @@ law("the projects step scans his folder: recent repos come checked, old ones not
   w.feed(o.groups[0].items[1].act);
   eq(w.v.setup.cta.text, "add 1 project");
   w.key("Enter");
-  eq(w.cmds("project_add"), [{ cmd: "project_add", path: "~/work/checkout-api", worktrees: true, land: false }]);
+  eq(w.cmds("project_add"), [{ cmd: "project_add", path: "~/work/checkout-api" }]);
   eq(w.s.projects.map((p) => p.name).slice(-1), ["checkout-api"]);
   eq(w.v.setup.title, "try it: hold fn");
 });
@@ -213,18 +213,18 @@ law("the add-a-project sheet: a path field with choose…, his repos with ticks,
   eq([o.title, o.path.text, o.path.ph, o.path.choose.text, o.foundTitle, o.go.state, o.go.text, o.items.map((i) => i.label)],
     ["add a project", "", "drop a folder here, or choose one", "choose…", "found in your folders", "disabled", "add", ["checkout-api", "engine-shaders", "dotfiles"]]);
   eq([o.cancel.tip, o.go.tip], ["esc", "⏎"]);
-  eq(o.choices.map((c) => [c.label, c.control.toggle.on, c.sub]), [["agents in their own worktree", true, "ψ: each agent has its own copy of the repo, nobody steps on anyone"],
-    ["main may land on main", false, "otherwise an approval each time"]]);
+  // one choice (amb-home m_9135): off = the repo's own flow decides (land absent), on = land true
+  eq(o.choices.map((c) => [c.label, c.control.toggle.on, c.sub]), [["main may land on main", false, "otherwise your repo's flow decides: a pull request or an approval"]]);
   w.feed(o.items[1].act);
-  w.feed(o.choices[1].control.toggle.act);
+  w.feed(o.choices[0].control.toggle.act);
   o = w.v.sheet;
-  eq([o.go.text, o.choices[1].sub, o.items[1].check.on], ["add engine-shaders", "sb land after the tests, without asking you", true]);
+  eq([o.go.text, o.choices[0].sub, o.items[1].check.on], ["add engine-shaders", "sb land after the tests, without asking you", true]);
   w.feed(o.items[0].act);
   eq(w.v.sheet.go.text, "add 2 projects");
   // the sheet holds the keys: a digit is not a card's answer; ⏎ adds
   eq(w.key("2").eat, false);
   w.key("Enter");
-  eq(w.cmds("project_add"), [{ cmd: "project_add", path: "~/engine-shaders", worktrees: true, land: true }, { cmd: "project_add", path: "~/work/checkout-api", worktrees: true, land: true }]);
+  eq(w.cmds("project_add"), [{ cmd: "project_add", path: "~/engine-shaders", land: true }, { cmd: "project_add", path: "~/work/checkout-api", land: true }]);
   eq([w.v.sheet, w.v.side.rows.filter((r) => r.kind === "pj").map((r) => r.name).slice(-2)], [null, ["engine-shaders", "checkout-api"]]);
 });
 law("a folder dropped on the window opens the sheet on it; a typed path counts; choose… asks the shell's picker; esc closes", () => {

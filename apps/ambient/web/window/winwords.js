@@ -89,7 +89,7 @@
       // the add-a-project sheet
       add_t: "add a project", add_s: "a folder, a git repo. its main starts right away.", add_path: "drop a folder here, or choose one", choose: "choose…",
       found_in: "found in your folders", wt: "agents in their own worktree", wt_s: "ψ: each agent has its own copy of the repo, nobody steps on anyone",
-      land: "main may land on main", land_on: "sb land after the tests, without asking you", land_off: "otherwise an approval each time",
+      land: "main may land on main", land_on: "sb land after the tests, without asking you", land_off: "otherwise your repo's flow decides: a pull request or an approval",
       cancel: "cancel", add: "add", add_one: ({ p }) => `add ${p}`, cancel_tip: "esc", add_tip: "⏎",
     },
     fr: {
@@ -166,7 +166,7 @@
       k_hold_fn: "tenir fn", k_fn_space: "fn espace",
       add_t: "ajouter un projet", add_s: "un dossier, un repo git. son main démarre tout de suite.", add_path: "dépose un dossier ici, ou choisis-en un", choose: "choisir…",
       found_in: "trouvés dans tes dossiers", wt: "les agents dans leur worktree", wt_s: "ψ : chaque agent a sa copie du repo, rien ne se marche dessus",
-      land: "main peut landrer sur main", land_on: "sb land après les tests, sans te demander", land_off: "sinon une approbation à chaque fois",
+      land: "main peut landrer sur main", land_on: "sb land après les tests, sans te demander", land_off: "sinon le flow de ton repo décide : une pull request ou une approbation",
       cancel: "annuler", add: "ajouter", add_one: ({ p }) => `ajouter ${p}`, cancel_tip: "esc", add_tip: "⏎",
     },
   };
