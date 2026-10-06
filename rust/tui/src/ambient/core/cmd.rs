@@ -48,6 +48,12 @@ pub enum Cmd {
     Archive { agent: String, stop_first: bool },
     /// `/restore <agent>`: back in his list.
     Unarchive { agent: String },
+    /// The window: the projects it shows now (replaces the set; the core
+    /// decides what it holds, core/hubs.rs).
+    Shown { projects: Vec<String> },
+    /// The window: a command for a project's hub (bise-proto's `HubCmd`
+    /// with its `project`), routed as is.
+    Typed(Value),
     /// Harness A: the words the fake voice hears at the next talk (only
     /// with the fake voice on; an error otherwise).
     FakeWords { text: String },
@@ -59,7 +65,12 @@ impl Cmd {
     pub fn parse(line: &str) -> Result<Cmd, String> {
         let v: Value = serde_json::from_str(line).map_err(|e| format!("not JSON: {e}"))?;
         let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
-        Ok(match s("cmd").as_str() {
+        let cmd = s("cmd");
+        // a hub's command with its project: the window's (bise-proto)
+        if v.get("project").is_some() && cmd != "hello" && bise_proto::hub::HubCmd::TAGS.contains(&cmd.as_str()) {
+            return Ok(Cmd::Typed(v));
+        }
+        Ok(match cmd.as_str() {
             "talk_start" => match v.get("page").and_then(|p| p.get("id")).and_then(Value::as_str).map(str::trim) {
                 Some(id) if !id.is_empty() => Cmd::PageTalk { page: id.to_string() },
                 _ => Cmd::TalkStart,
@@ -90,6 +101,9 @@ impl Cmd {
                 Cmd::EveryStop { id: id.ok_or("every_stop: no id")? }
             }
             "fake_words" => Cmd::FakeWords { text: s("text") },
+            "shown" => Cmd::Shown {
+                projects: v.get("projects").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect(),
+            },
             c @ ("agent_preview" | "agent_history" | "agent_unwatch" | "agent_send" | "follow" | "stop" | "archive" | "unarchive") => {
                 let agent = s("agent").trim().trim_start_matches('@').to_string();
                 if agent.is_empty() {

@@ -7,6 +7,7 @@
 use std::io::{self, BufRead, Write};
 use std::os::unix::net::UnixStream;
 use std::sync::mpsc::Sender;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -29,6 +30,8 @@ pub enum HubIn {
 #[derive(Clone, Default)]
 pub struct Hub {
     writer: Arc<Mutex<Option<UnixStream>>>,
+    /// [`Hub::close`] said: the reader thread ends at its next turn
+    closed: Arc<AtomicBool>,
 }
 
 impl Hub {
@@ -37,15 +40,19 @@ impl Hub {
     pub fn start<T: Send + 'static>(
         mut connect: Connect,
         tx: Sender<T>,
-        wrap: fn(HubIn) -> T,
+        wrap: impl Fn(HubIn) -> T + Send + 'static,
         retry: Duration,
     ) -> Hub {
         let hub = Hub::default();
         let writer = hub.writer.clone();
+        let closed = hub.closed.clone();
         std::thread::spawn(move || {
             // Down is said once per loss, not at each failed attempt
             let mut down_said = false;
             loop {
+                if closed.load(Ordering::SeqCst) {
+                    return;
+                }
                 let stream = match connect() {
                     Ok(s) => s,
                     Err(_) => {
@@ -64,6 +71,9 @@ impl Hub {
                     continue;
                 };
                 if let Ok(mut slot) = writer.lock() {
+                    if closed.load(Ordering::SeqCst) {
+                        return;
+                    }
                     *slot = Some(w);
                 }
                 if tx.send(wrap(HubIn::Up)).is_err() {
@@ -85,6 +95,9 @@ impl Hub {
                 if let Ok(mut slot) = writer.lock() {
                     *slot = None;
                 }
+                if closed.load(Ordering::SeqCst) {
+                    return;
+                }
                 down_said = true;
                 if tx.send(wrap(HubIn::Down)).is_err() {
                     return;
@@ -93,6 +106,17 @@ impl Hub {
             }
         });
         hub
+    }
+
+    /// No more of this hub: the connection closes (the hub's idle-exit
+    /// counts one client less) and the reader thread ends, saying nothing.
+    pub fn close(&self) {
+        self.closed.store(true, Ordering::SeqCst);
+        if let Ok(mut slot) = self.writer.lock() {
+            if let Some(s) = slot.take() {
+                let _ = s.shutdown(std::net::Shutdown::Both);
+            }
+        }
     }
 
     /// One request line to the hub; false when it is away or the write

@@ -225,6 +225,12 @@ pub struct ProjectRow {
     pub agents: u32,
     pub working: u32,
     pub waits: u32,
+    /// its hub runs (the sidebar's dot)
+    #[serde(default)]
+    pub running: bool,
+    /// its folder is gone (moved or deleted)
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub missing: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

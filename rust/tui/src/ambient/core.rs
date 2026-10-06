@@ -6,9 +6,11 @@
 
 mod agents_view;
 mod cmd;
+mod hubs;
 mod voice;
 
 pub use self::cmd::Cmd;
+pub use self::hubs::{branch_of_head, ProjectFacts, ProjectPorts, Spawn};
 use super::hub::{Hub, HubIn};
 use super::speech::{Speech, Step};
 use crate::voicemode::{Heard, ListenJob, ListenMsg, Listener, Mic, MicBlock, MicStream, SayJob, Speaker, Synthesizer, UttId};
@@ -228,6 +230,8 @@ pub struct Core {
     hub_agents: Vec<Value>,
     /// the hub's pages as last seen
     hub_pages: Vec<Value>,
+    /// every project's typed connection, for the window (core/hubs.rs)
+    hubs: hubs::Hubs,
     /// the agents shown (round 10): a history panel open, a preview
     feeds: Vec<agents_view::Feed>,
     /// the typed `subscribe`/`page` sent, answered in order
@@ -280,6 +284,7 @@ impl Core {
             hub_agents: Vec::new(),
             hub_pages: Vec::new(),
             feeds: Vec::new(),
+            hubs: Default::default(),
             pending: std::collections::VecDeque::new(),
             target: None,
             last_state: None,
@@ -398,6 +403,8 @@ impl Core {
                 self.slash(&format!("/archive {agent}{force}"));
             }
             Cmd::Unarchive { agent } => self.slash(&format!("/restore {agent}")),
+            Cmd::Shown { projects } => self.shown(projects),
+            Cmd::Typed(v) => self.typed_cmd(v),
             Cmd::FakeWords { text } => match &self.ports.fake_words {
                 Some(w) => w.set(&text),
                 None => self.error("fake_words: the fake voice is off (harness A only)."),
@@ -615,6 +622,7 @@ impl Core {
 
     /// Stdin closed: the app is gone. Nothing of the shots stays.
     pub fn shutdown(&mut self) {
+        self.close_projects();
         self.stop_voice();
         self.talk = None;
         let mut all: Vec<Shot> = self.sent_shots.drain(..).collect();

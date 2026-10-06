@@ -369,6 +369,39 @@ fn ambient_connector(
     })
 }
 
+/// What ambient-core reads of the projects (bise desktop S3b): a
+/// connection to any project's hub (it may start that hub, like the
+/// voice target's), the registry rows, each hub's view.json, its pid, the
+/// checkout's branch. Read-only but the connection.
+fn ambient_projects(exe: std::path::PathBuf, root: std::path::PathBuf) -> (bend_tui::ambient::ConnectFor, bend_tui::ambient::ProjectFacts) {
+    let connect_for: bend_tui::ambient::ConnectFor = Box::new(move |path| {
+        ambient_connector(switchboard::paths::Paths::for_workspace(path), exe.clone(), root.clone())
+    });
+    let facts = bend_tui::ambient::ProjectFacts {
+        rows: Box::new(|| bise_home::projects::list(&bise_home::Home::from_env(), &switchboard::paths::home_workspace())),
+        view: Box::new(|id| bend_tui::ambient::projects::read_view(&bise_home::Home::from_env().hub_dir(id))),
+        running: Box::new(|path| {
+            let pid = std::fs::read_to_string(switchboard::paths::Paths::for_workspace(path).pid_file()).ok();
+            pid.and_then(|p| p.trim().parse::<u32>().ok()).is_some_and(switchboard::procs::alive)
+        }),
+        exists: Box::new(|path| path.is_dir()),
+        git: Box::new(|path| {
+            let dot = path.join(".git");
+            let dir = if dot.is_dir() {
+                Some(dot)
+            } else {
+                // a worktree: `.git` is a file naming its git dir
+                std::fs::read_to_string(&dot).ok().and_then(|t| t.trim().strip_prefix("gitdir: ").map(|d| path.join(d)))
+            };
+            match dir {
+                Some(d) => (std::fs::read_to_string(d.join("HEAD")).ok().and_then(|h| bend_tui::ambient::branch_of_head(&h)), true),
+                None => (None, false),
+            }
+        }),
+    };
+    (connect_for, facts)
+}
+
 fn run_sbd(args: &[String]) -> std::io::Result<()> {
     let paths = switchboard::paths::Paths::for_workspace(&sb_workspace(args));
     let root = live_app_root_or_exit();
@@ -612,8 +645,9 @@ fn run_main() -> std::io::Result<()> {
                 let root = live_app_root_or_exit();
                 let exe = std::env::current_exe()?;
                 let workspace = paths.workspace.to_string_lossy().to_string();
+                let projects = ambient_projects(exe.clone(), root.clone());
                 let connect = ambient_connector(paths, exe, root);
-                std::process::exit(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind));
+                std::process::exit(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects)));
             }
             // bise ambient: open the app on this workspace (scripts/ambient.sh)
             Some("ambient") => {

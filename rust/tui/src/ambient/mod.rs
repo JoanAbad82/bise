@@ -20,7 +20,7 @@ mod speech;
 #[cfg(test)]
 mod tests;
 
-pub use self::core::{Cmd, Core, Ports};
+pub use self::core::{branch_of_head, Cmd, Core, ProjectFacts, ProjectPorts, Ports, Spawn};
 pub use self::hub::{Connect, Hub, HubIn};
 
 use std::io::{self, BufRead, Write};
@@ -36,6 +36,8 @@ const RETRY: Duration = Duration::from_millis(500);
 pub enum In {
     Line(String),
     Hub(HubIn),
+    /// a project hub's connection (the window's, core/hubs.rs), by id
+    Project(String, HubIn),
     /// stdin closed: the app is gone
     Eof,
 }
@@ -128,6 +130,7 @@ pub fn run(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write) {
                 }
             }
             Ok(In::Hub(h)) => core.hub(h),
+            Ok(In::Project(id, h)) => core.project_hub(&id, h),
             Ok(In::Eof) | Err(RecvTimeoutError::Disconnected) => break,
             Err(RecvTimeoutError::Timeout) => {}
         }
@@ -146,9 +149,21 @@ pub fn run(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write) {
 /// `bise ambient-core --workspace <ws>`: `connect` reaches the
 /// workspace's hub (the binary's: the first call may start it),
 /// `user_kind` is the hub's (`switchboard::model::user_kind`).
-pub fn core_main(workspace: String, connect: Connect, user_kind: fn(&str) -> bool) -> i32 {
+/// A connection to the hub of a workspace (`switchboard::client::connect`
+/// in `bise ambient-core`: it may start that hub).
+pub type ConnectFor = Box<dyn Fn(&std::path::Path) -> Connect>;
+
+pub fn core_main(workspace: String, connect: Connect, user_kind: fn(&str) -> bool, projects: Option<(ConnectFor, ProjectFacts)>) -> i32 {
     let (tx, rx) = mpsc::channel::<In>();
     let hub = Hub::start(connect, tx.clone(), In::Hub, RETRY);
+    let projects = projects.map(|(connect_for, facts)| {
+        let tx = tx.clone();
+        let spawn: Spawn = Box::new(move |path, id| {
+            let id = id.to_string();
+            Hub::start(connect_for(path), tx.clone(), move |h| In::Project(id.clone(), h), RETRY)
+        });
+        ProjectPorts { spawn, facts }
+    });
     std::thread::spawn(move || {
         for l in io::stdin().lock().lines().map_while(Result::ok) {
             if tx.send(In::Line(l)).is_err() {
@@ -159,6 +174,9 @@ pub fn core_main(workspace: String, connect: Connect, user_kind: fn(&str) -> boo
     });
     let (ports, fake_ev) = ports_for_env(user_kind);
     let mut core = Core::new(workspace, hub, ports);
+    if let Some(p) = projects {
+        core.set_projects(p);
+    }
     let mut out = io::stdout().lock();
     if !write_out(&mut out, fake_ev.into_iter().collect()) {
         return 0;
