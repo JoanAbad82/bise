@@ -300,8 +300,12 @@
       case "ui_terminal":   // start bise in a terminal (amb-mac runs 'bise' in Terminal)
         return { m, cmds: [{ cmd: "app_run_bise" }] };
 
-      case "error":
-        return none(flashNow(m, { kind: "error", glyph: "▲", text: ev.text || "", ttl: T.error, still: true }, now));
+      case "error": {
+        // a route correction or cancel that did nothing (amb-hub 56087c96): the route had ended, in
+        // his words; a wrong target keeps the hub's own text
+        const late = /^route_/.test(ev.cmd || "") && /already went or was cancelled/.test(ev.text || "");
+        return none(flashNow(m, { kind: "error", glyph: "▲", text: late ? Wd.route.late : ev.text || "", ttl: T.error, still: true }, now));
+      }
 
       // ---- the app's own events (amb-mac: down comes 250 ms into a hold with no other key, the
       // app sends talk_start/talk_end/shot itself; tap = fn released under 250 ms; cancel = the app

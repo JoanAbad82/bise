@@ -1608,6 +1608,11 @@ law("desktop S8 route line (v9): after a talk, '→ telemetry · main' for 2 s; 
   eq([c.cmds, M.view(c.m, 110).state], [[{ cmd: "route_cancel", project: "bise-home-00000000", rid: "r7" }], "working"]);
   // after the deadline: no line, tab and esc are the usual keys again
   eq([M.view(m, 1900).state, M.step(m, { ev: "app_key", key: "tab" }, 1900).cmds], ["working", []]);
+  // amb-hub's error for a tab / fn esc after the route ended (56087c96): plain words; a wrong target keeps its text
+  // (bise is working on his words here, so the line is the working glass's sub line)
+  const err = (text, cmd = "route_correct") => M.view(M.step(m, { ev: "error", project: "bise-home-00000000", cmd, text }, 1950).m, 1960);
+  eq([err("route r7 already went or was cancelled").sub, err("route r7 already went or was cancelled", "route_cancel").sub], ["too late: your words already went.", "too late: your words already went."]);
+  eq(err("no project named nope (sb project list)").sub, "no project named nope (sb project list)");
   // a followed job's agent: '→ storefront · stock · following'
   m = M.step(m, { ev: "route", project: "home", to: "storefront-5c1d", agent: "stock", followed: true, text: "relance le replay", correct_until_ms: 2000, at_wall: 0 }, 2000).m;
   eq(Bar.spec(M.view(m, 2010)).head.line.text, "→ storefront · stock · following");
