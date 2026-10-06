@@ -20,7 +20,8 @@ enum MenuWords {
     // the native fallback menu (S8; ambient signs the words)
     static let open = "open bise"
     static let quietHour = "quiet for 1 h"
-    static let quietEnd = "end quiet"
+    static let quietUntil = "quiet until"
+    static let resume = "resume"
 }
 
 @MainActor
@@ -40,7 +41,7 @@ final class StatusItem: NSObject {
     var onAccess: (() -> Void)?               // that row: System Settings' Accessibility pane
     var onWindow: (() -> Void)?               // open bise (the window, ⌘0)
     var onQuietHour: (() -> Void)?            // quiet for 1 h, or its end
-    var isQuietHour: () -> Bool = { false }
+    var quietHourEnds: () -> Date? = { nil }
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     // what the icon says (SPEC §0): the inputs, then IconLook decides
@@ -220,13 +221,18 @@ final class StatusItem: NSObject {
 
     // the native menu (S8): a right click, or a click before the page is up
     func fallbackMenu() {
-        show(StatusItem.fallbackRows(quiet: isQuietHour(), noAccess: noAccess()))
+        show(StatusItem.fallbackRows(quietEnds: quietHourEnds(), noAccess: noAccess()))
     }
 
     // its rows, with the words (the harness reads them: it has no status item)
-    static func fallbackRows(quiet: Bool, noAccess: Bool) -> [MenuItemOut] {
-        MenuRows.fallback(quiet: quiet, noAccess: noAccess,
-                          words: (MenuWords.open, MenuWords.quietHour, MenuWords.quietEnd, SettingsWords.menu, MenuWords.quit))
+    static func fallbackRows(quietEnds: Date?, noAccess: Bool) -> [MenuItemOut] {
+        let until = quietEnds.map { d -> String in
+            let f = DateFormatter()
+            f.dateFormat = DateFormatter.dateFormat(fromTemplate: "jmm", options: 0, locale: .current)
+            return f.string(from: d)
+        }
+        return MenuRows.fallback(quietUntil: until, noAccess: noAccess,
+                                 words: (MenuWords.open, MenuWords.quietHour, MenuWords.quietUntil, MenuWords.resume, SettingsWords.menu, MenuWords.quit))
     }
 
     private func show(_ rows: [MenuItemOut]) {

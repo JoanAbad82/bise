@@ -125,12 +125,14 @@ if let d = FileManager.default.contents(atPath: fixtures + "/count.json"),
     law("count.json is readable at \(fixtures)", false)
 }
 
-// S8: the native fallback menu (a right click, or before the page is up)
-let fw = (open: "open bise", quietHour: "quiet for 1 h", quietEnd: "end quiet", settings: "settings…", quit: "quit bise ambient")
-let fb = MenuRows.fallback(quiet: false, words: fw)
+// S8: the native fallback menu (a right click, or before the page is up; ambient m_8618)
+let fw = (open: "open bise", quietHour: "quiet for 1 h", quietUntil: "quiet until", resume: "resume", settings: "settings…", quit: "quit bise ambient")
+let fb = MenuRows.fallback(quietUntil: nil, words: fw)
 law("fallback: open bise, quiet for 1 h, settings, then quit", fb.map(\.kind) == [.window, .quiet, .settings, .separator, .quit] && fb[1].title == "quiet for 1 h")
-law("fallback: in the quiet hour, the row ends it", MenuRows.fallback(quiet: true, words: fw)[1].title == "end quiet")
-law("fallback: fn can't be heard: that row first", MenuRows.fallback(quiet: false, noAccess: true, words: fw).first?.kind == .access)
+let fq = MenuRows.fallback(quietUntil: "11:41", words: fw)
+law("fallback: in the quiet hour, 'quiet until 11:41' (said, not a button) then 'resume'",
+    fq[1].title == "quiet until 11:41" && !fq[1].enabled && fq[2].kind == .quiet && fq[2].title == "resume")
+law("fallback: fn can't be heard: that row first", MenuRows.fallback(quietUntil: nil, noAccess: true, words: fw).first?.kind == .access)
 
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all MenuRows laws hold")

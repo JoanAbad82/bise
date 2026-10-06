@@ -268,7 +268,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         st.isHidden = { [weak self] in self?.capsule.hidden ?? false }
         st.onWindow = { [weak self] in self?.openWindow(nil) }
         st.onQuietHour = { [weak self] in self?.quietHour() }
-        st.isQuietHour = { [weak self] in self?.quiet.paused ?? false }
+        st.quietHourEnds = { [weak self] in self?.quietHourEnds }
         status = st
         st.reduceMotion = reduceMotion
         // the icon moved (another item came, the menu bar changed screens)

@@ -36,7 +36,7 @@ extension AmbientApp {
     // the page not up = the fallback), right = the fallback; the fallback is
     // reported as its rows, never shown
     func harnessStatusClick(_ button: String) -> [String: Any] {
-        let rows = { StatusItem.fallbackRows(quiet: self.quiet.paused, noAccess: false).map(\.json) }
+        let rows = { StatusItem.fallbackRows(quietEnds: self.quietHourEnds, noAccess: false).map(\.json) }
         if button == "right" { return ["menu": "fallback", "rows": rows()] }
         switch IconClick.act(shown: !capsule.hidden) {
         case .close:

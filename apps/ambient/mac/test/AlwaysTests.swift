@@ -121,7 +121,7 @@ law("bottom: it grows upward, the glass's bottom never moves", lowTall.maxY - 40
 law("bottom: never off the screen", Placement.bar(CGSize(width: 776, height: 2000), glass: glass, on: mac, at: .bottom).maxY <= mac.visible.maxY)
 let icon = CGRect(x: 1300, y: 949, width: 30, height: 33)
 let drop = Placement.bar(CGSize(width: 776, height: 300), glass: glass, on: mac, at: .menu(icon))
-law("menu: the glass's top just under the menu bar", drop.maxY == mac.visible.maxY - Placement.menuGap)
+law("menu: the glass's top 6 px under the icon (the DS)", drop.maxY == icon.minY - Placement.menuGap)
 law("menu: near the right edge, kept on the screen (not centered past it)", drop.maxX <= mac.visible.maxX && drop.minX >= mac.visible.minX)
 let iconMid = CGRect(x: 700, y: 949, width: 30, height: 33)
 law("menu: centered on the icon when there is room", Placement.bar(CGSize(width: 776, height: 300), glass: glass, on: mac, at: .menu(iconMid)).minX + glass.midX == iconMid.midX)
@@ -132,7 +132,7 @@ law("anchor: what he opens shows where it asked (top, the dropdown)",
 let fakeIcon = CGRect(x: Placement.offScreen.frame.maxX - 220, y: Placement.offScreen.frame.maxY - 24, width: 30, height: 24)
 let fakeDrop = Placement.bar(CGSize(width: 776, height: 300), glass: glass, on: Placement.offScreen, at: .menu(fakeIcon))
 law("harness: the dropdown under the fake pearl touches no screen and sits under it",
-    !Placement.touches(fakeDrop, screens: [builtin, ext]) && fakeDrop.maxY == Placement.offScreen.visible.maxY - Placement.menuGap)
+    !Placement.touches(fakeDrop, screens: [builtin, ext]) && fakeDrop.maxY == fakeIcon.minY - Placement.menuGap)
 law("harness: the bar at the bottom or under an icon stays off-screen there",
     !Placement.touches(Placement.bar(CGSize(width: 1004, height: 600), glass: glass, on: Placement.offScreen, at: .bottom), screens: [builtin, ext]))
 

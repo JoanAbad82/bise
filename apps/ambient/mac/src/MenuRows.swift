@@ -117,16 +117,23 @@ enum MenuRows {
 
     // the native menu (S8): the dropdown is the bar's page under the icon;
     // this minimal menu is what a right click, or a click before the page is
-    // up, gets: open bise ⌘0, quiet for 1 h (or its end), settings ⌘,, quit
-    static func fallback(quiet: Bool, noAccess: Bool = false,
-                         words: (open: String, quietHour: String, quietEnd: String, settings: String, quit: String)) -> [MenuItemOut] {
+    // up, gets: open bise ⌘0, quiet for 1 h, settings ⌘,, quit ⌘Q; in his
+    // quiet hour, 'quiet until 11:41' (said, not a button) then 'resume'
+    // (ambient m_8618)
+    static func fallback(quietUntil: String?, noAccess: Bool = false,
+                         words: (open: String, quietHour: String, quietUntil: String, resume: String, settings: String, quit: String)) -> [MenuItemOut] {
         var out: [MenuItemOut] = []
         if noAccess {
             out.append(MenuItemOut(kind: .access, title: needsAccess))
             out.append(MenuItemOut(kind: .separator))
         }
         out.append(MenuItemOut(kind: .window, title: words.open))
-        out.append(MenuItemOut(kind: .quiet, title: quiet ? words.quietEnd : words.quietHour))
+        if let t = quietUntil {
+            out.append(MenuItemOut(kind: .header, title: "\(words.quietUntil) \(t)", enabled: false))
+            out.append(MenuItemOut(kind: .quiet, title: words.resume))
+        } else {
+            out.append(MenuItemOut(kind: .quiet, title: words.quietHour))
+        }
         out.append(MenuItemOut(kind: .settings, title: words.settings))
         out.append(MenuItemOut(kind: .separator))
         out.append(MenuItemOut(kind: .quit, title: words.quit))

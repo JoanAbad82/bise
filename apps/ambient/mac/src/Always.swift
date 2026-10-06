@@ -151,10 +151,10 @@ enum Placement {
             // glass's bottom edge fixed, it grows upward
             top = s.visible.minY + barBottom + g.maxY
         case .menu(let icon):
-            // the pearl's dropdown: the glass's top just under the menu bar,
-            // centered on the icon
+            // the pearl's dropdown: the glass's top 6 px under the icon (the
+            // DS, ambient m_8618), centered on it
             x = icon.midX - g.midX
-            top = s.visible.maxY - menuGap + g.minY
+            top = Swift.min(icon.minY, s.visible.maxY) - menuGap + g.minY
         }
         x = Swift.min(Swift.max(x, s.visible.minX), s.visible.maxX - w)
         top = Swift.min(top, s.visible.maxY)
@@ -163,7 +163,7 @@ enum Placement {
     }
 
     static let barBottom: CGFloat = 96   // the glass's bottom edge above the visible area's (the Dock)
-    static let menuGap: CGFloat = 6       // under the menu bar, for the dropdown
+    static let menuGap: CGFloat = 6       // under the menu-bar icon, for the dropdown (the DS)
 
     // where the bar shows (S8): what he opens by hand to type or browse
     // (fn space, fn a, fn 0, fn i, fn ,) at the top; what bise brings (a
