@@ -231,9 +231,12 @@ pub fn list(home: &Home, home_ws: &Path) -> Vec<Row> {
     rows(&read(home), home_ws)
 }
 
-/// The pure part of [`list`].
+/// The part of [`list`] after the read. The home row is the canonical
+/// home workspace (its hub runs there: `/var/...` and `/private/var/...`
+/// are one folder and one hub id).
 pub fn rows(projects: &[Project], home_ws: &Path) -> Vec<Row> {
-    let home_row = Row { path: home_ws.to_path_buf(), name: "bise".into(), id: crate::hub_id(home_ws), home: true, added_ms: 0 };
+    let home_ws = canonical(home_ws);
+    let home_row = Row { id: crate::hub_id(&home_ws), path: home_ws, name: "bise".into(), home: true, added_ms: 0 };
     std::iter::once(home_row)
         .chain(projects.iter().map(|p| Row { path: p.path.clone(), name: p.name.clone(), id: crate::hub_id(&p.path), home: false, added_ms: p.added_ms }))
         .collect()

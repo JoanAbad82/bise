@@ -115,6 +115,24 @@ fn home_is_row_zero_and_never_in_the_file() {
     assert!(remove(&mut l2, "bise").is_err());
 }
 
+// amb-core m_8673: the home workspace named through a symlink
+// (/var/folders vs /private/var/folders) is one row, its hub's id
+#[test]
+fn home_row_is_the_canonical_home_workspace() {
+    let root = tmp("home-link");
+    let real = root.join("real-ws");
+    std::fs::create_dir_all(&real).unwrap();
+    let link = root.join("link-ws");
+    std::os::unix::fs::symlink(&real, &link).unwrap();
+    let r = rows(&[], &link);
+    assert_eq!(r[0].path, real);
+    assert_eq!(r[0].id, crate::hub_id(&real));
+    // and the hub's boot at the real path is refused as home
+    let home = Home::at(root.join(".bise"));
+    assert!(add_path(&home, &link, &real, None, 1).is_err());
+    assert_eq!(list(&home, &link).len(), 1);
+}
+
 #[test]
 fn update_writes_whole_and_an_error_writes_nothing() {
     let root = tmp("update");
