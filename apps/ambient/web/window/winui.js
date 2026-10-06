@@ -125,6 +125,9 @@
     const el = UI.dock.render({ head: d.h, keys: d.k, q: d.q, typeHint: d.ty,
       ctx: d.body || d.shot ? { shot: d.shot ? h("div", "w-shot", svg(d.shot)) : null, body: d.body, origin: d.origin } : null,
       opts: d.opts.map((o) => ({ n: o.n, text: o.label, picked: o.picked, on: o.sel, act: { ev: "ui_pick", card: d.card, n: o.n } })) });
+    // a card not picked yet (bise's view): a click on its question picks it, his words then answer it
+    const q = d.choose && el.querySelector && el.querySelector(".q");
+    if (q) withAct(q, d.choose);
     return [tabs, el];
   }
 

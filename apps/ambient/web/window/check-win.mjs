@@ -136,8 +136,16 @@ law("above bise's composer: the newest card, '1 of 3 ← →'; ← → walk the 
   const w = win();
   let c = w.v.composer;
   eq([c.dock.h, c.dock.k, c.dock.q, c.dock.opts.map((o) => o.label)], ["? telemetry · alerts needs you", "1 of 3   ← →", "passer la compaction de 14:00 à 03:00 ?", ["move it to 03:00", "leave it"]]);
-  // the line says what his words will do: answer this question (accent), esc for a plain message
+  // bise's view: his words go to bise; another project's card is answered only when he picks it
+  // (ambient m_9079): the card says '1 answer'
+  eq([c.div, c.divAcc, c.divHint, c.ph, c.dock.ty], ["you → bise", false, "", "write to bise, then ⏎", "1 answer"]);
+  // a click on it picks it: the line says it in the accent, esc puts it back
+  w.feed(c.dock.choose);
+  c = w.v.composer;
   eq([c.div, c.divAcc, c.divHint, c.ph], ["answering telemetry · alerts · passer la compaction de 14:00 à 03:00 ?", true, "esc write a plain message", "your answer, then ⏎"]);
+  w.key("Escape");
+  eq([w.v.composer.div, !!w.v.composer.dock], ["you → bise", true]);
+  c = w.v.composer;
   assert.equal(w.key("ArrowRight").eat, true);
   c = w.v.composer;
   eq([c.dock.h, c.dock.k], ["? engine · netcode · merge the rollback fix?", "approval · 2 of 3   ← →"]);
@@ -165,15 +173,22 @@ law("1-9 in an empty field answers the card above; it leaves at once, the thread
 });
 law("words then ⏎ answer the card above; with no card, ⏎ sends to the thread", () => {
   const w = win();
+  // T1 run 3 step 4: on bise's view words go to bise, never to another project's card in the dock
+  w.type("what is on today");
+  w.key("Enter");
+  eq([w.sent.filter((c) => c.cmd === "answer"), w.sent.filter((c) => c.cmd === "send").pop()], [[], { cmd: "send", project: F.HOME, agent: "main", text: "what is on today", mode: "now" }]);
+  // picked, they answer it; after one answer the composer is bise's again
+  w.feed(w.v.composer.dock.choose);
   w.type("attends le test à 150 ms");
   w.key("Enter");
   eq(w.sent.filter((c) => c.cmd === "answer"), [{ cmd: "answer", project: P.telemetry, card: "c-alerts", reply: "attends le test à 150 ms" }]);
-  eq(w.v.composer.text, "");
+  // (the dock moves on to netcode's approval: its line, not 'answering …')
+  eq([w.v.composer.text, w.v.composer.divAcc, w.v.composer.div], ["", false, "you → bise · the merge waits for 1 or 2"]);
   w.go(P.evals);
   assert.equal(w.v.composer.dock, null);
   eq([w.v.composer.div, w.v.composer.ph], ["you → evals · main", "write to evals’s main, then ⏎"]);
   w.type("relance l'eval rag"); w.key("Enter");
-  eq(w.sent.filter((c) => c.cmd === "send"), [{ cmd: "send", project: P.evals, agent: "main", text: "relance l'eval rag", mode: "now" }]);
+  eq(w.sent.filter((c) => c.cmd === "send" && c.project === P.evals), [{ cmd: "send", project: P.evals, agent: "main", text: "relance l'eval rag", mode: "now" }]);
   // the core's echo replaces the line he sent
   eq(rowsOf(w.v, "msg").filter((m) => m.you && m.text === "relance l'eval rag").map((m) => m.pending), [false]);
   // shift+⏎ is a new line
@@ -181,12 +196,16 @@ law("words then ⏎ answer the card above; with no card, ⏎ sends to the thread
 });
 law("esc on a question: a plain message first (the card stays), esc again puts it off (the line says ⌘I); ⌘I opens every card above the composer, esc goes back to the thread", () => {
   const w = win();
+  // in its own thread: esc on its question = a plain message first, the card stays
+  w.go(P.telemetry, "alerts");
   w.key("Escape");
-  eq([w.v.composer.dock.h, w.v.composer.div, w.v.composer.divAcc, w.v.composer.ph], ["? telemetry · alerts needs you", "you → bise", false, "write to bise, then ⏎"]);
+  eq([w.v.composer.dock.h, w.v.composer.div, w.v.composer.divAcc, w.v.composer.ph], ["? alerts needs you", "you → alerts", false, "write to alerts, then ⏎"]);
+  w.go(F.HOME);
+  // on bise's view nothing is picked: esc puts the card off at once
   w.key("Escape");
   eq(w.v.composer.dock.h, "? engine · netcode · merge the rollback fix?");
-  // an approval: esc puts it off at once (his words never answered it)
-  w.key("Escape"); w.key("Escape"); w.key("Escape");
+  // an approval: esc puts it off at once too (his words never answered it)
+  w.key("Escape"); w.key("Escape");
   eq(w.v.composer.dock, null);
   eq(rowsOf(w.v, "marker").map((x) => x.text), ["? telemetry · alerts asked you · ⌘I"]);
   eq(w.v.composer.ph, "write to bise, then ⏎");
@@ -675,6 +694,20 @@ law("window run 3: a project whose folder is gone can't be written to (composer 
   // its thread opens after all (the folder is back): the composer takes words again
   w.feed({ ev: "thread", project: P.engine, agent: "main", entries: [], before: null, more: false });
   eq([w.v.composer.disabled, w.v.composer.locked], [false, false]);
+});
+
+law("T1 run 3 step 8: a digit over an empty composer picks the card's option, even when it reaches the field as text; ↑ into the dock then ⏎ answers", () => {
+  const w = win();
+  w.go(P.engine, "netcode");
+  // the key never came as a keydown: the field got '1'
+  w.feed({ ev: "ui_type", text: "1" });
+  eq([w.sent.filter((c) => c.cmd === "answer").pop().reply, w.v.composer.text], ["1", ""]);
+  // bise's view, nothing picked: ↑ selects the last option of the card, ⏎ answers with it
+  F.reset();
+  const w2 = win();
+  w2.key("ArrowUp");
+  w2.key("Enter");
+  eq(w2.sent.filter((c) => c.cmd === "answer").pop(), { cmd: "answer", project: P.telemetry, card: "c-alerts", reply: "2" });
 });
 
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {

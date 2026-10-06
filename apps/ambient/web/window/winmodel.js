@@ -270,7 +270,8 @@
     cmds.push({ cmd: "answer", project: c.project, card: c.id, reply: opt ? String(opt.n) : how.text });
     const said = opt ? opt.label : how.text;
     const k = keyOf(s.route);
-    s = { ...s, answered: set(s.answered, c.id, said), picked: opt ? { card: c.id, n: opt.n } : null };
+    // after one answer bise's composer goes back to a plain message by itself
+    s = { ...s, answered: set(s.answered, c.id, said), picked: opt ? { card: c.id, n: opt.n } : null, chosen: set(s.chosen || {}, keyOf(s.route), null), optSel: null };
     if (how.text != null) s = { ...s, drafts: set(s.drafts, k, "") };
     // the inbox stays open on the next card; it closes with the last one
     if (s.inbox && !D.allCards(s).length) s = { ...s, inbox: null };
@@ -305,6 +306,8 @@
     const d = D.dock(s);
     // esc on a question he'd answer: write a plain message instead (the card stays); again: put
     // the card away
+    // a card he picked on bise's view: esc puts it back, his words go to bise again
+    if (d && (s.chosen || {})[k] === d.card.id) return { ...s, chosen: set(s.chosen, k, null) };
     if (d && D.answers(s, d)) return { ...s, plain: set(s.plain || {}, k, d.card.id) };
     if (d) return { ...s, dockOff: set(s.dockOff, k, [...(s.dockOff[k] || []), d.card.id]) };
     if (s.route.agent !== "main") return go(s, { project: s.route.project, agent: "main" }, cmds);
@@ -386,6 +389,11 @@
       const i = cur < 0 ? (ev.key === "ArrowDown" ? 0 : n - 1) : (cur + (ev.key === "ArrowDown" ? 1 : -1) + n) % n;
       return eat({ ...s, optSel: { card: d.card.id, i } });
     }
+    // ↑ into the dock then ⏎: the selected option answers
+    if (d && empty && ev.key === "Enter" && !ev.shift && s.optSel && s.optSel.card === d.card.id) {
+      const o = (d.card.options || [])[s.optSel.i];
+      if (o) return eat(answer({ ...s, optSel: null }, d, { n: o.n }, cmds));
+    }
     if (ev.key === "Enter" && !ev.shift) return eat(send(s, cmds));
     return { s, eat: false };
   }
@@ -394,7 +402,16 @@
     const k = keyOf(s.route);
     switch (ev.ev) {
       case "ui_route": return go(s, { project: ev.project, agent: ev.agent || "main" }, cmds);
-      case "ui_type": return set(s, "drafts", set(s.drafts, k, ev.text));
+      case "ui_type": {
+        // a lone digit typed into an empty composer under a card picks that option, as the key
+        // does (a key that reaches the field without a keydown, T1 run 3 step 8)
+        const d = D.dock(s);
+        if (d && !(s.drafts[k] || "").length && /^[1-9]$/.test(ev.text || "") && (d.card.options || []).some((o) => o.n === +ev.text))
+          return answer(s, d, { n: +ev.text }, cmds);
+        return set(s, "drafts", set(s.drafts, k, ev.text));
+      }
+      // he picks a card on bise's view (a click on it): his words answer it now
+      case "ui_dock_choose": { const d = D.dock(s); return d && d.card.id === ev.card ? { ...s, chosen: set(s.chosen || {}, k, ev.card) } : s; }
       case "ui_pick": { const d = D.dock(s); return d && d.card.id === ev.card ? answer(s, d, { n: ev.n }, cmds) : s; }
       case "ui_dock": return moveDock(s, ev.by);
       case "ui_inbox": {

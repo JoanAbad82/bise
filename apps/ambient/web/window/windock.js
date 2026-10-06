@@ -66,7 +66,16 @@
   // the hub says it (Card.approval, amb-core m_8808); until then its kind does
   const isApproval = (c) => !!c && (c.approval != null ? !!c.approval : ["approval", "merge", "confirm"].includes(c.kind));
   // the composer answers the card above it: a question, unless he chose a plain message (esc)
-  const answers = (s, d) => !!d && !isApproval(d.card) && !((s.plain || {})[keyOf(s.route)] === d.card.id);
+  // (ambient m_9079, lead m_9081): in a project's or an agent's own thread its own question is
+  // answered by default (esc: a plain message); on bise's view (every project's cards) his words
+  // go to bise unless he picked the card (a click on it, ↑ into it then ⏎, or ⌘I's inbox)
+  const answers = (s, d) => {
+    if (!d || isApproval(d.card)) return false;
+    const k = keyOf(s.route);
+    const own = d.mode !== "inbox" && !(s.route.project === HOME && s.route.agent === "main");
+    if (own) return (s.plain || {})[k] !== d.card.id;
+    return d.mode === "inbox" || (s.chosen || {})[k] === d.card.id;
+  };
   const oneLine = (t, n = 64) => { const l = String(t || "").split("\n")[0].trim(); return l.length > n ? `${l.slice(0, n - 1)}…` : l; };
 
   // the dock's words (DS composer "dock · une question" / "dock · l'inbox" / "dock · la revue")
@@ -88,7 +97,8 @@
       q: c.question,
       opts: (c.options || []).map((o, i) => ({ n: o.n, label: o.label, picked: s.picked && s.picked.card === c.id && s.picked.n === o.n, sel: !!(s.optSel && s.optSel.card === c.id && s.optSel.i === i) })),
       // a question keeps 'or type your answer below'; an approval says to pick
-      ty: approval ? T(s, "pick_n", { n: (c.options || []).length || 2 }) : T(s, "type_below"),
+      ty: approval ? T(s, "pick_n", { n: (c.options || []).length || 2 }) : answers(s, d) ? T(s, "type_below") : T(s, "pick_answer"),
+      choose: approval || answers(s, d) ? null : { ev: "ui_dock_choose", card: c.id },
       tabs: d.mode === "inbox" ? d.list.map((x, i) => ({ id: x.id, text: `${x.agent} · ${x.title || x.question}`, on: i === d.i })) : null,
       card: c.id,
     };
