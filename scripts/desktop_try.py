@@ -83,7 +83,20 @@ def try_env(base, real, tryh, repo=REPO):
     drop = set(OWN_PATHS) | set(NOT_INHERITED) | {"BISE_HOME"}
     env = {k: v for k, v in base.items() if k not in drop and not k.startswith("SB_") and k != "BISE_ROLE"}
     env.update(BISE_HOME=tryh, BISE_HOME_WORKSPACE=os.path.join(tryh, "bise"), BISE_APP_ROOT=repo)
+    if "PATH" in env:
+        env["PATH"] = clean_path(env["PATH"], real, homes=(os.path.expanduser("~/.bise"),))
     return env
+
+
+def clean_path(path, real, homes=()):
+    """PATH without any bise state's hubs/ and run/ folders: an agent's shell has
+    <his ~/.bise>/hubs/<hub>/bin first (its sb talks to HIS hub); the try's processes must never
+    find that one. `homes` adds other bise homes to strip (the default ~/.bise when `real` is a
+    stand-in, as in the try-proof)."""
+    roots = [real, *homes]
+    bad = [os.path.join(r, d) for r in roots for d in ("hubs", "run")]
+    keep = [p for p in path.split(":") if p and not any(under(p, b) for b in bad)]
+    return ":".join(keep)
 
 
 def his_env(base):

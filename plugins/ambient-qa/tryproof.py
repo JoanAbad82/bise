@@ -23,6 +23,7 @@ an auth.json with a fake API key (so the try's key_command reads it in place). T
 import glob
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -148,7 +149,10 @@ def run(out=None):
     tryh = os.path.join(real, "try", "desktop")
     hook = os.path.join(PROOF, "open-hook.sh")
     with open(hook, "w") as f:
-        f.write("#!/bin/bash\nexec %s -B %s real _try_open \"$@\"\n" % (sys.executable, os.path.join(HERE, "qa.py")))
+        # the launcher drops SB_* (SB_AGENT names qa's run dir), so the hook names the dir itself:
+        # without it the app's socket went to ra-me while the proof read ra-<agent>
+        f.write("#!/bin/bash\nexport AMBIENT_REAL_DIR=%s\nexec %s -B %s real _try_open -- \"$@\"\n"
+                % (shlex.quote(qa.REAL_DIR), sys.executable, os.path.join(HERE, "qa.py")))
     os.chmod(hook, 0o755)
     base = {k: v for k, v in os.environ.items() if not k.startswith("SB_") and k not in ("BISE_ROLE", "BISE_HOME")}
     env = dict(base, BISE_TRY_REAL=real, BISE_TRY_BISE=bise, BISE_TRY_OPEN=hook, TRYPROOF_HOME=home)
@@ -168,10 +172,17 @@ def run(out=None):
         pid = launched["pid"]
         watch = open(os.path.join(qa.REAL_APP_DIR, "watch.log")).read()
         verdict("watchdog attached first", ("watching pid %d" % pid) in watch, "watch.log %s" % watch.strip().splitlines()[-1:])
-        st = qa.real_call("state")
-        core_ws = (st.get("core") or {}).get("workspace")
-        verdict("the core runs the try's home workspace", core_ws and os.path.realpath(core_ws) == os.path.realpath(os.path.join(tryh, "bise")),
-                "core workspace %s" % core_ws)
+        # the launcher passes no --workspace: the core runs `ambient-core --home` (state.core.workspace
+        # stays ''), and its home workspace is BISE_HOME_WORKSPACE = <try>/bise. So: no other
+        # workspace named, and the home workspace's hub lives in the try home's hubs/.
+        core_ws = (qa.real_call("state").get("core") or {}).get("workspace") or ""
+        t0, hubs = time.time(), []
+        while time.time() - t0 < 20 and not any(os.path.basename(h).startswith("bise-") for h in hubs):
+            hubs = sorted(os.listdir(os.path.join(tryh, "hubs"))) if os.path.isdir(os.path.join(tryh, "hubs")) else []
+            time.sleep(0.5)
+        home_ok = core_ws == "" or os.path.realpath(core_ws) == os.path.realpath(os.path.join(tryh, "bise"))
+        verdict("the core runs the try's home workspace", home_ok and any(h.startswith("bise-") for h in hubs),
+                "core workspace %r (''=--home), hubs in the try home %s" % (core_ws, hubs))
         qa.real_win("open")
         time.sleep(3)
         qas = json.loads(qa.real_op("eval", window="win", js="(() => JSON.stringify([...document.querySelectorAll('[data-qa]')].map(e => e.getAttribute('data-qa'))))()").get("value") or "[]")

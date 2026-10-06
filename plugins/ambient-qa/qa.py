@@ -3933,7 +3933,8 @@ def _real_cli(a):
         return {"report": tryproof.report(R), "steps": R["steps"]}
     if c == "_try_open":
         import tryproof
-        return tryproof.try_open(a.args)
+        # the hook passes '--' so the app's own --bise/--env aren't read as qa.py's options
+        return tryproof.try_open(a.args[1:] if a.args[:1] == ["--"] else a.args)
     if c == "t1":
         import t1
         txt = t1.run(a.out, a.bise)

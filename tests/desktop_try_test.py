@@ -46,6 +46,11 @@ def pure():
     check(e["BISE_HOME"] == tryh and e["BISE_HOME_WORKSPACE"] == tryh + "/bise", "the try's homes: %s" % e)
     check(not [k for k in ("BEND_RUN_DIR", "SB_SOCKET", "BISE_ROLE", "BISE_EXPORTS_FOR", "SB_BUILD_DIR") if k in e], "no override or internal var survives: %s" % e)
     check(e["HOME"] == "/Users/x" and e["ANTHROPIC_FOUNDRY_API_KEY"] == "k", "HOME and his provider env stay")
+    e2 = T.try_env(dict(base, PATH="%s/hubs/h-1/bin:/usr/bin:%s/run/x:/bin" % (real, real)), real, tryh)
+    check(e2["PATH"] == "/usr/bin:/bin", "an agent shell's hub bin (his sb) leaves the try's PATH: %s" % e2["PATH"])
+    other = "/Users/x/.bise"
+    check(T.clean_path("%s/hubs/h/bin:/usr/bin:%s/run/r:%s/try/bin" % (other, other, other), real, homes=(other,)) == "/usr/bin:%s/try/bin" % other,
+          "the default ~/.bise's hubs/ and run/ go too when the real home is a stand-in")
     h = T.his_env(base)
     check("BISE_HOME" not in h and "SB_SOCKET" not in h and h["HOME"] == "/Users/x", "his env: no BISE_HOME, no hub var")
 
