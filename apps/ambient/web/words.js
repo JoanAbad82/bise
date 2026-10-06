@@ -230,6 +230,13 @@
   }
 
   // the first sentence of a report, at most `max` characters
+  // a row's one line (lead m_8547, amb-tools' S8 run): an agent's line can carry the hub's
+  // wrappers ('ack: <agent_message from=…>…</agent_message>') and markup: tags out (their words
+  // stay), markdown plain, one line, its first sentence, an ellipsis past max
+  function oneLine(text, max = 90) {
+    const t = String(text == null ? "" : text).replace(/<\/?[a-z][\w-]*(?:\s[^<>]*)?\/?>/gi, " ").replace(/\s+/g, " ").trim();
+    return firstSentence(t, max);
+  }
   function firstSentence(text, max = 90) {
     const t = plain(text);
     if (!t) return "";
@@ -334,5 +341,5 @@
   // an agent's row is a label, not a sentence: no final period
   const rowLabel = (s) => String(s || "").replace(/\.$/, "");
 
-  root.AmbWords = { W, spot, route, menu, GLYPH, idleLine, firstSentence, doneLine, failLine, needsLine, answeredLine, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
+  root.AmbWords = { W, spot, route, menu, GLYPH, idleLine, firstSentence, oneLine, doneLine, failLine, needsLine, answeredLine, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
 })(typeof window !== "undefined" ? window : globalThis);

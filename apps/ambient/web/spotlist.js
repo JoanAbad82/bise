@@ -21,7 +21,7 @@
     const rows = m.agents.map((a, i) => {
       const waits = cards.filter((c) => c.agent === a.name).length || Math.max(0, +a.waits || 0);
       const status = waits ? "waiting" : a.status === "starting" ? "working" : a.status || "idle";
-      const title = a.title || a.note || "";
+      const title = Wd.oneLine(a.title || a.note || "");
       const sinceMs = +a.since_ms > 0 ? Math.max(0, wall - a.since_ms) : +a.turn_ms >= 0 && a.turn_ms != null ? +a.turn_ms : null;
       const followed = a.name in m.follows ? m.follows[a.name] : !!a.followed;
       return { name: a.name, project: a.project || null, pname: a.project_name || null, status, title, purpose: a.purpose || "", waits, followed, archived: !!a.archived, age: sinceMs == null ? "" : Wd.age(sinceMs), i,
@@ -61,7 +61,7 @@
     });
     const agentRow = (r) => ({ kind: "agent", name: r.name, project: r.project, pname: r.pname, status: r.status, title: r.title, marks: r.marks });
     if (!q) {
-      const cardRows = cards.map((c) => ({ kind: "card", id: c.id, agent: c.agent, pname: pname(c.project), text: c.title || c.text || "" }));
+      const cardRows = cards.map((c) => ({ kind: "card", id: c.id, agent: c.agent, pname: pname(c.project), text: Wd.oneLine(c.title || c.text || "") }));
       const work = all.filter((r) => r.status === "working").map(agentRow);
       return { q, mode: "empty", sections: [
         ...(cardRows.length ? [{ label: Wd.spot.waiting, acc: true, rows: cardRows }] : []),

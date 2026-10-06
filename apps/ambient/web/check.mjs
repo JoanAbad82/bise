@@ -1741,6 +1741,16 @@ law("desktop S8: app_anchor says where the bar sits (top, bottom, menu); the vie
   assert.equal(M.view(M.step(m, { ev: "app_anchor", at: "side" }, 40).m, 50).anchor, null);
 });
 
+law("rows are one plain line (lead m_8547): an agent's line loses the hub's wrappers and markup, keeps its words, its first sentence, an ellipsis when long", () => {
+  eq(Wd.oneLine('ack: <agent_message from="main" id="m_1">on it. i\'ll profile signup first</agent_message>'), "ack: on it.");
+  eq(Wd.oneLine("**fixed** the `login` test\nand more"), "fixed the login test and more");
+  assert.ok(Wd.oneLine("x".repeat(200)).endsWith("…"));
+  const agents = [{ name: "perf", status: "working", title: 'ack: <agent_message from="main">profiling signup. then the fix</agent_message>', project: "p1" }];
+  let m = M.step(M.init(), { ev: "state", agents, cards: [], projects: [{ project: "p1", name: "acme", order: 1 }] }, 0).m;
+  m = M.step(m, { ev: "app_key", key: "space" }, 10).m;
+  eq(Bar.spec(M.view(m, 20, Fake.T0)).sections.find((x) => x.label === "at work").rows[0].sub, "ack: profiling signup.");
+});
+
 // the desktop window's laws (window/check-win.mjs) run with the capsule's
 { const w = (await import("./window/check-win.mjs")).results(); pass += w.pass; fail += w.fail; }
 { const w = (await import("./window/check-setup.mjs")).results(); pass += w.pass; fail += w.fail; }

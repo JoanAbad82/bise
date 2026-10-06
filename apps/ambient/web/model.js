@@ -864,7 +864,7 @@
           glyph: asks ? "?" : Wd.GLYPH[a.status] || "·",
           kind: asks ? "need" : a.status,
           // short: its task line, or a done agent's done line
-          what: Wd.rowLabel(asks ? "needs you" : doneLine || a.note || a.status),
+          what: Wd.rowLabel(asks ? "needs you" : doneLine || Wd.oneLine(a.note || "") || a.status),
           age: Wd.age(a.turn_ms),
         };
       }).concat(writingRows);
@@ -878,9 +878,9 @@
       const pname = (id) => (m.projects.find((p) => p.project === id) || {}).name || null;
       v.menu = {
         working: working(m.agents), waits: cards.length, failed: m.agents.filter((a) => a.status === "failed").length,
-        cards: cards.map((c) => ({ id: c.id, agent: c.agent, pname: pname(c.project), text: c.title || c.text || "" })),
+        cards: cards.map((c) => ({ id: c.id, agent: c.agent, pname: pname(c.project), text: Wd.oneLine(c.title || c.text || "") })),
         followed: m.agents.filter((a) => (a.name in m.follows ? m.follows[a.name] : a.followed) && a.status !== "done").map((a) => ({
-          name: a.name, project: a.project || null, pname: pname(a.project) || a.project_name || null, job: a.job || null, title: a.title || "", failed: a.status === "failed" })),
+          name: a.name, project: a.project || null, pname: pname(a.project) || a.project_name || null, job: a.job || null, title: Wd.oneLine(a.title || ""), failed: a.status === "failed" })),
         quiet: m.quiet && m.quiet.why === "paused" ? { until: m.quiet.until } : null,
       };
     } else if (m.pane === "settings") {
