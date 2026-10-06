@@ -101,7 +101,7 @@ export function Spot({ input, to = "to bise", pearl, children, keys, testId }: S
 
 /** the reference's typed words or placeholder + caret, for a still */
 export function SpotStill({ text, placeholder }: { text?: ReactNode; placeholder?: ReactNode }) {
-  return text != null && text !== "" ? <>{text}</> : <><span className="lo">{placeholder}</span><span className="b-composer"><span className="in"><span className="cur" /></span></span></>;
+  return text != null && text !== "" ? <>{text}</> : <><span className="cur" /><span className="lo">{placeholder}</span></>;
 }
 
 export interface MenuItemProps {
