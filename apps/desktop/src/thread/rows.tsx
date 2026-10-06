@@ -53,6 +53,14 @@ function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       ) : (
         <Marker>{e.text}</Marker>
       );
+    case 'stopped':
+      // ⛔6: the hub's typed fact of a stop (amb-core 515aa58d), at its pos
+      return (
+        <Marker>
+          ■ {e.text === '' ? 'stopped' : e.text}
+          {e.at_ms > 0 ? ` · ${clock(e.at_ms)}` : ''}
+        </Marker>
+      );
     case 'report':
       return <Marker>{e.report ? `${e.report.kind} · ${e.text}` : e.text}</Marker>;
     case 'you':

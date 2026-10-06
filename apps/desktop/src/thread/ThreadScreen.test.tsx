@@ -107,6 +107,20 @@ describe('the thread screen', () => {
     expect(v.getByTestId('thread.screen').textContent).not.toContain('stopping perf');
   });
 
+  it("⛔6: the hub's stopped entry shows in the thread", () => {
+    const { store } = setup();
+    act(() => {
+      store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 950, at_ms: Date.UTC(2026, 0, 1, 14, 5), kind: 'stopped', text: 'stopped' } });
+    });
+    const v = render(
+      <StoreProvider store={store}>
+        <EntryRow ctx={ctx} pos={950} />
+      </StoreProvider>,
+    );
+    expect(v.getByTestId('thread.entry.950').dataset.kind).toBe('stopped');
+    expect(v.getByTestId('thread.entry.950').textContent).toContain('■ stopped');
+  });
+
   it('a new entry never re-renders the composer', () => {
     const { store } = setup();
     render(
