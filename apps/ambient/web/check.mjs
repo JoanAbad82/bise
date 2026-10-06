@@ -1366,6 +1366,9 @@ law("S9 a drop on the pearl (amb-mac m_9037): app_drop opens the spotlight with 
   eq(w.cmds.filter((c) => c.cmd === "send"), [{ cmd: "send", text: "why does this climb at 14 h https://grafana.internal/d/ingest" }]);
   // esc drops the drop
   eq(M.step(r.m, { ev: "app_key", key: "esc", local: true }, 20).m.drop, null);
+  // ⏎ from the app (app_key enter, T1 run 5 step 18) sends it with what he typed, like the row
+  const typed = M.step(r.m, { ev: "ui_spot_type", text: "summarize this" }, 20).m;
+  eq(M.step(typed, { ev: "app_key", key: "enter" }, 30).cmds.filter((c) => c.cmd === "send"), [{ cmd: "send", text: "summarize this", files: ["/Users/you/Desktop/forest.ktx", "/Users/you/shots"] }]);
 });
 
 law("card seat (amb-mac 9c529bdd): while bise's window holds the cards (app_card_seat 'window') the bar keeps the hello and never turns into the card, its keys answer nothing; at 'bar' the card asks again (lead m_8746)", () => {

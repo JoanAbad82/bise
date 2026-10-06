@@ -625,6 +625,7 @@
     if (m.route && now < m.route.until && (k === "tab" || k === "esc")) return step(m, { ev: k === "tab" ? "ui_route_next" : "ui_route_cancel" }, now);
     // while you were away (S9): enter opens bise, esc closes it
     if (C.awayOn(m, now) && !m.pane && (k === "enter" || k === "esc")) return C.awayAct(m, k === "enter" ? null : undefined);
+    if (m.pane === "spot" && m.drop && k === "enter") return step(m, { ev: "ui_spot_send" }, now);   // a drop: ⏎ sends it (run 5)
     const cards = visibleCards(m);
     if (/^[1-9]$/.test(k)) {
       // no pane: the card the glass asks (none while bise's window holds the cards)
