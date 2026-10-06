@@ -324,6 +324,8 @@ struct Shell {
     proto: proto::Proto,
     /// view.json's writer (bise desktop S1, daemon/projects.rs)
     projects: projects::Projects,
+    /// bise's home hub: the projects its routing guesses from (daemon/routing.rs)
+    routing: routing::Routing,
     /// Agents a page's notes were sent to: the pages they update, and
     /// whether a turn of theirs has the notes yet (started or steered
     /// since). Its end without a publish puts the pages back to ready.
@@ -2582,6 +2584,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         positions: BTreeMap::new(),
         proto: proto::Proto::default(),
         projects: projects::Projects::boot(&paths),
+        routing: routing::Routing::default(),
         search: search::Index::default(),
         offsets: BTreeMap::new(),
         booting: false,

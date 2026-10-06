@@ -10,7 +10,10 @@
 //! No target: false, and the caller steps today's input unchanged.
 //!
 //! Read-only: never starts a hub, never writes; the gathered projects are
-//! kept 60 s while the registry's rows stay the same. The fn context is
+//! kept 60 s while the registry's rows stay the same ([`Routing`], a field
+//! of the Shell). To converge (architect m_9063): [`recent_of`] parses a
+//! transcript's roles itself; once amb-hub's step 3 index over the same
+//! files lands, read the recent lines through its reader. The fn context is
 //! the input op's `context` (amb-core owns it end to end: the typed send
 //! puts it there); until it does, only his words name a project.
 
@@ -21,7 +24,6 @@ use crate::route::{self, Candidate, Guess};
 use bise_proto::context::FnContext;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 /// How long gathered projects stay fresh.
@@ -31,9 +33,28 @@ const RECENT: usize = 60;
 /// How much of a transcript's end is read for them.
 const TAIL: u64 = 128 * 1024;
 
-/// The last gathering: when, for which registry rows, what.
-type Cached = (Instant, Vec<String>, Vec<Candidate>);
-static CACHE: Mutex<Option<Cached>> = Mutex::new(None);
+/// The home hub's routing state: the last gathering (when, for which
+/// registry rows, what), a field of its Shell.
+#[derive(Default)]
+pub(super) struct Routing {
+    last: Option<(Instant, Vec<String>, Vec<Candidate>)>,
+}
+
+impl Routing {
+    /// The projects now: the kept ones while fresh and the registry's rows
+    /// unchanged, else gathered again.
+    fn candidates(&mut self, home: &bise_home::Home, rows: &[bise_home::projects::Row], now: Instant) -> Vec<Candidate> {
+        let ids: Vec<String> = rows.iter().filter(|r| !r.home).map(|r| r.id.clone()).collect();
+        if let Some((at, was, list)) = &self.last {
+            if now.duration_since(*at) < TTL && *was == ids {
+                return list.clone();
+            }
+        }
+        let list = gather(home, rows);
+        self.last = Some((now, ids, list.clone()));
+        list
+    }
+}
 
 impl Shell {
     /// His input to bise's main goes to a project when the guess is clear
@@ -46,7 +67,9 @@ impl Shell {
         if !routable(focus, text, via, queued) || !crate::paths::is_home(&self.opts.paths.workspace) {
             return false;
         }
-        let projects = candidates();
+        let home = bise_home::Home::from_env();
+        let rows = bise_home::projects::list(&home, &crate::paths::home_workspace());
+        let projects = self.routing.candidates(&home, &rows, Instant::now());
         let ctx: FnContext = context.and_then(|c| serde_json::from_value(c.clone()).ok()).unwrap_or_default();
         let g = route::guess(text, &ctx, &projects);
         let Some(to) = route::target(&g) else { return false };
@@ -75,23 +98,6 @@ fn why_line(g: &Guess, name: &str) -> String {
         "recent" => format!("{name} talked about this lately"),
         other => other.to_string(),
     }
-}
-
-/// The projects now: the cached ones while fresh and the registry's rows
-/// unchanged, else gathered again.
-fn candidates() -> Vec<Candidate> {
-    let home = bise_home::Home::from_env();
-    let rows = bise_home::projects::list(&home, &crate::paths::home_workspace());
-    let ids: Vec<String> = rows.iter().filter(|r| !r.home).map(|r| r.id.clone()).collect();
-    let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some((at, was, list)) = cache.as_ref() {
-        if at.elapsed() < TTL && *was == ids {
-            return list.clone();
-        }
-    }
-    let list = gather(&home, &rows);
-    *cache = Some((Instant::now(), ids, list.clone()));
-    list
 }
 
 /// One candidate per registered project (the home row skipped): its git
@@ -226,6 +232,25 @@ mod tests {
         let g = route::guess("is the checkout still slow on the shop?", &FnContext::default(), &c);
         assert_eq!(route::target(&g).as_deref(), Some("shop-1"));
         assert_eq!(why_line(&g, "shop"), "you named shop");
+    }
+
+    #[test]
+    fn gathered_projects_are_kept_a_minute_while_the_rows_stay() {
+        let d = scratch("keep");
+        let home = bise_home::Home::at(d.join("state"));
+        let shop = d.join("shop");
+        std::fs::create_dir_all(&shop).unwrap();
+        let row = |id: &str| Row { path: shop.clone(), name: id.into(), id: id.into(), home: false, added_ms: 0 };
+        let tr = home.hub_dir("shop-1").join("agents/main");
+        std::fs::create_dir_all(&tr).unwrap();
+        let mut r = Routing::default();
+        let t0 = Instant::now();
+        assert!(r.candidates(&home, &[row("shop-1")], t0)[0].recent.is_empty());
+        std::fs::write(tr.join("transcript.log"), "1\tsb you : the checkout\n").unwrap();
+        assert!(r.candidates(&home, &[row("shop-1")], t0 + Duration::from_secs(30))[0].recent.is_empty(), "kept");
+        assert_eq!(r.candidates(&home, &[row("shop-1")], t0 + TTL)[0].recent, vec!["the checkout"], "a minute later: gathered again");
+        let both = r.candidates(&home, &[row("shop-1"), row("docs-2")], t0 + TTL);
+        assert_eq!(both.len(), 2, "a new row: gathered again at once");
     }
 
     #[test]
