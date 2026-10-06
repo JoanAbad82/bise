@@ -79,6 +79,12 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             CapsulePanel.simulatedKeys = true
             Browser.blocked = true
             Capsule.blockLinks = true
+            // every window of the process, AppKit's own too (its text-input
+            // indicator, proof run #2), made and kept off his screens
+            KeepOff.install()
+            // and ask the text input system not to show its language indicator
+            // at all (this process's registration domain only, never his prefs)
+            UserDefaults.standard.register(defaults: ["TSMLanguageIndicatorEnabled": false])
         }
         capsule = Capsule(offScreen: config.harness != nil)
         if config.harness != nil {

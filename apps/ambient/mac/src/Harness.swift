@@ -448,7 +448,7 @@ final class Harness {
     // false = this window touches a real screen: said, then the app quits at once
     func check(_ w: NSWindow) -> Bool {
         guard Placement.touches(w.frame, screens: NSScreen.screens.map(\.frame)) else { return true }
-        Log.say("harness: GUARD: window \(String(describing: type(of: w))) #\(w.windowNumber) frame \(w.frame) touches a real screen \(NSScreen.screens.map(\.frame)): quitting now")
+        Log.say("harness: GUARD: window \(String(describing: type(of: w))) #\(w.windowNumber) frame \(w.frame) visible \(w.isVisible) onscreen \(w.occlusionState.contains(.visible)) alpha \(w.alphaValue) level \(w.level.rawValue) touches a real screen \(NSScreen.screens.map(\.frame)): quitting now")
         if w.isVisible { w.orderOut(nil) }
         exit(3)
     }
@@ -469,7 +469,10 @@ final class Harness {
             if Placement.touches(r, screens: displays) {
                 let num = (w[kCGWindowNumber as String] as? NSNumber)?.intValue ?? -1
                 let on = (w[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue ?? false
-                Log.say("harness: GUARD: window server window #\(num) bounds \(r) onscreen \(on) touches a display \(displays): quitting now")
+                let alpha = (w[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? -1
+                let layer = (w[kCGWindowLayer as String] as? NSNumber)?.intValue ?? -1
+                let cls = NSApp.windows.first { $0.windowNumber == num }.map { String(describing: type(of: $0)) } ?? "not an NSWindow"
+                Log.say("harness: GUARD: window server window #\(num) (\(cls)) bounds \(r) onscreen \(on) alpha \(alpha) layer \(layer) touches a display \(displays): quitting now")
                 for x in NSApp.windows where x.windowNumber == num { x.orderOut(nil) }
                 exit(3)
             }

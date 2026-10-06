@@ -36,6 +36,21 @@ MainActor.assumeIsolated {
         made.allSatisfy { !Placement.touches($0.frame, screens: screens) })
     off.apply(CapsuleShape(w: 524, h: 900, radius: 26, note: nil, glass: CGRect(x: 84, y: 0, width: 440, height: 900)))
     law("harness smoke: placed by its first app_size, still off every screen", !Placement.touches(off.panel.frame, screens: screens))
+
+    // KeepOff (proof run #2: AppKit's TUINSWindow made at 0,0,500,500): every
+    // window of the process, any class, made, moved or ordered in, stays off
+    KeepOff.install()
+    final class OtherWindow: NSWindow {}   // like AppKit's own (TUINSWindow)
+    let w1 = OtherWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 500), styleMask: .borderless, backing: .buffered, defer: false)
+    law("keep-off: a window made at 0,0,500,500 is made off every screen", !Placement.touches(w1.frame, screens: screens) && w1.frame.size == NSSize(width: 500, height: 500))
+    w1.setFrame(NSRect(x: 100, y: 100, width: 300, height: 200), display: false)
+    law("keep-off: setFrame onto a screen lands off it", !Placement.touches(w1.frame, screens: screens))
+    w1.setFrameOrigin(NSPoint(x: 10, y: 10))
+    law("keep-off: setFrameOrigin onto a screen lands off it", !Placement.touches(w1.frame, screens: screens))
+    w1.setFrameTopLeftPoint(NSPoint(x: 10, y: 600))
+    law("keep-off: setFrameTopLeftPoint onto a screen lands off it", !Placement.touches(w1.frame, screens: screens))
+    let p1 = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
+    law("keep-off: an NSPanel too", !Placement.touches(p1.frame, screens: screens))
 }
 
 if failures > 0 { print("\(failures) failed"); exit(1) }

@@ -109,6 +109,13 @@ enum Placement {
         return screens.contains { $0.insetBy(dx: -1, dy: -1).intersects(frame) }
     }
 
+    // harness A's keep-off (KeepOff.swift): a rect that touches a real screen
+    // goes to the off-screen box, same size; anything else stays as it is
+    static func keepOff(_ r: CGRect, screens: [CGRect]) -> CGRect {
+        guard touches(r, screens: screens) else { return r }
+        return CGRect(origin: offScreen.frame.origin, size: r.size)
+    }
+
     // round 10's side panel: docked to the right edge, full height under the
     // menu bar; the glass's right edge on the visible area's right edge, its
     // top right under the menu bar; the pearl's room at its left. Never

@@ -98,6 +98,14 @@ law("harness guard: a panel on a second screen", Placement.touches(CGRect(x: 300
 law("harness guard: an empty frame is nothing", !Placement.touches(.zero, screens: [builtin]))
 law("harness guard: no screens, nothing touches", !Placement.touches(CGRect(x: 0, y: 0, width: 10, height: 10), screens: []))
 
+// harness A's keep-off: AppKit's own windows too (TUINSWindow at 0,0, proof run #2)
+let tui = CGRect(x: 0, y: 0, width: 500, height: 500)
+law("keep-off: a window at 0,0 on the built-in goes off every screen, same size",
+    Placement.keepOff(tui, screens: [builtin]).size == tui.size && !Placement.touches(Placement.keepOff(tui, screens: [builtin]), screens: [builtin, ext]))
+law("keep-off: a window already off-screen stays where it is",
+    Placement.keepOff(CGRect(x: -30000, y: -30000, width: 524, height: 900), screens: [builtin]) == CGRect(x: -30000, y: -30000, width: 524, height: 900))
+law("keep-off: on a second screen too", !Placement.touches(Placement.keepOff(CGRect(x: 2000, y: 100, width: 50, height: 20), screens: [builtin, ext]), screens: [builtin, ext]))
+
 // the panel's keys (round 10): opened by hand, it takes them; esc/⌘W hands them back
 var pk = KeyFocus()
 law("panel keys: opening it takes them", pk.feed(.openedByHand) == .take)
