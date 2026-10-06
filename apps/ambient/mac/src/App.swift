@@ -532,6 +532,14 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "send":
             // a spotlight send: the front window goes with it (SPEC §3)
             shoot { [weak self] in self?.toCore(cmd) }
+        case "app_panel", "app_panel_close":
+            // ⏎ or a click on an agent row (amb-web d4b74f38): the side panel
+            // (lead m_8122: this switch had no case, so it never opened)
+            switch PanelCmd.from(cmd) {
+            case .open(let a): openPanel(a)
+            case .close: closePanel()
+            case nil: Log.say("app: \(name) without an agent")
+            }
         default:
             if name.hasPrefix("app_") { Log.say("app: unknown \(name)") } else { toCore(cmd) }
         }
@@ -925,7 +933,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "app_size":
             if let s = side, let sh = CapsuleShape.from(cmd, maxHeight: s.maxHeight) { s.apply(sh) }
         case "app_panel":
-            openPanel(cmd["agent"] as? String)
+            if case .open(let a) = PanelCmd.from(cmd) { openPanel(a) }
         case "app_panel_close", "app_hide":
             closePanel()
         case "app_focus":

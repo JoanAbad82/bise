@@ -80,6 +80,25 @@ enum EscRoute: Equatable {
     }
 }
 
+// the side panel's cmds, from either page (lead m_8122: the bar's ⏎ or
+// click on an agent row sent {cmd:'app_panel', agent} into the bar's own
+// cmd switch, which had no case for it: 'app: unknown app_panel', no
+// panel). Both pages' cmds go through this one reading.
+enum PanelCmd: Equatable {
+    case open(String)   // app_panel {agent}: open on it, or re-point it
+    case close          // app_panel_close
+
+    static func from(_ cmd: [String: Any]) -> PanelCmd? {
+        switch cmd["cmd"] as? String {
+        case "app_panel":
+            guard let a = cmd["agent"] as? String, !a.isEmpty else { return nil }
+            return .open(a)
+        case "app_panel_close": return .close
+        default: return nil
+        }
+    }
+}
+
 // a screen as the capsule's placement sees it (Cocoa coords: y up)
 struct ScreenBox: Equatable {
     var frame: CGRect

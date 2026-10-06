@@ -129,5 +129,11 @@ law("esc: main speaks without the keys: the app tells the page", esc(true, keys:
 law("esc: the page not loaded: the app hides the bar", esc(true, keys: true, ready: false, "open") == .dismiss)
 law("esc: the bar hidden: his esc only", esc(false, keys: false, "none") == .nothing)
 
+// the side panel's cmds, from the bar's page too (lead m_8122)
+law("panel cmd: an agent row's app_panel opens it on that agent", PanelCmd.from(["cmd": "app_panel", "agent": "a1"]) == .open("a1"))
+law("panel cmd: app_panel without an agent does nothing", PanelCmd.from(["cmd": "app_panel"]) == nil && PanelCmd.from(["cmd": "app_panel", "agent": ""]) == nil)
+law("panel cmd: app_panel_close closes it", PanelCmd.from(["cmd": "app_panel_close"]) == .close)
+law("panel cmd: other cmds are not the panel's", PanelCmd.from(["cmd": "app_hide"]) == nil && PanelCmd.from(["cmd": "open_terminal", "agent": "a1"]) == nil)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Always laws hold")
