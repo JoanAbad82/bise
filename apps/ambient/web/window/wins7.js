@@ -17,14 +17,16 @@
 (function (root) {
   "use strict";
   // screen name -> its module, and the key of its state in s7
-  const parts = () => ({ environments: [root.AmbWinEnv, "env"], artifacts: [root.AmbWinArts, "arts"], review: [root.AmbWinReview, "rv"] });
+  const parts = () => ({ environments: [root.AmbWinEnv, "env"], artifacts: [root.AmbWinArts, "arts"], review: [root.AmbWinReview, "rv"], commit: [root.AmbWinReview, "rv"] });
+  // each module once (review and commit share the review's): init, owns and step visit these
+  const mods = () => [...new Map(Object.values(parts()).map(([m, k]) => [k, [m, k]])).values()];
 
   function init() {
     const s7 = {};
-    for (const [m, k] of Object.values(parts())) if (m) s7[k] = m.init();
+    for (const [m, k] of mods()) if (m) s7[k] = m.init();
     return s7;
   }
-  const owns = (ev) => Object.values(parts()).some(([m]) => m && m.owns(ev));
+  const owns = (ev) => mods().some(([m]) => m && m.owns(ev));
 
   function enter(s7, route, s) {
     const p = parts()[route && route.screen];
@@ -35,7 +37,7 @@
 
   function step(s7, ev, s) {
     let cmds = [], route, eat, quote;
-    for (const [m, k] of Object.values(parts())) {
+    for (const [m, k] of mods()) {
       if (!m || !m.owns(ev)) continue;
       const r = m.step(s7[k], ev, s);
       s7 = { ...s7, [k]: r.e };
@@ -59,10 +61,11 @@
     const p = parts()[s.route && s.route.screen];
     return p && p[0] ? p[0].view(s) : null;
   }
-  // a project's changes / artifacts tab: null keeps amb-win's simple lists until those screens land
-  const tab = () => null;
+  // a project's changes tab (the review module's list); artifacts: null keeps amb-win's own list
+  const tab = (s, project, t) => (t === "changes" && root.AmbWinReview ? root.AmbWinReview.changes(s, project) : null);
 
   function draw(d, UI) {
+    if (d && d.screen === "changes") return root.AmbWinReview.drawChanges(d, UI);
     const p = d && parts()[d.screen];
     return p && p[0] ? p[0].draw(d, UI) : null;
   }

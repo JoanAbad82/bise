@@ -214,6 +214,38 @@ law("review: an agent with an approval card merges by answering it (its 'merge' 
   // netcode has no worktree path known to the review? it has one: open in editor is offered
   eq(w.v.actions.map((a) => a.text), ["merge into main", "ask for changes", "open in editor"]);
 });
+law("a project's changes tab (lead m_8972): agents ahead with their branch, files ± and 'at work' / 'ready to merge', a click opens the review; then 'merged today' with sha, title, who and time, a click opens that commit's diff", () => {
+  const w = win();
+  // the worktrees ask each agent-ahead's diff once per state of its worktree (ahead, head), so the
+  // summary is there before any review (the boot's own asks aren't pumped in this harness: a new head)
+  const items = w.s.s7.env.wt[P.engine].map((x) => ({ ...x, head: "f00d" }));
+  w.feed({ ev: "worktrees", project: P.engine, items });
+  eq(w.sent.filter((c) => c.cmd === "diff" && c.project === P.engine), [{ cmd: "diff", project: P.engine, agent: "streaming" }, { cmd: "diff", project: P.engine, agent: "netcode" }]);
+  const n = w.sent.length;
+  w.feed({ ev: "worktrees", project: P.engine, items });
+  eq(w.sent.length, n);   // the same worktrees: nothing asked again
+  let d = S7.tab(w.s, P.engine, "changes");
+  eq(d.rows.map((r) => [r.name, r.branch, r.end, r.what, r.dot]), [["streaming", "sb/streaming", "3 files · +84 −21", "ready to merge", "ok"], ["netcode", "sb/netcode", "1 file · +12 −3", "at work", "wk"]]);
+  eq(d.rows[0].act, { ev: "win_open", route: `review/${P.engine}/streaming` });
+  // merged today (amb-core's {ev:'merged'}, newest first; by: an agent, 'main', 'you' or absent)
+  const at = Date.UTC(2026, 9, 6, 12, 5);
+  const sha = "e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e";
+  w.feed({ ev: "merged", project: P.engine, items: [{ sha, title: "streaming: decode off the frame", by: "streaming", at_ms: at }, { sha: "aa11bb2", title: "bump the version", by: "you", at_ms: at - 3600e3 }, { sha: "cc33dd4", title: "old land", at_ms: at - 7200e3 }] });
+  d = S7.tab(w.s, P.engine, "changes");
+  eq(d.merged.map((c) => [c.sha, c.title, c.meta]), [["e0f3df5", "streaming: decode off the frame", "streaming · 14:05"], ["aa11bb2", "bump the version", "you · 13:05"], ["cc33dd4", "old land", "12:05"]]);
+  eq(d.merged.map((c) => c.act.route), [`commit/${P.engine}/${sha}`, `commit/${P.engine}/aa11bb2`, `commit/${P.engine}/cc33dd4`]);
+  // a commit's screen (amb-win's commit/<project>/<sha>) asks diff {commit} with the agent that landed
+  // it (else main), and keeps it apart from the agent's live diff (the answer echoes commit)
+  eq(S7.enter(w.s.s7, { screen: "commit", project: P.engine, sha }, w.s).cmds, [{ cmd: "diff", project: P.engine, agent: "streaming", commit: sha }]);
+  eq(S7.enter(w.s.s7, { screen: "commit", project: P.engine, sha: "aa11bb2" }, w.s).cmds, [{ cmd: "diff", project: P.engine, agent: "main", commit: "aa11bb2" }]);
+  w.feed({ ev: "diff", project: P.engine, agent: "streaming", commit: sha, base: "main", files: [{ path: "a.rs", status: "modified", add: 1, del: 0, hunks: [] }] });
+  eq(S7.tab(w.s, P.engine, "changes").rows[0].end, "3 files · +84 −21");
+  eq(S7.view({ ...w.s, route: { screen: "commit", project: P.engine, sha } }).changed, "1 file · +1 −0");
+  // nothing ahead, nothing merged: says so
+  eq(S7.tab(w.s, P.storefront, "changes").empty === null, true);
+  eq(S7.tab({ ...w.s, s7: { ...w.s.s7, env: { ...w.s.s7.env, wt: {} } } }, P.home || "nowhere", "changes").empty.title, "nothing waiting to merge into main");
+});
+
 law("review: loading until the diff comes; an agent with nothing ahead says so", () => {
   const w = win();
   // the fake answers at once; a review whose diff hasn't come shows the skeleton

@@ -15,13 +15,22 @@
 (function (root) {
   "use strict";
   const init = () => ({ diffs: {}, pick: {}, sel: null });
-  const EVS = new Set(["diff", "ui_rv_file", "ui_rv_line", "ui_rv_merge", "ui_rv_retry", "ui_rv_more", "ui_rv_sha"]);
+  const EVS = new Set(["diff", "worktrees", "merged", "ui_rv_file", "ui_rv_line", "ui_rv_merge", "ui_rv_retry", "ui_rv_more", "ui_rv_sha"]);
   const owns = (ev) => EVS.has(ev.ev) || (ev.ev === "error" && ev.cmd === "diff");
   const k = (project, agent) => `${project}/${agent}`;
+  // a route's diff: the agent's branch, or one landed commit (review/<p>/<agent>/<sha>; the diff
+  // answer echoes commit, amb-core m_8975)
+  const kc = (project, agent, commit) => (commit ? `${project}/@${commit}` : k(project, agent));
+  const rk = (r) => kc(r.project, r.agent, r.commit);
+  // screen 'commit' (amb-win's route commit/<project>/<sha>, m_8977): one landed commit's review,
+  // its agent the one 'merged today' names (else main, who lands his own and the features)
+  const byOf = (e, project, sha) => { const c = (((e && e.merged) || {})[project] || []).find((x) => x.sha === sha); return c && c.by && c.by !== "you" ? c.by : "main"; };
+  const norm = (e, r) => (r && r.screen === "commit" ? { ...r, agent: byOf(e, r.project, r.sha), commit: r.sha } : r);
   const base = (p) => String(p || "").split("/").pop();
 
-  function enter(e, route) {
-    return { e: { ...e, sel: null, err: null }, cmds: [{ cmd: "diff", project: route.project, agent: route.agent }] };
+  function enter(e, route0) {
+    const route = norm(e, route0);
+    return { e: { ...e, sel: null, err: null }, cmds: [{ cmd: "diff", project: route.project, agent: route.agent, ...(route.commit ? { commit: route.commit } : {}) }] };
   }
 
   // the picked file's lines, hunk headers between them; i counts the selectable lines only
@@ -42,34 +51,47 @@
   }
 
   function step(e, ev, s) {
-    const r = s.route;
+    const r = norm(e, s.route);
     switch (ev.ev) {
-      case "diff": return { e: { ...e, diffs: { ...e.diffs, [k(ev.project, ev.agent)]: ev }, err: null }, cmds: [] };
+      case "diff": return { e: { ...e, diffs: { ...e.diffs, [kc(ev.project, ev.agent, ev.commit)]: ev }, err: null }, cmds: [] };
+      // the changes tab's summaries: each agent with work ahead gets its diff asked once per state
+      // of its worktree (ahead, head), so '3 files · +84 −21' is there before he opens the review
+      case "worktrees": {
+        const asked = { ...(e.asked || {}) }, cmds = [];
+        for (const w of ev.items || []) {
+          if (!w.agent || !(w.ahead > 0)) continue;
+          const sig = `${w.ahead}:${w.head || ""}`, key = k(ev.project, w.agent);
+          if (asked[key] !== sig) { asked[key] = sig; cmds.push({ cmd: "diff", project: ev.project, agent: w.agent }); }
+        }
+        return { e: { ...e, asked }, cmds };
+      }
+      // what landed on the trunk today (amb-core m_8975: newest first, by = an agent, 'main', 'you' or absent)
+      case "merged": return { e: { ...e, merged: { ...(e.merged || {}), [ev.project]: ev.items || [] } }, cmds: [] };
       // the core couldn't make it (an unknown agent): the screen says so instead of loading forever
-      case "error": return { e: { ...e, err: r && r.screen === "review" ? { key: k(r.project, r.agent), text: String(ev.text || ""), more: false } : e.err }, cmds: [] };
+      case "error": return { e: { ...e, err: r && r.screen === "review" ? { key: rk(r), text: String(ev.text || ""), more: false } : e.err }, cmds: [] };
       // '↻ try again' asks the diff again; '▸' shows the rest of the core's text
       case "ui_rv_retry": return { e: { ...e, err: null }, cmds: [{ cmd: "diff", project: r.project, agent: r.agent }] };
       case "ui_rv_more": return { e: { ...e, err: e.err && { ...e.err, more: !e.err.more } }, cmds: [] };
       // the merged sha (ambient m_8830, identity10's click audit): the commit on GitHub when the
       // project has a GitHub remote (its row's web url), else the sha copied ('copied e0f3df5')
       case "ui_rv_sha": {
-        const d = e.diffs[k(r.project, r.agent)], web = webOf(s, r.project);
+        const d = e.diffs[rk(r)], web = webOf(s, r.project);
         if (!d || !d.merged) return { e, cmds: [] };
         if (web) return { e, cmds: [{ cmd: "app_open_url", url: `${web}/commit/${d.merged}`, project: r.project }] };
         return { e: { ...e, copied: d.merged }, cmds: [{ cmd: "app_copy", text: d.merged }] };
       }
-      case "ui_rv_file": return { e: { ...e, pick: { ...e.pick, [k(r.project, r.agent)]: ev.i }, sel: null }, cmds: [] };
+      case "ui_rv_file": return { e: { ...e, pick: { ...e.pick, [rk(r)]: ev.i }, sel: null }, cmds: [] };
       case "ui_rv_line": {
-        const d = e.diffs[k(r.project, r.agent)];
-        const fi = e.pick[k(r.project, r.agent)] || 0;
+        const d = e.diffs[rk(r)];
+        const fi = e.pick[rk(r)] || 0;
         const file = d && d.files[fi];
         if (!file) return { e, cmds: [] };
         // shift extends the selection in the same file; amb-win's model keeps one quote per pos, so
         // a file's quote has its own pos: -(file index + 1) (no thread entry: a review line has
         // no pos in the agent's thread; file + lines say where it is)
-        const a = ev.shift && e.sel && e.sel.key === k(r.project, r.agent) && e.sel.file === fi ? e.sel.a : ev.i;
+        const a = ev.shift && e.sel && e.sel.key === rk(r) && e.sel.file === fi ? e.sel.a : ev.i;
         const q = { ...quote(r.agent, file, a, ev.i), pos: -(fi + 1) };
-        return { e: { ...e, sel: { key: k(r.project, r.agent), file: fi, a, b: ev.i } }, cmds: [], quote: q };
+        return { e: { ...e, sel: { key: rk(r), file: fi, a, b: ev.i } }, cmds: [], quote: q };
       }
       // merge into main: the agent's approval card when it has one (its "merge" option), else the
       // merge cmd (S3a draft); the core answers with the diff carrying merged: <sha>
@@ -92,7 +114,7 @@
   // keys on the review (amb-win forwards ui_key while a screen shows): ⌘⏎ merges, ⌘O opens the
   // worktree in his editor; never while he is writing in the composer
   function key(e, ev, s) {
-    const r = s.route;
+    const r = norm(e, s.route);
     if (!ev.meta || ((s.drafts && s.drafts[`review:${k(r.project, r.agent)}`]) || "").trim()) return null;
     if (ev.key === "Enter") return step(e, { ev: "ui_rv_merge" }, s);
     const lower = String(ev.key || "").toLowerCase();
@@ -120,9 +142,9 @@
   const pm = (f) => [f.add ? `+${f.add}` : "", f.del ? `−${f.del}` : ""].filter(Boolean).join(" ");
 
   function view(s) {
-    const r = s.route;
     const e = s.s7.rv;
-    const d = e.diffs[k(r.project, r.agent)];
+    const r = norm(e, s.route);
+    const d = e.diffs[rk(r)];
     const p = s.projects.find((x) => x.project === r.project) || { name: r.project };
     const a = (s.agents[r.project] || []).find((x) => x.name === r.agent) || { status: "idle", title: "" };
     const dot = a.status === "working" ? "wk" : a.status === "done" ? "ok" : a.status === "waiting" ? "nd" : "";
@@ -130,14 +152,14 @@
     const head = { t1: r.agent, dot: merged ? "ok" : dot, t2: [p.name, ...(a.branch || (d && d.head) ? [`ψ ${a.branch || d.head}`] : []), ...(a.title ? [a.title] : []), merged ? `merged · ${merged}` : a.status], acc: -1,
       end: [{ kind: "btn", text: "thread", act: { ev: "ui_route", project: r.project, agent: r.agent } }] };
     // an error keeps the way back (ambient m_8820): '▲ can't show the changes.', the core's text (one line, ▸ the rest), '↻ try again'
-    if (!d && e.err && e.err.key === k(r.project, r.agent)) return { screen: "review", head, err: { title: "can't show the changes.", text: e.err.text, more: e.err.more } };
+    if (!d && e.err && e.err.key === rk(r)) return { screen: "review", head, err: { title: "can't show the changes.", text: e.err.text, more: e.err.more } };
     if (!d) return { screen: "review", head, loading: true };
-    const fi = Math.min(e.pick[k(r.project, r.agent)] || 0, Math.max(0, d.files.length - 1));
+    const fi = Math.min(e.pick[rk(r)] || 0, Math.max(0, d.files.length - 1));
     const add = d.files.reduce((n, f) => n + f.add, 0), del = d.files.reduce((n, f) => n + f.del, 0);
     const res = d.result ? { label: d.result.label, sub: d.result.sub || "", text: `${num(d.result.before)} ${d.result.unit} → ${num(d.result.after)} ${d.result.unit}`,
       better: d.result.after < d.result.before, series: d.result.series || null } : null;
     const file = d.files[fi];
-    const sel = e.sel && e.sel.key === k(r.project, r.agent) && e.sel.file === fi ? [Math.min(e.sel.a, e.sel.b), Math.max(e.sel.a, e.sel.b)] : null;
+    const sel = e.sel && e.sel.key === rk(r) && e.sel.file === fi ? [Math.min(e.sel.a, e.sel.b), Math.max(e.sel.a, e.sel.b)] : null;
     // what he can do with it: merge (primary), ask for changes (the composer, addressed), his editor
     const ed = editorPath(s, r.project, r.agent);
     const actions = merged || !d.files.length ? [] : [
@@ -193,5 +215,39 @@
       diff);
   }
 
-  root.AmbWinReview = { init, owns, enter, step, key, view, draw, linesOf, quote };
+  // ---- a project's changes tab (lead m_8972; amb-win hooks the tab): one row per agent with work
+  // ahead of the trunk (its worktree's branch, the diff's files and ±, 'at work' / 'ready to merge'),
+  // a click opens its review; then 'merged today' (sha, title, who, time), a click opens that
+  // commit's diff. Words: best guesses, asked to ambient.
+  const sum = (d, w) => {
+    if (!d || d.merged || !d.files.length) return `${w.ahead} ahead`;
+    const add = d.files.reduce((n, f) => n + f.add, 0), del = d.files.reduce((n, f) => n + f.del, 0);
+    return `${d.files.length} file${d.files.length > 1 ? "s" : ""} · +${add} −${del}`;
+  };
+  function changes(s, project) {
+    const e = s.s7.rv, agents = s.agents[project] || [];
+    const trunk = ((s.projects || []).find((p) => p.project === project) || {}).branch || "main";
+    const rows = ((s.s7.env.wt[project]) || []).filter((w) => w.agent && w.ahead > 0).map((w) => {
+      const a = agents.find((x) => x.name === w.agent) || { status: "idle" };
+      const busy = ["working", "starting"].includes(a.status);
+      return { name: w.agent, branch: w.branch, end: sum(e.diffs[k(project, w.agent)], w), what: busy ? "at work" : a.status === "waiting" ? "needs you" : "ready to merge",
+        dot: busy ? "wk" : a.status === "waiting" ? "nd" : "ok", act: { ev: "win_open", route: `review/${project}/${w.agent}` } };
+    });
+    const tz = s.tz || undefined;
+    const hm = (ms) => new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, ...(tz ? { timeZone: tz } : {}) });
+    const merged = ((e.merged || {})[project] || []).map((c) => ({ sha: short(c.sha), title: c.title, meta: [c.by, hm(c.at_ms)].filter(Boolean).join(" · "),
+      act: { ev: "win_open", route: `commit/${project}/${c.sha}` } }));
+    return { screen: "changes", rows, merged, empty: rows.length || merged.length ? null
+      : { title: `nothing waiting to merge into ${trunk}`, text: "an agent's branch shows here once it has commits ahead" } };
+  }
+  function drawChanges(d, UI) {
+    const { h, act } = UI.core;
+    if (d.empty) return h("div", "w7 w7-ch", UI.empty.render(d.empty));
+    return h("div", "w7 w7-ch",
+      d.rows.map((r) => UI.job.render({ state: r.dot, name: r.name, psi: true, end: r.end, what: `${r.branch} · ${r.what}`, act: r.act })),
+      d.merged.length ? h("div", "w7-sec", "merged today") : null,
+      d.merged.map((c) => act(h("div", "b-row w7-mg", h("span", "w7-sha", c.sha), h("b", "nm", c.title), h("span", "end", c.meta)), c.act)));
+  }
+
+  root.AmbWinReview = { init, owns, enter, step, key, view, draw, linesOf, quote, changes, drawChanges };
 })(typeof window !== "undefined" ? window : globalThis);

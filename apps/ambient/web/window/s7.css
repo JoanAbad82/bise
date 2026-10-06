@@ -55,3 +55,9 @@
 .w7-err .x .mo{cursor:pointer;flex:none}
 .w7-hint{white-space:pre;cursor:pointer;color:var(--c-text-2)}
 .w7-sha{font-family:var(--font-mono);cursor:pointer;text-decoration:underline;text-decoration-color:var(--c-text-3);text-underline-offset:3px}
+/* a project's changes tab: agents ahead (amb-kit's job rows), then 'merged today' rows */
+.w7-sec{margin:var(--s-4) 0 4px;padding:0 8px;font-size:var(--t-12);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--c-text-3)}
+.w7-mg{display:flex;gap:10px;align-items:baseline;cursor:pointer}
+.w7-mg .w7-sha{text-decoration:none;color:var(--c-text-2);flex:none}
+.w7-mg .nm{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:500}
+.w7-mg .end{margin-left:auto;color:var(--c-text-3);font-size:var(--t-12);flex:none}
