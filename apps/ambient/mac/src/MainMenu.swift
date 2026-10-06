@@ -11,6 +11,7 @@ import AppKit
 
 enum MenuAct: Equatable {
     case quit, close, settings, hide
+    case window             // open bise: the window on bise (⌘0, lead m_9077)
     case edit(String)       // a standard editing action, by its selector
 }
 
@@ -24,6 +25,7 @@ struct MenuKey: Equatable {
 enum MainMenu {
     // the table (pure: the laws in test/MainMenuTests.swift)
     static let app: [MenuKey] = [
+        MenuKey(title: "open bise", key: "0", act: .window),
         MenuKey(title: "settings…", key: ",", act: .settings),
         MenuKey(title: "hide bise", key: "h", act: .hide),
         MenuKey(title: "quit bise ambient", key: "q", act: .quit),
@@ -105,6 +107,7 @@ final class MainMenuView: NSObject {
         case .close: return "close"
         case .settings: return "settings"
         case .hide: return "hide"
+        case .window: return "window"
         case .edit(let s): return s
         }
     }
@@ -115,6 +118,7 @@ final class MainMenuView: NSObject {
         case "close": on?(.close)
         case "settings": on?(.settings)
         case "hide": on?(.hide)
+        case "window": on?(.window)
         default: break
         }
     }

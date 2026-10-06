@@ -55,6 +55,13 @@ struct CardPush: Equatable {
         return "\(p)#\(c)"
     }
 
+    // the cards held while quiet, as one batch (S9, amb-web m_9033): one bar for
+    // the batch, keyed by its cards ('<project>#<id>'), whatever their order
+    static func batchKey(_ cards: [String]) -> String? {
+        let c = cards.filter { !$0.isEmpty }
+        return c.isEmpty ? nil : "batch:" + c.sorted().joined(separator: ",")
+    }
+
     mutating func shows(card: String?) -> Bool {
         guard let c = card, !c.isEmpty else { return true }
         if c == last { return false }

@@ -20,6 +20,10 @@ struct QuietMachine {
     private(set) var meeting = false
     private(set) var fullScreen = false
     private(set) var paused = false     // he asked: quiet for 1 h (the menu, S8)
+    private(set) var camera = false     // a camera runs somewhere: a video call (S9)
+    private(set) var sharing = false    // his screen is shared or recorded (S9)
+    private var camBusySince: Double? = nil
+    private var camFreeSince: Double? = nil
     private var busySince: Double? = nil
     private var freeSince: Double? = nil
     private var ownOpen = false
@@ -28,9 +32,13 @@ struct QuietMachine {
 
     init() {}
 
-    var on: Bool { call || meeting || fullScreen || paused }
-    // a call wins: it's the one that's live; then a meeting, then full screen, then his hour
-    var why: String { call ? "call" : meeting ? "meeting" : fullScreen ? "full_screen" : paused ? "paused" : "" }
+    var on: Bool { call || camera || sharing || meeting || fullScreen || paused }
+    // a call wins (the mic or a camera): it's the one that's live; then a shared
+    // screen, a meeting, full screen, his hour. macOS Focus isn't read (no API
+    // without a new permission: lead m_9029)
+    var why: String {
+        call || camera ? "call" : sharing ? "sharing" : meeting ? "meeting" : fullScreen ? "full_screen" : paused ? "paused" : ""
+    }
 
     // quiet for 1 h from the menu, or its end (App ends it after the hour)
     mutating func pause(_ on: Bool) { paused = on }
@@ -58,6 +66,23 @@ struct QuietMachine {
     }
 
     mutating func meeting(_ now: Bool) { meeting = now }
+
+    // a sample of the cameras: does one run somewhere? bise never opens one,
+    // so no grace; the same on/off delays as the mic (a blip is not a call)
+    mutating func camera(running: Bool, at t: Double) {
+        if running {
+            camFreeSince = nil
+            if camBusySince == nil { camBusySince = t }
+            if !camera, let b = camBusySince, t - b >= onAfter { camera = true }
+        } else {
+            camBusySince = nil
+            if camFreeSince == nil { camFreeSince = t }
+            if camera, let f = camFreeSince, t - f >= offAfter { camera = false }
+        }
+    }
+
+    // his screen is shared or recorded (a call's share, a recording app)
+    mutating func sharing(_ now: Bool) { sharing = now }
 
     // the front app fills a screen (a video, a talk, a game)
     mutating func fullScreen(_ now: Bool) { fullScreen = now }

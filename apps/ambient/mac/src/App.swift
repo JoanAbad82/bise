@@ -538,6 +538,14 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
                     sayCardSeat(.bar)
                     if cardPush.shows(card: card) { visFeed(.card) } else { capsule.refreshMouse() }
                 }
+            case "batch":
+                // the cards held while quiet, now it's over (S9, amb-web m_9033): one bar for them
+                let cards = (cmd["cards"] as? [Any] ?? []).map { "\($0)" }
+                if let key = CardPush.batchKey(cards) {
+                    heldCard = nil
+                    sayCardSeat(.bar)
+                    if cardPush.shows(card: key) { Log.say("app: \(cards.count) cards held while quiet come to the bar"); visFeed(.card) }
+                }
             case "none":
                 // the hello is over (5 s, or fn, esc, a click): its glass goes
                 if helloOn { helloOn = false; visFeed(.dismiss) }
@@ -787,6 +795,12 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     func menuAct(_ a: MenuAct) {
         switch a {
+        case .window:
+            // ⌘0 wherever bise has the keys (the bar included): the window on bise,
+            // like the menu's 'open bise ⌘0' (lead m_9077); the bar steps aside
+            Log.say("app: ⌘0")
+            if !capsule.hidden { visFeed(.dismiss) }
+            openWindow("bise")
         case .quit:
             Log.say("app: ⌘Q")
             NSApp.terminate(nil)

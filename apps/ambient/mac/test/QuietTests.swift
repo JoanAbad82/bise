@@ -78,5 +78,35 @@ law("quiet hour: a meeting meanwhile names the meeting", qp.why == "meeting")
 qp.meeting(false); qp.pause(false)
 law("quiet hour: its end ends the quiet", !qp.on && qp.change()! == (false, ""))
 
+// S9: a camera in use is a call; a shared screen is quiet (lead m_9025)
+func cams(_ m: inout QuietMachine, _ running: Bool, _ t0: Double, _ t1: Double) -> [String] {
+    var out: [String] = []
+    var t = t0
+    while t <= t1 + 1e-9 {
+        m.camera(running: running, at: t)
+        if let c = m.change() { out.append("\(c.on ? "on" : "off"):\(c.why)") }
+        t += 1
+    }
+    return out
+}
+var cam = QuietMachine()
+law("camera: a camera running for 2 s is a call", cams(&cam, true, 0, 3) == ["on:call"])
+law("camera: free for 3 s ends it", cams(&cam, false, 4, 8) == ["off:"])
+var blip = QuietMachine()
+law("camera: a 1 s blip is not a call", cams(&blip, true, 0, 1) + cams(&blip, false, 2, 5) == [])
+var own2 = QuietMachine()
+own2.own(open: true, at: 0)
+law("camera: bise's own talk doesn't freeze the camera (bise never opens one)", cams(&own2, true, 0, 3) == ["on:call"])
+
+var sh = QuietMachine()
+sh.sharing(true)
+law("sharing: a shared screen is quiet, why sharing", sh.change().map { "\($0.on):\($0.why)" } == "true:sharing")
+sh.meeting(true)
+law("sharing: outranks a meeting (the screen is seen)", sh.why == "sharing")
+_ = samples(&sh, true, 0, 3)
+law("sharing: a call during a share names the call", sh.why == "call")
+sh.sharing(false); sh.meeting(false)
+law("sharing: all over: off once the call ends", samples(&sh, false, 4, 8) == ["off:"] && !sh.on)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Quiet laws hold")

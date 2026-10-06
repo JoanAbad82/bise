@@ -129,5 +129,13 @@ law("card key: home's #4 and acme's #4 each show the bar",
 law("card key: a page that names no project keys by id alone", CardPush.key(card: "4", project: nil) == "4")
 law("card key: no card, no key (an older page: shows each time)", CardPush.key(card: nil, project: "acme") == nil)
 
+// the quiet batch (S9, amb-web m_9033): one bar per batch
+var bp = CardPush()
+law("batch: the cards held while quiet show the bar once", bp.shows(card: CardPush.batchKey(["acme#4", "bise#2"])))
+law("batch: the same batch said again, in any order, doesn't", !bp.shows(card: CardPush.batchKey(["bise#2", "acme#4"])))
+law("batch: an empty batch has no key (nothing to show)", CardPush.batchKey([]) == nil && CardPush.batchKey([""]) == nil)
+law("batch: a quiet bar never shows for a card",
+    { var v = Visibility(); _ = v.feed(.quiet(true), at: 0); _ = v.feed(.card, at: 1); return !v.visible(at: 2) }())
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Visibility laws hold")

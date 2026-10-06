@@ -14,6 +14,9 @@ extension AmbientApp {
             MainActor.assumeIsolated {
                 guard let self, let running = MicProbe.running() else { return }
                 self.quiet.mic(running: running, at: self.uptime)
+                // S9: a camera in use is a call; a shared screen is quiet too
+                if let cam = CameraProbe.running() { self.quiet.camera(running: cam, at: self.uptime) }
+                if let shared = SharingProbe.present() { self.quiet.sharing(shared) }
                 self.sayQuiet()
             }
         })

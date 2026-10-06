@@ -13,6 +13,7 @@ func find(_ key: String, shift: Bool = false) -> MenuAct? {
 }
 
 law("⌘Q quits bise ambient", find("q") == .quit)
+law("⌘0 opens the window on bise wherever bise has the keys, the bar included (lead m_9077)", find("0") == .window)
 law("⌘W closes", find("w") == .close)
 law("⌘, opens settings (= fn ,)", find(",") == .settings)
 law("⌘H hides bise (= fn .)", find("h") == .hide)
