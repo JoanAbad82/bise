@@ -103,8 +103,9 @@
     const send = { ev: "ui_spot_send", text: v.spot.text };
     const left = L.mode === "names" ? [item(["⏎"], sel ? SP.open(sel.t) : SP.openInBise), item(["⌘", "⏎"], SP.sendQ(q), send)]
       : L.mode === "ask" ? [item(["⏎"], SP.sendToBise), ...(firstAgent ? [item(["↓"], SP.thenOpen(firstAgent.name))] : [])]
-        : [item(["⏎"], SP.openInBise), item(["⌘", "⏎"], SP.sendToBise, q ? send : null)];
-    s.foot = { left: [...left, item(["tab"], SP.startAgent, q ? { ev: "ui_spot_tab", text: v.spot.text } : null)], right: [item(["esc"], SP.close, { ev: "ui_close" })] };
+        : [item(["⏎"], SP.openInBise)];
+    // ⌘⏎ and tab only once he has typed (round 9's rule, ambient m_8617 (2))
+    s.foot = { left: [...left, ...(q ? [item(["tab"], SP.startAgent, { ev: "ui_spot_tab", text: v.spot.text })] : [])], right: [item(["esc"], SP.close, { ev: "ui_close" })] };
     return s;
   }
 
@@ -182,7 +183,9 @@
       }
       case "needs": {
         const a = v.ask;
-        const [acc, rest] = a.batch ? a.title.split(" · ") : [a.label || B.needs(a.agent), B.now];
+        // the global main is called bise on ambient surfaces (v9; ambient m_8617 (1)): '? bise needs you'
+        const asMain = !a.agent || a.agent === "main";
+        const [acc, rest] = a.batch ? a.title.split(" · ") : [asMain ? B.needs("bise") : a.label || B.needs(a.agent), B.now];
         const more = a.more > 0 ? ` · +${a.more}` : "";
         s.head = { h: 52, lab: { acc: a.batch ? `? ${acc}` : acc, rest: (rest || "") + more } };
         // the body takes a click too (pm's fail 45): drafts -> review (row 1), a question -> its full text
@@ -276,7 +279,7 @@
           t: [a.pname, a.name, MN.following].filter(Boolean).join(" · "), sub: a.job ? MN.job(a.job) : a.title || null,
           act: { ev: "ui_agent", agent: a.name, ...(a.project ? { project: a.project } : {}) }, qa: `job-${a.name}` })) });
         s.sections.push({ rows: [
-          { g: ":*", t: MN.openBise, right: { keys: ["⌘", "0"] }, act: { ev: "ui_open_bise" }, qa: "open-bise" },
+          { g: "", t: MN.openBise, right: { keys: ["⌘", "0"] }, act: { ev: "ui_open_bise" }, qa: "open-bise" },
           { g: "☾", t: u.quiet ? MN.quietUntil(hm(u.quiet.until)) : MN.quietHour, act: { ev: "ui_quiet_hour" }, qa: "quiet-hour" },
           { g: "⚙", t: MN.settings, right: { keys: ["⌘", ","] }, act: { ev: "app_key", key: "," }, qa: "settings" },
         ] });

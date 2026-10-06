@@ -370,7 +370,7 @@ law("round 9: a pushed question is one bar: '? main needs you · now', '⌘ ⏎ 
   const card = { id: "q", agent: "main", label: "? main needs you", text: "Que fais-tu ?", options: [{ n: 1, label: "regarde" }, { n: 2, label: "arrête" }, { n: 3, label: "laisse" }] };
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [card], pages: [] }, 0).m;
   let s = Bar.spec(M.view(m, 10));
-  eq([s.head.h, s.head.lab, s.head.right.keys, s.head.right.w], [52, { acc: "? main needs you", rest: "now" }, ["⌘", "⏎"], "full text"]);
+  eq([s.head.h, s.head.lab, s.head.right.keys, s.head.right.w], [52, { acc: "? bise needs you", rest: "now" }, ["⌘", "⏎"], "full text"]);
   eq(s.text, { s: "Que fais-tu ?", clamp: 4, full: false, act: { ev: "ui_ask_more" } });   // the body takes a click (pm's fail 45)
   eq(s.sections[0].rows.map((r) => [r.g, r.gk, r.t, !!r.sel]), [["1", true, "regarde", true], ["2", true, "arrête", false], ["3", true, "laisse", false]]);
   eq(s.sections[0].rows[1].act, { ev: "ui_option", card: "q", i: 1 });
@@ -1479,7 +1479,8 @@ law("desktop S8 spotlight empty (v9): waiting for you, at work, environments wit
     ["waiting for you", [["alerts", "telemetry", "compaction at 03:00?", "⏎"]]],
     ["at work", [["stock", "storefront", "flash sale replay · 62%", ""]]],
     ["environments", [["telemetry", "", "/Users/you/telemetry  ·  in front: grafana.internal", "⌘1"], ["storefront", "", "/Users/you/storefront  ·  main · 5 agents", "⌘2"]]]]);
-  eq(s.foot.left.map((i) => `${i.keys.join(" ")} ${i.w}`), ["⏎ open in bise", "⌘ ⏎ send to bise", "tab start an agent"]);
+  // nothing typed: only ⏎ and esc (ambient m_8617 (2)); ⌘⏎ and tab come with the first character
+  eq(s.foot.left.map((i) => `${i.keys.join(" ")} ${i.w}`), ["⏎ open in bise"]);
   // ⏎ on the card (selected first) opens it in the window; ⌘2 = storefront
   eq(M.step(m, Bar.selRow(s).act, 30).cmds.at(-1), { cmd: "app_window", route: "agent/telemetry-8e02/alerts" });
   eq(M.step(m, Bar.cmdRow(s, "2").act, 30).cmds.at(-1), { cmd: "app_window", route: "project/storefront-5c1d" });
@@ -1716,7 +1717,7 @@ law("desktop S8 menu-bar dropdown (v9): app_menu on opens it under the pearl: '3
   let m = M.step(M.init(), { ev: "state", agents, cards, projects }, 0).m;
   m = M.step(m, { ev: "app_menu", on: true }, 10).m;
   const v = M.view(m, 20), s = Bar.spec(v);
-  eq([v.state, v.content.kind, s.head.lab.acc, s.text.s], ["menu", "open", "3 at work · 2 wait for you", "nothing broke today"]);
+  eq([v.state, v.content.kind, s.head.lab.acc, s.text.s], ["menu", "open", "3 at work · 2 wait for you", "all quiet."]);
   eq(s.sections.map((x) => x.rows.map((r) => [r.t, r.p || "", r.sub || "", r.right && r.right.keys ? r.right.keys.join("") : ""])), [
     [["alerts", "telemetry", "compaction at 03:00?", "fn1"], ["search", "storefront", "reindex tonight?", ""]],
     [["storefront · stock · following", "", "flash sale replay · 6 200 / 10 000 orders", ""]],
@@ -1731,6 +1732,9 @@ law("desktop S8 menu-bar dropdown (v9): app_menu on opens it under the pearl: '3
   eq(Bar.spec(M.view(q, 50)).sections[2].rows[1].t, "quiet until 15:21 · end it");
   eq(M.step(q, { ev: "ui_quiet_hour" }, 60).cmds, [{ cmd: "app_quiet_hour", on: false }]);
   eq(M.step(m, { ev: "app_menu", on: false }, 70).m.pane, null);
+  // nobody working, nothing waiting: no zero as a label (ambient m_8617 (3))
+  const idle = M.step(M.step(M.init(), { ev: "state", agents: [], cards: [], projects }, 0).m, { ev: "app_menu", on: true }, 10).m;
+  eq(Bar.spec(M.view(idle, 20)).head.lab.rest, "nobody at work");
 });
 
 law("desktop S8: app_anchor says where the bar sits (top, bottom, menu); the view carries it so the bar rises from the bottom", () => {

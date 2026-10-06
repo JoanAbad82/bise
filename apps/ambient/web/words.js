@@ -173,8 +173,8 @@
 
   // desktop S8: the menu-bar pearl's dropdown (v9 'la perle dans la barre de menus')
   const menu = {
-    head: (work, waits) => `${work} at work${waits ? ` · ${waits} wait${waits === 1 ? "s" : ""} for you` : ""}`,
-    calm: "nothing broke today", broke: (n) => `▲ ${n} failed`,
+    head: (work, waits) => `${work ? `${work} at work` : "nobody at work"}${waits ? ` · ${waits} wait${waits === 1 ? "s" : ""} for you` : ""}`,
+    calm: "all quiet.", broke: (n) => `▲ ${n} failed`,
     following: "following", job: (j) => `${j.label || ""} · ${num(j.step)} / ${num(j.steps)}${j.unit ? ` ${j.unit}` : ""}`.replace(/^ · /, ""),
     openBise: "open bise", quietHour: "quiet for 1 h", quietUntil: (hm) => `quiet until ${hm} · end it`, settings: "settings…",
     nothingWaits: "nothing waits for you",

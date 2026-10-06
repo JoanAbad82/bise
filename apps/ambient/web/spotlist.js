@@ -21,7 +21,8 @@
     const rows = m.agents.map((a, i) => {
       const waits = cards.filter((c) => c.agent === a.name).length || Math.max(0, +a.waits || 0);
       const status = waits ? "waiting" : a.status === "starting" ? "working" : a.status || "idle";
-      const title = Wd.oneLine(a.title || a.note || "");
+      // its title line, never its brief or its last message (ambient m_8617)
+      const title = Wd.oneLine(a.title || "");
       const sinceMs = +a.since_ms > 0 ? Math.max(0, wall - a.since_ms) : +a.turn_ms >= 0 && a.turn_ms != null ? +a.turn_ms : null;
       const followed = a.name in m.follows ? m.follows[a.name] : !!a.followed;
       return { name: a.name, project: a.project || null, pname: a.project_name || null, status, title, purpose: a.purpose || "", waits, followed, archived: !!a.archived, age: sinceMs == null ? "" : Wd.age(sinceMs), i,
