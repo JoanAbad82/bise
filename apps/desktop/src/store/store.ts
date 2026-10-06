@@ -81,6 +81,8 @@ export interface Pending {
   readonly agent: string;
   readonly text: string;
   readonly mode: Mode;
+  /** files he attached (absolute paths), sent with his words */
+  readonly files?: readonly string[];
   readonly at_ms: number;
   readonly state: 'sending' | 'failed';
   readonly why?: string;
@@ -427,20 +429,34 @@ export class Store {
     this.port?.send(cmd);
   }
 
-  /** His words to an agent: shown at once as pending, then sent. Returns its cid. */
-  send(a: { project: string; agent: string; text: string; mode?: Mode }): number {
+  /**
+   * His words to an agent: shown at once as pending, then sent. Returns its cid.
+   * files: absolute paths he attached; the hub renders them once after his
+   * words (an image as one the model sees, any other file by its path).
+   */
+  send(a: { project: string; agent: string; text: string; mode?: Mode; files?: readonly string[] }): number {
     const key = threadKey(a.project, a.agent);
     const t = this.thread(key);
     this.cid += 1;
     const mode = a.mode ?? 'now';
-    const p: Pending = { cid: this.cid, project: a.project, agent: a.agent, text: a.text, mode, at_ms: this.now(), state: 'sending' };
+    const files = a.files !== undefined && a.files.length > 0 ? [...a.files] : undefined;
+    const p: Pending = {
+      cid: this.cid,
+      project: a.project,
+      agent: a.agent,
+      text: a.text,
+      mode,
+      ...(files === undefined ? {} : { files }),
+      at_ms: this.now(),
+      state: 'sending',
+    };
     t.pending = [...t.pending, p];
     this.emit(`pending:${key}`);
     if (this.coreState === 'down') {
       this.failOldest(a.project, 'not sent');
       return p.cid;
     }
-    this.command({ cmd: 'send', project: a.project, agent: a.agent, text: a.text, mode });
+    this.command({ cmd: 'send', project: a.project, agent: a.agent, text: a.text, mode, ...(files === undefined ? {} : { files }) });
     return p.cid;
   }
 
@@ -451,7 +467,7 @@ export class Store {
     if (t === undefined || p === undefined) return;
     t.pending = t.pending.filter((x) => x.cid !== cid);
     this.emit(`pending:${key}`);
-    this.send({ project: p.project, agent: p.agent, text: p.text, mode: p.mode });
+    this.send({ project: p.project, agent: p.agent, text: p.text, mode: p.mode, ...(p.files === undefined ? {} : { files: p.files }) });
   }
 
   /** Drops a failed send (he gave up on it). */

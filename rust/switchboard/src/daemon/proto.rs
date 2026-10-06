@@ -240,7 +240,7 @@ impl Shell {
                 let (entries, before, more) = pthread::page(&lines, &ctx, limit.map_or(LIMIT, |l| (l as usize).clamp(1, MAX_LIMIT)));
                 self.proto_send(id, &HubEv::Thread { project, agent, entries, before, more });
             }
-            HubCmd::Send { agent, text, mode, context, .. } => {
+            HubCmd::Send { agent, text, mode, context, files, .. } => {
                 if !known(self, &agent) {
                     return self.proto_error(id, &tag, &format!("no agent {agent}"));
                 }
@@ -255,7 +255,8 @@ impl Shell {
                 }
                 // S9: the fn context as a field of the input op, never
                 // rendered here (the input arm's one render)
-                self.client_line(id, json!({"op": "input", "focus": agent, "text": text, "queued": queued, "context": context}));
+                // item H: his files as a field too, rendered by the same input arm
+                self.client_line(id, json!({"op": "input", "focus": agent, "text": text, "queued": queued, "context": context, "files": files}));
             }
             HubCmd::Answer { card, reply, .. } => {
                 if !self.hub.st.open_cards().any(|c| c.id == card) {

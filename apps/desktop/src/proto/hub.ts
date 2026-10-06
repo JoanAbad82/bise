@@ -54,4 +54,12 @@ export type HubCmd = { "cmd": "hello", proto: number,
  * every typed connection is typed_only: S8 removes the mixed
  * case (and this flag's false)
  */
-typed_only?: boolean, } | { "cmd": "subscribe", project: string, agent: string, limit?: number | null, } | { "cmd": "unsubscribe", project: string, agent: string, } | { "cmd": "page", project: string, agent: string, before: number, limit?: number | null, } | { "cmd": "send", project: string, agent: string, text: string, mode: Mode, context?: FnContext | null, } | { "cmd": "answer", project: string, card: number, reply: string, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, } | { "cmd": "diff", project: string, agent: string, commit?: string | null, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "route_correct", project: string, rid: number, to: string, } | { "cmd": "route_cancel", project: string, rid: number, } | { "cmd": "follow", project: string, agent: string, on: boolean, };
+typed_only?: boolean, } | { "cmd": "subscribe", project: string, agent: string, limit?: number | null, } | { "cmd": "unsubscribe", project: string, agent: string, } | { "cmd": "page", project: string, agent: string, before: number, limit?: number | null, } | { "cmd": "send", project: string, agent: string, text: string, mode: Mode, context?: FnContext | null, 
+/**
+ * files he attached or dropped (absolute paths): the hub renders
+ * them once after his words (switchboard's attached::render): an
+ * image as an image-store marker the model sees, any other file
+ * listed by its path; a path that isn't absolute or doesn't exist
+ * is left out. Never on a slash command
+ */
+files?: Array<string>, } | { "cmd": "answer", project: string, card: number, reply: string, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, } | { "cmd": "diff", project: string, agent: string, commit?: string | null, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "route_correct", project: string, rid: number, to: string, } | { "cmd": "route_cancel", project: string, rid: number, } | { "cmd": "follow", project: string, agent: string, on: boolean, };

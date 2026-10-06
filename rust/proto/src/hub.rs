@@ -218,6 +218,13 @@ pub enum HubCmd {
         mode: Mode,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         context: Option<FnContext>,
+        /// files he attached or dropped (absolute paths): the hub renders
+        /// them once after his words (switchboard's attached::render): an
+        /// image as an image-store marker the model sees, any other file
+        /// listed by its path; a path that isn't absolute or doesn't exist
+        /// is left out. Never on a slash command
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        files: Vec<String>,
     },
     /// a card's answer: an option's number or words (approvals and merges
     /// included: the hub's one /answer path)

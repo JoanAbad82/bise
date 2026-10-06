@@ -7,6 +7,7 @@
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"perf","text":"look at the cold bench","mode":"now"}
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"then the warm one","mode":"queued"}
 {"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"why is this slow?","mode":"now","context":{"app":"Safari","url":"https://grafana.acme.test/d/p99","title":"p99 latency"}}
+{"cmd":"send","project":"acme-1a2b3c4d","agent":"main","text":"what stands out here","mode":"now","files":["/Users/ana/notes/q3-notes.md","/Users/ana/Desktop/shot.png"]}
 {"cmd":"answer","project":"acme-1a2b3c4d","card":9,"reply":"1"}
 {"cmd":"answer","project":"acme-1a2b3c4d","card":10,"reply":"yes"}
 {"cmd":"stop","project":"acme-1a2b3c4d","agent":"perf"}

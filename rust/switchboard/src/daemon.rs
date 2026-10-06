@@ -2082,10 +2082,14 @@ impl Shell {
                     let queued = v.get("queued").and_then(|x| x.as_bool()).unwrap_or(false);
                     let text = match self.page_reply_text(&s("text")) {
                         Some(reply) => reply,
-                        // bise's home hub: words about a project go there (daemon/routing.rs)
-                        None if self.route_input(&s("focus"), &s("text"), &s("via"), queued, v.get("context")) => return self.page_answers(),
                         None => {
-                            let t = Self::capsule_hint(s("text"), &s("via"));
+                            // his attached files, rendered once (item H)
+                            let said = fn_context::with_files(&v, s("text"));
+                            // bise's home hub: words about a project go there (daemon/routing.rs)
+                            if self.route_input(&s("focus"), &s("text"), &said, &s("via"), queued, v.get("context")) {
+                                return self.page_answers();
+                            }
+                            let t = Self::capsule_hint(said, &s("via"));
                             self.steps_hint(t, &s("via"))
                         }
                     };

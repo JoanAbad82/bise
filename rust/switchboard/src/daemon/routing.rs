@@ -50,6 +50,9 @@ pub(super) struct Routing {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct Ask {
     text: String,
+    /// what sb-core holds (his words with his attached files rendered):
+    /// the ask's key, never shown to the route model
+    held: String,
     title: Option<String>,
     url: Option<String>,
     projects: Vec<Candidate>,
@@ -88,7 +91,10 @@ impl Shell {
     /// `context`: the input's fn context as it came (amb-core's
     /// `bise_proto::context::FnContext`, read here, never kept); absent
     /// or another shape: none, his words alone decide.
-    pub(super) fn route_input(&mut self, focus: &str, text: &str, via: &str, queued: bool, context: Option<&serde_json::Value>) -> bool {
+    /// `text`: his words (the guess reads them); `held`: what goes to the
+    /// project, his words with his attached files already rendered once
+    /// (item H: image-store markers, global to every hub, and paths).
+    pub(super) fn route_input(&mut self, focus: &str, text: &str, held: &str, via: &str, queued: bool, context: Option<&serde_json::Value>) -> bool {
         if !routable(focus, text, via, queued) || !crate::paths::is_home(&self.opts.paths.workspace) {
             return false;
         }
@@ -103,15 +109,15 @@ impl Shell {
             if route_model().is_none() || projects.is_empty() {
                 return false;
             }
-            self.routing.ask = Some(Ask { text: text.to_string(), title: ctx.title.clone(), url: ctx.url.clone(), projects });
+            self.routing.ask = Some(Ask { text: text.to_string(), held: held.to_string(), title: ctx.title.clone(), url: ctx.url.clone(), projects });
             let (to, name, why) = (String::new(), String::new(), String::new());
-            self.step(Input::RouteHold { text: text.to_string(), via: via.to_string(), to, name, why, context: context.cloned() });
+            self.step(Input::RouteHold { text: held.to_string(), via: via.to_string(), to, name, why, context: context.cloned() });
             self.routing.ask = None;
             return true;
         };
         let name = projects.iter().find(|c| c.id == to).map_or_else(|| to.clone(), |c| c.name.clone());
         let why = why_line(&g, &name);
-        self.step(Input::RouteHold { text: text.to_string(), via: via.to_string(), to, name, why, context: context.cloned() });
+        self.step(Input::RouteHold { text: held.to_string(), via: via.to_string(), to, name, why, context: context.cloned() });
         true
     }
 
@@ -119,7 +125,7 @@ impl Shell {
     /// in the step route_input made): the route model is asked on a
     /// thread, its answer comes back as `Msg::RoutePick`.
     pub(super) fn route_ask(&mut self, rid: u64, text: String) {
-        let Some(ask) = self.routing.ask.take().filter(|a| a.text == text) else { return };
+        let Some(ask) = self.routing.ask.take().filter(|a| a.held == text) else { return };
         let Some(model) = route_model() else { return };
         let request = pick_request(&ask);
         let (repl, root, spawn_env, tx) = (self.opts.repl_bin.clone(), self.opts.app_root.clone(), self.opts.spawn_env, self.tx.clone());
@@ -423,12 +429,22 @@ mod tests {
     // for its text or his selection)
     #[test]
     fn the_pick_request_shows_the_projects_his_words_title_and_url_only() {
-        let a = Ask { text: "fix it".into(), title: Some("Checkout - Safari".into()), url: Some("https://shop.test/cart".into()), projects: shop_and_docs() };
+        let a = Ask {
+            text: "fix it".into(),
+            held: "fix it
+
+[files he attached:]
+/w/secret-plan.md".into(),
+            title: Some("Checkout - Safari".into()),
+            url: Some("https://shop.test/cart".into()),
+            projects: shop_and_docs(),
+        };
         let r = pick_request(&a);
         for want in ["project: shop", "project: docs", "remote: git@github.com:acme/shop.git", "shop line 4", "docs line 0", "front window title: Checkout - Safari", "front page URL: https://shop.test/cart", "the user's words: fix it"] {
             assert!(r.contains(want), "{want} in {r}");
         }
         assert!(!r.contains("shop line 5"), "{PICK_RECENT} recent lines per project: {r}");
+        assert!(!r.contains("secret-plan"), "his words only, never what is held with his files: {r}");
         let bare = pick_request(&Ask { text: "fix it".into(), projects: shop_and_docs(), ..Ask::default() });
         assert!(!bare.contains("front window") && !bare.contains("front page"), "{bare}");
     }

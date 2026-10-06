@@ -58,6 +58,18 @@ def repo(path, remote):
            " && git remote add origin %s && echo base > README && git add README && git commit -qm init" % remote)
 
 
+def tiny_png():
+    """A 1x1 PNG (the image store sniffs it)."""
+    import struct
+    import zlib
+
+    def chunk(kind, data):
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r" + bytes([10, 26, 10]) + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(bytes([0, 255, 0, 0]))) + chunk(b"IEND", b"")
+
+
 def main():
     if not os.path.exists(EXE):
         sys.exit("build first: cd rust && cargo build")
@@ -138,6 +150,31 @@ def main():
         wait.until(lambda: len(of_type(hstate, "route_sent")) >= 2, 15, "sent to atlas at 2 s")
         outs = [e["out"] for e in of_type(hstate, "x_out") if "build is red" in e["out"]["text"]]
         check(len(outs) == 1 and outs[0]["project"] == by_name["atlas"]["id"], "forwarded once, to atlas: %r" % outs)
+
+        # item H (architect m_9875): his attached files travel with routed
+        # words, rendered once on the home hub: the image as its
+        # image-store marker (one store for every hub), once though he
+        # attached it twice; another file by its path
+        c.wait_idle("main")
+        png = os.path.join(E.tmp, "cart.png")
+        with open(png, "wb") as f:
+            f.write(tiny_png())
+        notes = os.path.join(E.tmp, "q3-notes.md")
+        with open(notes, "w") as f:
+            f.write("q3")
+        c.send({"op": "input", "focus": "main", "text": "look at the cart on shop", "files": [png, notes, png]})
+        wait.until(lambda: [e for e in of_type(hstate, "x_out") if "look at the cart" in e["out"]["text"]], 15, "the files' route sent")
+        sent = [e["out"]["text"] for e in of_type(hstate, "x_out") if "look at the cart" in e["out"]["text"]][0]
+        nl = chr(10)
+        check(sent.count('<image name="cart.png"') == 1 and ("[files he attached:]" + nl + notes) in sent and sent.count(notes) == 1,
+              "the routed text carries the marker once and the notes' path: %r" % sent)
+        b64 = sent.split('b64="', 1)[1].split('"', 1)[0]
+        check(os.path.exists(b64), "the marker names the shared image store: %s" % b64)
+        wait.until(lambda: [m for m in of_type(pstate["shop"], "message_sent")
+                            if m["msg"]["from"] == "user" and "look at the cart" in m["msg"]["text"]], 60, "shop got it")
+        got = [m["msg"]["text"] for m in of_type(pstate["shop"], "message_sent")
+               if m["msg"]["from"] == "user" and "look at the cart" in m["msg"]["text"]][0]
+        check('<image name="cart.png"' in got and notes in got, "shop's main has his files: %r" % got)
     except AssertionError as e:
         print("FAIL", e)
         ok = False

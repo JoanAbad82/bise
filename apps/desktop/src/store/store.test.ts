@@ -90,6 +90,20 @@ describe('store', () => {
     expect(store.pending(K)).toHaveLength(1);
   });
 
+  it('a send carries the files he attached, typed, and a retry sends them again; no files means no field', () => {
+    const { store, sent } = fake();
+    const files = ['/Users/ana/notes/q3-notes.md', '/Users/ana/Desktop/shot.png'];
+    const cid = store.send({ project: P, agent: 'main', text: 'what stands out here', files });
+    store.send({ project: P, agent: 'main', text: 'plain', files: [] });
+    expect(sent).toEqual([
+      { cmd: 'send', project: P, agent: 'main', text: 'what stands out here', mode: 'now', files },
+      { cmd: 'send', project: P, agent: 'main', text: 'plain', mode: 'now' },
+    ]);
+    store.apply({ ev: 'error', project: P, cmd: 'send', text: 'hub gone' });
+    store.retry(threadKey(P, 'main'), cid);
+    expect(sent[2]).toEqual({ cmd: 'send', project: P, agent: 'main', text: 'what stands out here', mode: 'now', files });
+  });
+
   it("a send's error fails the oldest sending row of that project, with the hub's words", () => {
     const { store } = fake();
     store.send({ project: P, agent: 'perf', text: 'one' });

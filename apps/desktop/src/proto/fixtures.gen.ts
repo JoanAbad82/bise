@@ -47,6 +47,7 @@ export const hub_cmd: readonly HubCmd[] = [
   {"agent":"perf","cmd":"send","mode":"now","project":"acme-1a2b3c4d","text":"look at the cold bench"},
   {"agent":"main","cmd":"send","mode":"queued","project":"acme-1a2b3c4d","text":"then the warm one"},
   {"agent":"main","cmd":"send","context":{"app":"Safari","title":"p99 latency","url":"https://grafana.acme.test/d/p99"},"mode":"now","project":"acme-1a2b3c4d","text":"why is this slow?"},
+  {"agent":"main","cmd":"send","files":["/Users/ana/notes/q3-notes.md","/Users/ana/Desktop/shot.png"],"mode":"now","project":"acme-1a2b3c4d","text":"what stands out here"},
   {"card":9,"cmd":"answer","project":"acme-1a2b3c4d","reply":"1"},
   {"card":10,"cmd":"answer","project":"acme-1a2b3c4d","reply":"yes"},
   {"agent":"perf","cmd":"stop","project":"acme-1a2b3c4d"},

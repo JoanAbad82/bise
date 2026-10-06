@@ -346,16 +346,10 @@ impl Core {
                     self.send_to_main(text, false);
                 }
             }
-            // the files as their paths after his words: main reads them
-            // with its tools (the page names them, run 5 step 18)
-            Cmd::SendFiles { text, files } => {
-                let list = files.join("\n");
-                let text = match text.trim() {
-                    "" => format!("[files he dropped on bise:]\n{list}"),
-                    t => format!("{t}\n\n[files he dropped on bise:]\n{list}"),
-                };
-                self.send_to_main(text, false);
-            }
+            // his dropped files go as the input's files field: the hub
+            // renders them once after his words (switchboard attached.rs,
+            // item H: an image as a marker the model sees, others listed)
+            Cmd::SendFiles { text, files } => self.send_input(text.trim().to_string(), false, "capsule", files),
             Cmd::Start { text } => {
                 let text = text.trim().to_string();
                 if !text.is_empty() {
@@ -444,6 +438,11 @@ impl Core {
     /// [`send_to_main`] with its `via`: "capsule" (one short line back),
     /// "capsule-start" (start an agent; the hub's hint says so).
     fn send_via(&mut self, words: String, voice: bool, via: &str) {
+        self.send_input(words, voice, via, Vec::new());
+    }
+
+    /// [`send_via`] with his files (absolute paths) as the input's `files`.
+    fn send_input(&mut self, words: String, voice: bool, via: &str, files: Vec<String>) {
         let shot = self.shot.take();
         let text = match &shot {
             Some(s) if words.is_empty() => s.marker(),
@@ -461,6 +460,9 @@ impl Core {
         let mut input = json!({"op": "input", "focus": "main", "text": text, "via": via});
         if let Some(c) = ctx {
             input["context"] = json!(c);
+        }
+        if !files.is_empty() {
+            input["files"] = json!(files);
         }
         if !self.hub.send(&input) {
             if let Some(s) = shot {

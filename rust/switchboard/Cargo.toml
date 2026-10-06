@@ -8,6 +8,8 @@ description = "Switchboard: one main agent that routes to task sub-agents (hub, 
 [dependencies]
 bend-plugins = { path = "../plugins" }
 bise-catalog = { path = "../catalog" }
+# his attached images into the image store (attached.rs, daemon/fn_context.rs)
+bend-images = { path = "../images" }
 bise-home = { path = "../home" }
 # the typed client protocol (bise desktop S3a, daemon/proto.rs)
 bise-proto = { path = "../proto" }

@@ -488,9 +488,15 @@ fn a_dropped_file_reaches_main_with_his_words() {
     t.ready();
     let cmd = Cmd::parse(r#"{"cmd":"send","text":" summarize this ","files":["/w/q3-notes.md","/w/b.png"]}"#).unwrap();
     t.cmd(cmd);
-    assert_eq!(t.hub.next()["text"], "summarize this\n\n[files he dropped on bise:]\n/w/q3-notes.md\n/w/b.png");
+    // item H: his words and the files as a field; the hub renders them once
+    let input = t.hub.next();
+    assert_eq!((input["text"].as_str(), input["files"].clone()), (Some("summarize this"), serde_json::json!(["/w/q3-notes.md", "/w/b.png"])));
     t.cmd(Cmd::parse(r#"{"cmd":"send","text":"","files":["/w/q3-notes.md"]}"#).unwrap());
-    assert_eq!(t.hub.next()["text"], "[files he dropped on bise:]\n/w/q3-notes.md");
+    let input = t.hub.next();
+    assert_eq!((input["text"].as_str(), input["files"].clone()), (Some(""), serde_json::json!(["/w/q3-notes.md"])));
+    // a send without files has no files field
+    t.cmd(Cmd::parse(r#"{"cmd":"send","text":"hi"}"#).unwrap());
+    assert!(t.hub.next().get("files").is_none());
     assert_eq!(Cmd::parse(r#"{"cmd":"send","text":"hi","files":[]}"#), Ok(Cmd::Send { text: "hi".into() }));
     assert!(Cmd::parse(r#"{"cmd":"send","text":"hi","files":["notes.md"]}"#).is_err());
 }

@@ -24,6 +24,7 @@ bise_home::test_home!();
 pub mod agents_md;
 pub mod approvals;
 pub mod artifacts;
+pub mod attached;
 pub mod board;
 pub mod card_link;
 pub mod cli;

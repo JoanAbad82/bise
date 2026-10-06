@@ -5,12 +5,46 @@
 
 use super::*;
 
+/// What an attached path is, for `crate::attached::render`: an image put in
+/// the image store (its marker), another file, or left out (logged).
+fn look_file(path: &str) -> crate::attached::Look {
+    use crate::attached::Look;
+    let p = std::path::Path::new(path);
+    if !p.is_absolute() || !p.is_file() {
+        eprintln!("sbd: attached file left out (not an absolute path to a file): {path}");
+        return Look::Skip;
+    }
+    match bend_images::store_file(p) {
+        Ok(stored) => {
+            let name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+            Look::Image(bend_images::marker(&name, path, &stored))
+        }
+        Err(_) => Look::File,
+    }
+}
+
+/// His words with the input op's attached files rendered after them (item
+/// H), once, before routing: a routed send carries the same text to the
+/// other project (image-store markers are global to every hub). Never on a
+/// slash command.
+pub(super) fn with_files(v: &Value, text: String) -> String {
+    match v.get("files").and_then(Value::as_array).filter(|_| !text.trim_start().starts_with('/')) {
+        Some(files) => {
+            let files: Vec<String> = files.iter().filter_map(Value::as_str).map(str::to_string).collect();
+            crate::attached::render(&text, &files, &mut look_file)
+        }
+        None => text,
+    }
+}
+
 impl Shell {
     /// His input stepped into sb-core, with its fn context when the op
     /// has one (never on a slash command): the block after his words for
     /// the model, the context kept for the 'you' line this step writes.
+    /// `text` already has his attached files ([`with_files`]).
     pub(super) fn step_input(&mut self, client: ClientId, v: &Value, focus: String, text: String, queued: bool) {
-        let ctx = crate::fn_context::of(v.get("context")).filter(|_| !text.trim_start().starts_with('/'));
+        let slash = text.trim_start().starts_with('/');
+        let ctx = crate::fn_context::of(v.get("context")).filter(|_| !slash);
         let text = match &ctx {
             Some(c) => crate::fn_context::with_context(&text, c),
             None => text,
