@@ -7,6 +7,7 @@ import { Settings, type SettingsPorts } from './Settings';
 import { appName, excludedApps, flag, getPref, knownApps, onboarded, putPref, type Prefs } from './prefs';
 import { addPaths, offers, ordered } from './projects';
 import { KEY_SECTIONS } from './keys';
+import { checks } from './check';
 
 afterEach(cleanup);
 
@@ -31,7 +32,7 @@ const ports = (): SettingsPorts & { sent: AppCmd[]; went: string[] } => {
 };
 
 const view = (page: string, p = ports(), extra: Partial<Parameters<typeof Settings>[0]> = {}) =>
-  render(<Settings page={page} prefs={prefs()} accounts={accounts()} projects={projects()} found={found()} plugins={null} computerUse={null} ports={p} {...extra} />);
+  render(<Settings page={page} prefs={prefs()} accounts={accounts()} projects={projects()} found={found()} plugins={null} computerUse={null} perms={{}} ports={p} {...extra} />);
 
 describe('prefs', () => {
   it('reads and puts dotted keys without touching the rest', () => {
@@ -210,5 +211,32 @@ describe('computer use', () => {
     expect(screen.queryByTestId('settings.cu.web')).toBeNull();
     fireEvent.click(screen.getByTestId('settings.cu.switch'));
     expect(p.sent.at(-1)).toEqual({ cmd: 'computer_use', act: 'on' });
+  });
+});
+
+describe('setup check (S.8)', () => {
+  it('lists what bise needs with its fix; check again reads fresh', () => {
+    const p = ports();
+    const perm: string[] = [];
+    view('setup', { ...p, perm: (x, a) => perm.push(`${x} ${a}`) }, { perms: { mic: 'allowed', accessibility: 'denied', screen: 'ask' }, accounts: accounts().map((a) => ({ ...a, state: 'signed_out' as const })) });
+    const g = screen.getByTestId('settings.check');
+    expect(g.textContent).toContain('denied');
+    expect(screen.queryByTestId('settings.check.mic.fix')).toBeNull();
+    fireEvent.click(screen.getByTestId('settings.check.accessibility.fix'));
+    fireEvent.click(screen.getByTestId('settings.check.screen.fix'));
+    fireEvent.click(screen.getByTestId('settings.check.model.fix'));
+    fireEvent.click(screen.getByTestId('settings.check.again'));
+    expect(perm).toEqual(['accessibility open', 'screen ask']);
+    expect(p.went).toEqual(['models']);
+    expect(p.sent).toEqual([{ cmd: 'setup_check' }]);
+  });
+
+  it('no helper: no permission rows; a gone home says to restart', () => {
+    const list = checks({}, accounts(), projects().map((r) => (r.home ? { ...r, missing: true } : r)), false);
+    expect(list.map((c) => [c.id, c.ok])).toEqual([
+      ['model', true],
+      ['home', false],
+    ]);
+    expect(list[1]?.detail).toContain('restart bise');
   });
 });

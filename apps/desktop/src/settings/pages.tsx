@@ -10,14 +10,16 @@ import { Accounts } from './accounts';
 import { Projects } from './projects';
 import { Plugins } from './plugins';
 import { Computer } from './computer';
+import { checks, SetupCheck } from './check';
 import { KEY_SECTIONS } from './keys';
 import { appName, excludedApps, flag, knownApps, num, str, type Prefs } from './prefs';
 import type { SettingsData, SettingsPorts } from './Settings';
 
-export type Page = 'general' | 'voice' | 'privacy' | 'quiet' | 'models' | 'projects' | 'plugins' | 'computer' | 'keys';
+export type Page = 'setup' | 'general' | 'voice' | 'privacy' | 'quiet' | 'models' | 'projects' | 'plugins' | 'computer' | 'keys';
 
 export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
   { id: 'general', title: 'general', sub: 'bise on your Mac.' },
+  { id: 'setup', title: 'setup', sub: 'what bise needs, checked again. /setup in the terminal.' },
   { id: 'voice', title: 'voice and fn', sub: 'how you talk to bise.' },
   { id: 'privacy', title: 'context and privacy', sub: 'what fn adds to your question. nothing is read unless you hold fn.' },
   { id: 'quiet', title: 'quiet moments', sub: 'when cards wait, and how they come back.' },
@@ -166,6 +168,19 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
       return <Accounts accounts={data.accounts} send={ports.send} />;
     case 'projects':
       return <Projects projects={data.projects} found={data.found} ports={ports} />;
+    case 'setup':
+      return (
+        <SetupCheck
+          list={checks(data.perms, data.accounts, data.projects, ports.perm !== undefined)}
+          ports={{
+            send: ports.send,
+            ...(ports.perm ? { perm: ports.perm } : {}),
+            models: () => {
+              ports.go('models');
+            },
+          }}
+        />
+      );
     case 'plugins':
       return <PluginsPage items={data.plugins} send={ports.send} />;
     case 'computer':

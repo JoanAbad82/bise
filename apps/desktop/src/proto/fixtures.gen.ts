@@ -111,6 +111,7 @@ export const app_cmd: readonly AppCmd[] = [
   {"cmd":"talk_start","page":{"id":"q3-notes","url":"http://127.0.0.1:47438/p/q3-notes"}},
   {"cmd":"talk_end"},
   {"cmd":"talk_cancel"},
+  {"cmd":"setup_check"},
 ];
 
 /** rust/proto/fixtures/draft_hub_cmd.jsonl */

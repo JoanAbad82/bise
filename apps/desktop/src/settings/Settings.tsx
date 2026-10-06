@@ -7,11 +7,12 @@
 // A switch flips at once: the value he set shows until the core's next
 // prefs (which carries it, or not when the core refused it).
 import { useState } from 'react';
-import type { Account, AppCmd, Found, JsonValue, Plugin, ProjectRow } from '@/proto';
+import type { Account, AppCmd, Found, JsonValue, Perm, Plugin, ProjectRow } from '@/proto';
 import { Row, Settings as Frame } from '@/ds';
 import { putPref, type Prefs } from './prefs';
 import { PAGES, PageBody, pageOf, type Page } from './pages';
 import type { ComputerUse } from './computer';
+import type { Perms } from './check';
 import './settings.css';
 
 export interface SettingsData {
@@ -24,6 +25,8 @@ export interface SettingsData {
   plugins: readonly Plugin[] | null;
   /** computer use's state (none yet: null) */
   computerUse: ComputerUse | null;
+  /** the helper's permissions (none: not known, or no helper) */
+  perms: Perms;
 }
 
 export interface SettingsPorts {
@@ -32,6 +35,8 @@ export interface SettingsPorts {
   back: () => void;
   /** a page of settings (the route's) */
   go: (page: Page) => void;
+  /** a permission through the helper (none: no helper on this platform) */
+  perm?: (perm: Perm, action: 'ask' | 'open') => void;
   /** the system's folder picker (window.bise, amb-mac): resolves to a path, or null */
   pickFolder?: () => Promise<string | null>;
 }

@@ -316,6 +316,9 @@ pub enum AppCmd {
         project: Option<Project>,
         name: String,
     },
+    /// check again (S.8, the TUI's `/setup`): `prefs`, `accounts` and
+    /// `projects` come again, read fresh
+    SetupCheck,
     /// computer use (P.2): `act` on | off | uninstall | check (its page is
     /// open: the setup check runs, once a second, until leave or 2 min
     /// without a check) | leave | fix (`fix`: a row's fix, his click only)
@@ -374,6 +377,7 @@ impl AppCmd {
         "talk_start",
         "talk_end",
         "talk_cancel",
+        "setup_check",
     ];
 
     pub fn decode(line: &str) -> Result<AppCmd, String> {

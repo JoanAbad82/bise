@@ -368,3 +368,19 @@ fn computer_use_polls_while_its_page_is_open_and_fixes_on_his_act() {
     app(&mut t, r#"{"cmd":"computer_use","act":"dance"}"#);
     assert!(evs(&t.take(), "error")[0]["text"].as_str().is_some_and(|e| e.contains("no act dance")));
 }
+
+/// S.8: check again sends prefs, accounts and the projects list, read
+/// fresh (a key removed elsewhere shows as signed out at once).
+#[test]
+fn check_again_reads_prefs_accounts_and_projects_fresh() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    app(&mut t, r#"{"cmd":"key_set","id":"anthropic","key":"sk-1"}"#);
+    t.take();
+    w.borrow_mut().keys.clear();
+    app(&mut t, r#"{"cmd":"setup_check"}"#);
+    let out = t.take();
+    assert_eq!(evs(&out, "prefs").len(), 1);
+    assert_eq!(evs(&out, "accounts")[0]["items"][0]["state"], "signed_out", "the removed key, read fresh");
+    assert!(evs(&out, "error").is_empty());
+}

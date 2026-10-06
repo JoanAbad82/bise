@@ -5,12 +5,13 @@
 //! `AppCmd`), answered by `prefs`, `accounts`, `found`, the projects list
 //! read again, or `error {cmd, text}`; and the agent plugins (P.1):
 //! `plugins`, `plugin_set`, `plugin_login`, `plugin_logout`, answered by
-//! `plugins` (the TUI's /plugins functions, crate::plugins); and computer
-//! use (P.2): `computer_use {act}` answered by `computer_use` (the TUI's
+//! `plugins` (the TUI's /plugins functions, crate::plugins); computer use
+//! (P.2): `computer_use {act}` answered by `computer_use` (the TUI's
 //! /computer-use functions: its setup check runs on its own thread only
 //! while the window's page is open, stops at `leave` or [`CU_IDLE`] after
-//! the last `check`, never on the tick). All I/O through
-//! [`crate::ambient::setup::SetupPorts`]; the jobs that end later (a walk,
+//! the last `check`, never on the tick); and `setup_check` (S.8, check
+//! again: prefs, accounts and the projects list sent again, read fresh).
+//! All I/O through [`crate::ambient::setup::SetupPorts`]; the jobs that end later (a walk,
 //! a sign-in) come back on the tick. A key is never in an event.
 
 use super::Core;
@@ -40,6 +41,7 @@ pub const TAGS: &[&str] = &[
     "plugin_login",
     "plugin_logout",
     "computer_use",
+    "setup_check",
 ];
 
 /// Computer use's setup check stops this long after the page's last
@@ -204,6 +206,11 @@ impl Core {
                 let res = self.workspace_of(project.as_deref()).and_then(|ws| (p.plugin_logout)(&ws, &name));
                 let shown = self.emit_plugins(project);
                 ("plugin_logout", res.and(shown))
+            }
+            AppCmd::SetupCheck => {
+                self.app_start();
+                self.poll_projects(true);
+                ("setup_check", Ok(()))
             }
             AppCmd::ComputerUse { act, fix } => ("computer_use", self.computer_use(&act, fix.as_deref())),
             other => return self.setup_error("setup", &format!("not a setup command: {other:?}")),

@@ -3,37 +3,12 @@
 // (bise-mac-helper through window.bise: its perms and fn events, a perm
 // command), and the hook that sends a fresh home there once. Owner:
 // amb-home.
-import { useEffect, useRef, useState } from 'react';
-import type { HelperEv } from '@/proto';
+import { useEffect, useRef } from 'react';
 import { useAccounts, useFound, usePrefs, useStore } from '@/store';
 import { useRouter } from '@/app/router';
 import { onboarded, prefsOf } from '@/settings';
 import { Onboarding } from './Onboarding';
-import type { Perms } from './model';
-
-/** The helper's last perms and fn act (none on a platform without the helper). */
-function useHelper(): { perms: Perms; fn: { act: string; n: number } | null } {
-  const [perms, setPerms] = useState<Perms>({});
-  const [fn, setFn] = useState<{ act: string; n: number } | null>(null);
-  useEffect(() => {
-    const bise = typeof window === 'undefined' ? undefined : window.bise;
-    if (bise === undefined) return;
-    const on = (ev: HelperEv) => {
-      if (ev.ev === 'perms') setPerms({ mic: ev.mic, accessibility: ev.accessibility, screen: ev.screen, calendar: ev.calendar });
-      else if (ev.ev === 'fn') setFn((f) => ({ act: ev.act, n: (f?.n ?? 0) + 1 }));
-    };
-    let live = true;
-    void bise.helperState().then((evs) => {
-      if (live) for (const ev of evs) if (ev.ev === 'perms') on(ev);
-    });
-    const off = bise.onHelper(on);
-    return () => {
-      live = false;
-      off();
-    };
-  }, []);
-  return { perms, fn };
-}
+import { useHelper } from './helper';
 
 export function OnboardingScreen() {
   const store = useStore();
