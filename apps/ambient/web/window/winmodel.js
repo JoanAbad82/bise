@@ -359,10 +359,23 @@
     }
     if (ev.key === "Escape") return eat(esc(s, cmds));
     if (ev.key === "Enter" && alt && !meta && !ctrl && !ev.shift) return eat(send(s, cmds, "queued"));
+    // ⌘⏎ answers with the option ↑ ↓ selected (keyboard parity with a click; lead m_8790)
+    if (ev.key === "Enter" && meta && !alt && !ctrl && empty) {
+      const d = D.dock(s);
+      const o = d && s.optSel && s.optSel.card === d.card.id ? (d.card.options || [])[s.optSel.i] : null;
+      if (o) return eat(answer({ ...s, optSel: null }, d, { n: o.n }, cmds));
+    }
     if (meta || ctrl || alt) return { s, eat: false };
     const d = D.dock(s);
     if (d && empty && (ev.key === "ArrowLeft" || ev.key === "ArrowRight")) return eat(moveDock(s, ev.key === "ArrowLeft" ? -1 : 1));
     if (d && empty && digit != null && digit > 0) return eat(answer(s, d, { n: digit }, cmds));
+    // ↑ ↓ in an empty composer walk the card's options (the first ↓ selects the first)
+    if (d && empty && (ev.key === "ArrowUp" || ev.key === "ArrowDown") && (d.card.options || []).length) {
+      const n = d.card.options.length;
+      const cur = s.optSel && s.optSel.card === d.card.id ? s.optSel.i : -1;
+      const i = cur < 0 ? (ev.key === "ArrowDown" ? 0 : n - 1) : (cur + (ev.key === "ArrowDown" ? 1 : -1) + n) % n;
+      return eat({ ...s, optSel: { card: d.card.id, i } });
+    }
     if (ev.key === "Enter" && !ev.shift) return eat(send(s, cmds));
     return { s, eat: false };
   }

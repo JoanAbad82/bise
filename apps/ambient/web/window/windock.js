@@ -81,7 +81,7 @@
       origin: d.mode === "inbox" && c.origin ? `asked by ${c.origin.by}${c.origin.via ? `, via ${c.origin.via}` : ""}` : "",
       shot: d.mode === "inbox" && c.origin ? c.origin.shot || "" : "",
       q: c.question,
-      opts: (c.options || []).map((o) => ({ n: o.n, label: o.label, picked: s.picked && s.picked.card === c.id && s.picked.n === o.n })),
+      opts: (c.options || []).map((o, i) => ({ n: o.n, label: o.label, picked: s.picked && s.picked.card === c.id && s.picked.n === o.n, sel: !!(s.optSel && s.optSel.card === c.id && s.optSel.i === i) })),
       // a question keeps 'or type your answer below'; an approval says to pick
       ty: approval ? T(s, "pick_n", { n: (c.options || []).length || 2 }) : T(s, "type_below"),
       tabs: d.mode === "inbox" ? d.list.map((x, i) => ({ id: x.id, text: `${x.agent} · ${x.title || x.question}`, on: i === d.i })) : null,

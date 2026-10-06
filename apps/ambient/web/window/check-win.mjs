@@ -623,6 +623,24 @@ law("the composer rule (ambient m_8771): words answer a question and say so firs
   eq(w3.sent.filter((x) => x.cmd === "answer").pop().reply, "1");
 });
 
+law("↑ ↓ in an empty composer select a card's option, ⌘⏎ answers with it (keyboard parity with a click); never while he has words", () => {
+  const w = win();
+  w.go(P.engine, "netcode");
+  eq(w.key("ArrowDown").eat, true);
+  eq(w.v.composer.dock.opts.map((o) => o.sel), [true, false]);
+  w.key("ArrowDown");
+  eq(w.v.composer.dock.opts.map((o) => o.sel), [false, true]);
+  w.key("ArrowUp"); w.key("ArrowUp");
+  eq(w.v.composer.dock.opts.map((o) => o.sel), [false, true]);
+  // with words in the composer, ⌘⏎ never decides
+  w.type("hm");
+  w.key("Enter", { meta: true });
+  eq(w.sent.filter((c) => c.cmd === "answer"), []);
+  w.type("");
+  w.key("Enter", { meta: true });
+  eq(w.sent.filter((c) => c.cmd === "answer").pop(), { cmd: "answer", project: P.engine, card: w.sent.filter((c) => c.cmd === "answer").pop().card, reply: "2" });
+});
+
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {
   const dir = join(here, "../../../../rust/proto/fixtures");
   if (!existsSync(dir)) return;
