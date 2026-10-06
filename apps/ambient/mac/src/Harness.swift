@@ -26,12 +26,13 @@ import WebKit
 @MainActor
 final class Harness {
     static let ops = ["ping", "state", "mouse", "key", "type", "fn", "voice", "shot", "eval", "events", "quit",
-                      "win_open", "win_close", "win_restore", "deeplink"]
+                      "win_open", "win_close", "win_restore", "deeplink", "status_click"]
 
     // the app's doors, wired by App
     var bar: (() -> Capsule)?
     var win: (() -> DesktopWindow?)?                    // bise's window (S4), made at its first open
     var winOp: ((String, [String: Any]) -> Void)?      // App: win_open {route?}, win_close, deeplink {open|route}
+    var statusClick: ((String) -> [String: Any])?      // App: the pearl's click path (left: dropdown, right: fallback rows)
     var keyEvent: ((CGEventType, CGEvent) -> Bool)?    // Keys.qaEvent: the tap's own path
     var appState: (() -> [String: Any])?
     // the core's fake voice (its words file) once it said {ev:'fake_voice', on:true}; nil = none
@@ -182,6 +183,14 @@ final class Harness {
             winOp?(op, q)
             try? await Task.sleep(nanoseconds: 150_000_000)
             return ["win": winInfo()]
+        case "status_click":
+            let button = (q["button"] as? String) == "right" ? "right" : "left"
+            guard let r = statusClick?(button) else { throw Failure(description: "status_click: not wired") }
+            note("harness>status_click", ["button": button, "menu": r["menu"] ?? NSNull()])
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            var out = r
+            out["bar"] = windowInfo(bar?())
+            return out
         case "win_restore":
             // close, then open where he left it: the route and frame come back
             winOp?("win_close", [:])

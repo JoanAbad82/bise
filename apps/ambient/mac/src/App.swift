@@ -792,12 +792,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     // a click on the pearl (S8): the dropdown, the bar's page in its menu
     // pane under the icon; the native menu when the page isn't up
-    func menuView() {
-        guard capsule.ready, let icon = status?.iconRect else { status?.fallbackMenu(); return }
+    // (harness A: no status item, its fake icon rect off-screen; false = the fallback menu instead)
+    @discardableResult
+    func menuView(icon fake: NSRect? = nil) -> Bool {
+        guard capsule.ready, let icon = fake ?? status?.iconRect else { status?.fallbackMenu(); return false }
         anchor(.menu(icon))
         visFeed(.open)
         capsule.post(["ev": "app_menu", "on": true])
         takeKeys()
+        return true
     }
 
     func agentsView() {

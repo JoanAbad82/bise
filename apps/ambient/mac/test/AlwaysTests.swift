@@ -128,6 +128,11 @@ law("menu: centered on the icon when there is room", Placement.bar(CGSize(width:
 law("anchor: what bise brings shows at the bottom", Placement.anchorAtShow(asked: nil) == .bottom)
 law("anchor: what he opens shows where it asked (top, the dropdown)",
     Placement.anchorAtShow(asked: .top) == .top && Placement.anchorAtShow(asked: .menu(icon)) == .menu(icon))
+// harness A's fake pearl (App.harnessIcon, status_click): top right of the off-screen box
+let fakeIcon = CGRect(x: Placement.offScreen.frame.maxX - 220, y: Placement.offScreen.frame.maxY - 24, width: 30, height: 24)
+let fakeDrop = Placement.bar(CGSize(width: 776, height: 300), glass: glass, on: Placement.offScreen, at: .menu(fakeIcon))
+law("harness: the dropdown under the fake pearl touches no screen and sits under it",
+    !Placement.touches(fakeDrop, screens: [builtin, ext]) && fakeDrop.maxY == Placement.offScreen.visible.maxY - Placement.menuGap)
 law("harness: the bar at the bottom or under an icon stays off-screen there",
     !Placement.touches(Placement.bar(CGSize(width: 1004, height: 600), glass: glass, on: Placement.offScreen, at: .bottom), screens: [builtin, ext]))
 

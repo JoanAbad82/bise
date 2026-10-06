@@ -220,9 +220,13 @@ final class StatusItem: NSObject {
 
     // the native menu (S8): a right click, or a click before the page is up
     func fallbackMenu() {
-        let rows = MenuRows.fallback(quiet: isQuietHour(), noAccess: noAccess(),
-                                     words: (MenuWords.open, MenuWords.quietHour, MenuWords.quietEnd, SettingsWords.menu, MenuWords.quit))
-        show(rows)
+        show(StatusItem.fallbackRows(quiet: isQuietHour(), noAccess: noAccess()))
+    }
+
+    // its rows, with the words (the harness reads them: it has no status item)
+    static func fallbackRows(quiet: Bool, noAccess: Bool) -> [MenuItemOut] {
+        MenuRows.fallback(quiet: quiet, noAccess: noAccess,
+                          words: (MenuWords.open, MenuWords.quietHour, MenuWords.quietEnd, SettingsWords.menu, MenuWords.quit))
     }
 
     private func show(_ rows: [MenuItemOut]) {
