@@ -19,7 +19,7 @@ extension AmbientApp {
             }
         }
         DesktopWindow.tap = { [weak hs] who, ev in hs?.note(who, ev) }
-        hs.statusClick = { [weak self] button in self?.harnessStatusClick(button) ?? [:] }
+        hs.statusClick = { [weak self] button, pageUp in self?.harnessStatusClick(button, pageUp: pageUp) ?? [:] }
         hs.keyEvent = { [weak self] t, e in self?.keys.qaEvent(t, e) ?? false }
         hs.appState = { [weak self] in self?.harnessState() ?? [:] }
         Log.tap = { [weak hs] line in MainActor.assumeIsolated { hs?.note("log", line) } }
@@ -34,8 +34,9 @@ extension AmbientApp {
     // status_click (amb-tools m_8520): StatusItem's own click path without a
     // status item: left = the dropdown (App.menuView with the fake icon rect;
     // the page not up = the fallback), right = the fallback; the fallback is
-    // reported as its rows, never shown
-    func harnessStatusClick(_ button: String) -> [String: Any] {
+    // reported as its rows, never shown; page_up false = the click as if the
+    // page weren't up (lead m_8615: the left click's own fallback branch)
+    func harnessStatusClick(_ button: String, pageUp: Bool?) -> [String: Any] {
         let rows = { StatusItem.fallbackRows(quietEnds: self.quietHourEnds, noAccess: false).map(\.json) }
         if button == "right" { return ["menu": "fallback", "rows": rows()] }
         switch IconClick.act(shown: !capsule.hidden) {
@@ -43,10 +44,10 @@ extension AmbientApp {
             visFeed(.dismiss)
             return ["menu": "closed"]
         case .open:
-            if menuView(icon: AmbientApp.harnessIcon) {
+            if menuView(icon: AmbientApp.harnessIcon, pageUp: pageUp) {
                 return ["menu": "dropdown", "anchor": capsule.anchor.name, "icon": anchorIcon()]
             }
-            return ["menu": "fallback", "why": "the page isn't up", "rows": rows()]
+            return ["menu": "fallback", "why": pageUp == false ? "the page isn't up (page_up false)" : "the page isn't up", "rows": rows()]
         }
     }
 

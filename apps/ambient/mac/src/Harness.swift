@@ -32,7 +32,7 @@ final class Harness {
     var bar: (() -> Capsule)?
     var win: (() -> DesktopWindow?)?                    // bise's window (S4), made at its first open
     var winOp: ((String, [String: Any]) -> Void)?      // App: win_open {route?}, win_close, deeplink {open|route}
-    var statusClick: ((String) -> [String: Any])?      // App: the pearl's click path (left: dropdown, right: fallback rows)
+    var statusClick: ((String, Bool?) -> [String: Any])?   // App: the pearl's click path (left: dropdown, right: fallback rows; page_up false: as if the page were down)
     var keyEvent: ((CGEventType, CGEvent) -> Bool)?    // Keys.qaEvent: the tap's own path
     var appState: (() -> [String: Any])?
     // the core's fake voice (its words file) once it said {ev:'fake_voice', on:true}; nil = none
@@ -185,7 +185,7 @@ final class Harness {
             return ["win": winInfo()]
         case "status_click":
             let button = (q["button"] as? String) == "right" ? "right" : "left"
-            guard let r = statusClick?(button) else { throw Failure(description: "status_click: not wired") }
+            guard let r = statusClick?(button, q["page_up"] as? Bool) else { throw Failure(description: "status_click: not wired") }
             note("harness>status_click", ["button": button, "menu": r["menu"] ?? NSNull()])
             try? await Task.sleep(nanoseconds: 150_000_000)
             var out = r
