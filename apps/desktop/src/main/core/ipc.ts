@@ -8,6 +8,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { CORE_IPC, type CoreState } from '../../shared/api';
 import { binPath } from '../paths';
 import { configOf } from './env';
+import { Latest } from '../../shared/latest';
 import { CoreProcess } from './process';
 
 let core: CoreProcess | null = null;
@@ -30,10 +31,13 @@ function log(line: string): void {
  */
 export function startCore(env: Readonly<Record<string, string | undefined>> = process.env): void {
   let state: CoreState = 'down';
+  // the last state events, for a window that loads after they went out
+  const latest = new Latest();
   ipcMain.on(CORE_IPC.cmd, (_e, cmd: unknown) => {
     core?.send(cmd);
   });
   ipcMain.handle(CORE_IPC.stateNow, (): CoreState => state);
+  ipcMain.handle(CORE_IPC.snapshot, (): Record<string, unknown>[] => latest.snapshot());
   const bise = binPath({ env, packaged: app.isPackaged, resourcesPath: process.resourcesPath, appPath: app.getAppPath(), exists: existsSync });
   const config = configOf(bise, env);
   if (config === null) {
@@ -44,9 +48,12 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
     { config, logFile: join(app.getPath('userData'), 'core.log'), env },
     {
       onEvent: (ev) => {
+        latest.keep(ev);
         broadcast(CORE_IPC.ev, ev);
       },
       onState: (s) => {
+        // a new core starts from nothing: it says its state again
+        if (s === 'starting') latest.clear();
         state = s;
         broadcast(CORE_IPC.state, s);
       },

@@ -1,0 +1,48 @@
+// The core's last state events, kept by main (src/main/core/ipc.ts) for a window that loads after
+// they went out (amb-tools m_9703: the sidebar stayed empty when the window
+// loaded after the first `projects`). Pure. A state event replaces the one
+// before it with the same tag (and project); live-only events (a thread's
+// entries and typing, a diff, routes, job_end, errors, open) are never kept:
+// a window asks for those itself (subscribe, diff...).
+
+/** The tags whose last event is the state now, per project when they carry one. */
+export const STATE_TAGS: ReadonlySet<string> = new Set([
+  'projects',
+  'prefs',
+  'accounts',
+  'found',
+  'welcome',
+  'agents',
+  'cards',
+  'artifacts',
+  'worktrees',
+  'dev_servers',
+  'merged',
+  'jobs',
+  'plugins',
+]);
+
+export class Latest {
+  private readonly last = new Map<string, Record<string, unknown>>();
+
+  /** Keeps `ev` when it is a state event (the newest per tag and project). */
+  keep(ev: Record<string, unknown>): void {
+    const tag = ev['ev'];
+    if (typeof tag !== 'string' || !STATE_TAGS.has(tag)) return;
+    const project = typeof ev['project'] === 'string' ? ev['project'] : '';
+    // re-inserted: the snapshot keeps the order they last changed in
+    const key = `${tag} ${project}`;
+    this.last.delete(key);
+    this.last.set(key, ev);
+  }
+
+  /** The kept events, oldest change first: replayed in order they give the state now. */
+  snapshot(): Record<string, unknown>[] {
+    return [...this.last.values()];
+  }
+
+  /** The core restarted: what it said before no longer holds. */
+  clear(): void {
+    this.last.clear();
+  }
+}

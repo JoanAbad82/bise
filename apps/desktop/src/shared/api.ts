@@ -67,6 +67,13 @@ export interface CorePort {
   readonly onState: (listener: (state: CoreState) => void) => () => void;
   /** The state now (a window that loads late asks once, then follows onState). */
   readonly state: () => Promise<CoreState>;
+  /**
+   * The core's last state events (projects, prefs, accounts, agents, cards...),
+   * kept by main: a window that loads late replays them once, after it
+   * listens to onEvent (IPC keeps order, so nothing is lost or older).
+   * Optional so a test's fake port may leave it out (the preload always has it).
+   */
+  readonly snapshot?: () => Promise<Record<string, unknown>[]>;
 }
 
 /** The core channel's IPC names (amb-core). */
@@ -75,6 +82,7 @@ export const CORE_IPC = {
   ev: 'bise:core-ev',
   state: 'bise:core-state',
   stateNow: 'bise:core-state-now',
+  snapshot: 'bise:core-snapshot',
 } as const;
 
 export type Surface = 'window' | 'capsule';

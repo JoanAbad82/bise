@@ -28,5 +28,6 @@ export function coreBridge(ipc: IpcRenderer): CorePort {
       };
     },
     state: async () => (await ipc.invoke(CORE_IPC.stateNow)) as CoreState,
+    snapshot: async () => (await ipc.invoke(CORE_IPC.snapshot)) as Record<string, unknown>[],
   };
 }

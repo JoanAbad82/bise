@@ -8,13 +8,21 @@ import type { Account, Agent, Artifact, Card, DevServer, Entry, Found, Job, Json
 import type { CorePort, CoreState } from '@/shared/api';
 import { diffKey, Store, type Away, type Diff, type Ev, type Pending, type ThreadOrder } from './store';
 
-/** Feeds a store from a core port: its events, its state now and then. Returns the unsubscribe. */
+/**
+ * Feeds a store from a core port: its live events, then the state events
+ * main kept from before this window loaded (asked after the listener is on:
+ * IPC keeps order, so the snapshot is never older than a live event already
+ * applied), and the core's state. Returns the unsubscribe.
+ */
 export function connect(store: Store, port: CorePort): () => void {
   const offEv = port.onEvent((ev) => {
     store.apply(ev);
   });
   const offState = port.onState((s) => {
     store.setCore(s);
+  });
+  void port.snapshot?.().then((evs) => {
+    for (const ev of evs) store.apply(ev);
   });
   void port.state().then((s) => {
     store.setCore(s);
