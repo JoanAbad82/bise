@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
 import { formatRoute, type Route } from './route';
+import { useMenuRouting } from './menu';
 import { Main, Row, Side, Win } from '@/ds';
 import '@/ds/index.css';
 import './app.css';
@@ -24,6 +25,7 @@ export function App() {
 
 function Shell() {
   useHistoryKeys();
+  useMenuRouting(useRouter());
   return (
     <div className="app-shell" data-testid="app.root">
       <Win side={<Sidebar />} main={<Current />} />
