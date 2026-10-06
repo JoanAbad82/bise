@@ -51,7 +51,7 @@
   // settings, the add-a-project sheet) as root.AmbWinS11 in s.s11. An extension is { init(),
   // owns(ev), enter(x, route, s), step(x, ev, s) -> {x, cmds, route?, quote?, back?, eat?}, view(s),
   // tab?(s, project, tab), draw?(d, UI), key?(x, ev, s), wantsKeys?(x, s) }
-  const EXTS = [["s7", "AmbWinS7", ["review", "artifacts", "environments"]], ["s11", "AmbWinS11", ["onboarding", "settings"]]];
+  const EXTS = [["s7", "AmbWinS7", ["review", "artifacts", "environments", "commit"]], ["s11", "AmbWinS11", ["onboarding", "settings"]]];
   const S7 = () => root.AmbWinS7 || null;
   const SCREENS = EXTS.flatMap((e) => e[2]);
   const extOf = (screen) => EXTS.find((e) => e[2].includes(screen) && root[e[1]]);
@@ -73,6 +73,7 @@
 
   function titleOf(s, r) {
     if (r.screen === "review") return `review · ${r.agent} · ${D.pname(s, r.project)}`;
+    if (r.screen === "commit") return `${String(r.sha || "").slice(0, 7)} · ${D.pname(s, r.project)}`;
     if (r.screen === "onboarding") return "welcome to bise";
     if (r.screen === "notfound") return "not found";
     if (r.screen) return r.screen;
@@ -94,7 +95,7 @@
     return s;
   }
   // the route as the shell keeps it for restore (win_title's route, win_open's)
-  const routeOf = (r) => (r.screen === "review" ? `review/${r.project}/${r.agent}` : r.screen === "notfound" ? r.want
+  const routeOf = (r) => (r.screen === "review" ? `review/${r.project}/${r.agent}` : r.screen === "commit" ? `commit/${r.project}/${r.sha}` : r.screen === "notfound" ? r.want
     : r.screen === "settings" && r.page ? `settings/${r.page}` : r.screen ? r.screen
     : r.project === HOME && r.agent === "main" ? "bise" : r.agent === "main" ? `project/${r.project}` : `agent/${r.project}/${r.agent}`);
 
@@ -179,8 +180,10 @@
     if (parts[0] === "project" && proj(parts[1])) return { project: proj(parts[1]), agent: "main" };
     if (parts[0] === "agent" && proj(parts[1]) && parts[2] && has(proj(parts[1]), parts[2])) return { project: proj(parts[1]), agent: parts[2] };
     if (parts[0] === "review" && proj(parts[1]) && parts[2]) return { screen: "review", project: proj(parts[1]), agent: parts[2] };
+    // a merged commit's diff (amb-web's review module, from the changes tab's 'merged today')
+    if (parts[0] === "commit" && proj(parts[1]) && parts[2]) return { screen: "commit", project: proj(parts[1]), agent: "main", sha: parts[2] };
     if (parts[0] === "settings") return { screen: "settings", project: HOME, agent: "main", ...(parts[1] ? { page: parts.slice(1).join("/") } : {}) };
-    if (SCREENS.includes(parts[0]) && parts[0] !== "review") return { screen: parts[0], project: HOME, agent: "main" };
+    if (SCREENS.includes(parts[0]) && parts[0] !== "review" && parts[0] !== "commit") return { screen: parts[0], project: HOME, agent: "main" };
     // the short forms: <project> and <project>/<agent>
     if (proj(parts[0]) && !parts[1]) return { project: proj(parts[0]), agent: "main" };
     if (proj(parts[0]) && parts[1] && has(proj(parts[0]), parts[1])) return { project: proj(parts[0]), agent: parts[1] };

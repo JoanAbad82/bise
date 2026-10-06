@@ -295,7 +295,7 @@
     const x = root.AmbWinS7;
     if (!x) return null;
     const r = s.route;
-    if (r.screen) return ["review", "artifacts", "environments"].includes(r.screen) && x.view ? x.view(s) : null;
+    if (r.screen) return ["review", "artifacts", "environments", "commit"].includes(r.screen) && x.view ? x.view(s) : null;
     const t = r.project !== HOME && r.agent === "main" ? s.tab[r.project] || "thread" : "thread";
     return t !== "thread" && x.tab ? x.tab(s, r.project, t) : null;
   }

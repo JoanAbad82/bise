@@ -355,8 +355,11 @@ law("a project's changes tab lists its agents' branches, its artifacts tab what 
   w.go(P.storefront);
   assert.equal(w.v.tab, null);
   w.feed({ ev: "ui_tab", tab: "changes" });
-  eq(w.v.tab.items.map((x) => [x.name, x.branch, x.what]), [["checkout", "sb/checkout", "2 commits ahead · one idempotency key per order (#812)"],
-    ["search", "sb/search", "1 commit ahead · reindex tonight 02:00?"], ["wallet", "sb/wallet", "nothing to merge · Apple Pay at checkout"]]);
+  // changes is amb-web's list (bc626197, lead m_8971): agents ahead of main, then merged today;
+  // a row opens the agent's review
+  const ch = w.v.s7;
+  eq([w.v.tab, ch.screen, ch.rows.map((x) => [x.name, x.branch, x.end, x.what]), ch.rows[0].act],
+    [null, "changes", [["checkout", "sb/checkout", "2 ahead", "at work"], ["search", "sb/search", "1 ahead", "needs you"]], { ev: "win_open", route: `review/${P.storefront}/checkout` }]);
   eq(w.v.head.seg.map((x) => x.on), [false, true, false]);
   w.feed({ ev: "ui_tab", tab: "artifacts" });
   eq(w.v.tab.items.map((x) => [x.title, x.meta, x.new]), [["flash sale replay", "stock · 10:40", true], ["3-D Secure timeouts", "checkout · 09:50", true]]);
