@@ -5,7 +5,7 @@
 // carry over: a trigger opens a word (paragraph start or after a space) and the word has no
 // space yet, except `@"` which opens a quoted path (a folder with a space) until a closing `"`.
 
-export type TriggerKind = 'at' | 'skill' | 'slash';
+export type TriggerKind = 'at' | 'skill' | 'slash' | 'arg';
 
 export interface Trigger {
   readonly kind: TriggerKind;
@@ -15,6 +15,27 @@ export interface Trigger {
   readonly start: number;
   /** `@"`: the query is a quoted path, it may hold spaces. */
   readonly quoted: boolean;
+  /** `arg`: the command's name (`/model`) and the argument's index (0 = the first). */
+  readonly command?: string;
+  readonly index?: number;
+}
+
+/**
+ * The argument being typed after a command's name (commands.rs `arg_slot`): `/model op` is
+ * argument 0 of /model, query `op`. Only on the message's first line; null past an argument that
+ * takes the rest of the line (`isText(name, i)`).
+ */
+export function argAt(before: string, messageStart: boolean, isCommand: (name: string) => boolean, isText: (name: string, i: number) => boolean): Trigger | null {
+  if (!messageStart || !before.startsWith('/')) return null;
+  const sp = before.indexOf(' ');
+  if (sp < 0) return null;
+  const name = before.slice(0, sp);
+  if (!isCommand(name)) return null;
+  const parts = before.slice(sp + 1).split(' ');
+  const index = parts.length - 1;
+  for (let i = 0; i < index; i += 1) if (isText(name, i)) return null;
+  const query = parts[index] ?? '';
+  return { kind: 'arg', query, start: before.length - query.length, quoted: false, command: name, index };
 }
 
 const isSpace = (c: string): boolean => /\s/u.test(c);

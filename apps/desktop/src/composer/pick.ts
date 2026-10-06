@@ -1,6 +1,6 @@
 // The picker's rows for a trigger, and what picking one does. Pure: the plugin (Picker.tsx) asks
 // for the rows when the trigger changes and applies the pick to the editor.
-import type { PickAgent, PickCommand, PickFile, PickSkill } from './sources';
+import type { ComposerSources, PickAgent, PickCommand, PickFile, PickSkill } from './sources';
 import { agentPick, filePick, prefixFirst, skillPick, type Trigger } from './tokens';
 
 export interface Row {
@@ -72,6 +72,24 @@ export function commandRows(t: Trigger, commands: readonly PickCommand[]): Row[]
         pick: c.args ? { kind: 'insert', text: `${name} `, browse: false } : { kind: 'run', name },
       };
     });
+}
+
+/** The values of the argument being typed (`/model op` -> the models starting with or holding
+ *  `op`): fixed words filtered here, listed kinds from the screen's `choices`. */
+export function argRows(t: Trigger, commands: readonly PickCommand[], sources: { readonly choices?: ComposerSources['choices'] }): Row[] {
+  if (t.kind !== 'arg' || t.command === undefined || t.index === undefined) return [];
+  const cmd = commands.find((c) => `/${c.name.replace(/^\//u, '')}` === t.command);
+  const kind = cmd?.argKinds?.[t.index];
+  if (kind === undefined || kind === 'text') return [];
+  const list = typeof kind === 'object' ? prefixFirst(kind.words, t.query, (w) => w.value) : (sources.choices?.(kind, t.query) ?? []);
+  return list.map((c) => ({
+    id: `arg.${c.value}`,
+    label: c.value,
+    desc: c.desc,
+    tag: 'cmd',
+    off: false,
+    pick: { kind: 'insert', text: `${c.value} `, browse: false },
+  }));
 }
 
 /** Tab on a row: always completes (a command's name, then its arguments), never runs. */

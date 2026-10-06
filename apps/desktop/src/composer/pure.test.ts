@@ -1,9 +1,9 @@
 // The composer's pure parts: triggers, the send's text, drafts, the picker's rows.
 import { describe, expect, it } from 'vitest';
-import { filePick, prefixFirst, triggerAt } from './tokens';
+import { argAt, filePick, prefixFirst, triggerAt } from './tokens';
 import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Segment } from './message';
 import { enqueue, load, popNewest, remember, save, takeOldest, HISTORY_MAX, type Store } from './drafts';
-import { commandLine, commandRows, completion, move } from './pick';
+import { argRows, commandLine, commandRows, completion, move } from './pick';
 
 const memStore = (): Store & { m: Map<string, string> } => {
   const m = new Map<string, string>();
@@ -108,6 +108,23 @@ describe('the / list', () => {
     const [, compact] = commandRows({ kind: 'slash', query: '', start: 0, quoted: false }, cmds);
     expect(compact?.pick).toEqual({ kind: 'run', name: '/compact' });
     expect(compact && completion(compact)).toEqual({ kind: 'insert', text: '/compact ', browse: false });
+  });
+  it('after a command, its argument popup: fixed words here, listed kinds from the screen', () => {
+    const withArgs = [
+      { name: '/model', desc: 'm', args: true, ready: true, argKinds: [{ words: [{ value: 'opus', desc: 'big' }, { value: 'haiku', desc: 'small' }] }] },
+      { name: '/archive', desc: 'a', args: true, ready: true, argKinds: ['agent' as const] },
+      { name: '/new', desc: 'n', args: true, ready: true, argKinds: ['text' as const, 'agent' as const] },
+    ];
+    const is = (n: string): boolean => withArgs.some((c) => c.name === n);
+    const text = (n: string, i: number): boolean => withArgs.find((c) => c.name === n)?.argKinds[i] === 'text';
+    const t = argAt('/model op', true, is, text);
+    expect(t).toMatchObject({ kind: 'arg', command: '/model', index: 0, query: 'op', start: 7 });
+    expect(t && argRows(t, withArgs, {}).map((r) => r.pick)).toEqual([{ kind: 'insert', text: 'opus ', browse: false }]);
+    const a = argAt('/archive p', true, is, text);
+    expect(a && argRows(a, withArgs, { choices: (k, q) => (k === 'agent' ? [{ value: `perf-${q}`, desc: '' }] : []) }).map((r) => r.label)).toEqual(['perf-p']);
+    expect(argAt('/new fix the build', true, is, text)).toBeNull();
+    expect(argAt('/model op', false, is, text)).toBeNull();
+    expect(argAt('/nope x', true, is, text)).toBeNull();
   });
   it('a typed command line runs; an unknown /word is text', () => {
     expect(commandLine('/model opus ', cmds)).toEqual({ name: '/model', args: 'opus', ready: true });

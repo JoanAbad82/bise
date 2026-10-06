@@ -14,11 +14,33 @@ export interface PickSkill {
   readonly desc: string;
 }
 
+/** What completes one argument of a command (the TUI's commands.rs `Arg`): fixed words, or a
+ *  list the screen knows (live agents, archived ones, open cards, branches, models, efforts,
+ *  plugins); `text` takes the rest of the line and completes nothing. */
+export type ArgKind =
+  | { readonly words: readonly Choice[] }
+  | 'agent'
+  | 'archived'
+  | 'card'
+  | 'branch'
+  | 'model'
+  | 'effort'
+  | 'plugin'
+  | 'text';
+
+/** One value an argument can take, as its popup shows it. */
+export interface Choice {
+  readonly value: string;
+  readonly desc: string;
+}
+
 export interface PickCommand {
   readonly name: string;
   readonly desc: string;
   /** It takes arguments: picking completes `/name `, ⏎ on the full line runs it. */
   readonly args: boolean;
+  /** Its arguments in order, each with what completes it (none: nothing to offer). */
+  readonly argKinds?: readonly ArgKind[];
   /** Its screen or core command exists; else the list shows it greyed, `not yet` (bar 2.1). */
   readonly ready: boolean;
 }
@@ -44,6 +66,8 @@ export interface ComposerSources {
   files(query: string): Promise<readonly PickFile[]>;
   /** A pasted or dropped image saved to a file the core can send; null when it can't be. */
   saveImage(file: File): Promise<SavedImage | null>;
+  /** The values of a listed argument kind matching `query` (the screen's lists); none: no popup. */
+  choices?(kind: Exclude<ArgKind, 'text' | { readonly words: readonly Choice[] }>, query: string): readonly Choice[];
 }
 
 /** No lists, no effects: a composer that only types and sends (the spotlight's first step, tests). */

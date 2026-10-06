@@ -6,7 +6,7 @@
 import { useState, type JSX } from 'react';
 import { Composer } from './Composer';
 import { prefixFirst } from './tokens';
-import type { ComposerSources, PickFile } from './sources';
+import type { ArgKind, ComposerSources, PickFile } from './sources';
 import { Spotlight, type SpotData } from '@/spotlight';
 import { LivePearl, MOODS, type Mood } from '@/pearl';
 
@@ -56,6 +56,19 @@ const COMMANDS = [
   ['theme', 'auto, light or dark', true, false],
 ] as const;
 
+const ARG_KINDS: Partial<Record<string, readonly ArgKind[]>> = {
+  model: [{ words: [{ value: 'opus', desc: 'the strongest' }, { value: 'sonnet', desc: 'fast' }, { value: 'default', desc: 'the workspace default' }] }],
+  reasoning: [{ words: [{ value: 'low', desc: '' }, { value: 'medium', desc: '' }, { value: 'high', desc: '' }] }],
+  archive: ['agent'],
+  stop: ['agent'],
+  isolate: ['agent'],
+  rename: ['agent', 'text'],
+  restore: ['archived'],
+  answer: ['card', 'text'],
+  close: ['card', 'text'],
+  new: ['text'],
+};
+
 const SOURCES: ComposerSources = {
   agents: [{ name: 'main', desc: 'bise' }, { name: 'perf', desc: 'sort_unstable in the hot query' }, { name: 'docs', desc: 'the README' }],
   skills: [
@@ -63,7 +76,15 @@ const SOURCES: ComposerSources = {
     { name: 'plain-language', desc: 'concise replies' },
     { name: 'grill-me', desc: 'stress-test a plan' },
   ],
-  commands: COMMANDS.map(([name, desc, args, ready]) => ({ name: `/${name}`, desc, args, ready })),
+  commands: COMMANDS.map(([name, desc, args, ready]) => ({ name: `/${name}`, desc, args, ready, argKinds: ARG_KINDS[name] })),
+  choices: (kind, q) => {
+    const lists: Partial<Record<typeof kind, readonly { value: string; desc: string }[]>> = {
+      agent: [{ value: 'perf', desc: 'sort_unstable in the hot query' }, { value: 'docs', desc: 'the README' }],
+      archived: [{ value: 'old-fix', desc: 'archived 2 days ago' }],
+      card: [{ value: '1', desc: 'alerts: which threshold?' }],
+    };
+    return prefixFirst(lists[kind] ?? [], q, (c) => c.value);
+  },
   files: (q) => Promise.resolve(prefixFirst(FILES, q.replace(/^"/u, ''), (f) => f.path.split('/').at(-1) ?? f.path).slice(0, 20)),
   saveImage: (f) => Promise.resolve({ path: `/tmp/bise-lab/${f.name || 'pasted.png'}`, name: f.name || 'pasted.png' }),
 };

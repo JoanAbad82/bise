@@ -26,9 +26,9 @@ import { $caretOffset, $insertAtCaret, $insertChip, $replaceBeforeCaret, $select
 import { $caretOnFirstLine, $isBlank, $readSegments, $textBeforeCaret } from './read';
 import { buildMessage, chars, chipStrip, isLongPaste, nextChipNumber, preview, type Chip, type Outgoing, type Segment } from './message';
 import { enqueue, historyAt, load, popNewest, remember, save, takeOldest, type Saved, type Store } from './drafts';
-import { agentRows, commandLine, commandRows, completion, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
+import { agentRows, argRows, commandLine, commandRows, completion, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
 import { isImagePath, type ComposerSources, type PickFile } from './sources';
-import { triggerAt, type Trigger } from './tokens';
+import { argAt, triggerAt, type Trigger } from './tokens';
 import { Picker } from './Picker';
 
 /** What the screen around a composer may ask of it (dictation, the send button, focus). */
@@ -57,6 +57,17 @@ interface BrainProps {
 const DRAFT_DEBOUNCE_MS = 400;
 
 const triggerKey = (t: Trigger | null): string => (t === null ? '' : `${t.kind}:${t.start}:${t.quoted ? 'q' : ''}:${t.query}`);
+
+/** On a command line, the argument being typed (its popup), before any @ or $ in it. */
+function slotOf(text: string, messageStart: boolean, sources: ComposerSources): Trigger | null {
+  const find = (name: string) => sources.commands.find((c) => `/${c.name.replace(/^\//u, '')}` === name);
+  return argAt(
+    text,
+    messageStart,
+    (name) => find(name) !== undefined,
+    (name, i) => find(name)?.argKinds?.[i] === 'text',
+  );
+}
 
 const json = (editor: LexicalEditor): string => JSON.stringify(editor.getEditorState().toJSON());
 
@@ -135,7 +146,9 @@ export function Brain(p: BrainProps): JSX.Element | null {
         ? [...agentRows(trigger, p.sources.agents), ...(files.key === tkey ? fileRows(files.items) : [])]
         : trigger.kind === 'skill'
           ? skillRows(trigger, p.sources.skills)
-          : commandRows(trigger, p.sources.commands);
+          : trigger.kind === 'arg'
+            ? argRows(trigger, p.sources.commands, p.sources)
+            : commandRows(trigger, p.sources.commands);
     return all.slice(0, MAX_ROWS);
   }, [trigger, tkey, files, p.sources]);
 
@@ -265,7 +278,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
     return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
       const r = editorState.read(() => ({ blank: $isBlank(), segs: $readSegments(), before: $textBeforeCaret() }));
       props.current.onCanSend(!r.blank);
-      const t = r.before === null ? null : triggerAt(r.before.text, r.before.messageStart);
+      const t = r.before === null ? null : (slotOf(r.before.text, r.before.messageStart, props.current.sources) ?? triggerAt(r.before.text, r.before.messageStart));
       const k = triggerKey(t);
       if (k !== lastTrigger) {
         lastTrigger = k;
