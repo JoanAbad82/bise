@@ -3500,7 +3500,7 @@ def real_alive():
         return None
 
 
-def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None, path=None):
+def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None, path=None, session_env=None):
     """His real app (no --qa) on an isolated HOME and a throwaway fake-provider hub, as launchd
     would start it: PATH=/usr/bin:/bin:/usr/sbin:/sbin, HOME, his args (--workspace, --bise).
     bise: his (~/.bise/dev/build/ambient/target/debug/bise) unless given; root: the tree whose
@@ -3532,6 +3532,14 @@ def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None,
            "USER": os.environ.get("USER", ""), "LOGNAME": os.environ.get("LOGNAME", os.environ.get("USER", "")),
            "SHELL": os.environ.get("SHELL", "/bin/zsh"), "LANG": os.environ.get("LANG", "en_US.UTF-8"),
            "AMBIENT_HARNESS": REAL_APP_DIR, "BISE_AMBIENT_TEST_INPUT": REAL_SOCK}
+    # a bise session's vars as his shell would carry them (bug 2's case, ambient-lead m_8076):
+    # only ever pointing at ANOTHER throwaway hub under ~/.bise/gate, never his
+    session_env = dict(session_env or {})
+    gate = os.path.realpath(os.path.expanduser("~/.bise/gate")) + "/"
+    for k, v in session_env.items():
+        if str(v).startswith("/") and not os.path.realpath(v).startswith(gate):
+            raise QAError("refused: session_env %s=%s is not under ~/.bise/gate" % (k, v))
+    env.update(session_env)
     # his own launch's args (amb-mac m_7974, from ps on his running app): --bise --web --workspace
     # and --env BISE_APP_ROOT / PATH (what the core spawn gets); never --dev (his ~/.bise/dev):
     # without it the app's dev dir is <BISE_HOME>/dev
@@ -3595,7 +3603,7 @@ def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None,
             real_stop()
             raise QAError("stopped: the watchdog did not attach to pid %s in 5 s (watch.log)" % pid)
         # the app and its core carry nothing of the agent's or the real hub's (SB_SOCKET, SB_AGENT...)
-        leaked = real_env_leaks(pid)
+        leaked = [k for k in real_env_leaks(pid) if k not in session_env]
         if leaked:
             real_stop()
             raise QAError("stopped: the harness app carries the agent's env: %s" % leaked)
