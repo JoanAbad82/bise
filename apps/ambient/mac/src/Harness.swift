@@ -26,13 +26,14 @@ import WebKit
 @MainActor
 final class Harness {
     static let ops = ["ping", "state", "mouse", "key", "type", "fn", "voice", "shot", "eval", "events", "quit",
-                      "win_open", "win_close", "win_restore", "deeplink", "status_click"]
+                      "win_open", "win_close", "win_restore", "deeplink", "status_click", "front"]
 
     // the app's doors, wired by App
     var bar: (() -> Capsule)?
     var win: (() -> DesktopWindow?)?                    // bise's window (S4), made at its first open
     var winOp: ((String, [String: Any]) -> Void)?      // App: win_open {route?}, win_close, deeplink {open|route}
     var statusClick: ((String, Bool?) -> [String: Any])?   // App: the pearl's click path (left: dropdown, right: fallback rows; page_up false: as if the page were down)
+    var front: (([String: Any]) -> [String: Any])?      // App: the front-app fixture for the fn context (S9; never his apps)
     var keyEvent: ((CGEventType, CGEvent) -> Bool)?    // Keys.qaEvent: the tap's own path
     var appState: (() -> [String: Any])?
     // the core's fake voice (its words file) once it said {ev:'fake_voice', on:true}; nil = none
@@ -183,6 +184,11 @@ final class Harness {
             winOp?(op, q)
             try? await Task.sleep(nanoseconds: 150_000_000)
             return ["win": winInfo()]
+        case "front":
+            // {app, bundle, title?, document?, url?, tab_url?, selection?, texts?} or {clear:true}:
+            // what the next fn reads instead of a front app; answers what it would send
+            guard let r = front?(q) else { throw Failure(description: "front: not wired") }
+            return r
         case "status_click":
             let button = (q["button"] as? String) == "right" ? "right" : "left"
             guard let r = statusClick?(button, q["page_up"] as? Bool) else { throw Failure(description: "status_click: not wired") }

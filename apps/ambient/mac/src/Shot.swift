@@ -18,19 +18,7 @@ struct ShotResult {
     var bounds: CGRect?        // CG global coords (top-left origin), for the corners
 }
 
-// the skip list (SPEC §5.2): the built-in apps and the user's own
-// (AppSettings.skipBundles, the settings view), plus private windows
-enum SkipList {
-    // a private window shows in its title (best effort: Safari's private
-    // windows don't say it in the title on every version)
-    static let privateMarks = ["private browsing", "incognito", "inprivate", "navigation privée", "private window"]
-
-    static func skips(bundle: String?, title: String, apps: Set<String> = AppSettings.builtInBundles) -> Bool {
-        if let b = bundle, apps.contains(b) { return true }
-        let t = title.lowercased()
-        return privateMarks.contains { t.contains($0) }
-    }
-}
+// the skip list (SkipList) lives in FrontRules.swift: the fn context obeys it too
 
 @MainActor
 enum Shot {

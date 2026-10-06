@@ -61,6 +61,7 @@ struct AppSettings: Equatable {
         SkipApp(bundle: "com.apple.systempreferences", name: "System Settings"),
         SkipApp(bundle: "com.apple.Settings", name: "System Settings"),
         SkipApp(bundle: "com.apple.SystemSettings", name: "System Settings"),
+        SkipApp(bundle: "com.apple.MobileSMS", name: "Messages"),   // S9 (lead m_9025, bise_home's EXCLUDED_APPS_SEED)
     ]
     static let builtInBundles = Set(builtIn.map(\.bundle))
     static let maxSkip = 100

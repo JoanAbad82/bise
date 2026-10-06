@@ -89,6 +89,7 @@ extension AmbientApp {
         capsule.pickScreen()   // the mouse's screen, when displays have their own menu bars
         talking = true
         defer { morning() }   // after the shot's front window is chosen
+        readFront()           // S9: the front app's context, before any page of ours comes in front
         quiet.own(open: true, at: uptime)
         visFeed(.talk(true))
         if state == "down" { status?.set(holding: true) }
@@ -107,7 +108,7 @@ extension AmbientApp {
             self.beginTalk(state, page: page)
         }
         settleTalk = { finish(nil) }
-        Browser.activeTab(front) { url in finish(url.flatMap { PageOpen.pageRef(tab: $0, pagesURL: base) }) }
+        askTab(front) { url in finish(url.flatMap { PageOpen.pageRef(tab: $0, pagesURL: base) }) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { MainActor.assumeIsolated { finish(nil) } }
     }
 
@@ -157,6 +158,7 @@ extension AmbientApp {
 
     func spotlight() {
         anchor(.top)
+        readFront()   // S9: before the morning page could come in front
         morning()
         visFeed(.show(Visibility.brief))   // until the field takes the keys
         capsule.post(["ev": "app_key", "key": "space"])

@@ -20,6 +20,17 @@ extension AmbientApp {
         }
         DesktopWindow.tap = { [weak hs] who, ev in hs?.note(who, ev) }
         hs.statusClick = { [weak self] button, pageUp in self?.harnessStatusClick(button, pageUp: pageUp) ?? [:] }
+        hs.front = { [weak self] q in
+            guard let self else { return [:] }
+            if q["clear"] as? Bool == true { self.harnessFront = nil; return ["front": NSNull()] }
+            let s = { (k: String) in q[k] as? String }
+            let raw = FrontRaw(app: s("app"), bundle: s("bundle"), title: s("title"), document: s("document"),
+                               axURL: s("url"), tabURL: s("tab_url"), selection: s("selection"),
+                               texts: q["texts"] as? [String] ?? [])
+            self.harnessFront = raw
+            let c = FrontRules.build(raw, skip: self.settings.skipBundles)
+            return ["context": c.context, "front": c.front]
+        }
         hs.keyEvent = { [weak self] t, e in self?.keys.qaEvent(t, e) ?? false }
         hs.appState = { [weak self] in self?.harnessState() ?? [:] }
         Log.tap = { [weak hs] line in MainActor.assumeIsolated { hs?.note("log", line) } }

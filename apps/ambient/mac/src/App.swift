@@ -44,6 +44,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     var routeJob: DispatchWorkItem?       // App+Talk: the route line's tab, 4 s at most
     var heldCard: String?                 // a card bise's window holds (CardSeat), not yet in the bar
     var cardSeatSaid: CardSeat = .bar     // the last app_card_seat the bar's page got
+    var tabWaiters: [@MainActor (String?) -> Void]?   // App+Front: one active-tab ask at a time
+    var harnessFront: FrontRaw?           // App+Front: the harness's front-app fixture (never his apps)
     var askedAnchor: BarAnchor?           // where the next show puts the bar (S8; none = bottom centre)
     let mainMenu = MainMenuView() // the hidden main menu: ⌘Q ⌘W ⌘, ⌘H and Edit
     var status: StatusItem?
@@ -389,6 +391,11 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.checkFullScreen() }
             }
+        }
+        // the spotlight's 'in front' row follows his app switches (S9, name only)
+        ws.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] n in
+            let app = n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            MainActor.assumeIsolated { self?.frontSwitched(app) }
         }
         // the capsule covered by a full-screen window or another Space: no drawing
         NotificationCenter.default.addObserver(forName: NSWindow.didChangeOcclusionStateNotification, object: capsule.panel, queue: .main) { [weak self] _ in
