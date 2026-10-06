@@ -11,9 +11,9 @@
 //!
 //! Read-only: never starts a hub, never writes; the gathered projects are
 //! kept 60 s while the registry's rows stay the same ([`Routing`], a field
-//! of the Shell). To converge (architect m_9063): [`recent_of`] parses a
-//! transcript's roles itself; once amb-hub's step 3 index over the same
-//! files lands, read the recent lines through its reader. The fn context is
+//! of the Shell). A project's main thread is found and read the way `sb
+//! history --project` reads it (architect m_9063): its folder from the
+//! project's view.json (`xread::who_of`), its roles by `search::classify`. The fn context is
 //! the input op's `context` (amb-core owns it end to end: the typed send
 //! puts it there); until it does, only his words name a project.
 
@@ -21,6 +21,7 @@ use super::Shell;
 use crate::core::Input;
 use crate::model::MAIN;
 use crate::route::{self, Candidate, Guess};
+use crate::search::Role;
 use bise_proto::context::FnContext;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
@@ -111,7 +112,7 @@ fn gather(home: &bise_home::Home, rows: &[bise_home::projects::Row]) -> Vec<Cand
             name: r.name.clone(),
             path: r.path.clone(),
             remotes: remotes_of(&std::fs::read_to_string(r.path.join(".git").join("config")).unwrap_or_default()),
-            recent: recent_of(&tail(&home.hub_dir(&r.id).join("agents").join(MAIN).join("transcript.log"))),
+            recent: recent_of(&tail(&main_transcript(&home.hub_dir(&r.id), &r.name))),
         })
         .collect()
 }
@@ -134,17 +135,29 @@ fn remotes_of(config: &str) -> Vec<String> {
     v
 }
 
-/// His lines and main's answers at a transcript's end, newest first.
+/// A project's main thread: its folder from the project's view.json
+/// (amb-hub's `xread::who_of`, the reader `sb history --project` uses),
+/// `agents/main` without a view.
+fn main_transcript(state: &Path, name: &str) -> std::path::PathBuf {
+    let who = super::xread::who_of(name, state);
+    let dir = who
+        .iter()
+        .find(|w| w.name == format!("{name}/{MAIN}"))
+        .and_then(|w| w.dir.split_once('/').map(|(_, d)| d.to_string()))
+        .unwrap_or_else(|| MAIN.to_string());
+    state.join("agents").join(dir).join("transcript.log")
+}
+
+/// His lines and main's answers at a transcript's end, newest first; the
+/// roles read by `search::classify`, the one parser of transcript roles.
 fn recent_of(transcript: &str) -> Vec<String> {
     let mut v: Vec<String> = transcript
         .lines()
-        .filter_map(|l| {
-            let body = l.split_once('\t').map_or(l, |(_, b)| b);
-            body.strip_prefix("sb you : ").or_else(|| body.strip_prefix("  obs: assistant: "))
-        })
-        .map(str::trim)
+        .filter_map(|l| crate::search::classify(l.split_once('\t').map_or(l, |(_, b)| b)))
+        .filter(|(role, _)| matches!(role, Role::User | Role::Assistant))
+        // its readable text names the role first ("user: ", "assistant: ")
+        .map(|(role, t)| t.strip_prefix(&format!("{}: ", role.name())).unwrap_or(&t).trim().to_string())
         .filter(|t| !t.is_empty())
-        .map(String::from)
         .collect();
     v.reverse();
     v.truncate(RECENT);

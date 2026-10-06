@@ -405,8 +405,10 @@ mod tests {
         let shown = user_message(&Msg { id: 12, from: USER.into(), text: "why does p99 rise".into(), ..msg() }, true);
         assert!(shown.starts_with(&format!("<user_message id=\"{USER_ID_PREFIX}12\"")), "{shown}");
         assert!(r.contains(&format!("<user_message id=\"{USER_ID_PREFIX}<n>\">")));
-        // nothing names a command that is not shipped yet (C: amb-hub's step 3)
-        assert!(!r.contains("--project <p>") && !r.contains("sb inspect <p>/"));
+        // it reads the projects' threads with amb-hub's step 3 (C, 175eb516)
+        for needle in ["`sb history \"<words>\" --project <p>`", "`--all`", "`sb show <p>/<agent>#<pos>`", "`sb inspect <p>/<agent>`"] {
+            assert!(r.contains(needle), "{needle}");
+        }
     }
 
     /// docs/ambient-vision.md §3 B, docs/ambient-pages.md §2.9: main's rule
