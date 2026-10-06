@@ -652,6 +652,21 @@ law("window run 2: the hub's older artifacts event ({rows, seen_ms}, no project)
   eq(Object.keys(w.s.arts).includes("undefined"), false);
 });
 
+law("window run 3: a project whose folder is gone can't be written to (composer disabled, it says why); a project's tabs are named by name", () => {
+  const w = win();
+  w.feed({ ev: "projects", projects: w.s.projects.map((p) => (p.project === P.evals ? { ...p, missing: true } : p)) });
+  w.go(P.evals);
+  eq([w.v.composer.disabled, w.v.composer.ph], [true, "evals's folder is gone · find it or remove the project"]);
+  w.type("hello?");
+  w.key("Enter");
+  w.feed({ ev: "ui_send" });
+  w.key("Enter", { alt: true });
+  eq(w.sent.filter((c) => c.cmd === "send"), []);
+  // another project still takes words
+  w.go(P.storefront);
+  eq(w.v.composer.disabled, false);
+});
+
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {
   const dir = join(here, "../../../../rust/proto/fixtures");
   if (!existsSync(dir)) return;

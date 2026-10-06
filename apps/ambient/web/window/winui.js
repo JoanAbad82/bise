@@ -196,7 +196,8 @@
     const name = (p) => (p === "home" ? "bise" : p);
     switch (a.ev) {
       case "ui_route": return a.agent && a.agent !== "main" ? `route:${name(a.project)}/${a.agent}` : `route:${name(a.project)}`;
-      case "ui_tab": case "ui_tab_i": return `tab:${a.tab || a.i}`;
+      // by name, never by index (the harness opens a project's changes and its review by it)
+      case "ui_tab": case "ui_tab_i": return `tab:${a.tab || ["thread", "changes", "artifacts"][a.i] || a.i}`;
       case "ui_pick": return `opt:${a.n}`;
       case "ui_inbox": return a.card ? `inbox:${a.card}` : "inbox";
       case "ui_fold": return `fold:${a.pos}`;

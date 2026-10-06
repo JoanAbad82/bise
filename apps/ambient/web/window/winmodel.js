@@ -361,6 +361,7 @@
       return eat(s);
     }
     if (ev.key === "Escape") return eat(esc(s, cmds));
+    if (ev.key === "Enter" && D.gone(s)) return eat(s);
     if (ev.key === "Enter" && alt && !meta && !ctrl && !ev.shift) return eat(send(s, cmds, "queued"));
     // ⌘⏎ answers with the option ↑ ↓ selected (keyboard parity with a click; lead m_8790)
     if (ev.key === "Enter" && meta && !alt && !ctrl && empty) {
@@ -422,7 +423,7 @@
         return set(s, "quotes", set(s.quotes, k, [...(s.quotes[k] || []), D.quoteText(s.route.agent, e, ev.text)]));
       }
       case "ui_unquote": return set(s, "quotes", set(s.quotes, k, (s.quotes[k] || []).filter((_, i) => i !== ev.i)));
-      case "ui_send": return send(s, cmds);
+      case "ui_send": return D.gone(s) ? s : send(s, cmds);
       case "ui_stop": if (!(s.route.project === HOME && s.route.agent === "main")) cmds.push({ cmd: "stop", project: s.route.project, agent: s.route.agent }); return s;
       case "ui_older": {
         const t = s.threads[k];

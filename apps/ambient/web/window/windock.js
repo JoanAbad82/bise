@@ -49,6 +49,8 @@
     return { mode: "thread", list, i, card: list[i] };
   }
 
+  // the project in view lost its folder (its projects row says missing): nothing can go there
+  const gone = (s) => !!(s.projects.find((p) => p.project === s.route.project) || {}).missing;
   const pname = (s, project) => (s.projects.find((p) => p.project === project) || {}).name || project;
   // who asks, as the place you are needs it: from bise or the inbox, "telemetry · alerts"; inside
   // the project, "alerts"
@@ -128,6 +130,7 @@
   function placeholder(s, d, agentRow) {
     const r = s.route;
     if (s.offline) return T(s, "ph_offline");
+    if (gone(s)) return T(s, "ph_gone", { p: pname(s, s.route.project) });
     if (answers(s, d)) return T(s, "ph_answer");
     if (r.project === HOME) return T(s, "ph_write", { to: "bise" });
     if (r.agent === "main") return T(s, "ph_main", { p: pname(s, r.project) });
@@ -158,5 +161,5 @@
     return `❝ ${i + 1} “${clip(first, 48)}”  ${q.who}${q.at_ms && fmt ? ` ${fmt(q.at_ms)}` : ""}`;
   }
 
-  root.AmbWinDock = { HOME, keyOf, allCards, scopeCards, dock, dockWords, markerText, divider, dividerParts, isApproval, answers, oneLine, placeholder, quoteLines, quoteText, quoteChip, pname };
+  root.AmbWinDock = { HOME, keyOf, gone, allCards, scopeCards, dock, dockWords, markerText, divider, dividerParts, isApproval, answers, oneLine, placeholder, quoteLines, quoteText, quoteChip, pname };
 })(typeof window !== "undefined" ? window : globalThis);
