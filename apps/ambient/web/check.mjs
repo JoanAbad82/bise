@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Uint8Array, Float32Array, String, Number });
-for (const f of ["words.js", "face.js", "policy.js", "spotlist.js", "model.js", "pearl.js", "bar.js", "fakecore.js", "../kit/notelines.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+for (const f of ["words.js", "face.js", "policy.js", "cards.js", "spotlist.js", "model.js", "pearl.js", "bar.js", "fakecore.js", "../kit/notelines.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
 const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes, BiseLines, AmbPearl: Pearl, AmbBar: Bar } = ctx;
 const W = Wd.W;
 
@@ -1290,6 +1290,63 @@ law("every project's cards reach the bar (amb-mac m_8894): the core's projects r
   eq(M.visibleCards(after).map((c) => c.id), [9, "acme-1a2b3c4d#10"]);
   const home = M.step(m, { ev: "app_key", key: "1" }, 90).m;
   eq(M.visibleCards(M.step(home, { ev: "state", agents: [], cards: m.cards, pages: [] }, 100).m).map((c) => c.id), ["acme-1a2b3c4d#9", "acme-1a2b3c4d#10"]);
+});
+
+law("S9 quiet batch (amb-mac m_9037): cards that come while quiet wait (an urgent one asks), then come together, '2 questions · about 1 min', '1 of 2', one at a time; esc puts the rest off", () => {
+  const q = (id, text, extra = {}) => ({ id, kind: "question", agent: "search", text, options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }], ...extra });
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [q("a", "old one")], pages: [] }, 0).m;
+  m = M.step(m, { ev: "app_quiet", on: true, why: "call" }, 10).m;
+  m = M.step(m, { ev: "state", agents: [], cards: [q("a", "old one"), q("b", "reindex tonight?"), q("c", "drop the cache?"), q("u", "run it now?", { urgent: true })], pages: [] }, 20).m;
+  eq(M.view(m, 30).ask.id, "u");                              // urgent asks during the call
+  m = M.step(m, { ev: "app_key", key: "1" }, 40).m;           // answered
+  eq(M.view(m, 50).state !== "needs", true);                  // the rest wait
+  m = M.step(m, { ev: "app_quiet", on: false }, 60).m;
+  // (each answer's line shows a few seconds first, then the next card)
+  let v = M.view(m, 4500), s = Bar.spec(v);
+  eq([v.ask.id, v.content, s.head.lab], ["b", { kind: "batch", cards: ["b", "c"] }, { acc: "2 questions · about 1 min", rest: "1 of 2" }]);
+  m = M.step(m, { ev: "app_key", key: "2" }, 4600).m;
+  v = M.view(m, 9000);
+  eq([v.ask.id, Bar.spec(v).head.lab.rest], ["c", "2 of 2"]);
+  m = M.step(m, { ev: "app_key", key: "1" }, 9100).m;
+  eq([M.view(m, 14000).ask.id, M.view(m, 14000).ask.batch9], ["a", null]);   // the batch is done; the old one asks as usual
+  // esc on a batch card: the whole batch waits in the inbox
+  let e = M.step(M.step(M.step(M.step(M.init(), { ev: "state", agents: [], cards: [], pages: [] }, 0).m, { ev: "app_quiet", on: true, why: "meeting" }, 1).m,
+    { ev: "state", agents: [], cards: [q("b", "x"), q("c", "y")], pages: [] }, 2).m, { ev: "app_quiet", on: false }, 3).m;
+  e = M.step(e, { ev: "app_key", key: "esc", local: true }, 4).m;
+  eq([M.view(e, 5).state, e.batch, Object.keys(e.later).sort()], ["idle", null, ["b", "c"]]);
+});
+
+law("S9 while you were away (amb-core m_9044): the core's away_summary is one card before any list, '3 done · 1 question · nothing broke', a row per project that moved; enter opens bise, a row its project, esc closes; nothing moved: no card", () => {
+  const projects = [{ project: "home", name: "bise", home: true }, { project: "storefront-5c1d", name: "storefront" }, { project: "engine-31aa", name: "engine" }];
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [], projects }, 0).m;
+  const since = new Date(2026, 9, 6, 8, 52).getTime();
+  m = M.step(m, { ev: "away_summary", since_ms: since, done: 3, questions: 1, failed: 0, projects: [{ project: "storefront-5c1d", done: 2, questions: 1, failed: 0 }, { project: "engine-31aa", done: 1, questions: 0, failed: 0 }, { project: "home", done: 0, questions: 0, failed: 0 }] }, 10).m;
+  const v = M.view(m, 20), s = Bar.spec(v);
+  eq([v.state, v.content, s.head.lab, s.text.s], ["away", { kind: "away", since: "08:52" }, { acc: "while you were away", rest: "08:52" }, "3 done · 1 question · nothing broke"]);
+  eq(s.sections[0].rows.map((r) => [r.t, r.sub]), [["storefront", "2 done · 1 question"], ["engine", "1 done"]]);
+  eq(M.step(m, { ev: "app_key", key: "enter", local: true }, 30).cmds, [{ cmd: "app_window", route: "bise" }]);
+  eq(M.step(m, s.sections[0].rows[0].act, 30).cmds, [{ cmd: "app_window", route: "project/storefront-5c1d" }]);
+  const gone = M.step(m, { ev: "app_key", key: "esc", local: true }, 30);
+  eq([gone.cmds, M.view(gone.m, 40).state], [[{ cmd: "app_hide" }], "idle"]);   // esc closes: nothing left, the app hides
+  // a failure says itself; nothing moved: no card
+  eq(Bar.spec(M.view(M.step(M.init(), { ev: "away_summary", since_ms: since, done: 0, questions: 0, failed: 1, projects: [] }, 0).m, 1)).text.s, "1 failed");
+  eq(M.view(M.step(M.init(), { ev: "away_summary", since_ms: since, done: 0, questions: 0, failed: 0, projects: [] }, 0).m, 1).state, "idle");
+});
+
+law("S9 a drop on the pearl (amb-mac m_9037): app_drop opens the spotlight with the files ('with'); enter alone sends them ({cmd:'send', files}), his words go with them, a link as text; the capsule says '→ bise · forest.ktx' until bise routes it", () => {
+  const files = [{ name: "forest.ktx", path: "/Users/you/Desktop/forest.ktx", kind: "file" }, { name: "shots", path: "/Users/you/shots", kind: "folder" }];
+  let r = M.step(M.init(), { ev: "app_drop", files }, 0);
+  eq(r.cmds, [{ cmd: "app_focus", on: true }]);
+  let s = Bar.spec(M.view(r.m, 10));
+  eq([s.kind, s.sections[0].label, s.sections[0].rows.map((x) => [x.g, x.t])], ["spotlight", "with", [["▢", "forest.ktx"], ["▤", "shots"]]]);
+  const sent = M.step(r.m, { ev: "ui_spot_send" }, 20);
+  eq(sent.cmds.filter((c) => c.cmd === "send"), [{ cmd: "send", text: "", files: ["/Users/you/Desktop/forest.ktx", "/Users/you/shots"] }]);
+  eq(M.view(M.step(sent.m, { ev: "sent" }, 30).m, 40).sub, "→ bise · forest.ktx +1");
+  // with his words; a dropped link goes as text
+  const w = M.step(M.step(M.init(), { ev: "app_drop", files: [], url: "https://grafana.internal/d/ingest" }, 0).m, { ev: "ui_spot_send", text: "why does this climb at 14 h" }, 10);
+  eq(w.cmds.filter((c) => c.cmd === "send"), [{ cmd: "send", text: "why does this climb at 14 h https://grafana.internal/d/ingest" }]);
+  // esc drops the drop
+  eq(M.step(r.m, { ev: "app_key", key: "esc", local: true }, 20).m.drop, null);
 });
 
 law("card seat (amb-mac 9c529bdd): while bise's window holds the cards (app_card_seat 'window') the bar keeps the hello and never turns into the card, its keys answer nothing; at 'bar' the card asks again (lead m_8746)", () => {

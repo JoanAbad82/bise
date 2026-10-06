@@ -188,8 +188,9 @@
         const a = v.ask;
         // the global main is called bise on ambient surfaces (v9; ambient m_8617 (1)): '? bise needs you'
         const asMain = !a.agent || a.agent === "main";
-        const [acc, rest] = a.batch ? a.title.split(" · ") : [asMain ? B.needs("bise") : a.label || B.needs(a.agent), B.now];
-        const more = a.more > 0 ? ` · +${a.more}` : "";
+        // a quiet batch (S9): '2 questions · about 1 min' and '1 of 2' over the card's own label
+        const [acc, rest] = a.batch9 ? [a.batch9.title, a.batch9.k] : a.batch ? a.title.split(" · ") : [asMain ? B.needs("bise") : a.label || B.needs(a.agent), B.now];
+        const more = a.more > 0 && !a.batch9 ? ` · +${a.more}` : "";   // a batch says '1 of 2' instead
         s.head = { h: 52, lab: { acc: a.batch ? `? ${acc}` : acc, rest: (rest || "") + more } };
         // the body takes a click too (pm's fail 45): drafts -> review (row 1), a question -> its full text
         if (a.batch) { s.big = a.text; s.bigAct = { ev: "ui_option", card: a.id, i: a.options[0].i }; }
@@ -205,6 +206,15 @@
         if (a.open) s.foot.left.push(item(["fn", "o"], B.openPage, key("o")));
         return s;
       }
+      // while you were away (S9): '3 done · 1 question · nothing broke', a row per project that moved
+      case "away": {
+        const A = v.away, S = Wd.s9;
+        s.head = { h: 52, lab: { acc: S.away, rest: A.since } };
+        s.text = { s: A.line };
+        if (A.rows.length) s.sections = [{ rows: A.rows.map((r) => ({ g: "ψ", t: r.name, sub: r.line, act: { ev: "ui_away", project: r.project }, qa: `away-${r.project}` })) }];
+        s.foot = { left: [item(["⏎"], S.open, { ev: "ui_away", project: null })], right: [item(["esc"], S.close, { ev: "ui_away" })] };
+        return s;
+      }
       case "hello": {
         s.head = { h: 68, line: v.text ? { words: { list: v.text.split(" "), lit: v.text.split(" ").length }, size: "hello" } : { text: "", size: "hello" } };
         s.foot = { left: [item(["fn"], B.talk, null, B.hold), item(["fn", "space"], B.type), item(["fn", "0"], B.goingOn), item(["fn", "o"], B.startHere)], right: [] };
@@ -212,6 +222,14 @@
       }
       case "find": return finder(s, v);
       case "spotlight": {
+        // a drop on the pearl (S9): its files first, 'with', and plain enter sends them
+        if (v.spot.drop) {
+          const d = v.spot.drop, r = v.spot.list ? spotlight(s, v) : v.find ? finder(s, v) : s;
+          r.head = { h: 68, input: { text: v.spot.text, ph: SP.ph }, right: { text: SP.to } };
+          r.sections = [{ label: Wd.s9.with, rows: [...d.files.map((f) => ({ g: f.kind === "folder" ? "▤" : f.kind === "image" ? "▣" : "▢", t: f.name, sub: f.path, fixed: true })),
+            ...(d.url ? [{ g: "↗", t: d.url, fixed: true }] : [])] }, ...(r.sections || [])];
+          return r;
+        }
         if (v.spot.list) return spotlight(s, v);
         if (v.find) return finder(s, v);
         const t = v.spot.text.trim();

@@ -365,5 +365,17 @@
   // an agent's row is a label, not a sentence: no final period
   const rowLabel = (s) => String(s || "").replace(/\.$/, "");
 
-  root.AmbWords = { W, spot, route, menu, GLYPH, idleLine, firstSentence, oneLine, doneLine, failLine, needsLine, answeredLine, card, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
+  // S9 (v9 'les cartes, hors de la fenêtre', ds/comps.py; ambient signs): the quiet batch, while
+  // you were away, a drop on the pearl
+  const s9 = {
+    batch: (n, min) => `${n} question${n === 1 ? "" : "s"} · about ${min} min`,
+    of: (i, n) => `${i} of ${n}`,
+    away: "while you were away", open: "open in bise", close: "close",
+    awayLine: (x, row) => {
+      const parts = [x.done ? `${x.done} done` : "", x.questions ? plural(x.questions, "question", "questions") : "", x.failed ? `${x.failed} failed` : ""].filter(Boolean);
+      return [...parts, ...(row || x.failed ? [] : ["nothing broke"])].join(" · ");
+    },
+    drop: (name) => `→ bise · ${name}`, with: "with",
+  };
+  root.AmbWords = { s9, W, spot, route, menu, GLYPH, idleLine, firstSentence, oneLine, doneLine, failLine, needsLine, answeredLine, card, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
 })(typeof window !== "undefined" ? window : globalThis);

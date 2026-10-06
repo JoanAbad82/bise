@@ -69,7 +69,13 @@
       // a permission ask is opened (until he answers); its refused line is a timed line, 8 s (amb-mac m_5679)
       case "perm": return { kind: v.perm ? "open" : "line" };
       // the card's own id and its project (ids are per hub; amb-mac m_8894 keys its once-per-card rule by both)
-      case "needs": { const c = asking[0]; return { kind: "needs", card: c && (c.cid ?? c.id), ...(c && c.project ? { project: c.project } : {}) }; }
+      case "needs": {
+        // a quiet batch (S9, amb-mac m_9037): the app shows the bar once for its card list
+        if (v.ask && v.ask.batch9) return { kind: "batch", cards: v.ask.batch9.cards };
+        const c = asking[0]; return { kind: "needs", card: c && (c.cid ?? c.id), ...(c && c.project ? { project: c.project } : {}) };
+      }
+      // while you were away (S9): shown once, like a card
+      case "away": return { kind: "away", since: v.away.since };
       case "idle": return { kind: "none" };
       // SPEC §0: never for done, failed, a page ready (they live in the menu-bar marble); an
       // answer's line (`cookies has it: yes.`), the morning page, a key's answer, the hub lost do

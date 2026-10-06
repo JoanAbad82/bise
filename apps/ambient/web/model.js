@@ -107,25 +107,8 @@
   // a page's name on your surfaces: its title, else its id with spaces (vision §3 B)
   const pageName = (p) => p.title || String(p.id).replace(/-/g, " ");
   const working = root.AmbPolicy.working;
-  // every project's open cards (amb-mac m_8894): home's come in state.cards, the others in the core's
-  // projects rows (ProjectRow.cards, 'question' for text); ids are per hub, so a project's card is
-  // '<project>#<id>' here and keeps its own id (cid) and project for the answer and the app
-  const projCards = (ps) => ps.filter((p) => !p.home).flatMap((p) => (p.cards || []).map((c) => ({ ...c, text: c.text ?? c.question ?? "", cid: c.id, id: `${p.project}#${c.id}`, project: p.project })));
-  const allCards = (m) => m.cards.concat(m.pcards || []);
-  const visibleCards = (m) => allCards(m).filter((c) => !m.answered[c.id]);
-  // an answer to a card, its own id and, for a project's, its project
-  const ansCmd = (card, reply) => ({ cmd: "answer", card: card.cid ?? card.id, reply, ...(card.cid != null ? { project: card.project } : {}) });
-  // what the question glass may ask: not a card he put off with esc (it keeps waiting in the inbox
-  // and the count, ambient m_6500), and in a call or a meeting only the urgent ones
-  // the card he brought up from fn i / fn 0 (m.frontCard) asks first, even in a call
-  // while bise's window holds the cards (app_card_seat 'window', amb-mac 9c529bdd) the bar asks
-  // nothing: it keeps what it shows (the hello, a line), its keys answer no card
-  const askable = (m) => {
-    if (m.seat === "window") return [];
-    const a = visibleCards(m).filter((c) => !(m.later || {})[c.id] && (c.id === m.frontCard || !m.quiet || c.urgent));
-    const i = a.findIndex((c) => c.id === m.frontCard);
-    return i > 0 ? [a[i], ...a.slice(0, i), ...a.slice(i + 1)] : a;
-  };
+  // every project's cards, answers, what the glass may ask, S9's batch, away and drop: cards.js (pure)
+  const C = root.AmbCards, { projCards, allCards, visibleCards, ansCmd, askable } = C;
   const lv = (m, who, now) => (now - m.lvl[who].at < T.level ? m.lvl[who].v : 0);
   const listening = (m) => m.fn || m.handsFree || m.phase === "listening";
   // can't reach bise: only a send the core never answered at all, 3 s on (lead m_8094)
@@ -174,7 +157,7 @@
     const was = TYPED.includes(m.pane), will = TYPED.includes(pane);
     if (was && !will) cmds.push({ cmd: "app_focus", on: false });
     if (will && !was) cmds.push({ cmd: "app_focus", on: true });
-    return { m: { ...m, pane, spotText: will && was ? m.spotText : "", rowSel: pane === m.pane ? m.rowSel || 0 : 0 }, cmds };
+    return { m: { ...m, pane, spotText: will && was ? m.spotText : m.drop && will ? m.spotText : "", drop: will ? m.drop : null, rowSel: pane === m.pane ? m.rowSel || 0 : 0 }, cmds };
   }
 
   // the bar's agents and the spotlight's list: spotlist.js (pure)
@@ -436,7 +419,11 @@
       case "app_card_seat":
         return none({ ...m, seat: ev.at === "window" ? "window" : "bar" });
       case "app_quiet":
-        return none({ ...m, quiet: ev.on ? { why: ev.why || "", until: +ev.until_ms || 0 } : null });
+        return none(C.quiet({ ...m, quiet: ev.on ? { why: ev.why || "", until: +ev.until_ms || 0 } : null }, !!ev.on));
+      // S9 (cards.js): while you were away (the core's answer to the app's away_back), a drop on the pearl
+      case "away_summary": return none(C.away(m, ev));
+      case "ui_away": return C.awayAct(m, ev.project);
+      case "app_drop": return setPane({ ...m, drop: C.drop(ev), spotText: "" }, "spot");
       // desktop S8: the menu-bar pearl's dropdown is this page (amb-mac m_8489/m_8514): app_menu
       // on places the bar under the icon; off (a click away, esc, a second click) leaves
       case "app_menu":
@@ -586,13 +573,13 @@
       }
       case "ui_spot_send":    // ⏎ send to main; tab (agent: true) start an agent, which main does
       case "ui_spot_tab": {
-        const text = (ev.text ?? m.spotText).trim();
-        if (!text) return none(m);
+        const text = (ev.text ?? m.spotText).trim(), d = m.pane === "spot" && m.drop;
+        if (!text && !d) return none(m);
         const r = setPane({ ...m, spotText: "" }, null);
         // tab: amb-core's own cmd start (e00ad291), which answers 'sent' like send; the words wait
-        // in m.pending until 'sent' (can't reach bise after 3 s)
-        const cmd = { cmd: ev.ev === "ui_spot_tab" ? "start" : "send", text };
-        return { m: { ...r.m, mine: true, voice: false, said: text, lastSent: text, turnNames: names(m.agents), chips: [], pending: { cmd, text, at: now } }, cmds: [...r.cmds, cmd] };
+        // in m.pending until 'sent' (can't reach bise after 3 s); a drop's files go with them (S9)
+        const cmd = d ? C.dropSend(d, text) : { cmd: ev.ev === "ui_spot_tab" ? "start" : "send", text };
+        return { m: { ...r.m, mine: true, voice: false, said: text, line: d ? Wd.s9.drop(C.dropName(d)) : null, lastSent: text || m.lastSent, turnNames: names(m.agents), chips: [], pending: { cmd, text: cmd.text, at: now } }, cmds: [...r.cmds, cmd] };
       }
       case "ui_perm":
         // continue: macOS's prompt; not now: the refused path (the app answers app_perm denied, and
@@ -627,6 +614,8 @@
     const none = (x) => ({ m: x, cmds: [] });
     // the 2 s after bise names the project: tab corrects it, fn esc cancels (v9)
     if (m.route && now < m.route.until && (k === "tab" || k === "esc")) return step(m, { ev: k === "tab" ? "ui_route_next" : "ui_route_cancel" }, now);
+    // while you were away (S9): enter opens bise, esc closes it
+    if (m.away && !m.pane && (k === "enter" || k === "esc")) return C.awayAct(m, k === "enter" ? null : undefined);
     const cards = visibleCards(m);
     if (/^[1-9]$/.test(k)) {
       // no pane: the card the glass asks (none while bise's window holds the cards)
@@ -653,7 +642,7 @@
     if (refused && k === "enter") return step(m, { ev: "ui_perm", perm: refused.perm, do: "settings" }, now);
     if (refused && k === "esc") return none({ ...m, flashes: m.flashes.filter((f) => f !== refused) });
     if (asked && k === "esc" && !helloOn(m, now) && !listening(m) && m.phase !== "speaking") {
-      return none({ ...m, later: { ...(m.later || {}), [asked.id]: true }, optSel: 0, optFor: null });
+      return none({ ...(C.batchLeft(m).includes(asked.id) ? C.batchLater(m) : m), later: { ...(C.batchLeft(m).includes(asked.id) ? C.batchLater(m).later : m.later || {}), [asked.id]: true }, optSel: 0, optFor: null });
     }
     switch (k) {
       // fn + ⏎: a card asked from a page opens that page at the question (amb-core, 7e41f98e:
@@ -809,7 +798,7 @@
     } else if (m.pane === "spot") {
       v.state = "spotlight"; v.size = "open";
       // the key bar: `tab start an agent` only once there is text (designer)
-      v.spot = { text: m.spotText, hint: W.spotHint, keys: W.spotKeys.filter(([k]) => k !== "tab" || m.spotText.trim()) };
+      v.spot = { drop: m.drop || null, text: m.spotText, hint: W.spotHint, keys: W.spotKeys.filter(([k]) => k !== "tab" || m.spotText.trim()) };
       // desktop S8 (v9 'fn espace, la spotlight'): what waits, what works, the environments, and
       // typing finds an agent or an environment; ⏎ follows the shape of what he typed
       if (m.agents.length || m.projects.some((p) => !p.home) || visibleCards(m).length) v.spot.list = spotList(m, wall);
@@ -975,8 +964,11 @@
       v.state = "hub_down"; v.text = W.hubDown; v.frozen = true;
       // start bise from here too, naming the bise the app runs (lead m_8108 (2); null: no row)
       v.bise = m.bisePath;
+    } else if (m.away) {
+      v.state = "away"; v.size = "open"; v.away = C.awayView(m, m.tz);   // S9: before any list
     } else if (need) {
       v.state = "needs"; v.size = "open"; v.ask = ask();
+      v.ask.batch9 = C.batchHead(m, asking[0]);   // S9: the batch head and its count
     } else {
       // at rest nothing shows (docs/ambient-app.md §8, 'out of the way'): no status line; the app
       // hides the capsule (app_content none) and the menu-bar icon carries the count
