@@ -71,6 +71,8 @@
   }
   const show = (node, on) => node.classList.toggle("on", !!on);
   // a key, or a chord as caps side by side ('–' a dash between them, never a '+')
+  // a line in parts, each its own color (the away summary: '1 question' pink, '▲ 1 failed' red)
+  const parts = (ps) => ps.map((p) => (p.gc ? `<span class="${esc(p.gc)}">${esc(p.t)}</span>` : esc(p.t))).join(" · ");
   const caps = (keys) => (keys || []).map((k) => (k === "–" ? `<span class="dash">–</span>` : `<kbd class="k">${esc(k)}</kbd>`)).join("");
   const act = (a) => (a ? ` data-act="${esc(JSON.stringify(a))}"` : "");
   const hint = (it, cls = "fi") => {
@@ -150,7 +152,7 @@
       const tag = r.fixed || !r.act ? "div" : "button";
       const role = r.right && r.right.sw != null ? ` role="switch" aria-checked="${!!r.right.sw}"` : "";
       const mk = r.mark || {};
-      return `<${tag}${tag === "button" ? ' type="button"' : ""} class="row${r.fixed ? " fixed" : ""}${r.seen ? " seen" : ""}${r.sub && mk.t !== undefined ? " two" : ""}" data-r="${i}" data-row="${i}" data-qa="${esc(r.qa || `row-${i}`)}"${act(r.act)}${role} style="${quiet ? "animation:none" : `animation-delay:${i * 20}ms`}"><span class="g ${r.gc || ""}" aria-hidden="true">${g}</span><span class="t">${marked(r.t, mk.t)}${r.p ? `<em class="p"> · ${esc(r.p)}</em>` : ""}${r.sub ? `<small>${marked(r.sub, mk.sub)}</small>` : ""}</span><span class="s">${right}</span></${tag}>`;
+      return `<${tag}${tag === "button" ? ' type="button"' : ""} class="row${r.fixed ? " fixed" : ""}${r.seen ? " seen" : ""}${r.sub && mk.t !== undefined ? " two" : ""}" data-r="${i}" data-row="${i}" data-qa="${esc(r.qa || `row-${i}`)}"${act(r.act)}${role} style="${quiet ? "animation:none" : `animation-delay:${i * 20}ms`}"><span class="g ${r.gc || ""}" aria-hidden="true">${g}</span><span class="t">${marked(r.t, mk.t)}${r.p ? `<em class="p"> · ${esc(r.p)}</em>` : ""}${r.sub ? `<small>${r.subParts ? parts(r.subParts) : marked(r.sub, mk.sub)}</small>` : ""}</span><span class="s">${right}</span></${tag}>`;
     }).join("")).join("");
   }
   const strip = (sections) => sections.map((s) => ({ ...s, rows: s.rows.map(({ sel, ...r }) => r) }));
@@ -230,7 +232,7 @@
       // the card's body takes a real click (pm's fail 45): the question's full text, the drafts'
       // big line their first row (review)
       el.mid.innerHTML = (s.big ? `<div class="big"${s.bigAct ? ` data-qa="body"${act(s.bigAct)}` : ""}>${esc(s.big)}</div>` : "")
-        + (t ? `<div class="text${t.clamp && !t.full ? " clamp" : ""}${t.dim ? " dim" : ""}${t.path ? " path" : ""}"${t.act ? ` data-qa="body"${act(t.act)}` : ""}>${esc(t.s)}</div>` : "");
+        + (t ? `<div class="text${t.clamp && !t.full ? " clamp" : ""}${t.dim ? " dim" : ""}${t.path ? " path" : ""}"${t.act ? ` data-qa="body"${act(t.act)}` : ""}>${t.parts ? parts(t.parts) : esc(t.s)}</div>` : "");
       show(el.mid, s.big || t);
     });
     const rowsOn = s.sections.some((x) => x.rows.length || x.label);

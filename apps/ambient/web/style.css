@@ -69,6 +69,7 @@ html:not(.app) .glass { -webkit-backdrop-filter: blur(40px) saturate(1.8); backd
 .q.wrap { transition: color .2s var(--ease-out); }
 .q.wrap.dim { color: var(--dim); }
 .q.dim { color: var(--dim); }
+.text .a, .row small .a { color: var(--acc); } .text .risk, .row small .risk { color: var(--risk); }
 .q.big { animation: qin .16s linear; }
 @keyframes qin { from { opacity: 0; } }
 .q .gl { color: var(--faint); }

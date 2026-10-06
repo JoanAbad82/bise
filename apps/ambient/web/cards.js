@@ -58,7 +58,7 @@
     const a = m.away;
     const hm = new Date(a.since_ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, ...(tz ? { timeZone: tz } : {}) });
     const name = (id) => (m.projects.find((p) => p.project === id) || {}).name || id;
-    return { since: hm, line: Wd.s9.awayLine(a), rows: a.projects.map((p) => ({ project: p.project, name: name(p.project), line: Wd.s9.awayLine(p, true) })) };
+    return { since: hm, line: Wd.s9.awayParts(a), rows: a.projects.map((p) => ({ project: p.project, name: name(p.project), line: Wd.s9.awayParts(p) })) };
   }
   // ⏎ or a row: bise's window (a row: that project), the card goes; esc: it goes
   function awayAct(m, project) {

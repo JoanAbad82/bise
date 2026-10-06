@@ -209,9 +209,11 @@
       // while you were away (S9): '3 done · 1 question · nothing broke', a row per project that moved
       case "away": {
         const A = v.away, S = Wd.s9;
-        s.head = { h: 52, lab: { acc: S.away, rest: A.since } };
-        s.text = { s: A.line };
-        if (A.rows.length) s.sections = [{ rows: A.rows.map((r) => ({ g: "ψ", t: r.name, sub: r.line, act: { ev: "ui_away", project: r.project }, qa: `away-${r.project}` })) }];
+        // the head is dim (nothing in it waits on him); the questions are pink, a failure red (ambient m_9111)
+        const txt = (parts) => parts.map((p) => p.t).join(" · ");
+        s.head = { h: 52, lab: { acc: "", rest: `${S.away} · ${A.since}` } };
+        s.text = { s: txt(A.line), parts: A.line };
+        if (A.rows.length) s.sections = [{ rows: A.rows.map((r) => ({ g: "ψ", t: r.name, sub: txt(r.line), subParts: r.line, act: { ev: "ui_away", project: r.project }, qa: `away-${r.project}` })) }];
         s.foot = { left: [item(["⏎"], S.open, { ev: "ui_away", project: null })], right: [item(["esc"], S.close, { ev: "ui_away" })] };
         return s;
       }

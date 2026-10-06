@@ -131,8 +131,8 @@
     { name: "stock", status: "working", title: "flash sale replay · 62%", project: "storefront-5c1d", followed: true, job: { label: "flash sale replay", step: 6200, steps: 10000, unit: "orders" } },
     { name: "netcode", status: "working", title: "co-op at 150 ms · run 3 of 8", project: "engine-31aa" },
     { name: "streaming", status: "done", title: "40 ms → 15 ms, ready to merge", project: "engine-31aa" }];
-  const CARDS8 = [{ id: "c-alerts", agent: "alerts", project: "telemetry-8e02", title: "compaction at 03:00?", text: "passer la compaction de 14:00 à 03:00 ?", options: ["move it to 03:00", "leave it"] },
-    { id: "c-search", agent: "search", project: "storefront-5c1d", title: "reindex tonight 02:00?", text: "réindexer ce soir à 02:00 ?", options: ["tonight 02:00", "now, second index"] }];
+  const CARDS8 = [{ id: "c-alerts", agent: "alerts", project: "telemetry-8e02", title: "compaction at 03:00?", text: "move the 14:00 compaction to 03:00?", options: ["move it to 03:00", "leave it"] },
+    { id: "c-search", agent: "search", project: "storefront-5c1d", title: "reindex tonight 02:00?", text: "reindex tonight at 02:00, or now?", options: ["tonight 02:00", "now, second index"] }];
   const s8 = () => [[0, { ev: "hub", up: true, workspace: "~/bise" }], [0, { ev: "state", agents: AG8, cards: CARDS8, projects: PROJ }],
     [0, { ev: "app_front", app: "Chrome", bundle: "com.google.Chrome", url: "https://grafana.internal/d/ingest", title: "ingest p99" }]];
 

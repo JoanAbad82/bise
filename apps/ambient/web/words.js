@@ -371,10 +371,10 @@
     batch: (n, min) => `${n} question${n === 1 ? "" : "s"} · about ${min} min`,
     of: (i, n) => `${i} of ${n}`,
     away: "while you were away", open: "open in bise", close: "close",
-    awayLine: (x, row) => {
-      const parts = [x.done ? `${x.done} done` : "", x.questions ? plural(x.questions, "question", "questions") : "", x.failed ? `${x.failed} failed` : ""].filter(Boolean);
-      return [...parts, ...(row || x.failed ? [] : ["nothing broke"])].join(" · ");
-    },
+    // only what is (ambient m_9111): '3 done · 1 question', '▲ 1 failed' in red when something
+    // failed; pink only for what waits on him (the questions)
+    awayParts: (x) => [x.done ? { t: `${x.done} done` } : null, x.questions ? { t: plural(x.questions, "question", "questions"), gc: "a" } : null,
+      x.failed ? { t: `▲ ${x.failed} failed`, gc: "risk" } : null].filter(Boolean),
     drop: (name) => `→ bise · ${name}`, with: "with", send: "send to bise",
   };
   root.AmbWords = { s9, W, spot, route, menu, GLYPH, idleLine, firstSentence, oneLine, doneLine, failLine, needsLine, answeredLine, card, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };

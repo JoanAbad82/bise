@@ -1332,20 +1332,22 @@ law("S9 quiet batch (amb-mac m_9037): cards that come while quiet wait (an urgen
   eq([M.view(e, 5).state, e.batch, Object.keys(e.later).sort()], ["idle", null, ["b", "c"]]);
 });
 
-law("S9 while you were away (amb-core m_9044): the core's away_summary is one card before any list, '3 done · 1 question · nothing broke', a row per project that moved; enter opens bise, a row its project, esc closes; nothing moved: no card", () => {
+law("S9 while you were away (amb-core m_9044): the core's away_summary is one card before any list, '3 done · 1 question' (pink questions, a red ▲ failure, the head dim), a row per project that moved; enter opens bise, a row its project, esc closes; nothing moved: no card", () => {
   const projects = [{ project: "home", name: "bise", home: true }, { project: "storefront-5c1d", name: "storefront" }, { project: "engine-31aa", name: "engine" }];
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [], projects }, 0).m;
   const since = new Date(2026, 9, 6, 8, 52).getTime();
   m = M.step(m, { ev: "away_summary", since_ms: since, done: 3, questions: 1, failed: 0, projects: [{ project: "storefront-5c1d", done: 2, questions: 1, failed: 0 }, { project: "engine-31aa", done: 1, questions: 0, failed: 0 }, { project: "home", done: 0, questions: 0, failed: 0 }] }, 10).m;
   const v = M.view(m, 20), s = Bar.spec(v);
-  eq([v.state, v.content, s.head.lab, s.text.s], ["away", { kind: "away", since: "08:52" }, { acc: "while you were away", rest: "08:52" }, "3 done · 1 question · nothing broke"]);
-  eq(s.sections[0].rows.map((r) => [r.t, r.sub]), [["storefront", "2 done · 1 question"], ["engine", "1 done"]]);
+  // only what is, the head dim, only the questions pink (ambient m_9111)
+  eq([v.state, v.content, s.head.lab, s.text.s], ["away", { kind: "away", since: "08:52" }, { acc: "", rest: "while you were away · 08:52" }, "3 done · 1 question"]);
+  eq(s.text.parts, [{ t: "3 done" }, { t: "1 question", gc: "a" }]);
+  eq(s.sections[0].rows.map((r) => [r.t, r.sub, r.subParts.map((p) => p.gc || "")]), [["storefront", "2 done · 1 question", ["", "a"]], ["engine", "1 done", [""]]]);
   eq(M.step(m, { ev: "app_key", key: "enter", local: true }, 30).cmds, [{ cmd: "app_window", route: "bise" }]);
   eq(M.step(m, s.sections[0].rows[0].act, 30).cmds, [{ cmd: "app_window", route: "project/storefront-5c1d" }]);
   const gone = M.step(m, { ev: "app_key", key: "esc", local: true }, 30);
   eq([gone.cmds, M.view(gone.m, 40).state], [[{ cmd: "app_hide" }], "idle"]);   // esc closes: nothing left, the app hides
   // a failure says itself; nothing moved: no card
-  eq(Bar.spec(M.view(M.step(M.init(), { ev: "away_summary", since_ms: since, done: 0, questions: 0, failed: 1, projects: [] }, 0).m, 1)).text.s, "1 failed");
+  eq(Bar.spec(M.view(M.step(M.init(), { ev: "away_summary", since_ms: since, done: 2, questions: 0, failed: 1, projects: [] }, 0).m, 1)).text.parts, [{ t: "2 done" }, { t: "▲ 1 failed", gc: "risk" }]);
   eq(M.view(M.step(M.init(), { ev: "away_summary", since_ms: since, done: 0, questions: 0, failed: 0, projects: [] }, 0).m, 1).state, "idle");
 });
 
