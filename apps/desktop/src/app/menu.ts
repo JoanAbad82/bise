@@ -7,6 +7,7 @@
 import { useEffect, useRef } from 'react';
 import type { MenuAction } from '@/shared/api';
 import type { Router } from './router';
+import { parseRoute } from './route';
 
 type Listener = (action: MenuAction) => void;
 const listeners = new Set<Listener>();
@@ -26,6 +27,21 @@ export function useMenuRouting(router: Router) {
       const screen = routeOfMenu(action);
       if (screen !== undefined) router.go({ screen });
       else for (const l of [...listeners]) l(action);
+    });
+  }, [router]);
+}
+
+/**
+ * In the shell: a route main sends this live window (the capsule's
+ * openWindow(route) while the window is open, amb-mac b9f1fc04) goes to the
+ * router; a wrong one shows notfound, as a link.
+ */
+export function useMainRoutes(router: Router) {
+  useEffect(() => {
+    const bise = (window as Partial<Window>).bise;
+    if (bise === undefined) return;
+    return bise.onRoute((route) => {
+      router.go(parseRoute(route));
     });
   }, [router]);
 }

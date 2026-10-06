@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
 import { formatRoute, startRouteOf, type Route } from './route';
-import { useMenuRouting } from './menu';
+import { useMainRoutes, useMenuRouting } from './menu';
 import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { Main, Row, Side, Win } from '@/ds';
 import '@/ds/index.css';
@@ -36,7 +36,9 @@ function testMode(): boolean {
 
 function Shell() {
   useHistoryKeys();
-  useMenuRouting(useRouter());
+  const router = useRouter();
+  useMenuRouting(router);
+  useMainRoutes(router);
   return (
     <div className="app-shell" data-testid="app.root">
       <Win side={<Sidebar />} main={<Current />} />
