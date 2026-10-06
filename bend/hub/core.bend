@@ -2085,11 +2085,21 @@ def rename.old(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +new
       pick_lazy(X.Cx<o>, String.eq(old, M.MAIN()), u => notice(o, cx, String.append("no agent named @", name)),
         u => rename.go(o, valid && Bool.not(M.name_taken(st(o, cx), new)), cx, old, new))
 
+# the typed fact of a stop (desktop reset, architect m_9650 D): in the same
+# step as the interrupt, a 'stopped' line in that agent's feed; the thread's
+# fold turns it into an entry of kind 'stopped' at its position
+def stopped(-o: M.St, +cx: X.Cx<o>, +agent: String) -> X.Cx<o>:
+  line(o, cx, agent, "stopped", "stopped")
+
+# the interrupt's effect for that agent (the shell flags its REPL)
+def interrupt.fx(-o: M.St, +cx: X.Cx<o>, +n: String) -> X.Cx<o>:
+  out(o, cx, [J.kv("fx", J.JStr{"interrupt"}), J.kv("agent", J.JStr{n})])
+
 def interrupt.go(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>) -> X.Cx<o>:
   match m:
     case Some{+n}:
       pick_lazy(X.Cx<o>, is_busy(X.Rt.run(rt(o, cx, n))),
-        u => out(o, cx, [J.kv("fx", J.JStr{"interrupt"}), J.kv("agent", J.JStr{n})]),
+        u => stopped(o, interrupt.fx(o, cx, n), n),
         u => notice(o, cx, "no turn in progress to interrupt"))
     case None{}:
       notice(o, cx, "no turn in progress to interrupt")
@@ -2773,7 +2783,7 @@ def req_interrupt(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +ag
       reply_err(o, cx, token, String.append("no agent named ", agent))
     case Some{+n}:
       pick_lazy(X.Cx<o>, is_busy(X.Rt.run(rt(o, cx, n))),
-        u => reply(o, out(o, cx, [J.kv("fx", J.JStr{"interrupt"}), J.kv("agent", J.JStr{n})]), token, ok_body(Nil{})),
+        u => reply(o, stopped(o, interrupt.fx(o, cx, n), n), token, ok_body(Nil{})),
         u => reply_err(o, cx, token, "no turn in progress"))
 
 def req_stop(-o: M.St, m: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +agent: String, +reason: String) -> X.Cx<o>:

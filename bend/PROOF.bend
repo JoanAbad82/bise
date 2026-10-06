@@ -5306,3 +5306,15 @@ def Laws.card_choice_words_refused(o, cx, c, text, e):
 def Laws.xhub_ask_needs_words(text, b, e):
   %Equal.sym(Bool, HM.trim_is_empty(text), b, e) : {Bool.pick(Maybe<&2, String>, _, Some{"empty question"}, None{}) == Bool.pick(Maybe<&2, String>, b, Some{"empty question"}, None{}) : Maybe<&2, String>}
   {==}
+
+def Laws.interrupt_says_stopped_once(o, cx, n, e):
+  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.stopped(o, HC.interrupt.fx(o, cx, n), n), u => HC.notice(o, cx, "no turn in progress to interrupt")) == HC.line(o, HC.interrupt.fx(o, cx, n), n, "stopped", "stopped") : HX.Cx<o>}
+  {==}
+
+def Laws.interrupt_idle_says_nothing(o, cx, n, e):
+  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.stopped(o, HC.interrupt.fx(o, cx, n), n), u => HC.notice(o, cx, "no turn in progress to interrupt")) == HC.notice(o, cx, "no turn in progress to interrupt") : HX.Cx<o>}
+  {==}
+
+def Laws.req_interrupt_says_stopped_once(o, cx, token, agent, n, e):
+  %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.reply(o, HC.stopped(o, HC.interrupt.fx(o, cx, n), n), token, HC.ok_body(Nil{})), u => HC.reply_err(o, cx, token, "no turn in progress")) == HC.reply(o, HC.line(o, HC.interrupt.fx(o, cx, n), n, "stopped", "stopped"), token, HC.ok_body(Nil{})) : HX.Cx<o>}
+  {==}

@@ -5,7 +5,7 @@
 import type { FnContext } from './context';
 import type { Opt, ReportKind } from './rows';
 
-export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report";
+export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped";
 
 /**
  * What a tool call did, for the counted summary.

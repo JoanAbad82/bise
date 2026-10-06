@@ -2127,6 +2127,27 @@ fn an_interrupt_names_who_asked() {
     assert_eq!(by_of(&fx).as_deref(), Some("user"), "{:?}", fx);
 }
 
+// desktop reset (architect m_9650 D): an interrupt of a running turn writes,
+// in the same step, one 'stopped' line in that agent's feed (the thread's
+// typed 'stopped' entry); an interrupt with no turn running writes none
+#[test]
+fn an_interrupt_writes_a_stopped_line_in_the_same_step() {
+    let mut t = T::new();
+    t.spawn_task("net"); // its first turn is running
+    let stopped = |fx: &[Effect]| {
+        fx.iter()
+            .filter(|e| matches!(e, Effect::Line { agent, line } if agent == "net" && line == "sb stopped : stopped"))
+            .count()
+    };
+    let fx = t.go(Input::ClientInterrupt { client: 1, agent: "net".into() });
+    assert!(fx.iter().any(|e| matches!(e, Effect::Interrupt { agent, .. } if agent == "net")), "{:?}", fx);
+    assert_eq!(stopped(&fx), 1, "{:?}", fx);
+    let (_, fx) = t.req(MAIN, AgentReq::Interrupt { agent: "net".into() });
+    assert_eq!(stopped(&fx), 1, "sb interrupt from main too: {:?}", fx);
+    let fx = t.go(Input::ClientInterrupt { client: 1, agent: "nobody".into() });
+    assert_eq!(fx.iter().filter(|e| matches!(e, Effect::Line { line, .. } if line.starts_with("sb stopped"))).count(), 0, "{:?}", fx);
+}
+
 // ---- BISE-04: hub line protocol v2 (contract C2) ----
 
 fn send_v2(t: &mut T, from: &str, to: &str, text: &str, expect: bool, reply_to: Option<u64>, why: &str) -> Vec<Effect> {

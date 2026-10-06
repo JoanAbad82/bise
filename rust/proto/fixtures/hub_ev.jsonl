@@ -5,6 +5,7 @@
 {"ev":"thread","project":"acme-1a2b3c4d","agent":"perf","entries":[{"pos":200,"at_ms":1791090000000,"kind":"agent","text":"an older reply"}],"before":200,"more":true}
 {"ev":"entry","project":"acme-1a2b3c4d","agent":"perf","entry":{"pos":16,"at_ms":1791100016000,"kind":"tools","text":"searched once","tools":{"count":1,"summary":"searched once","items":[{"pos":16,"at_ms":1791100016000,"text":"looking for the slow query","kind":"search"}]}}}
 {"ev":"entry","project":"acme-1a2b3c4d","agent":"perf","entry":{"pos":17,"at_ms":1791100017000,"kind":"tools","text":"edited 1 file, 1 other step","tools":{"count":2,"summary":"edited 1 file, 1 other step","items":[{"pos":17,"at_ms":1791100017000,"text":"patching the query","kind":"edit"},{"pos":18,"at_ms":1791100018000,"text":"browser: opened the dashboard","kind":"other"}]}}}
+{"ev":"entry","project":"acme-1a2b3c4d","agent":"perf","entry":{"pos":19,"at_ms":1791100019000,"kind":"stopped","text":"stopped"}}
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":"running the tests"}
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":""}
 {"ev":"error","project":"acme-1a2b3c4d","cmd":"send","text":"send: context isn't supported yet"}

@@ -5278,3 +5278,36 @@ law image_why_checks:
     Con{Im.img_why(4, "QUJD"), Nil{}}}}}
     == Con{"empty file", Con{"invalid base64", Con{"invalid base64", Con{"", Nil{}}}}}
     : List<&2, String>}
+
+# ---- a stopped turn is a typed fact (desktop reset, architect m_9650 D,
+# m_9693): sb-core, where the interrupt is decided, writes one 'stopped'
+# line in that agent's feed in the same step as fx interrupt ----
+
+# LAW: the window's or the TUI's interrupt of a running turn emits fx
+# interrupt and then exactly one 'stopped' line for that agent.
+law interrupt_says_stopped_once:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +n: String
+  for e: {HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))) == True{} : Bool}
+  {HC.interrupt.go(o, Some{n}, cx) == HC.line(o, HC.interrupt.fx(o, cx, n), n, "stopped", "stopped") : HX.Cx<o>}
+
+# LAW: with no turn running, the interrupt is only a notice: no fx
+# interrupt, no 'stopped' line.
+law interrupt_idle_says_nothing:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +n: String
+  for e: {HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))) == False{} : Bool}
+  {HC.interrupt.go(o, Some{n}, cx) == HC.notice(o, cx, "no turn in progress to interrupt") : HX.Cx<o>}
+
+# LAW: an agent's `sb interrupt` of a running turn says it the same way
+# (one 'stopped' line after fx interrupt), then answers ok.
+law req_interrupt_says_stopped_once:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +token: Nat
+  for +agent: String
+  for +n: String
+  for e: {HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))) == True{} : Bool}
+  {HC.req_interrupt(o, Some{n}, cx, token, agent) == HC.reply(o, HC.line(o, HC.interrupt.fx(o, cx, n), n, "stopped", "stopped"), token, HC.ok_body(Nil{})) : HX.Cx<o>}

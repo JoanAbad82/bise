@@ -25,6 +25,9 @@ pub enum EntryKind {
     Card,
     Page,
     Report,
+    /// its turn was stopped (an interrupt: sb-core's `stopped` line, written
+    /// in the same step as the interrupt)
+    Stopped,
 }
 
 /// What a tool call did, for the counted summary.
@@ -408,6 +411,10 @@ impl Fold<'_> {
                     e.from = Some(from);
                     self.cont = Some(self.push(e));
                 }
+                // an interrupt (sb-core writes it in the interrupt's step)
+                "stopped" => {
+                    self.push(Entry::new(pos, ms, EntryKind::Stopped, text));
+                }
                 "msg-you" => {
                     let (_, body) = text.split_once(" : ").unwrap_or(("", text.as_str()));
                     self.cont = Some(self.push(Entry::new(pos, ms, EntryKind::Agent, body.to_string())));
@@ -519,6 +526,24 @@ mod tests {
         assert_eq!(e[6].text, "Perf notes v2");
         // closed card: answered
         assert!(fold(&lines(), &ctx_with(&[], &page))[5].card.as_ref().unwrap().answered);
+    }
+
+    /// An interrupt's 'stopped' line (sb-core, architect m_9650 D) is an
+    /// entry of its own at its position, and ends the message before it.
+    #[test]
+    fn a_stopped_line_is_a_stopped_entry() {
+        let page = |_: &str| None;
+        let ls = vec![
+            (1, 1001, "sb you : go".to_string()),
+            (2, 1002, "  obs: assistant: working on".to_string()),
+            (3, 1003, "sb stopped : stopped".to_string()),
+            (4, 1004, "a line after".to_string()),
+        ];
+        let e = fold(&ls, &ctx_with(&[], &page));
+        let kinds: Vec<EntryKind> = e.iter().map(|e| e.kind).collect();
+        assert_eq!(kinds, [EntryKind::You, EntryKind::Agent, EntryKind::Stopped]);
+        assert_eq!((e[2].pos, e[2].text.as_str()), (3, "stopped"));
+        assert_eq!(e[1].text, "working on", "the line after the stop doesn't join the agent's message");
     }
 
     /// Law (architect m_9048): a context line attaches only to the 'you'

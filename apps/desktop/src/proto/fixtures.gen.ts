@@ -17,6 +17,7 @@ export const hub_ev: readonly HubEv[] = [
   {"agent":"perf","before":200,"entries":[{"at_ms":1791090000000,"kind":"agent","pos":200,"text":"an older reply"}],"ev":"thread","more":true,"project":"acme-1a2b3c4d"},
   {"agent":"perf","entry":{"at_ms":1791100016000,"kind":"tools","pos":16,"text":"searched once","tools":{"count":1,"items":[{"at_ms":1791100016000,"kind":"search","pos":16,"text":"looking for the slow query"}],"summary":"searched once"}},"ev":"entry","project":"acme-1a2b3c4d"},
   {"agent":"perf","entry":{"at_ms":1791100017000,"kind":"tools","pos":17,"text":"edited 1 file, 1 other step","tools":{"count":2,"items":[{"at_ms":1791100017000,"kind":"edit","pos":17,"text":"patching the query"},{"at_ms":1791100018000,"kind":"other","pos":18,"text":"browser: opened the dashboard"}],"summary":"edited 1 file, 1 other step"}},"ev":"entry","project":"acme-1a2b3c4d"},
+  {"agent":"perf","entry":{"at_ms":1791100019000,"kind":"stopped","pos":19,"text":"stopped"},"ev":"entry","project":"acme-1a2b3c4d"},
   {"agent":"perf","ev":"typing","project":"acme-1a2b3c4d","text":"running the tests"},
   {"agent":"perf","ev":"typing","project":"acme-1a2b3c4d","text":""},
   {"cmd":"send","ev":"error","project":"acme-1a2b3c4d","text":"send: context isn't supported yet"},
