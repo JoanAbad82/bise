@@ -214,6 +214,9 @@ pub struct Core {
     next_utt: UttId,
     /// the shot for the next message
     shot: Option<Shot>,
+    /// the fn context for the next message (S9): its `shot` filled from
+    /// the shot at send
+    fn_ctx: Option<bise_proto::context::FnContext>,
     /// shots sent, forgotten (deleted) at the end of main's turn
     sent_shots: Vec<Shot>,
     /// the pages of the last state: (id, title)
@@ -278,6 +281,7 @@ impl Core {
             speech: None,
             next_utt: 1,
             shot: None,
+            fn_ctx: None,
             sent_shots: Vec::new(),
             page_titles: Vec::new(),
             batches_seen: Vec::new(),
@@ -332,7 +336,8 @@ impl Core {
                     return self.page_voice_over(&page, "cancel", "");
                 }
                 if self.talk.take().is_some() {
-                    // the shot of fn down was for these words
+                    // the shot and context of fn down were for these words
+                    self.fn_ctx = None;
                     if let Some(s) = self.shot.take() {
                         self.forget(vec![s]);
                     }
@@ -340,6 +345,8 @@ impl Core {
                 }
             }
             Cmd::Shot { path, app, title } => self.take_shot(&path, app, title),
+            // the latest fn wins; an excluded app's `{}` clears
+            Cmd::FnContext(c) => self.fn_ctx = Some(c).filter(|c| *c != bise_proto::context::FnContext::default()),
             Cmd::Send { text } => {
                 let text = text.trim().to_string();
                 if !text.is_empty() || self.shot.is_some() {
@@ -504,6 +511,7 @@ impl Core {
             return self.page_voice_over(page, phase, &words);
         }
         if words.is_empty() {
+            self.fn_ctx = None;
             if let Some(s) = self.shot.take() {
                 self.forget(vec![s]);
             }
@@ -541,8 +549,18 @@ impl Core {
             Some(s) => format!("{words}\n\n{}", s.marker()),
             None => words.clone(),
         };
+        // S9: the fn context goes as a field (the hub frames it after his
+        // words, its one render); its shot is the stored file, a path in
+        // the image store (the window's thumbnail), never the app's PNG
+        let ctx = self.fn_ctx.take().map(|mut c| {
+            c.shot = shot.as_ref().map(|s| s.stored.file.display().to_string());
+            c
+        });
         // via: the hub tells main it came from the capsule (one short line back)
-        let input = json!({"op": "input", "focus": "main", "text": text, "via": via});
+        let mut input = json!({"op": "input", "focus": "main", "text": text, "via": via});
+        if let Some(c) = ctx {
+            input["context"] = json!(c);
+        }
         if !self.hub.send(&input) {
             if let Some(s) = shot {
                 self.forget(vec![s]);

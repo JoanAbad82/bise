@@ -4,6 +4,7 @@
 //! (projects, open, project_add) are other types ([`crate::draft`]), so
 //! they can't reach a hub or come from one.
 
+use crate::context::FnContext;
 use crate::diff::{DiffFile, DiffResult};
 use crate::rows::{Agent, Artifact, Card, DevServer, Merged, Worktree};
 use crate::thread::Entry;
@@ -174,15 +175,16 @@ pub enum HubCmd {
         limit: Option<u32>,
     },
     /// his words to an agent (main included), as the TUI sends them;
-    /// `context`: decision F's fields, refused with an error until its
-    /// stream renders it
+    /// `context`: what was on his screen at fn (S9): the hub frames it
+    /// after his words for the model (switchboard's fn_context::render)
+    /// and keeps it on his thread entry
     Send {
         project: Project,
         agent: String,
         text: String,
         mode: Mode,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        context: Option<Value>,
+        context: Option<FnContext>,
     },
     /// a card's answer: an option's number or words (approvals and merges
     /// included: the hub's one /answer path)

@@ -225,9 +225,6 @@ impl Shell {
                 self.proto_send(id, &HubEv::Thread { project, agent, entries, before, more });
             }
             HubCmd::Send { agent, text, mode, context, .. } => {
-                if context.is_some() {
-                    return self.proto_error(id, &tag, "send's context isn't taken yet: send the words alone");
-                }
                 if !known(self, &agent) {
                     return self.proto_error(id, &tag, &format!("no agent {agent}"));
                 }
@@ -240,7 +237,9 @@ impl Shell {
                 if queued && text.trim_start().starts_with('/') {
                     return self.proto_error(id, &tag, "a command can't wait in the queue: send it now");
                 }
-                self.client_line(id, json!({"op": "input", "focus": agent, "text": text, "queued": queued}));
+                // S9: the fn context as a field of the input op, never
+                // rendered here (the input arm's one render)
+                self.client_line(id, json!({"op": "input", "focus": agent, "text": text, "queued": queued, "context": context}));
             }
             HubCmd::Answer { card, reply, .. } => {
                 if !self.hub.st.open_cards().any(|c| c.id == card) {

@@ -13,6 +13,10 @@ pub enum Cmd {
     TalkEnd,
     TalkCancel,
     Shot { path: PathBuf, app: String, title: String },
+    /// S9 (amb-mac m_9035): what the app read of his front app at fn
+    /// (talk or spotlight), sent apart from talk_start; `{}` (an excluded
+    /// app) clears it. The next turn to main carries it, then it's gone.
+    FnContext(bise_proto::context::FnContext),
     Send { text: String },
     /// fn space's typed text sent with tab: main starts an agent on it
     /// (only main starts agents; ambient-lead m_6513)
@@ -77,6 +81,10 @@ impl Cmd {
             },
             "talk_end" => Cmd::TalkEnd,
             "talk_cancel" => Cmd::TalkCancel,
+            "fn_context" => match v.get("context") {
+                Some(c) if c.is_object() => Cmd::FnContext(serde_json::from_value(c.clone()).map_err(|e| format!("fn_context: {e}"))?),
+                _ => return Err("fn_context: no context object".into()),
+            },
             "shot" => Cmd::Shot { path: PathBuf::from(s("path")), app: s("app"), title: s("title") },
             "send" => Cmd::Send { text: s("text") },
             "start" => Cmd::Start { text: s("text") },

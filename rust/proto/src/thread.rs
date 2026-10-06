@@ -5,6 +5,7 @@
 //! live line refolds the newest lines, and an entry whose JSON changed is
 //! sent again at the same pos.
 
+use crate::context::FnContext;
 use crate::rows::{question, Opt, ReportKind};
 use crate::{is_false, Pos};
 use serde::{Deserialize, Serialize};
@@ -109,11 +110,16 @@ pub struct Entry {
     pub page: Option<PageRef>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub report: Option<ReportRef>,
+    /// his message's fn context (S9): what was on his screen when he
+    /// spoke, from the `sb context : <json>` line right after his 'you'
+    /// line (the window draws the shot and the app on his message)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<FnContext>,
 }
 
 impl Entry {
     fn new(pos: Pos, at_ms: u64, kind: EntryKind, text: String) -> Entry {
-        Entry { pos, at_ms, kind, text, from: None, tools: None, card: None, page: None, report: None }
+        Entry { pos, at_ms, kind, text, from: None, tools: None, card: None, page: None, report: None, context: None }
     }
 }
 
@@ -266,6 +272,9 @@ struct Fold<'a> {
     cont: Option<usize>,
     /// tool id -> (entry, item)
     tools: Vec<(u32, usize, usize)>,
+    /// the 'you' entry the previous line pushed: the only one a context
+    /// line may attach to
+    you: Option<usize>,
     ctx: &'a Ctx<'a>,
 }
 
@@ -333,6 +342,7 @@ impl Fold<'_> {
 
     fn line(&mut self, pos: Pos, ms: u64, line: &str) {
         let line = line.strip_prefix("history ").unwrap_or(line);
+        let you = self.you.take();
         if line.is_empty() || line == "--- idle" || line.starts_with("  ev: ") {
             return;
         }
@@ -372,7 +382,17 @@ impl Fold<'_> {
             let (kind, raw) = rest.split_once(" : ").unwrap_or((rest, ""));
             let text = unescape(raw);
             match kind {
-                "you" => self.cont = Some(self.push(Entry::new(pos, ms, EntryKind::You, text))),
+                "you" => {
+                    let i = self.push(Entry::new(pos, ms, EntryKind::You, text));
+                    (self.cont, self.you) = (Some(i), Some(i));
+                }
+                // his fn context: on the 'you' line right before it, else
+                // dropped (a stray one never lands on another entry)
+                "context" => {
+                    if let (Some(i), Ok(c)) = (you, serde_json::from_str::<FnContext>(raw)) {
+                        self.out[i].context = Some(c);
+                    }
+                }
                 "msg-in" => {
                     let (head, body) = text.split_once(" : ").unwrap_or(("", text.as_str()));
                     let from = head.split(' ').next().unwrap_or("").trim_start_matches('@').to_string();
@@ -418,7 +438,7 @@ impl Fold<'_> {
 
 /// An agent's transcript lines as entries, oldest first.
 pub fn fold(lines: &[Line], ctx: &Ctx) -> Vec<Entry> {
-    let mut f = Fold { out: Vec::new(), cont: None, tools: Vec::new(), ctx };
+    let mut f = Fold { out: Vec::new(), cont: None, tools: Vec::new(), you: None, ctx };
     for (pos, ms, l) in lines {
         f.line(*pos, *ms, l);
     }
@@ -491,6 +511,34 @@ mod tests {
         assert_eq!(e[6].text, "Perf notes v2");
         // closed card: answered
         assert!(fold(&lines(), &ctx_with(&[], &page))[5].card.as_ref().unwrap().answered);
+    }
+
+    /// Law (architect m_9048): a context line attaches only to the 'you'
+    /// line right before it; a stray one (after anything else, or a second
+    /// one) is dropped, never attached elsewhere.
+    #[test]
+    fn a_context_line_belongs_to_the_you_line_right_before_it() {
+        let none = |_: &str| None;
+        let ctx = ctx_with(&[], &none);
+        let l = |pos: u64, line: &str| (pos, pos, line.to_string());
+        let lines = vec![
+            l(1, r#"sb you : why is this slow?"#),
+            l(2, r#"sb context : {"app":"Safari","url":"https://grafana.acme.test/d/p99"}"#),
+            l(3, r#"sb context : {"app":"Mail"}"#),
+            l(4, "  obs: assistant: looking"),
+            l(5, r#"sb context : {"app":"Notes"}"#),
+            l(6, "sb you : and this?"),
+            l(7, "  obs: turn_started"),
+            l(8, r#"sb context : {"app":"Code"}"#),
+            l(9, "sb you : third"),
+            l(10, "sb context : not json"),
+        ];
+        let e = fold(&lines, &ctx);
+        assert_eq!(e.len(), 4);
+        assert_eq!(e[0].context.as_ref().and_then(|c| c.url.as_deref()), Some("https://grafana.acme.test/d/p99"));
+        assert_eq!(e[0].text, "why is this slow?");
+        assert!(e[1..].iter().all(|e| e.context.is_none()), "{e:?}");
+        assert_eq!(e[2].text, "and this?");
     }
 
     #[test]

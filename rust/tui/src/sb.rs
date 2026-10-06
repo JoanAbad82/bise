@@ -1351,6 +1351,9 @@ pub(super) fn parse_hub_line(rest: &str) -> Option<Ev> {
     let field = |s: &str| unescape_md(&s.replace(" \\: ", " : "));
     Some(match kind {
         "you" => Ev::You(text, Mark::Sent, false),
+        // S9: the fn context of the 'you' line before it (the window's
+        // thread shows it on his message; the TUI doesn't)
+        "context" => return None,
         // BISE-86: `undelivered : {name} : {text}` (fields escaped)
         "undelivered" => {
             let (name, t) = raw.split_once(" : ").unwrap_or((raw, ""));

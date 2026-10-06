@@ -12,6 +12,7 @@
 
 mod art;
 mod features;
+mod fn_context;
 mod gate;
 mod history;
 mod pages;
@@ -339,6 +340,11 @@ struct Shell {
     /// text)]). Not taken in PAGE_WAIT_MS: they go to main; main's not
     /// taken: a warn in its feed. Never silently lost (pm's D fail 37).
     page_waits: BTreeMap<String, (u64, Vec<(String, String)>)>,
+    /// S9: the fn context of the input being stepped: (agent, its JSON).
+    /// Its 'you' line goes to the transcript without the rendered block,
+    /// with an `sb context : <json>` line after it in the same append
+    /// (feed). Set and cleared around one `step`.
+    fn_ctx: Option<(String, String)>,
     /// the agents each page's latest version names (`data-agent`):
     /// page id -> names (None: not read from the store yet)
     page_agents: Option<BTreeMap<String, Vec<String>>>,
@@ -901,25 +907,35 @@ impl Shell {
         self.page_agent_line(name, line);
         let Some(dir) = self.dir_of(name) else { return };
         let path = self.transcript(&dir);
-        let pos = match self.positions.get(name) {
-            Some(p) => p + 1,
-            None => transcript_len(&path) + 1,
-        };
-        self.positions.insert(name.to_string(), pos);
+        let lines = self.fn_ctx_lines(name, line);
         let ts = now_ms();
-        let b = self.buffers.entry(name.to_string()).or_default();
-        b.push_back((pos, ts, line.to_string()));
-        while b.len() > BUFFER_LINES {
-            b.pop_front();
+        let mut out = String::new();
+        let mut events = Vec::new();
+        for line in lines {
+            let pos = match self.positions.get(name) {
+                Some(p) => p + 1,
+                None => transcript_len(&path) + 1,
+            };
+            self.positions.insert(name.to_string(), pos);
+            let b = self.buffers.entry(name.to_string()).or_default();
+            b.push_back((pos, ts, line.clone()));
+            while b.len() > BUFFER_LINES {
+                b.pop_front();
+            }
+            out.push_str(&format!("{ts}\t{line}\n"));
+            events.push(line_event(name, pos, ts, &line));
         }
+        // one append: a 'you' line and its context line never part
         if let Ok(mut f) = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(&path)
         {
-            let _ = writeln!(f, "{}\t{}", ts, line);
+            let _ = f.write_all(out.as_bytes());
         }
-        self.broadcast(&line_event(name, pos, ts, line));
+        for e in events {
+            self.broadcast(&e);
+        }
     }
 
     /// One event to every client (serialized once).
@@ -2093,7 +2109,8 @@ impl Shell {
                             self.steps_hint(t, &s("via"))
                         }
                     };
-                    self.step(Input::ClientInput { client: id, focus: s("focus"), text, queued });
+                    // S9: with its fn context (daemon/fn_context.rs)
+                    self.step_input(id, &v, s("focus"), text, queued);
                 }
                 self.page_answers();
             }
@@ -2635,6 +2652,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         pages: None,
         page_turns: BTreeMap::new(),
         page_waits: BTreeMap::new(),
+        fn_ctx: None,
         page_agents: None,
         page_agent_sent: BTreeMap::new(),
         last_intent: BTreeMap::new(),

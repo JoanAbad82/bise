@@ -427,6 +427,56 @@ fn send_goes_to_main_with_the_shot_marker_and_the_png_is_deleted() {
     assert!(!b64.exists(), "the stored shot is not kept after main's turn");
 }
 
+/// S9 (amb-mac m_9035): the latest fn_context rides the next message to
+/// main as the input op's `context` field (never rendered by the core),
+/// its shot is the stored file in the image store, and it's gone after
+/// that message; an excluded app's `{}` clears it; a cancelled talk drops
+/// it.
+#[test]
+fn the_fn_context_rides_the_next_message_once() {
+    use bise_proto::context::FnContext;
+    let mut t = T::new();
+    t.ready();
+    let safari = FnContext { app: Some("Safari".into()), url: Some("https://grafana.acme.test/d/p99".into()), ..FnContext::default() };
+    t.cmd(Cmd::FnContext(FnContext { app: Some("Mail".into()), ..FnContext::default() }));
+    t.cmd(Cmd::FnContext(safari.clone()));
+    let png = t.dir.join("front.png");
+    std::fs::write(&png, b"\x89PNG fake").unwrap();
+    t.cmd(Cmd::Shot { path: png, app: "Safari".into(), title: "p99".into() });
+    t.cmd(Cmd::Send { text: "why is this slow?".into() });
+    let req = t.hub.next();
+    let text = req["text"].as_str().unwrap();
+    assert!(text.starts_with("why is this slow?\n\n<image name=\"[Screen]\""), "the core never renders the context: {text}");
+    assert!(!text.contains("screen_context") && !text.contains("grafana"), "{text}");
+    let ctx: FnContext = serde_json::from_value(req["context"].clone()).unwrap();
+    let shot = ctx.shot.clone().expect("the shot's stored file");
+    // the stored file (the app's PNG is gone), beside the marker's b64
+    assert!(std::path::Path::new(&shot).exists() && !shot.ends_with("front.png"), "{shot}");
+    let b64 = PathBuf::from(&bend_images::markers(text)[0].b64);
+    assert_eq!(std::path::Path::new(&shot).parent(), b64.parent(), "{shot}");
+    assert_eq!(FnContext { shot: None, ..ctx }, safari);
+    // once
+    t.cmd(Cmd::Send { text: "and this?".into() });
+    assert!(t.hub.next().get("context").is_none());
+    // an excluded app clears it
+    t.cmd(Cmd::FnContext(safari.clone()));
+    t.cmd(Cmd::FnContext(FnContext::default()));
+    t.cmd(Cmd::Send { text: "third".into() });
+    assert!(t.hub.next().get("context").is_none());
+    // a cancelled talk drops it
+    t.cmd(Cmd::TalkStart);
+    t.cmd(Cmd::FnContext(safari));
+    t.cmd(Cmd::TalkCancel);
+    t.cmd(Cmd::Send { text: "fourth".into() });
+    assert!(t.hub.next().get("context").is_none());
+    assert_eq!(Cmd::parse(r#"{"cmd":"fn_context","context":{}}"#), Ok(Cmd::FnContext(FnContext::default())));
+    assert_eq!(
+        Cmd::parse(r#"{"cmd":"fn_context","context":{"app":"Code","file":"/w/a.rs"}}"#),
+        Ok(Cmd::FnContext(FnContext { app: Some("Code".into()), file: Some("/w/a.rs".into()), ..FnContext::default() }))
+    );
+    assert!(Cmd::parse(r#"{"cmd":"fn_context"}"#).is_err());
+}
+
 #[test]
 fn a_shot_steered_into_a_running_turn_is_forgotten_at_its_end() {
     let mut t = T::new();
