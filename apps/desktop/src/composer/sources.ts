@@ -63,11 +63,11 @@ export interface ComposerSources {
   readonly skills: readonly PickSkill[];
   readonly commands: readonly PickCommand[];
   /** The workspace's files for an `@` query, ranked by the core (files.rs's ranking). */
-  files(query: string): Promise<readonly PickFile[]>;
+  readonly files: (query: string) => Promise<readonly PickFile[]>;
   /** A pasted or dropped image saved to a file the core can send; null when it can't be. */
-  saveImage(file: File): Promise<SavedImage | null>;
+  readonly saveImage: (file: File) => Promise<SavedImage | null>;
   /** The values of a listed argument kind matching `query` (the screen's lists); none: no popup. */
-  choices?(kind: Exclude<ArgKind, 'text' | { readonly words: readonly Choice[] }>, query: string): readonly Choice[];
+  readonly choices?: (kind: Exclude<ArgKind, 'text' | { readonly words: readonly Choice[] }>, query: string) => readonly Choice[];
 }
 
 /** No lists, no effects: a composer that only types and sends (the spotlight's first step, tests). */
