@@ -894,9 +894,15 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // the menu-bar icon is the status (§8): working (agents or main busy) and
     // the count of items waiting for you
     func statusIcon() {
+        let i = iconInputs()
+        status?.set(working: i.working, count: i.count)
+    }
+
+    // what the pearl is told (working, its count): one source for the icon and the harness
+    func iconInputs() -> (working: Bool, count: Int) {
         let mainBusy = ["working", "sending", "speaking"].contains(phase)
         // the cards waiting + the ready pages he hasn't opened (count.json, shared with the web)
-        status?.set(working: working || mainBusy, count: MenuRows.count(memory["state"] ?? [:]))
+        return (working || mainBusy, MenuRows.count(memory["state"] ?? [:]))
     }
 
     // you away: no key or mouse for 5 minutes

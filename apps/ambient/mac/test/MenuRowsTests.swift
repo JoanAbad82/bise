@@ -46,6 +46,8 @@ law("things wait: the count beside it, whatever the mood", look(count: 3).count 
 law("done or a page ready: the done glint for 8 s", look(glint: 8, now: 1).mood == .done && look(glint: 8, now: 9).mood == .still)
 law("failed: it stops, ▲ for 8 s", look(working: true, failed: 8, now: 1) == IconLook(mood: .fail, moving: false, extra: "▲", count: 0))
 law("quiet: away, ☾, still", look(working: true, quiet: true) == IconLook(mood: .away, moving: false, extra: "☾", count: 0))
+law("quiet with cards waiting (S9 batch, the harness's state.pearl): away, ☾ and the count",
+    look(count: 2, quiet: true) == IconLook(mood: .away, moving: false, extra: "☾", count: 2))
 law("you hold fn: listen, faster", look(quiet: true, holding: true).mood == .listen && look(holding: true).fps == 24 && look(working: true).fps == 12)
 law("reduced motion: never moving", !look(working: true, still: true).moving && !look(holding: true, still: true).moving)
 

@@ -81,10 +81,19 @@ extension AmbientApp {
         return ["x": r.minX, "y": r.minY, "w": r.width, "h": r.height]
     }
 
+    // the menu-bar pearl as the icon would draw it (lead m_9238: the harness has
+    // no status item): IconLook from the app's own inputs, without the 8 s flashes
+    func pearlState() -> [String: Any] {
+        let i = iconInputs()
+        let look = IconLook.of(working: i.working, count: i.count, quiet: quiet.on, holding: talking,
+                               glintUntil: -1, failedUntil: -1, now: 0, reduceMotion: reduceMotion)
+        return ["mood": look.mood.rawValue, "count": look.count, "extra": look.extra, "quiet": quiet.on, "why": quiet.why]
+    }
+
     func harnessState() -> [String: Any] {
         ["vis": ["pinned": vis.pinned, "hidden": capsule.hidden], "talking": talking, "phase": phase,
          "keys": ["bar": keyFocus.bar],
-         "anchor": capsule.anchor.name, "icon": anchorIcon(),
+         "anchor": capsule.anchor.name, "icon": anchorIcon(), "pearl": pearlState(),
          "screen": capsule.screenBox.map { b -> [String: Any] in
              let r = { (f: CGRect) -> [String: Any] in ["x": f.minX, "y": f.minY, "w": f.width, "h": f.height] }
              return ["frame": r(b.frame), "visible": r(b.visible)]
