@@ -69,5 +69,14 @@ law("not before it starts, not at its end",
 law("all-day, free, declined or alone: not a meeting",
     !CalendarEvent.meetingNow([ev(-600, 600, allDay: true), ev(-600, 600, busy: false), ev(-600, 600, declined: true), ev(-600, 600, people: 0)], now: now))
 
+// S8: quiet for 1 h from the menu
+var qp = QuietMachine()
+qp.pause(true)
+law("quiet hour: on, why paused", qp.on && qp.why == "paused" && qp.change()! == (true, "paused"))
+qp.meeting(true)
+law("quiet hour: a meeting meanwhile names the meeting", qp.why == "meeting")
+qp.meeting(false); qp.pause(false)
+law("quiet hour: its end ends the quiet", !qp.on && qp.change()! == (false, ""))
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Quiet laws hold")

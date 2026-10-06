@@ -25,9 +25,6 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     var keyFocus = KeyFocus()     // who has his keystrokes (round 9)
     var content = "none"          // the page's last app_content kind (EscRoute)
     var cardPush = CardPush()     // a card shows the bar once (lead m_8105)
-    var side: Capsule?            // round 10's side panel, made at its first open
-    var panelAgent: String?       // the agent it shows
-    var panelKeys = KeyFocus()    // the panel's own keys (it takes them when opened)
     var desktop: DesktopWindow?   // bise's window (S4, DesktopWindow.swift), made at its first open
 
     // the state of the split-out parts (App+*.swift: extensions hold no stored properties)
@@ -42,6 +39,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     var helloOn = false                   // App+Perms: the glass shows the hello
     var askShown = false                  // App+Perms: the glass is open for a permission ask
     var globeSaid = false                 // App+Perms: the emoji picker line, once per launch
+    var quietHourJob: DispatchWorkItem?   // App+Quiet: the end of his quiet hour
+    var askedAnchor: BarAnchor?           // where the next show puts the bar (S8; none = bottom centre)
     let mainMenu = MainMenuView() // the hidden main menu: ⌘Q ⌘W ⌘, ⌘H and Edit
     var status: StatusItem?
     var signals: [DispatchSourceSignal] = []
@@ -247,7 +246,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             guard let self else { return }
             switch IconClick.act(shown: !self.capsule.hidden) {
             case .close: self.visFeed(.dismiss)
-            case .open: self.agentsView()
+            case .open: self.menuView()
             }
         }
         st.onPage = { Browser.open($0) }
@@ -265,6 +264,9 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         st.noAccess = { [weak self] in self.map { $0.permNow().accessibility != .granted } ?? false }
         st.onAccess = { [weak self] in self?.permDo(.settings(.accessibility)) }
         st.isHidden = { [weak self] in self?.capsule.hidden ?? false }
+        st.onWindow = { [weak self] in self?.openWindow(nil) }
+        st.onQuietHour = { [weak self] in self?.quietHour() }
+        st.isQuietHour = { [weak self] in self?.quiet.paused ?? false }
         status = st
         st.reduceMotion = reduceMotion
         // the icon moved (another item came, the menu bar changed screens)
@@ -349,7 +351,6 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         reduceMotion = on
         status?.reduceMotion = on
         capsule.post(["ev": "app_reduce_motion", "on": on])
-        side?.post(["ev": "app_reduce_motion", "on": on])
         edgeSetup()
     }
 
@@ -390,7 +391,6 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 self?.capsule.screensChanged()
-                self?.side?.screensChanged()
                 self?.edge.rebuild()
             }
         }
@@ -403,7 +403,6 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         asleep = false
         if !sandbox { core.check(); keys.reenable() } else { core.check() }
         capsule.screensChanged()
-        side?.screensChanged()
         edge.rebuild()
         sayVisible()
     }
@@ -546,6 +545,11 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         case "send":
             // a spotlight send: the front window goes with it (SPEC §3)
             shoot { [weak self] in self?.toCore(cmd) }
+        case "app_quiet_hour":
+            // the dropdown's 'quiet for 1 h' (on true), its end (on false), or a toggle
+            quietHour(cmd["on"] as? Bool)
+        case "open_in":
+            openIn(cmd)
         case "app_window":
             // ⏎ in the bar, a card, the spotlight: open it in bise's window (S4)
             guard let r = WinRoute.from(route: cmd["route"] as? String, open: cmd["open"] as? [String: Any], current: config.workspace) else {
@@ -553,14 +557,6 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             }
             openWindow(r)
             if !capsule.hidden { visFeed(.dismiss) }
-        case "app_panel", "app_panel_close":
-            // ⏎ or a click on an agent row (amb-web d4b74f38): the side panel
-            // (lead m_8122: this switch had no case, so it never opened)
-            switch PanelCmd.from(cmd) {
-            case .open(let a): openPanel(a)
-            case .close: closePanel()
-            case nil: Log.say("app: \(name) without an agent")
-            }
         default:
             if name.hasPrefix("app_") { Log.say("app: unknown \(name)") } else { toCore(cmd) }
         }
@@ -692,8 +688,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
 
     func coreEvent(_ ev: [String: Any]) {
         guard let kind = ev["ev"] as? String else { return }
-        side?.post(ev)      // the side panel's page hears every core event (it keeps its agent's)
-        desktop?.post(ev)   // and bise's window's
+        desktop?.post(ev)   // bise's window's page hears every core event too
         if AmbientApp.remembered.contains(kind) { memory[kind] = ev }
         if let u = ev["pages_url"] as? String, !u.isEmpty { pagesURL = u }
         defer { Browser.pagesURL = pagesURL }
@@ -764,14 +759,11 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             if let d = desktop, d.window.isKeyWindow { d.open("settings") } else { settingsView() }
         case .hide:
             if let d = desktop, !d.hidden, d.window.isKeyWindow, !harnessMode { NSApp.hide(nil) }
-            closePanel()
             if !capsule.hidden { visFeed(.dismiss) }
         case .close:
-            let panelShown = side.map { !$0.hidden } ?? false
             switch MainMenu.close(windowKey: desktop?.window.isKeyWindow ?? false, windowShown: desktop.map { !$0.hidden } ?? false,
-                                  panelKey: side?.panel.isKeyWindow ?? false, panelShown: panelShown, barShown: !capsule.hidden) {
+                                  barShown: !capsule.hidden) {
             case .window: desktop?.close()
-            case .panel: closePanel()
             case .bar: visFeed(.dismiss)
             case .nothing: break
             }
@@ -790,7 +782,26 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     }
 
     // a menu-bar click: what's going on (the agents and the inbox, fn + 0)
+    // where the bar shows (S8, Placement.anchorAtShow): asked for the next
+    // show, or the bar moves now; leaving the dropdown tells the page
+    func anchor(_ a: BarAnchor) {
+        guard !capsule.hidden else { askedAnchor = a; return }
+        if case .menu = capsule.anchor, a != capsule.anchor { capsule.post(["ev": "app_menu", "on": false]) }
+        capsule.setAnchor(a)
+    }
+
+    // a click on the pearl (S8): the dropdown, the bar's page in its menu
+    // pane under the icon; the native menu when the page isn't up
+    func menuView() {
+        guard capsule.ready, let icon = status?.iconRect else { status?.fallbackMenu(); return }
+        anchor(.menu(icon))
+        visFeed(.open)
+        capsule.post(["ev": "app_menu", "on": true])
+        takeKeys()
+    }
+
     func agentsView() {
+        anchor(.top)
         morning()
         visFeed(.open)
         capsule.post(["ev": "app_key", "key": "0"])
@@ -800,6 +811,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     // fn , or the menu's settings…: the settings view (amb-web draws it,
     // app_settings carries what it shows)
     func settingsView() {
+        anchor(.top)
         visFeed(.open)
         capsule.post(settingsEvent())
         capsule.post(["ev": "app_key", "key": ","])
@@ -840,11 +852,14 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
         let shown = vis.feed(e, at: t)
         if shown == capsule.hidden {
             if shown {
+                capsule.setAnchor(Placement.anchorAtShow(asked: askedAnchor))
+                askedAnchor = nil
                 capsule.pickScreen()
                 capsule.show(fade: reduceMotion)                // in at once at its size, the page fades it in (reduced motion: a 0.15 s panel fade)
                 capsule.post(["ev": "app_hidden", "on": false])
                 morning()
             } else {
+                if case .menu = capsule.anchor { capsule.post(["ev": "app_menu", "on": false]) }
                 capsule.post(["ev": "app_hidden", "on": true])  // the page shrinks it into the icon
                 capsule.hide(after: reduceMotion ? Capsule.fadeTime : Capsule.leaveTime, fade: reduceMotion)   // then out once the page's 0.12 s leave is drawn (the user, m_6567)
             }

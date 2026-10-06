@@ -71,6 +71,20 @@ extension AmbientApp {
     }
 
     // a change: the page (app_quiet) and the core (quiet: text only)
+    // quiet for 1 h (the native menu; the dropdown sends app_quiet_hour): again = its end
+    func quietHour(_ on: Bool? = nil) {
+        let want = on ?? !quiet.paused
+        quiet.pause(want)
+        quietHourJob?.cancel()
+        if want {
+            let job = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.quietHour(false) } }
+            quietHourJob = job
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3600, execute: job)
+        }
+        Log.say("app: quiet for 1 h \(want ? "on" : "off")")
+        sayQuiet()
+    }
+
     func sayQuiet() {
         guard let c = quiet.change() else { return }
         Log.say("app: quiet \(c.on) \(c.why)")

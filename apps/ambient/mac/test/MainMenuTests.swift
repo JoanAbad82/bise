@@ -27,15 +27,11 @@ law("the page's own keys are left to it (⌘F ⌘D ⌘O ⌘. ⌘⌫ ⌘↑↓)",
 law("the panel's ⋯ 'quit bise ambient' (app_quit): ⌘Q's own act", MainMenu.pageCmd("app_quit") == .quit)
 law("other page cmds are not menu acts", MainMenu.pageCmd("app_copy") == nil && MainMenu.pageCmd("app_hide") == nil)
 
-law("⌘W: the panel when it has the keys", MainMenu.close(panelKey: true, panelShown: true, barShown: true) == .panel)
-law("⌘W: the bar when it has them (the panel stays)", MainMenu.close(panelKey: false, panelShown: true, barShown: true) == .bar)
-law("⌘W: the panel alone shown, clicked away: the panel", MainMenu.close(panelKey: false, panelShown: true, barShown: false) == .panel)
-law("⌘W: the bar alone", MainMenu.close(panelKey: false, panelShown: false, barShown: true) == .bar)
-law("⌘W: nothing shown, nothing", MainMenu.close(panelKey: false, panelShown: false, barShown: false) == .nothing)
-law("⌘W: bise's window when it has the keys (hidden, the app stays)",
-    MainMenu.close(windowKey: true, windowShown: true, panelKey: false, panelShown: true, barShown: true) == .window)
-law("⌘W: the bar first when the bar has the keys over the window", MainMenu.close(windowKey: false, windowShown: true, panelKey: false, panelShown: false, barShown: true) == .bar)
-law("⌘W: the window alone shown: the window", MainMenu.close(windowKey: false, windowShown: true, panelKey: false, panelShown: false, barShown: false) == .window)
+law("⌘W: bise's window when it has the keys (hidden, the app stays)", MainMenu.close(windowKey: true, windowShown: true, barShown: true) == .window)
+law("⌘W: the bar first when the bar has the keys over the window", MainMenu.close(windowKey: false, windowShown: true, barShown: true) == .bar)
+law("⌘W: the window alone shown: the window", MainMenu.close(windowKey: false, windowShown: true, barShown: false) == .window)
+law("⌘W: the bar alone", MainMenu.close(barShown: true) == .bar)
+law("⌘W: nothing shown, nothing", MainMenu.close(barShown: false) == .nothing)
 law("⌘M minimizes the key window", find("m") == .edit("performMiniaturize:"))
 
 if failures > 0 { print("\(failures) failed"); exit(1) }

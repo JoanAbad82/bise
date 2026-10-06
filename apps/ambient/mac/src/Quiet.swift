@@ -19,6 +19,7 @@ struct QuietMachine {
     private(set) var call = false
     private(set) var meeting = false
     private(set) var fullScreen = false
+    private(set) var paused = false     // he asked: quiet for 1 h (the menu, S8)
     private var busySince: Double? = nil
     private var freeSince: Double? = nil
     private var ownOpen = false
@@ -27,9 +28,12 @@ struct QuietMachine {
 
     init() {}
 
-    var on: Bool { call || meeting || fullScreen }
-    // a call wins: it's the one that's live; then a meeting, then full screen
-    var why: String { call ? "call" : meeting ? "meeting" : fullScreen ? "full_screen" : "" }
+    var on: Bool { call || meeting || fullScreen || paused }
+    // a call wins: it's the one that's live; then a meeting, then full screen, then his hour
+    var why: String { call ? "call" : meeting ? "meeting" : fullScreen ? "full_screen" : paused ? "paused" : "" }
+
+    // quiet for 1 h from the menu, or its end (App ends it after the hour)
+    mutating func pause(_ on: Bool) { paused = on }
 
     // bise's own mic (talk_start .. talk_end / cancel)
     mutating func own(open: Bool, at t: Double) {

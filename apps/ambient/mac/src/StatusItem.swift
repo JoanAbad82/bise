@@ -17,6 +17,10 @@ enum MenuWords {
     static let hide = "hide bise"
     static let hideKeys = "fn ."
     static let quit = "quit bise ambient"
+    // the native fallback menu (S8; ambient signs the words)
+    static let open = "open bise"
+    static let quietHour = "quiet for 1 h"
+    static let quietEnd = "end quiet"
 }
 
 @MainActor
@@ -34,6 +38,9 @@ final class StatusItem: NSObject {
     var cards: () -> [Card] = { [] }
     var noAccess: () -> Bool = { false }      // fn can't be heard: the menu's first row
     var onAccess: (() -> Void)?               // that row: System Settings' Accessibility pane
+    var onWindow: (() -> Void)?               // open bise (the window, ⌘0)
+    var onQuietHour: (() -> Void)?            // quiet for 1 h, or its end
+    var isQuietHour: () -> Bool = { false }
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     // what the icon says (SPEC §0): the inputs, then IconLook decides
@@ -205,10 +212,23 @@ final class StatusItem: NSObject {
         let e = NSApp.currentEvent
         let menu = e?.type == .rightMouseUp || e?.modifierFlags.contains(.control) == true
         if !menu {
-            onOpen?()   // a click (or ⌥ click) on the icon: bise's full view
+            onOpen?()   // a click (or ⌥ click) on the icon: the dropdown (the bar's page under it)
         } else {
+            fallbackMenu()
+        }
+    }
+
+    // the native menu (S8): a right click, or a click before the page is up
+    func fallbackMenu() {
+        let rows = MenuRows.fallback(quiet: isQuietHour(), noAccess: noAccess(),
+                                     words: (MenuWords.open, MenuWords.quietHour, MenuWords.quietEnd, SettingsWords.menu, MenuWords.quit))
+        show(rows)
+    }
+
+    private func show(_ rows: [MenuItemOut]) {
+        do {
             let m = NSMenu()
-            for r in rows() {
+            for r in rows {
                 switch r.kind {
                 case .separator: m.addItem(.separator())
                 case .header: m.addItem(header(r.title))
@@ -247,6 +267,7 @@ final class StatusItem: NSObject {
         switch k {
         case .quit: return "q"
         case .settings: return ","
+        case .window: return "0"
         default: return nil
         }
     }
@@ -260,6 +281,8 @@ final class StatusItem: NSObject {
         case .talk: return #selector(spotlight)
         case .toggle: return #selector(toggle)
         case .settings: return #selector(settings)
+        case .window: return #selector(window)
+        case .quiet: return #selector(quietHour)
         case .quit: return #selector(quit)
         case .header, .separator: return nil
         }
@@ -278,6 +301,8 @@ final class StatusItem: NSObject {
     @objc private func spotlight() { onSpotlight?() }
     @objc private func toggle() { onToggle?() }
     @objc private func settings() { onSettings?() }
+    @objc private func window() { onWindow?() }
+    @objc private func quietHour() { onQuietHour?() }
     @objc private func stopWatch(_ sender: NSMenuItem) { if let id = sender.representedObject as? Int { onStopWatch?(id) } }
     @objc private func quit() { NSApp.terminate(nil) }
 }

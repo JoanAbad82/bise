@@ -28,7 +28,7 @@ MainActor.assumeIsolated {
     // harness A (card #428): made far off every screen, from init
     let screens = NSScreen.screens.map(\.frame)
     let before = Set(NSApp.windows.map { ObjectIdentifier($0) })
-    let off = Capsule(side: true, offScreen: true)
+    let off = Capsule(offScreen: true)
     law("harness smoke: the panel is made off every screen", !Placement.touches(off.panel.frame, screens: screens))
     law("harness smoke: invisible until placed and shown", off.panel.alphaValue == 0 && !off.panel.isVisible)
     let made = NSApp.windows.filter { !before.contains(ObjectIdentifier($0)) }

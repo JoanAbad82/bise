@@ -91,16 +91,10 @@ final class Capsule: NSObject, WKNavigationDelegate {
     // the corners of both boxes: macOS's window radius, not the page's
     let radius: CGFloat
 
-    // round 10: the side panel (an agent's history, docked right) is a
-    // second Capsule: the same glass, mask, mouse and keys, its own page
-    // (panel.html), its own place (Placement.side)
-    let side: Bool
-
     // harness A (card #428): made far off every screen, deferred, invisible
     let offScreen: Bool
 
-    init(side: Bool = false, offScreen: Bool = false) {
-        self.side = side
+    init(offScreen: Bool = false) {
         self.offScreen = offScreen
         radius = macWindowRadius(offScreen: offScreen)
         // every launch (main m_8012): made far off every screen, deferred and
@@ -110,8 +104,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
                              styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
         panel.alphaValue = 0
         panel.isFloatingPanel = true
-        // the side panel stays while he works in his apps: above them, under the bar
-        panel.level = side ? .floating : .statusBar
+        panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
@@ -143,7 +136,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
         conf.mediaTypesRequiringUserActionForPlayback = []
         conf.preferences.setValue(true, forKey: "developerExtrasEnabled")
         conf.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
-        conf.userContentController.addUserScript(WKUserScript(source: Capsule.boot(side: side), injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        conf.userContentController.addUserScript(WKUserScript(source: Capsule.bootJS, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         web = CapsuleWebView(frame: root.bounds, configuration: conf)
         web.setValue(false, forKey: "drawsBackground")
         web.underPageBackgroundColor = .clear
@@ -176,15 +169,14 @@ final class Capsule: NSObject, WKNavigationDelegate {
     }
 
     // in the page before its own scripts: the app's marks
-    static let bootJS = boot(side: false)    // the bar, the edge glow, QA's views
-
-    static func boot(side: Bool) -> String { """
-    window.ambientApp = {mac: true\(side ? ", panel: true" : "")};
+    // the bar, the edge glow, QA's views
+    static let bootJS = """
+    window.ambientApp = {mac: true};
     (function () {
       var mark = function () { document.documentElement && document.documentElement.classList.add('app'); };
       if (document.documentElement) mark(); else document.addEventListener('DOMContentLoaded', mark);
     })();
-    """ }
+    """
 
     @objc func mouseEntered(with e: NSEvent) { onHover?(true) }
     @objc func mouseExited(with e: NSEvent) { onHover?(false) }
@@ -196,7 +188,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
         ready = false
         watcher = nil
         guard let dir else { web.loadHTMLString(Capsule.missing("no web UI dir given (--web)"), baseURL: nil); return }
-        let index = URL(fileURLWithPath: dir).appendingPathComponent(side ? "panel.html" : "index.html")
+        let index = URL(fileURLWithPath: dir).appendingPathComponent("index.html")
         guard FileManager.default.fileExists(atPath: index.path) else {
             web.loadHTMLString(Capsule.missing("no \(index.path)"), baseURL: nil); return
         }
@@ -206,7 +198,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
     }
 
     func reload() {
-        Log.say(side ? "panel: reload" : "capsule: reload")
+        Log.say("capsule: reload")
         ready = false
         web.reload()
     }
@@ -221,7 +213,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
     static var tap: ((String, [String: Any]) -> Void)?
 
     func post(_ ev: [String: Any]) {
-        Capsule.tap?(side ? "app>panel" : "app>page", ev)
+        Capsule.tap?("app>page", ev)
         guard ready, let s = JSON.string(ev) else { return }
         web.evaluateJavaScript("window.ambient && window.ambient.recv(\(s))", completionHandler: nil)
     }
@@ -262,6 +254,18 @@ final class Capsule: NSObject, WKNavigationDelegate {
     // or the mouse's when each display has its own menu bar; picked again
     // at launch, on a display change or a wake, and when you call bise
     private var screenIndex = 0
+    // where it sits on its screen (S8): top, bottom centre, under the icon
+    private(set) var anchor: BarAnchor = .top
+
+    // a new anchor moves it at once (a shown bar) and tells the page
+    func setAnchor(_ a: BarAnchor) {
+        guard a != anchor else { return }
+        anchor = a
+        place(panel.frame.size)
+        applyMask()
+        post(["ev": "app_anchor", "at": a.name])
+    }
+
     // harness A: set = every panel far off his screens (Placement.offScreen)
     var pinnedScreen: (() -> NSScreen?)?
     // harness A's guard: false = a frame touches a real screen (the app quits)
@@ -295,11 +299,8 @@ final class Capsule: NSObject, WKNavigationDelegate {
 
     var maxHeight: CGFloat {
         let b = pinnedScreen != nil ? Placement.offScreen : screen.map { ScreenBox(frame: $0.frame, visible: $0.visibleFrame) }
-        return side ? (b.map { Placement.sideHeight(on: $0) } ?? 900) : (b?.frame.height ?? 900) * 0.7
+        return (b?.frame.height ?? 900) * 0.7
     }
-
-    // the side panel's glass height (the page draws its glass this tall)
-    var sideHeight: CGFloat { maxHeight }
 
     // round 9 (ambient m_6521): the glass centered on the screen, its top
     // 170 px below the screen's top, the pearl at its left, growing down;
@@ -310,7 +311,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
         if pinnedScreen != nil { b = Placement.offScreen }
         else if let s = screen { b = ScreenBox(frame: s.frame, visible: s.visibleFrame) }
         else { return }
-        let f = side ? Placement.side(size, glass: shape.glass, on: b) : Placement.bar(size, glass: shape.glass, on: b)
+        let f = Placement.bar(size, glass: shape.glass, on: b, at: anchor)
         let moved = f.origin != panel.frame.origin || f.size != panel.frame.size
         panel.setFrame(f, display: true)
         refreshMouse()

@@ -80,21 +80,17 @@ enum EscRoute: Equatable {
     }
 }
 
-// the side panel's cmds, from either page (lead m_8122: the bar's ⏎ or
-// click on an agent row sent {cmd:'app_panel', agent} into the bar's own
-// cmd switch, which had no case for it: 'app: unknown app_panel', no
-// panel). Both pages' cmds go through this one reading.
-enum PanelCmd: Equatable {
-    case open(String)   // app_panel {agent}: open on it, or re-point it
-    case close          // app_panel_close
+// where the bar sits on its screen (Placement.bar): top (round 9, 170 px
+// down), bottom centre (S8), or under the menu-bar icon (its rect)
+enum BarAnchor: Equatable {
+    case top, bottom
+    case menu(CGRect)
 
-    static func from(_ cmd: [String: Any]) -> PanelCmd? {
-        switch cmd["cmd"] as? String {
-        case "app_panel":
-            guard let a = cmd["agent"] as? String, !a.isEmpty else { return nil }
-            return .open(a)
-        case "app_panel_close": return .close
-        default: return nil
+    var name: String {
+        switch self {
+        case .top: return "top"
+        case .bottom: return "bottom"
+        case .menu: return "menu"
         }
     }
 }
@@ -130,17 +126,39 @@ enum Placement {
     // the box's top) centered on the screen, its top edge 170 px below the
     // screen's top; the panel holds the pearl at the glass's left and grows
     // downward only (the top never moves). Never off the visible area.
-    static func bar(_ size: CGSize, glass: CGRect?, on s: ScreenBox) -> CGRect {
+    static func bar(_ size: CGSize, glass: CGRect?, on s: ScreenBox, at anchor: BarAnchor = .top) -> CGRect {
         let g = glass ?? CGRect(origin: .zero, size: size)
         let w = min(size.width, s.visible.width)
         let h = min(size.height, s.visible.height)
         var x = s.frame.midX - g.midX
         var top = s.frame.maxY - barTop + g.minY
+        switch anchor {
+        case .top:
+            break
+        case .bottom:
+            // desktop v9 (S8): cards and the talk at the bottom centre; the
+            // glass's bottom edge fixed, it grows upward
+            top = s.visible.minY + barBottom + g.maxY
+        case .menu(let icon):
+            // the pearl's dropdown: the glass's top just under the menu bar,
+            // centered on the icon
+            x = icon.midX - g.midX
+            top = s.visible.maxY - menuGap + g.minY
+        }
         x = Swift.min(Swift.max(x, s.visible.minX), s.visible.maxX - w)
         top = Swift.min(top, s.visible.maxY)
         let y = Swift.max(top - h, s.visible.minY)
         return CGRect(x: x, y: y, width: w, height: h)
     }
+
+    static let barBottom: CGFloat = 96   // the glass's bottom edge above the visible area's (the Dock)
+    static let menuGap: CGFloat = 6       // under the menu bar, for the dropdown
+
+    // where the bar shows (S8): what he opens by hand to type or browse
+    // (fn space, fn a, fn 0, fn i, fn ,) at the top; what bise brings (a
+    // card, the talk, an answer) at the bottom centre; the pearl's dropdown
+    // under the icon. Chosen when it shows, kept while it shows.
+    static func anchorAtShow(asked: BarAnchor?) -> BarAnchor { asked ?? .bottom }
 
     // harness A (the user: 'nothing in his face, ever', card #428): the
     // screen the harness app places its panels on, far off every real one
@@ -160,24 +178,6 @@ enum Placement {
         guard touches(r, screens: screens) else { return r }
         return CGRect(origin: offScreen.frame.origin, size: r.size)
     }
-
-    // round 10's side panel: docked to the right edge, full height under the
-    // menu bar; the glass's right edge on the visible area's right edge, its
-    // top right under the menu bar; the pearl's room at its left. Never
-    // taller than the visible area, never above the menu bar.
-    static let sideWidth: CGFloat = 440
-
-    static func side(_ size: CGSize, glass: CGRect?, on s: ScreenBox) -> CGRect {
-        let g = glass ?? CGRect(origin: .zero, size: size)
-        let h = min(size.height, s.visible.height + g.minY)
-        let x = s.visible.maxX - g.maxX
-        let top = s.visible.maxY + g.minY
-        let y = Swift.max(top - h, s.visible.minY)
-        return CGRect(x: x, y: y, width: size.width, height: top - y)
-    }
-
-    // the glass's height the side panel page draws: the visible height
-    static func sideHeight(on s: ScreenBox) -> CGFloat { s.visible.height }
 
     // SPEC §1: 20 px from the screen's right edge, 12 px under the menu bar;
     // never off the screen: a box taller or wider than the visible area is

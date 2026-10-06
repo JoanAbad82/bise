@@ -1,7 +1,7 @@
 // MainMenu: the hidden main menu (round 10, the user: "il n'y a pas de
 // commande Q pour quitter"). bise ambient is a menu-bar app (LSUIElement):
 // macOS never draws this menu, but its key equivalents work whenever bise
-// has the keys (the bar or the side panel is the key window), and only
+// has the keys (the bar or bise's window is the key window), and only
 // then: never his front app's ⌘Q. WKWebView hands every ⌘ key to the page
 // first; the ones the page doesn't take (it never takes these) reach here.
 // The Edit items have no target: they go down the responder chain to the
@@ -55,13 +55,11 @@ enum MainMenu {
     }
 
     // ⌘W: bise's window when it has the keys (S4: hidden, the app stays),
-    // the panel when it has them, else the bar (esc's order)
-    enum CloseWhat: Equatable { case window, panel, bar, nothing }
-    static func close(windowKey: Bool = false, windowShown: Bool = false, panelKey: Bool, panelShown: Bool, barShown: Bool) -> CloseWhat {
+    // else the bar (esc's order)
+    enum CloseWhat: Equatable { case window, bar, nothing }
+    static func close(windowKey: Bool = false, windowShown: Bool = false, barShown: Bool) -> CloseWhat {
         if windowShown && windowKey { return .window }
-        if panelShown && panelKey { return .panel }
         if barShown { return .bar }
-        if panelShown { return .panel }
         if windowShown { return .window }
         return .nothing
     }

@@ -2,6 +2,7 @@
 // The same AmbientApp; its state lives in App.swift.
 
 import AppKit
+import UniformTypeIdentifiers
 
 extension AmbientApp {
     // MARK: bise's window (S4, DesktopWindow.swift): never at launch, made at its first open
@@ -33,6 +34,33 @@ extension AmbientApp {
         case .regular: NSApp.setActivationPolicy(.regular)
         case .accessory: NSApp.setActivationPolicy(.accessory)
         case .unchanged: break
+        }
+    }
+
+    // {cmd:'open_in', app:'terminal'|'editor', project, path} (S8, amb-web's
+    // environments): the folder in his terminal or editor (OpenIn), through
+    // NSWorkspace only (no shell string); QA and the harness never open it
+    func openIn(_ cmd: [String: Any]) {
+        guard let kind = (cmd["app"] as? String).flatMap(OpenIn.Kind.init(rawValue:)) else {
+            Log.say("app: open_in: app must be terminal or editor"); return
+        }
+        let fm = FileManager.default
+        guard let dir = OpenIn.folder(cmd["path"] as? String, isDir: { p in
+            var d: ObjCBool = false
+            return fm.fileExists(atPath: p, isDirectory: &d) && d.boolValue
+        }) else { Log.say("app: open_in: not a folder: \(cmd["path"] ?? "none")"); return }
+        let ws = NSWorkspace.shared
+        let running = ws.runningApplications.compactMap(\.bundleIdentifier)
+        let installed = (OpenIn.terminals + OpenIn.editors).filter { ws.urlForApplication(withBundleIdentifier: $0) != nil }
+        let source = UTType.sourceCode
+        let def = ws.urlForApplication(toOpen: source).flatMap { Bundle(url: $0)?.bundleIdentifier }
+        let pick = OpenIn.pick(kind, running: running, installed: installed, defaultForSource: def)
+        Log.say("app: open_in \(kind.rawValue) \(dir) with \(pick ?? "Finder")")
+        if sandbox { harness?.note("app>open_in", ["app": kind.rawValue, "path": dir, "with": pick ?? "Finder"]); return }
+        let folder = URL(fileURLWithPath: dir, isDirectory: true)
+        guard let id = pick, let app = ws.urlForApplication(withBundleIdentifier: id) else { ws.open(folder); return }
+        ws.open([folder], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration()) { _, err in
+            if let err { Log.say("app: open_in failed: \(err.localizedDescription)") }
         }
     }
 

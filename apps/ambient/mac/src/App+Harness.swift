@@ -9,7 +9,6 @@ extension AmbientApp {
     func harnessSetup() {
         guard let hs = harness else { return }
         hs.bar = { [unowned self] in self.capsule }
-        hs.side = { [weak self] in self?.side }
         hs.win = { [weak self] in self?.desktop }
         hs.winOp = { [weak self] op, q in
             guard let self else { return }
@@ -30,7 +29,7 @@ extension AmbientApp {
 
     func harnessState() -> [String: Any] {
         ["vis": ["pinned": vis.pinned, "hidden": capsule.hidden], "talking": talking, "phase": phase,
-         "panel_agent": panelAgent ?? NSNull(), "keys": ["bar": keyFocus.bar, "panel": panelKeys.bar],
+         "keys": ["bar": keyFocus.bar],
          "win_route": desktop?.route ?? NSNull(),
          "core": ["bise": config.bise, "workspace": config.workspace],
          "hub": memory["hub"] ?? NSNull()]

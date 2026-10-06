@@ -51,6 +51,7 @@ extension AmbientApp {
             case ",":
                 settingsView()
             case "i":
+                anchor(.top)
                 visFeed(.open)
                 capsule.post(["ev": "app_key", "key": k])
                 takeKeys()
@@ -142,6 +143,7 @@ extension AmbientApp {
 
     // fn space: the page opens its field and asks app_focus on (typing)
     func spotlight() {
+        anchor(.top)
         morning()
         visFeed(.show(Visibility.brief))   // until the field takes the keys
         capsule.post(["ev": "app_key", "key": "space"])
@@ -151,6 +153,7 @@ extension AmbientApp {
     // fn a (round 10): every agent in the finder; the page opens it at 860
     // and asks app_focus on, like fn space
     func agentsFinder() {
+        anchor(.top)
         visFeed(.show(Visibility.brief))   // until the field takes the keys
         capsule.post(["ev": "app_key", "key": "a"])
         takeKeys()

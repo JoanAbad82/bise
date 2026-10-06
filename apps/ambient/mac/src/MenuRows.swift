@@ -48,7 +48,7 @@ struct MenuWatch: Equatable {
 
 // one row of the menu-bar menu, as StatusItem draws it and QA reads it
 struct MenuItemOut: Equatable {
-    enum Kind: String { case access, header, card, page, watch, stop, talk, toggle, settings, quit, separator }
+    enum Kind: String { case access, header, card, page, watch, stop, talk, toggle, settings, quit, separator, window, quiet }
     var kind: Kind
     var title: String = ""
     var keys: String? = nil
@@ -110,6 +110,24 @@ enum MenuRows {
         out.append(MenuItemOut(kind: .talk, title: words.talk, keys: words.talkKeys))
         out.append(MenuItemOut(kind: .toggle, title: hidden ? words.show : words.hide, keys: words.hideKeys))
         out.append(MenuItemOut(kind: .settings, title: words.settings, keys: words.settingsKeys))
+        out.append(MenuItemOut(kind: .separator))
+        out.append(MenuItemOut(kind: .quit, title: words.quit))
+        return out
+    }
+
+    // the native menu (S8): the dropdown is the bar's page under the icon;
+    // this minimal menu is what a right click, or a click before the page is
+    // up, gets: open bise ⌘0, quiet for 1 h (or its end), settings ⌘,, quit
+    static func fallback(quiet: Bool, noAccess: Bool = false,
+                         words: (open: String, quietHour: String, quietEnd: String, settings: String, quit: String)) -> [MenuItemOut] {
+        var out: [MenuItemOut] = []
+        if noAccess {
+            out.append(MenuItemOut(kind: .access, title: needsAccess))
+            out.append(MenuItemOut(kind: .separator))
+        }
+        out.append(MenuItemOut(kind: .window, title: words.open))
+        out.append(MenuItemOut(kind: .quiet, title: quiet ? words.quietEnd : words.quietHour))
+        out.append(MenuItemOut(kind: .settings, title: words.settings))
         out.append(MenuItemOut(kind: .separator))
         out.append(MenuItemOut(kind: .quit, title: words.quit))
         return out
