@@ -54,3 +54,4 @@
 .w7-err .x.all .tx{white-space:normal}
 .w7-err .x .mo{cursor:pointer;flex:none}
 .w7-hint{white-space:pre;cursor:pointer;color:var(--c-text-2)}
+.w7-sha{font-family:var(--font-mono);cursor:pointer;text-decoration:underline;text-decoration-color:var(--c-text-3);text-underline-offset:3px}

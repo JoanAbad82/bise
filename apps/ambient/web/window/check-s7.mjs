@@ -243,7 +243,15 @@ law("review on the frozen diff (amb-core 6e2503f6): a truncated, binary or gener
   // an older agent, merged, its folder gone: no files, the merge and the core's note
   w.open("review", P.engine, "old");
   w.feed({ ev: "diff", project: P.engine, agent: "old", base: "main", files: [], merged: "e0f3df5", note: "old is archived and its folder is gone" });
-  eq(w.v.empty, { title: "merged into main · e0f3df5", text: "old is archived and its folder is gone" });
+  eq(w.v.empty, { title: "merged into main · ", text: "old is archived and its folder is gone", sha: { text: "e0f3df5", tip: "copy", act: { ev: "ui_rv_sha" } } });
+  // the sha (ambient m_8830): no GitHub remote copies it ('copied e0f3df5'); a GitHub remote opens the commit there
+  const full = "e0f3df5a1b2c3d4e5f60718293a4b5c6d7e8f901";
+  w.feed({ ev: "diff", project: P.engine, agent: "old", base: "main", files: [], merged: full, note: "" });
+  eq(w.feed({ ev: "ui_rv_sha" }).cmds.filter((c) => c.cmd === "app_copy"), [{ cmd: "app_copy", text: full }]);
+  eq(w.v.empty.sha.text, "copied e0f3df5");
+  const gh = M.step({ ...w.s, projects: w.s.projects.map((p) => (p.project === P.engine ? { ...p, web: "https://github.com/acme/engine" } : p)) }, { ev: "ui_rv_sha" });
+  eq(gh.cmds.filter((c) => c.cmd === "app_open_url"), [{ cmd: "app_open_url", url: `https://github.com/acme/engine/commit/${full}`, project: P.engine }]);
+  eq(S7.view(gh.s).empty.sha.tip, "open on GitHub");
   // an unknown agent: the core's error replaces the skeleton
   const s7 = { ...w.s.s7, rv: { ...w.s.s7.rv, diffs: {} } };
   let s = { ...w.s, s7, route: { screen: "review", project: P.engine, agent: "ghost" } };

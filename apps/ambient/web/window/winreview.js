@@ -15,7 +15,7 @@
 (function (root) {
   "use strict";
   const init = () => ({ diffs: {}, pick: {}, sel: null });
-  const EVS = new Set(["diff", "ui_rv_file", "ui_rv_line", "ui_rv_merge", "ui_rv_retry", "ui_rv_more"]);
+  const EVS = new Set(["diff", "ui_rv_file", "ui_rv_line", "ui_rv_merge", "ui_rv_retry", "ui_rv_more", "ui_rv_sha"]);
   const owns = (ev) => EVS.has(ev.ev) || (ev.ev === "error" && ev.cmd === "diff");
   const k = (project, agent) => `${project}/${agent}`;
   const base = (p) => String(p || "").split("/").pop();
@@ -50,6 +50,14 @@
       // '↻ try again' asks the diff again; '▸' shows the rest of the core's text
       case "ui_rv_retry": return { e: { ...e, err: null }, cmds: [{ cmd: "diff", project: r.project, agent: r.agent }] };
       case "ui_rv_more": return { e: { ...e, err: e.err && { ...e.err, more: !e.err.more } }, cmds: [] };
+      // the merged sha (ambient m_8830, identity10's click audit): the commit on GitHub when the
+      // project has a GitHub remote (its row's web url), else the sha copied ('copied e0f3df5')
+      case "ui_rv_sha": {
+        const d = e.diffs[k(r.project, r.agent)], web = webOf(s, r.project);
+        if (!d || !d.merged) return { e, cmds: [] };
+        if (web) return { e, cmds: [{ cmd: "app_open_url", url: `${web}/commit/${d.merged}`, project: r.project }] };
+        return { e: { ...e, copied: d.merged }, cmds: [{ cmd: "app_copy", text: d.merged }] };
+      }
       case "ui_rv_file": return { e: { ...e, pick: { ...e.pick, [k(r.project, r.agent)]: ev.i }, sel: null }, cmds: [] };
       case "ui_rv_line": {
         const d = e.diffs[k(r.project, r.agent)];
@@ -76,6 +84,8 @@
     }
     return { e, cmds: [] };
   }
+  // a project's web url on GitHub (amb-core's ProjectRow web, when its remote is GitHub)
+  const webOf = (s, project) => { const p = (s.projects || []).find((x) => x.project === project); return p && /^https:\/\/github\.com\//.test(p.web || "") ? p.web.replace(/\/$/, "") : null; };
   // the agent's open approval card, if any (the merge decision above the composer)
   const approval = (s, project, agent) => ((s.cards && s.cards[project]) || []).find((c) => c.agent === agent && (c.kind === "approval" || c.kind === "merge"));
 
@@ -95,6 +105,7 @@
     return w ? w.path : null;
   };
 
+  const short = (sha) => String(sha).slice(0, 7);
   const num = (n) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10));
   // a file's note in the list, and the diff's body when it has no lines to show (ambient m_8820):
   // 'renamed from decode.rs' (the old name when the core gives it, f.from), a binary's size when it
@@ -141,7 +152,8 @@
         lines: linesOf(file).map((l) => (l.kind === "hunk" ? { hunk: l.text }
           : { old: l.old, new: l.new, sign: l.kind === "add" ? "+" : l.kind === "del" ? "-" : "", text: l.text, i: l.i, sel: !!(sel && l.i >= sel[0] && l.i <= sel[1]),
             act: { ev: "ui_rv_line", i: l.i } })) } : null,
-      empty: d.files.length ? null : merged ? { title: `merged into ${d.base || "main"} · ${merged}`, text: d.note || "" }
+      empty: d.files.length ? null : merged ? { title: `merged into ${d.base || "main"} · `, text: d.note || "",
+        sha: { text: e.copied === merged ? `copied ${short(merged)}` : short(merged), tip: webOf(s, r.project) ? "open on GitHub" : "copy", act: { ev: "ui_rv_sha" } } }
         : { title: "nothing changed yet", text: d.note || `${r.agent}'s branch has no commit ahead of ${d.base || "main"}` } };
   }
 
@@ -159,6 +171,11 @@
   function draw(d, UI) {
     const { h, act } = UI.core;
     if (d.loading) return h("div", "w7 w7-rv", UI.skel.render({}), UI.skel.render({}));
+    if (d.empty && d.empty.sha) {
+      const sha = act(h("span", "w7-sha", d.empty.sha.text), d.empty.sha.act);
+      sha.title = d.empty.sha.tip;
+      return h("div", "w7 w7-rv", h("div", "b-empty", h("b", null, d.empty.title, sha), d.empty.text && h("span", null, d.empty.text)));
+    }
     if (d.empty) return h("div", "w7 w7-rv", UI.empty.render(d.empty));
     if (d.err) return h("div", "w7 w7-rv", h("div", "w7-err", h("div", "t", h("span", "m", "▲"), " ", d.err.title),
       h("div", ["x", d.err.more && "all"], h("span", "tx", d.err.text), act(h("span", "mo", d.err.more ? "▾" : "▸"), { ev: "ui_rv_more" })),
