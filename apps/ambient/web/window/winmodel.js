@@ -213,7 +213,10 @@
         return { ...s, cards: set(s.cards, ev.project, ev.cards), live: set(s.live || {}, ev.project, true), picked: s.picked && ids.has(String(s.picked.card)) ? s.picked : null };
       }
       case "jobs": return set(s, "jobs", set(s.jobs, ev.project, ev.jobs));
-      case "artifacts": return set(s, "arts", set(s.arts, ev.project, ev.items));
+      // only the typed list (S7 emitter 1: {project, items}); the hub's older artifacts event
+      // ({rows, new, seen_ms}, no project) also reaches the window and would leave an undefined
+      // list that broke every draw of bise's view (amb-tools' window run 2)
+      case "artifacts": return ev.project && Array.isArray(ev.items) ? set(s, "arts", set(s.arts, ev.project, ev.items)) : s;
       case "scheduled": return set(s, "sched", set(s.sched, ev.project, ev.items));
       case "thread": {
         const k = `${ev.project}/${ev.agent}`;

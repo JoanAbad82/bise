@@ -641,6 +641,17 @@ law("↑ ↓ in an empty composer select a card's option, ⌘⏎ answers with it
   eq(w.sent.filter((c) => c.cmd === "answer").pop(), { cmd: "answer", project: P.engine, card: w.sent.filter((c) => c.cmd === "answer").pop().card, reply: "2" });
 });
 
+law("window run 2: the hub's older artifacts event ({rows, seen_ms}, no project) is ignored, so bise's view still draws and back to bise swaps the body", () => {
+  const w = win();
+  w.go(P.storefront);
+  w.feed({ ev: "artifacts", new: 0, seen_ms: F.NOW, rows: [] });
+  w.feed({ ev: "artifacts", project: P.storefront, items: [{ id: "n", kind: "page", title: "notes", agent: "main", version: 1, at_ms: F.NOW, url: "http://x", new: true }] });
+  w.go(F.HOME);
+  const v = w.v;
+  eq([v.head.t1, v.thread.rows.length > 0, !!v.composer.dock, v.board.sections[0].items.length > 0], ["bise", true, true, true]);
+  eq(Object.keys(w.s.arts).includes("undefined"), false);
+});
+
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {
   const dir = join(here, "../../../../rust/proto/fixtures");
   if (!existsSync(dir)) return;

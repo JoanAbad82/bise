@@ -72,7 +72,7 @@
     if (r.screen === "notfound") return { t1: T(s, "notfound"), t2: [r.want], acc: -1, end: [] };
     if (isBise(r)) {
       const working = s.projects.reduce((n, p) => n + projectWorking(s, p.project), 0);
-      const fresh = Object.values(s.arts).flat().filter((a) => a.new).length;
+      const fresh = Object.values(s.arts).flat().filter((a) => a && a.new).length;
       return { pearl: true, t1: "bise", t2: [T(s, "every_project"), T(s, "at_work", { n: working }), ...(all ? [T(s, "waiting", { n: all })] : [])], acc: all ? 2 : -1,
         end: [...(fresh ? [{ kind: "chip", text: T(s, "n_new", { n: fresh }) }] : []), { kind: "chip", text: "⌕", kbd: "⌘K" }] };
     }
@@ -185,7 +185,7 @@
       }
       case "artifact": {
         const a = e.artifact || {};
-        const fresh = Object.values(s.arts).flat().some((x) => x.id === a.id && x.new);
+        const fresh = Object.values(s.arts).flat().some((x) => x && x.id === a.id && x.new);
         return { t: "art", pos: e.pos, title: a.title || e.text, kind: a.kind || "page", meta: `${e.from || ""}${e.from ? " · " : ""}${hm(s, e.at_ms)}`, new: fresh, url: a.url || "" };
       }
     }
@@ -230,7 +230,7 @@
     if (isBise(r)) {
       const waiting = D.allCards(s).map((c) => ({ who: `${D.pname(s, c.project)} · ${c.agent}`, text: c.title || c.question, act: { ev: "ui_inbox", card: c.id } }));
       const day = dayLabel(s, s.now);
-      const made = Object.entries(s.arts).flatMap(([project, list]) => list.map((a) => ({ ...a, project })))
+      const made = Object.entries(s.arts).flatMap(([project, list]) => (Array.isArray(list) ? list : []).filter(Boolean).map((a) => ({ ...a, project })))
         .filter((a) => dayLabel(s, a.at_ms) === day).sort((a, b) => b.at_ms - a.at_ms).slice(0, 4)
         .map((a) => ({ title: a.title, kind: a.kind, new: !!a.new, act: { ev: "ui_route", project: a.project, agent: a.agent } }));
       return { sections: [{ sh: T(s, "board_waiting", { n: waiting.length }), kind: "cards", items: waiting }, { sh: T(s, "made_today"), kind: "thumbs", items: made }] };
