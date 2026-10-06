@@ -18,6 +18,7 @@ mod pages;
 mod projects;
 mod proto;
 mod repl;
+mod routing;
 mod release;
 mod session_log;
 mod versions;
@@ -2076,14 +2077,17 @@ impl Shell {
                 // a step of his answered on its card (roadmap D): ticked
                 // on its page, the page's agent told there
                 if !self.page_step_answer(id, &s("text")) {
+                    let queued = v.get("queued").and_then(|x| x.as_bool()).unwrap_or(false);
                     let text = match self.page_reply_text(&s("text")) {
                         Some(reply) => reply,
+                        // bise's home hub: words about a project go there (daemon/routing.rs)
+                        None if self.route_input(&s("focus"), &s("text"), &s("via"), queued, v.get("context")) => return self.page_answers(),
                         None => {
                             let t = Self::capsule_hint(s("text"), &s("via"));
                             self.steps_hint(t, &s("via"))
                         }
                     };
-                    self.step(Input::ClientInput { client: id, focus: s("focus"), text, queued: v.get("queued").and_then(|x| x.as_bool()).unwrap_or(false) });
+                    self.step(Input::ClientInput { client: id, focus: s("focus"), text, queued });
                 }
                 self.page_answers();
             }

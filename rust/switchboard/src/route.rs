@@ -2,7 +2,7 @@
 //! project the user's words to bise are about, from the fn context (the front
 //! app's file, URL, title), the words themselves and each project's recent
 //! threads. Pure: no I/O, no clock, no model; the home hub's shell gathers the
-//! candidates (daemon/route.rs) and calls [`guess`] then [`target`] once per
+//! candidates (daemon/routing.rs) and calls [`guess`] then [`target`] once per
 //! message, before any turn (the fast path: amb-hub's 2 s `route_hold`).
 //! [`target`] is the only place the threshold lives: sb-core gets a project or
 //! nothing, never a score. Nothing here sends anything.
