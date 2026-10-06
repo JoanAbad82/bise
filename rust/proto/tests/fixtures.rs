@@ -106,3 +106,16 @@ mod erased {
         }
     }
 }
+
+/// The fn context (decision F): each line decodes and encodes back to the
+/// same JSON (absent fields stay absent), and an unknown field is ignored.
+#[test]
+fn the_fn_context_round_trips() {
+    use bise_proto::context::FnContext;
+    for l in lines("context.jsonl") {
+        let c: FnContext = serde_json::from_str(&l).unwrap_or_else(|e| panic!("context.jsonl: {e}\n  {l}"));
+        assert_eq!(serde_json::to_value(&c).unwrap(), json(&l), "context.jsonl: the round trip changed it");
+    }
+    let c: FnContext = serde_json::from_str(r#"{"app":"Mail","later":"a field of a newer app"}"#).unwrap();
+    assert_eq!(c, FnContext { app: Some("Mail".into()), ..Default::default() });
+}

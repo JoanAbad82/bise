@@ -50,6 +50,7 @@ pub mod procs;
 pub mod proto_view;
 pub mod prompts;
 pub mod role;
+pub mod route;
 pub mod router;
 pub mod search;
 pub mod sweep;
