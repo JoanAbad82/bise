@@ -13,6 +13,7 @@ import { memo, type MouseEvent } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { pathOf } from './paths';
+import { Code, known } from './Code';
 
 /** A link he may open from an answer: http, https or mailto. */
 export function openable(href: string | undefined): href is string {
@@ -93,7 +94,7 @@ export const Markdown = memo(function Markdown({ text, onLink, onPath }: { text:
               copy
             </button>
           </div>
-          <pre className="th-pre">{children}</pre>
+          <pre className="th-pre">{known(lang) ? <Code text={text} lang={lang} /> : children}</pre>
         </div>
       );
     },
