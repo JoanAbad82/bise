@@ -21,12 +21,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 import desktop_try as T  # noqa: E402
+
+sys.path.insert(0, HERE)
+import wait  # noqa: E402
 
 FAILS = []
 
@@ -151,9 +153,7 @@ def integration():
         ws = os.path.join(tryh, "repos", "alpha")
         hub = subprocess.Popen([bise, "sbd", "--workspace", ws], env=henv, stdin=subprocess.DEVNULL,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        t0 = time.time()
-        while not T.hub_socks(tryh) and time.time() - t0 < 30:
-            time.sleep(0.2)
+        wait.until(lambda: T.hub_socks(tryh), 30, "the try hub's socket under %s/hubs" % tryh, poll=0.2)
         check(T.hub_socks(tryh) and T.hub_socks(tryh)[0].startswith(tryh + "/hubs/"), "the hub's state is in the try home: %s" % T.hub_socks(tryh))
         r = go("--stop")
         check(r.returncode == 0 and "your own app stays closed" in r.stderr, "--stop: %s" % r.stderr[-400:])
