@@ -54,7 +54,7 @@ type Agent is Data:
     declared: Maybe<&2, Decl>, aliases: List<&2, String>,
     files: List<&2, String>, ws: J.Json, dir: String, brief: J.Json,
     created: Nat, failure: Maybe<&2, String>, note: String, report: J.Json,
-    snap: Maybe<&2, String>}
+    snap: Maybe<&2, String>, follow: Bool}
 
 type St is Data:
   St{agents: List<&2, Agent>, order: List<&2, String>, msgs: List<&2, MRec>,
@@ -218,11 +218,11 @@ def rec_of(xs: List<&2, MRec>, +id: Nat) -> Maybe<&2, MRec>:
   find(~MRec, ~Nat, ~(r => Msg.id(MRec.msg(r))), ~(a => b => Nat.is_eq(a, b)), xs, id)
 
 def new_agent(+name: String, +is_main: Bool, +parent: Maybe<&2, String>, +ws: J.Json, +brief: J.Json, +created: Nat) -> Agent:
-  Agent{name, is_main, parent, LActive{}, None{}, Nil{}, Nil{}, ws, name, brief, created, None{}, "", J.JNull{}, None{}}
+  Agent{name, is_main, parent, LActive{}, None{}, Nil{}, Nil{}, ws, name, brief, created, None{}, "", J.JNull{}, None{}, False{}}
 
 def Agent.name(x: Agent) -> String:
   match x:
-    case Agent{+name, _, _, _, _, _, _, _, _, _, _, _, _, _, _}:
+    case Agent{+name, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _}:
       name
 
 # replace (or add) the agent named `n`
@@ -345,7 +345,7 @@ def agent_named(xs: List<&2, Agent>, +n: String) -> Maybe<&2, Agent>:
 
 def Agent.aliases(x: Agent) -> List<&2, String>:
   match x:
-    case Agent{_, _, _, _, _, +aliases, _, _, _, _, _, _, _, _, _}:
+    case Agent{_, _, _, _, _, +aliases, _, _, _, _, _, _, _, _, _, _}:
       aliases
 
 def agent_alias(xs: List<&2, Agent>, +n: String) -> Maybe<&2, String>:
@@ -392,22 +392,22 @@ def agent_op.file(known: Bool, +files: List<&2, String>, +p: String) -> List<&2,
 
 def agent_op(+a: Agent, op: AgentOp) -> Agent:
   match a:
-    case Agent{+name, +is_main, +parent, +life, +declared, +aliases, +files, +ws, +dir, +brief, +created, +failure, +note, +report, +snap}:
+    case Agent{+name, +is_main, +parent, +life, +declared, +aliases, +files, +ws, +dir, +brief, +created, +failure, +note, +report, +snap, +follow}:
       match op:
         case OLife{+l, +why}:
-          Agent{name, is_main, parent, l, agent_op.decl(l, declared), aliases, files, ws, dir, brief, created, why, note, report, snap}
+          Agent{name, is_main, parent, l, agent_op.decl(l, declared), aliases, files, ws, dir, brief, created, why, note, report, snap, follow}
         case OWs{+w}:
-          Agent{name, is_main, parent, life, declared, aliases, files, w, dir, brief, created, failure, note, report, snap}
+          Agent{name, is_main, parent, life, declared, aliases, files, w, dir, brief, created, failure, note, report, snap, follow}
         case ODeclared{+d, +n}:
-          Agent{name, is_main, parent, life, d, aliases, files, ws, dir, brief, created, failure, n, report, snap}
+          Agent{name, is_main, parent, life, d, aliases, files, ws, dir, brief, created, failure, n, report, snap, follow}
         case OFile{+p}:
-          Agent{name, is_main, parent, life, declared, aliases, agent_op.file(str_in(files, p), files, p), ws, dir, brief, created, failure, note, report, snap}
+          Agent{name, is_main, parent, life, declared, aliases, agent_op.file(str_in(files, p), files, p), ws, dir, brief, created, failure, note, report, snap, follow}
         case ORename{+nn}:
-          Agent{nn, is_main, parent, life, declared, snoc(String, aliases, name), files, ws, dir, brief, created, failure, note, report, snap}
+          Agent{nn, is_main, parent, life, declared, snoc(String, aliases, name), files, ws, dir, brief, created, failure, note, report, snap, follow}
         case OSnap{+sn}:
-          Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, sn}
+          Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, report, sn, follow}
         case OReport{+rp}:
-          Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, rp, snap}
+          Agent{name, is_main, parent, life, declared, aliases, files, ws, dir, brief, created, failure, note, rp, snap, follow}
 
 # apply an operation to the agent named `n` (no agent: nothing changes)
 def map_agent(xs: List<&2, Agent>, +n: String, +op: AgentOp) -> List<&2, Agent>:
@@ -820,68 +820,75 @@ def clip_tail(+s: String, +max: Nat) -> String:
 
 def Agent.is_main(x: Agent) -> Bool:
   match x:
-    case Agent{_, +is_main, _, _, _, _, _, _, _, _, _, _, _, _, _}:
+    case Agent{_, +is_main, _, _, _, _, _, _, _, _, _, _, _, _, _, _}:
       is_main
 
 def Agent.parent(x: Agent) -> Maybe<&2, String>:
   match x:
-    case Agent{_, _, +parent, _, _, _, _, _, _, _, _, _, _, _, _}:
+    case Agent{_, _, +parent, _, _, _, _, _, _, _, _, _, _, _, _, _}:
       parent
 
 def Agent.life(x: Agent) -> Life:
   match x:
-    case Agent{_, _, _, +life, _, _, _, _, _, _, _, _, _, _, _}:
+    case Agent{_, _, _, +life, _, _, _, _, _, _, _, _, _, _, _, _}:
       life
 
 def Agent.declared(x: Agent) -> Maybe<&2, Decl>:
   match x:
-    case Agent{_, _, _, _, +declared, _, _, _, _, _, _, _, _, _, _}:
+    case Agent{_, _, _, _, +declared, _, _, _, _, _, _, _, _, _, _, _}:
       declared
 
 def Agent.files(x: Agent) -> List<&2, String>:
   match x:
-    case Agent{_, _, _, _, _, _, +files, _, _, _, _, _, _, _, _}:
+    case Agent{_, _, _, _, _, _, +files, _, _, _, _, _, _, _, _, _}:
       files
 
 def Agent.ws(x: Agent) -> J.Json:
   match x:
-    case Agent{_, _, _, _, _, _, _, +ws, _, _, _, _, _, _, _}:
+    case Agent{_, _, _, _, _, _, _, +ws, _, _, _, _, _, _, _, _}:
       ws
 
 def Agent.dir(x: Agent) -> String:
   match x:
-    case Agent{_, _, _, _, _, _, _, _, +dir, _, _, _, _, _, _}:
+    case Agent{_, _, _, _, _, _, _, _, +dir, _, _, _, _, _, _, _}:
       dir
 
 def Agent.brief(x: Agent) -> J.Json:
   match x:
-    case Agent{_, _, _, _, _, _, _, _, _, +brief, _, _, _, _, _}:
+    case Agent{_, _, _, _, _, _, _, _, _, +brief, _, _, _, _, _, _}:
       brief
 
 def Agent.created(x: Agent) -> Nat:
   match x:
-    case Agent{_, _, _, _, _, _, _, _, _, _, +created, _, _, _, _}:
+    case Agent{_, _, _, _, _, _, _, _, _, _, +created, _, _, _, _, _}:
       created
 
 def Agent.failure(x: Agent) -> Maybe<&2, String>:
   match x:
-    case Agent{_, _, _, _, _, _, _, _, _, _, _, +failure, _, _, _}:
+    case Agent{_, _, _, _, _, _, _, _, _, _, _, +failure, _, _, _, _}:
       failure
 
 def Agent.note(x: Agent) -> String:
   match x:
-    case Agent{_, _, _, _, _, _, _, _, _, _, _, _, +note, _, _}:
+    case Agent{_, _, _, _, _, _, _, _, _, _, _, _, +note, _, _, _}:
       note
 
 def Agent.report(x: Agent) -> J.Json:
   match x:
-    case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, +report, _}:
+    case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, +report, _, _}:
       report
 
 def Agent.snap(x: Agent) -> Maybe<&2, String>:
   match x:
-    case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, _, +snap}:
+    case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, _, +snap, _}:
       snap
+
+# bise desktop S10: someone asked to hear when it ends (one job: off again
+# at its job_end)
+def Agent.follow(x: Agent) -> Bool:
+  match x:
+    case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, +f}:
+      f
 
 # dev-flow §3.1: the place of a ws: "shared", or its worktree's id (the
 # Rust Workspace::place_id; an older journal's worktree has none: its

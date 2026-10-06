@@ -3900,7 +3900,7 @@ def hub_is_rename(op: HM.AgentOp) -> Bool:
 
 def hub_names_op(h: HM.Agent, op: HM.AgentOp, nr: {hub_is_rename(op) == False{} : Bool}) -> {HI.names(HM.agent_op(h, op)) == HI.names(h) : List<&2, String>}:
   match h:
-    case HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn}:
+    case HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
       match op:
         case HM.OLife{l, why}:
           {==}
@@ -3911,7 +3911,7 @@ def hub_names_op(h: HM.Agent, op: HM.AgentOp, nr: {hub_is_rename(op) == False{} 
         case HM.OFile{p}:
           {==}
         case HM.ORename{nn}:
-          hub_absurd_eq(hub_tf_absurd(nr), List<&2, String>, HI.names(HM.agent_op(HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn}, HM.ORename{nn})), HI.names(HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn}))
+          hub_absurd_eq(hub_tf_absurd(nr), List<&2, String>, HI.names(HM.agent_op(HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}, HM.ORename{nn})), HI.names(HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}))
         case HM.OSnap{x}:
           {==}
         case HM.OReport{x}:
@@ -4158,7 +4158,7 @@ def hub_apart_ren_before(+x: List<&2, String>, +m: String, +al: List<&2, String>
 def hub_aa_map_ren.top(+x: List<&2, String>, h: HM.Agent, +t: List<&2, HM.Agent>, +new: String, ah: HI.Apart(x, HI.names(h)), +fx: {HM.str_in(x, new) == False{} : Bool},
     at: HI.ApartAll(x, HI.profile(t))) -> HI.ApartAll(x, HI.profile(HM.agent_op(h, HM.ORename{new}) <> t)):
   match h:
-    case HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn}:
+    case HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
       HX.Both{hub_apart_ren_before(x, name, al, new, ah, fx), at}
 
 def hub_aa_map_ren.pick(c: Bool, +x: List<&2, String>, +h: HM.Agent, +t: List<&2, HM.Agent>, +old: String, +new: String, +e: {String.eq(HM.Agent.name(h), old) == c : Bool},
@@ -4187,7 +4187,7 @@ def hub_aa_map_ren(+x: List<&2, String>, +t: List<&2, HM.Agent>, +old: String, +
 def hub_nok_ren.top(h: HM.Agent, +t: List<&2, HM.Agent>, +new: String, a1: HI.ApartAll(HI.names(h), HI.profile(t)), ft: hub_free(HI.profile(t), new),
     nt: HI.NamesOK(HI.profile(t))) -> HI.NamesOK(HI.profile(HM.agent_op(h, HM.ORename{new}) <> t)):
   match h:
-    case HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn}:
+    case HM.Agent{name, im, pa, life, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
       HX.Both{hub_aa_ren(name, al, new, HI.profile(t), a1, ft), nt}
 
 def hub_nok_ren.pick(c: Bool, +h: HM.Agent, +t: List<&2, HM.Agent>, +old: String, +new: String, +e: {String.eq(HM.Agent.name(h), old) == c : Bool},

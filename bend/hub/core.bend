@@ -461,7 +461,7 @@ def status_of_run(+a: M.Agent, x: X.Rt) -> String:
 # the status every view shows (model.rs Agent::status)
 def status_str(a: M.Agent, +x: X.Rt) -> String:
   match a:
-    case M.Agent{+n, +im, +pa, life, +de, +al, +fi, +ws, +di, +br, +cr, +fa, +no, +rp, +sn}:
+    case M.Agent{+n, +im, +pa, life, +de, +al, +fi, +ws, +di, +br, +cr, +fa, +no, +rp, +sn, +fo}:
       match life:
         case M.LArchived{}:
           "archived"
@@ -470,7 +470,7 @@ def status_str(a: M.Agent, +x: X.Rt) -> String:
         case M.LFailed{}:
           "failed"
         case M.LActive{}:
-          status_of_run(M.Agent{n, im, pa, M.LActive{}, de, al, fi, ws, di, br, cr, fa, no, rp, sn}, x)
+          status_of_run(M.Agent{n, im, pa, M.LActive{}, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}, x)
 
 # the relation of the sender to the recipient, as the recipient reads it
 # (prompts.rs relation)
