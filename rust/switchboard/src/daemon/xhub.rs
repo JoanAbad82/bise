@@ -90,6 +90,12 @@ impl Shell {
         });
     }
 
+    /// Whether `sb follow` request `v` goes to another project's hub: on
+    /// bise's home hub, an agent named `<p>/<agent>`.
+    pub(super) fn wants_follow(&self, v: &Value) -> bool {
+        crate::paths::is_home(&self.opts.paths.workspace) && v.get("agent").and_then(Value::as_str).is_some_and(|a| a.contains('/'))
+    }
+
     /// S10, bise's home hub: `sb follow <p>/<agent> [--off]` (main only):
     /// the project's hub follows its task (started first when stopped);
     /// a command, not a message: no outbox, its answer or its failure

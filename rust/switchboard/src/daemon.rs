@@ -2235,7 +2235,7 @@ impl Shell {
                 write_json(&mut stream, &self.xinspect(&v));
             }
             // S10: bise's `sb follow <p>/<agent>`: on that project's hub
-            "follow" if crate::paths::is_home(&self.opts.paths.workspace) && v["agent"].as_str().is_some_and(|a| a.contains('/')) => {
+            "follow" if self.wants_follow(&v) => {
                 self.xfollow(stream, &v);
             }
             "history" | "show" if xread::wanted(cmd, &v) => {
