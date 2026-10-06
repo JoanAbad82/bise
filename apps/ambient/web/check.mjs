@@ -1608,11 +1608,16 @@ law("desktop S8 route line (v9): after a talk, '→ telemetry · main' for 2 s; 
   eq([c.cmds, M.view(c.m, 110).state], [[{ cmd: "route_cancel", project: "bise-home-00000000", rid: "r7" }], "working"]);
   // after the deadline: no line, tab and esc are the usual keys again
   eq([M.view(m, 1900).state, M.step(m, { ev: "app_key", key: "tab" }, 1900).cmds], ["working", []]);
-  // amb-hub's error for a tab / fn esc after the route ended (56087c96): plain words; a wrong target keeps its text
-  // (bise is working on his words here, so the line is the working glass's sub line)
-  const err = (text, cmd = "route_correct") => M.view(M.step(m, { ev: "error", project: "bise-home-00000000", cmd, text }, 1950).m, 1960);
-  eq([err("route r7 already went or was cancelled").sub, err("route r7 already went or was cancelled", "route_cancel").sub], ["too late: your words already went.", "too late: your words already went."]);
-  eq(err("no project named nope (sb project list)").sub, "no project named nope (sb project list)");
+  // amb-hub's error for a tab / fn esc after the route ended (56087c96): nothing failed, so no ▲, where it
+  // went in the route's names, dim, 3 s (ambient m_9024); a wrong target keeps the hub's text
+  const done = M.step(m, { ev: "route_done", project: "bise-home-00000000", rid: "r7", state: "sent", to: "telemetry-8e02" }, 1900).m;
+  const late = (cmd) => M.step(done, { ev: "error", project: "bise-home-00000000", cmd, text: "route r7 already went or was cancelled" }, 1950).m;
+  const idle = { ...late("route_cancel"), mine: false, phase: "idle" };
+  const lv = M.view(idle, 1960), ls = Bar.spec(lv);
+  eq([lv.state, lv.text, lv.glyph, ls.head.line.dim, lv.content.kind], ["routed", "already sent to telemetry · main.", null, true, "line"]);
+  eq(M.view(idle, 4960).state, "idle");   // 3 s
+  eq(M.view(late("route_correct"), 1960).sub, "already sent to telemetry · main.");   // while bise works: the sub line
+  eq(M.view(M.step(m, { ev: "error", project: "bise-home-00000000", cmd: "route_correct", text: "no project named nope (sb project list)" }, 1950).m, 1960).sub, "no project named nope (sb project list)");
   // a followed job's agent: '→ storefront · stock · following'
   m = M.step(m, { ev: "route", project: "home", to: "storefront-5c1d", agent: "stock", followed: true, text: "relance le replay", correct_until_ms: 2000, at_wall: 0 }, 2000).m;
   eq(Bar.spec(M.view(m, 2010)).head.line.text, "→ storefront · stock · following");

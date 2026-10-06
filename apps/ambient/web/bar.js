@@ -36,7 +36,7 @@
 
   // the line a key's answer, a flash or an error says, its glyph colored by what it is
   const GC = { "✓": "ok", "▲": "risk", "?": "a", "!": "a" };   // ✉ stays faint (dim, ambient m_8793)
-  const lineOf = (v) => ({ text: v.text, glyph: v.glyph || null, gc: GC[v.glyph] || null, size: "big" });
+  const lineOf = (v) => ({ text: v.text, glyph: v.glyph || null, gc: GC[v.glyph] || null, size: "big", ...(v.dim ? { dim: true } : {}) });
 
   // the rows of the agents an answer started (the model's chips: names)
   const started = (v) => (v.chips && v.chips.length ? [{ label: B.agentsStarted, rows: v.chips.map((n) => ({ g: "∿", t: n })) }] : []);

@@ -303,8 +303,9 @@
       case "error": {
         // a route correction or cancel that did nothing (amb-hub 56087c96): the route had ended, in
         // his words; a wrong target keeps the hub's own text
-        const late = /^route_/.test(ev.cmd || "") && /already went or was cancelled/.test(ev.text || "");
-        return none(flashNow(m, { kind: "error", glyph: "▲", text: late ? Wd.route.late : ev.text || "", ttl: T.error, still: true }, now));
+        const late = /^route_/.test(ev.cmd || "") && /already went or was cancelled/.test(ev.text || ""), r = m.route || m.lastRoute;
+        if (late && r) return none(flashNow(m, { kind: "routed", text: Wd.route.sent(r.name || (m.projects.find((x) => x.project === r.to) || {}).name || r.to, r.agent), ttl: 3000, dim: true }, now));
+        return none(flashNow(m, { kind: "error", glyph: "▲", text: ev.text || "", ttl: T.error, still: true }, now));
       }
 
       // ---- the app's own events (amb-mac: down comes 250 ms into a hold with no other key, the
@@ -519,7 +520,7 @@
         return none({ ...m, route: { rid: ev.rid ?? null, project: ev.project || "home", to: ev.to, name: ev.name || null, agent: ev.agent || null, followed: !!ev.followed, until: same ? m.route.until : now + left } });
       }
       case "route_done":
-        return none(m.route && (ev.rid == null || m.route.rid === ev.rid) ? { ...m, route: null } : m);
+        return none(m.route && (ev.rid == null || m.route.rid === ev.rid) ? { ...m, route: null, lastRoute: m.route } : m);
       case "ui_route_next": {
         const r = m.route;
         const ps = m.projects.filter((p) => !p.home).sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -965,7 +966,7 @@
       v.chips = m.chips;
       kissAt(m.doneAt);
     } else if (flash) {
-      v.state = flash.kind;
+      v.state = flash.kind; v.dim = !!flash.dim;
       v.glyph = flash.glyph || null; v.text = flash.text; v.sub = flash.sub || null;
       if (flash.perm) v.denied = flash.perm;
       if (flash.kiss) kissAt(flash.at);

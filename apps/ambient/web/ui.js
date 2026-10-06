@@ -111,7 +111,7 @@
       // his words wrap (lead m_7163): as many lines as they need up to a cap, the end always in
       // view, a fade at the top once they pass it
       if (L.wrap) left = `<div class="q wrap"><span class="qi"></span></div>`;
-      else left = `<div class="q${L.ph ? " ph" : ""}${L.size ? " " + L.size : ""}">${L.words ? "" : `${L.glyph ? `<span class="gl ${L.gc || ""}">${esc(L.glyph)}</span> ` : ""}${esc(L.text)}`}</div>`;
+      else left = `<div class="q${L.ph ? " ph" : ""}${L.dim ? " dim" : ""}${L.size ? " " + L.size : ""}">${L.words ? "" : `${L.glyph ? `<span class="gl ${L.gc || ""}">${esc(L.glyph)}</span> ` : ""}${esc(L.text)}`}</div>`;
     }
     return `<div class="inrow h${h.h}${h.line && h.line.wrap ? " grow" : ""}">${left}${right}</div>`;
   }

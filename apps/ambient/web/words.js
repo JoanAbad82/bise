@@ -169,8 +169,9 @@
   const route = {
     line: (name, agent, followed) => `→ ${name} · ${agent || "main"}${followed ? " · following" : ""}`,
     another: "another project", cancel: "cancel",
-    // a tab or fn esc that came after the route ended (amb-hub 56087c96's error): best guess, to ambient
-    late: "too late: your words already went.",
+    // a tab or fn esc after the route ended (amb-hub 56087c96's error): nothing failed, so no ▲; where
+    // it went, the route's own names, dim 3 s (ambient m_9024): he writes again to send it elsewhere
+    sent: (name, agent) => `already sent to ${name} · ${agent || "main"}.`,
   };
 
   // desktop S8: the menu-bar pearl's dropdown (v9 'la perle dans la barre de menus')
