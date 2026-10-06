@@ -167,7 +167,7 @@
     set: [["the settings page", { nav: [{ kind: "ag", name: "general", on: true }, { kind: "ag", name: "voice and fn" }, { kind: "ag", name: "quiet moments" }], title: "quiet moments", sub: "when bise holds its cards" }]],
     onb: [
       ["hello", { pearl: true, title: "hi. i'm bise.", sub: "hold fn and talk to me, from any app.", cta: { text: "start", kind: "pri" }, steps: 5, step: 0 }],
-      ["try fn", { pearl: true, title: "try it: hold fn", sub: "“what moved in storefront this week?”", fn: "down", steps: 5, step: 4 }],
+      ["try fn", { pearl: { mood: "listen" }, title: "try it: hold fn", sub: "“what moved in storefront this week?”", fn: "down", steps: 5, step: 4 }],
     ],
     fnkey: [["up", {}], ["down", { down: true }]],
   });

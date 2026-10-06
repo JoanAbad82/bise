@@ -28,10 +28,10 @@
     h("div", "nav", (d.nav || []).map((r) => UI.row.render(r))),
     h("div", "pg", h("div", "b-h", d.title), d.sub ? h("div", "b-sub", d.sub) : null, d.children)));
 
-  // an onboarding step: {pearl (the 120 px pearl), title, sub, children: [Element], cta: btn data,
-  // fn: "up" | "down" (the fn key), steps: n, step: i}
+  // an onboarding step: {pearl (true, or {mood}: the 120 px pearl), title, sub, children: [Element],
+  // cta: btn data, fn: "up" | "down" (the fn key), steps: n, step: i}
   define("onb", (d) => h("div", "b-onb",
-    d.pearl ? UI.pearl.render({ size: 120 }) : null,
+    d.pearl ? UI.pearl.render({ size: 120, mood: typeof d.pearl === "object" ? d.pearl.mood : undefined }) : null,
     h("div", "t", d.title),
     d.sub ? h("div", "s", d.sub) : null,
     d.children,
