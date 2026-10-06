@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay, threadKey } from '@/store';
-import { EntryRow, PendingRow, type RowCtx } from './rows';
+import { EntryRow, type RowCtx } from './rows';
 import { ThreadScreen } from './ThreadScreen';
 
 // the composer is amb-web's: here a stand-in that counts its renders
@@ -56,7 +56,7 @@ describe('the thread screen', () => {
 
   it('⛔3: a send shows at once as his row, before any event; a failed one says so and retries', () => {
     const { store, cmds } = setup();
-    render(
+    const row = render(
       <StoreProvider store={store}>
         <ThreadScreen project={P} agent="perf" />
       </StoreProvider>,
@@ -71,11 +71,7 @@ describe('the thread screen', () => {
     expect(cmds.at(-1)).toMatchObject({ cmd: 'send', project: P, agent: 'perf', text: 'look', files: ['/tmp/shot.png'] });
     const [p] = store.pending(K);
     if (p === undefined) throw new Error('no pending send');
-    const row = render(
-      <StoreProvider store={store}>
-        <PendingRow ctx={ctx} cid={p.cid} />
-      </StoreProvider>,
-    );
+    // drawn by the screen itself, in the same render as the send (outside the virtual list)
     expect(row.getByTestId(`thread.pending.${p.cid}`).dataset.state).toBe('sending');
     expect(row.getByTestId(`thread.pending.${p.cid}`).textContent).toContain('hi there');
     act(() => {

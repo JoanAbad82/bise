@@ -16,7 +16,7 @@ import './thread.css';
 // no extra parts (Virtuoso reads its `components` object: never undefined)
 const NONE = {};
 // Virtuoso measures its own box: it must fill the list's flex area
-const FILL = { height: '100%' };
+const FILL = { flex: '1 1 auto', minHeight: 0 };
 // it opens on the newest row's end (a long answer's last line, not its
 // first): at the bottom, so new rows follow
 const LAST = { index: 'LAST', align: 'end' } as const;
@@ -42,6 +42,9 @@ export interface ThreadListProps {
   onOlder: () => void;
   /** above the oldest row while `more` (a loading line) */
   head?: ReactNode;
+  /** under the newest row, outside the virtual list: drawn in the same
+   * frame as the change that adds it (his sends before they land) */
+  tail?: ReactNode;
   testId?: string;
   ref?: Ref<ThreadListHandle>;
 }
@@ -65,7 +68,7 @@ export function newAtEnd(last: string | undefined, keys: readonly string[]): num
   return i < 0 ? 0 : keys.length - 1 - i;
 }
 
-export function ThreadList({ keys, row, more, onOlder, head, testId, ref }: ThreadListProps) {
+export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref }: ThreadListProps) {
   const virtuoso = useRef<VirtuosoHandle>(null);
   // the anchor of firstItemIndex, moved during render (React's
   // "state from the previous render" pattern): no effect, no extra frame
@@ -126,6 +129,7 @@ export function ThreadList({ keys, row, more, onOlder, head, testId, ref }: Thre
         components={head !== undefined && more ? { Header: () => head } : NONE}
         increaseViewportBy={{ top: 600, bottom: 300 }}
       />
+      {tail}
       {!atBottom && (
         <button type="button" className="th-to-end" onClick={toEnd} data-testid="thread.to-end">
           ↓ back to the bottom{seen.unseen > 0 ? ` · ${String(seen.unseen)} new` : ''}

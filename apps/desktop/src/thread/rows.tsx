@@ -6,7 +6,7 @@
 import { memo, useEffect, useState } from 'react';
 import { Answered, Art, Button, Chip, Fold, Marker, Msg, Opts, Tool } from '@/ds';
 import type { Entry } from '@/proto';
-import { useEntry, usePending, useProjects, useStore } from '@/store';
+import { useAgents, useCoreState, useEntry, usePending, useProjects, useStore } from '@/store';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
@@ -160,11 +160,12 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
   const store = useStore();
   const p = usePending(ctx.tkey).find((x) => x.cid === cid);
   const hold = useHoldOf(store, ctx.tkey, cid);
+  const connecting = useConnecting(ctx.project);
   if (p === undefined) return null;
   // a routed send: its route's state is the row's (lead m_9854)
   const failed = p.state === 'failed' && hold?.state !== 'sent';
   const state = hold !== undefined && hold.state !== 'cancelled' ? hold.state : p.state;
-  const time = hold?.state === 'held' ? undefined : hold?.state === 'sent' ? `sent to ${hold.name}` : failed ? `not sent${p.why !== undefined && p.why !== 'not sent' ? ` · ${p.why}` : ''}` : 'sending…';
+  const time = hold?.state === 'held' ? undefined : hold?.state === 'sent' ? `sent to ${hold.name}` : failed ? `not sent${p.why !== undefined && p.why !== 'not sent' ? ` · ${p.why}` : ''}` : (connecting ?? 'sending…');
   return (
     <div className={failed ? 'th-row th-pending th-failed' : hold?.state === 'sent' ? 'th-row th-routed' : 'th-row th-pending'} data-testid={`thread.pending.${cid}`} data-state={state}>
       <Msg from="you" name="you" av="y" time={time} state={failed ? 'error' : undefined}>
@@ -196,6 +197,19 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
     </div>
   );
 });
+
+/**
+ * The wait before a send can go, named (lead m_10108): while the core
+ * starts or the project's hub hasn't said who it is yet (no agents from it:
+ * its welcome comes first), 'connecting to bise…'; none once connected.
+ */
+function useConnecting(project: string): string | undefined {
+  const core = useCoreState();
+  const agents = useAgents(project);
+  const row = useProjects().find((p) => p.project === project);
+  if (core === 'up' && agents.length > 0) return undefined;
+  return `connecting to ${row === undefined || row.home ? 'bise' : row.name}…`;
+}
 
 /** Seconds left to change a held route, ticking while it shows. */
 function useLeft(until: number): number {

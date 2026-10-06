@@ -162,12 +162,14 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
   const store = useStore();
   const view = useThreadOrder(tkey);
   const pending = usePending(tkey);
-  const keys = useMemo(() => [...view.order.map(entryKey), ...pending.map((p) => pendingKey(String(p.cid)))], [view, pending]);
+  // entries only: his sends not landed yet are the list's tail, outside the
+  // virtual list, so his row is drawn in ⏎'s own frame (bar ⛔3: < 100 ms)
+  const keys = useMemo(() => view.order.map(entryKey), [view]);
   const ctx = useMemo<RowCtx>(() => ({ tkey, project, agent, bise, onLink: openLink }), [tkey, project, agent, bise]);
   const row = useCallback(
     (key: string) => {
       const pos = posOfKey(key);
-      return pos === undefined ? <PendingRow ctx={ctx} cid={Number(key.slice(2))} /> : <EntryRow ctx={ctx} pos={pos} />;
+      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} />;
     },
     [ctx],
   );
@@ -181,8 +183,15 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
     if (sent > last.current) listRef.current?.scrollToEnd();
     last.current = sent;
   }, [sent, listRef]);
-  if (!view.loaded && keys.length === 0) return <div className="th-list th-loading" data-testid="thread.loading" />;
-  return <ThreadList ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} testId="thread.list" />;
+  const tail = pending.length === 0 ? undefined : (
+    <div className="th-tail">
+      {pending.map((p) => (
+        <PendingRow key={pendingKey(String(p.cid))} ctx={ctx} cid={p.cid} />
+      ))}
+    </div>
+  );
+  if (!view.loaded && keys.length === 0 && tail === undefined) return <div className="th-list th-loading" data-testid="thread.loading" />;
+  return <ThreadList ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} tail={tail} testId="thread.list" />;
 });
 
 /** "3 agents · 1 at work · 2 waiting": a project's live agents (main out). Pure. */
