@@ -11,7 +11,7 @@
 //   - a row opens its agent's thread.
 import path from 'node:path';
 import { test, expect } from '../../harness';
-import { hubAgents, hubOf, launchOn, launchReal, realWorld, tui, tuiAgents, tuiReady, tuiSay, TUI_STATUS, type Tui } from '../world';
+import { hubAgents, hubOf, launchOn, launchReal, realWorld, tui, tuiAgents, tuiPanel, tuiReady, tuiSay, TUI_STATUS, type Tui } from '../world';
 
 const T = {
   screen: '[data-testid="agents.screen"]',
@@ -77,13 +77,14 @@ test('agents/list: the same agents and statuses as the TUI panel and the hub, li
     // at rest: the same agents, order and statuses in the three places
     const compare = async (when: string) => {
       const app = await appRows(page);
-      const panel = tuiAgents(t?.screen() ?? '');
+      const panel = t ? await tuiPanel(t) : [];
       const hub = (await hubAgents(w, 'telemetry')).filter((a) => !a.dropped);
       test.info().annotations.push({ type: when, description: JSON.stringify({ app, panel, hub: hub.map((a) => [a.name, a.status]) }) });
+      expect(panel.length, `${when}: the TUI's panel lists its agents`).toBeGreaterThan(0);
       expect([...app.map((a) => a.name)].sort(), `${when}: the same agents as the TUI's panel`).toEqual(panel.map((p) => p.name).sort());
-      // the order is the panel's numbering for ⌥1-9 in both (src/app/keys.ts panelAgents): the TUI keeps
-      // its agents in their start order, the app sorts them by status, so ⌥2 can open another agent
-      expect.soft(app.map((a) => a.name), `${when}: the same order as the TUI's panel (⌥N opens the same agent)`).toEqual(panel.map((p) => p.name));
+      // the order is the panel's numbering for ⌥1-9 in both (src/app/keys.ts panelAgents; amb-win
+      // c0d5c638: main first, then the hub's start order, as the TUI's panel)
+      expect(app.map((a) => a.name), `${when}: the same order as the TUI's panel (⌥N opens the same agent)`).toEqual(panel.map((p) => p.name));
       for (const p of panel) {
         const a = app.find((x) => x.name === p.name);
         expect(TUI_STATUS[p.glyph] ?? [], `${when}: ${p.name} is '${a?.status ?? '?'}' in the app, '${p.glyph}' in the TUI`).toContain(a?.status);
@@ -106,9 +107,18 @@ test('agents/list: the same agents and statuses as the TUI panel and the hub, li
     t.keys('Escape');
     await sleep(1500);
     await compare('after the turn');
-    // a row opens its agent
-    await page.locator(T.open('p99')).click();
-    await expect(page.locator(T.thread), "p99's row opens p99's thread").toHaveAttribute('data-agent', 'p99', { timeout: 5000 });
+    // ⌥1 opens the same agent in both: the panel's number 1 in the TUI, the window's ⌥1
+    const one = (await tuiPanel(t)).find((a) => a.n === 1)?.name ?? '';
+    expect(one, "the TUI's panel has an agent numbered 1").not.toBe('');
+    t.keys('M-1');
+    await expect.poll(() => / you → (\S+) /.exec(t?.screen() ?? '')?.[1], { timeout: 5000, message: `the TUI's ⌥1 opens ${one}` }).toBe(one);
+    t.keys('Escape');
+    // a row opens its agent (main's), then the window's ⌥1 from that thread
+    await page.locator(T.open('main')).click();
+    await expect(page.locator(T.thread), "main's row opens main's thread").toHaveAttribute('data-agent', 'main', { timeout: 5000 });
+    await page.keyboard.press('Alt+Digit1');
+    await expect(page.locator(T.thread), `the window's ⌥1 opens ${one}, as the TUI's`).toHaveAttribute('data-agent', one, { timeout: 5000 });
+    await page.screenshot({ path: test.info().outputPath('alt-1.png') });
   } finally {
     if (t) {
       test.info().attachments.push({ name: 'tui', contentType: 'text/plain', body: Buffer.from(t.screen()) });

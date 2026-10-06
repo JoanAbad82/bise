@@ -120,6 +120,24 @@ export function transcriptHas(w: World, project: string, agent: string, words: s
   }
 }
 
+/**
+ * The TUI's side panel, one trimmed string per screen line: the text between the panel's left
+ * border (the '┬' in the top border) and the right border. Cut by column, not by '│': a tip
+ * popover ('new: your agents…') drawn over the feed can cover the border between feed and panel.
+ */
+function panelOf(screen: string): string[] {
+  const lines = screen.split('\n');
+  const col = (lines[0] ?? '').indexOf('┬');
+  return lines.map((l) => {
+    if (col < 0) {
+      const cells = l.split('│');
+      return (cells.length >= 3 ? (cells[cells.length - 2] ?? '') : '').trim();
+    }
+    const end = l.lastIndexOf('│');
+    return end > col ? l.slice(col + 1, end).trim() : '';
+  });
+}
+
 /** The terminal on the same hub, in a detached tmux session of its own (never his tmux server). */
 export type Tui = { screen: () => string; keys: (...k: string[]) => void; close: () => void };
 
@@ -153,7 +171,8 @@ export async function tuiReady(t: Tui, timeoutMs = 20_000): Promise<void> {
     const s = t.screen();
     // its first-run pages: the 'hi, i'm bise … any key' splash, the provider step: esc leaves each
     if (/how do you want to pay|any key/.test(s)) t.keys('Escape');
-    else if (/│\s+agents\s+│/.test(s)) return;
+    // ready: its panel lists agents (the 'agents' head alone can come a frame before its rows)
+    else if (/│\s+agents\s+│/.test(s) && tuiAgents(s).length > 0) return;
     if (Date.now() - t0 > timeoutMs) throw new Error(`the TUI isn't ready after ${timeoutMs} ms:\n${s}`);
     await sleep(300);
   }
@@ -164,10 +183,7 @@ export async function tuiReady(t: Tui, timeoutMs = 20_000): Promise<void> {
  * [{ n, agent, text }] with the text as drawn (cut with … at the panel's width).
  */
 export function tuiInbox(screen: string): { n: number; agent: string; text: string }[] {
-  const panel = screen.split('\n').map((l) => {
-    const cells = l.split('│');
-    return (cells.length >= 3 ? (cells[cells.length - 2] ?? '') : '').trim();
-  });
+  const panel = panelOf(screen);
   const at = panel.indexOf('inbox');
   if (at < 0) return [];
   const out: { n: number; agent: string; text: string }[] = [];
@@ -184,10 +200,7 @@ export function tuiInbox(screen: string): { n: number; agent: string; text: stri
  * [{ n, glyph, name }]. The glyph is its status (rust/tui/src/theme.rs, TUI_STATUS).
  */
 export function tuiAgents(screen: string): { n: number; glyph: string; name: string }[] {
-  const panel = screen.split('\n').map((l) => {
-    const cells = l.split('│');
-    return (cells.length >= 3 ? (cells[cells.length - 2] ?? '') : '').trim();
-  });
+  const panel = panelOf(screen);
   const at = panel.indexOf('agents');
   if (at < 0) return [];
   const out: { n: number; glyph: string; name: string }[] = [];
@@ -200,6 +213,19 @@ export function tuiAgents(screen: string): { n: number; glyph: string; name: str
     out.push({ n: Number(m[1]), glyph: m[2] ?? '', name: m[3] ?? '' });
   }
   return out;
+}
+
+/**
+ * The TUI's panel agents once it draws them: the screen is read again until the panel has rows
+ * (a capture can land mid-redraw, with only the top border drawn). [] after `timeoutMs`.
+ */
+export async function tuiPanel(t: Tui, timeoutMs = 5000): Promise<{ n: number; glyph: string; name: string }[]> {
+  const t0 = Date.now();
+  for (;;) {
+    const rows = tuiAgents(t.screen());
+    if (rows.length > 0 || Date.now() - t0 > timeoutMs) return rows;
+    await sleep(200);
+  }
 }
 
 /** The statuses a TUI panel glyph stands for (rust/tui/src/theme.rs: G_WORKING …). */
