@@ -2158,7 +2158,7 @@ def req_xask.go(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q:
 
 # `sb project ask <p> "<question>"` (main only): bise's own words
 def req_xask(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
-  req_xask.go(o, Maybe.or(&2, String, pre, Bool.pick(Maybe<&2, String>, M.trim_is_empty(C.get_s(q, "text")), Some{"empty question"}, None{})), cx, token, q)
+  req_xask.go(o, Maybe.or(&2, String, pre, XB.ask_ok(C.get_s(q, "text"))), cx, token, q)
 
 # home: the project hub has it (a late ack of a settled send: nothing)
 def xack(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:

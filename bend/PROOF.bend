@@ -5217,3 +5217,7 @@ def Laws.card_confirm_words_refused(o, cx, c, text, e):
 def Laws.card_choice_words_refused(o, cx, c, text, e):
   %Equal.sym(Bool, HC.is_option(HM.Card.text(c), text), False{}, e) : {HC.answer.choice(o, _, cx, c, text) == HC.words_refused(o, cx, c, "one of its numbers") : HX.Cx<o>}
   {==}
+
+def Laws.xhub_ask_needs_words(text, b, e):
+  %Equal.sym(Bool, HM.trim_is_empty(text), b, e) : {Bool.pick(Maybe<&2, String>, _, Some{"empty question"}, None{}) == Bool.pick(Maybe<&2, String>, b, Some{"empty question"}, None{}) : Maybe<&2, String>}
+  {==}

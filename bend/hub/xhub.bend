@@ -63,6 +63,11 @@ def forward(+s: M.St, +from: String, +id: Nat) -> Fwd:
     forward.done(XH.out_by_msg(XH.Xs.outbox(M.St.x(s)), id), s, id),
     FwdErr{"only main forwards to the projects"})
 
+# bise's own question (`sb project ask`): words, never a blank (law
+# xhub_ask_needs_words); None: it may go
+def ask_ok(+text: String) -> Maybe<&2, String>:
+  Bool.pick(Maybe<&2, String>, M.trim_is_empty(text), Some{"empty question"}, None{})
+
 # the outbox entry of a new send: the next xid, pending, never tried
 def new_out(+x: XH.Xs, +project: String, +k: XH.XKind, +msg: Nat, +text: String) -> XH.Out:
   XH.Out{XH.Xs.next_xid(x), project, k, msg, text, XH.OPending{}, 0n}

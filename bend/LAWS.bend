@@ -4483,6 +4483,14 @@ law xhub_forward_needs_his_message:
   for e: {String.eq(HM.Msg.from(m), HM.USER()) == False{} : Bool}
   {HXB.his.go(Some{m}, id) == HXB.FwdErr{String.append(HXB.mid(id), " is not a message the user sent you: forward his own words only (your own question: sb project ask)")} : HXB.Fwd}
 
+# LAW: bise's own question needs words: a blank one is refused, any other
+# may go (architect m_8864: the core's section validates nothing itself).
+law xhub_ask_needs_words:
+  for +text: String
+  for b: Bool
+  for e: {HM.trim_is_empty(text) == b : Bool}
+  {HXB.ask_ok(text) == Bool.pick(Maybe<&2, String>, b, Some{"empty question"}, None{}) : Maybe<&2, String>}
+
 # LAW: a send settles once: after its settle, no answer opens it again
 # (a second x_reply for it changes nothing: core's xanswer on None).
 law xhub_outbox_settles_once:
