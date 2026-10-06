@@ -65,6 +65,7 @@
       shot: null,                   // { app, title, skipped }
       perms: {}, permAsk: null,
       hello: null,                  // { at }: the hello, once ever (app_hello)
+      seat: "bar",                  // who shows the cards: 'window' while bise's window is key (app_card_seat)
       hidden: false, reduce: false, edgeGlow: true,
       radius: 16,                   // macOS's window radius (app_settings.radius); 16 until it comes
       quiet: null,                  // { why: 'call' | 'meeting' | '' } while in a call or a meeting (app_quiet)
@@ -109,10 +110,13 @@
   const visibleCards = (m) => m.cards.filter((c) => !m.answered[c.id]);
   // what the question glass may ask: not a card he put off with esc (it keeps waiting in the inbox
   // and the count, ambient m_6500), and in a call or a meeting only the urgent ones
-  // the card he brought up from fn i / fn 0 (m.front) asks first, even in a call
+  // the card he brought up from fn i / fn 0 (m.frontCard) asks first, even in a call
+  // while bise's window holds the cards (app_card_seat 'window', amb-mac 9c529bdd) the bar asks
+  // nothing: it keeps what it shows (the hello, a line), its keys answer no card
   const askable = (m) => {
-    const a = visibleCards(m).filter((c) => !(m.later || {})[c.id] && (c.id === m.front || !m.quiet || c.urgent));
-    const i = a.findIndex((c) => c.id === m.front);
+    if (m.seat === "window") return [];
+    const a = visibleCards(m).filter((c) => !(m.later || {})[c.id] && (c.id === m.frontCard || !m.quiet || c.urgent));
+    const i = a.findIndex((c) => c.id === m.frontCard);
     return i > 0 ? [a[i], ...a.slice(0, i), ...a.slice(i + 1)] : a;
   };
   const lv = (m, who, now) => (now - m.lvl[who].at < T.level ? m.lvl[who].v : 0);
@@ -426,6 +430,9 @@
       // the hello, once ever (ambient m_5702; amb-mac sends it once and keeps "said hello")
       case "app_hello":
         return none({ ...m, hello: { at: now } });
+      // bise's window (in front, key) holds the cards above its composer: the bar never turns into one
+      case "app_card_seat":
+        return none({ ...m, seat: ev.at === "window" ? "window" : "bar" });
       case "app_quiet":
         return none({ ...m, quiet: ev.on ? { why: ev.why || "", until: +ev.until_ms || 0 } : null });
       // desktop S8: the menu-bar pearl's dropdown is this page (amb-mac m_8489/m_8514): app_menu
@@ -470,7 +477,7 @@
         if (!visibleCards(m).some((c) => c.id === ev.card)) return none(m);
         const r = setPane(m, null);
         const later = { ...(m.later || {}) }; delete later[ev.card];
-        return { m: { ...r.m, later, front: ev.card, optFor: ev.card, optSel: 0 }, cmds: r.cmds };
+        return { m: { ...r.m, later, frontCard: ev.card, optFor: ev.card, optSel: 0 }, cmds: r.cmds };
       }
       case "ui_page": {      // a click on a page in "for you"
         const p = m.pages.find((x) => x.id === ev.page);
@@ -616,7 +623,8 @@
     if (m.route && now < m.route.until && (k === "tab" || k === "esc")) return step(m, { ev: k === "tab" ? "ui_route_next" : "ui_route_cancel" }, now);
     const cards = visibleCards(m);
     if (/^[1-9]$/.test(k)) {
-      const card = cards[m.pane === "inbox" || m.pane === "agents" ? m.sel : 0];
+      // no pane: the card the glass asks (none while bise's window holds the cards)
+      const card = m.pane === "inbox" || m.pane === "agents" ? cards[m.sel] : askable(m)[0];
       // the digit is the option's own n (a hard confirm: 1 allow, 3 no)
       const opt = card && Wd.options(card).find((o) => o.n === +k);
       if (!opt) return none(m);

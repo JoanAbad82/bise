@@ -1227,6 +1227,23 @@ law("the hello, once ever (app_hello): the pearl gathers 1.2 s, 'hi, i'm bise. h
   eq([rv(0).gather, rv(0).text, rv(1500).puff, rv(5400).state, rv(5600).content.kind], [0, W.hello, false, "hello", "none"]);
 });
 
+law("card seat (amb-mac 9c529bdd): while bise's window holds the cards (app_card_seat 'window') the bar keeps the hello and never turns into the card, its keys answer nothing; at 'bar' the card asks again (lead m_8746)", () => {
+  const card = { id: "c1", agent: "search", text: "reindex tonight 02:00?", options: ["yes", "no"] };
+  let m = M.step(M.init(), { ev: "app_card_seat", at: "window" }, 0).m;
+  m = M.step(m, { ev: "app_hello" }, 1000).m;
+  m = M.step(m, { ev: "state", agents: [{ name: "search", status: "waiting" }], cards: [card], pages: [] }, 1500).m;
+  eq([M.view(m, 2000).state, M.view(m, 2000).need], ["hello", false]);
+  eq([M.view(m, 7000).state, M.view(m, 7000).content.kind], ["idle", "none"]);   // the hello over: nothing, no card
+  eq(M.step(m, { ev: "app_key", key: "1" }, 7100).cmds.filter((c) => c.cmd === "answer"), []);
+  // he leaves the window: the card is the bar's again
+  const b = M.step(m, { ev: "app_card_seat", at: "bar" }, 8000).m;
+  eq([M.view(b, 8100).state, M.view(b, 8100).ask.id], ["needs", "c1"]);
+  // the card he brought up (fn i) stays first after the front app changes (app_front kept its own field)
+  const two = M.step(b, { ev: "state", agents: [], cards: [card, { ...card, id: "c2" }], pages: [] }, 8200).m;
+  const f = M.step(M.step(two, { ev: "ui_card", card: "c2" }, 8300).m, { ev: "app_front", app: "Code", bundle: "com.microsoft.VSCode" }, 8400).m;
+  eq(M.view(f, 8500).ask.id, "c2");
+});
+
 law("a batch of drafts is one glass: '3 drafts wait for you · <page>', 'replies to …', 1 review (opens the page), 2 send all 3 ('∿ sending 3 replies.') (ambient m_6056, lead m_6063)", () => {
   const card = { id: "b1", agent: "inbox", kind: "drafts", text: "3 drafts ready: legal · Lucas · Marc",
     options: [{ n: 1, label: "review" }, { n: 2, label: "send all 3" }],
