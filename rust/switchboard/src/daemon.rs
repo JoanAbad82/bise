@@ -21,6 +21,7 @@ mod repl;
 mod release;
 mod session_log;
 mod versions;
+mod dev_servers;
 mod worktrees;
 mod xhub;
 

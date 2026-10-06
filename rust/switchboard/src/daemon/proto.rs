@@ -29,6 +29,8 @@ pub(super) struct Proto {
     last: (String, String),
     /// the agents' statuses and folders at the last `worktrees` scan
     worktrees: String,
+    /// the background jobs' ports once found (dev_servers.rs)
+    pub(super) dev_ports: super::dev_servers::Ports,
 }
 
 #[derive(Default)]
@@ -119,6 +121,7 @@ impl Shell {
             let arts = self.proto_artifacts(&arts);
             self.proto_send(id, &arts);
             self.worktrees_typed(vec![id]);
+            self.dev_servers_typed(vec![id]);
             return;
         }
         if !self.proto.conns.contains_key(&id) {
@@ -135,6 +138,7 @@ impl Shell {
             | HubCmd::Unarchive { project, .. }
             | HubCmd::ArtifactsSeen { project }
             | HubCmd::Worktrees { project }
+            | HubCmd::DevServers { project }
             | HubCmd::Diff { project, .. } => project.clone(),
             HubCmd::Hello { .. } => unreachable!(),
             HubCmd::Unknown { tag, .. } => return self.proto_error(id, tag, &format!("unknown command: {tag}")),
@@ -227,6 +231,8 @@ impl Shell {
             }
             // git in a thread (worktrees.rs), to this client
             HubCmd::Worktrees { .. } => self.worktrees_typed(vec![id]),
+            // jobs and lsof in a thread (dev_servers.rs), to this client
+            HubCmd::DevServers { .. } => self.dev_servers_typed(vec![id]),
             HubCmd::Hello { .. } | HubCmd::Unknown { .. } => {}
         }
     }
@@ -272,6 +278,7 @@ impl Shell {
                 if key != self.proto.worktrees {
                     self.proto.worktrees = key;
                     self.worktrees_typed(ids.clone());
+                    self.dev_servers_typed(ids.clone());
                 }
             }
             // the art store changed (artifacts_refresh broadcasts it)

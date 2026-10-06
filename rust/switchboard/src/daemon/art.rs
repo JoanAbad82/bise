@@ -288,8 +288,12 @@ impl Shell {
                     }
                 }
             }
-            let v = crate::proto_view::diff(&ev, &project, &agent).to_value();
-            let _ = tx.send(Msg::ToClient { id, v });
+            let mut typed = crate::proto_view::diff(&ev, &project, &agent);
+            // the answer says which commit it is (not the live change)
+            if let bise_proto::hub::HubEv::Diff { commit: c, .. } = &mut typed {
+                *c = commit;
+            }
+            let _ = tx.send(Msg::ToClient { id, v: typed.to_value() });
         });
     }
 

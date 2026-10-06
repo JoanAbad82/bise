@@ -1,3 +1,2 @@
-{"ev":"dev_servers","project":"acme-1a2b3c4d","items":[{"agent":"perf","url":"http://localhost:5173","port":5173,"cmd":"pnpm dev","up":true,"name":"dev server"}]}
 {"ev":"jobs","project":"acme-1a2b3c4d","jobs":[{"agent":"perf","label":"bench the queries","step":3,"steps":5,"state":"running"}]}
 {"ev":"route","project":"bise-home-00000000","to":"acme-1a2b3c4d","text":"why does p99 rise","correct_until_ms":1791100402000}

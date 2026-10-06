@@ -12,7 +12,9 @@ use bise_proto::Pos;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+mod dev_servers;
 mod worktrees;
+pub use dev_servers::{dev_servers, lsof_ports, server_name, Job};
 pub use worktrees::{left_right, worktree_list, worktrees};
 
 /// The entries of the newest lines a subscription keeps, so a live line
@@ -198,6 +200,7 @@ pub fn diff(ev: &Value, project: &str, agent: &str) -> HubEv {
         files,
         result: None,
         merged: None,
+        commit: None,
         note: Some(s(ev, "note")).filter(|n| !n.is_empty()),
     }
 }

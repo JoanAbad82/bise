@@ -5,7 +5,7 @@
 //! they can't reach a hub or come from one.
 
 use crate::diff::{DiffFile, DiffResult};
-use crate::rows::{Agent, Artifact, Card, Worktree};
+use crate::rows::{Agent, Artifact, Card, DevServer, Worktree};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
@@ -37,6 +37,9 @@ pub enum HubEv {
     /// the agents change (a turn ends, one comes or goes) and on
     /// `worktrees`
     Worktrees { project: Project, items: Vec<Worktree> },
+    /// the agents' background servers, with `worktrees` (same moments)
+    /// and on `dev_servers`
+    DevServers { project: Project, items: Vec<DevServer> },
     /// an agent's change (the answer to `diff`): its checkout or branch
     /// vs `base`; `head` its branch (none: the shared folder)
     Diff {
@@ -54,6 +57,10 @@ pub enum HubEv {
         /// path sets it; the review shows 7 and opens it on GitHub)
         #[serde(default, skip_serializing_if = "Option::is_none")]
         merged: Option<String>,
+        /// the commit asked (`diff {commit}`): this is that commit alone,
+        /// not the agent's live change (amb-web m_8974)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        commit: Option<String>,
         /// why there are no files to show (its folder is gone...)
         #[serde(default, skip_serializing_if = "Option::is_none")]
         note: Option<String>,
@@ -72,7 +79,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "diff", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "diff", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -179,13 +186,15 @@ pub enum HubCmd {
     },
     /// the environments screen opened: `worktrees` comes again
     Worktrees { project: Project },
+    /// the environments screen opened: `dev_servers` comes again
+    DevServers { project: Project },
     /// a tag this version doesn't know: answered with `error`
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)

@@ -138,6 +138,26 @@ impl Card {
     }
 }
 
+/// A server an agent runs in the background (`pnpm dev`, a local
+/// grafana): its job listening on a port, or a known server command not
+/// listening yet (no port, no url).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DevServer {
+    pub agent: String,
+    /// what it is ("dev server", "http server")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// `http://localhost:<port>` once it listens
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+    /// the job's command line
+    pub cmd: String,
+    /// its job runs
+    pub up: bool,
+}
+
 /// A worktree of the project's repo: an agent's, or one of his own (the
 /// main checkout included).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

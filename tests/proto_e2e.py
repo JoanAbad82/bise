@@ -11,13 +11,15 @@ Run: python3 -u tests/proto_e2e.py (after scripts/bins.sh)
 import json
 import os
 import re
+import signal
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "diff", "error")
+TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "diff", "error")
 FIXTURES = os.path.join(e2e.ROOT, "rust", "proto", "fixtures", "hub_ev.jsonl")
 
 
@@ -209,6 +211,32 @@ def main():
         n = len(typed(c, "worktrees"))
         c.send({"cmd": "worktrees", "project": project})
         c.wait(lambda: len(typed(c, "worktrees")) > n and t5_row() and t5_row()["dirty"], 60, "an untracked file: dirty")
+
+        # dev servers: t5's background job (the bash tool's files) whose
+        # CHILD listens on a port (architect m_8711: the job's process group)
+        bg = os.path.join(E.state, "agents", "t5", "tmp", "bg")
+        os.makedirs(os.path.join(bg, "9.slot"), exist_ok=True)
+        server = subprocess.Popen(["sh", "-c", "python3 -m http.server 0 --bind 127.0.0.1 & wait"],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        try:
+            with open(os.path.join(bg, "9.pid"), "w") as fh:
+                fh.write(str(server.pid))
+            with open(os.path.join(bg, "9.cmd"), "w") as fh:
+                fh.write("python3 -m http.server 0")
+
+            def t5_server():
+                ds = typed(c, "dev_servers")
+                rows = [d for d in (ds[-1]["items"] if ds else []) if d["agent"] == "t5" and d.get("port")]
+                return rows[0] if rows else None
+            def ask_servers():
+                c.send({"cmd": "dev_servers", "project": project})
+                return t5_server()
+            c.wait(ask_servers, 30, "t5's server with its port (asked until it listens)")
+            d = t5_server()
+            check(d["url"] == "http://localhost:%d" % d["port"] and d["name"] == "http server" and d["up"], "t5's server: %r" % d)
+        finally:
+            os.killpg(server.pid, signal.SIGTERM)
+            server.wait(timeout=10)
 
         # stop and archive: reach the hub's own paths (an unknown agent: an error)
         c.send({"cmd": "stop", "project": project, "agent": "main"})
