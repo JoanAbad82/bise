@@ -16,3 +16,12 @@
 .w7-dev .url{font-family:var(--font-mono);font-size:var(--t-12);color:var(--c-text-2)}
 .w7-dev .end.ok{color:var(--c-ok)}
 .w7-none{padding:0 8px;height:var(--row-tight);display:flex;align-items:center;color:var(--c-text-3);font-size:var(--t-13)}
+
+/* artifacts: the filter, then a grid of thumbnails (amb-kit's .b-tn tile, larger) */
+.w7-filter{display:flex}
+.w7-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.w7-tile>svg,.w7-tile>.ph{height:112px}
+.w7-tile .w7-tt{display:flex;align-items:center;gap:6px;padding:8px 10px 0;min-width:0}
+.w7-tile .w7-tt b{font-weight:600;font-size:var(--t-13);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.w7-tile .w7-tm{padding:2px 10px 9px;color:var(--c-text-3);font-size:var(--t-11);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w7-tile.is-static{cursor:default}

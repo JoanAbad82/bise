@@ -352,5 +352,6 @@
     return w;
   }
 
-  root.AmbWinUI = { mount, boot, esc };
+  // thumb(kind): an artifact's svg thumbnail (S7's artifacts screen draws with it)
+  root.AmbWinUI = { mount, boot, esc, thumb: svg };
 })(typeof window !== "undefined" ? window : globalThis);

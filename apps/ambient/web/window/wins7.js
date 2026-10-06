@@ -16,7 +16,7 @@
 (function (root) {
   "use strict";
   // screen name -> its module, and the key of its state in s7
-  const parts = () => ({ environments: [root.AmbWinEnv, "env"] });
+  const parts = () => ({ environments: [root.AmbWinEnv, "env"], artifacts: [root.AmbWinArts, "arts"] });
 
   function init() {
     const s7 = {};

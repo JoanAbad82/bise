@@ -1,6 +1,6 @@
 // bise desktop · the fake core's S7 world: desktop-app v9's worktrees, dev servers (and, next,
 // the review's diffs) as S3a's draft events (rust/proto/src/draft.rs: worktrees, dev_servers,
-// diff). Loaded after winfake.js; its boot() and respond() append these (amb-win, m_8307).
+// diff), and the answer to artifacts_seen. Loaded after winfake.js; its boot() and respond() append these (amb-win, m_8307).
 //
 //   AmbWinFake7.boot()          -> [ev]                the S7 events a fresh window gets
 //   AmbWinFake7.respond(cmd)    -> [[ms, ev]] | null   what the core answers to an S7 cmd
@@ -41,8 +41,12 @@
     }
     return evs;
   }
-  // nothing to answer yet: worktrees and dev servers come pushed, like artifacts
-  function respond() { return null; }
+  // worktrees and dev servers come pushed, like artifacts; he looked at a project's artifacts:
+  // none is new any more (the core owns 'new'; winfake.js's ARTIFACTS stay as they are)
+  function respond(cmd) {
+    if (cmd.cmd === "artifacts_seen") return [[0, { ev: "artifacts", project: cmd.project, items: (F.ARTIFACTS[cmd.project] || []).map((a) => ({ ...a, new: false })) }]];
+    return null;
+  }
 
   root.AmbWinFake7 = { boot, respond, WORKTREES, DEV_SERVERS };
 })(typeof window !== "undefined" ? window : globalThis);

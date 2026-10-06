@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Map, String, Number, Date, Intl, RegExp });
-for (const f of ["winfake.js", "winfake7.js", "windock.js", "winenv.js", "wins7.js", "winmodel.js", "winview.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+for (const f of ["winfake.js", "winfake7.js", "windock.js", "winenv.js", "winarts.js", "wins7.js", "winmodel.js", "winview.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
 const { AmbWinFake: F, AmbWinFake7: F7, AmbWinModel: M, AmbWinS7: S7 } = ctx;
 const j = (x) => (x === undefined ? x : JSON.parse(JSON.stringify(x)));
 const eq = (a, b, msg) => assert.deepStrictEqual(j(a), j(b), msg);
@@ -103,6 +103,56 @@ law("environments: live: a new worktree, a stopped server, an agent that finishe
   eq([g[0].rows[3].end, g[0].rows[3].act], ["stopped", null]);
   eq(w.v.head.t2, ["4 projects", "6 worktrees", "2 dev servers"]);
 });
+// ---- artifacts
+const tiles = (v) => v.items.map((a) => [a.title, a.meta, a.new]);
+law("artifacts: every project's, newest first, 'project · agent · time', new marked; the header says how many are new since he looked", () => {
+  const w = win();
+  const r = w.open("artifacts");
+  eq(w.v.head, { t1: "artifacts", t2: ["every project", "4", "4 new since you looked"], acc: 2 });
+  eq(tiles(w.v), [["frame times, before and after", "engine · streaming · 11:12", true], ["flash sale replay", "storefront · stock · 10:40", true],
+    ["eval report", "evals · rag · 09:58", true], ["3-D Secure timeouts", "storefront · checkout · 09:50", true]]);
+  eq(w.v.items.map((a) => a.version || ""), ["", "", "v3", "v2"]);
+  eq(w.v.filter, { items: ["all", "storefront", "telemetry", "engine", "evals"], on: 0, act: { ev: "ui_art_filter" } });
+  // the core hears he looked, once per project with something new
+  if (!hooked) eq(r.cmds, [{ cmd: "artifacts_seen", project: P.storefront }, { cmd: "artifacts_seen", project: P.engine }, { cmd: "artifacts_seen", project: P.evals }]);
+  assert.deepEqual(w.sent.filter((c) => c.cmd === "artifacts_seen").map((c) => c.project).sort(), [P.storefront, P.engine, P.evals].sort());
+});
+law("artifacts: 'new' stays for this visit after the core drops it, and is gone the next time he opens the screen", () => {
+  const w = win();
+  w.open("artifacts");
+  // the fake core answered artifacts_seen: nothing is new for it any more
+  assert.ok(Object.values(w.s.arts).flat().every((a) => !a.new));
+  eq(tiles(w.v).map((t) => t[2]), [true, true, true, true]);
+  w.feed({ ev: "win_open", route: "bise" });
+  w.open("artifacts");
+  eq([w.v.head.t2, tiles(w.v).map((t) => t[2])], [["every project", "4"], [false, false, false, false]]);
+  assert.equal(w.sent.filter((c) => c.cmd === "artifacts_seen").length, 3);
+  // one made while he looks shows new at once
+  w.feed({ ev: "artifacts", project: P.telemetry, items: [{ id: "a-p99", kind: "chart", title: "ingest p99, 7 days", agent: "alerts", version: 1, at_ms: F.NOW - 60000, url: "", new: true }] });
+  eq([w.v.head.t2, tiles(w.v)[0]], [["every project", "5", "1 new since you looked"], ["ingest p99, 7 days", "telemetry · alerts · 14:32", true]]);
+});
+law("artifacts: the filter keeps one project's (by the seg's part); a project with none says so", () => {
+  const w = win();
+  w.open("artifacts");
+  w.feed({ ev: "ui_art_filter", i: 1 });
+  eq([w.v.head.t2, w.v.filter.on, tiles(w.v).map((t) => t[0])], [["storefront", "2", "2 new since you looked"], 1, ["flash sale replay", "3-D Secure timeouts"]]);
+  w.feed({ ev: "ui_art_filter", i: 2 });
+  eq([w.v.head.t2, w.v.items, w.v.empty], [["telemetry", "0"], [], { title: "nothing from telemetry yet", text: "what its agents make shows here" }]);
+  w.feed({ ev: "ui_art_filter", i: 0 });
+  eq([w.v.filter.on, w.v.items.length], [0, 4]);
+});
+law("artifacts: one with a url opens in his browser (app_open_url with its project); one without has no click; older ones say yesterday or the day", () => {
+  const w = win();
+  w.open("artifacts");
+  const day = 86400000;
+  w.feed({ ev: "artifacts", project: P.evals, items: [
+    { id: "deck", kind: "report", title: "model card deck", agent: "report", version: 1, at_ms: F.NOW - day, url: "http://127.0.0.1:47123/p/deck", new: false },
+    { id: "old", kind: "table", title: "baseline", agent: "rag", version: 1, at_ms: F.NOW - 4 * day, url: "", new: false }] });
+  const deck = w.v.items.find((a) => a.id === "deck"), old = w.v.items.find((a) => a.id === "old");
+  eq([deck.meta, old.meta, old.act], ["evals · report · yesterday", "evals · rag · Tue 29 Sept", null]);
+  eq(w.feed(deck.act).cmds, [{ cmd: "app_open_url", project: P.evals, url: "http://127.0.0.1:47123/p/deck" }]);
+});
+
 law("the fake S7 world speaks S3a's drafts: every event names its project, no event for bise's own", () => {
   const evs = F7.boot();
   eq([...new Set(evs.map((e) => e.ev))], ["worktrees", "dev_servers"]);
