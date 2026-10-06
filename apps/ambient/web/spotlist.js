@@ -62,7 +62,9 @@
     });
     const agentRow = (r) => ({ kind: "agent", name: r.name, project: r.project, pname: r.pname, status: r.status, title: r.title, marks: r.marks });
     if (!q) {
-      const cardRows = cards.map((c) => ({ kind: "card", id: c.id, agent: c.agent, pname: pname(c.project), text: Wd.oneLine(c.title || c.text || "") }));
+      // the kind by the glyph alone (ambient m_8793): ? a question, ! an approval, ✉ drafts to send
+      const mark = (c) => { const P = root.AmbPolicy, G = Wd.card.glyph; return !P.approval(c) ? G.question : P.approvalKind(c) === "drafts" ? G.drafts : G.approval; };
+      const cardRows = cards.map((c) => ({ kind: "card", id: c.id, agent: c.agent, pname: pname(c.project), text: Wd.oneLine(c.title || c.text || ""), mark: mark(c) }));
       const work = all.filter((r) => r.status === "working").map(agentRow);
       return { q, mode: "empty", sections: [
         ...(cardRows.length ? [{ label: Wd.spot.waiting, acc: true, rows: cardRows }] : []),

@@ -35,7 +35,7 @@
   const home = (p) => String(p).replace(/^\/Users\/[^/]+(?=\/|$)/, "~");
 
   // the line a key's answer, a flash or an error says, its glyph colored by what it is
-  const GC = { "✓": "ok", "▲": "risk", "?": "a" };
+  const GC = { "✓": "ok", "▲": "risk", "?": "a", "!": "a" };   // ✉ stays faint (dim, ambient m_8793)
   const lineOf = (v) => ({ text: v.text, glyph: v.glyph || null, gc: GC[v.glyph] || null, size: "big" });
 
   // the rows of the agents an answer started (the model's chips: names)
@@ -93,7 +93,7 @@
     s.head = { h: 68, input: { text: v.spot.text, ph: SP.ph }, right: { text: q ? SP.to : SP.holdFn } };
     let envN = 0;
     const row = (r) => {
-      if (r.kind === "card") return { g: "?", gc: "a", t: asker(r.agent), p: r.pname, sub: r.text, right: { keys: ["⏎"] }, act: { ev: "ui_open_card", card: r.id }, qa: `card-${r.id}` };
+      if (r.kind === "card") return { g: r.mark || "?", gc: r.mark === "✉" ? null : "a", t: asker(r.agent), p: r.pname, sub: r.text, right: { keys: ["⏎"] }, act: { ev: "ui_open_card", card: r.id }, qa: `card-${r.id}` };
       if (r.kind === "env") { envN++; return { g: "ψ", t: r.name, sub: `${r.path}${r.sub ? `  ·  ${r.sub}` : ""}`, right: envN <= 9 ? { keys: ["⌘", String(envN)] } : null, act: { ev: "ui_project", project: r.project }, qa: `env-${r.name}` }; }
       if (r.kind === "ask") return { g: "@", gc: "a", t: SP.askBise, sub: r.text, act: { ev: "ui_spot_send", text: v.spot.text }, qa: "ask-bise" };
       const [g, gc] = AG[r.status] || AG.idle;

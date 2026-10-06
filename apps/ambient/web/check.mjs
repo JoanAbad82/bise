@@ -476,7 +476,18 @@ law("a card says its kind (ambient m_8772, lead m_8776): a question is answered 
   const ta = talk(a, "merge it");
   eq(ta.during.label.text, "to checkout · the merge waits for 1 or 2");
   eq(ta.r.cmds, [{ cmd: "agent_send", agent: "checkout", text: "merge it", mode: "now" }]);
+  eq([M.view(ta.r.m, 500).glyph, M.view(ta.r.m, 500).text], ["✉", "sent to checkout as a message   the merge still waits for 1 or 2"]);
   eq(M.view(ta.r.m, 10000).ask.id, "a1");
+  // the nouns (ambient m_8793): a confirm names what it runs, else 'the approval'; drafts wait (plural); a trial
+  const to = (c) => talk({ ...a, ...c }, "x").during.label.text;
+  eq([to({ kind: "confirm", text: "run `rm -rf target`?" }), to({ kind: "confirm", text: "publish the weekly update?" }), to({ kind: "confirm", text: "ok?" }),
+    to({ kind: "feature_try" }), to({ kind: "question", batch: { count: 2 }, page: { id: "p", drafts: true } })],
+  ["to checkout · the delete waits for 1 or 2", "to checkout · the publish waits for 1 or 2", "to checkout · the approval waits for 1 or 2",
+    "to checkout · the trial waits for 1 or 2", "to checkout · the drafts wait for 1 or 2"]);
+  // the spotlight's card rows: the kind by the glyph alone (? question, ! approval in the accent, ✉ drafts, faint)
+  const cards = [q, a, { ...a, id: "d1", kind: "question", page: { id: "p", drafts: true }, batch: { count: 2 } }];
+  const sp = M.step(M.step(M.init(), { ev: "state", agents: [], cards, pages: [] }, 0).m, { ev: "app_key", key: "space" }, 10).m;
+  eq(Bar.spec(M.view(sp, 20)).sections[0].rows.map((r) => [r.g, r.gc, r.sub]), [["?", "a", "which date works?"], ["!", "a", "merge sb/checkout into main?"], ["✉", null, "merge sb/checkout into main?"]]);
   // main's approval: bise's usual send (main reads it), never an answer
   const tm = talk({ ...a, agent: "main" }, "merge it");
   eq([tm.during.label.text, tm.r.cmds.some((c) => c.cmd === "answer")], ["to bise · the merge waits for 1 or 2", false]);

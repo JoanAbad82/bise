@@ -144,7 +144,7 @@
 
   // who asks, on ambient surfaces (main is bise), and an approval's 'to checkout · the merge waits for 1 or 2'
   const who = (c) => (!c.agent || c.agent === "main" ? "bise" : c.agent);
-  const cardTo = (c) => Wd.card.to(who(c), root.AmbPolicy.approvalKind(c), choices(c).map((o) => o.n));
+  const cardTo = (c, line = Wd.card.to) => line(who(c), root.AmbPolicy.approvalKind(c), c.text || "", choices(c).map((o) => o.n));
   function answer(m, card, opt, now) {
     const choice = opt ? opt.label : null;
     const reply = String(opt.n);
@@ -327,7 +327,7 @@
         const said = (m.fn || m.handsFree) && m.heard.text.trim(), onCard = st === "up" && said && !m.pane ? askable(m)[0] : null;
         const t = onCard && root.AmbPolicy.talkOnCard(onCard, said);
         if (t) return { m: flashNow({ ...m, fn: false, handsFree: false, heard: { text: "", final: false }, ...(t.answer ? { answered: { ...m.answered, [onCard.id]: true } } : {}) },
-          t.answer ? { kind: "answered", glyph: "✓", text: Wd.card.answered(said), ttl: T.answered, kiss: true } : { kind: "answered", glyph: "→", text: cardTo(onCard), ttl: T.answered }, now), cmds: [t.cmd] };
+          t.answer ? { kind: "answered", glyph: "✓", text: Wd.card.answered(said), ttl: T.answered, kiss: true } : { kind: "answered", glyph: "✉", text: cardTo(onCard, Wd.card.sent), ttl: T.answered }, now), cmds: [t.cmd] };
         if (st === "up") return none({ ...m, fn: false, handsFree: false, lastSent: (m.fn || m.handsFree) && m.heard.text.trim() ? m.heard.text.trim() : m.lastSent, said: m.fn || m.handsFree ? m.heard.text : m.said, pending: m.fn || m.handsFree ? { cmd: { cmd: "send", text: m.heard.text }, text: m.heard.text, at: now, voice: true } : m.pending });
         if (st === "cancel") {
           return { m: flashNow({ ...m, fn: false, handsFree: false, mine: false, heard: { text: "", final: false }, phase: m.phase === "listening" ? "idle" : m.phase }, { kind: "cancel", text: W.cancelled }, now), cmds: [{ cmd: "talk_cancel" }] };

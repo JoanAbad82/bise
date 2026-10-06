@@ -260,12 +260,22 @@
   // by voice ('answering checkout · which date works?', then '✓ answered: <words>'); an approval
   // (merge, send, run...) only by 1/2: what he says goes to the agent as a message, the card stays
   const or = (ns) => (ns.length > 1 ? `${ns.slice(0, -1).join(", ")} or ${ns.at(-1)}` : String(ns[0] || 1));
-  const NOUN = { merge: "the merge", feature_merge: "the merge", feature_try: "the try", update: "the update", signin: "the sign-in", drafts: "the drafts" };
+  // what waits, named as he would (ambient m_8793): a confirm names what it runs when its text says
+  // it, else 'the approval' (never 'the card': our word, not his); feature_try is trying a feature
+  // build ('the trial'), feature_merge merges it ('the merge')
+  const NOUN = { merge: "the merge", feature_merge: "the merge", feature_try: "the trial", update: "the update", signin: "the sign-in", drafts: "the drafts" };
+  const noun = (kind, text) => NOUN[kind] || (kind === "confirm" ? (/\bpublish/i.test(text) ? "the publish" : /\b(delete|remove|rm)\b/i.test(text) ? "the delete"
+    : /\b(run|command)\b|`/i.test(text) ? "the command" : "the approval") : "the approval");
+  const waits = (kind, text, ns) => `${noun(kind, text)} ${kind === "drafts" ? "wait" : "waits"} for ${or(ns)}`;
   const card = {
     pick: (ns) => `pick ${or(ns)}`,
     answering: (who, q) => `answering ${who}${q ? ` · ${q}` : ""}`,
-    to: (who, kind, ns) => `to ${who} · ${NOUN[kind] || "the card"} waits for ${or(ns)}`,
+    to: (who, kind, text, ns) => `to ${who} · ${waits(kind, text, ns)}`,
+    // after a held fn on an approval: '✉ sent to checkout as a message   the merge still waits for 1 or 2'
+    sent: (who, kind, text, ns) => `sent to ${who} as a message   ${waits(kind, text, ns).replace(/ (waits?) for/, " still $1 for")}`,
     answered: (words) => `answered: ${words}`,
+    // the spotlight's card rows say the kind by the glyph alone: a question, an approval, drafts to send
+    glyph: { question: "?", approval: "!", drafts: "✉" },
   };
   // a batch of drafts waiting on one page (amb-core 34703bf0; ambient m_6056, ambient-lead m_6063):
   // '3 drafts wait for you · launch recap', 'replies to legal, Lucas and Marc', '1 review' first
