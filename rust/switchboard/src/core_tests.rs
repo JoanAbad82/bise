@@ -3674,6 +3674,14 @@ fn open_card(t: &mut T, kind: &str, text: &str) -> u64 {
         "confirm" => {
             t.go(Input::ConfirmOpen { agent: MAIN.into(), text: text.into() });
         }
+        // main drops a worktree agent with work: the hub asks him first
+        "drop" => {
+            t.user(MAIN, "/new -w fix: x");
+            t.go(Input::ReplReady { agent: "fix".into() });
+            t.go(Input::ReplIdle { agent: "fix".into(), leftover: false });
+            t.env.loss = Loss { dirty: 1, unpushed: 0 };
+            t.req(MAIN, AgentReq::Drop { agent: "fix".into() });
+        }
         _ => {
             let mut fx = Vec::new();
             t.hub.core(&mut fx, &mut t.env, None, json!({"t": "card_open", "kind": kind, "agent": MAIN, "text": text}));
@@ -3712,7 +3720,7 @@ fn an_approval_card_takes_its_options_never_words() {
 // amb-core's next commit (sb-core keeps yes/no words there); add it then.
 #[test]
 fn approval_kinds_agree_with_proto() {
-    for kind in ["question", "confirm", "merge", "feature_try", "feature_merge", "update", "signin"] {
+    for kind in ["question", "drop", "confirm", "merge", "feature_try", "feature_merge", "update", "signin"] {
         let mut t = T::new();
         let id = open_card(&mut t, kind, "go on?\n\n1. yes\n2. no");
         t.user(MAIN, &format!("/answer {} some typed words", id));

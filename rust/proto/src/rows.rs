@@ -127,12 +127,32 @@ pub struct Card {
 
 impl Card {
     /// A kind answered only by one of its options: every kind but
-    /// `question` (the hub's `confirm`, `merge`, `feature_try`,
-    /// `feature_merge`, `update`, `signin`, and any newer one: a kind
-    /// nobody taught the clients is safer picked than typed).
+    /// `question` and `drop` (sb-core keeps yes/no words there, and a drop
+    /// never reaches a window: bise's bookkeeping): the hub's `confirm`,
+    /// `merge`, `feature_try`, `feature_merge`, `update`, `signin`, and any
+    /// newer one (a kind nobody taught the clients is safer picked than
+    /// typed). sb-core's refusal of words says the same (amb-hub's
+    /// agreement test, architect m_8848).
     pub fn approval_kind(kind: &str) -> bool {
-        kind != "question"
+        !matches!(kind, "question" | "drop")
     }
+}
+
+/// A worktree of the project's repo: an agent's, or one of his own (the
+/// main checkout included).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Worktree {
+    pub path: String,
+    /// its branch ("" when detached)
+    pub branch: String,
+    /// the agent working there (none: his own)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    /// changes not committed, untracked files included
+    pub dirty: bool,
+    /// commits ahead of and behind the trunk
+    pub ahead: u32,
+    pub behind: u32,
 }
 
 /// A question and its options: the trailing numbered lines (`1. v1`,

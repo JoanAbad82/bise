@@ -21,6 +21,7 @@ mod repl;
 mod release;
 mod session_log;
 mod versions;
+mod worktrees;
 mod xhub;
 
 use history::{history_line, transcript_page};

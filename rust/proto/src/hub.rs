@@ -5,7 +5,7 @@
 //! they can't reach a hub or come from one.
 
 use crate::diff::{DiffFile, DiffResult};
-use crate::rows::{Agent, Artifact, Card};
+use crate::rows::{Agent, Artifact, Card, Worktree};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
@@ -33,6 +33,10 @@ pub enum HubEv {
     /// every artifact of the project, at hello and on change; `new`: made
     /// or changed since he last looked (`artifacts_seen` clears it)
     Artifacts { project: Project, items: Vec<Artifact> },
+    /// the repo's worktrees (the agents' and his others), at hello, when
+    /// the agents change (a turn ends, one comes or goes) and on
+    /// `worktrees`
+    Worktrees { project: Project, items: Vec<Worktree> },
     /// an agent's change (the answer to `diff`): its checkout or branch
     /// vs `base`; `head` its branch (none: the shared folder)
     Diff {
@@ -68,7 +72,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "diff", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "diff", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -173,13 +177,15 @@ pub enum HubCmd {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         commit: Option<String>,
     },
+    /// the environments screen opened: `worktrees` comes again
+    Worktrees { project: Project },
     /// a tag this version doesn't know: answered with `error`
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)

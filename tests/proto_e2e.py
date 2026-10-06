@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "diff", "error")
+TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "diff", "error")
 FIXTURES = os.path.join(e2e.ROOT, "rust", "proto", "fixtures", "hub_ev.jsonl")
 
 
@@ -193,6 +193,22 @@ def main():
         check(f5[0]["status"] == "added" and f5[0]["add"] == 2 and not f5[0].get("truncated"), "its row: %r" % f5[0])
         lines = [(l["kind"], l.get("new"), l["text"]) for h in f5[0]["hunks"] for l in h["lines"]]
         check(lines == [("add", 1, "1"), ("add", 2, "2")], "its lines, numbered: %r" % lines)
+
+        # worktrees: t5's, with its commit ahead; an untracked file makes it dirty
+        def t5_row():
+            ws = typed(c, "worktrees")
+            rows = [w for w in (ws[-1]["items"] if ws else []) if w.get("agent") == "t5"]
+            return rows[0] if rows else None
+        c.send({"cmd": "worktrees", "project": project})
+        c.wait(lambda: t5_row() is not None, 60, "t5's worktree")
+        w = t5_row()
+        check(w["ahead"] >= 1 and w["behind"] == 0 and w["branch"] and not w["dirty"], "t5's worktree: %r" % w)
+        check(any(x.get("agent") is None for x in typed(c, "worktrees")[-1]["items"]), "his own checkout listed, no agent")
+        with open(os.path.join(w["path"], "scratch.txt"), "w") as fh:
+            fh.write("not committed\n")
+        n = len(typed(c, "worktrees"))
+        c.send({"cmd": "worktrees", "project": project})
+        c.wait(lambda: len(typed(c, "worktrees")) > n and t5_row() and t5_row()["dirty"], 60, "an untracked file: dirty")
 
         # stop and archive: reach the hub's own paths (an unknown agent: an error)
         c.send({"cmd": "stop", "project": project, "agent": "main"})

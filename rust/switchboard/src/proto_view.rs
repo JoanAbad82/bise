@@ -12,6 +12,9 @@ use bise_proto::Pos;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+mod worktrees;
+pub use worktrees::{left_right, worktree_list, worktrees};
+
 /// The entries of the newest lines a subscription keeps, so a live line
 /// folds into the entry it belongs to (a tools entry growing).
 pub const KEEP: usize = 8;

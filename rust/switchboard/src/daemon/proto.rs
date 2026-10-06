@@ -27,6 +27,8 @@ pub(super) struct Proto {
     since: Since,
     /// the last `agents` and `cards` sent (sent again only when changed)
     last: (String, String),
+    /// the agents' statuses and folders at the last `worktrees` scan
+    worktrees: String,
 }
 
 #[derive(Default)]
@@ -64,7 +66,7 @@ fn lines_of(raw: Vec<(usize, Option<u64>, String)>) -> Vec<Line> {
 }
 
 impl Shell {
-    fn project(&self) -> String {
+    pub(super) fn project(&self) -> String {
         crate::paths::workspace_id(&self.opts.paths.workspace)
     }
 
@@ -116,6 +118,7 @@ impl Shell {
             let arts = self.artifacts_ev();
             let arts = self.proto_artifacts(&arts);
             self.proto_send(id, &arts);
+            self.worktrees_typed(vec![id]);
             return;
         }
         if !self.proto.conns.contains_key(&id) {
@@ -131,6 +134,7 @@ impl Shell {
             | HubCmd::Archive { project, .. }
             | HubCmd::Unarchive { project, .. }
             | HubCmd::ArtifactsSeen { project }
+            | HubCmd::Worktrees { project }
             | HubCmd::Diff { project, .. } => project.clone(),
             HubCmd::Hello { .. } => unreachable!(),
             HubCmd::Unknown { tag, .. } => return self.proto_error(id, tag, &format!("unknown command: {tag}")),
@@ -221,6 +225,8 @@ impl Shell {
                 }
                 self.diff_typed(id, project, agent, commit);
             }
+            // git in a thread (worktrees.rs), to this client
+            HubCmd::Worktrees { .. } => self.worktrees_typed(vec![id]),
             HubCmd::Hello { .. } | HubCmd::Unknown { .. } => {}
         }
     }
@@ -259,6 +265,13 @@ impl Shell {
                 }
                 if new.1 {
                     self.proto_live(|l, ctx| l.refold(ctx));
+                }
+                // an agent came, went, started or ended a turn: its
+                // worktree may have changed (commits, files)
+                let key = self.worktrees_key();
+                if key != self.proto.worktrees {
+                    self.proto.worktrees = key;
+                    self.worktrees_typed(ids.clone());
                 }
             }
             // the art store changed (artifacts_refresh broadcasts it)

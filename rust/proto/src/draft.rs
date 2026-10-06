@@ -4,9 +4,8 @@
 //! When a stream ships one, it moves to [`crate::hub`] (or stays here for
 //! the core's own messages) and its fixture joins the frozen ones.
 //!
-//! - [`DraftHubEv`]: diffs and worktrees (S7), (artifacts shipped: hub.rs, from
-//!   art-core's list), dev servers (S7), followed jobs (S10), routing
-//!   "→ project" (S2);
+//! - [`DraftHubEv`]: dev servers (S7; artifacts, diffs and worktrees
+//!   shipped: hub.rs), followed jobs (S10), routing "→ project" (S2);
 //! - [`DraftHubCmd`]: follow (S10);
 //! - [`CoreEv`] (core -> app: the projects list, an app-side open) and
 //!   [`AppCmd`] (app -> core: open, project_add): never a hub's (S3b);
@@ -16,17 +15,6 @@ use crate::rows::{Agent, Card};
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Worktree {
-    pub path: String,
-    pub branch: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub agent: Option<String>,
-    pub dirty: bool,
-    pub ahead: u32,
-    pub behind: u32,
-}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DevServer {
@@ -61,7 +49,6 @@ pub struct Job {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "ev", rename_all = "snake_case")]
 pub enum DraftHubEv {
-    Worktrees { project: Project, items: Vec<Worktree> },
     DevServers { project: Project, items: Vec<DevServer> },
     Jobs { project: Project, jobs: Vec<Job> },
     /// "→ telemetry": bise routes his words to a project's main; tab
@@ -79,7 +66,7 @@ pub enum DraftHubEv {
 }
 
 impl DraftHubEv {
-    pub const TAGS: &'static [&'static str] = &["worktrees", "dev_servers", "jobs", "route"];
+    pub const TAGS: &'static [&'static str] = &["dev_servers", "jobs", "route"];
 
     pub fn decode(line: &str) -> Result<DraftHubEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| DraftHubEv::Unknown { tag, raw })

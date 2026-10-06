@@ -203,18 +203,23 @@ impl Core {
                 if !HubEv::TAGS.contains(&ev.as_str()) {
                     return;
                 }
-                match HubEv::from_value(v.clone()) {
-                    Ok(HubEv::Welcome { .. }) => {
+                // a typed tag that doesn't decode is the hub's older event
+                // of the same name (`artifacts` {rows, new, seen_ms} from a
+                // hub that doesn't know typed_only): never the window's
+                // (amb-win m_8886)
+                let Ok(typed) = HubEv::from_value(v.clone()) else { return };
+                match typed {
+                    HubEv::Welcome { .. } => {
                         c.welcomed = true;
                         for agent in self.hubs.subs.get(id).into_iter().flatten() {
                             c.hub.send(&json!({"cmd": "subscribe", "project": id, "agent": agent}));
                         }
                     }
-                    Ok(HubEv::Agents { agents, .. }) => {
+                    HubEv::Agents { agents, .. } => {
                         let cards = c.rows.take().map(|r| r.1).unwrap_or_default();
                         c.rows = Some((agents, cards));
                     }
-                    Ok(HubEv::Cards { cards, .. }) => {
+                    HubEv::Cards { cards, .. } => {
                         let agents = c.rows.take().map(|r| r.0).unwrap_or_default();
                         c.rows = Some((agents, cards));
                     }

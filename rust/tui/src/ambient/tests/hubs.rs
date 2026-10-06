@@ -160,7 +160,9 @@ fn the_window_reaches_every_projects_hub_through_the_core() {
     assert!(!has(&t.take(), "error"));
     w.welcome(&mut t, "shop");
     assert_eq!(w.end("shop").next(), json!({"cmd": "subscribe", "project": "shop", "agent": "main"}), "the kept subscription at welcome");
-    // its typed events go out as they are; its rows feed the sidebar
+    // its typed events go out as they are; its rows feed the sidebar; the
+    // hub's older event under a typed tag never does (amb-win m_8886)
+    w.end("shop").say(json!({"ev": "artifacts", "rows": [], "new": [], "seen_ms": 0}));
     w.end("shop").say(json!({"ev": "thread", "project": "shop", "agent": "main", "entries": [], "more": false}));
     w.end("shop").say(json!({"ev": "agents", "project": "shop", "agents": [
         {"name": "main", "main": true, "status": "idle", "archived": false, "title": "", "purpose": "", "since_ms": 1, "waits": 0},
@@ -168,6 +170,7 @@ fn the_window_reaches_every_projects_hub_through_the_core() {
     w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "projects" && v["projects"][1]["working"] == 1));
     let out = t.take();
     assert!(out.iter().any(|v| v["ev"] == "thread" && v["project"] == "shop"));
+    assert!(!out.iter().any(|v| v["ev"] == "artifacts"), "the older artifacts event stays out of the window's feed");
     assert!(out.iter().any(|v| v["ev"] == "projects" && v["projects"][1]["running"] == true));
     // a send now: to shop's hub as it came
     let send = json!({"cmd": "send", "project": "shop", "agent": "main", "text": "ship it", "mode": "now"});
