@@ -14,8 +14,10 @@ options, a merge question, a blocked agent, an artifact.
   qa.py world say <project|bise> "<words>"      words to that project's main (the fake one)
   qa.py world down                              stops every hub of the world by its pid
 
-`up` takes the heavy lock itself (/usr/bin/lockf -k ~/.bise/run/heavy.lock
-nice -n 10): it may rebuild the tree's helpers (scripts/bins.sh). The hubs
+`up` takes the heavy lock (/usr/bin/lockf -k ~/.bise/run/heavy.lock nice
+-n 10) only around a rebuild of the tree's helpers (scripts/bins.sh) that
+will compile; with built helpers and an existing bise it never waits on it
+(main m_10008: the lock is for cargo builds and gates). The hubs
 then idle until `down`; a daemon holds a `hello` on each, so none of them
 stops through idle-exit. `world.json` (in the world's folder) names every hub:
 its workspace, socket, state folder and pid. Nothing here touches the user's
@@ -418,21 +420,49 @@ def under_heavy_lock(pid=None):
     return False
 
 
-def up(n=3, bise=None, root=None):
-    """Clear the old world, start the daemon (under the heavy lock), wait until seeded."""
+def helpers_fresh(root):
+    """True when the tree's helpers are the build of its sources now: each <root>/<helper> is there
+    with a <helper>.key (written by bins.sh) equal to `bins.sh key` of the sources. Then nothing
+    compiles, and bins.sh isn't called at all (its cache may have been pruned: a call would compile)."""
     import qa
-    # one take of the lock, never two: `lockf -k heavy.lock qa.py world up` from a caller that
-    # already holds it waited on itself forever (main m_9310); an ancestor lockf on it counts
-    if os.environ.get("AMBIENT_WORLD_LOCKED") != "1" and not under_heavy_lock():
-        args = [sys.executable, "-B", os.path.join(HERE, "qa.py"), "world", "up", "--projects", str(n)] \
-            + (["--bise", bise] if bise else []) + (["--root", root] if root else [])
-        os.makedirs(os.path.dirname(LOCK), exist_ok=True)
-        r = subprocess.run(["/usr/bin/lockf", "-k", LOCK, "nice", "-n", "10"] + args, capture_output=True, text=True,
-                           env=dict(os.environ, AMBIENT_WORLD_LOCKED="1"))
+    bins = os.path.join(root, "scripts", "bins.sh")
+    for h in qa.HELPERS:
+        exe = os.path.join(root, h)
         try:
-            return json.loads(r.stdout)
-        except ValueError:
-            raise qa.QAError("world up failed (%s): %s" % (r.returncode, (r.stderr or r.stdout)[-2000:]))
+            have = open(exe + ".key").read().strip()
+        except OSError:
+            return False
+        if not have or not os.access(exe, os.X_OK):
+            return False
+        k = subprocess.run([bins, "key", "--src", root, h], capture_output=True, text=True, cwd=root, timeout=120)
+        if k.returncode != 0 or k.stdout.strip() != have:
+            return False
+    return True
+
+
+def ensure_helpers_locked(root):
+    """The tree's helpers current, taking the heavy lock only around a compile that will run (main
+    m_10008: the lock is for builds and gates only): fresh helpers take no lock; stale ones are
+    rebuilt by scripts/bins.sh under `lockf -k heavy.lock nice -n 10`, or directly when this
+    process already runs under the lock (one take, never two: main m_9310)."""
+    import qa
+    if helpers_fresh(root):
+        return
+    if os.environ.get("AMBIENT_WORLD_LOCKED") == "1" or under_heavy_lock():
+        qa.ensure_helpers(root)
+        return
+    os.makedirs(os.path.dirname(LOCK), exist_ok=True)
+    bins = os.path.join(root, "scripts", "bins.sh")
+    p = subprocess.run(["/usr/bin/lockf", "-k", LOCK, "nice", "-n", "10", bins, "--src", root] + list(qa.HELPERS),
+                       capture_output=True, text=True, cwd=root, timeout=1800)
+    if p.returncode != 0:
+        raise qa.QAError("scripts/bins.sh %s failed in %s: %s" % (" ".join(qa.HELPERS), root, (p.stderr or p.stdout)[-1200:]))
+
+
+def up(n=3, bise=None, root=None):
+    """Clear the old world, start the daemon, wait until seeded. The heavy lock only around a
+    helpers compile that runs (ensure_helpers_locked); an up with built helpers never waits on it."""
+    import qa
     world = world_dir()
     P = _paths(world)
     guard(world)
@@ -447,7 +477,7 @@ def up(n=3, bise=None, root=None):
         root = root or root2
     if not root:
         raise qa.QAError("%s has no app root with a built repl-live (--root)" % bise)
-    qa.ensure_helpers(root)
+    ensure_helpers_locked(root)
     if os.path.exists(world):
         shutil.rmtree(world)
     os.makedirs(world)

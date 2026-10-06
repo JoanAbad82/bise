@@ -183,9 +183,12 @@ a tree that lacks those commits. One run at a time: it uses your QA dir's hub.
 
 ## The heavy lock
 
-`qa.py world up` takes `~/.bise/run/heavy.lock` itself (for its bins
-build and the hubs' start), and skips it when it already runs under a
-`lockf ... heavy.lock` of its own ancestry. Never wrap a command that
+`qa.py world up` takes `~/.bise/run/heavy.lock` itself only around a
+helpers build that will compile (scripts/bins.sh, stale helpers); with
+built helpers and an existing bise it never waits on the lock (main
+m_10008: the lock is for cargo builds and gates only). It skips the lock
+when it already runs under a `lockf ... heavy.lock` of its own ancestry,
+so don't wrap `world up` in the lock yourself. Never wrap a command that
 takes the lock in a second take of it: before that check, a
 `lockf -k heavy.lock qa.py world up` waited on itself and held the lock
 for everyone (main m_9310). `qa.py real t1`, `t1-setup` and `try-proof`
