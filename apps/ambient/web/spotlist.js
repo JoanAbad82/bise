@@ -64,12 +64,17 @@
     if (!q) {
       // the kind by the glyph alone (ambient m_8793): ? a question, ! an approval, ✉ drafts to send
       const mark = (c) => { const P = root.AmbPolicy, G = Wd.card.glyph; return !P.approval(c) ? G.question : P.approvalKind(c) === "drafts" ? G.drafts : G.approval; };
-      const cardRows = cards.map((c) => ({ kind: "card", id: c.id, agent: c.agent, pname: pname(c.project), text: Wd.oneLine(c.title || c.text || ""), mark: mark(c) }));
+      const cardRows = cards.map((c) => ({ kind: "card", id: c.id, agent: c.agent, pname: pname(c.project), text: root.AmbPolicy.approval(c) ? Wd.cardLine(c.title || c.text || "") : Wd.oneLine(c.title || c.text || ""), mark: mark(c) }));
+      // what's in front when no project matches it (T1 run 4, step 16): its own row, first in
+      // the environments ('Pricing · Acme', 'in front: acme.test · Chrome'); nothing to open
+      const f = m.front, fhost = f && ((/^[a-z]+:\/\/([^/:]+)/i.exec(f.url || "") || [])[1] || "");
+      const frontRow = f && !front ? [{ kind: "front", name: f.title || f.app, sub: Wd.spot.inFront([fhost || Wd.spot.path(f.path), f.title ? f.app : ""].filter(Boolean).join(" · ")) }] : [];
+      const envRows = [...frontRow, ...envs];
       const work = all.filter((r) => r.status === "working").map(agentRow);
       return { q, mode: "empty", sections: [
         ...(cardRows.length ? [{ label: Wd.spot.waiting, acc: true, rows: cardRows }] : []),
         ...(work.length ? [{ label: Wd.spot.atWork, rows: work }] : []),
-        ...(envs.length ? [{ label: Wd.spot.envs, rows: envs }] : [])] };
+        ...(envRows.length ? [{ label: Wd.spot.envs, rows: envRows }] : [])] };
     }
     // 1-2 words: names (an agent's or a project's name, title or purpose, the project's agents)
     const short = ws.length <= 2;

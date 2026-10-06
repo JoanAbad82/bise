@@ -424,6 +424,7 @@
         return none(C.quiet({ ...m, quiet: ev.on ? { why: ev.why || "", until: +ev.until_ms || 0 } : null }, !!ev.on));
       // S9 (cards.js): while you were away (the core's answer to the app's away_back), a drop on the pearl
       case "away_summary": return none(C.away(m, ev));
+      case "app_away": return none(C.awayOpen(m, ev, now));
       // a project's agents (the core's agents event; home's come in state): its main is the project
       case "agents": {
         const p = m.projects.find((x) => x.project === ev.project);
@@ -623,7 +624,7 @@
     // the 2 s after bise names the project: tab corrects it, fn esc cancels (v9)
     if (m.route && now < m.route.until && (k === "tab" || k === "esc")) return step(m, { ev: k === "tab" ? "ui_route_next" : "ui_route_cancel" }, now);
     // while you were away (S9): enter opens bise, esc closes it
-    if (m.away && !m.pane && (k === "enter" || k === "esc")) return C.awayAct(m, k === "enter" ? null : undefined);
+    if (C.awayOn(m, now) && !m.pane && (k === "enter" || k === "esc")) return C.awayAct(m, k === "enter" ? null : undefined);
     const cards = visibleCards(m);
     if (/^[1-9]$/.test(k)) {
       // no pane: the card the glass asks (none while bise's window holds the cards)
@@ -972,8 +973,8 @@
       v.state = "hub_down"; v.text = W.hubDown; v.frozen = true;
       // start bise from here too, naming the bise the app runs (lead m_8108 (2); null: no row)
       v.bise = m.bisePath;
-    } else if (m.away) {
-      v.state = "away"; v.size = "open"; v.away = C.awayView(m, m.tz);   // S9: before any list
+    } else if (C.awayOn(m, now)) {
+      v.state = "away"; v.size = "open"; v.away = C.awayView(m, m.tz, now, wall);   // S9: before any list
     } else if (need) {
       v.state = "needs"; v.size = "open"; v.ask = ask();
       v.ask.batch9 = C.batchHead(m, asking[0]);   // S9: the batch head and its count

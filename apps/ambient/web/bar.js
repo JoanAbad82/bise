@@ -94,7 +94,8 @@
     let envN = 0;
     const row = (r) => {
       if (r.kind === "card") return { g: r.mark || "?", gc: r.mark === "✉" ? null : "a", t: asker(r.agent), p: r.pname, sub: r.text, right: { keys: ["⏎"] }, act: { ev: "ui_open_card", card: r.id }, qa: `card-${r.id}` };
-      if (r.kind === "env") { envN++; return { g: "ψ", t: r.name, sub: `${r.path}${r.sub ? `  ·  ${r.sub}` : ""}`, right: envN <= 9 ? { keys: ["⌘", String(envN)] } : null, act: { ev: "ui_project", project: r.project }, qa: `env-${r.name}` }; }
+      if (r.kind === "front") return { g: "◦", t: r.name, sub: r.sub, fixed: true, qa: "front" };
+      if (r.kind === "env") { envN++; return { g: "ψ", t: r.name, sub: `${SP.path(r.path)}${r.sub ? `  ·  ${r.sub}` : ""}`, right: envN <= 9 ? { keys: ["⌘", String(envN)] } : null, act: { ev: "ui_project", project: r.project }, qa: `env-${r.name}` }; }
       if (r.kind === "ask") return { g: "@", gc: "a", t: SP.askBise, sub: r.text, act: { ev: "ui_spot_send", text: v.spot.text }, qa: "ask-bise" };
       const [g, gc] = AG[r.status] || AG.idle;
       return { g, gc, t: r.name, p: r.pname, sub: r.title || null, mark: r.marks ? { t: r.marks.name, sub: r.marks.title } : undefined,

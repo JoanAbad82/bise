@@ -50,13 +50,21 @@
 
   // ---- while you were away (S9): after the app's away_back the core sends away_summary {since_ms,
   // done, questions, failed, projects: [{project, done, questions, failed}]}; one card, before any
-  // list: 'while you were away · 08:52', '3 done · 1 question · nothing broke', a row per project
+  // list: 'while you were away · 08:52', '3 done · 1 question', a row per project
   // that moved; ⏎ (or a row) opens bise, esc closes. Nothing happened: no card.
   const moved = (x) => (x.done || 0) + (x.questions || 0) + (x.failed || 0) > 0;
-  const away = (m, ev) => (moved(ev) ? { ...m, away: { since_ms: +ev.since_ms || 0, done: +ev.done || 0, questions: +ev.questions || 0, failed: +ev.failed || 0, projects: (ev.projects || []).filter(moved) } } : m);
-  function awayView(m, tz) {
+  // the app's app_away {away_ms} (T1 run 4, step 19) opens the card at once, before any pending
+  // card: its head first, the summary fills it; a summary where nothing moved clears it, and no
+  // summary within 5 s lets it go (the core may not answer)
+  const AWAY_WAIT = 5000;
+  const awayOpen = (m, ev, now) => ({ ...m, away: { pending: true, at: now, away_ms: +ev.away_ms || 0, since_ms: ev.at_wall != null ? +ev.at_wall - (+ev.away_ms || 0) : null, done: 0, questions: 0, failed: 0, projects: [] } });
+  const away = (m, ev) => (moved(ev) ? { ...m, away: { since_ms: +ev.since_ms || (m.away && m.away.since_ms) || 0, done: +ev.done || 0, questions: +ev.questions || 0, failed: +ev.failed || 0, projects: (ev.projects || []).filter(moved) } }
+    : m.away && m.away.pending ? { ...m, away: null } : m);
+  const awayOn = (m, now) => !!m.away && !(m.away.pending && now - m.away.at >= AWAY_WAIT);
+  function awayView(m, tz, now = 0, wall = now) {
     const a = m.away;
-    const hm = new Date(a.since_ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, ...(tz ? { timeZone: tz } : {}) });
+    const since = a.since_ms != null ? a.since_ms : wall - (now - a.at) - a.away_ms;
+    const hm = new Date(since).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, ...(tz ? { timeZone: tz } : {}) });
     const name = (id) => (m.projects.find((p) => p.project === id) || {}).name || id;
     return { since: hm, line: Wd.s9.awayParts(a), rows: a.projects.map((p) => ({ project: p.project, name: name(p.project), line: Wd.s9.awayParts(p) })) };
   }
@@ -76,5 +84,5 @@
     return { cmd: "send", text: words, ...(d.files.length ? { files: d.files.map((f) => f.path) } : {}) };
   }
 
-  root.AmbCards = { projCards, allCards, visibleCards, ansCmd, askable, quiet, batchLeft, batchHead, batchLater, away, awayView, awayAct, drop, dropName, dropSend };
+  root.AmbCards = { projCards, allCards, visibleCards, ansCmd, askable, quiet, batchLeft, batchHead, batchLater, away, awayOpen, awayOn, awayView, awayAct, drop, dropName, dropSend };
 })(typeof window !== "undefined" ? window : globalThis);

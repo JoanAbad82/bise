@@ -160,6 +160,16 @@
     waiting: "waiting for you", atWork: "at work", envs: "environments", found: "found",
     inFront: (what) => (what ? `in front: ${what}` : "in front"),
     envSub: (branch, n) => `${branch} · ${n} agent${n === 1 ? "" : "s"}`,
+    // a path as he reads it (ambient m_9164): his home folder is ~, and a path still too long
+    // is cut in the middle, keeping its last folders ('~/…/code/telemetry')
+    path: (p, max = 32) => {
+      const s = String(p || "").replace(/^\/(?:Users|home)\/[^/]+(?=\/|$)/, "~");
+      if (s.length <= max) return s;
+      const parts = s.split("/"), head = parts[0];
+      let tail = parts[parts.length - 1];
+      for (let i = parts.length - 2; i > 0 && `${head}/…/${parts[i]}/${tail}`.length <= max; i--) tail = `${parts[i]}/${tail}`;
+      return `${head}/…/${tail}`;
+    },
     askBise: "ask bise", openInBise: "open in bise", sendToBise: "send to bise",
     open: (name) => `open ${name}`, sendQ: (q) => `send “${q}” to bise`, thenOpen: (name) => `then ⏎ open ${name}`,
     startAgent: "start an agent", close: "close",
@@ -239,6 +249,25 @@
   function oneLine(text, max = 90) {
     const t = String(text == null ? "" : text).replace(/<\/?[a-z][\w-]*(?:\s[^<>]*)?\/?>/gi, " ").replace(/\s+/g, " ").trim();
     return firstSentence(t, max);
+  }
+  // an approval's spotlight row (ambient m_9164): one short line, its first line then what the
+  // second adds, without the names the first already said ('tryme is ready to try · 1 commit ·
+  // +3 −0', not '… 1 commit on tryme · …'), cut with … past max, never wrapped
+  function cardLine(text, max = 64) {
+    const lines = String(text == null ? "" : text).split("\n").map((l) => oneLine(l, 400)).filter(Boolean);
+    if (!lines.length) return "";
+    const toks = (l) => l.split(/\s+/).filter(Boolean);
+    const key = (t) => t.toLowerCase().replace(/[^\p{L}\p{N}_./-]/gu, "");
+    const first = toks(lines[0]);
+    const named = new Set(first.filter((t, i) => i === 0 || /[-_./\d]/.test(t)).map(key).filter(Boolean));
+    const out = [];
+    for (const t of toks(lines[1] || "")) {
+      if (named.has(key(t))) { if (/^(on|in|at|of|for|to|from)$/i.test(out[out.length - 1] || "")) out.pop(); continue; }
+      out.push(t);
+    }
+    const second = out.join(" ").replace(/·(\s*·)+/g, "·").replace(/^[\s·]+|[\s·]+$/g, "");
+    const s = [lines[0], second].filter(Boolean).join(" · ");
+    return s.length > max ? s.slice(0, max - 1).replace(/\s+\S*$/, "").replace(/[\s·]+$/, "") + "…" : s;
   }
   function firstSentence(text, max = 90) {
     const t = plain(text);
@@ -377,5 +406,5 @@
       x.failed ? { t: `▲ ${x.failed} failed`, gc: "risk" } : null].filter(Boolean),
     drop: (name) => `→ bise · ${name}`, with: "with", send: "send to bise",
   };
-  root.AmbWords = { s9, W, spot, route, menu, GLYPH, idleLine, firstSentence, oneLine, doneLine, failLine, needsLine, answeredLine, card, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
+  root.AmbWords = { s9, W, spot, route, menu, GLYPH, idleLine, firstSentence, oneLine, cardLine, doneLine, failLine, needsLine, answeredLine, card, drafts, names, seesLine, seesParts, optionLabel, options, age, plural, permDenied, waiting, rowLabel, mdWords, plain, pageReady, forYou, morning, pageMeta, watching, voiceNoteOn, moodLabel, sayOf };
 })(typeof window !== "undefined" ? window : globalThis);

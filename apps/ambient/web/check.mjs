@@ -1636,7 +1636,7 @@ law("desktop S8 spotlight empty (v9): waiting for you, at work, environments wit
   eq(s.sections.map((x) => [x.label, x.rows.map((r) => [r.t, r.p || "", r.sub, r.right ? r.right.keys.join("") : ""])]), [
     ["waiting for you", [["alerts", "telemetry", "compaction at 03:00?", "⏎"]]],
     ["at work", [["stock", "storefront", "flash sale replay · 62%", ""]]],
-    ["environments", [["telemetry", "", "/Users/you/telemetry  ·  in front: grafana.internal", "⌘1"], ["storefront", "", "/Users/you/storefront  ·  main · 5 agents", "⌘2"]]]]);
+    ["environments", [["telemetry", "", "~/telemetry  ·  in front: grafana.internal", "⌘1"], ["storefront", "", "~/storefront  ·  main · 5 agents", "⌘2"]]]]);
   // nothing typed: only ⏎ and esc (ambient m_8617 (2)); ⌘⏎ and tab come with the first character
   eq(s.foot.left.map((i) => `${i.keys.join(" ")} ${i.w}`), ["⏎ open in bise"]);
   // ⏎ on the card (selected first) opens it in the window; ⌘2 = storefront
@@ -1646,7 +1646,7 @@ law("desktop S8 spotlight empty (v9): waiting for you, at work, environments wit
   m = M.step(m, { ev: "app_front", app: "Code", bundle: "com.microsoft.VSCode", path: "/Users/you/storefront/src/cart.ts" }, 40).m;
   eq(Bar.spec(M.view(m, 50, Fake.T0)).sections[2].rows.map((r) => r.t), ["storefront", "telemetry"]);
   m = M.step(m, { ev: "app_front", app: null }, 60).m;
-  eq(Bar.spec(M.view(m, 70, Fake.T0)).sections[2].rows.map((r) => r.sub), ["/Users/you/storefront  ·  main · 5 agents", "/Users/you/telemetry  ·  main · 2 agents"]);
+  eq(Bar.spec(M.view(m, 70, Fake.T0)).sections[2].rows.map((r) => r.sub), ["~/storefront  ·  main · 5 agents", "~/telemetry  ·  main · 2 agents"]);
   // a project's name finds it and its agents ("eng" in v9: engine's agents, then engine)
   m = M.step(m, { ev: "ui_spot_type", text: "store" }, 80).m;
   eq(Bar.spec(M.view(m, 90, Fake.T0)).sections[0].rows.map((r) => r.t), ["stock", "wallet", "storefront"]);
@@ -1655,6 +1655,40 @@ law("desktop S8 spotlight empty (v9): waiting for you, at work, environments wit
   let mm = M.step(M.init(), { ev: "state", agents, cards: both, projects }, 0).m;
   eq(Bar.spec(M.view(M.step(mm, { ev: "app_key", key: "space" }, 10).m, 20, Fake.T0)).sections[0].rows.map((r) => r.t).sort(), ["alerts", "bise"]);
   eq(Bar.spec(M.view(M.step(mm, { ev: "app_menu", on: true }, 10).m, 20)).sections[0].rows.map((r) => r.t).sort(), ["alerts", "bise"]);
+});
+law("T1 run 4 (lead m_9163, ambient m_9164): what's in front that no project matches is its own row ('Pricing · Acme', 'in front: acme.test · Chrome', never selected); paths read ~ and cut in the middle; an approval row is one short line", () => {
+  const projects = [{ project: "home", name: "bise", home: true }, { project: "shop-1", name: "shop", path: "/Users/gabrielvergnaud/code/shop", branch: "main", agents: 1 }];
+  const cards = [{ id: 2, project: "shop-1", agent: "main", kind: "feature_try", approval: true, text: "t1-97894 is ready to try\n1 commit on t1-97894 · +3 −0\nyou can try it in its own window", options: ["try", "merge", "later"] }];
+  let m = M.step(M.init(), { ev: "state", agents: [], cards, projects }, 0).m;
+  m = M.step(m, { ev: "app_front", app: "Chrome", bundle: "com.google.Chrome", title: "Pricing · Acme", url: "https://acme.test/pricing" }, 5).m;
+  const s = Bar.spec(M.view(M.step(m, { ev: "app_key", key: "space" }, 10).m, 20, Fake.T0));
+  eq(s.sections.map((x) => [x.label, x.rows.map((r) => [r.g, r.t, r.sub, !!r.sel])]), [
+    ["waiting for you", [["!", "bise", "t1-97894 is ready to try · 1 commit · +3 −0", true]]],
+    ["environments", [["◦", "Pricing · Acme", "in front: acme.test · Chrome", false], ["ψ", "shop", "~/code/shop  ·  main · 1 agent", false]]]]);
+  // an editor on a file no project holds: the app's title, its path from ~
+  m = M.step(m, { ev: "app_front", app: "TextEdit", title: "", path: "/Users/gabrielvergnaud/notes/todo.txt" }, 30).m;
+  eq(Bar.spec(M.view(M.step(m, { ev: "app_key", key: "space" }, 40).m, 50, Fake.T0)).sections[1].rows[0].sub, "in front: ~/notes/todo.txt");
+  eq([Wd.spot.path("/Users/gabrielvergnaud/work/clients/acme/monorepo/code/telemetry"), Wd.spot.path("/opt/x"), Wd.spot.path("/home/me")], ["~/…/acme/monorepo/code/telemetry", "/opt/x", "~"]);
+  eq(Wd.cardLine("a very long branch name is ready to try with a sentence that runs past the row\n1 commit", 40).length <= 40, true);
+});
+law("T1 run 4 step 19 (lead m_9163): app_away opens 'while you were away' at once, before a waiting card; the summary fills it, a summary where nothing moved clears it, no summary in 5 s lets it go", () => {
+  const card = { id: "4", agent: "main", text: "compaction at 03:00?", options: ["yes", "no"] };
+  const back = new Date(2026, 9, 4, 13, 47).getTime();
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [card], pages: [] }, 0).m;
+  m = M.step(m, { ev: "app_away", away_ms: 2700000 }, 100).m;
+  const v = M.view(m, 100, back);
+  eq([v.state, Bar.spec(v).head.lab.rest], ["away", "while you were away · 13:02"]);
+  eq(M.view(m, 5200, back + 5000).state, "needs");
+  const f = M.step(m, { ev: "away_summary", since_ms: 0, done: 3, questions: 1, failed: 0, projects: [] }, 3000).m;
+  eq([M.view(f, 9000, back).state, Bar.spec(M.view(f, 9000, back)).text.s], ["away", "3 done · 1 question"]);
+  eq(M.view(M.step(m, { ev: "away_summary", since_ms: 0, done: 0, questions: 0, failed: 0, projects: [] }, 300).m, 400, back).state, "needs");
+});
+law("T1 run 4 step 18 (lead m_9163): a drop stays in the spotlight until send or esc, even when a card arrives or comes back to the bar", () => {
+  let m = M.step(M.init(), { ev: "app_drop", files: [{ name: "forest.ktx", path: "/Users/you/forest.ktx", kind: "file" }] }, 0).m;
+  m = M.step(m, { ev: "state", agents: [], cards: [{ id: "5", agent: "main", text: "ship it?", options: ["yes", "no"] }], pages: [] }, 100).m;
+  m = M.step(m, { ev: "app_card_seat", at: "bar" }, 200).m;
+  const v = M.view(m, 300);
+  eq([v.state, v.content.kind, Bar.selRow(Bar.spec(v)).qa], ["spotlight", "type", "drop-send"]);
 });
 law("desktop S8 route line (v9): after a talk, '→ telemetry · main' for 2 s; tab = the next project (route_correct), fn esc = cancel (route_cancel); then bise's usual 'working'", () => {
   const projects = [{ project: "home", name: "bise", home: true, order: 0 }, { project: "storefront-5c1d", name: "storefront", order: 1 },
