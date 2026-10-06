@@ -37,7 +37,7 @@
       return null;
     }
     function handle(d) {
-      const el = h("span", "w-drag", "⋮⋮");
+      const el = h("span", "w-grip", "⋮⋮");
       el.title = d.tip || "";
       el.setAttribute("draggable", "true");
       el.setAttribute("data-drag", JSON.stringify({ project: d.project }));
@@ -78,11 +78,9 @@
       const fn = d.fn ? act(UI.fnkey.render({ down: d.fn === "down" }), { ev: "ui_onb_fn" }) : null;
       // try fn: his words land under the key while he holds it, then stay once he let go
       const heard = d.fn ? h("div", ["w-heard", d.fn === "down" && "on"], d.heard || " ") : null;
-      const el = UI.onb.render({ pearl: d.pearl, title: d.title, sub: d.sub, children: [children, fn, heard, d.hint ? h("div", ["w-hint", d.done && "ok"], d.hint) : null],
+      // the pearl's mood (listen while he holds fn, done after): the kit's onb takes {mood}
+      const el = UI.onb.render({ pearl: d.pearl ? { mood: d.pearl === true ? "rest" : d.pearl } : null, title: d.title, sub: d.sub, children: [children, fn, heard, d.hint ? h("div", ["w-hint", d.done && "ok"], d.hint) : null],
         cta: { ...d.cta, act: { ev: "ui_onb_next" } }, steps: d.steps, step: d.step });
-      // the pearl's mood (listen while he holds fn, done after): winui's pearlsIn reads data-mood
-      const p = el.querySelector && el.querySelector("[data-bise-pearl]");
-      if (p && d.pearl && d.pearl !== true) p.setAttribute("data-mood", d.pearl);
       return h("div", "w-onb",
         h("div", "w-onbtop b-lights-pad",
           d.back ? act(UI.btn.render({ text: d.back, kind: "ghost" }), { ev: "ui_onb_back" }) : h("span"),

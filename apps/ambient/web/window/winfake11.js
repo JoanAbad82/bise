@@ -10,7 +10,7 @@
     prefs: { onboarded: true, theme: "system", login: true, menubar_count: true, voice: { fn_hold: true, fn_twice: true, language: "auto" },
       context: { shot: true, url: true, file: true, window_text: true }, excluded_apps: ["1Password", "Messages"], shots_keep_days: 7,
       quiet: { call: true, share: true, fullscreen: true, focus: true, batch_min: 30, away_card: true } },
-    accounts: [{ id: "chatgpt", label: "ChatGPT plan", kind: "subscription", state: "signed_in", who: "gabriel@…" },
+    accounts: [{ id: "chatgpt", label: "ChatGPT plan", kind: "subscription", state: "signed_in", who: "you@example.com" },
       { id: "claude", label: "Claude plan", kind: "subscription", state: "signed_out" },
       { id: "anthropic", label: "Anthropic", kind: "key", state: "signed_out" }],
     perms: { mic: "allowed", accessibility: "allowed", screen: "ask" },
@@ -42,7 +42,7 @@
     switch (cmd.cmd) {
       case "prefs_set": W.prefs = put(W.prefs, cmd.key, cmd.value); return [[0, { ev: "prefs", prefs: W.prefs }]];
       case "sign_in":
-        W.accounts = W.accounts.map((a) => (a.id === cmd.id ? { ...a, state: "signed_in", who: "gabriel@…" } : a));
+        W.accounts = W.accounts.map((a) => (a.id === cmd.id ? { ...a, state: "signed_in", who: "you@example.com" } : a));
         return [[1500, { ev: "accounts", items: W.accounts }]];
       case "key_set":
         W.accounts = W.accounts.map((a) => (a.id === cmd.id ? { ...a, state: "signed_in", who: `…${String(cmd.key).slice(-3)}` } : a));
