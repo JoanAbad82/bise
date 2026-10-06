@@ -1906,7 +1906,7 @@ def hub_unique_sent(+ms: List<&2, HM.MRec>, +m: HM.Msg, +nm: Nat, k: {HM.Msg.id(
 # keeps the state unique
 def hub_apply_unique(s: HM.St, e: HM.Ev, u: HI.Unique(s), k: HX.FreshEv(s, e)) -> HI.Unique(HM.apply(s, e)):
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       match e:
         case HM.ETaskCreated{a, b, c, d, f}:
           u
@@ -2009,7 +2009,7 @@ def hub_prefix_tr(-a: List<&2, Nat>, -x: List<&2, Nat>, -y: List<&2, Nat>, e: {x
 # every event keeps the messages, in order (a new one comes last)
 def hub_apply_kept(s: HM.St, e: HM.Ev) -> HI.Kept(s, HM.apply(s, e)):
   match s:
-    case HM.St{ag, od, +ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, +ms, ca, no, nm, nc, tm, xs}:
       match e:
         case HM.EMsgSent{+m}:
           hub_prefix_tr(HI.ids(ms),
@@ -2211,7 +2211,7 @@ def hub_rej(ids: List<&2, Nat>, +xs: List<&2, HM.MRec>) -> List<&2, HM.MRec>:
 
 def hub_msgs_state(s: HM.St, +id: Nat, +x: HM.MSt) -> {HM.St.msgs(HM.apply(s, HM.EMsgState{id, x})) == HM.map_msg(HM.St.msgs(s), id, HM.OSt{x}) : List<&2, HM.MRec>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       {==}
 
 def hub_msgs_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
@@ -2323,12 +2323,12 @@ def hub_d_hout(-o: HM.St, +cx: HX.Cx<o>, +kvs: List<&2, Sigma<&2, &2, String, _ 
 
 def hub_msgs_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.msgs(HM.apply(s, HM.ECardClosed{id, res})) == HM.St.msgs(s) : List<&2, HM.MRec>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       {==}
 
 def hub_msgs_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>) -> {HM.St.msgs(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.St.msgs(s) : List<&2, HM.MRec>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       {==}
 
 def hub_msgs_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o, b) : HM.St}) -> {HM.St.msgs(HX.d(o, a)) == HM.St.msgs(HX.d(o, b)) : List<&2, HM.MRec>}:
@@ -2338,17 +2338,17 @@ def hub_msgs_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o,
 
 def hub_msgs_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat) -> {HM.St.msgs(HM.apply(s, HM.ETimerStop{id, why, at})) == HM.St.msgs(s) : List<&2, HM.MRec>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       {==}
 
 def hub_agents_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat) -> {HM.St.agents(HM.apply(s, HM.ETimerStop{id, why, at})) == HM.St.agents(s) : List<&2, HM.Agent>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       {==}
 
 def hub_cards_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat) -> {HM.St.cards(HM.apply(s, HM.ETimerStop{id, why, at})) == HM.St.cards(s) : List<&2, HM.Card>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       {==}
 
 def hub_msgs_gone_each(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +why: String)
@@ -2463,7 +2463,7 @@ def hub_agents_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(
 
 def hub_agents_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.agents(HM.apply(s, HM.ECardClosed{id, res})) == HM.St.agents(s) : List<&2, HM.Agent>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       {==}
 
 def hub_agents_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: String)
@@ -2485,7 +2485,7 @@ def hub_agents_close_ids(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>, +res: St
 
 def hub_agents_state(s: HM.St, +id: Nat, +x: HM.MSt) -> {HM.St.agents(HM.apply(s, HM.EMsgState{id, x})) == HM.St.agents(s) : List<&2, HM.Agent>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       {==}
 
 def hub_agents_reject(-o: HM.St, +ids: List<&2, Nat>, +cx: HX.Cx<o>)
@@ -2637,17 +2637,17 @@ def hub_cards_eq(-o: HM.St, -a: HX.Cx<o>, -b: HX.Cx<o>, e: {HX.d(o, a) == HX.d(o
 
 def hub_cards_closed(s: HM.St, +id: Nat, +res: String) -> {HM.St.cards(HM.apply(s, HM.ECardClosed{id, res})) == HM.drop_card(HM.St.cards(s), id) : List<&2, HM.Card>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       {==}
 
 def hub_cards_life(s: HM.St, +n: String, +l: HM.Life, +r: Maybe<&2, String>) -> {HM.St.cards(HM.apply(s, HM.ELifecycle{n, l, r})) == HM.St.cards(s) : List<&2, HM.Card>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       {==}
 
 def hub_cards_state(s: HM.St, +id: Nat, +x: HM.MSt) -> {HM.St.cards(HM.apply(s, HM.EMsgState{id, x})) == HM.St.cards(s) : List<&2, HM.Card>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       {==}
 
 # rejecting messages keeps the cards
@@ -2838,7 +2838,7 @@ def hub_ucards_open(+cs: List<&2, HM.Card>, +c: HM.Card, +nc: Nat, +k: {HM.Card.
 
 def hub_apply_ucards(s: HM.St, e: HM.Ev, u: HI.UniqueCards(s), k: HX.FreshEv(s, e)) -> HI.UniqueCards(HM.apply(s, e)):
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       match e:
         case HM.ECardOpened{c}:
           hub_ucards_open(ca, c, nc, k, u)
@@ -2976,7 +2976,7 @@ def hub_ag(-o: HM.St, +cx: HX.Cx<o>) -> List<&2, HM.Agent>:
 
 def hub_ag_notes(s: HM.St) -> {HM.St.agents(HM.apply(s, HM.ENotesFlushed{})) == HM.St.agents(s) : List<&2, HM.Agent>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       {==}
 
 def hub_ag_flush(-o: HM.St, f: Bool, +cx: HX.Cx<o>) -> {hub_ag(o, HC.pump.flush(o, f, cx)) == hub_ag(o, cx) : List<&2, HM.Agent>}:
@@ -3629,15 +3629,15 @@ def hub_qimp_eq(+s1: HM.St, -s2: HM.St, +n: String, e: {s2 == s1 : HM.St}) -> {h
 # marking a message delivered never fills a queue (on the whole state)
 def hub_qimp_deliv(s: HM.St, +id: Nat, +n: String) -> {hub_qimp(s, HM.apply(s, HM.EMsgState{id, HM.Delivered{}}), n) == True{} : Bool}:
   match s:
-    case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm}:
-      +ns = HM.names_of(HM.St{ag, od, ms, ca, no, nm, nc, tm}, n)
+    case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm, +xs}:
+      +ns = HM.names_of(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}, n)
       hub_qimp_mk(List.is_empty(&2, HM.Msg, HM.queued_in(ms, ns)), List.is_empty(&2, HM.Msg, HM.queued_in(HM.map_msg(ms, id, HM.OSt{HM.Delivered{}}), ns)),
         e => hub_qdeliv(ms, id, ns, e))
 
 def hub_qimp_flush(s: HM.St, +n: String) -> {hub_qimp(s, HM.apply(s, HM.ENotesFlushed{}), n) == True{} : Bool}:
   match s:
-    case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm}:
-      hub_qimp_refl(HM.St{ag, od, ms, ca, no, nm, nc, tm}, n)
+    case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm, +xs}:
+      hub_qimp_refl(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}, n)
 
 
 # ---- L4 support: the frame of a delivery to another agent ----
@@ -4203,14 +4203,14 @@ def hub_nok_tr(-x: List<&2, List<&2, String>>, -y: List<&2, List<&2, String>>, e
 # new name) keeps the names of the agents apart
 def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e)) -> HI.NamesApart(HM.apply(s, e)):
   match s:
-    case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm}:
+    case HM.St{+ag, +od, +ms, +ca, +no, +nm, +nc, +tm, +xs}:
       match e:
         case HM.ETaskCreated{+n, pa, br, ws, at}:
           hub_nok_tr(HI.profile(HM.put_agent(ag, n, HM.new_agent(n, False{}, Some{pa}, ws, br, at))), HM.snoc(List<&2, String>, HI.profile(ag), [n]),
-            hub_put_absent(ag, n, HM.new_agent(n, False{}, Some{pa}, ws, br, at), hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm}, n, k)),
-            hub_nok_snoc(HI.profile(ag), [n], u, hub_allapart_new(HI.profile(ag), n, hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm}, n, k))))
+            hub_put_absent(ag, n, HM.new_agent(n, False{}, Some{pa}, ws, br, at), hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}, n, k)),
+            hub_nok_snoc(HI.profile(ag), [n], u, hub_allapart_new(HI.profile(ag), n, hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}, n, k))))
         case HM.ERenamed{old, +new}:
-          hub_nok_ren(ag, old, new, u, hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm}, new, k))
+          hub_nok_ren(ag, old, new, u, hub_nt(HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}, new, k))
         case HM.ELifecycle{+x, +l, +r}:
           hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OLife{l, r})), HI.profile(ag), hub_prof_map(ag, x, HM.OLife{l, r}, {==}), u)
         case HM.EWorkspace{+x, +w}:
@@ -4877,7 +4877,7 @@ def hub_keep_drop(+xs: List<&2, HTM.Timer>, +id: Nat, +rest: List<&2, Nat>)
 def hub_live_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat)
     -> {HTM.Tms.live(HM.St.tm(HM.apply(s, HM.ETimerStop{id, why, at}))) == HTM.drop(HTM.Tms.live(HM.St.tm(s)), id) : List<&2, HTM.Timer>}:
   match s:
-    case HM.St{ag, od, ms, ca, no, nm, nc, tm}:
+    case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       match tm:
         case HTM.Tms{l, e, li}:
           {==}
