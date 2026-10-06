@@ -10,6 +10,7 @@ config. They run offscreen through `tests/harness` like every check: `pnpm test:
 | `mac-keys.spec.ts` | the menu bar is bise's (not `bise-desktop`), every ⛔2 key shows with the standard role; Settings… and Inbox reach the window when no bise window is focused; quitting tells the helper to quit and ends the app |
 | `fn.spec.ts` | fn space: the spotlight at the top with the keys, again or esc closes; fn held: the talk at the bottom without the keys, the core gets `talk_start` in < 300 ms, the helper `own_mic`, the release `talk_end`; fn fn: hands-free until the next tap; fn i: the inbox in the window |
 | `capsule.spec.ts` | the glass 170 px under the top (fn space) or 96 px above the bottom (the talk), centred, nothing drawn past the window; a card bise pushes shows at the bottom without the keys; a quiet moment (call, sharing, full screen) holds it until it ends; the helper gets `config` (his excluded apps) at start |
+| `setup.spec.ts` | S.7: with none granted each permission has its allow and continue for now works, allow asks the helper (perm ask), a refusal offers System Settings (perm open), a grant shows at once; S.5: the core killed, one line says so (app.core), the app starts it again and talks to it (subscribes again), no Terminal |
 | `world.ts` | the shared world: the app on FakeHelper + FakeCore, main's stdout lines, the capsule's page, the menu as the menu bar draws it, a click on a menu item |
 
 ## What these runs can't see
@@ -44,6 +45,26 @@ Virtualization.framework, through `tart`), never on his screen:
 5. **The glass**: vibrancy over a light and a dark wallpaper, frames while the talk animates.
 6. **Setup on a fresh account**: S.1 (no CLI), S.2 (sign in), S.5 (the core killed), S.6 (update from
    a throwaway feed), S.7 (permissions refused then granted) on a new macOS user.
+
+### Without a VM: the same items by hand (about 10 min, on a packaged bise.app)
+
+On his Mac or anyone's, with a throwaway bise home. Each row: what to press, what you must see. A
+row that fails: a screenshot and one line to qa-native.
+
+| # | press | see |
+|---|---|---|
+| 1 | open the bise menu, Edit, Go, Window | the menu says bise (never bise-desktop); each item shows its key: Settings… ⌘, · Hide bise ⌘H · Quit bise ⌘Q · Close Window ⌘W · Undo ⌘Z · Redo ⇧⌘Z · Cut ⌘X · Copy ⌘C · Paste ⌘V · Select All ⌘A · Find ⌘F · Inbox ⌘I · Minimize ⌘M |
+| 2 | in the window: ⌘, then ⌘I then ⌘F | settings, then the inbox, then the find bar in a thread |
+| 3 | ⌘W, then bise › Settings… from the menu bar | the window closes, bise keeps running; Settings… opens the window on settings |
+| 4 | ⌘M, click bise in the Dock; ⌘H, click it again | it minimizes and comes back; it hides and comes back |
+| 5 | TextEdit in front: hold fn and say a sentence, let go | the talk shows at the bottom in under 0.3 s; TextEdit's title bar stays active (not greyed); the words reach bise |
+| 6 | TextEdit in front: fn fn, speak, then fn once | hands-free shows and stays without holding; the tap ends it |
+| 7 | TextEdit in front: fn space, type, esc | the spotlight at the top takes the typing; esc closes it; TextEdit is active again and its caret blinks |
+| 8 | TextEdit full screen (⌃⌘F): fn space; then have an agent ask a question | the spotlight and then the card draw over the full-screen TextEdit, on its Space; TextEdit keeps the keys for the card |
+| 9 | during a FaceTime call or a screen share: have an agent ask a question | no card shows during the call; it shows when the call ends |
+| 10 | click the pearl in the menu bar; right-click it | the dropdown under the pearl; right-click: open bise ⌘0, settings ⌘,, quit ⌘Q |
+| 11 | System Settings › Privacy & Security › Accessibility, Microphone, Screen Recording | bise is listed (not bise-mac-helper, not Electron) once setup asked for each |
+| 12 | the capsule over a light then a dark wallpaper | the glass blurs what's behind it; no hard edge cut off at its right or bottom |
 
 Cost, to ask the user first: a macOS 26 base image is ~25 GB to download and ~50 GB on disk
 (sparse; ~30 GB really written); the VM wants 8 GB of RAM and 4 cores while it runs, about 2-3x
