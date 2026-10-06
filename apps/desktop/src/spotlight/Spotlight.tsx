@@ -4,7 +4,7 @@
 // stay the same nodes), the live pearl mounted once. bise's answer shows under the input at a
 // readable size; the panel grows with it (onHeight tells the window), and past ANSWER_MAX_LINES it
 // cuts with 'the rest in bise' (⏎ opens it in the window).
-import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent } from 'react';
+import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent, type ReactNode } from 'react';
 import { Spot, SpotGroup, SpotRow, type DotState } from '@/ds';
 import { LivePearl, type Mood } from '@/pearl';
 import { flat, spotList, type AgentStatus, type SpotData, type SpotItem } from './list';
@@ -23,6 +23,9 @@ export interface SpotlightProps {
   readonly mood?: Mood;
   readonly level?: number;
   readonly still?: boolean;
+  /** The pearl's place: the capsule passes a hole and keeps its one live pearl over it (never
+   *  re-mounted when the capsule changes view); alone, the spotlight draws its own. */
+  readonly pearl?: ReactNode;
   /** A sentence for bise (⏎ on 'ask bise', or ⏎ with nothing picked). */
   readonly onAsk: (text: string) => void;
   /** Open a card, an agent or an environment in bise's window. */
@@ -144,7 +147,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
       <Spot
         testId={`${testId}.frame`}
         to={W.to}
-        pearl={<LivePearl mood={p.mood ?? 'rest'} level={p.level} still={p.still} size={40} testId={`${testId}.pearl`} />}
+        pearl={p.pearl ?? <LivePearl mood={p.mood ?? 'rest'} level={p.level} still={p.still} size={40} testId={`${testId}.pearl`} />}
         input={
           <input
             ref={input}
