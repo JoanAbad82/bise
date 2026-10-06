@@ -1,0 +1,21 @@
+/* src/ds · every style of the design system, in desktop-ds v5's order. Import once, at the renderer's
+   root (import "../ds/index.css"). tokens.css is desktop-ds v5's, byte-equal (the check says so):
+   dark by default, light with the system or <html data-theme="light">. Components read only roles
+   (--c-*, --t-*, --s-*, --r-*, --e-*, --d-*, --ease-*), never the palette (--p-*). */
+@import "./tokens.css";
+@import "./css/base.css";
+@import "./css/prim.css";
+@import "./css/window.css";
+@import "./css/thread.css";
+@import "./css/composer.css";
+@import "./css/board.css";
+@import "./css/capsule.css";
+@import "./css/spotlight.css";
+@import "./css/sideviews.css";
+@import "./css/menus.css";
+@import "./css/toasts.css";
+@import "./css/cards.css";
+@import "./css/settings.css";
+@import "./css/onboarding.css";
+@import "./css/motion.css";
+@import "./css/live.css";

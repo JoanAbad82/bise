@@ -1,0 +1,81 @@
+// @vitest-environment happy-dom
+// src/ds · the components' behavior: test ids, handlers, and the typing invariant (a frame's
+// re-render never replaces the editor in its slot, nor the rows of a list).
+import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ComposerFrame, Dock, Field, Msg, Opts, Row, Seg, Spot, SpotRow, Tabs, Toggle } from "./index";
+
+afterEach(cleanup);
+
+describe("src/ds", () => {
+  it("the composer's frame keeps the editor's node when send, dock or focus change", () => {
+    const editor = <div contentEditable suppressContentEditableWarning data-testid="composer.editor">hi</div>;
+    const { getByTestId, rerender } = render(<ComposerFrame send="off" testId="composer">{editor}</ComposerFrame>);
+    const before = getByTestId("composer.editor");
+    rerender(<ComposerFrame send="on" focus testId="composer" dock={<Dock head="? x" q="y" />}>{editor}</ComposerFrame>);
+    rerender(<ComposerFrame send="stop" testId="composer">{editor}</ComposerFrame>);
+    expect(getByTestId("composer.editor")).toBe(before);
+    expect(getByTestId("composer.stop").textContent).toBe("■");
+  });
+
+  it("send is a real button, off when there is nothing to send", () => {
+    const onSend = vi.fn();
+    const { getByTestId, rerender } = render(<ComposerFrame send="off" onSend={onSend} testId="c"><span /></ComposerFrame>);
+    expect((getByTestId("c.send") as HTMLButtonElement).disabled).toBe(true);
+    rerender(<ComposerFrame send="on" onSend={onSend} testId="c"><span /></ComposerFrame>);
+    fireEvent.click(getByTestId("c.send"));
+    expect(onSend).toHaveBeenCalledTimes(1);
+  });
+
+  it("the spotlight's input slot survives its rows changing", () => {
+    const input = <input data-testid="spot.input" />;
+    const { getByTestId, rerender } = render(<Spot input={input}><SpotRow lead="bise" name="a" on testId="spot.row.a" /></Spot>);
+    const before = getByTestId("spot.input");
+    rerender(<Spot input={input}><SpotRow lead="bise" name="a" testId="spot.row.a" /><SpotRow lead="wk" name="b" on testId="spot.row.b" /></Spot>);
+    expect(getByTestId("spot.input")).toBe(before);
+    expect(getByTestId("spot.row.b").className).toContain("on");
+  });
+
+  it("a list row stays the same node when its neighbors change", () => {
+    const { getByTestId, rerender } = render(<div><Row name="a" testId="side.a" /><Row name="b" testId="side.b" /></div>);
+    const a = getByTestId("side.a");
+    rerender(<div><Row name="a" testId="side.a" /><Row name="b" on testId="side.b" /><Row name="c" testId="side.c" /></div>);
+    expect(getByTestId("side.a")).toBe(a);
+  });
+
+  it("options, tabs and segments hand back what was picked, with ids per part", () => {
+    const pick = vi.fn();
+    const { getByTestId } = render(<>
+      <Opts items={[{ n: 1, text: "yes" }, { n: 2, text: "no" }]} onPick={pick} testId="dock.opt" />
+      <Tabs items={[{ id: "search", text: "search" }]} onPick={pick} testId="inbox.tab" />
+      <Seg items={["a", "b"]} on={0} onPick={pick} testId="seg" />
+    </>);
+    fireEvent.click(getByTestId("dock.opt.2"));
+    fireEvent.click(getByTestId("inbox.tab.search"));
+    fireEvent.click(getByTestId("seg.1"));
+    expect(pick.mock.calls).toEqual([[2], ["search"], [1]]);
+  });
+
+  it("the toggle flips by click and by space; a disabled one doesn't", () => {
+    const flip = vi.fn();
+    const { getByTestId } = render(<><Toggle on={false} onChange={flip} testId="t" /><Toggle on onChange={flip} state="disabled" testId="d" /></>);
+    fireEvent.click(getByTestId("t"));
+    fireEvent.keyDown(getByTestId("t"), { key: " " });
+    fireEvent.click(getByTestId("d"));
+    expect(flip.mock.calls).toEqual([[true], [true]]);
+  });
+
+  it("the field is a real input with its test id, uncontrolled", () => {
+    const { getByTestId } = render(<Field defaultValue="acme" testId="setup.workspace" />);
+    const input = getByTestId("setup.workspace") as HTMLInputElement;
+    expect(input.tagName).toBe("INPUT");
+    fireEvent.change(input, { target: { value: "acme/x" } });
+    expect(input.value).toBe("acme/x");
+  });
+
+  it("a message shows words from data as text, never markup", () => {
+    const { container } = render(<Msg from="agent" name="x">{"<img src=x onerror=alert(1)>"}</Msg>);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.textContent).toContain("<img src=x");
+  });
+});
