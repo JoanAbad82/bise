@@ -80,7 +80,7 @@
       ["picked, sending", { items: [{ n: 1, text: "tonight 02:00", picked: true }, { n: 2, text: "now", state: "disabled" }] }]],
     dock: [
       ["a question", { head: "? telemetry · alerts needs you", keys: "1 of 3   ← →", q: "move the compaction from 14:00 to 03:00?", opts: [{ n: 1, text: "move it to 03:00", act: { ev: "ui_answer", i: 1 } }, { n: 2, text: "leave it", act: { ev: "ui_answer", i: 2 } }], typeHint: "or type your answer below" }],
-      ["the review", { head: "? streaming is done · merge it?", keys: "approval", q: "merge sb/streaming into main: 3 files, 40 ms → 15 ms on the PS5 replay.", opts: [{ n: 1, text: "merge into main" }, { n: 2, text: "not yet" }], typeHint: "or type your answer below" }],
+      ["the review", { head: "? streaming is done · merge it?", keys: "approval", q: "merge sb/streaming into main: 3 files, 40 ms → 15 ms on the PS5 replay.", opts: [{ n: 1, text: "merge into main" }, { n: 2, text: "not yet" }], typeHint: "pick 1 or 2" }],
       ["an error to pick up", { kind: "err", head: "▲ checkout stopped", keys: "bise", q: "your ChatGPT sign-in expired. your agents on ChatGPT stopped; they resume once you sign in.", opts: [{ n: 1, text: "sign in again" }] }],
       ["nothing to answer", { kind: "plain", head: "stock is done", keys: "esc closes", q: "500 sold out of 500, no oversell.", opts: [{ n: 1, text: "open the report" }] }],
     ],
