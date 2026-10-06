@@ -22,28 +22,29 @@ test('composer/at-files: @ opens the file picker, ranks by name, tab inserts the
   });
 });
 
-// bar T B8 (the terminal's files.rs pick memory): a path he picked ranks first among the paths the
-// next time (the live agents stay above the paths)
-test('composer/at-files: a picked path ranks first next time', async () => {
+// bar T B8 (the terminal's files.rs pick memory): a path he picked ranks first next time WITHIN
+// its tier (files.rs ranks exact name, name prefix, then fuzzy; a recent pick goes first inside
+// its tier, not above a better tier: ambient-lead m_10097). In '@src/' both files are in one tier:
+// pick the second (src/main.rs) with ⏎, and the next '@src/' lists it first.
+test('composer/at-files: a picked path ranks first in its tier next time', async () => {
   await onTarget(async ({ page }) => {
     const field = page.locator(T.field);
-    await field.click();
-    await page.keyboard.type('@s');
     const picker = page.locator(T.picker);
+    const paths = async (): Promise<string[]> => (await picker.locator(T.pickerRow).allInnerTexts()).map((r) => r.split('\n')[0]?.trim() ?? '').filter((r) => r.includes('/') || /\.[a-z]+$/i.test(r));
+    await field.click();
+    await page.keyboard.type('@src/');
     await expect(picker).toBeVisible({ timeout: 1500 });
-    const before = (await picker.locator(T.pickerRow).allInnerTexts()).map((r) => r.split('\n')[0]?.trim() ?? '');
-    // the last FILE row (a folder's tab goes into it, E21): picked, it must rank first next time
-    const at = before.reduce((k, r, i) => (/\.[a-z]+$/i.test(r) ? i : k), -1);
-    expect(at, `a file row below the first for "@s": ${before.join(' | ')}`).toBeGreaterThan(0);
-    const last = before[at] ?? '';
-    for (let i = 0; i < at; i++) await press(page, 'ArrowDown');
-    await press(page, 'Tab');
+    const before = await paths();
+    expect(before.length, `two files in src/: ${before.join(' | ')}`).toBeGreaterThan(1);
+    const second = before[1] ?? '';
+    await press(page, 'ArrowDown');
+    await press(page, 'Enter');
+    expect((await field.evaluate(fieldText)).trim(), 'the pick went in').toBe(second);
     await press(page, 'Meta+a');
     await press(page, 'Backspace');
-    await page.keyboard.type('@s');
+    await page.keyboard.type('@src/');
     await expect(picker).toBeVisible({ timeout: 1500 });
-    // the live agents come first in the @ popup (docs/at-mentions.md), then the paths
-    const paths = (await picker.locator(T.pickerRow).allInnerTexts()).map((r) => r.split('\n')[0]?.trim() ?? '').filter((r) => r.includes('/') || /\.[a-z]+$/i.test(r));
-    expect(paths[0], `the picked path ("${last}") is the first path now: ${paths.join(' | ')}`).toBe(last);
+    const after = await paths();
+    expect(after[0], `the picked path ("${second}") is first now: ${after.join(' | ')}`).toBe(second);
   });
 });
