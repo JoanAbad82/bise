@@ -35,9 +35,9 @@ export function ChangesScreen({ project }: { project: string }) {
             <Row
               key={w.path}
               kind="ag"
-              name={agent ?? (w.branch === '' ? 'detached' : w.branch)}
-              sub={w.branch}
-              end={branchEnd(w)}
+              // the branch as the TUI names it ('sb/checkout'), whose worktree it is at the end
+              name={w.branch === '' ? 'detached' : w.branch}
+              end={`${agent ?? 'yours'} · ${branchEnd(w)}`}
               onClick={
                 agent == null
                   ? undefined

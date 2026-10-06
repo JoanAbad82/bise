@@ -212,3 +212,10 @@
   text-decoration: underline dotted;
   text-underline-offset: 2px;
 }
+
+.th-agents-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}

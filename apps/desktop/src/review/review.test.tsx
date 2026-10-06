@@ -85,3 +85,30 @@ describe('the agents screen', () => {
     expect((v.getByTestId('agents.new') as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+describe('the changes screen (A.6)', () => {
+  it("names each branch as the TUI does ('sb/perf'), whose worktree it is and how far ahead", async () => {
+    const { ChangesScreen } = await import('./ChangesScreen');
+    const { wrap, store } = setup();
+    act(() => {
+      store.apply({ ev: 'worktrees', project: P, items: [{ path: '/w/perf', branch: 'sb/perf', agent: 'perf', ahead: 1, behind: 0, dirty: false }] });
+    });
+    const v = render(wrap(<ChangesScreen project={P} />));
+    const row = v.getByTestId('changes.branch.perf');
+    expect(row.textContent).toContain('sb/perf');
+    expect(row.textContent).toContain('perf · 1 ahead');
+  });
+});
+
+describe('the window /commands (bar 2.1, A.2)', () => {
+  it('/agents opens the agents list, /diff a review or the changes, /switch an agent', async () => {
+    const { runWindowCommand, windowCommands } = await import('@/thread/commands');
+    expect(windowCommands.map((c) => c.name)).toContain('agents');
+    expect(runWindowCommand('agents', '', { project: P, agent: 'main' })).toEqual({ screen: 'agents', project: P });
+    expect(runWindowCommand('/agents', '', { project: P, agent: 'main' })).toEqual({ screen: 'agents', project: P });
+    expect(runWindowCommand('diff', '', { project: P, agent: 'main' })).toEqual({ screen: 'changes', project: P });
+    expect(runWindowCommand('diff', 'perf', { project: P, agent: 'main' })).toEqual({ screen: 'review', project: P, agent: 'perf' });
+    expect(runWindowCommand('switch', 'perf', { project: P, agent: 'main' })).toEqual({ screen: 'thread', project: P, agent: 'perf' });
+    expect(runWindowCommand('new', 'x', { project: P, agent: 'main' })).toBeUndefined();
+  });
+});

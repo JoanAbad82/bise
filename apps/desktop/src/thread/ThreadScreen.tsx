@@ -13,6 +13,8 @@ import { Composer, useComposerSources } from '@/composer';
 import type { Outgoing } from '@/composer/message';
 import { threadKey, useAgents, useCoreState, useProjects, usePending, useStore, useThreadOrder, useTyping } from '@/store';
 import { useMenuAction } from '@/app/menu';
+import { useRouter } from '@/app/router';
+import { windowCommands, runWindowCommand } from './commands';
 import { dotOf, lineOf } from '@/agents/model';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
@@ -120,7 +122,31 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   // a project's main: its counts (tui-parity W2), else the agent's line
   const all = useAgents(project);
   const counts = agent === 'main' ? countsOf(all) : '';
-  const sub = bise ? ['every project', counts].filter(Boolean).join(' · ') : [agent === 'main' ? 'main' : (projectName ?? project), agent === 'main' ? counts : me ? lineOf(me) : ''].filter(Boolean).join(' · ');
+  const router = useRouter();
+  // the counts open the agents list (bar A.2: the TUI's /agents and panel)
+  const countsLink =
+    counts === '' ? null : (
+      <a
+        href="#agents"
+        className="th-agents-link"
+        onClick={(e) => {
+          e.preventDefault();
+          router.go({ screen: 'agents', project });
+        }}
+        data-testid="thread.agents"
+      >
+        {counts}
+      </a>
+    );
+  const lead = bise ? 'every project' : agent === 'main' ? 'main' : (projectName ?? project);
+  const sub =
+    agent === 'main' && countsLink !== null ? (
+      <>
+        {lead} · {countsLink}
+      </>
+    ) : (
+      [lead, !bise && agent !== 'main' && me ? lineOf(me) : ''].filter(Boolean).join(' · ')
+    );
 
   return (
     <FoldsContext value={folds}>
@@ -251,7 +277,17 @@ function History({ project, agent }: { project: string; agent: string }) {
 /** amb-web's composer, aimed at this agent; its props stay stable while the thread moves. */
 const ThreadComposer = memo(function ThreadComposer({ project, agent, busy, to, onStop }: { project: string; agent: string; busy: boolean; to: string; onStop: () => void }) {
   const store = useStore();
-  const sources = useComposerSources(project);
+  const router = useRouter();
+  // the window's own /commands (the screens they open), next to the core's
+  // once amb-home's lists land (bar 2.1)
+  const sources = useComposerSources(project, { commands: windowCommands });
+  const onCommand = useCallback(
+    (name: string, args: string) => {
+      const r = runWindowCommand(name, args, { project, agent });
+      if (r !== undefined) router.go(r);
+    },
+    [router, project, agent],
+  );
   const onSend = useCallback(
     (out: Outgoing) => {
       // ⏎ while a turn runs steers it ('now', as the TUI); the files he
@@ -261,5 +297,5 @@ const ThreadComposer = memo(function ThreadComposer({ project, agent, busy, to, 
     },
     [store, project, agent],
   );
-  return <Composer target={`${project}/${agent}`} busy={busy} sources={sources} to={to} onSend={onSend} onStop={onStop} testId="composer" />;
+  return <Composer target={`${project}/${agent}`} busy={busy} sources={sources} to={to} onSend={onSend} onCommand={onCommand} onStop={onStop} testId="composer" />;
 });

@@ -9,6 +9,7 @@ import { Markdown, langOf } from './Markdown';
 import { newAtEnd } from './ThreadList';
 import { EntryRow, foldOf, type RowCtx } from './rows';
 import { countsOf, ThreadScreen } from './ThreadScreen';
+import { createRouter, RouterContext } from '@/app/router';
 
 vi.mock('@/composer', () => ({
   Composer: () => <div data-testid="composer" />,
@@ -68,7 +69,7 @@ describe('thread parity rows (tui-parity M2 N11 M8 B15 B11 C47 W2 W5)', () => {
     });
     const v = render(
       <StoreProvider store={store}>
-        <ThreadScreen project={P} agent="old" />
+        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="old" /></RouterContext>
       </StoreProvider>,
     );
     expect(v.queryByTestId('composer')).toBeNull();

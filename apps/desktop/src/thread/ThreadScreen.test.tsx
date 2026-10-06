@@ -5,6 +5,7 @@ import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay, threadKey } from '@/store';
 import { EntryRow, type RowCtx } from './rows';
 import { ThreadScreen } from './ThreadScreen';
+import { createRouter, RouterContext } from '@/app/router';
 
 // the composer is amb-web's: here a stand-in that counts its renders
 const composer = vi.hoisted(() => ({ renders: 0, props: null as null | { busy?: boolean; onSend: (o: { text: string; files: string[] }) => void } }));
@@ -46,7 +47,7 @@ describe('the thread screen', () => {
     const { store, cmds } = setup();
     const v = render(
       <StoreProvider store={store}>
-        <ThreadScreen project={P} agent="perf" />
+        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="perf" /></RouterContext>
       </StoreProvider>,
     );
     expect(cmds).toContainEqual({ cmd: 'subscribe', project: P, agent: 'perf' });
@@ -58,7 +59,7 @@ describe('the thread screen', () => {
     const { store, cmds } = setup();
     const row = render(
       <StoreProvider store={store}>
-        <ThreadScreen project={P} agent="perf" />
+        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="perf" /></RouterContext>
       </StoreProvider>,
     );
     act(() => {
@@ -87,7 +88,7 @@ describe('the thread screen', () => {
     const { store, cmds } = setup();
     const v = render(
       <StoreProvider store={store}>
-        <ThreadScreen project={P} agent="perf" />
+        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="perf" /></RouterContext>
       </StoreProvider>,
     );
     act(() => {
@@ -125,7 +126,7 @@ describe('the thread screen', () => {
     const { store } = setup();
     render(
       <StoreProvider store={store}>
-        <ThreadScreen project={P} agent="perf" />
+        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="perf" /></RouterContext>
       </StoreProvider>,
     );
     const before = composer.renders;
