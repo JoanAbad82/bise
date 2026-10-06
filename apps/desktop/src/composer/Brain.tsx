@@ -1,0 +1,476 @@
+// The composer's behavior, as one Lexical plugin: the keys (⏎ send, ⇧⏎ new line, tab queue or
+// complete, esc put away or close, ↑/↓ drafts or the list), the pickers (@ $ /), long pastes and
+// images as chips, the drafts kept per target, the queue sent at the turn's end. It reads the
+// editor on each update and writes it only on his actions (edit.ts). Its React state (the
+// picker, the strip, send on/off) changes on transitions only, never per keystroke.
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import {
+  $createParagraphNode,
+  $getRoot,
+  $getSelection,
+  $isRangeSelection,
+  COMMAND_PRIORITY_HIGH,
+  DROP_COMMAND,
+  HISTORY_PUSH_TAG,
+  KEY_ARROW_DOWN_COMMAND,
+  KEY_ARROW_UP_COMMAND,
+  KEY_ENTER_COMMAND,
+  KEY_ESCAPE_COMMAND,
+  KEY_TAB_COMMAND,
+  PASTE_COMMAND,
+  type LexicalEditor,
+} from 'lexical';
+import { mergeRegister } from '@lexical/utils';
+import { $caretOffset, $insertAtCaret, $insertChip, $replaceBeforeCaret, $selectRange } from './edit';
+import { $caretOnFirstLine, $isBlank, $readSegments, $textBeforeCaret } from './read';
+import { buildMessage, chars, chipStrip, isLongPaste, nextChipNumber, preview, type Chip, type Outgoing, type Segment } from './message';
+import { enqueue, historyAt, load, popNewest, remember, save, takeOldest, type Saved, type Store } from './drafts';
+import { agentRows, commandLine, commandRows, completion, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
+import { isImagePath, type ComposerSources, type PickFile } from './sources';
+import { triggerAt, type Trigger } from './tokens';
+import { Picker } from './Picker';
+
+/** What the screen around a composer may ask of it (dictation, the send button, focus). */
+export interface ComposerActions {
+  submit(): void;
+  /** Words at the caret (dictation's final text, a pick from elsewhere): editable, never sent. */
+  insertText(text: string): void;
+  focus(): void;
+}
+
+interface BrainProps {
+  readonly target: string;
+  readonly busy: boolean;
+  readonly sources: ComposerSources;
+  readonly store: Store;
+  readonly testId: string;
+  readonly send: (o: Outgoing) => void;
+  readonly command: (name: string, args: string) => void;
+  readonly onCanSend: (on: boolean) => void;
+  readonly onStrip: (strip: JSX.Element | null) => void;
+  /** Hands the screen its actions once mounted (Composer keeps them for the send button). */
+  readonly onActions: (a: ComposerActions) => void;
+}
+
+/** The draft is written this long after the last change (never on each key of a burst). */
+const DRAFT_DEBOUNCE_MS = 400;
+
+const triggerKey = (t: Trigger | null): string => (t === null ? '' : `${t.kind}:${t.start}:${t.quoted ? 'q' : ''}:${t.query}`);
+
+const json = (editor: LexicalEditor): string => JSON.stringify(editor.getEditorState().toJSON());
+
+const segmentsOf = (editor: LexicalEditor, entry: string): Segment[] => editor.parseEditorState(entry).read(() => $readSegments());
+
+export function Brain(p: BrainProps): JSX.Element | null {
+  const [editor] = useLexicalComposerContext();
+  const props = useRef(p);
+  useEffect(() => {
+    props.current = p;
+  });
+
+  // ---- the target's saved composer (drafts.ts), loaded when the target changes ----
+  const saved = useRef<Saved>(load(p.store, p.target));
+  const browsing = useRef(-1);
+  const timer = useRef<number | null>(null);
+
+  const writeNow = (): void => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+    const blank = editor.getEditorState().read(() => $isBlank());
+    saved.current = { ...saved.current, draft: blank ? null : json(editor) };
+    save(props.current.store, props.current.target, saved.current);
+  };
+
+  const setContent = (entry: string | null): void => {
+    if (entry === null) {
+      editor.update(() => {
+        const root = $getRoot();
+        root.clear();
+        root.append($createParagraphNode());
+        root.selectEnd();
+      });
+    } else {
+      editor.setEditorState(editor.parseEditorState(entry));
+      editor.update(() => {
+        $getRoot().selectEnd();
+      });
+    }
+  };
+
+  useEffect(() => {
+    saved.current = load(p.store, p.target);
+    browsing.current = -1;
+    setContent(saved.current.draft);
+    return () => {
+      writeNow(); // the target changes or the screen goes: the draft is kept at once
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the editor's content follows the target only
+  }, [p.target, p.store, editor]);
+
+  // ---- the picker ----
+  const [trigger, setTrigger] = useState<Trigger | null>(null);
+  const [files, setFiles] = useState<{ key: string; items: readonly PickFile[] }>({ key: '', items: [] });
+  // the keyboard's row, for one trigger: a new trigger starts at the first row
+  const [sel, setSel] = useState({ key: '', i: 0 });
+  const [dismissed, setDismissed] = useState('');
+  const tkey = triggerKey(trigger);
+
+  useEffect(() => {
+    if (trigger?.kind !== 'at') return;
+    let live = true;
+    const key = tkey;
+    void p.sources.files(trigger.query).then((items) => {
+      if (live) setFiles({ key, items });
+    });
+    return () => {
+      live = false;
+    };
+  }, [trigger, tkey, p.sources]);
+
+  const rows = useMemo<Row[]>(() => {
+    if (trigger === null) return [];
+    const all =
+      trigger.kind === 'at'
+        ? [...agentRows(trigger, p.sources.agents), ...(files.key === tkey ? fileRows(files.items) : [])]
+        : trigger.kind === 'skill'
+          ? skillRows(trigger, p.sources.skills)
+          : commandRows(trigger, p.sources.commands);
+    return all.slice(0, MAX_ROWS);
+  }, [trigger, tkey, files, p.sources]);
+
+  const open = trigger !== null && rows.length > 0 && dismissed !== `${trigger.kind}:${trigger.start}`;
+  const index = sel.key === tkey ? Math.min(sel.i, Math.max(0, rows.length - 1)) : 0;
+  const live = useRef({ open, rows, index, trigger, tkey });
+  useEffect(() => {
+    live.current = { open, rows, index, trigger, tkey };
+  });
+  const setIndex = (i: number): void => {
+    setSel({ key: live.current.tkey, i });
+  };
+
+  // ---- his actions ----
+  const clear = (): void => {
+    setContent(null);
+    browsing.current = -1;
+  };
+
+  const submit = (): void => {
+    const segs = editor.getEditorState().read(() => $readSegments());
+    if (segs.length === 0 || segs.every((s) => s.kind === 'text' && s.text.trim() === '')) return;
+    const entry = json(editor);
+    const only = segs.length === 1 && segs[0]?.kind === 'text' ? segs[0].text : null;
+    const cmd = only === null ? null : commandLine(only, props.current.sources.commands);
+    if (cmd !== null) {
+      if (!cmd.ready) return; // shown greyed as `not yet` in the list; the line stays his to change
+      props.current.command(cmd.name, cmd.args);
+    } else {
+      props.current.send(buildMessage(segs));
+    }
+    saved.current = remember(saved.current, entry);
+    clear();
+    writeNow();
+  };
+
+  const apply = (pick: Pick): void => {
+    const t = live.current.trigger;
+    if (t === null) return;
+    if (pick.kind === 'run') {
+      const cmd = props.current.sources.commands.find((c) => `/${c.name.replace(/^\//u, '')}` === pick.name);
+      if (cmd?.ready !== true) return;
+      saved.current = remember(saved.current, json(editor));
+      props.current.command(pick.name, '');
+      clear();
+      writeNow();
+      return;
+    }
+    editor.update(() => {
+      const before = $textBeforeCaret();
+      if (before === null) return;
+      $replaceBeforeCaret(chars(before.text.slice(t.start)).length, pick.text);
+    });
+  };
+
+  const queue = (): void => {
+    saved.current = enqueue(saved.current, json(editor));
+    clear();
+    writeNow();
+  };
+
+  const putAway = (): void => {
+    saved.current = remember(saved.current, json(editor));
+    clear();
+    writeNow();
+  };
+
+  const addChip = (make: (n: number) => Chip): void => {
+    editor.update(() => {
+      $insertChip(make(nextChipNumber($readSegments())));
+    });
+  };
+
+  const addImages = (list: readonly File[]): void => {
+    for (const f of list) {
+      void props.current.sources.saveImage(f).then((img) => {
+        if (img !== null) addChip((n) => ({ kind: 'image', n, path: img.path, name: img.name }));
+      });
+    }
+  };
+
+  /** A long paste: inline first, then its chip in a second undo step (⌘Z puts it back inline). */
+  const longPaste = (raw: string): void => {
+    const text = raw.replace(/\r\n?/gu, '\n');
+    let start: number | null = null;
+    editor.update(
+      () => {
+        const sel = $getSelection();
+        if ($isRangeSelection(sel) && !sel.isCollapsed()) sel.removeText();
+        start = $caretOffset();
+        $insertAtCaret(text);
+      },
+      { tag: HISTORY_PUSH_TAG, discrete: true },
+    );
+    editor.update(
+      () => {
+        if (start === null || !$selectRange(start, start + text.length)) return;
+        $insertChip({ kind: 'paste', n: nextChipNumber($readSegments()), text });
+      },
+      { tag: HISTORY_PUSH_TAG },
+    );
+  };
+
+  const actions: ComposerActions = {
+    submit,
+    insertText: (text) => {
+      // discrete: the words are in before the next call (a dictated sentence then a send)
+      editor.update(
+        () => {
+          $insertAtCaret(text);
+        },
+        { discrete: true },
+      );
+    },
+    focus: () => {
+      editor.focus();
+    },
+  };
+  useEffect(() => {
+    props.current.onActions(actions);
+  });
+
+  // ---- the editor's updates: what he typed, read (never written back) ----
+  useEffect(() => {
+    let lastStrip = '';
+    let lastTrigger = '';
+    return editor.registerUpdateListener(({ editorState, dirtyElements, dirtyLeaves }) => {
+      const r = editorState.read(() => ({ blank: $isBlank(), segs: $readSegments(), before: $textBeforeCaret() }));
+      props.current.onCanSend(!r.blank);
+      const t = r.before === null ? null : triggerAt(r.before.text, r.before.messageStart);
+      const k = triggerKey(t);
+      if (k !== lastTrigger) {
+        lastTrigger = k;
+        setTrigger(t);
+      }
+      const chips = r.segs.flatMap((s) => (s.kind === 'chip' ? [s.chip] : []));
+      const q = saved.current.queue;
+      const stripKey = JSON.stringify([chips, q]);
+      if (stripKey !== lastStrip) {
+        lastStrip = stripKey;
+        props.current.onStrip(chips.length === 0 && q.length === 0 ? null : <Strip chips={chips} queued={q.map((e) => preview(buildMessage(segmentsOf(editor, e)).text, 48))} testId={props.current.testId} />);
+      }
+      if (dirtyElements.size > 0 || dirtyLeaves.size > 0) {
+        if (timer.current !== null) window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(writeNow, DRAFT_DEBOUNCE_MS);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- registered once per editor; reads refs
+  }, [editor]);
+
+  // ---- the keys ----
+  useEffect(() => {
+    const blank = (): boolean => editor.getEditorState().read(() => $isBlank());
+    return mergeRegister(
+      editor.registerCommand(
+        KEY_ENTER_COMMAND,
+        (e) => {
+          if (e?.isComposing === true) return false; // an accent or an IME word being composed
+          const l = live.current;
+          if (l.open) {
+            e?.preventDefault();
+            const row = l.rows[l.index];
+            if (row !== undefined && !row.off) apply(row.pick);
+            return true;
+          }
+          if (e?.shiftKey === true) return false; // a new line
+          e?.preventDefault();
+          submit();
+          return true;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
+      editor.registerCommand(
+        KEY_TAB_COMMAND,
+        (e) => {
+          const l = live.current;
+          if (l.open) {
+            e.preventDefault();
+            const row = l.rows[l.index];
+            if (row !== undefined && !row.off) apply(completion(row));
+            return true;
+          }
+          if (props.current.busy && !blank()) {
+            e.preventDefault();
+            queue();
+            return true;
+          }
+          return false;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
+      editor.registerCommand(
+        KEY_ESCAPE_COMMAND,
+        (e) => {
+          const l = live.current;
+          if (l.open && l.trigger !== null) {
+            e.preventDefault();
+            setDismissed(`${l.trigger.kind}:${l.trigger.start}`);
+            return true;
+          }
+          // during a turn a plain esc is the screen's stop (⛔6, amb-win): left unhandled, it
+          // bubbles there and the text stays
+          if (props.current.busy) return false;
+          if (!blank()) {
+            e.preventDefault();
+            putAway();
+            return true;
+          }
+          return false;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
+      editor.registerCommand(
+        KEY_ARROW_UP_COMMAND,
+        (e) => {
+          const l = live.current;
+          if (l.open) {
+            e.preventDefault();
+            setIndex(move(l.index, -1, l.rows.length));
+            return true;
+          }
+          if (blank()) {
+            const popped = popNewest(saved.current);
+            if (popped !== null) {
+              e.preventDefault();
+              saved.current = popped.rest;
+              setContent(popped.entry);
+              return true;
+            }
+          }
+          if (blank() || (browsing.current >= 0 && editor.getEditorState().read(() => $caretOnFirstLine()))) {
+            const entry = historyAt(saved.current, browsing.current + 1);
+            if (entry === null) return blank();
+            e.preventDefault();
+            browsing.current += 1;
+            setContent(entry);
+            return true;
+          }
+          return false;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
+      editor.registerCommand(
+        KEY_ARROW_DOWN_COMMAND,
+        (e) => {
+          const l = live.current;
+          if (l.open) {
+            e.preventDefault();
+            setIndex(move(l.index, 1, l.rows.length));
+            return true;
+          }
+          if (browsing.current < 0) return false;
+          e.preventDefault();
+          browsing.current -= 1;
+          setContent(browsing.current < 0 ? null : historyAt(saved.current, browsing.current));
+          return true;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
+      editor.registerCommand(
+        PASTE_COMMAND,
+        (e) => {
+          if (!(e instanceof ClipboardEvent) || e.clipboardData === null) return false;
+          const images = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'));
+          if (images.length > 0) {
+            e.preventDefault();
+            addImages(images);
+            return true;
+          }
+          const text = e.clipboardData.getData('text/plain');
+          if (!isLongPaste(text)) return false;
+          e.preventDefault();
+          longPaste(text);
+          return true;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
+      editor.registerCommand(
+        DROP_COMMAND,
+        (e) => {
+          const images = Array.from(e.dataTransfer?.files ?? []).filter((f) => f.type.startsWith('image/') || isImagePath(f.name));
+          if (images.length === 0) return false;
+          e.preventDefault();
+          addImages(images);
+          return true;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- registered once per editor; reads refs
+  }, [editor]);
+
+  // ---- the turn ended: the oldest queued message leaves (queue.rs) ----
+  const wasBusy = useRef(p.busy);
+  useEffect(() => {
+    if (wasBusy.current && !p.busy) {
+      const taken = takeOldest(saved.current);
+      if (taken !== null) {
+        saved.current = taken.rest;
+        save(p.store, p.target, saved.current);
+        p.send(buildMessage(segmentsOf(editor, taken.entry)));
+      }
+    }
+    wasBusy.current = p.busy;
+  }, [p, editor]);
+
+  return open ? (
+    <Picker
+      rows={rows}
+      index={index}
+      testId={`${p.testId}.pick`}
+      onPick={(i) => {
+        const row = rows[i];
+        if (row !== undefined && !row.off) apply(row.pick);
+        editor.focus();
+      }}
+    />
+  ) : null;
+}
+
+/** Above the box: the chips' strip (`▤ 1 “first words…”  240 lines · 9.8 kB`) and the queue. */
+function Strip({ chips, queued, testId }: { chips: readonly Chip[]; queued: readonly string[]; testId: string }): JSX.Element {
+  return (
+    <div className="b-composer-strip" data-testid={`${testId}.strip`}>
+      {queued.map((q, i) => (
+        <div key={`q${i}`} className="q" data-testid={`${testId}.queued.${i + 1}`}>
+          {q}
+          <span className="k">queued · sent when this turn ends · ↑ edit</span>
+        </div>
+      ))}
+      {chips.map((c) => (
+        <div key={c.n} className="c" data-testid={`${testId}.strip.${c.n}`}>
+          {chipStrip(c)}
+        </div>
+      ))}
+    </div>
+  );
+}
