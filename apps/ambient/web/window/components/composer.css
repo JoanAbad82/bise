@@ -1,0 +1,34 @@
+/* bise desktop window · the composer and the dock above it: quote, dock (question, approval, inbox), options, tabs */
+.b-composer{padding:6px 22px 14px}
+.b-composer .div{font:var(--t-11) var(--font-mono);color:var(--c-text-3);padding:0 4px 6px}
+.b-composer .box{display:flex;align-items:flex-end;gap:10px;min-height:48px;padding:12px 12px 12px 16px;border-radius:var(--r-4);background:var(--c-raised);box-shadow:var(--e-1),0 4px 16px var(--c-shadow);transition:box-shadow var(--d-fast) var(--ease-out)}
+.b-composer .box.is-focus{box-shadow:0 0 0 1px var(--c-focus),0 4px 16px var(--c-shadow)}
+.b-composer .in{flex:1;font:var(--t-15)/1.45 var(--font-read)}
+.b-composer .in .ph{color:var(--c-text-3)}
+.b-composer .in .cur{display:inline-block;width:2px;height:1.1em;background:var(--c-text);vertical-align:-.2em;animation:b-blink 1s steps(1) infinite}
+.b-composer .keys{font:var(--t-11) var(--font-mono);color:var(--c-text-3);padding:7px 4px 0;white-space:pre}
+.b-composer .send{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--c-ink);color:var(--c-on-ink);font-size:var(--t-13);flex:none}
+.b-composer .send.off{background:var(--c-active);color:var(--c-text-3)}
+.b-composer .send.stop{border-radius:8px}
+.b-composer.is-disabled .box{opacity:.55}
+.b-quote{display:inline-flex;margin:0 0 6px;padding:3px 10px;border-radius:var(--r-2);font-size:var(--t-12);color:var(--c-text-2);background:var(--c-active)}
+.b-dock{margin-bottom:8px;border-radius:var(--r-4);padding:12px 14px;background:var(--c-accent-soft);box-shadow:inset 0 0 0 1px var(--c-accent-line),0 6px 20px color-mix(in srgb,var(--c-accent) 12%,transparent);animation:b-rise var(--d-base) var(--ease-pop) both}
+.b-dock .h{display:flex;align-items:center;gap:8px;font-size:var(--t-12);font-weight:600;color:var(--c-accent)}
+.b-dock .h .k{margin-left:auto;font:400 var(--t-11) var(--font-mono);color:var(--c-text-3);white-space:pre}
+.b-dock .q{margin:5px 0 10px;font:var(--t-15)/1.45 var(--font-read)}
+.b-dock.plain{background:var(--c-raised);box-shadow:var(--e-1)}
+.b-dock.plain .h{color:var(--c-text-2)}
+.b-dock.err{background:var(--c-err-soft);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c-err) 45%,transparent)}
+.b-dock.err .h{color:var(--c-err)}
+.b-opts{display:flex;flex-wrap:wrap;gap:6px}
+.b-opt{display:inline-flex;gap:8px;align-items:center;height:30px;padding:0 13px;border-radius:var(--r-pill);background:var(--c-solid);box-shadow:inset 0 0 0 1px var(--c-line-strong);font-size:var(--t-13);transition:background var(--d-fast) var(--ease-out),box-shadow var(--d-fast)}
+.b-opt b{font:600 var(--t-12) var(--font-mono);color:var(--c-accent)}
+.b-opt:hover,.b-opt.is-hover{background:var(--c-hover)}
+.b-opt.on{box-shadow:inset 0 0 0 1.5px var(--c-ink)}
+.b-opt.is-focus{box-shadow:inset 0 0 0 1px var(--c-line-strong),0 0 0 3px var(--c-focus)}
+.b-opt.picked{background:var(--c-ink);color:var(--c-on-ink);box-shadow:none}
+.b-opt.picked b{color:var(--c-on-ink)}
+.b-opt.ty{background:none;box-shadow:none;color:var(--c-text-3)}
+.b-tabs{display:flex;gap:6px;margin-bottom:6px;overflow:hidden}
+.b-tabs>span{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:var(--r-2);font-size:var(--t-12);color:var(--c-text-2);background:var(--c-hover);white-space:nowrap}
+.b-tabs>span.on{color:var(--c-text);background:color-mix(in srgb,var(--c-accent) 15%,transparent)}

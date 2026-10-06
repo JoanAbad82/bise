@@ -1,0 +1,100 @@
+/* bise desktop · tokens (the reference). dark by default, light with the system or data-theme. */
+:root, [data-theme="dark"] {
+  --p-bg: #141211; --p-text: #ece6da; --p-dim: #a39c90; --p-faint: #857d72; --p-rule: #4a4540;
+  --p-accent: #f4a6b0; --p-err: #ff5a52; --p-ok: #b9d99a; --p-raised: #1f1c1a; --p-chip: #231f1d;
+  --p-frame: #2a2623; --p-shadow: #000000;
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --font-read: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: Newsreader, "Iowan Old Style", Georgia, serif;
+  --c-canvas: var(--p-frame);
+  --c-window: color-mix(in srgb, var(--p-bg) 80%, transparent);
+  --c-sidebar: color-mix(in srgb, var(--p-raised) 45%, transparent);
+  --c-surface: color-mix(in srgb, var(--p-bg) 55%, transparent);
+  --c-raised: color-mix(in srgb, var(--p-raised) 72%, transparent);
+  --c-solid: var(--p-bg);
+  --c-sunken: var(--p-chip);
+  --c-overlay: color-mix(in srgb, var(--p-bg) 76%, transparent);
+  --c-text: var(--p-text);
+  --c-text-2: var(--p-dim);
+  --c-text-3: var(--p-faint);
+  --c-ink: var(--p-text);
+  --c-on-ink: var(--p-bg);
+  --c-line: color-mix(in srgb, var(--p-text) 10%, transparent);
+  --c-line-strong: var(--p-rule);
+  --c-hover: color-mix(in srgb, var(--p-text) 6%, transparent);
+  --c-active: color-mix(in srgb, var(--p-text) 10%, transparent);
+  --c-press: color-mix(in srgb, var(--p-text) 15%, transparent);
+  --c-focus: color-mix(in srgb, var(--p-text) 60%, transparent);
+  --c-accent: var(--p-accent);
+  --c-accent-soft: color-mix(in srgb, var(--p-accent) 11%, var(--p-bg));
+  --c-accent-line: color-mix(in srgb, var(--p-accent) 45%, transparent);
+  --c-ok: var(--p-ok);
+  --c-ok-soft: color-mix(in srgb, var(--p-ok) 13%, transparent);
+  --c-err: var(--p-err);
+  --c-err-soft: color-mix(in srgb, var(--p-err) 12%, transparent);
+  --c-shadow: color-mix(in srgb, var(--p-shadow) 55%, transparent);
+  --t-11: .6875rem; --t-12: .75rem; --t-13: .8125rem; --t-14: .875rem; --t-15: .9375rem; --t-17: 1.0625rem; --t-22: 1.375rem; --t-30: 1.875rem;
+  --lh-ui: 1.35; --lh-read: 1.55;
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
+  --r-1: 6px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 22px; --r-pill: 999px;
+  --row: 32px; --row-tight: 28px; --sidebar: 240px; --board: 260px;
+  --e-1: 0 0 0 1px var(--c-line), 0 1px 2px var(--c-shadow);
+  --e-2: 0 0 0 1px var(--c-line), 0 8px 24px var(--c-shadow);
+  --e-3: 0 0 0 1px var(--c-line), 0 24px 64px var(--c-shadow);
+  --glass: blur(30px) saturate(1.4);
+  --d-press: 80ms; --d-fast: 140ms; --d-base: 220ms; --d-slow: 360ms; --d-mood: 900ms;
+  --ease-out: cubic-bezier(.2, 0, 0, 1); --ease-io: cubic-bezier(.4, 0, .2, 1); --ease-pop: cubic-bezier(.34, 1.4, .64, 1);
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --p-bg: #fdfbf7; --p-text: #1b1917; --p-dim: #6b645a; --p-faint: #7d766c; --p-rule: #cfc8bd;
+  --p-accent: #b8416b; --p-err: #b3261e; --p-ok: #3f7a2a; --p-raised: #f4f0e8; --p-chip: #efe9df;
+  --p-frame: #e2dcd2; --p-shadow: #5a4a3a;
+} }
+[data-theme="light"] {
+  --p-bg: #fdfbf7; --p-text: #1b1917; --p-dim: #6b645a; --p-faint: #7d766c; --p-rule: #cfc8bd;
+  --p-accent: #b8416b; --p-err: #b3261e; --p-ok: #3f7a2a; --p-raised: #f4f0e8; --p-chip: #efe9df;
+  --p-frame: #e2dcd2; --p-shadow: #5a4a3a;
+}
+/* roles are computed where the palette changes, so a light subtree recomputes them */
+[data-theme="light"], [data-theme="dark"] {
+  --c-canvas: var(--p-frame);
+  --c-window: color-mix(in srgb, var(--p-bg) 80%, transparent);
+  --c-sidebar: color-mix(in srgb, var(--p-raised) 45%, transparent);
+  --c-surface: color-mix(in srgb, var(--p-bg) 55%, transparent);
+  --c-raised: color-mix(in srgb, var(--p-raised) 72%, transparent);
+  --c-solid: var(--p-bg);
+  --c-sunken: var(--p-chip);
+  --c-overlay: color-mix(in srgb, var(--p-bg) 76%, transparent);
+  --c-text: var(--p-text);
+  --c-text-2: var(--p-dim);
+  --c-text-3: var(--p-faint);
+  --c-ink: var(--p-text);
+  --c-on-ink: var(--p-bg);
+  --c-line: color-mix(in srgb, var(--p-text) 10%, transparent);
+  --c-line-strong: var(--p-rule);
+  --c-hover: color-mix(in srgb, var(--p-text) 6%, transparent);
+  --c-active: color-mix(in srgb, var(--p-text) 10%, transparent);
+  --c-press: color-mix(in srgb, var(--p-text) 15%, transparent);
+  --c-focus: color-mix(in srgb, var(--p-text) 60%, transparent);
+  --c-accent: var(--p-accent);
+  --c-accent-soft: color-mix(in srgb, var(--p-accent) 11%, var(--p-bg));
+  --c-accent-line: color-mix(in srgb, var(--p-accent) 45%, transparent);
+  --c-ok: var(--p-ok);
+  --c-ok-soft: color-mix(in srgb, var(--p-ok) 13%, transparent);
+  --c-err: var(--p-err);
+  --c-err-soft: color-mix(in srgb, var(--p-err) 12%, transparent);
+  --c-shadow: color-mix(in srgb, var(--p-shadow) 55%, transparent);
+  --t-11: .6875rem; --t-12: .75rem; --t-13: .8125rem; --t-14: .875rem; --t-15: .9375rem; --t-17: 1.0625rem; --t-22: 1.375rem; --t-30: 1.875rem;
+  --lh-ui: 1.35; --lh-read: 1.55;
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
+  --r-1: 6px; --r-2: 8px; --r-3: 12px; --r-4: 16px; --r-5: 22px; --r-pill: 999px;
+  --row: 32px; --row-tight: 28px; --sidebar: 240px; --board: 260px;
+  --e-1: 0 0 0 1px var(--c-line), 0 1px 2px var(--c-shadow);
+  --e-2: 0 0 0 1px var(--c-line), 0 8px 24px var(--c-shadow);
+  --e-3: 0 0 0 1px var(--c-line), 0 24px 64px var(--c-shadow);
+  --glass: blur(30px) saturate(1.4);
+  --d-press: 80ms; --d-fast: 140ms; --d-base: 220ms; --d-slow: 360ms; --d-mood: 900ms;
+  --ease-out: cubic-bezier(.2, 0, 0, 1); --ease-io: cubic-bezier(.4, 0, .2, 1); --ease-pop: cubic-bezier(.34, 1.4, .64, 1);
+}
+@media (prefers-reduced-motion: reduce) { :root { --d-fast: 0ms; --d-base: 120ms; --d-slow: 160ms; } }

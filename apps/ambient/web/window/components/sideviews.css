@@ -1,0 +1,5 @@
+/* bise desktop window · side views */
+.b-sideview{width:420px;border-left:1px solid var(--c-line);background:var(--c-solid);display:flex;flex-direction:column}
+.b-sideview .sh2{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--c-line);font-weight:600}
+.b-sideview .sh2 .end{margin-left:auto;display:flex;gap:6px}
+.b-files{padding:6px}

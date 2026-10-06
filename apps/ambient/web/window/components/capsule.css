@@ -1,0 +1,16 @@
+/* bise desktop window · the fn capsule: words, wave, shot, countdown, the screen edge */
+.b-capsule{width:min(620px,100%);border-radius:26px;padding:12px 14px 12px 12px;background:var(--c-overlay);backdrop-filter:var(--glass);box-shadow:var(--e-3)}
+.b-capsule .r1{display:flex;align-items:center;gap:12px}
+.b-capsule .wd{flex:1;font:var(--t-17)/1.35 var(--font-read)}
+.b-capsule .wd .lo{color:var(--c-text-3)}
+.b-capsule .r2{display:flex;gap:8px;align-items:center;margin:9px 0 0 68px;flex-wrap:wrap}
+.b-capsule .cd{height:3px;border-radius:2px;background:var(--c-active);margin:10px 0 0 68px;overflow:hidden}
+.b-capsule .cd i{display:block;height:100%;background:var(--c-text);animation:b-drain 2s linear infinite}
+.b-capsule .hint{font:var(--t-11) var(--font-mono);color:var(--c-text-3);margin:8px 0 0 68px;white-space:pre}
+.b-wave{display:flex;gap:2px;align-items:center;height:22px}
+.b-wave i{display:block;width:3px;height:100%;border-radius:2px;background:var(--c-text);animation:b-wave 1s var(--ease-io) infinite}
+.b-wave i:nth-child(2){animation-delay:-.2s}.b-wave i:nth-child(3){animation-delay:-.4s}.b-wave i:nth-child(4){animation-delay:-.6s}.b-wave i:nth-child(5){animation-delay:-.8s}
+.b-wave.off i{animation:none;height:20%;opacity:.4}
+.b-shot{width:56px;height:34px;border-radius:6px;overflow:hidden;box-shadow:0 0 0 1px var(--c-line-strong);background:var(--c-raised);flex:none}
+.b-shot svg{display:block;width:100%;height:100%}
+.b-edge{border-radius:var(--r-4);box-shadow:inset 0 0 0 2px var(--c-accent-line),inset 0 0 70px color-mix(in srgb,var(--c-accent) 28%,transparent);animation:b-glow 2.2s var(--ease-io) infinite}

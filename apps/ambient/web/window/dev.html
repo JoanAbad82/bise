@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>bise desktop · window components</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components/all.css">
+<style>
+  /* the dev page's own frame (not a component): both themes side by side, one section per component */
+  body { margin: 0; background: var(--c-canvas); }
+  .dev { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  /* each column sets its own text color: a light column inside a dark page must not inherit the dark one's */
+  .dev > section { padding: 24px; background: var(--c-canvas); color: var(--c-text); min-width: 0; }
+  .dev h1 { font: 600 var(--t-22) var(--font-ui); color: var(--c-text); margin: 0 0 16px; }
+  .dev h2 { font: 600 var(--t-15) var(--font-ui); color: var(--c-text); margin: 24px 0 8px; }
+  .dev .b-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .dev .wide .b-grid { grid-template-columns: 1fr; }
+</style>
+</head>
+<body class="b-ui">
+<div class="dev" id="dev"></div>
+<script src="components/core.js"></script>
+<script src="components/prim.js"></script>
+<script src="components/window.js"></script>
+<script src="components/thread.js"></script>
+<script src="components/composer.js"></script>
+<script src="components/board.js"></script>
+<script src="components/fixtures.js"></script>
+<script>
+// every component in every state (components/fixtures.js), dark on the left, light on the right.
+// a click on a part logs its act. ?only=<name> shows one component.
+(function () {
+  const UI = window.BiseUI;
+  const only = new URLSearchParams(location.search).get("only");
+  const WIDE = ["side", "msg", "route", "tool", "diff", "dock", "composer", "head", "tabs"];
+  const PANE = ["msg", "route", "tool", "fold", "answered", "marker", "art", "diff", "empty", "err"];
+  const { h } = UI.core;
+  const on = (act) => console.log("act", JSON.stringify(act));
+  for (const theme of ["dark", "light"]) {
+    const col = h("section", null, h("h1", null, "window components · " + theme));
+    col.setAttribute("data-theme", theme);
+    for (const [name, states] of Object.entries(UI.fixtures)) {
+      if (only && only !== name) continue;
+      const grid = h("div", "b-grid", states.map(([label, data]) => {
+        const el = UI[name](data, on);
+        return h("div", "b-state", h("div", "b-lab", label), PANE.includes(name) ? h("div", "b-pane", el) : el);
+      }));
+      col.append(h("h2", null, name), h("div", ["b-stage", WIDE.includes(name) && "wide"], grid));
+    }
+    document.getElementById("dev").append(col);
+  }
+})();
+</script>
+<script src="../ds/pearl.js"></script>
+<script src="../ds/pearl-mount.js"></script>
+</body>
+</html>

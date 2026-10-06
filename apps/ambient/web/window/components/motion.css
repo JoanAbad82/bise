@@ -1,0 +1,14 @@
+/* bise desktop window · motion keyframes, bar widths, svg helpers */
+@keyframes b-breathe{0%,100%{transform:scale(.8);opacity:.6}50%{transform:scale(1.1);opacity:1}}
+@keyframes b-run{to{background-position:28px 0}}
+@keyframes b-slide{0%{transform:translateX(-100%)}100%{transform:translateX(340%)}}
+@keyframes b-shimmer{to{background-position:-200% 0}}
+@keyframes b-spin{to{transform:rotate(360deg)}}
+@keyframes b-blink{50%{opacity:0}}
+@keyframes b-wave{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+@keyframes b-drain{from{width:100%}to{width:0}}
+@keyframes b-glow{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes b-rise{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1;transform:none}}
+
+.b-bar>i.w5{width:5%}.b-bar>i.w10{width:10%}.b-bar>i.w15{width:15%}.b-bar>i.w20{width:20%}.b-bar>i.w25{width:25%}.b-bar>i.w30{width:30%}.b-bar>i.w35{width:35%}.b-bar>i.w40{width:40%}.b-bar>i.w45{width:45%}.b-bar>i.w50{width:50%}.b-bar>i.w55{width:55%}.b-bar>i.w60{width:60%}.b-bar>i.w65{width:65%}.b-bar>i.w70{width:70%}.b-bar>i.w75{width:75%}.b-bar>i.w80{width:80%}.b-bar>i.w85{width:85%}.b-bar>i.w90{width:90%}.b-bar>i.w95{width:95%}.b-bar>i.w100{width:100%}
+.sv-err{fill:none;stroke:var(--c-err);stroke-width:2}.sv-ok{fill:none;stroke:var(--c-ok);stroke-width:2}.sv-f{fill:var(--c-text)}.sv-dim{opacity:.3}

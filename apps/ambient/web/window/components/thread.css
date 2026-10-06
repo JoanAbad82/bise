@@ -1,0 +1,42 @@
+/* bise desktop window · the thread: message, avatar, tool (folded work), output, fold, answered, marker, route, artifact, diff, quote pop */
+.b-thread{display:flex;flex-direction:column;gap:14px;padding:6px 22px 12px;max-width:760px}
+.b-msg{display:grid;grid-template-columns:26px minmax(0,1fr);gap:0 10px}
+.b-av{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:var(--t-11);font-weight:650;color:var(--c-text-2);background:var(--c-hover)}
+.b-who{font-size:var(--t-12);color:var(--c-text-2)}
+.b-who b{color:var(--c-text);font-weight:600;margin-right:6px}
+.b-text{font:var(--t-15)/var(--lh-read) var(--font-read);color:var(--c-text)}
+.b-text code{font:var(--t-13) var(--font-mono);padding:1px 5px;border-radius:5px;background:var(--c-sunken)}
+.b-msg.you .b-text{color:var(--c-text)}
+.b-msg.in{margin-left:36px}
+.b-msg.is-streaming .b-text::after{content:"";display:inline-block;width:7px;height:7px;margin-left:4px;border-radius:50%;background:var(--c-text);animation:b-breathe 1s var(--ease-io) infinite}
+.b-msg.is-error .b-text{color:var(--c-text-2)}
+.b-tool{display:flex;align-items:center;gap:8px;margin-top:6px;padding:5px 10px;border-radius:var(--r-2);font-size:var(--t-12);color:var(--c-text-2);background:var(--c-hover);width:fit-content;max-width:100%;white-space:nowrap;overflow:hidden}
+.b-tool .chev{color:var(--c-text-3);transition:transform var(--d-fast) var(--ease-out)}
+.b-tool.open .chev{transform:rotate(90deg)}
+.b-tool.run .lbl::after{content:"…"}
+.b-tool.err{color:var(--c-err);background:var(--c-err-soft)}
+.b-out{margin:4px 0 0;padding:8px 10px;border-radius:var(--r-2);font:var(--t-12)/1.5 var(--font-mono);color:var(--c-text-2);background:var(--c-sunken);white-space:pre;overflow:hidden}
+.b-fold{font-size:var(--t-12);color:var(--c-text-3);margin-left:36px}
+.b-answered{font-size:var(--t-13);color:var(--c-text-2);margin-left:36px}
+.b-marker{font-size:var(--t-12);color:var(--c-accent);margin-left:36px}
+.b-route{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 10px;align-items:center;margin-top:8px;padding:9px 12px;border-radius:var(--r-3);background:var(--c-raised);box-shadow:var(--e-1)}
+.b-route .p1{font-weight:600;white-space:nowrap}
+.b-route .p2{font-size:var(--t-12);color:var(--c-text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.b-route .p3{font-size:var(--t-11);color:var(--c-text-3);white-space:nowrap}
+.b-route .b-bar{grid-column:1/-1;margin-top:6px}
+.b-art{display:inline-flex;align-items:center;gap:10px;margin-top:8px;padding:6px 12px 6px 6px;border-radius:var(--r-3);background:var(--c-raised);box-shadow:var(--e-1);transition:box-shadow var(--d-fast) var(--ease-out),transform var(--d-fast) var(--ease-out)}
+.b-art:hover,.b-art.is-hover{box-shadow:var(--e-2);transform:translateY(-1px)}
+.b-art .th{width:64px;height:40px;border-radius:6px;background:var(--c-solid);overflow:hidden}
+.b-art .th svg{display:block;width:100%;height:100%}
+.b-art .an{font-weight:600;font-size:var(--t-13)}
+.b-art .am{display:block;font-size:var(--t-11);color:var(--c-text-3)}
+.b-diff{margin-top:8px;border-radius:var(--r-3);overflow:hidden;box-shadow:var(--e-1);background:var(--c-solid);font:var(--t-12)/1.6 var(--font-mono)}
+.b-diff .fh{display:flex;gap:10px;align-items:center;padding:6px 12px;background:var(--c-raised);font:500 var(--t-12) var(--font-ui)}
+.b-diff .fh span{color:var(--c-text-3)}
+.b-diff .fh .ok{color:var(--c-ok)}.b-diff .fh .er{color:var(--c-err)}
+.b-dl{display:grid;grid-template-columns:3em 3em 1.4em minmax(0,1fr);white-space:pre}
+.b-dl i{font-style:normal;color:var(--c-text-3);text-align:right;padding-right:8px}
+.b-dl.ad{background:color-mix(in srgb,var(--c-ok) 13%,transparent)}
+.b-dl.rm{background:color-mix(in srgb,var(--c-err) 12%,transparent)}
+.b-dl.pk{box-shadow:inset 3px 0 0 var(--c-ink)}
+.b-quotepop{display:inline-flex;margin:4px 0 4px 6.4em;padding:3px 10px;border-radius:var(--r-2);background:var(--c-ink);color:var(--c-on-ink);font:var(--t-12) var(--font-ui)}
