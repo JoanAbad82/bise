@@ -60,7 +60,7 @@ body { background: var(--c-canvas); overflow: hidden; }
 .w-composer .send { cursor: default; }
 .w-quotes:empty { display: none; }
 .w-quotes { display: flex; flex-wrap: wrap; gap: 6px; }
-.w-quotes .b-quote { cursor: default; }
+.w-quotes .b-quote { cursor: default; white-space: pre; } /* the TUI strip's two spaces before the place stay */
 .b-opt { cursor: default; }
 .b-tabs > span { cursor: default; }
 .w-pearl { width: 100%; height: 100%; }
@@ -80,4 +80,4 @@ body { background: var(--c-canvas); overflow: hidden; }
 .w-ac svg { display: block; width: 100%; height: 110px; background: var(--c-solid); }
 .w-ac .ai { padding: 8px 11px; }
 .w-ac .ai b { font-weight: 600; }
-.w-ac .ai span { display: block; font-size: var(--t-12); color: var(--c-text-3); }
+.w-ac .ai .m { display: block; font-size: var(--t-12); color: var(--c-text-3); }

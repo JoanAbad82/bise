@@ -315,6 +315,8 @@
       const r = x.step(s.s7 || (x.init && x.init()), ev, s);
       let out = { ...s, s7: r.s7 };
       cmds.push(...(r.cmds || []));
+      // a quote ❝ from S7's lines (review): {agent, pos, text, file, lines, n}, one per pos like ui_line
+      if (r.quote) { const k = keyOf(out.route); out = { ...out, quotes: set(out.quotes, k, [...(out.quotes[k] || []).filter((q) => q.pos !== r.quote.pos), r.quote]) }; }
       if (r.route) out = go(out, r.route, cmds);
       return { s: out, cmds, eat: !!r.eat };
     }

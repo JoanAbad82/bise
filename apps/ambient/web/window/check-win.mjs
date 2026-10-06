@@ -250,6 +250,7 @@ law("a project's main: its header, the folded messages between agents, 'asked ·
   eq(rowsOf(w.v, "art").map((x) => [x.title, x.meta, x.new]), [["flash sale replay", "stock · 10:40", true]]);
   const b = w.v.board.sections;
   eq(b[0].items.map((x) => `${x.key} ${x.name}${x.psi ? " ψ" : ""} ${x.dot}`), ["⌥1 checkout ψ wk", "⌥2 search ψ nd", "⌥3 stock wk", "⌥4 promo ", "⌥5 wallet ψ "]);
+  eq(b[0].items.map((x) => x.pct), [null, null, 62, null, null]);
   eq(b[1], { sh: "scheduled", kind: "sched", items: [{ text: "◷ search reindex", when: "tonight 02:00" }] });
   eq(w.v.jobs, []);
 });
@@ -331,7 +332,7 @@ law("⌘K finds an agent or a project by its name: starts-with first, ↑ ↓ mo
     "bise·every project", "alerts·telemetry", "evals·~/evals"]);
   assert.ok(!w.v.finder.rows.some((r) => r.name === "netcode"));
   w.feed({ ev: "ui_find_type", text: "st" });
-  eq(w.v.finder.rows.map((r) => r.name), ["storefront", "stock", "streaming"]);
+  eq(w.v.finder.rows.map((r) => [r.name, r.dot]), [["storefront", "nd"], ["stock", "wk"], ["streaming", "ok"]]);
   // a letter is the finder field's, not a 1-9 answer nor a send
   eq([w.key("r").eat, w.key("1").eat], [false, false]);
   w.key("ArrowDown"); w.key("ArrowDown");

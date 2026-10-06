@@ -215,7 +215,9 @@
     if (r.agent !== "main") return null;
     const list = M.agentsOf(s, r.project).map((a, i) => {
       const dot = agentDot(s, r.project, a);
-      return { name: a.name, key: i < 9 ? `⌥${i + 1}` : "", psi: !!a.branch, dot, w: a.title, nd: dot === "nd", er: dot === "er", done: a.status === "done", act: { ev: "ui_route", project: r.project, agent: a.name } };
+      // a job with a known end (S10's progress) draws its bar under the line, like the jobs strip
+      const job = (s.jobs[r.project] || []).find((j) => j.agent === a.name && j.state === "running" && j.steps);
+      return { name: a.name, key: i < 9 ? `⌥${i + 1}` : "", psi: !!a.branch, dot, w: a.title, pct: job ? pct(job.step, job.steps) : null, nd: dot === "nd", er: dot === "er", done: a.status === "done", act: { ev: "ui_route", project: r.project, agent: a.name } };
     });
     const sched = (s.sched[r.project] || []).map((x) => ({ text: `◷ ${x.label}`, when: whenText(s, x.at_ms) }));
     return { sections: [{ sh: `agents · ${list.length}`, kind: "agents", items: list }, ...(sched.length ? [{ sh: "scheduled", kind: "sched", items: sched }] : [])] };
@@ -241,7 +243,8 @@
     const list = root.AmbWinFind.rows(s, s.finder.q);
     const i = Math.min(s.finder.i, Math.max(0, list.length - 1));
     return { q: s.finder.q, rows: list.slice(0, 12).map((r, n) => ({ kind: r.kind, name: r.name, where: r.where, note: r.note || "",
-      dot: r.kind === "ag" ? (openCardsOf(s, r.route.project, r.name).length ? "nd" : DOT[r.status] || "") : "", on: n === i, act: { ev: "ui_find_open", i: n } })),
+      dot: r.kind === "ag" ? (openCardsOf(s, r.route.project, r.name).length ? "nd" : DOT[r.status] || "")
+        : r.kind === "pj" ? (projectWaits(s, r.route.project) ? "nd" : projectWorking(s, r.route.project) ? "wk" : "") : "", on: n === i, act: { ev: "ui_find_open", i: n } })),
       empty: list.length ? "" : "no agent or project by that name", keys: "⏎ open   ↑ ↓ move   esc close" };
   }
 

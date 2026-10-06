@@ -144,7 +144,7 @@
     if (!t) return null;
     if (t.empty) return UI.thread.render({ children: [UI.empty.render({ title: t.empty.b, text: t.empty.s })] });
     if (t.tab === "changes") return UI.thread.render({ children: t.items.map((it) => UI.job.render({ state: it.dot, name: it.name, psi: true, end: it.branch, what: it.what, act: it.act })) });
-    return h("div", "w-grid", t.items.map((it) => withAct(h("div", "w-ac", svg(it.kind), h("div", "ai", h("b", null, it.title), it.new ? [" ", UI.chip.render({ text: "new", tone: "acc" })] : null, h("span", null, it.meta))), it.act)));
+    return h("div", "w-grid", t.items.map((it) => withAct(h("div", "w-ac", svg(it.kind), h("div", "ai", h("b", null, it.title), it.new ? [" ", UI.chip.render({ text: "new", tone: "acc" })] : null, h("span", "m", it.meta))), it.act)));
   }
 
   function board(v) {
@@ -154,7 +154,7 @@
       const items = sec.items.map((it) => {
         if (sec.kind === "cards") return UI.job.render({ state: "nd", name: it.who, what: it.text, act: it.act });
         if (sec.kind === "thumbs") return { title: it.title, thumb: svg(it.kind), act: it.act };
-        if (sec.kind === "agents") return UI.job.render({ state: it.dot, name: it.name, key: it.key, psi: it.psi, what: it.w, act: it.act });
+        if (sec.kind === "agents") return UI.job.render({ state: it.dot, name: it.name, key: it.key, psi: it.psi, what: it.w, pct: it.pct, act: it.act });
         return UI.job.render({ state: "sched", name: it.text.replace(/^◷ /, ""), end: it.when });
       });
       return [UI.sh.render({ text: sec.sh }), sec.kind === "thumbs" ? UI.thumbs.render({ items }) : items];
