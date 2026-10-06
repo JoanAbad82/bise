@@ -260,7 +260,7 @@
     { id: "s8-route", spec: ["let go"], label: "S8: → telemetry · main", build: () => sort([...s8(), [200, { ev: "app_anchor", at: "bottom" }],
       [300, { ev: "app_fn", state: "down", key: "fn" }], [1300, { ev: "app_fn", state: "up", key: "fn" }], [1350, { ev: "sent", voice: true }], [1400, { ev: "phase", phase: "sending" }],
       // a long deadline here so the line stays to look at; the core's is 2 s
-      [1450, { ev: "route", project: "home", to: "telemetry-8e02", text: "pourquoi le p99 d'ingest monte à 14 h", correct_until_ms: Date.now() + 1450 + 10000 }]]) },
+      [1450, { ev: "route", project: "home", rid: "r1", to: "telemetry-8e02", name: "telemetry", text: "pourquoi le p99 d'ingest monte à 14 h", correct_until_ms: Date.now() + 1450 + 10000, why: "ingest is telemetry's" }]]) },
     { id: "s8-menu", spec: ["menu"], label: "S8: the pearl's dropdown", build: () => sort([...s8(), [200, { ev: "app_anchor", at: "menu" }], [300, { ev: "app_menu", on: true }]]) },
     { id: "still", spec: ["reduced motion"], label: "reduced motion", build: () => sort([[0, { ev: "app_reduce_motion", on: true }], ...base(), ...talkTurn(1500).ev, [16000, state(AGENTS, [CARD])]]) },
   ];

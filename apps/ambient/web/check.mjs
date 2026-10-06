@@ -1587,18 +1587,25 @@ law("desktop S8 route line (v9): after a talk, '→ telemetry · main' for 2 s; 
   m = M.step(M.step(m, { ev: "app_fn", state: "down", key: "fn" }, 10).m, { ev: "app_fn", state: "up", key: "fn" }, 20).m;
   m = M.step(M.step(m, { ev: "sent", voice: true }, 30).m, { ev: "phase", phase: "sending" }, 40).m;
   // the core's deadline is its wall clock: 1.8 s left when it came (at_wall, stamped by ui.js)
-  m = M.step(m, { ev: "route", project: "home", to: "telemetry-8e02", text: "pourquoi le p99 monte à 14 h", correct_until_ms: 1800, at_wall: 0 }, 50).m;
+  // bise-proto's route (amb-hub eed00361): project = the home hub's id, rid, name
+  m = M.step(m, { ev: "route", project: "bise-home-00000000", rid: "r7", to: "telemetry-8e02", name: "telemetry", text: "pourquoi le p99 monte à 14 h", correct_until_ms: 1800, why: "telemetry is the ingest", at_wall: 0 }, 50).m;
   let v = M.view(m, 60), s = Bar.spec(v);
   eq([v.state, v.mood, v.content, s.head.line.text], ["route", "work", { kind: "got", route: true }, "→ telemetry · main"]);
   eq(s.foot.left.map((i) => `${i.keys.join(" ")} ${i.w}`), ["tab another project", "fn esc cancel"]);
   // tab: the next project in order (wraps), the line follows
   let r = M.step(m, { ev: "app_key", key: "tab" }, 100);
-  eq([r.cmds, Bar.spec(M.view(r.m, 110)).head.line.text], [[{ cmd: "route_correct", project: "home", to: "engine-31aa" }], "→ engine · main"]);
+  eq([r.cmds, Bar.spec(M.view(r.m, 110)).head.line.text], [[{ cmd: "route_correct", project: "bise-home-00000000", rid: "r7", to: "engine-31aa" }], "→ engine · main"]);
   r = M.step(r.m, { ev: "app_key", key: "tab" }, 120);
-  eq(r.cmds, [{ cmd: "route_correct", project: "home", to: "storefront-5c1d" }]);
+  eq(r.cmds, [{ cmd: "route_correct", project: "bise-home-00000000", rid: "r7", to: "storefront-5c1d" }]);
+  // the hub's route again with the same rid is that correction: its name, the same deadline
+  const fixed = M.step(r.m, { ev: "route", project: "bise-home-00000000", rid: "r7", to: "storefront-5c1d", name: "storefront", text: "…", correct_until_ms: 1800, at_wall: 500 }, 130).m;
+  eq([Bar.spec(M.view(fixed, 140)).head.line.text, fixed.route.until], ["→ storefront · main", r.m.route.until]);
+  // route_done ends the line (sent or cancelled); another rid's doesn't
+  eq(M.step(fixed, { ev: "route_done", project: "bise-home-00000000", rid: "r6", state: "sent", to: "x" }, 150).m.route.rid, "r7");
+  eq(M.view(M.step(fixed, { ev: "route_done", project: "bise-home-00000000", rid: "r7", state: "sent", to: "storefront-5c1d", xid: "x1" }, 150).m, 160).state, "working");
   // fn esc: cancelled, the line goes
   const c = M.step(m, { ev: "app_key", key: "esc" }, 100);
-  eq([c.cmds, M.view(c.m, 110).state], [[{ cmd: "route_cancel", project: "home" }], "working"]);
+  eq([c.cmds, M.view(c.m, 110).state], [[{ cmd: "route_cancel", project: "bise-home-00000000", rid: "r7" }], "working"]);
   // after the deadline: no line, tab and esc are the usual keys again
   eq([M.view(m, 1900).state, M.step(m, { ev: "app_key", key: "tab" }, 1900).cmds], ["working", []]);
   // a followed job's agent: '→ storefront · stock · following'

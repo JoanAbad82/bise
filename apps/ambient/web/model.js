@@ -504,24 +504,28 @@
       // ↑ in an empty spotlight: his last message comes back to edit (SPEC §4)
       case "ui_spot_last":
         return m.lastSent ? none({ ...m, spotText: m.lastSent, rowSel: 0 }) : none(m);
-      // desktop S8: bise routes his words to a project (S3a draft route {project, to, text,
-      // correct_until_ms}; ui.js stamps at_wall, the page's clock when it came): the capsule says
-      // '→ telemetry · main' until then; tab = the next project, fn esc = cancel (the core decides)
+      // desktop S8: bise routes his words to a project (bise-proto route {project: the home hub's id,
+      // rid, to, name, text, correct_until_ms, why}, amb-hub eed00361; ui.js stamps at_wall): the
+      // capsule says '→ telemetry · main' until then; tab = the next project, fn esc = cancel. The
+      // same rid again is a correction (new to/name, same deadline); route_done {rid, state} ends it
       case "route": {
         if (!ev.to) return none({ ...m, route: null });
+        const same = m.route && ev.rid != null && m.route.rid === ev.rid;
         const left = ev.correct_until_ms != null && ev.at_wall != null ? Math.max(0, ev.correct_until_ms - ev.at_wall) : T.route;
-        return none({ ...m, route: { to: ev.to, agent: ev.agent || null, followed: !!ev.followed, until: now + left } });
+        return none({ ...m, route: { rid: ev.rid ?? null, project: ev.project || "home", to: ev.to, name: ev.name || null, agent: ev.agent || null, followed: !!ev.followed, until: same ? m.route.until : now + left } });
       }
+      case "route_done":
+        return none(m.route && (ev.rid == null || m.route.rid === ev.rid) ? { ...m, route: null } : m);
       case "ui_route_next": {
         const r = m.route;
         const ps = m.projects.filter((p) => !p.home).sort((a, b) => (a.order || 0) - (b.order || 0));
         if (!r || now >= r.until || ps.length < 2) return none(m);
         const next = ps[(ps.findIndex((p) => p.project === r.to) + 1) % ps.length];
-        return { m: { ...m, route: { ...r, to: next.project, agent: null } }, cmds: [{ cmd: "route_correct", project: "home", to: next.project }] };
+        return { m: { ...m, route: { ...r, to: next.project, name: next.name || null, agent: null } }, cmds: [{ cmd: "route_correct", project: r.project, rid: r.rid, to: next.project }] };
       }
       case "ui_route_cancel":
         if (!m.route || now >= m.route.until) return none(m);
-        return { m: { ...m, route: null }, cmds: [{ cmd: "route_cancel", project: "home" }] };
+        return { m: { ...m, route: null }, cmds: [{ cmd: "route_cancel", project: m.route.project, rid: m.route.rid }] };
       // the front app (amb-mac's app_front, m_8448): app null = an excluded app, nothing known
       case "app_front":
         return none({ ...m, front: ev.app ? { app: String(ev.app), url: ev.url || "", path: ev.path || "", title: ev.title || "" } : null });
@@ -927,7 +931,7 @@
     } else if (m.route && now < m.route.until && !listening(m)) {
       v.state = "route"; v.size = "open"; v.pose = "think";
       const p = m.projects.find((x) => x.project === m.route.to);
-      v.route = { line: Wd.route.line(p ? p.name : m.route.to, m.route.agent, m.route.followed), until: m.route.until };
+      v.route = { line: Wd.route.line(m.route.name || (p ? p.name : m.route.to), m.route.agent, m.route.followed), until: m.route.until };
     } else if (m.mine && (m.phase === "sending" || m.phase === "working" || (m.phase === "idle" && now - m.sentAt < 30000 && !m.main.text))) {
       v.state = "working"; v.size = "open"; v.pose = "think";
       v.label = { text: "bise", acc: true };
