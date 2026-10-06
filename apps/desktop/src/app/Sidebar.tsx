@@ -100,13 +100,23 @@ function Agents({ project, route }: { project: string; route: Route }) {
   const now = useNow();
   return (
     <>
-      {agents.map((a) => {
+      {agents.map((a, i) => {
         const end = endOf(a, now);
         return (
           <Row
             key={a.name}
             kind="ag"
-            name={a.name}
+            name={
+              // its ⌥ number (tui-parity W4: the panel's numbers for ⌥1-9)
+              i < 9 ? (
+                <>
+                  <span className="app-n">{i + 1}</span>
+                  {a.name}
+                </>
+              ) : (
+                a.name
+              )
+            }
             dot={dotOf(a.status)}
             end={end.text}
             needs={end.needs}

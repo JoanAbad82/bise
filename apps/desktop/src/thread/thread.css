@@ -3,8 +3,25 @@
    tokens (src/ds/tokens.css); the body stays at the ds's reading size
    (bar ⛔4: never under 13 pt). */
 .th-list {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
+}
+
+/* scrolled up: back to the newest, with what came meanwhile */
+.th-to-end {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border: 1px solid var(--c-line);
+  border-radius: 999px;
+  background: var(--c-window, var(--paper));
+  color: var(--c-text);
+  font: inherit;
+  cursor: pointer;
+  box-shadow: var(--e-1);
 }
 
 .th-md > :first-child {
@@ -34,9 +51,37 @@
   cursor: pointer;
 }
 
+/* a code block: its language and copy on top (copy shows on hover) */
+.th-code {
+  margin: 0 0 0.6em;
+}
+
+.th-code-head {
+  display: flex;
+  justify-content: space-between;
+  min-height: 18px;
+  padding: 0 4px;
+  color: var(--c-text-2);
+  font-size: 11px;
+}
+
+.th-code-copy {
+  visibility: hidden;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.th-code:hover .th-code-copy,
+.th-code-copy:focus-visible {
+  visibility: visible;
+}
+
 /* a block keeps its shape: no wrap, its own scroll, selectable for ⌘C */
 .th-pre {
-  margin: 0 0 0.6em;
+  margin: 0;
   padding: 10px 12px;
   border-radius: 8px;
   background: var(--c-sunken);
@@ -147,4 +192,14 @@
 
 .th-routed .b-msg {
   opacity: 0.8;
+}
+
+/* an archived agent: history only, no composer */
+.th-history {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-2);
 }

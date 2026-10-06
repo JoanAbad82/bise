@@ -58,6 +58,13 @@ export function nextFirstIndex(prev: { first: string | undefined; index: number 
   return { first, index: k > 0 ? prev.index - k : prev.index };
 }
 
+/** How many keys came after `last` (an older page in front doesn't count). Pure. */
+export function newAtEnd(last: string | undefined, keys: readonly string[]): number {
+  if (last === undefined) return 0;
+  const i = keys.lastIndexOf(last);
+  return i < 0 ? 0 : keys.length - 1 - i;
+}
+
 export function ThreadList({ keys, row, more, onOlder, head, testId, ref }: ThreadListProps) {
   const virtuoso = useRef<VirtuosoHandle>(null);
   // the anchor of firstItemIndex, moved during render (React's
@@ -74,6 +81,19 @@ export function ThreadList({ keys, row, more, onOlder, head, testId, ref }: Thre
     onOlder();
   }, [more, keys, onOlder]);
 
+  // M2 / N11: scrolled up, a bar takes him back to the newest, with how
+  // many rows came meanwhile (the TUI's 'back to the bottom · N new')
+  const [atBottom, setAtBottom] = useState(true);
+  const [seen, setSeen] = useState({ last: keys.at(-1), count: keys.length, unseen: 0 });
+  const last = keys.at(-1);
+  if (last !== seen.last) {
+    const added = atBottom ? 0 : newAtEnd(seen.last, keys);
+    setSeen({ last, count: keys.length, unseen: atBottom ? 0 : seen.unseen + added });
+  }
+  const toEnd = useCallback(() => {
+    if (keys.length > 0) virtuoso.current?.scrollToIndex({ index: keys.length - 1, align: 'end' });
+  }, [keys]);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -81,11 +101,9 @@ export function ThreadList({ keys, row, more, onOlder, head, testId, ref }: Thre
         const i = keys.indexOf(key);
         if (i >= 0) virtuoso.current?.scrollToIndex({ index: i, align: 'center' });
       },
-      scrollToEnd() {
-        if (keys.length > 0) virtuoso.current?.scrollToIndex({ index: keys.length - 1, align: 'end' });
-      },
+      scrollToEnd: toEnd,
     }),
-    [keys],
+    [keys, toEnd],
   );
 
   return (
@@ -101,9 +119,18 @@ export function ThreadList({ keys, row, more, onOlder, head, testId, ref }: Thre
         followOutput={(atBottom) => (atBottom ? 'auto' : false)}
         alignToBottom
         startReached={startReached}
+        atBottomStateChange={(b) => {
+          setAtBottom(b);
+          if (b) setSeen((x) => ({ ...x, unseen: 0 }));
+        }}
         components={head !== undefined && more ? { Header: () => head } : NONE}
         increaseViewportBy={{ top: 600, bottom: 300 }}
       />
+      {!atBottom && (
+        <button type="button" className="th-to-end" onClick={toEnd} data-testid="thread.to-end">
+          ↓ back to the bottom{seen.unseen > 0 ? ` · ${String(seen.unseen)} new` : ''}
+        </button>
+      )}
     </div>
   );
 }

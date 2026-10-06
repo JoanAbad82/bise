@@ -8,7 +8,7 @@
 // its own data; the composer is memo'd with stable props, so neither an
 // entry, a step nor a send ever re-renders it.
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
-import { Head, Marker } from '@/ds';
+import { Button, Head, Marker } from '@/ds';
 import { Composer, useComposerSources } from '@/composer';
 import type { Outgoing } from '@/composer/message';
 import { threadKey, useAgents, useCoreState, usePending, useStore, useThreadOrder, useTyping } from '@/store';
@@ -109,7 +109,10 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   };
 
   const title = bise ? 'bise' : agent === 'main' ? (projectName ?? project) : agent;
-  const sub = bise ? 'every project' : [agent === 'main' ? 'main' : (projectName ?? project), me ? lineOf(me) : ''].filter(Boolean).join(' · ');
+  // a project's main: its counts (tui-parity W2), else the agent's line
+  const all = useAgents(project);
+  const counts = agent === 'main' ? countsOf(all) : '';
+  const sub = bise ? ['every project', counts].filter(Boolean).join(' · ') : [agent === 'main' ? 'main' : (projectName ?? project), agent === 'main' ? counts : me ? lineOf(me) : ''].filter(Boolean).join(' · ');
 
   return (
     <FoldsContext value={folds}>
@@ -131,7 +134,11 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} />
         {stopping && <Marker>stopping {agent}…</Marker>}
         <TypingLine text={typing} />
-        <ThreadComposer project={project} agent={agent} busy={busy} to={`you → ${title}`} onStop={stop} />
+        {me?.archived === true ? (
+          <History project={project} agent={agent} />
+        ) : (
+          <ThreadComposer project={project} agent={agent} busy={busy} to={`you → ${title}`} onStop={stop} />
+        )}
       </section>
     </FindMarkContext>
     </FoldsContext>
@@ -177,6 +184,34 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
   if (!view.loaded && keys.length === 0) return <div className="th-list th-loading" data-testid="thread.loading" />;
   return <ThreadList ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} testId="thread.list" />;
 });
+
+/** "3 agents · 1 at work · 2 waiting": a project's live agents (main out). Pure. */
+export function countsOf(agents: readonly { main: boolean; archived: boolean; status: string; waits: number }[]): string {
+  const live = agents.filter((a) => !a.main && !a.archived);
+  if (live.length === 0) return '';
+  const work = live.filter((a) => a.status === 'working').length;
+  const waits = agents.reduce((n, a) => n + a.waits, 0);
+  return [`${String(live.length)} ${live.length === 1 ? 'agent' : 'agents'}`, work > 0 ? `${String(work)} at work` : '', waits > 0 ? `${String(waits)} waiting` : ''].filter(Boolean).join(' · ');
+}
+
+/** An archived agent's thread is history only (tui-parity C47): no composer, a way to restore it. */
+function History({ project, agent }: { project: string; agent: string }) {
+  const store = useStore();
+  return (
+    <div className="th-history" data-testid="thread.archived">
+      <span>{agent} is archived: its thread is history only</span>
+      <Button
+        kind="ghost"
+        onClick={() => {
+          store.command({ cmd: 'unarchive', project, agent });
+        }}
+        testId="thread.restore"
+      >
+        restore it
+      </Button>
+    </div>
+  );
+}
 
 /** amb-web's composer, aimed at this agent; its props stay stable while the thread moves. */
 const ThreadComposer = memo(function ThreadComposer({ project, agent, busy, to, onStop }: { project: string; agent: string; busy: boolean; to: string; onStop: () => void }) {

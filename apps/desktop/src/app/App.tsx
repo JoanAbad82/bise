@@ -19,6 +19,7 @@ import { OnboardingScreen, useFirstLaunch } from '@/setup';
 import { AgentsScreen } from '@/agents/AgentsScreen';
 import { ChangesScreen } from '@/review/ChangesScreen';
 import { ReviewScreen } from '@/review/ReviewScreen';
+import { EnvironmentsScreen } from '@/review/EnvironmentsScreen';
 import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
 import { Sidebar } from './Sidebar';
@@ -102,6 +103,8 @@ function ScreenOf({ route }: { route: Route }) {
       return <Known project={route.project}>{() => <ReviewScreen project={route.project} agent={route.agent} />}</Known>;
     case 'commit':
       return <Known project={route.project}>{() => <ReviewScreen project={route.project} agent="main" commit={route.sha} />}</Known>;
+    case 'environments':
+      return <Known project={route.project}>{() => <EnvironmentsScreen project={route.project} />}</Known>;
     case 'inbox':
       return <InboxScreen />;
     case 'settings':

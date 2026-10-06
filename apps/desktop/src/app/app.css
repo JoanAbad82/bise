@@ -55,3 +55,12 @@
 .app-palette .b-spot {
   width: min(640px, 90vw);
 }
+
+/* an agent's ⌥ number in the sidebar */
+.app-n {
+  display: inline-block;
+  min-width: 1.1em;
+  margin-right: 4px;
+  color: var(--c-text-2);
+  font-variant-numeric: tabular-nums;
+}

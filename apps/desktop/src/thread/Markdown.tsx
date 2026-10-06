@@ -20,6 +20,19 @@ export function openable(href: string | undefined): href is string {
 
 const plugins = [remarkGfm];
 
+/** A code block's language from its class ('language-rust'). Pure. */
+export function langOf(className: unknown): string | undefined {
+  const list = Array.isArray(className) ? className : typeof className === 'string' ? className.split(' ') : [];
+  for (const c of list) if (typeof c === 'string' && c.startsWith('language-')) return c.slice(9);
+  return undefined;
+}
+
+/** The text of a markdown tree node, as written. Pure. */
+export function textOf(n: { type: string; value?: unknown; children?: readonly unknown[] }): string {
+  if (n.type === 'text' && typeof n.value === 'string') return n.value;
+  return (n.children ?? []).map((c) => textOf(c as { type: string })).join('');
+}
+
 export const Markdown = memo(function Markdown({ text, onLink }: { text: string; onLink?: (url: string) => void }) {
   const components: Components = {
     a({ href, children }) {
@@ -34,9 +47,30 @@ export const Markdown = memo(function Markdown({ text, onLink }: { text: string;
         </a>
       );
     },
-    // a block keeps its shape: no wrapping, its own horizontal scroll
-    pre({ children }) {
-      return <pre className="th-pre">{children}</pre>;
+    // a block keeps its shape: no wrapping, its own horizontal scroll; its
+    // language on top, a copy button on hover (tui-parity B15, M8)
+    pre({ node, children }) {
+      const code = node?.children.find((c) => c.type === 'element' && c.tagName === 'code');
+      const lang = code?.type === 'element' ? langOf(code.properties.className) : undefined;
+      const text = code === undefined ? '' : textOf(code);
+      return (
+        <div className="th-code">
+          <div className="th-code-head">
+            <span className="th-code-lang">{lang ?? ''}</span>
+            <button
+              type="button"
+              className="th-code-copy"
+              onClick={() => {
+                void (window as Partial<Window>).bise?.copy(text);
+              }}
+              data-testid="thread.code.copy"
+            >
+              copy
+            </button>
+          </div>
+          <pre className="th-pre">{children}</pre>
+        </div>
+      );
     },
     table({ children }) {
       return (

@@ -55,6 +55,8 @@ function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       );
     case 'report':
       return <Marker>{e.report ? `${e.report.kind} · ${e.text}` : e.text}</Marker>;
+    case 'you':
+      return <YouRow e={e} ctx={ctx} />;
     default: {
       const who = whoOf(e, ctx);
       return (
@@ -64,6 +66,37 @@ function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       );
     }
   }
+}
+
+/** A message of his longer than this folds to its first lines (tui-parity B11, the TUI's You(_, _, open)). */
+export const LONG_LINES = 12;
+export const LONG_CHARS = 1200;
+const SHOWN_LINES = 6;
+
+/** The folded words of a long message, or none when it shows whole. Pure. */
+export function foldOf(text: string): { head: string; lines: number } | undefined {
+  const lines = text.split('\n');
+  if (lines.length <= LONG_LINES && text.length <= LONG_CHARS) return undefined;
+  const head = lines.slice(0, SHOWN_LINES).join('\n');
+  return { head: head.length > LONG_CHARS ? `${head.slice(0, LONG_CHARS)}…` : head, lines: lines.length };
+}
+
+function YouRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const [open, setOpen] = useFold();
+  const fold = foldOf(e.text);
+  const toggle = () => {
+    setOpen((o) => !o);
+  };
+  return (
+    <Msg from="you" name="you" av="y" time={clock(e.at_ms)}>
+      <Markdown text={fold === undefined || open ? e.text : fold.head} onLink={ctx.onLink} />
+      {fold !== undefined && (
+        <Fold open={open} onToggle={toggle} testId={`thread.fold.${e.pos}`}>
+          {open ? 'fold it' : `show all · ${String(fold.lines)} lines`}
+        </Fold>
+      )}
+    </Msg>
+  );
 }
 
 /** Its tool calls in a row: one counted line, open to the steps. */
