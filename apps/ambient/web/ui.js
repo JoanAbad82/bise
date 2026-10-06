@@ -394,7 +394,7 @@
   });
   input.addEventListener("input", () => recv({ ev: "ui_spot_type", text: input.value }));
   input.addEventListener("keydown", (e) => {
-    const s = lastS, finding = !!(s && s.preview !== undefined);
+    const s = lastS, finding = !!(s && (s.preview !== undefined || (s.kind === "spotlight" && s.sections.length)));
     const rows = s ? Bar.selectable(s).length : 0;
     // ↑ in an empty field on the first row: his last message comes back to edit (SPEC §4)
     if (e.key === "ArrowUp" && !input.value.trim() && !(model.rowSel > 0) && model.lastSent) {
@@ -405,6 +405,9 @@
     // asks main, ⌘O terminal, ⌘D follow
     } else if ((finding || rows > 1) && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
       e.preventDefault(); recv({ ev: "app_key", key: e.key === "ArrowUp" ? "up" : "down", local: true, n: rows });
+    // the spotlight's environments: ⌘1-9 opens that project in bise's window (desktop S8)
+    } else if (s && e.metaKey && /^[1-9]$/.test(e.key) && Bar.cmdRow(s, e.key)) {
+      e.preventDefault(); run(Bar.cmdRow(s, e.key).act);
     } else if (finding && e.metaKey && /^[od]$/i.test(e.key)) {
       e.preventDefault();
       const it = s.foot.left.find((x) => x.keys[0] === "⌘" && x.keys[1] === e.key.toUpperCase());

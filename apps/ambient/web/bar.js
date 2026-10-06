@@ -82,6 +82,31 @@
     if (s.preview) { const r = selRow(s); s.preview.act = s.preview.name ? { ev: "ui_agent", agent: s.preview.name } : r ? r.act : { ev: "ui_spot_send" }; }
     return s;
   }
+  // ---- desktop S8, the spotlight (v9): its sections when empty, the found rows, ⏎ by shape
+  const SP = Wd.spot;
+  function spotlight(s, v) {
+    const L = v.spot.list, q = L.q;
+    s.head = { h: 68, input: { text: v.spot.text, ph: SP.ph }, right: { text: SP.to } };
+    let envN = 0;
+    const row = (r) => {
+      if (r.kind === "card") return { g: "?", gc: "a", t: r.agent, p: r.pname, sub: r.text, right: { keys: ["⏎"] }, act: { ev: "ui_open_card", card: r.id }, qa: `card-${r.id}` };
+      if (r.kind === "env") { envN++; return { g: "ψ", t: r.name, sub: `${r.path}${r.sub ? `  ·  ${r.sub}` : ""}`, right: envN <= 9 ? { keys: ["⌘", String(envN)] } : null, act: { ev: "ui_project", project: r.project }, qa: `env-${r.name}` }; }
+      if (r.kind === "ask") return { g: "@", gc: "a", t: SP.askBise, sub: r.text, act: { ev: "ui_spot_send", text: v.spot.text }, qa: "ask-bise" };
+      const [g, gc] = AG[r.status] || AG.idle;
+      return { g, gc, t: r.name, p: r.pname, sub: r.title || null, mark: r.marks ? { t: r.marks.name, sub: r.marks.title } : undefined,
+        act: { ev: "ui_agent", agent: r.name, ...(r.project ? { project: r.project } : {}) }, qa: `agent-${r.name}` };
+    };
+    s.sections = L.sections.map((sec) => ({ label: sec.label, acc: !!sec.acc, rows: sec.rows.map(row) }));
+    markSel(s, v.rowSel);
+    const sel = selRow(s), firstAgent = L.sections.flatMap((x) => x.rows).find((r) => r.kind === "agent");
+    const send = { ev: "ui_spot_send", text: v.spot.text };
+    const left = L.mode === "names" ? [item(["⏎"], sel ? SP.open(sel.t) : SP.openInBise), item(["⌘", "⏎"], SP.sendQ(q), send)]
+      : L.mode === "ask" ? [item(["⏎"], SP.sendToBise), ...(firstAgent ? [item(["↓"], SP.thenOpen(firstAgent.name))] : [])]
+        : [item(["⏎"], SP.openInBise), item(["⌘", "⏎"], SP.sendToBise, q ? send : null)];
+    s.foot = { left: [...left, item(["tab"], SP.startAgent, q ? { ev: "ui_spot_tab", text: v.spot.text } : null)], right: [item(["esc"], SP.close, { ev: "ui_close" })] };
+    return s;
+  }
+
   // the preview of the selected agent: its status chip, what it does now, what waits on you, its
   // last actions, its last report, its pages, and the ways in (⏎ ⌘O ⌘D); until the core's
   // agent_preview comes, its title line stands for 'now'
@@ -175,6 +200,7 @@
       }
       case "find": return finder(s, v);
       case "spotlight": {
+        if (v.spot.list) return spotlight(s, v);
         if (v.find) return finder(s, v);
         const t = v.spot.text.trim();
         s.head = { h: 68, input: { text: v.spot.text, ph: B.typeHint } };

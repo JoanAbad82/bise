@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Uint8Array, Float32Array, String, Number });
-for (const f of ["words.js", "face.js", "model.js", "pearl.js", "bar.js", "panelmodel.js", "fakecore.js", "../kit/notelines.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+for (const f of ["words.js", "face.js", "spotlist.js", "model.js", "pearl.js", "bar.js", "panelmodel.js", "fakecore.js", "../kit/notelines.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
 const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes, BiseLines, AmbPearl: Pearl, AmbBar: Bar, AmbPanel: Pn } = ctx;
 const W = Wd.W;
 
@@ -1424,36 +1424,72 @@ law("round 10: the preview follows ↑↓; it's asked once per agent (the page w
   q = Bar.spec(v10(n, 1100)).preview;
   eq([q.loading, q.now, q.waits[0].act, q.ways.map((w) => w.w)], [false, "the banner, half the size on mobile", { ev: "ui_card", card: "c1" }, ["open its history", "terminal", "follow"]]);
 });
-law("round 10: fn space + typing filters agents by name, title and purpose, the match marked; ⏎ opens the selected agent (its panel, the bar goes); ⌘⏎ and no match ask main; an archived agent comes back in a search", () => {
+law("desktop S8 spotlight (v9): fn space asks bise or finds an agent; 1-2 words naming an agent list it and ⏎ opens it in the window; a sentence puts 'ask bise' first, the agents it names at ↓", () => {
   let m = M.step(R10(), { ev: "app_key", key: "space" }, 10).m;
   let s = Bar.spec(v10(m));
-  eq([s.kind, s.w, s.head.input.ph, s.head.right.keys], ["spotlight", 860, "ask bise, find an agent or a page", ["fn", "space"]]);
+  eq([s.kind, s.head.input.ph, s.head.right.text], ["spotlight", "ask bise, or find an agent", "to bise"]);
+  const foot = (x) => x.foot.left.map((i) => `${i.keys.join(" ")} ${i.w}`);
+  // v9's example 1: a name -> that agent, ⏎ opens it, ⌘⏎ still sends the words to bise
   m = M.step(m, { ev: "ui_spot_type", text: "perf" }, 20).m;
   s = Bar.spec(v10(m));
-  eq(s.sections.map((x) => [x.label, x.rows.map((r) => r.t)]), [["agents", ["perf"]], ["ask", ["ask main: perf", "start an agent: perf"]]]);
+  eq(s.sections.map((x) => [x.label, x.rows.map((r) => r.t)]), [["found", ["perf"]]]);
   eq(s.sections[0].rows[0].mark, { t: [0, 4], sub: null });
+  eq(foot(s), ["⏎ open perf", "⌘ ⏎ send « perf » to bise", "tab start an agent"]);
   const row = Bar.selRow(s);
   eq(row.act, { ev: "ui_agent", agent: "perf" });
   const r = M.step(m, row.act, 30);
-  eq(r.cmds, [{ cmd: "app_focus", on: false }, { cmd: "app_window", route: "agent/home/perf" }]);   // desktop S8: its thread in the window
+  eq(r.cmds, [{ cmd: "app_focus", on: false }, { cmd: "app_window", route: "agent/home/perf" }]);
   assert.equal(r.m.pane, null);
-  // the title and the purpose match too
+  // the title and the purpose name an agent too
   m = M.step(m, { ev: "ui_spot_type", text: "banner" }, 40).m;
   eq(Bar.spec(v10(m)).sections[0].rows.map((x) => [x.t, x.mark.sub]), [["cookies", [4, 10]]]);
   m = M.step(m, { ev: "ui_spot_type", text: "emoji" }, 45).m;
-  eq(v10(m).find.rows.map((x) => x.name), ["emoji-csv"]);
-  m = M.step(m, { ev: "ui_spot_type", text: "router" }, 50).m;
-  eq(v10(m).find.rows.map((x) => x.name), ["old-spike"]);
-  // nothing matches: the preview says ⏎ asks main, and ⏎ (the selected row) does
+  eq(Bar.spec(v10(m)).sections[0].rows.map((x) => x.t), ["emoji-csv"]);
+  // v9's example 2: a sentence goes to bise; ⏎ sends it
   m = M.step(m, { ev: "ui_spot_type", text: "dark theme for billing" }, 60).m;
   s = Bar.spec(v10(m));
-  eq([s.sections[0].rows.length, s.preview.empty], [0, "no agent matches. ⏎ asks main instead."]);
+  eq(s.sections[0].rows.map((x) => [x.t, x.sub]), [["ask bise", "dark theme for billing"]]);
   eq(Bar.selRow(s).act, { ev: "ui_spot_send", text: "dark theme for billing" });
-  // a click on that preview does what its ⏎ does: asks main (lead m_8123)
-  eq(s.preview.act, { ev: "ui_spot_send", text: "dark theme for billing" });
+  eq(foot(s), ["⏎ send to bise", "tab start an agent"]);
+  // v9's example 3: a sentence that starts with an agent's name still goes to bise; the agent waits at ↓
+  m = M.step(m, { ev: "ui_spot_type", text: "perf ne trouve pas le cache" }, 70).m;
+  s = Bar.spec(v10(m));
+  eq(s.sections[0].rows.map((x) => x.t), ["ask bise", "perf"]);
+  eq([Bar.selRow(s).act.ev, foot(s)], ["ui_spot_send", ["⏎ send to bise", "↓ then ⏎ open perf", "tab start an agent"]]);
+  m = M.step(m, { ev: "app_key", key: "down", local: true, n: 2 }, 75).m;
+  eq(Bar.selRow(Bar.spec(v10(m))).act, { ev: "ui_agent", agent: "perf" });
   // typing puts the selection back on the first row
-  m = M.step(M.step(m, { ev: "app_key", key: "down", local: true, n: 2 }, 70).m, { ev: "ui_spot_type", text: "dark" }, 80).m;
-  eq(v10(m).find.sel, 0);
+  m = M.step(m, { ev: "ui_spot_type", text: "perf ne trouve pas le cache !" }, 80).m;
+  eq(Bar.selRow(Bar.spec(v10(m))).act.ev, "ui_spot_send");
+});
+law("desktop S8 spotlight empty (v9): waiting for you, at work, environments with the front app's project first and ⌘1-9; ⏎ opens each in the window", () => {
+  const projects = [{ project: "home", name: "bise", home: true, order: 0 },
+    { project: "storefront-5c1d", name: "storefront", path: "/Users/you/storefront", branch: "main", agents: 5, order: 1 },
+    { project: "telemetry-8e02", name: "telemetry", path: "/Users/you/telemetry", branch: "main", agents: 2, order: 2, hosts: ["grafana.internal"] }];
+  const agents = [{ name: "alerts", status: "waiting", title: "compaction at 03:00?", project: "telemetry-8e02" },
+    { name: "stock", status: "working", title: "flash sale replay · 62%", project: "storefront-5c1d" },
+    { name: "wallet", status: "idle", title: "Apple Pay", project: "storefront-5c1d" }];
+  const cards = [{ id: "c-alerts", agent: "alerts", project: "telemetry-8e02", title: "compaction at 03:00?", text: "passer la compaction à 03:00 ?", options: ["move it", "leave it"] }];
+  let m = M.step(M.init(), { ev: "state", agents, cards, projects }, 0).m;
+  m = M.step(m, { ev: "app_front", app: "Chrome", bundle: "com.google.Chrome", url: "https://grafana.internal/d/ingest", title: "ingest p99" }, 5).m;
+  m = M.step(m, { ev: "app_key", key: "space" }, 10).m;
+  const s = Bar.spec(M.view(m, 20, Fake.T0));
+  eq(s.sections.map((x) => [x.label, x.rows.map((r) => [r.t, r.p || "", r.sub, r.right ? r.right.keys.join("") : ""])]), [
+    ["waiting for you", [["alerts", "telemetry", "compaction at 03:00?", "⏎"]]],
+    ["at work", [["stock", "storefront", "flash sale replay · 62%", ""]]],
+    ["environments", [["telemetry", "", "/Users/you/telemetry  ·  in front: grafana.internal", "⌘1"], ["storefront", "", "/Users/you/storefront  ·  main · 5 agents", "⌘2"]]]]);
+  eq(s.foot.left.map((i) => `${i.keys.join(" ")} ${i.w}`), ["⏎ open in bise", "⌘ ⏎ send to bise", "tab start an agent"]);
+  // ⏎ on the card (selected first) opens it in the window; ⌘2 = storefront
+  eq(M.step(m, Bar.selRow(s).act, 30).cmds.at(-1), { cmd: "app_window", route: "agent/telemetry-8e02/alerts" });
+  eq(M.step(m, Bar.cmdRow(s, "2").act, 30).cmds.at(-1), { cmd: "app_window", route: "project/storefront-5c1d" });
+  // an editor on a project's folder puts it first; an excluded app (app null) knows nothing
+  m = M.step(m, { ev: "app_front", app: "Code", bundle: "com.microsoft.VSCode", path: "/Users/you/storefront/src/cart.ts" }, 40).m;
+  eq(Bar.spec(M.view(m, 50, Fake.T0)).sections[2].rows.map((r) => r.t), ["storefront", "telemetry"]);
+  m = M.step(m, { ev: "app_front", app: null }, 60).m;
+  eq(Bar.spec(M.view(m, 70, Fake.T0)).sections[2].rows.map((r) => r.sub), ["/Users/you/storefront  ·  main · 5 agents", "/Users/you/telemetry  ·  main · 2 agents"]);
+  // a project's name finds it and its agents ("eng" in v9: engine's agents, then engine)
+  m = M.step(m, { ev: "ui_spot_type", text: "store" }, 80).m;
+  eq(Bar.spec(M.view(m, 90, Fake.T0)).sections[0].rows.map((r) => r.t), ["stock", "wallet", "storefront"]);
 });
 law("round 10: ⌘D follows the selected agent (again to stop), ⌘O opens it in the terminal; fn space with no agents stays round 9's 700 px field", () => {
   let m = M.step(R10(), { ev: "app_key", key: "a" }, 10).m;

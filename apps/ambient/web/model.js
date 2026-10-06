@@ -45,6 +45,8 @@
       hub: { up: false, workspace: "", known: false },
       seen: false,                  // a `state` came
       agents: [], cards: [],
+      projects: [],                 // desktop S8: every project (core's state.projects), bise's own aside
+      front: null,                  // the front app's facts (amb-mac's app_front, S9's fn context)
       phase: "idle", phaseAt: 0, line: "",
       heard: { text: "", final: false },
       lvl: { you: { v: 0, at: -1e9 }, main: { v: 0, at: -1e9 } },
@@ -183,33 +185,9 @@
     return { m: { ...m, pane, spotText: will && was ? m.spotText : "", rowSel: pane === m.pane ? m.rowSel || 0 : 0 }, cmds };
   }
 
-  // ---- round 10 (identity10, preview A): your agents in the bar. fn a lists them all, fn space
-  // + typing filters them (name, title, purpose; amb-core m_7030: archived rows come too, search
-  // only); waiting on you first, then blocked, working, idle, done, failed. Pure: the view and
-  // check.mjs read it.
-  const ROSTER_ORDER = { waiting: 0, blocked: 1, working: 2, starting: 2, idle: 3, done: 4, failed: 5 };
-  const match = (s, q) => {
-    const i = q ? String(s || "").toLowerCase().indexOf(q) : -1;
-    return i < 0 ? null : [i, i + q.length];
-  };
-  function roster(m, text, wall) {
-    const q = String(text || "").trim().toLowerCase();
-    const cards = visibleCards(m);
-    const rows = m.agents.map((a, i) => {
-      const waits = cards.filter((c) => c.agent === a.name).length || Math.max(0, +a.waits || 0);
-      const status = waits ? "waiting" : a.status === "starting" ? "working" : a.status || "idle";
-      const title = a.title || a.note || "";
-      const sinceMs = +a.since_ms > 0 ? Math.max(0, wall - a.since_ms) : +a.turn_ms >= 0 && a.turn_ms != null ? +a.turn_ms : null;
-      const followed = a.name in m.follows ? m.follows[a.name] : !!a.followed;
-      return { name: a.name, project: a.project || null, pname: a.project_name || null, status, title, purpose: a.purpose || "", waits, followed, archived: !!a.archived, age: sinceMs == null ? "" : Wd.age(sinceMs), i,
-        marks: { name: match(a.name, q), title: match(title, q) } };
-    });
-    const hit = (r) => !q || r.marks.name || r.marks.title || (r.purpose && r.purpose.toLowerCase().includes(q));
-    // archived ones only when he searches for them
-    return rows.filter((r) => (q ? hit(r) : !r.archived))
-      .sort((a, b) => (ROSTER_ORDER[a.status] ?? 3) - (ROSTER_ORDER[b.status] ?? 3) || a.i - b.i)
-      .map(({ i, ...r }) => r);
-  }
+  // the bar's agents and the spotlight's list: spotlist.js (pure)
+  const roster = (m, text, wall) => root.AmbSpot.roster(m, text, wall, visibleCards(m));
+  const spotList = (m, wall) => root.AmbSpot.spotList(m, wall, visibleCards(m));
 
   function step(m, ev, now) {
     const none = (x) => ({ m: x, cmds: [] });
@@ -224,7 +202,7 @@
       case "state": {
         const agents = Array.isArray(ev.agents) ? ev.agents : [];
         const cards = Array.isArray(ev.cards) ? ev.cards : [];
-        let m2 = { ...m, agents, cards, seen: true, pages: Array.isArray(ev.pages) ? sortPages(ev.pages) : m.pages,
+        let m2 = { ...m, agents, cards, seen: true, projects: Array.isArray(ev.projects) ? ev.projects : m.projects, pages: Array.isArray(ev.pages) ? sortPages(ev.pages) : m.pages,
           // the hub's state also lists a week of ended timers (ended_ms, /scheduled): not watching
           timers: Array.isArray(ev.timers) ? ev.timers.filter((t) => t && t.id != null && t.ended_ms == null) : m.timers };
         // the hub dropped a card: forget that it was answered here
@@ -501,6 +479,15 @@
       // ↑ in an empty spotlight: his last message comes back to edit (SPEC §4)
       case "ui_spot_last":
         return m.lastSent ? none({ ...m, spotText: m.lastSent, rowSel: 0 }) : none(m);
+      // the front app (amb-mac's app_front, m_8448): app null = an excluded app, nothing known
+      case "app_front":
+        return none({ ...m, front: ev.app ? { app: String(ev.app), url: ev.url || "", path: ev.path || "", title: ev.title || "" } : null });
+      // an environment in the spotlight: that project in bise's window
+      case "ui_project": {
+        if (!ev.project) return none(m);
+        const r = setPane(m, null);
+        return { m: r.m, cmds: [...r.cmds, { cmd: "app_window", route: agentRoute(ev.project, "main") }] };
+      }
       // the bise the app runs for 'start bise in a terminal' (amb-mac m_8082; null: none found)
       case "app_bise":
         return none({ ...m, bisePath: ev.path == null ? null : String(ev.path) });
@@ -834,8 +821,9 @@
       v.state = "spotlight"; v.size = "open";
       // the key bar: `tab start an agent` only once there is text (designer)
       v.spot = { text: m.spotText, hint: W.spotHint, keys: W.spotKeys.filter(([k]) => k !== "tab" || m.spotText.trim()) };
-      // round 10: with agents, fn space is also their finder (preview A, 860 wide)
-      if (m.agents.length) v.find = findView("spot");
+      // desktop S8 (v9 'fn espace, la spotlight'): what waits, what works, the environments, and
+      // typing finds an agent or an environment; ⏎ follows the shape of what he typed
+      if (m.agents.length || m.projects.some((p) => !p.home) || visibleCards(m).length) v.spot.list = spotList(m, wall);
       if (inTurn(m)) v.pose = "think";
     } else if (m.pane === "find") {
       v.state = "find"; v.size = "open";
