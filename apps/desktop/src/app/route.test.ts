@@ -84,3 +84,14 @@ describe('router', () => {
     expect(r.get()).toEqual({ screen: 'bise' });
   });
 });
+
+describe('the core line (bar S.5)', () => {
+  it("says when the core is down or coming back, never on a quick first start, gone once it's up", async () => {
+    const { coreLine } = await import('./CoreLine');
+    expect(coreLine('up', { wasUp: true, slow: true })).toBeUndefined();
+    expect(coreLine('down', { wasUp: true, slow: false })).toBe("bise isn't running · starting it again…");
+    expect(coreLine('starting', { wasUp: true, slow: false })).toBe('starting bise again…');
+    expect(coreLine('starting', { wasUp: false, slow: false })).toBeUndefined();
+    expect(coreLine('starting', { wasUp: false, slow: true })).toBe('starting bise…');
+  });
+});

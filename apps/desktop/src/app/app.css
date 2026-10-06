@@ -32,3 +32,10 @@
 .app-dim {
   color: var(--ink-2);
 }
+
+/* bise's core can't be reached (CoreLine): one line over the screen */
+.app-core {
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--c-line);
+  color: var(--c-text-2);
+}

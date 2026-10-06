@@ -22,6 +22,7 @@ import { ReviewScreen } from '@/review/ReviewScreen';
 import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
 import { Sidebar } from './Sidebar';
+import { CoreLine } from './CoreLine';
 import '@/ds/index.css';
 import './app.css';
 
@@ -64,6 +65,7 @@ function Current() {
   // leaks into the next (the old window showed shop's thread under bise)
   return (
     <Main testId="app.main">
+      <CoreLine />
       <ScreenOf key={formatRoute(route)} route={route} />
     </Main>
   );

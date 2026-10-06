@@ -11,7 +11,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardE
 import { Head, Marker } from '@/ds';
 import { Composer, useComposerSources } from '@/composer';
 import type { Outgoing } from '@/composer/message';
-import { threadKey, useAgents, usePending, useStore, useThreadOrder, useTyping } from '@/store';
+import { threadKey, useAgents, useCoreState, usePending, useStore, useThreadOrder, useTyping } from '@/store';
 import { useMenuAction } from '@/app/menu';
 import { dotOf, lineOf } from '@/agents/model';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
@@ -39,13 +39,17 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   const store = useStore();
   const tkey = threadKey(project, agent);
 
-  // the thread's pages and live entries while it is shown
+  // the thread's pages and live entries while it is shown, asked again
+  // when a restarted core comes up (a new core holds no subscription)
+  const core = useCoreState();
+  const live = core !== 'down';
   useEffect(() => {
+    if (!live) return;
     store.subscribeThread(project, agent);
     return () => {
       store.unsubscribeThread(project, agent);
     };
-  }, [store, project, agent]);
+  }, [store, project, agent, live]);
 
   const me = useAgents(project).find((a) => a.name === agent);
   const typing = useTyping(tkey);
