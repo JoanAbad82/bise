@@ -577,6 +577,10 @@ pub enum Input {
         to: String,
         name: String,
         why: String,
+        /// his fn context (FnContext JSON), as the input op had it: sb-core
+        /// carries it as text to the project, which renders it there
+        /// (fn_context::with_context); never on the home hub
+        context: Option<Value>,
     },
     /// A held route goes to `to` instead (the shell checked it in the
     /// registry; `bise`: a cancel). `client`: the typed connection that
@@ -775,6 +779,8 @@ pub enum Effect {
         project: String,
         kind: String,
         text: String,
+        /// a routed message's fn context (FnContext JSON text, "" none)
+        context: String,
     },
     /// desktop S2, a project hub: main's answer to bise's message `xid`
     /// goes back to bise's hub `hub` (`xreply` on its hub.sock).
@@ -2260,8 +2266,9 @@ impl Hub {
             Input::XReply { xid, name, text } => {
                 self.core(&mut fx, env, None, json!({"t": "x_reply", "xid": xid, "name": name, "text": text}))
             }
-            Input::RouteHold { text, via, to, name, why } => {
-                let i = json!({"t": "route_hold", "text": text, "via": via, "to": to, "name": name, "why": why});
+            Input::RouteHold { text, via, to, name, why, context } => {
+                let context = context.filter(|c| !c.is_null()).map_or(String::new(), |c| c.to_string());
+                let i = json!({"t": "route_hold", "text": text, "via": via, "to": to, "name": name, "why": why, "context": context});
                 self.core(&mut fx, env, None, i)
             }
             Input::RouteCorrect { client, rid, to, name } => {
@@ -2414,6 +2421,7 @@ impl Hub {
                 project: jstr(f, "project"),
                 kind: jstr(f, "kind"),
                 text: jstr(f, "text"),
+                context: jstr(f, "context"),
             }),
             "xreply" => fx.push(Effect::XReply { hub: jstr(f, "hub"), xid: f["xid"].as_u64().unwrap_or(0), text: jstr(f, "text") }),
             "route" => fx.push(Effect::Route {

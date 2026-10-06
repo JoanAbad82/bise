@@ -1241,7 +1241,7 @@ impl Shell {
             Effect::Feature { token, op, name, agents } => self.feature(token, op, name, agents),
             Effect::Update { card, id, version } => self.update_to(card, id, version),
             Effect::UpdateLater { id } => versions::update_later(&id),
-            Effect::XDeliver { xid, project, kind, text } => self.xdeliver(xid, project, kind, text),
+            Effect::XDeliver { xid, project, kind, text, context } => self.xdeliver(xid, project, kind, text, context),
             Effect::XReply { hub, xid, text } => self.xreply_back(hub, xid, text),
             Effect::Route { rid, to, name, text, due_ms, why } => {
                 let project = self.project();

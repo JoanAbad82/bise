@@ -76,7 +76,7 @@ impl Shell {
         let Some(to) = route::target(&g) else { return false };
         let name = projects.iter().find(|c| c.id == to).map_or_else(|| to.clone(), |c| c.name.clone());
         let why = why_line(&g, &name);
-        self.step(Input::RouteHold { text: text.to_string(), via: via.to_string(), to, name, why });
+        self.step(Input::RouteHold { text: text.to_string(), via: via.to_string(), to, name, why, context: context.cloned() });
         true
     }
 }

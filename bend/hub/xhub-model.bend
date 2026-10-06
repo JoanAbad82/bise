@@ -24,7 +24,7 @@ type OutSt is Data:
 # `msg`: the home hub's message it forwards (kind input) or 0; `text`: the
 # words sent (copied by sb-core from that message, or the question)
 type Out is Data:
-  Out{xid: Nat, project: String, kind: XKind, msg: Nat, text: String, st: OutSt, tries: Nat}
+  Out{xid: Nat, project: String, kind: XKind, msg: Nat, text: String, st: OutSt, tries: Nat, context: String}
 
 # `msg`: the message the project hub made of it (its id there)
 type XIn is Data:
@@ -40,7 +40,7 @@ type RSt is Data:
 # the project's hub id, `name` its name (the note and the event), `via`
 # the view he typed in ("" none)
 type Route is Data:
-  Route{rid: Nat, text: String, via: String, to: String, name: String, due: Nat, act: Nat, why: String, st: RSt}
+  Route{rid: Nat, text: String, via: String, to: String, name: String, due: Nat, act: Nat, why: String, st: RSt, context: String}
 
 type Xs is Data:
   Xs{outbox: List<&2, Out>, next_xid: Nat, xin: List<&2, XIn>, routes: List<&2, Route>, next_rid: Nat}
@@ -52,38 +52,44 @@ def empty() -> Xs:
 
 def Out.xid(x: Out) -> Nat:
   match x:
-    case Out{+xid, _, _, _, _, _, _}:
+    case Out{+xid, _, _, _, _, _, _, _}:
       xid
 
 def Out.project(x: Out) -> String:
   match x:
-    case Out{_, +p, _, _, _, _, _}:
+    case Out{_, +p, _, _, _, _, _, _}:
       p
 
 def Out.kind(x: Out) -> XKind:
   match x:
-    case Out{_, _, +k, _, _, _, _}:
+    case Out{_, _, +k, _, _, _, _, _}:
       k
 
 def Out.msg(x: Out) -> Nat:
   match x:
-    case Out{_, _, _, +m, _, _, _}:
+    case Out{_, _, _, +m, _, _, _, _}:
       m
 
 def Out.text(x: Out) -> String:
   match x:
-    case Out{_, _, _, _, +t, _, _}:
+    case Out{_, _, _, _, +t, _, _, _}:
       t
 
 def Out.st(x: Out) -> OutSt:
   match x:
-    case Out{_, _, _, _, _, +s, _}:
+    case Out{_, _, _, _, _, +s, _, _}:
       s
 
 def Out.tries(x: Out) -> Nat:
   match x:
-    case Out{_, _, _, _, _, _, +n}:
+    case Out{_, _, _, _, _, _, +n, _}:
       n
+
+# the context of his routed words (Route.context), "" for the rest
+def Out.context(x: Out) -> String:
+  match x:
+    case Out{_, _, _, _, _, _, _, +v}:
+      v
 
 def XIn.hub(x: XIn) -> String:
   match x:
@@ -137,47 +143,55 @@ def Xs.next_rid(x: Xs) -> Nat:
 
 def Route.rid(x: Route) -> Nat:
   match x:
-    case Route{+v, _, _, _, _, _, _, _, _}:
+    case Route{+v, _, _, _, _, _, _, _, _, _}:
       v
 
 def Route.text(x: Route) -> String:
   match x:
-    case Route{_, +v, _, _, _, _, _, _, _}:
+    case Route{_, +v, _, _, _, _, _, _, _, _}:
       v
 
 def Route.via(x: Route) -> String:
   match x:
-    case Route{_, _, +v, _, _, _, _, _, _}:
+    case Route{_, _, +v, _, _, _, _, _, _, _}:
       v
 
 def Route.to(x: Route) -> String:
   match x:
-    case Route{_, _, _, +v, _, _, _, _, _}:
+    case Route{_, _, _, +v, _, _, _, _, _, _}:
       v
 
 def Route.name(x: Route) -> String:
   match x:
-    case Route{_, _, _, _, +v, _, _, _, _}:
+    case Route{_, _, _, _, +v, _, _, _, _, _}:
       v
 
 def Route.due(x: Route) -> Nat:
   match x:
-    case Route{_, _, _, _, _, +v, _, _, _}:
+    case Route{_, _, _, _, _, +v, _, _, _, _}:
       v
 
 def Route.act(x: Route) -> Nat:
   match x:
-    case Route{_, _, _, _, _, _, +v, _, _}:
+    case Route{_, _, _, _, _, _, +v, _, _, _}:
       v
 
 def Route.why(x: Route) -> String:
   match x:
-    case Route{_, _, _, _, _, _, _, +v, _}:
+    case Route{_, _, _, _, _, _, _, +v, _, _}:
       v
 
 def Route.st(x: Route) -> RSt:
   match x:
-    case Route{_, _, _, _, _, _, _, _, +v}:
+    case Route{_, _, _, _, _, _, _, _, +v, _}:
+      v
+
+# his fn context (FnContext JSON text, "" none): carried to the project,
+# rendered there like a direct input's (fn_context::with_context), never
+# on the home hub
+def Route.context(x: Route) -> String:
+  match x:
+    case Route{_, _, _, _, _, _, _, _, _, +v}:
       v
 
 def rst_str(s: RSt) -> String:
@@ -201,13 +215,13 @@ def route_of(xs: List<&2, Route>, +rid: Nat) -> Maybe<&2, Route>:
 
 def Route.with_to(x: Route, +to: String, +name: String) -> Route:
   match x:
-    case Route{+r, +tx, +v, _, _, +d, +a, +w, +s}:
-      Route{r, tx, v, to, name, d, a, w, s}
+    case Route{+r, +tx, +v, _, _, +d, +a, +w, +s, +c}:
+      Route{r, tx, v, to, name, d, a, w, s, c}
 
 def Route.with_st(x: Route, +s: RSt) -> Route:
   match x:
-    case Route{+r, +tx, +v, +to, +n, +d, +a, +w, _}:
-      Route{r, tx, v, to, n, d, a, w, s}
+    case Route{+r, +tx, +v, +to, +n, +d, +a, +w, _, +c}:
+      Route{r, tx, v, to, n, d, a, w, s, c}
 
 type RouteOp is Data:
   RTo{to: String, name: String}
@@ -289,8 +303,8 @@ def out_by_msg(xs: List<&2, Out>, +msg: Nat) -> Maybe<&2, Out>:
 
 def Out.with_st(x: Out, +s: OutSt) -> Out:
   match x:
-    case Out{+xid, +p, +k, +m, +t, _, +n}:
-      Out{xid, p, k, m, t, s, n}
+    case Out{+xid, +p, +k, +m, +t, _, +n, +c}:
+      Out{xid, p, k, m, t, s, n, c}
 
 # acked only from pending (a late ack never reopens a settled send)
 def acked_st(s: OutSt) -> OutSt:
@@ -302,13 +316,13 @@ def acked_st(s: OutSt) -> OutSt:
 
 def Out.acked(x: Out) -> Out:
   match x:
-    case Out{+xid, +p, +k, +m, +t, +s, +n}:
-      Out{xid, p, k, m, t, acked_st(s), n}
+    case Out{+xid, +p, +k, +m, +t, +s, +n, +c}:
+      Out{xid, p, k, m, t, acked_st(s), n, c}
 
 def Out.tried(x: Out) -> Out:
   match x:
-    case Out{+xid, +p, +k, +m, +t, +s, +n}:
-      Out{xid, p, k, m, t, s, 1n+n}
+    case Out{+xid, +p, +k, +m, +t, +s, +n, +c}:
+      Out{xid, p, k, m, t, s, 1n+n, c}
 
 def Out.settled(x: Out) -> Out:
   Out.with_st(x, OSettled{})
@@ -381,7 +395,8 @@ def x_route(+x: Xs, +rid: Nat, +op: RouteOp) -> Xs:
 def out_json(+o: Out) -> J.Json:
   J.obj([J.kv("xid", J.JNum{Out.xid(o)}), J.kv("project", J.JStr{Out.project(o)}),
     J.kv("kind", J.JStr{kind_str(Out.kind(o))}), J.kv("msg", J.JNum{Out.msg(o)}),
-    J.kv("text", J.JStr{Out.text(o)}), J.kv("state", J.JStr{st_str(Out.st(o))}), J.kv("tries", J.JNum{Out.tries(o)})])
+    J.kv("text", J.JStr{Out.text(o)}), J.kv("state", J.JStr{st_str(Out.st(o))}), J.kv("tries", J.JNum{Out.tries(o)}),
+    J.kv("context", J.JStr{Out.context(o)})])
 
 def xin_json(+i: XIn) -> J.Json:
   J.obj([J.kv("hub", J.JStr{XIn.hub(i)}), J.kv("xid", J.JNum{XIn.xid(i)}), J.kv("msg", J.JNum{XIn.msg(i)}),
@@ -390,7 +405,8 @@ def xin_json(+i: XIn) -> J.Json:
 def route_json(+r: Route) -> J.Json:
   J.obj([J.kv("rid", J.JNum{Route.rid(r)}), J.kv("text", J.JStr{Route.text(r)}), J.kv("via", J.JStr{Route.via(r)}),
     J.kv("to", J.JStr{Route.to(r)}), J.kv("name", J.JStr{Route.name(r)}), J.kv("due_ms", J.JNum{Route.due(r)}),
-    J.kv("act", J.JNum{Route.act(r)}), J.kv("why", J.JStr{Route.why(r)}), J.kv("state", J.JStr{rst_str(Route.st(r))})])
+    J.kv("act", J.JNum{Route.act(r)}), J.kv("why", J.JStr{Route.why(r)}), J.kv("state", J.JStr{rst_str(Route.st(r))}),
+    J.kv("context", J.JStr{Route.context(r)})])
 
 # ---- the journal's kinds of this state (model.bend's Ev EX) ----
 

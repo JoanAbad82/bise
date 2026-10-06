@@ -2129,7 +2129,7 @@ def aemit(-o: M.St, +cx: X.Cx<o>, +e: TM.ActEv) -> X.Cx<o>:
 def xdeliver(-o: M.St, +cx: X.Cx<o>, +ob: XH.Out) -> X.Cx<o>:
   out(o, cx, [J.kv("fx", J.JStr{"xdeliver"}), J.kv("xid", J.JNum{XH.Out.xid(ob)}),
     J.kv("project", J.JStr{XH.Out.project(ob)}), J.kv("kind", J.JStr{XH.kind_str(XH.Out.kind(ob))}),
-    J.kv("msg", J.JNum{XH.Out.msg(ob)}), J.kv("text", J.JStr{XH.Out.text(ob)})])
+    J.kv("msg", J.JNum{XH.Out.msg(ob)}), J.kv("text", J.JStr{XH.Out.text(ob)}), J.kv("context", J.JStr{XH.Out.context(ob)})])
 
 # home: a new outbox entry, journaled, then its first delivery
 def xsend.new(-o: M.St, +cx: X.Cx<o>, +token: Nat, +ob: XH.Out) -> X.Cx<o>:
@@ -2141,7 +2141,7 @@ def xsend.fwd(-o: M.St, f: XB.Fwd, +cx: X.Cx<o>, +token: Nat, +project: String, 
     case XB.FwdErr{+e}:
       reply_err(o, cx, token, e)
     case XB.FwdOk{+text}:
-      xsend.new(o, cx, token, XB.new_out(xst(o, cx), project, XH.KInput{}, id, text))
+      xsend.new(o, cx, token, XB.new_out(xst(o, cx), project, XH.KInput{}, id, text, ""))
 
 # `sb project send <p> --input m_<n>` (main only, req.main): `pre_err`,
 # the hub's (an unknown project, this hub itself)
@@ -2157,7 +2157,7 @@ def req_xask.go(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q:
     case Some{+e}:
       reply_err(o, cx, token, e)
     case None{}:
-      xsend.new(o, cx, token, XB.new_out(xst(o, cx), C.get_s(q, "project"), XH.KAsk{}, 0n, C.get_s(q, "text")))
+      xsend.new(o, cx, token, XB.new_out(xst(o, cx), C.get_s(q, "project"), XH.KAsk{}, 0n, C.get_s(q, "text"), ""))
 
 # `sb project ask <p> "<question>"` (main only): bise's own words
 def req_xask(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
@@ -2227,14 +2227,14 @@ def route_done(-o: M.St, +cx: X.Cx<o>, +rid: Nat, +state: String, +to: String, +
 
 # home: the input route_hold (the shell's route.rs picked `to`, a project
 # hub id, `name` its name): held, its act set, the window told
-def route_hold(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +to: String, +name: String, +why: String) -> X.Cx<o>:
-  +r = XB.new_route(xst(o, cx), tms(o, cx), text, via, to, name, why, now(o, cx))
+def route_hold(-o: M.St, +cx: X.Cx<o>, +text: String, +via: String, +to: String, +name: String, +why: String, +context: String) -> X.Cx<o>:
+  +r = XB.new_route(xst(o, cx), tms(o, cx), text, via, to, name, why, now(o, cx), context)
   +cx2 = xemit(o, cx, XH.XRouteHeld{r})
   route_ev(o, aemit(o, cx2, TM.ActSet{XB.route_act(r)}), r)
 
 def route_fire.sent(-o: M.St, +cx: X.Cx<o>, +r: XH.Route, +id: Nat) -> X.Cx<o>:
   +cx2 = emit(o, mark_delivered(o, cx, id), M.ESettled{id}, Unit{}, Unit{}, Unit{})
-  +ob = XB.new_out(xst(o, cx2), XH.Route.to(r), XH.KInput{}, id, XH.Route.text(r))
+  +ob = XB.new_out(xst(o, cx2), XH.Route.to(r), XH.KInput{}, id, XH.Route.text(r), XH.Route.context(r))
   +cx3 = xdeliver(o, xemit(o, cx2, XH.XOut{ob}), ob)
   +cx4 = xemit(o, cx3, XH.XRoute{XH.Route.rid(r), XH.REnd{XH.RSent{}}})
   +cx5 = route_done(o, cx4, XH.Route.rid(r), "sent", XH.Route.to(r), J.JNum{XH.Out.xid(ob)})
@@ -3288,7 +3288,7 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
     case IXReply{}:
       xanswer(o, XB.open(xst(o, cx), C.get_nat(i, "xid")), cx, C.get_nat(i, "xid"), C.get_s(i, "name"), C.get_s(i, "text"))
     case IRouteHold{}:
-      route_hold(o, cx, C.get_s(i, "text"), C.get_s(i, "via"), C.get_s(i, "to"), C.get_s(i, "name"), C.get_s(i, "why"))
+      route_hold(o, cx, C.get_s(i, "text"), C.get_s(i, "via"), C.get_s(i, "to"), C.get_s(i, "name"), C.get_s(i, "why"), C.get_s(i, "context"))
     case IRouteCorrect{}:
       route_correct(o, cx, C.get_nat(i, "rid"), C.get_s(i, "to"), C.get_s(i, "name"))
     case IRouteCancel{}:

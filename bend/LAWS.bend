@@ -4551,7 +4551,8 @@ law route_fires_at_due_only:
   for +name: String
   for +why: String
   for +now: Nat
-  {HTM.Act.due(HXB.route_act(HXB.new_route(x, tm, text, via, to, name, why, now))) == Nat.add(now, 2000n) : Nat}
+  for +context: String
+  {HTM.Act.due(HXB.route_act(HXB.new_route(x, tm, text, via, to, name, why, now, context))) == Nat.add(now, 2000n) : Nat}
 
 # LAW (architect m_8883): a fire makes no turn: his message is journaled
 # (an id for the history and `--input`) by route_said, never by a send

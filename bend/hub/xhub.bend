@@ -69,8 +69,8 @@ def ask_ok(+text: String) -> Maybe<&2, String>:
   Bool.pick(Maybe<&2, String>, M.trim_is_empty(text), Some{"empty question"}, None{})
 
 # the outbox entry of a new send: the next xid, pending, never tried
-def new_out(+x: XH.Xs, +project: String, +k: XH.XKind, +msg: Nat, +text: String) -> XH.Out:
-  XH.Out{XH.Xs.next_xid(x), project, k, msg, text, XH.OPending{}, 0n}
+def new_out(+x: XH.Xs, +project: String, +k: XH.XKind, +msg: Nat, +text: String, +context: String) -> XH.Out:
+  XH.Out{XH.Xs.next_xid(x), project, k, msg, text, XH.OPending{}, 0n, context}
 
 # ---- the outbox's steps (home side) ----
 
@@ -178,8 +178,8 @@ def HOLD_MS() -> Nat:
 
 # a new held route: the next rid, due HOLD_MS from `now`, its act the
 # clock's next one
-def new_route(+x: XH.Xs, +tm: TM.Tms, +text: String, +via: String, +to: String, +name: String, +why: String, +now: Nat) -> XH.Route:
-  XH.Route{XH.Xs.next_rid(x), text, via, to, name, Nat.add(now, HOLD_MS()), TM.Tms.next_act(tm), why, XH.RHeld{}}
+def new_route(+x: XH.Xs, +tm: TM.Tms, +text: String, +via: String, +to: String, +name: String, +why: String, +now: Nat, +context: String) -> XH.Route:
+  XH.Route{XH.Xs.next_rid(x), text, via, to, name, Nat.add(now, HOLD_MS()), TM.Tms.next_act(tm), why, XH.RHeld{}, context}
 
 # the act that sends a held route at its due time (law
 # route_fires_at_due_only: timers.bend's acts_due)

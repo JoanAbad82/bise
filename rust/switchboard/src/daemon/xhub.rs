@@ -55,11 +55,16 @@ impl Shell {
     }
 
     /// bise's home hub: deliver outbox entry `xid` to the hub `project`.
-    pub(super) fn xdeliver(&mut self, xid: u64, project: String, kind: String, text: String) {
+    /// `context`: a routed message's fn context (FnContext JSON text, ""
+    /// none), sent as the op's `context` for the project to render.
+    pub(super) fn xdeliver(&mut self, xid: u64, project: String, kind: String, text: String, context: String) {
         let own = crate::paths::workspace_id(&self.opts.paths.workspace);
         let (tx, exe, root, log) = (self.tx.clone(), self.opts.exe.clone(), self.opts.app_root.clone(), self.opts.paths.clone());
         std::thread::spawn(move || {
-            let req = json!({"op": "xin", "hub": own, "xid": xid, "kind": kind, "text": text});
+            let mut req = json!({"op": "xin", "hub": own, "xid": xid, "kind": kind, "text": text});
+            if let Some(c) = serde_json::from_str::<Value>(&context).ok().filter(Value::is_object) {
+                req["context"] = c;
+            }
             let res = hub_paths(&project).and_then(|p| call(&p, &exe, &root, &req));
             let input = match res {
                 Ok(_) => Input::XAck { xid },

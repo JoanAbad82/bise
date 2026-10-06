@@ -3544,7 +3544,7 @@ mod every_tests;
 fn xdelivers(fx: &[Effect]) -> Vec<(u64, String, String, String)> {
     fx.iter()
         .filter_map(|e| match e {
-            Effect::XDeliver { xid, project, kind, text } => Some((*xid, project.clone(), kind.clone(), text.clone())),
+            Effect::XDeliver { xid, project, kind, text, .. } => Some((*xid, project.clone(), kind.clone(), text.clone())),
             _ => None,
         })
         .collect()
@@ -3685,7 +3685,7 @@ fn route_dones(fx: &[Effect]) -> Vec<(u64, String, String, Option<u64>)> {
 }
 
 fn hold(t: &mut T, text: &str) -> Vec<Effect> {
-    t.go(Input::RouteHold { text: text.into(), via: String::new(), to: "shop-1".into(), name: "shop".into(), why: "Safari: shop.test".into() })
+    t.go(Input::RouteHold { text: text.into(), via: String::new(), to: "shop-1".into(), name: "shop".into(), why: "Safari: shop.test".into(), context: None })
 }
 
 // his words wait 2 s on the timers' clock, then go once: his message to
@@ -3761,6 +3761,36 @@ fn a_cancelled_route_is_said_to_main_and_never_sent() {
         t.env.now += 5_000;
         assert!(xdelivers(&t.go(Input::Tick)).is_empty(), "{how}");
     }
+}
+
+// his fn context rides the route to the project's delivery, kept across a
+// restart; the routed message on the home hub keeps his words alone
+#[test]
+fn a_routed_message_carries_his_context_to_the_project() {
+    let mut t = T::new();
+    let ctx = json!({"app": "Safari", "url": "https://grafana.shop.test/d/p99"});
+    t.go(Input::RouteHold { text: "why does p99 rise".into(), via: String::new(), to: "shop-1".into(), name: "shop".into(), why: "the front page".into(), context: Some(ctx.clone()) });
+    let journal = t.journal.borrow().clone();
+    let mut h = Hub::new("/w");
+    h.replay(&journal);
+    let mut env = FakeEnv::new();
+    env.now = t.env.now + 2_500;
+    let fx = h.handle(Input::Tick, &mut env);
+    let sent: Vec<(String, String)> = fx
+        .iter()
+        .filter_map(|e| match e {
+            Effect::XDeliver { text, context, .. } => Some((text.clone(), context.clone())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(sent.len(), 1, "{:?}", fx);
+    assert_eq!(sent[0].0, "why does p99 rise");
+    assert_eq!(serde_json::from_str::<Value>(&sent[0].1).unwrap(), ctx);
+    let his = *h.st.msgs.keys().max().unwrap();
+    assert_eq!(h.st.msgs[&his].text, "why does p99 rise", "no context on the home hub");
+    // a forward or an ask carries none
+    let (_, fx) = t.req(MAIN, AgentReq::ProjectAsk { project: "shop".into(), text: "status?".into() });
+    assert!(fx.iter().any(|e| matches!(e, Effect::XDeliver { context, .. } if context.is_empty())), "{:?}", fx);
 }
 
 // a restart mid-hold: the act is in the journal, it fires once after
