@@ -243,6 +243,10 @@ pub struct ProjectView {
     pub v: u32,
     pub project: Project,
     pub written_ms: u64,
+    /// set at a clean stop, absent while it runs (readers tell a running
+    /// hub by its pid or a ping, never by a flag here)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stopped_ms: Option<u64>,
     pub last_activity_ms: u64,
     pub agents: Vec<Agent>,
     pub cards: Vec<Card>,
