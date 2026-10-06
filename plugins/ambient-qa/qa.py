@@ -3527,11 +3527,13 @@ def real_alive():
         return None
 
 
-def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None, path=None, session_env=None):
+def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None, path=None, session_env=None, world=False):
     """His real app (no --qa) on an isolated HOME and a throwaway fake-provider hub, as launchd
     would start it: PATH=/usr/bin:/bin:/usr/sbin:/sbin, HOME, his args (--workspace, --bise).
     bise: his (~/.bise/dev/build/ambient/target/debug/bise) unless given; root: the tree whose
     repl-live and sb-core the hub runs (bins.sh makes them current), default this tree.
+    world: on the running `qa.py world` instead (its HOME, bise's home workspace, its hubs and
+    registered projects: bise desktop's multi-project runs); no hub of its own then.
     One harness at a time: a QA app of this agent and an older harness are stopped first."""
     app = os.path.abspath(app or os.environ.get("AMBIENT_REAL_APP") or REAL_APP)
     exe = _bundle_exe(app)
@@ -3542,20 +3544,27 @@ def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None,
     if alive():
         stop()
     real_stop()
-    if os.path.isdir(REAL_HOME):
+    home = REAL_HOME
+    if world:
+        import world as world_mod
+        w = world_mod.state()
+        home = w["home"]
+        info = {"ws": os.path.join(home, world_mod.HOME_NAME), "state": [h["sock"] for h in w["hubs"] if h["home"]][0], "tmp": w["world"]}
+    elif os.path.isdir(REAL_HOME):
         if not os.path.realpath(REAL_HOME).startswith(os.path.realpath(os.path.expanduser("~/.bise/gate")) + "/"):
             raise QAError("refusing to clear %s: not under ~/.bise/gate" % REAL_HOME)
         shutil.rmtree(REAL_HOME, ignore_errors=True)
-    _prepare_home(REAL_HOME)
+    _prepare_home(home)
     os.makedirs(REAL_APP_DIR, exist_ok=True)
     try:
         os.unlink(REAL_SOCK)
     except OSError:
         pass
     path = path or his_app_path()
-    _real_guard(["x", "--bise", bise, "--env", "PATH=%s" % path, "--env", "BISE_APP_ROOT=%s" % root], {"HOME": REAL_HOME})
-    info = _start_hub(bise, root, "fake", home=REAL_HOME)
-    env = {"HOME": REAL_HOME, "BISE_HOME": os.path.join(REAL_HOME, ".bise"), "PATH": LAUNCHD_PATH, "TMPDIR": _user_tmp(),
+    _real_guard(["x", "--bise", bise, "--env", "PATH=%s" % path, "--env", "BISE_APP_ROOT=%s" % root], {"HOME": home})
+    if not world:
+        info = _start_hub(bise, root, "fake", home=REAL_HOME)
+    env = {"HOME": home, "BISE_HOME": os.path.join(home, ".bise"), "PATH": LAUNCHD_PATH, "TMPDIR": _user_tmp(),
            "USER": os.environ.get("USER", ""), "LOGNAME": os.environ.get("LOGNAME", os.environ.get("USER", "")),
            "SHELL": os.environ.get("SHELL", "/bin/zsh"), "LANG": os.environ.get("LANG", "en_US.UTF-8"),
            "AMBIENT_HARNESS": REAL_APP_DIR, "BISE_AMBIENT_TEST_INPUT": REAL_SOCK}
@@ -3636,8 +3645,8 @@ def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None,
             raise QAError("stopped: the harness app carries the agent's env: %s" % leaked)
         # it reached only its own: its core's workspace is the throwaway one, its hub under the harness HOME
         core_ws = ((real_call("state").get("core") or {}).get("workspace"))
-        hub = (real_feed().get("hub") or "")
-        if core_ws and os.path.realpath(core_ws) != os.path.realpath(info["ws"]) or not os.path.realpath(hub).startswith(os.path.realpath(REAL_HOME) + "/"):
+        hub = info["state"] if world else (real_feed().get("hub") or "")
+        if core_ws and os.path.realpath(core_ws) != os.path.realpath(info["ws"]) or not os.path.realpath(hub).startswith(os.path.realpath(home) + "/"):
             real_stop()
             raise QAError("refused after launch: the core's workspace %s or the hub %s is not the harness's own" % (core_ws, hub))
     if not ping:
