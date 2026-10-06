@@ -89,6 +89,19 @@ extension AmbientApp {
         sayQuiet()
     }
 
+    // harness A's 'quiet' op (amb-tools m_9124): the probes' own path with fake
+    // samples, never his camera or screen. call = a camera running past the
+    // on delay, sharing = the screen watcher, meeting = a meeting now, '' = all over
+    func harnessQuiet(_ why: String) {
+        let t = uptime
+        let cam = why == "call"
+        quiet.camera(running: cam, at: t)
+        quiet.camera(running: cam, at: t + max(quiet.onAfter, quiet.offAfter))
+        quiet.sharing(why == "sharing")
+        quiet.meeting(why == "meeting")
+        sayQuiet()
+    }
+
     func sayQuiet() {
         guard let c = quiet.change() else { return }
         Log.say("app: quiet \(c.on) \(c.why)")

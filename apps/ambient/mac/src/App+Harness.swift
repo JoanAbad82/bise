@@ -21,6 +21,11 @@ extension AmbientApp {
         DesktopWindow.tap = { [weak hs] who, ev in hs?.note(who, ev) }
         hs.statusClick = { [weak self] button, pageUp in self?.harnessStatusClick(button, pageUp: pageUp) ?? [:] }
         hs.away = { [weak self] ms in self?.sayAway(ms) }
+        hs.quiet = { [weak self] why in
+            guard let self else { return [:] }
+            self.harnessQuiet(why)
+            return ["on": self.quiet.on, "why": self.quiet.why]
+        }
         hs.drop = { [weak self] q in
             let items = (q["paths"] as? [String] ?? []).map { p -> DropItem in
                 var dir: ObjCBool = false

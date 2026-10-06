@@ -26,13 +26,14 @@ import WebKit
 @MainActor
 final class Harness {
     static let ops = ["ping", "state", "mouse", "key", "type", "fn", "voice", "shot", "eval", "events", "quit",
-                      "win_open", "win_close", "win_restore", "deeplink", "status_click", "front", "drop", "away"]
+                      "win_open", "win_close", "win_restore", "deeplink", "status_click", "front", "drop", "away", "quiet"]
 
     // the app's doors, wired by App
     var bar: (() -> Capsule)?
     var win: (() -> DesktopWindow?)?                    // bise's window (S4), made at its first open
     var winOp: ((String, [String: Any]) -> Void)?      // App: win_open {route?}, win_close, deeplink {open|route}
     var statusClick: ((String, Bool?) -> [String: Any])?   // App: the pearl's click path (left: dropdown, right: fallback rows; page_up false: as if the page were down)
+    var quiet: ((String) -> [String: Any])?             // App: a fake call/sharing/meeting through the quiet path (S9)
     var away: ((Int) -> Void)?                          // App: back after away_ms (S9; never his lock screen)
     var drop: (([String: Any]) -> [String: Any])?       // App: a drop on the pearl {paths, url?} (S9; fixture paths)
     var front: (([String: Any]) -> [String: Any])?      // App: the front-app fixture for the fn context (S9; never his apps)
@@ -186,6 +187,12 @@ final class Harness {
             winOp?(op, q)
             try? await Task.sleep(nanoseconds: 150_000_000)
             return ["win": winInfo()]
+        case "quiet":
+            // {why:'call'|'sharing'|'meeting'|''}: the camera/screen probes' path with fake samples
+            let why = q["why"] as? String ?? ""
+            guard ["call", "sharing", "meeting", ""].contains(why) else { throw Failure(description: "quiet: why is call, sharing, meeting or ''") }
+            guard let r = quiet?(why) else { throw Failure(description: "quiet: not wired") }
+            return r
         case "away":
             // {away_ms}: as if he came back after that long (the core's away_summary follows)
             let ms = (q["away_ms"] as? NSNumber)?.intValue ?? 45 * 60 * 1000
