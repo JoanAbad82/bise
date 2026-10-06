@@ -161,8 +161,10 @@
   }
 
   // the bar's agents and the spotlight's list: spotlist.js (pure)
-  const roster = (m, text, wall) => root.AmbSpot.roster(m, text, wall, visibleCards(m));
-  const spotList = (m, wall) => root.AmbSpot.spotList(m, wall, visibleCards(m));
+  // with every project's agents (the core's agents {project, agents}, T1 run 3: 'checkout' is shop's)
+  const everyAgent = (m) => ({ ...m, agents: m.agents.concat(Object.values(m.pagents || {}).flat()) });
+  const roster = (m, text, wall) => root.AmbSpot.roster(everyAgent(m), text, wall, visibleCards(m));
+  const spotList = (m, wall) => root.AmbSpot.spotList(everyAgent(m), wall, visibleCards(m));
 
   function step(m, ev, now) {
     const none = (x) => ({ m: x, cmds: [] });
@@ -422,6 +424,12 @@
         return none(C.quiet({ ...m, quiet: ev.on ? { why: ev.why || "", until: +ev.until_ms || 0 } : null }, !!ev.on));
       // S9 (cards.js): while you were away (the core's answer to the app's away_back), a drop on the pearl
       case "away_summary": return none(C.away(m, ev));
+      // a project's agents (the core's agents event; home's come in state): its main is the project
+      case "agents": {
+        const p = m.projects.find((x) => x.project === ev.project);
+        if (!ev.project || !Array.isArray(ev.agents) || (p && p.home)) return none(m);
+        return none({ ...m, pagents: { ...m.pagents, [ev.project]: ev.agents.filter((a) => !a.main && a.name !== "main" && !a.archived).map((a) => ({ ...a, project: ev.project, project_name: p ? p.name : null })) } });
+      }
       case "ui_away": return C.awayAct(m, ev.project);
       case "app_drop": return setPane({ ...m, drop: C.drop(ev), spotText: "" }, "spot");
       // desktop S8: the menu-bar pearl's dropdown is this page (amb-mac m_8489/m_8514): app_menu
@@ -553,7 +561,7 @@
       // ⏎ or a click on an agent row: its thread in bise's window (desktop S8, v9 'pas dans un
       // panneau'; amb-mac's {cmd:'app_window', route} dismisses the bar as the window opens)
       case "ui_agent": {
-        const a = m.agents.find((x) => x.name === ev.agent && (ev.project == null || projOf(x) === ev.project));
+        const a = everyAgent(m).agents.find((x) => x.name === ev.agent && (ev.project == null || projOf(x) === ev.project));
         if (!a) return none(m);
         const r = setPane(m, null);
         return { m: r.m, cmds: [...r.cmds, { cmd: "app_window", route: agentRoute(projOf(a), a.name) }] };

@@ -1292,6 +1292,22 @@ law("every project's cards reach the bar (amb-mac m_8894): the core's projects r
   eq(M.visibleCards(M.step(home, { ev: "state", agents: [], cards: m.cards, pages: [] }, 100).m).map((c) => c.id), ["acme-1a2b3c4d#9", "acme-1a2b3c4d#10"]);
 });
 
+law("the spotlight finds every project's agents (T1 run 3, lead m_9076): 'checkout' (shop's agent, from the core's agents event) + enter opens its thread; a name two projects share lists both with their project", () => {
+  const projects = [{ project: "home", name: "bise", home: true, order: 0 }, { project: "shop-11aa", name: "shop", order: 1 }, { project: "web-22bb", name: "web", order: 2 }];
+  let m = M.step(M.init(), { ev: "state", agents: [{ name: "perf", status: "working", title: "signup bench" }], cards: [], projects }, 0).m;
+  m = M.step(m, { ev: "agents", project: "shop-11aa", agents: [{ name: "main", main: true, status: "idle" }, { name: "checkout", status: "working", title: "idempotency keys" }] }, 1).m;
+  m = M.step(m, { ev: "app_key", key: "space" }, 10).m;
+  m = M.step(m, { ev: "ui_spot_type", text: "checkout" }, 20).m;
+  let s = Bar.spec(M.view(m, 30));
+  const found = s.sections.flatMap((x) => x.rows).filter((r) => r.qa && r.qa.startsWith("agent-"));
+  eq(found.map((r) => [r.t, r.p]), [["checkout", "shop"]]);
+  eq(M.step(m, Bar.selRow(s).act, 40).cmds.at(-1), { cmd: "app_window", route: "agent/shop-11aa/checkout" });
+  // two projects with a 'checkout': both, each with its project
+  m = M.step(m, { ev: "agents", project: "web-22bb", agents: [{ name: "checkout", status: "idle", title: "new cart" }] }, 50).m;
+  s = Bar.spec(M.view(m, 60));
+  eq(s.sections.flatMap((x) => x.rows).filter((r) => r.qa && r.qa.startsWith("agent-")).map((r) => [r.t, r.p]), [["checkout", "shop"], ["checkout", "web"]]);
+});
+
 law("S9 quiet batch (amb-mac m_9037): cards that come while quiet wait (an urgent one asks), then come together, '2 questions · about 1 min', '1 of 2', one at a time; esc puts the rest off", () => {
   const q = (id, text, extra = {}) => ({ id, kind: "question", agent: "search", text, options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }], ...extra });
   let m = M.step(M.init(), { ev: "state", agents: [], cards: [q("a", "old one")], pages: [] }, 0).m;
