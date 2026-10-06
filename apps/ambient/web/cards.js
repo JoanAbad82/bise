@@ -57,8 +57,12 @@
   // card: its head first, the summary fills it; a summary where nothing moved clears it, and no
   // summary within 5 s lets it go (the core may not answer)
   const AWAY_WAIT = 5000;
-  const awayOpen = (m, ev, now) => ({ ...m, away: { pending: true, at: now, away_ms: +ev.away_ms || 0, since_ms: ev.at_wall != null ? +ev.at_wall - (+ev.away_ms || 0) : null, done: 0, questions: 0, failed: 0, projects: [] } });
-  const away = (m, ev) => (moved(ev) ? { ...m, away: { since_ms: +ev.since_ms || (m.away && m.away.since_ms) || 0, done: +ev.done || 0, questions: +ev.questions || 0, failed: +ev.failed || 0, projects: (ev.projects || []).filter(moved) } }
+  // T1 run 6 step 21: the card is said once. Seen (the bar shown with it), the bar hiding takes it
+  // away, and a summary that comes once it's gone (late, or after he let it go) shows nothing:
+  // it never waits behind a call to cover the batch. A summary with no app_away (an older app) still shows.
+  const awaySeen = (m) => (!m.away ? m : !m.hidden ? (m.away.shown ? m : { ...m, away: { ...m.away, shown: true } }) : m.away.shown ? { ...m, away: null } : m);
+  const awayOpen = (m, ev, now) => ({ ...m, awayAsked: true, away: { pending: true, shown: !m.hidden, at: now, away_ms: +ev.away_ms || 0, since_ms: ev.at_wall != null ? +ev.at_wall - (+ev.away_ms || 0) : null, done: 0, questions: 0, failed: 0, projects: [] } });
+  const away = (m, ev) => (m.awayAsked && !m.away ? m : moved(ev) ? { ...m, away: { shown: !!(m.away && m.away.shown), since_ms: +ev.since_ms || (m.away && m.away.since_ms) || 0, done: +ev.done || 0, questions: +ev.questions || 0, failed: +ev.failed || 0, projects: (ev.projects || []).filter(moved) } }
     : m.away && m.away.pending ? { ...m, away: null } : m);
   const awayOn = (m, now) => !!m.away && !(m.away.pending && now - m.away.at >= AWAY_WAIT);
   function awayView(m, tz, now = 0, wall = now) {
@@ -84,5 +88,5 @@
     return { cmd: "send", text: words, ...(d.files.length ? { files: d.files.map((f) => f.path) } : {}) };
   }
 
-  root.AmbCards = { projCards, allCards, visibleCards, ansCmd, askable, quiet, batchLeft, batchHead, batchLater, away, awayOpen, awayOn, awayView, awayAct, drop, dropName, dropSend };
+  root.AmbCards = { projCards, allCards, visibleCards, ansCmd, askable, quiet, batchLeft, batchHead, batchLater, away, awayOpen, awayOn, awaySeen, awayView, awayAct, drop, dropName, dropSend };
 })(typeof window !== "undefined" ? window : globalThis);

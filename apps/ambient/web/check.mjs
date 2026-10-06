@@ -1686,6 +1686,25 @@ law("T1 run 4 step 19 (lead m_9163): app_away opens 'while you were away' at onc
   eq([M.view(f, 9000, back).state, Bar.spec(M.view(f, 9000, back)).text.s], ["away", "3 done · 1 question"]);
   eq(M.view(M.step(m, { ev: "away_summary", since_ms: 0, done: 0, questions: 0, failed: 0, projects: [] }, 300).m, 400, back).state, "needs");
 });
+law("T1 run 6 step 21: the away card is said once; seen then hidden, it's gone, and a summary that comes once it's gone (late, after a call) never covers the batch", () => {
+  const sum = { ev: "away_summary", since_ms: 1, done: 3, questions: 0, failed: 0, projects: [{ project: "t", done: 3, questions: 0, failed: 0 }] };
+  const card = { id: "9", agent: "main", text: "quiet check 1: go ahead?", options: ["yes", "no"] };
+  let m = M.step(M.init(), { ev: "app_hidden", on: true }, 0).m;
+  m = M.step(m, { ev: "app_away", away_ms: 2700000 }, 100).m;
+  m = M.step(m, { ev: "app_hidden", on: false }, 150).m;
+  m = M.step(m, sum, 1000).m;
+  eq(M.view(m, 1100).state, "away");
+  m = M.step(m, { ev: "app_hidden", on: true }, 4000).m;
+  m = M.step(m, { ev: "app_quiet", on: true, why: "call" }, 5000).m;
+  m = M.step(m, { ev: "state", agents: [], cards: [card], pages: [] }, 6000).m;
+  m = M.step(m, sum, 7000).m;   // a second (late) summary: nothing
+  m = M.step(m, { ev: "app_quiet", on: false }, 60000).m;
+  eq(M.view(m, 60100).state, "needs");
+  // a summary after the 5 s let-go shows nothing either
+  let l = M.step(M.init(), { ev: "app_away", away_ms: 2700000 }, 0).m;
+  l = M.step(l, { ev: "app_hidden", on: true }, 6000).m;
+  eq(M.view(M.step(l, sum, 7000).m, 7100).state, "idle");
+});
 law("T1 run 4 step 18 (lead m_9163): a drop stays in the spotlight until send or esc, even when a card arrives or comes back to the bar", () => {
   let m = M.step(M.init(), { ev: "app_drop", files: [{ name: "forest.ktx", path: "/Users/you/forest.ktx", kind: "file" }] }, 0).m;
   m = M.step(m, { ev: "state", agents: [], cards: [{ id: "5", agent: "main", text: "ship it?", options: ["yes", "no"] }], pages: [] }, 100).m;

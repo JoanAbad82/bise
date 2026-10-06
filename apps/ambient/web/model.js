@@ -372,8 +372,8 @@
         // hidden (esc, fn ., a click away, the app's timers: docs/ambient-app.md §8): an open pane
         // closes, so the next timed show is never stuck behind a stale full view
         const hidden = !!(ev.on ?? ev.hidden);
-        if (!hidden || !m.pane) return none({ ...m, hidden, focused: hidden ? false : m.focused });
-        const r = setPane({ ...m, hidden, focused: false }, null);
+        if (!hidden || !m.pane) return none(C.awaySeen({ ...m, hidden, focused: hidden ? false : m.focused }));
+        const r = setPane(C.awaySeen({ ...m, hidden, focused: false }), null);
         return r;
       }
       case "app_reduce_motion":
