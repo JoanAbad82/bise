@@ -19,6 +19,7 @@ import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
 import { entryKey, pendingKey, posOfKey } from './entry';
 import { FindBar } from './FindBar';
 import { createFindMark, FindMarkContext } from './findmark';
+import { trackRoutes, useHeld } from './routes';
 
 export interface ThreadScreenProps {
   project: string;
@@ -51,6 +52,10 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     };
   }, [store, project, agent, live]);
 
+  // bise's routing holds of his sends here (read before the first send)
+  trackRoutes(store);
+  const held = useHeld(store, tkey);
+
   const me = useAgents(project).find((a) => a.name === agent);
   const typing = useTyping(tkey);
   const busy = me?.status === 'working' || typing !== '';
@@ -71,8 +76,13 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   if (stopping && !busy) setStopping(false);
 
   const onKeyDown = (e: KeyboardEvent) => {
+    // esc while bise holds his words: keep them with bise (route_cancel)
+    if (e.key === 'Escape' && !e.defaultPrevented && held !== undefined && !findOpen) {
+      e.preventDefault();
+      store.command({ cmd: 'route_cancel', project: held.home, rid: held.rid });
+    }
     // the composer leaves a plain esc unhandled while busy (amb-web m_9540)
-    if (e.key === 'Escape' && !e.defaultPrevented && busy && !findOpen) {
+    else if (e.key === 'Escape' && !e.defaultPrevented && busy && !findOpen) {
       e.preventDefault();
       stop();
     } else if (e.key === 'f' && e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {

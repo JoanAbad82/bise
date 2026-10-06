@@ -130,3 +130,21 @@
   color: var(--c-text-2);
   font-variant-numeric: tabular-nums;
 }
+
+/* a send bise holds for a project (the routing hold): its own state */
+.th-hold {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-left: 40px;
+}
+
+.th-hold-to {
+  color: var(--c-acc, inherit);
+  font-variant-numeric: tabular-nums;
+}
+
+.th-routed .b-msg {
+  opacity: 0.8;
+}
