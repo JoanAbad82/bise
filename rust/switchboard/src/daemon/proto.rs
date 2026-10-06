@@ -136,6 +136,11 @@ impl Shell {
         true
     }
 
+    /// The typed connections still open.
+    pub(super) fn typed_ids(&self) -> Vec<ClientId> {
+        self.proto.conns.keys().copied().filter(|id| self.clients.contains_key(id)).collect()
+    }
+
     fn proto_error(&mut self, id: ClientId, cmd: &str, text: &str) {
         let project = Some(self.project());
         let cmd = Some(cmd.to_string()).filter(|c| !c.is_empty());

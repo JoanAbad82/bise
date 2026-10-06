@@ -828,6 +828,10 @@ pub enum Effect {
         to: String,
         xid: Option<u64>,
     },
+    /// A feature merged into the trunk (T1 run 5 step 9): today's merged
+    /// list goes again to the typed connections, as after a land (a
+    /// feature merge writes no `landed` line).
+    MergedChanged,
     /// S10: a followed task ended (done or failed), once: his notification.
     JobEnd {
         agent: String,
@@ -1549,6 +1553,10 @@ impl Hub {
         }
         if let Some((kind, text)) = &d.line {
             fx.push(line(MAIN, kind, text));
+        }
+        // the merge reached the trunk: the changes tab's merged today again
+        if d.close.as_deref() == Some("merged") {
+            fx.push(Effect::MergedChanged);
         }
         self.dirty = true;
     }

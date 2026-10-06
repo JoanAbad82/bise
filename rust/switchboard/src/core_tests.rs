@@ -3960,3 +3960,23 @@ fn approval_kinds_agree_with_proto() {
         assert_eq!(refused, bise_proto::rows::Card::approval_kind(kind), "{kind}");
     }
 }
+
+// T1 run 5 step 9: a feature merge writes no `landed` line, so the typed
+// connections' merged-today list is sent again on its own effect; any
+// other feature step (dropped, replaced, a plain line) sends nothing.
+#[test]
+fn a_feature_merge_refreshes_merged_today() {
+    let mut t = T::new();
+    let done = |close: Option<&str>| FeatureDone {
+        name: "cu".into(),
+        close: close.map(String::from),
+        line: Some(("info".into(), "✓ cu merged into main".into())),
+        ..FeatureDone::default()
+    };
+    let fx = t.go(Input::Feature(done(Some("merged"))));
+    assert_eq!(fx.iter().filter(|e| **e == Effect::MergedChanged).count(), 1, "{:?}", fx);
+    for close in [None, Some("dropped"), Some("replaced")] {
+        let fx = t.go(Input::Feature(done(close)));
+        assert!(!fx.contains(&Effect::MergedChanged), "{close:?}: {:?}", fx);
+    }
+}

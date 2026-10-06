@@ -4,7 +4,8 @@
 //! land brought it, read from the `landed` lines of main's feed (they
 //! survive a hub restart). Git and the transcript are read in a thread.
 //! Sent at a typed hello, after each land (its `landed` line in main's
-//! feed) and on `merged`.
+//! feed), after a feature merge (`Effect::MergedChanged`: it writes no
+//! landed line) and on `merged`.
 //!
 //! Interim source (architect m_9058): `by` and the after-land trigger read
 //! main's feed text (`sb landed :` lines); the structured fix is a land
@@ -19,6 +20,13 @@ use bise_proto::hub::HubEv;
 const LANDS: usize = 4000;
 
 impl Shell {
+    /// Today's merged list to every typed connection (a feature merged:
+    /// `Effect::MergedChanged`).
+    pub(super) fn merged_all(&mut self) {
+        let ids = self.typed_ids();
+        self.merged_typed(ids);
+    }
+
     pub(super) fn merged_typed(&mut self, ids: Vec<ClientId>) {
         if ids.is_empty() {
             return;

@@ -95,9 +95,24 @@ def main():
         reg = json.load(open(os.path.join(E.state, "features.json")))
         check(reg["features"][0]["trial"], "the registry: %r" % reg)
 
+        # a window's typed connection: its merged today must follow the
+        # feature merge (it writes no landed line; T1 run 5 step 9)
+        w = e2e.Client(os.path.join(E.state, "hub.sock"))
+        w.wait(lambda: w.state is not None, 20, "the window's replay")
+        w.send({"cmd": "hello", "proto": 1, "typed_only": True})
+        w.wait(lambda: any(e.get("ev") == "merged" for e in w.events), 20, "merged at hello")
+
         # 1 merge: main fast-forwarded, agents archived, branch trashed
         c.say("/answer %d 1" % m["id"])
         c.wait_line("main", "✓ cu merged into main (2 commits,", 90)
+        tip = out(E.ws, "git rev-parse main")
+
+        def merged_has_tip():
+            with w.lock:
+                ms = [e for e in w.events if e.get("ev") == "merged"]
+            return ms and any(i.get("sha") == tip for i in ms[-1]["items"])
+        w.wait(merged_has_tip, 30, "merged today with the feature merge's tip, unasked")
+        w.s.close()
         c.wait_status("cu-a", "archived", 30)
         c.wait_status("cu-b", "archived", 30)
         check(out(E.ws, "git log --format=%s main") == "cu-b\ncu-a\nignore\ninit", "linear on main")
