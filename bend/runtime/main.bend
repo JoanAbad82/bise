@@ -43,6 +43,9 @@ import ../vendor/json.bend as J
 import ./main-pure.bend as Rtp
 import ../core/edit.bend as Ed
 import ./debug.bend as Dbg
+import ./drain.bend as Dr
+import ./provider-pure.bend as Pvp
+import ./race.bend as Race
 import ./gate-pure.bend as Gp
 
 # where the loop's output goes (stdout, or a REPL socket): Pv.Out
@@ -52,47 +55,17 @@ type RtEnd is Type:
 
 # ---- the IO loop ----
 
-def print_lines(lines: List<&2, String>) -> IO(Unit):
-  match lines:
-    case Nil{}:
-      IO.pure(Unit, Unit{})
-    case Con{l, rest}:
-      do IO<Unit>:
-        IO.print(l)
-        print_lines(rest)
-
-# send one batch of lines to the loop's output; a socket send hands the
-# socket back, so the new Pv.Out is returned for the next hop.
-# every batch also leaves its breadcrumbs in the session debug log;
-# the wire log: Pv.wire_log (the provider's in-flight notes share it)
-def emit(out: Pv.Out, +lines: List<&2, String>) -> IO(Pv.Out):
-  match out:
-    case Pv.OStd{}:
-      do IO<Pv.Out>:
-        d : Unit <- Dbg.sent(lines)
-        print_lines(lines)
-        IO.pure(Pv.Out, Pv.OStd{})
-    case Pv.ONet{sock}:
-      do IO<Pv.Out>:
-        d : Unit <- Dbg.sent(lines)
-        +text : String <- IO.pure(String,
-          String.append(String.join(lines, "\n"), "\n"))
-        Pv.wire_log(text)
-        sm : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(sock, text)
-        s2 : Socket <- IO.pure(Socket, Pv.out.pair(sm))
-        IO.pure(Pv.Out, Pv.ONet{s2})
-
 def emit_call_ann(out: Pv.Out, +call: T.Call, live: Bool) -> IO(Pv.Out):
   match live:
     case True{}:
-      emit(out, Con{Rtp.call_ann(call), Nil{}})
+      Dr.emit(out, Con{Rtp.call_ann(call), Nil{}})
     case False{}:
       IO.pure(Pv.Out, out)
 
 def emit_res_ann(out: Pv.Out, +id: U32, +r: Xp.ExecRes, live: Bool) -> IO(Pv.Out):
   match live:
     case True{}:
-      emit(out, Con{Rtp.res_ann(id, r), Nil{}})
+      Dr.emit(out, Con{Rtp.res_ann(id, r), Nil{}})
     case False{}:
       IO.pure(Pv.Out, out)
 
@@ -149,9 +122,9 @@ def gate.ask_x(out: Pv.Out, +name: String, +args: String, +dir: String, +extra: 
     +nonce : String <- IO.pure(String, Gp.nonce_of(gate.rnd(ra), gate.rnd(rb)))
     +n : String <- IO.pure(String, Nat.show(now))
     u : Unit <- P.write_file(gpath, "")
-    out2 : Pv.Out <- emit(out, [Gp.ask_line_x(n, name, args, nonce, extra)])
+    out2 : Pv.Out <- Dr.emit(out, [Gp.ask_line_x(n, name, args, nonce, extra)])
     +v : Gp.Verdict <- gate.wait(0n, gpath, ipath, n, nonce)
-    out3 : Pv.Out <- emit(out2, [Gp.done_line(n, Gp.how_of(v))])
+    out3 : Pv.Out <- Dr.emit(out2, [Gp.done_line(n, Gp.how_of(v))])
     IO.pure(Pv.Out & Gp.Verdict, (out3, v))
 
 @unsafe
@@ -395,14 +368,19 @@ def exec_program.call.node(is_node: Bool, +name: String, +args: String,
     case False{}:
       Sh.exec_mcp(name, args, live)
 
+def exec_program.call.sleep.do(+secs: U32) -> IO(Xp.ExecRes):
+  do IO<Xp.ExecRes>:
+    u : Unit <- IO.sleep(U32.mul(secs, 1000))
+    IO.pure(Xp.ExecRes, Xp.Ex{True{},
+      String.append("slept ", String.append(U32.show(secs), "s"))})
+
+@unsafe
 def exec_program.call.sleep.valid.pick(valid: Bool, +secs: U32)
     -> IO(Xp.ExecRes):
   match valid:
     case True{}:
-      do IO<Xp.ExecRes>:
-        u : Unit <- IO.sleep(U32.mul(secs, 1000))
-        IO.pure(Xp.ExecRes, Xp.Ex{True{},
-          String.append("slept ", String.append(U32.show(secs), "s"))})
+      # raced: a stop ends the sleep within a tick (issue 13)
+      exec_tool.raced(exec_program.call.sleep.do(secs), "the sleep")
     case False{}:
       IO.pure(Xp.ExecRes, Xp.Ex{False{}, "sleep requires 0 < seconds < 20"})
 
@@ -486,7 +464,7 @@ def exec_program.call.bash(is_bash: Bool, +name: String, +args: String,
 def emit_sub(out: Pv.Out, +name: String, +r: Xp.ExecRes, live: Bool) -> IO(Pv.Out):
   match live:
     case True{}:
-      emit(out, Con{Rtp.sub_ann(name, r), Nil{}})
+      Dr.emit(out, Con{Rtp.sub_ann(name, r), Nil{}})
     case False{}:
       IO.pure(Pv.Out, out)
 
@@ -636,6 +614,27 @@ def exec_tool.with(out: Pv.Out, act: IO(Xp.ExecRes)) -> IO(Pv.Out & Xp.ExecRes):
     r : Xp.ExecRes <- act
     IO.pure(Pv.Out & Xp.ExecRes, (out, r))
 
+# ---- a call a stop leaves behind (issue 13) ----
+# A remote call (the merged search, an MCP tool) or a program's sleep
+# runs raced against the interrupt flag (runtime/race.bend): a stop
+# answers at once with who asked; the call itself cannot be killed and
+# may still finish (Rtp.abandoned says so). Edits and writes are never
+# raced: they are instant, and one finishing after the stop would be a
+# change nobody was told about. Bash stops its own command (bg_wrap).
+def exec_tool.raced.got(r: Race.Raced<Xp.ExecRes>, +what: String) -> Xp.ExecRes:
+  match r:
+    case Race.Won{x}:
+      x
+    case Race.Stopped{+who}:
+      Xp.Ex{False{}, Rtp.abandoned(who, what)}
+
+@unsafe
+def exec_tool.raced(act: IO(Xp.ExecRes), +what: String) -> IO(Xp.ExecRes):
+  do IO<Xp.ExecRes>:
+    +ip : String <- Pv.interrupt_path()
+    r : Race.Raced<Xp.ExecRes> <- Race.until_stop(Xp.ExecRes, ip, act)
+    IO.pure(Xp.ExecRes, exec_tool.raced.got(r, what))
+
 # the skill loader: the vibe_sdk exact-name contract, executed by
 # reading the SKILL.md the catalog points at
 def exec_tool.skill(+args: String, +live: Bool) -> IO(Xp.ExecRes):
@@ -652,7 +651,8 @@ def exec_tool.run(t: Rtp.Tool, out: Pv.Out, +name: String, +args: String,
     case Rtp.TBash{}:
       exec_tool.with(out, Sh.bash_exec(W.flat_cmd(args)))
     case Rtp.TSearch{}:
-      exec_tool.with(out, Sh.exec_search(args, live))
+      exec_tool.with(out, exec_tool.raced(Sh.exec_search(args, live),
+        "the search"))
     case Rtp.TSkill{}:
       exec_tool.with(out, exec_tool.skill(args, live))
     case Rtp.TPatch{}:
@@ -662,7 +662,8 @@ def exec_tool.run(t: Rtp.Tool, out: Pv.Out, +name: String, +args: String,
     case Rtp.TWrite{}:
       exec_tool.with(out, Edt.exec_write(args, live))
     case Rtp.TMcp{}:
-      exec_tool.with(out, Sh.exec_mcp(name, args, live))
+      exec_tool.with(out, exec_tool.raced(Sh.exec_mcp(name, args, live),
+        String.concat(["the call to ", name])))
 
 # a call past its gate: run (bash under the sandbox its allow names), or
 # its denial as a failed result
@@ -699,7 +700,7 @@ def exec_tool(out: Pv.Out, +call: T.Call, +live: Bool) -> IO(Pv.Out & Xp.ExecRes
 def emit_code_ann.pick(is_code: Bool, out: Pv.Out, +call: T.Call) -> IO(Pv.Out):
   match is_code:
     case True{}:
-      emit(out, Con{Rtp.code_ann(call), Rtp.intent_anns(call)})
+      Dr.emit(out, Con{Rtp.code_ann(call), Rtp.intent_anns(call)})
     case False{}:
       IO.pure(Pv.Out, out)
 
@@ -710,157 +711,71 @@ def emit_code_ann(out: Pv.Out, +call: T.Call, live: Bool) -> IO(Pv.Out):
     case False{}:
       IO.pure(Pv.Out, out)
 
-def steer_path() -> IO(String):
-  do IO<String>:
-    pr : Result<&1, &1, U32 & String, String> <- IO.get_env("BEND_REPL_PORT")
-    +p : String <- IO.pure(String, P.env_or(pr, "0"))
-    +d : String <- P.side_dir()
-    IO.pure(String, Rtp.steer_path_of(d, p))
-
 def harness_info(+model: String, +threshold: String) -> IO(String):
   do IO<String>:
-    +sp : String <- steer_path()
+    +sp : String <- Dr.steer_path()
     +ip : String <- Pv.interrupt_path()
     IO.pure(String, Rtp.info_line(model, threshold, sp, ip))
-
-# apply the drained lines one by one. Mid-turn Steer produces no acts
-# (apply.user.busy), so the continuation work in `after` is untouched.
-# Structural recursion on the shrinking line list; out and rt are
-# merely threaded.
-# apply the drained lines one by one. Mid-turn Steer produces no acts
-# (apply.user.busy), so the continuation work in `after` is untouched.
-# Structural recursion on the shrinking line list; out and the session
-# fields are merely threaded.
-def drain_steer.one(steers: List<&2, String>, out: Pv.Out, +sess: T.Session,
-    +script: List<&2, M.Reply>, +cmds: List<&2, T.Cmd>, live: Bool)
-    -> IO(Pv.Out & Rtp.Rt):
-  match steers:
-    case Nil{}:
-      do IO<Pv.Out & Rtp.Rt>:
-        IO.pure(Pv.Out & Rtp.Rt, (out, Rtp.Rt{sess, script, cmds, live}))
-    case Con{+l, +rest}:
-      do IO<Pv.Out & Rtp.Rt>:
-        +res : T.Res <- IO.pure(T.Res,
-          S.apply(sess, Rtp.steer_cmd(l)))
-        out2 : Pv.Out <- emit(out, Rtp.drain_steer.emit_of(res))
-        drain_steer.one(rest, out2, Rtp.drain_steer.next_of(sess, res),
-          script, cmds, live)
-
-# destructure the runtime state once, then fold the steering lines in
-def drain_steer.step(out: Pv.Out, +rt: Rtp.Rt, +steers: List<&2, String>)
-    -> IO(Pv.Out & Rtp.Rt):
-  match rt:
-    case Rtp.Rt{+sess, +script, +cmds, +live}:
-      drain_steer.one(steers, out, sess, script, cmds, live)
-
-# read-then-truncate: content that arrives after the read stays in the
-# file for the NEXT boundary, never lost, never double-applied
-def drain_steer.some(empty: Bool, +path: String, out: Pv.Out, +rt: Rtp.Rt,
-    +c: String) -> IO(Pv.Out & Rtp.Rt):
-  match empty:
-    case True{}:
-      do IO<Pv.Out & Rtp.Rt>:
-        IO.pure(Pv.Out & Rtp.Rt, (out, rt))
-    case False{}:
-      do IO<Pv.Out & Rtp.Rt>:
-        u : Unit <- P.write_file(path, "")
-        drain_steer.step(out, rt, Rtp.drain_steer.skip_go(String.split(c, Tx.newline())))
-
-def drain_steer.pick(m: Maybe<&2, String>, +path: String, out: Pv.Out, +rt: Rtp.Rt)
-    -> IO(Pv.Out & Rtp.Rt):
-  match m:
-    case None{}:
-      do IO<Pv.Out & Rtp.Rt>:
-        IO.pure(Pv.Out & Rtp.Rt, (out, rt))
-    case Some{+c}:
-      drain_steer.some(String.is_empty(c), path, out, rt, c)
-
-# ---- the interrupt side-channel (Ctrl+C in the TUI) ----
-# Same shape as the steering side-channel: the socket is only read
-# between turns, so a mid-turn interrupt would sit in the kernel buffer
-# until the turn ends. The TUI writes a flag file instead; the runtime
-# drains it right after the steering file at the same safe boundaries.
-# The Core kills the turn (CandidateDiscarded + TurnDone interrupted),
-# commits any steering the turn was holding, and the in-flight result
-# is then rejected cleanly ("no pending completion").
-
-def drain_interrupt.some(empty: Bool, +ipath: String, out: Pv.Out, +rt: Rtp.Rt,
-    +sess: T.Session, +script: List<&2, M.Reply>, +cmds: List<&2, T.Cmd>,
-    +live: Bool) -> IO(Pv.Out & Rtp.Rt):
-  match empty:
-    case True{}:
-      do IO<Pv.Out & Rtp.Rt>:
-        IO.pure(Pv.Out & Rtp.Rt, (out, rt))
-    case False{}:
-      do IO<Pv.Out & Rtp.Rt>:
-        u : Unit <- P.write_file(ipath, "")
-        +res : T.Res <- IO.pure(T.Res, S.apply(sess, T.Interrupt{}))
-        out2 : Pv.Out <- emit(out, Rtp.drain_steer.emit_of(res))
-        IO.pure(Pv.Out & Rtp.Rt,
-          (out2, Rtp.Rt{Rtp.drain_steer.next_of(sess, res), script, cmds, live}))
-
-def drain_interrupt.pick(m: Maybe<&2, String>, +ipath: String, out: Pv.Out,
-    +rt: Rtp.Rt, +sess: T.Session, +script: List<&2, M.Reply>,
-    +cmds: List<&2, T.Cmd>, live: Bool) -> IO(Pv.Out & Rtp.Rt):
-  match m:
-    case None{}:
-      do IO<Pv.Out & Rtp.Rt>:
-        IO.pure(Pv.Out & Rtp.Rt, (out, rt))
-    case Some{+c}:
-      drain_interrupt.some(String.is_empty(c), ipath, out, rt, sess,
-        script, cmds, live)
-
-# consumes the drained pair once and runs the interrupt check
-def drain_interrupt(pr: Pv.Out & Rtp.Rt) -> IO(Pv.Out & Rtp.Rt):
-  match pr:
-    case (out2, +rt2):
-      match rt2:
-        case Rtp.Rt{+sess, +script, +cmds, +live}:
-          do IO<Pv.Out & Rtp.Rt>:
-            +ipath : String <- Pv.interrupt_path()
-            m : Maybe<&2, String> <- P.read_file(ipath)
-            drain_interrupt.pick(m, ipath, out2, rt2, sess, script, cmds,
-              live)
-
-def drain_steer.file(+path: String, out: Pv.Out, +rt: Rtp.Rt) -> IO(Pv.Out & Rtp.Rt):
-  do IO<Pv.Out & Rtp.Rt>:
-    m : Maybe<&2, String> <- P.read_file(path)
-    pr : Pv.Out & Rtp.Rt <- drain_steer.pick(m, path, out, rt)
-    drain_interrupt(pr)
-
-# the entry point: scripted runs (live=False) never touch the file, so
-# the scenarios and harness-demo stay hermetic
-def drain_steer(out: Pv.Out, +rt: Rtp.Rt) -> IO(Pv.Out & Rtp.Rt):
-  match rt:
-    case Rtp.Rt{_, _, _, +live}:
-      match live:
-        case True{}:
-          do IO<Pv.Out & Rtp.Rt>:
-            path : String <- steer_path()
-            drain_steer.file(path, out, rt)
-        case False{}:
-          do IO<Pv.Out & Rtp.Rt>:
-            IO.pure(Pv.Out & Rtp.Rt, (out, rt))
 
 # consumes the exec pair once and hands (handle, cmd) to the loop's
 # continuation; the closure passed by run captures its +params and
 # self-references run, so no mutual recursion is needed
-def exec_done.drained(pd: Pv.Out & Rtp.Rt, k: Nat, +cmd: T.Cmd,
-    next: Nat -> Pv.Out -> Rtp.Rt -> T.Cmd -> IO(RtEnd)) -> IO(RtEnd):
+def exec_done.drained(pd: Pv.Out & Rtp.Rt, k: Nat, +job: Rtp.Job,
+    next: Nat -> Pv.Out -> Rtp.Rt -> Rtp.Job -> IO(RtEnd)) -> IO(RtEnd):
   match pd:
     case (out5, +rt3):
-      next(k)(out5)(rt3)(cmd)
+      next(k)(out5)(rt3)(job)
+
+# a stop is in (the flag is set): the tool's own result first, then the
+# drain that ends the turn (Rtp.tool_first, issue 13)
+def exec_done.after(pd: Pv.Out & Rtp.Rt, k: Nat, +acts: List<&2, T.Act>,
+    +after: List<&2, T.Act>,
+    next: Nat -> Pv.Out -> Rtp.Rt -> Rtp.Job -> IO(RtEnd)) -> IO(RtEnd):
+  match pd:
+    case (out6, +rt4):
+      next(k)(out6)(rt4)(Rtp.after_first(rt4, acts, after))
+
+def exec_done.first(f: Rtp.First, out4: Pv.Out, k: Nat, +after: List<&2, T.Act>,
+    next: Nat -> Pv.Out -> Rtp.Rt -> Rtp.Job -> IO(RtEnd)) -> IO(RtEnd):
+  match f:
+    case Rtp.First{+lines, +rt3, +acts}:
+      do IO<RtEnd>:
+        out5 : Pv.Out <- Dr.emit(out4, lines)
+        pd : Pv.Out & Rtp.Rt <- Dr.drain_steer(out5, rt3)
+        exec_done.after(pd, k, acts, after, next)
+
+def exec_done.pick(stop: Bool, out4: Pv.Out, k: Nat, +cmd: T.Cmd,
+    +after: List<&2, T.Act>, +rt2: Rtp.Rt,
+    next: Nat -> Pv.Out -> Rtp.Rt -> Rtp.Job -> IO(RtEnd)) -> IO(RtEnd):
+  match stop:
+    case True{}:
+      exec_done.first(Rtp.tool_first(rt2, cmd), out4, k, after, next)
+    case False{}:
+      do IO<RtEnd>:
+        pd : Pv.Out & Rtp.Rt <- Dr.drain_steer(out4, rt2)
+        exec_done.drained(pd, k, Rtp.JCmd{cmd, after}, next)
+
+# live only: is a stop in? (scripted runs never read the flag)
+def exec_done.stopped(live: Bool) -> IO(Bool):
+  match live:
+    case True{}:
+      do IO<Bool>:
+        +ip : String <- Pv.interrupt_path()
+        m : Maybe<&2, String> <- P.read_file(ip)
+        IO.pure(Bool, Pvp.interrupt_flag(m))
+    case False{}:
+      IO.pure(Bool, False{})
 
 def exec_done(pr: Pv.Out & Xp.ExecRes, k: Nat, +call: T.Call,
     +after: List<&2, T.Act>, +rt2: Rtp.Rt, +live: Bool,
-    next: Nat -> Pv.Out -> Rtp.Rt -> T.Cmd -> IO(RtEnd)) -> IO(RtEnd):
+    next: Nat -> Pv.Out -> Rtp.Rt -> Rtp.Job -> IO(RtEnd)) -> IO(RtEnd):
   match pr:
     case (out3, +r):
       do IO<RtEnd>:
         out4 : Pv.Out <- emit_res_ann(out3, Rtp.call_id(call), r, live)
         +cmd : T.Cmd <- IO.pure(T.Cmd, X.exec_cmd(r, Rtp.call_id(call)))
-        pd : Pv.Out & Rtp.Rt <- drain_steer(out4, rt2)
-        exec_done.drained(pd, k, cmd, next)
+        +stop : Bool <- exec_done.stopped(live)
+        exec_done.pick(stop, out4, k, cmd, after, rt2, next)
 
 # the same boundary for a model result: the completion is applied on the
 # drained state, so steering that arrived during the call is already in
@@ -890,7 +805,7 @@ def model_back(nr: Pv.Out & Rem.RemoteRes, +rt2: Rtp.Rt, k: Nat, +action: U32,
   match nr:
     case (n, +res):
       do IO<RtEnd>:
-        pd : Pv.Out & Rtp.Rt <- drain_steer(n, rt2)
+        pd : Pv.Out & Rtp.Rt <- Dr.drain_steer(n, rt2)
         model_done(pd, k, res, action, after, next)
 
 # one edit toolset per request (main-pure.bend retool): the provider
@@ -951,7 +866,7 @@ def run(fuel: Nat, out: Pv.Out, +rt: Rtp.Rt, +job: Rtp.Job, tr: Rtp.Trans) -> IO
                       run(k, out, rt2, job2, Rtp.transition_queued(rt2, job2))
                     case Rtp.EPrints{lines}:
                       do IO<RtEnd>:
-                        out2 : Pv.Out <- emit(out, lines)
+                        out2 : Pv.Out <- Dr.emit(out, lines)
                         run(k, out2, rt2, job2, Rtp.transition(rt2, job2))
                     case Rtp.EModel{+action, +request, +after}:
                       # the real provider call (the hub HTTP client);
@@ -978,9 +893,8 @@ def run(fuel: Nat, out: Pv.Out, +rt: Rtp.Rt, +job: Rtp.Job, tr: Rtp.Trans) -> IO
                         out2 : Pv.Out <- emit_code_ann(out1, call, live)
                         pr : Pv.Out & Xp.ExecRes <- exec_tool(out2, call, live)
                         exec_done(pr, k, call, after, rt2, live,
-                          k2 => o4 => +r3 => +c =>
-                            run(k2, o4, r3, Rtp.JCmd{c, after},
-                              Rtp.transition(r3, Rtp.JCmd{c, after})))
+                          k2 => o4 => +r3 => +j =>
+                            run(k2, o4, r3, j, Rtp.transition(r3, j)))
 
 # BEND_CONTEXT_FILE: the ephemeral context, re-read before every model
 # call (runtime/remote.bend with_context); unset or missing: ""
