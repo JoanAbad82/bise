@@ -59,7 +59,8 @@
   // the card's kind decides what typed words do (ambient m_8771, lead m_8775): a question is
   // answered by his words; an approval (merge, send, publish, run, delete: anything that acts or
   // leaves) only by 1 / 2 or a click, his words go to the agent as a plain message
-  const isApproval = (c) => !!c && ["approval", "merge", "confirm"].includes(c.kind);
+  // the hub says it (Card.approval, amb-core m_8808); until then its kind does
+  const isApproval = (c) => !!c && (c.approval != null ? !!c.approval : ["approval", "merge", "confirm"].includes(c.kind));
   // the composer answers the card above it: a question, unless he chose a plain message (esc)
   const answers = (s, d) => !!d && !isApproval(d.card) && !((s.plain || {})[keyOf(s.route)] === d.card.id);
   const oneLine = (t, n = 64) => { const l = String(t || "").split("\n")[0].trim(); return l.length > n ? `${l.slice(0, n - 1)}…` : l; };
