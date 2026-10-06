@@ -2,7 +2,7 @@
 //! step 2): fake hubs, one socket pair per connection the core opens.
 
 use super::*;
-use crate::ambient::core::{ProjectFacts, ProjectPorts};
+use crate::ambient::core::{ProjectFacts, ProjectPorts, LINGER, START};
 use bise_home::projects::Row;
 use std::collections::HashMap;
 
@@ -16,7 +16,7 @@ struct World {
 
 fn rows() -> Vec<Row> {
     let r = |id: &str, home: bool| Row { path: PathBuf::from(format!("/p/{id}")), name: id.into(), id: id.into(), home, added_ms: 0 };
-    vec![r("home", true), r("shop", false), r("docs", false)]
+    vec![r("home", true), r("shop", false), r("docs", false), r("mail", false)]
 }
 
 /// docs' open card in its view.json (docs' hub is stopped).
@@ -145,7 +145,7 @@ fn the_window_reaches_every_projects_hub_through_the_core() {
     w.until(&mut t, |o| has(o, "projects"));
     let p = t.take().into_iter().find(|v| v["ev"] == "projects").unwrap();
     let rows = p["projects"].as_array().unwrap();
-    assert_eq!(rows.iter().map(|r| r["project"].as_str().unwrap()).collect::<Vec<_>>(), ["home", "shop", "docs"]);
+    assert_eq!(rows.iter().map(|r| r["project"].as_str().unwrap()).collect::<Vec<_>>(), ["home", "shop", "docs", "mail"]);
     assert_eq!((rows[0]["home"].as_bool(), rows[0]["order"].as_u64()), (Some(true), Some(0)));
     assert_eq!((rows[1]["branch"].as_str(), rows[1]["git"].as_bool()), (Some("main"), Some(true)));
     assert_eq!((rows[2]["missing"].as_bool(), rows[2]["running"].as_bool()), (Some(true), Some(false)), "docs: from its files only");
@@ -153,13 +153,15 @@ fn the_window_reaches_every_projects_hub_through_the_core() {
     let mut open: Vec<&String> = w.open.keys().collect();
     open.sort();
     assert_eq!(open, ["home", "shop"]);
-    // before its welcome: a send is refused (never held), a subscribe kept
-    typed(&mut t, json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now"}));
-    assert!(t.take().iter().any(|v| v["ev"] == "error" && v["project"] == "shop"));
+    // before its welcome: a send waits for it (decision m_8720: sent or
+    // an error at its deadline, never silence), a subscribe is kept
+    let hi = json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now"});
+    typed(&mut t, hi.clone());
     typed(&mut t, json!({"cmd": "subscribe", "project": "shop", "agent": "main"}));
     assert!(!has(&t.take(), "error"));
     w.welcome(&mut t, "shop");
     assert_eq!(w.end("shop").next(), json!({"cmd": "subscribe", "project": "shop", "agent": "main"}), "the kept subscription at welcome");
+    assert_eq!(w.end("shop").next(), hi, "then the send that waited");
     // its typed events go out as they are; its rows feed the sidebar; the
     // hub's older event under a typed tag never does (amb-win m_8886)
     w.end("shop").say(json!({"ev": "artifacts", "rows": [], "new": [], "seen_ms": 0}));
@@ -176,9 +178,13 @@ fn the_window_reaches_every_projects_hub_through_the_core() {
     let send = json!({"cmd": "send", "project": "shop", "agent": "main", "text": "ship it", "mode": "now"});
     typed(&mut t, send.clone());
     assert_eq!(w.end("shop").next(), send);
-    // a subscribe in docs (not shown) holds docs while it lasts
+    // a subscribe in mail (not shown) holds mail while it lasts
+    typed(&mut t, json!({"cmd": "subscribe", "project": "mail", "agent": "main"}));
+    w.opened(&mut t, &["mail"]);
+    // docs' folder is gone: refused at once, its hub never started
     typed(&mut t, json!({"cmd": "subscribe", "project": "docs", "agent": "main"}));
-    w.opened(&mut t, &["docs"]);
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("refused");
+    assert_eq!((e["project"].as_str(), e["text"].as_str()), (Some("docs"), Some("docs: its folder is gone")));
     // an unknown project: refused
     typed(&mut t, json!({"cmd": "page", "project": "nope", "agent": "main", "before": 3}));
     assert!(t.take().iter().any(|v| v["ev"] == "error" && v["project"] == "nope"));
@@ -188,8 +194,8 @@ fn the_window_reaches_every_projects_hub_through_the_core() {
     w.opened(&mut t, &["shop"]);
     w.welcome(&mut t, "shop");
     assert_eq!(w.end("shop").next()["cmd"], "subscribe");
-    // the window shows nothing, docs unsubscribed: only home stays held
-    typed(&mut t, json!({"cmd": "unsubscribe", "project": "docs", "agent": "main"}));
+    // the window shows nothing, mail unsubscribed: only home stays held
+    typed(&mut t, json!({"cmd": "unsubscribe", "project": "mail", "agent": "main"}));
     typed(&mut t, json!({"cmd": "unsubscribe", "project": "shop", "agent": "main"}));
     typed(&mut t, json!({"cmd": "shown", "projects": []}));
     // what each wrote before it closed, then its end (never a timeout)
@@ -207,8 +213,71 @@ fn the_window_reaches_every_projects_hub_through_the_core() {
     let shop = closed(w.end("shop"));
     assert_eq!(shop.len(), 1, "its unsubscribe, then closed: {shop:?}");
     assert!(shop[0].contains("unsubscribe"));
-    let docs = closed(w.end("docs"));
-    assert!(docs.iter().all(|l| l.contains("\"hello\"")), "docs never welcomed: only the hellos went: {docs:?}");
+    let mail = closed(w.end("mail"));
+    assert!(mail.iter().all(|l| l.contains("\"hello\"")), "mail never welcomed: only the hellos went: {mail:?}");
+    assert!(!w.open.contains_key("docs"), "a folder gone: never a connection");
+}
+
+#[test]
+fn a_command_is_written_at_most_once_and_ends_written_or_errored() {
+    // architect m_8956: waiting never re-sends what a hub may already have
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    let (a, b) = (json!({"cmd": "answer", "project": "shop", "card": 1, "reply": "1"}), json!({"cmd": "stop", "project": "shop", "agent": "main"}));
+    typed(&mut t, a.clone());
+    typed(&mut t, b.clone());
+    w.welcome(&mut t, "shop");
+    assert_eq!((w.end("shop").next(), w.end("shop").next()), (a, b), "each once, in order, at the welcome");
+    // its hub restarts and welcomes again: nothing goes twice
+    w.end("shop").w.shutdown(std::net::Shutdown::Both).unwrap();
+    w.open.remove("shop");
+    w.opened(&mut t, &["shop"]);
+    w.welcome(&mut t, "shop");
+    let mut l = String::new();
+    assert!(w.end("shop").r.read_line(&mut l).is_err(), "nothing re-sent after a reconnection: {l}");
+    // and one that never gets a welcome ends as an error, once
+    w.end("shop").w.shutdown(std::net::Shutdown::Both).unwrap();
+    typed(&mut t, json!({"cmd": "stop", "project": "shop", "agent": "x"}));
+    t.core.tick(Instant::now() + START + Duration::from_secs(1));
+    t.core.tick(Instant::now() + START + Duration::from_secs(2));
+    t.out.extend(t.core.take_out());
+    assert_eq!(t.take().iter().filter(|v| v["ev"] == "error" && v["cmd"] == "stop").count(), 1);
+}
+
+#[test]
+fn a_command_to_a_project_not_held_connects_delivers_then_lets_go() {
+    // decision m_8720, amb-tools' run 3: bise's dock answers telemetry's
+    // card while the window shows bise only
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    w.opened(&mut t, &["home"]);
+    assert!(!w.open.contains_key("mail"));
+    let answer = json!({"cmd": "answer", "project": "mail", "card": 2, "reply": "1"});
+    typed(&mut t, answer.clone());
+    assert!(!has(&t.take(), "error"), "no refusal: it waits for its hub");
+    w.opened(&mut t, &["mail"]);
+    w.welcome(&mut t, "mail");
+    assert_eq!(w.end("mail").next(), answer, "delivered at its welcome");
+    // a send too, while it lingers: at once
+    let send = json!({"cmd": "send", "project": "mail", "agent": "main", "text": "hi", "mode": "now"});
+    typed(&mut t, send.clone());
+    assert_eq!(w.end("mail").next(), send);
+    // its hold goes once it lingered (its answers had time to come)
+    t.core.tick(Instant::now() + LINGER + Duration::from_secs(1));
+    let mut l = String::new();
+    assert_eq!(w.end("mail").r.read_line(&mut l).unwrap(), 0, "closed, nothing more: {l}");
+    // a hub that never comes: the command's error at its deadline
+    let late = json!({"cmd": "answer", "project": "shop", "card": 1, "reply": "2"});
+    typed(&mut t, late);
+    t.core.tick(Instant::now() + START + Duration::from_secs(1));
+    t.out.extend(t.core.take_out());
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("its error at the deadline");
+    assert_eq!((e["project"].as_str(), e["cmd"].as_str()), (Some("shop"), Some("answer")));
 }
 
 #[test]
@@ -234,21 +303,28 @@ fn the_rows_carry_the_open_cards_of_every_project() {
 }
 
 #[test]
-fn a_send_to_a_hub_that_went_away_is_refused_at_once() {
-    // lead m_8769 (a), amb-win m_8774 (5): never silence, never held
+fn a_send_to_a_hub_that_went_away_waits_for_it_then_says_so() {
+    // lead m_8769 (a), amb-win m_8774 (5): never silence: sent when its hub
+    // is back, else an error at the deadline
     let mut t = T::new();
     t.ready();
     let mut w = world(&mut t);
     typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
     w.opened(&mut t, &["home", "shop"]);
     w.welcome(&mut t, "shop");
+    t.take();
     w.end("shop").w.shutdown(std::net::Shutdown::Both).unwrap();
     w.open.remove("shop");
-    // the core hears it went away, then the hub is down a while
-    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "projects" && v["projects"][1]["running"] == false));
+    // the core may or may not have heard it went away: either way the
+    // send waits (a failed write on a welcomed connection too)
     t.take();
     typed(&mut t, json!({"cmd": "send", "project": "shop", "agent": "main", "text": "still there?", "mode": "now"}));
-    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("an error at once");
+    let out = t.take();
+    assert!(!has(&out, "error"), "it waits for its hub: {out:?}");
+    // its hub never says welcome again: the error at the deadline
+    t.core.tick(Instant::now() + START + Duration::from_secs(1));
+    t.out.extend(t.core.take_out());
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("an error at the deadline");
     assert_eq!((e["project"].as_str(), e["cmd"].as_str()), (Some("shop"), Some("send")));
     assert!(e["text"].as_str().unwrap().contains("nothing sent"), "{e}");
 }

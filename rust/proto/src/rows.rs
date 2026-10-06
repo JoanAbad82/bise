@@ -145,6 +145,9 @@ pub struct Worktree {
     pub path: String,
     /// its branch ("" when detached)
     pub branch: String,
+    /// the full sha it sits at ("detached at e0f3df5", amb-web m_8951)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head: Option<String>,
     /// the agent working there (none: his own)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent: Option<String>,

@@ -43,6 +43,7 @@ impl Core {
     pub fn tick(&mut self, now: Instant) {
         self.tick_talk(now);
         self.tick_speech();
+        self.tick_projects(now);
         self.poll_projects(false);
     }
 

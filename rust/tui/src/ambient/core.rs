@@ -11,6 +11,8 @@ mod voice;
 
 pub use self::cmd::Cmd;
 pub use self::hubs::{branch_of_head, ProjectFacts, ProjectPorts, Spawn};
+#[cfg(test)]
+pub use self::hubs::{LINGER, START};
 use super::hub::{Hub, HubIn};
 use super::speech::{Speech, Step};
 use crate::voicemode::{Heard, ListenJob, ListenMsg, Listener, Mic, MicBlock, MicStream, SayJob, Speaker, Synthesizer, UttId};

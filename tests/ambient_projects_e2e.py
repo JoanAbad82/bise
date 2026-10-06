@@ -81,6 +81,22 @@ def main():
         core.wait(lambda e: e.get("ev") == "entry" and e.get("project") == shop_id and e["entry"]["kind"] == "agent",
                   90, "shop's main answers")
 
+        # a project not held: a send connects to its hub on demand, goes at
+        # its welcome, then the hold goes (decision m_8720, amb-tools run 3)
+        core.cmd(cmd="unsubscribe", project=shop_id, agent="main")
+        core.cmd(cmd="shown", projects=[])
+        mark = len(core.evs)
+        core.cmd(cmd="send", project=shop_id, agent="main", text="while not shown", mode="now")
+        core.cmd(cmd="shown", projects=[shop_id])
+        core.cmd(cmd="subscribe", project=shop_id, agent="main")
+        core.wait(lambda e: e.get("ev") == "thread" and e.get("project") == shop_id
+                  and any("while not shown" in x["text"] for x in e["entries"])
+                  or e.get("ev") == "entry" and e.get("project") == shop_id and "while not shown" in e["entry"]["text"],
+                  90, "the send to an unheld shop reached its main")
+        with core.lock:
+            errs = [e for e in core.evs[mark:] if e.get("ev") == "error" and e.get("project") == shop_id]
+        check(not errs, "no refusal for an unheld project: %r" % errs)
+
         core.cmd(cmd="page", project="nope-00000000", agent="main", before=3)
         core.wait(lambda e: e.get("ev") == "error" and e.get("project") == "nope-00000000" and e.get("cmd") == "page",
                   20, "an unknown project refused")

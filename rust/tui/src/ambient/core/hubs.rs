@@ -66,7 +66,30 @@ struct Conn {
     welcomed: bool,
     /// its own rows, as its hub sent them (fresher than its view.json)
     rows: Option<(Vec<Agent>, Vec<Card>)>,
+    /// commands for a hub not welcomed yet, each with its deadline (sent
+    /// at the welcome, else an error at the deadline)
+    pending: Vec<(Value, Instant)>,
+    /// held for a command only (a project not shown, not subscribed):
+    /// closed once this passes with nothing pending
+    until: Option<Instant>,
 }
+
+impl Conn {
+    fn new(hub: Hub, until: Option<Instant>) -> Conn {
+        Conn { hub, welcomed: false, rows: None, pending: Vec::new(), until }
+    }
+
+    /// Kept though no rule holds it: a command waits or was just sent.
+    fn lingers(&self, now: Instant) -> bool {
+        !self.pending.is_empty() || self.until.is_some_and(|u| u > now)
+    }
+}
+
+/// How long a command waits for its hub's welcome (it may start).
+pub const START: Duration = Duration::from_secs(20);
+/// How long a hub held for a command stays held after it went (its
+/// answer, an error, the echo of a send).
+pub const LINGER: Duration = Duration::from_secs(15);
 
 #[derive(Default)]
 pub(super) struct Hubs {
@@ -144,8 +167,13 @@ impl Core {
         if self.hubs.ports.is_none() {
             return self.project_error(&project, &cmd, "this core has no projects");
         }
-        if !self.hubs.rows.iter().any(|r| r.id == project) {
+        let Some(row) = self.hubs.rows.iter().find(|r| r.id == project).cloned() else {
             return self.project_error(&project, &cmd, &format!("there's no project {project}"));
+        };
+        // never a hub for a folder that is gone (its hub would start on a
+        // missing workspace)
+        if cmd != "unsubscribe" && !self.folder_exists(&row.path) {
+            return self.project_error(&project, &cmd, &format!("{}: its folder is gone", row.name));
         }
         if track(&mut self.hubs.subs, &cmd, &project, &agent) {
             self.hold();
@@ -155,32 +183,94 @@ impl Core {
             // kept: sent at its hub's welcome
             ("subscribe" | "unsubscribe", false) => {}
             (_, true) => {
-                let sent = self.hubs.conns.get(&project).is_some_and(|c| c.hub.send(&v));
-                if !sent {
-                    self.project_error(&project, &cmd, "its hub went away: nothing sent. try again in a moment.");
+                let Some(c) = self.hubs.conns.get_mut(&project) else { return };
+                // the write failed: its hub just went (its Down is on its
+                // way); the reader connects again, the command waits
+                if !c.hub.send(&v) {
+                    c.welcomed = false;
+                    c.pending.push((v, Instant::now() + START));
                 }
             }
-            (_, false) => self.project_error(&project, &cmd, "its hub isn't connected yet: nothing sent. try again in a moment."),
+            // its hub connects on demand (started if needed), the command
+            // goes at its welcome, then the hold goes (decision m_8720)
+            (_, false) => self.deliver_at_welcome(&project, &row.path, v),
+        }
+    }
+
+    fn folder_exists(&self, path: &Path) -> bool {
+        self.hubs.ports.as_ref().is_some_and(|p| (p.facts.exists)(path))
+    }
+
+    /// `v` waits for `project`'s welcome on its connection, opened for it
+    /// when no rule holds that project.
+    fn deliver_at_welcome(&mut self, project: &str, path: &Path, v: Value) {
+        let now = Instant::now();
+        if !self.hubs.conns.contains_key(project) {
+            let Some(p) = self.hubs.ports.as_mut() else { return };
+            let hub = (p.spawn)(path, project);
+            self.hubs.conns.insert(project.to_string(), Conn::new(hub, Some(now + START + LINGER)));
+        }
+        if let Some(c) = self.hubs.conns.get_mut(project) {
+            c.pending.push((v, now + START));
+        }
+    }
+
+    /// Commands past their deadline get their error; the hubs held for a
+    /// command only go once it went.
+    pub(super) fn tick_projects(&mut self, now: Instant) {
+        let mut late: Vec<(String, String)> = Vec::new();
+        let mut close = false;
+        for (id, c) in self.hubs.conns.iter_mut() {
+            c.pending.retain(|(v, deadline)| {
+                let ok = *deadline > now;
+                if !ok {
+                    late.push((id.clone(), v.get("cmd").and_then(Value::as_str).unwrap_or("").to_string()));
+                }
+                ok
+            });
+            close |= c.until.is_some_and(|u| u <= now) && c.pending.is_empty();
+        }
+        for (id, cmd) in late {
+            self.project_error(&id, &cmd, "its hub didn't start: nothing sent. try again in a moment.");
+        }
+        if close {
+            self.hold_at(now);
         }
     }
 
     /// Open the connections to hold, close the others.
     fn hold(&mut self) {
-        let want = held(&self.hubs.rows, self.hubs.shown.as_deref(), &self.hubs.subs);
-        let gone: Vec<String> = self.hubs.conns.keys().filter(|id| !want.contains(*id)).cloned().collect();
+        self.hold_at(Instant::now());
+    }
+
+    fn hold_at(&mut self, now: Instant) {
+        let mut want = held(&self.hubs.rows, self.hubs.shown.as_deref(), &self.hubs.subs);
+        // a folder gone: never its hub (it would start on a missing
+        // workspace), whatever holds it
+        let gone_folders: BTreeSet<String> = self.hubs.rows.iter().filter(|r| !self.folder_exists(&r.path)).map(|r| r.id.clone()).collect();
+        want.retain(|id| !gone_folders.contains(id));
+        let gone: Vec<String> = self
+            .hubs
+            .conns
+            .iter()
+            .filter(|(id, c)| gone_folders.contains(*id) || (!want.contains(*id) && !c.lingers(now)))
+            .map(|(id, _)| id.clone())
+            .collect();
         for id in gone {
             if let Some(c) = self.hubs.conns.remove(&id) {
                 c.hub.close();
             }
         }
         for id in want {
-            if self.hubs.conns.contains_key(&id) {
+            if let Some(c) = self.hubs.conns.get_mut(&id) {
+                // a rule holds it now: no longer for a command only
+                c.until = None;
                 continue;
             }
             let Some(path) = self.hubs.rows.iter().find(|r| r.id == id).map(|r| r.path.clone()) else { continue };
             let Some(p) = self.hubs.ports.as_mut() else { return };
             let hub = (p.spawn)(&path, &id);
-            self.hubs.conns.insert(id, Conn { hub, welcomed: false, rows: None });
+            self.hubs.conns.insert(id, Conn::new(hub, None));
         }
     }
 
@@ -213,6 +303,20 @@ impl Core {
                         c.welcomed = true;
                         for agent in self.hubs.subs.get(id).into_iter().flatten() {
                             c.hub.send(&json!({"cmd": "subscribe", "project": id, "agent": agent}));
+                        }
+                        // the commands that waited for it, in order; a hub
+                        // held for them only stays a while for their answers
+                        let mut failed = Vec::new();
+                        for (cmd, _) in std::mem::take(&mut c.pending) {
+                            if !c.hub.send(&cmd) {
+                                failed.push(cmd.get("cmd").and_then(Value::as_str).unwrap_or("").to_string());
+                            }
+                        }
+                        if let Some(u) = c.until.as_mut() {
+                            *u = Instant::now() + LINGER;
+                        }
+                        for cmd in failed {
+                            self.project_error(id, &cmd, "its hub went away: nothing sent. try again in a moment.");
                         }
                     }
                     HubEv::Agents { agents, .. } => {
