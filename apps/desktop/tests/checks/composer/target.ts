@@ -38,6 +38,10 @@ export const T = {
   /** the lab's 'a turn runs' box (a running turn: tab queues) and the queued messages */
   busy: '[data-testid="lab.busy"]',
   queued: '[data-testid^="composer.queued."]',
+  /** the key bar under the field, and the lab's switches for K4 and W9 (asked of amb-web m_10035) */
+  keys: '[data-testid="composer.keys"]',
+  vision: '[data-testid="lab.vision"]',
+  voiceMode: '[data-testid="lab.voice"]',
   /** a skill of the world (the lab's fake list) */
   skill: { query: 'plain', name: 'plain-language' },
   /** amb-mac's private clipboard (2aa0294d): ⌘C/⌘X/⌘V never reach his pasteboard */
