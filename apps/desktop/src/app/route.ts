@@ -129,3 +129,21 @@ export function routeOfOpen(o: { project: string; what: 'thread' | 'review' | 'a
 export function sameRoute(a: Route, b: Route): boolean {
   return formatRoute(a) === formatRoute(b);
 }
+
+/**
+ * The start route of a test run ("show me desktop <route>", a check that
+ * opens a screen directly): `#route=<route string>` in the page's hash
+ * (amb-mac's main sets it from BISE_DESKTOP_ROUTE in test mode). None
+ * without it; a wrong one is notfound, as a link.
+ */
+export function startRouteOf(hash: string): Route | undefined {
+  const m = /^#?route=(.*)$/.exec(hash);
+  if (m === null) return undefined;
+  let path = m[1] ?? '';
+  try {
+    path = decodeURIComponent(path);
+  } catch {
+    // a broken escape: the raw words, which parse to notfound
+  }
+  return parseRoute(path);
+}

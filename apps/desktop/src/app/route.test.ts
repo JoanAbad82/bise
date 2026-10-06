@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatRoute, MAIN, parseRoute, projectOf, routeOfOpen, type Route } from './route';
+import { formatRoute, MAIN, parseRoute, projectOf, routeOfOpen, startRouteOf, type Route } from './route';
 import { createRouter } from './router';
 
 const every: Route[] = [
@@ -45,6 +45,16 @@ describe('routes', () => {
     expect(routeOfOpen({ project: 'p', what: 'review', agent: 'perf' })).toEqual({ screen: 'review', project: 'p', agent: 'perf' });
     expect(routeOfOpen({ project: 'p', what: 'artifact', id: 'x' })).toEqual({ screen: 'artifacts', project: 'p', id: 'x' });
     expect(routeOfOpen({ project: 'p', what: 'worktree' })).toEqual({ screen: 'environments', project: 'p' });
+  });
+});
+
+describe('the start route of a test run', () => {
+  it('#route=<route> opens that screen; none without it; a wrong one is notfound', () => {
+    expect(startRouteOf('#route=agent/shop-ab9f3c3b/perf')).toEqual({ screen: 'thread', project: 'shop-ab9f3c3b', agent: 'perf' });
+    expect(startRouteOf('#route=commit%2Fp%2F155ffb0')).toEqual({ screen: 'commit', project: 'p', sha: '155ffb0' });
+    expect(startRouteOf('')).toBeUndefined();
+    expect(startRouteOf('#other')).toBeUndefined();
+    expect(startRouteOf('#route=nope/x')).toEqual({ screen: 'notfound', path: 'nope/x' });
   });
 });
 

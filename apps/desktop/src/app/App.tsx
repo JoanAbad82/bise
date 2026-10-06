@@ -8,19 +8,25 @@
 // touches, never the shell, the sidebar or the composer.
 import { useEffect, useState } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
-import { formatRoute, type Route } from './route';
+import { formatRoute, startRouteOf, type Route } from './route';
 import { useMenuRouting } from './menu';
 import { Main, Row, Side, Win } from '@/ds';
 import '@/ds/index.css';
 import './app.css';
 
 export function App() {
-  const [router] = useState(() => createRouter({ screen: 'bise' }));
+  const [router] = useState(() => createRouter(firstRoute()));
   return (
     <RouterContext value={router}>
       <Shell />
     </RouterContext>
   );
+}
+
+/** bise's thread, or in test mode the run's start route (`#route=…`, amb-tools m_9577). */
+function firstRoute(): Route {
+  const test = (window as Partial<Window>).bise?.test === true;
+  return (test ? startRouteOf(window.location.hash) : undefined) ?? { screen: 'bise' };
 }
 
 function Shell() {
