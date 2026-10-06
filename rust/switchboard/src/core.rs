@@ -74,6 +74,11 @@ pub trait Env {
     fn worktree_feature(&mut self, _name: &str, feature: &str) -> Result<Workspace, String> {
         Err(format!("no feature {}", feature))
     }
+    /// bise desktop S2 (bise's home hub): the hub id of the registered
+    /// project `name` (its name or its id), never this hub's own.
+    fn project_hub(&self, name: &str) -> Result<String, String> {
+        Err(format!("no project {}", name))
+    }
 }
 
 /// A request of the `sb` CLI (RFC 0003 §4, RFC 0001 §7.2, §7.5).
@@ -208,6 +213,17 @@ pub enum AgentReq {
     /// `sb every` (docs/ambient-roadmap.md B): the hub's timers (every.rs);
     /// the Rust side's, never sent to sb-core.
     Every(EveryReq),
+    /// `sb project send <project> --input m_<n>` (bise's main, desktop S2):
+    /// the user's message `msg` to main, forwarded by reference.
+    ProjectSend {
+        project: String,
+        msg: u64,
+    },
+    /// `sb project ask <project> "<question>"`: bise's own question.
+    ProjectAsk {
+        project: String,
+        text: String,
+    },
 }
 
 /// `sb every`'s three forms.
@@ -410,6 +426,14 @@ impl AgentReq {
                 },
                 o => return Err(format!("sb every: unknown step {}", o)),
             }),
+            "project_send" => AgentReq::ProjectSend {
+                project: jstr(v, "project"),
+                msg: parse_msg_id(&jstr(v, "msg")).ok_or("usage: sb project send <project> --input m_<n>")?,
+            },
+            "project_ask" => AgentReq::ProjectAsk {
+                project: jstr(v, "project"),
+                text: jstr(v, "text"),
+            },
             other => return Err(format!("unknown command: {}", other)),
         };
         Ok(req)
@@ -521,6 +545,29 @@ pub enum Input {
     SignedIn,
     /// update-card: the end of `1` on an update item (`Effect::Update`):
     /// Ok, the switch started; Err, why it failed (nothing changed).
+    /// desktop S2, a project hub: bise's message (`xin` on hub.sock) from
+    /// bise's hub `hub`; `token` answers the caller (ack or error).
+    XIn {
+        token: Token,
+        hub: String,
+        xid: u64,
+        kind: String,
+        text: String,
+    },
+    /// desktop S2, bise's home hub: the project hub has outbox entry `xid`.
+    XAck {
+        xid: u64,
+    },
+    /// Its delivery failed (the hub away, a refusal): a retry later.
+    XFail {
+        xid: u64,
+    },
+    /// The project `name` answered it (`xreply` on hub.sock).
+    XReply {
+        xid: u64,
+        name: String,
+        text: String,
+    },
     Updated {
         card: u64,
         version: String,
@@ -696,6 +743,22 @@ pub enum Effect {
     UpdateLater {
         id: String,
     },
+    /// desktop S2, bise's home hub: deliver outbox entry `xid` to the
+    /// project hub `project` (a hub id; started when stopped), on a
+    /// thread; it comes back as `Input::XAck` or `Input::XFail`.
+    XDeliver {
+        xid: u64,
+        project: String,
+        kind: String,
+        text: String,
+    },
+    /// desktop S2, a project hub: main's answer to bise's message `xid`
+    /// goes back to bise's hub `hub` (`xreply` on its hub.sock).
+    XReply {
+        hub: String,
+        xid: u64,
+        text: String,
+    },
 }
 
 /// What a feature step did (dev-flow §5.1), for the hub: a card to open
@@ -868,6 +931,9 @@ pub struct Hub {
     /// build builds or is on trial (the `Δ`). Runtime only.
     pub feature_lids: BTreeMap<String, String>,
     pub trying: BTreeSet<String>,
+    /// desktop S2, set by the daemon: this is bise's home hub, so main
+    /// reads every user message with its id (`prompts::user_message`).
+    pub user_ids: bool,
     /// pr-hub (pr-design §7-§10), runtime but `known`: what the journal
     /// says of each place's PR (its number; `pr_*` lines, read back by
     /// `replay`); `pr_lids`: the held line of a worktree with no PR yet
@@ -1073,6 +1139,7 @@ impl Hub {
             flow: None,
             feature_lids: BTreeMap::new(),
             trying: BTreeSet::new(),
+            user_ids: false,
             pr_known: BTreeMap::new(),
             pr_lids: BTreeMap::new(),
             pr_ok_ms: BTreeMap::new(),
@@ -2139,6 +2206,15 @@ impl Hub {
             Input::Release(c) => self.release_in(&mut fx, env, c),
             Input::SignedIn => self.signed_in(&mut fx, env),
             Input::Updated { card, version, res } => self.updated(&mut fx, env, card, &version, res),
+            Input::XIn { token, hub, xid, kind, text } => {
+                let i = json!({"t": "x_in", "token": token, "hub": hub, "xid": xid, "kind": kind, "text": text});
+                self.core(&mut fx, env, None, i)
+            }
+            Input::XAck { xid } => self.core(&mut fx, env, None, json!({"t": "x_ack", "xid": xid})),
+            Input::XFail { xid } => self.core(&mut fx, env, None, json!({"t": "x_fail", "xid": xid})),
+            Input::XReply { xid, name, text } => {
+                self.core(&mut fx, env, None, json!({"t": "x_reply", "xid": xid, "name": name, "text": text}))
+            }
         }
         self.refresh_contexts(&mut fx, env.now());
         if self.dirty {
@@ -2280,6 +2356,13 @@ impl Hub {
                 }
             }
             "deliver" => self.deliver(fx, env, f),
+            "xdeliver" => fx.push(Effect::XDeliver {
+                xid: f["xid"].as_u64().unwrap_or(0),
+                project: jstr(f, "project"),
+                kind: jstr(f, "kind"),
+                text: jstr(f, "text"),
+            }),
+            "xreply" => fx.push(Effect::XReply { hub: jstr(f, "hub"), xid: f["xid"].as_u64().unwrap_or(0), text: jstr(f, "text") }),
             // not the client's `confirm` (a yes/no in the status row): a card's
             // the user's digit on a hub item (merge.rs)
             "card_choice" => self.card_choice(fx, env, f),
@@ -2366,7 +2449,7 @@ impl Hub {
         for m in f["msgs"].as_array().into_iter().flatten() {
             let id = m["id"].as_u64().unwrap_or(0);
             if let Some(msg) = self.st.msgs.get(&id) {
-                parts.push(prompts::tagged(msg, &jstr(m, "rel")));
+                parts.push(prompts::tagged(msg, &jstr(m, "rel"), self.user_ids && agent == MAIN));
             }
         }
         let text = parts.join("\n\n");
@@ -2899,6 +2982,15 @@ impl Hub {
                 reply(fx, body);
                 return;
             }
+            // desktop S2: the project's hub id (sb-core never reads the registry)
+            AgentReq::ProjectSend { project, msg } => match env.project_hub(&project) {
+                Ok(hub) => json!({"cmd": "project_send", "project": hub, "msg": msg}),
+                Err(e) => json!({"cmd": "project_send", "pre_err": e}),
+            },
+            AgentReq::ProjectAsk { project, text } => match env.project_hub(&project) {
+                Ok(hub) => json!({"cmd": "project_ask", "project": hub, "text": text}),
+                Err(e) => json!({"cmd": "project_ask", "pre_err": e}),
+            },
         };
         self.core(
             fx,

@@ -21,6 +21,7 @@ mod repl;
 mod release;
 mod session_log;
 mod versions;
+mod xhub;
 
 use history::{history_line, transcript_page};
 use repl::{adopt, adoptable, busy_at, kill_pid, supervise};
@@ -124,6 +125,12 @@ enum Msg {
         id: ClientId,
     },
     AgentNew {
+        token: Token,
+        stream: UnixStream,
+        v: Value,
+    },
+    /// bise's cross-hub `xin` / `xreply` (daemon/xhub.rs).
+    XHub {
         token: Token,
         stream: UnixStream,
         v: Value,
@@ -1221,6 +1228,8 @@ impl Shell {
             Effect::Feature { token, op, name, agents } => self.feature(token, op, name, agents),
             Effect::Update { card, id, version } => self.update_to(card, id, version),
             Effect::UpdateLater { id } => versions::update_later(&id),
+            Effect::XDeliver { xid, project, kind, text } => self.xdeliver(xid, project, kind, text),
+            Effect::XReply { hub, xid, text } => self.xreply_back(hub, xid, text),
         }
     }
 
@@ -2196,6 +2205,9 @@ impl Shell {
                 let body = self.artifact_cmd(&from, &v);
                 write_json(&mut stream, &body);
             }
+            "project_list" => {
+                write_json(&mut stream, &xhub::list_body());
+            }
             _ => match AgentReq::from_json(&v) {
                 Ok(req) => {
                     // `sb card --page <id>[#<item>]`: a page that isn't there
@@ -2280,6 +2292,9 @@ fn accept_loop(listener: UnixListener, tx: Sender<Msg>) {
                 }
                 Some("version") => {
                     let _ = tx.send(Msg::Version { stream, v });
+                }
+                Some("xin" | "xreply") => {
+                    let _ = tx.send(Msg::XHub { token: id, stream, v });
                 }
                 Some("notice") => {
                     let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
@@ -2472,6 +2487,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     crate::util::timing("start (socket bound)");
     let workspace = paths.workspace.to_string_lossy().to_string();
     let mut hub = Hub::with_core(&workspace, opts.core_bin.clone());
+    hub.user_ids = xhub::is_home(&paths.workspace);
     let (mut events, unreadable) = read_journal(&std::fs::read_to_string(paths.journal()).unwrap_or_default());
     // BISE-230: the task worktrees of the old place (<state>/worktrees/)
     // move to <home>/worktrees/<id>/<task>/, and the journal follows
@@ -2910,6 +2926,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
                 }
             }
             Msg::AgentNew { token, stream, v } => sh.agent_request(token, stream, v),
+            Msg::XHub { token, stream, v } => sh.xhub_op(token, stream, v),
             Msg::Version { mut stream, v } => {
                 let from = v.get("from").and_then(|x| x.as_str()).unwrap_or("");
                 let what = v.get("do").and_then(|x| x.as_str()).unwrap_or("");

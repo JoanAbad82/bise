@@ -24,6 +24,12 @@ import ./hub/inv.bend as HI
 
 import ./hub/timers.bend as HTM
 
+import ./hub/xhub-model.bend as HXH
+
+import ./hub/xhub.bend as HXB
+
+import ./hub/codec.bend as HCo
+
 import ./core/api.bend as Api
 
 import ./LAWS.bend as Laws
@@ -1946,6 +1952,10 @@ def hub_apply_unique(s: HM.St, e: HM.Ev, u: HI.Unique(s), k: HX.FreshEv(s, e)) -
           u
         case HM.ETimerStop{a, b, c}:
           u
+        case HM.EX{a}:
+          u
+        case HM.EAct{a}:
+          u
 
 def hub_apply_all_unique(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.Unique(s), f: HX.Fresh(evs, s)) -> HI.Unique(HM.apply_all(evs, s)):
   match evs:
@@ -2056,6 +2066,10 @@ def hub_apply_kept(s: HM.St, e: HM.Ev) -> HI.Kept(s, HM.apply(s, e)):
         case HM.ETimerRun{a, b}:
           hub_prefix_refl(HI.ids(ms))
         case HM.ETimerStop{a, b, c}:
+          hub_prefix_refl(HI.ids(ms))
+        case HM.EX{a}:
+          hub_prefix_refl(HI.ids(ms))
+        case HM.EAct{a}:
           hub_prefix_refl(HI.ids(ms))
 
 def hub_apply_all_kept(+evs: List<&2, HM.Ev>, +s: HM.St) -> HI.Kept(s, HM.apply_all(evs, s)):
@@ -2877,6 +2891,10 @@ def hub_apply_ucards(s: HM.St, e: HM.Ev, u: HI.UniqueCards(s), k: HX.FreshEv(s, 
         case HM.ETimerRun{a, b}:
           u
         case HM.ETimerStop{a, b, c}:
+          u
+        case HM.EX{a}:
+          u
+        case HM.EAct{a}:
           u
 
 def hub_apply_all_ucards(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.UniqueCards(s), f: HX.Fresh(evs, s)) -> HI.UniqueCards(HM.apply_all(evs, s)):
@@ -4245,6 +4263,10 @@ def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e
           u
         case HM.ETimerStop{a, b, c}:
           u
+        case HM.EX{a}:
+          u
+        case HM.EAct{a}:
+          u
 
 def hub_apply_all_names(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.NamesApart(s), f: HX.Fresh(evs, s)) -> HI.NamesApart(HM.apply_all(evs, s)):
   match evs:
@@ -4879,7 +4901,7 @@ def hub_live_tstop(s: HM.St, +id: Nat, +why: String, +at: Nat)
   match s:
     case HM.St{ag, od, ms, ca, no, nm, nc, tm, xs}:
       match tm:
-        case HTM.Tms{l, e, li}:
+        case HTM.Tms{l, e, li, ac, na}:
           {==}
 
 # the live timers after a drop's stops: those of no stopped id
@@ -5059,3 +5081,129 @@ def Laws.busy_batch_has_no_queued(xs):
               Laws.busy_batch_has_no_queued(t)
             case False{}:
               Laws.busy_batch_has_no_queued(t)
+
+# ---- bise's cross-hub messages (desktop S2, hub/xhub.bend) ----
+
+def Laws.xhub_only_main_forwards(s, from, id, e):
+  %Equal.sym(Bool, String.eq(from, HM.MAIN()), False{}, e) : {Bool.pick(HXB.Fwd, _, HXB.forward.done(HXH.out_by_msg(HXH.Xs.outbox(HM.St.x(s)), id), s, id), HXB.FwdErr{"only main forwards to the projects"}) == HXB.FwdErr{"only main forwards to the projects"} : HXB.Fwd}
+  {==}
+
+def Laws.xhub_forward_once(s, id, ob, e):
+  %Equal.sym(Maybe<&2, HXH.Out>, HXH.out_by_msg(HXH.Xs.outbox(HM.St.x(s)), id), Some{ob}, e) : {HXB.forward.done(_, s, id) == HXB.FwdErr{String.append(String.append(HXB.mid(id), " was already forwarded to "), HXH.Out.project(ob))} : HXB.Fwd}
+  {==}
+
+def Laws.xhub_forward_needs_his_message(m, id, e):
+  %Equal.sym(Bool, String.eq(HM.Msg.from(m), HM.USER()), False{}, e) : {Bool.pick(HXB.Fwd, Bool.and(_, String.eq(HM.Msg.to(m), HM.MAIN())), HXB.FwdOk{HM.Msg.text(m)}, HXB.FwdErr{String.append(HXB.mid(id), " is not a message the user sent you: forward his own words only (your own question: sb project ask)")}) == HXB.FwdErr{String.append(HXB.mid(id), " is not a message the user sent you: forward his own words only (your own question: sb project ask)")} : HXB.Fwd}
+  {==}
+
+# the settled head is not open
+def hub_x_settled.head(+h: HXH.Out, +t: List<&2, HXH.Out>, +xid: Nat, +e: {Nat.is_eq(HXH.Out.xid(h), xid) == True{} : Bool})
+    -> {HXB.open.of(HXH.out_of(HXH.out_op(HXH.OpSettled{}, h) <> t, xid)) == None{} : Maybe<&2, HXH.Out>}:
+  match h:
+    case HXH.Out{xi, p, k, m, tx, s, n}:
+      %Equal.sym(Bool, Nat.is_eq(xi, xid), True{}, e) : {HXB.open.of(Bool.pick(Maybe<&2, HXH.Out>, _, Some{HXH.Out{xi, p, k, m, tx, HXH.OSettled{}, n}}, HXH.out_of(t, xid))) == None{} : Maybe<&2, HXH.Out>}
+      {==}
+
+def hub_x_settled.go(c: Bool, +h: HXH.Out, +t: List<&2, HXH.Out>, +xid: Nat, +e: {Nat.is_eq(HXH.Out.xid(h), xid) == c : Bool},
+    ih: {HXB.open.of(HXH.out_of(HXH.out_set(t, xid, HXH.OpSettled{}), xid)) == None{} : Maybe<&2, HXH.Out>})
+    -> {HXB.open.of(HXH.out_of(HXH.out_set(h <> t, xid, HXH.OpSettled{}), xid)) == None{} : Maybe<&2, HXH.Out>}:
+  match c:
+    case True{}:
+      %Equal.sym(Bool, Nat.is_eq(HXH.Out.xid(h), xid), True{}, e) : {HXB.open.of(HXH.out_of(Bool.pick(List<&2, HXH.Out>, _, HXH.out_op(HXH.OpSettled{}, h) <> t, h <> HXH.out_set(t, xid, HXH.OpSettled{})), xid)) == None{} : Maybe<&2, HXH.Out>}
+      hub_x_settled.head(h, t, xid, e)
+    case False{}:
+      %Equal.sym(Bool, Nat.is_eq(HXH.Out.xid(h), xid), False{}, e) : {HXB.open.of(HXH.out_of(Bool.pick(List<&2, HXH.Out>, _, HXH.out_op(HXH.OpSettled{}, h) <> t, h <> HXH.out_set(t, xid, HXH.OpSettled{})), xid)) == None{} : Maybe<&2, HXH.Out>}
+      %Equal.sym(Bool, Nat.is_eq(HXH.Out.xid(h), xid), False{}, e) : {HXB.open.of(Bool.pick(Maybe<&2, HXH.Out>, _, Some{h}, HXH.out_of(HXH.out_set(t, xid, HXH.OpSettled{}), xid))) == None{} : Maybe<&2, HXH.Out>}
+      ih
+
+# after a settle of `xid`, no entry of it is open
+def hub_x_settled(+xs: List<&2, HXH.Out>, +xid: Nat) -> {HXB.open.of(HXH.out_of(HXH.out_set(xs, xid, HXH.OpSettled{}), xid)) == None{} : Maybe<&2, HXH.Out>}:
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      hub_x_settled.go(Nat.is_eq(HXH.Out.xid(h), xid), h, t, xid, {==}, hub_x_settled(t, xid))
+
+def Laws.xhub_outbox_settles_once(x, xid):
+  match x:
+    case HXH.Xs{ob, n, xi}:
+      hub_x_settled(ob, xid)
+
+def hub_x_seen.go(c: Bool, +h: HXH.XIn, +t: List<&2, HXH.XIn>, +i: HXH.XIn,
+    +e: {Bool.and(String.eq(HXH.XIn.hub(h), HXH.XIn.hub(i)), Nat.is_eq(HXH.XIn.xid(h), HXH.XIn.xid(i))) == c : Bool},
+    ih: {HXB.seen.of(HXH.xin_of(List.append(&2, HXH.XIn, t, [i]), HXH.XIn.hub(i), HXH.XIn.xid(i))) == True{} : Bool})
+    -> {HXB.seen.of(HXH.xin_of(List.append(&2, HXH.XIn, h <> t, [i]), HXH.XIn.hub(i), HXH.XIn.xid(i))) == True{} : Bool}:
+  match c:
+    case True{}:
+      %Equal.sym(Bool, Bool.and(String.eq(HXH.XIn.hub(h), HXH.XIn.hub(i)), Nat.is_eq(HXH.XIn.xid(h), HXH.XIn.xid(i))), True{}, e) : {HXB.seen.of(Bool.pick(Maybe<&2, HXH.XIn>, _, Some{h}, HXH.xin_of(List.append(&2, HXH.XIn, t, [i]), HXH.XIn.hub(i), HXH.XIn.xid(i)))) == True{} : Bool}
+      {==}
+    case False{}:
+      %Equal.sym(Bool, Bool.and(String.eq(HXH.XIn.hub(h), HXH.XIn.hub(i)), Nat.is_eq(HXH.XIn.xid(h), HXH.XIn.xid(i))), False{}, e) : {HXB.seen.of(Bool.pick(Maybe<&2, HXH.XIn>, _, Some{h}, HXH.xin_of(List.append(&2, HXH.XIn, t, [i]), HXH.XIn.hub(i), HXH.XIn.xid(i)))) == True{} : Bool}
+      ih
+
+# a record added last is found by its origin
+def hub_x_seen(+xs: List<&2, HXH.XIn>, +i: HXH.XIn) -> {HXB.seen.of(HXH.xin_of(List.append(&2, HXH.XIn, xs, [i]), HXH.XIn.hub(i), HXH.XIn.xid(i))) == True{} : Bool}:
+  match xs:
+    case Nil{}:
+      %Equal.sym(Bool, String.eq(HXH.XIn.hub(i), HXH.XIn.hub(i)), True{}, hub_str_eq_refl(HXH.XIn.hub(i))) : {HXB.seen.of(Bool.pick(Maybe<&2, HXH.XIn>, Bool.and(_, Nat.is_eq(HXH.XIn.xid(i), HXH.XIn.xid(i))), Some{i}, None{})) == True{} : Bool}
+      %Equal.sym(Bool, Nat.is_eq(HXH.XIn.xid(i), HXH.XIn.xid(i)), True{}, hub_eq_refl(HXH.XIn.xid(i))) : {HXB.seen.of(Bool.pick(Maybe<&2, HXH.XIn>, _, Some{i}, None{})) == True{} : Bool}
+      {==}
+    case Con{h, t}:
+      hub_x_seen.go(Bool.and(String.eq(HXH.XIn.hub(h), HXH.XIn.hub(i)), Nat.is_eq(HXH.XIn.xid(h), HXH.XIn.xid(i))), h, t, i, {==}, hub_x_seen(t, i))
+
+def Laws.xhub_xin_delivered_once(x, i):
+  match x:
+    case HXH.Xs{ob, n, xi}:
+      hub_x_seen(xi, i)
+
+def Laws.xhub_xin_replied_once(i):
+  match i:
+    case HXH.XIn{h, x, m, k, r}:
+      {==}
+
+def hub_act_gone.go(c: Bool, +h: HTM.Act, +t: List<&2, HTM.Act>, +id: Nat, +e: {Nat.is_eq(HTM.Act.id(h), id) == c : Bool},
+    ih: {HTM.act_find(HTM.act_drop(t, id), id) == None{} : Maybe<&2, HTM.Act>})
+    -> {HTM.act_find(HTM.act_drop(h <> t, id), id) == None{} : Maybe<&2, HTM.Act>}:
+  match c:
+    case True{}:
+      %Equal.sym(Bool, Nat.is_eq(HTM.Act.id(h), id), True{}, e) : {HTM.act_find(Bool.pick(List<&2, HTM.Act>, _, HTM.act_drop(t, id), h <> HTM.act_drop(t, id)), id) == None{} : Maybe<&2, HTM.Act>}
+      ih
+    case False{}:
+      %Equal.sym(Bool, Nat.is_eq(HTM.Act.id(h), id), False{}, e) : {HTM.act_find(Bool.pick(List<&2, HTM.Act>, _, HTM.act_drop(t, id), h <> HTM.act_drop(t, id)), id) == None{} : Maybe<&2, HTM.Act>}
+      %Equal.sym(Bool, Nat.is_eq(HTM.Act.id(h), id), False{}, e) : {Bool.pick(Maybe<&2, HTM.Act>, _, Some{h}, HTM.act_find(HTM.act_drop(t, id), id)) == None{} : Maybe<&2, HTM.Act>}
+      ih
+
+# dropping an id leaves no act of it
+def hub_act_gone(+xs: List<&2, HTM.Act>, +id: Nat) -> {HTM.act_find(HTM.act_drop(xs, id), id) == None{} : Maybe<&2, HTM.Act>}:
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      hub_act_gone.go(Nat.is_eq(HTM.Act.id(h), id), h, t, id, {==}, hub_act_gone(t, id))
+
+def Laws.act_fires_once(tm, id):
+  match tm:
+    case HTM.Tms{l, e, li, ac, na}:
+      hub_act_gone(ac, id)
+
+def hub_due_all.go(c: Bool, +h: HTM.Act, +t: List<&2, HTM.Act>, +now: Nat, +e: {Nat.is_le(HTM.Act.due(h), now) == c : Bool},
+    ih: {Laws.all_due(HTM.acts_due(t, now), now) == True{} : Bool})
+    -> {Laws.all_due(HTM.acts_due(h <> t, now), now) == True{} : Bool}:
+  match c:
+    case True{}:
+      %Equal.sym(Bool, Nat.is_le(HTM.Act.due(h), now), True{}, e) : {Laws.all_due(Bool.pick(List<&2, HTM.Act>, _, h <> HTM.acts_due(t, now), HTM.acts_due(t, now)), now) == True{} : Bool}
+      %Equal.sym(Bool, Nat.is_le(HTM.Act.due(h), now), True{}, e) : {Bool.and(_, Laws.all_due(HTM.acts_due(t, now), now)) == True{} : Bool}
+      ih
+    case False{}:
+      %Equal.sym(Bool, Nat.is_le(HTM.Act.due(h), now), False{}, e) : {Laws.all_due(Bool.pick(List<&2, HTM.Act>, _, h <> HTM.acts_due(t, now), HTM.acts_due(t, now)), now) == True{} : Bool}
+      ih
+
+def Laws.act_due_only(xs, now):
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      hub_due_all.go(Nat.is_le(HTM.Act.due(h), now), h, t, now, {==}, Laws.act_due_only(t, now))
+
+def Laws.unknown_kind_skipped(j, n):
+  {==}

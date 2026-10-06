@@ -242,6 +242,22 @@ pub fn rows(projects: &[Project], home_ws: &Path) -> Vec<Row> {
         .collect()
 }
 
+/// The hub id of the row named `name` (its name or its id), for a
+/// message from the hub `own` (bise desktop S2): never `own` itself, so a
+/// delivery never goes to the sender's own socket.
+pub fn target(rows: &[Row], name: &str, own: &str) -> Result<String, String> {
+    let name = name.trim().trim_start_matches('@');
+    let row = rows
+        .iter()
+        .find(|r| r.name == name)
+        .or_else(|| rows.iter().find(|r| r.id == name))
+        .ok_or_else(|| format!("no project named {name} (sb project list)"))?;
+    if row.id == own {
+        return Err(format!("{} is this hub itself", row.name));
+    }
+    Ok(row.id.clone())
+}
+
 /// The one writer: under an exclusive lock, read the list, let `f`
 /// change it, renumber the orders, write it whole (tmp + rename). `f`'s
 /// error writes nothing. A file a newer bise wrote (`v` > 1) is never

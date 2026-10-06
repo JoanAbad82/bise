@@ -25,6 +25,13 @@ impl Env for FakeEnv {
     fn now(&self) -> u64 {
         self.now
     }
+    // desktop S2: one registered project, `shop`
+    fn project_hub(&self, name: &str) -> Result<String, String> {
+        match name {
+            "shop" => Ok("shop-1".into()),
+            _ => Err(format!("no project named {}", name)),
+        }
+    }
     fn is_git(&self) -> bool {
         self.git
     }
@@ -3526,3 +3533,128 @@ fn a_batched_replay_builds_the_same_state_as_one_event_at_a_time() {
 /// `sb every`'s timers on sb-core (every_tests.rs).
 #[path = "every_tests.rs"]
 mod every_tests;
+
+// ---- desktop S2: bise's cross-hub messages (hub/xhub.bend) ----
+
+fn xdelivers(fx: &[Effect]) -> Vec<(u64, String, String, String)> {
+    fx.iter()
+        .filter_map(|e| match e {
+            Effect::XDeliver { xid, project, kind, text } => Some((*xid, project.clone(), kind.clone(), text.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+fn xreplies(fx: &[Effect]) -> Vec<(String, u64, String)> {
+    fx.iter()
+        .filter_map(|e| match e {
+            Effect::XReply { hub, xid, text } => Some((hub.clone(), *xid, text.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+fn last_msg(t: &T) -> u64 {
+    *t.hub.st.msgs.keys().max().unwrap()
+}
+
+// home side: only main forwards, only his own message, once; the outbox
+// entry is delivered, retried on the timers' clock after a failure, and
+// settled once by the project's answer, which reaches main from @<project>
+#[test]
+fn bise_forwards_his_message_once_and_settles_on_the_answer() {
+    let mut t = T::new();
+    t.user(MAIN, "the shop's login is broken, fix it");
+    let his = last_msg(&t);
+    let (tok, fx) = t.req(MAIN, AgentReq::ProjectSend { project: "shop".into(), msg: his });
+    assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "{:?}", fx);
+    assert_eq!(xdelivers(&fx), vec![(1, "shop-1".into(), "input".into(), "the shop's login is broken, fix it".into())]);
+    // once per message
+    let (tok, fx) = t.req(MAIN, AgentReq::ProjectSend { project: "shop".into(), msg: his });
+    assert!(reply(&fx, tok).unwrap()["error"].as_str().unwrap().contains("already forwarded"), "{:?}", fx);
+    assert!(xdelivers(&fx).is_empty());
+    // an unknown project, a task, a message that isn't his
+    let (tok, fx) = t.req(MAIN, AgentReq::ProjectSend { project: "nope".into(), msg: his });
+    assert!(reply(&fx, tok).unwrap()["error"].as_str().unwrap().contains("no project named nope"));
+    t.spawn_task("docs");
+    let (tok, fx) = t.req("docs", AgentReq::ProjectSend { project: "shop".into(), msg: his });
+    assert_eq!(reply(&fx, tok).unwrap()["ok"], false);
+    let (_, _) = t.req("docs", AgentReq::Send { to: MAIN.into(), text: "fyi".into(), expect_reply: false, reply_to: None, queued: false, why: String::new(), switch: None });
+    let theirs = last_msg(&t);
+    let (tok, fx) = t.req(MAIN, AgentReq::ProjectSend { project: "shop".into(), msg: theirs });
+    assert!(reply(&fx, tok).unwrap()["error"].as_str().unwrap().contains("not a message the user sent you"), "{:?}", fx);
+    // a failure: the next try is a timer, due in 1 s; not before
+    t.go(Input::XFail { xid: 1 });
+    t.env.now += 500;
+    assert!(xdelivers(&t.go(Input::Tick)).is_empty());
+    t.env.now += 600;
+    assert_eq!(xdelivers(&t.go(Input::Tick)).len(), 1);
+    // fired once
+    t.env.now += 5_000;
+    assert!(xdelivers(&t.go(Input::Tick)).is_empty());
+    // acked: no retry after a late failure's tick either
+    t.go(Input::XAck { xid: 1 });
+    t.go(Input::XFail { xid: 1 });
+    t.env.now += 60_000;
+    assert!(xdelivers(&t.go(Input::Tick)).is_empty());
+    // the answer: main hears it from @shop, once
+    t.go(Input::XReply { xid: 1, name: "shop".into(), text: "fixed on sb/login".into() });
+    let ans = t.hub.st.msgs.values().find(|m| m.from == "@shop").expect("an answer from @shop");
+    assert_eq!(ans.to, MAIN);
+    assert!(ans.text.contains("fixed on sb/login") && ans.text.contains(&format!("m_{}", his)), "{}", ans.text);
+    let n = t.hub.st.msgs.len();
+    t.go(Input::XReply { xid: 1, name: "shop".into(), text: "again".into() });
+    assert_eq!(t.hub.st.msgs.len(), n);
+    // bise's own question: no message of his needed
+    let (tok, fx) = t.req(MAIN, AgentReq::ProjectAsk { project: "shop".into(), text: "is the login fixed?".into() });
+    assert_eq!(reply(&fx, tok).unwrap()["ok"], true);
+    assert_eq!(xdelivers(&fx), vec![(2, "shop-1".into(), "ask".into(), "is the login fixed?".into())]);
+}
+
+// a pending send goes again at boot (the project drops the copy)
+#[test]
+fn a_pending_send_goes_again_after_a_restart() {
+    let mut t = T::new();
+    t.user(MAIN, "tell the shop hello");
+    let his = last_msg(&t);
+    t.req(MAIN, AgentReq::ProjectSend { project: "shop".into(), msg: his });
+    let journal = t.journal.borrow().clone();
+    let mut h = Hub::new("/w");
+    h.replay(&journal);
+    let fx = h.handle(Input::Boot, &mut FakeEnv::new());
+    assert_eq!(xdelivers(&fx).len(), 1, "{:?}", fx);
+}
+
+// project side: bise's message reaches main once per origin, as his words
+// via bise or as @bise's question; main's answer goes back once
+#[test]
+fn a_project_says_bise_message_once_and_answers_it_once() {
+    let mut t = T::new();
+    let fx = t.go(Input::XIn { token: 900, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "fix the login".into() });
+    assert_eq!(reply(&fx, 900).unwrap()["ok"], true, "{:?}", fx);
+    let said = say_to(&fx, MAIN).expect("main hears it");
+    assert!(said.contains("<user_message via=\"bise\">") && said.contains("fix the login"), "{}", said);
+    // the same origin again: acked, not said again
+    let fx = t.go(Input::XIn { token: 901, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "fix the login".into() });
+    assert_eq!(reply(&fx, 901).unwrap()["seen"], true);
+    assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none());
+    // main's turn ends: its answer goes back to bise's hub
+    let fx = t.turn(MAIN, "on it: sb/login");
+    assert_eq!(xreplies(&fx), vec![("home-1".into(), 7, "on it: sb/login".into())]);
+    // bise's own question, answered with sb send @bise --reply-to, once
+    let fx = t.go(Input::XIn { token: 902, hub: "home-1".into(), xid: 8, kind: "ask".into(), text: "status?".into() });
+    let said = say_to(&fx, MAIN).or_else(|| steer_to(&fx, MAIN)).expect("main hears it");
+    assert!(said.contains("from=\"@bise\""), "{}", said);
+    let q = last_msg(&t);
+    let send = |t: &mut T| {
+        t.req(MAIN, AgentReq::Send { to: "@bise".into(), text: "green".into(), expect_reply: false, reply_to: Some(q), queued: false, why: String::new(), switch: None })
+    };
+    let (tok, fx) = send(&mut t);
+    assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "{:?}", fx);
+    assert_eq!(xreplies(&fx), vec![("home-1".into(), 8, "green".into())]);
+    let (tok, fx) = send(&mut t);
+    assert_eq!(reply(&fx, tok).unwrap()["ok"], false);
+    assert!(xreplies(&fx).is_empty());
+    // and its end of turn sends nothing more
+    assert!(xreplies(&t.turn(MAIN, "done")).is_empty());
+}

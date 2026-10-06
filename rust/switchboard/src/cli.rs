@@ -473,6 +473,9 @@ pub fn build(args: &[String]) -> Result<Value, String> {
         "send" => {
             let (pos, o) = parse_args(rest, &["reply-to", "mode", "why", "model", "effort"], &["expect-reply"])?;
             let to = agent_arg(&pos, "usage: sb send <agent> \"<text>\"")?;
+            // desktop S2: `@bise` (bise's question in a project hub) is
+            // a sender of its own, not the agent `bise`
+            let to = if pos.first().map(String::as_str) == Some("@bise") { "@bise".to_string() } else { to };
             req.insert("to".into(), json!(to));
             // issue #4: `--model`/`--effort` move the task from its next
             // turn; the text is optional then (a switch alone)
@@ -502,6 +505,30 @@ pub fn build(args: &[String]) -> Result<Value, String> {
             // the user in main's feed (C2 `answered`)
             if o.contains_key("why") {
                 req.insert("why".into(), json!(str_of(&o, "why")));
+            }
+        }
+        // desktop S2 (bise's main): the projects, his words forwarded by
+        // reference, bise's own question
+        "project" => {
+            let (pos, o) = parse_args(rest, &["input"], &[])?;
+            let usage = "usage: sb project list | send <project> --input m_<n> | ask <project> \"<question>\"";
+            match pos.first().map(String::as_str) {
+                None | Some("list") => {
+                    req.insert("cmd".into(), json!("project_list"));
+                }
+                Some("send") => {
+                    let input = str_of(&o, "input");
+                    let msg = crate::core::parse_msg_id(&input).ok_or(usage)?;
+                    req.insert("cmd".into(), json!("project_send"));
+                    req.insert("project".into(), json!(pos.get(1).ok_or(usage)?));
+                    req.insert("msg".into(), json!(format!("{}{msg}", crate::prompts::USER_ID_PREFIX)));
+                }
+                Some("ask") => {
+                    req.insert("cmd".into(), json!("project_ask"));
+                    req.insert("project".into(), json!(pos.get(1).ok_or(usage)?));
+                    req.insert("text".into(), json!(text_of(pos.get(2..).unwrap_or(&[]))?));
+                }
+                Some(_) => return Err(usage.into()),
             }
         }
         "ask" => {
@@ -928,6 +955,11 @@ pub fn render(cmd: &str, v: &Value) -> (bool, String) {
     }
     let text = match cmd {
         "list" | "tasks" | "inspect" | "history" | "show" | "artifact" => s("text"),
+        // `sb project list` answers its text; send and ask, their outbox id
+        "project" => match v.get("xid").and_then(|x| x.as_u64()) {
+            Some(xid) => format!("sent to {} as x_{} (its answer comes to you from @<project>)", s("project"), xid),
+            None => s("text"),
+        },
         // issue #4: `sb send <task> --model <id>` alone: the hub's line
         "send" if s("cmd") == "switch" => s("text"),
         "send" => format!("sent {} to {} ({}, thread {})", s("message_id"), s("to"), s("delivery"), s("thread")),
@@ -1168,6 +1200,15 @@ mod tests {
         assert_eq!(w["text"], "v2");
         let q = build(&a(&["send", "docs", "later", "--mode", "queued"])).unwrap();
         assert_eq!(q["mode"], "queued");
+        // desktop S2: @bise keeps its @; the project commands
+        assert_eq!(build(&a(&["send", "@bise", "green", "--reply-to", "m_3"])).unwrap()["to"], "@bise");
+        let p = build(&a(&["project", "send", "shop", "--input", "m_12"])).unwrap();
+        assert_eq!((p["cmd"].as_str(), p["project"].as_str(), p["msg"].as_str()), (Some("project_send"), Some("shop"), Some("m_12")));
+        assert_eq!(build(&a(&["project", "send", "shop", "--input", "12"])).unwrap()["msg"], "m_12");
+        assert!(build(&a(&["project", "send", "shop"])).is_err());
+        let k = build(&a(&["project", "ask", "shop", "is", "it", "green?"])).unwrap();
+        assert_eq!((k["cmd"].as_str(), k["text"].as_str()), (Some("project_ask"), Some("is it green?")));
+        assert_eq!(build(&a(&["project"])).unwrap()["cmd"], "project_list");
         assert!(build(&a(&["send", "docs", "x", "--mode", "soon"])).is_err());
     }
 

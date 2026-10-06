@@ -115,6 +115,21 @@ fn home_is_row_zero_and_never_in_the_file() {
     assert!(remove(&mut l2, "bise").is_err());
 }
 
+// desktop S2: a cross-hub message goes to a registered row, by name or
+// id, and never to the sender's own hub (architect m_8524 3.)
+#[test]
+fn target_is_a_row_and_never_the_sender() {
+    let l = vec![Project { path: "/c/shop".into(), name: "shop".into(), order: 0, added_ms: 1 }];
+    let r = rows(&l, Path::new("/u/bise"));
+    let (home, shop) = (crate::hub_id(Path::new("/u/bise")), crate::hub_id(Path::new("/c/shop")));
+    assert_eq!(target(&r, "shop", &home), Ok(shop.clone()));
+    assert_eq!(target(&r, "@shop", &home), Ok(shop.clone()));
+    assert_eq!(target(&r, &shop, &home), Ok(shop.clone()));
+    assert!(target(&r, "shop", &shop).unwrap_err().contains("this hub itself"));
+    assert!(target(&r, "bise", &home).unwrap_err().contains("this hub itself"));
+    assert!(target(&r, "nope", &home).unwrap_err().contains("no project named nope"));
+}
+
 // amb-core m_8673: the home workspace named through a symlink
 // (/var/folders vs /private/var/folders) is one row, its hub's id
 #[test]

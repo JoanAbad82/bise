@@ -83,6 +83,10 @@ type Ev is Data:
   ETimerFired{id: Nat, fired: Nat, next: Nat, at: Nat, undelivered: Bool}
   ETimerRun{id: Nat, at: Nat}
   ETimerStop{id: Nat, why: String, at: Nat}
+  # bise desktop S2: the cross-hub state's lines (xhub-model.bend) and
+  # the acts' (timers.bend): one constructor each, their kinds inside
+  EX{e: XH.XEv}
+  EAct{e: TM.ActEv}
 
 type AgentOp is Data:
   OLife{life: Life, reason: Maybe<&2, String>}
@@ -560,6 +564,10 @@ def apply(+st: St, e: Ev) -> St:
           St{agents, order, msgs, cards, notes, nm, nc, TM.run(tm, id, at), xs}
         case ETimerStop{+id, +why, +at}:
           St{agents, order, msgs, cards, notes, nm, nc, TM.stop(tm, id, why, at), xs}
+        case EX{+xe}:
+          St{agents, order, msgs, cards, notes, nm, nc, tm, XH.apply(xs, xe)}
+        case EAct{+ae}:
+          St{agents, order, msgs, cards, notes, nm, nc, TM.act_apply(tm, ae), xs}
 
 # the state after a journal: the replay of a list of events
 def apply_all(evs: List<&2, Ev>, +st: St) -> St:

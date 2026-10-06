@@ -13,6 +13,10 @@ import ./codec.bend as C
 
 import ./timers.bend as TM
 
+import ./xhub-model.bend as XH
+
+import ./xhub.bend as XB
+
 type Snd is Data:
   Snd{from: String, to: String, text: String, expect: Bool,
     reply_to: Maybe<&2, Nat>, plain: Bool, auto: Bool, queued: Bool,
@@ -75,6 +79,10 @@ type In is Data:
   IEverySet{}
   IEveryStop{}
   IEveryRun{}
+  IXIn{}
+  IXAck{}
+  IXFail{}
+  IXReply{}
   INone{}
 
 type CardK is Data:
@@ -101,6 +109,8 @@ type Cmd is Data:
   CIsolate{}
   CMove{}
   CWithdraw{}
+  CProjectSend{}
+  CProjectAsk{}
 
 # the hub after an input: the new state and its effects, or, when a git
 # answer is missing, the hub unchanged and the query (the daemon replays
@@ -2061,6 +2071,186 @@ def focus(-o: M.St, +cx: X.Cx<o>, +f: String, note: Maybe<&2, String>, +direct: 
     case None{}:
       cx
 
+# ---- cross-hub (S2, hub/xhub.bend) ----
+# The steps of bise's cross-hub messages, wired around xhub.bend's pure
+# decisions: they call send, emit, out and reply, which are core's, and
+# xhub.bend cannot import core (Bend has no import cycles). Nothing is
+# decided here. Home side (bise's hub): `sb project send|ask` puts an
+# entry in the outbox and asks the hub for an `xdeliver`; the delivery's
+# ack or failure (a retry act, timers.bend's one clock) and the project's
+# answer (to main, from `@<project>`) come back as inputs. Project side:
+# `x_in` says it to main once per origin, as the user's words via bise
+# or as `@bise`'s question; main's answer (the end of its turn, or
+# `sb send @bise --reply-to`) goes back once, as an `xreply`.
+
+def xst(-o: M.St, +cx: X.Cx<o>) -> XH.Xs:
+  M.St.x(st(o, cx))
+
+def xemit(-o: M.St, +cx: X.Cx<o>, +e: XH.XEv) -> X.Cx<o>:
+  emit(o, cx, M.EX{e}, Unit{}, Unit{}, Unit{})
+
+def aemit(-o: M.St, +cx: X.Cx<o>, +e: TM.ActEv) -> X.Cx<o>:
+  emit(o, cx, M.EAct{e}, Unit{}, Unit{}, Unit{})
+
+def xdeliver(-o: M.St, +cx: X.Cx<o>, +ob: XH.Out) -> X.Cx<o>:
+  out(o, cx, [J.kv("fx", J.JStr{"xdeliver"}), J.kv("xid", J.JNum{XH.Out.xid(ob)}),
+    J.kv("project", J.JStr{XH.Out.project(ob)}), J.kv("kind", J.JStr{XH.kind_str(XH.Out.kind(ob))}),
+    J.kv("msg", J.JNum{XH.Out.msg(ob)}), J.kv("text", J.JStr{XH.Out.text(ob)})])
+
+# home: a new outbox entry, journaled, then its first delivery
+def xsend.new(-o: M.St, +cx: X.Cx<o>, +token: Nat, +ob: XH.Out) -> X.Cx<o>:
+  +cx2 = xdeliver(o, xemit(o, cx, XH.XOut{ob}), ob)
+  reply(o, cx2, token, ok_body([J.kv("xid", J.JNum{XH.Out.xid(ob)}), J.kv("project", J.JStr{XH.Out.project(ob)})]))
+
+def xsend.fwd(-o: M.St, f: XB.Fwd, +cx: X.Cx<o>, +token: Nat, +project: String, +id: Nat) -> X.Cx<o>:
+  match f:
+    case XB.FwdErr{+e}:
+      reply_err(o, cx, token, e)
+    case XB.FwdOk{+text}:
+      xsend.new(o, cx, token, XB.new_out(xst(o, cx), project, XH.KInput{}, id, text))
+
+# `sb project send <p> --input m_<n>` (main only, req.main): `pre_err`,
+# the hub's (an unknown project, this hub itself)
+def req_xsend(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
+  match pre:
+    case Some{+e}:
+      reply_err(o, cx, token, e)
+    case None{}:
+      xsend.fwd(o, XB.forward(st(o, cx), M.MAIN(), C.get_nat(q, "msg")), cx, token, C.get_s(q, "project"), C.get_nat(q, "msg"))
+
+def req_xask.go(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
+  match err:
+    case Some{+e}:
+      reply_err(o, cx, token, e)
+    case None{}:
+      xsend.new(o, cx, token, XB.new_out(xst(o, cx), C.get_s(q, "project"), XH.KAsk{}, 0n, C.get_s(q, "text")))
+
+# `sb project ask <p> "<question>"` (main only): bise's own words
+def req_xask(-o: M.St, pre: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
+  req_xask.go(o, Maybe.or(&2, String, pre, Bool.pick(Maybe<&2, String>, M.trim_is_empty(C.get_s(q, "text")), Some{"empty question"}, None{})), cx, token, q)
+
+# home: the project hub has it (a late ack of a settled send: nothing)
+def xack(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:
+  match m:
+    case None{}:
+      cx
+    case Some{_}:
+      xemit(o, cx, XH.XOp{xid, XH.OpAcked{}})
+
+# home: a delivery failed: one more try, and the next one's act
+def xfail(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>, +xid: Nat) -> X.Cx<o>:
+  match m:
+    case None{}:
+      cx
+    case Some{+ob}:
+      +cx2 = xemit(o, cx, XH.XOp{xid, XH.OpTried{}})
+      aemit(o, cx2, TM.ActSet{XB.retry_act(tms(o, cx2), xid, XH.Out.tries(ob), now(o, cx2))})
+
+def xanswer.kind(k: XH.XKind, +ob: XH.Out, +text: String) -> String:
+  match k:
+    case XH.KInput{}:
+      cat(["(answer to the user's ", mid(XH.Out.msg(ob)), " you forwarded) ", text])
+    case XH.KAsk{}:
+      cat(["(answer to your question \"", M.clip(M.one_line(XH.Out.text(ob)), 200n), "\") ", text])
+
+def xanswer.text(+ob: XH.Out, +text: String) -> String:
+  xanswer.kind(XH.Out.kind(ob), ob, text)
+
+# home: the project's answer settles its send, once (law
+# xhub_outbox_settles_once) and reaches main from `@<project>`
+def xanswer(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>, +xid: Nat, +name: String, +text: String) -> X.Cx<o>:
+  match m:
+    case None{}:
+      cx
+    case Some{+ob}:
+      +cx2 = xemit(o, cx, XH.XOp{xid, XH.OpSettled{}})
+      fst(o, send(o, cx2, msg(String.append("@", name), M.MAIN(), xanswer.text(ob, text), False{}, None{}, False{}, False{})))
+
+def xretry(-o: M.St, m: Maybe<&2, XH.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
+  match m:
+    case None{}:
+      cx
+    case Some{+ob}:
+      xdeliver(o, cx, ob)
+
+def act_fire(-o: M.St, w: TM.What, +cx: X.Cx<o>) -> X.Cx<o>:
+  match w:
+    case TM.Retry{+xid}:
+      xretry(o, XB.pending(xst(o, cx), xid), cx)
+    case TM.RouteSend{_}:
+      # the 2 s routing hold: step 2
+      cx
+
+def acts_tick.each(-o: M.St, xs: List<&2, TM.Act>, +cx: X.Cx<o>) -> X.Cx<o>:
+  match xs:
+    case Nil{}:
+      cx
+    case Con{+a, +rest}:
+      acts_tick.each(o, rest, act_fire(o, TM.Act.what(a), aemit(o, cx, TM.ActDone{TM.Act.id(a)})))
+
+# the acts due at the tick fire once each (laws act_fires_once,
+# act_due_only); none due: nothing (idle-cpu)
+def acts_tick(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+  acts_tick.each(o, TM.acts_due(TM.Tms.acts(tms(o, cx)), now(o, cx)), cx)
+
+def xboot.each(-o: M.St, xs: List<&2, XH.Out>, +cx: X.Cx<o>) -> X.Cx<o>:
+  match xs:
+    case Nil{}:
+      cx
+    case Con{+ob, +rest}:
+      xboot.each(o, rest, xdeliver(o, cx, ob))
+
+# home: at boot the pending sends go again (the project drops a second
+# copy: law xhub_xin_delivered_once)
+def xboot(-o: M.St, +cx: X.Cx<o>) -> X.Cx<o>:
+  xboot.each(o, XB.pendings(XH.Xs.outbox(xst(o, cx))), cx)
+
+def xin.snd(k: XH.XKind, +text: String) -> Snd:
+  match k:
+    case XH.KInput{}:
+      Snd{M.USER(), M.MAIN(), text, True{}, None{}, False{}, False{}, False{}, Some{XB.VIA_BISE()}}
+    case XH.KAsk{}:
+      Snd{XB.FROM_BISE(), M.MAIN(), text, True{}, None{}, False{}, False{}, False{}, None{}}
+
+def xin.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat, +k: XH.XKind) -> X.Cx<o>:
+  match p:
+    case (+cx, SErr{+e}):
+      reply_err(o, cx, token, e)
+    case (+cx, SOk{+m}):
+      reply(o, xemit(o, cx, XH.XGot{XH.XIn{hub, xid, M.Msg.id(m), k, False{}}}), token, ok_body(Nil{}))
+
+# project: bise's message, said to main once per origin (hub, xid)
+def xin(-o: M.St, seen: Bool, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +k: XH.XKind, +text: String) -> X.Cx<o>:
+  match seen:
+    case True{}:
+      reply(o, cx, token, ok_body([J.kv("seen", J.JBool{True{}})]))
+    case False{}:
+      xin.sent(o, send(o, cx, xin.snd(k, text)), token, hub, xid, k)
+
+# project: main answered bise's message: settled here, sent back once
+# (law xhub_xin_replied_once)
+def xreplied(-o: M.St, +cx: X.Cx<o>, +i: XH.XIn, +text: String) -> X.Cx<o>:
+  +cx2 = emit(o, cx, M.ESettled{XH.XIn.msg(i)}, Unit{}, Unit{}, Unit{})
+  +cx3 = xemit(o, cx2, XH.XReplied{XH.XIn.hub(i), XH.XIn.xid(i)})
+  out(o, cx3, [J.kv("fx", J.JStr{"xreply"}), J.kv("hub", J.JStr{XH.XIn.hub(i)}),
+    J.kv("xid", J.JNum{XH.XIn.xid(i)}), J.kv("text", J.JStr{text})])
+
+def xreply_due(+s: M.St, +from: String, r: Maybe<&2, Nat>) -> Maybe<&2, XH.XIn>:
+  match r:
+    case None{}:
+      None{}
+    case Some{+id}:
+      Bool.pick(Maybe<&2, XH.XIn>, String.eq(from, M.MAIN()), XB.reply_due(M.St.x(s), id), None{})
+
+# project: `sb send @bise --reply-to m_<n> "..."`: main's answer to an
+# open message of bise's, before its turn ends
+def req_xreply(-o: M.St, r: Maybe<&2, XH.XIn>, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
+  match r:
+    case None{}:
+      reply_err(o, cx, token, "@bise takes only main's answer to an open message from bise: sb send @bise --reply-to m_<n> \"...\"")
+    case Some{+i}:
+      reply(o, xreplied(o, cx, i, C.get_s(q, "text")), token, ok_body([J.kv("to", J.JStr{XB.FROM_BISE()}), J.kv("delivery", J.JStr{"sent"})]))
+
 # ---- the agents' `sb` requests (RFC 0003 §4, RFC 0001 §7.2, §7.5) ----
 
 def jstr_list.one(h: J.Json, +rest: List<&2, String>) -> List<&2, String>:
@@ -2145,7 +2335,9 @@ def req_send.hold(+s: M.St, r: Maybe<&2, Nat>) -> Maybe<&2, Nat>:
       M.card_holding(M.St.cards(s), id)
 
 def req_send(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
-  req_send.held(o, req_send.hold(st(o, cx), C.opt_nat(J.get(q, "reply_to"))), cx, token, from, q)
+  pick_lazy(X.Cx<o>, String.eq(C.get_s(q, "to"), XB.FROM_BISE()),
+    u => req_xreply(o, xreply_due(st(o, cx), from, C.opt_nat(J.get(q, "reply_to"))), cx, token, q),
+    u => req_send.held(o, req_send.hold(st(o, cx), C.opt_nat(J.get(q, "reply_to"))), cx, token, from, q))
 def wait.park(-o: M.St, +cx: X.Cx<o>, +w: X.Waiter) -> X.Cx<o>:
   +r = rr(o, cx)
   +cx2 = set_r(o, cx, X.R.with_waiters(r, M.snoc(X.Waiter, X.R.waiters(r), w)))
@@ -2427,7 +2619,9 @@ def cmd_tag(+c: String) -> Cmd:
   Bool.pick(Cmd, String.eq(c, "restore"), CRestore{},
   Bool.pick(Cmd, String.eq(c, "isolate"), CIsolate{},
   Bool.pick(Cmd, String.eq(c, "move"), CMove{},
-  Bool.pick(Cmd, String.eq(c, "withdraw"), CWithdraw{}, CCard{})))))))))))))))
+  Bool.pick(Cmd, String.eq(c, "withdraw"), CWithdraw{},
+  Bool.pick(Cmd, String.eq(c, "project_send"), CProjectSend{},
+  Bool.pick(Cmd, String.eq(c, "project_ask"), CProjectAsk{}, CCard{})))))))))))))))))
 
 def req.main.go(-o: M.St, c: Cmd, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx<o>:
   match c:
@@ -2451,6 +2645,10 @@ def req.main.go(-o: M.St, c: Cmd, +cx: X.Cx<o>, +token: Nat, +q: J.Json) -> X.Cx
       req_task.res(o, move_task(o, C.opt_str(J.get(q, "pre_err")), cx, C.get_s(q, "agent"), J.get(q, "ws")), token)
     case CWithdraw{}:
       req_withdraw(o, M.card_of(M.St.cards(st(o, cx)), C.get_nat(q, "card")), cx, token, C.get_nat(q, "card"), C.get_s(q, "why"))
+    case CProjectSend{}:
+      req_xsend(o, C.opt_str(J.get(q, "pre_err")), cx, token, q)
+    case CProjectAsk{}:
+      req_xask(o, C.opt_str(J.get(q, "pre_err")), cx, token, q)
     case _:
       req_card(o, C.opt_nat(J.get(q, "for")), cx, token, C.get_s(q, "text"))
 
@@ -2722,7 +2920,7 @@ def skip_steered(xs: List<&2, M.Msg>, +skip: Bool, +ids: List<&2, Nat>) -> List<
 
 # RFC 0003 §5.1: the end-of-turn answer to `@task message` typed in
 # another view goes back to that view, and main gets it as a note
-def auto_reply(-o: M.St, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: M.Msg, +body: String) -> X.Cx<o>:
+def auto_reply.local(-o: M.St, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: M.Msg, +body: String) -> X.Cx<o>:
   match via:
     case None{}:
       fst(o, send(o, cx, msg(agent, M.Msg.from(m), body, False{}, Some{M.Msg.id(m)}, False{}, True{})))
@@ -2732,6 +2930,17 @@ def auto_reply(-o: M.St, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +
       +cx3 = line(o, cx2, view, "msg-you", cat([agent, " : ", body]))
       note_main(o, cx3, cat(["@", agent, " answered the user (asked from @", view, "'s view: \"", M.clip(M.one_line(M.Msg.text(m)), 500n),
         "\"): \"", M.clip_tail(M.one_line(body), 2000n), "\""]))
+
+# a message bise sent this hub (S2) is answered back to bise's hub
+def auto_reply.x(-o: M.St, r: Maybe<&2, XH.XIn>, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: M.Msg, +body: String) -> X.Cx<o>:
+  match r:
+    case Some{+i}:
+      xreplied(o, cx, i, body)
+    case None{}:
+      auto_reply.local(o, via, cx, agent, m, body)
+
+def auto_reply(-o: M.St, via: Maybe<&2, String>, +cx: X.Cx<o>, +agent: String, +m: M.Msg, +body: String) -> X.Cx<o>:
+  auto_reply.x(o, XB.reply_due(xst(o, cx), M.Msg.id(m)), via, cx, agent, m, body)
 
 # RFC 0003 §7: a question gets an answer, the end of the turn
 def auto_replies(-o: M.St, qs: List<&2, M.Msg>, +cx: X.Cx<o>, +agent: String, +body: String) -> X.Cx<o>:
@@ -2844,7 +3053,14 @@ def in_tag(+t: String) -> In:
   Bool.pick(In, String.eq(t, "every_set"), IEverySet{},
   Bool.pick(In, String.eq(t, "every_stop"), IEveryStop{},
   Bool.pick(In, String.eq(t, "every_run"), IEveryRun{},
-  INone{})))))))))))))))))))))))))))))))))))
+  # bise's cross-hub messages (S2, the `cross-hub` section): a project
+  # hub receives one (x_in); bise's home hub hears how its delivery went
+  # (x_ack, x_fail) and the project's answer (x_reply)
+  Bool.pick(In, String.eq(t, "x_in"), IXIn{},
+  Bool.pick(In, String.eq(t, "x_ack"), IXAck{},
+  Bool.pick(In, String.eq(t, "x_fail"), IXFail{},
+  Bool.pick(In, String.eq(t, "x_reply"), IXReply{},
+  INone{})))))))))))))))))))))))))))))))))))))))
 
 # `/close N`: the user files a card without answering it
 def close_by_user(-o: M.St, m: Maybe<&2, M.Card>, +cx: X.Cx<o>, +id: Nat) -> X.Cx<o>:
@@ -2873,7 +3089,7 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
     case IReq{}:
       agent_req(o, cx, C.get_nat(i, "token"), C.get_s(i, "from"), Maybe.default(&2, J.Json, J.get(i, "req"), J.JNull{}))
     case ITick{}:
-      timers_tick(o, tick(o, cx))
+      acts_tick(o, timers_tick(o, tick(o, cx)))
     case IIdle{}:
       repl_idle(o, cx, C.get_s(i, "agent"), C.get_b(i, "leftover"), C.get_b(i, "held"))
     case ITurnStarted{}:
@@ -2891,7 +3107,7 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
     case IExited{}:
       repl_exited(o, cx, C.get_s(i, "agent"), C.get_b(i, "crashed"), C.get_s(i, "reason"))
     case IBoot{}:
-      boot(o, cx)
+      xboot(o, boot(o, cx))
     case ISay{}:
       user_says(o, cx, C.get_s(i, "focus"), C.get_s(i, "text"), C.get_b(i, "queued"))
     case IRoute{}:
@@ -2940,6 +3156,14 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
       timer_stop(o, cx, i)
     case IEveryRun{}:
       timer_run(o, cx, i)
+    case IXIn{}:
+      xin(o, XB.seen(xst(o, cx), C.get_s(i, "hub"), C.get_nat(i, "xid")), cx, C.get_nat(i, "token"), C.get_s(i, "hub"), C.get_nat(i, "xid"), XH.kind_of(C.get_s(i, "kind")), C.get_s(i, "text"))
+    case IXAck{}:
+      xack(o, XB.pending(xst(o, cx), C.get_nat(i, "xid")), cx, C.get_nat(i, "xid"))
+    case IXFail{}:
+      xfail(o, XB.pending(xst(o, cx), C.get_nat(i, "xid")), cx, C.get_nat(i, "xid"))
+    case IXReply{}:
+      xanswer(o, XB.open(xst(o, cx), C.get_nat(i, "xid")), cx, C.get_nat(i, "xid"), C.get_s(i, "name"), C.get_s(i, "text"))
     case INone{}:
       cx
 

@@ -40,6 +40,9 @@ import ./hub/cx.bend as HX
 import ./hub/core.bend as HC
 import ./hub/inv.bend as HI
 import ./hub/timers.bend as HTM
+import ./hub/xhub-model.bend as HXH
+import ./hub/xhub.bend as HXB
+import ./hub/codec.bend as HCo
 
 # LAW: a checkpoint restores to exactly the session it exported.
 law checkpoint_roundtrip:
@@ -4423,6 +4426,84 @@ law user_queued_said_at_idle:
   for +q: List<&2, HM.Msg>
   for +m: Bool
   {HC.pump.run(o, HM.RIdle{}, cx, name, q, m) == HC.pump.batch(o, q, cx, name, False{}, m) : HX.Cx<o>}
+
+# ---- bise's cross-hub messages (desktop S2, hub/xhub.bend) ----
+# Local laws on xhub.bend's decisions and xhub-model.bend's state: the
+# core's `cross-hub` section only wires them (it decides nothing).
+
+# LAW: only main forwards the user's words to a project.
+law xhub_only_main_forwards:
+  for +s: HM.St
+  for +from: String
+  for +id: Nat
+  for e: {String.eq(from, HM.MAIN()) == False{} : Bool}
+  {HXB.forward(s, from, id) == HXB.FwdErr{"only main forwards to the projects"} : HXB.Fwd}
+
+# LAW: a message of his is forwarded once: with an outbox entry for it,
+# main's forward is refused.
+law xhub_forward_once:
+  for +s: HM.St
+  for +id: Nat
+  for +ob: HXH.Out
+  for e: {HXH.out_by_msg(HXH.Xs.outbox(HM.St.x(s)), id) == Some{ob} : Maybe<&2, HXH.Out>}
+  {HXB.forward(s, HM.MAIN(), id) == HXB.FwdErr{String.append(String.append(HXB.mid(id), " was already forwarded to "), HXH.Out.project(ob))} : HXB.Fwd}
+
+# LAW: only his own words go by reference (architect's B): a message not
+# from the user is refused, whatever it says (bise's own question goes by
+# `sb project ask`, from @bise, with no authority).
+law xhub_forward_needs_his_message:
+  for +m: HM.Msg
+  for +id: Nat
+  for e: {String.eq(HM.Msg.from(m), HM.USER()) == False{} : Bool}
+  {HXB.his.go(Some{m}, id) == HXB.FwdErr{String.append(HXB.mid(id), " is not a message the user sent you: forward his own words only (your own question: sb project ask)")} : HXB.Fwd}
+
+# LAW: a send settles once: after its settle, no answer opens it again
+# (a second x_reply for it changes nothing: core's xanswer on None).
+law xhub_outbox_settles_once:
+  for +x: HXH.Xs
+  for +xid: Nat
+  {HXB.open(HXH.x_op(x, xid, HXH.OpSettled{}), xid) == None{} : Maybe<&2, HXH.Out>}
+
+# LAW: a delivery is said once: once received, the same origin (hub, xid)
+# is seen (core's xin acks it and says nothing).
+law xhub_xin_delivered_once:
+  for +x: HXH.Xs
+  for +i: HXH.XIn
+  {HXB.seen(HXH.x_in(x, i), HXH.XIn.hub(i), HXH.XIn.xid(i)) == True{} : Bool}
+
+# LAW: an answered record is never due again (core's xreplied journals
+# x_replied with each answer it sends back).
+law xhub_xin_replied_once:
+  for +i: HXH.XIn
+  {HXB.reply.of(Some{HXH.XIn.done(i)}) == None{} : Maybe<&2, HXH.XIn>}
+
+# LAW (one clock): an act fires once: after its act_done, it is gone.
+law act_fires_once:
+  for +tm: HTM.Tms
+  for +id: Nat
+  {HTM.act_find(HTM.Tms.acts(HTM.act_done(tm, id)), id) == None{} : Maybe<&2, HTM.Act>}
+
+def all_due(xs: List<&2, HTM.Act>, +now: Nat) -> Bool:
+  match xs:
+    case Nil{}:
+      True{}
+    case Con{+h, +t}:
+      Nat.is_le(HTM.Act.due(h), now) && all_due(t, now)
+
+# LAW (one clock): a tick fires only acts due by its now.
+law act_due_only:
+  for +xs: List<&2, HTM.Act>
+  for +now: Nat
+  {all_due(HTM.acts_due(xs, now), now) == True{} : Bool}
+
+# LAW (old-core replay, architect m_8524 c.): a journal line of a kind
+# this sb-core doesn't know decodes to nothing, so it is skipped, never
+# misread; the script test replays a fixture journal with the base's
+# sb-core for the other direction.
+law unknown_kind_skipped:
+  for +j: J.Json
+  for +n: String
+  {HCo.ev_of.kind(HCo.KUnknown{}, j, n) == None{} : Maybe<&2, HM.Ev>}
 
 # LAW (L12): stopping or dropping a task, in any state where no two open
 # cards share an id (every state the hub reaches: cards_unique), leaves no

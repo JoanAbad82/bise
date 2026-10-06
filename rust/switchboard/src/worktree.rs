@@ -273,6 +273,12 @@ impl Env for GitEnv {
         self.merged.insert(branch.to_string(), head.to_string());
     }
 
+    fn project_hub(&self, name: &str) -> Result<String, String> {
+        let home = bise_home::Home::from_env();
+        let rows = bise_home::projects::list(&home, &crate::paths::home_workspace());
+        bise_home::projects::target(&rows, name, &crate::paths::workspace_id(self.ws()))
+    }
+
     fn is_git(&self) -> bool {
         is_git_dir(self.ws())
     }
