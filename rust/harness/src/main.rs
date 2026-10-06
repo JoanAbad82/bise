@@ -33,6 +33,7 @@ use std::net::TcpListener;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
+mod ambient;
 mod approot;
 mod debuglog;
 mod doctor;
@@ -327,81 +328,6 @@ fn sb_workspace(args: &[String]) -> std::path::PathBuf {
         .unwrap_or_else(|| std::path::PathBuf::from("."))
 }
 
-/// bise ambient's workspace (docs/ambient-pages.md §5.1): `--home`, an
-/// empty `--workspace` (the app started from the menu bar) or, for
-/// `bise ambient` (`core` false), no `--workspace` outside a git repo:
-/// the home workspace `~/bise`, created on first use; else
-/// `sb_workspace`'s (the `--workspace`, the launch dir, the cwd).
-fn ambient_workspace(args: &[String], core: bool) -> std::path::PathBuf {
-    let given = args.iter().position(|a| a == "--workspace").map(|i| args.get(i + 1).cloned().unwrap_or_default());
-    let home = args.iter().any(|a| a == "--home")
-        || given.as_deref() == Some("")
-        || (given.is_none() && !core && !switchboard::worktree::is_git_dir(&sb_workspace(args)));
-    if !home {
-        return sb_workspace(args);
-    }
-    match switchboard::paths::ensure_home_workspace() {
-        Ok(d) => d,
-        Err(e) => {
-            let d = switchboard::paths::home_workspace();
-            eprintln!("bise ambient: cannot create {}: {}", d.display(), e);
-            std::process::exit(1);
-        }
-    }
-}
-
-/// bise ambient's hub connection: the first call starts the hub when
-/// none runs (`client::connect`, like the TUI); later calls (after a
-/// loss) only connect and say hello: the user may have stopped bise.
-fn ambient_connector(
-    paths: switchboard::paths::Paths,
-    exe: std::path::PathBuf,
-    root: std::path::PathBuf,
-) -> bend_tui::ambient::Connect {
-    let mut first = true;
-    Box::new(move || {
-        if std::mem::take(&mut first) {
-            return switchboard::client::connect(&paths, &exe, &root);
-        }
-        let mut s = std::os::unix::net::UnixStream::connect(paths.socket())?;
-        s.write_all(b"{\"op\":\"hello\"}\n")?;
-        Ok(s)
-    })
-}
-
-/// What ambient-core reads of the projects (bise desktop S3b): a
-/// connection to any project's hub (it may start that hub, like the
-/// voice target's), the registry rows, each hub's view.json, its pid, the
-/// checkout's branch. Read-only but the connection.
-fn ambient_projects(exe: std::path::PathBuf, root: std::path::PathBuf) -> (bend_tui::ambient::ConnectFor, bend_tui::ambient::ProjectFacts) {
-    let connect_for: bend_tui::ambient::ConnectFor = Box::new(move |path| {
-        ambient_connector(switchboard::paths::Paths::for_workspace(path), exe.clone(), root.clone())
-    });
-    let facts = bend_tui::ambient::ProjectFacts {
-        rows: Box::new(|| bise_home::projects::list(&bise_home::Home::from_env(), &switchboard::paths::home_workspace())),
-        view: Box::new(|id| bend_tui::ambient::projects::read_view(&bise_home::Home::from_env().hub_dir(id))),
-        running: Box::new(|path| {
-            let pid = std::fs::read_to_string(switchboard::paths::Paths::for_workspace(path).pid_file()).ok();
-            pid.and_then(|p| p.trim().parse::<u32>().ok()).is_some_and(switchboard::procs::alive)
-        }),
-        exists: Box::new(|path| path.is_dir()),
-        git: Box::new(|path| {
-            let dot = path.join(".git");
-            let dir = if dot.is_dir() {
-                Some(dot)
-            } else {
-                // a worktree: `.git` is a file naming its git dir
-                std::fs::read_to_string(&dot).ok().and_then(|t| t.trim().strip_prefix("gitdir: ").map(|d| path.join(d)))
-            };
-            match dir {
-                Some(d) => (std::fs::read_to_string(d.join("HEAD")).ok().and_then(|h| bend_tui::ambient::branch_of_head(&h)), true),
-                None => (None, false),
-            }
-        }),
-    };
-    (connect_for, facts)
-}
-
 fn run_sbd(args: &[String]) -> std::io::Result<()> {
     let paths = switchboard::paths::Paths::for_workspace(&sb_workspace(args));
     let root = live_app_root_or_exit();
@@ -641,21 +567,10 @@ fn run_main() -> std::io::Result<()> {
             // child on stdio JSON, a client of the workspace's hub
             Some("ambient-core") => {
                 load_keys();
-                let paths = switchboard::paths::Paths::for_workspace(&ambient_workspace(&args[1..], true));
-                let root = live_app_root_or_exit();
-                let exe = std::env::current_exe()?;
-                let workspace = paths.workspace.to_string_lossy().to_string();
-                let projects = ambient_projects(exe.clone(), root.clone());
-                let connect = ambient_connector(paths, exe, root);
-                std::process::exit(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects)));
+                std::process::exit(ambient::core(&args[1..])?);
             }
             // bise ambient: open the app on this workspace (scripts/ambient.sh)
-            Some("ambient") => {
-                let paths = switchboard::paths::Paths::for_workspace(&ambient_workspace(&args[1..], false));
-                let root = live_app_root_or_exit();
-                let exe = std::env::current_exe()?;
-                std::process::exit(bend_tui::ambient::launch_main(&paths.workspace, &exe, &root));
-            }
+            Some("ambient") => std::process::exit(ambient::launch(&args[1..])?),
             Some("sbswitch") => {
                 // the version switcher: detached, from the old version's binary
                 let rest = &args[1..];
