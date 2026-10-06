@@ -33,6 +33,9 @@ export const T = {
   /** the lists around the composer: none of their nodes may be replaced while he types */
   lists: ['[data-testid="lab.sent"]'],
   sent: '[data-testid^="lab.sent."]',
+  /** the lab's 'a turn runs' box (a running turn: tab queues) and the queued messages */
+  busy: '[data-testid="lab.busy"]',
+  queued: '[data-testid^="composer.queued."]',
   /** a skill of the world (the lab's fake list) */
   skill: { query: 'plain', name: 'plain-language' },
   /** amb-mac's private clipboard (2aa0294d): ⌘C/⌘X/⌘V never reach his pasteboard */
