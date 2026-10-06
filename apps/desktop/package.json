@@ -18,7 +18,8 @@
     "smoke": "node scripts/smoke.mjs",
     "test:e2e": "playwright test -c tests/harness/playwright.config.ts",
     "test": "vitest run",
-    "gallery": "vite src/ds/gallery"
+    "gallery": "vite src/ds/gallery",
+    "dist": "electron-builder --config electron-builder.mjs --mac --dir"
   },
   "dependencies": {
     "@lexical/clipboard": "0.52.0",
@@ -46,6 +47,7 @@
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "5.2.0",
     "electron": "44.5.1",
+    "electron-builder": "26.17.0",
     "electron-vite": "5.0.0",
     "eslint": "9.39.5",
     "eslint-plugin-react-hooks": "7.1.1",
