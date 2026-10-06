@@ -2469,6 +2469,8 @@ fn boot_step(paths: &Paths, what: &str) {
 pub fn run(opts: Opts) -> std::io::Result<()> {
     let paths = opts.paths.clone();
     std::fs::create_dir_all(&paths.state)?;
+    // under a test run's jail (BISE_TEST_HOME), a hub outside it stops here
+    crate::client::jailed(&paths)?;
     // a state path too long for a unix socket: the short link first
     paths.prepare_socket()?;
     // one hub per workspace

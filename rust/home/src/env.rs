@@ -148,6 +148,7 @@ pub const VARS: &[Var] = &[
     user("BISE_SOUNDS_LINE", "the voice sounds' line WAV (a dev command)"),
     user("BISE_TERM_BG", "the terminal's background, over what is detected"),
     user("BISE_TERM_TITLE", "the terminal title on or off"),
+    test("BISE_TEST_HOME", "a whole test run's jail (the desktop harness): every bise of the run refuses a workspace, state dir or BISE_HOME outside it, and his real home (test_home::jail)"),
     user("BISE_THEME", "the theme"),
     user("BISE_UPDATE_INTERVAL", "seconds between update checks"),
     user("BISE_VOICE_AEC", "0: voice without echo cancelling"),

@@ -182,6 +182,15 @@ pub fn core_main(
         }
         let _ = tx.send(In::Eof);
     });
+    // a whole test run's jail (BISE_TEST_HOME): this core's workspace and
+    // bise home must be inside it, before any hub is reached or started
+    let home = bise_home::Home::from_env();
+    for p in [std::path::Path::new(&workspace), home.root()] {
+        if let Err(e) = bise_home::test_home::jail(p) {
+            eprintln!("ambient-core: refused: {e}");
+            return 3;
+        }
+    }
     let (ports, fake_ev) = ports_for_env(user_kind);
     let mut core = Core::new(workspace, hub, ports);
     if let Some(p) = projects {
