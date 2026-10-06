@@ -1,6 +1,7 @@
 // The composer's pure parts: triggers, the send's text, drafts, the picker's rows.
 import { describe, expect, it } from 'vitest';
-import { argAt, filePick, prefixFirst, triggerAt } from './tokens';
+import { argAt, browseText, filePick, parentQuery, prefixFirst, triggerAt } from './tokens';
+import { loadRecent, picked, recentFirst, RECENT_MAX } from './recent';
 import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Segment } from './message';
 import { enqueue, load, popNewest, remember, save, takeOldest, HISTORY_MAX, type Store } from './drafts';
 import { argRows, commandLine, commandRows, completion, move } from './pick';
@@ -174,5 +175,32 @@ describe('live markdown keys (mdlive.rs)', () => {
     expect(subwordRight(t, 0)).toBe(5);
     expect(subwordRight(t, 5)).toBe(9);
     expect(subwordRight(t, 9)).toBe(15);
+  });
+});
+
+describe('@ folders and recent picks (files.rs)', () => {
+  it('one folder up, and the word that browses it', () => {
+    expect(parentQuery('rust/tui/')).toBe('rust');
+    expect(parentQuery('rust/')).toBe('');
+    expect(parentQuery('/usr/')).toBe('/');
+    expect(parentQuery('rust/tu')).toBeNull();
+    expect(parentQuery('')).toBeNull();
+    expect(browseText('rust')).toBe('@rust/');
+    expect(browseText('docs/my notes')).toBe('@"docs/my notes/');
+    expect(browseText('')).toBe('@');
+    expect(browseText('/')).toBe('@/');
+  });
+  it('a picked file ranks first in its tier, never over a name match', () => {
+    const s = memStore();
+    picked(s, 'rust/tui/src/main.rs');
+    picked(s, 'docs/at-mentions.md');
+    expect(loadRecent(s)).toEqual(['docs/at-mentions.md', 'rust/tui/src/main.rs']);
+    const f = (path: string) => ({ path, dir: false });
+    const core = [f('hub/main.bend'), f('rust/tui/src/main.rs'), f('docs/x.md')];
+    expect(recentFirst(core, 'main', loadRecent(s)).map((x) => x.path)).toEqual(['rust/tui/src/main.rs', 'hub/main.bend', 'docs/x.md']);
+    const m = [f('rust/tui/src/sb/mention.rs'), f('docs/at-mentions.md')];
+    expect(recentFirst(m, 'mention', loadRecent(s))[0]?.path).toBe('rust/tui/src/sb/mention.rs');
+    for (let i = 0; i < RECENT_MAX + 5; i += 1) picked(s, `f${i}`);
+    expect(loadRecent(s)).toHaveLength(RECENT_MAX);
   });
 });

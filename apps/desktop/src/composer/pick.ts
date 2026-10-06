@@ -18,7 +18,7 @@ export interface Row {
 /** What a pick does: replace the trigger's word by `text` (and keep the list open on `browse`),
  *  or run the command now. */
 export type Pick =
-  | { readonly kind: 'insert'; readonly text: string; readonly browse: boolean }
+  | { readonly kind: 'insert'; readonly text: string; readonly browse: boolean; readonly path?: string }
   | { readonly kind: 'run'; readonly name: string };
 
 /** At most this many rows in a list (the TUI's popup shows fewer; the rest is a query away). */
@@ -39,7 +39,7 @@ export function agentRows(t: Trigger, agents: readonly PickAgent[]): Row[] {
 export function fileRows(files: readonly PickFile[]): Row[] {
   return files.map((f) => {
     const p = filePick(f.path, f.dir);
-    return { id: `file.${f.path}`, label: f.dir && !f.path.endsWith('/') ? `${f.path}/` : f.path, desc: '', tag: f.dir ? 'dir' : 'file', off: false, pick: { kind: 'insert', text: p.text, browse: p.browse } };
+    return { id: `file.${f.path}`, label: f.dir && !f.path.endsWith('/') ? `${f.path}/` : f.path, desc: '', tag: f.dir ? 'dir' : 'file', off: false, pick: { kind: 'insert', text: p.text, browse: p.browse, path: f.path } };
   });
 }
 

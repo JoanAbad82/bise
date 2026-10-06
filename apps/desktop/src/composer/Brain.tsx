@@ -18,6 +18,8 @@ import {
   DROP_COMMAND,
   HISTORY_PUSH_TAG,
   KEY_ARROW_DOWN_COMMAND,
+  KEY_ARROW_LEFT_COMMAND,
+  KEY_ARROW_RIGHT_COMMAND,
   KEY_ARROW_UP_COMMAND,
   KEY_BACKSPACE_COMMAND,
   KEY_DOWN_COMMAND,
@@ -37,7 +39,8 @@ import { buildMessage, chars, chipStrip, isLongPaste, nextChipNumber, preview, t
 import { enqueue, historyAt, load, popNewest, remember, save, takeOldest, type Saved, type Store } from './drafts';
 import { agentRows, argRows, commandLine, commandRows, completion, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
 import { isImagePath, type ComposerSources, type PickFile } from './sources';
-import { argAt, triggerAt, type Trigger } from './tokens';
+import { argAt, browseText, parentQuery, triggerAt, type Trigger } from './tokens';
+import { loadRecent, picked, recentFirst } from './recent';
 import { Picker } from './Picker';
 
 /** What the screen around a composer may ask of it (dictation, the send button, focus). */
@@ -163,14 +166,14 @@ export function Brain(p: BrainProps): JSX.Element | null {
     if (trigger === null) return [];
     const all =
       trigger.kind === 'at'
-        ? [...agentRows(trigger, p.sources.agents), ...(files.key === tkey ? fileRows(files.items) : [])]
+        ? [...agentRows(trigger, p.sources.agents), ...(files.key === tkey ? fileRows(recentFirst(files.items, trigger.query, loadRecent(p.store))) : [])]
         : trigger.kind === 'skill'
           ? skillRows(trigger, p.sources.skills)
           : trigger.kind === 'arg'
             ? argRows(trigger, p.sources.commands, p.sources)
             : commandRows(trigger, p.sources.commands);
     return all.slice(0, MAX_ROWS);
-  }, [trigger, tkey, files, p.sources]);
+  }, [trigger, tkey, files, p.sources, p.store]);
 
   const open = trigger !== null && rows.length > 0 && dismissed !== `${trigger.kind}:${trigger.start}`;
   const index = sel.key === tkey ? Math.min(sel.i, Math.max(0, rows.length - 1)) : 0;
@@ -217,11 +220,31 @@ export function Brain(p: BrainProps): JSX.Element | null {
       writeNow();
       return;
     }
+    if (pick.path !== undefined && !pick.browse) picked(props.current.store, pick.path); // B8
     editor.update(() => {
       const before = $textBeforeCaret();
       if (before === null) return;
       $replaceBeforeCaret(chars(before.text.slice(t.start)).length, pick.text);
     });
+  };
+
+  /** ← or ⌫ on `@dir/`: one folder up (files.rs parent_query, input.rs at_nav); false elsewhere. */
+  const folderUp = (): boolean => {
+    let done = false;
+    editor.update(
+      () => {
+        const before = $textBeforeCaret();
+        if (before === null) return;
+        const t = triggerAt(before.text, before.messageStart);
+        if (t?.kind !== 'at') return;
+        const up = parentQuery(t.query);
+        if (up === null) return;
+        $replaceBeforeCaret(chars(before.text.slice(t.start)).length, browseText(up));
+        done = true;
+      },
+      { discrete: true },
+    );
+    return done;
   };
 
   const queue = (): void => {
@@ -399,7 +422,36 @@ export function Brain(p: BrainProps): JSX.Element | null {
       ),
       editor.registerCommand(
         KEY_BACKSPACE_COMMAND,
-        (e) => (e.altKey || e.metaKey || e.ctrlKey ? false : run(e, outdentAtStart)),
+        (e) => {
+          if (e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return false;
+          if (folderUp()) {
+            e.preventDefault();
+            return true;
+          }
+          return run(e, outdentAtStart);
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
+      // the @ list's folder keys (E21): → on a folder row browses it, ← on `@dir/` goes up
+      editor.registerCommand(
+        KEY_ARROW_RIGHT_COMMAND,
+        (e) => {
+          const l = live.current;
+          const row = l.rows[l.index];
+          if (!l.open || l.trigger?.kind !== 'at' || row?.tag !== 'dir' || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false;
+          e.preventDefault();
+          apply(row.pick);
+          return true;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
+      editor.registerCommand(
+        KEY_ARROW_LEFT_COMMAND,
+        (e) => {
+          if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey || !folderUp()) return false;
+          e.preventDefault();
+          return true;
+        },
         COMMAND_PRIORITY_HIGH,
       ),
       editor.registerCommand(

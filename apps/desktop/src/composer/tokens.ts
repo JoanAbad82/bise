@@ -97,3 +97,19 @@ export function prefixFirst<T>(items: readonly T[], query: string, name: (t: T) 
   }
   return [...pre, ...sub];
 }
+
+/** One folder up from a query that browses a folder (files.rs parent_query): `rust/tui/` ->
+ *  `rust`, `rust/` -> the root `''`, `/usr/` -> `/`; null when the query doesn't end with `/`. */
+export function parentQuery(query: string): string | null {
+  if (!query.endsWith('/')) return null;
+  const q = query.slice(0, -1);
+  const i = q.lastIndexOf('/');
+  return i === 0 ? '/' : i > 0 ? q.slice(0, i) : '';
+}
+
+/** The `@` word that browses a folder (files.rs browse): `@rust/tui/`, `@"docs/my notes/`, `@`. */
+export function browseText(path: string): string {
+  if (path === '') return '@';
+  const p = path.endsWith('/') ? path : `${path}/`;
+  return /\s/u.test(p) ? `@"${p}` : `@${p}`;
+}
