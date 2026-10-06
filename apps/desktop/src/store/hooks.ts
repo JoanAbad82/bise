@@ -4,7 +4,7 @@
 // The store comes from StoreContext: the app's one store (bound to
 // window.bise.core) by default, a test's own store through the provider.
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import type { Account, Agent, Artifact, Card, DevServer, Entry, Found, Job, JsonValue, Merged, ProjectRow, Worktree } from '@/proto';
+import type { Account, Agent, Artifact, Card, DevServer, Entry, Found, Job, JsonValue, Merged, Plugin, ProjectRow, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
 import { diffKey, Store, type Away, type Diff, type Ev, type Pending, type ThreadOrder } from './store';
 
@@ -70,6 +70,7 @@ export const useCards = (project: string): readonly Card[] => useSlice(`cards:${
 export const usePrefs = (): JsonValue | null => useSlice('prefs', (s) => s.prefs());
 export const useAccounts = (): readonly Account[] => useSlice('accounts', (s) => s.accounts());
 export const useFound = (): readonly Found[] => useSlice('found', (s) => s.found());
+export const usePlugins = (project?: string): readonly Plugin[] | null => useSlice(`plugins:${project ?? ''}`, (s) => s.plugins(project));
 export const useArtifacts = (project: string): readonly Artifact[] => useSlice(`artifacts:${project}`, (s) => s.artifacts(project));
 export const useWorktrees = (project: string): readonly Worktree[] => useSlice(`worktrees:${project}`, (s) => s.worktrees(project));
 export const useDevServers = (project: string): readonly DevServer[] => useSlice(`dev_servers:${project}`, (s) => s.devServers(project));

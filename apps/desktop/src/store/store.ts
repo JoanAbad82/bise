@@ -27,6 +27,7 @@ import type {
   JsonValue,
   Merged,
   Mode,
+  Plugin,
   ProjectRow,
   Worktree,
 } from '@/proto';
@@ -59,6 +60,7 @@ export const TAGS = {
   accounts: true,
   found: true,
   away_summary: true,
+  plugins: true,
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */
@@ -186,6 +188,10 @@ export class Store {
   found(): readonly Found[] {
     return this.slice('found', EMPTY);
   }
+  /** a workspace's agent plugins (none: bise's home's); null until the core sent them */
+  plugins(project?: string): readonly Plugin[] | null {
+    return this.slice<readonly Plugin[] | null>(`plugins:${project ?? ''}`, null);
+  }
   artifacts(project: string): readonly Artifact[] {
     return this.slice(`artifacts:${project}`, EMPTY);
   }
@@ -284,6 +290,9 @@ export class Store {
         return;
       case 'found':
         this.put('found', ev.items);
+        return;
+      case 'plugins':
+        this.put(`plugins:${ev.project ?? ''}`, ev.items);
         return;
       case 'away_summary':
         this.put('away', ev);

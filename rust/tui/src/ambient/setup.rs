@@ -12,7 +12,7 @@
 //! A key never goes out in an event or a log line ([`redact`]).
 
 use bise_home::projects::Row;
-use bise_proto::draft::{Account, Found};
+use bise_proto::draft::{Account, Found, Plugin};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
@@ -30,6 +30,8 @@ pub enum Done {
     Scanned { dir: PathBuf, entries: Vec<Entry> },
     /// his sign-in ended (Err: its last line)
     SignedIn { id: String, res: Result<(), String> },
+    /// a plugin server's login ended (P.1; Err: its reason)
+    LoggedIn { name: String, project: Option<String>, res: Result<(), String> },
 }
 
 /// A repo the walk found.
@@ -55,6 +57,12 @@ pub type IdFn = Box<dyn Fn(&str) -> Result<(), String>>;
 pub type KeySetFn = Box<dyn Fn(&str, &str) -> Result<(), String>>;
 pub type SignInFn = Box<dyn Fn(&str, Sender<Done>) -> Result<(), String>>;
 pub type PathFn = Box<dyn Fn(&Path) -> Result<(), String>>;
+/// A workspace's plugins (`pending`: the logins whose browser is open).
+pub type PluginsFn = Box<dyn Fn(&Path, &[String]) -> Vec<Plugin>>;
+pub type PluginSetFn = Box<dyn Fn(&str, bool) -> Result<(), String>>;
+/// (workspace, server name, the project it was asked for, the channel of its end)
+pub type PluginLoginFn = Box<dyn Fn(&Path, &str, Option<String>, Sender<Done>) -> Result<(), String>>;
+pub type PluginLogoutFn = Box<dyn Fn(&Path, &str) -> Result<(), String>>;
 
 /// Everything the setup commands read or write.
 pub struct SetupPorts {
@@ -76,6 +84,14 @@ pub struct SetupPorts {
     pub add: PathFn,
     pub registry: Box<dyn Fn(RegistryOp) -> Result<(), String>>,
     pub flow: FlowFn,
+    /// a workspace's agent plugins (`pending`: logins whose browser is open)
+    pub plugins: PluginsFn,
+    /// plugins.json through bend_plugins' one writer
+    pub plugin_set: PluginSetFn,
+    /// a plugin server's browser login, `Done::LoggedIn` at its end (never
+    /// run by a test)
+    pub plugin_login: PluginLoginFn,
+    pub plugin_logout: PluginLogoutFn,
 }
 
 /// A catalog provider's status as the window's account: a subscription
@@ -243,6 +259,21 @@ pub fn live(flow: FlowFn) -> SetupPorts {
             })
         }),
         flow,
+        // the TUI's /plugins functions (crate::plugins), the one code path
+        plugins: Box::new(crate::plugins::rows),
+        plugin_set: Box::new(|name, on| crate::plugins::set(name, on).map(|_| ())),
+        plugin_login: Box::new(|ws, name, project, tx| {
+            let ts = bend_plugins::login::targets(ws);
+            let t = bend_plugins::login::find(&ts, name)?.clone();
+            std::thread::spawn(move || {
+                let (secrets, sd) = (bend_plugins::oauth::store_dir(), bend_plugins::status::dir());
+                let open = |u: &str| bend_plugins::oauth::open_browser(u).map_err(|e| e.to_string());
+                let r = bend_plugins::login::run(&t, &secrets, Some(&sd), &open, bend_plugins::login::WAIT, None, None);
+                let _ = tx.send(Done::LoggedIn { name: t.name.clone(), project, res: r.map(|_| ()) });
+            });
+            Ok(())
+        }),
+        plugin_logout: Box::new(|ws, name| crate::plugins::logout(ws, name).map(|_| ())),
     }
 }
 

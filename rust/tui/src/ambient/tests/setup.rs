@@ -4,7 +4,7 @@
 use super::*;
 use crate::ambient::setup::{Done, Entry, RegistryOp, SetupPorts};
 use bise_home::projects::Row;
-use bise_proto::draft::Account;
+use bise_proto::draft::{Account, Plugin, PluginLogin};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -18,6 +18,11 @@ struct World {
     ops: Vec<RegistryOp>,
     /// the sign-in's channel, to end it from the test
     signing: Option<std::sync::mpsc::Sender<Done>>,
+    /// plugins.json's toggles, the plugin logins started, the logouts
+    plugin_sets: Vec<(String, bool)>,
+    plugin_logins: Vec<(PathBuf, String)>,
+    plugin_logouts: Vec<(PathBuf, String)>,
+    logging_in: Option<std::sync::mpsc::Sender<Done>>,
 }
 
 fn rows() -> Vec<Row> {
@@ -28,6 +33,7 @@ fn rows() -> Vec<Row> {
 fn setup(t: &mut T) -> Rc<RefCell<World>> {
     let w = Rc::new(RefCell::new(World::default()));
     let (a, b, c, d, e, f, g, h, i) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
+    let (j, k, l, m) = (w.clone(), w.clone(), w.clone(), w.clone());
     t.core.set_setup(SetupPorts {
         prefs: Box::new(move || a.borrow().prefs.clone()),
         write_prefs: Box::new(move |v| {
@@ -80,6 +86,29 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
         }),
         flow: Box::new(move |p, trunk| {
             i.borrow_mut().flows.push((p.into(), trunk));
+            Ok(())
+        }),
+        plugins: Box::new(move |ws, pending| {
+            let off = j.borrow().plugin_sets.iter().rev().find(|(n, _)| n == "computer").is_none_or(|(_, on)| !on);
+            let login = |name: &str| PluginLogin { name: name.into(), host: "mcp.linear.app".into(), state: if pending.iter().any(|p| p == name) { "pending" } else { "needs" }.into(), tools: None };
+            let p = |name: &str, state: &str, logins| Plugin { name: name.into(), state: state.into(), scope: "user".into(), what: Some(ws.to_string_lossy().into_owned()), logins };
+            vec![p("linear", "loaded", vec![login("linear")]), p("computer", if off { "disabled" } else { "loaded" }, vec![])]
+        }),
+        plugin_set: Box::new(move |name, on| {
+            if name == "nope" {
+                return Err("no plugin nope".into());
+            }
+            k.borrow_mut().plugin_sets.push((name.into(), on));
+            Ok(())
+        }),
+        plugin_login: Box::new(move |ws, name, _project, tx| {
+            let mut w = l.borrow_mut();
+            w.plugin_logins.push((ws.into(), name.into()));
+            w.logging_in = Some(tx);
+            Ok(())
+        }),
+        plugin_logout: Box::new(move |ws, name| {
+            m.borrow_mut().plugin_logouts.push((ws.into(), name.into()));
             Ok(())
         }),
     });
@@ -205,4 +234,51 @@ fn setup_lines_parse_as_the_cores_and_hub_commands_stay_typed() {
     assert!(matches!(Cmd::parse(r#"{"cmd":"send","project":"a","agent":"main","text":"x","mode":"now"}"#), Ok(Cmd::Typed(_))));
     let e = Cmd::parse(r#"{"cmd":"key_set","id":"a"}"#).err().unwrap();
     assert!(e.starts_with("key_set"), "{e}");
+}
+
+/// P.1: the plugins of bise's home or of a project, a toggle through the
+/// one writer, a logout, and a login that runs once, pending until it
+/// ends (the fake's runner: never his browser).
+#[test]
+fn the_window_lists_toggles_and_logs_in_to_plugins() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    app(&mut t, r#"{"cmd":"plugins"}"#);
+    let out = t.take();
+    let ev = evs(&out, "plugins");
+    assert_eq!(ev.len(), 1);
+    assert!(ev[0].get("project").is_none());
+    assert_eq!(ev[0]["items"][0]["what"], "/p/home", "bise's home workspace");
+    assert_eq!(ev[0]["items"][1]["state"], "disabled");
+
+    app(&mut t, r#"{"cmd":"plugin_set","project":"shop","name":"computer","on":true}"#);
+    let out = t.take();
+    assert_eq!(w.borrow().plugin_sets, vec![("computer".to_string(), true)]);
+    let ev = evs(&out, "plugins");
+    assert_eq!((ev[0]["project"].as_str(), ev[0]["items"][1]["state"].as_str()), (Some("shop"), Some("loaded")));
+    assert_eq!(ev[0]["items"][0]["what"], "/p/shop");
+
+    app(&mut t, r#"{"cmd":"plugin_set","name":"nope","on":false}"#);
+    let out = t.take();
+    assert_eq!(evs(&out, "error")[0]["cmd"], "plugin_set");
+    app(&mut t, r#"{"cmd":"plugins","project":"gone"}"#);
+    assert!(evs(&t.take(), "error")[0]["text"].as_str().is_some_and(|e| e.contains("no project gone")));
+
+    app(&mut t, r#"{"cmd":"plugin_logout","name":"linear"}"#);
+    assert_eq!(w.borrow().plugin_logouts, vec![(PathBuf::from("/p/home"), "linear".to_string())]);
+    t.take();
+
+    app(&mut t, r#"{"cmd":"plugin_login","name":"linear"}"#);
+    let out = t.take();
+    assert_eq!(evs(&out, "plugins")[0]["items"][0]["logins"][0]["state"], "pending");
+    app(&mut t, r#"{"cmd":"plugin_login","name":"linear"}"#);
+    assert!(evs(&t.take(), "error")[0]["text"].as_str().is_some_and(|e| e.contains("still open")));
+    assert_eq!(w.borrow().plugin_logins.len(), 1, "one login at a time");
+
+    let tx = w.borrow_mut().logging_in.take().unwrap();
+    tx.send(Done::LoggedIn { name: "linear".into(), project: None, res: Err("the browser closed".into()) }).unwrap();
+    t.until(|o| !evs(o, "plugins").is_empty());
+    let out = t.take();
+    assert!(evs(&out, "error")[0]["text"].as_str().is_some_and(|e| e.contains("linear: the browser closed")));
+    assert_eq!(evs(&out, "plugins")[0]["items"][0]["logins"][0]["state"], "needs", "no longer pending");
 }

@@ -75,6 +75,8 @@ export const core_ev: readonly CoreEv[] = [
   {"ev":"accounts","items":[{"id":"chatgpt","kind":"subscription","label":"ChatGPT","state":"signed_in","who":"camille@example.com"},{"id":"anthropic-key","kind":"key","label":"Anthropic key","state":"signed_out"}]},
   {"dir":"/Users/camille/code","ev":"found","items":[{"git":true,"known":false,"last_ms":1791100000000,"name":"shop","path":"/Users/camille/code/shop"},{"git":true,"known":true,"last_ms":1791000000000,"name":"acme","path":"/Users/camille/acme"}]},
   {"done":3,"ev":"away_summary","failed":0,"projects":[{"done":2,"failed":0,"project":"acme-1a2b3c4d","questions":1},{"done":1,"failed":0,"project":"shop-0badc0de","questions":0}],"questions":1,"since_ms":1791100000000},
+  {"ev":"plugins","items":[{"logins":[{"host":"mcp.linear.app","name":"linear","state":"needs"}],"name":"linear","scope":"user","state":"loaded","what":"Linear issues and projects"},{"name":"computer","scope":"built-in","state":"disabled","what":"drive Chrome and your apps"},{"logins":[{"host":"notes.example.com","name":"notes","state":"in","tools":4}],"name":"notes","scope":"workspace","state":"loaded"}]},
+  {"ev":"plugins","items":[],"project":"acme-1a2b3c4d"},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */
@@ -92,6 +94,11 @@ export const app_cmd: readonly AppCmd[] = [
   {"cmd":"found_scan","dir":"/Users/camille/code"},
   {"cmd":"found_scan"},
   {"away_ms":1800000,"cmd":"away_back"},
+  {"cmd":"plugins"},
+  {"cmd":"plugins","project":"acme-1a2b3c4d"},
+  {"cmd":"plugin_set","name":"computer","on":true},
+  {"cmd":"plugin_login","name":"linear"},
+  {"cmd":"plugin_logout","name":"notes","project":"acme-1a2b3c4d"},
 ];
 
 /** rust/proto/fixtures/draft_hub_cmd.jsonl */

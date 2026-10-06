@@ -11,3 +11,8 @@
 {"cmd":"found_scan","dir":"/Users/camille/code"}
 {"cmd":"found_scan"}
 {"cmd":"away_back","away_ms":1800000}
+{"cmd":"plugins"}
+{"cmd":"plugins","project":"acme-1a2b3c4d"}
+{"cmd":"plugin_set","name":"computer","on":true}
+{"cmd":"plugin_login","name":"linear"}
+{"cmd":"plugin_logout","project":"acme-1a2b3c4d","name":"notes"}

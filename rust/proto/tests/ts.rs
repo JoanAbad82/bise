@@ -61,7 +61,7 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
         module!(cfg, "rows": rows::Status, rows::ReportKind, rows::Report, rows::Agent, rows::Opt, rows::CardPage, rows::Card, rows::Merged, rows::DevServer, rows::Worktree, rows::Artifact),
         module!(cfg, "thread": thread::EntryKind, thread::ToolKind, thread::ToolItem, thread::Tools, thread::EntryCard, thread::PageRef, thread::ReportRef, thread::Entry),
         module!(cfg, "hub": hub::JobState, hub::Job, hub::HubEv, hub::Mode, hub::HubCmd),
-        module!(cfg, "draft": draft::Quote, draft::Queued, draft::DraftHubCmd, draft::ProjectRow, draft::OpenWhat, draft::Account, draft::Found, draft::AwayProject, draft::CoreEv, draft::AppCmd, draft::ProjectView),
+        module!(cfg, "draft": draft::Quote, draft::Queued, draft::DraftHubCmd, draft::ProjectRow, draft::OpenWhat, draft::Account, draft::Found, draft::AwayProject, draft::Plugin, draft::PluginLogin, draft::CoreEv, draft::AppCmd, draft::ProjectView),
         module!(cfg, "helper": helper::HelperEv, helper::Responsible, helper::FnAct, helper::TalkKey, helper::Grant, helper::QuietWhy, helper::Perm, helper::PermAction, helper::HelperCmd),
     ]
 }

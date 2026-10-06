@@ -3,7 +3,9 @@
 //! `sign_in`, `key_set`, `key_remove`, `found_scan`, `project_add`,
 //! `project_remove`, `project_move`, `project_rename` (proto::draft's
 //! `AppCmd`), answered by `prefs`, `accounts`, `found`, the projects list
-//! read again, or `error {cmd, text}`. All I/O through
+//! read again, or `error {cmd, text}`; and the agent plugins (P.1):
+//! `plugins`, `plugin_set`, `plugin_login`, `plugin_logout`, answered by
+//! `plugins` (the TUI's /plugins functions, crate::plugins). All I/O through
 //! [`crate::ambient::setup::SetupPorts`]; the jobs that end later (a walk,
 //! a sign-in) come back on the tick. A key is never in an event.
 
@@ -26,6 +28,10 @@ pub const TAGS: &[&str] = &[
     "project_remove",
     "project_move",
     "project_rename",
+    "plugins",
+    "plugin_set",
+    "plugin_login",
+    "plugin_logout",
 ];
 
 pub(crate) struct Setup {
@@ -34,13 +40,15 @@ pub(crate) struct Setup {
     rx: Receiver<Done>,
     /// the provider whose sign-in runs (one at a time)
     signing: Option<String>,
+    /// the plugin servers whose login runs (their browser is open)
+    logins: Vec<String>,
 }
 
 impl Core {
     /// The setup's ports (the binary's live ones, or a test's).
     pub fn set_setup(&mut self, ports: SetupPorts) {
         let (tx, rx) = channel();
-        self.setup = Some(Setup { ports, tx, rx, signing: None });
+        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new() });
     }
 
     /// What the window needs first: his preferences and his accounts (at
@@ -139,11 +147,60 @@ impl Core {
                 ("project_move", self.registry(&project, |path| RegistryOp::Move(path, order as usize)))
             }
             AppCmd::ProjectRename { project, name } => ("project_rename", self.registry(&project, |path| RegistryOp::Rename(path, name))),
+            AppCmd::Plugins { project } => ("plugins", self.emit_plugins(project)),
+            AppCmd::PluginSet { project, name, on } => {
+                let res = (p.plugin_set)(&name, on);
+                let shown = self.emit_plugins(project);
+                ("plugin_set", res.and(shown))
+            }
+            AppCmd::PluginLogin { project, name } => {
+                let res = match self.workspace_of(project.as_deref()) {
+                    Ok(_) if s.logins.contains(&name) => Err(format!("the login to {name} is still open in your browser")),
+                    Ok(ws) => (p.plugin_login)(&ws, &name, project.clone(), s.tx.clone()),
+                    Err(e) => Err(e),
+                };
+                if res.is_ok() {
+                    if let Some(s) = self.setup.as_mut() {
+                        s.logins.push(name);
+                    }
+                    let _ = self.emit_plugins(project);
+                }
+                ("plugin_login", res)
+            }
+            AppCmd::PluginLogout { project, name } => {
+                let res = self.workspace_of(project.as_deref()).and_then(|ws| (p.plugin_logout)(&ws, &name));
+                let shown = self.emit_plugins(project);
+                ("plugin_logout", res.and(shown))
+            }
             other => return self.setup_error("setup", &format!("not a setup command: {other:?}")),
         };
         if let Err(e) = res {
             self.setup_error(cmd, &e);
         }
+    }
+
+    /// The folder whose plugins a command means: the project's, else bise's home.
+    fn workspace_of(&self, project: Option<&str>) -> Result<PathBuf, String> {
+        let s = self.setup.as_ref().ok_or("this core has no setup")?;
+        let rows = (s.ports.rows)();
+        let row = match project {
+            Some(id) => rows.iter().find(|r| r.id == id).ok_or_else(|| format!("there's no project {id}"))?,
+            None => rows.iter().find(|r| r.home).ok_or("bise's home isn't in the projects list")?,
+        };
+        Ok(row.path.clone())
+    }
+
+    /// `plugins` for that workspace (its logins still open marked pending).
+    fn emit_plugins(&mut self, project: Option<String>) -> Result<(), String> {
+        let ws = self.workspace_of(project.as_deref())?;
+        let s = self.setup.as_ref().ok_or("this core has no setup")?;
+        let items = (s.ports.plugins)(&ws, &s.logins);
+        let mut ev = json!({"ev": "plugins", "items": items});
+        if let Some(p) = project {
+            ev["project"] = json!(p);
+        }
+        self.emit(ev);
+        Ok(())
     }
 
     /// A change to the list for project `id`, then the list read again.
@@ -175,6 +232,15 @@ impl Core {
                         self.setup_error("sign_in", &format!("{id}: {e}"));
                     }
                     self.emit_accounts();
+                }
+                Done::LoggedIn { name, project, res } => {
+                    if let Some(s) = self.setup.as_mut() {
+                        s.logins.retain(|n| *n != name);
+                    }
+                    if let Err(e) = res {
+                        self.setup_error("plugin_login", &format!("{name}: {e}"));
+                    }
+                    let _ = self.emit_plugins(project);
                 }
             }
         }

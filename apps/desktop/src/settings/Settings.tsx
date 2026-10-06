@@ -7,7 +7,7 @@
 // A switch flips at once: the value he set shows until the core's next
 // prefs (which carries it, or not when the core refused it).
 import { useState } from 'react';
-import type { Account, AppCmd, Found, JsonValue, ProjectRow } from '@/proto';
+import type { Account, AppCmd, Found, JsonValue, Plugin, ProjectRow } from '@/proto';
 import { Row, Settings as Frame } from '@/ds';
 import { putPref, type Prefs } from './prefs';
 import { PAGES, PageBody, pageOf, type Page } from './pages';
@@ -19,6 +19,8 @@ export interface SettingsData {
   projects: readonly ProjectRow[];
   /** the repos found_scan found in his folders (none yet: empty) */
   found: readonly Found[];
+  /** bise's home's agent plugins (none yet: null, the page asks) */
+  plugins: readonly Plugin[] | null;
 }
 
 export interface SettingsPorts {

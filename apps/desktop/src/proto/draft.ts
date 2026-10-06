@@ -93,14 +93,49 @@ known: boolean, };
 export type AwayProject = { project: string, done: number, questions: number, failed: number, };
 
 /**
+ * An agent plugin of his (P.1, the TUI's `/plugins`): bend_plugins'
+ * resolution of a workspace, user and built-in plugins included.
+ */
+export type Plugin = { name: string, 
+/**
+ * loaded | disabled | shadowed | invalid
+ */
+state: string, 
+/**
+ * built-in | user | workspace
+ */
+scope: string, what?: string | null, 
+/**
+ * its remote MCP servers that log in (none: nothing to log in to)
+ */
+logins?: Array<PluginLogin>, };
+
+/**
+ * A plugin's remote MCP server that logs in through his browser.
+ */
+export type PluginLogin = { 
+/**
+ * what `plugin_login` takes (its id, or plugin/server)
+ */
+name: string, host: string, 
+/**
+ * needs | in | out | pending (its browser is open)
+ */
+state: string, 
+/**
+ * its tools, once a session connected it
+ */
+tools?: number | null, };
+
+/**
  * What the core sends the app besides the hubs' events (S3b).
  */
-export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, };
+export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, };
 
 /**
  * What the app asks the core itself (never forwarded to a hub).
  */
-export type AppCmd = { "cmd": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "cmd": "project_add", path: string, land?: boolean | null, } | { "cmd": "project_remove", project: string, } | { "cmd": "project_move", project: string, order: number, } | { "cmd": "project_rename", project: string, name: string, } | { "cmd": "prefs_set", key: string, value: JsonValue, } | { "cmd": "sign_in", id: string, } | { "cmd": "key_set", id: string, key: string, } | { "cmd": "key_remove", id: string, } | { "cmd": "found_scan", dir?: string | null, } | { "cmd": "away_back", away_ms: number, };
+export type AppCmd = { "cmd": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "cmd": "project_add", path: string, land?: boolean | null, } | { "cmd": "project_remove", project: string, } | { "cmd": "project_move", project: string, order: number, } | { "cmd": "project_rename", project: string, name: string, } | { "cmd": "prefs_set", key: string, value: JsonValue, } | { "cmd": "sign_in", id: string, } | { "cmd": "key_set", id: string, key: string, } | { "cmd": "key_remove", id: string, } | { "cmd": "found_scan", dir?: string | null, } | { "cmd": "away_back", away_ms: number, } | { "cmd": "plugins", project?: string | null, } | { "cmd": "plugin_set", project?: string | null, name: string, on: boolean, } | { "cmd": "plugin_login", project?: string | null, name: string, } | { "cmd": "plugin_logout", project?: string | null, name: string, };
 
 /**
  * `hubs/<id>/view.json` (S1, written only by that hub): what the sidebar

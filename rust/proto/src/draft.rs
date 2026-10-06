@@ -127,6 +127,37 @@ pub struct Found {
     pub known: bool,
 }
 
+/// An agent plugin of his (P.1, the TUI's `/plugins`): bend_plugins'
+/// resolution of a workspace, user and built-in plugins included.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Plugin {
+    pub name: String,
+    /// loaded | disabled | shadowed | invalid
+    pub state: String,
+    /// built-in | user | workspace
+    pub scope: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub what: Option<String>,
+    /// its remote MCP servers that log in (none: nothing to log in to)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub logins: Vec<PluginLogin>,
+}
+
+/// A plugin's remote MCP server that logs in through his browser.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PluginLogin {
+    /// what `plugin_login` takes (its id, or plugin/server)
+    pub name: String,
+    pub host: String,
+    /// needs | in | out | pending (its browser is open)
+    pub state: String,
+    /// its tools, once a session connected it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools: Option<u32>,
+}
+
 /// One project's part of `away_summary` (only a project where something
 /// happened while he was away).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -165,12 +196,20 @@ pub enum CoreEv {
     /// his cards (questions and approvals) that came; `projects`: each
     /// project where one of those happened, in his projects' order
     AwaySummary { since_ms: u64, done: u32, questions: u32, failed: u32, projects: Vec<AwayProject> },
+    /// his agent plugins for `project`'s workspace (none: bise's home),
+    /// the answer to `plugins` and to each change; a change applies to
+    /// the sessions that start after it (the TUI's `/reload`)
+    Plugins {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        items: Vec<Plugin>,
+    },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -215,6 +254,30 @@ pub enum AppCmd {
     /// he's back at his Mac after `away_ms` (the app's read): the core
     /// answers `away_summary`
     AwayBack { away_ms: u64 },
+    /// the plugins of `project`'s workspace (none: bise's home): `plugins`
+    Plugins {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+    },
+    /// turn a plugin on or off (plugins.json, bend_plugins' one writer)
+    PluginSet {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        name: String,
+        on: bool,
+    },
+    /// log in to a plugin's remote MCP server: opens his browser (his
+    /// click only, never a test), `plugins` again at its end
+    PluginLogin {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        name: String,
+    },
+    PluginLogout {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        name: String,
+    },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
@@ -232,6 +295,10 @@ impl AppCmd {
         "key_remove",
         "found_scan",
         "away_back",
+        "plugins",
+        "plugin_set",
+        "plugin_login",
+        "plugin_logout",
     ];
 
     pub fn decode(line: &str) -> Result<AppCmd, String> {

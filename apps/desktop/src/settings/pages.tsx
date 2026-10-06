@@ -3,16 +3,17 @@
 // privacy, quiet moments, models, projects, keys. Each one draws its part
 // of SettingsData with the DS's Group rows and says what he changes.
 // Owner: amb-home.
-import { useState, type ReactNode } from 'react';
-import type { JsonValue } from '@/proto';
+import { useEffect, useState, type ReactNode } from 'react';
+import type { AppCmd, JsonValue, Plugin } from '@/proto';
 import { Button, Chip, Field, Group, Kbd, Seg, Toggle, type GroupItem } from '@/ds';
 import { Accounts } from './accounts';
 import { Projects } from './projects';
+import { Plugins } from './plugins';
 import { KEY_SECTIONS } from './keys';
 import { appName, excludedApps, flag, knownApps, num, str, type Prefs } from './prefs';
 import type { SettingsData, SettingsPorts } from './Settings';
 
-export type Page = 'general' | 'voice' | 'privacy' | 'quiet' | 'models' | 'projects' | 'keys';
+export type Page = 'general' | 'voice' | 'privacy' | 'quiet' | 'models' | 'projects' | 'plugins' | 'keys';
 
 export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
   { id: 'general', title: 'general', sub: 'bise on your Mac.' },
@@ -21,6 +22,7 @@ export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
   { id: 'quiet', title: 'quiet moments', sub: 'when cards wait, and how they come back.' },
   { id: 'models', title: 'models', sub: 'your subscription is enough; an API key works too. /models and /provider in the terminal.' },
   { id: 'projects', title: 'projects', sub: "one main per project; yours, bise, coordinates them. the order is ⌘1 … ⌘9's." },
+  { id: 'plugins', title: 'plugins', sub: 'what your agents can use besides the repo: skills, tools, servers. /plugins in the terminal.' },
   { id: 'keys', title: 'keys', sub: "every terminal key works here too; ⌘ adds a Mac app's gestures. /help in the terminal." },
 ];
 
@@ -162,6 +164,8 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
       return <Accounts accounts={data.accounts} send={ports.send} />;
     case 'projects':
       return <Projects projects={data.projects} found={data.found} ports={ports} />;
+    case 'plugins':
+      return <PluginsPage items={data.plugins} send={ports.send} />;
     case 'keys':
       return <KeyList />;
   }
@@ -240,6 +244,14 @@ function Privacy({ prefs, setPref, tg }: { prefs: Prefs | null; setPref: (key: s
       />
     </>
   );
+}
+
+/** the plugins page asks the core for them each time it opens (bise's home's) */
+function PluginsPage({ items, send }: { items: readonly Plugin[] | null; send: (cmd: AppCmd) => void }) {
+  useEffect(() => {
+    send({ cmd: 'plugins' });
+  }, [send]);
+  return <Plugins items={items} send={send} />;
 }
 
 /** a bundle id typed by hand (com.example.app), ⏎ adds it */

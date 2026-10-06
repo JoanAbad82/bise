@@ -31,7 +31,7 @@ const ports = (): SettingsPorts & { sent: AppCmd[]; went: string[] } => {
 };
 
 const view = (page: string, p = ports(), extra: Partial<Parameters<typeof Settings>[0]> = {}) =>
-  render(<Settings page={page} prefs={prefs()} accounts={accounts()} projects={projects()} found={found()} ports={p} {...extra} />);
+  render(<Settings page={page} prefs={prefs()} accounts={accounts()} projects={projects()} found={found()} plugins={null} ports={p} {...extra} />);
 
 describe('prefs', () => {
   it('reads and puts dotted keys without touching the rest', () => {
@@ -143,5 +143,39 @@ describe('Settings', () => {
       for (const r of s.rows) expect(g.textContent).toContain(r.action);
       expect(new Set(s.rows.map((r) => r.keys)).size).toBe(s.rows.length);
     }
+  });
+});
+
+describe('plugins', () => {
+  const plugins = () => {
+    const e = core_ev.find((x) => x.ev === 'plugins' && x.project == null);
+    if (e?.ev !== 'plugins') throw new Error('fixture');
+    return e.items;
+  };
+
+  it('asks the core when the page opens; toggles, logs in on click only, logs out', () => {
+    const p = ports();
+    view('plugins', p, { plugins: plugins() });
+    expect(p.sent).toEqual([{ cmd: 'plugins' }]);
+    expect(screen.getByTestId('settings.plugin.linear').getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByTestId('settings.plugin.computer').getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(screen.getByTestId('settings.plugin.computer'));
+    fireEvent.click(screen.getByTestId('settings.login.linear'));
+    fireEvent.click(screen.getByTestId('settings.login.notes.out'));
+    expect(p.sent.slice(1)).toEqual([
+      { cmd: 'plugin_set', name: 'computer', on: true },
+      { cmd: 'plugin_login', name: 'linear' },
+      { cmd: 'plugin_logout', name: 'notes' },
+    ]);
+    expect(screen.getByTestId('settings.plugins.logins').textContent).toContain('notes.example.com · logged in · 4 tools');
+  });
+
+  it('none yet: says it looks; a login running shows its spinner', () => {
+    view('plugins', ports(), { plugins: null });
+    expect(screen.getByTestId('settings.page.plugins').textContent).toContain('looking at your plugins');
+    cleanup();
+    const pending = plugins().map((x) => ({ ...x, logins: (x.logins ?? []).map((l) => ({ ...l, state: 'pending' })) }));
+    view('plugins', ports(), { plugins: pending });
+    expect(screen.getByTestId('settings.login.linear').getAttribute('aria-busy')).toBe('true');
   });
 });

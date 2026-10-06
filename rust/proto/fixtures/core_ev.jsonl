@@ -5,3 +5,5 @@
 {"ev":"accounts","items":[{"id":"chatgpt","label":"ChatGPT","kind":"subscription","state":"signed_in","who":"camille@example.com"},{"id":"anthropic-key","label":"Anthropic key","kind":"key","state":"signed_out"}]}
 {"ev":"found","dir":"/Users/camille/code","items":[{"path":"/Users/camille/code/shop","name":"shop","git":true,"last_ms":1791100000000,"known":false},{"path":"/Users/camille/acme","name":"acme","git":true,"last_ms":1791000000000,"known":true}]}
 {"ev":"away_summary","since_ms":1791100000000,"done":3,"questions":1,"failed":0,"projects":[{"project":"acme-1a2b3c4d","done":2,"questions":1,"failed":0},{"project":"shop-0badc0de","done":1,"questions":0,"failed":0}]}
+{"ev":"plugins","items":[{"name":"linear","state":"loaded","scope":"user","what":"Linear issues and projects","logins":[{"name":"linear","host":"mcp.linear.app","state":"needs"}]},{"name":"computer","state":"disabled","scope":"built-in","what":"drive Chrome and your apps"},{"name":"notes","state":"loaded","scope":"workspace","logins":[{"name":"notes","host":"notes.example.com","state":"in","tools":4}]}]}
+{"ev":"plugins","project":"acme-1a2b3c4d","items":[]}
