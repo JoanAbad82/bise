@@ -40,6 +40,7 @@ enum KeyLog {
         case .talkEnd: return "keys: release → talk end"
         case .cancel: return "keys: hold cancelled (another key)"
         case .tap: return "keys: fn tap"
+        case .key("tab"): return "keys: tab on the route line"
         case .key(let k): return "keys: fn + \(k)"
         case .plainEsc: return nil   // his own esc: not ours to log
         }
@@ -69,6 +70,9 @@ struct KeyMachine {
     var holdAfter: Double = 0.25
     var doubleWithin: Double = 0.4
     var rightOption = true       // the fallback key (a setting)
+    // S8 (amb-web c091e239): after a talk, the route line ('→ telemetry')
+    // takes a plain tab for its ~2 s (to correct the route); never longer
+    var routeOpen = false
 
     private(set) var fnIsDown = false
     private var fnAt = 0.0
@@ -143,6 +147,11 @@ struct KeyMachine {
                     if talking != nil { talking = nil; out.append(.cancel) }
                     out.append(.key(name))
                 }
+            } else if routeOpen && code == 48 && !fnIsDown {
+                // tab while the route line shows: bise's, never his app's
+                swallow = true
+                swallowed.insert(code)
+                if !repeated { out.append(.key("tab")) }
             } else {
                 if code == 53 && !fnIsDown && !repeated { out.append(.plainEsc) }
                 if fnIsDown && !fnSpoiled {

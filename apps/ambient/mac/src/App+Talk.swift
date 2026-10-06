@@ -142,6 +142,19 @@ extension AmbientApp {
     }
 
     // fn space: the page opens its field and asks app_focus on (typing)
+    // the route line after a talk (S8, amb-web c091e239: content {kind:'got',
+    // route:true}): a plain tab goes to the page as app_key 'tab' while it
+    // shows (fn esc already does), and never more than 4 s
+    func routeLine(_ on: Bool) {
+        guard keys.routeOpen != on else { return }
+        keys.routeOpen = on
+        routeJob?.cancel()
+        guard on else { return }
+        let job = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.keys.routeOpen = false } }
+        routeJob = job
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: job)
+    }
+
     func spotlight() {
         anchor(.top)
         morning()

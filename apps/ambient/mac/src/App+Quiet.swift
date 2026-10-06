@@ -76,6 +76,7 @@ extension AmbientApp {
         let want = on ?? !quiet.paused
         quiet.pause(want)
         quietHourJob?.cancel()
+        quietHourEnds = want ? Date().addingTimeInterval(3600) : nil
         if want {
             let job = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.quietHour(false) } }
             quietHourJob = job
@@ -90,7 +91,10 @@ extension AmbientApp {
         Log.say("app: quiet \(c.on) \(c.why)")
         visFeed(.quiet(c.on))   // quiet: bise never shows by itself
         status?.set(quiet: c.on)
-        capsule.post(["ev": "app_quiet", "on": c.on, "why": c.why])
+        var ev: [String: Any] = ["ev": "app_quiet", "on": c.on, "why": c.why]
+        // his hour: when it ends ('quiet until 15:21', amb-web m_8540)
+        if c.why == "paused", let end = quietHourEnds { ev["until_ms"] = Int(end.timeIntervalSince1970 * 1000) }
+        capsule.post(ev)
         toCore(["cmd": "quiet", "on": c.on, "why": c.why])
         if !c.on { helloSoon() }   // a hello held by quiet comes now
     }

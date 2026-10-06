@@ -85,5 +85,20 @@ law("log: hands-free, release, cancel, chords",
 law("log: his own esc is not logged", KeyLog.line(.plainEsc) == nil)
 law("round 9: fn p is a bise key (your pages)", biseKeys[35] == "p")
 
+// S8: the route line after a talk takes a plain tab (amb-web c091e239)
+var rm = KeyMachine()
+let tabOff = rm.feed(.keyDown(48, repeated: false), at: 0)
+law("route: no route line, tab is his app's", !tabOff.swallow && tabOff.out.isEmpty)
+rm.routeOpen = true
+let tabOn = rm.feed(.keyDown(48, repeated: false), at: 1)
+law("route: the route line shows, tab is bise's (app_key tab)", tabOn.swallow && tabOn.out == [.key("tab")])
+law("route: its key up is eaten too", rm.feed(.keyUp(48), at: 1.1).swallow)
+law("route: a held tab repeats nothing", rm.feed(.keyDown(48, repeated: true), at: 1.2).out.isEmpty)
+let otherKey = rm.feed(.keyDown(0, repeated: false), at: 1.3)
+law("route: other keys stay his", !otherKey.swallow && otherKey.out.isEmpty)
+rm.routeOpen = false
+law("route: the line gone, tab is his again", !rm.feed(.keyDown(48, repeated: false), at: 2).swallow)
+law("log: the route line's tab is said as such", KeyLog.line(.key("tab")) == "keys: tab on the route line")
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all KeyMachine laws hold")

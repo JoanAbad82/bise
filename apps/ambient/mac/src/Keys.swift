@@ -27,6 +27,12 @@ final class Keys {
 
     var talking: Bool { machine.talking != nil || machine.handsFree }
 
+    // the route line shows (S8): a plain tab is bise's
+    var routeOpen: Bool {
+        get { machine.routeOpen }
+        set { machine.routeOpen = newValue }
+    }
+
     static var trusted: Bool { AXIsProcessTrusted() }
 
     // macOS's own Accessibility prompt (once per binary)

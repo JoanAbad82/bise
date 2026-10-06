@@ -40,6 +40,8 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
     var askShown = false                  // App+Perms: the glass is open for a permission ask
     var globeSaid = false                 // App+Perms: the emoji picker line, once per launch
     var quietHourJob: DispatchWorkItem?   // App+Quiet: the end of his quiet hour
+    var quietHourEnds: Date?              // App+Quiet: when it ends (app_quiet until_ms)
+    var routeJob: DispatchWorkItem?       // App+Talk: the route line's tab, 4 s at most
     var askedAnchor: BarAnchor?           // where the next show puts the bar (S8; none = bottom centre)
     let mainMenu = MainMenuView() // the hidden main menu: ⌘Q ⌘W ⌘, ⌘H and Edit
     var status: StatusItem?
@@ -502,6 +504,7 @@ final class AmbientApp: NSObject, NSApplicationDelegate {
             // the short lines (done, failed, a page ready, a key's answer)
             let kind = cmd["kind"] as? String ?? ""
             content = kind
+            routeLine(kind == "got" && cmd["route"] as? Bool == true)
             // anything else on the glass ends the hello's claim on it
             if kind != "hello" && kind != "none" { helloOn = false }
             switch kind {
