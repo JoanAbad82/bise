@@ -6,7 +6,71 @@
 
 use super::*;
 
+/// The pages' part of the Shell (architect's review 6, m_9155): the
+/// server and what the hub keeps about pages, one field of the Shell
+/// (`Shell::pg`) instead of ten.
+#[derive(Default)]
+pub(super) struct PageState {
+    /// The pages and their server (docs/ambient-pages.md); None: the
+    /// server could not start (said in the hub log).
+    pub(super) pages: Option<std::sync::Arc<crate::pages::Pages>>,
+    /// Agents a page's notes were sent to: the pages they update, and
+    /// whether a turn of theirs has the notes yet (started or steered
+    /// since). Its end without a publish puts the pages back to ready.
+    pub(super) page_turns: BTreeMap<String, (Vec<String>, bool)>,
+    /// Page messages sent to an agent that has not taken them yet (no
+    /// turn started or steered since): agent -> (first sent at, [(page,
+    /// text)]). Not taken in PAGE_WAIT_MS: they go to main; main's not
+    /// taken: a warn in its feed. Never silently lost (pm's D fail 37).
+    pub(super) page_waits: BTreeMap<String, (u64, Vec<(String, String)>)>,
+    /// the agents each page's latest version names (`data-agent`):
+    /// page id -> names (None: not read from the store yet)
+    pub(super) page_agents: Option<BTreeMap<String, Vec<String>>>,
+    /// the last `agent` frame pushed on each page, per agent
+    pub(super) page_agent_sent: BTreeMap<(String, String), Value>,
+    /// each agent's last tool intent (an `agent` frame's note when it
+    /// declared none)
+    pub(super) last_intent: BTreeMap<String, String>,
+    /// each watched page's last `watch` (meta.watch)
+    pub(super) page_watch_sent: BTreeMap<String, Value>,
+    /// The open cards of the pages' question blocks (§4.2): card →
+    /// (page, block); None until read from the store.
+    pub(super) page_cards: Option<BTreeMap<u64, (String, String)>>,
+    /// The answers given to those cards, until the hub closes them.
+    pub(super) page_replies: BTreeMap<u64, String>,
+    /// `sb card --page`: an agent's card → its page link (card_link.rs),
+    /// shown on the card while it is open; its answer goes to the agent
+    /// as usual (unlike `page_cards`, whose answers take the page's path)
+    pub(super) card_links: BTreeMap<u64, Value>,
+}
+
+impl PageState {
+    /// At the hub's start: the cards survive a restart, so do their links
+    /// (lead m_6039); the server starts with [`Shell::start_pages`].
+    pub(super) fn load(state: &Path) -> PageState {
+        PageState { card_links: crate::card_link::load(&crate::card_link::file(state)), ..Default::default() }
+    }
+}
+
 impl Shell {
+    /// The page server (docs/ambient-pages.md §2.4): 127.0.0.1, a stable
+    /// port per workspace; its notes come back to the loop.
+    pub(super) fn start_pages(&mut self, paths: &Paths, tx: &Sender<Msg>) {
+        match crate::pages::start(&paths.state, &crate::paths::workspace_id(&paths.workspace), self.opts.app_root.join("apps/ambient/kit"), self.holds.clone()) {
+            Ok(p) => {
+                let tx = std::sync::Mutex::new(tx.clone());
+                p.connect_hub(Box::new(move |m| {
+                    if let Ok(t) = tx.lock() {
+                        let _ = t.send(Msg::Page(m));
+                    }
+                }));
+                log_line(paths, &format!("pages at {}", p.base()));
+                self.pg.pages = Some(p);
+            }
+            Err(e) => log_line(paths, &format!("no page server: {}", e)),
+        }
+    }
+
     // ---- pages (docs/ambient-pages.md §2.2-§2.6; the store and the server: pages/) ----
 
     /// An agent that is gone for its page's notes: dropped, archived,
@@ -77,7 +141,7 @@ impl Shell {
     /// ever coming back.
     pub(super) fn start_here(&mut self, paths: &crate::paths::Paths) {
         use crate::first_run;
-        let Some(pages) = self.pages.clone() else { return };
+        let Some(pages) = self.pg.pages.clone() else { return };
         let Some(html) = first_run::due(&paths.state, &paths.workspace, &crate::paths::home_workspace(), &self.opts.app_root) else {
             return;
         };
@@ -101,7 +165,7 @@ impl Shell {
     /// None when there is no such page (or it did not pass).
     pub(super) fn about_you_redraw(&mut self) -> Option<u64> {
         use crate::keeps;
-        let pages = self.pages.clone()?;
+        let pages = self.pg.pages.clone()?;
         let meta = pages.store.meta("about-you")?;
         let read = |n: &str| keeps::file(n).ok().and_then(|p| std::fs::read_to_string(p).ok()).unwrap_or_default();
         let p = crate::pages::store::Publish {
@@ -127,7 +191,7 @@ impl Shell {
     }
 
     pub(super) fn page_op(&mut self, cmd: &str, from: &str, v: &Value) -> Value {
-        let Some(pages) = self.pages.clone() else {
+        let Some(pages) = self.pg.pages.clone() else {
             return json!({"ok": false, "error": "the page server is not running (see the hub log)"});
         };
         let s = |k: &str| v.get(k).and_then(|x| x.as_str()).map(String::from);
@@ -173,7 +237,7 @@ impl Shell {
                         // its writer's turn: the caller's runs now; another
                         // agent's is the next one (its end without a
                         // publish puts the page back to ready)
-                        let e = self.page_turns.entry(agent.clone()).or_insert_with(|| (Vec::new(), false));
+                        let e = self.pg.page_turns.entry(agent.clone()).or_insert_with(|| (Vec::new(), false));
                         if !e.0.contains(&meta.id) {
                             e.0.push(meta.id.clone());
                         }
@@ -236,10 +300,10 @@ impl Shell {
                             crate::pages::mirror::spawn(pages.clone(), meta.id.clone(), bise_home::Home::from_env().config_file());
                         }
                         // the notes it was updating for are answered
-                        if let Some((ids, _)) = self.page_turns.get_mut(from) {
+                        if let Some((ids, _)) = self.pg.page_turns.get_mut(from) {
                             ids.retain(|i| *i != meta.id);
                             if ids.is_empty() {
-                                self.page_turns.remove(from);
+                                self.pg.page_turns.remove(from);
                             }
                         }
                         self.broadcast(&pages.page_ev(&meta));
@@ -269,7 +333,7 @@ impl Shell {
 
     /// The page server's news.
     pub(super) fn page_msg(&mut self, m: crate::pages::PageMsg) {
-        let Some(pages) = self.pages.clone() else { return };
+        let Some(pages) = self.pg.pages.clone() else { return };
         match m {
             crate::pages::PageMsg::Notes { id } => {
                 // a tick on the page (a draft too) closes its step's card
@@ -310,13 +374,13 @@ impl Shell {
                 // (none: only start notes were sent)
                 if !text.is_empty() {
                     let to = if self.page_agent_gone(&agent) { MAIN.to_string() } else { agent };
-                    self.page_turns.entry(to.clone()).or_insert_with(|| (Vec::new(), false)).0.push(id.clone());
+                    self.pg.page_turns.entry(to.clone()).or_insert_with(|| (Vec::new(), false)).0.push(id.clone());
                     if let Some(meta) = pages.set_state(&id, "updating") {
                         self.broadcast(&pages.page_ev(&meta));
                     }
                     // as from the user (client 0: no view of its own);
                     // watched until a turn of `to` takes it
-                    let w = self.page_waits.entry(to.clone()).or_insert_with(|| (now_ms(), Vec::new()));
+                    let w = self.pg.page_waits.entry(to.clone()).or_insert_with(|| (now_ms(), Vec::new()));
                     w.1.push((id.clone(), text.clone()));
                     let text = Self::page_hint(&to, text);
                     self.step(Input::ClientInput { client: 0, focus: to, text, queued: false });
@@ -342,14 +406,14 @@ impl Shell {
     /// The agents each page's latest version names, read from the store
     /// the first time.
     pub(super) fn page_agents_now(&mut self) -> &mut BTreeMap<String, Vec<String>> {
-        if self.page_agents.is_none() {
-            let m: BTreeMap<String, Vec<String>> = match &self.pages {
+        if self.pg.page_agents.is_none() {
+            let m: BTreeMap<String, Vec<String>> = match &self.pg.pages {
                 Some(p) => p.store.list().into_iter().map(|m| (m.id.clone(), p.store.data_agents(&m.id))).filter(|(_, n)| !n.is_empty()).collect(),
                 None => BTreeMap::new(),
             };
-            self.page_agents = Some(m);
+            self.pg.page_agents = Some(m);
         }
-        self.page_agents.get_or_insert_with(BTreeMap::new)
+        self.pg.page_agents.get_or_insert_with(BTreeMap::new)
     }
 
     /// An agent's live status on a page item (kit's `agent` frame, amb-kit
@@ -371,7 +435,7 @@ impl Shell {
             .as_ref()
             .map(|(_, n)| n.trim().to_string())
             .filter(|n| !n.is_empty())
-            .or_else(|| self.last_intent.get(&a.name).cloned());
+            .or_else(|| self.pg.last_intent.get(&a.name).cloned());
         let mut f = json!({"name": name, "status": status});
         if let Some(n) = note {
             f["note"] = json!(n);
@@ -382,7 +446,7 @@ impl Shell {
     /// Push the `agent` frames that changed, on every page naming them;
     /// each page keeps its last frames for a new stream.
     pub(super) fn page_agent_push(&mut self) {
-        let Some(pages) = self.pages.clone() else { return };
+        let Some(pages) = self.pg.pages.clone() else { return };
         let list: Vec<(String, Vec<String>)> = self.page_agents_now().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         // the agents at work on page items: their drafts wait; when one
         // is done, its page's drafts are judged again (ambient-lead m_6168)
@@ -410,16 +474,16 @@ impl Shell {
             for name in names {
                 let f = self.page_agent_frame(&name);
                 let key = (id.clone(), name.clone());
-                if self.page_agent_sent.get(&key) == Some(&f) {
+                if self.pg.page_agent_sent.get(&key) == Some(&f) {
                     continue;
                 }
                 pages.push(&id, "agent", &f);
-                self.page_agent_sent.insert(key, f);
+                self.pg.page_agent_sent.insert(key, f);
                 changed = true;
             }
             if changed {
                 let frames: serde_json::Map<String, Value> =
-                    self.page_agent_sent.iter().filter(|((p, _), _)| *p == id).map(|((_, n), f)| (n.clone(), f.clone())).collect();
+                    self.pg.page_agent_sent.iter().filter(|((p, _), _)| *p == id).map(|((_, n), f)| (n.clone(), f.clone())).collect();
                 let _ = pages.locked(|s| s.save_agent_frames(&id, &frames));
             }
         }
@@ -430,14 +494,14 @@ impl Shell {
     /// no word of his on it since (an approve, a send, "put it in my
     /// drafts"). The approvals gate makes a draft call a card then.
     pub(crate) fn pending_review_of(&self, name: &str) -> Option<String> {
-        self.pages.as_ref()?.store.pending_review(name)
+        self.pg.pages.as_ref()?.store.pending_review(name)
     }
 
     /// meta.watch of each page a timer watches (`sb every --page`), and
     /// SSE `watch` when it changes (null when its last timer ends):
     /// {timer, every, checked_ms, until_ms} (amb-kit m_5454).
     pub(super) fn page_watch_push(&mut self) {
-        let Some(pages) = self.pages.clone() else { return };
+        let Some(pages) = self.pg.pages.clone() else { return };
         let mut now: BTreeMap<String, Value> = BTreeMap::new();
         for t in self.hub.timers().map.values() {
             let Some(page) = &t.page else { continue };
@@ -448,7 +512,7 @@ impl Shell {
             let checked = m.versions.last().map_or(0, |v| v.at_ms).max(t.last_ms);
             now.insert(page.clone(), json!({"timer": t.id, "every": t.sched.label(), "checked_ms": checked, "until_ms": t.until_ms}));
         }
-        let before = std::mem::take(&mut self.page_watch_sent);
+        let before = std::mem::take(&mut self.pg.page_watch_sent);
         for (id, w) in &now {
             if before.get(id) != Some(w) {
                 let _ = pages.locked(|s| s.set_watch(id, Some(w.clone())));
@@ -459,7 +523,7 @@ impl Shell {
             let _ = pages.locked(|s| s.set_watch(id, None));
             pages.push(id, "watch", &Value::Null);
         }
-        self.page_watch_sent = now;
+        self.pg.page_watch_sent = now;
     }
 
     /// A tool intent of an agent some page names: its item's note.
@@ -468,7 +532,7 @@ impl Shell {
             return;
         }
         if let crate::wire::Wire::Intent(text) = crate::wire::parse(line) {
-            self.last_intent.insert(name.to_string(), crate::util::one_line(&text));
+            self.pg.last_intent.insert(name.to_string(), crate::util::one_line(&text));
             self.page_agent_push();
         }
     }
@@ -481,13 +545,14 @@ impl Shell {
         use crate::pages::{untaken, Untaken};
         let now = now_ms();
         let late: Vec<(String, Untaken)> = self
+            .pg
             .page_waits
             .iter()
             .map(|(a, (at, _))| (a.clone(), untaken(a, now.saturating_sub(*at))))
             .filter(|(_, u)| *u != Untaken::Wait)
             .collect();
         for (agent, u) in late {
-            let Some((_, items)) = self.page_waits.remove(&agent) else { continue };
+            let Some((_, items)) = self.pg.page_waits.remove(&agent) else { continue };
             let pages: Vec<String> = items.iter().map(|(p, _)| p.clone()).collect();
             match u {
                 Untaken::ToMain => {
@@ -499,7 +564,7 @@ impl Shell {
                         body.join("\n\n")
                     );
                     log_line(&self.opts.paths, &format!("pages {}: @{agent} took no turn on the notes: to main", pages.join(", ")));
-                    let w = self.page_waits.entry(MAIN.to_string()).or_insert_with(|| (now, Vec::new()));
+                    let w = self.pg.page_waits.entry(MAIN.to_string()).or_insert_with(|| (now, Vec::new()));
                     w.1.extend(pages.iter().map(|p| (p.clone(), String::new())));
                     let text = Self::page_hint(MAIN, text);
                     self.step(Input::ClientInput { client: 0, focus: MAIN.to_string(), text, queued: false });
@@ -518,11 +583,11 @@ impl Shell {
     /// ends without a publish puts its pages back to ready (the notes
     /// stay sent).
     pub(super) fn page_turn(&mut self, name: &str, line: &str) {
-        let Some((ids, seen)) = self.page_turns.get_mut(name) else { return };
+        let Some((ids, seen)) = self.pg.page_turns.get_mut(name) else { return };
         // what its writer does now, on the pages it writes or updates
         // (the model's one-line intent of each bash/run_typescript call)
         if let crate::wire::Wire::Intent(text) = crate::wire::parse(line) {
-            if let Some(p) = &self.pages {
+            if let Some(p) = &self.pg.pages {
                 for id in ids.iter() {
                     p.push(id, "progress", &json!({"text": text}));
                 }
@@ -539,8 +604,8 @@ impl Shell {
         }
         let how = o.trim_start_matches("turn_done: ").trim().to_string();
         let ids = std::mem::take(ids);
-        self.page_turns.remove(name);
-        let Some(pages) = self.pages.clone() else { return };
+        self.pg.page_turns.remove(name);
+        let Some(pages) = self.pg.pages.clone() else { return };
         for id in ids {
             // the page says why nothing came (amb-kit m_5105)
             let writing = pages.store.meta(&id).is_some_and(|m| m.state == "writing");
@@ -559,7 +624,7 @@ impl Shell {
 
     /// `card_links` to the hub's state (card_link.rs), after each change.
     pub(super) fn save_card_links(&self) {
-        if let Err(e) = crate::card_link::save(&crate::card_link::file(&self.opts.paths.state), &self.card_links) {
+        if let Err(e) = crate::card_link::save(&crate::card_link::file(&self.opts.paths.state), &self.pg.card_links) {
             log_line(&self.opts.paths, &format!("card links not saved: {e}"));
         }
     }
@@ -567,8 +632,8 @@ impl Shell {
     /// The open cards of the pages' questions: card → (page, block),
     /// read from the store once.
     pub(super) fn page_cards(&mut self) -> &mut BTreeMap<u64, (String, String)> {
-        let pages = self.pages.clone();
-        self.page_cards.get_or_insert_with(|| {
+        let pages = self.pg.pages.clone();
+        self.pg.page_cards.get_or_insert_with(|| {
             let mut m = BTreeMap::new();
             if let Some(p) = pages {
                 for meta in p.store.list() {
@@ -596,7 +661,7 @@ impl Shell {
     /// old one closes `replaced`), a question gone closes its card
     /// (`withdrawn`), an answered one stays answered.
     pub(super) fn page_questions(&mut self, id: &str, agent: &str, html: &str) {
-        let Some(pages) = self.pages.clone() else { return };
+        let Some(pages) = self.pg.pages.clone() else { return };
         let old = pages.store.questions(id);
         let new = crate::pages::questions::of_fragment(html);
         if old.is_empty() && new.is_empty() {
@@ -643,7 +708,7 @@ impl Shell {
     /// `answered`, and the pick is a `pick` note on that block, sent to
     /// the page's agent (main when it is gone) like any notes.
     pub(super) fn page_answer_without_card(&mut self, id: &str, block: &str, reply: &str) {
-        let Some(pages) = self.pages.clone() else { return };
+        let Some(pages) = self.pg.pages.clone() else { return };
         let Some(meta) = pages.store.meta(id) else { return };
         let mut qs = pages.store.questions(id);
         let Some(q) = qs.iter_mut().find(|q| q.block == block && q.reply.is_none()) else { return };
@@ -678,7 +743,7 @@ impl Shell {
         // data-plan makes step cards (the filter on `due` below). A
         // promises page or a meeting page has none, so its rows of his
         // show in sb page waiting and the state's overdue count only.
-        let Some(pages) = self.pages.clone() else { return };
+        let Some(pages) = self.pg.pages.clone() else { return };
         let Some(meta) = pages.store.meta(id) else { return };
         let html = pages.store.html(id, meta.version()).unwrap_or_default();
         let rows = crate::pages::checklist::judged(&html, &pages.store.questions(id));
@@ -881,7 +946,7 @@ impl Shell {
     /// (main when it is gone), the card closes. Review (2) or other
     /// words: the card stays (the capsule opens the page at the first).
     pub(super) fn page_drafts_answer(&mut self, id: &str, card: u64, reply: &str) -> bool {
-        let Some(pages) = self.pages.clone() else { return false };
+        let Some(pages) = self.pg.pages.clone() else { return false };
         let Some(meta) = pages.store.meta(id) else { return false };
         if !crate::pages::drafts::is_send_all(reply) {
             return true;
@@ -907,7 +972,7 @@ impl Shell {
     /// An approve note for each draft of page `id` that waits now (only
     /// those in `keys` when given); the notes it wrote.
     pub(super) fn page_approve_drafts(&mut self, id: &str, keys: Option<&[String]>) -> Vec<crate::pages::store::Note> {
-        let Some(pages) = self.pages.clone() else { return Vec::new() };
+        let Some(pages) = self.pg.pages.clone() else { return Vec::new() };
         let Some(meta) = pages.store.meta(id) else { return Vec::new() };
         let html = pages.store.html(id, meta.version()).unwrap_or_default();
         let drafts = crate::pages::drafts::ready(&html, crate::pages::drafts::pending(&html, &pages.store.notes(id), &pages.store.questions(id)), &|a| pages.held(id, a, meta.version()));
@@ -924,7 +989,7 @@ impl Shell {
     /// The approves written: the page hears them, its agent (main when
     /// gone) gets one notes message.
     pub(super) fn page_send_approves(&mut self, id: &str, meta: &crate::pages::store::Meta, sent: &[crate::pages::store::Note]) {
-        let Some(pages) = self.pages.clone() else { return };
+        let Some(pages) = self.pg.pages.clone() else { return };
         if sent.is_empty() {
             return;
         }
@@ -940,7 +1005,7 @@ impl Shell {
     /// silently nothing. False: no batch card of a page.
     pub(super) fn page_old_batch_answer(&mut self, client: ClientId, card: u64, reply: &str) -> bool {
         use crate::pages::checklist::BATCH;
-        let Some(pages) = self.pages.clone() else { return false };
+        let Some(pages) = self.pg.pages.clone() else { return false };
         let Some(id) = pages.store.list().into_iter().map(|m| m.id).find(|id| pages.store.steps(id).iter().any(|s| s.block == BATCH && s.card == card)) else {
             return false;
         };
@@ -978,7 +1043,7 @@ impl Shell {
     /// the next step's turn comes. `text`: the user's words when they are
     /// not a plain "done". False: no such row.
     pub(super) fn page_tick(&mut self, id: &str, item: &str, text: &str) -> bool {
-        let Some(pages) = self.pages.clone() else { return false };
+        let Some(pages) = self.pg.pages.clone() else { return false };
         let Some(meta) = pages.store.meta(id) else { return false };
         let rows = pages.store.html(id, meta.version()).map(|h| crate::pages::checklist::rows_of(&h)).unwrap_or_default();
         let Some(row) = rows.iter().find(|r| r.item == item) else { return false };
@@ -1047,7 +1112,7 @@ impl Shell {
     /// (main when it is gone). sb-core's question path would send it to
     /// main, the card's asker (pm's 25: a task's page).
     pub(super) fn page_question_answer(&mut self, id: &str, block: &str, card: u64, reply: &str) -> bool {
-        let Some(pages) = self.pages.clone() else { return false };
+        let Some(pages) = self.pg.pages.clone() else { return false };
         let reply = reply.trim();
         let words = match reply.parse::<usize>() {
             Ok(k) => pages.store.questions(id).iter().find(|q| q.block == block).and_then(|q| q.option(k).map(String::from)),
@@ -1079,14 +1144,14 @@ impl Shell {
         let (n, reply) = rest.trim().split_once(' ')?;
         let card: u64 = n.trim_start_matches('#').parse().ok()?;
         let (id, block) = self.page_cards().get(&card).cloned()?;
-        let pages = self.pages.clone()?;
+        let pages = self.pg.pages.clone()?;
         let reply = reply.trim().to_string();
         let words = match reply.parse::<usize>() {
             Ok(k) => pages.store.questions(&id).iter().find(|q| q.block == block).and_then(|q| q.option(k).map(String::from)),
             Err(_) => None,
         }
         .unwrap_or(reply);
-        self.page_replies.insert(card, words.clone());
+        self.pg.page_replies.insert(card, words.clone());
         Some(format!("/answer {card} {words}"))
     }
 
@@ -1094,7 +1159,7 @@ impl Shell {
     /// (`answered {block, reply}` on its SSE; "" when the card closed
     /// without one: withdrawn by main, closed by the user).
     pub(super) fn page_answers(&mut self) {
-        let Some(pages) = self.pages.clone() else { return };
+        let Some(pages) = self.pg.pages.clone() else { return };
         let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
         let closed: Vec<(u64, String, String)> = self
             .page_cards()
@@ -1119,7 +1184,7 @@ impl Shell {
                 }
                 continue;
             }
-            let reply = self.page_replies.remove(&card);
+            let reply = self.pg.page_replies.remove(&card);
             let mut qs = pages.store.questions(&id);
             if let Some(q) = qs.iter_mut().find(|q| q.card == card) {
                 match &reply {

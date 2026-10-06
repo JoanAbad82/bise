@@ -322,48 +322,19 @@ struct Shell {
     prs: Option<crate::forge::poll::Poller>,
     /// computer use's events.jsonl: each stop, one line in main's feed
     cu: crate::computer_use::Watch,
-    /// The pages and their server (docs/ambient-pages.md); None: the
-    /// server could not start (said in the hub log).
-    pages: Option<std::sync::Arc<crate::pages::Pages>>,
+    /// the pages: their server and what the hub keeps about them (daemon/pages.rs)
+    pg: pages::PageState,
     /// the typed protocol's connections (bise desktop S3a, daemon/proto.rs)
     proto: proto::Proto,
     /// view.json's writer (bise desktop S1, daemon/projects.rs)
     projects: projects::Projects,
     /// bise's home hub: the projects its routing guesses from (daemon/routing.rs)
     routing: routing::Routing,
-    /// Agents a page's notes were sent to: the pages they update, and
-    /// whether a turn of theirs has the notes yet (started or steered
-    /// since). Its end without a publish puts the pages back to ready.
-    page_turns: BTreeMap<String, (Vec<String>, bool)>,
-    /// Page messages sent to an agent that has not taken them yet (no
-    /// turn started or steered since): agent -> (first sent at, [(page,
-    /// text)]). Not taken in PAGE_WAIT_MS: they go to main; main's not
-    /// taken: a warn in its feed. Never silently lost (pm's D fail 37).
-    page_waits: BTreeMap<String, (u64, Vec<(String, String)>)>,
     /// S9: the fn context of the input being stepped: (agent, its JSON).
     /// Its 'you' line goes to the transcript without the rendered block,
     /// with an `sb context : <json>` line after it in the same append
     /// (feed). Set and cleared around one `step`.
     fn_ctx: Option<(String, String)>,
-    /// the agents each page's latest version names (`data-agent`):
-    /// page id -> names (None: not read from the store yet)
-    page_agents: Option<BTreeMap<String, Vec<String>>>,
-    /// the last `agent` frame pushed on each page, per agent
-    page_agent_sent: BTreeMap<(String, String), Value>,
-    /// each agent's last tool intent (an `agent` frame's note when it
-    /// declared none)
-    last_intent: BTreeMap<String, String>,
-    /// each watched page's last `watch` (meta.watch)
-    page_watch_sent: BTreeMap<String, Value>,
-    /// The open cards of the pages' question blocks (§4.2): card →
-    /// (page, block); None until read from the store.
-    page_cards: Option<BTreeMap<u64, (String, String)>>,
-    /// The answers given to those cards, until the hub closes them.
-    page_replies: BTreeMap<u64, String>,
-    /// `sb card --page`: an agent's card → its page link (card_link.rs),
-    /// shown on the card while it is open; its answer goes to the agent
-    /// as usual (unlike `page_cards`, whose answers take the page's path)
-    card_links: BTreeMap<u64, Value>,
     /// idle-exit (`idle.rs`): no UI for the grace and nothing runs, the
     /// hub stops for good
     idle: crate::idle::Watch,
@@ -743,7 +714,7 @@ impl Shell {
         // watched pages skip those)
         snap["timers"] = json!(self.hub.timers().state(now_ms()));
         // the pages (docs/ambient-pages.md §2.3), newest first
-        if let Some(p) = &self.pages {
+        if let Some(p) = &self.pg.pages {
             snap["pages"] = json!(p.list_json());
             snap["pages_url"] = json!(p.base());
             // his late promises (checklist rows of his past data-due): a
@@ -753,15 +724,15 @@ impl Shell {
             let p = p.clone();
             let qs = self.page_cards().clone();
             let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
-            let n = self.card_links.len();
-            self.card_links.retain(|c, _| open.contains(c));
-            if self.card_links.len() != n {
+            let n = self.pg.card_links.len();
+            self.pg.card_links.retain(|c, _| open.contains(c));
+            if self.pg.card_links.len() != n {
                 self.save_card_links();
             }
             if let Some(cards) = snap["cards"].as_array_mut() {
                 for c in cards {
                     // an agent's card linked with `sb card --page`
-                    if let Some(link) = c["id"].as_u64().and_then(|n| self.card_links.get(&n)) {
+                    if let Some(link) = c["id"].as_u64().and_then(|n| self.pg.card_links.get(&n)) {
                         c["page"] = link.clone();
                     }
                     let Some((id, block)) = c["id"].as_u64().and_then(|n| qs.get(&n)) else { continue };
@@ -900,8 +871,8 @@ impl Shell {
 
     /// A line enters a feed: memory, transcript, every client.
     fn feed(&mut self, name: &str, line: &str) {
-        if self.page_waits.contains_key(name) && crate::pages::took_input(line) {
-            self.page_waits.remove(name);
+        if self.pg.page_waits.contains_key(name) && crate::pages::took_input(line) {
+            self.pg.page_waits.remove(name);
         }
         self.page_turn(name, line);
         self.page_agent_line(name, line);
@@ -2006,7 +1977,7 @@ impl Shell {
             "exe": self.opts.exe.to_string_lossy(),
             "version": crate::switch::version_info(&self.opts.app_root),
             "reload": self.reload_id,
-            "pages_url": self.pages.as_ref().map(|p| p.base()),
+            "pages_url": self.pg.pages.as_ref().map(|p| p.base()),
         }));
         push(&self.snapshot());
         for name in &self.hub.st.order {
@@ -2056,7 +2027,7 @@ impl Shell {
         if via != "capsule" || text.trim_start().starts_with('/') {
             return text;
         }
-        let Some(pages) = self.pages.clone() else { return text };
+        let Some(pages) = self.pg.pages.clone() else { return text };
         let keys: Vec<(String, String)> = self.page_cards().values().filter(|(_, k)| k.starts_with("row:")).cloned().collect();
         let mut steps: Vec<String> = Vec::new();
         for (id, key) in keys {
@@ -2118,7 +2089,7 @@ impl Shell {
             }
             // a note talk's words (§4.1): to the page's frame, never an input
             "page_voice" => {
-                if let Some(p) = &self.pages {
+                if let Some(p) = &self.pg.pages {
                     let page = s("page");
                     if p.store.meta(&page).is_some() {
                         p.push(&page, "voice", &json!({"phase": s("phase"), "text": s("text")}));
@@ -2270,7 +2241,7 @@ impl Shell {
                     // `sb card --page <id>[#<item>]`: a page that isn't there
                     // is refused before the card opens (pm's B m_6008)
                     let link = match (cmd, v.get("page").and_then(Value::as_str)) {
-                        ("card", Some(spec)) => match self.pages.as_ref().map(|p| crate::card_link::link(p, spec)) {
+                        ("card", Some(spec)) => match self.pg.pages.as_ref().map(|p| crate::card_link::link(p, spec)) {
                             Some(Ok(l)) => Some(l),
                             Some(Err(e)) => {
                                 write_json(&mut stream, &json!({"ok": false, "error": e}));
@@ -2289,7 +2260,7 @@ impl Shell {
                     if let Some(l) = link {
                         let new = self.hub.st.open_cards().map(|c| c.id).filter(|c| !before.contains(c)).max();
                         if let Some(card) = new {
-                            self.card_links.insert(card, l);
+                            self.pg.card_links.insert(card, l);
                             self.save_card_links();
                             let snap = self.snapshot();
                             self.broadcast(&snap);
@@ -2655,18 +2626,8 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         features: features::Features::load(&paths.state),
         prs: None,
         cu: crate::computer_use::Watch::new(),
-        pages: None,
-        page_turns: BTreeMap::new(),
-        page_waits: BTreeMap::new(),
+        pg: pages::PageState::load(&paths.state),
         fn_ctx: None,
-        page_agents: None,
-        page_agent_sent: BTreeMap::new(),
-        last_intent: BTreeMap::new(),
-        page_watch_sent: BTreeMap::new(),
-        page_cards: None,
-        page_replies: BTreeMap::new(),
-        // the cards survive a restart, so do their links (lead m_6039)
-        card_links: crate::card_link::load(&crate::card_link::file(&paths.state)),
         idle: crate::idle::Watch::new(
             crate::idle::grace(
                 std::env::var(crate::idle::ENV).ok().as_deref(),
@@ -2677,21 +2638,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         holds: crate::idle::Holds::default(),
         art: art::Art::default(),
     };
-    // the page server (docs/ambient-pages.md §2.4): 127.0.0.1, a stable
-    // port per workspace; its notes come back to the loop
-    match crate::pages::start(&paths.state, &crate::paths::workspace_id(&paths.workspace), sh.opts.app_root.join("apps/ambient/kit"), sh.holds.clone()) {
-        Ok(p) => {
-            let tx = std::sync::Mutex::new(tx.clone());
-            p.connect_hub(Box::new(move |m| {
-                if let Ok(t) = tx.lock() {
-                    let _ = t.send(Msg::Page(m));
-                }
-            }));
-            log_line(&paths, &format!("pages at {}", p.base()));
-            sh.pages = Some(p);
-        }
-        Err(e) => log_line(&paths, &format!("no page server: {}", e)),
-    }
+    sh.start_pages(&paths, &tx);
     sh.start_here(&paths);
     match sh.idle.grace() {
         Some(g) => log_line(&paths, &format!("idle exit: after {} s without a UI, once nothing runs", g.as_secs())),

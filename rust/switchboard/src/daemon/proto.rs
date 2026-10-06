@@ -78,7 +78,7 @@ impl Shell {
     }
 
     fn facts(&self) -> Facts {
-        Facts { open: self.hub.st.open_cards().map(|c| c.id).collect(), pages: self.pages.clone() }
+        Facts { open: self.hub.st.open_cards().map(|c| c.id).collect(), pages: self.pg.pages.clone() }
     }
 
     fn proto_send(&mut self, id: ClientId, ev: &HubEv) {
@@ -318,7 +318,7 @@ impl Shell {
 
     /// The art store's event as the typed `artifacts`.
     fn proto_artifacts(&self, ev: &Value) -> HubEv {
-        let pages = self.pages.clone();
+        let pages = self.pg.pages.clone();
         let page_url = |id: &str| pages.as_ref().filter(|p| p.store.meta(id).is_some()).map(|p| p.url(id));
         HubEv::Artifacts { project: self.project(), items: proto_view::artifacts(ev, page_url) }
     }
