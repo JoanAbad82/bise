@@ -11,8 +11,8 @@
 //! No `project`: the helper knows no hub. A closed stdin is `quit`: the
 //! helper never outlives the app.
 //!
-//! DRAFT: names may still move until Electron's main decodes these lines;
-//! frozen (the v1 rule: add, never rename) in that commit. The fixtures
+//! Frozen since Electron's main decodes them (src/main/helper/lines.ts): the
+//! v1 rule holds, a name is added, never renamed or retyped. The fixtures
 //! (`fixtures/helper_ev.jsonl`, `fixtures/helper_cmd.jsonl`) are the one
 //! source: the Rust round trip here, the Swift helper's own tests (it
 //! decodes every command line and encodes every event line back), the

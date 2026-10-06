@@ -4,6 +4,8 @@
 // the two can't drift. Owner: amb-core (the core channel lands here next);
 // other chunks ask amb-core to add a member.
 
+import type { HelperCmd, HelperEv } from '../proto';
+
 export interface BiseApi {
   /** process.platform of the main process ('darwin', 'win32', 'linux'). */
   readonly platform: string;
@@ -22,6 +24,16 @@ export interface BiseApi {
   readonly copy: (text: string) => Promise<void>;
   /** The menu's own keys (⌘, ⌘I ⌘F) for this window; returns the unsubscribe. */
   readonly onMenu: (listener: (action: MenuAction) => void) => () => void;
+  /**
+   * bise-mac-helper's events (fn, context, front, perms, quiet, shot...;
+   * bise_proto::helper), to every window; returns the unsubscribe. No helper
+   * in this run (not macOS, a test run without the stub): never called.
+   */
+  readonly onHelper: (listener: (ev: HelperEv) => void) => () => void;
+  /** The helper's last state events (hello, front, perms, quiet), for a window that just opened. */
+  readonly helperState: () => Promise<HelperEv[]>;
+  /** A command to the helper (read_context, perm, shot, route, own_mic, config; never quit). */
+  readonly helper: (cmd: HelperCmd) => void;
 }
 
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */
@@ -34,6 +46,9 @@ export const IPC = {
   menu: 'bise:menu',
   /** test mode: a clipboard item of the menu, played on the window's private buffer */
   clip: 'bise:clip',
+  helperEv: 'bise:helper-ev',
+  helperState: 'bise:helper-state',
+  helperCmd: 'bise:helper-cmd',
 } as const;
 
 /** Test mode's stdout lines for effects that would leave the app. */

@@ -13,7 +13,7 @@
 //! The crate holds every JSON-line contract bise has, each in its own
 //! module (one TS generator, one fixtures convention): the hub protocol
 //! ([`hub`]), the core ↔ app lines (the draft `CoreEv`/`AppCmd`), and
-//! bise-mac-helper ↔ Electron's main ([`helper`], draft).
+//! bise-mac-helper ↔ Electron's main ([`helper`]).
 //!
 //! Every event and command carries `project`: the hub's id
 //! (`bise_home`'s hub id of the workspace, e.g. `harness-3abb2bd8`), a

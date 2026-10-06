@@ -4,6 +4,7 @@
 // In test mode it also fences the clipboard (src/main/clipfence.ts): ⌘C ⌘X
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import type { HelperEv } from '../proto';
 import { IPC, TEST_ENV, type BiseApi, type MenuAction } from '../shared/api';
 import { installClipFence, type ClipOp, type WinLike } from './clipfence';
 
@@ -32,6 +33,19 @@ const api: BiseApi = {
     return () => {
       ipcRenderer.removeListener(IPC.menu, on);
     };
+  },
+  onHelper: (listener) => {
+    const on = (_e: IpcRendererEvent, ev: HelperEv): void => {
+      listener(ev);
+    };
+    ipcRenderer.on(IPC.helperEv, on);
+    return () => {
+      ipcRenderer.removeListener(IPC.helperEv, on);
+    };
+  },
+  helperState: async () => (await ipcRenderer.invoke(IPC.helperState)) as HelperEv[],
+  helper: (cmd) => {
+    ipcRenderer.send(IPC.helperCmd, cmd);
   },
 };
 

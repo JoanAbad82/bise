@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { app, BrowserWindow, Menu } from 'electron';
 import { READY_LINE, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
+import { startHelper } from './helper/run';
 import { installIpc, sendClip, sendMenu } from './ipc';
 import { menuTemplate } from './menu';
 
@@ -70,6 +71,7 @@ if (testMode) {
 
 void app.whenReady().then(() => {
   installIpc(testMode);
+  startHelper(testMode);
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       menuTemplate({
