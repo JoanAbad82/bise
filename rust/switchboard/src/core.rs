@@ -1044,6 +1044,8 @@ impl Hub {
     #[cfg(test)]
     pub fn new(workspace: &str) -> Hub {
         let bin = bise_home::env::test_setting("SB_CORE_BIN").map(PathBuf::from).unwrap_or_else(default_core_bin);
+        // a test on an sb-core of other sources lies both ways (core_fresh.rs)
+        crate::core_fresh::check(&bin);
         Hub::with_core(workspace, bin)
     }
 

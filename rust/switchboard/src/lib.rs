@@ -30,6 +30,8 @@ pub mod cli;
 pub mod client;
 pub mod computer_use;
 pub mod core;
+#[cfg(test)]
+mod core_fresh;
 pub mod daemon;
 pub mod devflow;
 pub mod diff;

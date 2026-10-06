@@ -15,6 +15,7 @@ mod features;
 mod gate;
 mod history;
 mod pages;
+mod projects;
 mod proto;
 mod repl;
 mod release;
@@ -310,6 +311,8 @@ struct Shell {
     pages: Option<std::sync::Arc<crate::pages::Pages>>,
     /// the typed protocol's connections (bise desktop S3a, daemon/proto.rs)
     proto: proto::Proto,
+    /// view.json's writer (bise desktop S1, daemon/projects.rs)
+    projects: projects::Projects,
     /// Agents a page's notes were sent to: the pages they update, and
     /// whether a turn of theirs has the notes yet (started or steered
     /// since). Its end without a publish puts the pages back to ready.
@@ -1158,6 +1161,7 @@ impl Shell {
                 self.page_watch_push();
                 let snap = self.snapshot();
                 self.broadcast(&snap);
+                self.view_changed(&snap);
             }
             Effect::AskRole { dir, key, request } => self.ask_role(dir, key, request),
             Effect::Confirm { card, agent: _, text } => self.on_confirm(card, &text),
@@ -1622,6 +1626,8 @@ impl Shell {
     /// idle-exit, at each tick: no UI for the grace and nothing runs,
     /// the hub stops for good (the stop of `bise --stop`).
     fn idle_check(&mut self) {
+        // view.json's debounced write rides the same tick (daemon/projects.rs)
+        self.view_tick();
         let uis = self.clients.len() + self.holds.count();
         // the look reads self: the watch is taken out for it
         let mut w = std::mem::replace(&mut self.idle, crate::idle::Watch::new(None, std::time::Instant::now()));
@@ -1632,6 +1638,7 @@ impl Shell {
             crate::idle::Step::Say(s) => log_line(&self.opts.paths, &s),
             crate::idle::Step::Stop(s) => {
                 log_line(&self.opts.paths, &s);
+                self.view_stopped();
                 let _ = self.tx.send(Msg::Shutdown { keep: false });
             }
         }
@@ -2143,6 +2150,7 @@ impl Shell {
                     .get("keep_agents")
                     .and_then(|x| x.as_bool())
                     .unwrap_or(false);
+                self.view_stopped();
                 let _ = self.tx.send(Msg::Shutdown { keep });
             }
             other => {
@@ -2533,6 +2541,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         buffers: BTreeMap::new(),
         positions: BTreeMap::new(),
         proto: proto::Proto::default(),
+        projects: projects::Projects::boot(&paths),
         search: search::Index::default(),
         offsets: BTreeMap::new(),
         booting: false,
