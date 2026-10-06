@@ -94,7 +94,23 @@ PROJECTS = [
                     {"report": "done", "text": "discount codes work at checkout (checkout/cart.py, checkout/codes.py). waiting for your merge."}]},
          {"name": "search", "place": "", "objective": "search doesn't find tshirt",
           "steps": [{"report": "blocked", "text": "search ne trouve pas tshirt: the index matches whole names only. fuzzy match or a synonym list?"}]},
-     ]},
+         # a FEATURE with 2 agents (qa-flows m_10155): each in its own worktree from the feature's tip,
+         # landing on the feature branch, so a try and a merge are possible (sb feature ready / merge)
+         {"name": "gift-api", "feature": "gift-cards", "objective": "gift cards: the balance API",
+          "steps": [{"write": "checkout/gift.py", "text": "BALANCES = {}\n\n\ndef balance(code):\n    return BALANCES.get(code, 0)\n"},
+                    {"commit": "gift cards: balance(code) for the cart and checkout"},
+                    {"land": "gift cards: the balance API, checkout/gift.py"},
+                    {"report": "done", "text": "gift card balance API landed on gift-cards (checkout/gift.py)."}]},
+         # ...and an agent with an open QUESTION of its own: it asks main, main escalates it as a card
+         # tied to the agent's message (sb card --for), so the card is the agent's, not main's
+         {"name": "gift-ui", "feature": "gift-cards", "objective": "gift cards: show the balance to the buyer",
+          "steps": [{"write": "checkout/gift_ui.py", "text": "def label(balance):\n    return 'gift card: %.2f' % balance\n"},
+                    {"commit": "gift cards: the balance label"},
+                    {"land": "gift cards: the balance label, checkout/gift_ui.py"},
+                    {"ask": "gift cards: show the balance on the cart page, or only at checkout?\n1. on the cart page\n2. only at checkout"},
+                    {"report": "blocked", "text": "waiting for your answer: cart page or checkout only?"}]},
+     ],
+     "feature": "gift-cards"},
     {"name": "docs",
      "files": {"README.md": "# docs\n\nthe user guide.\n", "guide/start.md": "# getting started\n\nInstal the app, then run it.\n"},
      "cards": [],
@@ -120,6 +136,10 @@ def marker(world, project, agent):
     return os.path.join(world, "seeded", "%s.%s" % (project, agent))
 
 
+def ask_file(world, project, agent):
+    return os.path.join(world, "asks", "%s.%s" % (project, agent))
+
+
 def agent_script(world, project, agent):
     """The bash an agent runs in its own folder (worktree or the shared one): its steps, then the
     seeded marker (before a long `work`, so an agent at work counts as seeded)."""
@@ -137,6 +157,14 @@ def agent_script(world, project, agent):
         elif "report" in s:
             out.append("sb report %s %s%s" % (s["report"], shlex.quote(s["text"]),
                                               " --step %s" % shlex.quote(s["step"]) if s.get("step") else ""))
+        elif "land" in s:
+            out.append("sb land %s" % shlex.quote(s["land"]))
+        elif "ask" in s:
+            # its question to main; main's script waits for the message id and escalates it
+            f = ask_file(world, project, agent["name"])
+            out.append("mkdir -p %s" % shlex.quote(os.path.dirname(f)))
+            out.append("sb send main --expect-reply %s | sed -n 's/^sent \\(m_[0-9]*\\).*/\\1/p' > %s.tmp && mv %s.tmp %s"
+                       % (shlex.quote(s["ask"]), shlex.quote(f), shlex.quote(f), shlex.quote(f)))
         elif "artifact" in s:
             out.append("sb artifact add %s --title %s" % (shlex.quote(s["artifact"]), shlex.quote(s["title"])))
         elif "work" in s:
@@ -155,12 +183,22 @@ def main_script(world, project):
     """The bash the project's fake main runs: its agents (each with its script as the brief's
     {{bash:}}), then its cards."""
     out = ["set -u"]
+    if project.get("feature"):
+        out.append("sb feature new %s" % shlex.quote(project["feature"]))
     for a in project["agents"]:
         script = os.path.join(world, "seed", project["name"], a["name"] + ".sh")
         brief = "%s {{bash: bash %s}}" % (a["objective"], script)
-        out.append("sb spawn %s%s --objective %s" % (a["name"], " --place %s" % a["place"] if a["place"] else "", shlex.quote(brief)))
+        where = " --feature %s" % shlex.quote(a["feature"]) if a.get("feature") else (" --place %s" % a["place"] if a.get("place") else "")
+        out.append("sb spawn %s%s --objective %s" % (a["name"], where, shlex.quote(brief)))
     for c in project["cards"]:
         out.append("sb card %s" % shlex.quote(c))
+    # an agent's question: wait (up to 300 s) for its message to main, then the card for it
+    for a in project["agents"]:
+        for st in a["steps"]:
+            if "ask" in st:
+                f = shlex.quote(ask_file(world, project["name"], a["name"]))
+                out.append("for i in $(seq 600); do [ -s %s ] && break; sleep 0.5; done" % f)
+                out.append("[ -s %s ] && sb card --for \"$(cat %s)\" %s" % (f, f, shlex.quote(st["ask"])))
     out.append("echo seeded main")
     return "\n".join(out) + "\n"
 

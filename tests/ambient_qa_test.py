@@ -633,12 +633,21 @@ def world_fixtures_seed_every_desktop_shape():
     check({s["report"] for s in steps if "report" in s} >= {"done", "blocked", "progress"}, "done, blocked and progress reports")
     check(any(a["place"] == "new" for p in world.plan(3) for a in p["agents"]) and any(not a["place"] for p in world.plan(3) for a in p["agents"]),
           "worktree agents and a shared-folder one")
+    # qa-flows m_10155: a feature with 2 agents (worktrees from its tip, landing on it) and an agent's own question
+    shop = world.plan(2)[1]
+    feat = [a for a in shop["agents"] if a.get("feature") == shop.get("feature")]
+    check(shop.get("feature") and len(feat) == 2 and all(any("land" in st for st in a["steps"]) for a in feat), "a feature with 2 agents that land on it")
+    ms = world.main_script(os.path.join(world.GATE, "w-test"), shop)
+    check(ms.index("sb feature new gift-cards") < ms.index("sb spawn gift-api --feature gift-cards"), "the feature exists before its agents")
+    check(any("ask" in st for a in feat for st in a["steps"]), "an agent asks its own question")
     cards = [c for p in world.plan(3) for c in p["cards"]]
     check(any("merge" in c and "\n1. " in c for c in cards) and len(cards) >= 2, "a merge question and a question with options")
     w = os.path.join(world.GATE, "w-test")
     for p in world.plan(3):
         m = world.main_script(w, p)
-        check(m.count("sb spawn ") == len(p["agents"]) and m.count("sb card ") == len(p["cards"]), "main's script: %s" % p["name"])
+        asks = [st for a in p["agents"] for st in a["steps"] if "ask" in st]
+        check(m.count("sb spawn ") == len(p["agents"]) and m.count("sb card ") == len(p["cards"]) + len(asks), "main's script: %s" % p["name"])
+        check(m.count("sb card --for ") == len(asks), "an agent's question is main's card for that agent's message: %s" % p["name"])
         check("{{bash: bash %s/seed/%s/" % (w, p["name"]) in m, "the brief carries the agent's script by absolute path")
         scripts = [m] + [world.agent_script(w, p["name"], a) for a in p["agents"]]
         for s in scripts:
