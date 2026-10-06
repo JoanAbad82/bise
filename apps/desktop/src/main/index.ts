@@ -12,8 +12,10 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu } from 'electron';
 import { READY_LINE, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
+import { installIpc, sendMenu } from './ipc';
+import { menuTemplate } from './menu';
 
 const testMode = process.env[TEST_ENV] === '1';
 const OFF_DISPLAY = -30000;
@@ -67,6 +69,19 @@ if (testMode) {
 }
 
 void app.whenReady().then(() => {
+  installIpc(testMode);
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(
+      menuTemplate({
+        platform: process.platform,
+        appName: app.name,
+        dev: !app.isPackaged,
+        send: (action) => {
+          sendMenu(action);
+        },
+      }),
+    ),
+  );
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
