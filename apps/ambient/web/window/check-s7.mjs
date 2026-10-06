@@ -264,6 +264,24 @@ law("review on the frozen diff (amb-core 6e2503f6): a truncated, binary or gener
   eq([again.cmds.filter((c) => c.cmd === "diff"), S7.view(again.s).loading], [[{ cmd: "diff", project: P.engine, agent: "ghost" }], true]);
 });
 
+law("review on bise-proto's own fixture lines (amb-core ce8ecd24): binary/generated read before truncated, the size, 'renamed from decode.rs', a full merged sha shown short, ProjectRow.web opens GitHub", () => {
+  const fx = (f) => readFileSync(join(here, "../../../../rust/proto/fixtures", f), "utf8").split(String.fromCharCode(10)).filter(Boolean).map((l) => JSON.parse(l));
+  const [live, old] = fx("hub_ev.jsonl").filter((e) => e.ev === "diff");
+  const acme = fx("core_ev.jsonl").find((e) => e.ev === "projects").projects.find((p) => p.project === live.project);
+  const w = win();
+  // the fixture's project, as the core lists it, among the fake ones
+  w.feed({ ev: "projects", projects: [...w.s.projects, acme] });
+  w.open("review", live.project, "perf");
+  w.feed(live);
+  eq(w.v.files.map((f) => [f.name, f.note]), [["query.rs", "sorts in place now"], ["Cargo.lock", "generated"], ["forest.ktx", "new file"], ["codec.rs", "renamed from decode.rs"]]);
+  const body = (i) => { w.feed({ ev: "ui_rv_file", i }); return w.v.diff.none && w.v.diff.none.text; };
+  eq([body(1), body(2)], ["a generated file: its lines aren't shown.", "a binary file, 2.1 MB: no lines to show."]);
+  w.open("review", old.project, "old");
+  w.feed(old);
+  eq([w.v.empty.sha.text, w.v.empty.sha.tip], ["e0f3df5", "open on GitHub"]);
+  eq(w.feed({ ev: "ui_rv_sha" }).cmds.filter((c) => c.cmd === "app_open_url"), [{ cmd: "app_open_url", url: `${acme.web}/commit/${old.merged}`, project: old.project }]);
+});
+
 law("the fake S7 world speaks S3a's drafts: every event names its project, no event for bise's own", () => {
   const evs = F7.boot();
   eq([...new Set(evs.map((e) => e.ev))], ["worktrees", "dev_servers"]);
