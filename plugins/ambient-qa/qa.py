@@ -3364,10 +3364,14 @@ def _exe_pid(exe):
     """The pid running exactly this executable (the harness bundle's own path), or None."""
     # ps, not pgrep: the path has spaces, and pgrep's regex missed it in proof run #2 (the watchdog
     # never attached; amb-mac's own guard did the job)
+    # and both the path as given and its real path: ~/.bise/dev/build links into
+    # ~/.local/state/switchboard/build, and a process started by launchd shows the real one
+    # (proof run #3: the watchdog never attached)
     r = subprocess.run(["ps", "-axww", "-o", "pid=,args="], capture_output=True, text=True)
+    names = {exe, os.path.realpath(exe)}
     for line in r.stdout.splitlines():
         pid, _, args = line.strip().partition(" ")
-        if args == exe or args.startswith(exe + " "):
+        if any(args == n or args.startswith(n + " ") for n in names):
             return int(pid)
     return None
 
