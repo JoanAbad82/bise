@@ -9,7 +9,7 @@
 // entry, a step nor a send ever re-renders it.
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { Head, Marker } from '@/ds';
-import { Composer } from '@/composer';
+import { Composer, useComposerSources } from '@/composer';
 import type { Outgoing } from '@/composer/message';
 import { threadKey, useAgents, usePending, useStore, useThreadOrder, useTyping } from '@/store';
 import { useMenuAction } from '@/app/menu';
@@ -136,6 +136,7 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
 /** amb-web's composer, aimed at this agent; its props stay stable while the thread moves. */
 const ThreadComposer = memo(function ThreadComposer({ project, agent, busy, to, onStop }: { project: string; agent: string; busy: boolean; to: string; onStop: () => void }) {
   const store = useStore();
+  const sources = useComposerSources(project);
   const onSend = useCallback(
     (out: Outgoing) => {
       // ⏎ while a turn runs steers it ('now', as the TUI); files are @paths
@@ -144,5 +145,5 @@ const ThreadComposer = memo(function ThreadComposer({ project, agent, busy, to, 
     },
     [store, project, agent],
   );
-  return <Composer target={`${project}/${agent}`} busy={busy} to={to} onSend={onSend} onStop={onStop} testId="composer" />;
+  return <Composer target={`${project}/${agent}`} busy={busy} sources={sources} to={to} onSend={onSend} onStop={onStop} testId="composer" />;
 });

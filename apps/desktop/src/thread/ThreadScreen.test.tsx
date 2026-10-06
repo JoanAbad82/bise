@@ -14,6 +14,7 @@ vi.mock('@/composer', () => ({
     composer.props = props;
     return <div data-testid="composer" />;
   },
+  useComposerSources: () => ({ agents: [], skills: [], commands: [], files: () => Promise.resolve([]), saveImage: () => Promise.resolve(null) }),
 }));
 
 const P = 'acme-1a2b3c4d';

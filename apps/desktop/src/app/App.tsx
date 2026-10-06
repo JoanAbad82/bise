@@ -15,8 +15,10 @@ import { ThreadScreen } from '@/thread/ThreadScreen';
 import { useProjects } from '@/store';
 import { InboxScreen } from '@/inbox';
 import { SettingsScreen } from '@/settings';
+import { OnboardingScreen, useFirstLaunch } from '@/setup';
 import { Skel } from '@/ds';
-import { Main, Row, Side, Win } from '@/ds';
+import { Main, Win } from '@/ds';
+import { Sidebar } from './Sidebar';
 import '@/ds/index.css';
 import './app.css';
 
@@ -44,30 +46,12 @@ function Shell() {
   const router = useRouter();
   useMenuRouting(router);
   useMainRoutes(router);
+  // a home not onboarded opens on the onboarding once (amb-home c44c926d)
+  useFirstLaunch();
   return (
     <div className="app-shell" data-testid="app.root">
       <Win side={<Sidebar />} main={<Current />} />
     </div>
-  );
-}
-
-/** The sidebar: bise, then his projects and their agents (the rows come from the store's projects next). */
-function Sidebar() {
-  const router = useRouter();
-  const route = useRoute();
-  return (
-    <Side testId="app.sidebar">
-      <Row
-        kind="me"
-        name="bise"
-        sub="every project"
-        on={route.screen === 'bise'}
-        onClick={() => {
-          router.go({ screen: 'bise' });
-        }}
-        testId="app.sidebar.bise"
-      />
-    </Side>
   );
 }
 
@@ -94,6 +78,8 @@ function ScreenOf({ route }: { route: Route }) {
       return <InboxScreen />;
     case 'settings':
       return <SettingsScreen page={route.page} />;
+    case 'onboarding':
+      return <OnboardingScreen />;
     case 'lab':
       if (!testMode()) return <NotFound path={formatRoute(route)} />;
       return route.lab === 'composer' ? <ComposerLab /> : route.lab === 'spotlight' ? <SpotlightLab /> : <PearlLab />;
