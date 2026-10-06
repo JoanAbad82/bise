@@ -162,7 +162,8 @@
       // a card that isn't open any more (a stale row's card, lead m_8728): it goes, not back
       if (/isn't open|not open/.test(text)) cards = set(cards, ev.project, list.filter((c) => !mineAnswered.has(String(c.id))));
     }
-    return { ...s, threads, answered, picked, cards, toast: { project: ev.project || null, cmd: ev.cmd || null, text, at: s.now } };
+    const gone = ev.project && /folder is gone/i.test(text) ? set(s.gone || {}, ev.project, true) : s.gone;
+    return { ...s, threads, answered, picked, cards, gone, toast: { project: ev.project || null, cmd: ev.cmd || null, text, at: s.now } };
   }
 
   // a deep link from the shell, the capsule or a card: bise · project/<p> · agent/<p>/<a> · inbox
@@ -227,7 +228,9 @@
         const entries = older ? [...ev.entries.filter((e) => !t.entries.some((x) => x.pos === e.pos)), ...t.entries] : [...ev.entries, ...mine];
         // it opened after all: no error left on it, nor over the window
         const toast = s.toast && s.toast.project === ev.project && (s.toast.cmd === "subscribe" || s.toast.cmd === "page") ? null : s.toast;
-        return { ...set(s, "threads", set(s.threads, k, { ...t, entries, before: ev.before, more: !!ev.more, loading: false, paging: false, error: undefined })), toast };
+        // a thread that opens: its project's folder is there after all
+        const gone = s.gone && s.gone[ev.project] ? set(s.gone, ev.project, false) : s.gone;
+        return { ...set(s, "threads", set(s.threads, k, { ...t, entries, before: ev.before, more: !!ev.more, loading: false, paging: false, error: undefined })), toast, gone };
       }
       case "entry": {
         const k = `${ev.project}/${ev.agent}`;

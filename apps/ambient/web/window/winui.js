@@ -306,6 +306,8 @@
       R.send.dataset.act = JSON.stringify(v.composer.send === "stop" ? { ev: "ui_stop" } : { ev: "ui_send" });
       R.send.dataset.qa = v.composer.send === "stop" ? "stop" : "send";
       el.querySelector(".w-composer").classList.toggle("is-disabled", v.composer.disabled);
+      // a project whose folder is gone takes no words at all (offline still lets him type)
+      R.field.readOnly = !!v.composer.locked;
       R.keys.textContent = v.composer.keys;
       put("board", board(v));
       if (routeKey !== lastRoute) { lastRoute = routeKey; R.field.focus(); }
@@ -413,7 +415,18 @@
       let sent = "";
       const size = () => {
         const r = (q) => { const b = el.querySelector(q); if (!b) return null; const x = b.getBoundingClientRect(); return [Math.round(x.left), Math.round(x.top), Math.round(x.width), Math.round(x.height)]; };
-        const cmd = { cmd: "win_size", sidebar: Math.round(el.querySelector(".w-side").getBoundingClientRect().width), drag: [r(".w-side .b-lights"), r(".w-head .b-head")].filter(Boolean) };
+        // the head drags the window only left of its controls (tabs, chips): a mousedown on a
+        // tab must reach the page, or the shell starts a window drag and the click never comes
+        // (amb-tools' window run 4: tab:changes did nothing)
+        const head = () => {
+          const b = el.querySelector(".w-head .b-head");
+          if (!b) return null;
+          const x = b.getBoundingClientRect();
+          const end = b.querySelector(".end");
+          const right = end ? Math.min(x.right, end.getBoundingClientRect().left - 8) : x.right;
+          return [Math.round(x.left), Math.round(x.top), Math.max(0, Math.round(right - x.left)), Math.round(x.height)];
+        };
+        const cmd = { cmd: "win_size", sidebar: Math.round(el.querySelector(".w-side").getBoundingClientRect().width), drag: [r(".w-side .b-lights"), head()].filter(Boolean) };
         const k = JSON.stringify(cmd);
         if (k !== sent) { sent = k; post(cmd); }
       };

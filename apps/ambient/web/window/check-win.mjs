@@ -665,6 +665,13 @@ law("window run 3: a project whose folder is gone can't be written to (composer 
   // another project still takes words
   w.go(P.storefront);
   eq(w.v.composer.disabled, false);
+  // run 4: the row said running, only the core's error said the folder was gone: same lock
+  w.go(P.engine);
+  w.feed({ ev: "error", project: P.engine, cmd: "subscribe", text: "engine: its folder is gone" });
+  eq([w.v.composer.disabled, w.v.composer.locked, w.v.composer.send, w.v.composer.ph], [true, true, "off", "engine's folder is gone · find it or remove the project"]);
+  // its thread opens after all (the folder is back): the composer takes words again
+  w.feed({ ev: "thread", project: P.engine, agent: "main", entries: [], before: null, more: false });
+  eq([w.v.composer.disabled, w.v.composer.locked], [false, false]);
 });
 
 law("bise-proto's shared fixtures (rust/proto/fixtures, what the real core forwards) step through the window and draw", () => {

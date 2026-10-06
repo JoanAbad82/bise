@@ -220,7 +220,7 @@
     const working = a && a.status === "working" && s.route.agent !== "main";
     const div = D.dividerParts(s, d, a);
     return { dock: D.dockWords(s, d), div: div.text, divAcc: div.acc, divHint: div.hint, ph: D.placeholder(s, d, a), text, quotes,
-      send: text.trim() ? "on" : working ? "stop" : "off", disabled: !!s.offline || D.gone(s),
+      send: D.gone(s) ? "off" : text.trim() ? "on" : working ? "stop" : "off", disabled: !!s.offline || D.gone(s), locked: D.gone(s),
       keys: T(s, "keys", { working }) };
   }
 

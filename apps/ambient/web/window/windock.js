@@ -50,7 +50,9 @@
   }
 
   // the project in view lost its folder (its projects row says missing): nothing can go there
-  const gone = (s) => !!(s.projects.find((p) => p.project === s.route.project) || {}).missing;
+  // (its projects row says missing, or the core refused it with 'its folder is gone': run 4's
+  // core sent the error while the row still said running)
+  const gone = (s) => !!((s.projects.find((p) => p.project === s.route.project) || {}).missing || (s.gone || {})[s.route.project]);
   const pname = (s, project) => (s.projects.find((p) => p.project === project) || {}).name || project;
   // who asks, as the place you are needs it: from bise or the inbox, "telemetry · alerts"; inside
   // the project, "alerts"
