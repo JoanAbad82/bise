@@ -57,5 +57,14 @@ Checks find things only by `data-testid`. In components, pass the id as the `tes
   role, `contentEditable`. A spread counts as present.
 - The list: `node tests/harness/lint/testids.mjs [--md]` prints every id in `src/**/*.tsx` with its file:line.
 
+## Show me
+`node tests/harness/showme/showme.mjs <surface> [state] [--frames <ms>] [--out <dir>] [--size <w>x<h>]` shows one screen
+in one state, out of his sight. It writes `shot.png` and `meta.json` (with the proof), and with `--frames` also every
+drawn frame (`frames/NNNN.png`, `frames.json`: times and change per frame).
+- `old-window <hash>`: `inbox`, `agent/storefront/search`, `light`, `fresh`
+- `old-capsule <scene>[@ms]`: a `fakecore.js` scene id: `talk@1500`, `spot`, `needs`, `s9-away`, ...
+- `desktop [route]`: the new app from `out/` (`pnpm build` first). The route goes in as `BISE_DESKTOP_ROUTE`.
+- `<file.html> [query]`: any page.
+
 ## Coming
-`show me` (any screen, any fixture state, to PNGs and frames) · the macOS VM pass for qa-native.
+fixture states for `desktop` (replaying `@/proto/fixtures.gen` through the store) · (any screen, any fixture state, to PNGs and frames) · the macOS VM pass for qa-native.
