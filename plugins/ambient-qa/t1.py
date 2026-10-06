@@ -176,6 +176,9 @@ class Run:
         self.events()
         try:
             self._flows(shop, agent, other, ids)
+            ops = (qa.real_alive() or {}).get("ops") or []
+            if "front" in ops:
+                self._s9(ops)
             self.R["violations"] = qa.real_violations(pid)
         finally:
             self.R["front_end"] = qa._front()
@@ -244,13 +247,18 @@ class Run:
                 time.sleep(0.2)
                 return qa.real_keys("enter", window="win")
             return act
+        import re
+
+        def answered(words):
+            # the fake main answers 'ack: <words>', bise wraps them ('ack: <user_message …> words …')
+            return bool(re.search(r"ack: (<user_message[^>]*> )?%s" % re.escape(words), self.text()))
         w4 = "what is on today"
         S(4, "words in bise's thread, bise answers", say_in("bise", w4),
-          lambda: (bool(wait(lambda: "ack: %s" % w4 in self.text())), "bise's answer %s in the thread" % ("seen" if "ack: %s" % w4 in self.text() else "NOT seen")),
+          lambda: (bool(wait(lambda: answered(w4))), "bise's answer %s in the thread" % ("seen" if answered(w4) else "NOT seen")),
           settle=1.0)
         w5 = "how is the cart going"
         S(5, "words in %s's main, it answers" % shop, say_in("project/%s" % ids.get(shop, shop), w5),
-          lambda: (bool(wait(lambda: "ack: %s" % w5 in self.text())), "main's answer %s" % ("seen" if "ack: %s" % w5 in self.text() else "NOT seen")),
+          lambda: (bool(wait(lambda: answered(w5))), "main's answer %s" % ("seen" if answered(w5) else "NOT seen")),
           settle=1.0)
         S(6, "an agent's thread (%s)" % agent, lambda: self.click("route:%s/%s" % (ids.get(shop, shop), agent)),
           lambda: (agent in (self.st()["win"]["title"] or ""), "title %r" % self.st()["win"]["title"]), settle=2.0)
@@ -427,6 +435,128 @@ class Run:
         finally:
             if os.path.isdir(g["ws"] + ".gone") and not os.path.exists(g["ws"]):
                 os.rename(g["ws"] + ".gone", g["ws"])
+
+    # ---- S9 on fixtures (amb-mac's harness ops front, drop, away; ambient-lead m_9117)
+    def _s9(self, ops):
+        S, wait = self.step, self.wait
+        rest = lambda: [qa.real_keys("esc") for _ in range(2)]  # noqa: E731
+
+        def spot():
+            qa.real_op("fn", kind="down"); qa.real_keys("space"); qa.real_op("fn", kind="up")
+            time.sleep(0.8)
+
+        # the flows above leave cards open (the bar would show them over the S9 panes): withdrawn
+        for h in self.W["hubs"]:
+            for c in self.cards(h["project"]):
+                world.say(h["project"], '[[bash: sb card --withdraw %s "cleared before S9"]]' % c["id"])
+        wait(lambda: not any(self.cards(h["project"]) for h in self.W["hubs"]), 30)
+
+        def ctx_sent():
+            return [e[1] for e in self.events() if isinstance(e[1], dict) and e[1].get("cmd") == "fn_context"]
+
+        def front():
+            rest()
+            qa.real_win("close")
+            self.events()
+            r = qa.real_op("front", app="Google Chrome", bundle="com.google.Chrome", title="Pricing · Acme",
+                           url="https://acme.test/pricing", tab_url="https://acme.test/pricing", selection="Team plan, 12 € a seat")
+            self.R["front_reply"] = r
+            spot()
+            self.R["front_ctx"] = ctx_sent()
+            return r
+
+        def front_ok():
+            t = self.text("bar")
+            ctx = self.R.get("front_ctx") or []
+            got = any("acme.test" in json.dumps(c) for c in ctx)
+            row = "in front" in t and ("Acme" in t or "acme.test" in t)
+            return row and got, "spotlight row %s; fn_context to the core %s (%d sent)" % (
+                "'in front: …' shown" if row else "NOT shown", "with the URL" if got else "WITHOUT the URL", len(ctx))
+        S(16, "fn space with a browser in front: 'in front' row + fn_context", front, front_ok, window="bar", settle=1.0)
+
+        def excluded():
+            rest()
+            self.events()
+            r = qa.real_op("front", app="1Password", bundle="com.1password.1password", title="Vault · bank", selection="secret")
+            self.R["excluded_reply"] = r
+            spot()
+            self.R["excluded_ctx"] = ctx_sent()
+            return r
+
+        def excluded_ok():
+            t = self.text("bar")
+            r = self.R.get("excluded_reply") or {}
+            leak = any(("bank" in json.dumps(c) or "1Password" in json.dumps(c) or "secret" in json.dumps(c)) for c in self.R.get("excluded_ctx") or [])
+            return (not r.get("context")) and not (r.get("front") or {}).get("app") and "in front" not in t and not leak, \
+                "reply context %r front %r; row %s; leaked to the core %s" % (r.get("context"), r.get("front"),
+                                                                             "shown" if "in front" in t else "none", leak)
+        S(17, "an excluded app in front (1Password): nothing read", excluded, excluded_ok, window="bar", settle=1.0)
+        qa.real_op("front", clear=True)
+
+        f = os.path.join(self.info["world"], "fixtures", "q3-notes.md")
+        os.makedirs(os.path.dirname(f), exist_ok=True)
+        with open(f, "w") as fh:
+            fh.write("# q3 notes\n\n- churn down 2 points\n- the pricing page ships friday\n")
+
+        def drop():
+            rest()
+            r = qa.real_op("drop", paths=[f])
+            time.sleep(1.0)
+            self.R["drop_bar"] = self.text("bar")
+            qa.real_op("type", window="bar", text="what stands out here")
+            time.sleep(0.3)
+            qa.real_keys("enter", window="bar")
+            return r
+        S(18, "a file dropped on the pearl -> the spotlight -> sent to bise", drop,
+          lambda: (bool(wait(lambda: "q3-notes.md" in self.transcript(world.HOME_NAME), 20)) and "q3-notes.md" in (self.R.get("drop_bar") or ""),
+                   "spotlight %s the file; bise's main %s it" % ("names" if "q3-notes.md" in (self.R.get("drop_bar") or "") else "does NOT name",
+                                                                 "got" if "q3-notes.md" in self.transcript(world.HOME_NAME) else "did NOT get")),
+          window="bar", settle=1.5)
+
+        def away():
+            rest()
+            time.sleep(0.5)
+            return qa.real_op("away", away_ms=45 * 60 * 1000)
+        S(19, "back after 45 min away: the away card first", away,
+          lambda: (bool(wait(lambda: self.st()["bar"]["visible"] and "while you were away" in self.text("bar"), 15)),
+                   "bar %s; 'while you were away' %s" % (self.st()["bar"]["visible"], "shown" if "while you were away" in self.text("bar") else "NOT shown")),
+          window="bar", settle=1.5)
+
+        def empty_spot():
+            rest()
+            time.sleep(0.5)
+            spot()
+            return None
+        names = [h["project"] for h in self.W["hubs"] if not h["home"]]
+        S(20, "the empty spotlight's sections, several projects", empty_spot,
+          lambda: (self.st()["bar"]["visible"] and sum(n in self.text("bar") for n in names) >= 2,
+                   "projects named: %s" % [n for n in names if n in self.text("bar")]), window="bar", settle=1.0)
+        if "quiet" not in ops:
+            return
+        others = names[:2]
+
+        def quiet():
+            rest()
+            qa.real_win("close")
+            time.sleep(0.5)
+            on = qa.real_op("quiet", why="call")
+            time.sleep(0.8)
+            for i, p in enumerate(others):
+                world.say(p, "[[bash: sb card $'quiet check %d: go ahead?\\n1. yes\\n2. no']]" % i)
+            wait(lambda: all(any("quiet check %d" % i in (c.get("text") or "") for c in self.cards(p)) for i, p in enumerate(others)), 30)
+            time.sleep(2.0)
+            s = qa.real_op("state")
+            self.R["quiet_during"] = {"bar": (s.get("bar") or {}).get("visible"), "icon": s.get("icon"), "on": on,
+                                      "bar_shot": qa.real_op("shot", what="bar").get("png")}
+            return qa.real_op("quiet", why="")
+
+        def quiet_ok():
+            d = self.R.get("quiet_during") or {}
+            t = wait(lambda: self.st()["bar"]["visible"] and "question" in self.text("bar") and self.text("bar"), 15) or self.text("bar")
+            batch = "questions · about" in t or "question · about" in t
+            return (d.get("bar") is False) and batch, "during the call: bar %s, pearl %s; after: %s" % (
+                "hidden" if d.get("bar") is False else "SHOWN", json.dumps(d.get("icon"))[:80], "one batch '%s'" % t[:60] if batch else "NO batch (%s)" % t[:80])
+        S(21, "quiet (a call): cards wait, the pearl counts, then one batch", quiet, quiet_ok, window="bar", settle=1.5)
 
     # ---- the one-screen report
     def report(self):
