@@ -12,6 +12,8 @@ describe('isOwnPage', () => {
   it("the app's own page, with any route in its hash", () => {
     expect(isOwnPage(built.file, built)).toBe(true);
     expect(isOwnPage(`${built.file}#route=inbox`, built)).toBe(true);
+    expect(isOwnPage(`${built.file}?surface=capsule`, built)).toBe(true);
+    expect(isOwnPage('http://localhost:5173/?surface=window#route=inbox', dev)).toBe(true);
     expect(isOwnPage('http://localhost:5173/#route=settings', dev)).toBe(true);
   });
 

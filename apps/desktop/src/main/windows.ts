@@ -1,7 +1,8 @@
 // bise's windows, both on the same renderer bundle: the main window (the
 // sidebar and the screens) and the capsule (capsule.ts). The preload learns
 // which one it is from `--bise-surface=<surface>` (window.bise.surface), the
-// renderer its first screen from the URL's hash `route=<route>`.
+// renderer its first screen from the URL's hash `route=<route>`; the URL's
+// query `surface=` names the window too (for tests and the guard).
 //
 // Test mode (BISE_DESKTOP_TEST=1), for the harness: nothing ever in his face.
 // Every window renders offscreen (webPreferences.offscreen) and is never shown
@@ -28,14 +29,21 @@ export function webPreferences(surface: Surface, testMode: boolean): BrowserWind
   };
 }
 
-/** Loads the renderer, on `route` when given. */
-export function loadRenderer(win: BrowserWindow, route: string | undefined): void {
+/**
+ * Loads the renderer for `surface` (its URL says which: '?surface=window' or
+ * '?surface=capsule', so tests and the guard tell the two pages apart:
+ * qa-type m_9675), on `route` when given ('#route=<route>').
+ */
+export function loadRenderer(win: BrowserWindow, surface: Surface, route: string | undefined): void {
   const hash = route === undefined || route === '' ? '' : `route=${encodeURIComponent(route)}`;
   const devUrl = process.env['ELECTRON_RENDERER_URL'];
   if (!app.isPackaged && devUrl !== undefined && devUrl !== '') {
-    void win.loadURL(hash === '' ? devUrl : `${devUrl}#${hash}`);
+    const u = new URL(devUrl);
+    u.searchParams.set('surface', surface);
+    u.hash = hash;
+    void win.loadURL(u.toString());
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), hash === '' ? {} : { hash });
+    void win.loadFile(join(__dirname, '../renderer/index.html'), { query: { surface }, ...(hash === '' ? {} : { hash }) });
   }
 }
 
@@ -73,7 +81,7 @@ export class MainWindow {
         win.show();
       });
     }
-    loadRenderer(win, route ?? (test ? process.env[ROUTE_ENV] : undefined));
+    loadRenderer(win, 'window', route ?? (test ? process.env[ROUTE_ENV] : undefined));
     return win;
   }
 

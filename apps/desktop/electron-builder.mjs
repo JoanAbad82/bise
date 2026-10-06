@@ -8,7 +8,9 @@
 // Both binaries are built before, never here (the Rust build takes the heavy
 // lock): BISE_PACK_BISE and BISE_PACK_HELPER give their paths; a missing one
 // stops the build with its name.
-import { existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 function need(name) {
   const p = process.env[name];
@@ -21,8 +23,41 @@ function need(name) {
 const bise = need('BISE_PACK_BISE');
 const helper = need('BISE_PACK_HELPER');
 
+// BISE_PACK_SIGN_DIR: the Swift app's stable self-signed identity ('bise
+// ambient dev' in <dir>/sign.keychain-db, made by apps/ambient/mac/build.sh
+// with AMBIENT_SIGN_DIR), so macOS keeps his grants across rebuilds. Its
+// certificate isn't trusted by the codesigning policy, so electron-builder
+// won't pick it: the app is signed here, deep, after packing.
+const signDir = process.env['BISE_PACK_SIGN_DIR'];
+
+function signStable(appPath) {
+  const kc = join(signDir, 'sign.keychain-db');
+  const pass = readFileSync(join(signDir, 'pass'), 'utf8');
+  execFileSync('security', ['unlock-keychain', '-p', pass, kc]);
+  const ids = execFileSync('security', ['find-identity', '-p', 'codesigning', kc], { encoding: 'utf8' });
+  const id = /\b([0-9A-F]{40}) "bise ambient dev"/.exec(ids)?.[1];
+  if (id === undefined) throw new Error(`electron-builder.mjs: no 'bise ambient dev' identity in ${kc}`);
+  // codesign finds identities only in the search list: the keychain joins it for the signing
+  const orig = execFileSync('security', ['list-keychains', '-d', 'user'], { encoding: 'utf8' })
+    .split('\n')
+    .map((l) => l.trim().replace(/"/g, ''))
+    .filter((l) => l !== '');
+  execFileSync('security', ['list-keychains', '-d', 'user', '-s', ...orig, kc]);
+  try {
+    execFileSync('codesign', ['--force', '--deep', '--sign', id, '--keychain', kc, appPath]);
+  } finally {
+    execFileSync('security', ['list-keychains', '-d', 'user', '-s', ...orig]);
+  }
+  execFileSync('codesign', ['--verify', '--deep', '--strict', appPath]);
+}
+
 export default {
   appId: 'dev.bise.desktop',
+  afterPack: (ctx) => {
+    if (signDir !== undefined && ctx.electronPlatformName === 'darwin') {
+      signStable(join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app`));
+    }
+  },
   productName: 'bise',
   directories: { output: 'dist' },
   files: ['out/**', 'package.json'],
@@ -36,12 +71,12 @@ export default {
     target: ['dir'],
     // signing: electron-builder rewrites Info.plist and adds the helper and
     // bise, which breaks Electron's own seal, so a dir build is re-signed
-    // deep. BISE_PACK_IDENTITY names a codesigning identity (with
-    // CSC_KEYCHAIN: its keychain), e.g. the stable self-signed one the Swift
-    // app uses so his grants survive rebuilds; else ad hoc ('-'). Notarizing
+    // deep: with BISE_PACK_SIGN_DIR by signStable (above), else
+    // BISE_PACK_IDENTITY names a codesigning identity (CSC_KEYCHAIN: its
+    // keychain), else ad hoc ('-'). Notarizing
     // and the Developer ID come with the release work. No hardened runtime
     // until the entitlements exist.
-    identity: process.env['BISE_PACK_IDENTITY'] ?? '-',
+    identity: signDir === undefined ? (process.env['BISE_PACK_IDENTITY'] ?? '-') : null,
     hardenedRuntime: false,
     extraFiles: [{ from: helper, to: 'MacOS/bise-mac-helper' }],
     extendInfo: {

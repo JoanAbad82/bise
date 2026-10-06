@@ -55,7 +55,7 @@ export class Capsule {
       if (this.state.shown && this.state.keys) this.hide('blur');
     });
     this.win = win;
-    loadRenderer(win, undefined);
+    loadRenderer(win, 'capsule', undefined);
   }
 
   get window(): BrowserWindow {
