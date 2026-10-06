@@ -9,17 +9,19 @@
 // Core: entering asks {cmd:'diff', project, agent}; the core answers the S3a draft event
 // diff {project, agent, base, head, files: [{path, status, add, del, note?, hunks: [{header,
 // lines: [{kind: ctx|add|del, old?, new?, text}]}]}], result?: {label, sub?, before, after,
-// unit, series?: {before: [n], after: [n]}}}.
+// unit, series?: {before: [n], after: [n]}}}. Frozen in bise-proto (amb-core 6e2503f6): a file may
+// come without hunks (truncated, binary, generated), the diff may carry merged: <sha> and a note
+// (an archived agent's folder gone); an unknown agent answers error {cmd:'diff', text}.
 (function (root) {
   "use strict";
   const init = () => ({ diffs: {}, pick: {}, sel: null });
   const EVS = new Set(["diff", "ui_rv_file", "ui_rv_line", "ui_rv_merge"]);
-  const owns = (ev) => EVS.has(ev.ev);
+  const owns = (ev) => EVS.has(ev.ev) || (ev.ev === "error" && ev.cmd === "diff");
   const k = (project, agent) => `${project}/${agent}`;
   const base = (p) => String(p || "").split("/").pop();
 
   function enter(e, route) {
-    return { e: { ...e, sel: null }, cmds: [{ cmd: "diff", project: route.project, agent: route.agent }] };
+    return { e: { ...e, sel: null, err: null }, cmds: [{ cmd: "diff", project: route.project, agent: route.agent }] };
   }
 
   // the picked file's lines, hunk headers between them; i counts the selectable lines only
@@ -42,7 +44,9 @@
   function step(e, ev, s) {
     const r = s.route;
     switch (ev.ev) {
-      case "diff": return { e: { ...e, diffs: { ...e.diffs, [k(ev.project, ev.agent)]: ev } }, cmds: [] };
+      case "diff": return { e: { ...e, diffs: { ...e.diffs, [k(ev.project, ev.agent)]: ev }, err: null }, cmds: [] };
+      // the core couldn't make it (an unknown agent): the screen says so instead of loading forever
+      case "error": return { e: { ...e, err: r && r.screen === "review" ? { key: k(r.project, r.agent), text: String(ev.text || "") } : e.err }, cmds: [] };
       case "ui_rv_file": return { e: { ...e, pick: { ...e.pick, [k(r.project, r.agent)]: ev.i }, sel: null }, cmds: [] };
       case "ui_rv_line": {
         const d = e.diffs[k(r.project, r.agent)];
@@ -89,6 +93,11 @@
   };
 
   const num = (n) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10));
+  // a file's note in the list, and the diff's body when it has no lines to show (best guesses, asked to ambient)
+  const fileNote = (f) => (f.status === "added" ? "new file" : f.status === "deleted" ? "deleted" : f.status === "renamed" ? "renamed"
+    : f.binary ? "binary" : f.generated ? "generated" : f.truncated ? "too big to show" : "");
+  const bodyNote = (f) => (f.binary ? "a binary file: no lines to show" : f.generated ? "a generated file: its lines aren't shown"
+    : f.truncated ? "too big to show here: open it in your editor" : "no lines to show");
   const pm = (f) => [f.add ? `+${f.add}` : "", f.del ? `−${f.del}` : ""].filter(Boolean).join(" ");
 
   function view(s) {
@@ -101,6 +110,7 @@
     const merged = d && d.merged;
     const head = { t1: r.agent, dot: merged ? "ok" : dot, t2: [p.name, ...(a.branch || (d && d.head) ? [`ψ ${a.branch || d.head}`] : []), ...(a.title ? [a.title] : []), merged ? `merged · ${merged}` : a.status], acc: -1,
       end: [{ kind: "btn", text: "thread", act: { ev: "ui_route", project: r.project, agent: r.agent } }] };
+    if (!d && e.err && e.err.key === k(r.project, r.agent)) return { screen: "review", head, empty: { title: "can't show the changes", text: e.err.text } };
     if (!d) return { screen: "review", head, loading: true };
     const fi = Math.min(e.pick[k(r.project, r.agent)] || 0, Math.max(0, d.files.length - 1));
     const add = d.files.reduce((n, f) => n + f.add, 0), del = d.files.reduce((n, f) => n + f.del, 0);
@@ -116,13 +126,14 @@
       ...(ed ? [{ text: "open in editor", kbd: "⌘O", act: { ev: "ui_env_open", project: r.project, app: "editor", path: ed } }] : [])];
     return { screen: "review", head, result: res, actions,
       changed: d.files.length ? `${d.files.length} file${d.files.length > 1 ? "s" : ""} · +${add} −${del}` : "",
-      files: d.files.map((f, i) => ({ name: base(f.path), note: f.note || (f.status === "added" ? "new file" : f.status === "deleted" ? "deleted" : ""), end: pm(f), on: i === fi,
+      files: d.files.map((f, i) => ({ name: base(f.path), note: f.note || fileNote(f), end: pm(f), on: i === fi,
         act: { ev: "ui_rv_file", i } })),
-      diff: file ? { file: file.path, add: file.add, rm: file.del,
+      diff: file ? { file: file.path, add: file.add, rm: file.del, none: (file.hunks || []).length ? null : bodyNote(file),
         lines: linesOf(file).map((l) => (l.kind === "hunk" ? { hunk: l.text }
           : { old: l.old, new: l.new, sign: l.kind === "add" ? "+" : l.kind === "del" ? "-" : "", text: l.text, i: l.i, sel: !!(sel && l.i >= sel[0] && l.i <= sel[1]),
             act: { ev: "ui_rv_line", i: l.i } })) } : null,
-      empty: d.files.length ? null : { title: "nothing changed yet", text: `${r.agent}'s branch has no commit ahead of ${d.base || "main"}` } };
+      empty: d.files.length ? null : merged ? { title: `merged into ${d.base || "main"} · ${merged}`, text: d.note || "" }
+        : { title: "nothing changed yet", text: d.note || `${r.agent}'s branch has no commit ahead of ${d.base || "main"}` } };
   }
 
   // ---- draw: the result, the files, the picked file's diff (amb-kit's sideview + diff)
@@ -140,7 +151,7 @@
     const { h } = UI.core;
     if (d.loading) return h("div", "w7 w7-rv", UI.skel.render({}), UI.skel.render({}));
     if (d.empty) return h("div", "w7 w7-rv", UI.empty.render(d.empty));
-    const diff = d.diff ? UI.diff.render({ file: d.diff.file, add: d.diff.add, rm: d.diff.rm,
+    const diff = d.diff && d.diff.none ? h("div", "w7-none", d.diff.none) : d.diff ? UI.diff.render({ file: d.diff.file, add: d.diff.add, rm: d.diff.rm,
       lines: d.diff.lines.filter((l) => !l.hunk).map((l) => ({ old: l.old, new: l.new, sign: l.sign, text: l.text, sel: l.sel, act: l.act })) }) : null;
     return h("div", "w7 w7-rv",
       d.result ? h("div", "w7-result", h("div", "w7-rl", h("span", "lb", d.result.label), d.result.sub ? h("span", "sb", d.result.sub) : null,

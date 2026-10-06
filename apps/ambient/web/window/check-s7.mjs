@@ -223,6 +223,30 @@ law("review: loading until the diff comes; an agent with nothing ahead says so",
   eq([w.v.files, w.v.empty], [[], { title: "nothing changed yet", text: "wallet's branch has no commit ahead of main" }]);
 });
 
+law("review on the frozen diff (amb-core 6e2503f6): a truncated, binary or generated file has no lines and says so; a merged diff with a note; an unknown agent's error stops the loading", () => {
+  const w = win();
+  w.open("review", P.engine, "streaming");
+  const hunk = { header: "@@ -10,4 +10,6 @@ fn slow()", lines: [{ kind: "ctx", old: 10, new: 10, text: "let rows = db.query(q);" }, { kind: "del", old: 11, text: "rows.sort();" }, { kind: "add", new: 11, text: "rows.sort_unstable();" }] };
+  w.feed({ ev: "diff", project: P.engine, agent: "streaming", base: "main", head: "sb/streaming", files: [
+    { path: "src/query.rs", status: "modified", add: 3, del: 1, hunks: [hunk], note: "sorts in place now" },
+    { path: "Cargo.lock", status: "modified", add: 120, del: 80, hunks: [], truncated: true },
+    { path: "logo.png", status: "added", add: 0, del: 0, hunks: [], binary: true },
+    { path: "gen/api.rs", status: "renamed", add: 2, del: 2, hunks: [], generated: true }] });
+  eq(w.v.files.map((f) => [f.name, f.note]), [["query.rs", "sorts in place now"], ["Cargo.lock", "too big to show"], ["logo.png", "new file"], ["api.rs", "renamed"]]);
+  eq([w.v.diff.none, w.v.diff.lines.length], [null, 4]);
+  const pick = (i) => { w.feed({ ev: "ui_rv_file", i }); return w.v.diff.none; };
+  eq([pick(1), pick(2), pick(3)], ["too big to show here: open it in your editor", "a binary file: no lines to show", "a generated file: its lines aren't shown"]);
+  // an older agent, merged, its folder gone: no files, the merge and the core's note
+  w.open("review", P.engine, "old");
+  w.feed({ ev: "diff", project: P.engine, agent: "old", base: "main", files: [], merged: "e0f3df5", note: "old is archived and its folder is gone" });
+  eq(w.v.empty, { title: "merged into main · e0f3df5", text: "old is archived and its folder is gone" });
+  // an unknown agent: the core's error replaces the skeleton
+  const s7 = { ...w.s.s7, rv: { ...w.s.s7.rv, diffs: {} } };
+  let s = { ...w.s, s7, route: { screen: "review", project: P.engine, agent: "ghost" } };
+  s = M.step(s, { ev: "error", cmd: "diff", text: "no agent ghost in engine" }).s;
+  eq(S7.view(s).empty, { title: "can't show the changes", text: "no agent ghost in engine" });
+});
+
 law("the fake S7 world speaks S3a's drafts: every event names its project, no event for bise's own", () => {
   const evs = F7.boot();
   eq([...new Set(evs.map((e) => e.ev))], ["worktrees", "dev_servers"]);
