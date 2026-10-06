@@ -8,6 +8,11 @@ use std::io::Write;
 /// `bise ambient-core`: the macOS app's core, its child on stdio JSON, a
 /// client of the workspace's hub and of every project's hub.
 pub fn core(args: &[String]) -> std::io::Result<i32> {
+    // bise's home is the window's first row: on a fresh install its
+    // folder (~/bise) is made here, never reported gone (amb-tools m_9345)
+    if let Err(e) = switchboard::paths::ensure_home_workspace() {
+        eprintln!("ambient-core: cannot create {}: {}", switchboard::paths::home_workspace().display(), e);
+    }
     let paths = switchboard::paths::Paths::for_workspace(&ambient_workspace(args, true));
     let root = crate::live_app_root_or_exit();
     let exe = std::env::current_exe()?;

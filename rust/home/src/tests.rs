@@ -470,4 +470,6 @@ fn the_window_sets_known_prefs_by_dotted_key_and_keeps_their_types() {
     assert_eq!(w["theme"], json!("dark"));
     assert!(w["excluded_apps"].as_array().is_some_and(|a| a.contains(&json!("com.apple.MobileSMS"))), "the seed, resolved");
     assert_eq!(prefs::for_window(Some(json!({"excluded_apps": []})))["excluded_apps"], json!([]));
+    assert_eq!(prefs::for_window(None)["onboarded"], json!(false), "a fresh home: not onboarded");
+    assert_eq!(prefs::for_window(Some(json!({"onboarded": true})))["onboarded"], json!(true));
 }

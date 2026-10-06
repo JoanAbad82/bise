@@ -115,6 +115,11 @@ pub fn for_window(obj: Option<Value>) -> Value {
     let mut v = obj.filter(Value::is_object).unwrap_or_else(|| Value::Object(Default::default()));
     let apps = excluded_apps(v.get(Pref::ExcludedApps.key()).cloned());
     v[Pref::ExcludedApps.key()] = Value::from(apps);
+    // a fresh home has no key: not onboarded yet (the window's first
+    // launch shows on `false`; amb-tools m_9345)
+    if v.get(Pref::Onboarded.key()).is_none_or(Value::is_null) {
+        v[Pref::Onboarded.key()] = Value::Bool(false);
+    }
     v
 }
 

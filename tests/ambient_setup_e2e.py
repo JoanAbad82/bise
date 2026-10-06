@@ -50,8 +50,8 @@ def main():
         sys.exit("build first: scripts/bins.sh + cargo build")
     E = e2e.Env()
     home = tempfile.mkdtemp(prefix="bs-", dir=e2e.short_tmp())
-    home_ws = os.path.realpath(os.path.join(E.tmp, "home-ws"))
-    os.makedirs(home_ws)
+    # not made here: a fresh install has no ~/bise, the core makes it
+    home_ws = os.path.join(os.path.realpath(E.tmp), "home-ws")
     E.env.pop("SB_STATE_DIR")
     E.env["BISE_HOME"] = os.path.join(home, "b")
     E.env["BISE_HOME_WORKSPACE"] = home_ws
@@ -69,6 +69,10 @@ def main():
         core.wait(lambda e: e.get("ev") == "prefs", 30, "prefs at the start")
         core.wait(lambda e: e.get("ev") == "accounts", 30, "accounts at the start")
         check("com.apple.MobileSMS" in core.last("prefs")["prefs"]["excluded_apps"], "the seed: %r" % core.last("prefs"))
+        check(core.last("prefs")["prefs"]["onboarded"] is False, "a fresh home: not onboarded: %r" % core.last("prefs"))
+        check(os.path.isdir(home_ws), "the core made bise's home folder")
+        with core.lock:
+            check(not any(e.get("ev") == "error" and "gone" in e.get("text", "") for e in core.evs), "bise's home never gone")
         accounts = core.last("accounts")["items"]
         keyed = [a for a in accounts if a["kind"] == "key"]
         check(keyed, "a provider that takes a key: %r" % accounts)
