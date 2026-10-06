@@ -3,12 +3,13 @@
 //! local midnight (first parent, newest first), each with the agent whose
 //! land brought it, read from the `landed` lines of main's feed (they
 //! survive a hub restart). Git and the transcript are read in a thread.
-//! Sent at a typed hello, after each land (its `landed` line in main's
-//! feed), after a feature merge (`Effect::MergedChanged`: it writes no
-//! landed line) and on `merged`.
+//! Sent at a typed hello, after each land (the Rust land path's
+//! `Msg::Land` with its `landed` fields, not main's feed text), after a
+//! feature merge (`Effect::MergedChanged`: it writes no landed line) and
+//! on `merged`.
 //!
-//! Interim source (architect m_9058): `by` and the after-land trigger read
-//! main's feed text (`sb landed :` lines); the structured fix is a land
+//! Interim source (architect m_9058): `by` still reads main's feed text
+//! (`sb landed :` lines); the structured fix is a land
 //! record the hub writes through sb-core when it lands (agent, from, to,
 //! at), which this file then reads instead.
 

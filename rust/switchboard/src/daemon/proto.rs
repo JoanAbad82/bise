@@ -389,10 +389,6 @@ impl Shell {
                         self.proto_send(id, &HubEv::Typing { project: project.clone(), agent: agent.clone(), text: text.clone() });
                     }
                 }
-                // a land reached main's feed: today's merged list again
-                if agent == MAIN && line.starts_with("sb landed : ") {
-                    self.merged_typed(ids.clone());
-                }
             }
             _ => {}
         }

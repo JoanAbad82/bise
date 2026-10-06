@@ -2971,6 +2971,9 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
                     sh.feed(MAIN, &format!("sb {} : {}", kind, wire_escape(&text)));
                     // a land moved main or a feature: the features' facts again
                     sh.refresh_features();
+                    if kind == "landed" {
+                        sh.merged_all();
+                    }
                 }
                 let snap = sh.snapshot();
                 sh.broadcast(&snap);

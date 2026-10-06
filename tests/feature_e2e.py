@@ -50,6 +50,18 @@ def main():
         check(out(E.ws, "git rev-parse cu") == base, "cu starts at main's tip")
         c.wait_idle("main")
 
+        # a window's typed connection: its merged today follows each land
+        # and the feature merge, unasked (T1 run 5 step 9)
+        w = e2e.Client(os.path.join(E.state, "hub.sock"))
+        w.wait(lambda: w.state is not None, 20, "the window's replay")
+        w.send({"cmd": "hello", "proto": 1, "typed_only": True})
+        w.wait(lambda: any(e.get("ev") == "merged" for e in w.events), 20, "merged at hello")
+
+        def merged_events():
+            with w.lock:
+                return [e for e in w.events if e.get("ev") == "merged"]
+        before_lands = len(merged_events())
+
         # two agents, each its own worktree from cu's tip, landing on cu
         for n, f in (("cu-a", "a.txt"), ("cu-b", "b.txt")):
             c.say('[[bash: sb spawn %s --feature cu --objective "{{bash: echo %s > %s && git add %s && git commit -qm %s && sb land}}"]]'
@@ -61,6 +73,7 @@ def main():
         check(a["place_id"] == "feature:cu", "it shows in the feature's place: %r" % a["place_id"])
         c.wait_line("main", "cu-a landed 1 commit on cu", 60)
         c.wait_line("main", "cu-b landed 1 commit on cu", 60)
+        w.wait(lambda: len(merged_events()) >= before_lands + 2, 30, "merged again after each land, unasked")
         check(out(E.ws, "git log --format=%s cu") == "cu-b\ncu-a\nignore\ninit", "both on cu: " + out(E.ws, "git log --format=%s cu"))
         check(out(E.ws, "git rev-parse main") == base, "main never moved")
         p = place(c, "feature:cu")
@@ -95,21 +108,14 @@ def main():
         reg = json.load(open(os.path.join(E.state, "features.json")))
         check(reg["features"][0]["trial"], "the registry: %r" % reg)
 
-        # a window's typed connection: its merged today must follow the
-        # feature merge (it writes no landed line; T1 run 5 step 9)
-        w = e2e.Client(os.path.join(E.state, "hub.sock"))
-        w.wait(lambda: w.state is not None, 20, "the window's replay")
-        w.send({"cmd": "hello", "proto": 1, "typed_only": True})
-        w.wait(lambda: any(e.get("ev") == "merged" for e in w.events), 20, "merged at hello")
-
         # 1 merge: main fast-forwarded, agents archived, branch trashed
+        # (a feature merge writes no landed line: its own effect)
         c.say("/answer %d 1" % m["id"])
         c.wait_line("main", "✓ cu merged into main (2 commits,", 90)
         tip = out(E.ws, "git rev-parse main")
 
         def merged_has_tip():
-            with w.lock:
-                ms = [e for e in w.events if e.get("ev") == "merged"]
+            ms = merged_events()
             return ms and any(i.get("sha") == tip for i in ms[-1]["items"])
         w.wait(merged_has_tip, 30, "merged today with the feature merge's tip, unasked")
         w.s.close()
