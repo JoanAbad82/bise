@@ -15,7 +15,7 @@
 (function (root) {
   "use strict";
   const init = () => ({ diffs: {}, pick: {}, sel: null });
-  const EVS = new Set(["diff", "ui_rv_file", "ui_rv_line", "ui_rv_merge"]);
+  const EVS = new Set(["diff", "ui_rv_file", "ui_rv_line", "ui_rv_merge", "ui_rv_retry", "ui_rv_more"]);
   const owns = (ev) => EVS.has(ev.ev) || (ev.ev === "error" && ev.cmd === "diff");
   const k = (project, agent) => `${project}/${agent}`;
   const base = (p) => String(p || "").split("/").pop();
@@ -46,7 +46,10 @@
     switch (ev.ev) {
       case "diff": return { e: { ...e, diffs: { ...e.diffs, [k(ev.project, ev.agent)]: ev }, err: null }, cmds: [] };
       // the core couldn't make it (an unknown agent): the screen says so instead of loading forever
-      case "error": return { e: { ...e, err: r && r.screen === "review" ? { key: k(r.project, r.agent), text: String(ev.text || "") } : e.err }, cmds: [] };
+      case "error": return { e: { ...e, err: r && r.screen === "review" ? { key: k(r.project, r.agent), text: String(ev.text || ""), more: false } : e.err }, cmds: [] };
+      // '↻ try again' asks the diff again; '▸' shows the rest of the core's text
+      case "ui_rv_retry": return { e: { ...e, err: null }, cmds: [{ cmd: "diff", project: r.project, agent: r.agent }] };
+      case "ui_rv_more": return { e: { ...e, err: e.err && { ...e.err, more: !e.err.more } }, cmds: [] };
       case "ui_rv_file": return { e: { ...e, pick: { ...e.pick, [k(r.project, r.agent)]: ev.i }, sel: null }, cmds: [] };
       case "ui_rv_line": {
         const d = e.diffs[k(r.project, r.agent)];
@@ -93,11 +96,16 @@
   };
 
   const num = (n) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10));
-  // a file's note in the list, and the diff's body when it has no lines to show (best guesses, asked to ambient)
-  const fileNote = (f) => (f.status === "added" ? "new file" : f.status === "deleted" ? "deleted" : f.status === "renamed" ? "renamed"
+  // a file's note in the list, and the diff's body when it has no lines to show (ambient m_8820):
+  // 'renamed from decode.rs' (the old name when the core gives it, f.from), a binary's size when it
+  // has one (f.size, bytes), ⌘O open in editor after the ones he can read there
+  const fileNote = (f) => (f.status === "added" ? "new file" : f.status === "deleted" ? "deleted" : f.status === "renamed" ? (f.from ? `renamed from ${base(f.from)}` : "renamed")
     : f.binary ? "binary" : f.generated ? "generated" : f.truncated ? "too big to show" : "");
-  const bodyNote = (f) => (f.binary ? "a binary file: no lines to show" : f.generated ? "a generated file: its lines aren't shown"
-    : f.truncated ? "too big to show here: open it in your editor" : "no lines to show");
+  const bytes = (n) => (n >= 1e6 ? `${num(Math.round(n / 1e5) / 10)} MB` : n >= 1e3 ? `${Math.round(n / 1e3)} KB` : `${n} B`);
+  const bodyNote = (f) => (f.binary ? { text: `a binary file${f.size > 0 ? `, ${bytes(f.size)}` : ""}: no lines to show.` }
+    : f.generated ? { text: "a generated file: its lines aren't shown.", open: true }
+    : f.truncated ? { text: "too big to show here.", open: true } : { text: "no lines to show." });
+  const noLines = (f, ed, project) => { const b = bodyNote(f); return { text: b.text, open: b.open && ed ? { ev: "ui_env_open", project, app: "editor", path: ed } : null }; };
   const pm = (f) => [f.add ? `+${f.add}` : "", f.del ? `−${f.del}` : ""].filter(Boolean).join(" ");
 
   function view(s) {
@@ -110,7 +118,8 @@
     const merged = d && d.merged;
     const head = { t1: r.agent, dot: merged ? "ok" : dot, t2: [p.name, ...(a.branch || (d && d.head) ? [`ψ ${a.branch || d.head}`] : []), ...(a.title ? [a.title] : []), merged ? `merged · ${merged}` : a.status], acc: -1,
       end: [{ kind: "btn", text: "thread", act: { ev: "ui_route", project: r.project, agent: r.agent } }] };
-    if (!d && e.err && e.err.key === k(r.project, r.agent)) return { screen: "review", head, empty: { title: "can't show the changes", text: e.err.text } };
+    // an error keeps the way back (ambient m_8820): '▲ can't show the changes.', the core's text (one line, ▸ the rest), '↻ try again'
+    if (!d && e.err && e.err.key === k(r.project, r.agent)) return { screen: "review", head, err: { title: "can't show the changes.", text: e.err.text, more: e.err.more } };
     if (!d) return { screen: "review", head, loading: true };
     const fi = Math.min(e.pick[k(r.project, r.agent)] || 0, Math.max(0, d.files.length - 1));
     const add = d.files.reduce((n, f) => n + f.add, 0), del = d.files.reduce((n, f) => n + f.del, 0);
@@ -128,7 +137,7 @@
       changed: d.files.length ? `${d.files.length} file${d.files.length > 1 ? "s" : ""} · +${add} −${del}` : "",
       files: d.files.map((f, i) => ({ name: base(f.path), note: f.note || fileNote(f), end: pm(f), on: i === fi,
         act: { ev: "ui_rv_file", i } })),
-      diff: file ? { file: file.path, add: file.add, rm: file.del, none: (file.hunks || []).length ? null : bodyNote(file),
+      diff: file ? { file: file.path, add: file.add, rm: file.del, none: (file.hunks || []).length ? null : noLines(file, ed, r.project),
         lines: linesOf(file).map((l) => (l.kind === "hunk" ? { hunk: l.text }
           : { old: l.old, new: l.new, sign: l.kind === "add" ? "+" : l.kind === "del" ? "-" : "", text: l.text, i: l.i, sel: !!(sel && l.i >= sel[0] && l.i <= sel[1]),
             act: { ev: "ui_rv_line", i: l.i } })) } : null,
@@ -148,10 +157,14 @@
     return t.content.firstChild;
   }
   function draw(d, UI) {
-    const { h } = UI.core;
+    const { h, act } = UI.core;
     if (d.loading) return h("div", "w7 w7-rv", UI.skel.render({}), UI.skel.render({}));
     if (d.empty) return h("div", "w7 w7-rv", UI.empty.render(d.empty));
-    const diff = d.diff && d.diff.none ? h("div", "w7-none", d.diff.none) : d.diff ? UI.diff.render({ file: d.diff.file, add: d.diff.add, rm: d.diff.rm,
+    if (d.err) return h("div", "w7 w7-rv", h("div", "w7-err", h("div", "t", h("span", "m", "▲"), " ", d.err.title),
+      h("div", ["x", d.err.more && "all"], h("span", "tx", d.err.text), act(h("span", "mo", d.err.more ? "▾" : "▸"), { ev: "ui_rv_more" })),
+      UI.btn.render({ text: "↻ try again", act: { ev: "ui_rv_retry" } })));
+    const none = d.diff && d.diff.none;
+    const diff = none ? h("div", "w7-none", none.text, none.open ? act(h("span", "w7-hint", "   ", UI.kbd.render({ text: "⌘O" }), " open in editor"), none.open) : null) : d.diff ? UI.diff.render({ file: d.diff.file, add: d.diff.add, rm: d.diff.rm,
       lines: d.diff.lines.filter((l) => !l.hunk).map((l) => ({ old: l.old, new: l.new, sign: l.sign, text: l.text, sel: l.sel, act: l.act })) }) : null;
     return h("div", "w7 w7-rv",
       d.result ? h("div", "w7-result", h("div", "w7-rl", h("span", "lb", d.result.label), d.result.sub ? h("span", "sb", d.result.sub) : null,

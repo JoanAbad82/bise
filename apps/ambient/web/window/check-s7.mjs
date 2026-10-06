@@ -230,12 +230,16 @@ law("review on the frozen diff (amb-core 6e2503f6): a truncated, binary or gener
   w.feed({ ev: "diff", project: P.engine, agent: "streaming", base: "main", head: "sb/streaming", files: [
     { path: "src/query.rs", status: "modified", add: 3, del: 1, hunks: [hunk], note: "sorts in place now" },
     { path: "Cargo.lock", status: "modified", add: 120, del: 80, hunks: [], truncated: true },
-    { path: "logo.png", status: "added", add: 0, del: 0, hunks: [], binary: true },
-    { path: "gen/api.rs", status: "renamed", add: 2, del: 2, hunks: [], generated: true }] });
-  eq(w.v.files.map((f) => [f.name, f.note]), [["query.rs", "sorts in place now"], ["Cargo.lock", "too big to show"], ["logo.png", "new file"], ["api.rs", "renamed"]]);
+    { path: "logo.png", status: "added", add: 0, del: 0, hunks: [], binary: true, size: 2100000 },
+    { path: "gen/api.rs", status: "modified", add: 2, del: 2, hunks: [], generated: true },
+    { path: "src/decode_pool.rs", status: "renamed", from: "src/streaming/decode.rs", add: 1, del: 1, hunks: [hunk] }] });
+  eq(w.v.files.map((f) => [f.name, f.note]), [["query.rs", "sorts in place now"], ["Cargo.lock", "too big to show"], ["logo.png", "new file"], ["api.rs", "generated"],
+    ["decode_pool.rs", "renamed from decode.rs"]]);
   eq([w.v.diff.none, w.v.diff.lines.length], [null, 4]);
-  const pick = (i) => { w.feed({ ev: "ui_rv_file", i }); return w.v.diff.none; };
-  eq([pick(1), pick(2), pick(3)], ["too big to show here: open it in your editor", "a binary file: no lines to show", "a generated file: its lines aren't shown"]);
+  // no lines: why, and ⌘O open in editor (the worktree) after the ones he can read there (ambient m_8820)
+  const pick = (i) => { w.feed({ ev: "ui_rv_file", i }); const n = w.v.diff.none; return [n.text, !!n.open]; };
+  eq([pick(1), pick(2), pick(3)], [["too big to show here.", true], ["a binary file, 2.1 MB: no lines to show.", false], ["a generated file: its lines aren't shown.", true]]);
+  eq(w.v.diff.none.open, { ev: "ui_env_open", project: P.engine, app: "editor", path: w.s.s7.env.wt[P.engine].find((x) => x.agent === "streaming").path });
   // an older agent, merged, its folder gone: no files, the merge and the core's note
   w.open("review", P.engine, "old");
   w.feed({ ev: "diff", project: P.engine, agent: "old", base: "main", files: [], merged: "e0f3df5", note: "old is archived and its folder is gone" });
@@ -244,7 +248,12 @@ law("review on the frozen diff (amb-core 6e2503f6): a truncated, binary or gener
   const s7 = { ...w.s.s7, rv: { ...w.s.s7.rv, diffs: {} } };
   let s = { ...w.s, s7, route: { screen: "review", project: P.engine, agent: "ghost" } };
   s = M.step(s, { ev: "error", cmd: "diff", text: "no agent ghost in engine" }).s;
-  eq(S7.view(s).empty, { title: "can't show the changes", text: "no agent ghost in engine" });
+  eq(S7.view(s).err, { title: "can't show the changes.", text: "no agent ghost in engine", more: false });
+  // ▸ the rest of the text; ↻ try again asks the diff again
+  s = M.step(s, { ev: "ui_rv_more" }).s;
+  eq(S7.view(s).err.more, true);
+  const again = M.step(s, { ev: "ui_rv_retry" });
+  eq([again.cmds.filter((c) => c.cmd === "diff"), S7.view(again.s).loading], [[{ cmd: "diff", project: P.engine, agent: "ghost" }], true]);
 });
 
 law("the fake S7 world speaks S3a's drafts: every event names its project, no event for bise's own", () => {
