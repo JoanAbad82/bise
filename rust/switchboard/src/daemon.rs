@@ -1154,6 +1154,9 @@ impl Shell {
             }
             Effect::Land { token, job } => self.land(token, *job),
             Effect::ToClient { client, body } => {
+                if self.typed_notice(client, &body) {
+                    return;
+                }
                 if let Some(s) = self.clients.get_mut(&client) {
                     write_json(s, &body);
                 }

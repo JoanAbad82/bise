@@ -31,6 +31,9 @@ pub(super) struct Proto {
     worktrees: String,
     /// the background jobs' ports once found (dev_servers.rs)
     pub(super) dev_ports: super::dev_servers::Ports,
+    /// the typed command being stepped (its connection, its tag): a
+    /// notice sb-core sends that connection meanwhile becomes its error
+    stepping: Option<(ClientId, String)>,
 }
 
 #[derive(Default)]
@@ -103,6 +106,26 @@ impl Shell {
         let hub = bise_home::projects::target(&rows, to, &self.project())?;
         let name = rows.iter().find(|r| r.id == hub).map_or_else(|| hub.clone(), |r| r.name.clone());
         Ok(Some((hub, name)))
+    }
+
+    /// Steps sb-core for typed command `cmd` of connection `id`: its
+    /// notice to that connection (a route that ended, ...) comes back as
+    /// `error {cmd, text}`, so a command that does nothing says why.
+    fn step_typed(&mut self, id: ClientId, cmd: &str, input: Input) {
+        self.proto.stepping = Some((id, cmd.to_string()));
+        self.step(input);
+        self.proto.stepping = None;
+    }
+
+    /// `Effect::ToClient`'s body for `client`, as the typed `error` when it
+    /// is a notice for the typed command being stepped; false: not one.
+    pub(super) fn typed_notice(&mut self, client: ClientId, body: &Value) -> bool {
+        let Some((id, cmd)) = self.proto.stepping.clone() else { return false };
+        if id != client || body.get("ev").and_then(Value::as_str) != Some("notice") {
+            return false;
+        }
+        self.proto_error(client, &cmd, body.get("text").and_then(Value::as_str).unwrap_or(""));
+        true
     }
 
     fn proto_error(&mut self, id: ClientId, cmd: &str, text: &str) {
@@ -258,15 +281,15 @@ impl Shell {
             HubCmd::Worktrees { .. } => self.worktrees_typed(vec![id]),
             // jobs and lsof in a thread (dev_servers.rs), to this client
             HubCmd::DevServers { .. } => self.dev_servers_typed(vec![id]),
-            // the 2 s hold (sb-core's routing hold): a route that went
-            // already gets sb-core's notice; an unknown target never
-            // reaches sb-core
+            // the 2 s hold (sb-core's routing hold): a route that ended
+            // already gets sb-core's notice, as an error (step_typed); an
+            // unknown target never reaches sb-core
             HubCmd::RouteCorrect { rid, to, .. } => match self.route_to(&to) {
                 Err(e) => self.proto_error(id, &tag, &e),
-                Ok(None) => self.step(Input::RouteCancel { rid }),
-                Ok(Some((to, name))) => self.step(Input::RouteCorrect { rid, to, name }),
+                Ok(None) => self.step_typed(id, &tag, Input::RouteCancel { client: Some(id), rid }),
+                Ok(Some((to, name))) => self.step_typed(id, &tag, Input::RouteCorrect { client: Some(id), rid, to, name }),
             },
-            HubCmd::RouteCancel { rid, .. } => self.step(Input::RouteCancel { rid }),
+            HubCmd::RouteCancel { rid, .. } => self.step_typed(id, &tag, Input::RouteCancel { client: Some(id), rid }),
             HubCmd::Hello { .. } | HubCmd::Unknown { .. } => {}
         }
     }

@@ -3718,10 +3718,16 @@ fn a_held_route_goes_at_two_seconds_once_with_no_turn() {
     // once: no second fire, and a late correction or cancel changes nothing
     t.env.now += 10_000;
     assert!(xdelivers(&t.go(Input::Tick)).is_empty());
-    let fx = t.go(Input::RouteCorrect { rid: 1, to: "docs-2".into(), name: "docs".into() });
+    let fx = t.go(Input::RouteCorrect { client: None, rid: 1, to: "docs-2".into(), name: "docs".into() });
     assert!(routes(&fx).is_empty() && xdelivers(&fx).is_empty());
-    let fx = t.go(Input::RouteCancel { rid: 1 });
+    let fx = t.go(Input::RouteCancel { client: None, rid: 1 });
     assert!(route_dones(&fx).is_empty() && say_to(&fx, MAIN).is_none());
+    // the typed connection that asked hears why nothing happened
+    for input in [Input::RouteCancel { client: Some(5), rid: 1 }, Input::RouteCorrect { client: Some(5), rid: 1, to: "docs-2".into(), name: "docs".into() }] {
+        let fx = t.go(input);
+        assert!(fx.iter().any(|e| matches!(e, Effect::ToClient { client: 5, body } if body["ev"] == "notice"
+            && body["text"].as_str().unwrap_or("").contains("route 1 already went or was cancelled"))), "{:?}", fx);
+    }
 }
 
 // a correction changes the project, not the time; `bise` is a cancel
@@ -3731,7 +3737,7 @@ fn a_corrected_route_goes_to_the_new_project_at_the_same_time() {
     let now = t.env.now;
     hold(&mut t, "update the docs");
     t.env.now += 1_000;
-    let fx = t.go(Input::RouteCorrect { rid: 1, to: "docs-2".into(), name: "docs".into() });
+    let fx = t.go(Input::RouteCorrect { client: None, rid: 1, to: "docs-2".into(), name: "docs".into() });
     assert_eq!(routes(&fx), vec![(1, "docs-2".into(), "docs".into(), now + 2000)]);
     t.env.now += 1_100;
     let fx = t.go(Input::Tick);
@@ -3746,8 +3752,8 @@ fn a_cancelled_route_is_said_to_main_and_never_sent() {
         let mut t = T::new();
         hold(&mut t, "never mind, for you");
         let fx = match how {
-            "cancel" => t.go(Input::RouteCancel { rid: 1 }),
-            _ => t.go(Input::RouteCorrect { rid: 1, to: "bise".into(), name: "bise".into() }),
+            "cancel" => t.go(Input::RouteCancel { client: None, rid: 1 }),
+            _ => t.go(Input::RouteCorrect { client: None, rid: 1, to: "bise".into(), name: "bise".into() }),
         };
         assert_eq!(route_dones(&fx), vec![(1, "cancelled".into(), "shop-1".into(), None)], "{how}");
         let said = say_to(&fx, MAIN).or_else(|| steer_to(&fx, MAIN)).expect("main hears his words");

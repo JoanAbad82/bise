@@ -87,6 +87,10 @@ def main():
             ({"cmd": "answer", "project": project, "card": 999, "reply": "1"}, "answer"),
             ({"cmd": "subscribe", "project": project}, "subscribe"),
             ({"cmd": "diff", "project": project, "agent": "nobody"}, "diff"),
+            # S2 step 2: a route that isn't held (sb-core's notice, as the
+            # error), a target not in the registry (never stepped)
+            ({"cmd": "route_cancel", "project": project, "rid": 99}, "route_cancel"),
+            ({"cmd": "route_correct", "project": project, "rid": 99, "to": "nope-00000000"}, "route_correct"),
         ]
         for i, (cmd, tag) in enumerate(refused):
             c.send(cmd)

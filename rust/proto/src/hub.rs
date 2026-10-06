@@ -206,11 +206,10 @@ pub enum HubCmd {
     DevServers { project: Project },
     /// a held route goes to project `to` instead (a hub id of the
     /// registry, else an error; "bise": his words stay with bise's main,
-    /// a cancel); a route that ended already: nothing (its `route_done`
-    /// came)
+    /// a cancel); a route that ended already: an error
     RouteCorrect { project: Project, rid: u64, to: String },
     /// a held route doesn't go: his words reach bise's main as a plain
-    /// message (a route that ended already: nothing)
+    /// message (a route that ended already: an error)
     RouteCancel { project: Project, rid: u64 },
     /// a tag this version doesn't know: answered with `error`
     #[serde(skip)]

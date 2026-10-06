@@ -579,14 +579,17 @@ pub enum Input {
         why: String,
     },
     /// A held route goes to `to` instead (the shell checked it in the
-    /// registry; `bise`: a cancel).
+    /// registry; `bise`: a cancel). `client`: the typed connection that
+    /// asked, which gets sb-core's notice when the route ended already.
     RouteCorrect {
+        client: Option<ClientId>,
         rid: u64,
         to: String,
         name: String,
     },
     /// A held route doesn't go: his words reach main as today.
     RouteCancel {
+        client: Option<ClientId>,
         rid: u64,
     },
     Updated {
@@ -2257,10 +2260,10 @@ impl Hub {
                 let i = json!({"t": "route_hold", "text": text, "via": via, "to": to, "name": name, "why": why});
                 self.core(&mut fx, env, None, i)
             }
-            Input::RouteCorrect { rid, to, name } => {
-                self.core(&mut fx, env, None, json!({"t": "route_correct", "rid": rid, "to": to, "name": name}))
+            Input::RouteCorrect { client, rid, to, name } => {
+                self.core(&mut fx, env, client, json!({"t": "route_correct", "rid": rid, "to": to, "name": name}))
             }
-            Input::RouteCancel { rid } => self.core(&mut fx, env, None, json!({"t": "route_cancel", "rid": rid})),
+            Input::RouteCancel { client, rid } => self.core(&mut fx, env, client, json!({"t": "route_cancel", "rid": rid})),
         }
         self.refresh_contexts(&mut fx, env.now());
         if self.dirty {
