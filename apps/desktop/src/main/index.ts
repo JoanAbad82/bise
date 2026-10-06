@@ -10,7 +10,7 @@
 // Application Support), and main prints READY_LINE on stdout once the page
 // has loaded.
 import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app, ipcMain, Menu } from 'electron';
@@ -23,9 +23,24 @@ import { configOfPrefs } from './helper/config';
 import { installIpc, sendClip, sendMenu } from './ipc';
 import { menuTemplate } from './menu';
 import { startTray } from './tray';
+import { testHomeProblem } from './testhome';
 import { MainWindow } from './windows';
 
 const testMode = process.env[TEST_ENV] === '1';
+
+// a test run starts only in the throwaway home its harness made (testhome.ts):
+// else it says why and stops here, before any window, helper or core (main
+// m_9883: a run with his real HOME started his real global hub)
+if (testMode) {
+  const problem = testHomeProblem(process.env, userInfo().homedir);
+  if (problem !== null) {
+    process.stderr.write(`bise-desktop: test mode refused: ${problem}\n`);
+    process.exit(3);
+  }
+  // every bise this run starts (the core, the hubs it starts) is jailed in it
+  // too: bise_home's test_home::jail refuses any path outside BISE_TEST_HOME
+  process.env['BISE_TEST_HOME'] ??= process.env['HOME'];
+}
 
 // the menu bar says 'bise' (Quit bise, Hide bise, About bise), not the
 // package's name (qa-native m_9724)
