@@ -342,6 +342,12 @@ def daemon(bise, root, n):
             json.dump(info, f, indent=1)
         os.replace(P["json"] + ".tmp", P["json"])
         while not stop["now"]:
+            for h, E in zip(hubs, envs):
+                if E.fake.poll() is not None:
+                    h["fake_pid"] = revive_fake(E, h["project"])
+                    with open(P["json"] + ".tmp", "w") as f:
+                        json.dump(info, f, indent=1)
+                    os.replace(P["json"] + ".tmp", P["json"])
             time.sleep(0.3)
     finally:
         for E in envs:
@@ -355,6 +361,21 @@ def daemon(bise, root, n):
             os.unlink(P["json"])
         except OSError:
             pass
+
+
+def revive_fake(E, project):
+    """A world lives for hours and its fake providers died under one (exit seen by the daemon, no
+    traceback; amb-tools' wwin3 run): a dead one is reaped, its exit logged, and a new one started on
+    the same port, so the hub's BEND_PROVIDER_URL stays right. Returns the new pid."""
+    import e2e
+    port = E.env["BEND_PROVIDER_URL"].split("127.0.0.1:")[1].split("/")[0]
+    print("world: %s's fake provider exited (%s): restarted on port %s" % (project, E.fake.returncode, port), flush=True)
+    E.fake = subprocess.Popen([sys.executable, "-u", os.path.join(e2e.HERE, "fake_provider.py"), port],
+                              stdout=subprocess.PIPE, text=True, env=e2e.clean_env(FAKE_LOG=E.fake_log))
+    line = E.fake.stdout.readline()
+    if not line.startswith("PORT"):
+        print("world: %s's fake provider didn't come back: %r" % (project, line), flush=True)
+    return E.fake.pid
 
 
 def register(bise, home, workspaces):
