@@ -24,7 +24,9 @@ const T = {
 test('thread/send: on the real core, a sent message shows at once, reaches main, and main answers', async () => {
   test.setTimeout(180_000);
   const w = realWorld();
-  const words = `hi from qa-flows ${Date.now() % 1_000_000}`;
+  // [[slow: 2]]: the scripted model takes 2 s to answer, so main's working state lasts long enough
+  // to be seen (an instant fake reply ends the turn before the agents event says 'working')
+  const words = `hi from qa-flows ${Date.now() % 1_000_000} [[slow: 2]]`;
   const s = await launchReal(w);
   try {
     const { page } = s;
@@ -51,9 +53,15 @@ test('thread/send: on the real core, a sent message shows at once, reaches main,
     await page.keyboard.press('Enter');
     expect.soft(await shownMs, 'ms from ⏎ to his words drawn in the thread').toBeLessThan(100);
     await expect.poll(() => field.evaluate((e) => e.textContent), { message: 'the field is empty after the send' }).toBe('');
-    await expect.soft(page.locator(T.working).first(), "main's working state shows within 1 s").toBeVisible({ timeout: 1000 });
+    // measured, not only bounded: bise's words go through the hub's routing hold (2 s for him to
+    // correct where they go) before main starts; the TUI typed on bise's own hub skips it (1.45 s)
+    const sentAt = Date.now();
+    await page.locator(T.working).first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined);
+    const workingMs = Date.now() - sentAt;
+    test.info().annotations.push({ type: 'working', description: `main's working state shown ${workingMs} ms after ⏎` });
+    expect.soft(workingMs, "ms from ⏎ to main's working state shown").toBeLessThan(1000);
     await expect.poll(() => transcriptHas(w, 'bise', 'main', words), { timeout: 10_000, message: "the home hub's main got his words" }).toBe(true);
-    await expect(page.locator(T.thread), "the model's answer is drawn in the thread").toContainText(new RegExp(`ack: .*${words}`), { timeout: 20_000 });
+    await expect(page.locator(T.thread), "the model's answer is drawn in the thread").toContainText(new RegExp(`ack: .*${words.replace(/[[\]]/g, '\\$&')}`), { timeout: 20_000 });
     await page.screenshot({ path: test.info().outputPath('answered.png') });
   } finally {
     await s.close();

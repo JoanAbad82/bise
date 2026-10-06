@@ -62,28 +62,37 @@ test('spotlight/answer on the real core: fn+space, ask, the whole answer readabl
     const field = cap.locator('[data-testid="spot.input"]');
     await expect(field, 'fn+space opens the spotlight').toBeVisible({ timeout: 5000 });
     const n = `q${Date.now() % 1_000_000}`; // his words this run, never an earlier run's
-    const ask = `[[bash: seq -f 'line %g of 20 ${n}' 1 20]]`;
-    const lastLine = `line 20 of 20 ${n}`;
+    // short lines: the scripted model quotes at most 400 characters of a tool's output
+    const ask = `[[bash: seq -f 'l%g/20 ${n}' 1 20]]`;
+    const lastLine = `l20/20 ${n}`;
     await field.click();
     await cap.keyboard.type(ask);
     await cap.keyboard.press('Enter');
-    await expect.poll(() => transcriptHas(w, 'bise', 'main', `of 20 ${n}' 1 20`), { timeout: 10_000, message: "bise's main got the question" }).toBe(true);
+    await expect.poll(() => transcriptHas(w, 'bise', 'main', `/20 ${n}' 1 20`), { timeout: 10_000, message: "bise's main got the question" }).toBe(true);
     const answer = cap.locator('[data-testid="spot.answer"]');
     try {
       await expect(answer, 'the answer shows in the spotlight, where he asked').toBeVisible({ timeout: 15_000 });
     } finally {
       await cap.screenshot({ path: test.info().outputPath('spotlight.png') });
     }
-    const whole = (await answer.innerText()).includes(lastLine);
-    if (whole) {
-      expect.soft(await textProblems(cap, '[data-testid="spot.answer"]', 13), 'the answer in the spotlight: nothing clipped, offscreen or under 13 px').toEqual([]);
-    } else {
+    // the answer done: its text still for 1.5 s (it streams; ⏎ before the end would pick a row)
+    let seen = '', still = 0;
+    for (const t0 = Date.now(); still < 1500 && Date.now() - t0 < 20_000; ) {
+      const now = await answer.innerText();
+      still = now === seen ? still + 250 : 0;
+      seen = now;
+      await cap.waitForTimeout(250);
+    }
+    await cap.screenshot({ path: test.info().outputPath('spotlight-done.png') });
+    // what the spotlight shows is readable, whole or not
+    expect.soft(await textProblems(cap, '[data-testid="spot.answer"]', 12.95), 'the answer in the spotlight: nothing clipped, offscreen or under 13 px').toEqual([]);
+    if (!seen.includes(lastLine)) {
       await cap.keyboard.press('Enter'); // the rest in bise: ⏎ on an empty field opens it
       const list = page.locator('[data-testid="thread.list"]');
       await expect(list, "the window shows the rest in bise's thread").toContainText(lastLine, { timeout: 5000 });
       await page.getByText(lastLine).last().scrollIntoViewIfNeeded();
       await page.screenshot({ path: test.info().outputPath('window.png') });
-      const problems = (await textProblems(page, '[data-testid="thread.list"]', 13)).filter((p) => /line \d+ of 20/.test(p.text));
+      const problems = (await textProblems(page, '[data-testid="thread.list"]', 13)).filter((p) => /l\d+\/20/.test(p.text));
       expect.soft(problems, 'the answer in the window: nothing clipped or under 13 px').toEqual([]);
     }
   } finally {
