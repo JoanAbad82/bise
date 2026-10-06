@@ -21,6 +21,8 @@ export interface RowCtx {
   /** bise's own main (the pearl, 'bise') */
   readonly bise: boolean;
   readonly onLink: (url: string) => void;
+  /** a file path named in an answer, relative to the agent's folder (M4, B14) */
+  readonly onPath?: (path: string, line?: number) => void;
 }
 
 export const EntryRow = memo(function EntryRow({ ctx, pos }: { ctx: RowCtx; pos: number }) {
@@ -69,7 +71,7 @@ function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       const who = whoOf(e, ctx);
       return (
         <Msg from={who.from} name={who.name} indent={who.indent} time={clock(e.at_ms)} av={who.from === 'you' ? 'y' : undefined}>
-          <Markdown text={e.text} onLink={ctx.onLink} />
+          <Markdown text={e.text} onLink={ctx.onLink} onPath={ctx.onPath} />
         </Msg>
       );
     }
@@ -97,7 +99,7 @@ function YouRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   };
   return (
     <Msg from="you" name="you" av="y" time={clock(e.at_ms)}>
-      <Markdown text={fold === undefined || open ? e.text : fold.head} onLink={ctx.onLink} />
+      <Markdown text={fold === undefined || open ? e.text : fold.head} onLink={ctx.onLink} onPath={ctx.onPath} />
       {fold !== undefined && (
         <Fold open={open} onToggle={toggle} testId={`thread.fold.${e.pos}`}>
           {open ? 'fold it' : `show all · ${String(fold.lines)} lines`}

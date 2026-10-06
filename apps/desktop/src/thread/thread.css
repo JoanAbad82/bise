@@ -205,3 +205,10 @@
   border-top: 1px solid var(--c-line);
   color: var(--c-text-2);
 }
+
+/* a file path in an answer: opens in his editor */
+.th-path {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}

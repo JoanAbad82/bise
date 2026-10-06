@@ -11,7 +11,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardE
 import { Button, Head, Marker } from '@/ds';
 import { Composer, useComposerSources } from '@/composer';
 import type { Outgoing } from '@/composer/message';
-import { threadKey, useAgents, useCoreState, usePending, useStore, useThreadOrder, useTyping } from '@/store';
+import { threadKey, useAgents, useCoreState, useProjects, usePending, useStore, useThreadOrder, useTyping } from '@/store';
 import { useMenuAction } from '@/app/menu';
 import { dotOf, lineOf } from '@/agents/model';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
@@ -20,6 +20,7 @@ import { entryKey, pendingKey, posOfKey } from './entry';
 import { FindBar } from './FindBar';
 import { createFindMark, FindMarkContext } from './findmark';
 import { trackRoutes, useHeld } from './routes';
+import { absolute } from './paths';
 import { createFolds, FoldsContext } from './folds';
 
 export interface ThreadScreenProps {
@@ -29,6 +30,13 @@ export interface ThreadScreenProps {
   bise?: boolean;
   /** the project's name for the head and the composer's 'you → …' */
   projectName?: string;
+}
+
+/** The agent's folder: its worktree, else its project's checkout; none until the rows come. */
+function useBase(project: string, agent: string): string | undefined {
+  const a = useAgents(project).find((x) => x.name === agent);
+  const row = useProjects().find((p) => p.project === project);
+  return a?.worktree ?? row?.path;
 }
 
 /** A link from an answer: his browser, through main (http/https/mailto only). */
@@ -165,7 +173,25 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
   // entries only: his sends not landed yet are the list's tail, outside the
   // virtual list, so his row is drawn in ⏎'s own frame (bar ⛔3: < 100 ms)
   const keys = useMemo(() => view.order.map(entryKey), [view]);
-  const ctx = useMemo<RowCtx>(() => ({ tkey, project, agent, bise, onLink: openLink }), [tkey, project, agent, bise]);
+  // relative paths in its answers are under the agent's folder: its worktree, else the project's
+  const base = useBase(project, agent);
+  const ctx = useMemo<RowCtx>(
+    () => ({
+      tkey,
+      project,
+      agent,
+      bise,
+      onLink: openLink,
+      ...(base === undefined
+        ? {}
+        : {
+            onPath: (path: string, line?: number) => {
+              void (window as Partial<Window>).bise?.openPath(absolute(path, base), line === undefined ? {} : { line });
+            },
+          }),
+    }),
+    [tkey, project, agent, bise, base],
+  );
   const row = useCallback(
     (key: string) => {
       const pos = posOfKey(key);

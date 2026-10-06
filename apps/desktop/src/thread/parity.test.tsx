@@ -94,3 +94,29 @@ describe('thread parity rows (tui-parity M2 N11 M8 B15 B11 C47 W2 W5)', () => {
     ]);
   });
 });
+
+describe('file paths in answers (tui-parity M4, B14)', () => {
+  it('names a file in inline code, with its line; not a version, a url or words', async () => {
+    const { pathOf, absolute } = await import('./paths');
+    expect(pathOf('src/app/App.tsx:42')).toEqual({ path: 'src/app/App.tsx', line: 42 });
+    expect(pathOf('/etc/hosts')).toEqual({ path: '/etc/hosts' });
+    expect(pathOf('Cargo.toml')).toEqual({ path: 'Cargo.toml' });
+    expect(pathOf('rust/tui/src')).toEqual({ path: 'rust/tui/src' });
+    expect(pathOf('1.2.3')).toBeUndefined();
+    expect(pathOf('https://x.y/z')).toBeUndefined();
+    expect(pathOf('npm install')).toBeUndefined();
+    expect(pathOf('foo')).toBeUndefined();
+    expect(absolute('src/a.ts', '/w/acme/')).toBe('/w/acme/src/a.ts');
+    expect(absolute('../b.ts', '/w/acme')).toBe('/w/b.ts');
+    expect(absolute('/x/y', '/w')).toBe('/x/y');
+  });
+
+  it('a path in an answer is a link that asks to open it at its line; a code block stays code', () => {
+    const onPath = vi.fn();
+    const v = render(<Markdown text={'see `src/app/App.tsx:42` and\n\n```\nsrc/x.ts\n```'} onPath={onPath} />);
+    const links = v.getAllByTestId('thread.path');
+    expect(links).toHaveLength(1);
+    fireEvent.click(links[0] as HTMLElement);
+    expect(onPath).toHaveBeenCalledWith('src/app/App.tsx', 42);
+  });
+});

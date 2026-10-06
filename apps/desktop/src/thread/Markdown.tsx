@@ -12,6 +12,7 @@
 import { memo, type MouseEvent } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { pathOf } from './paths';
 
 /** A link he may open from an answer: http, https or mailto. */
 export function openable(href: string | undefined): href is string {
@@ -33,8 +34,32 @@ export function textOf(n: { type: string; value?: unknown; children?: readonly u
   return (n.children ?? []).map((c) => textOf(c as { type: string })).join('');
 }
 
-export const Markdown = memo(function Markdown({ text, onLink }: { text: string; onLink?: (url: string) => void }) {
+export const Markdown = memo(function Markdown({ text, onLink, onPath }: { text: string; onLink?: (url: string) => void; onPath?: (path: string, line?: number) => void }) {
   const components: Components = {
+    // a file path in inline code opens in his editor (tui-parity M4, B14);
+    // a block's code (it ends with a newline) stays code
+    code({ className, children }) {
+      const t = typeof children === 'string' ? children : '';
+      const f = onPath === undefined || t.includes('\n') ? undefined : pathOf(t);
+      if (f === undefined) return <code className={className}>{children}</code>;
+      return (
+        <code
+          className="th-path"
+          role="link"
+          tabIndex={0}
+          title={`open ${f.path} in your editor`}
+          onClick={() => {
+            onPath?.(f.path, f.line);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onPath?.(f.path, f.line);
+          }}
+          data-testid="thread.path"
+        >
+          {children}
+        </code>
+      );
+    },
     a({ href, children }) {
       if (!openable(href)) return <span className="th-link-off">{children}</span>;
       const open = (e: MouseEvent) => {
