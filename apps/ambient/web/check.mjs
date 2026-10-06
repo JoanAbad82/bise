@@ -1268,6 +1268,30 @@ law("the hello, once ever (app_hello): the pearl gathers 1.2 s, 'hi, i'm bise. h
   eq([rv(0).gather, rv(0).text, rv(1500).puff, rv(5400).state, rv(5600).content.kind], [0, W.hello, false, "hello", "none"]);
 });
 
+law("every project's cards reach the bar (amb-mac m_8894): the core's projects rows (fixture acme, ProjectRow.cards) join home's state.cards; ids are per hub, so acme's #4 and home's #4 stay two cards; answers and app_content carry the card's own id and its project", () => {
+  const fx = readFileSync(join(here, "../../../rust/proto/fixtures/core_ev.jsonl"), "utf8").split(String.fromCharCode(10)).filter(Boolean).map((l) => JSON.parse(l));
+  const rows = fx.find((e) => e.ev === "projects").projects;
+  const acme = rows.find((p) => p.project === "acme-1a2b3c4d");
+  // home's card #9 collides with acme's #9 on purpose
+  let m = M.step(M.init(), { ev: "state", agents: [], cards: [{ id: 9, kind: "question", agent: "main", text: "home's own?", options: [{ n: 1, label: "yes" }, { n: 2, label: "no" }] }], pages: [] }, 0).m;
+  m = M.step(m, { ev: "projects", projects: rows }, 10).m;
+  eq(M.visibleCards(m).map((c) => [c.id, c.cid ?? null, c.text]), [[9, null, "home's own?"], ["acme-1a2b3c4d#9", 9, "which bench?"], ["acme-1a2b3c4d#10", 10, "run rm -rf target?"]]);
+  // the spotlight marks acme's confirm (approval: true) as an approval
+  const sp = Bar.spec(M.view(M.step(m, { ev: "app_key", key: "space" }, 20).m, 30));
+  eq(sp.sections[0].rows.map((r) => r.g), ["?", "?", "!"]);
+  // the glass asks home's first; picking acme's from fn i answers acme's #9 with its project
+  const v = M.view(m, 40);
+  eq(v.content, { kind: "needs", card: 9 });
+  const acmeFirst = M.step(m, { ev: "ui_card", card: "acme-1a2b3c4d#9" }, 50).m;
+  eq(M.view(acmeFirst, 60).content, { kind: "needs", card: 9, project: acme.project });
+  eq(M.step(acmeFirst, { ev: "app_key", key: "2" }, 70).cmds.filter((c) => c.cmd === "answer"), [{ cmd: "answer", card: 9, reply: "2", project: acme.project }]);
+  // answered stays hidden on the next state (numeric ids kept across the prune), home's #9 still asks
+  const after = M.step(M.step(acmeFirst, { ev: "app_key", key: "2" }, 70).m, { ev: "state", agents: [], cards: m.cards, pages: [] }, 80).m;
+  eq(M.visibleCards(after).map((c) => c.id), [9, "acme-1a2b3c4d#10"]);
+  const home = M.step(m, { ev: "app_key", key: "1" }, 90).m;
+  eq(M.visibleCards(M.step(home, { ev: "state", agents: [], cards: m.cards, pages: [] }, 100).m).map((c) => c.id), ["acme-1a2b3c4d#9", "acme-1a2b3c4d#10"]);
+});
+
 law("card seat (amb-mac 9c529bdd): while bise's window holds the cards (app_card_seat 'window') the bar keeps the hello and never turns into the card, its keys answer nothing; at 'bar' the card asks again (lead m_8746)", () => {
   const card = { id: "c1", agent: "search", text: "reindex tonight 02:00?", options: ["yes", "no"] };
   let m = M.step(M.init(), { ev: "app_card_seat", at: "window" }, 0).m;

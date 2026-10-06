@@ -107,7 +107,14 @@
   // a page's name on your surfaces: its title, else its id with spaces (vision §3 B)
   const pageName = (p) => p.title || String(p.id).replace(/-/g, " ");
   const working = root.AmbPolicy.working;
-  const visibleCards = (m) => m.cards.filter((c) => !m.answered[c.id]);
+  // every project's open cards (amb-mac m_8894): home's come in state.cards, the others in the core's
+  // projects rows (ProjectRow.cards, 'question' for text); ids are per hub, so a project's card is
+  // '<project>#<id>' here and keeps its own id (cid) and project for the answer and the app
+  const projCards = (ps) => ps.filter((p) => !p.home).flatMap((p) => (p.cards || []).map((c) => ({ ...c, text: c.text ?? c.question ?? "", cid: c.id, id: `${p.project}#${c.id}`, project: p.project })));
+  const allCards = (m) => m.cards.concat(m.pcards || []);
+  const visibleCards = (m) => allCards(m).filter((c) => !m.answered[c.id]);
+  // an answer to a card, its own id and, for a project's, its project
+  const ansCmd = (card, reply) => ({ cmd: "answer", card: card.cid ?? card.id, reply, ...(card.cid != null ? { project: card.project } : {}) });
   // what the question glass may ask: not a card he put off with esc (it keeps waiting in the inbox
   // and the count, ambient m_6500), and in a call or a meeting only the urgent ones
   // the card he brought up from fn i / fn 0 (m.frontCard) asks first, even in a call
@@ -154,10 +161,10 @@
     // send all says '∿ sending 3 replies.', dim, 4 s: nothing has left yet (ambient-lead m_6063)
     const b = batchOf(card), p = card.page;
     if (b) {
-      if (opt.n === b.send.n) return { m: flashNow(m2, { kind: "sending", glyph: "∿", text: Wd.drafts.sending(b.count, b.what), ttl: T.answered }, now), cmds: [{ cmd: "answer", card: card.id, reply }] };
-      return { m: { ...m2, lastPage: p.id || m.lastPage }, cmds: [{ cmd: "answer", card: card.id, reply }, ...(p.url ? [{ cmd: "app_open_url", url: p.url, page: p.id }] : [])] };
+      if (opt.n === b.send.n) return { m: flashNow(m2, { kind: "sending", glyph: "∿", text: Wd.drafts.sending(b.count, b.what), ttl: T.answered }, now), cmds: [ansCmd(card, reply)] };
+      return { m: { ...m2, lastPage: p.id || m.lastPage }, cmds: [ansCmd(card, reply), ...(p.url ? [{ cmd: "app_open_url", url: p.url, page: p.id }] : [])] };
     }
-    return { m: flashNow(m2, f, now), cmds: [{ cmd: "answer", card: card.id, reply }] };
+    return { m: flashNow(m2, f, now), cmds: [ansCmd(card, reply)] };
   }
 
   // the panes with the typed field (fn space, fn a): they take the keys
@@ -187,11 +194,11 @@
       case "state": {
         const agents = Array.isArray(ev.agents) ? ev.agents : [];
         const cards = Array.isArray(ev.cards) ? ev.cards : [];
-        let m2 = { ...m, agents, cards, seen: true, projects: Array.isArray(ev.projects) ? ev.projects : m.projects, pages: Array.isArray(ev.pages) ? sortPages(ev.pages) : m.pages,
+        let m2 = { ...m, agents, cards, seen: true, projects: Array.isArray(ev.projects) ? ev.projects : m.projects, pcards: Array.isArray(ev.projects) ? projCards(ev.projects) : m.pcards, pages: Array.isArray(ev.pages) ? sortPages(ev.pages) : m.pages,
           // the hub's state also lists a week of ended timers (ended_ms, /scheduled): not watching
           timers: Array.isArray(ev.timers) ? ev.timers.filter((t) => t && t.id != null && t.ended_ms == null) : m.timers };
         // the hub dropped a card: forget that it was answered here
-        const ids = new Set(cards.map((c) => c.id));
+        const ids = new Set(allCards(m2).map((c) => String(c.id)));
         m2.answered = Object.fromEntries(Object.keys(m.answered).filter((id) => ids.has(id)).map((id) => [id, true]));
         if (m2.sel >= visibleCards(m2).length) m2.sel = 0;
         if (!m.seen) return none(m2);
@@ -413,6 +420,11 @@
       case "app_icon":
         return none({ ...m, icon: [ev.x, ev.y, ev.w, ev.h].every((n) => Number.isFinite(+n)) ? { x: +ev.x, y: +ev.y, w: +ev.w, h: +ev.h } : null });
       // the hello, once ever (ambient m_5702; amb-mac sends it once and keeps "said hello")
+      // the core's projects rows (S3b): the projects and the cards of those it doesn't hold here
+      case "projects": {
+        if (!Array.isArray(ev.projects)) return none(m);
+        return none({ ...m, projects: ev.projects, pcards: projCards(ev.projects) });
+      }
       case "app_hello":
         return none({ ...m, hello: { at: now } });
       // bise's window (in front, key) holds the cards above its composer: the bar never turns into one
@@ -449,13 +461,13 @@
 
       // ---- the page's own (clicks, the spotlight field)
       case "ui_option": {
-        const card = m.cards.find((c) => c.id === ev.card);
+        const card = allCards(m).find((c) => c.id === ev.card);
         const opt = card && Wd.options(card)[ev.i];
         if (!opt || m.answered[card.id]) return none(m);
         return answer(m, card, opt, now);
       }
       case "ui_open_card":   // a click on a card's `fn + ⏎ open it`
-        return openCard(m, m.cards.find((c) => c.id === ev.card));
+        return openCard(m, allCards(m).find((c) => c.id === ev.card));
       // a card row in fn i or fn 0 (⏎ or a click): that card comes up as the question bar with all
       // its choices (a drafts card: review and send all; lead m_6613), even one he put off
       case "ui_card": {

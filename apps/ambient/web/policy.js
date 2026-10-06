@@ -68,7 +68,8 @@
       case "hello": return { kind: "hello" };
       // a permission ask is opened (until he answers); its refused line is a timed line, 8 s (amb-mac m_5679)
       case "perm": return { kind: v.perm ? "open" : "line" };
-      case "needs": return { kind: "needs", card: asking[0] && asking[0].id };
+      // the card's own id and its project (ids are per hub; amb-mac m_8894 keys its once-per-card rule by both)
+      case "needs": { const c = asking[0]; return { kind: "needs", card: c && (c.cid ?? c.id), ...(c && c.project ? { project: c.project } : {}) }; }
       case "idle": return { kind: "none" };
       // SPEC §0: never for done, failed, a page ready (they live in the menu-bar marble); an
       // answer's line (`cookies has it: yes.`), the morning page, a key's answer, the hub lost do
@@ -82,15 +83,17 @@
   // ---- a card's kind (ambient's composer rule m_8772): an approval acts or leaves (a confirm, a
   // merge, a try, an update, a sign-in, drafts to send); words never approve it, only 1/2. A
   // question (or a card with no kind, the fake core's) takes words.
-  const approval = (c) => !!c && (!!c.batch || !!(c.page && c.page.drafts) || (!!c.kind && c.kind !== "question"));
+  const approval = (c) => !!c && (c.approval === true || !!c.batch || !!(c.page && c.page.drafts) || (!!c.kind && c.kind !== "question"));
   const approvalKind = (c) => (c.batch || (c.page && c.page.drafts) ? "drafts" : c.kind);
   // his talk on the card the glass asks: a question gets it as its answer; an approval's agent gets
   // it as a plain message (main's: bise's usual send) and the card stays. null: the usual send.
   function talkOnCard(c, text) {
     if (!c || !text) return null;
-    if (!approval(c)) return { answer: true, cmd: { cmd: "answer", card: c.id, reply: text } };
+    // a project's card (another hub) answers with its own id and its project (model.js projCards)
+    const pj = c.cid != null ? { project: c.project } : {};
+    if (!approval(c)) return { answer: true, cmd: { cmd: "answer", card: c.cid ?? c.id, reply: text, ...pj } };
     if (!c.agent || c.agent === "main") return null;
-    return { answer: false, cmd: { cmd: "agent_send", agent: c.agent, text, mode: "now" } };
+    return { answer: false, cmd: { cmd: "agent_send", agent: c.agent, text, mode: "now", ...pj } };
   }
 
   // a batch of drafts on one page (amb-core 34703bf0, card.page.drafts, card.batch {count, title,
