@@ -341,6 +341,19 @@ law("environments on bise-proto's worktrees fixture (amb-core e4160bd6): the age
   eq([g().rows[0].sha.text, g().rows[0].sha.tip], ["copied e0f3df5", "copy"]);
 });
 
+law("bise-proto's frozen dev_servers and merged (amb-core 3dac82f3): a server with only a port opens localhost, one not listening yet has no click; merged's lines fill 'merged today'", () => {
+  const w = win();
+  w.open("environments");
+  w.feed({ ev: "dev_servers", project: P.engine, items: [{ agent: "streaming", cmd: "cargo run --bin viewer", port: 8080, up: true }, { agent: "netcode", name: "relay", cmd: "./relay", up: false }] });
+  const g = w.v.groups.find((x) => x.project === P.engine);
+  eq(g.rows.filter((r) => r.kind === "dev").map((r) => [r.name, r.url, r.end, !!r.act]), [["cargo run --bin viewer", "localhost:8080", "running", true], ["relay", "", "not listening yet", false]]);
+  eq(g.rows.find((r) => r.kind === "dev").act, { ev: "ui_env_url", project: P.engine, url: "http://localhost:8080" });
+  // amb-core's merged line (m_8989), by 'you' and an agent
+  w.feed({ ev: "merged", project: P.engine, items: [{ sha: "e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e", title: "perf: sort_unstable in the hot query", by: "perf", at_ms: 1791100400000 },
+    { sha: "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678", title: "fix typo in README", by: "you", at_ms: 1791100100000 }] });
+  eq(S7.tab(w.s, P.engine, "changes").merged.map((c) => [c.sha, c.title, c.meta.split(" · ")[0]]), [["e0f3df5", "perf: sort_unstable in the hot query", "perf"], ["a1b2c3d", "fix typo in README", "you"]]);
+});
+
 law("the fake S7 world speaks S3a's drafts: every event names its project, no event for bise's own", () => {
   const evs = F7.boot();
   eq([...new Set(evs.map((e) => e.ev))], ["worktrees", "dev_servers"]);

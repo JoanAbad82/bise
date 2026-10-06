@@ -52,9 +52,12 @@
     return { kind: "wt", branch: w.branch || (sha ? "detached at " : "detached"), sha, agent: w.agent, what, end, dot, dirty: !!w.dirty,
       act: w.agent ? { ev: "ui_route", project: p.project, agent: w.agent } : { ev: "ui_env_open", project: p.project, app: "editor", path: w.path } };
   }
+  // frozen in bise-proto (amb-core 3dac82f3): {agent, name?, url?, port?, cmd, up}; url and port
+  // are absent while a known server isn't listening yet; a port alone is localhost's
   function serverRow(p, d) {
-    return { kind: "dev", name: d.name || d.cmd || "dev server", url: bare(d.url), end: d.up ? "running" : "stopped", up: !!d.up,
-      act: d.up ? { ev: "ui_env_url", project: p.project, url: d.url } : null };
+    const url = d.url || (d.port ? `http://localhost:${d.port}` : "");
+    return { kind: "dev", name: d.name || d.cmd || "dev server", url: bare(url), end: d.up ? "running" : url ? "stopped" : "not listening yet", up: !!d.up,
+      act: d.up && url ? { ev: "ui_env_url", project: p.project, url } : null };
   }
 
   function view(s) {
