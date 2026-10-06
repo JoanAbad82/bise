@@ -7,13 +7,18 @@ import { useAgents, useArtifacts, useCards } from '@/store';
 import { prefixFirst } from './tokens';
 import { NO_SOURCES, type Choice, type ComposerSources } from './sources';
 
-export function useComposerSources(project: string, extra: Partial<ComposerSources> = {}): ComposerSources {
+// K4 (the TUI's attach.rs): `inView` is the agent the composer sends to; its row says its model
+// and whether that model reads images (`vision`, from bise's model catalog). Images are refused
+// only when the catalog says no (`vision === false`): an unknown model is never refused on a guess.
+export function useComposerSources(project: string, extra: Partial<ComposerSources> = {}, inView?: string): ComposerSources {
   const agents = useAgents(project);
   const cards = useCards(project);
   const made = useArtifacts(project);
   const { files, skills, commands, saveImage } = extra;
   return useMemo<ComposerSources>(() => {
     const live = agents.filter((a) => !a.archived);
+    const target = inView === undefined ? undefined : agents.find((a) => a.name === inView);
+    const noVision = target?.vision === false ? (target.model ?? target.name) : undefined;
     const lists = {
       agent: live.map((a): Choice => ({ value: a.name, desc: a.title })),
       archived: agents.filter((a) => a.archived).map((a): Choice => ({ value: a.name, desc: a.title })),
@@ -26,7 +31,8 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
       commands: commands ?? NO_SOURCES.commands,
       files: files ?? NO_SOURCES.files,
       saveImage: saveImage ?? NO_SOURCES.saveImage,
+      ...(noVision === undefined ? {} : { noVision }),
       choices: (kind, query) => (kind === 'agent' || kind === 'archived' || kind === 'card' ? prefixFirst(lists[kind], query, (c) => c.value) : []),
     };
-  }, [agents, cards, made, files, skills, commands, saveImage]);
+  }, [agents, cards, made, files, skills, commands, saveImage, inView]);
 }

@@ -274,13 +274,15 @@ function History({ project, agent }: { project: string; agent: string }) {
   );
 }
 
+const COMMANDS = { commands: windowCommands };
+
 /** amb-web's composer, aimed at this agent; its props stay stable while the thread moves. */
 const ThreadComposer = memo(function ThreadComposer({ project, agent, busy, to, onStop }: { project: string; agent: string; busy: boolean; to: string; onStop: () => void }) {
   const store = useStore();
   const router = useRouter();
   // the window's own /commands (the screens they open), next to the core's
   // once amb-home's lists land (bar 2.1)
-  const sources = useComposerSources(project, { commands: windowCommands });
+  const sources = useComposerSources(project, COMMANDS, agent);
   const onCommand = useCallback(
     (name: string, args: string) => {
       const r = runWindowCommand(name, args, { project, agent });
