@@ -48,5 +48,14 @@ tool's file-size limit). Run it once from launchd:
 Or point `BISE_HARNESS_ELECTRON_DIST` at a folder holding an Electron.app that is already patched
 (a shared one: `~/.bise/dev/electron-dist/v44.5.1-lsui`).
 
+## Test ids (guarantee 4)
+Checks find things only by `data-testid`. In components, pass the id as the `testId` prop, and the ds puts it on the element.
+- Name: `<area>.<thing>[.<id>]`, lowercase kebab-case parts joined by dots: `composer.editor`, `inbox.card.c-search`,
+  `thread.msg.42`. A sub-part adds `.<i>` (`sub(testId, i)`). Areas are listed in `lint/testid.mjs`: `AREAS`.
+- Lint: `lint/testid.mjs` is the ESLint plugin `bise-testid`. `name` checks literal and template ids. `present`
+  flags what a person can act on without an id: a native control, a click/key/change handler, an interactive
+  role, `contentEditable`. A spread counts as present.
+- The list: `node tests/harness/lint/testids.mjs [--md]` prints every id in `src/**/*.tsx` with its file:line.
+
 ## Coming
-data-testid convention `<area>.<thing>[.<id>]` + its lint · `show me` (any screen, any fixture state, to PNGs and frames) · the macOS VM pass for qa-native.
+`show me` (any screen, any fixture state, to PNGs and frames) · the macOS VM pass for qa-native.
