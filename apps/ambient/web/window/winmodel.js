@@ -74,6 +74,7 @@
   function titleOf(s, r) {
     if (r.screen === "review") return `review · ${r.agent} · ${D.pname(s, r.project)}`;
     if (r.screen === "onboarding") return "welcome to bise";
+    if (r.screen === "notfound") return "not found";
     if (r.screen) return r.screen;
     if (r.project === HOME) return "bise";
     const p = D.pname(s, r.project);
@@ -83,7 +84,7 @@
     if (!r || keyOf(r) === keyOf(s.route)) return s;
     if (history) s = { ...s, back: [...s.back, s.route].slice(-50), fwd: [] };
     s = { ...s, route: r, inbox: null, sel: null, picked: null, finder: null };
-    if (r.screen) {
+    if (r.screen === "notfound") { /* nothing to subscribe: the view says it isn't there */ } else if (r.screen) {
       const e = extOf(r.screen);
       const x = e && root[e[1]];
       if (x && x.enter) { const out = x.enter(s[e[0]] || (x.init && x.init()), r, s); s = { ...s, [e[0]]: out[e[0]] !== undefined ? out[e[0]] : out.s7 }; cmds.push(...(out.cmds || [])); }
@@ -92,7 +93,8 @@
     return s;
   }
   // the route as the shell keeps it for restore (win_title's route, win_open's)
-  const routeOf = (r) => (r.screen === "review" ? `review/${r.project}/${r.agent}` : r.screen ? r.screen
+  const routeOf = (r) => (r.screen === "review" ? `review/${r.project}/${r.agent}` : r.screen === "notfound" ? r.want
+    : r.screen === "settings" && r.page ? `settings/${r.page}` : r.screen ? r.screen
     : r.project === HOME ? "bise" : r.agent === "main" ? `project/${r.project}` : `agent/${r.project}/${r.agent}`);
 
   // a deep link from the shell, the capsule or a card: bise · project/<p> · agent/<p>/<a> · inbox
@@ -100,13 +102,19 @@
   function resolve(s, route) {
     const parts = String(route || "").split("/");
     const proj = (x) => (s.projects.find((p) => p.project === x || p.name === x) || {}).project;
+    // an agent we know isn't in its project (its list came, the name isn't there) is not found
+    const has = (p, a) => !s.agents[p] || s.agents[p].some((x) => x.name === a);
     if (parts[0] === "bise" || parts[0] === "") return { project: HOME, agent: "main" };
     if (parts[0] === "project" && proj(parts[1])) return { project: proj(parts[1]), agent: "main" };
-    if (parts[0] === "agent" && proj(parts[1]) && parts[2]) return { project: proj(parts[1]), agent: parts[2] };
+    if (parts[0] === "agent" && proj(parts[1]) && parts[2] && has(proj(parts[1]), parts[2])) return { project: proj(parts[1]), agent: parts[2] };
     if (parts[0] === "review" && proj(parts[1]) && parts[2]) return { screen: "review", project: proj(parts[1]), agent: parts[2] };
     if (parts[0] === "settings") return { screen: "settings", project: HOME, agent: "main", ...(parts[1] ? { page: parts.slice(1).join("/") } : {}) };
     if (SCREENS.includes(parts[0]) && parts[0] !== "review") return { screen: parts[0], project: HOME, agent: "main" };
-    return null;
+    // the short forms: <project> and <project>/<agent>
+    if (proj(parts[0]) && !parts[1]) return { project: proj(parts[0]), agent: "main" };
+    if (proj(parts[0]) && parts[1] && has(proj(parts[0]), parts[1])) return { project: proj(parts[0]), agent: parts[1] };
+    // anything else is a place that isn't there (yet): its own screen, with the link it came from
+    return route ? { screen: "notfound", project: HOME, agent: "main", want: String(route) } : null;
   }
 
   // entries: a page replaces (newest) or goes before (older); an entry with a known pos replaces

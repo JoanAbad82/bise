@@ -8,7 +8,7 @@
 
   const HOME = "home";
   // a thread's key; a screen (S7's review, artifacts, environments) keys its own composer
-  const keyOf = (r) => `${r.screen ? `${r.screen}:` : ""}${r.project}/${r.agent}`;
+  const keyOf = (r) => `${r.screen ? `${r.screen}${r.want ? `=${r.want}` : ""}:` : ""}${r.project}/${r.agent}`;
 
   // every open card, newest first (the inbox's order: "la plus récente en haut"), minus the ones
   // he answered a moment ago (the core's next `cards` drops them; until then they stay hidden)

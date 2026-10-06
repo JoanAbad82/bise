@@ -190,12 +190,45 @@
     }
   }
 
+  // ---- data-qa: a stable name on everything clickable, for the off-screen harness (amb-tools,
+  // lead m_8397): read from its act, so a row, a tab, an option or a button is named by what it does
+  function qaName(a) {
+    const name = (p) => (p === "home" ? "bise" : p);
+    switch (a.ev) {
+      case "ui_route": return a.agent && a.agent !== "main" ? `route:${name(a.project)}/${a.agent}` : `route:${name(a.project)}`;
+      case "ui_tab": case "ui_tab_i": return `tab:${a.tab || a.i}`;
+      case "ui_pick": return `opt:${a.n}`;
+      case "ui_inbox": return a.card ? `inbox:${a.card}` : "inbox";
+      case "ui_fold": return `fold:${a.pos}`;
+      case "ui_line": return `line:${a.pos}:${a.i}`;
+      case "ui_unquote": return `unquote:${a.i}`;
+      case "ui_find_open": return `find:${a.i}`;
+      case "ui_set_page": return `page:${a.page}`;
+      case "ui_set_pref": return `pref:${a.key}`;
+      case "ui_perm_ask": return `perm:${a.perm}`;
+      case "ui_acct_sign_in": return `sign-in:${a.id}`;
+      case "ui_key_edit": return `key:${a.id}`;
+      case "ui_onb_pick": case "ui_add_pick": return `pick:${a.path}`;
+      case "ui_add_toggle": return `add-choice:${a.key}`;
+      case "ui_set_move": return `move:${a.project}`;
+      case "ui_set_remove": return `remove:${a.project}`;
+      default: return String(a.ev || "").replace(/^ui_/, "").replace(/_/g, "-");
+    }
+  }
+  function qa(rootEl) {
+    for (const n of rootEl.querySelectorAll("[data-act]")) {
+      try { n.setAttribute("data-qa", qaName(JSON.parse(n.getAttribute("data-act")))); } catch (e) { /* not ours */ }
+    }
+  }
+
   // ---- mount: the static frame, then regions redrawn when their HTML changes
   function mount(el, { post, recv: hook }) {
     el.innerHTML = `<div class="w-app b-ui"><aside class="w-side"></aside><main class="b-main w-main"><div class="w-head"></div><div class="w-jobs"></div>` +
       `<div class="w-scroll"><div class="w-thread"></div></div><div class="w-full" hidden></div><div class="w-over" hidden></div><div class="w-find" hidden><div class="b-spot"><div class="in"><input class="tx w-findq" placeholder="find an agent or a project" spellcheck="false"></div><div class="w-findrows"></div></div></div><div class="b-composer w-composer"><div class="w-dock"></div><div class="w-quotes"></div><div class="div"></div>` +
       `<div class="box"><textarea class="in w-field" rows="1" spellcheck="false"></textarea><span class="send off" data-act='{"ev":"ui_send"}'>↑</span></div><div class="keys"></div></div></main><aside class="w-board b-board"></aside></div>`;
     const $ = (sel) => el.querySelector(sel);
+    el.querySelector(".w-field").setAttribute("data-qa", "composer");
+    el.querySelector(".w-findq").setAttribute("data-qa", "finder");
     const R = { side: $(".w-side"), head: $(".w-head"), jobs: $(".w-jobs"), thread: $(".w-thread"), scroll: $(".w-scroll"), dock: $(".w-dock"), quotes: $(".w-quotes"),
       div: $(".w-composer .div"), field: $(".w-field"), box: $(".w-composer .box"), send: $(".w-composer .send"), keys: $(".w-composer .keys"), board: $(".w-board"), app: $(".w-app"),
       full: $(".w-full"), over: $(".w-over"), find: $(".w-find"), findq: $(".w-findq"), findrows: $(".w-findrows") };
@@ -214,6 +247,7 @@
       if (last[name] === html) return false;
       last[name] = html;
       R[name].replaceChildren(...box.childNodes);
+      qa(R[name]);
       return true;
     }
 
@@ -253,6 +287,7 @@
       R.send.className = `send ${v.composer.send}`;
       R.send.textContent = v.composer.send === "stop" ? "■" : "↑";
       R.send.dataset.act = JSON.stringify(v.composer.send === "stop" ? { ev: "ui_stop" } : { ev: "ui_send" });
+      R.send.dataset.qa = v.composer.send === "stop" ? "stop" : "send";
       el.querySelector(".w-composer").classList.toggle("is-disabled", v.composer.disabled);
       R.keys.textContent = v.composer.keys;
       put("board", board(v));

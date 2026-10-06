@@ -103,7 +103,7 @@ law("deep links from the shell: project/<name>, agent/<name>/<agent>, inbox", ()
   w.feed({ ev: "win_open", route: "inbox" });
   assert.equal(w.v.composer.dock.mode, "inbox");
   w.feed({ ev: "win_open", route: "nowhere/at/all" });
-  eq(w.s.route, { project: P.engine, agent: "main" });
+  eq(w.s.route, { screen: "notfound", project: F.HOME, agent: "main", want: "nowhere/at/all" });
 });
 
 // ---- bise's thread
@@ -399,6 +399,22 @@ law("⌥⏎ queues his words for the end of a working agent's turn; the line say
   eq(F.respond(r.cmds[0])[0][0], 2500);
   w.go(P.storefront, "promo");
   assert.doesNotMatch(w.v.composer.keys, /⌥⏎/);
+});
+
+law("every route change names the window with its route; a link to a place that isn't there opens 'not found' with that link", () => {
+  const w = win();
+  w.feed({ ev: "win_open", route: "telemetry/p99" });
+  eq([w.s.route.screen, w.v.head.t1, w.v.head.t2, w.v.thread.empty.b], ["notfound", "not found", ["telemetry/p99"], "nothing here"]);
+  eq(w.sent.filter((c) => c.cmd === "win_title").pop(), { cmd: "win_title", text: "not found", route: "telemetry/p99" });
+  w.feed({ ev: "win_open", route: "telemetry/alerts" });
+  eq(w.s.route, { project: P.telemetry, agent: "alerts" });
+  w.feed({ ev: "win_open", route: "storefront" });
+  eq(w.s.route, { project: P.storefront, agent: "main" });
+  w.key(",", { meta: true });
+  eq(w.sent.filter((c) => c.cmd === "win_title").pop(), { cmd: "win_title", text: "settings", route: "settings" });
+  eq(w.sent.filter((c) => c.cmd === "win_title").map((c) => c.route), ["bise", "telemetry/p99", `agent/${P.telemetry}/alerts`, `project/${P.storefront}`, "settings"]);
+  // no cmd for a place that isn't there: nothing to subscribe
+  eq(w.sent.filter((c) => c.cmd === "subscribe" && c.agent === "p99"), []);
 });
 
 // ---- the core's pages and live entries

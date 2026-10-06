@@ -56,6 +56,7 @@
   function header(s) {
     const r = s.route;
     const all = D.allCards(s).length;
+    if (r.screen === "notfound") return { t1: "not found", t2: [r.want], acc: -1, end: [] };
     if (r.project === HOME) {
       const working = s.projects.reduce((n, p) => n + projectWorking(s, p.project), 0);
       const fresh = Object.values(s.arts).flat().filter((a) => a.new).length;
@@ -172,6 +173,7 @@
   }
 
   function thread(s) {
+    if (s.route.screen === "notfound") return { rows: [], empty: { b: "nothing here", s: `no project or agent at “${s.route.want}”. ⌘K finds one by its name; ⌘0 goes back to bise.` } };
     const t = s.threads[keyOf(s.route)];
     if (!t || (t.loading && !t.entries.length)) return { loading: true, rows: [] };
     const rows = [];
