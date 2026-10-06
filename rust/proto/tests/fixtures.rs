@@ -117,3 +117,17 @@ fn the_fn_context_round_trips() {
     let c: FnContext = serde_json::from_str(r#"{"app":"Mail","later":"a field of a newer app"}"#).unwrap();
     assert_eq!(c, FnContext { app: Some("Mail".into()), ..Default::default() });
 }
+
+/// bise-mac-helper's lines (architect m_9461): every line of both
+/// directions round-trips, every tag has a line, an unknown tag stays
+/// unknown. (Its own pipe: a helper's `error` is no hub's `error`.)
+#[test]
+fn the_helper_lines_round_trip_and_cover_every_tag() {
+    use bise_proto::helper::{HelperCmd, HelperEv};
+    let t = round_trip("helper_ev.jsonl", "ev", HelperEv::decode, |m| !matches!(m, HelperEv::Unknown { .. }), HelperEv::to_value);
+    covers(&t, HelperEv::TAGS, "helper_ev.jsonl");
+    let t = round_trip("helper_cmd.jsonl", "cmd", HelperCmd::decode, |m| !matches!(m, HelperCmd::Unknown { .. }), HelperCmd::to_value);
+    covers(&t, HelperCmd::TAGS, "helper_cmd.jsonl");
+    let e = HelperEv::decode(r#"{"ev":"pulse","n":1}"#).unwrap();
+    assert!(matches!(&e, HelperEv::Unknown { tag, .. } if tag == "pulse"));
+}
