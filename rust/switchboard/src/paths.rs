@@ -17,37 +17,9 @@ pub struct Paths {
     pub worktrees: PathBuf,
 }
 
-/// FNV-1a, 64 bits: a stable id for a workspace path.
-fn fnv1a(s: &str) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for b in s.bytes() {
-        h ^= b as u64;
-        h = h.wrapping_mul(0x0100_0000_01b3);
-    }
-    h
-}
-
+/// The hub id of a workspace: `bise_home::hub_id` (one owner).
 pub fn workspace_id(workspace: &Path) -> String {
-    let base = workspace
-        .file_name()
-        .map(|s| s.to_string_lossy().to_string())
-        .unwrap_or_else(|| "root".to_string());
-    let base: String = base
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                c
-            } else {
-                '-'
-            }
-        })
-        .take(32)
-        .collect();
-    format!(
-        "{}-{:08x}",
-        base,
-        fnv1a(&workspace.to_string_lossy()) as u32
-    )
+    bise_home::hub_id(workspace)
 }
 
 /// The home workspace (docs/ambient-pages.md §5.1): `~/bise`, a plain
