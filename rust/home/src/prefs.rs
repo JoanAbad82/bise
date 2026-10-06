@@ -43,6 +43,9 @@ pub const EXCLUDED_APPS_SEED: &[(&str, &str)] = &[
     ("com.apple.MobileSMS", "Messages"),
 ];
 
+/// The prefs event's names of the seed's apps (`for_window`).
+pub const APP_NAMES: &str = "app_names";
+
 /// The `excluded_apps` value as read from its slot: his list when set
 /// (an empty list included: he cleared it), else the seed.
 pub fn excluded_apps(v: Option<Value>) -> Vec<String> {
@@ -110,11 +113,14 @@ pub fn set_dotted(obj: &Value, key: &str, value: Value) -> Result<Value, String>
 }
 
 /// What the window reads of `prefs.json` (`ev: prefs`): its object as is,
-/// with `excluded_apps` resolved ([`excluded_apps`]: the seed when unset).
+/// with `excluded_apps` resolved ([`excluded_apps`]: the seed when unset)
+/// and `app_names`, the seed's id -> name (read-only: not a key the
+/// window sets), so the window names the apps from this one table.
 pub fn for_window(obj: Option<Value>) -> Value {
     let mut v = obj.filter(Value::is_object).unwrap_or_else(|| Value::Object(Default::default()));
     let apps = excluded_apps(v.get(Pref::ExcludedApps.key()).cloned());
     v[Pref::ExcludedApps.key()] = Value::from(apps);
+    v[APP_NAMES] = Value::Object(EXCLUDED_APPS_SEED.iter().map(|(id, name)| (id.to_string(), Value::from(*name))).collect());
     // a fresh home has no key: not onboarded yet (the window's first
     // launch shows on `false`; amb-tools m_9345)
     if v.get(Pref::Onboarded.key()).is_none_or(Value::is_null) {

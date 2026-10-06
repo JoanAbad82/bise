@@ -1,0 +1,9 @@
+/* settings (src/settings, amb-home): ds tokens only; the frame is the ds's .b-set */
+.settings { height: 100%; min-height: 0; outline: none; }
+.settings .b-set { height: 100%; }
+.settings-row-acts { display: inline-flex; align-items: center; gap: var(--s-1); }
+.settings-key { margin-top: var(--s-3); max-width: 420px; }
+.settings-sheet { margin-top: var(--s-4); padding: var(--s-4); border-radius: var(--r-3); background: var(--c-raised); box-shadow: var(--e-1); }
+.settings-sheet-h { font-size: var(--t-15); color: var(--c-text); margin-bottom: var(--s-1); }
+.settings-sheet .b-field { flex: 1; }
+.settings-sheet-acts { display: flex; justify-content: flex-end; margin-top: var(--s-3); }

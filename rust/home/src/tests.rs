@@ -472,4 +472,8 @@ fn the_window_sets_known_prefs_by_dotted_key_and_keeps_their_types() {
     assert_eq!(prefs::for_window(Some(json!({"excluded_apps": []})))["excluded_apps"], json!([]));
     assert_eq!(prefs::for_window(None)["onboarded"], json!(false), "a fresh home: not onboarded");
     assert_eq!(prefs::for_window(Some(json!({"onboarded": true})))["onboarded"], json!(true));
+    // the seed's names ride along, one table for the window; never a key it sets
+    assert_eq!(w["app_names"]["com.apple.MobileSMS"], json!("Messages"));
+    assert_eq!(w["app_names"].as_object().map(|m| m.len()), Some(prefs::EXCLUDED_APPS_SEED.len()));
+    assert!(prefs::set_dotted(&o, "app_names", json!({})).is_err());
 }
