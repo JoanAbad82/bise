@@ -23,6 +23,9 @@ html.app, html.app body { overflow: hidden; }
   transition: opacity .12s var(--ease-in), transform .12s var(--ease-in); }
 .bar.on { opacity: 1; transform: none; pointer-events: auto;
   transition: opacity .16s var(--ease-out), transform .2s var(--ease-out); }
+/* at the bottom of the screen (app_anchor bottom: fn, the cards) it rises: +4 px -> 0 */
+.bar.rise { transform: translateY(4px); }
+.bar.rise.on { transform: none; }
 .still .bar, .still .bar.on { transform: none; transition: opacity .15s linear; }
 /* the first frames of a show: the glass's height comes as it is (the rows too: ui.js draws them
    without their rise) */

@@ -1733,6 +1733,14 @@ law("desktop S8 menu-bar dropdown (v9): app_menu on opens it under the pearl: '3
   eq(M.step(m, { ev: "app_menu", on: false }, 70).m.pane, null);
 });
 
+law("desktop S8: app_anchor says where the bar sits (top, bottom, menu); the view carries it so the bar rises from the bottom", () => {
+  let m = M.step(M.init(), { ev: "app_anchor", at: "bottom" }, 0).m;
+  assert.equal(M.view(m, 10).anchor, "bottom");
+  m = M.step(m, { ev: "app_anchor", at: "menu" }, 20).m;
+  assert.equal(M.view(m, 30).anchor, "menu");
+  assert.equal(M.view(M.step(m, { ev: "app_anchor", at: "side" }, 40).m, 50).anchor, null);
+});
+
 // the desktop window's laws (window/check-win.mjs) run with the capsule's
 { const w = (await import("./window/check-win.mjs")).results(); pass += w.pass; fail += w.fail; }
 { const w = (await import("./window/check-setup.mjs")).results(); pass += w.pass; fail += w.fail; }

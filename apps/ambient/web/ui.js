@@ -164,6 +164,8 @@
   function render(v, s) {
     host.classList.toggle("still", !!v.still);
     bar.dataset.state = v.state;
+    // at the bottom of the screen (fn, the cards) the bar rises up; elsewhere it drops in
+    bar.classList.toggle("rise", v.anchor === "bottom");
     const on = !v.hidden && !!s.head;
     if (on && !bar.classList.contains("on")) {
       bar.classList.add("appear");

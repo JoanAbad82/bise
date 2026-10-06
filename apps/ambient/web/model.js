@@ -416,6 +416,10 @@
       // a pushed card's footer shows the plain keys then, fn chords before (ambient m_6519)
       case "app_focused":
         return none({ ...m, focused: !!ev.on });
+      // where the app puts the bar (amb-mac m_8514): top (the spotlight), bottom (fn, the cards:
+      // bottom-centre), menu (under the pearl); the bar rises from below when it sits at the bottom
+      case "app_anchor":
+        return none({ ...m, anchor: ["top", "bottom", "menu"].includes(ev.at) ? ev.at : null });
       // the menu-bar icon's rect in the page's CSS px (the capsule grows out of it, SPEC §0)
       case "app_icon":
         return none({ ...m, icon: [ev.x, ev.y, ev.w, ev.h].every((n) => Number.isFinite(+n)) ? { x: +ev.x, y: +ev.y, w: +ev.w, h: +ev.h } : null });
@@ -727,6 +731,7 @@
       unseen: m.hidden || m.visible === false,   // nobody sees it: no orb frames
       icon: m.icon || null,  // the menu-bar icon (the capsule grows out of it)
       radius: m.radius,     // the capsule's and the glass's corners
+      anchor: m.anchor || null,  // top | bottom | menu: where the app put the bar (its appear follows)
       kiss: false,
       // the panel has the keys, one source for every footer: the app sends app_focused exactly when
       // the bar takes or gives back the keys (amb-mac m_8112), and none reach it while hidden
