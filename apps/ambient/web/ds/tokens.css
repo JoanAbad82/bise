@@ -98,3 +98,12 @@
   --ease-out: cubic-bezier(.2, 0, 0, 1); --ease-io: cubic-bezier(.4, 0, .2, 1); --ease-pop: cubic-bezier(.34, 1.4, .64, 1);
 }
 @media (prefers-reduced-motion: reduce) { :root { --d-fast: 0ms; --d-base: 120ms; --d-slow: 160ms; } }
+/* light: softer raised surfaces and shadows (amb-win's S6 review) */
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --c-shadow: color-mix(in srgb, var(--p-shadow) 30%, transparent);
+  --c-raised: color-mix(in srgb, var(--p-raised) 60%, transparent);
+} }
+[data-theme="light"] {
+  --c-shadow: color-mix(in srgb, var(--p-shadow) 30%, transparent);
+  --c-raised: color-mix(in srgb, var(--p-raised) 60%, transparent);
+}
