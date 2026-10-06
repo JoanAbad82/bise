@@ -140,6 +140,139 @@ qa-type writes the first cut of `inbox/cmd-i`, `thread/send` and `spotlight/answ
 | O.5 | fn hold from rest with another app frontmost (old check: listens in under 300 ms) | hold fn while in another app | the capsule listens in under 300 ms; the app doesn't steal focus | amb-mac (helper), amb-web (capsule) | qa-native `native/fn-from-rest` |
 | O.6 | every button takes a real click, with hover (round 10 audit) | click every control once | each one acts on the first click, with bise not frontmost | each chunk on its own surfaces | qa-flows `app/clicks` |
 
+## T: the terminal's gaps (tui-parity's exhaustive audit)
+
+tui-parity read all of `rust/tui` against `apps/desktop` in `docs/terminal-parity.md` (b920338e). It
+found 294 items: 69 MISSING, 45 part missing and 3 that differ. Every MISSING item and every missing
+part is a row below. Each row keeps tui-parity's id (C, K, E, I, F, V, M, W, S, N, L, B), so it doesn't
+clash with the bar's S.n setup rows. The source lines (file:line) are in that doc.
+
+The owners are ambient-lead's split (m_9976). When a row needs a typed feed event or command from the
+core, the chunk column names amb-core too.
+
+These rules hold for every row:
+
+- A key shown in the key list (`settings/keys.ts`) with no handler is a fail. Today ten of them have
+  none: ⌘0, ⌘1…9, ⌥0…9, ⌘K, ⌘D, ⌘⇧A, ⌘E, ⌘/ and ⌘.
+- The real thread's composer gets the same sources as the lab (commands, files, skills). Today
+  `thread/ThreadScreen.tsx:151` passes none, so 2.1, 2.2 and 2.3 fail in the thread until they are
+  wired.
+
+### On purpose (ambient-lead's call on the 3 that differ; the user can override)
+
+| id | terminal | the app, on purpose | hand test | pass | chunk | check |
+|---|---|---|---|---|---|---|
+| K7 esc during a turn | esc never interrupts; it puts the draft away | esc **stops** the turn (the window has no other visible stop; Codex and Claude do the same); the TUI's own interrupt key works too | esc during a long answer; then the TUI's interrupt key during another | both stop the turn in under 1 s (⛔6), and the composer keeps its text | amb-win | qa-flows `thread/interrupt` |
+| I3 inbox walk | ←/→ and ctrl+n/ctrl+p walk the items | ↑/↓ walk the items and ←/→ the options (a vertical list), **plus** ctrl+n/ctrl+p as in the TUI | ⌘I with 3 items: ↑↓, ←→, ctrl+n, ctrl+p | each key moves as said, and the key list shows each one | amb-home | qa-flows `inbox/keys` |
+| B21 esc in the / popup | esc clears the /query; the @ and $ popups keep the text | the same as the TUI: esc **clears** the /query (today the app keeps it, `composer/Brain.tsx:366`) | type "/arch", press esc; type "@ap", press esc | after /: the field is empty; after @: "@ap" stays | amb-web | qa-type `composer/slash` |
+
+### The composer (amb-web)
+
+| id | terminal | hand test | pass | chunk | check |
+|---|---|---|---|---|---|
+| K3 ⏎ inside a code fence | ⏎ in an open ``` block is a new line; the message sends only once the block is closed | type ``` and a line, ⏎, another line, then ``` and ⏎ | the first ⏎ adds a line; only the ⏎ after the closing ``` sends | amb-web | qa-type `composer/code-fence-enter` |
+| K4 / B6 images to a model that reads none | refused with the no-vision line; the message and its images stay | with a text-only model in view, send a message with an image | one line says that model can't read images; nothing is sent; the draft and the chip stay | amb-web, amb-core (the model's vision flag) | qa-type `composer/no-vision` |
+| K11 tab on a list item | indents a markdown list item | type "- a", ⏎, "b", then tab | "b" goes one level in, and the caret stays | amb-web | qa-type `composer/list-indent` |
+| K12 backspace at the start of a list item | outdents it | on that indented item, caret at its start, backspace | it goes one level out; one more backspace removes the bullet | amb-web | qa-type `composer/list-indent` |
+| K23 undo with nothing left | says "no undo: an agent may already have acted…" | send a message, then ⌘Z in the empty field | that line shows once, and nothing else changes | amb-web | qa-type `composer/no-undo` |
+| E3 subword moves | ctrl+⌥←/→ moves by camelCase, snake_case, kebab-case and digits | in "fooBar_baz-qux2", ctrl+⌥→ four times | the caret stops at Bar, baz, qux and 2 | amb-web | qa-type `composer/subword` |
+| E9 subword deletes | ctrl+⌥⌫ / ctrl+⌥⌦ delete one subword | at the end of "fooBar", ctrl+⌥⌫ | "foo" is left | amb-web | qa-type `composer/subword` |
+| E21 folders in the @ popup | → goes into a folder; ← or ⌫ on `@dir/` goes one folder up | "@src", → on src/, then ← | it lists src/'s files, then goes back up a level | amb-web, amb-core (the file index) | qa-type `composer/at-folders` |
+| E22 `:name:` emoji | `:tada:` becomes 🎉 | type ":tada:" | 🎉 in the field | amb-web | qa-type `composer/emoji` |
+| W13 the emoji popup | ":cl" lists the matching emoji | type ":cl", ↓, ⏎ | a list filters as he types; ⏎ inserts the emoji | amb-web | qa-type `composer/emoji` |
+| B8 @ ranking memory | a path he picked ranks first next time | pick src/app.rs with "@ap", then type "@ap" again | src/app.rs is first | amb-web | qa-type `composer/at-files` |
+| B9 / W8 live markdown | lists go on after ⏎, code lines keep their indent, ``` blocks are colored as he types | type "- a⏎", then a ```rust block with an indented line | the next bullet comes by itself; the indent stays; the block is colored, and no node is replaced outside the line he types (⛔1) | amb-web | qa-type `composer/live-markdown` |
+| W9 the key bar | the keys of the current mode (rest, selection, voice), and a tip every 5 minutes | look at the key bar at rest, with text selected in the thread, and in voice mode | the keys change with the mode, and each one shown works | amb-web | qa-type `composer/keybar` |
+| C45 `steer …` / `say …` | the prefix is stripped before the line runs | send "say hello" | main gets "hello" | amb-web, amb-core | qa-type `composer/prefixes` |
+
+### The thread, its rows and states, the window keys (amb-win)
+
+The rows need typed feed events from amb-core (thinking, compaction, usage and context, a failed turn
+and why, not delivered, landed, PR news, artifacts, scheduled, agent folds, answered for you, notices,
+model and effort, hub confirmations). Each such event gets a fixture the UI replays (guarantee 3).
+
+| id | terminal | hand test | pass | chunk | check |
+|---|---|---|---|---|---|
+| S1 working, turn time | the gust, "working · 1m" | send a long ask | the working state shows its turn time, ticking | amb-win, amb-core | qa-flows `thread/states` |
+| S2 starting | its own frame while an agent starts | /new an agent | "starting" shows until its first turn | amb-win, amb-core | qa-flows `thread/states` |
+| S3 waiting on someone | "⋯ waiting on docs" | an agent waits on another | its row and thread say who it waits on | amb-win, amb-core | qa-flows `thread/states` |
+| S8 thinking | "thought for Ns", folded; a click or ctrl+o opens it | ask something that makes the model think | a folded "thought for Ns" row that opens on a click | amb-win, amb-core | qa-flows `thread/rows` |
+| S9 tool calls | one row per call: description, state (∿ 12s, ✓ 0.3s, ✗ exit 1), the first error line, the code and its output when open | ask for a command that fails | one row per call with its state and time; the failing one shows its first error line; opening it shows the code and the output | amb-win, amb-core | qa-flows `thread/rows` |
+| S12 compaction | "≡ compacting", then the summary folded | /compact | the compacting state, then a folded summary that opens | amb-win, amb-core | qa-flows `thread/rows` |
+| S13 usage and context | the context gauge ("18k · 2%") and prices | a few turns, then look | the gauge shows and matches the TUI on the same hub | amb-win, amb-core | qa-flows `thread/rows` |
+| S14 failed or interrupted, and why | "failed: …", "interrupted by …" | make a turn fail (the fake provider errors) | a row says it failed and why | amb-win, amb-core | qa-flows `thread/rows` |
+| S15 / K22 / B20 not delivered | "✗ not delivered: {name} stopped. ⏎ send again · esc drop" | send to an agent that stopped | that row, with ⏎ to resend and esc to drop; the text is never lost | amb-win, amb-core | qa-flows `thread/not-delivered` |
+| S16 agent-to-agent messages | shown, folded, or "▸ 4 messages between 2 agents" | two agents talk | the run folds into one row that opens | amb-win, amb-core | qa-flows `thread/rows` |
+| S17 answered for you by main | ":* docs asked: v1 or v2? · i answered: v2 ▸", which opens to the why | main answers an agent's question | that row, and it opens to the why | amb-win, amb-core | qa-flows `thread/rows` |
+| S20 / M12 landed | "± 3 files +42 −18 a1b2c3d"; a click opens the diff | an agent lands | that row; a click opens the review on that diff | amb-win, amb-core | qa-flows `thread/rows` |
+| S21 PR news | "↑ #412 changes asked · dark-mode is on it", with the number linked | a fake PR event | that row; the number opens the PR | amb-win, amb-core | qa-flows `thread/rows` |
+| S22 / M13 artifacts | a "↗ title · kind · v3" chip that opens it | an agent registers a file and a link | a chip for each one, not only for pages; ↗ opens each in its app | amb-win, amb-core | qa-flows `thread/rows` |
+| S23 scheduled | "◷" when a timer is set, runs and ends | set an `sb every` timer for 1 min | the three lines show | amb-win, amb-core | qa-flows `thread/rows` |
+| S25 notices | Warn, Err and Info lines (e.g. "the inbox is empty") | trigger a warning on the fake hub | a notice row of the right kind | amb-win, amb-core | qa-flows `thread/rows` |
+| S29 / L19 computer use, live | an agent drives an app; "you took the wheel · ⏎ give it back"; stopped until he writes | a fake computer-use agent, then he moves the mouse | the live mark, the took-the-wheel line, and ⏎ gives it back | amb-win, amb-core | qa-flows `thread/computer-use` |
+| S32 / C47 an archived agent | its feed is history only; a line to it is refused | open an archived agent | no composer that sends; a send attempt says "history only" | amb-win | qa-flows `agents/archived` |
+| S33 the no-vision line in the thread | the refusal line, with the message kept | as K4 | the line shows in the thread | amb-win | qa-type `composer/no-vision` |
+| S36 one-time hints | the first agent, the first card, … once per user | a fresh throwaway HOME: start the first agent | its hint shows once, never again after a restart | amb-win | qa-flows `thread/hints` |
+| S40 / W3 the divider | "you → main · model · effort · approvals mode · state · context" | look under the thread | the model, effort, approvals mode, state, turn time and context are all there, and they match the TUI | amb-win, amb-core | qa-flows `thread/divider` |
+| W2 the top edge | where he is, the counts, and "↗ designer · features update" for a new artifact | an agent makes an artifact | the counts and the new-artifact line show | amb-win, amb-core | qa-flows `thread/top-edge` |
+| W4 / K14 / K16 the agents panel | numbered for ⌥1-9, a status glyph, the turn time, who it waits on; ⌥0 is main; alt+↑/↓ select | 3 agents: ⌥2, ⌥0, alt+↓ | the numbers show; ⌥2 opens agent 2 and ⌥0 main; alt+↓ selects the next one | amb-win | qa-flows `agents/panel-keys` |
+| W5 worktree sections | a worktree 2+ agents share is a section; an agent alone carries its mark | 2 agents in one worktree, 1 alone | the section and the mark show (the environments route says "not yet" today) | amb-win, amb-core | qa-flows `agents/worktrees` |
+| W6 / K18 preview | space on a selected agent shows its feed in place | select an agent, then space | its feed shows without entering it; space again closes it | amb-win | qa-flows `agents/preview` |
+| W7 / K24 the inbox strip | its own box above the divider, numbered for ctrl+1-9 | 2 items waiting; ctrl+2 | the strip shows in the thread; ctrl+2 opens item 2 | amb-win (strip), amb-home (items) | qa-flows `inbox/strip` |
+| W11 artifacts in @ | the @ popup lists artifacts by their token too | type "@pricing" | the pricing page shows in the list and goes into the message | amb-win, amb-core | qa-flows `thread/at-artifacts` |
+| W14 / V1 the agent palette | find any agent by name, archived ones too; ↑↓ ⏎ esc | ⌘K, type part of a name | the palette filters, and ⏎ opens; ⌘K is listed and works | amb-win | qa-flows `agents/palette` |
+| V3 the help overlay | the key list, filtered as he types; tab goes between help and shortcuts | open it and type "inbox" | only the matching keys show | amb-win | qa-flows `settings/keys` |
+| C15 / W20 / V6 any branch's diff | /diff <branch>, a branch picker; ctrl+g, ↑↓, pgup/pgdn, tab in the panel | /diff some-branch; then the keys | that branch's diff shows; each key moves as in the TUI | amb-win, amb-core | qa-flows `review/diff` |
+| V7 / L11 / B7 quote diff lines | drag or shift+↑↓ over diff lines, then type: a "src/a.rs:12-14 · 3 lines" chip | select 3 lines in a diff and type | the chip carries its file and lines; the agent answers about them | amb-win, amb-web (chip) | qa-flows `review/quote` |
+| F1 / F2 fold and unfold | ctrl+o opens or closes everything folded; space opens the selected one | ⌘E (as listed), then space on one row | everything opens or closes; space toggles the one selected | amb-win | qa-flows `thread/folds` |
+| F5 / M2 / N11 / B12 back to the bottom | the view stays put while scrolled up; a bar shows "N unseen"; a click or End goes back | scroll up during a turn | the view doesn't move; the bar counts the new rows; End or a click goes to the tail | amb-win | qa-flows `thread/scroll` |
+| F7 / M8 / B13 copy a code block | ctrl+y or a click copies the block, without borders or line numbers | hover a block, click copy; then ctrl+y | the clipboard holds just the code | amb-win | qa-flows `thread/code-copy` |
+| M4 / B14 file paths | a file path in the feed is a link that opens in his editor | click "src/app.rs:12" in an answer | the file opens at that line | amb-win, amb-mac (open) | qa-flows `thread/file-links` |
+| M14 turn time on hover | hovering a turn shows its time | hover an old turn | its time shows | amb-win | qa-flows `thread/hover` |
+| B11 long messages fold | a long message of his folds, and opens on click | send 80 lines | it folds, and a click opens it whole | amb-win | qa-flows `thread/rows` |
+| B15 code blocks | a box with the language, highlighted | an answer with a rust block | the language shows and the code is highlighted | amb-win | qa-flows `thread/answers` |
+| K2 ⏎ on an empty composer | with an agent selected, enters it; gives a stopped computer-use agent back the wheel; signs in again after expiry | each of the three, with an empty field | ⏎ does that one act | amb-win, amb-home (sign-in) | qa-flows `thread/empty-enter` |
+
+### Inbox, settings, sign-in, approvals, first run (amb-home)
+
+| id | terminal | hand test | pass | chunk | check |
+|---|---|---|---|---|---|
+| I6 / B3 a draft per inbox item | each item keeps his typed answer | type half an answer on item 1, go to item 2, come back | the half answer is still there | amb-home | qa-flows `inbox/drafts` |
+| I8 folded parts | ctrl+o opens an item's folded parts | an item with a long brief | ctrl+o opens and closes it | amb-home | qa-flows `inbox/keys` |
+| I9 / C46 / S30 hub confirmations | a y/n question in the feed (e.g. archive a working agent); y, n or esc | archive a working agent | the question shows; y archives, n keeps it, esc puts it off | amb-home, amb-core | qa-flows `inbox/confirm` |
+| N14 / L8 answer by voice | `heard "the first one" → 1` | the fake mic says "the first one" on a card | option 1 is picked, and the line shows what was heard | amb-home, amb-web (capsule) | qa-native `voice/answer-card` |
+| V8 / W21 approval rules | the mode, the checker, the saved rules of this repo; remove a rule | open approvals, remove one rule | the rule is gone in the TUI too | amb-home, amb-core | qa-flows `settings/approvals` |
+| V14 / S28 / L2 expired ChatGPT sign-in | the agents it stopped wait; "⏎ sign in again"; c copies the link | expire the fake subscription | a line says so; sign-in again in the app; the waiting agents go on | amb-home, amb-core | qa-native `setup/sign-in` |
+| L5 a model with no key | /model x opens that provider's setup, then runs the line | pick a model whose provider has no key | the provider's setup opens, then the model is set | amb-home | qa-flows `settings/models` |
+| V17 effort per role | the roles screen sets a model and an effort per role | set main's effort | the TUI's /models shows the same | amb-home, amb-core | qa-flows `settings/models` |
+| L1 / M18 the first-run text | "show me what you can do" fills the composer, selected, and doesn't send | first run in a fresh HOME, click it | the text is in the composer, selected, and nothing is sent | amb-home | qa-flows `setup/welcome` |
+| L25 / S37 the demo | the built-in demo with a tip per step | start the demo | a tip shows at each step | amb-home | qa-flows `setup/demo` |
+
+### Commands still missing (amb-home's commands item)
+
+| id | terminal | hand test | pass | chunk | check |
+|---|---|---|---|---|---|
+| C3 /new --with-changes | moves his uncommitted changes into the new worktree | change a file, then /new -w --with-changes x: do it | the new agent's worktree has the change, and his tree is clean | amb-home, amb-core | qa-flows `commands/new` |
+| C13 / L15 /artifacts add | registers a path or link for the agent in view | /artifacts add https://x.test | it shows in /artifacts and as a chip | amb-home, amb-core | qa-flows `commands/artifacts` |
+| C40 /cancel, /undo | says there is no undo: tell main the change instead | /undo | that line; nothing goes to the agent as text | amb-home | qa-flows `commands/undo` |
+| C42 / L14 /flow pr\|trunk | the repo's dev flow: land by PR or on trunk | /flow pr, then /flow | it is set, and /flow says which | amb-home, amb-core | qa-flows `commands/flow` |
+
+### The mac shell and voice with the agent in view (amb-mac)
+
+| id | terminal | hand test | pass | chunk | check |
+|---|---|---|---|---|---|
+| W33 / N10 counts outside the app | the tab title "#2 ↗1 ●3 · harness" | 2 items waiting, the window in the back | the dock badge and the window title show the counts | amb-mac | qa-native `native/badge` |
+| W25 / V13 / K26 / M16 the terminal panel | a real shell in the workspace, kept while hidden; ctrl+` toggles it; drag resizes | ctrl+`, run `ls`, hide it, show it | the shell is in the workspace and kept; every key goes to it; it resizes | amb-mac | qa-native `native/terminal-panel` |
+| V12 / W24 / L21 / N13 voice mode with the agent in view | ctrl+r twice: talk with that agent, its answer said aloud, mute, type instead, cut in | in an agent's view, start voice mode, say a line (fake mic) | the line reaches that agent, not main; the answer is spoken (fake speaker) sentence by sentence; mute and type instead work | amb-mac, amb-web | qa-native `voice/agent-in-view` |
+
+### The design system (no owner named; amb-kit)
+
+| id | terminal | hand test | pass | chunk | check |
+|---|---|---|---|---|---|
+| N2 color alone | NO_COLOR: every color cue has a plain stand-in | turn on macOS increase contrast | every state still reads without its color (a glyph or a word) | amb-kit | qa-type `ds/contrast` |
+
+B16 (how a narrow window lays out) was not checked by tui-parity; ambient-pm checks it on the hand pass.
+
 ## Order
 
 ⛔1–⛔6 first, with ⛔1s and ⛔1p: they are his 7 bugs. Then 2.1–2.7, then S.1–S.5 (no one without a
