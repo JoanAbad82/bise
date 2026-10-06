@@ -6,7 +6,7 @@
 // re-renders only when the route changes. Every list below reads the store
 // through its own per-key hooks, so an event re-renders the rows it
 // touches, never the shell, the sidebar or the composer.
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
 import { formatRoute, startRouteOf, type Route } from './route';
 import { useMainRoutes, useMenuRouting } from './menu';
@@ -16,6 +16,9 @@ import { useProjects } from '@/store';
 import { InboxScreen } from '@/inbox';
 import { SettingsScreen } from '@/settings';
 import { OnboardingScreen, useFirstLaunch } from '@/setup';
+import { AgentsScreen } from '@/agents/AgentsScreen';
+import { ChangesScreen } from '@/review/ChangesScreen';
+import { ReviewScreen } from '@/review/ReviewScreen';
 import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
 import { Sidebar } from './Sidebar';
@@ -74,6 +77,14 @@ function ScreenOf({ route }: { route: Route }) {
       return <BiseThread />;
     case 'thread':
       return <ProjectThread project={route.project} agent={route.agent} />;
+    case 'agents':
+      return <Known project={route.project}>{(name) => <AgentsScreen project={route.project} projectName={name} />}</Known>;
+    case 'changes':
+      return <Known project={route.project}>{() => <ChangesScreen project={route.project} />}</Known>;
+    case 'review':
+      return <Known project={route.project}>{() => <ReviewScreen project={route.project} agent={route.agent} />}</Known>;
+    case 'commit':
+      return <Known project={route.project}>{() => <ReviewScreen project={route.project} agent="main" commit={route.sha} />}</Known>;
     case 'inbox':
       return <InboxScreen />;
     case 'settings':
@@ -101,6 +112,15 @@ function ProjectThread({ project, agent }: { project: string; agent: string }) {
   const row = projects.find((p) => p.project === project);
   if (row === undefined) return projects.length === 0 ? <Skel /> : <NotFound path={formatRoute({ screen: 'thread', project, agent })} />;
   return <ThreadScreen project={project} agent={agent} bise={row.home && agent === 'main'} projectName={row.name} />;
+}
+
+/** A project's screen once the core's rows know it; an unknown project is notfound, never bise. */
+function Known({ project, children }: { project: string; children: (name: string) => ReactNode }) {
+  const route = useRoute();
+  const projects = useProjects();
+  const row = projects.find((p) => p.project === project);
+  if (row === undefined) return projects.length === 0 ? <Skel /> : <NotFound path={formatRoute(route)} />;
+  return <>{children(row.name)}</>;
 }
 
 /** A screen not built yet says so, never a blank or a silent gap. */

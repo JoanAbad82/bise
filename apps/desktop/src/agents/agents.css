@@ -1,0 +1,32 @@
+/* The agents screen (amb-win): a head, then the agents with their line,
+   last report and acts. */
+.ag-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.ag-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 16px 24px;
+}
+
+.ag-item {
+  padding: 4px 0 10px;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.ag-line,
+.ag-report {
+  margin: 2px 0 0 28px;
+  color: var(--c-text-2);
+}
+
+.ag-acts {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 0 24px;
+}
