@@ -120,6 +120,22 @@
   const sort = (ev) => { down = false; return ev.slice().sort((a, b) => a[0] - b[0]); };
 
   // the scenes: id, the SPEC §2 state(s) it shows, its label, its events
+  // desktop S8 (v9's world): projects, agents in them, what waits; for the spotlight, the route
+  // line and the menu-bar dropdown
+  const PROJ = [{ project: "home", name: "bise", home: true, order: 0 },
+    { project: "storefront-5c1d", name: "storefront", path: "/Users/you/storefront", branch: "main", agents: 5, order: 1 },
+    { project: "telemetry-8e02", name: "telemetry", path: "/Users/you/telemetry", branch: "main", agents: 2, order: 2, hosts: ["grafana.internal"] },
+    { project: "engine-31aa", name: "engine", path: "/Users/you/engine", branch: "main", agents: 2, order: 3 }];
+  const AG8 = [{ name: "alerts", status: "waiting", title: "compaction at 03:00?", project: "telemetry-8e02" },
+    { name: "search", status: "waiting", title: "reindex tonight 02:00?", project: "storefront-5c1d" },
+    { name: "stock", status: "working", title: "flash sale replay · 62%", project: "storefront-5c1d", followed: true, job: { label: "flash sale replay", step: 6200, steps: 10000, unit: "orders" } },
+    { name: "netcode", status: "working", title: "co-op at 150 ms · run 3 of 8", project: "engine-31aa" },
+    { name: "streaming", status: "done", title: "40 ms → 15 ms, ready to merge", project: "engine-31aa" }];
+  const CARDS8 = [{ id: "c-alerts", agent: "alerts", project: "telemetry-8e02", title: "compaction at 03:00?", text: "passer la compaction de 14:00 à 03:00 ?", options: ["move it to 03:00", "leave it"] },
+    { id: "c-search", agent: "search", project: "storefront-5c1d", title: "reindex tonight 02:00?", text: "réindexer ce soir à 02:00 ?", options: ["tonight 02:00", "now, second index"] }];
+  const s8 = () => [[0, { ev: "hub", up: true, workspace: "~/bise" }], [0, { ev: "state", agents: AG8, cards: CARDS8, projects: PROJ }],
+    [0, { ev: "app_front", app: "Chrome", bundle: "com.google.Chrome", url: "https://grafana.internal/d/ingest", title: "ingest p99" }]];
+
   const SCENES = [
     { id: "idle", spec: ["idle"], label: "idle", build: () => base() },
     { id: "quiet", spec: ["idle"], label: "all quiet", build: () => base(AGENTS.map((a) => ({ ...a, status: "idle", working: false }))) },
@@ -240,6 +256,12 @@
       down = true;
       return evs;
     } },
+    { id: "s8-spot", spec: ["spotlight"], label: "S8: fn space, v9's spotlight", build: () => sort([...s8(), [300, { ev: "app_key", key: "space" }]]) },
+    { id: "s8-route", spec: ["let go"], label: "S8: → telemetry · main", build: () => sort([...s8(), [200, { ev: "app_anchor", at: "bottom" }],
+      [300, { ev: "app_fn", state: "down", key: "fn" }], [1300, { ev: "app_fn", state: "up", key: "fn" }], [1350, { ev: "sent", voice: true }], [1400, { ev: "phase", phase: "sending" }],
+      // a long deadline here so the line stays to look at; the core's is 2 s
+      [1450, { ev: "route", project: "home", to: "telemetry-8e02", text: "pourquoi le p99 d'ingest monte à 14 h", correct_until_ms: Date.now() + 1450 + 10000 }]]) },
+    { id: "s8-menu", spec: ["menu"], label: "S8: the pearl's dropdown", build: () => sort([...s8(), [200, { ev: "app_anchor", at: "menu" }], [300, { ev: "app_menu", on: true }]]) },
     { id: "still", spec: ["reduced motion"], label: "reduced motion", build: () => sort([[0, { ev: "app_reduce_motion", on: true }], ...base(), ...talkTurn(1500).ev, [16000, state(AGENTS, [CARD])]]) },
   ];
 
