@@ -1,6 +1,6 @@
 // composer/slash · bar 2.1 (docs/desktop-bar.md) · his bug 1: "@files, $skills, /commands dead".
 // Real keys only. The terminal is the reference: its commands are read from
-// rust/tui/src/commands.rs. Passes when "/" opens a picker, typing filters it, tab completes the
+// rust/tui/src/commands.rs, less what bar 2.1 leaves out (/version). Passes when "/" opens a picker, typing filters it, tab completes the
 // command, and each of the terminal's commands is in the picker when its name is typed.
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -8,7 +8,11 @@ import { test, expect } from '../../harness';
 import { T, fieldText, onTarget } from './target';
 
 const REPO = path.resolve(__dirname, '../../../../..');
-const terminal = [...readFileSync(path.join(REPO, 'rust/tui/src/commands.rs'), 'utf8').matchAll(/name: "(\/[a-z-]+)"/g)].map((m) => m[1] ?? '');
+/** bar 2.1's rule: every TUI command that acts on bise; /version (a dev tool) stays out */
+const LEFT_OUT = new Set(['/version']);
+const terminal = [...readFileSync(path.join(REPO, 'rust/tui/src/commands.rs'), 'utf8').matchAll(/name: "(\/[a-z-]+)"/g)]
+  .map((m) => m[1] ?? '')
+  .filter((n) => !LEFT_OUT.has(n));
 
 test("composer/slash: / lists the terminal's commands, filters, tab completes", async () => {
   expect(terminal.length, "the terminal's command list was read").toBeGreaterThan(20);
