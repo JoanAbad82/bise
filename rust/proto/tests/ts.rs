@@ -3,7 +3,7 @@
 //! compile ts-rs), never hand-edited (architect m_9476).
 //!
 //! - one `.ts` per wire module (hub, draft, thread, rows, diff, context,
-//!   helper) + `json.ts` (serde_json's Value) + `index.ts`;
+//!   helper, pty) + `json.ts` (serde_json's Value) + `index.ts`;
 //! - `fixtures.gen.ts`: every fixture line as a typed constant, so
 //!   `pnpm typecheck` fails when a fixture doesn't fit its generated type;
 //! - u64/i64 come out as `number` (ids, positions, `*_ms`: safe below 2^53),
@@ -15,7 +15,7 @@
 //! stale; `BISE_PROTO_BLESS=1` writes them.
 #![cfg(feature = "ts")]
 
-use bise_proto::{context, diff, draft, helper, hub, rows, thread};
+use bise_proto::{context, diff, draft, helper, hub, pty, rows, thread};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -63,6 +63,7 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
         module!(cfg, "hub": hub::JobState, hub::Job, hub::HubEv, hub::Mode, hub::HubCmd),
         module!(cfg, "draft": draft::Quote, draft::Queued, draft::DraftHubCmd, draft::ProjectRow, draft::OpenWhat, draft::Account, draft::Found, draft::AwayProject, draft::Plugin, draft::PluginLogin, draft::CuRow, draft::CoreEv, draft::AppCmd, draft::TalkPage, draft::ProjectView),
         module!(cfg, "helper": helper::HelperEv, helper::Responsible, helper::FnAct, helper::TalkKey, helper::Grant, helper::QuietWhy, helper::Perm, helper::PermAction, helper::HelperCmd),
+        module!(cfg, "pty": pty::PtyEv, pty::PtyCmd),
     ]
 }
 
@@ -78,6 +79,8 @@ const FIXTURES: &[(&str, &str, &str)] = &[
     ("context.jsonl", "FnContext", "context"),
     ("helper_ev.jsonl", "HelperEv", "helper"),
     ("helper_cmd.jsonl", "HelperCmd", "helper"),
+    ("pty_ev.jsonl", "PtyEv", "pty"),
+    ("pty_cmd.jsonl", "PtyCmd", "pty"),
 ];
 
 fn proto_dir() -> PathBuf {

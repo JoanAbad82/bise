@@ -132,7 +132,7 @@ fn parent() -> Vec<(OsString, OsString)> {
 
 #[test]
 fn no_child_inherits_an_internal_variable() {
-    for child in [Child::Hub, Child::Core, Child::Repl] {
+    for child in [Child::Hub, Child::Core, Child::Repl, Child::Shell] {
         let env = env_for(child, parent(), [("SB_AGENT", "t1")]);
         let get = |k: &str| env.get(k).map(|v| v.to_string_lossy().into_owned());
         for junk in ["SB_CORE_BIN", "SB_SOCKET", "SB_TASK", "BISE_ROLE", "BISE_SESSION_CHOICE", "BISE_APP_ROOT", "BEND_WORKDIR", "BEND_WIRE_LOG", "BISE_OWNERS"] {

@@ -37,15 +37,15 @@ describe('the application menu (bar ⛔2)', () => {
     for (const want of ['hide', 'hideOthers', 'quit', 'close', 'windowMenu', 'about']) expect(r).toContain(want);
   });
 
-  it("sends bise's own keys to the renderer: ⌘, settings, ⌘I inbox, ⌘F find", () => {
+  it("sends bise's own keys to the renderer: ⌘, settings, ⌘I inbox, ⌘F find, ⌃` terminal", () => {
     const { items, sent } = build('darwin');
     const keys = new Map(items.filter((i) => i.click !== undefined).map((i) => [i.accelerator, i]));
-    expect([...keys.keys()].sort()).toEqual(['CmdOrCtrl+,', 'CmdOrCtrl+F', 'CmdOrCtrl+I']);
-    for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F']) {
+    expect([...keys.keys()].sort()).toEqual(['CmdOrCtrl+,', 'CmdOrCtrl+F', 'CmdOrCtrl+I', 'Ctrl+`']);
+    for (const k of ['CmdOrCtrl+,', 'CmdOrCtrl+I', 'CmdOrCtrl+F', 'Ctrl+`']) {
       const click = keys.get(k)?.click as (() => void) | undefined;
       click?.();
     }
-    expect(sent).toEqual(['settings', 'inbox', 'find']);
+    expect(sent).toEqual(['settings', 'inbox', 'find', 'terminal']);
   });
 
   it('settings once per platform, never twice', () => {
@@ -81,6 +81,15 @@ describe('menuTarget (qa-native m_9724)', () => {
   it('settings and the inbox open the main window when it has no keys (closed, or the capsule has them)', () => {
     expect(menuTarget('settings', false)).toEqual({ open: 'settings' });
     expect(menuTarget('inbox', false)).toEqual({ open: 'inbox' });
+    expect(menuTarget('terminal', false)).toEqual({ open: 'terminal' });
+  });
+
+  it('View > Terminal is ctrl+` (bar T W25) and sends terminal', () => {
+    const { items, sent } = build('darwin');
+    const t = items.find((i) => i.label === 'Terminal');
+    expect(t?.accelerator).toBe('Ctrl+`');
+    (t?.click as (() => void) | undefined)?.();
+    expect(sent).toEqual(['terminal']);
   });
 
   it('the main window with the keys gets them itself; find always goes to the focused page', () => {

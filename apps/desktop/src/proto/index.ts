@@ -10,3 +10,4 @@ export type * from './thread';
 export type * from './hub';
 export type * from './draft';
 export type * from './helper';
+export type * from './pty';

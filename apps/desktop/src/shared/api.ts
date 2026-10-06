@@ -54,6 +54,32 @@ export interface BiseApi {
   readonly onRoute: (listener: (route: string) => void) => () => void;
   /** `bise ambient-core`, run by main (src/main/core): its events in, typed commands out. */
   readonly core: CorePort;
+  /** The terminal panel's shells (src/main/term): one `bise pty` per project, kept while hidden. */
+  readonly term: TermApi;
+}
+
+/** What open answers: the shell's id and, for a shell that was already running, its screen now. */
+export type TermOpened = { readonly id: string; readonly screen: Uint8Array | null } | { readonly error: string };
+
+/**
+ * The terminal panel (bar T W25/V13/K26/M16). A shell runs in its project's
+ * folder (main finds it in the core's projects rows), kept while the panel is
+ * hidden or the window closed. Open again: `screen` holds escape sequences
+ * that redraw it as it is (reset the terminal, write them), then `onData`
+ * goes on from there. Its id is the project's.
+ */
+export interface TermApi {
+  readonly open: (project: string, cols: number, rows: number) => Promise<TermOpened>;
+  /** keys, a paste (UTF-8; ≤ 64 kB a call) */
+  readonly write: (id: string, data: string) => void;
+  /** the panel's size in cells (clamped 2..500 × 1..200) */
+  readonly resize: (id: string, cols: number, rows: number) => void;
+  /** ends the shell (onExit follows) */
+  readonly kill: (id: string) => void;
+  /** the shells' output, every 16 ms at most; returns the unsubscribe */
+  readonly onData: (listener: (id: string, bytes: Uint8Array) => void) => () => void;
+  /** a shell ended (its code; null for a signal); the next open starts a new one */
+  readonly onExit: (listener: (id: string, code: number | null) => void) => () => void;
 }
 
 /** The core child as main sees it: starting, up (writes go through), down (restarting, or no bise). */
@@ -121,7 +147,7 @@ export interface CapsuleApi {
 }
 
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */
-export type MenuAction = 'settings' | 'inbox' | 'find';
+export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal';
 
 /** The IPC channels between the preload and main (owner: amb-mac). */
 export const IPC = {
@@ -141,6 +167,12 @@ export const IPC = {
   openWindow: 'bise:open-window',
   route: 'bise:route',
   quit: 'bise:quit',
+  termOpen: 'bise:term-open',
+  termWrite: 'bise:term-write',
+  termResize: 'bise:term-resize',
+  termKill: 'bise:term-kill',
+  termData: 'bise:term-data',
+  termExit: 'bise:term-exit',
   /** test mode: the preload asks main for the clipboard's seed (the env's files) */
   clipSeed: 'bise:clip-seed',
 } as const;
@@ -165,6 +197,8 @@ export const OPEN_PATH_LINE = 'bise-desktop: open-path';
 /** Test mode (no Dock icon): the Dock's badge as `BADGE_LINE "2"` ("" = none); the window's title is main's getTitle(). */
 export const BADGE_LINE = 'bise-desktop: badge';
 export const COPY_LINE = 'bise-desktop: copy';
+/** Test mode: a shell's life as `TERM_LINE "<id>" open` / `TERM_LINE "<id>" exit <code|null>`. */
+export const TERM_LINE = 'bise-desktop: term';
 
 /** The environment variable that turns test mode on. */
 export const TEST_ENV = 'BISE_DESKTOP_TEST';

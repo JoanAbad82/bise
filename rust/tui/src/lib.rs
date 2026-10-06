@@ -122,6 +122,8 @@ mod zen;
 mod voice;
 mod voicemode;
 pub mod ambient;
+// `bise pty`: the desktop's terminal panel, one shell per process
+pub mod pty;
 #[cfg(test)]
 mod voice_ui_tests;
 #[cfg(test)]

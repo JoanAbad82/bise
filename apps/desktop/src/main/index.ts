@@ -23,6 +23,7 @@ import { onCoreEvent, startCore, stopCore } from './core/ipc';
 import { configOfPrefs } from './helper/config';
 import { installIpc, sendClip, sendMenu } from './ipc';
 import { menuTemplate } from './menu';
+import { startTerms, type TermHost } from './term/host';
 import { startTray } from './tray';
 import { testHomeProblem } from './testhome';
 import { MainWindow } from './windows';
@@ -66,6 +67,9 @@ installGuard(
   testMode,
 );
 
+// the terminal panel's shells (term/host.ts), ended at quit
+let terms: TermHost | null = null;
+
 void app.whenReady().then(() => {
   installIpc(testMode);
   const helper = startHelper(testMode);
@@ -76,6 +80,7 @@ void app.whenReady().then(() => {
     });
   }
   startCore();
+  terms = startTerms(testMode);
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       menuTemplate({
@@ -117,6 +122,7 @@ void app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  terms?.stopAll();
   stopCore();
 });
 

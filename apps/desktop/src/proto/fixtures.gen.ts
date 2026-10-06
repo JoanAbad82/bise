@@ -7,6 +7,7 @@ import type { FnContext } from './context';
 import type { AppCmd, CoreEv, DraftHubCmd, ProjectView } from './draft';
 import type { HelperCmd, HelperEv } from './helper';
 import type { HubCmd, HubEv } from './hub';
+import type { PtyCmd, PtyEv } from './pty';
 
 /** rust/proto/fixtures/hub_ev.jsonl */
 export const hub_ev: readonly HubEv[] = [
@@ -179,4 +180,23 @@ export const helper_cmd: readonly HelperCmd[] = [
   {"action":"ask","cmd":"perm","perm":"calendar"},
   {"cmd":"shot","dir":"/Users/u/.bise/run/shots","id":"s1"},
   {"cmd":"quit"},
+];
+
+/** rust/proto/fixtures/pty_ev.jsonl */
+export const pty_ev: readonly PtyEv[] = [
+  {"cols":80,"cwd":"/w/shop","ev":"started","pid":4242,"rows":24,"shell":"/bin/zsh"},
+  {"data":"bHMNCg==","ev":"data"},
+  {"alternate":true,"cols":80,"data":"G1s/MTA0OWgbW0gbWzJK","ev":"screen","rows":24},
+  {"alternate":false,"cols":120,"data":"G1tIG1sySiQg","ev":"screen","rows":30},
+  {"code":0,"ev":"exit"},
+  {"ev":"exit"},
+  {"ev":"error","text":"write: base64: Invalid symbol 33, offset 0."},
+];
+
+/** rust/proto/fixtures/pty_cmd.jsonl */
+export const pty_cmd: readonly PtyCmd[] = [
+  {"cmd":"write","data":"bHMNCg=="},
+  {"cmd":"resize","cols":120,"rows":30},
+  {"cmd":"attach"},
+  {"cmd":"kill"},
 ];

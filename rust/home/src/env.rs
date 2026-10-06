@@ -202,6 +202,9 @@ pub enum Child {
     Core,
     /// An agent's REPL, a one-shot or checker REPL.
     Repl,
+    /// His own shell (the desktop's terminal panel, `bise pty`): his
+    /// settings only, nothing of bise's internals or of a test run.
+    Shell,
 }
 
 /// The test settings a hub never gets: `SB_CORE_BIN` is the cargo tests'

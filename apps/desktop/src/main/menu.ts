@@ -3,7 +3,7 @@
 // Electron roles, so each does exactly what the OS does (undo, redo, cut,
 // copy, paste, select all in the focused field; hide, quit, close, minimize)
 // and shows in the menu bar with its key. bise's own items (settings ⌘,,
-// inbox ⌘I, find ⌘F) only send a MenuAction to the focused window's
+// inbox ⌘I, find ⌘F, terminal ⌃`) only send a MenuAction to the focused window's
 // renderer, which decides what it means (src/shared/api.ts onMenu).
 import type { MenuItemConstructorOptions } from 'electron';
 import type { MenuAction } from '../shared/api';
@@ -12,7 +12,7 @@ import type { ClipOp } from './clipfence';
 export interface MenuOptions {
   readonly platform: NodeJS.Platform;
   readonly appName: string;
-  /** dev builds and tests: reload and the devtools in a View menu */
+  /** dev builds and tests: reload and the devtools in the View menu */
   readonly dev: boolean;
   readonly send: (action: MenuAction) => void;
   /**
@@ -101,9 +101,16 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
     submenu: [item('Inbox', 'CmdOrCtrl+I', 'inbox')],
   };
 
-  const view: MenuItemConstructorOptions[] = o.dev
-    ? [{ label: 'View', submenu: [{ role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' }] }]
-    : [];
+  // the terminal panel (bar T W25): ctrl+` as in the TUI; reload and the devtools in dev builds
+  const view: MenuItemConstructorOptions[] = [
+    {
+      label: 'View',
+      submenu: [
+        item('Terminal', 'Ctrl+`', 'terminal'),
+        ...(o.dev ? ([{ type: 'separator' }, { role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' }] satisfies MenuItemConstructorOptions[]) : []),
+      ],
+    },
+  ];
 
   const window: MenuItemConstructorOptions = mac
     ? { role: 'windowMenu' }
@@ -115,8 +122,8 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
 export type MenuTarget = { readonly send: 'focused' } | { readonly open: string };
 
 /**
- * Pure: where a bise item of the menu goes (qa-native m_9724). Settings and
- * the inbox are screens of the main window: to it when it has the keys, else
+ * Pure: where a bise item of the menu goes (qa-native m_9724). Settings,
+ * the inbox and the terminal panel are the main window's: to it when it has the keys, else
  * it opens on that route (closed with ⌘W, the capsule or another app has the
  * keys, a test run). Find is the focused page's (the capsule's own search
  * included), else the main window's (qa-flows m_9739: never dropped).

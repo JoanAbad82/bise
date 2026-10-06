@@ -569,6 +569,8 @@ fn run_main() -> std::io::Result<()> {
                 load_keys();
                 std::process::exit(ambient::core(&args[1..])?);
             }
+            // the desktop's terminal panel: one shell, bise-proto pty lines
+            Some("pty") => std::process::exit(bend_tui::pty::main(&args[1..])),
             // bise ambient: open the app on this workspace (scripts/ambient.sh)
             Some("ambient") => std::process::exit(ambient::launch(&args[1..])?),
             Some("sbswitch") => {

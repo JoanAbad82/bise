@@ -131,3 +131,16 @@ fn the_helper_lines_round_trip_and_cover_every_tag() {
     let e = HelperEv::decode(r#"{"ev":"pulse","n":1}"#).unwrap();
     assert!(matches!(&e, HelperEv::Unknown { tag, .. } if tag == "pulse"));
 }
+
+/// `bise pty`'s lines (architect m_10140): every line of both directions
+/// round-trips, every tag has a line, an unknown tag stays unknown.
+#[test]
+fn the_pty_lines_round_trip_and_cover_every_tag() {
+    use bise_proto::pty::{PtyCmd, PtyEv};
+    let t = round_trip("pty_ev.jsonl", "ev", PtyEv::decode, |m| !matches!(m, PtyEv::Unknown { .. }), PtyEv::to_value);
+    covers(&t, PtyEv::TAGS, "pty_ev.jsonl");
+    let t = round_trip("pty_cmd.jsonl", "cmd", PtyCmd::decode, |m| !matches!(m, PtyCmd::Unknown { .. }), PtyCmd::to_value);
+    covers(&t, PtyCmd::TAGS, "pty_cmd.jsonl");
+    let c = PtyCmd::decode(r#"{"cmd":"scroll","by":3}"#).unwrap();
+    assert!(matches!(&c, PtyCmd::Unknown { tag, .. } if tag == "scroll"));
+}

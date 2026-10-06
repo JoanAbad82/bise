@@ -5,7 +5,7 @@
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
-import { IPC, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type Surface } from '../shared/api';
+import { IPC, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type Surface, type TermOpened } from '../shared/api';
 import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
 import { coreBridge } from './core/bridge';
 
@@ -18,6 +18,8 @@ interface Pushed {
   [IPC.helperEv]: HelperEv;
   [IPC.capsuleState]: CapsuleState;
   [IPC.route]: string;
+  [IPC.termData]: { id: string; bytes: Uint8Array };
+  [IPC.termExit]: { id: string; code: number | null };
 }
 
 // one listener on a channel, its unsubscribe
@@ -78,6 +80,26 @@ const api: BiseApi = {
   },
   onRoute: (listener) => listen(IPC.route, listener),
   core: coreBridge(ipcRenderer),
+  term: {
+    open: async (project, cols, rows) => (await ipcRenderer.invoke(IPC.termOpen, project, cols, rows)) as TermOpened,
+    write: (id, data) => {
+      ipcRenderer.send(IPC.termWrite, id, data);
+    },
+    resize: (id, cols, rows) => {
+      ipcRenderer.send(IPC.termResize, id, cols, rows);
+    },
+    kill: (id) => {
+      ipcRenderer.send(IPC.termKill, id);
+    },
+    onData: (listener) =>
+      listen(IPC.termData, (v) => {
+        listener(v.id, v.bytes);
+      }),
+    onExit: (listener) =>
+      listen(IPC.termExit, (v) => {
+        listener(v.id, v.code);
+      }),
+  },
 };
 
 contextBridge.exposeInMainWorld('bise', api);
