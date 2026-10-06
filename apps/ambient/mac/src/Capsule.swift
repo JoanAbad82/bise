@@ -25,6 +25,37 @@ final class CapsulePanel: NSPanel {
     }
 }
 
+// harness A: one simulated key window at a time, as AppKit has one key
+// window: the bar taking the keys takes them from bise's window too (amb-tools
+// m_8542: the window kept test_key under the spotlight, the typed words went
+// into its composer)
+@MainActor
+protocol SimKeyWindow: NSWindow {
+    var testKey: Bool { get set }
+}
+
+extension CapsulePanel: SimKeyWindow {}
+
+@MainActor
+enum SimKeys {
+    nonisolated(unsafe) static weak var owner: NSWindow?
+
+    static func take(_ w: SimKeyWindow) {
+        if let o = owner as? SimKeyWindow, o !== w { give(o) }
+        owner = w
+        guard !w.testKey else { return }
+        w.testKey = true
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: w)
+    }
+
+    static func give(_ w: SimKeyWindow) {
+        if owner === w { owner = nil }
+        guard w.testKey else { return }
+        w.testKey = false
+        NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: w)
+    }
+}
+
 // the page's boxes (app_size): CapsuleShape, Shape.swift
 
 // one click acts (the user's dogfood, B1): WKWebView turned the first click
@@ -297,6 +328,11 @@ final class Capsule: NSObject, WKNavigationDelegate {
         applyMask()
     }
 
+    // the screen box it is placed on (harness: the off-screen one), for the harness's state
+    var screenBox: ScreenBox? {
+        pinnedScreen != nil ? Placement.offScreen : screen.map { ScreenBox(frame: $0.frame, visible: $0.visibleFrame) }
+    }
+
     var maxHeight: CGFloat {
         let b = pinnedScreen != nil ? Placement.offScreen : screen.map { ScreenBox(frame: $0.frame, visible: $0.visibleFrame) }
         return (b?.frame.height ?? 900) * 0.7
@@ -451,6 +487,7 @@ final class Capsule: NSObject, WKNavigationDelegate {
     }
 
     private var keysFrom: NSRunningApplication?
+    private weak var keysFromWindow: NSWindow?   // bise's own window had them (the spotlight over it)
     var onKeyFocus: ((Bool) -> Void)?   // the bar took the keys (true) or gave them back
     var onClickOutside: (() -> Void)?   // a click in another app while the bar shows
 
@@ -531,29 +568,40 @@ final class Capsule: NSObject, WKNavigationDelegate {
     func focus(_ on: Bool) {
         if on {
             let front = NSWorkspace.shared.frontmostApplication
-            if front?.processIdentifier != ProcessInfo.processInfo.processIdentifier { keysFrom = front }
+            // bise's own window had the keys (the spotlight over it): it gets them back, not his last app
+            let mine = front?.processIdentifier == ProcessInfo.processInfo.processIdentifier || CapsulePanel.simulatedKeys
+            let had = CapsulePanel.simulatedKeys ? SimKeys.owner : NSApp.keyWindow
+            if !panel.isKeyWindow {
+                keysFromWindow = mine && had !== panel ? had : nil
+                if !mine { keysFrom = front } else if keysFromWindow != nil { keysFrom = nil }
+            }
             if hidden { show() }
             if CapsulePanel.simulatedKeys {
                 // harness A: the keys are bise's without leaving his app
                 panel.orderFrontRegardless()
                 panel.makeFirstResponder(web)
-                if !panel.testKey {
-                    panel.testKey = true
-                    NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: panel)
-                }
+                SimKeys.take(panel)
                 return
             }
             panel.makeKeyAndOrderFront(nil)
             panel.makeFirstResponder(web)
         } else if CapsulePanel.simulatedKeys {
-            if panel.testKey {
-                panel.testKey = false
-                NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: panel)
+            guard panel.testKey else { return }
+            SimKeys.give(panel)
+            if KeyBack.after(fromWindow: keysFromWindow != nil, windowShown: keysFromWindow?.isVisible ?? false, fromApp: false) == .window,
+               let w = keysFromWindow as? SimKeyWindow {
+                SimKeys.take(w)
             }
+            keysFromWindow = nil
         } else if panel.isKeyWindow {
             panel.resignKey()
-            keysFrom?.activate()
+            switch KeyBack.after(fromWindow: keysFromWindow != nil, windowShown: keysFromWindow?.isVisible ?? false, fromApp: keysFrom != nil) {
+            case .window: keysFromWindow?.makeKeyAndOrderFront(nil)
+            case .app: keysFrom?.activate()
+            case .nothing: break
+            }
             keysFrom = nil
+            keysFromWindow = nil
         }
     }
 }

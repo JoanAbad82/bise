@@ -95,6 +95,17 @@ enum BarAnchor: Equatable {
     }
 }
 
+// who gets the keys back when the bar gives them (lead m_8549): bise's own
+// window when it had them just before (the spotlight over the window), as
+// long as it still shows; else his app; else nobody (his app has them still)
+enum KeyBack: Equatable {
+    case window, app, nothing
+    static func after(fromWindow: Bool, windowShown: Bool, fromApp: Bool) -> KeyBack {
+        if fromWindow && windowShown { return .window }
+        return fromApp ? .app : .nothing
+    }
+}
+
 // a screen as the capsule's placement sees it (Cocoa coords: y up)
 struct ScreenBox: Equatable {
     var frame: CGRect

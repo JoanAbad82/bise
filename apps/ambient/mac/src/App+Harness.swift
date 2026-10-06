@@ -59,6 +59,10 @@ extension AmbientApp {
         ["vis": ["pinned": vis.pinned, "hidden": capsule.hidden], "talking": talking, "phase": phase,
          "keys": ["bar": keyFocus.bar],
          "anchor": capsule.anchor.name, "icon": anchorIcon(),
+         "screen": capsule.screenBox.map { b -> [String: Any] in
+             let r = { (f: CGRect) -> [String: Any] in ["x": f.minX, "y": f.minY, "w": f.width, "h": f.height] }
+             return ["frame": r(b.frame), "visible": r(b.visible)]
+         } ?? NSNull(),
          "win_route": desktop?.route ?? NSNull(),
          "core": ["bise": config.bise, "workspace": config.workspace],
          "hub": memory["hub"] ?? NSNull()]

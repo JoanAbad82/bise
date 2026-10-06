@@ -209,10 +209,15 @@ final class Harness {
     private func desktop() -> DesktopWindow? { win.flatMap { $0() } }
 
     // a window by its name: bar (default), win
-    private func view(_ name: String?) -> (any HarnessView, String)? {
-        switch name {
+    static let windowNames = ["bar", "win"]
+
+    // nil = no such window yet; an unknown name throws (amb-tools m_8542:
+    // window:'side' was answered by the bar)
+    private func view(_ name: String?) throws -> (any HarnessView, String)? {
+        switch name ?? "bar" {
+        case "bar": return (bar?()).map { ($0, "bar") }
         case "win": return desktop().map { ($0, "win") }
-        default: return (bar?()).map { ($0, "bar") }
+        case let n: throw Failure(description: "no window '\(n)': the windows are \(Harness.windowNames.joined(separator: ", "))")
         }
     }
 
@@ -274,7 +279,7 @@ final class Harness {
             throw Failure(description: "mouse needs window: bar|win, x, y (the page's CSS px from that window's top-left)")
         }
         let want = q["window"] as? String
-        guard let (c, name) = view(want) else { throw Failure(description: "mouse: no \(want ?? "bar") window yet") }
+        guard let (c, name) = try view(want) else { throw Failure(description: "mouse: no \(want ?? "bar") window yet") }
         // the window's content: the web view's own height (its title bar is the page's)
         let local = HarnessClick.local(css: CGPoint(x: x, y: y), windowHeight: c.hwin.contentView?.frame.height ?? c.hwin.frame.height)
         return (c, name, local)
@@ -374,7 +379,7 @@ final class Harness {
     // the window that has bise's keys: the test-key one (or the real key one)
     private func keyTarget() -> (NSWindow, String)? {
         for name in ["win", "bar"] {
-            guard let (c, _) = view(name), c.hwin.isVisible else { continue }
+            guard let (c, _) = try? view(name), c.hwin.isVisible else { continue }
             if c.hwin.isKeyWindow { return (c.hwin, name) }
         }
         return nil
@@ -482,7 +487,7 @@ final class Harness {
     // the web views' own snapshots only: never a screen or window capture
     private func shot(_ q: [String: Any]) async throws -> [String: Any] {
         let what = q["what"] as? String ?? "bar"
-        guard let (c, _) = view(what) else { throw Failure(description: "shot what: bar (= panel), win; that one doesn't exist yet") }
+        guard let (c, _) = try view(what) else { throw Failure(description: "shot what: bar (= panel), win; that one doesn't exist yet") }
         let shots = dir + "/shots"
         try? FileManager.default.createDirectory(atPath: shots, withIntermediateDirectories: true)
         let path = shots + "/\(what)-\(ms()).png"
@@ -548,7 +553,7 @@ final class Harness {
 
     private func eval(_ q: [String: Any]) async throws -> [String: Any] {
         guard let src = q["js"] as? String, !src.isEmpty else { throw Failure(description: "eval needs js") }
-        guard let (c, _) = view(q["window"] as? String) else { throw Failure(description: "eval: no such window yet") }
+        guard let (c, _) = try view(q["window"] as? String) else { throw Failure(description: "eval: no such window yet") }
         let wrapped = "(() => { const v = (\n\(src)\n); return typeof v === 'string' ? v : JSON.stringify(v === undefined ? null : v); })()"
         return ["value": await js(c.hweb, wrapped) ?? NSNull()]
     }

@@ -46,6 +46,21 @@ MainActor.assumeIsolated {
     law("window smoke: its web view routes the ⌘ keys (DesktopWebView), never released on close", dw.web.superview != nil && !dw.window.isReleasedWhenClosed)
     law("window smoke: no route before the page says one: bise's thread", dw.lastRoute == "bise")
 
+    // harness A: one simulated key window at a time (amb-tools m_8542)
+    CapsulePanel.simulatedKeys = true
+    let bar2 = Capsule(offScreen: true)
+    let win2 = DesktopWindow(offScreen: true, defaults: UserDefaults(suiteName: "dev.bise.ambient.smoke") ?? .standard)
+    SimKeys.take(win2.window)
+    law("sim keys: the window has them", win2.window.isKeyWindow && !bar2.panel.isKeyWindow)
+    bar2.focus(true)
+    law("sim keys: the spotlight over the window takes them from it", bar2.panel.isKeyWindow && !win2.window.isKeyWindow)
+    win2.window.orderFrontRegardless()
+    bar2.focus(false)
+    law("sim keys: the bar closing gives them back to the window", win2.window.isKeyWindow && !bar2.panel.isKeyWindow)
+    win2.window.orderOut(nil)
+    bar2.panel.orderOut(nil)
+    CapsulePanel.simulatedKeys = false
+
     // KeepOff (proof run #2: AppKit's TUINSWindow made at 0,0,500,500): every
     // window of the process, any class, made, moved or ordered in, stays off
     KeepOff.install()

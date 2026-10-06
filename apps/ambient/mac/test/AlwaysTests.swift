@@ -136,5 +136,11 @@ law("harness: the dropdown under the fake pearl touches no screen and sits under
 law("harness: the bar at the bottom or under an icon stays off-screen there",
     !Placement.touches(Placement.bar(CGSize(width: 1004, height: 600), glass: glass, on: Placement.offScreen, at: .bottom), screens: [builtin, ext]))
 
+// the keys back (lead m_8549): the spotlight over bise's window gives them to the window
+law("keys back: the window had them and still shows: the window", KeyBack.after(fromWindow: true, windowShown: true, fromApp: false) == .window)
+law("keys back: the window had them but closed since: his app", KeyBack.after(fromWindow: true, windowShown: false, fromApp: true) == .app)
+law("keys back: his app had them: his app", KeyBack.after(fromWindow: false, windowShown: true, fromApp: true) == .app)
+law("keys back: nobody to give them to: nothing", KeyBack.after(fromWindow: false, windowShown: false, fromApp: false) == .nothing)
+
 if failures > 0 { print("\(failures) failed"); exit(1) }
 print("all Always laws hold")

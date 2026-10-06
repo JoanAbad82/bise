@@ -23,7 +23,7 @@
 import AppKit
 import WebKit
 
-final class DesktopNSWindow: NSWindow {
+final class DesktopNSWindow: NSWindow, SimKeyWindow {
     var testKey = false
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
@@ -284,10 +284,7 @@ final class DesktopWindow: NSObject, WKNavigationDelegate, NSWindowDelegate {
         if CapsulePanel.simulatedKeys {
             window.orderFrontRegardless()
             window.makeFirstResponder(web)
-            if !window.testKey {
-                window.testKey = true
-                NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: window)
-            }
+            SimKeys.take(window)
             return
         }
         NSApp.activate()
@@ -313,10 +310,7 @@ final class DesktopWindow: NSObject, WKNavigationDelegate, NSWindowDelegate {
         guard !hidden else { return }
         hidden = true
         saveFrame()
-        if window.testKey {
-            window.testKey = false
-            NotificationCenter.default.post(name: NSWindow.didResignKeyNotification, object: window)
-        }
+        SimKeys.give(window)
         window.orderOut(nil)
         onShown?(false)
     }
