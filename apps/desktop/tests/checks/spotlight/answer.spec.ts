@@ -1,44 +1,11 @@
 // spotlight/answer · bar ⛔4 (docs/desktop-bar.md, fn + space part) · his bug 6: "bise's answer to
 // fn+space lands in a panel too small to read". First cut by qa-type, handed to qa-flows.
-// Target: today's capsule until the new spotlight lab answers long (asked of amb-win/amb-web).
-// Real keys: type a question in the spotlight, ⏎; the fake core answers with 20 lines. Passes when
-// all 20 lines are drawn: nothing clipped, offscreen or tiny (the harness's textProblems, from
-// layout), and the last line is on screen in a frame (or reachable by scrolling the answer).
+// The first cut targeted today's capsule (the old app's long-answer scene) and stayed red by
+// design; retired (ambient-lead m_11004): the real-core test below is bug 6's verdict.
 import { test, expect, textProblems, FakeHelper } from '../../harness';
-import { SO as S, onScene } from './target';
 import { launchReal, realWorld, transcriptHas } from '../world';
 
-test('spotlight/answer: a 20-line answer is readable whole', async () => {
-  await onScene(S.launchLong, async ({ page }) => {
-    const field = page.locator(S.field);
-    await expect(field).toBeVisible({ timeout: 5000 });
-    await field.click();
-    await page.keyboard.type('le plan de release ?', { delay: 30 });
-    await page.keyboard.press('Enter');
-    await expect(page.locator(S.answer)).toContainText('line 1 of 20', { timeout: 5000 });
-    await page.waitForTimeout(800);
-    const problems = await textProblems(page, S.answer, 12);
-    if (problems.length) test.info().annotations.push({ type: 'problems', description: JSON.stringify(problems.slice(0, 8)) });
-    await page.screenshot({ path: test.info().outputPath('answer.png') });
-    expect.soft(problems, 'answer text clipped, offscreen or under 12 px').toEqual([]);
-    // the last line: drawn inside the viewport once scrolled into view, if the answer scrolls
-    const last = page.getByText(S.answerText);
-    await last.scrollIntoViewIfNeeded().catch(() => undefined);
-    const shown = await last.evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      let p: HTMLElement | null = el.parentElement;
-      while (p) {
-        const cs = getComputedStyle(p), pr = p.getBoundingClientRect();
-        if ((cs.overflowY === 'hidden' || cs.overflowY === 'clip') && (r.bottom > pr.bottom + 1 || r.top < pr.top - 1)) return false;
-        p = p.parentElement;
-      }
-      return r.bottom <= window.innerHeight && r.top >= 0 && r.height > 0;
-    }).catch(() => false);
-    expect.soft(shown, 'the answer\'s last line can be seen').toBe(true);
-  });
-});
-
-// The same row on the REAL core (qa-flows): the new app over the throwaway world (../world.ts),
+// The row on the REAL core (qa-flows): the new app over the throwaway world (../world.ts),
 // fn+space from the scripted helper (the helper is the one input we script: its fn key is
 // qa-native's), then real keys in the spotlight. The scripted model answers a [[bash:]] with the
 // command's output, so "seq" makes a real 20-line answer from bise's main. Passes when:
