@@ -5,7 +5,7 @@
 import type { FnContext } from './context';
 import type { Opt, ReportKind } from './rows';
 
-export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped";
+export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped" | "to_agent";
 
 /**
  * What a tool call did, for the counted summary.
@@ -51,4 +51,17 @@ text: string, from?: string | null, tools?: Tools | null, card?: EntryCard | nul
  * spoke, from the `sb context : <json>` line right after his 'you'
  * line (the window draws the shot and the app on his message)
  */
-context?: FnContext | null, };
+context?: FnContext | null, 
+/**
+ * a `to_agent` entry: who it went to
+ */
+to?: string | null, 
+/**
+ * a `to_agent` entry: it waits for the reply (its question)
+ */
+asks?: boolean, 
+/**
+ * a `to_agent` entry: its message id (`m_12` is 12; the card main
+ * opens for it says `for` the same)
+ */
+msg?: number | null, };

@@ -560,6 +560,19 @@ const L3_LONG: usize = 60;
 /// A closed level-3 text shows at most this many rows, then `… ▸`.
 const L3_ROWS: usize = 2;
 
+/// Who sent a level-3 message: `from`, or with none (sb-core's `sent`
+/// line: what this feed's owner sent) the owner.
+pub(crate) fn l3_sender(from: &str) -> String {
+    if !from.is_empty() {
+        return from.to_string();
+    }
+    if main_feed() {
+        "main".to_string()
+    } else {
+        feed_owner()
+    }
+}
+
 /// Who a level-3 message went to: `to`, or with none (what this feed's
 /// owner received) the owner (`main` in main's feed), else the message id.
 pub(crate) fn l3_receiver(to: &str, id: &str) -> String {
@@ -767,7 +780,7 @@ fn l3_chip_row(form: ChipForm, from: &str, to: &str, id: &str, width: usize) -> 
         40..=59 => (16, false),
         _ => (10, true),
     };
-    let (s, r) = chip_names(from, &l3_receiver(to, id), cap, chip_frame(compact, form), w);
+    let (s, r) = chip_names(&l3_sender(from), &l3_receiver(to, id), cap, chip_frame(compact, form), w);
     let mut head = vec![Span::raw(L3_X)];
     head.extend(chip_spans(&s, &r, form, compact));
     Line::from(head)

@@ -20,6 +20,8 @@ pub enum EntryKind {
     Agent,
     /// a message from another agent (`from`)
     FromAgent,
+    /// a message this agent sent another one (`to`; `asks`: it waits
+    /// for the reply, its question), sb-core's `sent` line
     /// its tool calls in a row
     Tools,
     Card,
@@ -28,6 +30,9 @@ pub enum EntryKind {
     /// its turn was stopped (an interrupt: sb-core's `stopped` line, written
     /// in the same step as the interrupt)
     Stopped,
+    /// a message this agent sent another one (`to`; `asks`: it waits
+    /// for the reply, its question), sb-core's `sent` line
+    ToAgent,
 }
 
 /// What a tool call did, for the counted summary.
@@ -126,11 +131,21 @@ pub struct Entry {
     /// line (the window draws the shot and the app on his message)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<FnContext>,
+    /// a `to_agent` entry: who it went to
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
+    /// a `to_agent` entry: it waits for the reply (its question)
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub asks: bool,
+    /// a `to_agent` entry: its message id (`m_12` is 12; the card main
+    /// opens for it says `for` the same)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub msg: Option<u64>,
 }
 
 impl Entry {
     fn new(pos: Pos, at_ms: u64, kind: EntryKind, text: String) -> Entry {
-        Entry { pos, at_ms, kind, text, from: None, tools: None, card: None, page: None, report: None, context: None }
+        Entry { pos, at_ms, kind, text, from: None, tools: None, card: None, page: None, report: None, context: None, to: None, asks: false, msg: None }
     }
 }
 
@@ -411,6 +426,18 @@ impl Fold<'_> {
                     e.from = Some(from);
                     self.cont = Some(self.push(e));
                 }
+                // what this task sent: `sent : {to} : m_<n> : {ask} : {text}`
+                // (sb-core's line_fields: a field's own " : " is " \: ")
+                "sent" => {
+                    let f: Vec<String> = raw.splitn(4, " : ").map(|x| unescape(&x.replace(" \\: ", " : "))).collect();
+                    if let [to, id, ask, body] = f.as_slice() {
+                        let mut e = Entry::new(pos, ms, EntryKind::ToAgent, body.clone());
+                        e.to = Some(to.clone()).filter(|t| !t.is_empty());
+                        e.asks = ask == "1";
+                        e.msg = id.strip_prefix("m_").and_then(|n| n.parse().ok());
+                        self.cont = Some(self.push(e));
+                    }
+                }
                 // an interrupt (sb-core writes it in the interrupt's step)
                 "stopped" => {
                     self.push(Entry::new(pos, ms, EntryKind::Stopped, text));
@@ -544,6 +571,30 @@ mod tests {
         assert_eq!(kinds, [EntryKind::You, EntryKind::Agent, EntryKind::Stopped]);
         assert_eq!((e[2].pos, e[2].text.as_str()), (3, "stopped"));
         assert_eq!(e[1].text, "working on", "the line after the stop doesn't join the agent's message");
+    }
+
+    /// What a task sent (sb-core's `sent` line, architect m_10203) is a
+    /// `to_agent` entry: to whom, its id, whether it asks; the card main
+    /// opens for it, written in the task's feed too, is its card entry.
+    #[test]
+    fn a_sent_line_is_the_tasks_own_message() {
+        let page = |_: &str| None;
+        let ls = vec![
+            (1, 1001, "tool #1 bash : sb send main --expect-reply \"cart or checkout?\"".to_string()),
+            (2, 1002, "sb sent : main : m_9 : 1 : gift cards: cart \\: or checkout?\\n1. on the cart page\\n2. only at checkout".to_string()),
+            (3, 1003, "sb card : #2 question @gift-ui : gift cards: cart or checkout?\\n1. on the cart page\\n2. only at checkout".to_string()),
+            (4, 1004, "sb sent : docs : m_11 : 0 : fyi".to_string()),
+        ];
+        let e = fold(&ls, &ctx_with(&[2], &page));
+        let kinds: Vec<EntryKind> = e.iter().map(|e| e.kind).collect();
+        assert_eq!(kinds, [EntryKind::Tools, EntryKind::ToAgent, EntryKind::Card, EntryKind::ToAgent]);
+        assert_eq!((e[1].to.as_deref(), e[1].msg, e[1].asks), (Some("main"), Some(9), true));
+        assert_eq!(e[1].text, "gift cards: cart : or checkout?\n1. on the cart page\n2. only at checkout", "its fields unescaped");
+        let c = e[2].card.as_ref().unwrap();
+        assert_eq!((c.id, c.options.len(), c.answered), (2, 2, false));
+        assert_eq!((e[3].to.as_deref(), e[3].msg, e[3].asks, e[3].text.as_str()), (Some("docs"), Some(11), false, "fyi"));
+        let j = serde_json::to_value(&e[3]).unwrap();
+        assert_eq!((j["kind"].as_str(), j.get("asks")), (Some("to_agent"), None), "asks: false is left out");
     }
 
     /// Law (architect m_9048): a context line attaches only to the 'you'

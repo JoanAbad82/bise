@@ -978,10 +978,28 @@ def feed_main(-o: M.St, +cx: X.Cx<o>, +m: M.Msg, +why: String) -> X.Cx<o>:
       v => line(o, cx, M.MAIN(), "msg", cat([from, " → ", to, " ", mid(M.Msg.id(m)), " : ", M.Msg.text(m)])),
       v => cx))
 
+# What a task sent is a fact of its own thread (desktop bar A.3, S16;
+# architect m_10203): a message from a task (not main, whose feed has
+# `msg` for every message, not the user) to another agent writes one
+# line in the task's own feed, `sent : {to} : m_<n> : {ask} : {text}`
+# (ask 1: it waits for a reply, --expect-reply or sb ask). A message to
+# the user is `msg-you` already. A view only: no state changes.
+# The sender must be an agent of this hub (architect m_10280): '@bise'
+# (a cross-hub delegation) or the hub's own name has no feed here.
+def is_task_send(-o: M.St, +cx: X.Cx<o>, +from: String, +to: String) -> Bool:
+  has_agent(o, cx, from) && Bool.not(String.eq(from, M.MAIN())) && Bool.not(String.eq(to, M.USER()))
+
+def feed_sender(-o: M.St, +cx: X.Cx<o>, +m: M.Msg) -> X.Cx<o>:
+  +from = M.Msg.from(m)
+  +to = M.Msg.to(m)
+  pick_lazy(X.Cx<o>, is_task_send(o, cx, from, to),
+    u => line_fields(o, cx, from, "sent", [to, mid(M.Msg.id(m)), Bool.pick(String, M.Msg.expect(m), "1", "0"), M.Msg.text(m)]),
+    u => cx)
+
 def send.fed(-o: M.St, p: X.Cx<o> & SendR, +why: String) -> X.Cx<o> & SendR:
   match p:
     case (+cx, SOk{+m}):
-      (feed_main(o, cx, m, why), SOk{m})
+      (feed_main(o, feed_sender(o, cx, m), m, why), SOk{m})
     case (+cx, SErr{+e}):
       (cx, SErr{e})
 
@@ -2817,9 +2835,20 @@ def req_card.settle(-o: M.St, m: Maybe<&2, Nat>, +cx: X.Cx<o>) -> X.Cx<o>:
     case Some{+id}:
       emit(o, cx, M.ESettled{id}, Unit{}, Unit{}, Unit{})
 
+# a card main opens for a task's message (`sb card --for m_<n>`) shows in
+# that task's own feed too (a registered agent of this hub, not main) (bar A.3, architect m_10203), with the line
+# main's feed gets: a view; open or answered still comes from the cards
+def is_task_of(-o: M.St, +cx: X.Cx<o>, +agent: String) -> Bool:
+  has_agent(o, cx, agent) && Bool.not(String.eq(agent, M.MAIN()))
+
+def card_to_asker(-o: M.St, +cx: X.Cx<o>, +id: Nat, +agent: String, +text: String) -> X.Cx<o>:
+  pick_lazy(X.Cx<o>, is_task_of(o, cx, agent),
+    u => line(o, cx, agent, "card", cat(["#", ns(id), " question @", agent, " : ", text])),
+    u => cx)
+
 def req_card.go(-o: M.St, +cx: X.Cx<o>, +token: Nat, +agent: String, +text: String, +for_msg: Maybe<&2, Nat>) -> X.Cx<o>:
   +id = M.St.next_card(st(o, cx))
-  +cx2 = open_card(o, cx, "question", agent, text, for_msg)
+  +cx2 = card_to_asker(o, open_card(o, cx, "question", agent, text, for_msg), id, agent, text)
   # main hands the question over: no automatic reply
   +cx3 = req_card.settle(o, for_msg, cx2)
   reply(o, cx3, token, ok_body([J.kv("card", J.JNum{id})]))

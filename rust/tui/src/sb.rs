@@ -1421,6 +1421,23 @@ pub(super) fn parse_hub_line(rest: &str) -> Option<Ev> {
                 fold: false,
             }
         }
+        // what this feed's owner (a task) sent another agent, sb-core's
+        // line (architect m_10203): `sent : {to} : m_<n> : {ask} : {text}`;
+        // `from` empty: the owner (render::l3_sender). Its `sb send` box
+        // goes quiet as for main's `msg` lines (BISE-110: same id)
+        "sent" => {
+            let f: Vec<String> = raw.splitn(4, " : ").map(field).collect();
+            let [to, id, _ask, body] = f.as_slice() else { return Some(Ev::Info(text)) };
+            Ev::AgentMsg {
+                from: String::new(),
+                to: shown_name(to),
+                text: body.clone(),
+                level: 3,
+                id: id.clone(),
+                open: false,
+                fold: false,
+            }
+        }
         "msg-you" => {
             let (from, body) = text.split_once(" : ").unwrap_or(("", text.as_str()));
             Ev::AgentMsg {
@@ -1644,6 +1661,23 @@ mod hub_line_tests {
         // level 3: a chip, the id as the receiver (BISE-106)
         let (m3, to_you) = (format!("{} docs → m_3", crate::render::G_ENVELOPE), format!("{G_MSG} docs to you"));
         for want in [m3.as_str(), "done", to_you.as_str(), "la v2", "docs needs you", "→ you → @docs"] {
+            assert!(text.contains(want), "{want:?} missing in:\n{text}");
+        }
+    }
+
+    /// sb-core's `sent` line (architect m_10203): what this feed's owner
+    /// sent, a level-3 message from the owner, with its id (so its
+    /// `sb send` box goes quiet) and its fields unescaped.
+    #[test]
+    fn a_sent_line_is_the_owners_message() {
+        assert_eq!(p("sent : main : m_9 : 1 : cart \\: or checkout?"), Some(msg("", "main", "cart : or checkout?", 3, "m_9")));
+        assert_eq!(p("sent : switchboard : m_4 : 0 : hi"), Some(msg("", "bise", "hi", 3, "m_4")));
+        assert_eq!(p("sent : main"), Some("info main".into()), "a short line is never lost");
+        crate::render::set_feed_owner("gift-ui");
+        let text = draw(&[parse_hub_line("sent : main : m_9 : 1 : cart or checkout?").unwrap()]);
+        crate::render::set_feed_owner("");
+        let head = format!("{} gift-ui → main", crate::render::G_ENVELOPE);
+        for want in [head.as_str(), "cart or checkout?"] {
             assert!(text.contains(want), "{want:?} missing in:\n{text}");
         }
     }

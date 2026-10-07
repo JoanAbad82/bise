@@ -5362,3 +5362,67 @@ law req_interrupt_says_stopped_once:
   for +n: String
   for e: {HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))) == True{} : Bool}
   {HC.req_interrupt(o, Some{n}, cx, token, agent) == HC.reply(o, HC.line(o, HC.interrupt.fx(o, cx, n), n, "stopped", "stopped"), token, HC.ok_body(Nil{})) : HX.Cx<o>}
+
+# ---- what a task sent is a fact of its own thread (desktop bar A.3 and
+# S16, architect m_10203): sb-core writes one 'sent' line in the sender's
+# own feed for a task's message to another agent; main's feed keeps its
+# 'msg' lines, a message to the user stays 'msg-you'. A card main opens
+# for a task's message shows in that task's feed too. Views only ----
+
+# LAW: a task's message to another agent writes exactly one 'sent' line
+# in the task's feed: to, the message id, 1 if it waits for a reply, text.
+law task_send_says_sent_once:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +m: HM.Msg
+  for e: {HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)) == True{} : Bool}
+  {HC.feed_sender(o, cx, m) == HC.line_fields(o, cx, HM.Msg.from(m), "sent", [HM.Msg.to(m), HC.mid(HM.Msg.id(m)), Bool.pick(String, HM.Msg.expect(m), "1", "0"), HM.Msg.text(m)]) : HX.Cx<o>}
+
+# LAW: main's messages, the user's, a message to the user, and a message
+# from a name that isn't an agent of this hub write no 'sent' line.
+law other_send_says_no_sent:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +m: HM.Msg
+  for e: {HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)) == False{} : Bool}
+  {HC.feed_sender(o, cx, m) == cx : HX.Cx<o>}
+
+# LAW: a sender this hub has no agent of ('@bise', a cross-hub
+# delegation, or any unknown name) is never a task's send.
+law unknown_sender_is_no_task_send:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +from: String
+  for +to: String
+  for e: {HC.has_agent(o, cx, from) == False{} : Bool}
+  {HC.is_task_send(o, cx, from, to) == False{} : Bool}
+
+# LAW: a card opened for a task's message also writes its 'card' line in
+# that task's feed (main's own cards stay in main's feed only).
+law task_card_shows_in_its_feed:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +id: Nat
+  for +agent: String
+  for +text: String
+  for e: {HC.is_task_of(o, cx, agent) == True{} : Bool}
+  {HC.card_to_asker(o, cx, id, agent, text) == HC.line(o, cx, agent, "card", HC.cat(["#", HC.ns(id), " question @", agent, " : ", text])) : HX.Cx<o>}
+
+# LAW: a card whose agent isn't an agent of this hub (or is main) writes
+# no extra line.
+law other_card_no_extra_line:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +id: Nat
+  for +agent: String
+  for +text: String
+  for e: {HC.is_task_of(o, cx, agent) == False{} : Bool}
+  {HC.card_to_asker(o, cx, id, agent, text) == cx : HX.Cx<o>}
+
+# LAW: an agent this hub doesn't have is never a task of it.
+law unknown_agent_is_no_task:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +agent: String
+  for e: {HC.has_agent(o, cx, agent) == False{} : Bool}
+  {HC.is_task_of(o, cx, agent) == False{} : Bool}

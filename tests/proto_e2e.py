@@ -175,6 +175,21 @@ def main():
         card = [x for x in c.cards() if x["kind"] == "question"][0]
         c.wait(lambda: any(r["id"] == card["id"] for x in typed(c, "cards") for r in x["cards"]), 30, "the card as a typed row")
         c.wait_idle("main")
+        # bar A.3 (architect m_10203): t3's own question and the card main
+        # opened for it are facts of t3's own thread (sb-core's 'sent' and
+        # 'card' lines in t3's feed), typed as to_agent and card entries
+        c.wait(lambda: any(l.startswith("sb sent : main : %s : 1 : v1 ou v2" % msg_id) for l in c.lines("t3")), 30, "t3's sent line")
+        c.wait(lambda: any(l.startswith("sb card : #%d question @t3 : v1 ou v2" % card["id"]) for l in c.lines("t3")), 30, "the card in t3's feed")
+        n = len(typed(c, "thread"))
+        c.send({"cmd": "subscribe", "project": project, "agent": "t3"})
+        c.wait(lambda: len(typed(c, "thread")) > n, 20, "t3's thread")
+        t3 = typed(c, "thread")[-1]["entries"]
+        asked = [x for x in t3 if x["kind"] == "to_agent"]
+        check(asked and asked[0]["to"] == "main" and asked[0]["asks"] and asked[0]["msg"] == int(msg_id[2:]) and asked[0]["text"] == "v1 ou v2 ?",
+              "t3's question as its own entry: %r" % t3)
+        cards3 = [x for x in t3 if x["kind"] == "card"]
+        check(cards3 and cards3[0]["card"]["id"] == card["id"] and not cards3[0]["card"]["answered"], "its card in its thread, open: %r" % cards3)
+        c.send({"cmd": "unsubscribe", "project": project, "agent": "t3"})
         reply = "/archive t3 --force\nv2 --force"
         c.send({"cmd": "answer", "project": project, "card": card["id"], "reply": reply})
         c.wait(lambda: not c.cards(), 30, "the card closed by the answer")

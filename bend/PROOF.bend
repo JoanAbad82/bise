@@ -5339,3 +5339,27 @@ def Laws.interrupt_idle_says_nothing(o, cx, n, e):
 def Laws.req_interrupt_says_stopped_once(o, cx, token, agent, n, e):
   %Equal.sym(Bool, HC.is_busy(HX.Rt.run(HC.rt(o, cx, n))), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.reply(o, HC.stopped(o, HC.interrupt.fx(o, cx, n), n), token, HC.ok_body(Nil{})), u => HC.reply_err(o, cx, token, "no turn in progress")) == HC.reply(o, HC.line(o, HC.interrupt.fx(o, cx, n), n, "stopped", "stopped"), token, HC.ok_body(Nil{})) : HX.Cx<o>}
   {==}
+
+def Laws.task_send_says_sent_once(o, cx, m, e):
+  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.line_fields(o, cx, HM.Msg.from(m), "sent", [HM.Msg.to(m), HC.mid(HM.Msg.id(m)), Bool.pick(String, HM.Msg.expect(m), "1", "0"), HM.Msg.text(m)]), u => cx) == HC.line_fields(o, cx, HM.Msg.from(m), "sent", [HM.Msg.to(m), HC.mid(HM.Msg.id(m)), Bool.pick(String, HM.Msg.expect(m), "1", "0"), HM.Msg.text(m)]) : HX.Cx<o>}
+  {==}
+
+def Laws.other_send_says_no_sent(o, cx, m, e):
+  %Equal.sym(Bool, HC.is_task_send(o, cx, HM.Msg.from(m), HM.Msg.to(m)), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.line_fields(o, cx, HM.Msg.from(m), "sent", [HM.Msg.to(m), HC.mid(HM.Msg.id(m)), Bool.pick(String, HM.Msg.expect(m), "1", "0"), HM.Msg.text(m)]), u => cx) == cx : HX.Cx<o>}
+  {==}
+
+def Laws.task_card_shows_in_its_feed(o, cx, id, agent, text, e):
+  %Equal.sym(Bool, HC.is_task_of(o, cx, agent), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.line(o, cx, agent, "card", HC.cat(["#", HC.ns(id), " question @", agent, " : ", text])), u => cx) == HC.line(o, cx, agent, "card", HC.cat(["#", HC.ns(id), " question @", agent, " : ", text])) : HX.Cx<o>}
+  {==}
+
+def Laws.other_card_no_extra_line(o, cx, id, agent, text, e):
+  %Equal.sym(Bool, HC.is_task_of(o, cx, agent), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => HC.line(o, cx, agent, "card", HC.cat(["#", HC.ns(id), " question @", agent, " : ", text])), u => cx) == cx : HX.Cx<o>}
+  {==}
+
+def Laws.unknown_sender_is_no_task_send(o, cx, from, to, e):
+  %Equal.sym(Bool, HC.has_agent(o, cx, from), False{}, e) : {Bool.and(Bool.and(_, Bool.not(String.eq(from, HM.MAIN()))), Bool.not(String.eq(to, HM.USER()))) == False{} : Bool}
+  {==}
+
+def Laws.unknown_agent_is_no_task(o, cx, agent, e):
+  %Equal.sym(Bool, HC.has_agent(o, cx, agent), False{}, e) : {Bool.and(_, Bool.not(String.eq(agent, HM.MAIN()))) == False{} : Bool}
+  {==}
