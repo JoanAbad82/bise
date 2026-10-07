@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, chipOf, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, chipOf, dropAuthor, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -96,5 +96,12 @@ describe("the thread's reading (ambient m_11777)", () => {
     expect(chipOf({ app: 'Ghostty', shot: 'x.png' })).toEqual({ label: '◫ with Ghostty', open: null, tip: "the screenshot isn't kept" });
     expect(chipOf({ app: 'Ghostty', title: 'zsh — harness' })?.label).toBe('◫ with Ghostty · zsh — harness');
     expect(chipOf({})).toBeNull();
+  });
+
+  it("a row that starts with its author's name drops it: the name line says it (ambient m_11934)", () => {
+    expect(dropAuthor('perf: the parsed copy cuts it', 'perf')).toBe('the parsed copy cuts it');
+    expect(dropAuthor('performance: fine', 'perf')).toBe('performance: fine');
+    expect(dropAuthor('the perf: fine', 'perf')).toBe('the perf: fine');
+    expect(dropAuthor('hi', '')).toBe('hi');
   });
 });

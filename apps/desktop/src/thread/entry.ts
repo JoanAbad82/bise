@@ -169,3 +169,10 @@ export function chipOf(c: { app?: string | null; url?: string | null; title?: st
   const shotOnly = sources.length === 0 && Boolean(c.shot);
   return { label, open: first?.open ?? null, tip: shotOnly ? "the screenshot isn't kept" : undefined };
 }
+
+/** His agents often start with their own name ('perf: the parsed copy…'): the name line already
+ *  says it, so the row drops that prefix (ambient m_11934). Pure. */
+export function dropAuthor(text: string, name: string): string {
+  if (name === '' || !text.startsWith(`${name}:`)) return text;
+  return text.slice(name.length + 1).trimStart();
+}

@@ -10,7 +10,8 @@
 //   - (e) the time sits on the name line ('bise 09:46'); a row inside a group (same author, under
 //     5 min) has no name line and shows its time there on hover only; days are separated
 //     ('yesterday', 'today');
-//   - (f) no avatar circles: bise's pearl at 14 px on its name line.
+//   - (f) no avatar circles: bise's pearl at 14 px on its name line; every row's text starts at the
+//     column edge, and a row never repeats its author ('perf: …' under 'perf').
 // Writes one sheet (light + dark, 1400 and 800 px windows, top and bottom, a hover row) for
 // ambient. Owner: amb-home.
 import { writeFileSync } from 'node:fs';
@@ -172,6 +173,16 @@ test('thread/reading: one column, no raw context, no empty thinking, one restore
     await expect(page.getByTestId('thread.entry.8')).toHaveAttribute('data-head', 'true');
     await expect(page.getByTestId('thread.entry.9')).toHaveAttribute('data-head', 'false');
     await expect(page.getByTestId('thread.entry.10')).toHaveAttribute('data-head', 'true');
+    // ambient m_11934: one left edge (no indent for another agent's rows), no 'perf:' under 'perf'
+    await expect(page.getByTestId('thread.entry.8')).not.toContainText('perf:');
+    const edges = await page.evaluate(() =>
+      [8, 9, 10].map((n) => {
+        const row = document.querySelector(`[data-testid="thread.entry.${String(n)}"]`)?.getBoundingClientRect();
+        const text = document.querySelector(`[data-testid="thread.entry.${String(n)}"] .b-text`)?.getBoundingClientRect();
+        return row && text ? Math.abs(text.left - row.left) : -1;
+      }),
+    );
+    for (const d of edges) expect(d, `every row's text on the column edge: ${JSON.stringify(edges)}`).toBeLessThan(1);
 
     // shots: light + dark, 1400 and 800, top and bottom
     for (const t of ['light', 'dark'] as const) {

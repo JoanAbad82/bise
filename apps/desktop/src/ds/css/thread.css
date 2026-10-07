@@ -11,7 +11,6 @@
 .b-msg.you .b-text{width:fit-content;max-width:68ch;padding:8px 12px;border-radius:12px;background:var(--c-raised)}
 .b-ctx{margin-top:4px}
 .b-text code{font:var(--t-13) var(--font-mono);padding:1px 5px;border-radius:5px;background:var(--c-sunken)}
-.b-msg.in{margin-left:24px}
 .b-msg.is-streaming .b-text::after{content:"∿";display:inline;margin-left:4px;color:var(--c-text);font:400 12px/1 var(--font-ui);animation:b-pulse .8s var(--ease-io) infinite alternate}
 :root[data-still] .b-msg.is-streaming .b-text::after{animation:none;color:var(--c-text-2)}
 @media (prefers-reduced-motion: reduce){.b-msg.is-streaming .b-text::after{animation:none;color:var(--c-text-2)}}

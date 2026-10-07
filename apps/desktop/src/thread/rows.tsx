@@ -11,7 +11,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
-import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, stripContext, thoughtNothing, whoOf } from './entry';
+import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, stripContext, thoughtNothing, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -147,7 +147,7 @@ function EntryBody({ e, ctx, head }: { e: Entry; ctx: RowCtx; head: boolean }) {
       return (
         <Msg from={who.from} name={who.name} indent={who.indent} time={clock(e.at_ms)} head={head}>
           {e.thinking != null && e.thinking.ms >= THOUGHT_MS && <ThinkingLine pos={e.pos} head={thoughtFor(e.thinking.ms)} body={e.thinking.text} />}
-          <Markdown text={e.text} onLink={ctx.onLink} onPath={ctx.onPath} />
+          <Markdown text={dropAuthor(e.text, e.from ?? ctx.agent)} onLink={ctx.onLink} onPath={ctx.onPath} />
         </Msg>
       );
     }
