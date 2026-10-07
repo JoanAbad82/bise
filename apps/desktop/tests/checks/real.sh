@@ -14,9 +14,10 @@ qa="$desktop/../../plugins/ambient-qa/qa.py"
 up=(world up --projects 2)
 [ -n "${QA_BISE:-}" ] && up+=(--bise "$QA_BISE")
 
-# No real key reaches the world: world up hands its hubs this env, and the app's core inherits
-# it too (a hub then counts his providers as ready, and the window's model catalog differs from
-# the TUI's, which gets the world's env only). Every key, token and provider variable goes; one
+# No real key reaches the run: world up builds its hubs' env from an allowlist since amb-tools'
+# b81056b0 (and refuses a leak), but the app's core, Playwright and the TUI next to it get this
+# env (a hub started with his keys counts his providers as ready, and the window's model catalog
+# then differs from the TUI's). Every key, token and provider variable goes; one
 # fake Mistral key (never valid) stands in on both sides (world.ts passes qa-fake- values to the
 # TUI), so the hub's catalog and the TUI's /model list the same ready provider.
 for v in $(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' |
