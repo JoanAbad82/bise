@@ -3,13 +3,15 @@
 // leaves the app: a link and a copy become stdout lines the harness reads
 // (EXTERNAL_LINE, COPY_LINE), never his browser or his clipboard.
 import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { basename, extname } from 'node:path';
-import { app, BrowserWindow, clipboard, ipcMain, session, shell } from 'electron';
-import { COPY_LINE, EXTERNAL_LINE, IPC, OPEN_PATH_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_TEXT_ENV, type MenuAction } from '../shared/api';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, session, shell, type OpenDialogOptions } from 'electron';
+import { COPY_LINE, EXTERNAL_LINE, IPC, OPEN_PATH_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_TEXT_ENV, TEST_PICK_FOLDER_ENV, type MenuAction } from '../shared/api';
 import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
 import { menuTarget } from './menu';
 import { externalUrl } from './external';
+import { pickedInTest } from './pick';
 
 // the page's async clipboard API (navigator.clipboard): its permissions
 const CLIPBOARD_PERMS = new Set(['clipboard-read', 'clipboard-sanitized-write']);
@@ -58,6 +60,7 @@ export function installIpc(testMode: boolean): void {
   }
   ipcMain.handle(IPC.openExternal, (_e, raw: unknown): Promise<boolean> => openLink(raw, testMode));
   ipcMain.handle(IPC.openPath, (_e, raw: unknown, opts: unknown): Promise<boolean> => openFile(raw, opts, testMode));
+  ipcMain.handle(IPC.pickFolder, (e): Promise<string | null> => pickFolder(BrowserWindow.fromWebContents(e.sender), testMode));
   ipcMain.handle(IPC.copy, async (_e, text: unknown): Promise<void> => {
     if (typeof text !== 'string' || text.length > MAX_COPY) return;
     if (testMode) {
@@ -104,6 +107,18 @@ export async function openFile(raw: unknown, opts: unknown, testMode: boolean): 
   if (plan.how === 'editor') await shell.openExternal(plan.url);
   else shell.showItemInFolder(plan.path);
   return true;
+}
+
+/**
+ * His folder pick (window.bise.pickFolder): macOS's open panel for folders,
+ * attached to `win`, starting in his home; null on cancel. Test mode: the
+ * env's absolute TEST_PICK_FOLDER_ENV at once, else null, never a panel.
+ */
+export async function pickFolder(win: BrowserWindow | null, testMode: boolean): Promise<string | null> {
+  if (testMode) return pickedInTest(process.env[TEST_PICK_FOLDER_ENV]);
+  const opts: OpenDialogOptions = { properties: ['openDirectory', 'createDirectory'], defaultPath: homedir() };
+  const r = win === null ? await dialog.showOpenDialog(opts) : await dialog.showOpenDialog(win, opts);
+  return r.canceled ? null : (r.filePaths[0] ?? null);
 }
 
 /** Test mode: a clipboard item of the menu, played in the focused window's fence. */

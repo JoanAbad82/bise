@@ -45,6 +45,13 @@ export interface BiseApi {
    */
   readonly openPath: (path: string, opts?: { line?: number }) => Promise<boolean>;
   /**
+   * His folder pick (macOS's open panel: folders only, 'New Folder' allowed,
+   * starting in his home, attached to the asking window); null when he
+   * cancels. Test mode never opens a panel: BISE_DESKTOP_TEST_PICK_FOLDER
+   * (an absolute path) is the answer at once, else null.
+   */
+  readonly pickFolder: () => Promise<string | null>;
+  /**
    * Puts text on the clipboard. In test mode: the window's private buffer
    * (⌘V pastes it) and `COPY_LINE <text as JSON>` on stdout, never his clipboard.
    */
@@ -214,6 +221,7 @@ export type MenuAction = 'settings' | 'inbox' | 'find' | 'terminal';
 export const IPC = {
   openExternal: 'bise:open-external',
   openPath: 'bise:open-path',
+  pickFolder: 'bise:pick-folder',
   copy: 'bise:copy',
   menu: 'bise:menu',
   /** test mode: a clipboard item of the menu, played on the window's private buffer */
@@ -253,6 +261,9 @@ export type UpdateState =
   | { readonly state: 'ready'; readonly version: string }
   | { readonly state: 'failed'; readonly version: string; readonly why: string }
   | { readonly state: 'went_bad'; readonly version: string };
+
+/** Test mode: the folder window.bise.pickFolder answers (an absolute path), never a panel. */
+export const TEST_PICK_FOLDER_ENV = 'BISE_DESKTOP_TEST_PICK_FOLDER';
 
 /** Test mode: the fake .app (inside the test HOME) the updater swaps; never his bundle. */
 export const UPDATE_TARGET_ENV = 'BISE_DESKTOP_UPDATE_TARGET';
