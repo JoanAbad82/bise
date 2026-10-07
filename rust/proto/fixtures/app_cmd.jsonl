@@ -31,6 +31,12 @@
 {"cmd":"dictate_start","id":"d1"}
 {"cmd":"dictate_stop","id":"d1"}
 {"cmd":"dictate_cancel","id":"d1"}
+{"cmd":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":true}
+{"cmd":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":false}
+{"cmd":"voice_mute","on":true}
+{"cmd":"voice_type","on":false}
+{"cmd":"voice_send"}
+{"cmd":"voice_cut"}
 {"cmd":"card_in_view","project":"acme-1a2b3c4d","card":9}
 {"cmd":"card_in_view"}
 {"cmd":"commands"}

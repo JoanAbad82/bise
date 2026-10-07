@@ -79,6 +79,8 @@ pub enum Cmd {
     Typed(Value),
     /// The window's setup commands (S11, core/setup.rs).
     App(bise_proto::draft::AppCmd),
+    /// voice mode's commands (core/voice_mode.rs)
+    VoiceMode(bise_proto::draft::AppCmd),
     /// Harness A: the words the fake voice hears at the next talk (only
     /// with the fake voice on; an error otherwise).
     FakeWords { text: String },
@@ -115,6 +117,9 @@ impl Cmd {
                 bise_proto::draft::AppCmd::DictateCancel { id } if !id.trim().is_empty() => Cmd::DictateCancel { id },
                 _ => return Err(format!("{cmd}: no id")),
             },
+            "voice_mode" | "voice_mute" | "voice_type" | "voice_send" | "voice_cut" => {
+                Cmd::VoiceMode(bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))?)
+            }
             "card_in_view" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
                 bise_proto::draft::AppCmd::CardInView { project, card } => Cmd::CardInView { project, card },
                 other => return Err(format!("{cmd}: decoded as {other:?}")),

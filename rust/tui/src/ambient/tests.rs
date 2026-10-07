@@ -21,6 +21,7 @@ const WS: &str = "/w/repo";
 mod dictate;
 mod hubs;
 mod setup;
+mod voice_mode;
 
 /// The hub's `user_kind` (switchboard::model), as main.rs hands it in.
 fn user_kind(kind: &str) -> bool {
@@ -62,6 +63,8 @@ struct T {
     ends: Receiver<HubEnd>,
     hub: HubEnd,
     fakes: Fakes,
+    /// voice mode's fakes (voicemode/fakes.rs): its mic, listener, speaker
+    vf: crate::voicemode::fakes::Fakes,
     out: Vec<Value>,
     dir: PathBuf,
     say_ok: Arc<AtomicBool>,
@@ -110,6 +113,7 @@ impl T {
         let (tx, rx) = mpsc::channel();
         let hub = Hub::start(connect, tx, |h| h, Duration::from_millis(20));
         let fakes = Fakes::new();
+        let vf = crate::voicemode::fakes::Fakes::new();
         let dir = temp_dir();
         let say_ok = Arc::new(AtomicBool::new(true));
         let (spk, ok) = (fakes.speaker.clone(), say_ok.clone());
@@ -133,6 +137,10 @@ impl T {
             store_image: Box::new(fake_store(dir.clone())),
             user_kind,
             fake_words: None,
+            voice_mode: {
+                let f = crate::voicemode::fakes::Fakes { mic: vf.mic.clone(), listen: vf.listen.clone(), synth: vf.synth.clone(), speaker: vf.speaker.clone() };
+                Box::new(move || Ok((f.ports(crate::voicemode::Route::Headphones), f.jobs(true), crate::voicemode::config::VoiceModeConfig::default())))
+            },
         };
         let ports = match fake {
             Some(w) => {
@@ -144,7 +152,7 @@ impl T {
         };
         let core = Core::new(WS.into(), hub, ports);
         let hub = ends.recv_timeout(Duration::from_secs(3)).expect("the core never connected");
-        let mut t = T { core, rx, ends, hub, fakes, out: Vec::new(), dir, say_ok };
+        let mut t = T { core, rx, ends, hub, fakes, vf, out: Vec::new(), dir, say_ok };
         t.until(|o| o.iter().any(|v| v["ev"] == "hub"));
         t
     }
@@ -975,6 +983,7 @@ fn a_send_while_the_hub_is_away_is_an_error() {
         store_image: Box::new(|_| Err("no store".into())),
         user_kind,
         fake_words: None,
+        voice_mode: Box::new(|| Err("no voice mode".into())),
     };
     let mut core = Core::new(WS.into(), hub, ports);
     core.cmd(Cmd::Send { text: "hello".into() }, Instant::now());
@@ -1014,6 +1023,7 @@ fn the_run_loop_writes_lines_and_ends_with_stdin() {
         store_image: Box::new(|_| Err("no store".into())),
         user_kind,
         fake_words: None,
+        voice_mode: Box::new(|| Err("no voice mode".into())),
     };
     let mut core = Core::new(WS.into(), hub, ports);
     tx.send(super::In::Hub(HubIn::Down)).unwrap();

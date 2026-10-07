@@ -54,7 +54,7 @@ function toWindow(r: Route): void {
   w?.webContents.send(CORE_IPC.ev, r.ev);
 }
 
-/** A window that dictates: when it's gone (closed, crashed, reloaded), its dictations stop. */
+/** A window that dictates or talks in voice mode: when it's gone (closed, crashed, reloaded), its mic stops. */
 function watch(contents: Electron.WebContents): void {
   if (watched.has(contents.id)) return;
   const id = contents.id;
@@ -86,7 +86,8 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
   let state: CoreState = 'down';
   ipcMain.on(CORE_IPC.cmd, (e, cmd: unknown) => {
     dictations.sent(e.sender.id, cmd);
-    if ((cmd as { cmd?: unknown } | null)?.cmd === 'dictate_start') watch(e.sender);
+    const name = (cmd as { cmd?: unknown } | null)?.cmd;
+    if (name === 'dictate_start' || name === 'voice_mode') watch(e.sender);
     core?.send(cmd);
   });
   ipcMain.handle(CORE_IPC.stateNow, (): CoreState => state);

@@ -56,7 +56,7 @@ impl Core {
     }
 
     pub(super) fn dictate_start(&mut self, id: String, now: Instant) {
-        if self.talk.is_some() || self.dictation.is_some() {
+        if self.talk.is_some() || self.dictation.is_some() || self.voice_on.is_some() {
             return self.dictate_error(&id, "", "the mic is busy.");
         }
         // he dictates while main speaks: the voice stops, its text stays

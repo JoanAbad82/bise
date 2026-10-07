@@ -50,4 +50,22 @@ describe('dictation routes (bar I, architect m_10537)', () => {
     expect(r.coreGone()).toEqual([{ to: 'window', window: 3, ev: { ev: 'dictation', id: 'd3', text: '', final: true, cancelled: true } }]);
     expect(r.coreGone()).toEqual([]);
   });
+
+  it("voice mode's events go only to the window that turned it on; that window gone turns it off; the core gone ends it there", () => {
+    const r = new DictationRoutes();
+    expect(r.route({ ev: 'voice_mode', project: 'p', agent: 'perf', on: true, state: 'listening' })).toEqual({ to: 'none' });
+    r.sent(4, { cmd: 'voice_mode', project: 'p', agent: 'perf', on: true });
+    const heard = { ev: 'voice_mode', project: 'p', agent: 'perf', on: true, state: 'hearing', heard: 'his words' };
+    expect(r.route(heard)).toEqual({ to: 'window', window: 4, ev: heard });
+    // his window goes: voice mode is turned off, never left listening
+    expect(r.gone(5)).toEqual([]);
+    expect(r.gone(4)).toEqual([{ cmd: 'voice_mode', project: 'p', agent: 'perf', on: false }]);
+    expect(r.route(heard)).toEqual({ to: 'none' });
+    // the last event (on: false) ends the route
+    r.sent(6, { cmd: 'voice_mode', project: 'p', agent: 'main', on: true });
+    expect(r.route({ ev: 'voice_mode', project: 'p', agent: 'main', on: false, state: 'listening' })).toMatchObject({ to: 'window', window: 6 });
+    expect(r.route(heard)).toEqual({ to: 'none' });
+    r.sent(7, { cmd: 'voice_mode', project: 'p', agent: 'main', on: true });
+    expect(r.coreGone()).toEqual([{ to: 'window', window: 7, ev: { ev: 'voice_mode', project: 'p', agent: 'main', on: false, state: 'listening', note: 'bise stopped' } }]);
+  });
 });

@@ -83,6 +83,7 @@ export const TAGS = {
   plugins: true,
   computer_use: true,
   dictation: true,
+  voice_mode: true,
   voice_answer: true,
   level: true,
   commands: true,
@@ -170,6 +171,8 @@ export interface Dictation {
   readonly cancelled: boolean;
   readonly error: string | null;
 }
+/** Voice mode's state (core/voice_mode.rs), only in the window that turned it on. */
+export type VoiceModeState = EvOf<'voice_mode'>;
 export type { AwayProject };
 
 const EMPTY_ORDER: ThreadOrder = { order: [], before: null, more: false, loaded: false };
@@ -456,6 +459,11 @@ export class Store {
         // bar N14: his talk answered a card in view; the inbox shows it, then answers
         this.put('voice_answer', ev);
         return;
+      case 'voice_mode':
+        // only the window that turned it on gets it (main's routes); its
+        // last (on: false) stays until he turns it on again
+        this.put('voice_mode', ev);
+        return;
       case 'dictation':
         // only the window that started it gets it (main's routes); an id
         // this store never started, or one already over, is ignored
@@ -689,6 +697,35 @@ export class Store {
     if (asked === undefined) return;
     this.asked.delete(ev.rid);
     asked.resolve(a);
+  }
+
+  /**
+   * Voice mode with the agent in view (the TUI's ctrl+r twice): the core's
+   * mic and speaker, his turns to that agent, its answers said aloud. Another
+   * agent while on: it follows him there; off: it ends (useVoiceMode's last
+   * state has on: false and the note).
+   */
+  voiceMode(project: string, agent: string, on: boolean): void {
+    this.command({ cmd: 'voice_mode', project, agent, on });
+  }
+  /** His mic off (m) or on again; the agent still speaks. */
+  voiceMute(on: boolean): void {
+    this.command({ cmd: 'voice_mute', on });
+  }
+  /** He types (tab): the mic waits; his normal send to that agent gets its answer said. */
+  voiceType(on: boolean): void {
+    this.command({ cmd: 'voice_type', on });
+  }
+  /** What he said goes now (the TUI's space tap). */
+  voiceSend(): void {
+    this.command({ cmd: 'voice_send' });
+  }
+  /** Cut the agent off: its voice stops, its running turn is stopped. */
+  voiceCut(): void {
+    this.command({ cmd: 'voice_cut' });
+  }
+  voiceModeNow(): VoiceModeState | null {
+    return this.slice<VoiceModeState | null>('voice_mode', null);
   }
 
   dictateStart(): string {

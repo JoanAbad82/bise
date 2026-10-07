@@ -6,7 +6,7 @@
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import type { Account, Agent, PickCommand, PickSkill, RoleRow, Artifact, Card, DevServer, Entry, Feature, Found, Model, Job, JsonValue, Merged, Plugin, ProjectRow, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
-import { diffKey, Store, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder } from './store';
+import { diffKey, Store, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder, type VoiceModeState } from './store';
 
 /**
  * Feeds a store from a core port: its live events, then the state events
@@ -114,6 +114,8 @@ export const useFiles = (project: string): FilesAnswer | null => useSlice(`files
 export const useLevel = (who: 'you' | 'main'): number => useSlice(`level:${who}`, (s) => s.level(who));
 /** A dictation this window started (store.dictateStart()): its whole text so far, final, cancelled, error. */
 export const useDictation = (id: string | null): Dictation | null => useSlice(`dictation:${id ?? ''}`, (s) => (id === null ? null : s.dictation(id)));
+/** Voice mode's state in this window (null: never on here): state, heard, said, muted, note, fail. */
+export const useVoiceMode = (): VoiceModeState | null => useSlice('voice_mode', (s) => s.voiceModeNow());
 export const useCoreState = (): CoreState => useSlice('core', (s) => s.core());
 
 /** A thread's order, before and more (key: threadKey(project, agent)). */

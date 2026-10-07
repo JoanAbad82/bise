@@ -14,9 +14,11 @@ mod picks;
 mod voice_answer;
 mod setup;
 mod voice;
+mod voice_mode;
 
 pub use self::cmd::Cmd;
 pub use self::hubs::{branch_of_head, ProjectFacts, ProjectPorts, Spawn};
+pub use self::voice_mode::OpenVoiceMode;
 #[cfg(test)]
 pub use self::hubs::{LINGER, START};
 #[cfg(test)]
@@ -80,6 +82,8 @@ pub struct Ports {
     /// harness A's fake voice (fake.rs): the next talk's words, set by
     /// the `fake_words` cmd; None in his normal run (the cmd is refused)
     pub fake_words: Option<super::fake::Words>,
+    /// voice mode's controller ports (core/voice_mode.rs)
+    pub voice_mode: OpenVoiceMode,
 }
 
 /// One phase of main's turn, for the orb (§4 `phase`).
@@ -219,6 +223,8 @@ pub struct Core {
     talk: Option<Talk>,
     /// the composer's mic (bar I, core/dictate.rs)
     dictation: Option<dictate::Dictation>,
+    /// voice mode with the agent in view (core/voice_mode.rs)
+    voice_on: Option<voice_mode::VoiceOn>,
     /// the composer's `@` answers on their way (core/picks.rs)
     picks: picks::Picks,
     /// bar N14: the card in front of him (core/voice_answer.rs)
@@ -294,6 +300,7 @@ impl Core {
             voice_out: None,
             talk: None,
             dictation: None,
+            voice_on: None,
             picks: picks::Picks::default(),
             in_view: None,
             speaker: None,
@@ -354,6 +361,7 @@ impl Core {
             Cmd::DictateStart { id } => self.dictate_start(id, now),
             Cmd::DictateStop { id } => self.dictate_stop(&id, now),
             Cmd::DictateCancel { id } => self.dictate_cancel(&id),
+            Cmd::VoiceMode(c) => self.voice_mode_cmd(c, now),
             Cmd::CardInView { project, card } => self.in_view = project.zip(card),
             Cmd::Commands => self.pick_commands(),
             Cmd::Skills { project } => self.pick_skills(project),
@@ -567,6 +575,7 @@ impl Core {
 
     /// Stdin closed: the app is gone. Nothing of the shots stays.
     pub fn shutdown(&mut self) {
+        self.voice_mode_off(Instant::now(), Some("bise stopped"));
         self.close_projects();
         self.stop_voice();
         self.talk = None;

@@ -43,6 +43,7 @@ impl Core {
     pub fn tick(&mut self, now: Instant) {
         self.tick_talk(now);
         self.tick_dictation(now);
+        self.tick_voice_mode(now);
         self.tick_picks();
         self.tick_speech();
         self.tick_projects(now);
@@ -165,6 +166,10 @@ impl Core {
     pub(super) fn talk_start(&mut self, page: Option<String>) {
         if self.talk.is_some() {
             return;
+        }
+        // one mic owner: voice mode has it (ambient-lead m_11168)
+        if let Some(why) = self.voice_mode_busy() {
+            return self.emit(json!({"ev": "error", "cmd": "talk_start", "text": why}));
         }
         // fn wins over the composer's mic: the dictation ends first
         self.dictate_yield();

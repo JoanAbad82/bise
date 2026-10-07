@@ -113,6 +113,9 @@ pub(super) struct Hubs {
     polled: Option<Instant>,
     /// J: the job ends the window got, (project, agent, key), newest last
     ends: VecDeque<(String, String, u64)>,
+    /// voice mode's thread (project, agent): followed by the core only
+    /// while the window doesn't follow it itself (core/voice_mode.rs)
+    voice: Option<(String, String)>,
 }
 
 /// J: how many job ends the core remembers to drop a second copy.
@@ -233,6 +236,15 @@ impl Core {
         if track(&mut self.hubs.subs, &cmd, &project, &agent) {
             self.hold();
         }
+        // voice mode still follows that thread: the window's unsubscribe
+        // stays here (the core's own subscription goes when voice mode ends)
+        if cmd == "unsubscribe" && self.hubs.voice.as_ref().is_some_and(|(p, a)| *p == project && *a == agent) {
+            return;
+        }
+        // his typed send while voice mode waits on his typing: its answer is said
+        if cmd == "send" {
+            self.voice_mode_typed(&project, &agent);
+        }
         let welcomed = self.hubs.conns.get(&project).is_some_and(|c| c.welcomed);
         match (cmd.as_str(), welcomed) {
             // kept: sent at its hub's welcome
@@ -293,13 +305,50 @@ impl Core {
         }
     }
 
+    /// The window's subscriptions and voice mode's thread.
+    fn all_subs(&self) -> BTreeMap<String, BTreeSet<String>> {
+        let mut subs = self.hubs.subs.clone();
+        if let Some((p, a)) = &self.hubs.voice {
+            subs.entry(p.clone()).or_default().insert(a.clone());
+        }
+        subs
+    }
+
+    /// Voice mode's thread (architect m_11164): the core subscribes to it
+    /// only when the window doesn't, and unsubscribes when voice mode ends
+    /// or moves (never a hidden subscription left behind).
+    pub(super) fn voice_sub(&mut self, want: Option<(String, String)>) {
+        let old = self.hubs.voice.take();
+        if old == want {
+            self.hubs.voice = old;
+            return;
+        }
+        let window = |s: &Self, p: &str, a: &str| s.hubs.subs.get(p).is_some_and(|x| x.contains(a));
+        if let Some((p, a)) = &old {
+            if !window(self, p, a) {
+                if let Some(c) = self.hubs.conns.get_mut(p).filter(|c| c.welcomed) {
+                    c.hub.send(&json!({"cmd": "unsubscribe", "project": p, "agent": a}));
+                }
+            }
+        }
+        if let Some((p, a)) = &want {
+            if !window(self, p, a) {
+                if let Some(c) = self.hubs.conns.get_mut(p).filter(|c| c.welcomed) {
+                    c.hub.send(&json!({"cmd": "subscribe", "project": p, "agent": a}));
+                }
+            }
+        }
+        self.hubs.voice = want;
+        self.hold();
+    }
+
     /// Open the connections to hold, close the others.
     fn hold(&mut self) {
         self.hold_at(Instant::now());
     }
 
     fn hold_at(&mut self, now: Instant) {
-        let mut want = held(&self.hubs.rows, self.hubs.shown.as_deref(), &self.hubs.subs);
+        let mut want = held(&self.hubs.rows, self.hubs.shown.as_deref(), &self.all_subs());
         // a folder gone: never its hub (it would start on a missing
         // workspace), whatever holds it
         let gone_folders: BTreeSet<String> = self.hubs.rows.iter().filter(|r| !self.folder_exists(&r.path)).map(|r| r.id.clone()).collect();
@@ -356,10 +405,14 @@ impl Core {
                 if !first_end(&mut self.hubs.ends, &typed) {
                     return;
                 }
+                // voice mode hears its agent's turn and messages
+                let for_voice = (self.voice_on.is_some() && matches!(typed, HubEv::Agents { .. } | HubEv::Entry { .. })).then(|| typed.clone());
                 match typed {
                     HubEv::Welcome { .. } => {
                         c.welcomed = true;
-                        for agent in self.hubs.subs.get(id).into_iter().flatten() {
+                        let voice = self.hubs.voice.as_ref().filter(|(p, _)| p == id).map(|(_, a)| a);
+                        let subs = self.hubs.subs.get(id);
+                        for agent in subs.into_iter().flatten().chain(voice.filter(|a| !subs.is_some_and(|s| s.contains(*a)))) {
                             c.hub.send(&json!({"cmd": "subscribe", "project": id, "agent": agent}));
                         }
                         // the commands that waited for it, in order; a hub
@@ -386,6 +439,9 @@ impl Core {
                         c.rows = Some((agents, cards));
                     }
                     _ => {}
+                }
+                if let Some(t) = for_voice {
+                    self.voice_mode_hub(&t);
                 }
                 self.emit(v);
                 if matches!(ev.as_str(), "welcome" | "agents" | "cards") {

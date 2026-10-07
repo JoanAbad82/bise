@@ -152,6 +152,23 @@ fn live_jobs(cfg: &VoiceModeConfig) -> Result<Jobs, String> {
     Ok(Jobs { listen: config::listen_job()?, say: config::say_job(cfg) })
 }
 
+/// The desktop core's voice mode (ambient core/voice_mode.rs): the same
+/// ports, jobs and settings as ctrl+r twice here (BISE_VOICE_FAKE's fakes
+/// when set). `fake_only`: harness A's core, which never opens a device:
+/// without BISE_VOICE_FAKE it refuses.
+pub(crate) fn for_core(fake_only: bool) -> Result<(Ports, Jobs, VoiceModeConfig), String> {
+    let cfg = config::load();
+    let (ports, jobs) = match bise_home::env::test_setting("BISE_VOICE_FAKE") {
+        Some(wav) => fake_ports(&wav)?,
+        None if fake_only => return Err("voice mode: no fake voice here (BISE_VOICE_FAKE)".into()),
+        None => {
+            let jobs = live_jobs(&cfg)?;
+            (live_ports(&jobs.listen)?, jobs)
+        }
+    };
+    Ok((ports, jobs, cfg))
+}
+
 /// A faint line in the thread in view.
 fn note(app: &mut App, text: String) {
     push_event(&mut app.events, &mut app.cache, Ev::Info(format!("· {}", text)));

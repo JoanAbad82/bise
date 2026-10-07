@@ -64,6 +64,7 @@ fn live_ports(user_kind: fn(&str) -> bool) -> Ports {
         store_image: Box::new(bend_images::store_file),
         user_kind,
         fake_words: None,
+        voice_mode: Box::new(|| crate::voicemode::live::for_core(false)),
     }
 }
 
@@ -83,6 +84,8 @@ fn fake_ports(user_kind: fn(&str) -> bool, words: fake::Words) -> Ports {
         store_image: Box::new(bend_images::store_file),
         user_kind,
         fake_words: Some(words),
+        // harness A: BISE_VOICE_FAKE's fakes or a refusal, never a device
+        voice_mode: Box::new(|| crate::voicemode::live::for_core(true)),
     }
 }
 

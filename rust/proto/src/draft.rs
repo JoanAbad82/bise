@@ -393,6 +393,30 @@ pub enum CoreEv {
     /// sent), then answers option `n` (1-based) through the hub's one
     /// answer path; the words did not go to main
     VoiceAnswer { project: Project, card: u64, n: u32, line: String, ms: u64 },
+    /// voice mode with the agent in view (bar V12/W24/L21/N13, the
+    /// TUI's ctrl+r twice): its state, on each change, only to the window
+    /// that turned it on (the app's main routes it), never journaled,
+    /// never in a log. `state`: listening, hearing (he talks, `heard`:
+    /// his words so far), sending, thinking (the agent works), speaking
+    /// (`said`: the sentence being said), muted, typing, failed (`fail`:
+    /// why, voice mode stays on). `on: false` is its last (he left, his
+    /// window went, the core stopped; `note`: how long, how many turns)
+    VoiceMode {
+        project: Project,
+        agent: String,
+        on: bool,
+        state: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        heard: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        said: Option<String>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        muted: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        note: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fail: Option<String>,
+    },
     Dictation {
         id: String,
         text: String,
@@ -415,7 +439,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "dictation", "voice_answer", "commands", "skills", "files", "roles", "app_update"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -543,6 +567,23 @@ pub enum AppCmd {
     DictateStop { id: String },
     /// dropped: the mic goes off, one final `dictation` with `cancelled`
     DictateCancel { id: String },
+    /// voice mode (draft, the TUI's ctrl+r twice): `on` with `agent` of
+    /// `project`: the core opens the mic and the speaker (voicemode's own
+    /// controller), his turns go to that agent (never main unless main is
+    /// in view), its answers are said aloud (nothing aloud while quiet).
+    /// Another agent while on: it follows him there; `on: false` leaves.
+    /// One mic owner: refused while a talk or a dictation runs; while on,
+    /// fn and dictation are refused. Its state comes as `voice_mode`
+    VoiceMode { project: Project, agent: String, on: bool },
+    /// his mic off (m) or on again; the agent still speaks
+    VoiceMute { on: bool },
+    /// he types (tab): the mic waits; his typed send is the window's
+    /// normal `send`, then `voice_type {on: false}`: its answer is said
+    VoiceType { on: bool },
+    /// send what he said now (the TUI's space tap)
+    VoiceSend,
+    /// cut the agent off (its voice stops, its turn is stopped)
+    VoiceCut,
     /// bar N14: the card in front of him in the focused window (the ⌘I
     /// inbox's current item), or none (both absent: the window blurred,
     /// closed or left the inbox); fn's talk answers it by voice when its
@@ -606,6 +647,11 @@ impl AppCmd {
         "dictate_start",
         "dictate_stop",
         "dictate_cancel",
+        "voice_mode",
+        "voice_mute",
+        "voice_type",
+        "voice_send",
+        "voice_cut",
         "card_in_view",
         "commands",
         "skills",

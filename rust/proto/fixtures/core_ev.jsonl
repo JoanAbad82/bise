@@ -15,6 +15,11 @@
 {"ev":"dictation","id":"d1","text":"fix the login test","final":true}
 {"ev":"dictation","id":"d2","text":"","final":true,"cancelled":true}
 {"ev":"dictation","id":"d3","text":"","final":true,"error":"the mic is busy."}
+{"ev":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":true,"state":"hearing","heard":"why is the cold bench slow"}
+{"ev":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":true,"state":"speaking","said":"The cold bench reads the cache from disk."}
+{"ev":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":true,"state":"thinking","muted":true}
+{"ev":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":true,"state":"failed","fail":"no voice model: /voice"}
+{"ev":"voice_mode","project":"acme-1a2b3c4d","agent":"perf","on":false,"state":"listening","note":"voice mode ended · 4 min · 3 turns"}
 {"ev":"level","who":"you","v":0.42}
 {"ev":"level","who":"main","v":0.0}
 {"ev":"commands","items":[{"name":"/new","desc":"start an agent: /new [-w] [name:] objective","args":[{"kind":"words","words":[{"value":"-w","desc":"in its own git worktree"}]},{"kind":"text"}],"runs":"hub","runnable":false},{"name":"/inbox","desc":"open what waits for you","args":[],"runs":"window","runnable":false},{"name":"/close","desc":"close an inbox item without answering: /close N [note]","args":[{"kind":"card"},{"kind":"note"}],"runs":"hub","runnable":false}]}

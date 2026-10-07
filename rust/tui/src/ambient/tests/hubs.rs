@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 /// The projects' side: each connection the core opened, by project id,
 /// and what their reader threads say.
-struct World {
+pub(super) struct World {
     ends: Receiver<(String, HubEnd)>,
     rx: Receiver<(String, HubIn)>,
     open: HashMap<String, HubEnd>,
@@ -27,7 +27,7 @@ fn docs_card() -> Value {
         "options": [{"n": 1, "label": "yes"}, {"n": 2, "label": "no"}], "urgent": false, "since_ms": 1})
 }
 
-fn world(t: &mut T) -> World {
+pub(super) fn world(t: &mut T) -> World {
     let gone = std::sync::Arc::new(std::sync::Mutex::new(vec![PathBuf::from("/p/docs")]));
     let gone2 = gone.clone();
     let (etx, ends) = mpsc::channel::<(String, HubEnd)>();
@@ -73,7 +73,7 @@ fn world(t: &mut T) -> World {
 
 impl World {
     /// Both sides' events in, a tick, events out, until `done` holds.
-    fn until(&mut self, t: &mut T, done: impl Fn(&[Value]) -> bool) {
+    pub(super) fn until(&mut self, t: &mut T, done: impl Fn(&[Value]) -> bool) {
         let t0 = Instant::now();
         loop {
             while let Ok((id, e)) = self.ends.try_recv() {
@@ -94,9 +94,24 @@ impl World {
         }
     }
 
+    /// [`until`] with the core's clock ticking (voice mode's controller
+    /// moves on the tick: tests/voice_mode.rs).
+    pub(super) fn until_ticking(&mut self, t: &mut T, done: impl Fn(&[Value]) -> bool) {
+        let t0 = Instant::now();
+        loop {
+            t.core.tick(Instant::now());
+            self.until(t, |_| true);
+            if done(&t.out) {
+                return;
+            }
+            assert!(t0.elapsed() < Duration::from_secs(3), "timed out ticking; out: {:#?}", t.out);
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+
     /// Until the core has a connection to each of `ids` (its reader
     /// threads connect on their own).
-    fn opened(&mut self, t: &mut T, ids: &[&str]) {
+    pub(super) fn opened(&mut self, t: &mut T, ids: &[&str]) {
         let t0 = Instant::now();
         while !ids.iter().all(|id| self.open.contains_key(*id)) {
             self.until(t, |_| true);
@@ -105,12 +120,12 @@ impl World {
         }
     }
 
-    fn end(&mut self, id: &str) -> &mut HubEnd {
+    pub(super) fn end(&mut self, id: &str) -> &mut HubEnd {
         self.open.get_mut(id).unwrap_or_else(|| panic!("no connection to {id}"))
     }
 
     /// The hub of `id` says welcome (after the core's typed hello).
-    fn welcome(&mut self, t: &mut T, id: &str) {
+    pub(super) fn welcome(&mut self, t: &mut T, id: &str) {
         self.until(t, |_| true);
         // next() skips the hellos: read the raw lines up to the typed one
         let e = self.end(id);
@@ -129,7 +144,7 @@ impl World {
     }
 }
 
-fn typed(t: &mut T, v: Value) {
+pub(super) fn typed(t: &mut T, v: Value) {
     t.cmd(Cmd::parse(&v.to_string()).unwrap());
 }
 
