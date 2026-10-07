@@ -60,6 +60,8 @@ const api: BiseApi = {
   },
   openExternal: async (url) => (await ipcRenderer.invoke(IPC.openExternal, url)) === true,
   openPath: async (path, opts) => (await ipcRenderer.invoke(IPC.openPath, path, opts)) === true,
+  quickLook: async (path) => (await ipcRenderer.invoke(IPC.quickLook, path)) === true,
+  showInFinder: async (path) => (await ipcRenderer.invoke(IPC.showInFinder, path)) === true,
   pickFolder: async () => {
     const p: unknown = await ipcRenderer.invoke(IPC.pickFolder);
     return typeof p === 'string' ? p : null;

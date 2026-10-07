@@ -22,7 +22,8 @@ import { startHelper } from './helper/run';
 import { adoptLoginEnv } from './loginenv';
 import { onCoreEvent, sendToCore, startCore, stopCore } from './core/ipc';
 import { configOfPrefs } from './helper/config';
-import { installIpc, sendClip, sendMenu } from './ipc';
+import { installIpc, sendClip, sendMenu, setProjectRoots } from './ipc';
+import { projectRoots } from './reveal';
 import { menuTemplate } from './menu';
 import { startTerms, type TermHost } from './term/host';
 import { startTray } from './tray';
@@ -88,6 +89,11 @@ void app.whenReady().then(() => {
       if (ev['ev'] === 'prefs') helper.config(configOfPrefs(ev['prefs']));
     });
   }
+  // his project folders: where quickLook / showInFinder may look (reveal.ts)
+  onCoreEvent((ev) => {
+    const r = projectRoots(ev);
+    if (r !== null) setProjectRoots(r);
+  });
   // his theme for the glass, the frames and the menus (theme.ts): the system's until his prefs come
   nativeTheme.themeSource = 'system';
   onCoreEvent((ev) => {

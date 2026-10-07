@@ -6,12 +6,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, extname } from 'node:path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, session, shell, type OpenDialogOptions } from 'electron';
-import { COPY_LINE, EXTERNAL_LINE, IPC, OPEN_PATH_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_TEXT_ENV, TEST_PICK_FOLDER_ENV, type MenuAction } from '../shared/api';
+import { COPY_LINE, EXTERNAL_LINE, IPC, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_TEXT_ENV, TEST_PICK_FOLDER_ENV, type MenuAction } from '../shared/api';
 import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
 import { menuTarget } from './menu';
 import { externalUrl } from './external';
 import { pickedInTest } from './pick';
+import { allowedPath } from './reveal';
 
 // the page's async clipboard API (navigator.clipboard): its permissions
 const CLIPBOARD_PERMS = new Set(['clipboard-read', 'clipboard-sanitized-write']);
@@ -60,6 +61,8 @@ export function installIpc(testMode: boolean): void {
   }
   ipcMain.handle(IPC.openExternal, (_e, raw: unknown): Promise<boolean> => openLink(raw, testMode));
   ipcMain.handle(IPC.openPath, (_e, raw: unknown, opts: unknown): Promise<boolean> => openFile(raw, opts, testMode));
+  ipcMain.handle(IPC.quickLook, (e, raw: unknown): boolean => quickLook(BrowserWindow.fromWebContents(e.sender), raw, testMode));
+  ipcMain.handle(IPC.showInFinder, (_e, raw: unknown): boolean => showInFinder(raw, testMode));
   ipcMain.handle(IPC.pickFolder, (e): Promise<string | null> => pickFolder(BrowserWindow.fromWebContents(e.sender), testMode));
   ipcMain.handle(IPC.copy, async (_e, text: unknown): Promise<void> => {
     if (typeof text !== 'string' || text.length > MAX_COPY) return;
@@ -106,6 +109,42 @@ export async function openFile(raw: unknown, opts: unknown, testMode: boolean): 
   const plan = openPlan(path, line, process.env, (scheme) => app.getApplicationNameForProtocol(`${scheme}://`) !== '');
   if (plan.how === 'editor') await shell.openExternal(plan.url);
   else shell.showItemInFolder(plan.path);
+  return true;
+}
+
+/** His home and project folders: where quickLook and showInFinder may look (reveal.ts). */
+let roots: readonly string[] = [];
+/** The core's projects rows changed (index.ts). */
+export function setProjectRoots(paths: readonly string[]): void {
+  roots = paths;
+}
+const lookable = (raw: unknown): string | null => {
+  const p = allowedPath(raw, [homedir(), ...roots]);
+  return p !== null && existsSync(p) ? p : null;
+};
+
+/** window.bise.quickLook: macOS's Quick Look panel of `win` on the file; test mode a stdout line. */
+export function quickLook(win: BrowserWindow | null, raw: unknown, testMode: boolean): boolean {
+  const p = lookable(raw);
+  if (p === null) return false;
+  if (testMode) {
+    process.stdout.write(`${QUICKLOOK_LINE} ${p}\n`);
+    return true;
+  }
+  if (win === null || process.platform !== 'darwin') return false;
+  win.previewFile(p);
+  return true;
+}
+
+/** window.bise.showInFinder: the file selected in a Finder window; test mode a stdout line. */
+export function showInFinder(raw: unknown, testMode: boolean): boolean {
+  const p = lookable(raw);
+  if (p === null) return false;
+  if (testMode) {
+    process.stdout.write(`${REVEAL_LINE} ${p}\n`);
+    return true;
+  }
+  shell.showItemInFolder(p);
   return true;
 }
 

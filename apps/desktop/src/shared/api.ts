@@ -52,6 +52,14 @@ export interface BiseApi {
    */
   readonly pickFolder: () => Promise<string | null>;
   /**
+   * macOS's Quick Look on a file, from the asking window (its own panel);
+   * true when shown. Only a path under his home or a project folder; test
+   * mode prints QUICKLOOK_LINE <path> instead.
+   */
+  readonly quickLook: (path: string) => Promise<boolean>;
+  /** The file selected in a Finder window; same fence; test mode prints REVEAL_LINE <path>. */
+  readonly showInFinder: (path: string) => Promise<boolean>;
+  /**
    * Puts text on the clipboard. In test mode: the window's private buffer
    * (⌘V pastes it) and `COPY_LINE <text as JSON>` on stdout, never his clipboard.
    */
@@ -222,6 +230,8 @@ export const IPC = {
   openExternal: 'bise:open-external',
   openPath: 'bise:open-path',
   pickFolder: 'bise:pick-folder',
+  quickLook: 'bise:quick-look',
+  showInFinder: 'bise:show-in-finder',
   copy: 'bise:copy',
   menu: 'bise:menu',
   /** test mode: a clipboard item of the menu, played on the window's private buffer */
@@ -288,6 +298,11 @@ export const CAPSULE_LINE = 'bise-desktop: capsule';
 /** Test mode's stdout lines for effects that would leave the app. */
 export const EXTERNAL_LINE = 'bise-desktop: external';
 export const OPEN_PATH_LINE = 'bise-desktop: open-path';
+
+/** Test mode: window.bise.quickLook's line on stdout, `QUICKLOOK_LINE <path>`. */
+export const QUICKLOOK_LINE = 'bise-desktop: quicklook';
+/** Test mode: window.bise.showInFinder's line on stdout, `REVEAL_LINE <path>`. */
+export const REVEAL_LINE = 'bise-desktop: reveal';
 /** Test mode (no Dock icon): the Dock's badge as `BADGE_LINE "2"` ("" = none); the window's title is main's getTitle(). */
 export const BADGE_LINE = 'bise-desktop: badge';
 export const COPY_LINE = 'bise-desktop: copy';
