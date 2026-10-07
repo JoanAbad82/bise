@@ -37,7 +37,8 @@ export function whoOf(e: Entry, ctx: { agent: string; bise: boolean }): { from: 
     case 'you':
       return { from: 'you', name: 'you', indent: false };
     case 'from_agent':
-      return { from: 'agent', name: e.from ?? 'an agent', indent: true };
+      // batch 3a: a message between two other agents says to whom ('perf → docs')
+      return { from: 'agent', name: e.to != null && e.to !== '' && e.to !== ctx.agent ? `${e.from ?? 'an agent'} → ${e.to}` : (e.from ?? 'an agent'), indent: true };
     default:
       return ctx.bise && ctx.agent === 'main' ? { from: 'bise', name: 'bise', indent: false } : { from: 'agent', name: ctx.agent, indent: false };
   }

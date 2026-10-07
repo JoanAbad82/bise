@@ -43,3 +43,12 @@ describe('M14: a turn time on hover', () => {
     expect(whenOf(0, NOW, 'UTC')).toBe('');
   });
 });
+
+describe('batch 3a: a message between two other agents', () => {
+  it("names both ('perf → docs'), and only the sender when it is to the agent in view", () => {
+    const m = e({ kind: 'from_agent', from: 'perf', to: 'docs' });
+    expect(whoOf(m, { agent: 'main', bise: false }).name).toBe('perf → docs');
+    expect(whoOf(m, { agent: 'docs', bise: false }).name).toBe('perf');
+    expect(whoOf(e({ kind: 'from_agent', from: 'perf' }), { agent: 'main', bise: false }).name).toBe('perf');
+  });
+});

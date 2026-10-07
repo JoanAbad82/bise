@@ -315,6 +315,52 @@
   width: 1em;
   text-align: center;
 }
+/* batch 3a: the hub's news lines (landed, PR news, approvals, answered for him): a mark that
+   says what it means, the words; tone by the mark and its words, never color alone */
+.th-news {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--c-text-2);
+}
+.th-news-mark {
+  flex: none;
+  width: 1em;
+  text-align: center;
+}
+.th-news.ok .th-news-mark {
+  color: var(--c-ok, var(--c-text));
+}
+.th-news.err .th-news-mark {
+  color: var(--c-accent);
+}
+.th-news.dim {
+  color: var(--c-text-3);
+}
+.th-news-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--c-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.th-news-link:hover {
+  color: var(--c-text);
+  text-decoration-thickness: 2px;
+}
+.th-news-link:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--c-focus);
+  border-radius: 3px;
+}
+.th-news-note {
+  margin: 2px 0 0 calc(1em + 8px);
+  color: var(--c-text-3);
+}
+
 .th-unknown {
   color: var(--c-text-2);
 }

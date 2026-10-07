@@ -3,7 +3,7 @@
 // Each row reads its own data with the store's per-key hooks (useEntry,
 // usePending), so a new or replaced entry re-renders that row alone; the
 // list above it only holds keys. Memo'd on their props (strings, numbers).
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useState, type ReactNode } from 'react';
 import { Answered, Art, Button, Chip, Fold, Marker, Msg, Opts, Tool } from '@/ds';
 import type { Entry } from '@/proto';
 import { useAgents, useCoreState, useEntry, usePending, useProjects, useStore, useThreadOrder } from '@/store';
@@ -12,6 +12,7 @@ import { useFold } from './folds';
 import { Markdown } from './Markdown';
 import { clock, whenOf, whoOf } from './entry';
 import { useToday } from '@/app/clock';
+import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
 
 /** What a row needs of its thread. */
@@ -93,6 +94,17 @@ function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       return <NoticeRow e={e} />;
     case 'not_delivered':
       return <NotDeliveredRow e={e} ctx={ctx} />;
+    // amb-feed's batch 3a (5d4189cb): the hub's news lines, typed
+    case 'landed':
+      return <LandedRow e={e} ctx={ctx} />;
+    case 'pr':
+      return <PrRow e={e} ctx={ctx} />;
+    case 'artifact':
+      return <MadeRow e={e} ctx={ctx} />;
+    case 'answered':
+      return <AnsweredRow e={e} />;
+    case 'approval':
+      return <ApprovalRow e={e} />;
     case 'unknown':
       // a kind from a newer hub: its words, plain and dim
       return (
@@ -110,6 +122,109 @@ function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       );
     }
   }
+}
+
+/** A news line's mark: what it means, never its color alone. */
+function NewsLine({ mark, tone, testId, children }: { mark: string; tone: 'ok' | 'err' | 'plain' | 'dim'; testId: string; children: ReactNode }) {
+  return (
+    <div className={`th-news ${tone}`} data-testid={testId} data-tone={tone}>
+      <span className="th-news-mark" aria-hidden="true">
+        {mark}
+      </span>
+      <span className="th-news-text">{children}</span>
+    </div>
+  );
+}
+
+/** 'perf landed on main · a1b2c3d · 3 files +42 −18': the sha opens the commit. */
+function LandedRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const router = useRouter();
+  const l = e.landed;
+  if (l == null) return <Marker>{e.text}</Marker>;
+  return (
+    <NewsLine mark="✓" tone="ok" testId={`thread.landed.${e.pos}`}>
+      {l.agent} landed on {l.target} ·{' '}
+      <button
+        type="button"
+        className="th-news-link"
+        onClick={() => {
+          router.go({ screen: 'commit', project: ctx.project, sha: l.sha });
+        }}
+        data-testid={`thread.landed.${e.pos}.sha`}
+      >
+        {l.sha.slice(0, 7)}
+      </button>
+      {e.text !== '' ? ` · ${e.text}` : ''}
+    </NewsLine>
+  );
+}
+
+/** A PR's news: its number opens it; failing / done / news said by its mark and words. */
+function PrRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const p = e.pr;
+  if (p == null) return <Marker>{e.text}</Marker>;
+  const [mark, tone] = p.state === 'failing' ? (['▲', 'err'] as const) : p.state === 'done' ? (['✓', 'dim'] as const) : (['•', 'plain'] as const);
+  return (
+    <NewsLine mark={mark} tone={tone} testId={`thread.pr.${e.pos}`}>
+      <button
+        type="button"
+        className="th-news-link"
+        onClick={() => {
+          ctx.onLink(p.url);
+        }}
+        data-testid={`thread.pr.${e.pos}.link`}
+      >
+        PR #{p.number}
+      </button>{' '}
+      · {p.text}
+    </NewsLine>
+  );
+}
+
+/** What an agent made: a card that opens it (its page, else the project's artifacts). */
+function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const router = useRouter();
+  const m = e.made;
+  if (m == null) return <Marker>{e.text}</Marker>;
+  return (
+    <Art
+      title={`↗ ${m.title}`}
+      meta={[m.kind_word, m.v > 1 ? `v${String(m.v)}` : '', m.agent].filter(Boolean).join(' · ')}
+      onClick={() => {
+        if (m.url != null && m.url !== '') ctx.onLink(m.url);
+        else router.go({ screen: 'artifacts', project: ctx.project, id: m.id });
+      }}
+      testId={`thread.artifact.${e.pos}`}
+    />
+  );
+}
+
+/** Main answered an agent's question for him: the question, the answer, and why, dim. */
+function AnsweredRow({ e }: { e: Entry }) {
+  const a = e.answered;
+  if (a == null) return <Marker>{e.text}</Marker>;
+  return (
+    <div className="th-answered" data-testid={`thread.answered.${e.pos}`}>
+      <NewsLine mark="↳" tone="plain" testId={`thread.answered.${e.pos}.head`}>
+        answered {a.agent} for you: {a.question} → <b>{a.answer}</b>
+      </NewsLine>
+      {a.why !== '' && <div className="th-news-note">{a.why}</div>}
+    </div>
+  );
+}
+
+/** His answer to an approval, folded: allowed or said no, and his words under it. */
+function ApprovalRow({ e }: { e: Entry }) {
+  const a = e.approval;
+  if (a == null) return <Marker>{e.text}</Marker>;
+  return (
+    <div className="th-approval" data-testid={`thread.approval.${e.pos}`} data-ok={a.ok}>
+      <NewsLine mark={a.ok ? '✓' : '✕'} tone={a.ok ? 'ok' : 'dim'} testId={`thread.approval.${e.pos}.head`}>
+        {a.text}
+      </NewsLine>
+      {a.note != null && a.note !== '' && <div className="th-news-note">{a.note}</div>}
+    </div>
+  );
 }
 
 /** A thinking row's head, as the TUI's words::thought_for: 'thought for 3.2s', 'thought' (time unknown). Pure. */
