@@ -20,7 +20,7 @@ describe("the / list: the TUI's commands in its order, never a silent gap", () =
     const rows = pickCommands(core);
     expect(rows.slice(0, core.length).map((r) => r.name)).toEqual(core.map((c) => c.name));
     const ready = Object.fromEntries(rows.map((r) => [r.name, r.ready]));
-    expect(ready).toMatchObject({ '/new': true, '/compact': true, '/inbox': true, '/scheduled': false, '/rename': true, '/agents': true, '/quit': false });
+    expect(ready).toMatchObject({ '/new': true, '/compact': true, '/inbox': true, '/scheduled': true, '/rename': true, '/agents': true, '/quit': true });
   });
   it("maps the arguments the composer completes (a note is free text) and adds the window's own the TUI lacks", () => {
     const rows = pickCommands(core);
@@ -43,7 +43,11 @@ describe('a command line runs as the TUI runs it', () => {
     expect(windowRun('/shortcuts', '', at)).toEqual({ help: true });
     expect(windowRun('/plugins', '', at)).toEqual({ go: { screen: 'settings', page: 'plugins' } });
     expect(windowRun('/welcome', '', at)).toEqual({ go: { screen: 'onboarding' } });
-    expect(windowRun('/scheduled', '', at), 'no screen yet').toBeUndefined();
+    expect(windowRun('/scheduled', '', at), 'R4').toEqual({ go: { screen: 'scheduled' } });
+    expect(windowRun('/quit', '', at), 'R5: quits, the agents keep running').toEqual({ quit: true });
+    expect(windowRun('/diff', 'sb/x', at), 'R7: a branch, with or without an agent').toEqual({ go: { screen: 'branch', project: P, branch: 'sb/x' } });
+    expect(windowRun('/diff', 'feat/a/b', at), 'its slashes kept').toEqual({ go: { screen: 'branch', project: P, branch: 'feat/a/b' } });
+    expect(windowRun('/diff', 'perf', at), 'an agent: its review').toEqual({ go: { screen: 'review', project: P, agent: 'perf' } });
     expect(windowRun('/new', 'x', at)).toBeUndefined();
   });
   it("a line he typed that isn't a window screen goes to the hub as typed (architect m_11011), never parsed here", () => {
@@ -54,10 +58,25 @@ describe('a command line runs as the TUI runs it', () => {
     expect(slashOf('/flow', 'pr', at), 'C42').toEqual(slash('/flow pr'));
     expect(slashOf('compact', '', at)).toEqual(slash('/compact'));
   });
-  it('a window command with words of its own goes to the hub: /artifacts add <url> (C13), /plugins enable <x>', () => {
+  it("a window command's words act as its settings switch (R2, R3): the same AppCmd settings sends", () => {
+    expect(windowRun('/plugins', 'disable notes', at)).toEqual({ app: { cmd: 'plugin_set', name: 'notes', on: false } });
+    expect(windowRun('/plugins', 'enable computer', at)).toEqual({ app: { cmd: 'plugin_set', name: 'computer', on: true } });
+    expect(windowRun('/plugins', 'login linear', at)).toEqual({ app: { cmd: 'plugin_login', name: 'linear' } });
+    expect(windowRun('/plugins', 'logout linear', at)).toEqual({ app: { cmd: 'plugin_logout', name: 'linear' } });
+    expect(windowRun('/plugins', 'list', at), 'list: the page').toEqual({ go: { screen: 'settings', page: 'plugins' } });
+    expect(windowRun('/plugins', 'login', at), 'no name: the hub lists them').toBeUndefined();
+    expect(windowRun('/plugins', 'frob x', at), 'unknown: the hub says the usage').toBeUndefined();
+    expect(windowRun('/theme', 'light', at)).toEqual({ app: { cmd: 'prefs_set', key: 'theme', value: 'light' } });
+    expect(windowRun('/theme', 'dark', at)).toEqual({ app: { cmd: 'prefs_set', key: 'theme', value: 'dark' } });
+    expect(windowRun('/theme', 'auto', at), "the TUI's auto is the system's").toEqual({ app: { cmd: 'prefs_set', key: 'theme', value: 'system' } });
+    expect(windowRun('/theme', '', at), 'bare: the page').toEqual({ go: { screen: 'settings', page: 'general' } });
+    expect(windowRun('/computer-use', 'off', at)).toEqual({ app: { cmd: 'computer_use', act: 'off' } });
+    expect(windowRun('/computer-use', 'uninstall', at)).toEqual({ app: { cmd: 'computer_use', act: 'uninstall' } });
+    expect(windowRun('/computer-use', '', at), 'bare: the page sets it up').toEqual({ go: { screen: 'settings', page: 'computer' } });
+  });
+  it('a window command with words of its own goes to the hub: /artifacts add <url> (C13)', () => {
     expect(windowRun('/artifacts', '', at)).toEqual({ go: { screen: 'artifacts', project: P } });
     expect(windowRun('/artifacts', 'add https://x.test', at), 'C13: not the screen').toBeUndefined();
-    expect(windowRun('/plugins', 'enable x', at)).toBeUndefined();
     expect(slashOf('/artifacts', 'add https://x.test', at)).toEqual({ cmd: 'slash', project: P, agent: 'perf', line: '/artifacts add https://x.test' });
   });
 });

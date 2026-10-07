@@ -2,12 +2,14 @@
 // 40f14a12): the TUI's commands in its order, from the core (useCommands),
 // each ready or greyed 'not yet', never a silent gap. How one runs:
 // - runs 'window': it opens its screen here (the window owns readiness:
-//   ready when the screen exists);
+//   ready when the screen exists), or with its words does what that screen's
+//   switch does (/theme light, /plugins disable x, /computer-use off: the
+//   same AppCmd settings sends), or quits (/quit);
 // - runs 'hub': his line as he typed it, HubCmd slash (the TUI's router and
 //   handlers run it in the hub; architect m_11011).
 // Owner: amb-win. Pure.
 import type { ArgKind, PickCommand } from '@/composer';
-import type { HubCmd, PickArg, PickCommand as CoreCommand } from '@/proto';
+import type { AppCmd, HubCmd, PickArg, PickCommand as CoreCommand } from '@/proto';
 import { MAIN, type Route } from '@/app/route';
 
 /** The window's own commands the TUI has no row for, after the core's. */
@@ -15,16 +17,45 @@ export const windowCommands: readonly PickCommand[] = [
   { name: 'agents', desc: 'the agents of this project', args: false, ready: true },
   { name: 'archived', desc: 'its archived agents', args: false, ready: true },
   { name: 'switch', desc: 'go to an agent', args: true, argKinds: ['agent'], ready: true },
-  { name: 'diff', desc: "an agent's changes, or the project's", args: true, argKinds: ['agent'], ready: true },
+  { name: 'diff', desc: "an agent's or a branch's changes, or the project's", args: true, argKinds: ['agent'], ready: true },
   { name: 'prs', desc: 'its open pull requests', args: false, ready: true },
   { name: 'artifacts', desc: 'what its agents made', args: false, ready: true },
-  { name: 'scheduled', desc: 'its timers', args: false, ready: false },
+  { name: 'scheduled', desc: 'its timers', args: false, ready: true },
 ];
 
-/** What a window command does here: a screen, or the key list over the window. */
-export type WindowRun = { readonly go: Route } | { readonly help: true };
+/**
+ * What a window command does here: a screen, the key list over the window,
+ * one of the core's own commands (the one settings sends for the same
+ * switch: /plugins disable x, /theme light, /computer-use off), or quit.
+ */
+export type WindowRun = { readonly go: Route } | { readonly help: true } | { readonly app: AppCmd } | { readonly quit: true };
 
 const at0 = (args: string): string => args.trim().split(/\s+/)[0] ?? '';
+const at1 = (args: string): string => args.trim().split(/\s+/)[1] ?? '';
+
+/** The TUI's /theme words (auto = follow the system) as the window's prefs theme. */
+const THEMES: Readonly<Record<string, string>> = { light: 'light', dark: 'dark', auto: 'system', system: 'system' };
+
+/**
+ * /plugins <sub> <name> as settings · plugins sends it (rust/tui/src/plugins.rs's
+ * subcommands); 'list', a bare login/logout or an unknown word: none (the screen
+ * or the hub's usage line).
+ */
+function pluginsRun(args: string): AppCmd | undefined {
+  const [sub, name] = [at0(args), at1(args)];
+  if (name === '') return undefined;
+  switch (sub) {
+    case 'enable':
+    case 'disable':
+      return { cmd: 'plugin_set', name, on: sub === 'enable' };
+    case 'login':
+      return { cmd: 'plugin_login', name };
+    case 'logout':
+      return { cmd: 'plugin_logout', name };
+    default:
+      return undefined;
+  }
+}
 
 /** The screen a window command opens here; none: not one of the window's (or no screen yet). */
 export function windowRun(name: string, args: string, at: { project: string; agent: string }): WindowRun | undefined {
@@ -37,6 +68,8 @@ export function windowRun(name: string, args: string, at: { project: string; age
     case 'switch':
       return go(arg === '' ? { screen: 'agents', project: at.project } : { screen: 'thread', project: at.project, agent: arg });
     case 'diff': {
+      // a branch (it has a slash: sb/x, feat/y) opens its diff, an agent on it or none (R7, amb-win's route)
+      if (arg.includes('/')) return go({ screen: 'branch', project: at.project, branch: arg });
       const who = arg === '' ? at.agent : arg;
       return go(who === MAIN ? { screen: 'changes', project: at.project } : { screen: 'review', project: at.project, agent: who });
     }
@@ -55,14 +88,28 @@ export function windowRun(name: string, args: string, at: { project: string; age
     case 'models':
     case 'provider':
       return go({ screen: 'settings', page: 'models' });
-    case 'theme':
-      return go({ screen: 'settings', page: 'general' });
+    case 'theme': {
+      // '/theme light' switches as settings · general does; bare or unknown: the page
+      const t = THEMES[arg];
+      return t === undefined ? go({ screen: 'settings', page: 'general' }) : { app: { cmd: 'prefs_set', key: 'theme', value: t } };
+    }
     case 'setup':
       return go({ screen: 'settings', page: 'setup' });
-    case 'plugins':
-      return arg === '' ? go({ screen: 'settings', page: 'plugins' }) : undefined;
+    case 'plugins': {
+      // '/plugins disable x' acts as settings · plugins' switch; 'list' or bare: the page;
+      // anything else goes to the hub, whose line says the usage
+      if (arg === '' || arg === 'list') return go({ screen: 'settings', page: 'plugins' });
+      const c = pluginsRun(args);
+      return c === undefined ? undefined : { app: c };
+    }
     case 'computer-use':
-      return go({ screen: 'settings', page: 'computer' });
+      // '/computer-use off|uninstall' acts as the settings page's buttons; bare: the page (it sets up)
+      return arg === 'off' || arg === 'uninstall' ? { app: { cmd: 'computer_use', act: arg } } : go({ screen: 'settings', page: 'computer' });
+    case 'scheduled':
+      return go({ screen: 'scheduled' });
+    case 'quit':
+      // the window and the capsule quit; the agents keep running (the hub is its own process)
+      return { quit: true };
     case 'welcome':
       return go({ screen: 'onboarding' });
     default:

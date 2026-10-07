@@ -690,6 +690,8 @@ export const ThreadComposer = memo(function ThreadComposer({
       const w = windowRun(name, args, at);
       if (w !== undefined) {
         if ('go' in w) router.go(w.go);
+        else if ('app' in w) store.command(w.app);
+        else if ('quit' in w) window.bise.quit();
         else window.dispatchEvent(new Event(HELP_EVENT));
         return;
       }
