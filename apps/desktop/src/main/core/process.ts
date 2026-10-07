@@ -5,15 +5,21 @@
 // pending sends failed on `down`). Node only (no Electron), so its test
 // drives a fake core script.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { openSync, closeSync } from 'node:fs';
+import { closeSync, openSync, readSync, statSync } from 'node:fs';
 import { Backoff, coreArgs, coreEnv, type CoreConfig } from './env';
+import { exitOf, failedToStart } from './exit';
 import { eventOf, LineSplitter, lineOf } from './lines';
-import type { CoreState } from '../../shared/api';
+import type { CoreExit, CoreState } from '../../shared/api';
+
+/** At most this much of a run's stderr is read back from the log at its end. */
+const TAIL = 16 * 1024;
 
 export interface CoreHooks {
   /** a JSON object with a string `ev`, as the core wrote it */
   readonly onEvent: (ev: Record<string, unknown>) => void;
   readonly onState: (state: CoreState) => void;
+  /** how a run ended (exit.ts): before the 'down' it causes; never at stop() */
+  readonly onExit?: (exit: CoreExit) => void;
   /** a log line of main (not the core's stderr, which goes to the log file) */
   readonly log: (line: string) => void;
 }
@@ -32,6 +38,8 @@ export class CoreProcess {
   private stopped = true;
   private gen = 0;
   private startedAt = 0;
+  /** the log's size when this run started: its own stderr comes after */
+  private logFrom = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private readonly backoff = new Backoff();
   private stateNow: CoreState = 'down';
@@ -93,6 +101,7 @@ export class CoreProcess {
     this.gen += 1;
     const g = this.gen;
     this.startedAt = Date.now();
+    this.logFrom = this.logSize();
     let err: number | 'ignore' = 'ignore';
     if (this.opts.logFile !== undefined) {
       try {
@@ -112,6 +121,7 @@ export class CoreProcess {
     } catch (e) {
       this.hooks.log(`core: can't start ${config.bise}: ${String(e)}`);
       if (typeof err === 'number') closeSync(err);
+      this.hooks.onExit?.(failedToStart(`can't start ${config.bise}: ${String(e)}`, Date.now()));
       this.exited(g);
       return;
     }
@@ -137,12 +147,44 @@ export class CoreProcess {
     });
     child.on('error', (e) => {
       this.hooks.log(`core: ${e.message}`);
+      if (g === this.gen && !this.stopped) this.hooks.onExit?.(failedToStart(e.message, Date.now()));
       this.exited(g);
     });
     child.on('exit', (code, signal) => {
       this.hooks.log(`core: exited ${String(code ?? signal)}`);
+      if (g === this.gen && !this.stopped) this.hooks.onExit?.(exitOf(code, signal, this.runTail(), this.opts.logFile ?? null, Date.now()));
       this.exited(g);
     });
+  }
+
+  private logSize(): number {
+    if (this.opts.logFile === undefined) return 0;
+    try {
+      return statSync(this.opts.logFile).size;
+    } catch {
+      return 0;
+    }
+  }
+
+  /** What this run wrote to the log (its last TAIL bytes at most). */
+  private runTail(): string {
+    const file = this.opts.logFile;
+    if (file === undefined) return '';
+    try {
+      const end = statSync(file).size;
+      const from = Math.max(this.logFrom, end - TAIL);
+      if (end <= from) return '';
+      const fd = openSync(file, 'r');
+      try {
+        const buf = Buffer.alloc(end - from);
+        readSync(fd, buf, 0, buf.length, from);
+        return buf.toString('utf8');
+      } finally {
+        closeSync(fd);
+      }
+    } catch {
+      return '';
+    }
   }
 
   private exited(g: number): void {

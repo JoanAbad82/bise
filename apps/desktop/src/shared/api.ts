@@ -85,6 +85,27 @@ export interface TermApi {
 /** The core child as main sees it: starting, up (writes go through), down (restarting, or no bise). */
 export type CoreState = 'starting' | 'up' | 'down';
 
+/**
+ * How the core's last run ended (bar S.5 'its last log line', O.4 crash;
+ * src/main/core/exit.ts), sent with every core state after its first end.
+ * - how: 'clean' (exit 0), 'code' (exit `code`), 'signal' (killed by
+ *   `signal`), 'failed' (it could not start: `last` says why);
+ * - crash: a fatal signal (SIGSEGV, SIGABRT, SIGBUS...) or a Rust panic;
+ * - last: its last stderr line of that run (a panic's message), trimmed,
+ *   at most 300 characters, never a key or a token; '' when it said nothing;
+ * - log: for a crash, the core's log (the report): CorePort.revealLog shows
+ *   it in Finder, window.bise.copy copies its path.
+ */
+export interface CoreExit {
+  readonly how: 'clean' | 'code' | 'signal' | 'failed';
+  readonly code: number | null;
+  readonly signal: string | null;
+  readonly crash: boolean;
+  readonly last: string;
+  readonly log: string | null;
+  readonly at_ms: number;
+}
+
 /** What the window sends the core: bise-proto's typed commands only (a HubCmd carries its project). */
 export type CoreCmd = AppCmd | HubCmd | DraftHubCmd;
 
@@ -98,9 +119,14 @@ export interface CorePort {
   /** One command to the core; dropped (with a log line in main) when the core is down. */
   readonly send: (cmd: CoreCmd) => void;
   readonly onEvent: (listener: (ev: Record<string, unknown>) => void) => () => void;
-  readonly onState: (listener: (state: CoreState) => void) => () => void;
+  /** The core's state, with how its last run ended (null until it ended once). */
+  readonly onState: (listener: (state: CoreState, exit: CoreExit | null) => void) => () => void;
   /** The state now (a window that loads late asks once, then follows onState). */
   readonly state: () => Promise<CoreState>;
+  /** How its last run ended, now (null: it never ended). Optional for a test's fake port. */
+  readonly lastExit?: () => Promise<CoreExit | null>;
+  /** Shows the core's log in Finder (a crash's report); in test mode a CORE_REVEAL_LINE on stdout. */
+  readonly revealLog?: () => void;
   /**
    * The core's last state events (projects, prefs, accounts, agents, cards...),
    * kept by main: a window that loads late replays them once, after it
@@ -117,7 +143,12 @@ export const CORE_IPC = {
   state: 'bise:core-state',
   stateNow: 'bise:core-state-now',
   snapshot: 'bise:core-snapshot',
+  exitNow: 'bise:core-exit-now',
+  revealLog: 'bise:core-reveal-log',
 } as const;
+
+/** Test mode: revealLog prints `CORE_REVEAL_LINE <log path>` instead of opening Finder. */
+export const CORE_REVEAL_LINE = 'bise-desktop: reveal';
 
 export type Surface = 'window' | 'capsule';
 

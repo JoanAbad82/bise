@@ -4,8 +4,8 @@
 // src/main/index.ts calls startCore() once at ready and stopCore() at quit.
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { app, BrowserWindow, ipcMain } from 'electron';
-import { CORE_IPC, type CoreState } from '../../shared/api';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { CORE_IPC, CORE_REVEAL_LINE, TEST_ENV, type CoreExit, type CoreState } from '../../shared/api';
 import { binPath } from '../paths';
 import { configOf } from './env';
 import { Latest } from '../../shared/latest';
@@ -19,6 +19,8 @@ const listeners = new Set<(ev: Record<string, unknown>) => void>();
 // a dictation's words go only to the window that started it (dictation.ts)
 const dictations = new DictationRoutes();
 const watched = new Set<number>();
+// how its last run ended (exit.ts), sent with every state: null until it ended once
+let lastExit: CoreExit | null = null;
 
 /**
  * Main's own listener on the core's events (amb-mac m_9733: the helper's
@@ -36,6 +38,13 @@ export function onCoreEvent(listener: (ev: Record<string, unknown>) => void): ()
 function broadcast(channel: string, payload: unknown): void {
   for (const w of BrowserWindow.getAllWindows()) {
     if (!w.isDestroyed()) w.webContents.send(channel, payload);
+  }
+}
+
+/** The state with how the last run ended: one event, so the window reads both at once. */
+function sendState(s: CoreState): void {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (!w.isDestroyed()) w.webContents.send(CORE_IPC.state, s, lastExit);
   }
 }
 
@@ -82,6 +91,13 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
   });
   ipcMain.handle(CORE_IPC.stateNow, (): CoreState => state);
   ipcMain.handle(CORE_IPC.snapshot, (): Record<string, unknown>[] => latest.snapshot());
+  ipcMain.handle(CORE_IPC.exitNow, (): CoreExit | null => lastExit);
+  const logFile = join(app.getPath('userData'), 'core.log');
+  // a crash's report in Finder (test mode: a line, never Finder)
+  ipcMain.on(CORE_IPC.revealLog, () => {
+    if (env[TEST_ENV] === '1') process.stdout.write(`${CORE_REVEAL_LINE} ${logFile}${String.fromCharCode(10)}`);
+    else shell.showItemInFolder(logFile);
+  });
   const bise = binPath({ env, packaged: app.isPackaged, resourcesPath: process.resourcesPath, appPath: app.getAppPath(), exists: existsSync });
   const config = configOf(bise, env);
   if (config === null) {
@@ -89,7 +105,7 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
     return;
   }
   core = new CoreProcess(
-    { config, logFile: join(app.getPath('userData'), 'core.log'), env },
+    { config, logFile, env },
     {
       onEvent: (ev) => {
         // a dictation's words: its window only, never kept, never main's listeners
@@ -108,7 +124,11 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
         // a core gone took its mic with it: its dictations end
         if (s !== 'up') for (const r of dictations.coreGone()) toWindow(r);
         state = s;
-        broadcast(CORE_IPC.state, s);
+        sendState(s);
+      },
+      onExit: (e) => {
+        lastExit = e;
+        log(`core: ended ${e.how}${e.code === null ? '' : ` ${String(e.code)}`}${e.signal === null ? '' : ` ${e.signal}`}${e.crash ? ' (crash)' : ''}`);
       },
       log,
     },

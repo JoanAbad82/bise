@@ -2,7 +2,7 @@ import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { CoreState } from '../../shared/api';
+import type { CoreExit, CoreState } from '../../shared/api';
 import { Backoff, configOf, coreArgs, coreEnv } from './env';
 import { eventOf, LineSplitter, lineOf, NL } from './lines';
 import { CoreProcess } from './process';
@@ -139,4 +139,67 @@ describe('CoreProcess', () => {
     core.stop();
     expect(states.includes('up')).toBe(false);
   });
+
+  it('says how a run ended: a panic is a crash with its message and the log; only this run\'s stderr counts', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bise-core-test-'));
+    const logFile = join(dir, 'core.log');
+    writeFileSync(logFile, `an older run's last words${NL}`);
+    const bise = join(dir, 'bise');
+    writeFileSync(
+      bise,
+      [
+        '#!/bin/sh',
+        'echo "ambient-core: hello" >&2',
+        'echo "thread \'main\' panicked at tui/src/ambient/core.rs:120:9:" >&2',
+        'echo "no hub for sk-ant-SECRETSECRET1234" >&2',
+        "echo 'note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace' >&2",
+        'exit 101',
+      ].join(NL) + NL,
+    );
+    chmodSync(bise, 0o755);
+    const exits: CoreExit[] = [];
+    const core = new CoreProcess(
+      { config: { bise, workspace: '' }, logFile, scale: 1000 },
+      { onEvent: () => undefined, onState: () => undefined, log: () => undefined, onExit: (e) => exits.push(e) },
+    );
+    core.start();
+    await waitFor(() => exits.length === 1);
+    core.stop();
+    expect(exits[0]).toMatchObject({ how: 'code', code: 101, crash: true, log: logFile });
+    expect(exits[0]?.last).toBe('no hub for …');
+  });
+
+  it('a core killed by SIGSEGV is a crash; one that exits 0 is clean; stop() says nothing', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bise-core-test-'));
+    const logFile = join(dir, 'core.log');
+    const bise = join(dir, 'bise');
+    writeFileSync(bise, ['#!/bin/sh', 'echo "about to fall" >&2', 'kill -SEGV $$'].join(NL) + NL);
+    chmodSync(bise, 0o755);
+    const exits: CoreExit[] = [];
+    const core = new CoreProcess(
+      { config: { bise, workspace: '' }, logFile, scale: 1000 },
+      { onEvent: () => undefined, onState: () => undefined, log: () => undefined, onExit: (e) => exits.push(e) },
+    );
+    core.start();
+    await waitFor(() => exits.length === 1);
+    core.stop();
+    expect(exits[0]).toMatchObject({ how: 'signal', signal: 'SIGSEGV', crash: true, last: 'about to fall', log: logFile });
+
+    writeFileSync(bise, ['#!/bin/sh', 'echo "done" >&2', 'exit 0'].join(NL) + NL);
+    const clean: CoreExit[] = [];
+    const c2 = new CoreProcess(
+      { config: { bise, workspace: '' }, logFile, scale: 1000 },
+      { onEvent: () => undefined, onState: () => undefined, log: () => undefined, onExit: (e) => clean.push(e) },
+    );
+    c2.start();
+    await waitFor(() => clean.length === 1);
+    c2.stop();
+    expect(clean[0]).toMatchObject({ how: 'clean', code: 0, crash: false, last: 'done', log: null });
+    const n = clean.length;
+    c2.start();
+    c2.stop();
+    await new Promise((r) => setTimeout(r, 200));
+    expect(clean.length - n).toBeLessThanOrEqual(1);
+  });
 });
+
