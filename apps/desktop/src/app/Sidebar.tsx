@@ -148,14 +148,16 @@ function AgentRow({ project, a, n, route, now }: { project: string; a: Agent; n:
       kind="ag"
       name={
         // its ⌥ number (tui-parity W4: the panel's numbers for ⌥1-9)
-        n >= 1 && n <= 9 ? (
-          <>
-            <span className="app-n">{n}</span>
-            {a.name}
-          </>
-        ) : (
-          a.name
-        )
+        <>
+          {n >= 1 && n <= 9 && <span className="app-n">{n}</span>}
+          {a.name}
+          {/* its context gauge, the hub's words as sent ('42k · 17%', amb-feed b8cb4b1e) */}
+          {a.usage != null && a.usage.words !== '' && (
+            <span className="app-gauge" data-testid={`app.sidebar.agent.${a.name}.gauge`}>
+              {a.usage.words}
+            </span>
+          )}
+        </>
       }
       dot={dotOf(a.status)}
       end={end.text}

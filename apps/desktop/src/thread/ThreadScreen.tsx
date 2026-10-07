@@ -151,14 +151,25 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
       </a>
     );
   const lead = bise ? 'every project' : agent === 'main' ? 'main' : (projectName ?? project);
-  const sub =
-    agent === 'main' && countsLink !== null ? (
-      <>
-        {lead} · {countsLink}
-      </>
-    ) : (
-      [lead, !bise && agent !== 'main' && me ? lineOf(me) : ''].filter(Boolean).join(' · ')
-    );
+  // its context gauge, the hub's words as sent (the TUI's divider: '42k · 17%')
+  const gauge = me?.usage?.words ?? '';
+  const sub = (
+    <>
+      {agent === 'main' && countsLink !== null ? (
+        <>
+          {lead} · {countsLink}
+        </>
+      ) : (
+        [lead, !bise && agent !== 'main' && me ? lineOf(me) : ''].filter(Boolean).join(' · ')
+      )}
+      {gauge !== '' && (
+        <span className="th-gauge" data-testid="thread.usage">
+          {' · '}
+          {gauge}
+        </span>
+      )}
+    </>
+  );
 
   return (
     <FoldsContext value={folds}>

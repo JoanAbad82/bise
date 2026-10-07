@@ -7,7 +7,7 @@ import { Store, StoreProvider, replay, threadKey } from '@/store';
 import { placesOf } from '@/review/EnvironmentsScreen';
 import { Markdown, langOf } from './Markdown';
 import { newAtEnd } from './ThreadList';
-import { digitsOf, EntryRow, foldOf, toAgentName, type RowCtx } from './rows';
+import { digitsOf, EntryRow, foldOf, NOTICE_MARK, thoughtFor, toAgentName, type RowCtx } from './rows';
 import { countsOf, ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
 
@@ -197,5 +197,91 @@ describe('who a question waits for (ambient m_10689)', () => {
     expect(digitsOf([1, 2])).toBe('1 or 2');
     expect(digitsOf([1, 2, 3])).toBe('1, 2 or 3');
     expect(digitsOf([1])).toBe('1');
+  });
+});
+
+describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not delivered, usage)", () => {
+  const ctx: RowCtx = { tkey: threadKey(P, 'perf'), project: P, agent: 'perf', bise: false, onLink: () => undefined };
+  const rowOf = (store: Store, pos: number) =>
+    render(
+      <StoreProvider store={store}>
+        <EntryRow ctx={ctx} pos={pos} />
+      </StoreProvider>,
+    );
+
+  it("thinking: the TUI's head words, folded, open to what it thought; a reply's own thinking rides on it", () => {
+    expect([0, 3200, 12_000, 75_000].map(thoughtFor)).toEqual(['thought', 'thought for 3.2s', 'thought for 12s', 'thought for 1m15s']);
+    const store = new Store(null);
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 21, at_ms: 1, kind: 'thinking', text: 'thought for 3.2s', thinking: { ms: 3200, text: 'the cold run is the slow one' } } });
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 22, at_ms: 2, kind: 'agent', text: 'done.', thinking: { ms: 900, text: 'check it twice' } } });
+    const v = rowOf(store, 21);
+    expect(v.getByTestId('thread.think.21.head').textContent).toContain('thought for 3.2s');
+    expect(v.getByTestId('thread.think.21').textContent).not.toContain('the cold run');
+    fireEvent.click(v.getByTestId('thread.think.21.head'));
+    expect(v.getByTestId('thread.think.21').textContent).toContain('the cold run is the slow one');
+    cleanup();
+    const r = rowOf(store, 22);
+    expect(r.getByTestId('thread.think.22.head').textContent).toContain('thought for 0.9s');
+    expect(r.getByTestId('thread.entry.22').textContent).toContain('done.');
+  });
+
+  it('compaction: a line while it runs, then the summary folded', () => {
+    const store = new Store(null);
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 22, at_ms: 1, kind: 'compacting', text: 'compacting' } });
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 23, at_ms: 2, kind: 'compacted', text: 'we profiled the hub' } });
+    expect(rowOf(store, 22).getByTestId('thread.compacting.22').textContent).toContain('compacting');
+    cleanup();
+    const v = rowOf(store, 23);
+    expect(v.getByTestId('thread.compacted.23').textContent).not.toContain('we profiled');
+    fireEvent.click(v.getByTestId('thread.compacted.23.head'));
+    expect(v.getByTestId('thread.compacted.23').textContent).toContain('we profiled the hub');
+  });
+
+  it('a notice says its level in a glyph, not by color alone; an unknown kind is its words, dim', () => {
+    const store = new Store(null);
+    const levels = ['info', 'warn', 'err'] as const;
+    levels.forEach((level, i) => {
+      store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 30 + i, at_ms: 1, kind: 'notice', text: `t ${level}`, notice: { level, text: `${level} words` } } });
+    });
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 40, at_ms: 1, kind: 'unknown', text: 'from a newer hub' } });
+    levels.forEach((level, i) => {
+      const n = rowOf(store, 30 + i).getByTestId(`thread.notice.${String(30 + i)}`);
+      expect(n.dataset.level).toBe(level);
+      expect(n.textContent).toBe(`${NOTICE_MARK[level]}${level} words`);
+      cleanup();
+    });
+    expect(NOTICE_MARK.warn).toBe('▲');
+    expect(NOTICE_MARK.err).toBe('✗');
+    expect(rowOf(store, 40).getByTestId('thread.unknown.40').textContent).toBe('from a newer hub');
+  });
+
+  it('not delivered: send again sends his words to that agent; esc drops it from view', () => {
+    const cmds: CoreCmd[] = [];
+    const port: CorePort = { send: (c) => cmds.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    const store = new Store(port);
+    store.setCore('up');
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 26, at_ms: 1, kind: 'not_delivered', text: 'then the warm run', not_delivered: { to: 'alerts', text: 'then the warm run' } } });
+    const v = rowOf(store, 26);
+    expect(v.getByTestId('thread.notdelivered.26').textContent).toContain('not delivered to alerts');
+    fireEvent.click(v.getByTestId('thread.notdelivered.26.again'));
+    expect(cmds.at(-1)).toMatchObject({ cmd: 'send', project: P, agent: 'alerts', text: 'then the warm run' });
+    expect(v.getByTestId('thread.notdelivered.26').textContent).toContain('sent again');
+    cleanup();
+    const w = rowOf(store, 26);
+    fireEvent.keyDown(w.getByTestId('thread.notdelivered.26'), { key: 'Escape' });
+    expect(w.queryByTestId('thread.notdelivered.26')).toBeNull();
+  });
+
+  it("usage: the hub's gauge words in the head, as sent", () => {
+    const store = new Store(null);
+    act(() => {
+      store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('perf', { usage: { model: 'm', context: 42310, window: 256000, words: '42k · 17%' } })] });
+    });
+    const v = render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="perf" /></RouterContext>
+      </StoreProvider>,
+    );
+    expect(v.getByTestId('thread.usage').textContent).toBe(' · 42k · 17%');
   });
 });

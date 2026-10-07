@@ -92,3 +92,11 @@
   color: var(--c-text-2);
   font-variant-numeric: tabular-nums;
 }
+
+/* an agent's context gauge in the sidebar, the hub's words ('42k · 17%') */
+.app-gauge {
+  margin-left: 6px;
+  color: var(--c-text-2);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}

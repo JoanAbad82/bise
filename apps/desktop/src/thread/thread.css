@@ -239,3 +239,50 @@
 .th-card-opts {
   margin: -4px 0 8px 52px;
 }
+
+/* amb-feed's batch 2 rows (b8cb4b1e) */
+.th-think,
+.th-compact {
+  color: var(--c-text-2);
+}
+.th-think-body {
+  margin: 4px 0 8px 18px;
+  color: var(--c-text-2);
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+.th-notice {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.th-notice.info,
+.th-notice.unknown {
+  color: var(--c-text-2);
+}
+.th-notice.warn .th-notice-mark,
+.th-notice.err .th-notice-mark {
+  color: var(--c-accent);
+}
+.th-notice-mark {
+  flex: none;
+  width: 1em;
+  text-align: center;
+}
+.th-unknown {
+  color: var(--c-text-2);
+}
+.th-notdelivered {
+  outline: none;
+}
+.th-notdelivered-head {
+  color: var(--c-text-2);
+}
+.th-notdelivered-text {
+  margin: 2px 0 4px;
+  white-space: pre-wrap;
+}
+.th-notdelivered-acts {
+  display: flex;
+  gap: 8px;
+}

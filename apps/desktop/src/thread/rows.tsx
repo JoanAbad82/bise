@@ -69,15 +69,144 @@ function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       return <YouRow e={e} ctx={ctx} />;
     case 'to_agent':
       return <ToAgentRow e={e} ctx={ctx} />;
+    // amb-feed's batch 2 (b8cb4b1e): the lines the hub's fold used to drop
+    case 'thinking':
+      return <ThinkingLine pos={e.pos} head={e.text === '' ? thoughtFor(e.thinking?.ms ?? 0) : e.text} body={e.thinking?.text ?? ''} />;
+    case 'compacting':
+      return (
+        <div className="th-compact" data-testid={`thread.compacting.${e.pos}`}>
+          <Marker>compacting its context…</Marker>
+        </div>
+      );
+    case 'compacted':
+      return <CompactedRow e={e} />;
+    case 'notice':
+      return <NoticeRow e={e} />;
+    case 'not_delivered':
+      return <NotDeliveredRow e={e} ctx={ctx} />;
+    case 'unknown':
+      // a kind from a newer hub: its words, plain and dim
+      return (
+        <div className="th-unknown" data-testid={`thread.unknown.${e.pos}`}>
+          {e.text}
+        </div>
+      );
     default: {
       const who = whoOf(e, ctx);
       return (
         <Msg from={who.from} name={who.name} indent={who.indent} time={clock(e.at_ms)} av={who.from === 'you' ? 'y' : undefined}>
+          {e.thinking != null && <ThinkingLine pos={e.pos} head={thoughtFor(e.thinking.ms)} body={e.thinking.text} />}
           <Markdown text={e.text} onLink={ctx.onLink} onPath={ctx.onPath} />
         </Msg>
       );
     }
   }
+}
+
+/** A thinking row's head, as the TUI's words::thought_for: 'thought for 3.2s', 'thought' (time unknown). Pure. */
+export function thoughtFor(ms: number): string {
+  if (ms <= 0) return 'thought';
+  const s = Math.floor(ms / 1000);
+  if (ms < 10_000) return `thought for ${String(s)}.${String(Math.floor((ms % 1000) / 100))}s`;
+  if (ms < 60_000) return `thought for ${String(s)}s`;
+  return `thought for ${String(Math.floor(ms / 60_000))}m${String(Math.floor((ms % 60_000) / 1000))}s`;
+}
+
+/** What the model thought: one folded line, open to its words (⌘E opens them all). */
+function ThinkingLine({ pos, head, body }: { pos: number; head: string; body: string }) {
+  const [open, setOpen] = useFold();
+  const toggle = () => {
+    setOpen((o) => !o);
+  };
+  return (
+    <div className="th-think" data-testid={`thread.think.${pos}`}>
+      <Fold open={open} onToggle={body === '' ? undefined : toggle} testId={`thread.think.${pos}.head`}>
+        {head}
+      </Fold>
+      {open && body !== '' && <div className="th-think-body">{body}</div>}
+    </div>
+  );
+}
+
+/** The summary its context was compacted to: one folded line. */
+function CompactedRow({ e }: { e: Entry }) {
+  const [open, setOpen] = useFold();
+  const toggle = () => {
+    setOpen((o) => !o);
+  };
+  return (
+    <div className="th-compact" data-testid={`thread.compacted.${e.pos}`}>
+      <Fold open={open} onToggle={e.text === '' ? undefined : toggle} testId={`thread.compacted.${e.pos}.head`}>
+        context compacted
+      </Fold>
+      {open && e.text !== '' && <div className="th-think-body">{e.text}</div>}
+    </div>
+  );
+}
+
+/** A notice's mark by level (the TUI's: info dim, warn ▲, err ✗): the tone is said in a glyph and words, never by color alone. */
+export const NOTICE_MARK = { info: '·', warn: '▲', err: '✗', unknown: '·' } as const;
+
+function NoticeRow({ e }: { e: Entry }) {
+  const level = e.notice?.level ?? 'info';
+  const text = e.notice?.text ?? e.text;
+  return (
+    <div className={`th-notice ${level}`} data-level={level} data-testid={`thread.notice.${e.pos}`}>
+      <span className="th-notice-mark" aria-label={level === 'err' ? 'error' : level === 'warn' ? 'warning' : 'note'}>
+        {NOTICE_MARK[level]}
+      </span>
+      <span>{text}</span>
+    </div>
+  );
+}
+
+/** His message didn't reach the agent (BISE-86): send it again, or drop it from view. */
+function NotDeliveredRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const store = useStore();
+  const [gone, setGone] = useState<'sent' | 'dropped' | null>(null);
+  const nd = e.not_delivered;
+  const to = nd?.to ?? ctx.agent;
+  const text = nd?.text ?? e.text;
+  if (gone === 'dropped') return null;
+  const again = () => {
+    store.send({ project: ctx.project, agent: to, text, mode: 'now' });
+    setGone('sent');
+  };
+  const drop = () => {
+    setGone('dropped');
+  };
+  return (
+    <div
+      className="th-notdelivered"
+      data-testid={`thread.notdelivered.${e.pos}`}
+      tabIndex={-1}
+      onKeyDown={(k) => {
+        if (gone !== null) return;
+        if (k.key === 'Enter') again();
+        else if (k.key === 'Escape') drop();
+        else return;
+        k.preventDefault();
+        k.stopPropagation();
+      }}
+    >
+      <div className="th-notdelivered-head">
+        <span aria-label="error">✗</span> not delivered to {to}
+      </div>
+      <div className="th-notdelivered-text">{text}</div>
+      {gone === 'sent' ? (
+        <div className="th-waits">sent again</div>
+      ) : (
+        <div className="th-notdelivered-acts">
+          <Button kind="ghost" onClick={again} testId={`thread.notdelivered.${e.pos}.again`}>
+            ⏎ send again
+          </Button>
+          <Button kind="ghost" onClick={drop} testId={`thread.notdelivered.${e.pos}.drop`}>
+            esc drop
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** A message of his longer than this folds to its first lines (tui-parity B11, the TUI's You(_, _, open)). */
