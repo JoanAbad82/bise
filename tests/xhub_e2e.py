@@ -136,6 +136,19 @@ def main():
         got = one.makefile().readline()
         one.close()
         check(json.loads(got).get("ok") is True, "the xin is acked: %r" % got)
+        # docs/issues/16: hub to hub ops are the user's (peer::access User):
+        # served on hub.sock to a process that is not an agent's (this test,
+        # bise's hub; `sb project send` above went through it too), never on
+        # agent.sock, the agents' SB_SOCKET
+        asock = os.path.join(pstate, "agent.sock")
+        if os.path.exists(asock):
+            two = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            two.settimeout(30)
+            two.connect(asock)
+            two.sendall((json.dumps({"op": "xin", "hub": home_row["id"], "xid": 98, "kind": "input", "text": "not from an agent"}) + "\n").encode())
+            got = two.makefile().readline()
+            two.close()
+            check("does not serve" in got, "agent.sock does not serve xin: %r" % got)
         wait.until(lambda: [x for x in of_type(pstate, "x_in") if x["in"]["xid"] == 99], 30, "the routed input with its context")
         xin = [x for x in of_type(pstate, "x_in") if x["in"]["xid"] == 99][0]["in"]
         said = [m["msg"] for m in of_type(pstate, "message_sent") if m["msg"]["id"] == xin["msg"]][0]
