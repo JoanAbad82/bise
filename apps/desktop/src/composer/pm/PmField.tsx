@@ -26,6 +26,7 @@ import { argAt, browseText, parentQuery, triggerAt, type Trigger } from '../toke
 import { loadRecent, picked, recentFirst } from '../recent';
 import { emojiToken, typedEmoji } from '../emoji';
 import { dictated, HOLD_MS } from '../dictate';
+import { DOUBLE_CTRL_R_MS } from '@/voicemode/model';
 import { Picker } from '../Picker';
 import { FIELD_NODES } from './schema';
 import { Colors } from './colors';
@@ -445,6 +446,8 @@ export function PmField(p: PmFieldProps): JSX.Element {
   // ---- dictation (bar I / 2.6, the TUI's ctrl+r): a live node at the caret shows his words as
   // they come; nothing reads it (not the send, not the draft); his last words replace it as text,
   // one undo step. Esc cancels it: the node goes, the text around it stays ----
+  /** the last ctrl+r's time (the double press is voice mode) */
+  const lastR = useRef(Number.NEGATIVE_INFINITY);
   const dict = useRef<{ id: string; mic: boolean; downAt: number; off: () => void } | null>(null);
   const dictUpdate = (): void => {
     const d = dict.current;
@@ -635,6 +638,17 @@ export function PmField(p: PmFieldProps): JSX.Element {
     if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && k.toLowerCase() === 'r' && props.current.sources.dictate !== undefined) {
       e.preventDefault();
       if (e.repeat) return true;
+      // ctrl+r twice within DOUBLE_CTRL_R_MS (the TUI's): voice mode, the first press's
+      // dictation cancelled (amb-home's src/voicemode; one ctrl+r stays dictation)
+      const voice = props.current.sources.voice;
+      const twice = voice !== undefined && e.timeStamp - lastR.current < DOUBLE_CTRL_R_MS;
+      lastR.current = e.timeStamp;
+      if (twice) {
+        lastR.current = Number.NEGATIVE_INFINITY;
+        if (dict.current !== null) dictCancel();
+        voice();
+        return true;
+      }
       if (dict.current === null) dictStart(e.timeStamp);
       else if (dict.current.mic) dictStop();
       return true;

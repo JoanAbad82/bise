@@ -83,6 +83,9 @@ export interface ComposerSources {
   readonly noVision?: string;
   /** Dictation into the field (bar I / 2.6): the mic and its words; none: no mic control. */
   readonly dictate?: DictatePort;
+  /** Voice mode with the agent in view (ctrl+r twice, the TUI's DOUBLE_CTRL_R; amb-home's
+   *  src/voicemode); none: a second ctrl+r only stops the dictation. */
+  readonly voice?: () => void;
   /** The values of a listed argument kind matching `query` (the screen's lists); none: no popup. */
   readonly choices?: (kind: Exclude<ArgKind, 'text' | { readonly words: readonly Choice[] }>, query: string) => readonly Choice[];
 }

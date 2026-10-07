@@ -49,6 +49,7 @@ import { loadRecent, picked, recentFirst } from './recent';
 import { emojiToken, typedEmoji } from './emoji';
 import { $colorsUpToDate, $recolor } from './highlight';
 import { dictated, replaceOp, HOLD_MS } from './dictate';
+import { DOUBLE_CTRL_R_MS } from '@/voicemode/model';
 import { Picker } from './Picker';
 
 /** What the screen around a composer may ask of it (dictation, the send button, focus). */
@@ -422,6 +423,8 @@ export function Brain(p: BrainProps): JSX.Element | null {
   // ---- dictation (bar I / 2.6, the TUI's ctrl+r): the core's words REPLACE the dictated part
   // from where it began, only the chars that changed, the caret kept (dictate.ts); one final ends
   // it; an error's words stay and the error shows in the strip ----
+  /** the last ctrl+r's time (the double press is voice mode) */
+  const lastR = useRef(Number.NEGATIVE_INFINITY);
   const dict = useRef<{ id: string; start: number; before: string; shown: string; mic: boolean; downAt: number; first: boolean; off: () => void } | null>(null);
   const dictUpdate = (): void => {
     const d = dict.current;
@@ -645,6 +648,17 @@ export function Brain(p: BrainProps): JSX.Element | null {
           if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && k.toLowerCase() === 'r' && props.current.sources.dictate !== undefined) {
             e.preventDefault();
             if (e.repeat) return true;
+            // ctrl+r twice within DOUBLE_CTRL_R_MS (the TUI's): voice mode, the first press's
+            // dictation cancelled (amb-home's src/voicemode; one ctrl+r stays dictation)
+            const voice = props.current.sources.voice;
+            const twice = voice !== undefined && e.timeStamp - lastR.current < DOUBLE_CTRL_R_MS;
+            lastR.current = e.timeStamp;
+            if (twice) {
+              lastR.current = Number.NEGATIVE_INFINITY;
+              if (dict.current !== null) dictCancel();
+              voice();
+              return true;
+            }
             if (dict.current === null) dictStart(e.timeStamp);
             else if (dict.current.mic) dictStop();
             return true;

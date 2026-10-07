@@ -1,0 +1,38 @@
+/* voice mode's pane (VoicePane.tsx, ambient m_11632): the composer's place, frame and width, ~2 rows taller; ds tokens */
+.vm-pane { flex: none; margin: 0 16px 14px; outline: none; }
+.vm-label { margin: 0 0 4px; font: 11px var(--font-mono); color: var(--c-text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vm-label.waits { color: var(--c-text-3); opacity: .8; }
+.vm-frame {
+  box-sizing: border-box; min-height: 132px; padding: 11px 14px; border-radius: 12px; box-shadow: 0 0 0 1px var(--c-line-strong);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.vm-pane:focus-visible .vm-frame { box-shadow: 0 0 0 1px var(--c-line-strong), 0 0 0 3px var(--c-focus); }
+.vm-row { display: flex; align-items: center; gap: 10px; min-height: 22px; }
+.vm-who { min-width: 3ch; font-size: var(--t-13); color: var(--c-text-2); }
+b.vm-who { font-weight: 600; color: var(--c-text); }
+.vm-pearl { display: inline-flex; width: 22px; height: 22px; flex: none; }
+.vm-bars { display: inline-flex; align-items: center; gap: 2px; height: 18px; }
+.vm-bars i { display: block; width: 3px; min-height: 2px; border-radius: 1px; background: var(--c-text-3); transition: height 60ms var(--ease-out); }
+.vm-bars.accent i { background: var(--c-accent); }
+.vm-bars.text i { background: var(--c-text); }
+.vm-words {
+  margin: 0; font: 15px/1.45 var(--font-read); color: var(--c-text); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.vm-words.listening, .vm-words.sending, .vm-words.said { color: var(--c-text-2); }
+.vm-words.muted { color: var(--c-text-3); }
+.vm-words.failed { color: var(--c-err); }
+.vm-dot { animation: vm-blink 1s steps(2, start) infinite; }
+.vm-sign { color: var(--c-accent); animation: vm-pulse 1.4s var(--ease-out) infinite; }
+.vm-more { color: var(--c-text-3); font-size: var(--t-12); }
+.vm-more kbd, .vm-keys kbd { font: 600 11px var(--font-mono); color: var(--c-text-2); }
+.vm-keys { display: flex; flex-wrap: wrap; gap: 2px 18px; margin: 6px 2px 0; font-size: 11.5px; color: var(--c-text-3); }
+.vm-keys button { font: inherit; color: inherit; background: none; border: 0; padding: 0; white-space: nowrap; cursor: pointer; }
+.vm-keys button:hover { color: var(--c-text-2); }
+.vm-typing { margin: 0 16px 4px; font: 11px var(--font-mono); color: var(--c-text-3); }
+@keyframes vm-blink { to { visibility: hidden; } }
+@keyframes vm-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) {
+  .vm-bars i { transition: none; }
+  .vm-dot, .vm-sign { animation: none; }
+}

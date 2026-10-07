@@ -112,8 +112,8 @@ export function useSkills(project: string): readonly PickSkill[] {
 export const useFiles = (project: string): FilesAnswer | null => useSlice(`files:${project}`, (s) => s.filesNow(project));
 /** fn's talk: what bise heard so far (the whole text; final once the talk ended), null before a talk. */
 export const useHeard = (): { readonly text: string; readonly final: boolean } | null => useSlice('heard', (s) => s.heard());
-/** A voice's loudness now, 0..1 ('you': the mic during a talk or a dictation; 'main': its spoken answer). */
-export const useLevel = (who: 'you' | 'main'): number => useSlice(`level:${who}`, (s) => s.level(who));
+/** A voice's loudness now, 0..1 ('you': the mic during a talk, a dictation or voice mode; 'main': its spoken answer; 'agent': voice mode's agent speaking). */
+export const useLevel = (who: 'you' | 'main' | 'agent'): number => useSlice(`level:${who}`, (s) => s.level(who));
 /** A dictation this window started (store.dictateStart()): its whole text so far, final, cancelled, error. */
 export const useDictation = (id: string | null): Dictation | null => useSlice(`dictation:${id ?? ''}`, (s) => (id === null ? null : s.dictation(id)));
 /** Voice mode's state in this window (null: never on here): state, heard, said, muted, note, fail. */

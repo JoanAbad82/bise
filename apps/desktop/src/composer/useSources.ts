@@ -37,7 +37,7 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
     }),
     [store],
   );
-  const { files, skills, commands, saveImage } = extra;
+  const { files, skills, commands, saveImage, voice } = extra;
   return useMemo<ComposerSources>(() => {
     const live = agents.filter((a) => !a.archived);
     const target = inView === undefined ? undefined : agents.find((a) => a.name === inView);
@@ -58,7 +58,8 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
       saveImage: saveImage ?? NO_SOURCES.saveImage,
       ...(noVision === undefined ? {} : { noVision }),
       dictate,
+      ...(voice === undefined ? {} : { voice }),
       choices: (kind, query) => (kind === 'agent' || kind === 'archived' || kind === 'card' ? prefixFirst(lists[kind], query, (c) => c.value) : []),
     };
-  }, [agents, cards, made, files, skills, commands, saveImage, inView, dictate]);
+  }, [agents, cards, made, files, skills, commands, saveImage, inView, dictate, voice]);
 }

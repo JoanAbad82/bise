@@ -34,6 +34,7 @@ import { createFindMark, FindMarkContext } from './findmark';
 import { trackRoutes, useHeld } from './routes';
 import { absolute } from './paths';
 import { createFolds, FoldsContext } from './folds';
+import { ThreadVoice, useVoiceHere } from '@/voicemode';
 
 export interface ThreadScreenProps {
   project: string;
@@ -78,6 +79,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   const held = useHeld(store, tkey);
 
   const me = useAgents(project).find((a) => a.name === agent);
+  // voice mode on this agent: its pane takes the composer's place (amb-home's src/voicemode)
+  const voice = useVoiceHere(project, agent);
   const typing = useTyping(tkey);
   const busy = me?.status === 'working' || typing !== '';
 
@@ -293,7 +296,11 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         <ThreadInbox project={project} />
         {me?.archived === true ? (
           <History project={project} agent={agent} />
+        ) : voice === 'pane' ? (
+          <ThreadVoice project={project} agent={agent} />
         ) : (
+          <>
+          {voice === 'typing' && <ThreadVoice project={project} agent={agent} />}
           <ThreadComposer
             project={project}
             agent={agent}
@@ -306,6 +313,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
             onReady={onComposer}
             onSent={onSent}
           />
+          </>
         )}
       </section>
     </FindMarkContext>
@@ -545,8 +553,12 @@ const ThreadComposer = memo(function ThreadComposer({
       commands: pickCommands(core),
       skills,
       files: (q: string) => store.files(project, q).then((a) => (a === null ? [] : [...a.items, ...(a.folder ? [{ path: a.folder.path, dir: true }] : [])])),
+      // ctrl+r twice: voice mode with this agent (amb-home's src/voicemode)
+      voice: () => {
+        store.voiceMode(project, agent, true);
+      },
     }),
-    [core, skills, store, project, filesSettled],
+    [core, skills, store, project, agent, filesSettled],
   );
   const sources = useComposerSources(project, extra, agent);
   const onCommand = useCallback(
