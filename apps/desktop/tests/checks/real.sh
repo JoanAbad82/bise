@@ -40,7 +40,8 @@ for s in "${specs[@]}"; do
   if [ "$s" = "${fresh[0]}" ]; then later+=("$s"); else mine+=("$s"); fi
 done
 # a folder holding a fresh check runs it last too, not in the shared world
-for s in "${mine[@]}"; do
+# (${a[@]+"${a[@]}"}: macOS's bash 3.2 calls an empty array unbound under set -u)
+for s in ${mine[@]+"${mine[@]}"}; do
   case "${fresh[0]}" in "$s"/*) later+=("${fresh[0]}") ;; esac
 done
 grep='real core|thread/|inbox/cmd-i|agents/|review/'
@@ -52,7 +53,7 @@ if [ ${#mine[@]} -gt 0 ]; then
   PLAYWRIGHT_JSON_OUTPUT_NAME="${TMPDIR:-/tmp}/qa-flows-real.json" pnpm exec playwright test -c tests/harness/playwright.config.ts "${mine[@]}" -g "$grep" --grep-invert 'feature-drop' --reporter=list,json || rc=1
 fi
 n=0
-for s in "${later[@]}"; do
+for s in ${later[@]+"${later[@]}"}; do
   n=$((n + 1))
   down
   if ! python3 -B "$qa" "${up[@]}" > "${TMPDIR:-/tmp}/qa-flows-world.json" 2>&1; then

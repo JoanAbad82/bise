@@ -12,7 +12,7 @@
 // and gift-ui's view shows the question, as the TUI's view of gift-ui does.
 import path from 'node:path';
 import { test, expect } from '../../harness';
-import { hubAgents, hubOf, launchOn, realWorld, transcriptHas, tui, tuiAgents, tuiReady, type Tui } from '../world';
+import { hubAgents, hubOf, hubState, launchOn, realWorld, transcriptHas, tui, tuiAgents, tuiInbox, tuiReady, type Tui } from '../world';
 
 const T = {
   screen: '[data-testid="agents.screen"]',
@@ -100,11 +100,28 @@ test("agents/view: an agent's own question shows on its row and in its view, as 
     expect(flat(t.screen()), "the TUI's view of gift-ui has its question").toContain(ask);
     await page.locator(T.open('gift-ui')).click();
     await expect(page.locator(T.thread)).toHaveAttribute('data-agent', 'gift-ui', { timeout: 5000 });
+    const view = page.locator(T.thread);
     try {
-      await expect(page.locator(T.screen.replace('agents.screen', 'thread.screen')), "gift-ui's view shows its question").toContainText(ask, { timeout: 10_000 });
+      await expect(view, "gift-ui's view shows its message to main as a question ('✉ gift-ui → main', amb-win 1b1d0abe)").toContainText('✉ gift-ui → main', { timeout: 10_000 });
+      await expect(view, "gift-ui's view shows its question").toContainText(ask);
     } finally {
       await page.screenshot({ path: test.info().outputPath('question.png') });
     }
+    // the card main opened for it (card #2 in the world), in gift-ui's thread with its options
+    const cards = async () => ((await hubState(hubOf(w, 'shop').sock))['cards'] as { id: number; text?: string; question?: string }[] | undefined) ?? [];
+    const id = (await cards()).find((c) => (c.text ?? c.question ?? '').includes(ask))?.id;
+    expect(id, 'the hub has the card for gift-ui\'s question').toBeDefined();
+    const card = page.locator(`[data-testid="thread.card.${String(id)}"]`);
+    await expect(card, "the card shows in gift-ui's thread").toBeVisible({ timeout: 5000 });
+    await expect(page.locator(`[data-testid="thread.card.${String(id)}.opt.1"]`), 'with its first option').toContainText('on the cart page');
+    await page.screenshot({ path: test.info().outputPath('card.png') });
+    // his click answers it: the hub and the TUI see it answered, gift-ui gets the reply
+    await page.locator(`[data-testid="thread.card.${String(id)}.opt.1"]`).click();
+    await expect.poll(async () => (await cards()).some((c) => c.id === id), { timeout: 15_000, message: 'the hub has the card answered' }).toBe(false);
+    await expect.poll(() => tuiInbox(t?.screen() ?? '').some((r) => r.agent === 'gift-ui'), { timeout: 10_000, message: "the TUI's inbox drops gift-ui's card" }).toBe(false);
+    await expect.poll(() => transcriptHas(w, 'shop', 'gift-ui', 'on the cart page'), { timeout: 30_000, message: 'gift-ui gets the reply' }).toBe(true);
+    await expect(card, "the card in gift-ui's thread says answered").toContainText('answered', { timeout: 5000 });
+    await page.screenshot({ path: test.info().outputPath('answered.png') });
   } finally {
     if (t) {
       test.info().attachments.push({ name: 'tui', contentType: 'text/plain', body: Buffer.from(t.screen()) });
