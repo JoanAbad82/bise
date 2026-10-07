@@ -47,7 +47,11 @@ export class TermHost {
     broadcast(IPC.termData, { id, bytes });
   });
 
-  constructor(private readonly testMode: boolean) {}
+  constructor(
+    private readonly testMode: boolean,
+    /** his login shell's environment in process.env (loginenv.ts): the first spawn waits for it */
+    private readonly ready: Promise<void> = Promise.resolve(),
+  ) {}
 
   /** The core's projects rows: where each project's shell runs. */
   setRows(rows: readonly unknown[]): void {
@@ -71,6 +75,7 @@ export class TermHost {
       return { id, screen };
     }
     // room for this one: the least recently used of the others ends
+    await this.ready;
     const drop = evictee(new Map([...this.lastUse].filter(([k]) => k !== id && this.shells.has(k))), MAX_SHELLS);
     if (drop !== null) this.kill(drop);
     const core = binPath({ env: process.env, packaged: app.isPackaged, resourcesPath: process.resourcesPath, appPath: app.getAppPath(), exists: existsSync });
@@ -168,8 +173,8 @@ export class TermHost {
 }
 
 /** The shells' IPC (window.bise.term) and their folders from the core's projects rows. */
-export function startTerms(testMode: boolean): TermHost {
-  const host = new TermHost(testMode);
+export function startTerms(testMode: boolean, ready?: Promise<void>): TermHost {
+  const host = new TermHost(testMode, ready);
   onCoreEvent((ev) => {
     if (ev['ev'] === 'projects' && Array.isArray(ev['projects'])) host.setRows(ev['projects'] as unknown[]);
   });

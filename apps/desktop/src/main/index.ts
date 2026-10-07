@@ -14,11 +14,12 @@ import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { app, ipcMain, Menu } from 'electron';
-import { BADGE_LINE, IPC, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
+import { BADGE_LINE, CORE_IPC, IPC, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
 import { Capsule, installCapsuleIpc } from './capsule';
 import { badgeOf, CountKeeper, titleOf } from './counts';
 import { installGuard } from './guard';
 import { startHelper } from './helper/run';
+import { adoptLoginEnv } from './loginenv';
 import { onCoreEvent, startCore, stopCore } from './core/ipc';
 import { configOfPrefs } from './helper/config';
 import { installIpc, sendClip, sendMenu } from './ipc';
@@ -70,6 +71,10 @@ installGuard(
 // the terminal panel's shells (term/host.ts), ended at quit
 let terms: TermHost | null = null;
 
+// his login shell's environment (loginenv.ts), asked now; the core and the
+// shells wait for it, the window never does (never in a test run)
+const loginEnv = adoptLoginEnv(process.platform, testMode);
+
 void app.whenReady().then(() => {
   installIpc(testMode);
   const helper = startHelper(testMode);
@@ -79,8 +84,18 @@ void app.whenReady().then(() => {
       if (ev['ev'] === 'prefs') helper.config(configOfPrefs(ev['prefs']));
     });
   }
-  startCore();
-  terms = startTerms(testMode);
+  // the shells' IPC now; their first spawn waits for his login env
+  terms = startTerms(testMode, loginEnv);
+  // the core waits for his login env (a slow ~/.zshrc), the window doesn't
+  // (architect m_10436): until it starts, the window hears an empty snapshot
+  // and 'starting' (its 'connecting to bise…'), then the core's own handlers
+  ipcMain.handle(CORE_IPC.stateNow, () => 'starting');
+  ipcMain.handle(CORE_IPC.snapshot, () => []);
+  void loginEnv.then(() => {
+    ipcMain.removeHandler(CORE_IPC.stateNow);
+    ipcMain.removeHandler(CORE_IPC.snapshot);
+    startCore();
+  });
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       menuTemplate({
