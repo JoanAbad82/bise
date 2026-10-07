@@ -47,6 +47,7 @@ import { argAt, browseText, parentQuery, triggerAt, type Trigger } from './token
 import { loadRecent, picked, recentFirst } from './recent';
 import { emojiToken, typedEmoji } from './emoji';
 import { $colorsUpToDate, $recolor } from './highlight';
+import { dictated, replaceOp, HOLD_MS } from './dictate';
 import { Picker } from './Picker';
 
 /** What the screen around a composer may ask of it (dictation, the send button, focus). */
@@ -55,6 +56,8 @@ export interface ComposerActions {
   /** Words at the caret (dictation's final text, a pick from elsewhere): editable, never sent. */
   insertText(text: string): void;
   focus(): void;
+  /** The mic control: on, or off when on (bar I). */
+  dictate(): void;
 }
 
 interface BrainProps {
@@ -79,6 +82,8 @@ export interface FieldBar {
   readonly selected: boolean;
   readonly images: boolean;
   readonly typing: boolean;
+  /** dictation: the mic on, then its last words coming */
+  readonly dictating: 'recording' | 'transcribing' | null;
 }
 
 /** The tag of the colors' own update (it never triggers another pass). */
@@ -364,25 +369,6 @@ export function Brain(p: BrainProps): JSX.Element | null {
     }, 0);
   };
 
-  const actions: ComposerActions = {
-    submit,
-    insertText: (text) => {
-      // discrete: the words are in before the next call (a dictated sentence then a send)
-      editor.update(
-        () => {
-          $insertAtCaret(text);
-        },
-        { discrete: true },
-      );
-    },
-    focus: () => {
-      editor.focus();
-    },
-  };
-  useEffect(() => {
-    props.current.onActions(actions);
-  });
-
   // ---- the strip above the box: the chips and the queue, re-drawn only when they change ----
   const lastStrip = useRef('');
   // one line the composer says to him (ctrl+z with nothing to undo), until his next edit
@@ -407,7 +393,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
   };
 
   // ---- the key bar's mode: reported when it changes, never per keystroke ----
-  const bar = useRef<FieldBar>({ fileList: false, selected: false, images: false, typing: false });
+  const bar = useRef<FieldBar>({ fileList: false, selected: false, images: false, typing: false, dictating: null });
   const lastBar = useRef('');
   const pushBar = (part: Partial<FieldBar>): void => {
     bar.current = { ...bar.current, ...part };
@@ -419,6 +405,100 @@ export function Brain(p: BrainProps): JSX.Element | null {
   useEffect(() => {
     pushBar({ fileList });
   }, [fileList]);
+
+  // ---- dictation (bar I / 2.6, the TUI's ctrl+r): the core's words REPLACE the dictated part
+  // from where it began, only the chars that changed, the caret kept (dictate.ts); one final ends
+  // it; an error's words stay and the error shows in the strip ----
+  const dict = useRef<{ id: string; start: number; before: string; shown: string; mic: boolean; downAt: number; first: boolean; off: () => void } | null>(null);
+  const dictUpdate = (): void => {
+    const d = dict.current;
+    const port = props.current.sources.dictate;
+    if (d === null || port === undefined) return;
+    const st = port.read(d.id);
+    if (st === null) return;
+    const next = st.cancelled ? '' : dictated(st.text, d.before);
+    const caret = editor.getEditorState().read(() => $caretOffset()) ?? d.start + d.shown.length;
+    const op = replaceOp(d.start, d.shown, next, caret);
+    if (op !== null) {
+      // one undo step for the whole dictation: the first change pushes, the rest merge into it
+      editor.update(
+        () => {
+          $applyOp(op);
+        },
+        { tag: d.first ? HISTORY_PUSH_TAG : HISTORY_MERGE_TAG, discrete: true },
+      );
+      d.first = false;
+      d.shown = next;
+    }
+    if (!st.final) return;
+    d.off();
+    dict.current = null;
+    pushBar({ dictating: null });
+    if (st.error !== null) say(st.error);
+  };
+  /** The mic on; `downAt`: the key's down time (event timeStamp), none from the button. */
+  const dictStart = (downAt = Number.POSITIVE_INFINITY): void => {
+    const port = props.current.sources.dictate;
+    if (port === undefined || dict.current !== null) return;
+    const a = editor.getEditorState().read(() => {
+      const text = $plainText();
+      return { text, caret: $caretOffset() ?? text.length };
+    });
+    const d = { id: '', start: a.caret, before: a.text.slice(0, a.caret), shown: '', mic: true, downAt, first: true, off: (): void => undefined };
+    dict.current = d;
+    pushBar({ dictating: 'recording' });
+    d.id = port.start();
+    d.off = port.subscribe(d.id, dictUpdate);
+    dictUpdate(); // a refusal comes at once ('the mic is busy.')
+  };
+  const dictStop = (): void => {
+    const d = dict.current;
+    if (d === null || !d.mic) return;
+    d.mic = false;
+    props.current.sources.dictate?.stop(d.id);
+    if (dict.current !== null) pushBar({ dictating: 'transcribing' });
+  };
+  const dictCancel = (): void => {
+    const d = dict.current;
+    if (d !== null) props.current.sources.dictate?.cancel(d.id);
+  };
+  // push-to-talk: ctrl+r held past HOLD_MS stops on its release; a short press leaves the mic on
+  useEffect(() => {
+    const up = (e: KeyboardEvent): void => {
+      const d = dict.current;
+      if (d === null || !d.mic || (e.key.toLowerCase() !== 'r' && e.key !== 'Control')) return;
+      if (e.timeStamp - d.downAt >= HOLD_MS) dictStop();
+    };
+    window.addEventListener('keyup', up, true);
+    return () => {
+      window.removeEventListener('keyup', up, true);
+      dictCancel(); // a composer that goes away never leaves the mic on
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- registered once; reads refs
+  }, [editor]);
+
+  const actions: ComposerActions = {
+    submit,
+    dictate: () => {
+      if (dict.current === null) dictStart();
+      else if (dict.current.mic) dictStop();
+    },
+    insertText: (text) => {
+      // discrete: the words are in before the next call (a dictated sentence then a send)
+      editor.update(
+        () => {
+          $insertAtCaret(text);
+        },
+        { discrete: true },
+      );
+    },
+    focus: () => {
+      editor.focus();
+    },
+  };
+  useEffect(() => {
+    props.current.onActions(actions);
+  });
 
   // ---- the editor's updates: what he typed, read (never written back) ----
   useEffect(() => {
@@ -509,6 +589,22 @@ export function Brain(p: BrainProps): JSX.Element | null {
         (e) => {
           if (e.isComposing) return false;
           const k = e.key;
+          // ctrl+r: the mic on (held: push-to-talk; pressed: on until a key), again: off
+          if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && k.toLowerCase() === 'r' && props.current.sources.dictate !== undefined) {
+            e.preventDefault();
+            if (e.repeat) return true;
+            if (dict.current === null) dictStart(e.timeStamp);
+            else if (dict.current.mic) dictStop();
+            return true;
+          }
+          if (dict.current !== null && k === 'Enter') {
+            // never send half a dictation: ⏎ turns the mic off, the words stay to read
+            e.preventDefault();
+            dictStop();
+            return true;
+          }
+          // any other key while the mic is on ends it (the key still does its job)
+          if (dict.current?.mic === true && !['Control', 'Shift', 'Alt', 'Meta', 'Escape', 'CapsLock'].includes(k)) dictStop();
           if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && k.toLowerCase() === 'z') {
             if (history.canUndo.peek()) {
               if (!e.ctrlKey) return false; // ⌘Z: the history's own key
@@ -613,6 +709,12 @@ export function Brain(p: BrainProps): JSX.Element | null {
       editor.registerCommand(
         KEY_ESCAPE_COMMAND,
         (e) => {
+          if (dict.current !== null) {
+            // esc during a dictation cancels it: its words go, the text around them stays
+            e.preventDefault();
+            dictCancel();
+            return true;
+          }
           const l = live.current;
           if (l.open && l.trigger !== null) {
             e.preventDefault();

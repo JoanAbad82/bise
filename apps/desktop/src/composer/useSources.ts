@@ -3,9 +3,9 @@
 // number. Files, skills and commands come from the core once amb-core's step 4 generates their
 // events (until then their lists are empty: the pickers show nothing, never a guess).
 import { useMemo } from 'react';
-import { useAgents, useArtifacts, useCards } from '@/store';
+import { useAgents, useArtifacts, useCards, useStore } from '@/store';
 import { prefixFirst } from './tokens';
-import { NO_SOURCES, type Choice, type ComposerSources } from './sources';
+import { NO_SOURCES, type Choice, type ComposerSources, type DictatePort } from './sources';
 
 // K4 (the TUI's attach.rs): `inView` is the agent the composer sends to; its row says its model
 // and whether that model reads images (`vision`, from bise's model catalog). Images are refused
@@ -14,6 +14,22 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
   const agents = useAgents(project);
   const cards = useCards(project);
   const made = useArtifacts(project);
+  const store = useStore();
+  // the mic through the store (bar I): only this window gets its words, a reload cancels
+  const dictate = useMemo<DictatePort>(
+    () => ({
+      start: () => store.dictateStart(),
+      stop: (id) => {
+        store.dictateStop(id);
+      },
+      cancel: (id) => {
+        store.dictateCancel(id);
+      },
+      read: (id) => store.dictation(id),
+      subscribe: (id, fn) => store.subscribe(`dictation:${id}`, fn),
+    }),
+    [store],
+  );
   const { files, skills, commands, saveImage } = extra;
   return useMemo<ComposerSources>(() => {
     const live = agents.filter((a) => !a.archived);
@@ -32,7 +48,8 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
       files: files ?? NO_SOURCES.files,
       saveImage: saveImage ?? NO_SOURCES.saveImage,
       ...(noVision === undefined ? {} : { noVision }),
+      dictate,
       choices: (kind, query) => (kind === 'agent' || kind === 'archived' || kind === 'card' ? prefixFirst(lists[kind], query, (c) => c.value) : []),
     };
-  }, [agents, cards, made, files, skills, commands, saveImage, inView]);
+  }, [agents, cards, made, files, skills, commands, saveImage, inView, dictate]);
 }

@@ -18,3 +18,17 @@
 .b-composer .keys .pairs { display: flex; gap: 3ch; min-width: 0; overflow: hidden; }
 .b-composer .keys .kk { color: var(--c-text-2); }
 .b-composer .keys .tip { margin-left: auto; overflow: hidden; text-overflow: ellipsis; }
+/* the mic control (bar I): its key at rest, a meter and 'listening…' while on; fixed width, so the
+   key line never moves when it changes */
+.b-composer .keys .mic { flex: none; display: inline-flex; align-items: center; gap: 6px; min-width: 15ch; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: default; }
+.b-composer .keys .mic.recording { color: var(--c-text); }
+.b-composer .keys .mic .meter { display: inline-flex; align-items: center; gap: 2px; height: 10px; }
+.b-composer .keys .mic .meter i { width: 2px; height: calc(3px + 7px * var(--lvl, 0.3)); border-radius: 1px; background: var(--c-accent); }
+.b-composer .keys .mic .meter i:nth-child(2), .b-composer .keys .mic .meter i:nth-child(4) { height: calc(3px + 5px * var(--lvl, 0.3)); }
+.b-composer .keys .mic .meter.pulse i { animation: b-mic-pulse 1.1s ease-in-out infinite; }
+.b-composer .keys .mic .meter.pulse i:nth-child(2) { animation-delay: .15s; }
+.b-composer .keys .mic .meter.pulse i:nth-child(3) { animation-delay: .3s; }
+.b-composer .keys .mic .meter.pulse i:nth-child(4) { animation-delay: .45s; }
+.b-composer .keys .mic .meter.pulse i:nth-child(5) { animation-delay: .6s; }
+@keyframes b-mic-pulse { 0%, 100% { transform: scaleY(.5); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .b-composer .keys .mic .meter.pulse i { animation: none; } }

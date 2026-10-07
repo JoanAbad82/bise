@@ -18,7 +18,7 @@ import { ChipNode } from './ChipNode';
 import { Brain, type ComposerActions, type FieldBar } from './Brain';
 import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, type TipClock } from './keybar';
 import type { Outgoing } from './message';
-import { NO_SOURCES, type ComposerSources } from './sources';
+import { NO_SOURCES, type ComposerSources, type DictatePort } from './sources';
 import type { Store } from './drafts';
 
 export interface ComposerProps {
@@ -77,8 +77,9 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
   const actions = useRef<ComposerActions | null>(null);
   const [canSend, setCanSend] = useState(false);
   const [strip, setStrip] = useState<JSX.Element | null>(null);
-  const [field, setField] = useState<FieldBar>({ fileList: false, selected: false, images: false, typing: false });
-  const mode = barMode({ ...field, voice, quoting, busy });
+  const [field, setField] = useState<FieldBar>({ fileList: false, selected: false, images: false, typing: false, dictating: null });
+  const dictating = field.dictating;
+  const mode = barMode({ ...field, voice: voice ?? dictating, quoting, busy });
 
   // the tip: the one after the last session's, the next every 5 minutes, never while he types
   const [tip, setTip] = useState<TipClock | null>(null);
@@ -90,8 +91,11 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
     const raw = store.getItem(TIP_KEY);
     const saved = raw === null ? null : Number(raw);
     let clock = startTip(Number.isInteger(saved) ? saved : null, Date.now());
-    setTip(clock);
     store.setItem(TIP_KEY, String(clock.index));
+    // the first tip shows on the next tick (no render cascade from inside the effect)
+    const first = window.setTimeout(() => {
+      setTip(clock);
+    }, 0);
     const timer = window.setInterval(() => {
       const next = tickTip(clock, Date.now(), typing.current);
       if (next === clock) return;
@@ -100,6 +104,7 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
       store.setItem(TIP_KEY, String(next.index));
     }, 30_000);
     return () => {
+      window.clearTimeout(first);
       window.clearInterval(timer);
     };
   }, [store]);
@@ -111,6 +116,17 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
       to={to}
       keys={
         <>
+          {sources.dictate !== undefined && (
+            <Mic
+              state={dictating}
+              level={sources.dictate.level}
+              onClick={() => {
+                actions.current?.dictate();
+                actions.current?.focus();
+              }}
+              testId={testId}
+            />
+          )}
           <span className="pairs" data-testid={`${testId}.keys`} data-mode={keys === undefined ? mode : 'fixed'}>
             {keys ??
               barPairs(mode, field.typing).map(([k, l]) => (
@@ -167,3 +183,56 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
     </ComposerFrame>
   );
 });
+
+/** The mic control in the key line (bar I): its key at rest; while the mic is on, a meter and
+ *  'listening…'; then '…' while the last words come. Its own state only: the field never re-renders. */
+function Mic({ state, level, onClick, testId }: { state: 'recording' | 'transcribing' | null; level: DictatePort['level']; onClick: () => void; testId: string }): JSX.Element {
+  return (
+    <button
+      type="button"
+      className={`mic${state === null ? '' : ` ${state}`}`}
+      onMouseDown={(e) => {
+        e.preventDefault(); // the field keeps the caret
+      }}
+      onClick={onClick}
+      aria-pressed={state === 'recording'}
+      aria-label={state === 'recording' ? 'stop dictating' : 'dictate'}
+      data-testid={`${testId}.mic`}
+      data-state={state ?? 'off'}
+    >
+      {state === null ? (
+        <>
+          <span className="kk">ctrl+r</span> dictate
+        </>
+      ) : state === 'recording' ? (
+        <>
+          <Meter level={level} testId={testId} /> listening…
+        </>
+      ) : (
+        '…'
+      )}
+    </button>
+  );
+}
+
+/** Five bars: his voice level when the app has it, else a slow pulse (the mic is on). */
+function Meter({ level, testId }: { level: DictatePort['level']; testId: string }): JSX.Element {
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = box.current;
+    if (level === undefined || el === null) return;
+    // the level writes one CSS variable, no React render per sample
+    return level((v) => {
+      el.style.setProperty('--lvl', String(Math.max(0, Math.min(1, v))));
+    });
+  }, [level]);
+  return (
+    <span ref={box} className={`meter${level === undefined ? ' pulse' : ''}`} data-testid={`${testId}.meter`} aria-hidden>
+      <i />
+      <i />
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}

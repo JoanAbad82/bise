@@ -6,7 +6,7 @@
 import { useState, type JSX } from 'react';
 import { Composer } from './Composer';
 import { prefixFirst } from './tokens';
-import type { ArgKind, ComposerSources, PickFile } from './sources';
+import type { ArgKind, ComposerSources, DictatePort, DictateState, PickFile } from './sources';
 import { Spotlight, type SpotData } from '@/spotlight';
 import { LivePearl, MOODS, type Mood } from '@/pearl';
 
@@ -83,7 +83,77 @@ const ARG_KINDS: Partial<Record<string, readonly ArgKind[]>> = {
   new: ['text'],
 };
 
+/** The words the lab's fake mic hears (qa-type's SAID). */
+export const LAB_SAID = "on garde la file d'attente";
+
+/**
+ * The lab's fake mic (no core, never the real mic): once on it says LAB_SAID word by word every
+ * 250 ms; stop sends the final with every word 200 ms later; cancel ends it empty; `busy` refuses
+ * at once ('the mic is busy.', as the core when fn talks).
+ */
+function fakeMic(busy: () => boolean): DictatePort {
+  const states = new Map<string, DictateState>();
+  const subs = new Map<string, Set<() => void>>();
+  const timers = new Map<string, number>();
+  let n = 0;
+  const put = (id: string, st: DictateState): void => {
+    states.set(id, st);
+    for (const fn of [...(subs.get(id) ?? [])]) fn();
+  };
+  const end = (id: string): void => {
+    window.clearInterval(timers.get(id));
+    timers.delete(id);
+  };
+  return {
+    start: () => {
+      n += 1;
+      const id = `lab-${String(n)}`;
+      if (busy()) {
+        put(id, { text: '', final: true, cancelled: false, error: 'the mic is busy.' });
+        return id;
+      }
+      put(id, { text: '', final: false, cancelled: false, error: null });
+      const words = LAB_SAID.split(' ');
+      let k = 0;
+      timers.set(
+        id,
+        window.setInterval(() => {
+          if (k >= words.length) return;
+          k += 1;
+          put(id, { text: words.slice(0, k).join(' '), final: false, cancelled: false, error: null });
+        }, 250),
+      );
+      return id;
+    },
+    stop: (id) => {
+      if (states.get(id)?.final !== false) return;
+      end(id);
+      window.setTimeout(() => {
+        put(id, { text: LAB_SAID, final: true, cancelled: false, error: null });
+      }, 200);
+    },
+    cancel: (id) => {
+      if (states.get(id)?.final !== false) return;
+      end(id);
+      put(id, { text: '', final: true, cancelled: true, error: null });
+    },
+    read: (id) => states.get(id) ?? null,
+    subscribe: (id, fn) => {
+      const set = subs.get(id) ?? new Set();
+      set.add(fn);
+      subs.set(id, set);
+      return () => {
+        set.delete(fn);
+      };
+    },
+  };
+}
+
+let micBusy = false;
+const LAB_MIC = fakeMic(() => micBusy);
+
 const SOURCES: ComposerSources = {
+  dictate: LAB_MIC,
   agents: [{ name: 'main', desc: 'bise' }, { name: 'perf', desc: 'sort_unstable in the hot query' }, { name: 'docs', desc: 'the README' }],
   skills: [
     { name: 'review', desc: 'review a change' },
@@ -146,6 +216,7 @@ export function ComposerLab(): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [vision, setVision] = useState(true);
   const [voice, setVoice] = useState(false);
+  const [busyMic, setBusyMic] = useState(false);
   return (
     <section className="lab" data-testid="lab.composer">
       <label>
@@ -156,6 +227,18 @@ export function ComposerLab(): JSX.Element {
       </label>
       <label>
         <input type="checkbox" checked={voice} onChange={(e) => { setVoice(e.currentTarget.checked); }} data-testid="lab.voice" /> voice mode
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          checked={busyMic}
+          onChange={(e) => {
+            micBusy = e.currentTarget.checked;
+            setBusyMic(micBusy);
+          }}
+          data-testid="lab.micBusy"
+        />{' '}
+        the mic is busy
       </label>
       <SentLog log={log} />
       <Composer

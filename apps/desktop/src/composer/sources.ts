@@ -81,8 +81,34 @@ export interface ComposerSources {
   /** The model in view reads no images (its name, for the refusal line); unset: it does or we
    *  don't know, and nothing is refused on a guess (attach.rs refused_images, K4). */
   readonly noVision?: string;
+  /** Dictation into the field (bar I / 2.6): the mic and its words; none: no mic control. */
+  readonly dictate?: DictatePort;
   /** The values of a listed argument kind matching `query` (the screen's lists); none: no popup. */
   readonly choices?: (kind: Exclude<ArgKind, 'text' | { readonly words: readonly Choice[] }>, query: string) => readonly Choice[];
+}
+
+/** One dictation's words so far: `text` is the WHOLE text (it replaces the dictated part, never
+ *  appended); one `final` ends it (stopped, fn's talk, the time limit, cancelled, an error). */
+export interface DictateState {
+  readonly text: string;
+  readonly final: boolean;
+  readonly cancelled: boolean;
+  /** what went wrong ('the mic is busy.', no mic, no voice model); its words so far are kept */
+  readonly error: string | null;
+}
+
+/** The mic, as the composer sees it (the store's dictateStart/Stop/Cancel and its dictation slice). */
+export interface DictatePort {
+  /** The mic on: a new dictation's id. */
+  readonly start: () => string;
+  /** The mic off: the final words follow. */
+  readonly stop: (id: string) => void;
+  readonly cancel: (id: string) => void;
+  readonly read: (id: string) => DictateState | null;
+  /** Called on each change of that dictation; returns the unsubscribe. */
+  readonly subscribe: (id: string, fn: () => void) => () => void;
+  /** His voice level (0-1) while the mic is on, when the app has it; none: the meter pulses. */
+  readonly level?: (fn: (v: number) => void) => () => void;
 }
 
 /** No lists, no effects: a composer that only types and sends (the spotlight's first step, tests). */
