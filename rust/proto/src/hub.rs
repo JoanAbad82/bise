@@ -157,12 +157,16 @@ pub enum HubEv {
     /// nothing in the hub: a later command just asks again
     Confirm { project: Project, id: u64, text: String },
     /// a plain line from the hub to the window that sent `cmd` (a
-    /// confirm answered no: "drop of @x cancelled"), not a failure
+    /// confirm answered no: "drop of @x cancelled"; `/flow`'s answer to
+    /// a `slash`), not a failure. `cid`: the slash command's, when it
+    /// had one (architect m_10911)
     Notice {
         project: Project,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cmd: Option<String>,
         text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cid: Option<u64>,
     },
     /// an unknown or refused command, never silence
     Error {
@@ -370,13 +374,28 @@ pub enum HubCmd {
     /// tell me when it's done (S10, decision E): a flag on the task, one
     /// job (off again at its `job_end`); `on: false` stops following
     Follow { project: Project, agent: String, on: bool },
+    /// draft (architect m_10724, m_10789): a slash line he typed in
+    /// `agent`'s view (the TUI's focus), parsed by the TUI's own router
+    /// (`/rename`, `/answer`, `/close`, `/archive`, `/restore`,
+    /// `/isolate`, `/stop`, `/compact`, `/flow`...) and run by the same
+    /// handlers. A bad line: `error` with the router's words and `cid`;
+    /// a refusal: `error` with sb-core's words and `cid`; a success
+    /// shows in the events it moves (`agents`, `prs`, an entry), `/flow`'s
+    /// answer as a `notice`. Plain text is refused: that's `send`
+    Slash {
+        project: Project,
+        agent: String,
+        line: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cid: Option<u64>,
+    },
     /// a tag this version doesn't know: answered with `error`
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)

@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "jobs", "job_end", "error")
+TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "jobs", "job_end", "error", "notice")
 FIXTURES = os.path.join(e2e.ROOT, "rust", "proto", "fixtures", "hub_ev.jsonl")
 
 
@@ -418,6 +418,34 @@ def main():
         for ev in typed(c, "thread"):
             pos = [e["pos"] for e in ev["entries"]]
             check(len(pos) == len(set(pos)), "a pos twice in %s's page: %r" % (ev["agent"], pos))
+
+        # slash (architect m_10789/m_10798): his typed slash line, parsed by
+        # the TUI's router, run by the same handlers; a refusal is one
+        # error with its cid, a success none
+        def slash(line, cid, agent="main"):
+            c.send({"cmd": "slash", "project": project, "agent": agent, "line": line, "cid": cid})
+
+        def by_cid(cid):
+            return [e for e in errors() if e.get("cid") == cid]
+
+        slash("/answer 999 v2", 91)
+        c.wait(lambda: by_cid(91), 20, "a slash refused by sb-core")
+        check(len(by_cid(91)) == 1 and "999" in by_cid(91)[0]["text"] and by_cid(91)[0]["cmd"] == "slash", "one error with its cid: %r" % by_cid(91))
+        slash("/rename main", 92)
+        c.wait(lambda: by_cid(92), 20, "a slash the router refuses")
+        check(by_cid(92)[0]["text"].startswith("usage: /rename"), "the router's words: %r" % by_cid(92))
+        slash("just words", 93)
+        c.wait(lambda: by_cid(93), 20, "plain text refused")
+        n = len(typed(c, "notice"))
+        slash("/flow", 94)
+        c.wait(lambda: len(typed(c, "notice")) > n, 20, "/flow's answer as a notice")
+        check(typed(c, "notice")[-1].get("cid") == 94 and typed(c, "notice")[-1]["text"] and not by_cid(94), "a notice, never an error: %r" % typed(c, "notice")[-1])
+        n = len(typed(c, "agents"))
+        slash("/tasks", 95)
+        c.wait(lambda: len(typed(c, "agents")) > n, 20, "/tasks answered with the agents rows")
+        slash("/restore t4", 96)
+        c.wait(lambda: (c.agent("t4") or {}).get("status") != "archived", 60, "t4 restored by a slash line")
+        check(not by_cid(95) and not by_cid(96), "no error for a success: %r" % (by_cid(95) + by_cid(96)))
 
         # every typed event has the frozen keys of the fixtures
         need = required_keys()

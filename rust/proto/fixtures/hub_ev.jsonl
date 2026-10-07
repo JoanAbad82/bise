@@ -16,6 +16,7 @@
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":""}
 {"ev":"confirm","project":"acme-1a2b3c4d","id":3,"text":"@perf is working: archive it anyway? (y/n)"}
 {"ev":"notice","project":"acme-1a2b3c4d","cmd":"confirm","text":"drop of @perf cancelled"}
+{"ev":"notice","project":"acme-1a2b3c4d","cmd":"slash","text":"this repo lands on main (trunk)","cid":32}
 {"ev":"error","project":"acme-1a2b3c4d","cmd":"send","text":"send: context isn't supported yet"}
 {"ev":"error","project":"acme-1a2b3c4d","cmd":"send","text":"no agent perf","cid":12,"reason":"refused"}
 {"ev":"error","project":"acme-1a2b3c4d","cmd":"send","text":"@perf is archived: not delivered","cid":13,"reason":"undelivered"}

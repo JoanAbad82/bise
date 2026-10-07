@@ -29,6 +29,7 @@ export const hub_ev: readonly HubEv[] = [
   {"agent":"perf","ev":"typing","project":"acme-1a2b3c4d","text":""},
   {"ev":"confirm","id":3,"project":"acme-1a2b3c4d","text":"@perf is working: archive it anyway? (y/n)"},
   {"cmd":"confirm","ev":"notice","project":"acme-1a2b3c4d","text":"drop of @perf cancelled"},
+  {"cid":32,"cmd":"slash","ev":"notice","project":"acme-1a2b3c4d","text":"this repo lands on main (trunk)"},
   {"cmd":"send","ev":"error","project":"acme-1a2b3c4d","text":"send: context isn't supported yet"},
   {"cid":12,"cmd":"send","ev":"error","project":"acme-1a2b3c4d","reason":"refused","text":"no agent perf"},
   {"cid":13,"cmd":"send","ev":"error","project":"acme-1a2b3c4d","reason":"undelivered","text":"@perf is archived: not delivered"},
@@ -93,6 +94,8 @@ export const hub_cmd: readonly HubCmd[] = [
   {"agent":"perf","cmd":"effort","effort":"high","project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"follow","on":true,"project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"follow","on":false,"project":"acme-1a2b3c4d"},
+  {"agent":"perf","cid":31,"cmd":"slash","line":"/rename perf perf2","project":"acme-1a2b3c4d"},
+  {"agent":"main","cmd":"slash","line":"/flow","project":"acme-1a2b3c4d"},
 ];
 
 /** rust/proto/fixtures/core_ev.jsonl */

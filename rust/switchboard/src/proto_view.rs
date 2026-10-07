@@ -18,6 +18,7 @@ mod dev_servers;
 mod features;
 mod merged;
 mod models;
+pub mod slash;
 mod worktrees;
 pub use dev_servers::{dev_servers, lsof_ports, server_name, Job};
 pub use features::{features, PlaceCard};

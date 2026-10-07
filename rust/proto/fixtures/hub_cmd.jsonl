@@ -37,3 +37,5 @@
 {"cmd":"effort","project":"acme-1a2b3c4d","agent":"perf","effort":"high"}
 {"cmd":"follow","project":"acme-1a2b3c4d","agent":"perf","on":true}
 {"cmd":"follow","project":"acme-1a2b3c4d","agent":"perf","on":false}
+{"cmd":"slash","project":"acme-1a2b3c4d","agent":"perf","line":"/rename perf perf2","cid":31}
+{"cmd":"slash","project":"acme-1a2b3c4d","agent":"main","line":"/flow"}
