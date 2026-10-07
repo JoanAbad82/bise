@@ -39,3 +39,14 @@
   .sch-row > :nth-child(3) { display: none; }
   .sch-main { padding: 16px 16px 0; }
 }
+
+/* 'scheduled here': panel A's second block, one project's tasks, two lines like the artifacts' rows */
+.sch-here { padding: 4px 0 8px; }
+.sch-here-h { padding: 14px 8px 4px; font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
+.sch-here-row { display: grid; grid-template-columns: 14px minmax(0, 1fr); align-items: start; gap: 12px; width: 100%; padding: 6px 8px; border: 0; border-radius: var(--r-2); background: none; color: var(--c-text); font: var(--t-13) var(--font-ui); text-align: left; cursor: default; }
+.sch-here-row:hover { background: var(--c-hover); }
+.sch-here-row:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--c-focus); }
+.sch-here-g { padding-top: 1px; font-family: var(--font-mono); color: var(--c-text-2); }
+.sch-here-two { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sch-here-t, .sch-here-sub { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sch-here-sub { font: var(--t-12) var(--font-ui); color: var(--c-text-2); }

@@ -2,7 +2,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { formatRoute, parseRoute } from '@/app/route';
-import { ahead, endsWords, nextRunWords, ordinal, runsWords, ScheduledView, type ScheduledTask, type Task } from './index';
+import { ahead, endsWords, nextRunWords, ordinal, runsWords, ScheduledHere, ScheduledView, type ScheduledTask, type Task } from './index';
+import { Store, StoreProvider } from '@/store';
 
 afterEach(cleanup);
 
@@ -61,5 +62,25 @@ describe('the scheduled screen', () => {
   it('nothing scheduled says how one comes', () => {
     render(<ScheduledView tasks={[]} ports={{ stop: () => undefined }} now={NOW} />);
     expect(screen.getByTestId('scheduled.empty').textContent).toBe('nothing scheduled. agents set them with sb every; tell one “check the build every 5m”.');
+  });
+});
+
+describe('scheduled here (panel A)', () => {
+  it("one project's tasks soonest first, two lines; a row opens the screen; none: no block", () => {
+    const store = new Store(null);
+    store.apply({ ev: 'projects', projects: [{ project: 'shop-1', name: 'storefront', path: '/x/shop' }, { project: 'acme-2', name: 'acme', path: '/x/acme' }] });
+    store.apply({ ev: 'scheduled', project: 'shop-1', items: [task(7, { agent: 'perf', words: 'rerun the bench', every: '1h', next_ms: NOW + 3_600_000 }), task(4, { next_ms: NOW + 600_000 })] });
+    store.apply({ ev: 'scheduled', project: 'acme-2', items: [task(9, { agent: 'api' })] });
+    let opened = 0;
+    render(<StoreProvider store={store}><ScheduledHere project="shop-1" onOpen={() => { opened++; }} /></StoreProvider>);
+    const rows = screen.getByTestId('scheduled.here').querySelectorAll('button');
+    expect([...rows].map((r) => r.dataset['testid'])).toEqual(['scheduled.here.row.4', 'scheduled.here.row.7']);
+    expect(rows[0]?.textContent).toContain('check the deploy of storefront');
+    expect(rows[0]?.textContent).toContain('deploy-watch · every 5m');
+    fireEvent.click(screen.getByTestId('scheduled.here.row.7'));
+    expect(opened).toBe(1);
+    cleanup();
+    render(<StoreProvider store={store}><ScheduledHere project="nowhere" onOpen={() => undefined} /></StoreProvider>);
+    expect(screen.queryByTestId('scheduled.here')).toBeNull();
   });
 });
