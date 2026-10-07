@@ -5,6 +5,7 @@ import type { Account, AppCmd, Found } from '@/proto';
 import { core_ev } from '@/proto/fixtures.gen';
 import { fnAct, next, START, stepOf, ticked } from './model';
 import { Onboarding, type OnboardingPorts } from './Onboarding';
+import { FirstRun, showsFirstRun } from './FirstRun';
 
 afterEach(cleanup);
 
@@ -104,5 +105,27 @@ describe('Onboarding', () => {
       { cmd: 'prefs_set', key: 'onboarded', value: true },
     ]);
     expect(p.log).toEqual(['done']);
+  });
+});
+
+describe('the first-run text (L1 / M18)', () => {
+  it("shows the TUI's words; its suggestion hands DEMO to fill, never a send", () => {
+    const filled: string[] = [];
+    render(<FirstRun onFill={(t) => filled.push(t)} />);
+    expect(screen.getByTestId('setup.firstrun').textContent).toContain("what's on your mind?");
+    fireEvent.click(screen.getByTestId('setup.firstrun.demo'));
+    expect(filled).toEqual(['show me what you can do']);
+  });
+
+  it('once the composer holds it, the last line says how to go on', () => {
+    render(<FirstRun ready onFill={() => undefined} />);
+    expect(screen.getByTestId('setup.firstrun.ready').textContent).toBe('⏎ try it · or just type your own');
+    expect(screen.queryByTestId('setup.firstrun.demo')).toBeNull();
+  });
+
+  it('shows while he said nothing and main is the only agent', () => {
+    expect(showsFirstRun(false, 1)).toBe(true);
+    expect(showsFirstRun(true, 1)).toBe(false);
+    expect(showsFirstRun(false, 2)).toBe(false);
   });
 });

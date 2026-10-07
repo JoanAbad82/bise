@@ -12,6 +12,7 @@ import {
   $getRoot,
   $parseSerializedNode,
   $getSelection,
+  $selectAll,
   $isRangeSelection,
   CLEAR_HISTORY_COMMAND,
   COMMAND_PRIORITY_HIGH,
@@ -55,6 +56,11 @@ export interface ComposerActions {
   submit(): void;
   /** Words at the caret (dictation's final text, a pick from elsewhere): editable, never sent. */
   insertText(text: string): void;
+  /**
+   * The field holds `text` alone, all of it selected, and has the focus (the first-run text's
+   * "show me what you can do", BISE-284): typing replaces it, ⏎ sends it; never a send.
+   */
+  fill(text: string): void;
   focus(): void;
   /** The mic control: on, or off when on (bar I). */
   dictate(): void;
@@ -493,6 +499,22 @@ export function Brain(p: BrainProps): JSX.Element | null {
         },
         { discrete: true },
       );
+    },
+    fill: (text) => {
+      // what he had typed goes (the TUI's ed.set); the words in, then all selected (amb-kit, L1/M18)
+      editor.update(
+        () => {
+          const root = $getRoot();
+          root.clear();
+          const p = $createParagraphNode();
+          root.append(p);
+          p.select();
+          $insertAtCaret(text);
+          $selectAll();
+        },
+        { discrete: true },
+      );
+      editor.focus();
     },
     focus: () => {
       editor.focus();

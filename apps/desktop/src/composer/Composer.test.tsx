@@ -70,6 +70,25 @@ describe('the composer', () => {
     expect(sent.trim().endsWith('why 03:00?')).toBe(true);
   });
 
+  it('fill(text): the field holds the words alone, all selected, and nothing is sent (L1/M18, amb-kit)', async () => {
+    const { getByTestId, onSend, act: a } = await mount();
+    const field = getByTestId('composer.field');
+    await act(async () => {
+      a.insertText('an old draft');
+      a.fill('show me what you can do');
+      await Promise.resolve();
+    });
+    expect(field.textContent).toBe('show me what you can do');
+    expect(onSend).not.toHaveBeenCalled();
+    // selected: what he types next replaces it
+    await act(async () => {
+      a.insertText('hi');
+      await Promise.resolve();
+    });
+    expect(field.textContent).toBe('hi');
+    expect(getByTestId('composer.field')).toBe(field);
+  });
+
   it('runs a typed command line instead of sending it', async () => {
     const onCommand = vi.fn();
     const sources = { ...NO_SOURCES, commands: [{ name: '/model', desc: 'set the model', args: true, ready: true }] };

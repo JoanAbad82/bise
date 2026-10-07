@@ -6,3 +6,4 @@
 export { Onboarding, type OnboardingPorts, type OnboardingProps } from './Onboarding';
 export { OnboardingScreen, useFirstLaunch } from './screen';
 export { STEPS, type Step } from './model';
+export { FirstRun, FIRST_RUN, DEMO, showsFirstRun, type FirstRunProps } from './FirstRun';
