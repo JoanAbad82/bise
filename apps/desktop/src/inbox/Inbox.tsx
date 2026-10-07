@@ -14,7 +14,7 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Card as CardRow } from '@/proto';
 import { Empty, Head, Row } from '@/ds';
-import { dotOf, InboxCard, kindTitle, takesWords } from './InboxCard';
+import { dotOf, folds, InboxCard, kindTitle, takesWords } from './InboxCard';
 import { cardKey } from './order';
 import { inboxDrafts, type Drafts } from './drafts';
 import { current, prune, START, step, visible, type Act, type Key } from './model';
@@ -46,6 +46,8 @@ export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts }
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [s, setS] = useState(START);
+  // ctrl+o: the current item's folded lines open (bar I8); a new item folds again
+  const [whole, setWhole] = useState<string | null>(null);
   const list = visible(cards, s);
   const cur = current(list, s);
   const curKey = cur ? cardKey(cur) : null;
@@ -78,6 +80,11 @@ export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts }
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'o') {
+      e.preventDefault();
+      if (cur && curKey !== null && folds(cur.question)) setWhole(whole === curKey ? null : curKey);
+      return;
+    }
     const k = keyOf(e, field.current?.value ?? '');
     if (k === null || (k.k === 'close' && !ports.close)) return;
     e.preventDefault();
@@ -102,6 +109,7 @@ export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts }
               project={names[cur.project]}
               on={s.hl}
               now={now}
+              full={whole === curKey}
               acts={{
                 pick: (n) => {
                   key({ k: 'pick', n });

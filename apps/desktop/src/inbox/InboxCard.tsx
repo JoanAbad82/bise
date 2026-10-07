@@ -34,11 +34,14 @@ export interface InboxCardProps {
   children?: ReactNode;
   /** more cards behind it */
   stacked?: boolean;
+  /** a long question folded (false) or whole (true; ctrl+o, bar I8);
+   * none: always whole (the capsule's card) */
+  full?: boolean;
   /** default `inbox.card.<project>-<id>`; its options are `<testId>.opt.<n>` */
   testId?: string;
 }
 
-export function InboxCard({ card, project, acts, on = null, now, keys, children, stacked, testId }: InboxCardProps) {
+export function InboxCard({ card, project, acts, on = null, now, keys, children, stacked, full, testId }: InboxCardProps) {
   const id = testId ?? `inbox.card.${cardKey(card)}`;
   const page = card.page;
   return (
@@ -47,7 +50,7 @@ export function InboxCard({ card, project, acts, on = null, now, keys, children,
       who={kindTitle(card.kind, card.agent)}
       rest={` · ${project ?? card.project}`}
       k={age(now - card.since_ms)}
-      q={card.question}
+      q={full === false ? <Folded text={card.question} testId={`${id}.more`} /> : card.question}
       keys={keys ?? hints(card)}
       stacked={stacked}
       testId={id}
@@ -74,6 +77,30 @@ export function InboxCard({ card, project, acts, on = null, now, keys, children,
         </div>
       )}
     </Card>
+  );
+}
+
+/** A long question's first lines (bar I8): more than FOLD_AT lines show
+ * FOLD_SHOW of them and how many more, ctrl+o opens the rest. */
+export const FOLD_AT = 8;
+export const FOLD_SHOW = 6;
+
+export function folds(text: string): boolean {
+  return text.split('\n').length > FOLD_AT;
+}
+
+function Folded({ text, testId }: { text: string; testId: string }) {
+  const lines = text.split('\n');
+  if (lines.length <= FOLD_AT) return <>{text}</>;
+  const more = lines.length - FOLD_SHOW;
+  return (
+    <>
+      {lines.slice(0, FOLD_SHOW).join('\n')}
+      <span className="inbox-more" data-testid={testId}>
+        {`\n… ${String(more)} more lines `}
+        <Kbd>ctrl o</Kbd>
+      </span>
+    </>
   );
 }
 

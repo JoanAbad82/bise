@@ -110,6 +110,26 @@ describe('Inbox', () => {
     expect(drafts.get('gone-00000000-1')).toBe('');
   });
 
+  it('ctrl+o opens a long item and folds it again; a short one has nothing folded (I8)', () => {
+    const c = cards()[1];
+    if (!c) throw new Error('fixture');
+    const long = { ...c, question: Array.from({ length: 12 }, (_, i) => `line ${String(i + 1)}`).join('\n') };
+    render(<Inbox cards={[long]} names={{}} ports={ports()} now={1791100400000} />);
+    const card = () => screen.getByTestId(`inbox.card.${long.project}-${String(long.id)}`).textContent;
+    const more = `inbox.card.${long.project}-${String(long.id)}.more`;
+    expect(card()).toContain('line 6');
+    expect(card()).not.toContain('line 7');
+    expect(screen.getByTestId(more).textContent).toContain('6 more lines');
+    fireEvent.keyDown(screen.getByTestId('inbox.root'), { key: 'o', ctrlKey: true });
+    expect(card()).toContain('line 12');
+    expect(screen.queryByTestId(more)).toBeNull();
+    fireEvent.keyDown(screen.getByTestId('inbox.root'), { key: 'o', ctrlKey: true });
+    expect(card()).not.toContain('line 12');
+    cleanup();
+    render(<Inbox cards={[c]} names={{}} ports={ports()} now={1791100400000} />);
+    expect(screen.queryByTestId(`inbox.card.${c.project}-${String(c.id)}.more`)).toBeNull();
+  });
+
   it('nothing open: says so', () => {
     render(<Inbox cards={[]} names={{}} ports={ports()} />);
     expect(screen.getByTestId('inbox.root').textContent).toContain('nothing waits for you');
