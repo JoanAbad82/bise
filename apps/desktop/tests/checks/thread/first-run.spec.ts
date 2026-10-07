@@ -19,7 +19,14 @@ const world = () => [
       shots_keep_days: 7,
     },
   },
-  { ev: 'projects', projects: [{ project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true }] },
+  // a project: with none, bise's empty thread shows designer's 'no project yet' centre instead (m_12093)
+  {
+    ev: 'projects',
+    projects: [
+      { project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true },
+      { project: 'acme-1a2b3c4d', name: 'acme', path: '/nowhere/acme', git: true, home: false, order: 1, agents: 1, working: 0, waits: 0, running: true },
+    ],
+  },
   { ev: 'welcome', project: HOME, proto: 1, workspace: '/nowhere', name: 'bise' },
   { ev: 'agents', project: HOME, agents: [{ name: 'main', main: true, status: 'idle', archived: false, title: '', purpose: '', since_ms: 1791100000000, waits: 0 }] },
   { ev: 'thread', project: HOME, agent: 'main', entries: [], before: null, more: false },

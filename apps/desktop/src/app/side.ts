@@ -92,12 +92,17 @@ export function projectSide(p: ProjectRow, refused = false): { text: string; err
   return { text: working === '' && p.waits === 0 ? 'all quiet' : working, err: false, count: p.waits };
 }
 
-/** The project the right panel shows here: the route's, bise's own on bise; none on the global screens. Pure. */
-export function panelProject(route: Route, home: string | undefined): string | undefined {
+/**
+ * The project the right panel shows here: the route's; on bise's own thread every project's ('',
+ * designer m_12093), none while he has no project; none on the global screens. Pure.
+ */
+export function panelProject(route: Route, home: string | undefined, projects: number): string | undefined {
+  const all = projects > 0 ? '' : undefined;
   switch (route.screen) {
     case 'bise':
-      return home;
+      return all;
     case 'thread':
+      return route.project === home ? all : route.project;
     case 'agents':
     case 'changes':
     case 'review':

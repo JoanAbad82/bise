@@ -68,7 +68,7 @@ function useWakes(project: string): ReadonlyMap<string, number> {
 
 /** One sidebar row: a lead (pearl or sign), the name, its end words, his pink count. */
 function SRow({ kind, lead, name, end, endErr, count, on, title, onClick, testId, children }: {
-  kind: 'top' | 'pj' | 'ag' | 'more' | 'foot';
+  kind: 'top' | 'pj' | 'ag' | 'more' | 'ft';
   lead: ReactNode;
   name: ReactNode;
   end?: ReactNode;
@@ -120,8 +120,8 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
       testId="app.sidebar"
       foot={
         <>
-          <SRow kind="foot" lead="+" name="add a project" end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.add" />
-          <SRow kind="foot" lead="⚙" name="settings" end={<kbd>⌘,</kbd>} onClick={() => { router.go({ screen: 'settings' }); }} testId="app.sidebar.settings" />
+          <SRow kind="ft" lead="+" name="add a project" end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.add" />
+          <SRow kind="ft" lead="⚙" name="settings" end={<kbd>⌘,</kbd>} onClick={() => { router.go({ screen: 'settings' }); }} testId="app.sidebar.settings" />
         </>
       }
     >

@@ -69,11 +69,13 @@ describe('the frame', () => {
     expect(panelAt(1050, true)).toEqual({ docked: true, open: true });
     expect(panelAt(800, true)).toEqual({ docked: false, open: false });
   });
-  it("the panel's project: the route's, bise's own on bise, none on the global screens", () => {
-    expect(panelProject({ screen: 'thread', project: 'p', agent: 'perf' }, 'h')).toBe('p');
-    expect(panelProject({ screen: 'bise' }, 'h')).toBe('h');
-    expect(panelProject({ screen: 'artifacts', project: '' }, 'h')).toBeUndefined();
-    expect(panelProject({ screen: 'settings' }, 'h')).toBeUndefined();
+  it("the panel's project: the route's, every project's on bise's thread, none without a project or on the global screens", () => {
+    expect(panelProject({ screen: 'thread', project: 'p', agent: 'perf' }, 'h', 1)).toBe('p');
+    expect(panelProject({ screen: 'bise' }, 'h', 2), "bise's own thread: every project's").toBe('');
+    expect(panelProject({ screen: 'thread', project: 'h', agent: 'main' }, 'h', 2)).toBe('');
+    expect(panelProject({ screen: 'bise' }, 'h', 0), 'no project yet: no panel').toBeUndefined();
+    expect(panelProject({ screen: 'artifacts', project: '' }, 'h', 2)).toBeUndefined();
+    expect(panelProject({ screen: 'settings' }, 'h', 2)).toBeUndefined();
   });
   it("the crumb: 'storefront › perf', a project's main is the project", () => {
     const name = () => 'storefront';

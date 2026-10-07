@@ -35,6 +35,7 @@ import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
 import { entryKey, pendingKey, posOfKey } from './entry';
 import { FindBar } from './FindBar';
+import { NoProject } from './NoProject';
 import { createFindMark, FindMarkContext } from './findmark';
 import { trackRoutes, useHeld } from './routes';
 import { absolute } from './paths';
@@ -322,7 +323,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
           </div>
         )}
         <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} />
-        {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} />}
+        {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} bise={bise} />}
         {stopping && <Marker>stopping {agent}…</Marker>}
         {fresh && <StartingLine a={me} />}
         {!bise && agent !== MAIN && !fresh && <LiveLine a={me} />}
@@ -384,8 +385,11 @@ export function codeToCopy(doc: Document): string | undefined {
  * "show me what you can do" puts the words in the composer, selected (never
  * a send); then its last line says ⏎ tries it. Gone once he said something.
  */
-function FirstRunSlot({ tkey, project, composer }: { tkey: string; project: string; composer: RefObject<ComposerActions | null> }) {
+function FirstRunSlot({ tkey, project, composer, bise }: { tkey: string; project: string; composer: RefObject<ComposerActions | null>; bise: boolean }) {
   const store = useStore();
+  const rows = useProjects();
+  // bise's own thread before any project: designer's 'no project yet' centre (m_12093), demo only
+  const noProject = bise && rows.length > 0 && !rows.some((p) => !p.home);
   const view = useThreadOrder(tkey);
   const pending = usePending(tkey);
   const live = useAgents(project).filter((a) => !a.archived).length;
@@ -393,6 +397,14 @@ function FirstRunSlot({ tkey, project, composer }: { tkey: string; project: stri
   // his words in the thread: an entry of his, or a send of his on its way
   const said = pending.length > 0 || view.order.some((pos) => store.entry(tkey, pos)?.kind === 'you');
   if (!view.loaded || !showsFirstRun(said, live)) return null;
+  if (noProject)
+    return (
+      <NoProject
+        onDemo={(text) => {
+          composer.current?.fill(text);
+        }}
+      />
+    );
   return (
     <FirstRun
       ready={ready}

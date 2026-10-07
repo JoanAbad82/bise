@@ -651,3 +651,63 @@
   margin-left: auto;
   color: var(--c-text-3);
 }
+
+/* bise's own thread before any project (designer's 'no project yet', m_12093): centred, its
+   28 px pearl, 'bise is here.' in 600, the line in text-2, 'add a project ⌘N' and the quiet demo */
+.th-noproj {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: auto;
+  padding: 48px 24px;
+  text-align: center;
+}
+.th-noproj-pearl .b-pearl {
+  width: 28px;
+  height: 28px;
+}
+.th-noproj-t {
+  margin: 6px 0 0;
+  font-size: var(--t-17, 17px);
+  font-weight: 600;
+  color: var(--c-text);
+}
+.th-noproj-s {
+  margin: 0;
+  max-width: 34em;
+  color: var(--c-text-2);
+}
+.th-noproj-acts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 10px;
+}
+.th-noproj-acts kbd {
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.7;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.th-noproj-demo {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--c-text-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.th-noproj-demo:hover {
+  color: var(--c-text);
+}
+.th-noproj-demo:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--c-focus);
+  border-radius: 3px;
+}

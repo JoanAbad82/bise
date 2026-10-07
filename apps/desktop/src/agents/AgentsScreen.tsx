@@ -53,7 +53,16 @@ export function AgentsScreen({ project, projectName }: { project: string; projec
   };
   const router = useRouter();
   // W6/K18: ↑↓ select an agent, space shows its feed in place, space again (or esc) closes it
-  const [sel, setSel] = useState<string | null>(null);
+  // the selected row comes back after a reload, an update swap or a core restart (keep.ts: 10 minutes)
+  const selKey = `agents.sel:${project}`;
+  const [sel, setSelState] = useState<string | null>(() => {
+    const k = keep.view(selKey);
+    return typeof k === 'string' ? k : null;
+  });
+  const setSel = (name: string | null) => {
+    keep.setView(selKey, name ?? undefined, true);
+    setSelState(name);
+  };
   const [peek, setPeek] = useState<string | null>(null);
   const order = [...live, ...(showArchived ? archived : [])].map((a) => a.name);
   const section = useRef<HTMLElement>(null);

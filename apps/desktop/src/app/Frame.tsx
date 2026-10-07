@@ -78,10 +78,10 @@ export function useFrame(): FrameState {
     setSlid(next === null ? null : { what: next, at: at_ });
   };
   const side = width !== 'narrow' && hidden !== true;
-  const project = panelProject(route, home);
+  const project = panelProject(route, home, rows.filter((p) => !p.home).length);
   const row = rows.find((p) => p.project === project);
   const at = panelAt(WIDE_PX[width], kept);
-  const panel = project === undefined ? undefined : { project, name: row?.name ?? project, docked: at.docked && at.open };
+  const panel = project === undefined ? undefined : { project, name: project === '' ? 'all projects' : (row?.name ?? project), docked: at.docked && at.open };
   return {
     width,
     side,

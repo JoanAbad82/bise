@@ -137,7 +137,8 @@ test('setup/welcome (S.9 + L1): a fresh home gets hello, then start-here in his 
     await page.screenshot({ path: test.info().outputPath('after-hello.png') }); // the frame for the report
     const opened = out.of(EXTERNAL);
     expect(opened, 'after hello, start-here opens in his browser, once (test mode: the external line)').toEqual([START]);
-    const first = page.getByTestId('setup.firstrun.demo');
+    // with no project yet bise's empty thread is designer's 'no project yet' centre: the same demo (m_12093)
+    const first = page.getByTestId('setup.firstrun.demo').or(page.getByTestId('thread.noproject.demo'));
     const has = await first.isVisible().catch(() => false);
     expect.soft(has, "the first-run text 'show me what you can do' is offered in main's empty thread").toBe(true);
     if (has) {

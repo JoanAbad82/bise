@@ -94,6 +94,8 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     const panel = page.getByTestId('app.panel');
     await expect(panel).toContainText('artifacts· storefront');
     expect(Math.round((await panel.boundingBox())?.width ?? 0), 'the panel is 320 px').toBe(320);
+    await expect(panel.getByTestId('scheduled.here'), "then 'scheduled here'").toContainText('check the deploy');
+    await expect(page.getByTestId('app.panel.keys')).toHaveText(/⏎\s*open\s*space\s*quick look\s*⌥⌘0\s*hide/);
     await page.mouse.move(1, 400);
     await page.screenshot({ path: shot('w1400-light') });
     await core.send(prefs('dark') as never);
@@ -142,14 +144,37 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
 });
 
 test('app/sidebar-v6: no project yet: only bise, the top rows and add a project', async () => {
-  const w = world().slice(0, 1).concat([{ ev: 'projects', projects: [{ project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true }] }] as never[]);
+  const w = world().slice(0, 1).concat([
+    { ev: 'projects', projects: [{ project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true }] },
+    { ev: 'welcome', project: HOME, proto: 1, workspace: '/nowhere', name: 'bise' },
+    { ev: 'agents', project: HOME, agents: [agent('main', 'idle')] },
+    { ev: 'thread', project: HOME, agent: 'main', entries: [], before: null, more: false },
+  ] as never[]);
   const core = new FakeCore(w as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: 'bise', size: '1400x860' });
   try {
     const { page } = s;
     await expect(page.getByTestId('app.sidebar.empty-add')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('[data-testid^="app.sidebar.project."]')).toHaveCount(0);
+    // designer m_12093: the centre, the composer stays, no panel and no panel button without a project
+    await expect(page.getByTestId('thread.noproject')).toContainText('bise is here.');
+    await expect(page.getByTestId('thread.noproject.add')).toContainText('add a project');
+    await expect(page.getByTestId('composer')).toBeVisible();
+    await expect(page.getByTestId('app.panel')).toHaveCount(0);
+    await expect(page.getByTestId('app.title.panel')).toHaveCount(0);
+    // the foot: two plain 28 px rows with their words
+    for (const id of ['app.sidebar.add', 'app.sidebar.settings']) {
+      const box = await page.getByTestId(id).boundingBox();
+      expect(Math.round(box?.height ?? 0), `${id} is a 28 px row`).toBe(28);
+    }
+    await expect(page.getByTestId('app.sidebar.add')).toContainText('add a project');
+    await expect(page.getByTestId('app.sidebar.settings')).toContainText('settings');
     await page.screenshot({ path: shot('empty-light') });
+    await core.send(prefs('dark') as never);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: shot('empty-dark') });
+    await page.getByTestId('thread.noproject.demo').click();
+    await expect(page.getByTestId('composer.field'), 'the demo fills the composer').toContainText('show me what you can do');
     await page.getByTestId('app.sidebar.empty-add').click();
     await expect(page.locator('[data-testid^="settings"]').first(), 'it opens settings').toBeVisible({ timeout: 3000 });
   } finally {
