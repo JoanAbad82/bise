@@ -117,6 +117,20 @@ export function pickCommands(core: readonly CoreCommand[]): PickCommand[] {
  * TUI's router parses it and runs the TUI's handler; no parser here. The
  * typed HubCmds (new, rename, model...) stay for buttons, pickers and forms.
  */
+/**
+ * A sent line that is a slash command the composer's list doesn't know
+ * (qa-flows d50c36c5: /undo, /cancel, /flow pr went out as messages): '/word
+ * args' with a plain command word, one line. It goes to the hub as typed
+ * slash like the known ones, and the hub's line (a notice or its refusal)
+ * shows as the TUI's. A path ('/usr/bin is odd') or a multi-line text stays
+ * a message. Pure.
+ */
+export function slashLine(text: string): { name: string; args: string } | null {
+  const m = /^\/([a-z][a-z0-9_-]*)(?:[ \t]+([^\n]*))?$/u.exec(text.trim());
+  if (m === null) return null;
+  return { name: `/${m[1] ?? ''}`, args: (m[2] ?? '').trim() };
+}
+
 export function slashOf(name: string, args: string, at: { project: string; agent: string }): Extract<HubCmd, { cmd: 'slash' }> {
   const word = name.startsWith('/') ? name : `/${name}`;
   const line = args.trim() === '' ? word : `${word} ${args.trim()}`;

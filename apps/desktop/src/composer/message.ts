@@ -12,8 +12,25 @@
 export type Chip =
   | { readonly kind: 'image'; readonly n: number; readonly path: string; readonly name: string; readonly thumb?: string }
   | { readonly kind: 'paste'; readonly n: number; readonly text: string }
-  | { readonly kind: 'quote'; readonly n: number; readonly text: string; readonly from: string }
+  | { readonly kind: 'quote'; readonly n: number; readonly text: string; readonly from: string; readonly at?: QuoteAt }
   | { readonly kind: 'artifact'; readonly n: number; readonly id: string; readonly title: string; readonly url: string };
+
+/** Where in a diff a quote comes from (quote.rs Where): the file, its lines in the new file and the old one ('12-14'; '' none). */
+export interface QuoteAt {
+  readonly file: string;
+  readonly new: string;
+  readonly old: string;
+}
+
+/** A quote's place in words (quote.rs about): 'src/a.rs:12-14 · 3 lines', 'src/a.rs:11-12 · 2 removed lines', else 'main · 3 lines'. */
+export function quoteAbout(from: string, text: string, at?: QuoteAt): string {
+  const n = lineCount(text);
+  const s = n === 1 ? '' : 's';
+  if (at === undefined || at.file === '') return `${from} · ${n} line${s}`;
+  if (at.new !== '') return `${at.file}:${at.new} · ${n} line${s}`;
+  if (at.old !== '') return `${at.file}:${at.old} · ${n} removed line${s}`;
+  return `${at.file} · ${n} line${s}`;
+}
 
 export type Segment = { readonly kind: 'text'; readonly text: string } | { readonly kind: 'chip'; readonly chip: Chip };
 
@@ -74,10 +91,8 @@ export function chipStrip(c: Chip): string {
       const kb = new TextEncoder().encode(c.text).length / 1000;
       return `${chipLabel(c)} “${preview(c.text, 32)}”   ${lineCount(c.text)} lines · ${kb.toFixed(1)} kB`;
     }
-    case 'quote': {
-      const n = lineCount(c.text);
-      return `${chipLabel(c)} “${preview(c.text, 32)}”  ${c.from} · ${n} ${n === 1 ? 'line' : 'lines'}`;
-    }
+    case 'quote':
+      return `${chipLabel(c)} “${preview(c.text, 32)}”  ${quoteAbout(c.from, c.text, c.at)}`;
     case 'artifact':
       return `${chipLabel(c)}  ${c.url}`;
   }
@@ -86,8 +101,12 @@ export function chipStrip(c: Chip): string {
 const pasteTag = (n: number, text: string): string =>
   `<pasted n="${n}" lines="${lineCount(text)}">\n${text.replaceAll('</pasted>', '</pasted >')}\n</pasted>`;
 
-const quoteTag = (from: string, text: string): string =>
-  `<selection from="${from.replaceAll('"', "'")}">\n${chars(text).slice(0, QUOTE_MAX_CHARS).join('').replaceAll('</selection>', '</selection >')}\n</selection>`;
+const attr = (s: string): string => s.replaceAll('"', "'").replaceAll('\n', ' ');
+/** quote.rs tag_at: from, then file / new / old when known. */
+const quoteHead = (from: string, at?: QuoteAt): string =>
+  [`from="${attr(from)}"`, ...(at === undefined ? [] : (['file', 'new', 'old'] as const).filter((k) => at[k] !== '').map((k) => `${k}="${attr(at[k])}"`))].join(' ');
+const quoteTag = (from: string, text: string, at?: QuoteAt): string =>
+  `<selection ${quoteHead(from, at)}>\n${chars(text).slice(0, QUOTE_MAX_CHARS).join('').replaceAll('</selection>', '</selection >')}\n</selection>`;
 
 /** The send for these segments: quotes in front, pastes and image labels in place, the words
  *  trimmed at both ends. Empty text and no files: nothing to send. */
@@ -102,7 +121,7 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
     }
     const c = s.chip;
     if (c.kind === 'quote') {
-      if (quotes.length < QUOTE_MAX) quotes.push(quoteTag(c.from, c.text));
+      if (quotes.length < QUOTE_MAX) quotes.push(quoteTag(c.from, c.text, c.at));
     } else if (c.kind === 'paste') {
       body += pasteTag(c.n, c.text);
     } else if (c.kind === 'artifact') {

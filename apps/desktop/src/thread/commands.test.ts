@@ -1,7 +1,7 @@
 // The composer's / list in the window and how a command line runs (amb-core's C/A/B 40f14a12).
 import { describe, expect, it } from 'vitest';
 import type { PickCommand as CoreCommand } from '@/proto';
-import { pickCommands, slashOf, windowCommands, windowRun } from './commands';
+import { pickCommands, slashLine, slashOf, windowCommands, windowRun } from './commands';
 
 const P = 'shop-1a2b3c4d';
 const at = { project: P, agent: 'perf' };
@@ -59,5 +59,17 @@ describe('a command line runs as the TUI runs it', () => {
     expect(windowRun('/artifacts', 'add https://x.test', at), 'C13: not the screen').toBeUndefined();
     expect(windowRun('/plugins', 'enable x', at)).toBeUndefined();
     expect(slashOf('/artifacts', 'add https://x.test', at)).toEqual({ cmd: 'slash', project: P, agent: 'perf', line: '/artifacts add https://x.test' });
+  });
+});
+
+describe('a slash line the list does not know (qa-flows d50c36c5)', () => {
+  it('/undo, /cancel, /flow pr are commands for the hub; a path or several lines stay a message', () => {
+    expect(slashLine('/undo')).toEqual({ name: '/undo', args: '' });
+    expect(slashLine(' /flow pr ')).toEqual({ name: '/flow', args: 'pr' });
+    expect(slashLine('/cancel')).toEqual({ name: '/cancel', args: '' });
+    expect(slashLine('/usr/bin is odd')).toBeNull();
+    expect(slashLine('/flow pr\nand more')).toBeNull();
+    expect(slashLine('why /flow?')).toBeNull();
+    expect(slashOf('/flow', 'pr', { project: 'p', agent: 'main' })).toEqual({ cmd: 'slash', project: 'p', agent: 'main', line: '/flow pr' });
   });
 });

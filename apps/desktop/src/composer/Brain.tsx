@@ -40,7 +40,7 @@ import { mergeRegister } from '@lexical/utils';
 import { $applyOp, $caretOffset, $insertAtCaret, $insertChip, $replaceBeforeCaret, $selectRange } from './edit';
 import { $caretOnFirstLine, $isBlank, $plainText, $readSegments, $textBeforeCaret } from './read';
 import { enterMakesNewline, indent, newline, outdentAtStart, subwordLeft, subwordRight, NO_UNDO, type Op } from './mdlive';
-import { buildMessage, chars, chipStrip, isLongPaste, nextChipNumber, noVisionLine, preview, type Chip, type Outgoing, type Segment } from './message';
+import { buildMessage, chars, chipStrip, isLongPaste, nextChipNumber, noVisionLine, preview, type Chip, type Outgoing, type QuoteAt, type Segment } from './message';
 import { enqueue, historyAt, load, popNewest, remember, save, takeOldest, type Saved, type Store } from './drafts';
 import { agentRows, argRows, artifactRows, commandLine, commandRows, completion, emojiRows, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
 import { isImagePath, type ComposerSources, type PickFile } from './sources';
@@ -64,8 +64,11 @@ export interface ComposerActions {
   focus(): void;
   /** The mic control: on, or off when on (bar I). */
   dictate(): void;
-  /** Text selected in the thread, as a quote chip at the caret (`❝ 1`, its strip says `from` and its lines), then the focus. */
-  quote(text: string, from: string): void;
+  /**
+   * Text selected in the thread, as a quote chip at the caret (`❝ 1`, its strip says `from` and its lines), then the focus.
+   * `at`: lines of a diff (V7, diffquote.rs): the strip says 'src/a.rs:12-14 · 3 lines' and the tag carries file / new / old.
+   */
+  quote(text: string, from: string, at?: QuoteAt): void;
 }
 
 interface BrainProps {
@@ -519,14 +522,14 @@ export function Brain(p: BrainProps): JSX.Element | null {
     focus: () => {
       editor.focus();
     },
-    quote: (text, from) => {
+    quote: (text, from, at) => {
       // a selection of the thread as a quote chip at the caret (quote.rs; amb-win, lead m_10649)
       if (text.trim() === '') return;
       editor.update(
         () => {
           // from the thread the field had no focus: the chip goes at the draft's end, the caret after it
           $getRoot().selectEnd();
-          $insertChip({ kind: 'quote', n: nextChipNumber($readSegments()), text, from });
+          $insertChip({ kind: 'quote', n: nextChipNumber($readSegments()), text, from, ...(at === undefined ? {} : { at }) });
           $getRoot().selectEnd();
         },
         { discrete: true },

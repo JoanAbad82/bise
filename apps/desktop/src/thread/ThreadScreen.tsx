@@ -16,11 +16,12 @@ import type { Outgoing } from '@/composer/message';
 import { threadKey, useAgents, useCommands, useCoreState, useFiles, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
 import { useMenuAction } from '@/app/menu';
 import { useRouter } from '@/app/router';
-import { pickCommands, slashOf, windowRun } from './commands';
+import { pickCommands, slashLine, slashOf, windowRun } from './commands';
 import { HELP_EVENT } from '@/app/keys';
 import { MAIN } from '@/app/route';
 import { FirstRun, showsFirstRun, Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
+import { takeQuotes } from '@/review/quote';
 import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
 import { ThreadInbox } from '@/inbox';
 import { dotOf, lineOf } from '@/agents/model';
@@ -87,9 +88,20 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   // his bug 3: a selection in the thread, then a key, quotes it in the composer
   const section = useRef<HTMLElement>(null);
   const composer = useRef<ComposerActions | null>(null);
-  const onComposer = useCallback((a: ComposerActions) => {
-    composer.current = a;
-  }, []);
+  const onComposer = useCallback(
+    (a: ComposerActions) => {
+      composer.current = a;
+      // V7: lines quoted in the review come in as chips, then the key he typed
+      const q = takeQuotes(project, agent);
+      if (q === null) return;
+      // after the composer's own listeners are up (its strip reads the chips on an update)
+      setTimeout(() => {
+        for (const x of q.quotes) a.quote(x.text, q.from, x.at);
+        a.insertText(q.key);
+      }, 0);
+    },
+    [project, agent],
+  );
   const quoting = useThreadQuote(section, composer, agent);
   // L25: the demo's tips; 'inside' and 'end' sit at the thread's top, his send moves the tour
   const tour = useTour(project);
@@ -505,13 +517,19 @@ const ThreadComposer = memo(function ThreadComposer({
   );
   const onSend = useCallback(
     (out: Outgoing) => {
+      // a '/word' line the composer's list doesn't know is still a command: the hub's router runs it
+      const sl = out.files.length === 0 ? slashLine(out.text) : null;
+      if (sl !== null) {
+        onCommand(sl.name, sl.args);
+        return;
+      }
       // ⏎ while a turn runs steers it ('now', as the TUI); the files he
       // attached or dropped go with it (amb-core item H: the hub renders them
       // once, an image as a marker the model sees). Tab's queue: amb-web's
       store.send({ project, agent, text: out.text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}) });
       onSent();
     },
-    [store, project, agent, onSent],
+    [store, project, agent, onSent, onCommand],
   );
   return <Composer target={`${project}/${agent}`} busy={busy} sources={sources} to={to} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
 });

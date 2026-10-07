@@ -3,7 +3,8 @@
 // change or a commit from 'merged today' is read-only ('merged · e0f3df5
 // · 14:05', no merge, no ask for changes); a merge happens only by his
 // click on the agent's open merge card (the hub's one /answer path).
-import { useEffect, useRef, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { flatRows, handQuotes, quotesOf, range, type RowAt, type Sel } from './quote';
 import { Button, Diff, Empty, Head, Skel } from '@/ds';
 import { useCards, useDiff, useMerged, useStore } from '@/store';
 import { clock } from '@/thread/entry';
@@ -32,7 +33,78 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
   useEffect(() => {
     body.current?.focus();
   }, []);
+  // V7 / L11: drag or shift+↑↓ select whole lines, a typed key quotes them in the thread
+  const fileLines = useMemo(() => diff?.files.map(linesOf) ?? [], [diff]);
+  const paths = useMemo(() => diff?.files.map((f) => f.path) ?? [], [diff]);
+  const rows = useMemo(() => flatRows(fileLines), [fileLines]);
+  const starts = useMemo(() => fileLines.reduce<number[]>((acc, _ls, i) => [...acc, i === 0 ? 0 : (acc[i - 1] ?? 0) + (fileLines[i - 1]?.length ?? 0)], []), [fileLines]);
+  const [sel, setSel] = useState<Sel | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const target = commit === undefined ? agent : MAIN;
+  const from = commit === undefined ? `${agent} vs main` : `commit ${commit.slice(0, 7)}`;
+  const rowOf = (el: EventTarget | null): number | undefined => {
+    const id = el instanceof Element ? el.closest('.b-dl')?.getAttribute('data-testid') : null;
+    const m = id == null ? null : /^review\.file\.(\d+)\.(\d+)$/u.exec(id);
+    if (m === null) return undefined;
+    const s = starts[Number(m[1])];
+    return s === undefined ? undefined : s + Number(m[2]);
+  };
+  const onMouseDown = (e: MouseEvent) => {
+    const i = rowOf(e.target);
+    if (i === undefined || e.button !== 0) return;
+    e.preventDefault();
+    body.current?.focus();
+    setSel({ anchor: i, head: i });
+    setDragging(true);
+  };
+  const onMouseOver = (e: MouseEvent) => {
+    if (!dragging) return;
+    const i = rowOf(e.target);
+    if (i !== undefined) setSel((s) => (s === null ? s : { ...s, head: i }));
+  };
+  useEffect(() => {
+    if (!dragging) return;
+    const up = () => {
+      setDragging(false);
+    };
+    window.addEventListener('mouseup', up);
+    return () => {
+      window.removeEventListener('mouseup', up);
+    };
+  }, [dragging]);
+  const quoteKey = (e: KeyboardEvent): boolean => {
+    if (sel === null) return false;
+    if (e.key === 'Escape' || ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey)) {
+      setSel(null);
+      if (e.key === 'Escape') e.preventDefault();
+      return e.key === 'Escape';
+    }
+    const qs = quotesOf(paths, fileLines, rows, sel);
+    if (e.key === 'c' && e.metaKey) {
+      e.preventDefault();
+      void (window as Partial<Window>).bise?.copy(qs.map((q) => q.text).join('\n'));
+      return true;
+    }
+    if (e.key.length !== 1 || e.metaKey || e.ctrlKey || e.altKey || qs.length === 0) return false;
+    e.preventDefault();
+    handQuotes({ project, agent: target, from, quotes: qs, key: e.key });
+    router.go({ screen: 'thread', project, agent: target });
+    return true;
+  };
   const onKey = (e: KeyboardEvent) => {
+    if (quoteKey(e)) return;
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && e.shiftKey && rows.length > 0) {
+      e.preventDefault();
+      const d = e.key === 'ArrowDown' ? 1 : -1;
+      setSel((s) => {
+        if (s === null) {
+          const i = (starts[Math.max(0, at.current)] ?? 0) + 1;
+          return { anchor: Math.min(i, rows.length - 1), head: Math.min(i, rows.length - 1) };
+        }
+        return { ...s, head: Math.max(0, Math.min(rows.length - 1, s.head + d)) };
+      });
+      return;
+    }
     const files = body.current?.querySelectorAll<HTMLElement>('.rv-file') ?? [];
     if (e.key === 'Tab' && files.length > 0) {
       e.preventDefault();
@@ -83,7 +155,7 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
           </>
         }
       />
-      <div className="rv-body" data-testid="review.files" tabIndex={-1} ref={body} onKeyDown={onKey}>
+      <div className="rv-body" data-testid="review.files" tabIndex={-1} ref={body} onKeyDown={onKey} onMouseDown={onMouseDown} onMouseOver={onMouseOver} data-selecting={sel !== null || undefined}>
         {diff === null ? (
           <Skel />
         ) : diff.files.length === 0 ? (
@@ -92,11 +164,30 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
           diff.files.map((f, i) => (
             <div key={f.path} className="rv-file">
               {f.note != null && f.note !== '' && <p className="rv-note">{f.note}</p>}
-              <Diff file={fileHead(f)} add={f.add} rm={f.del} lines={linesOf(f)} testId={`review.file.${i}`} />
+              <Diff
+                file={fileHead(f)}
+                add={f.add}
+                rm={f.del}
+                lines={(fileLines[i] ?? []).map((l, li) => (inSel(sel, (starts[i] ?? 0) + li) ? { ...l, sel: true } : l))}
+                pop={sel !== null && !dragging && lastFileOf(sel, rows) === i ? <span data-testid="review.quote.pop">type to ask {target} about it · ⌘C copy</span> : undefined}
+                testId={`review.file.${i}`}
+              />
             </div>
           ))
         )}
       </div>
     </section>
   );
+}
+
+/** Row `i` of the flat list is in the selection. */
+function inSel(s: Sel | null, i: number): boolean {
+  if (s === null) return false;
+  const [a, b] = range(s);
+  return i >= a && i <= b;
+}
+
+/** The file the selection ends in (its pop goes under it). */
+function lastFileOf(s: Sel, rows: readonly RowAt[]): number | undefined {
+  return rows[range(s)[1]]?.f;
 }
