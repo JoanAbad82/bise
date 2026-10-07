@@ -2,8 +2,8 @@
 // store. Every project's open cards come from the core's projects rows
 // (a held hub's own cards, else its view.json's), so one list holds what
 // waits on him everywhere; an answer is the hub's one /answer path
-// (store.answer). Close waits for the typed HubCmd close (amb-core): until
-// then the inbox has no close key or button. Owner: amb-home.
+// (store.answer), a close the hub's one close path (store.close, the
+// typed HubCmd close). Owner: amb-home.
 import { useMemo } from 'react';
 import type { ProjectRow } from '@/proto';
 import { useProjects, useStore } from '@/store';
@@ -30,6 +30,9 @@ export function InboxScreen() {
       ports={{
         answer: (project, card, reply) => {
           store.answer(project, card, reply);
+        },
+        close: (project, card) => {
+          store.close(project, card);
         },
         back: () => {
           router.back();

@@ -281,6 +281,9 @@ pub enum HubCmd {
     /// a card's answer: an option's number or words (approvals and merges
     /// included: the hub's one /answer path)
     Answer { project: Project, card: u64, reply: String },
+    /// close a card without answering it (the TUI's `/close N`): the
+    /// hub's one close path (sb-core's `close`), a refusal as `error`
+    Close { project: Project, card: u64 },
     /// stop its turn
     Stop { project: Project, agent: String },
     /// out of his list (`force`: a working one is stopped first)
@@ -357,7 +360,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)

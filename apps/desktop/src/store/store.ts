@@ -616,6 +616,10 @@ export class Store {
   answer(project: string, card: number, reply: string): void {
     this.command({ cmd: 'answer', project, card, reply });
   }
+  /** Close a card without answering it (the TUI's /close N). */
+  close(project: string, card: number): void {
+    this.command({ cmd: 'close', project, card });
+  }
   stop(project: string, agent: string): void {
     this.command({ cmd: 'stop', project, agent });
   }

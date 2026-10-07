@@ -282,6 +282,7 @@ impl Shell {
             | HubCmd::Page { project, .. }
             | HubCmd::Send { project, .. }
             | HubCmd::Answer { project, .. }
+            | HubCmd::Close { project, .. }
             | HubCmd::Stop { project, .. }
             | HubCmd::Archive { project, .. }
             | HubCmd::Unarchive { project, .. }
@@ -366,6 +367,14 @@ impl Shell {
                     return self.proto_error(id, &tag, "an answer needs words or an option's number");
                 }
                 self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd: UserCmd::Answer { card, text } });
+            }
+            // the TUI's /close handler with its field (Input::UserCmd, no
+            // text; step_typed: a card already gone comes back as error)
+            HubCmd::Close { card, .. } => {
+                if !self.hub.st.open_cards().any(|c| c.id == card) {
+                    return self.proto_error(id, &tag, &format!("card {card} isn't open"));
+                }
+                self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd: UserCmd::Close { card } });
             }
             HubCmd::Stop { agent, .. } => {
                 if !known(self, &agent) {

@@ -100,6 +100,7 @@ def main():
             ({"cmd": "send", "project": project, "agent": "main", "text": "/archive main", "mode": "queued"}, "send"),
             ({"cmd": "send", "project": project, "agent": "nobody", "text": "hi", "mode": "now", "cid": 41}, "send"),
             ({"cmd": "answer", "project": project, "card": 999, "reply": "1"}, "answer"),
+            ({"cmd": "close", "project": project, "card": 999}, "close"),
             ({"cmd": "subscribe", "project": project}, "subscribe"),
             ({"cmd": "diff", "project": project, "agent": "nobody"}, "diff"),
             # S2 step 2: a route that isn't held (sb-core's notice, as the
@@ -248,6 +249,20 @@ def main():
         check("/archive t3 --force" in tr and "v2 --force" in tr, "t3 got the whole reply: %s" % tr[-800:])
         check(c.agent("t3")["status"] != "archived", "the reply archived nothing: %r" % c.agent("t3"))
         check(typed(c, "cards")[-1]["cards"] == [], "the typed cards are empty again")
+
+        # close without answering (the inbox's close): an open card goes,
+        # no error, and the typed cards event no longer has it
+        c.say('[[bash: sb card "close me from the window?"]]')
+        c.wait(lambda: any(x["kind"] == "question" for x in c.cards()), 60, "a card to close")
+        shut = [x for x in c.cards() if x["kind"] == "question"][0]
+        c.wait(lambda: any(r["id"] == shut["id"] for x in typed(c, "cards") for r in x["cards"]), 30, "the card to close as a typed row")
+        c.wait_idle("main")
+        n_err = len(typed(c, "error"))
+        c.send({"cmd": "close", "project": project, "card": shut["id"]})
+        c.wait(lambda: not c.cards(), 30, "the card closed by close")
+        c.wait(lambda: all(r["id"] != shut["id"] for r in typed(c, "cards")[-1]["cards"]), 30, "the typed cards without it")
+        check(len(typed(c, "error")) == n_err, "close of an open card gave no error: %r" % typed(c, "error")[n_err:])
+        c.wait_idle("main", timeout=90)
 
         # an artifact made by main comes typed, new; artifacts_seen clears new
         c.say('[[bash: echo notes > "$TMPDIR/notes.md" && sb artifact add "$TMPDIR/notes.md" --title "Notes"]]')

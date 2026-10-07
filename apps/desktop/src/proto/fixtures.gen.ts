@@ -59,6 +59,7 @@ export const hub_cmd: readonly HubCmd[] = [
   {"agent":"main","cmd":"send","files":["/Users/ana/notes/q3-notes.md","/Users/ana/Desktop/shot.png"],"mode":"now","project":"acme-1a2b3c4d","text":"what stands out here"},
   {"card":9,"cmd":"answer","project":"acme-1a2b3c4d","reply":"1"},
   {"card":10,"cmd":"answer","project":"acme-1a2b3c4d","reply":"yes"},
+  {"card":9,"cmd":"close","project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"stop","project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"archive","force":true,"project":"acme-1a2b3c4d"},
   {"agent":"old-fix","cmd":"archive","force":false,"project":"acme-1a2b3c4d"},
