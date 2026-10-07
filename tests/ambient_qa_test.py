@@ -640,6 +640,26 @@ def world_fixtures_seed_every_desktop_shape():
     ms = world.main_script(os.path.join(world.GATE, "w-test"), shop)
     check(ms.index("sb feature new gift-cards") < ms.index("sb spawn gift-api --feature gift-cards"), "the feature exists before its agents")
     check(any("ask" in st for a in feat for st in a["steps"]), "an agent asks its own question")
+    # ambient-lead m_10397: the shop's GitHub is the world's fake gh, first on the hubs' PATH
+    check(shop.get("origin", "").startswith("https://github.com/") and {p["number"] for p in shop["prs"]} == {412, 415}, "shop has an origin and PRs #412, #415")
+    gw = tempfile.mkdtemp()
+    bindir = world.fake_gh(gw, world.plan(2))
+    gh = lambda *a: subprocess.run([os.path.join(bindir, "gh")] + list(a), capture_output=True, text=True)  # noqa: E731
+    check(gh("auth", "status", "--hostname", "github.com").returncode == 0, "fake gh: logged in")
+    r = gh("api", "graphql", "-f", 'query=query { repository(owner: "acme-qa", name: "shop") { b0: pullRequests(headRefName: "sb/checkout", first: 3) { nodes { x } } '
+           'b1: pullRequests(headRefName: "sb/receipts", first: 3) { nodes { x } } b2: pullRequests(headRefName: "sb/search", first: 3) { nodes { x } } } }')
+    rep = json.loads(r.stdout)["data"]["repository"]
+    n412, n415 = rep["b0"]["nodes"][0], rep["b1"]["nodes"][0]
+    check(n412["number"] == 412 and n412["reviewDecision"] == "CHANGES_REQUESTED" and not n412["isDraft"]
+          and n412["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["state"] == "FAILURE", "#412: changes requested, checks fail")
+    check(n415["number"] == 415 and n415["isDraft"] and n415["commits"]["nodes"][0]["commit"]["statusCheckRollup"]["state"] == "PENDING"
+          and rep["b2"]["nodes"] == [], "#415 draft, checks running; no PR on sb/search")
+    check("e2e" in gh("run", "view", "7412", "--log-failed", "-R", "github.com/acme-qa/shop").stdout, "the failed e2e's log")
+    check(gh("pr", "merge", "412").returncode != 0, "fake gh never merges")
+    other = json.loads(gh("api", "graphql", "-f", 'query=query { repository(owner: "someone", name: "else") { b0: pullRequests(headRefName: "sb/checkout", first: 3) { nodes { x } } } }').stdout)
+    check(other["data"]["repository"]["b0"]["nodes"] == [], "a repo it doesn't know has no PRs")
+    check(len(open(os.path.join(gw, "gh.log")).read().splitlines()) == 5, "every call logged")
+    shutil.rmtree(gw, ignore_errors=True)
     cards = [c for p in world.plan(3) for c in p["cards"]]
     check(any("merge" in c and "\n1. " in c for c in cards) and len(cards) >= 2, "a merge question and a question with options")
     w = os.path.join(world.GATE, "w-test")

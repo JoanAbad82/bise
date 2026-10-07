@@ -94,6 +94,11 @@ PROJECTS = [
                     {"report": "done", "text": "discount codes work at checkout (checkout/cart.py, checkout/codes.py). waiting for your merge."}]},
          {"name": "search", "place": "", "objective": "search doesn't find tshirt",
           "steps": [{"report": "blocked", "text": "search ne trouve pas tshirt: the index matches whole names only. fuzzy match or a synonym list?"}]},
+         # a worktree agent with a draft PR, checks running (#415 below)
+         {"name": "receipts", "place": "new", "objective": "email the receipt after checkout",
+          "steps": [{"write": "checkout/receipt.py", "text": "def receipt(order):\n    return 'total: %.2f' % order['total']\n"},
+                    {"commit": "receipts: the receipt text"},
+                    {"report": "progress", "text": "draft PR #415 open, e2e running", "step": "2/3"}]},
          # a FEATURE with 2 agents (qa-flows m_10155): each in its own worktree from the feature's tip,
          # landing on the feature branch, so a try and a merge are possible (sb feature ready / merge)
          {"name": "gift-api", "feature": "gift-cards", "objective": "gift cards: the balance API",
@@ -110,7 +115,23 @@ PROJECTS = [
                     {"ask": "gift cards: show the balance on the cart page, or only at checkout?\n1. on the cart page\n2. only at checkout"},
                     {"report": "blocked", "text": "waiting for your answer: cart page or checkout only?"}]},
      ],
-     "feature": "gift-cards"},
+     "feature": "gift-cards",
+     # the shop's GitHub, for the PR list (ambient-lead m_10397): an origin on github.com that only the
+     # world's fake gh (fake_gh.py, first on the hubs' PATH) ever answers; nothing reaches the network
+     "origin": "https://github.com/acme-qa/shop.git",
+     "prs": [
+         {"number": 412, "branch": "sb/checkout", "title": "checkout: discount codes", "draft": False,
+          "review": "CHANGES_REQUESTED", "rollup": "FAILURE",
+          "checks": [{"name": "unit", "conclusion": "SUCCESS"},
+                     {"name": "e2e", "conclusion": "FAILURE", "log": ["FAIL checkout/test_total.py::test_spring10 - assert 90.0 == 89.99"]}],
+          "reviews": [{"state": "CHANGES_REQUESTED", "author": "lea-qa", "body": "round after the discount, not before"}]},
+         # the hub follows PRs of plain worktree places only (core.rs pr_watches): a feature agent's
+         # branch is never asked, so the draft is on receipts' worktree branch
+         {"number": 415, "branch": "sb/receipts", "title": "receipts: email the receipt after checkout", "draft": True,
+          "review": None, "rollup": "PENDING",
+          "checks": [{"name": "unit", "conclusion": "SUCCESS"}, {"name": "e2e", "status": "IN_PROGRESS", "conclusion": None}],
+          "reviews": []},
+     ]},
     {"name": "docs",
      "files": {"README.md": "# docs\n\nthe user guide.\n", "guide/start.md": "# getting started\n\nInstal the app, then run it.\n"},
      "cards": [],
@@ -243,8 +264,9 @@ def write_seeds(world, projects):
     return want
 
 
-def make_repo(ws, files):
-    """A project's git repo on main, its files committed."""
+def make_repo(ws, files, origin=None):
+    """A project's git repo on main, its files committed; `origin` its remote (never fetched or pushed:
+    only the world's fake gh reads it)."""
     os.makedirs(ws, exist_ok=True)
     for rel, text in files.items():
         p = os.path.join(ws, rel)
@@ -257,6 +279,29 @@ def make_repo(ws, files):
         r = subprocess.run(cmd, cwd=ws, capture_output=True, text=True, env=env)
         if r.returncode != 0:
             raise RuntimeError("make_repo %s: %s: %s" % (ws, " ".join(cmd), (r.stderr or r.stdout).strip()))
+    if origin:
+        subprocess.run(["git", "remote", "add", "origin", origin], cwd=ws, check=True, capture_output=True)
+        subprocess.run(["git", "config", "remote.origin.pushurl", "DISABLED-in-world"], cwd=ws, check=True, capture_output=True)
+
+
+def fake_gh(world, projects):
+    """<world>/bin/gh: the world's gh (fake_gh.py) over the PRs of every project with an origin, put
+    first on the world hubs' PATH. Returns the bin folder."""
+    bindir = os.path.join(world, "bin")
+    os.makedirs(bindir, exist_ok=True)
+    for p in projects:
+        if p.get("origin"):
+            ref = p["origin"].rstrip("/").removesuffix(".git").split("/")
+            with open(os.path.join(world, "prs-%s.json" % p["name"]), "w") as f:
+                json.dump({"owner": ref[-2], "name": ref[-1], "prs": p.get("prs", [])}, f, indent=1)
+    gh = os.path.join(bindir, "gh")
+    with open(gh, "w") as f:
+        # one gh for every hub: the PR data of the repo the hub asks about (its owner/name in the query)
+        f.write("#!/bin/sh\n# the world's fake gh (plugins/ambient-qa/fake_gh.py): never his gh, his login or the network\n"
+                "exec %s %s %s \"$@\"\n" % (shlex.quote(sys.executable), shlex.quote(os.path.join(HERE, "fake_gh.py")),
+                                              shlex.quote(world)))
+    os.chmod(gh, 0o755)
+    return bindir
 
 
 # ---------------------------------------------------------------- where
@@ -329,12 +374,14 @@ def daemon(bise, root, n):
     signal.signal(signal.SIGTERM, lambda *_: stop.update(now=True))
     signal.signal(signal.SIGINT, lambda *_: stop.update(now=True))
     hubs, envs, holds = [], [], []
+    bindir = fake_gh(world, projects)
     try:
         for name, files in [(HOME_NAME, None)] + [(p["name"], p["files"]) for p in projects]:
             ws = home_ws if files is None else os.path.join(home, "code", name)
             if files is not None:
-                make_repo(ws, files)
+                make_repo(ws, files, next((p.get("origin") for p in projects if p["name"] == name), None))
             E = e2e.Env()
+            E.env["PATH"] = bindir + os.pathsep + E.env.get("PATH", "/usr/bin:/bin")
             envs.append(E)
             E.ws = ws
             sb_core = os.path.join(root, "sb-core")
