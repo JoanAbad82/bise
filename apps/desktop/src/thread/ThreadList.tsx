@@ -54,6 +54,8 @@ export interface ThreadListProps {
    * selector inside the row: its words, not a divider above them that goes
    * once the row before it arrives); none: the whole row */
   holdPart?: string;
+  /** a row's React key when not its own (the live row and the entry that takes its place share one) */
+  reactKey?: (key: string) => string;
 }
 
 /**
@@ -94,7 +96,7 @@ export function newAtEnd(last: string | undefined, keys: readonly string[]): num
   return i < 0 ? 0 : keys.length - 1 - i;
 }
 
-export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, keepKey, holdPart }: ThreadListProps) {
+export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, keepKey, holdPart, reactKey }: ThreadListProps) {
   const virtuoso = useRef<VirtuosoHandle>(null);
   // the anchor of firstItemIndex, moved during render (React's
   // "state from the previous render" pattern): no effect, no extra frame
@@ -297,7 +299,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
         style={FILL}
         data={keys}
         firstItemIndex={next.index}
-        computeItemKey={(_, key) => key}
+        computeItemKey={(_, key) => (reactKey === undefined ? key : reactKey(key))}
         itemContent={(_, key) => row(key)}
         followOutput={(b) => (b || stick.current ? 'auto' : false)}
         totalListHeightChanged={onGrow}

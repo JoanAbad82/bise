@@ -13,7 +13,9 @@ import { Composer, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer';
 import { quoteFrom, quoteKey, quoteText } from './quote';
 import type { Outgoing } from '@/composer/message';
-import { threadKey, useAgents, useCards, useCommands, useCoreState, useFiles, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
+import { threadKey, useAgents, useCards, useCommands, useCoreState, useEntry, useFiles, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
+import { usePartialText } from '@/shared/partial';
+import { LIVE, liveKey, useLive, useStill } from './live';
 import { useMenuAction } from '@/app/menu';
 import { useRouter } from '@/app/router';
 import { pickCommands, slashLine, slashOf, windowRun } from './commands';
@@ -290,7 +292,12 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
 
   // designer's v6 (5): an agent whose thread has nothing of its own yet (his first message at most) is starting
   const order = useThreadOrder(tkey);
-  const fresh = !bise && agent !== MAIN && me !== undefined && !me.archived && order.loaded && order.order.length <= 1 && me.status === 'working' && me.waits === 0;
+  // once it writes (a streamed reply, live.ts) it isn't starting any more, even between the
+  // partial's clear and its entry (sticky for this thread: the line never comes back mid-turn)
+  const writing = usePartialText(project, agent) !== null;
+  const [wrote, setWrote] = useState<string | null>(null);
+  if (writing && wrote !== tkey) setWrote(tkey);
+  const fresh = !bise && agent !== MAIN && me !== undefined && !me.archived && order.loaded && order.order.length <= 1 && me.status === 'working' && me.waits === 0 && !writing && wrote !== tkey;
   // designer's desktop-screens v6 (1): '⋯' at the head's right (rename, model, reasoning)
   const more =
     me && !me.archived && !bise ? (
@@ -450,7 +457,25 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
   // R13: more than 3 agent-to-agent messages in a row fold into '▸ 4 messages between 2 agents'
   const [openRuns, setOpenRuns] = useState<ReadonlySet<number>>(() => new Set());
   const runs = useMemo(() => foldedRuns(view.order, (pos) => store.entry(tkey, pos), agent), [view, store, tkey, agent]);
-  const keys = useMemo(() => withRuns(view.order, runs, openRuns, entryKey), [view, runs, openRuns]);
+  const listed = useMemo(() => withRuns(view.order, runs, openRuns, entryKey), [view, runs, openRuns]);
+  // the reply being written (streaming): a live row at the end, drawn as the entry it becomes,
+  // which takes its place with the same key (live.ts, text-appearing v2)
+  const partial = usePartialText(project, agent);
+  const lastPos = view.order.at(-1) ?? -1;
+  const lastKind = useEntry(tkey, lastPos)?.kind;
+  const live = useLive(partial, lastPos, lastKind);
+  const still = useStill();
+  const keys = useMemo(() => (live.entry === null ? listed : [...listed, LIVE]), [listed, live.entry]);
+  const liveCall = live.call;
+  const handed = live.handed;
+  const reactKey = useCallback(
+    (key: string) => {
+      if (key === LIVE) return liveCall === null ? key : liveKey(liveCall);
+      const pos = posOfKey(key);
+      return (pos === undefined ? undefined : handed.get(pos)) ?? key;
+    },
+    [liveCall, handed],
+  );
   // relative paths in its answers are under the agent's folder: its worktree, else the project's
   const base = useBase(project, agent);
   const ctx = useMemo<RowCtx>(
@@ -496,10 +521,11 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
           </button>
         );
       }
+      if (key === LIVE) return live.entry === null ? null : <EntryRow ctx={ctx} pos={-1} prev={lastPos < 0 ? undefined : lastPos} live={live.entry} still={still} />;
       const pos = posOfKey(key);
-      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} />;
+      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} still={still} />;
     },
-    [ctx, prevOf, runs, openRuns],
+    [ctx, prevOf, runs, openRuns, live.entry, lastPos, still],
   );
   const onOlder = useCallback(() => {
     store.olderPage(project, agent);
@@ -519,7 +545,7 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
     </div>
   );
   if (!view.loaded && keys.length === 0 && tail === undefined) return <div className="th-list th-loading" data-testid="thread.loading" />;
-  return <ThreadList ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} tail={tail} testId="thread.list" keepKey={tkey} holdPart=".th-row" />;
+  return <ThreadList ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} tail={tail} testId="thread.list" keepKey={tkey} holdPart=".th-row" reactKey={reactKey} />;
 });
 
 /** "3 agents · 1 at work · 2 waiting": a project's live agents (main out). Pure. */

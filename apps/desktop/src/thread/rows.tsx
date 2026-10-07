@@ -10,7 +10,7 @@ import { useAgents, useCoreState, useEntry, useHubRefused, usePending, useProjec
 import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
-import { Markdown } from './Markdown';
+import { Answer, Markdown } from './Markdown';
 import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
@@ -29,8 +29,11 @@ export interface RowCtx {
   readonly onPath?: (path: string, line?: number) => void;
 }
 
-export const EntryRow = memo(function EntryRow({ ctx, pos, prev }: { ctx: RowCtx; pos: number; prev?: number | undefined }) {
-  const e = useEntry(ctx.tkey, pos);
+export const EntryRow = memo(function EntryRow({ ctx, pos, prev, live, still = false }: { ctx: RowCtx; pos: number; prev?: number | undefined; live?: Entry | undefined; still?: boolean }) {
+  // the live row (live.ts) is this same row drawing the entry it becomes, so
+  // the entry takes its place with nothing unmounted (text-appearing v2 (4))
+  const stored = useEntry(ctx.tkey, pos);
+  const e = live ?? stored;
   const before = useEntry(ctx.tkey, prev ?? -1);
   const hit = useIsCurrent(pos);
   const today = useToday();
@@ -49,10 +52,10 @@ export const EntryRow = memo(function EntryRow({ ctx, pos, prev }: { ctx: RowCtx
           <span>{day}</span>
         </div>
       )}
-      <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={`thread.entry.${pos}`} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head}>
+      <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={live === undefined ? `thread.entry.${pos}` : 'thread.stream'} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head}>
         {/* a turn that opens on its work (tools, a thinking) still shows who and when */}
         {head && (e.kind === 'tools' || (e.kind === 'thinking' && !thoughtNothing(e))) && <NameLine e={e} ctx={ctx} />}
-        <EntryBody e={e} ctx={ctx} head={head} />
+        <EntryBody e={e} ctx={ctx} head={head} live={live !== undefined} still={still} />
       </div>
     </>
   );
@@ -70,7 +73,7 @@ function NameLine({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   );
 }
 
-function EntryBody({ e, ctx, head }: { e: Entry; ctx: RowCtx; head: boolean }) {
+function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head: boolean; live: boolean; still: boolean }) {
   switch (e.kind) {
     case 'tools':
       return <ToolsRow e={e} ctx={ctx} />;
@@ -147,7 +150,7 @@ function EntryBody({ e, ctx, head }: { e: Entry; ctx: RowCtx; head: boolean }) {
       return (
         <Msg from={who.from} name={who.name} indent={who.indent} time={clock(e.at_ms)} head={head}>
           {e.thinking != null && e.thinking.ms >= THOUGHT_MS && <ThinkingLine pos={e.pos} head={thoughtFor(e.thinking.ms)} body={e.thinking.text} />}
-          <Markdown text={dropAuthor(e.text, e.from ?? ctx.agent)} onLink={ctx.onLink} onPath={ctx.onPath} />
+          <Answer text={dropAuthor(e.text, e.from ?? ctx.agent)} live={live} still={still} onLink={ctx.onLink} onPath={ctx.onPath} />
         </Msg>
       );
     }

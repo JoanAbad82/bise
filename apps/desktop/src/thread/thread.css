@@ -756,3 +756,40 @@
   outline: 0;
   box-shadow: 0 0 0 2px var(--c-focus);
 }
+
+/* a streamed answer (ambient's text-appearing v2, designer signed): only the
+   new words of an update fade in, opacity only (no slide, blur or scale);
+   a new list item / table row / code box as one; new whole code lines. */
+@keyframes th-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.th-answer .th-w,
+.th-answer .th-in,
+.th-answer .th-ln-in {
+  animation: th-in 180ms ease-out both;
+}
+.th-answer .th-wave {
+  margin-left: 0.3em;
+  color: var(--c-text-2);
+  animation: b-pulse 0.9s ease-in-out infinite alternate;
+}
+/* the window not in front, or reduced motion: the text still comes, no fade, the ∿ still */
+.th-answer.th-still .th-w,
+.th-answer.th-still .th-in,
+.th-answer.th-still .th-ln-in,
+.th-answer.th-still .th-wave {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .th-answer .th-w,
+  .th-answer .th-in,
+  .th-answer .th-ln-in,
+  .th-answer .th-wave {
+    animation: none;
+  }
+}

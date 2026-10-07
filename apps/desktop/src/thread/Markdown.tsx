@@ -9,11 +9,13 @@
 // A link never navigates the window: a click goes to `onLink` (the thread
 // hands it the shell's open-in-browser), and only http(s) and mailto links
 // are links at all.
-import { memo, type MouseEvent } from 'react';
+import { memo, useEffect, useState, type MouseEvent } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { pathOf } from './paths';
-import { Code, known } from './Code';
+import { Code, PlainCode, known } from './Code';
+import { fade, type FadeOpts } from './fade';
+import { streamView } from './stream';
 
 /** A link he may open from an answer: http, https or mailto. */
 export function openable(href: string | undefined): href is string {
@@ -68,12 +70,15 @@ export const Markdown = memo(function Markdown({
   onLink,
   onPath,
   breaks = false,
+  fading,
 }: {
   text: string;
   onLink?: (url: string) => void;
   onPath?: (path: string, line?: number) => void;
   /** every line he typed stays a line (his own messages); answers stay standard markdown */
   breaks?: boolean;
+  /** a streamed answer: its new words fade in (Answer below) */
+  fading?: FadeOpts;
 }) {
   const components: Components = {
     // a file path in inline code opens in his editor (tui-parity M4, B14);
@@ -118,8 +123,11 @@ export const Markdown = memo(function Markdown({
       const code = node?.children.find((c) => c.type === 'element' && c.tagName === 'code');
       const lang = code?.type === 'element' ? langOf(code.properties.className) : undefined;
       const text = code === undefined ? '' : textOf(code);
+      // a streamed answer: its new box fades in once, then its new whole lines (fade.ts)
+      const fresh = code?.type === 'element' && typeof code.properties.dataFrom === 'string' ? Number(code.properties.dataFrom) : undefined;
+      const boxIn = Array.isArray(node?.properties.className) && node.properties.className.includes('th-in');
       return (
-        <div className="th-code">
+        <div className={boxIn ? 'th-code th-in' : 'th-code'}>
           <div className="th-code-head">
             <span className="th-code-lang b-md-lang">{lang ?? ''}</span>
             <button
@@ -133,7 +141,7 @@ export const Markdown = memo(function Markdown({
               copy
             </button>
           </div>
-          <pre className="th-pre">{known(lang) ? <Code text={text} lang={lang} /> : children}</pre>
+          <pre className="th-pre">{known(lang) ? <Code text={text} lang={lang} from={fresh} /> : fresh !== undefined ? <PlainCode text={text} from={fresh} /> : children}</pre>
         </div>
       );
     },
@@ -152,9 +160,62 @@ export const Markdown = memo(function Markdown({
   return (
     // b-md: the ds's markdown colors, the TUI's (src/ds/css/md.css); th-md: the thread's layout
     <div className="th-md b-md">
-      <ReactMarkdown remarkPlugins={breaks ? withBreaks : plugins} components={components} skipHtml>
+      <ReactMarkdown remarkPlugins={breaks ? withBreaks : plugins} rehypePlugins={fading === undefined ? undefined : [[fade, fading]]} components={components} skipHtml>
         {text}
       </ReactMarkdown>
     </div>
   );
 });
+
+/** Each Answer's rendered length after its last pass (its next update fades from there). */
+const totals = new WeakMap<object, number>();
+
+/** How long the new words of one update take to fade in (120 ms of stagger + 180 ms of fade). */
+export const FADE_MS = 300;
+
+/**
+ * An agent's answer, streamed or whole (text-appearing v2): while `live`,
+ * only what is whole shows (stream.ts) and the working sign rides after the
+ * last word; at each new text, only the words new since the last update
+ * fade in, and FADE_MS later the thread draws them plain again (nothing
+ * above re-animates or moves). The entry that replaces the live text is the
+ * same Answer (the same row): its last words fade in, nothing else moves.
+ * `still`: no fade (reduced motion, or the window not in front); the text
+ * still comes with each update.
+ */
+export function Answer({ text, live = false, still = false, onLink, onPath }: { text: string; live?: boolean; still?: boolean; onLink?: (url: string) => void; onPath?: (path: string, line?: number) => void }) {
+  const shown = live ? streamView(text) : text;
+  // the text's rendered length after each pass (fade.ts onTotal): the next update's `from`
+  const [me] = useState(() => ({}));
+  const [seen, setSeen] = useState(shown);
+  // Infinity: nothing fades (a row drawn whole, or its words already faded)
+  const [from, setFrom] = useState(Infinity);
+  if (shown !== seen) {
+    setSeen(shown);
+    setFrom(still ? Infinity : (totals.get(me) ?? Infinity));
+  }
+  useEffect(() => {
+    if (from === Infinity) return;
+    const t = window.setTimeout(() => {
+      setFrom(Infinity);
+    }, FADE_MS);
+    return () => {
+      window.clearTimeout(t);
+    };
+  }, [from, seen]);
+  const fading: FadeOpts | undefined =
+    live || from !== Infinity
+      ? {
+          from,
+          wave: live,
+          onTotal: (n) => {
+            totals.set(me, n);
+          },
+        }
+      : undefined;
+  return (
+    <div className={still ? 'th-answer th-still' : 'th-answer'} data-live={live || undefined}>
+      <Markdown text={shown} onLink={onLink} onPath={onPath} fading={fading} />
+    </div>
+  );
+}
