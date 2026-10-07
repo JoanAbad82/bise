@@ -37,6 +37,7 @@ impl Shell {
     pub(super) fn proto_rows(&mut self, snap: &Value) -> (HubEv, HubEv) {
         let project = self.project();
         let now = now_ms();
+        self.seed_usage(snap);
         // K4: each agent's model read against the hub's catalog (his
         // config.toml merged, re-read when it changes), fresh each time
         self.setup();
@@ -49,11 +50,37 @@ impl Shell {
             let u = calls.get(name)?;
             let context = u.input + u.output;
             let window = cat.map(|c| c.context_window(&u.model)).filter(|w| *w > 0);
-            Some(AgentUsage { model: u.model.clone(), context, window, words: words::context_words(context, window) })
+            Some(AgentUsage { model: u.model.clone(), context, window, words: words::context_words(context, window), short: words::short_words(context, window) })
         };
         let agents = proto_view::agents(snap, &mut self.proto.since, now, crate::model::user_kind, &vision, &usage);
         let cards = proto_view::cards(snap, &project, now, crate::model::user_kind);
         (HubEv::Agents { project: project.clone(), agents }, HubEv::Cards { project, cards })
+    }
+
+    /// S13 (amb-win m_10985, architect m_10999): an agent the hub has no
+    /// usage for yet gets it once from its transcript's tail, by the rule
+    /// the TUI uses on its feed (`lines::current_usage`: the last usage
+    /// line, none when a compaction ended after it), so a hub restart no
+    /// longer blanks the gauge. Once per agent, never per broadcast; live
+    /// lines then move it (`proto_usage_line`). No usage, no row: never
+    /// an invented 0.
+    fn seed_usage(&mut self, snap: &Value) {
+        let names: Vec<String> = snap
+            .get("agents")
+            .and_then(Value::as_array)
+            .map(|a| a.iter().filter_map(|x| x.get("name").and_then(Value::as_str).map(str::to_string)).collect())
+            .unwrap_or_default();
+        for name in names {
+            if !self.proto.seeded.insert(name.clone()) || self.proto.usage.contains_key(&name) {
+                continue;
+            }
+            let Some(dir) = self.dir_of(&name) else { continue };
+            let tail = transcript_tail(&self.transcript(&dir), SEED_BYTES);
+            let last = pthread::lines::current_usage(tail.iter().map(|l| pthread::lines::usage_mark(l)));
+            if let Some(u) = last.and_then(|t| bise_session::usage_line::parse(&t)) {
+                self.proto.usage.insert(name, u);
+            }
+        }
     }
 
     /// The typed `prs` (bar A.7): the open PRs of this hub's places, the
@@ -261,6 +288,28 @@ impl Shell {
         }
         ids
     }
+}
+
+/// The bytes of a transcript's end read to seed an agent's usage: enough
+/// for its last usage line.
+const SEED_BYTES: u64 = 64 * 1024;
+
+/// The lines in the last `bytes` of a transcript, without their `<ms>\t`
+/// stamp (a line cut by the start is dropped).
+fn transcript_tail(path: &std::path::Path, bytes: u64) -> Vec<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let Ok(mut f) = std::fs::File::open(path) else { return Vec::new() };
+    let from = f.metadata().map(|m| m.len()).unwrap_or(0).saturating_sub(bytes);
+    let mut buf = Vec::new();
+    if f.seek(SeekFrom::Start(from)).is_err() || f.take(bytes).read_to_end(&mut buf).is_err() {
+        return Vec::new();
+    }
+    let text = String::from_utf8_lossy(&buf);
+    let mut lines = text.lines();
+    if from > 0 {
+        lines.next();
+    }
+    lines.map(|l| l.split_once('\t').map_or(l, |(_, line)| line).to_string()).collect()
 }
 
 /// The mtimes of config.toml and auth.json (none: no file).

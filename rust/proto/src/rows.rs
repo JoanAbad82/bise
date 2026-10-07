@@ -131,6 +131,10 @@ pub struct AgentUsage {
     /// (bise-proto's `words::context_words`; the window never rebuilds
     /// them)
     pub words: String,
+    /// the compact form the TUI's task list shows: "21%", or "42k"
+    /// without a known window (`words::short_words`, amb-win m_10985)
+    #[serde(default)]
+    pub short: String,
 }
 
 /// A numbered option of a card.

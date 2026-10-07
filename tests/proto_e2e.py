@@ -413,7 +413,7 @@ def main():
         # on its row, when its REPL said its usage since this hub started
         if any(l.startswith("  obs: usage: ") for l in c.lines("main")):
             rows = [a for ev in typed(c, "agents") for a in ev["agents"] if a["name"] == "main" and a.get("usage")]
-            check(rows and rows[-1]["usage"]["context"] > 0 and rows[-1]["usage"]["words"], "main's usage on its row: %r" % rows[-1:])
+            check(rows and rows[-1]["usage"]["context"] > 0 and rows[-1]["usage"]["words"] and rows[-1]["usage"]["short"], "main's usage on its row: %r" % rows[-1:])
         # every entry carries its kind's payload, and a fold's pos once
         for ev in typed(c, "thread"):
             pos = [e["pos"] for e in ev["entries"]]

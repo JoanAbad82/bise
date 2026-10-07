@@ -141,6 +141,15 @@ pub fn context_words(used: u64, window: Option<u64>) -> String {
     }
 }
 
+/// The gauge's compact form (the TUI's task list, the window's sidebar):
+/// "21%", or "42k" without a known window.
+pub fn short_words(used: u64, window: Option<u64>) -> String {
+    match window {
+        Some(w) => format!("{}%", percent(used, w)),
+        None => tokens(used),
+    }
+}
+
 /// The first non-empty line, clipped to `max` characters (with `…`).
 pub fn one_line(s: &str, max: usize) -> String {
     let l = s.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");

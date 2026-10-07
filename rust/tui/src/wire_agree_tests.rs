@@ -77,6 +77,24 @@ fn the_tui_and_the_fold_say_the_same_words_for_the_same_lines() {
     assert_eq!(folded.len(), 14, "{folded:?}");
 }
 
+/// architect m_10999: the TUI's gauge (usage::current over its events)
+/// and the hub's seed (lines::current_usage over the transcript's lines)
+/// read the same usage for the same lines, by the one rule.
+#[test]
+fn the_tui_and_the_hub_read_the_same_current_usage() {
+    let u1 = "  obs: usage: model=mistral/codestral-latest in=1200 out=30";
+    let u2 = "  obs: usage: model=mistral/codestral-latest in=42000 out=310";
+    let done = "  obs: compaction_done: the summary";
+    for ls in [vec![u1], vec![u1, "sb you : hi", u2], vec![u1, done], vec![u1, done, u2], vec!["sb you : hi"]] {
+        let evs: Vec<Ev> = ls.iter().filter_map(|l| parse_line(l)).collect();
+        let tui = crate::usage::current(&evs).map(|u| (u.model.clone(), u.input, u.output, u.short()));
+        let hub = bise_proto::thread::lines::current_usage(ls.iter().map(|l| bise_proto::thread::lines::usage_mark(l)))
+            .and_then(|t| bise_session::usage_line::parse(&t))
+            .map(|u| (u.model.clone(), u.input, u.output, words::short_words(u.input + u.output, crate::models::context_window(&u.model))));
+        assert_eq!(tui, hub, "{ls:?}");
+    }
+}
+
 /// A failed turn's words come from one place (`thread::words`), which the
 /// fold's notice entries will call too.
 #[test]

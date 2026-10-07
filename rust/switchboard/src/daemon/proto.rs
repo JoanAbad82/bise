@@ -53,6 +53,9 @@ pub(super) struct Proto {
     /// S13: each agent's last usage line since this hub started (by name;
     /// none after a compaction, until its next call)
     usage: BTreeMap<String, bise_session::usage_line::UsageLine>,
+    /// the agents whose usage was seeded from their transcript's tail
+    /// (once each, architect m_10999)
+    seeded: BTreeSet<String>,
 }
 
 /// G: the typed command being stepped (its connection, its tag, a send's

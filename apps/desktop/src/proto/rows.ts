@@ -405,4 +405,9 @@ window?: number | null,
  * (bise-proto's `words::context_words`; the window never rebuilds
  * them)
  */
-words: string, };
+words: string, 
+/**
+ * the compact form the TUI's task list shows: "21%", or "42k"
+ * without a known window (`words::short_words`, amb-win m_10985)
+ */
+short: string, };

@@ -84,3 +84,19 @@ fn bash_calls_read_as_reports_and_publishes() {
     assert_eq!(publish_in("sb page publish ./weekly.html"), Some("weekly".into()));
     assert_eq!(publish_in("sb page publish a.html --id perf-notes"), Some("perf-notes".into()));
 }
+
+/// architect m_10999: the current usage is the last usage line unless a
+/// compaction ended after it (the TUI over its events, the hub over a
+/// transcript tail).
+#[test]
+fn the_current_usage_is_the_last_one_unless_compacted_after() {
+    let cur = |ls: &[&str]| current_usage(ls.iter().map(|l| usage_mark(l)));
+    let u1 = "  obs: usage: model=m in=10 out=2";
+    let u2 = "  obs: usage: model=m in=30 out=1";
+    let done = "  obs: compaction_done: the summary";
+    assert_eq!(cur(&[]), None);
+    assert_eq!(cur(&[u1, "--- idle", u2, "sb you : hi"]), Some("model=m in=30 out=1".into()));
+    assert_eq!(cur(&[u1, done]), None);
+    assert_eq!(cur(&[u1, done, u2]), Some("model=m in=30 out=1".into()));
+    assert_eq!(usage_mark("tool #3 bash : ls"), UsageMark::Other);
+}
