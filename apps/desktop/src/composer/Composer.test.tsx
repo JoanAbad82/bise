@@ -8,6 +8,9 @@ import { Composer } from './Composer';
 import type { ComposerActions } from './Brain';
 import type { Store } from './drafts';
 import { NO_SOURCES } from './sources';
+import { asLexicalEntry } from './Brain';
+import { entryOf, entrySegments, lexicalJsonOf } from './entry';
+import { buildMessage, type Segment } from './message';
 
 afterEach(cleanup);
 
@@ -138,5 +141,41 @@ describe('the composer', () => {
     again.unmount();
     const other = await mount({ store, target: 'p/other' });
     expect(other.getByTestId('composer.field').textContent).toBe('');
+  });
+
+  it('reads what the TipTap engine saved ({v:2,segs}): a rollback never hides his draft, history or queue (lead m_11680)', async () => {
+    const segs: Segment[] = [
+      { kind: 'text', text: 'café 👋 déjà\nligne 2 ' },
+      { kind: 'chip', chip: { kind: 'paste', n: 1, text: 'a\nb' } },
+      { kind: 'text', text: ' fin' },
+    ];
+    const v2 = entryOf(segs);
+    expect(JSON.parse(v2)).toMatchObject({ v: 2 });
+    // each place an entry is read: the draft, a history line (↑), a queued message
+    expect(entrySegments(asLexicalEntry(v2))).toEqual(segs);
+    expect(asLexicalEntry(lexicalJsonOf(segs))).toBe(lexicalJsonOf(segs)); // a Lexical entry as it is
+    const store = memStore();
+    const queued = entryOf([{ kind: 'text', text: 'après ça 🎉' }]);
+    store.setItem('bise.composer.v1.p/main', JSON.stringify({ draft: v2, history: [v2], queue: [queued] }));
+    const onSend = vi.fn();
+    const got: { a: ComposerActions | null } = { a: null };
+    const el = (busy: boolean) => <Composer target="p/main" store={store} busy={busy} onSend={onSend} onReady={(a) => (got.a = a)} />;
+    const ui = render(el(true));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(ui.getByTestId('composer.field').textContent).toContain('café 👋 déjà');
+    expect(ui.getByTestId('composer.field').textContent).toContain('ligne 2');
+    expect(ui.getByTestId('composer.field').textContent).toContain('fin');
+    await act(async () => {
+      ui.rerender(el(false)); // the turn ends: the queued one leaves, whole
+      await Promise.resolve();
+    });
+    expect(onSend).toHaveBeenLastCalledWith(buildMessage([{ kind: 'text', text: 'après ça 🎉' }]));
+    await act(async () => {
+      got.a?.submit(); // the draft sends exactly what the TipTap engine would have sent
+      await Promise.resolve();
+    });
+    expect(onSend).toHaveBeenLastCalledWith(buildMessage(segs));
   });
 });

@@ -42,6 +42,7 @@ import { $caretOnFirstLine, $isBlank, $plainText, $readSegments, $textBeforeCare
 import { enterMakesNewline, indent, newline, outdentAtStart, subwordLeft, subwordRight, NO_UNDO, type Op } from './mdlive';
 import { buildMessage, chars, chipStrip, isLongPaste, nextChipNumber, noVisionLine, preview, type Chip, type Outgoing, type QuoteAt, type Segment } from './message';
 import { enqueue, historyAt, load, popNewest, remember, save, takeOldest, type Saved, type Store } from './drafts';
+import { entrySegments, lexicalJsonOf } from './entry';
 import { agentRows, argRows, artifactRows, commandLine, commandRows, completion, emojiRows, enterSends, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
 import { isImagePath, type ComposerSources, type PickFile } from './sources';
 import { argAt, browseText, parentQuery, triggerAt, type Trigger } from './tokens';
@@ -119,10 +120,24 @@ function slotOf(text: string, messageStart: boolean, sources: ComposerSources): 
   );
 }
 
+/** A saved entry as this engine's editor-state JSON: an entry the TipTap engine wrote
+ *  ({v:2,segs}) is converted, so going back from the TipTap build never hides a draft, a history
+ *  line or a queued message (ambient-lead m_11680); a Lexical entry passes as it is. */
+export function asLexicalEntry(entry: string): string {
+  try {
+    const v = JSON.parse(entry) as { root?: unknown } | null;
+    if (v === null || typeof v !== 'object' || v.root !== undefined) return entry;
+  } catch {
+    return entry;
+  }
+  const segs = entrySegments(entry);
+  return segs === null ? entry : lexicalJsonOf(segs);
+}
+
 /** The root's children of a saved editor state (drafts.ts entries); [] when unreadable. */
 function serializedChildren(entry: string): SerializedLexicalNode[] {
   try {
-    const v = JSON.parse(entry) as { root?: { children?: SerializedLexicalNode[] } };
+    const v = JSON.parse(asLexicalEntry(entry)) as { root?: { children?: SerializedLexicalNode[] } };
     return Array.isArray(v.root?.children) ? v.root.children : [];
   } catch {
     return [];
@@ -131,7 +146,7 @@ function serializedChildren(entry: string): SerializedLexicalNode[] {
 
 const json = (editor: LexicalEditor): string => JSON.stringify(editor.getEditorState().toJSON());
 
-const segmentsOf = (editor: LexicalEditor, entry: string): Segment[] => editor.parseEditorState(entry).read(() => $readSegments());
+const segmentsOf = (editor: LexicalEditor, entry: string): Segment[] => editor.parseEditorState(asLexicalEntry(entry)).read(() => $readSegments());
 
 export function Brain(p: BrainProps): JSX.Element | null {
   const [editor] = useLexicalComposerContext();
