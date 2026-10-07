@@ -52,17 +52,14 @@ test('thread/hover-time: an old turn shows its day and time under the mouse, a t
     const { page } = s;
     const old = page.getByTestId('thread.entry.1');
     await expect(old).toBeVisible({ timeout: 10_000 });
-    const when = page.getByTestId('thread.when.1');
-    await expect(when, 'hidden until hovered').toHaveCSS('opacity', '0');
-    await old.hover();
-    await expect(when, 'shown under the mouse').toHaveCSS('opacity', '1');
-    const want = await page.evaluate((ms) => `${new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(ms)} ${new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).format(ms)}`, OLD);
-    await expect(when).toHaveText(want);
+    // ambient m_11777 (amb-home): the time sits on the name line, the day on its separator
+    const clockOf = (ms: number) => page.evaluate((ms) => new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).format(ms), ms);
+    await expect(page.getByTestId('thread.who.1')).toContainText(await clockOf(OLD));
+    const day = await page.evaluate((ms) => new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).format(ms).replace(',', '').toLowerCase(), OLD);
+    await expect(page.getByTestId('thread.day.1')).toHaveText(day);
     await page.screenshot({ path: test.info().outputPath('hover-old.png') });
-    await page.getByTestId('thread.entry.2').hover();
-    await expect(when, 'gone when the mouse leaves').toHaveCSS('opacity', '0');
-    const clockNow = await page.evaluate((ms) => new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }).format(ms), today);
-    await expect(page.getByTestId('thread.when.2')).toHaveText(clockNow);
+    await expect(page.getByTestId('thread.day.2')).toHaveText('today');
+    await expect(page.locator('[data-testid="thread.entry.2"] .b-who').first()).toContainText(await clockOf(today));
   } finally {
     await s.close();
     core.dispose();

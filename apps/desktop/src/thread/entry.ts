@@ -62,3 +62,110 @@ export function findText(e: Entry): string {
   if (e.page) parts.push(e.page.title);
   return parts.join('\n');
 }
+
+// ---- the thread's reading (ambient's spec m_11777, his try round 3; amb-home)
+
+/** A name line opens a group when the author changes or after this much silence. */
+export const GROUP_GAP_MS = 5 * 60_000;
+
+/** The day a time falls on, in his time zone ('2026-10-06'). */
+function dayOf(ms: number, tz?: string): string {
+  return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: tz }).format(ms);
+}
+
+/** Two times on the same day (a time of 0 is never a new day). */
+export function sameDay(a: number, b: number, tz?: string): boolean {
+  return a <= 0 || b <= 0 || dayOf(a, tz) === dayOf(b, tz);
+}
+
+/** The day separator's words: 'today', 'yesterday', 'mon 6 oct'. Pure. */
+export function dayLabel(ms: number, now: number, tz?: string): string {
+  if (sameDay(ms, now, tz)) return 'today';
+  if (sameDay(ms, now - 86_400_000, tz)) return 'yesterday';
+  const f = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz }).formatToParts(ms);
+  const part = (t: string) => f.find((p) => p.type === t)?.value ?? '';
+  return `${part('weekday')} ${part('day')} ${part('month')}`.toLowerCase();
+}
+
+/** Under this a thinking shows nothing (ambient m_11777 (c), the TUI's: nothing was thought). */
+export const THOUGHT_MS = 1000;
+
+/** A thinking row with nothing in it: under 1 s, no words of its own (or the hub's 'thought for 0.0s'). Pure. */
+export function thoughtNothing(e: Entry): boolean {
+  return e.kind === 'thinking' && (e.thinking?.ms ?? 0) < THOUGHT_MS && (e.text === '' || /^thought for 0(\.\d+)?s$/.test(e.text));
+}
+
+/** Who a row is by, for its group: his words, another agent's, the agent's own words and work; none: a line of the thread's own (a notice, a news line, a separator, a hidden thinking) that opens nothing, so the next message shows its name. */
+export function authorOf(e: Entry, ctx: { agent: string; bise: boolean }): string | null {
+  if (thoughtNothing(e)) return null;
+  switch (e.kind) {
+    case 'you':
+      return 'you';
+    case 'from_agent':
+      return `from:${e.from ?? ''}:${e.to ?? ''}`;
+    case 'to_agent':
+      return `to:${e.to ?? ''}`;
+    case 'notice':
+    case 'compacting':
+    case 'compacted':
+    case 'not_delivered':
+    case 'unknown':
+    case 'card':
+    case 'page':
+    case 'report':
+    case 'stopped':
+    case 'landed':
+    case 'pr':
+    case 'artifact':
+    case 'answered':
+    case 'approval':
+    case 'scheduled':
+      return null;
+    default:
+      return `agent:${ctx.agent}`;
+  }
+}
+
+/** The row opens a group (its name line shows): a new author, 5 min of silence, a new day, or no row before it. Pure. */
+export function groupHead(prev: Entry | undefined, e: Entry, ctx: { agent: string; bise: boolean }, tz?: string): boolean {
+  const a = authorOf(e, ctx);
+  if (prev === undefined || a === null) return true;
+  if (authorOf(prev, ctx) !== a) return true;
+  if (e.at_ms > 0 && prev.at_ms > 0 && e.at_ms - prev.at_ms > GROUP_GAP_MS) return true;
+  return !sameDay(prev.at_ms, e.at_ms, tz);
+}
+
+const CONTEXT_BLOCK = /\n*<screen_context\b[^>]*>[\s\S]*?<\/screen_context>\s*/g;
+
+/** His words without the fn context block the hub appended (the window shows a chip instead). Pure. */
+export function stripContext(text: string): string {
+  return text.replace(CONTEXT_BLOCK, '\n').trim();
+}
+
+/** The fn context chip: 'with Chrome · localhost:4801/sett…' (the app and the host whole, the path cut), what a click opens, and the other sources counted. Pure. */
+export function chipOf(c: { app?: string | null; url?: string | null; title?: string | null; file?: string | null; shot?: string | null }): {
+  label: string;
+  open: { url: string } | { file: string } | null;
+  tip: string | undefined;
+} | null {
+  const app = c.app ?? '';
+  const sources: { what: string; open: { url: string } | { file: string } | null }[] = [];
+  if (c.url) {
+    const m = /^[a-z]+:\/\/([^/?#]+)(.*)$/i.exec(c.url);
+    const host = m?.[1] ?? c.url;
+    const rest = m?.[2] ?? '';
+    const path = rest.length > 6 ? `${rest.slice(0, 5)}…` : rest;
+    sources.push({ what: `${host}${path}`, open: { url: c.url } });
+  }
+  if (c.file) {
+    const name = c.file.split('/').pop() ?? c.file;
+    sources.push({ what: name.length > 24 ? `${name.slice(0, 23)}…` : name, open: { file: c.file } });
+  }
+  if (sources.length === 0 && c.title) sources.push({ what: c.title.length > 28 ? `${c.title.slice(0, 27)}…` : c.title, open: null });
+  if (app === '' && sources.length === 0 && !c.shot) return null;
+  const first = sources[0];
+  const more = sources.length > 1 ? ` +${String(sources.length - 1)}` : '';
+  const label = `◫ with ${app || 'the screen'}${first ? ` · ${first.what}` : ''}${more}`;
+  const shotOnly = sources.length === 0 && Boolean(c.shot);
+  return { label, open: first?.open ?? null, tip: shotOnly ? "the screenshot isn't kept" : undefined };
+}

@@ -4,7 +4,7 @@
 // message must not re-render the others.
 import { memo, type MouseEventHandler, type ReactNode, type Ref } from "react";
 import { cx, st, sub } from "./cx";
-import { Bar, Chip, Dot, Pearl, type DotState } from "./prim";
+import { Bar, Chip, Dot, Pearl } from "./prim";
 import { Quote } from "./composer";
 
 /** the thread column (a virtualized list goes here as one child) */
@@ -15,15 +15,15 @@ export function Thread({ children, testId }: { children: ReactNode; testId?: str
 export interface MsgProps {
   from: "you" | "bise" | "agent";
   name?: ReactNode;
-  /** "10:42", "by voice, from Chrome": joined with " · " */
+  /** "10:42", "by voice, from Chrome": joined with " · ", right after the name */
   time?: string;
   via?: string;
-  /** his initial; bise gets the pearl, an agent its dot */
-  av?: string;
-  dot?: DotState | undefined;
+  /** false: a row inside a group (same author, under 5 min): no name line; its own time shows
+   *  faint in that line's place on hover, the line's height kept (ambient m_11777) */
+  head?: boolean;
   /** indented: an agent's message to another */
   indent?: boolean;
-  /** the context it came with (chips, a shot) */
+  /** the context it came with (chips, a shot), under the words */
   context?: ReactNode;
   /** the lines he quoted, above his words */
   quote?: ReactNode;
@@ -36,18 +36,27 @@ export interface MsgProps {
   ref?: Ref<HTMLDivElement>;
 }
 /** a message */
-export const Msg = memo(function Msg({ from, name, time, via, av, dot, indent, context, quote, state, children, after, testId, ref }: MsgProps) {
+export const Msg = memo(function Msg({ from, name, time, via, head = true, indent, context, quote, state, children, after, testId, ref }: MsgProps) {
   const meta = [time, via].filter(Boolean).join(" · ");
+  // no avatars (ambient m_11777): the name line carries bise's pearl at 14 px, an agent's name in
+  // 600, 'you' alone; his words sit in a quiet block
   return (
-    <div ref={ref} className={cx("b-msg", from === "you" && "you", indent && "in", st(state))} data-testid={testId} aria-busy={state === "streaming" || undefined}>
-      <div className="b-av">{from === "bise" ? <Pearl size={22} /> : dot !== undefined ? <Dot state={dot} lg /> : av ?? ""}</div>
-      <div>
-        <div className="b-who"><b>{name ?? from}</b>{meta}</div>
-        {context != null && <div className="b-who">{context}</div>}
-        {quote != null && <Quote>{quote}</Quote>}
-        <div className="b-text">{children}</div>
-        {after}
-      </div>
+    <div ref={ref} className={cx("b-msg", from === "you" && "you", indent && "in", !head && "grouped", st(state))} data-testid={testId} aria-busy={state === "streaming" || undefined}>
+      {head ? (
+        <div className="b-who">
+          {from === "bise" && <Pearl size={14} />}
+          <b>{name ?? from}</b>
+          {meta !== "" && <span className="b-time">{meta}</span>}
+        </div>
+      ) : (
+        <div className="b-who b-hover" aria-hidden="true">
+          {meta}
+        </div>
+      )}
+      {quote != null && <Quote>{quote}</Quote>}
+      <div className="b-text">{children}</div>
+      {context != null && <div className="b-ctx">{context}</div>}
+      {after}
     </div>
   );
 });

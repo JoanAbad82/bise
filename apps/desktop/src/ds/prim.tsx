@@ -131,7 +131,7 @@ export function Dot({ state, lg }: { state?: DotState | undefined; lg?: boolean 
   return <i className={cx("b-dot", state, lg && "lg")} role="img" aria-label={word} title={word} />;
 }
 
-export type PearlSize = 22 | 40 | 56 | 120;
+export type PearlSize = 14 | 22 | 40 | 56 | 120;
 export interface PearlProps {
   size?: PearlSize;
   mood?: string;

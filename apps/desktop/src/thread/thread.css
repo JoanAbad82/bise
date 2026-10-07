@@ -148,23 +148,89 @@
   padding: 0 0 2px;
 }
 
-/* M14: the turn's time shows under the mouse, at the row's top right */
-.th-when {
-  position: absolute;
-  top: 2px;
-  right: 0;
-  padding: 0 4px;
-  border-radius: var(--r-1, 3px);
-  background: var(--c-bg, transparent);
-  color: var(--c-text-3);
-  font: var(--t-12) var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--d-fast) var(--ease-out);
+/* ambient m_11777 (a): one reading column, 720 px at most, centred, 24 px each side when
+   narrower. The rows, the day lines, the strip, the docked card, the voice pane and the
+   composer share its width and its left edge. A row's time sits on its name line (ds). */
+.th-screen {
+  --th-col: min(720px, calc(100% - 48px));
 }
-.th-row:hover > .th-when {
-  opacity: 1;
+.th-row,
+.th-day,
+.th-screen .th-typing,
+.th-screen .th-refused,
+.th-screen .inbox-strip,
+.th-screen .inbox-dock,
+.th-screen .vm-pane,
+.th-screen .b-composer {
+  box-sizing: border-box;
+  width: var(--th-col);
+  margin-left: auto;
+  margin-right: auto;
+}
+.th-screen .b-composer {
+  padding-left: 0;
+  padding-right: 0;
+}
+.th-row + .th-row[data-head='true'],
+.th-day + .th-row {
+  padding-top: 10px;
+}
+
+/* a day ('today', 'yesterday', 'mon 6 oct') and 'session restored · 14:02': centred, thin rules */
+.th-day {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0 8px;
+  color: var(--c-text-3);
+  font: var(--t-12) var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+.th-day::before,
+.th-day::after {
+  content: '';
+  flex: 1 1 0;
+  height: 1px;
+  background: var(--c-line);
+}
+.th-row > .th-day {
+  width: auto;
+}
+
+/* (b) what was in front of him when he spoke: '◫ with Chrome · localhost:4801/sett…' */
+.th-ctx {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-text-3);
+  font: var(--t-11) var(--font-mono);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.th-ctx:hover:not(:disabled) {
+  color: var(--c-text-2);
+  text-decoration: underline;
+}
+.th-ctx:disabled {
+  cursor: default;
+}
+
+/* code, tables and diffs take the whole column and scroll sideways; the bar shows on hover */
+.th-pre,
+.th-table,
+.th-row .b-diff {
+  max-width: 100%;
+  scrollbar-width: none;
+}
+.th-pre:hover,
+.th-table:hover,
+.th-row .b-diff:hover {
+  scrollbar-width: thin;
 }
 
 .th-hit {

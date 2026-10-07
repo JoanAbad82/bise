@@ -395,12 +395,14 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
     }),
     [tkey, project, agent, bise, base],
   );
+  // each row reads the one before it: its group and its day (ambient m_11777)
+  const prevOf = useMemo(() => new Map(view.order.map((p, i) => [p, view.order[i - 1]])), [view]);
   const row = useCallback(
     (key: string) => {
       const pos = posOfKey(key);
-      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} />;
+      return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} />;
     },
-    [ctx],
+    [ctx, prevOf],
   );
   const onOlder = useCallback(() => {
     store.olderPage(project, agent);

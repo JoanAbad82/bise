@@ -4,14 +4,14 @@
 // usePending), so a new or replaced entry re-renders that row alone; the
 // list above it only holds keys. Memo'd on their props (strings, numbers).
 import { memo, useEffect, useState, type ReactNode } from 'react';
-import { Answered, Art, Button, Chip, Fold, Marker, Msg, Opts, Tool } from '@/ds';
+import { Answered, Art, Button, Chip, Fold, Marker, Msg, Opts, Pearl, Tool } from '@/ds';
 import type { Entry } from '@/proto';
 import { useAgents, useCoreState, useEntry, useHubRefused, usePending, useProjects, useStore, useThreadOrder } from '@/store';
 import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
-import { clock, whenOf, whoOf } from './entry';
+import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, stripContext, thoughtNothing, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -29,26 +29,48 @@ export interface RowCtx {
   readonly onPath?: (path: string, line?: number) => void;
 }
 
-export const EntryRow = memo(function EntryRow({ ctx, pos }: { ctx: RowCtx; pos: number }) {
+export const EntryRow = memo(function EntryRow({ ctx, pos, prev }: { ctx: RowCtx; pos: number; prev?: number | undefined }) {
   const e = useEntry(ctx.tkey, pos);
+  const before = useEntry(ctx.tkey, prev ?? -1);
   const hit = useIsCurrent(pos);
   const today = useToday();
   if (e === undefined) return null;
-  // M14: the turn's time under the mouse (its day too when older than today)
-  const when = whenOf(e.at_ms, today);
+  const p = prev === undefined ? undefined : before;
+  // one 'session restored' row, never the same notice stacked (the TUI's)
+  if (e.kind === 'notice' && p?.kind === 'notice' && (p.notice?.text ?? p.text) === (e.notice?.text ?? e.text)) return null;
+  // ambient m_11777: a day separator between days; a name line opens a group (a new author, 5
+  // min of silence); the rows inside show their time on hover in its place
+  const day = e.at_ms > 0 && (p === undefined || !sameDay(p.at_ms, e.at_ms)) ? dayLabel(e.at_ms, today) : null;
+  const head = groupHead(p, e, ctx);
   return (
-    <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={`thread.entry.${pos}`} data-kind={e.kind} data-from={e.from ?? undefined}>
-      <EntryBody e={e} ctx={ctx} />
-      {when !== '' && (
-        <span className="th-when" aria-hidden="true" data-testid={`thread.when.${pos}`}>
-          {when}
-        </span>
+    <>
+      {day !== null && (
+        <div className="th-day" data-testid={`thread.day.${pos}`}>
+          <span>{day}</span>
+        </div>
       )}
-    </div>
+      <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={`thread.entry.${pos}`} data-kind={e.kind} data-from={e.from ?? undefined} data-head={head}>
+        {/* a turn that opens on its work (tools, a thinking) still shows who and when */}
+        {head && (e.kind === 'tools' || (e.kind === 'thinking' && !thoughtNothing(e))) && <NameLine e={e} ctx={ctx} />}
+        <EntryBody e={e} ctx={ctx} head={head} />
+      </div>
+    </>
   );
 });
 
-function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+/** The name line of a group that opens on its work: Msg's own line ('bise 09:46', the pearl at 14 px). */
+function NameLine({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const who = whoOf(e, ctx);
+  return (
+    <div className="b-who" data-testid={`thread.who.${String(e.pos)}`}>
+      {who.from === 'bise' && <Pearl size={14} />}
+      <b>{who.name}</b>
+      {e.at_ms > 0 && <span className="b-time">{clock(e.at_ms)}</span>}
+    </div>
+  );
+}
+
+function EntryBody({ e, ctx, head }: { e: Entry; ctx: RowCtx; head: boolean }) {
   switch (e.kind) {
     case 'tools':
       return <ToolsRow e={e} />;
@@ -78,11 +100,14 @@ function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
     case 'report':
       return <Marker>{e.report ? `${e.report.kind} · ${e.text}` : e.text}</Marker>;
     case 'you':
-      return <YouRow e={e} ctx={ctx} />;
+      return <YouRow e={e} ctx={ctx} head={head} />;
     case 'to_agent':
       return <ToAgentRow e={e} ctx={ctx} />;
     // amb-feed's batch 2 (b8cb4b1e): the lines the hub's fold used to drop
     case 'thinking':
+      // nothing thought under 1 s shows nothing (ambient m_11777, the TUI's)
+      // (the hub's own head words 'thought for 0.0s' too)
+      if (thoughtNothing(e)) return null;
       return <ThinkingLine pos={e.pos} head={e.text === '' ? thoughtFor(e.thinking?.ms ?? 0) : e.text} body={e.thinking?.text ?? ''} />;
     case 'compacting':
       return (
@@ -120,8 +145,8 @@ function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
     default: {
       const who = whoOf(e, ctx);
       return (
-        <Msg from={who.from} name={who.name} indent={who.indent} time={clock(e.at_ms)} av={who.from === 'you' ? 'y' : undefined}>
-          {e.thinking != null && <ThinkingLine pos={e.pos} head={thoughtFor(e.thinking.ms)} body={e.thinking.text} />}
+        <Msg from={who.from} name={who.name} indent={who.indent} time={clock(e.at_ms)} head={head}>
+          {e.thinking != null && e.thinking.ms >= THOUGHT_MS && <ThinkingLine pos={e.pos} head={thoughtFor(e.thinking.ms)} body={e.thinking.text} />}
           <Markdown text={e.text} onLink={ctx.onLink} onPath={ctx.onPath} />
         </Msg>
       );
@@ -232,6 +257,9 @@ function ApprovalRow({ e }: { e: Entry }) {
   );
 }
 
+/** Thinking under this long shows no row: entry.ts owns it (ambient m_11777). */
+export { THOUGHT_MS };
+
 /** A thinking row's head, as the TUI's words::thought_for: 'thought for 3.2s', 'thought' (time unknown). Pure. */
 export function thoughtFor(ms: number): string {
   if (ms <= 0) return 'thought';
@@ -315,6 +343,14 @@ export const NOTICE_MARK = { info: '·', warn: '▲', err: '✗', unknown: '·' 
 function NoticeRow({ e }: { e: Entry }) {
   const level = e.notice?.level ?? 'info';
   const text = e.notice?.text ?? e.text;
+  // 'session restored · 14:02', one row centred like a day separator (ambient m_11777)
+  if (level === 'info' && text.startsWith('session restored')) {
+    return (
+      <div className="th-day th-restored" data-testid={`thread.notice.${e.pos}`}>
+        <span>{e.at_ms > 0 ? `session restored · ${clock(e.at_ms)}` : 'session restored'}</span>
+      </div>
+    );
+  }
   return (
     <div className={`th-notice ${level}`} data-level={level} data-testid={`thread.notice.${e.pos}`}>
       <span className="th-notice-mark" aria-label={level === 'err' ? 'error' : level === 'warn' ? 'warning' : 'note'}>
@@ -387,21 +423,50 @@ export function foldOf(text: string): { head: string; lines: number } | undefine
   return { head: head.length > LONG_CHARS ? `${head.slice(0, LONG_CHARS)}…` : head, lines: lines.length };
 }
 
-function YouRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+function YouRow({ e, ctx, head }: { e: Entry; ctx: RowCtx; head: boolean }) {
   const [open, setOpen] = useFold();
-  const fold = foldOf(e.text);
+  // the fn context block the hub appended never shows: a chip from the typed context instead
+  const text = stripContext(e.text);
+  const fold = foldOf(text);
   const toggle = () => {
     setOpen((o) => !o);
   };
+  const chip = e.context != null ? chipOf(e.context) : null;
   return (
-    <Msg from="you" name="you" av="y" time={clock(e.at_ms)}>
-      <Markdown text={fold === undefined || open ? e.text : fold.head} onLink={ctx.onLink} onPath={ctx.onPath} breaks />
+    <Msg
+      from="you"
+      name="you"
+      time={clock(e.at_ms)}
+      head={head}
+      context={chip === null ? undefined : <ContextChip chip={chip} ctx={ctx} pos={e.pos} />}
+    >
+      <Markdown text={fold === undefined || open ? text : fold.head} onLink={ctx.onLink} onPath={ctx.onPath} breaks />
       {fold !== undefined && (
         <Fold open={open} onToggle={toggle} testId={`thread.fold.${e.pos}`}>
           {open ? 'fold it' : `show all · ${String(fold.lines)} lines`}
         </Fold>
       )}
     </Msg>
+  );
+}
+
+/** '◫ with Chrome · localhost:4801/sett…': a url opens in his browser, a file in his editor; a shot alone isn't kept. */
+function ContextChip({ chip, ctx, pos }: { chip: NonNullable<ReturnType<typeof chipOf>>; ctx: RowCtx; pos: number }) {
+  const open = chip.open;
+  const run =
+    open === null
+      ? undefined
+      : 'url' in open
+        ? () => {
+            ctx.onLink(open.url);
+          }
+        : () => {
+            void (window as Partial<Window>).bise?.openPath(open.file, {});
+          };
+  return (
+    <button type="button" className="th-ctx" disabled={run === undefined} title={chip.tip} onClick={run} data-testid={`thread.context.${String(pos)}`}>
+      {chip.label}
+    </button>
   );
 }
 
@@ -542,7 +607,7 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
   const time = hold?.state === 'held' ? undefined : hold?.state === 'sent' ? `sent to ${hold.name}` : failed ? `not sent${p.why !== undefined && p.why !== 'not sent' ? ` · ${p.why}` : ''}` : (connecting ?? 'sending…');
   return (
     <div className={failed ? 'th-row th-pending th-failed' : hold?.state === 'sent' ? 'th-row th-routed' : 'th-row th-pending'} data-testid={`thread.pending.${cid}`} data-state={state}>
-      <Msg from="you" name="you" av="y" time={time} state={failed ? 'error' : undefined}>
+      <Msg from="you" name="you" time={time} state={failed ? 'error' : undefined}>
         <Markdown text={p.text} onLink={ctx.onLink} />
       </Msg>
       {hold?.state === 'held' && <HoldLine hold={hold} />}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { clock, entryKey, findText, pendingKey, posOfKey, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, chipOf, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -50,5 +50,51 @@ describe('batch 3a: a message between two other agents', () => {
     expect(whoOf(m, { agent: 'main', bise: false }).name).toBe('perf → docs');
     expect(whoOf(m, { agent: 'docs', bise: false }).name).toBe('perf');
     expect(whoOf(e({ kind: 'from_agent', from: 'perf' }), { agent: 'main', bise: false }).name).toBe('perf');
+  });
+});
+
+describe("the thread's reading (ambient m_11777)", () => {
+  const ctx = { agent: 'main', bise: true };
+  const T = Date.UTC(2026, 9, 6, 9, 46);
+
+  it('a group opens on a new author, after 5 min of silence, on a new day; notices open nothing', () => {
+    const a = e({ at_ms: T });
+    expect(groupHead(undefined, a, ctx, 'UTC')).toBe(true);
+    expect(groupHead(a, e({ at_ms: T + 60_000 }), ctx, 'UTC')).toBe(false);
+    expect(groupHead(a, e({ at_ms: T + GROUP_GAP_MS + 1 }), ctx, 'UTC')).toBe(true);
+    expect(groupHead(a, e({ kind: 'you', at_ms: T + 1 }), ctx, 'UTC')).toBe(true);
+    expect(groupHead(e({ kind: 'you', at_ms: T }), e({ kind: 'you', at_ms: T + 1 }), ctx, 'UTC')).toBe(false);
+    expect(groupHead(a, e({ kind: 'notice', at_ms: T + 1 }), ctx, 'UTC')).toBe(true);
+    expect(groupHead(e({ kind: 'from_agent', from: 'docs' }), e({ kind: 'from_agent', from: 'perf' }), ctx, 'UTC')).toBe(true);
+    const late = Date.UTC(2026, 9, 6, 23, 58);
+    expect(groupHead(e({ at_ms: late }), e({ at_ms: late + 3 * 60_000 }), ctx, 'UTC')).toBe(true);
+  });
+
+  it("days: 'today', 'yesterday', then 'mon 6 oct'", () => {
+    expect(sameDay(T, T + 3_600_000, 'UTC')).toBe(true);
+    expect(sameDay(0, T, 'UTC')).toBe(true);
+    expect(dayLabel(T, T + 3_600_000, 'UTC')).toBe('today');
+    expect(dayLabel(T, T + 86_400_000, 'UTC')).toBe('yesterday');
+    expect(dayLabel(T, T + 3 * 86_400_000, 'UTC')).toBe('tue 6 oct');
+  });
+
+  it('his words never show the screen_context block', () => {
+    const t = 'why is this slow?\n\n<screen_context app="Ghostty">\nThis is what was in front of the user\ntitle: x\n</screen_context>\n';
+    expect(stripContext(t)).toBe('why is this slow?');
+    expect(stripContext('<screen_context app="X">a</screen_context>\nhi')).toBe('hi');
+    expect(stripContext('a < b, no block')).toBe('a < b, no block');
+  });
+
+  it('the chip cuts the path, never the app or the host; a url opens, a shot alone is not kept', () => {
+    expect(chipOf({ app: 'Chrome', url: 'http://localhost:4801/settings' })).toEqual({
+      label: '◫ with Chrome · localhost:4801/sett…',
+      open: { url: 'http://localhost:4801/settings' },
+      tip: undefined,
+    });
+    expect(chipOf({ app: 'Zed', file: '/repo/src/main.rs', url: 'https://a.dev/' })?.label).toBe('◫ with Zed · a.dev/ +1');
+    expect(chipOf({ app: 'Zed', file: '/repo/src/main.rs' })?.open).toEqual({ file: '/repo/src/main.rs' });
+    expect(chipOf({ app: 'Ghostty', shot: 'x.png' })).toEqual({ label: '◫ with Ghostty', open: null, tip: "the screenshot isn't kept" });
+    expect(chipOf({ app: 'Ghostty', title: 'zsh — harness' })?.label).toBe('◫ with Ghostty · zsh — harness');
+    expect(chipOf({})).toBeNull();
   });
 });

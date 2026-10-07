@@ -220,9 +220,16 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
     fireEvent.click(v.getByTestId('thread.think.21.head'));
     expect(v.getByTestId('thread.think.21').textContent).toContain('the cold run is the slow one');
     cleanup();
+    // under 1 s nothing was thought worth a line (ambient m_11777 (c)): the reply alone
     const r = rowOf(store, 22);
-    expect(r.getByTestId('thread.think.22.head').textContent).toContain('thought for 0.9s');
+    expect(r.queryByTestId('thread.think.22.head')).toBeNull();
     expect(r.getByTestId('thread.entry.22').textContent).toContain('done.');
+    cleanup();
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 23, at_ms: 3, kind: 'agent', text: 'done.', thinking: { ms: 1200, text: 'check it twice' } } });
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: { pos: 24, at_ms: 4, kind: 'thinking', text: 'thought for 0.0s', thinking: { ms: 0, text: '' } } });
+    expect(rowOf(store, 23).getByTestId('thread.think.23.head').textContent).toContain('thought for 1.2s');
+    cleanup();
+    expect(rowOf(store, 24).queryByTestId('thread.think.24')).toBeNull();
   });
 
   it('compaction: a line while it runs, then the summary folded', () => {

@@ -47,7 +47,7 @@
 .b-dot.off{opacity:.35}
 .b-dot.lg{width:16px;height:16px}
 .b-pearl{display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--c-accent);font-family:var(--font-display);font-style:italic}
-.b-pearl.s22{width:22px;height:22px}.b-pearl.s40{width:40px;height:40px;font-size:1.1em}.b-pearl.s56{width:56px;height:56px;font-size:1.5em}.b-pearl.s120{width:120px;height:120px;font-size:3em}
+.b-pearl.s14{width:14px;height:14px}.b-pearl.s22{width:22px;height:22px}.b-pearl.s40{width:40px;height:40px;font-size:1.1em}.b-pearl.s56{width:56px;height:56px;font-size:1.5em}.b-pearl.s120{width:120px;height:120px;font-size:3em}
 .b-bar{height:4px;border-radius:2px;background:var(--c-active);overflow:hidden}
 .b-bar>i{display:block;height:100%;border-radius:2px;background:repeating-linear-gradient(90deg,var(--c-text) 0 10px,var(--c-text-2) 10px 14px);background-size:28px 100%;animation:b-run 1.2s linear infinite}
 .b-bar.err>i{background:var(--c-err);animation:none}

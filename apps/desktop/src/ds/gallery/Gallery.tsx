@@ -159,7 +159,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
     <div className="g-main">
       <Thread testId="ds.thread">
         <Day>today</Day>
-        <Msg from="you" name="you" av="G" time="10:41" via="by voice, from Chrome" context={<Chip>decode_pool.rs</Chip>}
+        <Msg from="you" name="you" time="10:41" via="by voice, from Chrome" context={<Chip>decode_pool.rs</Chip>}
           quote={<>1 “workers: [Worker; 4],” decode_pool.rs:13-14 · 2 lines</>}>
           why only 4 workers here?
         </Msg>
@@ -172,10 +172,10 @@ export const SECTIONS: Record<string, () => ReactNode> = {
           4 was the core count of the CI box. on your Mac, <code>8</code> is safe; i asked alerts to bench it.
         </Msg>
         <Fold>4 messages between 2 agents</Fold>
-        <Msg from="agent" name="alerts" dot="wk" time="10:42" indent state="streaming">benching 8 workers on the replay set</Msg>
+        <Msg from="agent" name="alerts" time="10:42" indent state="streaming">benching 8 workers on the replay set</Msg>
         <Marker>? search asked you · it waits above the composer</Marker>
         <Answered>main answered for you: “keep the old index”</Answered>
-        <Msg from="agent" name="search" dot="er" time="10:43" state="error">the index build failed twice: out of disk</Msg>
+        <Msg from="agent" name="search" time="10:43" state="error">the index build failed twice: out of disk</Msg>
       </Thread>
     </div>
   ),
