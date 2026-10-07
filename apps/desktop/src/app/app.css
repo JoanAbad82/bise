@@ -593,3 +593,10 @@
     animation: none;
   }
 }
+
+/* bise's still ink pearl at rest (BisePearl), in the head and the no-project centre too */
+.b-pearl > .app-pearl {
+  display: block;
+  width: 100%;
+  height: 100%;
+}

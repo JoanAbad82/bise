@@ -24,6 +24,7 @@ import { useTour } from '@/setup/useTour';
 import { Hint, hintUsed, useHint } from './hints';
 import { folds, moreWords, projectSide, signOf } from './side';
 import { useKeptScroll } from './keep';
+import { BisePearl } from './BisePearl';
 
 /** His projects in his order, bise's own out (it is the bise row). Pure. */
 export function projectsOf(rows: readonly ProjectRow[]): ProjectRow[] {
@@ -135,7 +136,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
       </button>
       <SRow
         kind="top"
-        lead={<Pearl size={14} mood={waits > 0 ? 'need' : undefined} />}
+        lead={<BisePearl size={14} />}
         name="bise"
         count={waits}
         title={waits > 0 ? `${String(waits)} waiting for you` : 'every project'}

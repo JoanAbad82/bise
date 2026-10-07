@@ -69,6 +69,7 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     expect(Math.round((await side.boundingBox())?.width ?? 0), 'the sidebar is 240 px').toBe(240);
     await expect(page.getByTestId('app.sidebar.search')).toContainText('search or jump');
     await expect(page.getByTestId('app.sidebar.bise').locator('.app-cnt'), "bise's pink count").toHaveText('2');
+    await expect(page.getByTestId('app.sidebar.bise').getByTestId('bise.pearl.rest'), 'something waits: the live pink pearl').toHaveCount(0);
     await expect(page.getByTestId('app.sidebar.artifacts')).toContainText('1 new');
     await expect(page.getByTestId('app.sidebar.scheduled')).toContainText('1');
     await expect(page.getByTestId(`app.sidebar.project.${P}`)).toContainText('∿ 2');
@@ -158,6 +159,9 @@ test('app/sidebar-v6: no project yet: only bise, the top rows and add a project'
     await expect(page.locator('[data-testid^="app.sidebar.project."]')).toHaveCount(0);
     // designer m_12093: the centre, the composer stays, no panel and no panel button without a project
     await expect(page.getByTestId('thread.noproject')).toContainText('bise is here.');
+    // nothing waits on him: bise's pearl is the ink one at rest everywhere (designer m_12127)
+    await expect(page.getByTestId('app.sidebar.bise').getByTestId('bise.pearl.rest')).toBeVisible();
+    await expect(page.getByTestId('thread.noproject').getByTestId('bise.pearl.rest')).toBeVisible();
     await expect(page.getByTestId('thread.noproject.add')).toContainText('add a project');
     await expect(page.getByTestId('composer')).toBeVisible();
     await expect(page.getByTestId('app.panel')).toHaveCount(0);

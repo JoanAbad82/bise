@@ -1,7 +1,8 @@
 // app/design-base · ambient's design sign-off blocker (m_10689): every window screen drew in the
 // browser's Times (no root carried the DS's .b-ui), and bise's sidebar row and header drew the
 // old ':*' glyph. Passes when the window's and the capsule's body and screens compute the DS's UI
-// font (--font-ui), and bise's row and header hold the live pearl (a canvas, no glyph). Owner:
+// font (--font-ui), and bise's row and header hold bise's pearl, never the glyph: at rest the ink
+// pearl (designer m_12127; the live pink one only while bise waits on him). Owner:
 // amb-win (lead m_10690). The new app on the scripted core.
 import { FakeCore, FakeHelper, launchDesktop, test, expect } from '../../harness';
 import { capsulePage } from '../native/world';
@@ -34,7 +35,7 @@ const fonts = (sel: string) => {
 };
 const first = (stack: string): string => (stack.split(',')[0] ?? '').trim().replace(/^"|"$/g, '');
 
-test("app/design-base: the window and the capsule in the DS's UI font; bise's row and header hold the live pearl", async () => {
+test("app/design-base: the window and the capsule in the DS's UI font; bise's row and header hold bise's pearl, ink at rest", async () => {
   const helper = new FakeHelper();
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ helper, core });
@@ -46,11 +47,13 @@ test("app/design-base: the window and the capsule in the DS's UI font; bise's ro
       expect(f.ui, '--font-ui is defined').not.toBe('');
       expect(first(f.got), `${sel} computes the DS's UI font, not Times`).toBe(first(f.ui));
     }
-    // bise's pearl: the live one (a canvas), never ':*'
+    // bise's pearl, never ':*': nothing waits on him here, so the ink pearl at rest, still (no
+    // canvas); the live pink one only while bise waits on him (ambient's thread spec f, designer m_12127)
     for (const where of ['.b-side', '.b-head']) {
       const pearl = page.locator(`${where} [data-bise-pearl]`).first();
       await expect(pearl, `${where}: bise's pearl`).toBeVisible();
-      await expect(pearl.locator('canvas'), `${where}: the live pearl`).toHaveCount(1);
+      await expect(pearl.getByTestId('bise.pearl.rest'), `${where}: the ink pearl at rest`).toHaveCount(1);
+      await expect(pearl.locator('canvas'), `${where}: no live pink pearl while nothing waits`).toHaveCount(0);
       await expect(pearl, `${where}: no ':*' glyph`).not.toContainText(':*');
     }
     await page.screenshot({ path: test.info().outputPath('base.png') });

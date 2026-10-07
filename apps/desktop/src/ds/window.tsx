@@ -79,14 +79,16 @@ export interface HeadProps {
   sub?: ReactNode;
   pearl?: 22 | 40;
   dot?: DotState | undefined;
+  /** its own lead in place of the pearl or the dot (the window's bise pearl: ink at rest) */
+  lead?: ReactNode;
   /** buttons and chips on the right */
   end?: ReactNode;
 }
 /** the main column's head: who this thread is with */
-export function Head({ title, sub, pearl, dot, end }: HeadProps) {
+export function Head({ title, sub, pearl, dot, lead, end }: HeadProps) {
   return (
     <div className="b-head">
-      {pearl ? <Pearl size={pearl} /> : dot !== undefined ? <Dot state={dot} lg /> : null}
+      {lead ?? (pearl ? <Pearl size={pearl} /> : dot !== undefined ? <Dot state={dot} lg /> : null)}
       <span><span className="t1">{title}</span>{sub != null && <span className="t2">{sub}</span>}</span>
       {end != null && <span className="end">{end}</span>}
     </div>

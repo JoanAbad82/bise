@@ -5,12 +5,12 @@
 // and the head keeps the chip and the buttons. LiveLine: what it does now, at the thread's end.
 // StartingLine: the empty thread's line. The words are head.ts's. Owner: amb-home.
 import type { ReactNode } from 'react';
-import { Pearl } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAgents, useDiff } from '@/store';
 import { useNow } from '@/app/clock';
 import { ago } from '@/agents/model';
 import { useRouter } from '@/app/router';
+import { BisePearl } from '@/app/BisePearl';
 import { biseChip, branchLine, roleOf, stateChip, type StateChip } from './head';
 
 function Chip({ chip, testId }: { chip: StateChip; testId: string }) {
@@ -76,7 +76,8 @@ export function BiseHead({ project, name, more }: { project: string; name: strin
   return (
     <div className="ah ah-bise" data-testid="thread.head">
       <span className="ah-who">
-        <Pearl size={14} />
+        {/* ink at rest, pink only while bise waits on him (ambient's thread spec f, designer m_12127) */}
+        <BisePearl size={14} />
         <b className="ah-name" data-testid="thread.head.name">
           bise<span className="ah-project"> · {name}</span>
         </b>

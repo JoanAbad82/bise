@@ -2,7 +2,8 @@
 // m_12093): its pearl, 'bise is here.', what a project gives, 'add a project ⌘N', and from the
 // first-run text only its demo, as a quiet button. The composer stays under it: bise answers
 // without a project too. Owner: amb-win.
-import { Button, Pearl } from '@/ds';
+import { Button } from '@/ds';
+import { BisePearl } from '@/app/BisePearl';
 import { DEMO } from '@/setup';
 import { useRouter } from '@/app/router';
 
@@ -11,7 +12,7 @@ export function NoProject({ onDemo }: { onDemo: (text: string) => void }) {
   return (
     <div className="th-noproj" data-testid="thread.noproject">
       <span className="th-noproj-pearl">
-        <Pearl size={40} />
+        <BisePearl size={40} />
       </span>
       <p className="th-noproj-t">bise is here.</p>
       <p className="th-noproj-s">add a project to give it its own bise. bise will route what you ask to it.</p>

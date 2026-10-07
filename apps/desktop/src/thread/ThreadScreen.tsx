@@ -36,6 +36,7 @@ import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
 import { entryKey, pendingKey, posOfKey } from './entry';
 import { FindBar } from './FindBar';
 import { NoProject } from './NoProject';
+import { BisePearl } from '@/app/BisePearl';
 import { createFindMark, FindMarkContext } from './findmark';
 import { trackRoutes, useHeld } from './routes';
 import { absolute } from './paths';
@@ -287,7 +288,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     <FindMarkContext value={mark}>
       <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
         {bise || !me || me.archived ? (
-          <Head title={headTitle} sub={sub} pearl={bise ? 22 : undefined} dot={bise || !me ? undefined : dotOf(me.status)} />
+          <Head title={headTitle} sub={sub} lead={bise ? <BisePearl size={22} /> : undefined} dot={bise || !me ? undefined : dotOf(me.status)} />
         ) : agent === MAIN ? (
           <BiseHead project={project} name={projectName ?? project} more={more} />
         ) : (
