@@ -37,6 +37,7 @@ import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
 import { entryKey, pendingKey, posOfKey } from './entry';
 import { FindBar } from './FindBar';
 import { NoProject } from './NoProject';
+import { foldedRuns, runKey, runWords, withRuns } from './runs';
 import { BisePearl } from '@/app/BisePearl';
 import { createFindMark, FindMarkContext } from './findmark';
 import { trackRoutes, useHeld } from './routes';
@@ -446,7 +447,10 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
   const pending = usePending(tkey);
   // entries only: his sends not landed yet are the list's tail, outside the
   // virtual list, so his row is drawn in ⏎'s own frame (bar ⛔3: < 100 ms)
-  const keys = useMemo(() => view.order.map(entryKey), [view]);
+  // R13: more than 3 agent-to-agent messages in a row fold into '▸ 4 messages between 2 agents'
+  const [openRuns, setOpenRuns] = useState<ReadonlySet<number>>(() => new Set());
+  const runs = useMemo(() => foldedRuns(view.order, (pos) => store.entry(tkey, pos), agent), [view, store, tkey, agent]);
+  const keys = useMemo(() => withRuns(view.order, runs, openRuns, entryKey), [view, runs, openRuns]);
   // relative paths in its answers are under the agent's folder: its worktree, else the project's
   const base = useBase(project, agent);
   const ctx = useMemo<RowCtx>(
@@ -470,10 +474,32 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
   const prevOf = useMemo(() => new Map(view.order.map((p, i) => [p, view.order[i - 1]])), [view]);
   const row = useCallback(
     (key: string) => {
+      const run = key.startsWith('r:') ? runs.find((r) => runKey(r.start) === key) : undefined;
+      if (run !== undefined) {
+        const open = openRuns.has(run.start);
+        return (
+          <button
+            type="button"
+            className="th-run"
+            aria-expanded={open}
+            onClick={() => {
+              setOpenRuns((s) => {
+                const next = new Set(s);
+                if (next.has(run.start)) next.delete(run.start);
+                else next.add(run.start);
+                return next;
+              });
+            }}
+            data-testid={`thread.run.${String(run.start)}`}
+          >
+            {runWords(run, open)}
+          </button>
+        );
+      }
       const pos = posOfKey(key);
       return pos === undefined ? null : <EntryRow ctx={ctx} pos={pos} prev={prevOf.get(pos)} />;
     },
-    [ctx, prevOf],
+    [ctx, prevOf, runs, openRuns],
   );
   const onOlder = useCallback(() => {
     store.olderPage(project, agent);
