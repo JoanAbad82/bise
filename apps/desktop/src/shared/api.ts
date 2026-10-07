@@ -9,6 +9,11 @@ import type { AppCmd, DraftHubCmd, HelperCmd, HelperEv, HubCmd } from '../proto'
 export interface BiseApi {
   /** process.platform of the main process ('darwin', 'win32', 'linux'). */
   readonly platform: string;
+  /**
+   * His home folder, a constant read once (main's os.homedir(); the test home
+   * in a test run), for showing paths as ~/… (amb-win's shortPath).
+   */
+  readonly home: string;
   /** True when the app runs in test mode (BISE_DESKTOP_TEST=1): off-display window, no Dock icon. */
   readonly test: boolean;
   /**
@@ -210,6 +215,9 @@ export const IPC = {
 
 /** The preload's argument naming its window: `--bise-surface=window|capsule`. */
 export const SURFACE_ARG = '--bise-surface=';
+
+/** The preload's argument with his home folder (main's os.homedir(): the test home under test): `--bise-home=<path>`. */
+export const HOME_ARG = '--bise-home=';
 
 /** Test mode: the main window's first screen (amb-tools' 'show me', the checks). */
 export const ROUTE_ENV = 'BISE_DESKTOP_ROUTE';

@@ -5,12 +5,15 @@
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
-import { IPC, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type Surface, type TermOpened } from '../shared/api';
+import { HOME_ARG, IPC, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type Surface, type TermOpened } from '../shared/api';
+import { argValue } from './args';
 import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
 import { coreBridge } from './core/bridge';
 
 const test = process.env[TEST_ENV] === '1';
-const surface: Surface = process.argv.includes(`${SURFACE_ARG}capsule`) ? 'capsule' : 'window';
+const surface: Surface = argValue(process.argv, SURFACE_ARG) === 'capsule' ? 'capsule' : 'window';
+// his home folder from main (windows.ts), read once
+const home = argValue(process.argv, HOME_ARG) ?? '';
 
 // what main sends on each channel a page listens to
 interface Pushed {
@@ -46,6 +49,7 @@ if (fence !== null) {
 
 const api: BiseApi = {
   platform: process.platform,
+  home,
   test,
   openExternal: async (url) => (await ipcRenderer.invoke(IPC.openExternal, url)) === true,
   openPath: async (path, opts) => (await ipcRenderer.invoke(IPC.openPath, path, opts)) === true,

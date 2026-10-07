@@ -11,9 +11,10 @@
 // BISE_DESKTOP_ROUTE opens the main window on that screen (amb-tools m_9576:
 // 'show me' and the checks open any screen without clicks); main prints
 // READY_LINE once the main window's page has loaded.
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { app, BrowserWindow, type BrowserWindowConstructorOptions } from 'electron';
-import { IPC, READY_LINE, ROUTE_ENV, SURFACE_ARG, type Surface } from '../shared/api';
+import { HOME_ARG, IPC, READY_LINE, ROUTE_ENV, SURFACE_ARG, type Surface } from '../shared/api';
 import { glassOf } from './glass';
 
 export const OFF = -30000;
@@ -25,7 +26,7 @@ export function webPreferences(surface: Surface, testMode: boolean): BrowserWind
     contextIsolation: true,
     sandbox: true,
     nodeIntegration: false,
-    additionalArguments: [`${SURFACE_ARG}${surface}`],
+    additionalArguments: [`${SURFACE_ARG}${surface}`, `${HOME_ARG}${homedir()}`],
     ...(testMode ? { offscreen: true } : {}),
   };
 }
