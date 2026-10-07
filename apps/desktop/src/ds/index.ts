@@ -1,5 +1,5 @@
-// src/ds · bise desktop's design system: desktop-ds v5 (apps/ambient/web/ds, designer's reference) as
-// CSS-variable tokens (tokens.css) and React components. Owner: amb-kit.
+// src/ds · bise desktop's design system: desktop-ds v5 (copied in from designer's reference; src/ds
+// is the design system now) as CSS-variable tokens (tokens.css) and React components. Owner: amb-kit.
 //
 // The rules every component keeps:
 // - a pure render of its props: no state, no effect, no store; the screens own state and keys;

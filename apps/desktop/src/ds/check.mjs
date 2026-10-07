@@ -5,7 +5,6 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const here = import.meta.dirname;
-const ref = join(here, "..", "..", "..", "ambient", "web", "ds");
 const read = (p) => readFileSync(p, "utf8");
 const cssDir = join(here, "css");
 const css = Object.fromEntries(readdirSync(cssDir).filter((f) => f.endsWith(".css")).map((f) => [f, read(join(cssDir, f))]));
@@ -16,16 +15,8 @@ function law(name, fn) {
   try { fn(); pass++; console.log("  ✓ " + name); } catch (e) { fail++; console.log("  ✗ " + name + "\n    " + String(e instanceof Error ? e.message : e).split("\n")[0]); }
 }
 
-law("tokens.css is desktop-ds v5's, byte for byte (apps/ambient/web/ds/tokens.css)", () => {
-  assert.equal(read(join(here, "tokens.css")), read(join(ref, "tokens.css")));
-});
-
-law("css/ holds every rule of the reference's ds.css, unchanged", () => {
-  const all = Object.values(css).join("\n");
-  const rules = read(join(ref, "ds.css")).split("\n").filter((l) => l.trim() && !l.startsWith("/*") && !/^\s/.test(l) && l.includes("{"));
-  assert.ok(rules.length > 100, `only ${rules.length} rules read from ds.css`);
-  for (const l of rules) assert.ok(all.includes(l), `missing from css/: ${l.slice(0, 90)}`);
-});
+// src/ds is the design system now: desktop-ds v5 was copied in from designer's reference, which
+// went with apps/ambient (amb-mac's delete plan, step 2), so no law compares it with a reference.
 
 law("index.css imports tokens.css first, md-tokens.css next, then every file of css/, live.css last", () => {
   const imports = [...read(join(here, "index.css")).matchAll(/@import "\.\/([\w/.-]+)";/g)].map((m) => m[1]);
