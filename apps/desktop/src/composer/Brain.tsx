@@ -42,7 +42,7 @@ import { $caretOnFirstLine, $isBlank, $plainText, $readSegments, $textBeforeCare
 import { enterMakesNewline, indent, newline, outdentAtStart, subwordLeft, subwordRight, NO_UNDO, type Op } from './mdlive';
 import { buildMessage, chars, chipStrip, isLongPaste, nextChipNumber, noVisionLine, preview, type Chip, type Outgoing, type QuoteAt, type Segment } from './message';
 import { enqueue, historyAt, load, popNewest, remember, save, takeOldest, type Saved, type Store } from './drafts';
-import { agentRows, argRows, artifactRows, commandLine, commandRows, completion, emojiRows, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
+import { agentRows, argRows, artifactRows, commandLine, commandRows, completion, emojiRows, enterSends, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from './pick';
 import { isImagePath, type ComposerSources, type PickFile } from './sources';
 import { argAt, browseText, parentQuery, triggerAt, type Trigger } from './tokens';
 import { loadRecent, picked, recentFirst } from './recent';
@@ -722,7 +722,7 @@ export function Brain(p: BrainProps): JSX.Element | null {
         (e) => {
           if (e?.isComposing === true) return false; // an accent or an IME word being composed
           const l = live.current;
-          if (l.open) {
+          if (l.open && !enterSends(l.trigger, l.rows[l.index])) {
             e?.preventDefault();
             const row = l.rows[l.index];
             if (row !== undefined && !row.off) apply(row.pick);

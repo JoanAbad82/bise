@@ -140,6 +140,16 @@ export function argRows(t: Trigger, commands: readonly PickCommand[], sources: {
   }));
 }
 
+/**
+ * ⏎ with the list open on an argument whose word is already typed whole (`/close 1` and the row
+ * `1`, `/archive perf` and the row `perf`): the line is a complete command, so ⏎ sends it instead
+ * of inserting the same word again (qa-flows 28a5419b: '/close 1' never left the field). Every
+ * argument kind; Tab still completes. Pure.
+ */
+export function enterSends(t: Trigger | null, row: Row | undefined): boolean {
+  return t?.kind === 'arg' && row !== undefined && t.query !== '' && row.label === t.query;
+}
+
 /** Tab on a row: always completes (a command's name, then its arguments), never runs. */
 export function completion(row: Row): Pick {
   return row.pick.kind === 'run' ? { kind: 'insert', text: `${row.pick.name} `, browse: false } : row.pick;

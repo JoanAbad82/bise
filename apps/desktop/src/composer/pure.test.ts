@@ -11,7 +11,7 @@ import { codeRuns, colorLines, proseRuns } from './mdcolor';
 import { loadRecent, picked, recentFirst, RECENT_MAX } from './recent';
 import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Segment } from './message';
 import { enqueue, load, popNewest, remember, save, takeOldest, HISTORY_MAX, type Store } from './drafts';
-import { argRows, commandLine, commandRows, completion, move } from './pick';
+import { argRows, commandLine, commandRows, completion, enterSends, move, type Row } from './pick';
 import { enterMakesNewline, indent, item, newline, outdentAtStart, subwordLeft, subwordRight, type Op } from './mdlive';
 
 const memStore = (): Store & { m: Map<string, string> } => {
@@ -134,6 +134,25 @@ describe('the / list', () => {
     expect(argAt('/new fix the build', true, is, text)).toBeNull();
     expect(argAt('/model op', false, is, text)).toBeNull();
     expect(argAt('/nope x', true, is, text)).toBeNull();
+  });
+  it('⏎ sends a command whose argument is already typed whole; otherwise it picks (qa-flows 28a5419b)', () => {
+    const withArgs = [
+      { name: '/close', desc: 'c', args: true, ready: true, argKinds: ['card' as const, 'text' as const] },
+      { name: '/archive', desc: 'a', args: true, ready: true, argKinds: ['agent' as const] },
+      { name: '/flow', desc: 'f', args: true, ready: true, argKinds: [{ words: [{ value: 'pr', desc: '' }, { value: 'trunk', desc: '' }] }] },
+    ];
+    const is = (n: string): boolean => withArgs.some((c) => c.name === n);
+    const text = (): boolean => false;
+    const choices = (k: string, q: string): { value: string; desc: string }[] =>
+      (k === 'card' ? ['1', '12'] : k === 'agent' ? ['perf', 'perf2'] : []).filter((v) => v.startsWith(q)).map((value) => ({ value, desc: '' }));
+    const top = (line: string): [ReturnType<typeof argAt>, Row | undefined] => {
+      const t = argAt(line, true, is, text);
+      return [t, t === null ? undefined : argRows(t, withArgs, { choices })[0]];
+    };
+    for (const line of ['/close 1', '/archive perf', '/flow pr']) expect(enterSends(...top(line)), line).toBe(true);
+    for (const line of ['/close ', '/archive pe', '/flow t']) expect(enterSends(...top(line)), line).toBe(false);
+    expect(enterSends({ kind: 'slash', query: 'close', start: 0, quoted: false }, commandRows({ kind: 'slash', query: 'close', start: 0, quoted: false }, cmds)[0])).toBe(false);
+    expect(enterSends(null, undefined)).toBe(false);
   });
   it('a typed command line runs; an unknown /word is text', () => {
     expect(commandLine('/model opus ', cmds)).toEqual({ name: '/model', args: 'opus', ready: true });
