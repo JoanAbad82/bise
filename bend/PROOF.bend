@@ -5333,7 +5333,20 @@ def Laws.unknown_kind_skipped(j, n):
 # ---- the composer rule ----
 
 def Laws.card_confirm_words_refused(o, cx, c, text, e):
-  %Equal.sym(Bool, HC.confirm_ok(text), False{}, e) : {HC.answer.confirm(o, _, cx, c, text) == HC.words_refused(o, cx, c, "1, 2 or 3") : HX.Cx<o>}
+  %Equal.sym(Bool, HC.confirm_ok(text), False{}, e) : {HC.answer.confirm(o, _, cx, c, text) == HC.words_refused(o, cx, c, HC.confirm_opts()) : HX.Cx<o>}
+  {==}
+
+def Laws.card_confirm_no_alias(o, cx, c, text, e):
+  %Equal.sym(Bool, HC.is_no(String.to_lower(String.trim(text))), True{}, e) : {HC.answer.confirm(o, HC.confirm_pick(_, String.trim(text)), cx, c, text) == HC.answer.confirm(o, True{}, cx, c, text) : HX.Cx<o>}
+  {==}
+
+def Laws.card_confirm_nope_is_words():
+  {==}
+
+def Laws.card_confirm_now_is_words():
+  {==}
+
+def Laws.card_confirm_no_thanks_is_words():
   {==}
 
 def Laws.card_choice_words_refused(o, cx, c, text, e):

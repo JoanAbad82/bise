@@ -1887,16 +1887,34 @@ def any_opt(xs: List<&2, String>, +n: String) -> Bool:
 def is_option(+card: String, +t: String) -> Bool:
   is_number(t) && any_opt(String.lines(card), String.trim(t))
 
+# a deny alias (lead m_10900): `no` or `no: <why>`, any case, on the
+# lowered trimmed answer; it can only refuse (`nope`, `now` are words)
+def is_no(+l: String) -> Bool:
+  String.eq(l, "no") || String.starts_with(l, "no:")
+
+# a deny alias is an answer; else the options and the TUI's `deny:`
+def confirm_pick(no: Bool, +s: String) -> Bool:
+  match no:
+    case True{}:
+      True{}
+    case False{}:
+      String.eq(s, "1") || String.eq(s, "2") || String.eq(s, "3") || String.starts_with(String.to_lower(s), "deny:")
+
 # an approval card's answer (the composer rule, lead m_8777): its options
-# 1 allow, 2 always, 3 no, or the TUI's explicit deny action (`deny:
-# <why>`, a refusal with its note); typed words never answer it
+# 1 allow, 2 always, 3 no, the TUI's explicit deny action (`deny: <why>`,
+# a refusal with its note) or its aliases `no` and `no: <why>`; typed
+# words never answer it
 def confirm_ok(+t: String) -> Bool:
   +s = String.trim(t)
-  String.eq(s, "1") || String.eq(s, "2") || String.eq(s, "3") || String.starts_with(String.to_lower(s), "deny:")
+  confirm_pick(is_no(String.to_lower(s)), s)
+
+# what a confirm card waits for, said when words are refused
+def confirm_opts() -> String:
+  "1 allow · 2 always · 3 no · or no: <why>"
 
 # typed words on an approval card: the card stays open, nothing wakes
 def words_refused(-o: M.St, +cx: X.Cx<o>, +c: M.Card, +opts: String) -> X.Cx<o>:
-  notice(o, cx, cat(["card #", ns(M.Card.id(c)), " waits for ", opts, ": typed words don't answer it"]))
+  notice(o, cx, cat(["card #", ns(M.Card.id(c)), " waits for ", opts, " — typed words don't answer it"]))
 
 def answer.confirm(-o: M.St, ok: Bool, +cx: X.Cx<o>, +c: M.Card, +text: String) -> X.Cx<o>:
   match ok:
@@ -1908,7 +1926,7 @@ def answer.confirm(-o: M.St, ok: Bool, +cx: X.Cx<o>, +c: M.Card, +text: String) 
         J.kv("agent", J.JStr{M.Card.agent(c)}), J.kv("text", J.JStr{text})])
       close_card(o, cx2, M.Card.id(c), "answered")
     case False{}:
-      words_refused(o, cx, c, "1, 2 or 3")
+      words_refused(o, cx, c, confirm_opts())
 
 # a hub item's answer (M.choice_kind): one of its numbers goes to the
 # hub's Rust side (the `card_choice` effect), which acts and closes the

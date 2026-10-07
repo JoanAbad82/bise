@@ -14,7 +14,7 @@ mod art;
 mod boot;
 mod features;
 mod fn_context;
-mod gate;
+pub(crate) mod gate;
 mod history;
 mod pages;
 mod projects;

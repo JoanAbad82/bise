@@ -4030,7 +4030,7 @@ fn an_approval_card_takes_its_options_never_words() {
         let fx = t.user(MAIN, &format!("/answer {} {}", id, words));
         assert!(t.hub.st.cards.contains_key(&id), "open after {words:?}");
         assert!(!fx.iter().any(|e| matches!(e, Effect::Confirm { .. })), "no verdict for {words:?}: {:?}", fx);
-        assert!(format!("{:?}", fx).contains("waits for 1, 2 or 3: typed words don't answer it"), "{:?}", fx);
+        assert!(format!("{:?}", fx).contains("waits for 1 allow · 2 always · 3 no · or no: <why> — typed words don't answer it"), "{:?}", fx);
     }
     let fx = t.user(MAIN, &format!("/answer {} 1", id));
     assert!(fx.iter().any(|e| matches!(e, Effect::Confirm { text, .. } if text == "1")), "{:?}", fx);
@@ -4040,6 +4040,72 @@ fn an_approval_card_takes_its_options_never_words() {
     let id = *t.hub.st.cards.keys().max().unwrap();
     let fx = t.user(MAIN, &format!("/answer {} deny: not on friday", id));
     assert!(fx.iter().any(|e| matches!(e, Effect::Confirm { text, .. } if text == "deny: not on friday")), "{:?}", fx);
+}
+
+// the deny aliases (lead m_10900): `no` and `no: <why>` close a confirm
+// card with his words, which the gate reads as no with the note
+#[test]
+fn an_approval_card_takes_no_with_its_reason() {
+    use crate::daemon::gate::{answer_of, Answer};
+    let mut t = T::new();
+    t.go(Input::ConfirmOpen { agent: MAIN.into(), text: "main wants to push to main".into() });
+    let id = *t.hub.st.cards.keys().max().unwrap();
+    let fx = t.user(MAIN, &format!("/answer {} no: use a branch", id));
+    let text = fx.iter().find_map(|e| match e { Effect::Confirm { text, .. } => Some(text.clone()), _ => None });
+    assert_eq!(text.as_deref(), Some("no: use a branch"), "{:?}", fx);
+    assert_eq!(answer_of("no: use a branch"), Answer::No("use a branch".into()));
+    assert!(!t.hub.st.cards.contains_key(&id));
+}
+
+// the rule has two homes, sb-core (confirm_ok) and the gate (answer_of):
+// over one table, what sb-core lets through is the decision the gate
+// reads, and nothing sb-core refuses would be an allow at the gate
+#[test]
+fn sb_core_and_the_gate_agree_on_a_confirm_answer() {
+    use crate::daemon::gate::{answer_of, Answer};
+    #[derive(Debug, PartialEq)]
+    enum Want {
+        Allow,
+        Always,
+        No(String),
+        Refused,
+    }
+    let no = |n: &str| Want::No(n.into());
+    let table = [
+        ("1", Want::Allow),
+        ("2", Want::Always),
+        ("3", no("")),
+        ("no", no("")),
+        ("No", no("")),
+        ("  NO  ", no("")),
+        ("no: use a branch", no("use a branch")),
+        ("deny: x", no("x")),
+        ("nope", Want::Refused),
+        ("now", Want::Refused),
+        ("no thanks", Want::Refused),
+        ("non", Want::Refused),
+        ("", Want::Refused),
+        ("3 no", Want::Refused),
+    ];
+    let mut t = T::new();
+    for (input, want) in table {
+        t.go(Input::ConfirmOpen { agent: MAIN.into(), text: "main wants to run make".into() });
+        let id = *t.hub.st.cards.keys().max().unwrap();
+        let fx = t.user(MAIN, &format!("/answer {} {}", id, input));
+        let sent = fx.iter().find_map(|e| match e { Effect::Confirm { text, .. } => Some(text.clone()), _ => None });
+        let got = match sent.as_deref().map(answer_of) {
+            None => Want::Refused,
+            Some(Answer::Allow) => Want::Allow,
+            Some(Answer::Always) => Want::Always,
+            Some(Answer::No(note)) => Want::No(note),
+        };
+        assert_eq!(got, want, "{input:?}: {:?}", fx);
+        assert_eq!(t.hub.st.cards.contains_key(&id), want == Want::Refused, "{input:?}: the card");
+        if want == Want::Refused {
+            assert_ne!(answer_of(input), Answer::Allow, "{input:?}: refused by sb-core, an allow at the gate");
+            t.user(MAIN, &format!("/answer {} 3", id));
+        }
+    }
 }
 
 // one answer on both sides: the kinds whose card refuses typed words are

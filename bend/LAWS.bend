@@ -4490,7 +4490,29 @@ law card_confirm_words_refused:
   for +c: HM.Card
   for +text: String
   for e: {HC.confirm_ok(text) == False{} : Bool}
-  {HC.answer.kind(o, HC.KConfirm{}, cx, c, text) == HC.words_refused(o, cx, c, "1, 2 or 3") : HX.Cx<o>}
+  {HC.answer.kind(o, HC.KConfirm{}, cx, c, text) == HC.words_refused(o, cx, c, HC.confirm_opts()) : HX.Cx<o>}
+
+# LAW: `no` and `no: <why>` (any case, lead m_10900) are deny aliases: the
+# card gets the same verdict path as its option 3, with his words as the
+# note (the gate reads them as no, never allow: gate::answer_of).
+law card_confirm_no_alias:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +c: HM.Card
+  for +text: String
+  for e: {HC.is_no(String.to_lower(String.trim(text))) == True{} : Bool}
+  {HC.answer.kind(o, HC.KConfirm{}, cx, c, text) == HC.answer.confirm(o, True{}, cx, c, text) : HX.Cx<o>}
+
+# LAW: only `no` itself or its `no:` prefix: words that start like it stay
+# words.
+law card_confirm_nope_is_words:
+  {HC.confirm_ok("nope") == False{} : Bool}
+
+law card_confirm_now_is_words:
+  {HC.confirm_ok("now") == False{} : Bool}
+
+law card_confirm_no_thanks_is_words:
+  {HC.confirm_ok("No thanks") == False{} : Bool}
 
 # LAW: a hub item (merge, feature_*, update, signin) takes only one of its
 # options' numbers: other words are refused, the item stays open, main is
