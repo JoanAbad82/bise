@@ -82,7 +82,8 @@ describe('the agents screen', () => {
     expect(cmds.at(-1)).toEqual({ cmd: 'stop', project: P, agent: 'perf' });
     fireEvent.click(v.getByTestId('agents.archive.perf'));
     expect(cmds.at(-1)).toEqual({ cmd: 'archive', project: P, agent: 'perf', force: true });
-    expect((v.getByTestId('agents.new') as HTMLButtonElement).disabled).toBe(true);
+    // A.1: '+ new agent' is live since amb-feed 6cb6c0ef's typed new
+    expect((v.getByTestId('agents.new') as HTMLButtonElement).disabled).toBe(false);
   });
 });
 

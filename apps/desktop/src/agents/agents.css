@@ -30,3 +30,98 @@
   gap: 6px;
   margin: 6px 0 0 24px;
 }
+
+/* an agent's name, model and reasoning (Tune), and the '+ new agent' sheet */
+.ag-tune,
+.ag-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 8px 24px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 10px;
+  background: var(--c-raised);
+}
+
+.th-screen > .ag-tune {
+  margin: 4px 16px 8px;
+}
+
+.ag-sheet {
+  margin-left: 0;
+}
+
+.ag-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ag-field > span {
+  min-width: 72px;
+  color: var(--c-text-2);
+}
+
+.ag-field input,
+.ag-brief {
+  padding: 4px 8px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 6px;
+  background: var(--c-solid);
+  color: var(--c-text);
+  font: inherit;
+}
+
+.ag-field input {
+  min-width: 220px;
+}
+
+.ag-field input[aria-invalid='true'] {
+  border-color: var(--c-err);
+}
+
+.ag-brief {
+  width: 100%;
+  resize: vertical;
+}
+
+.ag-sheet-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.ag-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ag-seg {
+  padding: 3px 10px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--c-text-2);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ag-seg.on {
+  border-color: var(--c-text);
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.ag-why {
+  color: var(--c-text-2);
+  font-size: 12px;
+}
+
+.ag-err {
+  margin: 0;
+  color: var(--c-err);
+}

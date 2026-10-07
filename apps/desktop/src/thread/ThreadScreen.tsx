@@ -16,6 +16,7 @@ import { useMenuAction } from '@/app/menu';
 import { useRouter } from '@/app/router';
 import { windowCommands, runWindowCommand } from './commands';
 import { dotOf, lineOf } from '@/agents/model';
+import { Tune } from '@/agents/Tune';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
 import { entryKey, pendingKey, posOfKey } from './entry';
@@ -118,6 +119,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     }
   };
 
+  const [tuning, setTuning] = useState(false);
   const title = bise ? 'bise' : agent === 'main' ? (projectName ?? project) : agent;
   // a project's main: its counts (tui-parity W2), else the agent's line
   const all = useAgents(project);
@@ -152,7 +154,38 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     <FoldsContext value={folds}>
     <FindMarkContext value={mark}>
       <section className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} onKeyDown={onKeyDown}>
-        <Head title={title} sub={sub} pearl={bise ? 22 : undefined} dot={bise || !me ? undefined : dotOf(me.status)} />
+        <Head
+          title={title}
+          sub={sub}
+          pearl={bise ? 22 : undefined}
+          dot={bise || !me ? undefined : dotOf(me.status)}
+          end={
+            me && !me.archived && !bise ? (
+              <Button
+                kind="ghost"
+                title={me.main ? 'model, reasoning' : 'rename, model, reasoning'}
+                onClick={() => {
+                  setTuning((x) => !x);
+                }}
+                testId="thread.more"
+              >
+                …
+              </Button>
+            ) : undefined
+          }
+        />
+        {tuning && me && !me.archived && (
+          <Tune
+            key={me.name}
+            project={project}
+            a={me}
+            onRenamed={(to) => {
+              setTuning(false);
+              // the thread follows its new name
+              router.go({ screen: 'thread', project, agent: to });
+            }}
+          />
+        )}
         {findOpen && (
           <FindBar
             tkey={tkey}
