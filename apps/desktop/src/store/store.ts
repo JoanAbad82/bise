@@ -55,6 +55,7 @@ export const TAGS = {
   route_done: true,
   jobs: true,
   job_end: true,
+  followed_end: true,
   error: true,
   projects: true,
   open: true,
@@ -325,6 +326,7 @@ export class Store {
       case 'route':
       case 'route_done':
       case 'job_end':
+      case 'followed_end':
       case 'open':
         // one-shot: read through onEvent
         return;
