@@ -1,11 +1,11 @@
 // The sidebar: bise, his projects (the core's rows, his order), and the
-// agents of the project in view. Owner: amb-win.
+// agents of each project in its folder (open by default). Owner: amb-win.
 //
 // It reads only projects, the route and the agents of the project in view:
 // a thread's entries never re-render it. A project's dot says, in this
 // order: its folder is gone, its hub is down, an agent works, something
 // waits on him, all quiet.
-import { Fragment, memo, useEffect } from 'react';
+import { Fragment, memo, useEffect, useSyncExternalStore } from 'react';
 import { Row, SectionHead, Side, type DotState } from '@/ds';
 import type { Agent, Feature, ProjectRow } from '@/proto';
 import { useAgents, useFeatures, useProjects } from '@/store';
@@ -75,14 +75,79 @@ export function Sidebar() {
   );
 }
 
+// A project's folder (his try round 2, ambient-lead m_11456 item 3): open by default, his close
+// remembered per project for the next launches (localStorage, this window's own).
+const CLOSED_KEY = 'bise.sidebar.closed';
+let closed: ReadonlySet<string> = readClosed();
+const closedSubs = new Set<() => void>();
+
+function readClosed(): ReadonlySet<string> {
+  try {
+    const v: unknown = JSON.parse(globalThis.localStorage.getItem(CLOSED_KEY) ?? '[]');
+    return new Set(Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Opens or closes a project's folder, and remembers it. */
+export function toggleFolder(project: string): void {
+  const next = new Set(closed);
+  if (next.has(project)) next.delete(project);
+  else next.add(project);
+  closed = next;
+  try {
+    globalThis.localStorage.setItem(CLOSED_KEY, JSON.stringify([...next]));
+  } catch {
+    // no storage (a unit test's DOM): kept for this session only
+  }
+  for (const f of closedSubs) f();
+}
+
+function useFolderOpen(project: string): boolean {
+  return useSyncExternalStore(
+    (f) => {
+      closedSubs.add(f);
+      return () => {
+        closedSubs.delete(f);
+      };
+    },
+    () => !closed.has(project),
+  );
+}
+
+/** What a folder shows for a project the window has no agents of yet: its counts, or nothing. Pure. */
+export function folderLine(p: Pick<ProjectRow, 'working' | 'waits'>): string {
+  return [p.working > 0 ? `${String(p.working)} at work` : '', p.waits > 0 ? `${String(p.waits)} waiting for you` : ''].filter(Boolean).join(' · ');
+}
+
 const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow; on: boolean; route: Route }) {
   const router = useRouter();
   const end = projectEnd(p);
+  const open = useFolderOpen(p.project);
   return (
     <>
       <Row
         kind="pj"
-        name={p.name}
+        name={
+          <>
+            <button
+              type="button"
+              className="app-fold"
+              aria-expanded={open}
+              aria-label={open ? `close ${p.name}` : `open ${p.name}`}
+              title={open ? 'close the folder' : 'open the folder'}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFolder(p.project);
+              }}
+              data-testid={`app.sidebar.project.${p.project}.fold`}
+            >
+              {open ? '▾' : '▸'}
+            </button>
+            {p.name}
+          </>
+        }
         dot={projectDot(p)}
         end={end.text}
         needs={end.needs}
@@ -92,10 +157,22 @@ const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow;
         }}
         testId={`app.sidebar.project.${p.project}`}
       />
-      {on && <Agents project={p.project} route={route} />}
+      {open && <Folder p={p} route={route} />}
     </>
   );
 });
+
+/** An open folder: its agents when the window has them (a project it shows), else its counts. */
+function Folder({ p, route }: { p: ProjectRow; route: Route }) {
+  const agents = useAgents(p.project);
+  if (agents.length > 0) return <Agents project={p.project} route={route} />;
+  const line = folderLine(p);
+  return line === '' ? null : (
+    <div className="app-folder-line" data-testid={`app.sidebar.project.${p.project}.counts`}>
+      {line}
+    </div>
+  );
+}
 
 /**
  * The live agents of the project in view, main out (it is the project's
