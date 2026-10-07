@@ -177,6 +177,14 @@ fn render_all() -> BTreeMap<String, String> {
 #[test]
 fn the_typescript_types_are_fresh() {
     let dir = proto_dir();
+    // a checkout without the desktop app (main's desktop-hub, architect
+    // m_11797): nothing to compare against; the types still render below
+    let desktop = dir.parent().and_then(Path::parent).is_some_and(Path::is_dir);
+    if !desktop && std::env::var_os(BLESS).is_none() {
+        assert!(!render_all().is_empty());
+        eprintln!("no apps/desktop here: the TypeScript files are not compared");
+        return;
+    }
     let want = render_all();
     let present: Vec<String> = std::fs::read_dir(&dir)
         .map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| n.ends_with(".ts")).collect())
