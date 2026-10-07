@@ -120,10 +120,29 @@ export function agentsOf(items: readonly Item[]): string[] {
 /** The key of an item (its project and id): the route's and the list's. */
 export const keyOf = (it: Item): string => `${it.project}/${it.a.id}`;
 
-/** The versions popover's rows, newest first: v2 the current one, v1. */
-export function versions(a: Artifact): { v: number; words: string }[] {
+/**
+ * What amb-feed adds to the artifact row (m_11959): its file on disk, and each version's time and
+ * print-only note. Read as optional until bise-proto's TS has them; absent, the menus hide.
+ */
+interface Coming {
+  readonly path?: string | null;
+  readonly versions?: readonly { readonly v: number; readonly at_ms?: number; readonly note?: string | null }[] | null;
+}
+
+/** The artifact's file on disk (show in Finder, quick look), else null. Pure. */
+export function pathOf(a: Artifact): string | null {
+  const p = (a as Artifact & Coming).path;
+  return typeof p === 'string' && p !== '' ? p : null;
+}
+
+/** The versions popover's rows, newest first: 'v2  the current one  14:02', 'v1  <its note>  13:20'. */
+export function versions(a: Artifact, now = Date.now()): { v: number; words: string; when?: string }[] {
+  const known = (a as Artifact & Coming).versions ?? [];
   return Array.from({ length: Math.max(1, a.version) }, (_, i) => {
     const v = Math.max(1, a.version) - i;
-    return { v, words: i === 0 ? 'the current one' : '' };
+    const k = known.find((x) => x.v === v);
+    const at = k?.at_ms ?? (i === 0 ? a.at_ms : undefined);
+    const words = i === 0 ? 'the current one' : (k?.note ?? '');
+    return k === undefined && i > 0 ? { v, words } : { v, words, ...(at === undefined ? {} : { when: whenWords(at, now) }) };
   });
 }

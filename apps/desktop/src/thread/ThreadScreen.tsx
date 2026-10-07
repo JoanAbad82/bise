@@ -519,7 +519,11 @@ function CardHint({ project }: { project: string }) {
   ) : null;
 }
 
-const ThreadComposer = memo(function ThreadComposer({
+/**
+ * The thread's composer, also mounted under an open artifact (amb-kit's src/artifacts/Open.tsx,
+ * desktop-screens v6) with `about`: its own drafts, and the message names the artifact.
+ */
+export const ThreadComposer = memo(function ThreadComposer({
   project,
   agent,
   busy,
@@ -530,6 +534,7 @@ const ThreadComposer = memo(function ThreadComposer({
   quoting,
   onReady,
   onSent,
+  about,
 }: {
   project: string;
   agent: string;
@@ -544,6 +549,8 @@ const ThreadComposer = memo(function ThreadComposer({
   onReady: (a: ComposerActions) => void;
   /** his send went (the demo tour's step) */
   onSent: () => void;
+  /** the artifact his words are about (an open artifact's composer): sent as `about [title](url): …` */
+  about?: { id: string; title: string; url: string };
 }) {
   const store = useStore();
   const router = useRouter();
@@ -603,13 +610,19 @@ const ThreadComposer = memo(function ThreadComposer({
       // ⏎ while a turn runs steers it ('now', as the TUI); the files he
       // attached or dropped go with it (amb-core item H: the hub renders them
       // once, an image as a marker the model sees). Tab's queue: amb-web's
-      store.send({ project, agent, text: out.text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}) });
+      const text = about === undefined ? out.text : aboutText(about, out.text);
+      store.send({ project, agent, text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}) });
       onSent();
     },
-    [store, project, agent, onSent, onCommand, answer],
+    [store, project, agent, onSent, onCommand, answer, about],
   );
-  return <Composer target={`${project}/${agent}`} busy={busy} sources={sources} to={to} placeholder={placeholder} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
+  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} to={to} placeholder={placeholder} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
 });
+
+/** A message about an artifact: `about [its title](its url): his words` (the chip's own link form). Pure. */
+export function aboutText(a: { title: string; url: string }, text: string): string {
+  return `about [${a.title.replace(/[[\]]/gu, '')}](${a.url}): ${text}`;
+}
 
 /** The composer's label while it answers a docked card: 'answering perf · which bench do you…' (main is bise). Pure. */
 export function answeringLabel(c: { agent: string; question: string }): string {

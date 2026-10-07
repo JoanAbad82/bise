@@ -8,6 +8,10 @@ import type { Route } from '@/app/route';
 import { formatRoute, parseRoute } from '@/app/route';
 import { byDay, dayWords, filterItems, glyphOf, kindWords, ALL, versions, whenWords, type Item } from './model';
 import { ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
+import { putInDraft } from './put';
+import { aboutText } from '@/thread/ThreadScreen';
+import { load } from '@/composer/drafts';
+import { entryOf, entrySegments } from '@/composer/entry';
 
 afterEach(cleanup);
 
@@ -27,7 +31,7 @@ describe('artifacts model', () => {
     expect(dayWords(at(2, 9, 0), NOW)).toBe('the 1st of October');
     expect(whenWords(at(0, 14, 2), NOW)).toBe('14:02');
     expect(whenWords(at(5, 9, 5), NOW)).toBe('28 Sep 09:05');
-    expect(versions(art('a', 'page', { version: 2 }))).toEqual([{ v: 2, words: 'the current one' }, { v: 1, words: '' }]);
+    expect(versions(art('a', 'page', { version: 2 }), NOW)).toEqual([{ v: 2, words: 'the current one', when: '14:02' }, { v: 1, words: '' }]);
     expect(versionUrl('http://h/p/x', 3, 1)).toBe('http://h/p/x/v/1');
   });
 
@@ -56,7 +60,7 @@ describe('artifacts model', () => {
 function world() {
   const store = new Store(null);
   store.apply({ ev: 'projects', projects: [{ project: 'shop-1', name: 'storefront', path: '/x/shop' }, { project: 'acme-2', name: 'acme', path: '/x/acme' }] });
-  store.apply({ ev: 'artifacts', project: 'shop-1', items: [art('notes', 'page', { new: true, version: 2, title: 'product page, before / after' }), art('bench', 'file', { at_ms: at(1, 9, 0) })] });
+  store.apply({ ev: 'artifacts', project: 'shop-1', items: [art('notes', 'page', { new: true, version: 2, title: 'product page, before / after' }), { ...art('bench', 'file', { at_ms: at(1, 9, 0) }), path: '/x/shop/bench.csv' } as Artifact] });
   store.apply({ ev: 'artifacts', project: 'acme-2', items: [art('pr-12', 'pr', { agent: 'api', title: 'fix the checkout' })] });
   return store;
 }
@@ -108,5 +112,85 @@ describe('artifacts screens', () => {
     expect(screen.getByTestId('artifact.page').getAttribute('src')).toBe('http://127.0.0.1:47123/p/notes/v/1');
     fireEvent.click(screen.getByTestId('artifact.back'));
     expect(router.get()).toEqual({ screen: 'artifacts', project: '' });
+  });
+
+  it("under the page, the composer asks the agent that made it: 'about “…” · to perf'", () => {
+    mount(<ArtifactOpen project="shop-1" id="notes" />, { screen: 'artifacts', project: 'shop-1', id: 'notes' });
+    const c = screen.getByTestId('artifact.composer');
+    expect(c.textContent).toContain('about “product page, before / after” · to perf');
+    expect(c.innerHTML).toContain('ask perf about it, then ⏎');
+    expect(aboutText({ title: 'Q3 [plan]', url: 'http://h/p/q3' }, 'why v2?')).toBe('about [Q3 plan](http://h/p/q3): why v2?');
+  });
+
+  it("⋯ puts it in a message: a chip at the end of perf's draft, then perf's thread; show in Finder only with a file and the bridge", () => {
+    window.localStorage.clear();
+    window.localStorage.setItem('bise.composer.v1.shop-1/perf', JSON.stringify({ draft: entryOf([{ kind: 'text', text: 'look at' }]), history: [], queue: [] }));
+    const router = mount(<ArtifactOpen project="shop-1" id="notes" />, { screen: 'artifacts', project: 'shop-1', id: 'notes' });
+    fireEvent.click(screen.getByTestId('artifact.more'));
+    expect(screen.queryByTestId('artifact.finder')).toBeNull();
+    fireEvent.click(screen.getByTestId('artifact.put'));
+    expect(router.get()).toEqual({ screen: 'thread', project: 'shop-1', agent: 'perf' });
+    const draft = load(window.localStorage, 'shop-1/perf').draft ?? '';
+    expect(entrySegments(draft)).toEqual([
+      { kind: 'text', text: 'look at ' },
+      { kind: 'chip', chip: { kind: 'artifact', n: 1, id: 'notes', title: 'product page, before / after', url: 'http://127.0.0.1:47123/p/notes' } },
+      { kind: 'text', text: ' ' },
+    ]);
+    cleanup();
+    const shown: string[] = [];
+    const g = globalThis as { bise?: unknown };
+    g.bise = { showInFinder: (p: string) => { shown.push(p); return Promise.resolve(true); } };
+    try {
+      mount(<ArtifactOpen project="shop-1" id="bench" />, { screen: 'artifacts', project: 'shop-1', id: 'bench' });
+      fireEvent.click(screen.getByTestId('artifact.more'));
+      fireEvent.click(screen.getByTestId('artifact.finder'));
+      expect(shown).toEqual(['/x/shop/bench.csv']);
+    } finally {
+      delete g.bise;
+    }
+  });
+
+  it('the list: @ puts the row in a message, space looks at its file (else opens it)', async () => {
+    window.localStorage.clear();
+    const looked: string[] = [];
+    const g = globalThis as { bise?: unknown };
+    g.bise = { quickLook: (p: string) => { looked.push(p); return Promise.resolve(true); } };
+    try {
+      const opened: string[] = [];
+      mount(<ArtifactList project="shop-1" onOpen={(id) => opened.push(id)} />);
+      const list = screen.getByTestId('artifacts.panel');
+      fireEvent.keyDown(list, { key: 'ArrowDown' });
+      fireEvent.keyDown(list, { key: ' ' });
+      expect(opened).toEqual(['notes']);
+      fireEvent.keyDown(list, { key: 'ArrowDown' });
+      fireEvent.keyDown(list, { key: ' ' });
+      await Promise.resolve();
+      expect(looked).toEqual(['/x/shop/bench.csv']);
+      expect(opened).toEqual(['notes']);
+      fireEvent.keyDown(list, { key: '@' });
+      expect(load(window.localStorage, 'shop-1/perf').draft).toContain('"id":"bench"');
+    } finally {
+      delete g.bise;
+    }
+  });
+});
+
+describe('put it in a message', () => {
+  it('appends to the draft, numbers the chip after the others, keeps an unreadable draft aside', () => {
+    const m = new Map<string, string>();
+    const s = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v); }, removeItem: (k: string) => { m.delete(k); } };
+    const a = { id: 'a1', title: 'plan', url: 'http://h/p/a1' };
+    putInDraft(s, 'p/perf', a);
+    expect(entrySegments(load(s, 'p/perf').draft ?? '')).toEqual([{ kind: 'chip', chip: { kind: 'artifact', n: 1, ...a } }, { kind: 'text', text: ' ' }]);
+    putInDraft(s, 'p/perf', { ...a, id: 'a2' });
+    expect(entrySegments(load(s, 'p/perf').draft ?? '')?.flatMap((x) => (x.kind === 'chip' ? [x.chip.n] : []))).toEqual([1, 2]);
+    m.set('bise.composer.v1.p/api', JSON.stringify({ draft: 'not an entry', history: [], queue: [] }));
+    putInDraft(s, 'p/api', a);
+    expect(m.get('bise.composer.v1.p/api.unread')).toContain('not an entry');
+  });
+
+  it("the versions menu says each version's note and time when the hub sends them", () => {
+    const a = { ...art('a', 'page', { version: 2, at_ms: at(0, 14, 2) }), versions: [{ v: 2, at_ms: at(0, 14, 2) }, { v: 1, at_ms: at(0, 13, 20), note: 'before the fix' }] };
+    expect(versions(a, NOW)).toEqual([{ v: 2, words: 'the current one', when: '14:02' }, { v: 1, words: 'before the fix', when: '13:20' }]);
   });
 });

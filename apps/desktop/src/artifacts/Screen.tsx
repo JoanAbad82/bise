@@ -7,7 +7,8 @@ import { Button, Field, Menu, MenuItem } from '@/ds';
 import { useProjects } from '@/store';
 import { useRouter } from '@/app/router';
 import { useAllArtifacts } from './hooks';
-import { ArtifactRows } from './List';
+import { ArtifactRows, useLook } from './List';
+import { usePutInMessage } from './Open';
 import { agentsOf, ALL, filterItems, KIND_FILTERS, keyOf, type Filter, type Item, type KindFilter } from './model';
 import './artifacts.css';
 
@@ -24,6 +25,8 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
   const open = (it: Item) => {
     router.go({ screen: 'artifacts', project: it.project, id: it.a.id });
   };
+  const look = useLook(open);
+  const put = usePutInMessage();
   const toggleKind = (k: KindFilter) => {
     setF({ ...f, kinds: f.kinds.includes(k) ? f.kinds.filter((x) => x !== k) : [...f.kinds, k] });
   };
@@ -79,7 +82,8 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
       ) : items.length === 0 ? (
         <div className="art-empty" data-testid="artifacts.none">nothing matches. clear a filter to see more.</div>
       ) : (
-        <ArtifactRows items={items} now={now} sel={sel ?? (items[0] ? keyOf(items[0]) : null)} onSel={setSel} onOpen={open} form="screen" testId="artifacts.list" />
+        <ArtifactRows items={items} now={now} sel={sel ?? (items[0] ? keyOf(items[0]) : null)} onSel={setSel} onOpen={open} onLook={look}
+          onPut={(it) => { put(it.project, it.a); }} form="screen" testId="artifacts.list" />
       )}
       <div className="art-keys" data-testid="artifacts.keys">
         <span><b>⏎</b> open</span>

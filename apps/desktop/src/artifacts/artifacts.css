@@ -54,4 +54,9 @@
 .art-open-end { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; flex: none; }
 .art-v { font-family: var(--font-mono); }
 .art-open-body { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; padding: 24px 16px; background: color-mix(in srgb, var(--c-text) 3%, transparent); overflow: hidden; }
+/* the versions popover's row: 'v2  the current one  14:02' */
+.art-v-words { margin-left: 10px; color: var(--c-text-2); }
+.art-v-when { margin-left: auto; padding-left: 16px; color: var(--c-text-3); }
+/* his words about it, under the page: the thread's composer, the 680 column */
+.art-open-composer { flex: none; display: flex; flex-direction: column; align-items: stretch; width: 100%; max-width: 712px; margin: 0 auto; padding: 0 16px 12px; box-sizing: border-box; }
 .art-paper { width: 100%; max-width: 680px; height: 100%; border: 0; border-radius: var(--r-3); background: var(--c-solid); box-shadow: var(--e-1); }

@@ -3,12 +3,38 @@
 // the version menu, 'open in browser ↗', '⋯'), then the page itself from the pages server, on
 // paper, max 680 wide, centred on a lightly tinted backdrop. A link inside the page goes to his
 // browser (the shell's guard). Owner: amb-kit.
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Button, Menu, MenuItem } from '@/ds';
 import { useRouter } from '@/app/router';
+import { useAgents, useStore } from '@/store';
+import { ThreadComposer } from '@/thread/ThreadScreen';
 import { useAllArtifacts } from './hooks';
-import { kindOf, versions, whenWords } from './model';
+import { kindOf, pathOf, versions, whenWords } from './model';
+import { putInDraft } from './put';
 import './artifacts.css';
+
+/** What the window's bridge offers here (each one absent in a plain browser or a test: its item hides). */
+export interface ArtBridge {
+  openExternal?: (u: string) => unknown;
+  copy?: (t: string) => unknown;
+  quickLook?: (path: string) => Promise<boolean>;
+  showInFinder?: (path: string) => Promise<boolean>;
+}
+export const bridge = (): ArtBridge | undefined => (globalThis as { bise?: ArtBridge }).bise;
+
+/** '@ put it in a message': the artifact as a chip in its agent's draft, then that thread. */
+export function usePutInMessage(): (project: string, a: { id: string; title: string; url: string; agent: string }) => void {
+  const router = useRouter();
+  return useCallback(
+    (project, a) => {
+      putInDraft(window.localStorage, `${project}/${a.agent}`, a);
+      router.go({ screen: 'thread', project, agent: a.agent });
+    },
+    [router],
+  );
+}
+
+const noop = () => undefined;
 
 /** The page's url at a version: the current one as is, an older one at /v/<n>. Pure. */
 export function versionUrl(url: string, current: number, v: number): string {
@@ -22,7 +48,15 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
   const [menu, setMenu] = useState<'versions' | 'more' | null>(null);
   const [v, setV] = useState<number | null>(null);
   const [now] = useState(() => Date.now());
-  const bise = (globalThis as { bise?: { openExternal?: (u: string) => unknown; copy?: (t: string) => unknown } }).bise;
+  const bise = bridge();
+  const store = useStore();
+  const put = usePutInMessage();
+  const agent = it?.a.agent ?? '';
+  const busy = useAgents(project).find((x) => x.name === agent)?.status === 'working';
+  const onStop = useCallback(() => {
+    store.stop(project, agent);
+  }, [store, project, agent]);
+  const about = useMemo(() => (it === undefined ? undefined : { id: it.a.id, title: it.a.title, url: it.a.url }), [it]);
   const back = () => {
     router.go({ screen: 'artifacts', project: '' });
   };
@@ -40,6 +74,8 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
   const shown = v ?? a.version;
   const url = versionUrl(a.url, a.version, shown);
   const page = kindOf(a.kind) === 'page';
+  const path = pathOf(a);
+  const finder = path !== null && bise?.showInFinder !== undefined ? bise.showInFinder : undefined;
   return (
     <section className="art-open" data-testid="artifact.open"
       onKeyDown={(e) => {
@@ -61,9 +97,11 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
             </Button>
             {menu === 'versions' && (
               <Menu testId="artifact.versions">
-                {versions(a).map((x) => (
+                {versions(a, now).map((x) => (
                   <MenuItem key={x.v} on={x.v === shown} onClick={() => { setV(x.v); setMenu(null); }} testId={`artifact.versions.v${String(x.v)}`}>
-                    <span className="art-v">{`v${String(x.v)}`}</span> {x.words}
+                    <span className="art-v">{`v${String(x.v)}`}</span>
+                    <span className="art-v-words">{x.words}</span>
+                    {x.when !== undefined && <span className="art-v-when">{x.when}</span>}
                   </MenuItem>
                 ))}
               </Menu>
@@ -74,7 +112,11 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
             <Button kind="ghost" onClick={() => { setMenu(menu === 'more' ? null : 'more'); }} testId="artifact.more">⋯</Button>
             {menu === 'more' && (
               <Menu testId="artifact.more.menu">
+                {finder !== undefined && path !== null && (
+                  <MenuItem onClick={() => { void finder(path); setMenu(null); }} testId="artifact.finder">show in Finder</MenuItem>
+                )}
                 <MenuItem onClick={() => { void bise?.copy?.(url); setMenu(null); }} testId="artifact.copy">copy link</MenuItem>
+                <MenuItem onClick={() => { setMenu(null); put(project, a); }} testId="artifact.put">put it in a message</MenuItem>
               </Menu>
             )}
           </span>
@@ -86,6 +128,22 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
         ) : (
           <div className="art-empty">this kind opens in your browser: open in browser ↗</div>
         )}
+      </div>
+      {/* his words about it go to the agent that made it (the thread's composer, its own drafts) */}
+      <div className="art-open-composer" data-testid="artifact.composer">
+        <ThreadComposer
+          project={project}
+          agent={a.agent}
+          busy={busy}
+          to={`about “${a.title}” · to ${a.agent}`}
+          placeholder={`ask ${a.agent} about it, then ⏎`}
+          answer={null}
+          onStop={onStop}
+          quoting={false}
+          onReady={noop}
+          onSent={noop}
+          {...(about === undefined ? {} : { about })}
+        />
       </div>
     </section>
   );
