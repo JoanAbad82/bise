@@ -73,6 +73,8 @@ export function formatRoute(r: Route): string {
     case 'commit':
       return `commit/${r.project}/${r.sha}`;
     case 'artifacts':
+      // project '': every project's (the sidebar's '↗ artifacts', amb-kit)
+      if (r.project === '') return 'artifacts';
       return r.id === undefined ? `artifacts/${r.project}` : `artifacts/${r.project}/${r.id}`;
     case 'settings':
       return r.page === undefined ? 'settings' : `settings/${r.page}`;
@@ -114,6 +116,7 @@ export function parseRoute(path: string): Route {
     case 'commit':
       return a !== undefined && b !== undefined && SHA.test(b) ? { screen: 'commit', project: a, sha: b } : nf;
     case 'artifacts':
+      if (args.length === 0) return { screen: 'artifacts', project: '' };
       if (one !== undefined) return { screen: 'artifacts', project: one };
       return a !== undefined && b !== undefined ? { screen: 'artifacts', project: a, id: b } : nf;
     case 'settings':

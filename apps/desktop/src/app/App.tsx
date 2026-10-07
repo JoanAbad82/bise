@@ -37,6 +37,7 @@ import { emitAction, useMenuAction } from './menu';
 import { TerminalPanel } from '@/terminal/Terminal';
 import { isToggleKey, shellProject, shellTakes } from '@/terminal/model';
 import { panel } from '@/terminal/panel';
+import { ArtifactOpen, ArtifactsScreen } from '@/artifacts';
 import '@/ds/index.css';
 import './app.css';
 
@@ -216,6 +217,9 @@ function ScreenOf({ route }: { route: Route }) {
       return <Known project={route.project}>{() => <ReviewScreen project={route.project} agent="main" commit={route.sha} />}</Known>;
     case 'environments':
       return <Known project={route.project}>{() => <EnvironmentsScreen project={route.project} />}</Known>;
+    case 'artifacts':
+      // every project's (project ''), one project's, or one artifact open (amb-kit's src/artifacts)
+      return route.id === undefined ? <ArtifactsScreen project={route.project} /> : <ArtifactOpen project={route.project} id={route.id} />;
     case 'inbox':
       return <InboxScreen />;
     case 'settings':
