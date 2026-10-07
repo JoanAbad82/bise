@@ -121,7 +121,7 @@ export const Markdown = memo(function Markdown({
       return (
         <div className="th-code">
           <div className="th-code-head">
-            <span className="th-code-lang">{lang ?? ''}</span>
+            <span className="th-code-lang b-md-lang">{lang ?? ''}</span>
             <button
               type="button"
               className="th-code-copy"
@@ -150,7 +150,8 @@ export const Markdown = memo(function Markdown({
     },
   };
   return (
-    <div className="th-md">
+    // b-md: the ds's markdown colors, the TUI's (src/ds/css/md.css); th-md: the thread's layout
+    <div className="th-md b-md">
       <ReactMarkdown remarkPlugins={breaks ? withBreaks : plugins} components={components} skipHtml>
         {text}
       </ReactMarkdown>

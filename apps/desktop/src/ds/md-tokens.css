@@ -1,0 +1,52 @@
+/* src/ds · the markdown roles: an answer's markdown in the TUI's colors (ambient-lead m_11457, the
+   user's try round 2). The source is the terminal app: rust/tui/src/markdown.rs + codeblock.rs say
+   which role each element takes, rust/tui/src/theme.rs DARK / LIGHT give the values. The ds palette
+   (tokens.css, desktop-ds v5) already holds the TUI's text, dim, faint, rule, accent and ok, so the
+   roles read it; the code's syntax colors are the only new values (theme.rs syntax_*). check.mjs
+   mirrors theme.rs: a change there turns its law red. Owner: amb-kit. */
+:root, [data-theme="dark"] {
+  --p-syn-keyword: #d7a6f0; --p-syn-string: #b9d99a; --p-syn-comment: #99928a;
+  --p-syn-number: #f0b27a; --p-syn-call: #8fc4f0; --p-syn-type: #e8cf9a;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --p-syn-keyword: #8a3fb0; --p-syn-string: #44782a; --p-syn-comment: #726b60;
+  --p-syn-number: #9a4a0c; --p-syn-call: #1f63a8; --p-syn-type: #7a5c00;
+} }
+[data-theme="light"] {
+  --p-syn-keyword: #8a3fb0; --p-syn-string: #44782a; --p-syn-comment: #726b60;
+  --p-syn-number: #9a4a0c; --p-syn-call: #1f63a8; --p-syn-type: #7a5c00;
+}
+:root, [data-theme="light"], [data-theme="dark"] {
+  /* prose: the TUI's text */
+  --md-text: var(--p-text);
+  /* **bold**: accent and bold (dark: pale pink, light: raspberry) */
+  --md-strong: var(--p-accent);
+  /* *italic*: text, italic */
+  --md-em: var(--p-text);
+  /* `code`: ok and bold (green) */
+  --md-code: var(--p-ok);
+  /* # a heading: text, bold */
+  --md-heading: var(--p-text);
+  /* [a link](url): its words in text, underlined in accent; a shown url in dim */
+  --md-link: var(--p-text);
+  --md-link-line: var(--p-accent);
+  --md-link-url: var(--p-dim);
+  /* - a list: the dash in accent; 1. a list: the number in dim */
+  --md-bullet: var(--p-accent);
+  --md-number: var(--p-dim);
+  /* > a quote: its bar and its words in text */
+  --md-quote: var(--p-text);
+  --md-quote-bar: var(--p-text);
+  /* a table's rule under its header, a --- rule */
+  --md-rule: var(--p-rule);
+  /* a code block: its box in faint, its language in dim, its words in the syntax colors */
+  --md-code-box: var(--p-faint);
+  --md-code-label: var(--p-dim);
+  --md-syn-plain: var(--p-text);
+  --md-syn-keyword: var(--p-syn-keyword);
+  --md-syn-string: var(--p-syn-string);
+  --md-syn-comment: var(--p-syn-comment);
+  --md-syn-number: var(--p-syn-number);
+  --md-syn-call: var(--p-syn-call);
+  --md-syn-type: var(--p-syn-type);
+}

@@ -1,0 +1,21 @@
+/* src/ds · .b-md: an answer's markdown in the TUI's colors (rust/tui/src/markdown.rs), on the markdown
+   roles of md-tokens.css. Colors only, plus the weight or slant the TUI gives each element; the layout
+   (margins, sizes, the code block's head) is the thread's (amb-win, src/thread/thread.css).
+   Not by color alone (bar N2): bold is bold, code is mono, a link is underlined, a quote has its bar. */
+.b-md{color:var(--md-text)}
+.b-md strong,.b-md b{color:var(--md-strong);font-weight:700}
+.b-md em,.b-md i{color:var(--md-em);font-style:italic}
+.b-md :not(pre)>code{color:var(--md-code);font-weight:600}
+.b-md h1,.b-md h2,.b-md h3,.b-md h4,.b-md h5,.b-md h6{color:var(--md-heading);font-weight:700}
+.b-md a{color:var(--md-link);text-decoration:underline;text-decoration-color:var(--md-link-line);text-underline-offset:2px}
+.b-md a:hover{text-decoration-thickness:2px}
+.b-md .b-md-url{color:var(--md-link-url)}
+.b-md ul>li::marker{color:var(--md-bullet)}
+.b-md ol>li::marker{color:var(--md-number)}
+.b-md blockquote{color:var(--md-quote);border-left:2px solid var(--md-quote-bar)}
+.b-md hr{border:0;border-top:1px solid var(--md-rule)}
+.b-md th{color:var(--md-heading);font-weight:700}
+.b-md thead th{border-bottom:1px solid var(--md-rule)}
+.b-md pre{box-shadow:inset 0 0 0 1px var(--md-code-box)}
+.b-md pre code{color:var(--md-syn-plain);font-weight:400}
+.b-md .b-md-lang{color:var(--md-code-label)}

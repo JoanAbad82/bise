@@ -3,6 +3,9 @@
 // shot per section and theme). Sections are `data-testid="ds.gallery.<name>"`; `?only=a,b` keeps
 // those sections. Pure: no store, no core.
 import { type ReactNode } from "react";
+import { Markdown } from "@/thread/Markdown";
+// the thread's layout around the markdown (its code block's head, its pre), as the window draws it
+import "@/thread/thread.css";
 import {
   Answered, Art, Bar, Board, Button, Capsule, Card, Check, Chip, ComposerFrame, ComposerStill, Day, Diff, Dock, Dot, Empty, Err,
   Field, Fold, Group, Head, Help, Job, Kbd, Main, Marker, Menu, MenuItem, MenuSep, Msg, Onb, Opts, Pearl, Quote, Route, Row,
@@ -31,6 +34,62 @@ export const CONTRAST: Record<string, Record<string, ReactNode>> = {
   route: { wk: <Route state="wk" p1="main → index" pct={50} />, ok: <Route state="ok" p1="main → index" />, er: <Route state="er" p1="main → index" /> },
   diff: { plain: <Diff file="a.rs" lines={[{ old: 1, new: 1, text: "x" }]} />, add: <Diff file="a.rs" lines={[{ new: 1, sign: "+", text: "x" }]} />, rm: <Diff file="a.rs" lines={[{ old: 1, sign: "-", text: "x" }]} /> },
 };
+
+/** one answer with every markdown element the TUI colors */
+export const MD_SAMPLE = [
+  "## the pool, after the bench",
+  "",
+  "the **p95 went from 2.1 s to 0.9 s** with *eight* workers; the change is in `src/pool.rs`. details in [the run](https://bise.dev/r/42).",
+  "",
+  "- raised `POOL_SIZE` to 8",
+  "- kept the **timeout** at 30 s",
+  "",
+  "1. merge it",
+  "2. watch the dashboard",
+  "",
+  "> the bench ran on the warm cache only",
+  "",
+  "| step | p95 |",
+  "|---|---:|",
+  "| before | 2.1 s |",
+  "| after | 0.9 s |",
+  "",
+  "```rust",
+  "// the size the bench chose",
+  "pub fn size() -> usize { let n: usize = 8; n.max(\"1\".len()) }",
+  "```",
+].join("\n");
+
+/** the TUI's own drawing of MD_SAMPLE (rust/tui/src/markdown.rs md_lines, codeblock.rs, syntax.rs), its colors as roles */
+function TuiMd() {
+  const s = (role: string, extra: object = {}) => ({ color: `var(--md-${role})`, ...extra });
+  const B = { fontWeight: 700 }, I = { fontStyle: "italic" };
+  const code = (t: string) => <span style={s("code", B)}>{t}</span>;
+  const strong = (t: string) => <span style={s("strong", B)}>{t}</span>;
+  return (
+    <pre className="g-tui" data-testid="ds.md.tui">
+      <span style={s("heading", B)}>the pool, after the bench</span>{"\n\n"}
+      the {strong("p95 went from 2.1 s to 0.9 s")} with <span style={s("em", I)}>eight</span> workers; the change is in {code("src/pool.rs")}. details in{" "}
+      <span style={{ ...s("link"), textDecoration: "underline", textDecorationColor: "var(--md-link-line)" }}>the run</span>
+      <span style={s("link-url")}> (https://bise.dev/r/42)</span>.{"\n\n"}
+      <span style={s("bullet")}>{"  - "}</span>raised {code("POOL_SIZE")} to 8{"\n"}
+      <span style={s("bullet")}>{"  - "}</span>kept the {strong("timeout")} at 30 s{"\n\n"}
+      <span style={s("number")}>{"  1. "}</span>merge it{"\n"}
+      <span style={s("number")}>{"  2. "}</span>watch the dashboard{"\n\n"}
+      <span style={s("quote-bar")}>{"  | "}</span><span style={s("quote")}>the bench ran on the warm cache only</span>{"\n\n"}
+      <span style={s("heading", B)}>step    p95</span>{"\n"}
+      <span style={s("rule")}>──────  ─────</span>{"\n"}
+      {"before  2.1 s\nafter   0.9 s\n\n"}
+      <span style={s("code-box")}>╭─</span><span style={s("code-label")}> rust </span><span style={s("code-box")}>{"─".repeat(52)}╮</span>{"\n"}
+      <span style={s("code-box")}>│ </span><span style={s("syn-comment", I)}>// the size the bench chose</span>{"\n"}
+      <span style={s("code-box")}>│ </span><span style={s("syn-keyword", B)}>pub fn</span> <span style={s("syn-call")}>size</span>
+      <span style={{ color: "var(--c-text-2)" }}>() -&gt; </span><span style={s("syn-type")}>usize</span> {"{ "}
+      <span style={s("syn-keyword", B)}>let</span> n: <span style={s("syn-type")}>usize</span> = <span style={s("syn-number")}>8</span>; n.<span style={s("syn-call")}>max</span>(
+      <span style={s("syn-string")}>"1"</span>.<span style={s("syn-call")}>len</span>()) {"}"}{"\n"}
+      <span style={s("code-box")}>╰{"─".repeat(59)}╯</span>
+    </pre>
+  );
+}
 
 /** the sections, in the reference's order; each draws in one theme */
 export const SECTIONS: Record<string, () => ReactNode> = {
@@ -258,6 +317,14 @@ export const SECTIONS: Record<string, () => ReactNode> = {
       ))}
     </div>
   ),
+  // an answer in the TUI's markdown colors (ambient-lead m_11457): the thread's real renderer on the
+  // left, the TUI's markdown.rs rules drawn as the terminal draws them on the right
+  markdown: () => (
+    <div className="g-md">
+      <div className="b-text"><Markdown text={MD_SAMPLE} /></div>
+      <TuiMd />
+    </div>
+  ),
   window: () => (
     <Win
       side={<Side foot="+ add a project"><Row kind="me" name="bise" sub="every project" /><SectionHead>projects</SectionHead><Row kind="pj" name="telemetry" dot="nd" end="2" needs on /></Side>}
@@ -267,7 +334,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
   ),
 };
 
-export const WIDE = new Set(["thread", "composer", "dock", "board", "sideview", "settings", "onboarding", "window", "head", "rows"]);
+export const WIDE = new Set(["markdown", "thread", "composer", "dock", "board", "sideview", "settings", "onboarding", "window", "head", "rows"]);
 
 /** the gallery: each section, dark | light */
 export function Gallery({ only }: { only?: readonly string[] }) {

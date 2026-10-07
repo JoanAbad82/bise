@@ -3,6 +3,7 @@
    dark by default, light with the system or <html data-theme="light">. Components read only roles
    (--c-*, --t-*, --s-*, --r-*, --e-*, --d-*, --ease-*), never the palette (--p-*). */
 @import "./tokens.css";
+@import "./md-tokens.css";
 @import "./css/base.css";
 @import "./css/prim.css";
 @import "./css/window.css";
@@ -17,5 +18,6 @@
 @import "./css/cards.css";
 @import "./css/settings.css";
 @import "./css/onboarding.css";
+@import "./css/md.css";
 @import "./css/motion.css";
 @import "./css/live.css";

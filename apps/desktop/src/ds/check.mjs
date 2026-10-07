@@ -27,11 +27,56 @@ law("css/ holds every rule of the reference's ds.css, unchanged", () => {
   for (const l of rules) assert.ok(all.includes(l), `missing from css/: ${l.slice(0, 90)}`);
 });
 
-law("index.css imports tokens.css first, then every file of css/, live.css last", () => {
+law("index.css imports tokens.css first, md-tokens.css next, then every file of css/, live.css last", () => {
   const imports = [...read(join(here, "index.css")).matchAll(/@import "\.\/([\w/.-]+)";/g)].map((m) => m[1]);
   assert.equal(imports[0], "tokens.css");
+  assert.equal(imports[1], "md-tokens.css");
   assert.equal(imports[imports.length - 1], "css/live.css");
-  assert.deepEqual([...imports.slice(1)].sort(), Object.keys(css).map((f) => "css/" + f).sort());
+  assert.deepEqual([...imports.slice(2)].sort(), Object.keys(css).map((f) => "css/" + f).sort());
+});
+
+// The markdown roles mirror the TUI (ambient-lead m_11457): each role and the theme.rs palette field it
+// must equal, in dark and in light (rust/tui/src/markdown.rs, codeblock.rs, syntax.rs pick the fields).
+export const MD_ROLES = {
+  "--md-text": "text", "--md-strong": "accent", "--md-em": "text", "--md-code": "ok", "--md-heading": "text",
+  "--md-link": "text", "--md-link-line": "accent", "--md-link-url": "dim", "--md-bullet": "accent", "--md-number": "dim",
+  "--md-quote": "text", "--md-quote-bar": "text", "--md-rule": "rule", "--md-code-box": "faint", "--md-code-label": "dim",
+  "--md-syn-plain": "text", "--md-syn-keyword": "syntax_keyword", "--md-syn-string": "syntax_string", "--md-syn-comment": "syntax_comment",
+  "--md-syn-number": "syntax_number", "--md-syn-call": "syntax_call", "--md-syn-type": "syntax_type",
+};
+
+/** A theme.rs palette (`pub(crate) const DARK: Palette = Palette { … };`) as {field: "#rrggbb"}. */
+function tuiPalette(rs, name) {
+  const at = rs.indexOf(`const ${name}: Palette = Palette {`);
+  assert.ok(at >= 0, `theme.rs has no ${name} palette`);
+  const body = rs.slice(at, rs.indexOf("};", at));
+  return Object.fromEntries([...body.matchAll(/^\s*(\w+):\s*rgb\(0x([0-9a-fA-F]{6})\)/gm)].map((m) => [m[1], "#" + m[2].toLowerCase()]));
+}
+
+/** The custom properties of the first block whose selector starts with `sel`, in a css text. */
+function block(s, sel) {
+  const at = s.indexOf(sel);
+  assert.ok(at >= 0, `no block ${sel}`);
+  const body = s.slice(s.indexOf("{", at) + 1, s.indexOf("}", at));
+  return Object.fromEntries([...body.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+}
+
+law("the markdown roles are the TUI's palette, dark and light (rust/tui/src/theme.rs)", () => {
+  const rs = read(join(here, "..", "..", "..", "..", "rust", "tui", "src", "theme.rs"));
+  const tokens = noComments(read(join(here, "tokens.css")));
+  const md = noComments(read(join(here, "md-tokens.css")));
+  const roles = block(md, ':root, [data-theme="light"], [data-theme="dark"]');
+  assert.deepEqual(Object.keys(roles).sort(), Object.keys(MD_ROLES).sort(), "md-tokens.css's roles are not MD_ROLES");
+  for (const [mode, tuiName, sel, synSel] of [["dark", "DARK", ":root, [data-theme=\"dark\"]", ":root, [data-theme=\"dark\"]"], ["light", "LIGHT", "[data-theme=\"light\"] {", "[data-theme=\"light\"] {"]]) {
+    const tui = tuiPalette(rs, tuiName);
+    const pal = { ...block(tokens, sel), ...block(md, synSel) };
+    for (const [role, field] of Object.entries(MD_ROLES)) {
+      const v = /^var\((--p-[\w-]+)\)$/.exec(roles[role] ?? "");
+      assert.ok(v, `${role} does not read a palette entry: ${roles[role]}`);
+      const got = (pal[v[1]] ?? "").toLowerCase();
+      assert.equal(got, tui[field], `${mode}: ${role} is ${got} (${v[1]}), the TUI's ${field} is ${tui[field]}`);
+    }
+  }
 });
 
 law("components read roles only: no palette (--p-*) and no raw color in css/", () => {

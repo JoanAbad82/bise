@@ -17,3 +17,5 @@ html,body{margin:0;background:#777}
 .g-main{display:flex;flex-direction:column;gap:12px;background:var(--c-surface);border-radius:var(--r-3)}
 /* stills for the visual check: no motion, no blinking caret */
 .g-still *,.g-still *::before,.g-still *::after{animation:none !important;transition:none !important}
+.g-md{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.g-tui{margin:0;padding:12px;border-radius:8px;background:var(--c-solid);color:var(--md-text);font:var(--t-12) var(--font-mono);white-space:pre-wrap;overflow:hidden}

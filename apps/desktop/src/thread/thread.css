@@ -46,10 +46,8 @@
   padding-left: 1.4em;
 }
 
+/* the markdown's colors are the ds's (src/ds/css/md.css, the TUI's): only layout here */
 .th-md a {
-  color: var(--c-acc, inherit);
-  text-decoration: underline;
-  text-underline-offset: 2px;
   cursor: pointer;
 }
 
@@ -115,8 +113,6 @@
 
 .th-md blockquote {
   padding-left: 10px;
-  border-left: 2px solid var(--c-line, rgba(127, 127, 127, 0.3));
-  color: var(--c-text-2);
 }
 
 .th-img {

@@ -5,16 +5,20 @@
 import { memo } from 'react';
 import { Highlight, Prism, type PrismTheme } from 'prism-react-renderer';
 
-const THEME: PrismTheme = {
-  plain: { color: 'var(--c-text)', backgroundColor: 'transparent' },
+// The TUI's syntax.rs style(): its token kinds on the ds's markdown roles (src/ds/md-tokens.css,
+// theme.rs syntax_*): keywords bold, comments italic, punctuation dim (amb-kit, lead m_11457).
+export const THEME: PrismTheme = {
+  plain: { color: 'var(--md-syn-plain)', backgroundColor: 'transparent' },
   styles: [
-    { types: ['comment', 'prolog', 'doctype', 'cdata'], style: { color: 'var(--c-text-2)', fontStyle: 'italic' } },
-    { types: ['keyword', 'builtin', 'important', 'atrule'], style: { color: 'var(--c-accent)' } },
-    { types: ['string', 'char', 'attr-value', 'regex', 'inserted'], style: { color: 'var(--c-ok)' } },
-    { types: ['number', 'boolean', 'constant', 'symbol'], style: { color: 'var(--c-accent)', opacity: 0.85 } },
-    { types: ['function', 'class-name', 'tag', 'selector'], style: { fontWeight: '600' } },
+    { types: ['comment', 'prolog', 'doctype', 'cdata'], style: { color: 'var(--md-syn-comment)', fontStyle: 'italic' } },
+    { types: ['keyword', 'builtin', 'important', 'atrule'], style: { color: 'var(--md-syn-keyword)', fontWeight: '700' } },
+    { types: ['string', 'char', 'attr-value', 'regex', 'url'], style: { color: 'var(--md-syn-string)' } },
+    { types: ['number', 'boolean', 'constant', 'symbol'], style: { color: 'var(--md-syn-number)' } },
+    { types: ['function', 'function-variable', 'method'], style: { color: 'var(--md-syn-call)' } },
+    { types: ['class-name', 'tag', 'selector', 'namespace', 'type'], style: { color: 'var(--md-syn-type)' } },
     { types: ['punctuation', 'operator'], style: { color: 'var(--c-text-2)' } },
-    { types: ['deleted'], style: { textDecorationLine: 'line-through' } },
+    { types: ['inserted'], style: { color: 'var(--c-ok)' } },
+    { types: ['deleted'], style: { color: 'var(--c-err)', textDecorationLine: 'line-through' } },
   ],
 };
 
