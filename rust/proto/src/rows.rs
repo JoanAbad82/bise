@@ -625,6 +625,34 @@ pub struct Artifact {
     pub new: bool,
 }
 
+/// A live scheduled task of a project (`sb every`), the `scheduled`
+/// event's row (⌘K's source, the scheduled screen): data, the window
+/// formats the times; `every` the task's how-often words (`every 2m`,
+/// `every day 07:30`, `once`: bise_proto::thread::scheduled::every_words,
+/// the TUI's), `done` its runs so far.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ScheduledTask {
+    pub id: u64,
+    /// the agent it wakes
+    pub agent: String,
+    /// who set it
+    pub by: String,
+    /// its words, what the agent reads at each run
+    pub words: String,
+    pub every: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub times: Option<u64>,
+    pub done: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub until_ms: Option<u64>,
+    /// the page it keeps fresh (`--page`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

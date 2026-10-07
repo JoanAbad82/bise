@@ -68,11 +68,7 @@ impl Task {
 
     /// How often, in a line: `every 2m`, `every day 07:30`, `once`.
     pub fn when(&self) -> String {
-        if self.times == Some(1) {
-            "once".into()
-        } else {
-            self.label.clone()
-        }
+        every_words(&self.label, self.times)
     }
 
     /// How often, short (the 80-column list): `2m`, `daily 07:30`, `once`.
@@ -112,6 +108,17 @@ impl Task {
                 by => format!("stopped by {by}"),
             },
         }
+    }
+}
+
+/// How often a task runs, in words, from its fields (the hub's typed rows
+/// and the TUI's lines say it with this one fn): `every 2m`, `every day
+/// 07:30` (its schedule's label), `once` (one run).
+pub fn every_words(label: &str, times: Option<u64>) -> String {
+    if times == Some(1) {
+        "once".into()
+    } else {
+        label.to_string()
     }
 }
 

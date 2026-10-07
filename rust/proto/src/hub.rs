@@ -6,7 +6,7 @@
 
 use crate::context::FnContext;
 use crate::diff::{DiffFile, DiffResult};
-use crate::rows::{Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, Merged, Model, Pr, Worktree};
+use crate::rows::{Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, Merged, Model, Pr, ScheduledTask, Worktree};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
@@ -70,6 +70,9 @@ pub enum HubEv {
     /// every artifact of the project, at hello and on change; `new`: made
     /// or changed since he last looked (`artifacts_seen` clears it)
     Artifacts { project: Project, items: Vec<Artifact> },
+    /// the live scheduled tasks (`sb every`) of the project, at hello, on
+    /// `scheduled` and whenever one is set, runs, stops or ends
+    Scheduled { project: Project, items: Vec<ScheduledTask> },
     /// the repo's worktrees (the agents' and his others), at hello, when
     /// the agents change (a turn ends, one comes or goes) and on
     /// `worktrees`
@@ -233,7 +236,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -386,6 +389,12 @@ pub enum HubCmd {
     Features { project: Project },
     /// the PR list opened: `prs` comes again
     Prs { project: Project },
+    /// the scheduled tasks asked for: `scheduled` comes again
+    Scheduled { project: Project },
+    /// stop scheduled task `id` (his, like the TUI's /scheduled stop: its
+    /// agent hears it, its line says `stopped by you`); an unknown or
+    /// ended id is an `error`
+    ScheduledStop { project: Project, id: u64 },
     /// the model picker opened: `models` comes again (after a login made
     /// elsewhere, the keys are read again)
     Models { project: Project },
@@ -451,7 +460,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "scheduled", "scheduled_stop", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)

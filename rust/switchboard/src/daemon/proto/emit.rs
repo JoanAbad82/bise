@@ -85,6 +85,12 @@ impl Shell {
 
     /// The typed `prs` (bar A.7): the open PRs of this hub's places, the
     /// rows the TUI's `/prs` draws (forge::news::pr_rows).
+    /// ⌘K and the scheduled screen: the live timers as rows, built from
+    /// the hub's typed timer state (proto_view::scheduled, the one builder).
+    pub(super) fn scheduled_ev(&self) -> HubEv {
+        HubEv::Scheduled { project: self.project(), items: proto_view::scheduled(self.hub.timers()) }
+    }
+
     pub(super) fn prs_ev(&self) -> HubEv {
         let places = crate::place::places(&self.hub.st, &self.hub.prs);
         crate::forge::news::prs_ev(self.project(), &places)
@@ -188,6 +194,16 @@ impl Shell {
                     self.proto.prs = p;
                     for id in &ids {
                         self.proto_send(*id, &prs);
+                    }
+                }
+                // ⌘K: a timer set, run, stopped or ended (each comes back
+                // as a state change)
+                let sched = self.scheduled_ev();
+                let s = sched.encode();
+                if s != self.proto.scheduled {
+                    self.proto.scheduled = s;
+                    for id in &ids {
+                        self.proto_send(*id, &sched);
                     }
                 }
                 // bar A.5: config.toml or auth.json moved (a stat): the

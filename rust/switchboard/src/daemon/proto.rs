@@ -43,6 +43,8 @@ pub(super) struct Proto {
     features: String,
     /// the last `prs` sent (bar A.7: sent again only when changed)
     prs: String,
+    /// the last `scheduled` sent (⌘K: sent again only when changed)
+    scheduled: String,
     /// bar A.5: config.toml's and auth.json's mtimes at the last `models`
     /// (a stat on each state broadcast, never a read), and its JSON
     models_at: Option<(Option<std::time::SystemTime>, Option<std::time::SystemTime>)>,
@@ -269,6 +271,8 @@ impl Shell {
             self.proto_send(id, &feats);
             let prs = self.prs_ev();
             self.proto_send(id, &prs);
+            let sched = self.scheduled_ev();
+            self.proto_send(id, &sched);
             let models = self.models_ev();
             self.proto_send(id, &models);
             let appr = self.approvals_ev(false);
@@ -298,6 +302,8 @@ impl Shell {
             | HubCmd::Merged { project }
             | HubCmd::Features { project }
             | HubCmd::Prs { project }
+            | HubCmd::Scheduled { project }
+            | HubCmd::ScheduledStop { project, .. }
             | HubCmd::Models { project }
             | HubCmd::New { project, .. }
             | HubCmd::Rename { project, .. }

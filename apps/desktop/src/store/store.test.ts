@@ -54,6 +54,17 @@ describe('store', () => {
     expect(store.approvals('other')).toBeNull();
   });
 
+  it('keeps the live scheduled tasks per project, whole each time', () => {
+    const { store } = fake();
+    expect(store.scheduled(P)).toEqual([]);
+    const task = { id: 3, agent: 'main', by: 'main', words: 'every 10m', every: '10m', done: 0, next_ms: 1791100600000 };
+    store.apply({ ev: 'scheduled', project: P, items: [task] });
+    expect(store.scheduled(P).map((t) => t.id)).toEqual([3]);
+    store.apply({ ev: 'scheduled', project: P, items: [] });
+    expect(store.scheduled(P)).toEqual([]);
+    expect(store.scheduled('other')).toEqual([]);
+  });
+
   it('takes every fixture event and skips unknown tags', () => {
     const { store } = fake();
     const events = allFixtureEvents();

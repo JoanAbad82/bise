@@ -389,6 +389,31 @@ export type Artifact = { id: string, kind: string, title: string, agent: string,
 new: boolean, };
 
 /**
+ * A live scheduled task of a project (`sb every`), the `scheduled`
+ * event's row (⌘K's source, the scheduled screen): data, the window
+ * formats the times; `every` the task's how-often words (`every 2m`,
+ * `every day 07:30`, `once`: bise_proto::thread::scheduled::every_words,
+ * the TUI's), `done` its runs so far.
+ */
+export type ScheduledTask = { id: number, 
+/**
+ * the agent it wakes
+ */
+agent: string, 
+/**
+ * who set it
+ */
+by: string, 
+/**
+ * its words, what the agent reads at each run
+ */
+words: string, every: string, times?: number | null, done: number, next_ms?: number | null, until_ms?: number | null, 
+/**
+ * the page it keeps fresh (`--page`)
+ */
+page?: string | null, };
+
+/**
  * An agent's context after its last model call (bar S13, the divider's
  * gauge): the tokens the model saw plus its reply.
  */

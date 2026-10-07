@@ -196,6 +196,19 @@ impl Shell {
                 let prs = self.prs_ev();
                 self.proto_send(id, &prs);
             }
+            // the live timers, from the hub's state (no line read)
+            HubCmd::Scheduled { .. } => {
+                let sched = self.scheduled_ev();
+                self.proto_send(id, &sched);
+            }
+            // his stop, the TUI's /scheduled stop (its `every_stop` op):
+            // the agent hears it, its line says `stopped by you`
+            HubCmd::ScheduledStop { id: timer, .. } => {
+                if !self.hub.timers().map.contains_key(&timer) {
+                    return self.proto_error(id, &tag, &format!("no scheduled task #{timer}"));
+                }
+                self.step_typed(id, &tag, Input::EveryStop { id: timer, why: String::new() });
+            }
             // the keys and config read again (a login made elsewhere)
             HubCmd::Models { .. } => {
                 let models = self.models_ev();

@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "jobs", "job_end", "error", "notice", "approvals")
+TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "jobs", "job_end", "error", "notice", "approvals")
 FIXTURES = os.path.join(e2e.ROOT, "rust", "proto", "fixtures", "hub_ev.jsonl")
 
 
@@ -284,9 +284,25 @@ def main():
         s = entries("scheduled")[0]
         check(s["scheduled"]["head"].startswith("main scheduled #") and " · every 10m · 2 times · next " in s["scheduled"]["head"]
               and s["scheduled"]["words"] == "poll the build" and s["text"] == s["scheduled"]["head"] and s["scheduled"]["id"] > 0, "scheduled: %r" % s)
+        # ⌘K (architect m_11874): the live task in the scheduled event,
+        # built from the hub's timers; his stop through scheduled_stop
+        sid = s["scheduled"]["id"]
+        c.wait(lambda: any(i["id"] == sid for i in (typed(c, "scheduled") or [{"items": []}])[-1]["items"]), 30, "the task in the scheduled event")
+        row = [i for i in typed(c, "scheduled")[-1]["items"] if i["id"] == sid][0]
+        check(row["agent"] == "main" and row["by"] == "main" and row["words"] == "poll the build" and row["every"] == "every 10m"
+              and row["times"] == 2 and row["done"] == 0 and row["next_ms"] > 0, "scheduled row: %r" % row)
+        n = len(typed(c, "scheduled"))
+        c.send({"cmd": "scheduled", "project": project})
+        c.wait(lambda: len(typed(c, "scheduled")) > n, 20, "scheduled again on its command")
         c.wait_idle("main", timeout=90)
-        c.say('[[bash: sb every --stop %d]]' % s["scheduled"]["id"])
+        n_err = len(typed(c, "error"))
+        c.send({"cmd": "scheduled_stop", "project": project, "id": 999999})
+        c.wait(lambda: len(typed(c, "error")) > n_err, 20, "an unknown task's stop refused")
+        check(typed(c, "error")[-1]["cmd"] == "scheduled_stop", "its error: %r" % typed(c, "error")[-1])
+        c.send({"cmd": "scheduled_stop", "project": project, "id": sid})
+        c.wait(lambda: all(i["id"] != sid for i in typed(c, "scheduled")[-1]["items"]), 30, "the stopped task leaves the scheduled event")
         c.wait(lambda: any("ended" in x["scheduled"]["head"] for x in entries("scheduled")), 60, "its end as a typed entry")
+        check(any(x["scheduled"]["head"].endswith("stopped by you") for x in entries("scheduled")), "his stop says so: %r" % entries("scheduled")[-1])
         c.wait_idle("main", timeout=90)
         c.send({"cmd": "unsubscribe", "project": project, "agent": "main"})
 

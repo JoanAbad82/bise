@@ -113,6 +113,29 @@ pub fn agents(
     out
 }
 
+/// ⌘K and the scheduled screen (architect m_11874): the live timers as
+/// rows, from the hub's typed timer state (never its lines); the
+/// how-often words are bise-proto's, the TUI's (`every_words`). The one
+/// builder: the `scheduled` event and view.json's index both call it.
+pub fn scheduled(timers: &crate::every::Timers) -> Vec<bise_proto::rows::ScheduledTask> {
+    timers
+        .map
+        .values()
+        .map(|t| bise_proto::rows::ScheduledTask {
+            id: t.id,
+            agent: t.agent.clone(),
+            by: t.by.clone(),
+            words: t.text.clone(),
+            every: bise_proto::thread::scheduled::every_words(&t.sched.label(), t.times),
+            times: t.times,
+            done: t.fired,
+            next_ms: Some(t.next_ms).filter(|ms| *ms > 0),
+            until_ms: t.until_ms,
+            page: t.page.clone().filter(|p| !p.is_empty()),
+        })
+        .collect()
+}
+
 /// S10: the followed agents of a hub snapshot, each a running job: its
 /// last progress (else its objective), `--step n/m`, since its last
 /// report (else its creation). A follow ends with its job (job_end), so
@@ -365,6 +388,49 @@ mod tests {
 
     fn uk(k: &str) -> bool {
         matches!(k, "question" | "drop" | "confirm")
+    }
+
+    /// Law (architect m_11874): the `scheduled` row the hub builds from a
+    /// timer and the TUI's Task::of on the line the hub writes for it say
+    /// the same id, agent, words, how often, times and runs so far.
+    #[test]
+    fn the_scheduled_rows_and_the_tuis_lines_agree() {
+        use crate::every::{Sched, Timer, Timers};
+        use bise_proto::thread::scheduled::Task;
+        let t = |id: u64, sched: Sched, times: Option<u64>, until_ms: Option<u64>, fired: u64| Timer {
+            id,
+            agent: "perf".into(),
+            by: "main".into(),
+            text: format!("check #{id}"),
+            sched,
+            next_ms: 1_790_000_120_000,
+            until_ms,
+            times,
+            fired,
+            page: None,
+            last_ms: 0,
+            runs: vec![],
+        };
+        let mut timers = Timers::default();
+        for x in [
+            t(1, Sched::Every(120_000), None, None, 0),
+            t(2, Sched::Daily(450), None, None, 3),
+            t(3, Sched::Every(600_000), Some(1), None, 0),
+            t(4, Sched::Every(60_000), Some(6), None, 2),
+            t(5, Sched::Every(300_000), None, Some(1_790_100_000_000), 1),
+        ] {
+            timers.map.insert(x.id, x);
+        }
+        let rows = scheduled(&timers);
+        assert_eq!(rows.len(), 5);
+        for r in &rows {
+            let mut line = timers.map[&r.id].json();
+            line["ev"] = json!("set");
+            let task = Task::of(&line).unwrap();
+            assert_eq!((r.id, &r.agent, &r.words, &r.every, r.times, r.done), (task.id, &task.agent, &task.text, &task.when(), task.times, task.fired), "#{}", r.id);
+        }
+        let every: Vec<&str> = rows.iter().map(|r| r.every.as_str()).collect();
+        assert_eq!(every, ["every 2m", "every day 07:30", "once", "every 1m", "every 5m"]);
     }
 
     fn snap() -> Value {

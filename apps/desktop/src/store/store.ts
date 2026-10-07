@@ -43,6 +43,7 @@ import type {
   PickSkill,
   Plugin,
   ProjectRow,
+  ScheduledTask,
   Worktree,
 } from '@/proto';
 import type { CoreCmd, CorePort, CoreState } from '@/shared/api';
@@ -59,6 +60,7 @@ export const TAGS = {
   entry: true,
   typing: true,
   artifacts: true,
+  scheduled: true,
   worktrees: true,
   dev_servers: true,
   merged: true,
@@ -320,6 +322,10 @@ export class Store {
   worktrees(project: string): readonly Worktree[] {
     return this.slice(`worktrees:${project}`, EMPTY);
   }
+  /** the project's live scheduled tasks (sb every), whole each time; none until the hub said */
+  scheduled(project: string): readonly ScheduledTask[] {
+    return this.slice(`scheduled:${project}`, EMPTY);
+  }
   devServers(project: string): readonly DevServer[] {
     return this.slice(`dev_servers:${project}`, EMPTY);
   }
@@ -407,6 +413,7 @@ export class Store {
         return;
       }
       case 'artifacts':
+      case 'scheduled':
       case 'worktrees':
       case 'dev_servers':
       case 'merged':
