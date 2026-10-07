@@ -90,6 +90,12 @@ describe('keys', () => {
     expect(words.act).toEqual({ t: 'answer', project: 'acme', card: 2, reply: 'cold, then warm' });
   });
 
+  it('ctrl+n / ctrl+p walk the items with words in the field too (bar I3, the TUI card view)', () => {
+    expect(run([{ k: 'next' }], 'a draft').s.cur).toBe('acme-2');
+    expect(run([{ k: 'next' }, { k: 'next' }, { k: 'prev' }], 'a draft').s.cur).toBe('acme-2');
+    expect(run([{ k: 'down' }], 'a draft').s.cur).toBeNull();
+  });
+
   it('↑↓ move between items and stop at the ends; done takes ⏎ with no words', () => {
     const { s, acts } = run([{ k: 'down' }, { k: 'down' }, { k: 'down' }, { k: 'enter' }]);
     expect(acts).toEqual([{ t: 'answer', project: 'acme', card: 3, reply: '' }]);

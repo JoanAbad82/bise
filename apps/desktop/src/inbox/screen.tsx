@@ -3,12 +3,14 @@
 // (a held hub's own cards, else its view.json's), so one list holds what
 // waits on him everywhere; an answer is the hub's one /answer path
 // (store.answer), a close the hub's one close path (store.close, the
-// typed HubCmd close). Owner: amb-home.
+// typed HubCmd close). ThreadInbox: the thread's inbox strip (Strip.tsx)
+// fed the same way, for one project. Owner: amb-home.
 import { useCallback, useMemo } from 'react';
 import type { ProjectRow } from '@/proto';
 import { useProjects, useStore, useVoiceAnswer } from '@/store';
 import { useRouter } from '@/app/router';
 import { Inbox } from './Inbox';
+import { InboxStrip } from './Strip';
 
 /** Every project's cards, and each project's name, from the projects rows. */
 export function inboxOf(rows: readonly ProjectRow[]) {
@@ -49,6 +51,41 @@ export function InboxScreen() {
         openPage: (url) => {
           void window.bise.openExternal(url);
         },
+      }}
+    />
+  );
+}
+
+/** The strip as the thread mounts it: the project's open items from the store. */
+export function ThreadInbox({ project }: { project: string }) {
+  const rows = useProjects();
+  const store = useStore();
+  const router = useRouter();
+  const cards = useMemo(() => rows.find((r) => r.project === project)?.cards ?? [], [rows, project]);
+  const inView = useCallback(
+    (c: { project: string; card: number } | null) => {
+      store.cardInView(c?.project ?? null, c?.card ?? null);
+    },
+    [store],
+  );
+  return (
+    <InboxStrip
+      project={project}
+      cards={cards}
+      ports={{
+        answer: (p, card, reply) => {
+          store.answer(p, card, reply);
+        },
+        close: (p, card) => {
+          store.close(p, card);
+        },
+        openInbox: () => {
+          router.go({ screen: 'inbox' });
+        },
+        openPage: (url) => {
+          void window.bise.openExternal(url);
+        },
+        inView,
       }}
     />
   );

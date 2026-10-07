@@ -3,10 +3,12 @@
 // InboxCard.tsx is one item as a card (the capsule's bottom cards mount it
 // alone, amb-web); model.ts is its state and keys, order.ts its order (the
 // hub's rank). The screen the shell mounts (reading src/store) comes with
-// the store.
+// the store. Strip.tsx is the thread's inbox strip (stripRows.ts its rules),
+// ThreadInbox (screen.tsx) the one line the thread mounts.
 export { Inbox, type InboxPorts, type InboxProps } from './Inbox';
 export { InboxCard, kindTitle, takesWords, type InboxCardActs, type InboxCardProps } from './InboxCard';
 export { sortCards, cardKey } from './order';
 export { inboxDrafts, makeDrafts, type Drafts } from './drafts';
-export { InboxScreen, inboxOf } from './screen';
+export { InboxScreen, ThreadInbox, inboxOf } from './screen';
 export { ConfirmBar } from './confirm';
+export { InboxStrip, type InboxStripProps, type StripPorts } from './Strip';

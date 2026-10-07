@@ -240,6 +240,9 @@ export function keyOf(e: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'al
   if (e.key === 'Escape') return { k: 'esc' };
   if (e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'x') return { k: 'close' };
   if (e.metaKey && e.key === 'Backspace' && empty) return { k: 'close' };
+  // ctrl+n / ctrl+p walk the items as the TUI's card view (bar I3), words or not
+  if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'n') return { k: 'next' };
+  if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'p') return { k: 'prev' };
   if (e.metaKey || e.ctrlKey || e.altKey) return null;
   if (e.key === 'Enter' && !e.shiftKey) return { k: 'enter' };
   if (!empty) return null;

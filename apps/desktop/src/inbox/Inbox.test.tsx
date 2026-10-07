@@ -183,6 +183,9 @@ describe('Inbox', () => {
     expect(keyOf(k('Backspace', { metaKey: true }), '')).toEqual({ k: 'close' });
     expect(keyOf(k('Backspace', { metaKey: true }), 'x')).toBeNull();
     expect(keyOf(k('x', { ctrlKey: true }), 'x')).toEqual({ k: 'close' });
+    expect(keyOf(k('n', { ctrlKey: true }), 'x')).toEqual({ k: 'next' });
+    expect(keyOf(k('p', { ctrlKey: true }), '')).toEqual({ k: 'prev' });
+    expect(keyOf(k('n', { ctrlKey: true, shiftKey: true }), '')).toBeNull();
   });
 
   it('InboxCard alone: a card with its options and the acts it is given, no list', () => {

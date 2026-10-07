@@ -3,7 +3,8 @@
 // screen (Inbox.tsx) draws it and runs the acts. Owner: amb-home.
 //
 // The keys are the TUI's card view (rust/tui/src/sb/cards.rs, its key
-// handler): ↑↓ the previous / next item, ←→ walk the current item's
+// handler): ↑↓ the previous / next item on an empty field, ctrl+p / ctrl+n
+// with words in it too (its step(app, ±1, true)), ←→ walk the current item's
 // options (none on open: a reflex ⏎ never answers), ⏎ picks the one the
 // keyboard is on, or sends his typed words (a question only: an approval
 // is answered by one of its options, never words), 1-9 pick at once on an
@@ -28,7 +29,7 @@ export interface InboxState {
 export const START: InboxState = { cur: null, hl: null, gone: new Set() };
 
 export type Key =
-  | { k: 'up' | 'down' | 'left' | 'right' | 'enter' | 'close' | 'esc' }
+  | { k: 'up' | 'down' | 'prev' | 'next' | 'left' | 'right' | 'enter' | 'close' | 'esc' }
   | { k: 'digit'; n: number }
   | { k: 'pick'; n: number }
   | { k: 'select'; key: string };
@@ -79,9 +80,12 @@ export function step(s: InboxState, list: readonly Card[], key: Key, text: strin
     case 'select':
       return { s: { ...s, cur: key.key, hl: null } };
     case 'up':
-    case 'down': {
-      if (!c || !empty) return { s };
-      const i = list.indexOf(c) + (key.k === 'down' ? 1 : -1);
+    case 'down':
+    case 'prev':
+    case 'next': {
+      // ↑↓ belong to his words when there are some; ctrl+p/n never do
+      if (!c || (!empty && (key.k === 'up' || key.k === 'down'))) return { s };
+      const i = list.indexOf(c) + (key.k === 'down' || key.k === 'next' ? 1 : -1);
       const to = list[Math.max(0, Math.min(list.length - 1, i))];
       return { s: { ...s, cur: to ? cardKey(to) : s.cur, hl: to === c ? s.hl : null } };
     }
