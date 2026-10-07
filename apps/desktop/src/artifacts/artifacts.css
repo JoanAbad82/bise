@@ -20,9 +20,10 @@
   .art-filters { gap: 4px; }
   .art-filters .b-btn.ghost { padding: 0 8px; }
   .art-kind { padding: 0 8px; }
-  .art-search { flex-basis: 160px; min-width: 96px; }
+  .art-search { flex-basis: 160px; min-width: 120px; }
 }
-.art-search .b-field { width: 100%; }
+/* border-box: the field's 10 px sides stay inside its slot (content-box ran 20 px past the edge) */
+.art-search .b-field { width: 100%; box-sizing: border-box; }
 
 .art-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; outline: none; }
 .art-day-h { padding: 14px 8px 4px; font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }

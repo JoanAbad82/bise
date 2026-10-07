@@ -11,6 +11,14 @@ const SHOP = 'shop-1a2b3c4d';
 const ACME = 'acme-5e6f7a8b';
 const M = 60_000;
 
+/** A daily 07:30 task's next run: today's 07:30 if still ahead, else tomorrow's (designer m_12105). */
+function next0730(now: number): number {
+  const d = new Date(now);
+  d.setHours(7, 30, 0, 0);
+  if (d.getTime() <= now) d.setDate(d.getDate() + 1);
+  return d.getTime();
+}
+
 function world(now: number, theme: 'light' | 'dark') {
   return [
     { ev: 'prefs', prefs: { onboarded: true, theme } },
@@ -30,7 +38,7 @@ function world(now: number, theme: 'light' | 'dark') {
     },
     {
       ev: 'scheduled', project: ACME, items: [
-        { id: 2, agent: 'main', by: 'you', words: 'the morning page: what changed overnight and what waits on me', every: 'day 07:30', done: 12, next_ms: now + 16 * 60 * M },
+        { id: 2, agent: 'main', by: 'you', words: 'the morning page: what changed overnight and what waits on me', every: 'day 07:30', done: 12, next_ms: next0730(now) },
         { id: 9, agent: 'api', by: 'main', words: 'watch the checkout PR until its checks are green', every: '10m', times: 6, done: 2, next_ms: now + 8 * M, until_ms: now + 2 * 60 * M },
       ],
     },
@@ -73,6 +81,11 @@ test('scheduled/screens: the list and one task, light and dark, 1400 and 800', a
       for (const w of [1400, 800]) {
         await size(w);
         expect.soft(await inside(), `list ${t} ${String(w)}: nothing leaves the window`).toEqual([]);
+        // the next-run column has room for 'tomorrow 07:30', and 'how often' is the rhythm alone
+        // ('wakes' may end in '…' at 800, as signed; 'how often' and 'next run' never)
+        const cut = await page.locator('.sch-row:not(.sch-cols) > :nth-child(3), .sch-row:not(.sch-cols) > .sch-next').evaluateAll((els) =>
+          els.filter((e) => e.getClientRects().length > 0 && e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent));
+        expect.soft(cut, `list ${t} ${String(w)}: no cut words in the columns`).toEqual([]);
         await page.screenshot({ path: test.info().outputPath(`list-${t}-${String(w)}.png`) });
       }
     }

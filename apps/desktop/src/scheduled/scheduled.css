@@ -35,7 +35,7 @@
   .sch-screen.has-pane .sch-main { display: none; }
   .sch-screen.has-pane .sch-pane { flex: 1 1 auto; width: auto; border-left: 0; }
   .sch-pane > .b-btn:first-child { display: inline-flex; }
-  .sch-row { grid-template-columns: minmax(0, 1fr) 140px 90px; }
+  .sch-row { grid-template-columns: minmax(0, 1fr) 140px 120px; }
   .sch-row > :nth-child(3) { display: none; }
   .sch-main { padding: 16px 16px 0; }
 }

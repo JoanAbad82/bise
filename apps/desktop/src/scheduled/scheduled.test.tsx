@@ -42,7 +42,9 @@ describe('the scheduled screen', () => {
     const rows = screen.getByTestId('scheduled.list').querySelectorAll('[role=option]');
     expect([...rows].map((r) => r.getAttribute('data-testid'))).toEqual(['scheduled.row.4', 'scheduled.row.9']);
     expect(rows[0]?.textContent).toContain('deploy-watch · storefront');
-    expect(rows[0]?.textContent).toContain('every 5m · 6 of 24');
+    // 'how often' holds only the rhythm; the count is the pane's 'its runs' (designer m_12105)
+    expect(rows[0]?.textContent).toContain('every 5m');
+    expect(rows[0]?.textContent).not.toContain('6 of 24');
     expect(screen.getByTestId('scheduled.count').textContent).toBe('active · 2');
     const root = screen.getByTestId('scheduled.screen');
     fireEvent.keyDown(root, { key: 'Enter' });

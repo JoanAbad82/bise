@@ -101,7 +101,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
                 onClick={() => { setSel(keyOf(x)); setOpen(keyOf(x)); setAsking(false); }}>
                 <span className="sch-asks">{asks(x.t)}</span>
                 <span className="sch-dim">{wakes(x)}</span>
-                <span className="sch-dim">{`${howOften(x.t)} · ${runsWords(x.t)}`}</span>
+                <span className="sch-dim">{howOften(x.t)}</span>
                 <span className="sch-next">{nextWords(x.t, now)}</span>
               </div>
             ))}
@@ -116,8 +116,8 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
       {cur && (
         <aside className="sch-pane" data-testid="scheduled.pane">
           <Button kind="ghost" onClick={() => { setOpen(null); setAsking(false); }} testId="scheduled.back">‹ scheduled</Button>
-          <div className="sch-k3">{`scheduled task #${String(cur.t.id)} · ${cur.t.agent}`}</div>
-          <div className="sch-title" data-testid="scheduled.pane.title">{asks(cur.t)}</div>
+          {/* the head, then its words once (designer m_12105: no title repeating the quote) */}
+          <div className="sch-k3" data-testid="scheduled.pane.title">{`scheduled task #${String(cur.t.id)} · ${cur.t.agent}`}</div>
           <div className="sch-label">the words it sends</div>
           <blockquote className="sch-quote" data-testid="scheduled.pane.words">{cur.t.words}</blockquote>
           <dl className="sch-kv">

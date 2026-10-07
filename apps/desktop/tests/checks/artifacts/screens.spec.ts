@@ -103,6 +103,12 @@ test('artifacts/screens: the list and one artifact open, light and dark, 1400 an
         await size(w);
         await page.getByTestId('artifacts.list').focus();
         expect.soft(await inside(), `${t} ${String(w)}: nothing leaves the window`).toEqual([]);
+        // the search ends inside the list's right edge (designer m_12105: it ran past it at 800)
+        const edge = await page.evaluate(() => {
+          const r = (id: string) => document.querySelector(`[data-testid="${id}"]`)?.closest('.art-search, .art-list')?.getBoundingClientRect();
+          return { search: r('artifacts.search')?.right ?? 0, list: r('artifacts.list')?.right ?? 0, field: document.querySelector('.art-search .b-field')?.getBoundingClientRect().right ?? 0 };
+        });
+        expect.soft(Math.max(edge.search, edge.field) <= edge.list + 1, `${t} ${String(w)}: the search inside the row ${JSON.stringify(edge)}`).toBe(true);
         const by = await page.getByTestId('artifacts.list.row.product-page').locator('.art-by').isVisible();
         expect.soft(by, `${t} ${String(w)}: 'made by' ${w >= 1000 ? 'shows' : 'drops'}`).toBe(w >= 1000);
         await page.screenshot({ path: test.info().outputPath(`list-${t}-${String(w)}.png`) });
