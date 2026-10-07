@@ -12,6 +12,8 @@
 {"cmd":"answer","project":"acme-1a2b3c4d","card":9,"reply":"1"}
 {"cmd":"answer","project":"acme-1a2b3c4d","card":10,"reply":"yes"}
 {"cmd":"close","project":"acme-1a2b3c4d","card":9}
+{"cmd":"confirm","project":"acme-1a2b3c4d","id":3,"yes":true}
+{"cmd":"confirm","project":"acme-1a2b3c4d","id":4,"yes":false}
 {"cmd":"stop","project":"acme-1a2b3c4d","agent":"perf"}
 {"cmd":"archive","project":"acme-1a2b3c4d","agent":"perf","force":true}
 {"cmd":"archive","project":"acme-1a2b3c4d","agent":"old-fix","force":false}

@@ -65,6 +65,9 @@ struct Stepping {
     cid: Option<u64>,
     notices: Vec<String>,
     undelivered: bool,
+    /// its notices are plain lines (`notice`), not failures: a confirm's
+    /// no ("drop of @x cancelled", bar I9)
+    as_notice: bool,
 }
 
 #[derive(Default)]
@@ -178,6 +181,13 @@ impl Shell {
         self.proto.stepping = Some(Stepping { id, cmd: cmd.to_string(), cid, ..Default::default() });
         f(self);
         let Some(s) = self.proto.stepping.take() else { return };
+        if s.as_notice {
+            let project = self.project();
+            for text in s.notices {
+                self.proto_send(id, &HubEv::Notice { project: project.clone(), cmd: Some(s.cmd.clone()), text });
+            }
+            return;
+        }
         let (cid, reason) = (s.cid, s.cid.map(|_| if s.undelivered { "undelivered" } else { "refused" }));
         for text in s.notices {
             self.proto_error_cid(id, &s.cmd, &text, cid, reason);
@@ -194,6 +204,22 @@ impl Shell {
         }
         s.notices.push(body.get("text").and_then(Value::as_str).unwrap_or("").to_string());
         true
+    }
+
+    /// `Effect::ToClient`'s body for `client` when it is sb-core's yes/no
+    /// question (`confirm`, bar I9) and `client` is a typed connection:
+    /// sent as the typed `confirm`, to that connection only. True: a
+    /// typed-only connection is done with it (another one also gets the
+    /// older line).
+    pub(super) fn typed_confirm(&mut self, client: ClientId, body: &Value) -> bool {
+        if body.get("ev").and_then(Value::as_str) != Some("confirm") || !self.proto.conns.contains_key(&client) {
+            return false;
+        }
+        let id = body.get("id").and_then(Value::as_u64).unwrap_or(0);
+        let text = body.get("text").and_then(Value::as_str).unwrap_or("").to_string();
+        let project = self.project();
+        self.proto_send(client, &HubEv::Confirm { project, id, text });
+        self.proto.typed_only(client)
     }
 
     /// A handler's typed result for `client` when it is the typed
@@ -306,6 +332,7 @@ impl Shell {
             | HubCmd::Send { project, .. }
             | HubCmd::Answer { project, .. }
             | HubCmd::Close { project, .. }
+            | HubCmd::Confirm { project, .. }
             | HubCmd::Stop { project, .. }
             | HubCmd::Archive { project, .. }
             | HubCmd::Unarchive { project, .. }
@@ -402,6 +429,17 @@ impl Shell {
                     return self.proto_error(id, &tag, &format!("card {card} isn't open"));
                 }
                 self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd: UserCmd::Close { card } });
+            }
+            // his answer to the hub's yes/no question: sb-core's own
+            // confirm path; a no's line comes back as a notice, not an
+            // error (an unknown or answered id: sb-core says nothing)
+            HubCmd::Confirm { id: cid, yes, .. } => {
+                self.stepping(id, &tag, None, |sh| {
+                    if let Some(s) = sh.proto.stepping.as_mut() {
+                        s.as_notice = true;
+                    }
+                    sh.step(Input::ClientConfirm { client: id, id: cid, yes });
+                });
             }
             HubCmd::Stop { agent, .. } => {
                 if !known(self, &agent) {

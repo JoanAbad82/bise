@@ -14,6 +14,8 @@
 {"ev":"entry","project":"acme-1a2b3c4d","agent":"main","entry":{"pos":26,"at_ms":1791100026000,"kind":"not_delivered","text":"then the warm run","not_delivered":{"to":"perf","text":"then the warm run"}}}
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":"running the tests"}
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":""}
+{"ev":"confirm","project":"acme-1a2b3c4d","id":3,"text":"@perf is working: archive it anyway? (y/n)"}
+{"ev":"notice","project":"acme-1a2b3c4d","cmd":"confirm","text":"drop of @perf cancelled"}
 {"ev":"error","project":"acme-1a2b3c4d","cmd":"send","text":"send: context isn't supported yet"}
 {"ev":"error","project":"acme-1a2b3c4d","cmd":"send","text":"no agent perf","cid":12,"reason":"refused"}
 {"ev":"error","project":"acme-1a2b3c4d","cmd":"send","text":"@perf is archived: not delivered","cid":13,"reason":"undelivered"}

@@ -18,6 +18,24 @@ function fake(): { sent: CoreCmd[]; store: Store } {
 const entry = (pos: number, text: string, kind: Entry['kind'] = 'agent'): Entry => ({ pos, at_ms: pos, kind, text });
 
 describe('store', () => {
+  it("keeps the hub's yes/no questions; an answer or esc drops one; a new welcome drops them all (I9)", () => {
+    const { sent, store } = fake();
+    store.apply({ ev: 'confirm', project: P, id: 3, text: '@perf is working: archive it anyway? (y/n)' });
+    store.apply({ ev: 'confirm', project: P, id: 4, text: '@ux is working: archive it anyway? (y/n)' });
+    expect(store.confirms(P).map((c) => c.id)).toEqual([3, 4]);
+    store.confirm(P, 3, false);
+    expect(sent.at(-1)).toEqual({ cmd: 'confirm', project: P, id: 3, yes: false });
+    store.apply({ ev: 'notice', project: P, cmd: 'confirm', text: 'drop of @perf cancelled' });
+    expect(store.notice(P)).toBe('drop of @perf cancelled');
+    const n = sent.length;
+    store.putOff(P, 4);
+    expect(sent.length).toBe(n);
+    expect(store.confirms(P)).toEqual([]);
+    store.apply({ ev: 'confirm', project: P, id: 5, text: 'archive it anyway? (y/n)' });
+    store.apply({ ev: 'welcome', project: P, proto: 1, workspace: '/w', name: 'acme' });
+    expect(store.confirms(P)).toEqual([]);
+  });
+
   it('takes every fixture event and skips unknown tags', () => {
     const { store } = fake();
     const events = allFixtureEvents();

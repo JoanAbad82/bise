@@ -1162,7 +1162,7 @@ impl Shell {
             }
             Effect::Land { token, job } => self.land(token, *job),
             Effect::ToClient { client, body } => {
-                if self.typed_notice(client, &body) {
+                if self.typed_notice(client, &body) || self.typed_confirm(client, &body) {
                     return;
                 }
                 if let Some(s) = self.clients.get_mut(&client) {

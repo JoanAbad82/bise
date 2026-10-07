@@ -290,6 +290,29 @@ def main():
         check(all(e.get("ev") in TYPED and "project" in e for e in after),
               "only typed events after typed_only: %r" % sorted({e.get("ev") for e in after}))
 
+        # bar I9: the hub's yes/no question goes to the window that asked
+        # only, typed; no comes back as a notice (never an error), yes does it
+        c.say("/new tq: wait for my next message")
+        c.wait(lambda: c.agent("tq") is not None, 60, "tq")
+        c.wait_idle("tq", timeout=120)
+        # mid-turn: the hub asks before archiving it
+        c.say("[[slow: 60]] long turn", focus="tq")
+        c.wait_status("tq", "working", 30)
+        asked = lambda: [e for e in w.events if e.get("ev") == "confirm"]
+        w.send({"cmd": "archive", "project": project, "agent": "tq", "force": False})
+        w.wait(lambda: asked(), 20, "the typed confirm in the asking window")
+        q = asked()[-1]
+        check(q["project"] == project and "archive @tq" in q["text"], "the question: %r" % q)
+        check(not any(e.get("ev") == "confirm" for e in c.events), "the other window got no confirm")
+        w.send({"cmd": "confirm", "project": project, "id": q["id"], "yes": False})
+        w.wait(lambda: any(e.get("ev") == "notice" and e.get("cmd") == "confirm" for e in w.events), 20, "no's line as a notice")
+        check(not any(e.get("ev") == "error" and e.get("cmd") == "confirm" for e in w.events), "a no is not an error")
+        check(c.agent("tq")["status"] != "archived", "no kept tq: %r" % c.agent("tq"))
+        w.send({"cmd": "archive", "project": project, "agent": "tq", "force": False})
+        w.wait(lambda: len(asked()) >= 2, 20, "asked again")
+        w.send({"cmd": "confirm", "project": project, "id": asked()[-1]["id"], "yes": True})
+        c.wait(lambda: c.agent("tq")["status"] == "archived", 60, "yes archived tq")
+
         # diff: a worktree agent's commit, typed, line by line
         c.say('/new -w t5: {{bash: seq 1 2 > f5.txt && git add f5.txt && git commit -qm f5 && echo done}}')
         c.wait(lambda: c.agent("t5") is not None, 60, "t5")

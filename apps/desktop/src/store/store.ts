@@ -9,6 +9,11 @@
 // order (positions), its entries by position (a `thread` page merges, an
 // `entry` replaces only that entry), typing, and his pending sends.
 //
+// The hub's yes/no questions (`confirm`, bar I9) belong to the connection
+// that asked: a new `welcome` for that project (the core reconnected, so the
+// hub sees a new connection) drops them, so he never answers an id the hub
+// tied to a gone connection.
+//
 // Unknown tags (a newer core, the capsule's older events) are ignored at
 // runtime: only the tags of TAGS are applied, and TAGS is checked complete
 // against the generated unions at compile time.
@@ -65,6 +70,8 @@ export const TAGS = {
   jobs: true,
   job_end: true,
   followed_end: true,
+  confirm: true,
+  notice: true,
   error: true,
   projects: true,
   open: true,
@@ -99,6 +106,13 @@ export function typed(raw: unknown): Ev | null {
 }
 
 export const threadKey = (project: string, agent: string): string => `${project}/${agent}`;
+
+/** The hub's yes/no question to this window (bar I9: archive a working agent...). */
+export interface Confirm {
+  readonly project: string;
+  readonly id: number;
+  readonly text: string;
+}
 
 /** His send, shown at once, until its 'you' entry lands (FIFO by text) or it fails. */
 export interface Pending {
@@ -240,6 +254,14 @@ export class Store {
   /** The hub's cards when it sent them, else the projects row's. */
   cards(project: string): readonly Card[] {
     return this.slice(`cards:${project}`, EMPTY);
+  }
+  /** the hub's open yes/no questions to this window, oldest first */
+  confirms(project: string): readonly Confirm[] {
+    return this.slice(`confirms:${project}`, EMPTY);
+  }
+  /** the hub's last plain line to this window (a no's 'drop of @x cancelled') */
+  notice(project: string): string | null {
+    return this.slice<string | null>(`notice:${project}`, null);
   }
   prefs(): JsonValue | null {
     return this.slice<JsonValue | null>('prefs', null);
@@ -413,7 +435,18 @@ export class Store {
         if (ev.cid !== undefined && ev.cid !== null) this.failCid(ev.cid, ev.reason ?? 'refused', ev.text);
         else this.failOldest(ev.project ?? null, ev.text);
         return;
+      case 'confirm':
+        // a question belongs to the connection that asked: only this window gets it
+        this.put(`confirms:${ev.project}`, [...this.confirms(ev.project).filter((c) => c.id !== ev.id), { project: ev.project, id: ev.id, text: ev.text }]);
+        return;
+      case 'notice':
+        this.put(`notice:${ev.project}`, ev.text);
+        return;
       case 'welcome':
+        // a new hello: the hub tied the open questions to a connection
+        // that is gone (the core reconnected), so none can be answered
+        if (this.confirms(ev.project).length > 0) this.put(`confirms:${ev.project}`, EMPTY);
+        return;
       case 'route':
       case 'route_done':
       case 'job_end':
@@ -715,6 +748,19 @@ export class Store {
   }
   answer(project: string, card: number, reply: string): void {
     this.command({ cmd: 'answer', project, card, reply });
+  }
+  /** His answer to the hub's yes/no question (a no's line comes back as a notice). */
+  confirm(project: string, id: number, yes: boolean): void {
+    this.dropConfirm(project, id);
+    this.command({ cmd: 'confirm', project, id, yes });
+  }
+  /** Put off (esc): the question leaves the window; the hub holds nothing for it, a later command asks again. */
+  putOff(project: string, id: number): void {
+    this.dropConfirm(project, id);
+  }
+  private dropConfirm(project: string, id: number): void {
+    const now = this.confirms(project);
+    if (now.some((c) => c.id === id)) this.put(`confirms:${project}`, now.filter((c) => c.id !== id));
   }
   /** Close a card without answering it (the TUI's /close N). */
   close(project: string, card: number): void {

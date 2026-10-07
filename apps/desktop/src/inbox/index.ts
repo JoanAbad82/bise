@@ -9,3 +9,4 @@ export { InboxCard, kindTitle, takesWords, type InboxCardActs, type InboxCardPro
 export { sortCards, cardKey } from './order';
 export { inboxDrafts, makeDrafts, type Drafts } from './drafts';
 export { InboxScreen, inboxOf } from './screen';
+export { ConfirmBar } from './confirm';

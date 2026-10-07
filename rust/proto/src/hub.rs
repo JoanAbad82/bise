@@ -151,6 +151,19 @@ pub enum HubEv {
     /// (project, agent, key), whichever of this and that project's own
     /// job_end comes first
     FollowedEnd { project: Project, agent: String, key: u64, state: JobState, label: String, summary: String },
+    /// a yes/no question from the hub to the window that asked (bar
+    /// I9: archive a working agent...), answered by `confirm` with its
+    /// `id`; only that connection gets it. Left unanswered it holds
+    /// nothing in the hub: a later command just asks again
+    Confirm { project: Project, id: u64, text: String },
+    /// a plain line from the hub to the window that sent `cmd` (a
+    /// confirm answered no: "drop of @x cancelled"), not a failure
+    Notice {
+        project: Project,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cmd: Option<String>,
+        text: String,
+    },
     /// an unknown or refused command, never silence
     Error {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -175,7 +188,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "route", "route_done", "jobs", "job_end", "followed_end", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "notice", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -284,6 +297,9 @@ pub enum HubCmd {
     /// close a card without answering it (the TUI's `/close N`): the
     /// hub's one close path (sb-core's `close`), a refusal as `error`
     Close { project: Project, card: u64 },
+    /// his answer to the hub's `confirm` `id`: yes or no (a no comes
+    /// back as `notice`, never as `error`)
+    Confirm { project: Project, id: u64, yes: bool },
     /// stop its turn
     Stop { project: Project, agent: String },
     /// out of his list (`force`: a working one is stopped first)
@@ -360,7 +376,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)
