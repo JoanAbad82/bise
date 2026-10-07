@@ -56,7 +56,7 @@ done
 for s in ${mine[@]+"${mine[@]}"}; do
   case "${fresh[0]}" in "$s"/*) later+=("${fresh[0]}") ;; esac
 done
-grep='real core|thread/|inbox/cmd-i|agents/|review/'
+grep='real core|thread/|inbox/cmd-i|agents/|review/|pages/|settings/|app/'
 rc=0
 # the list on stdout, and every annotation (the checks' measured times) in a JSON beside it
 # (given to Playwright alone, never exported: world up refuses any env value that reaches
