@@ -163,16 +163,22 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     if (busy) stop();
   });
 
+  /**
+   * The thread's esc, once no list or popup took it (R18, the TUI's order): while bise holds his
+   * words, keep them with bise (route_cancel); while the agent works, stop the turn. The composer
+   * calls it itself (ProseMirror preventDefaults every Escape); an esc from elsewhere bubbles here.
+   */
+  // memo'd: the composer is (a new entry never re-renders it)
+  const escape = useCallback((): boolean => {
+    if (findOpen) return false;
+    if (held !== undefined) store.command({ cmd: 'route_cancel', project: held.home, rid: held.rid });
+    else if (busy) stop();
+    else return false;
+    return true;
+  }, [findOpen, held, busy, store, stop]);
   const onKeyDown = (e: KeyboardEvent) => {
-    // esc while bise holds his words: keep them with bise (route_cancel)
-    if (e.key === 'Escape' && !e.defaultPrevented && held !== undefined && !findOpen) {
-      e.preventDefault();
-      store.command({ cmd: 'route_cancel', project: held.home, rid: held.rid });
-    }
-    // the composer leaves a plain esc unhandled while busy (amb-web m_9540)
-    else if (e.key === 'Escape' && !e.defaultPrevented && busy && !findOpen) {
-      e.preventDefault();
-      stop();
+    if (e.key === 'Escape' && !e.defaultPrevented) {
+      if (escape()) e.preventDefault();
     } else if (e.key === 'f' && e.metaKey && !e.shiftKey && !e.altKey && !e.ctrlKey) {
       e.preventDefault();
       setFindOpen(true);
@@ -366,6 +372,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
             placeholder={answering === null ? composerWords(title).placeholder : 'your answer, then ⏎'}
             answer={answering === null ? null : answering.id}
             onStop={stop}
+            onEscape={escape}
             quoting={quoting}
             onReady={onComposer}
             onSent={onSent}
@@ -650,6 +657,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   placeholder,
   answer,
   onStop,
+  onEscape,
   quoting,
   onReady,
   onSent,
@@ -666,6 +674,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   /** the docked card his words answer (item 7), else none */
   answer: number | null;
   onStop: () => void;
+  /** an esc the composer's lists didn't take (R18): the screen's (route_cancel, stop) */
+  onEscape?: () => void;
   quoting: boolean;
   onReady: (a: ComposerActions) => void;
   /** his send went (the demo tour's step) */
@@ -746,7 +756,7 @@ export const ThreadComposer = memo(function ThreadComposer({
     const act = emptyEnter(cards, agent);
     if (act !== null) store.command(act);
   }, [cards, agent, store]);
-  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} {...(toEnd === undefined ? {} : { toEnd })} placeholder={placeholder} onEmptyEnter={onEmptyEnter} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
+  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} {...(toEnd === undefined ? {} : { toEnd })} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
 });
 
 /** A message about an artifact: `about [its title](its url): his words` (the chip's own link form). Pure. */

@@ -91,6 +91,35 @@ describe('the composer', () => {
     expect(getByTestId('composer.field')).toBe(field);
   });
 
+  it("R18: esc no list took goes to the screen while busy or on a blank field (ProseMirror swallows esc's default); else his words go to history", async () => {
+    const onEscape = vi.fn();
+    const esc = (el: Element) => {
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, bubbles: true, cancelable: true }));
+    };
+    const busy = await mount({ busy: true, onEscape });
+    const field = busy.getByTestId('composer.field');
+    await act(async () => {
+      busy.act.insertText('hello');
+      await Promise.resolve();
+    });
+    esc(field);
+    expect(onEscape, 'busy: the screen stops the turn').toHaveBeenCalledTimes(1);
+    expect(field.textContent, 'his draft stays').toBe('hello');
+    busy.unmount();
+
+    const idle = await mount({ onEscape, target: 'p/other' });
+    const f2 = idle.getByTestId('composer.field');
+    esc(f2);
+    expect(onEscape, 'blank: the screen (keep with bise, ...)').toHaveBeenCalledTimes(2);
+    await act(async () => {
+      idle.act.insertText('later');
+      await Promise.resolve();
+    });
+    esc(f2);
+    expect(onEscape, 'idle with words: put away, not the screen').toHaveBeenCalledTimes(2);
+    expect(f2.textContent).toBe('');
+  });
+
   it('runs a typed command line instead of sending it', async () => {
     const onCommand = vi.fn();
     const sources = { ...NO_SOURCES, commands: [{ name: '/model', desc: 'set the model', args: true, ready: true }] };

@@ -64,6 +64,12 @@ export interface PmFieldProps {
   readonly onActions: (a: ComposerActions) => void;
   /** K2: ⏎ on an empty field (never an empty send): the screen's act, if any (sign in again, ...) */
   readonly onEmptyEnter?: (() => void) | undefined;
+  /**
+   * R18: an esc no list took, while busy or on a blank field: the screen's act (stop the turn,
+   * keep his words with bise). Called here because ProseMirror preventDefaults every Escape
+   * (captureKeyDown), so a screen's bubbling handler never sees it as free.
+   */
+  readonly onEscape?: (() => void) | undefined;
 }
 
 /** The draft is written this long after the last change (never on each key of a burst). */
@@ -767,13 +773,12 @@ export function PmField(p: PmFieldProps): JSX.Element {
           setDismissed(`${l.trigger.kind}:${l.trigger.start}`);
           return true;
         }
-        if (props.current.busy) return false;
-        if (!blankNow()) {
-          e.preventDefault();
-          putAway();
-          return true;
-        }
-        return false;
+        // no list open: the screen's esc (stop the turn) while busy or on a blank field; else his
+        // words go to history (↑ brings them back)
+        e.preventDefault();
+        if (props.current.busy || blankNow()) props.current.onEscape?.();
+        else putAway();
+        return true;
       }
       case 'ArrowUp': {
         if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false;
