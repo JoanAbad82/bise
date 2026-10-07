@@ -124,6 +124,8 @@ export const core_ev: readonly CoreEv[] = [
   {"ev":"plugins","items":[],"project":"acme-1a2b3c4d"},
   {"ev":"computer_use","flash":"opened · path copied","on":true,"ready":false,"rows":[{"detail":"Chrome 131","id":"browser","label":"Chrome","state":"done"},{"action":"open chrome://extensions","detail":"add bise to Chrome","fix":"add_extension","help":["1  ⏎ opens chrome://extensions · turn on Developer mode, top right","2  Load unpacked, then pick bise's extension folder","3  i'll see it here, no key needed"],"id":"extension","label":"Chrome extension","state":"waits"},{"detail":"last","id":"live_test","label":"live test","state":"not_yet"},{"action":"open System Settings","apps":true,"detail":"bise can click and type in apps","fix":"request_accessibility","help":["turn on bise Computer Use in the list. i'll see it"],"id":"accessibility","label":"accessibility","state":"waits"}]},
   {"ev":"computer_use","on":false,"ready":false,"rows":[]},
+  {"ev":"heard","final":false,"text":"why is the cold"},
+  {"ev":"heard","final":true,"text":"why is the cold bench slow"},
   {"ev":"dictation","final":false,"id":"d1","text":"fix the"},
   {"card":9,"ev":"voice_answer","line":"heard \"the first one\" → 1 cold","ms":1500,"n":1,"project":"acme-1a2b3c4d"},
   {"ev":"dictation","final":true,"id":"d1","text":"fix the login test"},

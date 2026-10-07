@@ -86,6 +86,7 @@ export const TAGS = {
   voice_mode: true,
   voice_answer: true,
   level: true,
+  heard: true,
   commands: true,
   skills: true,
   files: true,
@@ -451,6 +452,10 @@ export class Store {
       case 'files':
         this.filesAnswer(ev);
         return;
+      case 'heard':
+        // fn's talk: the whole text so far, then all of it (final); the capsule's talk view draws it
+        this.put('heard', { text: ev.text, final: ev.final });
+        return;
       case 'level':
         // a meter's input (~30 Hz): only who reads that voice re-renders
         if (this.slices.get(`level:${ev.who}`) !== ev.v) this.put(`level:${ev.who}`, ev.v);
@@ -636,6 +641,8 @@ export class Store {
   // ---- actions (typed commands to the core)
 
   command(cmd: CoreCmd): void {
+    // a new talk starts with nothing heard
+    if (cmd.cmd === 'talk_start' && this.slices.get('heard') != null) this.put('heard', null);
     this.port?.send(cmd);
   }
 
@@ -742,6 +749,10 @@ export class Store {
   }
   dictateCancel(id: string): void {
     if (this.dictating.has(id)) this.command({ cmd: 'dictate_cancel', id });
+  }
+  /** fn's talk: what bise heard so far (the whole text; final once the talk ended), null before a talk. */
+  heard(): { readonly text: string; readonly final: boolean } | null {
+    return this.slice<{ readonly text: string; readonly final: boolean } | null>('heard', null);
   }
   /** A voice's loudness now, 0..1: 'you' (the mic), 'main' (its spoken answer). */
   level(who: string): number {

@@ -357,6 +357,15 @@ pub enum CoreEv {
     /// (the mic: his talk or a dictation, for a meter) or `main` (main's
     /// spoken answer). No words, to every window
     Level { who: String, v: f64 },
+    /// fn's talk (`talk_start`): what bise has heard so far, the WHOLE
+    /// text each time (`final` false, ~as the words come), then all of it
+    /// once (`final` true) when the talk ends; to every window (the
+    /// capsule's talk view draws it). Never journaled, never in a log
+    Heard {
+        text: String,
+        #[serde(rename = "final")]
+        is_final: bool,
+    },
     /// a dictation's words (bar I, `dictate_start {id}`), only to the
     /// window that started it (the app's main routes it by `id`), never
     /// to main, never journaled, never in a log. `text` is the WHOLE text
@@ -439,7 +448,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })

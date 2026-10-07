@@ -307,6 +307,18 @@ describe('store', () => {
     expect(store.signing()).toBeNull();
   });
 
+  it("heard: fn's talk words so far, then final; a new talk starts empty (the capsule's talk view)", () => {
+    const { sent, store } = fake();
+    expect(store.heard()).toBeNull();
+    store.apply({ ev: 'heard', text: 'why is the cold', final: false });
+    expect(store.heard()).toEqual({ text: 'why is the cold', final: false });
+    store.apply({ ev: 'heard', text: 'why is the cold bench slow', final: true });
+    expect(store.heard()).toEqual({ text: 'why is the cold bench slow', final: true });
+    store.command({ cmd: 'talk_start' });
+    expect(sent.at(-1)).toEqual({ cmd: 'talk_start' });
+    expect(store.heard()).toBeNull();
+  });
+
   it("level: each voice's loudness, the last value, a repeat changes nothing", () => {
     const { store } = fake();
     expect(store.level('you')).toBe(0);

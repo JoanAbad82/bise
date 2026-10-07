@@ -115,6 +115,9 @@ cid?: number | null, } | { "cmd": "answer", project: string, card: number, reply
 /**
  * draft: the kind of an [`HubEv::Error`], one enum for every typed
  * failure the window draws by kind (architect m_11379): a kind this
- * version doesn't know reads as Unknown.
+ * version doesn't know reads as Unknown. Only the desktop core sets
+ * these, about a hub (a hub never says it is older or refused: its own
+ * errors carry none); the window draws by kind, and falls back to the
+ * text for Unknown or none, never matching the text.
  */
 export type ErrorKind = "hub_older" | "hub_refused" | "unknown";

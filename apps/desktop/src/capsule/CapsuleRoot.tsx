@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type JSX
 import { newAgent } from '@/agents/actions';
 import { InboxCard } from '@/inbox';
 import type { Card, HelperEv } from '@/proto';
-import { threadKey, useProjects, useStore } from '@/store';
+import { threadKey, useHeard, useLevel, useProjects, useStore } from '@/store';
 import type { SpotFront, SpotItem, SpotRoute } from '@/spotlight';
 import { useTheme } from '@/theme';
 import '@/ds/index.css';
@@ -241,13 +241,18 @@ export function CapsuleRoot(): JSX.Element {
     [store, bise],
   );
 
+  // fn's talk: the words the core heard so far and the mic's level (the talk view grows with them,
+  // up to its 320 px cap, then scrolls; amb-mac's place.ts pin keeps the top-left)
+  const heard = useHeard();
+  const level = useLevel('you');
+
   return (
     <Capsule
       view={view}
       spot={spot}
       answer={last}
-      heard=""
-      level={0}
+      heard={heard?.text ?? ''}
+      level={level}
       still={still}
       card={cardOf}
       route={route}
