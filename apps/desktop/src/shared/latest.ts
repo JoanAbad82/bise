@@ -20,6 +20,8 @@ export const STATE_TAGS: ReadonlySet<string> = new Set([
   'merged',
   'jobs',
   'plugins',
+  // the sidebar's '◷ scheduled n' and each agent's next wake (desktop-screens v6)
+  'scheduled',
   // a project's hub refused this core: kept until its hub welcomes it again
   'hub_refused',
 ]);

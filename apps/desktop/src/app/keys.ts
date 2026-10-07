@@ -20,7 +20,15 @@ export const HELP_EVENT = 'bise:help';
 /** What a screen does for a key (the thread listens with useAppAction). */
 export type ScreenAction = 'fold-all' | 'stop' | 'to-end' | 'copy-code';
 
-export type KeyAct = { readonly go: Route } | { readonly palette: true } | { readonly help: true } | { readonly screen: ScreenAction };
+/** What the window's frame does: show or hide the sidebar (⌘\), the right panel (⌥⌘0). */
+export type FrameAction = 'sidebar' | 'panel';
+
+export type KeyAct =
+  | { readonly go: Route }
+  | { readonly palette: true }
+  | { readonly help: true }
+  | { readonly screen: ScreenAction }
+  | { readonly frame: FrameAction };
 
 export interface KeyLike {
   readonly key: string;
@@ -72,6 +80,11 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
     return name !== undefined ? { go: { screen: 'thread', project: p, agent: name } } : undefined;
   }
   if (only('meta') && e.code === 'KeyK') return { palette: true };
+  // designer's desktop-screens v6: ⌘\ the sidebar, ⌥⌘0 the right panel, ⌘N add a project, ⌘, settings
+  if (only('meta') && e.code === 'Backslash') return { frame: 'sidebar' };
+  if (e.metaKey && e.altKey && !e.ctrlKey && !e.shiftKey && e.code === 'Digit0') return { frame: 'panel' };
+  if (only('meta') && e.code === 'KeyN') return { go: { screen: 'settings', page: 'projects' } };
+  if (only('meta') && e.code === 'Comma') return { go: { screen: 'settings' } };
   if (only('meta') && e.code === 'KeyD') {
     const r = c.route;
     if (r.screen === 'thread' && r.agent !== MAIN) return { go: { screen: 'review', project: r.project, agent: r.agent } };

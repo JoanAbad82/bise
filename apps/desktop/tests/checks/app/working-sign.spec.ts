@@ -9,7 +9,7 @@ import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
 const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
-const agent = (name: string, status: string) => ({ name, main: name === 'main', status, archived: false, title: '', purpose: '', since_ms: 1791100000000, waits: status === 'waiting' ? 1 : 0 });
+const agent = (name: string, status: string) => ({ name, main: name === 'main', status, archived: false, title: '', purpose: '', since_ms: Date.now() - 60_000, waits: status === 'waiting' ? 1 : 0 });
 const prefs = (theme: string) => ({
   ev: 'prefs',
   prefs: { onboarded: true, theme, context: { shot: true, url: true, file: true, window_text: false }, excluded_apps: [], quiet: { call: true, share: true, fullscreen: true, focus: true, batch_min: 20, away_card: true }, voice: { fn_hold: true, fn_twice: 'spotlight', language: 'auto' }, shots_keep_days: 7 },
@@ -60,9 +60,14 @@ test("app/working-sign: '∿' in the dot's slot, the open row pulses, the others
     // the others are out of step: not all at the same opacity
     const hush = await Promise.all(['cache', 'docs', 'api'].map(async (n) => (await look(n)).opacity));
     expect(new Set(hush.map((o) => o.toFixed(2))).size, 'never blinks in chorus').toBeGreaterThan(1);
-    // waiting, done and the project keep their own signs
-    expect((await look('ui')).anim).toBe('none');
-    expect((await look('lint')).anim).toBe('none');
+    // waiting on him and done keep their own signs in the 15 px column (desktop-screens v6): '?' and '✓', still
+    const sign = (n: string) => page.locator(`[data-testid="app.sidebar.agent.${n}"] .app-g`);
+    await expect(sign('ui')).toHaveText('?');
+    await expect(sign('lint')).toHaveText('✓');
+    for (const n of ['ui', 'lint']) {
+      const moving = await sign(n).evaluate((g) => [g, ...Array.from(g.querySelectorAll('*'))].filter((el) => getComputedStyle(el).animationName !== 'none').length);
+      expect(moving, `${n}'s sign is still`).toBe(0);
+    }
     const pj = page.locator(`[data-testid="app.sidebar.project.${P}"] .b-dot`);
     if ((await pj.count()) > 0) expect(await pj.evaluate((el) => el.classList.contains('wk')), 'the project never pulses').toBe(false);
     await page.screenshot({ path: test.info().outputPath('light.png') });

@@ -474,7 +474,8 @@ function History({ project, agent }: { project: string; agent: string }) {
   const store = useStore();
   return (
     <div className="th-history" data-testid="thread.archived">
-      <span>{agent} is archived: its thread is history only</span>
+      {/* designer's ⌘K screen (amb-win m_11920): '<name> is archived · ⌘⏎ restore' */}
+      <span>{agent} is archived ·</span>
       <Button
         kind="ghost"
         onClick={() => {
@@ -482,7 +483,7 @@ function History({ project, agent }: { project: string; agent: string }) {
         }}
         testId="thread.restore"
       >
-        restore it
+        <kbd>⌘⏎</kbd> restore
       </Button>
     </div>
   );

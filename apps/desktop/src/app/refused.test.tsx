@@ -6,7 +6,7 @@ import type { CoreCmd, CorePort } from '@/shared/api';
 import type { ProjectRow } from '@/proto';
 import { Store, StoreProvider } from '@/store';
 import { RefusedLine, refusedLead } from './Refused';
-import { projectDot, projectEnd } from './Sidebar';
+import { projectSide } from './side';
 
 const P = 'shop-ab9f3c3b';
 
@@ -69,12 +69,11 @@ describe('a refused project', () => {
     expect(v.queryByTestId('x.refused')).toBeNull();
   });
 
-  it("its sidebar row: the dot says er, the end 'refused' (a gone folder still says so first)", () => {
+  it("its sidebar row: the end 'refused' in err (a gone folder still says so first)", () => {
     const row = { project: P, name: 'shop', path: '/nowhere/shop', git: true, home: false, order: 1, agents: 2, working: 1, waits: 0, running: true } as ProjectRow;
-    expect(projectDot(row, true)).toBe('er');
-    expect(projectEnd(row, true)).toEqual({ text: 'refused', needs: true });
-    expect(projectEnd(row, false)).toEqual({ text: '1 at work', needs: false });
-    expect(projectEnd({ ...row, missing: true }, true).text).toBe('folder gone');
+    expect(projectSide(row, true)).toEqual({ text: 'refused', err: true, count: 0 });
+    expect(projectSide(row, false)).toEqual({ text: '∿ 1', err: false, count: 0 });
+    expect(projectSide({ ...row, missing: true }, true).text).toBe('folder gone');
     expect(refusedLead('bise')).toBe("bise's hub refused bise");
   });
 });

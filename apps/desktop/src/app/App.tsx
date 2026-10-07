@@ -6,7 +6,7 @@
 // re-renders only when the route changes. Every list below reads the store
 // through its own per-key hooks, so an event re-renders the rows it
 // touches, never the shell, the sidebar or the composer.
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
 import { formatRoute, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
 import { keep } from './keep';
@@ -27,13 +27,15 @@ import { EnvironmentsScreen } from '@/review/EnvironmentsScreen';
 import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
 import { Sidebar } from './Sidebar';
+import { Over, Titlebar, useFrame } from './Frame';
+import { Panel } from './Panel';
 import { numbersOf } from '@/agents/model';
 import { CoreLine } from './CoreLine';
 import { UpdateLine } from './UpdateLine';
 import { Palette, usePaletteOpen } from './Palette';
 import { Help } from '@/help/Help';
 import { useTheme } from '@/theme';
-import { HELP_EVENT, keyAction, typingIn } from './keys';
+import { HELP_EVENT, keyAction, typingIn, type FrameAction } from './keys';
 import { emitAction, useMenuAction } from './menu';
 import { TerminalPanel } from '@/terminal/Terminal';
 import { isToggleKey, shellProject, shellTakes } from '@/terminal/model';
@@ -123,13 +125,16 @@ function Shell() {
   useEffect(() => {
     paletteOpen(palette);
   }, [palette]);
+  const frame = useFrame();
+  const openPalette = useCallback(() => {
+    setPalette(true);
+  }, [setPalette]);
   useWindowKeys(
-    () => {
-      setPalette(true);
-    },
+    openPalette,
     () => {
       setHelp(true);
     },
+    frame.toggle,
   );
   // the composer's /help and /shortcuts open the same key list
   useEffect(() => {
@@ -155,7 +160,7 @@ function Shell() {
   useTheme();
   useShown();
   return (
-    <div className="app-shell b-ui" data-testid="app.root">
+    <div className={`app-shell b-ui w-${frame.width}${frame.side ? '' : ' no-side'}`} data-testid="app.root">
       {/* setup is the window itself, never a window drawn inside it (his try round 3) */}
       {route.screen === 'onboarding' ? (
         <div className="app-setup">
@@ -163,7 +168,24 @@ function Shell() {
           <OnboardingScreen />
         </div>
       ) : (
-        <Win side={<Sidebar />} main={<Current />} />
+        <>
+          <Win
+            side={frame.side ? <Sidebar onSearch={openPalette} /> : null}
+            main={<Current top={<Titlebar frame={frame} />} />}
+            aside={frame.panel?.docked === true ? <Panel project={frame.panel.project} name={frame.panel.name} /> : undefined}
+          />
+          {/* under 1000 px (or hidden by ⌘\) the sidebar slides over; the panel too under 1000 px */}
+          {frame.over === 'side' && (
+            <Over side="left" onClose={frame.close}>
+              <Sidebar onSearch={openPalette} />
+            </Over>
+          )}
+          {frame.over === 'panel' && frame.panel !== undefined && (
+            <Over side="right" onClose={frame.close}>
+              <Panel project={frame.panel.project} name={frame.panel.name} over />
+            </Over>
+          )}
+        </>
       )}
       {palette && (
         <Palette
@@ -183,12 +205,13 @@ function Shell() {
   );
 }
 
-function Current() {
+function Current({ top }: { top: ReactNode }) {
   const route = useRoute();
   // a screen remounts when its route changes: no state of one thread
   // leaks into the next (the old window showed shop's thread under bise)
   return (
     <Main testId="app.main">
+      {top}
       <CoreLine />
       <UpdateLine />
       <ScreenOf key={formatRoute(route)} route={route} />
@@ -323,9 +346,14 @@ function NotFound({ path }: { path: string }) {
  * ⌘K opens the palette, the rest go to the shown screens. Capture phase, by
  * key code: the composer never types ⌥1's '¡'.
  */
-function useWindowKeys(openPalette: () => void, openHelp: () => void) {
+function useWindowKeys(openPalette: () => void, openHelp: () => void, onFrame: (what: FrameAction) => void) {
   const router = useRouter();
   const store = useStore();
+  // the frame's toggle reads this render's width and choices: the listener stays, the target moves
+  const frameRef = useRef(onFrame);
+  useEffect(() => {
+    frameRef.current = onFrame;
+  });
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return;
@@ -352,6 +380,7 @@ function useWindowKeys(openPalette: () => void, openHelp: () => void) {
       if ('go' in act) router.go(act.go);
       else if ('palette' in act) openPalette();
       else if ('help' in act) openHelp();
+      else if ('frame' in act) frameRef.current(act.frame);
       else emitAction(act.screen);
     };
     window.addEventListener('keydown', onKey, true);

@@ -111,42 +111,6 @@
   overflow-wrap: anywhere;
 }
 
-/* an agent's ⌥ number in the sidebar */
-.app-n {
-  display: inline-block;
-  min-width: 1.1em;
-  margin-right: 4px;
-  color: var(--c-text-2);
-  font-variant-numeric: tabular-nums;
-}
-
-/* a project's folder: its disclosure (open by default) and, for a project the window has no
-   agents of, its counts line under the row */
-.app-fold {
-  display: inline-block;
-  width: 1.1em;
-  margin-right: 2px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--c-text-3);
-  font: inherit;
-  cursor: pointer;
-}
-.app-fold:hover {
-  color: var(--c-text);
-}
-.app-fold:focus-visible {
-  outline: 0;
-  box-shadow: 0 0 0 2px var(--c-focus);
-  border-radius: 3px;
-}
-.app-folder-line {
-  padding: 2px 12px 6px 40px;
-  color: var(--c-text-2);
-  font-size: var(--t-12);
-}
-
 /* a project whose hub refused this core (lead m_11347): ✗, the hub's words, a retry; the tone
    is said by the mark and the words, never by color alone */
 .app-refused {
@@ -211,23 +175,421 @@
   padding: 2px 8px 6px 20px;
 }
 
-/* the sidebar scrolls its rows; '+ add a project' stays at its foot, on top,
-   hit at its center and changing on hover (qa-flows' O.6 clicks audit) */
+/* The sidebar (designer's desktop-screens v6/v7): 240 px, rows 28 px, radius 6, a 15 px mono
+   sign column; agents indented 23 px; the pink only for what waits on him */
+.app-shell .b-win > .cols {
+  grid-template-columns: 240px minmax(0, 1fr) auto;
+}
+.app-shell.no-side .b-win > .cols {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.app-shell .b-side {
+  padding: 0 8px 0;
+  border-right: 1px solid var(--c-line);
+}
+.app-search {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  margin: 0 0 8px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--c-text) 5%, transparent);
+  color: var(--c-text-3);
+  font: inherit;
+  font-size: var(--t-13, 13px);
+  text-align: left;
+  cursor: pointer;
+}
+.app-search:hover {
+  background: var(--c-hover);
+}
+.app-search-w {
+  flex: 1;
+}
+.app-search kbd,
+.app-r kbd,
+.app-title kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--c-text-3);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.app-r {
+  flex: none;
+  position: relative;
+  height: 28px;
+  gap: 7px;
+  padding: 0 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.app-r .nm {
+  flex: 1;
+  min-width: 0;
+}
+.app-r.ag {
+  padding-left: 23px;
+  color: var(--c-text);
+}
+.app-r.pj .nm,
+.app-r.top[data-testid='app.sidebar.bise'] .nm {
+  font-weight: 600;
+}
+.app-r.more,
+.app-r.foot {
+  color: var(--c-text-3);
+}
+.app-r.more {
+  padding-left: 23px;
+}
+.app-r.foot:hover,
+.app-r.more:hover {
+  color: var(--c-text);
+}
+.app-g {
+  flex: none;
+  width: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  color: var(--c-text-2);
+}
+.app-sign.ink {
+  color: var(--c-text);
+}
+.app-sign.acc {
+  color: var(--c-accent);
+}
+.app-sign.err {
+  color: var(--c-err, var(--c-accent));
+}
+.app-sign.dim {
+  color: var(--c-text-2);
+}
+.app-m {
+  flex: none;
+  color: var(--c-text-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.app-m.err {
+  color: var(--c-err, var(--c-accent));
+}
+.app-cnt {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--c-accent);
+  color: var(--c-solid, #fff);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* a project's pearl: 12 px, still (bise's own is the live one) */
+.app-r.pj .b-pearl {
+  width: 12px;
+  height: 12px;
+}
+.app-pearl {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c-text) 85%, var(--c-sidebar)), color-mix(in srgb, var(--c-text) 30%, var(--c-sidebar)) 70%);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--c-text) 18%, transparent);
+}
+.app-pearl.pk {
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c-accent) 60%, var(--c-sidebar)), var(--c-accent) 70%);
+}
+/* the head 'projects': 11.5 px, 600, text-3, no capitals */
+.app-shell .b-side .b-sh {
+  padding: 14px 8px 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+/* a project's folder and ⋯ buttons: on hover or focus; a shut folder always says so */
+.app-fold,
+.app-more {
+  flex: none;
+  width: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--c-text-3);
+  font: inherit;
+  cursor: pointer;
+  opacity: 0;
+}
+.app-r:hover .app-fold,
+.app-r:hover .app-more,
+.app-fold.shut,
+.app-more.on,
+.app-fold:focus-visible,
+.app-more:focus-visible {
+  opacity: 1;
+}
+.app-fold:hover,
+.app-more:hover {
+  color: var(--c-text);
+}
+.app-fold:focus-visible,
+.app-more:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--c-focus);
+}
+.app-menu {
+  position: relative;
+  z-index: 5;
+  margin: 2px 0 4px 23px;
+}
+/* the foot: '+ add a project ⌘N', '⚙ settings ⌘,', on top of the scrolled rows, hit at their
+   centre and changing on hover (qa-flows' O.6 clicks audit) */
 [data-testid='app.sidebar'] {
   min-height: 0;
   overflow-y: auto;
 }
-[data-testid='app.sidebar.add'] {
+.app-shell .b-side .foot {
   position: sticky;
   bottom: 0;
   z-index: 1;
-  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: auto;
+  padding: 6px 0 8px;
+  border-top: 1px solid var(--c-line);
   background: var(--c-sidebar);
-  border-radius: var(--r-2);
-  cursor: pointer;
-  transition: color var(--d-fast) var(--ease-out);
 }
-[data-testid='app.sidebar.add']:hover {
+.app-r.foot:hover {
+  background: var(--c-hover);
+}
+
+/* the titlebar over the main column: 36 px, the window's drag region */
+.app-title {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 12px 0 18px;
+  border-bottom: 1px solid var(--c-line);
+  -webkit-app-region: drag;
+  white-space: nowrap;
+}
+.app-title button {
+  -webkit-app-region: no-drag;
+}
+.app-title.away {
+  padding-left: 0;
+}
+/* macOS's own lights sit here when the sidebar is away */
+.app-title-lights {
+  flex: none;
+  width: 76px;
+}
+.app-title-tg {
+  flex: none;
+  position: relative;
+  width: 18px;
+  height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--c-text-2);
+  cursor: pointer;
+}
+.app-title-tg span {
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  bottom: 2px;
+  width: 1.5px;
+  background: var(--c-text-2);
+}
+.app-title-tg:hover {
+  box-shadow: inset 0 0 0 1.5px var(--c-text);
+}
+.app-title-wait {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c-accent) 14%, transparent);
+  color: var(--c-accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.app-crumb {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c-text-2);
+  font-size: var(--t-13, 13px);
+}
+.app-crumb .last {
   color: var(--c-text);
-  background: var(--c-hover, var(--c-sidebar));
+  font-weight: 600;
+}
+.app-crumb-sep {
+  margin: 0 7px;
+  color: var(--c-text-3);
+}
+.app-title-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c-text) 13%, transparent);
+  color: var(--c-text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.app-title-btn.on {
+  background: color-mix(in srgb, var(--c-text) 9%, transparent);
+  box-shadow: none;
+}
+.app-title-btn:focus-visible,
+.app-title-tg:focus-visible,
+.app-title-wait:focus-visible,
+.app-search:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+/* the right panel, option A: 320 px, docked in the frame's third column or sliding over */
+.app-panel {
+  box-sizing: border-box;
+  width: 320px;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 8px 0;
+  border-left: 1px solid var(--c-line);
+  background: var(--c-surface);
+}
+.app-panel.over {
+  background: var(--c-solid);
+}
+.app-panel-head {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 6px 8px;
+}
+.app-panel-dim {
+  color: var(--c-text-2);
+}
+.app-panel-all {
+  margin-left: auto;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--c-text-2);
+  font: inherit;
+  cursor: pointer;
+}
+.app-panel-all:hover {
+  color: var(--c-text);
+  background: var(--c-hover);
+}
+.app-panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.app-panel-keys {
+  flex: none;
+  display: flex;
+  gap: 16px;
+  padding: 8px 6px 10px;
+  border-top: 1px solid var(--c-line);
+  color: var(--c-text-3);
+  font-size: 11.5px;
+}
+.app-panel-keys kbd {
+  margin-right: 4px;
+  font-family: var(--font-mono);
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--c-text-2);
+}
+
+/* what slides over the window (under 1000 px): the sidebar from the left, the panel from the
+   right, over a 45% scrim of the window's paper; esc or a click on the scrim closes it */
+.app-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: color-mix(in srgb, var(--c-solid, var(--c-window)) 45%, transparent);
+}
+.app-over {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 41;
+  display: flex;
+  box-shadow: var(--e-3);
+  animation: app-slide var(--d-fast, 0.16s) var(--ease-out, ease-out);
+}
+.app-over.left {
+  left: 0;
+  width: 240px;
+}
+.app-over.left .b-side {
+  flex: 1;
+  background: var(--c-solid, var(--c-sidebar));
+}
+.app-over.left .b-side .foot {
+  background: var(--c-solid, var(--c-sidebar));
+}
+.app-over.right {
+  right: 0;
+  top: 36px;
+}
+@keyframes app-slide {
+  from {
+    transform: translateX(var(--app-from, -12px));
+    opacity: 0;
+  }
+}
+.app-over.right {
+  --app-from: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-over {
+    animation: none;
+  }
 }

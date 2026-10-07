@@ -17,6 +17,7 @@ import { Empty, Head, Row } from '@/ds';
 import { dotOf, folds, InboxCard, takesWords, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { inboxDrafts, type Drafts } from './drafts';
+import { caretAtEnd } from '@/app/keep';
 import { current, prune, START, step, visible, type Act, type Key } from './model';
 import './inbox.css';
 
@@ -119,8 +120,10 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
   }, [cards, drafts]);
 
   // the current item takes the keys: its field, or the screen for an approval
+  // (a kept answer comes back with the caret at its end, like the composer: his next key follows his words)
   useEffect(() => {
     (field.current ?? root.current)?.focus();
+    caretAtEnd(field.current);
   }, [curKey]);
 
   const run = (a: Act) => {

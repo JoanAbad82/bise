@@ -1,76 +1,153 @@
-// The sidebar: bise, his projects (the core's rows, his order), and the
-// agents of each project in its folder (open by default). Owner: amb-win.
+// The sidebar (designer's desktop-screens v6/v7, signed): 'search or jump
+// ⌘K', bise, '↗ artifacts' and '◷ scheduled' for every project at once,
+// then his projects, each with its pearl (its bise: a click opens 'bise ·
+// storefront') and its agents, one sign each in a mono column (side.ts),
+// never a 'main' row; done agents quiet for an hour fold into 'n more
+// today'; the archived ones are in the project's ⋯ menu; '+ add a project'
+// and settings at the foot. Owner: amb-win.
 //
-// It reads only projects, the route and the agents of the project in view:
-// a thread's entries never re-render it. A project's dot says, in this
-// order: its folder is gone, its hub is down, an agent works, something
-// waits on him, all quiet.
-import { Fragment, memo, useEffect, useSyncExternalStore } from 'react';
-import { Row, SectionHead, Side, type DotState } from '@/ds';
+// It reads only projects, the route, the agents of each open folder and
+// counts (numbers, so a snapshot never changes for nothing): a thread's
+// entries never re-render it.
+import { Fragment, memo, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { Dot, Menu, MenuItem, MenuSep, Pearl, SectionHead, Side } from '@/ds';
 import type { Agent, Feature, ProjectRow } from '@/proto';
-import { useAgents, useFeatures, useHubRefused, useProjects } from '@/store';
+import { useAgents, useFeatures, useHubRefused, useProjects, useStore, type Store } from '@/store';
 import { RefusedLine } from './Refused';
 import { groupsOf } from '@/review/feature';
-import { dotOf, endOf, liveOf, numbersOf } from '@/agents/model';
+import { archivedOf, liveOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
 import { useRoute, useRouter } from './router';
 import { useNow } from './clock';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
 import { Hint, hintUsed, useHint } from './hints';
-
-/** A project row's dot (refused: its hub said no to this core, lead m_11347). Pure. */
-export function projectDot(p: ProjectRow, refused = false): DotState {
-  if (p.missing === true || refused) return 'er';
-  if (!p.running) return 'off';
-  // its '2 at work' is the row's words: a project's sign never moves for its agents' work (ambient m_11472)
-  if (p.waits > 0) return 'nd';
-  return 'ok';
-}
-
-/** A project row's end: what waits on him (accent), else how many work, else its gone folder. Pure. */
-export function projectEnd(p: ProjectRow, refused = false): { text: string; needs: boolean } {
-  if (p.missing === true) return { text: 'folder gone', needs: true };
-  if (refused) return { text: 'refused', needs: true };
-  if (p.waits > 0) return { text: String(p.waits), needs: true };
-  if (p.working > 0) return { text: `${p.working} at work`, needs: false };
-  return { text: '', needs: false };
-}
+import { folds, moreWords, projectSide, signOf } from './side';
 
 /** His projects in his order, bise's own out (it is the bise row). Pure. */
 export function projectsOf(rows: readonly ProjectRow[]): ProjectRow[] {
   return rows.filter((p) => !p.home).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
 }
 
-export function Sidebar() {
+/** What waits on him across every project: bise's pink count, the narrow titlebar's 'n waiting'. */
+export function useWaitingTotal(): number {
+  return useProjects().reduce((n, p) => n + p.waits, 0);
+}
+
+/** A number summed over projects' store slices, re-read when one of them changes. */
+function useSum(prefix: string, ids: string, count: (store: Store, project: string) => number): number {
+  const store = useStore();
+  return useSyncExternalStore(
+    (cb) => {
+      const offs = ids === '' ? [] : ids.split('\n').map((p) => store.subscribe(`${prefix}:${p}`, cb));
+      return () => {
+        for (const off of offs) off();
+      };
+    },
+    () => (ids === '' ? 0 : ids.split('\n').reduce((n, p) => n + count(store, p), 0)),
+  );
+}
+
+/** Each agent's next wake in a project (its scheduled tasks' soonest run), as 'agent ms' lines. */
+function useWakes(project: string): ReadonlyMap<string, number> {
+  const store = useStore();
+  const lines = useSyncExternalStore(
+    (cb) => store.subscribe(`scheduled:${project}`, cb),
+    () => {
+      const soonest = new Map<string, number>();
+      for (const t of store.scheduled(project)) {
+        if (t.next_ms == null) continue;
+        const was = soonest.get(t.agent);
+        if (was === undefined || t.next_ms < was) soonest.set(t.agent, t.next_ms);
+      }
+      return [...soonest].map(([a, ms]) => `${a} ${String(ms)}`).join('\n');
+    },
+  );
+  return useMemo(() => new Map(lines === '' ? [] : lines.split('\n').map((l) => [l.slice(0, l.lastIndexOf(' ')), Number(l.slice(l.lastIndexOf(' ') + 1))] as const)), [lines]);
+}
+
+/** One sidebar row: a lead (pearl or sign), the name, its end words, his pink count. */
+function SRow({ kind, lead, name, end, endErr, count, on, title, onClick, testId, children }: {
+  kind: 'top' | 'pj' | 'ag' | 'more' | 'foot';
+  lead: ReactNode;
+  name: ReactNode;
+  end?: ReactNode;
+  endErr?: boolean;
+  count?: number;
+  on?: boolean;
+  title?: string;
+  onClick?: () => void;
+  testId?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className={`b-row app-r ${kind}${on === true ? ' on' : ''}`} role="button" tabIndex={-1} aria-current={on === true || undefined} title={title}
+      onClick={onClick} data-testid={testId}>
+      <span className="app-g">{lead}</span>
+      <span className="nm">{name}</span>
+      {children}
+      {end != null && end !== '' && <span className={endErr === true ? 'app-m err' : 'app-m'}>{end}</span>}
+      {count !== undefined && count > 0 && <span className="app-cnt">{count}</span>}
+    </div>
+  );
+}
+
+/** A project's pearl, still (one live pearl per window is bise's own; a dozen would cost the GPU). */
+function StillPearl({ pink }: { pink?: boolean }) {
+  return (
+    <Pearl size={14}>
+      <i className={pink === true ? 'app-pearl pk' : 'app-pearl'} />
+    </Pearl>
+  );
+}
+
+export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const router = useRouter();
   const route = useRoute();
   const rows = useProjects();
   const home = rows.find((p) => p.home);
   const inView = projectOf(route);
-  const waits = rows.reduce((n, p) => n + p.waits, 0);
+  const waits = useWaitingTotal();
+  const ids = rows.map((p) => p.project).join('\n');
+  const fresh = useSum('artifacts', ids, (s, p) => s.artifacts(p).filter((a) => a.new).length);
+  const scheduled = useSum('scheduled', ids, (s, p) => s.scheduled(p).length);
+  const projects = projectsOf(rows);
+  const add = () => {
+    router.go({ screen: 'settings', page: 'projects' });
+  };
   return (
     <Side
       testId="app.sidebar"
-      foot="+ add a project"
-      footTestId="app.sidebar.add"
-      onFoot={() => {
-        router.go({ screen: 'settings', page: 'projects' });
-      }}
+      foot={
+        <>
+          <SRow kind="foot" lead="+" name="add a project" end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.add" />
+          <SRow kind="foot" lead="⚙" name="settings" end={<kbd>⌘,</kbd>} onClick={() => { router.go({ screen: 'settings' }); }} testId="app.sidebar.settings" />
+        </>
+      }
     >
-      <Row
-        kind="me"
+      <button type="button" className="app-search" onClick={onSearch} data-testid="app.sidebar.search">
+        <span aria-hidden="true">⌕</span>
+        <span className="app-search-w">search or jump</span>
+        <kbd>⌘K</kbd>
+      </button>
+      <SRow
+        kind="top"
+        lead={<Pearl size={14} mood={waits > 0 ? 'need' : undefined} />}
         name="bise"
-        sub={waits > 0 ? `${waits} waiting for you` : 'every project'}
-        on={route.screen === 'bise' || (home !== undefined && inView === home.project)}
-        onClick={() => {
-          router.go({ screen: 'bise' });
-        }}
+        count={waits}
+        title={waits > 0 ? `${String(waits)} waiting for you` : 'every project'}
+        on={route.screen === 'bise' || (home !== undefined && inView === home.project && route.screen === 'thread' && route.agent === MAIN)}
+        onClick={() => { router.go({ screen: 'bise' }); }}
         testId="app.sidebar.bise"
       />
+      <SRow kind="top" lead="↗" name="artifacts" end={fresh > 0 ? `${String(fresh)} new` : ''} on={route.screen === 'artifacts' && route.project === ''}
+        onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} testId="app.sidebar.artifacts" />
+      <SRow kind="top" lead="◷" name="scheduled" end={scheduled > 0 ? String(scheduled) : ''} on={route.screen === 'scheduled'}
+        onClick={() => { router.go({ screen: 'scheduled' }); }} testId="app.sidebar.scheduled" />
       {home !== undefined && inView === home.project && <Agents project={home.project} route={route} />}
       <SectionHead>projects</SectionHead>
-      {projectsOf(rows).map((p) => (
+      {projects.length === 0 && <SRow kind="more" lead="+" name="add a project" end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.empty-add" />}
+      {projects.map((p) => (
         <ProjectItem key={p.project} p={p} on={inView === p.project} route={route} />
       ))}
     </Side>
@@ -118,83 +195,120 @@ function useFolderOpen(project: string): boolean {
   );
 }
 
-/** What a folder shows for a project the window has no agents of yet: its counts, or nothing. Pure. */
-export function folderLine(p: Pick<ProjectRow, 'working' | 'waits'>): string {
-  return [p.working > 0 ? `${String(p.working)} at work` : '', p.waits > 0 ? `${String(p.waits)} waiting for you` : ''].filter(Boolean).join(' · ');
-}
-
 const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow; on: boolean; route: Route }) {
   const router = useRouter();
   const refused = useHubRefused(p.project) !== null;
-  const end = projectEnd(p, refused);
+  const side = projectSide(p, refused);
   const open = useFolderOpen(p.project);
+  const [menu, setMenu] = useState(false);
   return (
     <>
-      <Row
+      <SRow
         kind="pj"
-        name={
-          <>
-            <button
-              type="button"
-              className="app-fold"
-              aria-expanded={open}
-              aria-label={open ? `close ${p.name}` : `open ${p.name}`}
-              title={open ? 'close the folder' : 'open the folder'}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFolder(p.project);
-              }}
-              data-testid={`app.sidebar.project.${p.project}.fold`}
-            >
-              {open ? '▾' : '▸'}
-            </button>
-            {p.name}
-          </>
-        }
-        dot={projectDot(p, refused)}
-        end={end.text}
-        needs={end.needs}
+        lead={<StillPearl />}
+        name={p.name}
+        end={side.text}
+        endErr={side.err}
+        count={side.count}
+        title={side.count > 0 ? `${String(side.count)} waiting for you` : undefined}
         on={on && route.screen === 'thread' && route.agent === MAIN}
-        onClick={() => {
-          router.go({ screen: 'thread', project: p.project, agent: MAIN });
-        }}
+        onClick={() => { router.go({ screen: 'thread', project: p.project, agent: MAIN }); }}
         testId={`app.sidebar.project.${p.project}`}
-      />
+      >
+        <button
+          type="button"
+          className={open ? 'app-fold' : 'app-fold shut'}
+          aria-expanded={open}
+          aria-label={open ? `close ${p.name}` : `open ${p.name}`}
+          title={open ? 'close the folder' : 'open the folder'}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleFolder(p.project);
+          }}
+          data-testid={`app.sidebar.project.${p.project}.fold`}
+        >
+          {open ? '▾' : '▸'}
+        </button>
+        <button
+          type="button"
+          className={menu ? 'app-more on' : 'app-more'}
+          aria-label={`${p.name}: more`}
+          aria-expanded={menu}
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenu((m) => !m);
+          }}
+          data-testid={`app.sidebar.project.${p.project}.menu`}
+        >
+          ⋯
+        </button>
+      </SRow>
+      {menu && <ProjectMenu p={p} onClose={() => { setMenu(false); }} />}
       {/* its hub refused this core: the hub's words and a retry, open or closed (lead m_11347) */}
       <RefusedLine project={p.project} name={p.name} className="app-refused" testId={`app.sidebar.project.${p.project}.refused`} />
-      {open && <Folder p={p} route={route} />}
+      {open && <Agents project={p.project} route={route} />}
     </>
   );
 });
 
-/** An open folder: its agents when the window has them (a project it shows), else its counts. */
-function Folder({ p, route }: { p: ProjectRow; route: Route }) {
-  const agents = useAgents(p.project);
-  if (agents.length > 0) return <Agents project={p.project} route={route} />;
-  const line = folderLine(p);
-  return line === '' ? null : (
-    <div className="app-folder-line" data-testid={`app.sidebar.project.${p.project}.counts`}>
-      {line}
+/** A project's ⋯ menu: its agents list, then its archived agents (each opens its thread). */
+function ProjectMenu({ p, onClose }: { p: ProjectRow; onClose: () => void }) {
+  const router = useRouter();
+  const archived = archivedOf(useAgents(p.project));
+  useEffect(() => {
+    const away = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !(e.target instanceof Element && e.target.closest('.app-menu, .app-more') !== null)) onClose();
+    };
+    window.addEventListener('mousedown', away, true);
+    window.addEventListener('keydown', away, true);
+    return () => {
+      window.removeEventListener('mousedown', away, true);
+      window.removeEventListener('keydown', away, true);
+    };
+  }, [onClose]);
+  const go = (r: Route) => {
+    onClose();
+    router.go(r);
+  };
+  return (
+    <div className="app-menu">
+      <Menu testId={`app.sidebar.project.${p.project}.menu.list`}>
+        <MenuItem onClick={() => { go({ screen: 'agents', project: p.project }); }} testId={`app.sidebar.project.${p.project}.menu.agents`}>
+          all agents
+        </MenuItem>
+        <MenuSep />
+        {archived.length === 0 ? (
+          <MenuItem disabled>no archived agent</MenuItem>
+        ) : (
+          archived.map((a) => (
+            <MenuItem key={a.name} hotkey="archived" onClick={() => { go({ screen: 'thread', project: p.project, agent: a.name }); }}
+              testId={`app.sidebar.project.${p.project}.menu.archived.${a.name}`}>
+              – {a.name}
+            </MenuItem>
+          ))
+        )}
+      </Menu>
     </div>
   );
 }
 
 /**
- * The live agents of the project in view, main out (it is the project's
- * row), as the TUI's panel: the ones in no feature, then each feature's
- * head ('ψ gift-cards', opens the feature) with its agents under it.
+ * A project's live agents, main out (it is the project's row), in the TUI
+ * panel's order (⌥1-9 follow it): the ones in no feature, then each
+ * feature's head ('ψ gift-cards', opens the feature) with its agents. Done
+ * agents quiet for an hour fold into 'n more today' (one at rest stays).
  */
 function Agents({ project, route }: { project: string; route: Route }) {
   const router = useRouter();
   const all = useAgents(project);
   const features = useFeatures(project);
-  const { solo, groups } = groupsOf(
-    liveOf(all).filter((a) => !a.main),
-    features,
-  );
-  // the TUI's numbers: kept while an agent lives, a newcomer takes the smallest free one
-  const nums = numbersOf(project, all);
+  const wakes = useWakes(project);
   const now = useNow();
+  const [unfolded, setUnfolded] = useState(false);
+  const live = liveOf(all).filter((a) => !a.main);
+  const folded = live.filter((a) => folds(a, now, wakes.get(a.name)) && !(route.screen === 'thread' && route.project === project && route.agent === a.name));
+  const shown = unfolded ? live : live.filter((a) => !folded.includes(a));
+  const { solo, groups } = groupsOf(shown, features);
   // L25: the demo's 'start' tip under the first demo agent, 'steer' under the one that waits for him
   const tour = useTour(project);
   const liveDemo = tour.snap.members.filter((m) => !m.archived);
@@ -206,42 +320,49 @@ function Agents({ project, route }: { project: string; route: Route }) {
   useEffect(() => {
     if (inAgent) hintUsed('first_agent');
   }, [inAgent]);
-  const row = (a: Agent) =>
-    tipAt === a.name && tour.tip !== null ? (
-      <Fragment key={a.name}>
-        <AgentRow project={project} a={a} n={nums.get(a.name) ?? 0} route={route} now={now} />
-        <div className="app-tip">
-          <Tip tip={tour.tip} snap={tour.snap} />
-        </div>
-      </Fragment>
-    ) : hint && first === a.name ? (
-      <Fragment key={a.name}>
-        <AgentRow project={project} a={a} n={nums.get(a.name) ?? 0} route={route} now={now} />
-        <div className="app-tip">
-          <Hint name="first_agent" />
-        </div>
-      </Fragment>
-    ) : (
-      <AgentRow key={a.name} project={project} a={a} n={nums.get(a.name) ?? 0} route={route} now={now} />
-    );
+  const row = (a: Agent) => {
+    const r = <AgentRow key={a.name} project={project} a={a} route={route} now={now} wake={wakes.get(a.name)} />;
+    if (tipAt === a.name && tour.tip !== null)
+      return (
+        <Fragment key={a.name}>
+          {r}
+          <div className="app-tip">
+            <Tip tip={tour.tip} snap={tour.snap} />
+          </div>
+        </Fragment>
+      );
+    if (hint && first === a.name)
+      return (
+        <Fragment key={a.name}>
+          {r}
+          <div className="app-tip">
+            <Hint name="first_agent" />
+          </div>
+        </Fragment>
+      );
+    return r;
+  };
   return (
     <>
       {solo.map(row)}
       {groups.map((g) => (
         <Fragment key={`ψ ${g.feature.name}`}>
-          <Row
+          <SRow
             kind="ag"
-            name={`ψ ${g.feature.name}`}
+            lead="ψ"
+            name={g.feature.name}
             end={distanceShort(g.feature)}
             on={route.screen === 'feature' && route.project === project && route.name === g.feature.name}
-            onClick={() => {
-              router.go({ screen: 'feature', project, name: g.feature.name });
-            }}
+            onClick={() => { router.go({ screen: 'feature', project, name: g.feature.name }); }}
             testId={`app.sidebar.feature.${g.feature.name}`}
           />
           {g.agents.map(row)}
         </Fragment>
       ))}
+      {folded.length > 0 && (
+        <SRow kind="more" lead="" name={unfolded ? 'fold the quiet ones' : moreWords(folded, now)} title={folded.map((a) => a.name).join(', ')}
+          onClick={() => { setUnfolded((u) => !u); }} testId={`app.sidebar.project.${project}.more`} />
+      )}
     </>
   );
 }
@@ -253,19 +374,18 @@ function distanceShort(f: Feature): string {
   return `${String(f.ahead)} ahead`;
 }
 
-function AgentRow({ project, a, n, route, now }: { project: string; a: Agent; n: number; route: Route; now: number }) {
+function AgentRow({ project, a, route, now, wake }: { project: string; a: Agent; route: Route; now: number; wake: number | undefined }) {
   const router = useRouter();
-  const end = endOf(a, now);
+  const sign = signOf(a, now, wake);
   return (
-    <Row
+    <SRow
       kind="ag"
+      // at work: the DS's breeze '∿' (it pulses on the open row, murmurs on the others, still with reduced motion)
+      lead={a.status === 'working' && sign.g === '∿' ? <Dot state="wk" /> : <span className={`app-sign ${sign.tone}`}>{sign.g}</span>}
       name={
-        // its ⌥ number (tui-parity W4: the panel's numbers for ⌥1-9)
         <>
-          {n >= 1 && n <= 9 && <span className="app-n">{n}</span>}
           {a.name}
-          {/* its context gauge, the TUI panel's short form as the hub sends it ('17%', or '42k'
-              without a known window; amb-feed c317fc32); the head keeps the long words */}
+          {/* its context gauge, the TUI panel's short form as the hub sends it (amb-feed c317fc32) */}
           {a.usage != null && a.usage.short !== '' && (
             <span className="app-gauge" data-testid={`app.sidebar.agent.${a.name}.gauge`}>
               {a.usage.short}
@@ -273,13 +393,12 @@ function AgentRow({ project, a, n, route, now }: { project: string; a: Agent; n:
           )}
         </>
       }
-      dot={dotOf(a.status)}
-      end={end.text}
-      needs={end.needs}
+      end={sign.end}
+      endErr={sign.endTone === 'err'}
+      count={sign.count}
+      title={sign.title}
       on={route.screen === 'thread' && route.project === project && route.agent === a.name}
-      onClick={() => {
-        router.go({ screen: 'thread', project, agent: a.name });
-      }}
+      onClick={() => { router.go({ screen: 'thread', project, agent: a.name }); }}
       testId={`app.sidebar.agent.${a.name}`}
     />
   );

@@ -1,7 +1,7 @@
 // app/folders · his try round 2 item 3 (ambient-lead m_11456, m_11618): a project's folder in the
 // sidebar is open by default and his close is remembered per project. Passes when, on the bise
 // view, acme (a project the window has agents of) lists its agents under its row, shop (no agents
-// known: its hub isn't held for the sidebar) shows its counts '2 at work · 1 waiting for you', a
+// known: its hub isn't held for the sidebar) says '∿ 2' and his pink count 1 on its row, a
 // click on acme's ▾ closes it (its agents leave, the row stays, nothing navigates) and is kept in
 // the window's storage, and ▸ opens it again. The scripted core (FakeCore). Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
@@ -27,14 +27,16 @@ const world = () => [
   { ev: 'agents', project: ACME, agents: [agent('main'), agent('perf', 'working'), agent('docs')] },
 ];
 
-test("app/folders: every project's folder opens by default; a close is his, remembered; a project without agents shows its counts", async () => {
+test("app/folders: every project's folder opens by default; a close is his, remembered; a project without agents says its counts on its row", async () => {
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: 'bise' });
   try {
     const { page } = s;
     await expect(page.getByTestId('app.sidebar.agent.perf'), "acme's agents, open by default").toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId('app.sidebar.agent.docs')).toBeVisible();
-    await expect(page.getByTestId(`app.sidebar.project.${SHOP}.counts`), "shop's counts").toHaveText('2 at work · 1 waiting for you');
+    // desktop-screens v6: the row says it, '∿ 2' and his pink count (no counts line under it)
+    await expect(page.getByTestId(`app.sidebar.project.${SHOP}`), "shop's row").toContainText('∿ 2');
+    await expect(page.getByTestId(`app.sidebar.project.${SHOP}`).locator('.app-cnt'), 'his pink count').toHaveText('1');
     await expect(page.getByTestId(`app.sidebar.project.${ACME}.fold`)).toHaveAttribute('aria-expanded', 'true');
     await page.screenshot({ path: test.info().outputPath('open.png') });
 
