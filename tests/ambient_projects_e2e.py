@@ -47,6 +47,10 @@ def main():
     E.env["BISE_HOME"] = os.path.join(home, "b")
     E.env["BISE_HOME_WORKSPACE"] = home_ws
     E.env["BISE_APP_ROOT"] = e2e.ROOT
+    # voice mode's fakes (voicemode/live.rs for_core): a WAV as the mic,
+    # these words at each flush, a silent synth; never a device
+    E.env["BISE_VOICE_FAKE"] = os.path.join(e2e.ROOT, "rust/tui/src/voicemode/testdata/sentence.wav")
+    E.env["BISE_VOICE_FAKE_HEARD"] = "what is the state of the build"
     shop = os.path.join(E.tmp, "shop")
     os.makedirs(shop)
     sh(shop, "git init -q -b main && git config user.email t@t && git config user.name t && git config commit.gpgsign false && echo s > README && git add README && git commit -qm init")
@@ -111,6 +115,43 @@ def main():
         check(typed and all(e.get("project") for e in typed), "every typed event carries its project")
         check(any(e.get("project") == ids.get(os.path.realpath(home_ws)) for e in typed if e["ev"] == "welcome"),
               "home is held too")
+        # voice mode with shop's main in view (architect m_11485): the
+        # process wiring end to end on the fakes. His fake words reach
+        # shop's main as a voice input (never bise's main), its answer is
+        # said, and off unsubscribes the thread the core held for it
+        # the window no longer follows shop's main: the thread voice mode
+        # hears is the core's own subscription, dropped when it ends
+        core.cmd(cmd="unsubscribe", project=shop_id, agent="main")
+        at = core.mark()
+        core.cmd(cmd="voice_mode", project=shop_id, agent="main", on=True)
+        core.wait(lambda e: e.get("ev") == "voice_mode" and e.get("on") is True and e.get("project") == shop_id, 30, "voice mode on", since=at)
+        core.wait(lambda e: e.get("ev") == "entry" and e.get("project") == shop_id and e.get("agent") == "main"
+                  and e["entry"].get("kind") == "you" and "what is the state of the build" in e["entry"]["text"],
+                  90, "his fake words in shop's main thread", since=at)
+        with core.lock:
+            home_you = [e for e in core.evs[at:] if e.get("ev") == "entry" and e.get("project") != shop_id
+                        and "what is the state of the build" in e["entry"].get("text", "")]
+        check(not home_you, "the words went to shop's main only: %r" % home_you)
+        core.wait(lambda e: e.get("ev") == "voice_mode" and e.get("project") == shop_id and e.get("state") == "speaking" and e.get("said"),
+                  90, "shop main's answer said", since=at)
+        off = core.mark()
+        core.cmd(cmd="voice_mode", project=shop_id, agent="main", on=False)
+        core.wait(lambda e: e.get("ev") == "voice_mode" and e.get("on") is False, 30, "voice mode off", since=off)
+        # unsubscribed: a typed send to shop's main is answered (the hub's
+        # echo lands in its thread) but no entry of that thread comes now
+        core.cmd(cmd="send", project=shop_id, agent="main", text="after voice mode", mode="now")
+        def reached():
+            # shop's main took a turn on it: the fake provider saw the words
+            with open(E.fake_log) as f:
+                return "after voice mode" in f.read()
+        wait.until(reached, 60, "the send reached shop's main", poll=0.5)
+        # its answer and echo come within the turn; then the check below
+        wait.until(lambda: core.seen(lambda e: e.get("ev") == "agents" and e.get("project") == shop_id
+                                     and any(a["name"] == "main" and a["status"] != "working" for a in e["agents"]), since=off),
+                   60, "shop's main done with it")
+        with core.lock:
+            after = [e for e in core.evs[off:] if e.get("ev") == "entry" and e.get("project") == shop_id]
+        check(not after, "no entry of shop's main after voice mode ended: %r" % after)
         ok = True
         print("PASS ambient_projects_e2e", flush=True)
     finally:
