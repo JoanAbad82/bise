@@ -20,6 +20,8 @@ export const STATE_TAGS: ReadonlySet<string> = new Set([
   'merged',
   'jobs',
   'plugins',
+  // a project's hub refused this core: kept until its hub welcomes it again
+  'hub_refused',
 ]);
 
 export class Latest {
@@ -34,6 +36,8 @@ export class Latest {
     const key = `${tag} ${project}`;
     this.last.delete(key);
     this.last.set(key, ev);
+    // its hub took this core again (hub_retry): the refusal no longer holds
+    if (tag === 'welcome') this.last.delete(`hub_refused ${project}`);
   }
 
   /** The kept events, oldest change first: replayed in order they give the state now. */

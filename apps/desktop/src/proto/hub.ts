@@ -63,7 +63,7 @@ checker_model?: string | null,
  * the workspace's git root: the rules below are its own and
  * every project's
  */
-repo: string, rules: Array<ApprovalRule>, flash?: boolean, } | { "ev": "notice", project: string, cmd?: string | null, text: string, cid?: number | null, } | { "ev": "error", project?: string | null, cmd?: string | null, text: string, 
+repo: string, rules: Array<ApprovalRule>, flash?: boolean, } | { "ev": "notice", project: string, cmd?: string | null, text: string, cid?: number | null, } | { "ev": "refused", error: string, } | { "ev": "error", project?: string | null, cmd?: string | null, text: string, 
 /**
  * draft (G): the failed send's cid (HubCmd send's), to the
  * connection that sent it: the window fails exactly that row

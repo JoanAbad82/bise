@@ -93,6 +93,8 @@ export const TAGS = {
   roles: true,
   signing: true,
   app_update: true,
+  hub_refused: true,
+  refused: true,
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */
@@ -500,7 +502,17 @@ export class Store {
         // bar V8/W21: the mode, the checker and the rules, whole each time
         this.put(`approvals:${ev.project}`, ev);
         return;
+      case 'refused':
+        // a hub's own refusal of a connection: the core reads it and says
+        // hub_refused; it never reaches a window as is
+        return;
+      case 'hub_refused':
+        // a project's hub refused this core: its words until he retries
+        this.put(`hub_refused:${ev.project}`, ev.error);
+        return;
       case 'welcome':
+        // its hub took this core (again): no refusal holds
+        if (this.slices.get(`hub_refused:${ev.project}`) != null) this.put(`hub_refused:${ev.project}`, null);
         // a new hello: the hub tied the open questions to a connection
         // that is gone (the core reconnected), so none can be answered
         if (this.confirms(ev.project).length > 0) this.put(`confirms:${ev.project}`, EMPTY);
@@ -730,6 +742,14 @@ export class Store {
   /** Cut the agent off: its voice stops, its running turn is stopped. */
   voiceCut(): void {
     this.command({ cmd: 'voice_cut' });
+  }
+  /** Why a project's hub refused this core (its words), or null. */
+  hubRefused(project: string): string | null {
+    return this.slice<string | null>(`hub_refused:${project}`, null);
+  }
+  /** Try a refused project's hub again (his click): the core connects once more. */
+  hubRetry(project: string): void {
+    this.command({ cmd: 'hub_retry', project });
   }
   voiceModeNow(): VoiceModeState | null {
     return this.slice<VoiceModeState | null>('voice_mode', null);

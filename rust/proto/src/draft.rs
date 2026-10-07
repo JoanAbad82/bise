@@ -443,12 +443,16 @@ pub enum CoreEv {
     /// signature, and swaps itself only on his click. Sent once per
     /// version, never for the same build or an older one
     AppUpdate { version: String, url: String, sha256: String },
+    /// a project's hub refused this core's connection (its words): the
+    /// core never reconnects to it until he retries (`hub_retry`) or a
+    /// new core starts; commands to it get error {kind: hub_refused}
+    HubRefused { project: Project, error: String },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -593,6 +597,9 @@ pub enum AppCmd {
     VoiceSend,
     /// cut the agent off (its voice stops, its turn is stopped)
     VoiceCut,
+    /// try a refused project's hub again (his action, `hub_refused`); a
+    /// project that isn't refused: nothing
+    HubRetry { project: Project },
     /// bar N14: the card in front of him in the focused window (the ⌘I
     /// inbox's current item), or none (both absent: the window blurred,
     /// closed or left the inbox); fn's talk answers it by voice when its
@@ -661,6 +668,7 @@ impl AppCmd {
         "voice_type",
         "voice_send",
         "voice_cut",
+        "hub_retry",
         "card_in_view",
         "commands",
         "skills",

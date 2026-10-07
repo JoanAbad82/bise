@@ -24,6 +24,10 @@ pub enum HubIn {
     Up,
     /// lost, or not reachable yet: the thread keeps trying
     Down,
+    /// the hub refused this connection (bise_proto HubEv::Refused, its
+    /// words): the thread has ended, it never connects again (the hub's
+    /// verdict is about this process: retrying alone wouldn't change it)
+    Refused(String),
 }
 
 /// The writer half: None while the hub is away.
@@ -86,7 +90,18 @@ impl Hub {
                     match r.read_line(&mut line) {
                         Ok(0) | Err(_) => break,
                         Ok(_) => {
-                            if tx.send(wrap(HubIn::Line(line.trim_end().to_string()))).is_err() {
+                            let l = line.trim_end();
+                            // the typed refusal (docs/issues/16): said once,
+                            // then this reader ends without reconnecting
+                            let refused = l.contains("\"refused\"").then(|| bise_proto::hub::HubEv::decode(l));
+                            if let Some(Ok(bise_proto::hub::HubEv::Refused { error })) = refused {
+                                if let Ok(mut slot) = writer.lock() {
+                                    *slot = None;
+                                }
+                                let _ = tx.send(wrap(HubIn::Refused(error)));
+                                return;
+                            }
+                            if tx.send(wrap(HubIn::Line(l.to_string()))).is_err() {
                                 return;
                             }
                         }
@@ -127,5 +142,36 @@ impl Hub {
         let mut line = v.to_string();
         line.push('\n');
         s.write_all(line.as_bytes()).is_ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::mpsc;
+
+    /// A typed refusal then EOF: Up, Refused with the hub's words, and
+    /// the reader ends: it never connects again (connect called once).
+    #[test]
+    fn a_refusal_ends_the_reader_without_reconnecting() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let c2 = calls.clone();
+        let connect: Connect = Box::new(move || {
+            c2.fetch_add(1, Ordering::SeqCst);
+            let (core_end, mut hub_end) = UnixStream::pair()?;
+            writeln!(hub_end, "{}", serde_json::json!({"ev": "refused", "error": "an agent's process"}))?;
+            drop(hub_end);
+            Ok(core_end)
+        });
+        let (tx, rx) = mpsc::channel();
+        let hub = Hub::start(connect, tx, |h| h, Duration::from_millis(5));
+        assert_eq!(rx.recv_timeout(Duration::from_secs(3)).unwrap(), HubIn::Up);
+        assert_eq!(rx.recv_timeout(Duration::from_secs(3)).unwrap(), HubIn::Refused("an agent's process".into()));
+        // the thread ended: its sender is gone, nothing else comes
+        assert!(rx.recv_timeout(Duration::from_millis(200)).is_err());
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "connected once");
+        assert!(!hub.send(&serde_json::json!({"cmd": "x"})), "nothing goes to a hub that refused");
     }
 }

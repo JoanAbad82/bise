@@ -592,3 +592,49 @@ fn a_talk_answers_the_card_in_view_as_the_tui_decides() {
     assert!(!talk(&mut t, "the first one").iter().any(|v| v["ev"] == "voice_answer"));
     assert_eq!(t.hub.next()["text"], "the first one");
 }
+
+/// hub_refused (architect m_11379): a project hub that refuses this core
+/// (HubEv::Refused, then EOF) is never connected again on its own: one
+/// hub_refused with its words, a command that waited fails with kind
+/// hub_refused, later commands get it at once with nothing sent, a poll
+/// that still holds it opens nothing; only hub_retry (his action) opens
+/// it once more. hub_retry on a project that isn't refused does nothing.
+#[test]
+fn a_hub_that_refuses_the_core_is_never_retried_alone() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    // a command waits for shop's welcome, then the hub refuses
+    typed(&mut t, json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now", "cid": 7}));
+    let why = "a client in an agent's process (perf) can't act as you on hub.sock";
+    w.end("shop").say(json!({"ev": "refused", "error": why}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "hub_refused"));
+    let out = t.take();
+    let refused: Vec<&Value> = out.iter().filter(|v| v["ev"] == "hub_refused").collect();
+    assert_eq!(refused, [&json!({"ev": "hub_refused", "project": "shop", "error": why})], "{out:#?}");
+    assert!(
+        out.iter().any(|v| v["ev"] == "error" && v["kind"] == "hub_refused" && v["cid"] == 7 && v["text"] == format!("shop's hub refused this connection: {why}")),
+        "the waiting send failed with the hub's words: {out:#?}"
+    );
+    w.open.remove("shop");
+    // later commands: refused at once; polls and ticks open nothing
+    typed(&mut t, json!({"cmd": "subscribe", "project": "shop", "agent": "main"}));
+    typed(&mut t, json!({"cmd": "send", "project": "shop", "agent": "main", "text": "again", "mode": "now", "cid": 8}));
+    assert!(t.take().iter().any(|v| v["ev"] == "error" && v["kind"] == "hub_refused" && v["cid"] == 8));
+    for _ in 0..5 {
+        t.core.poll_projects(true);
+        w.until(&mut t, |_| true);
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    assert!(w.ends.try_recv().is_err() && !w.open.contains_key("shop"), "never connected again on its own");
+    // hub_retry on a project that isn't refused: nothing
+    typed(&mut t, json!({"cmd": "hub_retry", "project": "mail"}));
+    w.until(&mut t, |_| true);
+    assert!(!w.open.contains_key("mail") && w.ends.try_recv().is_err(), "mail isn't refused: hub_retry does nothing");
+    // his retry: shop's hub is opened once more
+    typed(&mut t, json!({"cmd": "hub_retry", "project": "shop"}));
+    w.opened(&mut t, &["shop"]);
+    w.welcome(&mut t, "shop");
+}

@@ -121,6 +121,18 @@ pub(super) struct Hubs {
     voice: Option<(String, String)>,
     /// hub-skew: the projects already told their hub is older (once each)
     older: BTreeSet<String>,
+    /// the projects whose hub refused this core's connection, with its
+    /// words (HubEv::Refused, docs/issues/16): never connected again until
+    /// he retries (`hub_retry`) or a new core starts. The hub's verdict is
+    /// about this core's process (a core started by an agent, e.g. an
+    /// ambient-qa run on a real workspace, is refused by design), so
+    /// retrying on our own would never change it
+    refused: BTreeMap<String, String>,
+}
+
+/// What a command to a refused project's hub answers (kind hub_refused).
+fn refused_text(name: &str, why: &str) -> String {
+    format!("{name}'s hub refused this connection: {why}")
 }
 
 /// hub-skew (architect m_11314): what the window says when this
@@ -238,6 +250,16 @@ impl Core {
         self.poll_projects(true);
     }
 
+    /// `hub_retry {project}`: his action on a refused project, its hub
+    /// held again (a new refusal says hub_refused again); a project that
+    /// isn't refused: nothing.
+    pub(super) fn hub_retry(&mut self, project: &str) {
+        if self.hubs.refused.remove(project).is_some() {
+            self.hold();
+            self.emit_projects();
+        }
+    }
+
     /// A window command for a project's hub (a `HubCmd` with `project`).
     pub(super) fn typed_cmd(&mut self, v: Value) {
         let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
@@ -253,6 +275,14 @@ impl Core {
         // window that sends too early reads plainly in the logs)
         if !row.home && self.hubs.shown.is_none() {
             return self.project_error(&project, &cmd, &format!("project {project} isn't shown yet"), cid, None);
+        }
+        // its hub refused this core: nothing goes until he retries
+        if let Some(why) = self.hubs.refused.get(&project).cloned() {
+            if cmd == "unsubscribe" {
+                track(&mut self.hubs.subs, &cmd, &project, &agent);
+                return;
+            }
+            return self.project_error(&project, &cmd, &refused_text(&row.name, &why), cid, Some(bise_proto::hub::ErrorKind::HubRefused));
         }
         // never a hub for a folder that is gone (its hub would start on a
         // missing workspace)
@@ -381,7 +411,7 @@ impl Core {
         // a folder gone: never its hub (it would start on a missing
         // workspace), whatever holds it
         let gone_folders: BTreeSet<String> = self.hubs.rows.iter().filter(|r| !self.folder_exists(&r.path)).map(|r| r.id.clone()).collect();
-        want.retain(|id| !gone_folders.contains(id));
+        want.retain(|id| !gone_folders.contains(id) && !self.hubs.refused.contains_key(id));
         let gone: Vec<String> = self
             .hubs
             .conns
@@ -418,6 +448,21 @@ impl Core {
             HubIn::Down => {
                 c.welcomed = false;
                 c.rows = None;
+                self.emit_projects();
+            }
+            // its reader has ended: no reconnect, its waiting commands
+            // fail with the hub's words, nothing more goes until he retries
+            HubIn::Refused(why) => {
+                let Some(c) = self.hubs.conns.remove(id) else { return };
+                c.hub.close();
+                let name = self.hubs.rows.iter().find(|r| r.id == id).map(|r| r.name.clone()).unwrap_or_else(|| id.to_string());
+                self.hubs.refused.insert(id.to_string(), why.clone());
+                for (cmd, _) in c.pending {
+                    let tag = cmd.get("cmd").and_then(Value::as_str).unwrap_or("").to_string();
+                    let cid = cmd.get("cid").and_then(Value::as_u64);
+                    self.project_error(id, &tag, &refused_text(&name, &why), cid, Some(bise_proto::hub::ErrorKind::HubRefused));
+                }
+                self.emit(json!({"ev": "hub_refused", "project": id, "error": why}));
                 self.emit_projects();
             }
             HubIn::Line(l) => {
@@ -495,7 +540,7 @@ impl Core {
 
     /// At most every [`POLL`] while the window shows something (`force`:
     /// now): the registry and the files again, the holds, the rows.
-    pub(super) fn poll_projects(&mut self, force: bool) {
+    pub(crate) fn poll_projects(&mut self, force: bool) {
         if self.hubs.shown.is_none() {
             return;
         }

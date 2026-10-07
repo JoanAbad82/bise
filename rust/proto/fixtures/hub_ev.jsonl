@@ -49,3 +49,4 @@
 {"ev":"job_end","project":"acme-1a2b3c4d","agent":"perf","state":"done","label":"make the e2e fast","summary":"p99 down 31%","key":1791100500000}
 {"ev":"followed_end","project":"acme-1a2b3c4d","agent":"perf","key":1791100500000,"state":"done","label":"make the e2e fast","summary":"p99 down 31%"}
 {"ev":"job_end","project":"acme-1a2b3c4d","agent":"docs","state":"failed","label":"rewrite the guide","summary":"the REPL crashed 3 times: oom"}
+{"ev":"refused","error":"a client in an agent's process (perf) can't act as you on hub.sock"}

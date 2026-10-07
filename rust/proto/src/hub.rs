@@ -200,6 +200,10 @@ pub enum HubEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cid: Option<u64>,
     },
+    /// the hub refused this connection (docs/issues/16: a client in an
+    /// agent's process), then closes it: socket-auth's accept.rs writes
+    /// it, the TUI and the desktop core read it (never reconnecting)
+    Refused { error: String },
     /// an unknown or refused command, never silence
     Error {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -229,7 +233,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "approvals", "notice", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)

@@ -50,4 +50,16 @@ describe('Latest', () => {
     expect(late.jobs('acme-1a2b3c4d')).toEqual(early.jobs('acme-1a2b3c4d'));
     expect(late.core()).toBe('up');
   });
+
+  it("keeps a hub's refusal for a late window until that hub welcomes the core again", () => {
+    const l = new Latest();
+    l.keep({ ev: 'hub_refused', project: 'shop', error: 'an agent process' });
+    l.keep({ ev: 'hub_refused', project: 'mail', error: 'an agent process' });
+    expect(l.snapshot().filter((e) => e['ev'] === 'hub_refused').map((e) => e['project'])).toEqual(['shop', 'mail']);
+    l.keep({ ev: 'welcome', project: 'shop', proto: 1, workspace: '/p/shop', name: 'shop' });
+    expect(l.snapshot().filter((e) => e['ev'] === 'hub_refused').map((e) => e['project'])).toEqual(['mail']);
+    const s = new Store(null);
+    for (const ev of l.snapshot()) s.apply(ev);
+    expect([s.hubRefused('mail'), s.hubRefused('shop')]).toEqual(['an agent process', null]);
+  });
 });

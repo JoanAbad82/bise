@@ -116,6 +116,8 @@ export const useHeard = (): { readonly text: string; readonly final: boolean } |
 export const useLevel = (who: 'you' | 'main' | 'agent'): number => useSlice(`level:${who}`, (s) => s.level(who));
 /** A dictation this window started (store.dictateStart()): its whole text so far, final, cancelled, error. */
 export const useDictation = (id: string | null): Dictation | null => useSlice(`dictation:${id ?? ''}`, (s) => (id === null ? null : s.dictation(id)));
+/** Why this project's hub refused this core (its words; useStore().hubRetry(project) tries again), or null. */
+export const useHubRefused = (project: string): string | null => useSlice(`hub_refused:${project}`, (s) => s.hubRefused(project));
 /** Voice mode's state in this window (null: never on here): state, heard, said, muted, note, fail. */
 export const useVoiceMode = (): VoiceModeState | null => useSlice('voice_mode', (s) => s.voiceModeNow());
 export const useCoreState = (): CoreState => useSlice('core', (s) => s.core());

@@ -62,6 +62,7 @@ export const hub_ev: readonly HubEv[] = [
   {"agent":"perf","ev":"job_end","key":1791100500000,"label":"make the e2e fast","project":"acme-1a2b3c4d","state":"done","summary":"p99 down 31%"},
   {"agent":"perf","ev":"followed_end","key":1791100500000,"label":"make the e2e fast","project":"acme-1a2b3c4d","state":"done","summary":"p99 down 31%"},
   {"agent":"docs","ev":"job_end","label":"rewrite the guide","project":"acme-1a2b3c4d","state":"failed","summary":"the REPL crashed 3 times: oom"},
+  {"error":"a client in an agent's process (perf) can't act as you on hub.sock","ev":"refused"},
 ];
 
 /** rust/proto/fixtures/hub_cmd.jsonl */
@@ -146,6 +147,7 @@ export const core_ev: readonly CoreEv[] = [
   {"ev":"files","folder":{"path":"rust"},"items":[{"dir":true,"path":"rust/tui"}],"project":"acme-1a2b3c4d","q":"rust/","rid":8},
   {"ev":"roles","items":[{"about":"your team lead","effort":"high","kind":"chat","model":"anthropic/claude-opus-5-5","name":"main","role":"main","source":"config"},{"about":"the tasks main starts","follows":"main","kind":"chat","model":"anthropic/claude-opus-5-5","name":"agents","role":"agents","source":"default"},{"about":"speech to text","kind":"voice","model":"mistral/voxtral-mini-latest","name":"voice","role":"voice","source":"env"}]},
   {"ev":"app_update","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","url":"https://github.com/gvergnaud/bise/releases/latest/download/bise-desktop-darwin-arm64.zip","version":"2026.10.2-26"},
+  {"error":"a client in an agent's process (perf) can't act as you on hub.sock","ev":"hub_refused","project":"shop-5e6f7a8b"},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */
@@ -198,6 +200,7 @@ export const app_cmd: readonly AppCmd[] = [
   {"cmd":"role_set","effort":"high","model":"mistral/devstral-medium-latest","role":"agents"},
   {"cmd":"role_set","role":"small"},
   {"built":"2026-10-07T10:00:00Z","cmd":"app_version","id":"d25"},
+  {"cmd":"hub_retry","project":"shop-5e6f7a8b"},
 ];
 
 /** rust/proto/fixtures/draft_hub_cmd.jsonl */

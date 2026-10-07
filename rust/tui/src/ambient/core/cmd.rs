@@ -81,6 +81,8 @@ pub enum Cmd {
     App(bise_proto::draft::AppCmd),
     /// voice mode's commands (core/voice_mode.rs)
     VoiceMode(bise_proto::draft::AppCmd),
+    /// try a refused project's hub again (his action)
+    HubRetry { project: String },
     /// Harness A: the words the fake voice hears at the next talk (only
     /// with the fake voice on; an error otherwise).
     FakeWords { text: String },
@@ -120,6 +122,10 @@ impl Cmd {
             "voice_mode" | "voice_mute" | "voice_type" | "voice_send" | "voice_cut" => {
                 Cmd::VoiceMode(bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))?)
             }
+            "hub_retry" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+                bise_proto::draft::AppCmd::HubRetry { project } => Cmd::HubRetry { project },
+                other => return Err(format!("{cmd}: decoded as {other:?}")),
+            },
             "card_in_view" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
                 bise_proto::draft::AppCmd::CardInView { project, card } => Cmd::CardInView { project, card },
                 other => return Err(format!("{cmd}: decoded as {other:?}")),

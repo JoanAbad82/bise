@@ -30,3 +30,4 @@
 {"ev":"files","project":"acme-1a2b3c4d","rid":8,"q":"rust/","items":[{"path":"rust/tui","dir":true}],"folder":{"path":"rust"}}
 {"ev":"roles","items":[{"role":"main","name":"main","about":"your team lead","kind":"chat","model":"anthropic/claude-opus-5-5","effort":"high","source":"config"},{"role":"agents","name":"agents","about":"the tasks main starts","kind":"chat","model":"anthropic/claude-opus-5-5","source":"default","follows":"main"},{"role":"voice","name":"voice","about":"speech to text","kind":"voice","model":"mistral/voxtral-mini-latest","source":"env"}]}
 {"ev":"app_update","version":"2026.10.2-26","url":"https://github.com/gvergnaud/bise/releases/latest/download/bise-desktop-darwin-arm64.zip","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
+{"ev":"hub_refused","project":"shop-5e6f7a8b","error":"a client in an agent's process (perf) can't act as you on hub.sock"}

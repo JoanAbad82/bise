@@ -362,6 +362,7 @@ impl Core {
             Cmd::DictateStop { id } => self.dictate_stop(&id, now),
             Cmd::DictateCancel { id } => self.dictate_cancel(&id),
             Cmd::VoiceMode(c) => self.voice_mode_cmd(c, now),
+            Cmd::HubRetry { project } => self.hub_retry(&project),
             Cmd::CardInView { project, card } => self.in_view = project.zip(card),
             Cmd::Commands => self.pick_commands(),
             Cmd::Skills { project } => self.pick_skills(project),
@@ -608,6 +609,13 @@ impl Core {
                 }
             }
             HubIn::Line(l) => self.hub_line(&l),
+            // the hub refused this core (docs/issues/16): never again until
+            // a new core starts; the window says why
+            HubIn::Refused(why) => {
+                self.hub_up = Some(false);
+                let project = bise_home::hub_id(Path::new(&self.workspace));
+                self.emit(json!({"ev": "hub_refused", "project": project, "error": why}));
+            }
         }
     }
 
