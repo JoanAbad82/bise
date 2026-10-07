@@ -10,6 +10,9 @@ use bise_catalog::auth::{EnvFile, Keys, Store};
 use bise_home::style::{hang, Style};
 use switchboard::tools_env;
 
+mod os;
+use os::{linux_check, os_release_name};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Mark {
     Ok,
@@ -269,6 +272,17 @@ fn run(cmd: &str, args: &[&str]) -> Option<String> {
     o.status.success().then(|| String::from_utf8_lossy(&o.stdout).trim().to_string())
 }
 
+/// The OS line: macOS's version check, or Linux's.
+fn os() -> Check {
+    if !cfg!(target_os = "macos") {
+        let arch = crate::version::build_target();
+        let arch = arch.split_once('-').map_or(arch.as_str(), |(_, a)| a).to_string();
+        let name = std::fs::read_to_string("/etc/os-release").ok().and_then(|t| os_release_name(&t));
+        return linux_check(name.as_deref(), &arch, Path::new("/etc/NIXOS").exists());
+    }
+    macos()
+}
+
 fn macos() -> Check {
     let version = run("/usr/bin/sw_vers", &["-productVersion"]);
     let rosetta = run("/usr/sbin/sysctl", &["-n", "sysctl.proc_translated"]).as_deref() == Some("1");
@@ -391,7 +405,7 @@ fn migration(home: &bise_home::Home) -> Check {
 /// The PATH the agents' tools are looked up on (the hub's, plus the usual
 /// dirs; the hub also adds the login shell's, BISE-166).
 fn tools_path() -> String {
-    tools_env::join_path(&[&std::env::var("PATH").unwrap_or_default(), &tools_env::STD_DIRS.join(":")])
+    tools_env::join_path(&[&std::env::var("PATH").unwrap_or_default(), &tools_env::host_std_dirs()])
 }
 
 fn git() -> Check {
@@ -802,10 +816,12 @@ pub(crate) fn main(args: &[String]) -> i32 {
     let setup = bise_catalog::Setup::load(&home.config_file());
     let config = config_check(&home.config_file(), &setup.catalog.warnings);
     let compaction = compaction_check(&setup, std::env::var("BEND_THRESHOLD").ok().as_deref());
-    let checks = vec![
-        macos(),
-        bise(verbose),
-        signature(),
+    let mut checks = vec![os(), bise(verbose)];
+    // a code signature is a macOS thing
+    if cfg!(target_os = "macos") {
+        checks.push(signature());
+    }
+    checks.extend([
         on_path(),
         home_check(&home),
         migration(&home),
@@ -814,8 +830,7 @@ pub(crate) fn main(args: &[String]) -> i32 {
         github(),
         config,
         keys,
-    ];
-    let mut checks = checks;
+    ]);
     // the ChatGPT sign-in, then the other tools' logins (presence only)
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     if let Ok(store) = Store::read(&home.auth_file()) {
