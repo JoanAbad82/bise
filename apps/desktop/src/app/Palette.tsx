@@ -7,7 +7,7 @@
 // esc closes. Its own field: the composer keeps its draft. Owner: amb-web (lead m_11864), in
 // amb-win's shell.
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { useCoreEvent, useProjects, useStore } from '@/store';
+import { useCoreEvent, useIndex, useProjects, useStore } from '@/store';
 import type { Ev } from '@/store/store';
 import { flatHits, marks, nextScope, SCOPES, searchList, type Hit, type Scope, type SearchList } from '@/search/rank';
 import { searchDataOf } from '@/search/data';
@@ -79,6 +79,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
   const store = useStore();
   const router = useRouter();
   const projects = useProjects();
+  const index = useIndex();
   const now = useNow();
   const [q, setQ] = useState('');
   const [scope, setScope] = useState<Scope>('all');
@@ -90,11 +91,15 @@ export function Palette({ onClose }: { onClose: () => void }) {
       if (READS.has(ev.ev)) setVersion((v) => v + 1);
     }, []),
   );
+  // the projects the core doesn't hold: asked once per opening, re-sent by the core on change
+  useEffect(() => {
+    store.askIndex();
+  }, [store]);
   const data = useMemo(
-    () => searchDataOf({ projects, agents: (p) => store.agents(p), artifacts: (p) => store.artifacts(p), cards: (p) => store.cards(p) }),
+    () => searchDataOf({ projects, agents: (p) => store.agents(p), artifacts: (p) => store.artifacts(p), cards: (p) => store.cards(p), index }),
     // version: a held project's agents, cards or artifacts changed
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [projects, store, version],
+    [projects, index, store, version],
   );
   const list = useMemo(() => searchList(data, q, scope, now), [data, q, scope, now]);
   const hits = useMemo(() => flatHits(list), [list]);

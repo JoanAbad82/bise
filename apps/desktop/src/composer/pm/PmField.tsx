@@ -112,6 +112,8 @@ export function PmField(p: PmFieldProps): JSX.Element {
   });
   const host = useRef<HTMLDivElement>(null);
   const ed = useRef<Editor | null>(null);
+  // he put a caret in the field once: a quote from outside goes at that caret, else at the end
+  const hadFocus = useRef(false);
   const [blank, setBlank] = useState(true);
   // the editor's handlers read the latest closures through these (set after each render)
   const changed = useRef<(tr: Transaction | null) => void>(() => undefined);
@@ -193,6 +195,12 @@ export function PmField(p: PmFieldProps): JSX.Element {
         handleKeyDown: (_v, e) => keys.current(e),
         handlePaste: (_v, e) => paste.current(e),
         handleDrop: (_v, e) => drop.current(e),
+        handleDOMEvents: {
+          focus: () => {
+            hadFocus.current = true;
+            return false;
+          },
+        },
         clipboardTextSerializer: clipboardText,
       },
     });
@@ -557,11 +565,13 @@ export function PmField(p: PmFieldProps): JSX.Element {
       if (text.trim() === '') return;
       const st = state();
       if (st === null) return;
-      // from the thread the field had no focus: the chip goes at the draft's end, the caret after it
+      // at his caret (kept while the field is blurred), after his selected words if any; a field
+      // he never put a caret in: at the draft's end (lead m_11968). The caret goes after the chip.
       const chip: Chip = { kind: 'quote', n: nextChipNumber(segmentsOf(st.doc)), text, from, ...(at === undefined ? {} : { at }) };
-      const end = TextSelection.atEnd(st.doc).from;
-      const tr = st.tr.insert(end, nodeType(st.schema, 'chip').create({ chip }));
-      tr.setSelection(TextSelection.atEnd(tr.doc));
+      const pos = hadFocus.current ? st.selection.to : TextSelection.atEnd(st.doc).from;
+      const node = nodeType(st.schema, 'chip').create({ chip });
+      const tr = st.tr.insert(pos, node);
+      tr.setSelection(TextSelection.create(tr.doc, pos + node.nodeSize));
       dispatch(tr);
       view()?.focus();
     },

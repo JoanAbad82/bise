@@ -4,6 +4,7 @@
 // · 14:05', no merge, no ask for changes); a merge happens only by his
 // click on the agent's open merge card (the hub's one /answer path).
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { copyText, QuotePop } from '@/quote/QuotePop';
 import { flatRows, handQuotes, quotesOf, range, type RowAt, type Sel } from './quote';
 import { Button, Diff, Empty, Head, Skel } from '@/ds';
 import { useCards, useDiff, useMerged, useStore } from '@/store';
@@ -91,6 +92,17 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
     router.go({ screen: 'thread', project, agent: target });
     return true;
   };
+  // the pop's parts (lead m_11968): the ask words quote with nothing typed, '⌘C copy' copies
+  const askClick = () => {
+    if (sel === null) return;
+    const qs = quotesOf(paths, fileLines, rows, sel);
+    if (qs.length === 0) return;
+    handQuotes({ project, agent: target, from, quotes: qs, key: '' });
+    router.go({ screen: 'thread', project, agent: target });
+  };
+  const copyClick = () => {
+    if (sel !== null) copyText(quotesOf(paths, fileLines, rows, sel).map((q) => q.text).join('\n'));
+  };
   const onKey = (e: KeyboardEvent) => {
     if (quoteKey(e)) return;
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && e.shiftKey && rows.length > 0) {
@@ -169,7 +181,7 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
                 add={f.add}
                 rm={f.del}
                 lines={(fileLines[i] ?? []).map((l, li) => (inSel(sel, (starts[i] ?? 0) + li) ? { ...l, sel: true } : l))}
-                pop={sel !== null && !dragging && lastFileOf(sel, rows) === i ? <span data-testid="review.quote.pop">type to ask {target} about it · ⌘C copy</span> : undefined}
+                pop={sel !== null && !dragging && lastFileOf(sel, rows) === i ? <QuotePop to={target} testId="review.quote.pop" onAsk={askClick} onCopy={copyClick} /> : undefined}
                 testId={`review.file.${i}`}
               />
             </div>

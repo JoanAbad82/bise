@@ -1,0 +1,30 @@
+/* the selection pop's parts: the pill itself is the ds's .b-quotepop look (ink, r-2, 12 px) */
+.q-pop {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: pre;
+}
+.q-part {
+  all: unset;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.q-part:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.q-dot {
+  opacity: 0.6;
+}
+
+/* the thread's pop: under the selection's last line, over the rows */
+.q-float {
+  position: fixed;
+  z-index: 15;
+  padding: 3px 10px;
+  border-radius: var(--r-2);
+  background: var(--c-ink);
+  color: var(--c-on-ink);
+  font: var(--t-12) var(--font-ui);
+  box-shadow: 0 2px 8px var(--c-shadow);
+}

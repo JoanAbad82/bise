@@ -1,9 +1,9 @@
 // The store's shapes (generated from rust/proto) mapped to the search's own view types: the one
 // place a protocol change reaches the search. Pure.
-// Today: the agents (archived too), cards and artifacts of the projects the core holds; the
-// projects it does not hold come with amb-core's index, the scheduled tasks with amb-feed's typed
-// list (lead m_11859): both are inputs here when they land.
-import type { Agent, Artifact, Card, ProjectRow } from '@/proto';
+// The agents (archived too), cards and artifacts of the projects the core holds (live slices);
+// the projects it does not hold from amb-core's index (2926a991: their view.json, as of
+// written_ms); the scheduled tasks with amb-feed's typed list (lead m_11859) when it lands.
+import type { Agent, Artifact, Card, IndexRow, ProjectRow } from '@/proto';
 import type { SearchData, SearchScheduled } from './rank';
 
 export interface StoreView {
@@ -12,6 +12,8 @@ export interface StoreView {
   readonly artifacts: (project: string) => readonly Artifact[];
   readonly cards: (project: string) => readonly Card[];
   readonly scheduled?: (project: string) => readonly SearchScheduled[];
+  /** amb-core's index: the projects the core does not hold (store.index()). */
+  readonly index?: readonly IndexRow[];
 }
 
 /** An artifact's dim words: 'page · v2', 'image'. */
@@ -19,16 +21,32 @@ const whatOf = (a: Artifact): string => (a.version > 1 ? `${a.kind} · v${String
 
 /** Everything the search reads, bise's home first, then his projects in his order. */
 export function searchDataOf(v: StoreView): SearchData {
-  const projects = [...v.projects].sort((a, b) => Number(b.home) - Number(a.home) || a.order - b.order);
+  const listed = [...v.projects].sort((a, b) => Number(b.home) - Number(a.home) || a.order - b.order);
+  const ids = new Set(listed.map((p) => p.project));
+  const idx = new Map((v.index ?? []).map((r) => [r.project, r]));
+  // a project the index knows but his list doesn't (yet): searched too, named by its id
+  const projects = [
+    ...listed.map((p) => ({ id: p.project, name: p.name, home: p.home, cards: p.cards ?? [], working: p.working })),
+    ...(v.index ?? []).filter((r) => !ids.has(r.project)).map((r) => ({ id: r.project, name: r.project, home: false, cards: [] as Card[], working: 0 })),
+  ];
+  // a held project's live slice wins; else what the index read from its files
+  const agentsOf = (p: string): readonly Agent[] => {
+    const live = v.agents(p);
+    return live.length > 0 ? live : (idx.get(p)?.agents ?? []);
+  };
+  const artifactsOf = (p: string): readonly Artifact[] => {
+    const live = v.artifacts(p);
+    return live.length > 0 ? live : (idx.get(p)?.artifacts ?? []);
+  };
   return {
-    projects: projects.map((p) => ({ id: p.project, name: p.name, home: p.home })),
+    projects: projects.map((p) => ({ id: p.id, name: p.name, home: p.home })),
     agents: projects.flatMap((p) => {
-      const cards = v.cards(p.project);
-      const open = cards.length > 0 ? cards : (p.cards ?? []);
-      return v.agents(p.project).map((a) => {
+      const cards = v.cards(p.id);
+      const open = cards.length > 0 ? cards : p.cards;
+      return agentsOf(p.id).map((a) => {
         const ask = open.find((c) => c.agent === a.name)?.question;
         return {
-          project: p.project,
+          project: p.id,
           name: a.name,
           main: a.main,
           archived: a.archived,
@@ -43,8 +61,8 @@ export function searchDataOf(v: StoreView): SearchData {
       });
     }),
     artifacts: projects.flatMap((p) =>
-      v.artifacts(p.project).map((a) => ({ project: p.project, id: a.id, title: a.title, kind: a.kind, what: whatOf(a), agent: a.agent, at_ms: a.at_ms })),
+      artifactsOf(p.id).map((a) => ({ project: p.id, id: a.id, title: a.title, kind: a.kind, what: whatOf(a), agent: a.agent, at_ms: a.at_ms })),
     ),
-    scheduled: projects.flatMap((p) => v.scheduled?.(p.project) ?? []),
+    scheduled: projects.flatMap((p) => v.scheduled?.(p.id) ?? []),
   };
 }
