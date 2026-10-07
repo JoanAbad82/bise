@@ -70,7 +70,8 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(page.getByTestId('app.sidebar.search')).toContainText('search or jump');
     await expect(page.getByTestId('app.sidebar.bise').locator('.app-cnt'), "bise's pink count").toHaveText('2');
     await expect(page.getByTestId('app.sidebar.bise').getByTestId('bise.pearl.rest'), 'something waits: the live pink pearl').toHaveCount(0);
-    await expect(page.getByTestId('app.sidebar.artifacts')).toContainText('1 new');
+    // tui-parity R17: who made it, until he opens the artifacts
+    await expect(page.getByTestId('app.sidebar.artifacts')).toContainText('1 new · perf');
     await expect(page.getByTestId('app.sidebar.scheduled')).toContainText('1');
     await expect(page.getByTestId(`app.sidebar.project.${P}`)).toContainText('∿ 2');
     await expect(page.getByTestId('app.sidebar.agent.main'), "never a 'main' row").toHaveCount(0);

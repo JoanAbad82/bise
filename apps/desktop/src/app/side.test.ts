@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Agent, ProjectRow } from '@/proto';
 import { crumbOf, folds, moreWords, panelAt, panelProject, projectSide, signOf, turnShort } from './side';
 import { keyAction, type KeyLike } from './keys';
+import { newWords } from './Sidebar';
 
 const NOW = new Date(2026, 9, 7, 14, 0).getTime();
 const agent = (name: string, status: Agent['status'], over: Partial<Agent> = {}): Agent => ({
@@ -91,5 +92,13 @@ describe('the frame', () => {
     expect(keyAction(k('Digit0'), ctx)).toEqual({ go: { screen: 'bise' } });
     expect(keyAction(k('KeyN'), ctx)).toEqual({ go: { screen: 'settings', page: 'projects' } });
     expect(keyAction(k('Comma'), ctx)).toEqual({ go: { screen: 'settings' } });
+  });
+});
+
+describe("the artifacts row's new ones (tui-parity R17)", () => {
+  it("'1 new · designer' when one agent made them, '3 new' from several, nothing when none", () => {
+    expect(newWords(1, ['designer'])).toBe('1 new · designer');
+    expect(newWords(3, ['perf', 'search'])).toBe('3 new');
+    expect(newWords(0, [])).toBe('');
   });
 });

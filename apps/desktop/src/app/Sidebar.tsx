@@ -50,6 +50,31 @@ function useSum(prefix: string, ids: string, count: (store: Store, project: stri
   );
 }
 
+/** Who made the new artifacts across these projects, in a stable order. */
+function useNewMakers(ids: string): string[] {
+  const store = useStore();
+  const names = useSyncExternalStore(
+    (cb) => {
+      const offs = ids === '' ? [] : ids.split('\n').map((p) => store.subscribe(`artifacts:${p}`, cb));
+      return () => {
+        for (const off of offs) off();
+      };
+    },
+    () => {
+      const who = new Set<string>();
+      for (const p of ids === '' ? [] : ids.split('\n')) for (const a of store.artifacts(p)) if (a.new && a.agent !== '') who.add(a.agent);
+      return [...who].sort().join('\n');
+    },
+  );
+  return useMemo(() => (names === '' ? [] : names.split('\n')), [names]);
+}
+
+/** The artifacts row's end: '1 new · designer' when one agent made them, else '3 new'; '' when none is new. Pure. */
+export function newWords(fresh: number, makers: readonly string[]): string {
+  if (fresh <= 0) return '';
+  return makers.length === 1 ? `${String(fresh)} new · ${makers[0] ?? ''}` : `${String(fresh)} new`;
+}
+
 /** Each agent's next wake in a project (its scheduled tasks' soonest run), as 'agent ms' lines. */
 function useWakes(project: string): ReadonlyMap<string, number> {
   const store = useStore();
@@ -114,6 +139,8 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const waits = useWaitingTotal();
   const ids = rows.map((p) => p.project).join('\n');
   const fresh = useSum('artifacts', ids, (s, p) => s.artifacts(p).filter((a) => a.new).length);
+  // tui-parity R17: who made the new ones ('↗ 1 new · designer'), until he opens the artifacts
+  const makers = useNewMakers(ids);
   const scheduled = useSum('scheduled', ids, (s, p) => s.scheduled(p).length);
   const projects = projectsOf(rows);
   const add = () => {
@@ -144,7 +171,8 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         onClick={() => { router.go({ screen: 'bise' }); }}
         testId="app.sidebar.bise"
       />
-      <SRow kind="top" lead="↗" name="artifacts" end={fresh > 0 ? `${String(fresh)} new` : ''} on={route.screen === 'artifacts' && route.project === ''}
+      <SRow kind="top" lead="↗" name="artifacts" end={newWords(fresh, makers)} title={makers.length > 0 ? `new from ${makers.join(', ')}` : undefined}
+        on={route.screen === 'artifacts' && route.project === ''}
         onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} testId="app.sidebar.artifacts" />
       <SRow kind="top" lead="◷" name="scheduled" end={scheduled > 0 ? String(scheduled) : ''} on={route.screen === 'scheduled'}
         onClick={() => { router.go({ screen: 'scheduled' }); }} testId="app.sidebar.scheduled" />
