@@ -105,6 +105,43 @@ def pure():
                       for e in ae), "the app's env: the try home, never a test variable: %s" % ae)
 
 
+def hook_keeps_pid():
+    """BISE_TRY_OPEN (the gate's open): the app the hook starts is found and its pid kept in
+    <try>/dev/desktop/app.pid, so --stop finds it (qa-native m_11066). The 'app' is a throwaway
+    bundle whose executable is a link to this python (not /bin/sleep: ps -E hides a platform
+    binary's env), started by the hook with the env it gets, sleeping."""
+    gate = os.path.realpath(os.path.expanduser("~/.bise/gate"))
+    os.makedirs(gate, exist_ok=True)
+    w = tempfile.mkdtemp(prefix="dtry-hook-", dir=gate)
+    tryh, app = os.path.join(w, "try"), os.path.join(w, "bise try.app")
+    started = []
+    old = os.environ.get("BISE_TRY_OPEN")
+    try:
+        os.makedirs(os.path.join(app, "Contents", "MacOS"))
+        os.symlink(os.path.realpath(sys.executable), T.app_exe(app))
+        hook = os.path.join(w, "open.sh")
+        with open(hook, "w") as f:
+            f.write('#!/bin/sh\napp="$1"; shift\nenv "$@" "$app/Contents/MacOS/bise try" -c "import signal; signal.pause()" </dev/null >/dev/null 2>&1 &\necho $! > "%s/started"\n' % w)
+        os.chmod(hook, 0o755)
+        os.environ["BISE_TRY_OPEN"] = hook
+        pid = T.open_app(app, tryh, {"PATH": "/usr/bin:/bin"})
+        started.append(int(open(os.path.join(w, "started")).read()))
+        check(pid == started[0], "the hook's app is found: %s vs %s" % (pid, started))
+        check(T.read_pid(T.app_pid_file(tryh)) == started[0], "its pid is kept in app.pid")
+        check(T.app_running(app, tryh) == started[0], "app_running (what --stop reads) sees it")
+    finally:
+        if old is None:
+            os.environ.pop("BISE_TRY_OPEN", None)
+        else:
+            os.environ["BISE_TRY_OPEN"] = old
+        for p in started:
+            try:
+                os.kill(p, 15)
+            except OSError:
+                pass
+        shutil.rmtree(w, ignore_errors=True)
+
+
 def git(*a, cwd=None):
     return subprocess.run(["git"] + list(a), cwd=cwd, capture_output=True, text=True, check=True).stdout.strip()
 
@@ -195,6 +232,7 @@ def integration():
 if __name__ == "__main__":
     pure()
     if "--pure" not in sys.argv:
+        hook_keeps_pid()
         integration()
     print("desktop-try: %s" % ("all pass" if not FAILS else "%d FAIL" % len(FAILS)))
     sys.exit(1 if FAILS else 0)

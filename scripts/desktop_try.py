@@ -359,22 +359,30 @@ def app_running(app, tryh):
 def open_app(app, tryh, env):
     """The new app on the try home, as a normal app (his run, not a test): a new instance (-n) of the
     try's own bundle, so his own app, if any runs, is left alone. BISE_TRY_OPEN (tests, gate only):
-    that command gets the app and its env instead."""
+    that command gets the app and its env instead; the app it starts is found and kept the same way,
+    so --stop finds it (qa-native m_11066)."""
     os.makedirs(os.path.dirname(app_pid_file(tryh)), exist_ok=True)
     hook = os.environ.get("BISE_TRY_OPEN")
     if hook:
         run([hook, app] + app_env(tryh, env), env)
-        return None
-    cmd = ["open", "-n", "-a", app]
-    for e in app_env(tryh, env):
-        cmd += ["--env", e]
-    run(cmd, env)
+    else:
+        cmd = ["open", "-n", "-a", app]
+        for e in app_env(tryh, env):
+            cmd += ["--env", e]
+        run(cmd, env)
+    return keep_app_pid(app, tryh)
+
+
+def keep_app_pid(app, tryh, timeout=20):
+    """Waits for the try's app to show up (find_app_pid) and keeps its pid in <try>/dev/desktop/app.pid,
+    which app_running and --stop read. None when it never shows up."""
     t0, pid = time.time(), None
-    while pid is None and time.time() - t0 < 20:
+    while pid is None and time.time() - t0 < timeout:
         pid = find_app_pid(app, tryh)
         if pid is None:
             time.sleep(0.3)
     if pid:
+        os.makedirs(os.path.dirname(app_pid_file(tryh)), exist_ok=True)
         with open(app_pid_file(tryh), "w") as f:
             f.write("%d\n" % pid)
     return pid
