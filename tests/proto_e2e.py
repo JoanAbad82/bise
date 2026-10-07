@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "diff", "jobs", "job_end", "error")
+TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "diff", "jobs", "job_end", "error")
 FIXTURES = os.path.join(e2e.ROOT, "rust", "proto", "fixtures", "hub_ev.jsonl")
 
 
@@ -75,6 +75,12 @@ def main():
         # S10: the followed jobs at hello: none yet
         c.wait(lambda: typed(c, "jobs"), 20, "jobs at hello")
         check(typed(c, "jobs")[0]["items"] == [] and typed(c, "jobs")[0]["project"] == project, "no job yet: %r" % typed(c, "jobs"))
+        # bar A.7: the PR list at hello, none here (no forge): the hub's words
+        c.wait(lambda: typed(c, "prs"), 20, "prs at hello")
+        prs0 = typed(c, "prs")[0]
+        check(prs0["items"] == [] and prs0["head"] == "" and prs0["none"].startswith("no open PR"), "no PR: %r" % prs0)
+        c.send({"cmd": "prs", "project": project})
+        c.wait(lambda: len(typed(c, "prs")) > 1, 20, "prs again on its command")
         c.wait(lambda: typed(c, "artifacts"), 20, "the artifacts at hello")
         check(typed(c, "artifacts")[0]["items"] == [] and typed(c, "artifacts")[0]["project"] == project, "no artifact yet")
 

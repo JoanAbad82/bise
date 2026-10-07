@@ -2825,22 +2825,17 @@ impl Hub {
             }
             UserCmd::Tasks => fx.push(notice(client, &board::user_board(&self.st, env.now()))),
             UserCmd::Prs => {
-                // `prs`: rows drawn like the PR lines; `text` for a client
-                // that does not know them (sb's CLI prints it)
+                // `prs`: the typed rows (bise-proto rows::Pr), the TUI
+                // draws them like the PR lines; `text` for a client that
+                // does not know them (sb's CLI prints it)
                 let places = crate::place::places(&self.st, &self.prs);
-                let text = crate::forge::news::prs_list(&places);
-                match crate::forge::news::prs_rows(&places) {
-                    None => fx.push(notice(client, &text)),
-                    Some((head, rows)) => {
-                        let rows: Vec<Value> = rows
-                            .iter()
-                            .map(|r| json!({"tone": r.tone.as_str(), "number": r.number, "url": r.url, "text": r.text}))
-                            .collect();
-                        fx.push(Effect::ToClient {
-                            client,
-                            body: json!({"ev": "prs", "head": head, "rows": rows, "text": text}),
-                        })
-                    }
+                let rows = crate::forge::news::pr_rows(&places);
+                let text = crate::forge::news::prs_list(&rows);
+                if rows.is_empty() {
+                    fx.push(notice(client, &text));
+                } else {
+                    let head = crate::forge::news::prs_head(&rows);
+                    fx.push(Effect::ToClient { client, body: json!({"ev": "prs", "head": head, "rows": rows, "text": text}) })
                 }
             }
             UserCmd::Interrupt => {

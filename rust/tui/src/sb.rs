@@ -1312,17 +1312,28 @@ fn answer_route(text: &str) -> Option<(&str, u64, &str)> {
 }
 
 /// The feed rows of the hub's `prs` answer to `/prs`:
-/// `{head, rows: [{tone, number, url, text}]}`.
+/// `{head, rows: [bise-proto rows::Pr]}`; each row's tone is the TUI's
+/// look of what it means ([`pr_tone`]), never a color from the wire.
 pub(super) fn prs_events(v: &serde_json::Value) -> Vec<Ev> {
     // the head at col 1, like every feed row's glyph column (designer)
     let head = format!(" {}", v["head"].as_str().unwrap_or_default());
     let mut out = vec![Ev::Fold { head, text: String::new(), open: false }];
     for r in v["rows"].as_array().into_iter().flatten() {
-        let s = |k: &str| r[k].as_str().unwrap_or_default().to_string();
-        let Some(number) = r["number"].as_u64() else { continue };
-        out.push(Ev::Pr { tone: s("tone"), number, url: s("url"), text: s("text"), url_row: true });
+        let Ok(pr) = serde_json::from_value::<bise_proto::rows::Pr>(r.clone()) else { continue };
+        out.push(Ev::Pr { tone: pr_tone(&pr).into(), number: pr.number, url: pr.url, text: pr.text, url_row: true });
     }
     out
+}
+
+/// A `/prs` row's tone: red when its checks fail, dim for a draft, else
+/// plain (the PR line's look, designer).
+pub(super) fn pr_tone(pr: &bise_proto::rows::Pr) -> &'static str {
+    use bise_proto::rows::{PrChecks, PrState};
+    match (pr.checks, pr.state) {
+        (PrChecks::Fail, _) => "red",
+        (_, PrState::Draft) => "dim",
+        _ => "plain",
+    }
 }
 
 /// A sender or receiver as the user reads it: the hub's own id
@@ -1596,10 +1607,30 @@ mod hub_line_tests {
         assert_eq!(p("pr : plain : x : u : hi"), Some("info hi".into()));
         // `/prs`: a dim head at col 1, each row a PR line with its URL under it
         let evs = prs_events(&serde_json::json!({"head": "1 PR open", "rows": [
-            {"tone": "red", "number": 415, "url": "https://github.com/o/r/pull/415", "text": "sb/x · x · checks fail: e2e"}]}));
+            {"number": 415, "url": "https://github.com/o/r/pull/415", "branch": "sb/x", "agents": ["x"], "state": "open", "checks": "fail",
+             "failing": ["e2e"], "review": "none", "words": "checks fail: e2e", "text": "sb/x · x · checks fail: e2e"}]}));
+        assert!(matches!(&evs[1], Ev::Pr { tone, number: 415, .. } if tone == "red"), "failing checks: red");
         let rows = draw(&evs);
         assert!(rows.starts_with(" 1 PR open\n"), "{rows}");
         assert!(rows.contains("#415 sb/x · x · checks fail: e2e\n   https://github.com/o/r/pull/415"), "{rows}");
+    }
+
+    /// Law (architect m_10314): a `/prs` row's tone, from what it means,
+    /// is the one the hub sent before (forge::news: Checks::Fail red,
+    /// else a draft dim, else plain), for every state and checks.
+    #[test]
+    fn a_pr_rows_tone_is_its_meanings_look() {
+        use bise_proto::rows::{Pr, PrChecks, PrReview, PrState};
+        let row = |state, checks| Pr {
+            number: 1, url: String::new(), branch: String::new(), agents: vec![], state, checks,
+            failing: vec![], review: PrReview::None, words: String::new(), text: String::new(),
+        };
+        for state in [PrState::Open, PrState::Draft, PrState::Unknown] {
+            for checks in [PrChecks::Pass, PrChecks::Fail, PrChecks::Running, PrChecks::None, PrChecks::Unknown] {
+                let before = if checks == PrChecks::Fail { "red" } else if state == PrState::Draft { "dim" } else { "plain" };
+                assert_eq!(pr_tone(&row(state, checks)), before, "{state:?} {checks:?}");
+            }
+        }
     }
 
     #[test]

@@ -301,6 +301,67 @@ pub struct Feature {
     pub card: Option<u64>,
 }
 
+/// An open pull request's state (merged and closed ones aren't listed).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum PrState {
+    Open,
+    Draft,
+    /// a state this version doesn't know (a newer hub)
+    #[serde(other)]
+    Unknown,
+}
+
+/// Its checks on the head commit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum PrChecks {
+    Pass,
+    Fail,
+    Running,
+    /// none reported yet
+    None,
+    #[serde(other)]
+    Unknown,
+}
+
+/// Its review.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum PrReview {
+    Approved,
+    Changes,
+    None,
+    #[serde(other)]
+    Unknown,
+}
+
+/// An open pull request of the project's places (the TUI's `/prs` row):
+/// what it means, and the hub's own words for it (never rebuilt by a
+/// client).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Pr {
+    pub number: u64,
+    pub url: String,
+    pub branch: String,
+    /// the agents of its place, in the hub's order
+    pub agents: Vec<String>,
+    pub state: PrState,
+    pub checks: PrChecks,
+    /// the failing checks' names, when `checks` is `fail`
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failing: Vec<String>,
+    pub review: PrReview,
+    /// its state in words: `changes asked · checks pass`, `draft · checks running`
+    pub words: String,
+    /// its `/prs` line after `#<number>`: `sb/x · x, y · <words>`
+    pub text: String,
+}
+
 /// A question and its options: the trailing numbered lines (`1. v1`,
 /// `1) v1`, `1 - v1`, `1 v1`, two to nine, numbered from 1) or a list
 /// inline at the end of its last line (`Que fais-tu ? 1. a 2. b`). None

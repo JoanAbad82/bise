@@ -6,7 +6,7 @@
 
 use crate::context::FnContext;
 use crate::diff::{DiffFile, DiffResult};
-use crate::rows::{Agent, Artifact, Card, DevServer, Feature, Merged, Worktree};
+use crate::rows::{Agent, Artifact, Card, DevServer, Feature, Merged, Pr, Worktree};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
@@ -74,6 +74,17 @@ pub enum HubEv {
     /// `features`, and when one changes (made, synced, built, merged,
     /// dropped, its card opened or closed, its agents)
     Features { project: Project, items: Vec<Feature> },
+    /// the open pull requests of the project's places (the TUI's `/prs`),
+    /// by number: at hello, on `prs`, and when one changes; `head` the
+    /// hub's head line (`2 PRs open`, "" when none), `none` its words when
+    /// there is no open PR
+    Prs {
+        project: Project,
+        head: String,
+        items: Vec<Pr>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        none: Option<String>,
+    },
     /// an agent's change (the answer to `diff`): its checkout or branch
     /// vs `base`; `head` its branch (none: the shared folder)
     Diff {
@@ -151,7 +162,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "diff", "route", "route_done", "jobs", "job_end", "followed_end", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "diff", "route", "route_done", "jobs", "job_end", "followed_end", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -274,6 +285,8 @@ pub enum HubCmd {
     Merged { project: Project },
     /// the features view opened: `features` comes again
     Features { project: Project },
+    /// the PR list opened: `prs` comes again
+    Prs { project: Project },
     /// a held route goes to project `to` instead (a hub id of the
     /// registry, else an error; "bise": his words stay with bise's main,
     /// a cancel); a route that ended already: an error
@@ -290,7 +303,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "route_correct", "route_cancel", "follow"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "route_correct", "route_cancel", "follow"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)

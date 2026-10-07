@@ -256,6 +256,44 @@ adopted?: boolean, created_ms: number,
 card?: number | null, };
 
 /**
+ * An open pull request's state (merged and closed ones aren't listed).
+ */
+export type PrState = "open" | "draft" | "unknown";
+
+/**
+ * Its checks on the head commit.
+ */
+export type PrChecks = "pass" | "fail" | "running" | "none" | "unknown";
+
+/**
+ * Its review.
+ */
+export type PrReview = "approved" | "changes" | "none" | "unknown";
+
+/**
+ * An open pull request of the project's places (the TUI's `/prs` row):
+ * what it means, and the hub's own words for it (never rebuilt by a
+ * client).
+ */
+export type Pr = { number: number, url: string, branch: string, 
+/**
+ * the agents of its place, in the hub's order
+ */
+agents: Array<string>, state: PrState, checks: PrChecks, 
+/**
+ * the failing checks' names, when `checks` is `fail`
+ */
+failing?: Array<string>, review: PrReview, 
+/**
+ * its state in words: `changes asked · checks pass`, `draft · checks running`
+ */
+words: string, 
+/**
+ * its `/prs` line after `#<number>`: `sb/x · x, y · <words>`
+ */
+text: string, };
+
+/**
  * An artifact of a project (what an agent made for him), the
  * `artifacts` event's row.
  */

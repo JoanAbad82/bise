@@ -24,5 +24,6 @@
 {"cmd":"route_cancel","project":"bise-home-00000000","rid":3}
 {"cmd":"merged","project":"acme-1a2b3c4d"}
 {"cmd":"features","project":"acme-1a2b3c4d"}
+{"cmd":"prs","project":"acme-1a2b3c4d"}
 {"cmd":"follow","project":"acme-1a2b3c4d","agent":"perf","on":true}
 {"cmd":"follow","project":"acme-1a2b3c4d","agent":"perf","on":false}

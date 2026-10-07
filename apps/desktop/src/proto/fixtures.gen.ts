@@ -33,6 +33,8 @@ export const hub_ev: readonly HubEv[] = [
   {"ev":"route_done","project":"bise-home-00000000","rid":4,"state":"cancelled","to":"acme-1a2b3c4d"},
   {"ev":"merged","items":[{"at_ms":1791100400000,"by":"perf","sha":"e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e","title":"perf: sort_unstable in the hot query"},{"at_ms":1791100100000,"sha":"a1b2c3d4e5f60718293a4b5c6d7e8f9012345678","title":"fix typo in README"}],"project":"acme-1a2b3c4d"},
   {"ev":"features","items":[{"adds":42,"agents":["gift-api","gift-ui"],"ahead":2,"base":"main","behind":1,"branch":"gift-cards","building":false,"card":7,"checked":true,"created_ms":1791100000000,"dels":3,"name":"gift-cards","tip":"4b825dc642cb6eb9a060e54bf8d69288fbee4904","trial":true,"tried":{"at_ms":1791100400000,"run":"~/.bise/dev/versions/4b825dc/bise","sha":"4b825dc"}},{"adds":0,"adopted":true,"agents":[],"ahead":0,"base":"main","behind":3,"branch":"old-ui","building":true,"checked":false,"created_ms":1791000000000,"dels":0,"name":"old-ui","tip":"","trial":false}],"project":"acme-1a2b3c4d"},
+  {"ev":"prs","head":"2 PRs open","items":[{"agents":["dark-mode"],"branch":"sb/dark-mode","checks":"fail","failing":["e2e"],"number":412,"review":"changes","state":"open","text":"sb/dark-mode · dark-mode · changes asked · checks fail: e2e","url":"https://github.com/acme/acme/pull/412","words":"changes asked · checks fail: e2e"},{"agents":[],"branch":"sb/perf","checks":"running","number":415,"review":"none","state":"draft","text":"sb/perf · no agent · draft · checks running","url":"https://github.com/acme/acme/pull/415","words":"draft · checks running"}],"project":"acme-1a2b3c4d"},
+  {"ev":"prs","head":"","items":[],"none":"no open PR. in PR flow, an agent in a worktree opens one when its work is done (/flow).","project":"acme-1a2b3c4d"},
   {"ev":"jobs","items":[{"agent":"perf","label":"bench the queries","of":5,"since_ms":1791100300000,"state":"running","step":3},{"agent":"docs","label":"rewrite the guide","since_ms":1791100100000,"state":"running"}],"project":"acme-1a2b3c4d"},
   {"agent":"perf","ev":"job_end","key":1791100500000,"label":"make the e2e fast","project":"acme-1a2b3c4d","state":"done","summary":"p99 down 31%"},
   {"agent":"perf","ev":"followed_end","key":1791100500000,"label":"make the e2e fast","project":"acme-1a2b3c4d","state":"done","summary":"p99 down 31%"},
@@ -67,6 +69,7 @@ export const hub_cmd: readonly HubCmd[] = [
   {"cmd":"route_cancel","project":"bise-home-00000000","rid":3},
   {"cmd":"merged","project":"acme-1a2b3c4d"},
   {"cmd":"features","project":"acme-1a2b3c4d"},
+  {"cmd":"prs","project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"follow","on":true,"project":"acme-1a2b3c4d"},
   {"agent":"perf","cmd":"follow","on":false,"project":"acme-1a2b3c4d"},
 ];

@@ -5,7 +5,8 @@
 //! live). Its commands reach the same paths as the TUI's ops (input,
 //! interrupt, `/answer`, `/archive`, `/restore`; a feature's try, merge or
 //! drop is its card's `answer`, never a command of its own, and `features`
-//! comes at hello and on change); a command this hub can't
+//! comes at hello and on change, as `prs` does, the TUI's `/prs` rows); a
+//! command this hub can't
 //! do gets `error {cmd, text}`, never silence. The rows and the live fold
 //! are pure (`crate::proto_view`); this file only wires them.
 
@@ -37,6 +38,8 @@ pub(super) struct Proto {
     jobs: String,
     /// the last `features` sent (bar A.6: sent again only when changed)
     features: String,
+    /// the last `prs` sent (bar A.7: sent again only when changed)
+    prs: String,
     /// the typed command being stepped (its connection, its tag): a
     /// notice sb-core sends that connection meanwhile becomes its error
     stepping: Option<(ClientId, String)>,
@@ -203,6 +206,8 @@ impl Shell {
             self.merged_typed(vec![id]);
             let feats = self.features_ev();
             self.proto_send(id, &feats);
+            let prs = self.prs_ev();
+            self.proto_send(id, &prs);
             return;
         }
         if !self.proto.conns.contains_key(&id) {
@@ -222,6 +227,7 @@ impl Shell {
             | HubCmd::DevServers { project }
             | HubCmd::Merged { project }
             | HubCmd::Features { project }
+            | HubCmd::Prs { project }
             | HubCmd::RouteCorrect { project, .. }
             | HubCmd::RouteCancel { project, .. }
             | HubCmd::Follow { project, .. }
@@ -326,6 +332,11 @@ impl Shell {
                 let feats = self.features_ev();
                 self.proto_send(id, &feats);
             }
+            // the forge poll's last snapshots (Hub.prs): no network here
+            HubCmd::Prs { .. } => {
+                let prs = self.prs_ev();
+                self.proto_send(id, &prs);
+            }
             // the 2 s hold (sb-core's routing hold): a route that ended
             // already gets sb-core's notice, as an error (step_typed); an
             // unknown target never reaches sb-core
@@ -340,6 +351,13 @@ impl Shell {
             HubCmd::Follow { agent, on, .. } => self.step_typed(id, &tag, Input::Follow { client: Some(id), agent, on }),
             HubCmd::Hello { .. } | HubCmd::Unknown { .. } => {}
         }
+    }
+
+    /// The typed `prs` (bar A.7): the open PRs of this hub's places, the
+    /// rows the TUI's `/prs` draws (forge::news::pr_rows).
+    fn prs_ev(&self) -> HubEv {
+        let places = crate::place::places(&self.hub.st, &self.hub.prs);
+        crate::forge::news::prs_ev(self.project(), &places)
     }
 
     /// The art store's event as the typed `artifacts`.
@@ -395,6 +413,16 @@ impl Shell {
                     self.proto.features = f;
                     for id in &ids {
                         self.proto_send(*id, &feats);
+                    }
+                }
+                // bar A.7: a PR opened, closed, reviewed or checked (the
+                // forge poll's report lands as a state change)
+                let prs = self.prs_ev();
+                let p = prs.encode();
+                if p != self.proto.prs {
+                    self.proto.prs = p;
+                    for id in &ids {
+                        self.proto_send(*id, &prs);
                     }
                 }
                 // an agent came, went, started or ended a turn: its
