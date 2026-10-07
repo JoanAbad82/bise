@@ -275,7 +275,7 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
   it("usage: the hub's gauge words in the head, as sent", () => {
     const store = new Store(null);
     act(() => {
-      store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('perf', { usage: { model: 'm', context: 42310, window: 256000, words: '42k · 17%' } })] });
+      store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('perf', { usage: { model: 'm', context: 42310, window: 256000, words: '42k · 17%', short: '17%' } })] });
     });
     const v = render(
       <StoreProvider store={store}>

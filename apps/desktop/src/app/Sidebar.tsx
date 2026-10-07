@@ -151,10 +151,11 @@ function AgentRow({ project, a, n, route, now }: { project: string; a: Agent; n:
         <>
           {n >= 1 && n <= 9 && <span className="app-n">{n}</span>}
           {a.name}
-          {/* its context gauge, the hub's words as sent ('42k · 17%', amb-feed b8cb4b1e) */}
-          {a.usage != null && a.usage.words !== '' && (
+          {/* its context gauge, the TUI panel's short form as the hub sends it ('17%', or '42k'
+              without a known window; amb-feed c317fc32); the head keeps the long words */}
+          {a.usage != null && a.usage.short !== '' && (
             <span className="app-gauge" data-testid={`app.sidebar.agent.${a.name}.gauge`}>
-              {a.usage.words}
+              {a.usage.short}
             </span>
           )}
         </>

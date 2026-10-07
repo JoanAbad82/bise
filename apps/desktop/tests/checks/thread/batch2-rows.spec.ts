@@ -32,7 +32,7 @@ const world = () => [
     ],
   },
   { ev: 'welcome', project: P, proto: 1, workspace: '/nowhere/acme', name: 'acme' },
-  { ev: 'agents', project: P, agents: [agent('main'), agent('perf', { usage: { model: 'mistral/codestral-latest', context: 42310, window: 256000, words: '42k · 17%' } }), agent('alerts')] },
+  { ev: 'agents', project: P, agents: [agent('main'), agent('perf', { usage: { model: 'mistral/codestral-latest', context: 42310, window: 256000, words: '42k · 17%', short: '17%' } }), agent('alerts')] },
   {
     ev: 'thread',
     project: P,
@@ -73,7 +73,7 @@ test("thread/batch2-rows: thinking, compaction, notices, not delivered and the c
     await expect(page.getByTestId('thread.unknown.27')).toHaveText('a row from a newer hub');
 
     await expect(page.getByTestId('thread.usage'), "the head's gauge, the hub's words").toContainText('42k · 17%');
-    await expect(page.getByTestId('app.sidebar.agent.perf.gauge'), "perf's row in the sidebar").toHaveText('42k · 17%');
+    await expect(page.getByTestId('app.sidebar.agent.perf.gauge'), "perf's row in the sidebar").toHaveText('17%');
     await page.screenshot({ path: test.info().outputPath('batch2.png') });
 
     const nd = page.getByTestId('thread.notdelivered.26');
