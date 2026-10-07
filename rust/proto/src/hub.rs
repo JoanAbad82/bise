@@ -6,7 +6,7 @@
 
 use crate::context::FnContext;
 use crate::diff::{DiffFile, DiffResult};
-use crate::rows::{Agent, Artifact, Card, DevServer, Merged, Worktree};
+use crate::rows::{Agent, Artifact, Card, DevServer, Feature, Merged, Worktree};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
@@ -70,6 +70,10 @@ pub enum HubEv {
     /// the commits that reached the trunk today, newest first: at hello,
     /// after each land and on `merged`
     Merged { project: Project, items: Vec<Merged> },
+    /// the project's feature branches (dev-flow §5.1): at hello, on
+    /// `features`, and when one changes (made, synced, built, merged,
+    /// dropped, its card opened or closed, its agents)
+    Features { project: Project, items: Vec<Feature> },
     /// an agent's change (the answer to `diff`): its checkout or branch
     /// vs `base`; `head` its branch (none: the shared folder)
     Diff {
@@ -130,7 +134,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "diff", "route", "route_done", "jobs", "job_end", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "diff", "route", "route_done", "jobs", "job_end", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -251,6 +255,8 @@ pub enum HubCmd {
     DevServers { project: Project },
     /// the changes tab opened: `merged` comes again
     Merged { project: Project },
+    /// the features view opened: `features` comes again
+    Features { project: Project },
     /// a held route goes to project `to` instead (a hub id of the
     /// registry, else an error; "bise": his words stay with bise's main,
     /// a cancel); a route that ended already: an error
@@ -267,7 +273,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "route_correct", "route_cancel", "follow"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "route_correct", "route_cancel", "follow"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)

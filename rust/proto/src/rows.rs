@@ -247,6 +247,60 @@ pub struct Worktree {
     pub behind: u32,
 }
 
+/// A feature's last try build (`sb feature` / the try card's "try it").
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct FeatureTry {
+    /// the tip built (short)
+    pub sha: String,
+    /// what to run, in his words (`~/.bise/dev/versions/fd25c45/bise`,
+    /// or `git checkout <name>` when the repo has no try command)
+    pub run: String,
+    pub at_ms: u64,
+}
+
+/// A feature branch (dev-flow §5.1): several agents land on it, he tries
+/// it, it merges into the trunk only on his answer. Its actions are the
+/// answers of its open card (`card`, kind `feature_try` or
+/// `feature_merge`) through `answer`, as in the TUI: no command of its own.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Feature {
+    pub name: String,
+    /// its local branch (never pushed)
+    pub branch: String,
+    /// the trunk it leaves and merges into (`main`)
+    pub base: String,
+    /// its live agents, in the hub's order
+    pub agents: Vec<String>,
+    /// commits it has that the trunk lacks, and the other way
+    pub ahead: u32,
+    pub behind: u32,
+    /// lines added and removed against the trunk
+    pub adds: u32,
+    pub dels: u32,
+    /// its tip (full sha; "" before git was read)
+    pub tip: String,
+    /// the repo's check passed on this tip
+    pub checked: bool,
+    /// its last try build
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tried: Option<FeatureTry>,
+    /// on trial: built, and he hasn't said merge, keep working or drop yet
+    pub trial: bool,
+    /// a try build runs now
+    pub building: bool,
+    /// an existing local branch `sb feature new` took as it was
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub adopted: bool,
+    pub created_ms: u64,
+    /// its open card (`feature_try`: try it / show the diff / not yet;
+    /// `feature_merge`: merge / keep working / drop the branch, the drop
+    /// asked once more as the TUI does), the id `answer` takes
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card: Option<u64>,
+}
+
 /// A question and its options: the trailing numbered lines (`1. v1`,
 /// `1) v1`, `1 - v1`, `1 v1`, two to nine, numbered from 1) or a list
 /// inline at the end of its last line (`Que fais-tu ? 1. a 2. b`). None

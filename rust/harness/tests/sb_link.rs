@@ -27,6 +27,8 @@ fn cases() -> Vec<Vec<&'static str>> {
         vec!["wait", "m_1", "--timeout", "1"],
         vec!["status", "working", "--note", "a note"],
         vec!["report", "done", "all good", "--decision", "d1"],
+        vec!["follow", "perf"],
+        vec!["follow", "perf", "--off"],
         vec!["inspect", "main", "--query", "x", "--around", "#3", "--limit", "2"],
         vec!["inspect", "main", "--origin"],
         vec!["spawn", "t1", "--objective", "do it"],

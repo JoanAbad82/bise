@@ -184,6 +184,78 @@ dirty: boolean,
 ahead: number, behind: number, };
 
 /**
+ * A feature's last try build (`sb feature` / the try card's "try it").
+ */
+export type FeatureTry = { 
+/**
+ * the tip built (short)
+ */
+sha: string, 
+/**
+ * what to run, in his words (`~/.bise/dev/versions/fd25c45/bise`,
+ * or `git checkout <name>` when the repo has no try command)
+ */
+run: string, at_ms: number, };
+
+/**
+ * A feature branch (dev-flow §5.1): several agents land on it, he tries
+ * it, it merges into the trunk only on his answer. Its actions are the
+ * answers of its open card (`card`, kind `feature_try` or
+ * `feature_merge`) through `answer`, as in the TUI: no command of its own.
+ */
+export type Feature = { name: string, 
+/**
+ * its local branch (never pushed)
+ */
+branch: string, 
+/**
+ * the trunk it leaves and merges into (`main`)
+ */
+base: string, 
+/**
+ * its live agents, in the hub's order
+ */
+agents: Array<string>, 
+/**
+ * commits it has that the trunk lacks, and the other way
+ */
+ahead: number, behind: number, 
+/**
+ * lines added and removed against the trunk
+ */
+adds: number, dels: number, 
+/**
+ * its tip (full sha; "" before git was read)
+ */
+tip: string, 
+/**
+ * the repo's check passed on this tip
+ */
+checked: boolean, 
+/**
+ * its last try build
+ */
+tried?: FeatureTry | null, 
+/**
+ * on trial: built, and he hasn't said merge, keep working or drop yet
+ */
+trial: boolean, 
+/**
+ * a try build runs now
+ */
+building: boolean, 
+/**
+ * an existing local branch `sb feature new` took as it was
+ */
+adopted?: boolean, created_ms: number, 
+/**
+ * its open card (`feature_try`: try it / show the diff / not yet;
+ * `feature_merge`: merge / keep working / drop the branch, the drop
+ * asked once more as the TUI does), the id `answer` takes
+ */
+card?: number | null, };
+
+/**
  * An artifact of a project (what an agent made for him), the
  * `artifacts` event's row.
  */

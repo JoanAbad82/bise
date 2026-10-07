@@ -3,7 +3,9 @@
 //! `welcome`, then `agents` and `cards` now and on each change, and the
 //! threads it subscribes to as entries (`thread`, then `entry`/`typing`
 //! live). Its commands reach the same paths as the TUI's ops (input,
-//! interrupt, `/answer`, `/archive`, `/restore`); a command this hub can't
+//! interrupt, `/answer`, `/archive`, `/restore`; a feature's try, merge or
+//! drop is its card's `answer`, never a command of its own, and `features`
+//! comes at hello and on change); a command this hub can't
 //! do gets `error {cmd, text}`, never silence. The rows and the live fold
 //! are pure (`crate::proto_view`); this file only wires them.
 
@@ -33,6 +35,8 @@ pub(super) struct Proto {
     pub(super) dev_ports: super::dev_servers::Ports,
     /// the last `jobs` sent (S10: sent again only when changed)
     jobs: String,
+    /// the last `features` sent (bar A.6: sent again only when changed)
+    features: String,
     /// the typed command being stepped (its connection, its tag): a
     /// notice sb-core sends that connection meanwhile becomes its error
     stepping: Option<(ClientId, String)>,
@@ -189,6 +193,8 @@ impl Shell {
             self.worktrees_typed(vec![id]);
             self.dev_servers_typed(vec![id]);
             self.merged_typed(vec![id]);
+            let feats = self.features_ev();
+            self.proto_send(id, &feats);
             return;
         }
         if !self.proto.conns.contains_key(&id) {
@@ -207,6 +213,7 @@ impl Shell {
             | HubCmd::Worktrees { project }
             | HubCmd::DevServers { project }
             | HubCmd::Merged { project }
+            | HubCmd::Features { project }
             | HubCmd::RouteCorrect { project, .. }
             | HubCmd::RouteCancel { project, .. }
             | HubCmd::Follow { project, .. }
@@ -306,6 +313,11 @@ impl Shell {
             HubCmd::DevServers { .. } => self.dev_servers_typed(vec![id]),
             // git and main's transcript in a thread (merged.rs)
             HubCmd::Merged { .. } => self.merged_typed(vec![id]),
+            // the registry and the facts the threads read: no git here
+            HubCmd::Features { .. } => {
+                let feats = self.features_ev();
+                self.proto_send(id, &feats);
+            }
             // the 2 s hold (sb-core's routing hold): a route that ended
             // already gets sb-core's notice, as an error (step_typed); an
             // unknown target never reaches sb-core
@@ -364,6 +376,17 @@ impl Shell {
                     self.proto.jobs = j;
                     for id in &ids {
                         self.proto_send(*id, &jobs);
+                    }
+                }
+                // bar A.6: a feature made, synced, built, merged or
+                // dropped, its card or its agents (the steps' ends and
+                // the facts' refresh come back as a snapshot)
+                let feats = self.features_ev();
+                let f = feats.encode();
+                if f != self.proto.features {
+                    self.proto.features = f;
+                    for id in &ids {
+                        self.proto_send(*id, &feats);
                     }
                 }
                 // an agent came, went, started or ended a turn: its
