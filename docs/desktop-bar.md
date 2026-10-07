@@ -273,7 +273,53 @@ model and effort, hub confirmations). Each such event gets a fixture the UI repl
 
 B16 (how a narrow window lays out) was not checked by tui-parity; ambient-pm checks it on the hand pass.
 
-## Status at ambient-app 6b1530fc (ambient-pm, for ambient-lead m_10664)
+## Status at ambient-app a2039499: what is left (ambient-pm, for ambient-lead m_12152)
+
+How this was read: the 117 specs in `apps/desktop/tests/checks`, the 214 lands since 6b1530fc, and
+the QA agents' notes in sb. No app was run, and no heavy job.
+
+Every row not listed here passes. That is a check, green on the real core or in the harness, named
+in a land or a QA report. Since 6b1530fc these rows went to pass:
+
+- ⛔1s, 2.4–2.7 (with quotes), 3.1–3.4.
+- S.2, S.3, S.6, S.7, S.8, S.9, P.1, P.2, O.3, O.5.
+- From section T:
+  - the thread's rows: batch 2, 3a and 3b, S2, S8, S12–S17, S20, S22, S23, S25 and S36;
+  - inbox, palette and preview: W6/K18, W7/K24, W14/V1, W2 (the sidebar), F5/M2/N11/B12, F7/M8/B13, M14, B11, V7/L11 and S32/C47;
+  - settings, first run, demo and voice: L5, V8/W21, V17, L1/M18, L25/S37, N14/L8 and V12/W24/L21/N13.
+
+tui-parity is re-auditing the terminal against a2039499; its new gaps will come as new rows.
+
+| row | status | owner | the smallest next step |
+|---|---|---|---|
+| S.5 + O.4 core down, crash | **fail**: app/core-line red, "copy its path" never turns "copied". native/crash and setup/offline's last-log-line were red before CoreLine got the core's end and last line | amb-win (src/app/CoreLine.tsx) | fix the copied state; qa-native reruns native/crash + native/setup |
+| O.6 every control clicks | **fail (soft)**: app/clicks on the real core, '+ add a project' green, one target still red on telemetry's screen | the target's chunk | qa-flows names the target in one line; its owner fixes it |
+| S21 PR news | **fail (flaky)**: news-real found the failing #412 PR row in one run only | amb-win, amb-feed | qa-flows makes the PR step wait on the row's event, not a time |
+| 2.1 / 2.2 / 2.3 in the real thread | built: thread/composer-sources is green in the harness; composer/lists-real's reds were fixed in 516b891a, with **no real-core rerun yet** | amb-web, amb-core | qa-type: `real.sh composer/lists-real` |
+| C3, C13, C40, C42 commands | built: thread/commands' reds (/undo, /cancel and /flow sent as messages) were fixed, with **no real-core rerun yet** | amb-home, amb-feed | qa-flows: `real.sh thread/commands` |
+| I9/C46/S30 confirmations | built: app/confirm-bar green in the harness; not run on the real core | amb-home | qa-type reruns it on the real core |
+| W5 worktree sections | check written (agents/worktrees, 3377e118); no run result in the lands | amb-win | qa-flows posts the run's result |
+| W11 artifacts in @ | check written (thread/at-artifacts, 982e582a); no run result in the lands | amb-web | qa-flows posts the run's result |
+| O.2 pages | check written (pages/open, 828910b0); no run result in the lands | amb-win | qa-flows posts the run's result |
+| O.6's composer part | check written (composer/controls); no run result found | amb-web | qa-type posts the run's result |
+| 3.5 the key list | built, no check | amb-win, amb-home | qa-flows: settings/keys, every listed key has a handler and does its act |
+| I3 ctrl+n / ctrl+p, I8 ctrl+o | built (the W7/K24 land, 72995314), no check: inbox/keys was never written | amb-home | qa-flows writes inbox/keys |
+| I6/B3 a draft per inbox item | built in part: app/keep-all keeps the ⌘I answer across a reload; two items with one draft each are not checked | amb-home | qa-flows: inbox/drafts with two items |
+| V14/S28/L2 expired sign-in | built (a7556130, vitest only); "not covered: the screen's wiring against a real core" | amb-home, amb-core | qa-native: setup/sign-in's expired case on the fake subscription |
+| F1/F2 fold all / one, V3 the help filter | built (677c70cf), no check | amb-win | qa-flows: thread/folds, and a filter case in settings/keys |
+| N2 color alone | built (a824752f), no check | amb-kit | qa-type: ds/contrast with increase contrast on |
+| S9 tool calls | partly: the tools row exists and opens; each call's state and time, its first error line and its output are not confirmed | amb-win, amb-feed | qa-flows adds a failing-call case to thread/rows |
+| S40/W3 the divider | partly: the context gauge is in the sidebar (rows-batch2); model, effort and approvals mode under the thread are not confirmed | amb-win | amb-win says where they show; qa-flows: thread/divider |
+| S3 waiting on someone | not built (no land) | amb-win, amb-feed | a typed "waiting on" field on the agent row |
+| S29/L19 computer use, live | not built (no land; P.2 setup passes) | amb-win, amb-core | plan with architect: the "took the wheel" event |
+| C15/W20/V6 any branch's diff | partly: the diff keys only; a branch by name is not built | amb-win, amb-feed | a typed diff of a branch, then /diff <branch> |
+| K2 ⏎ on an empty composer | not built | amb-win, amb-home | enter the selected agent first (the other two acts wait on S29 and V14) |
+| O.1 approvals as cards | partly: news-real checks the approval row in the thread; approve and deny from ⌘I are not confirmed | amb-home, amb-core | qa-flows: inbox/approvals |
+| S.4 where bise works | ?: app/folders checks the sidebar's folders; picking a workspace with no terminal is not confirmed | amb-home | amb-home says which screen does it; qa-flows: setup/workspace |
+| S.1 no CLI (VM) | not run: native/vm-pass is opt-in, and the last try (de71e6d2) was off-screen only | amb-mac, qa-native | one VM pass when desktop-hub frees the heavy lock |
+| B16 narrow window | not checked | ambient-pm | my hand pass |
+
+## Status at ambient-app 6b1530fc (superseded by the section above; kept for the record)
 
 How this was read: the checks in `apps/desktop/tests/checks`, the land messages on ambient-app since
 4d22b577, and the reports of qa-type, qa-flows and qa-native. No app was run.
