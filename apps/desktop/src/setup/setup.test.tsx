@@ -90,6 +90,47 @@ describe('Onboarding', () => {
     expect(screen.getByTestId('setup.step.model')).toBeTruthy();
   });
 
+  it('the projects step (round 3): a filter narrows the found list; choose a folder… adds it ticked and it is added on ⏎', async () => {
+    const p = ports();
+    const picked: string[] = [];
+    const pickFolder = () => {
+      picked.push('asked');
+      return Promise.resolve('/Users/camille/notes');
+    };
+    // the fixture's shop (recent, ticked) and a second repo not his yet, older (unticked); acme is known: not listed
+    const list: Found[] = [...found(), { name: 'billing', path: '/Users/camille/code/billing', git: true, known: false, last_ms: NOW - 90 * 86_400_000 }];
+    render(<Onboarding accounts={accounts()} found={list} perms={{}} ports={{ ...p, pickFolder }} now={NOW} />);
+    for (let i = 0; i < 3; i++) fireEvent.click(screen.getByTestId('setup.next'));
+    expect(screen.getByTestId('setup.step.projects')).toBeTruthy();
+    // the rows' checks (the rows themselves carry setup.found.<path>)
+    const names = () =>
+      [...screen.getByTestId('setup.found').querySelectorAll('[data-testid^="setup.found."], [data-testid^="setup.chosen."]')]
+        .map((e) => e.getAttribute('data-testid') ?? '')
+        .filter((id) => !id.includes('/'));
+    expect(names()).toEqual(['setup.found.shop', 'setup.found.billing']);
+    fireEvent.change(screen.getByTestId('setup.filter'), { target: { value: 'BILL' } });
+    expect(names()).toEqual(['setup.found.billing']);
+    fireEvent.change(screen.getByTestId('setup.filter'), { target: { value: 'nothing-like-it' } });
+    expect(screen.getByTestId('setup.filter.none').textContent).toContain('no repo matches');
+    fireEvent.change(screen.getByTestId('setup.filter'), { target: { value: '' } });
+    fireEvent.click(screen.getByTestId('setup.choose'));
+    await screen.findByTestId('setup.chosen.notes');
+    expect(picked).toEqual(['asked']);
+    expect(names()).toEqual(['setup.chosen.notes', 'setup.found.shop', 'setup.found.billing']);
+    expect(screen.getByTestId('setup.next').textContent).toBe('add 2 projects');
+    fireEvent.click(screen.getByTestId('setup.next'));
+    expect(p.sent).toEqual([
+      { cmd: 'project_add', path: '/Users/camille/notes' },
+      { cmd: 'project_add', path: '/Users/camille/code/shop' },
+    ]);
+  });
+
+  it('no picker in the shell: no choose a folder… button', () => {
+    render(<Onboarding accounts={accounts()} found={found()} perms={{}} ports={ports()} now={NOW} />);
+    for (let i = 0; i < 3; i++) fireEvent.click(screen.getByTestId('setup.next'));
+    expect(screen.queryByTestId('setup.choose')).toBeNull();
+  });
+
   it('the fn step: holding fn then letting go turns its button into open bise', () => {
     const p = ports();
     const props = { accounts: accounts(), found: found(), perms: {}, ports: p, now: NOW };

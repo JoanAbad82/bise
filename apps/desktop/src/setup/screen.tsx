@@ -10,6 +10,7 @@ import { useRoute, useRouter } from '@/app/router';
 import { onboarded, prefsOf, useKeyError } from '@/settings';
 import { Onboarding } from './Onboarding';
 import { useHelper } from './helper';
+import { pickerPort } from '@/settings/picker';
 
 export function OnboardingScreen() {
   const store = useStore();
@@ -32,10 +33,12 @@ export function OnboardingScreen() {
         done: () => {
           router.go({ screen: 'bise' });
         },
+        ...pickerPort(),
       }}
     />
   );
 }
+
 
 /**
  * The first prefs of a home not onboarded yet open the first launch, once,

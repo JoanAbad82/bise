@@ -10,6 +10,7 @@ import { useRouter } from '@/app/router';
 import { useHelper } from '@/setup/helper';
 import { Settings } from './Settings';
 import { pageOf } from './pages';
+import { pickerPort } from './picker';
 import type { Prefs } from './prefs';
 
 /** The prefs event's value as an object (anything else: none yet). */
@@ -133,6 +134,8 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
           store.command(cmd);
         },
         // esc on the sign-in under way (V14): the core ends it (error {cmd: sign_in, '<id>: cancelled'} + accounts)
+        // settings · add project's 'choose…' (the same bridge as the first launch's)
+        ...pickerPort(),
         cancelSignIn: (id) => {
           store.command({ cmd: 'sign_in_cancel', id });
         },

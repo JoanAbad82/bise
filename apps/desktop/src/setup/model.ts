@@ -27,12 +27,36 @@ export interface OnbState {
   readonly at: number;
   /** the found repos he ticked or unticked, by path (absent: its default) */
   readonly picks: Readonly<Record<string, boolean>>;
+  /** the folders he chose by hand ('choose a folder…'), newest first; ticked unless he unticks them */
+  readonly chosen: readonly string[];
   /** fn: held now, and held once at least */
   readonly fn: 'up' | 'down';
   readonly tried: boolean;
 }
 
-export const START: OnbState = { at: 0, picks: {}, fn: 'up', tried: false };
+export const START: OnbState = { at: 0, picks: {}, chosen: [], fn: 'up', tried: false };
+
+/** A folder he chose by hand joins the list at the top, ticked (one already found is just ticked). */
+export function choose(s: OnbState, path: string, found: readonly Found[]): OnbState {
+  const picks = { ...s.picks, [path]: true };
+  if (found.some((f) => f.path === path) || s.chosen.includes(path)) return { ...s, picks };
+  return { ...s, picks, chosen: [path, ...s.chosen] };
+}
+
+/** A chosen folder is ticked unless he unticked it. */
+export function chosenTicked(s: OnbState, path: string): boolean {
+  return s.picks[path] ?? true;
+}
+
+/** The found repos whose name or path holds every word he typed (case aside). Pure. */
+export function filterFound<T extends { name: string; path: string }>(items: readonly T[], q: string): readonly T[] {
+  const words = q.toLowerCase().split(/\s+/).filter((w) => w !== '');
+  if (words.length === 0) return items;
+  return items.filter((f) => {
+    const hay = `${f.name} ${f.path}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
+}
 
 export function stepOf(s: OnbState): Step {
   return STEPS[Math.max(0, Math.min(STEPS.length - 1, s.at))] ?? 'hello';
@@ -59,6 +83,7 @@ export function next(s: OnbState, c: Ctx): { s: OnbState; cmds: AppCmd[]; done: 
   const cmds: AppCmd[] = [];
   if (at === 'model' && !c.signedIn) return { s, cmds, done: false };
   if (at === 'projects') {
+    for (const p of s.chosen) if (chosenTicked(s, p)) cmds.push({ cmd: 'project_add', path: p });
     for (const f of c.found) if (!f.known && ticked(s, f, c.now)) cmds.push({ cmd: 'project_add', path: f.path });
   }
   if (at === 'fn') return finish(s, cmds);
@@ -78,6 +103,11 @@ export function back(s: OnbState): OnbState {
 
 export function pick(s: OnbState, f: Found, now: number): OnbState {
   return { ...s, picks: { ...s.picks, [f.path]: !ticked(s, f, now) } };
+}
+
+/** Tick or untick a folder he chose by hand. */
+export function pickChosen(s: OnbState, path: string): OnbState {
+  return { ...s, picks: { ...s.picks, [path]: !chosenTicked(s, path) } };
 }
 
 /** The helper's fn: held, let go (a hold counts as a try once he lets go). */

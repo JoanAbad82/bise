@@ -1,7 +1,22 @@
 /* the first launch (src/setup, amb-home): the ds's .b-onb centered, its foot under it; ds tokens only */
-.setup { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-4); height: 100%; min-height: 0; overflow-y: auto; padding: var(--s-6); outline: none; }
-.setup .b-onb { max-width: 560px; width: 100%; }
+/* safe center: a step taller than the window starts at its top and scrolls, never cut above (round 3) */
+.setup { display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: var(--s-4); height: 100%; min-height: 0; overflow-y: auto; padding: var(--s-6) var(--s-4); outline: none; }
+/* the step fits the window: it shrinks to the height left (the ds's 420 px floor is for the gallery) */
+.setup .b-onb { flex: 0 1 auto; min-height: 0; max-height: 100%; max-width: 560px; width: 100%; box-sizing: border-box; }
 .setup .b-onb .b-group, .setup .b-onb .b-help { text-align: left; }
+.setup-foot { flex: none; }
+/* the projects step: filter + 'choose a folder…' over the list; the list scrolls inside, the button stays */
+.setup-pick { display: flex; gap: var(--s-2); width: 100%; margin-top: var(--s-3); }
+.setup-pick .b-field { flex: 1 1 auto; min-width: 0; }
+.setup-pick .b-btn { flex: none; }
+.setup-list { flex: 1 1 auto; min-height: 72px; width: 100%; overflow-y: auto; overscroll-behavior: contain; }
+.setup-list .b-group { margin: 0; }
+@media (max-height: 640px) {
+  .setup { padding-top: var(--s-3); padding-bottom: var(--s-3); }
+  .setup .b-onb { padding-top: var(--s-3); padding-bottom: var(--s-3); }
+  .setup .b-onb .b-btn.pri { margin-top: var(--s-3); }
+  .setup .b-onb .steps { margin-top: var(--s-2); }
+}
 .setup-acts { display: inline-flex; align-items: center; gap: var(--s-1); }
 .setup-foot { display: flex; gap: var(--s-2); }
 /* a demo tip (L25 / S37): one line, the accent's soft fill, keys as keys */

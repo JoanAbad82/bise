@@ -68,3 +68,5 @@
 /* keyboard focus on the parts that take it */
 .b-opt:focus-visible,.b-row:focus-visible,.b-mi:focus-visible,.b-task:focus-visible{outline:0;box-shadow:inset 0 0 0 2px var(--c-focus)}
 .b-toggle:focus-visible,.b-check:focus-visible{outline:0;box-shadow:0 0 0 2px var(--c-solid),0 0 0 4px var(--c-focus)}
+/* a group row's check sits on the label's line: .b-gi .l span{display:block} (the sub) also caught the check (round 3 shots) */
+.b-gi .l>.b-check{display:inline-flex;margin-right:6px;vertical-align:-3px}

@@ -6,9 +6,12 @@
 // permissions and fn. Owner: amb-home.
 import { useState } from 'react';
 import type { Account, AppCmd, Found, Perm } from '@/proto';
-import { Button, Check, Chip, Group, Help, Onb } from '@/ds';
+import { Button, Check, Chip, Field, Group, Help, Onb, type GroupItem } from '@/ds';
 import { Accounts, signedIn, type KeyError } from '@/settings';
-import { allAllowed, back, finish, fnAct, next, pick, PERMS, START, stepOf, STEPS, ticked, type OnbState, type Perms } from './model';
+import {
+  allAllowed, back, choose as choose_, chosenTicked, filterFound, finish, fnAct, next, pick, pickChosen, PERMS, START, stepOf, STEPS, ticked,
+  type OnbState, type Perms,
+} from './model';
 import './setup.css';
 
 export interface OnboardingPorts {
@@ -17,6 +20,8 @@ export interface OnboardingPorts {
   perm: (perm: Perm, action: 'ask' | 'open') => void;
   /** the first launch ended (done or skipped): open bise */
   done: () => void;
+  /** the system's folder picker (window.bise.pickFolder, amb-mac): a path, or null when he cancels */
+  pickFolder?: () => Promise<string | null>;
 }
 
 export interface OnboardingProps {
@@ -41,6 +46,8 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [st, setSt] = useState<OnbState>(START);
+  // the projects step's filter over the found repos
+  const [q, setQ] = useState('');
   // the helper's fn acts fold into the state as they come (keyed on n, never re-applied)
   const [seen, setSeen] = useState(0);
   let s = st;
@@ -130,7 +137,44 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
       break;
     case 'projects': {
       const items = found.filter((f) => !f.known);
-      const n = items.filter((f) => ticked(s, f, now)).length;
+      const n = items.filter((f) => ticked(s, f, now)).length + s.chosen.filter((p) => chosenTicked(s, p)).length;
+      const shown = filterFound(items, q);
+      const choose = ports.pickFolder;
+      // the folders he chose by hand, then the found repos the filter keeps
+      const rows: GroupItem[] = [
+        ...s.chosen.map((p) => ({
+          id: p,
+          label: baseName(p),
+          sub: p,
+          check: (
+            <Check
+              on={chosenTicked(s, p)}
+              label={baseName(p)}
+              onChange={() => {
+                setSt(pickChosen(s, p));
+              }}
+              testId={`setup.chosen.${baseName(p)}`}
+            />
+          ),
+          value: 'chosen',
+        })),
+        ...shown.map((f) => ({
+          id: f.path,
+          label: f.name,
+          sub: f.path,
+          check: (
+            <Check
+              on={ticked(s, f, now)}
+              label={f.name}
+              onChange={() => {
+                setSt(pick(s, f, now));
+              }}
+              testId={`setup.found.${f.name}`}
+            />
+          ),
+          value: `git · ${ago(now - f.last_ms)}`,
+        })),
+      ];
       body = (
         <Onb
           {...frame}
@@ -138,28 +182,38 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
           sub="i found these repos in your folder. each gets its main; bise coordinates them."
           cta={{ text: n > 0 ? `add ${String(n)} ${n === 1 ? 'project' : 'projects'}` : 'continue without a project', onClick: go, testId: 'setup.next' }}
         >
-          {found.length === 0 ? (
+          <div className="setup-pick">
+            {items.length > 0 && (
+              <Field
+                placeholder="filter: type a name or a path"
+                value={q}
+                onChange={(e) => {
+                  setQ(e.currentTarget.value);
+                }}
+                testId="setup.filter"
+              />
+            )}
+            {choose && (
+              <Button
+                onClick={() => {
+                  void choose().then((p) => {
+                    if (p !== null && p !== '') setSt((cur) => choose_(cur, p, found));
+                  });
+                }}
+                testId="setup.choose"
+              >
+                choose a folder…
+              </Button>
+            )}
+          </div>
+          {found.length === 0 && s.chosen.length === 0 ? (
             <Help>looking in your folders…</Help>
+          ) : rows.length === 0 ? (
+            <Help testId="setup.filter.none">{`no repo matches “${q}”. choose a folder…, or clear the filter.`}</Help>
           ) : (
-            <Group
-              testId="setup.found"
-              items={items.map((f) => ({
-                id: f.path,
-                label: f.name,
-                sub: f.path,
-                check: (
-                  <Check
-                    on={ticked(s, f, now)}
-                    label={f.name}
-                    onChange={() => {
-                      setSt(pick(s, f, now));
-                    }}
-                    testId={`setup.found.${f.name}`}
-                  />
-                ),
-                value: `git · ${ago(now - f.last_ms)}`,
-              }))}
-            />
+            <div className="setup-list" data-testid="setup.list">
+              <Group testId="setup.found" items={rows} />
+            </div>
           )}
         </Onb>
       );
@@ -211,6 +265,12 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
       </div>
     </section>
   );
+}
+
+/** A path's last part, its name in the list. Pure. */
+export function baseName(p: string): string {
+  const parts = p.replace(/\/+$/, '').split('/');
+  return parts[parts.length - 1] ?? p;
 }
 
 function ago(ms: number): string {
