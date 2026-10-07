@@ -310,6 +310,12 @@ def page_drive_local_only():
             check(False, "drove %s" % url)
         except qa.QAError as e:
             check("local pages only" in str(e), e)
+    # never one of his apps (ambient-lead m_12343: his /Applications Chrome set off App Management)
+    for exe in ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", os.path.expanduser("~/Applications/X.app/Contents/MacOS/X"),
+                "/opt/x/Thing.app/Contents/MacOS/t"):
+        p = subprocess.run(["node", os.path.join(PLUGIN, "pagedrive.mjs"), json.dumps({"url": "http://127.0.0.1:1/x", "out": "/tmp/x"})],
+                           capture_output=True, text=True, timeout=30, env=dict(os.environ, QA_CHROME=exe))
+        check(p.returncode == 1 and json.loads(p.stdout)["error"].startswith("refused: "), (exe, p.stdout))
 
 
 @test

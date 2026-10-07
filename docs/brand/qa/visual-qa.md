@@ -18,7 +18,7 @@ and compared with the mockups and the book (§5 colors, §6 glyphs, §8–§17).
   pass with the §5 role it matches.
 - **PNG:** only the shots cited below (`*.png`, ~135 KB each); every
   other shot is in `.html` (open in a browser) and `.ansi` (`cat` in a
-  terminal). Regenerate a PNG with headless Chrome: `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars --screenshot=x.png --window-size=1220,790 file://…/x.html`.
+  terminal). Regenerate a PNG with pagedrive (Playwright's chrome-headless-shell in our own cache, never his `/Applications` Chrome: macOS charges that one to bise and its updater sets off App Management): `node plugins/ambient-qa/pagedrive.mjs '{"url": "file:///…/x.html", "out": "/tmp/x", "width": 1220, "height": 790, "scale": 1}'` writes `/tmp/x.page.png`. Install the shell once with `(cd apps/desktop && npx playwright install chromium-headless-shell)`.
 - **Passes:** `shots/dark/`, `shots/light/` (`BISE_THEME=dark|light`),
   `shots/ascii/` (`BISE_ASCII=1`, dark), onboarding in dark and light
   (`SB_ONBOARDING=on`). Re-run:

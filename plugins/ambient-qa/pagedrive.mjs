@@ -9,9 +9,9 @@
 //           {type: "text"}, {wait: ms}, {shot: "name"} (any mix in one step, in that order)
 // Prints {results, logs} as JSON: each eval's value, each shot's file, the page's console.
 import { spawn } from "node:child_process";
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from "node:fs";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { mkdtempSync, writeFileSync, rmSync, existsSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { homedir, tmpdir } from "node:os";
 
 const args = JSON.parse(process.argv[2] || "{}");
 const { url, out } = args;
@@ -23,13 +23,48 @@ const u = new URL(url);
 if (!(u.protocol === "file:" || ["127.0.0.1", "localhost", "[::1]"].includes(u.hostname))) {
   fail("local pages only (the throwaway hub's page server or a file): " + url);
 }
-const CHROME = process.env.QA_CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-if (!existsSync(CHROME)) fail("no Chrome at " + CHROME + " (QA_CHROME to point elsewhere)");
+// The browser is Playwright's chrome-headless-shell in our own cache, never one of his apps: his
+// /Applications Chrome run headless was charged to bise by macOS, its updater tried to rewrite its
+// own bundle, and App Management told him 'bise was prevented from modifying apps on your Mac'
+// (ambient-lead m_12343). The shell is a plain binary (no bundle, no updater). Install it once:
+//   (cd apps/desktop && npx playwright install chromium-headless-shell)
+const PW_CACHE = join(homedir(), "Library", "Caches", "ms-playwright");
+const CHROME = process.env.QA_CHROME || headlessShell();
+const refused = appBinary(CHROME);
+if (refused) fail(refused);
+if (!CHROME || !existsSync(CHROME)) {
+  fail("no chrome-headless-shell in " + PW_CACHE + ": run (cd apps/desktop && npx playwright install chromium-headless-shell)");
+}
+
+/** The newest chrome-headless-shell under Playwright's cache, or "". */
+function headlessShell() {
+  let best = "";
+  try {
+    for (const d of readdirSync(PW_CACHE).filter((n) => n.startsWith("chromium_headless_shell-")).sort((a, b) => Number(a.split("-")[1]) - Number(b.split("-")[1]))) {
+      for (const sub of readdirSync(join(PW_CACHE, d))) {
+        const exe = join(PW_CACHE, d, sub, "chrome-headless-shell");
+        if (existsSync(exe)) best = exe;
+      }
+    }
+  } catch { /* no cache */ }
+  return best;
+}
+
+/** Why an executable is refused (one line), or "": anything in /Applications, ~/Applications or an app bundle. */
+export function appBinary(exe) {
+  if (!exe) return "";
+  const p = resolve(exe);
+  for (const root of ["/Applications", join(homedir(), "Applications"), "/System/Applications"]) {
+    if (p === root || p.startsWith(root + "/")) return "refused: " + p + " is one of his apps (" + root + "); QA runs our own chrome-headless-shell, never his browser";
+  }
+  if (/\.app(\/|$)/.test(p)) return "refused: " + p + " is inside an app bundle we didn't build; QA runs our own chrome-headless-shell";
+  return "";
+}
 
 const dir = mkdtempSync(join(process.env.TMPDIR || tmpdir(), "qa-chrome-"));
 const port = 9300 + Math.floor(Math.random() * 600);
 const chrome = spawn(CHROME, [
-  `--user-data-dir=${dir}`, `--remote-debugging-port=${port}`, "--headless=new",
+  `--user-data-dir=${dir}`, `--remote-debugging-port=${port}`, "--headless",
   "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--disable-sync",
   `--window-size=${W},${H}`, "about:blank",
 ], { stdio: "ignore" });
