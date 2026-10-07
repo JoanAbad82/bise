@@ -19,6 +19,7 @@ import { useRouter } from '@/app/router';
 import { pickCommands, slashLine, slashOf, windowRun } from './commands';
 import { HELP_EVENT } from '@/app/keys';
 import { MAIN } from '@/app/route';
+import { RefusedLine } from '@/app/Refused';
 import { FirstRun, showsFirstRun, Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
 import { takeQuotes } from '@/review/quote';
@@ -298,6 +299,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         {stopping && <Marker>stopping {agent}…</Marker>}
         <TypingLine text={typing} />
         {/* W7/K24: the project's open items over the composer's divider (amb-home f44d082e) */}
+        {/* its hub refused this core: the hub's words and a retry, over the composer (lead m_11347) */}
+        <RefusedLine project={project} name={bise ? 'bise' : (projectName ?? project)} className="app-refused th-refused" testId="thread.refused" />
         <CardHint project={project} />
         <ThreadInbox project={project} />
         {me?.archived === true ? (

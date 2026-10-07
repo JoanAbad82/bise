@@ -6,7 +6,8 @@
 import { memo, useEffect, useState, type ReactNode } from 'react';
 import { Answered, Art, Button, Chip, Fold, Marker, Msg, Opts, Tool } from '@/ds';
 import type { Entry } from '@/proto';
-import { useAgents, useCoreState, useEntry, usePending, useProjects, useStore, useThreadOrder } from '@/store';
+import { useAgents, useCoreState, useEntry, useHubRefused, usePending, useProjects, useStore, useThreadOrder } from '@/store';
+import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
@@ -580,8 +581,13 @@ function useConnecting(project: string): string | undefined {
   const core = useCoreState();
   const agents = useAgents(project);
   const row = useProjects().find((p) => p.project === project);
+  // its hub refused this core: say so, never an endless 'connecting…' (lead m_11347; the
+  // hub's words and the retry are on the line over the composer)
+  const refused = useHubRefused(project) !== null;
+  const name = row === undefined || row.home ? 'bise' : row.name;
+  if (refused) return refusedLead(name);
   if (core === 'up' && agents.length > 0) return undefined;
-  return `connecting to ${row === undefined || row.home ? 'bise' : row.name}…`;
+  return `connecting to ${name}…`;
 }
 
 /** Seconds left to change a held route, ticking while it shows. */

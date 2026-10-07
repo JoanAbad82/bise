@@ -8,7 +8,8 @@
 import { Fragment, memo, useEffect, useSyncExternalStore } from 'react';
 import { Row, SectionHead, Side, type DotState } from '@/ds';
 import type { Agent, Feature, ProjectRow } from '@/proto';
-import { useAgents, useFeatures, useProjects } from '@/store';
+import { useAgents, useFeatures, useHubRefused, useProjects } from '@/store';
+import { RefusedLine } from './Refused';
 import { groupsOf } from '@/review/feature';
 import { dotOf, endOf, liveOf, numbersOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
@@ -18,9 +19,9 @@ import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
 import { Hint, hintUsed, useHint } from './hints';
 
-/** A project row's dot. Pure. */
-export function projectDot(p: ProjectRow): DotState {
-  if (p.missing === true) return 'er';
+/** A project row's dot (refused: its hub said no to this core, lead m_11347). Pure. */
+export function projectDot(p: ProjectRow, refused = false): DotState {
+  if (p.missing === true || refused) return 'er';
   if (!p.running) return 'off';
   // its '2 at work' is the row's words: a project's sign never moves for its agents' work (ambient m_11472)
   if (p.waits > 0) return 'nd';
@@ -28,8 +29,9 @@ export function projectDot(p: ProjectRow): DotState {
 }
 
 /** A project row's end: what waits on him (accent), else how many work, else its gone folder. Pure. */
-export function projectEnd(p: ProjectRow): { text: string; needs: boolean } {
+export function projectEnd(p: ProjectRow, refused = false): { text: string; needs: boolean } {
   if (p.missing === true) return { text: 'folder gone', needs: true };
+  if (refused) return { text: 'refused', needs: true };
   if (p.waits > 0) return { text: String(p.waits), needs: true };
   if (p.working > 0) return { text: `${p.working} at work`, needs: false };
   return { text: '', needs: false };
@@ -123,7 +125,8 @@ export function folderLine(p: Pick<ProjectRow, 'working' | 'waits'>): string {
 
 const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow; on: boolean; route: Route }) {
   const router = useRouter();
-  const end = projectEnd(p);
+  const refused = useHubRefused(p.project) !== null;
+  const end = projectEnd(p, refused);
   const open = useFolderOpen(p.project);
   return (
     <>
@@ -148,7 +151,7 @@ const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow;
             {p.name}
           </>
         }
-        dot={projectDot(p)}
+        dot={projectDot(p, refused)}
         end={end.text}
         needs={end.needs}
         on={on && route.screen === 'thread' && route.agent === MAIN}
@@ -157,6 +160,8 @@ const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow;
         }}
         testId={`app.sidebar.project.${p.project}`}
       />
+      {/* its hub refused this core: the hub's words and a retry, open or closed (lead m_11347) */}
+      <RefusedLine project={p.project} name={p.name} className="app-refused" testId={`app.sidebar.project.${p.project}.refused`} />
       {open && <Folder p={p} route={route} />}
     </>
   );
