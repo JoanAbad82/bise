@@ -35,8 +35,8 @@
 .b-help.err{color:var(--c-err)}
 .b-dot{display:inline-block;flex:none;width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--c-solid) 0,color-mix(in srgb,var(--c-text-3) 70%,transparent) 55%,transparent 72%)}
 /* working: the TUI's breeze '∿' in the dot's slot (ambient m_11472): opacity only, never a scale or a move; the agent in view pulses (text <-> text-2, 0.8 s), every other one murmurs (the Hush: text-2 <-> text-3, 1.3 s, out of step); still when the window is away or motion is reduced */
-.b-dot.wk{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:none;color:var(--c-text-2);font:400 12px/1 var(--font-ui);animation:b-hush 1.3s var(--ease-io) infinite alternate}
-.b-dot.wk::before{content:"∿"}
+.b-dot.wk{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:none;color:var(--c-text-2);font:500 var(--t-14)/1 var(--font-ui);animation:b-hush 1.3s var(--ease-io) infinite alternate}
+.b-dot.wk::before{content:"∿";position:relative;top:-1px}
 .b-row:nth-child(3n+2) .b-dot.wk{animation-delay:-.45s}.b-row:nth-child(3n) .b-dot.wk{animation-delay:-.9s}
 .b-row.on .b-dot.wk,.b-head .b-dot.wk{color:var(--c-text);animation:b-pulse .8s var(--ease-io) infinite alternate;animation-delay:0s}
 :root[data-still] .b-dot.wk,:root[data-still] .b-row.on .b-dot.wk,:root[data-still] .b-head .b-dot.wk{animation:none;color:var(--c-text-2);opacity:1}
