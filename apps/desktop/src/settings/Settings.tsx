@@ -9,7 +9,8 @@
 import { useState } from 'react';
 import type { Account, AppCmd, Found, JsonValue, Model, Perm, Plugin, ProjectRow, RoleRow } from '@/proto';
 import type { Held } from './hold';
-import type { ApprovalsCmd, ApprovalsDraft, SignInDraft } from './draft';
+import type { SignInDraft } from './draft';
+import type { ApprovalsCmd, ApprovalsEv } from './approvals';
 import { Row, Settings as Frame } from '@/ds';
 import { putPref, type Prefs } from './prefs';
 import { PAGES, PageBody, pageOf, type Page } from './pages';
@@ -39,9 +40,11 @@ export interface SettingsData {
   roleError?: string | null;
   /** a model waiting for its provider's setup (bar L5, hold.ts) */
   held?: Held | null;
-  /** the hub's approvals: mode, checker, this repo's rules (bar V8; draft.ts until typed) */
-  approvals?: ApprovalsDraft | null;
-  /** the expired sign-in: the agents waiting, the sign-in under way (bar V14; draft.ts until typed) */
+  /** the hub's approvals: mode, checker, this repo's rules (bar V8, HubEv approvals) */
+  approvals?: ApprovalsEv | null;
+  /** the hub's last refusal of an approvals or remove_rule command, in its words */
+  approvalsError?: string | null;
+  /** the expired sign-in: the agents waiting (the signin card's), the sign-in under way (bar V14; signing is draft until amb-core types it) */
   signin?: SignInDraft | null;
   /** his home folder, to say ~ */
   home?: string;
@@ -59,7 +62,7 @@ export interface SettingsPorts {
   pickFolder?: () => Promise<string | null>;
   /** a model whose provider isn't set up waits here (bar L5): hold.ts's holdForSetup */
   hold?: (h: Held) => void;
-  /** the approvals' commands (bar V8); none until the hub's are typed */
+  /** the approvals' commands (bar V8: HubCmd approvals / remove_rule) */
   approvals?: (c: ApprovalsCmd) => void;
   /** copy a text to his clipboard (the sign-in link, bar V14) */
   copy?: (text: string) => void;

@@ -171,7 +171,7 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
     case 'models':
       return <Models data={data} ports={ports} />;
     case 'approvals':
-      return <Approvals approvals={data.approvals ?? null} send={ports.approvals ?? null} home={data.home ?? ''} />;
+      return <Approvals approvals={data.approvals ?? null} send={ports.approvals ?? null} error={data.approvalsError ?? null} home={data.home ?? ''} />;
     case 'projects':
       return <Projects projects={data.projects} found={data.found} ports={ports} />;
     case 'setup':

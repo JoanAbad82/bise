@@ -6,8 +6,9 @@ import type { CoreCmd } from '@/shared/api';
 import { heldReady, modelOrSetup, needsSetup, releaseHeld, type Held } from './hold';
 import { Approvals, checkerWords, ruleNote, ruleWhat } from './approvals';
 import { Accounts, expiredWords } from './accounts';
-import type { ApprovalsCmd, ApprovalsDraft, RuleDraft } from './draft';
-import { core_ev } from '@/proto/fixtures.gen';
+import type { ApprovalsCmd, ApprovalsEv } from './approvals';
+import type { ApprovalRule } from '@/proto';
+import { core_ev, hub_ev } from '@/proto/fixtures.gen';
 import { Settings, type SettingsPorts } from './Settings';
 import { appName, excludedApps, flag, getPref, knownApps, onboarded, putPref, type Prefs } from './prefs';
 import { addPaths, offers, ordered } from './projects';
@@ -354,42 +355,60 @@ describe('which model does what (V17) and a model with no key (L5)', () => {
   });
 });
 
-describe('approvals (V8 / W21) and the expired sign-in (V14 / S28 / L2), on the draft shapes', () => {
+describe('approvals (V8 / W21) on the typed HubEv approvals, and the expired sign-in (V14 / S28 / L2)', () => {
   const NOW = 1791100400000;
-  const rule = (id: string, tool: string, pattern: string, extra: Partial<RuleDraft> = {}): RuleDraft => ({ id, tool, pattern, path: '', every: false, from: '', outside: false, ...extra });
-  const A: ApprovalsDraft = {
-    mode: 'auto', env: false, checker: 'jev', checker_who: 'TypeSafe', checker_model: 'jev-1.13', repo: '/Users/camille/acme',
-    rules: [
-      rule('r1', 'bash', 'cargo test *', { added: NOW - 3 * 86_400_000, from: 'card #12, api-v2' }),
-      rule('r2', 'edit', '', { path: '/Users/camille/notes', every: true }),
-      rule('r3', 'gmail.send_email', ''),
-    ],
+  // rules as the hub sends them: the toml's fields (their identity) + the TUI's words, no age
+  const R: ApprovalRule[] = [
+    { tool: 'bash', pattern: 'cargo test *', project: '/Users/camille/acme', added: '2026-10-02', from: 'card #12, api-v2', added_ms: NOW - 3 * 86_400_000, what: 'cargo test *', note: 'from api-v2' },
+    { tool: 'edit', path: '/Users/camille/notes', what: 'edits to ~/notes', note: 'every project' },
+    { tool: 'gmail.send_email', what: 'gmail.send_email', note: 'a connector' },
+  ];
+  const A: ApprovalsEv = {
+    ev: 'approvals', project: 'acme-1a2b3c4d', mode: 'auto', env: false, checker: 'jev', checker_who: 'TypeSafe', checker_model: 'jev-1.13', repo: '/Users/camille/acme', rules: R,
   };
 
-  it("says each rule in the TUI's words", () => {
-    expect(ruleWhat(A.rules[0] as RuleDraft)).toBe('cargo test *');
-    expect(ruleWhat(A.rules[1] as RuleDraft, '/Users/camille')).toBe('edits to ~/notes');
-    expect(ruleWhat(A.rules[2] as RuleDraft)).toBe('gmail.send_email');
-    expect(ruleNote(A.rules[0] as RuleDraft, NOW)).toBe('3 days ago · from api-v2');
-    expect(ruleNote(A.rules[1] as RuleDraft, NOW)).toBe('every project');
-    expect(ruleNote(A.rules[2] as RuleDraft, NOW)).toBe('a connector');
+  it("says each rule in the TUI's words, its age counted here from added_ms", () => {
+    expect(ruleWhat(R[0] as ApprovalRule)).toBe('cargo test *');
+    expect(ruleWhat(R[1] as ApprovalRule)).toBe('edits to ~/notes');
+    expect(ruleWhat({ tool: 'gmail.send_email' })).toBe('gmail.send_email');
+    expect(ruleNote(R[0] as ApprovalRule, NOW)).toBe('3 days ago · from api-v2');
+    expect(ruleNote(R[0] as ApprovalRule, NOW + 4 * 86_400_000)).toBe('7 days ago · from api-v2');
+    expect(ruleNote(R[1] as ApprovalRule, NOW)).toBe('every project');
+    expect(ruleNote({ tool: 'bash', added_ms: NOW }, NOW)).toBe('today');
     expect(checkerWords(A)).toBe('TypeSafe · jev-1.13');
     expect(checkerWords({ ...A, checker: 'off' })).toBe('off · every command asks you');
+    expect(checkerWords({ ...A, checker: 'unknown' })).toBe('none yet');
   });
 
-  it('the mode switches, a rule asks before it goes, keep it keeps it', () => {
+  it('the fixture approvals event draws (yolo forced by the environment, no rules)', () => {
+    const ev = hub_ev.find((e) => e.ev === 'approvals' && e.env);
+    expect(ev?.ev).toBe('approvals');
+    if (ev?.ev !== 'approvals') return;
+    render(<Approvals approvals={ev} send={null} home="/Users/me" now={NOW} />);
+    expect(screen.getByTestId('settings.approvals.repo').textContent).toBe('what runs without asking you in ~/acme.');
+    expect(screen.getByTestId('settings.approvals').textContent).toContain('yolo · this session (BISE_APPROVALS)');
+  });
+
+  it('the mode switches, a rule asks before it goes and is sent back whole, keep it keeps it, a refusal shows', () => {
     const sent: ApprovalsCmd[] = [];
-    render(<Approvals approvals={A} send={(c) => sent.push(c)} home="/Users/camille" now={NOW} />);
+    const r = render(<Approvals approvals={A} send={(c) => sent.push(c)} home="/Users/camille" now={NOW} />);
     expect(screen.getByTestId('settings.approvals.repo').textContent).toBe('what runs without asking you in ~/acme.');
     fireEvent.click(screen.getByTestId('settings.approvals.switch.1'));
-    expect(sent).toEqual([{ cmd: 'approvals', mode: 'yolo' }]);
-    fireEvent.click(screen.getByTestId('settings.approvals.rule.r1.remove'));
+    expect(sent).toEqual([{ cmd: 'approvals', project: 'acme-1a2b3c4d', mode: 'yolo' }]);
+    fireEvent.click(screen.getByTestId('settings.approvals.rule.0.remove'));
     expect(screen.getByTestId('settings.approvals.rules').textContent).toContain('remove it?');
-    fireEvent.click(screen.getByTestId('settings.approvals.rule.r1.keep'));
+    fireEvent.click(screen.getByTestId('settings.approvals.rule.0.keep'));
     expect(sent.length).toBe(1);
-    fireEvent.click(screen.getByTestId('settings.approvals.rule.r1.remove'));
-    fireEvent.click(screen.getByTestId('settings.approvals.rule.r1.yes'));
-    expect(sent[1]).toEqual({ cmd: 'remove_rule', rule: 'r1' });
+    fireEvent.click(screen.getByTestId('settings.approvals.rule.0.remove'));
+    fireEvent.click(screen.getByTestId('settings.approvals.rule.0.yes'));
+    expect(sent[1]).toEqual({ cmd: 'remove_rule', project: 'acme-1a2b3c4d', rule: R[0] });
+    // the hub's fresh list (the rule gone, every row a new object, as parsed JSON) folds any ask;
+    // a refusal says so under the list
+    fireEvent.click(screen.getByTestId('settings.approvals.rule.1.remove'));
+    const fresh = R.slice(1).map((x) => ({ ...x }));
+    r.rerender(<Approvals approvals={{ ...A, rules: fresh }} send={(c) => sent.push(c)} error="that rule is already gone" now={NOW} />);
+    expect(screen.getByTestId('settings.approvals.rules').textContent).not.toContain('remove it?');
+    expect(screen.getByTestId('settings.approvals.error').textContent).toBe('that rule is already gone');
   });
 
   it('a mode forced by the environment is said, not switched; no rule yet says how one comes; nothing sent yet says so', () => {

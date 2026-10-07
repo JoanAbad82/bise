@@ -1,9 +1,9 @@
 // Settings as the shell mounts it (route settings[/<page>]): Settings fed
 // by the store (the core's prefs, accounts, projects, found) and sending
 // through it (store.command: the core's AppCmd). Owner: amb-home.
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { JsonValue, Perm } from '@/proto';
-import { useAccounts, useComputerUse, useCoreEvent, useFound, useModels, usePlugins, usePrefs, useProjects, useRoles, useStore, type Ev } from '@/store';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import type { JsonValue, Perm, ProjectRow } from '@/proto';
+import { useAccounts, useApprovals, useComputerUse, useCoreEvent, useFound, useModels, usePlugins, usePrefs, useProjects, useRoles, useStore, type Ev } from '@/store';
 import type { KeyError } from './accounts';
 import { heldReady, holdForSetup, releaseHeld, useHeld } from './hold';
 import { useRouter } from '@/app/router';
@@ -24,6 +24,34 @@ export function prefsOf(v: JsonValue | null): Prefs | null {
 export function useKeyError(): KeyError | null {
   return useCmdError('key_set');
 }
+
+/**
+ * The agents the expired ChatGPT sign-in stopped (bar V14): the `waiting` of the hub's one signin
+ * card (Card.waiting), whichever project shows it. Read across every project's cards.
+ */
+export function useSigninWaiting(projects: readonly ProjectRow[]): readonly string[] {
+  const store = useStore();
+  const ids = projects.map((p) => p.project).join('\n');
+  const joined = useSyncExternalStore(
+    (cb) => {
+      const offs = ids === '' ? [] : ids.split('\n').map((p) => store.subscribe(`cards:${p}`, cb));
+      return () => {
+        for (const off of offs) off();
+      };
+    },
+    // a string: the same names give the same snapshot (no new array each read)
+    () => {
+      for (const p of ids === '' ? [] : ids.split('\n')) {
+        const card = store.cards(p).find((c) => c.kind === 'signin');
+        if (card) return (card.waiting ?? []).join('\n');
+      }
+      return null;
+    },
+  );
+  return joined === null || joined === '' ? NONE : joined.split('\n');
+}
+
+const NONE: readonly string[] = [];
 
 /** The core's last refusal of `cmd` (error {cmd, text}), counted so the same words twice count. */
 export function useCmdError(cmd: string): KeyError | null {
@@ -64,6 +92,13 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
     store.command(held.cmd);
     releaseHeld();
   }, [held, accounts, store]);
+  // approvals (V8): the home project's (the settings route names no project; the mode and the
+  // checker are the machine's); a refusal of either command shows under the list
+  const approvals = useApprovals(homeProject ?? '');
+  const modeError = useCmdError('approvals');
+  const ruleError = useCmdError('remove_rule');
+  const approvalsError = (ruleError?.text ?? null) ?? (modeError?.text ?? null);
+  const waiting = useSigninWaiting(projects);
   const router = useRouter();
   const prefs = prefsOf(usePrefs());
   const { perms } = useHelper();
@@ -85,8 +120,14 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
       computerUse={useComputerUse()}
       perms={perms}
       keyError={keyError}
+      approvals={approvals}
+      approvalsError={approvalsError}
+      signin={{ waiting }}
       ports={{
         send: (cmd) => {
+          store.command(cmd);
+        },
+        approvals: (cmd) => {
           store.command(cmd);
         },
         back: () => {
