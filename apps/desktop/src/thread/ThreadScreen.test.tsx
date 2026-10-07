@@ -51,8 +51,10 @@ describe('the thread screen', () => {
       </StoreProvider>,
     );
     expect(cmds).toContainEqual({ cmd: 'subscribe', project: P, agent: 'perf' });
+    const before = cmds.length;
     v.unmount();
-    expect(cmds.at(-1)).toEqual({ cmd: 'unsubscribe', project: P, agent: 'perf' });
+    // (the inbox strip in the thread says its card_in_view too)
+    expect(cmds.slice(before)).toContainEqual({ cmd: 'unsubscribe', project: P, agent: 'perf' });
   });
 
   it('⛔3: a send shows at once as his row, before any event; a failed one says so and retries', () => {

@@ -20,6 +20,7 @@ import { pickCommands, slashOf, windowRun } from './commands';
 import { HELP_EVENT } from '@/app/keys';
 import { MAIN } from '@/app/route';
 import { FirstRun, showsFirstRun } from '@/setup';
+import { ThreadInbox } from '@/inbox';
 import { dotOf, lineOf } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
@@ -225,6 +226,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} />}
         {stopping && <Marker>stopping {agent}…</Marker>}
         <TypingLine text={typing} />
+        {/* W7/K24: the project's open items over the composer's divider (amb-home f44d082e) */}
+        <ThreadInbox project={project} />
         {me?.archived === true ? (
           <History project={project} agent={agent} />
         ) : (
