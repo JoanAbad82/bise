@@ -7,7 +7,7 @@
 //   - C42: /flow pr sets it (the hub's line), /flow then says which, as the TUI's /flow;
 //   - C13: /artifacts add <url> is in /artifacts (the window's screen and the TUI's) and in the thread;
 //   - C3: /new -w --with-changes <name>: … starts the agent on its own worktree with his change,
-//     his tree clean of it; the TUI's panel lists it;
+//     his tree keeps it too (copied, as the TUI); the TUI's panel lists it;
 //   - typed slash: /compact (compacting, then the folded summary), /close N on a real card (it leaves
 //     the hub) and /close 999 (refused), /help (the key list), a refused line
 //     ('/new --with-changes x: y') in place with the TUI's words.
@@ -166,9 +166,9 @@ test('thread/commands: /undo /cancel /flow /artifacts add /new -w --with-changes
       await expect.soft.poll(() => wtPath !== '' && existsSync(path.join(wtPath, file)) && readFileSync(path.join(wtPath, file), 'utf8').includes(`his change ${n}`), { timeout: 15_000, message: 'his change moved into the new worktree' }).toBe(true);
       const status = git(ws, 'status', '--porcelain');
       test.info().attachments.push({ name: 'his-status', contentType: 'text/plain', body: Buffer.from(status) });
-      // the hub copies, never moves: worktree.rs with_changes_carries_the_user_edits asserts his tree
-      // keeps the edit too (the TUI's /new is the same path); the bar's 'his tree clean' is asked of the lead
-      test.info().annotations.push({ type: 'c3-his-tree', description: status.includes(file) ? 'his tree still has the change (hub copies)' : 'his tree is clean' });
+      // copied, never moved (ambient-lead m_11252: the TUI is the bar): his tree keeps the edit too,
+      // as worktree.rs with_changes_carries_the_user_edits asserts
+      expect.soft(status.includes(file), 'copied: his tree keeps his edit').toBe(true);
       await expect.soft.poll(() => tuiAgents(t?.screen() ?? '').some((x) => x.name === name), { timeout: 10_000, message: "the TUI's panel lists it" }).toBe(true);
       await page.screenshot({ path: test.info().outputPath('new-wt.png') });
     });
