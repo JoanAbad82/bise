@@ -16,6 +16,7 @@ Run: python3 -u tests/ambient_qa_test.py [--live]
 import datetime
 import json
 import os
+import shlex
 import shutil
 import socket
 import subprocess
@@ -676,9 +677,32 @@ def world_fixtures_seed_every_desktop_shape():
     w = os.path.join(world.GATE, "w-test")
     for p in world.plan(3):
         m = world.main_script(w, p)
-        asks = [st for a in p["agents"] for st in a["steps"] if "ask" in st]
+        asks = [st for a in p["agents"] for st in a["steps"] if "ask" in st and not st.get("main_answers")]
+        answered = [(a["name"], st["main_answers"]) for a in p["agents"] for st in a["steps"] if st.get("main_answers")]
         check(m.count("sb spawn ") == len(p["agents"]) and m.count("sb card ") == len(p["cards"]) + len(asks), "main's script: %s" % p["name"])
         check(m.count("sb card --for ") == len(asks), "an agent's question is main's card for that agent's message: %s" % p["name"])
+        for who, ans in answered:
+            # qa-flows m_11510 (b): main answers for him, a reply to the agent's message with its why
+            check("sb send %s --reply-to \"$(cat " % who in m and "--why %s" % shlex.quote(ans["why"]) in m,
+                  "main answers %s's question itself, with why: %s" % (who, p["name"]))
+    plan3 = world.plan(3)
+    check(any(st.get("main_answers") for st in plan3[0]["agents"][1]["steps"]) and world.plan(2)[0] is not None,
+          "telemetry (in every world) has the question main answers")
+    sends = [(a["name"], st["send"]) for p in plan3 for a in p["agents"] for st in a["steps"] if "send" in st]
+    check(("receipts", "checkout") in sends and "sb send checkout " in world.agent_script(w, "shop", plan3[1]["agents"][2]),
+          "a message between two other agents (receipts -> checkout, m_11510 (c)): %s" % sends)
+    ap = plan3[1].get("approval")
+    check(ap and ap["note"] and world.approval_command("/w/h", ap) == "git push --force /w/h/nowhere.git HEAD:main",
+          "the approval seed is a forced push to a missing path in the world's home, never the network (m_11510 (a)): %s" % ap)
+    ch = tempfile.mkdtemp(prefix="aqa-cfg-")
+    try:
+        os.makedirs(os.path.join(ch, ".bise"))
+        world.checker_off(ch)
+        world.checker_off(ch)
+        cfg = open(os.path.join(ch, ".bise", "config.toml")).read()
+        check(cfg.count('classify = "off"') == 1 and "[roles]" in cfg, "the world's checker is off, written once: %r" % cfg)
+    finally:
+        shutil.rmtree(ch, ignore_errors=True)
         check("{{bash: bash %s/seed/%s/" % (w, p["name"]) in m, "the brief carries the agent's script by absolute path")
         scripts = [m] + [world.agent_script(w, p["name"], a) for a in p["agents"]]
         for s in scripts:

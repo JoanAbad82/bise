@@ -81,6 +81,9 @@ PROJECTS = [
          {"name": "alerts", "place": "new", "objective": "page on-call when p99 stays above 800 ms",
           "steps": [{"write": "src/alerts.py", "text": "ALERTS = [{'metric': 'p99', 'above_ms': 800, 'for': '5m'}]\n"},
                     {"report": "progress", "text": "wiring the p99 alert", "step": "2/4"},
+                    # a question main answers for him (qa-flows m_11510 (b): the 'answered for you' row, with why)
+                    {"ask": "page on-call through PagerDuty or Slack?\n1. PagerDuty\n2. Slack",
+                     "main_answers": {"text": "PagerDuty", "why": "the runbook pages on-call through PagerDuty; Slack is for FYI only"}},
                     {"work": 3600}]},
      ]},
     {"name": "shop",
@@ -99,6 +102,8 @@ PROJECTS = [
          {"name": "receipts", "place": "new", "objective": "email the receipt after checkout",
           "steps": [{"write": "checkout/receipt.py", "text": "def receipt(order):\n    return 'total: %.2f' % order['total']\n"},
                     {"commit": "receipts: the receipt text"},
+                    # a message between two other agents (qa-flows m_11510 (c): the 'a → b' row)
+                    {"send": "checkout", "text": "the receipt shows the discounted total: does total() round before or after the code?"},
                     {"report": "progress", "text": "draft PR #415 open, e2e running", "step": "2/3"}]},
          # a FEATURE with 2 agents (qa-flows m_10155): each in its own worktree from the feature's tip,
          # landing on the feature branch, so a try and a merge are possible (sb feature ready / merge)
@@ -117,6 +122,12 @@ PROJECTS = [
                     {"report": "blocked", "text": "waiting for your answer: cart page or checkout only?"}]},
      ],
      "feature": "gift-cards",
+     # a tool approval he answers with a note, in auto mode (qa-flows m_11510 (a)): after the seeds,
+     # the world switches this hub to auto for the session, an agent force-pushes (a hard rule: a
+     # card even in auto), the world answers 'no: <note>' as him, then yolo again. The call never
+     # runs; its remote is a path in the world's home that doesn't exist, never the network.
+     "approval": {"agent": "release", "objective": "publish the release branch",
+                  "remote": "nowhere.git", "note": "use a branch, never force main"},
      # the shop's GitHub, for the PR list (ambient-lead m_10397): an origin on github.com that only the
      # world's fake gh (fake_gh.py, first on the hubs' PATH) ever answers; nothing reaches the network
      "origin": "https://github.com/acme-qa/shop.git",
@@ -187,6 +198,8 @@ def agent_script(world, project, agent):
             out.append("mkdir -p %s" % shlex.quote(os.path.dirname(f)))
             out.append("sb send main --expect-reply %s | sed -n 's/^sent \\(m_[0-9]*\\).*/\\1/p' > %s.tmp && mv %s.tmp %s"
                        % (shlex.quote(s["ask"]), shlex.quote(f), shlex.quote(f), shlex.quote(f)))
+        elif "send" in s:
+            out.append("sb send %s %s" % (shlex.quote(s["send"]), shlex.quote(s["text"])))
         elif "artifact" in s:
             out.append("sb artifact add %s --title %s" % (shlex.quote(s["artifact"]), shlex.quote(s["title"])))
         elif "work" in s:
@@ -214,13 +227,19 @@ def main_script(world, project):
         out.append("sb spawn %s%s --objective %s" % (a["name"], where, shlex.quote(brief)))
     for c in project["cards"]:
         out.append("sb card %s" % shlex.quote(c))
-    # an agent's question: wait (up to 300 s) for its message to main, then the card for it
+    # an agent's question: wait (up to 300 s) for its message to main, then the card for it, or
+    # main's own answer with its why (main_answers: the hub's 'answered' line)
     for a in project["agents"]:
         for st in a["steps"]:
             if "ask" in st:
                 f = shlex.quote(ask_file(world, project["name"], a["name"]))
                 out.append("for i in $(seq 600); do [ -s %s ] && break; sleep 0.5; done" % f)
-                out.append("[ -s %s ] && sb card --for \"$(cat %s)\" %s" % (f, f, shlex.quote(st["ask"])))
+                if st.get("main_answers"):
+                    ans = st["main_answers"]
+                    out.append("[ -s %s ] && sb send %s --reply-to \"$(cat %s)\" --why %s %s"
+                               % (f, shlex.quote(a["name"]), f, shlex.quote(ans["why"]), shlex.quote(ans["text"])))
+                else:
+                    out.append("[ -s %s ] && sb card --for \"$(cat %s)\" %s" % (f, f, shlex.quote(st["ask"])))
     out.append("echo seeded main")
     return "\n".join(out) + "\n"
 
@@ -248,6 +267,45 @@ def feature_script(world, ws, name):
         "sb feature ready %s" % q(name),
         "echo seeded feature %s" % q(name),
     ]) + "\n"
+
+
+def checker_off(home):
+    """The world's bise home has the approvals checker off ([roles] classify = "off"): a gated call
+    in auto mode is a card, never a model call (the hubs run yolo anyway, but for approval_seed)."""
+    cfg = os.path.join(home, ".bise", "config.toml")
+    text = open(cfg).read() if os.path.exists(cfg) else ""
+    if "classify" not in text:
+        with open(cfg, "a") as f:
+            f.write(("\n" if text and not text.endswith("\n") else "") + "[roles]\nclassify = \"off\"\n")
+
+
+def approval_command(home, spec):
+    """The seeded agent's call the gate asks about: a forced push (tier 0, a card in auto whatever
+    the sandbox; a write outside the workspace was let through to the sandbox, no card), to a
+    remote that is a missing path in the world's home: it could never reach the network. Pure."""
+    return "git push --force %s HEAD:main" % shlex.quote(os.path.join(home, spec["remote"]))
+
+
+def approval_seed(c, home, spec, timeout):
+    """qa-flows m_11510 (a): his answer to a tool approval with a note, in auto mode. The hub goes
+    auto for this session (BISE_APPROVALS is set, so config.toml keeps yolo), an agent's call that
+    writes outside its workspace raises the gate's card, the world answers '/answer N no: <note>' as
+    him (the hold client is the hub's starter), the call never runs, the hub goes back to yolo."""
+    def mode():
+        evs = [e for e in list(c.events) if e.get("ev") == "approvals"]
+        return evs[-1].get("mode") if evs else None
+    c.send({"op": "approvals", "mode": "auto"})
+    c.wait(lambda: mode() == "auto", timeout, "the hub in auto")
+    try:
+        c.say("/new %s: %s {{bash: %s}}" % (spec["agent"], spec["objective"], approval_command(home, spec)))
+        card = c.wait(lambda: next((cd for cd in c.cards() if cd.get("kind") == "confirm" and cd.get("agent") == spec["agent"]), None),
+                      timeout, "the approval card for %s" % spec["agent"])
+        c.say("/answer %d no: %s" % (card["id"], spec["note"]))
+        c.wait(lambda: not any(cd.get("id") == card["id"] for cd in c.cards()), timeout, "the approval card closed")
+        c.wait_line("main", "sb approval : no : %s" % spec["agent"], timeout)
+    finally:
+        c.send({"op": "approvals", "mode": "yolo"})
+        c.wait(lambda: mode() == "yolo", timeout, "the hub back in yolo")
 
 
 def write_seeds(world, projects):
@@ -368,6 +426,7 @@ def daemon(bise, root, n):
         load_factor = getattr(e2e, "load_factor", lambda: 1.0)
     home = P["home"]
     qa._prepare_home(home)
+    checker_off(home)
     home_ws = os.path.join(home, HOME_NAME)
     os.makedirs(home_ws, exist_ok=True)
     projects = plan(n)
@@ -427,6 +486,10 @@ def daemon(bise, root, n):
             if stop["now"] or time.time() - t0 > 300 * load_factor():
                 raise RuntimeError("not seeded in time: %s" % [os.path.basename(m) for m in want if not os.path.exists(m)])
             time.sleep(0.3)
+        for p in projects:
+            if p.get("approval"):
+                c = holds[[h["project"] for h in hubs].index(p["name"])]
+                approval_seed(c, home, p["approval"], 120 * load_factor())
         info = {"pid": os.getpid(), "world": world, "home": home, "bise": bise, "root": root, "projects": n,
                 "hubs": hubs, "registry": register(bise, home, [h["ws"] for h in hubs if not h["home"]]),
                 "up_ms": int(time.time() * 1000)}
