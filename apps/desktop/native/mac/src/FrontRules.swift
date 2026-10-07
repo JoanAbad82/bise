@@ -1,7 +1,7 @@
 import Foundation
 
 // FrontRules: what bise reads of the front app at fn (S9, architect F; cut
-// from apps/ambient/mac for bise-mac-helper). Pure: the reader
+// from the Swift app for bise-mac-helper). Pure: the reader
 // (FrontRead.swift) hands raw strings in; this decides what goes out, as
 // bise_proto::context::FnContext (the helper's {ev:'context'}) and the
 // spotlight's 'in front' row ({ev:'front'}). An excluded app sends nothing.

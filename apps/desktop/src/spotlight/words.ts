@@ -1,4 +1,4 @@
-// The spotlight's words, as ambient signed them for the capsule (apps/ambient/web/words.js `spot`,
+// The spotlight's words, as ambient signed them for the old web capsule (its words.js `spot`,
 // m_9164, m_9196). Pure.
 
 export const W = {

@@ -1,4 +1,4 @@
-// How the core is started (pure), as the Swift app does (apps/ambient/mac
+// How the core is started (pure), as the Swift app did (its
 // Core.swift, Support.swift CoreEnv/BisePick/Backoff): `<bise> ambient-core
 // --workspace <ws>`, or `--home` with no workspace; never PATH's `bise`
 // (a path or nothing: lead m_8079); the env without the launcher's agent

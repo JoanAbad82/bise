@@ -1,5 +1,5 @@
 // Where the capsule goes (pure; Electron's screen coordinates: y grows down).
-// Ported from apps/ambient/mac's Placement (desktop v9, S8):
+// Ported from the Swift app's Placement (desktop v9, S8):
 //   top     what he opens by hand (fn space, the spotlight): the glass's top
 //           170 px under the display's top, centred; it grows downward
 //   bottom  what bise brings (a card, the talk, an answer): the glass's bottom

@@ -181,8 +181,8 @@ system. The capsule's web UI moves to the same file. An identity = another token
 | ambient-lead | this file, `docs/ambient-app.md`, `tests/ambient_pages_e2e.py`, integration |
 | amb-core | `rust/switchboard/src/pages/` (except lint.rs), the hub/daemon/cli/core lines for pages, `rust/tui/src/ambient/**` |
 | amb-kit | `kit/` (except notes.js), `rust/switchboard/src/pages/lint.rs`, `prompts/skills-all/bise-pages/`, main's rule |
-| amb-web | `kit/notes.js`, `apps/ambient/web/**` ("for you", fn + o) |
-| amb-mac | `apps/ambient/mac/**`, `scripts/ambient.sh` |
+| amb-web | `kit/notes.js`, the capsule in `apps/desktop/src` ("for you", fn + o) |
+| amb-mac | `apps/desktop/src/main/**`, `apps/desktop/native/mac/**`, `scripts/desktop.sh` |
 
 A shared file (Cargo.toml, Cargo.lock, a new dependency): ask ambient-lead. Commit with `sb land`.
 Tests never open a browser, the app, the mic or the user's pages: a throwaway hub (tests/e2e.py),
@@ -322,5 +322,5 @@ with the payment" becomes a `sb page tick`. bise's own rows: `data-done` on repu
 ### 6.6 The full view's "for you" and the count
 Unopened pages first (`version > opened_version`, amb-core 03821a37), newest first, then seen ones
 dim; a watched page shows its watch line (amb-web 6e78047f). The menu-bar count and this list use
-one rule (questions + approvals + unopened pages), fixed in `apps/ambient/web/fixtures/count.json`
-and tested on both sides.
+one rule (questions + approvals + unopened pages), fixed in a count fixture of the old web capsule
+and tested on both sides (Swift era).

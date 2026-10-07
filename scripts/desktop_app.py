@@ -9,7 +9,7 @@
   desktop.sh stop                                   quit it (its process, by the bundle's path, never by name)
   desktop.sh status                                 running or not, its pid, the built key
 
-It replaces scripts/ambient.sh (the Swift app's), and `bise ambient` runs `desktop.sh open`.
+It replaces the Swift app's launcher script, and `bise ambient` runs `desktop.sh open`.
 
 One app, one path: <build dir>/desktop/bise.app (<build dir> as bins.sh picks it), 'bise',
 dev.bise.desktop, with this bise packed inside (Contents/Resources/bin/bise) and the native

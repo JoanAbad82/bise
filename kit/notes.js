@@ -6,8 +6,8 @@
 // When kit.js swaps in the next version (`bise:swapped`), notes re-anchor (`moved` when their
 // block or quote is gone) and show what happened to them (done, the agent's answer, open).
 //
-// Two halves: `BiseNotes.core` is pure (the words, anchoring, the notes model: node checks run it,
-// apps/ambient/web/check.mjs) and `mount()` is the DOM (the page's, under the shell's CSP: no
+// Two halves: `BiseNotes.core` is pure (the words, anchoring, the notes model: node checks run it)
+// and `mount()` is the DOM (the page's, under the shell's CSP: no
 // inline style, only CSSOM for the pins' positions). Classes are `bn-*`; looks come from the kit's
 // role tokens (notes.css).
 (function (root) {

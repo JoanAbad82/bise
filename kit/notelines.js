@@ -7,8 +7,7 @@
 // On a k-diff a click on a row's numbers picks that row, shift-click or a drag on the numbers
 // picks a run: the same toolbar as a text selection comes up.
 //
-// Two halves, like notes.js: `BiseLines.core` is pure (node checks run it, apps/ambient/web/
-// check.mjs) and the DOM helpers read the page. Loaded before notes.js.
+// Two halves, like notes.js: `BiseLines.core` is pure (node checks run it) and the DOM helpers read the page. Loaded before notes.js.
 (function (root) {
   "use strict";
 

@@ -576,7 +576,7 @@ fn run_main() -> std::io::Result<()> {
             }
             // the desktop's terminal panel: one shell, bise-proto pty lines
             Some("pty") => std::process::exit(bend_tui::pty::main(&args[1..])),
-            // bise ambient: open the app on this workspace (scripts/ambient.sh)
+            // bise ambient: open the app on this workspace (scripts/desktop.sh)
             Some("ambient") => std::process::exit(ambient::launch(&args[1..])?),
             Some("sbswitch") => {
                 // the version switcher: detached, from the old version's binary

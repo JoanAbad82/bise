@@ -2,7 +2,7 @@
 // T: the new app's composer, mounted alone on fake data by amb-web's lab (test mode,
 // '#route=lab/composer', amb-win d4ab66dd); its sends show in the lab's visible log (lab.sent.<n>),
 // the effect a check reads. Every composer check was red first on the old Swift app's window (sets
-// 1 and 2, d38f2df9 and 0f13bb20); that target went with apps/ambient (delete plan step 2).
+// 1 and 2, d38f2df9 and 0f13bb20); that target went with the old apps (delete plan step 2).
 import path from 'node:path';
 import { launchDesktop, type Session } from '../../harness';
 

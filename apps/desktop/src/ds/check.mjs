@@ -16,7 +16,7 @@ function law(name, fn) {
 }
 
 // src/ds is the design system now: desktop-ds v5 was copied in from designer's reference, which
-// went with apps/ambient (amb-mac's delete plan, step 2), so no law compares it with a reference.
+// went with the old capsule (amb-mac's delete plan, step 2), so no law compares it with a reference.
 
 law("index.css imports tokens.css first, md-tokens.css next, then every file of css/, live.css last", () => {
   const imports = [...read(join(here, "index.css")).matchAll(/@import "\.\/([\w/.-]+)";/g)].map((m) => m[1]);

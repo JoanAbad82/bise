@@ -1,6 +1,6 @@
 // Tab: a Chromium browser's active tab URL, through AppleScript, only when
 // he already allowed bise to automate that browser (never asks: a
-// prompt at fn would be in his face). Cut from apps/ambient/mac's Browser.
+// prompt at fn would be in his face). Cut from the Swift app's Browser.
 // One script at a time: a second asker waits for the same answer.
 
 import AppKit

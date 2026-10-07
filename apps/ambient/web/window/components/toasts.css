@@ -1,5 +1,0 @@
-/* bise desktop window · toasts */
-.b-toast{display:flex;align-items:center;gap:10px;width:min(380px,100%);padding:10px 12px 10px 14px;border-radius:var(--r-3);background:var(--c-overlay);backdrop-filter:var(--glass);box-shadow:var(--e-2);font-size:var(--t-13);animation:b-rise var(--d-base) var(--ease-pop) both}
-.b-toast .end{margin-left:auto;display:flex;gap:4px}
-.b-toast.err{box-shadow:var(--e-2),inset 3px 0 0 var(--c-err)}
-.b-toast .m{color:var(--c-err);font-weight:700}

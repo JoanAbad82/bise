@@ -108,7 +108,7 @@
   const start = (flow) => ({ flow: flow || 0, ...MOODS.rest });
 
   // the shader on a canvas: draw(S, t, level) with the mood values S as they are (the capsule
-  // eases them; the sprite tool sets them, apps/ambient/web/tools/pearl-sprites.mjs)
+  // eases them)
   function renderer(cv, opts) {
     const gl = cv.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: false, ...(opts || {}) });
     if (!gl) return null;

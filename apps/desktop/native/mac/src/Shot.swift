@@ -1,5 +1,5 @@
 // Shot: one PNG of the front window (ScreenCaptureKit), when Electron asks
-// ({cmd:'shot', id, dir}; cut from apps/ambient/mac). Never shown, never
+// ({cmd:'shot', id, dir}; cut from the Swift app). Never shown, never
 // kept: the core stores it and deletes the file. The skip list: password managers,
 // private browser windows, System Settings: nothing is captured, the chip
 // says so.

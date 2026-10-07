@@ -5,7 +5,13 @@ Lead: the task `ambient-lead` (tech, integration). Design lead: `ambient` (look,
 words; it signs off the screens), with `designer` for the brand. The design spec is ambient's
 `SPEC.md` next to the mocks (`site/content/ambient/`, untracked, local: http://127.0.0.1:4747/content/ambient/).
 The mocks stay out of git; the app's own code (the constellation port included) is new code in
-`apps/ambient/`.
+`apps/desktop/`.
+
+> **The Swift app and the old web capsule are gone** (amb-mac's delete plan, lead m_12155). bise
+> ambient is the Electron app in `apps/desktop` (window, capsule and tray in one app) with the
+> native helper `apps/desktop/native/mac` (fn, shots, quiet moments, permissions); `bise ambient`
+> runs `scripts/desktop.sh open`. The core contract (§4) still holds; the app-side parts of §2-§3
+> and the owners below describe the Swift era and stay as history.
 
 ## 1. What v1 is (done when)
 
@@ -24,7 +30,7 @@ are two views of one thread.
 Three pieces, two processes, one new native binary:
 
 ```
- bise ambient.app (Swift, AppKit)                        bise ambient-core (Rust, in bend-tui)
+ the Swift app (AppKit, deleted)                         bise ambient-core (Rust, in bend-tui)
  ┌──────────────────────────────────────┐   stdio JSON  ┌─────────────────────────────────────┐
  │ capsule NSPanel ─ WKWebView (web UI) │◀─────────────▶│ hub client (hub.sock, like the TUI) │
  │ edge-glow overlay window             │   lines       │ mic + listener (voicemode: cpal,    │
@@ -33,7 +39,7 @@ Three pieces, two processes, one new native binary:
  │ ScreenCaptureKit front-window shot   │               │ screenshot → image store → marker   │
  │ notifications (UNUserNotification)   │               │ state/lines → compact UI events     │
  └──────────────────────────────────────┘               └─────────────────────────────────────┘
-        apps/ambient/mac/   apps/ambient/web/                  rust/tui/src/ambient/
+        (the Swift app)    (the web capsule)                  rust/tui/src/ambient/
 ```
 
 Why this split:
@@ -50,11 +56,11 @@ Why this split:
   `bise_catalog`) and the image markers (`bend-images`) already exist in Rust. The core is a
   subcommand of the `bise` binary (`bise ambient-core`, a module of bend-tui so it reaches
   `voicemode` and the `sb` wire parsing): **no new Rust binary**.
-- **One new native binary, one stable path.** `scripts/ambient.sh build` compiles the Swift app
-  into `<bise dev dir>/build/ambient/bise ambient.app` (`<bise dev dir>` = bins.sh's `$STATE`), and
+- **One new native binary, one stable path.** The launcher script compiled the Swift app
+  into one path under `<bise dev dir>/build/ambient/` (`<bise dev dir>` = bins.sh's `$STATE`), and
   only when its sources' hash changed (like bins.sh). Never another copy, never spawned by tests
   (the EDR deletes fresh unsigned binaries), never `pkill` by name: the app writes its pid to
-  `<bise dev dir>/ambient/app.pid` and `scripts/ambient.sh stop` kills that pid. Ad-hoc signed,
+  `<bise dev dir>/ambient/app.pid` and its stop command killed that pid (today: `scripts/desktop.sh`, one app at `<build dir>/desktop/bise.app`). Ad-hoc signed,
   bundle id `dev.bise.ambient`.
 - **Launch.** `bise ambient` (in a repo) finds the workspace like the TUI does, builds the app if
   needed and `open`s it with `--args --workspace <ws> --bise <its own exe>`; the app spawns
@@ -132,11 +138,11 @@ first (the capsule's "for you").
 The process rules: the core exits on stdin EOF (the app died: no orphan); its stderr goes to
 `<bise dev dir>/ambient/core.log`, the app's own log to `<bise dev dir>/ambient/app.log`.
 
-Launch: `scripts/ambient.sh open --workspace <ws> --bise <exe> [--web <dir>]` builds when the hash
-changed (stopping the running app first), opens the app at its one path; when the app already runs
-with another workspace it writes `<bise dev dir>/ambient/switch.json` and sends SIGUSR1 to the pid
-in `app.pid` (`open` ignores `--args` on a running app). `bise ambient` execs that script from the
-app root (v1 is dev-only).
+Launch (today): `scripts/desktop.sh open --workspace <ws> --bise <exe>` builds when its key changed
+(apps/desktop's tree, the packed bise, the recipe) and opens `<build dir>/desktop/bise.app` on that
+workspace; a running app is brought in front and never written over (a new build is swapped in at
+the next open). `bise ambient` runs that script from the app root. The Swift era's launcher wrote
+`switch.json` and sent SIGUSR1 instead.
 
 App-only events to the web UI: `app_quiet` (`on`, `why`: `call`/`meeting`: text only, non-urgent
 cards wait; replayed after a reload; `app_settings.meeting_quiet` off by default, `app_setting
@@ -194,8 +200,8 @@ Each slice ends with something the user can run (`bise ambient`).
 |---|---|---|
 | **ambient-lead** | `docs/ambient-app.md` (the contract §4), integration, the gates, `sb land` | all |
 | **amb-core** | `rust/tui/src/ambient/**`, its lines in `rust/tui/src/lib.rs` and `rust/harness/src/main.rs` (`ambient`, `ambient-core`) | 1-3: hub, voice, cards |
-| **amb-mac** | `apps/ambient/mac/**`, `scripts/ambient.sh` | 1-4: panel, fn, shots, notifications, build |
-| **amb-web** | `apps/ambient/web/**` (incl. `dev.html` + the fake core) | 1-4: capsule, constellation, states, words |
+| **amb-mac** | `apps/desktop/src/main/**`, `apps/desktop/native/mac/**`, `scripts/desktop.sh` (was the Swift app) | 1-4: panel, fn, shots, notifications, build |
+| **amb-web** | the capsule and composer in `apps/desktop/src` (was the old web capsule) | 1-4: capsule, constellation, states, words |
 | (later) **amb-outputs** | the viewers and note layer | 5 |
 
 Shared files nobody owns (Cargo.toml, Cargo.lock, a new crate dependency): ask ambient-lead.
@@ -210,8 +216,8 @@ connectors impossible by default). The done-when runs on fixtures; a run on his 
 only when he starts it himself.
 
 - Commit with `sb land "<long subject>"` (no `--here`) from your worktree: it lands on `ambient-app`.
-  Before: `tests/gate.sh quick` (Rust), `apps/ambient/mac/build.sh --check` (Swift type-check, no
-  binary), the web UI's checks (`node apps/ambient/web/check.mjs`).
+  Before: `tests/gate.sh quick` (Rust); in `apps/desktop`: `pnpm -s typecheck`, `lint`, `test`,
+  `build`; `apps/desktop/native/mac/build.sh --check` (the helper's Swift type-check, no binary).
 - Never open the mic, play a sound, take a screenshot or start the app on the user's Mac from a test:
   fakes and fixtures (voicemode's ScriptedMic, `say -o` + `afconvert`, a fake hub socket). The
   real app runs only when the user (or the lead, once per slice) launches it.
@@ -267,9 +273,9 @@ mood table with every uniform, sizes, cost, tokens by role; `--working` is motio
 
 | piece | owner | what |
 |---|---|---|
-| the pearl in the capsule | amb-web | `apps/ambient/web/pearl.js`: the mist pearl (WebGL1, one context), bise pink, the moods mapped from the contract (listen + level, think, speak + main's level, need, done, away/quiet, still under reduced motion); replaces orb.js |
+| the pearl in the capsule | amb-web | `apps/desktop/src/pearl/` (was the old capsule's pearl.js): the mist pearl (WebGL1, one context), bise pink, the moods mapped from the contract (listen + level, think, speak + main's level, need, done, away/quiet, still under reduced motion); replaces orb.js |
 | the glass | amb-web (+ amb-mac for the NSVisualEffectView tint) | round 8's capsule: dark smoked glass, light from inside, no edge stroke unless SPEC says; grows out of the pearl in the menu bar (0.75 s expo out, back 0.6 s expo in) |
-| the menu-bar pearl | amb-web renders, amb-mac plays | no WebGL in the status item: amb-web renders the pearl's states as sprite frames at 18 pt @1x/@2x/@3x (headless Chrome, a script in apps/ambient/web/tools/, output in apps/ambient/mac/Resources/pearl/), amb-mac plays them in IconLook (still, turning, glint, stopped + ▲, ember + ☾, brighter while fn; still under reduced motion), the rose count as text |
+| the menu-bar pearl | amb-web renders, amb-mac plays | no WebGL in the status item: amb-web renders the pearl's states as sprite frames at 18 pt @1x/@2x/@3x (headless Chrome; the frames now ship in `apps/desktop/resources/pearl/`), amb-mac plays them in IconLook (still, turning, glint, stopped + ▲, ember + ☾, brighter while fn; still under reduced motion), the rose count as text |
 | the app icon | amb-web renders, amb-mac packs | the pearl on round 8's glass, 1024 px → `.icns` with iconutil in build.sh |
 | tokens | amb-kit | `tokens.css` roles get round 8's values where the glass shows (the frame, notes, send bar on pages); the paper stays unless ambient says otherwise |
 | QA gate | ambient (+ amb-tools' scenes) | contact sheet of every mood and icon state in the real app, signed before it's "in" |

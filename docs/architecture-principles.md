@@ -16,7 +16,7 @@ repo (the `bise-implement` skill sends you here).
 | `sb` CLI | `rust/switchboard/src/cli.rs` (busybox link) | nothing | `hub.sock`, one request, one reply |
 | computer-use broker | `rust/computer-use` | browser links, `state.json` | `run/computer-use.sock`, Chrome host, helper app |
 | bend-jsrt | `rust/jsrt` | the `run_typescript` sandbox | the REPL |
-| ambient app (branch) | `apps/ambient/{mac,web,kit}`, `rust/tui/src/ambient/` | the capsule's UI state | `bise ambient-core` → `hub.sock`; the page server |
+| desktop app (branch) | `apps/desktop` (+ `native/mac`, the helper), `rust/tui/src/ambient/` | the capsule's UI state | `bise ambient-core` → `hub.sock`; the page server |
 
 Crates: `home` (every path) ← `session`, `plugins`, `images` ← `catalog` ←
 `switchboard`, `tui` ← `harness` (the `bise` binary). `tui` does not depend on

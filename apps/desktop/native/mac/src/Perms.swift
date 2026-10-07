@@ -1,5 +1,5 @@
 // Perms: macOS's answer for each permission bise needs, and the ways to
-// ask (cut from apps/ambient/mac's App+Perms; the plan of which to ask when
+// ask (cut from the Swift app's App+Perms; the plan of which to ask when
 // is the app's now, Electron's). The helper reads them: Electron spawns it,
 // so macOS charges them to bise's app (hello's `responsible` says which
 // process). Reads only; a prompt only on {cmd:'perm', action:'ask'}.

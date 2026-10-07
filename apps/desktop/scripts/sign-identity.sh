@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # sign-identity.sh <dir> — make bise's stable code-signing identity when it is missing, never
-# otherwise. Owner: amb-mac. Moved from apps/ambient/mac/build.sh (the Swift app's), same name and
+# otherwise. Owner: amb-mac. Moved from the Swift app's build.sh, same name and
 # same files, so an identity that build made is used as is.
 #
 # Why: ad hoc, macOS keys a permission grant (Accessibility, the mic, the screen) on the binary's

@@ -1,5 +1,5 @@
 // Quiet: when bise must not talk (docs/ambient-roadmap.md "it knows when
-// not to talk"), as pure logic (cut from apps/ambient/mac): QuietMonitor.swift
+// not to talk"), as pure logic (cut from the Swift app): QuietMonitor.swift
 // samples the mic, the cameras, a shared screen and the calendar, this
 // decides, and the helper says {ev:'quiet', on, why} on a change. A call = the default input device runs while
 // bise's own mic is closed; a meeting = a calendar event now. While quiet

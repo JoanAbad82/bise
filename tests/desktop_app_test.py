@@ -4,7 +4,7 @@
 The pure parts: one app path under the build dir (never apps/desktop/dist, never a second
 copy), the build recipe (the native helper, pnpm install --frozen-lockfile, build, dist into the
 staging dir with this bise packed inside, 'bise' / dev.bise.desktop, the stable identity only when
-given; never the Swift app's ambient.sh or apps/ambient), the open command (a new instance of
+given; never the deleted Swift app's script or folder), the open command (a new instance of
 that exact bundle with the workspace and app root in its env), the arguments, and the key
 (changes with the bise packed inside). Then sign-identity.sh's refusal of a half-made sign dir,
 left as is. Never builds, opens or stops an app, never touches his sign dir.
@@ -112,7 +112,7 @@ def sign_half_made_law():
 if __name__ == "__main__":
     print("desktop_app (scripts/desktop.sh)")
     law("one app path under the build dir; the stable identity's folder is the Swift app's", paths_law)
-    law("the recipe: helper, frozen install, build, dist into staging with this bise inside; never ambient.sh", recipe_law)
+    law("the recipe: helper, frozen install, build, dist into staging with this bise inside; never the Swift app", recipe_law)
     law("open: a new instance of that exact bundle, the workspace and app root in its env", open_law)
     law("arguments: --workspace (resolved) | --home, --bise; anything else refused", parse_law)
     law("the key follows apps/desktop and the bise packed inside", key_law)

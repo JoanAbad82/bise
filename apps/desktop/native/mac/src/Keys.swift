@@ -1,5 +1,5 @@
 // Keys: one active CGEventTap (keyDown, keyUp, flagsChanged), under
-// Accessibility (cut from apps/ambient/mac for bise-mac-helper). It feeds KeyMachine and swallows what the machine says
+// Accessibility (cut from the Swift app for bise-mac-helper). It feeds KeyMachine and swallows what the machine says
 // (fn + a bise key: fn + 1 must not type a 1 in the front app); every
 // other event passes untouched. macOS disables a tap that is too slow or
 // on user input: it is re-enabled at once.

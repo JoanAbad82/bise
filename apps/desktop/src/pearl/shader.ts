@@ -1,4 +1,4 @@
-// The pearl's fragment shader, as is from the capsule's (apps/ambient/web/pearl.js, round 8: the
+// The pearl's fragment shader, as is from the old web capsule's (its pearl.js, round 8: the
 // reference's variant 1 'the mist pearl', palette 'pink'), and its palette. WebGL1. Only
 // well-defined GLSL (WebKit's Metal path draws garbage where Chrome forgives): no atan(0,0), no pow
 // of a negative base, no smoothstep with edge0 >= edge1.

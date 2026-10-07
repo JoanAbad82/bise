@@ -1,7 +1,7 @@
 // The spotlight's targets, in one place (qa-type).
 // S: the new app's spotlight, mounted alone on fake data by amb-web's lab (test mode,
 // launchDesktop({ route: 'lab/spotlight' })). Every spotlight check was red first on the old Swift
-// app's capsule, where his bugs 6 and 7 live (set 1, d38f2df9); that target went with apps/ambient
+// app's capsule, where his bugs 6 and 7 live (set 1, d38f2df9); that target went with the old apps
 // (delete plan step 2).
 import { launchDesktop, type Session } from '../../harness';
 

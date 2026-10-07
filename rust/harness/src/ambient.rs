@@ -22,7 +22,7 @@ pub fn core(args: &[String]) -> std::io::Result<i32> {
     Ok(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects), Some(ambient_setup())))
 }
 
-/// `bise ambient`: open the app on this workspace (scripts/ambient.sh).
+/// `bise ambient`: open the app on this workspace (scripts/desktop.sh).
 pub fn launch(args: &[String]) -> std::io::Result<i32> {
     let paths = switchboard::paths::Paths::for_workspace(&ambient_workspace(args, false));
     let root = crate::live_app_root_or_exit();

@@ -603,9 +603,9 @@ act, not by the page's click event.
 
 ## Click and key audit, round 10 (the user via main m_6963: "il manque beaucoup de click events sur beaucoup de choses; pas de ⌘Q")
 
-This audit reads the code only, at ambient-app faeb8a47: `apps/ambient/web/bar.js` + `ui.js`
-(the bar), `apps/ambient/mac/src/StatusItem.swift` + `MenuRows.swift` + `Capsule.swift` (menu bar,
-panel) and `kit/kit.js` + `notes.js` (the pages' frame). No app run. "click" = a
+This audit reads the code only, at ambient-app faeb8a47 (before the Swift app and the old web
+capsule were deleted): the old capsule's `bar.js` + `ui.js` (the bar), the Swift app's
+`StatusItem.swift` + `MenuRows.swift` + `Capsule.swift` (menu bar, panel) and `kit/kit.js` + `notes.js` (the pages' frame). No app run. "click" = a
 `data-act` button or a row that sends something. "hover" = a `:hover` style. "info" = text with
 no act, arrow cursor. The rule behind every "should": anything that shows a key or looks like a
 row does the same thing on click, and a click never does more than its key.
@@ -688,8 +688,8 @@ exclusivement."
 This audit reads code and docs only at ambient-app b63216d6, with no app run: the TUI's
 `rust/tui/src/commands.rs` (every /command), `help.rs`, `onboarding/`, `sb/`, and ambient's
 `rust/tui/src/ambient/core.rs` (what the app can ask the core: `main`, `answer`, `start`, `send`,
-`every_stop`, `voice`, `shot`, `quiet`, `hush`, `talk_*`, `state`), `apps/ambient/web/bar.js` and
-`apps/ambient/mac/src`.
+`every_stop`, `voice`, `shot`, `quiet`, `hush`, `talk_*`, `state`), the old capsule's `bar.js` and
+the Swift app's sources.
 
 - **ok**: ambient does it in its own UI.
 - **via main**: only by asking main in words; main does it with `sb`. That works when main has

@@ -213,7 +213,7 @@ def read_pid(path):
 
 
 def build_dir(env):
-    """His build dir, as scripts/bins.sh and ambient.sh pick it: BISE_HOME/dev, else ~/.bise/dev once
+    """His build dir, as scripts/bins.sh and desktop_app.py pick it: BISE_HOME/dev, else ~/.bise/dev once
     migrated, else ~/.local/state/switchboard; /build. Pure but for the migrated check."""
     if env.get("SB_BUILD_DIR"):
         return env["SB_BUILD_DIR"]
@@ -228,7 +228,7 @@ def build_dir(env):
 
 
 def try_paths(env):
-    """Where the try build goes: the bise (cargo -p bend-harness into <build>/target, ambient.sh's
+    """Where the try build goes: the bise (cargo -p bend-harness into <build>/target, the old
     try target), the native helper (one stable path: the EDR deletes fresh unsigned binaries) and
     the new app, packaged by `pnpm dist` in apps/desktop/dist."""
     build = build_dir(env)
