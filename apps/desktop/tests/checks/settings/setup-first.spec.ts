@@ -2,7 +2,9 @@
 // his '/model openrouter/…' typed in perf's thread while OpenRouter has no key. The core holds the
 // line (it never reaches the hub) and says setup_first (amb-core 4519a877). Passes when, with the
 // scripted core (FakeCore, fake data, a fake key):
-//   - setup_first opens settings · models on OpenRouter's setup: 'needs OpenRouter' and its key field;
+//   - a setup_first he didn't cause (the core's start replay after a restart or relaunch) keeps
+//     the wait and never moves the screen; the same cid again does nothing (ambient-lead m_12345);
+//   - after his own /model, setup_first opens settings · models on OpenRouter's setup: 'needs OpenRouter' and its key field;
 //   - his key goes as key_set; the accounts showing OpenRouter signed in take him back to perf's
 //     thread, the window sends nothing else (the core sends the held line itself) and no cancel;
 //   - a second one, left without a key (he clicks perf in the sidebar): setup_first_cancel.
@@ -10,7 +12,7 @@
 // a_model_whose_provider_has_no_key_waits_for_its_setup). Owner: amb-home.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
-type Cmd = { cmd?: string; id?: string; key?: string };
+type Cmd = { cmd?: string; id?: string; key?: string; line?: string };
 
 const ACME = 'acme-1a2b3c4d';
 const MODEL = 'openrouter/qwen/qwen3-coder';
@@ -34,7 +36,21 @@ test('settings/setup-first: a /model the core holds opens its provider setup; th
     await expect(thread).toHaveAttribute('data-project', ACME, { timeout: 10_000 });
     await core.send(accounts('signed_out') as never);
 
-    await test.step("setup_first opens settings · models on OpenRouter's setup, its key field open", async () => {
+    await test.step("a setup_first he didn't cause (the core's start replay) keeps the wait and moves nothing", async () => {
+      await core.send({ ...first, cid: 7 } as never);
+      await sleep(400);
+      await expect(thread).toHaveAttribute('data-agent', 'perf');
+    });
+
+    await test.step("his /model, then setup_first: settings · models on OpenRouter's setup, its key field open", async () => {
+      await page.getByTestId('composer.field').click();
+      await page.keyboard.type(`/model ${MODEL}`);
+      await page.keyboard.press('Enter');
+      await core.waitCmd((c) => (c as Cmd).cmd === 'slash' && ((c as Cmd).line ?? '').startsWith('/model '), 3000).catch(async () => {
+        // a list open took the first ⏎
+        await page.keyboard.press('Enter');
+        await core.waitCmd((c) => (c as Cmd).cmd === 'slash' && ((c as Cmd).line ?? '').startsWith('/model '), 3000);
+      });
       await core.send(first as never);
       await expect(page.getByTestId('settings.models.want')).toContainText(`${MODEL} needs OpenRouter`, { timeout: 3000 });
       await expect(page.getByTestId('settings.key.field')).toBeVisible();
@@ -54,9 +70,21 @@ test('settings/setup-first: a /model the core holds opens its provider setup; th
       expect(after.filter((c) => c === 'slash' || c === 'model' || c === 'setup_first_cancel'), 'the core sends the held line, not the window').toEqual([]);
     });
 
+    await test.step('the same held line again (a core restart replays cid 12): nothing moves', async () => {
+      await core.send(first as never);
+      await sleep(400);
+      await expect(thread).toHaveAttribute('data-agent', 'perf');
+    });
+
     await test.step('a second one, left without a key: setup_first_cancel', async () => {
       await core.send(accounts('signed_out') as never);
-      await core.send(first as never);
+      await page.getByTestId('composer.field').click();
+      await page.keyboard.type(`/model ${MODEL}`);
+      await page.keyboard.press('Enter');
+      await core.waitCmd((c) => (c as Cmd).cmd === 'slash' && ((c as Cmd).line ?? '').startsWith('/model ') && core.cmds().filter((x) => (x as Cmd).cmd === 'slash').length >= 2, 3000).catch(async () => {
+        await page.keyboard.press('Enter');
+      });
+      await core.send({ ...first, cid: 13 } as never);
       await expect(page.getByTestId('settings.models.want')).toBeVisible({ timeout: 3000 });
       expect(cancels()).toEqual([]);
       await page.getByTestId('app.sidebar.agent.perf').click();

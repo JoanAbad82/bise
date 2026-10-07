@@ -206,6 +206,8 @@ export class Store {
   private readonly evListeners = new Set<(ev: Ev) => void>();
   private coreState: CoreState = 'down';
   private cid = 0;
+  /** R8: when this window last sent a /model (a setup_first after it is his; a replayed one isn't) */
+  private modelSentAt = Number.NEGATIVE_INFINITY;
   /** the dictations this window started and not over yet (bar I) */
   private readonly dictating = new Set<string>();
   /** the `@` queries on their way: rid -> its project and resolve; each project's newest rid */
@@ -673,6 +675,7 @@ export class Store {
   command(cmd: CoreCmd): void {
     // a new talk starts with nothing heard
     if (cmd.cmd === 'talk_start' && this.slices.get('heard') != null) this.put('heard', null);
+    if (cmd.cmd === 'slash' && cmd.line.trim().startsWith('/model ')) this.modelSentAt = this.now();
     this.port?.send(cmd);
   }
 
@@ -680,6 +683,13 @@ export class Store {
    * The composer's mic (bar I): the core records and sends this window the
    * words (useDictation(id)); never to main. Returns the dictation's id.
    */
+  /** R8: this window sent a /model in the last `ms` (then forgets it: one setup_first per send). */
+  takeModelSent(ms: number): boolean {
+    const mine = this.now() - this.modelSentAt <= ms;
+    this.modelSentAt = Number.NEGATIVE_INFINITY;
+    return mine;
+  }
+
   /** Each role's model and effort (V17; set with command({cmd: 'role_set', role, model?, effort?})). */
   roles(): readonly RoleRow[] {
     return this.slice('roles', EMPTY);

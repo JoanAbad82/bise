@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Account } from '@/proto';
 import { core_ev } from '@/proto/fixtures.gen';
 import { heldOfSetupFirst, type Held } from './hold';
-import { onLeave, onReady } from './setup-first';
+import { decide, keyOf, onLeave, onReady } from './setup-first';
 
 const first = core_ev.find((e) => e.ev === 'setup_first');
 if (first?.ev !== 'setup_first') throw new Error('no setup_first fixture');
@@ -41,5 +41,13 @@ describe('R8: the core holds a keyless /model (setup_first)', () => {
     expect(onLeave(held, signedIn)).toBeNull();
     expect(onLeave({ ...held, cmd: { cmd: 'role_set', role: 'main', model: 'x' } }, ACCOUNTS)).toBeNull();
     expect(onLeave(null, ACCOUNTS)).toBeNull();
+  });
+
+  it('acts once per held line, and opens settings only right after his own /model (a replay keeps the wait, moves nothing)', () => {
+    expect(decide(first, new Set(), true)).toBe('open');
+    expect(decide(first, new Set(), false)).toBe('hold');
+    expect(decide(first, new Set([keyOf(first)]), true)).toBe('none');
+    expect(keyOf(first)).toBe('cid:12');
+    expect(keyOf({ ...first, cid: null })).toBe('acme-1a2b3c4d/perf/openrouter/qwen/qwen3-coder');
   });
 });

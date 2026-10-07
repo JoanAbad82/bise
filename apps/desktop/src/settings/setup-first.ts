@@ -4,7 +4,9 @@
 // settings · models (the wait of hold.ts, its key field open); once an account of that provider
 // shows signed in, the core sends the held line itself and he goes back to the thread he typed it
 // in; leaving settings with the provider not ready drops it (setup_first_cancel), as the TUI's
-// panel closed does. Owner: amb-home.
+// panel closed does. A setup_first acts once per held line, and moves the screen only right after
+// his own /model here: the core's start replay (a restart, a relaunch) never throws him to settings.
+// Owner: amb-home.
 import { useCallback, useEffect, useRef } from 'react';
 import type { Account } from '@/proto';
 import type { CoreCmd } from '@/shared/api';
@@ -16,16 +18,41 @@ import { heldOfSetupFirst, heldReady, holdForSetup, releaseHeld, type Held } fro
 /** Where setup_first takes him: the provider's setup on settings · models. */
 export const SETUP_ROUTE: Route = { screen: 'settings', page: 'models' };
 
-/** The app's listener: a setup_first holds its wait and opens settings · models. Mounted once, in App. */
+/** A setup_first this window answers only when it follows his own /model by this much. */
+export const MINE_MS = 10_000;
+
+type SetupFirst = { project: string; agent: string; provider: string; name: string; model: string; cid?: number | null };
+
+/** One held line: its cid, else what it holds. */
+export const keyOf = (ev: SetupFirst): string => (ev.cid != null ? `cid:${String(ev.cid)}` : `${ev.project}/${ev.agent}/${ev.model}`);
+
+/**
+ * What a setup_first does (ambient-lead m_12345): once per held line (a cid already handled or
+ * cancelled does nothing); it opens settings only right after his own /model in this window, so a
+ * core restart or a relaunch that replays it never moves the screen he's on, it only keeps the wait.
+ */
+export function decide(ev: SetupFirst, seen: ReadonlySet<string>, mine: boolean): 'open' | 'hold' | 'none' {
+  if (seen.has(keyOf(ev))) return 'none';
+  return mine ? 'open' : 'hold';
+}
+
+/** The held lines this window already acted on (its life: a relaunch starts empty). */
+const seen = new Set<string>();
+
+/** The app's listener: a setup_first holds its wait, and opens settings · models when it is his. Mounted once, in App. */
 export function useSetupFirstOpens(): void {
   const router = useRouter();
+  const store = useStore();
   const open = useCallback(
     (ev: Ev) => {
       if (ev.ev !== 'setup_first') return;
+      const d = decide(ev, seen, store.takeModelSent(MINE_MS));
+      if (d === 'none') return;
+      seen.add(keyOf(ev));
       holdForSetup(heldOfSetupFirst(ev));
-      router.go(SETUP_ROUTE);
+      if (d === 'open') router.go(SETUP_ROUTE);
     },
-    [router],
+    [router, store],
   );
   useCoreEvent(open);
 }
