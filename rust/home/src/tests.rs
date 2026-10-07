@@ -457,7 +457,18 @@ fn the_window_sets_known_prefs_by_dotted_key_and_keeps_their_types() {
     assert_eq!(prefs::set_dotted(&o, "context.url", json!(true)).unwrap()["context"], json!({"url": true}));
     assert_eq!(prefs::set_dotted(&json!({"voice": "old"}), "voice.fn_hold", json!(true)).unwrap()["voice"], json!({"fn_hold": true}));
     assert_eq!(prefs::set_dotted(&o, "quiet.call", Value::Null).unwrap()["quiet"], json!({"batch_min": 20}), "null takes it out");
-    assert!(prefs::set_dotted(&o, "hints", json!({})).is_err(), "not the window's");
+    assert!(prefs::set_dotted(&o, "hints", json!({})).is_err(), "never hints whole");
+    // S36: a one-time hint marked seen, the TUI's key in the same object
+    let h = prefs::set_dotted(&json!({"hints": {"first_agent": true}}), "hints.first_card", json!(true)).unwrap();
+    assert_eq!(h["hints"], json!({"first_agent": true, "first_card": true}));
+    for name in prefs::WINDOW_HINTS {
+        assert!(prefs::set_dotted(&o, &format!("hints.{name}"), json!(true)).is_ok(), "{name}");
+    }
+    assert!(prefs::set_dotted(&o, "hints.first_card", json!(false)).is_err(), "never unseen by the window");
+    assert!(prefs::set_dotted(&o, "hints.first_card", Value::Null).is_err(), "never taken out");
+    assert!(prefs::set_dotted(&o, "hints.first_card", json!("yes")).is_err());
+    assert!(prefs::set_dotted(&o, "hints.other", json!(true)).is_err(), "only the TUI's hints");
+    assert!(prefs::set_dotted(&o, "hints.first_card.x", json!(true)).is_err());
     assert!(prefs::set_dotted(&o, "setup.asked", json!(true)).is_err());
     assert!(prefs::set_dotted(&o, "quiet..call", json!(true)).is_err());
     assert!(prefs::set_dotted(&o, "shots_keep_days", json!("7")).is_err(), "a number stays a number");

@@ -21,6 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from bise_env import clean_env  # noqa: E402
 from e2e import EXE, Env, check  # noqa: E402
+import wait  # noqa: E402
 
 
 def port_open(port):
@@ -57,10 +58,7 @@ def main():
         os.killpg(p.pid, signal.SIGTERM)
         p.wait(timeout=10)
         check(p.returncode != 0, "the login ended: %s" % p.returncode)
-        deadline = time.time() + 5
-        while port_open(port) and time.time() < deadline:
-            time.sleep(0.1)
-        check(not port_open(port), "the port %s is free again" % port)
+        wait.until(lambda: not port_open(port), 5, "the port %s free again" % port)
         rest = p.stdout.read()
         check(all(json.loads(l).get("ev") in ("error", "done") for l in rest.splitlines() if l.strip()),
               "only typed lines after: %r" % rest)

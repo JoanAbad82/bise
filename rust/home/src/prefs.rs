@@ -59,6 +59,13 @@ pub fn excluded_apps(v: Option<Value>) -> Vec<String> {
 /// architect m_9130): anything else is refused, never written.
 pub const WINDOW_KEYS: &[&str] = &["onboarded", "theme", "voice", "context", "excluded_apps", "quiet", "shots_keep_days"];
 
+/// The one-time hints the window may mark seen (`prefs_set {key:
+/// "hints.<name>", value: true}`, S36): the TUI's own keys (tui hints.rs
+/// `Hint::key`), in the same `hints` object, so a hint seen in either
+/// never shows again. Only marking seen: never `hints` whole, never
+/// another value (unseeing one is not the window's).
+pub const WINDOW_HINTS: &[&str] = &["first_agent", "first_level3", "first_card", "first_steer", "first_yolo", "first_auto"];
+
 /// The type a typed key keeps (a wrong one is refused).
 fn typed(key: &str, v: &Value) -> Result<(), String> {
     let ok = match key {
@@ -84,7 +91,13 @@ pub fn set_dotted(obj: &Value, key: &str, value: Value) -> Result<Value, String>
         return Err(format!("{key:?} is not a preference"));
     }
     let top = parts[0];
-    if !WINDOW_KEYS.contains(&top) {
+    if top == "hints" {
+        match parts[..] {
+            [_, name] if WINDOW_HINTS.contains(&name) && value == Value::Bool(true) => {}
+            [_, name] if WINDOW_HINTS.contains(&name) => return Err(format!("hints.{name} can only be true")),
+            _ => return Err(format!("{key} is not a hint the window marks")),
+        }
+    } else if !WINDOW_KEYS.contains(&top) {
         return Err(format!("{top} is not a preference the window sets"));
     }
     if parts.len() == 1 {
