@@ -8,6 +8,7 @@
 // amb-win's shell.
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useCoreEvent, useIndex, useProjects, useStore } from '@/store';
+import { caretAtEnd, useKeptText } from '@/app/keep';
 import type { Ev } from '@/store/store';
 import { flatHits, marks, nextScope, SCOPES, searchList, type Hit, type Scope, type SearchList } from '@/search/rank';
 import { searchDataOf } from '@/search/data';
@@ -81,7 +82,8 @@ export function Palette({ onClose }: { onClose: () => void }) {
   const projects = useProjects();
   const index = useIndex();
   const now = useNow();
-  const [q, setQ] = useState('');
+  // kept across a reload or an update swap (amb-win's keep, lead m_11756): dropped once used or on esc
+  const [q, setQ, dropQ] = useKeptText('palette');
   const [scope, setScope] = useState<Scope>('all');
   const [at, setAt] = useState(0);
   const [version, setVersion] = useState(0);
@@ -109,6 +111,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     field.current?.focus();
+    caretAtEnd(field.current);
   }, []);
   useEffect(() => {
     document.querySelector(`[data-testid="app.palette.item.${String(cur)}"]`)?.scrollIntoView({ block: 'nearest' });
@@ -116,6 +119,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
 
   const open = (h: Hit | undefined, restore = false) => {
     if (h === undefined) return;
+    dropQ();
     onClose();
     if (h.open.to === 'artifact') {
       router.go({ screen: 'artifacts', project: h.open.project, id: h.open.id });
@@ -129,6 +133,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
   const ask = () => {
     const text = q.trim();
     if (text === '' || home === undefined) return;
+    dropQ();
     onClose();
     store.send({ project: home, agent: 'main', text });
     router.go({ screen: 'thread', project: home, agent: MAIN });
@@ -154,6 +159,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
     } else if (e.key === 'Escape' || (e.ctrlKey && e.key === 'c')) {
       e.preventDefault();
       e.stopPropagation();
+      dropQ();
       onClose();
     }
   };
