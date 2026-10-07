@@ -13,7 +13,7 @@ import { Composer, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer/Brain';
 import { quoteFrom, quoteKey, quoteText } from './quote';
 import type { Outgoing } from '@/composer/message';
-import { threadKey, useAgents, useCommands, useCoreState, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
+import { threadKey, useAgents, useCommands, useCoreState, useFiles, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
 import { useMenuAction } from '@/app/menu';
 import { useRouter } from '@/app/router';
 import { hubCmdOf, pickCommands, windowRun } from './commands';
@@ -431,13 +431,19 @@ const ThreadComposer = memo(function ThreadComposer({
   // by files.rs (a newer query replaces an older one: [] for it)
   const core = useCommands();
   const skills = useSkills(project);
+  // while the workspace's first walk runs, an '@' answer is partial and the
+  // fuller one comes later (useFiles): when it does, the files source changes
+  // once, so an open '@' list asks again and shows it
+  const filesSettled = useFiles(project)?.partial !== true;
   const extra = useMemo(
     () => ({
+      // a new files source once the walk settles: the composer's '@' asks again
+      settled: filesSettled,
       commands: pickCommands(core),
       skills,
       files: (q: string) => store.files(project, q).then((a) => (a === null ? [] : [...a.items, ...(a.folder ? [{ path: a.folder.path, dir: true }] : [])])),
     }),
-    [core, skills, store, project],
+    [core, skills, store, project, filesSettled],
   );
   const sources = useComposerSources(project, extra, agent);
   const onCommand = useCallback(

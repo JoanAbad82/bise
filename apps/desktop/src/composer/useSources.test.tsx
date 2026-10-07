@@ -60,3 +60,26 @@ describe('K4: the agent in view refuses images only when its model reads none', 
     expect(result.current.noVision).toBe('perf');
   });
 });
+
+describe("the TUI's lists (qa-type b37dc4c1 reds 1 and 2)", () => {
+  it("'@' lists the other agents, never the one he writes to; an agent argument never offers main", () => {
+    const { store, wrapper } = setup();
+    act(() => {
+      store.apply({
+        ev: 'agents',
+        project: P,
+        agents: [
+          { archived: false, main: true, name: 'main', purpose: '', since_ms: 1, status: 'idle', title: '', waits: 0 },
+          { archived: false, main: false, name: 'p99', purpose: '', since_ms: 1, status: 'done', title: '', waits: 0 },
+          { archived: false, main: false, name: 'alerts', purpose: '', since_ms: 1, status: 'working', title: '', waits: 0 },
+        ],
+      });
+    });
+    const inMain = renderHook(() => useComposerSources(P, {}, 'main'), { wrapper }).result.current;
+    expect(inMain.agents.map((a) => a.name)).toEqual(['p99', 'alerts']);
+    expect(inMain.choices?.('agent', '').map((c) => c.value)).toEqual(['p99', 'alerts']);
+    const inP99 = renderHook(() => useComposerSources(P, {}, 'p99'), { wrapper }).result.current;
+    expect(inP99.agents.map((a) => a.name)).toEqual(['main', 'alerts']);
+    expect(inP99.choices?.('agent', '').map((c) => c.value), 'main is never an agent argument').toEqual(['p99', 'alerts']);
+  });
+});

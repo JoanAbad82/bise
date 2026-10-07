@@ -13,7 +13,7 @@ import { useMainRoutes, useMenuRouting } from './menu';
 import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { ThreadScreen } from '@/thread/ThreadScreen';
 import { useProjects, useStore } from '@/store';
-import { InboxScreen } from '@/inbox';
+import { ConfirmBar, InboxScreen } from '@/inbox';
 import { SettingsScreen } from '@/settings';
 import { OnboardingScreen, useFirstLaunch } from '@/setup';
 import { AgentsScreen } from '@/agents/AgentsScreen';
@@ -130,9 +130,20 @@ function Current() {
     <Main testId="app.main">
       <CoreLine />
       <ScreenOf key={formatRoute(route)} route={route} />
+      <RouteConfirm route={route} />
       <RouteTerminal route={route} />
     </Main>
   );
+}
+
+/**
+ * The hub's yes/no question for the project in view (bar I9/C46/S30,
+ * amb-home's ConfirmBar): under the screen, wherever he clicked (agents,
+ * thread, review…); nothing while no question is open.
+ */
+function RouteConfirm({ route }: { route: Route }) {
+  const project = projectOf(route);
+  return project === undefined ? null : <ConfirmBar project={project} />;
 }
 
 /** The terminal panel of the project in view (bise's own on bise, the inbox, settings). */

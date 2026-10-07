@@ -43,12 +43,14 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
     const target = inView === undefined ? undefined : agents.find((a) => a.name === inView);
     const noVision = target?.vision === false ? (target.model ?? target.name) : undefined;
     const lists = {
-      agent: live.map((a): Choice => ({ value: a.name, desc: a.title })),
+      // an agent argument (/archive, /rename, /stop…) never offers main (the TUI's agent_choices)
+      agent: live.filter((a) => !a.main).map((a): Choice => ({ value: a.name, desc: a.title })),
       archived: agents.filter((a) => a.archived).map((a): Choice => ({ value: a.name, desc: a.title })),
       card: cards.map((c): Choice => ({ value: String(c.id), desc: `${c.agent}: ${c.question}` })),
     };
     return {
-      agents: live.map((a) => ({ name: a.name, desc: a.title })),
+      // `@` lists the others: not the agent he writes to (the TUI's filter_mentions)
+      agents: live.filter((a) => a.name !== inView).map((a) => ({ name: a.name, desc: a.title })),
       artifacts: made.map((a) => ({ id: a.id, title: a.title, kind: a.kind, agent: a.agent, url: a.url, atMs: a.at_ms })),
       skills: skills ?? NO_SOURCES.skills,
       commands: commands ?? NO_SOURCES.commands,

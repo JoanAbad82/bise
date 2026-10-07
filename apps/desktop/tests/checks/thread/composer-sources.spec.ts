@@ -67,8 +67,13 @@ test("thread/composer-sources: the real thread's /, @ and $ list the core's comm
     await expect(page.getByTestId('composer.pick.cmd.inbox')).not.toContainText('not yet');
     await page.screenshot({ path: test.info().outputPath('slash.png') });
 
+    // an agent argument never offers main (qa-type b37dc4c1 red 2)
+    await page.keyboard.type('rename ');
+    await expect(page.getByTestId('composer.pick.arg.perf'), "'/rename ' offers perf").toBeVisible({ timeout: 2000 });
+    await expect(page.getByTestId('composer.pick.arg.main'), 'never main').toHaveCount(0);
+
     // a runnable hub command goes out typed
-    await page.keyboard.type('rename perf p2');
+    await page.keyboard.type('perf p2');
     await page.keyboard.press('Enter');
     const rename = await core.waitCmd((c) => c.cmd === 'rename', 3000);
     expect(rename).toMatchObject({ project: HOME, agent: 'perf', to: 'p2' });
@@ -79,6 +84,14 @@ test("thread/composer-sources: the real thread's /, @ and $ list the core's comm
     await expect(page.getByTestId('composer.pick.skill.release-bise'), '"$" lists the skills').toBeVisible({ timeout: 2000 });
     await expect(page.getByTestId('composer.pick.skill.review')).toBeVisible();
     await page.keyboard.press('Escape');
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Backspace');
+
+    // '@' alone: the other agents, never the one he writes to (qa-type b37dc4c1 red 1)
+    await page.keyboard.type('@');
+    await expect(page.getByTestId('composer.pick.agent.perf'), "'@' lists perf").toBeVisible({ timeout: 2000 });
+    await expect(page.getByTestId('composer.pick.agent.main'), 'not main, the agent in view').toHaveCount(0);
+    // (no esc: an '@' list put off at this place stays off for the next '@' there)
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('Backspace');
 
