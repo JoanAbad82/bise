@@ -10,7 +10,11 @@
 //        again by itself, and the line goes once it's back; Terminal never opens
 import { execFileSync } from 'node:child_process';
 import { test, expect } from '../../harness';
+import path from 'node:path';
 import { onWorld, sleep } from './world';
+
+/** the scripted core that logs a line on stderr first (what the window should show as its last log line) */
+const NOISY = path.join(__dirname, 'fakes', 'core-noisy.mjs');
 
 const PERMS = ['mic', 'accessibility', 'screen'] as const;
 
@@ -45,7 +49,7 @@ test('setup/perms: none granted: allow asks the helper, a refusal says how, a gr
 /** the pids of the core stub, a child of the app's main */
 const corePids = (appPid: number): number[] => {
   try {
-    return execFileSync('/usr/bin/pgrep', ['-P', String(appPid), '-f', 'core-stub']).toString().split('\n').filter(Boolean).map(Number);
+    return execFileSync('/usr/bin/pgrep', ['-P', String(appPid), '-f', 'core-(stub|noisy)']).toString().split('\n').filter(Boolean).map(Number);
   } catch {
     return [];
   }
@@ -70,4 +74,27 @@ test('setup/offline: the core dies: one line says so, the app starts it again, T
     await sleep(200);
     expect(out.lines.filter((l) => l.startsWith('bise-desktop: external')), 'nothing opened outside the app (no Terminal)').toEqual([]);
   });
+});
+
+test("setup/offline: while the core is down the line shows the core's last log line", async () => {
+  await onWorld(async ({ s }) => {
+    const pid = s.app.process().pid ?? -1;
+    await expect.poll(() => corePids(pid).length, { message: 'the core runs', timeout: 3000 }).toBe(1);
+    await sleep(500);
+    // SIGSTOP then SIGKILL: the line must stay up long enough to read, so the restart is held off by
+    // killing every new core too for 1.5 s
+    const end = Date.now() + 1500;
+    const seen: string[] = [];
+    const line = s.page.getByTestId('app.core');
+    while (Date.now() < end) {
+      for (const p of corePids(pid)) { try { process.kill(p, 'SIGKILL'); } catch { /* gone */ } }
+      if (await line.isVisible()) {
+        if (seen.length === 0) await s.page.screenshot({ path: test.info().outputPath('offline-line.png') }); // the frame for the report
+        seen.push(await line.innerText());
+      }
+      await sleep(100);
+    }
+    expect(seen.length, 'the line is up while the core is down').toBeGreaterThan(0);
+    expect.soft(seen.some((t) => t.includes('listening on the fixture world')), `the line shows the core's last log line (saw ${JSON.stringify([...new Set(seen)])})`).toBe(true);
+  }, { env: { BISE_DESKTOP_BISE: NOISY } });
 });

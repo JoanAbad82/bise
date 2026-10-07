@@ -38,10 +38,13 @@ export class Lines {
 }
 
 /** The app on the scripted helper and core; `body` runs, then everything is closed and proven. */
-export async function onWorld(body: (w: World) => Promise<void>, o: { route?: string; core?: FakeCore } = {}): Promise<void> {
+export async function onWorld(
+  body: (w: World) => Promise<void>,
+  o: { route?: string; core?: FakeCore; env?: Record<string, string> } = {},
+): Promise<void> {
   const helper = new FakeHelper();
   const core = o.core ?? new FakeCore();
-  const s = await launchDesktop({ helper, core, ...(o.route === undefined ? {} : { route: o.route }) });
+  const s = await launchDesktop({ helper, core, ...(o.route === undefined ? {} : { route: o.route }), ...(o.env === undefined ? {} : { env: o.env }) });
   const out = new Lines();
   s.app.process().stdout?.setEncoding('utf8');
   s.app.process().stdout?.on('data', (d: string) => { out.push(d); });
