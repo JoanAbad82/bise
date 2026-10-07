@@ -2,8 +2,9 @@
 // place a protocol change reaches the search. Pure.
 // The agents (archived too), cards and artifacts of the projects the core holds (live slices);
 // the projects it does not hold from amb-core's index (2926a991: their view.json, as of
-// written_ms); the scheduled tasks with amb-feed's typed list (lead m_11859) when it lands.
-import type { Agent, Artifact, Card, IndexRow, ProjectRow } from '@/proto';
+// written_ms); the scheduled tasks from amb-feed's typed list (284bd5c6; the index's rows carry
+// none yet: amb-core adds them).
+import type { Agent, Artifact, Card, IndexRow, ProjectRow, ScheduledTask } from '@/proto';
 import type { SearchData, SearchScheduled } from './rank';
 
 export interface StoreView {
@@ -11,13 +12,23 @@ export interface StoreView {
   readonly agents: (project: string) => readonly Agent[];
   readonly artifacts: (project: string) => readonly Artifact[];
   readonly cards: (project: string) => readonly Card[];
-  readonly scheduled?: (project: string) => readonly SearchScheduled[];
+  readonly scheduled?: (project: string) => readonly ScheduledTask[];
   /** amb-core's index: the projects the core does not hold (store.index()). */
   readonly index?: readonly IndexRow[];
 }
 
 /** An artifact's dim words: 'page · v2', 'image'. */
 const whatOf = (a: Artifact): string => (a.version > 1 ? `${a.kind} · v${String(a.version)}` : a.kind);
+
+/** A scheduled task as the search reads it (its words, the agent it wakes, when next). */
+const scheduledOf = (project: string, t: ScheduledTask): SearchScheduled => ({
+  project,
+  id: t.id,
+  agent: t.agent,
+  words: t.words,
+  every: t.every.replace(/^every /u, ''),
+  ...(t.next_ms == null ? {} : { next_ms: t.next_ms }),
+});
 
 /** Everything the search reads, bise's home first, then his projects in his order. */
 export function searchDataOf(v: StoreView): SearchData {
@@ -63,6 +74,6 @@ export function searchDataOf(v: StoreView): SearchData {
     artifacts: projects.flatMap((p) =>
       artifactsOf(p.id).map((a) => ({ project: p.id, id: a.id, title: a.title, kind: a.kind, what: whatOf(a), agent: a.agent, at_ms: a.at_ms })),
     ),
-    scheduled: projects.flatMap((p) => v.scheduled?.(p.id) ?? []),
+    scheduled: projects.flatMap((p) => (v.scheduled?.(p.id) ?? []).map((t) => scheduledOf(p.id, t))),
   };
 }

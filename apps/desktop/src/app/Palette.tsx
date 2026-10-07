@@ -54,7 +54,7 @@ function Pairs({ text }: { text: string }): ReactNode {
 }
 
 /** The events that change what the search reads. */
-const READS = new Set<Ev['ev']>(['agents', 'artifacts', 'cards', 'projects']);
+const READS = new Set<Ev['ev']>(['agents', 'artifacts', 'cards', 'projects', 'scheduled']);
 
 /** A name with the query's matches bold and underlined. */
 function Marked({ text, q }: { text: string; q: string }): ReactNode {
@@ -96,7 +96,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
     store.askIndex();
   }, [store]);
   const data = useMemo(
-    () => searchDataOf({ projects, agents: (p) => store.agents(p), artifacts: (p) => store.artifacts(p), cards: (p) => store.cards(p), index }),
+    () => searchDataOf({ projects, agents: (p) => store.agents(p), artifacts: (p) => store.artifacts(p), cards: (p) => store.cards(p), scheduled: (p) => store.scheduled(p), index }),
     // version: a held project's agents, cards or artifacts changed
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [projects, index, store, version],

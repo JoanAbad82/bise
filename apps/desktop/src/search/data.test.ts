@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Agent, Artifact, IndexRow, ProjectRow } from '@/proto';
+import type { Agent, Artifact, IndexRow, ProjectRow, ScheduledTask } from '@/proto';
 import { searchDataOf } from './data';
 
 const agent = (name: string, archived = false): Agent =>
@@ -25,5 +25,17 @@ describe('search data: held projects live, the others from amb-core index', () =
     expect(names).toEqual(['acme/main', 'acme/perf', 'docs/main', 'docs/old-links (archived)', 'lost/ghost']);
     expect(d.artifacts.map((a) => `${a.project}/${a.id}`)).toEqual(['docs/links']);
     expect(d.projects.map((p) => p.name)).toEqual(['home', 'acme', 'docs', 'lost']);
+  });
+
+  it("a held project's scheduled tasks (amb-feed's typed list) are searched: words, the agent it wakes, how often, next run", () => {
+    const task: ScheduledTask = { id: 48, agent: 'checkout', by: 'you', words: 're-run the flaky checkout test', every: 'every 30m', done: 3, next_ms: 1_000 };
+    const d = searchDataOf({
+      projects: [project('sf', 1)],
+      agents: () => [],
+      artifacts: () => [],
+      cards: () => [],
+      scheduled: (p) => (p === 'sf' ? [task] : []),
+    });
+    expect(d.scheduled).toEqual([{ project: 'sf', id: 48, agent: 'checkout', words: 're-run the flaky checkout test', every: '30m', next_ms: 1_000 }]);
   });
 });
