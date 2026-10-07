@@ -95,8 +95,13 @@ test('thread/commands: /undo /cancel /flow /artifacts add /new -w --with-changes
       for (const cmd of ['/undo', '/cancel']) {
         const before = await noticeNow();
         await say(cmd);
-        const said = await noticeAfter(before).catch(() => '');
+        // /cancel's line is /undo's word for word: the same words may stay; then read it after a pause
+        const said = await noticeAfter(before).catch(async () => {
+          await sleep(1500);
+          return noticeNow();
+        });
         expect.soft(said, `${cmd}: the hub's no-undo line in the window`).toContain('no undo: an agent may already have acted');
+        await expect.soft(page.locator(T.list).getByText(cmd, { exact: true }), `${cmd}: never a message row ('not sent' with retry)`).toHaveCount(0);
         const seen = await tuiCmd(term(), cmd);
         const head = words(cmd, said, seen);
         expect.soft(flat(seen), `${cmd}: the TUI says the same words`).toContain(head);
