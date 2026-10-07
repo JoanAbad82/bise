@@ -102,7 +102,8 @@ test("agents/view: an agent's own question shows on its row and in its view, as 
     await expect(page.locator(T.thread)).toHaveAttribute('data-agent', 'gift-ui', { timeout: 5000 });
     const view = page.locator(T.thread);
     try {
-      await expect(view, "gift-ui's view shows its message to main as a question ('✉ gift-ui → main', amb-win 1b1d0abe)").toContainText('✉ gift-ui → main', { timeout: 10_000 });
+      // the window names main 'bise' (amb-win e298b066, display only); the TUI keeps 'main'
+      await expect(view, "gift-ui's view shows its message to main as a question ('✉ gift-ui → bise', amb-win 1b1d0abe, e298b066)").toContainText('✉ gift-ui → bise', { timeout: 10_000 });
       await expect(view, "gift-ui's view shows its question").toContainText(ask);
     } finally {
       await page.screenshot({ path: test.info().outputPath('question.png') });

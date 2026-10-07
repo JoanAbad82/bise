@@ -6,7 +6,7 @@
 // world, bise-home + acme), which plays the hub's route events as the real core forwards them;
 // what the app sends back is read from the core's command log (outside the app). Real keys and
 // clicks only. Passes when, in the window's thread and in the spotlight:
-//   - his words' row shows the hold at once (<= 250 ms after the route event): 'to acme · N s to
+//   - his words' row shows the hold at once (<= 250 ms after the route event): '→ bise · acme · N s to
 //     change', and N counts down;
 //   - 'keep it with bise' sends route_cancel for that rid; another project sends route_correct;
 //   - route_done 'sent' turns the row into 'sent to acme', the hold gone.
@@ -48,7 +48,7 @@ test('thread/route-hold: the hold shows at once, counts down, keep and correct r
     await core.send({ ev: 'route', project: HOME, rid: 41, to: ACME, name: 'acme', text: w1, correct_until_ms: Date.now() + 3000, why: 'test' });
     const hold = row(w1).locator(T.hold);
     await expect(hold, 'the hold shows on his row at once').toBeVisible({ timeout: 250 });
-    await expect(hold).toContainText(/to acme · [23] s to change/);
+    await expect(hold).toContainText(/→ bise · acme · [23] s to change/);
     const n0 = Number(/· (\d) s/.exec(await hold.innerText())?.[1]);
     await page.waitForTimeout(1300);
     const n1 = Number(/· (\d) s/.exec(await hold.innerText())?.[1]);
@@ -111,6 +111,7 @@ test('spotlight/route-hold: fn+space, ask, the hold shows at once in the spotlig
     } finally {
       await cap.screenshot({ path: test.info().outputPath('spot-held.png') });
     }
+    // the spotlight keeps its own words (amb-web's spotlight/words.ts routeTo; e298b066 renamed the thread's only)
     await expect(hold).toContainText(/to acme · [23] s to change/);
     const left0 = Number(await hold.getAttribute('data-left'));
     await cap.waitForTimeout(1300);
