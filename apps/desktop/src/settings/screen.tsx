@@ -9,6 +9,7 @@ import { heldReady, holdForSetup, releaseHeld, useHeld } from './hold';
 import { useRouter } from '@/app/router';
 import { useHelper } from '@/setup/helper';
 import { Settings } from './Settings';
+import { pageOf } from './pages';
 import type { Prefs } from './prefs';
 
 /** The prefs event's value as an object (anything else: none yet). */
@@ -46,14 +47,16 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
   // the roles pick from the home's models (bise's own catalog)
   const home = projects.find((p) => p.home);
   const models = useModels(home?.project ?? '');
-  // the home's models come on request (the hub sends a project's models on {cmd: models}): once
+  // the home's models come on request (the hub sends a project's models on {cmd: models}): once,
+  // and only when the models page is shown (the roles pick from them), never when settings mount
   const asked = useRef(false);
   const homeProject = home?.project;
+  const onModels = pageOf(page).id === 'models';
   useEffect(() => {
-    if (asked.current || homeProject === undefined || models.length > 0) return;
+    if (!onModels || asked.current || homeProject === undefined || models.length > 0) return;
     asked.current = true;
     store.command({ cmd: 'models', project: homeProject });
-  }, [homeProject, models.length, store]);
+  }, [onModels, homeProject, models.length, store]);
   // a model waiting for its provider's setup goes once an account of that provider signs in (L5)
   const held = useHeld();
   useEffect(() => {
