@@ -39,7 +39,7 @@ describe("the window's keys", () => {
     expect(keyAction(k('KeyE', { metaKey: true }), ctx())).toEqual({ screen: 'fold-all' });
     expect(keyAction(k('Period', { metaKey: true }), ctx())).toEqual({ screen: 'stop' });
     expect(keyAction(k('KeyY', { ctrlKey: true }), ctx())).toEqual({ screen: 'copy-code' });
-    expect(keyAction(k('Slash', { metaKey: true }), ctx())).toEqual({ go: { screen: 'settings', page: 'keys' } });
+    expect(keyAction(k('Slash', { metaKey: true }), ctx())).toEqual({ help: true });
     // editing keys are not the window's
     expect(keyAction(k('KeyC', { metaKey: true }), ctx())).toBeUndefined();
     expect(keyAction(k('KeyA', { metaKey: true }), ctx())).toBeUndefined();
@@ -60,5 +60,13 @@ describe('the agent palette', () => {
     expect(all.map((i) => `${i.projectName}/${i.agent.name}`)).toEqual(['bise/main', 'acme/main', 'acme/perf', 'acme/docs', 'shop/main', 'acme/old']);
     expect(paletteItems(projects, (p) => agents[p] ?? [], 'do').map((i) => i.agent.name)).toEqual(['docs']);
     expect(paletteItems(projects, (p) => agents[p] ?? [], 'shop').map((i) => i.projectName)).toEqual(['shop']);
+  });
+});
+
+describe('the key list (amb-web 1e60fbd6)', () => {
+  it('? opens it when not typing, never in a field with text', () => {
+    const q = { key: '?', code: 'Slash', metaKey: false, altKey: false, ctrlKey: false, shiftKey: true };
+    expect(keyAction(q, { route: { screen: 'bise' }, projects: [], agents: () => [], typing: false })).toEqual({ help: true });
+    expect(keyAction(q, { route: { screen: 'bise' }, projects: [], agents: () => [], typing: true })).toBeUndefined();
   });
 });

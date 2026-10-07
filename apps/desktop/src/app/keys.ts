@@ -17,7 +17,7 @@ import { projectsOf } from './Sidebar';
 /** What a screen does for a key (the thread listens with useAppAction). */
 export type ScreenAction = 'fold-all' | 'stop' | 'to-end' | 'copy-code';
 
-export type KeyAct = { readonly go: Route } | { readonly palette: true } | { readonly screen: ScreenAction };
+export type KeyAct = { readonly go: Route } | { readonly palette: true } | { readonly help: true } | { readonly screen: ScreenAction };
 
 export interface KeyLike {
   readonly key: string;
@@ -80,7 +80,9 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
     return p ? { go: { screen: 'artifacts', project: p } } : undefined;
   }
   if (only('meta') && e.code === 'KeyE') return { screen: 'fold-all' };
-  if (only('meta') && e.code === 'Slash') return { go: { screen: 'settings', page: 'keys' } };
+  // the key list over the window (amb-web 1e60fbd6, src/help): ⌘/, or ? when not typing
+  if (only('meta') && e.code === 'Slash') return { help: true };
+  if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey && !c.typing) return { help: true };
   if (only('meta') && e.code === 'Period') return { screen: 'stop' };
   if (only('ctrl') && e.code === 'KeyY') return { screen: 'copy-code' };
   if (only('none') && e.key === 'End' && !c.typing) return { screen: 'to-end' };

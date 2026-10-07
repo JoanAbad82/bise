@@ -28,6 +28,7 @@ import { Sidebar } from './Sidebar';
 import { numbersOf } from '@/agents/model';
 import { CoreLine } from './CoreLine';
 import { Palette } from './Palette';
+import { Help } from '@/help/Help';
 import { keyAction, typingIn } from './keys';
 import { emitAction, useMenuAction } from './menu';
 import { TerminalPanel } from '@/terminal/Terminal';
@@ -68,9 +69,15 @@ function testMode(): boolean {
 function Shell() {
   useHistoryKeys();
   const [palette, setPalette] = useState(false);
-  useWindowKeys(() => {
-    setPalette(true);
-  });
+  const [help, setHelp] = useState(false);
+  useWindowKeys(
+    () => {
+      setPalette(true);
+    },
+    () => {
+      setHelp(true);
+    },
+  );
   const router = useRouter();
   useMenuRouting(router);
   useMainRoutes(router);
@@ -88,6 +95,13 @@ function Shell() {
         <Palette
           onClose={() => {
             setPalette(false);
+          }}
+        />
+      )}
+      {help && (
+        <Help
+          onClose={() => {
+            setHelp(false);
           }}
         />
       )}
@@ -224,7 +238,7 @@ function NotFound({ path }: { path: string }) {
  * ⌘K opens the palette, the rest go to the shown screens. Capture phase, by
  * key code: the composer never types ⌥1's '¡'.
  */
-function useWindowKeys(openPalette: () => void) {
+function useWindowKeys(openPalette: () => void, openHelp: () => void) {
   const router = useRouter();
   const store = useStore();
   useEffect(() => {
@@ -252,13 +266,14 @@ function useWindowKeys(openPalette: () => void) {
       e.stopPropagation();
       if ('go' in act) router.go(act.go);
       else if ('palette' in act) openPalette();
+      else if ('help' in act) openHelp();
       else emitAction(act.screen);
     };
     window.addEventListener('keydown', onKey, true);
     return () => {
       window.removeEventListener('keydown', onKey, true);
     };
-  }, [router, store, openPalette]);
+  }, [router, store, openPalette, openHelp]);
 }
 
 function inTerminal(el: Element | null): boolean {
