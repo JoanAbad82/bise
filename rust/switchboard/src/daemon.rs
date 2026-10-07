@@ -19,6 +19,7 @@ mod pages;
 mod projects;
 mod proto;
 mod repl;
+mod recycling;
 mod routing;
 mod release;
 mod session_log;
@@ -298,6 +299,9 @@ struct Shell {
     /// the REPL restarts (the user: a recording or a draft in progress
     /// must survive).
     spawn_plugins: BTreeMap<String, PromptInputs>,
+    /// What each live REPL read since it started: an aged one restarts
+    /// at idle (daemon/recycling.rs, a workaround for the Bend allocator).
+    recycle: recycling::Recycle,
     /// The last plugins check (every 2 s on the tick).
     plugins_checked: Option<std::time::Instant>,
     /// The small model failed and agent_model answered: role lines use
@@ -1592,6 +1596,7 @@ impl Shell {
             .filter(|a| !self.switching.contains_key(&a.dir) && self.repls.contains_key(&a.dir))
             .filter(|a| {
                 self.reload_repls.contains(&a.dir)
+                    || self.recycle.is_due(&a.dir)
                     || self
                         .bins
                         .get(&a.dir)
@@ -1605,6 +1610,7 @@ impl Shell {
             };
             if r.stream.write_all(b"reload\n").is_ok() {
                 self.reload_repls.remove(&dir);
+                self.recycle_asked(&dir);
                 log_line(
                     &self.opts.paths,
                     &format!(
@@ -1920,6 +1926,7 @@ impl Shell {
             // the reload acknowledgement of a switch: not the agent's news
             return;
         }
+        self.recycle_line(dir, line);
         if self.restored.contains(dir) {
             if line.contains("obs: session_restored") {
                 self.restored.remove(dir);
@@ -2626,6 +2633,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         spawn_keys: BTreeMap::new(),
         spawn_plugins: BTreeMap::new(),
         plugins_checked: None,
+        recycle: recycling::Recycle::from_env(),
         small_broken: Default::default(),
         setup: None,
         archived: BTreeSet::new(),
@@ -2816,6 +2824,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
                     },
                 );
                 sh.switch_spawned.remove(&dir);
+                sh.recycle_started(&dir);
                 crate::util::timing(&format!("repl connected {} (adopted {})", dir, adopted));
                 if let Some(q) = sh.switching.remove(&dir) {
                     // a switched REPL: same session, the core never saw

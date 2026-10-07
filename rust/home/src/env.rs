@@ -136,6 +136,7 @@ pub const VARS: &[Var] = &[
     internal("BISE_PAGES_EXPORT", "the public pages' export folder, for the mirror command the hub runs (pages/mirror.rs)"),
     user("BISE_POINTER", "mouse pointer shapes on or off"),
     test("BISE_PROTO_BLESS", "bise-proto's ts test rewrites apps/desktop/src/proto instead of failing on stale files"),
+    user("BISE_RECYCLE_TOKENS", "context tokens an agent's REPL reads before the hub restarts it at idle (0: never)"),
     user("BISE_REDUCE_MOTION", "fewer animations"),
     test("BISE_RELEASE_CHECK_SECS", "how often the hub checks for a release (tests)"),
     test("BISE_RELEASE_SCRIPT", "the release script the hub runs (tests)"),

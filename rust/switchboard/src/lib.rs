@@ -53,6 +53,7 @@ pub mod place;
 pub mod procs;
 pub mod proto_view;
 pub mod prompts;
+pub mod recycle;
 pub mod role;
 pub mod route;
 pub mod router;
