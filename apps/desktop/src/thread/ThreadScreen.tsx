@@ -19,7 +19,8 @@ import { useRouter } from '@/app/router';
 import { pickCommands, slashOf, windowRun } from './commands';
 import { HELP_EVENT } from '@/app/keys';
 import { MAIN } from '@/app/route';
-import { FirstRun, showsFirstRun } from '@/setup';
+import { FirstRun, showsFirstRun, Tip } from '@/setup';
+import { useTour } from '@/setup/useTour';
 import { ThreadInbox } from '@/inbox';
 import { dotOf, lineOf } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
@@ -89,6 +90,16 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     composer.current = a;
   }, []);
   const quoting = useThreadQuote(section, composer, agent);
+  // L25: the demo's tips; 'inside' and 'end' sit at the thread's top, his send moves the tour
+  const tour = useTour(project);
+  const tourSent = useRef(tour.sent);
+  useEffect(() => {
+    tourSent.current = tour.sent;
+  }, [tour.sent]);
+  const onSent = useCallback(() => {
+    tourSent.current();
+  }, []);
+  const topTip = (tour.tip === 'inside' && tour.snap.focus === agent) || tour.tip === 'end' ? tour.tip : null;
   useMenuAction('find', () => {
     setFindOpen(true);
   });
@@ -222,6 +233,11 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
             }}
           />
         )}
+        {topTip !== null && (
+          <div className="th-tip">
+            <Tip tip={topTip} snap={tour.snap} />
+          </div>
+        )}
         <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} />
         {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} />}
         {stopping && <Marker>stopping {agent}…</Marker>}
@@ -231,7 +247,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         {me?.archived === true ? (
           <History project={project} agent={agent} />
         ) : (
-          <ThreadComposer project={project} agent={agent} busy={busy} to={`you → ${title}`} onStop={stop} quoting={quoting} onReady={onComposer} />
+          <ThreadComposer project={project} agent={agent} busy={busy} to={`you → ${title}`} onStop={stop} quoting={quoting} onReady={onComposer} onSent={onSent} />
         )}
       </section>
     </FindMarkContext>
@@ -417,6 +433,7 @@ const ThreadComposer = memo(function ThreadComposer({
   onStop,
   quoting,
   onReady,
+  onSent,
 }: {
   project: string;
   agent: string;
@@ -425,6 +442,8 @@ const ThreadComposer = memo(function ThreadComposer({
   onStop: () => void;
   quoting: boolean;
   onReady: (a: ComposerActions) => void;
+  /** his send went (the demo tour's step) */
+  onSent: () => void;
 }) {
   const store = useStore();
   const router = useRouter();
@@ -469,8 +488,9 @@ const ThreadComposer = memo(function ThreadComposer({
       // attached or dropped go with it (amb-core item H: the hub renders them
       // once, an image as a marker the model sees). Tab's queue: amb-web's
       store.send({ project, agent, text: out.text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}) });
+      onSent();
     },
-    [store, project, agent],
+    [store, project, agent, onSent],
   );
   return <Composer target={`${project}/${agent}`} busy={busy} sources={sources} to={to} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
 });

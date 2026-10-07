@@ -16,6 +16,7 @@ import { useProjects, useStore } from '@/store';
 import { ConfirmBar, InboxScreen } from '@/inbox';
 import { SettingsScreen } from '@/settings';
 import { OnboardingScreen, useFirstLaunch } from '@/setup';
+import { paletteOpen } from '@/setup/useTour';
 import { AgentsScreen } from '@/agents/AgentsScreen';
 import { ChangesScreen } from '@/review/ChangesScreen';
 import { ReviewScreen } from '@/review/ReviewScreen';
@@ -71,6 +72,10 @@ function Shell() {
   useHistoryKeys();
   const [palette, setPalette] = useState(false);
   const [help, setHelp] = useState(false);
+  // L25: the demo tour's 'end' goes when he opens the agent list
+  useEffect(() => {
+    paletteOpen(palette);
+  }, [palette]);
   useWindowKeys(
     () => {
       setPalette(true);

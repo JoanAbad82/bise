@@ -101,6 +101,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* the demo tour's tip under a sidebar row (L25: 'start', 'steer') */
+.app-tip {
+  padding: 2px 8px 6px 20px;
+}
+
 /* the sidebar scrolls its rows; '+ add a project' stays at its foot, on top,
    hit at its center and changing on hover (qa-flows' O.6 clicks audit) */
 [data-testid='app.sidebar'] {

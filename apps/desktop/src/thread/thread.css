@@ -131,6 +131,12 @@
   height: 100%;
 }
 
+/* the demo tour's tip at the thread's top (L25: 'inside', 'end') */
+.th-tip {
+  flex: 0 0 auto;
+  padding: 8px 24px 0;
+}
+
 .th-loading {
   flex: 1 1 auto;
 }

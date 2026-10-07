@@ -14,6 +14,8 @@ import { dotOf, endOf, liveOf, numbersOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
 import { useRoute, useRouter } from './router';
 import { useNow } from './clock';
+import { Tip } from '@/setup';
+import { useTour } from '@/setup/useTour';
 
 /** A project row's dot. Pure. */
 export function projectDot(p: ProjectRow): DotState {
@@ -110,7 +112,21 @@ function Agents({ project, route }: { project: string; route: Route }) {
   // the TUI's numbers: kept while an agent lives, a newcomer takes the smallest free one
   const nums = numbersOf(project, all);
   const now = useNow();
-  const row = (a: Agent) => <AgentRow key={a.name} project={project} a={a} n={nums.get(a.name) ?? 0} route={route} now={now} />;
+  // L25: the demo's 'start' tip under the first demo agent, 'steer' under the one that waits for him
+  const tour = useTour(project);
+  const liveDemo = tour.snap.members.filter((m) => !m.archived);
+  const tipAt = tour.tip === 'start' ? liveDemo[0]?.name : tour.tip === 'steer' ? liveDemo.at(-1)?.name : undefined;
+  const row = (a: Agent) =>
+    tipAt === a.name && tour.tip !== null ? (
+      <Fragment key={a.name}>
+        <AgentRow project={project} a={a} n={nums.get(a.name) ?? 0} route={route} now={now} />
+        <div className="app-tip">
+          <Tip tip={tour.tip} snap={tour.snap} />
+        </div>
+      </Fragment>
+    ) : (
+      <AgentRow key={a.name} project={project} a={a} n={nums.get(a.name) ?? 0} route={route} now={now} />
+    );
   return (
     <>
       {solo.map(row)}
