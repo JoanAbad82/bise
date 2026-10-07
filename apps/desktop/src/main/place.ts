@@ -6,7 +6,12 @@
 //           96 px above the work area's bottom (the Dock), centred; it grows upward
 //   menu    the tray's dropdown: the glass's top 6 px under the tray icon,
 //           centred on it
-// Never outside the work area (no menu bar, no Dock).
+// Never outside the work area (no menu bar, no Dock), checked once, at show.
+// While shown it never re-centres or climbs (lead m_11455: the input must not
+// move while he types): `pinned` notes where its glass sits at show, and each
+// new size keeps that glass's left edge and its anchored edge (top for the
+// spotlight and the menu, bottom for what bise brings) where they were; it
+// grows right and away from that edge only.
 
 export interface Rect {
   readonly x: number;
@@ -61,4 +66,24 @@ export function capsuleBounds(size: { width: number; height: number }, d: Displa
   x = Math.min(Math.max(x, wa.x), wa.x + wa.width - w);
   y = Math.min(Math.max(y, wa.y), wa.y + wa.height - h);
   return { x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) };
+}
+
+/** Where the glass was pinned at show: its left edge, and its anchored edge's y (top, or bottom for 'bottom'). */
+export interface Pin {
+  readonly x: number;
+  readonly y: number;
+  readonly edge: 'top' | 'bottom';
+}
+
+/** The pin of a capsule placed at `b` (capsuleBounds) with this glass. */
+export function pinOf(b: Rect, size: { width: number; height: number }, anchor: Anchor, glass?: Rect): Pin {
+  const g = glass ?? { x: 0, y: 0, width: size.width, height: size.height };
+  return anchor.at === 'bottom' ? { x: b.x + g.x, y: b.y + g.y + g.height, edge: 'bottom' } : { x: b.x + g.x, y: b.y + g.y, edge: 'top' };
+}
+
+/** The window's bounds for a new size while shown: the glass's left edge and pinned edge stay put; no centring, no clamp. */
+export function pinnedBounds(size: { width: number; height: number }, pin: Pin, glass?: Rect): Rect {
+  const g = glass ?? { x: 0, y: 0, width: size.width, height: size.height };
+  const y = pin.edge === 'top' ? pin.y - g.y : pin.y - (g.y + g.height);
+  return { x: Math.round(pin.x - g.x), y: Math.round(y), width: Math.round(size.width), height: Math.round(size.height) };
 }

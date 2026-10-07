@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOTTOM, capsuleBounds, MENU_GAP, OFF_DISPLAY, TOP, type DisplayBox } from './place';
+import { BOTTOM, capsuleBounds, MENU_GAP, OFF_DISPLAY, pinnedBounds, pinOf, TOP, type DisplayBox } from './place';
 
 // a 1512x982 MacBook display: the menu bar 33 px, the Dock 70 px
 const mac: DisplayBox = {
@@ -52,5 +52,37 @@ describe('capsuleBounds', () => {
     const b = capsuleBounds(size, OFF_DISPLAY, { at: 'top' });
     expect(b.x).toBeLessThan(-20000);
     expect(b.y).toBeLessThan(-20000);
+  });
+});
+
+describe('a shown capsule never moves while he types (lead m_11455)', () => {
+  it('the spotlight: 20 sizes as the list filters, its glass top-left stays where it was at show', () => {
+    const glass0 = { x: 84, y: 28, width: 700, height: 60 };
+    const b0 = capsuleBounds({ width: 868, height: 120 }, mac, { at: 'top' }, glass0);
+    const pin = pinOf(b0, { width: 868, height: 120 }, { at: 'top' }, glass0);
+    for (let i = 0; i < 20; i++) {
+      const h = 60 + ((i * 37) % 400);
+      const glass = { x: 84, y: 28, width: 700 + (i % 3) * 80, height: h };
+      const b = pinnedBounds({ width: glass.width + 168, height: h + 60 }, pin, glass);
+      expect([b.x + glass.x, b.y + glass.y]).toEqual([b0.x + glass0.x, b0.y + glass0.y]);
+    }
+  });
+
+  it('a list taller than the space below grows past it rather than climbing (clamped once, at show)', () => {
+    const glass = { x: 0, y: 0, width: 700, height: 2000 };
+    const b0 = capsuleBounds({ width: 700, height: 60 }, mac, { at: 'top' });
+    const b = pinnedBounds({ width: 700, height: 2000 }, pinOf(b0, { width: 700, height: 60 }, { at: 'top' }), glass);
+    expect(b.y).toBe(b0.y);
+    expect(b.x).toBe(b0.x);
+  });
+
+  it('what bise brings (the voice view, a card): its left and its bottom stay, it grows upward', () => {
+    const g0 = { x: 84, y: 0, width: 700, height: 80 };
+    const b0 = capsuleBounds({ width: 868, height: 80 }, mac, { at: 'bottom' }, g0);
+    const pin = pinOf(b0, { width: 868, height: 80 }, { at: 'bottom' }, g0);
+    const g1 = { x: 84, y: 0, width: 860, height: 300 };
+    const b1 = pinnedBounds({ width: 1028, height: 300 }, pin, g1);
+    expect(b1.x + g1.x).toBe(b0.x + g0.x);
+    expect(b1.y + g1.y + g1.height).toBe(b0.y + g0.y + g0.height);
   });
 });

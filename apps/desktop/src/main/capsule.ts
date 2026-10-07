@@ -16,7 +16,7 @@
 import { BrowserWindow, ipcMain, screen, type Tray } from 'electron';
 import { CAPSULE_LINE, IPC, type CapsuleAt, type CapsuleState } from '../shared/api';
 import { glassOf } from './glass';
-import { capsuleBounds, OFF_DISPLAY, type Anchor, type DisplayBox, type Rect } from './place';
+import { capsuleBounds, OFF_DISPLAY, pinnedBounds, pinOf, type Anchor, type DisplayBox, type Pin, type Rect } from './place';
 import { loadRenderer, OFF, webPreferences } from './windows';
 
 const START = { width: 640, height: 120 };
@@ -25,6 +25,8 @@ export class Capsule {
   private readonly win: BrowserWindow;
   private size: { width: number; height: number } = START;
   private glass: Rect | undefined;
+  /** where the glass was put at show: it stays there while shown (place.ts) */
+  private pin: Pin | null = null;
   private state: CapsuleState = { shown: false, at: 'bottom', keys: false, why: 'asked' };
   tray: Tray | null = null;
 
@@ -67,6 +69,8 @@ export class Capsule {
 
   show(at: CapsuleAt, keys: boolean, why: CapsuleState['why'] = 'asked'): void {
     this.state = { shown: true, at, keys, why };
+    // placed (and kept inside the screen) once, here; then pinned
+    this.pin = null;
     this.place();
     if (this.testMode) {
       process.stdout.write(`${CAPSULE_LINE} show ${at}${keys ? ' keys' : ''}\n`);
@@ -81,6 +85,7 @@ export class Capsule {
   hide(why: CapsuleState['why'] = 'asked'): void {
     if (!this.state.shown) return;
     this.state = { ...this.state, shown: false, keys: false, why };
+    this.pin = null;
     if (this.testMode) process.stdout.write(`${CAPSULE_LINE} hide\n`);
     else this.win.hide();
     this.tell();
@@ -115,8 +120,16 @@ export class Capsule {
     return { at };
   }
 
+  /** At show: centred on its anchor, inside the screen, and pinned. Shown: a new size keeps the glass's left and anchored edge. */
   private place(): void {
-    this.win.setBounds(capsuleBounds(this.size, this.display(), this.anchor(), this.glass));
+    if (this.pin !== null) {
+      this.win.setBounds(pinnedBounds(this.size, this.pin, this.glass));
+      return;
+    }
+    const anchor = this.anchor();
+    const b = capsuleBounds(this.size, this.display(), anchor, this.glass);
+    this.win.setBounds(b);
+    if (this.state.shown) this.pin = pinOf(b, this.size, anchor, this.glass);
   }
 
   private tell(): void {
