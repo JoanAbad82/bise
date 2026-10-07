@@ -121,6 +121,9 @@ test("review/prs: shop's PRs from the world's gh, the same rows as the TUI's /pr
       await expect(page.locator('[data-testid="prs.words.412"]'), "#412's words, the failing check named").toHaveText('changes asked · checks fail: e2e');
       await expect(page.locator('[data-testid="prs.row.415"]')).toContainText('sb/receipts');
       await expect(page.locator('[data-testid="prs.words.415"]')).toHaveText('draft · checks running');
+      // tone by meaning, never color alone: the failing PR's tone is an error's, and its words say why
+      await expect(r412, "#412's tone is an error's (checks fail)").toHaveAttribute('data-tone', 'err');
+      await expect(page.locator('[data-testid="prs.row.415"]'), "#415's tone is not an error's").not.toHaveAttribute('data-tone', 'err');
     } finally {
       await page.screenshot({ path: test.info().outputPath('prs-shop.png') });
     }
