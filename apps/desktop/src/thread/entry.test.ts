@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { clock, entryKey, findText, pendingKey, posOfKey, whoOf } from './entry';
+import { clock, entryKey, findText, pendingKey, posOfKey, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -32,5 +32,14 @@ describe('thread rows', () => {
       'slow',
     );
     expect(found.matches.length).toBeGreaterThan(0);
+  });
+});
+
+describe('M14: a turn time on hover', () => {
+  const NOW = Date.UTC(2026, 9, 14, 15, 0);
+  it("today's turn shows its clock, an older day's its date too, no time shows nothing", () => {
+    expect(whenOf(Date.UTC(2026, 9, 14, 9, 46), NOW, 'UTC')).toBe('09:46');
+    expect(whenOf(Date.UTC(2026, 9, 12, 7, 0), NOW, 'UTC')).toBe('12 Oct 07:00');
+    expect(whenOf(0, NOW, 'UTC')).toBe('');
   });
 });

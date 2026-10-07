@@ -19,6 +19,18 @@ export function clock(ms: number, tz?: string): string {
   return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz }).format(ms);
 }
 
+/**
+ * A turn's time on hover (M14, the TUI's BISE-271): '14:05' today, '12 Oct 14:05' an
+ * older day, '' without a time. Pure (`now` and `tz` given).
+ */
+export function whenOf(ms: number, now: number, tz?: string): string {
+  if (ms <= 0) return '';
+  const day = (t: number) => new Intl.DateTimeFormat('en-GB', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: tz }).format(t);
+  if (day(ms) === day(now)) return clock(ms, tz);
+  const d = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: tz }).format(ms);
+  return `${d} ${clock(ms, tz)}`;
+}
+
 /** Who speaks in a message row: his words, the shown agent's (bise's pearl on bise's main), another agent's. */
 export function whoOf(e: Entry, ctx: { agent: string; bise: boolean }): { from: 'you' | 'bise' | 'agent'; name: string; indent: boolean } {
   switch (e.kind) {

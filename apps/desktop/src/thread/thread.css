@@ -142,7 +142,27 @@
 }
 
 .th-row {
+  position: relative;
   padding: 0 0 2px;
+}
+
+/* M14: the turn's time shows under the mouse, at the row's top right */
+.th-when {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  padding: 0 4px;
+  border-radius: var(--r-1, 3px);
+  background: var(--c-bg, transparent);
+  color: var(--c-text-3);
+  font: var(--t-12) var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--d-fast) var(--ease-out);
+}
+.th-row:hover > .th-when {
+  opacity: 1;
 }
 
 .th-hit {

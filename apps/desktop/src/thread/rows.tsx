@@ -10,7 +10,8 @@ import { useAgents, useCoreState, useEntry, usePending, useProjects, useStore, u
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
-import { clock, whoOf } from './entry';
+import { clock, whenOf, whoOf } from './entry';
+import { useToday } from '@/app/clock';
 import { useIsCurrent } from './findmark';
 
 /** What a row needs of its thread. */
@@ -28,10 +29,18 @@ export interface RowCtx {
 export const EntryRow = memo(function EntryRow({ ctx, pos }: { ctx: RowCtx; pos: number }) {
   const e = useEntry(ctx.tkey, pos);
   const hit = useIsCurrent(pos);
+  const today = useToday();
   if (e === undefined) return null;
+  // M14: the turn's time under the mouse (its day too when older than today)
+  const when = whenOf(e.at_ms, today);
   return (
     <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={`thread.entry.${pos}`} data-kind={e.kind} data-from={e.from ?? undefined}>
       <EntryBody e={e} ctx={ctx} />
+      {when !== '' && (
+        <span className="th-when" aria-hidden="true" data-testid={`thread.when.${pos}`}>
+          {when}
+        </span>
+      )}
     </div>
   );
 });

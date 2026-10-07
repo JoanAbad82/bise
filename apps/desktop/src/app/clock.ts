@@ -25,6 +25,11 @@ function subscribe(l: () => void): () => void {
   };
 }
 
+/** Today's local midnight: re-renders its reader only when the day changes (M14's hover times). */
+export function useToday(): number {
+  return useSyncExternalStore(subscribe, () => new Date(now).setHours(0, 0, 0, 0));
+}
+
 /** Now, to the minute: re-renders its reader once a minute. */
 export function useNow(): number {
   return useSyncExternalStore(subscribe, () => now);
