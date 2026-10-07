@@ -69,7 +69,7 @@ export class MainWindow {
   create(route?: string): BrowserWindow {
     const test = this.testMode;
     const win = new BrowserWindow({
-      // its narrowest is one column, the sidebar folded (mainsize.ts)
+      // its narrowest fits the sidebar and one column (mainsize.ts)
       width: MAIN_SIZE.width,
       height: MAIN_SIZE.height,
       minWidth: MAIN_SIZE.minWidth,
