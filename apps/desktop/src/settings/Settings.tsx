@@ -13,6 +13,7 @@ import { putPref, type Prefs } from './prefs';
 import { PAGES, PageBody, pageOf, type Page } from './pages';
 import type { ComputerUse } from './computer';
 import type { Perms } from './check';
+import type { KeyError } from './accounts';
 import './settings.css';
 
 export interface SettingsData {
@@ -27,6 +28,8 @@ export interface SettingsData {
   computerUse: ComputerUse | null;
   /** the helper's permissions (none: not known, or no helper) */
   perms: Perms;
+  /** the core's last refusal of a key (error {cmd: key_set}), shown on the key field (bar S.2) */
+  keyError?: KeyError | null;
 }
 
 export interface SettingsPorts {

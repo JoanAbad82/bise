@@ -104,6 +104,36 @@ describe('Settings', () => {
     f.value = 'sk-test';
     fireEvent.keyDown(f, { key: 'Enter' });
     expect(p.sent).toEqual([{ cmd: 'key_set', id: 'anthropic-key', key: 'sk-test' }]);
+    // the field stays while the core checks, and a second ⏎ sends nothing more
+    expect(screen.getByTestId('settings.key.help').textContent).toMatch(/checking/);
+    fireEvent.keyDown(f, { key: 'Enter' });
+    expect(p.sent.length).toBe(1);
+  });
+
+  it('S.2: a key the core refuses says so in place, the field kept; the key added closes it', () => {
+    const p = ports();
+    const r = view('models', p);
+    fireEvent.click(screen.getByTestId('settings.key.add'));
+    const f = screen.getByTestId<HTMLInputElement>('settings.key.field');
+    f.value = 'sk-wrong';
+    fireEvent.keyDown(f, { key: 'Enter' });
+    const again = (extra: Partial<Parameters<typeof Settings>[0]>) => {
+      r.rerender(<Settings page="models" prefs={prefs()} accounts={extra.accounts ?? accounts()} projects={projects()} found={found()} plugins={null} computerUse={null} perms={{}} ports={p} {...extra} />);
+    };
+    again({ keyError: { n: 1, text: 'anthropic-key: the provider refused this key (401)' } });
+    const help = screen.getByTestId('settings.key.help');
+    expect(help.textContent).toBe('the provider refused this key (401). check it, then ⏎ again');
+    expect(help.getAttribute('role')).toBe('alert');
+    expect(screen.getByTestId<HTMLInputElement>('settings.key.field').value).toBe('sk-wrong');
+    expect(document.body.textContent).not.toContain('sk-wrong');
+    // he fixes it and sends again: one more key_set
+    const g = screen.getByTestId<HTMLInputElement>('settings.key.field');
+    fireEvent.change(g, { target: { value: 'sk-right' } });
+    fireEvent.keyDown(g, { key: 'Enter' });
+    expect(p.sent.filter((c) => c.cmd === 'key_set').length).toBe(2);
+    expect(screen.getByTestId('settings.key.help').textContent).toMatch(/checking/);
+    // the core adds it: the field goes, the row says added
+    again({ keyError: { n: 1, text: 'anthropic-key: the provider refused this key (401)' }, accounts: accounts().map((a) => (a.id === 'anthropic-key' ? { ...a, state: 'signed_in' } : a)) });
     expect(screen.queryByTestId('settings.key.field')).toBeNull();
   });
 

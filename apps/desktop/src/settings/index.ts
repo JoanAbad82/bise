@@ -6,7 +6,7 @@
 // src/store) comes with the store.
 export { Settings, type SettingsData, type SettingsPorts, type SettingsProps } from './Settings';
 export { PAGES, KeyList, type Page } from './pages';
-export { Accounts, signedIn } from './accounts';
+export { Accounts, signedIn, keyField, keyErrorWords, type KeyError } from './accounts';
 export { onboarded, type Prefs } from './prefs';
 export { KEY_SECTIONS } from './keys';
-export { SettingsScreen, prefsOf } from './screen';
+export { SettingsScreen, prefsOf, useKeyError } from './screen';

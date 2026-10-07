@@ -12,12 +12,48 @@ export function signedIn(accounts: readonly Account[]): boolean {
   return accounts.some((a) => a.state === 'signed_in');
 }
 
-export function Accounts({ accounts, send }: { accounts: readonly Account[]; send: (cmd: AppCmd) => void }) {
+/** the core's last refusal of a key (error {cmd: key_set}), counted so the same words twice count */
+export interface KeyError {
+  n: number;
+  text: string;
+}
+
+/** a refusal's words for him: the core's text without its account id ("anthropic-key: …") */
+export function keyErrorWords(text: string, id: string | null): string {
+  const t = id !== null && text.startsWith(`${id}: `) ? text.slice(id.length + 2) : text;
+  return t.trim() === '' ? 'the provider refused this key' : t.trim();
+}
+
+/**
+ * The key's field after ⏎ (bar S.2): it stays, with what he typed, while the core checks; a
+ * refusal newer than the send shows in place (field in error, the core's words); the key in the
+ * core's accounts closes it. Pure, for the tests.
+ */
+export function keyField(
+  sent: { n: number; base: readonly Account[] } | null,
+  keyError: KeyError | null,
+  accounts: readonly Account[],
+  id: string | null,
+): 'typing' | 'checking' | 'refused' | 'added' {
+  if (sent === null) return 'typing';
+  if (keyError !== null && keyError.n > sent.n) return 'refused';
+  if (accounts !== sent.base && accounts.some((a) => a.id === id && a.state === 'signed_in')) return 'added';
+  return 'checking';
+}
+
+export function Accounts({ accounts, send, keyError = null }: { accounts: readonly Account[]; send: (cmd: AppCmd) => void; keyError?: KeyError | null }) {
   // the sign-ins he started here: a spinner until the core's next accounts
   const [signing, setSigning] = useState<{ base: readonly Account[]; ids: readonly string[] }>({ base: accounts, ids: [] });
   const busy = signing.base === accounts ? signing.ids : [];
   const [keyFor, setKeyFor] = useState<string | null>(null);
   const [bad, setBad] = useState(false);
+  // the key he sent: the refusals counted before it don't count for it
+  const [sent, setSent] = useState<{ n: number; base: readonly Account[] } | null>(null);
+  const field = keyField(sent, keyError, accounts, keyFor);
+  if (field === 'added') {
+    setKeyFor(null);
+    setSent(null);
+  }
   const subs = accounts.filter((a) => a.kind === 'subscription');
   const keys = accounts.filter((a) => a.kind === 'key');
   const key = keys.find((a) => a.state === 'signed_in');
@@ -54,7 +90,7 @@ export function Accounts({ accounts, send }: { accounts: readonly Account[]; sen
         </Button>
       </span>
     ) : firstKey ? (
-      <Button onClick={() => { setKeyFor(firstKey.id); setBad(false); }} testId="settings.key.add">
+      <Button onClick={() => { setKeyFor(firstKey.id); setBad(false); setSent(null); }} testId="settings.key.add">
         add a key
       </Button>
     ) : undefined,
@@ -68,12 +104,18 @@ export function Accounts({ accounts, send }: { accounts: readonly Account[]; sen
             autoFocus
             type="password"
             placeholder="paste your key, then ⏎"
-            state={bad ? 'error' : undefined}
+            state={bad || field === 'refused' ? 'error' : undefined}
             testId="settings.key.field"
+            onChange={() => {
+              // he fixes the key: the refusal was for the last one
+              if (field === 'refused') setSent(null);
+              if (bad) setBad(false);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.preventDefault();
                 setKeyFor(null);
+                setSent(null);
               } else if (e.key === 'Enter') {
                 e.preventDefault();
                 const k = e.currentTarget.value.trim();
@@ -81,13 +123,21 @@ export function Accounts({ accounts, send }: { accounts: readonly Account[]; sen
                   setBad(true);
                   return;
                 }
+                if (field === 'checking') return; // one send per key
                 send({ cmd: 'key_set', id: keyFor, key: k });
-                e.currentTarget.value = '';
-                setKeyFor(null);
+                setSent({ n: keyError?.n ?? 0, base: accounts });
               }
             }}
           />
-          <Help err={bad}>{bad ? 'paste a key first' : 'it stays on this Mac; esc cancels'}</Help>
+          <Help err={bad || field === 'refused'} testId="settings.key.help">
+            {bad
+              ? 'paste a key first'
+              : field === 'refused' && keyError !== null
+                ? `${keyErrorWords(keyError.text, keyFor)}. check it, then ⏎ again`
+                : field === 'checking'
+                  ? 'checking the key with the provider…'
+                  : 'it stays on this Mac; esc cancels'}
+          </Help>
         </div>
       )}
     </>

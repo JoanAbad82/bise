@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import type { Account, AppCmd, Found, Perm } from '@/proto';
 import { Button, Check, Chip, Group, Help, Onb } from '@/ds';
-import { Accounts, signedIn } from '@/settings';
+import { Accounts, signedIn, type KeyError } from '@/settings';
 import { allAllowed, back, finish, fnAct, next, pick, PERMS, START, stepOf, STEPS, ticked, type OnbState, type Perms } from './model';
 import './setup.css';
 
@@ -25,6 +25,8 @@ export interface OnboardingProps {
   perms: Perms;
   /** the helper's last fn act (talk_start, talk_end...), with a counter so the same act twice counts */
   fn?: { act: string; n: number } | null;
+  /** the core's last refusal of a key (bar S.2), shown on the model step's key field */
+  keyError?: KeyError | null;
   ports: OnboardingPorts;
   now?: number;
 }
@@ -35,7 +37,7 @@ const PERM_WORDS: Record<string, { label: string; sub: string; lost: string }> =
   screen: { label: 'screen recording', sub: 'for the capture fn adds to your question', lost: 'fn will send your words without a capture' },
 };
 
-export function Onboarding({ accounts, found, perms, fn = null, ports, now: pinned }: OnboardingProps) {
+export function Onboarding({ accounts, found, perms, fn = null, keyError = null, ports, now: pinned }: OnboardingProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [st, setSt] = useState<OnbState>(START);
@@ -121,7 +123,7 @@ export function Onboarding({ accounts, found, perms, fn = null, ports, now: pinn
           sub="your subscription is enough. you can change it per project."
           cta={{ text: 'continue', onClick: go, state: ok ? undefined : 'disabled', testId: 'setup.next' }}
         >
-          <Accounts accounts={accounts} send={ports.send} />
+          <Accounts accounts={accounts} send={ports.send} keyError={keyError} />
           {!ok && <Help>sign in to one of them to go on</Help>}
         </Onb>
       );

@@ -115,8 +115,8 @@ export function Field({ icon, state, testId, ref, ...input }: FieldProps) {
 }
 
 /** a help line under a control; `err` in the error color */
-export function Help({ children, err }: { children: ReactNode; err?: boolean }) {
-  return <div className={cx("b-help", err && "err")}>{children}</div>;
+export function Help({ children, err, testId }: { children: ReactNode; err?: boolean; testId?: string }) {
+  return <div className={cx("b-help", err && "err")} role={err ? "alert" : undefined} data-testid={testId}>{children}</div>;
 }
 
 /** a dot state in words: its accessible name and tooltip (never by color alone, bar N2) */

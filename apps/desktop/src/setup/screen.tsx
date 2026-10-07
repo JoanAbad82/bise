@@ -6,7 +6,7 @@
 import { useEffect, useRef } from 'react';
 import { useAccounts, useFound, usePrefs, useStore } from '@/store';
 import { useRouter } from '@/app/router';
-import { onboarded, prefsOf } from '@/settings';
+import { onboarded, prefsOf, useKeyError } from '@/settings';
 import { Onboarding } from './Onboarding';
 import { useHelper } from './helper';
 
@@ -20,6 +20,7 @@ export function OnboardingScreen() {
       found={useFound()}
       perms={perms}
       fn={fn}
+      keyError={useKeyError()}
       ports={{
         send: (cmd) => {
           store.command(cmd);

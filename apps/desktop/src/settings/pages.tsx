@@ -165,7 +165,7 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
       );
     }
     case 'models':
-      return <Accounts accounts={data.accounts} send={ports.send} />;
+      return <Accounts accounts={data.accounts} send={ports.send} keyError={data.keyError ?? null} />;
     case 'projects':
       return <Projects projects={data.projects} found={data.found} ports={ports} />;
     case 'setup':
