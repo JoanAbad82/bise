@@ -2368,16 +2368,19 @@ def _cli(argv):
     p = sub.add_parser("world", help="bise desktop: one throwaway HOME, bise's home hub + 2-3 seeded projects (world.py)")
     ws = p.add_subparsers(dest="wcmd", required=True)
     q = ws.add_parser("up"); q.add_argument("--projects", type=int, default=3); q.add_argument("--bise"); q.add_argument("--root")
+    q.add_argument("--rich", action="store_true", help="the try gate's world: more agents, long threads, every card kind, pages, timers, a screen_context message")
+    q.add_argument("--agents", type=int, default=0, help="with --rich: telemetry gets this many agents (filler agents added)")
     ws.add_parser("down"); ws.add_parser("state")
     q = ws.add_parser("say"); q.add_argument("project"); q.add_argument("text")
     q = ws.add_parser("feature"); q.add_argument("project"); q.add_argument("name")
     p = sub.add_parser("_world"); p.add_argument("--bise", required=True); p.add_argument("--root", required=True); p.add_argument("--projects", type=int, default=3)
+    p.add_argument("--rich", action="store_true"); p.add_argument("--agents", type=int, default=0)
     a = ap.parse_args(argv)
     if a.cmd in ("world", "_world"):
         import world
         if a.cmd == "_world":
-            return world.daemon(a.bise, a.root, a.projects)
-        r = {"up": lambda: world.up(a.projects, a.bise, a.root), "down": world.down, "state": world.state,
+            return world.daemon(a.bise, a.root, a.projects, a.rich, a.agents)
+        r = {"up": lambda: world.up(a.projects, a.bise, a.root, a.rich, a.agents), "down": world.down, "state": world.state,
              "say": lambda: world.say(a.project, a.text), "feature": lambda: world.feature(a.project, a.name)}[a.wcmd]()
         print(json.dumps(r, indent=1, ensure_ascii=False))
         return

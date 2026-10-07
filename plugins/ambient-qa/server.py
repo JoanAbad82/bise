@@ -25,6 +25,8 @@ TOOLS = [
     ("stop", "Stop the throwaway hub (its own pids only).", {}, []),
     ("world", "bise desktop's throwaway world (world.py): one isolated HOME under ~/.bise/gate with bise's home hub and 2-3 projects (telemetry, shop, docs), each its own fake-provider hub, seeded by its fake main: agents in worktrees, a committed diff ready to merge, an agent at work in a dirty worktree, cards with options, a merge question, a blocked agent, an artifact, a message between two agents, a question main answers for him, a tool approval he refused with a note. do: up (projects 2|3, bise?, root?; takes the heavy lock only to compile stale helpers), state (each hub's agents, commits, diffs, cards, socket), say (project or 'bise', text: words to that project's fake main; [[bash: ...]] scripts it), feature (project, name: a real approval card), down (always, when done: stops every hub by pid).",
      {"do": {"type": "string", "enum": ["up", "state", "say", "feature", "down"]}, "projects": {"type": "integer"}, "bise": {"type": "string"}, "root": {"type": "string"},
+      "rich": {"type": "boolean", "description": "up: the try gate's world (3 projects, ~14 agents, 200+-entry threads, tool rows ok/fail with edits, every card kind, pages, timers, a screen_context message, try_real for BISE_TRY_REAL)"},
+      "agents": {"type": "integer", "description": "up with rich: telemetry gets this many agents"},
       "project": {"type": "string"}, "text": {"type": "string"}, "name": {"type": "string"}}, ["do"]),
     ("page_publish", "On the throwaway hub, main publishes a page (sb page publish): `file` or amb-kit's weekly-update example, `edit` {old: new} for a v2, `done` note ids, `answers` {note id: text}. Returns its url.",
      {"file": {"type": "string"}, "id": {"type": "string"}, "title": {"type": "string"}, "edit": {"type": "object"}, "done": {"type": "array", "items": {"type": "string"}}, "answers": {"type": "object"}}, []),
@@ -77,7 +79,7 @@ def run(name, a):
         import world
         d = a["do"]
         if d == "up":
-            r = world.up(a.get("projects", 3), a.get("bise"), a.get("root"))
+            r = world.up(a.get("projects", 3), a.get("bise"), a.get("root"), bool(a.get("rich")), int(a.get("agents") or 0))
         elif d == "say":
             r = world.say(a["project"], a["text"])
         elif d == "feature":

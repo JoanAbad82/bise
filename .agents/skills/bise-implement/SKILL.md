@@ -41,6 +41,11 @@ each from this repo. It is short. The architect agent keeps it current.
 9. Tests on fake data (fake provider, throwaway hub, tmux); never the user's
    real accounts or hub.
 
+## Before sb land
+
+- apps/desktop: `pnpm check` + `pnpm test:land` (the fixed harness set in
+  `apps/desktop/tests/harness/land.mjs`, off-screen, under the heavy lock).
+
 ## Unsure? Ask before writing it
 
 Unsure where something belongs, whether a change breaks a seam, or whether a

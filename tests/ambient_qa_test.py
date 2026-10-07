@@ -13,6 +13,7 @@ import os
 import shlex
 import shutil
 import socket
+import re
 import subprocess
 import sys
 import tempfile
@@ -600,6 +601,45 @@ def world_fixtures_seed_every_desktop_shape():
     except qa.QAError:
         pass
     world.guard(w, [os.path.join(w, "h")])
+
+
+@test
+def rich_world_fixtures():
+    """qa.py world up --rich: 3 projects with every agent status, 110 messages to telemetry's main (tables, code, lists, every
+    third answered by a markdown file), 30 tool turns (failing bash, edits), filler agents up to --agents, a screen_context
+    block like fn_context.rs's, a try-real dir on the fake provider; needles never in the message"""
+    import world
+    ps = world.plan(3, rich=True)
+    names = {p["name"]: [a["name"] for a in p["agents"]] for p in ps}
+    check({"dashboards", "ingest"} <= set(names["telemetry"]) and "perf" in names["shop"] and "changelog" in names["docs"], names)
+    check(world.plan(3) == world.PROJECTS[:3], "the plain world is unchanged")
+    d = tempfile.mkdtemp(prefix="aq-rich-")
+    msgs = world.rich_messages(d)
+    check(len(msgs) == 110 and all(m["needle"] not in m["text"] for m in msgs), "needles")
+    bodies = "".join(m["text"] for m in msgs) + "".join(m.get("body", "") for m in msgs)
+    check("|---|" in bodies and "```python" in bodies and "- [ ]" in bodies and sum(1 for m in msgs if m.get("reply")) == 36, "markdown kinds")
+    dash = world.dash_messages()
+    check(len(dash) == 30 and all(m["needle"] not in m["text"] for m in dash), "dash needles")
+    check(sum("sys.exit(1)" in m["text"] for m in dash) == 10 and all("[[edit: " in m["text"] for m in dash), "fails and edits")
+    for m in dash:   # every edit's JSON parses as the fake provider reads it
+        for arg in re.findall(r"\[\[edit: (.*?)\]\]", m["text"], re.S):
+            check(json.loads(arg, strict=False)["file_path"] == "panels.md", arg)
+    have = len(names["telemetry"])
+    check(len(world.crowd(30, have)) == 30 - have and world.crowd(3, have) == [], "filler agents")
+    try:
+        world.crowd(200, have)
+        check(False, "more filler than names")
+    except ValueError:
+        pass
+    s = world.screen_message()
+    check(s.startswith("make the apply-code") and '\n\n<screen_context app="Figma">\n' + world.SCREEN_NOTE in s and s.endswith("</screen_context>"), s)
+    real = world.try_real(os.path.join(d, "try-real"), [{"ws": "/w/telemetry", "project": "telemetry"}, {"ws": "/w/shop", "project": "shop"}],
+                          "http://127.0.0.1:4242/v1/chat/completions")
+    pj = json.load(open(os.path.join(real, "projects.json")))
+    cfg = open(os.path.join(real, "config.toml")).read()
+    check([p["name"] for p in pj["projects"]] == ["telemetry", "shop"] and 'base_url = "http://127.0.0.1:4242/v1"' in cfg
+          and 'key_env = ""' in cfg and cfg.count("[roles]") == 1, cfg)
+    shutil.rmtree(d, ignore_errors=True)
 
 
 @test

@@ -22,6 +22,8 @@ the injected <bise_state> block is not one):
   call's description too (BISE-223);
 - once every marker ran (or there is none), the agent answers
   "done: <last tool result>" or "ack: <the message>";
+- `[[reply: PATH]]`: once every marker ran, the answer is PATH's text,
+  verbatim (markdown kept), instead of "done: …" / "ack: …";
 - `[[ts: CODE]]`: a run_typescript call with that program (CODE without
   `]]`);
 - `[[think: TEXT]]`: every reply to that message starts with reasoning
@@ -93,6 +95,7 @@ FAMILIES = ("anthropic", "openai-chat", "openai-responses", "gemini")
 MARK = re.compile(r"\[\[(bash|skill|edit|write_file|apply_patch|run_typescript|ts): (.*?)\]\]", re.S)
 INNER = re.compile(r"\{\{(bash): (.*?)\}\}", re.S)
 THINK = re.compile(r"\[\[think: (.*?)\]\]", re.S)
+REPLY = re.compile(r"\[\[reply: ([^\]\n]+)\]\]")
 ERROR = re.compile(r"\[\[error: (\w+)(?: x(\d+))?(?: retry=(\d+))?\]\]")
 FIXTURE = re.compile(r"\[\[fixture: ([\w.-]+)\]\]")
 SLOW = re.compile(r"\[\[slow: ([\d.]+)\]\]")
@@ -339,6 +342,15 @@ def reply_for(conv, seen=0):
             cmd, desc = arg.split(" @@ ", 1)
             args = {"arg": cmd.strip(), "description": desc.strip()}
         turn["calls"] = [{"id": "call_%d_%d" % (idx, calls_done), "name": tool, "args": args}]
+        return turn
+    # `[[reply: PATH]]`: once every call ran, the answer is that file's text verbatim (long
+    # markdown, code blocks, tables: ambient-qa's rich world)
+    rep = REPLY.search(user)
+    if rep:
+        try:
+            turn["text"] = open(rep.group(1).strip(), encoding="utf-8").read()
+        except OSError as e:
+            turn["text"] = "ack: no reply file (%s)" % e
         return turn
     results = [m["text"] for m in after if m["role"] == "tool"]
     if results:
