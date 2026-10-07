@@ -48,6 +48,12 @@ export interface ComposerProps {
   readonly testId?: string;
 }
 
+/** 'write to perf' under 'you → perf' (ambient m_10689); 'write to bise' with no target line. */
+export function writeTo(to: string | undefined): string {
+  const name = /→\s*([^·]+)/u.exec(to ?? '')?.[1]?.trim();
+  return `write to ${name !== undefined && name !== '' ? name : 'bise'}`;
+}
+
 /** The last tip shown (keybar.rs keeps it in the `tip` preference): the next session starts after it. */
 const TIP_KEY = 'bise.composer.v1.tip';
 
@@ -67,7 +73,7 @@ const EXTENSION = defineExtension({
 });
 
 export const Composer = memo(function Composer(props: ComposerProps): JSX.Element {
-  const { target, busy = false, sources = NO_SOURCES, to, placeholder = 'write to bise', keys, voice = null, quoting = false, testId = 'composer' } = props;
+  const { target, busy = false, sources = NO_SOURCES, to, placeholder = writeTo(to), keys, voice = null, quoting = false, testId = 'composer' } = props;
   const store = useMemo<Store>(() => props.store ?? window.localStorage, [props.store]);
   // the latest callbacks, read by the editor's handlers without re-creating them
   const cb = useRef(props);
@@ -137,7 +143,7 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
           </span>
           {keys === undefined && tipText !== undefined && (
             <span className="tip" data-testid={`${testId}.tip`}>
-              tip · {tipText}
+              tip: {tipText}
             </span>
           )}
         </>
@@ -202,7 +208,7 @@ function Mic({ state, level, onClick, testId }: { state: 'recording' | 'transcri
     >
       {state === null ? (
         <>
-          <span className="kk">ctrl+r</span> dictate
+          <span className="kk">⌃R</span> dictate
         </>
       ) : state === 'recording' ? (
         <>
