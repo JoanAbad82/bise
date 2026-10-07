@@ -7,54 +7,28 @@
 //       reads back as the same segments; one that doesn't read keeps its raw JSON aside;
 //   (3) a draft saved and a send made while dictation is live hold none of its words.
 import { act, cleanup, render } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { $createLineBreakNode, $createParagraphNode, $createTextNode, $getRoot, createEditor } from 'lexical';
 import { getSchema } from '@tiptap/core';
 import type { Node as PmNode } from '@tiptap/pm/model';
 import { $createChipNode, ChipNode as LexicalChip } from '../ChipNode';
 import { $readSegments } from '../read';
-import { buildMessage, type Chip, type Outgoing } from '../message';
+import { buildMessage, type Outgoing } from '../message';
 import { entryOf, entrySegments, lexicalJsonOf } from '../entry';
 import { load, type Store } from '../drafts';
 import type { ComposerActions } from '../Brain';
 import type { ComposerSources, DictateState } from '../sources';
 import { NO_SOURCES } from '../sources';
 import { FIELD_NODES } from './schema';
+import { CASES, img, paste, quote, type Content } from './golden';
 import { nodeType, segmentsOf } from './pmtext';
 import { PmField } from './PmField';
 
 afterEach(cleanup);
 
 const schema = getSchema(FIELD_NODES);
-
-const img: Chip = { kind: 'image', n: 1, path: '/Users/g/shot.png', name: 'shot.png' };
-const paste: Chip = { kind: 'paste', n: 2, text: Array.from({ length: 14 }, (_, i) => `line ${i + 1}`).join('\n') };
-const quote: Chip = { kind: 'quote', n: 3, text: 'fn a() {}\nfn b() {}', from: 'perf vs main', at: { file: 'src/q.rs', new: '10-11', old: '' } };
-const artifact: Chip = { kind: 'artifact', n: 4, id: 'a1', title: 'Q3 [plan]', url: 'https://bise.dev/m/q3' };
-
-/** A message as paragraphs of parts: a string is text ('\n' a line break), an object a chip. */
-type Part = string | Chip;
-type Content = readonly (readonly Part[])[];
-
-const CASES: readonly { name: string; content: Content; golden: Outgoing }[] = [
-  { name: 'plain text', content: [['ça va ? 👍']], golden: { text: 'ça va ? 👍', files: [] } },
-  { name: 'line breaks and trimmed ends', content: [['  first\nsecond\n\n']], golden: { text: 'first\nsecond', files: [] } },
-  { name: 'two paragraphs (an old draft)', content: [['one'], ['two']], golden: { text: 'one\ntwo', files: [] } },
-  { name: 'an image', content: [['see ', img, ' here']], golden: { text: 'see [Image #1] here', files: ['/Users/g/shot.png'] } },
-  {
-    name: 'a long paste',
-    content: [['look: ', paste]],
-    golden: { text: `look: <pasted n="2" lines="14">\n${(paste as { text: string }).text}\n</pasted>`, files: [] },
-  },
-  {
-    name: 'a quote of diff lines',
-    content: [[quote, 'why this order?']],
-    golden: { text: '<selection from="perf vs main" file="src/q.rs" new="10-11">\nfn a() {}\nfn b() {}\n</selection>\nwhy this order?', files: [] },
-  },
-  { name: 'an artifact', content: [['read ', artifact]], golden: { text: 'read [Q3 plan](https://bise.dev/m/q3)', files: [] } },
-  { name: 'a code fence', content: [['```ts\nconst a = 1;\n  return a;\n```']], golden: { text: '```ts\nconst a = 1;\n  return a;\n```', files: [] } },
-  { name: 'say/steer word dropped', content: [['steer use v2']], golden: { text: 'use v2', files: [] } },
-];
 
 /** The content in a headless Lexical editor (the old engine's nodes), and its editor-state JSON. */
 function lexical(content: Content): { out: Outgoing; json: string } {
@@ -127,6 +101,15 @@ describe('(2) old drafts: nothing he typed is lost', () => {
       // and back: the new entry, and the Lexical JSON the old engine reads while the flag switches
       expect(entrySegments(entryOf(segs ?? [])), c.name).toEqual(segs);
       expect(entrySegments(lexicalJsonOf(segs ?? [])), c.name).toEqual(segs);
+    }
+  });
+
+  it('the saved Lexical entries (fixtures/lexical-entries.json, made by the old engine) read back and send the golden bytes', () => {
+    const saved = JSON.parse(readFileSync(join(__dirname, 'fixtures/lexical-entries.json'), 'utf8')) as Record<string, string>;
+    for (const c of CASES) {
+      const entry = saved[c.name];
+      expect(entry, c.name).toBeDefined();
+      expect(buildMessage(entrySegments(entry ?? '') ?? []), c.name).toEqual(c.golden);
     }
   });
 
