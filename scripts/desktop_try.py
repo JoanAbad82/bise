@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
-"""desktop-try: the user's first try of bise desktop, on a bise home of its own.
+"""desktop-try: the user's first try of bise desktop (the new app, apps/desktop), on a bise home of its own.
 
   bise-ambient --try [repo…] [--fresh] [--replace]   build, set up the try home, open the app on it
-  bise-ambient --try --stop                          stop the try's app and hubs (by pid)
+  bise-ambient --try --stop                          quit the try's app and stop its hubs (by pid)
 
 (~/.local/bin/bise-ambient execs scripts/desktop-try.sh, which runs this.)
+
+The build (under the heavy lock, nice 10): this checkout's bise into his build dir's target (cargo -p
+bend-harness), its repl-live, repl-scripted and sb-core (scripts/bins.sh), the native helper
+(apps/desktop/native/mac/build.sh), then the new app: pnpm install --frozen-lockfile, pnpm build,
+pnpm dist (electron-builder --mac --dir) as its own bundle 'bise try' (dev.bise.desktop.try:
+apps/desktop/dist/mac-arm64/bise try.app) with that bise packed inside it, so the app's core and
+every hub it starts run the try build. Signed with the stable 'bise ambient dev' identity
+(<build>/ambient/sign, or BISE_TRY_SIGN_DIR), else ad hoc.
 
 The try home is ~/.bise/try/desktop (BISE_HOME): its own hubs, sockets, run dirs, journals,
 projects.json and prefs, and its own home workspace (BISE_HOME_WORKSPACE=<try>/bise, never his
@@ -20,15 +28,19 @@ projects.json and prefs, and its own home workspace (BISE_HOME_WORKSPACE=<try>/b
   key_command that refreshes HIS grant under HIS lock (subs-auth m_9175/m_9180); his config.toml
   is copied without [pages] (its mirror would publish to his site);
 - no connectors, the computer plugin disabled: his first try runs on his code only;
-- one app at its one path (his build dir), opened with BISE_HOME=<try>; his own running app is
-  quit only on his 'y' (or --replace), never silently (ambient-lead m_9174).
+- the app is opened as a new instance of the try's own bundle (open -n --env BISE_HOME=<try>…), its
+  pid kept in <try>/dev/desktop/app.pid; his own bise (app, hub, ~/bise) is never touched, and an
+  open try is reopened only with --replace. --stop quits that pid (checked against the try app's
+  executable first) and the try home's hubs.
 
-Decisions: ambient-lead m_9146/m_9174, architect m_9176 (the four leaks), subs-auth m_9175/m_9180.
-The pure parts (env, guard, config, repos, names) are tested in tests/desktop_try_test.py.
+Decisions: ambient-lead m_9146/m_9174/m_11012, architect m_9176 (the four leaks), subs-auth
+m_9175/m_9180. The pure parts (env, guard, config, repos, names, build script, app env) are tested
+in tests/desktop_try_test.py.
 """
 import json
 import os
 import re
+import shlex
 import shutil
 import signal
 import socket
@@ -37,6 +49,11 @@ import sys
 import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+DESKTOP = os.path.join(REPO, "apps", "desktop")
+# the try's own bundle (amb-mac bce89c8e, m_11023): its own userData (~/Library/Application
+# Support/bise try) and TCC grants, never his app's; 'open -n -a <path>' opens that exact copy
+APP_NAME = "bise try"
+APP_ID = "dev.bise.desktop.try"
 sys.path.insert(0, os.path.join(REPO, "tests"))
 from bise_env import NOT_INHERITED, OWN_PATHS  # noqa: E402  (the one list, never copied)
 
@@ -100,8 +117,8 @@ def clean_path(path, real, homes=()):
 
 
 def his_env(base):
-    """His own environment for his own app and the build (ambient.sh picks his build dir from
-    it): no BISE_HOME, no agent's or hub's variables."""
+    """His own environment for the build (his build dir comes from it): no BISE_HOME, no agent's or
+    hub's variables."""
     drop = set(OWN_PATHS) | set(NOT_INHERITED) | {"BISE_HOME"}
     return {k: v for k, v in base.items() if k not in drop and not k.startswith("SB_") and k != "BISE_ROLE"}
 
@@ -195,23 +212,67 @@ def read_pid(path):
         return None
 
 
-def build(env):
-    """ambient-app's bise + repl-live + sb-core and the app, his build dirs, under the heavy lock
-    (scripts/ambient.sh try --build-only: a launchd job under a file-size cap)."""
+def build_dir(env):
+    """His build dir, as scripts/bins.sh and ambient.sh pick it: BISE_HOME/dev, else ~/.bise/dev once
+    migrated, else ~/.local/state/switchboard; /build. Pure but for the migrated check."""
+    if env.get("SB_BUILD_DIR"):
+        return env["SB_BUILD_DIR"]
+    home = env.get("HOME") or os.path.expanduser("~")
+    if env.get("BISE_HOME"):
+        state = os.path.join(env["BISE_HOME"], "dev")
+    elif os.path.exists(os.path.join(home, ".bise", "migrated.json")):
+        state = os.path.join(home, ".bise", "dev")
+    else:
+        state = os.path.join(home, ".local", "state", "switchboard")
+    return os.path.join(state, "build")
+
+
+def try_paths(env):
+    """Where the try build goes: the bise (cargo -p bend-harness into <build>/target, ambient.sh's
+    try target), the native helper (one stable path: the EDR deletes fresh unsigned binaries) and
+    the new app, packaged by `pnpm dist` in apps/desktop/dist."""
+    build = build_dir(env)
+    return {"target": os.path.join(build, "target"), "bise": os.path.join(build, "target", "debug", "bise"),
+            "helper": os.path.join(build, "desktop-try", "bise-mac-helper"),
+            "sign": os.path.join(build, "ambient", "sign"),
+            "app": os.path.join(DESKTOP, "dist", "mac-arm64" if os.uname().machine == "arm64" else "mac", APP_NAME + ".app")}
+
+
+def build_script(paths, sign_dir=None):
+    """The one build, run under the heavy lock: bise and its helpers for the try home (repl-live,
+    repl-scripted, sb-core next to this checkout), the native helper, then the new app (apps/desktop:
+    pnpm install --frozen-lockfile, build, dist = electron-builder --mac --dir, the try's bise packed
+    inside it). Pure."""
+    q = shlex.quote
+    lines = ["set -euo pipefail",
+             "export CARGO_TARGET_DIR=%s CARGO_INCREMENTAL=0" % q(paths["target"]),
+             "cd %s/rust && cargo build -p bend-harness" % q(REPO),
+             "cd %s && scripts/bins.sh repl-live repl-scripted sb-core" % q(REPO),
+             "export MACOSX_DEPLOYMENT_TARGET=\"$(scripts/bins.sh macos-target)\"",
+             "mkdir -p %s" % q(os.path.dirname(paths["helper"])),
+             # ad hoc here; afterPack re-signs the whole app deep with the stable identity
+             "apps/desktop/native/mac/build.sh %s" % q(paths["helper"]),
+             "cd %s" % q(DESKTOP),
+             "pnpm install --frozen-lockfile",
+             "pnpm build",
+             "BISE_PACK_NAME=%s BISE_PACK_APP_ID=%s BISE_PACK_BISE=%s BISE_PACK_HELPER=%s%s pnpm dist"
+             % (q(APP_NAME), q(APP_ID), q(paths["bise"]), q(paths["helper"]), " BISE_PACK_SIGN_DIR=%s" % q(sign_dir) if sign_dir else "")]
+    return "\n".join(lines) + "\n"
+
+
+def build(env, paths):
+    """The try build under the heavy lock (/usr/bin/lockf -k ~/.bise/run/heavy.lock nice -n 10)."""
     lock = os.path.expanduser("~/.bise/run/heavy.lock")
     os.makedirs(os.path.dirname(lock), exist_ok=True)
-    say("building ambient-app %s (waits for other heavy jobs first)…" % run(["git", "-C", REPO, "rev-parse", "--short", "HEAD"], env).stdout.strip())
-    r = subprocess.run(["/usr/bin/lockf", "-k", lock, "nice", "-n", "10", os.path.join(REPO, "scripts", "ambient.sh"), "try", "--build-only"],
-                       env=dict(env, CARGO_INCREMENTAL="0"))
+    # the stable 'bise ambient dev' identity (amb-mac m_11023): the try's grants survive rebuilds; else ad hoc
+    sign = os.environ.get("BISE_TRY_SIGN_DIR") or (paths["sign"] if os.path.isdir(paths["sign"]) else None)
+    say("building %s for the try (waits for other heavy jobs first)…" % run(["git", "-C", REPO, "rev-parse", "--short", "HEAD"], env).stdout.strip())
+    r = subprocess.run(["/usr/bin/lockf", "-k", lock, "nice", "-n", "10", "/bin/bash", "-c", build_script(paths, sign)], env=env)
     if r.returncode != 0:
         raise TryError("the build failed (exit %d)" % r.returncode)
-
-
-def app_and_bise(env):
-    """His one app path and the try path's bise (ambient.sh's, from his env)."""
-    app = run([os.path.join(REPO, "scripts", "ambient.sh"), "path"], env).stdout.strip().splitlines()[-1]
-    bise = os.path.join(os.path.dirname(app), "target", "debug", "bise")
-    return app, bise
+    for k in ("bise", "app"):
+        if not os.path.exists(paths[k]):
+            raise TryError("no %s at %s after the build" % (k, paths[k]))
 
 
 def setup(real, tryh, repos, env, bise):
@@ -258,40 +319,86 @@ def setup(real, tryh, repos, env, bise):
     return out
 
 
-def his_app_pid(real):
-    pid = read_pid(os.path.join(real, "dev", "ambient", "app.pid"))
-    return pid if pid and pid_alive(pid) else None
+def app_env(tryh, env):
+    """What the new app is opened with (open --env): the try home, its own home workspace, this
+    checkout for the hubs' repl-live, the try's PATH. Pure."""
+    return ["BISE_HOME=%s" % tryh, "BISE_HOME_WORKSPACE=%s" % os.path.join(tryh, "bise"), "BISE_APP_ROOT=%s" % REPO,
+            "PATH=%s" % env.get("PATH", "/usr/bin:/bin")]
 
 
-def ask_quit(pid, replace, stdin=None):
-    """His app runs: quit it on his 'y' (or --replace), else refuse (ambient-lead m_9174)."""
-    q = "your bise ambient app is running (pid %d). quit it and open the try?" % pid
-    if replace:
-        return True
-    stdin = stdin or sys.stdin
-    if not stdin.isatty():
-        raise TryError(q + " (no terminal to answer: run it again with --replace)")
-    sys.stderr.write(q + " [y/N] ")
-    sys.stderr.flush()
-    return stdin.readline().strip().lower() in ("y", "yes")
+def app_pid_file(tryh):
+    return os.path.join(tryh, "dev", "desktop", "app.pid")
 
 
-def app_args(bise, tryh, env):
-    """The app's args for the try: the try's bise, its dev dir, and the env its core needs."""
-    return ["--bise", bise, "--web", os.path.join(REPO, "apps", "ambient", "web"), "--dev", os.path.join(tryh, "dev"),
-            "--env", "BISE_HOME=%s" % tryh, "--env", "BISE_HOME_WORKSPACE=%s" % os.path.join(tryh, "bise"),
-            "--env", "BISE_APP_ROOT=%s" % REPO, "--env", "PATH=%s" % env.get("PATH", "/usr/bin:/bin")]
+def app_exe(app):
+    return os.path.join(app, "Contents", "MacOS", os.path.basename(app)[:-len(".app")])
 
 
-def open_app(app, bise, tryh, env):
-    """The one app path on the try home's bise, as a normal app (it's his run, not a test).
-    BISE_TRY_OPEN (tests, gate only): that command gets the same args instead."""
-    os.makedirs(os.path.join(tryh, "dev", "ambient"), exist_ok=True)
+def find_app_pid(app, tryh):
+    """The try's app among the running processes: its executable is the try app's and its own
+    environment says BISE_HOME=<try> (ps -E; nothing else of it is read). Never by name."""
+    out = subprocess.run(["ps", "-axwwE", "-o", "pid=,command="], capture_output=True, text=True).stdout
+    exe = app_exe(app)
+    for l in out.splitlines():
+        pid, _, rest = l.strip().partition(" ")
+        if pid.isdigit() and rest.startswith(exe) and (" BISE_HOME=%s " % tryh) in rest + " ":
+            return int(pid)
+    return None
+
+
+def app_running(app, tryh):
+    """The try app's pid when it runs: its pid file, checked against what that pid runs now."""
+    pid = read_pid(app_pid_file(tryh))
+    if pid and pid_alive(pid):
+        cmd = subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+        if cmd.startswith(app_exe(app)):
+            return pid
+    return None
+
+
+def open_app(app, tryh, env):
+    """The new app on the try home, as a normal app (his run, not a test): a new instance (-n) of the
+    try's own bundle, so his own app, if any runs, is left alone. BISE_TRY_OPEN (tests, gate only):
+    that command gets the app and its env instead."""
+    os.makedirs(os.path.dirname(app_pid_file(tryh)), exist_ok=True)
     hook = os.environ.get("BISE_TRY_OPEN")
     if hook:
-        run([hook] + app_args(bise, tryh, env), env)
-        return
-    run(["open", "-a", app, "--args"] + app_args(bise, tryh, env), env)
+        run([hook, app] + app_env(tryh, env), env)
+        return None
+    cmd = ["open", "-n", "-a", app]
+    for e in app_env(tryh, env):
+        cmd += ["--env", e]
+    run(cmd, env)
+    t0, pid = time.time(), None
+    while pid is None and time.time() - t0 < 20:
+        pid = find_app_pid(app, tryh)
+        if pid is None:
+            time.sleep(0.3)
+    if pid:
+        with open(app_pid_file(tryh), "w") as f:
+            f.write("%d\n" % pid)
+    return pid
+
+
+def quit_app(app, tryh, timeout=10):
+    """The try's app quits (SIGTERM: Electron quits as on ⌘Q), by its checked pid. Returns it."""
+    pid = app_running(app, tryh)
+    if not pid:
+        return None
+    # an Apple Event quit (app.quit: will-quit stops its core and shells, the helper quits), by the
+    # try's own bundle id; SIGTERM to the checked pid if it doesn't go, never pkill by name
+    subprocess.run(["osascript", "-e", 'tell application id "%s" to quit' % APP_ID], capture_output=True, timeout=15)
+    t0 = time.time()
+    while pid_alive(pid) and time.time() - t0 < timeout:
+        time.sleep(0.2)
+    if pid_alive(pid):
+        os.kill(pid, signal.SIGTERM)
+    t0 = time.time()
+    while pid_alive(pid) and time.time() - t0 < timeout:
+        time.sleep(0.2)
+    if pid_alive(pid):
+        os.kill(pid, signal.SIGKILL)
+    return pid
 
 
 def hub_socks(tryh):
@@ -324,17 +431,12 @@ def try_pids(tryh):
     return pids
 
 
-def stop(real, tryh):
-    """The try's app (its pid file), then each hub (stop_hub on its socket, then SIGTERM by pid)."""
+def stop(real, tryh, app=None):
+    """The try's app (its checked pid), then each hub (stop_hub on its socket, then SIGTERM by pid)."""
     guard(real, tryh)
     out = {"app": None, "hubs": [], "killed": []}
-    app = read_pid(os.path.join(tryh, "dev", "ambient", "app.pid"))
-    if app and pid_alive(app):
-        os.kill(app, signal.SIGTERM)
-        t0 = time.time()
-        while pid_alive(app) and time.time() - t0 < 10:
-            time.sleep(0.2)
-        out["app"] = app
+    if app:
+        out["app"] = quit_app(app, tryh)
     for sock in hub_socks(tryh):
         if os.path.exists(sock) and stop_hub(sock):
             out["hubs"].append(sock)
@@ -355,34 +457,36 @@ def main(argv):
     flags = {a for a in argv if a.startswith("--")}
     bad = flags - {"--try", "--stop", "--fresh", "--replace", "--no-build", "--no-open"}
     if bad:
-        raise TryError("unknown option %s (--try [repo…] [--fresh] [--replace], --try --stop)" % ", ".join(sorted(bad)))
+        raise TryError("unknown option %s (--try [repo…] [--fresh|--replace], --try --stop)" % ", ".join(sorted(bad)))
     real, tryh = homes()
     guard(real, tryh)
-    if "--stop" in flags:
-        r = stop(real, tryh)
-        say("stopped the try (app %s, %d hubs)" % (r["app"] or "not running", len(r["hubs"])))
-        say("your own app stays closed: bise-ambient to reopen it")
-        return 0
     mine = his_env(os.environ)
+    paths = try_paths(mine)
+    if "--stop" in flags:
+        r = stop(real, tryh, paths["app"])
+        say("stopped the try (app %s, %d hubs). your own bise wasn't touched" % (r["app"] or "not running", len(r["hubs"])))
+        return 0
     env = try_env(os.environ, real, tryh)
-    pid = his_app_pid(real)
-    if pid and not ask_quit(pid, "--replace" in flags):
-        raise TryError("your bise ambient app is running (pid %d): the try didn't open" % pid)
-    if "--no-build" not in flags:
-        build(mine)
-    # tests only (a try home under ~/.bise/gate): BISE_TRY_BISE names the bise (ambient.sh path
-    # would build an app), BISE_TRY_OPEN a command that gets the app's args instead of 'open -a'
-    # (ambient-qa's off-screen harness app: never on his screen)
+    # tests only (a try home under ~/.bise/gate): BISE_TRY_BISE names the bise (no build), BISE_TRY_OPEN
+    # a command that gets the app and its env instead of 'open' (never on his screen)
     hooks = [k for k in ("BISE_TRY_BISE", "BISE_TRY_OPEN") if os.environ.get(k)]
     if hooks and not under(tryh, GATE):
         raise TryError("%s: for tests on a try home under ~/.bise/gate only" % ", ".join(hooks))
-    app, bise = (None, os.environ["BISE_TRY_BISE"]) if os.environ.get("BISE_TRY_BISE") else app_and_bise(mine)
-    if app is None and "--no-open" not in flags and not os.environ.get("BISE_TRY_OPEN"):
-        raise TryError("BISE_TRY_BISE is for tests: with --no-open or BISE_TRY_OPEN only")
+    if os.environ.get("BISE_TRY_BISE"):
+        if "--no-open" not in flags and not os.environ.get("BISE_TRY_OPEN"):
+            raise TryError("BISE_TRY_BISE is for tests: with --no-open or BISE_TRY_OPEN only")
+        paths = dict(paths, bise=os.environ["BISE_TRY_BISE"])
+    # one try app at a time: an open one is reopened only with --replace; his own app is never touched
+    running = app_running(paths["app"], tryh)
+    if running and "--replace" not in flags and "--no-open" not in flags:
+        raise TryError("the try is already open (pid %d): bise-ambient --try --replace reopens it, --stop closes it" % running)
+    if "--no-build" not in flags:
+        build(his_env(os.environ), paths)
+    bise = paths["bise"]
     if not os.access(bise, os.X_OK):
         raise TryError("no bise at %s: build first" % bise)
     if "--fresh" in flags and os.path.isdir(tryh):
-        stop(real, tryh)
+        stop(real, tryh, paths["app"])
         guard(real, tryh, [tryh])
         shutil.rmtree(tryh)
     repos = [os.path.realpath(r) for r in args] or his_repos(open(os.path.join(real, "projects.json")).read()
@@ -396,13 +500,13 @@ def main(argv):
     if "--no-open" in flags:
         say("set up (not opened): %s" % tryh)
         return 0
-    if pid:
-        subprocess.run([os.path.join(REPO, "scripts", "ambient.sh"), "stop"], env=mine)
-        t0 = time.time()
-        while pid_alive(pid) and time.time() - t0 < 10:
-            time.sleep(0.2)
-    open_app(app, bise, tryh, env)
-    say("bise is open on the try home %s (%d projects). stop it: bise-ambient --try --stop" % (tryh, len(done)))
+    if running:
+        quit_app(paths["app"], tryh)
+    if not os.environ.get("BISE_TRY_OPEN") and not os.path.isdir(paths["app"]):
+        raise TryError("no app at %s: build first (without --no-build)" % paths["app"])
+    pid = open_app(paths["app"], tryh, env)
+    say("bise desktop is open on the try home %s (%d projects%s). stop it: bise-ambient --try --stop"
+        % (tryh, len(done), ", pid %d" % pid if pid else ""))
     return 0
 
 

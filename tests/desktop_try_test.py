@@ -86,6 +86,23 @@ def pure():
     check(T.his_repos(json.dumps({"v": 1, "projects": [{"path": "/b", "order": 1}, {"path": "/a", "order": 0}, {"name": "x"}]})) == ["/a", "/b"], "projects.json by order")
     check(T.his_repos("not json") == [], "a bad projects.json: none")
     check(T.clone_names(["/x/app", "/y/app", "/z/my repo"]) == ["app", "app-2", "my-repo"], "clone names")
+    # the NEW app (lead m_11012): its own bundle, built and packed with the try's bise, opened on the try home
+    p = T.try_paths({"HOME": "/h", "BISE_HOME": "/h/.bise"})
+    check(p["bise"] == "/h/.bise/dev/build/target/debug/bise" and p["app"].endswith("/apps/desktop/dist/mac-arm64/bise try.app")
+          and p["helper"] == "/h/.bise/dev/build/desktop-try/bise-mac-helper", "try paths: %s" % p)
+    check(T.app_exe(p["app"]).endswith("bise try.app/Contents/MacOS/bise try"), "the app's executable")
+    sc = T.build_script(p, "/h/sign")
+    order = [sc.index(x) for x in ("cargo build -p bend-harness", "bins.sh repl-live repl-scripted sb-core", "native/mac/build.sh",
+                                   "pnpm install --frozen-lockfile", "pnpm build", "pnpm dist")]
+    check(order == sorted(order), "build: bise, helpers, native helper, then install, build, dist: %s" % sc)
+    check("BISE_PACK_NAME='bise try' BISE_PACK_APP_ID=dev.bise.desktop.try BISE_PACK_BISE=/h/.bise/dev/build/target/debug/bise" in sc
+          and "BISE_PACK_SIGN_DIR=/h/sign pnpm dist" in sc and "ambient.sh" not in sc and "apps/ambient" not in sc,
+          "dist packs the try's bise into its own bundle, signed stable; no old app: %s" % sc)
+    check("BISE_PACK_SIGN_DIR" not in T.build_script(p, None), "no sign dir: ad hoc")
+    ae = T.app_env("/h/.bise/try/desktop", {"PATH": "/usr/bin"})
+    check(ae[:2] == ["BISE_HOME=/h/.bise/try/desktop", "BISE_HOME_WORKSPACE=/h/.bise/try/desktop/bise"] and "PATH=/usr/bin" in ae
+          and not any(e.split("=")[0] in ("BISE_DESKTOP_TEST", "BISE_TEST_HOME", "BISE_DESKTOP_USER_DATA", "BISE_DESKTOP_HELPER", "BISE_DESKTOP_BISE")
+                      for e in ae), "the app's env: the try home, never a test variable: %s" % ae)
 
 
 def git(*a, cwd=None):

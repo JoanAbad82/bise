@@ -51,6 +51,11 @@ def _env_arg(args, key):
 def try_open(args):
     """The hook desktop_try.py calls with the app's args: the harness app, off-screen, those
     args exactly, on the proof's throwaway HOME."""
+    if args and args[0].endswith(".app"):
+        # desktop_try.py now opens the NEW app (apps/desktop, ambient-lead m_11012): its hook gets
+        # '<app> KEY=VAL...', not the old Swift app's args; this proof drives the old app only
+        raise qa.QAError("try-proof drives the old Swift app; 'bise-ambient --try' opens the new desktop app now: "
+                         "prove it off-screen with qa-native's run instead")
     home = os.environ.get("TRYPROOF_HOME")
     tryh = _env_arg(args, "BISE_HOME")
     if not home or not tryh or not os.path.realpath(tryh).startswith(PROOF + "/") or not os.path.realpath(home).startswith(PROOF + "/"):
