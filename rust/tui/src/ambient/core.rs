@@ -20,7 +20,7 @@ pub use self::cmd::Cmd;
 pub use self::hubs::{branch_of_head, ProjectFacts, ProjectPorts, Spawn};
 pub use self::voice_mode::OpenVoiceMode;
 #[cfg(test)]
-pub use self::hubs::{LINGER, START};
+pub use self::hubs::{HUB_OLDER, LINGER, START};
 #[cfg(test)]
 pub use self::dictate::DICTATE_MAX;
 use super::hub::{Hub, HubIn};

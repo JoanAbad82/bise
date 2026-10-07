@@ -79,11 +79,14 @@ struct Conn {
     /// held for a command only (a project not shown, not subscribed):
     /// closed once this passes with nothing pending
     until: Option<Instant>,
+    /// hub-skew: the commands its welcome listed (empty: a hub older
+    /// than the list, or not welcomed yet)
+    cmds: Vec<String>,
 }
 
 impl Conn {
     fn new(hub: Hub, until: Option<Instant>) -> Conn {
-        Conn { hub, welcomed: false, rows: None, pending: Vec::new(), until }
+        Conn { hub, welcomed: false, rows: None, pending: Vec::new(), until, cmds: Vec::new() }
     }
 
     /// Kept though no rule holds it: a command waits or was just sent.
@@ -116,6 +119,25 @@ pub(super) struct Hubs {
     /// voice mode's thread (project, agent): followed by the core only
     /// while the window doesn't follow it itself (core/voice_mode.rs)
     voice: Option<(String, String)>,
+    /// hub-skew: the projects already told their hub is older (once each)
+    older: BTreeSet<String>,
+}
+
+/// hub-skew (architect m_11314): what the window says when this
+/// project's hub doesn't know a command, or is too old to say which.
+pub const HUB_OLDER: &str = "this project's hub is older: update bise";
+
+/// hub-skew: a hub that listed its commands (`welcome.cmds`) and lacks
+/// `tag`, the typed command's own tag (never its text: architect
+/// m_11487). An empty list (an older hub) lacks nothing we can know.
+pub fn lacks(cmds: &[String], tag: &str) -> bool {
+    !cmds.is_empty() && !cmds.iter().any(|c| c == tag)
+}
+
+/// hub-skew: a hub too old to list its commands that speaks an older
+/// proto than this core (one notice; its errors pass as they are).
+pub fn older_proto(cmds: &[String], proto: u32) -> bool {
+    cmds.is_empty() && proto < bise_proto::PROTO
 }
 
 /// J: how many job ends the core remembers to drop a second copy.
@@ -255,6 +277,9 @@ impl Core {
             ("subscribe" | "unsubscribe", false) => {}
             (_, true) => {
                 let Some(c) = self.hubs.conns.get_mut(&project) else { return };
+                if lacks(&c.cmds, &cmd) {
+                    return self.project_error(&project, &cmd, HUB_OLDER, cid, Some(bise_proto::hub::ErrorKind::HubOlder));
+                }
                 // the write failed: its hub just went (its Down is on its
                 // way); the reader connects again, the command waits
                 if !c.hub.send(&v) {
@@ -412,8 +437,10 @@ impl Core {
                 // voice mode hears its agent's turn and messages
                 let for_voice = (self.voice_on.is_some() && matches!(typed, HubEv::Agents { .. } | HubEv::Entry { .. })).then(|| typed.clone());
                 match typed {
-                    HubEv::Welcome { .. } => {
+                    HubEv::Welcome { cmds, proto, .. } => {
                         c.welcomed = true;
+                        let older = older_proto(&cmds, proto) && self.hubs.older.insert(id.to_string());
+                        c.cmds = cmds;
                         let voice = self.hubs.voice.as_ref().filter(|(p, _)| p == id).map(|(_, a)| a);
                         let subs = self.hubs.subs.get(id);
                         for agent in subs.into_iter().flatten().chain(voice.filter(|a| !subs.is_some_and(|s| s.contains(*a)))) {
@@ -422,9 +449,14 @@ impl Core {
                         // the commands that waited for it, in order; a hub
                         // held for them only stays a while for their answers
                         let mut failed = Vec::new();
+                        let mut lacked = Vec::new();
                         for (cmd, _) in std::mem::take(&mut c.pending) {
-                            if !c.hub.send(&cmd) {
-                                failed.push((cmd.get("cmd").and_then(Value::as_str).unwrap_or("").to_string(), cmd.get("cid").and_then(Value::as_u64)));
+                            let tag = cmd.get("cmd").and_then(Value::as_str).unwrap_or("").to_string();
+                            let cid = cmd.get("cid").and_then(Value::as_u64);
+                            if lacks(&c.cmds, &tag) {
+                                lacked.push((tag, cid));
+                            } else if !c.hub.send(&cmd) {
+                                failed.push((tag, cid));
                             }
                         }
                         if let Some(u) = c.until.as_mut() {
@@ -432,6 +464,12 @@ impl Core {
                         }
                         for (cmd, cid) in failed {
                             self.project_error(id, &cmd, "its hub went away: nothing sent. try again in a moment.", cid, None);
+                        }
+                        for (cmd, cid) in lacked {
+                            self.project_error(id, &cmd, HUB_OLDER, cid, Some(bise_proto::hub::ErrorKind::HubOlder));
+                        }
+                        if older {
+                            self.emit(json!({"ev": "notice", "project": id, "text": HUB_OLDER}));
                         }
                     }
                     HubEv::Agents { agents, .. } => {

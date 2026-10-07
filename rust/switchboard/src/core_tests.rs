@@ -4276,6 +4276,25 @@ fn a_typed_rename_model_and_effort_take_the_tuis_paths() {
     assert!(fx.contains(&Effect::Choose { client: 1, agent: "login".into(), model: None, effort: Some("high".into()), default: false }), "{fx:?}");
 }
 
+/// qa-flows 28a5419b (ambient-lead m_11512): '/close N' closes a hub item
+/// (feature_merge, merge, ...) like a question, through the TUI's line
+/// and through a typed client's step (the window's slash).
+#[test]
+fn close_closes_every_kind_of_card() {
+    for kind in ["question", "merge", "feature_try", "feature_merge", "update", "signin"] {
+        for typed in [false, true] {
+            let mut t = T::new();
+            let id = open_card(&mut t, kind, "merge checkout into main?\n\n1. merge\n2. keep working\n3. drop the branch");
+            let fx = if typed {
+                t.go(Input::UserCmd { client: 1, focus: MAIN.into(), cmd: UserCmd::Close { card: id } })
+            } else {
+                t.user(MAIN, &format!("/close {id}"))
+            };
+            assert!(!t.hub.st.cards.contains_key(&id), "{kind} typed={typed}: still open, {fx:?}");
+        }
+    }
+}
+
 /// No number a client sends panics the hub (core_num.rs).
 #[path = "core_num_tests.rs"]
 mod core_num_tests;

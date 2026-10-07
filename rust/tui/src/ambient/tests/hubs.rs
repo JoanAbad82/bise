@@ -2,7 +2,7 @@
 //! step 2): fake hubs, one socket pair per connection the core opens.
 
 use super::*;
-use crate::ambient::core::{ProjectFacts, ProjectPorts, LINGER, START};
+use crate::ambient::core::{ProjectFacts, ProjectPorts, HUB_OLDER, LINGER, START};
 use bise_home::projects::Row;
 use std::collections::HashMap;
 
@@ -126,6 +126,11 @@ impl World {
 
     /// The hub of `id` says welcome (after the core's typed hello).
     pub(super) fn welcome(&mut self, t: &mut T, id: &str) {
+        self.welcome_as(t, id, json!({}));
+    }
+
+    /// [`welcome`] with `extra` fields on it (hub-skew: `cmds`, `proto`).
+    pub(super) fn welcome_as(&mut self, t: &mut T, id: &str, extra: Value) {
         self.until(t, |_| true);
         // next() skips the hellos: read the raw lines up to the typed one
         let e = self.end(id);
@@ -139,13 +144,72 @@ impl World {
             }
             assert_eq!(v["op"], "hello", "only the connector's hello before it: {v}");
         }
-        self.end(id).say(json!({"ev": "welcome", "project": id, "proto": 1, "workspace": format!("/p/{id}"), "name": id}));
+        let mut welcome = json!({"ev": "welcome", "project": id, "proto": 1, "workspace": format!("/p/{id}"), "name": id});
+        for (k, v) in extra.as_object().into_iter().flatten() {
+            welcome[k] = v.clone();
+        }
+        self.end(id).say(welcome);
         self.until(t, |o| o.iter().any(|v| v["ev"] == "welcome" && v["project"] == id));
     }
 }
 
 pub(super) fn typed(t: &mut T, v: Value) {
     t.cmd(Cmd::parse(&v.to_string()).unwrap());
+}
+
+/// hub-skew (architect m_11314, m_11487): a hub that lists its commands
+/// never gets one it lacks, decided on the command's tag before sending:
+/// the window gets error kind hub_older with the cid, for a command that
+/// waited for the welcome and for one sent after it; the rest still goes.
+#[test]
+fn a_hub_that_lacks_a_command_never_gets_it() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    let older = |out: &[Value], cid: u64| {
+        out.iter().any(|v| v["ev"] == "error" && v["kind"] == "hub_older" && v["cid"] == cid && v["cmd"] == "slash" && v["project"] == "shop" && v["text"] == HUB_OLDER)
+    };
+    // waits for the welcome, then refused there
+    typed(&mut t, json!({"cmd": "slash", "project": "shop", "agent": "main", "line": "/flow", "cid": 5}));
+    let hi = json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now"});
+    typed(&mut t, hi.clone());
+    w.welcome_as(&mut t, "shop", json!({"cmds": ["hello", "subscribe", "send"]}));
+    w.until(&mut t, |o| older(o, 5));
+    assert_eq!(w.end("shop").next(), hi, "the slash never reached shop's hub; the send did");
+    // after the welcome: refused at once, nothing written
+    typed(&mut t, json!({"cmd": "slash", "project": "shop", "agent": "main", "line": "/flow", "cid": 6}));
+    assert!(older(&t.take(), 6));
+    typed(&mut t, hi.clone());
+    assert_eq!(w.end("shop").next(), hi, "only the send was written");
+    assert!(!t.take().iter().any(|v| v["ev"] == "notice"), "a hub that lists its commands is not 'older'");
+}
+
+/// hub-skew (architect m_11314 (3)): a hub too old to list its commands
+/// that speaks an older proto: one notice per project, its commands still
+/// go (its own errors pass as they are); the same proto: nothing.
+#[test]
+fn a_hub_too_old_to_list_its_commands_says_so_once() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop", "mail"]}));
+    w.opened(&mut t, &["home", "shop", "mail"]);
+    w.welcome_as(&mut t, "shop", json!({"proto": 0}));
+    w.welcome(&mut t, "mail");
+    let notices = |out: &[Value], p: &str| out.iter().filter(|v| v["ev"] == "notice" && v["project"] == p && v["text"] == HUB_OLDER).count();
+    let out = t.take();
+    assert_eq!((notices(&out, "shop"), notices(&out, "mail")), (1, 0), "{out:#?}");
+    let slash = json!({"cmd": "slash", "project": "shop", "agent": "main", "line": "/flow", "cid": 7});
+    typed(&mut t, slash.clone());
+    assert_eq!(w.end("shop").next(), slash, "no list: no guessing, it goes");
+    // shop's hub restarts, still old: no second notice
+    w.end("shop").w.shutdown(std::net::Shutdown::Both).unwrap();
+    w.open.remove("shop");
+    w.opened(&mut t, &["shop"]);
+    w.welcome_as(&mut t, "shop", json!({"proto": 0}));
+    assert_eq!(notices(&t.take(), "shop"), 0, "once per project");
 }
 
 /// G (architect m_10348): every send error the core makes itself echoes
