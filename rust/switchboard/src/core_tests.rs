@@ -4275,3 +4275,7 @@ fn a_typed_rename_model_and_effort_take_the_tuis_paths() {
     let fx = t.go(cmd("login", UserCmd::Reasoning { effort: Some("high".into()) }));
     assert!(fx.contains(&Effect::Choose { client: 1, agent: "login".into(), model: None, effort: Some("high".into()), default: false }), "{fx:?}");
 }
+
+/// No number a client sends panics the hub (core_num.rs).
+#[path = "core_num_tests.rs"]
+mod core_num_tests;

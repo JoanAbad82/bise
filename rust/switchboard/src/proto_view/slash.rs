@@ -70,7 +70,8 @@ mod tests {
         assert!(matches!(r("/rename"), Slash::Refuse(e) if e.starts_with("usage: /rename")));
         assert!(matches!(route(parse("/rename perf", "main")), Slash::Refuse(e) if e.starts_with("usage: /rename")));
         assert!(matches!(r("/rename perf2"), Slash::Step(UserCmd::Rename { .. })));
-        assert!(matches!(r("/answer x"), Slash::Refuse(e) if e.starts_with("usage: /answer")));
+        // main's core_num (close-panic): the refusal names the bad value, then the usage
+        assert!(matches!(r("/answer x"), Slash::Refuse(e) if e.starts_with("not a card number: x") && e.contains("usage: /answer")));
         assert!(matches!(r("hello there"), Slash::Refuse(e) if e.starts_with("not a command")));
         assert!(matches!(r("@ "), Slash::Refuse(_)));
         assert!(matches!(r("/tasks"), Slash::Agents));
