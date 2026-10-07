@@ -23,8 +23,16 @@
 .b-composer .keys .tip { margin-left: auto; overflow: hidden; text-overflow: ellipsis; }
 /* the mic control (bar I): its key at rest, a meter and 'listening…' while on; fixed width, so the
    key line never moves when it changes */
-.b-composer .keys .mic { flex: none; display: inline-flex; align-items: center; gap: 6px; min-width: 15ch; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: default; }
+.b-composer .keys .mic { flex: none; display: inline-flex; align-items: center; gap: 6px; min-width: 15ch; padding: 1px 4px; margin: -1px -4px; border: 0; border-radius: var(--r-2); background: none; font: inherit; color: inherit; cursor: default; transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out); }
 .b-composer .keys .mic.recording { color: var(--c-text); }
+/* hover (bar O.6): every composer control shows the pointer is on it, the ds ghost button's
+   hover (prim.css .b-btn.ghost); the padding sits in a negative margin, so the key line never moves */
+.b-composer .keys .mic:hover { background: var(--c-hover); color: var(--c-text); }
+/* the ds send has no hover of its own: the ds primary button's (prim.css .b-btn.pri:hover) */
+.b-composer .send { transition: background var(--d-fast) var(--ease-out); }
+.b-composer .send:not(:disabled):not(.off):hover { background: color-mix(in srgb, var(--c-ink) 88%, var(--c-solid)); }
+/* the @ $ / list: the row under the pointer (the picked one keeps its ink) */
+.b-composer-pick .b-mi:not(.on):not(.dis):hover { background: var(--c-hover); }
 .b-composer .keys .mic .meter { display: inline-flex; align-items: center; gap: 2px; height: 10px; }
 .b-composer .keys .mic .meter i { width: 2px; height: calc(3px + 7px * var(--lvl, 0)); border-radius: 1px; background: var(--c-text-2); transition: height 60ms linear; }
 .b-composer .keys .mic .meter i:nth-child(2), .b-composer .keys .mic .meter i:nth-child(4) { height: calc(3px + 5px * var(--lvl, 0)); }
