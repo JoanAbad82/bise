@@ -272,6 +272,10 @@ def main():
         c.wait(lambda: any(i["title"] == "Notes" and i["new"] for x in typed(c, "artifacts") for i in x["items"]), 90, "a new artifact")
         art = [i for x in typed(c, "artifacts") for i in x["items"] if i["title"] == "Notes"][0]
         check(art["agent"] == "main" and art["version"] == 1 and art["url"], "its row: %r" % art)
+        # amb-kit's artifacts screen: a file's path (absolute, the file
+        # itself) and the store's versions, oldest first
+        check(art.get("path", "").endswith("/notes.md") and art["path"].startswith("/"), "a file's path: %r" % art.get("path"))
+        check([v["v"] for v in art.get("versions", [])] == [1] and art["versions"][0]["at_ms"] == art["at_ms"], "its versions: %r" % art.get("versions"))
         c.send({"cmd": "artifacts_seen", "project": project})
         c.wait(lambda: any(i["title"] == "Notes" and not i["new"] for i in typed(c, "artifacts")[-1]["items"]), 20, "seen: not new")
         c.wait_idle("main", timeout=90)

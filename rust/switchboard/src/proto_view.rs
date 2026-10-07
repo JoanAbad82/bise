@@ -4,7 +4,7 @@
 //! to `bise_proto` rows, and the live fold of a subscribed thread (only
 //! the entries that changed go out).
 
-use bise_proto::rows::{question, Agent, Artifact, Card, CardPage, Report, ReportKind, Status};
+use bise_proto::rows::{question, Agent, Artifact, ArtifactVersion, Card, CardPage, Report, ReportKind, Status};
 use bise_proto::diff::{DiffFile, DiffLine, Hunk, LineKind};
 use bise_proto::hub::{HubEv, Job as Followed, JobState};
 use bise_proto::thread::lines::unescape;
@@ -13,6 +13,7 @@ use bise_proto::thread::{self, Ctx, Entry, Line};
 use bise_proto::Pos;
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::path::Path;
 
 pub mod approvals;
 mod dev_servers;
@@ -213,7 +214,20 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>) -> Vec<A
                 Some(u) => u,
                 None => Some(s(r, "copy")).filter(|c| !c.is_empty() && !s(r, "target").contains("://")).unwrap_or_else(|| s(r, "target")),
             };
+            let target = s(r, "target");
+            let path = Some(target.clone()).filter(|t| s(r, "by") != "page" && !crate::artifacts::is_link(t) && Path::new(t).is_absolute());
+            let versions = r.get("versions").and_then(Value::as_array).map_or_else(Vec::new, |vs| {
+                vs.iter()
+                    .map(|v| ArtifactVersion {
+                        v: v.get("v").and_then(Value::as_u64).unwrap_or(0) as u32,
+                        at_ms: v.get("ts_ms").and_then(Value::as_u64).unwrap_or(0),
+                        note: Some(s(v, "note")).filter(|n| !n.is_empty()),
+                    })
+                    .collect()
+            });
             Artifact {
+                path,
+                versions,
                 title: s(r, "title"),
                 agent: s(r, "agent"),
                 version: r.get("v").and_then(Value::as_u64).unwrap_or(0) as u32,
@@ -502,8 +516,10 @@ mod tests {
         let ev = json!({"ev": "artifacts", "seen_ms": 100, "rows": [
             {"id": "perf-notes", "kind": "page", "title": "Perf notes", "agent": "perf", "by": "page", "ts_ms": 150, "v": 2,
              "target": "/st/pages/perf-notes", "copy": null},
-            {"id": "deck", "kind": "file", "title": "Deck", "agent": "main", "by": "agent", "ts_ms": 90, "v": 1,
-             "target": "/w/deck.pdf", "copy": "/st/art/deck/1.pdf"},
+            {"id": "deck", "kind": "file", "title": "Deck", "agent": "main", "by": "agent", "ts_ms": 90, "v": 2,
+             "target": "/w/deck.pdf", "copy": "/st/art/deck/1.pdf", "versions": [
+                {"v": 1, "ts_ms": 80, "target": "/w/deck.pdf", "copy": "/st/art/deck/1.pdf", "note": ""},
+                {"v": 2, "ts_ms": 90, "target": "/w/deck.pdf", "copy": null, "note": "no copy: too big"}]},
             {"id": "site", "kind": "site", "title": "Site", "agent": "web", "by": "agent", "ts_ms": 200, "v": 3,
              "target": "https://x.dev", "copy": "/st/art/site/3"},
             {"id": "mine", "kind": "file", "title": "Mine", "agent": "main", "by": "you", "ts_ms": 300, "v": 1,
@@ -511,9 +527,14 @@ mod tests {
         let a = artifacts(&ev, |id| (id == "perf-notes").then(|| "http://127.0.0.1:1/p/perf-notes".to_string()));
         let row = |i: usize| (a[i].id.as_str(), a[i].url.as_str(), a[i].version, a[i].new);
         assert_eq!(row(0), ("perf-notes", "http://127.0.0.1:1/p/perf-notes", 2, true), "a page: its server url");
-        assert_eq!(row(1), ("deck", "/st/art/deck/1.pdf", 1, false), "a file: its kept copy, seen before");
+        assert_eq!(row(1), ("deck", "/st/art/deck/1.pdf", 2, false), "a file: its kept copy, seen before");
         assert_eq!(row(2), ("site", "https://x.dev", 3, true), "a link: the link");
         assert_eq!(row(3), ("mine", "/w/m.txt", 1, false), "his own is never new");
+        let paths: Vec<Option<&str>> = a.iter().map(|x| x.path.as_deref()).collect();
+        assert_eq!(paths, [None, Some("/w/deck.pdf"), None, Some("/w/m.txt")], "a path for a file only, never a page or a link");
+        let v = |v: u32, at_ms: u64, note: Option<&str>| ArtifactVersion { v, at_ms, note: note.map(Into::into) };
+        assert_eq!(a[1].versions, [v(1, 80, None), v(2, 90, Some("no copy: too big"))], "the store's versions, oldest first, its words");
+        assert!(a[0].versions.is_empty(), "a row without versions has none");
     }
 
     #[test]

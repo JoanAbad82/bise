@@ -623,6 +623,28 @@ pub struct Artifact {
     pub url: String,
     /// made or changed since he last looked
     pub new: bool,
+    /// the file on disk (absolute), only for a file target, never for a
+    /// link or a page: the window shows it in the Finder or opens it.
+    /// Sent on the client socket only, never to an agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// every version the store keeps, oldest first: the store's whole
+    /// list, no cap (the versions popover); left out when empty (a row
+    /// from before it, an older hub)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub versions: Vec<ArtifactVersion>,
+}
+
+/// One version of an artifact: its number, when it was made, and the
+/// TUI's /artifacts words for it (a page's 'n notes open', 'no copy: …'),
+/// printed as they are.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ArtifactVersion {
+    pub v: u32,
+    pub at_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
 }
 
 /// A live scheduled task of a project (`sb every`), the `scheduled`

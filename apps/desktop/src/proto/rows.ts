@@ -386,7 +386,26 @@ export type Artifact = { id: string, kind: string, title: string, agent: string,
 /**
  * made or changed since he last looked
  */
-new: boolean, };
+new: boolean, 
+/**
+ * the file on disk (absolute), only for a file target, never for a
+ * link or a page: the window shows it in the Finder or opens it.
+ * Sent on the client socket only, never to an agent.
+ */
+path?: string | null, 
+/**
+ * every version the store keeps, oldest first: the store's whole
+ * list, no cap (the versions popover); left out when empty (a row
+ * from before it, an older hub)
+ */
+versions?: Array<ArtifactVersion>, };
+
+/**
+ * One version of an artifact: its number, when it was made, and the
+ * TUI's /artifacts words for it (a page's 'n notes open', 'no copy: …'),
+ * printed as they are.
+ */
+export type ArtifactVersion = { v: number, at_ms: number, note?: string | null, };
 
 /**
  * A live scheduled task of a project (`sb every`), the `scheduled`
