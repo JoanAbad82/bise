@@ -42,6 +42,12 @@ export const T = {
   keys: '[data-testid="composer.keys"]',
   vision: '[data-testid="lab.vision"]',
   voiceMode: '[data-testid="lab.voice"]',
+  /** the mic in the key line (data-state off|recording|transcribing), its meter, the lab's 'mic busy' box */
+  mic: '[data-testid="composer.mic"]',
+  meter: '[data-testid="composer.meter"]',
+  micBusy: '[data-testid="lab.micBusy"]',
+  /** what the lab's fake mic says (Lab.tsx LAB_SAID), a word every 250 ms */
+  labSaid: "on garde la file d'attente",
   /** a skill of the world (the lab's fake list) */
   skill: { query: 'plain', name: 'plain-language' },
   /** amb-mac's private clipboard (2aa0294d): ⌘C/⌘X/⌘V never reach his pasteboard */
