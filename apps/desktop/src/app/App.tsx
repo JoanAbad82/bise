@@ -22,6 +22,7 @@ import { AgentsScreen } from '@/agents/AgentsScreen';
 import { ChangesScreen } from '@/review/ChangesScreen';
 import { ReviewScreen } from '@/review/ReviewScreen';
 import { FeatureScreen } from '@/review/FeatureScreen';
+import { BranchScreen } from '@/review/BranchScreen';
 import { PrsScreen } from '@/review/PrsScreen';
 import { EnvironmentsScreen } from '@/review/EnvironmentsScreen';
 import { Skel } from '@/ds';
@@ -257,6 +258,9 @@ function ScreenOf({ route }: { route: Route }) {
       return <Known project={route.project}>{() => <FeatureScreen project={route.project} name={route.name} />}</Known>;
     case 'commit':
       return <Known project={route.project}>{() => <ReviewScreen project={route.project} agent="main" commit={route.sha} />}</Known>;
+    case 'branch':
+      // a branch's diff by name ('/diff sb/x', amb-web's windowRun)
+      return <Known project={route.project}>{() => <BranchScreen project={route.project} branch={route.branch} />}</Known>;
     case 'environments':
       return <Known project={route.project}>{() => <EnvironmentsScreen project={route.project} />}</Known>;
     case 'artifacts':

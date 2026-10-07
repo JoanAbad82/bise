@@ -109,6 +109,7 @@ export function panelProject(route: Route, home: string | undefined, projects: n
     case 'feature':
     case 'prs':
     case 'commit':
+    case 'branch':
     case 'environments':
       return route.project;
     default:
@@ -134,6 +135,8 @@ export function crumbOf(route: Route, name: (project: string) => string): string
       return [name(route.project), `ψ ${route.name}`];
     case 'commit':
       return [name(route.project), route.sha.slice(0, 7)];
+    case 'branch':
+      return [name(route.project), route.branch];
     case 'artifacts':
       return route.project === '' ? ['artifacts'] : [name(route.project), 'artifacts'];
     case 'settings':

@@ -98,3 +98,23 @@
 .pr-ok .pr-words {
   color: var(--c-ok);
 }
+
+/* a plain link in a review screen's words (the branch screen's 'see the changes') */
+.rv-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--c-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.rv-link:hover {
+  color: var(--c-accent);
+}
+.rv-link:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--c-focus);
+  border-radius: 3px;
+}

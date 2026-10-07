@@ -14,6 +14,7 @@
 //   feature/<p>/<name>         a feature: its branch, agents, try / merge / drop
 //   prs/<p>                    its open pull requests (the TUI's /prs)
 //   commit/<p>/<sha>           one commit already on main, read-only
+//   branch/<p>/<branch>        a branch's diff by its name ('/diff sb/x'; the branch keeps its slashes)
 //   artifacts/<p>[/<id>]       a project's artifacts (one opened)
 //   environments/<p>           its worktrees and dev servers
 //   inbox | settings[/<page>] | onboarding    amb-home's screens
@@ -30,6 +31,7 @@ export type Route =
   | { screen: 'review'; project: string; agent: string }
   | { screen: 'feature'; project: string; name: string }
   | { screen: 'commit'; project: string; sha: string }
+  | { screen: 'branch'; project: string; branch: string }
   | { screen: 'artifacts'; project: string; id?: string }
   | { screen: 'environments'; project: string }
   | { screen: 'inbox' }
@@ -74,6 +76,8 @@ export function formatRoute(r: Route): string {
       return `feature/${r.project}/${r.name}`;
     case 'commit':
       return `commit/${r.project}/${r.sha}`;
+    case 'branch':
+      return `branch/${r.project}/${r.branch}`;
     case 'artifacts':
       // project '': every project's (the sidebar's '↗ artifacts', amb-kit)
       if (r.project === '') return 'artifacts';
@@ -118,6 +122,12 @@ export function parseRoute(path: string): Route {
       return a !== undefined && b !== undefined ? { screen: 'feature', project: a, name: b } : nf;
     case 'commit':
       return a !== undefined && b !== undefined && SHA.test(b) ? { screen: 'commit', project: a, sha: b } : nf;
+    case 'branch': {
+      // everything after the project is the branch, slashes kept ('sb/x')
+      const [p, ...rest] = args;
+      const branch = rest.join('/');
+      return p !== undefined && NAME.test(p) && rest.length > 0 && rest.every((x) => NAME.test(x)) ? { screen: 'branch', project: p, branch } : nf;
+    }
     case 'artifacts':
       if (args.length === 0) return { screen: 'artifacts', project: '' };
       if (one !== undefined) return { screen: 'artifacts', project: one };
