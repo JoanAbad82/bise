@@ -1,13 +1,16 @@
 // The live pearl (bar ⛔1p, his bug 2: the old pearl flickered): one canvas, one WebGL1 context,
 // created once and never re-mounted by a mood or a level change. Props land in a ref; one
 // requestAnimationFrame loop eases the mood (moods.ts) and draws at the display's rate while the
-// pearl moves, and stops drawing once it has settled under reduced motion. The drawing buffer is
+// pearl moves (bise works or listens: moods.ts MOVES), and stops once it has settled in any other
+// mood: at rest the pearl is one still frame, no loop (ambient-lead m_11707: battery, and his
+// 'clignote très bizarrement'); under reduced motion it is always still. A new mood, level or size
+// wakes the loop for as long as it needs. The drawing buffer is
 // square, sized only when the element's size changes (a ResizeObserver), never per frame: a resize
 // clears the buffer, and a cleared frame is a flicker. No CSS transform ever lands on the canvas
 // (a scaled WebGL canvas showed as a thin sliver in round 9); the size is the `size` prop and the
 // shader's zoom. The background stays transparent: the pearl floats free (lead m_6479, L1).
 import { memo, useEffect, useRef, type JSX } from 'react';
-import { ease, settled, start, type Mood, type PearlState } from './moods';
+import { ease, moves, settled, start, type Mood, type PearlState } from './moods';
 import { FRAGMENT, PINK, VERTEX } from './shader';
 
 export interface LivePearlProps {
@@ -105,7 +108,7 @@ export const LivePearl = memo(function LivePearl(props: LivePearlProps): JSX.Ele
       const gather = helloAt === null || reduce ? 0 : Math.max(0, 1 - (now - helloAt) / HELLO_MS);
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
       gl.uniform2f(u.res, gl.drawingBufferWidth, gl.drawingBufferHeight);
-      gl.uniform1f(u.t, reduce ? 0 : t);
+      gl.uniform1f(u.t, s.clock);
       gl.uniform1f(u.flow, s.flow);
       gl.uniform1f(u.lvl, s.voice * level);
       gl.uniform1f(u.think, s.think);
@@ -119,7 +122,7 @@ export const LivePearl = memo(function LivePearl(props: LivePearlProps): JSX.Ele
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-      const calm = reduce && settled(s, p.mood, true) && gather === 0;
+      const calm = !moves(p.mood, reduce) && settled(s, p.mood, reduce) && gather === 0;
       if (!calm) raf = requestAnimationFrame(frame);
     };
 

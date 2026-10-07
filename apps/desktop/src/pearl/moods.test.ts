@@ -1,6 +1,6 @@
 // The pearl's easing: no jump between moods (bug 2), stillness under reduced motion.
 import { describe, expect, it } from 'vitest';
-import { ease, settled, start, type PearlState } from './moods';
+import { ease, moves, settled, start, type PearlState } from './moods';
 
 const run = (s0: PearlState, mood: Parameters<typeof ease>[1], ms: number, reduce = false, level = 0): PearlState[] => {
   const out: PearlState[] = [];
@@ -27,6 +27,35 @@ describe('the pearl', () => {
     const quiet = run(start(), 'listen', 1000, false, 0).at(-1)?.flow ?? 0;
     const loud = run(start(), 'listen', 1000, false, 1).at(-1)?.flow ?? 0;
     expect(loud).toBeGreaterThan(quiet * 1.5);
+  });
+  it('is still at rest (lead m_11707): from the first frame, nothing left to draw', () => {
+    const first = ease(start(12), 'rest', 0, 1, false); // the loop's first step lands on the targets
+    expect(settled(first, 'rest', false)).toBe(true);
+    const later = ease(first, 'rest', 1, 0.0167, false);
+    expect(later.flow).toBe(first.flow);
+    expect(later.clock).toBe(first.clock);
+  });
+  it('moves only while bise works or listens; every other mood settles still', () => {
+    for (const mood of ['listen', 'speak', 'work'] as const) {
+      expect(moves(mood, false)).toBe(true);
+      expect(moves(mood, true)).toBe(false);
+      const a = run(start(), mood, 2000).at(-1) ?? start();
+      expect(ease(a, mood, 0, 0.0167, false).clock - a.clock).toBeGreaterThan(0.015);
+    }
+    for (const mood of ['rest', 'still', 'need', 'done', 'fail', 'away'] as const) {
+      expect(moves(mood, false)).toBe(false);
+      const after = run(run(start(), 'work', 2000).at(-1) ?? start(), mood, 3000).at(-1) ?? start();
+      expect(settled(after, mood, false), `${mood} settles within 3 s of work`).toBe(true);
+    }
+  });
+  it("never jumps on a wake: the shader's clock only advances by what it moved", () => {
+    const still = run(start(5), 'rest', 3000).at(-1) ?? start();
+    const woke = ease(still, 'work', 0, 0.0167, false);
+    expect(woke.clock - still.clock).toBeLessThan(0.0167);
+    const frames = [still, ...run(still, 'work', 1500)];
+    for (let i = 1; i < frames.length; i += 1) {
+      expect((frames[i]?.clock ?? 0) - (frames[i - 1]?.clock ?? 0)).toBeLessThanOrEqual(0.0167 + 1e-9);
+    }
   });
   it('stands still under reduced motion, and settles so nothing is drawn', () => {
     const frames = run(start(), 'work', 3000, true);

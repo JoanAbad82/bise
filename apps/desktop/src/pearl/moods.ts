@@ -1,7 +1,11 @@
 // The pearl's moods and how it moves between them (SPEC §1's table, the capsule's pearl.js as is).
 // Pure, for the checks: every value eases toward its mood's target with 1 - e^(-dt/0.3) (a change
 // takes ~0.9 s: never a jump, his bug 2), and the smoke's flow integrates
-// dt · speed · (1 + 1.2 · voice · level). Under reduced motion the pearl stands still in every mood.
+// dt · speed · (1 + 1.2 · voice · level). The pearl moves only while bise works or listens (MOVES:
+// listen, speak, work; ambient-lead m_11707: battery, and "the pearl clignote très bizarrement"):
+// in every other mood its speed and motion ease to 0, so once settled it is one still frame and
+// nothing is drawn. Its clock (the shader's breath and twinkle) runs at `motion`, so it stops with
+// it and picks up where it was, never jumping on a wake. Under reduced motion it stands still always.
 
 export type Mood = 'rest' | 'still' | 'listen' | 'speak' | 'work' | 'need' | 'done' | 'fail' | 'away';
 
@@ -18,7 +22,17 @@ export interface MoodValues {
 
 export interface PearlState extends MoodValues {
   readonly flow: number;
+  /** 1 while it moves, 0 once still: eases like the rest */
+  readonly motion: number;
+  /** seconds the pearl has moved (the shader's t): advances at dt · motion */
+  readonly clock: number;
 }
+
+/** The moods in which the pearl moves: bise works or listens. */
+export const MOVES: ReadonlySet<Mood> = new Set<Mood>(['listen', 'speak', 'work']);
+
+/** Whether the pearl moves in this mood: never under reduced motion. */
+export const moves = (mood: Mood, reduce: boolean): boolean => !reduce && MOVES.has(mood);
 
 export const MOODS: Readonly<Record<Mood, MoodValues>> = {
   rest: { speed: 0.18, think: 0, need: 0, done: 0, away: 0, listen: 0, voice: 0, still: 0 },
@@ -32,15 +46,19 @@ export const MOODS: Readonly<Record<Mood, MoodValues>> = {
   away: { speed: 0.06, think: 0, need: 0, done: 0, away: 1, listen: 0, voice: 0, still: 0 },
 };
 
-const KEYS = ['speed', 'think', 'need', 'done', 'away', 'listen', 'voice', 'still'] as const;
+const KEYS = ['speed', 'think', 'need', 'done', 'away', 'listen', 'voice', 'still', 'motion'] as const;
 
-/** The mood's targets; under reduced motion: no speed, no voice, still. */
-export function target(mood: Mood, reduce: boolean): MoodValues {
+type Targets = MoodValues & { readonly motion: number };
+
+/** The mood's targets: no speed and no motion unless it moves; under reduced motion also still, no voice. */
+export function target(mood: Mood, reduce: boolean): Targets {
   const m = MOODS[mood];
-  return reduce ? { ...m, speed: 0, still: 1, voice: 0 } : m;
+  if (reduce) return { ...m, speed: 0, still: 1, voice: 0, motion: 0 };
+  return moves(mood, reduce) ? { ...m, motion: 1 } : { ...m, speed: 0, motion: 0 };
 }
 
-export const start = (flow = 0): PearlState => ({ flow, ...MOODS.rest });
+/** A pearl at rest, still; `flow` (and its clock) set where its smoke starts. */
+export const start = (flow = 0): PearlState => ({ flow, clock: flow, ...target('rest', false) });
 
 /** One step of `dt` seconds toward `mood`; a step over 1 s lands on the targets. */
 export function ease(s: PearlState, mood: Mood, level: number, dt: number, reduce: boolean): PearlState {
@@ -49,10 +67,11 @@ export function ease(s: PearlState, mood: Mood, level: number, dt: number, reduc
   const n = { ...s };
   for (const key of KEYS) n[key] = s[key] + (m[key] - s[key]) * k;
   n.flow = s.flow + dt * n.speed * (1 + 1.2 * n.voice * level);
+  n.clock = s.clock + Math.min(dt, 1) * n.motion;
   return n;
 }
 
-/** Every value at its target: under reduced motion there is nothing left to draw. */
+/** Every value at its target: in a mood that does not move, nothing is left to draw. */
 export function settled(s: PearlState, mood: Mood, reduce: boolean): boolean {
   const m = target(mood, reduce);
   return KEYS.every((key) => Math.abs(s[key] - m[key]) < 0.002);

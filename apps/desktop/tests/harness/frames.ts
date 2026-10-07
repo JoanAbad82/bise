@@ -2,7 +2,9 @@
 // with its timestamp), decoded, and the measures the checks need on it. Pure measures take frames
 // and boxes in CSS pixels; only Recorder talks to the app.
 //   changedOutside(frames, box)  per consecutive pair, pixels that changed outside the box
-//                                (typing must leave everything outside the field untouched)
+//                                (typing must leave everything outside the field untouched),
+//                                not counting the frames' masks: the pearls' boxes, an intended
+//                                animation (ambient-lead m_11707; the Recorder reads them)
 //   changedInside(frames, box)   same, inside the box
 //   flashes(frames, box)         frames that differ from both neighbors while the neighbors match
 //                                each other (a blink: a flicker, an emptied region drawn again)
@@ -13,7 +15,19 @@ import { PNG } from 'pngjs';
 import type { CDPSession, Page } from '@playwright/test';
 
 export type Box = { x: number; y: number; width: number; height: number };
-export type Frame = { t: number; png: PNG; scale: number };
+/** `masks`: boxes of intended animation (every [data-bise-pearl] and live pearl canvas on the page) */
+export type Frame = { t: number; png: PNG; scale: number; masks?: Box[] };
+
+/** Where the page draws a pearl: the ds Pearl slot and every live pearl canvas (the capsule's, the spotlight's). */
+export const PEARL_SELECTOR = '[data-bise-pearl], canvas.b-live-pearl';
+
+/** The boxes of every pearl on the page, in CSS pixels (empty when the page has none). */
+export async function pearlBoxes(page: Page): Promise<Box[]> {
+  return page.evaluate((sel) => Array.from(document.querySelectorAll(sel)).map((e) => {
+    const r = e.getBoundingClientRect();
+    return { x: r.x, y: r.y, width: r.width, height: r.height };
+  }).filter((b) => b.width > 0 && b.height > 0), PEARL_SELECTOR).catch(() => []);
+}
 
 type ScreencastFrame = { data: string; sessionId: number; metadata: { timestamp?: number; deviceWidth: number } };
 
@@ -24,8 +38,11 @@ export class Recorder {
 
   constructor(private readonly cdp: CDPSession, private readonly page: Page) {}
 
+  private masks: Box[] = [];
+
   async start(): Promise<void> {
     this.frames = [];
+    this.masks = await pearlBoxes(this.page);
     this.on = true;
     this.cdp.on('Page.screencastFrame', this.onFrame);
     await this.cdp.send('Page.startScreencast', { format: 'png', everyNthFrame: 1 });
@@ -42,6 +59,8 @@ export class Recorder {
     await this.cdp.send('Page.stopScreencast').catch(() => undefined);
     this.on = false;
     this.cdp.off('Page.screencastFrame', this.onFrame);
+    const masks = [...this.masks, ...(await pearlBoxes(this.page))]; // where the pearls were at the start and at the end
+    for (const f of this.frames) f.masks = masks;
     return this.frames;
   }
 
@@ -63,14 +82,15 @@ const rgbDiff = (a: Buffer, b: Buffer, i: number): number =>
 const inBox = (x: number, y: number, b: Box | undefined, s: number): boolean =>
   !!b && x >= b.x * s && x < (b.x + b.width) * s && y >= b.y * s && y < (b.y + b.height) * s;
 
-/** Pixels that differ between two frames, counted inside or outside a box. */
-export function diffPixels(a: PNG, b: PNG, box: Box | undefined, where: 'inside' | 'outside', scale: number): number {
+/** Pixels that differ between two frames, counted inside or outside a box, never inside a mask. */
+export function diffPixels(a: PNG, b: PNG, box: Box | undefined, where: 'inside' | 'outside', scale: number, masks: Box[] = []): number {
   if (a.width !== b.width || a.height !== b.height) return a.width * a.height;
   let n = 0;
   for (let y = 0; y < a.height; y++) {
     for (let x = 0; x < a.width; x++) {
       const inside = inBox(x, y, box, scale);
       if ((where === 'inside') !== inside) continue;
+      if (masks.some((m) => inBox(x, y, m, scale))) continue;
       if (rgbDiff(a.data, b.data, (y * a.width + x) * 4) > THRESHOLD) n++;
     }
   }
@@ -83,8 +103,9 @@ const pairs = <T>(xs: T[]): [T, T][] => {
   return out;
 };
 
+/** Per pair, pixels changed outside the box, the pearls' boxes (the frames' masks) not counted. */
 export function changedOutside(frames: Frame[], box: Box): number[] {
-  return pairs(frames).map(([a, b]) => diffPixels(a.png, b.png, box, 'outside', a.scale));
+  return pairs(frames).map(([a, b]) => diffPixels(a.png, b.png, box, 'outside', a.scale, a.masks));
 }
 
 export function changedInside(frames: Frame[], box: Box): number[] {

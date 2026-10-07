@@ -9,6 +9,51 @@ import {
   caretBlinks, changedOutside, dropFiles, expect, FakeCore, FakeHelper, flashes, fps, launchDesktop, launchPage, maxJump, prove, Recorder, replacedNodes, test, textProblems, typeAndWatch,
 } from '../index';
 
+/** a frame of a w x h page, filled with grey, `paint` pixels in red */
+const frameOf = (w: number, h: number, paint: [number, number][] = [], masks?: { x: number; y: number; width: number; height: number }[]) => {
+  const png = new PNG({ width: w, height: h });
+  png.data.fill(128);
+  for (const [x, y] of paint) png.data[(y * w + x) * 4] = 255;
+  return { t: 0, png, scale: 1, masks };
+};
+
+test('frames: changedOutside never counts a pearl (an intended animation), and counts 1 px anywhere else', () => {
+  const pearl = { x: 29, y: 64, width: 15, height: 15 }; // the sidebar's pearl box that tripped composer/dictation
+  const field = { x: 100, y: 100, width: 80, height: 20 };
+  const all15: [number, number][] = [];
+  for (let y = pearl.y; y < pearl.y + 15; y++) for (let x = pearl.x; x < pearl.x + 15; x++) all15.push([x, y]);
+  expect(changedOutside([frameOf(200, 200, [], [pearl]), frameOf(200, 200, all15, [pearl])], field)).toEqual([0]);
+  expect(changedOutside([frameOf(200, 200, [], [pearl]), frameOf(200, 200, [...all15, [5, 5]], [pearl])], field)).toEqual([1]);
+  expect(changedOutside([frameOf(200, 200), frameOf(200, 200, all15)], field), 'without masks the same change counts').toEqual([225]);
+});
+
+test('frames: the Recorder masks the pearls it finds on the page, nothing else', async () => {
+  const s = await launchPage(FIXTURE);
+  try {
+    await s.page.evaluate(() => {
+      const add = (css: string, attr?: string): HTMLElement => {
+        const e = document.createElement('div');
+        e.style.cssText = `position:fixed;${css}`;
+        if (attr) e.setAttribute(attr, '22');
+        document.body.append(e);
+        return e;
+      };
+      const pearl = add('left:29px;top:64px;width:15px;height:15px;background:#000', 'data-bise-pearl');
+      const dot = add('left:300px;top:300px;width:1px;height:1px;background:#000');
+      let i = 0;
+      const tick = (): void => { i++; pearl.style.background = i % 2 ? '#f0f' : '#0f0'; if (i === 20) dot.style.background = '#fff'; if (i < 40) requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    });
+    const rec = new Recorder(s.cdp, s.page);
+    const frames = await rec.during(() => s.page.waitForTimeout(1000), 0);
+    expect(frames[0]?.masks).toEqual([{ x: 29, y: 64, width: 15, height: 15 }, { x: 29, y: 64, width: 15, height: 15 }]);
+    const changed = changedOutside(frames, { x: 0, y: 0, width: 1, height: 1 }).filter((n) => n > 0);
+    expect(changed, 'only the 1 px dot counts, once').toEqual([1]);
+  } finally {
+    await s.close();
+  }
+});
+
 const FIXTURE = path.join(__dirname, '..', 'fixtures', 'typing.html');
 const withQuery = (q: string): string => `file://${FIXTURE}?${q}`;
 
