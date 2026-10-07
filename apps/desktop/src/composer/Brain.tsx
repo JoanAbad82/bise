@@ -58,6 +58,8 @@ export interface ComposerActions {
   focus(): void;
   /** The mic control: on, or off when on (bar I). */
   dictate(): void;
+  /** Text selected in the thread, as a quote chip at the caret (`❝ 1`, its strip says `from` and its lines), then the focus. */
+  quote(text: string, from: string): void;
 }
 
 interface BrainProps {
@@ -494,6 +496,20 @@ export function Brain(p: BrainProps): JSX.Element | null {
     },
     focus: () => {
       editor.focus();
+    },
+    quote: (text, from) => {
+      // a selection of the thread as a quote chip at the caret (quote.rs; amb-win, lead m_10649)
+      if (text.trim() === '') return;
+      editor.update(
+        () => {
+          // from the thread the field had no focus: the chip goes at the draft's end, the caret after it
+          $getRoot().selectEnd();
+          $insertChip({ kind: 'quote', n: nextChipNumber($readSegments()), text, from });
+          $getRoot().selectEnd();
+        },
+        { discrete: true },
+      );
+      editor.focus(undefined, { defaultSelection: 'rootEnd' });
     },
   };
   useEffect(() => {

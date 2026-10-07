@@ -50,6 +50,26 @@ describe('the composer', () => {
     expect(field.textContent).toBe('');
   });
 
+  it("quote(text, from): a quote chip at the caret, then his words; the send puts the TUI's <selection> in front (amb-win)", async () => {
+    const { getByTestId, onSend, act: a } = await mount();
+    await act(async () => {
+      a.quote('one\ntwo\nthree', 'main');
+      a.insertText('why 03:00?');
+      await Promise.resolve();
+    });
+    const chip = getByTestId('composer.chip.1');
+    expect(chip.getAttribute('data-kind')).toBe('quote');
+    await act(async () => {
+      a.quote('   ', 'main');
+      a.submit();
+      await Promise.resolve();
+    });
+    const sent = (onSend.mock.calls[0]?.[0] as { text: string } | undefined)?.text ?? '';
+    expect(sent.startsWith('<selection from="main">')).toBe(true);
+    expect(sent).toContain('one\ntwo\nthree');
+    expect(sent.trim().endsWith('why 03:00?')).toBe(true);
+  });
+
   it('runs a typed command line instead of sending it', async () => {
     const onCommand = vi.fn();
     const sources = { ...NO_SOURCES, commands: [{ name: '/model', desc: 'set the model', args: true, ready: true }] };

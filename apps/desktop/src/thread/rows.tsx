@@ -30,7 +30,7 @@ export const EntryRow = memo(function EntryRow({ ctx, pos }: { ctx: RowCtx; pos:
   const hit = useIsCurrent(pos);
   if (e === undefined) return null;
   return (
-    <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={`thread.entry.${pos}`} data-kind={e.kind}>
+    <div className={hit ? 'th-row th-hit' : 'th-row'} data-testid={`thread.entry.${pos}`} data-kind={e.kind} data-from={e.from ?? undefined}>
       <EntryBody e={e} ctx={ctx} />
     </div>
   );

@@ -10,6 +10,8 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { Button, Head, Marker } from '@/ds';
 import { Composer, useComposerSources } from '@/composer';
+import type { ComposerActions } from '@/composer/Brain';
+import { quoteFrom, quoteKey, quoteText } from './quote';
 import type { Outgoing } from '@/composer/message';
 import { threadKey, useAgents, useCoreState, useProjects, usePending, useStore, useThreadOrder, useTyping } from '@/store';
 import { useMenuAction } from '@/app/menu';
@@ -76,6 +78,13 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   const [mark] = useState(createFindMark);
   const [folds] = useState(createFolds);
   const list = useRef<ThreadListHandle>(null);
+  // his bug 3: a selection in the thread, then a key, quotes it in the composer
+  const section = useRef<HTMLElement>(null);
+  const composer = useRef<ComposerActions | null>(null);
+  const onComposer = useCallback((a: ComposerActions) => {
+    composer.current = a;
+  }, []);
+  const quoting = useThreadQuote(section, composer, agent);
   useMenuAction('find', () => {
     setFindOpen(true);
   });
@@ -153,7 +162,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   return (
     <FoldsContext value={folds}>
     <FindMarkContext value={mark}>
-      <section className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} onKeyDown={onKeyDown}>
+      <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} onKeyDown={onKeyDown}>
         <Head
           title={title}
           sub={sub}
@@ -204,7 +213,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         {me?.archived === true ? (
           <History project={project} agent={agent} />
         ) : (
-          <ThreadComposer project={project} agent={agent} busy={busy} to={`you → ${title}`} onStop={stop} />
+          <ThreadComposer project={project} agent={agent} busy={busy} to={`you → ${title}`} onStop={stop} quoting={quoting} onReady={onComposer} />
         )}
       </section>
     </FindMarkContext>
@@ -310,7 +319,71 @@ function History({ project, agent }: { project: string; agent: string }) {
 const COMMANDS = { commands: windowCommands };
 
 /** amb-web's composer, aimed at this agent; its props stay stable while the thread moves. */
-const ThreadComposer = memo(function ThreadComposer({ project, agent, busy, to, onStop }: { project: string; agent: string; busy: boolean; to: string; onStop: () => void }) {
+/**
+ * Text selected in this thread's list: true while there is some (the
+ * composer's key bar says typing asks about it); a printable key then puts it
+ * in the composer as a quote chip followed by that key, ⌘' as the chip alone
+ * (quote.ts). Capture phase on the window, before the window's own keys.
+ */
+function useThreadQuote(section: RefObject<HTMLElement | null>, composer: RefObject<ComposerActions | null>, agent: string): boolean {
+  const [quoting, setQuoting] = useState(false);
+  useEffect(() => {
+    const inList = (): Selection | undefined => {
+      const sel = document.getSelection();
+      if (sel === null || sel.isCollapsed || sel.rangeCount === 0) return undefined;
+      const box = section.current?.querySelector('[data-testid="thread.list"]');
+      return box != null && box.contains(sel.getRangeAt(0).commonAncestorContainer) ? sel : undefined;
+    };
+    const onSel = () => {
+      setQuoting(inList() !== undefined);
+    };
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.defaultPrevented || e.isComposing) return;
+      const k = quoteKey(e);
+      if (k === undefined) return;
+      const sel = inList();
+      const acts = composer.current;
+      if (sel === undefined || acts === null) return;
+      const text = quoteText(String(sel));
+      if (text === '') return;
+      const at = sel.anchorNode instanceof Element ? sel.anchorNode : (sel.anchorNode?.parentElement ?? null);
+      const row = at?.closest('.th-row');
+      e.preventDefault();
+      e.stopPropagation();
+      const from = quoteFrom(row?.getAttribute('data-kind'), row?.getAttribute('data-from'), agent);
+      // the thread's selection goes first: cleared after, it would take the field's caret with it
+      sel.removeAllRanges();
+      setQuoting(false);
+      acts.quote(text, from);
+      if (k === 'type') acts.insertText(e.key);
+    };
+    document.addEventListener('selectionchange', onSel);
+    window.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('selectionchange', onSel);
+      window.removeEventListener('keydown', onKey, true);
+    };
+  }, [section, composer, agent]);
+  return quoting;
+}
+
+const ThreadComposer = memo(function ThreadComposer({
+  project,
+  agent,
+  busy,
+  to,
+  onStop,
+  quoting,
+  onReady,
+}: {
+  project: string;
+  agent: string;
+  busy: boolean;
+  to: string;
+  onStop: () => void;
+  quoting: boolean;
+  onReady: (a: ComposerActions) => void;
+}) {
   const store = useStore();
   const router = useRouter();
   // the window's own /commands (the screens they open), next to the core's
@@ -332,5 +405,5 @@ const ThreadComposer = memo(function ThreadComposer({ project, agent, busy, to, 
     },
     [store, project, agent],
   );
-  return <Composer target={`${project}/${agent}`} busy={busy} sources={sources} to={to} onSend={onSend} onCommand={onCommand} onStop={onStop} testId="composer" />;
+  return <Composer target={`${project}/${agent}`} busy={busy} sources={sources} to={to} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
 });

@@ -9,7 +9,7 @@
 //   (firstItemIndex goes down by the rows added in front);
 // - at the bottom it follows new rows; scrolled up, it stays where he is;
 // - the list never holds the composer: it sits beside it in the screen.
-import { useCallback, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useCallback, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import './thread.css';
 
@@ -93,6 +93,18 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref }
     const added = atBottom ? 0 : newAtEnd(seen.last, keys);
     setSeen({ last, count: keys.length, unseen: atBottom ? 0 : seen.unseen + added });
   }
+  // it opens on the newest row's end. Not through Virtuoso's
+  // initialTopMostItemIndex: that keeps the whole list visibility:hidden
+  // until a scroll event says the item was reached, and a thread shorter
+  // than the screen never scrolls, so its rows stayed invisible and could
+  // not be selected (his bug 3, qa-type 7a27cbab). Once, when the first rows come.
+  const opened = useRef(false);
+  useLayoutEffect(() => {
+    if (opened.current || keys.length === 0) return;
+    opened.current = true;
+    virtuoso.current?.scrollToIndex(LAST);
+  }, [keys.length]);
+
   const toEnd = useCallback(() => {
     if (keys.length > 0) virtuoso.current?.scrollToIndex({ index: keys.length - 1, align: 'end' });
   }, [keys]);
@@ -116,7 +128,6 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref }
         style={FILL}
         data={keys}
         firstItemIndex={next.index}
-        initialTopMostItemIndex={LAST}
         computeItemKey={(_, key) => key}
         itemContent={(_, key) => row(key)}
         followOutput={(atBottom) => (atBottom ? 'auto' : false)}
