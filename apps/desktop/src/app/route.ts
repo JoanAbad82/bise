@@ -12,6 +12,7 @@
 //   changes/<p>                a project's changes (branches, merged today)
 //   review/<p>/<a>             an agent's change, to review and merge
 //   feature/<p>/<name>         a feature: its branch, agents, try / merge / drop
+//   prs/<p>                    its open pull requests (the TUI's /prs)
 //   commit/<p>/<sha>           one commit already on main, read-only
 //   artifacts/<p>[/<id>]       a project's artifacts (one opened)
 //   environments/<p>           its worktrees and dev servers
@@ -25,6 +26,7 @@ export type Route =
   | { screen: 'thread'; project: string; agent: string }
   | { screen: 'agents'; project: string }
   | { screen: 'changes'; project: string }
+  | { screen: 'prs'; project: string }
   | { screen: 'review'; project: string; agent: string }
   | { screen: 'feature'; project: string; name: string }
   | { screen: 'commit'; project: string; sha: string }
@@ -61,6 +63,7 @@ export function formatRoute(r: Route): string {
       return r.agent === MAIN ? `project/${r.project}` : `agent/${r.project}/${r.agent}`;
     case 'agents':
     case 'changes':
+    case 'prs':
     case 'environments':
       return `${r.screen}/${r.project}`;
     case 'review':
@@ -101,6 +104,7 @@ export function parseRoute(path: string): Route {
       return a !== undefined && b !== undefined ? { screen: 'thread', project: a, agent: b } : nf;
     case 'agents':
     case 'changes':
+    case 'prs':
     case 'environments':
       return one !== undefined ? { screen: head, project: one } : nf;
     case 'review':

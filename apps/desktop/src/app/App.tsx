@@ -20,6 +20,7 @@ import { AgentsScreen } from '@/agents/AgentsScreen';
 import { ChangesScreen } from '@/review/ChangesScreen';
 import { ReviewScreen } from '@/review/ReviewScreen';
 import { FeatureScreen } from '@/review/FeatureScreen';
+import { PrsScreen } from '@/review/PrsScreen';
 import { EnvironmentsScreen } from '@/review/EnvironmentsScreen';
 import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
@@ -127,6 +128,8 @@ function ScreenOf({ route }: { route: Route }) {
       return <Known project={route.project}>{() => <ChangesScreen project={route.project} />}</Known>;
     case 'review':
       return <Known project={route.project}>{() => <ReviewScreen project={route.project} agent={route.agent} />}</Known>;
+    case 'prs':
+      return <Known project={route.project}>{() => <PrsScreen project={route.project} />}</Known>;
     case 'feature':
       return <Known project={route.project}>{() => <FeatureScreen project={route.project} name={route.name} />}</Known>;
     case 'commit':

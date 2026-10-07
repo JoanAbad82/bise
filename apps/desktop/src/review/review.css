@@ -42,3 +42,59 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* a PR row (PrsScreen): dot, number, branch · agents, its state in words at the end */
+.pr-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--c-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pr-row:hover {
+  background: var(--c-hover);
+}
+
+.pr-num {
+  font-variant-numeric: tabular-nums;
+  color: var(--c-text-2);
+}
+
+.pr-main {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pr-agents,
+.pr-draft,
+.pr-rest {
+  color: var(--c-text-2);
+}
+
+.pr-words {
+  color: var(--c-text-2);
+}
+
+/* the meaning's tone on the words too (never the dot alone) */
+.pr-err .pr-words {
+  color: var(--c-err);
+}
+
+.pr-nd .pr-words {
+  color: var(--c-accent);
+}
+
+.pr-ok .pr-words {
+  color: var(--c-ok);
+}

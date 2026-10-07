@@ -10,6 +10,7 @@ export const windowCommands: readonly PickCommand[] = [
   { name: 'archived', desc: 'its archived agents', args: false, ready: true },
   { name: 'switch', desc: 'go to an agent', args: true, argKinds: ['agent'], ready: true },
   { name: 'diff', desc: "an agent's changes, or the project's", args: true, argKinds: ['agent'], ready: true },
+  { name: 'prs', desc: 'its open pull requests', args: false, ready: true },
   { name: 'artifacts', desc: 'what its agents made', args: false, ready: false },
   { name: 'scheduled', desc: 'its timers', args: false, ready: false },
 ];
@@ -28,6 +29,8 @@ export function runWindowCommand(name: string, args: string, at: { project: stri
       const who = arg === '' ? at.agent : arg;
       return who === MAIN ? { screen: 'changes', project: at.project } : { screen: 'review', project: at.project, agent: who };
     }
+    case 'prs':
+      return { screen: 'prs', project: at.project };
     case 'artifacts':
       return { screen: 'artifacts', project: at.project };
     default:

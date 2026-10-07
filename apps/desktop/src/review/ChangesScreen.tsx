@@ -3,7 +3,7 @@
 // branch opens its review; a merged commit opens read-only.
 import { useEffect } from 'react';
 import { Empty, Head, Row, SectionHead } from '@/ds';
-import { useFeatures, useMerged, useStore, useWorktrees } from '@/store';
+import { useFeatures, useMerged, usePrs, useStore, useWorktrees } from '@/store';
 import { distance, stateWords } from './feature';
 import { useRouter } from '@/app/router';
 import { MAIN } from '@/app/route';
@@ -17,12 +17,14 @@ export function ChangesScreen({ project }: { project: string }) {
   const worktrees = useWorktrees(project);
   const merged = useMerged(project);
   const features = useFeatures(project);
+  const prs = usePrs(project);
 
   // fresh lists on open (the old window's f8e8330a)
   useEffect(() => {
     store.command({ cmd: 'worktrees', project });
     store.command({ cmd: 'merged', project });
     store.command({ cmd: 'features', project });
+    store.command({ cmd: 'prs', project });
   }, [store, project]);
 
   const branches = branchesOf(worktrees);
@@ -30,6 +32,16 @@ export function ChangesScreen({ project }: { project: string }) {
     <section className="rv-screen" data-testid="changes.screen" data-project={project}>
       <Head title="changes" sub={`${branches.length} branches · ${merged.length} merged today`} />
       <div className="rv-body">
+        <Row
+          kind="ag"
+          // its open PRs (bar A.7, the TUI's /prs): the count, the list one click away
+          name="pull requests"
+          end={prs === null ? '…' : prs.items.length === 0 ? 'none open' : prs.head}
+          onClick={() => {
+            router.go({ screen: 'prs', project });
+          }}
+          testId="changes.prs"
+        />
         {features.length > 0 && <SectionHead>features</SectionHead>}
         {features.map((f) => (
           <Row

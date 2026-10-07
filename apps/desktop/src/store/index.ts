@@ -3,6 +3,6 @@
 // usePending, ... Act: useStore().send / answer / stop / subscribeThread /
 // olderPage / command(any typed AppCmd | HubCmd). Tests: new Store(fakePort),
 // StoreProvider, replay(store, fixtures) from './replay'.
-export { Store, TAGS, typed, threadKey, diffKey, type Ev, type EvOf, type Pending, type ThreadOrder, type Diff, type Away } from './store';
+export { Store, TAGS, typed, threadKey, diffKey, type Ev, type EvOf, type Pending, type ThreadOrder, type Diff, type Away, type PrsList } from './store';
 export * from './hooks';
 export { replay, allFixtureEvents } from './replay';

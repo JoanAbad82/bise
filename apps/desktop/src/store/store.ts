@@ -28,6 +28,7 @@ import type {
   Feature,
   Merged,
   Mode,
+  Pr,
   Plugin,
   ProjectRow,
   Worktree,
@@ -50,6 +51,7 @@ export const TAGS = {
   dev_servers: true,
   merged: true,
   features: true,
+  prs: true,
   diff: true,
   route: true,
   route_done: true,
@@ -68,6 +70,14 @@ export const TAGS = {
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */
+/** A project's PR list (the prs event without its tag). */
+export interface PrsList {
+  readonly head: string;
+  readonly items: readonly Pr[];
+  /** the hub's words when none is open */
+  readonly none: string | null;
+}
+
 export function typed(raw: unknown): Ev | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const tag = (raw as { ev?: unknown }).ev;
@@ -222,6 +232,10 @@ export class Store {
   features(project: string): readonly Feature[] {
     return this.slice(`features:${project}`, EMPTY);
   }
+  /** a project's open PRs as the TUI's /prs (amb-feed 66faffe3): its head, rows, and the 'none' words; null until the hub sent them */
+  prs(project: string): PrsList | null {
+    return this.slice<PrsList | null>(`prs:${project}`, null);
+  }
   jobs(project: string): readonly Job[] {
     return this.slice(`jobs:${project}`, EMPTY);
   }
@@ -297,6 +311,9 @@ export class Store {
       case 'features':
       case 'jobs':
         this.put(`${ev.ev}:${ev.project}`, ev.items);
+        return;
+      case 'prs':
+        this.put(`prs:${ev.project}`, { head: ev.head, items: ev.items, none: ev.none ?? null } satisfies PrsList);
         return;
       case 'diff':
         this.put(diffKey(ev.project, ev.agent, ev.commit ?? undefined), ev);

@@ -6,7 +6,7 @@
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import type { Account, Agent, Artifact, Card, DevServer, Entry, Feature, Found, Job, JsonValue, Merged, Plugin, ProjectRow, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
-import { diffKey, Store, type Away, type Diff, type Ev, type EvOf, type Pending, type ThreadOrder } from './store';
+import { diffKey, Store, type Away, type Diff, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder } from './store';
 
 /**
  * Feeds a store from a core port: its live events, then the state events
@@ -76,6 +76,7 @@ export const useArtifacts = (project: string): readonly Artifact[] => useSlice(`
 export const useWorktrees = (project: string): readonly Worktree[] => useSlice(`worktrees:${project}`, (s) => s.worktrees(project));
 export const useDevServers = (project: string): readonly DevServer[] => useSlice(`dev_servers:${project}`, (s) => s.devServers(project));
 export const useMerged = (project: string): readonly Merged[] => useSlice(`merged:${project}`, (s) => s.merged(project));
+export const usePrs = (project: string): PrsList | null => useSlice(`prs:${project}`, (s) => s.prs(project));
 export const useFeatures = (project: string): readonly Feature[] => useSlice(`features:${project}`, (s) => s.features(project));
 export const useJobs = (project: string): readonly Job[] => useSlice(`jobs:${project}`, (s) => s.jobs(project));
 export const useDiff = (project: string, agent: string, commit?: string): Diff | null =>
