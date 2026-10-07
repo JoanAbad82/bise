@@ -273,6 +273,96 @@ model and effort, hub confirmations). Each such event gets a fixture the UI repl
 
 B16 (how a narrow window lays out) was not checked by tui-parity; ambient-pm checks it on the hand pass.
 
+## Status at ambient-app 6b1530fc (ambient-pm, for ambient-lead m_10664)
+
+How this was read: the checks in `apps/desktop/tests/checks`, the land messages on ambient-app since
+4d22b577, and the reports of qa-type, qa-flows and qa-native. No app was run.
+
+- **pass**: its check is green. "real core" means the check runs on the real core next to the TUI
+  (`tests/checks/real.sh`). "harness" means it runs on the scripted core or the lab. The sha is the
+  green run or the fix the run confirmed.
+- **fail**: its check is red, or the app does it only partly. The row says what he'd see.
+- **built, no check**: a land built it, but no check proves it yet.
+- **not built**: no land does it.
+- **?**: a check exists but i found no result, or i couldn't tell from the lands.
+
+The status is one table here, keyed by row id. A column added to each of the ~150 rows above would
+be the same data, and harder to keep in sync.
+
+| id | status | owner | waits on |
+|---|---|---|---|
+| ⛔1 | pass, harness (composer/typing, composer/accents; 97db8f62, d38f2df9) | amb-web | - |
+| ⛔1s | ? spotlight/typing moved onto the new labs in fef4c763; i found no result for it | amb-web | qa-type: a run result |
+| ⛔1p | pass, harness (pearl/frames fef4c763: one canvas, no flash, no jump) | amb-web | - |
+| ⛔2 | pass (composer/edit-keys, harness; native/mac-keys in qa-native's 15/15 at 7e1ca30e) | amb-mac, amb-web | - |
+| ⛔3 | pass, real core (thread/send 5ee10a00, cold rule: the TUI's first send 382 ms; thread/route-hold exists) | amb-win, amb-core | - |
+| ⛔4 | pass (thread/answers, spotlight/answer; lead m_10664) | amb-win, amb-web | - |
+| ⛔5 | pass, real core (inbox/cmd-i, 4.6 s) | amb-home | - |
+| ⛔6 | pass, real core (thread/interrupt 2c1ba161, after the runtime's issue 13 fix) | amb-win, amb-core | - |
+| 2.1 | **fail in the real thread**: `/` lists nothing (ThreadScreen passes no commands). Passes in the lab (composer/slash 2d2d331d, with B21) | amb-web, amb-home | amb-home's commands item (C) and wiring the thread's sources |
+| 2.2 | **fail in the real thread**: `@` lists no files. Passes in the lab (composer/at-files a4c30647) | amb-web, amb-home | amb-home (A), the file source in the thread |
+| 2.3 | **fail in the real thread**: `$` lists no skills. Passes in the lab (composer/dollar-skills 97db8f62) | amb-web, amb-home | amb-home (B), the skill source in the thread |
+| 2.4 | pass, harness (composer/images + no-vision 2/2; the files reach the agent, ad1eb9c7) | amb-web | - |
+| 2.5 | built, rerun pending: red on the real thread (7a27cbab, a drag selected nothing and no path led to the chip); amb-win's fix 35d08ae5 passes it on the scripted core | amb-win, amb-web | qa-type's rerun (working) |
+| 2.6 | pass: composer/dictation 5/5 in the lab, composer/dictation-real 1/1 on the real core (7a27cbab) | amb-web, amb-core | - |
+| 2.7 | pass, harness (composer/long-paste) | amb-web | - |
+| 3.1 | pass, harness (composer/queue-steer) | amb-web | - |
+| 3.2 | pass, harness (composer/drafts) | amb-web | - |
+| 3.3 | pass, real core (agents/write-to-one) | amb-win | - |
+| 3.4 | pass, real core (thread/find) | amb-win | - |
+| 3.5 | built, no check (677c70cf: the keys listed with no handler got one) | amb-win, amb-home | a settings/keys check (qa-flows) |
+| S.1 | ? the VM pass (native/vm-pass) exists and is opt-in; skipped so far | amb-mac | a VM run (qa-native) |
+| S.2 | built, no check (settings/accounts.tsx signs in); the expired sign-in is not built (see V14) | amb-home | a setup/sign-in check |
+| S.3 | built, no check (settings · models by click); effort per role not built (V17) | amb-home | a settings/models check |
+| S.4 | ? settings/projects.tsx exists; i found no land that says it switches the workspace | amb-home | amb-home to confirm |
+| S.5 | **fail**: the app restarts the core (green), but while the core is down he sees only "bise isn't running · starting it again…", with no last log line (red, 6b1530fc; src/app/CoreLine.tsx has none) | amb-mac, amb-core | the last log line in CoreLine |
+| S.6 | not built | amb-mac | - |
+| S.7 | pass, harness (setup/perms, 15/15) | amb-home, amb-mac | - |
+| S.8 | ? settings/check.tsx exists; no check | amb-home | a setup/check-again check |
+| S.9 | built, no check (setup/Onboarding.tsx) | amb-home | a setup/welcome check |
+| A.1–A.7 | pass, real core (agents/new, list, view, lifecycle, settings, models, tune; review/feature, feature-view, feature-drop, prs, prs-list; lead m_10664) | amb-win, amb-feed | - |
+| P.1 | built, no check (settings/plugins.tsx) | amb-home | a settings/plugins check |
+| P.2 | built, no check (settings/computer.tsx); the live hand-back is not built (S29) | amb-home, amb-mac | a setup/computer-use check |
+| O.1 | ? i found no land or check for tool approvals as cards | amb-home, amb-core | amb-home to confirm |
+| O.2 | built, no check (page rows in the thread) | amb-win | a pages/open check |
+| O.3 | not built (no scheduled lines; history works only by asking main) | amb-win, amb-core | amb-feed item 5 batch 2 (scheduled) |
+| O.4 | **fail** (native/crash red, 6b1530fc): after a crash he sees the plain "isn't running" line, with no crash words and no report action; the restart works | amb-mac, amb-core | the crash line and a report action |
+| O.5 | pass, harness (native/fn-from-rest 6b1530fc: one talk_start within 300 ms with TextEdit in front, bise never frontmost; real fn in the VM pass 442f748a) | amb-mac | - |
+| O.6 | built, no check (data-testid on controls) | every chunk | an app/clicks check |
+| K7 | pass, real core (thread/interrupt) | amb-win | - |
+| I3 | ? no inbox/keys check; i couldn't tell whether ctrl+n/ctrl+p are wired | amb-home | an inbox/keys check |
+| B21 | pass, harness (composer/slash, B21 case) | amb-web | - |
+| K3, K4/B6, K11, K12, K23, E3, E9, E21, E22, W13, B8, B9/W8, W9, C45 | pass, harness (qa-type at 803e7d35 and after: code-fence-enter, no-vision, list-indent, no-undo, subword, at-folders, emoji, at-files, live-markdown, keybar, prefixes) | amb-web | - |
+| S1, S2, S3, S8, S9, S12, S13, S14, S17, S20/M12, S21, S22/M13, S23, S25, S40/W3 | not built: no thinking, compaction, usage, failed-turn, landed, PR, artifact, scheduled, notice or model rows in the thread yet | amb-win, amb-feed | amb-feed item 5 batch 2 (typed rows; batch 1 f1f7f3d0 is the parser), then amb-win |
+| S15/K22/B20 | built, no check of its own (77de63ae: "not delivered" on his row, with retry) | amb-win, amb-feed | a thread/not-delivered check |
+| S16 | pass, harness (thread/to-agent; eb752406, 1b1d0abe) | amb-win, amb-feed | - |
+| S29/L19 | not built | amb-win, amb-core | - |
+| S32/C47 | built, no check (550d0324) | amb-win | an agents/archived check |
+| S33 | pass, harness (composer/no-vision) | amb-win | - |
+| S36 | not built | amb-win | - |
+| W2 | partly built, no check (550d0324: the counts); the new-artifact line waits on artifact events | amb-win | amb-feed batch 2 |
+| W4/K14/K16 | pass, real core (agents/list: the TUI's order and sticky numbers, ⌥1 opens p99 in both; c0d5c638, 677c70cf) | amb-win | - |
+| W5 | built, no check (550d0324) | amb-win | an agents/worktrees check |
+| W6/K18 | not built | amb-win | - |
+| W7/K24 | not built (the inbox strip in the thread) | amb-win, amb-home | - |
+| W11 | built, no check (e31308b1, artifacts in the @ list) | amb-web | a thread/at-artifacts check |
+| W14/V1, V3, F1/F2, F5/M2/N11/B12, F7/M8/B13 | built, no check (677c70cf keys, 550d0324 rows) | amb-win | qa-flows: palette, keys, folds, scroll, code-copy checks |
+| C15/W20/V6 | partly built: the diff keys (677c70cf); any branch by name is not built | amb-win, amb-feed | - |
+| V7/L11 | not built (quote diff lines) | amb-win | - |
+| M4/B14 | pass, harness (thread/file-links, c5b3ae87) | amb-win, amb-mac | - |
+| M14 | not built | amb-win | - |
+| B11 | built, no check (550d0324) | amb-win | a thread/rows check |
+| B15 | built (e62beef4: language label and colors); thread/answers checks only the label's size | amb-win | - |
+| K2 | not built | amb-win, amb-home | - |
+| I6/B3, I8, I9/C46/S30, N14/L8, V8/W21, V14/S28/L2, L5, V17, L1/M18, L25/S37 | not built: no amb-home land since 4d22b577 | amb-home | amb-home's turn |
+| C3 | partly built: the typed `new` command takes with_changes (6cb6c0ef); the /command is not built | amb-home | amb-home's commands item |
+| C13/L15, C40, C42/L14 | not built | amb-home | amb-home's commands item |
+| W33/N10 | pass, harness (native/badge 6b1530fc: the badge and "bise · 2 waiting" in the title, updated at once; the Dock icon itself is the VM pass's) | amb-mac | - |
+| W25/V13/K26/M16 | pass, harness (terminal/panel: ⌃` opens a shell, hide and show keep it; 7dc16b63) | amb-win, amb-mac | - |
+| V12/W24/L21/N13 | not built (voice mode with the agent in view) | amb-mac, amb-web | - |
+| N2 | built, no check (a824752f, never by color alone) | amb-kit | a ds/contrast check |
+| B16 | not checked (narrow window) | - | ambient-pm's hand pass |
+
 ## Order
 
 ⛔1–⛔6 first, with ⛔1s and ⛔1p: they are his 7 bugs. Then 2.1–2.7, then S.1–S.5 (no one without a
