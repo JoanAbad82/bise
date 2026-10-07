@@ -14,6 +14,9 @@ import { assign, liveOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
 import { projectsOf } from './Sidebar';
 
+/** A window event that opens the key list (the composer's /help and /shortcuts). */
+export const HELP_EVENT = 'bise:help';
+
 /** What a screen does for a key (the thread listens with useAppAction). */
 export type ScreenAction = 'fold-all' | 'stop' | 'to-end' | 'copy-code';
 

@@ -29,7 +29,7 @@ import { numbersOf } from '@/agents/model';
 import { CoreLine } from './CoreLine';
 import { Palette } from './Palette';
 import { Help } from '@/help/Help';
-import { keyAction, typingIn } from './keys';
+import { HELP_EVENT, keyAction, typingIn } from './keys';
 import { emitAction, useMenuAction } from './menu';
 import { TerminalPanel } from '@/terminal/Terminal';
 import { isToggleKey, shellProject, shellTakes } from '@/terminal/model';
@@ -78,6 +78,16 @@ function Shell() {
       setHelp(true);
     },
   );
+  // the composer's /help and /shortcuts open the same key list
+  useEffect(() => {
+    const open = () => {
+      setHelp(true);
+    };
+    window.addEventListener(HELP_EVENT, open);
+    return () => {
+      window.removeEventListener(HELP_EVENT, open);
+    };
+  }, []);
   const router = useRouter();
   useMenuRouting(router);
   useMainRoutes(router);

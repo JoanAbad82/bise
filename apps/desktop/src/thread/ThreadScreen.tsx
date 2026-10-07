@@ -13,10 +13,11 @@ import { Composer, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer/Brain';
 import { quoteFrom, quoteKey, quoteText } from './quote';
 import type { Outgoing } from '@/composer/message';
-import { threadKey, useAgents, useCoreState, useProjects, usePending, useStore, useThreadOrder, useTyping } from '@/store';
+import { threadKey, useAgents, useCommands, useCoreState, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
 import { useMenuAction } from '@/app/menu';
 import { useRouter } from '@/app/router';
-import { windowCommands, runWindowCommand } from './commands';
+import { hubCmdOf, pickCommands, windowRun } from './commands';
+import { HELP_EVENT } from '@/app/keys';
 import { dotOf, lineOf } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
@@ -316,8 +317,6 @@ function History({ project, agent }: { project: string; agent: string }) {
   );
 }
 
-const COMMANDS = { commands: windowCommands };
-
 /** amb-web's composer, aimed at this agent; its props stay stable while the thread moves. */
 /**
  * Text selected in this thread's list: true while there is some (the
@@ -386,15 +385,36 @@ const ThreadComposer = memo(function ThreadComposer({
 }) {
   const store = useStore();
   const router = useRouter();
-  // the window's own /commands (the screens they open), next to the core's
-  // once amb-home's lists land (bar 2.1)
-  const sources = useComposerSources(project, COMMANDS, agent);
+  // the composer's lists from the core (amb-core's C/A/B 40f14a12): the TUI's
+  // commands in its order (window ones ready when their screen exists, the
+  // hub's when they run typed), the workspace's $ skills, its @ files ranked
+  // by files.rs (a newer query replaces an older one: [] for it)
+  const core = useCommands();
+  const skills = useSkills(project);
+  const extra = useMemo(
+    () => ({
+      commands: pickCommands(core),
+      skills,
+      files: (q: string) => store.files(project, q).then((a) => (a === null ? [] : [...a.items, ...(a.folder ? [{ path: a.folder.path, dir: true }] : [])])),
+    }),
+    [core, skills, store, project],
+  );
+  const sources = useComposerSources(project, extra, agent);
   const onCommand = useCallback(
     (name: string, args: string) => {
-      const r = runWindowCommand(name, args, { project, agent });
-      if (r !== undefined) router.go(r);
+      const at = { project, agent };
+      const w = windowRun(name, args, at);
+      if (w !== undefined) {
+        if ('go' in w) router.go(w.go);
+        else window.dispatchEvent(new Event(HELP_EVENT));
+        return;
+      }
+      const cmd = hubCmdOf(name, args, at);
+      if (cmd !== undefined) store.command(cmd);
+      // /model or /reasoning with no value: the agent's tune, where they're picked
+      else if (/^\/?(model|reasoning)$/.test(name)) router.go({ screen: 'agents', project });
     },
-    [router, project, agent],
+    [router, store, project, agent],
   );
   const onSend = useCallback(
     (out: Outgoing) => {
