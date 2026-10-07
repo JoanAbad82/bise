@@ -273,6 +273,72 @@ model and effort, hub confirmations). Each such event gets a fixture the UI repl
 
 B16 (how a narrow window lays out) was not checked by tui-parity; ambient-pm checks it on the hand pass.
 
+## Regression list (try gate)
+
+Owner: ambient-pm (ambient-lead m_12388, main m_12384). Every piece of feedback the user has given on
+the app is one row: the desktop app, plus what still applies from the old ambient days. Before any
+try build reaches him:
+
+1. qa-native opens the candidate off-screen on amb-tools' rich world.
+2. It takes one shot per row, in `~/.bise/gate/try-gate/<sha8>/<id>.png`, with an `index.md`.
+3. ambient-pm checks each shot by eye and marks the row **ok** or **red** in the run's log below.
+
+One red row, or an unsigned screen, means no try build. Each row has:
+
+- **id**: the shot's file name.
+- **his words**: quoted and dated (UTC), with where he said them.
+- **right**: what right looks like.
+- **shot**: the route or state, the width (1100 if not said) and the theme (light if not said).
+
+A row stays even after it passes: it is a regression list.
+
+| id | his words (date, where) | right | shot |
+|---|---|---|---|
+| R01 | "La UI est cassé sur ambiant! le layout va pas." (10-03, main#45596) | every screen laid out as signed: nothing overlaps, cut or spills | bise, inbox, settings, agent/shop/main at 1100 and at 800 |
+| R02 | "il faut toujours que l'espece d'orbe soit affiché sans background … Dans une carré avec un background c'est pas très beau" (10-03, main#45596) | the pearl floats with no box, plate or square behind it, on every surface | capsule:talk over a busy desktop, the pearl cropped at 2× |
+| R03 | "on ne peut pas cliquer sur les boutons de la UI de ambiant" (10-03, main#45596) | every control acts on the first click and shows its hover (app/clicks green on this build) | capsule:card with one button hovered; app/clicks' result in index.md |
+| R04 | "quelque chose spotlight like avec pleins de racourcis clavier" (10-03, main#45596) | each action in the spotlight and on cards shows its key | capsule:spot with an agent selected; capsule:card |
+| R05 | "maintenir la touche fn pour parler alors que la ui de ambiant n'était pas ouverte … cela n'a pas fonctionner" (10-03, main#45596) | fn held from rest, with another app in front, listens in under 300 ms (native/fn-from-rest green) | capsule:talk, 300 ms after fn from rest |
+| R06 | "il manque beaucoup de click events sur beaucoup de choses. Il n'y a pas de commande Q pour quitter." (10-04, main#48002) | a real menu bar with every mac key (⌘Q, ⌘W, ⌘, and Edit), and clickable rows, names and counts | the app menu and the Edit menu open |
+| R07 | "dans le menu Spotlight, je puisse sélectionner un agent et … je vois sur la droite … ses dernières actions … Et quand je clique … l'historique … interactif" (10-04, main#48002) | an agent selected in the spotlight shows its last actions; ⏎ or a click opens its thread in the window, live | capsule:spot with p99 selected; then agent/shop/p99 after ⏎ |
+| R08 | "la transcription de ce que je viens de dire, s'affiche dans une fenêtre trop petite, donc il est clippé … 'bise :* on it.' Que je préférais éviter" (10-04, main#49478) | his words shown whole and never clipped; no "on it" line: the pearl's thinking animation instead | capsule:talk after a 3-line spoken ask (fake mic), then 1 s later |
+| R09 | "quand je click sur un lien de nouveau commit sur main j'ai la UI de diff qui s'ouvre avec pas de diff!" (10-04, main#51145) | a landed or merged commit opens on its own diff, never an empty one | review/shop from a landed row whose branch is already on main |
+| R10 | "il faut un petit 'new' rose quelque part … je ne sais pas qu'est ce qui est nouveau" (10-04, main#52666) | new artifacts carry a pink "new" until he has seen them | the artifacts list with 2 new and some old |
+| R11 | "keyboard shortcuts like arrow, escape and enter don't work consistently / can't reach bise error / Clicking doesn't do anything … I don't get a user message" (10-05, main#55683) | the keys act on every surface; no "can't reach bise" on a healthy world; a send always shows his message | bise right after a send; the core line absent |
+| R12 | "je ne vois pas de curseur. A chaque fois que je tape, je vois tout qui clignote." (10-06, main#59926, bug 1) | a blinking caret where the next letter goes; nothing outside the field changes while he types | agent/shop/main mid-typing: a 6-frame strip |
+| R13 | "@fles et $skills et /command n'ont pas l'air de marcher." (10-06, main#59926, bug 1) | `/`, `@` and `$` list the TUI's items in the real thread | agent/shop/main with the / list, the @ list and the $ list open (3 shots) |
+| R14 | "Les animations du marble de bise clignote tres bizarement" (10-06, main#59926, bug 2) | the pearl moves smoothly, with no flash and no jump | the pearl through listen, think and answer: a frame strip |
+| R15 | "Les images ne marchent pas dans le composer, ni les quotes, ni le voice recording" (10-06, main#59926, bug 3) | image, quote and dictation chips in the composer, each removable | the composer with one image chip, one quote chip and dictation running |
+| R16 | "Command I ne fait rien" (10-06, main#59926, bug 4) | ⌘I opens the inbox with its items, most blocking first | inbox after ⌘I with 3 items |
+| R17 | "Mon mesage s'est envoyé mais ne fait rien." (10-06, main#59926, bug 5) | his message shows at once, then main's working state, then the answer | "after send in bise": at 100 ms and at 2 s |
+| R18 | "La réponse de bise quand j'envoie un message avec fn+space s'affiche dans une fenetre trop petite, et je peux pas le lire" (10-06, main#59926, bug 6) | a 40-line answer readable whole: it grows to fit or goes to the window | capsule:spot after a 40-line answer |
+| R19 | "Dans la UI de spotlight, quand je tape toute la UI clignote." (10-06, main#59926, bug 7) | the spotlight doesn't blink while he types | capsule:spot mid-typing: a 6-frame strip |
+| R20 | "the sorte of marble / orb … flying pixels forming a cute simple robot face" (10-06, main#61716); "les trucs dans bise presence sont très laid" (10-06, designer#30458) | the presence that designer and ambient signed, and nothing they didn't sign | the sidebar's bise row and capsule:talk |
+| R21 | "Je pense qu'on devrait enlever ça dans la sidebar … on peut ajouter un tip a propos de /scheduled" (10-06, main#62161) | no "◷ = its next run · /scheduled" legend line in the sidebar | bise with a scheduled agent in the sidebar |
+| R22 | "ce screen pour les notifications … C'est vraiment moche, il y a du texte qui dépasse de partout." (10-07, main#65938) | no text spills out of its card or row in the inbox, at any width | inbox with long cards, at 1100 and 800 |
+| R23 | "la coloration syntaxique en rose pâle … pour le bold … les trucs entre backticks … En vert" (10-07, main#66499) | bold in pale pink and `code` in green, in the thread and in the composer | an answer with bold, `code` and a list; the composer with the same |
+| R24 | "un input riche … quand tu fais Ctrl R … pour la dictation, je voudrais que ce soit une tip dans l'input, pareil pour les images … les quotes" (10-07, main#66499) | a rich input: dictation, images and quotes are chips in the text | the composer during ctrl+r, with an image and a quote |
+| R25 | "la partie interactive elle est pas … toute la box et si je hover l'input … une espèce de border qui apparaît" (10-07, main#66499) | a click anywhere in the box puts the caret in; no stray border on hover | the composer hovered, then clicked at its bottom-right corner |
+| R26 | "c'est dommage que les projets, les folders des projets soient fermés par défaut" (10-07, main#66499) | the project folders are open at first launch | bise at launch with a fresh keep |
+| R27 | "J'aime pas trop l'espèce de cercle qui grandit et qui rapte … pour dire si l'agent est en train de travailler" (10-07, main#66499) | the working sign that was signed, not a growing pulsing circle | the sidebar with 2 working agents: a frame strip |
+| R28 | "Il y a une image qui manque à côté de Bise ici" (10-07, main#66499) | the bise row has its avatar | the sidebar's top |
+| R29 | "Quand je fais fn espace … l'endroit où je tape reste à la même place … le border top et left de la boîte ne changent pas" (10-07, main#66499) | the spotlight field's top-left never moves while the list under it changes | capsule:spot with 30 agents, typing 1 to 4 letters: a strip with a guide line at the field's top |
+| R30 | "quand je tape sur Fn pendant longtemps pour être en voice mode … parfois la fenêtre bouge un peu" (10-07, main#66499) | the talk capsule doesn't move while it listens | capsule:talk held 10 s: a strip |
+| R31 | "il manque une sidebar à droite qui me liste les artefacts … La liste des sous-agents" (10-07, main#66499); "Je vois pas mes sous agents, je ne vois pas les artifacts, je ne vois pas les schedules" (10-07, main#67960) | a project shows its sub-agents, its artifacts and its scheduled tasks in the window | agent/shop/main with the project's side panel |
+| R32 | "j'étais en train de taper un message quand tu as refresh l'app … j'ai tout perdu … ça devrait etre vrai pour tout le state de l'app" (10-07, main#67886) | nothing he typed or opened is lost across a reload or a restart (app/keep-all green) | the composer and an inbox answer before and after a reload |
+| R33 | "onboarding window: deux fenetres imbriqués avec des boutons de fermeture en haut a gauche x2 . on veut du frameless" (10-07, main#67960) | one frameless window with a single set of window buttons, also at onboarding | setup:hello |
+| R34 | "La liste de projets a un probleme de scrollbar, une partie est offscreen … pas de recherche native pour selectioner un projet" (10-07, main#67960) | the project list fits and scrolls inside its box, with a search field | setup's project picker with 22 projects, at 1100 and 800 |
+| R35 | "le text n'a pas de max-width et ne wrap pas" (10-07, main#67960) | answers sit in a reading column of capped width and wrap | agent/shop/main with a long paragraph, at 1800 |
+| R36 | "je vois du XML rendu, comme si il y avait du contenu riche qui manquais" (10-07, main#67960) | no raw tags (`<screen_context>`, `<selection>`, `<pasted>`) in the thread: each one renders as its chip or is hidden | a turn sent with screen context, a quote and a paste |
+| R37 | "thought 0.0s" (his 10-07 screenshot, named by ambient-lead m_12388) | no thinking row for a turn that didn't think; a real time otherwise | a turn with no thinking, and a turn that thought |
+| R38 | "une fois que j'ai sélectionné, je voudrais pouvoir appuyer sur Space … pour que ça … cite … cliquer sur Type to Ask About It directement" (10-07, main#68436) | Space on a selection starts the quote; a click on "type to ask about it" puts the quote at the caret | a selection with its pop; then the composer after Space |
+| R39 | "l'app desktop allait se comporter comme le terminal en terme d'historique" (10-07, main#69423) | the thread holds the whole history, as the TUI does: older turns load when he scrolls up | agent/shop/main scrolled to the top |
+| R40 | "une petite animation quand le text apparait comme ce qu'il y a sur claude.ai" (10-07, main#69684) | streamed text appears with the signed animation (stagger capped), and nothing jumps | a streaming answer: a frame strip |
+
+**Run log** (one line per candidate: the sha, the date, the reds with what i saw, signed or not):
+
+- (first run: the 11:00 candidate, 10-08; qa-native shoots from ~08:30)
+
 ## Status at ambient-app a2039499: what is left (ambient-pm, for ambient-lead m_12152)
 
 How this was read: the 117 specs in `apps/desktop/tests/checks`, the 214 lands since 6b1530fc, and
