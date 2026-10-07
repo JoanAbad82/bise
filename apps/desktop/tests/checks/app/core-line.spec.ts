@@ -2,7 +2,7 @@
 // stderr, exit 101). Passes when the window's core line says 'bise crashed · starting it again…',
 // shows the panic's message dim and mono under it, offers 'show the report' (main's test mode prints
 // its reveal line, never Finder) and 'copy its path' (the test clipboard gets the log's path), and
-// goes once the core is back. The scripted core (FakeCore's stub) wrapped in fakes/core-panic.mjs,
+// goes a while after the core is back (it then says 'running again'). The scripted core (FakeCore's stub) wrapped in fakes/core-panic.mjs,
 // which panics on its first run only. Owner: amb-win.
 import path from 'node:path';
 import { CORE_REVEAL_LINE, COPY_LINE } from '../../../src/shared/api';
@@ -17,7 +17,8 @@ test('app/core-line: a panicked core: the line says it crashed, its last line, t
       const { page } = s;
       const line = page.getByTestId('app.core');
       await expect(line, 'one line about the core once it panicked').toBeVisible({ timeout: 5000 });
-      await expect(page.getByTestId('app.core.text')).toHaveText('bise crashed · starting it again…');
+      // main restarts it within a second: the crash's line stays a while after, saying so (CRASH_STAYS_MS)
+      await expect(page.getByTestId('app.core.text')).toHaveText(/^bise crashed · (starting it again…|running again)$/);
       const last = page.getByTestId('app.core.last');
       await expect(last, "the panic's message, under the words").toHaveText('no hub for acme: the workspace moved');
       const look = await last.evaluate((el) => {
@@ -35,7 +36,8 @@ test('app/core-line: a panicked core: the line says it crashed, its last line, t
       await out.wait(COPY_LINE, (rest) => rest === JSON.stringify(log), 2000);
       await expect(page.getByTestId('app.core.copy'), 'says it copied').toHaveText('copied');
 
-      await expect(line, 'gone once the core is back').toBeHidden({ timeout: 8000 });
+      await expect(page.getByTestId('app.core.text'), 'the core is back').toHaveText('bise crashed · running again');
+      await expect(line, 'gone a while after the core is back').toBeHidden({ timeout: 12_000 });
     },
     { env: { BISE_DESKTOP_BISE: PANIC } },
   );

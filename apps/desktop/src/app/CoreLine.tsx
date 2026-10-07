@@ -14,6 +14,13 @@ import { useCoreState } from '@/store';
 /** How long a first start may take before the line says so. */
 export const QUIET_START_MS = 2000;
 
+/**
+ * How long a crash's line stays once the core is back (bar O.4): main restarts the core in
+ * about half a second, so without it 'show the report' and 'copy its path' left before he could
+ * reach them (qa-native's app/core-line red).
+ */
+export const CRASH_STAYS_MS = 8000;
+
 /** How the core's last run ended, in words. Pure. */
 export function exitWords(exit: CoreExit): string {
   if (exit.crash) return 'bise crashed';
@@ -71,6 +78,27 @@ export function CoreLine() {
   const [slow, setSlow] = useState(false);
   const [copied, setCopied] = useState(false);
   if (state === 'up' && !wasUp) setWasUp(true);
+  // the last crash seen while down, kept a while once the core is back (the next run's exit is null)
+  const [crash, setCrash] = useState<CoreExit | null>(null);
+  const [after, setAfter] = useState<CoreExit | null>(null);
+  const [prev, setPrev] = useState(state);
+  if (exit?.crash && state !== 'up' && crash !== exit) setCrash(exit);
+  if (prev !== state) {
+    setPrev(state);
+    if (state === 'up' && crash !== null) {
+      setAfter(crash);
+      setCrash(null);
+    } else if (state !== 'up') setAfter(null);
+  }
+  useEffect(() => {
+    if (after === null) return;
+    const t = setTimeout(() => {
+      setAfter(null);
+    }, CRASH_STAYS_MS);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [after]);
   useEffect(() => {
     if (state !== 'starting' || wasUp) return;
     const t = setTimeout(() => {
@@ -80,9 +108,10 @@ export function CoreLine() {
       clearTimeout(t);
     };
   }, [state, wasUp]);
-  const text = coreLine(state, { wasUp, slow, exit });
+  const shown = after ?? exit;
+  const text = after !== null ? `${exitWords(after)} · running again` : coreLine(state, { wasUp, slow, exit });
   if (text === undefined) return null;
-  const log = exit?.crash ? exit.log : null;
+  const log = shown?.crash ? shown.log : null;
   return (
     <div className="app-core" role="status" data-testid="app.core" data-state={state}>
       <div className="app-core-head">
@@ -107,9 +136,9 @@ export function CoreLine() {
           </>
         )}
       </div>
-      {exit && exit.last !== '' && (
+      {shown && shown.last !== '' && (
         <div className="app-core-last" data-testid="app.core.last">
-          {exit.last}
+          {shown.last}
         </div>
       )}
     </div>
