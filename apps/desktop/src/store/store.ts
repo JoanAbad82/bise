@@ -31,6 +31,7 @@ import type {
   Model,
   Pr,
   PickCommand,
+  RoleRow,
   PickFile,
   PickFolder,
   PickSkill,
@@ -78,6 +79,7 @@ export const TAGS = {
   commands: true,
   skills: true,
   files: true,
+  roles: true,
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */
@@ -384,6 +386,9 @@ export class Store {
       case 'commands':
         this.put('commands', ev.items);
         return;
+      case 'roles':
+        this.put('roles', ev.items);
+        return;
       case 'skills':
         this.put(`skills:${ev.project}`, ev.items);
         return;
@@ -552,6 +557,10 @@ export class Store {
    * The composer's mic (bar I): the core records and sends this window the
    * words (useDictation(id)); never to main. Returns the dictation's id.
    */
+  /** Each role's model and effort (V17; set with command({cmd: 'role_set', role, model?, effort?})). */
+  roles(): readonly RoleRow[] {
+    return this.slice('roles', EMPTY);
+  }
   /** The `/` list (the TUI's commands.rs), asked once from each core. */
   commands(): readonly PickCommand[] {
     return this.slice('commands', EMPTY);

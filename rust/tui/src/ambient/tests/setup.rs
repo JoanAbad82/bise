@@ -4,7 +4,7 @@
 use super::*;
 use crate::ambient::setup::{CuPorts, Done, Entry, RegistryOp, SetupPorts};
 use bise_home::projects::Row;
-use bise_proto::draft::{Account, Plugin, PluginLogin};
+use bise_proto::draft::{Account, Plugin, PluginLogin, RoleRow};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -29,6 +29,8 @@ struct World {
     cu_fixes: Vec<String>,
     cu_live_tests: usize,
     cu_offs: Vec<bool>,
+    /// V17: the role_set writes
+    role_sets: Vec<(String, Option<String>, Option<String>)>,
 }
 
 fn rows() -> Vec<Row> {
@@ -41,6 +43,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
     let (a, b, c, d, e, f, g, h, i) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
     let (j, k, l, m) = (w.clone(), w.clone(), w.clone(), w.clone());
     let (n, o, q, r, u, v) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
+    let (x, y) = (w.clone(), w.clone());
     t.core.set_setup(SetupPorts {
         prefs: Box::new(move || a.borrow().prefs.clone()),
         write_prefs: Box::new(move |v| {
@@ -51,6 +54,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             let keyed = c.borrow().keys.iter().any(|(id, _)| id == "anthropic");
             vec![Account {
                 id: "anthropic".into(),
+                provider: "anthropic".into(),
                 label: "Anthropic".into(),
                 kind: "key".into(),
                 state: if keyed { "signed_in" } else { "signed_out" }.into(),
@@ -137,6 +141,17 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             }),
             live_test: Box::new(move |_| v.borrow_mut().cu_live_tests += 1),
         },
+        roles: Box::new(move || {
+            let main = x.borrow().role_sets.iter().rev().find(|(r, _, _)| r == "main").and_then(|(_, m, _)| m.clone()).unwrap_or_else(|| "mistral/m".into());
+            vec![RoleRow { role: "main".into(), name: "main".into(), about: "your team lead".into(), kind: "chat".into(), model: main, effort: None, source: "config".into(), follows: None }]
+        }),
+        role_set: Box::new(move |role, model, effort| {
+            if role == "nope" {
+                return Err("there's no role nope".into());
+            }
+            y.borrow_mut().role_sets.push((role.into(), model.map(String::from), effort.map(String::from)));
+            Ok(())
+        }),
     });
     w
 }
@@ -415,4 +430,25 @@ fn the_composer_lists_come_on_request_and_an_older_rid_never_wins() {
     assert!(evs(&out, "files").iter().all(|v| v["rid"] == 2), "{out:#?}");
     app(&mut t, r#"{"cmd":"files","project":"nowhere","q":"a","rid":3}"#);
     assert!(t.take().iter().any(|v| v["ev"] == "error" && v["cmd"] == "files"));
+}
+
+/// V17: role_set writes through the setup port and the roles come again;
+/// a bad role is an error and writes nothing; roles come at the start
+/// with prefs and accounts.
+#[test]
+fn a_role_set_writes_once_and_the_roles_come_again() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    t.core.app_start();
+    t.until(|o| o.iter().any(|v| v["ev"] == "roles"));
+    assert_eq!(evs(&t.take(), "roles")[0]["items"][0]["model"], "mistral/m");
+    app(&mut t, r#"{"cmd":"role_set","role":"main","model":"mistral/large","effort":"high"}"#);
+    let out = t.take();
+    assert_eq!(evs(&out, "roles")[0]["items"][0]["model"], "mistral/large");
+    assert_eq!(w.borrow().role_sets, vec![("main".to_string(), Some("mistral/large".to_string()), Some("high".to_string()))]);
+    app(&mut t, r#"{"cmd":"role_set","role":"nope","model":"x/y"}"#);
+    let out = t.take();
+    assert!(out.iter().any(|v| v["ev"] == "error" && v["cmd"] == "role_set"), "{out:#?}");
+    assert!(evs(&out, "roles").is_empty());
+    assert_eq!(w.borrow().role_sets.len(), 1);
 }

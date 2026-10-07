@@ -42,6 +42,7 @@ pub const TAGS: &[&str] = &[
     "plugin_logout",
     "computer_use",
     "setup_check",
+    "role_set",
 ];
 
 /// Computer use's setup check stops this long after the page's last
@@ -91,6 +92,14 @@ impl Core {
     pub fn app_start(&mut self) {
         self.emit_prefs();
         self.emit_accounts();
+        self.emit_roles();
+    }
+
+    /// Each role's model and effort (V17).
+    fn emit_roles(&mut self) {
+        let Some(s) = &self.setup else { return };
+        let items = (s.ports.roles)();
+        self.emit(json!({"ev": "roles", "items": items}));
     }
 
     fn emit_prefs(&mut self) {
@@ -206,6 +215,13 @@ impl Core {
                 let res = self.workspace_of(project.as_deref()).and_then(|ws| (p.plugin_logout)(&ws, &name));
                 let shown = self.emit_plugins(project);
                 ("plugin_logout", res.and(shown))
+            }
+            AppCmd::RoleSet { role, model, effort } => {
+                let res = (p.role_set)(&role, model.as_deref(), effort.as_deref());
+                if res.is_ok() {
+                    self.emit_roles();
+                }
+                ("role_set", res)
             }
             AppCmd::SetupCheck => {
                 self.app_start();

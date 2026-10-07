@@ -34,3 +34,5 @@
 {"cmd":"skills","project":"acme-1a2b3c4d"}
 {"cmd":"files","project":"acme-1a2b3c4d","q":"src/ma","rid":7}
 {"cmd":"files","project":"acme-1a2b3c4d","q":"rust/","rid":8,"limit":20}
+{"cmd":"role_set","role":"agents","model":"mistral/devstral-medium-latest","effort":"high"}
+{"cmd":"role_set","role":"small"}

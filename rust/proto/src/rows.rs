@@ -436,6 +436,16 @@ pub struct Model {
     /// the roles whose default model it is (config.toml's [roles])
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub default_for: Vec<ModelRole>,
+    /// draft (L5): its provider's catalog id (`anthropic`, `chatgpt`),
+    /// the `provider` of the account that sets it up; an alias: its
+    /// target's
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub provider_id: String,
+    /// draft (L5): its provider has a key or a sign-in this hub finds
+    /// (env, auth.json, the old .env files), or needs none; false: a pick
+    /// needs setup first. Absent: true (an older hub listed only these)
+    #[serde(default = "crate::yes", skip_serializing_if = "crate::is_true")]
+    pub key_ready: bool,
 }
 
 /// A question and its options: the trailing numbered lines (`1. v1`,

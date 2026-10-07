@@ -4,7 +4,7 @@
 // The store comes from StoreContext: the app's one store (bound to
 // window.bise.core) by default, a test's own store through the provider.
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import type { Account, Agent, PickCommand, PickSkill, Artifact, Card, DevServer, Entry, Feature, Found, Model, Job, JsonValue, Merged, Plugin, ProjectRow, Worktree } from '@/proto';
+import type { Account, Agent, PickCommand, PickSkill, RoleRow, Artifact, Card, DevServer, Entry, Feature, Found, Model, Job, JsonValue, Merged, Plugin, ProjectRow, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
 import { diffKey, Store, type Away, type Dictation, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder } from './store';
 
@@ -83,6 +83,8 @@ export const useJobs = (project: string): readonly Job[] => useSlice(`jobs:${pro
 export const useDiff = (project: string, agent: string, commit?: string): Diff | null =>
   useSlice(diffKey(project, agent, commit), (s) => s.diff(project, agent, commit));
 export const useAway = (): Away | null => useSlice('away', (s) => s.away());
+/** Each role's model and effort (V17), at the core's start, after each role_set, at setup_check. */
+export const useRoles = (): readonly RoleRow[] => useSlice('roles', (s) => s.roles());
 /** The `/` commands (the TUI's list; asked from the core on first use). */
 export function useCommands(): readonly PickCommand[] {
   const store = useStore();

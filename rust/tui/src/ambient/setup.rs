@@ -12,7 +12,7 @@
 //! A key never goes out in an event or a log line ([`redact`]).
 
 use bise_home::projects::Row;
-use bise_proto::draft::{Account, Found, Plugin};
+use bise_proto::draft::{Account, Found, Plugin, RoleRow};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
@@ -68,6 +68,8 @@ pub type PluginSetFn = Box<dyn Fn(&str, bool) -> Result<(), String>>;
 /// (workspace, server name, the project it was asked for, the channel of its end)
 pub type PluginLoginFn = Box<dyn Fn(&Path, &str, Option<String>, Sender<Done>) -> Result<(), String>>;
 pub type PluginLogoutFn = Box<dyn Fn(&Path, &str) -> Result<(), String>>;
+/// (role, model, effort): config.toml's `[roles]` through the one locked writer
+pub type RoleSetFn = Box<dyn Fn(&str, Option<&str>, Option<&str>) -> Result<(), String>>;
 /// What runs now from computer use's page (the live test, a helper that reopens).
 pub type CuBusy = std::sync::Arc<std::sync::Mutex<crate::computer_use::Busy>>;
 /// The poll's start: its channel and its stop flag.
@@ -121,6 +123,70 @@ pub struct SetupPorts {
     pub plugin_login: PluginLoginFn,
     pub plugin_logout: PluginLogoutFn,
     pub cu: CuPorts,
+    /// each role's model (V17, [`role_rows`] of config.toml's setup)
+    pub roles: Box<dyn Fn() -> Vec<RoleRow>>,
+    /// a role's model and effort, checked ([`check_role_set`]) then
+    /// written by bise_catalog's roles::save_role
+    pub role_set: RoleSetFn,
+}
+
+/// Each role's model and effort as the TUI's `/models` screen reads
+/// them (V17): the role's words, its model, its effort, where they come
+/// from (`config`, `env`, or `default`: bise picks, or it follows a role).
+pub fn role_rows(setup: &bise_catalog::Setup) -> Vec<RoleRow> {
+    use bise_catalog::roles::{Kind, Source, ROLES};
+    ROLES
+        .iter()
+        .map(|r| {
+            let (model, from) = setup.role_model(r.id);
+            let (source, follows) = match from {
+                Source::Picked => ("config", None),
+                Source::Env(_) => ("env", None),
+                Source::SameAs(to) => ("default", Some(to.to_string())),
+                Source::Auto | Source::None => ("default", None),
+            };
+            RoleRow {
+                role: r.id.into(),
+                name: r.name.into(),
+                about: r.about.into(),
+                kind: if r.kind == Kind::Voice { "voice" } else { "chat" }.into(),
+                model,
+                effort: Some(setup.role_effort(r.id).to_string()).filter(|e| !e.is_empty()),
+                source: source.into(),
+                follows,
+            }
+        })
+        .collect()
+}
+
+/// A `role_set` the TUI's roles screen would take: a known role, a model
+/// the catalog knows (a listed or unlisted model of a known provider, or
+/// an alias), an effort that model takes. Err: what's wrong, nothing written.
+pub fn check_role_set(setup: &bise_catalog::Setup, role: &str, model: Option<&str>, effort: Option<&str>) -> Result<(), String> {
+    use bise_catalog::roles::Kind;
+    let r = bise_catalog::roles::role(role).ok_or_else(|| format!("there's no role {role}"))?;
+    let c = &setup.catalog;
+    let Some(m) = model.map(str::trim).filter(|m| !m.is_empty()) else {
+        return match effort {
+            Some(_) => Err("an effort needs a model".into()),
+            None => Ok(()),
+        };
+    };
+    let target = c.aliases.iter().find(|(a, _)| a == m).map(|(_, to)| to.clone()).unwrap_or_else(|| m.to_string());
+    let res = c.resolve(&target);
+    if res.known == bise_catalog::Known::NoProvider {
+        return Err(format!("bise doesn't know the model {m}"));
+    }
+    if let Some(e) = effort.filter(|e| !e.is_empty()) {
+        if r.kind == Kind::Voice {
+            return Err(format!("the {} role takes no effort", r.name));
+        }
+        let efforts = res.efforts();
+        if !efforts.iter().any(|x| x == e) {
+            return Err(format!("{m} takes no effort {e}"));
+        }
+    }
+    Ok(())
 }
 
 /// A catalog provider's status as the window's account: a subscription
@@ -138,6 +204,7 @@ pub fn account_of(s: &bise_catalog::auth_cli::Status) -> Account {
         kind: if s.auth == "api" { "key" } else { "subscription" }.into(),
         state: state.into(),
         who: s.email.clone(),
+        provider: s.id.clone(),
     }
 }
 
@@ -291,6 +358,13 @@ pub fn live(flow: FlowFn) -> SetupPorts {
         // the TUI's /plugins functions (crate::plugins), the one code path
         plugins: Box::new(crate::plugins::rows),
         plugin_set: Box::new(|name, on| crate::plugins::set(name, on).map(|_| ())),
+        roles: Box::new(move || role_rows(&bise_catalog::Setup::load(&home().config_file()))),
+        role_set: Box::new(move |role, model, effort| {
+            let file = home().config_file();
+            check_role_set(&bise_catalog::Setup::load(&file), role, model, effort)?;
+            // the TUI's roles screen's own writer (locked, tmp + rename)
+            bise_catalog::roles::save_role(&file, role, model, effort)
+        }),
         plugin_login: Box::new(|ws, name, project, tx| {
             let ts = bend_plugins::login::targets(ws);
             let t = bend_plugins::login::find(&ts, name)?.clone();

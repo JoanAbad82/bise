@@ -73,6 +73,16 @@ pub(crate) fn parse(line: &str) -> Result<Value, String> {
     serde_json::from_str(line).map_err(|e| format!("not JSON: {e}"))
 }
 
+/// serde's default for a flag that is true unless said
+pub(crate) fn yes() -> bool {
+    true
+}
+
+/// skip a flag at its default (true)
+pub(crate) fn is_true(b: &bool) -> bool {
+    *b
+}
+
 pub(crate) fn is_false(b: &bool) -> bool {
     !*b
 }

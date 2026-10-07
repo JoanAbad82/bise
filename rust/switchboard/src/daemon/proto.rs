@@ -515,8 +515,11 @@ impl Shell {
         let home = bise_home::Home::from_env();
         let setup = self.setup().clone();
         let ready = bise_catalog::picks::ready_in(&setup, &env, &home);
-        let picks = bise_catalog::picks::picks(&setup, &|id| ready.iter().any(|r| r == id));
-        HubEv::Models { project: self.project(), items: proto_view::models(&setup, &picks) }
+        // L5: every model, each row saying whether its provider is ready
+        // (the window offers setup for the others); the TUI's /model
+        // popup still lists the ready ones only
+        let picks = bise_catalog::picks::picks(&setup, &|_| true);
+        HubEv::Models { project: self.project(), items: proto_view::models(&setup, &picks, &|id| ready.iter().any(|r| r == id)) }
     }
 
     /// config.toml or auth.json changed since the last `models` (a stat).

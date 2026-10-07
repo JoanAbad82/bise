@@ -359,7 +359,19 @@ default_effort?: string | null,
 /**
  * the roles whose default model it is (config.toml's [roles])
  */
-default_for?: Array<ModelRole>, };
+default_for?: Array<ModelRole>, 
+/**
+ * draft (L5): its provider's catalog id (`anthropic`, `chatgpt`),
+ * the `provider` of the account that sets it up; an alias: its
+ * target's
+ */
+provider_id?: string, 
+/**
+ * draft (L5): its provider has a key or a sign-in this hub finds
+ * (env, auth.json, the old .env files), or needs none; false: a pick
+ * needs setup first. Absent: true (an older hub listed only these)
+ */
+key_ready?: boolean, };
 
 /**
  * An artifact of a project (what an agent made for him), the

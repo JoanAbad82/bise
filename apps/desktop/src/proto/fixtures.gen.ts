@@ -114,6 +114,7 @@ export const core_ev: readonly CoreEv[] = [
   {"ev":"skills","items":[{"desc":"make a page for the user","name":"bise-pages"}],"project":"acme-1a2b3c4d"},
   {"ev":"files","items":[{"dir":false,"path":"src/main.rs"},{"dir":true,"path":"src/math","protected":true}],"partial":true,"project":"acme-1a2b3c4d","q":"src/ma","rid":7},
   {"ev":"files","folder":{"path":"rust"},"items":[{"dir":true,"path":"rust/tui"}],"project":"acme-1a2b3c4d","q":"rust/","rid":8},
+  {"ev":"roles","items":[{"about":"your team lead","effort":"high","kind":"chat","model":"anthropic/claude-opus-5-5","name":"main","role":"main","source":"config"},{"about":"the tasks main starts","follows":"main","kind":"chat","model":"anthropic/claude-opus-5-5","name":"agents","role":"agents","source":"default"},{"about":"speech to text","kind":"voice","model":"mistral/voxtral-mini-latest","name":"voice","role":"voice","source":"env"}]},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */
@@ -154,6 +155,8 @@ export const app_cmd: readonly AppCmd[] = [
   {"cmd":"skills","project":"acme-1a2b3c4d"},
   {"cmd":"files","project":"acme-1a2b3c4d","q":"src/ma","rid":7},
   {"cmd":"files","limit":20,"project":"acme-1a2b3c4d","q":"rust/","rid":8},
+  {"cmd":"role_set","effort":"high","model":"mistral/devstral-medium-latest","role":"agents"},
+  {"cmd":"role_set","role":"small"},
 ];
 
 /** rust/proto/fixtures/draft_hub_cmd.jsonl */

@@ -113,6 +113,9 @@ pub struct Account {
     pub state: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub who: Option<String>,
+    /// L5: the catalog provider it sets up (a model row's `provider_id`)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub provider: String,
 }
 
 /// A folder found by `found_scan` that could be a project.
@@ -192,6 +195,25 @@ pub struct AwayProject {
     pub done: u32,
     pub questions: u32,
     pub failed: u32,
+}
+
+/// A role's model (V17, config.toml's `[roles]`, the TUI's `/models`
+/// screen as data): `kind` chat or voice; `source`: `config` (set in
+/// config.toml), `env` (an env var sets it), `default` (unset: bise picks,
+/// or `follows` that role's model).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct RoleRow {
+    pub role: String,
+    pub name: String,
+    pub about: String,
+    pub kind: String,
+    pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+    pub source: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub follows: Option<String>,
 }
 
 /// How a slash command runs (C, architect m_10724): `hub` (his typed
@@ -340,6 +362,9 @@ pub enum CoreEv {
     /// time limit, fn's talk, `cancelled` with an empty text, or `error`:
     /// the start refused (the mic is busy, no mic, no voice model) or the
     /// listener failed, with the words heard so far)
+    /// each role's model and effort (V17): at the start, after each
+    /// `role_set`, at `setup_check`
+    Roles { items: Vec<RoleRow> },
     /// the slash commands (answer to `commands`, and once at the start):
     /// the TUI's `/` list as data
     Commands { items: Vec<PickCommand> },
@@ -374,7 +399,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins", "computer_use", "level", "dictation", "commands", "skills", "files"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins", "computer_use", "level", "dictation", "commands", "skills", "files", "roles"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -442,6 +467,17 @@ pub enum AppCmd {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         project: Option<Project>,
         name: String,
+    },
+    /// a role's model (V17, config.toml's `[roles]`, written by the same
+    /// locked writer as the TUI's roles screen): `model` none = it
+    /// follows its fallback again, `effort` none = the model's default;
+    /// a bad role or an unknown model is an error and writes nothing
+    RoleSet {
+        role: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effort: Option<String>,
     },
     /// check again (S.8, the TUI's `/setup`): `prefs`, `accounts` and
     /// `projects` come again, read fresh
@@ -534,6 +570,7 @@ impl AppCmd {
         "skills",
         "files",
         "setup_check",
+        "role_set",
     ];
 
     pub fn decode(line: &str) -> Result<AppCmd, String> {

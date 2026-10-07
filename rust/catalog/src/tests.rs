@@ -1184,3 +1184,39 @@ fn export_handoff_again_follows_config_and_env_edits() {
     assert!(!read(&p).contains("foundry.example") && !read(&p).contains("base_url = \"\""));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Law (architect m_10795): config.toml has one locked writer of a role
+/// (the TUI's roles screen and the desktop's core): writers racing on
+/// different roles lose no change, and no tmp file is left.
+#[test]
+fn racing_role_writers_lose_no_change() {
+    let dir = std::env::temp_dir().join(format!("bise-roles-race-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let file = dir.join("config.toml");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(&file, "[voice]\nlanguage = \"fr\"\n").unwrap();
+    let ids = [roles::MAIN, roles::AGENTS, roles::SMALL, roles::CLASSIFY];
+    let threads: Vec<_> = ids
+        .iter()
+        .enumerate()
+        .map(|(i, id)| {
+            let (file, id) = (file.clone(), id.to_string());
+            std::thread::spawn(move || {
+                for n in 0..10 {
+                    roles::save_role(&file, &id, Some(&format!("mistral/m{i}-{n}")), None).unwrap();
+                }
+            })
+        })
+        .collect();
+    for t in threads {
+        t.join().unwrap();
+    }
+    let text = std::fs::read_to_string(&file).unwrap();
+    for (i, id) in ids.iter().enumerate() {
+        assert!(text.contains(&format!("{id} = \"mistral/m{i}-9\"")), "{id} lost its change:\n{text}");
+    }
+    assert!(text.contains("language = \"fr\""), "{text}");
+    let left: Vec<_> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| n.contains(".tmp-")).collect();
+    assert!(left.is_empty(), "{left:?}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
