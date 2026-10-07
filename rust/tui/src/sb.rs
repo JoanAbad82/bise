@@ -1337,16 +1337,23 @@ pub(super) fn pr_tone(pr: &bise_proto::rows::Pr) -> &'static str {
     }
 }
 
+/// A PR news line's state (bise_proto: what it means, never a color, the
+/// window's too) as the TUI's look: news plain, done dim, failing red.
+pub(crate) fn pr_look(state: bise_proto::thread::PrNewsState) -> &'static str {
+    use bise_proto::thread::PrNewsState;
+    match state {
+        PrNewsState::Done => "dim",
+        PrNewsState::Failing => "red",
+        PrNewsState::News | PrNewsState::Unknown => "plain",
+    }
+}
+
 /// A sender or receiver as the user reads it: the hub's own id
 /// `switchboard` (bise's old name, still its id in the journals and the
 /// routing) shows as `bise`, like the agents read it (prompts.rs
 /// `shown_sender`); any other name stays.
 pub(crate) fn shown_name(name: &str) -> String {
-    if name == "switchboard" {
-        "bise".into()
-    } else {
-        name.to_string()
-    }
+    bise_proto::thread::lines::shown_name(name)
 }
 
 /// A hub line `sb <kind> : <text>` (hub line protocol, contract C2) as a
@@ -1413,16 +1420,11 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
         Hub::Gate(GateStep::Done) => Ev::Gate(crate::wire::Gate::Done),
         // a gate's card answered, folded (§9); BISE-307: never cut here,
         // the line cuts at the width and opens whole
+        // a sandbox card's fold says the sandbox was off for it (designer);
+        // the sentences are bise_proto's (the hub's fold says the same)
         Hub::Approval { how, who, what, note } => {
-            let what = what.trim();
-            // a sandbox card's fold says the sandbox was off for it (designer)
-            let ok = |text: String| Ev::Approval { ok: true, text, note: String::new(), asked: String::new(), open: false };
-            match how.as_str() {
-                "allowed" => ok(format!("you allowed {}: {}", who, what)),
-                "outside" => ok(format!("you let {} run it outside the sandbox: {}", who, what)),
-                "outside-always" => ok(format!("you always let {} run outside the sandbox here", what)),
-                _ => Ev::Approval { ok: false, text: format!("you said no to {}: {}", who, what), note: note.trim().to_string(), asked: String::new(), open: false },
-            }
+            let (ok, text, note) = bise_proto::thread::words::approval(&how, &who, &what, &note);
+            Ev::Approval { ok, text, note, asked: String::new(), open: false }
         }
         Hub::CardClosed { id, res } => Ev::CardClosed { id, res },
         // an answer to an item: the box's fold line (BISE-305, designer:
@@ -1432,7 +1434,7 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
             Ev::Approval { ok: true, text, note, asked: String::new(), open: false }
         }
         // pr-news (pr-design §4)
-        Hub::Pr { tone, number, url, text } => Ev::Pr { tone, number, url, text, url_row: false },
+        Hub::Pr { state, number, url, text } => Ev::Pr { tone: pr_look(state).into(), number, url, text, url_row: false },
         // site/m/artifacts C
         Hub::Artifact { id, agent, title, kind, v } => Ev::Made { id, agent, title, kind, v },
         // site/m/artifacts D

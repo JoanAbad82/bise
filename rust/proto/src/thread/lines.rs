@@ -180,7 +180,7 @@ pub enum Hub {
     /// an answer to an item: `you → @{asker} (answer to card #{id}) : {text}`
     Route { who: String, card: u64, said: String },
     /// pr-news: `pr : tone : number : url : text`
-    Pr { tone: String, number: u64, url: String, text: String },
+    Pr { state: crate::thread::PrNewsState, number: u64, url: String, text: String },
     /// `artifact : id : agent : title : kind : v`
     Artifact { id: String, agent: String, title: String, kind: String, v: u32 },
     /// `landed : agent : target : from : sha : files : add : del`
@@ -423,7 +423,7 @@ pub fn hub(rest: &str) -> Hub {
             let mut next = || f.next().unwrap_or_default();
             let (tone, number, url, t) = (next(), next(), next(), next());
             match number.parse::<u64>() {
-                Ok(number) => Hub::Pr { tone, number, url, text: t },
+                Ok(number) => Hub::Pr { state: pr_state(&tone), number, url, text: t },
                 // no number: its text field alone, never lost
                 Err(_) => other(t),
             }
@@ -517,6 +517,52 @@ pub fn publish_in(args: &str) -> Option<String> {
     let file = unq(words.first()?);
     let name = file.rsplit('/').next().unwrap_or(&file);
     Some(name.split('.').next().unwrap_or(name).to_string())
+}
+
+/// The hub's own sender in a message line (`switchboard`, or `bise`).
+pub fn is_hub_sender(from: &str) -> bool {
+    from == "switchboard" || from == "bise"
+}
+
+/// A sender as people see it: the hub's id `switchboard` is `bise`.
+pub fn shown_name(name: &str) -> String {
+    if name == "switchboard" { "bise".into() } else { name.to_string() }
+}
+
+/// A timer's wake an agent reads from bise (every.rs `wake_text`):
+/// `timer #48 (every 2m, 2/6, set by x): <words>` then the stop hint.
+/// Its id, the parenthesis's parts and its words; None: not a wake.
+pub fn timer_wake(text: &str) -> Option<(u64, &str, &str)> {
+    let rest = text.strip_prefix("timer #")?;
+    let (id, rest) = rest.split_once(" (")?;
+    let id = id.parse().ok()?;
+    let (how, words) = rest.split_once("): ")?;
+    let words = words.rsplit_once("\n(stop it: sb every --stop ").map_or(words, |(w, _)| w);
+    Some((id, how, words))
+}
+
+/// The note bise sends an agent when he stops its scheduled task (for
+/// the agent only: its ended line says it in the thread).
+pub fn is_stop_note(text: &str) -> bool {
+    text.starts_with(STOP_NOTE)
+}
+
+/// The stop note's head (architect m_11299: one owner): the hub's writer
+/// (switchboard core.rs `timer_stop_by_user`) starts its note with it,
+/// [`is_stop_note`] reads it.
+pub const STOP_NOTE: &str = "the user stopped timer #";
+
+/// A `pr` line's tone word (forge::news::Tone, the hub's writer) as what
+/// it means (architect m_11122: no color on the wire): `plain` is news,
+/// `dim` nothing for him (done), `red` failing checks.
+pub fn pr_state(tone: &str) -> crate::thread::PrNewsState {
+    use crate::thread::PrNewsState;
+    match tone {
+        "plain" => PrNewsState::News,
+        "dim" => PrNewsState::Done,
+        "red" => PrNewsState::Failing,
+        _ => PrNewsState::Unknown,
+    }
 }
 
 /// What one feed item says about an agent's context: a usage after a

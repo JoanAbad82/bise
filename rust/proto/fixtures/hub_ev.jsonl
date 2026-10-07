@@ -12,6 +12,12 @@
 {"ev":"entry","project":"acme-1a2b3c4d","agent":"perf","entry":{"pos":24,"at_ms":1791100024000,"kind":"notice","text":"turn failed: provider 500","notice":{"level":"err","text":"turn failed: provider 500"}}}
 {"ev":"entry","project":"acme-1a2b3c4d","agent":"perf","entry":{"pos":25,"at_ms":1791100025000,"kind":"notice","text":"model call failed (attempt 2/10): provider 529 (transient) · retry 3/10 in 4s","notice":{"level":"warn","text":"model call failed (attempt 2/10): provider 529 (transient) · retry 3/10 in 4s"}}}
 {"ev":"entry","project":"acme-1a2b3c4d","agent":"main","entry":{"pos":26,"at_ms":1791100026000,"kind":"not_delivered","text":"then the warm run","not_delivered":{"to":"perf","text":"then the warm run"}}}
+{"ev":"entry","project":"acme-1a2b3c4d","agent":"main","entry":{"pos":27,"at_ms":1791100027000,"kind":"landed","text":"3 files +42 −18","landed":{"agent":"perf","target":"main","from":"sb/perf","sha":"a1b2c3d","files":3,"add":42,"del":18}}}
+{"ev":"entry","project":"acme-1a2b3c4d","agent":"perf","entry":{"pos":28,"at_ms":1791100028000,"kind":"pr","text":"checks fail : e2e","pr":{"number":412,"url":"https://github.com/acme/app/pull/412","text":"checks fail : e2e","state":"failing"}}}
+{"ev":"entry","project":"acme-1a2b3c4d","agent":"main","entry":{"pos":29,"at_ms":1791100029000,"kind":"artifact","text":"the logo","made":{"id":"logo","agent":"designer","title":"the logo","kind":"image","kind_word":"image","v":2}}}
+{"ev":"entry","project":"acme-1a2b3c4d","agent":"main","entry":{"pos":30,"at_ms":1791100030000,"kind":"answered","text":"v2","answered":{"agent":"docs","question":"v1 or v2?","answer":"v2","why":"the brief says v2"}}}
+{"ev":"entry","project":"acme-1a2b3c4d","agent":"perf","entry":{"pos":31,"at_ms":1791100031000,"kind":"approval","text":"you said no to perf: rm -rf target","approval":{"ok":false,"text":"you said no to perf: rm -rf target","note":"not that"}}}
+{"ev":"entry","project":"acme-1a2b3c4d","agent":"main","entry":{"pos":32,"at_ms":1791100032000,"kind":"from_agent","text":"the numbers are in","from":"perf","to":"docs","msg":7}}
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":"running the tests"}
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":""}
 {"ev":"confirm","project":"acme-1a2b3c4d","id":3,"text":"@perf is working: archive it anyway? (y/n)"}

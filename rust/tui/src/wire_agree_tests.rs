@@ -64,7 +64,7 @@ fn the_tui_and_the_fold_say_the_same_words_for_the_same_lines() {
     let ls = lines();
     let numbered: Vec<bise_proto::thread::Line> = ls.iter().enumerate().map(|(i, l)| (i as u64 + 1, 0, l.to_string())).collect();
     let none = |_: &str| None;
-    let entries = fold(&numbered, &Ctx { open_cards: &[], page: &none, provider: &crate::models::provider_name });
+    let entries = fold(&numbered, &Ctx { open_cards: &[], page: &none, provider: &crate::models::provider_name, width: &unicode_width::UnicodeWidthStr::width });
     let folded: Vec<(EntryKind, String, String)> = entries
         .iter()
         .filter(|e| e.kind != EntryKind::Tools)
@@ -75,6 +75,56 @@ fn the_tui_and_the_fold_say_the_same_words_for_the_same_lines() {
         .collect();
     assert_eq!(folded, tui_words(&ls));
     assert_eq!(folded.len(), 14, "{folded:?}");
+}
+
+/// Item 5 batch 3a (architect m_11122): for the hub's news lines, the
+/// TUI's events and the fold's entries say the same: a PR's look comes
+/// from its state (`sb::pr_look`), the approval sentences and the answer
+/// split are bise_proto's, landed and made carry the same fields.
+#[test]
+fn the_tui_and_the_fold_agree_on_the_hubs_news() {
+    let ls = [
+        "sb landed : api : main : sb/api : a1b2c3d : 3 : 42 : 18",
+        "sb pr : red : 412 : https://x/412 : checks fail",
+        "sb pr : dim : 413 : https://x/413 : merged",
+        "sb pr : plain : 414 : https://x/414 : opened",
+        "sb artifact : logo : designer : the logo : image : 1",
+        "sb answered : docs : v1 or v2? : v2 : the brief",
+        "sb approval : outside : api : make bench",
+        "sb approval : no : api : rm -rf target : not that",
+        "sb route : you → @perf (answer to card #4) : a long answer that never fits on the sentence's own line",
+    ];
+    let numbered: Vec<_> = ls.iter().enumerate().map(|(i, l)| (i as u64 + 1, 0, l.to_string())).collect();
+    let none = |_: &str| None;
+    let entries = fold(&numbered, &Ctx { open_cards: &[], page: &none, provider: &crate::models::provider_name, width: &unicode_width::UnicodeWidthStr::width });
+    let evs: Vec<Ev> = ls.iter().filter_map(|l| parse_line(l)).collect();
+    assert_eq!(entries.len(), evs.len(), "{entries:?}");
+    for (e, ev) in entries.iter().zip(&evs) {
+        match ev {
+            Ev::Landed { agent, from, sha, files, add, del } => {
+                let d = e.landed.as_ref().unwrap();
+                assert_eq!((&d.agent, &d.from, &d.sha, d.files, d.add, d.del), (agent, from, sha, *files, *add, *del));
+            }
+            Ev::Pr { tone, number, url, text, .. } => {
+                let p = e.pr.as_ref().unwrap();
+                assert_eq!((crate::sb::pr_look(p.state), p.number, &p.url, &p.text), (tone.as_str(), *number, url, text));
+            }
+            Ev::Made { id, agent, title, kind, v } => {
+                let m = e.made.as_ref().unwrap();
+                assert_eq!((&m.id, &m.agent, &m.title, &m.kind, m.v), (id, agent, title, kind, *v));
+                assert_eq!(m.kind_word, crate::artifacts::kind_word(kind));
+            }
+            Ev::Answered { agent, question, answer, why, .. } => {
+                let a = e.answered.as_ref().unwrap();
+                assert_eq!((&a.agent, &a.question, &a.answer, &a.why), (agent, question, answer, why));
+            }
+            Ev::Approval { ok, text, note, .. } => {
+                let a = e.approval.as_ref().unwrap();
+                assert_eq!((a.ok, &a.text, &a.note), (*ok, text, note));
+            }
+            _ => panic!("an event the fold doesn't make for {e:?}"),
+        }
+    }
 }
 
 /// architect m_10999: the TUI's gauge (usage::current over its events)

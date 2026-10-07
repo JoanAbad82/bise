@@ -103,6 +103,11 @@ impl Facts {
     }
 }
 
+/// A string's display width, the TUI's (the fold's Ctx.width).
+fn width(s: &str) -> usize {
+    unicode_width::UnicodeWidthStr::width(s)
+}
+
 /// A provider's name for people from the hub's catalog (a missing key's
 /// notice in a thread, bise_proto's `words::no_key`).
 fn provider_name(setup: &Option<(Option<std::time::SystemTime>, bise_catalog::Setup)>, id: &str, key: &str) -> String {

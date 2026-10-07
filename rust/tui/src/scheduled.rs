@@ -185,7 +185,7 @@ pub(crate) fn hub_line_at(raw: &str, now: u64) -> Option<Ev> {
 
 /// The hub's own sender (its id `switchboard`, or `bise` as shown).
 pub(crate) fn is_hub(from: &str) -> bool {
-    from == "switchboard" || from == "bise"
+    bise_proto::thread::lines::is_hub_sender(from)
 }
 
 /// A run: the wake an agent reads from bise (every.rs `wake_text`,
@@ -194,14 +194,8 @@ pub(crate) fn is_hub(from: &str) -> bool {
 /// `scheduled #48 · 1 of 6 · waited 4m for answer-line to finish ▸`,
 /// `scheduled #48 · ran now, by you · <first words> ▸`. None: not a wake.
 pub(crate) fn run_line(text: &str) -> Option<Ev> {
-    let rest = text.strip_prefix("timer #")?;
-    let (id, rest) = rest.split_once(" (")?;
-    let id: u64 = id.parse().ok()?;
-    let (how, words) = rest.split_once("): ")?;
-    let words = match words.rsplit_once("\n(stop it: sb every --stop ") {
-        Some((w, _)) => w,
-        None => words,
-    };
+    // the one parser of a wake (bise_proto lines.rs, the hub's fold too)
+    let (id, how, words) = bise_proto::thread::lines::timer_wake(text)?;
     let mut head = format!("scheduled #{id}");
     let mut waited = None;
     let mut now = false;
@@ -227,7 +221,7 @@ pub(crate) fn run_line(text: &str) -> Option<Ev> {
 /// The note bise sends an agent when you stop its scheduled task: for
 /// the agent only (its ◷ ended line says it in the thread).
 pub(crate) fn is_stop_note(text: &str) -> bool {
-    text.starts_with("the user stopped timer #")
+    bise_proto::thread::lines::is_stop_note(text)
 }
 
 #[cfg(test)]

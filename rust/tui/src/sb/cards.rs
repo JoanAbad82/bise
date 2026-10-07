@@ -921,22 +921,14 @@ pub(super) fn fold_of(c: &Card, reply: &str, picked: Option<&str>) -> Fold {
     Fold { ok: true, text, note: String::new(), asked: String::new() }
 }
 
-/// A short answer: on the sentence's line (`you answered perf: both`).
-const ON_THE_LINE: usize = 30;
-
 /// The sentence of an answer to `who` and the words under it (BISE-307,
 /// designer): a picked option or any short one-line answer stays on the
 /// line (`you answered perf: both`), anything longer goes under it, whole
 /// (`you answered main` + the words). The same split for the box's own
 /// fold and the hub's line (another view, a reload).
 pub(super) fn answered(who: &str, words: &str) -> (String, String) {
-    use unicode_width::UnicodeWidthStr;
-    let w = words.trim();
-    if !w.contains('\n') && w.width() <= ON_THE_LINE {
-        (format!("you answered {who}: {w}"), String::new())
-    } else {
-        (format!("you answered {who}"), w.to_string())
-    }
+    // bise_proto's words (the hub's fold of the route line says the same)
+    bise_proto::thread::words::answered_split(who, words, &unicode_width::UnicodeWidthStr::width)
 }
 
 /// Card `id` is answered or closed: hidden until the hub drops it; the

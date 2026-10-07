@@ -5,7 +5,7 @@
 import type { FnContext } from './context';
 import type { Opt, ReportKind } from './rows';
 
-export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped" | "to_agent" | "thinking" | "compacting" | "compacted" | "notice" | "not_delivered" | "unknown";
+export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped" | "to_agent" | "thinking" | "compacting" | "compacted" | "notice" | "not_delivered" | "landed" | "pr" | "artifact" | "answered" | "approval" | "unknown";
 
 /**
  * What a tool call did, for the counted summary.
@@ -57,6 +57,42 @@ export type Notice = { level: NoticeLevel, text: string, };
 export type NotDelivered = { to: string, text: string, };
 
 /**
+ * A `landed` entry (site/m/artifacts D): `agent`'s commits from `from`
+ * landed on `target` at `sha`; the diff's size.
+ */
+export type Landed = { agent: string, target: string, from: string, sha: string, files: number, add: number, del: number, };
+
+/**
+ * What a PR's news means for him (pr-design §4), never a color: `news`
+ * (opened, reviewed, merged...), `done` (nothing for him to do),
+ * `failing` (its checks fail). The TUI maps it to its look.
+ */
+export type PrNewsState = "news" | "done" | "failing" | "unknown";
+
+/**
+ * A `pr` entry: the PR's number, its link, the news's words.
+ */
+export type PrNews = { number: number, url: string, text: string, state: PrNewsState, };
+
+/**
+ * An `artifact` entry (site/m/artifacts C): what was made; `kind_word`
+ * as the TUI's chip says it (`page`, `PR`, `file`), `url` when it is a
+ * page the hub serves.
+ */
+export type Made = { id: string, agent: string, title: string, kind: string, kind_word: string, v: number, url?: string | null, };
+
+/**
+ * An `answered` entry: main answered `agent`'s question for him.
+ */
+export type Answered = { agent: string, question: string, answer: string, why: string, };
+
+/**
+ * An `approval` entry: his answer, folded (`you allowed api: rm -rf
+ * target`, `you answered perf: both`); `note` the words under it.
+ */
+export type ApprovalFold = { ok: boolean, text: string, note?: string, };
+
+/**
  * One entry of a thread.
  */
 export type Entry = { 
@@ -91,4 +127,4 @@ msg?: number | null,
  * a `thinking` entry's, or an `agent` reply's own: the reasoning
  * before it ("thought for 3.2s", folded)
  */
-thinking?: Thinking | null, notice?: Notice | null, not_delivered?: NotDelivered | null, };
+thinking?: Thinking | null, notice?: Notice | null, not_delivered?: NotDelivered | null, landed?: Landed | null, pr?: PrNews | null, made?: Made | null, answered?: Answered | null, approval?: ApprovalFold | null, };

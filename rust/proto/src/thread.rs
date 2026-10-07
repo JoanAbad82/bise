@@ -50,6 +50,19 @@ pub enum EntryKind {
     /// his message didn't reach its agent (`not_delivered`: to whom, his
     /// text, never lost)
     NotDelivered,
+    /// an agent's commits landed (`landed`: on what, the sha, the diff's
+    /// size), the text its words: `3 files +42 −18`
+    Landed,
+    /// news of a pull request (`pr`: its number, link, words, state)
+    Pr,
+    /// an agent made or changed an artifact (`made`)
+    Artifact,
+    /// main answered an agent for him (`answered`: the question, the
+    /// answer, why)
+    Answered,
+    /// his answer to an approval card or an item, folded (`approval`:
+    /// yes or no, the sentence, the words under it)
+    Approval,
     /// a kind this reader doesn't know (a newer hub)
     #[serde(other)]
     Unknown,
@@ -91,6 +104,82 @@ pub struct Notice {
 pub struct NotDelivered {
     pub to: String,
     pub text: String,
+}
+
+/// A `landed` entry (site/m/artifacts D): `agent`'s commits from `from`
+/// landed on `target` at `sha`; the diff's size.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Landed {
+    pub agent: String,
+    pub target: String,
+    pub from: String,
+    pub sha: String,
+    pub files: u64,
+    pub add: u64,
+    pub del: u64,
+}
+
+/// What a PR's news means for him (pr-design §4), never a color: `news`
+/// (opened, reviewed, merged...), `done` (nothing for him to do),
+/// `failing` (its checks fail). The TUI maps it to its look.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum PrNewsState {
+    News,
+    Done,
+    Failing,
+    /// a state this reader doesn't know (a newer hub)
+    #[serde(other)]
+    Unknown,
+}
+
+/// A `pr` entry: the PR's number, its link, the news's words.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PrNews {
+    pub number: u64,
+    pub url: String,
+    pub text: String,
+    pub state: PrNewsState,
+}
+
+/// An `artifact` entry (site/m/artifacts C): what was made; `kind_word`
+/// as the TUI's chip says it (`page`, `PR`, `file`), `url` when it is a
+/// page the hub serves.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Made {
+    pub id: String,
+    pub agent: String,
+    pub title: String,
+    pub kind: String,
+    pub kind_word: String,
+    pub v: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+}
+
+/// An `answered` entry: main answered `agent`'s question for him.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Answered {
+    pub agent: String,
+    pub question: String,
+    pub answer: String,
+    pub why: String,
+}
+
+/// An `approval` entry: his answer, folded (`you allowed api: rm -rf
+/// target`, `you answered perf: both`); `note` the words under it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ApprovalFold {
+    pub ok: bool,
+    pub text: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub note: String,
 }
 
 /// What a tool call did, for the counted summary.
@@ -207,6 +296,16 @@ pub struct Entry {
     pub notice: Option<Notice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub not_delivered: Option<NotDelivered>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub landed: Option<Landed>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr: Option<PrNews>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub made: Option<Made>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answered: Option<Answered>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval: Option<ApprovalFold>,
 }
 
 impl Entry {
@@ -228,6 +327,11 @@ impl Entry {
             thinking: None,
             notice: None,
             not_delivered: None,
+            landed: None,
+            pr: None,
+            made: None,
+            answered: None,
+            approval: None,
         }
     }
 
@@ -243,6 +347,11 @@ impl Entry {
             (EntryKind::Report, self.report.is_some()),
             (EntryKind::Notice, self.notice.is_some()),
             (EntryKind::NotDelivered, self.not_delivered.is_some()),
+            (EntryKind::Landed, self.landed.is_some()),
+            (EntryKind::Pr, self.pr.is_some()),
+            (EntryKind::Artifact, self.made.is_some()),
+            (EntryKind::Answered, self.answered.is_some()),
+            (EntryKind::Approval, self.approval.is_some()),
         ];
         let thinking = match self.kind {
             EntryKind::Thinking => self.thinking.is_some(),
@@ -265,6 +374,9 @@ pub struct Ctx<'a> {
     /// a provider's name for people, by its id or its key variable (a
     /// missing key's notice; the catalog's `provider_name`)
     pub provider: &'a dyn Fn(&str, &str) -> String,
+    /// a string's display width (unicode-width; this crate stays pure
+    /// std): where an answer stays on its line (`words::answered_split`)
+    pub width: &'a dyn Fn(&str) -> usize,
 }
 
 /// A page of a thread: the newest `limit` entries of `lines`. `more`: the

@@ -1807,7 +1807,7 @@ impl Hub {
     /// from bise once in the same sb-core step, the ◷ line says so.
     fn timer_stop_by_user(&mut self, fx: &mut Fx, env: &mut dyn Env, id: u64, why: &str) {
         let Some(t) = self.st.timers.map.get(&id) else { return };
-        let wake = format!("the user stopped timer #{} ({}){}: don't set it again unless they ask", id, t.text, why);
+        let wake = crate::every::stop_note(id, &t.text, why);
         self.core(fx, env, None, json!({"t": "every_stop", "id": id, "why": "stopped by the user", "wake": wake}));
     }
 

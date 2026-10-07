@@ -4,7 +4,7 @@
 
 use super::lines::{self, Hub, Obs, Rec};
 use super::words::{self, one_line, summary};
-use super::{Ctx, Entry, EntryCard, EntryKind, Line, NotDelivered, Notice, PageRef, ReportRef, Thinking, ToolItem, ToolKind, Tools};
+use super::{Answered, ApprovalFold, Ctx, Entry, EntryCard, EntryKind, Landed, Line, Made, NotDelivered, Notice, PageRef, PrNews, ReportRef, Thinking, ToolItem, ToolKind, Tools};
 use crate::context::FnContext;
 use crate::rows::question;
 
@@ -147,6 +147,12 @@ impl Fold<'_> {
         }
     }
 
+    fn approval(&mut self, pos: u64, ms: u64, ok: bool, text: String, note: String) {
+        let mut e = Entry::new(pos, ms, EntryKind::Approval, text.clone());
+        e.approval = Some(ApprovalFold { ok, text, note });
+        self.push(e);
+    }
+
     fn notice(&mut self, pos: u64, ms: u64, n: Notice) {
         let mut e = Entry::new(pos, ms, EntryKind::Notice, n.text.clone());
         e.notice = Some(n);
@@ -199,6 +205,57 @@ impl Fold<'_> {
                 let card = EntryCard { id, question: q.clone(), options, answered: !self.ctx.open_cards.contains(&id) };
                 let mut e = Entry::new(pos, ms, EntryKind::Card, q);
                 e.card = Some(card);
+                self.cont = Some(self.push(e));
+            }
+            // site/m/artifacts D: `± 3 files +42 −18`
+            Hub::Landed { agent, target, from, sha, files, add, del } => {
+                let mut e = Entry::new(pos, ms, EntryKind::Landed, words::landed(files, add, del));
+                e.landed = Some(Landed { agent, target, from, sha, files, add, del });
+                self.push(e);
+            }
+            // pr-news (pr-design §4): what it means, never a color
+            Hub::Pr { state, number, url, text } => {
+                let mut e = Entry::new(pos, ms, EntryKind::Pr, text.clone());
+                e.pr = Some(PrNews { number, url, text, state });
+                self.push(e);
+            }
+            // site/m/artifacts C; a page this fold already shows (its
+            // publish's page entry) comes once (architect m_10476 p7)
+            Hub::Artifact { id, agent, title, kind, v } => {
+                if kind == "page" && self.out.iter().any(|e| e.page.as_ref().is_some_and(|p| p.id == id)) {
+                    return;
+                }
+                let url = if kind == "page" { (self.ctx.page)(&id).map(|p| p.url) } else { None };
+                let mut e = Entry::new(pos, ms, EntryKind::Artifact, title.clone());
+                e.made = Some(Made { kind_word: words::kind_word(&kind), id, agent, title, kind, v, url });
+                self.push(e);
+            }
+            // main answered an agent for him
+            Hub::Answered { agent, question, answer, why } => {
+                let mut e = Entry::new(pos, ms, EntryKind::Answered, answer.clone());
+                e.answered = Some(Answered { agent, question, answer, why });
+                self.push(e);
+            }
+            // a gate's card answered, folded (approvals-design.md §9)
+            Hub::Approval { how, who, what, note } => {
+                let (ok, text, note) = words::approval(&how, &who, &what, &note);
+                self.approval(pos, ms, ok, text, note);
+            }
+            // an answer to an item, its fold line (BISE-305/307)
+            Hub::Route { who, said, .. } => {
+                let (text, note) = words::answered_split(&who, &said, self.ctx.width);
+                self.approval(pos, ms, true, text, note);
+            }
+            // agent to agent in main's thread (the window groups the run);
+            // the hub's own timer wakes and stop notes are the agents'
+            Hub::Msg { from, to, id, body } => {
+                if lines::is_hub_sender(&from) && (lines::timer_wake(&body).is_some() || lines::is_stop_note(&body)) {
+                    return;
+                }
+                let mut e = Entry::new(pos, ms, EntryKind::FromAgent, body);
+                e.from = Some(lines::shown_name(&from));
+                e.to = Some(lines::shown_name(&to)).filter(|t| !t.is_empty());
+                e.msg = id.strip_prefix("m_").and_then(|n| n.parse().ok());
                 self.cont = Some(self.push(e));
             }
             // a warning, a spawn, computer use, a direct message

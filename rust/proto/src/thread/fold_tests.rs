@@ -26,7 +26,7 @@ fn lines() -> Vec<Line> {
 }
 
 fn ctx_with<'a>(open: &'a [u64], page: &'a dyn Fn(&str) -> Option<PageRef>) -> Ctx<'a> {
-    Ctx { open_cards: open, page, provider: &|id: &str, key: &str| if id.is_empty() { key.to_string() } else { id.to_uppercase() } }
+    Ctx { open_cards: open, page, provider: &|id: &str, key: &str| if id.is_empty() { key.to_string() } else { id.to_uppercase() }, width: &|s: &str| s.chars().count() }
 }
 
 #[test]
@@ -202,6 +202,47 @@ fn assert_pos_unique(e: &[Entry]) {
     for x in e {
         assert!(seen.insert(x.pos), "pos {} twice: {e:?}", x.pos);
     }
+}
+
+/// Item 5 batch 3a (architect m_11122): the hub's news lines are entries
+/// of their kind with their payload and the TUI's words; a page's
+/// artifact line comes once (its publish's page entry says it); the
+/// hub's own timer wakes in main's thread are not shown.
+#[test]
+fn the_hubs_news_lines_are_entries_of_their_kind() {
+    let l = |pos: u64, line: &str| (pos, 1_000 + pos, line.to_string());
+    let ls = vec![
+        l(1, "sb landed : api : main : sb/api : a1b2c3d : 3 : 42 : 18"),
+        l(2, "sb pr : red : 412 : https://x/412 : checks fail \\: e2e"),
+        l(3, "sb pr : dim : 413 : https://x/413 : merged"),
+        l(4, "tool #1 bash : sb page publish n.html --id q3"),
+        l(5, "sb artifact : q3 : designer : Q3 plan : page : 2"),
+        l(6, "sb artifact : logo : designer : the logo : image : 1"),
+        l(7, "sb answered : docs : v1 or v2? : v2 : the brief says v2"),
+        l(8, "sb approval : no : api : rm -rf target : not that"),
+        l(9, "sb approval : allowed : api : cargo test"),
+        l(10, "sb route : you → @perf (answer to card #4) : both"),
+        l(11, "sb msg : perf → docs m_7 : the numbers are in"),
+        l(12, "sb msg : switchboard → perf m_8 : timer #3 (every 2m, 1/4, set by perf): check it"),
+    ];
+    let page = |id: &str| Some(PageRef { id: id.into(), title: "Q3 plan".into(), v: Some(2), url: format!("http://h/p/{id}") });
+    let e = fold(&ls, &ctx_with(&[], &page));
+    let kinds: Vec<EntryKind> = e.iter().map(|x| x.kind).collect();
+    use EntryKind::*;
+    assert_eq!(kinds, [Landed, Pr, Pr, Page, Artifact, Answered, Approval, Approval, Approval, FromAgent], "{e:?}");
+    assert!(e.iter().all(|x| x.payload_matches_kind()), "{e:?}");
+    assert_eq!(e[0].text, "3 files +42 −18");
+    assert_eq!(e[0].landed.as_ref().map(|d| (d.sha.as_str(), d.target.as_str())), Some(("a1b2c3d", "main")));
+    assert_eq!(e[1].pr.as_ref().map(|p| (p.number, p.state, p.text.as_str())), Some((412, crate::thread::PrNewsState::Failing, "checks fail : e2e")));
+    assert_eq!(e[2].pr.as_ref().map(|p| p.state), Some(crate::thread::PrNewsState::Done));
+    let made = e[4].made.as_ref().unwrap();
+    assert_eq!((made.id.as_str(), made.kind_word.as_str(), made.v, made.url.as_deref()), ("logo", "image", 1, None));
+    assert_eq!(e[5].answered.as_ref().map(|a| a.why.as_str()), Some("the brief says v2"));
+    let ap = |i: usize| e[i].approval.clone().unwrap();
+    assert_eq!((ap(6).ok, ap(6).text.as_str(), ap(6).note.as_str()), (false, "you said no to api: rm -rf target", "not that"));
+    assert_eq!((ap(7).ok, ap(7).text.as_str()), (true, "you allowed api: cargo test"));
+    assert_eq!((ap(8).text.as_str(), ap(8).note.as_str()), ("you answered perf: both", ""));
+    assert_eq!((e[9].from.as_deref(), e[9].to.as_deref(), e[9].msg), (Some("perf"), Some("docs"), Some(7)));
 }
 
 #[test]

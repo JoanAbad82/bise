@@ -292,3 +292,16 @@ fn prs_are_typed_rows_and_the_text_is_made_from_them() {
         e => panic!("{e:?}"),
     }
 }
+
+/// Law (architect m_11122): every tone the hub writes on a `pr` line reads
+/// as what it means in bise_proto (no color on the wire): plain is news,
+/// dim done, red failing; none is Unknown.
+#[test]
+fn every_pr_tone_reads_as_its_state() {
+    use bise_proto::thread::{lines, PrNewsState};
+    let want = [(Tone::Plain, PrNewsState::News), (Tone::Dim, PrNewsState::Done), (Tone::Red, PrNewsState::Failing)];
+    for (tone, state) in want {
+        let line = format!("sb pr : {} : 7 : https://x/7 : hi", tone.as_str());
+        assert!(matches!(lines::read(&line), lines::Rec::Hub(lines::Hub::Pr { state: s, number: 7, .. }) if s == state), "{line}");
+    }
+}

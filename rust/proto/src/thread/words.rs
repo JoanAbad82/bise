@@ -141,6 +141,63 @@ pub fn context_words(used: u64, window: Option<u64>) -> String {
     }
 }
 
+/// `1 file`, `9 files` (the TUI's diff view, a landed row).
+pub fn files_word(n: u64) -> String {
+    if n == 1 { "1 file".to_string() } else { format!("{n} files") }
+}
+
+/// A landed row's words (site/m/artifacts D): `3 files +42 −18`; a side
+/// with no lines is left out.
+pub fn landed(files: u64, add: u64, del: u64) -> String {
+    let mut w = files_word(files);
+    if add > 0 {
+        w.push_str(&format!(" +{add}"));
+    }
+    if del > 0 {
+        w.push_str(&format!(" −{del}"));
+    }
+    w
+}
+
+/// An artifact's kind as its chip says it: `PR`, `file` (no kind),
+/// else the kind (`page`, `image`).
+pub fn kind_word(kind: &str) -> String {
+    match kind {
+        "pr" | "PR" => "PR".to_string(),
+        "" => "file".to_string(),
+        k => k.to_string(),
+    }
+}
+
+/// A gate's card answered, folded (approvals-design.md §9): yes or no,
+/// the sentence, the words under it. `how`: `allowed`, `outside`,
+/// `outside-always`, anything else a no (with his note).
+pub fn approval(how: &str, who: &str, what: &str, note: &str) -> (bool, String, String) {
+    let what = what.trim();
+    match how {
+        "allowed" => (true, format!("you allowed {who}: {what}"), String::new()),
+        "outside" => (true, format!("you let {who} run it outside the sandbox: {what}"), String::new()),
+        "outside-always" => (true, format!("you always let {what} run outside the sandbox here"), String::new()),
+        _ => (false, format!("you said no to {who}: {what}"), note.trim().to_string()),
+    }
+}
+
+/// The columns an answer stays on its line within (BISE-307, designer).
+pub const ANSWER_ON_THE_LINE: usize = 30;
+
+/// The sentence of an answer to `who` and the words under it (BISE-307):
+/// a short one-line answer stays on the line (`you answered perf:
+/// both`), a longer one goes under it, whole. `width`: the caller's
+/// display width of a string (the TUI's unicode width).
+pub fn answered_split(who: &str, words: &str, width: &dyn Fn(&str) -> usize) -> (String, String) {
+    let w = words.trim();
+    if !w.contains('\n') && width(w) <= ANSWER_ON_THE_LINE {
+        (format!("you answered {who}: {w}"), String::new())
+    } else {
+        (format!("you answered {who}"), w.to_string())
+    }
+}
+
 /// The gauge's compact form (the TUI's task list, the window's sidebar):
 /// "21%", or "42k" without a known window.
 pub fn short_words(used: u64, window: Option<u64>) -> String {
