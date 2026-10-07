@@ -154,3 +154,41 @@ describe('dictation in the composer', () => {
     expect(getByTestId('composer.mic').dataset.state).toBe('off');
   });
 });
+
+describe('the meter', () => {
+  it('follows his voice level; under reduced motion only voice / no voice', async () => {
+    const { meterLevel } = await import('./Composer');
+    expect(meterLevel(0.734, false)).toBe(0.73);
+    expect(meterLevel(1.4, false)).toBe(1);
+    expect(meterLevel(-1, false)).toBe(0);
+    expect([meterLevel(0.2, true), meterLevel(0.9, true), meterLevel(0.01, true)]).toEqual([0.6, 0.6, 0.15]);
+  });
+
+  it('writes the level the port gives while the mic is on, no pulse', async () => {
+    const mic = testMic();
+    let push: (v: number) => void = () => undefined;
+    const port: DictatePort = {
+      ...mic.port,
+      level: (fn) => {
+        push = fn;
+        fn(0);
+        return () => undefined;
+      },
+    };
+    const { getByTestId, a } = await mount(port);
+    await step(() => {
+      a.dictate();
+    });
+    const meter = getByTestId('composer.meter');
+    expect(meter.className).toBe('meter');
+    await step(() => {
+      push(0.42);
+    });
+    expect(meter.dataset.level).toBe('0.42');
+    expect(meter.style.getPropertyValue('--lvl')).toBe('0.42');
+    await step(() => {
+      push(0.9);
+    });
+    expect(meter.dataset.level).toBe('0.9');
+  });
+});

@@ -27,6 +27,13 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
       },
       read: (id) => store.dictation(id),
       subscribe: (id, fn) => store.subscribe(`dictation:${id}`, fn),
+      // his voice level from the core's level {who: 'you'} (amb-core 99b3ddd9), for the meter
+      level: (fn) => {
+        fn(store.level('you'));
+        return store.subscribe('level:you', () => {
+          fn(store.level('you'));
+        });
+      },
     }),
     [store],
   );

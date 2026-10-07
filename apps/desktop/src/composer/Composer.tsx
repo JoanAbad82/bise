@@ -215,19 +215,30 @@ function Mic({ state, level, onClick, testId }: { state: 'recording' | 'transcri
   );
 }
 
-/** Five bars: his voice level when the app has it, else a slow pulse (the mic is on). */
+/** The meter's height for a level: the level itself, or under reduced motion only voice / no voice
+ *  (two still heights, so the bars never move with each sample). */
+export const meterLevel = (v: number, reduced: boolean): number => {
+  const c = Math.max(0, Math.min(1, v));
+  return reduced ? (c > 0.05 ? 0.6 : 0.15) : Math.round(c * 100) / 100;
+};
+
+/** Five bars that follow his voice level (the core's level {who: 'you'}). */
 function Meter({ level, testId }: { level: DictatePort['level']; testId: string }): JSX.Element {
   const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     const el = box.current;
     if (level === undefined || el === null) return;
-    // the level writes one CSS variable, no React render per sample
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // each sample writes one CSS variable and one attribute (the checks read it), no React render
     return level((v) => {
-      el.style.setProperty('--lvl', String(Math.max(0, Math.min(1, v))));
+      const h = String(meterLevel(v, reduced));
+      if (el.dataset.level === h) return;
+      el.dataset.level = h;
+      el.style.setProperty('--lvl', h);
     });
   }, [level]);
   return (
-    <span ref={box} className={`meter${level === undefined ? ' pulse' : ''}`} data-testid={`${testId}.meter`} aria-hidden>
+    <span ref={box} className="meter" data-testid={`${testId}.meter`} data-level="0" aria-hidden>
       <i />
       <i />
       <i />

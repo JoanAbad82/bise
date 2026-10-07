@@ -107,7 +107,7 @@ export interface DictatePort {
   readonly read: (id: string) => DictateState | null;
   /** Called on each change of that dictation; returns the unsubscribe. */
   readonly subscribe: (id: string, fn: () => void) => () => void;
-  /** His voice level (0-1) while the mic is on, when the app has it; none: the meter pulses. */
+  /** His voice level (0-1) while the mic is on: called now and on each change; returns the unsubscribe. */
   readonly level?: (fn: (v: number) => void) => () => void;
 }
 

@@ -95,6 +95,10 @@ function fakeMic(busy: () => boolean): DictatePort {
   const states = new Map<string, DictateState>();
   const subs = new Map<string, Set<() => void>>();
   const timers = new Map<string, number>();
+  const levels = new Set<(v: number) => void>();
+  const say = (v: number): void => {
+    for (const fn of [...levels]) fn(v);
+  };
   let n = 0;
   const put = (id: string, st: DictateState): void => {
     states.set(id, st);
@@ -103,6 +107,7 @@ function fakeMic(busy: () => boolean): DictatePort {
   const end = (id: string): void => {
     window.clearInterval(timers.get(id));
     timers.delete(id);
+    say(0);
   };
   return {
     start: () => {
@@ -118,6 +123,7 @@ function fakeMic(busy: () => boolean): DictatePort {
       timers.set(
         id,
         window.setInterval(() => {
+          say([0.35, 0.8, 0.55, 0.9, 0.4][k % 5] ?? 0.5); // a voice, then the words
           if (k >= words.length) return;
           k += 1;
           put(id, { text: words.slice(0, k).join(' '), final: false, cancelled: false, error: null });
@@ -138,6 +144,13 @@ function fakeMic(busy: () => boolean): DictatePort {
       put(id, { text: '', final: true, cancelled: true, error: null });
     },
     read: (id) => states.get(id) ?? null,
+    level: (fn) => {
+      levels.add(fn);
+      fn(0);
+      return () => {
+        levels.delete(fn);
+      };
+    },
     subscribe: (id, fn) => {
       const set = subs.get(id) ?? new Set();
       set.add(fn);
