@@ -34,20 +34,23 @@ export function useNewArtifacts(): number {
   return useAllArtifacts().filter((it) => it.a.new).length;
 }
 
-// the last snapshot per (ids, names), and the arrays it was built from
-let last: { key: string; from: readonly (readonly Artifact[])[]; items: readonly Item[] } | null = null;
+// the last snapshot per (ids, names) and the arrays it was built from: one per key, so panel A's
+// one-project list and the global screen, mounted together, never rebuild each other's (amb-win
+// m_12088: a shared one made each getSnapshot a new array, and React's tearing check loops)
+const last = new Map<string, { from: readonly (readonly Artifact[])[]; items: readonly Item[] }>();
 
 function snapshot(store: Store, ids: string, names: string): readonly Item[] {
   const list = ids === '' ? [] : ids.split('\n');
   const nm = names.split('\n');
   const from = list.map((p) => store.artifacts(p));
   const key = `${ids}\u0000${names}`;
-  if (last !== null && last.key === key && last.from.length === from.length && last.from.every((x, i) => x === from[i])) return last.items;
+  const was = last.get(key);
+  if (was !== undefined && was.from.length === from.length && was.from.every((x, i) => x === from[i])) return was.items;
   const items: Item[] = [];
   list.forEach((p, i) => {
     for (const a of from[i] ?? []) items.push({ project: p, projectName: nm[i] ?? p, a });
   });
   items.sort((x, y) => y.a.at_ms - x.a.at_ms);
-  last = { key, from, items };
+  last.set(key, { from, items });
   return items;
 }

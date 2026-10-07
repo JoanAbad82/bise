@@ -6,7 +6,9 @@ import type { ScheduledTask, Task } from './model';
 
 const tasksOf = (store: Store, project: string): readonly ScheduledTask[] => store.scheduled(project);
 
-let last: { key: string; from: readonly (readonly ScheduledTask[])[]; items: readonly Task[] } | null = null;
+// one snapshot per (ids, names): two callers with different `only` never rebuild each other's
+// (amb-win m_12088: a shared one loops React's tearing check)
+const last = new Map<string, { from: readonly (readonly ScheduledTask[])[]; items: readonly Task[] }>();
 
 /** Every project's live scheduled tasks (or one project's), with a stable snapshot. */
 export function useAllScheduled(only?: string): readonly Task[] {
@@ -27,12 +29,13 @@ export function useAllScheduled(only?: string): readonly Task[] {
       const nm = names.split('\n');
       const from = list.map((p) => tasksOf(store, p));
       const key = `${ids}\u0000${names}`;
-      if (last !== null && last.key === key && last.from.length === from.length && last.from.every((x, i) => x === from[i])) return last.items;
+      const was = last.get(key);
+      if (was !== undefined && was.from.length === from.length && was.from.every((x, i) => x === from[i])) return was.items;
       const items: Task[] = [];
       list.forEach((p, i) => {
         for (const t of from[i] ?? []) items.push({ project: p, projectName: nm[i] ?? p, t });
       });
-      last = { key, from, items };
+      last.set(key, { from, items });
       return items;
     },
   );

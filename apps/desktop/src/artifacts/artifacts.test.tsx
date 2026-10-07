@@ -63,7 +63,7 @@ describe('artifacts model', () => {
 function world() {
   const store = new Store(null);
   store.apply({ ev: 'projects', projects: [{ project: 'shop-1', name: 'storefront', path: '/x/shop' }, { project: 'acme-2', name: 'acme', path: '/x/acme' }] });
-  store.apply({ ev: 'artifacts', project: 'shop-1', items: [art('notes', 'page', { new: true, version: 2, title: 'product page, before / after' }), { ...art('bench', 'file', { at_ms: at(1, 9, 0) }), path: '/x/shop/bench.csv' } as Artifact] });
+  store.apply({ ev: 'artifacts', project: 'shop-1', items: [art('notes', 'page', { new: true, version: 2, title: 'product page, before / after' }), art('bench', 'file', { at_ms: at(1, 9, 0), path: '/x/shop/bench.csv' })] });
   store.apply({ ev: 'artifacts', project: 'acme-2', items: [art('pr-12', 'pr', { agent: 'api', title: 'fix the checkout' })] });
   return store;
 }
@@ -183,7 +183,7 @@ describe('artifacts screens', () => {
     g.bise = { copy: (t: string) => { copied.push(t); } };
     try {
       const router = mount(<ArtifactsScreen />);
-      expect(screen.getByTestId('artifacts.keys').textContent).toBe('⏎ openv versions@ put it in a message⌘C copy');
+      expect(screen.getByTestId('artifacts.keys').textContent).toBe('⏎ openspace quick lookv versions@ put it in a message⌘C copy');
       const list = screen.getByTestId('artifacts.list');
       fireEvent.keyDown(list, { key: 'c', metaKey: true });
       expect(copied).toEqual(['http://127.0.0.1:47123/p/notes']);

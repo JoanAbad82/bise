@@ -87,6 +87,7 @@ export function ArtifactsScreen({ project = '' }: { project?: string }) {
       )}
       <div className="art-keys" data-testid="artifacts.keys">
         <span><b>⏎</b> open</span>
+        <span><b>space</b> quick look</span>
         <span><b>v</b> versions</span>
         <span><b>@</b> put it in a message</span>
         <span><b>⌘C</b> copy</span>
