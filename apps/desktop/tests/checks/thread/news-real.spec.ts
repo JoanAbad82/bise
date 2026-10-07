@@ -102,10 +102,16 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       expect.soft(words, "failing said by '▲', never color alone").toContain('▲');
       expect.soft(words, "the hub's words, as the TUI").toContain('checks fail');
       await row.screenshot({ path: test.info().outputPath('pr.png') }).catch(() => undefined);
-      const link = page.locator(`[data-testid="${(await row.getAttribute('data-testid', { timeout: 2000 }).catch(() => null)) ?? 'none'}.link"]`);
-      await link.click({ timeout: 5000 }).catch(() => undefined);
-      const url = await out.wait(EXTERNAL, () => true, 5000).catch(() => '');
-      note('pr-open', url);
+      // the number is a button (rows.tsx PrRow: ctx.onLink(url)); the world's fake gh seeds
+      // https://github.com/acme-qa/shop/pull/412. Every miss is said: the row's id, the link's
+      // words, the click's error (no silent catch), main's stdout
+      const id = await row.getAttribute('data-testid', { timeout: 2000 }).catch((e: unknown) => `none: ${String(e).split('\n')[0] ?? ''}`);
+      const link = page.locator(`[data-testid="${id ?? 'none'}.link"]`);
+      const linkWords = await link.textContent({ timeout: 2000 }).catch((e: unknown) => `none: ${String(e).split('\n')[0] ?? ''}`);
+      const clicked = await link.click({ timeout: 5000 }).then(() => 'ok', (e: unknown) => String(e).split('\n')[0] ?? 'error');
+      const url = await out.wait(EXTERNAL, () => true, 5000).catch((e: unknown) => `none: ${String(e).split('\n')[0] ?? ''}`);
+      note('pr-open', { id, link: linkWords, clicked, url, stdout: out.lines.filter((l) => l.includes('bise-desktop')).slice(-5) });
+      expect.soft(clicked, "a click on the PR's number").toBe('ok');
       expect.soft(url, 'its number opens the PR').toContain('/pull/412');
     });
 
