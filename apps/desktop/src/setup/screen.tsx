@@ -3,10 +3,10 @@
 // (bise-mac-helper through window.bise: its perms and fn events, a perm
 // command), and the hook that sends a fresh home there once. Owner:
 // amb-home.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Artifact } from '@/proto';
 import { useAccounts, useArtifacts, useFound, usePrefs, useProjects, useStore } from '@/store';
-import { useRouter } from '@/app/router';
+import { useRoute, useRouter } from '@/app/router';
 import { onboarded, prefsOf, useKeyError } from '@/settings';
 import { Onboarding } from './Onboarding';
 import { useHelper } from './helper';
@@ -62,13 +62,24 @@ export function useFirstLaunch(): void {
   // PR link (window.bise.openExternal; test mode prints 'bise-desktop: external <url>')
   const home = useProjects().find((p) => p.home);
   const url = startHereUrl(useArtifacts(home?.project ?? ''));
-  const done = prefs !== null && onboarded(prefs);
+  // hello ended, however (its last step, skip, or he left it): the window left the onboarding
+  // screen after showing it. The prefs' onboarded true counts too, but never alone: a core may
+  // not send prefs again after prefs_set (qa-native c99de916's stub doesn't).
+  const screen = useRoute().screen;
+  const [shown, setShown] = useState(false);
+  if (screen === 'onboarding' && !shown) setShown(true);
+  const ended = (shown && screen !== 'onboarding') || (prefs !== null && onboarded(prefs));
   useEffect(() => {
-    if (!fresh.current || opened.current || !done || url === null) return;
+    if (!helloOpens(fresh.current, opened.current, ended, url)) return;
     opened.current = true;
     const bise = window.bise as typeof window.bise | undefined;
-    void bise?.openExternal(url);
-  }, [done, url]);
+    void bise?.openExternal(url ?? '');
+  }, [ended, url]);
+}
+
+/** start-here opens now: a fresh home seen by this window, hello ended, not opened yet, its url known. */
+export function helloOpens(fresh: boolean, opened: boolean, ended: boolean, url: string | null): boolean {
+  return fresh && !opened && ended && url !== null;
 }
 
 /** The hub's start-here page among the home's artifacts (first_run.rs PAGE_ID), its url; none: null. */

@@ -6,7 +6,7 @@ import { core_ev } from '@/proto/fixtures.gen';
 import { fnAct, next, START, stepOf, ticked } from './model';
 import { Onboarding, type OnboardingPorts } from './Onboarding';
 import { FirstRun, showsFirstRun } from './FirstRun';
-import { startHereUrl } from './screen';
+import { helloOpens, startHereUrl } from './screen';
 
 afterEach(cleanup);
 
@@ -116,6 +116,14 @@ describe('the start-here page after hello (S.9)', () => {
     expect(startHereUrl([art('perf-notes', 'page', 'http://h/p/perf-notes')])).toBeNull();
     expect(startHereUrl([art('start-here', 'file', 'http://h/a/start-here')])).toBeNull();
     expect(startHereUrl([art('start-here', 'page', '')])).toBeNull();
+  });
+
+  it('opens once, on a fresh home only, after hello however it ended, once its url is known', () => {
+    expect(helloOpens(true, false, true, 'http://h/p/start-here')).toBe(true);
+    expect(helloOpens(false, false, true, 'http://h/p/start-here')).toBe(false); // onboarded before this window
+    expect(helloOpens(true, true, true, 'http://h/p/start-here')).toBe(false); // already opened
+    expect(helloOpens(true, false, false, 'http://h/p/start-here')).toBe(false); // hello still up
+    expect(helloOpens(true, false, true, null)).toBe(false); // the page not known yet
   });
 });
 
