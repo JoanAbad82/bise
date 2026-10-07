@@ -16,3 +16,7 @@
 .settings-select { height: 28px; max-width: 240px; padding: 0 8px; border: 0; border-radius: var(--r-2); background: var(--c-sunken); box-shadow: inset 0 0 0 1px var(--c-line); color: var(--c-text); font: var(--t-13) var(--font-ui); }
 .settings-select:hover { box-shadow: inset 0 0 0 1px var(--c-line-strong); background: var(--c-hover); }
 .settings-select:focus-visible { outline: 0; box-shadow: inset 0 0 0 1px var(--c-focus), 0 0 0 3px color-mix(in srgb, var(--c-focus) 25%, transparent); }
+/* the expired sign-in under way (V14): the waiting line and its two acts */
+.settings-signing { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-2); outline: none; }
+/* a rule's remove asking inline (V8) */
+.settings-ask { color: var(--c-accent); font-size: var(--t-13); }

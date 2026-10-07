@@ -98,6 +98,8 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
         hold: (h) => {
           holdForSetup(h);
         },
+        // the sign-in link (V14 c): the window's clipboard (test mode: its private buffer)
+        ...(bise ? { copy: (text: string) => void bise.copy(text) } : {}),
         ...(helper
           ? {
               perm: (perm: Perm, action: 'ask' | 'open') => {

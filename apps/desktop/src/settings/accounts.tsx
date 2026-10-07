@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import type { Account, AppCmd } from '@/proto';
 import { Button, Chip, Field, Group, Help, type GroupItem } from '@/ds';
+import type { SignInDraft } from './draft';
 
 /** He is signed in to one account at least (the first launch's model step goes on). */
 export function signedIn(accounts: readonly Account[]): boolean {
@@ -51,7 +52,27 @@ export interface Want {
 /** An account sets up `provider` (Account.provider; an older core: its id). */
 export const ofProvider = (a: Account, provider: string): boolean => (a.provider ?? a.id) === provider;
 
-export function Accounts({ accounts, send, keyError = null, want = null }: { accounts: readonly Account[]; send: (cmd: AppCmd) => void; keyError?: KeyError | null; want?: Want | null }) {
+/** An expired sign-in's line (bar V14 / S28): it expired, and the agents it stopped wait. */
+export function expiredWords(waiting: readonly string[]): string {
+  if (waiting.length === 0) return 'your sign-in expired: sign in again';
+  const names = waiting.length <= 3 ? waiting.join(', ') : `${waiting.slice(0, 2).join(', ')} and ${String(waiting.length - 2)} more`;
+  return `your sign-in expired: ${names} ${waiting.length === 1 ? 'waits' : 'wait'}`;
+}
+
+export interface AccountsProps {
+  accounts: readonly Account[];
+  send: (cmd: AppCmd) => void;
+  keyError?: KeyError | null;
+  want?: Want | null;
+  /** the expired sign-in: the agents waiting, the sign-in under way (draft.ts until typed) */
+  signin?: SignInDraft | null;
+  /** copy the sign-in link (c) */
+  copy?: (text: string) => void;
+  /** cancel the sign-in under way (esc) */
+  cancelSignIn?: (id: string) => void;
+}
+
+export function Accounts({ accounts, send, keyError = null, want = null, signin = null, copy, cancelSignIn }: AccountsProps) {
   // the sign-ins he started here: a spinner until the core's next accounts
   const [signing, setSigning] = useState<{ base: readonly Account[]; ids: readonly string[] }>({ base: accounts, ids: [] });
   const busy = signing.base === accounts ? signing.ids : [];
@@ -78,7 +99,9 @@ export function Accounts({ accounts, send, keyError = null, want = null }: { acc
     sub:
       a.state === 'signed_in' && a.who != null
         ? a.who
-        : want !== null && ofProvider(a, want.provider)
+        : a.state === 'expired'
+          ? expiredWords(signin?.waiting ?? [])
+          : want !== null && ofProvider(a, want.provider)
           ? `sign in for ${want.model}`
           : 'sign in with your browser',
     control:
@@ -123,6 +146,46 @@ export function Accounts({ accounts, send, keyError = null, want = null }: { acc
         </Help>
       )}
       <Group testId="settings.models" items={items} />
+      {(() => {
+        // a sign-in under way from here: the browser has it; c copies its link, esc cancels (V14 / L2)
+        const s = signin?.signing ?? null;
+        const id = s?.id ?? subs.find((a) => busy.includes(a.id))?.id ?? null;
+        if (id === null) return null;
+        const label = accounts.find((a) => a.id === id)?.label ?? id;
+        const url = s !== null && s.id === id ? s.url : null;
+        const cancel = () => {
+          if (cancelSignIn) cancelSignIn(id);
+          setSigning({ base: accounts, ids: busy.filter((x) => x !== id) });
+        };
+        return (
+          <div
+            className="settings-signing"
+            tabIndex={-1}
+            data-testid="settings.signing"
+            onKeyDown={(e) => {
+              if (e.key === 'c' && url !== null && copy) {
+                e.preventDefault();
+                copy(url);
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cancel();
+              }
+            }}
+          >
+            <Help>{`waiting for you to sign in to ${label} in your browser…`}</Help>
+            <span className="settings-row-acts">
+              {url !== null && copy && (
+                <Button kind="ghost" onClick={() => { copy(url); }} testId="settings.signing.copy">
+                  copy the link
+                </Button>
+              )}
+              <Button kind="ghost" onClick={cancel} testId="settings.signing.cancel">
+                cancel
+              </Button>
+            </span>
+          </div>
+        );
+      })()}
       {keyFor !== null && (
         <div className="settings-key">
           <Field

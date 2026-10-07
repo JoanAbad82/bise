@@ -8,6 +8,7 @@ import type { AppCmd, JsonValue, Plugin } from '@/proto';
 import { Button, Chip, Field, Group, Kbd, Seg, Toggle, type GroupItem } from '@/ds';
 import { Accounts } from './accounts';
 import { Roles } from './roles';
+import { Approvals } from './approvals';
 import { modelRow, needsSetup } from './hold';
 import { Projects } from './projects';
 import { Plugins } from './plugins';
@@ -17,7 +18,7 @@ import { KEY_SECTIONS } from './keys';
 import { appName, excludedApps, flag, knownApps, num, str, type Prefs } from './prefs';
 import type { SettingsData, SettingsPorts } from './Settings';
 
-export type Page = 'setup' | 'general' | 'voice' | 'privacy' | 'quiet' | 'models' | 'projects' | 'plugins' | 'computer' | 'keys';
+export type Page = 'setup' | 'general' | 'voice' | 'privacy' | 'quiet' | 'models' | 'approvals' | 'projects' | 'plugins' | 'computer' | 'keys';
 
 export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
   { id: 'general', title: 'general', sub: 'bise on your Mac.' },
@@ -26,6 +27,7 @@ export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
   { id: 'privacy', title: 'context and privacy', sub: 'what fn adds to your question. nothing is read unless you hold fn.' },
   { id: 'quiet', title: 'quiet moments', sub: 'when cards wait, and how they come back.' },
   { id: 'models', title: 'models', sub: 'your subscription is enough; an API key works too. /models and /provider in the terminal.' },
+  { id: 'approvals', title: 'approvals', sub: 'what runs without asking you. /approvals in the terminal.' },
   { id: 'projects', title: 'projects', sub: "one main per project; yours, bise, coordinates them. the order is ⌘1 … ⌘9's." },
   { id: 'plugins', title: 'plugins', sub: 'what your agents can use besides the repo: skills, tools, servers. /plugins in the terminal.' },
   { id: 'computer', title: 'computer use', sub: 'agents drive Chrome and your apps, step by step. /computer-use in the terminal.' },
@@ -168,6 +170,8 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
     }
     case 'models':
       return <Models data={data} ports={ports} />;
+    case 'approvals':
+      return <Approvals approvals={data.approvals ?? null} send={ports.approvals ?? null} home={data.home ?? ''} />;
     case 'projects':
       return <Projects projects={data.projects} found={data.found} ports={ports} />;
     case 'setup':
@@ -334,6 +338,9 @@ function Models({ data, ports }: { data: SettingsData; ports: SettingsPorts }) {
         send={ports.send}
         keyError={data.keyError ?? null}
         want={held !== null ? { provider: held.provider, providerName: held.providerName, model: held.model } : null}
+        signin={data.signin ?? null}
+        {...(ports.copy ? { copy: ports.copy } : {})}
+        {...(ports.cancelSignIn ? { cancelSignIn: ports.cancelSignIn } : {})}
       />
       <Roles
         roles={data.roles ?? []}

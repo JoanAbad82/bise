@@ -9,6 +9,7 @@
 import { useState } from 'react';
 import type { Account, AppCmd, Found, JsonValue, Model, Perm, Plugin, ProjectRow, RoleRow } from '@/proto';
 import type { Held } from './hold';
+import type { ApprovalsCmd, ApprovalsDraft, SignInDraft } from './draft';
 import { Row, Settings as Frame } from '@/ds';
 import { putPref, type Prefs } from './prefs';
 import { PAGES, PageBody, pageOf, type Page } from './pages';
@@ -38,6 +39,12 @@ export interface SettingsData {
   roleError?: string | null;
   /** a model waiting for its provider's setup (bar L5, hold.ts) */
   held?: Held | null;
+  /** the hub's approvals: mode, checker, this repo's rules (bar V8; draft.ts until typed) */
+  approvals?: ApprovalsDraft | null;
+  /** the expired sign-in: the agents waiting, the sign-in under way (bar V14; draft.ts until typed) */
+  signin?: SignInDraft | null;
+  /** his home folder, to say ~ */
+  home?: string;
 }
 
 export interface SettingsPorts {
@@ -52,6 +59,12 @@ export interface SettingsPorts {
   pickFolder?: () => Promise<string | null>;
   /** a model whose provider isn't set up waits here (bar L5): hold.ts's holdForSetup */
   hold?: (h: Held) => void;
+  /** the approvals' commands (bar V8); none until the hub's are typed */
+  approvals?: (c: ApprovalsCmd) => void;
+  /** copy a text to his clipboard (the sign-in link, bar V14) */
+  copy?: (text: string) => void;
+  /** cancel the sign-in under way (bar V14; draft: AppCmd sign_in_cancel) */
+  cancelSignIn?: (id: string) => void;
 }
 
 export interface SettingsProps extends SettingsData {

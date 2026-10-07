@@ -4,6 +4,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Account, AppCmd, Found, Model, ProjectRow, RoleRow } from '@/proto';
 import type { CoreCmd } from '@/shared/api';
 import { heldReady, modelOrSetup, needsSetup, releaseHeld, type Held } from './hold';
+import { Approvals, checkerWords, ruleNote, ruleWhat } from './approvals';
+import { Accounts, expiredWords } from './accounts';
+import type { ApprovalsCmd, ApprovalsDraft, RuleDraft } from './draft';
 import { core_ev } from '@/proto/fixtures.gen';
 import { Settings, type SettingsPorts } from './Settings';
 import { appName, excludedApps, flag, getPref, knownApps, onboarded, putPref, type Prefs } from './prefs';
@@ -348,5 +351,77 @@ describe('which model does what (V17) and a model with no key (L5)', () => {
   it("a role_set the core refused says so in its words", () => {
     view('models', ports(), { roles: ROLES, models: MODELS, accounts: ACCOUNTS, roleError: 'no model named x' });
     expect(screen.getByTestId('settings.roles.error').textContent).toBe('no model named x');
+  });
+});
+
+describe('approvals (V8 / W21) and the expired sign-in (V14 / S28 / L2), on the draft shapes', () => {
+  const NOW = 1791100400000;
+  const rule = (id: string, tool: string, pattern: string, extra: Partial<RuleDraft> = {}): RuleDraft => ({ id, tool, pattern, path: '', every: false, from: '', outside: false, ...extra });
+  const A: ApprovalsDraft = {
+    mode: 'auto', env: false, checker: 'jev', checker_who: 'TypeSafe', checker_model: 'jev-1.13', repo: '/Users/camille/acme',
+    rules: [
+      rule('r1', 'bash', 'cargo test *', { added: NOW - 3 * 86_400_000, from: 'card #12, api-v2' }),
+      rule('r2', 'edit', '', { path: '/Users/camille/notes', every: true }),
+      rule('r3', 'gmail.send_email', ''),
+    ],
+  };
+
+  it("says each rule in the TUI's words", () => {
+    expect(ruleWhat(A.rules[0] as RuleDraft)).toBe('cargo test *');
+    expect(ruleWhat(A.rules[1] as RuleDraft, '/Users/camille')).toBe('edits to ~/notes');
+    expect(ruleWhat(A.rules[2] as RuleDraft)).toBe('gmail.send_email');
+    expect(ruleNote(A.rules[0] as RuleDraft, NOW)).toBe('3 days ago · from api-v2');
+    expect(ruleNote(A.rules[1] as RuleDraft, NOW)).toBe('every project');
+    expect(ruleNote(A.rules[2] as RuleDraft, NOW)).toBe('a connector');
+    expect(checkerWords(A)).toBe('TypeSafe · jev-1.13');
+    expect(checkerWords({ ...A, checker: 'off' })).toBe('off · every command asks you');
+  });
+
+  it('the mode switches, a rule asks before it goes, keep it keeps it', () => {
+    const sent: ApprovalsCmd[] = [];
+    render(<Approvals approvals={A} send={(c) => sent.push(c)} home="/Users/camille" now={NOW} />);
+    expect(screen.getByTestId('settings.approvals.repo').textContent).toBe('what runs without asking you in ~/acme.');
+    fireEvent.click(screen.getByTestId('settings.approvals.switch.1'));
+    expect(sent).toEqual([{ cmd: 'approvals', mode: 'yolo' }]);
+    fireEvent.click(screen.getByTestId('settings.approvals.rule.r1.remove'));
+    expect(screen.getByTestId('settings.approvals.rules').textContent).toContain('remove it?');
+    fireEvent.click(screen.getByTestId('settings.approvals.rule.r1.keep'));
+    expect(sent.length).toBe(1);
+    fireEvent.click(screen.getByTestId('settings.approvals.rule.r1.remove'));
+    fireEvent.click(screen.getByTestId('settings.approvals.rule.r1.yes'));
+    expect(sent[1]).toEqual({ cmd: 'remove_rule', rule: 'r1' });
+  });
+
+  it('a mode forced by the environment is said, not switched; no rule yet says how one comes; nothing sent yet says so', () => {
+    const { rerender } = render(<Approvals approvals={{ ...A, env: true, rules: [] }} send={null} now={NOW} />);
+    expect(screen.queryByTestId('settings.approvals.switch')).toBeNull();
+    expect(screen.getByTestId('settings.approvals').textContent).toContain('auto · this session (BISE_APPROVALS)');
+    expect(screen.getByTestId('settings.approvals.empty').textContent).toContain('always allow');
+    rerender(<Approvals approvals={null} send={null} now={NOW} />);
+    expect(screen.getByTestId('settings.approvals.none')).toBeTruthy();
+  });
+
+  it('an expired subscription names the agents it stopped; sign in again shows the wait, c copies the link, esc cancels', () => {
+    const p = ports();
+    const copied: string[] = [];
+    const cancelled: string[] = [];
+    const accts: Account[] = [{ id: 'chatgpt', label: 'ChatGPT', kind: 'subscription', state: 'expired' }];
+    const r = render(<Accounts accounts={accts} send={p.send} signin={{ waiting: ['main', 't1'] }} copy={(t) => copied.push(t)} cancelSignIn={(id) => cancelled.push(id)} />);
+    expect(screen.getByTestId('settings.models').textContent).toContain('your sign-in expired: main, t1 wait');
+    fireEvent.click(screen.getByTestId('settings.account.chatgpt'));
+    expect(p.sent).toEqual([{ cmd: 'sign_in', id: 'chatgpt' }]);
+    r.rerender(<Accounts accounts={accts} send={p.send} signin={{ waiting: ['main', 't1'], signing: { id: 'chatgpt', url: 'https://auth.openai.com/x' } }} copy={(t) => copied.push(t)} cancelSignIn={(id) => cancelled.push(id)} />);
+    const box = screen.getByTestId('settings.signing');
+    expect(box.textContent).toContain('waiting for you to sign in to ChatGPT in your browser…');
+    fireEvent.keyDown(box, { key: 'c' });
+    expect(copied).toEqual(['https://auth.openai.com/x']);
+    fireEvent.keyDown(box, { key: 'Escape' });
+    expect(cancelled).toEqual(['chatgpt']);
+  });
+
+  it('expiredWords says who waits', () => {
+    expect(expiredWords([])).toBe('your sign-in expired: sign in again');
+    expect(expiredWords(['main'])).toBe('your sign-in expired: main waits');
+    expect(expiredWords(['a', 'b', 'c', 'd'])).toBe('your sign-in expired: a, b and 2 more wait');
   });
 });
