@@ -235,7 +235,7 @@ export const TUI_STATUS: Readonly<Record<string, readonly string[]>> = {
 };
 
 /** One agent as the hub's socket state has it (the fields the A rows read). */
-export type HubAgent = { name: string; status: string; main: boolean; dropped: boolean; branch: string | null; report: string | null; model: string; changes: { add: number; del: number; files: number } | null };
+export type HubAgent = { name: string; status: string; main: boolean; dropped: boolean; branch: string | null; report: string | null; model: string; effort?: string | null; mode?: string; path?: string; changes: { add: number; del: number; files: number } | null };
 
 /** The hub's agents, read straight from its socket (`hubState`). */
 export async function hubAgents(w: World, project: string): Promise<HubAgent[]> {
