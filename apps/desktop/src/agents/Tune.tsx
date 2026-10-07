@@ -9,7 +9,9 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 're
 import { Button } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAgents, useCoreEvent, useModels, useStore, useWorktrees, type Ev } from '@/store';
-import { defaultWords, EFFORTS, effortsFor, hasChanges, modelGroups, modelOf, nameProblem, newAgent, renameAgent, setEffort, setModel } from './actions';
+import { defaultWords, EFFORTS, effortsFor, hasChanges, modelGroups, modelOf, nameProblem, newAgent, renameAgent, setEffort } from './actions';
+import { modelOrSetup } from '@/settings';
+import { useRouter } from '@/app/router';
 
 /** The TUI's words for an effort (rust/tui/src/commands.rs effort_hint). */
 function hintOf(e: string): string {
@@ -41,6 +43,7 @@ export function useRefusal(project: string, cmds: readonly string[]): { text: st
 
 export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onRenamed?: (to: string) => void }) {
   const store = useStore();
+  const router = useRouter();
   const agents = useAgents(project);
   const refusal = useRefusal(project, ['rename', 'model', 'effort']);
   const [name, setName] = useState(a.name);
@@ -62,7 +65,19 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
   const efforts = effortsFor(models, current);
   const pick = (m: string) => {
     refusal.clear();
-    if (setModel(store, project, a.name, m)) setPicked(m.trim());
+    const model = m.trim();
+    if (model === '') return;
+    // L5 (amb-kit 6078b20c): a model whose provider has no key or sign-in yet opens that
+    // provider's setup on settings · models; settings sends the held pick once signed in
+    const how = modelOrSetup(model, models, { cmd: 'model', project, agent: a.name, model }, {
+      send: (c) => {
+        store.command(c);
+      },
+      setup: () => {
+        router.go({ screen: 'settings', page: 'models' });
+      },
+    });
+    if (how === 'sent') setPicked(model);
   };
   // refused: back to the model it runs
   if (picked !== undefined && refusal.cmd === 'model' && refusal.text !== undefined) setPicked(undefined);

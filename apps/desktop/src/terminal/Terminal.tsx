@@ -31,7 +31,7 @@ export const TerminalPanel = memo(function TerminalPanel({ project }: { project:
     >
       <Grip box={box} />
       <div className="term-head" data-testid="terminal.head">
-        <span>terminal · {shortPath(folder)}</span>
+        <span>terminal · {shortPath(folder, (window as { bise?: { home?: string } }).bise?.home || undefined)}</span>
         <button
           type="button"
           className="term-hide"

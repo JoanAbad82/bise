@@ -150,7 +150,9 @@ describe('the agents screen: new, rename, model, reasoning', () => {
     const renamed: string[] = [];
     const v = render(
       <StoreProvider store={store}>
-        <Tune project={P} a={ag('p99')} onRenamed={(to) => renamed.push(to)} />
+        <RouterContext value={createRouter({ screen: 'bise' })}>
+          <Tune project={P} a={ag('p99')} onRenamed={(to) => renamed.push(to)} />
+        </RouterContext>
       </StoreProvider>,
     );
     fireEvent.change(v.getByTestId('agents.rename.p99'), { target: { value: 'perf' } });
@@ -249,3 +251,37 @@ describe('the catalog, pure', () => {
   });
 });
 
+
+describe('L5: a model whose provider has no key yet (amb-kit 6078b20c)', () => {
+  it("Tune's pick of it opens settings · models and sends nothing; a ready model is sent at once", async () => {
+    const { releaseHeld } = await import('@/settings');
+    const { Tune } = await import('./Tune');
+    const cmds: CoreCmd[] = [];
+    const port: CorePort = { send: (c) => cmds.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    const store = new Store(port);
+    store.setCore('up');
+    store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('p99', { model: 'anthropic/claude-opus-5-5' })] });
+    store.apply({
+      ev: 'models',
+      project: P,
+      items: [
+        { id: 'anthropic/claude-opus-5-5', label: 'opus 5.5', provider: 'Anthropic', short: '1M', provider_id: 'anthropic', key_ready: true },
+        { id: 'mistral/devstral-medium-latest', label: 'devstral medium', provider: 'Mistral', short: '128k', provider_id: 'mistral', key_ready: false },
+      ],
+    });
+    const router = createRouter({ screen: 'agents', project: P });
+    const v = render(
+      <StoreProvider store={store}>
+        <RouterContext value={router}>
+          <Tune project={P} a={ag('p99', { model: 'anthropic/claude-opus-5-5' })} />
+        </RouterContext>
+      </StoreProvider>,
+    );
+    fireEvent.click(v.getByTestId('agents.model.p99.pick.mistral/devstral-medium-latest'));
+    expect(cmds.filter((c) => c.cmd === 'model'), 'nothing sent before the key').toEqual([]);
+    expect(router.get()).toEqual({ screen: 'settings', page: 'models' });
+    releaseHeld();
+    fireEvent.click(v.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5'));
+    expect(cmds.filter((c) => c.cmd === 'model')).toEqual([{ cmd: 'model', project: P, agent: 'p99', model: 'anthropic/claude-opus-5-5' }]);
+  });
+});

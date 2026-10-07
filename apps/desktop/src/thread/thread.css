@@ -218,6 +218,20 @@
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
+  transition: color var(--d-fast) var(--ease-out);
+}
+/* hover, as every control (qa-flows' O.6 clicks audit) */
+.th-agents-link:hover {
+  color: var(--c-text);
+}
+/* a tools row opens its steps: it points and darkens on hover */
+.th-row .b-tool[role='button'] {
+  cursor: pointer;
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
+}
+.th-row .b-tool[role='button']:hover {
+  color: var(--c-text);
+  background: var(--c-line, var(--c-hover));
 }
 
 /* who a question waits for (ambient m_10689): him in pink, main dim */
