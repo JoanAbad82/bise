@@ -4,7 +4,11 @@
 // (a path or nothing: lead m_8079); the env without the launcher's agent
 // plumbing; a restart backoff that resets after a healthy run.
 
-/** The workspace the core runs on (set by the launcher, or the harness in test mode); '' or unset = home. */
+/**
+ * The workspace the core runs on (set by the launcher, scripts/desktop.sh open, or the harness in
+ * test mode); '' or unset = home. The app's own variable: only Electron reads it (never Rust), so
+ * it isn't in bise_home::env::VARS (architect m_12200).
+ */
 export const WORKSPACE_ENV = 'BISE_DESKTOP_WORKSPACE';
 
 export interface CoreConfig {

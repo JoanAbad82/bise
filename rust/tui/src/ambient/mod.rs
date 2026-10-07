@@ -7,7 +7,7 @@
 //! listener, Voxtral TTS on a speaker opened at the first spoken answer)
 //! and puts the app's front-window shots in the image store as markers.
 //!
-//! `bise ambient` launches the app (`scripts/ambient.sh open`, amb-mac's).
+//! `bise ambient` launches the desktop app (`scripts/desktop.sh open`, amb-mac's).
 
 mod agents;
 mod core;
@@ -211,26 +211,17 @@ pub fn core_main(
     0
 }
 
-/// `bise ambient [--workspace <ws>]`: the app opens on this workspace
-/// (or the running one switches to it): `scripts/ambient.sh open` of the
-/// app root builds it when its sources changed. Its exit code.
+/// `bise ambient [--workspace <ws>]`: the desktop app opens on this
+/// workspace: `scripts/desktop.sh open` of the app root builds it when its
+/// sources changed (one app, `<build dir>/desktop/bise.app`, with this bise
+/// packed inside) and opens it. Its exit code.
 pub fn launch_main(workspace: &std::path::Path, exe: &std::path::Path, app_root: &std::path::Path) -> i32 {
-    let script = app_root.join("scripts/ambient.sh");
+    let (script, args) = launch_command(workspace, exe, app_root);
     if !script.exists() {
-        eprintln!("bise ambient needs the macOS app's sources ({} is missing): run it from a bise checkout.", script.display());
+        eprintln!("bise ambient needs the desktop app's sources ({} is missing): run it from a bise checkout.", script.display());
         return 1;
     }
-    let st = std::process::Command::new(&script)
-        .arg("open")
-        .arg("--workspace")
-        .arg(workspace)
-        .arg("--bise")
-        .arg(exe)
-        // the core's app root (repl-live): `open` drops this env, the
-        // script hands it to the app with --env
-        .env("BISE_APP_ROOT", app_root)
-        .current_dir(app_root)
-        .status();
+    let st = std::process::Command::new(&script).args(&args).current_dir(app_root).status();
     match st {
         Ok(s) => s.code().unwrap_or(1),
         Err(e) => {
@@ -238,5 +229,12 @@ pub fn launch_main(workspace: &std::path::Path, exe: &std::path::Path, app_root:
             1
         }
     }
+}
+
+/// What `bise ambient` runs (pure): `<app root>/scripts/desktop.sh open
+/// --workspace <ws> --bise <this exe>`.
+pub fn launch_command(workspace: &std::path::Path, exe: &std::path::Path, app_root: &std::path::Path) -> (std::path::PathBuf, Vec<std::ffi::OsString>) {
+    let args = ["open".into(), "--workspace".into(), workspace.as_os_str().to_owned(), "--bise".into(), exe.as_os_str().to_owned()];
+    (app_root.join("scripts/desktop.sh"), args.to_vec())
 }
 

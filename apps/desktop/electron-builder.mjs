@@ -34,9 +34,10 @@ const helper = need('BISE_PACK_HELPER');
 // optional: the release's VERSION file (make-release writes id= and built=)
 const version = process.env['BISE_PACK_VERSION'] ? need('BISE_PACK_VERSION') : null;
 
-// BISE_PACK_SIGN_DIR: the Swift app's stable self-signed identity ('bise
-// ambient dev' in <dir>/sign.keychain-db, made by apps/ambient/mac/build.sh
-// with AMBIENT_SIGN_DIR), so macOS keeps his grants across rebuilds. Its
+// BISE_PACK_SIGN_DIR: bise's stable self-signed identity ('bise ambient dev'
+// in <dir>/sign.keychain-db, made once by scripts/sign-identity.sh when
+// missing; the Swift app's build made the same one), so macOS keeps his
+// grants across rebuilds. Its
 // certificate isn't trusted by the codesigning policy, so electron-builder
 // won't pick it: the app is signed here, deep, after packing.
 const signDir = process.env['BISE_PACK_SIGN_DIR'];

@@ -1537,3 +1537,12 @@ fn fake_words_is_refused_in_his_normal_run() {
     t.cmd(Cmd::parse(r#"{"cmd":"fake_words","text":"hi"}"#).unwrap());
     assert!(has(&t.take(), "error"));
 }
+
+#[test]
+fn bise_ambient_opens_the_desktop_app_through_desktop_sh() {
+    use std::path::Path;
+    let (script, args) = super::launch_command(Path::new("/w/shop"), Path::new("/b/bise"), Path::new("/repo"));
+    assert_eq!(script, Path::new("/repo/scripts/desktop.sh"));
+    let args: Vec<String> = args.iter().map(|a| a.to_string_lossy().into_owned()).collect();
+    assert_eq!(args, ["open", "--workspace", "/w/shop", "--bise", "/b/bise"]);
+}
