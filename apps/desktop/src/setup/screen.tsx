@@ -20,6 +20,7 @@ export function OnboardingScreen() {
     <Onboarding
       accounts={useAccounts()}
       found={useFound()}
+      home={(globalThis as { bise?: { home?: string } }).bise?.home ?? ''}
       perms={perms}
       fn={fn}
       keyError={useKeyError()}

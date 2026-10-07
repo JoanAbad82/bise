@@ -9,7 +9,13 @@
 .setup-pick { display: flex; gap: var(--s-2); width: 100%; margin-top: var(--s-3); }
 .setup-pick .b-field { flex: 1 1 auto; min-width: 0; }
 .setup-pick .b-btn { flex: none; }
-.setup-list { flex: 1 1 auto; min-height: 72px; width: 100%; overflow-y: auto; overscroll-behavior: contain; }
+/* only the list gives up height: the button, the dots, the field keep theirs (ambient m_11825) */
+.setup .b-onb > :not(.setup-list) { flex: none; }
+.setup .b-onb .b-btn.pri { min-height: 36px; }
+/* the list's last 24 px fade into the ground: 'more below'; its 24 px bottom padding means the
+   fade covers only that padding once he has scrolled to the end, or when everything fits */
+.setup-list { flex: 1 1 auto; min-height: 72px; width: 100%; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 24px; box-sizing: border-box;
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent); mask-image: linear-gradient(to bottom, black calc(100% - 24px), transparent); }
 .setup-list .b-group { margin: 0; }
 @media (max-height: 640px) {
   .setup { padding-top: var(--s-3); padding-bottom: var(--s-3); }

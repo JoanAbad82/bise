@@ -12,11 +12,12 @@ import { FakeCore, launchDesktop, test, expect } from '../../harness';
 const NOW = 1791100400000;
 const NAMES = ['shop', 'billing', 'storefront', 'telemetry', 'acme-web', 'acme-api', 'notes', 'infra', 'docs-site', 'mobile', 'design-system', 'search',
   'payments', 'auth', 'mailer', 'analytics', 'admin', 'cli', 'sdk-js', 'sdk-py', 'website', 'blog', 'scripts', 'dotfiles'];
-const FOUND = {
+// the repos live in the app's (test) home, so the list shows them as ~/code/<name>
+const found = (home: string) => ({
   ev: 'found',
-  dir: '/Users/camille/code',
-  items: NAMES.map((name, i) => ({ name, path: `/Users/camille/code/${name}`, git: true, known: false, last_ms: NOW - i * 5 * 86_400_000 })),
-};
+  dir: `${home}/code`,
+  items: NAMES.map((name, i) => ({ name, path: `${home}/code/${name}`, git: true, known: false, last_ms: NOW - i * 5 * 86_400_000 })),
+});
 // amb-mac m_11804: the window opens 1100x720, min width 680, no min height (plan for ~480)
 const SIZES: [number, number][] = [[1100, 720], [1100, 520], [680, 600], [680, 480]];
 const PICKED = '/Users/camille/elsewhere/side-project';
@@ -36,6 +37,10 @@ function misfits(): string[] {
   if (root && root.scrollHeight > root.clientHeight + 1) out.push(`the page scrolls (${root.scrollHeight} > ${root.clientHeight}): the list should`);
   const list = document.querySelector('[data-testid="setup.list"]');
   if (list && list.scrollHeight <= list.clientHeight) out.push('the list does not scroll inside (24 repos should overflow it)');
+  // only the list gives up height (ambient m_11825: the button was squashed to a bar)
+  const btn = document.querySelector('[data-testid="setup.next"]');
+  if (btn && btn.getBoundingClientRect().height < 34) out.push(`the button is squashed (${Math.round(btn.getBoundingClientRect().height)} px high)`);
+  if (btn && btn.scrollHeight > btn.clientHeight + 1) out.push('the button\'s words spill out of it');
   const dots = document.querySelector('.b-onb .steps');
   if (dots && dots.getBoundingClientRect().bottom > H + 0.5) out.push('the step dots are below the window');
   return out;
@@ -52,8 +57,11 @@ test('settings/onboarding-fit: the projects step fits 680/1100 wide and short he
       await page.getByTestId('setup.next').click();
       await expect(page.getByTestId(`setup.step.${step}`)).toBeVisible({ timeout: 5000 });
     }
-    await core.send(FOUND as never);
+    const home = await page.evaluate(() => (window as unknown as { bise: { home: string } }).bise.home);
+    await core.send(found(home) as never);
     await expect(page.getByTestId('setup.found.dotfiles')).toBeAttached({ timeout: 5000 });
+    // the signed path rule: his home as ~ (ambient m_11825)
+    await expect(page.getByTestId('setup.found')).toContainText('~/code/shop');
     const win = await s.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().sort((a, b) => (b.getSize()[0] ?? 0) - (a.getSize()[0] ?? 0))[0]?.id ?? -1);
     for (const [w, h] of SIZES) {
       await s.app.evaluate(({ BrowserWindow }, [id, w2, h2]) => BrowserWindow.fromId(id ?? -1)?.setContentSize(w2 ?? 0, h2 ?? 0), [win, w, h]);

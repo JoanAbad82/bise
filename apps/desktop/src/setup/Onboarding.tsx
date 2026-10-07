@@ -34,6 +34,8 @@ export interface OnboardingProps {
   keyError?: KeyError | null;
   ports: OnboardingPorts;
   now?: number;
+  /** his home folder (window.bise.home), shown as ~ in the paths */
+  home?: string;
 }
 
 const PERM_WORDS: Record<string, { label: string; sub: string; lost: string }> = {
@@ -42,7 +44,7 @@ const PERM_WORDS: Record<string, { label: string; sub: string; lost: string }> =
   screen: { label: 'screen recording', sub: 'for the capture fn adds to your question', lost: 'fn will send your words without a capture' },
 };
 
-export function Onboarding({ accounts, found, perms, fn = null, keyError = null, ports, now: pinned }: OnboardingProps) {
+export function Onboarding({ accounts, found, perms, fn = null, keyError = null, ports, now: pinned, home = '' }: OnboardingProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [st, setSt] = useState<OnbState>(START);
@@ -145,7 +147,7 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
         ...s.chosen.map((p) => ({
           id: p,
           label: baseName(p),
-          sub: p,
+          sub: homePath(p, home),
           check: (
             <Check
               on={chosenTicked(s, p)}
@@ -161,7 +163,7 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
         ...shown.map((f) => ({
           id: f.path,
           label: f.name,
-          sub: f.path,
+          sub: homePath(f.path, home),
           check: (
             <Check
               on={ticked(s, f, now)}
@@ -179,7 +181,7 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
         <Onb
           {...frame}
           title="your projects"
-          sub="i found these repos in your folder. each gets its main; bise coordinates them."
+          sub="i found these repos in your folder. tick the ones bise should work in."
           cta={{ text: n > 0 ? `add ${String(n)} ${n === 1 ? 'project' : 'projects'}` : 'continue without a project', onClick: go, testId: 'setup.next' }}
         >
           <div className="setup-pick">
@@ -265,6 +267,21 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
       </div>
     </section>
   );
+}
+
+/**
+ * A path as he reads it (the signed rule, ambient m_11825): his home as '~', a long one cut in the
+ * middle keeping the last folders: '~/code/shop', '~/…/clients/acme/shop'. Pure.
+ */
+export function homePath(p: string, home: string, max = 40): string {
+  const h = home.replace(/\/+$/, '');
+  const s = h !== '' && (p === h || p.startsWith(`${h}/`)) ? `~${p.slice(h.length)}` : p;
+  if (s.length <= max) return s;
+  const parts = s.split('/');
+  const head = parts[0] ?? '';
+  let tail = parts.at(-1) ?? '';
+  for (let i = parts.length - 2; i > 0 && `${head}/…/${parts[i] ?? ''}/${tail}`.length <= max; i -= 1) tail = `${parts[i] ?? ''}/${tail}`;
+  return `${head}/…/${tail}`;
 }
 
 /** A path's last part, its name in the list. Pure. */

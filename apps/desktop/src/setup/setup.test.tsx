@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Account, AppCmd, Found } from '@/proto';
 import { core_ev } from '@/proto/fixtures.gen';
 import { fnAct, next, START, stepOf, ticked } from './model';
-import { Onboarding, type OnboardingPorts } from './Onboarding';
+import { homePath, Onboarding, type OnboardingPorts } from './Onboarding';
 import { FirstRun, showsFirstRun } from './FirstRun';
 import { helloOpens, startHereUrl } from './screen';
 
@@ -123,6 +123,13 @@ describe('Onboarding', () => {
       { cmd: 'project_add', path: '/Users/camille/notes' },
       { cmd: 'project_add', path: '/Users/camille/code/shop' },
     ]);
+  });
+
+  it('paths read with ~ for his home, a long one cut in the middle keeping the last folders', () => {
+    expect(homePath('/Users/camille/code/shop', '/Users/camille')).toBe('~/code/shop');
+    expect(homePath('/Users/camille', '/Users/camille/')).toBe('~');
+    expect(homePath('/opt/src/shop', '/Users/camille')).toBe('/opt/src/shop');
+    expect(homePath('/Users/camille/work/clients/acme-industries/platform/storefront', '/Users/camille')).toBe('~/…/acme-industries/platform/storefront');
   });
 
   it('no picker in the shell: no choose a folder… button', () => {
