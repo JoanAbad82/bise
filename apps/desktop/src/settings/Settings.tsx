@@ -7,7 +7,8 @@
 // A switch flips at once: the value he set shows until the core's next
 // prefs (which carries it, or not when the core refused it).
 import { useState } from 'react';
-import type { Account, AppCmd, Found, JsonValue, Perm, Plugin, ProjectRow } from '@/proto';
+import type { Account, AppCmd, Found, JsonValue, Model, Perm, Plugin, ProjectRow, RoleRow } from '@/proto';
+import type { Held } from './hold';
 import { Row, Settings as Frame } from '@/ds';
 import { putPref, type Prefs } from './prefs';
 import { PAGES, PageBody, pageOf, type Page } from './pages';
@@ -30,6 +31,13 @@ export interface SettingsData {
   perms: Perms;
   /** the core's last refusal of a key (error {cmd: key_set}), shown on the key field (bar S.2) */
   keyError?: KeyError | null;
+  /** which model does what (bar V17): the core's roles, and the home's models they pick from */
+  roles?: readonly RoleRow[];
+  models?: readonly Model[];
+  /** the core's last refusal of a role_set, in its words */
+  roleError?: string | null;
+  /** a model waiting for its provider's setup (bar L5, hold.ts) */
+  held?: Held | null;
 }
 
 export interface SettingsPorts {
@@ -42,6 +50,8 @@ export interface SettingsPorts {
   perm?: (perm: Perm, action: 'ask' | 'open') => void;
   /** the system's folder picker (window.bise, amb-mac): resolves to a path, or null */
   pickFolder?: () => Promise<string | null>;
+  /** a model whose provider isn't set up waits here (bar L5): hold.ts's holdForSetup */
+  hold?: (h: Held) => void;
 }
 
 export interface SettingsProps extends SettingsData {

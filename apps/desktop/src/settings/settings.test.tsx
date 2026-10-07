@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import type { Account, AppCmd, Found, ProjectRow } from '@/proto';
+import type { Account, AppCmd, Found, Model, ProjectRow, RoleRow } from '@/proto';
+import type { CoreCmd } from '@/shared/api';
+import { heldReady, modelOrSetup, needsSetup, releaseHeld, type Held } from './hold';
 import { core_ev } from '@/proto/fixtures.gen';
 import { Settings, type SettingsPorts } from './Settings';
 import { appName, excludedApps, flag, getPref, knownApps, onboarded, putPref, type Prefs } from './prefs';
@@ -268,5 +270,83 @@ describe('setup check (S.8)', () => {
       ['home', false],
     ]);
     expect(list[1]?.detail).toContain('restart bise');
+  });
+});
+
+describe('which model does what (V17) and a model with no key (L5)', () => {
+  const MODELS: Model[] = [
+    { id: 'anthropic/claude-opus-5-5', label: 'opus 5.5', provider: 'Anthropic', short: '1M', efforts: ['low', 'medium', 'high', 'max'], default_effort: 'high', provider_id: 'anthropic', key_ready: true },
+    { id: 'mistral/devstral-medium-latest', label: 'devstral medium', provider: 'Mistral', short: '128k', provider_id: 'mistral', key_ready: false },
+    { id: 'devstral', label: 'devstral', provider: '', short: '= mistral/devstral-medium-latest', alias_of: 'mistral/devstral-medium-latest' },
+  ];
+  const ROLES: RoleRow[] = [
+    { role: 'main', name: 'main', about: 'your team lead', kind: 'chat', model: 'anthropic/claude-opus-5-5', effort: 'high', source: 'config' },
+    { role: 'agents', name: 'agents', about: 'the tasks main starts', kind: 'chat', model: 'anthropic/claude-opus-5-5', source: 'default', follows: 'main' },
+    { role: 'voice', name: 'voice', about: 'speech to text', kind: 'voice', model: 'mistral/voxtral-mini-latest', source: 'env' },
+  ];
+  const ACCOUNTS: Account[] = [
+    { id: 'chatgpt', label: 'ChatGPT', kind: 'subscription', state: 'signed_in', provider: 'chatgpt' },
+    { id: 'anthropic', label: 'Anthropic key', kind: 'key', state: 'signed_in', provider: 'anthropic' },
+    { id: 'mistral', label: 'Mistral key', kind: 'key', state: 'signed_out', provider: 'mistral' },
+  ];
+
+  it('needsSetup: a model whose provider has no key names it; an alias follows its target; a ready one needs nothing', () => {
+    expect(needsSetup('mistral/devstral-medium-latest', MODELS)).toBe('mistral');
+    expect(needsSetup('devstral', MODELS)).toBe('mistral');
+    expect(needsSetup('anthropic/claude-opus-5-5', MODELS)).toBeNull();
+    expect(needsSetup('unknown/x', MODELS)).toBeNull();
+    const held = { provider: 'mistral', providerName: 'Mistral', model: 'devstral medium', cmd: { cmd: 'role_set', role: 'main', model: 'mistral/devstral-medium-latest' } as AppCmd };
+    expect(heldReady(held, ACCOUNTS)).toBe(false);
+    expect(heldReady(held, ACCOUNTS.map((a) => (a.id === 'mistral' ? { ...a, state: 'signed_in' } : a)))).toBe(true);
+  });
+
+  it('modelOrSetup: sends a ready model at once, holds the other and opens the setup', () => {
+    const sent: CoreCmd[] = [];
+    const went: string[] = [];
+    const ports = { send: (c: CoreCmd) => sent.push(c), setup: () => went.push('setup') };
+    expect(modelOrSetup('anthropic/claude-opus-5-5', MODELS, { cmd: 'model', project: 'p', agent: 'main', model: 'anthropic/claude-opus-5-5' }, ports)).toBe('sent');
+    expect(modelOrSetup('devstral', MODELS, { cmd: 'model', project: 'p', agent: 'main', model: 'devstral' }, ports)).toBe('setup');
+    expect(sent.length).toBe(1);
+    expect(went).toEqual(['setup']);
+    releaseHeld();
+  });
+
+  it("each role shows its model, where it comes from, and its effort; setting main's effort sends role_set", () => {
+    const p = ports();
+    view('models', p, { roles: ROLES, models: MODELS, accounts: ACCOUNTS });
+    const roles = screen.getByTestId('settings.roles');
+    expect(roles.textContent).toContain('your team lead · set here');
+    expect(roles.textContent).toContain('follows main');
+    expect(roles.textContent).toContain('from your environment');
+    expect(screen.getByTestId<HTMLSelectElement>('settings.role.main.model').value).toBe('anthropic/claude-opus-5-5');
+    expect(screen.getByTestId<HTMLSelectElement>('settings.role.agents.model').value).toBe('');
+    expect(screen.getByTestId('settings.role.voice.model').textContent).toBe('mistral/voxtral-mini-latest');
+    expect(screen.getByTestId('settings.role.main.effort.2').className).toContain('on');
+    fireEvent.click(screen.getByTestId('settings.role.main.effort.3'));
+    expect(p.sent).toEqual([{ cmd: 'role_set', role: 'main', effort: 'max' }]);
+    // back to its fallback: no model
+    fireEvent.change(screen.getByTestId('settings.role.main.model'), { target: { value: '' } });
+    expect(p.sent[1]).toEqual({ cmd: 'role_set', role: 'main', model: null });
+  });
+
+  it('L5: a model whose provider has no key is held, not sent; the setup asks for that provider, its key field open', () => {
+    const p = ports();
+    const held: Held[] = [];
+    const r = view('models', { ...p, hold: (h) => held.push(h) }, { roles: ROLES, models: MODELS, accounts: ACCOUNTS });
+    fireEvent.change(screen.getByTestId('settings.role.main.model'), { target: { value: 'mistral/devstral-medium-latest' } });
+    expect(p.sent).toEqual([]);
+    expect(held).toEqual([{ provider: 'mistral', providerName: 'Mistral', model: 'devstral medium', cmd: { cmd: 'role_set', role: 'main', model: 'mistral/devstral-medium-latest' } }]);
+    r.rerender(<Settings page="models" prefs={prefs()} accounts={ACCOUNTS} projects={projects()} found={found()} plugins={null} computerUse={null} perms={{}} ports={p} roles={ROLES} models={MODELS} held={held[0] ?? null} />);
+    expect(screen.getByTestId('settings.models.want').textContent).toBe("devstral medium needs Mistral: sign in or add its key here, then it's set.");
+    expect(screen.getByTestId<HTMLInputElement>('settings.key.field').type).toBe('password');
+    const f = screen.getByTestId<HTMLInputElement>('settings.key.field');
+    f.value = 'mk-1';
+    fireEvent.keyDown(f, { key: 'Enter' });
+    expect(p.sent).toEqual([{ cmd: 'key_set', id: 'mistral', key: 'mk-1' }]);
+  });
+
+  it("a role_set the core refused says so in its words", () => {
+    view('models', ports(), { roles: ROLES, models: MODELS, accounts: ACCOUNTS, roleError: 'no model named x' });
+    expect(screen.getByTestId('settings.roles.error').textContent).toBe('no model named x');
   });
 });

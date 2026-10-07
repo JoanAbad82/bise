@@ -41,11 +41,25 @@ export function keyField(
   return 'checking';
 }
 
-export function Accounts({ accounts, send, keyError = null }: { accounts: readonly Account[]; send: (cmd: AppCmd) => void; keyError?: KeyError | null }) {
+/** A model waiting for its provider's setup (bar L5, hold.ts): which provider, and for which model. */
+export interface Want {
+  provider: string;
+  providerName: string;
+  model: string;
+}
+
+/** An account sets up `provider` (Account.provider; an older core: its id). */
+export const ofProvider = (a: Account, provider: string): boolean => (a.provider ?? a.id) === provider;
+
+export function Accounts({ accounts, send, keyError = null, want = null }: { accounts: readonly Account[]; send: (cmd: AppCmd) => void; keyError?: KeyError | null; want?: Want | null }) {
   // the sign-ins he started here: a spinner until the core's next accounts
   const [signing, setSigning] = useState<{ base: readonly Account[]; ids: readonly string[] }>({ base: accounts, ids: [] });
   const busy = signing.base === accounts ? signing.ids : [];
-  const [keyFor, setKeyFor] = useState<string | null>(null);
+  const [picked, setKeyFor] = useState<string | null>(null);
+  // a waiting model whose provider is set up by a key: its field is open from the start (esc closes it)
+  const [closedFor, setClosedFor] = useState<Want | null>(null);
+  const wantKey = want !== null ? accounts.find((a) => a.kind === 'key' && ofProvider(a, want.provider) && a.state !== 'signed_in') : undefined;
+  const keyFor = picked ?? (wantKey !== undefined && closedFor !== want ? wantKey.id : null);
   const [bad, setBad] = useState(false);
   // the key he sent: the refusals counted before it don't count for it
   const [sent, setSent] = useState<{ n: number; base: readonly Account[] } | null>(null);
@@ -53,6 +67,7 @@ export function Accounts({ accounts, send, keyError = null }: { accounts: readon
   if (field === 'added') {
     setKeyFor(null);
     setSent(null);
+    if (want !== null) setClosedFor(want);
   }
   const subs = accounts.filter((a) => a.kind === 'subscription');
   const keys = accounts.filter((a) => a.kind === 'key');
@@ -60,7 +75,12 @@ export function Accounts({ accounts, send, keyError = null }: { accounts: readon
   const items: GroupItem[] = subs.map((a) => ({
     id: a.id,
     label: a.label,
-    sub: a.state === 'signed_in' && a.who != null ? a.who : 'sign in with your browser',
+    sub:
+      a.state === 'signed_in' && a.who != null
+        ? a.who
+        : want !== null && ofProvider(a, want.provider)
+          ? `sign in for ${want.model}`
+          : 'sign in with your browser',
     control:
       a.state === 'signed_in' ? (
         <Chip tone="ok" testId={`settings.account.${a.id}.ok`}>✓ signed in</Chip>
@@ -77,7 +97,7 @@ export function Accounts({ accounts, send, keyError = null }: { accounts: readon
         </Button>
       ),
   }));
-  const firstKey = keys[0];
+  const firstKey = wantKey ?? keys[0];
   items.push({
     id: 'key',
     label: 'an API key',
@@ -97,6 +117,11 @@ export function Accounts({ accounts, send, keyError = null }: { accounts: readon
   });
   return (
     <>
+      {want !== null && (
+        <Help testId="settings.models.want">
+          {`${want.model} needs ${want.providerName}: sign in or add its key here, then it's set.`}
+        </Help>
+      )}
       <Group testId="settings.models" items={items} />
       {keyFor !== null && (
         <div className="settings-key">
@@ -116,6 +141,7 @@ export function Accounts({ accounts, send, keyError = null }: { accounts: readon
                 e.preventDefault();
                 setKeyFor(null);
                 setSent(null);
+                if (want !== null) setClosedFor(want);
               } else if (e.key === 'Enter') {
                 e.preventDefault();
                 const k = e.currentTarget.value.trim();

@@ -7,6 +7,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { AppCmd, JsonValue, Plugin } from '@/proto';
 import { Button, Chip, Field, Group, Kbd, Seg, Toggle, type GroupItem } from '@/ds';
 import { Accounts } from './accounts';
+import { Roles } from './roles';
+import { modelRow, needsSetup } from './hold';
 import { Projects } from './projects';
 import { Plugins } from './plugins';
 import { Computer } from './computer';
@@ -165,7 +167,7 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
       );
     }
     case 'models':
-      return <Accounts accounts={data.accounts} send={ports.send} keyError={data.keyError ?? null} />;
+      return <Models data={data} ports={ports} />;
     case 'projects':
       return <Projects projects={data.projects} found={data.found} ports={ports} />;
     case 'setup':
@@ -312,6 +314,41 @@ export function KeyList(): ReactNode {
         />
       ))}
       <Chip>/help and /shortcuts in the terminal list the same keys</Chip>
+    </>
+  );
+}
+
+/**
+ * settings · models: his accounts, then which model does what (bar V17). A role set to a model
+ * whose provider has no key or sign-in yet waits for its setup here (bar L5): the accounts show
+ * that provider's sign-in or open its key field, and the screen sends the held role_set once the
+ * provider is signed in (hold.ts).
+ */
+function Models({ data, ports }: { data: SettingsData; ports: SettingsPorts }) {
+  const models = data.models ?? [];
+  const held = data.held ?? null;
+  return (
+    <>
+      <Accounts
+        accounts={data.accounts}
+        send={ports.send}
+        keyError={data.keyError ?? null}
+        want={held !== null ? { provider: held.provider, providerName: held.providerName, model: held.model } : null}
+      />
+      <Roles
+        roles={data.roles ?? []}
+        models={models}
+        error={data.roleError ?? null}
+        set={(cmd, model) => {
+          const provider = model !== null ? needsSetup(model, models) : null;
+          if (provider !== null && model !== null && ports.hold) {
+            const row = modelRow(model, models);
+            ports.hold({ provider, providerName: row?.provider ?? provider, model: row?.label ?? model, cmd });
+          } else {
+            ports.send(cmd);
+          }
+        }}
+      />
     </>
   );
 }

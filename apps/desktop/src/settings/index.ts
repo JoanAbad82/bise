@@ -9,4 +9,6 @@ export { PAGES, KeyList, type Page } from './pages';
 export { Accounts, signedIn, keyField, keyErrorWords, type KeyError } from './accounts';
 export { onboarded, type Prefs } from './prefs';
 export { KEY_SECTIONS } from './keys';
-export { SettingsScreen, prefsOf, useKeyError } from './screen';
+export { SettingsScreen, prefsOf, useKeyError, useCmdError } from './screen';
+export { needsSetup, modelOrSetup, modelRow, holdForSetup, releaseHeld, useHeld, heldReady, type Held } from './hold';
+export { Roles, roleSource, effortsOf, effortOf } from './roles';
