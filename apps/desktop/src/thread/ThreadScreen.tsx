@@ -29,6 +29,8 @@ import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
 import { ThreadInbox, takesWords, useStripCard } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
+import { AgentHead, BiseHead } from './AgentHead';
+import { composerWords } from './head';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
 import { entryKey, pendingKey, posOfKey } from './entry';
@@ -262,30 +264,31 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     </>
   );
 
+  // designer's desktop-screens v6 (1): '⋯' at the head's right (rename, model, reasoning)
+  const more =
+    me && !me.archived && !bise ? (
+      <Button
+        kind="ghost"
+        title={me.main ? 'model, reasoning' : 'rename, model, reasoning'}
+        onClick={() => {
+          setTuning((x) => !x);
+        }}
+        testId="thread.more"
+      >
+        ⋯
+      </Button>
+    ) : undefined;
   return (
     <FoldsContext value={folds}>
     <FindMarkContext value={mark}>
       <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
-        <Head
-          title={headTitle}
-          sub={sub}
-          pearl={bise ? 22 : undefined}
-          dot={bise || !me ? undefined : dotOf(me.status)}
-          end={
-            me && !me.archived && !bise ? (
-              <Button
-                kind="ghost"
-                title={me.main ? 'model, reasoning' : 'rename, model, reasoning'}
-                onClick={() => {
-                  setTuning((x) => !x);
-                }}
-                testId="thread.more"
-              >
-                …
-              </Button>
-            ) : undefined
-          }
-        />
+        {bise || !me || me.archived ? (
+          <Head title={headTitle} sub={sub} pearl={bise ? 22 : undefined} dot={bise || !me ? undefined : dotOf(me.status)} />
+        ) : agent === MAIN ? (
+          <BiseHead project={project} name={projectName ?? project} more={more} />
+        ) : (
+          <AgentHead project={project} a={me} more={more} note={voice !== 'off' ? 'voice mode' : undefined} />
+        )}
         {tuning && me && !me.archived && (
           <Tune
             key={me.name}
@@ -335,8 +338,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
             project={project}
             agent={agent}
             busy={busy}
-            to={answering === null ? `you → ${title}` : answeringLabel(answering)}
-            placeholder={answering === null ? undefined : 'your answer, then ⏎'}
+            to={answering === null ? composerWords(title).label : answeringLabel(answering)}
+            placeholder={answering === null ? composerWords(title).placeholder : 'your answer, then ⏎'}
             answer={answering === null ? null : answering.id}
             onStop={stop}
             quoting={quoting}

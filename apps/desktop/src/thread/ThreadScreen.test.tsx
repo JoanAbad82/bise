@@ -57,7 +57,7 @@ describe('the thread screen', () => {
     expect(cmds.slice(before)).toContainEqual({ cmd: 'unsubscribe', project: P, agent: 'perf' });
   });
 
-  it("voice mode on this agent adds ' · voice mode' to the head's subtitle, gone when it ends or is another agent's (amb-home m_11684)", () => {
+  it("voice mode on this agent adds 'voice mode' after the head's chip, gone when it ends or is another agent's (amb-home m_11684)", () => {
     const { store } = setup();
     const v = render(
       <StoreProvider store={store}>
@@ -68,7 +68,7 @@ describe('the thread screen', () => {
     act(() => {
       store.apply({ ev: 'voice_mode', project: P, agent: 'perf', on: true, state: 'listening' });
     });
-    expect(v.getByTestId('thread.voice').textContent).toBe(' · voice mode');
+    expect(v.getByTestId('thread.voice').textContent).toBe('voice mode');
     act(() => {
       store.apply({ ev: 'voice_mode', project: P, agent: 'perf', on: true, state: 'typing' });
     });

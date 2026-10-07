@@ -464,3 +464,99 @@
   display: flex;
   gap: 8px;
 }
+
+/* the agent view's head (designer's desktop-screens v6 (1), (3); amb-home): one row, 16 px sides;
+   the name in 600, its role line text-2, a state chip (pill, a 7% tint; what waits on him in
+   accent on accent 13%); at the right, quiet: its branch and files, 'changes ⌘D', '⋯'. Under
+   1000 px the name and role go to the titlebar's crumb: the chip and the buttons stay. */
+.ah {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 16px;
+  white-space: nowrap;
+  font: var(--t-13) var(--font-ui);
+}
+.ah-who {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.ah-bise .ah-who {
+  align-items: center;
+  gap: 6px;
+}
+.ah-name {
+  color: var(--c-text);
+  font-weight: 600;
+  font-size: var(--t-14);
+}
+.ah-project {
+  color: var(--c-text-2);
+  font-weight: 400;
+}
+.ah-role {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c-text-2);
+}
+.ah-chip {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-text) 7%, transparent);
+  color: var(--c-text-2);
+  font-size: var(--t-12);
+}
+.ah-chip.needs {
+  background: color-mix(in srgb, var(--c-accent) 13%, transparent);
+  color: var(--c-accent);
+}
+.ah-chip-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.ah-note {
+  color: var(--c-text-3);
+  font-size: var(--t-12);
+}
+.ah-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.ah-quiet,
+.ah-btn {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: var(--r-2);
+  background: none;
+  color: var(--c-text-3);
+  font: var(--t-12) var(--font-ui);
+  cursor: pointer;
+}
+.ah-btn {
+  color: var(--c-text-2);
+}
+.ah-btn kbd {
+  font: inherit;
+  color: var(--c-text-3);
+}
+.ah-quiet:hover,
+.ah-btn:hover {
+  background: var(--c-hover);
+  color: var(--c-text);
+}
+@media (max-width: 999px) {
+  .ah:not(.ah-bise) .ah-who {
+    display: none;
+  }
+}

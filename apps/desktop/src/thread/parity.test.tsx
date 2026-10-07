@@ -289,7 +289,7 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
         <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="perf" /></RouterContext>
       </StoreProvider>,
     );
-    expect(v.getByTestId('thread.usage').textContent).toBe(' · 42k · 17%');
+    expect(v.getByTestId('thread.usage').textContent).toBe('42k · 17%');
   });
 });
 
