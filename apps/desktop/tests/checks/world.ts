@@ -309,6 +309,22 @@ export async function launchOn(w: World, route: string, screen: string): Promise
   return launchReal(w, { route });
 }
 
+/**
+ * A left click on the first place the TUI's screen shows `text` (its first letter), as his mouse
+ * does it: an SGR mouse press and release written to the pane (the TUI captures the mouse).
+ * False when the screen doesn't show it.
+ */
+export function tuiClick(t: Tui, text: string): boolean {
+  const lines = t.screen().split('\n');
+  const row = lines.findIndex((l) => l.includes(text));
+  if (row < 0) return false;
+  // terminal cells: one per code point here (box lines and ASCII names)
+  const col = Array.from((lines[row] ?? '').slice(0, (lines[row] ?? '').indexOf(text))).length;
+  const at = `${String(col + 1)};${String(row + 1)}`;
+  t.keys('-l', `\x1b[<0;${at}M\x1b[<0;${at}m`);
+  return true;
+}
+
 /** The TUI's prompt: type these words (literally) and Enter. */
 export function tuiSay(t: Tui, words: string): void {
   t.keys('-l', words);
