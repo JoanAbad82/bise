@@ -68,4 +68,20 @@ describe('dictation routes (bar I, architect m_10537)', () => {
     r.sent(7, { cmd: 'voice_mode', project: 'p', agent: 'main', on: true });
     expect(r.coreGone()).toEqual([{ to: 'window', window: 7, ev: { ev: 'voice_mode', project: 'p', agent: 'main', on: false, state: 'listening', note: 'bise stopped' } }]);
   });
+
+  it("R8: a held /model's setup goes to the window that typed it; that window gone drops the line, never runs it", () => {
+    const r = new DictationRoutes();
+    const first = { ev: 'setup_first', project: 'shop', agent: 'perf', provider: 'openrouter', name: 'OpenRouter', model: 'openrouter/x' };
+    expect(r.route(first)).toEqual({ to: 'all' });
+    r.sent(4, { cmd: 'slash', project: 'shop', agent: 'perf', line: '/model openrouter/x', cid: 1 });
+    r.sent(5, { cmd: 'slash', project: 'shop', agent: 'perf', line: '/rename p2' });
+    expect(r.route(first)).toEqual({ to: 'window', window: 4, ev: first });
+    expect(r.gone(5)).toEqual([]);
+    expect(r.gone(4)).toEqual([{ cmd: 'setup_first_cancel' }]);
+    expect(r.gone(4)).toEqual([]);
+    // its own cancel: nothing more to drop when it closes
+    r.sent(6, { cmd: 'slash', project: 'shop', agent: 'perf', line: '/model openrouter/x' });
+    r.sent(6, { cmd: 'setup_first_cancel' });
+    expect(r.gone(6)).toEqual([]);
+  });
 });

@@ -156,6 +156,16 @@ impl Core {
         });
     }
 
+    /// R14: he took `path` from `project`'s `@` list: it ranks first in
+    /// that list's next answers (files::picked_in, the TUI's memory, on
+    /// that workspace's own index; an evicted one remembers nothing).
+    pub(super) fn file_picked(&mut self, project: String, path: String) {
+        match self.pick_root(&project) {
+            Ok(root) => crate::files::picked_in(&root, path.trim()),
+            Err(e) => self.emit(json!({"ev": "error", "cmd": "file_picked", "project": project, "text": e})),
+        }
+    }
+
     /// The workers' answers out, an older rid's dropped.
     pub(super) fn tick_picks(&mut self) {
         while let Ok(v) = self.picks.rx.try_recv() {

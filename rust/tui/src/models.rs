@@ -151,6 +151,19 @@ pub(crate) fn keyless(model: &str) -> Option<(String, String)> {
     (!ok).then(|| (p.id.clone(), p.name.clone()))
 }
 
+/// `/model <model> [default]` of a provider without a key: its provider
+/// id and the full model id. The one rule for the TUI (sb.rs: the
+/// provider's setup opens, then the line runs) and the window core (R8:
+/// the line is held until the provider works).
+pub(crate) fn model_needs_key(line: &str) -> Option<(String, String)> {
+    let mut w = line.split_whitespace();
+    if w.next() != Some("/model") {
+        return None;
+    }
+    let full = full_name(w.next()?)?;
+    keyless(&full).map(|(id, _)| (id, full))
+}
+
 /// A model as `/model` takes it (a full id, a bare one, an alias) as its
 /// full `provider/model` id; None for a provider nobody knows.
 pub(crate) fn full_name(model: &str) -> Option<String> {

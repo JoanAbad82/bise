@@ -45,6 +45,7 @@ pub const TAGS: &[&str] = &[
     "setup_check",
     "role_set",
     "app_version",
+    "setup_first_cancel",
 ];
 
 /// Computer use's setup check stops this long after the page's last
@@ -82,13 +83,82 @@ pub(crate) struct Setup {
     cu: Option<CuLive>,
     /// the desktop app's update check (bar S.6)
     pub(super) update: super::app_update::UpdateCheck,
+    /// R8: his `/model` line held until its provider works
+    held: Option<Held>,
+}
+
+/// R8 (the TUI's sb.rs /model, architect m_12214): a `/model <model>`
+/// whose provider has no key, held (never sent) until that provider
+/// works; dropped by `setup_first_cancel` (the window's own, or Electron
+/// main's when the window that sent it closes), its project removed, or
+/// the core restarting (memory only). One at a time: a newer replaces it.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Held {
+    project: String,
+    agent: String,
+    line: String,
+    cid: Option<u64>,
+    model: String,
+}
+
+/// What the window's typed slash does now.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Hold {
+    /// held: the window opens the provider's setup (`setup_first`)
+    Held,
+    /// not a `/model` that needs a key: sent to the hub as is
+    Forward,
 }
 
 impl Core {
     /// The setup's ports (the binary's live ones, or a test's).
     pub fn set_setup(&mut self, ports: SetupPorts) {
         let (tx, rx) = channel();
-        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), cu: None, update: Default::default() });
+        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), cu: None, update: Default::default(), held: None });
+    }
+
+    /// R8: his `/model <model>` in `agent`'s view, before it goes to the
+    /// hub: a model whose provider has no key is held and the window opens
+    /// that provider's setup; anything else goes on (models::model_needs_key,
+    /// the TUI's one rule).
+    pub(super) fn hold_if_keyless(&mut self, project: &str, agent: &str, line: &str, cid: Option<u64>) -> Hold {
+        let Some(s) = self.setup.as_mut() else { return Hold::Forward };
+        let Some((provider, model)) = crate::models::model_needs_key(line) else { return Hold::Forward };
+        s.held = Some(Held { project: project.into(), agent: agent.into(), line: line.into(), cid, model: model.clone() });
+        let name = crate::models::provider_name(&provider, "");
+        let mut ev = json!({"ev": "setup_first", "project": project, "agent": agent, "provider": provider, "name": name, "model": model});
+        if let Some(c) = cid {
+            ev["cid"] = json!(c);
+        }
+        self.emit(ev);
+        Hold::Held
+    }
+
+    /// R8: the accounts changed (a key set, a sign-in's end): a held
+    /// `/model` whose provider now works goes to the hub as he sent it.
+    fn replay_held(&mut self) {
+        let Some(h) = self.setup.as_ref().and_then(|s| s.held.clone()) else { return };
+        crate::models::forget_keys();
+        if crate::models::keyless(&h.model).is_some() {
+            return;
+        }
+        if let Some(s) = self.setup.as_mut() {
+            s.held = None;
+        }
+        let mut v = json!({"cmd": "slash", "project": h.project, "agent": h.agent, "line": h.line});
+        if let Some(c) = h.cid {
+            v["cid"] = json!(c);
+        }
+        self.typed_cmd(v);
+    }
+
+    /// R8: drop the held `/model` (of `project` only, when given).
+    fn drop_held(&mut self, project: Option<&str>) {
+        if let Some(s) = self.setup.as_mut() {
+            if project.is_none_or(|p| s.held.as_ref().is_some_and(|h| h.project == p)) {
+                s.held = None;
+            }
+        }
     }
 
     /// What the window needs first: his preferences and his accounts (at
@@ -116,6 +186,7 @@ impl Core {
         let Some(s) = &self.setup else { return };
         let items = (s.ports.accounts)();
         self.emit(json!({"ev": "accounts", "items": items}));
+        self.replay_held();
     }
 
     fn setup_error(&mut self, cmd: &str, text: &str) {
@@ -204,7 +275,17 @@ impl Core {
                 self.poll_projects(true);
                 ("project_add", res)
             }
-            AppCmd::ProjectRemove { project } => ("project_remove", self.registry(&project, RegistryOp::Remove)),
+            AppCmd::ProjectRemove { project } => {
+                let res = self.registry(&project, RegistryOp::Remove);
+                if res.is_ok() {
+                    self.drop_held(Some(&project));
+                }
+                ("project_remove", res)
+            }
+            AppCmd::SetupFirstCancel => {
+                self.drop_held(None);
+                return;
+            }
             AppCmd::ProjectMove { project, order } => {
                 ("project_move", self.registry(&project, |path| RegistryOp::Move(path, order as usize)))
             }

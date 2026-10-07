@@ -683,3 +683,77 @@ fn the_index_lists_the_projects_not_held_from_their_files_only() {
     let ids: Vec<&str> = ix["projects"].as_array().unwrap().iter().map(|r| r["project"].as_str().unwrap()).collect();
     assert_eq!(ids, ["shop", "docs", "mail"], "shop is in it now: {ix}");
 }
+
+/// R8 (the TUI's sb.rs /model, architect m_12214): his /model of a
+/// provider with no key is held, never sent: the window gets setup_first
+/// and opens that provider's setup; once the provider works (accounts
+/// after a key set) the line reaches the hub once with its cid. Cancelled
+/// (the window's own, or Electron main's when that window closed) then a
+/// key: nothing reaches the hub. A newer keyless /model replaces the held
+/// one; a ready provider's /model goes straight through.
+#[test]
+fn a_model_whose_provider_has_no_key_waits_for_its_setup() {
+    let ready = |ids: &[&str]| crate::models::TEST_READY.with(|r| *r.borrow_mut() = Some(ids.iter().map(|s| s.to_string()).collect()));
+    ready(&["anthropic"]);
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    super::setup::setup_ports(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    t.take();
+    let model = |cid: u64, m: &str| json!({"cmd": "slash", "project": "shop", "agent": "perf", "line": format!("/model {m}"), "cid": cid});
+    let first = |o: &[Value]| o.iter().find(|v| v["ev"] == "setup_first").cloned();
+    // held: setup_first, nothing to shop's hub
+    typed(&mut t, model(5, "openrouter/qwen/qwen3-coder"));
+    let sf = first(&t.take()).expect("setup_first");
+    assert_eq!(
+        (sf["project"].as_str(), sf["agent"].as_str(), sf["provider"].as_str(), sf["model"].as_str(), sf["cid"].as_u64()),
+        (Some("shop"), Some("perf"), Some("openrouter"), Some("openrouter/qwen/qwen3-coder"), Some(5))
+    );
+    assert_eq!(sf["name"].as_str(), Some("OpenRouter"));
+    // a newer one replaces it
+    typed(&mut t, model(6, "openrouter/x-ai/grok-4"));
+    assert!(first(&t.take()).is_some());
+    // the key works: the newest line reaches the hub, once
+    ready(&["anthropic", "openrouter"]);
+    t.cmd(Cmd::parse(&json!({"cmd": "key_set", "id": "openrouter", "key": "sk-or-1"}).to_string()).unwrap());
+    assert_eq!(w.end("shop").next(), model(6, "openrouter/x-ai/grok-4"));
+    t.cmd(Cmd::parse(&json!({"cmd": "key_set", "id": "openrouter", "key": "sk-or-2"}).to_string()).unwrap());
+    let hi = json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now"});
+    typed(&mut t, hi.clone());
+    assert_eq!(w.end("shop").next(), hi, "the held line went once");
+    // cancelled (or its window closed: Electron main sends the same) then a key: nothing
+    ready(&["anthropic"]);
+    t.take();
+    typed(&mut t, model(7, "openrouter/qwen/qwen3-coder"));
+    assert!(first(&t.take()).is_some());
+    t.cmd(Cmd::parse(r#"{"cmd":"setup_first_cancel"}"#).unwrap());
+    ready(&["anthropic", "openrouter"]);
+    t.cmd(Cmd::parse(&json!({"cmd": "key_set", "id": "openrouter", "key": "sk-or-3"}).to_string()).unwrap());
+    typed(&mut t, hi.clone());
+    assert_eq!(w.end("shop").next(), hi, "a cancelled line never runs");
+    // a ready provider: straight to the hub, no setup_first
+    let ok = model(8, "anthropic/claude-haiku-4-5");
+    typed(&mut t, ok.clone());
+    assert_eq!(w.end("shop").next(), ok);
+    assert!(first(&t.take()).is_none());
+    crate::models::TEST_READY.with(|r| *r.borrow_mut() = None);
+}
+
+/// R14: a file he took from a project's @ list ranks first in that
+/// project's next answers; an unknown project is an error.
+#[test]
+fn a_picked_file_is_remembered_for_its_project() {
+    let mut t = T::new();
+    t.ready();
+    let _w = world(&mut t);
+    super::setup::setup_ports(&mut t);
+    typed(&mut t, json!({"cmd": "file_picked", "project": "nowhere", "path": "a.rs"}));
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("refused");
+    assert_eq!((e["cmd"].as_str(), e["project"].as_str()), (Some("file_picked"), Some("nowhere")));
+    // shop's root has no index here (never searched): a no-op, no error
+    typed(&mut t, json!({"cmd": "file_picked", "project": "shop", "path": "src/b.rs"}));
+    assert!(!t.take().iter().any(|v| v["ev"] == "error"));
+}

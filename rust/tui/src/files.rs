@@ -596,10 +596,24 @@ pub(crate) fn pick(root: &Path, q: &str, limit: usize) -> Pick {
 /// Remember a picked path (boosted in the next searches).
 pub(crate) fn picked(path: &str) {
     if let Some(s) = state().first_mut() {
-        s.recent.retain(|p| p != path);
-        s.recent.insert(0, path.to_string());
-        s.recent.truncate(RECENT);
+        remember(s, path);
     }
+}
+
+/// Remember a path picked in `root`'s list (the window core's projects,
+/// desktop R14): on that root's own index, never the last one searched.
+/// A root with no index (never searched, or evicted past [`ROOTS`])
+/// remembers nothing: a no-op, as its picks went with it.
+pub(crate) fn picked_in(root: &Path, path: &str) {
+    if let Some(s) = state().iter_mut().find(|s| s.root == root) {
+        remember(s, path);
+    }
+}
+
+fn remember(s: &mut State, path: &str) {
+    s.recent.retain(|p| p != path);
+    s.recent.insert(0, path.to_string());
+    s.recent.truncate(RECENT);
 }
 
 #[cfg(test)]
@@ -687,6 +701,32 @@ mod tests {
         assert_eq!(top(&e, "", &["README.md"])[0], "README.md");
         // a recent path-only match does not jump over a name match
         assert_eq!(top(&e, "mention", &["projects/switchboard/docs/at-mentions.md"])[0], "rust/tui/src/sb/mention.rs");
+    }
+
+    /// R14 (architect m_12214): a window's pick lands on its own root's
+    /// index, never the root searched last; a re-pick moves to the front;
+    /// a root with no index (evicted) is a no-op.
+    #[test]
+    fn a_pick_in_a_root_is_remembered_on_that_root_only() {
+        let (a, b) = (PathBuf::from("/r14/project-a"), PathBuf::from("/r14/project-b"));
+        let recent = |r: &Path| state().iter().find(|s| s.root == r).map(|s| s.recent.clone());
+        {
+            let mut g = state();
+            for r in [&a, &b] {
+                g.retain(|s| s.root != *r);
+                g.insert(0, State { root: r.clone(), entries: Arc::new(Vec::new()), built: None, walking: false, recent: Vec::new() });
+            }
+        }
+        // b was searched last (first in the list): a's pick still goes to a
+        picked_in(&a, "src/b.rs");
+        picked_in(&a, "src/c.rs");
+        picked_in(&a, "src/b.rs");
+        assert_eq!(recent(&a).unwrap(), ["src/b.rs", "src/c.rs"]);
+        assert_eq!(recent(&b).unwrap(), Vec::<String>::new());
+        // an evicted (or never searched) root: nothing, no index made
+        picked_in(Path::new("/r14/gone"), "x.rs");
+        assert!(recent(Path::new("/r14/gone")).is_none());
+        state().retain(|s| s.root != a && s.root != b);
     }
 
     #[test]

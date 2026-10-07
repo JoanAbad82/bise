@@ -27,6 +27,8 @@ pub enum Cmd {
     Index,
     Skills { project: String },
     Files { project: String, q: String, rid: u64, limit: Option<u32> },
+    /// R14: a path he took from a workspace's `@` list
+    FilePicked { project: String, path: String },
     Shot { path: PathBuf, app: String, title: String },
     /// S9 (amb-mac m_9035): what the app read of his front app at fn
     /// (talk or spotlight), sent apart from talk_start; `{}` (an excluded
@@ -132,11 +134,12 @@ impl Cmd {
                 bise_proto::draft::AppCmd::CardInView { project, card } => Cmd::CardInView { project, card },
                 other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
-            "commands" | "index" | "skills" | "files" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+            "commands" | "index" | "skills" | "files" | "file_picked" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
                 bise_proto::draft::AppCmd::Commands => Cmd::Commands,
                 bise_proto::draft::AppCmd::Index => Cmd::Index,
                 bise_proto::draft::AppCmd::Skills { project } => Cmd::Skills { project },
                 bise_proto::draft::AppCmd::Files { project, q, rid, limit } => Cmd::Files { project, q, rid, limit },
+                bise_proto::draft::AppCmd::FilePicked { project, path } => Cmd::FilePicked { project, path },
                 other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
             "away_back" => Cmd::AwayBack { away_ms: v.get("away_ms").and_then(Value::as_u64).ok_or("away_back: no away_ms")? },

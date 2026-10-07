@@ -153,6 +153,7 @@ export const core_ev: readonly CoreEv[] = [
   {"ev":"app_update","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","url":"https://github.com/gvergnaud/bise/releases/latest/download/bise-desktop-darwin-arm64.zip","version":"2026.10.2-26"},
   {"error":"a client in an agent's process (perf) can't act as you on hub.sock","ev":"hub_refused","project":"shop-5e6f7a8b"},
   {"ev":"index","projects":[{"agents":[{"archived":false,"main":true,"name":"main","purpose":"","since_ms":1791100000000,"status":"idle","title":"","waits":0}],"artifacts":[{"agent":"writer","at_ms":1791100300000,"id":"q3-notes","kind":"page","new":true,"title":"Q3 notes","url":"http://127.0.0.1:47438/p/q3-notes","version":2}],"artifacts_total":7,"project":"docs-9a8b7c6d","scheduled":[{"agent":"writer","by":"main","done":3,"every":"every day 07:30","id":48,"next_ms":1791140000000,"page":"q3-notes","words":"refresh the Q3 notes"}],"up":false,"written_ms":1791100400000},{"agents":[],"artifacts":[],"project":"mail-1f2e3d4c","up":true}]},
+  {"agent":"perf","cid":12,"ev":"setup_first","model":"openrouter/qwen/qwen3-coder","name":"OpenRouter","project":"acme-1a2b3c4d","provider":"openrouter"},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */
@@ -203,6 +204,8 @@ export const app_cmd: readonly AppCmd[] = [
   {"cmd":"skills","project":"acme-1a2b3c4d"},
   {"cmd":"files","project":"acme-1a2b3c4d","q":"src/ma","rid":7},
   {"cmd":"files","limit":20,"project":"acme-1a2b3c4d","q":"rust/","rid":8},
+  {"cmd":"file_picked","path":"src/main.rs","project":"acme-1a2b3c4d"},
+  {"cmd":"setup_first_cancel"},
   {"cmd":"role_set","effort":"high","model":"mistral/devstral-medium-latest","role":"agents"},
   {"cmd":"role_set","role":"small"},
   {"built":"2026-10-07T10:00:00Z","cmd":"app_version","id":"d25"},

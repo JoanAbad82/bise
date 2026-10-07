@@ -176,6 +176,11 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
     w
 }
 
+/// The fake setup ports alone, for a test of another file (R8 in hubs.rs).
+pub(super) fn setup_ports(t: &mut T) {
+    setup(t);
+}
+
 fn app(t: &mut T, line: &str) {
     let c = Cmd::parse(line).unwrap();
     t.cmd(c);

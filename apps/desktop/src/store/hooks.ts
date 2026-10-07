@@ -123,6 +123,8 @@ export const useHubRefused = (project: string): string | null => useSlice(`hub_r
 export const useVoiceMode = (): VoiceModeState | null => useSlice('voice_mode', (s) => s.voiceModeNow());
 /** ⌘K's index (store.askIndex() once): every project the core doesn't hold, from its files, as of written_ms. */
 export const useIndex = (): readonly IndexRow[] => useSlice('index', (s) => s.index());
+/** R8: the /model the core holds until its provider works (open that provider's setup; setup_first_cancel drops it). */
+export const useSetupFirst = (): EvOf<'setup_first'> | null => useSlice('setup_first', (s) => s.setupFirst());
 export const useCoreState = (): CoreState => useSlice('core', (s) => s.core());
 
 /** A thread's order, before and more (key: threadKey(project, agent)). */

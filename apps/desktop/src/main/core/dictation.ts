@@ -24,6 +24,8 @@ export class DictationRoutes {
   private readonly owners = new Map<string, number>();
   /** voice mode's window and what it is on (one at a time: one mic owner) */
   private voice: { window: number; project: string; agent: string } | null = null;
+  /** R8: the window whose `/model` the core may hold (setup_first): its close drops the held line */
+  private setupOwner: number | null = null;
 
   /** A window's command: a `dictate_start` makes that window its id's owner. */
   sent(window: number, cmd: unknown): void {
@@ -34,6 +36,9 @@ export class DictationRoutes {
     if (c.cmd === 'voice_mode' && c.on === true && typeof c.project === 'string' && typeof c.agent === 'string') {
       this.voice = { window, project: c.project, agent: c.agent };
     }
+    // R8: a typed /model the core may hold until its provider works (one at a time: the newest)
+    if (c.cmd === 'slash' && typeof c.line === 'string' && c.line.trim().startsWith('/model ')) this.setupOwner = window;
+    if (c.cmd === 'setup_first_cancel' && this.setupOwner === window) this.setupOwner = null;
   }
 
   /**
@@ -47,6 +52,8 @@ export class DictationRoutes {
       if (ev.on === false) this.voice = null;
       return v === null ? { to: 'none' } : { to: 'window', window: v.window, ev };
     }
+    // R8: the setup a held /model opens is for the window that typed it
+    if (ev.ev === 'setup_first') return this.setupOwner === null ? { to: 'all' } : { to: 'window', window: this.setupOwner, ev };
     if (ev.ev !== 'dictation') return { to: 'all' };
     const id = typeof ev.id === 'string' ? ev.id : '';
     const window = this.owners.get(id);
@@ -67,6 +74,11 @@ export class DictationRoutes {
       cmds.push({ cmd: 'voice_mode', project: this.voice.project, agent: this.voice.agent, on: false });
       this.voice = null;
     }
+    // R8: a held /model never runs by surprise once its window is gone
+    if (this.setupOwner === window) {
+      cmds.push({ cmd: 'setup_first_cancel' });
+      this.setupOwner = null;
+    }
     return cmds;
   }
 
@@ -77,6 +89,8 @@ export class DictationRoutes {
     const v = this.voice;
     if (v !== null) routes.push({ to: 'window', window: v.window, ev: { ev: 'voice_mode', project: v.project, agent: v.agent, on: false, state: 'listening', note: 'bise stopped' } });
     this.voice = null;
+    // a new core holds nothing (memory only)
+    this.setupOwner = null;
     return routes;
   }
 }

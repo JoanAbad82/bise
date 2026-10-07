@@ -87,7 +87,8 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
   ipcMain.on(CORE_IPC.cmd, (e, cmd: unknown) => {
     dictations.sent(e.sender.id, cmd);
     const name = (cmd as { cmd?: unknown } | null)?.cmd;
-    if (name === 'dictate_start' || name === 'voice_mode') watch(e.sender);
+    // a window whose mic, voice mode or held /model (R8) must end with it
+    if (name === 'dictate_start' || name === 'voice_mode' || name === 'slash') watch(e.sender);
     core?.send(cmd);
   });
   ipcMain.handle(CORE_IPC.stateNow, (): CoreState => state);

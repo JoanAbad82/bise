@@ -98,6 +98,7 @@ export const TAGS = {
   app_update: true,
   hub_refused: true,
   index: true,
+  setup_first: true,
   refused: true,
 } as const satisfies Record<Ev['ev'], true>;
 
@@ -519,6 +520,10 @@ export class Store {
         // ⌘K's index: the projects the core doesn't hold, from their files
         this.put('index', ev.projects);
         return;
+      case 'setup_first':
+        // R8: his /model needs that provider's setup first (the core holds the line)
+        this.put('setup_first', ev);
+        return;
       case 'hub_refused':
         // a project's hub refused this core: its words until he retries
         this.put(`hub_refused:${ev.project}`, ev.error);
@@ -702,6 +707,17 @@ export class Store {
    * project replaced it or the core went down.
    */
   files(project: string, q: string, limit?: number): Promise<FilesAnswer | null> {
+    return this.askFiles(project, q, limit);
+  }
+  /** R14: he took `path` (as `files` answered it; a file, never a folder he browsed) from `project`'s @ list: it ranks first in that list's next answers. */
+  filePicked(project: string, path: string): void {
+    this.command({ cmd: 'file_picked', project, path });
+  }
+  /** R8: the last /model the core holds until its provider works (amb-home's setup opens on it), or null. */
+  setupFirst(): EvOf<'setup_first'> | null {
+    return this.slice<EvOf<'setup_first'> | null>('setup_first', null);
+  }
+  private askFiles(project: string, q: string, limit?: number): Promise<FilesAnswer | null> {
     this.rid += 1;
     const rid = this.rid;
     for (const [r, a] of this.asked) {

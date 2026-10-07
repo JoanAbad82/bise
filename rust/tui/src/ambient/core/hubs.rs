@@ -296,6 +296,10 @@ impl Core {
         if cmd != "unsubscribe" && !self.folder_exists(&row.path) {
             return self.project_error(&project, &cmd, &format!("{}: its folder is gone", row.name), cid, None);
         }
+        // R8: a /model whose provider has no key waits for its setup (setup.rs)
+        if cmd == "slash" && self.hold_if_keyless(&project, &agent, &s("line"), cid) == super::setup::Hold::Held {
+            return;
+        }
         if track(&mut self.hubs.subs, &cmd, &project, &agent) {
             self.hold();
         }

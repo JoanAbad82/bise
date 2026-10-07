@@ -1088,14 +1088,6 @@ fn model_overrides(app: &App) -> Vec<(String, String)> {
         .collect()
 }
 
-/// `/model <model> [default]` of a provider without a key: its provider
-/// id and the full model id.
-fn model_needs_key(typed: &str) -> Option<(String, String)> {
-    let arg = typed.split_whitespace().nth(1)?;
-    let full = crate::models::full_name(arg)?;
-    crate::models::keyless(&full).map(|(id, _)| (id, full))
-}
-
 /// One line typed by the user: the client's own commands (/voice,
 /// /quit, /clear, /help, /theme…) here, the rest goes to the hub.
 pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
@@ -1273,8 +1265,8 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
         }
         // a model whose provider has no key: set it up first, then the
         // line runs (never saved blindly, BISE-294)
-        "/model" if model_needs_key(&typed).is_some() => {
-            let (id, model) = model_needs_key(&typed).unwrap_or_default();
+        "/model" if crate::models::model_needs_key(&typed).is_some() => {
+            let (id, model) = crate::models::model_needs_key(&typed).unwrap_or_default();
             crate::onboarding::provider_request(crate::onboarding::Ask {
                 provider: Some(id),
                 model: Some(model),

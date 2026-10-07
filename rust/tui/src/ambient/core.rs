@@ -372,6 +372,7 @@ impl Core {
             Cmd::Index => self.index_cmd(now),
             Cmd::Skills { project } => self.pick_skills(project),
             Cmd::Files { project, q, rid, limit } => self.pick_files(project, q, rid, limit),
+            Cmd::FilePicked { project, path } => self.file_picked(project, path),
             Cmd::Shot { path, app, title } => self.take_shot(&path, app, title),
             // the latest fn wins; an excluded app's `{}` clears
             Cmd::AwayBack { away_ms } => self.away_back(away_ms),
