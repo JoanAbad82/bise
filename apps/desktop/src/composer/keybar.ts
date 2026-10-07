@@ -72,6 +72,7 @@ export function barPairs(mode: BarMode, typing: boolean): readonly Pair[] {
     case 'quote':
       return [
         ['type', 'to ask about it'],
+        ['tab', 'quote'],
         ['⌘C', 'copy'],
         ['esc', 'drop'],
       ];

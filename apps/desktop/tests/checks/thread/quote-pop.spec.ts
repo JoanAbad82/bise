@@ -1,8 +1,8 @@
 // thread/quote-pop · quoting a selection made easier (lead m_11968, the TUI's quote-keys twin):
-// text selected in the thread shows the selection pop under it ('type to ask about it · ⌘C copy');
+// text selected in the thread shows the selection pop under it ('type to ask about it · tab quote · ⌘C copy');
 // Space starts the quote like a letter (the chip, then the space); a click on the ask words puts
 // the quote in the composer AT HIS CARET with nothing typed; the review's pop does the same for
-// diff lines (the thread opens with the chip alone). The quote key joins when main picks it.
+// diff lines (the thread opens with the chip alone); tab quotes with nothing typed in both (the TUI's key, main m_12004).
 // The scripted core (FakeCore). Owner: amb-web.
 import type { Page } from '@playwright/test';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
@@ -57,7 +57,7 @@ async function selectAnswer(page: Page): Promise<void> {
 /** The field as it reads: words and chips ('❝ 1') in order. */
 const fieldText = (page: Page): Promise<string> => page.getByTestId('composer.field').evaluate((el) => el.textContent);
 
-test('thread/quote-pop: the pop under a selection, Space starts the quote, a click quotes at the caret with nothing typed', async () => {
+test('thread/quote-pop: the pop under a selection, Space starts the quote, tab quotes alone, a click quotes at the caret with nothing typed', async () => {
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: `agent/${HOME}/main` });
   try {
@@ -68,7 +68,7 @@ test('thread/quote-pop: the pop under a selection, Space starts the quote, a cli
     // Space: the quote, then the space, like a letter
     await selectAnswer(page);
     const pop = page.getByTestId('thread.quote.pop');
-    await expect(pop, 'the pop under the selection').toHaveText('type to ask about it · ⌘C copy');
+    await expect(pop, 'the pop under the selection').toHaveText('type to ask about it · tab quote · ⌘C copy');
     await page.screenshot({ path: test.info().outputPath('pop.png') });
     await page.keyboard.press('Space');
     await expect(chip, 'a quote chip').toHaveText('❝ 1');
@@ -76,6 +76,17 @@ test('thread/quote-pop: the pop under a selection, Space starts the quote, a cli
     await expect(pop, 'the pop goes with the selection').toBeHidden();
     await page.keyboard.type('why?');
     expect(await fieldText(page)).toBe('❝ 1 why?');
+
+    // tab: the quote alone, nothing typed (the TUI's key, main m_12004)
+    await page.keyboard.press('Meta+a');
+    await page.keyboard.press('Backspace');
+    await expect(chip).toHaveCount(0);
+    await selectAnswer(page);
+    await page.keyboard.press('Tab');
+    await expect(chip, 'a quote chip').toHaveCount(1);
+    expect(await fieldText(page), 'the chip alone, nothing typed').toBe('❝ 1');
+    await expect(field, 'the field has the focus').toBeFocused();
+    await expect(pop, 'the pop goes with the selection').toBeHidden();
 
     // a click on the ask words: the quote at his caret, nothing typed, the caret after the chip
     await page.keyboard.press('Meta+a');
@@ -115,8 +126,34 @@ test('review/quote-pop: a click on the pop asks about the picked lines, the thre
     await line(3).hover();
     await page.mouse.up();
     const pop = page.getByTestId('review.quote.pop');
-    await expect(pop).toHaveText('type to ask perf about it · ⌘C copy');
+    await expect(pop).toHaveText('type to ask perf about it · tab quote · ⌘C copy');
     await page.getByTestId('review.quote.pop.ask').click();
+    await expect(page.locator('[data-testid="thread.screen"][data-agent="perf"]'), "perf's thread").toBeVisible({ timeout: 5000 });
+    const chip = page.locator('[data-testid="composer.chip.1"][data-kind="quote"]');
+    await expect(chip, 'a quote chip').toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('src/query.rs:10-11 · 3 lines')).toBeVisible();
+    expect(await fieldText(page), 'nothing typed after it').toMatch(/^❝ 1 ?$/u);
+  } finally {
+    await s.close();
+    core.dispose();
+  }
+});
+
+test('review/quote-pop: tab asks about the picked lines, the thread opens with the chip alone', async () => {
+  const P = 'acme-1a2b3c4d';
+  const core = new FakeCore();
+  const s = await launchDesktop({ core, route: `review/${P}/perf` });
+  try {
+    const { page } = s;
+    const line = (i: number) => page.getByTestId(`review.file.0.${i}`);
+    await expect(line(1)).toBeVisible({ timeout: 10_000 });
+    await line(1).hover();
+    await page.mouse.down();
+    await line(3).hover();
+    await page.mouse.up();
+    const pop = page.getByTestId('review.quote.pop');
+    await expect(pop).toBeVisible();
+    await page.keyboard.press('Tab');
     await expect(page.locator('[data-testid="thread.screen"][data-agent="perf"]'), "perf's thread").toBeVisible({ timeout: 5000 });
     const chip = page.locator('[data-testid="composer.chip.1"][data-kind="quote"]');
     await expect(chip, 'a quote chip').toBeVisible({ timeout: 3000 });

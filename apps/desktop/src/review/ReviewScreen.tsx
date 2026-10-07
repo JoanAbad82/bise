@@ -86,9 +86,11 @@ export function ReviewScreen({ project, agent, commit }: { project: string; agen
       void (window as Partial<Window>).bise?.copy(qs.map((q) => q.text).join('\n'));
       return true;
     }
-    if (e.key.length !== 1 || e.metaKey || e.ctrlKey || e.altKey || qs.length === 0) return false;
+    // tab: the quote alone, nothing typed (the TUI's key, main m_12004)
+    const tab = e.key === 'Tab' && !e.shiftKey;
+    if ((!tab && e.key.length !== 1) || e.metaKey || e.ctrlKey || e.altKey || qs.length === 0) return false;
     e.preventDefault();
-    handQuotes({ project, agent: target, from, quotes: qs, key: e.key });
+    handQuotes({ project, agent: target, from, quotes: qs, key: tab ? '' : e.key });
     router.go({ screen: 'thread', project, agent: target });
     return true;
   };

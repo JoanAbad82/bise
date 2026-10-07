@@ -316,7 +316,7 @@ describe('the key bar (keybar.rs, W9)', () => {
     expect(barMode({ ...st, fileList: true, selected: true })).toBe('file');
     expect(line('file')).toContain('→ open a folder');
     expect(barMode({ ...st, quoting: true })).toBe('quote');
-    expect(line('quote')).toBe('type to ask about it   ⌘C copy   esc drop');
+    expect(line('quote')).toBe('type to ask about it   tab quote   ⌘C copy   esc drop');
     expect(barMode({ ...st, selected: true, busy: true })).toBe('selection');
     expect(barMode({ ...st, busy: true, images: true })).toBe('steer');
     expect(line('steer', true)).toBe('tab queue   ⏎ steer   esc stop');

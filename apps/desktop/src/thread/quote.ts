@@ -1,7 +1,7 @@
 // Quoting the thread (his bug 3, parity M6/B7; the TUI's quote.rs and
 // input.rs:415): text selected in the thread, then a key typed, goes into the
 // composer as a quote chip (`❝ 1`, its strip 'first words… main · 3 lines')
-// followed by that key; ⌘' quotes without typing. Pure rules here; the
+// followed by that key; tab (the TUI's key) and ⌘' quote without typing. Pure rules here; the
 // listeners are in ThreadScreen. Owner: amb-win.
 
 export interface KeyLike {
@@ -18,8 +18,10 @@ const GRAPHEMES = new Intl.Segmenter();
  * quote goes in, then the key), 'quote' (⌘': the quote alone), or nothing
  * (moves, copies, the window's keys). Pure.
  */
-export function quoteKey(e: KeyLike): 'type' | 'quote' | undefined {
+export function quoteKey(e: KeyLike & { readonly shiftKey?: boolean }): 'type' | 'quote' | undefined {
   if (e.metaKey && !e.ctrlKey && !e.altKey && e.key === "'") return 'quote';
+  // tab: the quote alone, the TUI's key (main m_12004, quote-keys)
+  if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey && e.shiftKey !== true) return 'quote';
   if (e.metaKey || e.ctrlKey) return undefined;
   // one character (a letter, a digit, a space, an accent typed with ⌥): his words begin
   return Array.from(GRAPHEMES.segment(e.key)).length === 1 ? 'type' : undefined;

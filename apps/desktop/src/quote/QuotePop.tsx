@@ -1,15 +1,18 @@
 // The selection pop (lead m_11968, the TUI's quote.rs pill, designer m_11973's words and order):
-// over text selected in the thread or lines picked in a review, ' type to ask about it · ⌘C copy '.
-// Each part is a control: a click on the ask words quotes the selection into the composer at
-// the caret (nothing typed), a click on '⌘C copy' copies it. A press never takes the focus or
-// the selection (they are what it acts on). The quote key ('<key> quote', between the two)
-// comes when main picks it (quote-keys sets it for the TUI; same key in both). Owner: amb-web.
+// over text selected in the thread or lines picked in a review,
+// ' type to ask about it · tab quote · cmd+c copy ' in the TUI, here 'type to ask about it · tab quote · ⌘C copy'
+// (tab is the quote key in both, main m_12004; the desktop's key words are its key bar's: 'tab', '⌘C').
+// Each part is a control: a click on the ask words or on 'tab quote' quotes the selection into the
+// composer at the caret (nothing typed), a click on '⌘C copy' copies it. A press never takes the
+// focus or the selection (they are what it acts on). Designer's order rule (m_11973): when the pop
+// must shrink, '⌘C copy' goes first, then 'tab quote'. Owner: amb-web.
 import type { MouseEvent, ReactNode } from 'react';
 import './quote.css';
 
 /** The words (one place, so the thread's pop and the review's read the same). */
 export const QW = {
   ask: (to?: string): string => (to === undefined ? 'type to ask about it' : `type to ask ${to} about it`),
+  key: 'tab quote',
   copy: '⌘C copy',
 } as const;
 
@@ -32,8 +35,12 @@ export function QuotePop({ to, onAsk, onCopy, testId }: QuotePopProps): ReactNod
       <button type="button" tabIndex={-1} className="q-part" data-testid={`${testId}.ask`} onMouseDown={keep} onClick={onAsk}>
         {QW.ask(to)}
       </button>
-      <span className="q-dot"> · </span>
-      <button type="button" tabIndex={-1} className="q-part" data-testid={`${testId}.copy`} onMouseDown={keep} onClick={onCopy}>
+      <span className="q-dot q-key"> · </span>
+      <button type="button" tabIndex={-1} className="q-part q-key" data-testid={`${testId}.key`} onMouseDown={keep} onClick={onAsk}>
+        {QW.key}
+      </button>
+      <span className="q-dot q-copy"> · </span>
+      <button type="button" tabIndex={-1} className="q-part q-copy" data-testid={`${testId}.copy`} onMouseDown={keep} onClick={onCopy}>
         {QW.copy}
       </button>
     </span>

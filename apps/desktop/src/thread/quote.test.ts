@@ -10,6 +10,9 @@ describe('quoting the thread (his bug 3, quote.rs)', () => {
     expect(quoteKey(k('é'))).toBe('type');
     expect(quoteKey(k('ø', { altKey: true }))).toBe('type');
     expect(quoteKey(k("'", { metaKey: true }))).toBe('quote');
+    expect(quoteKey(k('Tab'))).toBe('quote');
+    expect(quoteKey({ ...k('Tab'), shiftKey: true })).toBeUndefined();
+    expect(quoteKey(k('Tab', { metaKey: true }))).toBeUndefined();
     expect(quoteKey(k('c', { metaKey: true }))).toBeUndefined();
     expect(quoteKey(k('a', { ctrlKey: true }))).toBeUndefined();
     expect(quoteKey(k('ArrowDown'))).toBeUndefined();
