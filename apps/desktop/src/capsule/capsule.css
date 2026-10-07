@@ -8,9 +8,10 @@ html:has(.b-capsule), body:has(.b-capsule) { margin: 0; background: transparent;
    shows through (a CSS backdrop-filter sees nothing of the apps behind a window anyway). */
 .b-capsule { position: relative; width: fit-content; padding: 0; }
 .b-cap-glass, .b-cap-talk, .b-cap-answer { width: 640px; box-sizing: border-box; }
-.b-capsule .b-spot, .b-capsule .b-card, .b-capsule .b-menu { background: transparent; backdrop-filter: none; box-shadow: none; border-radius: 0; }
+.b-capsule .b-spot, .b-capsule .b-menu { background: transparent; backdrop-filter: none; box-shadow: none; border-radius: 0; }
 .b-capsule .b-spot { width: 640px; }
-.b-capsule .b-card { width: 560px; }
+/* the card is amb-home's InboxCard v2 on surface 'glass' (.ic.glass: no fill, no shadow) */
+.b-cap-card { width: 560px; }
 .b-cap-pearl { position: absolute; left: 18px; top: 14px; width: 40px; height: 40px; z-index: 2; pointer-events: none; }
 .b-cap-pearl.off { visibility: hidden; }
 .b-cap-hole { display: inline-block; width: 40px; height: 40px; flex: none; }

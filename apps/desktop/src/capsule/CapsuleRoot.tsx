@@ -211,14 +211,18 @@ export function CapsuleRoot(): JSX.Element {
       const [project = '', n = ''] = id.split(/\.(?=[^.]+$)/u);
       const c: Card | undefined = store.cards(project).find((x) => String(x.id) === n);
       if (c === undefined) return null;
-      // amb-home's card (ff4c4013): no state, no keys; the capsule owns them
+      // amb-home's card v2 (98ac9ea7): the inbox's option rows on the capsule's glass; with
+      // acts.open its footer says '1–3 pick   ⏎ open in bise   esc later' by itself
       return (
         <InboxCard
           card={c}
           project={store.projects().find((p) => p.project === project)?.name}
           now={Date.now()}
-          keys="1 2 pick   esc later"
+          surface="glass"
           acts={{
+            later: () => {
+              dispatch({ ev: 'close' });
+            },
             pick: (n) => {
               store.answer(project, c.id, String(n));
             },

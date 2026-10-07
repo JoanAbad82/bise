@@ -81,6 +81,11 @@ test('native/capsule: a card bise pushes shows at the bottom without the keys', 
     await core.send(push);
     expect(await out.wait(CAPSULE, (l) => l.startsWith('show')), 'the card shows at the bottom, never with the keys').toBe('show bottom');
     await expect(cap.getByTestId('capsule.card'), 'the card is drawn').toBeVisible();
+    // the inbox card v2 on the glass (amb-home 98ac9ea7): its own footer, '⏎ open in bise' and 'esc later'
+    await expect(cap.locator('[data-testid="capsule.card"] .ic.glass'), 'the inbox card on the glass').toBeVisible();
+    await expect(cap.getByTestId('capsule.card.view.open'), '⏎ open in bise').toBeVisible();
+    await expect(cap.getByTestId('capsule.card.view.later'), 'esc later').toBeVisible();
+    await expect(cap.getByTestId('capsule.card'), 'no old fixed keys line').not.toContainText('1 2 pick');
     const focused = await s.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((b) => b.isFocused()).length);
     expect(focused, 'no window of bise is focused').toBe(0);
   }, { core: new FakeCore(start) });
