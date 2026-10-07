@@ -94,6 +94,21 @@ describe('the core line (bar S.5)', () => {
     expect(coreLine('starting', { wasUp: false, slow: false })).toBeUndefined();
     expect(coreLine('starting', { wasUp: false, slow: true })).toBe('starting bise…');
   });
+
+  it('says how the core ended while it comes back; a panic or a fatal signal is a crash', async () => {
+    const { coreLine, exitWords } = await import('./CoreLine');
+    const base = { code: null, signal: null, crash: false, last: '', log: null, at_ms: 1 };
+    const code2 = { ...base, how: 'code' as const, code: 2 };
+    expect(coreLine('down', { wasUp: true, slow: false, exit: code2 })).toBe('bise stopped (exit 2) · starting it again…');
+    expect(coreLine('starting', { wasUp: true, slow: false, exit: code2 })).toBe('bise stopped (exit 2) · starting it again…');
+    expect(coreLine('up', { wasUp: true, slow: false, exit: code2 }), 'gone once it is up').toBeUndefined();
+    const panic = { ...base, how: 'code' as const, code: 101, crash: true, last: 'no hub for acme', log: '/u/core.log' };
+    expect(coreLine('down', { wasUp: true, slow: false, exit: panic })).toBe('bise crashed · starting it again…');
+    expect(exitWords({ ...base, how: 'signal', signal: 'SIGSEGV', crash: true })).toBe('bise crashed');
+    expect(exitWords({ ...base, how: 'signal', signal: 'SIGTERM' })).toBe('bise stopped (SIGTERM)');
+    expect(exitWords({ ...base, how: 'clean', code: 0 })).toBe('bise stopped');
+    expect(exitWords({ ...base, how: 'failed', last: 'spawn ENOENT' })).toBe("bise couldn't start");
+  });
 });
 
 describe("the projects the window shows (the core's 'shown')", () => {

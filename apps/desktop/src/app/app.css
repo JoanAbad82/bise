@@ -40,6 +40,34 @@
   color: var(--c-text-2);
 }
 
+.app-core-head {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+
+/* a crash's report: plain words in ink, as links */
+.app-core-act {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--c-ink);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* the core's last stderr line, dim mono under the words */
+.app-core-last {
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--c-text-3, var(--c-text-2));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* ⌘K's palette: over the window, the spotlight's look */
 .app-palette {
   position: fixed;
