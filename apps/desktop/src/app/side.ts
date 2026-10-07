@@ -6,6 +6,7 @@
 // Sidebar.tsx and App.tsx draw these.
 import type { Agent, ProjectRow } from '@/proto';
 import { MAIN, type Route } from './route';
+import { shortAge } from '@/agents/model';
 
 /** A sign's tone: ink (at work), accent (asks him), err (failed), dim (the rest). */
 export type Tone = 'ink' | 'acc' | 'err' | 'dim';
@@ -29,14 +30,9 @@ const hm = (ms: number) => {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-/** A turn's length, short: '40s', '6m', '1h 12m'. */
+/** A turn's length, in the one short age (ambient m_12439): 'now', '6 min', '2 h', '3 d'. */
 export function turnShort(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  if (s < 60) return `${String(s)}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${String(m)}m`;
-  const h = Math.floor(m / 60);
-  return m % 60 === 0 ? `${String(h)}h` : `${String(h)}h ${String(m % 60)}m`;
+  return shortAge(ms);
 }
 
 /**

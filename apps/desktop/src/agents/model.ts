@@ -21,15 +21,22 @@ export function dotOf(s: Status): DotState {
   }
 }
 
-/** How long ago, short: "now", "4 min", "2 h", "3d". */
-export function ago(ms: number, now: number): string {
-  const s = Math.max(0, Math.floor((now - ms) / 1000));
-  if (s < 60) return 'now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m} min`;
+/**
+ * A length of time, short, the same everywhere (ambient m_12439: the
+ * sidebar's turn time, the head's age, the inbox card's age()): "now",
+ * "4 min", "2 h", "3 d". Pure.
+ */
+export function shortAge(ms: number): string {
+  const m = Math.floor(Math.max(0, ms) / 60_000);
+  if (m < 1) return 'now';
+  if (m < 60) return `${String(m)} min`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} h`;
-  return `${Math.floor(h / 24)}d`;
+  return h < 24 ? `${String(h)} h` : `${String(Math.floor(h / 24))} d`;
+}
+
+/** How long ago, short (shortAge). */
+export function ago(ms: number, now: number): string {
+  return shortAge(now - ms);
 }
 
 /** A row's end: what waits on him first (accent), else its state or age. */

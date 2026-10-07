@@ -107,6 +107,8 @@ test('thread/streaming: a reply grows in place, whole words only, no raw marks, 
     await say(core, ANSWER.slice(0, ANSWER.indexOf('| warm')));
     await page.waitForTimeout(320);
     await shoot('mid-stream');
+    // the table is the last block: the ∿ sits under it with no line of its own (ambient m_12439)
+    expect(await page.getByTestId('thread.stream.wave').evaluate((w) => getComputedStyle(w).position), 'the sign under a table takes no height').toBe('absolute');
     await say(core, ANSWER);
     await page.waitForTimeout(320);
     for (const f of frames) {

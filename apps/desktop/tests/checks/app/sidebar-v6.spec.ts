@@ -82,7 +82,7 @@ test('app/sidebar-v6: the sidebar, the titlebar, panel A at 1400 px; the slide-o
     await expect(page.getByTestId('app.sidebar.agent.ci-fix')).toContainText('failed');
     await expect(sign('deploy-watch')).toHaveText('◷');
     await expect(sign('size-filter')).toHaveText('✓');
-    await expect(page.getByTestId('app.sidebar.agent.perf')).toContainText('14m');
+    await expect(page.getByTestId('app.sidebar.agent.perf')).toContainText('14 min');
     expect(Math.round((await sign('perf').boundingBox())?.width ?? 0), 'the sign column is 15 px').toBe(15);
     // done for hours: folded
     const more = page.getByTestId(`app.sidebar.project.${P}.more`);

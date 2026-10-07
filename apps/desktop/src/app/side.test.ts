@@ -16,8 +16,8 @@ describe('an agent sign', () => {
     expect(signOf(agent('search', 'working', { waits: 1 }), NOW)).toMatchObject({ g: '?', tone: 'acc', end: '', count: 1 });
   });
   it('at work: ∿ in ink and its turn time', () => {
-    expect(signOf(agent('perf', 'working', { turn_ms: 14 * 60_000 }), NOW)).toMatchObject({ g: '∿', tone: 'ink', end: '14m', count: 0 });
-    expect(signOf(agent('perf', 'working', { since_ms: NOW - 6 * 60_000 }), NOW).end).toBe('6m');
+    expect(signOf(agent('perf', 'working', { turn_ms: 14 * 60_000 }), NOW)).toMatchObject({ g: '∿', tone: 'ink', end: '14 min', count: 0 });
+    expect(signOf(agent('perf', 'working', { since_ms: NOW - 6 * 60_000 }), NOW).end).toBe('6 min');
   });
   it('waiting on someone: ⋯ with who on hover; failed: ✗ and failed in err', () => {
     const w = signOf(agent('a', 'waiting'), NOW);
@@ -32,7 +32,7 @@ describe('an agent sign', () => {
     expect(signOf(agent('x', 'idle'), NOW)).toMatchObject({ g: '–', end: 'stopped' });
   });
   it('turn words are short', () => {
-    expect([turnShort(40_000), turnShort(6 * 60_000), turnShort(72 * 60_000), turnShort(120 * 60_000)]).toEqual(['40s', '6m', '1h 12m', '2h']);
+    expect([turnShort(40_000), turnShort(6 * 60_000), turnShort(72 * 60_000), turnShort(120 * 60_000), turnShort(84 * 3_600_000)]).toEqual(['now', '6 min', '1 h', '2 h', '3 d']);
   });
 });
 

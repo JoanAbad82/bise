@@ -778,6 +778,18 @@
   color: var(--c-text-2);
   animation: b-pulse 0.9s ease-in-out infinite alternate;
 }
+/* after a table or a code box: under it, at the column's left edge, no layout height (ambient m_12439) */
+.th-answer .th-md {
+  position: relative;
+}
+.th-answer .th-wave-under {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  margin-left: 0;
+  line-height: 1;
+  transform: translateY(100%);
+}
 /* the window not in front, or reduced motion: the text still comes, no fade, the ∿ still */
 .th-answer.th-still .th-w,
 .th-answer.th-still .th-in,

@@ -40,7 +40,7 @@ describe('the agents list', () => {
     expect(endOf(ag('a', { status: 'done' }), T)).toEqual({ text: 'done', needs: false });
     expect(ago(T, T + 30_000)).toBe('now');
     expect(ago(T, T + 3 * 3_600_000)).toBe('3 h');
-    expect(ago(T, T + 50 * 3_600_000)).toBe('2d');
+    expect(ago(T, T + 50 * 3_600_000)).toBe('2 d');
     expect(lineOf(ag('a', { purpose: 'make it fast' }))).toBe('make it fast');
     expect(lineOf(ag('a', { title: 'profiling', purpose: 'x' }))).toBe('profiling');
   });

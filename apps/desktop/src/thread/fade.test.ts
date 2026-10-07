@@ -55,4 +55,10 @@ describe('the new words of a streamed answer fade in (text-appearing v2)', () =>
     const li = tree.children?.[1]?.children?.[0];
     expect(li?.children?.at(-1)?.children?.[0]?.value).toBe('∿');
   });
+  it('after a table or a code box the sign sits under it, with no line of its own (th-wave-under)', () => {
+    const tree = root(el('p', [t('sizes:')]), el('table', [el('tr', [el('td', [t('1')])])]));
+    fade({ from: Infinity, wave: true })(tree);
+    const wave = tree.children?.at(-1);
+    expect(wave?.properties?.className).toEqual(['th-wave', 'th-wave-under']);
+  });
 });

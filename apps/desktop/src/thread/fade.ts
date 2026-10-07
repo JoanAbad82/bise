@@ -108,19 +108,24 @@ function mark(n: HNode, from: number, at: { i: number }, w: { k: number; step: n
   n.children = out;
 }
 
-/** The element the '∿' goes in: the last block with words (a paragraph, a list item, a heading). */
-function lastHome(root: HNode): HNode {
+/**
+ * Where the '∿' goes: inline at the end of the last block with words (a
+ * paragraph, a list item, a heading); after a table or a code box, in the
+ * answer itself, drawn under that block with no height of its own
+ * (th-wave-under: ambient m_12439, else it took a line that went at the end).
+ */
+export function lastHome(root: HNode): { home: HNode; inline: boolean } {
   let n = root;
   for (;;) {
     const last = [...(n.children ?? [])].reverse().find((c) => c.type === 'element');
-    if (last === undefined) return n;
+    if (last === undefined) return { home: n, inline: n !== root };
     const t = last.tagName ?? '';
     if (t === 'ul' || t === 'ol' || t === 'li' || t === 'blockquote') {
       n = last;
       continue;
     }
-    if (t === 'p' || /^h[1-6]$/.test(t)) return last;
-    return n;
+    if (t === 'p' || /^h[1-6]$/.test(t)) return { home: last, inline: true };
+    return { home: root, inline: false };
   }
 }
 
@@ -133,8 +138,8 @@ export function fade(opts: FadeOpts) {
       mark(tree, opts.from, { i: 0 }, { k: 0, step: staggerOf(words) }, false);
     }
     if (opts.wave === true) {
-      const home = lastHome(tree);
-      (home.children ??= []).push({ type: 'element', tagName: 'span', properties: { className: ['th-wave'], ariaHidden: 'true', dataTestid: 'thread.stream.wave' }, children: [{ type: 'text', value: '∿' }] });
+      const { home, inline } = lastHome(tree);
+      (home.children ??= []).push({ type: 'element', tagName: 'span', properties: { className: inline ? ['th-wave'] : ['th-wave', 'th-wave-under'], ariaHidden: 'true', dataTestid: 'thread.stream.wave' }, children: [{ type: 'text', value: '∿' }] });
     }
     opts.onTotal?.(total);
   };
