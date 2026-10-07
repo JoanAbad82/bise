@@ -66,7 +66,7 @@ impl Core {
                     t.text.push_str(&w);
                     words = true;
                     if t.ending.is_none() {
-                        evs.push(json!({"ev": "heard", "text": t.text.trim(), "final": false}));
+                        evs.push(heard(t.text.trim(), false));
                     }
                 }
                 Ok(Heard::Flushed) => {
@@ -240,7 +240,7 @@ impl Core {
     pub(super) fn finish_talk(&mut self) {
         let Some(t) = self.talk.take() else { return };
         let words = t.text.trim().to_string();
-        self.emit(json!({"ev": "heard", "text": words, "final": true}));
+        self.emit(heard(&words, true));
         if let Some(page) = &t.page {
             // nothing heard: no note; the word "send" alone sends the
             // page's notes (§4.1)
@@ -279,4 +279,10 @@ impl Core {
             Err(_) => self.error("main can't see this window: the screenshot didn't save."),
         }
     }
+}
+
+/// fn's talk words as the app reads them: bise-proto's CoreEv::Heard, its
+/// one owner (architect m_11629), the whole text so far or, `done`, all of it.
+fn heard(text: &str, done: bool) -> Value {
+    serde_json::to_value(bise_proto::draft::CoreEv::Heard { text: text.to_string(), is_final: done }).unwrap_or_default()
 }
