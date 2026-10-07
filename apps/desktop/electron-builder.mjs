@@ -5,6 +5,11 @@
 //                                        so macOS charges its permissions to the app
 //                                        (src/main/helper/run.ts helperPath)
 //   Contents/Resources/pearl/*.png       the tray's pearl frames (src/main/tray.ts)
+// Its icon is resources/icon.png (1024 px, the Swift app's), made an .icns here.
+// A try build (amb-tools' 'bise-ambient --try') gets its own identity so it
+// never shares his app's userData, single-instance lock or permissions:
+// BISE_PACK_APP_ID (default dev.bise.desktop) and BISE_PACK_NAME (default
+// 'bise'; it names the .app, the menus and ~/Library/Application Support/<name>).
 // Both binaries are built before, never here (the Rust build takes the heavy
 // lock): BISE_PACK_BISE and BISE_PACK_HELPER give their paths; a missing one
 // stops the build with its name.
@@ -51,14 +56,17 @@ function signStable(appPath) {
   execFileSync('codesign', ['--verify', '--deep', '--strict', appPath]);
 }
 
+const appId = process.env['BISE_PACK_APP_ID'] || 'dev.bise.desktop';
+const productName = process.env['BISE_PACK_NAME'] || 'bise';
+
 export default {
-  appId: 'dev.bise.desktop',
+  appId,
   afterPack: (ctx) => {
     if (signDir !== undefined && ctx.electronPlatformName === 'darwin') {
       signStable(join(ctx.appOutDir, `${ctx.packager.appInfo.productFilename}.app`));
     }
   },
-  productName: 'bise',
+  productName,
   directories: { output: 'dist' },
   files: ['out/**', 'package.json'],
   asar: true,
@@ -68,6 +76,7 @@ export default {
   ],
   mac: {
     category: 'public.app-category.developer-tools',
+    icon: 'resources/icon.png',
     target: ['dir'],
     // signing: electron-builder rewrites Info.plist and adds the helper and
     // bise, which breaks Electron's own seal, so a dir build is re-signed

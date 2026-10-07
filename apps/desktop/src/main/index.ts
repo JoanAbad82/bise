@@ -47,8 +47,10 @@ if (testMode) {
 }
 
 // the menu bar says 'bise' (Quit bise, Hide bise, About bise), not the
-// package's name (qa-native m_9724)
-app.setName('bise');
+// package's name (qa-native m_9724). A packaged app already has its
+// productName ('bise', or a try build's own: electron-builder.mjs), which also
+// names its userData folder, so it keeps it.
+if (!app.isPackaged) app.setName('bise');
 
 if (testMode) {
   // never his ~/Library/Application Support: the harness's folder, else a fresh temp one
