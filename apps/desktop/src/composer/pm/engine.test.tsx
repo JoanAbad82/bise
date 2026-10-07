@@ -1,28 +1,25 @@
 // @vitest-environment happy-dom
-// The TipTap engine against the Lexical one (architect m_11500):
-//   (1) the wire: the same content gives byte-identical text and files on both paths (Lexical's
-//       $readSegments vs pmtext's segmentsOf, then message.ts's buildMessage). GOLDEN holds the
-//       expected sends: it stays as the fixture when Lexical goes (slice 4);
-//   (2) old drafts: a real Lexical editor-state JSON (draft, history, queue; every chip kind)
-//       reads back as the same segments; one that doesn't read keeps its raw JSON aside;
+// The TipTap engine's laws from architect m_11500, kept after the Lexical engine went (slice 4):
+//   (1) the wire: each content of golden.ts sends exactly its golden text and files (the table
+//       was proven byte-identical to the Lexical engine's sends before it went, b04dd6b3);
+//   (2) old drafts: the Lexical engine's saved entries (fixtures/lexical-entries.json, made by it)
+//       read back and send the same; a draft, history and queue it saved come back in the field;
+//       an entry that doesn't read keeps its raw JSON aside;
 //   (3) a draft saved and a send made while dictation is live hold none of its words.
 import { act, cleanup, render } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { $createLineBreakNode, $createParagraphNode, $createTextNode, $getRoot, createEditor } from 'lexical';
 import { getSchema } from '@tiptap/core';
 import type { Node as PmNode } from '@tiptap/pm/model';
-import { $createChipNode, ChipNode as LexicalChip } from '../ChipNode';
-import { $readSegments } from '../read';
-import { buildMessage, type Outgoing } from '../message';
-import { entryOf, entrySegments, lexicalJsonOf } from '../entry';
+import { buildMessage } from '../message';
+import { entryOf, entrySegments } from '../entry';
 import { load, type Store } from '../drafts';
-import type { ComposerActions } from '../Brain';
+import type { ComposerActions } from '../actions';
 import type { ComposerSources, DictateState } from '../sources';
 import { NO_SOURCES } from '../sources';
 import { FIELD_NODES } from './schema';
-import { CASES, img, paste, quote, type Content } from './golden';
+import { CASES, type Content } from './golden';
 import { nodeType, segmentsOf } from './pmtext';
 import { PmField } from './PmField';
 
@@ -30,33 +27,13 @@ afterEach(cleanup);
 
 const schema = getSchema(FIELD_NODES);
 
-/** The content in a headless Lexical editor (the old engine's nodes), and its editor-state JSON. */
-function lexical(content: Content): { out: Outgoing; json: string } {
-  const editor = createEditor({ nodes: [LexicalChip], onError: (e) => { throw e; } });
-  editor.update(
-    () => {
-      const root = $getRoot();
-      root.clear();
-      for (const para of content) {
-        const p = $createParagraphNode();
-        for (const part of para) {
-          if (typeof part !== 'string') {
-            p.append($createChipNode(part));
-            continue;
-          }
-          part.split('\n').forEach((line, i) => {
-            if (i > 0) p.append($createLineBreakNode());
-            if (line !== '') p.append($createTextNode(line));
-          });
-        }
-        root.append(p);
-      }
-    },
-    { discrete: true },
-  );
-  const segs = editor.getEditorState().read(() => $readSegments());
-  return { out: buildMessage(segs), json: JSON.stringify(editor.getEditorState().toJSON()) };
-}
+/** The Lexical engine's saved entries, one per golden content (made by it before it went). */
+const SAVED = JSON.parse(readFileSync(join(__dirname, 'fixtures/lexical-entries.json'), 'utf8')) as Record<string, string>;
+const saved = (name: string): string => {
+  const e = SAVED[name];
+  if (e === undefined) throw new Error(`no saved entry for ${name}`);
+  return e;
+};
 
 /** The content as the TipTap field's doc (one paragraph: paragraphs as hard breaks). */
 function pm(content: Content): PmNode {
@@ -77,10 +54,9 @@ function pm(content: Content): PmNode {
   return nodeType(schema, 'doc').create(null, nodeType(schema, 'paragraph').create(null, kids));
 }
 
-describe('(1) the wire: Lexical and TipTap send the same bytes', () => {
+describe('(1) the wire: each content sends its golden bytes', () => {
   for (const c of CASES) {
     it(c.name, () => {
-      expect(lexical(c.content).out).toEqual(c.golden);
       expect(buildMessage(segmentsOf(pm(c.content)))).toEqual(c.golden);
     });
   }
@@ -92,15 +68,11 @@ const memStore = (): Store & { m: Map<string, string> } => {
 };
 
 describe('(2) old drafts: nothing he typed is lost', () => {
-  it("a real Lexical entry reads back as the same segments and the same send (every chip kind)", () => {
+  it('an entry goes both ways: the new format reads back as the segments it was made of', () => {
     for (const c of CASES) {
-      const { out, json } = lexical(c.content);
-      const segs = entrySegments(json);
+      const segs = entrySegments(saved(c.name));
       expect(segs, c.name).not.toBeNull();
-      expect(buildMessage(segs ?? []), c.name).toEqual(out);
-      // and back: the new entry, and the Lexical JSON the old engine reads while the flag switches
       expect(entrySegments(entryOf(segs ?? [])), c.name).toEqual(segs);
-      expect(entrySegments(lexicalJsonOf(segs ?? [])), c.name).toEqual(segs);
     }
   });
 
@@ -115,12 +87,12 @@ describe('(2) old drafts: nothing he typed is lost', () => {
 
   it('draft, history and queue saved by the Lexical engine come back in the new field; ↑ brings the history', async () => {
     const store = memStore();
-    const draft = lexical([['half ', quote, ' thought']]).json;
-    const sent = lexical([['old ', img]]).json;
-    const queued = lexical([['later ', paste]]).json;
+    const draft = saved('a quote of diff lines');
+    const sent = saved('an image');
+    const queued = saved('a long paste');
     store.setItem('bise.composer.v1.p/main', JSON.stringify({ draft, history: [sent], queue: [queued] }));
     const { getByTestId, a, onSend } = await mount({ store });
-    expect(getByTestId('composer.field').textContent).toBe('half ❝ 3 thought');
+    expect(getByTestId('composer.field').textContent).toBe('❝ 3why this order?');
     await act(async () => {
       a.submit();
       await Promise.resolve();

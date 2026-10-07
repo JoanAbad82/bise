@@ -15,7 +15,7 @@ import { closeHistory, undo, undoDepth } from '@tiptap/pm/history';
 import { EditorState, TextSelection, type Transaction } from '@tiptap/pm/state';
 import type { EditorView } from '@tiptap/pm/view';
 import type { Slice } from '@tiptap/pm/model';
-import type { ComposerActions, FieldBar } from '../Brain';
+import type { ComposerActions, FieldBar } from '../actions';
 import { enterMakesNewline, indent, newline, outdentAtStart, subwordLeft, subwordRight, NO_UNDO, type Op } from '../mdlive';
 import { buildMessage, chipLabel, chipStrip, isLongPaste, nextChipNumber, noVisionLine, preview, type Chip, type Outgoing, type Segment } from '../message';
 import { enqueue, historyAt, keepUnread, load, popNewest, remember, save, takeOldest, type Saved, type Store } from '../drafts';

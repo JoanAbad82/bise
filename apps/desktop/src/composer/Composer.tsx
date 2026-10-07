@@ -1,5 +1,6 @@
-// The composer (bar ⛔1, ⛔2, 2.1-2.7, 3.1-3.2): a Lexical editor the app never rewrites per
-// keystroke. His typing goes keyboard -> contenteditable -> Lexical, and nothing in the app
+// The composer (bar ⛔1, ⛔2, 2.1-2.7, 3.1-3.2): a ProseMirror editor (TipTap core, pm/PmField.tsx)
+// the app never rewrites per keystroke. His typing goes keyboard -> contenteditable -> ProseMirror,
+// and nothing in the app
 // writes it back: no store round trip, no re-render of the field (the old app's bug 1: ui.js
 // rewrote the region with innerHTML on every state change). The app writes into it only on
 // what he asked for: a pick, a paste, a chip, dictation, ↑ through the drafts, a send that clears.
@@ -7,15 +8,9 @@
 // Mounted once per screen (React never re-creates the editor: the initial config is read once,
 // the callbacks go through refs). The frame around it is amb-kit's ComposerFrame.
 import { memo, useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { defineExtension } from 'lexical';
-import { HistoryExtension } from '@lexical/history';
-import { PlainTextExtension } from '@lexical/plain-text';
-import { LexicalExtensionComposer } from '@lexical/react/LexicalExtensionComposer';
-import { ContentEditable } from '@lexical/react/LexicalContentEditable';
 import { ComposerFrame } from '@/ds';
 import './composer.css';
-import { ChipNode } from './ChipNode';
-import { Brain, type ComposerActions, type FieldBar } from './Brain';
+import type { ComposerActions, FieldBar } from './actions';
 import { PmField } from './pm/PmField';
 import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, type TipClock } from './keybar';
 import type { Outgoing } from './message';
@@ -57,26 +52,6 @@ export function writeTo(to: string | undefined): string {
 
 /** The last tip shown (keybar.rs keeps it in the `tip` preference): the next session starts after it. */
 const TIP_KEY = 'bise.composer.v1.tip';
-
-function onError(error: Error): void {
-  // an editor error must not take the screen down; it is logged, and the text stays
-  console.error('composer', error);
-}
-
-/** The field's engine while the TipTap one is built (ambient-lead m_11458, slices 1-3): Lexical
- *  unless the build says `VITE_BISE_COMPOSER=pm`. The one switch point; it goes in slice 4 with
- *  the Lexical packages. */
-export const ENGINE: 'lexical' | 'pm' = import.meta.env.VITE_BISE_COMPOSER === 'pm' ? 'pm' : 'lexical';
-
-// module scope: one stable extension, so React never re-creates the editor
-const EXTENSION = defineExtension({
-  name: '@bise/composer',
-  namespace: 'bise-composer',
-  nodes: [ChipNode],
-  theme: { paragraph: 'p', text: { base: 't' } },
-  onError,
-  dependencies: [PlainTextExtension, HistoryExtension],
-});
 
 export const Composer = memo(function Composer(props: ComposerProps): JSX.Element {
   const { target, busy = false, sources = NO_SOURCES, to, placeholder = writeTo(to), keys, voice = null, quoting = false, testId = 'composer' } = props;
@@ -165,61 +140,27 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
         else actions.current?.submit();
       }}
     >
-      {ENGINE === 'pm' ? (
-          <PmField
-            target={target}
-            busy={busy}
-            sources={sources}
-            store={store}
-            testId={testId}
-            placeholder={placeholder}
-            send={(o) => {
-              cb.current.onSend(o);
-            }}
-            command={(name, args) => {
-              cb.current.onCommand?.(name, args);
-            }}
-            onCanSend={setCanSend}
-            onStrip={setStrip}
-            onBar={setField}
-            onActions={(a) => {
-              if (actions.current === null) cb.current.onReady?.(a);
-              actions.current = a;
-            }}
-          />
-      ) : (
-        <LexicalExtensionComposer extension={EXTENSION} contentEditable={null}>
-          <ContentEditable
-            className="b-field"
-            data-testid={`${testId}.field`}
-            aria-label={placeholder}
-            aria-multiline
-            spellCheck
-            aria-placeholder={placeholder}
-            placeholder={<span className="ph b-field-ph">{placeholder}</span>}
-          />
-          <Brain
-            target={target}
-            busy={busy}
-            sources={sources}
-            store={store}
-            testId={testId}
-            send={(o) => {
-              cb.current.onSend(o);
-            }}
-            command={(name, args) => {
-              cb.current.onCommand?.(name, args);
-            }}
-            onCanSend={setCanSend}
-            onStrip={setStrip}
-            onBar={setField}
-            onActions={(a) => {
-              if (actions.current === null) cb.current.onReady?.(a);
-              actions.current = a;
-            }}
-          />
-        </LexicalExtensionComposer>
-      )}
+      <PmField
+        target={target}
+        busy={busy}
+        sources={sources}
+        store={store}
+        testId={testId}
+        placeholder={placeholder}
+        send={(o) => {
+          cb.current.onSend(o);
+        }}
+        command={(name, args) => {
+          cb.current.onCommand?.(name, args);
+        }}
+        onCanSend={setCanSend}
+        onStrip={setStrip}
+        onBar={setField}
+        onActions={(a) => {
+          if (actions.current === null) cb.current.onReady?.(a);
+          actions.current = a;
+        }}
+      />
     </ComposerFrame>
   );
 });

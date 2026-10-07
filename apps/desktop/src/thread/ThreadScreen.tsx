@@ -10,7 +10,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { Button, Head, Marker } from '@/ds';
 import { Composer, useComposerSources } from '@/composer';
-import type { ComposerActions } from '@/composer/Brain';
+import type { ComposerActions } from '@/composer';
 import { quoteFrom, quoteKey, quoteText } from './quote';
 import type { Outgoing } from '@/composer/message';
 import { threadKey, useAgents, useCommands, useCoreState, useFiles, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';

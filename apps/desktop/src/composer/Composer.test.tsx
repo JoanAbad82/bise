@@ -5,11 +5,10 @@
 import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Composer } from './Composer';
-import type { ComposerActions } from './Brain';
+import type { ComposerActions } from './actions';
 import type { Store } from './drafts';
 import { NO_SOURCES } from './sources';
-import { asLexicalEntry } from './Brain';
-import { entryOf, entrySegments, lexicalJsonOf } from './entry';
+import { entryOf, entrySegments } from './entry';
 import { buildMessage, type Segment } from './message';
 
 afterEach(cleanup);
@@ -143,7 +142,7 @@ describe('the composer', () => {
     expect(other.getByTestId('composer.field').textContent).toBe('');
   });
 
-  it('reads what the TipTap engine saved ({v:2,segs}): a rollback never hides his draft, history or queue (lead m_11680)', async () => {
+  it('reads the entries it saved ({v:2,segs}): his draft, history and queue come back whole (lead m_11680)', async () => {
     const segs: Segment[] = [
       { kind: 'text', text: 'café 👋 déjà\nligne 2 ' },
       { kind: 'chip', chip: { kind: 'paste', n: 1, text: 'a\nb' } },
@@ -152,8 +151,7 @@ describe('the composer', () => {
     const v2 = entryOf(segs);
     expect(JSON.parse(v2)).toMatchObject({ v: 2 });
     // each place an entry is read: the draft, a history line (↑), a queued message
-    expect(entrySegments(asLexicalEntry(v2))).toEqual(segs);
-    expect(asLexicalEntry(lexicalJsonOf(segs))).toBe(lexicalJsonOf(segs)); // a Lexical entry as it is
+    expect(entrySegments(v2)).toEqual(segs);
     const store = memStore();
     const queued = entryOf([{ kind: 'text', text: 'après ça 🎉' }]);
     store.setItem('bise.composer.v1.p/main', JSON.stringify({ draft: v2, history: [v2], queue: [queued] }));

@@ -4,7 +4,7 @@
 import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Composer } from './Composer';
-import type { ComposerActions } from './Brain';
+import type { ComposerActions } from './actions';
 import { dictated, replaceOp } from './dictate';
 import type { Store } from './drafts';
 import { NO_SOURCES, type DictatePort, type DictateState } from './sources';

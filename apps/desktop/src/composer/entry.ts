@@ -3,7 +3,7 @@
 //
 // The reader also takes the old Lexical engine's entries (its editor-state JSON: paragraphs, text,
 // line breaks and 'bise-chip' nodes), so nothing he typed before the switch is lost. Keep that
-// reader one release after Lexical goes (architect m_11500). An entry neither reads: null, and the
+// reader one release after Lexical went (architect m_11500). An entry neither reads: null, and the
 // caller keeps its raw JSON (never dropped).
 import type { Chip, Segment } from './message';
 
@@ -75,23 +75,4 @@ function lexicalSegments(paras: readonly unknown[]): Segment[] {
     visit(p);
   });
   return tidy(out);
-}
-
-/** An entry as the old engine's editor-state JSON (the Lexical engine reads an entry the new one
- *  wrote while the dev flag switches between them; goes with Lexical in slice 4). */
-export function lexicalJsonOf(segs: readonly Segment[]): string {
-  const kids: Record<string, unknown>[] = [];
-  const t = (s: string): Record<string, unknown> => ({ type: 'text', text: s, detail: 0, format: 0, mode: 'normal', style: '', version: 1 });
-  for (const s of segs) {
-    if (s.kind === 'chip') {
-      kids.push({ type: 'bise-chip', version: 1, chip: s.chip });
-      continue;
-    }
-    s.text.split('\n').forEach((line, i) => {
-      if (i > 0) kids.push({ type: 'linebreak', version: 1 });
-      if (line !== '') kids.push(t(line));
-    });
-  }
-  const para = { type: 'paragraph', children: kids, direction: null, format: '', indent: 0, version: 1, textFormat: 0, textStyle: '' };
-  return JSON.stringify({ root: { type: 'root', children: [para], direction: null, format: '', indent: 0, version: 1 } });
 }
