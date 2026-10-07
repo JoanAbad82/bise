@@ -17,9 +17,57 @@ Status, for the desktop app:
 Sources are `file:line` under `rust/tui/src/` unless the path says otherwise; desktop paths are
 under `apps/desktop/src/`. Read from the source on `ambient-app` at 9c85cc18; nothing was run.
 
+## Re-audit at ambient-app a2039499
+
+The 117 rows that were MISSING, part missing or differs at 9c85cc18 were read again against
+ambient-app a2039499 (code and the checks under `apps/desktop/tests/checks`, nothing run). **Most
+are done now; 20 lines below are still open** (one line can group several old rows: R1 holds four
+commands, R15 and R16 hold V14, S28, L2, K2, S29, L19). Done: `/` `@` `$` wired (`thread/ThreadScreen.tsx:664`), the window's keys
+(`app/keys.ts`: ⌘0-9, ⌥0-9, ⌘K, ⌘D, ⌘⇧A, ⌘E, ⌘/, ⌘., end, ctrl+y, ⌥↑↓), the palette, the help
+overlay with filter, quotes (thread and diff lines), live markdown, list indent, code-fence ⏎,
+emoji, subword moves, `@` folders and artifacts, no-vision, no-undo, steer/say prefixes, confirms
+(`inbox/confirm.tsx`), the inbox strip with ctrl+1-9 and per-item drafts, archived threads
+read-only, agent preview (`agents/Peek.tsx`), worktrees, the terminal panel, voice mode with the
+agent in view (`voicemode/`), voice answers to items, the dock badge (`main/counts.ts`), thread
+rows for thinking, compaction, notices, not delivered (⏎ / esc), landed, PR news, artifacts,
+main's answers, approvals and scheduled lines, code blocks with language, highlighting and copy,
+file links, hover time, back-to-bottom with the new count, long messages folded, the demo tour,
+hints and "show me what you can do". Unknown `/words` go to the hub's router
+(`thread/commands.ts` `slashLine`), so `/cancel`, `/flow`, `/new --with-changes` and
+`/artifacts add` run as in the TUI.
+
+**Still missing or partial (20)**, one line each: owner · what · smallest proof.
+
+| # | owner | still missing | smallest proof |
+|---|---|---|---|
+| R1 | amb-feed (hub router) | typed `/stop <agent>`, `/restart`, `/update`, `/version` are listed as hub commands (`rust/tui/src/ambient/core/picks.rs:35`) but `router.rs` has no case for them: they become Passthrough and the hub answers "unknown command" (`rust/switchboard/src/core_user.rs:132`). The TUI runs them client-side (`rust/tui/src/sb.rs:1162`) | a hub unit test: `route(parse("/stop perf", MAIN))` then the core step yields an interrupt, not the "unknown command" notice; the same for `/restart`, `/update` |
+| R2 | amb-win | `/plugins enable\|disable\|login\|logout <name>` typed: `windowRun` returns nothing with an argument (`thread/commands.ts:62`), the line goes to the hub, which doesn't know `/plugins` | thread/commands spec: `/plugins disable x` ⏎ turns x off (settings · plugins shows it off), no "unknown command" |
+| R3 | amb-win | `/theme dark` and `/computer-use off\|uninstall` open their settings page and drop the argument (`thread/commands.ts:55`, `:64`) | `/theme light` ⏎ switches the palette; `/computer-use off` ⏎ turns it off |
+| R4 | amb-win | `/scheduled` is greyed "not yet" (`thread/commands.ts:22` ready false, no `windowRun` case) though the `scheduled` route and `scheduled/Screen.tsx` exist | `/scheduled` ⏎ opens `route:scheduled` |
+| R5 | amb-win | `/quit` has no `windowRun` case: greyed (⌘Q works) | `/quit` ⏎ quits, the agents keep running |
+| R6 | amb-feed + amb-win | `/approvals [yolo\|auto]` typed is not a command anywhere in the app's path (TUI client-side, `sb.rs:1205`); ⇧⇥ in the composer doesn't switch the mode; the mode isn't shown near the composer (TUI divider). The switch exists in settings · approvals | `/approvals yolo` ⏎ and ⇧⇥ in the composer each flip the mode settings · approvals shows |
+| R7 | amb-win | `/diff <branch>` takes an agent name only (`thread/commands.ts:41`): a branch with no agent can't be opened by name | `/diff sb/x` (a branch, no agent) opens its diff |
+| R8 | amb-home + amb-core | `/model <model>` whose provider has no key: the TUI opens that provider's setup, then runs the line (`sb.rs:1250`); the app sends it to the hub | `/model openrouter/x` with no OpenRouter key opens settings · models on OpenRouter; after the key, the agent's model is x |
+| R9 | amb-feed + amb-win | "waiting on <agent>": no `waiting_on` in the proto's agent row (`rust/proto/src/rows.rs`), and the head says "? waiting for you" for any `waiting` status (`thread/head.ts:21`), wrong when it waits on another agent | an agent waiting on docs shows "waiting on docs" in its head and the sidebar, not "waiting for you" |
+| R10 | amb-win | the model and effort of the agent in view are not shown (TUI divider); the proto has them (`rows.rs:100`, `:107`); the head shows state, usage and branch only (`thread/AgentHead.tsx:45`) | thread/agent-head: the head (or the composer's label) shows `opus · high` |
+| R11 | amb-feed + amb-win | a tool call's own result: ✓ / ✗ exit 1 and its first error line; the folded tools row lists `$` / `±` lines with times only (`thread/entry.ts:197`) | a failing bash call shows `✗ exit 1` and its first error line in its row |
+| R12 | amb-feed + amb-win | a failed turn and its reason (`failed: …`, `interrupted by …`): no entry kind of its own; not checked whether the hub sends it as a notice | a turn that fails shows one line with its reason |
+| R13 | amb-win | agent-to-agent runs folded by level (`▸ 4 messages between 2 agents`): to_agent rows exist, no fold of a run | 5 messages between two agents in main's thread show as one folded line |
+| R14 | amb-web + amb-core | the `@` list's memory: a picked path ranks first next time (`rust/tui/src/commands.rs` `PopItem.path`) | pick `src/b.rs` once, type `@` again: it's first |
+| R15 | amb-home | the expired ChatGPT sign-in in the thread: `⏎ sign in again` on an empty composer, `c` copies the link, esc cancels; today it's only in settings · accounts (`settings/accounts.tsx:65`). amb-home has K2 in hand | an expired sign-in: ⏎ in the stopped agent's empty composer starts the sign-in |
+| R16 | amb-core (in hand) | computer use live in the thread: the driving marks, "you took the wheel · ⏎ give it back", `/stop` letting go of Chrome (S29, L19, K2) | amb-core's S29/L19 checks |
+| R17 | amb-win | the top edge's "↗ N new" artifacts and who made them: not seen in the head or the sidebar (the dock badge counts exist) | a new artifact shows `↗ 1 new · designer` until the artifacts screen is opened |
+| R18 | lead's call | differs, unchanged: esc stops the turn (TUI: never) | none: say if on purpose |
+| R19 | lead's call | differs, unchanged: inbox ↑↓ change items and ←→ walk options (`inbox/Inbox.tsx:265`), the TUI the other way round | none: say if on purpose |
+| R20 | lead's call | differs, unchanged: esc on the `/` list keeps the text (the TUI clears it) | none: say if on purpose |
+
+Not re-checked: the 103 planned rows' behavior beyond the code being there, and narrow-window
+layout (B16). The rows below keep their first-audit status (9c85cc18); the list above supersedes
+them.
+
 ## Summary
 
-294 items: 53 done, 103 planned, 69 MISSING, 45 part missing, 3 differs, 20 n/a, 1 not checked.
+At the first audit (9c85cc18), 294 items: 53 done, 103 planned, 69 MISSING, 45 part missing, 3 differs, 20 n/a, 1 not checked.
 
 | area | items | done | planned | MISSING | part missing | differs | n/a |
 |---|---|---|---|---|---|---|---|
