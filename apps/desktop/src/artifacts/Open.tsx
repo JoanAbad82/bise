@@ -62,6 +62,14 @@ export function versionUrl(url: string, current: number, v: number): string {
   return `${url.replace(/\/+$/, '')}/v/${String(v)}`;
 }
 
+/** The page's url with his theme as a hint the kit reads (?theme=light|dark); none: as is. Pure. */
+export function themedUrl(url: string, theme: 'light' | 'dark' | null): string {
+  if (theme === null) return url;
+  const [base = '', hash] = url.split('#', 2);
+  const q = `${base}${base.includes('?') ? '&' : '?'}theme=${theme}`;
+  return hash === undefined ? q : `${q}#${hash}`;
+}
+
 export function ArtifactOpen({ project, id }: { project: string; id: string }) {
   const router = useRouter();
   const it = useAllArtifacts(project).find((x) => x.a.id === id);
@@ -150,10 +158,10 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
       </div>
       <div className="art-open-body">
         {page ? (
-          // the page follows his theme: the kit picks its dark paper by prefers-color-scheme, which
-          // an iframe takes from its element's color-scheme ('light dark': the system's)
-          <iframe className="art-paper" src={url} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            style={{ colorScheme: theme ?? 'light dark' }} data-testid="artifact.page" />
+          // the page follows his theme: opened with ?theme=<his pref>, the kit wears it (kit.js puts
+          // it on <html data-theme>); with no pref, the system's
+          <iframe className="art-paper" src={themedUrl(url, theme)} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            data-testid="artifact.page" />
         ) : (
           <div className="art-empty">this kind opens in your browser: open in browser ↗</div>
         )}

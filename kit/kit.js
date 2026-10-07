@@ -21,6 +21,18 @@
 (function (root) {
   "use strict";
 
+  // the theme the page was opened with (?theme=light|dark: the desktop window passes his pref) on
+  // <html data-theme>, which tokens.css follows over the system's; none: the system's
+  const themeOf = (search) => {
+    const m = /(?:^\?|&)theme=(light|dark)(?:&|$)/.exec(String(search || ""));
+    return m ? m[1] : null;
+  };
+  {
+    const t = themeOf(root.location && root.location.search);
+    const html = root.document && root.document.documentElement;
+    if (t && html && html.setAttribute) html.setAttribute("data-theme", t);
+  }
+
   // an agent's id as people read it (vision §3): hyphens become spaces, the id itself never changes
   // an agent's name as the user reads it: spaces, not hyphens; main speaks as bise on the ambient
   // surfaces (ambient m_5473, amb-web 4139b4fe): 'by bise', an agent's page keeps its own name
@@ -760,7 +772,7 @@
     return parts.join(" · ");
   }
 
-  const BiseKit = { W, ticked, untilWords, watchLine, replyWent, tasteWords, targetOf, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, wentWords, wentFor, applyWent, editableParts, options, norm };
+  const BiseKit = { W, themeOf, ticked, untilWords, watchLine, replyWent, tasteWords, targetOf, said, intentLines, since, ago, versionOf, diffBlocks, changedIn, isNumeric, numericColumns, swap, applyVersion, remember, decorate, pick, answered, react, approveAll, toSlack, replyTarget, replyText, dueWords, agentLine, agents, wentWords, wentFor, applyWent, editableParts, options, norm };
   root.BiseKit = BiseKit;
 
   // ---- the browser: the frame, the stream, the keys ----

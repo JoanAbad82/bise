@@ -1,16 +1,11 @@
 // The scheduled tasks across his projects, from the store's scheduled:<project> slices (amb-feed's
-// HubEv scheduled; until its store slice lands, none). Owner: amb-kit.
+// HubEv scheduled, 284bd5c6; none until the hub said). Owner: amb-kit.
 import { useSyncExternalStore } from 'react';
 import { useProjects, useStore, type Store } from '@/store';
 import type { ScheduledTask, Task } from './model';
 
-/** The store's scheduled tasks of a project, when the store keeps them (amb-feed's slice). */
-function tasksOf(store: Store, project: string): readonly ScheduledTask[] {
-  const read = (store as unknown as { scheduled?: (p: string) => readonly ScheduledTask[] }).scheduled;
-  return typeof read === 'function' ? read.call(store, project) : NONE;
-}
+const tasksOf = (store: Store, project: string): readonly ScheduledTask[] => store.scheduled(project);
 
-const NONE: readonly ScheduledTask[] = [];
 let last: { key: string; from: readonly (readonly ScheduledTask[])[]; items: readonly Task[] } | null = null;
 
 /** Every project's live scheduled tasks (or one project's), with a stable snapshot. */

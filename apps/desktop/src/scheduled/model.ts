@@ -1,30 +1,11 @@
 // Scheduled tasks (desktop-screens v6 'scheduled', designer m_11837; the TUI's scheduled_screen.rs
 // words): what wakes his agents, and when. Pure. Owner: amb-kit.
 //
-// DRAFT shape: amb-feed's coming rows::ScheduledTask (HubEv scheduled {project, items}, HubCmd
-// scheduled {project} and scheduled_stop {project, id}), mirrored here until bise-proto's TS has it;
-// then this type goes and the screen imports '@/proto'.
+// The task is amb-feed's typed rows::ScheduledTask (284bd5c6: HubEv scheduled {project, items},
+// HubCmd scheduled {project} and scheduled_stop {project, id}).
+import type { ScheduledTask } from '@/proto';
 
-/** One live scheduled task (`sb every`): its fields as the hub sends them. */
-export interface ScheduledTask {
-  id: number;
-  /** the agent it wakes */
-  agent: string;
-  /** who set it */
-  by: string;
-  /** its words: what the agent reads at each run */
-  words: string;
-  /** '5m', '1h', 'day 07:30' */
-  every: string;
-  /** how many runs in all; none: until stopped or until_ms */
-  times?: number | null;
-  /** runs so far */
-  done: number;
-  next_ms?: number | null;
-  until_ms?: number | null;
-  /** the page it keeps fresh (--page) */
-  page?: string | null;
-}
+export type { ScheduledTask };
 
 /** A task with its project (the event is per project). */
 export interface Task {

@@ -625,6 +625,23 @@ law("a write his word triggers is its own action block: its button says the writ
   assert.equal(K.react(a, null, "approve").kind, "approve");
 });
 
+law("a page opened with ?theme=light|dark wears it (the desktop window's pref), else the system's", () => {
+  assert.equal(K.themeOf("?theme=dark"), "dark");
+  assert.equal(K.themeOf("?a=1&theme=light"), "light");
+  assert.equal(K.themeOf("?theme=dark&x=2"), "dark");
+  assert.equal(K.themeOf("?theme=blue"), null);
+  assert.equal(K.themeOf("?nottheme=dark"), null);
+  assert.equal(K.themeOf(""), null);
+  // tokens.css: the system's dark block yields to data-theme=light, and data-theme=dark has the same values
+  const css = readFileSync(join(here, "tokens.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const sys = /@media \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme="light"\]\) \{([^}]*)\}/.exec(css);
+  const told = /:root\[data-theme="dark"\] \{([^}]*)\}/.exec(css);
+  assert.ok(sys, "the system's dark block, unless the page was told light");
+  assert.ok(told, "the told dark block");
+  const decls = (s) => s.split(";").map((d) => d.trim()).filter((d) => d !== "");
+  assert.deepEqual(decls(told[1]), decls(sys[1]), "the two dark blocks hold the same values");
+});
+
 law("kit.css takes its colors from tokens.css only", () => {
   const css = readFileSync(join(here, "kit.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
   const hex = css.match(/#[0-9a-f]{3,8}\b/gi) || [];

@@ -9,6 +9,7 @@ import { formatRoute, parseRoute } from '@/app/route';
 import { byDay, dayWords, filterItems, glyphOf, kindWords, ALL, timeOf, versions, whenWords, type Item } from './model';
 import { ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
 import { putInDraft } from './put';
+import { themedUrl } from './Open';
 import { aboutText } from '@/thread/ThreadScreen';
 import { load } from '@/composer/drafts';
 import { entryOf, entrySegments } from '@/composer/entry';
@@ -199,14 +200,18 @@ describe('artifacts screens', () => {
     }
   });
 
-  it("the page follows his theme: the iframe's color-scheme is his pref, else the system's", () => {
+  it("the page follows his theme: opened with ?theme=<his pref>, as is with none (the system's)", () => {
+    expect(themedUrl('http://h/p/x', 'dark')).toBe('http://h/p/x?theme=dark');
+    expect(themedUrl('http://h/p/x/v/1#s-3', 'light')).toBe('http://h/p/x/v/1?theme=light#s-3');
+    expect(themedUrl('http://h/p/x?a=1', 'dark')).toBe('http://h/p/x?a=1&theme=dark');
+    expect(themedUrl('http://h/p/x', null)).toBe('http://h/p/x');
     mount(<ArtifactOpen project="shop-1" id="notes" />, { screen: 'artifacts', project: 'shop-1', id: 'notes' });
-    expect(screen.getByTestId('artifact.page').style.colorScheme).toBe('light dark');
+    expect(screen.getByTestId('artifact.page').getAttribute('src')).toBe('http://127.0.0.1:47123/p/notes');
     cleanup();
     const store = world();
     store.apply({ ev: 'prefs', prefs: { theme: 'dark' } });
     render(<StoreProvider store={store}><RouterContext.Provider value={createRouter({ screen: 'artifacts', project: 'shop-1', id: 'notes' })}><ArtifactOpen project="shop-1" id="notes" /></RouterContext.Provider></StoreProvider>);
-    expect(screen.getByTestId('artifact.page').style.colorScheme).toBe('dark');
+    expect(screen.getByTestId('artifact.page').getAttribute('src')).toBe('http://127.0.0.1:47123/p/notes?theme=dark');
   });
 });
 

@@ -110,8 +110,11 @@
 
 /* dark paper, when the system is dark: the brand's dark paper as before (#171513 / #ece6da),
    with round 8's dark-column role colors */
+/* the system's choice unless the page was told one: the window opens a page with ?theme=light|dark
+   (his theme pref), kit.js puts it on <html data-theme>, and the block under this one (the same
+   values, kit/check.mjs keeps them equal) applies it whatever the system says */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --surface-made: #171513;
     --surface-card: #1f1c19;
     --ink: #ece6da;
@@ -134,6 +137,29 @@
     --term-accent: #f4a6b0; --term-err: #ff5a52; --term-ok: #b9d99a; --term-raised: #1f1c1a; --term-sel: #33292c;
     --term-chip: #231f1d; --term-frame: #2a2623;
   }
+}
+:root[data-theme="dark"] {
+  --surface-made: #171513;
+  --surface-card: #1f1c19;
+  --ink: #ece6da;
+  --dim: #b8b0a3;
+  --faint: #8a8276;
+  --kick: #8a8276;
+  --line: #ece6da1c;
+  --rule-strong: #ece6da;
+  --drop: #00000038;
+  --hover: #ece6da0a;
+  --accent: #f4a6b0;
+  --accent-soft: #f4a6b026;
+  --on-accent: #2a141b;
+  --pen: #f4a6b0;
+  --ok: #cfe8c0;
+  --risk: #ff9a8a;
+  --changed: #f4a6b01c;
+  --working: #b8b0a3;
+  --term-bg: #141211; --term-text: #ece6da; --term-dim: #a39c90; --term-faint: #857d72; --term-rule: #4a4540;
+  --term-accent: #f4a6b0; --term-err: #ff5a52; --term-ok: #b9d99a; --term-raised: #1f1c1a; --term-sel: #33292c;
+  --term-chip: #231f1d; --term-frame: #2a2623;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -15,6 +15,8 @@ export const STATE_TAGS: ReadonlySet<string> = new Set([
   'agents',
   'cards',
   'artifacts',
+  // a project's live scheduled tasks, whole each time (amb-feed 284bd5c6)
+  'scheduled',
   'worktrees',
   'dev_servers',
   'merged',

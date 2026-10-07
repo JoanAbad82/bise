@@ -15,7 +15,13 @@
 .art-kind:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--c-focus); }
 /* the search keeps the right end of the chips' row: 220, 160 in a narrow window, never wrapped */
 .art-search { margin-left: auto; flex: 0 1 220px; min-width: 120px; }
-@media (max-width: 900px) { .art-search { flex-basis: 160px; } }
+@media (max-width: 900px) {
+  /* one row at 800: tighter filters, the search 160 when it fits, never past the edge */
+  .art-filters { gap: 4px; }
+  .art-filters .b-btn.ghost { padding: 0 8px; }
+  .art-kind { padding: 0 8px; }
+  .art-search { flex-basis: 160px; min-width: 96px; }
+}
 .art-search .b-field { width: 100%; }
 
 .art-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; outline: none; }
