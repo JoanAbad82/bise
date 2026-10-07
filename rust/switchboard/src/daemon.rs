@@ -19,6 +19,7 @@ mod features;
 mod fn_context;
 pub(crate) mod gate;
 mod history;
+mod page_cards;
 mod pages;
 mod projects;
 mod proto;
