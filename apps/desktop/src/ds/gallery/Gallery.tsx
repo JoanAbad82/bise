@@ -50,7 +50,7 @@ export const SECTIONS: Record<string, () => ReactNode> = {
     </div>
   ),
   controls: () => (
-    <div className="g-row"><Toggle on={false} label="off" /><Toggle on label="on" /><Toggle on state="focus" /><Toggle on={false} state="disabled" /><Check on={false} /><Check on /></div>
+    <div className="g-row"><Toggle on={false} label="off" /><Toggle on label="on" /><Toggle on={false} state="hover" /><Toggle on state="hover" /><Toggle on state="focus" /><Toggle on={false} state="disabled" /><Check on={false} /><Check on /></div>
   ),
   field: () => (
     <div className="g-col">

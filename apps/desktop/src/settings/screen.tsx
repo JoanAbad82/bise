@@ -1,7 +1,7 @@
 // Settings as the shell mounts it (route settings[/<page>]): Settings fed
 // by the store (the core's prefs, accounts, projects, found) and sending
 // through it (store.command: the core's AppCmd). Owner: amb-home.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { JsonValue, Perm } from '@/proto';
 import { useAccounts, useComputerUse, useCoreEvent, useFound, useModels, usePlugins, usePrefs, useProjects, useRoles, useStore, type Ev } from '@/store';
 import type { KeyError } from './accounts';
@@ -46,6 +46,14 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
   // the roles pick from the home's models (bise's own catalog)
   const home = projects.find((p) => p.home);
   const models = useModels(home?.project ?? '');
+  // the home's models come on request (the hub sends a project's models on {cmd: models}): once
+  const asked = useRef(false);
+  const homeProject = home?.project;
+  useEffect(() => {
+    if (asked.current || homeProject === undefined || models.length > 0) return;
+    asked.current = true;
+    store.command({ cmd: 'models', project: homeProject });
+  }, [homeProject, models.length, store]);
   // a model waiting for its provider's setup goes once an account of that provider signs in (L5)
   const held = useHeld();
   useEffect(() => {

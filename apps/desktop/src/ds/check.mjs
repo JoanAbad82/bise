@@ -72,6 +72,13 @@ law("never by color alone (bar N2): increase contrast gives every color cue of c
   }
 });
 
+law("every control he can act on shows a hover (bar O.6)", () => {
+  const all = noComments(Object.values(css).join(" "));
+  for (const sel of [".b-btn:hover", ".b-row:hover", ".b-opt:hover", ".b-seg>span:hover", ".b-toggle:not(.is-disabled):hover", ".b-check:hover", ".b-field:not(.is-focus):not(.is-error):not(:focus-within):hover", ".b-chip[role=button]:hover", ".b-mi:not(.dis):not(.on):hover", ".b-tabs>span:not(.on):hover", ".b-task:hover", ".b-art:hover", ".b-tn:hover"]) {
+    assert.ok(all.includes(sel), `no hover rule: ${sel}`);
+  }
+});
+
 const tsx = readdirSync(here).filter((f) => f.endsWith(".tsx"));
 // the code without its comments (a comment may name window.html or document the DOM)
 const src = Object.fromEntries(tsx.map((f) => [f, noComments(read(join(here, f))).replace(/^\s*\/\/.*$/gm, "")]));
