@@ -3,6 +3,7 @@
 // bise's answer, and the effects go to the capsule window (show, hide, size) and the main window
 // (openWindow). A pushed card shows only when nothing else is up (his action first).
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react';
+import { newAgent } from '@/agents/actions';
 import { InboxCard } from '@/inbox';
 import type { Card, HelperEv } from '@/proto';
 import { threadKey, useProjects, useStore } from '@/store';
@@ -252,6 +253,10 @@ export function CapsuleRoot(): JSX.Element {
         asked.current = { after: order.length === 0 ? -1 : Math.max(...order), started: false };
         store.send({ project: home, agent: 'main', text });
         setLast(null);
+      }}
+      onNew={(brief) => {
+        // amb-win's newAgent (the TUI's /new): bise's home names it from the brief; it shows in 'at work'
+        if (home !== null) newAgent(store, home, { brief });
       }}
       onOpen={(item) => {
         bise?.openWindow(routeOf(item));

@@ -36,6 +36,8 @@ export interface CapsuleProps {
   /** amb-home's card for a pushed card, by id. */
   readonly card: (id: string) => ReactNode;
   readonly onAsk: (text: string) => void;
+  /** '/new …' in the spotlight: start an agent in bise's home (bar A.1) */
+  readonly onNew?: (brief: string) => void;
   readonly onOpen: (item: SpotItem) => void;
   readonly onOpenWindow: (route?: string) => void;
   readonly onClose: () => void;
@@ -84,7 +86,7 @@ export function Capsule(p: CapsuleProps): JSX.Element {
       <div className={`b-cap-pearl${pearl ? '' : ' off'}`}>
         <LivePearl mood={moodOf(v, answering)} level={p.level} still={p.still} size={40} testId="capsule.pearl" />
       </div>
-      {v.kind === 'spot' && <div data-glass className="b-cap-glass"><Spotlight data={p.spot} answer={p.answer} route={p.route} onRouteKeep={p.onRouteKeep} onRouteTo={p.onRouteTo} pearl={<span className="b-cap-hole" />} onAsk={p.onAsk} onOpen={p.onOpen} onOpenAnswer={() => { p.onOpenWindow('bise'); }} onClose={p.onClose} testId="spot" /></div>}
+      {v.kind === 'spot' && <div data-glass className="b-cap-glass"><Spotlight data={p.spot} answer={p.answer} route={p.route} onRouteKeep={p.onRouteKeep} onRouteTo={p.onRouteTo} pearl={<span className="b-cap-hole" />} onAsk={p.onAsk} onNew={p.onNew} onOpen={p.onOpen} onOpenAnswer={() => { p.onOpenWindow('bise'); }} onClose={p.onClose} testId="spot" /></div>}
       {v.kind === 'talk' && (
         <div className="b-cap-talk" data-testid="capsule.talk" data-glass>
           {p.heard !== '' ? p.heard : v.phase === 'listen' ? W.listening : W.thinking}

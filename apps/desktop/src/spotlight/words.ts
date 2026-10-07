@@ -23,7 +23,21 @@ export const W = {
   keepWithBise: 'keep it with bise',
   anotherProject: 'another project',
   keysRoute: 'esc keep it with bise   ↑↓ ⏎ another project',
+  // A.1: '/new …' or 'start an agent: …' starts an agent in bise's home with that brief
+  startAgent: 'start an agent',
+  keysNew: '⏎ start it   esc close',
 } as const;
+
+/**
+ * The brief of '/new <brief>' or 'start an agent: <brief>' (the colon optional, any case), else
+ * undefined: the TUI's /new with its brief, typed in the spotlight (bar A.1). Pure.
+ */
+export function newBrief(q: string): string | undefined {
+  const m = /^\s*(?:\/new|start an agent\s*:?)(?:\s+|$)([\s\S]*)$/iu.exec(q);
+  if (m === null) return undefined;
+  const brief = (m[1] ?? '').trim();
+  return brief === '' ? undefined : brief;
+}
 
 /** One line of text: tags out, whitespace runs as one space, cut at a word past `max` with `…`. */
 export function oneLine(text: string, max = 90): string {

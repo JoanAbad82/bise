@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { flat, spotList, type SpotData } from './list';
 import { Spotlight, answerLines, ANSWER_MAX_LINES } from './Spotlight';
-import { cardLine, shortPath } from './words';
+import { cardLine, newBrief, shortPath } from './words';
 
 afterEach(cleanup);
 
@@ -104,5 +104,55 @@ describe('the routing hold', () => {
       await Promise.resolve();
     });
     expect(onRouteKeep).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('start an agent from the spotlight (bar A.1)', () => {
+  it("'/new …' and 'start an agent: …' give the brief; anything else, or no brief, is not one", () => {
+    expect(newBrief('/new fix the flaky login test')).toBe('fix the flaky login test');
+    expect(newBrief('  Start an agent: profile the hub ')).toBe('profile the hub');
+    expect(newBrief('start an agent profile the hub')).toBe('profile the hub');
+    expect(newBrief('/new')).toBeUndefined();
+    expect(newBrief('start an agent:  ')).toBeUndefined();
+    expect(newBrief('/newsletter draft')).toBeUndefined();
+    expect(newBrief('please start an agent: x')).toBeUndefined();
+  });
+
+  it('the list is one row that starts it', () => {
+    const l = spotList(D, '/new profile the hub');
+    expect(l.mode).toBe('new');
+    expect(flat(l)).toEqual([{ kind: 'new', id: 'new', brief: 'profile the hub' }]);
+  });
+
+  it('⏎ starts it with the brief (not sent to bise), the input clears; with no onNew it goes to bise as words', async () => {
+    const onAsk = vi.fn();
+    const onNew = vi.fn();
+    const ui = render(<Spotlight data={D} onAsk={onAsk} onNew={onNew} onOpen={vi.fn()} onClose={vi.fn()} />);
+    const input = ui.getByTestId('spot.input') as HTMLInputElement;
+    await act(async () => {
+      fireEvent.input(input, { target: { value: 'start an agent: profile the hub' } });
+      await Promise.resolve();
+    });
+    expect(ui.getByTestId('spot.row.new').textContent).toContain('start an agent');
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter' });
+      await Promise.resolve();
+    });
+    expect(onNew).toHaveBeenCalledWith('profile the hub');
+    expect(onAsk).not.toHaveBeenCalled();
+    expect(input.value).toBe('');
+    cleanup();
+    const ask = vi.fn();
+    const ui2 = render(<Spotlight data={D} onAsk={ask} onOpen={vi.fn()} onClose={vi.fn()} />);
+    const in2 = ui2.getByTestId('spot.input') as HTMLInputElement;
+    await act(async () => {
+      fireEvent.input(in2, { target: { value: '/new profile the hub' } });
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.keyDown(in2, { key: 'Enter' });
+      await Promise.resolve();
+    });
+    expect(ask).toHaveBeenCalledWith('/new profile the hub');
   });
 });

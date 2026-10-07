@@ -5,7 +5,7 @@
 // 'ask bise' first and keeps the agents it names below.
 // The inputs are this module's own view types: the screen maps the store's (generated) shapes to
 // them, so a protocol change doesn't reach the list's rules.
-import { W, cardLine, hostOf, oneLine, shortPath, words } from './words';
+import { W, cardLine, hostOf, newBrief, oneLine, shortPath, words } from './words';
 
 export type AgentStatus = 'waiting' | 'blocked' | 'working' | 'idle' | 'done' | 'failed';
 
@@ -55,7 +55,8 @@ export type SpotItem =
   | { readonly kind: 'agent'; readonly id: string; readonly name: string; readonly project: string; readonly pname: string; readonly status: AgentStatus; readonly title: string }
   | { readonly kind: 'env'; readonly id: string; readonly project: string; readonly name: string; readonly sub: string; readonly front: boolean; readonly n: number | null }
   | { readonly kind: 'front'; readonly id: string; readonly name: string; readonly sub: string }
-  | { readonly kind: 'ask'; readonly id: string; readonly text: string };
+  | { readonly kind: 'ask'; readonly id: string; readonly text: string }
+  | { readonly kind: 'new'; readonly id: string; readonly brief: string };
 
 export interface SpotSection {
   readonly label: string | null;
@@ -63,7 +64,7 @@ export interface SpotSection {
 }
 
 export interface SpotList {
-  readonly mode: 'empty' | 'names' | 'ask';
+  readonly mode: 'empty' | 'names' | 'ask' | 'new';
   readonly sections: readonly SpotSection[];
 }
 
@@ -139,6 +140,10 @@ export function spotList(d: SpotData, text: string): SpotList {
     if (frontRow.length + envs.length > 0) sections.push({ label: W.envs, items: [...frontRow, ...envs] });
     return { mode: 'empty', sections };
   }
+
+  // '/new …' or 'start an agent: …': one row that starts it (bar A.1)
+  const brief = newBrief(q);
+  if (brief !== undefined) return { mode: 'new', sections: [{ label: null, items: [{ kind: 'new', id: 'new', brief }] }] };
 
   // 1-2 words: names (an agent's name, title or purpose, or its project's name; archived ones too)
   const hit = (a: SpotAgent): boolean =>

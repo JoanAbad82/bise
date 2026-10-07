@@ -8,7 +8,7 @@ import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, type JSX,
 import { Spot, SpotGroup, SpotRow, type DotState } from '@/ds';
 import { LivePearl, type Mood } from '@/pearl';
 import { flat, routeList, spotList, type AgentStatus, type SpotData, type SpotItem } from './list';
-import { W } from './words';
+import { W, newBrief } from './words';
 import './spotlight.css';
 
 export interface SpotAnswer {
@@ -42,6 +42,8 @@ export interface SpotlightProps {
   readonly onRouteTo?: (project: string) => void;
   /** A sentence for bise (⏎ on 'ask bise', or ⏎ with nothing picked). */
   readonly onAsk: (text: string) => void;
+  /** '/new …' or 'start an agent: …' (bar A.1): start an agent with that brief; none: it goes to bise as words. */
+  readonly onNew?: (brief: string) => void;
   /** Open a card, an agent or an environment in bise's window. */
   readonly onOpen: (item: SpotItem) => void;
   /** Open bise's answer in the window (the rest of a long one). */
@@ -65,6 +67,8 @@ const Row = memo(function Row({ item, on, testId, onPick }: { item: SpotItem; on
   switch (item.kind) {
     case 'ask':
       return <SpotRow lead="bise" name={W.askBise} what={item.text} hotkey="↵" on={on} onClick={click} testId={id} />;
+    case 'new':
+      return <SpotRow lead="bise" name={W.startAgent} what={item.brief} hotkey="↵" on={on} onClick={click} testId={id} />;
     case 'card':
       return <SpotRow lead="nd" name={`${item.mark} ${item.agent}`} where={item.pname} what={item.text} on={on} onClick={click} testId={id} />;
     case 'agent':
@@ -140,7 +144,10 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
 
   const send = (q: string): void => {
     if (q.trim() === '') return;
-    props.current.onAsk(q.trim());
+    const brief = newBrief(q);
+    const onNew = props.current.onNew;
+    if (brief !== undefined && onNew !== undefined) onNew(brief);
+    else props.current.onAsk(q.trim());
     if (input.current !== null) input.current.value = ''; // his send: the one write to the input
     setText('');
   };
@@ -151,6 +158,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
       return;
     }
     if (item.kind === 'ask') send(item.text);
+    else if (item.kind === 'new') send(input.current?.value ?? `/new ${item.brief}`);
     else if (item.kind !== 'front') props.current.onOpen(item);
   };
 
@@ -188,7 +196,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
   };
 
   const ans = p.answer ? answerLines(p.answer.text) : null;
-  const keys = route !== null ? W.keysRoute : list.mode === 'ask' ? W.keysAsk : W.keysEmpty;
+  const keys = route !== null ? W.keysRoute : list.mode === 'new' ? W.keysNew : list.mode === 'ask' ? W.keysAsk : W.keysEmpty;
 
   return (
     <div ref={box} className="b-spotlight" data-testid={testId}>
