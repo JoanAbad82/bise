@@ -3,7 +3,7 @@
 // files (opens the review), 'changes ⌘D', '⋯'. A project's bise: its 14 px pearl, 'bise ·
 // storefront', the project's chip. Under 1000 px the name goes to the titlebar's crumb (amb-win's)
 // and the head keeps the chip and the buttons. LiveLine: what it does now, at the thread's end.
-// The words are head.ts's. Owner: amb-home.
+// StartingLine: the empty thread's line. The words are head.ts's. Owner: amb-home.
 import type { ReactNode } from 'react';
 import { Pearl } from '@/ds';
 import type { Agent } from '@/proto';
@@ -21,8 +21,8 @@ function Chip({ chip, testId }: { chip: StateChip; testId: string }) {
   );
 }
 
-/** An agent's head. `more` is the '⋯' button (rename, model; the screen owns its panel); `note` a quiet word after the chip ('voice mode'); its context gauge after it. */
-export function AgentHead({ project, a, more, note }: { project: string; a: Agent; more?: ReactNode; note?: string | undefined }) {
+/** An agent's head (`starting`: its thread has nothing of its own yet). `more` is the '⋯' button (rename, model; the screen owns its panel); `note` a quiet word after the chip ('voice mode'); its context gauge after it. */
+export function AgentHead({ project, a, more, note, starting = false }: { project: string; a: Agent; more?: ReactNode; note?: string | undefined; starting?: boolean }) {
   const now = useNow();
   const router = useRouter();
   const diff = useDiff(project, a.name);
@@ -42,7 +42,7 @@ export function AgentHead({ project, a, more, note }: { project: string; a: Agen
           </span>
         )}
       </span>
-      <Chip chip={stateChip(a, now)} testId="thread.head.state" />
+      <Chip chip={starting && a.waits === 0 ? { text: 'starting', needs: false, live: true } : stateChip(a, now)} testId="thread.head.state" />
       {note !== undefined && (
         <span className="ah-note" data-testid="thread.voice">
           {note}
@@ -105,6 +105,16 @@ export function LiveLine({ a }: { a: Agent | undefined }) {
     <div className="th-live" data-testid="thread.live" aria-live="polite">
       ∿ {a.title}
       {t !== 'now' ? ` · ${t}` : ''}
+    </div>
+  );
+}
+
+/** The empty thread (v6 (5)): under his first message, '· checkout is starting: its own folder, sb/checkout'. */
+export function StartingLine({ a }: { a: Agent }) {
+  const where = a.branch != null && a.branch !== '' ? `its own folder, ${a.branch}` : "the project's folder";
+  return (
+    <div className="th-starting" data-testid="thread.starting">
+      · {a.name} is starting: {where}
     </div>
   );
 }

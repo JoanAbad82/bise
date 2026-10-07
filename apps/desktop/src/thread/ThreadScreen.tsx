@@ -29,7 +29,7 @@ import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
 import { ThreadInbox, takesWords, useStripCard } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
-import { AgentHead, BiseHead, LiveLine } from './AgentHead';
+import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
 import { composerWords } from './head';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
@@ -264,6 +264,9 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     </>
   );
 
+  // designer's v6 (5): an agent whose thread has nothing of its own yet (his first message at most) is starting
+  const order = useThreadOrder(tkey);
+  const fresh = !bise && agent !== MAIN && me !== undefined && !me.archived && order.loaded && order.order.length <= 1 && me.status !== 'done' && me.status !== 'failed';
   // designer's desktop-screens v6 (1): '⋯' at the head's right (rename, model, reasoning)
   const more =
     me && !me.archived && !bise ? (
@@ -287,7 +290,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         ) : agent === MAIN ? (
           <BiseHead project={project} name={projectName ?? project} more={more} />
         ) : (
-          <AgentHead project={project} a={me} more={more} note={voice !== 'off' ? 'voice mode' : undefined} />
+          <AgentHead project={project} a={me} more={more} note={voice !== 'off' ? 'voice mode' : undefined} starting={fresh} />
         )}
         {tuning && me && !me.archived && (
           <Tune
@@ -321,7 +324,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} />
         {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} />}
         {stopping && <Marker>stopping {agent}…</Marker>}
-        {!bise && agent !== MAIN && <LiveLine a={me} />}
+        {fresh && <StartingLine a={me} />}
+        {!bise && agent !== MAIN && !fresh && <LiveLine a={me} />}
         <TypingLine text={typing} />
         {/* W7/K24: the project's open items over the composer's divider (amb-home f44d082e) */}
         {/* its hub refused this core: the hub's words and a retry, over the composer (lead m_11347) */}

@@ -11,7 +11,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
-import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
+import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -118,7 +118,7 @@ function EntryBody({ e, ctx, head }: { e: Entry; ctx: RowCtx; head: boolean }) {
     case 'compacted':
       return <CompactedRow e={e} />;
     case 'notice':
-      return <NoticeRow e={e} />;
+      return <NoticeRow e={e} ctx={ctx} />;
     case 'not_delivered':
       return <NotDeliveredRow e={e} ctx={ctx} />;
     // amb-feed's batch 3a (5d4189cb): the hub's news lines, typed
@@ -340,9 +340,12 @@ function CompactedRow({ e }: { e: Entry }) {
 /** A notice's mark by level (the TUI's: info dim, warn ▲, err ✗): the tone is said in a glyph and words, never by color alone. */
 export const NOTICE_MARK = { info: '·', warn: '▲', err: '✗', unknown: '·' } as const;
 
-function NoticeRow({ e }: { e: Entry }) {
+function NoticeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const level = e.notice?.level ?? 'info';
   const text = e.notice?.text ?? e.text;
+  // a main's handoff (designer's v6 (3)): '→ perf · product page speed', opens its thread
+  const handoff = level === 'info' ? handoffOf(text) : null;
+  if (handoff !== null) return <HandoffRow pos={e.pos} to={handoff.agent} brief={handoff.brief} ctx={ctx} />;
   // 'session restored · 14:02', one row centred like a day separator (ambient m_11777)
   if (level === 'info' && text.startsWith('session restored')) {
     return (
@@ -358,6 +361,26 @@ function NoticeRow({ e }: { e: Entry }) {
       </span>
       <span>{text}</span>
     </div>
+  );
+}
+
+/** '→ perf · product page speed': who a main handed a job to, its role (else the brief); a click opens its thread. */
+function HandoffRow({ pos, to, brief, ctx }: { pos: number; to: string; brief: string; ctx: RowCtx }) {
+  const router = useRouter();
+  const a = useAgents(ctx.project).find((x) => x.name === to);
+  const role = a !== undefined && a.purpose !== '' ? a.purpose : brief;
+  return (
+    <button
+      type="button"
+      className="th-handoff"
+      onClick={() => {
+        router.go({ screen: 'thread', project: ctx.project, agent: to });
+      }}
+      data-testid={`thread.handoff.${String(pos)}`}
+    >
+      → {to}
+      {role !== '' && <span className="th-handoff-role"> · {role}</span>}
+    </button>
   );
 }
 

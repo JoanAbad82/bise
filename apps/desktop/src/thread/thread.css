@@ -596,3 +596,25 @@
   font: var(--t-13) var(--font-ui);
   padding: 6px 0 2px;
 }
+.th-handoff {
+  display: block;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--c-text);
+  font: var(--t-13) var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.th-handoff-role {
+  color: var(--c-text-2);
+}
+.th-handoff:hover .th-handoff-role {
+  color: var(--c-text);
+}
+/* the empty thread (v6 (5)): his first message, then '· checkout is starting: …' text-2 */
+.th-starting {
+  color: var(--c-text-2);
+  font: var(--t-13) var(--font-ui);
+  padding: 6px 0 2px;
+}

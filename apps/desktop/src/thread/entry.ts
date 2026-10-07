@@ -218,3 +218,10 @@ export function toolLines(items: readonly { pos: number; at_ms: number; text: st
   if (n('other') > 0) parts.push(`${String(n('other'))} other ${n('other') === 1 ? 'step' : 'steps'}`);
   return { lines, rest, restWords: parts.join(', ') };
 }
+
+/** A handoff in a main's thread (the hub's spawn notice '✚ main → new agent @perf : <brief>'): who it went to and the brief's first line; none for any other notice. Pure. */
+export function handoffOf(text: string): { agent: string; brief: string } | null {
+  const m = /^✚ \S+ → (?:new agent|new task|nouvelle tâche) @([A-Za-z0-9_-]+)(?: : ([\s\S]*))?$/.exec(text.trim());
+  if (m === null) return null;
+  return { agent: m[1] ?? '', brief: (m[2] ?? '').split('\n')[0]?.trim() ?? '' };
+}

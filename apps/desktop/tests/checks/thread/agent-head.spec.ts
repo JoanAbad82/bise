@@ -8,10 +8,14 @@
 //   - perf's rows: its commands as mono lines with their length ('$ lighthouse …  38 s'), its edits
 //     ('± web/product/Hero.tsx  4 s'), the reads counted and folded, the artifact made as a chip
 //     that opens in the window, and the live line '∿ running the bench three more times · 14 min';
+//   - the project's bise shows its handoffs '→ perf · product page speed' (they open the agent);
+//   - checkout's empty thread: his first message, '· checkout is starting: its own folder,
+//     sb/checkout', the chip 'starting';
 //   - the composer says 'to perf' and 'write to perf, then ⏎';
 //   - under 1000 px the head keeps the chip and the buttons, the name and role go (the titlebar's
 //     crumb says them).
-// Writes one sheet (light + dark, 1400 and 800, perf, search, bise · storefront) for designer.
+// Writes each view's shot as its own png at 2x (light + dark, 1400 and 800: perf, search, bise ·
+// storefront, checkout's empty thread) and one sheet of them, for designer.
 // Owner: amb-home.
 import { writeFileSync } from 'node:fs';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
@@ -31,6 +35,10 @@ const prefs = (theme: 'light' | 'dark') => ({
     shots_keep_days: 7,
   },
 });
+const spawn = (pos: number, at: number, agent: string, brief: string) => {
+  const text = `✚ main → new agent @${agent} : ${brief}`;
+  return { pos, at_ms: at, kind: 'notice', text, notice: { level: 'info', text } };
+};
 const world = (now: number) => {
   const ag = (name: string, over: Record<string, unknown>) => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: now - 60 * MIN, waits: 0, ...over });
   return [
@@ -39,7 +47,7 @@ const world = (now: number) => {
       ev: 'projects',
       projects: [
         { project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true },
-        { project: P, name: 'storefront', path: '/nowhere/storefront', git: true, home: false, order: 1, agents: 3, working: 1, waits: 1, running: true },
+        { project: P, name: 'storefront', path: '/nowhere/storefront', git: true, home: false, order: 1, agents: 4, working: 2, waits: 1, running: true },
       ],
     },
     { ev: 'welcome', project: P, proto: 1, workspace: '/nowhere/storefront', name: 'storefront' },
@@ -50,6 +58,7 @@ const world = (now: number) => {
         ag('main', {}),
         ag('perf', { status: 'working', since_ms: now - 14 * MIN, purpose: 'product page speed', title: 'running the bench three more times', branch: 'sb/perf', worktree: '/nowhere/wt/perf' }),
         ag('search', { status: 'idle', purpose: 'size filter on search', waits: 1, branch: 'sb/search' }),
+        ag('checkout', { status: 'working', since_ms: now - 5000, purpose: 'checkout on mobile safari', branch: 'sb/checkout' }),
       ],
     },
     {
@@ -94,7 +103,20 @@ const world = (now: number) => {
       more: false,
     },
     { ev: 'thread', project: P, agent: 'search', entries: [{ pos: 1, at_ms: now - 30 * MIN, kind: 'you', text: 'add a size filter to search' }], before: null, more: false },
-    { ev: 'thread', project: P, agent: 'main', entries: [{ pos: 1, at_ms: now - 15 * MIN, kind: 'agent', text: 'two jobs, two agents: perf takes the product page, search takes the size filter.' }], before: null, more: false },
+    {
+      ev: 'thread',
+      project: P,
+      agent: 'main',
+      entries: [
+        { pos: 1, at_ms: now - 16 * MIN, kind: 'you', text: "the product page is slow on mobile, and add a size filter to search while you're at it" },
+        { pos: 2, at_ms: now - 15 * MIN, kind: 'agent', text: "two jobs, two agents: perf takes the product page, search takes the size filter. i'll tell you when either needs you." },
+        spawn(3, now - 15 * MIN + 1000, 'perf', 'make the product page fast on mobile'),
+        spawn(4, now - 15 * MIN + 2000, 'search', 'add a size filter to search'),
+      ],
+      before: null,
+      more: false,
+    },
+    { ev: 'thread', project: P, agent: 'checkout', entries: [{ pos: 1, at_ms: now - 5000, kind: 'you', text: 'checkout fails on mobile safari when the card form autofills: find why' }], before: null, more: false },
   ];
 };
 
@@ -106,6 +128,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
   const shots: { label: string; png: Buffer }[] = [];
   try {
     const { page } = s;
+    const cdp = await page.context().newCDPSession(page);
     const size = async (w: number, h: number) => {
       await s.app.evaluate(({ BrowserWindow }, [w, h]) => {
         const win = BrowserWindow.getAllWindows().sort((a, b) => (b.getSize()[0] ?? 0) - (a.getSize()[0] ?? 0))[0];
@@ -157,6 +180,7 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
       ['perf', 'app.sidebar.agent.perf'],
       ['search', 'app.sidebar.agent.search'],
       ['bise · storefront', `app.sidebar.project.${P}`],
+      ['checkout (empty)', 'app.sidebar.agent.checkout'],
     ];
     for (const t of ['light', 'dark'] as const) {
       await theme(t);
@@ -174,6 +198,15 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
             await expect(page.getByTestId('thread.head.name')).toHaveText('bise · storefront');
             await expect(page.locator('[data-testid="thread.head"] .b-pearl.s14')).toHaveCount(1);
             await expect(page.getByTestId('thread.head.state')).toHaveText('1 waiting for you');
+            // (3) its handoffs
+            await expect(page.getByTestId('thread.handoff.3')).toHaveText('→ perf · product page speed');
+            await expect(page.getByTestId('thread.handoff.4')).toHaveText('→ search · size filter on search');
+          }
+          if (label === 'checkout (empty)') {
+            // (5) the empty thread: his first message, then the starting line; the chip says starting
+            await expect(page.getByTestId('thread.starting')).toHaveText('· checkout is starting: its own folder, sb/checkout');
+            await expect(page.getByTestId('thread.head.state')).toHaveText('starting');
+            await expect(page.getByTestId('thread.live')).toHaveCount(0);
           }
           if (label === 'perf') {
             if (w === 800) await expect(page.getByTestId('thread.head.name'), 'under 1000 px the name goes to the crumb').toBeHidden();
@@ -181,10 +214,20 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
             await expect(page.getByTestId('thread.head.state')).toBeVisible();
             await expect(page.getByTestId('thread.head.changes')).toBeVisible();
           }
-          shots.push({ label: `${t} · ${String(w)} · ${label}`, png: await page.screenshot() });
+          // designer m_12013: each shot its own png at 2x
+          await cdp.send('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 2, mobile: false });
+          const png = await page.screenshot();
+          await cdp.send('Emulation.clearDeviceMetricsOverride');
+          writeFileSync(test.info().outputPath(`agent-view-${t}-${String(w)}-${label.replace(/[^a-z]+/g, '-').replace(/-+$/, '')}@2x.png`), png);
+          shots.push({ label: `${t} · ${String(w)} · ${label}`, png });
         }
       }
     }
+    // a handoff opens its agent's thread
+    await size(1400, 900);
+    await go(`app.sidebar.project.${P}`);
+    await page.getByTestId('thread.handoff.3').click();
+    await expect(page.getByTestId('thread.head.name')).toHaveText('perf');
     // bise's chip opens the agents list
     await size(1400, 900);
     await go(`app.sidebar.project.${P}`);

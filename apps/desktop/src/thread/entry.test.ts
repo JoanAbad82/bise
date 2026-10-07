@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, TOOL_LINES, chipOf, dropAuthor, stepTime, toolLines, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, TOOL_LINES, chipOf, dropAuthor, handoffOf, stepTime, toolLines, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -131,5 +131,14 @@ describe("the agent view's tool rows (designer's desktop-screens v6 (2))", () =>
     const many = toolLines(Array.from({ length: 8 }, (_, i) => ({ pos: i, at_ms: 0, text: `cmd ${String(i)}`, kind: 'run' })));
     expect(many.lines).toHaveLength(TOOL_LINES);
     expect(many.restWords).toBe('ran 2 commands');
+  });
+});
+
+describe("a project's bise hands off (designer's desktop-screens v6 (3))", () => {
+  it("reads the hub's spawn notice: the agent and its brief's first line", () => {
+    expect(handoffOf('✚ main → new agent @perf : product page speed\nmore words')).toEqual({ agent: 'perf', brief: 'product page speed' });
+    expect(handoffOf('✚ main → new task @t : x')).toEqual({ agent: 't', brief: 'x' });
+    expect(handoffOf('✚ main → new agent @solo')).toEqual({ agent: 'solo', brief: '' });
+    expect(handoffOf('session restored · 6 messages')).toBeNull();
   });
 });
