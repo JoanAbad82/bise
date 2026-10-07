@@ -5,10 +5,11 @@
 // a thread's entries never re-render it. A project's dot says, in this
 // order: its folder is gone, its hub is down, an agent works, something
 // waits on him, all quiet.
-import { memo } from 'react';
+import { Fragment, memo } from 'react';
 import { Row, SectionHead, Side, type DotState } from '@/ds';
-import type { ProjectRow } from '@/proto';
-import { useAgents, useProjects } from '@/store';
+import type { Agent, Feature, ProjectRow } from '@/proto';
+import { useAgents, useFeatures, useProjects } from '@/store';
+import { groupsOf } from '@/review/feature';
 import { dotOf, endOf, liveOf, numbersOf } from '@/agents/model';
 import { MAIN, projectOf, type Route } from './route';
 import { useRoute, useRouter } from './router';
@@ -93,45 +94,77 @@ const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow;
   );
 });
 
-/** The live agents of the project in view, main out (it is the project's row). */
+/**
+ * The live agents of the project in view, main out (it is the project's
+ * row), as the TUI's panel: the ones in no feature, then each feature's
+ * head ('ψ gift-cards', opens the feature) with its agents under it.
+ */
 function Agents({ project, route }: { project: string; route: Route }) {
   const router = useRouter();
   const all = useAgents(project);
-  const agents = liveOf(all).filter((a) => !a.main);
+  const features = useFeatures(project);
+  const { solo, groups } = groupsOf(
+    liveOf(all).filter((a) => !a.main),
+    features,
+  );
   // the TUI's numbers: kept while an agent lives, a newcomer takes the smallest free one
   const nums = numbersOf(project, all);
   const now = useNow();
+  const row = (a: Agent) => <AgentRow key={a.name} project={project} a={a} n={nums.get(a.name) ?? 0} route={route} now={now} />;
   return (
     <>
-      {agents.map((a) => {
-        const end = endOf(a, now);
-        const n = nums.get(a.name) ?? 0;
-        return (
+      {solo.map(row)}
+      {groups.map((g) => (
+        <Fragment key={`ψ ${g.feature.name}`}>
           <Row
-            key={a.name}
             kind="ag"
-            name={
-              // its ⌥ number (tui-parity W4: the panel's numbers for ⌥1-9)
-              n >= 1 && n <= 9 ? (
-                <>
-                  <span className="app-n">{n}</span>
-                  {a.name}
-                </>
-              ) : (
-                a.name
-              )
-            }
-            dot={dotOf(a.status)}
-            end={end.text}
-            needs={end.needs}
-            on={route.screen === 'thread' && route.project === project && route.agent === a.name}
+            name={`ψ ${g.feature.name}`}
+            end={distanceShort(g.feature)}
+            on={route.screen === 'feature' && route.project === project && route.name === g.feature.name}
             onClick={() => {
-              router.go({ screen: 'thread', project, agent: a.name });
+              router.go({ screen: 'feature', project, name: g.feature.name });
             }}
-            testId={`app.sidebar.agent.${a.name}`}
+            testId={`app.sidebar.feature.${g.feature.name}`}
           />
-        );
-      })}
+          {g.agents.map(row)}
+        </Fragment>
+      ))}
     </>
+  );
+}
+
+/** A feature's end in the sidebar: what it waits for, else how far it is. */
+function distanceShort(f: Feature): string {
+  if (f.building) return 'building';
+  if (f.trial) return 'on trial';
+  return `${String(f.ahead)} ahead`;
+}
+
+function AgentRow({ project, a, n, route, now }: { project: string; a: Agent; n: number; route: Route; now: number }) {
+  const router = useRouter();
+  const end = endOf(a, now);
+  return (
+    <Row
+      kind="ag"
+      name={
+        // its ⌥ number (tui-parity W4: the panel's numbers for ⌥1-9)
+        n >= 1 && n <= 9 ? (
+          <>
+            <span className="app-n">{n}</span>
+            {a.name}
+          </>
+        ) : (
+          a.name
+        )
+      }
+      dot={dotOf(a.status)}
+      end={end.text}
+      needs={end.needs}
+      on={route.screen === 'thread' && route.project === project && route.agent === a.name}
+      onClick={() => {
+        router.go({ screen: 'thread', project, agent: a.name });
+      }}
+      testId={`app.sidebar.agent.${a.name}`}
+    />
   );
 }

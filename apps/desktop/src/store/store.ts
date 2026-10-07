@@ -25,6 +25,7 @@ import type {
   HubEv,
   Job,
   JsonValue,
+  Feature,
   Merged,
   Mode,
   Plugin,
@@ -48,6 +49,7 @@ export const TAGS = {
   worktrees: true,
   dev_servers: true,
   merged: true,
+  features: true,
   diff: true,
   route: true,
   route_done: true,
@@ -215,6 +217,10 @@ export class Store {
   merged(project: string): readonly Merged[] {
     return this.slice(`merged:${project}`, EMPTY);
   }
+  /** a project's features (amb-feed 5f436473: at hello, on change, on HubCmd features) */
+  features(project: string): readonly Feature[] {
+    return this.slice(`features:${project}`, EMPTY);
+  }
   jobs(project: string): readonly Job[] {
     return this.slice(`jobs:${project}`, EMPTY);
   }
@@ -287,6 +293,7 @@ export class Store {
       case 'worktrees':
       case 'dev_servers':
       case 'merged':
+      case 'features':
       case 'jobs':
         this.put(`${ev.ev}:${ev.project}`, ev.items);
         return;

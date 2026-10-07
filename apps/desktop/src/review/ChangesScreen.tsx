@@ -3,7 +3,8 @@
 // branch opens its review; a merged commit opens read-only.
 import { useEffect } from 'react';
 import { Empty, Head, Row, SectionHead } from '@/ds';
-import { useMerged, useStore, useWorktrees } from '@/store';
+import { useFeatures, useMerged, useStore, useWorktrees } from '@/store';
+import { distance, stateWords } from './feature';
 import { useRouter } from '@/app/router';
 import { MAIN } from '@/app/route';
 import { clock } from '@/thread/entry';
@@ -15,11 +16,13 @@ export function ChangesScreen({ project }: { project: string }) {
   const router = useRouter();
   const worktrees = useWorktrees(project);
   const merged = useMerged(project);
+  const features = useFeatures(project);
 
   // fresh lists on open (the old window's f8e8330a)
   useEffect(() => {
     store.command({ cmd: 'worktrees', project });
     store.command({ cmd: 'merged', project });
+    store.command({ cmd: 'features', project });
   }, [store, project]);
 
   const branches = branchesOf(worktrees);
@@ -27,6 +30,20 @@ export function ChangesScreen({ project }: { project: string }) {
     <section className="rv-screen" data-testid="changes.screen" data-project={project}>
       <Head title="changes" sub={`${branches.length} branches · ${merged.length} merged today`} />
       <div className="rv-body">
+        {features.length > 0 && <SectionHead>features</SectionHead>}
+        {features.map((f) => (
+          <Row
+            key={f.name}
+            kind="ag"
+            // a feature: its branch, its agents' work merged into it, tried and merged as one
+            name={`ψ ${f.name}`}
+            end={`${stateWords(f)} · ${distance(f)}`}
+            onClick={() => {
+              router.go({ screen: 'feature', project, name: f.name });
+            }}
+            testId={`changes.feature.${f.name}`}
+          />
+        ))}
         <SectionHead>branches</SectionHead>
         {branches.length === 0 && <Empty title="no branches">its agents work in the shared folder</Empty>}
         {branches.map((w) => {

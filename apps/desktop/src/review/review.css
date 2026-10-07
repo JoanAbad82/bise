@@ -22,3 +22,23 @@
   color: var(--c-text-2);
   margin: 4px 0;
 }
+
+/* a feature's card (FeatureScreen): its question, then its answers as buttons */
+.ft-card {
+  margin: 12px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: 10px;
+  background: var(--c-raised);
+}
+
+.ft-q {
+  margin: 0 0 10px;
+  color: var(--c-text);
+}
+
+.ft-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

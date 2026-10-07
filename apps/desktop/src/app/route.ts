@@ -11,6 +11,7 @@
 //   agents/<p>                 a project's agents list
 //   changes/<p>                a project's changes (branches, merged today)
 //   review/<p>/<a>             an agent's change, to review and merge
+//   feature/<p>/<name>         a feature: its branch, agents, try / merge / drop
 //   commit/<p>/<sha>           one commit already on main, read-only
 //   artifacts/<p>[/<id>]       a project's artifacts (one opened)
 //   environments/<p>           its worktrees and dev servers
@@ -25,6 +26,7 @@ export type Route =
   | { screen: 'agents'; project: string }
   | { screen: 'changes'; project: string }
   | { screen: 'review'; project: string; agent: string }
+  | { screen: 'feature'; project: string; name: string }
   | { screen: 'commit'; project: string; sha: string }
   | { screen: 'artifacts'; project: string; id?: string }
   | { screen: 'environments'; project: string }
@@ -63,6 +65,8 @@ export function formatRoute(r: Route): string {
       return `${r.screen}/${r.project}`;
     case 'review':
       return `review/${r.project}/${r.agent}`;
+    case 'feature':
+      return `feature/${r.project}/${r.name}`;
     case 'commit':
       return `commit/${r.project}/${r.sha}`;
     case 'artifacts':
@@ -101,6 +105,8 @@ export function parseRoute(path: string): Route {
       return one !== undefined ? { screen: head, project: one } : nf;
     case 'review':
       return a !== undefined && b !== undefined ? { screen: 'review', project: a, agent: b } : nf;
+    case 'feature':
+      return a !== undefined && b !== undefined ? { screen: 'feature', project: a, name: b } : nf;
     case 'commit':
       return a !== undefined && b !== undefined && SHA.test(b) ? { screen: 'commit', project: a, sha: b } : nf;
     case 'artifacts':
