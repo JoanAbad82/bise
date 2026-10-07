@@ -5,7 +5,7 @@
 // a thread's entries never re-render it. A project's dot says, in this
 // order: its folder is gone, its hub is down, an agent works, something
 // waits on him, all quiet.
-import { Fragment, memo } from 'react';
+import { Fragment, memo, useEffect } from 'react';
 import { Row, SectionHead, Side, type DotState } from '@/ds';
 import type { Agent, Feature, ProjectRow } from '@/proto';
 import { useAgents, useFeatures, useProjects } from '@/store';
@@ -16,6 +16,7 @@ import { useRoute, useRouter } from './router';
 import { useNow } from './clock';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
+import { Hint, hintUsed, useHint } from './hints';
 
 /** A project row's dot. Pure. */
 export function projectDot(p: ProjectRow): DotState {
@@ -116,12 +117,26 @@ function Agents({ project, route }: { project: string; route: Route }) {
   const tour = useTour(project);
   const liveDemo = tour.snap.members.filter((m) => !m.archived);
   const tipAt = tour.tip === 'start' ? liveDemo[0]?.name : tour.tip === 'steer' ? liveDemo.at(-1)?.name : undefined;
+  // S36: the first agent's one-time hint under the first agent's row (a demo tip there wins)
+  const first = solo[0]?.name ?? groups[0]?.agents[0]?.name;
+  const hint = useHint('first_agent', first !== undefined && tour.tip === null);
+  const inAgent = route.screen === 'thread' && route.project === project && route.agent !== MAIN;
+  useEffect(() => {
+    if (inAgent) hintUsed('first_agent');
+  }, [inAgent]);
   const row = (a: Agent) =>
     tipAt === a.name && tour.tip !== null ? (
       <Fragment key={a.name}>
         <AgentRow project={project} a={a} n={nums.get(a.name) ?? 0} route={route} now={now} />
         <div className="app-tip">
           <Tip tip={tour.tip} snap={tour.snap} />
+        </div>
+      </Fragment>
+    ) : hint && first === a.name ? (
+      <Fragment key={a.name}>
+        <AgentRow project={project} a={a} n={nums.get(a.name) ?? 0} route={route} now={now} />
+        <div className="app-tip">
+          <Hint name="first_agent" />
         </div>
       </Fragment>
     ) : (

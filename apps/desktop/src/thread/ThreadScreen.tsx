@@ -21,6 +21,7 @@ import { HELP_EVENT } from '@/app/keys';
 import { MAIN } from '@/app/route';
 import { FirstRun, showsFirstRun, Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
+import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
 import { ThreadInbox } from '@/inbox';
 import { dotOf, lineOf } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
@@ -98,6 +99,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   }, [tour.sent]);
   const onSent = useCallback(() => {
     tourSent.current();
+    // S36: his message puts the one-time hints away
+    hintsUserMessage();
   }, []);
   const topTip = (tour.tip === 'inside' && tour.snap.focus === agent) || tour.tip === 'end' ? tour.tip : null;
   useMenuAction('find', () => {
@@ -243,6 +246,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         {stopping && <Marker>stopping {agent}…</Marker>}
         <TypingLine text={typing} />
         {/* W7/K24: the project's open items over the composer's divider (amb-home f44d082e) */}
+        <CardHint project={project} />
         <ThreadInbox project={project} />
         {me?.archived === true ? (
           <History project={project} agent={agent} />
@@ -423,6 +427,23 @@ function useThreadQuote(section: RefObject<HTMLElement | null>, composer: RefObj
     };
   }, [section, composer, agent]);
   return quoting;
+}
+
+/**
+ * S36: the first card's one-time hint, over the thread's inbox strip; it goes when the
+ * project has no open card any more (answered, closed) or after his next message.
+ */
+function CardHint({ project }: { project: string }) {
+  const n = useProjects().find((p) => p.project === project)?.cards?.length ?? 0;
+  const on = useHint('first_card', n > 0);
+  useEffect(() => {
+    if (n === 0) hintUsed('first_card');
+  }, [n]);
+  return on ? (
+    <div className="th-hint">
+      <Hint name="first_card" />
+    </div>
+  ) : null;
 }
 
 const ThreadComposer = memo(function ThreadComposer({
