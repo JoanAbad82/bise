@@ -82,13 +82,8 @@ mod usage;
 mod models;
 mod term;
 mod feedsel;
-<<<<<<< Updated upstream
 mod find;
 mod find_bar;
-||||||| Stash base
-=======
-mod find;
->>>>>>> Stashed changes
 mod links;
 mod textlayer;
 mod pointer;

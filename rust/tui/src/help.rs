@@ -114,7 +114,6 @@ pub(crate) const ROWS: &[Row] = &[
     r(CARDS, "y|n|esc", "a confirmation: yes / no / not now"),
     r(FEED, "click ▸", "open or close one folded item: thinking, an output, a diff, a report"),
     r(FEED, "ctrl+o", "open or close everything folded").top(),
-<<<<<<< Updated upstream
     FIND,
     r(FEED, "/artifacts", "what your agents made, full screen: / find, ⏎ open, space quick look, v versions, @ put it in a message").top(),
     r(FEED, "/scheduled", "your scheduled tasks (agents set them with sb every), full screen: ⏎ open, r run now, x stop, tab ended too"),
@@ -123,12 +122,6 @@ pub(crate) const ROWS: &[Row] = &[
     r(FEED, "click ± 3 files|click ψ", "the diff of what an agent landed, or of its branch (the composer keeps the keys; a click in the panel takes them)"),
     r(FEED, "↑↓|tab|⏎|esc", "in the diff panel with the keys: move, next file (shift+tab: previous), open the line in your editor or unfold, esc closes; typing writes in the composer"),
     r(FEED, "pgup|pgdn|wheel", "scroll the feed"),
-||||||| Stash base
-    r(FEED, "pgup|pgdn|wheel", "scroll the feed (the card when it is shown)"),
-=======
-    r(FEED, "ctrl+f", "find in the history: ⏎ or ↑ older, shift+⏎ or ↓ newer, esc close (the view stays on the match)").top(),
-    r(FEED, "pgup|pgdn|wheel", "scroll the feed (the card when it is shown)"),
->>>>>>> Stashed changes
     r(FEED, "end", "back to the bottom"),
     r(FEED, "ctrl+l", "clear the display (/clear); scroll up to see the lines again"),
     r(FEED, "ctrl+y|click copy", "copy a code block: the one under the mouse (its copy on hover), else the newest on screen"),

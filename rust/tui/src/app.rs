@@ -48,7 +48,6 @@ pub(crate) struct App {
     /// the "type to ask about it" popup over the selection is up: set when
     /// a drag ends, dropped by a press or a scroll (quote.rs)
     pub(crate) quote_hint: bool,
-<<<<<<< Updated upstream
     /// ctrl+f: the find field, open (find.rs)
     pub(crate) find: Option<crate::find::Find>,
     /// expired-ux: the ChatGPT sign-in again, from the thread (resign.rs)
@@ -64,11 +63,6 @@ pub(crate) struct App {
     /// with them sends turns `ctrl_digits` on.
     pub(crate) ctrl_digits: bool,
     pub(crate) clicks: bool,
-||||||| Stash base
-=======
-    /// ctrl+f: the find field, open (find.rs)
-    pub(crate) find: Option<crate::find::Find>,
->>>>>>> Stashed changes
     // activity that arrived while pinned (shown by the back-to-bottom bar)
     pub(crate) unseen: usize,
     pub(crate) tail_visible: bool,
@@ -311,17 +305,12 @@ impl App {
             feed_y: 0,
             feed_sel: None,
             quote_hint: false,
-<<<<<<< Updated upstream
             find: None,
             resign: None,
             palette: None,
             cmd_keys: false,
             ctrl_digits: true,
             clicks: true,
-||||||| Stash base
-=======
-            find: None,
->>>>>>> Stashed changes
             unseen: 0,
             tail_visible: true,
             bottom_bar_rect: None,

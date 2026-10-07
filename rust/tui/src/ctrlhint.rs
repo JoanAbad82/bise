@@ -761,33 +761,9 @@ mod frame_tests {
             let div = row_of(&a, "you → main");
             assert!(!a[div].contains("working") && b[div].contains(" working "), "{}\n{}", a[div], b[div]);
             let bar = a.len() - 2;
-<<<<<<< Updated upstream
             assert!(b[bar].contains("ctrl+c interrupt   ctrl+o expand   ctrl+f find   ctrl+1 open an inbox item"), "{}", b[bar]);
             assert!(!b[bar].contains("ctrl+k/j") && !b[bar].contains("ctrl+g"), "{}", b[bar]);
             let mut changed = vec![0, fold, main, docs, div, bar];
-||||||| Stash base
-            assert!(b[bar].contains("ctrl+c interrupt   ctrl+o expand   ctrl+g "), "{}", b[bar]);
-            let mut changed = vec![fold, title, bar];
-            if hinted {
-                changed.push(div);
-            }
-            if card {
-                let y = crate::sb::ctrl_view(&app).card_area.bottom() as usize - 1;
-                assert!(b[y].contains(" ctrl+g hide ") && b[y].contains(" ctrl+x close "), "{}", b[y]);
-                changed.push(y);
-            }
-=======
-            assert!(b[bar].contains("ctrl+c interrupt   ctrl+o expand   ctrl+f find   ctrl+g "), "{}", b[bar]);
-            let mut changed = vec![fold, title, bar];
-            if hinted {
-                changed.push(div);
-            }
-            if card {
-                let y = crate::sb::ctrl_view(&app).card_area.bottom() as usize - 1;
-                assert!(b[y].contains(" ctrl+g hide ") && b[y].contains(" ctrl+x close "), "{}", b[y]);
-                changed.push(y);
-            }
->>>>>>> Stashed changes
             changed.sort();
             let diff: Vec<usize> = (0..a.len()).filter(|&y| a[y] != b[y]).collect();
             assert_eq!(diff, changed, "\n{}\n---\n{}", a.join("\n"), b.join("\n"));
