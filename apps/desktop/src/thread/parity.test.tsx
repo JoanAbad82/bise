@@ -285,3 +285,44 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
     expect(v.getByTestId('thread.usage').textContent).toBe(' · 42k · 17%');
   });
 });
+
+describe("the first-run text in main's empty thread (bar L1 / M18, amb-kit 29c5eb93)", () => {
+  const screen = (store: Store, agent = 'main') =>
+    render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent={agent} /></RouterContext>
+      </StoreProvider>,
+    );
+  const thread = (store: Store, entries: { pos: number; kind: 'you' | 'agent'; text: string }[]) => {
+    act(() => {
+      store.apply({ ev: 'thread', project: P, agent: 'main', entries: entries.map((e) => ({ ...e, at_ms: 1 })), before: null, more: false });
+    });
+  };
+
+  it("shows while he said nothing and main is the only agent; not in another agent's thread", () => {
+    const store = new Store(null);
+    act(() => {
+      store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('old', { archived: true })] });
+    });
+    thread(store, [{ pos: 1, kind: 'agent', text: 'hi.' }]);
+    expect(screen(store).getByTestId('setup.firstrun').textContent).toContain('show me what you can do');
+    cleanup();
+    expect(screen(store, 'old').queryByTestId('setup.firstrun')).toBeNull();
+  });
+
+  it('gone once he said something, or once another agent runs', () => {
+    const said = new Store(null);
+    act(() => {
+      said.apply({ ev: 'agents', project: P, agents: [ag('main')] });
+    });
+    thread(said, [{ pos: 1, kind: 'you', text: 'hello' }]);
+    expect(screen(said).queryByTestId('setup.firstrun')).toBeNull();
+    cleanup();
+    const busy = new Store(null);
+    act(() => {
+      busy.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('perf')] });
+    });
+    thread(busy, []);
+    expect(screen(busy).queryByTestId('setup.firstrun')).toBeNull();
+  });
+});

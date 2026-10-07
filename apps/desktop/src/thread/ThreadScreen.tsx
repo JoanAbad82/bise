@@ -18,6 +18,8 @@ import { useMenuAction } from '@/app/menu';
 import { useRouter } from '@/app/router';
 import { hubCmdOf, pickCommands, windowRun } from './commands';
 import { HELP_EVENT } from '@/app/keys';
+import { MAIN } from '@/app/route';
+import { FirstRun, showsFirstRun } from '@/setup';
 import { dotOf, lineOf } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
@@ -220,6 +222,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
           />
         )}
         <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} />
+        {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} />}
         {stopping && <Marker>stopping {agent}…</Marker>}
         <TypingLine text={typing} />
         {me?.archived === true ? (
@@ -246,6 +249,32 @@ export function codeToCopy(doc: Document): string | undefined {
 }
 
 /** The list: entries by pos, then his sends not confirmed yet. */
+/**
+ * The first-run text (bar L1 / M18, amb-kit's FirstRun) in main's thread
+ * while he has said nothing there and main is the project's only agent: its
+ * "show me what you can do" puts the words in the composer, selected (never
+ * a send); then its last line says ⏎ tries it. Gone once he said something.
+ */
+function FirstRunSlot({ tkey, project, composer }: { tkey: string; project: string; composer: RefObject<ComposerActions | null> }) {
+  const store = useStore();
+  const view = useThreadOrder(tkey);
+  const pending = usePending(tkey);
+  const live = useAgents(project).filter((a) => !a.archived).length;
+  const [ready, setReady] = useState(false);
+  // his words in the thread: an entry of his, or a send of his on its way
+  const said = pending.length > 0 || view.order.some((pos) => store.entry(tkey, pos)?.kind === 'you');
+  if (!view.loaded || !showsFirstRun(said, live)) return null;
+  return (
+    <FirstRun
+      ready={ready}
+      onFill={(text) => {
+        composer.current?.fill(text);
+        setReady(true);
+      }}
+    />
+  );
+}
+
 const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey: string; project: string; agent: string; bise: boolean; listRef: RefObject<ThreadListHandle | null> }) {
   const store = useStore();
   const view = useThreadOrder(tkey);
