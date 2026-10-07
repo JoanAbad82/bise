@@ -219,3 +219,11 @@
   text-underline-offset: 2px;
   cursor: pointer;
 }
+
+/* a to_agent row that waits for the reply (its question, amb-feed eb752406) */
+.th-asks {
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--c-accent);
+  font-size: 12px;
+}

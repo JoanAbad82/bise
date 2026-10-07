@@ -7,7 +7,7 @@ import { Store, StoreProvider, replay, threadKey } from '@/store';
 import { placesOf } from '@/review/EnvironmentsScreen';
 import { Markdown, langOf } from './Markdown';
 import { newAtEnd } from './ThreadList';
-import { EntryRow, foldOf, type RowCtx } from './rows';
+import { EntryRow, foldOf, toAgentName, type RowCtx } from './rows';
 import { countsOf, ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
 
@@ -131,4 +131,51 @@ describe('code colors (tui-parity B15)', () => {
     expect(pres[1]?.querySelectorAll('span.token').length).toBe(0);
     expect(pres[1]?.textContent).toBe('plain words\n');
   });
+
+  it("A.3 S16: an agent's message to main is '→ main' with its words; its question waits for the reply; main's card for it answers from the thread", () => {
+    expect(toAgentName('gift-ui', 'main', true)).toBe('✉ gift-ui → main');
+    expect(toAgentName('gift-ui', 'main', false)).toBe('gift-ui → main');
+    const cmds: CoreCmd[] = [];
+    const port: CorePort = { send: (c) => cmds.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    const store = new Store(port);
+    store.setCore('up');
+    const ask = 'gift cards: show the balance on the cart page, or only at checkout?';
+    store.apply({ ev: 'entry', project: P, agent: 'gift-ui', entry: { pos: 7, at_ms: 1, kind: 'to_agent', text: 'done: the balance label', to: 'main', asks: false, msg: 8 } });
+    store.apply({ ev: 'entry', project: P, agent: 'gift-ui', entry: { pos: 8, at_ms: 2, kind: 'to_agent', text: ask, to: 'main', asks: true, msg: 9 } });
+    store.apply({
+      ev: 'entry',
+      project: P,
+      agent: 'gift-ui',
+      entry: { pos: 9, at_ms: 3, kind: 'card', text: ask, card: { id: 2, question: ask, options: [{ n: 1, label: 'on the cart page' }, { n: 2, label: 'only at checkout' }], answered: false } },
+    });
+    const ctx: RowCtx = { tkey: threadKey(P, 'gift-ui'), project: P, agent: 'gift-ui', bise: false, onLink: () => undefined };
+    const v = render(
+      <StoreProvider store={store}>
+        <EntryRow ctx={ctx} pos={7} />
+        <EntryRow ctx={ctx} pos={8} />
+        <EntryRow ctx={ctx} pos={9} />
+      </StoreProvider>,
+    );
+    expect(v.getByTestId('thread.to.7').textContent).toContain('gift-ui → main');
+    expect(v.getByTestId('thread.to.7').textContent).not.toContain('✉');
+    expect(v.queryByTestId('thread.asks.7')).toBeNull();
+    expect(v.getByTestId('thread.to.8').textContent).toContain('✉ gift-ui → main');
+    expect(v.getByTestId('thread.to.8').textContent).toContain(ask);
+    expect(v.getByTestId('thread.asks.8').textContent).toBe('waits for the reply');
+    expect(v.getByTestId('thread.card.2').textContent).toContain(ask);
+    fireEvent.click(v.getByTestId('thread.card.2.opt.2'));
+    expect(cmds).toContainEqual(expect.objectContaining({ cmd: 'answer', project: P, card: 2, reply: '2' }));
+    // answered: one line, no options
+    act(() => {
+      store.apply({
+        ev: 'entry',
+        project: P,
+        agent: 'gift-ui',
+        entry: { pos: 9, at_ms: 3, kind: 'card', text: ask, card: { id: 2, question: ask, options: [{ n: 1, label: 'on the cart page' }, { n: 2, label: 'only at checkout' }], answered: true } },
+      });
+    });
+    expect(v.getByTestId('thread.card.2').textContent).toContain('✓ answered');
+    expect(v.queryByTestId('thread.card.2.opt.1')).toBeNull();
+  });
 });
+

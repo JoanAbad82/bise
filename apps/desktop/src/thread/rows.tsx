@@ -67,6 +67,8 @@ function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       return <Marker>{e.report ? `${e.report.kind} · ${e.text}` : e.text}</Marker>;
     case 'you':
       return <YouRow e={e} ctx={ctx} />;
+    case 'to_agent':
+      return <ToAgentRow e={e} ctx={ctx} />;
     default: {
       const who = whoOf(e, ctx);
       return (
@@ -133,6 +135,39 @@ function ToolsRow({ e }: { e: Entry }) {
   );
 }
 
+/**
+ * What this agent sent another (amb-feed eb752406, bar A.3): '→ main' and
+ * its words, indented as an exchange; one that waits for the reply is its
+ * question (the TUI's '✉ gift-ui → main'): marked so, the card main opens
+ * for it follows as its own entry.
+ */
+function ToAgentRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const to = e.to ?? 'main';
+  return (
+    <Msg
+      from="agent"
+      name={toAgentName(ctx.agent, to, e.asks === true)}
+      indent
+      time={clock(e.at_ms)}
+      testId={`thread.to.${String(e.pos)}`}
+      after={
+        e.asks === true ? (
+          <span className="th-asks" data-testid={`thread.asks.${String(e.pos)}`}>
+            waits for the reply
+          </span>
+        ) : undefined
+      }
+    >
+      <Markdown text={e.text} onLink={ctx.onLink} onPath={ctx.onPath} />
+    </Msg>
+  );
+}
+
+/** A to_agent row's name: '✉ gift-ui → main' when it asks, else 'gift-ui → main'. Pure. */
+export function toAgentName(from: string, to: string, asks: boolean): string {
+  return `${asks ? '✉ ' : ''}${from} → ${to}`;
+}
+
 /** A card it asked: open, its options answer it; answered, a line. */
 function CardRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const store = useStore();
@@ -140,7 +175,7 @@ function CardRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   if (!c) return <Marker>{e.text}</Marker>;
   if (c.answered) return <Answered testId={`thread.card.${c.id}`}>✓ answered: {c.question}</Answered>;
   return (
-    <Msg from={ctx.bise && ctx.agent === 'main' ? 'bise' : 'agent'} name={ctx.agent} time={clock(e.at_ms)}>
+    <Msg from={ctx.bise && ctx.agent === 'main' ? 'bise' : 'agent'} name={ctx.agent} time={clock(e.at_ms)} testId={`thread.card.${String(c.id)}`}>
       <Markdown text={c.question} onLink={ctx.onLink} />
       <Opts
         items={c.options.map((o) => ({ n: o.n, text: o.label }))}
