@@ -14,6 +14,17 @@ qa="$desktop/../../plugins/ambient-qa/qa.py"
 up=(world up --projects 2)
 [ -n "${QA_BISE:-}" ] && up+=(--bise "$QA_BISE")
 
+# No real key reaches the world: world up hands its hubs this env, and the app's core inherits
+# it too (a hub then counts his providers as ready, and the window's model catalog differs from
+# the TUI's, which gets the world's env only). Every key, token and provider variable goes; one
+# fake Mistral key (never valid) stands in on both sides (world.ts passes qa-fake- values to the
+# TUI), so the hub's catalog and the TUI's /model list the same ready provider.
+for v in $(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' |
+           grep -iE '(_api_key|_token|_secret|_bedrock|_password)$|^(anthropic|openai|azure|mistral|codestral|gemini|google|aws|openrouter|staging_mistral|gemfury)_'); do
+  unset "$v"
+done
+export MISTRAL_API_KEY=qa-fake-not-a-key
+
 down() { python3 -B "$qa" world down > /dev/null 2>&1 || true; }
 trap down EXIT INT TERM
 

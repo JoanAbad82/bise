@@ -147,7 +147,9 @@ export function tui(w: World, project: string, size = '160x50'): Tui {
   const tsock = path.join(sockDir, 's');
   const name = `qaf${Date.now() % 1_000_000}`;
   const [cols, rows] = size.split('x');
-  const env = { ...worldEnv(w), PATH: process.env['PATH'] ?? '/usr/bin:/bin', TERM: 'xterm-256color', LANG: 'en_US.UTF-8' };
+  // real.sh's fake provider keys (qa-fake-…, never valid): the TUI sees the providers the hub sees
+  const fake = Object.fromEntries(Object.entries(process.env).filter((e): e is [string, string] => e[1]?.startsWith('qa-fake-') === true));
+  const env = { ...worldEnv(w), ...fake, PATH: process.env['PATH'] ?? '/usr/bin:/bin', TERM: 'xterm-256color', LANG: 'en_US.UTF-8' };
   const tm = (args: string[]): string => execFileSync('tmux', ['-S', tsock, ...args], { encoding: 'utf8', env, timeout: 10_000 });
   const cmd = `cd ${JSON.stringify(h.ws)} && exec ${JSON.stringify(w.bise)}`;
   tm(['new-session', '-d', '-s', name, '-x', cols ?? '160', '-y', rows ?? '50', cmd]);
@@ -235,7 +237,7 @@ export const TUI_STATUS: Readonly<Record<string, readonly string[]>> = {
 };
 
 /** One agent as the hub's socket state has it (the fields the A rows read). */
-export type HubAgent = { name: string; status: string; main: boolean; dropped: boolean; branch: string | null; report: string | null; model: string; effort?: string | null; mode?: string; path?: string; changes: { add: number; del: number; files: number } | null };
+export type HubAgent = { name: string; status: string; main: boolean; dropped: boolean; branch: string | null; report: string | null; model: string; effort?: string | null; efforts?: string[]; mode?: string; path?: string; changes: { add: number; del: number; files: number } | null };
 
 /** The hub's agents, read straight from its socket (`hubState`). */
 export async function hubAgents(w: World, project: string): Promise<HubAgent[]> {
