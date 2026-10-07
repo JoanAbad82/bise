@@ -80,6 +80,10 @@ fn cases() -> Vec<Vec<&'static str>> {
         vec!["people", "set", "Nina", "support lead"],
         vec!["people", "remove", "Nina"],
         vec!["people", "set", "Nina"],
+        // followed jobs (S10): the user hears once when one ends
+        vec!["follow", "t1"],
+        vec!["follow", "acme/t1", "--off"],
+        vec!["follow"],
         vec!["version"],
         vec!["version", "switch", "HEAD"],
         vec!["restart", "current"],
