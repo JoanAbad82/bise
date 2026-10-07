@@ -1,0 +1,155 @@
+// thread/news-real · bar T, amb-win's batch 3a rows (f97e578a) on amb-feed's typed news (5d4189cb),
+// on the REAL core over the throwaway world (../world.ts), next to the TUI on the same hub
+// (ambient-lead m_11369; amb-win's thread/news-rows runs them on the scripted core's fixtures).
+// Owner: qa-flows. shop's main thread; each row a soft step, the TUI's line the reference:
+//   - landed: the seed's 'gift-api landed 1 commit on gift-cards (<sha>)' is a landed row with the
+//     same sha, and its sha opens that commit's review;
+//   - pr: '#412 checks fail: e2e' is a pr row, failing said by '▲' and the hub's words (data-tone
+//     err, never color alone), its number opens the PR (main's test-mode stdout line);
+//   - artifact: main's 'sb artifact add <url> --title …' is an artifact card with its title;
+//   - answered / approval: his answer to gift-ui's card #2 from the TUI, '/answer 2 no: <note>'
+//     on the merge card: whatever rows the hub types for them, next to the TUI's lines (the world
+//     has no tool approval in yolo, nor main answering for him: said in the annotations);
+//   - from_agent 'a → b': gift-ui's message to main in main's view names only the sender.
+import path from 'node:path';
+import { test, expect } from '../../harness';
+import { Lines } from '../native/world';
+import { hubOf, launchOn, realWorld, tui, tuiReady, worldSay, type Tui } from '../world';
+
+const T = {
+  field: '[data-testid="composer.field"]',
+  list: '[data-testid="thread.list"]',
+  landed: '[data-testid^="thread.landed."]:not([data-testid$=".sha"])',
+  pr: '[data-testid^="thread.pr."]:not([data-testid$=".link"])',
+  artifact: '[data-testid^="thread.artifact."]',
+  answered: '[data-testid^="thread.answered."]',
+  approval: '[data-testid^="thread.approval."]',
+  review: '[data-testid="review.screen"]',
+};
+const EXTERNAL = 'bise-desktop: external';
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+const flat = (s: string): string => s.replace(/[│╭╮╰╯─┃├┤┬┴]/g, ' ').replace(/\s+/g, ' ');
+
+async function tuiCmd(t: Tui, line: string): Promise<string> {
+  for (let i = 0; i < 40; i++) t.keys('BSpace');
+  t.keys('-l', line);
+  await sleep(500);
+  if (/┃\s*\/\w/.test(t.screen().split('\n').slice(-12).join('\n'))) t.keys('Escape');
+  t.keys('Enter');
+  const seen: string[] = [];
+  for (let i = 0; i < 8; i++) {
+    await sleep(300);
+    seen.push(t.screen());
+  }
+  return seen.join('\n');
+}
+
+test("thread/news-real: landed, PR news, artifact, answered, approval and agent rows on the real core, next to the TUI's lines", async () => {
+  test.setTimeout(300_000);
+  const w = realWorld();
+  const shop = hubOf(w, 'shop');
+  const project = path.basename(path.dirname(shop.sock));
+  const n = `n${Date.now() % 1_000_000}`;
+  const s = await launchOn(w, `project/${project}`, T.field);
+  const out = new Lines();
+  s.app.process().stdout?.setEncoding('utf8');
+  s.app.process().stdout?.on('data', (d: string) => {
+    out.push(d);
+  });
+  let t: Tui | undefined;
+  const term = (): Tui => {
+    if (t === undefined) throw new Error('no TUI');
+    return t;
+  };
+  const { page } = s;
+  const list = page.locator(T.list);
+  const toThread = async () => {
+    if (await page.locator(T.field).first().isVisible()) return;
+    await page.locator(`[data-testid="app.sidebar.project.${project}"]`).click({ timeout: 10_000 });
+    await expect(page.locator(T.field).first(), "back in shop's thread").toBeVisible({ timeout: 10_000 });
+  };
+  const note = (type: string, v: unknown) => test.info().annotations.push({ type, description: typeof v === 'string' ? v : JSON.stringify(v) });
+  try {
+    await expect(page.locator(T.field).first(), "shop's main thread").toBeVisible({ timeout: 15_000 });
+    t = tui(w, 'shop');
+    await tuiReady(t);
+    await page.screenshot({ path: test.info().outputPath('opened.png') });
+
+    await test.step('landed', async () => {
+      const row = list.locator(T.landed).filter({ hasText: 'gift-api' }).first();
+      await expect.soft(row, "the seed's gift-api landing is a landed row").toBeVisible({ timeout: 15_000 });
+      const words = ((await row.textContent().catch(() => '')) ?? '').trim();
+      const sha = /\b[0-9a-f]{7,}\b/.exec(words)?.[0] ?? '';
+      const tuiLine = /gift-api landed[^·]*?\(([0-9a-f]{7,})\)/.exec(flat(term().screen()));
+      note('landed', { window: words, tui: tuiLine?.[0] ?? '' });
+      expect.soft(sha, 'the same sha as the TUI line').toBe(tuiLine?.[1] ?? '?');
+      await row.screenshot({ path: test.info().outputPath('landed.png') }).catch(() => undefined);
+      const link = page.locator(`[data-testid="${(await row.getAttribute('data-testid', { timeout: 2000 }).catch(() => null)) ?? 'none'}.sha"]`);
+      await link.click({ timeout: 5000 }).catch(() => undefined);
+      await expect.soft(page.locator(T.review), 'its sha opens that commit').toBeVisible({ timeout: 10_000 });
+      await page.screenshot({ path: test.info().outputPath('landed-commit.png') });
+      await toThread();
+    });
+
+    await test.step('pr', async () => {
+      // #412 has several news rows ('opened', then 'checks fail: e2e'): the failing one is the TUI's '↑ #412 checks fail'
+      note('pr-rows', (await list.locator(T.pr).allTextContents()).map((r) => r.trim().slice(0, 120)));
+      const row = list.locator(T.pr).filter({ hasText: '#412' }).filter({ hasText: 'checks fail' }).first();
+      await expect.soft(row, "#412's failing checks are a pr row").toBeVisible({ timeout: 15_000 });
+      const words = ((await row.textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();
+      note('pr', { window: words, tone: await row.getAttribute('data-tone', { timeout: 2000 }).catch(() => null), tuiHas: flat(term().screen()).includes('#412 checks fail: e2e') });
+      await expect.soft(row, 'failing: an err tone').toHaveAttribute('data-tone', 'err');
+      expect.soft(words, "failing said by '▲', never color alone").toContain('▲');
+      expect.soft(words, "the hub's words, as the TUI").toContain('checks fail');
+      await row.screenshot({ path: test.info().outputPath('pr.png') }).catch(() => undefined);
+      const link = page.locator(`[data-testid="${(await row.getAttribute('data-testid', { timeout: 2000 }).catch(() => null)) ?? 'none'}.link"]`);
+      await link.click({ timeout: 5000 }).catch(() => undefined);
+      const url = await out.wait(EXTERNAL, () => true, 5000).catch(() => '');
+      note('pr-open', url);
+      expect.soft(url, 'its number opens the PR').toContain('/pull/412');
+    });
+
+    await test.step('artifact', async () => {
+      const title = `the logo ${n}`;
+      worldSay('shop', `[[bash: sb artifact add https://x.test/logo-${n} --title "${title}"]] made it`);
+      const row = list.locator(T.artifact).filter({ hasText: title }).first();
+      await expect.soft(row, 'an artifact card with its title').toBeVisible({ timeout: 30_000 });
+      await sleep(1000);
+      note('artifact', { window: ((await row.textContent().catch(() => '')) ?? '').trim(), tuiHas: flat(term().screen()).includes(title) });
+      expect.soft(flat(term().screen()), 'the TUI shows it too').toContain(title);
+      await row.screenshot({ path: test.info().outputPath('artifact.png') }).catch(() => undefined);
+    });
+
+    await test.step('answered: his answer to gift-ui from the TUI', async () => {
+      const seen = await tuiCmd(term(), '/answer 2 on the cart page');
+      note('answer-tui', flat(seen).slice(-500));
+      await sleep(3000);
+      const rows = await list.locator(`${T.answered}, ${T.approval}`).allTextContents();
+      note('answer-rows', rows.map((r) => r.trim()));
+      await page.screenshot({ path: test.info().outputPath('answered.png') });
+    });
+
+    await test.step("approval: 'no: <note>' on the merge card", async () => {
+      const seen = await tuiCmd(term(), `/answer 1 no: not now ${n}`);
+      note('approval-tui', flat(seen).slice(-500));
+      await sleep(3000);
+      const row = list.locator(T.approval).filter({ hasText: `not now ${n}` }).first();
+      const shown = await row.isVisible().catch(() => false);
+      note('approval', { shown, rows: (await list.locator(T.approval).allTextContents()).map((r) => r.trim()) });
+      if (shown) await row.screenshot({ path: test.info().outputPath('approval.png') }).catch(() => undefined);
+      else await page.screenshot({ path: test.info().outputPath('approval.png') });
+    });
+
+    await test.step("from_agent: gift-ui → main in main's view", async () => {
+      const head = list.locator('[data-testid^="thread.entry."]').filter({ hasText: 'waiting for your answer' }).first();
+      const words = ((await head.textContent().catch(() => '')) ?? '').trim();
+      note('from-agent', words.slice(0, 200));
+      expect.soft(words, "the sender's name").toContain('gift-ui');
+      expect.soft(words, "sent to the agent in view: only the sender, no 'gift-ui → main'").not.toContain('gift-ui → main');
+    });
+    test.info().attachments.push({ name: 'tui', contentType: 'text/plain', body: Buffer.from(term().screen()) });
+  } finally {
+    t?.close();
+    await s.close();
+  }
+});
