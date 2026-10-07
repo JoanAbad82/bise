@@ -9,6 +9,47 @@
   height: 100%;
 }
 
+/* one set of window controls (his try round 3, amb-mac): macOS's own lights
+   over the sidebar (titleBarStyle hiddenInset, src/main/windows.ts), so the
+   ds frame's drawn dots, radius and shadow go (the window is the frame), and
+   the sidebar's top and each screen's head move the window */
+.app-shell > .b-win {
+  border-radius: 0;
+  box-shadow: none;
+}
+.app-shell .b-lights {
+  height: 36px;
+  padding: 0;
+  -webkit-app-region: drag;
+}
+.app-shell .b-lights i {
+  display: none;
+}
+.app-shell .b-head {
+  -webkit-app-region: drag;
+}
+.app-shell .b-head button,
+.app-shell .b-head a,
+.app-shell .b-head input,
+.app-shell .b-head select,
+.app-shell .b-head [role='button'],
+.app-shell .b-head .end {
+  -webkit-app-region: no-drag;
+}
+/* the first launch fills the window: no sidebar, a drag strip for the lights */
+.app-setup {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  background: var(--c-surface);
+}
+.app-drag {
+  flex: none;
+  height: 36px;
+  -webkit-app-region: drag;
+}
+
 /* the ds frame's columns fill the window (its own min-height is a mockup's) */
 .app-shell > .b-win > .cols {
   height: 100%;

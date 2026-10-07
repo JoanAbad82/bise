@@ -122,6 +122,7 @@ function Shell() {
     };
   }, []);
   const router = useRouter();
+  const route = useRoute();
   useMenuRouting(router);
   useMainRoutes(router);
   // View > Terminal (⌃`): the panel under the screen (the key's own echo is dropped)
@@ -135,7 +136,15 @@ function Shell() {
   useShown();
   return (
     <div className="app-shell b-ui" data-testid="app.root">
-      <Win side={<Sidebar />} main={<Current />} />
+      {/* setup is the window itself, never a window drawn inside it (his try round 3) */}
+      {route.screen === 'onboarding' ? (
+        <div className="app-setup">
+          <div className="app-drag" />
+          <OnboardingScreen />
+        </div>
+      ) : (
+        <Win side={<Sidebar />} main={<Current />} />
+      )}
       {palette && (
         <Palette
           onClose={() => {

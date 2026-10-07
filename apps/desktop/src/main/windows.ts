@@ -20,6 +20,9 @@ import { MAIN_SIZE } from './mainsize';
 
 export const OFF = -30000;
 
+/** macOS's window buttons in the sidebar's 36 px top room (app.css .b-lights). */
+export const LIGHTS = { x: 16, y: 13 } as const;
+
 /** The webPreferences every bise window shares. */
 export function webPreferences(surface: Surface, testMode: boolean): BrowserWindowConstructorOptions['webPreferences'] {
   return {
@@ -78,6 +81,10 @@ export class MainWindow {
       // the harness draws the caret with CDP focus emulation.
       ...(test ? { x: OFF, y: OFF, focusable: false } : {}),
       title: this.title,
+      // one set of controls (his try round 3): macOS's lights over the
+      // sidebar's top room, no title bar and no title text; the page's
+      // sidebar top and heads are its drag regions (app.css)
+      ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: LIGHTS } : {}),
       ...glassOf('window', process.platform, test),
       webPreferences: webPreferences('window', test),
     });
