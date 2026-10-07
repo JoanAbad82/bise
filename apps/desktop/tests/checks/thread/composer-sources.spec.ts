@@ -1,9 +1,9 @@
 // thread/composer-sources · his bug 1 (tui-parity, bar 2.1/2.2/2.3; amb-core's C/A/B 40f14a12, lead
 // m_10766): /, @ and $ in the REAL thread's composer list nothing outside the lab. Passes when the
 // thread's composer asks the core for its lists and shows them: '/' the core's commands in the TUI's
-// order (a hub command with no typed form greyed 'not yet'), a ready window command runs here
-// (/inbox opens the inbox, /help the key list), a runnable hub command goes out typed (/rename ->
-// HubCmd rename), '$' the project's skills, '@' the files the core ranks for that query (its rid).
+// order (a window command with no screen here greyed 'not yet', every hub one ready), a window
+// command runs here (/inbox opens the inbox, /help the key list), a hub line goes out as he typed
+// it (HubCmd slash, architect m_11011), '$' the project's skills, '@' the files the core ranks for that query (its rid).
 // bise main's thread on the scripted core (FakeCore); the core's answers are sent by the check,
 // as the stub doesn't answer these asks. Real keys. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
@@ -36,6 +36,7 @@ const COMMANDS = [
   { name: '/inbox', desc: 'open what waits for you', args: [], runs: 'window', runnable: false },
   { name: '/compact', desc: "compact the agent's context", args: [], runs: 'hub', runnable: false },
   { name: '/help', desc: 'the commands and the essential keys', args: [], runs: 'window', runnable: false },
+  { name: '/scheduled', desc: 'its timers', args: [], runs: 'window', runnable: false },
 ];
 
 const F = '[data-testid="composer.field"]';
@@ -63,7 +64,8 @@ test("thread/composer-sources: the real thread's /, @ and $ list the core's comm
     const order = COMMANDS.map((c) => labels.findIndex((l) => l.includes(c.name)));
     expect(order.every((i) => i >= 0), `every core command is listed: ${labels.join(' | ')}`).toBe(true);
     expect([...order].sort((a, b) => a - b), "in the TUI's order").toEqual(order);
-    await expect(page.getByTestId('composer.pick.cmd.compact'), 'a hub command with no typed form: greyed').toContainText('not yet');
+    await expect(page.getByTestId('composer.pick.cmd.compact'), 'every hub command runs (as typed)').not.toContainText('not yet');
+    await expect(page.getByTestId('composer.pick.cmd.scheduled'), 'a window command with no screen here: greyed').toContainText('not yet');
     await expect(page.getByTestId('composer.pick.cmd.inbox')).not.toContainText('not yet');
     await page.screenshot({ path: test.info().outputPath('slash.png') });
 
@@ -75,8 +77,9 @@ test("thread/composer-sources: the real thread's /, @ and $ list the core's comm
     // a runnable hub command goes out typed
     await page.keyboard.type('perf p2');
     await page.keyboard.press('Enter');
-    const rename = await core.waitCmd((c) => c.cmd === 'rename', 3000);
-    expect(rename).toMatchObject({ project: HOME, agent: 'perf', to: 'p2' });
+    const line = await core.waitCmd((c) => c.cmd === 'slash', 3000);
+    expect(line, 'his line as typed, from the view he typed in').toMatchObject({ project: HOME, agent: 'main', line: '/rename perf p2' });
+    expect(core.cmds().some((c) => c.cmd === 'rename'), 'never parsed into a typed rename').toBe(false);
 
     // $ lists the project's skills
     await field.click();

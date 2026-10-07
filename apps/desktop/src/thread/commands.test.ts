@@ -1,7 +1,7 @@
 // The composer's / list in the window and how a command line runs (amb-core's C/A/B 40f14a12).
 import { describe, expect, it } from 'vitest';
 import type { PickCommand as CoreCommand } from '@/proto';
-import { hubCmdOf, pickCommands, windowCommands, windowRun } from './commands';
+import { pickCommands, slashOf, windowCommands, windowRun } from './commands';
 
 const P = 'shop-1a2b3c4d';
 const at = { project: P, agent: 'perf' };
@@ -16,11 +16,11 @@ const core: CoreCommand[] = [
 ];
 
 describe("the / list: the TUI's commands in its order, never a silent gap", () => {
-  it("keeps the core's order; a window command is ready when its screen exists, a hub one when it runs typed", () => {
+  it("keeps the core's order; a window command is ready when its screen exists, every hub one (its line goes as typed)", () => {
     const rows = pickCommands(core);
     expect(rows.slice(0, core.length).map((r) => r.name)).toEqual(core.map((c) => c.name));
     const ready = Object.fromEntries(rows.map((r) => [r.name, r.ready]));
-    expect(ready).toMatchObject({ '/new': true, '/compact': false, '/inbox': true, '/scheduled': false, '/rename': true, '/agents': true, '/quit': false });
+    expect(ready).toMatchObject({ '/new': true, '/compact': true, '/inbox': true, '/scheduled': false, '/rename': true, '/agents': true, '/quit': false });
   });
   it("maps the arguments the composer completes (a note is free text) and adds the window's own the TUI lacks", () => {
     const rows = pickCommands(core);
@@ -41,28 +41,23 @@ describe('a command line runs as the TUI runs it', () => {
     expect(windowRun('/inbox', '', at)).toEqual({ go: { screen: 'inbox' } });
     expect(windowRun('/help', '', at)).toEqual({ help: true });
     expect(windowRun('/shortcuts', '', at)).toEqual({ help: true });
-    expect(windowRun('/plugins', 'list', at)).toEqual({ go: { screen: 'settings', page: 'plugins' } });
+    expect(windowRun('/plugins', '', at)).toEqual({ go: { screen: 'settings', page: 'plugins' } });
     expect(windowRun('/welcome', '', at)).toEqual({ go: { screen: 'onboarding' } });
     expect(windowRun('/scheduled', '', at), 'no screen yet').toBeUndefined();
     expect(windowRun('/new', 'x', at)).toBeUndefined();
   });
-  it('the runnable hub ones become their typed HubCmd, on the agent in view when the TUI says so', () => {
-    expect(hubCmdOf('/new', 'fix the cart', at)).toEqual({ cmd: 'new', project: P, brief: 'fix the cart' });
-    expect(hubCmdOf('/new', '-w cart: fix the cart total', at)).toEqual({ cmd: 'new', project: P, brief: 'fix the cart total', name: 'cart', worktree: true });
-    expect(hubCmdOf('/rename', 'perf p2', at)).toEqual({ cmd: 'rename', project: P, agent: 'perf', to: 'p2' });
-    expect(hubCmdOf('/answer', '2 cart page only', at)).toEqual({ cmd: 'answer', project: P, card: 2, reply: 'cart page only' });
-    expect(hubCmdOf('/model', 'mistral/mistral-small-latest default', at)).toEqual({ cmd: 'model', project: P, agent: 'perf', model: 'mistral/mistral-small-latest', default: true });
-    expect(hubCmdOf('/reasoning', 'high', at)).toEqual({ cmd: 'effort', project: P, agent: 'perf', effort: 'high' });
-    expect(hubCmdOf('/archive', 'alerts', at)).toEqual({ cmd: 'archive', project: P, agent: 'alerts', force: false });
-    expect(hubCmdOf('/restore', 'alerts', at)).toEqual({ cmd: 'unarchive', project: P, agent: 'alerts' });
-    expect(hubCmdOf('/interrupt', '', at)).toEqual({ cmd: 'stop', project: P, agent: 'perf' });
-    expect(hubCmdOf('/stop', 'alerts', at)).toEqual({ cmd: 'stop', project: P, agent: 'alerts' });
+  it("a line he typed that isn't a window screen goes to the hub as typed (architect m_11011), never parsed here", () => {
+    const slash = (line: string) => ({ cmd: 'slash', project: P, agent: 'perf', line });
+    expect(slashOf('/rename', 'perf p2', at), 'a typed /rename is a slash, not a typed rename').toEqual(slash('/rename perf p2'));
+    expect(slashOf('/new', '-w --with-changes x: do it', at), 'C3').toEqual(slash('/new -w --with-changes x: do it'));
+    expect(slashOf('/undo', '', at), 'C40').toEqual(slash('/undo'));
+    expect(slashOf('/flow', 'pr', at), 'C42').toEqual(slash('/flow pr'));
+    expect(slashOf('compact', '', at)).toEqual(slash('/compact'));
   });
-  it('missing arguments send nothing; a hub command with no typed form sends nothing', () => {
-    expect(hubCmdOf('/new', '', at)).toBeUndefined();
-    expect(hubCmdOf('/rename', 'perf', at)).toBeUndefined();
-    expect(hubCmdOf('/answer', 'two words', at)).toBeUndefined();
-    expect(hubCmdOf('/model', '', at)).toBeUndefined();
-    expect(hubCmdOf('/compact', '', at)).toBeUndefined();
+  it('a window command with words of its own goes to the hub: /artifacts add <url> (C13), /plugins enable <x>', () => {
+    expect(windowRun('/artifacts', '', at)).toEqual({ go: { screen: 'artifacts', project: P } });
+    expect(windowRun('/artifacts', 'add https://x.test', at), 'C13: not the screen').toBeUndefined();
+    expect(windowRun('/plugins', 'enable x', at)).toBeUndefined();
+    expect(slashOf('/artifacts', 'add https://x.test', at)).toEqual({ cmd: 'slash', project: P, agent: 'perf', line: '/artifacts add https://x.test' });
   });
 });

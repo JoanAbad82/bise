@@ -16,7 +16,7 @@ import type { Outgoing } from '@/composer/message';
 import { threadKey, useAgents, useCommands, useCoreState, useFiles, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
 import { useMenuAction } from '@/app/menu';
 import { useRouter } from '@/app/router';
-import { hubCmdOf, pickCommands, windowRun } from './commands';
+import { pickCommands, slashOf, windowRun } from './commands';
 import { HELP_EVENT } from '@/app/keys';
 import { MAIN } from '@/app/route';
 import { FirstRun, showsFirstRun } from '@/setup';
@@ -455,10 +455,8 @@ const ThreadComposer = memo(function ThreadComposer({
         else window.dispatchEvent(new Event(HELP_EVENT));
         return;
       }
-      const cmd = hubCmdOf(name, args, at);
-      if (cmd !== undefined) store.command(cmd);
-      // /model or /reasoning with no value: the agent's tune, where they're picked
-      else if (/^\/?(model|reasoning)$/.test(name)) router.go({ screen: 'agents', project });
+      // every other line he typed goes to the hub as typed: its router runs it (architect m_11011)
+      store.command(slashOf(name, args, at));
     },
     [router, store, project, agent],
   );

@@ -3,14 +3,11 @@
 // each ready or greyed 'not yet', never a silent gap. How one runs:
 // - runs 'window': it opens its screen here (the window owns readiness:
 //   ready when the screen exists);
-// - runs 'hub' and runnable: the typed HubCmd the TUI's handler takes today
-//   (/new /archive /restore /rename /answer /model /reasoning /interrupt
-//   /stop), through the same functions as the window's screens; the others
-//   wait for the hub to take his typed line (amb-feed's HubCmd slash).
+// - runs 'hub': his line as he typed it, HubCmd slash (the TUI's router and
+//   handlers run it in the hub; architect m_11011).
 // Owner: amb-win. Pure.
 import type { ArgKind, PickCommand } from '@/composer';
 import type { HubCmd, PickArg, PickCommand as CoreCommand } from '@/proto';
-import { newCmd } from '@/agents/actions';
 import { MAIN, type Route } from '@/app/route';
 
 /** The window's own commands the TUI has no row for, after the core's. */
@@ -45,8 +42,9 @@ export function windowRun(name: string, args: string, at: { project: string; age
     }
     case 'prs':
       return go({ screen: 'prs', project: at.project });
+    // a window command with words of its own (/artifacts add <url>, /plugins enable <x>) is the hub's
     case 'artifacts':
-      return go({ screen: 'artifacts', project: at.project });
+      return arg === '' ? go({ screen: 'artifacts', project: at.project }) : undefined;
     case 'inbox':
       return go({ screen: 'inbox' });
     case 'help':
@@ -62,7 +60,7 @@ export function windowRun(name: string, args: string, at: { project: string; age
     case 'setup':
       return go({ screen: 'settings', page: 'setup' });
     case 'plugins':
-      return go({ screen: 'settings', page: 'plugins' });
+      return arg === '' ? go({ screen: 'settings', page: 'plugins' }) : undefined;
     case 'computer-use':
       return go({ screen: 'settings', page: 'computer' });
     case 'welcome':
@@ -105,58 +103,22 @@ export function pickCommands(core: readonly CoreCommand[]): PickCommand[] {
       desc: c.desc,
       args: c.args.length > 0,
       ...(c.args.length > 0 ? { argKinds: c.args.map(argKind) } : {}),
-      ready: c.runs === 'window' ? hasScreen(c.name) : c.runnable,
+      // the hub runs every typed line of its own (slash); a window one needs its screen here
+      ready: c.runs === 'window' ? hasScreen(c.name) : true,
     }),
   );
   const known = new Set(core.map((c) => c.name.replace(/^\//, '')));
   return [...rows, ...windowCommands.filter((w) => !known.has(w.name))];
 }
 
-/** /new's line as the TUI reads it: `[-w] [name:] objective`. */
-function newOf(project: string, args: string): HubCmd | undefined {
-  let rest = args.trim();
-  let worktree = false;
-  if (/^-w(\s|$)/.test(rest)) {
-    worktree = true;
-    rest = rest.slice(2).trim();
-  }
-  const m = /^([A-Za-z0-9][\w-]*):\s+(.*)$/s.exec(rest);
-  const name = m?.[1];
-  const brief = m?.[2] ?? rest;
-  return newCmd(project, { brief, ...(name === undefined ? {} : { name }), worktree });
-}
-
 /**
- * The typed HubCmd for a runnable hub command line (the TUI's handler runs
- * it); none: not runnable here, or its arguments are missing.
+ * A line he typed that isn't one of the window's screens goes to the hub as
+ * he typed it (architect m_11011, amb-feed's HubCmd slash cd021d67): the
+ * TUI's router parses it and runs the TUI's handler; no parser here. The
+ * typed HubCmds (new, rename, model...) stay for buttons, pickers and forms.
  */
-export function hubCmdOf(name: string, args: string, at: { project: string; agent: string }): HubCmd | undefined {
-  const words = args.trim() === '' ? [] : args.trim().split(/\s+/);
-  const [a, b] = words;
-  const rest = (n: number): string => words.slice(n).join(' ');
-  const { project, agent } = at;
-  switch (name.replace(/^\//, '')) {
-    case 'new':
-      return newOf(project, args);
-    case 'archive':
-      return a === undefined ? undefined : { cmd: 'archive', project, agent: a, force: false };
-    case 'restore':
-      return a === undefined ? undefined : { cmd: 'unarchive', project, agent: a };
-    case 'rename':
-      return a === undefined || b === undefined ? undefined : { cmd: 'rename', project, agent: a, to: b };
-    case 'answer': {
-      const card = Number(a);
-      return a === undefined || !Number.isInteger(card) || rest(1) === '' ? undefined : { cmd: 'answer', project, card, reply: rest(1) };
-    }
-    case 'model':
-      return a === undefined ? undefined : { cmd: 'model', project, agent, model: a, ...(b === 'default' ? { default: true } : {}) };
-    case 'reasoning':
-      return a === undefined ? undefined : { cmd: 'effort', project, agent, effort: a };
-    case 'interrupt':
-      return { cmd: 'stop', project, agent };
-    case 'stop':
-      return { cmd: 'stop', project, agent: a ?? agent };
-    default:
-      return undefined;
-  }
+export function slashOf(name: string, args: string, at: { project: string; agent: string }): Extract<HubCmd, { cmd: 'slash' }> {
+  const word = name.startsWith('/') ? name : `/${name}`;
+  const line = args.trim() === '' ? word : `${word} ${args.trim()}`;
+  return { cmd: 'slash', project: at.project, agent: at.agent, line };
 }
