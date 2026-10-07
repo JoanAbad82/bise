@@ -36,6 +36,23 @@ export function keyLine(l: SearchList, at: Hit | undefined, scope: Scope): strin
   return at?.archived === true ? PW.keysArchived(scope) : PW.keys;
 }
 
+/** Key pairs ('⏎ open   esc close') drawn with the TUI's 3-space gap (about 1.2em, designer
+ * m_11923): each gap is its own span, so the text still reads with its 3 spaces. */
+function Pairs({ text }: { text: string }): ReactNode {
+  const parts = text.split(/ {3}/);
+  const out: ReactNode[] = [];
+  parts.forEach((p, i) => {
+    if (i > 0)
+      out.push(
+        <span className="kgap" key={`g${i}`}>
+          {'   '}
+        </span>,
+      );
+    out.push(<span key={`p${i}`}>{p}</span>);
+  });
+  return out;
+}
+
 /** The events that change what the search reads. */
 const READS = new Set<Ev['ev']>(['agents', 'artifacts', 'cards', 'projects']);
 
@@ -237,7 +254,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
                     <span className="rt">
                       {h.where !== '' && <span className="pj">{h.where}</span>}
                       {h.when !== '' && <span>{h.when}</span>}
-                      {on && <span className="hint">{PW.hint(h)}</span>}
+                      {on && <span className="hint"><Pairs text={PW.hint(h)} /></span>}
                     </span>
                   </div>
                 );
@@ -246,7 +263,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
           ))}
         </div>
         <div className="app-k-keys" data-testid="app.palette.keys">
-          {keyLine(list, sel, scope)}
+          <Pairs text={keyLine(list, sel, scope)} />
         </div>
       </div>
     </div>

@@ -4,7 +4,8 @@
   position: fixed;
   inset: 0;
   z-index: 20;
-  background: color-mix(in srgb, var(--c-window) 45%, transparent);
+  /* the same 45 % wash of the window's background in both themes (designer m_11923) */
+  background: color-mix(in srgb, var(--c-solid) 45%, transparent);
 }
 
 .app-k {
@@ -203,6 +204,15 @@
 .app-k-ask kbd {
   font-family: var(--font-ui);
   color: var(--c-text-3);
+}
+
+/* the TUI's 3-space gap between key pairs: about 1.2em (designer m_11923) */
+.app-k-keys .kgap,
+.app-k-row .rt .hint .kgap {
+  display: inline-block;
+  width: 1.2em;
+  overflow: hidden;
+  vertical-align: top;
 }
 
 .app-k-keys {
