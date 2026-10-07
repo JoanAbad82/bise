@@ -28,6 +28,7 @@ import { Main, Win } from '@/ds';
 import { Sidebar } from './Sidebar';
 import { numbersOf } from '@/agents/model';
 import { CoreLine } from './CoreLine';
+import { UpdateLine } from './UpdateLine';
 import { Palette } from './Palette';
 import { Help } from '@/help/Help';
 import { useTheme } from '@/theme';
@@ -134,6 +135,7 @@ function Current() {
   return (
     <Main testId="app.main">
       <CoreLine />
+      <UpdateLine />
       <ScreenOf key={formatRoute(route)} route={route} />
       <RouteConfirm route={route} />
       <RouteTerminal route={route} />
