@@ -17,6 +17,7 @@ Never his ~/.bise, never an app (an app on the try home is the off-screen harnes
 """
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -99,10 +100,20 @@ def pure():
           and "BISE_PACK_SIGN_DIR=/h/sign pnpm dist" in sc and "ambient.sh" not in sc and "apps/ambient" not in sc,
           "dist packs the try's bise into its own bundle, signed stable; no old app: %s" % sc)
     check("BISE_PACK_SIGN_DIR" not in T.build_script(p, None), "no sign dir: ad hoc")
-    ae = T.app_env("/h/.bise/try/desktop", {"PATH": "/usr/bin"})
+    ae = T.app_env("/h/.bise/try/desktop", {"PATH": "/usr/bin"}, "/h/build/desktop-try/root-abc")
+    check("BISE_APP_ROOT=/h/build/desktop-try/root-abc" in ae and "BISE_APP_ROOT=%s" % ROOT not in ae,
+          "the app root is the build's snapshot, never the checkout: %s" % ae)
     check(ae[:2] == ["BISE_HOME=/h/.bise/try/desktop", "BISE_HOME_WORKSPACE=/h/.bise/try/desktop/bise"] and "PATH=/usr/bin" in ae
           and not any(e.split("=")[0] in ("BISE_DESKTOP_TEST", "BISE_TEST_HOME", "BISE_DESKTOP_USER_DATA", "BISE_DESKTOP_HELPER", "BISE_DESKTOP_BISE")
                       for e in ae), "the app's env: the try home, never a test variable: %s" % ae)
+
+
+def root_of(script):
+    """The snapshot app root a build script makes (root_script's last line: rm -rf R && mv R.tmp R)."""
+    for line in script.splitlines():
+        if line.startswith("rm -rf ") and " && mv " in line:
+            return shlex.split(line)[-1]
+    return None
 
 
 def stamp_skips_build():
@@ -120,15 +131,15 @@ def stamp_skips_build():
     calls, said = [], []
     real_run, real_say, old_sign = T.subprocess.run, T.say, os.environ.pop("BISE_TRY_SIGN_DIR", None)
 
-    def outputs():
-        for p in (paths["bise"], paths["helper"], T.packed_bise(paths["app"])):
+    def outputs(script):
+        for p in (paths["bise"], paths["helper"], T.packed_bise(paths["app"]), os.path.join(root_of(script), "repl-live")):
             os.makedirs(os.path.dirname(p), exist_ok=True)
             open(p, "w").close()
 
     def fake_run(cmd, *a, **k):
         if cmd and cmd[0] == "/usr/bin/lockf":
             calls.append(cmd)
-            outputs()
+            outputs(cmd[-1])
             return subprocess.CompletedProcess(cmd, 0)
         return real_run(cmd, *a, **k)
     T.subprocess.run, T.say = fake_run, (lambda *a: said.append(" ".join(str(x) for x in a)))
@@ -153,7 +164,9 @@ def stamp_skips_build():
         del calls[:]
         check(T.build(env, paths) is True and len(calls) == 1, "another HEAD builds again")
         s = T.build_stamp(env, paths, None)
-        check(T.up_to_date(s, dict(s), paths) and not T.up_to_date(s, dict(s, changes="x"), paths) and not T.up_to_date(s, None, paths),
+        r = T.read_stamp(paths)["root"]
+        check(T.up_to_date(s, dict(s, root=r), paths) and not T.up_to_date(s, dict(s, root=r, changes="x"), paths) and not T.up_to_date(s, None, paths)
+              and not T.up_to_date(s, dict(s), paths),
               "up_to_date: same stamp only")
     finally:
         T.subprocess.run, T.say = real_run, real_say
@@ -185,8 +198,8 @@ def staged_never_over_a_running_try():
         p = os.path.join(app, "Contents", "build.txt")
         return open(p).read() if os.path.exists(p) else None
 
-    def pack(app, n):
-        for p in (paths["bise"], paths["helper"], T.packed_bise(app)):
+    def pack(app, n, root):
+        for p in (paths["bise"], paths["helper"], T.packed_bise(app), os.path.join(root, "repl-live")):
             os.makedirs(os.path.dirname(p), exist_ok=True)
             open(p, "w").close()
         with open(os.path.join(app, "Contents", "build.txt"), "w") as f:
@@ -196,7 +209,7 @@ def staged_never_over_a_running_try():
         if cmd and cmd[0] == "/usr/bin/lockf":
             script = cmd[-1]
             scripts.append(script)
-            pack(paths["staged"] if "BISE_PACK_OUT=" in script else paths["app"], len(scripts))
+            pack(paths["staged"] if "BISE_PACK_OUT=" in script else paths["app"], len(scripts), root_of(script))
             return subprocess.CompletedProcess(cmd, 0)
         return real_run(cmd, *a, **k)
     T.subprocess.run, T.say = fake_run, (lambda *a: said.append(" ".join(str(x) for x in a)))
@@ -205,6 +218,10 @@ def staged_never_over_a_running_try():
         env = dict(os.environ)
         check(T.build(env, paths) is True and mark(paths["app"]) == "build 1" and T.read_stamp(paths)["where"] == "live",
               "nothing runs: the build is packed live")
+        root1 = T.try_root(paths)
+        check(root1 and root1.startswith(os.path.join(build, "desktop-try", "root-")) and not root1.startswith(ROOT)
+              and "cp -R prompts %s.tmp/prompts" % root1 in scripts[0] and "bins.sh path --src" in scripts[0],
+              "the app root is a snapshot in the build dir, never the checkout: %s" % root1)
         # his try opens from the live bundle; the source changes (a new HEAD in the stamp)
         running.append(77328)
         T.write_stamp(paths, dict(T.read_stamp(paths), head="0" * 40))
@@ -214,6 +231,9 @@ def staged_never_over_a_running_try():
               "into a fresh staging dir: %s" % scripts[1][-400:])
         check(mark(paths["app"]) == "build 1" and mark(paths["staged"]) == "build 2", "the running bundle is never written over")
         check(T.read_stamp(paths)["where"] == "staged", "the stamp says staged")
+        root2 = T.read_stamp(paths)["root"]
+        check(root2 != root1 and os.path.isdir(root1) and T.try_root(paths) == root1,
+              "a staged build gets its own root; the running try keeps reading its own: %s %s" % (root1, root2))
         check(any("quit it to get the new build" in s for s in said), "it says so: %s" % said)
         check(T.build(env, paths) is False and len(scripts) == 2, "staged and up to date: no second build")
         del said[:]
@@ -226,9 +246,11 @@ def staged_never_over_a_running_try():
         check(old == paths["app"] + ".old" and mark(paths["app"]) == "build 2" and mark(old) == "build 1"
               and not os.path.exists(paths["staged"]), "swapped: live is the staged build, the old one at .old")
         check(T.read_stamp(paths)["where"] == "live", "the stamp says live")
+        check(T.try_root(paths) == root2, "the swap moves the root with the bundle: the app opens on %s" % T.try_root(paths))
         check(T.build(env, paths) is False and len(scripts) == 2, "the swapped build is up to date: no build call")
         T.core_up = lambda app: app == paths["app"]
-        check(T.finish_swap(old, paths["app"], timeout=5) and not os.path.exists(old), ".old removed once the core answers")
+        check(T.finish_swap(old, paths["app"], timeout=5, paths=paths) and not os.path.exists(old) and not os.path.exists(root1)
+              and os.path.isdir(root2) and "old_root" not in T.read_stamp(paths), ".old and its root removed once the core answers")
         # a stamp that says staged with no staged bundle: nothing to swap
         T.write_stamp(paths, dict(T.read_stamp(paths), where="staged"))
         check(T.swap_staged(paths) is None and mark(paths["app"]) == "build 2", "no staged bundle: no swap")
@@ -261,7 +283,7 @@ def hook_keeps_pid():
             f.write('#!/bin/sh\napp="$1"; shift\nenv "$@" "$app/Contents/MacOS/bise try" -c "import signal; signal.pause()" </dev/null >/dev/null 2>&1 &\necho $! > "%s/started"\n' % w)
         os.chmod(hook, 0o755)
         os.environ["BISE_TRY_OPEN"] = hook
-        pid = T.open_app(app, tryh, {"PATH": "/usr/bin:/bin"})
+        pid = T.open_app(app, tryh, {"PATH": "/usr/bin:/bin"}, os.path.join(w, "root"))
         started.append(int(open(os.path.join(w, "started")).read()))
         check(pid == started[0], "the hook's app is found: %s vs %s" % (pid, started))
         check(T.read_pid(T.app_pid_file(tryh)) == started[0], "its pid is kept in app.pid")
