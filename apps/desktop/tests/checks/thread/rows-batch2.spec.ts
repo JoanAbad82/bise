@@ -141,10 +141,17 @@ test('thread/rows-batch2: thinking, a failed turn, usage, compaction and not del
       await expect.poll(live, { timeout: 15_000, message: `${AG} archived (the TUI)` }).toBe(false);
       await page.locator(T.project(shop)).click({ timeout: 10_000 });
       await expect(page.locator(T.thread)).toHaveAttribute('data-project', shop, { timeout: 5000 });
-      const gauges = await page.locator(T.gauges).allTextContents();
+      await expect.soft(page.locator(T.gauges).first(), "shop's agents carry their gauge in the sidebar").toBeVisible({ timeout: 10_000 });
+      const gauges = await page.locator(T.gauges).evaluateAll((els) =>
+        els.map((e) => ({ agent: (e.getAttribute('data-testid') ?? '').replace(/^app\.sidebar\.agent\./, '').replace(/\.gauge$/, ''), words: e.textContent.trim() })));
       const panel = flat(ts.screen()).match(/agents .*? inbox/)?.[0] ?? '';
       test.info().annotations.push({ type: 'sidebar-gauges', description: JSON.stringify({ window: gauges, tuiPanel: panel }) });
       expect.soft(gauges.length, "shop's agents carry their gauge in the sidebar").toBeGreaterThan(0);
+      // each one is the TUI panel's: '<n> <glyph> <name> … <pct>%'
+      for (const g of gauges) {
+        const tuiPct = new RegExp(`\\b${g.agent}\\b[^%]*?(\\d+%)`).exec(panel)?.[1] ?? '';
+        expect.soft(g.words, `${g.agent}'s gauge is the TUI panel's ${tuiPct}`).toBe(tuiPct);
+      }
       await say(`@${AG} first try ${n}`);
       const first = list.locator(T.nd, { hasText: `first try ${n}` }).last();
       await expect.soft(first, `'✗ not delivered to ${AG}'`).toContainText(`not delivered to ${AG}`, { timeout: 15_000 });
