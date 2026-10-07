@@ -73,7 +73,7 @@ function NameLine({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 function EntryBody({ e, ctx, head }: { e: Entry; ctx: RowCtx; head: boolean }) {
   switch (e.kind) {
     case 'tools':
-      return <ToolsRow e={e} />;
+      return <ToolsRow e={e} ctx={ctx} />;
     case 'card':
       return <CardRow e={e} ctx={ctx} />;
     case 'page':
@@ -503,10 +503,41 @@ function ContextChip({ chip, ctx, pos }: { chip: NonNullable<ReturnType<typeof c
   );
 }
 
+/**
+ * The call at work now (bar S9): the last step of the thread's last tools row while its agent's
+ * turn runs; none otherwise. Its pos and since when.
+ */
+function useLiveStep(ctx: RowCtx, e: Entry): { pos: number; at: number } | undefined {
+  const { order } = useThreadOrder(ctx.tkey);
+  const working = useAgents(ctx.project).some((a) => a.name === ctx.agent && a.status === 'working');
+  const last = e.tools?.items.at(-1);
+  if (!working || last === undefined || order.at(-1) !== e.pos) return undefined;
+  return { pos: last.pos, at: last.at_ms };
+}
+
+/** Seconds since `at`, ticking once a second while shown (the live call's '∿ 12 s'). */
+function useSecondsSince(at: number | undefined): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (at === undefined) return;
+    const t = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(t);
+    };
+  }, [at]);
+  return at === undefined ? 0 : Math.max(0, now - at);
+}
+
 /** Its tool calls in a row: one counted line, open to the steps. */
-function ToolsRow({ e }: { e: Entry }) {
+function ToolsRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const [open, setOpen] = useFold(false, e.pos);
   const items = e.tools?.items ?? [];
+  // the call at work: '∿' and its running time instead of its mark (S9); the hub doesn't send a
+  // call's end, exit or error yet (asked of amb-feed), so the finished ones keep their marks
+  const live = useLiveStep(ctx, e);
+  const runFor = useSecondsSince(live?.at);
   // designer's desktop-screens v6 (2): its commands and edits as mono lines with their length
   // ('$ lighthouse --preset=mobile …  38 s', '± web/product/Hero.tsx'); the rest fold into
   // their counted words
@@ -514,9 +545,15 @@ function ToolsRow({ e }: { e: Entry }) {
   return (
     <div className="th-tools" data-testid={`thread.toolrow.${String(e.pos)}`}>
       {t.lines.map((l) => (
-        <div key={l.pos} className="th-tool-line" data-testid={`thread.tool.${String(l.pos)}`}>
-          <span className="th-tool-mark">{l.mark}</span> <span className="th-tool-text">{l.text}</span>
-          {l.time !== '' && <span className="th-tool-time">{l.time}</span>}
+        <div key={l.pos} className={live?.pos === l.pos ? 'th-tool-line live' : 'th-tool-line'} data-testid={`thread.tool.${String(l.pos)}`} data-live={live?.pos === l.pos || undefined}>
+          <span className="th-tool-mark">{live?.pos === l.pos ? '∿' : l.mark}</span> <span className="th-tool-text">{l.text}</span>
+          {live?.pos === l.pos ? (
+            <span className="th-tool-time" data-testid={`thread.tool.${String(l.pos)}.time`}>
+              {liveTime(runFor)}
+            </span>
+          ) : (
+            l.time !== '' && <span className="th-tool-time">{l.time}</span>
+          )}
         </div>
       ))}
       {(t.rest.length > 0 || items.length === 0) && (
@@ -539,6 +576,13 @@ function ToolsRow({ e }: { e: Entry }) {
       )}
     </div>
   );
+}
+
+/** The live call's time: '0 s', '12 s', '1 m 4 s'. Pure. */
+export function liveTime(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${String(s)} s`;
+  return `${String(Math.floor(s / 60))} m ${String(s % 60)} s`;
 }
 
 /**

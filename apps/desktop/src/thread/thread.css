@@ -711,3 +711,9 @@
   box-shadow: 0 0 0 2px var(--c-focus);
   border-radius: 3px;
 }
+
+/* the call at work (bar S9): its '∿' in ink, its running time */
+.th-tool-line.live .th-tool-mark,
+.th-tool-line.live .th-tool-text {
+  color: var(--c-text);
+}
