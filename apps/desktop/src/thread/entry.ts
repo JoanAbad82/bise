@@ -31,6 +31,9 @@ export function whenOf(ms: number, now: number, tz?: string): string {
   return `${d} ${clock(ms, tz)}`;
 }
 
+/** An agent's name as shown: main is 'bise' (agents/model shownName, kept local: entry.ts stays pure of the agents module). */
+const shown = (agent: string): string => (agent === 'main' ? 'bise' : agent);
+
 /** Who speaks in a message row: his words, the shown agent's (bise's pearl on bise's main), another agent's. */
 export function whoOf(e: Entry, ctx: { agent: string; bise: boolean }): { from: 'you' | 'bise' | 'agent'; name: string; indent: boolean } {
   switch (e.kind) {
@@ -38,9 +41,13 @@ export function whoOf(e: Entry, ctx: { agent: string; bise: boolean }): { from: 
       return { from: 'you', name: 'you', indent: false };
     case 'from_agent':
       // batch 3a: a message between two other agents says to whom ('perf → docs')
-      return { from: 'agent', name: e.to != null && e.to !== '' && e.to !== ctx.agent ? `${e.from ?? 'an agent'} → ${e.to}` : (e.from ?? 'an agent'), indent: true };
+    {
+      // a project's main is 'bise' in every name the window shows (ambient m_11437)
+      const from = shown(e.from ?? 'an agent');
+      return { from: 'agent', name: e.to != null && e.to !== '' && e.to !== ctx.agent ? `${from} → ${shown(e.to)}` : from, indent: true };
+    }
     default:
-      return ctx.bise && ctx.agent === 'main' ? { from: 'bise', name: 'bise', indent: false } : { from: 'agent', name: ctx.agent, indent: false };
+      return ctx.bise && ctx.agent === 'main' ? { from: 'bise', name: 'bise', indent: false } : { from: 'agent', name: shown(ctx.agent), indent: false };
   }
 }
 

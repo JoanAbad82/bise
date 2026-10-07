@@ -32,7 +32,7 @@ describe("bise's routing hold", () => {
     expect(applyRoute([], route(9, 'acme-1', 'other words'), pending)).toEqual([]);
   });
 
-  it("his pending row shows 'to acme · 2 s to change', keep sends route_cancel, a project sends route_correct, then 'sent to'", () => {
+  it("his pending row shows '→ bise · acme · 2 s to change', keep sends route_cancel, a project sends route_correct, then 'sent to'", () => {
     const cmds: CoreCmd[] = [];
     const port: CorePort = { send: (c) => cmds.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
     const store = new Store(port);
@@ -54,7 +54,7 @@ describe("bise's routing hold", () => {
       store.apply(route(3, 'acme-1', 'why does p99 rise'));
     });
     expect(v.getByTestId(`thread.pending.${cid}`).dataset.state).toBe('held');
-    expect(v.getByTestId('thread.route').textContent).toMatch(/to acme · [12] s to change/);
+    expect(v.getByTestId('thread.route').textContent).toMatch(/→ bise · acme · [12] s to change/);
     fireEvent.click(v.getByTestId('thread.route.to.shop-2'));
     expect(cmds.at(-1)).toEqual({ cmd: 'route_correct', project: H, rid: 3, to: 'shop-2' });
     fireEvent.click(v.getByTestId('thread.route.keep'));

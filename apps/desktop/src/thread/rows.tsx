@@ -14,6 +14,7 @@ import { clock, whenOf, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
+import { shownName } from '@/agents/model';
 
 /** What a row needs of its thread. */
 export interface RowCtx {
@@ -402,14 +403,14 @@ function ToAgentRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   return (
     <Msg
       from="agent"
-      name={toAgentName(ctx.agent, to, e.asks === true)}
+      name={toAgentName(shownName(ctx.agent), shownName(to), e.asks === true)}
       indent
       time={clock(e.at_ms)}
       testId={`thread.to.${String(e.pos)}`}
       after={
         e.asks === true && !carded ? (
           <span className="th-waits main" data-testid={`thread.asks.${String(e.pos)}`}>
-            waits for {to}
+            waits for {shownName(to)}
           </span>
         ) : undefined
       }
@@ -477,7 +478,7 @@ function CardRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
     );
   }
   return (
-    <Msg from={ctx.bise && ctx.agent === 'main' ? 'bise' : 'agent'} name={ctx.agent} time={clock(e.at_ms)} testId={`thread.card.${String(c.id)}`}>
+    <Msg from={ctx.bise && ctx.agent === 'main' ? 'bise' : 'agent'} name={shownName(ctx.agent)} time={clock(e.at_ms)} testId={`thread.card.${String(c.id)}`}>
       <Markdown text={c.question} onLink={ctx.onLink} />
       {opts}
     </Msg>
@@ -570,7 +571,7 @@ function HoldLine({ hold }: { hold: Hold }) {
   return (
     <div className="th-hold" data-testid="thread.route" role="status" title={hold.why}>
       <span className="th-hold-to">
-        to {hold.name} · {left} s to change
+        → bise · {hold.name} · {left} s to change
       </span>
       <Button
         kind="ghost"

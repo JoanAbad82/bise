@@ -241,6 +241,12 @@
   text-underline-offset: 2px;
 }
 
+/* a project's main is 'bise' with its project dim after it (ambient m_11437) */
+.th-title-project {
+  color: var(--c-text-2);
+  font-weight: 400;
+}
+
 .th-agents-link {
   color: inherit;
   text-decoration: underline;

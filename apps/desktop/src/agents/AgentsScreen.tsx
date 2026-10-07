@@ -128,7 +128,7 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: 
     <div className={sel ? 'ag-item is-sel' : 'ag-item'} data-testid={`agents.row.${id}`} data-status={a.status} data-sel={sel || undefined} aria-selected={sel}>
       <Row
         kind={a.archived ? 'arch' : 'ag'}
-        name={a.main ? 'main' : a.name}
+        name={a.main ? 'bise' : a.name}
         dot={a.archived ? undefined : dotOf(a.status)}
         end={end.text}
         needs={end.needs}

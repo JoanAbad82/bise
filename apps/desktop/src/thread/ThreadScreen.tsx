@@ -24,7 +24,7 @@ import { useTour } from '@/setup/useTour';
 import { takeQuotes } from '@/review/quote';
 import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
 import { ThreadInbox, takesWords, useStripCard } from '@/inbox';
-import { dotOf, lineOf } from '@/agents/model';
+import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
@@ -159,7 +159,20 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   };
 
   const [tuning, setTuning] = useState(false);
-  const title = bise ? 'bise' : agent === 'main' ? (projectName ?? project) : agent;
+  // a project's main is bise (ambient m_11437): 'bise · acme', the project dim
+  const title = bise || agent !== 'main' ? shownName(bise ? 'main' : agent) : 'bise';
+  const headTitle =
+    agent === 'main' && !bise ? (
+      <>
+        bise
+        <span className="th-title-project" data-testid="thread.title.project">
+          {' · '}
+          {projectName ?? project}
+        </span>
+      </>
+    ) : (
+      title
+    );
   // inbox card v2 item 7 (ambient m_11273, amb-home 98ac9ea7): while the strip's card is docked
   // and takes words, the composer answers it; esc makes it a plain message again (that card);
   // an approval never takes words: his words stay a message and the card keeps waiting
@@ -193,15 +206,19 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         {counts}
       </a>
     );
-  const lead = bise ? 'every project' : agent === 'main' ? 'main' : (projectName ?? project);
+  const lead = bise ? 'every project' : agent === 'main' ? '' : (projectName ?? project);
   // its context gauge, the hub's words as sent (the TUI's divider: '42k · 17%')
   const gauge = me?.usage?.words ?? '';
   const sub = (
     <>
       {agent === 'main' && countsLink !== null ? (
-        <>
-          {lead} · {countsLink}
-        </>
+        lead === '' ? (
+          countsLink
+        ) : (
+          <>
+            {lead} · {countsLink}
+          </>
+        )
       ) : (
         [lead, !bise && agent !== 'main' && me ? lineOf(me) : ''].filter(Boolean).join(' · ')
       )}
@@ -219,7 +236,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     <FindMarkContext value={mark}>
       <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
         <Head
-          title={title}
+          title={headTitle}
           sub={sub}
           pearl={bise ? 22 : undefined}
           dot={bise || !me ? undefined : dotOf(me.status)}

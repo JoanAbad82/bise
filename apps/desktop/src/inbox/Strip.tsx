@@ -44,7 +44,7 @@ export interface InboxStripProps {
 function typing(t: EventTarget | null): boolean {
   if ((t instanceof HTMLTextAreaElement || t instanceof HTMLInputElement) && t.value !== '') return true;
   // the composer (a contenteditable) with his words in it: '2' in 'on the m2' is his, not option 2
-  return t instanceof HTMLElement && t.isContentEditable && (t.textContent ?? '').trim() !== '';
+  return t instanceof HTMLElement && t.isContentEditable && t.textContent.trim() !== '';
 }
 
 export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip }: InboxStripProps) {

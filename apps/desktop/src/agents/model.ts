@@ -109,3 +109,12 @@ export function archivedOf(agents: readonly Agent[]): Agent[] {
 export function lineOf(a: Agent): string {
   return a.title !== '' ? a.title : a.purpose;
 }
+
+/**
+ * An agent's name as the window shows it: a project's main is 'bise' (ambient m_11437, lead
+ * m_11431); every other agent keeps its name. Display only: ids, routes, test ids, the hub and
+ * the git branch 'main' never change. Pure.
+ */
+export function shownName(agent: string): string {
+  return agent === 'main' ? 'bise' : agent;
+}

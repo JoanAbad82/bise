@@ -156,10 +156,10 @@ describe('code colors (tui-parity B15)', () => {
         <EntryRow ctx={ctx} pos={9} />
       </StoreProvider>,
     );
-    expect(v.getByTestId('thread.to.7').textContent).toContain('gift-ui → main');
+    expect(v.getByTestId('thread.to.7').textContent).toContain('gift-ui → bise');
     expect(v.getByTestId('thread.to.7').textContent).not.toContain('✉');
     expect(v.queryByTestId('thread.asks.7')).toBeNull();
-    expect(v.getByTestId('thread.to.8').textContent).toContain('✉ gift-ui → main');
+    expect(v.getByTestId('thread.to.8').textContent).toContain('✉ gift-ui → bise');
     expect(v.getByTestId('thread.to.8').textContent).toContain(ask);
     // main's card follows its ask: one copy of the question (on the ask), the card's options right under it, waiting for him
     expect(v.queryByTestId('thread.asks.8')).toBeNull();
@@ -192,7 +192,7 @@ describe('who a question waits for (ambient m_10689)', () => {
         <EntryRow ctx={ctx} pos={4} />
       </StoreProvider>,
     );
-    expect(v.getByTestId('thread.asks.4').textContent).toBe('waits for main');
+    expect(v.getByTestId('thread.asks.4').textContent).toBe('waits for bise');
     expect(v.getByTestId('thread.asks.4').className).toContain('main');
     expect(digitsOf([1, 2])).toBe('1 or 2');
     expect(digitsOf([1, 2, 3])).toBe('1, 2 or 3');

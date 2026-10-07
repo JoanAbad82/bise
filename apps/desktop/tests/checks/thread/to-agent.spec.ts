@@ -1,5 +1,5 @@
 // thread/to-agent · bar A.3 and S16 (amb-feed eb752406): in an agent's own thread, what it sent
-// main ('gift-ui → main' and its words), its question ('✉ gift-ui → main', waits for the reply),
+// main ('gift-ui → bise' and its words: main is shown as bise), its question ('✉ gift-ui → bise', waits for the reply),
 // and the card main opened for it, answered from there with a click (store.answer). Owner:
 // amb-win (lead m_10311). The new app on the scripted core: a world whose gift-ui thread holds
 // those entries; the answer read outside the page, in the core's command log.
@@ -56,9 +56,9 @@ test("thread/to-agent: gift-ui's own thread shows its message to main, its quest
     const { page } = s;
     const thread = page.getByTestId('thread.screen');
     await expect(thread).toHaveAttribute('data-agent', 'gift-ui', { timeout: 10_000 });
-    await expect(page.getByTestId('thread.to.3'), 'its message to main').toContainText('gift-ui → main', { timeout: 10_000 });
+    await expect(page.getByTestId('thread.to.3'), 'its message to main, named bise').toContainText('gift-ui → bise', { timeout: 10_000 });
     await expect(page.getByTestId('thread.to.3')).toContainText('landed the balance label');
-    await expect(page.getByTestId('thread.to.4'), 'its question, as the TUI marks it').toContainText('✉ gift-ui → main');
+    await expect(page.getByTestId('thread.to.4'), 'its question, as the TUI marks it').toContainText('✉ gift-ui → bise');
     await expect(page.getByTestId('thread.to.4')).toContainText(ASK);
     // one copy of the question (ambient m_10689): on the ask; main's card right under it with its options only
     await expect(page.getByTestId('thread.asks.4'), 'with a card for it, the ask itself carries no wait tag').toHaveCount(0);
