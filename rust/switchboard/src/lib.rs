@@ -26,6 +26,7 @@ pub mod approvals;
 pub mod artifacts;
 pub mod attached;
 pub mod board;
+pub mod boot;
 pub mod card_link;
 pub mod cli;
 pub mod client;

@@ -11,6 +11,7 @@
 //!   `sb history`.
 
 mod art;
+mod boot;
 mod features;
 mod fn_context;
 mod gate;
@@ -2474,14 +2475,6 @@ pub fn drop_sb_link(bin_dir: &Path) {
     }
 }
 
-/// One step of the hub's start, in hub.log (`boot: ...`): the switcher
-/// waits while they come and names the last one when the hub never
-/// answers (switch.rs replace_hub). SB_TIMING gets it too.
-fn boot_step(paths: &Paths, what: &str) {
-    log_line(paths, &format!("boot: {}", what));
-    crate::util::timing(what);
-}
-
 pub fn run(opts: Opts) -> std::io::Result<()> {
     let paths = opts.paths.clone();
     std::fs::create_dir_all(&paths.state)?;
@@ -2515,14 +2508,9 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     }
     // the switcher reads where this hub runs from (to come back to it)
     let _ = std::fs::write(paths.state.join("hub.root"), opts.app_root.to_string_lossy().as_bytes());
-    log_line(
-        &paths,
-        &format!(
-            "hub start pid={} workspace={}",
-            std::process::id(),
-            paths.workspace.display()
-        ),
-    );
+    log_line(&paths, &format!("hub start pid={} workspace={}", std::process::id(), paths.workspace.display()));
+    // no boot hangs silently: its steps and the replay's batches are its progress
+    let boot = boot::Boot::start(&paths, "hub start (sb-core starting)");
 
     // the agents' tools, once, off the start path (the login shell may
     // take a moment; the first REPL spawn waits for it)
@@ -2545,6 +2533,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     let workspace = paths.workspace.to_string_lossy().to_string();
     let mut hub = Hub::with_core(&workspace, opts.core_bin.clone());
     hub.user_ids = xhub::is_home(&paths.workspace);
+    boot.core(hub.core_pid());
     let (mut events, unreadable) = read_journal(&std::fs::read_to_string(paths.journal()).unwrap_or_default());
     // BISE-230: the task worktrees of the old place (<state>/worktrees/)
     // move to <home>/worktrees/<id>/<task>/, and the journal follows
@@ -2557,11 +2546,11 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         log_line(&paths, &format!("worktree not moved: {}", e));
     }
     crate::sweep::follow_moves(&mut events, &paths.worktrees);
-    boot_step(&paths, &format!("journal read ({} events)", events.len()));
+    boot.step(&format!("journal read ({} events)", events.len()));
     if !unreadable.is_empty() {
         log_line(&paths, &format!("journal: {} unreadable lines (not replayed), at line {}", unreadable.len(), lines_list(&unreadable)));
     }
-    let skipped = hub.replay(&events);
+    let skipped = hub.replay_with(&events, &mut |done, total| boot.replayed(done, total));
     if !skipped.is_empty() {
         let mut kinds: Vec<String> = skipped.iter().map(|e| e["type"].to_string()).collect();
         kinds.dedup();
@@ -2570,7 +2559,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
             &format!("journal: {} events of a kind this hub does not know (not applied; a newer hub wrote them?): {}", skipped.len(), kinds.join(", ")),
         );
     }
-    boot_step(&paths, "journal replayed");
+    boot.step("journal replayed");
     // sb-core dies (an OOM, a runtime error, killed): the hub restarts it
     // on the journal instead of dying with it (BISE-292)
     {
@@ -2693,10 +2682,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
             sh.buffers.insert(a.name.clone(), tail);
         }
     }
-    boot_step(
-        &paths,
-        &format!("transcripts read ({} buffered lines)", sh.buffers.values().map(|b| b.len()).sum::<usize>()),
-    );
+    boot.step(&format!("transcripts read ({} buffered lines)", sh.buffers.values().map(|b| b.len()).sum::<usize>()));
 
     {
         let tx = tx.clone();
@@ -2777,7 +2763,8 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
     sh.down = sh.down_dirs();
     sh.reap_procs(None);
     sh.start_prs();
-    boot_step(&paths, "boot done (REPLs spawned)");
+    boot.step("boot done (REPLs spawned)");
+    boot.done();
 
     let mut keep_agents = false;
     while let Ok(m) = rx.recv() {
