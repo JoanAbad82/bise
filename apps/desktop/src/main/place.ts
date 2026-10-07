@@ -11,7 +11,10 @@
 // move while he types): `pinned` notes where its glass sits at show, and each
 // new size keeps that glass's left edge and its anchored edge (top for the
 // spotlight and the menu, bottom for what bise brings) where they were; it
-// grows right and away from that edge only.
+// grows right and away from that edge only. A bottom view that grows while
+// shown (the voice view, lead m_11532: `fitBounds`) is placed so its glass at
+// its max height would still end above the Dock, then pinned by its top-left
+// and grows down.
 
 export interface Rect {
   readonly x: number;
@@ -86,4 +89,17 @@ export function pinnedBounds(size: { width: number; height: number }, pin: Pin, 
   const g = glass ?? { x: 0, y: 0, width: size.width, height: size.height };
   const y = pin.edge === 'top' ? pin.y - g.y : pin.y - (g.y + g.height);
   return { x: Math.round(pin.x - g.x), y: Math.round(y), width: Math.round(size.width), height: Math.round(size.height) };
+}
+
+/**
+ * At show, a 'bottom' view that grows down: its glass's top where `maxHeight`
+ * of glass would end BOTTOM px above the work area's bottom (inside the work
+ * area), centred; the window is its current size. Pin it with edge 'top'.
+ */
+export function fitBounds(size: { width: number; height: number }, d: DisplayBox, glass: Rect | undefined, maxHeight: number): Rect {
+  const g = glass ?? { x: 0, y: 0, width: size.width, height: size.height };
+  const gMax = { ...g, height: Math.max(g.height, maxHeight) };
+  const tall = { width: size.width, height: size.height - g.height + gMax.height };
+  const b = capsuleBounds(tall, d, { at: 'bottom' }, gMax);
+  return { x: b.x, y: b.y, width: Math.round(size.width), height: Math.round(size.height) };
 }

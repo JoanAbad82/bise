@@ -14,9 +14,9 @@
 // Test mode: offscreen, never shown, on a display far from his; show/hide
 // only change its state and print CAPSULE_LINE on stdout.
 import { BrowserWindow, ipcMain, screen, type Tray } from 'electron';
-import { CAPSULE_LINE, IPC, type CapsuleAt, type CapsuleState } from '../shared/api';
+import { CAPSULE_LINE, IPC, type CapsuleAt, type CapsuleFit, type CapsuleState } from '../shared/api';
 import { glassOf } from './glass';
-import { capsuleBounds, OFF_DISPLAY, pinnedBounds, pinOf, type Anchor, type DisplayBox, type Pin, type Rect } from './place';
+import { capsuleBounds, fitBounds, OFF_DISPLAY, pinnedBounds, pinOf, type Anchor, type DisplayBox, type Pin, type Rect } from './place';
 import { loadRenderer, OFF, webPreferences } from './windows';
 
 const START = { width: 640, height: 120 };
@@ -27,6 +27,8 @@ export class Capsule {
   private glass: Rect | undefined;
   /** where the glass was put at show: it stays there while shown (place.ts) */
   private pin: Pin | null = null;
+  /** this show grows down from a pinned top-left (the voice view) */
+  private fit: CapsuleFit | null = null;
   private state: CapsuleState = { shown: false, at: 'bottom', keys: false, why: 'asked' };
   tray: Tray | null = null;
 
@@ -67,10 +69,11 @@ export class Capsule {
     return this.win;
   }
 
-  show(at: CapsuleAt, keys: boolean, why: CapsuleState['why'] = 'asked'): void {
+  show(at: CapsuleAt, keys: boolean, why: CapsuleState['why'] = 'asked', fit: CapsuleFit | null = null): void {
     this.state = { shown: true, at, keys, why };
     // placed (and kept inside the screen) once, here; then pinned
     this.pin = null;
+    this.fit = at === 'bottom' ? fit : null;
     this.place();
     if (this.testMode) {
       process.stdout.write(`${CAPSULE_LINE} show ${at}${keys ? ' keys' : ''}\n`);
@@ -127,9 +130,11 @@ export class Capsule {
       return;
     }
     const anchor = this.anchor();
-    const b = capsuleBounds(this.size, this.display(), anchor, this.glass);
+    const fit = this.fit;
+    const b = fit !== null ? fitBounds(this.size, this.display(), this.glass, fit.maxHeight) : capsuleBounds(this.size, this.display(), anchor, this.glass);
     this.win.setBounds(b);
-    if (this.state.shown) this.pin = pinOf(b, this.size, anchor, this.glass);
+    // a fit view keeps its top-left (it grows down), the others their anchored edge
+    if (this.state.shown) this.pin = pinOf(b, this.size, fit !== null ? { at: 'top' } : anchor, this.glass);
   }
 
   private tell(): void {
@@ -140,8 +145,8 @@ export class Capsule {
 /** The capsule's IPC: any window may show, hide or size it. */
 export function installCapsuleIpc(c: Capsule): void {
   const ats: ReadonlySet<string> = new Set(['top', 'bottom', 'menu']);
-  ipcMain.on(IPC.capsuleShow, (_e, at: unknown, keys: unknown) => {
-    if (typeof at === 'string' && ats.has(at)) c.show(at as CapsuleAt, keys === true);
+  ipcMain.on(IPC.capsuleShow, (_e, at: unknown, keys: unknown, fit: unknown) => {
+    if (typeof at === 'string' && ats.has(at)) c.show(at as CapsuleAt, keys === true, 'asked', isFit(fit) ? fit : null);
   });
   ipcMain.on(IPC.capsuleHide, () => {
     c.hide();
@@ -150,6 +155,12 @@ export function installCapsuleIpc(c: Capsule): void {
     if (typeof width !== 'number' || typeof height !== 'number') return;
     c.resize(width, height, isRect(glass) ? glass : undefined);
   });
+}
+
+function isFit(v: unknown): v is CapsuleFit {
+  if (typeof v !== 'object' || v === null) return false;
+  const f = v as Record<string, unknown>;
+  return f['grow'] === 'down' && typeof f['maxHeight'] === 'number' && f['maxHeight'] > 0 && f['maxHeight'] < 10_000;
 }
 
 function isRect(v: unknown): v is Rect {

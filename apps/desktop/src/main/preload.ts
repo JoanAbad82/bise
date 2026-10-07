@@ -72,8 +72,8 @@ const api: BiseApi = {
   },
   surface,
   capsule: {
-    show: (at, keys) => {
-      ipcRenderer.send(IPC.capsuleShow, at, keys);
+    show: (at, keys, fit) => {
+      ipcRenderer.send(IPC.capsuleShow, at, keys, fit);
     },
     hide: () => {
       ipcRenderer.send(IPC.capsuleHide);

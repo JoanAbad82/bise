@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOTTOM, capsuleBounds, MENU_GAP, OFF_DISPLAY, pinnedBounds, pinOf, TOP, type DisplayBox } from './place';
+import { BOTTOM, capsuleBounds, fitBounds, MENU_GAP, OFF_DISPLAY, pinnedBounds, pinOf, TOP, type DisplayBox } from './place';
 
 // a 1512x982 MacBook display: the menu bar 33 px, the Dock 70 px
 const mac: DisplayBox = {
@@ -84,5 +84,27 @@ describe('a shown capsule never moves while he types (lead m_11455)', () => {
     const b1 = pinnedBounds({ width: 1028, height: 300 }, pin, g1);
     expect(b1.x + g1.x).toBe(b0.x + g0.x);
     expect(b1.y + g1.y + g1.height).toBe(b0.y + g0.y + g0.height);
+  });
+});
+
+describe('the voice view: placed once for its max height, then its top-left stays (lead m_11532)', () => {
+  it('partials and levels grow it down to its max, never past the Dock line, top-left identical', () => {
+    const max = 420;
+    const g0 = { x: 84, y: 0, width: 700, height: 80 };
+    const b0 = fitBounds({ width: 868, height: 80 }, mac, g0, max);
+    // its max glass would end BOTTOM above the work area's bottom
+    expect(b0.y + g0.y + max).toBe(mac.workArea.y + mac.workArea.height - BOTTOM);
+    const pin = pinOf(b0, { width: 868, height: 80 }, { at: 'top' }, g0);
+    for (let i = 0; i < 20; i++) {
+      const g = { x: 84, y: 0, width: 700, height: 80 + i * 17 };
+      const b = pinnedBounds({ width: 868, height: g.height }, pin, g);
+      expect([b.x + g.x, b.y + g.y]).toEqual([b0.x + g0.x, b0.y + g0.y]);
+      expect(b.y + g.y + g.height).toBeLessThanOrEqual(mac.workArea.y + mac.workArea.height - BOTTOM);
+    }
+  });
+
+  it('a max taller than the work area still starts inside it', () => {
+    const b = fitBounds({ width: 700, height: 80 }, mac, undefined, 5000);
+    expect(b.y).toBe(mac.workArea.y);
   });
 });

@@ -8,6 +8,10 @@
 // blur that hid the window closes the view. Effects: the capsule window (show, hide), the main
 // window (open), the helper's mic (own_mic, so its quiet sampling skips bise's own use).
 import type { FnAct } from '@/proto';
+import type { CapsuleFit } from '../shared/api';
+
+/** The voice view grows down from where it showed and never moves (lead m_11532); its glass is at most 320 px (capsule.css). */
+export const TALK_FIT: CapsuleFit = { grow: 'down', maxHeight: 320 };
 
 export type View =
   | { readonly kind: 'none' }
@@ -40,7 +44,7 @@ export type CapEvent =
   | { readonly ev: 'close' };
 
 export type Fx =
-  | { readonly fx: 'show'; readonly at: 'top' | 'bottom' | 'menu'; readonly keys: boolean }
+  | { readonly fx: 'show'; readonly at: 'top' | 'bottom' | 'menu'; readonly keys: boolean; readonly fit?: CapsuleFit }
   | { readonly fx: 'hide' }
   | { readonly fx: 'open'; readonly route?: string }
   | { readonly fx: 'mic'; readonly open: boolean }
@@ -85,9 +89,9 @@ export function step(s: State, e: CapEvent): Step {
           if (e.key === 'i') return v.kind === 'none' ? { state: s, fx: [{ fx: 'open', route: 'inbox' }] } : go(s, NONE, { fx: 'hide' }, { fx: 'open', route: 'inbox' });
           return stay(s);
         case 'talk_start':
-          return go(s, { kind: 'talk', phase: 'listen', handsFree: false }, { fx: 'show', at: 'bottom', keys: false }, { fx: 'talk', cmd: 'talk_start' });
+          return go(s, { kind: 'talk', phase: 'listen', handsFree: false }, { fx: 'show', at: 'bottom', keys: false, fit: TALK_FIT }, { fx: 'talk', cmd: 'talk_start' });
         case 'double':
-          return go(s, { kind: 'talk', phase: 'listen', handsFree: true }, { fx: 'show', at: 'bottom', keys: false }, { fx: 'talk', cmd: 'talk_start' });
+          return go(s, { kind: 'talk', phase: 'listen', handsFree: true }, { fx: 'show', at: 'bottom', keys: false, fit: TALK_FIT }, { fx: 'talk', cmd: 'talk_start' });
         case 'talk_end':
           return v.kind === 'talk' && v.phase === 'listen' ? go(s, { kind: 'talk', phase: 'think', handsFree: v.handsFree }, { fx: 'talk', cmd: 'talk_end' }) : stay(s);
         case 'tap':

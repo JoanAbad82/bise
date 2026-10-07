@@ -160,7 +160,7 @@ export function CapsuleRoot(): JSX.Element {
   // the effects of each step, once
   useEffect(() => {
     for (const fx of m.fx) {
-      if (fx.fx === 'show') bise?.capsule.show(fx.at, fx.keys);
+      if (fx.fx === 'show') bise?.capsule.show(fx.at, fx.keys, fx.fit);
       else if (fx.fx === 'hide') bise?.capsule.hide();
       else if (fx.fx === 'mic') bise?.helper({ cmd: 'own_mic', open: fx.open });
       else if (fx.fx === 'talk') store.command({ cmd: fx.cmd });

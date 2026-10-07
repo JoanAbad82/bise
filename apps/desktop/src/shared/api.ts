@@ -177,6 +177,12 @@ export type Surface = 'window' | 'capsule';
  */
 export type CapsuleAt = 'top' | 'bottom' | 'menu';
 
+/** How a shown capsule grows (CapsuleApi.show): 'down' from a pinned top-left, its glass at most `maxHeight` px. */
+export interface CapsuleFit {
+  readonly grow: 'down';
+  readonly maxHeight: number;
+}
+
 export interface CapsuleState {
   readonly shown: boolean;
   readonly at: CapsuleAt;
@@ -188,7 +194,12 @@ export interface CapsuleState {
 
 export interface CapsuleApi {
   /** Shows it at `at`; `keys`: he types in it (the spotlight), else it never takes them (a card). */
-  readonly show: (at: CapsuleAt, keys: boolean) => void;
+  /**
+   * `fit`: a view that grows while shown and must not move (the voice view,
+   * lead m_11532): at 'bottom' it is placed once so that `maxHeight` of glass
+   * would still end above the Dock, then its top-left stays and it grows down.
+   */
+  readonly show: (at: CapsuleAt, keys: boolean, fit?: CapsuleFit) => void;
   readonly hide: () => void;
   /** Its content's size, and the glass inside a transparent margin when there is one. */
   readonly size: (width: number, height: number, glass?: { x: number; y: number; width: number; height: number }) => void;
