@@ -21,7 +21,7 @@ import type { Page } from '@playwright/test';
 import { test, expect, type Session } from '../../harness';
 import { makeUpdateFeed, OFFERED, type UpdateBuild } from '../fixtures/update';
 import { launchReal, realWorld, type World } from '../world';
-import { Lines, sleep } from './world';
+import { clickMenu, Lines, sleep } from './world';
 
 const UPDATE = 'bise-desktop: update';
 const RELAUNCH = 'bise-desktop: relaunch';
@@ -99,10 +99,14 @@ test('setup/update (S.6, real core) good: offered, ready, nothing by itself; his
     expect(out.of(RELAUNCH), 'no relaunch before his click').toEqual([]);
     expect(statSync(f.target).ino, 'the running bundle is untouched before his click').toBe(inoBefore);
     expect(existsSync(`${f.target}.old`), 'no .old before his click').toBe(false);
+    // he is on his inbox (⌘I, through the app's menu) when he sees the line, and clicks restart
+    await clickMenu(s, 'Go/Inbox');
+    await expect(s.page.getByTestId('inbox.root'), 'the inbox is open').toBeVisible({ timeout: 5000 });
+    const line = s.page.locator('[data-testid="app.update"][data-state="ready"]');
+    await expect(line, 'the window says the new bise is ready').toBeVisible({ timeout: 5000 });
+    await expect(line, 'its words name the version').toContainText(OFFERED.version);
     await s.page.screenshot({ path: test.info().outputPath('ready.png') });
-
-    // his click (the window's restart button; called from the page until amb-win draws it)
-    expect(await api(s.page, 'install', 'inbox'), 'install() takes the ready build').toBe(true);
+    await s.page.getByTestId('app.update.restart').click();
     await out.wait(RELAUNCH, (r) => r === f.target, 10_000);
     expect(existsSync(`${f.target}.old`), '<target>.old keeps the previous app').toBe(true);
     expect(existsSync(path.join(f.target, 'Contents', 'Info.plist')), 'a whole app in place').toBe(true);
@@ -142,6 +146,8 @@ for (const build of ['tampered', 'other'] as const satisfies readonly UpdateBuil
       expect(failed.version, 'the offered version').toBe(OFFERED.version);
       expect(failed.why ?? '', 'why names the signature').toContain("the new app's signature doesn't match this one's");
       expect(states(out).some((x) => x.state === 'ready'), 'never ready').toBe(false);
+      await sleep(500);
+      await expect(s.page.getByTestId('app.update'), 'a failed update shows nothing in the window').toHaveCount(0);
       expect(await api(s.page, 'install', 'inbox'), 'install() refuses: nothing is ready').toBe(false);
       await sleep(1000);
       expect(out.of(RELAUNCH), 'no relaunch').toEqual([]);
@@ -174,7 +180,10 @@ test('setup/update (S.6, real core) went_bad: a swapped-in app that never said i
     await sleep(2000);
     expect(out.of(RELAUNCH), 'nothing goes back by itself').toEqual([]);
     expect(existsSync(`${f.target}.old`), '.old waits for his click').toBe(true);
-    expect(await api(s.page, 'revert'), 'revert() takes the went_bad state').toBe(true);
+    const line = s.page.locator('[data-testid="app.update"][data-state="went_bad"]');
+    await expect(line, "the window says the new bise didn't start right").toBeVisible({ timeout: 5000 });
+    await s.page.screenshot({ path: test.info().outputPath('went-bad.png') });
+    await s.page.getByTestId('app.update.back').click();
     await out.wait(RELAUNCH, (r) => r === f.target, 10_000);
     expect(existsSync(`${f.target}.old`), '.old is moved back').toBe(false);
     expect(statSync(f.target).ino, 'the previous app is in place again').toBe(oldIno);
