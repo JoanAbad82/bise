@@ -105,9 +105,29 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref }
     virtuoso.current?.scrollToIndex(LAST);
   }, [keys.length]);
 
+  // it stays at its end until HE scrolls up (qa-type b37dc4c1, his bug 5):
+  // rows measured after the first scroll (long answers, markdown, the real
+  // core's pages and entries) grow the list under the end, so Virtuoso's
+  // own atBottom goes false with nobody scrolling; while it sticks, every
+  // growth goes back to the end and new rows follow. A wheel up or a key
+  // that scrolls up unsticks it; at the end, or after his send, it sticks.
+  const stick = useRef(true);
+  const [stuck, setStuck] = useState(true);
+  const setStick = useCallback((on: boolean) => {
+    stick.current = on;
+    setStuck(on);
+  }, []);
+  const toEndNow = useCallback(() => {
+    virtuoso.current?.scrollToIndex(LAST);
+  }, []);
+  const onGrow = useCallback(() => {
+    if (stick.current) toEndNow();
+  }, [toEndNow]);
+
   const toEnd = useCallback(() => {
+    setStick(true);
     if (keys.length > 0) virtuoso.current?.scrollToIndex({ index: keys.length - 1, align: 'end' });
-  }, [keys]);
+  }, [keys, setStick]);
 
   useImperativeHandle(
     ref,
@@ -122,7 +142,17 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref }
   );
 
   return (
-    <div className="th-list" data-testid={testId}>
+    <div
+      className="th-list"
+      data-testid={testId}
+      data-stuck={stuck}
+      onWheel={(e) => {
+        if (e.deltaY < 0 && stick.current) setStick(false);
+      }}
+      onKeyDown={(e) => {
+        if (['PageUp', 'Home', 'ArrowUp'].includes(e.key) && stick.current) setStick(false);
+      }}
+    >
       <Virtuoso
         ref={virtuoso}
         style={FILL}
@@ -130,18 +160,22 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref }
         firstItemIndex={next.index}
         computeItemKey={(_, key) => key}
         itemContent={(_, key) => row(key)}
-        followOutput={(atBottom) => (atBottom ? 'auto' : false)}
+        followOutput={(b) => (b || stick.current ? 'auto' : false)}
+        totalListHeightChanged={onGrow}
         alignToBottom
         startReached={startReached}
         atBottomStateChange={(b) => {
           setAtBottom(b);
-          if (b) setSeen((x) => ({ ...x, unseen: 0 }));
+          if (b) {
+            setSeen((x) => ({ ...x, unseen: 0 }));
+            setStick(true);
+          }
         }}
         components={head !== undefined && more ? { Header: () => head } : NONE}
         increaseViewportBy={{ top: 600, bottom: 300 }}
       />
       {tail}
-      {!atBottom && (
+      {!atBottom && !stuck && (
         <button type="button" className="th-to-end" onClick={toEnd} data-testid="thread.to-end">
           ↓ back to the bottom{seen.unseen > 0 ? ` · ${String(seen.unseen)} new` : ''}
         </button>
