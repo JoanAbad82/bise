@@ -7,6 +7,8 @@
 use bise_proto::rows::{question, Agent, Artifact, Card, CardPage, Report, ReportKind, Status};
 use bise_proto::diff::{DiffFile, DiffLine, Hunk, LineKind};
 use bise_proto::hub::{HubEv, Job as Followed, JobState};
+use bise_proto::thread::lines::unescape;
+use bise_proto::thread::words::one_line;
 use bise_proto::thread::{self, Ctx, Entry, Line};
 use bise_proto::Pos;
 use serde_json::Value;
@@ -74,8 +76,8 @@ pub fn agents(snap: &Value, since: &mut Since, now: u64, user_kind: fn(&str) -> 
             main: a.get("main").and_then(Value::as_bool).unwrap_or(false),
             status,
             archived,
-            title: thread::one_line(&title, 120),
-            purpose: thread::one_line(&s(&a, "objective"), 200),
+            title: one_line(&title, 120),
+            purpose: one_line(&s(&a, "objective"), 200),
             since_ms: at,
             waits,
             parent: Some(s(&a, "parent")).filter(|p| !p.is_empty()),
@@ -113,7 +115,7 @@ pub fn jobs(snap: &Value) -> Vec<Followed> {
             let progress = Some(s(a, "report")).filter(|r| !r.is_empty() && s(a, "report_kind") == "progress");
             Followed {
                 agent: s(a, "name"),
-                label: thread::one_line(&progress.unwrap_or_else(|| s(a, "objective")), 120),
+                label: one_line(&progress.unwrap_or_else(|| s(a, "objective")), 120),
                 step: n(a, "step"),
                 of: n(a, "of"),
                 state: JobState::Running,
@@ -281,7 +283,7 @@ fn hunk(h: &Value) -> Hunk {
 pub fn step_of(line: &str) -> Option<String> {
     if let Some(r) = line.strip_prefix("tool_intent #") {
         let text = r.split_once(" : ").map_or("", |(_, t)| t);
-        return Some(thread::one_line(&thread::unescape(text), 80));
+        return Some(one_line(&unescape(text), 80));
     }
     line.starts_with("  obs: turn_done").then(String::new)
 }

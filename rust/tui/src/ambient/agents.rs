@@ -91,15 +91,4 @@ mod tests {
         assert_eq!(status("starting"), ("working", false));
     }
 
-    /// bise-proto's copies of the TUI's wire helpers (temporary, until the
-    /// TUI takes proto's at the ambient merge) say the same.
-    #[test]
-    fn proto_copies_agree_with_the_tuis() {
-        for s in ["a\\nb", "plain", "x\\n\\ny", "", "tab\\tend"] {
-            assert_eq!(bise_proto::thread::unescape(s), crate::markdown::unescape_md(s), "unescape {s:?}");
-        }
-        for s in ["<think>hmm</think>on it", "<think>a\\nBENDSIG::s1</think>\\n<think>b</think>\\nok", "<think>open", "no thinking", "pre<think>t</think>post"] {
-            assert_eq!(bise_proto::thread::split_thinking(s), crate::wire::split_thinking(s), "split_thinking {s:?}");
-        }
-    }
 }

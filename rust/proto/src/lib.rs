@@ -29,10 +29,9 @@
 //! its stream emits it.
 //!
 //! [`thread::fold`] turns an agent's transcript lines into entries (the
-//! hub folds, clients don't). It brings its own copies of the TUI's
-//! `markdown::unescape_md` and `wire::split_thinking` (a test in bend-tui
-//! checks they agree); the TUI switches to these at the ambient merge
-//! into main, and its copies go then.
+//! hub folds, clients don't). It reads them with [`thread::lines`], the
+//! one parser of each line kind, which the TUI's `wire.rs`/`sb.rs` call
+//! too, and [`thread::words`] makes the words both show.
 //!
 //! The fixtures (`fixtures/*.jsonl`) are the one source for the Rust
 //! tests, the web's fake core (apps/ambient/web) and the Python e2e.

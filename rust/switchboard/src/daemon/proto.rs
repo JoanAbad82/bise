@@ -197,10 +197,11 @@ impl Shell {
     }
 
     /// G: a feed line written by the typed command being stepped: an
-    /// `undelivered` line (BISE-86) means the thread has his row.
+    /// `undelivered` line (BISE-86) means the thread has his row. The
+    /// line is read by the one parser of its kind (`thread::lines`).
     pub(super) fn typed_line(&mut self, line: &str) {
         if let Some(s) = self.proto.stepping.as_mut() {
-            s.undelivered |= line.starts_with("sb undelivered");
+            s.undelivered |= matches!(pthread::lines::read(line), pthread::lines::Rec::Hub(pthread::lines::Hub::Undelivered { .. }));
         }
     }
 
