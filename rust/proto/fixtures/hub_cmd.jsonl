@@ -25,6 +25,7 @@
 {"cmd":"merged","project":"acme-1a2b3c4d"}
 {"cmd":"features","project":"acme-1a2b3c4d"}
 {"cmd":"prs","project":"acme-1a2b3c4d"}
+{"cmd":"models","project":"acme-1a2b3c4d"}
 {"cmd":"new","project":"acme-1a2b3c4d","name":"fix","brief":"-w the login button: keep its label","worktree":true,"with_changes":true}
 {"cmd":"new","project":"acme-1a2b3c4d","brief":"x: look at the flaky e2e"}
 {"cmd":"rename","project":"acme-1a2b3c4d","agent":"perf","to":"perf-hub"}

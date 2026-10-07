@@ -299,6 +299,63 @@ words: string,
 text: string, };
 
 /**
+ * The role a model is config.toml's default for.
+ */
+export type ModelRole = "main" | "agents" | "unknown";
+
+/**
+ * A model the TUI's `/model` list offers (bise_catalog::picks: a chat
+ * model whose provider can run a turn on this hub now, or an alias):
+ * the facts its row is made from, and the hub's words for it.
+ */
+export type Model = { 
+/**
+ * what `model` takes: a full `provider/id`, or an alias
+ */
+id: string, 
+/**
+ * its name for people (`opus 5.5`)
+ */
+label: string, 
+/**
+ * its provider's name, the header it goes under ("" for an alias)
+ */
+provider: string, 
+/**
+ * its row's words under that header: `1M`, `128k · config.toml`,
+ * `= anthropic/claude-opus-5-5`
+ */
+short: string, 
+/**
+ * its context window in tokens (none for an alias)
+ */
+context?: number | null, 
+/**
+ * set in config.toml
+ */
+config?: boolean, 
+/**
+ * an alias: the model it names
+ */
+alias_of?: string | null, 
+/**
+ * whether it reads images (the catalog's K4 rule; none: not listed)
+ */
+vision?: boolean | null, 
+/**
+ * the reasoning efforts it takes (`/reasoning`), none: no setting
+ */
+efforts?: Array<string>, 
+/**
+ * the effort it gets by default
+ */
+default_effort?: string | null, 
+/**
+ * the roles whose default model it is (config.toml's [roles])
+ */
+default_for?: Array<ModelRole>, };
+
+/**
  * An artifact of a project (what an agent made for him), the
  * `artifacts` event's row.
  */

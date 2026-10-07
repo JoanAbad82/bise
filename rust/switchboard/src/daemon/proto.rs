@@ -42,6 +42,10 @@ pub(super) struct Proto {
     features: String,
     /// the last `prs` sent (bar A.7: sent again only when changed)
     prs: String,
+    /// bar A.5: config.toml's and auth.json's mtimes at the last `models`
+    /// (a stat on each state broadcast, never a read), and its JSON
+    models_at: Option<(Option<std::time::SystemTime>, Option<std::time::SystemTime>)>,
+    models: String,
     /// the typed command being stepped (its connection, its tag): a
     /// notice sb-core sends that connection meanwhile becomes its error
     stepping: Option<(ClientId, String)>,
@@ -224,6 +228,8 @@ impl Shell {
             self.proto_send(id, &feats);
             let prs = self.prs_ev();
             self.proto_send(id, &prs);
+            let models = self.models_ev();
+            self.proto_send(id, &models);
             return;
         }
         if !self.proto.conns.contains_key(&id) {
@@ -244,6 +250,7 @@ impl Shell {
             | HubCmd::Merged { project }
             | HubCmd::Features { project }
             | HubCmd::Prs { project }
+            | HubCmd::Models { project }
             | HubCmd::New { project, .. }
             | HubCmd::Rename { project, .. }
             | HubCmd::Model { project, .. }
@@ -362,6 +369,11 @@ impl Shell {
                 let prs = self.prs_ev();
                 self.proto_send(id, &prs);
             }
+            // the keys and config read again (a login made elsewhere)
+            HubCmd::Models { .. } => {
+                let models = self.models_ev();
+                self.proto_send(id, &models);
+            }
             // bar A.1 and A.5: the TUI's /new, /rename, /model, /reasoning,
             // their fields straight to the same handlers (Input::UserCmd,
             // architect m_10331): a refusal comes back as this error, the
@@ -412,6 +424,24 @@ impl Shell {
     fn prs_ev(&self) -> HubEv {
         let places = crate::place::places(&self.hub.st, &self.hub.prs);
         crate::forge::news::prs_ev(self.project(), &places)
+    }
+
+    /// The typed `models` (bar A.5): the TUI's `/model` list on this hub
+    /// (bise_catalog::picks), with the providers ready for this hub's own
+    /// environment: what its REPLs will have (architect m_10427).
+    fn models_ev(&mut self) -> HubEv {
+        self.proto.models_at = Some(models_mtimes());
+        let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+        let home = bise_home::Home::from_env();
+        let setup = self.setup().clone();
+        let ready = bise_catalog::picks::ready_in(&setup, &env, &home);
+        let picks = bise_catalog::picks::picks(&setup, &|id| ready.iter().any(|r| r == id));
+        HubEv::Models { project: self.project(), items: proto_view::models(&setup, &picks) }
+    }
+
+    /// config.toml or auth.json changed since the last `models` (a stat).
+    fn models_moved(&self) -> bool {
+        self.proto.models_at.is_some_and(|at| at != models_mtimes())
     }
 
     /// The art store's event as the typed `artifacts`.
@@ -479,6 +509,18 @@ impl Shell {
                         self.proto_send(*id, &prs);
                     }
                 }
+                // bar A.5: config.toml or auth.json moved (a stat): the
+                // models again when their rows changed
+                if self.models_moved() {
+                    let models = self.models_ev();
+                    let m = models.encode();
+                    if m != self.proto.models {
+                        self.proto.models = m;
+                        for id in &ids {
+                            self.proto_send(*id, &models);
+                        }
+                    }
+                }
                 // an agent came, went, started or ended a turn: its
                 // worktree may have changed (commits, files)
                 let key = self.worktrees_key();
@@ -541,4 +583,11 @@ impl Shell {
         }
         ids
     }
+}
+
+/// The mtimes of config.toml and auth.json (none: no file).
+fn models_mtimes() -> (Option<std::time::SystemTime>, Option<std::time::SystemTime>) {
+    let home = bise_home::Home::from_env();
+    let at = |p: PathBuf| std::fs::metadata(p).and_then(|m| m.modified()).ok();
+    (at(home.config_file()), at(home.auth_file()))
 }

@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "diff", "jobs", "job_end", "error")
+TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "jobs", "job_end", "error")
 FIXTURES = os.path.join(e2e.ROOT, "rust", "proto", "fixtures", "hub_ev.jsonl")
 
 
@@ -81,6 +81,13 @@ def main():
         check(prs0["items"] == [] and prs0["head"] == "" and prs0["none"].startswith("no open PR"), "no PR: %r" % prs0)
         c.send({"cmd": "prs", "project": project})
         c.wait(lambda: len(typed(c, "prs")) > 1, 20, "prs again on its command")
+        # bar A.5 (architect m_10427): the TUI's /model list at hello, again on 'models'
+        c.wait(lambda: typed(c, "models"), 20, "models at hello")
+        ms = typed(c, "models")[0]["items"]
+        check(all(m["id"] and "short" in m and "label" in m for m in ms), "model rows: %r" % ms[:3])
+        check(all(m.get("alias_of") or m.get("context") for m in ms), "a model has its context, an alias its target: %r" % ms[:3])
+        c.send({"cmd": "models", "project": project})
+        c.wait(lambda: len(typed(c, "models")) > 1, 20, "models again on its command")
         c.wait(lambda: typed(c, "artifacts"), 20, "the artifacts at hello")
         check(typed(c, "artifacts")[0]["items"] == [] and typed(c, "artifacts")[0]["project"] == project, "no artifact yet")
 

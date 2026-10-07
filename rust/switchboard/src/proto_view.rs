@@ -15,9 +15,11 @@ use std::collections::BTreeMap;
 mod dev_servers;
 mod features;
 mod merged;
+mod models;
 mod worktrees;
 pub use dev_servers::{dev_servers, lsof_ports, server_name, Job};
 pub use features::{features, PlaceCard};
+pub use models::models;
 pub use merged::{landed_line, merged, LOG_FORMAT as MERGED_LOG_FORMAT};
 pub use worktrees::{left_right, worktree_list, worktrees};
 
