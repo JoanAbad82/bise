@@ -4,20 +4,7 @@
 // no node replaced outside the line he types). Never during an accent or IME composition (the
 // composer skips the pass then). Runs inside editor.read / editor.update (the `$` prefix).
 import { $createRangeSelection, $createTextNode, $getRoot, $getSelection, $isElementNode, $isLineBreakNode, $isRangeSelection, $isTextNode, $setSelection, type ElementNode, type LexicalNode, type PointType, type TextNode } from 'lexical';
-import { colorLines, type Cls } from './mdcolor';
-
-/** A class's look, as the text node's inline style (the theme's tokens). */
-const STYLE: Record<Cls, string> = {
-  kw: 'color: var(--c-accent)',
-  str: 'color: var(--c-ok)',
-  num: 'color: var(--c-err)',
-  com: 'color: var(--c-text-3); font-style: italic',
-  type: 'color: var(--c-text-2)',
-  fence: 'color: var(--c-text-3)',
-  mark: 'color: var(--c-accent)',
-  code: 'color: var(--c-accent); font-family: var(--font-mono)',
-  head: 'font-weight: 600',
-};
+import { colorLines, COLOR_STYLE as STYLE, type Cls } from './mdcolor';
 
 interface Piece {
   readonly text: string;

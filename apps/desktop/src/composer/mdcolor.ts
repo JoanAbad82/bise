@@ -108,3 +108,17 @@ export function colorLines(text: string): Run[][] {
     return kind === 'code' ? codeRuns(line, lang) : proseRuns(line);
   });
 }
+
+/** A class's look as an inline style, in the theme's tokens (highlight.ts's text nodes, pm/colors.ts's decorations). */
+export const COLOR_STYLE: Record<Cls, string> = {
+  kw: 'color: var(--c-accent)',
+  str: 'color: var(--c-ok)',
+  num: 'color: var(--c-err)',
+  com: 'color: var(--c-text-3); font-style: italic',
+  type: 'color: var(--c-text-2)',
+  fence: 'color: var(--c-text-3)',
+  mark: 'color: var(--c-accent)',
+  code: 'color: var(--c-accent); font-family: var(--font-mono)',
+  head: 'font-weight: 600',
+};
+

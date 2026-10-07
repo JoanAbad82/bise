@@ -28,6 +28,7 @@ import { emojiToken, typedEmoji } from '../emoji';
 import { dictated, HOLD_MS } from '../dictate';
 import { Picker } from '../Picker';
 import { FIELD_NODES } from './schema';
+import { Colors } from './colors';
 import {
   applyOp,
   beforeCaret,
@@ -174,7 +175,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const ph = props.current.placeholder;
     const editor = new Editor({
       element: el,
-      extensions: [...FIELD_NODES, UndoRedo.configure({ depth: 100, newGroupDelay: 500 })],
+      extensions: [...FIELD_NODES, Colors, UndoRedo.configure({ depth: 100, newGroupDelay: 500 })],
       injectCSS: false,
       enableInputRules: false,
       enablePasteRules: false,

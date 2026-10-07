@@ -4,7 +4,7 @@
 // remount. Typing through the real key path is qa-type's (tests/checks/composer, Playwright).
 import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Composer, ENGINE } from './Composer';
+import { Composer } from './Composer';
 import type { ComposerActions } from './Brain';
 import type { Store } from './drafts';
 import { NO_SOURCES } from './sources';
@@ -102,8 +102,7 @@ describe('the composer', () => {
     expect(onSend).not.toHaveBeenCalled();
   });
 
-  // the TipTap engine draws colors as decorations in slice 3 (ambient-lead m_11458)
-  it.skipIf(ENGINE === 'pm')('colors a code block as he types, keeps the caret and the text (B9/W8)', async () => {
+  it('colors a code block as he types, keeps the caret and the text (B9/W8)', async () => {
     const { getByTestId, onSend, act: a } = await mount();
     const field = getByTestId('composer.field');
     await act(async () => {
