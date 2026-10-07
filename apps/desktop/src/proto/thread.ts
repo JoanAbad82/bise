@@ -5,7 +5,7 @@
 import type { FnContext } from './context';
 import type { Opt, ReportKind } from './rows';
 
-export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped" | "to_agent" | "thinking" | "compacting" | "compacted" | "notice" | "not_delivered" | "landed" | "pr" | "artifact" | "answered" | "approval" | "unknown";
+export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped" | "to_agent" | "thinking" | "compacting" | "compacted" | "notice" | "not_delivered" | "landed" | "pr" | "artifact" | "answered" | "approval" | "scheduled" | "unknown";
 
 /**
  * What a tool call did, for the counted summary.
@@ -93,6 +93,16 @@ export type Answered = { agent: string, question: string, answer: string, why: s
 export type ApprovalFold = { ok: boolean, text: string, note?: string, };
 
 /**
+ * A `scheduled` entry (batch 3b): a task set or ended (the hub's
+ * `scheduled` line) or a run (bise's wake), as the TUI's ◷ line says it:
+ * `head` (`perf scheduled #48 · every 2m · 6 times · next 14:22`,
+ * `scheduled #48 · 2 of 6 · check the build`, `scheduled #48 ended ·
+ * stopped by you`), `words` the task's words under it ("" when ended).
+ * Times are read at the line's own time, so a replay says the same.
+ */
+export type Scheduled = { id: number, head: string, words?: string, };
+
+/**
  * One entry of a thread.
  */
 export type Entry = { 
@@ -127,4 +137,4 @@ msg?: number | null,
  * a `thinking` entry's, or an `agent` reply's own: the reasoning
  * before it ("thought for 3.2s", folded)
  */
-thinking?: Thinking | null, notice?: Notice | null, not_delivered?: NotDelivered | null, landed?: Landed | null, pr?: PrNews | null, made?: Made | null, answered?: Answered | null, approval?: ApprovalFold | null, };
+thinking?: Thinking | null, notice?: Notice | null, not_delivered?: NotDelivered | null, landed?: Landed | null, pr?: PrNews | null, made?: Made | null, answered?: Answered | null, approval?: ApprovalFold | null, scheduled?: Scheduled | null, };

@@ -31,6 +31,8 @@ export const hub_ev: readonly HubEv[] = [
   {"agent":"main","entry":{"answered":{"agent":"docs","answer":"v2","question":"v1 or v2?","why":"the brief says v2"},"at_ms":1791100030000,"kind":"answered","pos":30,"text":"v2"},"ev":"entry","project":"acme-1a2b3c4d"},
   {"agent":"perf","entry":{"approval":{"note":"not that","ok":false,"text":"you said no to perf: rm -rf target"},"at_ms":1791100031000,"kind":"approval","pos":31,"text":"you said no to perf: rm -rf target"},"ev":"entry","project":"acme-1a2b3c4d"},
   {"agent":"main","entry":{"at_ms":1791100032000,"from":"perf","kind":"from_agent","msg":7,"pos":32,"text":"the numbers are in","to":"docs"},"ev":"entry","project":"acme-1a2b3c4d"},
+  {"agent":"perf","entry":{"at_ms":1791100033000,"kind":"scheduled","pos":33,"scheduled":{"head":"main scheduled #48 for perf · every 2m · 6 times · next 14:22","id":48,"words":"check the build"},"text":"main scheduled #48 for perf · every 2m · 6 times · next 14:22"},"ev":"entry","project":"acme-1a2b3c4d"},
+  {"agent":"perf","entry":{"at_ms":1791100034000,"kind":"scheduled","pos":34,"scheduled":{"head":"scheduled #48 ended · stopped by you","id":48},"text":"scheduled #48 ended · stopped by you"},"ev":"entry","project":"acme-1a2b3c4d"},
   {"agent":"perf","ev":"typing","project":"acme-1a2b3c4d","text":"running the tests"},
   {"agent":"perf","ev":"typing","project":"acme-1a2b3c4d","text":""},
   {"ev":"confirm","id":3,"project":"acme-1a2b3c4d","text":"@perf is working: archive it anyway? (y/n)"},

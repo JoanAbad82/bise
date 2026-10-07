@@ -3,8 +3,9 @@
 //! call's pos; a message on several lines is one entry).
 
 use super::lines::{self, Hub, Obs, Rec};
+use super::scheduled;
 use super::words::{self, one_line, summary};
-use super::{Answered, ApprovalFold, Ctx, Entry, EntryCard, EntryKind, Landed, Line, Made, NotDelivered, Notice, PageRef, PrNews, ReportRef, Thinking, ToolItem, ToolKind, Tools};
+use super::{Answered, ApprovalFold, Ctx, Entry, EntryCard, EntryKind, Landed, Line, Made, NotDelivered, Notice, PageRef, PrNews, ReportRef, Scheduled, Thinking, ToolItem, ToolKind, Tools};
 use crate::context::FnContext;
 use crate::rows::question;
 
@@ -153,6 +154,12 @@ impl Fold<'_> {
         self.push(e);
     }
 
+    fn scheduled(&mut self, pos: u64, ms: u64, s: Scheduled) {
+        let mut e = Entry::new(pos, ms, EntryKind::Scheduled, s.head.clone());
+        e.scheduled = Some(s);
+        self.push(e);
+    }
+
     fn notice(&mut self, pos: u64, ms: u64, n: Notice) {
         let mut e = Entry::new(pos, ms, EntryKind::Notice, n.text.clone());
         e.notice = Some(n);
@@ -170,6 +177,13 @@ impl Fold<'_> {
             Hub::Context(raw) => {
                 if let (Some(i), Ok(c)) = (you, serde_json::from_str::<FnContext>(&raw)) {
                     self.out[i].context = Some(c);
+                }
+            }
+            // a scheduled task's run reads as its line; the note of a
+            // stop is for the agent only (site/m/timers, the TUI's rule)
+            Hub::MsgIn { from, body, .. } if lines::is_hub_sender(&from) && (scheduled::run_line(&body).is_some() || lines::is_stop_note(&body)) => {
+                if let Some(s) = scheduled::run_line(&body) {
+                    self.scheduled(pos, ms, s);
                 }
             }
             Hub::MsgIn { from, body, .. } => {
@@ -235,6 +249,13 @@ impl Fold<'_> {
                 let mut e = Entry::new(pos, ms, EntryKind::Answered, answer.clone());
                 e.answered = Some(Answered { agent, question, answer, why });
                 self.push(e);
+            }
+            // a task set or ended, read at the line's own time (a replay
+            // says the same) on the hub's clock
+            Hub::Scheduled(json) => {
+                if let Some(s) = scheduled::hub_line(&json, ms, self.ctx.offset) {
+                    self.scheduled(pos, ms, s);
+                }
             }
             // a gate's card answered, folded (approvals-design.md §9)
             Hub::Approval { how, who, what, note } => {

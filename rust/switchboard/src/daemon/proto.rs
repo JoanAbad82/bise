@@ -108,6 +108,12 @@ fn width(s: &str) -> usize {
     unicode_width::UnicodeWidthStr::width(s)
 }
 
+/// The hub's local UTC offset at `ms` (bise_home's one reader): a
+/// scheduled task's clock times in a thread (batch 3b, `thread::when`).
+fn offset(ms: u64) -> i32 {
+    bise_home::clock::offset_at(ms)
+}
+
 /// A provider's name for people from the hub's catalog (a missing key's
 /// notice in a thread, bise_proto's `words::no_key`).
 fn provider_name(setup: &Option<(Option<std::time::SystemTime>, bise_catalog::Setup)>, id: &str, key: &str) -> String {

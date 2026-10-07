@@ -447,11 +447,9 @@ pub fn parse_until(s: &str, now: u64) -> Result<u64, String> {
 
 // ---- local time (libc) ----
 
+/// The local time at `ms` (bise_home's one localtime reader).
 fn tm_of(ms: u64) -> Option<libc::tm> {
-    let t = (ms / 1000) as libc::time_t;
-    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
-    let r = unsafe { libc::localtime_r(&t, &mut tm) };
-    (!r.is_null()).then_some(tm)
+    bise_home::clock::local_tm(ms)
 }
 
 /// Days since 1970-01-01 of a civil date (the proleptic Gregorian

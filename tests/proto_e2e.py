@@ -276,6 +276,20 @@ def main():
         c.wait(lambda: any(i["title"] == "Notes" and not i["new"] for i in typed(c, "artifacts")[-1]["items"]), 20, "seen: not new")
         c.wait_idle("main", timeout=90)
 
+        # item 5 batch 3b: a scheduled task main sets is a typed scheduled
+        # entry in its thread, the TUI's words (site/m/timers), its id
+        c.send({"cmd": "subscribe", "project": project, "agent": "main"})
+        c.say('[[bash: sb every 10m "poll the build" --times 2]]')
+        c.wait(lambda: entries("scheduled"), 60, "the scheduled task as a typed entry")
+        s = entries("scheduled")[0]
+        check(s["scheduled"]["head"].startswith("main scheduled #") and " · every 10m · 2 times · next " in s["scheduled"]["head"]
+              and s["scheduled"]["words"] == "poll the build" and s["text"] == s["scheduled"]["head"] and s["scheduled"]["id"] > 0, "scheduled: %r" % s)
+        c.wait_idle("main", timeout=90)
+        c.say('[[bash: sb every --stop %d]]' % s["scheduled"]["id"])
+        c.wait(lambda: any("ended" in x["scheduled"]["head"] for x in entries("scheduled")), 60, "its end as a typed entry")
+        c.wait_idle("main", timeout=90)
+        c.send({"cmd": "unsubscribe", "project": project, "agent": "main"})
+
         # a typed-only connection (a window's): after its hello, only typed
         # events, never the hub's older ones (state, line, artifacts rows)
         w = e2e.Client(os.path.join(E.state, "hub.sock"))

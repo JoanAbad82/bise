@@ -64,7 +64,7 @@ fn the_tui_and_the_fold_say_the_same_words_for_the_same_lines() {
     let ls = lines();
     let numbered: Vec<bise_proto::thread::Line> = ls.iter().enumerate().map(|(i, l)| (i as u64 + 1, 0, l.to_string())).collect();
     let none = |_: &str| None;
-    let entries = fold(&numbered, &Ctx { open_cards: &[], page: &none, provider: &crate::models::provider_name, width: &unicode_width::UnicodeWidthStr::width });
+    let entries = fold(&numbered, &Ctx { open_cards: &[], page: &none, provider: &crate::models::provider_name, width: &unicode_width::UnicodeWidthStr::width, offset: &|_| 0 });
     let folded: Vec<(EntryKind, String, String)> = entries
         .iter()
         .filter(|e| e.kind != EntryKind::Tools)
@@ -96,7 +96,7 @@ fn the_tui_and_the_fold_agree_on_the_hubs_news() {
     ];
     let numbered: Vec<_> = ls.iter().enumerate().map(|(i, l)| (i as u64 + 1, 0, l.to_string())).collect();
     let none = |_: &str| None;
-    let entries = fold(&numbered, &Ctx { open_cards: &[], page: &none, provider: &crate::models::provider_name, width: &unicode_width::UnicodeWidthStr::width });
+    let entries = fold(&numbered, &Ctx { open_cards: &[], page: &none, provider: &crate::models::provider_name, width: &unicode_width::UnicodeWidthStr::width, offset: &|_| 0 });
     let evs: Vec<Ev> = ls.iter().filter_map(|l| parse_line(l)).collect();
     assert_eq!(entries.len(), evs.len(), "{entries:?}");
     for (e, ev) in entries.iter().zip(&evs) {
@@ -152,4 +152,42 @@ fn a_failed_turn_reads_through_the_shared_words() {
     assert!(matches!(parse_line("  obs: turn_done: failed: 500"), Some(Ev::Err(t)) if t == "turn failed: 500"));
     assert!(matches!(parse_line("  obs: provider_retry: 2/10 · 529 · retry in 4s"), Some(Ev::Warn(t)) if t == words::provider_retry("2/10 · 529 · retry in 4s")));
     assert!(matches!(parse_line("  obs: turn_done: failed: your ChatGPT sign-in expired. x"), Some(Ev::Warn(t)) if t == EXPIRED_TUI));
+}
+
+/// Item 5 batch 3b (architect m_11122): a scheduled task's lines (set,
+/// ended, a run) read the same in the TUI and in the fold, at the same
+/// moment and on the same clock; the stop note is the agent's in both.
+#[test]
+fn the_tui_and_the_fold_agree_on_scheduled_lines() {
+    let set = r#"{"ev":"set","id":48,"agent":"perf","by":"main","label":"every day 07:30","text":"check the build","next_ms":1790050000000,"until_ms":1790300000000}"#;
+    let end = r#"{"ev":"end","id":48,"agent":"perf","by":"perf","label":"every 2m","text":"check the build","ended_ms":1790000500000,"end":"times","times":6,"in":"main"}"#;
+    let ls: Vec<(u64, u64, String)> = vec![
+        (1, 1_790_000_000_000, format!("sb scheduled : {set}")),
+        (2, 1_790_000_100_000, "sb msg-in : switchboard m_9 : timer #48 (every 2m, 2/6, waited 4m for perf to finish, set by main): check\\n(stop it: sb every --stop 48)".into()),
+        (3, 1_790_000_200_000, "sb msg-in : switchboard m_10 : the user stopped timer #48 (check): don't set it again unless they ask".into()),
+        (4, 1_790_000_500_000, format!("sb scheduled : {end}")),
+    ];
+    let none = |_: &str| None;
+    let entries = fold(&ls, &Ctx { open_cards: &[], page: &none, provider: &crate::models::provider_name, width: &unicode_width::UnicodeWidthStr::width, offset: &crate::when::offset_at });
+    let tui: Vec<(String, String)> = ls
+        .iter()
+        .filter_map(|(_, at, l)| match bise_proto::thread::lines::read(l) {
+            bise_proto::thread::lines::Rec::Hub(bise_proto::thread::lines::Hub::Scheduled(json)) => crate::scheduled::hub_line_at(&json, *at),
+            _ => parse_line(l),
+        })
+        .map(|ev| match ev {
+            Ev::Scheduled { head, words, .. } => (head, words),
+            _ => panic!("not a ◷ line"),
+        })
+        .collect();
+    let folded: Vec<(String, String)> = entries
+        .iter()
+        .map(|e| {
+            assert_eq!(e.kind, EntryKind::Scheduled, "{e:?}");
+            let s = e.scheduled.clone().unwrap();
+            (s.head, s.words)
+        })
+        .collect();
+    assert_eq!(folded, tui);
+    assert_eq!(folded.len(), 3, "the stop note is the agent's: {folded:?}");
 }

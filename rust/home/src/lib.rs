@@ -34,6 +34,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+pub mod clock;
 pub mod env;
 pub mod hub_id;
 pub mod migrate;

@@ -63,6 +63,9 @@ pub enum EntryKind {
     /// his answer to an approval card or an item, folded (`approval`:
     /// yes or no, the sentence, the words under it)
     Approval,
+    /// a scheduled task set, ended, or one of its runs (`scheduled`: its
+    /// id, the line's head, the task's words)
+    Scheduled,
     /// a kind this reader doesn't know (a newer hub)
     #[serde(other)]
     Unknown,
@@ -180,6 +183,21 @@ pub struct ApprovalFold {
     pub text: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub note: String,
+}
+
+/// A `scheduled` entry (batch 3b): a task set or ended (the hub's
+/// `scheduled` line) or a run (bise's wake), as the TUI's ◷ line says it:
+/// `head` (`perf scheduled #48 · every 2m · 6 times · next 14:22`,
+/// `scheduled #48 · 2 of 6 · check the build`, `scheduled #48 ended ·
+/// stopped by you`), `words` the task's words under it ("" when ended).
+/// Times are read at the line's own time, so a replay says the same.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Scheduled {
+    pub id: u64,
+    pub head: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub words: String,
 }
 
 /// What a tool call did, for the counted summary.
@@ -306,6 +324,8 @@ pub struct Entry {
     pub answered: Option<Answered>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub approval: Option<ApprovalFold>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheduled: Option<Scheduled>,
 }
 
 impl Entry {
@@ -332,6 +352,7 @@ impl Entry {
             made: None,
             answered: None,
             approval: None,
+            scheduled: None,
         }
     }
 
@@ -352,6 +373,7 @@ impl Entry {
             (EntryKind::Artifact, self.made.is_some()),
             (EntryKind::Answered, self.answered.is_some()),
             (EntryKind::Approval, self.approval.is_some()),
+            (EntryKind::Scheduled, self.scheduled.is_some()),
         ];
         let thinking = match self.kind {
             EntryKind::Thinking => self.thinking.is_some(),
@@ -377,6 +399,9 @@ pub struct Ctx<'a> {
     /// a string's display width (unicode-width; this crate stays pure
     /// std): where an answer stays on its line (`words::answered_split`)
     pub width: &'a dyn Fn(&str) -> usize,
+    /// the local UTC offset (seconds east) at a moment: a scheduled
+    /// task's clock times (`thread::when`; this crate has no time zone)
+    pub offset: &'a dyn Fn(u64) -> i32,
 }
 
 /// A page of a thread: the newest `limit` entries of `lines`. `more`: the
@@ -397,5 +422,7 @@ pub fn page(lines: &[Line], ctx: &Ctx, limit: usize) -> (Vec<Entry>, Option<Pos>
 
 pub mod fold;
 pub mod lines;
+pub mod scheduled;
+pub mod when;
 pub mod words;
 pub use fold::fold;

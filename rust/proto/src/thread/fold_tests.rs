@@ -26,7 +26,7 @@ fn lines() -> Vec<Line> {
 }
 
 fn ctx_with<'a>(open: &'a [u64], page: &'a dyn Fn(&str) -> Option<PageRef>) -> Ctx<'a> {
-    Ctx { open_cards: open, page, provider: &|id: &str, key: &str| if id.is_empty() { key.to_string() } else { id.to_uppercase() }, width: &|s: &str| s.chars().count() }
+    Ctx { open_cards: open, page, provider: &|id: &str, key: &str| if id.is_empty() { key.to_string() } else { id.to_uppercase() }, width: &|s: &str| s.chars().count(), offset: &|_| 0 }
 }
 
 #[test]
@@ -243,6 +243,36 @@ fn the_hubs_news_lines_are_entries_of_their_kind() {
     assert_eq!((ap(7).ok, ap(7).text.as_str()), (true, "you allowed api: cargo test"));
     assert_eq!((ap(8).text.as_str(), ap(8).note.as_str()), ("you answered perf: both", ""));
     assert_eq!((e[9].from.as_deref(), e[9].to.as_deref(), e[9].msg), (Some("perf"), Some("docs"), Some(7)));
+}
+
+/// batch 3b (site/m/timers): a task set and ended (the hub's
+/// `scheduled` lines) and a run (bise's wake in the agent's own feed) are
+/// `scheduled` entries with the TUI's words, read at the line's own time;
+/// the stop note stays the agent's; main's copy of another agent's run
+/// is not shown (its ◷ lines say enough).
+#[test]
+fn scheduled_lines_are_scheduled_entries() {
+    let set = r#"{"ev":"set","id":48,"agent":"perf","by":"main","label":"every 2m","text":"check the build","next_ms":1790000120000,"times":6}"#;
+    let end = r#"{"ev":"end","id":48,"agent":"perf","by":"main","label":"every 2m","text":"check the build","ended_ms":1790000500000,"end":"stopped","stopped_by":"user","times":6}"#;
+    let ls = vec![
+        (1, 1_790_000_000_000, format!("sb scheduled : {set}")),
+        (2, 1_790_000_120_000, "sb msg-in : switchboard m_9 : timer #48 (every 2m, 1/6, set by main): check the build\\n(stop it: sb every --stop 48)".to_string()),
+        (3, 1_790_000_200_000, "sb msg-in : switchboard m_10 : the user stopped timer #48 (check the build): don't set it again unless they ask".to_string()),
+        (4, 1_790_000_500_000, format!("sb scheduled : {end}")),
+        (5, 1_790_000_600_000, "sb msg : switchboard → docs m_11 : timer #7 (every 5m, set by docs): poll".to_string()),
+    ];
+    let none = |_: &str| None;
+    let e = fold(&ls, &ctx_with(&[], &none));
+    assert!(e.iter().all(|x| x.kind == EntryKind::Scheduled && x.payload_matches_kind()), "{e:?}");
+    let s: Vec<_> = e.iter().map(|x| x.scheduled.clone().unwrap()).collect();
+    assert_eq!(s.len(), 3, "{s:?}");
+    assert_eq!((s[0].id, s[0].words.as_str()), (48, "check the build"));
+    assert!(s[0].head.starts_with("main scheduled #48 for perf · every 2m · 6 times · next "), "{}", s[0].head);
+    assert_eq!(s[1].head, "scheduled #48 · 1 of 6 · check the build");
+    assert_eq!((s[2].head.as_str(), s[2].words.as_str()), ("scheduled #48 ended · stopped by you", ""));
+    assert_eq!(e[0].text, s[0].head, "the text is the line's head");
+    // a replay reads the same words: `now` is the line's own time
+    assert_eq!(fold(&ls, &ctx_with(&[], &none)), e);
 }
 
 #[test]
