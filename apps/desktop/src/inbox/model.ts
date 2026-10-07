@@ -86,7 +86,9 @@ export function step(s: InboxState, list: readonly Card[], key: Key, text: strin
       // ↑↓ belong to his words when there are some; ctrl+p/n never do
       if (!c || (!empty && (key.k === 'up' || key.k === 'down'))) return { s };
       const i = list.indexOf(c) + (key.k === 'down' || key.k === 'next' ? 1 : -1);
-      const to = list[Math.max(0, Math.min(list.length - 1, i))];
+      // the TUI's step(): ↑↓ stop at the ends, ctrl+n / ctrl+p wrap around (sb/cards.rs:849)
+      const wrap = key.k === 'next' || key.k === 'prev';
+      const to = list[wrap ? (i + list.length) % list.length : Math.max(0, Math.min(list.length - 1, i))];
       return { s: { ...s, cur: to ? cardKey(to) : s.cur, hl: to === c ? s.hl : null } };
     }
     case 'left':

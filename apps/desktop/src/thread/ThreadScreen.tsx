@@ -31,6 +31,7 @@ import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
 import { composerWords, emptyEnter } from './head';
+import { SignInLine, useThreadSignIn } from './signin';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
 import { entryKey, pendingKey, posOfKey } from './entry';
@@ -209,7 +210,21 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     keep.setView(plainKey, k, true);
   };
   const answering = docked !== null && takesWords(docked) && plainFor !== dockedKey ? docked : null;
+  // R15: an expired sign-in stopped this agent and his browser is on it: c on the empty composer
+  // copies the link, esc cancels (the TUI's resign.rs keys)
+  const cardsHere = useCards(project);
+  const signIn = useThreadSignIn(emptyEnter(cardsHere, agent) !== null);
   const onKeyDownCapture = (e: KeyboardEvent) => {
+    const field = e.target instanceof HTMLElement ? e.target.closest('[data-testid="composer.field"]') : null;
+    if (signIn.on && field !== null && field.textContent.trim() === '' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (e.key === 'Escape' || e.key === 'c') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key === 'c') signIn.copy();
+        else signIn.cancel();
+        return;
+      }
+    }
     if (e.key !== 'Escape' || answering === null || dockedKey === null) return;
     if (!(e.target instanceof HTMLElement) || e.target.closest('[data-testid="composer.field"]') === null) return;
     e.preventDefault();
@@ -328,6 +343,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         {stopping && <Marker>stopping {agent}…</Marker>}
         {fresh && <StartingLine a={me} />}
         {!bise && agent !== MAIN && !fresh && <LiveLine a={me} />}
+        {signIn.on && <SignInLine copied={signIn.copied} />}
         <TypingLine text={typing} />
         {/* W7/K24: the project's open items over the composer's divider (amb-home f44d082e) */}
         {/* its hub refused this core: the hub's words and a retry, over the composer (lead m_11347) */}

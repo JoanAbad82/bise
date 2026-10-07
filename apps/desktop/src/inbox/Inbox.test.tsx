@@ -201,6 +201,10 @@ describe('Inbox', () => {
     expect(keyOf(k('n', { ctrlKey: true }), 'x')).toEqual({ k: 'next' });
     expect(keyOf(k('p', { ctrlKey: true }), '')).toEqual({ k: 'prev' });
     expect(keyOf(k('n', { ctrlKey: true, shiftKey: true }), '')).toBeNull();
+    // R19: ctrl+arrows are the arrows (the TUI's arrow_mods)
+    expect(keyOf(k('ArrowDown', { ctrlKey: true }), '')).toEqual({ k: 'down' });
+    expect(keyOf(k('ArrowLeft', { ctrlKey: true }), '')).toEqual({ k: 'left' });
+    expect(keyOf(k('ArrowDown', { altKey: true }), '')).toBeNull();
   });
 
   it('InboxCard alone: a card with its options and the acts it is given, no list', () => {

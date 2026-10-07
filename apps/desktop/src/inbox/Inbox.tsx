@@ -258,7 +258,9 @@ export function keyOf(e: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'al
   // ctrl+n / ctrl+p walk the items as the TUI's card view (bar I3), words or not
   if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'n') return { k: 'next' };
   if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'p') return { k: 'prev' };
-  if (e.metaKey || e.ctrlKey || e.altKey) return null;
+  // R19: the arrows as the TUI's card view (sb/cards.rs:1223): plain or with ctrl, ↑↓ the items, ←→ the options
+  const arrow = e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight';
+  if (e.metaKey || e.altKey || (e.ctrlKey && !arrow)) return null;
   if (e.key === 'Enter' && !e.shiftKey) return { k: 'enter' };
   if (!empty) return null;
   switch (e.key) {

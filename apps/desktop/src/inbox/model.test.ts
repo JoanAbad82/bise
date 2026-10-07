@@ -96,6 +96,18 @@ describe('keys', () => {
     expect(run([{ k: 'down' }], 'a draft').s.cur).toBeNull();
   });
 
+  it("R19: ctrl+n / ctrl+p wrap around as the TUI's step(); ↑↓ stop at the ends", () => {
+    const v = visible(list, START);
+    const a = v[0];
+    const z = v.at(-1);
+    if (a === undefined || z === undefined) throw new Error('the fixture has items');
+    const first = cardKey(a);
+    const last = cardKey(z);
+    expect(run(Array.from({ length: v.length + 2 }, () => ({ k: 'down' as const }))).s.cur).toBe(last);
+    expect(run(Array.from({ length: v.length }, () => ({ k: 'next' as const }))).s.cur).toBe(first);
+    expect(run([{ k: 'prev' }]).s.cur).toBe(last);
+  });
+
   it('↑↓ move between items and stop at the ends; done takes ⏎ with no words', () => {
     const { s, acts } = run([{ k: 'down' }, { k: 'down' }, { k: 'down' }, { k: 'enter' }]);
     expect(acts).toEqual([{ t: 'answer', project: 'acme', card: 3, reply: '' }]);
