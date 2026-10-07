@@ -66,14 +66,21 @@ test("agents/settings: rename, model and reasoning of an agent, both ways betwee
     await page.locator(T.rename('speed')).fill('p99');
     await page.locator(T.rename('speed')).press('Enter');
     try {
-      // (soft: Tune closes on the send, onRenamed -> setTuning(false), before the hub answers, so
-      // a refused rename's words had nowhere to show: filed to amb-win via ambient-lead)
-      await expect.soft(page.locator(T.error('speed')), "the hub's refusal shows in place, in the TUI's words").toContainText('invalid or taken name', { timeout: 5000 });
+      // amb-win 16de4569: the field stays, says 'renaming…', then the hub's words, still editable
+      await expect(page.locator(T.error('speed')), "the hub's refusal shows in place").toContainText('invalid or taken name', { timeout: 5000 });
+      await expect(page.locator(T.rename('speed')), 'the field stays, editable').toBeEditable();
+      await expect(page.locator(`[data-testid="agents.rename.speed.wait"]`), "'renaming…' is gone once the hub answered").toHaveCount(0);
     } finally {
       await page.screenshot({ path: test.info().outputPath('rename-refused.png') });
     }
-    await sleep(1000);
+    const said = (await page.locator(T.error('speed')).innerText()).trim();
     expect(await agent('speed'), 'the refused rename changed nothing').toBeDefined();
+    // the TUI asked the same is refused with the same words
+    tuiSay(t, '/rename speed p99');
+    await expect.poll(() => flat(t?.screen() ?? ''), { timeout: 5000, message: "the TUI's /rename speed p99 is refused" }).toContain('invalid or taken name: p99');
+    expect(said, "the window's words are the TUI's").toContain('invalid or taken name: p99');
+    test.info().annotations.push({ type: 'refusal', description: said });
+    await page.locator(T.rename('speed')).press('Escape');
     if (await page.locator(T.tune('speed')).isVisible()) await page.locator(T.more('speed')).click();
 
     // main: no rename in the window; the TUI's /rename main is refused
