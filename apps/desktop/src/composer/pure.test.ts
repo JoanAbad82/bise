@@ -8,7 +8,6 @@ import DESKTOP_EMOJI from './emoji.tsv?raw';
 import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, TIP_EVERY_MS } from './keybar';
 import { noVisionLine } from './message';
 import { codeRuns, colorLines, proseRuns } from './mdcolor';
-import { loadRecent, picked, recentFirst, RECENT_MAX } from './recent';
 import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Segment } from './message';
 import { enqueue, load, popNewest, remember, save, takeOldest, HISTORY_MAX, type Store } from './drafts';
 import { argRows, commandLine, commandRows, completion, enterSends, move, type Row } from './pick';
@@ -210,7 +209,7 @@ describe('live markdown keys (mdlive.rs)', () => {
   });
 });
 
-describe('@ folders and recent picks (files.rs)', () => {
+describe('@ folders (files.rs)', () => {
   it('one folder up, and the word that browses it', () => {
     expect(parentQuery('rust/tui/')).toBe('rust');
     expect(parentQuery('rust/')).toBe('');
@@ -221,19 +220,6 @@ describe('@ folders and recent picks (files.rs)', () => {
     expect(browseText('docs/my notes')).toBe('@"docs/my notes/');
     expect(browseText('')).toBe('@');
     expect(browseText('/')).toBe('@/');
-  });
-  it('a picked file ranks first in its tier, never over a name match', () => {
-    const s = memStore();
-    picked(s, 'rust/tui/src/main.rs');
-    picked(s, 'docs/at-mentions.md');
-    expect(loadRecent(s)).toEqual(['docs/at-mentions.md', 'rust/tui/src/main.rs']);
-    const f = (path: string) => ({ path, dir: false });
-    const core = [f('hub/main.bend'), f('rust/tui/src/main.rs'), f('docs/x.md')];
-    expect(recentFirst(core, 'main', loadRecent(s)).map((x) => x.path)).toEqual(['rust/tui/src/main.rs', 'hub/main.bend', 'docs/x.md']);
-    const m = [f('rust/tui/src/sb/mention.rs'), f('docs/at-mentions.md')];
-    expect(recentFirst(m, 'mention', loadRecent(s))[0]?.path).toBe('rust/tui/src/sb/mention.rs');
-    for (let i = 0; i < RECENT_MAX + 5; i += 1) picked(s, `f${i}`);
-    expect(loadRecent(s)).toHaveLength(RECENT_MAX);
   });
 });
 

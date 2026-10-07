@@ -23,7 +23,6 @@ import { entryOf, entrySegments } from '../entry';
 import { agentRows, argRows, artifactRows, commandLine, commandRows, completion, emojiRows, enterSends, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from '../pick';
 import { isImagePath, type ComposerSources, type PickFile } from '../sources';
 import { argAt, browseText, parentQuery, triggerAt, type Trigger } from '../tokens';
-import { loadRecent, picked, recentFirst } from '../recent';
 import { emojiToken, typedEmoji } from '../emoji';
 import { dictated, HOLD_MS } from '../dictate';
 import { DOUBLE_CTRL_R_MS } from '@/voicemode/model';
@@ -273,7 +272,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
     if (trigger === null) return [];
     const all =
       trigger.kind === 'at'
-        ? [...agentRows(trigger, p.sources.agents), ...artifactRows(trigger, p.sources.artifacts ?? [], openedAt), ...(files.key === tkey ? fileRows(recentFirst(files.items, trigger.query, loadRecent(p.store))) : [])]
+        ? [...agentRows(trigger, p.sources.agents), ...artifactRows(trigger, p.sources.artifacts ?? [], openedAt), ...(files.key === tkey ? fileRows(files.items) : [])]
         : trigger.kind === 'skill'
           ? skillRows(trigger, p.sources.skills)
           : trigger.kind === 'arg'
@@ -282,7 +281,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
               ? emojiRows(trigger)
               : commandRows(trigger, p.sources.commands);
     return all.slice(0, MAX_ROWS);
-  }, [trigger, tkey, files, p.sources, p.store, openedAt]);
+  }, [trigger, tkey, files, p.sources, openedAt]);
 
   const open = trigger !== null && rows.length > 0 && dismissed !== `${trigger.kind}:${trigger.start}`;
   // after ← / ⌫ up a folder the keyboard's row is the folder he came from (→ goes back in), as a
@@ -365,7 +364,7 @@ export function PmField(p: PmFieldProps): JSX.Element {
       if (now !== null) dispatch(insertChip(now, { kind: 'artifact', n: nextChipNumber(segmentsOf(now.doc)), id: pick.id, title: pick.title, url: pick.url }));
       return;
     }
-    if (pick.path !== undefined && !pick.browse) picked(props.current.store, pick.path); // B8
+    if (pick.path !== undefined && !pick.browse) props.current.sources.filePicked?.(pick.path); // B8/R14: the core's memory
     replaceBefore(word, pick.text);
   };
 

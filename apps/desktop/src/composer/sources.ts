@@ -76,6 +76,9 @@ export interface ComposerSources {
   readonly artifacts?: readonly PickArtifact[];
   /** The workspace's files for an `@` query, ranked by the core (files.rs's ranking). */
   readonly files: (query: string) => Promise<readonly PickFile[]>;
+  /** He picked this file in the `@` list (never a folder he browsed): the core remembers it per
+   *  project and ranks it first in its tier on the next `files` answer (B8/R14, files::picked). */
+  readonly filePicked?: (path: string) => void;
   /** A pasted or dropped image saved to a file the core can send; null when it can't be. */
   readonly saveImage: (file: File) => Promise<SavedImage | null>;
   /** The model in view reads no images (its name, for the refusal line); unset: it does or we

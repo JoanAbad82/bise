@@ -55,6 +55,10 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
       skills: skills ?? NO_SOURCES.skills,
       commands: commands ?? NO_SOURCES.commands,
       files: files ?? NO_SOURCES.files,
+      // B8/R14: the core keeps his picks per project (ranks them first in their tier)
+      filePicked: (path) => {
+        store.filePicked(project, path);
+      },
       saveImage: saveImage ?? NO_SOURCES.saveImage,
       ...(noVision === undefined ? {} : { noVision }),
       dictate,

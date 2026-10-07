@@ -537,6 +537,7 @@ pub(crate) fn on_paste(app: &mut App, text: &str) {
     if app.term.paste(text) {
         return;
     }
+<<<<<<< Updated upstream
     if sb::palette::on_paste(app, text) {
         return;
     }
@@ -545,6 +546,12 @@ pub(crate) fn on_paste(app: &mut App, text: &str) {
     }
     // the paste lands in the composer: it has the keys again
     crate::diffview::give_back(app);
+||||||| Stash base
+=======
+    if crate::find::on_paste(app, text) {
+        return;
+    }
+>>>>>>> Stashed changes
     // normalize CRLF/CR so a terminal paste behaves like the
     // typed newline, then insert at the cursor
     let text = text.replace("\r\n", "\n").replace('\r', "\n");
@@ -666,6 +673,7 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
     if voice_key(app, k, voice::resolve_job) {
         return false;
     }
+<<<<<<< Updated upstream
     // cmd+k / ctrl+s: the agent palette takes the keys while it is open
     // (BISE-265)
     if sb::palette::on_key(app, k) {
@@ -675,6 +683,13 @@ pub(crate) fn on_key(app: &mut App, k: &crossterm::event::KeyEvent) -> bool {
     if crate::find_bar::on_key(app, k) {
         return false;
     }
+||||||| Stash base
+=======
+    // ctrl+f: the find field takes the keys while it is open (BISE-237)
+    if crate::find::on_key(app, k) {
+        return false;
+    }
+>>>>>>> Stashed changes
     if app.popup_dismissed.as_deref() != Some(app.ed.text.as_str()) {
         app.popup_dismissed = None;
     }

@@ -34,6 +34,7 @@ pub(crate) enum Mode {
     DropAsk,
     /// a yes / no question in the status row
     Confirm,
+<<<<<<< Updated upstream
     /// the card view (ctrl+1-9, a click on an inbox row): the composer
     /// answers the card
     Card,
@@ -41,6 +42,15 @@ pub(crate) enum Mode {
     Find,
     /// cmd+k / ctrl+s: the agent palette (BISE-265)
     Palette,
+||||||| Stash base
+    /// the card full screen
+    CardFull,
+=======
+    /// the card full screen
+    CardFull,
+    /// ctrl+f: the find field (BISE-237)
+    Find,
+>>>>>>> Stashed changes
     /// an agent is selected in the panel
     Selected,
     /// in an archived agent
@@ -103,6 +113,7 @@ impl Mode {
             Mode::Quote => &[ASK, ("tab", "quote"), ("cmd+c", "copy"), ("esc", "drop")],
             Mode::DropAsk => &[("y", "archive"), ("n or esc", "keep")],
             Mode::Confirm => &[("y", "yes"), ("n", "no"), ("esc", "cancel")],
+<<<<<<< Updated upstream
             Mode::Find => &[("⏎", "older"), ("shift+⏎", "newer"), ("esc", "close")],
             Mode::Palette => &[("↑↓", "choose"), ("⏎", "open"), ("esc", "close")],
             // the view's own keys come from `sb::card_key_pairs` (`1-2 pick`…)
@@ -110,6 +121,16 @@ impl Mode {
             Mode::Selected => &[("⏎", "enter"), ("space", "preview"), ("D", "archive"), ("esc", "close")],
             // the placeholder says /restore (designer: once)
             Mode::Archived => &[BACK],
+||||||| Stash base
+            Mode::CardFull => &[("alt+r", "answer"), ("pgup/pgdn", "scroll"), ("ctrl+f", "back")],
+            Mode::Selected => &[("⏎", "enter"), ("space", "preview"), ("D", "drop"), ("esc", "close")],
+            Mode::Archived => &[BACK, ("/restore", "brings it back")],
+=======
+            Mode::Find => &[("⏎", "older"), ("↑↓", "move"), ("esc", "close")],
+            Mode::CardFull => &[("alt+r", "answer"), ("pgup/pgdn", "scroll"), ("ctrl+f", "back")],
+            Mode::Selected => &[("⏎", "enter"), ("space", "preview"), ("D", "drop"), ("esc", "close")],
+            Mode::Archived => &[BACK, ("/restore", "brings it back")],
+>>>>>>> Stashed changes
             Mode::Steer => &[("tab", "queue"), ("⏎", "steer"), ("ctrl+c", "interrupt")],
             Mode::Default => &REST,
         }
@@ -136,10 +157,16 @@ pub(crate) fn mode(app: &App) -> Mode {
         Mode::Recording
     } else if app.voice.state() == voice::VoiceState::Flushing {
         Mode::Transcribing
+<<<<<<< Updated upstream
     } else if crate::sb::palette::is_open(app) {
         Mode::Palette
     } else if app.find.is_some() {
         Mode::Find
+||||||| Stash base
+=======
+    } else if app.find.is_some() {
+        Mode::Find
+>>>>>>> Stashed changes
     } else if commands::popup_open(app) && files::token(&app.ed.text, app.ed.cursor).is_some() {
         Mode::FilePopup
     } else if (app.feed_sel.is_some() && app.mouse.drag.is_none()) || crate::diffquote::selected(app) {

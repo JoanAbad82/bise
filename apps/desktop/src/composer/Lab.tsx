@@ -20,16 +20,29 @@ const FILES: readonly PickFile[] = [
   { path: 'shots/screen.png', dir: false },
 ];
 
+/** The files he picked, newest first: the fake core's pick memory (the real one is the core's,
+ *  file_picked, R14). */
+const labPicked: string[] = [];
+
 /** The fake core's file search, files.rs's shape: `src/` lists that folder's children, `src/ma`
- *  searches inside it, a bare word searches every name (prefix first). */
+ *  searches inside it, a bare word searches every name (prefix first); a picked file goes first
+ *  in its tier (prefix, then the rest), never above a better one. */
 function labFiles(q: string): readonly PickFile[] {
   const cut = q.lastIndexOf('/');
   const dir = cut < 0 ? '' : q.slice(0, cut + 1);
   const name = q.slice(cut + 1);
   const parent = (f: PickFile): string => f.path.slice(0, f.path.lastIndexOf('/') + 1);
+  const base = (f: PickFile): string => f.path.split('/').at(-1) ?? f.path;
   const inDir = dir === '' ? FILES : FILES.filter((f) => f.path.startsWith(dir) && f.path !== dir.slice(0, -1));
   const pool = name === '' ? inDir.filter((f) => parent(f) === dir) : inDir;
-  return prefixFirst(pool, name, (f) => f.path.split('/').at(-1) ?? f.path).slice(0, 20);
+  const tier = (f: PickFile): number => (base(f).toLowerCase().startsWith(name.toLowerCase()) ? 0 : 1);
+  const mem = (f: PickFile): number => (labPicked.includes(f.path) ? labPicked.indexOf(f.path) : labPicked.length);
+  const ranked = prefixFirst(pool, name, base);
+  return ranked
+    .map((f, i) => ({ f, i }))
+    .sort((a, b) => tier(a.f) - tier(b.f) || mem(a.f) - mem(b.f) || a.i - b.i)
+    .map((x) => x.f)
+    .slice(0, 20);
 }
 
 /** The commands of bar 2.1 (with the /shortcuts alias /keys); the ones without a screen or a cmd yet are greyed. */
@@ -183,6 +196,9 @@ const SOURCES: ComposerSources = {
     return prefixFirst(lists[kind] ?? [], q, (c) => c.value);
   },
   files: (q) => Promise.resolve(labFiles(q.replace(/^"/u, ''))),
+  filePicked: (path) => {
+    labPicked.splice(0, labPicked.length, path, ...labPicked.filter((p) => p !== path));
+  },
   saveImage: (f) => Promise.resolve({ path: `/tmp/bise-lab/${f.name || 'pasted.png'}`, name: f.name || 'pasted.png' }),
   artifacts: [
     { id: 'perf-notes', title: 'Perf notes', kind: 'page', agent: 'perf', url: 'http://127.0.0.1:47123/p/perf-notes', atMs: 1_791_100_014_000 },

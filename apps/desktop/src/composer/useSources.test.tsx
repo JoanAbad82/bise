@@ -83,3 +83,23 @@ describe("the TUI's lists (qa-type b37dc4c1 reds 1 and 2)", () => {
     expect(inP99.choices?.('agent', '').map((c) => c.value), 'main is never an agent argument').toEqual(['p99', 'alerts']);
   });
 });
+
+describe('R14: a picked file goes to the core, which keeps the memory', () => {
+  it('filePicked sends file_picked with the project and the path as given', () => {
+    const sent: unknown[] = [];
+    const port: CorePort = {
+      send: (c) => {
+        sent.push(c);
+      },
+      onEvent: () => () => undefined,
+      onState: () => () => undefined,
+      state: () => Promise.resolve('up'),
+    };
+    const store = new Store(port);
+    store.setCore('up');
+    const wrapper = ({ children }: { children: ReactNode }) => <StoreProvider store={store}>{children}</StoreProvider>;
+    const s = renderHook(() => useComposerSources(P, {}, 'main'), { wrapper }).result.current;
+    s.filePicked?.('src/b.rs');
+    expect(sent).toContainEqual({ cmd: 'file_picked', project: P, path: 'src/b.rs' });
+  });
+});

@@ -1,7 +1,7 @@
 // thread/composer-sources · his bug 1 (tui-parity, bar 2.1/2.2/2.3; amb-core's C/A/B 40f14a12, lead
 // m_10766): /, @ and $ in the REAL thread's composer list nothing outside the lab. Passes when the
 // thread's composer asks the core for its lists and shows them: '/' the core's commands in the TUI's
-// order (a window command with no screen here greyed 'not yet', every hub one ready), a window
+// order (a window command with no screen here greyed 'not yet', every hub one ready; /scheduled has its screen since R4), a window
 // command runs here (/inbox opens the inbox, /help the key list), a hub line goes out as he typed
 // it (HubCmd slash, architect m_11011), '$' the project's skills, '@' the files the core ranks for that query (its rid).
 // bise main's thread on the scripted core (FakeCore); the core's answers are sent by the check,
@@ -65,7 +65,7 @@ test("thread/composer-sources: the real thread's /, @ and $ list the core's comm
     expect(order.every((i) => i >= 0), `every core command is listed: ${labels.join(' | ')}`).toBe(true);
     expect([...order].sort((a, b) => a - b), "in the TUI's order").toEqual(order);
     await expect(page.getByTestId('composer.pick.cmd.compact'), 'every hub command runs (as typed)').not.toContainText('not yet');
-    await expect(page.getByTestId('composer.pick.cmd.scheduled'), 'a window command with no screen here: greyed').toContainText('not yet');
+    await expect(page.getByTestId('composer.pick.cmd.scheduled'), '/scheduled opens its screen now (R4)').not.toContainText('not yet');
     await expect(page.getByTestId('composer.pick.cmd.inbox')).not.toContainText('not yet');
     await page.screenshot({ path: test.info().outputPath('slash.png') });
 

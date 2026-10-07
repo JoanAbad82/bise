@@ -348,10 +348,22 @@ const STEPS: [Step; 6] = {
     ]
 };
 
+<<<<<<< Updated upstream
 /// The divider's label: ` you → name` and the tail (model, effort, mode,
 /// ψ); while the agent works, a dim ` · ` and the gust, then, ctrl held,
 /// ` working · 42s` dim (as much of it as `step` keeps).
 fn label(name: &str, tail: &[Span<'static>], working: Option<(&Working, Step)>) -> Vec<Span<'static>> {
+||||||| Stash base
+/// The divider's label: ` you → name `; while the agent works, the gust
+/// 1 space after the name, then `working · 42s` dim (as much of it as
+/// `step` keeps).
+fn label(name: &str, tail: &[Span<'static>], working: Option<(&Working, Step)>) -> Vec<Span<'static>> {
+=======
+/// The divider's label: ` you → name `; while the agent works, the gust
+/// 1 space after the name, then `working · 42s` dim (as much of it as
+/// `step` keeps).
+fn label(name: &str, find: bool, tail: &[Span<'static>], working: Option<(&Working, Step)>) -> Vec<Span<'static>> {
+>>>>>>> Stashed changes
     let arrow = if theme::ascii_mode() { "->" } else { "→" };
     let name = match working.and_then(|(_, s)| s.name_cut) {
         Some(n) => fit(vec![Span::raw(name.to_string())], n).into_iter().map(|s| s.content.into_owned()).collect(),
@@ -359,7 +371,8 @@ fn label(name: &str, tail: &[Span<'static>], working: Option<(&Working, Step)>) 
     };
     let mut out = vec![
         Span::raw(" "),
-        Span::styled(format!("you {} ", arrow), Style::default().fg(dim())),
+        // the find field is open (BISE-237): `find in main`
+        Span::styled(if find { "find in ".to_string() } else { format!("you {} ", arrow) }, Style::default().fg(dim())),
         Span::styled(name, Style::default().fg(accent())),
     ];
     out.extend(tail.iter().cloned());
@@ -384,20 +397,85 @@ fn width_of(spans: &[Span]) -> u16 {
 
 /// The columns the divider leaves for its right side on a screen `width`
 /// wide: from 1 rule cell and a space after the label to the state's end.
+<<<<<<< Updated upstream
 /// While the agent works, the label keeps its 5-cell gust, without the
 /// held words. With the key bar in the divider, the label keeps the
 /// short tail (`· opus·hi · ψ`).
 pub(crate) fn divider_room(width: u16, cols: Cols, name: &str, who: &Who, working: Option<&Working>) -> u16 {
     let tail = who.short_tail();
     let label_w = width_of(&label(name, &tail, working.map(|w| (w, STEPS[1]))));
+||||||| Stash base
+/// While the agent works, the label is the whole one (its first step).
+/// With the key bar in the divider, the label keeps the short tail
+/// (`· opus·hi · ψ`).
+pub(crate) fn divider_room(width: u16, cols: Cols, name: &str, who: &Who, working: Option<&Working>) -> u16 {
+    let tails = who.tails();
+    let tail = tails.get(2).or(tails.last()).cloned().unwrap_or_default();
+    let label_w = width_of(&label(name, &tail, working.map(|w| (w, STEPS[0]))));
+=======
+/// While the agent works, the label is the whole one (its first step).
+/// With the key bar in the divider, the label keeps the short tail
+/// (`· opus·hi · ψ`).
+pub(crate) fn divider_room(width: u16, cols: Cols, name: &str, who: &Who, working: Option<&Working>, find: bool) -> u16 {
+    let tails = who.tails();
+    let tail = tails.get(2).or(tails.last()).cloned().unwrap_or_default();
+    let label_w = width_of(&label(name, find, &tail, working.map(|w| (w, STEPS[0]))));
+>>>>>>> Stashed changes
     let start = cols.margin - 1 + label_w + 2;
     let end = width.saturating_sub(cols.margin);
     end.saturating_sub(start)
 }
 
+<<<<<<< Updated upstream
 /// The divider's rule on row `y` (its joins when framed); false when
 /// there is no room.
 fn divider_rule(buf: &mut Buffer, area: Rect, cols: Cols, y: u16) -> bool {
+||||||| Stash base
+/// The divider on row `y` (book §8): framed, a rule joining the frame
+/// (`├ … ┤`, `┴` under the panel's rule); bare, a plain rule. The label
+/// ` you → name ` from the margin, the `state` (cut to fit) ending 1
+/// column before the right margin's space, 3 columns at least between
+/// them. While the agent works, the label says it (` you → name ≈∿~·
+/// working · 42s `) and keeps its gust: short on room, the state goes
+/// whole first, then the label shrinks step by step ([`STEPS`]). The
+/// state's rect is returned (a click on `↓ back to the bottom` jumps to
+/// the tail), then the label's (zen keeps it, BISE-121).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn draw_divider(
+    buf: &mut Buffer,
+    area: Rect,
+    cols: Cols,
+    y: u16,
+    name: &str,
+    who: &Who,
+    working: Option<&Working>,
+    state: Vec<Span<'static>>,
+) -> (Rect, Rect) {
+    let area = area.intersection(buf.area);
+=======
+/// The divider on row `y` (book §8): framed, a rule joining the frame
+/// (`├ … ┤`, `┴` under the panel's rule); bare, a plain rule. The label
+/// ` you → name ` from the margin, the `state` (cut to fit) ending 1
+/// column before the right margin's space, 3 columns at least between
+/// them. While the agent works, the label says it (` you → name ≈∿~·
+/// working · 42s `) and keeps its gust: short on room, the state goes
+/// whole first, then the label shrinks step by step ([`STEPS`]). The
+/// state's rect is returned (a click on `↓ back to the bottom` jumps to
+/// the tail), then the label's (zen keeps it, BISE-121).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn draw_divider(
+    buf: &mut Buffer,
+    area: Rect,
+    cols: Cols,
+    y: u16,
+    name: &str,
+    who: &Who,
+    working: Option<&Working>,
+    state: Vec<Span<'static>>,
+    find: bool,
+) -> (Rect, Rect) {
+    let area = area.intersection(buf.area);
+>>>>>>> Stashed changes
     if area.width < 4 || y < area.y || y >= area.bottom() {
         return false;
     }
@@ -476,6 +554,7 @@ pub(crate) fn draw_divider(
     };
     let states: Vec<Vec<Span<'static>>> = states.into_iter().filter(|s| width_of(s) > 0).collect();
     let tails = who.tails();
+<<<<<<< Updated upstream
     let pick = ladder(states.len(), tails.len())
         .into_iter()
         .map(|(si, ti, step)| {
@@ -487,7 +566,17 @@ pub(crate) fn draw_divider(
     let (label, state) = match pick {
         Some((label, state, _)) => (label, state),
         // nothing fits: the smallest label, the state cut to what is left
+||||||| Stash base
+    let first = working.map(|w| (w, STEPS[0]));
+    let tail = tails.iter().find(|t| fits(&label(name, t, first), true)).or(tails.last()).cloned().unwrap_or_default();
+    let (label, state) = match working {
+=======
+    let first = working.map(|w| (w, STEPS[0]));
+    let tail = tails.iter().find(|t| fits(&label(name, find, t, first), true)).or(tails.last()).cloned().unwrap_or_default();
+    let (label, state) = match working {
+>>>>>>> Stashed changes
         None => {
+<<<<<<< Updated upstream
             let tail = tails.last().cloned().unwrap_or_default();
             let label = label(name, &tail, working.map(|w| (w, STEPS[STEPS.len() - 1])));
             let room = end.saturating_sub(lx + width_of(&label) + 2);
@@ -496,6 +585,29 @@ pub(crate) fn draw_divider(
                 _ => Vec::new(),
             };
             (label, state)
+||||||| Stash base
+            let lw = width_of(&label(name, &tail, None));
+            let room = end.saturating_sub(lx + lw + 2);
+            (label(name, &tail, None), fit(state, room as usize))
+        }
+        Some(wk) => {
+            let pick = STEPS
+                .iter()
+                .find(|s| fits(&label(name, &tail, Some((wk, **s))), s.state))
+                .unwrap_or(&STEPS[STEPS.len() - 1]);
+            (label(name, &tail, Some((wk, *pick))), if pick.state { state } else { Vec::new() })
+=======
+            let lw = width_of(&label(name, find, &tail, None));
+            let room = end.saturating_sub(lx + lw + 2);
+            (label(name, find, &tail, None), fit(state, room as usize))
+        }
+        Some(wk) => {
+            let pick = STEPS
+                .iter()
+                .find(|s| fits(&label(name, find, &tail, Some((wk, **s))), s.state))
+                .unwrap_or(&STEPS[STEPS.len() - 1]);
+            (label(name, find, &tail, Some((wk, *pick))), if pick.state { state } else { Vec::new() })
+>>>>>>> Stashed changes
         }
     };
     put(buf, lx, y, &label, end + 1);
@@ -561,8 +673,14 @@ mod tests {
         let area = Rect::new(0, 0, width, 1);
         let mut buf = Buffer::empty(area);
         let cols = crate::layout::cols(width, 40);
+<<<<<<< Updated upstream
         let states = states.iter().map(|s| vec![Span::raw(s.to_string())]).collect();
         draw_divider(&mut buf, area, cols, 0, name, who, working, states);
+||||||| Stash base
+        draw_divider(&mut buf, area, cols, 0, name, who, working, vec![Span::raw(state.to_string())]);
+=======
+        draw_divider(&mut buf, area, cols, 0, name, who, working, vec![Span::raw(state.to_string())], false);
+>>>>>>> Stashed changes
         (0..width).map(|x| buf[(x, 0)].symbol().to_string()).collect()
     }
 
