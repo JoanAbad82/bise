@@ -53,7 +53,8 @@ def main():
     open(os.path.join(tmp, ".agents", "skills", "alpha", "SKILL.md"), "w").write(SKILL)
     # 8. a skill file whose open never answers (a FIFO, the stand-in for a
     # link into ~/Documents that a launchd parent has no macOS privacy
-    # grant for): the scan skips it after 1 s and names it on stderr
+    # grant for): the scan skips it at its 3 s deadline and names it on
+    # stderr
     os.makedirs(os.path.join(tmp, ".agents", "skills", "gamma"))
     stuck = os.path.join(tmp, ".agents", "skills", "gamma", "SKILL.md")
     os.mkfifo(stuck)
@@ -136,17 +137,17 @@ def main():
                               env={**env, "BISE_ROLE": "agent"}, check=True, capture_output=True, text=True,
                               timeout=30)
         took = time.time() - t1
-        check("a skill file that never opens holds the scan 1 s, not forever (%.1f s)" % took, took < 2, repr(took))
+        check("a skill file that never opens holds the scan 3 s, not forever (%.1f s)" % took, took < 5, repr(took))
         check("the scan names it once on its output",
-              scan.stdout == "%s: not readable (macOS privacy?)\n" % stuck, repr(scan.stdout))
+              scan.stdout == "skills scan: skipped %s (no answer in 3 s)\n" % stuck, repr(scan.stdout))
         shared = open(a1).read() if os.path.exists(a1) else "<none>"
         check("the index still builds without it", shared.startswith("alpha\t") and "gamma" not in shared,
               repr(shared))
         check("the REPL logs the skipped file on stderr",
-              "bise: skills scan: %s: not readable (macOS privacy?)" % stuck in open(err).read(),
+              open(err).read().count("skills scan: skipped %s (no answer in 3 s)" % stuck) == 1,
               repr(open(err).read()[-400:]))
-        check("the REPL's scan ended within 2 s of its banner, so main's first turn can start (%.1f s)"
-              % (ready - banner), ready - banner < 2, repr(ready - banner))
+        check("the REPL's scan ended within 5 s of its banner, so main's first turn can start (%.1f s)"
+              % (ready - banner), ready - banner < 5, repr(ready - banner))
         adata = open(a2).read() if os.path.exists(a2) else "<none>"
         check("a task's index has no main-only built-in skill", adata.startswith("beta\t") and "bise-demo" not in adata,
               repr(adata))

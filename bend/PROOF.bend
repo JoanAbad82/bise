@@ -739,13 +739,16 @@ def Laws.skills_escape_xml():
 def Laws.skills_entry_format():
   {==}
 
-def Laws.skills_scan_never_blocks():
-  {==}
-
 def Laws.skills_catalog_dedupes():
   {==}
 
 def Laws.skills_catalog_empty_is_empty():
+  {==}
+
+def Laws.skills_scan_note_quiet():
+  {==}
+
+def Laws.skills_scan_note_names_the_skipped():
   {==}
 
 def Laws.skills_malformed_lines_skipped():

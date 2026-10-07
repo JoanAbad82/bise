@@ -45,12 +45,12 @@ def index_path() -> IO(String):
 #      ($BEND_WORKDIR/.agents/skills - the hub runs a task's REPL in the
 #      app root, so $PWD would miss the task's workspace - else
 #      $PWD/.agents/skills), then the plugin skills ($3, written by the
-#      plugins bridge, runtime/plugins.bend), then bise's built-in skills
-#      for every agent: the app root's prompts/skills-all (the hub runs
-#      every REPL in the app root, and versions.sh and build-dist.sh ship
-#      prompts/ whole), e.g. bise-pages; then, for main only
-#      (BISE_ROLE=main, set by the hub), main's own built-ins: the app
-#      root's prompts/skills, e.g. bise-demo
+#      plugins bridge, runtime/plugins.bend), then every agent's
+#      built-in skills, the app root's prompts/skills-all (bise-pages),
+#      then, for main only (BISE_ROLE=main, set by the hub), main's
+#      built-in skills: the app
+#      root's prompts/skills (the hub runs the REPL in the app root, and
+#      versions.sh and build-dist.sh ship prompts/ whole), e.g. bise-demo
 # Each index is written to a temp file then renamed: every REPL start
 # rescans, and a skill call or the TUI reading the shared index mid-scan
 # must see the old index or the new one, never a truncated file.
@@ -62,14 +62,102 @@ def index_path() -> IO(String):
 # every local skill. Tabs and quotes are stripped from the fields so the
 # tab-separated line stays unambiguous; folded multi-line YAML
 # descriptions are out of scope (the Agent Skills format is one line).
+# The scan never blocks the REPL's start (the first model call waits on
+# it): a SKILL.md that links into ~/Documents made `sed` wait ~40 min on
+# macOS's privacy check, and main never made its first call. So no
+# command reads a user path in the foreground: each folder's listing,
+# then each SKILL.md (its first 64 KiB, `head`), is read by a background
+# job of its own into a temp folder, all at once; the script waits at
+# most $BEND_SKILLS_SCAN_SECS (default 3) for the listings, then as long
+# for the files, kills what is left (its children: the job of a file
+# stuck in the kernel just stays, with no hold on our output), parses the
+# copies, and prints one line per skipped path ("skills scan: skipped
+# <path> (no answer in 3 s)"), which the REPL puts on its stderr
+# (repl.err). A SKILL.md that is not a regular file (a FIFO) is read the
+# same way: a writer-less FIFO is skipped at the deadline. Proc.run_for
+# kills the script itself after 20 s (a shell that hangs anyway).
 
-# The script itself is in skills-pure.bend (a law pins its guard): each
-# SKILL.md is read in the background with a 1 s watchdog, so a file
-# whose open never answers is skipped instead of holding main's first
-# turn. Its lines out ('<path>: not readable (macOS privacy?)') are the
-# skipped files; skills_scan prints them on stderr.
 def scan_script() -> String:
-  Skp.scan_script()
+  "lim=\"${BEND_SKILLS_SCAN_SECS:-3}\"
+t=$(mktemp -d \"${TMPDIR:-/tmp}/bend-skills.XXXXXX\") || exit 0
+trap 'rm -rf \"$t\"' EXIT
+job() {
+  id=\"$1\"; shift
+  ( \"$@\" > \"$t/$id\" 2>/dev/null; : > \"$t/$id.ok\" ) < /dev/null > /dev/null 2>&1 &
+  printf '%s %s\\n' \"$id\" \"$!\" >> \"$t/pids\"
+}
+settle() {
+  n=$((n + 1))
+  ( sleep \"$lim\"; : > \"$t/late$n\" ) < /dev/null > /dev/null 2>&1 &
+  tp=$!
+  while :; do
+    all=1
+    for id in \"$@\"; do [ -e \"$t/$id.ok\" ] || { all=0; break; }; done
+    [ \"$all\" = 1 ] && break
+    [ -e \"$t/late$n\" ] && break
+    sleep 0.05
+  done
+  pkill -P \"$tp\" 2>/dev/null
+}
+ok() {
+  [ -e \"$t/$1.ok\" ] && return 0
+  p=$(sed -n \"s/^$1 //p\" \"$t/pids\")
+  [ -n \"$p\" ] && pkill -9 -P \"$p\" 2>/dev/null
+  printf 'skills scan: skipped %s (no answer in %s s)\\n' \"$2\" \"$lim\"
+  return 1
+}
+entries() {
+  [ -d \"$1\" ] || return 0
+  for d in \"$1\"/*; do [ -e \"$d\" ] && printf '%s\\n' \"$d\"; done
+}
+line() {
+  n=$(sed -n 's/^name:[[:space:]]*//p' \"$t/$1\" | head -n 1)
+  s=$(sed -n 's/^description:[[:space:]]*//p' \"$t/$1\" | head -n 1)
+  n=$(printf '%s' \"$n\" | tr -d '\\t\\r\"')
+  s=$(printf '%s' \"$s\" | tr -d '\\t\\r\"')
+  [ -n \"$n\" ] && [ -n \"$s\" ] && printf '%s\\t%s\\t%s\\n' \"$n\" \"$s\" \"$2\"
+}
+index() {
+  for r in \"$@\"; do
+    [ -f \"$t/r$r.files\" ] || continue
+    while IFS=' ' read -r id f; do
+      [ -e \"$t/$id.ok\" ] && line \"$id\" \"$f\"
+    done < \"$t/r$r.files\"
+  done
+}
+w=\"${BEND_WORKDIR:-$PWD}\"
+b=\"\"; [ \"${BISE_ROLE:-}\" = main ] && b=\"$PWD/prompts/skills\"
+set -- \"$1\" \"$2\" \"$3\" \"$HOME/.agents/skills\" \"$HOME/.vibe/skills\" \"$w/.agents/skills\" \"$PWD/prompts/skills-all\" \"$b\"
+r=0; rs=\"\"
+for root in \"$4\" \"$5\" \"$6\" \"$7\" \"$8\"; do
+  r=$((r + 1)); [ -n \"$root\" ] && { job \"r$r\" entries \"$root\"; rs=\"$rs r$r\"; }
+done
+settle $rs
+k=0; fs=\"\"; r=0
+for root in \"$4\" \"$5\" \"$6\" \"$7\" \"$8\"; do
+  r=$((r + 1)); [ -n \"$root\" ] || continue
+  ok \"r$r\" \"$root\" || continue
+  while IFS= read -r d; do
+    k=$((k + 1)); f=\"$d/SKILL.md\"
+    job \"f$k\" head -c 65536 \"$f\"
+    printf 'f%s %s\\n' \"$k\" \"$f\" >> \"$t/r$r.files\"
+    fs=\"$fs f$k\"
+  done < \"$t/r$r\"
+done
+settle $fs
+for r in 1 2 3 4 5; do
+  [ -f \"$t/r$r.files\" ] || continue
+  while IFS=' ' read -r id f; do ok \"$id\" \"$f\" || true; done < \"$t/r$r.files\"
+done
+mkdir -p \"$(dirname \"$1\")\" \"$(dirname \"$2\")\"
+{ index 1 2; true; } > \"$1.$$\" && mv -f \"$1.$$\" \"$1\"
+{ index 3; cat \"$3\" 2>/dev/null; index 4 5; true; } > \"$2.$$\" && mv -f \"$2.$$\" \"$2\""
+
+# the backstop: the script bounds itself (two waits of $lim s), so this
+# only fires if the shell itself hangs; the REPL then starts on the
+# indexes of its last start
+def scan_timeout_ms() -> U32:
+  20000
 
 def scan_path(+dir: String, +port: String) -> String:
   String.append(dir, String.append("/bend-skills-scan-", String.append(port, ".sh")))
@@ -79,27 +167,14 @@ def session_index_path() -> IO(String):
     +r : String <- Pl.run_dir()
     IO.pure(String, String.append(r, "/skills-index.txt"))
 
-# the scan's output (Proc.run's status line, then the skill files it
-# skipped, one line each): each skipped file goes to stderr, the REPL's
-# log, never the session
-def scan_log.one(skipped: Bool, +l: String) -> IO(Unit):
-  match skipped:
+# the scan's skipped paths, on the REPL's stderr (repl.err); nothing
+# when it skipped none
+def scan_note(quiet: Bool, +note: String) -> IO(Unit):
+  match quiet:
     case True{}:
-      IO.print_err(String.append("bise: skills scan: ", l))
+      IO.pure(Unit, Unit{})
     case False{}:
-      IO.pure(Unit, Unit{})
-
-def scan_log.go(lines: List<&2, String>) -> IO(Unit):
-  match lines:
-    case Nil{}:
-      IO.pure(Unit, Unit{})
-    case Con{+l, rest}:
-      do IO<Unit>:
-        u : Unit <- scan_log.one(String.contains(l, ": not readable (macOS privacy?)"), l)
-        scan_log.go(rest)
-
-def scan_log(+out: String) -> IO(Unit):
-  scan_log.go(String.split(out, Tx.newline()))
+      IO.print_err(note)
 
 def skills_scan() -> IO(Unit):
   do IO<Unit>:
@@ -111,8 +186,10 @@ def skills_scan() -> IO(Unit):
     +side : String <- P.side_dir()
     +path : String <- IO.pure(String, scan_path(side, port))
     u : Unit <- P.write_file(path, scan_script())
-    out : String <- Proc.run(Con{"/bin/sh", Con{path, Con{idx, Con{sidx, Con{psk, Nil{}}}}}})
-    scan_log(out)
+    +out : String <- Proc.run_for(Con{"/bin/sh", Con{path, Con{idx, Con{sidx, Con{psk, Nil{}}}}}},
+      scan_timeout_ms())
+    +note : String <- IO.pure(String, Skp.scan_note(out))
+    scan_note(String.is_empty(note), note)
 
 # the index the catalog and the skill tool read: this session's index
 # first (workspace and plugin skills win a name clash: the first
