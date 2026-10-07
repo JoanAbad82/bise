@@ -70,6 +70,8 @@ export const useCards = (project: string): readonly Card[] => useSlice(`cards:${
 export const useVoiceAnswer = (): EvOf<'voice_answer'> | null => useSlice('voice_answer', (s) => s.voiceAnswer());
 export const useConfirms = (project: string): readonly Confirm[] => useSlice(`confirms:${project}`, (s) => s.confirms(project));
 export const useNotice = (project: string): HubLine | null => useSlice(`notice:${project}`, (s) => s.notice(project));
+/** bar V8/W21: the approvals mode, checker and rules of a project's hub; null until it said. */
+export const useApprovals = (project: string): EvOf<'approvals'> | null => useSlice(`approvals:${project}`, (s) => s.approvals(project));
 export const usePrefs = (): JsonValue | null => useSlice('prefs', (s) => s.prefs());
 export const useAccounts = (): readonly Account[] => useSlice('accounts', (s) => s.accounts());
 export const useFound = (): readonly Found[] => useSlice('found', (s) => s.found());

@@ -71,6 +71,7 @@ export const TAGS = {
   job_end: true,
   followed_end: true,
   confirm: true,
+  approvals: true,
   notice: true,
   error: true,
   projects: true,
@@ -278,6 +279,10 @@ export class Store {
   notice(project: string): HubLine | null {
     return this.slice<HubLine | null>(`notice:${project}`, null);
   }
+  /** how tool calls are approved on this machine and the repo's saved rules (bar V8/W21); null until the hub said */
+  approvals(project: string): EvOf<'approvals'> | null {
+    return this.slice<EvOf<'approvals'> | null>(`approvals:${project}`, null);
+  }
   prefs(): JsonValue | null {
     return this.slice<JsonValue | null>('prefs', null);
   }
@@ -465,6 +470,10 @@ export class Store {
         return;
       case 'notice':
         this.put(`notice:${ev.project}`, { text: ev.text, level: 'note' } satisfies HubLine);
+        return;
+      case 'approvals':
+        // bar V8/W21: the mode, the checker and the rules, whole each time
+        this.put(`approvals:${ev.project}`, ev);
         return;
       case 'welcome':
         // a new hello: the hub tied the open questions to a connection

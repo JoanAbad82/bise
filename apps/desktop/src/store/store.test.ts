@@ -41,6 +41,19 @@ describe('store', () => {
     expect(store.confirms(P)).toEqual([]);
   });
 
+  it('keeps the approvals mode and rules per project, whole each time (V8/W21)', () => {
+    const { store } = fake();
+    expect(store.approvals(P)).toBeNull();
+    const rule = { tool: 'bash', pattern: 'cargo test *', added: '1791100000000', added_ms: 1791100000000, what: 'cargo test *', note: 'from perf' };
+    store.apply({ ev: 'approvals', project: P, mode: 'auto', env: false, checker: 'jev', checker_who: 'TypeSafe', repo: '/w', rules: [rule], flash: true });
+    expect(store.approvals(P)?.mode).toBe('auto');
+    expect(store.approvals(P)?.rules.map((r) => r.what)).toEqual(['cargo test *']);
+    store.apply({ ev: 'approvals', project: P, mode: 'yolo', env: false, checker: 'jev', checker_who: 'TypeSafe', repo: '/w', rules: [] });
+    expect(store.approvals(P)?.mode).toBe('yolo');
+    expect(store.approvals(P)?.rules).toEqual([]);
+    expect(store.approvals('other')).toBeNull();
+  });
+
   it('takes every fixture event and skips unknown tags', () => {
     const { store } = fake();
     const events = allFixtureEvents();
