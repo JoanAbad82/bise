@@ -8,6 +8,8 @@ import { CapsuleRoot } from '@/capsule';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('index.html has no #root');
+// every surface in the DS's UI type (base.css .b-ui), never the browser's Times (ambient m_10689)
+document.body.classList.add('b-ui');
 
 createRoot(root).render(
   <StrictMode>

@@ -82,7 +82,7 @@ function Shell() {
   useFirstLaunch();
   useShown();
   return (
-    <div className="app-shell" data-testid="app.root">
+    <div className="app-shell b-ui" data-testid="app.root">
       <Win side={<Sidebar />} main={<Current />} />
       {palette && (
         <Palette

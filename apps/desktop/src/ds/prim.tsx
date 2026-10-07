@@ -7,6 +7,7 @@
 // :focus-within do it (css/live.css).
 import type { InputHTMLAttributes, MouseEventHandler, ReactNode, Ref } from "react";
 import { cx, st, step5, sub, type UiState } from "./cx";
+import { LivePearl, MOODS, type Mood } from "@/pearl";
 
 export type Tone = "acc" | "err" | "ok";
 export type DotState = "wk" | "nd" | "ok" | "er" | "off";
@@ -137,11 +138,13 @@ export interface PearlProps {
   /** the live pearl (src/pearl, amb-web) draws into this slot; without it, the reference's glyph */
   children?: ReactNode;
 }
-/** bise's pearl: the slot and its size; the animation is src/pearl's */
+/** a mood the live pearl knows, else rest */
+const moodOf = (m: string | undefined): Mood => (m !== undefined && m in MOODS ? (m as Mood) : "rest");
+/** bise's pearl: the slot and its size; without children the live pearl (src/pearl), floating free, never the old ':*' glyph (ambient m_10689) */
 export function Pearl({ size = 22, mood, children }: PearlProps) {
   return (
     <span className={cx("b-pearl", `s${size}`)} data-bise-pearl={size} data-mood={mood} aria-hidden="true">
-      {children ?? ":*"}
+      {children ?? <LivePearl mood={moodOf(mood)} size={size} />}
     </span>
   );
 }
