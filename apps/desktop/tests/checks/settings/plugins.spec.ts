@@ -7,7 +7,7 @@
 // Not here: a log in to a fake connector (the world has no remote MCP server that logs in; the
 // TUI's '/plugins login' says so there): it needs a fake one in the world (amb-tools).
 import { test, expect } from '../../harness';
-import { launchOn, realWorld, tui, tuiReady, tuiSay, type Tui } from '../world';
+import { launchOn, realWorld, tui, tuiReady, type Tui } from '../world';
 
 const T = {
   page: '[data-testid="settings.plugins"]',
