@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatRoute, MAIN, parseRoute, projectOf, routeOfOpen, startRouteOf, type Route } from './route';
+import { formatRoute, MAIN, parseRoute, projectOf, routeOfOpen, shownOf, startRouteOf, type Route } from './route';
 import { createRouter } from './router';
 
 const every: Route[] = [
@@ -112,8 +112,8 @@ describe('the core line (bar S.5)', () => {
 });
 
 describe("the projects the window shows (the core's 'shown')", () => {
-  it('home first, then the route project, deduped; empty until one is known', async () => {
-    const { shownOf } = await import('./App');
+  // pure, in route.ts: no import of App (which timed out at 5 s under load, ambient-lead m_11471)
+  it('home first, then the route project, deduped; empty until one is known', () => {
     expect(shownOf('home-1', { screen: 'thread', project: 'shop', agent: 'perf' })).toEqual(['home-1', 'shop']);
     expect(shownOf('home-1', { screen: 'bise' })).toEqual(['home-1']);
     expect(shownOf('home-1', { screen: 'thread', project: 'home-1', agent: 'main' })).toEqual(['home-1']);

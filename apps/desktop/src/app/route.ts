@@ -168,3 +168,10 @@ export function startRouteOf(hash: string): Route | undefined {
   }
   return parseRoute(path);
 }
+
+/** The shown set: home first, then the route's project, deduped (empty before the first rows). Pure. */
+export function shownOf(home: string | undefined, route: Route): string[] {
+  const out: string[] = [];
+  for (const p of [home, projectOf(route)]) if (p !== undefined && !out.includes(p)) out.push(p);
+  return out;
+}

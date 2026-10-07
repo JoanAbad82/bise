@@ -78,7 +78,7 @@ describe('thread parity rows (tui-parity M2 N11 M8 B15 B11 C47 W2 W5)', () => {
   });
 
   it("W2: a project main's counts", () => {
-    expect(countsOf([ag('main', { waits: 1 }), ag('a', { status: 'working' }), ag('b', { waits: 1 }), ag('c', { archived: true })])).toBe('2 agents · 1 at work · 2 waiting');
+    expect(countsOf([ag('main', { waits: 1 }), ag('a', { status: 'working' }), ag('b', { waits: 1 }), ag('c', { archived: true })])).toBe('2 agents · 1 at work · 2 waiting for you');
     expect(countsOf([ag('main')])).toBe('');
   });
 

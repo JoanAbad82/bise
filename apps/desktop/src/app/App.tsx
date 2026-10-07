@@ -8,7 +8,7 @@
 // touches, never the shell, the sidebar or the composer.
 import { useEffect, useState, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
-import { formatRoute, projectOf, startRouteOf, type Route } from './route';
+import { formatRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
 import { useMainRoutes, useMenuRouting } from './menu';
 import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { ThreadScreen } from '@/thread/ThreadScreen';
@@ -213,13 +213,6 @@ function useShown() {
   useEffect(() => {
     store.shown(key === '' ? [] : key.split('\n'));
   }, [store, key]);
-}
-
-/** The shown set: home first, then the route's project, deduped (empty before the first rows). Pure. */
-export function shownOf(home: string | undefined, route: Route): string[] {
-  const out: string[] = [];
-  for (const p of [home, projectOf(route)]) if (p !== undefined && !out.includes(p)) out.push(p);
-  return out;
 }
 
 /** bise's own thread: the home project's main, once the core said which it is. */

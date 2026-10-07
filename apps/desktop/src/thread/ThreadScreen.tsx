@@ -412,7 +412,7 @@ export function countsOf(agents: readonly { main: boolean; archived: boolean; st
   if (live.length === 0) return '';
   const work = live.filter((a) => a.status === 'working').length;
   const waits = agents.reduce((n, a) => n + a.waits, 0);
-  return [`${String(live.length)} ${live.length === 1 ? 'agent' : 'agents'}`, work > 0 ? `${String(work)} at work` : '', waits > 0 ? `${String(waits)} waiting` : ''].filter(Boolean).join(' · ');
+  return [`${String(live.length)} ${live.length === 1 ? 'agent' : 'agents'}`, work > 0 ? `${String(work)} at work` : '', waits > 0 ? `${String(waits)} waiting for you` : ''].filter(Boolean).join(' · ');
 }
 
 /** An archived agent's thread is history only (tui-parity C47): no composer, a way to restore it. */
