@@ -74,6 +74,8 @@ export const useNotice = (project: string): HubLine | null => useSlice(`notice:$
 export const useApprovals = (project: string): EvOf<'approvals'> | null => useSlice(`approvals:${project}`, (s) => s.approvals(project));
 export const usePrefs = (): JsonValue | null => useSlice('prefs', (s) => s.prefs());
 export const useAccounts = (): readonly Account[] => useSlice('accounts', (s) => s.accounts());
+/** V14: the sign-in open in his browser, {id, url} (copy the link), null at its end. */
+export const useSigning = (): { readonly id: string; readonly url: string } | null => useSlice('signing', (s) => s.signing());
 export const useFound = (): readonly Found[] => useSlice('found', (s) => s.found());
 export const useComputerUse = (): EvOf<'computer_use'> | null => useSlice('computer_use', (s) => s.computerUse());
 export const usePlugins = (project?: string): readonly Plugin[] | null => useSlice(`plugins:${project ?? ''}`, (s) => s.plugins(project));

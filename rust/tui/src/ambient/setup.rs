@@ -26,6 +26,8 @@ pub const MAX_FOUND: usize = 50;
 /// A job that ends later, back on the core's tick.
 #[derive(Debug, PartialEq)]
 pub enum Done {
+    /// a sign-in opened its link (V14: `auth login --events`' open)
+    Signing { id: String, url: String },
     /// a folder walked: its repos
     Scanned { dir: PathBuf, entries: Vec<Entry> },
     /// his sign-in ended (Err: its last line)
@@ -105,6 +107,9 @@ pub struct SetupPorts {
     /// only a provider that signs in; its browser flow, `Done::SignedIn`
     /// at its end (never run by a test)
     pub sign_in: SignInFn,
+    /// ends the open sign-in of that account (V14): its process group,
+    /// so its local callback listener goes too; Err when none is open
+    pub sign_in_cancel: IdFn,
     /// walks a folder on its own thread, `Done::Scanned` at its end
     pub scan: Box<dyn Fn(PathBuf, Sender<Done>)>,
     /// his home folder (`found_scan` without a folder)
@@ -272,6 +277,103 @@ pub fn redact(line: &str) -> String {
 /// The live ports: his `~/.bise` (or `$BISE_HOME`), his home folder, the
 /// catalog's key store, `bise auth login` for a sign-in; `flow` from the
 /// binary (devflow's writer).
+/// The open sign-ins (V14): id -> (its process group, cancelled).
+type SignIns = std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, (u32, std::sync::Arc<std::sync::atomic::AtomicBool>)>>>;
+
+/// What one line of `bise auth login <id> --events` says (architect m_10942:
+/// typed lines, never the terminal's prose).
+#[derive(Debug, PartialEq)]
+pub enum SignEv {
+    Open(String),
+    Done,
+    Error(String),
+}
+
+/// One `--events` line, or None (not one of them).
+pub fn sign_ev(line: &str) -> Option<SignEv> {
+    let v: Value = serde_json::from_str(line.trim()).ok()?;
+    let s = |k: &str| v.get(k).and_then(Value::as_str).map(str::to_string);
+    match s("ev")?.as_str() {
+        "open" => s("url").filter(|u| u.starts_with("http://") || u.starts_with("https://")).map(SignEv::Open),
+        "done" => Some(SignEv::Done),
+        "error" => Some(SignEv::Error(s("text").unwrap_or_else(|| "the sign-in failed".into()))),
+        _ => None,
+    }
+}
+
+/// `bise auth login <id> --events` in its own process group; its lines to
+/// the core (`Done::Signing` at its open, `Done::SignedIn` at its end).
+fn sign_in_run(id: &str, tx: Sender<Done>, open: &SignIns) -> Result<(), String> {
+    use std::io::{BufRead, Read};
+    use std::os::unix::process::CommandExt;
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let mut child = std::process::Command::new(exe)
+        .args(["auth", "login", id, "--events"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .process_group(0)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    if let Ok(mut m) = open.lock() {
+        m.insert(id.to_string(), (child.id(), cancelled.clone()));
+    }
+    let (id, open) = (id.to_string(), open.clone());
+    std::thread::spawn(move || {
+        let mut end: Option<Result<(), String>> = None;
+        if let Some(out) = child.stdout.take() {
+            for line in std::io::BufReader::new(out).lines().map_while(Result::ok) {
+                match sign_ev(&line) {
+                    Some(SignEv::Open(url)) => {
+                        let _ = tx.send(Done::Signing { id: id.clone(), url });
+                    }
+                    Some(SignEv::Done) => end = Some(Ok(())),
+                    Some(SignEv::Error(e)) => end = Some(Err(e)),
+                    None => {}
+                }
+            }
+        }
+        let mut err = String::new();
+        if let Some(mut e) = child.stderr.take() {
+            let _ = e.read_to_string(&mut err);
+        }
+        let ok = child.wait().is_ok_and(|s| s.success());
+        if let Ok(mut m) = open.lock() {
+            m.remove(&id);
+        }
+        let res = if cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+            Err("cancelled".to_string())
+        } else {
+            match end {
+                Some(r) => r,
+                None if ok => Ok(()),
+                None => Err(err.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("the sign-in failed").to_string()),
+            }
+        };
+        let _ = tx.send(Done::SignedIn { id, res });
+    });
+    Ok(())
+}
+
+/// Ends `id`'s open sign-in: its whole process group (the local callback
+/// listener with it); its thread then reports it cancelled.
+fn sign_in_cancel(id: &str, open: &SignIns) -> Result<(), String> {
+    let pg = match open.lock() {
+        Ok(m) => m.get(id).map(|(pg, c)| {
+            c.store(true, std::sync::atomic::Ordering::SeqCst);
+            *pg
+        }),
+        Err(_) => None,
+    };
+    let Some(pg) = pg else { return Err(format!("no sign-in open for {id}")) };
+    std::process::Command::new("kill")
+        .args(["-TERM", &format!("-{pg}")])
+        .status()
+        .map_err(|e| e.to_string())
+        .and_then(|s| if s.success() { Ok(()) } else { Err(format!("cannot end the sign-in of {id}")) })
+}
+
 pub fn live(flow: FlowFn) -> SetupPorts {
     use bise_catalog::auth_cli;
     let home = bise_home::Home::from_env;
@@ -280,6 +382,9 @@ pub fn live(flow: FlowFn) -> SetupPorts {
         auth_cli::Paths { auth_file: h.auth_file(), config: h.config_file(), env_files: h.env_files(), home: Some(h.user_home().to_path_buf()) }
     };
     let env = |k: &str| std::env::var(k).ok();
+    // the open sign-ins: their process group and whether it was cancelled
+    let open: SignIns = Default::default();
+    let open2 = open.clone();
     SetupPorts {
         prefs: Box::new(move || std::fs::read_to_string(home().prefs_file()).ok().and_then(|t| serde_json::from_str(&t).ok())),
         // the whole file, tmp + rename (bise_home's Slot)
@@ -312,25 +417,9 @@ pub fn live(flow: FlowFn) -> SetupPorts {
             if !setup.catalog.provider(id).is_some_and(|p| p.signs_in()) {
                 return Err(format!("{id} has no sign-in"));
             }
-            let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-            let child = std::process::Command::new(exe)
-                .args(["auth", "login", id])
-                .stdin(std::process::Stdio::null())
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::piped())
-                .spawn()
-                .map_err(|e| e.to_string())?;
-            let id = id.to_string();
-            std::thread::spawn(move || {
-                let res = match child.wait_with_output() {
-                    Ok(o) if o.status.success() => Ok(()),
-                    Ok(o) => Err(String::from_utf8_lossy(&o.stderr).lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("the sign-in failed").to_string()),
-                    Err(e) => Err(e.to_string()),
-                };
-                let _ = tx.send(Done::SignedIn { id, res });
-            });
-            Ok(())
+            sign_in_run(id, tx, &open)
         }),
+        sign_in_cancel: Box::new(move |id| sign_in_cancel(id, &open2)),
         scan: Box::new(move |dir, tx| {
             let h = home();
             let skip = vec![h.root().to_path_buf(), bise_home::projects::canonical(&home_workspace())];

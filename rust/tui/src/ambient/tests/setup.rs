@@ -13,6 +13,8 @@ struct World {
     prefs: Option<Value>,
     keys: Vec<(String, String)>,
     sign_ins: Vec<String>,
+    /// V14: the sign-ins cancelled
+    cancels: Vec<String>,
     added: Vec<PathBuf>,
     flows: Vec<(PathBuf, bool)>,
     ops: Vec<RegistryOp>,
@@ -43,7 +45,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
     let (a, b, c, d, e, f, g, h, i) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
     let (j, k, l, m) = (w.clone(), w.clone(), w.clone(), w.clone());
     let (n, o, q, r, u, v) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
-    let (x, y) = (w.clone(), w.clone());
+    let (x, y, z) = (w.clone(), w.clone(), w.clone());
     t.core.set_setup(SetupPorts {
         prefs: Box::new(move || a.borrow().prefs.clone()),
         write_prefs: Box::new(move |v| {
@@ -76,6 +78,15 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             let mut w = f.borrow_mut();
             w.sign_ins.push(id.into());
             w.signing = Some(tx);
+            Ok(())
+        }),
+        // the real port ends its process group; its thread then says cancelled
+        sign_in_cancel: Box::new(move |id| {
+            let mut w = z.borrow_mut();
+            w.cancels.push(id.into());
+            if let Some(tx) = w.signing.take() {
+                let _ = tx.send(Done::SignedIn { id: id.into(), res: Err("cancelled".into()) });
+            }
             Ok(())
         }),
         scan: Box::new(|dir, tx| {
@@ -227,6 +238,52 @@ fn a_sign_in_runs_once_at_a_time_and_accounts_come_at_its_end() {
     assert!(evs(&out, "error")[0]["text"].as_str().unwrap().contains("you closed the page"));
     app(&mut t, r#"{"cmd":"sign_in","id":"chatgpt"}"#);
     assert_eq!(w.borrow().sign_ins.len(), 2, "a new one after the end");
+}
+
+/// V14 (lead m_10936, architect m_10942): the link a sign-in opened comes
+/// once as `signing`; sign_in_cancel ends only the open one, its end is one
+/// error 'cancelled' with accounts, and a new sign-in works after.
+#[test]
+fn a_sign_in_says_its_link_and_can_be_cancelled() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    app(&mut t, r#"{"cmd":"sign_in_cancel","id":"chatgpt"}"#);
+    let out = t.take();
+    assert_eq!(evs(&out, "error")[0]["cmd"], "sign_in_cancel", "none open: {out:?}");
+    assert!(w.borrow().cancels.is_empty());
+    app(&mut t, r#"{"cmd":"sign_in","id":"chatgpt"}"#);
+    let url = "https://auth.openai.test/oauth/authorize?x=1";
+    let tx = w.borrow().signing.clone().unwrap();
+    tx.send(Done::Signing { id: "chatgpt".into(), url: url.into() }).unwrap();
+    t.until(|o| !evs(o, "signing").is_empty());
+    let out = t.take();
+    assert_eq!(evs(&out, "signing"), vec![&json!({"ev": "signing", "id": "chatgpt", "url": url})]);
+    // another account's cancel doesn't touch it
+    app(&mut t, r#"{"cmd":"sign_in_cancel","id":"openrouter"}"#);
+    assert!(w.borrow().cancels.is_empty());
+    assert_eq!(evs(&t.take(), "error")[0]["cmd"], "sign_in_cancel");
+    app(&mut t, r#"{"cmd":"sign_in_cancel","id":"chatgpt"}"#);
+    assert_eq!(w.borrow().cancels, vec!["chatgpt"]);
+    t.until(|o| !evs(o, "accounts").is_empty());
+    let out = t.take();
+    let errs = evs(&out, "error");
+    assert_eq!(errs.len(), 1, "{out:?}");
+    assert_eq!((errs[0]["cmd"].as_str(), errs[0]["text"].as_str()), (Some("sign_in"), Some("chatgpt: cancelled")));
+    assert!(evs(&out, "signing").is_empty(), "no second link");
+    app(&mut t, r#"{"cmd":"sign_in","id":"chatgpt"}"#);
+    assert_eq!(w.borrow().sign_ins.len(), 2, "a new one after the cancel");
+}
+
+/// V14: `auth login --events`' lines, typed; anything else is ignored.
+#[test]
+fn a_sign_in_reads_only_its_typed_lines() {
+    use crate::ambient::setup::{sign_ev, SignEv};
+    assert_eq!(sign_ev(r#"{"ev":"open","url":"http://localhost:1455/x"}"#), Some(SignEv::Open("http://localhost:1455/x".into())));
+    assert_eq!(sign_ev(r#"{"ev":"done","email":"a@b.c"}"#), Some(SignEv::Done));
+    assert_eq!(sign_ev(r#"{"ev":"error","text":"denied"}"#), Some(SignEv::Error("denied".into())));
+    assert_eq!(sign_ev(r#"{"ev":"open","url":"file:///etc/passwd"}"#), None, "only a web link");
+    assert_eq!(sign_ev("or open this link:"), None);
+    assert_eq!(sign_ev("  https://auth.openai.com/x"), None, "the prose is never read");
 }
 
 #[test]

@@ -89,6 +89,7 @@ export const TAGS = {
   skills: true,
   files: true,
   roles: true,
+  signing: true,
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */
@@ -286,6 +287,10 @@ export class Store {
   prefs(): JsonValue | null {
     return this.slice<JsonValue | null>('prefs', null);
   }
+  /** V14: the sign-in open in his browser (its link, to copy), until its end (accounts or error). */
+  signing(): { readonly id: string; readonly url: string } | null {
+    return this.slice<{ readonly id: string; readonly url: string } | null>('signing', null);
+  }
   accounts(): readonly Account[] {
     return this.slice('accounts', EMPTY);
   }
@@ -412,6 +417,11 @@ export class Store {
         return;
       case 'accounts':
         this.put('accounts', ev.items);
+        // a sign-in's end: its link is no longer open
+        if (this.signing() !== null) this.put('signing', null);
+        return;
+      case 'signing':
+        this.put('signing', { id: ev.id, url: ev.url });
         return;
       case 'found':
         this.put('found', ev.items);
@@ -453,6 +463,7 @@ export class Store {
         this.put(`dictation:${ev.id}`, { text: ev.text, final: ev.final, cancelled: ev.cancelled ?? false, error: ev.error ?? null } satisfies Dictation);
         return;
       case 'error':
+        if (ev.cmd === 'sign_in' && this.signing() !== null) this.put('signing', null);
         // a typed line the hub's router refused (HubCmd slash): his words to fix, as an error line
         if (ev.cmd === 'slash' && ev.project != null) {
           this.put(`notice:${ev.project}`, { text: ev.text, level: 'error' } satisfies HubLine);

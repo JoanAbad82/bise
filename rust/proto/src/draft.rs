@@ -321,6 +321,10 @@ pub enum CoreEv {
     /// here until that module types them
     Prefs { prefs: Value },
     Accounts { items: Vec<Account> },
+    /// draft (V14): a sign-in started: the link it opened in his browser
+    /// (the window copies it); once per sign-in, its end as before
+    /// (accounts, or error {cmd: sign_in})
+    Signing { id: String, url: String },
     /// the answer to `found_scan`
     Found { dir: String, items: Vec<Found> },
     /// the answer to `away_back` (S9, amb-mac m_9038): what happened while
@@ -404,7 +408,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins", "computer_use", "level", "dictation", "voice_answer", "commands", "skills", "files", "roles"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "dictation", "voice_answer", "commands", "skills", "files", "roles"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -439,6 +443,10 @@ pub enum AppCmd {
     PrefsSet { key: String, value: Value },
     /// opens his browser for that account, then `accounts` again
     SignIn { id: String },
+    /// draft (V14): ends the open sign-in of that account (its browser
+    /// page and local listener go); its end is error {cmd: sign_in,
+    /// text: '<id>: cancelled'}
+    SignInCancel { id: String },
     KeySet { id: String, key: String },
     KeyRemove { id: String },
     /// folders that could be projects (none: his home folder, depth 2)
@@ -565,6 +573,7 @@ impl AppCmd {
         "project_rename",
         "prefs_set",
         "sign_in",
+        "sign_in_cancel",
         "key_set",
         "key_remove",
         "found_scan",

@@ -295,6 +295,18 @@ describe('store', () => {
     store.apply({ ev: 'dictation', id: busy, text: '', final: true, error: 'the mic is busy.' });
     expect(store.dictation(busy)).toEqual({ text: '', final: true, cancelled: false, error: 'the mic is busy.' });
   });
+  it('V14: signing holds the open sign-in link until accounts or its error', () => {
+    const { store } = fake();
+    expect(store.signing()).toBeNull();
+    store.apply({ ev: 'signing', id: 'chatgpt', url: 'https://auth.openai.test/x' });
+    expect(store.signing()).toEqual({ id: 'chatgpt', url: 'https://auth.openai.test/x' });
+    store.apply({ ev: 'error', cmd: 'sign_in', text: 'chatgpt: cancelled' });
+    expect(store.signing()).toBeNull();
+    store.apply({ ev: 'signing', id: 'chatgpt', url: 'https://auth.openai.test/y' });
+    store.apply({ ev: 'accounts', items: [] });
+    expect(store.signing()).toBeNull();
+  });
+
   it("level: each voice's loudness, the last value, a repeat changes nothing", () => {
     const { store } = fake();
     expect(store.level('you')).toBe(0);

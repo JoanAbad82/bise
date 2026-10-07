@@ -29,6 +29,7 @@ use std::time::Instant;
 pub const TAGS: &[&str] = &[
     "prefs_set",
     "sign_in",
+    "sign_in_cancel",
     "key_set",
     "key_remove",
     "found_scan",
@@ -169,6 +170,15 @@ impl Core {
                     }
                 }
                 ("sign_in", res)
+            }
+            // V14: ends the open sign-in; its end comes as error
+            // {cmd: sign_in, text: '<id>: cancelled'} from its thread
+            AppCmd::SignInCancel { id } => {
+                let res = match &s.signing {
+                    Some(open) if *open == id => (p.sign_in_cancel)(&id),
+                    _ => Err(format!("no sign-in open for {id}")),
+                };
+                ("sign_in_cancel", res)
             }
             AppCmd::FoundScan { dir } => {
                 let dir = dir.filter(|d| !d.trim().is_empty()).map(PathBuf::from).unwrap_or_else(|| p.home_dir.clone());
@@ -370,6 +380,10 @@ impl Core {
                     let known: Vec<PathBuf> = self.setup.as_ref().map(|s| (s.ports.rows)().into_iter().map(|r| r.path).collect()).unwrap_or_default();
                     let items = rank(entries, &known);
                     self.emit(json!({"ev": "found", "dir": dir.to_string_lossy(), "items": items}));
+                }
+                // V14: the link it opened, once per sign-in
+                Done::Signing { id, url } => {
+                    self.emit(json!({"ev": "signing", "id": id, "url": url}));
                 }
                 Done::SignedIn { id, res } => {
                     if let Some(s) = self.setup.as_mut() {
