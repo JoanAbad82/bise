@@ -10,11 +10,15 @@ import { binPath } from '../paths';
 import { configOf } from './env';
 import { Latest } from '../../shared/latest';
 import { CoreProcess } from './process';
+import { DictationRoutes, type Route } from './dictation';
 
 let core: CoreProcess | null = null;
 // the last state events, for a window or a main-side listener that comes after they went out
 const latest = new Latest();
 const listeners = new Set<(ev: Record<string, unknown>) => void>();
+// a dictation's words go only to the window that started it (dictation.ts)
+const dictations = new DictationRoutes();
+const watched = new Set<number>();
 
 /**
  * Main's own listener on the core's events (amb-mac m_9733: the helper's
@@ -35,6 +39,30 @@ function broadcast(channel: string, payload: unknown): void {
   }
 }
 
+function toWindow(r: Route): void {
+  if (r.to !== 'window') return;
+  const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x.webContents.id === r.window);
+  w?.webContents.send(CORE_IPC.ev, r.ev);
+}
+
+/** A window that dictates: when it's gone (closed, crashed, reloaded), its dictations stop. */
+function watch(contents: Electron.WebContents): void {
+  if (watched.has(contents.id)) return;
+  const id = contents.id;
+  watched.add(id);
+  const gone = (): void => {
+    for (const c of dictations.gone(id)) core?.send(c);
+  };
+  contents.once('destroyed', () => {
+    watched.delete(id);
+    gone();
+  });
+  contents.on('render-process-gone', gone);
+  contents.on('did-start-navigation', (d) => {
+    if (d.isMainFrame && !d.isSameDocument) gone();
+  });
+}
+
 function log(line: string): void {
   process.stderr.write(`bise-desktop: ${line}${String.fromCharCode(10)}`);
 }
@@ -47,7 +75,9 @@ function log(line: string): void {
  */
 export function startCore(env: Readonly<Record<string, string | undefined>> = process.env): void {
   let state: CoreState = 'down';
-  ipcMain.on(CORE_IPC.cmd, (_e, cmd: unknown) => {
+  ipcMain.on(CORE_IPC.cmd, (e, cmd: unknown) => {
+    dictations.sent(e.sender.id, cmd);
+    if ((cmd as { cmd?: unknown } | null)?.cmd === 'dictate_start') watch(e.sender);
     core?.send(cmd);
   });
   ipcMain.handle(CORE_IPC.stateNow, (): CoreState => state);
@@ -62,6 +92,12 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
     { config, logFile: join(app.getPath('userData'), 'core.log'), env },
     {
       onEvent: (ev) => {
+        // a dictation's words: its window only, never kept, never main's listeners
+        const r = dictations.route(ev);
+        if (r.to !== 'all') {
+          toWindow(r);
+          return;
+        }
         latest.keep(ev);
         for (const l of [...listeners]) l(ev);
         broadcast(CORE_IPC.ev, ev);
@@ -69,6 +105,8 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
       onState: (s) => {
         // a new core starts from nothing: it says its state again
         if (s === 'starting') latest.clear();
+        // a core gone took its mic with it: its dictations end
+        if (s !== 'up') for (const r of dictations.coreGone()) toWindow(r);
         state = s;
         broadcast(CORE_IPC.state, s);
       },

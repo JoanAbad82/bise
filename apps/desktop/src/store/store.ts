@@ -69,6 +69,7 @@ export const TAGS = {
   away_summary: true,
   plugins: true,
   computer_use: true,
+  dictation: true,
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */
@@ -114,6 +115,17 @@ export interface ThreadOrder {
 
 export type Diff = EvOf<'diff'>;
 export type Away = EvOf<'away_summary'>;
+/**
+ * A dictation (bar I): `text` is the whole text so far (replace the
+ * composer's dictated part, never append); `final`: over (stopped, the time
+ * limit, fn's talk, cancelled, or `error`: refused or failed).
+ */
+export interface Dictation {
+  readonly text: string;
+  readonly final: boolean;
+  readonly cancelled: boolean;
+  readonly error: string | null;
+}
 export type { AwayProject };
 
 const EMPTY_ORDER: ThreadOrder = { order: [], before: null, more: false, loaded: false };
@@ -139,6 +151,8 @@ export class Store {
   private readonly evListeners = new Set<(ev: Ev) => void>();
   private coreState: CoreState = 'down';
   private cid = 0;
+  /** the dictations this window started and not over yet (bar I) */
+  private readonly dictating = new Set<string>();
   /** the last shown set sent (null: none yet); said again to a core that comes back up */
   private shownSet: readonly string[] | null = null;
   /** the threads this window follows (subscribeThread), said again to a core that comes back up */
@@ -343,6 +357,13 @@ export class Store {
       case 'away_summary':
         this.put('away', ev);
         return;
+      case 'dictation':
+        // only the window that started it gets it (main's routes); an id
+        // this store never started, or one already over, is ignored
+        if (!this.dictating.has(ev.id)) return;
+        if (ev.final) this.dictating.delete(ev.id);
+        this.put(`dictation:${ev.id}`, { text: ev.text, final: ev.final, cancelled: ev.cancelled ?? false, error: ev.error ?? null } satisfies Dictation);
+        return;
       case 'error':
         if (ev.cmd !== 'send') return;
         // G: exactly the row with this cid; with no cid (an older core or
@@ -481,6 +502,29 @@ export class Store {
 
   command(cmd: CoreCmd): void {
     this.port?.send(cmd);
+  }
+
+  /**
+   * The composer's mic (bar I): the core records and sends this window the
+   * words (useDictation(id)); never to main. Returns the dictation's id.
+   */
+  dictateStart(): string {
+    this.cid += 1;
+    const id = `d${String(this.cid)}-${String(this.now())}`;
+    this.dictating.add(id);
+    this.put(`dictation:${id}`, { text: '', final: false, cancelled: false, error: null } satisfies Dictation);
+    this.command({ cmd: 'dictate_start', id });
+    return id;
+  }
+  /** The mic off; the final words come in one last `dictation`. */
+  dictateStop(id: string): void {
+    if (this.dictating.has(id)) this.command({ cmd: 'dictate_stop', id });
+  }
+  dictateCancel(id: string): void {
+    if (this.dictating.has(id)) this.command({ cmd: 'dictate_cancel', id });
+  }
+  dictation(id: string): Dictation | null {
+    return this.slice<Dictation | null>(`dictation:${id}`, null);
   }
 
   /**

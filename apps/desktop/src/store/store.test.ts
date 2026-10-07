@@ -232,4 +232,30 @@ describe('store', () => {
     store.olderPage(P, 'perf', 20);
     expect(sent).toEqual([{ cmd: 'page', project: P, agent: 'perf', before: 50, limit: 20 }]);
   });
+  it("I: a dictation's whole text replaces, one final ends it, an id it never started is ignored", () => {
+    const { sent, store } = fake();
+    const id = store.dictateStart();
+    expect(sent).toEqual([{ cmd: 'dictate_start', id }]);
+    expect(store.dictation(id)).toEqual({ text: '', final: false, cancelled: false, error: null });
+    store.apply({ ev: 'dictation', id, text: 'fix the', final: false });
+    store.apply({ ev: 'dictation', id, text: 'fix the login', final: false });
+    expect(store.dictation(id)?.text).toBe('fix the login');
+    store.dictateStop(id);
+    expect(sent.at(-1)).toEqual({ cmd: 'dictate_stop', id });
+    store.apply({ ev: 'dictation', id, text: 'fix the login test', final: true });
+    expect(store.dictation(id)).toEqual({ text: 'fix the login test', final: true, cancelled: false, error: null });
+    // over: a late event changes nothing, stop/cancel send nothing
+    store.apply({ ev: 'dictation', id, text: 'late', final: false });
+    expect(store.dictation(id)?.text).toBe('fix the login test');
+    const n = sent.length;
+    store.dictateCancel(id);
+    expect(sent.length).toBe(n);
+    // another window's dictation never lands here
+    store.apply({ ev: 'dictation', id: 'not-mine', text: 'secret', final: false });
+    expect(store.dictation('not-mine')).toBeNull();
+    // a refused start is its final, with the error
+    const busy = store.dictateStart();
+    store.apply({ ev: 'dictation', id: busy, text: '', final: true, error: 'the mic is busy.' });
+    expect(store.dictation(busy)).toEqual({ text: '', final: true, cancelled: false, error: 'the mic is busy.' });
+  });
 });

@@ -242,12 +242,31 @@ pub enum CoreEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         flash: Option<String>,
     },
+    /// a dictation's words (bar I, `dictate_start {id}`), only to the
+    /// window that started it (the app's main routes it by `id`), never
+    /// to main, never journaled, never in a log. `text` is the WHOLE text
+    /// so far (replace, never append): a dropped or late partial can't
+    /// duplicate words; the composer's text is the last event's. Partials
+    /// have `final: false`; exactly one `final: true` ends it (stop, the
+    /// time limit, fn's talk, `cancelled` with an empty text, or `error`:
+    /// the start refused (the mic is busy, no mic, no voice model) or the
+    /// listener failed, with the words heard so far)
+    Dictation {
+        id: String,
+        text: String,
+        #[serde(rename = "final")]
+        is_final: bool,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        cancelled: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins", "computer_use"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins", "computer_use", "dictation"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -342,6 +361,16 @@ pub enum AppCmd {
     TalkEnd,
     /// the talk is dropped, nothing sent
     TalkCancel,
+    /// the composer's mic (bar I): the core opens the mic and dictates
+    /// into the window that sent this, never to main, never journaled;
+    /// `id`: the window's short-lived id, echoed on each `dictation`. One
+    /// mic user at a time: refused while a talk or another dictation
+    /// runs; fn (talk_start) ends a dictation first
+    DictateStart { id: String },
+    /// the words so far stay: the mic goes off, one final `dictation`
+    DictateStop { id: String },
+    /// dropped: the mic goes off, one final `dictation` with `cancelled`
+    DictateCancel { id: String },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
@@ -377,6 +406,9 @@ impl AppCmd {
         "talk_start",
         "talk_end",
         "talk_cancel",
+        "dictate_start",
+        "dictate_stop",
+        "dictate_cancel",
         "setup_check",
     ];
 

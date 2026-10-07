@@ -42,6 +42,7 @@ impl Core {
     /// words, the levels.
     pub fn tick(&mut self, now: Instant) {
         self.tick_talk(now);
+        self.tick_dictation(now);
         self.tick_speech();
         self.tick_projects(now);
         self.poll_projects(false);
@@ -164,6 +165,8 @@ impl Core {
         if self.talk.is_some() {
             return;
         }
+        // fn wins over the composer's mic: the dictation ends first
+        self.dictate_yield();
         // fn down while main speaks: the voice stops (the app sends
         // cut_in first; a talk_start alone does the same)
         self.stop_voice();

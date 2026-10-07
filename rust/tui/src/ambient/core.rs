@@ -7,6 +7,7 @@
 mod agents_view;
 mod away;
 mod cmd;
+mod dictate;
 mod hubs;
 mod setup;
 mod voice;
@@ -15,6 +16,8 @@ pub use self::cmd::Cmd;
 pub use self::hubs::{branch_of_head, ProjectFacts, ProjectPorts, Spawn};
 #[cfg(test)]
 pub use self::hubs::{LINGER, START};
+#[cfg(test)]
+pub use self::dictate::DICTATE_MAX;
 use super::hub::{Hub, HubIn};
 use super::speech::{Speech, Step};
 use crate::voicemode::{Heard, ListenJob, ListenMsg, Listener, Mic, MicBlock, MicStream, SayJob, Speaker, Synthesizer, UttId};
@@ -211,6 +214,8 @@ pub struct Core {
     /// the last message sent was said: Some(reached main's turn yet)
     voice_out: Option<bool>,
     talk: Option<Talk>,
+    /// the composer's mic (bar I, core/dictate.rs)
+    dictation: Option<dictate::Dictation>,
     speaker: Option<Box<dyn Speaker>>,
     speech: Option<Speech>,
     next_utt: UttId,
@@ -281,6 +286,7 @@ impl Core {
             main_text: String::new(),
             voice_out: None,
             talk: None,
+            dictation: None,
             speaker: None,
             speech: None,
             next_utt: 1,
@@ -336,6 +342,9 @@ impl Core {
             Cmd::PageTalk { page } => self.talk_start(Some(page)),
             Cmd::TalkEnd => self.talk_end(now),
             Cmd::TalkCancel => self.talk_cancel(),
+            Cmd::DictateStart { id } => self.dictate_start(id, now),
+            Cmd::DictateStop { id } => self.dictate_stop(&id, now),
+            Cmd::DictateCancel { id } => self.dictate_cancel(&id),
             Cmd::Shot { path, app, title } => self.take_shot(&path, app, title),
             // the latest fn wins; an excluded app's `{}` clears
             Cmd::AwayBack { away_ms } => self.away_back(away_ms),

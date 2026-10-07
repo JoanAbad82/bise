@@ -12,6 +12,11 @@ pub enum Cmd {
     PageTalk { page: String },
     TalkEnd,
     TalkCancel,
+    /// The composer's mic (bar I, core/dictate.rs): `id` is the window's,
+    /// echoed on each `dictation`.
+    DictateStart { id: String },
+    DictateStop { id: String },
+    DictateCancel { id: String },
     Shot { path: PathBuf, app: String, title: String },
     /// S9 (amb-mac m_9035): what the app read of his front app at fn
     /// (talk or spotlight), sent apart from talk_start; `{}` (an excluded
@@ -95,6 +100,12 @@ impl Cmd {
                 bise_proto::draft::AppCmd::TalkEnd => Cmd::TalkEnd,
                 bise_proto::draft::AppCmd::TalkCancel => Cmd::TalkCancel,
                 other => return Err(format!("{cmd}: decoded as {other:?}")),
+            },
+            "dictate_start" | "dictate_stop" | "dictate_cancel" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+                bise_proto::draft::AppCmd::DictateStart { id } if !id.trim().is_empty() => Cmd::DictateStart { id },
+                bise_proto::draft::AppCmd::DictateStop { id } if !id.trim().is_empty() => Cmd::DictateStop { id },
+                bise_proto::draft::AppCmd::DictateCancel { id } if !id.trim().is_empty() => Cmd::DictateCancel { id },
+                _ => return Err(format!("{cmd}: no id")),
             },
             "away_back" => Cmd::AwayBack { away_ms: v.get("away_ms").and_then(Value::as_u64).ok_or("away_back: no away_ms")? },
             "fn_context" => match v.get("context") {

@@ -18,6 +18,7 @@ use std::time::{Duration, Instant};
 
 const WS: &str = "/w/repo";
 
+mod dictate;
 mod hubs;
 mod setup;
 

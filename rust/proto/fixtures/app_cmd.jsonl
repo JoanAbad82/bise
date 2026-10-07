@@ -27,3 +27,6 @@
 {"cmd":"talk_end"}
 {"cmd":"talk_cancel"}
 {"cmd":"setup_check"}
+{"cmd":"dictate_start","id":"d1"}
+{"cmd":"dictate_stop","id":"d1"}
+{"cmd":"dictate_cancel","id":"d1"}

@@ -6,7 +6,7 @@
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import type { Account, Agent, Artifact, Card, DevServer, Entry, Feature, Found, Model, Job, JsonValue, Merged, Plugin, ProjectRow, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
-import { diffKey, Store, type Away, type Diff, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder } from './store';
+import { diffKey, Store, type Away, type Dictation, type Diff, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder } from './store';
 
 /**
  * Feeds a store from a core port: its live events, then the state events
@@ -83,6 +83,8 @@ export const useJobs = (project: string): readonly Job[] => useSlice(`jobs:${pro
 export const useDiff = (project: string, agent: string, commit?: string): Diff | null =>
   useSlice(diffKey(project, agent, commit), (s) => s.diff(project, agent, commit));
 export const useAway = (): Away | null => useSlice('away', (s) => s.away());
+/** A dictation this window started (store.dictateStart()): its whole text so far, final, cancelled, error. */
+export const useDictation = (id: string | null): Dictation | null => useSlice(`dictation:${id ?? ''}`, (s) => (id === null ? null : s.dictation(id)));
 export const useCoreState = (): CoreState => useSlice('core', (s) => s.core());
 
 /** A thread's order, before and more (key: threadKey(project, agent)). */
