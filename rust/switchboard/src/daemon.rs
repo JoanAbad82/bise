@@ -15,6 +15,8 @@
 mod accept;
 mod art;
 mod boot;
+mod capsule;
+mod choose;
 mod features;
 mod fn_context;
 pub(crate) mod gate;
@@ -794,93 +796,6 @@ impl Shell {
             }
         }
         snap
-    }
-
-    /// `/model`, `/reasoning` for `agent`: check, write its choice (and
-    /// config.toml for `default`), and say what it runs with now. A
-    /// model with another context window: its REPL reloads at its next
-    /// idle (same session), so the compaction threshold follows.
-    fn choose(&mut self, agent: &str, model: Option<String>, effort: Option<String>, default: bool) -> Result<String, String> {
-        let Some(a) = self.hub.st.agents.get(agent) else {
-            return Err(format!("no agent {}", agent));
-        };
-        let (dir, is_main) = (a.dir.clone(), a.is_main);
-        let before = self.in_use(&dir, is_main);
-        let short = |u: &bise_catalog::InUse| match u.effort.as_str() {
-            "" => u.model.name.clone(),
-            e => format!("{} · {}", u.model.name, e),
-        };
-        if model.is_none() && effort.is_none() {
-            let words = before.model.efforts();
-            let takes = if words.is_empty() {
-                "no reasoning setting".to_string()
-            } else {
-                format!("efforts: {}", words.join(", "))
-            };
-            return Ok(format!(
-                "{} runs {} (model from {}, {}) · /model <model>, /reasoning <effort>",
-                agent,
-                short(&before),
-                before.model_from,
-                takes
-            ));
-        }
-        let path = self.choice_path(&dir);
-        let mut choice = bise_catalog::Choice::read(&path);
-        if let Some(m) = &model {
-            let setup = self.setup();
-            let r = setup.catalog.resolve(m);
-            if r.known == bise_catalog::Known::NoProvider {
-                return Err(format!(
-                    "unknown provider for {}: pick a listed model, or add [providers.{}] to config.toml",
-                    m, r.provider
-                ));
-            }
-            if !r.needs.is_empty() {
-                return Err(format!("{} is not usable yet (needs {})", r.name, r.needs));
-            }
-            choice.model = r.name.clone();
-            // the user's pick: no longer the spawn's ask nor its fallback
-            choice = bise_catalog::Choice { model: choice.model, effort: choice.effort, ..Default::default() };
-        }
-        if let Some(e) = &effort {
-            let target = match &model {
-                Some(_) => self.setup().catalog.resolve(&choice.model),
-                None => before.model.clone(),
-            };
-            let words = target.efforts();
-            if words.is_empty() {
-                return Err(format!("{} has no reasoning setting", target.name));
-            }
-            if !words.iter().any(|w| w == e) {
-                return Err(format!("{} takes: {}", target.name, words.join(", ")));
-            }
-            choice.effort = e.clone();
-        }
-        if let Err(e) = choice.write(&path) {
-            return Err(format!("could not save the choice of {}: {}", agent, e));
-        }
-        let mut said = String::new();
-        if default {
-            // BISE-298: the role's line of [roles], its old key dropped
-            let role = if is_main { bise_catalog::roles::MAIN } else { bise_catalog::roles::AGENTS };
-            let cfg = bise_home::Home::from_env().config_file();
-            let text = std::fs::read_to_string(&cfg).unwrap_or_default();
-            let new = bise_catalog::roles::with_role(&text, role, &choice.model);
-            let tmp = cfg.with_extension("toml.tmp");
-            match std::fs::write(&tmp, new).and_then(|_| std::fs::rename(&tmp, &cfg)) {
-                Ok(()) => said = format!(" · config.toml [roles] {} = {}", role, choice.model),
-                Err(e) => said = format!(" · config.toml not written: {}", e),
-            }
-        }
-        let after = self.in_use(&dir, is_main);
-        if after.model.caps.context != before.model.caps.context && self.repls.contains_key(&dir) {
-            // the compaction threshold is 80 % of the window: a reload
-            // at the next idle takes the new one (nothing lost)
-            self.reload_repls.insert(dir.clone());
-        }
-        log_line(&self.opts.paths, &format!("{}: now on {} (was {})", agent, short(&after), short(&before)));
-        Ok(format!("✓ {} now on {} from its next call{}", agent, short(&after), said))
     }
 
     fn transcript(&self, dir: &str) -> PathBuf {
@@ -1807,45 +1722,6 @@ impl Shell {
         crate::util::timing("client hello written");
         self.clients.insert(id, stream);
         self.step(Input::ClientHello { client: id });
-    }
-
-    /// An input from bise ambient's capsule (`via: "capsule"`) carries one
-    /// more line, the one main's rule reads to answer in one short line
-    /// (prompts.rs); a slash command (`/answer N 1`) never gets it.
-    fn capsule_hint(text: String, via: &str) -> String {
-        if text.trim_start().starts_with('/') {
-            return text;
-        }
-        match via {
-            "capsule" => format!("{text}\n\n[from the capsule: answer in one short line]"),
-            // fn space's typed text sent with tab (ambient-lead m_6513):
-            // main starts an agent on it, only main does
-            "capsule-start" => format!("{text}\n\n[from the capsule: start an agent; answer in one short line]"),
-            _ => text,
-        }
-    }
-
-    /// The user's open steps (roadmap D) as one more line of a capsule
-    /// message to main: "done with the payment" from anywhere ticks the
-    /// right row (main runs `sb page tick`). Unchanged without any.
-    fn steps_hint(&mut self, text: String, via: &str) -> String {
-        if via != "capsule" || text.trim_start().starts_with('/') {
-            return text;
-        }
-        let Some(pages) = self.pg.pages.clone() else { return text };
-        let keys: Vec<(String, String)> = self.page_cards().values().filter(|(_, k)| k.starts_with("row:")).cloned().collect();
-        let mut steps: Vec<String> = Vec::new();
-        for (id, key) in keys {
-            let Some((block, item)) = key.trim_start_matches("row:").split_once('/') else { continue };
-            if let Some(s) = pages.store.steps(&id).into_iter().find(|s| s.block == block && s.item == item && s.reply.is_none()) {
-                steps.push(format!("{id} {item} \"{}\"", s.text));
-            }
-        }
-        if steps.is_empty() {
-            return text;
-        }
-        format!("{text}
-[his open steps: {}; when he says one is done: sb page tick <page> <item>]", steps.join(", "))
     }
 
     fn client_line(&mut self, id: ClientId, v: Value) {
@@ -2990,24 +2866,5 @@ mod tests {
             json!({"ev": "line", "agent": "main", "line": "  obs: turn_done: completed", "pos": 3, "ts": 1700000000000u64})
         );
         assert_eq!(line_event("t1", 1, 0, "x"), json!({"ev": "line", "agent": "t1", "line": "x", "pos": 1}));
-    }
-
-    /// The capsule's input carries the line main's rule reads (prompts.rs);
-    /// any other client's input, and a slash command, stay as they are.
-    #[test]
-    fn an_input_from_the_capsule_carries_the_hint_main_reads() {
-        let hinted = Shell::capsule_hint("what's running?".into(), "capsule");
-        assert!(hinted.starts_with("what's running?\n\n"));
-        assert!(hinted.ends_with("[from the capsule: answer in one short line]"));
-        // main's rule names the same line (prompts.rs)
-        assert!(crate::prompts::main_role("/w", "/t", "").contains("a `[from the capsule…]` line"));
-        assert_eq!(Shell::capsule_hint("what's running?".into(), ""), "what's running?");
-        assert_eq!(Shell::capsule_hint("hi".into(), "tui"), "hi");
-        assert_eq!(Shell::capsule_hint("/answer 3 1".into(), "capsule"), "/answer 3 1");
-        // fn space + tab: main starts an agent on it (ambient-lead m_6513)
-        assert_eq!(
-            Shell::capsule_hint("start an agent for: fix the login loop".into(), "capsule-start"),
-            "start an agent for: fix the login loop\n\n[from the capsule: start an agent; answer in one short line]"
-        );
     }
 }
