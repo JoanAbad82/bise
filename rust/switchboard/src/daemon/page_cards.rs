@@ -6,6 +6,94 @@
 use super::*;
 
 impl Shell {
+    /// The snapshot's pages (docs/ambient-pages.md §2.3), newest first, and
+    /// each card's page link. Moved out of Shell::snapshot unchanged
+    /// (architect m_12280).
+    pub(super) fn snapshot_pages(&mut self, snap: &mut Value) {
+        if let Some(p) = &self.pg.pages {
+            snap["pages"] = json!(p.list_json());
+            snap["pages_url"] = json!(p.base());
+            // his late promises (checklist rows of his past data-due): a
+            // count for the morning page and the menu bar, never a card
+            snap["overdue"] = json!(p.overdue());
+            // a page question's card links its block (fn + ⏎ opens it)
+            let p = p.clone();
+            let qs = self.page_cards().clone();
+            let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
+            let n = self.pg.card_links.len();
+            self.pg.card_links.retain(|c, _| open.contains(c));
+            if self.pg.card_links.len() != n {
+                self.save_card_links();
+            }
+            if let Some(cards) = snap["cards"].as_array_mut() {
+                for c in cards {
+                    // an agent's card linked with `sb card --page`
+                    if let Some(link) = c["id"].as_u64().and_then(|n| self.pg.card_links.get(&n)) {
+                        c["page"] = link.clone();
+                    }
+                    let Some((id, block)) = c["id"].as_u64().and_then(|n| qs.get(&n)) else { continue };
+                    // drafts batched in one card: the page opens at the
+                    // first (ambient-lead m_5977)
+                    if let Some((b, anchor)) = block.strip_prefix("drafts:").and_then(|k| k.split_once(':')) {
+                        c["page"] = json!({"id": id, "block": b, "item": anchor, "drafts": true, "url": format!("{}#{}", p.url(id), anchor)});
+                        // its fields for the capsule's words (amb-web
+                        // m_6061): {count, title, what, names}
+                        let card = c["id"].as_u64();
+                        if let Some(s) = p.store.steps(id).into_iter().find(|s| Some(s.card) == card && !s.info.is_null()) {
+                            c["batch"] = s.info;
+                        }
+                        continue;
+                    }
+                    // a step of his: its row (roadmap D)
+                    c["page"] = match block.strip_prefix("row:").and_then(|k| k.split_once('/')) {
+                        Some((b, item)) => json!({"id": id, "block": b, "item": item, "url": format!("{}#{}", p.url(id), item)}),
+                        None => json!({"id": id, "block": block, "url": format!("{}#{}", p.url(id), block)}),
+                    };
+                }
+            }
+        }
+    }
+
+    /// `sb card --page <id>[#<item>]`: a page that isn't there is refused
+    /// before the card opens (pm's B m_6008). Ok(None): not a card with a
+    /// page; Err: the refusal's words. Moved out of daemon.rs unchanged
+    /// (architect m_12280).
+    pub(super) fn card_page_link(&self, cmd: &str, v: &Value) -> Result<Option<Value>, String> {
+        match (cmd, v.get("page").and_then(Value::as_str)) {
+            ("card", Some(spec)) => match self.pg.pages.as_ref().map(|p| crate::card_link::link(p, spec)) {
+                Some(Ok(l)) => Ok(Some(l)),
+                Some(Err(e)) => Err(e),
+                None => Err("no pages on this hub".into()),
+            },
+            _ => Ok(None),
+        }
+    }
+
+    /// The card that step opened (an open card not in `before`) gets its
+    /// page link, saved, and the clients see it at once.
+    pub(super) fn link_new_card(&mut self, before: &[u64], l: Value) {
+        let new = self.hub.st.open_cards().map(|c| c.id).filter(|c| !before.contains(c)).max();
+        if let Some(card) = new {
+            self.pg.card_links.insert(card, l);
+            self.save_card_links();
+            let snap = self.snapshot();
+            self.broadcast(&snap);
+        }
+    }
+
+    /// A note talk's words (docs/ambient-pages.md §4.1): to the page's
+    /// frame, never an input. Moved out of daemon.rs's page_voice arm
+    /// unchanged (architect m_12280).
+    pub(super) fn page_voice(&self, v: &Value) {
+        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+        if let Some(p) = &self.pg.pages {
+            let page = s("page");
+            if p.store.meta(&page).is_some() {
+                p.push(&page, "voice", &json!({"phase": s("phase"), "text": s("text")}));
+            }
+        }
+    }
+
     /// `card_links` to the hub's state (card_link.rs), after each change.
     pub(super) fn save_card_links(&self) {
         if let Err(e) = crate::card_link::save(&crate::card_link::file(&self.opts.paths.state), &self.pg.card_links) {

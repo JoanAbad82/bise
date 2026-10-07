@@ -21,6 +21,7 @@ mod features;
 mod fn_context;
 pub(crate) mod gate;
 mod history;
+mod lines;
 mod page_cards;
 mod pages;
 mod projects;
@@ -733,49 +734,9 @@ impl Shell {
         // an ended one has `ended_ms` (amb-mac's menu and the capsule's
         // watched pages skip those)
         snap["timers"] = json!(self.hub.timers().state(now_ms()));
-        // the pages (docs/ambient-pages.md §2.3), newest first
-        if let Some(p) = &self.pg.pages {
-            snap["pages"] = json!(p.list_json());
-            snap["pages_url"] = json!(p.base());
-            // his late promises (checklist rows of his past data-due): a
-            // count for the morning page and the menu bar, never a card
-            snap["overdue"] = json!(p.overdue());
-            // a page question's card links its block (fn + ⏎ opens it)
-            let p = p.clone();
-            let qs = self.page_cards().clone();
-            let open: Vec<u64> = self.hub.st.open_cards().map(|c| c.id).collect();
-            let n = self.pg.card_links.len();
-            self.pg.card_links.retain(|c, _| open.contains(c));
-            if self.pg.card_links.len() != n {
-                self.save_card_links();
-            }
-            if let Some(cards) = snap["cards"].as_array_mut() {
-                for c in cards {
-                    // an agent's card linked with `sb card --page`
-                    if let Some(link) = c["id"].as_u64().and_then(|n| self.pg.card_links.get(&n)) {
-                        c["page"] = link.clone();
-                    }
-                    let Some((id, block)) = c["id"].as_u64().and_then(|n| qs.get(&n)) else { continue };
-                    // drafts batched in one card: the page opens at the
-                    // first (ambient-lead m_5977)
-                    if let Some((b, anchor)) = block.strip_prefix("drafts:").and_then(|k| k.split_once(':')) {
-                        c["page"] = json!({"id": id, "block": b, "item": anchor, "drafts": true, "url": format!("{}#{}", p.url(id), anchor)});
-                        // its fields for the capsule's words (amb-web
-                        // m_6061): {count, title, what, names}
-                        let card = c["id"].as_u64();
-                        if let Some(s) = p.store.steps(id).into_iter().find(|s| Some(s.card) == card && !s.info.is_null()) {
-                            c["batch"] = s.info;
-                        }
-                        continue;
-                    }
-                    // a step of his: its row (roadmap D)
-                    c["page"] = match block.strip_prefix("row:").and_then(|k| k.split_once('/')) {
-                        Some((b, item)) => json!({"id": id, "block": b, "item": item, "url": format!("{}#{}", p.url(id), item)}),
-                        None => json!({"id": id, "block": block, "url": format!("{}#{}", p.url(id), block)}),
-                    };
-                }
-            }
-        }
+        // the pages (docs/ambient-pages.md §2.3), newest first, and the
+        // cards' page links (daemon/page_cards.rs)
+        self.snapshot_pages(&mut snap);
         // one gate card for several agents' identical calls: it names them all
         self.gate_card_agents(&mut snap);
         let who: Vec<(String, String, bool)> =
@@ -812,23 +773,9 @@ impl Shell {
         let Some(dir) = self.dir_of(name) else { return };
         let path = self.transcript(&dir);
         let lines = self.fn_ctx_lines(name, line);
-        let ts = now_ms();
-        let mut out = String::new();
-        let mut events = Vec::new();
-        for line in lines {
-            let pos = match self.positions.get(name) {
-                Some(p) => p + 1,
-                None => transcript_len(&path) + 1,
-            };
-            self.positions.insert(name.to_string(), pos);
-            let b = self.buffers.entry(name.to_string()).or_default();
-            b.push_back((pos, ts, line.clone()));
-            while b.len() > BUFFER_LINES {
-                b.pop_front();
-            }
-            out.push_str(&format!("{ts}\t{line}\n"));
-            events.push(line_event(name, pos, ts, &line));
-        }
+        // positions, the memory buffer, the transcript text, the events
+        // (daemon/lines.rs)
+        let (out, events) = self.buffer_lines(name, &path, lines, now_ms());
         // one append: a 'you' line and its context line never part
         if let Ok(mut f) = std::fs::OpenOptions::new()
             .create(true)
@@ -1749,40 +1696,12 @@ impl Shell {
                 // BISE-266: a key saved since a REPL started reaches it
                 // before this message does
                 self.keys_changed();
-                // an answer to a page's question: its words, for the page
-                // from the capsule: a hint main's rule reads (one short line
-                // back); never on an answer or a slash command
-                // a step of his answered on its card (roadmap D): ticked
-                // on its page, the page's agent told there
-                if !self.page_step_answer(id, &s("text")) {
-                    let queued = v.get("queued").and_then(|x| x.as_bool()).unwrap_or(false);
-                    let text = match self.page_reply_text(&s("text")) {
-                        Some(reply) => reply,
-                        None => {
-                            // his attached files, rendered once (item H)
-                            let said = fn_context::with_files(&v, s("text"));
-                            // bise's home hub: words about a project go there (daemon/routing.rs)
-                            if self.route_input(&s("focus"), &s("text"), &said, &s("via"), queued, v.get("context")) {
-                                return self.page_answers();
-                            }
-                            let t = Self::capsule_hint(said, &s("via"));
-                            self.steps_hint(t, &s("via"))
-                        }
-                    };
-                    // S9: with its fn context (daemon/fn_context.rs)
-                    self.step_input(id, &v, s("focus"), text, queued);
-                }
-                self.page_answers();
+                // a page's answer, a step, a route or a plain input
+                // (daemon/capsule.rs)
+                self.input(id, &v);
             }
             // a note talk's words (§4.1): to the page's frame, never an input
-            "page_voice" => {
-                if let Some(p) = &self.pg.pages {
-                    let page = s("page");
-                    if p.store.meta(&page).is_some() {
-                        p.push(&page, "voice", &json!({"phase": s("phase"), "text": s("text")}));
-                    }
-                }
-            }
+            "page_voice" => self.page_voice(&v),
             // older lines of a feed, before a position (the TUI scrolled
             // to the top of what it holds)
             "history" => {
@@ -1925,33 +1844,20 @@ impl Shell {
             }
             _ => match AgentReq::from_json(&v) {
                 Ok(req) => {
-                    // `sb card --page <id>[#<item>]`: a page that isn't there
-                    // is refused before the card opens (pm's B m_6008)
-                    let link = match (cmd, v.get("page").and_then(Value::as_str)) {
-                        ("card", Some(spec)) => match self.pg.pages.as_ref().map(|p| crate::card_link::link(p, spec)) {
-                            Some(Ok(l)) => Some(l),
-                            Some(Err(e)) => {
-                                write_json(&mut stream, &json!({"ok": false, "error": e}));
-                                return;
-                            }
-                            None => {
-                                write_json(&mut stream, &json!({"ok": false, "error": "no pages on this hub"}));
-                                return;
-                            }
-                        },
-                        _ => None,
+                    // `sb card --page`'s link, checked before the card opens
+                    // (daemon/page_cards.rs)
+                    let link = match self.card_page_link(cmd, &v) {
+                        Ok(l) => l,
+                        Err(e) => {
+                            write_json(&mut stream, &json!({"ok": false, "error": e}));
+                            return;
+                        }
                     };
                     let before: Vec<u64> = self.hub.st.cards.keys().copied().collect();
                     self.replies.insert(token, stream);
                     self.step(Input::Agent { token, from, req });
                     if let Some(l) = link {
-                        let new = self.hub.st.open_cards().map(|c| c.id).filter(|c| !before.contains(c)).max();
-                        if let Some(card) = new {
-                            self.pg.card_links.insert(card, l);
-                            self.save_card_links();
-                            let snap = self.snapshot();
-                            self.broadcast(&snap);
-                        }
+                        self.link_new_card(&before, l);
                     }
                 }
                 Err(e) => {

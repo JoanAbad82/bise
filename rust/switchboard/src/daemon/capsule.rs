@@ -6,6 +6,39 @@
 use super::*;
 
 impl Shell {
+    /// A client's `input` (after its keys are reloaded): a step of his
+    /// answered on its card, an answer to a page's question, words bise's
+    /// home hub routes to a project, else an input with its files, the
+    /// capsule's hint and his open steps. Moved out of daemon.rs's input
+    /// arm unchanged (architect m_12280).
+    pub(super) fn input(&mut self, id: ClientId, v: &Value) {
+        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+        // an answer to a page's question: its words, for the page
+        // from the capsule: a hint main's rule reads (one short line
+        // back); never on an answer or a slash command
+        // a step of his answered on its card (roadmap D): ticked
+        // on its page, the page's agent told there
+        if !self.page_step_answer(id, &s("text")) {
+            let queued = v.get("queued").and_then(|x| x.as_bool()).unwrap_or(false);
+            let text = match self.page_reply_text(&s("text")) {
+                Some(reply) => reply,
+                None => {
+                    // his attached files, rendered once (item H)
+                    let said = fn_context::with_files(v, s("text"));
+                    // bise's home hub: words about a project go there (daemon/routing.rs)
+                    if self.route_input(&s("focus"), &s("text"), &said, &s("via"), queued, v.get("context")) {
+                        return self.page_answers();
+                    }
+                    let t = Self::capsule_hint(said, &s("via"));
+                    self.steps_hint(t, &s("via"))
+                }
+            };
+            // S9: with its fn context (daemon/fn_context.rs)
+            self.step_input(id, v, s("focus"), text, queued);
+        }
+        self.page_answers();
+    }
+
     /// An input from bise ambient's capsule (`via: "capsule"`) carries one
     /// more line, the one main's rule reads to answer in one short line
     /// (prompts.rs); a slash command (`/answer N 1`) never gets it.
