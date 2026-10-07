@@ -18,7 +18,8 @@ the one-line CLI:
 Never: the mic (the voice is faked in the app), the speaker, a screenshot
 of the user's screen (snapshots are the app's own web views on a synthetic
 backdrop), the user's real main (the fake hub is a throwaway: tests/e2e.py's
-scripted provider; `--hub real` is read-only: nothing is sent), a second
+scripted provider; the real workspace is refused: it needs a client the user
+started, docs/issues/16), a second
 copy of the app (scripts/ambient.sh builds the one path), pkill by name
 (only the QA app's own pid).
 """
@@ -679,8 +680,13 @@ def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", for
     if user_ask:
         print("ambient-qa: WARNING: this run uses the user's REAL accounts (%s), approved by the user in %s"
               % (", ".join(n for n, on in (("connectors", connectors), ("computer", computer)) if on) or "none", user_ask), file=sys.stderr)
-    if hub not in ("fake", "model", "real"):
-        raise QAError("hub: fake (a throwaway scripted hub), model (a throwaway hub with your real model and keys) or real (your workspace, read-only)")
+    if hub == "real":
+        # docs/issues/16 (socket-auth 6887139f): the real hub takes hello only from a client the
+        # user started, never from an agent's process; QA runs on throwaway hubs
+        raise QAError("refused: the real workspace needs a client the user started (an agent's process is refused "
+                      "on its hub.sock by design). QA runs on throwaway hubs: hub fake or model")
+    if hub not in ("fake", "model"):
+        raise QAError("hub: fake (a throwaway scripted hub) or model (a throwaway hub with your real model and keys)")
     if no_app:
         # the hub, its page server and the fake accounts only: never builds or opens the app (ambient-lead m_5413)
         if hub == "real":
@@ -2416,8 +2422,12 @@ def _hub_sb(info, *args):
     """`sb <args>` as the QA hub's main would run it (its own state dir and sb)."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("SB_")}
     # sb finds its hub by SB_SOCKET + SB_AGENT (the caller's own SB_* were dropped above, so
-    # this never reaches the hub the QA tool runs in)
-    env.update(SB_STATE_DIR=info["state"], SB_SOCKET=os.path.join(info["state"], "hub.sock"), SB_AGENT="main")
+    # this never reaches the hub the QA tool runs in). An agent's socket is agent.sock since
+    # docs/issues/16 (hub.sock refuses sb's ops there); hub.sock only for a hub from before it
+    sock = os.path.join(info["state"], "agent.sock")
+    if not os.path.exists(sock):
+        sock = os.path.join(info["state"], "hub.sock")
+    env.update(SB_STATE_DIR=info["state"], SB_SOCKET=sock, SB_AGENT="main")
     p = subprocess.run([os.path.join(info["state"], "bin", "sb")] + list(args), capture_output=True, text=True, env=env, timeout=30)
     return p.stdout + p.stderr
 

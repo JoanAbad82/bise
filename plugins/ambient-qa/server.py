@@ -15,8 +15,8 @@ import qa  # noqa: E402
 
 EV = {"type": "object", "description": "a contract event (docs/ambient-app.md §4): {ev: ..., ...}"}
 TOOLS = [
-    ("launch", "Start the real bise ambient.app in QA mode. hub=fake (default): a throwaway scripted hub, main answers 'ack: <your words>'; hub=real: the real workspace, read-only (nothing is ever sent). Builds the app at its one path if its sources changed (refused while the user's own app runs, unless force_build).",
-     {"hub": {"type": "string", "enum": ["fake", "model", "real"]}, "workspace": {"type": "string"}, "bise": {"type": "string", "description": "a bise with ambient-core (default: found)"},
+    ("launch", "Start the real bise ambient.app in QA mode. hub=fake (default): a throwaway scripted hub, main answers 'ack: <your words>'; hub=model: the same throwaway hub with the user's model and keys. The real workspace is refused: it needs a client the user started. Builds the app at its one path if its sources changed (refused while the user's own app runs, unless force_build).",
+     {"hub": {"type": "string", "enum": ["fake", "model"]}, "workspace": {"type": "string"}, "bise": {"type": "string", "description": "a bise with ambient-core (default: found)"},
       "backdrop": {"type": "string", "description": "dark, bright, busy, none, or a picture file"}, "force_build": {"type": "boolean"}, "restart": {"type": "boolean"},
       "connectors": {"type": "boolean", "description": "the user's REAL connectors: refused unless real_accounts_approved_by_user"},
       "computer": {"type": "boolean", "description": "the computer plugin (the user's browser): refused unless real_accounts_approved_by_user"},

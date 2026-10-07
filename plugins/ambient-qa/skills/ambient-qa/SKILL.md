@@ -39,7 +39,7 @@ Every tool returns JSON; PNG files are written under
 
 | tool | CLI | what |
 |---|---|---|
-| `launch({hub})` | `qa.py launch [--hub fake\|model\|real]` | fake (default): a throwaway hub, tests/e2e.py's scripted provider: main answers `ack: <your words>`. model: the same throwaway hub and workspace with the user's configured model and keys (costs credits; main's real behavior on the fake accounts, never the real main or his accounts). real: your workspace, read-only (nothing is ever sent). The result names the bise, its tree, the tree's commit and `behind_ambient_app` |
+| `launch({hub})` | `qa.py launch [--hub fake\|model]` | fake (default): a throwaway hub, tests/e2e.py's scripted provider: main answers `ack: <your words>`. model: the same throwaway hub and workspace with the user's configured model and keys (costs credits; main's real behavior on the fake accounts, never the real main or his accounts). The real workspace is refused (`hub: "real"`): it needs a client the user started. The result names the bise, its tree, the tree's commit and `behind_ambient_app` |
 | `scenes({only, backdrops, at, reduce, tokens, screen_h})` | `qa.py scenes [--only talk,needs] [--backdrops dark,bright,busy] [--reduce-motion] [--tokens f.css] [--at 400,1200]` | plays each scene in the app, shoots each moment, returns contact sheets (panel, and the screen's top 300 px; `screen_h: 0` = the whole screen) |
 | `frames({scene, every, span})` | `qa.py scenes --frames talk --every 80 [--span 0,2000]` | a strip of panel frames for the motion (springs, the lean-in, the needs-you edge); each file says when it was really taken (`taken_ms`) |
 | `look({tokens, reduce})` | `qa.py look --tokens f.json --reduce-motion on` | another look for what follows: a tokens file (`.css` as is, `.json` `{name: value}` as `:root --name`), kept across reloads; `tokens: ""` = the app's own |
@@ -108,8 +108,10 @@ Every tool returns JSON; PNG files are written under
    `still` scene plays a whole turn with it.
 7. `stop()` when done.
 
-Read-only on your real work: `launch({hub: "real", workspace: ...})`
-shows your real agents and cards; nothing you do reaches main.
+Never on your real work: since docs/issues/16 a hub takes a client's
+hello only from a process the user started, never from an agent's, so
+`launch({hub: "real"})` is refused ("the real workspace needs a client
+the user started"). QA runs on throwaway hubs (fake, model, or a world).
 
 ## Pages in a throwaway Chrome
 
