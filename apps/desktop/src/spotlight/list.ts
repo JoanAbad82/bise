@@ -35,6 +35,8 @@ export interface SpotCard {
   readonly text: string;
   /** ? a question, ! an approval, ✉ drafts to send (ambient m_8793) */
   readonly kind: 'question' | 'approval' | 'drafts';
+  /** its project's name when the projects list doesn't hold it (bise's home: 'bise') */
+  readonly pname?: string;
 }
 
 export interface SpotFront {
@@ -125,7 +127,7 @@ export function spotList(d: SpotData, text: string): SpotList {
       id: `card.${c.id}`,
       mark: MARK[c.kind],
       agent: c.agent,
-      pname: pname(c.project),
+      pname: c.pname ?? pname(c.project),
       text: c.kind === 'question' ? oneLine(c.text) : cardLine(c.text),
     }));
     const f = d.front;

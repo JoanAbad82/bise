@@ -2,7 +2,7 @@
 // How bise's answer appears in the spotlight and the capsule (ambient's text-appearing, m_12403).
 import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { answerRuns, fadeUnits, inlineRuns, runsText, staggerOf } from './live';
+import { answerRuns, fadeUnits, inlineRuns, runsText, staggerOf, tableCols, tableRows } from './live';
 import { LiveText } from './LiveText';
 
 describe('answerRuns: the shaping, never a raw mark', () => {
@@ -37,8 +37,12 @@ describe('answerRuns: the shaping, never a raw mark', () => {
   });
   it('a table shows once its separator arrived, a row once complete, columns from the header', () => {
     expect(answerRuns('| run | time |\n', true)).toEqual([]);
-    expect(answerRuns('| run | time |\n|---|---|\n| cold | 4.1', true)).toEqual([{ style: 'table', text: 'run  time' }]);
-    expect(answerRuns('| run | time |\n|---|---|\n| cold | 4.1 s |\n', true)).toEqual([{ style: 'table', text: 'run  time\ncold  4.1 s' }]);
+    expect(answerRuns('| run | time |\n|---|---|\n| cold | 4.1', true)).toEqual([{ style: 'table', text: 'run\ttime' }]);
+    expect(answerRuns('| run | time |\n|---|---|\n| cold | 4.1 s |\n', true)).toEqual([{ style: 'table', text: 'run\ttime\ncold\t4.1 s' }]);
+    // the cells: as many as the header's; the columns fixed from the header, 6 characters at least
+    expect(tableRows('run\ttime\ncold\t4.1 s')).toEqual([['run', 'time'], ['cold', '4.1 s']]);
+    expect(answerRuns('| a | b |\n|---|---|\n| 1 |\n| 2 | 3 | 4 |\n', false)).toEqual([{ style: 'table', text: 'a\tb\n1\t\n2\t3' }]);
+    expect(tableCols(['run', 'duration in ms'])).toBe('8ch 16ch');
   });
   it('a list keeps its dash; prose lines keep their breaks', () => {
     expect(runsText(answerRuns('two causes:\n- the index\n- the cache', false))).toBe('two causes:\n- the index\n- the cache');
@@ -91,6 +95,28 @@ describe('LiveText', () => {
     ui.rerender(<LiveText text={A} live={false} testId="t" />);
     expect(ui.queryByTestId('t.sign')).toBeNull();
     expect(ui.getByTestId('t').textContent).toBe(A);
+  });
+
+  it("after a code box or a table the '∿' sits out of the layout under it; after text, inline", () => {
+    const ui = render(<LiveText text={'Look:\n```\nlet a = 1;\n```\n'} live testId="t" />);
+    expect(ui.getByTestId('t.sign').className).toContain('after');
+    expect(ui.getByTestId('t.sign').textContent).toBe('∿');
+    ui.rerender(<LiveText text={'Look:\n| run | time |\n|---|---|\n| cold | 2.0 s |\n'} live testId="t" />);
+    expect(ui.getByTestId('t.sign').className).toContain('after');
+    ui.rerender(<LiveText text={'Look:\n| run | time |\n|---|---|\n| cold | 2.0 s |\nSo the'} live testId="t" />);
+    expect(ui.getByTestId('t.sign').className).not.toContain('after');
+    expect(ui.getByTestId('t.sign').textContent).toBe(' ∿');
+  });
+
+  it('a table draws as rows of cells, its header first, the columns from the header; a new row fades whole', () => {
+    const ui = render(<LiveText text={'| run | time |\n|---|---|\n| cold | 4.1 s |\n'} live testId="t" />);
+    const rows = (): HTMLElement[] => Array.from(ui.getByTestId('t').querySelectorAll<HTMLElement>('.table .tr'));
+    expect(rows().map((r) => Array.from(r.children).map((c) => c.textContent))).toEqual([['run', 'time'], ['cold', '4.1 s']]);
+    expect(rows()[0]?.className).toContain('th');
+    expect(rows().map((r) => r.style.gridTemplateColumns)).toEqual(['8ch 8ch', '8ch 8ch']);
+    ui.rerender(<LiveText text={'| run | time |\n|---|---|\n| cold | 4.1 s |\n| warm | 0.3 s |\n'} live testId="t" />);
+    expect(rows().map((r) => r.className.includes('fade'))).toEqual([false, false, true]);
+    expect(rows()[2]?.textContent).toBe('warm0.3 s');
   });
 
   it('reduced motion: the text comes, no fade, a still sign', () => {

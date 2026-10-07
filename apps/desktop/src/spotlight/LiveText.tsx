@@ -9,7 +9,7 @@
 // The shaping (bold, code, code box, table) is live.ts's.
 
 import { useEffect, useMemo, useState, type CSSProperties, type JSX, type ReactNode } from 'react';
-import { FADE_MS, STAGGER_SPAN_MS, answerRuns, fadeUnits, runsText, staggerOf, type Run } from './live';
+import { FADE_MS, STAGGER_SPAN_MS, answerRuns, fadeUnits, runsText, staggerOf, tableCols, tableRows, type Run } from './live';
 
 interface Batch {
   readonly from: number;
@@ -69,6 +69,38 @@ function runPieces(text: string, at: number, settled: number, batches: readonly 
   return out;
 }
 
+/**
+ * A table as the thread draws one (ambient m_12433): the ui font, the header in 600 over a 1 px
+ * --c-line rule, tabular numbers, the columns fixed from the header (a grid per row with the
+ * same columns, so a row that comes later never moves them). A row is the unit that fades.
+ */
+function Table({ text, at, settled, batches }: { text: string; at: number; settled: number; batches: readonly Batch[] }): JSX.Element {
+  const rows = tableRows(text);
+  const cols = { gridTemplateColumns: tableCols(rows[0] ?? []) } as CSSProperties;
+  // each row's flat offset: the rows before it and their '\n'
+  const starts = rows.reduce<number[]>((acc, cells, i) => [...acc, (acc[i] ?? at) + cells.join('\t').length + 1], [at]);
+  return (
+    <span className="table" role="table">
+      {rows.map((cells, i) => {
+        const start = starts[i] ?? at;
+        const b = start >= settled ? batches.find((x) => start >= x.from && start < x.to) : undefined;
+        // a new row's units start at its '\n' (the line before it) or at its first character
+        const d = b?.delays.get(start) ?? b?.delays.get(start - 1) ?? 0;
+        const style = b === undefined ? cols : ({ ...cols, '--d': `${String(d)}ms` } as CSSProperties);
+        return (
+          <span key={start} role="row" className={`tr${i === 0 ? ' th' : ''}${b === undefined ? '' : ' fade'}`} style={style}>
+            {cells.map((c, j) => (
+              <span key={j} role={i === 0 ? 'columnheader' : 'cell'}>
+                {c}
+              </span>
+            ))}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
 interface View {
   /** the plain text shown */
   readonly flat: string;
@@ -118,20 +150,25 @@ export function LiveText({ text, live, testId }: { text: string; live: boolean; 
       case 'code':
         return <code key={`r${start}`}>{pieces}</code>;
       case 'block':
-      case 'table':
         return (
-          <span key={`r${start}`} className={r.style === 'block' ? 'box' : 'table'}>
+          <span key={`r${start}`} className="box">
             {pieces}
           </span>
         );
+      case 'table':
+        return <Table key={`r${start}`} text={r.text} at={start} settled={view.settled} batches={view.batches} />;
     }
   });
+  // after a code box or a table, the '∿' sits in that block's bottom margin at the left edge,
+  // out of the layout, so its leaving moves nothing (ambient m_12433); after text, inline
+  const last = runs.at(-1)?.style;
+  const after = last === 'block' || last === 'table';
   return (
     <span className={`b-live${view.swap > 0 ? ` swap${view.swap % 2}` : ''}`} data-testid={testId} data-live={live ? '1' : '0'}>
       {body}
       {live && (
-        <span className={`sign${still() ? ' still' : ''}`} aria-hidden="true" data-testid={testId === undefined ? undefined : `${testId}.sign`}>
-          {' ∿'}
+        <span className={`sign${after ? ' after' : ''}${still() ? ' still' : ''}`} aria-hidden="true" data-testid={testId === undefined ? undefined : `${testId}.sign`}>
+          {after ? '∿' : ' ∿'}
         </span>
       )}
     </span>

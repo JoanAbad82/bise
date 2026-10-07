@@ -117,3 +117,141 @@ test('spotlight/streaming: bise main\'s reply streams in, only new words fade, n
     await s.close();
   }
 });
+
+// designer m_12432 + ambient m_12433: the '∿' after a code box or a table (in its bottom margin,
+// out of the layout, so its leaving moves nothing), the table drawn as the thread's, main's card
+// rows read 'bise', the dark panel (a stand-in for the glass behind it), and the capsule's 320 px
+// cap: a long spoken answer keeps its first lines above, scrolled, the newest at the bottom.
+test("spotlight/streaming: the '∿' after a block moves nothing, tables as the thread's, main's cards read bise, the capsule's cap scrolls", async () => {
+  test.setTimeout(120_000);
+  const core = new FakeCore();
+  const helper = new FakeHelper();
+  const s = await launchDesktop({ core, helper });
+  try {
+    const { app } = s;
+    await s.page.waitForTimeout(1500);
+    const card = (id: number, agent: string, question: string, approval = false): Record<string, unknown> => ({
+      id, project: HOME, kind: approval ? 'confirm' : 'question', rank: 1, agent, question,
+      options: [{ n: 1, label: 'yes' }, { n: 2, label: 'no' }], urgent: false, since_ms: 1791100310000, ...(approval ? { approval: true } : {}),
+    });
+    await core.send({ ev: 'cards', project: HOME, cards: [card(11, 'main', 'send the mail to legal?'), card(12, 'main', 'run the release script?', true)] } as unknown as Ev);
+    await helper.send({ ev: 'fn', act: 'key', key: 'space' });
+    await expect.poll(() => app.windows().some((p) => p.url().includes('surface=capsule'))).toBe(true);
+    const cap = app.windows().find((p) => p.url().includes('surface=capsule'));
+    if (!cap) throw new Error('no capsule window');
+    const input = cap.locator('[data-testid="spot.input"]');
+    await expect(input).toBeVisible({ timeout: 5000 });
+
+    // main's card rows read 'bise' (shownName, as the window)
+    await expect(cap.locator(`[data-testid="spot.row.card.${HOME}.11"]`), "main's question card reads '? bise'").toContainText('? bise', { timeout: 2000 });
+    await expect(cap.locator(`[data-testid="spot.row.card.${HOME}.12"]`), "main's approval reads '! bise'").toContainText('! bise');
+    expect(await cap.getByText(/^[?!] main$/).count(), "no '? main' row").toBe(0);
+    await cap.screenshot({ path: test.info().outputPath('8-cards.png') });
+
+    await input.click();
+    await cap.keyboard.type(`how do the benches compare ${Date.now() % 100000}`);
+    await cap.keyboard.press('Enter');
+    await core.waitCmd((c) => c['cmd'] === 'send' && c['agent'] === 'main');
+    const text = cap.locator('[data-testid="spot.answer.text"]');
+    const sign = cap.locator('[data-testid="spot.answer.text.sign"]');
+    const box = async (sel: string): Promise<Box> => {
+      const b = await cap.locator(sel).last().boundingBox();
+      if (!b) throw new Error(`no box for ${sel}`);
+      return b;
+    };
+    // the dark panel: what the glass behind it looks like in dark (a stand-in: the real glass is
+    // macOS vibrancy over his screen); the sheet's earlier dark shot was the glass over its grey
+    const backdrop = async (color: string, theme: 'dark' | 'light'): Promise<void> => {
+      await cap.emulateMedia({ reducedMotion: 'reduce', colorScheme: theme });
+      await cap.evaluate(([c, t]) => {
+        document.documentElement.dataset['theme'] = t;
+        document.documentElement.style.background = c;
+      }, [color, theme] as const);
+      await cap.waitForTimeout(300);
+    };
+
+    // a code box last: the sign under it, out of the layout
+    const code = 'The fix caches the walk:\n```rust\nlet idx = Index::walk_once(&root);\n```\n';
+    await core.send(partial(code, '9.1'));
+    await expect(text).toContainText('walk_once', { timeout: 1000 });
+    await expect(sign, "after a code box the '∿' is out of the layout").toHaveClass(/after/);
+    const codeBox = await box('[data-testid="spot.answer.text"] .box');
+    const signAt = await sign.boundingBox();
+    expect.soft((signAt?.y ?? 0) + 0.5, "the '∿' sits under the code box").toBeGreaterThanOrEqual(codeBox.y + codeBox.height);
+    expect.soft(Math.abs((signAt?.x ?? 0) - codeBox.x), "at the answer's left edge").toBeLessThan(2);
+    await cap.waitForTimeout(500);
+    await cap.screenshot({ path: test.info().outputPath('9-code-last.png') });
+
+    // a table last: drawn as the thread's (ui font, header 600 over a 1 px rule, tabular numbers)
+    const table = `${code}| run | time |\n|---|---|\n| cold | 2.0 s |\n| warm | 0.31 s |\n`;
+    await core.send(partial(table, '9.1'));
+    await expect(text).toContainText('warm', { timeout: 1000 });
+    await expect(sign).toHaveClass(/after/);
+    const look = await cap.locator('[data-testid="spot.answer.text"] .table').evaluate((t) => {
+      const th = t.querySelector('.th');
+      const cell = t.querySelector('.tr:not(.th) > span');
+      const cs = (e: Element | null): CSSStyleDeclaration | null => (e ? getComputedStyle(e) : null);
+      const rows = Array.from(t.querySelectorAll('.tr')).map((r) => Array.from(r.children).map((c) => Math.round(c.getBoundingClientRect().x)));
+      return {
+        headWeight: cs(th?.firstElementChild ?? null)?.fontWeight, rule: cs(th)?.borderBottomWidth, numbers: cs(t)?.fontVariantNumeric,
+        mono: (cs(cell)?.fontFamily ?? '').toLowerCase().includes('mono'), columns: rows.map((r) => r.join(',')),
+      };
+    });
+    expect.soft(look.headWeight, 'the header in 600').toBe('600');
+    expect.soft(look.rule, 'over a 1 px rule').toBe('1px');
+    expect.soft(look.numbers, 'tabular numbers').toContain('tabular-nums');
+    expect.soft(look.mono, 'the ui font, not mono').toBe(false);
+    expect.soft(new Set(look.columns).size, `the columns line up, from the header: ${look.columns.join(' | ')}`).toBe(1);
+    const tableBox = await box('[data-testid="spot.answer.text"] .table');
+    const signT = await sign.boundingBox();
+    expect.soft((signT?.y ?? 0) + 0.5, "the '∿' sits under the table").toBeGreaterThanOrEqual(tableBox.y + tableBox.height);
+    await cap.waitForTimeout(500);
+    await cap.screenshot({ path: test.info().outputPath('10-table-last.png') });
+    // its leaving moves nothing
+    await core.send(partial('', '9.1'));
+    await expect(sign).toHaveCount(0, { timeout: 1000 });
+    const after = await box('[data-testid="spot.answer.text"] .table');
+    expect.soft(after, "the '∿' leaving moves nothing").toEqual(tableBox);
+
+    // the dark panel and the glass over the sheet's grey, the same answer
+    await backdrop('#2a2a2c', 'dark');
+    await cap.screenshot({ path: test.info().outputPath('11-dark-panel.png') });
+    const colors = await cap.locator('.b-spot-answer').evaluate((el) => [getComputedStyle(el).color, getComputedStyle(document.documentElement).getPropertyValue('--c-text').trim()]);
+    expect.soft(colors[0], 'the answer is --c-text on the dark panel').not.toBe('');
+    await backdrop('#8e8e93', 'dark');
+    await cap.screenshot({ path: test.info().outputPath('11b-dark-on-grey.png') });
+    await backdrop('#f2f2f4', 'light');
+    await cap.screenshot({ path: test.info().outputPath('11c-light-panel.png') });
+    await backdrop('', 'dark');
+    await cap.evaluate(() => { delete document.documentElement.dataset['theme']; });
+    await cap.emulateMedia({ reducedMotion: 'no-preference', colorScheme: 'dark' });
+
+    // the capsule's cap: a long spoken answer grows to 320 px, then scrolls, the first lines above
+    await cap.keyboard.press('Escape');
+    await helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' });
+    await cap.waitForTimeout(400);
+    await helper.send({ ev: 'fn', act: 'talk_end' });
+    await core.waitCmd((c) => c['cmd'] === 'talk_end');
+    const lines = Array.from({ length: 14 }, (_, i) => `Line ${String(i + 1)}: the cold bench walks the index again.`);
+    for (let n = 2; n <= lines.length; n += 3) {
+      await core.send(partial(lines.slice(0, n).join('\n'), '10.1'));
+      await cap.waitForTimeout(300);
+    }
+    await core.send(partial(lines.join('\n'), '10.1'));
+    const answer = cap.locator('[data-testid="capsule.answer"]');
+    await expect(answer, 'the talk reaches its answer view').toBeVisible({ timeout: 2000 });
+    await expect(answer).toContainText('Line 14', { timeout: 1000 });
+    await cap.waitForTimeout(400);
+    const m = await answer.evaluate((el) => ({ h: el.clientHeight, sh: el.scrollHeight, top: el.scrollTop, all: el.textContent }));
+    expect.soft(m.h, 'it stops growing at 320 px').toBeLessThanOrEqual(320);
+    expect.soft(m.sh, 'then it scrolls').toBeGreaterThan(m.h);
+    expect.soft(m.sh - m.top - m.h, 'the newest line at the bottom').toBeLessThan(4);
+    expect.soft(m.all, 'the first lines are still there, above').toContain('Line 1:');
+    await cap.screenshot({ path: test.info().outputPath('12-cap-scrolled.png') });
+    await answer.evaluate((el) => { el.scrollTop = 0; });
+    await cap.waitForTimeout(200);
+    await cap.screenshot({ path: test.info().outputPath('12b-cap-top.png') });
+  } finally {
+    await s.close();
+  }
+});

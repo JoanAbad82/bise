@@ -183,10 +183,18 @@ export function CapsuleRoot(): JSX.Element {
       if (fx.fx === 'show') bise?.capsule.show(fx.at, fx.keys, fx.fit);
       else if (fx.fx === 'hide') bise?.capsule.hide();
       else if (fx.fx === 'mic') bise?.helper({ cmd: 'own_mic', open: fx.open });
-      else if (fx.fx === 'talk') store.command({ cmd: fx.cmd });
-      else bise?.openWindow(fx.route);
+      else if (fx.fx === 'talk') {
+        store.command({ cmd: fx.cmd });
+        // what he said goes to bise's main through the core: its reply is the answer view's,
+        // as a typed ask's is (without this the talk never reached its answer)
+        if (fx.cmd === 'talk_end' && home !== null) {
+          const order = store.threadOrder(threadKey(home, 'main')).order;
+          // (the answer view opens with its first reply, which replaces the last answer then)
+          asked.current = { after: order.length === 0 ? -1 : Math.max(...order), started: false };
+        }
+      } else bise?.openWindow(fx.route);
     }
-  }, [m.fx, bise, store]);
+  }, [m.fx, bise, store, home]);
 
   useEffect(() => {
     if (bise === undefined) return;

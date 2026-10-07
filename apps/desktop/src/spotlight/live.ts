@@ -76,15 +76,22 @@ const cells = (row: string): string[] => {
   return t.split('|').map((c) => c.trim());
 };
 
-/** A table's lines (header, separator, rows) as fixed columns from the header's widths. */
+/** A table run's rows and their cells (its text as tableText wrote it). */
+export const tableRows = (text: string): string[][] => text.split('\n').map((r) => r.split('\t'));
+
+/**
+ * A table's columns for a CSS grid, fixed from its header so a row that comes later never moves
+ * them: each its header's width plus a gap, 6 characters at least, in ch (a longer cell wraps).
+ */
+export const tableCols = (header: readonly string[]): string => header.map((h) => `${String(Math.max(6, h.length) + 2)}ch`).join(' ');
+
+/**
+ * A table's lines (header, separator, rows) as its run text: one line per row, its cells
+ * tab-separated, as many as the header has. LiveText draws it as a grid (tableRows, tableCols).
+ */
 function tableText(lines: readonly string[]): string {
   const head = cells(lines[0] ?? '');
-  const widths = head.map((c) => c.length);
-  const fmt = (cs: readonly string[]): string =>
-    cs
-      .map((c, i) => c.padEnd(widths[i] ?? 0))
-      .join('  ')
-      .trimEnd();
+  const fmt = (cs: readonly string[]): string => head.map((_, i) => cs[i] ?? '').join('\t');
   return [fmt(head), ...lines.slice(2).map((l) => fmt(cells(l)))].join('\n');
 }
 

@@ -92,7 +92,7 @@ describe('the store mapping', () => {
     );
     expect(d.projects.map((p) => [p.id, p.branch])).toEqual([['shop', 'main'], ['tel', 'dev']]);
     expect(d.agents).toMatchObject([{ name: 'perf', project: 'tel', status: 'working' }]);
-    expect(d.cards).toEqual([{ id: 'tel.4', agent: 'perf', project: 'tel', text: 'go?', kind: 'approval' }]);
+    expect(d.cards).toEqual([{ id: 'tel.4', agent: 'perf', project: 'tel', text: 'go?', kind: 'approval', pname: 'tel' }]);
     expect(cardKind(C(1, false))).toBe('question');
   });
 });

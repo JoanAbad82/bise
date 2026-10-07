@@ -11,12 +11,24 @@
 .b-live .fade { animation: b-live-in 180ms var(--ease-out) var(--d, 0ms) both; }
 .b-live.swap0 { animation: b-live-swap0 120ms var(--ease-out); }
 .b-live.swap1 { animation: b-live-swap1 120ms var(--ease-out); }
+.b-live { display: block; position: relative; }
 .b-live strong { font-weight: 600; }
-.b-live code, .b-live .box, .b-live .table { font-family: var(--font-mono); font-size: .88em; }
-.b-live code { padding: 0 .25em; border-radius: 4px; background: var(--c-sunken); }
-.b-live .box, .b-live .table { display: block; margin: 6px 0; white-space: pre; overflow-x: auto; }
-.b-live .box { padding: 8px 10px; border-radius: 8px; background: var(--c-sunken); animation: b-live-in 180ms var(--ease-out) both; }
+.b-live code, .b-live .box { font-family: var(--font-mono); font-size: .88em; }
+/* inline code: 2 px each side at most, so punctuation hugs it (amb-kit's fix, ambient m_12433) */
+.b-live code { padding: 0 2px; border-radius: 4px; background: var(--c-sunken); }
+.b-live .box, .b-live .table { display: block; margin: 6px 0; overflow-x: auto; }
+.b-live .box { padding: 8px 10px; border-radius: 8px; background: var(--c-sunken); white-space: pre; animation: b-live-in 180ms var(--ease-out) both; }
+/* a table as the thread's: ui font, header 600 over a 1 px --c-line rule, tabular numbers, the
+   columns fixed from the header (each row a grid with the same columns) */
+.b-live .table { white-space: normal; font-variant-numeric: tabular-nums; }
+.b-live .table .tr { display: grid; }
+.b-live .table .tr > span { padding: 3px 10px 3px 0; overflow-wrap: anywhere; }
+.b-live .table .th { border-bottom: 1px solid var(--c-line); }
+/* the weight on the cells, not the row: the row's ch (its columns) stays the body's */
+.b-live .table .th > span { font-weight: 600; }
 .b-live .sign { color: var(--c-text-2); animation: b-live-pulse 1.4s var(--ease-out) infinite; }
+/* after a code box or a table: in its bottom margin, at the answer's left edge, out of the layout */
+.b-live .sign.after { position: absolute; left: 0; top: 100%; line-height: 1; }
 .b-live .sign.still { animation: none; }
 @keyframes b-live-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes b-live-swap0 { from { opacity: .55; } to { opacity: 1; } }

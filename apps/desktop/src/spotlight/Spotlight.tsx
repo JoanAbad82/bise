@@ -10,6 +10,7 @@ import { LivePearl, type Mood } from '@/pearl';
 import { flat, routeList, spotList, type AgentStatus, type SpotData, type SpotItem } from './list';
 import { W, newBrief } from './words';
 import { LiveText } from './LiveText';
+import { shownName } from '@/agents/model';
 import { caretAtEnd, keep } from '@/app/keep';
 import './spotlight.css';
 
@@ -75,7 +76,7 @@ const Row = memo(function Row({ item, on, testId, onPick }: { item: SpotItem; on
     case 'new':
       return <SpotRow lead="bise" name={W.startAgent} what={item.brief} hotkey="↵" on={on} onClick={click} testId={id} />;
     case 'card':
-      return <SpotRow lead="nd" name={`${item.mark} ${item.agent}`} where={item.pname} what={item.text} on={on} onClick={click} testId={id} />;
+      return <SpotRow lead="nd" name={`${item.mark} ${shownName(item.agent)}`} where={item.pname} what={item.text} on={on} onClick={click} testId={id} />;
     case 'agent':
       return <SpotRow lead={DOT[item.status]} name={item.name} where={item.pname} what={item.title} on={on} onClick={click} testId={id} />;
     case 'env':
