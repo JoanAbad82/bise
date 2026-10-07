@@ -122,17 +122,33 @@ export interface ComposerFrameProps {
   tabs?: ReactNode;
   /** shown focused without focus (the gallery); live, :focus-within does it */
   focus?: boolean;
+  /** the whole frame is the input: a press on its padding or empty area (not on the editor, a chip, a
+   * button, the dock, the tabs or a quote) calls this to focus the editor, the caret at the end (his round 2) */
+  onBoxDown?: () => void;
   testId?: string;
 }
+
+/** A press in the frame that is not the editor's own text, a chip, a control, the dock, the tabs or a quote. Pure. */
+export function boxPress(target: EventTarget | null): boolean {
+  const el = target as { closest?: (s: string) => unknown } | null;
+  if (el === null || typeof el.closest !== "function") return true;
+  return el.closest('[contenteditable="true"], button, a, input, textarea, [role=button], .b-chip, .b-dock, .b-tabs, .b-quote') === null;
+}
 /** the composer's frame: tabs, dock, quote, the to-line, the box with the editor and send, the keys */
-export function ComposerFrame({ children, to, send, onSend, disabled, keys, quote, dock, tabs, focus, testId }: ComposerFrameProps) {
+export function ComposerFrame({ children, to, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, testId }: ComposerFrameProps) {
   return (
-    <div className={cx("b-composer", disabled && "is-disabled")} data-testid={testId}>
+    <div className={cx("b-composer", disabled && "is-disabled")} data-testid={testId}
+      onMouseDown={onBoxDown && ((e) => {
+        // the editor's own text keeps the click (the caret at the clicked line); elsewhere the frame focuses it
+        if (e.button !== 0 || !boxPress(e.target)) return;
+        e.preventDefault();
+        onBoxDown();
+      })}>
       {tabs}
       {dock}
       {quote}
       {to != null && <div className="div">{to}</div>}
-      <div className={cx("box", focus && "is-focus")}>
+      <div className={cx("box", focus && "is-focus")} data-testid={sub(testId, "box")}>
         <div className="in">{children}</div>
         <button type="button" className={cx("send", send === "stop" ? "stop" : send === "off" && "off")} onClick={onSend}
           disabled={send === "off" || disabled} aria-label={send === "stop" ? "stop" : "send"} data-testid={sub(testId, send === "stop" ? "stop" : "send")}>

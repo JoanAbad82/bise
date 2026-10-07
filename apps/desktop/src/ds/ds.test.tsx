@@ -18,6 +18,22 @@ describe("src/ds", () => {
     expect(getByTestId("composer.stop").textContent).toBe("■");
   });
 
+  it("the whole box is the input: a press on its padding calls onBoxDown, a press on the editor, a chip or send does not", () => {
+    const onBoxDown = vi.fn();
+    const { getByTestId } = render(
+      <ComposerFrame send="on" onBoxDown={onBoxDown} testId="c">
+        <div contentEditable suppressContentEditableWarning data-testid="c.editor">hi <span className="b-chip" data-testid="c.chip">1</span></div>
+      </ComposerFrame>,
+    );
+    fireEvent.mouseDown(getByTestId("c.box"), { button: 0 });
+    expect(onBoxDown).toHaveBeenCalledTimes(1);
+    fireEvent.mouseDown(getByTestId("c.editor"), { button: 0 });
+    fireEvent.mouseDown(getByTestId("c.chip"), { button: 0 });
+    fireEvent.mouseDown(getByTestId("c.send"), { button: 0 });
+    fireEvent.mouseDown(getByTestId("c.box"), { button: 2 });
+    expect(onBoxDown).toHaveBeenCalledTimes(1);
+  });
+
   it("send is a real button, off when there is nothing to send", () => {
     const onSend = vi.fn();
     const { getByTestId, rerender } = render(<ComposerFrame send="off" onSend={onSend} testId="c"><span /></ComposerFrame>);

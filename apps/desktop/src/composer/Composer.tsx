@@ -120,6 +120,10 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
     <ComposerFrame
       testId={testId}
       to={to}
+      // the whole box is the input: a press on its padding or empty area focuses the editor, caret at the end
+      onBoxDown={() => {
+        actions.current?.focusEnd();
+      }}
       keys={
         <>
           {sources.dictate !== undefined && (

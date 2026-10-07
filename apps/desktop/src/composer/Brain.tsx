@@ -62,6 +62,8 @@ export interface ComposerActions {
    */
   fill(text: string): void;
   focus(): void;
+  /** The focus with the caret at the draft's end (a press on the frame's padding or empty area, his round 2). */
+  focusEnd(): void;
   /** The mic control: on, or off when on (bar I). */
   dictate(): void;
   /**
@@ -521,6 +523,15 @@ export function Brain(p: BrainProps): JSX.Element | null {
     },
     focus: () => {
       editor.focus();
+    },
+    focusEnd: () => {
+      editor.update(
+        () => {
+          $getRoot().selectEnd();
+        },
+        { discrete: true },
+      );
+      editor.focus(undefined, { defaultSelection: 'rootEnd' });
     },
     quote: (text, from, at) => {
       // a selection of the thread as a quote chip at the caret (quote.rs; amb-win, lead m_10649)

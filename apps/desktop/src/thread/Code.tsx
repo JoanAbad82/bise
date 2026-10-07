@@ -22,6 +22,17 @@ export const THEME: PrismTheme = {
   ],
 };
 
+// the TUI's built-in type words (rust/tui/src/syntax.rs RUST_TYPES, PY_TYPES)
+const TYPE_WORDS = new Set([
+  'bool', 'char', 'str', 'u8', 'u16', 'u32', 'u64', 'u128', 'usize', 'i8', 'i16', 'i32', 'i64', 'i128', 'isize', 'f32', 'f64',
+  'int', 'float', 'list', 'dict', 'set', 'tuple', 'bytes', 'object',
+]);
+
+/** A token prism calls a keyword or a builtin that the TUI draws as a type. Pure. */
+export function typeWord(types: readonly string[], content: string): boolean {
+  return (types.includes('keyword') || types.includes('builtin')) && TYPE_WORDS.has(content.trim());
+}
+
 /** Prism knows this language (its bundled grammars). Pure. */
 export function known(lang: string | undefined): lang is string {
   return lang !== undefined && lang in Prism.languages;
@@ -35,9 +46,12 @@ export const Code = memo(function Code({ text, lang }: { text: string; lang: str
           {tokens.map((line, i) => (
             // a block's lines have no other key than their place
             <span key={i} {...getLineProps({ line })}>
-              {line.map((token, k) => (
-                <span key={k} {...getTokenProps({ token })} />
-              ))}
+              {line.map((token, k) => {
+                const props = getTokenProps({ token });
+                // prism calls the built-in types keywords; the TUI draws them as types (gold, not bold)
+                if (typeWord(token.types, token.content)) props.style = { ...props.style, color: 'var(--md-syn-type)', fontWeight: 'normal' };
+                return <span key={k} {...props} />;
+              })}
               {'\n'}
             </span>
           ))}
