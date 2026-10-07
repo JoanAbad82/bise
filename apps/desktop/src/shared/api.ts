@@ -17,6 +17,20 @@ export interface BiseApi {
   /** True when the app runs in test mode (BISE_DESKTOP_TEST=1): off-display window, no Dock icon. */
   readonly test: boolean;
   /**
+   * The app's own update (bar S.6, src/main/update): its state now and on
+   * every change. 'ready': the window shows 'bise <version> is ready ·
+   * restart'; 'went_bad': the new app didn't start right last time, 'go
+   * back'. Nothing installs without his click.
+   */
+  readonly update: {
+    readonly now: () => Promise<UpdateState>;
+    readonly onState: (listener: (s: UpdateState) => void) => () => void;
+    /** his click on 'restart': swap and start again, reopening `route` (the window's screen); false when nothing is ready */
+    readonly install: (route?: string) => Promise<boolean>;
+    /** his click on 'go back' (went_bad): the previous app again */
+    readonly revert: () => Promise<boolean>;
+  };
+  /**
    * Opens a link in his browser or mail app: http, https and mailto only
    * (src/main/external.ts). Resolves false when refused. In test mode nothing
    * opens: main prints `EXTERNAL_LINE <url>` on stdout instead.
@@ -211,7 +225,26 @@ export const IPC = {
   termExit: 'bise:term-exit',
   /** test mode: the preload asks main for the clipboard's seed (the env's files) */
   clipSeed: 'bise:clip-seed',
+  updateState: 'bise:update-state',
+  updateNow: 'bise:update-now',
+  updateInstall: 'bise:update-install',
+  updateRevert: 'bise:update-revert',
 } as const;
+
+/**
+ * The app's own update (bar S.6): none; downloading the newer app the core
+ * named; ready for his click; failed (why, for the log line); went_bad: the
+ * swapped-in app was started and never said it ran fine, so 'go back'.
+ */
+export type UpdateState =
+  | { readonly state: 'none' }
+  | { readonly state: 'downloading'; readonly version: string }
+  | { readonly state: 'ready'; readonly version: string }
+  | { readonly state: 'failed'; readonly version: string; readonly why: string }
+  | { readonly state: 'went_bad'; readonly version: string };
+
+/** Test mode: the fake .app (inside the test HOME) the updater swaps; never his bundle. */
+export const UPDATE_TARGET_ENV = 'BISE_DESKTOP_UPDATE_TARGET';
 
 /** The preload's argument naming its window: `--bise-surface=window|capsule`. */
 export const SURFACE_ARG = '--bise-surface=';
@@ -247,3 +280,7 @@ export const TEST_USER_DATA_ENV = 'BISE_DESKTOP_USER_DATA';
 
 /** The line main prints on stdout, in test mode, once the renderer has loaded. */
 export const READY_LINE = 'bise-desktop: ready';
+/** Test mode: the update's state on each change (`<line> <json>`). */
+export const UPDATE_LINE = 'bise-desktop: update';
+/** Test mode: the app would start again from this bundle now (never done in a test). */
+export const RELAUNCH_LINE = 'bise-desktop: relaunch';

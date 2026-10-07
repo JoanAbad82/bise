@@ -13,14 +13,14 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, ipcMain, Menu, nativeTheme } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme } from 'electron';
 import { BADGE_LINE, CORE_IPC, IPC, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
 import { Capsule, installCapsuleIpc } from './capsule';
 import { badgeOf, CountKeeper, titleOf } from './counts';
 import { installGuard } from './guard';
 import { startHelper } from './helper/run';
 import { adoptLoginEnv } from './loginenv';
-import { onCoreEvent, startCore, stopCore } from './core/ipc';
+import { onCoreEvent, sendToCore, startCore, stopCore } from './core/ipc';
 import { configOfPrefs } from './helper/config';
 import { installIpc, sendClip, sendMenu } from './ipc';
 import { menuTemplate } from './menu';
@@ -28,6 +28,7 @@ import { startTerms, type TermHost } from './term/host';
 import { startTray } from './tray';
 import { testHomeProblem } from './testhome';
 import { themeSourceOf } from './theme';
+import { takeRoute, Updates, updateTarget } from './update/run';
 import { MainWindow } from './windows';
 
 const testMode = process.env[TEST_ENV] === '1';
@@ -138,7 +139,33 @@ void app.whenReady().then(() => {
 `);
     else app.dock?.setBadge(badgeOf(c));
   });
-  main.create();
+  // the app's own update (update/run.ts, bar S.6): only a packed app (or a
+  // test's fake bundle in its test home) updates itself, on his click
+  const updatesDir = join(app.getPath('userData'), 'updates');
+  const target = updateTarget(testMode, process.env, app.isPackaged, process.execPath);
+  const updates =
+    target === null
+      ? null
+      : new Updates(target, updatesDir, {
+          testMode,
+          send: sendToCore,
+          stopCore,
+          broadcast: (s) => {
+            for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(IPC.updateState, s);
+          },
+        });
+  ipcMain.handle(IPC.updateNow, () => updates?.now() ?? { state: 'none' });
+  ipcMain.handle(IPC.updateInstall, (_e, route: unknown) => updates?.install(typeof route === 'string' ? route : null) ?? false);
+  ipcMain.handle(IPC.updateRevert, () => updates?.revert() ?? false);
+  if (updates !== null) {
+    void updates.start().then(() => {
+      onCoreEvent((ev) => {
+        updates.onCoreEvent(ev);
+      });
+    });
+  }
+  // after a swap, the screen he was on (written at his click)
+  main.create(target === null ? undefined : takeRoute(updatesDir));
   app.on('activate', () => {
     main.open();
   });

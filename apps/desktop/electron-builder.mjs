@@ -5,6 +5,10 @@
 //                                        so macOS charges its permissions to the app
 //                                        (src/main/helper/run.ts helperPath)
 //   Contents/Resources/pearl/*.png       the tray's pearl frames (src/main/tray.ts)
+//   Contents/Resources/VERSION           the app's build (id=, built= UTC with a Z), from
+//                                        BISE_PACK_VERSION when given: the updater says it to
+//                                        the core (src/main/update); none = a dev build, never
+//                                        offered an update
 // Its icon is resources/icon.png (1024 px, the Swift app's), made an .icns here.
 // A try build (amb-tools' 'bise-ambient --try') gets its own identity so it
 // never shares his app's userData, single-instance lock or permissions:
@@ -27,6 +31,8 @@ function need(name) {
 
 const bise = need('BISE_PACK_BISE');
 const helper = need('BISE_PACK_HELPER');
+// optional: the release's VERSION file (make-release writes id= and built=)
+const version = process.env['BISE_PACK_VERSION'] ? need('BISE_PACK_VERSION') : null;
 
 // BISE_PACK_SIGN_DIR: the Swift app's stable self-signed identity ('bise
 // ambient dev' in <dir>/sign.keychain-db, made by apps/ambient/mac/build.sh
@@ -72,6 +78,7 @@ export default {
   asar: true,
   extraResources: [
     { from: bise, to: 'bin/bise' },
+    ...(version === null ? [] : [{ from: version, to: 'VERSION' }]),
     { from: 'resources/pearl', to: 'pearl', filter: ['*.png'] },
   ],
   mac: {
