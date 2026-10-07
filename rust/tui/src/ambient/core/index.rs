@@ -2,7 +2,7 @@
 //! the core holds hubs only for home + shown + subscribed, so for every
 //! other registered project the window gets `index {projects}` with what
 //! that project's `view.json` says (its agents, its newest artifacts and
-//! their total), as of the view's `written_ms`, and whether its hub runs
+//! their total, its live scheduled tasks), as of the view's `written_ms`, and whether its hub runs
 //! (`up`). Read from files only: an index never starts or holds a hub.
 //! A held project is never in it (its live events say the same, and the
 //! hub writes the view with the same builders). Asked once (`index`, ⌘K
@@ -66,8 +66,9 @@ impl Core {
                         agents: v.agents,
                         artifacts: v.artifacts,
                         artifacts_total: v.artifacts_total,
+                        scheduled: v.scheduled,
                     },
-                    None => IndexRow { project: r.id.clone(), up, written_ms: None, agents: vec![], artifacts: vec![], artifacts_total: 0 },
+                    None => IndexRow { project: r.id.clone(), up, written_ms: None, agents: vec![], artifacts: vec![], artifacts_total: 0, scheduled: vec![] },
                 }
             })
             .collect()

@@ -57,6 +57,7 @@ pub(super) fn world(t: &mut T) -> World {
             cards: vec![serde_json::from_value(docs_card()).unwrap()],
             artifacts: vec![],
             artifacts_total: 0,
+            scheduled: vec![serde_json::from_value(json!({"id": 7, "agent": "main", "by": "main", "words": "check the docs build", "every": "every day 07:30", "done": 2, "next_ms": 5})).unwrap()],
         })),
         running: Box::new(|_| false),
         exists: Box::new(move |p| !gone2.lock().unwrap().iter().any(|g| g == p)),
@@ -660,6 +661,7 @@ fn the_index_lists_the_projects_not_held_from_their_files_only() {
     let rows = ix["projects"].as_array().unwrap();
     assert_eq!(rows.iter().map(|r| r["project"].as_str().unwrap()).collect::<Vec<_>>(), ["docs", "mail"], "held home and shop are never in it: {ix}");
     assert_eq!((rows[0]["up"].as_bool(), rows[0]["written_ms"].as_u64()), (Some(false), Some(1)), "docs: its view, as of when, its hub not up");
+    assert_eq!((rows[0]["scheduled"][0]["id"].as_u64(), rows[0]["scheduled"][0]["every"].as_str()), (Some(7), Some("every day 07:30")), "docs: its scheduled tasks from its view");
     assert_eq!((rows[1]["up"].as_bool(), rows[1].get("written_ms")), (Some(false), None), "mail: no view yet");
     let mut open: Vec<&String> = w.open.keys().collect();
     open.sort();

@@ -216,7 +216,7 @@ pub fn branch_of_head(head: &str) -> Option<String> {
 
 /// A held hub's own rows as a view (the sidebar's counts).
 fn live_view(project: &str, agents: &[Agent], cards: &[Card]) -> ProjectView {
-    ProjectView { v: 1, project: project.into(), written_ms: 0, stopped_ms: None, last_activity_ms: 0, agents: agents.to_vec(), cards: cards.to_vec(), artifacts: vec![], artifacts_total: 0 }
+    ProjectView { v: 1, project: project.into(), written_ms: 0, stopped_ms: None, last_activity_ms: 0, agents: agents.to_vec(), cards: cards.to_vec(), artifacts: vec![], artifacts_total: 0, scheduled: vec![] }
 }
 
 impl Core {

@@ -11,7 +11,7 @@
 //!   [`AppCmd`] (app -> core: open, project_add): never a hub's (S3b);
 //! - [`ProjectView`]: S1's `hubs/<id>/view.json` (amb-hub writes it).
 
-use crate::rows::{Agent, Artifact, Card};
+use crate::rows::{Agent, Artifact, Card, ScheduledTask};
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -712,6 +712,10 @@ pub struct ProjectView {
     pub artifacts: Vec<Artifact>,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub artifacts_total: u32,
+    /// ⌘K's index: its live scheduled tasks, as the typed `scheduled`
+    /// event gives them (the same builder, proto_view::scheduled)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scheduled: Vec<ScheduledTask>,
 }
 
 /// How many artifacts a `view.json` keeps (it is rewritten on every
@@ -737,4 +741,8 @@ pub struct IndexRow {
     pub artifacts: Vec<Artifact>,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub artifacts_total: u32,
+    /// its live scheduled tasks as of `written_ms` (a stopped hub runs
+    /// none: a `next_ms` in the past is not coming)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub scheduled: Vec<ScheduledTask>,
 }

@@ -3,7 +3,7 @@
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
 import type { JsonValue } from './json';
-import type { Agent, Artifact, Card } from './rows';
+import type { Agent, Artifact, Card, ScheduledTask } from './rows';
 
 /**
  * Selected lines of a thread quoted in a message (❝).
@@ -246,7 +246,12 @@ stopped_ms?: number | null, last_activity_ms: number, agents: Array<Agent>, card
  * `artifacts` event gives them (the same builder), the newest
  * [`VIEW_ARTIFACTS`] first; `artifacts_total`: how many it has
  */
-artifacts?: Array<Artifact>, artifacts_total?: number, };
+artifacts?: Array<Artifact>, artifacts_total?: number, 
+/**
+ * ⌘K's index: its live scheduled tasks, as the typed `scheduled`
+ * event gives them (the same builder, proto_view::scheduled)
+ */
+scheduled?: Array<ScheduledTask>, };
 
 /**
  * A project of ⌘K's index (CoreEv `index`): what its `view.json` says,
@@ -254,4 +259,9 @@ artifacts?: Array<Artifact>, artifacts_total?: number, };
  * (`up`: a stopped hub fires no timers, so the window never shows a
  * past next run as coming).
  */
-export type IndexRow = { project: string, up: boolean, written_ms?: number | null, agents: Array<Agent>, artifacts: Array<Artifact>, artifacts_total?: number, };
+export type IndexRow = { project: string, up: boolean, written_ms?: number | null, agents: Array<Agent>, artifacts: Array<Artifact>, artifacts_total?: number, 
+/**
+ * its live scheduled tasks as of `written_ms` (a stopped hub runs
+ * none: a `next_ms` in the past is not coming)
+ */
+scheduled?: Array<ScheduledTask>, };

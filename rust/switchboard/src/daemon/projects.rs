@@ -77,7 +77,9 @@ impl Shell {
         let vision = |m: &str| cat.and_then(|c| c.vision(m));
         // ⌘K's index: the same rows as the typed artifacts event
         let arts = self.artifact_rows(&self.artifacts_ev());
-        let v = view::of(snap, &project, now, self.projects.writer.last_activity_ms, stopped_ms, &mut self.projects.since, &vision, arts);
+        // and the same rows as the typed scheduled event
+        let sched = crate::proto_view::scheduled(self.hub.timers());
+        let v = view::of(snap, &project, now, self.projects.writer.last_activity_ms, stopped_ms, &mut self.projects.since, &vision, arts, sched);
         let paths = self.opts.paths.clone();
         let (tmp, file) = (paths.state.join("view.json.tmp"), paths.state.join(view::FILE));
         if write_logged(&paths, &tmp, &view::render(&v)) {
