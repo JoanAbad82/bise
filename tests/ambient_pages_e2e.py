@@ -142,12 +142,20 @@ def main():
         st, _, home = request(port, "GET", "/")
         check(st == 200 and 'href="/p/weekly-update"' in home, "for you lists it")
 
-        # the notes API: no token, another origin: refused
+        # the notes API: no token, a wrong token, another origin: refused;
+        # another Host (DNS rebinding): refused for a page and for the API
+        # (architect m_11797: the page server's refusals on a real hub)
         note = {"notes": [{"block": "p1", "quote": "dark mode", "kind": "note", "text": "use the March numbers"}]}
         st, _, _ = request(port, "POST", "/api/p/weekly-update/notes", note, {"Origin": origin})
         check(st == 403, "no token: 403, got %d" % st)
+        st, _, _ = request(port, "POST", "/api/p/weekly-update/notes", note, {"Origin": origin, "X-Bise-Token": "wrong"})
+        check(st == 403, "a wrong token: 403, got %d" % st)
         st, _, _ = request(port, "POST", "/api/p/weekly-update/notes", note, {"Origin": "http://evil.example", "X-Bise-Token": token})
         check(st == 403, "another origin: 403, got %d" % st)
+        st, _, body = request(port, "GET", "/p/weekly-update", None, {"Host": "evil.example:%d" % port})
+        check(st != 200 and "dark mode shipped" not in body, "another Host: refused, got %d" % st)
+        st, _, _ = request(port, "POST", "/api/p/weekly-update/notes", note, {"Host": "evil.example:%d" % port, "Origin": origin, "X-Bise-Token": token})
+        check(st != 200, "another Host on the API: refused, got %d" % st)
         st, _, saved = request(port, "POST", "/api/p/weekly-update/notes", note, {"Origin": origin, "X-Bise-Token": token})
         check(st == 200, "a draft saved: %d %s" % (st, saved))
         nid = json.loads(saved)["notes"][0]["id"]
