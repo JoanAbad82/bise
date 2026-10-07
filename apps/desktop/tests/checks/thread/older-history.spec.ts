@@ -53,14 +53,23 @@ test('thread/older-history: an older page arriving later goes on top in pos orde
     expect(ask.before, 'the page before the oldest row').toBe(20);
     const anchor = page.getByTestId('thread.entry.20');
     await expect(anchor).toBeVisible();
-    const y0 = (await anchor.boundingBox())?.y ?? -1;
+    // his wheels are still landing for a moment (they would rightly end the hold and move the row):
+    // y0 once the row has stopped moving
+    let y0 = -1;
+    for (let prev = NaN, t0 = Date.now(); Date.now() - t0 < 5000; ) {
+      await page.waitForTimeout(150);
+      y0 = (await anchor.boundingBox())?.y ?? -1;
+      if (y0 === prev) break;
+      prev = y0;
+    }
 
     await core.send({ ev: 'thread', project: P, agent: 'perf', entries: range(1, 19), before: 20, more: false } as never);
     await expect(page.getByTestId('thread.entry.19'), 'the older page is drawn').toBeAttached({ timeout: 3000 });
+    // react-virtuoso's own prepend left ~7 px; ThreadList holds the row he reads at its y while the
+    // new rows are measured (lead m_12263): it doesn't move at all. Read after the hold's frames.
+    await page.waitForTimeout(700);
     const y1 = (await anchor.boundingBox())?.y ?? -1;
-    // react-virtuoso's prepend keeps it within a few px (7 px measured on 41 px rows, not a jump):
-    // less than half a row, so the line he reads stays where his eyes are
-    expect(Math.abs(y1 - y0), `the row he was reading stays put (moved ${String(y1 - y0)} px)`).toBeLessThan(20);
+    expect(Math.abs(y1 - y0), `the row he was reading stays put (moved ${String(y1 - y0)} px)`).toBeLessThan(1);
     const order = await page.locator('[data-testid^="thread.entry."]').evaluateAll((els) => els.map((e) => Number(e.getAttribute('data-testid')?.split('.')[2])));
     expect(order, 'rows in pos order').toEqual([...order].sort((a, b) => a - b));
     expect(Math.max(...order.filter((p) => p < 20)), 'the older rows come before the newer ones').toBeLessThan(Math.min(...order.filter((p) => p >= 20)));

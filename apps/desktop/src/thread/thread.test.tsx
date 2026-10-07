@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render } from '@testing-library/react';
 import { Markdown, openable } from './Markdown';
-import { nextFirstIndex } from './ThreadList';
+import { anchorRow, nextFirstIndex } from './ThreadList';
 
 afterEach(cleanup);
 
@@ -13,6 +13,16 @@ describe('the list keeps what he reads when an older page comes in front', () =>
     expect(nextFirstIndex(a, ['e:4', 'e:7', 'e:10', 'e:12'])).toEqual({ first: 'e:4', index: 998 });
     // a first page into an empty list: the index stays
     expect(nextFirstIndex({ first: undefined, index: 1000 }, ['e:1'])).toEqual({ first: 'e:1', index: 1000 });
+  });
+  it('the row held still is the first one under the top edge (the line he reads)', () => {
+    const rows = [
+      { index: 998, top: -90, bottom: -50 },
+      { index: 999, top: -50, bottom: 10 },
+      { index: 1000, top: 10, bottom: 60 },
+    ];
+    expect(anchorRow(rows, 0)).toEqual({ index: 999, top: -50 });
+    expect(anchorRow(rows, 10)).toEqual({ index: 1000, top: 10 });
+    expect(anchorRow([], 0)).toBeUndefined();
   });
 });
 

@@ -50,6 +50,10 @@ export interface ThreadListProps {
   ref?: Ref<ThreadListHandle>;
   /** where his scroll is kept across a reload (keep.ts 'scroll:<it>', 10 minutes); none: not kept */
   keepKey?: string;
+  /** the part of a row held still when an older page comes in front (a
+   * selector inside the row: its words, not a divider above them that goes
+   * once the row before it arrives); none: the whole row */
+  holdPart?: string;
 }
 
 /**
@@ -64,6 +68,25 @@ export function nextFirstIndex(prev: { first: string | undefined; index: number 
   return { first, index: k > 0 ? prev.index - k : prev.index };
 }
 
+/**
+ * The row to hold still while an older page comes in front: the first one
+ * whose bottom is under the list's top edge (the line he reads), as
+ * Virtuoso's data-item-index (with firstItemIndex: stable across a
+ * prepend, unlike data-index, the position in `keys`). None when no row shows. Pure.
+ */
+export function anchorRow(rows: readonly { index: number; top: number; bottom: number }[], edge: number): { index: number; top: number } | undefined {
+  const r = rows.find((x) => x.bottom > edge);
+  return r === undefined ? undefined : { index: r.index, top: r.top };
+}
+
+/** How long after a prepend the anchor row is held (Virtuoso measures the new rows over a few frames). */
+const HOLD_MS = 1500;
+
+/** The part of a row held still: `sel` inside it when given and there, else the row. */
+function partOf(row: HTMLElement, sel: string | undefined): HTMLElement {
+  return (sel === undefined ? null : row.querySelector<HTMLElement>(sel)) ?? row;
+}
+
 /** How many keys came after `last` (an older page in front doesn't count). Pure. */
 export function newAtEnd(last: string | undefined, keys: readonly string[]): number {
   if (last === undefined) return 0;
@@ -71,13 +94,41 @@ export function newAtEnd(last: string | undefined, keys: readonly string[]): num
   return i < 0 ? 0 : keys.length - 1 - i;
 }
 
-export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, keepKey }: ThreadListProps) {
+export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, keepKey, holdPart }: ThreadListProps) {
   const virtuoso = useRef<VirtuosoHandle>(null);
   // the anchor of firstItemIndex, moved during render (React's
   // "state from the previous render" pattern): no effect, no extra frame
   const [anchor, setAnchor] = useState<{ first: string | undefined; index: number }>({ first: keys[0], index: START });
   const next = nextFirstIndex(anchor, keys);
   if (next !== anchor) setAnchor(next);
+
+  // the row he reads, measured at each scroll of his (not while held): when
+  // an older page comes in front, that row is held at that y (hold below)
+  const scroller = useRef<HTMLElement | null>(null);
+  const reading = useRef<{ index: number; top: number } | undefined>(undefined);
+  const held = useRef<{ index: number; top: number; until: number } | undefined>(undefined);
+  const holdRef = useRef<() => void>(() => undefined);
+  const measure = useCallback(() => {
+    const el = scroller.current;
+    if (el === null) return;
+    if (held.current !== undefined) {
+      holdRef.current();
+      return;
+    }
+    const rows = [...el.querySelectorAll<HTMLElement>('[data-item-index]')].map((r) => {
+      const b = partOf(r, holdPart).getBoundingClientRect();
+      return { index: Number(r.dataset.itemIndex), top: b.top, bottom: b.bottom };
+    });
+    reading.current = anchorRow(rows, el.getBoundingClientRect().top);
+  }, [holdPart]);
+  const scrollerRef = useCallback(
+    (el: HTMLElement | Window | null) => {
+      scroller.current?.removeEventListener('scroll', measure);
+      scroller.current = el instanceof HTMLElement ? el : null;
+      scroller.current?.addEventListener('scroll', measure, { passive: true });
+    },
+    [measure],
+  );
 
   // one older page at a time: asked again only once the keys changed
   const asked = useRef<string | undefined>(undefined);
@@ -121,9 +172,67 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
   const toEndNow = useCallback(() => {
     virtuoso.current?.scrollToIndex(LAST);
   }, []);
+  // the hold: the row he reads (its holdPart) back at the y it had before
+  // the prepend, by nudging scrollTop (Virtuoso's own prepend left ~7 px,
+  // up to 50 while it measures the new rows). Ends after HOLD_MS, at his
+  // wheel, key or click, or when it sticks to the end.
+  const hold = useCallback(() => {
+    const h = held.current;
+    const el = scroller.current;
+    if (h === undefined || el === null) return;
+    if (stick.current || Date.now() > h.until) {
+      held.current = undefined;
+      return;
+    }
+    const row = el.querySelector<HTMLElement>(`[data-item-index="${String(h.index)}"]`);
+    if (row === null) return;
+    const d = partOf(row, holdPart).getBoundingClientRect().top - h.top;
+    if (Math.abs(d) >= 0.5) el.scrollTop += d;
+  }, [holdPart]);
+  useLayoutEffect(() => {
+    holdRef.current = hold;
+  }, [hold]);
+  const firstIndex = useRef(next.index);
+  useLayoutEffect(() => {
+    const before = firstIndex.current;
+    firstIndex.current = next.index;
+    // an older page came in front: hold the row he read at the last scroll
+    if (next.index >= before || stick.current || reading.current === undefined) return;
+    held.current = { ...reading.current, until: Date.now() + HOLD_MS };
+    hold();
+    // Virtuoso draws the new rows over its next commits and frames: each
+    // scroll it makes comes back through measure (-> hold), each DOM change
+    // or resize in the list through the observers (a mutation is a
+    // microtask: it runs in a window in the background too, where frames and
+    // timers are throttled), and a timer covers the rest
+    const el = scroller.current;
+    let timer = 0;
+    const stop = () => {
+      window.clearTimeout(timer);
+      mo.disconnect();
+      ro.disconnect();
+    };
+    const again = () => {
+      hold();
+      if (held.current === undefined) stop();
+    };
+    const mo = new MutationObserver(again);
+    const ro = new ResizeObserver(again);
+    if (el !== null) {
+      mo.observe(el, { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
+      for (const c of el.children) ro.observe(c);
+    }
+    const tick = () => {
+      again();
+      if (held.current !== undefined) timer = window.setTimeout(tick, 16);
+    };
+    timer = window.setTimeout(tick, 0);
+    return stop;
+  }, [next.index, hold]);
   const onGrow = useCallback(() => {
     if (stick.current) toEndNow();
-  }, [toEndNow]);
+    else hold();
+  }, [toEndNow, hold]);
 
   useLayoutEffect(() => {
     if (opened.current || keys.length === 0) return;
@@ -170,15 +279,21 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, 
       className="th-list"
       data-testid={testId}
       data-stuck={stuck}
+      onPointerDown={() => {
+        held.current = undefined;
+      }}
       onWheel={(e) => {
+        held.current = undefined;
         if (e.deltaY < 0 && stick.current) setStick(false);
       }}
       onKeyDown={(e) => {
+        if (['PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown'].includes(e.key)) held.current = undefined;
         if (['PageUp', 'Home', 'ArrowUp'].includes(e.key) && stick.current) setStick(false);
       }}
     >
       <Virtuoso
         ref={virtuoso}
+        scrollerRef={scrollerRef}
         style={FILL}
         data={keys}
         firstItemIndex={next.index}

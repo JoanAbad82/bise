@@ -519,7 +519,7 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
     </div>
   );
   if (!view.loaded && keys.length === 0 && tail === undefined) return <div className="th-list th-loading" data-testid="thread.loading" />;
-  return <ThreadList ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} tail={tail} testId="thread.list" keepKey={tkey} />;
+  return <ThreadList ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} tail={tail} testId="thread.list" keepKey={tkey} holdPart=".th-row" />;
 });
 
 /** "3 agents · 1 at work · 2 waiting": a project's live agents (main out). Pure. */
