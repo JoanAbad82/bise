@@ -23,7 +23,7 @@ import { FirstRun, showsFirstRun, Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
 import { takeQuotes } from '@/review/quote';
 import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
-import { ThreadInbox } from '@/inbox';
+import { ThreadInbox, takesWords, useStripCard } from '@/inbox';
 import { dotOf, lineOf } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
@@ -160,6 +160,20 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
 
   const [tuning, setTuning] = useState(false);
   const title = bise ? 'bise' : agent === 'main' ? (projectName ?? project) : agent;
+  // inbox card v2 item 7 (ambient m_11273, amb-home 98ac9ea7): while the strip's card is docked
+  // and takes words, the composer answers it; esc makes it a plain message again (that card);
+  // an approval never takes words: his words stay a message and the card keeps waiting
+  const docked = useStripCard(project);
+  const dockedKey = docked === null ? null : `${docked.project}-${String(docked.id)}`;
+  const [plainFor, setPlainFor] = useState<string | null>(null);
+  const answering = docked !== null && takesWords(docked) && plainFor !== dockedKey ? docked : null;
+  const onKeyDownCapture = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape' || answering === null || dockedKey === null) return;
+    if (!(e.target instanceof HTMLElement) || e.target.closest('[data-testid="composer.field"]') === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setPlainFor(dockedKey);
+  };
   // a project's main: its counts (tui-parity W2), else the agent's line
   const all = useAgents(project);
   const counts = agent === 'main' ? countsOf(all) : '';
@@ -203,7 +217,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   return (
     <FoldsContext value={folds}>
     <FindMarkContext value={mark}>
-      <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} onKeyDown={onKeyDown}>
+      <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
         <Head
           title={title}
           sub={sub}
@@ -263,7 +277,18 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         {me?.archived === true ? (
           <History project={project} agent={agent} />
         ) : (
-          <ThreadComposer project={project} agent={agent} busy={busy} to={`you → ${title}`} onStop={stop} quoting={quoting} onReady={onComposer} onSent={onSent} />
+          <ThreadComposer
+            project={project}
+            agent={agent}
+            busy={busy}
+            to={answering === null ? `you → ${title}` : answeringLabel(answering)}
+            placeholder={answering === null ? undefined : 'your answer, then ⏎'}
+            answer={answering === null ? null : answering.id}
+            onStop={stop}
+            quoting={quoting}
+            onReady={onComposer}
+            onSent={onSent}
+          />
         )}
       </section>
     </FindMarkContext>
@@ -463,6 +488,8 @@ const ThreadComposer = memo(function ThreadComposer({
   agent,
   busy,
   to,
+  placeholder,
+  answer,
   onStop,
   quoting,
   onReady,
@@ -472,6 +499,10 @@ const ThreadComposer = memo(function ThreadComposer({
   agent: string;
   busy: boolean;
   to: string;
+  /** the field's words when empty (the composer's own 'write to …' when none) */
+  placeholder: string | undefined;
+  /** the docked card his words answer (item 7), else none */
+  answer: number | null;
   onStop: () => void;
   quoting: boolean;
   onReady: (a: ComposerActions) => void;
@@ -523,13 +554,27 @@ const ThreadComposer = memo(function ThreadComposer({
         onCommand(sl.name, sl.args);
         return;
       }
+      // the docked card's answer: his words, the hub's one /answer path (files go as a message)
+      if (answer !== null && out.files.length === 0) {
+        store.answer(project, answer, out.text);
+        onSent();
+        return;
+      }
       // ⏎ while a turn runs steers it ('now', as the TUI); the files he
       // attached or dropped go with it (amb-core item H: the hub renders them
       // once, an image as a marker the model sees). Tab's queue: amb-web's
       store.send({ project, agent, text: out.text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}) });
       onSent();
     },
-    [store, project, agent, onSent, onCommand],
+    [store, project, agent, onSent, onCommand, answer],
   );
-  return <Composer target={`${project}/${agent}`} busy={busy} sources={sources} to={to} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
+  return <Composer target={`${project}/${agent}`} busy={busy} sources={sources} to={to} placeholder={placeholder} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
 });
+
+/** The composer's label while it answers a docked card: 'answering perf · which bench do you…' (main is bise). Pure. */
+export function answeringLabel(c: { agent: string; question: string }): string {
+  const who = c.agent === 'main' ? 'bise' : c.agent;
+  const one = c.question.replace(/\s+/gu, ' ').trim();
+  const cut = Array.from(one).length > 40 ? `${Array.from(one).slice(0, 39).join('').trimEnd()}…` : one;
+  return `answering ${who} · ${cut}`;
+}

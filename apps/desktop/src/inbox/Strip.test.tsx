@@ -88,6 +88,22 @@ describe('InboxStrip (W7/K24)', () => {
     expect(did).toEqual(['close acme-1', 'close acme-2', 'answer acme-3 2']);
   });
 
+  it("a digit typed in the composer with his words in it is his, not an option (amb-win, item 7)", () => {
+    const { did, p } = ports();
+    render(<InboxStrip project="acme" cards={[card(1, 0)]} ports={p} now={NOW} />);
+    fireEvent.click(screen.getByTestId('strip.row.1'));
+    const field = document.createElement('div');
+    field.contentEditable = 'true';
+    field.textContent = 'cold, on the m';
+    document.body.appendChild(field);
+    fireEvent.keyDown(field, { key: '2', code: 'Digit2' });
+    expect(did).toEqual([]);
+    field.textContent = '';
+    fireEvent.keyDown(field, { key: '2', code: 'Digit2' });
+    expect(did).toEqual(['answer acme-1 2']);
+    field.remove();
+  });
+
   it("the docked card: 'bise asks' for main, no project for bise's home, the question's footer", () => {
     const c = { ...card(1, 0), agent: 'main' };
     render(<InboxStrip project="acme" name="acme-storefront" home cards={[c]} ports={ports().p} now={NOW} />);
