@@ -5,7 +5,7 @@
 // answer, esc folds it back; words answer in the ⌘I inbox. InboxStrip
 // draws it from props; ThreadInbox (screen.tsx) is the one line the thread
 // mounts, fed by the store. Owner: amb-home.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Card } from '@/proto';
 import { Dot, Kbd } from '@/ds';
 import { age, dotOf, InboxCard, kindTitle } from './InboxCard';
@@ -30,6 +30,8 @@ export interface InboxStripProps {
   ports: StripPorts;
   /** now, for the ages (a test pins it) */
   now?: number;
+  /** bar L25: the demo tour's tip, above the box (none: no tip) */
+  tip?: ReactNode;
 }
 
 /** A field he is typing in: esc there is his, not the strip's. */
@@ -37,7 +39,7 @@ function typing(t: EventTarget | null): boolean {
   return (t instanceof HTMLTextAreaElement || t instanceof HTMLInputElement) && t.value !== '';
 }
 
-export function InboxStrip({ project, cards, ports, now: pinned }: InboxStripProps) {
+export function InboxStrip({ project, cards, ports, now: pinned, tip }: InboxStripProps) {
   const [open, setOpen] = useState<string | null>(null);
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
   const [opened] = useState(() => Date.now());
@@ -93,55 +95,58 @@ export function InboxStrip({ project, cards, ports, now: pinned }: InboxStripPro
   if (list.length === 0) return null;
   const view = stripView(list, open);
   return (
-    <section className="inbox-strip" aria-label="inbox" data-testid="strip">
-      <div className="strip-title">
-        inbox <span className="strip-count">{`${String(list.length)} waiting`}</span>
-        <span className="strip-keys">
-          <Kbd>{list.length > 1 ? `ctrl 1–${String(Math.min(list.length, STRIP_KEYS))}` : 'ctrl 1'}</Kbd> open
-        </span>
-      </div>
-      {view.rows.map(({ card: c, n, open: isOpen }) =>
-        isOpen ? (
-          <div className="strip-open" key={cardKey(c)}>
-            <InboxCard
-              card={c}
-              now={now}
-              acts={{
-                pick: (o) => {
-                  leave(c);
-                  ports.answer(c.project, c.id, String(o));
-                },
-                close: () => {
-                  leave(c);
-                  ports.close(c.project, c.id);
-                },
-                ...(ports.openPage ? { openPage: ports.openPage } : {}),
-              }}
-              keys={
-                <>
-                  {c.options.length > 0 ? 'click an option' : 'nothing to pick'} · <Kbd>esc</Kbd> fold ·{' '}
-                  <button type="button" className="strip-link" onClick={ports.openInbox} data-testid={`strip.inbox.${cardKey(c)}`}>
-                    answer in words in the inbox
-                  </button>
-                </>
-              }
-              testId={`strip.card.${cardKey(c)}`}
-            />
-          </div>
-        ) : (
-          <StripRow key={cardKey(c)} c={c} n={n} now={now} onOpen={() => {
-            setOpen(cardKey(c));
-          }} />
-        ),
-      )}
-      {view.more > 0 && view.next && (
-        <button type="button" className="strip-row strip-more" data-testid="strip.more" onClick={() => {
-          setOpen(view.next ? cardKey(view.next) : null);
-        }}>
-          {`+ ${String(view.more)} more · ${kindTitle(view.next.kind, view.next.agent)}`}
-        </button>
-      )}
-    </section>
+    <>
+      {tip}
+      <section className="inbox-strip" aria-label="inbox" data-testid="strip">
+        <div className="strip-title">
+          inbox <span className="strip-count">{`${String(list.length)} waiting`}</span>
+          <span className="strip-keys">
+            <Kbd>{list.length > 1 ? `ctrl 1–${String(Math.min(list.length, STRIP_KEYS))}` : 'ctrl 1'}</Kbd> open
+          </span>
+        </div>
+        {view.rows.map(({ card: c, n, open: isOpen }) =>
+          isOpen ? (
+            <div className="strip-open" key={cardKey(c)}>
+              <InboxCard
+                card={c}
+                now={now}
+                acts={{
+                  pick: (o) => {
+                    leave(c);
+                    ports.answer(c.project, c.id, String(o));
+                  },
+                  close: () => {
+                    leave(c);
+                    ports.close(c.project, c.id);
+                  },
+                  ...(ports.openPage ? { openPage: ports.openPage } : {}),
+                }}
+                keys={
+                  <>
+                    {c.options.length > 0 ? 'click an option' : 'nothing to pick'} · <Kbd>esc</Kbd> fold ·{' '}
+                    <button type="button" className="strip-link" onClick={ports.openInbox} data-testid={`strip.inbox.${cardKey(c)}`}>
+                      answer in words in the inbox
+                    </button>
+                  </>
+                }
+                testId={`strip.card.${cardKey(c)}`}
+              />
+            </div>
+          ) : (
+            <StripRow key={cardKey(c)} c={c} n={n} now={now} onOpen={() => {
+              setOpen(cardKey(c));
+            }} />
+          ),
+        )}
+        {view.more > 0 && view.next && (
+          <button type="button" className="strip-row strip-more" data-testid="strip.more" onClick={() => {
+            setOpen(view.next ? cardKey(view.next) : null);
+          }}>
+            {`+ ${String(view.more)} more · ${kindTitle(view.next.kind, view.next.agent)}`}
+          </button>
+        )}
+      </section>
+    </>
   );
 }
 

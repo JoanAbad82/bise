@@ -11,7 +11,7 @@
 // a plain map, so they outlive the screen; dropped by an answer or a
 // close). The list's rows are memo'd: moving the keyboard re-renders the
 // two rows that change.
-import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { Card as CardRow } from '@/proto';
 import { Empty, Head, Row } from '@/ds';
 import { dotOf, folds, InboxCard, kindTitle, takesWords } from './InboxCard';
@@ -53,9 +53,11 @@ export interface InboxProps {
   drafts?: Drafts;
   /** the last answer by voice the core heard (bar N14) */
   voice?: VoiceAnswer | null;
+  /** bar L25: the demo tour's tip above the open item (none: no tip) */
+  tipOf?: (c: CardRow) => ReactNode;
 }
 
-export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts, voice = null }: InboxProps) {
+export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts, voice = null, tipOf }: InboxProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [s, setS] = useState(START);
@@ -165,6 +167,7 @@ export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts, 
             ))}
           </div>
           <div className="inbox-open">
+            {tipOf?.(cur)}
             <InboxCard
               card={cur}
               project={names[cur.project]}

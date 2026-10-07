@@ -4,13 +4,16 @@
 // waits on him everywhere; an answer is the hub's one /answer path
 // (store.answer), a close the hub's one close path (store.close, the
 // typed HubCmd close). ThreadInbox: the thread's inbox strip (Strip.tsx)
-// fed the same way, for one project. Owner: amb-home.
+// fed the same way, for one project. Both show the demo tour's 'card' tip
+// (bar L25, useTour) above the item that waits. Owner: amb-home.
 import { useCallback, useMemo } from 'react';
 import type { ProjectRow } from '@/proto';
 import { useProjects, useStore, useVoiceAnswer } from '@/store';
 import { useRouter } from '@/app/router';
 import { Inbox } from './Inbox';
 import { InboxStrip } from './Strip';
+import { Tip } from '@/setup';
+import { useTour } from '@/setup/useTour';
 
 /** Every project's cards, and each project's name, from the projects rows. */
 export function inboxOf(rows: readonly ProjectRow[]) {
@@ -37,6 +40,7 @@ export function InboxScreen() {
       cards={cards}
       names={names}
       voice={voice}
+      tipOf={(c) => <CardTip project={c.project} />}
       ports={{
         inView,
         answer: (project, card, reply) => {
@@ -72,6 +76,7 @@ export function ThreadInbox({ project }: { project: string }) {
     <InboxStrip
       project={project}
       cards={cards}
+      tip={<CardTip project={project} />}
       ports={{
         answer: (p, card, reply) => {
           store.answer(p, card, reply);
@@ -89,4 +94,11 @@ export function ThreadInbox({ project }: { project: string }) {
       }}
     />
   );
+}
+
+/** bar L25: the demo tour's 'card' tip (amb-kit's words, amb-win's one tour per
+ * project), above the item that waits: in the thread's strip and over ⌘I's open item. */
+function CardTip({ project }: { project: string }) {
+  const { tip, snap } = useTour(project);
+  return tip === 'card' ? <Tip tip="card" snap={snap} /> : null;
 }

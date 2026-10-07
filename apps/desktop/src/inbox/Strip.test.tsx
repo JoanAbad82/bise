@@ -70,6 +70,13 @@ describe('InboxStrip (W7/K24)', () => {
     expect(screen.getByTestId('strip.row.1').textContent).toContain('t2');
   });
 
+  it("the demo tour's tip goes above the box (L25), and not without an item", () => {
+    const { rerender } = render(<InboxStrip project="acme" cards={[card(1, 0)]} ports={ports().p} now={NOW} tip={<span data-testid="tip" />} />);
+    expect(screen.getByTestId('tip').compareDocumentPosition(screen.getByTestId('strip')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    rerender(<InboxStrip project="acme" cards={[]} ports={ports().p} now={NOW} tip={<span data-testid="tip" />} />);
+    expect(screen.queryByTestId('tip')).toBeNull();
+  });
+
   it('ctrl+N past the last row does nothing and leaves the key alone', () => {
     render(<InboxStrip project="acme" cards={[card(1, 0)]} ports={ports().p} now={NOW} />);
     const e = new KeyboardEvent('keydown', { code: 'Digit3', key: '3', ctrlKey: true, cancelable: true });
