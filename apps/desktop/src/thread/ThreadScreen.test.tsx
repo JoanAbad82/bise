@@ -65,7 +65,7 @@ describe('the thread screen', () => {
     act(() => {
       composer.props?.onSend({ text: 'hi there', files: [] });
     });
-    expect(cmds.at(-1)).toEqual({ cmd: 'send', project: P, agent: 'perf', text: 'hi there', mode: 'now' });
+    expect(cmds.at(-1)).toMatchObject({ cmd: 'send', project: P, agent: 'perf', text: 'hi there', mode: 'now' });
     act(() => {
       composer.props?.onSend({ text: 'look', files: ['/tmp/shot.png'] });
     });
@@ -81,7 +81,7 @@ describe('the thread screen', () => {
     expect(row.getByTestId(`thread.pending.${p.cid}`).dataset.state).toBe('failed');
     expect(row.getByTestId(`thread.pending.${p.cid}`).textContent).toContain('not sent · no agent perf');
     fireEvent.click(row.getByTestId(`thread.retry.${p.cid}`));
-    expect(cmds.at(-1)).toEqual({ cmd: 'send', project: P, agent: 'perf', text: 'hi there', mode: 'now' });
+    expect(cmds.at(-1)).toMatchObject({ cmd: 'send', project: P, agent: 'perf', text: 'hi there', mode: 'now' });
   });
 
   it('⛔6: esc while its turn runs sends stop, and the stop shows; at rest esc sends nothing', () => {

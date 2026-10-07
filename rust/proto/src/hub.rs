@@ -158,6 +158,16 @@ pub enum HubEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cmd: Option<String>,
         text: String,
+        /// draft (G): the failed send's cid (HubCmd send's), to the
+        /// connection that sent it: the window fails exactly that row
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cid: Option<u64>,
+        /// draft (G), with a cid: "refused" (nothing reached the thread:
+        /// his row shows not delivered, with retry) or "undelivered" (the
+        /// hub wrote its undelivered line in the thread: that entry
+        /// stands in for his row)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
     },
     /// a tag this version doesn't know (a newer hub): kept whole, ignored
     #[serde(skip)]
@@ -209,6 +219,9 @@ pub enum Mode {
 }
 
 /// What a client asks a hub.
+// one command is decoded at a time and never stored in bulk: the size of
+// its largest variant (Send, with its context and files) costs nothing
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "cmd", rename_all = "snake_case")]
@@ -260,6 +273,10 @@ pub enum HubCmd {
         /// is left out. Never on a slash command
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         files: Vec<String>,
+        /// draft (G): the window's id for this send, echoed on its error
+        /// to this connection only (never journaled: view state)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cid: Option<u64>,
     },
     /// a card's answer: an option's number or words (approvals and merges
     /// included: the hub's one /answer path)

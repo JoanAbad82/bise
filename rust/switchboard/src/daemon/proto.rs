@@ -46,9 +46,21 @@ pub(super) struct Proto {
     /// (a stat on each state broadcast, never a read), and its JSON
     models_at: Option<(Option<std::time::SystemTime>, Option<std::time::SystemTime>)>,
     models: String,
-    /// the typed command being stepped (its connection, its tag): a
-    /// notice sb-core sends that connection meanwhile becomes its error
-    stepping: Option<(ClientId, String)>,
+    /// the typed command being stepped: a notice sb-core sends its
+    /// connection meanwhile becomes its error, after the step
+    stepping: Option<Stepping>,
+}
+
+/// G: the typed command being stepped (its connection, its tag, a send's
+/// cid), the notices sb-core gave it, and whether that step wrote an
+/// `undelivered` line (BISE-86: then the thread has its row).
+#[derive(Default)]
+struct Stepping {
+    id: ClientId,
+    cmd: String,
+    cid: Option<u64>,
+    notices: Vec<String>,
+    undelivered: bool,
 }
 
 #[derive(Default)]
@@ -141,19 +153,32 @@ impl Shell {
     /// notice to that connection (a route that ended, ...) comes back as
     /// `error {cmd, text}`, so a command that does nothing says why.
     fn step_typed(&mut self, id: ClientId, cmd: &str, input: Input) {
-        self.proto.stepping = Some((id, cmd.to_string()));
-        self.step(input);
-        self.proto.stepping = None;
+        self.stepping(id, cmd, None, |sh| sh.step(input));
     }
 
-    /// `Effect::ToClient`'s body for `client`, as the typed `error` when it
-    /// is a notice for the typed command being stepped; false: not one.
+    /// Runs `f` (one step of a typed command) with its notices kept and
+    /// sent after as its errors; a send's (G) carry its cid, with reason
+    /// `undelivered` when the same step wrote the undelivered line, else
+    /// `refused`.
+    fn stepping(&mut self, id: ClientId, cmd: &str, cid: Option<u64>, f: impl FnOnce(&mut Self)) {
+        self.proto.stepping = Some(Stepping { id, cmd: cmd.to_string(), cid, ..Default::default() });
+        f(self);
+        let Some(s) = self.proto.stepping.take() else { return };
+        let (cid, reason) = (s.cid, s.cid.map(|_| if s.undelivered { "undelivered" } else { "refused" }));
+        for text in s.notices {
+            self.proto_error_cid(id, &s.cmd, &text, cid, reason);
+        }
+    }
+
+    /// `Effect::ToClient`'s body for `client`, kept as the typed `error`
+    /// when it is a notice for the typed command being stepped (sent at
+    /// the step's end); false: not one.
     pub(super) fn typed_notice(&mut self, client: ClientId, body: &Value) -> bool {
-        let Some((id, cmd)) = self.proto.stepping.clone() else { return false };
-        if id != client || body.get("ev").and_then(Value::as_str) != Some("notice") {
+        let Some(s) = self.proto.stepping.as_mut() else { return false };
+        if s.id != client || body.get("ev").and_then(Value::as_str) != Some("notice") {
             return false;
         }
-        self.proto_error(client, &cmd, body.get("text").and_then(Value::as_str).unwrap_or(""));
+        s.notices.push(body.get("text").and_then(Value::as_str).unwrap_or("").to_string());
         true
     }
 
@@ -161,7 +186,7 @@ impl Shell {
     /// command being stepped: its `error` when refused, nothing when done
     /// (the change shows in the events). False: not a typed command.
     pub(super) fn typed_outcome(&mut self, client: ClientId, r: &Result<String, String>) -> bool {
-        let Some((id, cmd)) = self.proto.stepping.clone() else { return false };
+        let Some((id, cmd)) = self.proto.stepping.as_ref().map(|s| (s.id, s.cmd.clone())) else { return false };
         if id != client {
             return false;
         }
@@ -171,15 +196,30 @@ impl Shell {
         true
     }
 
+    /// G: a feed line written by the typed command being stepped: an
+    /// `undelivered` line (BISE-86) means the thread has his row.
+    pub(super) fn typed_line(&mut self, line: &str) {
+        if let Some(s) = self.proto.stepping.as_mut() {
+            s.undelivered |= line.starts_with("sb undelivered");
+        }
+    }
+
     /// The typed connections still open.
     pub(super) fn typed_ids(&self) -> Vec<ClientId> {
         self.proto.conns.keys().copied().filter(|id| self.clients.contains_key(id)).collect()
     }
 
     fn proto_error(&mut self, id: ClientId, cmd: &str, text: &str) {
+        self.proto_error_cid(id, cmd, text, None, None);
+    }
+
+    /// The one typed error, to connection `id` only (a send's cid is that
+    /// window's: never another connection's, never journaled).
+    fn proto_error_cid(&mut self, id: ClientId, cmd: &str, text: &str, cid: Option<u64>, reason: Option<&str>) {
         let project = Some(self.project());
         let cmd = Some(cmd.to_string()).filter(|c| !c.is_empty());
-        self.proto_send(id, &HubEv::Error { project, cmd, text: text.to_string() });
+        let reason = reason.map(str::to_string);
+        self.proto_send(id, &HubEv::Error { project, cmd, text: text.to_string(), cid, reason });
     }
 
     /// The rows of the snapshot: `agents`, `cards`.
@@ -293,9 +333,9 @@ impl Shell {
                 let (entries, before, more) = pthread::page(&lines, &ctx, limit.map_or(LIMIT, |l| (l as usize).clamp(1, MAX_LIMIT)));
                 self.proto_send(id, &HubEv::Thread { project, agent, entries, before, more });
             }
-            HubCmd::Send { agent, text, mode, context, files, .. } => {
+            HubCmd::Send { agent, text, mode, context, files, cid, .. } => {
                 if !known(self, &agent) {
-                    return self.proto_error(id, &tag, &format!("no agent {agent}"));
+                    return self.proto_error_cid(id, &tag, &format!("no agent {agent}"), cid, cid.map(|_| "refused"));
                 }
                 // queued: sb-core holds it until the agent's turn ends
                 // (amb-hub 7dcb56ab), never the client. A command never
@@ -304,12 +344,15 @@ impl Shell {
                 // change both together
                 let queued = mode == Mode::Queued;
                 if queued && text.trim_start().starts_with('/') {
-                    return self.proto_error(id, &tag, "a command can't wait in the queue: send it now");
+                    return self.proto_error_cid(id, &tag, "a command can't wait in the queue: send it now", cid, cid.map(|_| "refused"));
                 }
                 // S9: the fn context as a field of the input op, never
                 // rendered here (the input arm's one render)
                 // item H: his files as a field too, rendered by the same input arm
-                self.client_line(id, json!({"op": "input", "focus": agent, "text": text, "queued": queued, "context": context, "files": files}));
+                // G: its notices (an agent gone: BISE-86's undelivered
+                // line) come back with its cid
+                let op = json!({"op": "input", "focus": agent, "text": text, "queued": queued, "context": context, "files": files});
+                self.stepping(id, &tag, cid, |sh| sh.client_line(id, op));
             }
             HubCmd::Answer { card, reply, .. } => {
                 if !self.hub.st.open_cards().any(|c| c.id == card) {

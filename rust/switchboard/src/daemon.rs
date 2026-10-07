@@ -1151,7 +1151,10 @@ impl Shell {
                     }
                 }
             }
-            Effect::Line { agent, line } => self.feed(&agent, &line),
+            Effect::Line { agent, line } => {
+                self.typed_line(&line);
+                self.feed(&agent, &line)
+            }
             Effect::Reply { token, body } => {
                 if let Some(mut s) = self.replies.remove(&token) {
                     write_json(&mut s, &body);

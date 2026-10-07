@@ -81,8 +81,8 @@ describe('store', () => {
     store.send({ project: P, agent: 'perf', text: 'again' });
     expect(store.pending(K).map((p) => p.state)).toEqual(['sending', 'sending']);
     expect(sent).toEqual([
-      { cmd: 'send', project: P, agent: 'perf', text: 'again', mode: 'now' },
-      { cmd: 'send', project: P, agent: 'perf', text: 'again', mode: 'now' },
+      { cmd: 'send', project: P, agent: 'perf', text: 'again', mode: 'now', cid: 1 },
+      { cmd: 'send', project: P, agent: 'perf', text: 'again', mode: 'now', cid: 2 },
     ]);
     const first = store.pending(K)[0]?.cid;
     store.apply({ ev: 'entry', project: P, agent: 'perf', entry: entry(9, 'again', 'you') });
@@ -96,12 +96,33 @@ describe('store', () => {
     const cid = store.send({ project: P, agent: 'main', text: 'what stands out here', files });
     store.send({ project: P, agent: 'main', text: 'plain', files: [] });
     expect(sent).toEqual([
-      { cmd: 'send', project: P, agent: 'main', text: 'what stands out here', mode: 'now', files },
-      { cmd: 'send', project: P, agent: 'main', text: 'plain', mode: 'now' },
+      { cmd: 'send', project: P, agent: 'main', text: 'what stands out here', mode: 'now', files, cid: 1 },
+      { cmd: 'send', project: P, agent: 'main', text: 'plain', mode: 'now', cid: 2 },
     ]);
     store.apply({ ev: 'error', project: P, cmd: 'send', text: 'hub gone' });
     store.retry(threadKey(P, 'main'), cid);
-    expect(sent[2]).toEqual({ cmd: 'send', project: P, agent: 'main', text: 'what stands out here', mode: 'now', files });
+    expect(sent[2]).toEqual({ cmd: 'send', project: P, agent: 'main', text: 'what stands out here', mode: 'now', files, cid: 3 });
+  });
+
+  it("G: a send's error with its cid fails exactly that row; undelivered: the thread's entry stands in for it", () => {
+    const { store, sent } = fake();
+    const one = store.send({ project: P, agent: 'perf', text: 'one' });
+    const two = store.send({ project: P, agent: 'perf', text: 'two' });
+    const three = store.send({ project: P, agent: 'perf', text: 'three' });
+    expect(sent.map((c) => (c as { cid?: number }).cid)).toEqual([one, two, three]);
+    // refused: only the second row, with the words; the oldest stays sending
+    store.apply({ ev: 'error', project: P, cmd: 'send', text: 'no agent perf', cid: two, reason: 'refused' });
+    expect(store.pending(K).map((p) => [p.cid, p.state, p.why])).toEqual([
+      [one, 'sending', undefined],
+      [two, 'failed', 'no agent perf'],
+      [three, 'sending', undefined],
+    ]);
+    // undelivered: the hub's undelivered entry is in the thread; his row goes, one fact
+    store.apply({ ev: 'error', project: P, cmd: 'send', text: '@perf is archived', cid: three, reason: 'undelivered' });
+    expect(store.pending(K).map((p) => p.cid)).toEqual([one, two]);
+    // an unknown cid changes nothing
+    store.apply({ ev: 'error', project: P, cmd: 'send', text: 'x', cid: 999, reason: 'refused' });
+    expect(store.pending(K).map((p) => p.state)).toEqual(['sending', 'failed']);
   });
 
   it("a send's error fails the oldest sending row of that project, with the hub's words", () => {

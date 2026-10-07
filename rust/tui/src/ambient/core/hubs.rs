@@ -186,8 +186,15 @@ impl Core {
         self.hold();
     }
 
-    fn project_error(&mut self, project: &str, cmd: &str, text: &str) {
-        self.emit(json!({"ev": "error", "project": project, "cmd": cmd, "text": text}));
+    /// `cid` (G): the failed send's, echoed so the window fails exactly
+    /// that row (nothing reached a thread: reason refused).
+    fn project_error(&mut self, project: &str, cmd: &str, text: &str, cid: Option<u64>) {
+        let mut ev = json!({"ev": "error", "project": project, "cmd": cmd, "text": text});
+        if let Some(cid) = cid {
+            ev["cid"] = json!(cid);
+            ev["reason"] = json!("refused");
+        }
+        self.emit(ev);
     }
 
     /// `shown {projects}`: the projects the window shows now.
@@ -206,21 +213,22 @@ impl Core {
     pub(super) fn typed_cmd(&mut self, v: Value) {
         let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
         let (project, cmd, agent) = (s("project"), s("cmd"), s("agent"));
+        let cid = v.get("cid").and_then(Value::as_u64);
         if self.hubs.ports.is_none() {
-            return self.project_error(&project, &cmd, "this core has no projects");
+            return self.project_error(&project, &cmd, "this core has no projects", cid);
         }
         let Some(row) = self.hubs.rows.iter().find(|r| r.id == project).cloned() else {
-            return self.project_error(&project, &cmd, &format!("there's no project {project}"));
+            return self.project_error(&project, &cmd, &format!("there's no project {project}"), cid);
         };
         // before shown, home only (architect m_10133: its own words, so a
         // window that sends too early reads plainly in the logs)
         if !row.home && self.hubs.shown.is_none() {
-            return self.project_error(&project, &cmd, &format!("project {project} isn't shown yet"));
+            return self.project_error(&project, &cmd, &format!("project {project} isn't shown yet"), cid);
         }
         // never a hub for a folder that is gone (its hub would start on a
         // missing workspace)
         if cmd != "unsubscribe" && !self.folder_exists(&row.path) {
-            return self.project_error(&project, &cmd, &format!("{}: its folder is gone", row.name));
+            return self.project_error(&project, &cmd, &format!("{}: its folder is gone", row.name), cid);
         }
         if track(&mut self.hubs.subs, &cmd, &project, &agent) {
             self.hold();
@@ -265,20 +273,20 @@ impl Core {
     /// Commands past their deadline get their error; the hubs held for a
     /// command only go once it went.
     pub(super) fn tick_projects(&mut self, now: Instant) {
-        let mut late: Vec<(String, String)> = Vec::new();
+        let mut late: Vec<(String, String, Option<u64>)> = Vec::new();
         let mut close = false;
         for (id, c) in self.hubs.conns.iter_mut() {
             c.pending.retain(|(v, deadline)| {
                 let ok = *deadline > now;
                 if !ok {
-                    late.push((id.clone(), v.get("cmd").and_then(Value::as_str).unwrap_or("").to_string()));
+                    late.push((id.clone(), v.get("cmd").and_then(Value::as_str).unwrap_or("").to_string(), v.get("cid").and_then(Value::as_u64)));
                 }
                 ok
             });
             close |= c.until.is_some_and(|u| u <= now) && c.pending.is_empty();
         }
-        for (id, cmd) in late {
-            self.project_error(&id, &cmd, "its hub didn't start: nothing sent. try again in a moment.");
+        for (id, cmd, cid) in late {
+            self.project_error(&id, &cmd, "its hub didn't start: nothing sent. try again in a moment.", cid);
         }
         if close {
             self.hold_at(now);
@@ -359,14 +367,14 @@ impl Core {
                         let mut failed = Vec::new();
                         for (cmd, _) in std::mem::take(&mut c.pending) {
                             if !c.hub.send(&cmd) {
-                                failed.push(cmd.get("cmd").and_then(Value::as_str).unwrap_or("").to_string());
+                                failed.push((cmd.get("cmd").and_then(Value::as_str).unwrap_or("").to_string(), cmd.get("cid").and_then(Value::as_u64)));
                             }
                         }
                         if let Some(u) = c.until.as_mut() {
                             *u = Instant::now() + LINGER;
                         }
-                        for cmd in failed {
-                            self.project_error(id, &cmd, "its hub went away: nothing sent. try again in a moment.");
+                        for (cmd, cid) in failed {
+                            self.project_error(id, &cmd, "its hub went away: nothing sent. try again in a moment.", cid);
                         }
                     }
                     HubEv::Agents { agents, .. } => {

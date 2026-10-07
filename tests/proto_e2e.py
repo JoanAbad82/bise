@@ -98,7 +98,7 @@ def main():
             ({"cmd": "fly", "project": project}, "fly"),
             ({"cmd": "send", "project": "other-00000000", "agent": "main", "text": "hi", "mode": "now"}, "send"),
             ({"cmd": "send", "project": project, "agent": "main", "text": "/archive main", "mode": "queued"}, "send"),
-            ({"cmd": "send", "project": project, "agent": "nobody", "text": "hi", "mode": "now"}, "send"),
+            ({"cmd": "send", "project": project, "agent": "nobody", "text": "hi", "mode": "now", "cid": 41}, "send"),
             ({"cmd": "answer", "project": project, "card": 999, "reply": "1"}, "answer"),
             ({"cmd": "subscribe", "project": project}, "subscribe"),
             ({"cmd": "diff", "project": project, "agent": "nobody"}, "diff"),
@@ -114,6 +114,10 @@ def main():
             c.send(cmd)
             c.wait(lambda: len(errors()) > i, 20, "an error for %r" % cmd)
             check(errors()[i].get("cmd") == tag and errors()[i]["text"], "refused %r: %r" % (cmd, errors()[i]))
+        # G: a refused send's error echoes its cid; a send without one has none
+        mine = [e for e in errors() if e.get("cid") == 41]
+        check(len(mine) == 1 and mine[0].get("reason") == "refused", "the refused send's cid: %r" % errors())
+        check(all("cid" not in e for e in errors() if e.get("cmd") == "send" and e is not mine[0]), "no cid on the others: %r" % errors())
 
         # subscribe: the thread's page, then its entries live
         c.send({"cmd": "subscribe", "project": project, "agent": "main"})
@@ -341,6 +345,21 @@ def main():
         c.send({"cmd": "stop", "project": project, "agent": "main"})
         c.send({"cmd": "archive", "project": project, "agent": "ghost", "force": False})
         c.wait(lambda: any(x.get("cmd") == "archive" for x in errors()), 20, "archive of an unknown agent refused")
+
+        # G (architect m_10348): a send to an archived task is undelivered
+        # (BISE-86's line in the thread): exactly one error with its cid,
+        # reason undelivered, so the window's row gives way to that entry
+        # (a task in its own worktree: archived, nothing revives it)
+        c.say("/new -w t4: say hi")
+        c.wait(lambda: c.agent("t4"), 60, "t4")
+        c.wait_idle("t4", timeout=120)
+        c.send({"cmd": "archive", "project": project, "agent": "t4", "force": True})
+        c.wait(lambda: (c.agent("t4") or {}).get("status") == "archived", 60, "t4 archived")
+        c.send({"cmd": "send", "project": project, "agent": "t4", "text": "still there?", "mode": "now", "cid": 77})
+        c.wait(lambda: [e for e in errors() if e.get("cid") == 77], 20, "the undelivered send's error")
+        c.wait(lambda: any(l.startswith("sb undelivered") and "still there?" in l for l in c.lines("t4") + c.lines("main")), 20, "the undelivered line")
+        und = [e for e in errors() if e.get("cid") == 77]
+        check(len(und) == 1 and und[0].get("reason") == "undelivered" and und[0].get("cmd") == "send", "one undelivered error: %r" % und)
 
         # every typed event has the frozen keys of the fixtures
         need = required_keys()

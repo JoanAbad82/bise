@@ -44,7 +44,19 @@ note?: string | null, } | { "ev": "route", project: string, rid: number, to: str
  * as in bise's followed_end of it: a window shows one line per
  * (project, agent, key)
  */
-key?: number | null, } | { "ev": "followed_end", project: string, agent: string, key: number, state: JobState, label: string, summary: string, } | { "ev": "error", project?: string | null, cmd?: string | null, text: string, };
+key?: number | null, } | { "ev": "followed_end", project: string, agent: string, key: number, state: JobState, label: string, summary: string, } | { "ev": "error", project?: string | null, cmd?: string | null, text: string, 
+/**
+ * draft (G): the failed send's cid (HubCmd send's), to the
+ * connection that sent it: the window fails exactly that row
+ */
+cid?: number | null, 
+/**
+ * draft (G), with a cid: "refused" (nothing reached the thread:
+ * his row shows not delivered, with retry) or "undelivered" (the
+ * hub wrote its undelivered line in the thread: that entry
+ * stands in for his row)
+ */
+reason?: string | null, };
 
 export type Mode = "now" | "queued";
 
@@ -68,4 +80,9 @@ typed_only?: boolean, } | { "cmd": "subscribe", project: string, agent: string, 
  * listed by its path; a path that isn't absolute or doesn't exist
  * is left out. Never on a slash command
  */
-files?: Array<string>, } | { "cmd": "answer", project: string, card: number, reply: string, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, } | { "cmd": "diff", project: string, agent: string, commit?: string | null, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "features", project: string, } | { "cmd": "prs", project: string, } | { "cmd": "models", project: string, } | { "cmd": "new", project: string, name?: string | null, brief: string, worktree?: boolean, with_changes?: boolean, } | { "cmd": "rename", project: string, agent: string, to: string, } | { "cmd": "model", project: string, agent: string, model: string, default?: boolean, } | { "cmd": "effort", project: string, agent: string, effort: string, } | { "cmd": "route_correct", project: string, rid: number, to: string, } | { "cmd": "route_cancel", project: string, rid: number, } | { "cmd": "follow", project: string, agent: string, on: boolean, };
+files?: Array<string>, 
+/**
+ * draft (G): the window's id for this send, echoed on its error
+ * to this connection only (never journaled: view state)
+ */
+cid?: number | null, } | { "cmd": "answer", project: string, card: number, reply: string, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, } | { "cmd": "diff", project: string, agent: string, commit?: string | null, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "features", project: string, } | { "cmd": "prs", project: string, } | { "cmd": "models", project: string, } | { "cmd": "new", project: string, name?: string | null, brief: string, worktree?: boolean, with_changes?: boolean, } | { "cmd": "rename", project: string, agent: string, to: string, } | { "cmd": "model", project: string, agent: string, model: string, default?: boolean, } | { "cmd": "effort", project: string, agent: string, effort: string, } | { "cmd": "route_correct", project: string, rid: number, to: string, } | { "cmd": "route_cancel", project: string, rid: number, } | { "cmd": "follow", project: string, agent: string, on: boolean, };

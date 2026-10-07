@@ -133,6 +133,25 @@ fn typed(t: &mut T, v: Value) {
     t.cmd(Cmd::parse(&v.to_string()).unwrap());
 }
 
+/// G (architect m_10348): every send error the core makes itself echoes
+/// the send's cid (reason refused: nothing reached a thread), so the
+/// window fails exactly that row; a send without a cid gets none.
+#[test]
+fn a_send_the_core_refuses_echoes_its_cid() {
+    let mut t = T::new();
+    t.ready();
+    let _w = world(&mut t);
+    typed(&mut t, json!({"cmd": "send", "project": "shop", "agent": "main", "text": "hi", "mode": "now", "cid": 7}));
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("refused");
+    assert_eq!((e["cmd"].as_str(), e["cid"].as_u64(), e["reason"].as_str()), (Some("send"), Some(7), Some("refused")), "{e}");
+    typed(&mut t, json!({"cmd": "send", "project": "nowhere", "agent": "main", "text": "hi", "mode": "now", "cid": 8}));
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("refused");
+    assert_eq!(e["cid"].as_u64(), Some(8), "{e}");
+    typed(&mut t, json!({"cmd": "send", "project": "nowhere", "agent": "main", "text": "hi", "mode": "now"}));
+    let e = t.take().into_iter().find(|v| v["ev"] == "error").expect("refused");
+    assert!(e.get("cid").is_none() && e.get("reason").is_none(), "{e}");
+}
+
 #[test]
 fn the_window_reaches_every_projects_hub_through_the_core() {
     let mut t = T::new();

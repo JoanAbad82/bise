@@ -344,7 +344,11 @@ export class Store {
         this.put('away', ev);
         return;
       case 'error':
-        if (ev.cmd === 'send') this.failOldest(ev.project ?? null, ev.text);
+        if (ev.cmd !== 'send') return;
+        // G: exactly the row with this cid; with no cid (an older core or
+        // hub) the oldest sending row of that project, as before
+        if (ev.cid !== undefined && ev.cid !== null) this.failCid(ev.cid, ev.reason ?? 'refused', ev.text);
+        else this.failOldest(ev.project ?? null, ev.text);
         return;
       case 'welcome':
       case 'route':
@@ -442,6 +446,23 @@ export class Store {
     this.emit(`pending:${key}`);
   }
 
+  /**
+   * G: the send `cid` failed. refused: nothing reached the thread, his row
+   * shows 'not delivered' with retry. undelivered: the hub wrote its
+   * undelivered entry in the thread, which stands in for his row (gone).
+   */
+  private failCid(cid: number, reason: string, why: string): void {
+    for (const [key, t] of this.threads) {
+      if (!t.pending.some((p) => p.cid === cid)) continue;
+      t.pending =
+        reason === 'undelivered'
+          ? t.pending.filter((p) => p.cid !== cid)
+          : t.pending.map((p) => (p.cid === cid ? { ...p, state: 'failed', why } : p));
+      this.emit(`pending:${key}`);
+      return;
+    }
+  }
+
   private failOldest(project: string | null, why: string): void {
     let oldest: { key: string; t: Thread; p: Pending } | null = null;
     for (const [key, t] of this.threads) {
@@ -489,7 +510,8 @@ export class Store {
       this.failOldest(a.project, 'not sent');
       return p.cid;
     }
-    this.command({ cmd: 'send', project: a.project, agent: a.agent, text: a.text, mode, ...(files === undefined ? {} : { files }) });
+    // G: the cid goes along; the core or the hub echoes it on this send's error
+    this.command({ cmd: 'send', project: a.project, agent: a.agent, text: a.text, mode, ...(files === undefined ? {} : { files }), cid: p.cid });
     return p.cid;
   }
 
