@@ -137,7 +137,9 @@ def main():
                               env={**env, "BISE_ROLE": "agent"}, check=True, capture_output=True, text=True,
                               timeout=30)
         took = time.time() - t1
-        check("a skill file that never opens holds the scan 3 s, not forever (%.1f s)" % took, took < 5, repr(took))
+        # 3 s deadline + the scan's own process starts, seconds under a
+        # gate's load (6 s at load 24): never forever
+        check("a skill file that never opens holds the scan 3 s, not forever (%.1f s)" % took, took < 8, repr(took))
         check("the scan names it once on its output",
               scan.stdout == "skills scan: skipped %s (no answer in 3 s)\n" % stuck, repr(scan.stdout))
         shared = open(a1).read() if os.path.exists(a1) else "<none>"
@@ -146,8 +148,8 @@ def main():
         check("the REPL logs the skipped file on stderr",
               open(err).read().count("skills scan: skipped %s (no answer in 3 s)" % stuck) == 1,
               repr(open(err).read()[-400:]))
-        check("the REPL's scan ended within 5 s of its banner, so main's first turn can start (%.1f s)"
-              % (ready - banner), ready - banner < 5, repr(ready - banner))
+        check("the REPL's scan ended within 8 s of its banner, so main's first turn can start (%.1f s)"
+              % (ready - banner), ready - banner < 8, repr(ready - banner))
         adata = open(a2).read() if os.path.exists(a2) else "<none>"
         check("a task's index has no main-only built-in skill", adata.startswith("beta\t") and "bise-demo" not in adata,
               repr(adata))
