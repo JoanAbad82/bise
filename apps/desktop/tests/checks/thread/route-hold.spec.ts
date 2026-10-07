@@ -111,8 +111,8 @@ test('spotlight/route-hold: fn+space, ask, the hold shows at once in the spotlig
     } finally {
       await cap.screenshot({ path: test.info().outputPath('spot-held.png') });
     }
-    // the spotlight keeps its own words (amb-web's spotlight/words.ts routeTo; e298b066 renamed the thread's only)
-    await expect(hold).toContainText(/to acme · [23] s to change/);
+    // the spotlight reads as the thread since amb-win's 4abe0fc0 ('→ bise · acme · sending' at 0)
+    await expect(hold).toContainText(/→ bise · acme · [23] s to change/);
     const left0 = Number(await hold.getAttribute('data-left'));
     await cap.waitForTimeout(1300);
     expect(Number(await hold.getAttribute('data-left')), 'the seconds count down').toBeLessThan(left0);

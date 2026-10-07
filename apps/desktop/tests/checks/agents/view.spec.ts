@@ -87,8 +87,9 @@ test("agents/view: an agent's own question shows on its row and in its view, as 
     const { page } = s;
     t = tui(w, 'shop');
     await tuiReady(t);
+    // read again until drawn: a capture can land mid-redraw (more seeded agents since b571ced9)
+    await expect.poll(() => tuiAgents(t?.screen() ?? '').some((a) => a.name === 'gift-ui'), { timeout: 10_000, message: "the TUI's panel lists gift-ui (the world seeds it: amb-tools 7d361b6e)" }).toBe(true);
     const panel = tuiAgents(t.screen()).find((a) => a.name === 'gift-ui');
-    expect(panel, "the TUI's panel lists gift-ui (the world seeds it: amb-tools 7d361b6e)").toBeTruthy();
     expect(panel?.glyph, "the TUI's panel has gift-ui needing him").toBe('?');
     const row = page.locator('[data-testid="agents.row.gift-ui"]');
     await expect(row).toBeVisible({ timeout: 15_000 });

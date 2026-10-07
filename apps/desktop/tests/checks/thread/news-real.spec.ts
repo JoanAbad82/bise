@@ -82,7 +82,8 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       const sha = /\b[0-9a-f]{7,}\b/.exec(words)?.[0] ?? '';
       const tuiLine = /gift-api landed[^·]*?\(([0-9a-f]{7,})\)/.exec(flat(term().screen()));
       note('landed', { window: words, tui: tuiLine?.[0] ?? '' });
-      expect.soft(sha, 'the same sha as the TUI line').toBe(tuiLine?.[1] ?? '?');
+      // the seeds land more than once since b571ced9: the window's sha must be one the TUI shows for gift-api
+      expect.soft(sha !== '' && flat(term().screen()).includes(`(${sha})`), `the TUI shows the window's sha (${sha})`).toBe(true);
       await row.screenshot({ path: test.info().outputPath('landed.png') }).catch(() => undefined);
       const link = page.locator(`[data-testid="${(await row.getAttribute('data-testid', { timeout: 2000 }).catch(() => null)) ?? 'none'}.sha"]`);
       await link.click({ timeout: 5000 }).catch(() => undefined);
@@ -94,11 +95,25 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
     await test.step('pr', async () => {
       // #412 has several news rows ('opened', then 'checks fail: e2e'): the failing one is the TUI's '↑ #412 checks fail'
       note('pr-rows', (await list.locator(T.pr).allTextContents()).map((r) => r.trim().slice(0, 120)));
-      const row = list.locator(T.pr).filter({ hasText: '#412' }).filter({ hasText: 'checks fail' }).first();
+      // the list re-renders while the seeds still arrive, so a row found once can leave the DOM:
+      // every read goes through the locator again, the row scrolled into view first
+      const row = list.locator(T.pr).filter({ hasText: '#412' }).filter({ hasText: 'checks fail' }).last();
+      // the seeds push it up the thread: only the rows near the view are drawn, so walk the list
+      // from its top down until it shows
+      if ((await row.count()) === 0) {
+        const scroller = list.locator('xpath=ancestor-or-self::*[@data-testid="thread.list"]');
+        await scroller.evaluate((el) => { el.scrollTop = 0; }).catch(() => undefined);
+        await list.hover({ timeout: 5000 }).catch(() => undefined);
+        for (let i = 0; i < 40 && (await row.count()) === 0; i++) {
+          await page.mouse.wheel(0, 400);
+          await sleep(150);
+        }
+      }
       await expect.soft(row, "#412's failing checks are a pr row").toBeVisible({ timeout: 15_000 });
+      await row.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => undefined);
       const words = ((await row.textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();
       note('pr', { window: words, tone: await row.getAttribute('data-tone', { timeout: 2000 }).catch(() => null), tuiHas: flat(term().screen()).includes('#412 checks fail: e2e') });
-      await expect.soft(row, 'failing: an err tone').toHaveAttribute('data-tone', 'err');
+      await expect.soft(row, 'failing: an err tone').toHaveAttribute('data-tone', 'err', { timeout: 5000 });
       expect.soft(words, "failing said by '▲', never color alone").toContain('▲');
       expect.soft(words, "the hub's words, as the TUI").toContain('checks fail');
       await row.screenshot({ path: test.info().outputPath('pr.png') }).catch(() => undefined);
@@ -106,7 +121,8 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       // https://github.com/acme-qa/shop/pull/412. Every miss is said: the row's id, the link's
       // words, the click's error (no silent catch), main's stdout
       const id = await row.getAttribute('data-testid', { timeout: 2000 }).catch((e: unknown) => `none: ${String(e).split('\n')[0] ?? ''}`);
-      const link = page.locator(`[data-testid="${id ?? 'none'}.link"]`);
+      const link = row.locator('button[data-testid$=".link"]');
+      await link.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => undefined);
       const linkWords = await link.textContent({ timeout: 2000 }).catch((e: unknown) => `none: ${String(e).split('\n')[0] ?? ''}`);
       const clicked = await link.click({ timeout: 5000 }).then(() => 'ok', (e: unknown) => String(e).split('\n')[0] ?? 'error');
       const url = await out.wait(EXTERNAL, () => true, 5000).catch((e: unknown) => `none: ${String(e).split('\n')[0] ?? ''}`);
@@ -135,23 +151,60 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       await page.screenshot({ path: test.info().outputPath('answered.png') });
     });
 
-    await test.step("approval: 'no: <note>' on the merge card", async () => {
-      const seen = await tuiCmd(term(), `/answer 1 no: not now ${n}`);
-      note('approval-tui', flat(seen).slice(-500));
-      await sleep(3000);
-      const row = list.locator(T.approval).filter({ hasText: `not now ${n}` }).first();
-      const shown = await row.isVisible().catch(() => false);
-      note('approval', { shown, rows: (await list.locator(T.approval).allTextContents()).map((r) => r.trim()) });
-      if (shown) await row.screenshot({ path: test.info().outputPath('approval.png') }).catch(() => undefined);
-      else await page.screenshot({ path: test.info().outputPath('approval.png') });
+    // amb-tools' seeds (b571ced9): release's 'git push --force …' card answered 'no: use a branch,
+    // never force main' as him (shop), alerts' question answered by main itself with --why
+    // (telemetry), receipts' message to checkout (shop)
+    await test.step('approval: his no with its note (seeded)', async () => {
+      const row = list.locator(T.approval).filter({ hasText: 'git push --force' }).first();
+      await expect.soft(row, "release's force push said no to: an approval row").toBeVisible({ timeout: 15_000 });
+      const words = ((await row.textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();
+      const tuiScreen = flat(term().screen());
+      note('approval', { window: words, ok: await row.getAttribute('data-ok', { timeout: 2000 }).catch(() => null), tuiHasNote: tuiScreen.includes('use a branch, never force main'), tuiLine: /[^·]{0,60}git push --force[^·]{0,80}/.exec(tuiScreen)?.[0] ?? '' });
+      await expect.soft(row, 'said no').toHaveAttribute('data-ok', 'false');
+      expect.soft(words, "'✕', never color alone").toContain('✕');
+      expect.soft(words, 'who it was').toContain('release');
+      expect.soft(words, 'his note under it').toContain('use a branch, never force main');
+      expect.soft(tuiScreen, "the TUI's line has the same note").toContain('use a branch, never force main');
+      await row.screenshot({ path: test.info().outputPath('approval.png') }).catch(() => undefined);
+    });
+
+    await test.step('from_agent: receipts → checkout in main\'s view (seeded)', async () => {
+      const row = list.locator('[data-testid^="thread.entry."]').filter({ hasText: 'does total() round before or after the code' }).first();
+      await expect.soft(row, "receipts' message to checkout shows in main's thread").toBeVisible({ timeout: 15_000 });
+      const words = ((await row.textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();
+      note('from-agent', { window: words.slice(0, 200), tuiHas: flat(term().screen()).includes('receipts → checkout') });
+      expect.soft(words, "a message between two other agents names both: 'receipts → checkout'").toContain('receipts → checkout');
+      await row.screenshot({ path: test.info().outputPath('from-agent.png') }).catch(() => undefined);
     });
 
     await test.step("from_agent: gift-ui → main in main's view", async () => {
       const head = list.locator('[data-testid^="thread.entry."]').filter({ hasText: 'waiting for your answer' }).first();
       const words = ((await head.textContent().catch(() => '')) ?? '').trim();
-      note('from-agent', words.slice(0, 200));
+      note('from-agent-main', words.slice(0, 200));
       expect.soft(words, "the sender's name").toContain('gift-ui');
-      expect.soft(words, "sent to the agent in view: only the sender, no 'gift-ui → main'").not.toContain('gift-ui → main');
+      expect.soft(words, "sent to the agent in view: only the sender, no 'gift-ui → bise'").not.toMatch(/gift-ui → (main|bise)/);
+    });
+
+    await test.step('answered for him: main answers alerts (telemetry, seeded)', async () => {
+      const tele = path.basename(path.dirname(hubOf(w, 'telemetry').sock));
+      await page.locator(`[data-testid="app.sidebar.project.${tele}"]`).click({ timeout: 10_000 });
+      const row = page.locator(T.list).locator(T.answered).filter({ hasText: 'alerts' }).first();
+      await expect.soft(row, "main's answer for him to alerts: an answered row").toBeVisible({ timeout: 15_000 });
+      const words = ((await row.textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();
+      const tt = tui(w, 'telemetry');
+      try {
+        await tuiReady(tt);
+        const tuiScreen = flat(tt.screen());
+        note('answered-for-you', { window: words, tuiHasAnswer: tuiScreen.includes('PagerDuty'), tuiHasWhy: tuiScreen.includes('the runbook pages on-call through PagerDuty') });
+        test.info().attachments.push({ name: 'tui-telemetry', contentType: 'text/plain', body: Buffer.from(tt.screen()) });
+        expect.soft(tuiScreen, "the TUI's answered line").toContain('PagerDuty');
+      } finally {
+        tt.close();
+      }
+      expect.soft(words, "'answered alerts for you'").toContain('answered alerts for you');
+      expect.soft(words, 'the answer').toContain('PagerDuty');
+      expect.soft(words, 'and why, under it').toContain('the runbook pages on-call through PagerDuty');
+      await row.screenshot({ path: test.info().outputPath('answered-for-you.png') }).catch(() => undefined);
     });
     test.info().attachments.push({ name: 'tui', contentType: 'text/plain', body: Buffer.from(term().screen()) });
   } finally {
