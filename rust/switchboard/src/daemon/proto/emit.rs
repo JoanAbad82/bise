@@ -111,6 +111,13 @@ impl Shell {
         self.proto.models_at.is_some_and(|at| at != models_mtimes())
     }
 
+    /// The hub's `approvals` event (gate.rs `approvals_ev`, the TUI's) as
+    /// the typed one (bar V8/W21); paths in the words as the TUI says them.
+    pub(super) fn proto_approvals(&self, ev: &Value) -> HubEv {
+        let home = std::env::var("HOME").ok();
+        proto_view::approvals::approvals(&self.project(), ev, home.as_deref())
+    }
+
     /// The art store's event as the typed `artifacts`.
     pub(super) fn proto_artifacts(&self, ev: &Value) -> HubEv {
         let pages = self.pg.pages.clone();
@@ -195,6 +202,14 @@ impl Shell {
                     self.proto.worktrees = key;
                     self.worktrees_typed(ids.clone());
                     self.dev_servers_typed(ids.clone());
+                }
+            }
+            // bar V8/W21: the mode switched or a rule left (set_mode,
+            // remove_rule broadcast the TUI's event): the typed one to all
+            Some("approvals") => {
+                let ev = self.proto_approvals(v);
+                for id in &ids {
+                    self.proto_send(*id, &ev);
                 }
             }
             // the art store changed (artifacts_refresh broadcasts it)

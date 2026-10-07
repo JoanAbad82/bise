@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
-TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "jobs", "job_end", "error", "notice")
+TYPED = ("welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "jobs", "job_end", "error", "notice", "approvals")
 FIXTURES = os.path.join(e2e.ROOT, "rust", "proto", "fixtures", "hub_ev.jsonl")
 
 
@@ -312,6 +312,27 @@ def main():
         w.wait(lambda: len(asked()) >= 2, 20, "asked again")
         w.send({"cmd": "confirm", "project": project, "id": asked()[-1]["id"], "yes": True})
         c.wait(lambda: c.agent("tq")["status"] == "archived", 60, "yes archived tq")
+
+        # bar V8/W21: approvals typed, from the TUI's own event. hello gave
+        # it; no mode answers the asker only; a mode switches it for every
+        # connection with flash; a bad word and a rule already gone are errors
+        appr = lambda cl: [e for e in cl.events if e.get("ev") == "approvals" and "project" in e]
+        check(appr(w) and appr(w)[0]["mode"] in ("yolo", "auto") and isinstance(appr(w)[0]["rules"], list), "approvals at hello: %r" % appr(w)[:1])
+        nw, nc = len(appr(w)), len(appr(c))
+        w.send({"cmd": "approvals", "project": project})
+        w.wait(lambda: len(appr(w)) > nw, 20, "approvals for the asker")
+        check(len(appr(c)) == nc, "only the asker got it")
+        was = appr(w)[-1]["mode"]
+        w.send({"cmd": "approvals", "project": project, "mode": "toggle"})
+        w.wait(lambda: appr(w)[-1]["mode"] != was, 20, "the mode toggled")
+        c.wait(lambda: appr(c) and appr(c)[-1]["mode"] != was and appr(c)[-1].get("flash"), 20, "every typed connection hears the switch")
+        check(appr(w)[-1].get("flash") is True, "flash on a switch: %r" % appr(w)[-1])
+        w.send({"cmd": "approvals", "project": project, "mode": was})
+        w.wait(lambda: appr(w)[-1]["mode"] == was, 20, "the mode back")
+        w.send({"cmd": "approvals", "project": project, "mode": "maybe"})
+        w.wait(lambda: any(e.get("ev") == "error" and e.get("cmd") == "approvals" for e in w.events), 20, "a bad mode refused")
+        w.send({"cmd": "remove_rule", "project": project, "rule": {"tool": "bash", "pattern": "never saved *"}})
+        w.wait(lambda: any(e.get("ev") == "error" and e.get("cmd") == "remove_rule" for e in w.events), 20, "a rule already gone refused")
 
         # diff: a worktree agent's commit, typed, line by line
         c.say('/new -w t5: {{bash: seq 1 2 > f5.txt && git add f5.txt && git commit -qm f5 && echo done}}')

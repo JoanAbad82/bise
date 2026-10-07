@@ -120,7 +120,12 @@ approval?: boolean,
  * TUI's, and has no table of its own (architect m_9549). Absent from
  * an older hub: a reader ranks it as `card_rank("")`
  */
-rank?: number | null, };
+rank?: number | null, 
+/**
+ * the `signin` card only (bar V14): the agents the expired ChatGPT
+ * sign-in stopped, which go on once he signs in
+ */
+waiting?: Array<string> | null, };
 
 /**
  * A commit that reached the project's trunk today (the changes tab's
@@ -411,3 +416,65 @@ words: string,
  * without a known window (`words::short_words`, amb-win m_10985)
  */
 short: string, };
+
+/**
+ * How tool calls are approved on this machine (bar V8/W21,
+ * approvals-design.md §8): `yolo` runs everything, `auto` asks the
+ * checker first.
+ */
+export type ApprovalMode = "yolo" | "auto" | "unknown";
+
+/**
+ * Who checks a gated call in `auto` (approvals-design.md §4).
+ */
+export type CheckerKind = "jev" | "model" | "off" | "unknown";
+
+/**
+ * One saved rule of `~/.bise/approvals.toml` (bar V8/W21): its fields as
+ * the file has them, which are also its identity (`remove_rule` sends
+ * them back, words ignored), and the words the TUI's `/approvals` list
+ * shows (`approvals::what`/`note`). Its age is not words here: the
+ * window shows `added_ms` with its own date helper (architect m_10951).
+ */
+export type ApprovalRule = { 
+/**
+ * `bash`, an edit tool, or a connector tool (`gmail.send_email`)
+ */
+tool: string, 
+/**
+ * bash: an arity pattern (`cargo test *`) or a command's text
+ */
+pattern?: string | null, 
+/**
+ * edit tools: a folder or file the edits may touch
+ */
+path?: string | null, 
+/**
+ * the repo it applies to; none: every project
+ */
+project?: string | null, 
+/**
+ * as the file says it (sent back as is to remove it)
+ */
+added?: string | null, 
+/**
+ * `card #12, api-v2`, or the file's own words
+ */
+from?: string | null, 
+/**
+ * `false`: its commands run outside the sandbox
+ */
+sandbox?: boolean | null, 
+/**
+ * when it was saved (ms), when `added` says it
+ */
+added_ms?: number | null, 
+/**
+ * what it allows: `cargo test *`, `edits to ~/notes` (none in a
+ * `remove_rule`: the hub reads the fields only)
+ */
+what?: string, 
+/**
+ * its source and where it applies: `from api · every project`
+ */
+note?: string, };

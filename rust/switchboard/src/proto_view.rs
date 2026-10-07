@@ -14,6 +14,7 @@ use bise_proto::Pos;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
+pub mod approvals;
 mod dev_servers;
 mod features;
 mod merged;
@@ -167,6 +168,8 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
                 options,
                 since_ms: now.saturating_sub(c.get("age_ms").and_then(Value::as_u64).unwrap_or(0)),
                 page,
+                // V14: the signin card's stopped agents (core.rs signin_waiting)
+                waiting: c.get("waiting").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect()),
             }
         })
         .collect()

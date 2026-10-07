@@ -283,6 +283,18 @@ impl Rule {
             outside: v.get("sandbox").and_then(|x| x.as_bool()) == Some(false),
         }
     }
+
+    /// Its facts for the words (bise_proto::approvals).
+    pub(crate) fn facts(&self) -> bise_proto::approvals::RuleFacts<'_> {
+        bise_proto::approvals::RuleFacts {
+            tool: &self.tool,
+            pattern: &self.pattern,
+            path: &self.path,
+            from: &self.from,
+            every: self.every,
+            outside: self.outside,
+        }
+    }
 }
 
 impl Approvals {

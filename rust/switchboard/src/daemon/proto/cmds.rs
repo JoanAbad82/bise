@@ -123,6 +123,33 @@ impl Shell {
                     sh.step(Input::ClientConfirm { client: id, id: cid, yes });
                 });
             }
+            // bar V8/W21: the TUI's `approvals` op, typed (his command:
+            // docs/issues/16 keeps agents' connections from it). A mode
+            // sets it and every connection hears it (with flash); none
+            // answers this connection; another word is refused
+            HubCmd::Approvals { mode: None, .. } => {
+                let ev = self.approvals_ev(false);
+                let ev = self.proto_approvals(&ev);
+                self.proto_send(id, &ev);
+            }
+            HubCmd::Approvals { mode: Some(word), .. } => {
+                let m = match word.as_str() {
+                    "toggle" => Some(self.gates.mode.other()),
+                    w => crate::approvals::Mode::parse(w),
+                };
+                let Some(m) = m else { return self.proto_error(id, &tag, &format!("approvals: {word} is not yolo, auto or toggle")) };
+                self.set_mode(m);
+                let ev = self.approvals_ev(true);
+                self.broadcast(&ev);
+            }
+            // the rule's fields back to gate.rs's remove_rule (rule_of_json):
+            // gone already is this error; done, every connection hears it
+            HubCmd::RemoveRule { rule, .. } => {
+                let v = serde_json::to_value(&rule).unwrap_or(Value::Null);
+                if let Err(e) = self.remove_rule(&v) {
+                    self.proto_error(id, &tag, &e);
+                }
+            }
             HubCmd::Stop { agent, .. } => {
                 if !known(self, &agent) {
                     return self.proto_error(id, &tag, &format!("no agent {agent}"));

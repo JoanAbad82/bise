@@ -6,7 +6,7 @@
 
 use crate::context::FnContext;
 use crate::diff::{DiffFile, DiffResult};
-use crate::rows::{Agent, Artifact, Card, DevServer, Feature, Merged, Model, Pr, Worktree};
+use crate::rows::{Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, Merged, Model, Pr, Worktree};
 use crate::thread::Entry;
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
@@ -156,6 +156,28 @@ pub enum HubEv {
     /// `id`; only that connection gets it. Left unanswered it holds
     /// nothing in the hub: a later command just asks again
     Confirm { project: Project, id: u64, text: String },
+    /// how tool calls are approved on this machine and the saved rules of
+    /// this repo (bar V8/W21: the TUI's `/approvals`, from the same JSON):
+    /// at hello, to every connection when the mode or the rules change,
+    /// to one connection on `approvals` with no mode. `env`: the mode is
+    /// set for this session by BISE_APPROVALS; `flash`: it just switched
+    Approvals {
+        project: Project,
+        mode: ApprovalMode,
+        env: bool,
+        checker: CheckerKind,
+        /// who checks: `TypeSafe`, `OpenRouter`, a chat model's id
+        checker_who: String,
+        /// Jev's model id (`jev-1.13`)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        checker_model: Option<String>,
+        /// the workspace's git root: the rules below are its own and
+        /// every project's
+        repo: String,
+        rules: Vec<ApprovalRule>,
+        #[serde(default, skip_serializing_if = "crate::is_false")]
+        flash: bool,
+    },
     /// a plain line from the hub to the window that sent `cmd` (a
     /// confirm answered no: "drop of @x cancelled"; `/flow`'s answer to
     /// a `slash`), not a failure. `cid`: the slash command's, when it
@@ -192,7 +214,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "notice", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "prs", "models", "diff", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "approvals", "notice", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)
@@ -304,6 +326,21 @@ pub enum HubCmd {
     /// his answer to the hub's `confirm` `id`: yes or no (a no comes
     /// back as `notice`, never as `error`)
     Confirm { project: Project, id: u64, yes: bool },
+    /// the approvals mode (bar V8/W21, the TUI's shift+tab and
+    /// `/approvals yolo|auto`): `yolo`, `auto` or `toggle` sets it and
+    /// every connection gets `approvals` with `flash`; no mode: this
+    /// connection gets `approvals` (the screen opened); another word is
+    /// an `error`. His command only: docs/issues/16 is what keeps an
+    /// agent's connection from sending it
+    Approvals {
+        project: Project,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mode: Option<String>,
+    },
+    /// a saved rule out of approvals.toml: `rule` is the row `approvals`
+    /// gave (its fields are its identity, its words are ignored); one
+    /// already gone is an `error`. His command only, as `approvals`
+    RemoveRule { project: Project, rule: ApprovalRule },
     /// stop its turn
     Stop { project: Project, agent: String },
     /// out of his list (`force`: a working one is stopped first)
@@ -395,7 +432,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "close", "confirm", "approvals", "remove_rule", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "models", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow", "slash"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)

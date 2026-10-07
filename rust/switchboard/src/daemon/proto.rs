@@ -259,6 +259,9 @@ impl Shell {
             self.proto_send(id, &prs);
             let models = self.models_ev();
             self.proto_send(id, &models);
+            let appr = self.approvals_ev(false);
+            let appr = self.proto_approvals(&appr);
+            self.proto_send(id, &appr);
             return;
         }
         if !self.proto.conns.contains_key(&id) {
@@ -272,6 +275,8 @@ impl Shell {
             | HubCmd::Answer { project, .. }
             | HubCmd::Close { project, .. }
             | HubCmd::Confirm { project, .. }
+            | HubCmd::Approvals { project, .. }
+            | HubCmd::RemoveRule { project, .. }
             | HubCmd::Stop { project, .. }
             | HubCmd::Archive { project, .. }
             | HubCmd::Unarchive { project, .. }

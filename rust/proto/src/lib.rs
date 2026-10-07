@@ -36,6 +36,7 @@
 //! The fixtures (`fixtures/*.jsonl`) are the one source for the Rust
 //! tests, the web's fake core (apps/ambient/web) and the Python e2e.
 
+pub mod approvals;
 pub mod context;
 pub mod diff;
 pub mod draft;
