@@ -97,6 +97,19 @@ describe('InboxStrip (W7/K24)', () => {
     expect(screen.getByTestId('strip.card.acme-1.keys').textContent).toBe('1 2pickor type your answer below⌘⌫closeesclater');
   });
 
+  it("an approval asks too ('bise asks'); while the keys drive, a resting mouse paints no hover", () => {
+    const a = { ...card(1, 0), agent: 'main', kind: 'merge', approval: true };
+    render(<InboxStrip project="acme" cards={[a]} ports={ports().p} now={NOW} />);
+    fireEvent.keyDown(window, { code: 'Digit1', key: '1', ctrlKey: true });
+    const c = screen.getByTestId('strip.card.acme-1');
+    expect(c.textContent).toContain('bise asks');
+    expect(c.className).not.toContain('driving');
+    fireEvent.keyDown(window, { key: 'ArrowRight', code: 'ArrowRight' });
+    expect(c.className).toContain('driving');
+    fireEvent.mouseMove(c);
+    expect(c.className).not.toContain('driving');
+  });
+
   it('cardKeyOf: digits that are options pick, ←→ walk, ⌘⌫ closes, esc puts off', () => {
     const k = (key: string, mods: Partial<Record<'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey', boolean>> = {}) => ({ key, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...mods });
     const c = card(1, 0);

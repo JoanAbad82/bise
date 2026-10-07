@@ -78,14 +78,33 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
       acts.pick(n);
     }, PICKED_MS);
   };
+  // while the keys drive (an option on), a resting mouse paints no hover;
+  // the next mouse move gives it back (ambient m_11426)
+  const [driving, setDriving] = useState(false);
+  const [lastOn, setLastOn] = useState(on);
+  if (on !== lastOn) {
+    setLastOn(on);
+    if (on !== null) setDriving(true);
+  }
   const where = project ?? card.project;
   const el = (
-    <div className={`ic ${surface}`} role="group" data-testid={id}>
+    <div
+      className={`ic ${surface}${driving ? ' driving' : ''}`}
+      role="group"
+      data-testid={id}
+      onMouseMove={
+        driving
+          ? () => {
+              setDriving(false);
+            }
+          : undefined
+      }
+    >
       <div className="ic-h">
         <span className="ic-g" aria-hidden="true">
           {glyphOf(card)}
         </span>
-        <b>{kindTitle(card.kind, card.agent)}</b>
+        <b>{titleOf(card)}</b>
         {home !== true && <span className="ic-p" data-testid={`${id}.project`}>{`· ${where}`}</span>}
         <span className="ic-k">{age(now - card.since_ms)}</span>
       </div>
@@ -188,6 +207,12 @@ function Folded({ text, testId }: { text: string; testId: string }) {
 /** Words answer it (a question), not only its options. */
 export function takesWords(c: CardRow): boolean {
   return c.approval !== true;
+}
+
+/** A card's title: an approval asks like a question ('bise asks', 'search asks'; ambient m_11426:
+ * its '!' and its options say it is one, the noun stays in the question), else kindTitle. */
+export function titleOf(c: CardRow): string {
+  return c.approval === true ? kindTitle('question', c.agent) : kindTitle(c.kind, c.agent);
 }
 
 /** An item's title (the TUI's kind_title, copy deck §17). */

@@ -8,7 +8,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Card } from '@/proto';
 import { Dot, Kbd } from '@/ds';
-import { age, dotOf, InboxCard, kindTitle } from './InboxCard';
+import { age, dotOf, InboxCard, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { STRIP_KEYS, stripKey, stripList, stripOpen, stripView, stripWords } from './stripRows';
 import './inbox.css';
@@ -193,7 +193,7 @@ export function InboxStrip({ project, name, home, cards, ports, now: pinned, tip
               openTo(view.next ? cardKey(view.next) : null);
             }}
           >
-            {`+ ${String(view.more)} more · ${kindTitle(view.next.kind, view.next.agent)}`}
+            {`+ ${String(view.more)} more · ${titleOf(view.next)}`}
           </button>
         )}
       </section>

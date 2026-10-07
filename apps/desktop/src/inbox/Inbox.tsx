@@ -14,7 +14,7 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { Card as CardRow } from '@/proto';
 import { Empty, Head, Row } from '@/ds';
-import { dotOf, folds, InboxCard, kindTitle, takesWords } from './InboxCard';
+import { dotOf, folds, InboxCard, takesWords, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { inboxDrafts, type Drafts } from './drafts';
 import { current, prune, START, step, visible, type Act, type Key } from './model';
@@ -234,7 +234,7 @@ const Item = memo(function Item({ c, n, on, name, onSelect }: { c: CardRow; n: n
     <Row
       kind="ag"
       dot={c.approval === true || c.urgent ? 'nd' : dotOf(c)}
-      name={`${String(n)}  ${kindTitle(c.kind, c.agent)}: ${firstLine(c.question)}`}
+      name={`${String(n)}  ${titleOf(c)}: ${firstLine(c.question)}`}
       end={name}
       needs={c.approval === true}
       on={on}

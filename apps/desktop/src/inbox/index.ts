@@ -6,7 +6,7 @@
 // the store. Strip.tsx is the thread's inbox strip (stripRows.ts its rules),
 // ThreadInbox (screen.tsx) the one line the thread mounts.
 export { Inbox, type InboxPorts, type InboxProps } from './Inbox';
-export { InboxCard, kindTitle, takesWords, PICKED_MS, type InboxCardActs, type InboxCardProps } from './InboxCard';
+export { InboxCard, kindTitle, titleOf, takesWords, PICKED_MS, type InboxCardActs, type InboxCardProps } from './InboxCard';
 export { sortCards, cardKey } from './order';
 export { inboxDrafts, makeDrafts, type Drafts } from './drafts';
 export { InboxScreen, ThreadInbox, inboxOf } from './screen';
