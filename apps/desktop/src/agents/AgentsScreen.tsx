@@ -4,7 +4,8 @@
 // archived ones below with restore; '+ new agent' (A.1) and each agent's
 // '…' (rename, model, reasoning: A.5) through amb-feed's typed commands
 // (actions.ts). Owner: amb-win.
-import { memo, useState } from 'react';
+import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Peek } from './Peek';
 import { Button, Empty, Head, Row, SectionHead } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAgents, useStore } from '@/store';
@@ -14,14 +15,55 @@ import { archivedOf, dotOf, endOf, lineOf, liveOf } from './model';
 import { NewAgentSheet, Tune } from './Tune';
 import './agents.css';
 
+/** What a key does on the list (W6/K18): move the selection, preview it, open it. Pure. */
+export function listKey(key: string, order: readonly string[], sel: string | null, peek: string | null): { sel: string | null; peek: string | null; open?: string } | null {
+  const i = sel === null ? -1 : order.indexOf(sel);
+  switch (key) {
+    case 'ArrowDown':
+      return { sel: order[Math.min(order.length - 1, i + 1)] ?? null, peek };
+    case 'ArrowUp':
+      return { sel: order[Math.max(0, i - 1)] ?? null, peek };
+    case ' ':
+      if (sel === null || i < 0) return null;
+      return { sel, peek: peek === sel ? null : sel };
+    case 'Escape':
+      return peek === null ? null : { sel, peek: null };
+    case 'Enter':
+      return sel === null || i < 0 ? null : { sel, peek, open: sel };
+    default:
+      return null;
+  }
+}
+
 export function AgentsScreen({ project, projectName }: { project: string; projectName?: string }) {
   const agents = useAgents(project);
   const live = liveOf(agents);
   const archived = archivedOf(agents);
   const [showArchived, setShowArchived] = useState(false);
   const [adding, setAdding] = useState(false);
+  const router = useRouter();
+  // W6/K18: ↑↓ select an agent, space shows its feed in place, space again (or esc) closes it
+  const [sel, setSel] = useState<string | null>(null);
+  const [peek, setPeek] = useState<string | null>(null);
+  const order = [...live, ...(showArchived ? archived : [])].map((a) => a.name);
+  const section = useRef<HTMLElement>(null);
+  useEffect(() => {
+    // the list takes the keys when nothing else has the focus
+    if (document.activeElement === null || document.activeElement === document.body) section.current?.focus();
+  }, []);
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target as HTMLElement;
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t.isContentEditable || (t !== section.current && t.closest('button') !== null)) return;
+    const next = listKey(e.key, order, sel, peek);
+    if (next === null) return;
+    e.preventDefault();
+    setSel(next.sel);
+    setPeek(next.peek);
+    if (next.open !== undefined) router.go({ screen: 'thread', project, agent: next.open });
+  };
   return (
-    <section className="ag-screen" data-testid="agents.screen" data-project={project}>
+    <section ref={section} tabIndex={-1} onKeyDown={onKeyDown} className="ag-screen" data-testid="agents.screen" data-project={project}>
       <Head
         title="agents"
         sub={`${projectName ?? project} · ${live.length} live`}
@@ -48,7 +90,7 @@ export function AgentsScreen({ project, projectName }: { project: string; projec
         )}
         {live.length === 0 && <Empty title="no agents yet" />}
         {live.map((a) => (
-          <AgentItem key={a.name} project={project} a={a} />
+          <AgentItem key={a.name} project={project} a={a} sel={sel === a.name} peek={peek === a.name} />
         ))}
         {archived.length > 0 && (
           <>
@@ -67,7 +109,7 @@ export function AgentsScreen({ project, projectName }: { project: string; projec
                 {showArchived ? '▾' : '▸'} archived · {archived.length}
               </span>
             </SectionHead>
-            {showArchived && archived.map((a) => <AgentItem key={a.name} project={project} a={a} />)}
+            {showArchived && archived.map((a) => <AgentItem key={a.name} project={project} a={a} sel={sel === a.name} peek={peek === a.name} />)}
           </>
         )}
       </div>
@@ -75,7 +117,7 @@ export function AgentsScreen({ project, projectName }: { project: string; projec
   );
 }
 
-const AgentItem = memo(function AgentItem({ project, a }: { project: string; a: Agent }) {
+const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: string; a: Agent; sel: boolean; peek: boolean }) {
   const store = useStore();
   const router = useRouter();
   const now = useNow();
@@ -83,7 +125,7 @@ const AgentItem = memo(function AgentItem({ project, a }: { project: string; a: 
   const id = a.name;
   const [tuning, setTuning] = useState(false);
   return (
-    <div className="ag-item" data-testid={`agents.row.${id}`} data-status={a.status}>
+    <div className={sel ? 'ag-item is-sel' : 'ag-item'} data-testid={`agents.row.${id}`} data-status={a.status} data-sel={sel || undefined} aria-selected={sel}>
       <Row
         kind={a.archived ? 'arch' : 'ag'}
         name={a.main ? 'main' : a.name}
@@ -174,6 +216,7 @@ const AgentItem = memo(function AgentItem({ project, a }: { project: string; a: 
           </Button>
         </div>
       )}
+      {peek && <Peek project={project} agent={a.name} />}
       {tuning && !a.archived && (
         <Tune
           key={a.name}
