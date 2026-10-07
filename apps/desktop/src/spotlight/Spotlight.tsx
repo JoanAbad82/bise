@@ -80,7 +80,7 @@ const Row = memo(function Row({ item, on, testId, onPick }: { item: SpotItem; on
   }
 });
 
-/** 'to telemetry · 2 s to change', counting down on its own (the list and the input don't re-render). */
+/** '→ bise · telemetry · 2 s to change', counting down on its own (the list and the input don't re-render). */
 export function RouteLine({ route, onKeep, testId }: { route: SpotRoute; onKeep?: (() => void) | undefined; testId: string }): JSX.Element {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {

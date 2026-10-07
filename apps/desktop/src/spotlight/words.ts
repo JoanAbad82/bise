@@ -18,8 +18,9 @@ export const W = {
   keysEmpty: '⏎ open in bise   esc close',
   keysAsk: '⏎ send to bise   ↑↓ move   esc close',
   answerMore: 'the rest in bise   ⏎ open',
-  // the routing hold (bar ⛔3, lead m_9855): bise picked the project, he has 2 s to change it
-  routeTo: (name: string, s: number): string => (s > 0 ? `to ${name} · ${s} s to change` : `to ${name} · sending`),
+  // the routing hold (bar ⛔3, lead m_9855): bise picked the project, he has 2 s to change it;
+  // the same words as the thread's hold (lead m_11564, e298b066: main is 'bise')
+  routeTo: (name: string, s: number): string => (s > 0 ? `→ bise · ${name} · ${s} s to change` : `→ bise · ${name} · sending`),
   keepWithBise: 'keep it with bise',
   anotherProject: 'another project',
   keysRoute: 'esc keep it with bise   ↑↓ ⏎ another project',

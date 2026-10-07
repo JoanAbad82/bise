@@ -86,12 +86,12 @@ describe('the spotlight rows', () => {
 });
 
 describe('the routing hold', () => {
-  it('shows "to <project> · N s to change" at once; esc keeps it with bise, ⏎ on another project corrects it', async () => {
+  it('shows "→ bise · <project> · N s to change" at once; esc keeps it with bise, ⏎ on another project corrects it', async () => {
     const onRouteKeep = vi.fn();
     const onRouteTo = vi.fn();
     const route = { rid: 7, to: 'tel', name: 'telemetry', until: Date.now() + 2000 };
     const ui = render(<Spotlight data={D} route={route} onRouteKeep={onRouteKeep} onRouteTo={onRouteTo} onAsk={vi.fn()} onOpen={vi.fn()} onClose={vi.fn()} />);
-    expect(ui.getByTestId('spot.route').textContent).toMatch(/^to telemetry · 2 s to change/u);
+    expect(ui.getByTestId('spot.route').textContent).toMatch(/^→ bise · telemetry · 2 s to change/u);
     expect(ui.queryByTestId('spot.row.env.tel')).toBeNull();
     const input = ui.getByTestId('spot.input');
     await act(async () => {
