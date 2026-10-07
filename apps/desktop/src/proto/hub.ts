@@ -19,7 +19,13 @@ export type Job = { agent: string, label: string, step?: number | null, of?: num
 /**
  * What a hub sends a client that said `hello {proto: 1}`.
  */
-export type HubEv = { "ev": "welcome", project: string, proto: number, workspace: string, name: string, } | { "ev": "agents", project: string, agents: Array<Agent>, } | { "ev": "cards", project: string, cards: Array<Card>, } | { "ev": "thread", project: string, agent: string, entries: Array<Entry>, before: number | null, more: boolean, } | { "ev": "entry", project: string, agent: string, entry: Entry, } | { "ev": "typing", project: string, agent: string, text: string, } | { "ev": "artifacts", project: string, items: Array<Artifact>, } | { "ev": "worktrees", project: string, items: Array<Worktree>, } | { "ev": "dev_servers", project: string, items: Array<DevServer>, } | { "ev": "merged", project: string, items: Array<Merged>, } | { "ev": "features", project: string, items: Array<Feature>, } | { "ev": "prs", project: string, head: string, items: Array<Pr>, none?: string | null, } | { "ev": "models", project: string, items: Array<Model>, } | { "ev": "diff", project: string, agent: string, base: string, head?: string | null, files: Array<DiffFile>, 
+export type HubEv = { "ev": "welcome", project: string, proto: number, workspace: string, name: string, 
+/**
+ * hub-skew (architect m_11314): the commands this hub knows, its
+ * `HubCmd::TAGS` (one owner). Empty: a hub older than the list;
+ * the core then compares `proto` with its own.
+ */
+cmds: Array<string>, } | { "ev": "agents", project: string, agents: Array<Agent>, } | { "ev": "cards", project: string, cards: Array<Card>, } | { "ev": "thread", project: string, agent: string, entries: Array<Entry>, before: number | null, more: boolean, } | { "ev": "entry", project: string, agent: string, entry: Entry, } | { "ev": "typing", project: string, agent: string, text: string, } | { "ev": "artifacts", project: string, items: Array<Artifact>, } | { "ev": "worktrees", project: string, items: Array<Worktree>, } | { "ev": "dev_servers", project: string, items: Array<DevServer>, } | { "ev": "merged", project: string, items: Array<Merged>, } | { "ev": "features", project: string, items: Array<Feature>, } | { "ev": "prs", project: string, head: string, items: Array<Pr>, none?: string | null, } | { "ev": "models", project: string, items: Array<Model>, } | { "ev": "diff", project: string, agent: string, base: string, head?: string | null, files: Array<DiffFile>, 
 /**
  * what the change measured (none: nothing measured; boxed: the
  * enum stays small, the wire is the same)

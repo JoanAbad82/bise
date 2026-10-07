@@ -244,7 +244,8 @@ impl Shell {
             self.proto.conns.entry(id).or_default().only = typed_only;
             let ws = self.opts.paths.workspace.clone();
             let name = ws.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
-            let welcome = HubEv::Welcome { project: self.project(), proto: PROTO, workspace: ws.to_string_lossy().to_string(), name };
+            let cmds = HubCmd::TAGS.iter().map(|t| t.to_string()).collect();
+            let welcome = HubEv::Welcome { project: self.project(), proto: PROTO, workspace: ws.to_string_lossy().to_string(), name, cmds };
             self.proto_send(id, &welcome);
             let snap = self.snapshot();
             let (agents, cards) = self.proto_rows(&snap);

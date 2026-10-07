@@ -44,7 +44,17 @@ pub struct Job {
 pub enum HubEv {
     /// the answer to `hello`: who this hub is (its tag is `welcome`: the
     /// hub's older `hello` event stays the TUI's)
-    Welcome { project: Project, proto: u32, workspace: String, name: String },
+    Welcome {
+        project: Project,
+        proto: u32,
+        workspace: String,
+        name: String,
+        /// hub-skew (architect m_11314): the commands this hub knows, its
+        /// `HubCmd::TAGS` (one owner). Empty: a hub older than the list;
+        /// the core then compares `proto` with its own.
+        #[serde(default)]
+        cmds: Vec<String>,
+    },
     /// every agent of the hub, on change
     Agents { project: Project, agents: Vec<Agent> },
     /// every open card of the hub, on change
@@ -471,5 +481,15 @@ mod tests {
         let t = HubEv::decode(r#"{"ev":"typing","project":"p","agent":"a","text":"x","new":1}"#).unwrap();
         assert_eq!(t, HubEv::Typing { project: "p".into(), agent: "a".into(), text: "x".into() });
         assert_eq!(t.tag(), "typing");
+    }
+
+    /// hub-skew (architect m_11314): a hub older than `cmds` says none, a
+    /// newer one lists its tags.
+    #[test]
+    fn a_welcome_without_cmds_is_an_older_hub() {
+        let old = HubEv::decode(r#"{"ev":"welcome","project":"p","proto":1,"workspace":"/w","name":"w"}"#).unwrap();
+        assert!(matches!(&old, HubEv::Welcome { cmds, .. } if cmds.is_empty()));
+        let new = HubEv::decode(r#"{"ev":"welcome","project":"p","proto":1,"workspace":"/w","name":"w","cmds":["hello","slash"]}"#).unwrap();
+        assert!(matches!(&new, HubEv::Welcome { cmds, .. } if cmds == &["hello", "slash"]));
     }
 }

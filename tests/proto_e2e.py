@@ -68,6 +68,9 @@ def main():
         project = w["project"]
         check(re.fullmatch(r"ws-[0-9a-f]{8}", project) and w["proto"] == 1 and w["name"] == "ws"
               and os.path.realpath(w["workspace"]) == os.path.realpath(E.ws), "welcome: %r" % w)
+        # hub-skew (architect m_11314): the commands this hub knows, its
+        # HubCmd tags, so the core never sends one it lacks
+        check({"hello", "subscribe", "send", "slash", "close"} <= set(w.get("cmds") or []) and len(w["cmds"]) == len(set(w["cmds"])), "welcome.cmds: %r" % w.get("cmds"))
         agents = typed(c, "agents")[0]
         main_row = [a for a in agents["agents"] if a["name"] == "main"]
         check(agents["project"] == project and main_row and main_row[0]["main"], "agents: %r" % agents)
