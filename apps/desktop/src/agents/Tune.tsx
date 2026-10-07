@@ -46,9 +46,18 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
   const [name, setName] = useState(a.name);
   const models = useModels(project);
   const [model, setModelText] = useState(a.model ?? '');
-  // the model it runs, or the one he just picked until the agents event says so
-  const [picked, setPicked] = useState<string | undefined>(undefined);
-  const current = picked ?? a.model ?? '';
+  // the model it runs, or the one he just picked until the agents row moves:
+  // a pick is held only while the row still says the model it said at the
+  // pick, so any agents event with another model (his pick landing, or a
+  // /model from the TUI) wins (qa-flows a8758ee6)
+  const [pick0, setPick0] = useState<{ to: string; from: string } | undefined>(undefined);
+  const runs = a.model ?? '';
+  const picked = pick0 !== undefined && pick0.from === runs ? pick0.to : undefined;
+  if (pick0 !== undefined && picked === undefined) setPick0(undefined);
+  const setPicked = (m: string | undefined) => {
+    setPick0(m === undefined ? undefined : { to: m, from: runs });
+  };
+  const current = picked ?? runs;
   const groups = modelGroups(models);
   const efforts = effortsFor(models, current);
   const pick = (m: string) => {

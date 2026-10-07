@@ -199,6 +199,37 @@ describe('the agents screen: new, rename, model, reasoning', () => {
   });
 });
 
+describe('the model mark follows the hub (qa-flows a8758ee6)', () => {
+  it('a model changed elsewhere (TUI /model) moves the mark, with or without a pick of his before', () => {
+    const { store, cmds, v } = setup();
+    const ev = hub_ev.find((e) => e.ev === 'models');
+    if (ev?.ev !== 'models') throw new Error('no models fixture');
+    const runs = (model: string) => {
+      act(() => {
+        store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('p99', { model })] });
+      });
+    };
+    act(() => {
+      store.apply({ ...ev, project: P });
+    });
+    runs('anthropic/claude-opus-5-5');
+    fireEvent.click(v.getByTestId('agents.more.p99'));
+    const on = (id: string) => v.getByTestId(`agents.model.p99.pick.${id}`).getAttribute('aria-selected');
+    // no pick: the row moves, the mark follows
+    runs('mistral/devstral-medium-latest');
+    expect(on('mistral/devstral-medium-latest')).toBe('true');
+    expect(on('anthropic/claude-opus-5-5')).toBe('false');
+    // his pick, held until the row moves...
+    fireEvent.click(v.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5'));
+    expect(cmds).toContainEqual({ cmd: 'model', project: P, agent: 'p99', model: 'anthropic/claude-opus-5-5' });
+    expect(on('anthropic/claude-opus-5-5')).toBe('true');
+    // ...then the TUI sets another one: the row wins
+    runs('opus');
+    expect(on('opus')).toBe('true');
+    expect(on('anthropic/claude-opus-5-5')).toBe('false');
+  });
+});
+
 describe('the catalog, pure', () => {
   it('groups, aliases resolved, efforts, default roles', () => {
     const ev = hub_ev.find((e) => e.ev === 'models');

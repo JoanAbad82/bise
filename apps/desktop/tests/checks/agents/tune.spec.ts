@@ -75,6 +75,10 @@ test('agents/tune: + new agent starts one; … renames it, sets its reasoning an
     await page.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5').click();
     await expect(page.getByTestId('agents.effort.p99.max'), "opus 5.5's own efforts").toBeVisible();
     await page.screenshot({ path: test.info().outputPath('models.png') });
+    // a model set elsewhere (the TUI's /model): only the hub's agents event, no pick here; the mark follows it
+    await core.send({ ev: 'agents', project: HOME, agents: [agent('main'), agent('p99', { model: 'opus', effort: 'high' }), agent('cart', { status: 'working' })] } as unknown as Ev);
+    await expect(page.getByTestId('agents.model.p99.pick.opus'), 'a model changed elsewhere moves the mark').toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
+    await expect(page.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5')).toHaveAttribute('aria-selected', 'false');
     // a typed id still goes
     await page.getByTestId('agents.model.p99').fill('anthropic/claude-opus-4');
     await page.getByTestId('agents.model.p99.set').click();
