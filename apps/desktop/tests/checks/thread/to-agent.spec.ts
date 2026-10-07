@@ -60,8 +60,11 @@ test("thread/to-agent: gift-ui's own thread shows its message to main, its quest
     await expect(page.getByTestId('thread.to.3')).toContainText('landed the balance label');
     await expect(page.getByTestId('thread.to.4'), 'its question, as the TUI marks it').toContainText('✉ gift-ui → main');
     await expect(page.getByTestId('thread.to.4')).toContainText(ASK);
-    await expect(page.getByTestId('thread.asks.4')).toHaveText('waits for the reply');
-    await expect(page.getByTestId('thread.card.2'), "main's card for it, in its thread").toContainText(ASK);
+    // one copy of the question (ambient m_10689): on the ask; main's card right under it with its options only
+    await expect(page.getByTestId('thread.asks.4'), 'with a card for it, the ask itself carries no wait tag').toHaveCount(0);
+    await expect(page.getByTestId('thread.card.2'), "main's card for it, its options only").not.toContainText(ASK);
+    await expect(page.getByTestId('thread.card.2.waits'), 'it waits for him, with the digits that answer it').toHaveText('waits for you · 1 or 2');
+    await expect(page.getByTestId('thread.screen').getByText(ASK, { exact: false }), 'the question shows once').toHaveCount(1);
     // in the DOM is not on screen (amb-win 35d08ae5): a short thread's rows are shown
     await expectShown(page.getByTestId('thread.to.3'), 'its message to main');
     await expectShown(page.getByTestId('thread.to.4'), 'its question');

@@ -85,7 +85,11 @@ export function FeatureScreen({ project, name }: { project: string; name: string
         )}
 
         <SectionHead>agents</SectionHead>
-        {mine.length === 0 && <Empty title="no agent on it now" />}
+        {mine.length === 0 && (
+          <p className="rv-note" data-testid="feature.noagent">
+            no agent on it now
+          </p>
+        )}
         {mine.map((a) => {
           const end = endOf(a, now);
           return (

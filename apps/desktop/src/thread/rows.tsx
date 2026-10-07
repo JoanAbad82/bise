@@ -6,7 +6,7 @@
 import { memo, useEffect, useState } from 'react';
 import { Answered, Art, Button, Chip, Fold, Marker, Msg, Opts, Tool } from '@/ds';
 import type { Entry } from '@/proto';
-import { useAgents, useCoreState, useEntry, usePending, useProjects, useStore } from '@/store';
+import { useAgents, useCoreState, useEntry, usePending, useProjects, useStore, useThreadOrder } from '@/store';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
@@ -138,11 +138,14 @@ function ToolsRow({ e }: { e: Entry }) {
 /**
  * What this agent sent another (amb-feed eb752406, bar A.3): '→ main' and
  * its words, indented as an exchange; one that waits for the reply is its
- * question (the TUI's '✉ gift-ui → main'): marked so, the card main opens
- * for it follows as its own entry.
+ * question (the TUI's '✉ gift-ui → main'). When main opened a card for it,
+ * that card follows with only its options and says it waits for him; with
+ * no card, the question waits for main (ambient m_10689: one copy of it).
  */
 function ToAgentRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const to = e.to ?? 'main';
+  const next = useNeighbor(ctx.tkey, e.pos, 1);
+  const carded = e.asks === true && next !== undefined && cardFollows(e, next);
   return (
     <Msg
       from="agent"
@@ -151,9 +154,9 @@ function ToAgentRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       time={clock(e.at_ms)}
       testId={`thread.to.${String(e.pos)}`}
       after={
-        e.asks === true ? (
-          <span className="th-asks" data-testid={`thread.asks.${String(e.pos)}`}>
-            waits for the reply
+        e.asks === true && !carded ? (
+          <span className="th-waits main" data-testid={`thread.asks.${String(e.pos)}`}>
+            waits for {to}
           </span>
         ) : undefined
       }
@@ -163,27 +166,67 @@ function ToAgentRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   );
 }
 
+/** A card entry right after the ask it answers (same words): the ask carries the question. Pure. */
+export function cardFollows(ask: Entry, card: Entry): boolean {
+  return ask.kind === 'to_agent' && ask.asks === true && card.kind === 'card' && card.card != null && card.card.question.trim() === ask.text.trim();
+}
+
+/** '1 or 2', '1, 2 or 3': the digits that answer a card. Pure. */
+export function digitsOf(ns: readonly number[]): string {
+  const d = ns.map(String);
+  return d.length <= 1 ? (d[0] ?? '') : `${d.slice(0, -1).join(', ')} or ${d.at(-1) ?? ''}`;
+}
+
+/** The entry before (-1) or after (+1) this one in the thread's order. */
+function useNeighbor(tkey: string, pos: number, dir: -1 | 1): Entry | undefined {
+  const { order } = useThreadOrder(tkey);
+  const i = order.indexOf(pos);
+  const at = i < 0 ? undefined : order[i + dir];
+  return useEntry(tkey, at ?? -1);
+}
+
 /** A to_agent row's name: '✉ gift-ui → main' when it asks, else 'gift-ui → main'. Pure. */
 export function toAgentName(from: string, to: string, asks: boolean): string {
   return `${asks ? '✉ ' : ''}${from} → ${to}`;
 }
 
-/** A card it asked: open, its options answer it; answered, a line. */
+/**
+ * A card it asked: open, its options answer it, tagged 'waits for you · 1
+ * or 2'; answered, a line. Right after the ask it answers, the ask carries
+ * the question and the card only its options (one copy of it).
+ */
 function CardRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const store = useStore();
+  const prev = useNeighbor(ctx.tkey, e.pos, -1);
   const c = e.card;
   if (!c) return <Marker>{e.text}</Marker>;
-  if (c.answered) return <Answered testId={`thread.card.${c.id}`}>✓ answered: {c.question}</Answered>;
-  return (
-    <Msg from={ctx.bise && ctx.agent === 'main' ? 'bise' : 'agent'} name={ctx.agent} time={clock(e.at_ms)} testId={`thread.card.${String(c.id)}`}>
-      <Markdown text={c.question} onLink={ctx.onLink} />
+  const follows = prev !== undefined && cardFollows(prev, e);
+  if (c.answered) return <Answered testId={`thread.card.${String(c.id)}`}>{follows ? '✓ answered' : `✓ answered: ${c.question}`}</Answered>;
+  const opts = (
+    <>
       <Opts
         items={c.options.map((o) => ({ n: o.n, text: o.label }))}
         onPick={(n) => {
           store.answer(ctx.project, c.id, String(n));
         }}
-        testId={`thread.card.${c.id}.opt`}
+        testId={`thread.card.${String(c.id)}.opt`}
       />
+      <span className="th-waits you" data-testid={`thread.card.${String(c.id)}.waits`}>
+        waits for you · {digitsOf(c.options.map((o) => o.n))}
+      </span>
+    </>
+  );
+  if (follows) {
+    return (
+      <div className="th-card-opts" data-testid={`thread.card.${String(c.id)}`}>
+        {opts}
+      </div>
+    );
+  }
+  return (
+    <Msg from={ctx.bise && ctx.agent === 'main' ? 'bise' : 'agent'} name={ctx.agent} time={clock(e.at_ms)} testId={`thread.card.${String(c.id)}`}>
+      <Markdown text={c.question} onLink={ctx.onLink} />
+      {opts}
     </Msg>
   );
 }

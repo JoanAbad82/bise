@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { clampHeight, DEFAULT_H, dragHeight, isToggleKey, KEEP_ABOVE, MIN_H, shellProject, shellTakes, writesOf } from './model';
+import { clampHeight, DEFAULT_H, dragHeight, isToggleKey, KEEP_ABOVE, MIN_H, shellProject, shellTakes, shortPath, writesOf } from './model';
 import { panel } from './panel';
 
 const key = (code: string, mods: Partial<{ metaKey: boolean; altKey: boolean; ctrlKey: boolean; shiftKey: boolean }> = {}, k = '') => ({
@@ -90,5 +90,16 @@ describe('panel state', () => {
   it('keeps the dragged height', () => {
     panel.setHeight(333);
     expect(panel.get().height).toBe(333);
+  });
+});
+
+describe('the panel head folder', () => {
+  it('home as ~, the middle cut, the last folder kept', () => {
+    expect(shortPath('/Users/g/code/shop')).toBe('~/…/shop');
+    expect(shortPath('/Users/g/shop')).toBe('~/shop');
+    expect(shortPath('/Users/g')).toBe('~');
+    expect(shortPath('/tmp/bh-1/home/term-panel-x', '/tmp/bh-1/home')).toBe('~/term-panel-x');
+    expect(shortPath('/srv/repos/acme/web')).toBe('/…/web');
+    expect(shortPath('')).toBe('');
   });
 });

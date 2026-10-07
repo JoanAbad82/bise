@@ -7,7 +7,7 @@ import { Store, StoreProvider, replay, threadKey } from '@/store';
 import { placesOf } from '@/review/EnvironmentsScreen';
 import { Markdown, langOf } from './Markdown';
 import { newAtEnd } from './ThreadList';
-import { EntryRow, foldOf, toAgentName, type RowCtx } from './rows';
+import { digitsOf, EntryRow, foldOf, toAgentName, type RowCtx } from './rows';
 import { countsOf, ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
 
@@ -161,8 +161,10 @@ describe('code colors (tui-parity B15)', () => {
     expect(v.queryByTestId('thread.asks.7')).toBeNull();
     expect(v.getByTestId('thread.to.8').textContent).toContain('✉ gift-ui → main');
     expect(v.getByTestId('thread.to.8').textContent).toContain(ask);
-    expect(v.getByTestId('thread.asks.8').textContent).toBe('waits for the reply');
-    expect(v.getByTestId('thread.card.2').textContent).toContain(ask);
+    // main's card follows its ask: one copy of the question (on the ask), the card's options right under it, waiting for him
+    expect(v.queryByTestId('thread.asks.8')).toBeNull();
+    expect(v.getByTestId('thread.card.2').textContent).not.toContain(ask);
+    expect(v.getByTestId('thread.card.2.waits').textContent).toBe('waits for you · 1 or 2');
     fireEvent.click(v.getByTestId('thread.card.2.opt.2'));
     expect(cmds).toContainEqual(expect.objectContaining({ cmd: 'answer', project: P, card: 2, reply: '2' }));
     // answered: one line, no options
@@ -179,3 +181,21 @@ describe('code colors (tui-parity B15)', () => {
   });
 });
 
+
+describe('who a question waits for (ambient m_10689)', () => {
+  it("an ask with no card waits for main, dim; the digits that answer a card read '1 or 2', '1, 2 or 3'", () => {
+    const store = new Store(null);
+    store.apply({ ev: 'entry', project: P, agent: 'gift-ui', entry: { pos: 4, at_ms: 1, kind: 'to_agent', text: 'which label?', to: 'main', asks: true, msg: 3 } });
+    const ctx: RowCtx = { tkey: threadKey(P, 'gift-ui'), project: P, agent: 'gift-ui', bise: false, onLink: () => undefined };
+    const v = render(
+      <StoreProvider store={store}>
+        <EntryRow ctx={ctx} pos={4} />
+      </StoreProvider>,
+    );
+    expect(v.getByTestId('thread.asks.4').textContent).toBe('waits for main');
+    expect(v.getByTestId('thread.asks.4').className).toContain('main');
+    expect(digitsOf([1, 2])).toBe('1 or 2');
+    expect(digitsOf([1, 2, 3])).toBe('1, 2 or 3');
+    expect(digitsOf([1])).toBe('1');
+  });
+});

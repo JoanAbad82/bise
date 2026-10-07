@@ -68,3 +68,17 @@ export function writesOf(data: string, units = WRITE_UNITS): string[] {
 export function shellProject(routeProject: string | undefined, home: string | undefined): string | undefined {
   return routeProject ?? home;
 }
+
+/**
+ * The panel head's folder (ambient m_10689): his home as '~', the middle cut
+ * so the last folder always shows: '~/…/shop'. Pure.
+ */
+export function shortPath(path: string, home?: string): string {
+  if (path === '') return '';
+  const homeOf = home ?? /^\/Users\/[^/]+/.exec(path)?.[0];
+  const rel = homeOf !== undefined && (path === homeOf || path.startsWith(`${homeOf}/`)) ? `~${path.slice(homeOf.length)}` : path;
+  const parts = rel.split('/').filter((x, i) => x !== '' || i === 0);
+  // '~', 'code', 'shop' → keep the root and the last folder, '…' between when there's more
+  if (parts.length <= 2) return parts.join('/') || '/';
+  return `${parts[0] ?? ''}/…/${parts.at(-1) ?? ''}`;
+}

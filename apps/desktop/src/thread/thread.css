@@ -220,10 +220,22 @@
   cursor: pointer;
 }
 
-/* a to_agent row that waits for the reply (its question, amb-feed eb752406) */
-.th-asks {
+/* who a question waits for (ambient m_10689): him in pink, main dim */
+.th-waits {
   display: inline-block;
   margin-top: 4px;
-  color: var(--c-accent);
   font-size: 12px;
+}
+
+.th-waits.you {
+  color: var(--c-accent);
+}
+
+.th-waits.main {
+  color: var(--c-text-2);
+}
+
+/* a card right under its ask: its options only, aligned with the ask's words */
+.th-card-opts {
+  margin: -4px 0 8px 52px;
 }

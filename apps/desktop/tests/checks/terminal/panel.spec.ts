@@ -75,6 +75,10 @@ test('terminal/panel: ⌃` opens a shell under the thread, hide and show keep th
       await expect(panel, '⌃` shows the panel').toBeVisible({ timeout: 3000 });
       await expect(page.getByTestId('terminal.screen'), 'its shell runs').toHaveAttribute('data-state', 'live', { timeout: 10_000 });
       await out.wait(OPEN, (l) => l.includes(`"${HOME}" open`), 5000);
+      // its head (ambient m_10689): 'terminal · <folder>' with the last folder kept, and how to hide it
+      await expect(page.getByTestId('terminal.head'), 'the head names the folder').toContainText(`terminal · `);
+      await expect(page.getByTestId('terminal.head')).toContainText(path.basename(dir));
+      await expect(page.getByTestId('terminal.hide')).toHaveText('⌃` hide');
       const rows = page.locator('[data-testid="terminal.screen"] .xterm-rows');
 
       // every key goes to the shell: it computes, so what shows is its answer, not his echo

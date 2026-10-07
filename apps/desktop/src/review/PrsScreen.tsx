@@ -49,7 +49,6 @@ function PrRow({ p }: { p: Pr }) {
       <span className="pr-main">
         <span className="pr-branch">{p.branch}</span>
         <span className="pr-agents"> · {agentsOf(p)}</span>
-        {p.state === 'draft' && <span className="pr-draft"> · draft</span>}
       </span>
       <span className="pr-words" data-testid={`prs.words.${String(p.number)}`}>
         {wordsOf(p)}

@@ -153,6 +153,10 @@ test("review/prs-list: the changes screen opens the PR list; rows say it in word
     await expect(page.getByTestId("prs.words.415")).toHaveText(
       "draft · checks running",
     );
+    expect(
+      (await page.getByTestId("prs.row.415").innerText()).match(/draft/g)?.length,
+      "'draft' once, on the right (ambient m_10689)",
+    ).toBe(1);
     await page.screenshot({ path: test.info().outputPath("prs.png") });
     await row.click();
     const url = await out.wait(EXTERNAL, () => true, 3000);

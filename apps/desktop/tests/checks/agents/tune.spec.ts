@@ -61,12 +61,28 @@ test('agents/tune: + new agent starts one; … renames it, sets its reasoning an
     // A.5: reasoning and model from its row's values, then set
     await page.getByTestId('agents.more.p99').click();
     await expect(page.getByTestId('agents.model.p99')).toHaveValue('openai/gpt-5');
+    // the DS's focus ring on his fields (ambient m_10689): 2 px of ink, 6 px off, never the accent
+    await page.getByTestId('agents.model.p99').focus();
+    const ring = await page.getByTestId('agents.model.p99').evaluate((el) => {
+      const cs = getComputedStyle(el);
+      const probe = document.createElement('i');
+      probe.style.color = 'var(--c-ink)';
+      el.parentElement?.append(probe);
+      const ink = getComputedStyle(probe).color;
+      probe.remove();
+      return { width: cs.outlineWidth, offset: cs.outlineOffset, color: cs.outlineColor, ink };
+    });
+    expect(ring, 'the focus ring is the DS ink ring').toEqual({ width: '2px', offset: '6px', color: ring.ink, ink: ring.ink });
     await expect(page.getByTestId('agents.effort.p99.medium')).toHaveAttribute('aria-checked', 'true');
     await page.getByTestId('agents.effort.p99.high').click();
     expect(await core.waitCmd((c) => c.cmd === 'effort', 5000)).toMatchObject({ cmd: 'effort', project: HOME, agent: 'p99', effort: 'high' });
     // the hub's catalog (amb-feed 7dfd1c74): the TUI's /model rows, its words as they come
     await core.send(MODELS as unknown as Ev);
     await expect(page.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5'), "the catalog's row, its words as they come").toContainText('opus 5.5');
+    // the model it runs is marked visibly: a leading ✓ and an ink outline, never aria-selected alone
+    await core.send({ ev: 'agents', project: HOME, agents: [agent('main'), agent('p99', { model: 'anthropic/claude-opus-5-5', effort: 'high' }), agent('cart', { status: 'working' })] } as unknown as Ev);
+    await expect(page.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5')).toContainText('✓');
+    expect(await page.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5').evaluate((el) => getComputedStyle(el).boxShadow), 'an outline on the current model').not.toBe('none');
     await expect(page.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5')).toContainText('default for main and agents');
     await expect(page.getByTestId('agents.model.p99.pick.mistral/devstral-medium-latest')).toContainText('128k · config.toml');
     await page.getByTestId('agents.model.p99.pick.mistral/devstral-medium-latest').click();

@@ -8,13 +8,15 @@ import { memo, useEffect, useRef, useState, type PointerEvent as RPointerEvent }
 import { Terminal as Xterm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
-import { dragHeight, shellTakes, writesOf } from './model';
+import { dragHeight, shellTakes, shortPath, writesOf } from './model';
 import { panel, usePanel } from './panel';
+import { useProjects } from '@/store';
 import './terminal.css';
 
 /** The panel for the project in view; nothing until it was first shown. */
 export const TerminalPanel = memo(function TerminalPanel({ project }: { project: string | undefined }) {
   const p = usePanel();
+  const folder = useProjects().find((x) => x.project === project)?.path ?? '';
   const box = useRef<HTMLDivElement>(null);
   if (!p.opened || project === undefined) return null;
   return (
@@ -28,6 +30,19 @@ export const TerminalPanel = memo(function TerminalPanel({ project }: { project:
       style={{ height: p.height }}
     >
       <Grip box={box} />
+      <div className="term-head" data-testid="terminal.head">
+        <span>terminal · {shortPath(folder)}</span>
+        <button
+          type="button"
+          className="term-hide"
+          onClick={() => {
+            panel.hide();
+          }}
+          data-testid="terminal.hide"
+        >
+          ⌃` hide
+        </button>
+      </div>
       {/* one shell view per project: another project's shell runs on in main */}
       <ShellView key={project} project={project} shown={p.shown} />
     </section>
