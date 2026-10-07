@@ -1,8 +1,6 @@
 // 'show me': one screen in one state, out of his sight, to PNGs. Driven by showme.mjs through the
 // env var SHOWME (JSON): { surface, state, framesMs, out, size }.
-//   surface  old-window   today's old window; state = its address hash (inbox, agent/storefront/search, light, fresh)
-//            old-capsule  today's old capsule (dev.html, clean); state = a fakecore scene id, '@<ms>' to jump in it
-//            desktop      the new app (apps/desktop/out) on the scripted core (fixture world) and helper;
+//   surface  desktop      the app (apps/desktop/out) on the scripted core (fixture world) and helper;
 //                         state = a route (bise, inbox, agent/<p>/<a>, ...),
 //                         passed as BISE_DESKTOP_ROUTE
 //            <file.html>  any page; state = its query string
@@ -11,7 +9,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { changeSeries, FakeCore, FakeHelper, fps, launchDesktop, launchPage, OLD_WEB, pngBytes, Recorder, test, type Session } from '../index';
+import { changeSeries, FakeCore, FakeHelper, fps, launchDesktop, launchPage, pngBytes, Recorder, test, type Session } from '../index';
 
 type Ask = { surface: string; state?: string; framesMs?: number; out: string; size?: string };
 
@@ -19,17 +17,6 @@ const ask = JSON.parse(process.env['SHOWME'] ?? '{}') as Ask;
 
 async function open(a: Ask): Promise<Session> {
   const o = a.size ? { size: a.size } : {};
-  if (a.surface === 'old-window') {
-    const s = await launchPage(path.join(OLD_WEB, 'window', 'index.html'), o);
-    if (a.state) await s.page.goto(`${pathToFileURL(path.join(OLD_WEB, 'window', 'index.html')).href}#${a.state}`);
-    return s;
-  }
-  if (a.surface === 'old-capsule') {
-    const [scene, at] = (a.state ?? 'idle').split('@');
-    const s = await launchPage(path.join(OLD_WEB, 'dev.html'), o);
-    await s.page.goto(`${pathToFileURL(path.join(OLD_WEB, 'dev.html')).href}?clean&s=${scene ?? 'idle'}${at ? `&t=${at}` : ''}`);
-    return s;
-  }
   if (a.surface === 'desktop') {
     // the fixture world (every event of rust/proto/fixtures) from the scripted core, and the scripted helper
     return launchDesktop({ ...o, core: new FakeCore(), helper: new FakeHelper(), ...(a.state ? { route: a.state } : {}) });

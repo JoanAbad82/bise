@@ -1,27 +1,21 @@
 #!/usr/bin/env python3
-"""ambient-qa: drive and inspect the real bise ambient.app without the user's hands.
+"""ambient-qa: throwaway hubs, fake accounts and scripted product runs for bise's QA, never the user's.
 
-The app, launched with `--qa fake|real`, opens a unix socket (0600) at
-<bise dev dir>/qa/ambient/qa.sock (apps/ambient/mac/src/QA.swift). This
-module launches it, talks to that socket, plays the SPEC §2 scenes and
-makes contact sheets. server.py exposes it as MCP tools; this file is also
-the one-line CLI:
+The Swift app this plugin once drove (QA.swift's socket, scenes, snapshots) is gone (amb-mac's
+delete plan, step 2): the desktop app's own checks live in apps/desktop/tests (its harness, its
+checks/world.ts and real.sh call `qa.py world`). What stays: a throwaway hub with the fake accounts
+and its page server, the scripted product runs through a `bise ambient-core` child, the asks, and
+the QA world (world.py: one throwaway HOME, bise's home hub + 2-3 seeded projects). server.py
+exposes it as MCP tools; this file is also the CLI:
 
-  qa.py launch [--hub fake|real] [--workspace WS] [--bise EXE]
-  qa.py scenes [--only id,id] [--backdrops dark,bright,busy] [--out DIR]
-  qa.py say "dark mode for the settings page"      (hold fn, words, let go)
-  qa.py snapshot [--what both|panel|screen|web] [--backdrop dark]
-  qa.py state | events [N] | fn down|up|tap|double|cancel | key K
-  qa.py inject '{"ev": "phase", "phase": "working"}'
-  qa.py stop
+  qa.py launch [--hub fake|model]              a throwaway hub, its pages, the fake accounts
+  qa.py run <scenario> [--keep] [--json]       a scripted product run (model hub, fake accounts)
+  qa.py ask "words" … | page … | tick | outbox | stop
+  qa.py world up [--projects 2|3] | state | say <project> <text> | feature <project> <name> | down
 
-Never: the mic (the voice is faked in the app), the speaker, a screenshot
-of the user's screen (snapshots are the app's own web views on a synthetic
-backdrop), the user's real main (the fake hub is a throwaway: tests/e2e.py's
-scripted provider; the real workspace is refused: it needs a client the user
-started, docs/issues/16), a second
-copy of the app (scripts/ambient.sh builds the one path), pkill by name
-(only the QA app's own pid).
+Never: the user's real main or hub (the real workspace is refused: it needs a client the user
+started, docs/issues/16), his real accounts (fake ones only, unless he asks for one run), pkill by
+name (only our own pids).
 """
 import calendar
 import datetime
@@ -41,7 +35,6 @@ import time
 # realpath: the plugin is linked into an agent's .agents/plugins; the repo is where it really lives
 HERE = os.path.dirname(os.path.realpath(__file__))
 REPO = os.path.abspath(os.environ.get("AMBIENT_QA_REPO") or os.path.join(HERE, "..", ".."))
-WEB = os.path.join(REPO, "apps", "ambient", "web")
 
 
 def dev_dir():
@@ -54,11 +47,8 @@ def dev_dir():
     return os.path.join(home, ".local", "state", "switchboard")
 
 
-# one QA app, hub and socket per agent: ambient, ambient-pm and ambient-lead
-# can QA at the same time without driving each other's app
+# one QA hub per agent: several agents can QA at the same time without sharing a hub
 QA_DIR = os.environ.get("AMBIENT_QA_DIR") or os.path.join(dev_dir(), "qa", os.environ.get("SB_AGENT") or "me")
-APP_DIR = os.path.join(QA_DIR, "ambient")          # the QA app's own: app.pid, app.log, core.log, qa.sock
-SOCK = os.path.join(APP_DIR, "qa.sock")
 RUN = os.path.join(QA_DIR, "run.json")
 HUB = os.path.join(QA_DIR, "hub.json")
 OUT = os.environ.get("AMBIENT_QA_OUT") or os.path.join(QA_DIR, "out")
@@ -217,59 +207,6 @@ def find_bise(explicit=None):
                       % "; ".join(skipped))
     raise QAError("no bise with ambient-core next to a built repl-live: pass bise=<exe> (a debug build of the ambient-app branch, "
                   "its tree built with ./run.sh) or set AMBIENT_QA_BISE and AMBIENT_QA_APP_ROOT")
-
-
-# ---------------------------------------------------------------- the socket
-
-class Client:
-    def __init__(self, path=SOCK, timeout=5.0):
-        self.s = socket.socket(socket.AF_UNIX)
-        self.s.settimeout(timeout)
-        try:
-            self.s.connect(path)
-        except OSError as e:
-            raise QAError("the QA app isn't running (%s): launch() first" % e)
-        self.f = self.s.makefile("rb")
-        self.n = 0
-
-    def call(self, op, timeout=30.0, **kw):
-        self.n += 1
-        req = dict(kw, op=op, id=self.n)
-        self.s.settimeout(timeout)
-        self.s.sendall((json.dumps(req) + "\n").encode())
-        while True:
-            line = self.f.readline()
-            if not line:
-                raise QAError("the QA app closed the socket during %s" % op)
-            r = json.loads(line)
-            if r.get("id") == self.n:
-                break
-        if not r.get("ok"):
-            raise QAError("%s: %s" % (op, r.get("error")))
-        r.pop("id", None)
-        r.pop("ok", None)
-        return r
-
-    def close(self):
-        try:
-            self.s.close()
-        except OSError:
-            pass
-
-
-def call(op, timeout=30.0, **kw):
-    c = Client()
-    try:
-        return c.call(op, timeout=timeout, **kw)
-    finally:
-        c.close()
-
-
-def alive():
-    try:
-        return call("ping", timeout=3)
-    except (QAError, OSError, ValueError):
-        return None
 
 
 def _pid_alive(pid):
@@ -646,33 +583,16 @@ def _stop_hub(only_pid=None):
     return True
 
 
-# ---------------------------------------------------------------- launch and stop
+# ---------------------------------------------------------------- the throwaway hub, up and down
 
-def _sh(args, **kw):
-    # the one app path: scripts/ambient.sh resolves the dev dir itself (BISE_HOME,
-    # ~/.bise/dev once migrated); an agent shell's SB_BUILD_DIR (another hub's
-    # build dir) made it build a second copy, which the EDR deletes
-    env = {k: v for k, v in os.environ.items() if k != "SB_BUILD_DIR"}
-    return subprocess.run(args, capture_output=True, text=True, cwd=REPO, env=env, **kw)
-
-
-def app_path(force_build=False):
-    """The app to launch, built by scripts/ambient.sh when its sources changed. The build never
-    stops his running app (amb-mac m_6527): while it runs, the new build waits in
-    <build>/new/bise ambient.app and the script prints THAT path as its last line, which QA
-    launches. force_build is kept for old callers and does nothing."""
-    r = _sh(["scripts/ambient.sh", "build"])
-    if r.returncode != 0:
-        raise QAError("scripts/ambient.sh build failed: " + (r.stderr or r.stdout)[-800:])
-    return r.stdout.strip().splitlines()[-1]
-
-
-def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", force_build=False, restart=False, connectors=False, computer=False,
-           real_accounts_approved_by_user="", no_app=False):
-    """connectors and computer touch the user's real accounts (his Gmail,
-    Slack, Linear, calendar, his browser and its logins): never, unless
-    `real_accounts_approved_by_user` names the user's own message asking for
-    this one run (the user's rule, main m_5200). Without it they are refused."""
+def launch(hub="fake", bise=None, connectors=False, computer=False, real_accounts_approved_by_user=""):
+    """A throwaway hub, its page server and the fake accounts (no app: the Swift app is gone,
+    the desktop app's checks live in apps/desktop/tests). hub fake: tests/e2e.py's scripted
+    provider; model: the user's model and keys on fake accounts. connectors and computer touch
+    the user's real accounts (his Gmail, Slack, Linear, calendar, his browser and its logins):
+    never, unless `real_accounts_approved_by_user` names the user's own message asking for this
+    one run (the user's rule, main m_5200). The real workspace is refused: it needs a client the
+    user started (docs/issues/16)."""
     user_ask = (real_accounts_approved_by_user or "").strip()
     if (connectors or computer) and not user_ask:
         raise QAError("refused: real connectors and the computer plugin touch the user's real accounts. Only for a run the user "
@@ -681,602 +601,28 @@ def launch(hub="fake", workspace=None, bise=None, web=None, backdrop="dark", for
         print("ambient-qa: WARNING: this run uses the user's REAL accounts (%s), approved by the user in %s"
               % (", ".join(n for n, on in (("connectors", connectors), ("computer", computer)) if on) or "none", user_ask), file=sys.stderr)
     if hub == "real":
-        # docs/issues/16 (socket-auth 6887139f): the real hub takes hello only from a client the
-        # user started, never from an agent's process; QA runs on throwaway hubs
         raise QAError("refused: the real workspace needs a client the user started (an agent's process is refused "
                       "on its hub.sock by design). QA runs on throwaway hubs: hub fake or model")
     if hub not in ("fake", "model"):
         raise QAError("hub: fake (a throwaway scripted hub) or model (a throwaway hub with your real model and keys)")
-    if no_app:
-        # the hub, its page server and the fake accounts only: never builds or opens the app (ambient-lead m_5413)
-        if hub == "real":
-            raise QAError("no_app needs a throwaway hub (fake or model)")
-        bise, root = find_bise(bise)
-        require_commits(root)
-        if alive():
-            stop(keep_hub=True)
-        info = _start_hub(bise, root, hub, connectors and hub == "model", computer, user_ask)
-        port = None
-        try:
-            port = _wait(lambda: _port(info["state"]), 30, "the page server")
-        except QAError:
-            pass
-        run = {"hub": hub, "no_app": True, "workspace": info["ws"], "bise": bise, "app_root": root, "tree": tree_info(root),
-               "pages_url": "http://127.0.0.1:%d/" % port if port else None, "outbox": os.path.join(info["tmp"], "outbox.jsonl"), "out": OUT}
-        with open(RUN, "w") as f:
-            json.dump(run, f, indent=1)
-        return run
-    up = alive()
-    if up and not restart:
-        run = _read(RUN) or {}
-        if run.get("hub") == hub:
-            return dict(run, already=True, pid=up.get("pid"))
-    if up:
-        stop(keep_hub=(hub != "real"))
     bise, root = find_bise(bise)
-    app = app_path(force_build)
-    web = web or os.environ.get("BISE_AMBIENT_WEB") or WEB
-    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "BISE_APP_ROOT": root}
-    if hub in ("fake", "model"):
-        info = _start_hub(bise, root, hub, connectors and hub == "model", computer, user_ask)
-        ws = info["ws"]
-        env.update(info["env"])
-    else:
-        ws = os.path.abspath(workspace or REPO)
-        if os.environ.get("BISE_HOME"):
-            env["BISE_HOME"] = os.environ["BISE_HOME"]
-    os.makedirs(APP_DIR, exist_ok=True)
+    require_commits(root)
+    info = _start_hub(bise, root, hub, connectors and hub == "model", computer, user_ask)
+    port = None
     try:
-        os.unlink(SOCK)
-    except OSError:
+        port = _wait(lambda: _port(info["state"]), 30, "the page server")
+    except QAError:
         pass
-    # the app's QA mode: real = read-only; fake and model hubs are throwaways it may write to
-    args = ["open", "-n", "-a", app, "--args", "--qa", "real" if hub == "real" else "fake", "--workspace", ws, "--bise", bise,
-            "--web", web, "--dev", QA_DIR]
-    for k, v in env.items():
-        args += ["--env", "%s=%s" % (k, v)]
-    r = subprocess.run(args, capture_output=True, text=True)
-    if r.returncode != 0:
-        raise QAError("open failed: " + r.stderr)
-    t0 = time.time()
-    ping = None
-    while time.time() - t0 < 30:
-        ping = alive()
-        if ping and ping.get("ready"):
-            break
-        time.sleep(0.25)
-    if not ping:
-        raise QAError("the QA app didn't open its socket in 30 s: see %s" % os.path.join(APP_DIR, "app.log"))
-    # the one app path, checked on the running process (open could pick another
-    # registered copy of dev.bise.ambient): another path is stopped, loudly
-    exe = subprocess.run(["ps", "-p", str(ping.get("pid")), "-o", "comm="], capture_output=True, text=True).stdout.strip()
-    if exe and not os.path.realpath(exe).startswith(os.path.realpath(app) + "/"):
-        try:
-            call("quit", timeout=3)
-        except (QAError, OSError):
-            os.kill(ping["pid"], signal.SIGTERM)
-        raise QAError("the QA app ran from %s, not the one app path %s: stopped. Delete that copy and launch again" % (exe, app))
-    call("backdrop", kind=backdrop)
-    hub_up = _wait_hub(30)
-    run = {"hub": hub, "workspace": ws, "bise": bise, "app_root": root, "tree": tree_info(root), "web": web, "app": app, "pid": ping.get("pid"),
-           "hub_up": hub_up, "socket": SOCK, "out": OUT, "logs": [os.path.join(APP_DIR, "app.log"), os.path.join(APP_DIR, "core.log")]}
+    run = {"hub": hub, "workspace": info["ws"], "bise": bise, "app_root": root, "tree": tree_info(root),
+           "pages_url": "http://127.0.0.1:%d/" % port if port else None, "outbox": os.path.join(info["tmp"], "outbox.jsonl"), "out": OUT}
     with open(RUN, "w") as f:
         json.dump(run, f, indent=1)
     return run
 
 
-def _wait_hub(timeout):
-    t0 = time.time()
-    while time.time() - t0 < timeout:
-        m = (state().get("model") or {})
-        if (m.get("hub") or {}).get("up"):
-            return True
-        time.sleep(0.3)
-    return False
-
-
-def stop(keep_hub=False):
-    """Quit the QA app (its own pid only) and the fake hub."""
-    out = {"app": "not running", "hub": "kept" if keep_hub else "not running"}
-    ping = alive()
-    pid = (ping or {}).get("pid")
-    if pid is None:
-        try:
-            pid = int(open(os.path.join(APP_DIR, "app.pid")).read().strip())
-        except (OSError, ValueError):
-            pid = None
-    if ping:
-        try:
-            call("quit", timeout=3)
-        except (QAError, OSError):
-            pass
-    if pid and _pid_alive(pid):
-        t0 = time.time()
-        while _pid_alive(pid) and time.time() - t0 < 5:
-            time.sleep(0.1)
-        if _pid_alive(pid):
-            os.kill(pid, signal.SIGTERM)
-        out["app"] = "stopped pid %d" % pid
-    if not keep_hub and _stop_hub():
-        out["hub"] = "stopped"
-    return out
-
-
-# ---------------------------------------------------------------- the driving ops
-
-def inject(ev):
-    if isinstance(ev, str):
-        ev = json.loads(ev)
-    return call("inject", ev=ev)
-
-
-def fn(state, key="fn"):
-    return call("fn", state=state, key=key)
-
-
-def key(k):
-    return call("key", k=k)
-
-
-def click(selector, route="appkit", deactivate=True, settle_ms=400):
-    """One real mouse click on the QA app's capsule (ambient-lead m_6481, ambient-pm's dogfood
-    check): a CGEvent left down/up at the element's screen point, posted to the QA app's own pid,
-    never the HID tap (his pointer never moves, no other app gets it), with bise not frontmost.
-    Returns, layer by layer: window_at_point (the window server's top window there), the panel's
-    mouse settings, hit_view (what the panel hit-tests there), appkit (the events AppKit saw), dom
-    (pointerdown/mousedown/click the page got, and on what), clicked. route=window names the panel
-    in the event (when 'point' fails, it tells routing from the view). It can't catch another app's
-    window above the panel taking a real click (window_at_point says it), nor hover under a moving
-    pointer."""
-    return call("click", timeout=20, selector=selector, route=route, deactivate=deactivate, settle_ms=settle_ms)
-
-
-CLICK_STATES = {
-    # a question card from main with a page link (options 1..n, open the page), and a batch of
-    # drafts (review, send all): the states pm's click check walks (ambient-pm m_6584)
-    "card": {"ev": "state", "agents": [], "pages": [], "timers": [],
-             "cards": [{"id": 901, "kind": "question", "agent": "main", "text": "which date works for the pricing review?",
-                        "options": [{"n": 1, "label": "tuesday"}, {"n": 2, "label": "thursday"}],
-                        "page": {"id": "mentions-qa", "block": "new", "item": "s-301", "url": "http://127.0.0.1:9/p/mentions-qa#s-301"}}]},
-    "drafts": {"ev": "state", "agents": [], "pages": [], "timers": [],
-               "cards": [{"id": 902, "agent": "inbox", "kind": "drafts", "text": "3 drafts ready: legal · Lucas · Marc",
-                          "options": [{"n": 1, "label": "review"}, {"n": 2, "label": "send all 3"}],
-                          "page": {"id": "inbox", "block": "r1", "item": "i1", "drafts": True, "url": "http://127.0.0.1:9/p/inbox#i1"},
-                          "batch": {"count": 3, "title": "your inbox", "what": "replies", "names": ["legal", "Lucas", "Marc"]}}]},
-}
-CLICK_STATES["settings"] = {"ev": "state", "agents": [], "pages": [], "timers": [], "cards": []}
-CLICK_STATES["question"] = CLICK_STATES["card"]
-CLICK_OPEN = {"card": "i", "drafts": "i", "settings": ",", "question": None}   # question: the card pushed by itself
-CLICK_DIRS = ("page>app", "app>core", "app>core(qa)", "app>open")
-
-
-def _view_now():
-    """The capsule's view without what moves by itself (the orb's pose, fps)."""
-    v = dict(state().get("view") or {})
-    for k in ("poseMs", "fps", "level", "t"):
-        v.pop(k, None)
-    return json.dumps(v, sort_keys=True)
-
-
-def clicks(state="card", open_key="auto", selector=None, settle_s=1.0, then=None):
-    """Every button the capsule shows in one state, clicked once each by the real mouse path
-    (ambient-pm m_6584): before each click the state is set again from rest (the fake core's
-    state event, then fn + open_key through the real key path), the element is found again by
-    its place, and one click goes in with bise not frontmost. Per button: its label, whether the
-    page got the click, and the commands that left the page/app after it (page>app, app>core):
-    exactly one expected. state: a CLICK_STATES name or a state event (dict)."""
-    ev = CLICK_STATES[state] if isinstance(state, str) else state
-    if open_key == "auto":
-        open_key = CLICK_OPEN.get(state, "i") if isinstance(state, str) else "i"
-    if isinstance(state, str) and state not in CLICK_STATES:
-        raise QAError("clicks: state %s (one of %s, or a state event)" % (state, ", ".join(sorted(CLICK_STATES))))
-
-    n = [0]
-
-    def setup():
-        rest()
-        # fresh card ids every time: a card the app has seen is never pushed again (ambient-pm
-        # m_6611: --state question never showed), and the page re-renders on a new one
-        e = json.loads(json.dumps(ev))
-        n[0] += 1
-        for cd in e.get("cards", []):
-            cd["id"] = int(cd["id"]) * 1000 + n[0] if isinstance(cd["id"], int) else "%s-%d" % (cd["id"], n[0])
-        inject(e)
-        if open_key:
-            code = KEYCODES[open_key]
-            keyev("fn_down"); keyev("down", code, fn=True); keyev("up", code, fn=True); keyev("fn_up")
-        # the view settled: the card comes in through the app's own show (~1 s); listed before,
-        # a target was re-rendered away by the time it was clicked (ambient-pm m_6611)
-        t, last = time.time(), None
-        while time.time() - t < 4:
-            time.sleep(0.3)
-            v = _view_now()
-            if v == last and time.time() - t > 0.9:
-                break
-            last = v
-        items = listing()
-        if then:
-            # a view reached by a click first (ambient-pm m_6641: a card's own bar, from its row in
-            # fn i: then='card-' clicks the first row whose data-qa starts with it)
-            hit = next((x for x in items if (x.get("qa") or "").startswith(then)), None)
-            if not hit:
-                return []
-            click('#amb [data-qa="%s"]' % hit["qa"])
-            settled()
-            items = listing()
-        return items
-
-    def settled():
-        t, last = time.time(), None
-        while time.time() - t < 4:
-            time.sleep(0.3)
-            v = _view_now()
-            if v == last and time.time() - t > 0.9:
-                break
-            last = v
-
-    def listing():
-        # round 9's targets (amb-web 3d99a361: [data-qa] under #amb, the glass itself excluded),
-        # else whatever looks clickable on an older page
-        if selector:
-            return call("clickables", selector=selector).get("items", [])
-        return call("clickables", selector="#amb [data-qa]:not([data-qa=glass])").get("items", []) or call("clickables").get("items", [])
-
-    first = setup()
-    out = {"state": state if isinstance(state, str) else "custom", "items": [], "fails": []}
-    if not first:
-        out["fails"].append("no clickable thing shown in state %s" % out["state"])
-    for it in first:
-        items = setup()
-        same = next((x for x in items if it.get("qa") and x.get("qa") == it["qa"]), None) \
-            or next((x for x in items if x["i"] == it["i"] and x["label"] == it["label"]), None)
-        r = {"i": it["i"], "label": it["label"], "cursor": it.get("cursor")}
-        out["items"].append(r)
-        if not same:
-            out["fails"].append("%r: not shown again the same way" % it["label"])
-            continue
-        mark = _mark()
-        v0 = _view_now()
-        try:
-            # its own data-qa when it has one (stable across re-renders), else its place
-            c = click('#amb [data-qa="%s"]' % same["qa"] if same.get("qa") else '[data-qa-i="%d"]' % same["i"])
-        except QAError as e:
-            out["fails"].append("%r: %s" % (it["label"], e))
-            continue
-        time.sleep(settle_s)
-        evs = [e for e in _new_events(mark) if e["dir"] in CLICK_DIRS]
-        # each with its hop: one answer shows as page>app (the page to the app) then app>core (the
-        # app to the core), one command on its way (ambient-pm m_6659)
-        cmds = [dict(e["ev"], route=e["dir"]) for e in evs]
-        changed = _view_now() != v0
-        # the page took it: its click on the target, or its pointerdown there when the target was
-        # re-rendered under the pointer before the click (the fn hints act on pointerdown)
-        # judged by the act (ambient-pm m_6680: presses that act on release, amb-web 78e24cdf): a
-        # command left or the view changed after a press on it counts, whatever the click event did
-        pressed = c.get("clicked") or any(d.get("inside") for d in c.get("dom") or [])
-        took = pressed or bool(cmds) or changed
-        r.update(clicked=bool(took), window_at_point=c.get("window_at_point"), commands=cmds, view_changed=changed)
-        if c.get("window_at_point") != "panel":
-            # the window server has another window there: his real click would go to it, whatever
-            # the app does with the event QA hands it (ambient-pm m_6641: the card body → Chrome)
-            out["fails"].append("%r: at its point the window server has %s, not the panel: a real click goes there" % (it["label"], c.get("window_at_point")))
-        if not took:
-            out["fails"].append("%r: the page got no click (window %s, hit %s)" % (it["label"], c.get("window_at_point"), c.get("hit_view")))
-        elif not cmds and not changed:
-            # an in-page action (↑↓ moves the selection) changes the view without a command
-            out["fails"].append("%r: clicked, but nothing happened (no command, the view unchanged)" % it["label"])
-        else:
-            # the same command twice on one hop (page>app, then app>core is one command on its way)
-            keys_ = [e["dir"] + json.dumps(e["ev"], sort_keys=True) for e in evs if e["ev"].get("cmd") not in ("app_size", "app_ready", "app_content")]
-            if len(keys_) != len(set(keys_)):
-                out["fails"].append("%r: a command went twice: %s" % (it["label"], cmds))
-        if it.get("cursor") == "text":
-            out["fails"].append("%r: the text cursor on a button" % it["label"])
-    rest()
-    out["verdict"] = "pass" if not out["fails"] else "FAIL"
-    return out
-
-
-def hover(selector, ms=1000):
-    """The pointer over an element without moving his pointer (ambient m_6592 (4)): mouseMoved
-    events at its point into the QA app's queue for `ms`; over = the page saw the pointer on it.
-    It can't drive the window server's tracking areas (cursor shape, enter/exit)."""
-    return call("hover", timeout=10 + ms / 1000, selector=selector, ms=ms)
-
-
-def eval_js(src, fn_held=False, settle_s=0.6):
-    """One JS expression read on the capsule's page (amb-mac m_6655), its value back (JSON
-    parsed when it is JSON). fn_held: read while fn is held through the real key path (talk
-    open), then let go with a cancel so nothing reaches the core. Reads only: never act with it."""
-    if fn_held:
-        call("fn", state="down")
-        time.sleep(settle_s)
-    try:
-        r = call("eval", js=src)
-    finally:
-        if fn_held:
-            call("fn", state="cancel")
-    v = r.get("value")
-    if isinstance(v, str):
-        try:
-            r["value"] = json.loads(v)
-        except ValueError:
-            pass
-    r["fn_held"] = fn_held
-    return r
-
-
-def alpha(name="alpha", pearl=None, glass=None, ring=6, outside=10, out=None):
-    """The panel's own pixels with alpha (ScreenCaptureKit, this window alone, no shadow) and the
-    verdicts ambient's gate wants: the pearl's 4 corners and a ring `ring` px outside its disc at
-    alpha 0 (the pearl floats on the screen), and `outside` px outside the glass at alpha 0 or
-    off the window (a click there reaches the app below)."""
-    kw = {"name": name, "ring": ring, "outside": outside, "dir": out or os.path.join(OUT, "alpha")}
-    if pearl:
-        kw["pearl"] = pearl
-    if glass:
-        kw["glass"] = glass
-    r = call("alpha", timeout=20, **kw)
-    fails = []
-    p = r.get("pearl")
-    if not p:
-        fails.append("no pearl on the page")
-    else:
-        if any(c for c in p.get("corners", []) if isinstance(c, int) and c > 0):
-            fails.append("the pearl's corners aren't transparent: %s" % p["corners"])
-        if p.get("ring_max", 0) > 0:
-            fails.append("a ring %s px outside the pearl has alpha up to %d" % (p.get("ring_px"), p["ring_max"]))
-    g = r.get("glass")
-    if g:
-        hot = {k: v for k, v in g.get("alpha_outside", {}).items() if isinstance(v, int) and v > 0}
-        if hot:
-            fails.append("%s px outside the glass the panel isn't transparent (a click there stays in bise): %s" % (g.get("outside_px"), hot))
-    r["fails"], r["verdict"] = fails, ("pass" if not fails else "FAIL")
-    return r
-
-
-def keyev(kind, code=None, fn=False, words=None, per_word_ms=None):
-    """A keyboard event through the app's real key path (Keys.qaEvent: KeyMachine, its hold
-    threshold, App.key) on a QA app whose tap never starts: kind fn_down|fn_up|down|up."""
-    kw = {"kind": kind}
-    if code is not None:
-        kw["code"] = code
-    if fn:
-        kw["fn"] = True
-    if words:
-        kw["words"] = words
-    if per_word_ms:
-        kw["per_word_ms"] = per_word_ms
-    return call("keyev", **kw)
-
-
-def rest():
-    """The capsule back to rest (folded into the icon) and bise not the active app."""
-    return call("rest", timeout=15)
-
-
-KEY_SPACE, KEY_DOT = 49, 47
-
-# macOS virtual key codes (Carbon kVK_*), US layout: what `keys` posts
-KEYCODES = {"return": 36, "enter": 36, "tab": 48, "space": 49, "delete": 51, "backspace": 51, "esc": 53, "escape": 53,
-            "left": 123, "right": 124, "down": 125, "up": 126, ".": 47, ",": 43, "/": 44,
-            "1": 18, "2": 19, "3": 20, "4": 21, "5": 23, "6": 22, "7": 26, "8": 28, "9": 25, "0": 29,
-            "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9, "b": 11, "q": 12, "w": 13,
-            "e": 14, "r": 15, "y": 16, "t": 17, "o": 31, "u": 32, "i": 34, "p": 35, "l": 37, "j": 38, "k": 40,
-            "n": 45, "m": 46}
-MODS = {"cmd": "cmd", "command": "cmd", "⌘": "cmd", "shift": "shift", "alt": "alt", "option": "alt", "ctrl": "ctrl", "control": "ctrl"}
-
-
-def key_seq(specs):
-    """'cmd+return', 'up', 'cmd+1', 'esc', 'type:hello world' → the keys op's [{code, flags, text?}];
-    'type:' text goes one character per key event (its unicode string, as typed)."""
-    seq = []
-    for s in specs:
-        if s.startswith("type:"):
-            for ch in s[5:]:
-                seq.append({"code": KEYCODES.get(ch.lower(), KEYCODES["space"] if ch == " " else 0), "flags": [], "text": ch})
-            continue
-        parts = [p for p in s.replace("⌘", "cmd+").lower().split("+") if p]
-        *mods, k = parts
-        bad = [m for m in mods if m not in MODS]
-        if bad or k not in KEYCODES:
-            raise QAError("keys: unknown key %r (keys: %s; mods: cmd shift alt ctrl; text: type:<words>)" % (s, " ".join(sorted(KEYCODES))))
-        seq.append({"code": KEYCODES[k], "flags": [MODS[m] for m in mods]})
-    return seq
-
-
-def keys(*specs, gap_ms=60):
-    """Real keys into the QA app's panel (ambient-lead m_6514, round 9's bar): CGEvent key down/up
-    posted to the QA app's own pid (never the HID tap, nothing reaches his front app), e.g.
-    keys('type:what is going on', 'return'), keys('down', 'down', 'cmd+return'), keys('cmd+2'),
-    keys('esc'). Returns the panel's key state, what AppKit saw and the page's keydown/input
-    events. The panel only takes them when the app made it key, as for his keys."""
-    return call("keys", timeout=30 + len(specs), seq=key_seq(specs), gap_ms=gap_ms)
-
-
-def _new_events(mark):
-    return [e for e in events(400, False).get("events", []) if e["t"] > mark]
-
-
-def _mark():
-    ev = events(1, True).get("events", [])
-    return ev[-1]["t"] if ev else 0.0
-
-
-def fn_hold_closed(variants=("launch", "fold", "hide"), words="what is on my plate today", per_word_ms=150,
-                   within_ms=300, answer_s=20):
-    """fn from rest (ambient-pm's dogfood check, ambient-lead m_6481): the capsule closed, bise not
-    frontmost, fn held through the real key path; the pearl must listen within `within_ms`, the
-    fake voice's words reach the core on release and main's line shows; a tap does nothing.
-    Variants: launch (as the app is now: run it right after `launch`), fold (opened with fn + space,
-    then left to fold by itself), hide (opened, then fn + . hid it). Never the real fn: the QA app
-    has no tap, the events go through Keys.qaEvent."""
-    out = {"variants": [], "fails": []}
-    for v in variants:
-        r = {"variant": v}
-        out["variants"].append(r)
-        rest()
-        if v in ("fold", "hide"):
-            keyev("fn_down"); keyev("down", KEY_SPACE, fn=True); keyev("up", KEY_SPACE, fn=True); keyev("fn_up")
-            t = time.time()
-            while time.time() - t < 3 and not state().get("app", {}).get("visible"):
-                time.sleep(0.05)
-            r["opened"] = bool(state().get("app", {}).get("visible"))
-            if v == "hide":
-                keyev("fn_down"); keyev("down", KEY_DOT, fn=True); keyev("up", KEY_DOT, fn=True); keyev("fn_up")
-            t = time.time()
-            while time.time() - t < 30 and state().get("app", {}).get("visible"):
-                time.sleep(0.2)
-            r["closed_after_s"] = round(time.time() - t, 1)
-        st = state().get("app", {})
-        r["rest"] = {"visible": st.get("visible"), "hidden": st.get("hidden")}
-        if st.get("visible"):
-            out["fails"].append("%s: the capsule is still on screen before fn" % v)
-            continue
-        mark = _mark()
-        t0 = time.time()
-        k = keyev("fn_down", words=words, per_word_ms=per_word_ms)
-        r["fn_down_swallowed"] = k.get("swallowed")
-        listen = None
-        while time.time() - t0 < 2.0:
-            a = state().get("app", {})
-            if a.get("listening") and a.get("visible"):
-                listen = round((time.time() - t0) * 1000)
-                break
-            time.sleep(0.02)
-        r["listening_ms"] = listen
-        if listen is None:
-            out["fails"].append("%s: fn held from rest: the pearl didn't listen within 2 s" % v)
-        elif listen > within_ms:
-            out["fails"].append("%s: fn held from rest: the pearl listened after %d ms (%d expected)" % (v, listen, within_ms))
-        time.sleep(len(words.split()) * per_word_ms / 1000 + 0.6)
-        keyev("fn_up")
-        sent = main = None
-        t1 = time.time()
-        while time.time() - t1 < answer_s and (sent is None or main is None):
-            for e in _new_events(mark):
-                ev = e["ev"]
-                if sent is None and e["dir"].startswith("app>core") and ev.get("cmd") == "send":
-                    sent = ev.get("text")
-                if main is None and e["dir"] == "core>app" and ev.get("ev") == "main":
-                    main = ev.get("text")
-            time.sleep(0.2)
-        r["sent"], r["main"] = sent, main
-        if not sent:
-            out["fails"].append("%s: the words never reached the core after fn up" % v)
-        elif words.split()[0].lower() not in sent.lower():
-            out["fails"].append("%s: the core got %r, not the words said" % (v, sent))
-        if sent and not main:
-            out["fails"].append("%s: no main line after the words" % v)
-    # a tap from rest does nothing visible and starts no recording
-    rest()
-    mark = _mark()
-    keyev("fn_down")
-    time.sleep(0.08)
-    keyev("fn_up")
-    time.sleep(1.0)
-    a = state().get("app", {})
-    talk = [e for e in _new_events(mark) if e["ev"].get("cmd") == "talk_start"]
-    out["tap"] = {"visible": a.get("visible"), "listening": a.get("listening"), "talk_start": len(talk)}
-    if a.get("visible") or a.get("listening") or talk:
-        out["fails"].append("a tap of fn from rest showed or started something: %s" % out["tap"])
-    rest()
-    out["verdict"] = "pass" if not out["fails"] else "FAIL"
-    return out
-
-
-def say(text, per_word_ms=240, wait_answer=True, timeout=90):
-    """Hold fn, the words heard one by one (a fake level), let go: they go to
-    main (the fake hub's main answers `ack: ...`); waits for main's answer
-    and for its spoken end (phase done)."""
-    before = len(events(2000, levels=False)["events"])
-    r = call("say", text=text, per_word_ms=per_word_ms, timeout=timeout)
-    if not wait_answer or not r.get("sent"):
-        return r
-    t0 = time.time()
-    main = None
-    while time.time() - t0 < timeout:
-        evs = events(2000, levels=False)["events"][before:]
-        for e in evs:
-            if e["dir"] == "core>app" and e["ev"].get("ev") == "main":
-                main = e["ev"].get("text")
-        if main is not None and any(e["ev"].get("ev") == "phase" and e["ev"].get("phase") == "done" and e["dir"] == "qa>app" for e in evs):
-            break
-        time.sleep(0.3)
-    r["main"] = main
-    return r
-
-
-def snapshot(what="both", backdrop=None, name=None, out=None):
-    out = out or os.path.join(OUT, "shots")
-    q = {"what": what, "dir": out}
-    if backdrop:
-        q["backdrop"] = backdrop
-    if name:
-        q["name"] = name
-    return call("snapshot", **q)
-
-
-MENUBAR_STATES = ("still", "work", "need", "away", "done", "fail", "listen")
-
-
-def menubar(states=None, frames=1, count=2, out=None):
-    """The menu-bar item (amb-mac's StatusItem) in each SPEC §0 state, put
-    there through its own API: its button's composed image (the pearl's
-    frame, ▲/☾, the rose count pill) at 1x and 2x, transparent and on a
-    light and a dark menu-bar strip, plus one sheet of them all. `frames`:
-    successive frames of the moving moods (work, done, listen)."""
-    out = out or os.path.join(OUT, "menubar-%s" % time.strftime("%Y%m%d-%H%M%S"))
-    q = {"dir": out, "frames": int(frames), "count": int(count)}
-    if states:
-        q["states"] = [s for s in states.split(",") if s] if isinstance(states, str) else list(states)
-    r = call("menubar", timeout=120, **q)
-    tiles = []
-    for s in r["states"]:
-        for strip in ("dark", "light"):
-            f = [p for p in s["files"] if p.endswith(".%s@2x.png" % strip)]
-            if f:
-                tiles.append({"path": f[0], "label": "%s · %s%s" % (s["state"], strip, " · %d frames" % frames if frames > 1 else "")})
-    if tiles:
-        r["sheet"] = os.path.join(out, "sheet.menubar.png")
-        # every tile at one scale, 8x of 1x (ambient m_5479): the strips share one width
-        zoom = 8
-        call("sheet", items=tiles, out=r["sheet"], cols=4, tile_w=zoom * float(r.get("strip_w") or 48),
-             title="bise ambient · the menu-bar item at %dx (need = %d)" % (zoom, count), timeout=60)
-    return r
-
-
-def menu():
-    """The menu-bar menu as its rows, in order (amb-mac a069b924: --qa has no
-    menu-bar item): {kind: header|card|page|watch|stop|talk|toggle|settings|
-    quit|separator, title, keys?, ref? (card id, page URL, timer id), enabled, indent?}."""
-    return call("menu")
-
-
-def menu_click(kind, ref=None):
-    """A menu row clicked as the real one: stop -> the watch's timer stops
-    (every_stop), page/watch -> the URL logged as opened (never his browser),
-    card -> bise opens on that card (app_key i)."""
-    if kind == "stop" and isinstance(ref, str) and ref.isdigit():
-        ref = int(ref)
-    return call("menu_click", kind=kind, ref=ref)
-
-
-def pearl(out=None):
-    """Every pearl frame amb-mac plays per mood (the bundle's <mood>-NN.png), at 1x and 2x."""
-    return call("pearl", dir=out or os.path.join(OUT, "pearl"), timeout=120)
-
-
-def state():
-    return call("state")
-
-
-def events(n=50, levels=False):
-    return call("events", n=n, levels=levels)
-
-
-def reset():
-    return call("reset")
+def stop():
+    """Stops the throwaway hub (its own pids only)."""
+    return {"hub": "stopped" if _stop_hub() else "not running"}
 
 
 # ---------------------------------------------------------------- pages on the throwaway hub
@@ -1287,7 +633,7 @@ KIT_EXAMPLE = os.path.join(REPO, "kit", "examples", "weekly-update.html")
 def _hub():
     info = _read(HUB)
     if not info or not _pid_alive(info.get("pid")):
-        raise QAError("no throwaway hub: launch() (hub fake or model) first")
+        raise QAError("no throwaway hub: qa.py launch (hub fake or model) first")
     sys.path.insert(0, os.path.join(REPO, "tests"))
     import e2e  # noqa: E402
     # one client per hub socket: page_meta and the polls called this every few
@@ -1757,18 +1103,13 @@ def _soft_until(x, get, secs):
 
 
 def answer_card(x, card_id, reply):
-    """His answer to a card, by the run's own path: headless, the core
-    child's stdin; on the app (ambient-pm m_6034: no core child there), the
-    page's own answer cmd through the QA app ({cmd: answer, card, reply},
-    what the capsule sends for fn + a digit or a click)."""
+    """His answer to a card, as the desktop app sends it: {cmd: answer, card, reply} on the
+    run's core child's stdin."""
     cmd = {"cmd": "answer", "card": card_id, "reply": str(reply)}
     core = x["core"]
-    if getattr(core, "p", None) is not None:
-        core.p.stdin.write(json.dumps(cmd) + "\n")
-        core.p.stdin.flush()
-    else:
-        call("cmd", cmd=cmd)
-    x["r"].setdefault("answers", []).append(dict(cmd, at=round(time.time(), 1), path="core" if getattr(core, "p", None) is not None else "app"))
+    core.p.stdin.write(json.dumps(cmd) + "\n")
+    core.p.stdin.flush()
+    x["r"].setdefault("answers", []).append(dict(cmd, at=round(time.time(), 1), path="core"))
 
 
 def question_pick(card, picks=None, default=1):
@@ -2505,24 +1846,19 @@ SENDS = {"send_message", "post_message", "comment_issue", "add_comment", "create
 
 
 class _Core:
-    """The ask goes through a core like the capsule's. headless: a `bise
-    ambient-core` child on stdio, sent text only (no talk_start: no mic; a
-    text send is never spoken: no speaker). Else the QA app's own core
-    (QA op cmd), the app on screen."""
+    """The ask goes through a core like the desktop app's: a `bise ambient-core` child on stdio,
+    sent text only (no talk_start: no mic; a text send is never spoken: no speaker)."""
 
-    def __init__(self, bise, root, info, headless, log_dir):
-        self.p, self.evs, self.lock, self.seen = None, [], threading.Lock(), 0
-        if headless:
-            env = {k: v for k, v in os.environ.items() if not k.startswith("SB_") and k not in ("BISE_ROLE", "BISE_EXPORTS_FOR")}
-            env.update(info.get("env") or {})
-            env["BISE_APP_ROOT"] = root
-            if os.path.exists(os.path.join(root, "sb-core")):
-                env["SB_CORE_BIN"] = os.path.join(root, "sb-core")
-            self.p = subprocess.Popen([bise, "ambient-core", "--workspace", info["ws"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                      stderr=open(os.path.join(log_dir, "core.err"), "a"), text=True, cwd=root, env=env)
-            threading.Thread(target=self._read, daemon=True).start()
-        else:
-            self.seen = len(events(2000)["events"])
+    def __init__(self, bise, root, info, log_dir):
+        self.evs, self.lock, self.seen = [], threading.Lock(), 0
+        env = {k: v for k, v in os.environ.items() if not k.startswith("SB_") and k not in ("BISE_ROLE", "BISE_EXPORTS_FOR")}
+        env.update(info.get("env") or {})
+        env["BISE_APP_ROOT"] = root
+        if os.path.exists(os.path.join(root, "sb-core")):
+            env["SB_CORE_BIN"] = os.path.join(root, "sb-core")
+        self.p = subprocess.Popen([bise, "ambient-core", "--workspace", info["ws"]], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                  stderr=open(os.path.join(log_dir, "core.err"), "a"), text=True, cwd=root, env=env)
+        threading.Thread(target=self._read, daemon=True).start()
         self.start = self.seen
 
     def _read(self):
@@ -2536,49 +1872,40 @@ class _Core:
 
     def send(self, text):
         cmd = {"cmd": "send", "text": text}
-        if self.p:
-            self.p.stdin.write(json.dumps(cmd) + "\n")
-            self.p.stdin.flush()
-        else:
-            call("cmd", cmd=cmd)
+        self.p.stdin.write(json.dumps(cmd) + "\n")
+        self.p.stdin.flush()
 
     def new(self):
         """The core's events since the last call."""
-        if self.p:
-            with self.lock:
-                out, self.seen = self.evs[self.seen:], len(self.evs)
-            return out
-        evs = events(2000)["events"]
-        out, self.seen = evs[self.seen:], len(evs)
-        return [e["ev"] for e in out if e.get("dir") == "core>app"]
+        with self.lock:
+            out, self.seen = self.evs[self.seen:], len(self.evs)
+        return out
 
     def close(self):
-        if self.p:
-            try:
-                self.p.stdin.close()
-                self.p.wait(5)
-            except (OSError, subprocess.TimeoutExpired):
-                self.p.terminate()
+        try:
+            self.p.stdin.close()
+            self.p.wait(5)
+        except (OSError, subprocess.TimeoutExpired):
+            self.p.terminate()
 
 
 def ask(texts, capsule=True, timeout=600, out=None):
-    """Asks to main on the running throwaway hub (launch --no-app, or with
-    the app), one after the other (ambient-pm m_5573): through a headless
-    core like the capsule's (`capsule`, so main reads the capsule's hint),
-    else as the TUI does. For each: main's final words to the capsule, their
+    """Asks to main on the running throwaway hub (qa.py launch), one after the other (ambient-pm
+    m_5573): through a headless core like the desktop app's (`capsule`, so main reads the
+    capsule's hint), else as the TUI does. For each: main's final words to the capsule, their
     length, the time until everyone is idle again, the pages it made or
     updated, the cards. Writes asks-<time>.json in the QA out dir."""
     if isinstance(texts, str):
         texts = [texts]
     info = _read(HUB)
     if not info or not _pid_alive(info.get("pid")):
-        raise QAError("no throwaway hub: qa.py launch --hub model --no-app first")
+        raise QAError("no throwaway hub: qa.py launch --hub model first")
     c, _ = _hub()
     _wait(lambda: c.state, 30, "the hub's state")
     root = (_read(RUN) or {}).get("app_root") or find_bise(info.get("bise"))[1]
     d = out or os.path.join(OUT, "asks")
     os.makedirs(d, exist_ok=True)
-    core = _Core(info["bise"], root, info, True, d) if capsule else None
+    core = _Core(info["bise"], root, info, d) if capsule else None
     results = []
     try:
         if core:
@@ -2626,28 +1953,6 @@ def ask(texts, capsule=True, timeout=600, out=None):
         lines.append("%-34s %6.1f s  %3d chars  %s%s%s\n    %s" % ('"%s"' % x["ask"][:32], x["secs"], x["len"], pg, ", %d card(s)" % len(x["cards"]) if x["cards"] else "",
                                                              " TIMEOUT" if x["timed_out"] else "", x["main"][:200] or "(no words to the capsule)"))
     return {"file": path, "asks": results, "report": "\n".join(lines)}
-
-
-def capsule_timeline(evs):
-    """What the capsule went through after a spoken ask, from the QA log:
-    the talk (talk_start, talk_end, the words sent), the phases, main's
-    lines, the core's got/needs, and what the page showed (app_content);
-    times in seconds from the talk's start."""
-    t0 = next((e["t"] for e in evs if e["dir"].startswith("app>core") and e["ev"].get("cmd") == "talk_start"), evs[0]["t"] if evs else 0)
-    out = []
-    for e in evs:
-        ev, d = e["ev"], e["dir"]
-        what = None
-        if d.startswith("app>core") and ev.get("cmd") in ("talk_start", "talk_end", "send", "talk_cancel"):
-            what = ev["cmd"] + (": " + ev["text"] if ev.get("text") else "")
-        elif d == "core>app" and ev.get("ev") in ("phase", "main", "got", "heard", "card", "page"):
-            what = ev["ev"] + ": " + str(ev.get("phase") or ev.get("text") or ev.get("title") or ev.get("id") or "")
-        elif d == "page>app" and ev.get("cmd") == "app_content":
-            what = "shows: " + str(ev.get("kind")) + (" " + str(ev.get("text"))[:80] if ev.get("text") else "")
-        # a repeat of the line just before (the core's 'working' every few seconds) is left out
-        if what and not (out and out[-1]["what"] == what[:160]):
-            out.append({"at": round(e["t"] - t0, 2), "dir": d, "what": what[:160]})
-    return out
 
 
 def keep_hub_state(state, dst):
@@ -2725,7 +2030,7 @@ def run_report(r):
     return "\n".join(L)
 
 
-def run(scenario, headless=False, timeout=900, keep=False, out=None, require=None, voice=False):
+def run(scenario, timeout=900, keep=False, out=None, require=None):
     """A scripted product run (ambient-lead m_5306): a model hub (the user's
     model and keys, throwaway state) with the fake accounts only; the
     scenario's ask through the core like the capsule's; times the page's
@@ -2750,7 +2055,7 @@ def run(scenario, headless=False, timeout=900, keep=False, out=None, require=Non
     # a TERM ended the process on the spot and left its throwaway hub running (05:58, amb-tools-m)
     signal.signal(signal.SIGTERM, _term_to_interrupt)
     try:
-        return _run(scenario, sc, headless, timeout, keep, out, require, voice)
+        return _run(scenario, sc, timeout, keep, out, require)
     finally:
         if (_read(lock) or {}).get("pid") == os.getpid():
             os.unlink(lock)
@@ -2760,33 +2065,24 @@ def _term_to_interrupt(*_):
     raise KeyboardInterrupt("SIGTERM")
 
 
-def _run(scenario, sc, headless, timeout, keep, out, require, voice=False):
+def _run(scenario, sc, timeout, keep, out, require):
     if "tick_min" in sc:
         # the fake clock's batches only on qa.py tick (0), never on their own mid-run
         os.environ["AMBIENT_QA_TICK_MIN"] = str(sc["tick_min"])
-    if voice and headless:
-        raise QAError("--voice drives the app's fn and the fake voice: run with --app, not --headless")
+    headless = True     # a bise ambient-core child: the Swift app (the old --app/--voice runs) is gone
     bise, root = find_bise()
     build = require_commits(root, require)
     seeded = None
-    if sc.get("seed") and not headless:
-        raise QAError("run %s seeds a scripted hub first: --headless only" % scenario)
-    if headless:
-        if alive():
-            raise QAError("a QA app is running: stop it first (qa.py stop), or run without --headless")
-        if sc.get("seed"):
-            # the night on a scripted hub (no credits), kept; then the model hub on its state
-            s_info = _start_hub(bise, root, "fake", keep=True, sets=sc.get("set", ""))
-            try:
-                seeded = SEEDS[sc["seed"]](s_info)
-            finally:
-                _stop_hub()
-            info = _start_hub(bise, root, "model", reuse=s_info["tmp"], sets=sc.get("set", ""))
-        else:
-            info = _start_hub(bise, root, "model", sets=sc.get("set", ""))
+    if sc.get("seed"):
+        # the night on a scripted hub (no credits), kept; then the model hub on its state
+        s_info = _start_hub(bise, root, "fake", keep=True, sets=sc.get("set", ""))
+        try:
+            seeded = SEEDS[sc["seed"]](s_info)
+        finally:
+            _stop_hub()
+        info = _start_hub(bise, root, "model", reuse=s_info["tmp"], sets=sc.get("set", ""))
     else:
-        launch(hub="model", restart=True)
-        info = _read(HUB)
+        info = _start_hub(bise, root, "model", sets=sc.get("set", ""))
     d = out or os.path.join(OUT, "runs", "%s-%s" % (scenario, time.strftime("%Y%m%d-%H%M%S")))
     os.makedirs(d, exist_ok=True)
     r = {"scenario": scenario, "ask": sc["ask"], "headless": headless, "at": time.strftime("%Y-%m-%d %H:%M"), "dir": d, "tree": dict(tree_info(root), required=build["required"]),
@@ -2797,9 +2093,8 @@ def _run(scenario, sc, headless, timeout, keep, out, require, voice=False):
     try:
         _wait(lambda: c.state, 30, "the hub's state")
         c.wait_idle("main", timeout=300)
-        core = _Core(bise, root, info, headless, d)
-        if headless:
-            _wait(lambda: any(e.get("ev") == "hub" and e.get("up") for e in core.evs), 60, "the core on the hub")
+        core = _Core(bise, root, info, d)
+        _wait(lambda: any(e.get("ev") == "hub" and e.get("up") for e in core.evs), 60, "the core on the hub")
         before = {p["id"] for p in c.state.get("pages", [])}
         t0 = time.time()
         rel = lambda: round(time.time() - t0, 1)
@@ -2820,14 +2115,7 @@ def _run(scenario, sc, headless, timeout, keep, out, require, voice=False):
         def settled():
             return all(_agent_settled(a) for a in (c.state or {}).get("agents", []))
 
-        if voice:
-            # spoken, as he would (ambient-lead m_5978): fn held, the fake mic says the ask, let go;
-            # the capsule's lines are recorded with their times next to the page's
-            r["voice"] = True
-            call("say", text=sc["ask"], per_word_ms=240, timeout=120)
-            r["t"]["said"] = rel()
-        else:
-            core.send(sc["ask"])
+        core.send(sc["ask"])
         page, quiet = None, None
         if sc.get("timed"):
             # pages that come later, on the hub's timers (the meetings): the flow waits for them itself
@@ -2936,11 +2224,6 @@ def _run(scenario, sc, headless, timeout, keep, out, require, voice=False):
             pass
     finally:
         r["load"]["end"] = round(os.getloadavg()[0], 1)
-        if voice and core:
-            try:
-                r["capsule"] = capsule_timeline(events(2000)["events"][core.start:])
-            except Exception as e:  # noqa: BLE001
-                r["capsule"] = [{"error": str(e)}]
         if core:
             core.close()
         try:
@@ -2973,7 +2256,7 @@ def _run(scenario, sc, headless, timeout, keep, out, require, voice=False):
                 r["hub_state"] = "not kept: %s" % e
         if not keep:
             # only the hub this run started: an older run ending late stopped a newer run's hub
-            r["stopped"] = _stop_hub(only_pid=info.get("pid")) if headless else stop()
+            r["stopped"] = _stop_hub(only_pid=info.get("pid"))
         with open(os.path.join(d, "run.json"), "w") as f:
             json.dump(r, f, indent=1, ensure_ascii=False)
         r["report"] = run_report(r)
@@ -2981,448 +2264,15 @@ def _run(scenario, sc, headless, timeout, keep, out, require, voice=False):
             f.write(r["report"] + "\n")
     return r
 
-
-# ---------------------------------------------------------------- the scenes
-
-def fake_scenes():
-    """amb-web's own scenes (apps/ambient/web/fakecore.js), built by node:
-    one source of truth for what each SPEC §2 state looks like in events."""
-    js = r"""
-      require(%s); require(%s);
-      const F = globalThis.AmbFake;
-      const resp = {};
-      for (const c of [{cmd: "answer"}, {cmd: "send", text: "$text"}, {cmd: "hush"}, {cmd: "cut_in"}, {cmd: "talk_cancel"}])
-        resp[c.cmd] = F.respond(c);
-      console.log(JSON.stringify({
-        scenes: F.SCENES.map((s) => ({id: s.id, spec: s.spec, label: s.label, events: s.build()})),
-        respond: resp, agents: F.AGENTS, card: F.CARD,
-      }));
-    """ % (json.dumps(os.path.join(WEB, "words.js")), json.dumps(os.path.join(WEB, "fakecore.js")))
-    r = subprocess.run(["node", "-e", js], capture_output=True, text=True)
-    if r.returncode != 0:
-        raise QAError("node couldn't build fakecore.js's scenes: " + r.stderr[-600:])
-    return json.loads(r.stdout)
-
-
-def extra_scenes(agents, card):
-    """The states ambient asked for that fakecore.js doesn't play (m_4768)."""
-    hub = [0, {"ev": "hub", "up": True, "workspace": "~/acme"}]
-
-    def st(a, cards=()):
-        return {"ev": "state", "agents": a, "cards": list(cards)}
-
-    def many(n):
-        notes = ["profiling signup", "settings page first", "the banner, half the size", "waits for the others",
-                 "it's always unicode", "the flaky login test", "docs for the CLI", "bump the deps"]
-        return [{"name": "agent-%02d" % (i + 1), "status": ["working", "idle", "done", "working", "blocked"][i % 5],
-                 "note": notes[i % len(notes)], "report": "", "working": i % 5 in (0, 3), "turn_ms": 60000 * (i + 1)}
-                for i in range(n)]
-    nopt = dict(card, id="c9", options=[], text="which date works for the offsite?")
-    card2 = {"id": "c2", "kind": "confirm", "agent": "perf", "text": "run the migration on the shared staging db?",
-             "options": [{"n": 1, "label": "allow"}, {"n": 3, "label": "no"}]}
-    one = [dict(agents[0])]
-    out = [
-        {"id": "idle-0", "spec": ["idle"], "label": "idle, no agent", "events": [hub, [0, st([])]]},
-        {"id": "idle-1", "spec": ["idle"], "label": "idle, 1 agent working", "events": [hub, [0, st(one)]]},
-        {"id": "needs-noopt", "spec": ["needs you"], "label": "needs you, no options", "events": [hub, [0, st(agents)], [600, st(agents, [nopt])]]},
-        {"id": "needs-2", "spec": ["needs you"], "label": "needs you, 2 waiting", "events": [hub, [0, st(agents)], [600, st(agents, [card, card2])]]},
-        {"id": "spot-text", "spec": ["spotlight"], "label": "spotlight with text", "events": [hub, [0, st(agents)], [400, {"ev": "app_key", "key": "space"}],
-                                                                                        [900, {"ev": "ui_spot_type", "text": "what's perf doing?"}]]},
-        {"id": "agents-5", "spec": ["agents"], "label": "fn + 0: 5 agents", "events": [hub, [0, st(many(5))], [500, {"ev": "app_key", "key": "0"}]]},
-        {"id": "agents-15", "spec": ["agents"], "label": "fn + 0: 15 agents", "events": [hub, [0, st(many(15))], [500, {"ev": "app_key", "key": "0"}]]},
-    ]
-    # pages (docs/ambient-pages.md §2.3, ambient-pm m_4888): the core's page event and state.pages
-    url = "http://127.0.0.1:47123/p/weekly-update"
-    page = {"id": "weekly-update", "title": "weekly update", "agent": "main", "version": 1, "url": url, "at_ms": 1790000000000, "state": "ready", "open_notes": 0}
-    older = dict(page, id="offsite-venues", title="offsite venues", url=url.replace("weekly-update", "offsite-venues"), at_ms=1789990000000, version=2)
-    pev = dict(page, ev="page")
-    out += [
-        {"id": "page-ready", "spec": ["pages"], "label": "a page is ready · fn + o", "events": [hub, [0, st(agents)], [600, pev]]},
-        {"id": "page-updating", "spec": ["pages"], "label": "a page updating (notes sent)", "events": [hub, [0, dict(st(agents), pages=[page])], [600, dict(pev, state="updating")]]},
-        {"id": "page-fn-o", "spec": ["pages"], "label": "fn + o opens the newest page (logged, not opened)", "events": [hub, [0, st(agents)], [600, pev], [2200, {"ev": "app_key", "key": "o"}]]},
-        {"id": "page-front", "spec": ["pages"], "label": "a page you wait for opens in front (logged)", "events": [hub, [0, st(agents)], [600, dict(pev, front=True)]]},
-        {"id": "for-you", "spec": ["pages", "agents"], "label": "fn + 0 with 'for you' pages", "events": [hub, [0, dict(st(agents), pages=[page, older])], [500, {"ev": "app_key", "key": "0"}]]},
-    ]
-    for p in ("mic", "screen"):
-        for s in ("ask", "denied"):
-            out.append({"id": "perm-%s-%s" % (p, s), "spec": ["permissions"], "label": "%s: %s" % (p, s),
-                        "events": [hub, [0, st(agents)], [500, {"ev": "app_perm", "perm": p, "state": s}]]})
-    return out
-
-
-# the events after which the capsule shows something new: a shot ~0.6 s later
-MOMENTS = {"phase", "app_fn", "app_key", "app_perm", "hub", "error", "main", "sent", "ui_spot_send", "ui_spot_type", "app_shot", "app_hidden"}
-
-
-def shot_times(events, settle=600, gap=900, cap=8):
-    """When to shoot a scene: after each moment (and each change of the cards
-    or the agents), merged when closer than `gap`, plus the end."""
-    times = []
-    last_state = None
-    for ms, ev in events:
-        k = ev.get("ev")
-        if k == "state":
-            sig = json.dumps([[a.get("name"), a.get("status")] for a in ev.get("agents", [])] + [c.get("id") for c in ev.get("cards", [])])
-            if sig != last_state:
-                last_state = sig
-                times.append(ms + settle)
-        elif k in MOMENTS:
-            times.append(ms + settle)
-    times.sort()
-    merged = []
-    for t in times:
-        if merged and t - merged[-1] < gap:
-            merged[-1] = t      # the later one: the capsule has settled
-        else:
-            merged.append(t)
-    # the end, once everything settled (its own shot unless right after the last)
-    end = max((ms for ms, _ in events), default=0) + 1200
-    if merged and end - merged[-1] < 400:
-        merged[-1] = end
-    else:
-        merged.append(end)
-    if len(merged) > cap:   # keep the first, the last, and an even spread
-        step = (len(merged) - 1) / (cap - 1)
-        merged = [merged[round(i * step)] for i in range(cap)]
-    return merged
-
-
-def all_scenes():
-    f = fake_scenes()
-    return f["scenes"] + extra_scenes(f["agents"], f["card"]), f["respond"]
-
-
-def tokens_css(path):
-    """A tokens file as CSS for the capsule: .css as is; .json {name: value}
-    (or {"tokens": {...}}) as :root custom properties (--name: value)."""
-    if not path:
-        return ""
-    txt = open(os.path.expanduser(path)).read()
-    if path.endswith(".json"):
-        t = json.loads(txt)
-        t = t.get("tokens", t)
-        return ":root{%s}" % ";".join("--%s:%s" % (k.lstrip("-"), v) for k, v in t.items())
-    return txt
-
-
-def look(tokens=None, reduce=None):
-    """The app's look for the next shots: a tokens file (None: the app's
-    own), reduced motion on or off (None: leave it)."""
-    out = {}
-    if tokens is not None:
-        out["css"] = call("css", css=tokens_css(tokens))
-    if reduce is not None:
-        inject({"ev": "app_reduce_motion", "on": bool(reduce)})
-        out["reduce_motion"] = bool(reduce)
-    return out
-
-
-def scenes(only=None, backdrops=("dark",), out=None, at=None, what="both", cols=4, reduce=False, tokens=None,
-           screen_h=300, frames=None, every=80, span=None):
-    """Play every scene (or `only`) in the real app, shoot each state, and
-    make a contact sheet per backdrop (the panels) plus one of the screens.
-    reduce: reduced motion on for every scene; tokens: a tokens file (.css or
-    .json) on the capsule; screen_h: the screen shots' top in points (0: all);
-    frames: a scene id: a strip of frames every `every` ms over `span`
-    [from, to] ms (default the whole scene), for the motion."""
-    if not alive():
-        raise QAError("the QA app isn't running: launch() first")
-    if isinstance(only, str):
-        only = [s for s in only.split(",") if s]
-    if isinstance(backdrops, str):
-        backdrops = [b for b in backdrops.split(",") if b]
-    sc, respond = all_scenes()
-    if frames:
-        only = [frames]
-    if only:
-        missing = set(only) - {s["id"] for s in sc}
-        if missing:
-            raise QAError("no scene %s; there are: %s" % (", ".join(sorted(missing)), ", ".join(s["id"] for s in sc)))
-        sc = [s for s in sc if s["id"] in only]
-    tag = "".join(["-reduce" if reduce else "", "-tokens" if tokens else "", "-frames" if frames else ""])
-    run = out or os.path.join(OUT, time.strftime("scenes-%Y%m%d-%H%M%S") + tag)
-    os.makedirs(run, exist_ok=True)
-    result = {"dir": run, "scenes": [], "sheets": [], "reduce": bool(reduce), "tokens": tokens}
-    if tokens:
-        look(tokens=tokens)
-    try:
-        for bd in backdrops:
-            tiles, screens = [], []
-            for s in sc:
-                events = s["events"]
-                if reduce:
-                    events = [[0, {"ev": "app_reduce_motion", "on": True}]] + events
-                if frames:
-                    end = max((ms for ms, _ in events), default=0) + 1200
-                    a, b = (span or [0, end])[:2]
-                    times = list(range(int(a), int(b) + 1, max(16, int(every))))   # 16: ambient m_6592 (each shot's at_ms/taken_ms say when it really came)
-                    w = "panel"
-                else:
-                    times = at or shot_times(events)
-                    w = what
-                shots = [{"at": t, "what": w} for t in times]
-                prefix = "%s.%s%s" % (s["id"], bd, tag)
-                r = call("play", timeout=300, events=events, shots=shots, respond=respond, dir=os.path.join(run, bd),
-                         prefix=prefix, backdrop=bd, tail_ms=300, screen_h=screen_h)
-                for sh in r.get("shots", []):
-                    label = "%s · %s @%.2fs" % (s["id"], s["label"], sh["at_ms"] / 1000) if not frames else "%s %.0f ms" % (s["id"], sh["at_ms"])
-                    if sh.get("panel"):
-                        tiles.append({"path": sh["panel"], "label": label})
-                    if sh.get("screen"):
-                        screens.append({"path": sh["screen"], "label": label})
-                for sh in r.get("shots", []):
-                    g = sh.get("glass") or {}
-                    sh["shown"], sh["app_glass"] = g.get("panel_visible"), g.get("app")
-                    if ghost_glass(g):
-                        result.setdefault("ghosts", []).append({"scene": s["id"], "backdrop": bd, "at_ms": sh.get("at_ms"), "glass": g})
-                result["scenes"].append({"id": s["id"], "spec": s["spec"], "label": s["label"], "backdrop": bd, "shots": r.get("shots", [])})
-                if reduce:
-                    inject({"ev": "app_reduce_motion", "on": False})
-            look_s = " · reduced motion" if reduce else ""
-            look_s += " · tokens %s" % os.path.basename(tokens) if tokens else ""
-            if tiles:
-                p = os.path.join(run, "sheet.%s.png" % bd)
-                title = ("bise ambient · %s frames every %d ms" % (frames, every)) if frames else "bise ambient · SPEC §2 states"
-                call("sheet", items=tiles, out=p, cols=(8 if frames else cols), tile_w=(320 if frames else 560),
-                     title="%s · %s backdrop%s · panel" % (title, bd, look_s), timeout=180)
-                result["sheets"].append(p)
-            if screens:
-                p = os.path.join(run, "sheet.%s.screen.png" % bd)
-                call("sheet", items=screens, out=p, cols=cols, tile_w=420, title="bise ambient · %s backdrop%s · screen" % (bd, look_s), timeout=180)
-                result["sheets"].append(p)
-    finally:
-        if tokens:
-            look(tokens="")
-        reset()
-    ghosts = result.get("ghosts", [])
-    result["fails"] = ["a ghost glass (the app blurs %s with no glass drawn) in %s @%s ms (%s)" % (g["glass"].get("app"), g["scene"], g["at_ms"], g["backdrop"])
-                       for g in ghosts]
-    with open(os.path.join(run, "index.json"), "w") as f:
-        json.dump(result, f, indent=1)
-    return result
-
-
-def ghost_glass(g):
-    """A shot's glass record (QA.glassNow) shows a ghost glass (ambient m_6683): the panel shown and
-    the app blurring its glass rect while the page draws no glass there (none, or opacity under
-    0.05): blur with no content."""
-    if not g or not g.get("panel_visible") or not g.get("app"):
-        return False
-    return not g.get("rect") or (g.get("opacity") is not None and g["opacity"] < 0.05)
-
-
-QA_DEFAULTS = "dev.bise.ambient.qa"   # the QA app's own defaults (App.swift: UserDefaults(suiteName:)), never the user's
-
-
-def _qa_defaults(*args):
-    return subprocess.run(["defaults"] + list(args), capture_output=True, text=True)
-
-
-def hello(every=300, span=3000, reduce=False, backdrop="dark", out=None):
-    """The hello, once ever (amb-mac f3d076aa, amb-web 439320e9), as the app
-    really says it: the QA defaults forget 'saidHello' and ask for a first
-    run (qa.firstRun: the app says hello only then in QA), the app restarts
-    on the same hub, Accessibility is granted through the page's own
-    app_perm 'continue' (App's fake prompt: granted -> helloSoon, 0.6 s),
-    then a frame every `every` ms from app_hello for `span` ms, and a sheet.
-    After: qa.firstRun cleared and the app restarted with every permission
-    on, so the other scenes never meet the hello. Needs a launched app."""
-    if not alive():
-        raise QAError("no QA app: launch() first")
-    hub = (_read(RUN) or {}).get("hub", "fake")
-    out = out or os.path.join(OUT, "hello-%s" % time.strftime("%Y%m%d-%H%M%S"))
-    os.makedirs(out, exist_ok=True)
-    stop(keep_hub=True)
-    _qa_defaults("write", QA_DEFAULTS, "qa.firstRun", "-bool", "true")
-    for k in ["saidHello"] + ["%s.%s" % (w, p) for w in ("asked", "told") for p in ("accessibility", "mic", "screen")]:
-        _qa_defaults("delete", QA_DEFAULTS, k)
-    r = {"dir": out, "frames": [], "reduce": bool(reduce)}
-    try:
-        launch(hub=hub, backdrop=backdrop, restart=True)
-        if reduce:
-            look(reduce=True)
-        n0 = len(events(2000)["events"])
-        call("cmd", cmd={"cmd": "app_perm", "perm": "accessibility", "do": "continue"})
-        t_hello = None
-        t0 = time.time()
-        while time.time() - t0 < 10 and t_hello is None:
-            # App posts app_hello to the page directly (not in the QA log); the page's
-            # app_content 'hello' is the first thing logged once it shows
-            if any(e["ev"].get("ev") == "app_hello" or (e["ev"].get("cmd") == "app_content" and e["ev"].get("kind") == "hello")
-                   for e in events(2000)["events"][n0:]):
-                t_hello = time.time()
-            time.sleep(0.03)
-        if t_hello is None:
-            raise QAError("no app_hello within 10 s of Accessibility granted: is the app built at f3d076aa or later? (events: %s)"
-                          % [e["ev"].get("ev") or e["ev"].get("cmd") for e in events(2000)["events"][n0:]][-12:])
-        r["hello_after_grant_ms"] = int((t_hello - t0) * 1000)
-        for k in range(int(span // every) + 1):
-            wait = t_hello + k * every / 1000.0 - time.time()
-            if wait > 0:
-                time.sleep(wait)
-            at = int((time.time() - t_hello) * 1000)
-            s = snapshot("panel", name="hello-%02d-%04dms" % (k, at), out=out)
-            r["frames"].append({"at_ms": at, "path": s.get("panel") or s.get("path")})
-        evs = events(2000)["events"][n0:]
-        r["content"] = [(e["ev"].get("kind")) for e in evs if e["ev"].get("cmd") == "app_content"]
-        tiles = [{"path": f["path"], "label": "%d ms" % f["at_ms"]} for f in r["frames"] if f["path"]]
-        if tiles:
-            r["sheet"] = os.path.join(out, "hello-sheet.png")
-            call("sheet", items=tiles, out=r["sheet"], cols=6, tile_w=320,
-                 title="bise ambient · the hello · every %d ms%s" % (every, " · reduced motion" if reduce else ""), timeout=120)
-    finally:
-        _qa_defaults("delete", QA_DEFAULTS, "qa.firstRun")
-        stop(keep_hub=True)
-        launch(hub=hub, backdrop=backdrop, restart=True)
-    return r
-
-
-def play(events, shots=(), name="play", backdrop=None, out=None, mute_core=True):
-    """A custom timeline: [[ms, ev], ...], shots [{at, what}] (ms)."""
-    out = out or os.path.join(OUT, "play")
-    q = dict(events=events, shots=list(shots), dir=out, prefix=name, mute_core=mute_core, tail_ms=200)
-    if backdrop:
-        q["backdrop"] = backdrop
-    _, respond = all_scenes()
-    q["respond"] = respond
-    return call("play", timeout=180, **q)
-
-
-# ---------------------------------------------------------------- the CLI
-
-# ---------------------------------------------------------------- harness A: the real app
-
-# `qa.py real` (ambient-lead m_7961): his REAL app build (no --qa), its normal path (core spawn
-# with --bise and the env launchd gives, focus logic, main menu), on an isolated HOME with a
-# throwaway fake-provider hub found by his own rules, its panels on an off-screen virtual
-# display, driven through amb-mac's test input socket (NSEvents into the app's own queue,
-# never HID). The app side honors the socket only when BISE_HOME is set and isn't ~/.bise.
-
 def _short_agent():
     return re.sub(r"[^a-z0-9]", "", (os.environ.get("SB_AGENT") or "me").lower())[:10] or "me"
 
 
-REAL_DIR = os.environ.get("AMBIENT_REAL_DIR") or os.path.join(os.path.expanduser("~/.bise/gate"), "ra-" + _short_agent())
-REAL_HOME = os.path.join(REAL_DIR, "h")         # the isolated HOME: short, the hub's socket lives under it
-REAL_APP_DIR = os.path.join(REAL_DIR, "app")    # AMBIENT_HARNESS: the app's test.sock and its output
-REAL_SOCK = os.path.join(REAL_APP_DIR, "test.sock")
-REAL_RUN = os.path.join(REAL_DIR, "run.json")
-REAL_APP = os.path.expanduser("~/.bise/dev/build/ambient/harness/bise ambient.app")
-HIS_BISE = os.path.expanduser("~/.bise/dev/build/ambient/target/debug/bise")
-LAUNCHD_PATH = "/usr/bin:/bin:/usr/sbin:/sbin"   # what launchd gives an app opened from the Finder or a login item
-
-
-WINS_JS = os.path.join(HERE, "wins.js")
 # his own state: a harness path must never point there (ambient-lead m_8004)
 HIS_STATE = [os.path.expanduser(p) for p in ("~/.bise/hubs", "~/.bise/run", "~/.bise/dev/ambient", "~/.bise/sessions",
                                               "~/.local/state/switchboard", "~/bise")]
 
 
-def real_windows(pid):
-    """The pid's windows and the online screens, from the window server (wins.js: bounds only)."""
-    r = subprocess.run(["osascript", "-l", "JavaScript", WINS_JS, str(pid)], capture_output=True, text=True, timeout=10)
-    if r.returncode != 0:
-        raise QAError("wins.js: %s" % r.stderr.strip()[-300:])
-    return json.loads(r.stdout)
-
-
-def _touches(w, screens):
-    """Does a window's rect share any area with a screen's (global top-left coords)?"""
-    return [s["id"] for s in screens
-            if w["x"] < s["x"] + s["w"] and s["x"] < w["x"] + w["w"] and w["y"] < s["y"] + s["h"] and s["y"] < w["y"] + w["h"]
-            and w["w"] > 0 and w["h"] > 0]
-
-
-def _app_type(pid):
-    """lsappinfo's ApplicationType for a pid: Foreground (Dock icon), UIElement (accessory), BackgroundOnly."""
-    r = subprocess.run(["lsappinfo", "info", "-only", "applicationtype", str(pid)], capture_output=True, text=True)
-    m = re.search(r'"ApplicationType"="([^"]+)"', r.stdout)
-    return m.group(1) if m else None
-
-
-def _front():
-    """The frontmost app: name and pid (lsappinfo, no permission)."""
-    asn = subprocess.run(["lsappinfo", "front"], capture_output=True, text=True).stdout.strip()
-    r = subprocess.run(["lsappinfo", "info", "-only", "name", "-only", "pid", asn], capture_output=True, text=True).stdout
-    name = re.search(r'"LSDisplayName"="([^"]*)"', r)
-    pid = re.search(r'"pid"\s*=\s*(\d+)', r)
-    return {"name": name.group(1) if name else None, "pid": int(pid.group(1)) if pid else None}
-
-
-def real_violations(pid):
-    """What breaks 'nothing in his face' right now: a window of the app touching a screen, the
-    app with a Dock icon, the app in front."""
-    v = []
-    try:
-        ws = real_windows(pid)
-    except (QAError, subprocess.TimeoutExpired, ValueError) as e:
-        return ["can't read the windows: %s" % e]
-    for w in ws["wins"]:
-        hit = _touches(w, ws["screens"])
-        if hit:
-            v.append("window %s at (%d,%d %dx%d) touches screen %s (onscreen %s, alpha %s, layer %s)"
-                     % (w["n"], w["x"], w["y"], w["w"], w["h"], hit, w.get("onscreen"), w.get("alpha"), w.get("layer")))
-    t = _app_type(pid)
-    if t == "Foreground":
-        v.append("the app has a Dock icon (ApplicationType Foreground)")
-    if _front().get("pid") == pid:
-        v.append("the app is frontmost")
-    return v
-
-
-def _exe_pid(exe):
-    """The pid running exactly this executable (the harness bundle's own path), or None."""
-    # ps, not pgrep: the path has spaces, and pgrep's regex missed it in proof run #2 (the watchdog
-    # never attached; amb-mac's own guard did the job)
-    # and both the path as given and its real path: ~/.bise/dev/build links into
-    # ~/.local/state/switchboard/build, and a process started by launchd shows the real one
-    # (proof run #3: the watchdog never attached)
-    r = subprocess.run(["ps", "-axww", "-o", "pid=,args="], capture_output=True, text=True)
-    names = {exe, os.path.realpath(exe)}
-    for line in r.stdout.splitlines():
-        pid, _, args = line.strip().partition(" ")
-        if any(args == n or args.startswith(n + " ") for n in names):
-            return int(pid)
-    return None
-
-
-def real_watch(pid, every=0.25):
-    """The independent guard (`qa.py _real_watch`, detached at launch): while the harness app
-    lives, every `every` s, a window touching a screen, a Dock icon or the app in front kills
-    it at once (SIGKILL) and writes why to <app dir>/watch.log."""
-    log = open(os.path.join(REAL_APP_DIR, "watch.log"), "a")
-    if isinstance(pid, str) and pid.startswith("exe:"):
-        exe, t0, pid = pid[4:], time.time(), None
-        while pid is None and time.time() - t0 < 60:
-            pid = _exe_pid(exe)
-            time.sleep(0.02)
-        if pid is None:
-            log.write("%s no process of %s in 60 s\n" % (time.strftime("%T"), exe))
-            return []
-    log.write("%s watching pid %d\n" % (time.strftime("%T"), pid))
-    log.flush()
-    while _pid_alive(pid):
-        v = real_violations(pid)
-        if v and not v[0].startswith("can't read"):
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except OSError:
-                pass
-            log.write("%s KILLED pid %d: %s\n" % (time.strftime("%T"), pid, "; ".join(v)))
-            log.flush()
-            return v
-        time.sleep(every)
-    log.write("%s pid %d gone\n" % (time.strftime("%T"), pid))
-    return []
-
-
-def _real_guard(argv, env):
-    """Refuse a launch whose paths reach his own state (his hubs, his app's socket and pid, his
-    sessions, his home workspace): the harness has its own HOME, BISE_HOME, state and hub."""
-    gate = os.path.realpath(os.path.expanduser("~/.bise/gate")) + "/"
-    if not os.path.realpath(REAL_HOME).startswith(gate):
-        raise QAError("refused: the harness HOME %s is not under ~/.bise/gate" % REAL_HOME)
-    refuse_his_state(list(argv[1:]) + list(env.values()))
 
 
 def refuse_his_state(vals):
@@ -3485,595 +2335,34 @@ def real_home_env(env, home):
     return env
 
 
-def _bundle_exe(app):
-    plist = os.path.join(app, "Contents", "Info.plist")
-    name = None
-    if os.path.exists(plist):
-        r = subprocess.run(["/usr/libexec/PlistBuddy", "-c", "Print :CFBundleExecutable", plist], capture_output=True, text=True)
-        name = r.stdout.strip() or None
-    exe = os.path.join(app, "Contents", "MacOS", name or os.path.splitext(os.path.basename(app))[0])
-    if not _is_exe(exe):
-        raise QAError("no app at %s (amb-mac's harness build: ~/.bise/dev/build/ambient/harness/; or pass app=)" % exe)
-    return exe
-
-
-def his_app_path():
-    """The PATH his running app hands its core (--env PATH=..., from ps), else this shell's."""
-    r = subprocess.run(["ps", "-axww", "-o", "args="], capture_output=True, text=True)
-    for line in r.stdout.splitlines():
-        if "/Contents/MacOS/bise ambient" in line and "--env PATH=" in line and REAL_DIR not in line:
-            m = re.search(r"--env PATH=(\S+)", line)
-            if m:
-                return m.group(1)
-    # his app isn't running: his login shell's PATH from a clean env (what the app's launcher
-    # hands it, amb-mac m_7974), never this agent's PATH (it carries the hub's bin)
-    sh = os.environ.get("SHELL", "/bin/zsh")
-    r = subprocess.run(["/usr/bin/env", "-i", "HOME=%s" % os.path.expanduser("~"), "USER=%s" % os.environ.get("USER", ""),
-                        "LOGNAME=%s" % os.environ.get("USER", ""), "SHELL=%s" % sh, "TERM=dumb", sh, "-l", "-c", 'printf %s "$PATH"'],
-                       capture_output=True, text=True, timeout=20, stdin=subprocess.DEVNULL)
-    return r.stdout.strip().splitlines()[-1] if r.returncode == 0 and r.stdout.strip() else LAUNCHD_PATH
-
-
-def _user_tmp():
-    r = subprocess.run(["getconf", "DARWIN_USER_TEMP_DIR"], capture_output=True, text=True)
-    return r.stdout.strip() or "/tmp/"
-
-
-def real_call(op, timeout=30.0, **kw):
-    try:
-        c = Client(REAL_SOCK)
-    except QAError:
-        raise QAError("the harness app isn't running (no %s): qa.py real launch first" % REAL_SOCK)
-    try:
-        return c.call(op, timeout=timeout, **kw)
-    finally:
-        c.close()
-
-
-def real_alive():
-    try:
-        return real_call("ping", timeout=3)
-    except (QAError, OSError, ValueError):
-        return None
-
-
-def real_launch(app=None, bise=None, root=None, args=None, timeout=40, web=None, path=None, session_env=None, world=False):
-    """His real app (no --qa) on an isolated HOME and a throwaway fake-provider hub, as launchd
-    would start it: PATH=/usr/bin:/bin:/usr/sbin:/sbin, HOME, his args (--workspace, --bise).
-    bise: his (~/.bise/dev/build/ambient/target/debug/bise) unless given; root: the tree whose
-    repl-live and sb-core the hub runs (bins.sh makes them current), default this tree.
-    world: on the running `qa.py world` instead (its HOME, bise's home workspace, its hubs and
-    registered projects: bise desktop's multi-project runs); no hub of its own then.
-    One harness at a time: a QA app of this agent and an older harness are stopped first."""
-    app = os.path.abspath(app or os.environ.get("AMBIENT_REAL_APP") or REAL_APP)
-    exe = _bundle_exe(app)
-    bise = os.path.abspath(bise or os.environ.get("AMBIENT_QA_BISE") or HIS_BISE)
-    if not _is_exe(bise):
-        raise QAError("no bise at %s: pass bise=" % bise)
-    root = root or os.environ.get("AMBIENT_QA_APP_ROOT") or app_root_of(bise) or REPO
-    if alive():
-        stop()
-    real_stop()
-    home = REAL_HOME
-    if world:
-        import world as world_mod
-        w = world_mod.state()
-        home = w["home"]
-        info = {"ws": os.path.join(home, world_mod.HOME_NAME), "state": [h["sock"] for h in w["hubs"] if h["home"]][0], "tmp": w["world"]}
-    elif os.path.isdir(REAL_HOME):
-        if not os.path.realpath(REAL_HOME).startswith(os.path.realpath(os.path.expanduser("~/.bise/gate")) + "/"):
-            raise QAError("refusing to clear %s: not under ~/.bise/gate" % REAL_HOME)
-        shutil.rmtree(REAL_HOME, ignore_errors=True)
-    _prepare_home(home)
-    os.makedirs(REAL_APP_DIR, exist_ok=True)
-    try:
-        os.unlink(REAL_SOCK)
-    except OSError:
-        pass
-    path = path or his_app_path()
-    _real_guard(["x", "--bise", bise, "--env", "PATH=%s" % path, "--env", "BISE_APP_ROOT=%s" % root], {"HOME": home})
-    if not world:
-        info = _start_hub(bise, root, "fake", home=REAL_HOME)
-    env = {"HOME": home, "BISE_HOME": os.path.join(home, ".bise"), "PATH": LAUNCHD_PATH, "TMPDIR": _user_tmp(),
-           "USER": os.environ.get("USER", ""), "LOGNAME": os.environ.get("LOGNAME", os.environ.get("USER", "")),
-           "SHELL": os.environ.get("SHELL", "/bin/zsh"), "LANG": os.environ.get("LANG", "en_US.UTF-8"),
-           "AMBIENT_HARNESS": REAL_APP_DIR, "BISE_AMBIENT_TEST_INPUT": REAL_SOCK}
-    # a bise session's vars as his shell would carry them (bug 2's case, ambient-lead m_8076):
-    # only ever pointing at ANOTHER throwaway hub under ~/.bise/gate, never his
-    session_env = dict(session_env or {})
-    gate = os.path.realpath(os.path.expanduser("~/.bise/gate")) + "/"
-    for k, v in session_env.items():
-        if str(v).startswith("/") and not os.path.realpath(v).startswith(gate):
-            raise QAError("refused: session_env %s=%s is not under ~/.bise/gate" % (k, v))
-    env.update(session_env)
-    # his own launch's args (amb-mac m_7974, from ps on his running app): --bise --web --workspace
-    # and --env BISE_APP_ROOT / PATH (what the core spawn gets); never --dev (his ~/.bise/dev):
-    # without it the app's dev dir is <BISE_HOME>/dev
-    web = web or os.path.join(root, "apps", "ambient", "web")
-    argv = [exe] + (list(args) if args is not None else
-                    ["--bise", bise, "--web", web, "--workspace", info["ws"],
-                     "--env", "BISE_APP_ROOT=%s" % root, "--env", "PATH=%s" % path])
-    _real_guard(argv, env)
-    out = open(os.path.join(REAL_APP_DIR, "app.out"), "a")
-    out.write("\n--- %s %s\n" % (time.strftime("%F %T"), " ".join(argv)))
-    out.flush()
-    # the independent guard first, watching for the harness executable's process: a window on his
-    # screens, a Dock icon or the app in front kills it (amb-mac's own guard quits it too)
-    subprocess.Popen([sys.executable, "-B", os.path.realpath(__file__), "_real_watch", "exe:" + exe], cwd=REPO,
-                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
-                     env=dict(os.environ, AMBIENT_REAL_DIR=REAL_DIR))
-    # launched by launchd through open (-g: never to the front; -n: a new instance), so the app is
-    # its own responsible process: a TCC check is never attributed to the agent's terminal
-    # (the first proof: Ghostty), and its env is launchd's plus ours, like his own app's
-    out.close()
-    cmd = ["open", "-g", "-n", "-a", app, "--stdout", os.path.join(REAL_APP_DIR, "app.out"), "--stderr", os.path.join(REAL_APP_DIR, "app.out")]
-    for k, v in env.items():
-        cmd += ["--env", "%s=%s" % (k, v)]
-    cmd += ["--args"] + argv[1:]
-    # open hands the app the CALLER's environment plus --env: from an agent shell that was the
-    # agent's whole env (SB_SOCKET = the real hub's socket, SB_AGENT, BISE_ROLE...; the bug 2/4
-    # run's core had them). So open runs with a clean env: the app gets only this and our --env.
-    clean = {"PATH": LAUNCHD_PATH, "HOME": os.path.expanduser("~"), "USER": os.environ.get("USER", ""),
-             "LOGNAME": os.environ.get("USER", ""), "TMPDIR": _user_tmp(), "LANG": os.environ.get("LANG", "en_US.UTF-8")}
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=30, env=clean)
-    if r.returncode != 0:
-        raise QAError("open failed: %s" % (r.stderr or r.stdout)[-500:])
-    t0, ping, pid = time.time(), None, None
-    while time.time() - t0 < timeout:
-        pid = pid or _exe_pid(exe)
-        if pid and not _pid_alive(pid):
-            break
-        ping = real_alive()
-        if ping:
-            pid = ping.get("pid") or pid
-            break
-        time.sleep(0.25)
-    if pid:
-        with open(os.path.join(REAL_APP_DIR, "app.pid"), "w") as f:
-            f.write(str(pid))
-    run = {"app": app, "exe": exe, "pid": pid, "argv": argv, "env": env, "bise": bise, "root": root, "tree": tree_info(root),
-           "home": REAL_HOME, "hub": {"state": info["state"], "ws": info["ws"], "tmp": info["tmp"]}, "socket": REAL_SOCK,
-           "ping": ping, "logs": real_logs()}
-    with open(REAL_RUN, "w") as f:
-        json.dump(run, f, indent=1)
-    if ping:
-        # first: the independent watchdog is attached to this pid, else nothing runs (ambient-lead m_8061)
-        t1, attached = time.time(), False
-        while time.time() - t1 < 5 and not attached:
-            try:
-                attached = ("watching pid %d" % pid) in open(os.path.join(REAL_APP_DIR, "watch.log")).read()
-            except OSError:
-                pass
-            time.sleep(0.1)
-        if not attached:
-            real_stop()
-            raise QAError("stopped: the watchdog did not attach to pid %s in 5 s (watch.log)" % pid)
-        # the app and its core carry nothing of the agent's or the real hub's (SB_SOCKET, SB_AGENT...)
-        leaked = [k for k in real_env_leaks(pid) if k not in session_env]
-        if leaked:
-            real_stop()
-            raise QAError("stopped: the harness app carries the agent's env: %s" % leaked)
-        # it reached only its own: its core's workspace is the throwaway one, its hub under the harness HOME
-        core_ws = ((real_call("state").get("core") or {}).get("workspace"))
-        hub = info["state"] if world else (real_feed().get("hub") or "")
-        if core_ws and os.path.realpath(core_ws) != os.path.realpath(info["ws"]) or not os.path.realpath(hub).startswith(os.path.realpath(home) + "/"):
-            real_stop()
-            raise QAError("refused after launch: the core's workspace %s or the hub %s is not the harness's own" % (core_ws, hub))
-    if not ping:
-        tail = open(os.path.join(REAL_APP_DIR, "app.out"), errors="replace").read()[-1500:]
-        alive_now = bool(pid and _pid_alive(pid))
-        real_stop()
-        try:
-            watch = open(os.path.join(REAL_APP_DIR, "watch.log")).read().splitlines()[-2:]
-        except OSError:
-            watch = []
-        raise QAError("the harness app %s its test socket in %d s; watch.log: %s; its output ends:\n%s"
-                      % ("didn't open" if alive_now else "quit before opening", timeout, watch, tail))
-    return run
-
-
-def real_logs():
-    """Where each layer of harness A writes: the app's output, its own logs under the isolated
-    HOME (<HOME>/.bise/ambient/*.log: app.log, core.log), the hub's dir."""
-    logs = [os.path.join(REAL_APP_DIR, "app.out")]
-    logs += sorted(glob.glob(os.path.join(REAL_HOME, ".bise", "ambient", "*.log")))
-    logs += sorted(glob.glob(os.path.join(REAL_HOME, ".bise", "dev", "ambient", "*.log")))
-    logs += sorted(glob.glob(os.path.join(REAL_HOME, ".bise", "hubs", "*", "hub.log")))
-    return logs
-
-
-def real_tail(n=40):
-    """The last n lines of every log of harness A, by file."""
-    out = {}
-    for p in real_logs():
-        try:
-            out[p] = open(p, errors="replace").read().splitlines()[-n:]
-        except OSError:
-            pass
-    return out
-
-
-def real_feed(agent="main", count=40):
-    """What the harness hub holds for an agent (main: did his words arrive, what did it answer):
-    the last lines of its transcript.log in the hub's own folder under the harness HOME (the
-    hub's {op:history} answered nothing for a 'before' past the end)."""
-    hubs = sorted(glob.glob(os.path.join(REAL_HOME, ".bise", "hubs", "*")))
-    if not hubs:
-        raise QAError("no harness hub under %s" % REAL_HOME)
-    t = os.path.join(hubs[0], "agents", agent, "transcript.log")
-    lines = open(t, errors="replace").read().splitlines() if os.path.exists(t) else []
-    keep = [l for l in lines if "\tsb you : " in l or "obs: assistant: " in l or "\tsb card : " in l]
-    return {"agent": agent, "lines": keep[-count:], "hub": os.path.join(hubs[0], "hub.sock")}
-
-
-def real_env_leaks(pid):
-    """The agent-only or real-hub variables in a process's env (ps eww): any is a leak."""
-    envl = subprocess.run(["ps", "eww", "-o", "command=", "-p", str(pid)], capture_output=True, text=True).stdout
-    bad = ("SB_SOCKET", "SB_AGENT", "SB_TASK", "SB_STATE_DIR", "BISE_ROLE", "BEND_STDIN", "GHOSTTY_RESOURCES_DIR")
-    return [k for k in bad if re.search(r"\s%s=" % k, envl)]
-
-
-def real_hub_send(text, focus="main"):
-    """Words into the harness hub as its user would type them in the TUI (the throwaway hub only):
-    the fake main runs the [[bash: ...]] in them, e.g. [[bash: sb card "which date?"]] raises a card."""
-    socks = sorted(glob.glob(os.path.join(REAL_HOME, ".bise", "hubs", "*", "hub.sock")))
-    if not socks:
-        raise QAError("no harness hub under %s" % REAL_HOME)
-    s = socket.socket(socket.AF_UNIX)
-    s.settimeout(5)
-    s.connect(socks[0])
-    try:
-        s.sendall(b'{"op":"hello"}\n')
-        s.sendall((json.dumps({"op": "input", "focus": focus, "text": text}) + "\n").encode())
-        time.sleep(0.3)
-    finally:
-        s.close()
-    return {"sent": text, "hub": socks[0]}
-
-
-def real_stop():
-    """Quit the harness app (its own pid only: a normal terminate, then SIGTERM) and its hub."""
-    out = {"app": "not running", "hub": "not running"}
-    pid = None
-    try:
-        pid = int(open(os.path.join(REAL_APP_DIR, "app.pid")).read().strip())
-    except (OSError, ValueError):
-        pass
-    if real_alive():
-        try:
-            real_call("quit", timeout=3)
-        except (QAError, OSError):
-            pass
-    if pid and _pid_alive(pid):
-        t0 = time.time()
-        while _pid_alive(pid) and time.time() - t0 < 5:
-            time.sleep(0.1)
-        if _pid_alive(pid):
-            os.kill(pid, signal.SIGTERM)
-        out["app"] = "stopped pid %d" % pid
-    info = _read(HUB)
-    if info and info.get("home") and _stop_hub():
-        out["hub"] = "stopped"
-    return out
-
-
-# the harness app's web views: the capsule's bar, the side panel, and bise desktop's window
-# (S4, amb-mac m_8218: window:'win' on mouse/key/type/eval, shot what:'win', win_open/close/restore, deeplink)
-WINDOWS = ("bar", "win")      # the side panel is gone since S8 (amb-mac m_8516, harness app 79a14b8c)
-
-
-def real_win(do, route=None, open=None):
-    """bise desktop's window, off-screen like the panels: open (a route, none = the last one),
-    close, restore (close then open: the route and frame come back), or a deep link exactly as a
-    capsule/card/spotlight ⏎ hands it ({open: {project?, agent?}} or {route}). The reply plus
-    the window's state after it (state.win: frame, visible, test_key, route, appearance)."""
-    if do == "open":
-        r = real_op("win_open", **({"route": route} if route else {}))
-    elif do in ("close", "restore"):
-        r = real_op("win_" + do)
-    elif do == "deeplink":
-        if not (route or open):
-            raise QAError("deeplink: a route or open {project?, agent?}")
-        r = real_op("deeplink", **({"open": open} if open else {"route": route}))
-    else:
-        raise QAError("win: open, close, restore or deeplink")
-    st = real_op("state")
-    return {"reply": r, "win": st.get("win"), "win_model": st.get("win_model")}
-
-
-def real_op(op, **kw):
-    """One op on the harness app's test socket (amb-mac's: ping state click key type fn shot
-    eval events quit), checked against the ops its ping lists."""
-    ping = real_alive()
-    if not ping:
-        raise QAError("the harness app isn't running: qa.py real launch first")
-    if op == "shot" and kw.get("what", kw.get("window")) not in WINDOWS:
-        raise QAError("shot: window bar or win only (the web view's own snapshot); never a display (ambient-lead m_8004)")
-    ops = ping.get("ops")
-    if ops and op not in ops and op != "ping":
-        raise QAError("the harness app has no op %r (it has: %s)" % (op, ", ".join(ops)))
-    timeout = 30 + float(kw.get("ms", 0) or 0) / 1000
-    return real_call(op, timeout=timeout, **kw)
-
-
-def real_click(selector, window="bar"):
-    """A click on a page element of a harness panel: its rect from the page (eval), then mouse
-    at its center in that window's own points from its top-left (the page's CSS px; amb-mac
-    m_8006), so AppKit's own hit test, ignoresMouseEvents and first-click rules apply."""
-    sel = json.dumps(selector)
-    r = real_op("eval", window=window, js="(() => { const e = document.querySelector(%s); if (!e) return null; const b = e.getBoundingClientRect(); "
-                "return JSON.stringify({x: b.left, y: b.top, w: b.width, h: b.height}); })()" % sel)
-    v = r.get("value")
-    rect = json.loads(v) if isinstance(v, str) else v
-    if not rect:
-        raise QAError("click: no %s in the %s page" % (selector, window))
-    x, y = rect["x"] + rect["w"] / 2, rect["y"] + rect["h"] / 2
-    out = real_op("mouse", window=window, x=x, y=y)
-    out["at"] = {"x": x, "y": y, "element": rect}
-    return out
-
-
-def real_keys(*specs, window=None):
-    """Key presses into the harness app ('up', 'esc', 'return', 'cmd+w', 'type:hello'), one key
-    op each in the app's format {key, mods} (amb-mac's: left right up down esc enter tab space
-    delete <char>), delivered the way NSApp would to the window that has the keys."""
-    names = {"return": "enter", "escape": "esc", "backspace": "delete"}
-    out = []
-    for spec in specs:
-        if spec.startswith("type:"):
-            out.append(real_op("type", text=spec[5:]))
-            continue
-        parts = [p for p in spec.replace("⌘", "cmd+").lower().split("+") if p]
-        *mods, k = parts
-        bad = [m for m in mods if m not in MODS]
-        if bad:
-            raise QAError("keys: unknown modifier in %r (cmd shift alt ctrl)" % spec)
-        kw = {"key": names.get(k, k), "mods": [MODS[m] for m in mods]}
-        if window:
-            kw["window"] = window
-        r = real_op("key", **kw)
-        r["spec"] = spec
-        out.append(r)
-    return out[0] if len(out) == 1 else {"keys": out}
-
-
-def real_proof(seconds=8.0):
-    """ONE short run that proves harness A stays out of his face (ambient-lead m_8004): sampled
-    every 0.5 s from launch to stop, at rest and while the bar shows (fn tap, fn hold, esc):
-    every window of the app vs every screen (none may touch one), the app never active and never
-    frontmost, his front app the same before, during and after, no Dock icon (ApplicationType),
-    no audio device or mic opened by the app's pid (coreaudiod's and TCC's logs over the run)."""
-    since = time.strftime("%Y-%m-%d %H:%M:%S")
-    out = {"front_before": _front(), "samples": 0, "violations": [], "windows_seen": {}, "screens": None,
-           "app_types": [], "app_active": [], "fronts": [], "steps": []}
-    pid = None
-    try:
-        run = real_launch()
-        pid = run["pid"]
-        out["pid"] = pid
-
-        def sample():
-            out["samples"] += 1
-            for v in real_violations(pid):
-                if v not in out["violations"]:
-                    out["violations"].append(v)
-            ws = real_windows(pid)
-            out["screens"] = ws["screens"]
-            for w in ws["wins"]:
-                out["windows_seen"][str(w["n"])] = {k: w[k] for k in ("x", "y", "w", "h", "onscreen")}
-            t = _app_type(pid)
-            if t not in out["app_types"]:
-                out["app_types"].append(t)
-            ping = real_alive() or {}
-            out["app_says"] = {k: ping.get(k) for k in ("offscreen", "screens", "windows", "front_app", "status_item")}
-            if ping.get("app_active") not in out["app_active"]:
-                out["app_active"].append(ping.get("app_active"))
-            f = _front().get("name")
-            if f not in out["fronts"]:
-                out["fronts"].append(f)
-
-        steps = [("rest", None), ("fn tap", lambda: real_op("fn", kind="tap")), ("esc", lambda: real_keys("esc")),
-                 ("fn hold 1 s", lambda: real_op("fn", kind="hold", ms=1000)), ("esc", lambda: real_keys("esc"))]
-        per = max(1.0, seconds / len(steps))
-        for name, act in steps:
-            if not _pid_alive(pid):
-                out["steps"].append({"name": name, "error": "the app is gone (a guard quit it?)"})
-                break
-            r = {"name": name}
-            try:
-                if act:
-                    act()
-            except QAError as e:
-                r["error"] = str(e)[:300]
-            t1 = time.time() + per
-            while time.time() < t1 and _pid_alive(pid):
-                sample()
-                time.sleep(0.5)
-            out["steps"].append(r)
-    finally:
-        out["stop"] = real_stop()
-        out["front_after"] = _front()
-    if pid:
-        lg = subprocess.run(["log", "show", "--style", "compact", "--start", since, "--predicate",
-                             'process == "coreaudiod" OR subsystem == "com.apple.TCC"'], capture_output=True, text=True, timeout=120).stdout
-        mine = [l for l in lg.splitlines() if re.search(r"\b%d\b" % pid, l)]
-        # coreaudiod lines about the pid = an audio device used; TCC: which services it asked and how
-        # (preflight=yes is a silent check; a real request could prompt, attributed to whoever launched it)
-        out["audio_lines"] = [l[:240] for l in mine if "coreaudiod" in l][:10]
-        msgs = {}
-        for l in lg.splitlines():
-            m = re.search(r"msgID=(%d\.\d+), function=\S+, service=(\w+), preflight=(\w+)" % pid, l)
-            if m:
-                msgs[m.group(1)] = {"service": m.group(2), "preflight": m.group(3)}
-            r = re.search(r"AUTHREQ_ATTRIBUTION: msgID=(%d\.\d+).*?identifier=([\w.]+)" % pid, l)
-            if r and r.group(1) in msgs:
-                msgs[r.group(1)]["responsible"] = r.group(2)
-        out["tcc"] = list(msgs.values())
-        try:
-            out["watch_log"] = open(os.path.join(REAL_APP_DIR, "watch.log")).read().splitlines()[-4:]
-        except OSError:
-            pass
-    fails = list(out["violations"])
-    if True in out["app_active"]:
-        fails.append("the app said it was active")
-    if out["front_before"].get("name") != out["front_after"].get("name") or len(out["fronts"]) > 1:
-        fails.append("his front app changed: %s -> %s -> %s" % (out["front_before"].get("name"), out["fronts"], out["front_after"].get("name")))
-    if "Foreground" in out["app_types"]:
-        fails.append("a Dock icon")
-    if out.get("audio_lines"):
-        fails.append("coreaudiod logged the app's pid: an audio device (see audio_lines)")
-    asked = [t for t in out.get("tcc", []) if t.get("preflight") != "yes"]
-    if asked:
-        fails.append("a TCC request that may prompt: %s" % asked)
-    if not out["samples"]:
-        fails.append("no sample taken")
-    out["fails"] = fails
-    out["verdict"] = "pass" if not fails else "FAIL"
-    return out
-
-
-def _real_cli(a):
-    c = a.rcmd
-    if c == "launch":
-        return real_launch(a.app, a.bise, a.root)
-    if c == "try-proof":
-        import tryproof
-        R = tryproof.run(a.out)
-        sys.stderr.write(tryproof.report(R))
-        return {"report": tryproof.report(R), "steps": R["steps"]}
-    if c == "_try_open":
-        import tryproof
-        # the hook passes '--' so the app's own --bise/--env aren't read as qa.py's options
-        return tryproof.try_open(a.args[1:] if a.args[:1] == ["--"] else a.args)
-    if c == "t1":
-        import t1
-        txt = t1.run(a.out, a.bise)
-        sys.stderr.write(txt)
-        return {"report": txt}
-    if c == "stop":
-        return real_stop()
-    if c in ("ping", "state"):
-        return real_op(c)
-    if c == "op":
-        return real_op(a.name, **json.loads(a.args))
-    if c == "keys":
-        return real_keys(*a.specs, window=a.window)
-    if c == "click":
-        if a.at:
-            x, y = (float(v) for v in a.at.split(","))
-            return real_op("mouse", window=a.window, x=x, y=y)
-        if a.selector:
-            return real_click(a.selector, a.window)
-        raise QAError("click: a selector or --at x,y (points from the window's top-left)")
-    if c == "type":
-        return real_op("type", text=a.text)
-    if c == "fn":
-        kw = {"kind": a.kind}
-        if a.ms:
-            kw["ms"] = a.ms
-        if a.words:
-            kw["words"] = a.words
-        return real_op("fn", **kw)
-    if c == "shot":
-        return real_op("shot", what=a.window)
-    if c == "win":
-        return real_win(a.do, a.route, json.loads(a.open) if a.open else None)
-    if c == "eval":
-        return real_op("eval", window=a.window, js=a.js)
-    if c == "events":
-        return real_op("events", **({"since": a.since} if a.since else {}))
-    if c == "feed":
-        return real_feed(a.agent, a.count)
-    if c == "logs":
-        return real_tail(a.n)
-    if c == "proof":
-        return real_proof(a.seconds)
-    raise QAError("real: unknown %s" % c)
-
+# ---------------------------------------------------------------- the CLI
 
 def _cli(argv):
     import argparse
     ap = argparse.ArgumentParser(prog="qa.py", description=__doc__.split("\n\n")[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("launch"); p.add_argument("--hub", default="fake"); p.add_argument("--no-app", action="store_true", help="the throwaway hub, its page server and the fake accounts only: never builds or opens the app"); p.add_argument("--connectors", action="store_true", help="hub model: the user's REAL connectors (needs --real-accounts-approved-by-user)"); p.add_argument("--computer", action="store_true", help="the QA hub may load the computer plugin: the user's browser (needs --real-accounts-approved-by-user)"); p.add_argument("--real-accounts-approved-by-user", default="", metavar="MESSAGE_ID", help="the user's own message asking for this one run"); p.add_argument("--workspace"); p.add_argument("--bise")
-    p.add_argument("--web"); p.add_argument("--backdrop", default="dark"); p.add_argument("--force-build", action="store_true"); p.add_argument("--restart", action="store_true")
-    p = sub.add_parser("stop"); p.add_argument("--keep-hub", action="store_true")
-    p = sub.add_parser("_real_watch"); p.add_argument("pid")
-    p = sub.add_parser("real", help="harness A: his real app (no --qa) on an isolated HOME, a throwaway hub and an off-screen display, driven by its test socket")
-    rs = p.add_subparsers(dest="rcmd", required=True)
-    q = rs.add_parser("launch"); q.add_argument("--app"); q.add_argument("--bise"); q.add_argument("--root")
-    for n in ("stop", "ping", "state"):
-        rs.add_parser(n)
-    q = rs.add_parser("op", help="any op of the test socket: op <name> '<json args>'"); q.add_argument("name"); q.add_argument("args", nargs="?", default="{}")
-    q = rs.add_parser("keys", help="up esc return cmd+w type:<text> ..."); q.add_argument("specs", nargs="+"); q.add_argument("--window", choices=WINDOWS)
-    q = rs.add_parser("click", help="a click on a selector, or --at x,y (points from the window's top-left)"); q.add_argument("selector", nargs="?"); q.add_argument("--at"); q.add_argument("--window", default="bar", choices=WINDOWS)
-    q = rs.add_parser("win", help="bise desktop's window (off-screen): open [--route r], close, restore, deeplink --route r | --open '{\"project\":..,\"agent\":..}'")
-    q.add_argument("do", choices=["open", "close", "restore", "deeplink"]); q.add_argument("--route"); q.add_argument("--open")
-    q = rs.add_parser("type"); q.add_argument("text")
-    q = rs.add_parser("fn"); q.add_argument("kind", choices=["down", "up", "tap", "hold"]); q.add_argument("--ms", type=int); q.add_argument("--words")
-    q = rs.add_parser("shot"); q.add_argument("--window", default="bar", choices=WINDOWS)
-    q = rs.add_parser("proof", help="one short run: no window on his screens, never active, his front app unchanged, no Dock icon, no audio"); q.add_argument("--seconds", type=float, default=8)
-    q = rs.add_parser("eval"); q.add_argument("js"); q.add_argument("--window", default="bar", choices=WINDOWS)
-    q = rs.add_parser("events"); q.add_argument("--since")
-    q = rs.add_parser("feed", help="the hub's last lines of an agent: did his words reach main?"); q.add_argument("--agent", default="main"); q.add_argument("--count", type=int, default=40)
-    q = rs.add_parser("logs"); q.add_argument("--n", type=int, default=40)
-    q = rs.add_parser("try-proof", help="the user's 'bise-ambient --try' through ~/.local/bin/bise-ambient on a throwaway home, the app off-screen (tryproof.py)")
-    q.add_argument("--out")
-    q = rs.add_parser("_try_open"); q.add_argument("args", nargs=argparse.REMAINDER)
-    q = rs.add_parser("t1", help="the first-try scenario on the running world (t1.py): a verdict per step, shots, report.txt")
-    q.add_argument("--out"); q.add_argument("--bise")
-    p = sub.add_parser("scenes"); p.add_argument("--only"); p.add_argument("--backdrops", default="dark"); p.add_argument("--out"); p.add_argument("--what", default="both")
-    p.add_argument("--reduce-motion", action="store_true"); p.add_argument("--tokens"); p.add_argument("--screen-h", type=int, default=300)
-    p.add_argument("--frames", help="a scene id: a strip of frames"); p.add_argument("--every", type=int, default=80)
-    p.add_argument("--span", help="from,to in ms (frames)"); p.add_argument("--at", help="ms,ms,... instead of the automatic moments")
-    p = sub.add_parser("look"); p.add_argument("--tokens", help="a .css or .json tokens file ('' = the app's own)"); p.add_argument("--reduce-motion", choices=["on", "off"])
+    p = sub.add_parser("launch", help="a throwaway hub, its page server and the fake accounts (no app)")
+    p.add_argument("--hub", default="fake", help="fake (scripted) or model (your model and keys, fake accounts)")
+    p.add_argument("--bise")
+    p.add_argument("--connectors", action="store_true", help="hub model: the user's REAL connectors (needs --real-accounts-approved-by-user)")
+    p.add_argument("--computer", action="store_true", help="the QA hub may load the computer plugin: the user's browser (needs --real-accounts-approved-by-user)")
+    p.add_argument("--real-accounts-approved-by-user", default="", metavar="MESSAGE_ID", help="the user's own message asking for this one run")
+    sub.add_parser("stop", help="stop the throwaway hub")
     p = sub.add_parser("page", help="pages on the throwaway hub")
-    p.add_argument("action", choices=["publish", "notes", "meta", "fixture", "drive"]); p.add_argument("--url"); p.add_argument("--steps", help="a JSON file of steps (drive)"); p.add_argument("--schemes", default="light,dark"); p.add_argument("--id", default="weekly-update"); p.add_argument("--file")
+    p.add_argument("action", choices=["publish", "notes", "meta", "fixture", "drive"]); p.add_argument("--url"); p.add_argument("--steps", help="a JSON file of steps (drive)"); p.add_argument("--schemes", default="light,dark")
+    p.add_argument("--file"); p.add_argument("--id", default="weekly-update")
     p.add_argument("--title", default="weekly update"); p.add_argument("--notes", help="JSON list of notes"); p.add_argument("--send", action="store_true")
     p.add_argument("--done", help="n1,n2"); p.add_argument("--edit", help='JSON {"old": "new"} applied to the file first')
-    p = sub.add_parser("list")
-    p = sub.add_parser("run", help="a scripted product run on a model hub with the fake accounts")
-    p.add_argument("scenario", choices=sorted(SCENARIOS)); p.add_argument("--headless", action="store_true", help="no app: a bise ambient-core child")
-    p.add_argument("--timeout", type=int, default=900); p.add_argument("--keep", action="store_true", help="leave the hub (and app) running"); p.add_argument("--out")
+    p = sub.add_parser("run", help="a scripted product run on a model hub with the fake accounts, through a bise ambient-core child")
+    p.add_argument("scenario", choices=sorted(SCENARIOS)); p.add_argument("--headless", action="store_true", help="(always: kept for old callers)")
+    p.add_argument("--timeout", type=int, default=900); p.add_argument("--keep", action="store_true", help="leave the hub running"); p.add_argument("--out")
     p.add_argument("--json", action="store_true", help="print run.json instead of the report")
     p.add_argument("--require", help="commits the bise tree must have (comma-separated): refused otherwise")
-    p.add_argument("--app", action="store_true", help="on the QA app (the default without --headless)")
-    p.add_argument("--voice", action="store_true", help="the ask spoken: the app's fn held, the fake voice says it; records the capsule's lines (with --app)")
-    p = sub.add_parser("say"); p.add_argument("text"); p.add_argument("--no-wait", action="store_true")
-    p = sub.add_parser("snapshot"); p.add_argument("--what", default="both"); p.add_argument("--backdrop"); p.add_argument("--name"); p.add_argument("--out")
-    p.add_argument("--menubar", action="store_true", help="the menu-bar item in each state (still, work, need, away, done, fail, listen) at 1x and 2x, and a sheet")
-    p.add_argument("--states", help="menubar: a subset, comma-separated"); p.add_argument("--frames", type=int, default=1, help="menubar: successive frames of a moving mood")
-    p.add_argument("--count", type=int, default=2, help="menubar: the need state's count")
-    p = sub.add_parser("pearl", help="every pearl frame amb-mac plays, per mood, at 1x and 2x"); p.add_argument("--out")
-    p = sub.add_parser("hello", help="the hello as the app says it (first run, Accessibility granted): frames from app_hello, a sheet")
-    p.add_argument("--every", type=int, default=300); p.add_argument("--span", type=int, default=3000); p.add_argument("--reduce-motion", action="store_true")
-    p.add_argument("--backdrop", default="dark"); p.add_argument("--out")
-    sub.add_parser("state"); sub.add_parser("reset"); sub.add_parser("ping"); sub.add_parser("outbox")
+    sub.add_parser("outbox")
     p = sub.add_parser("ask", help="asks to main on the running throwaway hub, one after the other: its words, length, time, pages")
     p.add_argument("texts", nargs="*"); p.add_argument("--file", help="one ask per line"); p.add_argument("--no-capsule", action="store_true", help="as the TUI, not through a core")
     p.add_argument("--timeout", type=int, default=600); p.add_argument("--json", action="store_true")
     p = sub.add_parser("tick", help="the launch's next batch of fake comments comes in now (numbers move)"); p.add_argument("--n", type=int, default=1)
-    p = sub.add_parser("events"); p.add_argument("n", nargs="?", type=int, default=40); p.add_argument("--levels", action="store_true")
-    p = sub.add_parser("fn"); p.add_argument("state"); p.add_argument("--key", default="fn")
-    p = sub.add_parser("key"); p.add_argument("k")
-    p = sub.add_parser("click", help="one real mouse click (a CGEvent posted to the QA app's pid, never the HID tap) on a capsule element: what the window server, AppKit and the page each saw")
-    p.add_argument("selector"); p.add_argument("--route", choices=["appkit", "point", "window"], default="appkit"); p.add_argument("--frontmost", action="store_true", help="leave bise active (default: not frontmost)")
-    p = sub.add_parser("fn-hold-closed", help="fn held from rest through the real key path (no tap): pearl listening within 300 ms, words to the core, main's line; a tap does nothing")
-    p.add_argument("--variants", default="launch,fold,hide"); p.add_argument("--words", default="what is on my plate today"); p.add_argument("--within-ms", type=int, default=300)
-    sub.add_parser("rest", help="the capsule back to rest and bise not the active app")
-    p = sub.add_parser("eval", help="read one JS expression on the capsule's page (its value back; reads only)"); p.add_argument("js"); p.add_argument("--fn-held", action="store_true", help="read while fn is held (talk open), then cancel")
-    p = sub.add_parser("hover", help="the pointer over an element (mouseMoved into the QA app's queue, his pointer never moves)"); p.add_argument("selector"); p.add_argument("--ms", type=int, default=1000)
-    p = sub.add_parser("alpha", help="the panel's pixels with alpha: the pearl's corners and a ring outside it, and around the glass, must be transparent")
-    p.add_argument("--name", default="alpha"); p.add_argument("--ring", type=float, default=6); p.add_argument("--outside", type=float, default=10)
-    p = sub.add_parser("clicks", help="every button the capsule shows in one state, one real click each (state set again before each): the page got it, one command left")
-    p.add_argument("--state", default="card", help="card, drafts, or a JSON file with a core state event"); p.add_argument("--open", default="auto", help="fn + this key opens the view (auto: i for cards, , for settings; none: no key)")
-    p.add_argument("--selector"); p.add_argument("--then", help="click the first target whose data-qa starts with this before listing (card- : a card's own bar from fn i)")
-    p = sub.add_parser("keys", help="real keys into the QA app's panel (CGEvent to its pid, never the HID tap): up down return tab esc cmd+return cmd+1 type:<words>")
-    p.add_argument("specs", nargs="+"); p.add_argument("--gap-ms", type=int, default=60)
-    sub.add_parser("menu", help="the menu-bar menu's rows, in order (kind, title, keys, ref, enabled)")
-    p = sub.add_parser("menu-click", help="click a menu row as the real one: stop <timer id>, page|watch <url>, card <id>")
-    p.add_argument("kind", choices=["stop", "page", "watch", "card"]); p.add_argument("ref")
-    p = sub.add_parser("inject"); p.add_argument("ev")
     p = sub.add_parser("_hub"); p.add_argument("--bise", required=True); p.add_argument("--kind", default="fake"); p.add_argument("--connectors", action="store_true"); p.add_argument("--computer", action="store_true")
     p.add_argument("--real-accounts-approved-by-user", default=""); p.add_argument("--keep", action="store_true"); p.add_argument("--reuse"); p.add_argument("--home")
     p = sub.add_parser("world", help="bise desktop: one throwaway HOME, bise's home hub + 2-3 seeded projects (world.py)")
@@ -4094,22 +2383,10 @@ def _cli(argv):
         return
     if a.cmd == "_hub":
         return hub_daemon(a.bise, a.kind, a.connectors, a.computer, a.real_accounts_approved_by_user, a.keep, a.reuse, a.home)
-    if a.cmd == "_real_watch":
-        return real_watch(a.pid if a.pid.startswith("exe:") else int(a.pid))
-    if a.cmd == "real":
-        print(json.dumps(_real_cli(a), indent=1, ensure_ascii=False))
-        return
     if a.cmd == "launch":
-        r = launch(a.hub, a.workspace, a.bise, a.web, a.backdrop, a.force_build, a.restart, a.connectors, a.computer, a.real_accounts_approved_by_user, a.no_app)
+        r = launch(a.hub, a.bise, a.connectors, a.computer, a.real_accounts_approved_by_user)
     elif a.cmd == "stop":
-        r = stop(a.keep_hub)
-    elif a.cmd == "scenes":
-        nums = lambda v: [float(x) for x in v.split(",")] if v else None
-        r = scenes(a.only, a.backdrops, a.out, at=nums(a.at), what=a.what, reduce=a.reduce_motion, tokens=a.tokens,
-                   screen_h=a.screen_h, frames=a.frames, every=a.every, span=nums(a.span))
-        r = {"dir": r["dir"], "sheets": r["sheets"], "scenes": len(r["scenes"])}
-    elif a.cmd == "look":
-        r = look(a.tokens, None if a.reduce_motion is None else a.reduce_motion == "on")
+        r = stop()
     elif a.cmd == "page":
         if a.action == "publish":
             r = page_publish(a.file, a.id, a.title, a.done.split(",") if a.done else None, None, json.loads(a.edit) if a.edit else None)
@@ -4121,26 +2398,11 @@ def _cli(argv):
             r = page_drive(None if a.url else a.id, a.url, json.load(open(a.steps)) if a.steps else None, a.schemes)
         else:
             r = page_fixture(a.id)
-    elif a.cmd == "list":
-        sc, _ = all_scenes()
-        r = [{"id": s["id"], "spec": s["spec"], "label": s["label"]} for s in sc]
     elif a.cmd == "run":
-        r = run(a.scenario, a.headless, a.timeout, a.keep, a.out, a.require, a.voice)
+        r = run(a.scenario, a.timeout, a.keep, a.out, a.require)
         if not a.json:
             print(r["report"])
             return
-    elif a.cmd == "say":
-        r = say(a.text, wait_answer=not a.no_wait)
-    elif a.cmd == "pearl":
-        r = pearl(a.out)
-    elif a.cmd == "hello":
-        r = hello(a.every, a.span, a.reduce_motion, a.backdrop, a.out)
-    elif a.cmd == "snapshot" and a.menubar:
-        r = menubar(a.states, a.frames, a.count, a.out)
-    elif a.cmd == "snapshot":
-        r = snapshot(a.what, a.backdrop, a.name, a.out)
-    elif a.cmd == "state":
-        r = state()
     elif a.cmd == "ask":
         texts = list(a.texts) + ([l.strip() for l in open(a.file) if l.strip()] if a.file else [])
         if not texts:
@@ -4151,41 +2413,8 @@ def _cli(argv):
             return
     elif a.cmd == "tick":
         r = tick(a.n)
-    elif a.cmd == "outbox":
+    else:
         r = outbox()
-    elif a.cmd == "reset":
-        r = reset()
-    elif a.cmd == "ping":
-        r = alive() or {"running": False}
-    elif a.cmd == "events":
-        r = events(a.n, a.levels)
-    elif a.cmd == "fn":
-        r = fn(a.state, a.key)
-    elif a.cmd == "key":
-        r = key(a.k)
-    elif a.cmd == "click":
-        r = click(a.selector, a.route, not a.frontmost)
-    elif a.cmd == "fn-hold-closed":
-        r = fn_hold_closed(tuple(v for v in a.variants.split(",") if v), a.words, within_ms=a.within_ms)
-    elif a.cmd == "rest":
-        r = rest()
-    elif a.cmd == "eval":
-        r = eval_js(a.js, fn_held=a.fn_held)
-    elif a.cmd == "hover":
-        r = hover(a.selector, a.ms)
-    elif a.cmd == "alpha":
-        r = alpha(a.name, ring=a.ring, outside=a.outside)
-    elif a.cmd == "clicks":
-        st = a.state if a.state in CLICK_STATES else json.load(open(a.state))
-        r = clicks(st, None if a.open == "none" else a.open, a.selector, then=a.then)
-    elif a.cmd == "keys":
-        r = keys(*a.specs, gap_ms=a.gap_ms)
-    elif a.cmd == "menu":
-        r = menu()
-    elif a.cmd == "menu-click":
-        r = menu_click(a.kind, a.ref)
-    elif a.cmd == "inject":
-        r = inject(a.ev)
     print(json.dumps(r, indent=1, ensure_ascii=False))
 
 

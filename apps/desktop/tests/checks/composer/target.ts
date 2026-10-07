@@ -1,11 +1,10 @@
 // The composer's targets, in one place (qa-type).
 // T: the new app's composer, mounted alone on fake data by amb-web's lab (test mode,
 // '#route=lab/composer', amb-win d4ab66dd); its sends show in the lab's visible log (lab.sent.<n>),
-// the effect a check reads. Every composer check was red first on today's window (sets 1 and 2,
-// d38f2df9 and 0f13bb20): TW keeps that target for the checks whose surface the lab lacks (a thread
-// to quote from, the core's voice path), and to replay the red.
+// the effect a check reads. Every composer check was red first on the old Swift app's window (sets
+// 1 and 2, d38f2df9 and 0f13bb20); that target went with apps/ambient (delete plan step 2).
 import path from 'node:path';
-import { launchDesktop, launchOld, type Session } from '../../harness';
+import { launchDesktop, type Session } from '../../harness';
 
 const FIXTURES = path.join(__dirname, '../fixtures');
 
@@ -52,21 +51,6 @@ export const T = {
   skill: { query: 'plain', name: 'plain-language' },
   /** amb-mac's private clipboard (2aa0294d): ⌘C/⌘X/⌘V never reach his pasteboard */
   clipboardFenced: true,
-};
-
-/** today's old window (apps/ambient/web/window on winfake.js) */
-export const TW = {
-  ...ids,
-  launch: (): Promise<Session> => launchOld('window'),
-  field: '[data-qa=composer]',
-  composer: '.w-composer',
-  lists: ['.w-thread', '.w-side'],
-  thread: '.w-thread',
-  message: '.b-msg, [data-testid^="thread.msg"]',
-  messageText: '.b-text, [data-testid^="thread.msg.text"]',
-  skill: { query: 'bise-p', name: 'bise-pages' },
-  /** no private clipboard: a check refuses ⌘C/⌘X/⌘V here */
-  clipboardFenced: false,
 };
 
 /** The text in the field, whatever the field is (a textarea today, a Lexical editor tomorrow). */

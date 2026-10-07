@@ -1,8 +1,7 @@
 // The harness checks itself: every detector passes on the fixture's good half and fails on its
 // bad half, and every launch stays out of his sight (the proof). If one of these fails, no check
 // built on the harness can be trusted.
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { PNG } from 'pngjs';
 import {
@@ -137,20 +136,6 @@ test('guards: a file dropped on a page without a drop handler and a window.open 
   }
 });
 
-test('guards: a PNG dropped on today\'s old window opens nothing (the exact qa-type m_9582 case)', async ({ oldWindow }) => {
-  const png = new PNG({ width: 8, height: 8 });
-  png.data.fill(200);
-  const file = path.join(mkdtempSync(path.join(os.tmpdir(), 'bh-png-')), 'shot.png');
-  writeFileSync(file, PNG.sync.write(png));
-  await dropFiles(oldWindow.page, '#win', [file]);
-  await oldWindow.page.waitForTimeout(800);
-  const end = await prove(oldWindow.app, oldWindow.watch);
-  expect(end.violations).toEqual([]);
-  expect(await oldWindow.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
-  expect(oldWindow.page.url()).toContain('window/index.html');
-  test.info().annotations.push({ type: 'blocked', description: (await oldWindow.blocked()).join(' | ') });
-});
-
 test('desktop: the new app runs on the scripted core and helper, out of sight (needs pnpm build)', async () => {
   test.skip(!existsSync(path.join(__dirname, '..', '..', '..', 'out', 'main', 'index.js')), 'no build in out/: pnpm build');
   const core = new FakeCore(), helper = new FakeHelper();
@@ -167,13 +152,6 @@ test('desktop: the new app runs on the scripted core and helper, out of sight (n
     core.dispose();
     helper.dispose();
   }
-});
-
-test('old UI: the window and the capsule load on their fake cores, out of sight', async ({ oldWindow, oldCapsule }) => {
-  await expect(oldWindow.page.locator('#win > *').first()).toBeAttached();
-  await expect(oldCapsule.page.locator('#amb > *').first()).toBeAttached();
-  expect(oldWindow.proof.violations).toEqual([]);
-  expect(oldCapsule.proof.violations).toEqual([]);
 });
 
 test('text: a clipped line and tiny words are reported', async () => {

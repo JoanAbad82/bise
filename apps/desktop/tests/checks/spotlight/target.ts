@@ -1,12 +1,9 @@
 // The spotlight's targets, in one place (qa-type).
 // S: the new app's spotlight, mounted alone on fake data by amb-web's lab (test mode,
-// launchDesktop({ route: 'lab/spotlight' })). SO: today's capsule (apps/ambient/web on fakecore.js)
-// in a scene page next to this file, where his bugs 6 and 7 live: every spotlight check was red
-// there first (set 1, d38f2df9), and SO replays it.
-import path from 'node:path';
-import { launchDesktop, launchPage, type Session } from '../../harness';
-
-const scene = (name: string) => (): Promise<Session> => launchPage(path.join(__dirname, `old-${name}.html`), { size: '1200x800' });
+// launchDesktop({ route: 'lab/spotlight' })). Every spotlight check was red first on the old Swift
+// app's capsule, where his bugs 6 and 7 live (set 1, d38f2df9); that target went with apps/ambient
+// (delete plan step 2).
+import { launchDesktop, type Session } from '../../harness';
 
 export type SpotTarget = {
   /** opens the spotlight with its rows listed */
@@ -34,18 +31,6 @@ export const S: SpotTarget = {
   list: '[data-testid="spot"]',
   row: '[data-testid^="spot.row."]',
   answer: '[data-testid="spot"]',
-  answerText: 'line 20 of 20',
-};
-
-export const SO: SpotTarget = {
-  launchFind: scene('find-type'),
-  launchLong: scene('long-answer'),
-  settleMs: 1200,
-  field: '#amb input.qin',
-  head: '#amb .gin .head',
-  list: '#amb .gin .body',
-  row: '#amb .gin .body .row',
-  answer: '#amb .glass',
   answerText: 'line 20 of 20',
 };
 

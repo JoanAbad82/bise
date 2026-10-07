@@ -26,10 +26,8 @@ Run: `pnpm test:e2e` (self-tests + `tests/checks/**`), one worker. Ask amb-tools
 ## Launch (`launch.ts`): each returns a Session `{ app, page, cdp, proof, watch, close }`
 | what | how |
 |---|---|
-| today's old window (composer, ⌘I, send) on `winfake.js` | `launchOld('window')`, fixture `oldWindow` |
-| today's old capsule (spotlight, pearl) on `fakecore.js` | `launchOld('capsule')`, fixture `oldCapsule` |
-| the new app (`apps/desktop/out`, `BISE_DESKTOP_TEST=1`) | `launchDesktop()`, fixture `desktop` |
-| any HTML file | `launchPage(file)` |
+| the app (`apps/desktop/out`, `BISE_DESKTOP_TEST=1`) | `launchDesktop()`, fixture `desktop` |
+| any HTML file (the harness's self-tests on `fixtures/`) | `launchPage(file)`, in `pageapp/main.js` |
 | fake microphone | `launch*({ micWav: 'x.wav' })` (Chromium's fake capture device) |
 | the scripted core | `launchDesktop({ core: new FakeCore() })`: its start world is every fixture of `rust/proto/fixtures` (or `new FakeCore([...events])`, or `'none'`). `core.send(ev)` sends more events, and `core.cmds()` / `core.waitCmd(pred)` read what the app sent the core (`fakes/core-stub.mjs`). Without it, the core stays `down`. |
 | the scripted Mac helper | `launchDesktop({ helper: new FakeHelper() })`: hello at start. `helper.send({ev:'fn',act:'talk_start',by:'fn'})` sends events, and `helper.cmds()` / `waitCmd` read the app's commands (`fakes/helper-stub.mjs`). Without it, there is no helper. |
@@ -75,9 +73,7 @@ Checks find things only by `data-testid`. In components, pass the id as the `tes
 `node tests/harness/showme/showme.mjs <surface> [state] [--frames <ms>] [--out <dir>] [--size <w>x<h>]` shows one screen
 in one state, out of his sight. It writes `shot.png` and `meta.json` (with the proof), and with `--frames` also every
 drawn frame (`frames/NNNN.png`, `frames.json`: times and change per frame).
-- `old-window <hash>`: `inbox`, `agent/storefront/search`, `light`, `fresh`
-- `old-capsule <scene>[@ms]`: a `fakecore.js` scene id: `talk@1500`, `spot`, `needs`, `s9-away`, ...
-- `desktop [route]`: the new app from `out/` (`pnpm build` first), on the scripted core (the fixture world) and
+- `desktop [route]`: the app from `out/` (`pnpm build` first), on the scripted core (the fixture world) and
   the scripted helper, opened on that route (`agent/acme-1a2b3c4d/perf`, `inbox`, ...).
 - `<file.html> [query]`: any page.
 

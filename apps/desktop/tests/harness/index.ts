@@ -1,13 +1,11 @@
 // The harness's one entry for checks: `import { test, expect, ... } from '../../harness'`.
 // test.extend gives each test fixtures that launch out of his sight with the proof step first and
 // prove again at the end (a rule broken during the test fails it):
-//   oldWindow   TODAY's old window (composer, ⌘I, send) on winfake.js
-//   oldCapsule  TODAY's old capsule (spotlight, pearl) on fakecore.js
-//   desktop     the new app (apps/desktop/out) in its test mode
+//   desktop     the app (apps/desktop/out) in its test mode
 // Each is a Session (launch.ts): { app, page, cdp, proof, watch }. Recorder (frames.ts) records
 // what renders; typing.ts, caret.ts, text.ts, perf.ts, inputs.ts measure and act.
 import { test as base } from '@playwright/test';
-import { launchDesktop, launchOld, type Session } from './launch';
+import { launchDesktop, type Session } from './launch';
 
 export { expect } from '@playwright/test';
 export * from './launch';
@@ -33,8 +31,6 @@ const session = (open: () => Promise<Session>) =>
     }
   };
 
-export const test = base.extend<{ oldWindow: Session; oldCapsule: Session; desktop: Session }>({
-  oldWindow: session(() => launchOld('window')),
-  oldCapsule: session(() => launchOld('capsule')),
+export const test = base.extend<{ desktop: Session }>({
   desktop: session(() => launchDesktop()),
 });

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """ambient-qa's MCP server (stdio, JSON-RPC 2.0, one message per line).
-The tools are qa.py's functions; a PNG comes back as an image block (made
-smaller with sips when big) next to its path."""
+The tools are qa.py's and world.py's functions: throwaway hubs, fake accounts, pages, scripted
+product runs and the QA world. The Swift app's tools (launch with an app, fn, keys, clicks,
+snapshots, scenes, menus) are gone with the app (amb-mac's delete plan, step 2); the desktop
+app's checks live in apps/desktop/tests. A PNG comes back as an image block (made smaller with
+sips when big) next to its path."""
 import base64
 import json
 import os
@@ -13,59 +16,17 @@ import traceback
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 import qa  # noqa: E402
 
-EV = {"type": "object", "description": "a contract event (docs/ambient-app.md §4): {ev: ..., ...}"}
 TOOLS = [
-    ("launch", "Start the real bise ambient.app in QA mode. hub=fake (default): a throwaway scripted hub, main answers 'ack: <your words>'; hub=model: the same throwaway hub with the user's model and keys. The real workspace is refused: it needs a client the user started. Builds the app at its one path if its sources changed (refused while the user's own app runs, unless force_build).",
-     {"hub": {"type": "string", "enum": ["fake", "model"]}, "workspace": {"type": "string"}, "bise": {"type": "string", "description": "a bise with ambient-core (default: found)"},
-      "backdrop": {"type": "string", "description": "dark, bright, busy, none, or a picture file"}, "force_build": {"type": "boolean"}, "restart": {"type": "boolean"},
+    ("launch", "A throwaway hub, its page server and the fake accounts (no app). hub=fake (default): tests/e2e.py's scripted provider, main answers 'ack: <your words>'; hub=model: the same throwaway hub with the user's model and keys (costs credits). The real workspace is refused: it needs a client the user started. Returns pages_url and the outbox file.",
+     {"hub": {"type": "string", "enum": ["fake", "model"]}, "bise": {"type": "string", "description": "a bise with ambient-core (default: found)"},
       "connectors": {"type": "boolean", "description": "the user's REAL connectors: refused unless real_accounts_approved_by_user"},
       "computer": {"type": "boolean", "description": "the computer plugin (the user's browser): refused unless real_accounts_approved_by_user"},
-      "real_accounts_approved_by_user": {"type": "string", "description": "the id of the user's own message asking for this one run on his real accounts; never set it on your own"},
-      "no_app": {"type": "boolean", "description": "the throwaway hub (fake or model), its page server and the fake accounts only: never builds or opens the app; returns pages_url and the outbox file"}}, []),
-    ("stop", "Quit the QA app and its fake hub.", {"keep_hub": {"type": "boolean"}}, []),
-    ("inject", "An event into the app as if real: a core event (hub, state, phase, heard, level, main, word, sent, error, page) or an app/web one (app_fn, app_key, app_perm, app_shot, app_hidden, app_reduce_motion, app_settings, ui_*).",
-     {"ev": EV}, ["ev"]),
-    ("fn", "The fn key, through the app's real key path: down (talk starts, the glow, the fake shot), up (send), tap, double (hands-free), cancel.",
-     {"state": {"type": "string", "enum": ["down", "up", "tap", "double", "cancel"]}, "key": {"type": "string", "enum": ["fn", "right_option"]}}, ["state"]),
-    ("key", "fn + a key, through the app's real key path: space 1-9 i 0 o . enter esc.", {"k": {"type": "string"}}, ["k"]),
-    ("click", "One real mouse click on a capsule element (CSS selector): a CGEvent left down/up at its screen point, posted to the QA app's own pid (never the HID tap: his pointer never moves), with bise not frontmost. Returns what each layer saw: window_at_point (the window server's top window), panel mouse settings, hit_view, appkit events, dom events (pointerdown/click and on what), clicked. Can't catch: another app's window above the panel taking a real click (window_at_point says it), hover under a moving pointer.",
-     {"selector": {"type": "string"}, "route": {"type": "string", "enum": ["appkit", "point", "window"], "description": "appkit (default): the routed event into the app queue; point/window: a CGEvent posted to the pid (AppKit gives it no window)"}, "frontmost": {"type": "boolean", "description": "leave bise active (default: not frontmost)"}}, ["selector"]),
-    ("fn_hold_closed", "fn held from rest (capsule closed, bise not frontmost) through the real key path (KeyMachine via Keys.qaEvent; the QA app has no tap, never his fn): the pearl listens within within_ms, the fake voice's words reach the core on release, main's line shows; variants launch, fold (opened then folded by itself), hide (fn + .); then a tap must do nothing.",
-     {"variants": {"type": "array", "items": {"type": "string", "enum": ["launch", "fold", "hide"]}}, "words": {"type": "string"}, "within_ms": {"type": "integer"}}, []),
-    ("rest", "The capsule back to rest (folded into the icon) and bise not the active app.", {}, []),
-    ("real", "Harness A: his REAL app build (no --qa) on an isolated HOME, a throwaway fake-provider hub found by his own rules, its panels on an off-screen virtual display, driven through the app's test socket (NSEvents into its own queue, never HID, never his screen, focus or keyboard). do: launch (app?, bise? default his ~/.bise/dev/build/ambient/target/debug/bise), stop (always, right after a run), feed (the hub's last lines of main: did his words arrive), logs (the tail of the app's, core's and hub's logs), keys (specs like up esc return cmd+w type:hello; args.window bar|side|win), win (bise desktop's window, off-screen like the panels: args.do open|close|restore|deeplink, args.route, args.open {project?, agent?}; returns state.win after), or any test-socket op (ping state mouse key type fn shot eval events; window/what: bar, side or win) with args.",
-     {"do": {"type": "string"}, "args": {"type": "object"}, "specs": {"type": "array", "items": {"type": "string"}}}, ["do"]),
-    ("world", "bise desktop's throwaway world (world.py): one isolated HOME under ~/.bise/gate with bise's home hub and 2-3 projects (telemetry, shop, docs), each its own fake-provider hub, seeded by its fake main: agents in worktrees, a committed diff ready to merge, an agent at work in a dirty worktree, cards with options, a merge question, a blocked agent, an artifact. do: up (projects 2|3, bise?, root?; takes the heavy lock only to compile stale helpers), state (each hub's agents, commits, diffs, cards, socket), say (project or 'bise', text: words to that project's fake main; [[bash: ...]] scripts it), down (always, when done: stops every hub by pid).",
-     {"do": {"type": "string", "enum": ["up", "state", "say", "down"]}, "projects": {"type": "integer"}, "bise": {"type": "string"}, "root": {"type": "string"},
-      "project": {"type": "string"}, "text": {"type": "string"}}, ["do"]),
-    ("eval", "Read one JS expression on the capsule's page: its value (JSON parsed), and whether the panel is visible. fn_held: read while fn is held (talk open), then cancel. Reads only: never act on the page with it.",
-     {"js": {"type": "string"}, "fn_held": {"type": "boolean"}}, ["js"]),
-    ("hover", "The pointer over an element: mouseMoved events at its point into the QA app's queue for ms (his pointer never moves); over = the page saw it. Can't drive tracking areas (cursor shape).",
-     {"selector": {"type": "string"}, "ms": {"type": "integer"}}, ["selector"]),
-    ("alpha", "The panel's own pixels with alpha (this window alone, no shadow) as a PNG, and the verdict: the pearl's 4 corners and a ring `ring` px outside its disc at alpha 0, and `outside` px outside the glass at alpha 0 (a click there reaches the app below).",
-     {"name": {"type": "string"}, "ring": {"type": "number"}, "outside": {"type": "number"}}, []),
-    ("clicks", "Every button the capsule shows in one state, one real click each (the state set again from rest before each, bise not frontmost): per button its label, whether the page got the click, the commands that left (exactly one expected), a text cursor flagged. state: card (a question with a page link), drafts (a batch: review, send all), settings, or a core state event; open: fn + this key opens the view (default: i for cards, , for settings). Aims at round 9's [data-qa] targets.",
-     {"state": {"type": ["string", "object"]}, "open": {"type": "string"}, "selector": {"type": "string"}, "then": {"type": "string", "description": "click the first target whose data-qa starts with this before listing (card-: a card's own bar from fn i)"}}, []),
-    ("keys", "Real keys into the QA app's panel: CGEvent key down/up posted to the QA app's pid (never the HID tap: nothing reaches his front app). specs: 'up', 'down', 'return', 'tab', 'esc', 'cmd+return', 'cmd+1'..'cmd+9', 'type:<words>'. Returns the panel's key state, what AppKit saw and the page's keydown/input events.",
-     {"specs": {"type": "array", "items": {"type": "string"}}, "gap_ms": {"type": "integer"}}, ["specs"]),
-    ("say", "Hold fn, say the words (heard partials, a fake voice level, no mic), let go: they go to main on the fake hub; waits for main's answer, then 'speaks' it (phase speaking, word by word). Returns main's text.",
-     {"text": {"type": "string"}, "per_word_ms": {"type": "number"}, "wait_answer": {"type": "boolean"}}, ["text"]),
-    ("snapshot", "PNGs of the app now: panel (the capsule and its needs-you note on the backdrop, glass composited), screen (the main screen: backdrop, edge glow and corners, the capsule), web (the web view alone), both (panel + screen).",
-     {"what": {"type": "string", "enum": ["both", "panel", "screen", "web", "all"]}, "backdrop": {"type": "string"}, "name": {"type": "string"}, "image": {"type": "boolean", "description": "return the panel image inline (default true)"}}, []),
-    ("state", "The web UI's model and view (what the capsule shows, its size, the orb's pose, the words) and the app's side (panel frame, shape, hidden, glow).", {}, []),
-    ("events", "The last n events in and out (core>app, qa>app, qa>page, page>app, app>core...), levels left out unless asked.",
-     {"n": {"type": "integer"}, "levels": {"type": "boolean"}}, []),
-    ("scenes", "Play every SPEC §2 state (fakecore.js's scenes plus the extra ones) in the real app, shoot each moment, and return a contact sheet per backdrop. `only`: scene ids; `at`: ms to shoot at instead of the automatic moments.",
-     {"only": {"type": "array", "items": {"type": "string"}}, "backdrops": {"type": "array", "items": {"type": "string"}}, "at": {"type": "array", "items": {"type": "number"}},
-      "what": {"type": "string", "enum": ["both", "panel", "screen"]}, "image": {"type": "boolean"},
-      "reduce": {"type": "boolean", "description": "reduced motion on for every scene"}, "tokens": {"type": "string", "description": "a tokens file (.css/.json) on the capsule"},
-      "screen_h": {"type": "number", "description": "the screen shots' top in points (default 300, 0 = the whole screen)"}}, []),
-    ("list_scenes", "The scene ids, their SPEC §2 states and labels.", {}, []),
-    ("frames", "A strip of frames of one scene for the motion (the open/close spring, the hold-fn lean-in, the needs-you edge): a panel PNG every `every` ms over `span` [from, to] ms, and one sheet.",
-     {"scene": {"type": "string"}, "every": {"type": "number"}, "span": {"type": "array", "items": {"type": "number"}}, "backdrop": {"type": "string"}, "reduce": {"type": "boolean"}, "tokens": {"type": "string"}}, ["scene"]),
-    ("look", "The app's look for what follows: a tokens file (.css as is, .json {name: value} as :root --name; '' = the app's own) and/or reduced motion on/off.",
-     {"tokens": {"type": "string"}, "reduce": {"type": "boolean"}}, []),
-    ("page_publish", "On the throwaway hub, main publishes a page (sb page publish): `file` or amb-kit's weekly-update example, `edit` {old: new} for a v2, `done` note ids, `answers` {note id: text}. Returns its url (open it in Chrome with the computer plugin).",
+      "real_accounts_approved_by_user": {"type": "string", "description": "the id of the user's own message asking for this one run on his real accounts; never set it on your own"}}, []),
+    ("stop", "Stop the throwaway hub (its own pids only).", {}, []),
+    ("world", "bise desktop's throwaway world (world.py): one isolated HOME under ~/.bise/gate with bise's home hub and 2-3 projects (telemetry, shop, docs), each its own fake-provider hub, seeded by its fake main: agents in worktrees, a committed diff ready to merge, an agent at work in a dirty worktree, cards with options, a merge question, a blocked agent, an artifact, a message between two agents, a question main answers for him, a tool approval he refused with a note. do: up (projects 2|3, bise?, root?; takes the heavy lock only to compile stale helpers), state (each hub's agents, commits, diffs, cards, socket), say (project or 'bise', text: words to that project's fake main; [[bash: ...]] scripts it), feature (project, name: a real approval card), down (always, when done: stops every hub by pid).",
+     {"do": {"type": "string", "enum": ["up", "state", "say", "feature", "down"]}, "projects": {"type": "integer"}, "bise": {"type": "string"}, "root": {"type": "string"},
+      "project": {"type": "string"}, "text": {"type": "string"}, "name": {"type": "string"}}, ["do"]),
+    ("page_publish", "On the throwaway hub, main publishes a page (sb page publish): `file` or amb-kit's weekly-update example, `edit` {old: new} for a v2, `done` note ids, `answers` {note id: text}. Returns its url.",
      {"file": {"type": "string"}, "id": {"type": "string"}, "title": {"type": "string"}, "edit": {"type": "object"}, "done": {"type": "array", "items": {"type": "string"}}, "answers": {"type": "object"}}, []),
     ("page_notes", "Draft notes on a page through its API (as notes.js would), optionally send them to the page's agent. A note: {block, kind: note|keep|drop|unsure|edit|voice|pin, quote?, text?, before?, after?}.",
      {"id": {"type": "string"}, "notes": {"type": "array"}, "send": {"type": "boolean"}}, ["id", "notes"]),
@@ -74,22 +35,13 @@ TOOLS = [
     ("page_meta", "A page's meta: versions, state, notes with their status (draft, sent, done, answered).", {"id": {"type": "string"}}, ["id"]),
     ("page_fixture", "ambient's fixture: the weekly-update page at v1, four notes sent (a note, a voice note, an edit, an unsure on a block v2 renames: moved), then v2 marking one done and answering one. Returns both urls and the notes.",
      {"id": {"type": "string"}}, []),
-    ("play", "A custom timeline into the app: events [[ms, ev], ...], shots [{at: ms, what}] (the core is muted while it plays). Files are named <name>@<s>s.",
-     {"events": {"type": "array"}, "shots": {"type": "array"}, "name": {"type": "string"}, "backdrop": {"type": "string"}}, ["events"]),
     ("outbox", "What the QA hub's main wrote to the fake accounts (drafts, sends, Slack posts, Linear issues, calendar events, GitHub comments): QA hubs only have fake Gmail, Slack, Linear, calendar, GitHub, HN, Reddit, X and Bluesky accounts with fixture data, never the user's.", {}, []),
-    ("ask", "Asks to main on the running throwaway hub (launch {hub: 'model', no_app: true} first), one after the other, through a core like the capsule's (capsule: false = as the TUI): main's words to the capsule, their length, the time until all idle, the pages made or updated, the cards.",
+    ("ask", "Asks to main on the running throwaway hub (launch {hub: 'model'} first), one after the other, through a bise ambient-core child like the desktop app's (capsule: false = as the TUI): main's words, their length, the time until all idle, the pages made or updated, the cards.",
      {"texts": {"type": "array", "items": {"type": "string"}}, "capsule": {"type": "boolean"}, "timeout": {"type": "integer"}}, ["texts"]),
     ("tick", "The fake launch's next batch of HN/Reddit/X/Bluesky comments comes in now, and its points, rank and likes move (they also come every 30 min of hub time).", {"n": {"type": "integer"}}, []),
-    ("reset", "The pages start over (the model back to its start), the panel shown.", {}, []),
-    ("run", "A scripted product run, measured the same way every time: a model hub (the user's model and keys, costs credits) with the fake accounts only; the scenario's ask through the core like the capsule's; times the page's first appearance, v1, then 3 scripted notes, send, v2 and the notes' outcomes; the outbox (no send on 'don't send'); main's capsule line length. Returns the one-screen report and its folder (run.json, report.txt, page bodies). Takes minutes.",
-     {"scenario": {"type": "string", "enum": sorted(qa.SCENARIOS)}, "headless": {"type": "boolean", "description": "no app: a bise ambient-core child (text only: no mic, no voice)"},
+    ("run", "A scripted product run, measured the same way every time: a model hub (the user's model and keys, costs credits) with the fake accounts only; the scenario's ask through a bise ambient-core child; times the page's first appearance, v1, then 3 scripted notes, send, v2 and the notes' outcomes; the outbox (no send on 'don't send'); main's line length. Returns the one-screen report and its folder (run.json, report.txt, page bodies). Takes minutes.",
+     {"scenario": {"type": "string", "enum": sorted(qa.SCENARIOS)},
       "timeout": {"type": "integer"}, "keep": {"type": "boolean"}, "require": {"type": "array", "items": {"type": "string"}, "description": "commits the bise tree must have, else refused"}}, ["scenario"]),
-    ("menubar", "The menu-bar item (the 18 px pearl) in each SPEC §0 state: still, work, need (+count), away ☾, done, fail ▲, listen, put there through amb-mac's StatusItem API; its own composed image at 1x and 2x, transparent and on a light and a dark menu-bar strip, and a sheet (returned as an image). frames > 1: successive frames of the moving moods.",
-     {"states": {"type": "array", "items": {"type": "string"}}, "frames": {"type": "integer"}, "count": {"type": "integer"}}, []),
-    ("pearl", "Every pearl frame amb-mac plays, per mood (the bundle's <mood>-NN.png), at 1x and 2x.", {}, []),
-    ("menu", "The menu-bar menu as its rows, in order (--qa has no menu-bar item): kind (header, card, page, watch, stop, talk, toggle, settings, quit, separator), title, keys, ref (card id, page URL, timer id), enabled, indent.", {}, []),
-    ("menu_click", "Click a menu row as the real one: stop (ref: the timer id) stops that watch, page or watch (ref: its URL) is logged as opened (never the user's browser), card (ref: its id) opens bise on that card.",
-     {"kind": {"type": "string", "enum": ["stop", "page", "watch", "card"]}, "ref": {"type": ["string", "integer"]}}, ["kind", "ref"]),
 ]
 
 
@@ -117,40 +69,10 @@ def image_block(path, max_px=1800):
 def run(name, a):
     images = []
     if name == "launch":
-        r = qa.launch(a.get("hub", "fake"), a.get("workspace"), a.get("bise"), None, a.get("backdrop", "dark"), a.get("force_build", False), a.get("restart", False),
-                      a.get("connectors", False), a.get("computer", False), a.get("real_accounts_approved_by_user", ""), bool(a.get("no_app")))
+        r = qa.launch(a.get("hub", "fake"), a.get("bise"), a.get("connectors", False), a.get("computer", False),
+                      a.get("real_accounts_approved_by_user", ""))
     elif name == "stop":
-        r = qa.stop(a.get("keep_hub", False))
-    elif name == "inject":
-        r = qa.inject(a["ev"])
-    elif name == "fn":
-        r = qa.fn(a["state"], a.get("key", "fn"))
-    elif name == "key":
-        r = qa.key(a["k"])
-    elif name == "click":
-        r = qa.click(a["selector"], a.get("route", "appkit"), not a.get("frontmost", False))
-    elif name == "fn_hold_closed":
-        r = qa.fn_hold_closed(tuple(a.get("variants") or ("launch", "fold", "hide")), a.get("words", "what is on my plate today"), within_ms=a.get("within_ms", 300))
-    elif name == "rest":
-        r = qa.rest()
-    elif name == "real":
-        d, kw = a["do"], dict(a.get("args") or {})
-        if d == "launch":
-            r = qa.real_launch(kw.get("app"), kw.get("bise"), kw.get("root"))
-        elif d == "stop":
-            r = qa.real_stop()
-        elif d == "feed":
-            r = qa.real_feed(kw.get("agent", "main"), kw.get("count", 40))
-        elif d == "logs":
-            r = qa.real_tail(kw.get("n", 40))
-        elif d == "keys":
-            r = qa.real_keys(*(a.get("specs") or []), window=kw.get("window"))
-        elif d == "win":
-            r = qa.real_win(kw.get("do", "open"), kw.get("route"), kw.get("open"))
-        else:
-            r = qa.real_op(d, **kw)
-        if d == "shot" and r.get("png"):
-            images.append(r["png"])
+        r = qa.stop()
     elif name == "world":
         import world
         d = a["do"]
@@ -158,51 +80,12 @@ def run(name, a):
             r = world.up(a.get("projects", 3), a.get("bise"), a.get("root"))
         elif d == "say":
             r = world.say(a["project"], a["text"])
+        elif d == "feature":
+            r = world.feature(a["project"], a["name"])
         elif d in ("down", "state"):
             r = getattr(world, d)()
         else:
-            raise qa.QAError("world: do up|state|say|down")
-    elif name == "eval":
-        r = qa.eval_js(a["js"], fn_held=a.get("fn_held", False))
-    elif name == "hover":
-        r = qa.hover(a["selector"], a.get("ms", 1000))
-    elif name == "alpha":
-        r = qa.alpha(a.get("name", "alpha"), ring=a.get("ring", 6), outside=a.get("outside", 10))
-        if r.get("png"):
-            images.append(r["png"])
-    elif name == "clicks":
-        o = a.get("open", "auto")
-        r = qa.clicks(a.get("state", "card"), None if o in (None, "", "none") else o, a.get("selector"), then=a.get("then"))
-    elif name == "keys":
-        r = qa.keys(*a["specs"], gap_ms=a.get("gap_ms", 60))
-    elif name == "say":
-        r = qa.say(a["text"], a.get("per_word_ms", 240), a.get("wait_answer", True))
-    elif name == "snapshot":
-        r = qa.snapshot(a.get("what", "both"), a.get("backdrop"), a.get("name"))
-        if a.get("image", True):
-            for k in ("panel", "web", "screen"):
-                if r.get(k):
-                    images.append(r[k])
-                    break
-    elif name == "state":
-        r = qa.state()
-    elif name == "events":
-        r = qa.events(a.get("n", 50), a.get("levels", False))
-    elif name == "scenes":
-        r = qa.scenes(a.get("only"), a.get("backdrops") or ["dark"], None, a.get("at"), a.get("what", "both"),
-                      reduce=a.get("reduce", False), tokens=a.get("tokens"), screen_h=a.get("screen_h", 300))
-        if a.get("image", True) and r["sheets"]:
-            images.append(r["sheets"][0])
-        r = {"dir": r["dir"], "sheets": r["sheets"],
-             "scenes": [{"id": s["id"], "backdrop": s["backdrop"], "shots": [sh.get("panel") or sh.get("screen") for sh in s["shots"]]} for s in r["scenes"]]}
-    elif name == "frames":
-        r = qa.scenes(backdrops=[a.get("backdrop", "dark")], frames=a["scene"], every=a.get("every", 80), span=a.get("span"),
-                      reduce=a.get("reduce", False), tokens=a.get("tokens"))
-        if r["sheets"]:
-            images.append(r["sheets"][0])
-        r = {"dir": r["dir"], "sheets": r["sheets"], "frames": [sh.get("panel") for s in r["scenes"] for sh in s["shots"]]}
-    elif name == "look":
-        r = qa.look(a.get("tokens"), a.get("reduce"))
+            raise qa.QAError("world: do up|state|say|feature|down")
     elif name == "page_publish":
         r = qa.page_publish(a.get("file"), a.get("id", "weekly-update"), a.get("title", "weekly update"), a.get("done"), a.get("answers"), a.get("edit"))
     elif name == "page_notes":
@@ -214,11 +97,6 @@ def run(name, a):
         r = qa.page_meta(a["id"])
     elif name == "page_fixture":
         r = qa.page_fixture(a.get("id", "weekly-update"))
-    elif name == "list_scenes":
-        sc, _ = qa.all_scenes()
-        r = [{"id": s["id"], "spec": s["spec"], "label": s["label"]} for s in sc]
-    elif name == "play":
-        r = qa.play(a["events"], a.get("shots", []), a.get("name", "play"), a.get("backdrop"))
     elif name == "ask":
         full = qa.ask(a["texts"], a.get("capsule", True) is not False, int(a.get("timeout") or 600))
         r = {"report": full["report"], "file": full["file"], "asks": full["asks"]}
@@ -226,20 +104,8 @@ def run(name, a):
         r = qa.tick(int(a.get("n") or 1))
     elif name == "outbox":
         r = qa.outbox()
-    elif name == "reset":
-        r = qa.reset()
-    elif name == "menubar":
-        r = qa.menubar(a.get("states"), int(a.get("frames") or 1), int(a.get("count") or 2))
-        if r.get("sheet"):
-            images.append(r["sheet"])
-    elif name == "pearl":
-        r = qa.pearl()
-    elif name == "menu":
-        r = qa.menu()
-    elif name == "menu_click":
-        r = qa.menu_click(a["kind"], a.get("ref"))
     elif name == "run":
-        full = qa.run(a["scenario"], bool(a.get("headless")), int(a.get("timeout") or 900), bool(a.get("keep")), require=a.get("require"))
+        full = qa.run(a["scenario"], int(a.get("timeout") or 900), bool(a.get("keep")), require=a.get("require"))
         r = {"report": full["report"], "dir": full["dir"], "fails": full["fails"], "t": full["t"]}
     else:
         raise qa.QAError("unknown tool %s" % name)
@@ -275,7 +141,7 @@ def main():
             continue   # a notification (initialized, cancelled)
         if method == "initialize":
             reply(id_, {"protocolVersion": msg.get("params", {}).get("protocolVersion", "2025-06-18"),
-                        "capabilities": {"tools": {}}, "serverInfo": {"name": "ambient-qa", "version": "0.1.0"}})
+                        "capabilities": {"tools": {}}, "serverInfo": {"name": "ambient-qa", "version": "0.2.0"}})
         elif method == "ping":
             reply(id_, {})
         elif method == "tools/list":

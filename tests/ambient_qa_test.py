@@ -1,17 +1,11 @@
-"""plugins/ambient-qa: the QA plugin of bise ambient.app.
+"""plugins/ambient-qa: bise's QA plugin for the throwaway world (no app).
 
-Offline (default, no app, no hub): the manifest, the MCP server's
-handshake and tools, the scenes built from apps/ambient/web/fakecore.js
-(every SPEC §2 state covered), the shot times, and the socket client
-against a fake QA socket (ids, errors).
+Offline (no hub, no app): the manifest, the MCP server's handshake and
+tools, the fake accounts, the scenarios' truths and page laws, the world's
+fixtures and guards. The desktop app's own checks live in
+apps/desktop/tests (they call qa.py world up|down|state|say).
 
---live: the real app in QA mode on a throwaway hub (never the mic, the
-speaker, the user's screen or real main): launch, a scene with its
-contact sheet, the voice loop (hold fn -> words -> send -> main answers ->
-spoken), a fn + key, then stop. It starts the app: run it by hand, never
-from the gate (docs/ambient-app.md §7).
-
-Run: python3 -u tests/ambient_qa_test.py [--live]
+Run: python3 -u tests/ambient_qa_test.py
 """
 import datetime
 import json
@@ -29,8 +23,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN = os.path.join(HERE, "..", "plugins", "ambient-qa")
 sys.path.insert(0, PLUGIN)
 import qa  # noqa: E402
-sys.path.insert(0, HERE)
-import wait  # noqa: E402
 sys.path.insert(0, os.path.join(PLUGIN, "fake-accounts"))
 import fake_accounts as fake  # noqa: E402
 
@@ -38,7 +30,6 @@ import fake_accounts as fake  # noqa: E402
 def iso_now():
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-SPEC_STATES = {"idle", "hold fn", "let go", "main speaks", "end of turn", "needs you", "answered", "done", "failed"}
 failures = []
 
 
@@ -82,47 +73,19 @@ def server_handshake():
     r = mcp({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}},
             {"jsonrpc": "2.0", "method": "notifications/initialized"},
             {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
-            {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "state", "arguments": {}}},
+            {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "nope", "arguments": {}}},
             {"jsonrpc": "2.0", "id": 4, "method": "nope"})
     check([m["id"] for m in r] == [1, 2, 3, 4], r)
     check(r[0]["result"]["serverInfo"]["name"] == "ambient-qa", r[0])
     names = {t["name"] for t in r[1]["result"]["tools"]}
-    want = {"launch", "stop", "inject", "fn", "key", "say", "snapshot", "state", "events", "scenes", "play", "reset", "list_scenes"}
+    want = {"launch", "stop", "world", "page_publish", "page_notes", "page_drive", "page_meta", "outbox", "ask", "tick", "run"}
     check(want <= names, names)
+    gone = {"inject", "fn", "key", "say", "snapshot", "state", "events", "scenes", "play", "reset", "list_scenes"}
+    check(not (gone & names), "the Swift app's tools are gone: %r" % (gone & names))
     for t in r[1]["result"]["tools"]:
         check(t["inputSchema"]["type"] == "object", t)
-    check(r[2]["result"]["isError"] and "isn't running" in r[2]["result"]["content"][0]["text"], r[2])
+    check(r[2]["result"]["isError"] or "error" in r[2], r[2])
     check(r[3]["error"]["code"] == -32601, r[3])
-
-
-@test
-def scenes_cover_spec():
-    """the scenes (fakecore.js + extras) cover every SPEC §2 state and ambient's list"""
-    sc, respond = qa.all_scenes()
-    ids = [s["id"] for s in sc]
-    check(len(ids) == len(set(ids)), "unique ids")
-    covered = set().union(*(set(s["spec"]) for s in sc))
-    check(SPEC_STATES <= covered, SPEC_STATES - covered)
-    for need in ("idle-0", "idle-1", "idle", "needs-noopt", "needs-2", "spot", "spot-text", "agents-5", "agents-15", "hide", "hub", "still",
-                 "perm", "perm-denied", "perm-mic-ask", "perm-mic-denied", "perm-screen-ask", "perm-screen-denied"):
-        check(need in ids, need)
-    for s in sc:
-        check(all(isinstance(e[0], (int, float)) and "ev" in e[1] for e in s["events"]), s["id"])
-    check({"answer", "send", "hush", "cut_in", "talk_cancel"} <= set(respond), respond.keys())
-    check(any("$text" in json.dumps(e) for e in respond["send"]), "send echoes the text")
-
-
-@test
-def shot_times_rule():
-    """shots: after each moment, merged when close, the end included, capped"""
-    evs = [[0, {"ev": "hub", "up": True}], [0, {"ev": "state", "agents": [], "cards": []}],
-           [100, {"ev": "level", "v": 0.3}], [2000, {"ev": "phase", "phase": "working"}], [2300, {"ev": "main", "text": "x"}]]
-    t = qa.shot_times(evs)
-    check(t == [600, 2900, 3500], t)
-    many = [[i * 1000, {"ev": "phase", "phase": "working"}] for i in range(30)]
-    t = qa.shot_times(many, cap=8)
-    check(len(t) == 8 and t[0] == 600 and t[-1] == 29000 + 1200, t)
-    check(qa.shot_times([]) == [1200], "an empty scene: one shot")
 
 
 @test
@@ -499,43 +462,8 @@ def launch_watch_cards_may_be_a_teammates_question():
 
 
 @test
-def a_ghost_glass_is_blur_with_no_glass_drawn():
-    """scenes: a shot whose app blurs a glass rect while the page draws none (or at opacity ~0) is a ghost glass; a hidden panel or a drawn glass is not"""
-    check(qa.ghost_glass({"panel_visible": True, "app": [80, 28, 700, 68]}), "no page glass")
-    check(qa.ghost_glass({"panel_visible": True, "app": [80, 28, 700, 68], "rect": [80, 28, 700, 68], "opacity": 0.01}), "opacity 0")
-    check(not qa.ghost_glass({"panel_visible": True, "app": [80, 28, 700, 68], "rect": [80, 28, 700, 68], "opacity": 1}), "drawn")
-    check(not qa.ghost_glass({"panel_visible": False, "app": [80, 28, 700, 68]}), "hidden")
-    check(not qa.ghost_glass({}), "no record")
-
-
-@test
-def eval_reads_the_page_and_lets_fn_go():
-    """eval: the page's value comes back JSON parsed; with fn held, fn goes down before the read and is cancelled after it, even when the read fails"""
-    seen, real = [], qa.call
-
-    def fake(op, timeout=30.0, **kw):
-        seen.append((op, kw.get("state")))
-        if op == "eval" and kw["js"] == "boom":
-            raise qa.QAError("eval failed")
-        return {"value": '{"w": "26px"}', "visible": True} if op == "eval" else {}
-    qa.call = fake
-    try:
-        r = qa.eval_js("x", fn_held=True, settle_s=0)
-        check(r["value"] == {"w": "26px"} and r["fn_held"], "parsed: %r" % r)
-        check(seen == [("fn", "down"), ("eval", None), ("fn", "cancel")], "order: %r" % seen)
-        seen.clear()
-        try:
-            qa.eval_js("boom", fn_held=True, settle_s=0)
-        except qa.QAError:
-            pass
-        check(seen[-1] == ("fn", "cancel"), "fn let go after a failed read: %r" % seen)
-    finally:
-        qa.call = real
-
-
-@test
-def real_harness_hub_finds_its_hub_by_his_rules():
-    """qa.py real: the hub's env gets the isolated HOME and none of the overrides that would tell it where its state is; the home has ~/.bise/migrated.json like his Mac; the sockets fit"""
+def real_home_env_finds_its_hub_by_his_rules():
+    """a throwaway home's hub env (world.py): the isolated HOME and none of the overrides that would tell it where its state is; the home has ~/.bise/migrated.json like his Mac"""
     home = tempfile.mkdtemp(prefix="rh-")
     his_bin = os.path.expanduser("~/.bise/hubs/harness-1/bin")
     env = {"SB_STATE_DIR": "/x", "BEND_SESSIONS_DIR": "/y", "BISE_HOME": "/z", "BISE_EXPORTS_FOR": "s", "BEND_PROVIDER_URL": "http://f",
@@ -546,72 +474,7 @@ def real_harness_hub_finds_its_hub_by_his_rules():
                   "TMPDIR": t, "TMP": t, "TEMP": t, "TMUX_TMPDIR": t, "PATH": "/usr/bin:/bin"},
           "env: his run dir, an agent's tmp and his hub's bin never reach a throwaway hub: %r" % env)
     check(os.path.exists(os.path.join(home, ".bise", "migrated.json")), "migrated.json")
-    # <home>/.bise/hubs/<name>-<16 hex>/hub.sock under the 104-byte unix socket limit
-    check(len(os.path.join(qa.REAL_HOME, ".bise", "hubs", "ws-" + "0" * 16, "hub.sock")) < 100, "hub socket path too long: %s" % qa.REAL_HOME)
-    check(len(qa.REAL_SOCK) < 100, "test socket path too long")
-    try:
-        qa._bundle_exe(os.path.join(home, "none.app"))
-        check(False, "a missing app must be refused")
-    except qa.QAError:
-        pass
     shutil.rmtree(home, ignore_errors=True)
-
-
-@test
-def real_harness_stays_out_of_his_face_and_his_state():
-    """qa.py real: a window sharing any area with a screen is caught, one at -30000 is not; a launch whose args or env reach his hubs, his app's dev dir or his home workspace is refused; a display shot is refused"""
-    scr = [{"id": 1, "x": 0, "y": 0, "w": 1512, "h": 982}]
-    check(qa._touches({"x": 500, "y": 900, "w": 844, "h": 224}, scr) == [1], "a panel on his screen")
-    check(qa._touches({"x": -30000, "y": -30000, "w": 844, "h": 224}, scr) == [], "off every screen")
-    check(qa._touches({"x": 1512, "y": 0, "w": 10, "h": 10}, scr) == [], "edge only")
-    for bad in (["x", "--workspace", os.path.expanduser("~/bise")], ["x", "--dev", os.path.expanduser("~/.bise/dev")+"/ambient"]):
-        try:
-            qa._real_guard(bad, {})
-            check(False, "refused: %r" % bad)
-        except qa.QAError:
-            pass
-    try:
-        qa._real_guard(["x"], {"SB_STATE_DIR": os.path.expanduser("~/.bise/hubs/harness-1")})
-        check(False, "refused: his hub in env")
-    except qa.QAError:
-        pass
-    qa._real_guard(["x", "--bise", os.path.expanduser("~/.bise/dev/build/ambient/target/debug/bise")], {"HOME": qa.REAL_HOME})
-    real, call = qa.real_alive, qa.real_call
-    qa.real_alive = lambda: {"ops": ["shot", "state", "win_open"]}
-    qa.real_call = lambda op, timeout=30, **kw: {"op": op, **kw}
-    try:
-        try:
-            qa.real_op("shot", window="display")
-            check(False, "a display shot must be refused")
-        except qa.QAError:
-            pass
-        # bise desktop's window (S4): its web view's own snapshot is a shot like the panels'
-        check(qa.real_op("shot", what="win") == {"op": "shot", "what": "win"}, "a shot of the window")
-        check(qa.real_win("open", route="bise")["reply"] == {"op": "win_open", "route": "bise"}, "win open with a route")
-        try:
-            qa.real_win("deeplink")
-            check(False, "a deeplink with no route or open must be refused")
-        except qa.QAError:
-            pass
-    finally:
-        qa.real_alive, qa.real_call = real, call
-
-
-@test
-def t1_report_is_one_line_per_step():
-    """qa.py real t1: the report has the proof line, one verdict line per step and the pass count"""
-    import t1
-    r = t1.Run.__new__(t1.Run)
-    r.out = tempfile.mkdtemp(prefix="t1-")
-    r.R = {"started": "now", "launch": {"web": "abc1234", "pid": 1}, "front_start": {"name": "Chrome"}, "front_end": {"name": "Chrome"},
-           "violations": [], "stop": {"app": "stopped pid 1"},
-           "steps": [{"n": 1, "name": "pearl", "verdict": "pass", "why": "window up", "s": 1.0},
-                     {"n": 2, "name": "⌘0", "verdict": "fail", "why": "no window", "s": 2.0}]}
-    txt = r.report()
-    lines = txt.splitlines()
-    check(lines[1].startswith("proof: front Chrome -> Chrome"), lines[1])
-    check(lines[3].startswith("PASS  1 pearl") and lines[4].startswith("FAIL  2 ⌘0"), lines[3:5])
-    check("1/2 pass" in txt and os.path.exists(os.path.join(r.out, "report.txt")), txt)
 
 
 @test
@@ -734,75 +597,6 @@ def world_fixtures_seed_every_desktop_shape():
 
 
 @test
-def key_specs_become_key_events():
-    """keys: names, modifiers and typed text become the keys op's key codes and flags"""
-    seq = qa.key_seq(["cmd+return", "up", "⌘2", "esc", "type:hi you"])
-    check(seq[:4] == [{"code": 36, "flags": ["cmd"]}, {"code": 126, "flags": []}, {"code": 19, "flags": ["cmd"]}, {"code": 53, "flags": []}], seq)
-    check([k["text"] for k in seq[4:]] == list("hi you") and seq[6]["code"] == 49, seq[4:])
-    try:
-        qa.key_seq(["hyper+q"])
-        check(False, "an unknown modifier passed")
-    except qa.QAError:
-        pass
-
-
-@test
-def fn_hold_closed_on_a_fake_app():
-    """fn-hold-closed: the pearl listening in time, the words to the core and main's line pass; an app that never listens, and a tap that opens the capsule, fail"""
-    class App:
-        def __init__(self, listens=True, tap_opens=False):
-            self.listens, self.tap_opens = listens, tap_opens
-            self.visible = self.listening = False
-            self.ev, self.t, self.down = [], 0.0, None
-
-        def log(self, d, ev):
-            self.t += 1
-            self.ev.append({"t": self.t, "dir": d, "ev": ev})
-
-        def keyev(self, kind, code=None, fn=False, words=None, per_word_ms=None):
-            if kind == "fn_down":
-                self.down, self.words = time.time(), words
-                if self.listens and words:
-                    self.visible = self.listening = True
-                    self.log("app>core(qa)", {"cmd": "talk_start"})
-                elif self.tap_opens:
-                    self.visible = True
-            elif kind == "down" and code == qa.KEY_SPACE:
-                self.visible = True
-            elif kind == "down" and code == qa.KEY_DOT:
-                self.visible = False
-            elif kind == "fn_up" and self.listening:
-                self.listening = self.visible = False
-                self.log("app>core", {"cmd": "send", "text": self.words})
-                self.log("core>app", {"ev": "main", "text": "ack: " + self.words})
-            return {"swallowed": True}
-
-        def rest(self):
-            self.visible = self.listening = False
-            return {}
-
-        def state(self):
-            return {"app": {"visible": self.visible, "listening": self.listening, "hidden": not self.visible}}
-
-        def events(self, n, levels):
-            return {"events": self.ev[-n:]}
-
-    names = ("keyev", "rest", "state", "events")
-    saved = {k: getattr(qa, k) for k in names}
-    try:
-        for app, ok in ((App(), True), (App(listens=False), False), (App(tap_opens=True), False)):
-            for k in names:
-                setattr(qa, k, getattr(app, k))
-            r = qa.fn_hold_closed(variants=("launch", "hide"), per_word_ms=10, answer_s=2)
-            check((r["verdict"] == "pass") == ok, r)
-            if ok:
-                check(all(v["listening_ms"] is not None and v["sent"] and v["main"] for v in r["variants"]), r)
-    finally:
-        for k, f in saved.items():
-            setattr(qa, k, f)
-
-
-@test
 def a_term_stops_a_run_like_ctrl_c():
     """kill <run pid> raises KeyboardInterrupt in the run, so its finally clauses stop its hub"""
     try:
@@ -833,25 +627,6 @@ def failed_run_keeps_hub_state():
     out = qa.keep_hub_state(st, os.path.join(d, "kept"))
     got = sorted(os.path.relpath(os.path.join(dp, n), out) for dp, _, fs in os.walk(out) for n in fs)
     check(got == ["agents/main/transcript.log", "agents/main/wire.log", "hub.log", "journal.jsonl"], got)
-
-
-@test
-def capsule_timeline_of_a_spoken_ask():
-    """run --voice: the capsule's lines from the QA log, timed from fn held"""
-    evs = [{"t": 9.0, "dir": "qa>app", "ev": {"ev": "app_size"}},
-           {"t": 10.0, "dir": "app>core(qa)", "ev": {"cmd": "talk_start"}},
-           {"t": 12.5, "dir": "app>core", "ev": {"cmd": "send", "text": "draft my weekly update"}},
-           {"t": 12.9, "dir": "core>app", "ev": {"ev": "phase", "phase": "thinking"}},
-           {"t": 14.0, "dir": "page>app", "ev": {"cmd": "app_content", "kind": "line", "text": "got it"}},
-           {"t": 31.0, "dir": "core>app", "ev": {"ev": "main", "text": "weekly update is on it."}}]
-    tl = qa.capsule_timeline(evs)
-    check([k["at"] for k in tl] == [0.0, 2.5, 2.9, 4.0, 21.0] and tl[1]["what"] == "send: draft my weekly update"
-          and tl[3]["what"].startswith("shows: line") and tl[4]["what"] == "main: weekly update is on it.", tl)
-    try:
-        qa._run("weekly-update", qa.SCENARIOS["weekly-update"], True, 10, False, None, None, voice=True)
-        check(False, "--voice --headless ran")
-    except qa.QAError as e:
-        check("--app" in str(e), e)
 
 
 @test
@@ -980,7 +755,7 @@ def one_run_at_a_time():
         with open(lock, "w") as f:
             json.dump({"pid": p.pid, "scenario": "launch-watch", "at": "01:00:00"}, f)
         try:
-            qa.run("checklist", headless=True)
+            qa.run("checklist")
             check(False, "a second run started")
         except qa.QAError as e:
             check("a run is live" in str(e) and "launch-watch" in str(e), e)
@@ -1026,78 +801,6 @@ def http_retries_a_reset():
     srv.close()
 
 
-@test
-def client_protocol():
-    """the socket client: one JSON line each way, ids matched, errors raised"""
-    d = tempfile.mkdtemp(prefix="aq-", dir="/tmp" if len(tempfile.gettempdir()) > 60 else None)
-    path = os.path.join(d, "qa.sock")
-    srv = socket.socket(socket.AF_UNIX)
-    srv.bind(path)
-    srv.listen(1)
-
-    def serve():
-        c, _ = srv.accept()
-        f = c.makefile("rb")
-        for line in f:
-            q = json.loads(line)
-            # a stale reply first: the client must skip it
-            c.sendall((json.dumps({"id": -1, "ok": True}) + "\n").encode())
-            r = {"id": q["id"], "ok": q["op"] != "bad", "echo": q}
-            if q["op"] == "bad":
-                r["error"] = "unknown op bad"
-            c.sendall((json.dumps(r) + "\n").encode())
-    threading.Thread(target=serve, daemon=True).start()
-    cl = qa.Client(path)
-    r = cl.call("inject", ev={"ev": "phase", "phase": "idle"})
-    check(r["echo"]["ev"]["phase"] == "idle" and "id" not in r and "ok" not in r, r)
-    try:
-        cl.call("bad")
-        check(False, "no error")
-    except qa.QAError as e:
-        check("unknown op bad" in str(e), e)
-    cl.close()
-    try:
-        qa.Client(os.path.join(d, "none.sock"))
-        check(False, "no error for a missing socket")
-    except qa.QAError as e:
-        check("launch() first" in str(e), e)
-
-
-def live():
-    """the real app on a throwaway hub"""
-    r = qa.launch("fake", restart=True)
-    check(r["hub_up"], "the fake hub is up in the app: %r" % r)
-    try:
-        st = qa.state()
-        check(st["app"]["mode"] == "fake" and st["model"]["hub"]["up"], st["app"])
-        out = tempfile.mkdtemp(prefix="aq-live-")
-        sc = qa.scenes(["idle", "needs"], ["dark"], out=out)
-        check(len(sc["sheets"]) == 2 and all(os.path.getsize(p) > 10000 for p in sc["sheets"]), sc["sheets"])
-        shots = [s for x in sc["scenes"] for s in x["shots"]]
-        check(all(os.path.exists(s["panel"]) and os.path.exists(s["screen"]) for s in shots), shots)
-        print("ok   scenes: %s" % sc["sheets"][0])
-        s = qa.say("dark mode for the settings page")
-        check(s.get("main") == "ack: dark mode for the settings page", s)
-        evs = qa.events(400)["events"]
-        sent = [e for e in evs if e["dir"] == "app>core" and e["ev"].get("cmd") == "send"]
-        check(sent and sent[-1]["ev"]["text"] == "dark mode for the settings page", "the words went to the core")
-        check(not any(e["ev"].get("cmd") == "talk_start" and e["dir"] == "app>core" for e in evs), "talk_start never reached the core")
-        check(any(e["ev"].get("ev") == "phase" and e["ev"].get("phase") == "speaking" for e in evs), "spoken")
-        print("ok   say: main answered %r" % s["main"])
-        qa.inject({"ev": "state", "agents": [], "cards": [{"id": "c1", "kind": "question", "agent": "cookies", "text": "keep it?",
-                                                            "options": [{"n": 1, "label": "yes"}, {"n": 2, "label": "no"}]}]})
-        wait.until(lambda: "keep it?" in json.dumps(qa.state()), 10, "the injected card on the page")
-        qa.key("1")
-        # the page answers through its message handler, a beat later
-        wait.until(lambda: any(e["ev"].get("cmd") == "answer" and e["dir"] == "app>core" and e["ev"].get("reply") == "1"
-                               for e in qa.events(60)["events"]), 3, "fn + 1 answered the card")
-        print("ok   fn + 1 answers a card")
-    finally:
-        qa.stop()
-
-
 if __name__ == "__main__":
-    if "--live" in sys.argv:
-        test(live)
     print("%d failed" % len(failures) if failures else "all ambient-qa tests pass")
     sys.exit(1 if failures else 0)

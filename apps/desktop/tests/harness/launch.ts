@@ -1,9 +1,9 @@
 // Launching the app under test, always out of his sight, with the proof step first and a watch
 // for the whole run.
-//   launchOld('window' | 'capsule')  TODAY's old web UI (apps/ambient/web) on its fake cores,
-//                                    in the harness's own Electron main (oldapp/main.js);
-//   launchDesktop()                  the new app (apps/desktop, built to out/), BISE_DESKTOP_TEST=1.
-// Both give the same Session, so a check moves from the old app to the new by one line.
+//   launchDesktop()     the app (apps/desktop, built to out/), BISE_DESKTOP_TEST=1;
+//   launchPage(file)    any local HTML file in the harness's own Electron main (pageapp/main.js):
+//                       the harness's self-tests run its detectors on fixtures/.
+// Both give the same Session.
 // Every launch: a throwaway userData folder, the harness's background-app Electron (electron.ts),
 // focus emulation on (the caret is drawn in a window that is never focused), the window-server
 // watch (proof.ts) from the first moment: its first violation kills the app at once, and the test
@@ -15,13 +15,6 @@ import { DESKTOP_DIR, harnessElectron } from './electron';
 import type { FakeCore, FakeHelper } from './fakes/helper';
 import { adoptHome, harnessEnv, Sentinel, testHome } from './isolation';
 import { prove, Watch, watcherBinary, type Proof } from './proof';
-
-export const OLD_WEB = path.resolve(DESKTOP_DIR, '..', 'ambient', 'web');
-export const OLD_PAGES = {
-  window: path.join(OLD_WEB, 'window', 'index.html'),
-  capsule: path.join(OLD_WEB, 'index.html'),
-} as const;
-export type OldSurface = keyof typeof OLD_PAGES;
 
 export type LaunchOptions = {
   /** viewport of the window, "<w>x<h>" */
@@ -50,7 +43,7 @@ export type LaunchOptions = {
 };
 
 /**
- * Installed in the app's main process right after launch (and in oldapp/main.js before its first
+ * Installed in the app's main process right after launch (and in pageapp/main.js before its first
  * window): nothing may open a window or navigate away from the page. A file dropped on a page that
  * doesn't handle drops made Chromium open it in a new, shown window on his screen (qa-type m_9582).
  * New windows are denied, navigations the page starts are cancelled, a window created without
@@ -224,12 +217,7 @@ function reusedUserData(dir: string): string {
 export function launchPage(htmlFile: string, o: LaunchOptions = {}): Promise<Session> {
   const env: Record<string, string> = { BISE_HARNESS_PAGE: path.resolve(htmlFile) };
   if (o.size) env['BISE_HARNESS_SIZE'] = o.size;
-  return start([path.join(__dirname, 'oldapp', 'main.js')], env, o);
-}
-
-/** TODAY's old web UI: 'window' (composer, ⌘I, send) or 'capsule' (spotlight, pearl). */
-export function launchOld(surface: OldSurface, o: LaunchOptions = {}): Promise<Session> {
-  return launchPage(OLD_PAGES[surface], o);
+  return start([path.join(__dirname, 'pageapp', 'main.js')], env, o);
 }
 
 /** The new app, from its build (apps/desktop/out), in its test mode. */

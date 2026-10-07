@@ -3,8 +3,8 @@
 // query is typed: the field is never replaced, no row that stays listed is replaced (the list
 // updates row by row), rows never replay their entrance, nothing in the field's line is replaced,
 // focus and caret hold, and the caret blinks.
-// Target S: the new app's spotlight lab; SO (today's capsule) replays the red.
-// Red on today's capsule: each key goes to the core and back and rewrites the head and the list
+// Target S: the new app's spotlight lab.
+// Red on the old Swift app's capsule (deleted): each key goes to the core and back and rewrites the head and the list
 // (ui.js put('head') / put('body') with innerHTML): the field is pulled out and put back, every
 // row replays its entrance.
 import { test, expect, typeAndWatch, caretBlinks } from '../../harness';
@@ -16,7 +16,7 @@ test('spotlight/typing: field kept, rows kept, no replayed entrance, caret', asy
   await onScene(S.launchFind, async ({ page }) => {
     const field = page.locator(S.field);
     await expect(field).toBeVisible({ timeout: 5000 });
-    await page.waitForTimeout(S.settleMs); // today's scene types its own 'perf' at 0.7 s
+    await page.waitForTimeout(S.settleMs);
     await field.click();
     await page.keyboard.press('Meta+A');
     await page.keyboard.press('Backspace');

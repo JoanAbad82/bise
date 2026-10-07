@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 // show me: any screen in any state, out of his sight, as PNGs (and its frames over time).
 //   node tests/harness/showme/showme.mjs <surface> [state] [--frames <ms>] [--out <dir>] [--size <w>x<h>]
-//   surface: old-window | old-capsule | desktop | <file.html>   (state: see showme.spec.ts)
-//   e.g.  showme.mjs old-window inbox
-//         showme.mjs old-capsule talk@1500 --frames 2000
-//         showme.mjs desktop agent/storefront-5c1d/search
+//   surface: desktop | <file.html>   (state: see showme.spec.ts)
+//   e.g.  showme.mjs desktop agent/storefront-5c1d/search
+//         showme.mjs desktop inbox --frames 2000
 // Prints the folder: shot.png, meta.json, and with --frames frames/NNNN.png + frames.json.
 // The desktop surface runs apps/desktop/out: `pnpm build` first.
 import { spawnSync } from 'node:child_process';
@@ -28,7 +27,7 @@ const out = path.resolve(flag('--out') ?? mkdtempSync(path.join(os.tmpdir(), 'sh
 const size = flag('--size');
 const [surface, state] = args;
 if (!surface) {
-  console.error('usage: showme.mjs <old-window|old-capsule|desktop|file.html> [state] [--frames ms] [--out dir] [--size WxH]');
+  console.error('usage: showme.mjs <desktop|file.html> [state] [--frames ms] [--out dir] [--size WxH]');
   process.exit(2);
 }
 const ask = { surface: surface.endsWith('.html') ? path.resolve(surface) : surface, state, framesMs, out, size };

@@ -2,7 +2,7 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "ambient-qa",
   "version": "0.1.0",
-  "description": "internal QA of bise ambient.app (for ambient, ambient-pm, ambient-lead): launch the real app on a throwaway scripted hub (never the real workspace: it needs a client the user started), drive it without the user's hands (any core or app event, fn, fn + key, a fake voice that reaches the fake main), read its model and events, and take PNGs of the capsule and of the screen composite; scenes() plays every SPEC §2 state and returns a contact sheet. Never the mic, the speaker, the user's screen or the real main.",
+  "description": "internal QA of bise's product flows (for the ambient and desktop agents): throwaway hubs (scripted, or the user's model) on fake accounts, pages driven in a throwaway headless Chrome, asks to main measured, scripted product runs with a one-screen report, and bise desktop's QA world (a throwaway home with 2-3 seeded projects) that apps/desktop/tests drive. Never the real workspace (it needs a client the user started), his accounts, his browser or the real main.",
   "homepage": "https://bise.dev",
   "license": "Apache-2.0",
   "extensions": {
