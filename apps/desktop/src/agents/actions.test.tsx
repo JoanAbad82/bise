@@ -115,8 +115,17 @@ describe('the agents screen: new, rename, model, reasoning', () => {
     fireEvent.change(name, { target: { value: 'perf' } });
     fireEvent.keyDown(name, { key: 'Enter' });
     expect(cmds).toContainEqual({ cmd: 'rename', project: P, agent: 'p99', to: 'perf' });
+    // it waits for the hub: the field stays, saying so
+    expect(v.getByTestId('agents.rename.p99.wait').textContent).toBe('renaming…');
+    // refused: the hub's words in place, the field editable again, no 'renaming…'
+    act(() => {
+      store.apply({ ev: 'error', project: P, cmd: 'rename', text: 'invalid or taken name: perf' });
+    });
+    expect(v.getByTestId('agents.tune.p99.error').textContent).toBe('invalid or taken name: perf');
+    expect(v.queryByTestId('agents.rename.p99.wait')).toBeNull();
+    expect((v.getByTestId('agents.rename.p99') as HTMLInputElement).readOnly).toBe(false);
+    expect((v.getByTestId('agents.rename.p99') as HTMLInputElement).value).toBe('perf');
 
-    fireEvent.click(v.getByTestId('agents.more.p99'));
     expect((v.getByTestId('agents.model.p99') as HTMLInputElement).value).toBe('openai/gpt-5');
     expect(v.getByTestId('agents.effort.p99.medium').getAttribute('aria-checked')).toBe('true');
     fireEvent.click(v.getByTestId('agents.effort.p99.high'));
@@ -128,5 +137,29 @@ describe('the agents screen: new, rename, model, reasoning', () => {
       store.apply({ ev: 'error', project: P, cmd: 'model', text: 'no key for anthropic: /provider' });
     });
     expect(v.getByTestId('agents.tune.p99.error').textContent).toBe('no key for anthropic: /provider');
+  });
+
+  it('a rename that lands: renaming… until the agents event has the new name, then onRenamed with it (the thread follows)', async () => {
+    const { Tune } = await import('./Tune');
+    const cmds: CoreCmd[] = [];
+    const port: CorePort = { send: (c) => cmds.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
+    const store = new Store(port);
+    store.setCore('up');
+    store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('p99')] });
+    const renamed: string[] = [];
+    const v = render(
+      <StoreProvider store={store}>
+        <Tune project={P} a={ag('p99')} onRenamed={(to) => renamed.push(to)} />
+      </StoreProvider>,
+    );
+    fireEvent.change(v.getByTestId('agents.rename.p99'), { target: { value: 'perf' } });
+    fireEvent.keyDown(v.getByTestId('agents.rename.p99'), { key: 'Enter' });
+    expect(cmds).toContainEqual({ cmd: 'rename', project: P, agent: 'p99', to: 'perf' });
+    expect(renamed).toEqual([]);
+    expect(v.getByTestId('agents.rename.p99.wait')).toBeTruthy();
+    act(() => {
+      store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('perf')] });
+    });
+    expect(renamed).toEqual(['perf']);
   });
 });

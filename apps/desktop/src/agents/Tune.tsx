@@ -5,29 +5,30 @@
 // levels. The current values come from the agents row; a refusal shows its
 // words here, a change shows when the next agents event comes. And the
 // '+ new agent' sheet (A.1). Owner: amb-win.
-import { useCallback, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAgents, useCoreEvent, useStore, useWorktrees, type Ev } from '@/store';
 import { EFFORTS, hasChanges, modelChoices, nameProblem, newAgent, renameAgent, setEffort, setModel } from './actions';
 
 /** The hub's last refusal of one of `cmds` for this project, cleared by `clear`. */
-export function useRefusal(project: string, cmds: readonly string[]): { text: string | undefined; clear: () => void } {
-  const [text, setText] = useState<string | undefined>(undefined);
+export function useRefusal(project: string, cmds: readonly string[]): { text: string | undefined; cmd: string | undefined; clear: () => void } {
+  const [got, setGot] = useState<{ text: string; cmd: string } | undefined>(undefined);
   const key = cmds.join(',');
   const on = useCallback(
     (ev: Ev) => {
       if (ev.ev !== 'error' || !('cmd' in ev) || ev.cmd == null) return;
       if ('project' in ev && ev.project != null && ev.project !== project) return;
-      if (key.split(',').includes(ev.cmd)) setText(ev.text);
+      if (key.split(',').includes(ev.cmd)) setGot({ text: ev.text, cmd: ev.cmd });
     },
     [project, key],
   );
   useCoreEvent(on);
   return {
-    text,
+    text: got?.text,
+    cmd: got?.cmd,
     clear: () => {
-      setText(undefined);
+      setGot(undefined);
     },
   };
 }
@@ -41,10 +42,24 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
   const problem = name.trim() === a.name ? undefined : nameProblem(name, agents, a.name);
   const id = a.name;
 
+  // a rename waits for the hub: the field stays (and says 'renaming…') until
+  // the agents event has the new name, then onRenamed; a refusal shows its
+  // words here with the field still editable (qa-flows 5362cd43)
+  const [renaming, setRenaming] = useState<string | undefined>(undefined);
+  const refusedRename = refusal.cmd === 'rename' && refusal.text !== undefined;
+  if (renaming !== undefined && refusedRename) setRenaming(undefined);
+  const landed = renaming !== undefined && agents.some((x) => x.name === renaming) ? renaming : undefined;
+  const done = useRef(false);
+  useEffect(() => {
+    if (landed === undefined || done.current) return;
+    done.current = true;
+    onRenamed?.(landed);
+  }, [landed, onRenamed]);
+
   const rename = () => {
-    if (problem !== undefined) return;
+    if (problem !== undefined || renaming !== undefined) return;
     refusal.clear();
-    if (renameAgent(store, project, a.name, name)) onRenamed?.(name.trim());
+    if (renameAgent(store, project, a.name, name)) setRenaming(name.trim());
   };
   const onNameKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -68,13 +83,19 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
             }}
             onKeyDown={onNameKey}
             onBlur={() => {
-              if (name.trim() !== a.name && problem === undefined) rename();
+              if (name.trim() !== a.name && problem === undefined && !refusedRename) rename();
             }}
+            readOnly={renaming !== undefined}
             spellCheck={false}
             aria-invalid={problem !== undefined}
             data-testid={`agents.rename.${id}`}
           />
           {problem !== undefined && <em className="ag-why">{problem}</em>}
+          {renaming !== undefined && (
+            <em className="ag-why" data-testid={`agents.rename.${id}.wait`}>
+              renaming…
+            </em>
+          )}
         </label>
       )}
       <label className="ag-field">

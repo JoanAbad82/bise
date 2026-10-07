@@ -60,10 +60,24 @@ test('agents/tune: + new agent starts one; … renames it, sets its reasoning an
     await expect(page.getByTestId('agents.tune.p99.error'), 'the refusal in place').toHaveText('no key for anthropic yet: /provider');
     await page.screenshot({ path: test.info().outputPath('tune.png') });
 
-    // rename inline
+    // rename inline: it waits for the hub; refused, the hub's words in place and the field still
+    // editable (qa-flows 5362cd43); accepted, the tune closes when the agents event has the name
     await page.getByTestId('agents.rename.p99').fill('perf');
     await page.getByTestId('agents.rename.p99').press('Enter');
     expect(await core.waitCmd((c) => c.cmd === 'rename', 5000)).toMatchObject({ cmd: 'rename', project: HOME, agent: 'p99', to: 'perf' });
+    await expect(page.getByTestId('agents.rename.p99.wait'), 'it says it waits for the hub').toHaveText('renaming…');
+    await core.send({ ev: 'error', project: HOME, cmd: 'rename', text: 'invalid or taken name: perf' } as unknown as Ev);
+    await expect(page.getByTestId('agents.tune.p99.error'), 'the refused rename shows its words in place').toHaveText('invalid or taken name: perf');
+    await expect(page.getByTestId('agents.rename.p99.wait')).toHaveCount(0);
+    await expect(page.getByTestId('agents.rename.p99'), 'the field stays, editable').toBeEditable();
+    await page.screenshot({ path: test.info().outputPath('rename-refused.png') });
+    await page.getByTestId('agents.rename.p99').fill('speed');
+    await page.getByTestId('agents.rename.p99').press('Enter');
+    await expect.poll(() => core.cmds().filter((c) => c.cmd === 'rename').length, { message: 'a second rename goes out' }).toBe(2);
+    expect(core.cmds().filter((c) => c.cmd === 'rename').at(-1)).toMatchObject({ agent: 'p99', to: 'speed' });
+    await core.send({ ev: 'agents', project: HOME, agents: [agent('main'), agent('speed', { model: 'openai/gpt-5', effort: 'high' }), agent('cart', { status: 'working' })] } as unknown as Ev);
+    await expect(page.getByTestId('agents.row.speed'), 'the renamed row').toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('agents.tune.p99'), 'the tune is gone with the old name').toHaveCount(0);
   } finally {
     await s.close();
     helper.dispose();
