@@ -3,7 +3,7 @@
 // landing with its sha (a click opens that commit), the logo artifact as a card, main's answer
 // for docs with its why, and perf's message to docs named 'perf → docs'; perf's thread shows its
 // PR's failing checks with the ▲ mark (never color alone) and his 'no' to an approval with his
-// note. Owner: amb-win.
+// note, and the scheduled task's ◷ lines (batch 3b, pos 33-34) with its words under the set one. Owner: amb-win.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
 const P = 'acme-1a2b3c4d';
@@ -32,6 +32,13 @@ test('thread/news-rows: landed, PR news, artifact, answered, approval and agent-
     const ap = page.getByTestId('thread.approval.31');
     await expect(ap).toContainText('you said no to perf: rm -rf target');
     await expect(ap).toContainText('not that');
+    // batch 3b (6e9d68f8): the scheduled task's ◷ lines, its words open under the set one
+    const sched = page.getByTestId('thread.scheduled.33');
+    await expect(sched).toContainText('◷');
+    await expect(sched).toContainText('main scheduled #48 for perf · every 2m · 6 times · next 14:22');
+    await page.getByTestId('thread.scheduled.33.head').click();
+    await expect(page.getByTestId('thread.scheduled.33.words')).toHaveText('check the build');
+    await expect(page.getByTestId('thread.scheduled.34')).toContainText('scheduled #48 ended · stopped by you');
     await page.screenshot({ path: test.info().outputPath('perf.png') });
   } finally {
     await s.close();

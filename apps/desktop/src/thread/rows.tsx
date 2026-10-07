@@ -106,6 +106,9 @@ function EntryBody({ e, ctx }: { e: Entry; ctx: RowCtx }) {
       return <AnsweredRow e={e} />;
     case 'approval':
       return <ApprovalRow e={e} />;
+    // batch 3b (6e9d68f8): a scheduled task's ◷ line
+    case 'scheduled':
+      return <ScheduledRow e={e} />;
     case 'unknown':
       // a kind from a newer hub: its words, plain and dim
       return (
@@ -254,6 +257,42 @@ function ThinkingLine({ pos, head, body }: { pos: number; head: string; body: st
 }
 
 /** The summary its context was compacted to: one folded line. */
+/**
+ * A scheduled task (sb every) set, run or ended, as the TUI's faint '◷ head ▸' row (wire.rs
+ * Scheduled): the head is the hub's words as sent; the words it sends open under it (none: no ▸).
+ */
+function ScheduledRow({ e }: { e: Entry }) {
+  const [open, setOpen] = useFold();
+  const s = e.scheduled;
+  const head = s?.head ?? e.text;
+  const words = s?.words ?? '';
+  return (
+    <div className="th-sched" data-testid={`thread.scheduled.${e.pos}`} data-id={s?.id}>
+      <span className="th-news-mark" aria-hidden="true">
+        ◷
+      </span>
+      {words === '' ? (
+        <span className="th-sched-head">{head}</span>
+      ) : (
+        <Fold
+          open={open}
+          onToggle={() => {
+            setOpen((o) => !o);
+          }}
+          testId={`thread.scheduled.${e.pos}.head`}
+        >
+          {head}
+        </Fold>
+      )}
+      {open && words !== '' && (
+        <div className="th-sched-words" data-testid={`thread.scheduled.${e.pos}.words`}>
+          {words}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CompactedRow({ e }: { e: Entry }) {
   const [open, setOpen] = useFold();
   const toggle = () => {

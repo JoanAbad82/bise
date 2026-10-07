@@ -363,6 +363,24 @@
   color: var(--c-text-3);
 }
 
+/* batch 3b: a scheduled task's faint ◷ line (the TUI's wire.rs Scheduled), its words under it */
+.th-sched {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--c-text-3);
+}
+.th-sched .b-fold {
+  color: inherit;
+}
+.th-sched-words {
+  flex-basis: 100%;
+  margin: 2px 0 0 calc(1em + 8px);
+  color: var(--c-text-2);
+  white-space: pre-wrap;
+}
+
 .th-unknown {
   color: var(--c-text-2);
 }

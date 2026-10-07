@@ -231,6 +231,12 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
           {gauge}
         </span>
       )}
+      {/* voice mode on this agent (ambient's spec m_11632, amb-home m_11684) */}
+      {voice !== 'off' && (
+        <span className="th-voice" data-testid="thread.voice">
+          {' · voice mode'}
+        </span>
+      )}
     </>
   );
 

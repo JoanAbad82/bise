@@ -57,6 +57,53 @@ describe('the thread screen', () => {
     expect(cmds.slice(before)).toContainEqual({ cmd: 'unsubscribe', project: P, agent: 'perf' });
   });
 
+  it("voice mode on this agent adds ' · voice mode' to the head's subtitle, gone when it ends or is another agent's (amb-home m_11684)", () => {
+    const { store } = setup();
+    const v = render(
+      <StoreProvider store={store}>
+        <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="perf" /></RouterContext>
+      </StoreProvider>,
+    );
+    expect(v.queryByTestId('thread.voice')).toBeNull();
+    act(() => {
+      store.apply({ ev: 'voice_mode', project: P, agent: 'perf', on: true, state: 'listening' });
+    });
+    expect(v.getByTestId('thread.voice').textContent).toBe(' · voice mode');
+    act(() => {
+      store.apply({ ev: 'voice_mode', project: P, agent: 'perf', on: true, state: 'typing' });
+    });
+    expect(v.getByTestId('thread.voice')).toBeTruthy();
+    act(() => {
+      store.apply({ ev: 'voice_mode', project: P, agent: 'main', on: true, state: 'listening' });
+    });
+    expect(v.queryByTestId('thread.voice')).toBeNull();
+    act(() => {
+      store.apply({ ev: 'voice_mode', project: P, agent: 'perf', on: false, state: 'listening' });
+    });
+    expect(v.queryByTestId('thread.voice')).toBeNull();
+  });
+
+  it("batch 3b: a scheduled entry is the TUI's '◷ head ▸' row, its words open under it; an ended one has no ▸", () => {
+    const { store } = setup();
+    // fixtures pos 33-34 (6e9d68f8): set with words, then ended without
+    const v = render(
+      <StoreProvider store={store}>
+        <EntryRow ctx={ctx} pos={33} />
+        <EntryRow ctx={ctx} pos={34} />
+      </StoreProvider>,
+    );
+    const set = v.getByTestId('thread.scheduled.33');
+    expect(set.textContent).toContain('◷');
+    expect(set.textContent).toContain('main scheduled #48 for perf · every 2m · 6 times · next 14:22');
+    expect(set.dataset.id).toBe('48');
+    expect(v.queryByTestId('thread.scheduled.33.words')).toBeNull();
+    fireEvent.click(v.getByTestId('thread.scheduled.33.head'));
+    expect(v.getByTestId('thread.scheduled.33.words').textContent).toBe('check the build');
+    const ended = v.getByTestId('thread.scheduled.34');
+    expect(ended.textContent).toBe('◷scheduled #48 ended · stopped by you');
+    expect(v.queryByTestId('thread.scheduled.34.head')).toBeNull();
+  });
+
   it('⛔3: a send shows at once as his row, before any event; a failed one says so and retries', () => {
     const { store, cmds } = setup();
     const row = render(
