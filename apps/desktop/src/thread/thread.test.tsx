@@ -61,3 +61,18 @@ describe('answers in markdown', () => {
     expect(openable(undefined)).toBe(false);
   });
 });
+
+describe('his own messages keep every line he typed (qa-flows 68b4f1ea)', () => {
+  it('a newline in his words is a line break; an answer stays standard markdown; code keeps its shape', async () => {
+    const { hardBreaks } = await import('./Markdown');
+    const tree = { type: 'root', children: [{ type: 'paragraph', children: [{ type: 'text', value: 'one\ntwo\nthree' }] }, { type: 'code', value: 'a\nb' }] };
+    hardBreaks(tree);
+    expect(tree.children[0]?.children?.map((c) => c.type)).toEqual(['text', 'break', 'text', 'break', 'text']);
+    expect(tree.children[1]).toEqual({ type: 'code', value: 'a\nb' });
+    const mine = render(<Markdown text={'line 1\nline 2\nline 3'} breaks />);
+    expect(mine.container.querySelectorAll('br')).toHaveLength(2);
+    cleanup();
+    const answer = render(<Markdown text={'line 1\nline 2'} />);
+    expect(answer.container.querySelectorAll('br')).toHaveLength(0);
+  });
+});

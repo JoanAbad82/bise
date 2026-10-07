@@ -230,7 +230,7 @@ function YouRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   };
   return (
     <Msg from="you" name="you" av="y" time={clock(e.at_ms)}>
-      <Markdown text={fold === undefined || open ? e.text : fold.head} onLink={ctx.onLink} onPath={ctx.onPath} />
+      <Markdown text={fold === undefined || open ? e.text : fold.head} onLink={ctx.onLink} onPath={ctx.onPath} breaks />
       {fold !== undefined && (
         <Fold open={open} onToggle={toggle} testId={`thread.fold.${e.pos}`}>
           {open ? 'fold it' : `show all · ${String(fold.lines)} lines`}

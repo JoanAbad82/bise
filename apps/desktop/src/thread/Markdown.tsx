@@ -22,6 +22,34 @@ export function openable(href: string | undefined): href is string {
 
 const plugins = [remarkGfm];
 
+/** The bits of an mdast node the breaks plugin reads. */
+interface MdNode {
+  type: string;
+  value?: string;
+  children?: MdNode[];
+}
+
+/** Every newline in a text node becomes a line break (remark-breaks' rule): code is left as written. Pure. */
+export function hardBreaks(node: MdNode): void {
+  if (node.children === undefined) return;
+  const out: MdNode[] = [];
+  for (const c of node.children) {
+    if (c.type === 'text' && c.value !== undefined && c.value.includes('\n')) {
+      c.value.split('\n').forEach((part, i) => {
+        if (i > 0) out.push({ type: 'break' });
+        if (part !== '') out.push({ type: 'text', value: part });
+      });
+    } else {
+      hardBreaks(c);
+      out.push(c);
+    }
+  }
+  node.children = out;
+}
+
+// his messages keep every line he typed (shift+enter), as the TUI shows them (qa-flows 68b4f1ea)
+const withBreaks = [remarkGfm, () => hardBreaks];
+
 /** A code block's language from its class ('language-rust'). Pure. */
 export function langOf(className: unknown): string | undefined {
   const list = Array.isArray(className) ? className : typeof className === 'string' ? className.split(' ') : [];
@@ -35,7 +63,18 @@ export function textOf(n: { type: string; value?: unknown; children?: readonly u
   return (n.children ?? []).map((c) => textOf(c as { type: string })).join('');
 }
 
-export const Markdown = memo(function Markdown({ text, onLink, onPath }: { text: string; onLink?: (url: string) => void; onPath?: (path: string, line?: number) => void }) {
+export const Markdown = memo(function Markdown({
+  text,
+  onLink,
+  onPath,
+  breaks = false,
+}: {
+  text: string;
+  onLink?: (url: string) => void;
+  onPath?: (path: string, line?: number) => void;
+  /** every line he typed stays a line (his own messages); answers stay standard markdown */
+  breaks?: boolean;
+}) {
   const components: Components = {
     // a file path in inline code opens in his editor (tui-parity M4, B14);
     // a block's code (it ends with a newline) stays code
@@ -112,7 +151,7 @@ export const Markdown = memo(function Markdown({ text, onLink, onPath }: { text:
   };
   return (
     <div className="th-md">
-      <ReactMarkdown remarkPlugins={plugins} components={components} skipHtml>
+      <ReactMarkdown remarkPlugins={breaks ? withBreaks : plugins} components={components} skipHtml>
         {text}
       </ReactMarkdown>
     </div>
