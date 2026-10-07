@@ -8,10 +8,12 @@ import { usePrs, useStore } from '@/store';
 import type { Pr } from '@/proto';
 import { agentsOf, toneOf, wordsOf, type PrTone } from './prs';
 import './review.css';
+import { useKeptScroll } from '@/app/keep';
 
 const DOT: Record<PrTone, 'er' | 'nd' | 'wk' | 'ok' | undefined> = { err: 'er', nd: 'nd', wk: 'wk', ok: 'ok', rest: undefined };
 
 export function PrsScreen({ project }: { project: string }) {
+  useKeptScroll(`prs:${project}`, () => document.querySelector<HTMLElement>('[data-testid="prs.screen"] .rv-body'));
   const store = useStore();
   const list = usePrs(project);
 

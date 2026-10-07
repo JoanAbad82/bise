@@ -7,12 +7,14 @@ import { useEffect, useState } from 'react';
 import { Button, Empty, Head, Row, SectionHead } from '@/ds';
 import { useAgents, useCards, useFeatures, useStore } from '@/store';
 import { useRouter } from '@/app/router';
+import { useKeptScroll } from '@/app/keep';
 import { dotOf, endOf } from '@/agents/model';
 import { useNow } from '@/app/clock';
 import { cardOf, choicesOf, distance, dropAsk, stateWords } from './feature';
 import './review.css';
 
 export function FeatureScreen({ project, name }: { project: string; name: string }) {
+  useKeptScroll(`feature:${project}/${name}`, () => document.querySelector<HTMLElement>('[data-testid="feature.screen"] .rv-body'));
   const store = useStore();
   const router = useRouter();
   const features = useFeatures(project);

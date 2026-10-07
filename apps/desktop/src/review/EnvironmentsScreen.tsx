@@ -11,6 +11,7 @@ import { useRouter } from '@/app/router';
 import { dotOf } from '@/agents/model';
 import { branchEnd } from './model';
 import './review.css';
+import { useKeptScroll } from '@/app/keep';
 
 export interface Place {
   /** the worktree's path; '' the shared checkout */
@@ -44,6 +45,7 @@ export function placesOf(agents: readonly Agent[], worktrees: readonly Worktree[
 }
 
 export function EnvironmentsScreen({ project }: { project: string }) {
+  useKeptScroll(`environments:${project}`, () => document.querySelector<HTMLElement>('[data-testid="environments.screen"] .rv-body'));
   const store = useStore();
   const router = useRouter();
   const agents = useAgents(project);

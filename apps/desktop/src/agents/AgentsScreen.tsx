@@ -11,7 +11,7 @@ import type { Agent } from '@/proto';
 import { useAgents, useStore } from '@/store';
 import { useRouter } from '@/app/router';
 import { useNow } from '@/app/clock';
-import { keep } from '@/app/keep';
+import { keep, useKeptScroll } from '@/app/keep';
 import { archivedOf, dotOf, endOf, lineOf, liveOf } from './model';
 import { NewAgentSheet, Tune } from './Tune';
 import './agents.css';
@@ -37,6 +37,7 @@ export function listKey(key: string, order: readonly string[], sel: string | nul
 }
 
 export function AgentsScreen({ project, projectName }: { project: string; projectName?: string }) {
+  useKeptScroll(`agents:${project}`, () => document.querySelector<HTMLElement>('[data-testid="agents.screen"] .ag-body'));
   const agents = useAgents(project);
   const live = liveOf(agents);
   const archived = archivedOf(agents);

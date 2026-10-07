@@ -10,11 +10,13 @@ import { Button, Diff, Empty, Head, Skel } from '@/ds';
 import { useCards, useDiff, useMerged, useStore } from '@/store';
 import { clock } from '@/thread/entry';
 import { useRouter } from '@/app/router';
+import { useKeptScroll } from '@/app/keep';
 import { MAIN } from '@/app/route';
 import { fileHead, headLine, linesOf, mergeCardOf, mergedSha, totals } from './model';
 import './review.css';
 
 export function ReviewScreen({ project, agent, commit }: { project: string; agent: string; commit?: string }) {
+  useKeptScroll(`review:${project}/${agent}/${commit ?? ''}`, () => document.querySelector<HTMLElement>('[data-testid="review.files"]'));
   const store = useStore();
   const router = useRouter();
   const diff = useDiff(project, agent, commit);

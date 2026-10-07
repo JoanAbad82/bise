@@ -23,6 +23,7 @@ import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
 import { Hint, hintUsed, useHint } from './hints';
 import { folds, moreWords, projectSide, signOf } from './side';
+import { useKeptScroll } from './keep';
 
 /** His projects in his order, bise's own out (it is the bise row). Pure. */
 export function projectsOf(rows: readonly ProjectRow[]): ProjectRow[] {
@@ -103,6 +104,8 @@ function StillPearl({ pink }: { pink?: boolean }) {
 
 export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const router = useRouter();
+  // where he was in a long sidebar comes back after a reload (keep.ts)
+  useKeptScroll('sidebar', () => document.querySelector<HTMLElement>('[data-testid="app.sidebar"]'));
   const route = useRoute();
   const rows = useProjects();
   const home = rows.find((p) => p.home);

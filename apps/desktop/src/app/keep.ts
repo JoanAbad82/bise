@@ -14,7 +14,7 @@
 // Field ids, the same words as the TUI's file where they meet: 'draft:<project>/<agent>' is the
 // composer's own (src/composer/drafts.ts), 'card:<project>/<id>' a card answer, 'spot' the
 // spotlight, 'palette', 'find:<project>/<agent>', 'rename:<project>/<agent>', 'new:<project>'.
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export interface KeepStore {
   getItem(key: string): string | null;
@@ -261,6 +261,48 @@ export const keptStorage = {
     }
   },
 };
+
+/**
+ * A list's scroll kept across reloads (10 minutes, like the thread's anchor): read back when
+ * the list mounts, once its rows are tall enough (a store refill can take a few frames), and
+ * written as he scrolls; at the top nothing is kept. `el` finds the scrolling element.
+ */
+export function useKeptScroll(key: string, el: () => HTMLElement | null): void {
+  useEffect(() => {
+    const box = el();
+    if (box === null) return;
+    const k = `scroll:${key}`;
+    const want = keep.view(k);
+    let frame = 0;
+    let tries = 0;
+    let moved = false;
+    // back where he was, as soon as the rows reach that far (at most ~1 s of frames)
+    const restore = () => {
+      if (typeof want !== 'number' || moved) return;
+      if (box.scrollHeight - box.clientHeight >= want || tries > 60) {
+        box.scrollTop = want;
+        return;
+      }
+      tries += 1;
+      frame = requestAnimationFrame(restore);
+    };
+    restore();
+    const onScroll = () => {
+      moved = true;
+      keep.setView(k, box.scrollTop > 0 ? box.scrollTop : undefined, true);
+    };
+    // the restore's own scroll event is not his move
+    const arm = requestAnimationFrame(() => {
+      box.addEventListener('scroll', onScroll, { passive: true });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      cancelAnimationFrame(arm);
+      box.removeEventListener('scroll', onScroll);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per list and key
+  }, [key]);
+}
 
 /** A field's caret at the end of its text, once, when it mounts (a ref callback). */
 export function caretAtEnd(el: HTMLInputElement | HTMLTextAreaElement | null): void {

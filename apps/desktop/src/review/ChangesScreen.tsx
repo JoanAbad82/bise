@@ -10,8 +10,11 @@ import { MAIN } from '@/app/route';
 import { clock } from '@/thread/entry';
 import { branchEnd, branchesOf } from './model';
 import './review.css';
+import { useKeptScroll } from '@/app/keep';
 
 export function ChangesScreen({ project }: { project: string }) {
+  // where he was in the list comes back after a reload (keep.ts)
+  useKeptScroll(`changes:${project}`, () => document.querySelector<HTMLElement>('[data-testid="changes.screen"] .rv-body'));
   const store = useStore();
   const router = useRouter();
   const worktrees = useWorktrees(project);
