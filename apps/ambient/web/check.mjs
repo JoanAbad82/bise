@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ctx = vm.createContext({ console, Math, JSON, Object, Array, Set, Uint8Array, Float32Array, String, Number });
-for (const f of ["words.js", "face.js", "policy.js", "cards.js", "spotlist.js", "model.js", "pearl.js", "bar.js", "fakecore.js", "../kit/notelines.js", "../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
+for (const f of ["words.js", "face.js", "policy.js", "cards.js", "spotlist.js", "model.js", "pearl.js", "bar.js", "fakecore.js", "../../../kit/notelines.js", "../../../kit/notes.js"]) vm.runInContext(readFileSync(join(here, f), "utf8"), ctx, { filename: f });
 const { AmbWords: Wd, AmbFace: F, AmbModel: M, AmbFake: Fake, BiseNotes, BiseLines, AmbPearl: Pearl, AmbBar: Bar } = ctx;
 const W = Wd.W;
 
@@ -840,8 +840,8 @@ law("the pearl (SPEC §1): every mood value eases with 1 - e^(-dt/.3) (~0.9 s to
   eq(Pearl.PINK.AMBER, [0.96, 0.56, 0.64]); eq(Pearl.PINK.EMBER, [0.58, 0.46, 0.96]);
   assert.ok(Pearl.FS.includes("mist pearl"));
 });
-law("the page frame's pearl is the capsule's: apps/ambient/kit/pearl.js is byte-identical to apps/ambient/web/pearl.js", () => {
-  assert.equal(readFileSync(join(here, "../kit/pearl.js"), "utf8"), readFileSync(join(here, "pearl.js"), "utf8"), "copy web/pearl.js to kit/pearl.js");
+law("the page frame's pearl is the capsule's: kit/pearl.js is byte-identical to apps/ambient/web/pearl.js", () => {
+  assert.equal(readFileSync(join(here, "../../../kit/pearl.js"), "utf8"), readFileSync(join(here, "pearl.js"), "utf8"), "copy web/pearl.js to kit/pearl.js");
 });
 law("the pearl's mood follows the capsule: listen, speak, work, need, done, fail, away, rest", () => {
   let m = M.step(M.init(), { ev: "state", agents: [{ name: "perf", status: "working" }], cards: [], pages: [] }, 0).m;
@@ -881,7 +881,7 @@ law("the morning page (app_morning, morning-<date>): 'good morning. N things nee
   eq(M.step(m, { ev: "app_key", key: "o" }, 30).cmds, [{ cmd: "app_open_url", url: "http://127.0.0.1:47123/p/morning-0612", page: "morning-0612" }]);
 });
 
-// ---- the page's note layer (apps/ambient/kit/notes.js): anchoring, re-anchoring, the model
+// ---- the page's note layer (kit/notes.js): anchoring, re-anchoring, the model
 const N = BiseNotes.core;
 // the tests' notes count n1, n2... (the page's own ids are n + time + random)
 const counted = () => { let i = 0; return { id: () => `n${++i}` }; };

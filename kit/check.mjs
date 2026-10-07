@@ -2,7 +2,7 @@
 // order, scroll kept, bise:swapped), what changed by block hash, the components' behavior
 // (numbers in tables, question picks), and that the kit itself never writes a style. kit.js runs
 // in a vm with a small fake DOM (no browser).
-//   node apps/ambient/kit/check.mjs
+//   node kit/check.mjs
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";

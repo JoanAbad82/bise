@@ -1,5 +1,5 @@
 //! The home workspace's first run (ambient-lead m_5675, m_5796): bise
-//! ambient's `start here` page (amb-kit's apps/ambient/kit/examples/
+//! ambient's `start here` page (amb-kit's kit/examples/
 //! start-here.html) is published once, as main, so it shows in `for you`
 //! as new. A marker in the hub's state says it was done: it never comes
 //! back, not even after the user deletes the page.
@@ -13,7 +13,7 @@ pub const MARKER: &str = "start-here.published";
 
 /// The page's file in the app root.
 pub fn page_file(app_root: &Path) -> PathBuf {
-    app_root.join("apps/ambient/kit/examples/start-here.html")
+    app_root.join("kit/examples/start-here.html")
 }
 
 fn same(a: &Path, b: &Path) -> bool {
@@ -45,7 +45,7 @@ mod tests {
     fn start_here_is_due_once_on_the_home_workspace_only() {
         let t = std::env::temp_dir().join(format!("sb-first-run-{}", std::process::id()));
         let (state, home, repo, root) = (t.join("st"), t.join("bise"), t.join("repo"), t.join("app"));
-        for d in [&state, &home, &repo, &root.join("apps/ambient/kit/examples")] {
+        for d in [&state, &home, &repo, &root.join("kit/examples")] {
             std::fs::create_dir_all(d).unwrap();
         }
         // no file in the app root: nothing (and no marker, so a later run tries)

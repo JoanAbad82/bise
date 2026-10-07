@@ -276,11 +276,11 @@ def root_script(root):
     BISE_APP_ROOT, copied like scripts/versions.sh makes a version dir, so his running try never
     reads this checkout (a checkout moved or rebuilt would change the runtime under his hubs):
     repl-live and sb-core from bins.sh's cache (immutable, one per source hash), bend-jsrt (a hard
-    link to its cache file), prompts/, plugins/, apps/ambient/kit, computer-use/extension, VERSION.
+    link to its cache file), prompts/, plugins/, kit/, computer-use/extension, VERSION.
     Built in <root>.tmp, then one rename. Run from the checkout. Pure."""
     q = shlex.quote
     t = root + ".tmp"
-    return ["rm -rf %s && mkdir -p %s/rust/jsrt/target/debug %s/apps/ambient %s/computer-use" % (q(t), q(t), q(t), q(t)),
+    return ["rm -rf %s && mkdir -p %s/rust/jsrt/target/debug %s/computer-use" % (q(t), q(t), q(t)),
             "b=\"$(scripts/bins.sh path --src \"$PWD\" repl-live)\" && cp \"$b\" %s/repl-live" % q(t),
             "if [ -f bend/hub/main.bend ]; then b=\"$(scripts/bins.sh path --src \"$PWD\" sb-core)\" && cp \"$b\" %s/sb-core; fi" % q(t),
             "js=\"$(scripts/bins.sh path --src \"$PWD\" bend-jsrt)\" && { ln -f \"$js\" %s/bend-jsrt 2>/dev/null || cp -c \"$js\" %s/bend-jsrt 2>/dev/null || cp \"$js\" %s/bend-jsrt; }"
@@ -288,7 +288,7 @@ def root_script(root):
             "ln -f %s/bend-jsrt %s/rust/jsrt/target/debug/bend-jsrt" % (q(t), q(t)),
             "cp -R prompts %s/prompts" % q(t),
             "if [ -d plugins ]; then cp -R plugins %s/plugins; fi" % q(t),
-            "if [ -d apps/ambient/kit ]; then cp -R apps/ambient/kit %s/apps/ambient/kit; fi" % q(t),
+            "if [ -d kit ]; then cp -R kit %s/kit; fi" % q(t),
             "if [ -d computer-use/extension ]; then cp -R computer-use/extension %s/computer-use/extension && rm -rf %s/computer-use/extension/test; fi"
             % (q(t), q(t)),
             "printf 'id=%%s\\ncommit=%%s\\nrepo=%%s\\n' %s \"$(git rev-parse HEAD)\" \"$PWD\" > %s/VERSION" % (q(os.path.basename(root)), q(t)),

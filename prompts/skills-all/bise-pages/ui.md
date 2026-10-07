@@ -82,7 +82,7 @@ reads (tabs show every pane).
   a step that waits on the user takes `data-who="yours"` (it gets the accent).
 - `k-grid` of `k-card`s, `k-kicker`, `k-tag`, `k-big` (a number).
 
-The full example, every component: `apps/ambient/kit/examples/feature-proposal.html` in the
+The full example, every component: `kit/examples/feature-proposal.html` in the
 bise repo (copy it, keep its shape, change the words and the cells).
 
 ## Your own style, when a component is not enough

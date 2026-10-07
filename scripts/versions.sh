@@ -130,10 +130,13 @@ build_from() {
   # computer use's browser extension, read at run time from the app root
   # (a version without plugins/ had no computer use: the try of d3391ca)
   if [ -d "$src/plugins" ]; then cp -R "$src/plugins" "$tmp/plugins"; fi
-  # bise ambient's kit (kit.js, notes.js, pearl.js, the CSS): the page
-  # server serves /kit from <app root>/apps/ambient/kit (a version without
-  # it served pages with no kit)
-  if [ -d "$src/apps/ambient/kit" ]; then
+  # bise's pages kit (kit.js, notes.js, pearl.js, the CSS): the page
+  # server serves /kit from <app root>/kit (a version without it served
+  # pages with no kit); an older commit had it at apps/ambient/kit, where
+  # its own page server reads it
+  if [ -d "$src/kit" ]; then
+    cp -R "$src/kit" "$tmp/kit"
+  elif [ -d "$src/apps/ambient/kit" ]; then
     mkdir -p "$tmp/apps/ambient"; cp -R "$src/apps/ambient/kit" "$tmp/apps/ambient/kit"
   fi
   if [ -d "$src/computer-use/extension" ]; then

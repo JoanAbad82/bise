@@ -56,7 +56,7 @@ impl Shell {
     /// The page server (docs/ambient-pages.md §2.4): 127.0.0.1, a stable
     /// port per workspace; its notes come back to the loop.
     pub(super) fn start_pages(&mut self, paths: &Paths, tx: &Sender<Msg>) {
-        match crate::pages::start(&paths.state, &crate::paths::workspace_id(&paths.workspace), self.opts.app_root.join("apps/ambient/kit"), self.holds.clone()) {
+        match crate::pages::start(&paths.state, &crate::paths::workspace_id(&paths.workspace), self.opts.app_root.join("kit"), self.holds.clone()) {
             Ok(p) => {
                 let tx = std::sync::Mutex::new(tx.clone());
                 p.connect_hub(Box::new(move |m| {

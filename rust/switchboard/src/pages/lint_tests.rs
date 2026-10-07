@@ -21,12 +21,12 @@ fn has(errs: &[String], want: &str) {
     );
 }
 
-const WEEKLY: &str = include_str!("../../../../apps/ambient/kit/examples/weekly-update.html");
+const WEEKLY: &str = include_str!("../../../../kit/examples/weekly-update.html");
 
 #[test]
 fn every_example_page_passes() {
     let dir =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/ambient/kit/examples");
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../kit/examples");
     let mut n = 0;
     for f in std::fs::read_dir(&dir).unwrap() {
         let p = f.unwrap().path();

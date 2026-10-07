@@ -1281,7 +1281,7 @@ def reset():
 
 # ---------------------------------------------------------------- pages on the throwaway hub
 
-KIT_EXAMPLE = os.path.join(REPO, "apps", "ambient", "kit", "examples", "weekly-update.html")
+KIT_EXAMPLE = os.path.join(REPO, "kit", "examples", "weekly-update.html")
 
 
 def _hub():
@@ -1932,7 +1932,7 @@ COOKIE_QUESTION = """<section data-kit="heading" data-id="title">
 </section>
 """
 
-KIT_EXAMPLES = os.path.join(REPO, "apps", "ambient", "kit", "examples")
+KIT_EXAMPLES = os.path.join(REPO, "kit", "examples")
 
 
 def _seed_morning(info, timeout=600):

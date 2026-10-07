@@ -20,7 +20,7 @@ terminal touched, and it works with the TUI closed (the capsule only).
                             │ store: <state>/pages/<id>/   GET /            "for you"
                             │ lint (pages/lint.rs)         GET /p/<id>      the page (wrapped)
                             │ ev "page", state.pages       GET /p/<id>/events  SSE
-                            │                              GET /kit/*       the kit (apps/ambient/kit)
+                            │                              GET /kit/*       the kit (kit/)
                             │                              /api/p/<id>/notes, /send  (token)
                             ▼
                 ambient-core → capsule "for you", fn + o → app opens/reuses the tab
@@ -73,7 +73,7 @@ the workspace id in 47100-47899, kept in `<state>/pages.port`), in `hello` and `
 | `GET /p/<id>/v/<n>/body` | the fragment alone (live swap) |
 | `GET /p/<id>/events` | SSE, events named `version {n}`, `state {state}`, `notes {…}` (`/events`: the home list's, `pages`) |
 | `GET /p/<id>/meta` | flat: `{id, title, agent, created_ms, state, versions, url, notes}` |
-| `GET /kit/<file>` | the kit's files, from the app root's `apps/ambient/kit/` |
+| `GET /kit/<file>` | the kit's files, from the app root's `kit/` |
 | `POST /api/p/<id>/notes` | upsert/delete draft notes `{notes: [...]}` |
 | `POST /api/p/<id>/send` | the drafts become `sent`, the notes message goes to the agent (§2.6) |
 
@@ -169,7 +169,7 @@ main's prompt (`rust/switchboard/src/prompts.rs` or the prompt file it reads), p
 
 ### 3.1 Tokens by role
 
-`apps/ambient/kit/tokens.css`: CSS custom properties named by role only: `--surface-talk`,
+`kit/tokens.css`: CSS custom properties named by role only: `--surface-talk`,
 `--surface-made`, `--accent`, `--pen`, `--ink`, `--dim`, `--faint`, `--rule`, type roles
 (`--font-read`, `--font-ui`, `--font-mono`), space, `--radius`, motion. Light and dark from the
 system. The capsule's web UI moves to the same file. An identity = another tokens file + assets.
@@ -180,8 +180,8 @@ system. The capsule's web UI moves to the same file. An identity = another token
 |---|---|
 | ambient-lead | this file, `docs/ambient-app.md`, `tests/ambient_pages_e2e.py`, integration |
 | amb-core | `rust/switchboard/src/pages/` (except lint.rs), the hub/daemon/cli/core lines for pages, `rust/tui/src/ambient/**` |
-| amb-kit | `apps/ambient/kit/` (except notes.js), `rust/switchboard/src/pages/lint.rs`, `prompts/skills-all/bise-pages/`, main's rule |
-| amb-web | `apps/ambient/kit/notes.js`, `apps/ambient/web/**` ("for you", fn + o) |
+| amb-kit | `kit/` (except notes.js), `rust/switchboard/src/pages/lint.rs`, `prompts/skills-all/bise-pages/`, main's rule |
+| amb-web | `kit/notes.js`, `apps/ambient/web/**` ("for you", fn + o) |
 | amb-mac | `apps/ambient/mac/**`, `scripts/ambient.sh` |
 
 A shared file (Cargo.toml, Cargo.lock, a new dependency): ask ambient-lead. Commit with `sb land`.

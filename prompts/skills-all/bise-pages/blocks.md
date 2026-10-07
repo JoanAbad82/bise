@@ -133,7 +133,7 @@ names the block and what to do: fix it and publish again.
 </section>
 ```
 
-More examples, each passing the lint, in the bise app's `apps/ambient/kit/examples/`:
+More examples, each passing the lint, in the bise app's `kit/examples/`:
 `offsite-venues.html` (a table to choose from), `pricing-question.html` (a decision),
 `inbox-review.html` (replies to send and a mail), `inbox-writing.html` (the same at v2, while
 writing), `launch-post.html` (a Slack post), `offsite-plan.html` (venues to compare, what's left),

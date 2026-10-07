@@ -1,5 +1,5 @@
 //! A note on the lines of a ui block (page-notes; docs/ambient-pages.md
-//! §2.6, §2.7): the note layer (`apps/ambient/kit/notelines.js`) puts on
+//! §2.6, §2.7): the note layer (`kit/notelines.js`) puts on
 //! a note the rows it covers in a k-diff or a k-term, `lines: [{old?,
 //! new?, n?, text}]` (a diff's old and new numbers, or a terminal's line
 //! number), `more` (rows past the 40 it keeps) and `part` (the tab or

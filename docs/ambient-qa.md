@@ -605,7 +605,7 @@ act, not by the page's click event.
 
 This audit reads the code only, at ambient-app faeb8a47: `apps/ambient/web/bar.js` + `ui.js`
 (the bar), `apps/ambient/mac/src/StatusItem.swift` + `MenuRows.swift` + `Capsule.swift` (menu bar,
-panel) and `apps/ambient/kit/kit.js` + `notes.js` (the pages' frame). No app run. "click" = a
+panel) and `kit/kit.js` + `notes.js` (the pages' frame). No app run. "click" = a
 `data-act` button or a row that sends something. "hover" = a `:hover` style. "info" = text with
 no act, arrow cursor. The rule behind every "should": anything that shows a key or looks like a
 row does the same thing on click, and a click never does more than its key.
