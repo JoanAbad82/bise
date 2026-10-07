@@ -14,7 +14,7 @@
 import path from 'node:path';
 import { test, expect } from '../../harness';
 import { Lines } from '../native/world';
-import { hubOf, launchOn, realWorld, tui, tuiReady, worldSay, type Tui } from '../world';
+import { hubOf, launchOn, realWorld, transcriptHas, tui, tuiReady, worldSay, type Tui } from '../world';
 
 const T = {
   field: '[data-testid="composer.field"]',
@@ -95,19 +95,20 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
     await test.step('pr', async () => {
       // #412 has several news rows ('opened', then 'checks fail: e2e'): the failing one is the TUI's '↑ #412 checks fail'
       note('pr-rows', (await list.locator(T.pr).allTextContents()).map((r) => r.trim().slice(0, 120)));
-      // the list re-renders while the seeds still arrive, so a row found once can leave the DOM:
-      // every read goes through the locator again, the row scrolled into view first
+      // wait on the row's event, not a time (bar S21): the hub's own feed line for #412's failing
+      // checks ('sb pr : red : 412 : … : checks fail: e2e …' in main's transcript), then go to it
+      // as he would, with the thread's find (⌘F): only the rows near the view are drawn, and the
+      // seeds push it up the thread
+      await expect.poll(() => transcriptHas(w, 'shop', 'main', 'sb pr : red : 412'), { timeout: 60_000, message: "the hub's event: #412's checks fail" }).toBe(true);
       const row = list.locator(T.pr).filter({ hasText: '#412' }).filter({ hasText: 'checks fail' }).last();
-      // the seeds push it up the thread: only the rows near the view are drawn, so walk the list
-      // from its top down until it shows
       if ((await row.count()) === 0) {
-        const scroller = list.locator('xpath=ancestor-or-self::*[@data-testid="thread.list"]');
-        await scroller.evaluate((el) => { el.scrollTop = 0; }).catch(() => undefined);
-        await list.hover({ timeout: 5000 }).catch(() => undefined);
-        for (let i = 0; i < 40 && (await row.count()) === 0; i++) {
-          await page.mouse.wheel(0, 400);
-          await sleep(150);
-        }
+        await page.locator(T.field).first().click();
+        await page.keyboard.press('Meta+f');
+        await page.locator('[data-testid="thread.find.field"]').waitFor({ timeout: 5000 });
+        await page.keyboard.type('checks fail: e2e');
+        await page.keyboard.press('Enter');
+        await expect.soft(row, 'find brings it into view').toBeVisible({ timeout: 10_000 });
+        note('pr-find', ((await page.locator('[data-testid="thread.find.count"]').textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim());
       }
       await expect.soft(row, "#412's failing checks are a pr row").toBeVisible({ timeout: 15_000 });
       await row.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => undefined);
