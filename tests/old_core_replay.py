@@ -41,9 +41,12 @@ FIXTURE = [
     msg(3, "@bise", "main"),
     {"type": "x_replied", "hub": "home-1", "xid": 7},
     {"type": "message_settled", "id": 3},
-    # bise desktop S10: a follow and its job's end
-    {"type": "follow", "name": "perf", "on": True},
+    # bise desktop S10: a follow and its job's end; J: the follow names the
+    # hub that asked, and the end goes back to it through the outbox
+    {"type": "follow", "name": "perf", "on": True, "hub": "home-1"},
     {"type": "job_end", "name": "perf", "state": "done"},
+    {"type": "x_out", "out": {"xid": 2, "project": "home-1", "kind": "job_end", "msg": 0,
+                              "text": "{\"agent\":\"perf\",\"key\":9000,\"state\":\"done\"}", "state": "pending", "tries": 0}},
 ]
 NEW = [i for i, e in enumerate(FIXTURE) if e["type"].startswith(("x_", "act_")) or e["type"] in ("follow", "job_end")]
 

@@ -585,6 +585,10 @@ impl Core {
         let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
         let ev = s("ev");
         if bise_proto::hub::HubEv::TAGS.contains(&ev.as_str()) {
+            // J: a job's end once, from whichever hub said it first
+            if !self.end_once(&v) {
+                return;
+            }
             return self.typed_ev(v);
         }
         match ev.as_str() {

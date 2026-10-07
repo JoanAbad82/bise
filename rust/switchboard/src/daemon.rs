@@ -1240,7 +1240,8 @@ impl Shell {
                 let project = self.project();
                 self.proto_route(bise_proto::hub::HubEv::Route { project, rid, to, name, text, correct_until_ms: due_ms, why })
             }
-            Effect::JobEnd { agent, state, label, summary } => self.job_end(agent, &state, label, summary),
+            Effect::JobEnd { agent, state, label, summary, key } => self.job_end(agent, &state, label, summary, key),
+            Effect::FollowedEnd { project, agent, key, state, label, summary } => self.followed_end(project, agent, key, &state, label, summary),
             Effect::MergedChanged => self.merged_all(),
             Effect::RouteAsk { rid, text } => self.route_ask(rid, text),
             Effect::RouteDone { rid, state, to, xid } => {

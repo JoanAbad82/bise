@@ -3662,19 +3662,19 @@ fn a_pending_send_goes_again_after_a_restart() {
 #[test]
 fn a_project_says_bise_message_once_and_answers_it_once() {
     let mut t = T::new();
-    let fx = t.go(Input::XIn { token: 900, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "fix the login".into() });
+    let fx = t.go(Input::XIn { token: 900, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "fix the login".into(), name: String::new() });
     assert_eq!(reply(&fx, 900).unwrap()["ok"], true, "{:?}", fx);
     let said = say_to(&fx, MAIN).expect("main hears it");
     assert!(said.contains("<user_message via=\"bise\">") && said.contains("fix the login"), "{}", said);
     // the same origin again: acked, not said again
-    let fx = t.go(Input::XIn { token: 901, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "fix the login".into() });
+    let fx = t.go(Input::XIn { token: 901, hub: "home-1".into(), xid: 7, kind: "input".into(), text: "fix the login".into(), name: String::new() });
     assert_eq!(reply(&fx, 901).unwrap()["seen"], true);
     assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none());
     // main's turn ends: its answer goes back to bise's hub
     let fx = t.turn(MAIN, "on it: sb/login");
     assert_eq!(xreplies(&fx), vec![("home-1".into(), 7, "on it: sb/login".into())]);
     // bise's own question, answered with sb send @bise --reply-to, once
-    let fx = t.go(Input::XIn { token: 902, hub: "home-1".into(), xid: 8, kind: "ask".into(), text: "status?".into() });
+    let fx = t.go(Input::XIn { token: 902, hub: "home-1".into(), xid: 8, kind: "ask".into(), text: "status?".into(), name: String::new() });
     let said = say_to(&fx, MAIN).or_else(|| steer_to(&fx, MAIN)).expect("main hears it");
     assert!(said.contains("from=\"@bise\""), "{}", said);
     let q = last_msg(&t);
@@ -3858,7 +3858,7 @@ fn report(t: &mut T, from: &str, kind: &str, summary: &str, step: Option<(u32, u
 fn a_followed_task_ends_once_and_the_follow_with_it() {
     let mut t = T::new();
     t.spawn_task("perf");
-    let (tok, fx) = t.req(MAIN, AgentReq::Follow { agent: "perf".into(), on: true });
+    let (tok, fx) = t.req(MAIN, AgentReq::Follow { agent: "perf".into(), on: true, hub: String::new() });
     assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "{:?}", fx);
     assert!(t.hub.st.agents["perf"].follow);
     let fx = report(&mut t, "perf", "progress", "bench 3 of 7", Some((3, 7)));
@@ -3890,17 +3890,92 @@ fn a_followed_task_that_fails_ends_at_once() {
     assert!(job_ends(&report(&mut t, "docs", "done", "done", None)).is_empty());
 }
 
+// J (architect m_10223), project side: a task followed for bise's home
+// hub ends once, its end (with the job's key) goes back to that hub
+// through the persisted outbox, and the follow's hub is cleared with it;
+// a follow of this hub's own main sends nothing back
+#[test]
+fn a_task_followed_for_bise_sends_its_end_back_once_through_the_outbox() {
+    let mut t = T::new();
+    t.spawn_task("perf");
+    let (tok, fx) = t.req(MAIN, AgentReq::Follow { agent: "perf".into(), on: true, hub: "home-1".into() });
+    assert_eq!(reply(&fx, tok).unwrap()["ok"], true, "{:?}", fx);
+    let fx = report(&mut t, "perf", "progress", "bench 3 of 7", Some((3, 7)));
+    assert!(job_ends(&fx).is_empty() && xdelivers(&fx).is_empty(), "progress stays quiet: {:?}", fx);
+    let fx = report(&mut t, "perf", "done", "p99 down 31%", None);
+    let key = fx
+        .iter()
+        .find_map(|e| match e {
+            Effect::JobEnd { key, .. } => Some(*key),
+            _ => None,
+        })
+        .expect("its job_end");
+    assert!(key > 0);
+    let back: Vec<(String, String, Value)> = fx
+        .iter()
+        .filter_map(|e| match e {
+            Effect::XDeliver { project, kind, text, .. } => Some((project.clone(), kind.clone(), serde_json::from_str(text).unwrap())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(back.len(), 1, "{:?}", fx);
+    let (to, kind, j) = &back[0];
+    assert_eq!((to.as_str(), kind.as_str()), ("home-1", "job_end"));
+    assert_eq!((j["agent"].as_str(), j["state"].as_str(), j["summary"].as_str(), j["key"].as_u64()), (Some("perf"), Some("done"), Some("p99 down 31%"), Some(key)));
+    // cleared with the follow: a second end goes nowhere
+    let fx = report(&mut t, "perf", "done", "again", None);
+    assert!(job_ends(&fx).is_empty() && xdelivers(&fx).is_empty(), "{:?}", fx);
+    // the entry is journaled: a restart before the home hub had it sends it again
+    let journal = t.journal.borrow().clone();
+    let mut h = Hub::new("/w");
+    h.replay(&journal);
+    let fx = h.handle(Input::Boot, &mut FakeEnv::new());
+    assert_eq!(xdelivers(&fx).len(), 1, "{:?}", fx);
+    // this hub's own main's follow: its end stays here
+    t.spawn_task("docs");
+    t.req(MAIN, AgentReq::Follow { agent: "docs".into(), on: true, hub: String::new() });
+    let fx = report(&mut t, "docs", "done", "guide rewritten", None);
+    assert_eq!(job_ends(&fx).len(), 1);
+    assert!(xdelivers(&fx).is_empty(), "{:?}", fx);
+}
+
+// J, bise's home hub: a followed task's end from a project says one line
+// in bise's main from @<project> (a message, so main wakes and tells him,
+// like a local task's end report) and fx followed_end once; a second
+// delivery of the same entry (a retry, a restart) adds nothing
+#[test]
+fn bise_hears_a_followed_task_end_once() {
+    let mut t = T::new();
+    let end = r#"{"agent":"perf","key":1791100500000,"state":"done","label":"make the e2e fast","summary":"p99 down 31%"}"#;
+    let fx = t.go(Input::XIn { token: 910, hub: "shop-5e6f7a8b".into(), xid: 4, kind: "job_end".into(), text: end.into(), name: "shop".into() });
+    assert_eq!(reply(&fx, 910).unwrap()["ok"], true, "{:?}", fx);
+    let said = say_to(&fx, MAIN).or_else(|| steer_to(&fx, MAIN)).expect("bise's main hears it");
+    assert!(said.contains("from=\"@shop\"") && said.contains("[report: done] @perf (followed): p99 down 31%"), "{}", said);
+    let ends: Vec<_> = fx
+        .iter()
+        .filter_map(|e| match e {
+            Effect::FollowedEnd { project, agent, key, state, .. } => Some((project.clone(), agent.clone(), *key, state.clone())),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(ends, vec![("shop-5e6f7a8b".to_string(), "perf".to_string(), 1791100500000, "done".to_string())]);
+    let fx = t.go(Input::XIn { token: 911, hub: "shop-5e6f7a8b".into(), xid: 4, kind: "job_end".into(), text: end.into(), name: "shop".into() });
+    assert_eq!(reply(&fx, 911).unwrap()["seen"], true);
+    assert!(say_to(&fx, MAIN).is_none() && steer_to(&fx, MAIN).is_none());
+    assert!(!fx.iter().any(|e| matches!(e, Effect::FollowedEnd { .. })), "{:?}", fx);
+}
+
 // who may follow what: main only, a task of this hub, not archived
 #[test]
 fn only_main_follows_a_live_task() {
     let mut t = T::new();
     t.spawn_task("perf");
     let err = |fx: &[Effect], tok| reply(fx, tok).unwrap()["error"].as_str().unwrap_or("").to_string();
-    let (tok, fx) = t.req("perf", AgentReq::Follow { agent: "perf".into(), on: true });
+    let (tok, fx) = t.req("perf", AgentReq::Follow { agent: "perf".into(), on: true, hub: String::new() });
     assert!(err(&fx, tok).contains("only main follows"), "{:?}", fx);
-    let (tok, fx) = t.req(MAIN, AgentReq::Follow { agent: MAIN.into(), on: true });
+    let (tok, fx) = t.req(MAIN, AgentReq::Follow { agent: MAIN.into(), on: true, hub: String::new() });
     assert!(err(&fx, tok).contains("main isn't a job"), "{:?}", fx);
-    let (tok, fx) = t.req(MAIN, AgentReq::Follow { agent: "nope".into(), on: true });
+    let (tok, fx) = t.req(MAIN, AgentReq::Follow { agent: "nope".into(), on: true, hub: String::new() });
     assert!(err(&fx, tok).contains("no agent named @nope"), "{:?}", fx);
     // the typed command's refusal is a notice to the connection that asked
     let fx = t.go(Input::Follow { client: Some(7), agent: "nope".into(), on: true });

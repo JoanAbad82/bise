@@ -163,7 +163,7 @@ def ev_names(e: M.Ev) -> List<&2, String>:
     case M.ERenamed{+name, +nn}:
       [name, nn]
     # S10: following and a job's end change the agent's row
-    case M.EFollow{+name, _}:
+    case M.EFollow{+name, _, _}:
       [name]
     case M.EJobEnd{+name, _}:
       [name]

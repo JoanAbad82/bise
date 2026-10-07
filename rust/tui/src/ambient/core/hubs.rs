@@ -34,7 +34,7 @@ use bise_home::projects::Row;
 use bise_proto::draft::{ProjectRow, ProjectView};
 use bise_proto::hub::HubEv;
 use bise_proto::rows::{Agent, Card};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 /// The registry's files are read at most this often.
 pub const POLL: Duration = Duration::from_secs(2);
@@ -111,6 +111,30 @@ pub(super) struct Hubs {
     git: BTreeMap<String, Checkout>,
     last: String,
     polled: Option<Instant>,
+    /// J: the job ends the window got, (project, agent, key), newest last
+    ends: VecDeque<(String, String, u64)>,
+}
+
+/// J: how many job ends the core remembers to drop a second copy.
+const ENDS_KEPT: usize = 64;
+
+/// J (architect m_10223): one bar line per (project, agent, key): the
+/// first of a project's own `job_end` and bise's `followed_end` of the same
+/// job goes to the window, the other is dropped. A `job_end` without a key
+/// (an older hub) always goes; anything else is not an end.
+pub fn first_end(seen: &mut VecDeque<(String, String, u64)>, ev: &HubEv) -> bool {
+    let k = match ev {
+        HubEv::JobEnd { project, agent, key: Some(key), .. } | HubEv::FollowedEnd { project, agent, key, .. } => (project.clone(), agent.clone(), *key),
+        _ => return true,
+    };
+    if seen.contains(&k) {
+        return false;
+    }
+    seen.push_back(k);
+    if seen.len() > ENDS_KEPT {
+        seen.pop_front();
+    }
+    true
 }
 
 /// The projects to hold: bise's home alone before the window says what it
@@ -167,6 +191,12 @@ impl Core {
     }
 
     /// `shown {projects}`: the projects the window shows now.
+    /// J: whether bise's home hub's typed line goes on (not the second
+    /// copy of a job end the window already has, [`first_end`]).
+    pub(super) fn end_once(&mut self, v: &Value) -> bool {
+        HubEv::from_value(v.clone()).map(|ev| first_end(&mut self.hubs.ends, &ev)).unwrap_or(true)
+    }
+
     pub(super) fn shown(&mut self, projects: Vec<String>) {
         self.hubs.shown = Some(projects);
         self.poll_projects(true);
@@ -315,6 +345,9 @@ impl Core {
                 // hub that doesn't know typed_only): never the window's
                 // (amb-win m_8886)
                 let Ok(typed) = HubEv::from_value(v.clone()) else { return };
+                if !first_end(&mut self.hubs.ends, &typed) {
+                    return;
+                }
                 match typed {
                     HubEv::Welcome { .. } => {
                         c.welcomed = true;
@@ -461,6 +494,41 @@ mod tests {
         assert!(subs.is_empty());
         assert!(!track(&mut subs, "send", "b", "main"));
         assert_eq!(ids(held(&rows, Some(&["a".into()]), &subs)), ["a", "home"]);
+    }
+
+    /// J (architect m_10223): both ends of one job arrive (shop's own
+    /// job_end, bise's followed_end), in either order: one line; another
+    /// job of the same agent is its own line; a keyless job_end always goes.
+    #[test]
+    fn a_job_end_and_its_followed_end_make_one_line() {
+        use bise_proto::hub::JobState;
+        let job = |key: Option<u64>| HubEv::JobEnd {
+            project: "shop-1".into(),
+            agent: "perf".into(),
+            state: JobState::Done,
+            label: "l".into(),
+            summary: "s".into(),
+            key,
+        };
+        let followed = |key: u64| HubEv::FollowedEnd {
+            project: "shop-1".into(),
+            agent: "perf".into(),
+            key,
+            state: JobState::Done,
+            label: "l".into(),
+            summary: "s".into(),
+        };
+        let mut seen = VecDeque::new();
+        assert!(first_end(&mut seen, &job(Some(7))));
+        assert!(!first_end(&mut seen, &followed(7)), "the second copy is dropped");
+        assert!(first_end(&mut seen, &followed(8)), "its next job: a line of its own");
+        assert!(!first_end(&mut seen, &job(Some(8))));
+        assert!(first_end(&mut seen, &job(None)) && first_end(&mut seen, &job(None)), "no key: always");
+        assert!(first_end(&mut seen, &HubEv::Typing { project: "p".into(), agent: "a".into(), text: String::new() }));
+        for k in 100..100 + ENDS_KEPT as u64 + 5 {
+            first_end(&mut seen, &followed(k));
+        }
+        assert_eq!(seen.len(), ENDS_KEPT);
     }
 
     #[test]

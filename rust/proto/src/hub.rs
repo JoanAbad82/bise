@@ -119,7 +119,24 @@ pub enum HubEv {
     /// with its job (`job_end`), so every row runs
     Jobs { project: Project, items: Vec<Job> },
     /// a followed task ended (done or failed), once: his notification
-    JobEnd { project: Project, agent: String, state: JobState, label: String, summary: String },
+    JobEnd {
+        project: Project,
+        agent: String,
+        state: JobState,
+        label: String,
+        summary: String,
+        /// draft (J): the job's key (its end's time on that hub), the same
+        /// as in bise's followed_end of it: a window shows one line per
+        /// (project, agent, key)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        key: Option<u64>,
+    },
+    /// draft (J, architect m_10223): bise's home hub heard that a task it
+    /// follows in another project ended (`project`: that project's hub
+    /// id); bise's main has its line. The window shows one line per
+    /// (project, agent, key), whichever of this and that project's own
+    /// job_end comes first
+    FollowedEnd { project: Project, agent: String, key: u64, state: JobState, label: String, summary: String },
     /// an unknown or refused command, never silence
     Error {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -134,7 +151,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "diff", "route", "route_done", "jobs", "job_end", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "worktrees", "dev_servers", "merged", "features", "diff", "route", "route_done", "jobs", "job_end", "followed_end", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)

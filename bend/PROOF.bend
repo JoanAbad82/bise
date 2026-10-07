@@ -1977,7 +1977,7 @@ def hub_apply_unique(s: HM.St, e: HM.Ev, u: HI.Unique(s), k: HX.FreshEv(s, e)) -
           u
         case HM.EAct{a}:
           u
-        case HM.EFollow{a, b}:
+        case HM.EFollow{a, b, c}:
           u
         case HM.EJobEnd{a, b}:
           u
@@ -2096,7 +2096,7 @@ def hub_apply_kept(s: HM.St, e: HM.Ev) -> HI.Kept(s, HM.apply(s, e)):
           hub_prefix_refl(HI.ids(ms))
         case HM.EAct{a}:
           hub_prefix_refl(HI.ids(ms))
-        case HM.EFollow{a, b}:
+        case HM.EFollow{a, b, c}:
           hub_prefix_refl(HI.ids(ms))
         case HM.EJobEnd{a, b}:
           hub_prefix_refl(HI.ids(ms))
@@ -2925,7 +2925,7 @@ def hub_apply_ucards(s: HM.St, e: HM.Ev, u: HI.UniqueCards(s), k: HX.FreshEv(s, 
           u
         case HM.EAct{a}:
           u
-        case HM.EFollow{a, b}:
+        case HM.EFollow{a, b, c}:
           u
         case HM.EJobEnd{a, b}:
           u
@@ -4302,10 +4302,11 @@ def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e
           u
         case HM.EAct{a}:
           u
-        case HM.EFollow{+x, +f}:
-          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OFollow{f})), HI.profile(ag), hub_prof_map(ag, x, HM.OFollow{f}, {==}), u)
+        case HM.EFollow{+x, +f, +h}:
+          +op = HM.OFollow{Bool.pick(Maybe<&2, String>, f, Some{h}, None{})}
+          hub_nok_tr(HI.profile(HM.map_agent(ag, x, op)), HI.profile(ag), hub_prof_map(ag, x, op, {==}), u)
         case HM.EJobEnd{+x, b}:
-          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OFollow{False{}})), HI.profile(ag), hub_prof_map(ag, x, HM.OFollow{False{}}, {==}), u)
+          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OFollow{None{}})), HI.profile(ag), hub_prof_map(ag, x, HM.OFollow{None{}}, {==}), u)
 
 def hub_apply_all_names(+evs: List<&2, HM.Ev>, +s: HM.St, u: HI.NamesApart(s), f: HX.Fresh(evs, s)) -> HI.NamesApart(HM.apply_all(evs, s)):
   match evs:
@@ -5259,13 +5260,26 @@ def Laws.follow_done_at_its_report(o, cx, from, summary):
 def Laws.follow_failed_at_once(o, cx, from, summary):
   {==}
 
-def Laws.follow_done_once(o, cx, name, state, summary, label):
+def Laws.follow_done_once(o, cx, name, state, summary, label, hub):
   {==}
 
 def Laws.follow_one_shot(a):
   match a:
     case HM.Agent{n, im, pa, li, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
       {==}
+
+def Laws.follow_hub_journaled(a, hub):
+  match a:
+    case HM.Agent{n, im, pa, li, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
+      {==}
+
+def Laws.follow_hub_cleared(a):
+  match a:
+    case HM.Agent{n, im, pa, li, de, al, fi, ws, di, br, cr, fa, no, rp, sn, fo}:
+      {==}
+
+def Laws.follow_end_back_only_to_who_asked(o, cx, hub, j):
+  {==}
 
 def hub_act_gone.go(c: Bool, +h: HTM.Act, +t: List<&2, HTM.Act>, +id: Nat, +e: {Nat.is_eq(HTM.Act.id(h), id) == c : Bool},
     ih: {HTM.act_find(HTM.act_drop(t, id), id) == None{} : Maybe<&2, HTM.Act>})

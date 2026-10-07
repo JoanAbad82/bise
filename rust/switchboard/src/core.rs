@@ -139,6 +139,9 @@ pub enum AgentReq {
     Follow {
         agent: String,
         on: bool,
+        /// J: the hub that asked (bise's home hub, through its xfollow op;
+        /// "" this hub's own main): the job's end goes back there
+        hub: String,
     },
     Spawn {
         name: String,
@@ -342,6 +345,7 @@ impl AgentReq {
             "follow" => AgentReq::Follow {
                 agent: jstr(v, "agent").trim_start_matches('@').to_string(),
                 on: !v.get("off").and_then(Value::as_bool).unwrap_or(false),
+                hub: String::new(),
             },
             "spawn" => AgentReq::Spawn {
                 name: jstr(v, "name"),
@@ -569,6 +573,9 @@ pub enum Input {
         xid: u64,
         kind: String,
         text: String,
+        /// the sender's project name (J: a followed task's end, kind
+        /// job_end, is said from `@<name>`; "" from bise's home hub)
+        name: String,
     },
     /// desktop S2, bise's home hub: the project hub has outbox entry `xid`.
     XAck {
@@ -851,8 +858,21 @@ pub enum Effect {
     /// feature merge writes no `landed` line).
     MergedChanged,
     /// S10: a followed task ended (done or failed), once: his notification.
+    /// `key`: the job's (its end's time here), the same in what goes back
+    /// to a hub that asked (J), so a window hearing both shows one line.
     JobEnd {
         agent: String,
+        state: String,
+        label: String,
+        summary: String,
+        key: u64,
+    },
+    /// J, bise's home hub: a task it follows in another project ended
+    /// (`project`: that hub's id); bise's main has its line already.
+    FollowedEnd {
+        project: String,
+        agent: String,
+        key: u64,
         state: String,
         label: String,
         summary: String,
@@ -2318,8 +2338,8 @@ impl Hub {
             Input::Release(c) => self.release_in(&mut fx, env, c),
             Input::SignedIn => self.signed_in(&mut fx, env),
             Input::Updated { card, version, res } => self.updated(&mut fx, env, card, &version, res),
-            Input::XIn { token, hub, xid, kind, text } => {
-                let i = json!({"t": "x_in", "token": token, "hub": hub, "xid": xid, "kind": kind, "text": text});
+            Input::XIn { token, hub, xid, kind, text, name } => {
+                let i = json!({"t": "x_in", "token": token, "hub": hub, "xid": xid, "kind": kind, "text": text, "name": name});
                 self.core(&mut fx, env, None, i)
             }
             Input::XAck { xid } => self.core(&mut fx, env, None, json!({"t": "x_ack", "xid": xid})),
@@ -2498,7 +2518,21 @@ impl Hub {
                 why: jstr(f, "why"),
             }),
             "route_ask" => fx.push(Effect::RouteAsk { rid: f["rid"].as_u64().unwrap_or(0), text: jstr(f, "text") }),
-            "job_end" => fx.push(Effect::JobEnd { agent: jstr(f, "agent"), state: jstr(f, "state"), label: jstr(f, "label"), summary: jstr(f, "summary") }),
+            "job_end" => fx.push(Effect::JobEnd {
+                agent: jstr(f, "agent"),
+                state: jstr(f, "state"),
+                label: jstr(f, "label"),
+                summary: jstr(f, "summary"),
+                key: f["key"].as_u64().unwrap_or(0),
+            }),
+            "followed_end" => fx.push(Effect::FollowedEnd {
+                project: jstr(f, "project"),
+                agent: jstr(f, "agent"),
+                key: f["key"].as_u64().unwrap_or(0),
+                state: jstr(f, "state"),
+                label: jstr(f, "label"),
+                summary: jstr(f, "summary"),
+            }),
             "route_done" => fx.push(Effect::RouteDone {
                 rid: f["rid"].as_u64().unwrap_or(0),
                 state: jstr(f, "state"),
@@ -3049,7 +3083,7 @@ impl Hub {
                 }
                 q
             }
-            AgentReq::Follow { agent, on } => json!({"cmd": "follow", "agent": agent, "off": !on}),
+            AgentReq::Follow { agent, on, hub } => json!({"cmd": "follow", "agent": agent, "off": !on, "hub": hub}),
             AgentReq::Spawn {
                 name,
                 brief,

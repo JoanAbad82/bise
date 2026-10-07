@@ -4705,12 +4705,35 @@ law follow_done_once:
   for +state: String
   for +summary: String
   for +label: String
-  {HC.job_end.go(o, False{}, cx, name, state, summary, label) == cx : HX.Cx<o>}
+  for +hub: String
+  {HC.job_end.go(o, False{}, cx, name, state, summary, label, hub) == cx : HX.Cx<o>}
 
 # LAW (architect m_9154): one job per follow: job_end turns follow off.
 law follow_one_shot:
   for +a: HM.Agent
-  {HM.Agent.follow(HM.agent_op(a, HM.OFollow{False{}})) == False{} : Bool}
+  {HM.Agent.follow(HM.agent_op(a, HM.OFollow{None{}})) == False{} : Bool}
+
+# LAW (J, architect m_10223): the hub that asked for a follow is kept
+# with it (journaled by EFollow), so its end can go back there.
+law follow_hub_journaled:
+  for +a: HM.Agent
+  for +hub: String
+  {HM.Agent.follow_hub(HM.agent_op(a, HM.OFollow{Some{hub}})) == hub : String}
+
+# LAW (J): the job's end clears it with the follow: a later end of the
+# same agent goes back nowhere.
+law follow_hub_cleared:
+  for +a: HM.Agent
+  {HM.Agent.follow_hub(HM.agent_op(a, HM.OFollow{None{}})) == "" : String}
+
+# LAW (J): an end goes back only to a hub that asked: a follow of this
+# hub's own main or window ("") puts nothing in the outbox.
+law follow_end_back_only_to_who_asked:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +hub: String
+  for +j: J.Json
+  {HC.job_end.back(o, True{}, cx, hub, j) == cx : HX.Cx<o>}
 
 # LAW (one clock): an act fires once: after its act_done, it is gone.
 law act_fires_once:

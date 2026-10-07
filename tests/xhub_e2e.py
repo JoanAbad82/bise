@@ -149,6 +149,56 @@ def main():
         r = sb_as_main(E.env, hsock, "follow", "nope/perf")
         check(r.returncode != 0 and "no project named nope" in (r.stdout + r.stderr), "follow on an unknown project: %s %s" % (r.stdout, r.stderr))
 
+        # J (architect m_10223): bise follows <p>/perf; its progress stays
+        # quiet; bise's hub is killed before perf ends; perf's end goes back
+        # through the project's outbox and lands once in bise's main, from
+        # @<p>, with the home hub's followed_end
+        pc = e2e.Client(psock)
+        pc.say('a task [[bash: sb spawn perf --objective "make the e2e fast"]]')
+        wait.until(lambda: [a for a in of_type(pstate, "agent_created") if a.get("agent", {}).get("name") == "perf"]
+                   or os.path.isdir(os.path.join(pstate, "agents", "perf")), 60, "the project's task perf")
+        pc.wait_idle("perf", timeout=90)
+        r = sb_as_main(E.env, hsock, "follow", "%s/perf" % name)
+        check(r.returncode == 0, "bise follows %s/perf: %s %s" % (name, r.stdout, r.stderr))
+        fol = [e for e in of_type(pstate, "follow") if e.get("name") == "perf"]
+        check(fol and fol[-1].get("on") is True and fol[-1].get("hub") == home_row["id"], "the follow journaled with bise's hub: %r" % fol)
+        perf = dict(E.env, SB_SOCKET=psock, SB_AGENT="perf")
+        r = bise(perf, "sb", "report", "progress", "bench 3 of 7", "--step", "3/7")
+        check(r.returncode == 0, "perf's progress: %s %s" % (r.stdout, r.stderr))
+        check(not [x for x in of_type(pstate, "x_out") if x.get("out", {}).get("kind") == "job_end"], "progress stays quiet")
+        # bise's hub goes away before the end
+        e2e.Client(hsock).send({"op": "stop_hub"})
+        hubs[0].wait(timeout=30)
+        wait.until(lambda: not os.path.exists(os.path.join(hstate, "hub.pid")), 30, "bise's hub stopped", poll=0.2)
+        r = bise(perf, "sb", "report", "done", "p99 down 31%")
+        check(r.returncode == 0, "perf's done: %s %s" % (r.stdout, r.stderr))
+        back = [x for x in of_type(pstate, "x_out") if x.get("out", {}).get("kind") == "job_end"]
+        check(len(back) == 1 and back[0]["out"]["project"] == home_row["id"], "its end in the project's outbox: %r" % back)
+        # bise's hub again (the project may have started it to deliver)
+        if not os.path.exists(hsock):
+            hubs.append(subprocess.Popen([EXE, "sbd", "--workspace", home_ws], cwd=ROOT, env=E.env,
+                                         stdin=subprocess.DEVNULL, stdout=err, stderr=err))
+        wait.until(lambda: [x for x in of_type(hstate, "x_in") if x["in"].get("kind") == "job_end"], 90, "bise's hub has perf's end")
+        got = [x for x in of_type(hstate, "x_in") if x["in"].get("kind") == "job_end"]
+        line = [m["msg"] for m in of_type(hstate, "message_sent") if m["msg"]["from"] == "@" + name and "@perf (followed)" in m["msg"]["text"]]
+        check(len(got) == 1 and len(line) == 1 and line[0]["to"] == "main" and "[report: done] @perf (followed): p99 down 31%" in line[0]["text"],
+              "one line in bise's main: %r %r" % (got, line))
+        wait.until(lambda: [x for x in of_type(pstate, "x_acked")], 60, "the project's entry acked")
+        # a second delivery of the same entry (a retry) adds nothing
+        hsock2 = os.path.join(hstate, "hub.sock")
+        one = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        one.settimeout(30)
+        one.connect(hsock2)
+        one.sendall((json.dumps({"op": "xin", "hub": prow["id"], "xid": back[0]["out"]["xid"], "kind": "job_end", "name": name,
+                                 "text": back[0]["out"]["text"]}) + "\n").encode())
+        again = json.loads(one.makefile().readline())
+        one.close()
+        check(again.get("seen") is True, "a second copy is seen: %r" % again)
+        line = [m["msg"] for m in of_type(hstate, "message_sent") if m["msg"]["from"] == "@" + name and "@perf (followed)" in m["msg"]["text"]]
+        check(len(line) == 1, "still one line: %r" % line)
+        fol = [e for e in of_type(pstate, "job_end") if e.get("name") == "perf"]
+        check(len(fol) == 1, "one job end: %r" % fol)
+
         # S2 step 3 (C): only bise reads other projects; a project's agent
         # is refused
         r = sb_as_main(E.env, psock, "history", "login", "--project", "bise")

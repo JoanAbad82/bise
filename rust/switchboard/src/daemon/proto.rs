@@ -101,9 +101,17 @@ impl Shell {
     }
 
     /// S10: a followed task ended: `job_end` to every typed connection.
-    pub(super) fn job_end(&mut self, agent: String, state: &str, label: String, summary: String) {
+    pub(super) fn job_end(&mut self, agent: String, state: &str, label: String, summary: String, key: u64) {
         let state = if state == "failed" { JobState::Failed } else { JobState::Done };
-        self.proto_route(HubEv::JobEnd { project: self.project(), agent, state, label, summary });
+        let key = Some(key).filter(|k| *k > 0);
+        self.proto_route(HubEv::JobEnd { project: self.project(), agent, state, label, summary, key });
+    }
+
+    /// J, bise's home hub: a task it follows in another project ended:
+    /// `followed_end` to every typed connection (its line is in main).
+    pub(super) fn followed_end(&mut self, project: String, agent: String, key: u64, state: &str, label: String, summary: String) {
+        let state = if state == "failed" { JobState::Failed } else { JobState::Done };
+        self.proto_route(HubEv::FollowedEnd { project, agent, key, state, label, summary });
     }
 
     /// `route_correct`'s `to`, checked in the registry before sb-core is

@@ -182,8 +182,8 @@ def ev_json(e: M.Ev) -> J.Json:
     case M.EAct{+ae}:
       act_ev_json(ae)
     # bise desktop S10 (an older sb-core reads these as unknown: skipped)
-    case M.EFollow{+name, +on}:
-      J.obj([ty("follow"), J.kv("name", J.JStr{name}), J.kv("on", J.JBool{on})])
+    case M.EFollow{+name, +on, +hub}:
+      J.obj([ty("follow"), J.kv("name", J.JStr{name}), J.kv("on", J.JBool{on}), J.kv("hub", J.JStr{hub})])
     case M.EJobEnd{+name, +state}:
       J.obj([ty("job_end"), J.kv("name", J.JStr{name}), J.kv("state", J.JStr{state})])
 
@@ -417,7 +417,8 @@ def ev_of.kind(k: EvK, +j: J.Json, +n: String) -> Maybe<&2, M.Ev>:
     case KActDone{}:
       Some{M.EAct{TM.ActDone{get_nat(j, "id")}}}
     case KFollow{}:
-      Some{M.EFollow{get_s(j, "name"), get_b(j, "on")}}
+      # J: an older journal has no hub ("": this hub's own follow)
+      Some{M.EFollow{get_s(j, "name"), get_b(j, "on"), get_s(j, "hub")}}
     case KJobEnd{}:
       Some{M.EJobEnd{get_s(j, "name"), get_s(j, "state")}}
     case KRouteHeld{}:

@@ -38,7 +38,13 @@ commit?: string | null,
 /**
  * why there are no files to show (its folder is gone...)
  */
-note?: string | null, } | { "ev": "route", project: string, rid: number, to: string, name: string, text: string, correct_until_ms: number, why: string, } | { "ev": "route_done", project: string, rid: number, state: string, to: string, xid?: number | null, } | { "ev": "jobs", project: string, items: Array<Job>, } | { "ev": "job_end", project: string, agent: string, state: JobState, label: string, summary: string, } | { "ev": "error", project?: string | null, cmd?: string | null, text: string, };
+note?: string | null, } | { "ev": "route", project: string, rid: number, to: string, name: string, text: string, correct_until_ms: number, why: string, } | { "ev": "route_done", project: string, rid: number, state: string, to: string, xid?: number | null, } | { "ev": "jobs", project: string, items: Array<Job>, } | { "ev": "job_end", project: string, agent: string, state: JobState, label: string, summary: string, 
+/**
+ * draft (J): the job's key (its end's time on that hub), the same
+ * as in bise's followed_end of it: a window shows one line per
+ * (project, agent, key)
+ */
+key?: number | null, } | { "ev": "followed_end", project: string, agent: string, key: number, state: JobState, label: string, summary: string, } | { "ev": "error", project?: string | null, cmd?: string | null, text: string, };
 
 export type Mode = "now" | "queued";
 

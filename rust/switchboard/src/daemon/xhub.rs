@@ -51,13 +51,14 @@ impl Shell {
                     Some(ctx) => crate::fn_context::with_context(&s("text"), &ctx),
                     None => s("text"),
                 };
-                self.step(Input::XIn { token, hub: s("hub"), xid, kind: s("kind"), text });
+                self.step(Input::XIn { token, hub: s("hub"), xid, kind: s("kind"), text, name: s("name") });
             }
             // S10: bise's `sb follow <p>/<agent>`: main's follow here, its
             // answer (ok or why not) back to bise's hub at once
             "xfollow" => {
                 self.replies.insert(token, stream);
-                let req = crate::core::AgentReq::Follow { agent: s("agent"), on: v.get("on").and_then(Value::as_bool).unwrap_or(true) };
+                // J: `hub` asked: the job's end goes back there (its outbox)
+                let req = crate::core::AgentReq::Follow { agent: s("agent"), on: v.get("on").and_then(Value::as_bool).unwrap_or(true), hub: s("hub") };
                 self.step(Input::Agent { token, from: crate::model::MAIN.into(), req });
             }
             _ => {
@@ -72,9 +73,11 @@ impl Shell {
     /// none), sent as the op's `context` for the project to render.
     pub(super) fn xdeliver(&mut self, xid: u64, project: String, kind: String, text: String, context: String) {
         let own = crate::paths::workspace_id(&self.opts.paths.workspace);
+        let ws = self.opts.paths.workspace.clone();
         let (tx, exe, root, log) = (self.tx.clone(), self.opts.exe.clone(), self.opts.app_root.clone(), self.opts.paths.clone());
         std::thread::spawn(move || {
-            let mut req = json!({"op": "xin", "hub": own, "xid": xid, "kind": kind, "text": text});
+            // J: `name` says who sends (a followed task's end is said from it)
+            let mut req = json!({"op": "xin", "hub": own, "xid": xid, "kind": kind, "text": text, "name": own_name(&ws)});
             if let Some(c) = serde_json::from_str::<Value>(&context).ok().filter(Value::is_object) {
                 req["context"] = c;
             }
@@ -127,7 +130,8 @@ impl Shell {
         };
         let (exe, root) = (self.opts.exe.clone(), self.opts.app_root.clone());
         std::thread::spawn(move || {
-            let req = json!({"op": "xfollow", "agent": agent, "on": on});
+            // J: `hub` (this one): the project's hub sends the job's end back here
+            let req = json!({"op": "xfollow", "agent": agent, "on": on, "hub": own});
             let body = match hub_paths(&id).and_then(|paths| call(&paths, &exe, &root, &req)) {
                 Ok(_) => json!({"ok": true, "agent": format!("{p}/{agent}"), "on": on}),
                 Err(e) => json!({"ok": false, "error": format!("{p}: {e}")}),

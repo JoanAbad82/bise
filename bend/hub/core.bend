@@ -2217,6 +2217,8 @@ def xanswer.kind(k: XH.XKind, +ob: XH.Out, +text: String) -> String:
       cat(["(answer to the user's ", mid(XH.Out.msg(ob)), " you forwarded) ", text])
     case XH.KAsk{}:
       cat(["(answer to your question \"", M.clip(M.one_line(XH.Out.text(ob)), 200n), "\") ", text])
+    case XH.KJobEnd{}:
+      text
 
 def xanswer.text(+ob: XH.Out, +text: String) -> String:
   xanswer.kind(XH.Out.kind(ob), ob, text)
@@ -2430,6 +2432,8 @@ def xin.snd(k: XH.XKind, +text: String) -> Snd:
       Snd{M.USER(), M.MAIN(), text, True{}, None{}, False{}, False{}, False{}, Some{XB.VIA_BISE()}}
     case XH.KAsk{}:
       Snd{XB.FROM_BISE(), M.MAIN(), text, True{}, None{}, False{}, False{}, False{}, None{}}
+    case XH.KJobEnd{}:
+      Snd{XB.FROM_BISE(), M.MAIN(), text, False{}, None{}, False{}, False{}, False{}, None{}}
 
 def xin.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat, +k: XH.XKind) -> X.Cx<o>:
   match p:
@@ -2438,13 +2442,52 @@ def xin.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat,
     case (+cx, SOk{+m}):
       reply(o, xemit(o, cx, XH.XGot{XH.XIn{hub, xid, M.Msg.id(m), k, False{}}}), token, ok_body(Nil{}))
 
-# project: bise's message, said to main once per origin (hub, xid)
-def xin(-o: M.St, seen: Bool, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +k: XH.XKind, +text: String) -> X.Cx<o>:
+# J, bise's home hub: the line a followed task's end says in bise's main,
+# from `@<project>`: the same words as a local task's report to main
+def xjob_end.line(+j: J.Json) -> String:
+  cat(["[report: ", C.get_s(j, "state"), "] @", C.get_s(j, "agent"), " (followed): ", String.trim(C.get_s(j, "summary"))])
+
+def xjob_end.sent(-o: M.St, p: X.Cx<o> & SendR, +token: Nat, +hub: String, +xid: Nat, +j: J.Json) -> X.Cx<o>:
+  match p:
+    case (+cx, SErr{+e}):
+      reply_err(o, cx, token, e)
+    case (+cx, SOk{+m}):
+      +cx2 = xemit(o, cx, XH.XGot{XH.XIn{hub, xid, M.Msg.id(m), XH.KJobEnd{}, True{}}})
+      +cx3 = out(o, cx2, [J.kv("fx", J.JStr{"followed_end"}), J.kv("project", J.JStr{hub}),
+        J.kv("agent", J.JStr{C.get_s(j, "agent")}), J.kv("key", J.JNum{C.get_nat(j, "key")}),
+        J.kv("state", J.JStr{C.get_s(j, "state")}), J.kv("label", J.JStr{C.get_s(j, "label")}),
+        J.kv("summary", J.JStr{C.get_s(j, "summary")})])
+      reply(o, cx3, token, ok_body(Nil{}))
+
+# J, bise's home hub: a task it follows in the project `name` ended: one
+# line in bise's main from `@<name>`, a message like a local task's end
+# report (it wakes main by the same rule: main tells him), recorded as
+# received once (law xhub_xin_delivered_once), and fx followed_end for
+# the window
+def xjob_end(-o: M.St, r: Result<&2, &2, String, J.Json>, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +name: String) -> X.Cx<o>:
+  match r:
+    case Fail{+e}:
+      reply_err(o, cx, token, cat(["a job_end that isn't JSON: ", e]))
+    case Done{+j}:
+      xjob_end.sent(o, send(o, cx, msg(String.append("@", name), M.MAIN(), xjob_end.line(j), False{}, None{}, False{}, False{})), token, hub, xid, j)
+
+def xin.kind(-o: M.St, k: XH.XKind, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +text: String, +name: String) -> X.Cx<o>:
+  match k:
+    case XH.KJobEnd{}:
+      xjob_end(o, J.parse(text), cx, token, hub, xid, name)
+    case XH.KInput{}:
+      xin.sent(o, send(o, cx, xin.snd(XH.KInput{}, text)), token, hub, xid, XH.KInput{})
+    case XH.KAsk{}:
+      xin.sent(o, send(o, cx, xin.snd(XH.KAsk{}, text)), token, hub, xid, XH.KAsk{})
+
+# project: bise's message, said to main once per origin (hub, xid); bise's
+# home hub: a followed task's end (kind job_end, `name` the project's)
+def xin(-o: M.St, seen: Bool, +cx: X.Cx<o>, +token: Nat, +hub: String, +xid: Nat, +k: XH.XKind, +text: String, +name: String) -> X.Cx<o>:
   match seen:
     case True{}:
       reply(o, cx, token, ok_body([J.kv("seen", J.JBool{True{}})]))
     case False{}:
-      xin.sent(o, send(o, cx, xin.snd(k, text)), token, hub, xid, k)
+      xin.kind(o, k, cx, token, hub, xid, text, name)
 
 # project: main answered bise's message: settled here, sent back once
 # (law xhub_xin_replied_once)
@@ -2644,12 +2687,30 @@ def req_status(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +is_main: Boo
 def job_label(+a: M.Agent) -> String:
   M.clip(M.one_line(J.get_str_or(M.Agent.brief(a), "objective", "")), 120n)
 
-def job_end.go(-o: M.St, f: Bool, +cx: X.Cx<o>, +name: String, +state: String, +summary: String, +label: String) -> X.Cx<o>:
+# J: the end of a job followed for another hub (bise's home hub): to its
+# outbox, journaled, delivered until that hub has it (a restart of either
+# hub loses nothing: the project's boot sends its pending entries again,
+# the home hub drops a second copy, law xhub_xin_delivered_once)
+def job_end.back(-o: M.St, local: Bool, +cx: X.Cx<o>, +hub: String, +j: J.Json) -> X.Cx<o>:
+  match local:
+    case True{}:
+      cx
+    case False{}:
+      +ob = XB.new_out(xst(o, cx), hub, XH.KJobEnd{}, 0n, J.stringify(j), "")
+      xdeliver(o, xemit(o, cx, XH.XOut{ob}), ob)
+
+# `key`: the job's (its end's time on this hub's clock), the same in the
+# fx job_end and in what goes back to `hub`, so a window that hears both
+# shows one line
+def job_end.go(-o: M.St, f: Bool, +cx: X.Cx<o>, +name: String, +state: String, +summary: String, +label: String, +hub: String) -> X.Cx<o>:
   match f:
     case True{}:
       +cx2 = emit(o, cx, M.EJobEnd{name, state}, Unit{}, Unit{}, Unit{})
-      out(o, cx2, [J.kv("fx", J.JStr{"job_end"}), J.kv("agent", J.JStr{name}), J.kv("state", J.JStr{state}),
-        J.kv("label", J.JStr{label}), J.kv("summary", J.JStr{summary})])
+      +key = now(o, cx2)
+      +cx3 = out(o, cx2, [J.kv("fx", J.JStr{"job_end"}), J.kv("agent", J.JStr{name}), J.kv("state", J.JStr{state}),
+        J.kv("label", J.JStr{label}), J.kv("summary", J.JStr{summary}), J.kv("key", J.JNum{key}), J.kv("hub", J.JStr{hub})])
+      job_end.back(o, String.is_empty(hub), cx3, hub, J.obj([J.kv("agent", J.JStr{name}), J.kv("key", J.JNum{key}),
+        J.kv("state", J.JStr{state}), J.kv("label", J.JStr{label}), J.kv("summary", J.JStr{summary})]))
     case False{}:
       cx
 
@@ -2658,7 +2719,7 @@ def job_end.of(-o: M.St, m: Maybe<&2, M.Agent>, +cx: X.Cx<o>, +name: String, +st
     case None{}:
       cx
     case Some{+a}:
-      job_end.go(o, M.Agent.follow(a), cx, name, state, summary, job_label(a))
+      job_end.go(o, M.Agent.follow(a), cx, name, state, summary, job_label(a), M.Agent.follow_hub(a))
 
 # a task's end (done, failed): its job_end when followed, once (laws
 # follow_done_once, follow_failed_at_once)
@@ -2684,8 +2745,10 @@ def follow_err.of(m: Maybe<&2, M.Agent>, +name: String) -> Maybe<&2, String>:
 def follow_err(+s: M.St, +name: String) -> Maybe<&2, String>:
   follow_err.of(M.get_agent(s, name), name)
 
-def follow_set(-o: M.St, +cx: X.Cx<o>, +name: String, +on: Bool) -> X.Cx<o>:
-  emit(o, cx, M.EFollow{name, on}, Unit{}, Unit{}, Unit{})
+# `hub`: who asked ("" this hub's own main or window; else bise's home
+# hub, J): journaled with the follow, cleared at its job_end
+def follow_set(-o: M.St, +cx: X.Cx<o>, +name: String, +on: Bool, +hub: String) -> X.Cx<o>:
+  emit(o, cx, M.EFollow{name, on, hub}, Unit{}, Unit{}, Unit{})
 
 # the input follow (the window's typed command, or bise's `sb follow
 # <p>/<agent>` on this hub's socket): an error is the asker's notice
@@ -2694,21 +2757,21 @@ def follow_in(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +name: String, +on
     case Some{+e}:
       notice(o, cx, e)
     case None{}:
-      follow_set(o, cx, name, on)
+      follow_set(o, cx, name, on, "")
 
-def req_follow.go(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +name: String, +on: Bool) -> X.Cx<o>:
+def req_follow.go(-o: M.St, err: Maybe<&2, String>, +cx: X.Cx<o>, +token: Nat, +name: String, +on: Bool, +hub: String) -> X.Cx<o>:
   match err:
     case Some{+e}:
       reply_err(o, cx, token, e)
     case None{}:
-      reply(o, follow_set(o, cx, name, on), token, ok_body([J.kv("agent", J.JStr{name}), J.kv("on", J.JBool{on})]))
+      reply(o, follow_set(o, cx, name, on, hub), token, ok_body([J.kv("agent", J.JStr{name}), J.kv("on", J.JBool{on})]))
 
 # `sb follow <agent> [--off]`: main only (his say-so goes through main)
 def req_follow(-o: M.St, +cx: X.Cx<o>, +token: Nat, +from: String, +q: J.Json) -> X.Cx<o>:
   +name = C.get_s(q, "agent")
   req_follow.go(o,
     Bool.pick(Maybe<&2, String>, String.eq(from, M.MAIN()), follow_err(st(o, cx), name), Some{"only main follows a task: ask main"}),
-    cx, token, name, Bool.not(C.get_b(q, "off")))
+    cx, token, name, Bool.not(C.get_b(q, "off")), C.get_s(q, "hub"))
 
 # the report's done and failed: their state change, then the job's end
 def report_done(-o: M.St, +cx: X.Cx<o>, +from: String) -> X.Cx<o>:
@@ -3490,7 +3553,7 @@ def dispatch.go(-o: M.St, tag: In, +cx: X.Cx<o>, +i: J.Json) -> X.Cx<o>:
     case IEveryRun{}:
       timer_run(o, cx, i)
     case IXIn{}:
-      xin(o, XB.seen(xst(o, cx), C.get_s(i, "hub"), C.get_nat(i, "xid")), cx, C.get_nat(i, "token"), C.get_s(i, "hub"), C.get_nat(i, "xid"), XH.kind_of(C.get_s(i, "kind")), C.get_s(i, "text"))
+      xin(o, XB.seen(xst(o, cx), C.get_s(i, "hub"), C.get_nat(i, "xid")), cx, C.get_nat(i, "token"), C.get_s(i, "hub"), C.get_nat(i, "xid"), XH.kind_of(C.get_s(i, "kind")), C.get_s(i, "text"), C.get_s(i, "name"))
     case IXAck{}:
       xack(o, XB.pending(xst(o, cx), C.get_nat(i, "xid")), cx, C.get_nat(i, "xid"))
     case IXFail{}:

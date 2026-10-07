@@ -15,6 +15,9 @@ import ../vendor/json.bend as J
 type XKind is Data:
   KInput{}
   KAsk{}
+  # J: a task this project's hub follows for bise ended (project -> bise's
+  # home hub): `text` is its JSON {agent, key, state, label, summary, name}
+  KJobEnd{}
 
 type OutSt is Data:
   OPending{}
@@ -247,9 +250,11 @@ def kind_str(k: XKind) -> String:
       "input"
     case KAsk{}:
       "ask"
+    case KJobEnd{}:
+      "job_end"
 
 def kind_of(+s: String) -> XKind:
-  Bool.pick(XKind, String.eq(s, "ask"), KAsk{}, KInput{})
+  Bool.pick(XKind, String.eq(s, "ask"), KAsk{}, Bool.pick(XKind, String.eq(s, "job_end"), KJobEnd{}, KInput{}))
 
 def st_str(s: OutSt) -> String:
   match s:

@@ -54,7 +54,7 @@ type Agent is Data:
     declared: Maybe<&2, Decl>, aliases: List<&2, String>,
     files: List<&2, String>, ws: J.Json, dir: String, brief: J.Json,
     created: Nat, failure: Maybe<&2, String>, note: String, report: J.Json,
-    snap: Maybe<&2, String>, follow: Bool}
+    snap: Maybe<&2, String>, follow: Maybe<&2, String>}
 
 type St is Data:
   St{agents: List<&2, Agent>, order: List<&2, String>, msgs: List<&2, MRec>,
@@ -89,8 +89,10 @@ type Ev is Data:
   EAct{e: TM.ActEv}
   # bise desktop S10: someone follows the agent (or stops), and the end of
   # a followed job (done or failed), journaled once: it turns follow off
-  # (one job per follow, law follow_one_shot)
-  EFollow{name: String, on: Bool}
+  # (one job per follow, law follow_one_shot). `hub`: the hub that asked
+  # (bise's home hub, through `sb follow <p>/<agent>`; "" this hub's own
+  # main or window): its end goes back there (J, law follow_hub_journaled)
+  EFollow{name: String, on: Bool, hub: String}
   EJobEnd{name: String, state: String}
 
 type AgentOp is Data:
@@ -101,7 +103,7 @@ type AgentOp is Data:
   ODeclared{d: Maybe<&2, Decl>, note: String}
   OFile{path: String}
   ORename{new_name: String}
-  OFollow{on: Bool}
+  OFollow{f: Maybe<&2, String>}
 
 type MsgOp is Data:
   OSt{st: MSt}
@@ -224,7 +226,7 @@ def rec_of(xs: List<&2, MRec>, +id: Nat) -> Maybe<&2, MRec>:
   find(~MRec, ~Nat, ~(r => Msg.id(MRec.msg(r))), ~(a => b => Nat.is_eq(a, b)), xs, id)
 
 def new_agent(+name: String, +is_main: Bool, +parent: Maybe<&2, String>, +ws: J.Json, +brief: J.Json, +created: Nat) -> Agent:
-  Agent{name, is_main, parent, LActive{}, None{}, Nil{}, Nil{}, ws, name, brief, created, None{}, "", J.JNull{}, None{}, False{}}
+  Agent{name, is_main, parent, LActive{}, None{}, Nil{}, Nil{}, ws, name, brief, created, None{}, "", J.JNull{}, None{}, None{}}
 
 def Agent.name(x: Agent) -> String:
   match x:
@@ -576,10 +578,10 @@ def apply(+st: St, e: Ev) -> St:
           St{agents, order, msgs, cards, notes, nm, nc, tm, XH.apply(xs, xe)}
         case EAct{+ae}:
           St{agents, order, msgs, cards, notes, nm, nc, TM.act_apply(tm, ae), xs}
-        case EFollow{+name, +on}:
-          St{map_agent(agents, name, OFollow{on}), order, msgs, cards, notes, nm, nc, tm, xs}
+        case EFollow{+name, +on, +hub}:
+          St{map_agent(agents, name, OFollow{Bool.pick(Maybe<&2, String>, on, Some{hub}, None{})}), order, msgs, cards, notes, nm, nc, tm, xs}
         case EJobEnd{+name, _}:
-          St{map_agent(agents, name, OFollow{False{}}), order, msgs, cards, notes, nm, nc, tm, xs}
+          St{map_agent(agents, name, OFollow{None{}}), order, msgs, cards, notes, nm, nc, tm, xs}
 
 # the state after a journal: the replay of a list of events
 def apply_all(evs: List<&2, Ev>, +st: St) -> St:
@@ -895,12 +897,26 @@ def Agent.snap(x: Agent) -> Maybe<&2, String>:
     case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, _, +snap, _}:
       snap
 
+def Agent.follow.of(f: Maybe<&2, String>) -> Bool:
+  match f:
+    case None{}:
+      False{}
+    case Some{_}:
+      True{}
+
 # bise desktop S10: someone asked to hear when it ends (one job: off again
 # at its job_end)
 def Agent.follow(x: Agent) -> Bool:
   match x:
     case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, +f}:
-      f
+      Agent.follow.of(f)
+
+# J: the hub its end goes back to ("" none: not followed, or followed by
+# this hub's own main or window)
+def Agent.follow_hub(x: Agent) -> String:
+  match x:
+    case Agent{_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, +f}:
+      Maybe.default(&2, String, f, "")
 
 # dev-flow §3.1: the place of a ws: "shared", or its worktree's id (the
 # Rust Workspace::place_id; an older journal's worktree has none: its
