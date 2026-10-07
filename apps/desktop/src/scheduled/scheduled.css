@@ -1,0 +1,41 @@
+/* src/scheduled (amb-kit): the scheduled screen (desktop-screens v6, designer m_11837). ds tokens only. */
+.sch-screen { display: flex; height: 100%; min-height: 0; outline: none; }
+.sch-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: 20px 28px 0; box-sizing: border-box; }
+.sch-head { flex: none; display: grid; grid-template-columns: 1fr auto; align-items: end; column-gap: 12px; margin-bottom: 14px; }
+.sch-h1 { font: 600 22px/1.2 var(--font-ui); color: var(--c-text); }
+.sch-h2 { grid-row: 2; margin-top: 2px; font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.sch-count { grid-row: 1 / 3; grid-column: 2; font: var(--t-12) var(--font-ui); color: var(--c-text-2); padding: 3px 10px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--c-line); }
+.sch-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.sch-row { display: grid; grid-template-columns: minmax(0, 1fr) 190px 170px 110px; gap: 12px; align-items: center; min-height: 36px; padding: 0 8px; border-radius: var(--r-2); font: var(--t-13) var(--font-ui); color: var(--c-text); cursor: default; }
+.sch-row > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sch-cols { min-height: 28px; font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
+.sch-row:not(.sch-cols):hover { background: var(--c-hover); }
+.sch-row.on { background: color-mix(in srgb, var(--c-text) 9%, transparent); }
+.sch-dim { color: var(--c-text-2); }
+.sch-next { color: var(--c-text-2); text-align: right; }
+.sch-keys { flex: none; display: flex; gap: 3ch; padding: 10px 8px 12px; border-top: 1px solid var(--c-line); font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+.sch-keys b { font-weight: 500; color: var(--c-text-2); }
+.sch-empty { padding: 32px 8px; font: var(--t-14) var(--font-read); color: var(--c-text-2); }
+
+/* one task: a 400 px pane at the right */
+.sch-pane { flex: none; width: 400px; box-sizing: border-box; overflow-y: auto; padding: 16px 20px; border-left: 1px solid var(--c-line); display: flex; flex-direction: column; gap: 8px; }
+.sch-pane > .b-btn:first-child { display: none; align-self: flex-start; }
+.sch-k3 { font: var(--t-12) var(--font-ui); color: var(--c-text-3); }
+.sch-title { font: 600 17px/1.3 var(--font-ui); color: var(--c-text); }
+.sch-label { margin-top: 8px; font: 600 11.5px/1.2 var(--font-ui); color: var(--c-text-3); }
+.sch-quote { margin: 0; padding: 10px 12px; border-radius: 9px; background: var(--c-raised); font: var(--t-13)/1.5 var(--font-read); color: var(--c-text); white-space: pre-wrap; }
+.sch-kv { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; margin: 4px 0 0; font: var(--t-13) var(--font-ui); }
+.sch-kv dt { color: var(--c-text-2); }
+.sch-kv dd { margin: 0; color: var(--c-text); }
+.sch-runs { font: var(--t-13) var(--font-ui); color: var(--c-text-2); }
+.sch-acts { display: flex; gap: 8px; margin-top: 12px; }
+.sch-ask { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; font: var(--t-13) var(--font-ui); color: var(--c-text); }
+/* under 1000 px the task replaces the list, with '‹ scheduled' */
+@media (max-width: 1000px) {
+  .sch-screen.has-pane .sch-main { display: none; }
+  .sch-screen.has-pane .sch-pane { flex: 1 1 auto; width: auto; border-left: 0; }
+  .sch-pane > .b-btn:first-child { display: inline-flex; }
+  .sch-row { grid-template-columns: minmax(0, 1fr) 140px 90px; }
+  .sch-row > :nth-child(3) { display: none; }
+  .sch-main { padding: 16px 16px 0; }
+}

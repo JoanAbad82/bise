@@ -38,6 +38,7 @@ import { TerminalPanel } from '@/terminal/Terminal';
 import { isToggleKey, shellProject, shellTakes } from '@/terminal/model';
 import { panel } from '@/terminal/panel';
 import { ArtifactOpen, ArtifactsScreen } from '@/artifacts';
+import { ScheduledScreen } from '@/scheduled';
 import '@/ds/index.css';
 import './app.css';
 
@@ -220,6 +221,9 @@ function ScreenOf({ route }: { route: Route }) {
     case 'artifacts':
       // every project's (project ''), one project's, or one artifact open (amb-kit's src/artifacts)
       return route.id === undefined ? <ArtifactsScreen project={route.project} /> : <ArtifactOpen project={route.project} id={route.id} />;
+    case 'scheduled':
+      // every project's live scheduled tasks (amb-kit's src/scheduled)
+      return <ScheduledScreen />;
     case 'inbox':
       return <InboxScreen />;
     case 'settings':

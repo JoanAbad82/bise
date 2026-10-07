@@ -33,6 +33,7 @@ export type Route =
   | { screen: 'artifacts'; project: string; id?: string }
   | { screen: 'environments'; project: string }
   | { screen: 'inbox' }
+  | { screen: 'scheduled' }
   | { screen: 'settings'; page?: string }
   | { screen: 'onboarding' }
   | { screen: 'lab'; lab: Lab }
@@ -57,6 +58,7 @@ export function formatRoute(r: Route): string {
   switch (r.screen) {
     case 'bise':
     case 'inbox':
+    case 'scheduled':
     case 'onboarding':
       return r.screen;
     case 'thread':
@@ -98,6 +100,7 @@ export function parseRoute(path: string): Route {
   switch (head) {
     case 'bise':
     case 'inbox':
+    case 'scheduled':
     case 'onboarding':
       return args.length === 0 ? { screen: head } : nf;
     case 'project':
