@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, chipOf, dropAuthor, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, TOOL_LINES, chipOf, dropAuthor, stepTime, toolLines, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -103,5 +103,33 @@ describe("the thread's reading (ambient m_11777)", () => {
     expect(dropAuthor('performance: fine', 'perf')).toBe('performance: fine');
     expect(dropAuthor('the perf: fine', 'perf')).toBe('the perf: fine');
     expect(dropAuthor('hi', '')).toBe('hi');
+  });
+});
+
+describe("the agent view's tool rows (designer's desktop-screens v6 (2))", () => {
+  it("a step's length: '38 s', '1 m 12 s', '2 m', none under 1 s", () => {
+    expect(stepTime(38_400)).toBe('38 s');
+    expect(stepTime(72_000)).toBe('1 m 12 s');
+    expect(stepTime(120_000)).toBe('2 m');
+    expect(stepTime(400)).toBe('');
+  });
+
+  it('commands and edits are lines with their length; reads and searches fold into counted words', () => {
+    const T = 1_791_100_000_000;
+    const t = toolLines([
+      { pos: 1, at_ms: T, text: 'src/a.rs', kind: 'read' },
+      { pos: 2, at_ms: T + 1000, text: 'lighthouse --preset=mobile /p/tee-classic', kind: 'run' },
+      { pos: 3, at_ms: T + 39_000, text: 'web/product/Hero.tsx', kind: 'edit' },
+      { pos: 4, at_ms: T + 40_000, text: 'reviews', kind: 'search' },
+    ]);
+    expect(t.lines).toEqual([
+      { pos: 2, mark: '$', text: 'lighthouse --preset=mobile /p/tee-classic', time: '38 s' },
+      { pos: 3, mark: '±', text: 'web/product/Hero.tsx', time: '1 s' },
+    ]);
+    expect(t.rest.map((r) => r.pos)).toEqual([1, 4]);
+    expect(t.restWords).toBe('read 1 file, searched once');
+    const many = toolLines(Array.from({ length: 8 }, (_, i) => ({ pos: i, at_ms: 0, text: `cmd ${String(i)}`, kind: 'run' })));
+    expect(many.lines).toHaveLength(TOOL_LINES);
+    expect(many.restWords).toBe('ran 2 commands');
   });
 });

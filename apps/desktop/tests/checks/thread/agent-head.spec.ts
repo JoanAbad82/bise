@@ -1,10 +1,13 @@
-// thread/agent-head · the agent view's head and composer words (designer's desktop-screens v6 (1),
-// (3), (4)). Passes when, in storefront with the scripted core (FakeCore, fake data):
+// thread/agent-head · the agent view's head, rows and composer words (designer's desktop-screens
+// v6 (1), (2), (3), (4)). Passes when, in storefront with the scripted core (FakeCore, fake data):
 //   - perf's head is one row: 'perf' in 600, its role 'product page speed', the chip '∿ working ·
 //     14 min', at the right 'sb/perf' (opens the review), 'changes ⌘D', '⋯';
 //   - search, which waits on him, has the chip '? waiting for you' in the accent;
 //   - the project's bise reads 'bise · storefront' with its 14 px pearl and the chip '1 waiting
 //     for you', which opens the agents list;
+//   - perf's rows: its commands as mono lines with their length ('$ lighthouse …  38 s'), its edits
+//     ('± web/product/Hero.tsx  4 s'), the reads counted and folded, the artifact made as a chip
+//     that opens in the window, and the live line '∿ running the bench three more times · 14 min';
 //   - the composer says 'to perf' and 'write to perf, then ⏎';
 //   - under 1000 px the head keeps the chip and the buttons, the name and role go (the titlebar's
 //     crumb says them).
@@ -45,7 +48,7 @@ const world = (now: number) => {
       project: P,
       agents: [
         ag('main', {}),
-        ag('perf', { status: 'working', since_ms: now - 14 * MIN, purpose: 'product page speed', branch: 'sb/perf', worktree: '/nowhere/wt/perf' }),
+        ag('perf', { status: 'working', since_ms: now - 14 * MIN, purpose: 'product page speed', title: 'running the bench three more times', branch: 'sb/perf', worktree: '/nowhere/wt/perf' }),
         ag('search', { status: 'idle', purpose: 'size filter on search', waits: 1, branch: 'sb/search' }),
       ],
     },
@@ -55,7 +58,37 @@ const world = (now: number) => {
       agent: 'perf',
       entries: [
         { pos: 1, at_ms: now - 14 * MIN, kind: 'you', text: 'the product page takes 4 s on mobile. find why and fix it, numbers before and after please' },
-        { pos: 2, at_ms: now - 13 * MIN, kind: 'agent', text: 'found it: the hero image ships at 2.4 MB, and the reviews widget blocks the first paint while it loads 900 reviews.' },
+        {
+          pos: 2,
+          at_ms: now - 13 * MIN,
+          kind: 'tools',
+          text: 'read 1 file, ran 2 commands',
+          tools: {
+            count: 3,
+            summary: 'read 1 file, ran 2 commands',
+            items: [
+              { pos: 3, at_ms: now - 13 * MIN, text: 'lighthouse --preset=mobile /p/tee-classic', kind: 'run' },
+              { pos: 4, at_ms: now - 13 * MIN + 38_000, text: 'pnpm trace web/product --cpu=4x', kind: 'run' },
+              { pos: 5, at_ms: now - 13 * MIN + 110_000, text: 'web/product/Hero.tsx', kind: 'read' },
+            ],
+          },
+        },
+        { pos: 6, at_ms: now - 11 * MIN, kind: 'agent', text: 'found it: the hero image ships at 2.4 MB, and the reviews widget blocks the first paint while it loads 900 reviews.' },
+        {
+          pos: 7,
+          at_ms: now - 10 * MIN,
+          kind: 'tools',
+          text: 'edited 2 files',
+          tools: {
+            count: 2,
+            summary: 'edited 2 files',
+            items: [
+              { pos: 8, at_ms: now - 10 * MIN, text: 'web/product/Hero.tsx', kind: 'edit' },
+              { pos: 9, at_ms: now - 10 * MIN + 4000, text: 'web/product/Reviews.tsx', kind: 'edit' },
+            ],
+          },
+        },
+        { pos: 10, at_ms: now - 2 * MIN, kind: 'artifact', text: 'made product page, before / after', made: { id: 'a1', agent: 'perf', title: 'product page, before / after', kind: 'page', kind_word: 'page', v: 2 } },
       ],
       before: null,
       more: false,
@@ -101,9 +134,21 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     await expect(page.getByTestId('thread.more')).toHaveText('⋯');
     const oneRow = await head.evaluate((el) => el.getBoundingClientRect().height);
     expect(oneRow, 'one row').toBeLessThan(60);
+    // (2) the rows: commands as mono lines with their length, the rest counted, edits, the artifact chip, the live line
+    await expect(page.getByTestId('thread.tool.3')).toHaveText('$ lighthouse --preset=mobile /p/tee-classic38 s');
+    await expect(page.getByTestId('thread.tool.4')).toHaveText('$ pnpm trace web/product --cpu=4x1 m 12 s');
+    await expect(page.getByTestId('thread.tools.2')).toHaveText(/read 1 file/);
+    await expect(page.getByTestId('thread.tool.8')).toHaveText('± web/product/Hero.tsx4 s');
+    await expect(page.getByTestId('thread.artifact.10')).toContainText('product page, before / after');
+    await expect(page.getByTestId('thread.artifact.10')).toContainText('page · v2');
+    await expect(page.getByTestId('thread.live')).toHaveText('∿ running the bench three more times · 14 min');
     // (4) the composer's words
     await expect(page.locator('.th-screen .b-composer .div')).toHaveText('to perf');
     await expect(page.locator('[data-testid="composer.field"][aria-placeholder]')).toHaveAttribute('aria-placeholder', 'write to perf, then ⏎');
+    // the artifact opens in the window
+    await page.getByTestId('thread.artifact.10').click();
+    await expect(page.getByTestId('thread.head')).toBeHidden();
+    await go('app.sidebar.agent.perf');
     // the branch opens the review
     await page.getByTestId('thread.head.branch').click();
     expect(await core.waitCmd((c) => c.cmd === 'diff', 3000)).toMatchObject({ project: P, agent: 'perf' });

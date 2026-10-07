@@ -157,6 +157,7 @@
 .th-row,
 .th-day,
 .th-screen .th-typing,
+.th-screen .th-live,
 .th-screen .th-refused,
 .th-screen .inbox-strip,
 .th-screen .inbox-dock,
@@ -559,4 +560,39 @@
   .ah:not(.ah-bise) .ah-who {
     display: none;
   }
+}
+
+/* the agent view's rows (designer's desktop-screens v6 (2); amb-home): its commands and edits as
+   mono 12 text-2 lines with their length text-3 after; an artifact made is a chip (1 px line,
+   r 9) that opens it in the window; the live line at the end says what it does now */
+.th-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.th-tool-line {
+  overflow: hidden;
+  color: var(--c-text-2);
+  font: var(--t-12) / 1.6 var(--font-mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.th-tool-mark {
+  color: var(--c-text-3);
+}
+.th-tool-time {
+  margin-left: 12px;
+  color: var(--c-text-3);
+}
+.th-row .b-art {
+  padding: 4px 10px;
+  border: 1px solid var(--c-line);
+  border-radius: 9px;
+  background: none;
+  box-shadow: none;
+}
+.th-live {
+  color: var(--c-text-2);
+  font: var(--t-13) var(--font-ui);
+  padding: 6px 0 2px;
 }

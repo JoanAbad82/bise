@@ -11,7 +11,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Markdown } from './Markdown';
-import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, stripContext, thoughtNothing, whoOf } from './entry';
+import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -219,10 +219,10 @@ function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   return (
     <Art
       title={`↗ ${m.title}`}
-      meta={[m.kind_word, m.v > 1 ? `v${String(m.v)}` : '', m.agent].filter(Boolean).join(' · ')}
+      meta={[m.kind_word, m.v > 1 ? `v${String(m.v)}` : ''].filter(Boolean).join(' · ')}
       onClick={() => {
-        if (m.url != null && m.url !== '') ctx.onLink(m.url);
-        else router.go({ screen: 'artifacts', project: ctx.project, id: m.id });
+        // designer's v6 (2): an artifact opens in the window, its own screen
+        router.go({ screen: 'artifacts', project: ctx.project, id: m.id });
       }}
       testId={`thread.artifact.${e.pos}`}
     />
@@ -474,23 +474,37 @@ function ContextChip({ chip, ctx, pos }: { chip: NonNullable<ReturnType<typeof c
 function ToolsRow({ e }: { e: Entry }) {
   const [open, setOpen] = useFold(false, e.pos);
   const items = e.tools?.items ?? [];
+  // designer's desktop-screens v6 (2): its commands and edits as mono lines with their length
+  // ('$ lighthouse --preset=mobile …  38 s', '± web/product/Hero.tsx'); the rest fold into
+  // their counted words
+  const t = toolLines(items);
   return (
-    <Tool
-      state={open ? 'open' : undefined}
-      onToggle={() => {
-        setOpen((o) => !o);
-      }}
-      out={
-        <ul className="th-steps">
-          {items.map((t) => (
-            <li key={t.pos}>{t.text}</li>
-          ))}
-        </ul>
-      }
-      testId={`thread.tools.${e.pos}`}
-    >
-      {e.tools?.summary ?? e.text}
-    </Tool>
+    <div className="th-tools" data-testid={`thread.toolrow.${String(e.pos)}`}>
+      {t.lines.map((l) => (
+        <div key={l.pos} className="th-tool-line" data-testid={`thread.tool.${String(l.pos)}`}>
+          <span className="th-tool-mark">{l.mark}</span> <span className="th-tool-text">{l.text}</span>
+          {l.time !== '' && <span className="th-tool-time">{l.time}</span>}
+        </div>
+      ))}
+      {(t.rest.length > 0 || items.length === 0) && (
+        <Tool
+          state={open ? 'open' : undefined}
+          onToggle={() => {
+            setOpen((o) => !o);
+          }}
+          out={
+            <ul className="th-steps">
+              {t.rest.map((r) => (
+                <li key={r.pos}>{r.text}</li>
+              ))}
+            </ul>
+          }
+          testId={`thread.tools.${String(e.pos)}`}
+        >
+          {t.restWords !== '' ? t.restWords : (e.tools?.summary ?? e.text)}
+        </Tool>
+      )}
+    </div>
   );
 }
 

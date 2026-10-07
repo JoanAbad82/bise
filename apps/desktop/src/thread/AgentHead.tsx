@@ -2,12 +2,14 @@
 // agent: its name in 600, its role line, its state chip; at the right, quiet, its branch and
 // files (opens the review), 'changes ⌘D', '⋯'. A project's bise: its 14 px pearl, 'bise ·
 // storefront', the project's chip. Under 1000 px the name goes to the titlebar's crumb (amb-win's)
-// and the head keeps the chip and the buttons. The words are head.ts's. Owner: amb-home.
+// and the head keeps the chip and the buttons. LiveLine: what it does now, at the thread's end.
+// The words are head.ts's. Owner: amb-home.
 import type { ReactNode } from 'react';
 import { Pearl } from '@/ds';
 import type { Agent } from '@/proto';
 import { useAgents, useDiff } from '@/store';
 import { useNow } from '@/app/clock';
+import { ago } from '@/agents/model';
 import { useRouter } from '@/app/router';
 import { biseChip, branchLine, roleOf, stateChip, type StateChip } from './head';
 
@@ -90,6 +92,19 @@ export function BiseHead({ project, name, more }: { project: string; name: strin
         <Chip chip={biseChip(agents)} testId="thread.head.state" />
       </button>
       <span className="ah-end">{more}</span>
+    </div>
+  );
+}
+
+/** The live line at the thread's end while it works (v6 (2)): '∿ running the bench three more times · 1 min'. */
+export function LiveLine({ a }: { a: Agent | undefined }) {
+  const now = useNow();
+  if (a === undefined || a.archived || a.status !== 'working' || a.title === '') return null;
+  const t = ago(a.since_ms, now);
+  return (
+    <div className="th-live" data-testid="thread.live" aria-live="polite">
+      ∿ {a.title}
+      {t !== 'now' ? ` · ${t}` : ''}
     </div>
   );
 }

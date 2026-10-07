@@ -29,7 +29,7 @@ import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
 import { ThreadInbox, takesWords, useStripCard } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
-import { AgentHead, BiseHead } from './AgentHead';
+import { AgentHead, BiseHead, LiveLine } from './AgentHead';
 import { composerWords } from './head';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
@@ -321,6 +321,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} />
         {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} />}
         {stopping && <Marker>stopping {agent}…</Marker>}
+        {!bise && agent !== MAIN && <LiveLine a={me} />}
         <TypingLine text={typing} />
         {/* W7/K24: the project's open items over the composer's divider (amb-home f44d082e) */}
         {/* its hub refused this core: the hub's words and a retry, over the composer (lead m_11347) */}

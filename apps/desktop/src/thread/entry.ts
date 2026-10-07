@@ -176,3 +176,45 @@ export function dropAuthor(text: string, name: string): string {
   if (name === '' || !text.startsWith(`${name}:`)) return text;
   return text.slice(name.length + 1).trimStart();
 }
+
+// ---- the agent view's tool rows (designer's desktop-screens v6 (2); amb-home)
+
+/** A step's length, as designer's rows say it: '38 s', '1 m 12 s', '2 m'. Under 1 s: none. Pure. */
+export function stepTime(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 1) return '';
+  if (s < 60) return `${String(s)} s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r === 0 ? `${String(m)} m` : `${String(m)} m ${String(r)} s`;
+}
+
+/** At most this many command and edit lines show; the rest fold into the counted line. */
+export const TOOL_LINES = 6;
+
+/** A turn's tools: its commands ('$ …') and edits ('± …') as lines with their length (until the next step), and the counted words of the rest ('read 6 files'), which fold. Pure. */
+export function toolLines(items: readonly { pos: number; at_ms: number; text: string; kind: string }[]): {
+  lines: { pos: number; mark: '$' | '±'; text: string; time: string }[];
+  rest: { pos: number; text: string }[];
+  restWords: string;
+} {
+  const lines: { pos: number; mark: '$' | '±'; text: string; time: string }[] = [];
+  const rest: { pos: number; text: string }[] = [];
+  items.forEach((t, i) => {
+    const next = items[i + 1];
+    const time = next !== undefined && t.at_ms > 0 && next.at_ms > t.at_ms ? stepTime(next.at_ms - t.at_ms) : '';
+    if ((t.kind === 'run' || t.kind === 'edit') && lines.length < TOOL_LINES) lines.push({ pos: t.pos, mark: t.kind === 'run' ? '$' : '±', text: t.text, time });
+    else rest.push({ pos: t.pos, text: t.text });
+  });
+  const n = (k: string) => items.filter((t) => t.kind === k).length;
+  const shownRun = lines.filter((l) => l.mark === '$').length;
+  const shownEdit = lines.length - shownRun;
+  const files = (x: number) => (x === 1 ? '1 file' : `${String(x)} files`);
+  const parts: string[] = [];
+  if (n('read') > 0) parts.push(`read ${files(n('read'))}`);
+  if (n('edit') - shownEdit > 0) parts.push(`edited ${files(n('edit') - shownEdit)}`);
+  if (n('run') - shownRun > 0) parts.push(`ran ${n('run') - shownRun === 1 ? '1 command' : `${String(n('run') - shownRun)} commands`}`);
+  if (n('search') > 0) parts.push(`searched ${n('search') === 1 ? 'once' : `${String(n('search'))} times`}`);
+  if (n('other') > 0) parts.push(`${String(n('other'))} other ${n('other') === 1 ? 'step' : 'steps'}`);
+  return { lines, rest, restWords: parts.join(', ') };
+}
