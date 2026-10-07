@@ -6,6 +6,7 @@ import { core_ev } from '@/proto/fixtures.gen';
 import { fnAct, next, START, stepOf, ticked } from './model';
 import { Onboarding, type OnboardingPorts } from './Onboarding';
 import { FirstRun, showsFirstRun } from './FirstRun';
+import { startHereUrl } from './screen';
 
 afterEach(cleanup);
 
@@ -105,6 +106,16 @@ describe('Onboarding', () => {
       { cmd: 'prefs_set', key: 'onboarded', value: true },
     ]);
     expect(p.log).toEqual(['done']);
+  });
+});
+
+describe('the start-here page after hello (S.9)', () => {
+  const art = (id: string, kind: string, url: string) => ({ id, kind, title: id, agent: 'main', version: 1, at_ms: NOW, url, new: true });
+  it("is the hub's start-here page among the home's artifacts, by its url", () => {
+    expect(startHereUrl([art('perf-notes', 'page', 'http://h/p/perf-notes'), art('start-here', 'page', 'http://h/p/start-here')])).toBe('http://h/p/start-here');
+    expect(startHereUrl([art('perf-notes', 'page', 'http://h/p/perf-notes')])).toBeNull();
+    expect(startHereUrl([art('start-here', 'file', 'http://h/a/start-here')])).toBeNull();
+    expect(startHereUrl([art('start-here', 'page', '')])).toBeNull();
   });
 });
 
