@@ -260,19 +260,65 @@ def build_script(paths, sign_dir=None):
     return "\n".join(lines) + "\n"
 
 
+def stamp_path(paths):
+    """The try build's stamp, next to its native helper in his build dir."""
+    return os.path.join(os.path.dirname(paths["helper"]), "try.stamp")
+
+
+def build_stamp(env, paths, sign):
+    """What the try build was made from: this checkout's HEAD, a hash of its uncommitted changes
+    (git status --porcelain, every untracked file listed, and git diff HEAD, so a second edit of a
+    changed file counts) and a hash of the build recipe itself (build_script with these paths and
+    this signing). Reads git only, never takes the lock (ambient-lead m_11206)."""
+    import hashlib
+    head = run(["git", "-C", REPO, "rev-parse", "HEAD"], env).stdout.strip()
+    status = run(["git", "-C", REPO, "status", "--porcelain", "--untracked-files=all"], env).stdout
+    diff = subprocess.run(["git", "-C", REPO, "diff", "HEAD", "--binary"], env=env, capture_output=True).stdout
+    changes = hashlib.sha256(status.encode() + b"\0" + diff).hexdigest() if status.strip() else ""
+    recipe = hashlib.sha256(build_script(paths, sign).encode()).hexdigest()
+    return {"head": head, "changes": changes, "recipe": recipe}
+
+
+def packed_bise(app):
+    return os.path.join(app, "Contents", "Resources", "bin", "bise")
+
+
+def up_to_date(stamp, saved, paths):
+    """The build can be skipped: the saved stamp is this one and every output is there (the packed
+    'bise try.app' with its bise inside, the try bise, the native helper). Pure but for the files."""
+    outs = (paths["app"], packed_bise(paths["app"]), paths["bise"], paths["helper"])
+    return bool(saved) and saved == stamp and all(os.path.exists(p) for p in outs)
+
+
 def build(env, paths):
-    """The try build under the heavy lock (/usr/bin/lockf -k ~/.bise/run/heavy.lock nice -n 10)."""
-    lock = os.path.expanduser("~/.bise/run/heavy.lock")
-    os.makedirs(os.path.dirname(lock), exist_ok=True)
+    """The try build under the heavy lock (/usr/bin/lockf -k ~/.bise/run/heavy.lock nice -n 10),
+    only when the stamp says something changed: an up-to-date build opens at once, without queueing
+    behind other heavy jobs. Returns True when it built."""
     # the stable 'bise ambient dev' identity (amb-mac m_11023): the try's grants survive rebuilds; else ad hoc
     sign = os.environ.get("BISE_TRY_SIGN_DIR") or (paths["sign"] if os.path.isdir(paths["sign"]) else None)
-    say("building %s for the try (waits for other heavy jobs first)…" % run(["git", "-C", REPO, "rev-parse", "--short", "HEAD"], env).stdout.strip())
+    stamp = build_stamp(env, paths, sign)
+    try:
+        saved = json.load(open(stamp_path(paths)))
+    except (OSError, ValueError):
+        saved = None
+    short = stamp["head"][:8] + (" + uncommitted changes" if stamp["changes"] else "")
+    if up_to_date(stamp, saved, paths):
+        say("up to date (%s), opening" % short)
+        return False
+    lock = os.path.expanduser("~/.bise/run/heavy.lock")
+    os.makedirs(os.path.dirname(lock), exist_ok=True)
+    say("building %s for the try (waits for other heavy jobs first)…" % short)
     r = subprocess.run(["/usr/bin/lockf", "-k", lock, "nice", "-n", "10", "/bin/bash", "-c", build_script(paths, sign)], env=env)
     if r.returncode != 0:
         raise TryError("the build failed (exit %d)" % r.returncode)
     for k in ("bise", "app"):
         if not os.path.exists(paths[k]):
             raise TryError("no %s at %s after the build" % (k, paths[k]))
+    os.makedirs(os.path.dirname(stamp_path(paths)), exist_ok=True)
+    with open(stamp_path(paths) + ".tmp", "w") as f:
+        json.dump(stamp, f)
+    os.replace(stamp_path(paths) + ".tmp", stamp_path(paths))
+    return True
 
 
 def setup(real, tryh, repos, env, bise):

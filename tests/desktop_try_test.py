@@ -105,6 +105,61 @@ def pure():
                       for e in ae), "the app's env: the try home, never a test variable: %s" % ae)
 
 
+def stamp_skips_build():
+    """An up-to-date try build opens with no build call (ambient-lead m_11206): the stamp (HEAD,
+    the uncommitted changes, the recipe) matches and every output exists -> no lockf, no cargo, no
+    pnpm, 'up to date (<sha>), opening'. A missing stamp, another recipe or a missing output builds
+    (under the lock) and writes the stamp. The build itself is faked: never a real cargo or pnpm."""
+    w = tempfile.mkdtemp(prefix="dtry-stamp-")
+    build = os.path.join(w, "build")
+    paths = {"target": os.path.join(build, "target"), "bise": os.path.join(build, "target", "debug", "bise"),
+             "helper": os.path.join(build, "desktop-try", "bise-mac-helper"), "sign": os.path.join(build, "ambient", "sign"),
+             "app": os.path.join(w, "dist", "bise try.app")}
+    calls, said = [], []
+    real_run, real_say, old_sign = T.subprocess.run, T.say, os.environ.pop("BISE_TRY_SIGN_DIR", None)
+
+    def outputs():
+        for p in (paths["bise"], paths["helper"], T.packed_bise(paths["app"])):
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            open(p, "w").close()
+
+    def fake_run(cmd, *a, **k):
+        if cmd and cmd[0] == "/usr/bin/lockf":
+            calls.append(cmd)
+            outputs()
+            return subprocess.CompletedProcess(cmd, 0)
+        return real_run(cmd, *a, **k)
+    T.subprocess.run, T.say = fake_run, (lambda *a: said.append(" ".join(str(x) for x in a)))
+    try:
+        env = dict(os.environ)
+        check(T.build(env, paths) is True and len(calls) == 1 and os.path.exists(T.stamp_path(paths)),
+              "no stamp: builds under the lock and writes the stamp: %s" % said)
+        del calls[:], said[:]
+        check(T.build(env, paths) is False and not calls, "a stamped tree: no build call (%d)" % len(calls))
+        head = real_run(["git", "-C", ROOT, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+        check(any(s.startswith("up to date (%s" % head[:8]) and s.endswith("), opening") for s in said), "says up to date: %s" % said)
+        os.remove(T.packed_bise(paths["app"]))
+        del calls[:]
+        check(T.build(env, paths) is True and len(calls) == 1, "a missing output (the packed bise) builds again")
+        stamp = json.load(open(T.stamp_path(paths)))
+        with open(T.stamp_path(paths), "w") as f:
+            json.dump(dict(stamp, recipe="older"), f)
+        del calls[:]
+        check(T.build(env, paths) is True and len(calls) == 1, "another recipe builds again")
+        with open(T.stamp_path(paths), "w") as f:
+            json.dump(dict(stamp, head="0" * 40), f)
+        del calls[:]
+        check(T.build(env, paths) is True and len(calls) == 1, "another HEAD builds again")
+        s = T.build_stamp(env, paths, None)
+        check(T.up_to_date(s, dict(s), paths) and not T.up_to_date(s, dict(s, changes="x"), paths) and not T.up_to_date(s, None, paths),
+              "up_to_date: same stamp only")
+    finally:
+        T.subprocess.run, T.say = real_run, real_say
+        if old_sign is not None:
+            os.environ["BISE_TRY_SIGN_DIR"] = old_sign
+        shutil.rmtree(w, ignore_errors=True)
+
+
 def hook_keeps_pid():
     """BISE_TRY_OPEN (the gate's open): the app the hook starts is found and its pid kept in
     <try>/dev/desktop/app.pid, so --stop finds it (qa-native m_11066). The 'app' is a throwaway
@@ -231,6 +286,7 @@ def integration():
 
 if __name__ == "__main__":
     pure()
+    stamp_skips_build()
     if "--pure" not in sys.argv:
         hook_keeps_pid()
         integration()
