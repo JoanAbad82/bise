@@ -28,6 +28,7 @@ import type {
   Feature,
   Merged,
   Mode,
+  Model,
   Pr,
   Plugin,
   ProjectRow,
@@ -52,6 +53,7 @@ export const TAGS = {
   merged: true,
   features: true,
   prs: true,
+  models: true,
   diff: true,
   route: true,
   route_done: true,
@@ -232,6 +234,10 @@ export class Store {
   features(project: string): readonly Feature[] {
     return this.slice(`features:${project}`, EMPTY);
   }
+  /** the models a project's agents can run, the TUI's /model list (amb-feed 7dfd1c74) */
+  models(project: string): readonly Model[] {
+    return this.slice(`models:${project}`, EMPTY);
+  }
   /** a project's open PRs as the TUI's /prs (amb-feed 66faffe3): its head, rows, and the 'none' words; null until the hub sent them */
   prs(project: string): PrsList | null {
     return this.slice<PrsList | null>(`prs:${project}`, null);
@@ -309,6 +315,7 @@ export class Store {
       case 'dev_servers':
       case 'merged':
       case 'features':
+      case 'models':
       case 'jobs':
         this.put(`${ev.ev}:${ev.project}`, ev.items);
         return;

@@ -8,8 +8,14 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '@/ds';
 import type { Agent } from '@/proto';
-import { useAgents, useCoreEvent, useStore, useWorktrees, type Ev } from '@/store';
-import { EFFORTS, hasChanges, modelChoices, nameProblem, newAgent, renameAgent, setEffort, setModel } from './actions';
+import { useAgents, useCoreEvent, useModels, useStore, useWorktrees, type Ev } from '@/store';
+import { defaultWords, EFFORTS, effortsFor, hasChanges, modelGroups, modelOf, nameProblem, newAgent, renameAgent, setEffort, setModel } from './actions';
+
+/** The TUI's words for an effort (rust/tui/src/commands.rs effort_hint). */
+function hintOf(e: string): string {
+  const known: Record<string, string> = { none: 'no reasoning, the fastest', minimal: 'barely any reasoning', max: 'the hard stuff', xhigh: 'the hard stuff' };
+  return EFFORTS.find((x) => x.effort === e)?.hint ?? known[e] ?? '';
+}
 
 /** The hub's last refusal of one of `cmds` for this project, cleared by `clear`. */
 export function useRefusal(project: string, cmds: readonly string[]): { text: string | undefined; cmd: string | undefined; clear: () => void } {
@@ -38,7 +44,19 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
   const agents = useAgents(project);
   const refusal = useRefusal(project, ['rename', 'model', 'effort']);
   const [name, setName] = useState(a.name);
+  const models = useModels(project);
   const [model, setModelText] = useState(a.model ?? '');
+  // the model it runs, or the one he just picked until the agents event says so
+  const [picked, setPicked] = useState<string | undefined>(undefined);
+  const current = picked ?? a.model ?? '';
+  const groups = modelGroups(models);
+  const efforts = effortsFor(models, current);
+  const pick = (m: string) => {
+    refusal.clear();
+    if (setModel(store, project, a.name, m)) setPicked(m.trim());
+  };
+  // refused: back to the model it runs
+  if (picked !== undefined && refusal.cmd === 'model' && refusal.text !== undefined) setPicked(undefined);
   const problem = name.trim() === a.name ? undefined : nameProblem(name, agents, a.name);
   const id = a.name;
 
@@ -70,7 +88,6 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
       setName(a.name);
     }
   };
-  const choices = modelChoices(agents, a.model);
   return (
     <div className="ag-tune" data-testid={`agents.tune.${id}`}>
       {!a.main && (
@@ -98,10 +115,42 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
           )}
         </label>
       )}
-      <label className="ag-field">
+      <div className="ag-field ag-models">
         <span>model</span>
+        <div className="ag-model-list" role="listbox" aria-label="model" data-testid={`agents.models.${id}`}>
+          {groups.length === 0 && <em className="ag-why">the list comes from the hub</em>}
+          {groups.map((g) => (
+            <div key={g.head} className="ag-model-group">
+              <div className="ag-model-head">{g.head}</div>
+              {g.rows.map((m) => {
+                const on = m.id === current;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    role="option"
+                    aria-selected={on}
+                    className={on ? 'ag-model on' : 'ag-model'}
+                    onClick={() => {
+                      pick(m.id);
+                    }}
+                    data-testid={`agents.model.${id}.pick.${m.id}`}
+                  >
+                    <span className="ag-model-mark">{on ? '✓' : ''}</span>
+                    <span className="ag-model-label">{m.label}</span>
+                    {/* the catalog's own words, as they come (never rebuilt here) */}
+                    <span className="ag-model-short">{m.short}</span>
+                    {defaultWords(m) !== '' && <span className="ag-model-def">{defaultWords(m)}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      <label className="ag-field">
+        <span>or an id</span>
         <input
-          list={`ag-models-${id}`}
           value={model}
           placeholder="provider/model"
           onChange={(e) => {
@@ -110,24 +159,17 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
-              refusal.clear();
-              setModel(store, project, a.name, model);
+              pick(model);
             }
           }}
           spellCheck={false}
           data-testid={`agents.model.${id}`}
         />
-        <datalist id={`ag-models-${id}`}>
-          {choices.map((m) => (
-            <option key={m} value={m} />
-          ))}
-        </datalist>
         <Button
           kind="ghost"
-          disabled={model.trim() === '' || model.trim() === (a.model ?? '')}
+          disabled={model.trim() === '' || model.trim() === current}
           onClick={() => {
-            refusal.clear();
-            setModel(store, project, a.name, model);
+            pick(model);
           }}
           testId={`agents.model.${id}.set`}
         >
@@ -136,24 +178,28 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
       </label>
       <div className="ag-field" role="radiogroup" aria-label="reasoning effort">
         <span>reasoning</span>
-        {EFFORTS.map((x) => (
+        {efforts.map((e) => (
           <button
-            key={x.effort}
+            key={e}
             type="button"
             role="radio"
-            aria-checked={a.effort === x.effort}
-            className={a.effort === x.effort ? 'ag-seg on' : 'ag-seg'}
-            title={x.hint}
+            aria-checked={a.effort === e}
+            className={a.effort === e ? 'ag-seg on' : 'ag-seg'}
+            title={hintOf(e)}
             onClick={() => {
               refusal.clear();
-              setEffort(store, project, a.name, x.effort);
+              setEffort(store, project, a.name, e);
             }}
-            data-testid={`agents.effort.${id}.${x.effort}`}
+            data-testid={`agents.effort.${id}.${e}`}
           >
-            {x.effort}
+            {e}
           </button>
         ))}
-        {a.effort == null && <em className="ag-why">its model says none</em>}
+        {efforts.length === 0 && (
+          <em className="ag-why" data-testid={`agents.effort.${id}.none`}>
+            {modelOf(models, current)?.label ?? current} has no reasoning setting
+          </em>
+        )}
       </div>
       {refusal.text !== undefined && (
         <p className="ag-err" role="alert" data-testid={`agents.tune.${id}.error`}>

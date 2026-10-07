@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { Agent, HubCmd, Worktree } from '@/proto';
+import type { Agent, HubCmd, Model, Worktree } from '@/proto';
+import { hub_ev } from '@/proto/fixtures.gen';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider } from '@/store';
 import { createRouter, RouterContext } from '@/app/router';
-import { hasChanges, modelChoices, nameProblem, newCmd, renameAgent, setEffort, setModel } from './actions';
+import { defaultWords, effortsFor, hasChanges, modelChoices, modelGroups, modelOf, nameProblem, newCmd, renameAgent, setEffort, setModel } from './actions';
 import { AgentsScreen } from './AgentsScreen';
 
 const P = 'acme-1a2b3c4d';
@@ -162,4 +163,58 @@ describe('the agents screen: new, rename, model, reasoning', () => {
     });
     expect(renamed).toEqual(['perf']);
   });
+
+  it("the model list is the hub's catalog: under each provider then aliases, the catalog's words as they come, the current one marked, its default roles; reasoning follows the picked model", () => {
+    const { store, cmds, v } = setup();
+    const ev = hub_ev.find((e) => e.ev === 'models');
+    if (ev?.ev !== 'models') throw new Error('no models fixture');
+    act(() => {
+      store.apply({ ...ev, project: P });
+      store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('p99', { model: 'anthropic/claude-opus-5-5', effort: 'high' })] });
+    });
+    fireEvent.click(v.getByTestId('agents.more.p99'));
+    const list = v.getByTestId('agents.models.p99');
+    expect([...list.querySelectorAll('.ag-model-head')].map((h) => h.textContent)).toEqual(['Anthropic', 'Mistral', 'aliases']);
+    const opus = v.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5');
+    expect(opus.getAttribute('aria-selected')).toBe('true');
+    expect(opus.textContent).toContain('✓');
+    expect(opus.textContent).toContain('opus 5.5');
+    expect(opus.textContent).toContain('1M');
+    expect(opus.textContent).toContain('default for main and agents');
+    expect(v.getByTestId('agents.model.p99.pick.mistral/devstral-medium-latest').textContent).toContain('128k · config.toml');
+    expect(v.getByTestId('agents.model.p99.pick.opus').textContent).toContain('= anthropic/claude-opus-5-5');
+    // opus 5.5 takes low, medium, high, max
+    expect(v.getByTestId('agents.effort.p99.max')).toBeTruthy();
+    // devstral has no reasoning setting: picked, it says so and offers none
+    fireEvent.click(v.getByTestId('agents.model.p99.pick.mistral/devstral-medium-latest'));
+    expect(cmds).toContainEqual({ cmd: 'model', project: P, agent: 'p99', model: 'mistral/devstral-medium-latest' });
+    expect(v.queryByTestId('agents.effort.p99.high')).toBeNull();
+    expect(v.getByTestId('agents.effort.p99.none').textContent).toBe('devstral medium has no reasoning setting');
+    // refused: back to the model it runs
+    act(() => {
+      store.apply({ ev: 'error', project: P, cmd: 'model', text: 'no key for mistral yet: /provider' });
+    });
+    expect(v.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5').getAttribute('aria-selected')).toBe('true');
+    expect(v.getByTestId('agents.effort.p99.max')).toBeTruthy();
+  });
 });
+
+describe('the catalog, pure', () => {
+  it('groups, aliases resolved, efforts, default roles', () => {
+    const ev = hub_ev.find((e) => e.ev === 'models');
+    if (ev?.ev !== 'models') throw new Error('no models fixture');
+    const ms = ev.items;
+    expect(modelGroups(ms).map((g) => [g.head, g.rows.map((m) => m.id)])).toEqual([
+      ['Anthropic', ['anthropic/claude-opus-5-5']],
+      ['Mistral', ['mistral/devstral-medium-latest']],
+      ['aliases', ['opus']],
+    ]);
+    expect(modelOf(ms, 'opus')?.id).toBe('anthropic/claude-opus-5-5');
+    expect(effortsFor(ms, 'opus')).toEqual(['low', 'medium', 'high', 'max']);
+    expect(effortsFor(ms, 'mistral/devstral-medium-latest')).toEqual([]);
+    expect(effortsFor(ms, 'openai/unknown')).toEqual(['low', 'medium', 'high']);
+    expect(defaultWords(ms[0] as Model)).toBe('default for main and agents');
+    expect(defaultWords(ms[1] as Model)).toBe('');
+  });
+});
+

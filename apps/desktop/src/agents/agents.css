@@ -125,3 +125,62 @@
   margin: 0;
   color: var(--c-err);
 }
+
+/* the model list: the TUI's /model rows under their provider (amb-feed 7dfd1c74) */
+.ag-models {
+  align-items: flex-start;
+}
+
+.ag-model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow: auto;
+  min-width: 320px;
+}
+
+.ag-model-head {
+  margin: 6px 0 2px;
+  color: var(--c-text-2);
+  font-size: 12px;
+}
+
+.ag-model {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--c-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ag-model:hover {
+  background: var(--c-hover);
+}
+
+.ag-model.on {
+  background: var(--c-active);
+  font-weight: 600;
+}
+
+.ag-model-mark {
+  width: 1em;
+  color: var(--c-accent);
+}
+
+.ag-model-short,
+.ag-model-def {
+  color: var(--c-text-2);
+  font-weight: 400;
+}
+
+.ag-model-def {
+  margin-left: auto;
+  font-size: 12px;
+}

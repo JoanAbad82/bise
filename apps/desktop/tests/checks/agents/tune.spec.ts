@@ -28,6 +28,17 @@ const world = () => [
 
 type Ev = Parameters<FakeCore['send']>[0];
 
+// the hub's models event as the proto fixture has it (rust/proto/fixtures/hub_ev.jsonl)
+const MODELS = {
+  ev: 'models',
+  project: HOME,
+  items: [
+    { id: 'anthropic/claude-opus-5-5', label: 'opus 5.5', provider: 'Anthropic', short: '1M', context: 1000000, vision: true, efforts: ['low', 'medium', 'high', 'max'], default_effort: 'high', default_for: ['main', 'agents'] },
+    { id: 'mistral/devstral-medium-latest', label: 'devstral medium', provider: 'Mistral', short: '128k · config.toml', context: 128000, config: true, vision: false },
+    { id: 'opus', label: 'opus', provider: '', short: '= anthropic/claude-opus-5-5', alias_of: 'anthropic/claude-opus-5-5' },
+  ],
+};
+
 test('agents/tune: + new agent starts one; … renames it, sets its reasoning and model; a refusal shows in place', async () => {
   const helper = new FakeHelper();
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
@@ -53,9 +64,21 @@ test('agents/tune: + new agent starts one; … renames it, sets its reasoning an
     await expect(page.getByTestId('agents.effort.p99.medium')).toHaveAttribute('aria-checked', 'true');
     await page.getByTestId('agents.effort.p99.high').click();
     expect(await core.waitCmd((c) => c.cmd === 'effort', 5000)).toMatchObject({ cmd: 'effort', project: HOME, agent: 'p99', effort: 'high' });
+    // the hub's catalog (amb-feed 7dfd1c74): the TUI's /model rows, its words as they come
+    await core.send(MODELS as unknown as Ev);
+    await expect(page.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5'), "the catalog's row, its words as they come").toContainText('opus 5.5');
+    await expect(page.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5')).toContainText('default for main and agents');
+    await expect(page.getByTestId('agents.model.p99.pick.mistral/devstral-medium-latest')).toContainText('128k · config.toml');
+    await page.getByTestId('agents.model.p99.pick.mistral/devstral-medium-latest').click();
+    expect(await core.waitCmd((c) => c.cmd === 'model' && (c as { model?: string }).model === 'mistral/devstral-medium-latest', 5000)).toMatchObject({ agent: 'p99' });
+    await expect(page.getByTestId('agents.effort.p99.none'), 'a model with no reasoning setting says so').toHaveText('devstral medium has no reasoning setting');
+    await page.getByTestId('agents.model.p99.pick.anthropic/claude-opus-5-5').click();
+    await expect(page.getByTestId('agents.effort.p99.max'), "opus 5.5's own efforts").toBeVisible();
+    await page.screenshot({ path: test.info().outputPath('models.png') });
+    // a typed id still goes
     await page.getByTestId('agents.model.p99').fill('anthropic/claude-opus-4');
     await page.getByTestId('agents.model.p99.set').click();
-    expect(await core.waitCmd((c) => c.cmd === 'model', 5000)).toMatchObject({ cmd: 'model', project: HOME, agent: 'p99', model: 'anthropic/claude-opus-4' });
+    expect(await core.waitCmd((c) => c.cmd === 'model' && (c as { model?: string }).model === 'anthropic/claude-opus-4', 5000)).toMatchObject({ cmd: 'model', project: HOME, agent: 'p99' });
     await core.send({ ev: 'error', project: HOME, cmd: 'model', text: 'no key for anthropic yet: /provider' } as unknown as Ev);
     await expect(page.getByTestId('agents.tune.p99.error'), 'the refusal in place').toHaveText('no key for anthropic yet: /provider');
     await page.screenshot({ path: test.info().outputPath('tune.png') });
