@@ -468,6 +468,35 @@ def main():
         c.wait(lambda: (c.agent("t4") or {}).get("status") != "archived", 60, "t4 restored by a slash line")
         check(not by_cid(95) and not by_cid(96), "no error for a success: %r" % (by_cid(95) + by_cid(96)))
 
+        # /artifacts through slash (qa-flows d50c36c5, ambient-lead m_11250):
+        # the TUI runs it in its client, the window's line reaches the same
+        # add (art_add): a notice with its cid, the item in the artifacts
+        # event; 'add' alone is the usage, bare /artifacts the list
+        n, na = len(typed(c, "notice")), len(typed(c, "artifacts"))
+        slash("/artifacts add https://example.com/spec-from-the-window", 97)
+        c.wait(lambda: any(e.get("cid") == 97 for e in typed(c, "notice")) or by_cid(97), 20, "/artifacts add answered")
+        check(not by_cid(97) and any(e.get("cid") == 97 and e["text"].startswith("↗ added") for e in typed(c, "notice")[n:]), "an added notice: %r %r" % (by_cid(97), typed(c, "notice")[n:]))
+        c.wait(lambda: any("spec-from-the-window" in (i.get("url") or "") for x in typed(c, "artifacts")[na:] for i in x["items"]), 20, "the link in the artifacts event")
+        slash("/artifacts add", 98)
+        c.wait(lambda: by_cid(98), 20, "/artifacts add alone refused")
+        check(by_cid(98)[0]["text"].startswith("usage: /artifacts add"), "its usage: %r" % by_cid(98))
+        na = len(typed(c, "artifacts"))
+        slash("/artifacts", 99)
+        c.wait(lambda: len(typed(c, "artifacts")) > na, 20, "/artifacts answered with the artifacts event")
+        check(not by_cid(99), "no error for /artifacts: %r" % by_cid(99))
+
+        # /close N through slash on an open card (qa-flows d50c36c5): the
+        # card leaves the hub, no error
+        c.say('[[bash: sb card "close me by a slash line?"]]')
+        c.wait(lambda: any(x["kind"] == "question" for x in c.cards()), 60, "a card to close by slash")
+        shut = [x for x in c.cards() if x["kind"] == "question"][0]
+        c.wait_idle("main")
+        slash("/close %d" % shut["id"], 100)
+        c.wait(lambda: all(x["id"] != shut["id"] for x in c.cards()), 30, "the card closed by /close through slash")
+        c.wait(lambda: all(r["id"] != shut["id"] for r in typed(c, "cards")[-1]["cards"]), 30, "the typed cards without it")
+        check(not by_cid(100), "no error for /close of an open card: %r" % by_cid(100))
+        c.wait_idle("main", timeout=90)
+
         # every typed event has the frozen keys of the fixtures
         need = required_keys()
         for ev in typed(c):

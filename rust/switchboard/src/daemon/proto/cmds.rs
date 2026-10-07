@@ -281,6 +281,19 @@ impl Shell {
                     self.broadcast(&snap);
                 }
             }
+            Slash::Artifacts(None) => {
+                let ev = self.artifacts_ev();
+                let arts = self.proto_artifacts(&ev);
+                self.proto_send(id, &arts);
+            }
+            // the TUI's `artifacts` op's add (art_add), in this agent's view
+            Slash::Artifacts(Some(target)) => {
+                match self.art_add(&agent, &target, None) {
+                    Ok(text) => self.proto_send(id, &HubEv::Notice { project, cmd: Some(tag.to_string()), text, cid }),
+                    Err(e) => self.proto_error_cid(id, tag, &e, cid, refused),
+                }
+                self.artifacts_refresh(true);
+            }
             Slash::Step(cmd) => self.stepping(id, tag, cid, |sh| sh.step(Input::UserCmd { client: id, focus: agent, cmd })),
         }
     }

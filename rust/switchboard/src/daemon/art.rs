@@ -96,36 +96,9 @@ impl Shell {
                 self.artifacts_refresh(true);
             }
             "add" => {
-                let agent = match s("agent") {
-                    a if a.is_empty() => MAIN.to_string(),
-                    a => a,
-                };
-                let cwd = self
-                    .hub
-                    .st
-                    .agents
-                    .get(&agent)
-                    .map(|a| self.art_where(a))
-                    .map(|w| match w {
-                        Where::Checkout { dir, .. } | Where::Shared { dir, .. } => dir.to_string_lossy().to_string(),
-                    })
-                    .unwrap_or_else(|| self.hub.workspace.clone());
-                let add = Add {
-                    target: s("target"),
-                    title: Some(s("title")).filter(|t| !t.trim().is_empty()),
-                    kind: None,
-                    agent,
-                    by: "you".into(),
-                    cwd,
-                };
-                let ev = match self.art_store().add(&add, now_ms()) {
-                    Ok(a) => {
-                        let text = format!("↗ added: {}", a.meta.title);
-                        if a.new_version {
-                            self.art_lines(&a);
-                        }
-                        json!({"ev": "notice", "text": text})
-                    }
+                let title = Some(s("title")).filter(|t| !t.trim().is_empty());
+                let ev = match self.art_add(&s("agent"), &s("target"), title) {
+                    Ok(text) => json!({"ev": "notice", "text": text}),
                     Err(e) => json!({"ev": "warn", "text": format!("▲ {}", e)}),
                 };
                 if let Some(c) = self.clients.get_mut(&id) {
@@ -141,6 +114,34 @@ impl Shell {
                 }
             }
         }
+    }
+
+    /// `/artifacts add <path or link>` by the user in `agent`'s view (the
+    /// TUI's `artifacts` op and the window's `slash`): the store's add,
+    /// its thread lines, and the words for the one who asked (`↗ added:
+    /// <title>`) or the store's refusal. The caller sends them and then
+    /// `artifacts_refresh(true)`.
+    pub(super) fn art_add(&mut self, agent: &str, target: &str, title: Option<String>) -> Result<String, String> {
+        let agent = match agent {
+            "" => MAIN.to_string(),
+            a => a.to_string(),
+        };
+        let cwd = self
+            .hub
+            .st
+            .agents
+            .get(&agent)
+            .map(|a| self.art_where(a))
+            .map(|w| match w {
+                Where::Checkout { dir, .. } | Where::Shared { dir, .. } => dir.to_string_lossy().to_string(),
+            })
+            .unwrap_or_else(|| self.hub.workspace.clone());
+        let add = Add { target: target.to_string(), title, kind: None, agent, by: "you".into(), cwd };
+        let a = self.art_store().add(&add, now_ms())?;
+        if a.new_version {
+            self.art_lines(&a);
+        }
+        Ok(format!("↗ added: {}", a.meta.title))
     }
 
     /// `sb artifact add|list` (an agent's request).

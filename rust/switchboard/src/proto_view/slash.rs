@@ -6,6 +6,7 @@
 //! (`agents`, `prs`, a `notice`), never an error.
 
 use crate::flow::FlowMode;
+use bise_proto::slash::{Artifacts, ARTIFACTS_ADD};
 use crate::router::UserCmd;
 
 /// What a slash line does.
@@ -23,6 +24,11 @@ pub enum Slash {
     /// `/flow [pr|trunk]`: the repo's flow, shown or set by the TUI's
     /// writer; its words as a `notice`, a refusal as an `error`
     Flow(Option<FlowMode>),
+    /// `/artifacts`: that connection's `artifacts` event (the window has
+    /// its own screen for it); `/artifacts add <path or link>`: the
+    /// hub's add, the one the TUI's client asks with its `artifacts` op
+    /// (the TUI runs `/artifacts` itself: the router never sees it)
+    Artifacts(Option<String>),
     /// everything else: one step of the TUI's own handler
     /// (`Input::UserCmd`), its refusals as `error`s with the cid
     Step(UserCmd),
@@ -37,6 +43,12 @@ pub fn route(cmd: UserCmd) -> Slash {
         UserCmd::Prs => Slash::Prs,
         UserCmd::Help => Slash::Help,
         UserCmd::Flow { set } => Slash::Flow(set),
+        UserCmd::Passthrough(l) => match bise_proto::slash::artifacts(&l) {
+            Some(Artifacts::List) => Slash::Artifacts(None),
+            Some(Artifacts::Add(target)) => Slash::Artifacts(Some(target)),
+            Some(Artifacts::Usage) => Slash::Refuse(ARTIFACTS_ADD.into()),
+            None => Slash::Step(UserCmd::Passthrough(l)),
+        },
         cmd => Slash::Step(cmd),
     }
 }
@@ -71,5 +83,10 @@ mod tests {
         assert!(matches!(r("/close 3"), Slash::Step(UserCmd::Close { card: 3 })));
         assert!(matches!(r("/compact"), Slash::Step(UserCmd::Passthrough(_))));
         assert!(matches!(r("@docs hi"), Slash::Step(UserCmd::To { .. })));
+        assert!(matches!(r("/artifacts"), Slash::Artifacts(None)));
+        assert!(matches!(r("/artifacts add https://x.dev/a b"), Slash::Artifacts(Some(t)) if t == "https://x.dev/a b"));
+        assert!(matches!(r("/artifacts add  "), Slash::Refuse(e) if e == ARTIFACTS_ADD));
+        assert!(matches!(r("/artifacts addx"), Slash::Artifacts(None)));
+        assert!(matches!(r("/bogus"), Slash::Step(UserCmd::Passthrough(_))));
     }
 }

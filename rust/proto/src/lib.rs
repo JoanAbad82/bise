@@ -44,6 +44,7 @@ pub mod helper;
 pub mod hub;
 pub mod pty;
 pub mod rows;
+pub mod slash;
 pub mod thread;
 
 use serde::de::DeserializeOwned;

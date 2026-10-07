@@ -1144,19 +1144,16 @@ pub(crate) fn handle_input(app: &mut App, v: &str) -> Vec<Ev> {
             crate::scheduled_screen::open(app);
             return out;
         }
+        // bise_proto::slash reads it, as the hub reads the window's line
         Some("/artifacts") => {
-            let rest = typed.trim_start_matches("/artifacts").trim();
-            match rest.strip_prefix("add") {
-                Some(target) if rest == "add" || rest.starts_with("add ") => {
-                    let target = target.trim();
-                    if target.is_empty() {
-                        out.push(Ev::Warn("/artifacts add <path or link>".into()));
-                    } else {
-                        let agent = app.sb.focus.clone();
-                        app.sb.send(json!({"op": "artifacts", "do": "add", "target": target, "agent": agent}));
-                    }
+            use bise_proto::slash::{artifacts, Artifacts, ARTIFACTS_ADD};
+            match artifacts(&typed) {
+                Some(Artifacts::Usage) => out.push(Ev::Warn(ARTIFACTS_ADD.into())),
+                Some(Artifacts::Add(target)) => {
+                    let agent = app.sb.focus.clone();
+                    app.sb.send(json!({"op": "artifacts", "do": "add", "target": target, "agent": agent}));
                 }
-                _ => crate::artifacts_screen::open(app),
+                Some(Artifacts::List) | None => crate::artifacts_screen::open(app),
             }
             return out;
         }
