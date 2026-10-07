@@ -20,6 +20,7 @@ import { pickCommands, slashLine, slashOf, windowRun } from './commands';
 import { HELP_EVENT } from '@/app/keys';
 import { MAIN } from '@/app/route';
 import { RefusedLine } from '@/app/Refused';
+import { keep, keptStorage } from '@/app/keep';
 import { FirstRun, showsFirstRun, Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
 import { takeQuotes } from '@/review/quote';
@@ -86,9 +87,18 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   const typing = useTyping(tkey);
   const busy = me?.status === 'working' || typing !== '';
 
-  const [findOpen, setFindOpen] = useState(false);
+  // ⌘F's bar stays open across a reload (keep.ts: an open panel, no age); its folds too
+  const findKey = `find.open:${project}/${agent}`;
+  const [findOpen, setFindOpenState] = useState(() => keep.view(findKey) === true);
+  const setFindOpen = useCallback(
+    (on: boolean) => {
+      setFindOpenState(on);
+      keep.setView(findKey, on ? true : undefined);
+    },
+    [findKey],
+  );
   const [mark] = useState(createFindMark);
-  const [folds] = useState(createFolds);
+  const [folds] = useState(() => createFolds(`${project}/${agent}`));
   const list = useRef<ThreadListHandle>(null);
   // his bug 3: a selection in the thread, then a key, quotes it in the composer
   const section = useRef<HTMLElement>(null);
@@ -184,7 +194,16 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   // an approval never takes words: his words stay a message and the card keeps waiting
   const docked = useStripCard(project);
   const dockedKey = docked === null ? null : `${docked.project}-${String(docked.id)}`;
-  const [plainFor, setPlainFor] = useState<string | null>(null);
+  // his esc to a plain message holds across a reload (keep.ts: the answering mode, 10 minutes)
+  const plainKey = `plain:${project}`;
+  const [plainFor, setPlainForState] = useState<string | null>(() => {
+    const v = keep.view(plainKey);
+    return typeof v === 'string' ? v : null;
+  });
+  const setPlainFor = (k: string) => {
+    setPlainForState(k);
+    keep.setView(plainKey, k, true);
+  };
   const answering = docked !== null && takesWords(docked) && plainFor !== dockedKey ? docked : null;
   const onKeyDownCapture = (e: KeyboardEvent) => {
     if (e.key !== 'Escape' || answering === null || dockedKey === null) return;
@@ -429,7 +448,7 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
     </div>
   );
   if (!view.loaded && keys.length === 0 && tail === undefined) return <div className="th-list th-loading" data-testid="thread.loading" />;
-  return <ThreadList ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} tail={tail} testId="thread.list" />;
+  return <ThreadList ref={listRef} keys={keys} row={row} more={view.more} onOlder={onOlder} head={<Marker>older messages…</Marker>} tail={tail} testId="thread.list" keepKey={tkey} />;
 });
 
 /** "3 agents · 1 at work · 2 waiting": a project's live agents (main out). Pure. */
@@ -676,7 +695,8 @@ export const ThreadComposer = memo(function ThreadComposer({
     },
     [store, project, agent, onSent, onCommand, answer, about],
   );
-  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} to={to} placeholder={placeholder} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
+  // his drafts, history and queue in the keep's file, never lost by a quit (keep.ts)
+  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} placeholder={placeholder} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
 });
 
 /** A message about an artifact: `about [its title](its url): his words` (the chip's own link form). Pure. */

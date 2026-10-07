@@ -8,6 +8,7 @@ import { useStore, useThreadOrder } from '@/store';
 import { findText } from './entry';
 import { counter, currentMatch, EMPTY, newer, older, refresh, search, wantsOlder, type FindState } from './find';
 import type { FindMark } from './findmark';
+import { caretAtEnd, useKeptText } from '@/app/keep';
 
 export interface FindBarProps {
   tkey: string;
@@ -22,6 +23,9 @@ export interface FindBarProps {
 export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarProps) {
   const store = useStore();
   const view = useThreadOrder(tkey);
+  // his needle survives a reload until he closes the bar (keep.ts)
+  const [kept, keepNeedle, dropNeedle] = useKeptText(`find:${project}/${agent}`);
+  const [first] = useState(kept);
   const [s, setS] = useState<FindState>(EMPTY);
   const field = useRef<HTMLInputElement>(null);
 
@@ -59,9 +63,20 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
     [mark],
   );
 
+  // a kept needle searches again once, at mount, with the caret at its end
+  const [searched, setSearched] = useState(first === '');
+  if (!searched) {
+    setSearched(true);
+    setS(search(entries, first));
+  }
   useEffect(() => {
     field.current?.focus();
+    caretAtEnd(field.current);
   }, []);
+  const close = (): void => {
+    dropNeedle();
+    onClose();
+  };
 
   return (
     <div className="th-find" data-testid="thread.find" role="search">
@@ -70,7 +85,9 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
         testId="thread.find.field"
         placeholder="find in this thread"
         aria-label="find in this thread"
+        defaultValue={first}
         onChange={(e) => {
+          keepNeedle(e.currentTarget.value);
           setS(search(entries, e.currentTarget.value));
         }}
         onKeyDown={(e) => {
@@ -80,7 +97,7 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
           } else if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
-            onClose();
+            close();
           }
         }}
       />
@@ -107,7 +124,7 @@ export function FindBar({ tkey, project, agent, mark, onGo, onClose }: FindBarPr
       >
         ↓
       </Button>
-      <Button kind="ghost" title="close (esc)" onClick={onClose} testId="thread.find.close">
+      <Button kind="ghost" title="close (esc)" onClick={close} testId="thread.find.close">
         ×
       </Button>
     </div>

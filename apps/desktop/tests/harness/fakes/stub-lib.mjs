@@ -31,7 +31,17 @@ function lines(on) {
 export function runStub({ start = [], sock, log, quitCmd, answer }) {
   const out = (line) => process.stdout.write(line + NL);
   for (const l of start) out(typeof l === 'string' ? l : JSON.stringify(l));
-  const relay = out;
+  // a test's {"harness":"exit","code":n} line ends this process with that code (a core that
+  // stops: the app restarts it, amb-win's app/keep); any other line goes out as is
+  const relay = (line) => {
+    if (line.startsWith('{"harness":"exit"')) {
+      let code = 1;
+      try { code = Number(JSON.parse(line).code ?? 1); } catch { /* the default */ }
+      quit(code);
+      return;
+    }
+    out(line);
+  };
   let server;
   if (sock) {
     rmSync(sock, { force: true });
@@ -43,11 +53,11 @@ export function runStub({ start = [], sock, log, quitCmd, answer }) {
     });
     server.listen(sock);
   }
-  const quit = () => {
+  function quit(code = 0) {
     server?.close();
     if (sock) rmSync(sock, { force: true });
-    process.exit(0);
-  };
+    process.exit(code);
+  }
   const s = lines((line) => {
     if (log) appendFileSync(log, line + NL);
     let cmd;

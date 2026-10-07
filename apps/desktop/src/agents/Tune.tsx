@@ -12,6 +12,7 @@ import { useAgents, useCoreEvent, useModels, useStore, useWorktrees, type Ev } f
 import { defaultWords, EFFORTS, effortsFor, hasChanges, modelGroups, modelOf, nameProblem, newAgent, renameAgent, setEffort } from './actions';
 import { modelOrSetup } from '@/settings';
 import { useRouter } from '@/app/router';
+import { useKeptText } from '@/app/keep';
 
 /** The TUI's words for an effort (rust/tui/src/commands.rs effort_hint). */
 function hintOf(e: string): string {
@@ -46,9 +47,22 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
   const router = useRouter();
   const agents = useAgents(project);
   const refusal = useRefusal(project, ['rename', 'model', 'effort']);
-  const [name, setName] = useState(a.name);
+  // his rename and his typed model id survive a reload until done or put back (keep.ts)
+  const [keptName, keepName, dropName] = useKeptText(a.main ? null : `rename:${project}/${a.name}`);
+  const [name, setNameState] = useState(keptName === '' ? a.name : keptName);
+  const setName = (n: string) => {
+    setNameState(n);
+    if (n === a.name) dropName();
+    else keepName(n);
+  };
   const models = useModels(project);
-  const [model, setModelText] = useState(a.model ?? '');
+  const [keptModel, keepModel, dropModel] = useKeptText(`model:${project}/${a.name}`);
+  const [model, setModelState] = useState(keptModel === '' ? (a.model ?? '') : keptModel);
+  const setModelText = (m: string) => {
+    setModelState(m);
+    if (m === (a.model ?? '')) dropModel();
+    else keepModel(m);
+  };
   // the model it runs, or the one he just picked until the agents row moves:
   // a pick is held only while the row still says the model it said at the
   // pick, so any agents event with another model (his pick landing, or a
@@ -77,7 +91,10 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
         router.go({ screen: 'settings', page: 'models' });
       },
     });
-    if (how === 'sent') setPicked(model);
+    if (how === 'sent') {
+      setPicked(model);
+      dropModel();
+    }
   };
   // refused: back to the model it runs
   if (picked !== undefined && refusal.cmd === 'model' && refusal.text !== undefined) setPicked(undefined);
@@ -95,8 +112,9 @@ export function Tune({ project, a, onRenamed }: { project: string; a: Agent; onR
   useEffect(() => {
     if (landed === undefined || done.current) return;
     done.current = true;
+    dropName();
     onRenamed?.(landed);
-  }, [landed, onRenamed]);
+  }, [landed, onRenamed, dropName]);
 
   const rename = () => {
     if (problem !== undefined || renaming !== undefined) return;
@@ -240,19 +258,32 @@ export function NewAgentSheet({ project, onDone }: { project: string; onDone: ()
   const agents = useAgents(project);
   const changes = hasChanges(useWorktrees(project));
   const refusal = useRefusal(project, ['new']);
-  const [brief, setBrief] = useState('');
-  const [name, setName] = useState('');
+  // his brief and name survive a reload until he starts it or cancels (keep.ts)
+  const [brief, setBrief, dropBrief] = useKeptText(`new:${project}`);
+  const [name, setName, dropNewName] = useKeptText(`new.name:${project}`);
   const [worktree, setWorktree] = useState(false);
   const [withChanges, setWithChanges] = useState(false);
   const [sent, setSent] = useState(false);
+  // the name it was started with (the field's kept words are dropped at the send)
+  const [sentName, setSentName] = useState('');
   const problem = name.trim() === '' ? undefined : nameProblem(name, agents);
+  const cancel = () => {
+    dropBrief();
+    dropNewName();
+    onDone();
+  };
   const send = () => {
     if (problem !== undefined) return;
     refusal.clear();
-    if (newAgent(store, project, { brief, name, worktree, withChanges: changes && withChanges })) setSent(true);
+    if (newAgent(store, project, { brief, name, worktree, withChanges: changes && withChanges })) {
+      setSent(true);
+      setSentName(name.trim());
+      dropBrief();
+      dropNewName();
+    }
   };
   // the new row came: the sheet's job is done
-  if (sent && refusal.text === undefined && name.trim() !== '' && agents.some((a) => a.name === name.trim())) onDone();
+  if (sent && refusal.text === undefined && sentName !== '' && agents.some((a) => a.name === sentName)) onDone();
   return (
     <div className="ag-sheet" data-testid="agents.newsheet">
       <textarea
@@ -270,7 +301,7 @@ export function NewAgentSheet({ project, onDone }: { project: string; onDone: ()
             send();
           } else if (e.key === 'Escape') {
             e.preventDefault();
-            onDone();
+            cancel();
           }
         }}
         data-testid="agents.new.brief"
@@ -318,7 +349,7 @@ export function NewAgentSheet({ project, onDone }: { project: string; onDone: ()
         <Button kind="pri" disabled={brief.trim() === '' || problem !== undefined} onClick={send} testId="agents.new.send">
           start it ⏎
         </Button>
-        <Button kind="ghost" onClick={onDone} testId="agents.new.cancel">
+        <Button kind="ghost" onClick={cancel} testId="agents.new.cancel">
           cancel
         </Button>
         {sent && refusal.text === undefined && <span className="ag-why">starting…</span>}

@@ -3,6 +3,7 @@
 // Owner: amb-win. The height is kept across launches (localStorage).
 import { useSyncExternalStore } from 'react';
 import { DEFAULT_H } from './model';
+import { keep } from '@/app/keep';
 
 export interface PanelState {
   /** the panel is on screen */
@@ -23,10 +24,14 @@ function savedHeight(): number {
   }
 }
 
-let state: PanelState = { shown: false, opened: false, height: savedHeight() };
+// shown across a reload, an update swap or the next day (keep.ts: an open panel, no age)
+const SHOWN = 'terminal';
+const keptShown = keep.view(SHOWN) === true;
+let state: PanelState = { shown: keptShown, opened: keptShown, height: savedHeight() };
 const listeners = new Set<() => void>();
 
 function set(next: PanelState) {
+  if (next.shown !== state.shown) keep.setView(SHOWN, next.shown ? true : undefined);
   state = next;
   for (const l of listeners) l();
 }

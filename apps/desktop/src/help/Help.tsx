@@ -6,20 +6,24 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Field, Kbd, Seg } from '@/ds';
 import { escOf, helpRows, otherPage, PAGES, type HelpPage } from './rows';
+import { caretAtEnd, useKeptText } from '@/app/keep';
 import './help.css';
 
 const STEP = 40;
 
 export function Help({ onClose, page: first = 'help' }: { onClose: () => void; page?: HelpPage }) {
   const [page, setPage] = useState<HelpPage>(first);
-  const [q, setQ] = useState('');
+  // his filter survives a reload while help is open (keep.ts; closing it drops it)
+  const [q, setQ, dropQ] = useKeptText('help');
   const field = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const sections = helpRows(page, q);
 
   useEffect(() => {
     field.current?.focus();
+    caretAtEnd(field.current);
   }, []);
+  useEffect(() => dropQ, [dropQ]);
 
   const scroll = (by: number | 'top' | 'end') => {
     const el = list.current;

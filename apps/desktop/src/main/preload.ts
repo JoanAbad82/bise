@@ -77,6 +77,16 @@ const api: BiseApi = {
     ipcRenderer.send(IPC.helperCmd, cmd);
   },
   surface,
+  // the renderer's keep on disk (amb-win, src/main/keep.ts)
+  keep: {
+    read: () => {
+      const t: unknown = ipcRenderer.sendSync(IPC.keepRead, surface);
+      return typeof t === 'string' ? t : null;
+    },
+    write: (text) => {
+      ipcRenderer.send(IPC.keepWrite, surface, text);
+    },
+  },
   capsule: {
     show: (at, keys, fit) => {
       ipcRenderer.send(IPC.capsuleShow, at, keys, fit);

@@ -11,6 +11,7 @@
 // - the list never holds the composer: it sits beside it in the screen.
 import { useCallback, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
+import { keep } from '@/app/keep';
 import './thread.css';
 
 // no extra parts (Virtuoso reads its `components` object: never undefined)
@@ -47,6 +48,8 @@ export interface ThreadListProps {
   tail?: ReactNode;
   testId?: string;
   ref?: Ref<ThreadListHandle>;
+  /** where his scroll is kept across a reload (keep.ts 'scroll:<it>', 10 minutes); none: not kept */
+  keepKey?: string;
 }
 
 /**
@@ -68,7 +71,7 @@ export function newAtEnd(last: string | undefined, keys: readonly string[]): num
   return i < 0 ? 0 : keys.length - 1 - i;
 }
 
-export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref }: ThreadListProps) {
+export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref, keepKey }: ThreadListProps) {
   const virtuoso = useRef<VirtuosoHandle>(null);
   // the anchor of firstItemIndex, moved during render (React's
   // "state from the previous render" pattern): no effect, no extra frame
@@ -98,12 +101,10 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref }
   // until a scroll event says the item was reached, and a thread shorter
   // than the screen never scrolls, so its rows stayed invisible and could
   // not be selected (his bug 3, qa-type 7a27cbab). Once, when the first rows come.
+  // After a reload (keep.ts) it opens where he had scrolled up to, if that row is loaded
+  // (below, once `stick` exists).
   const opened = useRef(false);
-  useLayoutEffect(() => {
-    if (opened.current || keys.length === 0) return;
-    opened.current = true;
-    virtuoso.current?.scrollToIndex(LAST);
-  }, [keys.length]);
+  const scrollKey = keepKey === undefined ? undefined : `scroll:${keepKey}`;
 
   // it stays at its end until HE scrolls up (qa-type b37dc4c1, his bug 5):
   // rows measured after the first scroll (long answers, markdown, the real
@@ -123,6 +124,29 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref }
   const onGrow = useCallback(() => {
     if (stick.current) toEndNow();
   }, [toEndNow]);
+
+  useLayoutEffect(() => {
+    if (opened.current || keys.length === 0) return;
+    opened.current = true;
+    const at = scrollKey === undefined ? undefined : keep.view(scrollKey);
+    const i = typeof at === 'string' ? keys.indexOf(at) : -1;
+    if (i >= 0 && i < keys.length - 1) {
+      // unstuck now (no growth may take it back to the end), drawn so in the next tick
+      stick.current = false;
+      queueMicrotask(() => {
+        setStuck(false);
+      });
+      virtuoso.current?.scrollToIndex({ index: i, align: 'start' });
+    } else virtuoso.current?.scrollToIndex(LAST);
+  }, [keys, scrollKey]);
+  // his place while scrolled up (the first row in view); at the end, nothing kept
+  const onRange = useCallback(
+    (r: { startIndex: number }) => {
+      if (scrollKey === undefined || !opened.current) return;
+      keep.setView(scrollKey, stick.current ? undefined : keys[r.startIndex - next.index], true);
+    },
+    [scrollKey, keys, next.index],
+  );
 
   const toEnd = useCallback(() => {
     setStick(true);
@@ -162,6 +186,7 @@ export function ThreadList({ keys, row, more, onOlder, head, tail, testId, ref }
         itemContent={(_, key) => row(key)}
         followOutput={(b) => (b || stick.current ? 'auto' : false)}
         totalListHeightChanged={onGrow}
+        rangeChanged={onRange}
         alignToBottom
         startReached={startReached}
         atBottomStateChange={(b) => {

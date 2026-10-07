@@ -13,5 +13,7 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     environment: 'node',
     passWithNoTests: true,
+    // the window's keep starts empty for every test (src/test-setup.ts)
+    setupFiles: ['src/test-setup.ts'],
   },
 });

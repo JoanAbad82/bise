@@ -91,6 +91,14 @@ export class FakeCore extends Stub<CoreEv | HubEv, AppCmd | HubCmd> {
     }
   }
 
+  /**
+   * The core stops (exit `code`): the app's main starts it again after its backoff, and the new
+   * one sends its start world again (amb-win's app/keep: a core restart loses nothing).
+   */
+  async exit(code = 1): Promise<void> {
+    await this.raw([JSON.stringify({ harness: 'exit', code })]);
+  }
+
   env(): Record<string, string> {
     return {
       BISE_DESKTOP_BISE: this.stub,

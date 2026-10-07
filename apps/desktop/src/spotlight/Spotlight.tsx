@@ -9,7 +9,11 @@ import { Spot, SpotGroup, SpotRow, type DotState } from '@/ds';
 import { LivePearl, type Mood } from '@/pearl';
 import { flat, routeList, spotList, type AgentStatus, type SpotData, type SpotItem } from './list';
 import { W, newBrief } from './words';
+import { caretAtEnd, keep } from '@/app/keep';
 import './spotlight.css';
+
+/** His typed words' field in the keep (keep.ts). */
+const KEPT = 'spot';
 
 export interface SpotAnswer {
   readonly text: string;
@@ -113,7 +117,8 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
   const testId = p.testId ?? 'spot';
   const input = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLDivElement>(null);
-  const [text, setText] = useState('');
+  // his words survive a reload or an update swap until sent or put away with esc (keep.ts, amb-win)
+  const [text, setText] = useState(() => keep.text(KEPT));
   // the list follows the words at React's pace; the input itself is never re-rendered by it
   const query = useDeferredValue(text);
   const route = p.route ?? null;
@@ -128,6 +133,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
 
   useEffect(() => {
     input.current?.focus();
+    caretAtEnd(input.current);
   }, []);
 
   useEffect(() => {
@@ -150,6 +156,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
     else props.current.onAsk(q.trim());
     if (input.current !== null) input.current.value = ''; // his send: the one write to the input
     setText('');
+    keep.dropText(KEPT);
   };
 
   const pick = (item: SpotItem): void => {
@@ -185,7 +192,10 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
     } else if (e.key === 'Escape') {
       e.preventDefault();
       if (route !== null) p.onRouteKeep?.();
-      else p.onClose();
+      else {
+        keep.dropText(KEPT);
+        p.onClose();
+      }
     } else if (e.metaKey && /^[1-9]$/u.test(e.key)) {
       const env = items.find((x) => x.kind === 'env' && x.n === Number(e.key));
       if (env !== undefined) {
@@ -213,8 +223,10 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
             spellCheck={false}
             autoComplete="off"
             data-testid={`${testId}.input`}
+            defaultValue={text}
             onInput={(e) => {
               setText(e.currentTarget.value);
+              keep.setText(KEPT, e.currentTarget.value);
             }}
             onKeyDown={onKeyDown}
           />

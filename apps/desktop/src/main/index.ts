@@ -13,7 +13,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme, session } from 'electron';
 import { BADGE_LINE, CORE_IPC, IPC, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
 import { Capsule, installCapsuleIpc } from './capsule';
 import { badgeOf, CountKeeper, titleOf } from './counts';
@@ -23,6 +23,7 @@ import { adoptLoginEnv } from './loginenv';
 import { onCoreEvent, sendToCore, startCore, stopCore } from './core/ipc';
 import { configOfPrefs } from './helper/config';
 import { installIpc, sendClip, sendMenu, setProjectRoots } from './ipc';
+import { installKeepIpc } from './keep';
 import { projectRoots } from './reveal';
 import { menuTemplate } from './menu';
 import { startTerms, type TermHost } from './term/host';
@@ -82,6 +83,8 @@ const loginEnv = adoptLoginEnv(process.platform, testMode);
 
 void app.whenReady().then(() => {
   installIpc(testMode);
+  // what he typed or opened, on disk for a reload, a relaunch or a crash (src/main/keep.ts)
+  installKeepIpc(app.getPath('userData'));
   const helper = startHelper(testMode);
   // his prefs (excluded apps...) reach the helper now and on every change
   if (helper !== null) {
@@ -178,6 +181,9 @@ void app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+  // the composer's history and the panels' own bits still live in localStorage: on disk before
+  // the app goes (Chromium writes it lazily; the keep itself is a file, src/main/keep.ts)
+  session.defaultSession.flushStorageData();
   terms?.stopAll();
   stopCore();
 });

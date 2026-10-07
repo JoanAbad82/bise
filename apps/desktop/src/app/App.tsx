@@ -8,7 +8,8 @@
 // touches, never the shell, the sidebar or the composer.
 import { useEffect, useState, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
-import { formatRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
+import { formatRoute, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
+import { keep } from './keep';
 import { useMainRoutes, useMenuRouting } from './menu';
 import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { ThreadScreen } from '@/thread/ThreadScreen';
@@ -44,6 +45,15 @@ import './app.css';
 
 export function App() {
   const [router] = useState(() => createRouter(firstRoute()));
+  // the window reopens where he left it, after a reload, an update swap or the next day (m_11763)
+  useEffect(() => {
+    const save = () => {
+      keep.setView('route', formatRoute(router.get()));
+    };
+    // the start route counts too (a deeplink, a test's start route): no move may follow
+    save();
+    return router.subscribe(save);
+  }, [router]);
   return (
     <RouterContext value={router}>
       <Shell />
@@ -61,7 +71,15 @@ function firstRoute(): Route {
     panel.show();
     return { screen: 'bise' };
   }
-  return (testMode() ? startRouteOf(window.location.hash) : undefined) ?? { screen: 'bise' };
+  return (testMode() ? startRouteOf(window.location.hash) : undefined) ?? keptRoute() ?? { screen: 'bise' };
+}
+
+/** Where he was when the window last closed (keep.ts), unless that was a test lab. */
+function keptRoute(): Route | undefined {
+  const s = keep.view('route');
+  if (typeof s !== 'string' || s === '') return undefined;
+  const r = parseRoute(s);
+  return r.screen === 'notfound' || r.screen === 'lab' ? undefined : r;
 }
 
 const TERMINAL = /^#?route=terminal$/;

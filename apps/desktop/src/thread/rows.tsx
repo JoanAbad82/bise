@@ -271,7 +271,7 @@ export function thoughtFor(ms: number): string {
 
 /** What the model thought: one folded line, open to its words (⌘E opens them all). */
 function ThinkingLine({ pos, head, body }: { pos: number; head: string; body: string }) {
-  const [open, setOpen] = useFold();
+  const [open, setOpen] = useFold(false, pos);
   const toggle = () => {
     setOpen((o) => !o);
   };
@@ -291,7 +291,7 @@ function ThinkingLine({ pos, head, body }: { pos: number; head: string; body: st
  * Scheduled): the head is the hub's words as sent; the words it sends open under it (none: no ▸).
  */
 function ScheduledRow({ e }: { e: Entry }) {
-  const [open, setOpen] = useFold();
+  const [open, setOpen] = useFold(false, e.pos);
   const s = e.scheduled;
   const head = s?.head ?? e.text;
   const words = s?.words ?? '';
@@ -323,7 +323,7 @@ function ScheduledRow({ e }: { e: Entry }) {
 }
 
 function CompactedRow({ e }: { e: Entry }) {
-  const [open, setOpen] = useFold();
+  const [open, setOpen] = useFold(false, e.pos);
   const toggle = () => {
     setOpen((o) => !o);
   };
@@ -424,7 +424,7 @@ export function foldOf(text: string): { head: string; lines: number } | undefine
 }
 
 function YouRow({ e, ctx, head }: { e: Entry; ctx: RowCtx; head: boolean }) {
-  const [open, setOpen] = useFold();
+  const [open, setOpen] = useFold(false, e.pos);
   // the fn context block the hub appended never shows: a chip from the typed context instead
   const text = stripContext(e.text);
   const fold = foldOf(text);
@@ -472,7 +472,7 @@ function ContextChip({ chip, ctx, pos }: { chip: NonNullable<ReturnType<typeof c
 
 /** Its tool calls in a row: one counted line, open to the steps. */
 function ToolsRow({ e }: { e: Entry }) {
-  const [open, setOpen] = useFold();
+  const [open, setOpen] = useFold(false, e.pos);
   const items = e.tools?.items ?? [];
   return (
     <Tool

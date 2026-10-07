@@ -78,6 +78,12 @@ export interface BiseApi {
   readonly helper: (cmd: HelperCmd) => void;
   /** Which window this page is: the main window or the capsule. */
   readonly surface: Surface;
+  /**
+   * This surface's keep on disk (amb-win, src/app/keep.ts + src/main/keep.ts): what he typed or
+   * opened, read once at start (sync), written whole at each change. Optional: a page outside
+   * Electron (a lab) keeps it in memory.
+   */
+  readonly keep?: { readonly read: () => string | null; readonly write: (text: string) => void };
   /** The capsule's window (src/main/capsule.ts): where it shows, its size. */
   readonly capsule: CapsuleApi;
   /** Opens the main window, on `route` when given (the capsule's ⏎, a card's 'open'). */
@@ -258,6 +264,9 @@ export const IPC = {
   updateNow: 'bise:update-now',
   updateInstall: 'bise:update-install',
   updateRevert: 'bise:update-revert',
+  /** the renderer's keep on disk (amb-win, src/main/keep.ts): read (sync) at start, write each change */
+  keepRead: 'bise:keep-read',
+  keepWrite: 'bise:keep-write',
 } as const;
 
 /**

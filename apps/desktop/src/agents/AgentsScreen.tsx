@@ -11,6 +11,7 @@ import type { Agent } from '@/proto';
 import { useAgents, useStore } from '@/store';
 import { useRouter } from '@/app/router';
 import { useNow } from '@/app/clock';
+import { keep } from '@/app/keep';
 import { archivedOf, dotOf, endOf, lineOf, liveOf } from './model';
 import { NewAgentSheet, Tune } from './Tune';
 import './agents.css';
@@ -40,7 +41,16 @@ export function AgentsScreen({ project, projectName }: { project: string; projec
   const live = liveOf(agents);
   const archived = archivedOf(agents);
   const [showArchived, setShowArchived] = useState(false);
-  const [adding, setAdding] = useState(false);
+  // the new-agent sheet stays open across a reload (keep.ts: an open panel, no age)
+  const addKey = `new.open:${project}`;
+  const [adding, setAddingState] = useState(() => keep.view(addKey) === true);
+  const setAdding = (f: boolean | ((x: boolean) => boolean)) => {
+    setAddingState((x) => {
+      const on = typeof f === 'function' ? f(x) : f;
+      keep.setView(addKey, on ? true : undefined);
+      return on;
+    });
+  };
   const router = useRouter();
   // W6/K18: ↑↓ select an agent, space shows its feed in place, space again (or esc) closes it
   const [sel, setSel] = useState<string | null>(null);
@@ -123,7 +133,16 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: 
   const now = useNow();
   const end = endOf(a, now);
   const id = a.name;
-  const [tuning, setTuning] = useState(false);
+  // its tune panel stays open across a reload (keep.ts: an open panel, no age)
+  const tuneKey = `tune.open:${project}/${a.name}`;
+  const [tuning, setTuningState] = useState(() => keep.view(tuneKey) === true);
+  const setTuning = (f: boolean | ((x: boolean) => boolean)) => {
+    setTuningState((x) => {
+      const on = typeof f === 'function' ? f(x) : f;
+      keep.setView(tuneKey, on ? true : undefined);
+      return on;
+    });
+  };
   return (
     <div className={sel ? 'ag-item is-sel' : 'ag-item'} data-testid={`agents.row.${id}`} data-status={a.status} data-sel={sel || undefined} aria-selected={sel}>
       <Row

@@ -8,7 +8,7 @@
 // focus emulation on (the caret is drawn in a window that is never focused), the window-server
 // watch (proof.ts) from the first moment: its first violation kills the app at once, and the test
 // fails on it. close() proves again, stops the watch and kills what is left by pid.
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { _electron as electron, type CDPSession, type ElectronApplication, type Page } from '@playwright/test';
 import { DESKTOP_DIR, harnessElectron } from './electron';
@@ -41,6 +41,12 @@ export type LaunchOptions = {
    * (under ~/.bise/gate/) or a /tmp/bh-* home, nothing else; same env and sentinel, never deleted.
    */
   home?: string;
+  /**
+   * A userData folder the test made and shares between its launches, as an update swap relaunches
+   * on the same one (amb-win, keep m_11756): only a /tmp/bh-<x>/userdata folder (testUserData()),
+   * never anything else; the launch's close leaves it, the test removes it.
+   */
+  userData?: string;
 };
 
 /**
@@ -101,6 +107,8 @@ export type Session = {
   close: () => Promise<Proof>;
   /** what the guards stopped so far: windows opened, navigations, non-offscreen windows (installGuards) */
   blocked: () => Promise<string[]>;
+  /** this launch's userData folder (pass it as LaunchOptions.userData to relaunch on it) */
+  userData: string;
 };
 
 const chromiumArgs = (o: LaunchOptions): string[] =>
@@ -150,7 +158,7 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
   watcherBinary(); // compiled before the app starts, so the watch starts within ms of the launch
   // every launch's own throwaway home, made here and never taken from the caller (isolation.ts)
   const h = o.home !== undefined ? adoptHome(o.home) : testHome();
-  const userData = path.join(h.root, 'userdata');
+  const userData = o.userData !== undefined ? reusedUserData(o.userData) : path.join(h.root, 'userdata');
   mkdirSync(userData, { recursive: true });
   const appEnv = harnessEnv(h, { ...env, BISE_HARNESS_USER_DATA: userData, BISE_DESKTOP_USER_DATA: userData }, o.env);
   let app: ElectronApplication | undefined;
@@ -184,7 +192,7 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
     };
     const blocked = (): Promise<string[]> =>
       opened.evaluate(() => [...((globalThis as unknown as { __biseHarnessBlocked?: string[] }).__biseHarnessBlocked ?? [])]);
-    return { app, page, cdp, proof, watch, close, blocked };
+    return { app, page, cdp, proof, watch, close, blocked, userData };
   } catch (e) {
     watch?.stop();
     const tree = await sentinel.tree();
@@ -194,6 +202,22 @@ async function start(args: string[], env: Record<string, string>, o: LaunchOptio
     if (stopped) throw new Error(`run stopped by the watch: ${stopped}`);
     throw e;
   }
+}
+
+/** A userData folder for several launches of one test (LaunchOptions.userData); the test removes its parent. */
+export function testUserData(): string {
+  const dir = path.join(mkdtempSync(path.join('/tmp', 'bh-')), 'userdata');
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+// A test's shared userData, only if it is a /tmp/bh-<x>/userdata folder (testUserData()).
+function reusedUserData(dir: string): string {
+  let real: string;
+  try { real = realpathSync(dir); } catch { throw new Error(`harness: userData ${dir} doesn't exist`); }
+  const rel = path.relative('/private/tmp', real).split(path.sep);
+  if (rel.length !== 2 || !(rel[0] ?? '').startsWith('bh-') || rel[1] !== 'userdata') throw new Error(`harness: refused userData ${real}: only another launch's /tmp/bh-*/userdata`);
+  return real;
 }
 
 /** Any local HTML file in the harness's own window (the harness's self-tests use fixtures/). */
