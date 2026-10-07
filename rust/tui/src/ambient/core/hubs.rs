@@ -190,12 +190,16 @@ impl Core {
     }
 
     /// `cid` (G): the failed send's, echoed so the window fails exactly
-    /// that row (nothing reached a thread: reason refused).
-    fn project_error(&mut self, project: &str, cmd: &str, text: &str, cid: Option<u64>) {
+    /// that row (nothing reached a thread: reason refused). `kind`: what
+    /// failed, for the window to draw (bise_proto::hub::ErrorKind).
+    fn project_error(&mut self, project: &str, cmd: &str, text: &str, cid: Option<u64>, kind: Option<bise_proto::hub::ErrorKind>) {
         let mut ev = json!({"ev": "error", "project": project, "cmd": cmd, "text": text});
         if let Some(cid) = cid {
             ev["cid"] = json!(cid);
             ev["reason"] = json!("refused");
+        }
+        if let Some(k) = kind {
+            ev["kind"] = json!(k);
         }
         self.emit(ev);
     }
@@ -218,20 +222,20 @@ impl Core {
         let (project, cmd, agent) = (s("project"), s("cmd"), s("agent"));
         let cid = v.get("cid").and_then(Value::as_u64);
         if self.hubs.ports.is_none() {
-            return self.project_error(&project, &cmd, "this core has no projects", cid);
+            return self.project_error(&project, &cmd, "this core has no projects", cid, None);
         }
         let Some(row) = self.hubs.rows.iter().find(|r| r.id == project).cloned() else {
-            return self.project_error(&project, &cmd, &format!("there's no project {project}"), cid);
+            return self.project_error(&project, &cmd, &format!("there's no project {project}"), cid, None);
         };
         // before shown, home only (architect m_10133: its own words, so a
         // window that sends too early reads plainly in the logs)
         if !row.home && self.hubs.shown.is_none() {
-            return self.project_error(&project, &cmd, &format!("project {project} isn't shown yet"), cid);
+            return self.project_error(&project, &cmd, &format!("project {project} isn't shown yet"), cid, None);
         }
         // never a hub for a folder that is gone (its hub would start on a
         // missing workspace)
         if cmd != "unsubscribe" && !self.folder_exists(&row.path) {
-            return self.project_error(&project, &cmd, &format!("{}: its folder is gone", row.name), cid);
+            return self.project_error(&project, &cmd, &format!("{}: its folder is gone", row.name), cid, None);
         }
         if track(&mut self.hubs.subs, &cmd, &project, &agent) {
             self.hold();
@@ -298,7 +302,7 @@ impl Core {
             close |= c.until.is_some_and(|u| u <= now) && c.pending.is_empty();
         }
         for (id, cmd, cid) in late {
-            self.project_error(&id, &cmd, "its hub didn't start: nothing sent. try again in a moment.", cid);
+            self.project_error(&id, &cmd, "its hub didn't start: nothing sent. try again in a moment.", cid, None);
         }
         if close {
             self.hold_at(now);
@@ -427,7 +431,7 @@ impl Core {
                             *u = Instant::now() + LINGER;
                         }
                         for (cmd, cid) in failed {
-                            self.project_error(id, &cmd, "its hub went away: nothing sent. try again in a moment.", cid);
+                            self.project_error(id, &cmd, "its hub went away: nothing sent. try again in a moment.", cid, None);
                         }
                     }
                     HubEv::Agents { agents, .. } => {

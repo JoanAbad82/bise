@@ -217,6 +217,11 @@ pub enum HubEv {
         /// stands in for his row)
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
+        /// draft: what kind of failure, for the window to draw (never its
+        /// text): the hub is older than this core (hub_older, amb-feed's
+        /// hub skew) or refused this core's connection (hub_refused)
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        kind: Option<ErrorKind>,
     },
     /// a tag this version doesn't know (a newer hub): kept whole, ignored
     #[serde(skip)]
@@ -492,4 +497,24 @@ mod tests {
         let new = HubEv::decode(r#"{"ev":"welcome","project":"p","proto":1,"workspace":"/w","name":"w","cmds":["hello","slash"]}"#).unwrap();
         assert!(matches!(&new, HubEv::Welcome { cmds, .. } if cmds == &["hello", "slash"]));
     }
+}
+
+/// draft: the kind of an [`HubEv::Error`], one enum for every typed
+/// failure the window draws by kind (architect m_11379): a kind this
+/// version doesn't know reads as Unknown. Only the desktop core sets
+/// these, about a hub (a hub never says it is older or refused: its own
+/// errors carry none); the window draws by kind, and falls back to the
+/// text for Unknown or none, never matching the text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum ErrorKind {
+    /// the project's hub is older than this core: the command is one it
+    /// doesn't know (amb-feed's hub skew, Welcome.cmds)
+    HubOlder,
+    /// the project's hub refused this core's connection (issue 16: a
+    /// process an agent started); nothing is sent until he retries
+    HubRefused,
+    #[serde(other)]
+    Unknown,
 }

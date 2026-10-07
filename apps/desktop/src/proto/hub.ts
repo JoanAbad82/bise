@@ -75,7 +75,13 @@ cid?: number | null,
  * hub wrote its undelivered line in the thread: that entry
  * stands in for his row)
  */
-reason?: string | null, };
+reason?: string | null, 
+/**
+ * draft: what kind of failure, for the window to draw (never its
+ * text): the hub is older than this core (hub_older, amb-feed's
+ * hub skew) or refused this core's connection (hub_refused)
+ */
+kind?: ErrorKind | null, };
 
 export type Mode = "now" | "queued";
 
@@ -105,3 +111,10 @@ files?: Array<string>,
  * to this connection only (never journaled: view state)
  */
 cid?: number | null, } | { "cmd": "answer", project: string, card: number, reply: string, } | { "cmd": "close", project: string, card: number, } | { "cmd": "confirm", project: string, id: number, yes: boolean, } | { "cmd": "approvals", project: string, mode?: string | null, } | { "cmd": "remove_rule", project: string, rule: ApprovalRule, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, } | { "cmd": "diff", project: string, agent: string, commit?: string | null, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "features", project: string, } | { "cmd": "prs", project: string, } | { "cmd": "models", project: string, } | { "cmd": "new", project: string, name?: string | null, brief: string, worktree?: boolean, with_changes?: boolean, } | { "cmd": "rename", project: string, agent: string, to: string, } | { "cmd": "model", project: string, agent: string, model: string, default?: boolean, } | { "cmd": "effort", project: string, agent: string, effort: string, } | { "cmd": "route_correct", project: string, rid: number, to: string, } | { "cmd": "route_cancel", project: string, rid: number, } | { "cmd": "follow", project: string, agent: string, on: boolean, } | { "cmd": "slash", project: string, agent: string, line: string, cid?: number | null, };
+
+/**
+ * draft: the kind of an [`HubEv::Error`], one enum for every typed
+ * failure the window draws by kind (architect m_11379): a kind this
+ * version doesn't know reads as Unknown.
+ */
+export type ErrorKind = "hub_older" | "hub_refused" | "unknown";
