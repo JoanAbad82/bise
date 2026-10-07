@@ -4306,8 +4306,7 @@ def hub_apply_names(s: HM.St, e: HM.Ev, u: HI.NamesApart(s), +k: HX.FreshEv(s, e
         case HM.EAct{a}:
           u
         case HM.EFollow{+x, +f, +h}:
-          +op = HM.OFollow{Bool.pick(Maybe<&2, String>, f, Some{h}, None{})}
-          hub_nok_tr(HI.profile(HM.map_agent(ag, x, op)), HI.profile(ag), hub_prof_map(ag, x, op, {==}), u)
+          hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OFollow{Bool.pick(Maybe<&2, String>, f, Some{h}, None{})})), HI.profile(ag), hub_prof_map(ag, x, HM.OFollow{Bool.pick(Maybe<&2, String>, f, Some{h}, None{})}, {==}), u)
         case HM.EJobEnd{+x, b}:
           hub_nok_tr(HI.profile(HM.map_agent(ag, x, HM.OFollow{None{}})), HI.profile(ag), hub_prof_map(ag, x, HM.OFollow{None{}}, {==}), u)
 
