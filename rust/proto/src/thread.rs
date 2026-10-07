@@ -25,8 +25,6 @@ pub enum EntryKind {
     Agent,
     /// a message from another agent (`from`)
     FromAgent,
-    /// a message this agent sent another one (`to`; `asks`: it waits
-    /// for the reply, its question), sb-core's `sent` line
     /// its tool calls in a row
     Tools,
     Card,
@@ -38,6 +36,61 @@ pub enum EntryKind {
     /// a message this agent sent another one (`to`; `asks`: it waits
     /// for the reply, its question), sb-core's `sent` line
     ToAgent,
+    /// the model's reasoning with no words after it (a tool-call-only
+    /// turn; `thinking`: how long, the text), folded as "thought for
+    /// 3.2s". A reply's own thinking rides on its `agent` entry.
+    Thinking,
+    /// a compaction started (`≡ compacting`)
+    Compacting,
+    /// a compaction's summary (the text), folded
+    Compacted,
+    /// a line of the runtime or the hub for him (`notice`: info, warn or
+    /// err, the words): a failed turn and why, a retry, a warning
+    Notice,
+    /// his message didn't reach its agent (`not_delivered`: to whom, his
+    /// text, never lost)
+    NotDelivered,
+    /// a kind this reader doesn't know (a newer hub)
+    #[serde(other)]
+    Unknown,
+}
+
+/// A `thinking` entry: how long the model thought (ms, 0 unknown: a
+/// replay) and what.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Thinking {
+    pub ms: u64,
+    pub text: String,
+}
+
+/// How a notice reads: info (dim), warn (▲, what to do), err (✗).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum NoticeLevel {
+    Info,
+    Warn,
+    Err,
+    #[serde(other)]
+    Unknown,
+}
+
+/// A `notice` entry: its level and its words ([`words::notice`]).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Notice {
+    pub level: NoticeLevel,
+    pub text: String,
+}
+
+/// A `not_delivered` entry: the agent his message didn't reach, and his
+/// text (BISE-86: send again or drop it).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct NotDelivered {
+    pub to: String,
+    pub text: String,
 }
 
 /// What a tool call did, for the counted summary.
@@ -146,11 +199,57 @@ pub struct Entry {
     /// opens for it says `for` the same)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub msg: Option<u64>,
+    /// a `thinking` entry's, or an `agent` reply's own: the reasoning
+    /// before it ("thought for 3.2s", folded)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<Thinking>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notice: Option<Notice>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub not_delivered: Option<NotDelivered>,
 }
 
 impl Entry {
     fn new(pos: Pos, at_ms: u64, kind: EntryKind, text: String) -> Entry {
-        Entry { pos, at_ms, kind, text, from: None, tools: None, card: None, page: None, report: None, context: None, to: None, asks: false, msg: None }
+        Entry {
+            pos,
+            at_ms,
+            kind,
+            text,
+            from: None,
+            tools: None,
+            card: None,
+            page: None,
+            report: None,
+            context: None,
+            to: None,
+            asks: false,
+            msg: None,
+            thinking: None,
+            notice: None,
+            not_delivered: None,
+        }
+    }
+
+    /// Law (architect m_10476): an entry of a kind with a payload carries
+    /// exactly that payload, and no other kind's: `pr` never comes with
+    /// `pr: None`. The kinds without a payload carry none, but for an
+    /// `agent` reply's own thinking (one line, one entry: pos is the key).
+    pub fn payload_matches_kind(&self) -> bool {
+        let has = [
+            (EntryKind::Tools, self.tools.is_some()),
+            (EntryKind::Card, self.card.is_some()),
+            (EntryKind::Page, self.page.is_some()),
+            (EntryKind::Report, self.report.is_some()),
+            (EntryKind::Notice, self.notice.is_some()),
+            (EntryKind::NotDelivered, self.not_delivered.is_some()),
+        ];
+        let thinking = match self.kind {
+            EntryKind::Thinking => self.thinking.is_some(),
+            EntryKind::Agent => true,
+            _ => self.thinking.is_none(),
+        };
+        thinking && has.iter().all(|(k, set)| *set == (self.kind == *k))
     }
 }
 
@@ -163,6 +262,9 @@ pub type Line = (Pos, u64, String);
 pub struct Ctx<'a> {
     pub open_cards: &'a [u64],
     pub page: &'a dyn Fn(&str) -> Option<PageRef>,
+    /// a provider's name for people, by its id or its key variable (a
+    /// missing key's notice; the catalog's `provider_name`)
+    pub provider: &'a dyn Fn(&str, &str) -> String,
 }
 
 /// A page of a thread: the newest `limit` entries of `lines`. `more`: the

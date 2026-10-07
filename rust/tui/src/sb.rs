@@ -1425,11 +1425,12 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
         Hub::Artifact { id, agent, title, kind, v } => Ev::Made { id, agent, title, kind, v },
         // site/m/artifacts D
         Hub::Landed { agent, from, sha, files, add, del, .. } => Ev::Landed { agent, from, sha, files, add, del },
-        Hub::Spawn(text) => Ev::Info(format!("✚ {}", text)),
-        // computer use (design §7.3): `↖ api-v2 stopped driving Chrome · you stopped it`
-        Hub::Computer(text) => Ev::Info(text),
-        Hub::Direct(text) => Ev::Info(format!("⇄ {}", text)),
-        Hub::Warn(text) => Ev::Warn(text),
+        // a spawn (✚), computer use (design §7.3: `↖ api-v2 stopped
+        // driving Chrome · you stopped it`), a direct message (⇄), a
+        // warning: the notices the hub's fold shows too
+        h @ (Hub::Spawn(_) | Hub::Computer(_) | Hub::Direct(_) | Hub::Warn(_)) => {
+            return bise_proto::thread::words::hub_notice(&h).map(crate::wire::notice_ev)
+        }
         // site/m/timers: a scheduled task set or ended
         Hub::Scheduled(json) => return crate::scheduled::hub_line(&json),
         Hub::Stopped(text) => Ev::Info(text),

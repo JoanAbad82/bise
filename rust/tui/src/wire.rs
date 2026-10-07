@@ -5,7 +5,7 @@
 
 use crate::{fmt_elapsed, sb, truncate_chars, usage};
 use bise_proto::thread::lines::{self, Obs, Rec, TurnEnd};
-use bise_proto::thread::words;
+use bise_proto::thread::{words, Notice, NoticeLevel};
 
 // ---- feed events ----
 
@@ -351,12 +351,8 @@ fn rec_ev(rec: Rec) -> Option<Ev> {
         Rec::ToolCode { id, code } => Ev::ToolCode { id, code },
         Rec::ToolResult { id, ok, preview } => Ev::ToolResult { id, ok, preview },
         Rec::Sub { name, ok, preview } => Ev::Sub { name, ok, preview },
-        // BR-003: right after an interrupt the in-flight completion has
-        // no turn to land on - expected plumbing, not an error
-        Rec::Rejected(r) if r == "no pending completion" || r == "no pending tool result" => {
-            Ev::Info("in-flight response dropped (turn interrupted)".into())
-        }
-        Rec::Rejected(r) => Ev::Err(r),
+        // BR-003: right after an interrupt, an info; else an error
+        Rec::Rejected(r) => notice_ev(words::rejected(&r)),
         // a replayed message was committed: the model read it
         Rec::HistYou(t) => Ev::You(t, Mark::Read, false),
         // steering the Core committed: your message with this text was
@@ -383,55 +379,30 @@ fn obs_ev(o: Obs) -> Option<Ev> {
         // C3: steering moves the mark of your message, no info line
         Obs::SteeringReceived(text) => Ev::MarkYou { text, mark: Mark::Received, or: None },
         Obs::Steered(text) => Ev::MarkYou { text, mark: Mark::Read, or: None },
-        Obs::NotificationReceived(t) => Ev::Info(format!("notification : {}", t)),
-        Obs::NotificationDelivered(t) => Ev::Info(format!("notification delivered to the model: {}", t)),
-        Obs::ProviderRetry(t) => Ev::Warn(words::provider_retry(&t)),
-        Obs::HarnessRestarted(t) => Ev::Err(format!(
-            "the harness crashed ({}) and restarted — the current turn is interrupted, the history is restored up to the last model call",
-            t
-        )),
-        // no key, or a ChatGPT plan line: the turn's end says it, once
-        // (BISE-294; subscriptions)
-        Obs::CandidateDiscarded(t) if no_key(&t).is_some() || words::is_plan_line(&t) => return None,
-        Obs::CandidateDiscarded(t) => Ev::Warn(format!("candidate discarded: {}", t)),
         Obs::CompactionStarted => Ev::Compact,
-        Obs::CompactionFailed(t) => Ev::Err(format!("compaction failed: {}", t)),
-        Obs::SessionRestored(t) => Ev::Info(format!("session restored · {} messages", t.trim_end_matches(" messages"))),
         Obs::CompactionDone(text) => Ev::Compacted { text, open: false },
         Obs::Usage(t) => return usage::Usage::parse(&t).map(Ev::Usage),
-        Obs::NullIteration => Ev::Warn("empty response from the model — retrying".into()),
         // a completed turn needs no annotation; a failure or an
         // interrupt must never disappear — the turn just stops
         Obs::TurnDone(TurnEnd::Completed) => Ev::TurnDone,
-        Obs::TurnDone(TurnEnd::Failed(why)) => turn_failed(&why),
-        // a stop someone asked for (by main, by the user), not a failure
-        Obs::TurnDone(TurnEnd::Interrupted { by: None }) => Ev::Warn("turn interrupted".into()),
-        Obs::TurnDone(TurnEnd::Interrupted { by: Some(by) }) => Ev::Warn(format!("turn interrupted by {}", by)),
-        Obs::TurnDone(TurnEnd::Other(t)) => Ev::Err(format!("turn stopped: {}", t)),
-        // the runtime ran out of execution budget mid-turn (never silent)
-        Obs::TurnStalled(t) => Ev::Err(format!("turn stopped: {}", t)),
+        // expired-ux (designer m_7456): the TUI signs in again on ⏎, a
+        // shorter path than the runtime's /provider (the CLI and the
+        // window keep the runtime's words)
+        Obs::TurnDone(TurnEnd::Failed(why)) if words::is_expired_line(&why) => Ev::Warn(EXPIRED_TUI.into()),
         Obs::Other(o) => Ev::Raw(o),
+        // the notices (a failed turn and why, a retry, a stop someone
+        // asked for...): the words the hub's fold shows too
+        o => return words::obs_notice(&o, &crate::models::provider_name).map(notice_ev),
     })
 }
 
-/// A turn that ended on `failed: <why>`.
-fn turn_failed(why: &str) -> Ev {
-    // the ChatGPT plan's own lines (subscriptions design, item 5): a
-    // limit, plan use off, usage not checked, the sign-in expired: a ▲
-    // that says what to do, not a ✗ failure
-    if words::is_plan_line(why) {
-        // expired-ux (designer m_7456): the TUI signs in again on ⏎, a
-        // shorter path than the runtime's /provider (the CLI keeps the
-        // runtime's words)
-        if words::is_expired_line(why) {
-            return Ev::Warn(EXPIRED_TUI.into());
-        }
-        return Ev::Warn(why.to_string());
+/// A notice (bise-proto's words) as the TUI's line of its level.
+pub(crate) fn notice_ev(n: Notice) -> Ev {
+    match n.level {
+        NoticeLevel::Warn => Ev::Warn(n.text),
+        NoticeLevel::Err => Ev::Err(n.text),
+        NoticeLevel::Info | NoticeLevel::Unknown => Ev::Info(n.text),
     }
-    if let Some(line) = no_key(why) {
-        return Ev::Err(line);
-    }
-    Ev::Err(format!("turn failed: {}", why))
 }
 
 /// The openings of the runtime's ChatGPT plan lines (bend/runtime, the
@@ -529,6 +500,7 @@ pub(crate) fn parse_history(v: &serde_json::Value) -> Vec<HistLine> {
 /// (OPENROUTER_API_KEY is not set): /provider sets it up`), and the older
 /// runtime's bare `OPENROUTER_API_KEY is not set`, as the designer's line:
 /// `turn stopped: no OpenRouter key yet. /provider sets it up.`
+#[cfg(test)]
 pub(crate) fn no_key(why: &str) -> Option<String> {
     words::no_key(why, &|id, var| crate::models::provider_name(id, var))
 }

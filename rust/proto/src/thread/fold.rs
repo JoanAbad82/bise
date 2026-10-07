@@ -3,8 +3,8 @@
 //! call's pos; a message on several lines is one entry).
 
 use super::lines::{self, Hub, Obs, Rec};
-use super::words::{one_line, summary};
-use super::{Ctx, Entry, EntryCard, EntryKind, Line, PageRef, ReportRef, ToolItem, ToolKind, Tools};
+use super::words::{self, one_line, summary};
+use super::{Ctx, Entry, EntryCard, EntryKind, Line, NotDelivered, Notice, PageRef, ReportRef, Thinking, ToolItem, ToolKind, Tools};
 use crate::context::FnContext;
 use crate::rows::question;
 
@@ -17,6 +17,8 @@ struct Fold<'a> {
     /// the 'you' entry the previous line pushed: the only one a context
     /// line may attach to
     you: Option<usize>,
+    /// the previous line's time (0: a replay), for a thinking's duration
+    last_ms: u64,
     ctx: &'a Ctx<'a>,
 }
 
@@ -83,7 +85,13 @@ impl Fold<'_> {
     }
 
     fn line(&mut self, pos: u64, ms: u64, line: &str) {
-        let line = line.strip_prefix("history ").unwrap_or(line);
+        // a line the REPL replays has the time of the replay: its
+        // thinking has no duration
+        let (line, replayed) = match line.strip_prefix("history ") {
+            Some(l) => (l, true),
+            None => (line, false),
+        };
+        let prev = std::mem::replace(&mut self.last_ms, if replayed { 0 } else { ms });
         let you = self.you.take();
         let rec = lines::read(line);
         match rec {
@@ -92,20 +100,57 @@ impl Fold<'_> {
             _ => self.cont = None,
         }
         match rec {
-            Rec::Obs(Obs::Assistant(t)) => {
-                let vis = lines::split_thinking(&t).map(|(_, v)| v).unwrap_or(t);
-                let text = lines::unescape(&vis).trim().to_string();
-                if !text.is_empty() {
-                    self.push(Entry::new(pos, ms, EntryKind::Agent, text));
-                }
-            }
+            Rec::Obs(o) => self.obs(pos, ms, o, if replayed { 0 } else { prev }),
             Rec::Tool { id, name, args } => self.tool(pos, ms, id, &name, &args),
             Rec::ToolIntent { id, text } => self.intent(id, &text),
+            Rec::Rejected(r) => self.notice(pos, ms, words::rejected(&r)),
             Rec::Hub(h) => self.hub(pos, ms, h, you),
             // a message's next line
             Rec::Raw(line) => self.more(&line),
             _ => {}
         }
+    }
+
+    fn obs(&mut self, pos: u64, ms: u64, o: Obs, prev: u64) {
+        match o {
+            // one line, one entry (pos is the entry's key): the thinking
+            // rides on the reply it comes before; a reply with nothing
+            // visible (a tool-call-only turn) is a thinking entry alone
+            Obs::Assistant(t) => {
+                let (thinking, vis) = match lines::split_thinking(&t) {
+                    Some((think, vis)) => {
+                        let ms_thought = words::thought_ms(prev, ms);
+                        (Some(Thinking { ms: ms_thought, text: lines::unescape(&think).trim().to_string() }), vis)
+                    }
+                    None => (None, t),
+                };
+                let text = lines::unescape(&vis).trim().to_string();
+                let mut e = match (&thinking, text.is_empty()) {
+                    (_, false) => Entry::new(pos, ms, EntryKind::Agent, text),
+                    (Some(th), true) => Entry::new(pos, ms, EntryKind::Thinking, words::thought_for(th.ms)),
+                    (None, true) => return,
+                };
+                e.thinking = thinking;
+                self.push(e);
+            }
+            Obs::CompactionStarted => {
+                self.push(Entry::new(pos, ms, EntryKind::Compacting, "compacting".into()));
+            }
+            Obs::CompactionDone(t) => {
+                self.push(Entry::new(pos, ms, EntryKind::Compacted, lines::unescape(&t)));
+            }
+            o => {
+                if let Some(n) = words::obs_notice(&o, self.ctx.provider) {
+                    self.notice(pos, ms, n);
+                }
+            }
+        }
+    }
+
+    fn notice(&mut self, pos: u64, ms: u64, n: Notice) {
+        let mut e = Entry::new(pos, ms, EntryKind::Notice, n.text.clone());
+        e.notice = Some(n);
+        self.push(e);
     }
 
     fn hub(&mut self, pos: u64, ms: u64, h: Hub, you: Option<usize>) {
@@ -138,6 +183,13 @@ impl Fold<'_> {
             Hub::Stopped(text) => {
                 self.push(Entry::new(pos, ms, EntryKind::Stopped, text));
             }
+            // BISE-86: his message didn't reach `to`; no cid here (the
+            // hub's error to his window carries it, architect m_10348)
+            Hub::Undelivered { to, text } => {
+                let mut e = Entry::new(pos, ms, EntryKind::NotDelivered, text.clone());
+                e.not_delivered = Some(NotDelivered { to, text });
+                self.push(e);
+            }
             Hub::MsgYou { body, .. } => {
                 self.cont = Some(self.push(Entry::new(pos, ms, EntryKind::Agent, body)));
             }
@@ -149,7 +201,12 @@ impl Fold<'_> {
                 e.card = Some(card);
                 self.cont = Some(self.push(e));
             }
-            _ => {}
+            // a warning, a spawn, computer use, a direct message
+            h => {
+                if let Some(n) = words::hub_notice(&h) {
+                    self.notice(pos, ms, n);
+                }
+            }
         }
     }
 
@@ -168,7 +225,7 @@ impl Fold<'_> {
 
 /// An agent's transcript lines as entries, oldest first.
 pub fn fold(lines: &[Line], ctx: &Ctx) -> Vec<Entry> {
-    let mut f = Fold { out: Vec::new(), cont: None, tools: Vec::new(), you: None, ctx };
+    let mut f = Fold { out: Vec::new(), cont: None, tools: Vec::new(), you: None, last_ms: 0, ctx };
     for (pos, ms, l) in lines {
         f.line(*pos, *ms, l);
     }

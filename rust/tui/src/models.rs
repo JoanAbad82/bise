@@ -161,13 +161,7 @@ pub(crate) fn full_name(model: &str) -> Option<String> {
 /// (`OPENROUTER_API_KEY` -> OpenRouter); the id or the variable itself
 /// when the catalog has none.
 pub(crate) fn provider_name(id: &str, key_env: &str) -> String {
-    let c = &setup().catalog;
-    let p = if id.is_empty() {
-        c.providers.iter().find(|p| !p.key_env.is_empty() && p.key_env == key_env && p.chats())
-    } else {
-        c.provider(id)
-    };
-    p.map(|p| p.name.clone()).unwrap_or_else(|| if id.is_empty() { key_env.to_string() } else { id.to_string() })
+    setup().catalog.provider_name(id, key_env)
 }
 
 /// The providers not ready, the offered ones first: `/model`'s last

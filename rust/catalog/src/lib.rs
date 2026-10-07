@@ -516,6 +516,19 @@ impl Catalog {
         self.providers.iter().find(|p| p.id == id)
     }
 
+    /// A provider's name for people, by its id or its key variable
+    /// (`OPENROUTER_API_KEY` -> OpenRouter); the id or the variable itself
+    /// when the catalog has none. The TUI's and the hub's (a missing
+    /// key's line, bise_proto's `words::no_key`).
+    pub fn provider_name(&self, id: &str, key_env: &str) -> String {
+        let p = if id.is_empty() {
+            self.providers.iter().find(|p| !p.key_env.is_empty() && p.key_env == key_env && p.chats())
+        } else {
+            self.provider(id)
+        };
+        p.map(|p| p.name.clone()).unwrap_or_else(|| if id.is_empty() { key_env.to_string() } else { id.to_string() })
+    }
+
     pub fn model(&self, name: &str) -> Option<&Model> {
         let (p, m) = split_name(name)?;
         self.models.iter().find(|x| x.provider == p && x.id == m)

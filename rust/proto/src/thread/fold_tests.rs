@@ -26,7 +26,7 @@ fn lines() -> Vec<Line> {
 }
 
 fn ctx_with<'a>(open: &'a [u64], page: &'a dyn Fn(&str) -> Option<PageRef>) -> Ctx<'a> {
-    Ctx { open_cards: open, page }
+    Ctx { open_cards: open, page, provider: &|id: &str, key: &str| if id.is_empty() { key.to_string() } else { id.to_uppercase() } }
 }
 
 #[test]
@@ -36,6 +36,7 @@ fn a_thread_folds_into_entries() {
     let kinds: Vec<EntryKind> = e.iter().map(|e| e.kind).collect();
     use EntryKind::*;
     assert_eq!(kinds, [You, Agent, Tools, FromAgent, Report, Card, Page]);
+    assert_eq!(e[1].thinking.as_ref().map(|t| t.text.as_str()), Some("hmm"), "its thinking rides on the reply (one line, one entry)");
     assert_eq!((e[0].pos, e[0].at_ms, e[0].text.as_str()), (1, 1001, "make it fast"));
     assert_eq!(e[1].text, "on it", "no thinking");
     let t = e[2].tools.as_ref().unwrap();
@@ -144,4 +145,89 @@ fn bash_calls_read_as_reports_and_publishes() {
     assert_eq!(publish_in("sb page publish ./weekly.html"), Some("weekly".into()));
     assert_eq!(summary(&[]), "");
     assert_eq!(one_line("  \nabcdef", 4), "abc…");
+}
+
+/// Batch 2 (bar T): thinking (its time from the line before), the
+/// compaction's two rows, the notices (a failed turn and why, a retry, a
+/// stop someone asked for, a hub warning) and a message not delivered;
+/// each entry carries exactly its kind's payload.
+#[test]
+fn the_turns_facts_are_entries_of_their_kind() {
+    let none = |_: &str| None;
+    let ls: Vec<Line> = vec![
+        (1, 1_000, "sb you : go".to_string()),
+        (2, 1_100, "  obs: turn_started".to_string()),
+        // a tool-call-only reply: its thinking is an entry alone
+        (3, 4_300, "  obs: assistant: <think>cold\\nor warm</think>".to_string()),
+        (4, 4_350, "  obs: assistant: on it".to_string()),
+        (5, 4_400, "  obs: compaction_started #1 auto".to_string()),
+        (6, 4_500, "  obs: compaction_done: we profiled".to_string()),
+        (7, 4_600, "  obs: provider_retry: 2/10 · provider 529 (transient) · retry in 4s".to_string()),
+        (8, 4_700, "  obs: turn_done: failed: provider 500".to_string()),
+        (9, 4_800, "  obs: turn_done: failed: interrupted by main".to_string()),
+        (10, 4_900, "  obs: turn_done: failed: no openrouter key yet (OPENROUTER_API_KEY is not set): /provider sets it up".to_string()),
+        (11, 5_000, "sb warn : the inbox is full".to_string()),
+        (12, 5_100, "sb undelivered : perf : then \\: the warm run".to_string()),
+        // a reply's own thinking rides on it (one line, one entry)
+        (13, 5_200, "history   obs: assistant: <think>old</think>replayed".to_string()),
+        (14, 5_300, "  obs: usage: model=m in=1 out=2 cache_read=0 cache_write=0".to_string()),
+        (15, 5_400, "  obs: turn_done: completed".to_string()),
+    ];
+    let e = fold(&ls, &ctx_with(&[], &none));
+    let kinds: Vec<EntryKind> = e.iter().map(|e| e.kind).collect();
+    use EntryKind::*;
+    assert_eq!(kinds, [You, Thinking, Agent, Compacting, Compacted, Notice, Notice, Notice, Notice, Notice, NotDelivered, Agent]);
+    let t = e[1].thinking.as_ref().unwrap();
+    assert_eq!((t.ms, t.text.as_str(), e[1].text.as_str()), (3_200, "cold\nor warm", "thought for 3.2s"), "the time since the line before");
+    assert_eq!(e[2].text, "on it");
+    assert_eq!(e[4].text, "we profiled");
+    let n = |i: usize| e[i].notice.clone().map(|n| (n.level, n.text)).unwrap();
+    use crate::thread::NoticeLevel::*;
+    assert_eq!(n(5), (Warn, "model call failed (attempt 2/10): provider 529 (transient) · retry 3/10 in 4s".into()));
+    assert_eq!(n(6), (Err, "turn failed: provider 500".into()));
+    assert_eq!(n(7), (Warn, "turn interrupted by main".into()), "a stop someone asked for, not a failure");
+    assert_eq!(n(8), (Err, "turn stopped: no OPENROUTER key yet. /provider sets it up.".into()), "the provider's name from the ctx");
+    assert_eq!(n(9), (Warn, "the inbox is full".into()));
+    let d = e[10].not_delivered.as_ref().unwrap();
+    assert_eq!((d.to.as_str(), d.text.as_str(), e[10].text.as_str()), ("perf", "then : the warm run", "then : the warm run"));
+    assert_eq!(e[11].thinking.as_ref().map(|t| (t.ms, t.text.as_str(), e[11].text.as_str())), Some((0, "old", "replayed")), "a replay has no duration");
+    assert!(e.iter().all(Entry::payload_matches_kind), "{e:?}");
+    assert_pos_unique(&e);
+}
+
+/// Law (architect m_10725): every pos appears once in a fold, pos being
+/// the entry's key (Live's diff, the window's store).
+fn assert_pos_unique(e: &[Entry]) {
+    let mut seen = std::collections::BTreeSet::new();
+    for x in e {
+        assert!(seen.insert(x.pos), "pos {} twice: {e:?}", x.pos);
+    }
+}
+
+#[test]
+fn every_pos_appears_once_in_a_fold() {
+    let none = |_: &str| None;
+    assert_pos_unique(&fold(&lines(), &ctx_with(&[9], &none)));
+}
+
+/// Law: in every fixture, an entry of a kind with a payload carries
+/// exactly that payload (architect m_10476).
+#[test]
+fn every_fixture_entry_carries_its_kinds_payload() {
+    let text = include_str!("../../fixtures/hub_ev.jsonl");
+    let mut n = 0;
+    for l in text.lines().filter(|l| !l.trim().is_empty()) {
+        let v: serde_json::Value = serde_json::from_str(l).unwrap();
+        let entries: Vec<serde_json::Value> = match v["ev"].as_str() {
+            Some("entry") => vec![v["entry"].clone()],
+            Some("thread") => v["entries"].as_array().cloned().unwrap_or_default(),
+            _ => continue,
+        };
+        for e in entries {
+            let e: Entry = serde_json::from_value(e).unwrap();
+            assert!(e.payload_matches_kind(), "{e:?}");
+            n += 1;
+        }
+    }
+    assert!(n >= 14, "{n} entries");
 }

@@ -178,10 +178,8 @@ pub(crate) fn ev_rows(ev: &Ev, tick: u32, width: usize) -> Vec<Line<'static>> {
 // expanded (ctrl+o, or a click) the reasoning shows under a faint rail
 pub(crate) fn thinking_lines(ms: u128, text: &str, open: bool, width: usize) -> Vec<Line<'static>> {
     let dim_st = Style::default().fg(dim());
-    let label = match fmt_think_ms(ms) {
-        d if d.is_empty() => "thought".to_string(),
-        d => format!("thought for {}", d),
-    };
+    // the hub's fold says the same (bise-proto's words)
+    let label = bise_proto::thread::words::thought_for(u64::try_from(ms).unwrap_or(u64::MAX));
     let head = Line::from(vec![
         Span::styled(format!(" {} ", G_THINK), dim_st),
         Span::styled(label, dim_st),
@@ -203,20 +201,6 @@ pub(crate) fn thinking_lines(ms: u128, text: &str, open: bool, width: usize) -> 
     rows
 }
 
-// 800ms -> "0.8s"; 4200ms -> "4.2s"; 12_300ms -> "12s"; 90_000 -> "1m30s";
-// 0 (no measured duration: a replayed section, or lines that arrived in
-// the same batch) -> ""
-pub(crate) fn fmt_think_ms(ms: u128) -> String {
-    if ms == 0 {
-        String::new()
-    } else if ms < 10_000 {
-        format!("{}.{}s", ms / 1000, (ms % 1000) / 100)
-    } else if ms < 60_000 {
-        format!("{}s", ms / 1000)
-    } else {
-        format!("{}m{}s", ms / 60_000, (ms % 60_000) / 1000)
-    }
-}
 
 thread_local! {
     /// the feed drawn is main's (ui.rs sets it before each frame)

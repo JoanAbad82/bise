@@ -376,6 +376,26 @@ def main():
         und = [e for e in errors() if e.get("cid") == 77]
         check(len(und) == 1 and und[0].get("reason") == "undelivered" and und[0].get("cmd") == "send", "one undelivered error: %r" % und)
 
+        # item 5 batch 2: that line is a typed not_delivered entry of the
+        # thread it's in (to whom, his text, never lost), no cid on it
+        where = "t4" if any(l.startswith("sb undelivered") for l in c.lines("t4")) else "main"
+        n = len(typed(c, "thread"))
+        c.send({"cmd": "subscribe", "project": project, "agent": where})
+        c.wait(lambda: len(typed(c, "thread")) > n, 20, "%s's thread" % where)
+        nd = [e for e in typed(c, "thread")[-1]["entries"] if e["kind"] == "not_delivered"]
+        check(nd and nd[-1]["not_delivered"] == {"to": "t4", "text": "still there?"} and "cid" not in nd[-1], "the not_delivered entry: %r" % nd)
+        c.send({"cmd": "unsubscribe", "project": project, "agent": where})
+
+        # item 5 batch 2 (S13): an agent's context after its last call is
+        # on its row, when its REPL said its usage since this hub started
+        if any(l.startswith("  obs: usage: ") for l in c.lines("main")):
+            rows = [a for ev in typed(c, "agents") for a in ev["agents"] if a["name"] == "main" and a.get("usage")]
+            check(rows and rows[-1]["usage"]["context"] > 0 and rows[-1]["usage"]["words"], "main's usage on its row: %r" % rows[-1:])
+        # every entry carries its kind's payload, and a fold's pos once
+        for ev in typed(c, "thread"):
+            pos = [e["pos"] for e in ev["entries"]]
+            check(len(pos) == len(set(pos)), "a pos twice in %s's page: %r" % (ev["agent"], pos))
+
         # every typed event has the frozen keys of the fixtures
         need = required_keys()
         for ev in typed(c):

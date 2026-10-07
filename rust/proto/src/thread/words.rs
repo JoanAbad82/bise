@@ -3,7 +3,143 @@
 //! a row's text. Pure std; a word that needs something outside this
 //! crate (a provider's long name) takes it from the caller.
 
-use super::{ToolItem, ToolKind};
+use super::lines::{Hub, Obs, TurnEnd};
+use super::{Notice, NoticeLevel, ToolItem, ToolKind};
+
+/// How long the model thought before a reply: the time since the line
+/// before it (the reply comes one batch after the previous line); 0 when
+/// either time is unknown (a replay).
+pub fn thought_ms(prev_ms: u64, at_ms: u64) -> u64 {
+    if prev_ms == 0 || at_ms == 0 {
+        return 0;
+    }
+    at_ms.saturating_sub(prev_ms)
+}
+
+/// 3200 -> "3.2s", 42_000 -> "42s", 125_000 -> "2m5s"; 0 -> "".
+pub fn think_time(ms: u64) -> String {
+    if ms == 0 {
+        String::new()
+    } else if ms < 10_000 {
+        format!("{}.{}s", ms / 1000, (ms % 1000) / 100)
+    } else if ms < 60_000 {
+        format!("{}s", ms / 1000)
+    } else {
+        format!("{}m{}s", ms / 60_000, (ms % 60_000) / 1000)
+    }
+}
+
+/// A thinking row's head: "thought for 3.2s", "thought" (time unknown).
+pub fn thought_for(ms: u64) -> String {
+    match think_time(ms) {
+        d if d.is_empty() => "thought".into(),
+        d => format!("thought for {d}"),
+    }
+}
+
+fn notice(level: NoticeLevel, text: String) -> Option<Notice> {
+    Some(Notice { level, text })
+}
+
+/// A runtime observation as the line he reads (info, warn, err), or None
+/// when it is no notice (a reply, a tool step, the compaction rows,
+/// usage, a completed turn, plumbing). `name`: a provider's long name
+/// (see [`no_key`]). A failed turn says why; a stop someone asked for is
+/// a warn, not a failure.
+pub fn obs_notice(o: &Obs, name: &dyn Fn(&str, &str) -> String) -> Option<Notice> {
+    use NoticeLevel::*;
+    match o {
+        Obs::NotificationReceived(t) => notice(Info, format!("notification : {t}")),
+        Obs::NotificationDelivered(t) => notice(Info, format!("notification delivered to the model: {t}")),
+        Obs::ProviderRetry(t) => notice(Warn, provider_retry(t)),
+        Obs::HarnessRestarted(t) => notice(
+            Err,
+            format!("the harness crashed ({t}) and restarted — the current turn is interrupted, the history is restored up to the last model call"),
+        ),
+        // no key, or a ChatGPT plan line: the turn's end says it, once
+        // (BISE-294; subscriptions)
+        Obs::CandidateDiscarded(t) if no_key(t, name).is_some() || is_plan_line(t) => None,
+        Obs::CandidateDiscarded(t) => notice(Warn, format!("candidate discarded: {t}")),
+        Obs::CompactionFailed(t) => notice(Err, format!("compaction failed: {t}")),
+        Obs::SessionRestored(t) => notice(Info, format!("session restored · {} messages", t.trim_end_matches(" messages"))),
+        Obs::NullIteration => notice(Warn, "empty response from the model — retrying".into()),
+        Obs::TurnDone(TurnEnd::Failed(why)) => Some(turn_failed(why, name)),
+        Obs::TurnDone(TurnEnd::Interrupted { by: None }) => notice(Warn, "turn interrupted".into()),
+        Obs::TurnDone(TurnEnd::Interrupted { by: Some(by) }) => notice(Warn, format!("turn interrupted by {by}")),
+        Obs::TurnDone(TurnEnd::Other(t)) | Obs::TurnStalled(t) => notice(Err, format!("turn stopped: {t}")),
+        _ => None,
+    }
+}
+
+/// A turn that ended on `failed: <why>`: the ChatGPT plan's own lines (a
+/// limit, plan use off, usage not checked, the sign-in expired) are a ▲
+/// that says what to do, a missing key says which, else a ✗ with why.
+pub fn turn_failed(why: &str, name: &dyn Fn(&str, &str) -> String) -> Notice {
+    if is_plan_line(why) {
+        return Notice { level: NoticeLevel::Warn, text: why.to_string() };
+    }
+    match no_key(why, name) {
+        Some(line) => Notice { level: NoticeLevel::Err, text: line },
+        None => Notice { level: NoticeLevel::Err, text: format!("turn failed: {why}") },
+    }
+}
+
+/// `core rejected: <why>`: right after an interrupt the in-flight
+/// completion has no turn to land on (BR-003, expected plumbing, an
+/// info); anything else is an error.
+pub fn rejected(r: &str) -> Notice {
+    if r == "no pending completion" || r == "no pending tool result" {
+        return Notice { level: NoticeLevel::Info, text: "in-flight response dropped (turn interrupted)".into() };
+    }
+    Notice { level: NoticeLevel::Err, text: r.to_string() }
+}
+
+/// A hub line that reads as a notice: a warning, a spawn (`✚`), computer
+/// use, a direct message (`⇄`).
+pub fn hub_notice(h: &Hub) -> Option<Notice> {
+    match h {
+        Hub::Warn(t) => notice(NoticeLevel::Warn, t.clone()),
+        Hub::Spawn(t) => notice(NoticeLevel::Info, format!("✚ {t}")),
+        Hub::Computer(t) => notice(NoticeLevel::Info, t.clone()),
+        Hub::Direct(t) => notice(NoticeLevel::Info, format!("⇄ {t}")),
+        _ => None,
+    }
+}
+
+/// 950 -> "950", 42_310 -> "42k", 1_250_000 -> "1.2M".
+pub fn tokens(n: u64) -> String {
+    if n < 1000 {
+        n.to_string()
+    } else if n < 1_000_000 {
+        format!("{}k", (n + 500) / 1000)
+    } else {
+        let tenths = (n + 50_000) / 100_000;
+        if tenths.is_multiple_of(10) {
+            format!("{}M", tenths / 10)
+        } else {
+            format!("{}.{}M", tenths / 10, tenths % 10)
+        }
+    }
+}
+
+/// `used` of `window` in percent, rounded (0 for no window).
+pub fn percent(used: u64, window: u64) -> u64 {
+    if window == 0 {
+        return 0;
+    }
+    // saturating: a corrupt token count never overflows (debug panics)
+    used.saturating_mul(100).saturating_add(window / 2) / window
+}
+
+/// The context gauge at rest (BISE-303, the divider): "42k · 21%", or
+/// "42k" without a known window. `window`: the model's, from the catalog
+/// (the caller's).
+pub fn context_words(used: u64, window: Option<u64>) -> String {
+    match window {
+        Some(w) => format!("{} · {}%", tokens(used), percent(used, w)),
+        None => tokens(used),
+    }
+}
 
 /// The first non-empty line, clipped to `max` characters (with `…`).
 pub fn one_line(s: &str, max: usize) -> String {

@@ -45,7 +45,14 @@ pub type Since = BTreeMap<String, (Status, u64)>;
 /// agent's `waits`); `user_kind`: the hub's (his cards); `vision`: the
 /// hub's model catalog's rule (`bise_catalog::Catalog::vision`, K4), read
 /// at each call so a /model change shows on the next agents event.
-pub fn agents(snap: &Value, since: &mut Since, now: u64, user_kind: fn(&str) -> bool, vision: &dyn Fn(&str) -> Option<bool>) -> Vec<Agent> {
+pub fn agents(
+    snap: &Value,
+    since: &mut Since,
+    now: u64,
+    user_kind: fn(&str) -> bool,
+    vision: &dyn Fn(&str) -> Option<bool>,
+    usage: &dyn Fn(&str) -> Option<bise_proto::rows::AgentUsage>,
+) -> Vec<Agent> {
     let list = |k: &str| snap.get(k).and_then(Value::as_array).cloned().unwrap_or_default();
     let cards = list("cards");
     let mut out = Vec::new();
@@ -95,6 +102,8 @@ pub fn agents(snap: &Value, since: &mut Since, now: u64, user_kind: fn(&str) -> 
             vision: Some(s(&a, "model")).filter(|m| !m.is_empty()).and_then(|m| vision(&m)),
             model: Some(s(&a, "model")).filter(|m| !m.is_empty()),
             effort: Some(s(&a, "effort")).filter(|e| !e.is_empty()),
+            // S13: its context after its last call (the hub's live usage)
+            usage: usage(&name),
             name,
         });
     }
@@ -385,19 +394,19 @@ mod tests {
         let mut s = snap();
         s["agents"][1]["model"] = json!("mistral/codestral-latest");
         s["agents"][2]["model"] = json!("ollama/llava");
-        let a = agents(&s, &mut since, 100, uk, &vision);
+        let a = agents(&s, &mut since, 100, uk, &vision, &|_| None);
         assert_eq!((a[1].model.as_deref(), a[1].vision), (Some("mistral/codestral-latest"), Some(false)), "listed, no vision");
         assert_eq!((a[2].model.as_deref(), a[2].vision), (Some("ollama/llava"), None), "unlisted: never a guess");
         assert_eq!((a[0].model.as_deref(), a[0].vision), (None, None), "no model in the snapshot");
         // his /model switch: the next rows follow
         s["agents"][1]["model"] = json!("anthropic/claude-haiku-4-5");
-        assert_eq!(agents(&s, &mut since, 200, uk, &vision)[1].vision, Some(true));
+        assert_eq!(agents(&s, &mut since, 200, uk, &vision, &|_| None)[1].vision, Some(true));
     }
 
     #[test]
     fn the_snapshot_becomes_rows() {
         let mut since = Since::new();
-        let a = agents(&snap(), &mut since, 100, uk, &|_| None);
+        let a = agents(&snap(), &mut since, 100, uk, &|_| None, &|_| None);
         assert_eq!(a.len(), 3);
         let p = &a[1];
         assert_eq!((p.status, p.title.as_str(), p.purpose.as_str(), p.waits), (Status::Working, "profiling the hub", "make the e2e fast", 2));
@@ -410,8 +419,8 @@ mod tests {
         // a status change moves since; the same keeps it
         let mut s2 = snap();
         s2["agents"][1]["status"] = json!("idle");
-        assert_eq!(agents(&s2, &mut since, 200, uk, &|_| None)[1].since_ms, 200);
-        assert_eq!(agents(&s2, &mut since, 300, uk, &|_| None)[1].since_ms, 200);
+        assert_eq!(agents(&s2, &mut since, 200, uk, &|_| None, &|_| None)[1].since_ms, 200);
+        assert_eq!(agents(&s2, &mut since, 300, uk, &|_| None, &|_| None)[1].since_ms, 200);
         let c = cards(&snap(), "acme", 5_000, uk);
         assert_eq!(c.iter().map(|c| c.id).collect::<Vec<_>>(), [9, 10], "his kinds, no drop");
         assert_eq!((c[0].question.as_str(), c[0].options.len(), c[0].since_ms, c[0].urgent), ("which bench?", 2, 4_000, false));
@@ -476,7 +485,7 @@ mod tests {
     fn a_live_thread_sends_only_what_changed() {
         let none = |_: &str| None;
         let open: [u64; 0] = [];
-        let ctx = Ctx { open_cards: &open, page: &none };
+        let ctx = Ctx { open_cards: &open, page: &none, provider: &|i: &str, _: &str| i.to_string() };
         let l = |pos: u64, line: &str| (pos, pos, line.to_string());
         let first = vec![l(1, "sb you : go"), l(2, "  obs: assistant: on it")];
         let page = thread::fold(&first, &ctx);

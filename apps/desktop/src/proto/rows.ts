@@ -74,7 +74,13 @@ vision?: boolean | null,
  * draft (bar A.5): its reasoning effort (`low`, `high`...), none when
  * its model has no reasoning setting or the hub didn't say
  */
-effort?: string | null, };
+effort?: string | null, 
+/**
+ * bar S13/S40: its context after its last model call, from the
+ * hub's live usage lines (none after a hub start until its next
+ * call, and after a compaction)
+ */
+usage?: AgentUsage | null, };
 
 /**
  * A numbered option of a card.
@@ -364,3 +370,27 @@ export type Artifact = { id: string, kind: string, title: string, agent: string,
  * made or changed since he last looked
  */
 new: boolean, };
+
+/**
+ * An agent's context after its last model call (bar S13, the divider's
+ * gauge): the tokens the model saw plus its reply.
+ */
+export type AgentUsage = { 
+/**
+ * the call's full `provider/model` id
+ */
+model: string, 
+/**
+ * tokens in its context
+ */
+context: number, 
+/**
+ * its model's context window, when the catalog knows it
+ */
+window?: number | null, 
+/**
+ * the gauge's words, as the TUI's divider says them: "42k · 21%"
+ * (bise-proto's `words::context_words`; the window never rebuilds
+ * them)
+ */
+words: string, };

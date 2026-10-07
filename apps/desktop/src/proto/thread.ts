@@ -5,7 +5,7 @@
 import type { FnContext } from './context';
 import type { Opt, ReportKind } from './rows';
 
-export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped" | "to_agent";
+export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped" | "to_agent" | "thinking" | "compacting" | "compacted" | "notice" | "not_delivered" | "unknown";
 
 /**
  * What a tool call did, for the counted summary.
@@ -33,6 +33,28 @@ export type EntryCard = { id: number, question: string, options: Array<Opt>, ans
 export type PageRef = { id: string, title: string, v?: number | null, url: string, };
 
 export type ReportRef = { kind: ReportKind, };
+
+/**
+ * A `thinking` entry: how long the model thought (ms, 0 unknown: a
+ * replay) and what.
+ */
+export type Thinking = { ms: number, text: string, };
+
+/**
+ * How a notice reads: info (dim), warn (▲, what to do), err (✗).
+ */
+export type NoticeLevel = "info" | "warn" | "err" | "unknown";
+
+/**
+ * A `notice` entry: its level and its words ([`words::notice`]).
+ */
+export type Notice = { level: NoticeLevel, text: string, };
+
+/**
+ * A `not_delivered` entry: the agent his message didn't reach, and his
+ * text (BISE-86: send again or drop it).
+ */
+export type NotDelivered = { to: string, text: string, };
 
 /**
  * One entry of a thread.
@@ -64,4 +86,9 @@ asks?: boolean,
  * a `to_agent` entry: its message id (`m_12` is 12; the card main
  * opens for it says `for` the same)
  */
-msg?: number | null, };
+msg?: number | null, 
+/**
+ * a `thinking` entry's, or an `agent` reply's own: the reasoning
+ * before it ("thought for 3.2s", folded)
+ */
+thinking?: Thinking | null, notice?: Notice | null, not_delivered?: NotDelivered | null, };

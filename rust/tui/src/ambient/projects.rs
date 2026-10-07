@@ -159,6 +159,7 @@ mod tests {
             model: None,
             vision: None,
             effort: None,
+            usage: None,
         }
     }
 

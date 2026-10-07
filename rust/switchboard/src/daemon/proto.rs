@@ -14,7 +14,8 @@
 use super::*;
 use crate::proto_view::{self, Live, Since};
 use bise_proto::hub::{HubCmd, HubEv, JobState, Mode};
-use bise_proto::thread::{self as pthread, Ctx, Line, PageRef};
+use bise_proto::rows::AgentUsage;
+use bise_proto::thread::{self as pthread, words, Ctx, Line, PageRef};
 use bise_proto::PROTO;
 use crate::router::UserCmd;
 
@@ -49,6 +50,9 @@ pub(super) struct Proto {
     /// the typed command being stepped: a notice sb-core sends its
     /// connection meanwhile becomes its error, after the step
     stepping: Option<Stepping>,
+    /// S13: each agent's last usage line since this hub started (by name;
+    /// none after a compaction, until its next call)
+    usage: BTreeMap<String, bise_session::usage_line::UsageLine>,
 }
 
 /// G: the typed command being stepped (its connection, its tag, a send's
@@ -95,6 +99,16 @@ impl Facts {
 
 fn lines_of(raw: Vec<(usize, Option<u64>, String)>) -> Vec<Line> {
     raw.into_iter().map(|(pos, ts, l)| (pos as u64, ts.unwrap_or(0), l)).collect()
+}
+
+/// A provider's name for people from the hub's catalog (a missing key's
+/// notice in a thread, bise_proto's `words::no_key`).
+fn provider_name(setup: &Option<(Option<std::time::SystemTime>, bise_catalog::Setup)>, id: &str, key: &str) -> String {
+    match setup {
+        Some((_, s)) => s.catalog.provider_name(id, key),
+        None if id.is_empty() => key.to_string(),
+        None => id.to_string(),
+    }
 }
 
 impl Shell {
@@ -232,7 +246,16 @@ impl Shell {
         self.setup();
         let cat = self.setup.as_ref().map(|(_, s)| &s.catalog);
         let vision = |m: &str| cat.and_then(|c| c.vision(m));
-        let agents = proto_view::agents(snap, &mut self.proto.since, now, crate::model::user_kind, &vision);
+        // S13: each agent's context after its last call, its window from
+        // the same catalog, the gauge's words the TUI's divider says
+        let calls = &self.proto.usage;
+        let usage = |name: &str| {
+            let u = calls.get(name)?;
+            let context = u.input + u.output;
+            let window = cat.map(|c| c.context_window(&u.model)).filter(|w| *w > 0);
+            Some(AgentUsage { model: u.model.clone(), context, window, words: words::context_words(context, window) })
+        };
+        let agents = proto_view::agents(snap, &mut self.proto.since, now, crate::model::user_kind, &vision, &usage);
         let cards = proto_view::cards(snap, &project, now, crate::model::user_kind);
         (HubEv::Agents { project: project.clone(), agents }, HubEv::Cards { project, cards })
     }
@@ -314,7 +337,9 @@ impl Shell {
                 let path = self.transcript(&dir);
                 let lines = lines_of(transcript_page(&path, transcript_len(&path) + 1, LINES));
                 let facts = self.facts();
-                let ctx = Ctx { open_cards: &facts.open, page: &|p: &str| facts.page(p) };
+                self.setup();
+                let setup = &self.setup;
+                let ctx = Ctx { open_cards: &facts.open, page: &|p: &str| facts.page(p), provider: &|i: &str, k: &str| provider_name(setup, i, k) };
                 let (entries, before, more) = pthread::page(&lines, &ctx, limit.map_or(LIMIT, |l| (l as usize).clamp(1, MAX_LIMIT)));
                 let live = Live::start(lines, &entries);
                 if let Some(c) = self.proto.conns.get_mut(&id) {
@@ -331,7 +356,9 @@ impl Shell {
                 let Some(dir) = self.dir_of(&agent) else { return self.proto_error(id, &tag, &format!("no agent {agent}")) };
                 let lines = lines_of(transcript_page(&self.transcript(&dir), before as usize, LINES));
                 let facts = self.facts();
-                let ctx = Ctx { open_cards: &facts.open, page: &|p: &str| facts.page(p) };
+                self.setup();
+                let setup = &self.setup;
+                let ctx = Ctx { open_cards: &facts.open, page: &|p: &str| facts.page(p), provider: &|i: &str, k: &str| provider_name(setup, i, k) };
                 let (entries, before, more) = pthread::page(&lines, &ctx, limit.map_or(LIMIT, |l| (l as usize).clamp(1, MAX_LIMIT)));
                 self.proto_send(id, &HubEv::Thread { project, agent, entries, before, more });
             }
@@ -597,6 +624,9 @@ impl Shell {
                 let ts = v.get("ts").and_then(Value::as_u64).unwrap_or(0);
                 let step = proto_view::step_of(&line);
                 let sent = self.proto_live_of(&agent, |l, ctx| l.push((pos, ts, line.clone()), ctx));
+                if self.proto_usage_line(&agent, &line) {
+                    self.proto_agents_again(&ids);
+                }
                 if let Some(text) = step {
                     let project = self.project();
                     for id in sent {
@@ -605,6 +635,39 @@ impl Shell {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// S13: a live line of `agent` that moves its context (its usage
+    /// line, a compaction's end): true when it did. The line is read by
+    /// the one parser of its kind (`thread::lines`), the usage by
+    /// bise_session's.
+    fn proto_usage_line(&mut self, agent: &str, line: &str) -> bool {
+        match pthread::lines::read(line) {
+            pthread::lines::Rec::Obs(pthread::lines::Obs::Usage(t)) => match bise_session::usage_line::parse(&t) {
+                Some(u) => {
+                    self.proto.usage.insert(agent.to_string(), u);
+                    true
+                }
+                None => false,
+            },
+            pthread::lines::Rec::Obs(pthread::lines::Obs::CompactionDone(_)) => self.proto.usage.remove(agent).is_some(),
+            _ => false,
+        }
+    }
+
+    /// The `agents` rows again, to `ids` when they changed (an agent's
+    /// context moved between two state broadcasts).
+    fn proto_agents_again(&mut self, ids: &[ClientId]) {
+        let snap = self.snapshot();
+        let (agents, _) = self.proto_rows(&snap);
+        let a = agents.encode();
+        if a == self.proto.last.0 {
+            return;
+        }
+        self.proto.last.0 = a;
+        for id in ids {
+            self.proto_send(*id, &agents);
         }
     }
 
@@ -619,7 +682,9 @@ impl Shell {
     /// One agent's subscriptions through `f`; the clients subscribed.
     fn proto_live_of(&mut self, agent: &str, f: impl Fn(&mut Live, &Ctx) -> Vec<pthread::Entry>) -> Vec<ClientId> {
         let facts = self.facts();
-        let ctx = Ctx { open_cards: &facts.open, page: &|p: &str| facts.page(p) };
+        self.setup();
+        let setup = &self.setup;
+        let ctx = Ctx { open_cards: &facts.open, page: &|p: &str| facts.page(p), provider: &|i: &str, k: &str| provider_name(setup, i, k) };
         let mut out: Vec<(ClientId, Vec<pthread::Entry>)> = Vec::new();
         for (id, c) in self.proto.conns.iter_mut() {
             if let Some(l) = c.subs.get_mut(agent) {

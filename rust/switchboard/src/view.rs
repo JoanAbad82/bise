@@ -34,7 +34,9 @@ pub fn of(snap: &Value, project: &str, now: u64, last_activity_ms: u64, stopped_
         written_ms: now,
         stopped_ms,
         last_activity_ms,
-        agents: proto_view::agents(snap, since, now, crate::model::user_kind, vision),
+        // the window's project view: no live usage (the hub's typed agents
+        // event carries it)
+        agents: proto_view::agents(snap, since, now, crate::model::user_kind, vision, &|_| None),
         cards: proto_view::cards(snap, project, now, crate::model::user_kind),
     }
 }

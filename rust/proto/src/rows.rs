@@ -108,6 +108,29 @@ pub struct Agent {
     /// its model has no reasoning setting or the hub didn't say
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub effort: Option<String>,
+    /// bar S13/S40: its context after its last model call, from the
+    /// hub's live usage lines (none after a hub start until its next
+    /// call, and after a compaction)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<AgentUsage>,
+}
+
+/// An agent's context after its last model call (bar S13, the divider's
+/// gauge): the tokens the model saw plus its reply.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct AgentUsage {
+    /// the call's full `provider/model` id
+    pub model: String,
+    /// tokens in its context
+    pub context: u64,
+    /// its model's context window, when the catalog knows it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window: Option<u64>,
+    /// the gauge's words, as the TUI's divider says them: "42k · 21%"
+    /// (bise-proto's `words::context_words`; the window never rebuilds
+    /// them)
+    pub words: String,
 }
 
 /// A numbered option of a card.
