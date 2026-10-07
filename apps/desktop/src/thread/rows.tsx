@@ -4,7 +4,7 @@
 // usePending), so a new or replaced entry re-renders that row alone; the
 // list above it only holds keys. Memo'd on their props (strings, numbers).
 import { memo, useEffect, useState, type ReactNode } from 'react';
-import { Answered, Art, Button, Chip, Fold, Marker, Msg, Opts, Pearl, Tool } from '@/ds';
+import { Answered, Button, Chip, Fold, Marker, Msg, Opts, Pearl, Tool } from '@/ds';
 import type { Entry } from '@/proto';
 import { useAgents, useCoreState, useEntry, useHubRefused, usePending, useProjects, useStore, useThreadOrder } from '@/store';
 import { refusedLead } from '@/app/Refused';
@@ -78,13 +78,13 @@ function EntryBody({ e, ctx, head }: { e: Entry; ctx: RowCtx; head: boolean }) {
       return <CardRow e={e} ctx={ctx} />;
     case 'page':
       return e.page ? (
-        <Art
-          title={`↗ ${e.page.title}`}
-          meta={[e.page.v == null ? '' : `v${e.page.v}`, clock(e.at_ms)].filter(Boolean).join(' · ')}
-          onClick={() => {
+        <ArtChip
+          title={e.page.title}
+          meta={[e.page.v == null ? '' : `v${String(e.page.v)}`, clock(e.at_ms)].filter(Boolean).join(' · ')}
+          onOpen={() => {
             if (e.page) ctx.onLink(e.page.url);
           }}
-          testId={`thread.page.${e.pos}`}
+          testId={`thread.page.${String(e.pos)}`}
         />
       ) : (
         <Marker>{e.text}</Marker>
@@ -217,15 +217,25 @@ function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const m = e.made;
   if (m == null) return <Marker>{e.text}</Marker>;
   return (
-    <Art
-      title={`↗ ${m.title}`}
+    <ArtChip
+      title={m.title}
       meta={[m.kind_word, m.v > 1 ? `v${String(m.v)}` : ''].filter(Boolean).join(' · ')}
-      onClick={() => {
+      onOpen={() => {
         // designer's v6 (2): an artifact opens in the window, its own screen
         router.go({ screen: 'artifacts', project: ctx.project, id: m.id });
       }}
-      testId={`thread.artifact.${e.pos}`}
+      testId={`thread.artifact.${String(e.pos)}`}
     />
+  );
+}
+
+/** An artifact or a page as one line (designer m_12065 (2)): '↗ product page, before / after   page · v2', 1 px line, r 9, fit-content, no thumbnail box. */
+function ArtChip({ title, meta, onOpen, testId }: { title: string; meta: string; onOpen: () => void; testId: string }) {
+  return (
+    <button type="button" className="th-art" onClick={onOpen} data-testid={testId}>
+      <span className="th-art-title">↗ {title}</span>
+      {meta !== '' && <span className="th-art-meta">{meta}</span>}
+    </button>
   );
 }
 

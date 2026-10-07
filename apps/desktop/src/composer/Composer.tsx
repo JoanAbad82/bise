@@ -27,6 +27,8 @@ export interface ComposerProps {
   readonly store?: Store;
   /** "you → bise · opus · high" */
   readonly to?: string;
+  /** a key hint at the label line's right ('esc write a plain message' while it answers a docked card) */
+  readonly toEnd?: string;
   readonly placeholder?: string;
   /** A fixed key bar (a screen of its own); unset: the bar follows the composer's mode (W9). */
   readonly keys?: string;
@@ -54,7 +56,7 @@ export function writeTo(to: string | undefined): string {
 const TIP_KEY = 'bise.composer.v1.tip';
 
 export const Composer = memo(function Composer(props: ComposerProps): JSX.Element {
-  const { target, busy = false, sources = NO_SOURCES, to, placeholder = writeTo(to), keys, voice = null, quoting = false, testId = 'composer' } = props;
+  const { target, busy = false, sources = NO_SOURCES, to, toEnd, placeholder = writeTo(to), keys, voice = null, quoting = false, testId = 'composer' } = props;
   const store = useMemo<Store>(() => props.store ?? window.localStorage, [props.store]);
   // the latest callbacks, read by the editor's handlers without re-creating them
   const cb = useRef(props);
@@ -100,7 +102,16 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
   return (
     <ComposerFrame
       testId={testId}
-      to={to}
+      to={
+        toEnd === undefined || to === undefined ? (
+          to
+        ) : (
+          <>
+            <span className="lbl">{to}</span>
+            <span className="end">{toEnd}</span>
+          </>
+        )
+      }
       // the whole box is the input: a press on its padding or empty area focuses the editor, caret at the end
       onBoxDown={() => {
         actions.current?.focusEnd();

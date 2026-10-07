@@ -158,6 +158,7 @@
 .th-day,
 .th-screen .th-typing,
 .th-screen .th-live,
+.th-screen .th-starting,
 .th-screen .th-refused,
 .th-screen .inbox-strip,
 .th-screen .inbox-dock,
@@ -584,12 +585,33 @@
   margin-left: 12px;
   color: var(--c-text-3);
 }
-.th-row .b-art {
-  padding: 4px 10px;
+.th-art {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 12px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 5px 10px;
   border: 1px solid var(--c-line);
   border-radius: 9px;
   background: none;
-  box-shadow: none;
+  color: var(--c-text);
+  font: var(--t-13) var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.th-art:hover {
+  background: var(--c-hover);
+}
+.th-art-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.th-art-meta {
+  flex: none;
+  color: var(--c-text-3);
+  font-size: var(--t-12);
 }
 .th-live {
   color: var(--c-text-2);
@@ -617,4 +639,15 @@
   color: var(--c-text-2);
   font: var(--t-13) var(--font-ui);
   padding: 6px 0 2px;
+}
+
+/* his words answer the docked card (designer's v6 s-wait): the label line in the accent, the way
+   back at its right */
+.th-screen[data-answering='true'] .b-composer .div {
+  display: flex;
+  color: var(--c-accent);
+}
+.th-screen .b-composer .div .end {
+  margin-left: auto;
+  color: var(--c-text-3);
 }

@@ -266,7 +266,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
 
   // designer's v6 (5): an agent whose thread has nothing of its own yet (his first message at most) is starting
   const order = useThreadOrder(tkey);
-  const fresh = !bise && agent !== MAIN && me !== undefined && !me.archived && order.loaded && order.order.length <= 1 && me.status !== 'done' && me.status !== 'failed';
+  const fresh = !bise && agent !== MAIN && me !== undefined && !me.archived && order.loaded && order.order.length <= 1 && me.status === 'working' && me.waits === 0;
   // designer's desktop-screens v6 (1): '⋯' at the head's right (rename, model, reasoning)
   const more =
     me && !me.archived && !bise ? (
@@ -284,7 +284,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   return (
     <FoldsContext value={folds}>
     <FindMarkContext value={mark}>
-      <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
+      <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
         {bise || !me || me.archived ? (
           <Head title={headTitle} sub={sub} pearl={bise ? 22 : undefined} dot={bise || !me ? undefined : dotOf(me.status)} />
         ) : agent === MAIN ? (
@@ -344,6 +344,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
             agent={agent}
             busy={busy}
             to={answering === null ? composerWords(title).label : answeringLabel(answering)}
+            toEnd={answering === null ? undefined : 'esc write a plain message'}
             placeholder={answering === null ? composerWords(title).placeholder : 'your answer, then ⏎'}
             answer={answering === null ? null : answering.id}
             onStop={stop}
@@ -615,6 +616,7 @@ export const ThreadComposer = memo(function ThreadComposer({
   agent,
   busy,
   to,
+  toEnd,
   placeholder,
   answer,
   onStop,
@@ -627,6 +629,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   agent: string;
   busy: boolean;
   to: string;
+  /** the label line's right: 'esc write a plain message' while it answers (designer v6 s-wait) */
+  toEnd?: string | undefined;
   /** the field's words when empty (the composer's own 'write to …' when none) */
   placeholder: string | undefined;
   /** the docked card his words answer (item 7), else none */
@@ -704,7 +708,7 @@ export const ThreadComposer = memo(function ThreadComposer({
     [store, project, agent, onSent, onCommand, answer, about],
   );
   // his drafts, history and queue in the keep's file, never lost by a quit (keep.ts)
-  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} placeholder={placeholder} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
+  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} {...(toEnd === undefined ? {} : { toEnd })} placeholder={placeholder} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
 });
 
 /** A message about an artifact: `about [its title](its url): his words` (the chip's own link form). Pure. */

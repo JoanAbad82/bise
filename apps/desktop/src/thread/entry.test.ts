@@ -16,7 +16,7 @@ describe('thread rows', () => {
   it("who speaks: his words, bise's main with the pearl, an agent, a message from another agent", () => {
     expect(whoOf(e({ kind: 'you' }), { agent: 'perf', bise: false }).from).toBe('you');
     expect(whoOf(e({}), { agent: 'main', bise: true })).toEqual({ from: 'bise', name: 'bise', indent: false });
-    expect(whoOf(e({}), { agent: 'main', bise: false })).toEqual({ from: 'agent', name: 'bise', indent: false });
+    expect(whoOf(e({}), { agent: 'main', bise: false })).toEqual({ from: 'bise', name: 'bise', indent: false });
     expect(whoOf(e({ kind: 'from_agent', from: 'docs' }), { agent: 'main', bise: false })).toEqual({ from: 'agent', name: 'docs', indent: true });
   });
 

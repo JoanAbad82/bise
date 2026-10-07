@@ -39,6 +39,8 @@ const spawn = (pos: number, at: number, agent: string, brief: string) => {
   const text = `✚ main → new agent @${agent} : ${brief}`;
   return { pos, at_ms: at, kind: 'notice', text, notice: { level: 'info', text } };
 };
+const QUESTION = 'which sizes should the filter offer: letters, or numbers too?';
+const searchCard = (now: number) => ({ id: 7, project: P, kind: 'question', rank: 1, agent: 'search', question: QUESTION, options: [{ n: 1, label: 'letters only' }, { n: 2, label: 'letters and numbers' }], urgent: false, since_ms: now - 5 * MIN });
 const world = (now: number) => {
   const ag = (name: string, over: Record<string, unknown>) => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: now - 60 * MIN, waits: 0, ...over });
   return [
@@ -47,7 +49,7 @@ const world = (now: number) => {
       ev: 'projects',
       projects: [
         { project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true },
-        { project: P, name: 'storefront', path: '/nowhere/storefront', git: true, home: false, order: 1, agents: 4, working: 2, waits: 1, running: true },
+        { project: P, name: 'storefront', path: '/nowhere/storefront', git: true, home: false, order: 1, agents: 4, working: 2, waits: 1, running: true, cards: [searchCard(now)] },
       ],
     },
     { ev: 'welcome', project: P, proto: 1, workspace: '/nowhere/storefront', name: 'storefront' },
@@ -164,6 +166,11 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     await expect(page.getByTestId('thread.tool.8')).toHaveText('± web/product/Hero.tsx4 s');
     await expect(page.getByTestId('thread.artifact.10')).toContainText('product page, before / after');
     await expect(page.getByTestId('thread.artifact.10')).toContainText('page · v2');
+    // (2) one line, fit-content, no empty thumbnail
+    const art = await page.getByTestId('thread.artifact.10').evaluate((el) => ({ h: el.getBoundingClientRect().height, w: el.getBoundingClientRect().width, thumb: el.querySelector('.th') !== null }));
+    expect(art.thumb, 'no empty thumbnail box').toBe(false);
+    expect(art.h, 'one line').toBeLessThan(36);
+    expect(art.w, 'fit-content').toBeLessThan(400);
     await expect(page.getByTestId('thread.live')).toHaveText('∿ running the bench three more times · 14 min');
     // (4) the composer's words
     await expect(page.locator('.th-screen .b-composer .div')).toHaveText('to perf');
@@ -193,6 +200,13 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
           if (label === 'search') {
             await expect(page.getByTestId('thread.head.state')).toHaveText('? waiting for you');
             await expect(page.getByTestId('thread.head.state')).toHaveAttribute('data-needs', 'true');
+            // designer m_12065 (4): its question docked above the composer, the label in the accent
+            if (!(await page.getByTestId('strip.dock').isVisible())) await page.getByTestId('strip.row.1').click();
+            await expect(page.getByTestId('strip.dock')).toBeVisible();
+            await expect(page.getByTestId('thread.starting'), 'a waiting agent is not starting').toHaveCount(0);
+            await expect(page.locator('.th-screen .b-composer .div .lbl')).toHaveText(/^answering search · which sizes/);
+            await expect(page.locator('.th-screen .b-composer .div .end')).toHaveText('esc write a plain message');
+            await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-answering', 'true');
           }
           if (label === 'bise · storefront') {
             await expect(page.getByTestId('thread.head.name')).toHaveText('bise · storefront');
@@ -201,12 +215,21 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
             // (3) its handoffs
             await expect(page.getByTestId('thread.handoff.3')).toHaveText('→ perf · product page speed');
             await expect(page.getByTestId('thread.handoff.4')).toHaveText('→ search · size filter on search');
+            // (1) bise's name line carries its 14 px pearl
+            await expect(page.locator('[data-testid="thread.entry.2"] .b-who .b-pearl.s14')).toHaveCount(1);
           }
           if (label === 'checkout (empty)') {
             // (5) the empty thread: his first message, then the starting line; the chip says starting
             await expect(page.getByTestId('thread.starting')).toHaveText('· checkout is starting: its own folder, sb/checkout');
             await expect(page.getByTestId('thread.head.state')).toHaveText('starting');
             await expect(page.getByTestId('thread.live')).toHaveCount(0);
+            // (3) the starting row on the column's edge, like every row
+            const dx = await page.evaluate(() => {
+              const a = document.querySelector('[data-testid="thread.starting"]')?.getBoundingClientRect();
+              const b = document.querySelector('[data-testid="thread.entry.1"]')?.getBoundingClientRect();
+              return a && b ? Math.abs(a.left - b.left) : -1;
+            });
+            expect(dx, 'the starting row starts on the column edge').toBeLessThan(1);
           }
           if (label === 'perf') {
             if (w === 800) await expect(page.getByTestId('thread.head.name'), 'under 1000 px the name goes to the crumb').toBeHidden();

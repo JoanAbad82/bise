@@ -47,7 +47,8 @@ export function whoOf(e: Entry, ctx: { agent: string; bise: boolean }): { from: 
       return { from: 'agent', name: e.to != null && e.to !== '' && e.to !== ctx.agent ? `${from} → ${shown(e.to)}` : from, indent: true };
     }
     default:
-      return ctx.bise && ctx.agent === 'main' ? { from: 'bise', name: 'bise', indent: false } : { from: 'agent', name: shown(ctx.agent), indent: false };
+      // every main is bise: its name line carries the 14 px pearl (designer m_12065 (1))
+      return ctx.agent === 'main' ? { from: 'bise', name: 'bise', indent: false } : { from: 'agent', name: shown(ctx.agent), indent: false };
   }
 }
 
