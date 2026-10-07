@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Card } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
 import { Inbox, keyOf, type InboxPorts } from './Inbox';
@@ -128,6 +128,45 @@ describe('Inbox', () => {
     cleanup();
     render(<Inbox cards={[c]} names={{}} ports={ports()} now={1791100400000} />);
     expect(screen.queryByTestId(`inbox.card.${c.project}-${String(c.id)}.more`)).toBeNull();
+  });
+
+  it('an answer by voice shows what was heard, then answers; esc undoes it (N14)', () => {
+    vi.useFakeTimers();
+    try {
+      const p = ports();
+      const views: unknown[] = [];
+      const two = cards().filter((c) => c.id !== 10);
+      const heard = { project: 'acme-1a2b3c4d', card: 9, n: 1, line: 'heard "the first one" → 1 cold', ms: 1500 };
+      const ui = (voice: typeof heard | null) => (
+        <Inbox cards={two} names={{}} ports={{ ...p, inView: (c) => views.push(c) }} now={1791100400000} drafts={makeDrafts()} voice={voice} />
+      );
+      const r = render(ui(null));
+      // the window had focus in the test: the current card is in view
+      expect(views.at(-1)).toEqual(document.hasFocus() ? { project: 'acme-1a2b3c4d', card: 9 } : null);
+      r.rerender(ui(heard));
+      expect(screen.getByTestId('inbox.heard').textContent).toContain('heard "the first one" → 1 cold');
+      expect(p.calls).toEqual([]);
+      act(() => {
+        vi.advanceTimersByTime(1500);
+      });
+      expect(p.calls).toEqual(['answer acme-1a2b3c4d 9 1']);
+      expect(screen.queryByTestId('inbox.heard')).toBeNull();
+      // a new heard event, undone with esc: nothing goes
+      const again = { ...heard, card: 11, line: 'heard "send" → 1 send' };
+      r.rerender(ui(again));
+      fireEvent.click(screen.getByTestId('inbox.item.acme-1a2b3c4d-11'));
+      expect(screen.getByTestId('inbox.heard')).toBeTruthy();
+      fireEvent.keyDown(screen.getByTestId('inbox.root'), { key: 'Escape' });
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(p.calls).toEqual(['answer acme-1a2b3c4d 9 1']);
+      expect(screen.queryByTestId('inbox.heard')).toBeNull();
+      r.unmount();
+      expect(views.at(-1)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('nothing open: says so', () => {

@@ -451,3 +451,65 @@ fn a_send_to_a_hub_that_went_away_waits_for_it_then_says_so() {
     assert_eq!((e["project"].as_str(), e["cmd"].as_str()), (Some("shop"), Some("send")));
     assert!(e["text"].as_str().unwrap().contains("nothing sent"), "{e}");
 }
+
+/// Law (bar N14/L8, architect m_10930): fn's words answer the card in view
+/// exactly as the TUI's answer_by_voice decides (voicemode/answers.rs
+/// `decide`, one table): a match sends `voice_answer` and nothing to
+/// main; no match, no card in view, or a card that closed: the words go
+/// to main as before.
+#[test]
+fn a_talk_answers_the_card_in_view_as_the_tui_decides() {
+    use crate::voicemode::answers;
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    let q = json!({"id": 7, "project": "shop", "kind": "question", "agent": "perf", "question": "which bench?",
+        "options": [{"n": 1, "label": "cold"}, {"n": 2, "label": "warm"}], "urgent": false, "since_ms": 2});
+    let a = json!({"id": 8, "project": "shop", "kind": "confirm", "agent": "perf", "question": "run rm -rf target?",
+        "options": [{"n": 1, "label": "allow once"}, {"n": 2, "label": "always here"}, {"n": 3, "label": "deny"}],
+        "urgent": true, "since_ms": 3, "approval": true});
+    w.end("shop").say(json!({"ev": "cards", "project": "shop", "cards": [q, a]}));
+    w.until(&mut t, |o| o.iter().any(|v| v["ev"] == "projects" && v["projects"][1]["waits"] == 2));
+    t.take();
+    let talk = |t: &mut T, words: &str| -> Vec<Value> {
+        t.cmd(Cmd::TalkStart);
+        let heard = t.fakes.listen.lock().unwrap().last().unwrap().heard.clone();
+        heard.send(Heard::Text(format!(" {words}"))).unwrap();
+        t.cmd(Cmd::TalkEnd);
+        heard.send(Heard::Flushed).unwrap();
+        t.until(|o| has(o, "sent") || o.iter().any(|v| v["ev"] == "voice_answer"));
+        t.take()
+    };
+    let labels = |c: &Value| -> Vec<String> { c["options"].as_array().unwrap().iter().map(|o| o["label"].as_str().unwrap().to_string()).collect() };
+    let table = [(&q, "the first one"), (&q, "warm"), (&q, "tell main the bench is cold"), (&a, "allow"), (&a, "yes do it"), (&a, "always"), (&a, "the first one")];
+    for (card, words) in table {
+        let id = card["id"].as_u64().unwrap();
+        t.cmd(Cmd::CardInView { project: Some("shop".into()), card: Some(id) });
+        let out = talk(&mut t, words);
+        let tui = answers::decide(words, card["approval"] == true, &labels(card));
+        let ev = out.iter().find(|v| v["ev"] == "voice_answer");
+        match tui {
+            Some((i, line)) => {
+                let ev = ev.unwrap_or_else(|| panic!("{words:?} on card {id}: the TUI answers {i}, the core sent {out:#?}"));
+                assert_eq!((ev["project"].as_str(), ev["card"].as_u64(), ev["n"].as_u64()), (Some("shop"), Some(id), Some(i as u64 + 1)), "{words:?}");
+                assert_eq!(ev["line"], line);
+                assert_eq!(ev["ms"], answers::HEARD_FOR.as_millis() as u64);
+                assert!(!has(&out, "sent"), "{words:?}: answered, so nothing to main");
+            }
+            None => {
+                assert!(ev.is_none(), "{words:?} on card {id}: the TUI sends words, the core answered {ev:?}");
+                assert_eq!(t.hub.next()["text"], words, "{words:?}: to main as before");
+            }
+        }
+    }
+    // a card that closed meanwhile, or none in view: words to main
+    t.cmd(Cmd::CardInView { project: Some("shop".into()), card: Some(99) });
+    assert!(!talk(&mut t, "the first one").iter().any(|v| v["ev"] == "voice_answer"));
+    assert_eq!(t.hub.next()["text"], "the first one");
+    t.cmd(Cmd::CardInView { project: None, card: None });
+    assert!(!talk(&mut t, "the first one").iter().any(|v| v["ev"] == "voice_answer"));
+    assert_eq!(t.hub.next()["text"], "the first one");
+}

@@ -41,10 +41,11 @@ describe('the store-fed screens', () => {
     const { sent } = mount(<InboxScreen />);
     expect(screen.getAllByTestId(/^inbox\.item\./).map((e) => e.dataset.testid)).toEqual(['inbox.item.acme-1a2b3c4d-10', 'inbox.item.acme-1a2b3c4d-9']);
     fireEvent.keyDown(screen.getByTestId('inbox.root'), { key: '2' });
-    expect(sent).toEqual([{ cmd: 'answer', project: 'acme-1a2b3c4d', card: 10, reply: '2' }]);
+    // the card in view (bar N14) goes too: only the commands to the hub count here
+    expect(sent.filter((c) => c.cmd !== 'card_in_view')).toEqual([{ cmd: 'answer', project: 'acme-1a2b3c4d', card: 10, reply: '2' }]);
     // the question is current now: close it without answering
     fireEvent.click(screen.getByTestId('inbox.card.acme-1a2b3c4d-9.close'));
-    expect(sent.at(-1)).toEqual({ cmd: 'close', project: 'acme-1a2b3c4d', card: 9 });
+    expect(sent.filter((c) => c.cmd !== 'card_in_view').at(-1)).toEqual({ cmd: 'close', project: 'acme-1a2b3c4d', card: 9 });
   });
 
   it('settings read the prefs event and send prefs_set through the store; the nav moves the route', () => {

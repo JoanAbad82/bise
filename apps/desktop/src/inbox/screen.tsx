@@ -4,9 +4,9 @@
 // waits on him everywhere; an answer is the hub's one /answer path
 // (store.answer), a close the hub's one close path (store.close, the
 // typed HubCmd close). Owner: amb-home.
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { ProjectRow } from '@/proto';
-import { useProjects, useStore } from '@/store';
+import { useProjects, useStore, useVoiceAnswer } from '@/store';
 import { useRouter } from '@/app/router';
 import { Inbox } from './Inbox';
 
@@ -23,11 +23,20 @@ export function InboxScreen() {
   const store = useStore();
   const router = useRouter();
   const { cards, names } = useMemo(() => inboxOf(rows), [rows]);
+  const voice = useVoiceAnswer();
+  const inView = useCallback(
+    (c: { project: string; card: number } | null) => {
+      store.cardInView(c?.project ?? null, c?.card ?? null);
+    },
+    [store],
+  );
   return (
     <Inbox
       cards={cards}
       names={names}
+      voice={voice}
       ports={{
+        inView,
         answer: (project, card, reply) => {
           store.answer(project, card, reply);
         },

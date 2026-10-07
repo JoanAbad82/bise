@@ -384,6 +384,11 @@ pub enum CoreEv {
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         partial: bool,
     },
+    /// bar N14: his talk answered the card in view (`card_in_view`): the
+    /// window shows `line` on that card for `ms` (esc undoes, nothing
+    /// sent), then answers option `n` (1-based) through the hub's one
+    /// answer path; the words did not go to main
+    VoiceAnswer { project: Project, card: u64, n: u32, line: String, ms: u64 },
     Dictation {
         id: String,
         text: String,
@@ -399,7 +404,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins", "computer_use", "level", "dictation", "commands", "skills", "files", "roles"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins", "computer_use", "level", "dictation", "voice_answer", "commands", "skills", "files", "roles"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -515,6 +520,16 @@ pub enum AppCmd {
     DictateStop { id: String },
     /// dropped: the mic goes off, one final `dictation` with `cancelled`
     DictateCancel { id: String },
+    /// bar N14: the card in front of him in the focused window (the ⌘I
+    /// inbox's current item), or none (both absent: the window blurred,
+    /// closed or left the inbox); fn's talk answers it by voice when its
+    /// words name an option (`voice_answer`), else they go to main
+    CardInView {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        project: Option<Project>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        card: Option<u64>,
+    },
     /// the slash commands: `commands` answers
     Commands,
     /// a workspace's skills: `skills` answers
@@ -566,6 +581,7 @@ impl AppCmd {
         "dictate_start",
         "dictate_stop",
         "dictate_cancel",
+        "card_in_view",
         "commands",
         "skills",
         "files",

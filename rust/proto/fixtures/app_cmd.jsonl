@@ -30,6 +30,8 @@
 {"cmd":"dictate_start","id":"d1"}
 {"cmd":"dictate_stop","id":"d1"}
 {"cmd":"dictate_cancel","id":"d1"}
+{"cmd":"card_in_view","project":"acme-1a2b3c4d","card":9}
+{"cmd":"card_in_view"}
 {"cmd":"commands"}
 {"cmd":"skills","project":"acme-1a2b3c4d"}
 {"cmd":"files","project":"acme-1a2b3c4d","q":"src/ma","rid":7}

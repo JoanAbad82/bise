@@ -82,6 +82,7 @@ export const TAGS = {
   plugins: true,
   computer_use: true,
   dictation: true,
+  voice_answer: true,
   level: true,
   commands: true,
   skills: true,
@@ -255,6 +256,14 @@ export class Store {
   cards(project: string): readonly Card[] {
     return this.slice(`cards:${project}`, EMPTY);
   }
+  /** the last answer by voice the core heard (bar N14), null: none */
+  voiceAnswer(): EvOf<'voice_answer'> | null {
+    return this.slice<EvOf<'voice_answer'> | null>('voice_answer', null);
+  }
+  /** The card in front of him in this focused window (bar N14), or none: fn's talk can answer it by voice. */
+  cardInView(project: string | null, card: number | null): void {
+    this.command(project === null || card === null ? { cmd: 'card_in_view' } : { cmd: 'card_in_view', project, card });
+  }
   /** the hub's open yes/no questions to this window, oldest first */
   confirms(project: string): readonly Confirm[] {
     return this.slice(`confirms:${project}`, EMPTY);
@@ -420,6 +429,10 @@ export class Store {
       case 'level':
         // a meter's input (~30 Hz): only who reads that voice re-renders
         if (this.slices.get(`level:${ev.who}`) !== ev.v) this.put(`level:${ev.who}`, ev.v);
+        return;
+      case 'voice_answer':
+        // bar N14: his talk answered a card in view; the inbox shows it, then answers
+        this.put('voice_answer', ev);
         return;
       case 'dictation':
         // only the window that started it gets it (main's routes); an id

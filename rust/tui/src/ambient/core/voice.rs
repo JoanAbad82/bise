@@ -253,6 +253,11 @@ impl Core {
             }
             return self.set_phase(Phase::Idle, None);
         }
+        // bar N14: words that answer the card in view don't go to main
+        if self.voice_answer(&words) {
+            self.fn_ctx = None;
+            return self.set_phase(Phase::Idle, None);
+        }
         self.send_to_main(words, true);
     }
 

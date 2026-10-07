@@ -28,6 +28,17 @@ export interface InboxPorts {
   back: () => void;
   /** a card that points at a page block: open it */
   openPage?: (url: string) => void;
+  /** bar N14: the card in front of him while this window has focus, null when none (fn's talk can answer it) */
+  inView?: (card: { project: string; card: number } | null) => void;
+}
+
+/** bar N14: the core heard his talk answer a card (the core's voice_answer). */
+export interface VoiceAnswer {
+  project: string;
+  card: number;
+  n: number;
+  line: string;
+  ms: number;
 }
 
 export interface InboxProps {
@@ -40,9 +51,11 @@ export interface InboxProps {
   now?: number;
   /** each item's typed words (default: the window's, drafts.ts) */
   drafts?: Drafts;
+  /** the last answer by voice the core heard (bar N14) */
+  voice?: VoiceAnswer | null;
 }
 
-export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts }: InboxProps) {
+export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts, voice = null }: InboxProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [s, setS] = useState(START);
@@ -53,6 +66,48 @@ export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts }
   const curKey = cur ? cardKey(cur) : null;
   const field = useRef<HTMLTextAreaElement>(null);
   const root = useRef<HTMLElement>(null);
+
+  // bar N14: the core knows the card in front of him while this window
+  // has focus; none when it blurs, leaves the inbox or the list empties
+  const inView = ports.inView;
+  const curProject = cur?.project ?? null;
+  const curId = cur?.id ?? null;
+  useEffect(() => {
+    if (!inView) return;
+    const say = () => {
+      inView(curProject !== null && curId !== null && document.hasFocus() ? { project: curProject, card: curId } : null);
+    };
+    const none = () => {
+      inView(null);
+    };
+    say();
+    window.addEventListener('focus', say);
+    window.addEventListener('blur', none);
+    return () => {
+      window.removeEventListener('focus', say);
+      window.removeEventListener('blur', none);
+      none();
+    };
+  }, [inView, curProject, curId]);
+
+  // bar N14: his talk answered the current card: its heard line shows for
+  // the event's ms (esc undoes, nothing sent), then the answer goes as the
+  // digit key's would
+  // the event that was answered or undone (none shows again)
+  const [done, setDone] = useState<VoiceAnswer | null>(null);
+  const heard = voice !== null && voice !== done && cards.some((c) => c.project === voice.project && c.id === voice.card) ? voice : null;
+  useEffect(() => {
+    if (heard === null) return;
+    const t = setTimeout(() => {
+      setDone(heard);
+      drafts.drop(`${heard.project}-${String(heard.card)}`);
+      ports.answer(heard.project, heard.card, String(heard.n));
+    }, heard.ms);
+    return () => {
+      clearTimeout(t);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one answer per heard event
+  }, [heard]);
 
   // an item that is gone takes its words with it
   useEffect(() => {
@@ -80,6 +135,12 @@ export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts }
   };
 
   const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    if (heard !== null && e.key === 'Escape') {
+      // the heard answer is undone: nothing goes
+      e.preventDefault();
+      setDone(heard);
+      return;
+    }
     if (e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'o') {
       e.preventDefault();
       if (cur && curKey !== null && folds(cur.question)) setWhole(whole === curKey ? null : curKey);
@@ -110,6 +171,15 @@ export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts }
               on={s.hl}
               now={now}
               full={whole === curKey}
+              {...(heard !== null && heard.project === cur.project && heard.card === cur.id
+                ? {
+                    keys: (
+                      <span className="inbox-heard" data-testid="inbox.heard">
+                        {heard.line} · esc undoes
+                      </span>
+                    ),
+                  }
+                : {})}
               acts={{
                 pick: (n) => {
                   key({ k: 'pick', n });

@@ -31,3 +31,5 @@
   border-radius: var(--r-1); cursor: pointer;
 }
 .confirm-bar button:hover { background: var(--c-hover); color: var(--c-text); }
+/* bar N14: what the core heard, on the card until the answer goes */
+.inbox-heard { color: var(--c-text); }

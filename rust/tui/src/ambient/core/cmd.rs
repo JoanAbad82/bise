@@ -17,6 +17,9 @@ pub enum Cmd {
     DictateStart { id: String },
     DictateStop { id: String },
     DictateCancel { id: String },
+    /// bar N14 (core/voice_answer.rs): the card in front of him in the
+    /// focused window, or none.
+    CardInView { project: Option<String>, card: Option<u64> },
     /// The composer's lists (desktop C/A/B, core/picks.rs): the `/`
     /// commands, a workspace's `$` skills, an `@` query's files.
     Commands,
@@ -111,6 +114,10 @@ impl Cmd {
                 bise_proto::draft::AppCmd::DictateStop { id } if !id.trim().is_empty() => Cmd::DictateStop { id },
                 bise_proto::draft::AppCmd::DictateCancel { id } if !id.trim().is_empty() => Cmd::DictateCancel { id },
                 _ => return Err(format!("{cmd}: no id")),
+            },
+            "card_in_view" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+                bise_proto::draft::AppCmd::CardInView { project, card } => Cmd::CardInView { project, card },
+                other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
             "commands" | "skills" | "files" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
                 bise_proto::draft::AppCmd::Commands => Cmd::Commands,

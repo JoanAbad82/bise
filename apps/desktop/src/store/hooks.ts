@@ -67,6 +67,7 @@ function useSlice<T>(key: string, read: (s: Store) => T): T {
 export const useProjects = (): readonly ProjectRow[] => useSlice('projects', (s) => s.projects());
 export const useAgents = (project: string): readonly Agent[] => useSlice(`agents:${project}`, (s) => s.agents(project));
 export const useCards = (project: string): readonly Card[] => useSlice(`cards:${project}`, (s) => s.cards(project));
+export const useVoiceAnswer = (): EvOf<'voice_answer'> | null => useSlice('voice_answer', (s) => s.voiceAnswer());
 export const useConfirms = (project: string): readonly Confirm[] => useSlice(`confirms:${project}`, (s) => s.confirms(project));
 export const useNotice = (project: string): string | null => useSlice(`notice:${project}`, (s) => s.notice(project));
 export const usePrefs = (): JsonValue | null => useSlice('prefs', (s) => s.prefs());
