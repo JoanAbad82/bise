@@ -115,6 +115,12 @@ export interface Confirm {
   readonly text: string;
 }
 
+/** The hub's last line to this window for a project: a plain line (a notice: /flow, a confirm's no) or an error (a refused slash line: his words to fix). */
+export interface HubLine {
+  readonly text: string;
+  readonly level: 'note' | 'error';
+}
+
 /** His send, shown at once, until its 'you' entry lands (FIFO by text) or it fails. */
 export interface Pending {
   readonly cid: number;
@@ -268,9 +274,9 @@ export class Store {
   confirms(project: string): readonly Confirm[] {
     return this.slice(`confirms:${project}`, EMPTY);
   }
-  /** the hub's last plain line to this window (a no's 'drop of @x cancelled') */
-  notice(project: string): string | null {
-    return this.slice<string | null>(`notice:${project}`, null);
+  /** the hub's last line to this window: a notice (a no's 'drop of @x cancelled', /flow) or a refused slash line */
+  notice(project: string): HubLine | null {
+    return this.slice<HubLine | null>(`notice:${project}`, null);
   }
   prefs(): JsonValue | null {
     return this.slice<JsonValue | null>('prefs', null);
@@ -442,6 +448,11 @@ export class Store {
         this.put(`dictation:${ev.id}`, { text: ev.text, final: ev.final, cancelled: ev.cancelled ?? false, error: ev.error ?? null } satisfies Dictation);
         return;
       case 'error':
+        // a typed line the hub's router refused (HubCmd slash): his words to fix, as an error line
+        if (ev.cmd === 'slash' && ev.project != null) {
+          this.put(`notice:${ev.project}`, { text: ev.text, level: 'error' } satisfies HubLine);
+          return;
+        }
         if (ev.cmd !== 'send') return;
         // G: exactly the row with this cid; with no cid (an older core or
         // hub) the oldest sending row of that project, as before
@@ -453,7 +464,7 @@ export class Store {
         this.put(`confirms:${ev.project}`, [...this.confirms(ev.project).filter((c) => c.id !== ev.id), { project: ev.project, id: ev.id, text: ev.text }]);
         return;
       case 'notice':
-        this.put(`notice:${ev.project}`, ev.text);
+        this.put(`notice:${ev.project}`, { text: ev.text, level: 'note' } satisfies HubLine);
         return;
       case 'welcome':
         // a new hello: the hub tied the open questions to a connection

@@ -6,7 +6,7 @@
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import type { Account, Agent, PickCommand, PickSkill, RoleRow, Artifact, Card, DevServer, Entry, Feature, Found, Model, Job, JsonValue, Merged, Plugin, ProjectRow, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
-import { diffKey, Store, type Away, type Confirm, type Dictation, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder } from './store';
+import { diffKey, Store, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder } from './store';
 
 /**
  * Feeds a store from a core port: its live events, then the state events
@@ -69,7 +69,7 @@ export const useAgents = (project: string): readonly Agent[] => useSlice(`agents
 export const useCards = (project: string): readonly Card[] => useSlice(`cards:${project}`, (s) => s.cards(project));
 export const useVoiceAnswer = (): EvOf<'voice_answer'> | null => useSlice('voice_answer', (s) => s.voiceAnswer());
 export const useConfirms = (project: string): readonly Confirm[] => useSlice(`confirms:${project}`, (s) => s.confirms(project));
-export const useNotice = (project: string): string | null => useSlice(`notice:${project}`, (s) => s.notice(project));
+export const useNotice = (project: string): HubLine | null => useSlice(`notice:${project}`, (s) => s.notice(project));
 export const usePrefs = (): JsonValue | null => useSlice('prefs', (s) => s.prefs());
 export const useAccounts = (): readonly Account[] => useSlice('accounts', (s) => s.accounts());
 export const useFound = (): readonly Found[] => useSlice('found', (s) => s.found());

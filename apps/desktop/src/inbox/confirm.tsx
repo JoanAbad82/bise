@@ -31,8 +31,8 @@ export function ConfirmBar({ project }: { project: string }) {
 
   if (q === undefined) {
     return notice === null ? null : (
-      <div className="confirm-bar note" role="status" data-testid="confirm.notice">
-        {notice}
+      <div className={`confirm-bar ${notice.level}`} role={notice.level === 'error' ? 'alert' : 'status'} data-testid="confirm.notice" data-level={notice.level}>
+        {notice.text}
       </div>
     );
   }

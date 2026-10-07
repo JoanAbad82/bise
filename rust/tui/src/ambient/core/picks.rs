@@ -5,8 +5,9 @@
 //! with no copy in TypeScript.
 //!
 //! - `commands`: COMMANDS as data, each with how it runs (`hub`: his
-//!   line goes to the hub's parser; `window`: a screen of the window) and,
-//!   for the hub's, whether a typed path exists today (`runnable`); the
+//!   line goes to the hub's parser; `window`: a screen of the window) and
+//!   `runnable`: every hub command runs (his typed line goes as amb-feed's
+//!   HubCmd slash, the hub's router parses it; architect m_11011); the
 //!   window owns its screens' readiness.
 //! - `skills {project}`: skills::index of that project's workspace (the
 //!   TUI's fingerprint cache, no watcher).
@@ -35,11 +36,6 @@ const HUB: &[&str] = &[
     "/restart", "/update", "/version", "/new", "/archive", "/restore", "/isolate", "/rename", "/answer", "/close", "/model", "/reasoning",
     "/interrupt", "/stop", "/compact",
 ];
-
-/// The hub's commands with a typed HubCmd today (answer, archive,
-/// unarchive, new, rename, model, effort, stop). The others run once the
-/// hub takes his typed line (HubCmd slash, amb-feed's).
-const RUNNABLE: &[&str] = &["/new", "/archive", "/restore", "/rename", "/answer", "/model", "/reasoning", "/interrupt", "/stop"];
 
 fn words(w: &[(&str, &str)]) -> PickArg {
     PickArg::Words { words: w.iter().map(|(value, desc)| PickChoice { value: value.to_string(), desc: desc.to_string() }).collect() }
@@ -72,7 +68,8 @@ pub fn commands() -> Vec<PickCommand> {
                 desc: c.desc.to_string(),
                 args: c.args.iter().map(|a| arg(*a)).collect(),
                 runs: if hub { Runs::Hub } else { Runs::Window },
-                runnable: hub && RUNNABLE.contains(&c.name),
+                // his typed line runs through HubCmd slash (the hub's router)
+                runnable: hub,
             }
         })
         .collect()
@@ -189,8 +186,8 @@ mod tests {
         for n in HUB {
             assert!(names.contains(n), "{n} is not a TUI command");
         }
-        for n in RUNNABLE {
-            assert!(HUB.contains(n), "{n} runnable but not the hub's");
+        for c in &list {
+            assert_eq!(c.runnable, c.runs == Runs::Hub, "{}: every hub command runs (slash), no window one is the hub's", c.name);
         }
         let new = list.iter().find(|c| c.name == "/new").unwrap();
         assert_eq!((new.runs, new.runnable), (Runs::Hub, true));
@@ -199,7 +196,7 @@ mod tests {
         let inbox = list.iter().find(|c| c.name == "/inbox").unwrap();
         assert_eq!((inbox.runs, inbox.runnable), (Runs::Window, false), "the window owns its screens");
         let compact = list.iter().find(|c| c.name == "/compact").unwrap();
-        assert_eq!((compact.runs, compact.runnable), (Runs::Hub, false), "until the hub takes his line");
+        assert_eq!((compact.runs, compact.runnable), (Runs::Hub, true), "his line goes as slash");
     }
 
     fn repo() -> PathBuf {

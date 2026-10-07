@@ -26,7 +26,12 @@ describe('store', () => {
     store.confirm(P, 3, false);
     expect(sent.at(-1)).toEqual({ cmd: 'confirm', project: P, id: 3, yes: false });
     store.apply({ ev: 'notice', project: P, cmd: 'confirm', text: 'drop of @perf cancelled' });
-    expect(store.notice(P)).toBe('drop of @perf cancelled');
+    expect(store.notice(P)).toEqual({ text: 'drop of @perf cancelled', level: 'note' });
+    // a refused typed line (HubCmd slash) is an error line, never a notice
+    store.apply({ ev: 'error', project: P, cmd: 'slash', text: 'no undo: an agent may already have acted.', cid: 3, reason: 'refused' });
+    expect(store.notice(P)).toEqual({ text: 'no undo: an agent may already have acted.', level: 'error' });
+    store.apply({ ev: 'notice', project: P, cmd: 'slash', text: 'flow: pr', cid: 4 });
+    expect(store.notice(P)).toEqual({ text: 'flow: pr', level: 'note' });
     const n = sent.length;
     store.putOff(P, 4);
     expect(sent.length).toBe(n);
