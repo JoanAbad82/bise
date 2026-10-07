@@ -5,9 +5,19 @@ import type { Card } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
 import { Inbox, keyOf, type InboxPorts } from './Inbox';
 import { makeDrafts } from './drafts';
-import { InboxCard } from './InboxCard';
+import { InboxCard, PICKED_MS } from './InboxCard';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+
+/** a clicked row shows picked, then picks (PICKED_MS) */
+const settle = () => {
+  act(() => {
+    vi.advanceTimersByTime(PICKED_MS);
+  });
+};
 
 const cards = (): Card[] => {
   const ev = hub_ev.find((e) => e.ev === 'cards');
@@ -49,10 +59,14 @@ describe('Inbox', () => {
     expect(p.calls[1]).toBe('answer acme-1a2b3c4d 9 cold, then warm');
   });
 
-  it('a click on an option picks it; close and esc', () => {
+  it('a click on an option shows it picked, then picks it; close and esc', () => {
+    vi.useFakeTimers();
     const p = ports();
     render(<Inbox cards={cards()} names={{}} ports={p} now={1791100400000} />);
     fireEvent.click(screen.getByTestId('inbox.card.acme-1a2b3c4d-10.opt.2'));
+    expect(screen.getByTestId('inbox.card.acme-1a2b3c4d-10.opt.2').className).toContain('picked');
+    expect(p.calls).toEqual([]);
+    settle();
     fireEvent.click(screen.getByTestId('inbox.card.acme-1a2b3c4d-9.close'));
     fireEvent.keyDown(screen.getByTestId('inbox.root'), { key: 'Escape' });
     expect(p.calls).toEqual(['answer acme-1a2b3c4d 10 2', 'close acme-1a2b3c4d 9', 'back']);
@@ -190,15 +204,19 @@ describe('Inbox', () => {
   });
 
   it('InboxCard alone: a card with its options and the acts it is given, no list', () => {
+    vi.useFakeTimers();
     const picked: number[] = [];
     const c = cards()[2];
     if (!c) throw new Error('fixture');
     render(<InboxCard card={c} project="acme" now={1791100400000} acts={{ pick: (n) => picked.push(n), open: () => picked.push(0), openPage: () => picked.push(-1) }} testId="capsule.card" />);
     fireEvent.click(screen.getByTestId('capsule.card.opt.1'));
+    settle();
     fireEvent.click(screen.getByTestId('capsule.card.open'));
     fireEvent.click(screen.getByTestId('capsule.card.page'));
     expect(picked).toEqual([1, 0, -1]);
     expect(screen.queryByTestId('capsule.card.close')).toBeNull();
-    expect(screen.getByTestId('capsule.card').textContent).toContain('main asks');
+    // main's card is bise's (ambient m_11273); outside the window: '⏎ open in bise', no close
+    expect(screen.getByTestId('capsule.card').textContent).toContain('bise asks');
+    expect(screen.getByTestId('capsule.card.keys').textContent).toBe('1 2pick⏎open in bise⌘Oopen its pageesclater');
   });
 });

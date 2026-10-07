@@ -1,10 +1,14 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Card } from '@/proto';
-import { InboxStrip, type StripPorts } from './Strip';
+import { InboxStrip, cardKeyOf, type StripPorts } from './Strip';
+import { PICKED_MS } from './InboxCard';
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const card = (id: number, rank: number, project = 'acme'): Card => ({
   id,
@@ -39,7 +43,8 @@ describe('InboxStrip (W7/K24)', () => {
     expect(screen.queryByTestId('strip')).toBeNull();
   });
 
-  it("numbers the project's items, ctrl+2 opens item 2 in place, a click on an option answers it", () => {
+  it("numbers the project's items, ctrl+2 docks item 2, a click on an option answers it", () => {
+    vi.useFakeTimers();
     const { did, p } = ports();
     render(<InboxStrip project="acme" cards={[card(1, 2), card(2, 0), card(3, 1), card(4, 3), card(9, 0, 'other')]} ports={p} now={NOW} />);
     expect(screen.getByTestId('strip.row.1').textContent).toContain('t2');
@@ -50,24 +55,59 @@ describe('InboxStrip (W7/K24)', () => {
     expect(screen.getByTestId('strip.card.acme-3')).toBeTruthy();
     expect(screen.queryByTestId('strip.row.2')).toBeNull();
     fireEvent.click(screen.getByTestId('strip.card.acme-3.opt.2'));
+    act(() => {
+      vi.advanceTimersByTime(PICKED_MS);
+    });
     expect(did).toEqual(['answer acme-3 2']);
     // it leaves at once: the next ones move up a number
     expect(screen.queryByTestId('strip.card.acme-3')).toBeNull();
     expect(screen.getByTestId('strip.row.2').textContent).toContain('t1');
   });
 
-  it('a click opens a row; esc folds it; close drops it; the inbox link opens ⌘I', () => {
+  it("a click docks a row; esc and 'esc later' put it off; '⌘⌫ close' and ⌘⌫ close it; a digit picks it", () => {
     const { did, p } = ports();
-    render(<InboxStrip project="acme" cards={[card(1, 0), card(2, 1)]} ports={p} now={NOW} />);
+    render(<InboxStrip project="acme" cards={[card(1, 0), card(2, 1), card(3, 2)]} ports={p} now={NOW} />);
     fireEvent.click(screen.getByTestId('strip.row.1'));
-    expect(screen.getByTestId('strip.card.acme-1')).toBeTruthy();
+    expect(screen.getByTestId('strip.dock')).toBeTruthy();
+    expect(screen.queryByTestId('strip')).toBeNull();
     fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' });
     expect(screen.queryByTestId('strip.card.acme-1')).toBeNull();
     fireEvent.keyDown(window, { code: 'Digit1', key: '1', ctrlKey: true });
-    fireEvent.click(screen.getByTestId('strip.inbox.acme-1'));
+    fireEvent.click(screen.getByTestId('strip.card.acme-1.later'));
+    expect(screen.queryByTestId('strip.card.acme-1')).toBeNull();
+    fireEvent.keyDown(window, { code: 'Digit1', key: '1', ctrlKey: true });
     fireEvent.click(screen.getByTestId('strip.card.acme-1.close'));
-    expect(did).toEqual(['inbox', 'close acme-1']);
-    expect(screen.getByTestId('strip.row.1').textContent).toContain('t2');
+    expect(did).toEqual(['close acme-1']);
+    fireEvent.keyDown(window, { code: 'Digit1', key: '1', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'Backspace', code: 'Backspace', metaKey: true });
+    // the card has the keys while no words are typed: a digit picks at once
+    fireEvent.keyDown(window, { code: 'Digit1', key: '1', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'ArrowRight', code: 'ArrowRight' });
+    expect(screen.getByTestId('strip.card.acme-3.opt.1').className).toContain('on');
+    fireEvent.keyDown(window, { key: '2', code: 'Digit2' });
+    expect(did).toEqual(['close acme-1', 'close acme-2', 'answer acme-3 2']);
+  });
+
+  it("the docked card: 'bise asks' for main, no project for bise's home, the question's footer", () => {
+    const c = { ...card(1, 0), agent: 'main' };
+    render(<InboxStrip project="acme" name="acme-storefront" home cards={[c]} ports={ports().p} now={NOW} />);
+    fireEvent.keyDown(window, { code: 'Digit1', key: '1', ctrlKey: true });
+    expect(screen.getByTestId('strip.card.acme-1').textContent).toContain('bise asks');
+    expect(screen.queryByTestId('strip.card.acme-1.project')).toBeNull();
+    expect(screen.getByTestId('strip.card.acme-1.keys').textContent).toBe('1 2pickor type your answer below⌘⌫closeesclater');
+  });
+
+  it('cardKeyOf: digits that are options pick, ←→ walk, ⌘⌫ closes, esc puts off', () => {
+    const k = (key: string, mods: Partial<Record<'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey', boolean>> = {}) => ({ key, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, ...mods });
+    const c = card(1, 0);
+    expect(cardKeyOf(k('2'), c, null)).toEqual({ t: 'pick', n: 2 });
+    expect(cardKeyOf(k('3'), c, null)).toBeNull();
+    expect(cardKeyOf(k('ArrowRight'), c, null)).toEqual({ t: 'on', n: 1 });
+    expect(cardKeyOf(k('ArrowRight'), c, 2)).toEqual({ t: 'on', n: 2 });
+    expect(cardKeyOf(k('ArrowLeft'), c, null)).toEqual({ t: 'on', n: 2 });
+    expect(cardKeyOf(k('Backspace', { metaKey: true }), c, null)).toEqual({ t: 'close' });
+    expect(cardKeyOf(k('Escape'), c, null)).toEqual({ t: 'later' });
+    expect(cardKeyOf(k('2', { ctrlKey: true }), c, null)).toBeNull();
   });
 
   it("the demo tour's tip goes above the box (L25), and not without an item", () => {

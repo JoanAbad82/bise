@@ -46,6 +46,8 @@ export interface InboxProps {
   cards: readonly CardRow[];
   /** a project id's name for the rows ("acme"); unknown: the id */
   names: Readonly<Record<string, string>>;
+  /** bise's own home projects: their card's header names no project */
+  homes?: ReadonlySet<string>;
   ports: InboxPorts;
   /** now, for the ages (a test pins it) */
   now?: number;
@@ -57,7 +59,7 @@ export interface InboxProps {
   tipOf?: (c: CardRow) => ReactNode;
 }
 
-export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts, voice = null, tipOf }: InboxProps) {
+export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxDrafts, voice = null, tipOf }: InboxProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [s, setS] = useState(START);
@@ -171,12 +173,13 @@ export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts, 
             <InboxCard
               card={cur}
               project={names[cur.project]}
+              home={homes?.has(cur.project) === true}
               on={s.hl}
               now={now}
               full={whole === curKey}
               {...(heard !== null && heard.project === cur.project && heard.card === cur.id
                 ? {
-                    keys: (
+                    note: (
                       <span className="inbox-heard" data-testid="inbox.heard">
                         {heard.line} · esc undoes
                       </span>
@@ -195,6 +198,12 @@ export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts, 
                     }
                   : {}),
                 ...(ports.openPage ? { openPage: ports.openPage } : {}),
+                later: () => {
+                  key({ k: 'esc' });
+                },
+                type: () => {
+                  field.current?.focus();
+                },
               }}
             >
               {takesWords(cur) && (

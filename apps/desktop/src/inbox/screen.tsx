@@ -20,6 +20,7 @@ export function inboxOf(rows: readonly ProjectRow[]) {
   return {
     cards: rows.flatMap((r) => r.cards ?? []),
     names: Object.fromEntries(rows.map((r) => [r.project, r.name])),
+    homes: new Set(rows.filter((r) => r.home).map((r) => r.project)),
   };
 }
 
@@ -27,7 +28,7 @@ export function InboxScreen() {
   const rows = useProjects();
   const store = useStore();
   const router = useRouter();
-  const { cards, names } = useMemo(() => inboxOf(rows), [rows]);
+  const { cards, names, homes } = useMemo(() => inboxOf(rows), [rows]);
   const voice = useVoiceAnswer();
   const inView = useCallback(
     (c: { project: string; card: number } | null) => {
@@ -39,6 +40,7 @@ export function InboxScreen() {
     <Inbox
       cards={cards}
       names={names}
+      homes={homes}
       voice={voice}
       tipOf={(c) => <CardTip project={c.project} />}
       ports={{
@@ -65,7 +67,8 @@ export function ThreadInbox({ project }: { project: string }) {
   const rows = useProjects();
   const store = useStore();
   const router = useRouter();
-  const cards = useMemo(() => rows.find((r) => r.project === project)?.cards ?? [], [rows, project]);
+  const row = rows.find((r) => r.project === project);
+  const cards = useMemo(() => row?.cards ?? [], [row]);
   const inView = useCallback(
     (c: { project: string; card: number } | null) => {
       store.cardInView(c?.project ?? null, c?.card ?? null);
@@ -75,6 +78,7 @@ export function ThreadInbox({ project }: { project: string }) {
   return (
     <InboxStrip
       project={project}
+      {...(row ? { name: row.name, home: row.home } : {})}
       cards={cards}
       tip={<CardTip project={project} />}
       ports={{
@@ -86,6 +90,9 @@ export function ThreadInbox({ project }: { project: string }) {
         },
         openInbox: () => {
           router.go({ screen: 'inbox' });
+        },
+        typeAt: () => {
+          document.querySelector<HTMLElement>('[data-testid="composer.field"]')?.focus();
         },
         openPage: (url) => {
           void window.bise.openExternal(url);
