@@ -27,6 +27,12 @@ export type World = { world: string; home: string; bise: string; hubs: HubInfo[]
 const qa = (args: string[], timeout: number): string =>
   execFileSync('python3', ['-B', QA, ...args], { cwd: REPO, encoding: 'utf8', timeout, stdio: ['ignore', 'pipe', 'pipe'] });
 
+/** One pure function of world.py (world_env, leaked, proc_env: amb-tools b81056b0), fed JSON on stdin. */
+const worldPy = (call: string, input: unknown): unknown =>
+  JSON.parse(execFileSync('python3', ['-B', '-c',
+    `import sys, json; sys.path.insert(0, ${JSON.stringify(path.dirname(QA))}); import world; a = json.load(sys.stdin); print(json.dumps(${call}))`],
+  { cwd: REPO, encoding: 'utf8', timeout: 20_000, input: JSON.stringify(input) })) as unknown;
+
 const parse = (out: string): World => JSON.parse(out.slice(out.indexOf('{'))) as World;
 
 /**
@@ -147,12 +153,23 @@ export function tui(w: World, project: string, size = '160x50'): Tui {
   const tsock = path.join(sockDir, 's');
   const name = `qaf${Date.now() % 1_000_000}`;
   const [cols, rows] = size.split('x');
-  // real.sh's fake provider keys (qa-fake-…, never valid): the TUI sees the providers the hub sees
-  const fake = Object.fromEntries(Object.entries(process.env).filter((e): e is [string, string] => e[1]?.startsWith('qa-fake-') === true));
-  const env = { ...worldEnv(w), ...fake, PATH: process.env['PATH'] ?? '/usr/bin:/bin', TERM: 'xterm-256color', LANG: 'en_US.UTF-8' };
+  // the world's hubs' rule (world.py world_env, an allowlist: no secret-named variable, the fake
+  // Mistral key), so the TUI sees the providers its hub sees; this process's BEND_* are an agent's,
+  // never the world's (worldEnv gives the world's own)
+  const mine = Object.fromEntries(Object.entries(process.env).filter((e): e is [string, string] => e[1] !== undefined && !e[0].startsWith('BEND_')));
+  const env = worldPy('world.world_env(a)', { ...mine, ...worldEnv(w), PATH: process.env['PATH'] ?? '/usr/bin:/bin', TERM: 'xterm-256color', LANG: 'en_US.UTF-8' }) as Record<string, string>;
+  // its own tmux server, started with that env: the pane gets the server's env, never his tmux's
   const tm = (args: string[]): string => execFileSync('tmux', ['-S', tsock, ...args], { encoding: 'utf8', env, timeout: 10_000 });
   const cmd = `cd ${JSON.stringify(h.ws)} && exec ${JSON.stringify(w.bise)}`;
   tm(['new-session', '-d', '-s', name, '-x', cols ?? '160', '-y', rows ?? '50', cmd]);
+  // the law (world.py refuse_leak): no real key in the TUI or its tmux server (ps -E, names only)
+  for (const pid of tm(['display', '-p', '-t', name, '#{pid} #{pane_pid}']).trim().split(/\s+/)) {
+    const names = worldPy('world.leaked(world.proc_env(a))', Number(pid)) as string[];
+    if (names.length > 0) {
+      try { tm(['kill-server']); } catch { /* gone */ }
+      throw new Error(`the TUI next to the world (pid ${pid}) holds secret-named variables: ${names.join(', ')} (values never shown)`);
+    }
+  }
   return {
     screen: () => tm(['capture-pane', '-p', '-t', name]),
     keys: (...k) => { tm(['send-keys', '-t', name, ...k]); },

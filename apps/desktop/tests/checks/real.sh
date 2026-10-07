@@ -15,11 +15,11 @@ up=(world up --projects 2)
 [ -n "${QA_BISE:-}" ] && up+=(--bise "$QA_BISE")
 
 # No real key reaches the run: world up builds its hubs' env from an allowlist since amb-tools'
-# b81056b0 (and refuses a leak), but the app's core, Playwright and the TUI next to it get this
-# env (a hub started with his keys counts his providers as ready, and the window's model catalog
-# then differs from the TUI's). Every key, token and provider variable goes; one
-# fake Mistral key (never valid) stands in on both sides (world.ts passes qa-fake- values to the
-# TUI), so the hub's catalog and the TUI's /model list the same ready provider.
+# b81056b0 (and refuses a leak), and world.ts starts the TUI next to it with the same rule
+# (world_env) and checks it; this scrub is the second guard, for all the run starts from this env:
+# the app's core, Playwright, the TUI (a hub started with his keys counts his providers as ready,
+# and the window's model catalog then differs from the TUI's). Every key, token and provider
+# variable goes; one fake Mistral key (never valid) stands in, as the world's hubs have one.
 for v in $(env | sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' |
            grep -iE '(_api_key|_token|_secret|_bedrock|_password)$|^(anthropic|openai|azure|mistral|codestral|gemini|google|aws|openrouter|staging_mistral|gemfury)_'); do
   unset "$v"
