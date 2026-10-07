@@ -40,6 +40,14 @@ pub fn is_home(ws: &Path) -> bool {
     canon(ws) == canon(&home_workspace())
 }
 
+/// Whether `ws` is in bise's projects registry (bise_home::projects, which
+/// the desktop app writes when it shows a project): one of the two facts
+/// of prompts::desktop_on, read once when a prompt is built.
+pub fn is_registered(ws: &Path) -> bool {
+    let ws = bise_home::projects::canonical(ws);
+    bise_home::projects::read(&bise_home::Home::from_env()).iter().any(|p| bise_home::projects::canonical(&p.path) == ws)
+}
+
 /// The home workspace, created on first use (never git-initialised).
 pub fn ensure_home_workspace() -> std::io::Result<PathBuf> {
     let d = home_workspace();

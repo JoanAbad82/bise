@@ -58,7 +58,7 @@ mod tests {
         assert!(hinted.starts_with("what's running?\n\n"));
         assert!(hinted.ends_with("[from the capsule: answer in one short line]"));
         // main's rule names the same line (prompts.rs)
-        assert!(crate::prompts::main_role("/w", "/t", "").contains("a `[from the capsule…]` line"));
+        assert!(crate::prompts::main_role("/w", "/t", "", true).contains("a `[from the capsule…]` line"));
         assert_eq!(Shell::capsule_hint("what's running?".into(), ""), "what's running?");
         assert_eq!(Shell::capsule_hint("hi".into(), "tui"), "hi");
         assert_eq!(Shell::capsule_hint("/answer 3 1".into(), "capsule"), "/answer 3 1");

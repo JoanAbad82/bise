@@ -1327,15 +1327,17 @@ impl Shell {
         let git = crate::worktree::is_git_dir(&self.opts.paths.workspace);
         let flow = self.flow_now().filter(|_| git);
         let style = self.commit_style();
-        if a.is_main && crate::paths::is_home(&self.opts.paths.workspace) {
+        let ws = &self.opts.paths.workspace;
+        let desktop = prompts::desktop_on(crate::paths::is_home(ws), crate::paths::is_registered(ws));
+        if a.is_main && crate::paths::is_home(ws) {
             return prompts::bise_role(&self.hub.workspace, tmp);
         }
         if a.is_main && !git {
-            return prompts::main_role(&self.hub.workspace, tmp, devflow::NO_GIT_SECTION);
+            return prompts::main_role(&self.hub.workspace, tmp, devflow::NO_GIT_SECTION, desktop);
         }
         if a.is_main {
             let section = devflow::main_section(flow.as_ref(), style.as_deref());
-            return prompts::main_role(&self.hub.workspace, tmp, &section);
+            return prompts::main_role(&self.hub.workspace, tmp, &section, desktop);
         }
         // a feature's agent: the feature's other agents (dev-flow §5.1)
         let id = crate::place::view_id(a);
@@ -1351,7 +1353,7 @@ impl Shell {
             others: &others,
             feature: a.ws.feature(),
         };
-        prompts::task_role(a, tmp, &devflow::task_place(flow.as_ref(), &place, style.as_deref()))
+        prompts::task_role(a, tmp, &devflow::task_place(flow.as_ref(), &place, style.as_deref()), desktop)
     }
 
     /// One role-line call in a thread (BISE-126): never waits in the
