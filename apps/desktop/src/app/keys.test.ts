@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Agent, ProjectRow } from '@/proto';
 import { keyAction, type KeyCtx, type KeyLike } from './keys';
-import { paletteItems } from './Palette';
 
 const row = (project: string, name: string, order: number, home = false): ProjectRow => ({ project, name, path: `/${name}`, git: !home, home, order, agents: 1, working: 0, waits: 0, running: true });
 const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1, waits: 0, ...over });
@@ -51,15 +50,6 @@ describe("the window's keys", () => {
     expect(keyAction({ ...k('ArrowDown', { altKey: true }), key: 'ArrowDown' }, ctx())).toEqual({ go: { screen: 'thread', project: 'a', agent: 'perf' } });
     expect(keyAction({ ...k('ArrowUp', { altKey: true }), key: 'ArrowUp' }, ctx({ route: { screen: 'thread', project: 'a', agent: 'docs' } }))).toEqual({ go: { screen: 'thread', project: 'a', agent: 'perf' } });
     expect(keyAction({ ...k('ArrowDown', { altKey: true }), key: 'ArrowDown' }, ctx({ typing: true }))).toBeUndefined();
-  });
-});
-
-describe('the agent palette', () => {
-  it('every agent, bise first then his order, archived last; a query ranks name prefix first', () => {
-    const all = paletteItems(projects, (p) => agents[p] ?? [], '');
-    expect(all.map((i) => `${i.projectName}/${i.agent.name}`)).toEqual(['bise/main', 'acme/main', 'acme/perf', 'acme/docs', 'shop/main', 'acme/old']);
-    expect(paletteItems(projects, (p) => agents[p] ?? [], 'do').map((i) => i.agent.name)).toEqual(['docs']);
-    expect(paletteItems(projects, (p) => agents[p] ?? [], 'shop').map((i) => i.projectName)).toEqual(['shop']);
   });
 });
 

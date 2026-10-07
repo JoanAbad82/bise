@@ -1,0 +1,91 @@
+import { describe, expect, it } from 'vitest';
+import { flatHits, marks, matchScore, nextScope, searchList, wordScore, type SearchData } from './rank';
+
+const NOW = Date.UTC(2026, 9, 14, 14, 30);
+const MIN = 60_000;
+const D: SearchData = {
+  projects: [
+    { id: 'home', name: 'home', home: true },
+    { id: 'sf', name: 'storefront' },
+    { id: 'docs', name: 'docs' },
+  ],
+  agents: [
+    { project: 'home', name: 'main', main: true, archived: false, status: 'idle', title: '', waits: 0, since_ms: NOW - 90 * MIN },
+    { project: 'sf', name: 'main', main: true, archived: false, status: 'idle', title: '', waits: 0, since_ms: NOW - 3 * MIN, atWork: 2 },
+    { project: 'sf', name: 'checkout', main: false, archived: false, status: 'working', title: 'apple pay on checkout', waits: 0, since_ms: NOW - 6 * MIN },
+    { project: 'sf', name: 'checkout-v1', main: false, archived: true, status: 'done', title: 'first stripe flow', waits: 0, since_ms: NOW - 3 * 1440 * MIN },
+    { project: 'sf', name: 'search', main: false, archived: false, status: 'blocked', title: 'search index', waits: 1, since_ms: NOW - 2 * MIN, ask: 'rebuild the search index tonight?' },
+    { project: 'docs', name: 'check-links', main: false, archived: false, status: 'done', title: 'dead links in the docs', waits: 0, since_ms: NOW - 1440 * MIN },
+    { project: 'sf', name: 'perf', main: false, archived: false, status: 'working', title: 'product page speed', waits: 0, since_ms: NOW - 14 * MIN },
+  ],
+  artifacts: [
+    { project: 'sf', id: 'shots', title: 'checkout on mobile', kind: 'image', what: '2 shots', agent: 'checkout', at_ms: NOW - 200 * MIN },
+    { project: 'sf', id: 'pp', title: 'product page, before / after', kind: 'page', what: 'page · v2', agent: 'perf', at_ms: NOW - 28 * MIN },
+  ],
+  scheduled: [{ project: 'sf', id: 48, agent: 'checkout', words: 're-run the flaky checkout test', every: '30 min', at_ms: NOW - 60 * MIN }],
+};
+
+describe('search: one ranking for ⌘K and the spotlight', () => {
+  it('a word scores by how it matches: whole, start, a word’s start, inside, else nothing', () => {
+    expect(wordScore('perf', 'perf')).toBeGreaterThan(wordScore('per', 'perf'));
+    expect(wordScore('per', 'perf')).toBeGreaterThan(wordScore('pay', 'apple pay'));
+    expect(wordScore('pay', 'apple pay')).toBeGreaterThan(wordScore('ppl', 'apple'));
+    expect(wordScore('xyz', 'apple')).toBe(0);
+    // every word must match a field; the name counts more than what it's about, which counts more than its project
+    expect(matchScore('check pay', { name: ['checkout'], about: ['apple pay'] })).toBeGreaterThan(0);
+    expect(matchScore('check zzz', { name: ['checkout'], about: ['apple pay'] })).toBe(-1);
+    expect(matchScore('sto', { name: ['storefront'] })).toBeGreaterThan(matchScore('sto', { name: ['x'], about: ['storefront'] }));
+    expect(matchScore('sto', { name: ['x'], about: ['storefront'] })).toBeGreaterThan(matchScore('sto', { name: ['x'], where: ['storefront'] }));
+  });
+
+  it("'che': agents (archived last), artifacts, scheduled, each a group; the name's match is marked", () => {
+    const l = searchList(D, 'che', 'all', NOW, 'UTC');
+    expect(l.mode).toBe('found');
+    expect(l.groups.map((g) => g.id)).toEqual(['agents', 'artifacts', 'scheduled']);
+    expect(l.groups[0]?.hits.map((h) => h.name)).toEqual(['checkout', 'check-links', 'checkout-v1']);
+    const v1 = l.groups[0]?.hits[2];
+    expect(v1?.archived).toBe(true);
+    expect(v1?.glyph).toBe('–');
+    expect(v1?.detail).toBe('archived · first stripe flow');
+    expect(v1?.when).toBe('3 days');
+    expect(l.groups[0]?.hits[0]).toMatchObject({ glyph: '∿', tone: 'ink', detail: 'apple pay on checkout', where: 'storefront', when: 'working · 6m' });
+    expect(l.groups[1]?.hits[0]).toMatchObject({ glyph: '◫', name: 'checkout on mobile', detail: '2 shots', where: 'checkout · storefront' });
+    expect(l.groups[2]?.hits[0]).toMatchObject({ glyph: '◷', where: 'checkout · storefront', when: 'every 30 min' });
+    expect(marks('checkout-v1', 'che')).toEqual([[0, 3]]);
+    expect(marks('#471 checkout: apple pay flag', 'che pay')).toEqual([
+      [5, 8],
+      [21, 24],
+    ]);
+  });
+
+  it('an archived agent is found by its old title too, after every live one', () => {
+    const l = searchList(D, 'stripe', 'all', NOW, 'UTC');
+    expect(flatHits(l).map((h) => h.name)).toEqual(['checkout-v1']);
+    expect(flatHits(l)[0]?.open).toEqual({ to: 'thread', project: 'sf', agent: 'checkout-v1' });
+  });
+
+  it('a scope keeps one kind; tab cycles all · agents · artifacts · scheduled', () => {
+    expect(searchList(D, 'che', 'agents', NOW).groups.map((g) => g.id)).toEqual(['agents']);
+    expect(searchList(D, 'che', 'scheduled', NOW).groups.map((g) => g.id)).toEqual(['scheduled']);
+    expect(nextScope('all')).toBe('agents');
+    expect(nextScope('scheduled')).toBe('all');
+    expect(nextScope('all', true)).toBe('scheduled');
+  });
+
+  it('no query: waiting for you, then recent mixed by recency, archived last', () => {
+    const l = searchList(D, '', 'all', NOW, 'UTC');
+    expect(l.mode).toBe('start');
+    expect(l.groups.map((g) => g.label)).toEqual(['waiting for you', 'recent']);
+    expect(l.groups[0]?.hits).toMatchObject([{ name: 'search', glyph: '?', tone: 'acc', detail: 'rebuild the search index tonight?', when: '2m', waiting: true }]);
+    const recent = l.groups[1]?.hits.map((h) => h.name) ?? [];
+    expect(recent.slice(0, 4)).toEqual(['bise · storefront', 'checkout', 'perf', 'product page, before / after']);
+    expect(recent.at(-1)).toBe('checkout-v1');
+    expect(l.groups[1]?.hits[0]).toMatchObject({ tone: 'pearl', when: '2 agents at work', where: '' });
+  });
+
+  it('nothing matches: none; nothing to search (only the bise rows): blank', () => {
+    expect(searchList(D, 'stripe webhook', 'all', NOW).mode).toBe('none');
+    const bare: SearchData = { projects: D.projects, agents: D.agents.filter((a) => a.main), artifacts: [], scheduled: [] };
+    expect(searchList(bare, '', 'all', NOW).mode).toBe('blank');
+  });
+});

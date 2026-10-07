@@ -111,22 +111,6 @@
   overflow-wrap: anywhere;
 }
 
-/* ⌘K's palette: over the window, the spotlight's look */
-.app-palette {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding-top: 12vh;
-  background: rgba(0, 0, 0, 0.12);
-  z-index: 20;
-}
-
-.app-palette .b-spot {
-  width: min(640px, 90vw);
-}
-
 /* an agent's ⌥ number in the sidebar */
 .app-n {
   display: inline-block;

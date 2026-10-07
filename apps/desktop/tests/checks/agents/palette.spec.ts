@@ -1,8 +1,13 @@
-// agents/palette · bar W14 / tui-parity V1 (the TUI's sb/palette.rs): ⌘K anywhere opens the agent
-// palette, it finds any agent by name in every project, archived ones too, ↑↓ move, ⏎ opens the
-// agent's thread, esc closes and the composer keeps its draft. Owner: amb-web (lead m_10665); the
-// palette is amb-win's src/app/Palette.tsx. The new app on the scripted core's fixture world:
-// bise's home (main) and acme (main, perf working, old-fix archived).
+// agents/palette · ⌘K, one search (designer's signed block s-k, desktop-screens v7; lead m_11844,
+// m_11864): over the window, every agent of every project, archived ones too, the artifacts and the
+// scheduled tasks, grouped, keyboard first; the composer keeps its draft. No query: 'recent'. A
+// query: agents (archived last), artifacts, scheduled; tab cycles the scope; ⏎ opens; ⌘⏎ restores
+// an archived agent then opens it; nothing found: '⌘⏎ ask bise' sends the words to bise. Shots light
+// and dark, 1400 and 800 wide, for designer's sign-off. Owner: amb-web; the palette is
+// src/app/Palette.tsx in amb-win's shell. The new app on the scripted core's fixture world: bise's
+// home (main) and acme (main, perf working, old-fix archived, the artifact 'Perf notes').
+import type { Page } from '@playwright/test';
+import type { BrowserWindow } from 'electron';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
 const ACME = 'acme-1a2b3c4d';
@@ -12,48 +17,134 @@ const T = {
   field: '[data-testid="app.palette.field"]',
   item: (k: number) => `[data-testid="app.palette.item.${String(k)}"]`,
   items: '[data-testid^="app.palette.item."]',
+  group: (g: string) => `[data-testid="app.palette.group.${g}"]`,
+  scope: (s: string) => `[data-testid="app.palette.scope.${s}"]`,
+  keys: '[data-testid="app.palette.keys"]',
+  none: '[data-testid="app.palette.none"]',
   thread: '[data-testid="thread.screen"]',
   composer: '[data-testid="composer.field"]',
 };
 
-test('agents/palette: ⌘K from the thread finds agents of every project, archived too; ↑↓ ⏎ opens, esc keeps the draft', async () => {
+const prefs = (theme: string) => ({
+  ev: 'prefs',
+  prefs: {
+    onboarded: true,
+    theme,
+    context: { shot: true, url: true, file: true, window_text: false },
+    excluded_apps: [],
+    quiet: { call: true, share: true, fullscreen: true, focus: true, batch_min: 20, away_card: true },
+    voice: { fn_hold: true, fn_twice: 'spotlight', language: 'auto' },
+    shots_keep_days: 7,
+  },
+});
+
+async function openK(page: Page): Promise<void> {
+  await page.keyboard.press('Meta+K');
+  await expect(page.locator(T.palette), '⌘K opens the search').toBeVisible({ timeout: 3000 });
+  await expect(page.locator(T.field), 'its field has the focus').toBeFocused();
+}
+
+test('agents/palette: ⌘K searches agents (archived too), artifacts, scheduled; scopes, ⏎, ⌘⏎ restore, ask bise', async () => {
   const core = new FakeCore();
   const s = await launchDesktop({ core, route: `agent/${HOME}/main` });
   try {
     const { page } = s;
+    const win = await s.app.browserWindow(page);
+    await win.evaluate((w: BrowserWindow) => {
+      w.setSize(1400, 900);
+    });
+    await expect.poll(() => page.evaluate(() => window.innerWidth), { timeout: 3000 }).toBe(1400);
     const thread = page.locator(T.thread);
     await expect(thread).toHaveAttribute('data-project', HOME, { timeout: 10_000 });
-    // a draft in the composer: the palette has its own field and leaves it alone
+    // a draft in the composer: the search has its own field and leaves it alone
     await page.locator(T.composer).click();
     await page.keyboard.type('half a thought');
-    await page.keyboard.press('Meta+K');
-    await expect(page.locator(T.palette), '⌘K opens the palette, focus in the composer').toBeVisible({ timeout: 3000 });
-    await expect(page.locator(T.field), 'its field has the focus').toBeFocused();
-    // every project's agents, the archived one too
-    const all = await page.locator(T.items).allTextContents();
-    expect(all.some((t) => t.includes('perf')), 'acme’s perf is listed from bise’s thread').toBe(true);
-    expect(all.some((t) => t.includes('old-fix') && t.includes('archived')), 'the archived old-fix is listed, marked archived').toBe(true);
-    await page.screenshot({ path: test.info().outputPath('all.png') });
-    // esc closes; the draft is still there
+    await openK(page);
+    // no query: recent, acme's perf from bise's thread
+    await expect(page.locator(T.group('recent'))).toBeVisible();
+    expect((await page.locator(T.items).allTextContents()).some((t) => t.includes('perf')), 'acme’s perf is in recent').toBe(true);
+    await expect(page.locator(T.keys)).toHaveText('↑↓ choose   ⏎ open   tab all · agents · artifacts · scheduled   esc close');
     await page.keyboard.press('Escape');
     await expect(page.locator(T.palette)).toBeHidden({ timeout: 2000 });
     await expect(page.locator(T.composer), 'the composer kept its draft').toContainText('half a thought');
-    // by name: 'old' puts the archived old-fix first; ⏎ opens its thread
-    await page.keyboard.press('Meta+K');
-    await expect(page.locator(T.field)).toBeFocused({ timeout: 3000 });
-    await page.keyboard.type('old');
-    await expect(page.locator(T.item(0)), "'old' finds old-fix").toContainText('old-fix');
+
+    // 'perf': the agent, and the artifact 'Perf notes'; tab keeps the agents only
+    await openK(page);
+    await page.keyboard.type('perf');
+    await expect(page.locator(T.item(0)), "'perf' finds perf first").toContainText('perf');
+    await expect(page.locator(`${T.item(0)} .mt`), 'the match is marked').toHaveText('perf');
+    await expect(page.locator(`${T.item(0)} .hint`), 'perf waits on him (the fixture’s card): ⏎ answers').toHaveText('⏎ answer');
+    await expect(page.locator(T.group('artifacts')), 'artifacts are searched').toContainText('Perf notes');
+    await page.screenshot({ path: test.info().outputPath('light-1400-query.png') });
+    await page.keyboard.press('Tab');
+    await expect(page.locator(T.scope('agents'))).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator(T.group('artifacts')), 'tab: agents only').toHaveCount(0);
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.locator(T.group('artifacts')), 'shift+tab: all again').toBeVisible();
     await page.keyboard.press('Enter');
     await expect(page.locator(T.palette)).toBeHidden({ timeout: 2000 });
-    await expect(thread, '⏎ opened old-fix’s thread in acme').toHaveAttribute('data-agent', 'old-fix', { timeout: 5000 });
+    await expect(thread, '⏎ opened perf').toHaveAttribute('data-agent', 'perf', { timeout: 5000 });
     await expect(thread).toHaveAttribute('data-project', ACME);
-    // ↓ moves: 'p' lists more than one; ↓ ⏎ opens the second
-    await page.keyboard.press('Meta+K');
-    await expect(page.locator(T.field)).toBeFocused({ timeout: 3000 });
+
+    // 'old': the archived old-fix, its hint and key line; ⌘⏎ restores it, then opens it
+    await openK(page);
+    await page.keyboard.type('old');
+    await expect(page.locator(T.item(0))).toContainText('old-fix');
+    await expect(page.locator(T.item(0))).toHaveAttribute('data-archived', 'true');
+    await expect(page.locator(T.item(0)), 'archived · its title').toContainText('archived');
+    await expect(page.locator(`${T.item(0)} .hint`)).toHaveText('⏎ open   ⌘⏎ restore');
+    await expect(page.locator(T.keys)).toHaveText('↑↓ choose   ⏎ open   ⌘⏎ restore   tab agents only   esc close');
+    await page.screenshot({ path: test.info().outputPath('light-1400-archived.png') });
+    await page.keyboard.press('Meta+Enter');
+    await core.waitCmd((c) => c.cmd === 'unarchive' && c.project === ACME && 'agent' in c && c.agent === 'old-fix');
+    await expect(thread, '⌘⏎ opened old-fix').toHaveAttribute('data-agent', 'old-fix', { timeout: 5000 });
+
+    // nothing matches: the words, and ⌘⏎ asks bise
+    await openK(page);
+    await page.keyboard.type('stripe webhook');
+    await expect(page.locator(T.none)).toContainText('nothing matches “stripe webhook”. archived agents, artifacts and scheduled tasks were searched too.');
+    await expect(page.locator(T.none)).toContainText('ask bise “stripe webhook”');
+    await expect(page.locator(T.keys)).toHaveText('⌘⏎ ask bise   esc close');
+    await page.screenshot({ path: test.info().outputPath('light-1400-none.png') });
+    await page.keyboard.press('Meta+Enter');
+    await core.waitCmd((c) => c.cmd === 'send' && c.project === HOME && 'text' in c && c.text === 'stripe webhook');
+    await expect(page.locator(T.palette)).toBeHidden({ timeout: 2000 });
+    await expect(thread).toHaveAttribute('data-project', HOME, { timeout: 5000 });
+
+    // dark: the same panel
+    await core.send(prefs('dark') as never);
+    await openK(page);
+    await page.screenshot({ path: test.info().outputPath('dark-1400-start.png') });
+    await page.keyboard.type('perf');
+    await page.screenshot({ path: test.info().outputPath('dark-1400-query.png') });
+    await page.keyboard.press('Escape');
+  } finally {
+    await s.close();
+    core.dispose();
+  }
+});
+
+test('agents/palette at 800 px: the same panel, the project column drops', async () => {
+  const core = new FakeCore();
+  const s = await launchDesktop({ core, route: `agent/${HOME}/main` });
+  try {
+    const { page } = s;
+    const win = await s.app.browserWindow(page);
+    await win.evaluate((w: BrowserWindow) => {
+      w.setMinimumSize(400, 300);
+      w.setSize(800, 700);
+    });
+    await expect.poll(() => page.evaluate(() => window.innerWidth), { timeout: 3000 }).toBe(800);
+    await expect(page.locator(T.thread)).toHaveAttribute('data-project', HOME, { timeout: 10_000 });
+    await openK(page);
     await page.keyboard.type('perf');
     await expect(page.locator(T.item(0))).toContainText('perf');
-    await page.keyboard.press('Enter');
-    await expect(thread, '⏎ opened perf').toHaveAttribute('data-agent', 'perf', { timeout: 5000 });
+    const box = await page.locator('.app-k').boundingBox();
+    expect(box?.width ?? 0, 'the panel is the window less 40 px').toBeLessThanOrEqual(760 + 1);
+    await expect(page.locator(`${T.item(0)} .pj`), 'no project column').toBeHidden();
+    await page.screenshot({ path: test.info().outputPath('light-800-query.png') });
+    await core.send(prefs('dark') as never);
+    await page.screenshot({ path: test.info().outputPath('dark-800-query.png') });
   } finally {
     await s.close();
     core.dispose();

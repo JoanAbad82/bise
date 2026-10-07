@@ -5,6 +5,7 @@
 // 'ask bise' first and keeps the agents it names below.
 // The inputs are this module's own view types: the screen maps the store's (generated) shapes to
 // them, so a protocol change doesn't reach the list's rules.
+import { matchScore } from '@/search/rank';
 import { W, cardLine, hostOf, newBrief, oneLine, shortPath, words } from './words';
 
 export type AgentStatus = 'waiting' | 'blocked' | 'working' | 'idle' | 'done' | 'failed';
@@ -145,10 +146,14 @@ export function spotList(d: SpotData, text: string): SpotList {
   const brief = newBrief(q);
   if (brief !== undefined) return { mode: 'new', sections: [{ label: null, items: [{ kind: 'new', id: 'new', brief }] }] };
 
-  // 1-2 words: names (an agent's name, title or purpose, or its project's name; archived ones too)
-  const hit = (a: SpotAgent): boolean =>
-    a.name.toLowerCase().includes(ql) || a.title.toLowerCase().includes(ql) || (a.purpose ?? '').toLowerCase().includes(ql) || pname(a.project).toLowerCase().startsWith(ql);
-  const byName = live.filter((x) => hit(x.a)).map((x) => agentItem(x.a, x.status));
+  // 1-2 words: names (an agent's name, title or purpose, or its project's name; archived ones too),
+  // ranked by src/search's rules, the window's ⌘K's (lead m_11844): archived after the live ones,
+  // then the best match, then waiting before working before the rest
+  const byName = live
+    .map((x) => ({ ...x, s: matchScore(ql, { name: [x.a.name], about: [x.a.title, x.a.purpose ?? ''], where: [pname(x.a.project)] }) }))
+    .filter((x) => x.s >= 0)
+    .sort((x, y) => Number(x.a.archived === true) - Number(y.a.archived === true) || y.s - x.s || ORDER[x.status] - ORDER[y.status] || x.i - y.i)
+    .map((x) => agentItem(x.a, x.status));
   const envHit = envs.filter((e) => e.kind === 'env' && (e.name.toLowerCase().startsWith(ql) || (d.projects.find((p) => p.id === e.project)?.path ?? '').toLowerCase().includes(ql)));
   if (ws.length <= 2 && byName.length + envHit.length > 0) {
     return { mode: 'names', sections: [{ label: W.found, items: [...byName, ...envHit] }] };
