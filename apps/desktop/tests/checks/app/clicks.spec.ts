@@ -35,25 +35,44 @@ type Audit = { id: string; hit: boolean; current: boolean; hover: boolean };
 
 /** Every visible control of the screen: hit at its center, a change on hover. */
 async function audit(page: Page, max = 40): Promise<Audit[]> {
+  // the screen settled first: a project's late controls (its agents in the sidebar, the head's
+  // counts…) come after its first frame; the list of controls must stop changing for 600 ms
+  const ids = () => page.locator(CONTROLS).evaluateAll((els) => els.map((e) => e.getAttribute('data-testid') ?? e.tagName).join(','));
+  let last = await ids();
+  for (let i = 0; i < 20; i++) {
+    await page.waitForTimeout(300);
+    const now = await ids();
+    if (now === last) {
+      await page.waitForTimeout(300);
+      if ((await ids()) === now) break;
+    }
+    last = now;
+  }
+  // each control probed by its own element (never re-found by index: amb-web m_10928, a late
+  // control shifts every index after it and the probe lands on another control)
+  // each one tagged once (data-qa-n), then found again by its tag
   const boxes = await page.locator(CONTROLS).evaluateAll((els) =>
     els
       .map((el, i) => {
+        el.setAttribute('data-qa-n', String(i));
         const r = el.getBoundingClientRect();
         const off = el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled;
-        return { i, id: el.getAttribute('data-testid') ?? `${el.tagName.toLowerCase()}:${el.textContent.trim().slice(0, 24)}`, x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height, off };
+        return { n: i, id: el.getAttribute('data-testid') ?? `${el.tagName.toLowerCase()}:${el.textContent.trim().slice(0, 24)}`, x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height, off };
       })
       .filter((b) => b.w > 2 && b.h > 2 && !b.off && b.x > 0 && b.y > 0 && b.x < window.innerWidth && b.y < window.innerHeight));
   const out: Audit[] = [];
   for (const b of boxes.slice(0, max)) {
+    const h = page.locator(`[data-qa-n="${String(b.n)}"]`);
+    if ((await h.count()) !== 1) continue;
     await page.mouse.move(1, 1);
     await page.waitForTimeout(60);
-    const look = (i: number) =>
-      page.locator(CONTROLS).nth(i).evaluate((el) => {
+    const look = () =>
+      h.evaluate((el) => {
         const c = getComputedStyle(el);
         return [c.backgroundColor, c.color, c.textDecorationLine, c.opacity, c.boxShadow, c.borderColor, c.filter].join('|');
       });
-    const before = await look(b.i);
-    const at = await page.locator(CONTROLS).nth(b.i).evaluate((el, p) => {
+    const before = await look();
+    const at = await h.evaluate((el, p) => {
       const top = document.elementFromPoint(p.x, p.y);
       // the item in view (current page, picked option) has no hover of its own
       const current = el.hasAttribute('aria-current') || el.getAttribute('aria-selected') === 'true' || el.classList.contains('on');
@@ -61,9 +80,10 @@ async function audit(page: Page, max = 40): Promise<Audit[]> {
     }, { x: b.x, y: b.y });
     await page.mouse.move(b.x, b.y);
     await page.waitForTimeout(160);
-    const after = await look(b.i);
+    const after = await look();
     out.push({ id: b.id, hit: at.hit, current: at.current, hover: before !== after });
   }
+
   await page.mouse.move(1, 1);
   return out;
 }

@@ -2,8 +2,9 @@
 // a line to it is refused. Owner: qa-flows. The NEW app on the REAL core over the throwaway world
 // (../world.ts), the TUI on the same hub as the reference; shop's 'search' (blocked, at rest,
 // in the shared folder; restored at the end). Passes when:
-//   - (soft) archive on 'checkout' (done, its own worktree, PR #412) either archives it or says why
-//     in place, as the TUI's /archive answers;
+//   - archive on 'checkout' (done, its own worktree, 1 unpushed commit, PR #412) asks in place
+//     (the hub's confirm, the ConfirmBar) the question the TUI's /archive asks '[y/N]': esc puts it
+//     off, n keeps it with the hub's line, y archives it and the TUI agrees (then /restore);
 //   - archived from the window, its thread opens from the 'archived' list as history: its old rows,
 //     'history only' words, no composer that sends;
 //   - the TUI, in focus on it, refuses a plain line with '<agent> is archived. /restore brings it
@@ -25,6 +26,8 @@ const T = {
   list: '[data-testid="thread.list"]',
   history: '[data-testid="thread.archived"]',
   restore: '[data-testid="thread.restore"]',
+  confirm: '[data-testid="confirm.bar"]',
+  notice: '[data-testid="confirm.notice"]',
   field: '[data-testid="composer.field"]',
 };
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -47,24 +50,46 @@ test('agents/archived: history only in the window, a line refused in the TUI, re
       await expect.poll(async () => (await live()).some((a) => a.name === AG), { timeout: 10_000, message: `${AG} back first` }).toBe(true);
     }
     await page.screenshot({ path: test.info().outputPath('opened.png') });
-    // (soft) a worktree agent with a PR: archived, or why not, in place; the TUI's /archive beside it
+    // a worktree agent with an unpushed commit: the hub asks in place (amb-home I9 bee17626, amb-win's
+    // ConfirmBar 516b891a), as the TUI's /archive asks '[y/N]'; esc puts it off, n keeps it, y archives
     await expect(page.locator(T.row(WT))).toBeVisible({ timeout: 15_000 });
-    const before = (await page.locator(T.row(WT)).innerText()).replace(/\s+/g, ' ');
+    const wtLive = async () => (await live()).some((a) => a.name === WT);
+    tuiSay(t, `/archive ${WT}`);
+    await sleep(1500);
+    const tuiAsk = /archive @?checkout\?[^[]*\[y\/N\]/.exec(flat(t.screen()))?.[0] ?? '';
+    tuiSay(t, 'n');
+    await sleep(1000);
+    test.info().attachments.push({ name: 'tui-archive-wt', contentType: 'text/plain', body: Buffer.from(t.screen()) });
+    expect.soft(tuiAsk, "the TUI's /archive asks [y/N]").not.toBe('');
+    const bar = page.locator(T.confirm);
     await page.locator(T.archive(WT)).click({ timeout: 10_000 });
-    await page.waitForTimeout(3000);
-    await page.screenshot({ path: test.info().outputPath('wt-archive-clicked.png') });
-    const wtLive = (await live()).some((a) => a.name === WT);
-    const after = wtLive ? (await page.locator(T.row(WT)).innerText()).replace(/\s+/g, ' ') : '';
-    if (wtLive) {
-      tuiSay(t, `/archive ${WT}`);
-      await sleep(2000);
-      test.info().attachments.push({ name: 'tui-archive-wt', contentType: 'text/plain', body: Buffer.from(t.screen()) });
-    }
-    test.info().annotations.push({ type: 'wt-archive', description: JSON.stringify({ wtLive, before, after, tuiArchived: !(await live()).some((a) => a.name === WT) }) });
-    expect.soft(!wtLive || after !== before, `archive on ${WT} (own worktree, PR): archived, or the row says why`).toBe(true);
-    if (!(await live()).some((a) => a.name === WT)) {
+    await expect.soft(bar, 'the window asks in place').toBeVisible({ timeout: 10_000 });
+    const ask = ((await bar.getAttribute('aria-label').catch(() => '')) ?? '').trim();
+    test.info().annotations.push({ type: 'wt-ask', description: JSON.stringify({ window: ask, tui: tuiAsk }) });
+    expect.soft(ask, 'the same question as the TUI: the unpushed commit kept').toMatch(/unpushed commit/);
+    await page.screenshot({ path: test.info().outputPath('wt-ask.png') });
+    // esc: put off, still live
+    await page.keyboard.press('Escape');
+    await expect.soft(bar, 'esc puts it off').toHaveCount(0, { timeout: 5000 });
+    expect.soft(await wtLive(), 'esc: still live').toBe(true);
+    // n: keeps it, with the hub's line
+    await page.locator(T.archive(WT)).click({ timeout: 10_000 });
+    await expect.soft(bar, 'asked again').toBeVisible({ timeout: 10_000 });
+    await page.keyboard.press('n');
+    await expect.soft(bar, 'n answers').toHaveCount(0, { timeout: 5000 });
+    await expect.soft(page.locator(T.notice), "n: the hub's line").toBeVisible({ timeout: 5000 });
+    test.info().annotations.push({ type: 'wt-no', description: (await page.locator(T.notice).textContent().catch(() => '')) ?? '' });
+    expect.soft(await wtLive(), 'n: still live').toBe(true);
+    // y: archives it, the TUI agrees
+    await page.locator(T.archive(WT)).click({ timeout: 10_000 });
+    await expect.soft(bar, 'asked a third time').toBeVisible({ timeout: 10_000 });
+    await page.keyboard.press('y');
+    await expect.soft.poll(wtLive, { timeout: 15_000, message: 'y archives it in the hub' }).toBe(false);
+    await expect.soft.poll(() => tuiAgents(t?.screen() ?? '').some((a) => a.name === WT), { timeout: 5000, message: "and it leaves the TUI's panel" }).toBe(false);
+    await page.screenshot({ path: test.info().outputPath('wt-archived.png') });
+    if (!(await wtLive())) {
       tuiSay(t, `/restore ${WT}`);
-      await sleep(1500);
+      await expect.poll(wtLive, { timeout: 15_000, message: `${WT} back (the TUI's /restore)` }).toBe(true);
     }
     await expect(page.locator(T.row(AG))).toBeVisible({ timeout: 15_000 });
     await page.locator(T.archive(AG)).click({ timeout: 10_000 });
