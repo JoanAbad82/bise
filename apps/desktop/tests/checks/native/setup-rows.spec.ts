@@ -117,6 +117,17 @@ test('setup/welcome (S.9 + L1): a fresh home gets hello, then start-here in his 
     project: 'bise-home-00000000',
     items: [{ id: 'start-here', kind: 'page', title: 'start here', agent: 'main', version: 1, at_ms: 1791100000000, url: START, new: true }],
   };
+  // a fresh home as the real core says it: bise's home project with main alone, main's thread empty
+  // (its first page, the answer to the window's subscribe), not onboarded, the hub's start-here page
+  const HOME = 'bise-home-00000000';
+  const freshHome = [
+    fresh,
+    { ev: 'projects', projects: [{ project: HOME, name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true }] },
+    { ev: 'welcome', project: HOME, proto: 1, workspace: '/nowhere', name: 'bise' },
+    { ev: 'agents', project: HOME, agents: [{ name: 'main', main: true, status: 'idle', archived: false, title: '', purpose: '', since_ms: 1791100000000, waits: 0 }] },
+    { ev: 'thread', project: HOME, agent: 'main', entries: [], before: null, more: false },
+    startHere,
+  ] as unknown as Ev[];
   await onWorld(async ({ s, core, out }) => {
     const { page } = s;
     await expect(page.getByTestId('setup.step.hello'), 'a fresh home opens hello by itself').toBeVisible({ timeout: 3000 });
@@ -126,7 +137,7 @@ test('setup/welcome (S.9 + L1): a fresh home gets hello, then start-here in his 
     await page.screenshot({ path: test.info().outputPath('after-hello.png') }); // the frame for the report
     const opened = out.of(EXTERNAL);
     expect(opened, 'after hello, start-here opens in his browser, once (test mode: the external line)').toEqual([START]);
-    const first = page.getByText(/show me what you can do/i).first();
+    const first = page.getByTestId('setup.firstrun.demo');
     const has = await first.isVisible().catch(() => false);
     expect.soft(has, "the first-run text 'show me what you can do' is offered in main's empty thread").toBe(true);
     if (has) {
@@ -137,5 +148,5 @@ test('setup/welcome (S.9 + L1): a fresh home gets hello, then start-here in his 
       expect.soft(sel, 'it fills the composer, selected').toMatch(/show me what you can do/i);
       expect(core.cmds().filter((c) => c.cmd === 'send').length, 'and nothing is sent').toBe(sends);
     }
-  }, { core: new FakeCore([...worldWith({ prefs: fresh }), startHere]) });
+  }, { core: new FakeCore(freshHome) });
 });
