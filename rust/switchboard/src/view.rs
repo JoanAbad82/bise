@@ -13,7 +13,8 @@
 //! Pure but for [`read`] and [`running`] (a file, a pid).
 
 use crate::proto_view::{self, Since};
-use bise_proto::draft::ProjectView;
+use bise_proto::draft::{ProjectView, VIEW_ARTIFACTS};
+use bise_proto::rows::Artifact;
 use serde_json::Value;
 use std::path::Path;
 
@@ -27,7 +28,24 @@ pub const DEBOUNCE_MS: u64 = 2_000;
 /// The view of the hub of `project` (its hub id) from its client
 /// snapshot (`core::Hub::snapshot`).
 /// `vision`: the hub's model catalog's rule (K4, see `proto_view::agents`).
-pub fn of(snap: &Value, project: &str, now: u64, last_activity_ms: u64, stopped_ms: Option<u64>, since: &mut Since, vision: &dyn Fn(&str) -> Option<bool>) -> ProjectView {
+/// `artifacts`: the rows its typed `artifacts` event gives (the same
+/// builder, `daemon/proto/emit.rs` artifact_rows): the newest
+/// [`VIEW_ARTIFACTS`] are kept, with the total (⌘K's index, architect m_11910).
+#[allow(clippy::too_many_arguments)]
+pub fn of(
+    snap: &Value,
+    project: &str,
+    now: u64,
+    last_activity_ms: u64,
+    stopped_ms: Option<u64>,
+    since: &mut Since,
+    vision: &dyn Fn(&str) -> Option<bool>,
+    artifacts: Vec<Artifact>,
+) -> ProjectView {
+    let artifacts_total = artifacts.len() as u32;
+    let mut artifacts = artifacts;
+    artifacts.sort_by_key(|a| std::cmp::Reverse(a.at_ms));
+    artifacts.truncate(VIEW_ARTIFACTS);
     ProjectView {
         v: V,
         project: project.to_string(),
@@ -38,6 +56,8 @@ pub fn of(snap: &Value, project: &str, now: u64, last_activity_ms: u64, stopped_
         // event carries it)
         agents: proto_view::agents(snap, since, now, crate::model::user_kind, vision, &|_| None),
         cards: proto_view::cards(snap, project, now, crate::model::user_kind),
+        artifacts,
+        artifacts_total,
     }
 }
 
@@ -123,7 +143,7 @@ mod tests {
     #[test]
     fn the_view_has_the_windows_rows_and_no_running_flag() {
         let mut since = Since::new();
-        let v = of(&snap(), "api-12345678", 100, 90, None, &mut since, &|_| None);
+        let v = of(&snap(), "api-12345678", 100, 90, None, &mut since, &|_| None, vec![]);
         assert_eq!((v.v, v.project.as_str(), v.written_ms, v.last_activity_ms, v.stopped_ms), (1, "api-12345678", 100, 90, None));
         assert_eq!(v.agents.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(), ["main", "p99"]);
         assert_eq!(v.agents[1].branch.as_deref(), Some("sb/p99"));
@@ -134,8 +154,32 @@ mod tests {
         assert!(!text.contains("running"), "{text}");
         assert!(!text.contains("stopped_ms"), "absent while it runs: {text}");
         assert_eq!(parse(&text), Some(v.clone()));
-        let stopped = of(&snap(), "api-12345678", 200, 90, Some(200), &mut since, &|_| None);
+        let stopped = of(&snap(), "api-12345678", 200, 90, Some(200), &mut since, &|_| None, vec![]);
         assert!(render(&stopped).contains("\"stopped_ms\": 200"));
+    }
+
+    /// ⌘K's index (architect m_11910): the view's artifacts are the rows
+    /// the typed `artifacts` event gives for the same art store event
+    /// (proto_view::artifacts), the newest VIEW_ARTIFACTS first, with the
+    /// total; a view written before the field reads as none.
+    #[test]
+    fn the_views_artifacts_are_the_typed_events_rows_newest_first_capped() {
+        let rows: Vec<Value> = (0..60u64)
+            .map(|i| serde_json::json!({"id": format!("a{i}"), "kind": "page", "title": format!("t{i}"), "agent": "perf", "v": 1, "ts_ms": 1_000 + i, "by": "agent", "target": format!("/w/a{i}.md")}))
+            .collect();
+        let ev = serde_json::json!({"ev": "artifacts", "rows": rows, "seen_ms": 1_030});
+        let typed = proto_view::artifacts(&ev, |_| None);
+        let v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None, typed.clone());
+        assert_eq!((v.artifacts.len(), v.artifacts_total), (VIEW_ARTIFACTS, 60));
+        let mut want = typed;
+        want.sort_by_key(|a| std::cmp::Reverse(a.at_ms));
+        want.truncate(VIEW_ARTIFACTS);
+        assert_eq!(v.artifacts, want, "the same rows as the typed event");
+        assert_eq!(v.artifacts[0].id, "a59");
+        assert_eq!(parse(&render(&v)), Some(v.clone()));
+        // an older view (no artifacts field) still reads, with none
+        let old = r#"{"v":1,"project":"x","written_ms":1,"last_activity_ms":1,"agents":[],"cards":[]}"#;
+        assert_eq!(parse(old).map(|v| (v.artifacts.len(), v.artifacts_total)), Some((0, 0)));
     }
 
     #[test]
@@ -143,7 +187,7 @@ mod tests {
         assert_eq!(parse(""), None);
         assert_eq!(parse("{not json"), None);
         assert_eq!(parse(r#"{"v":1}"#), None);
-        let mut v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None);
+        let mut v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None, vec![]);
         v.v = 2;
         assert_eq!(parse(&render(&v)), None);
     }

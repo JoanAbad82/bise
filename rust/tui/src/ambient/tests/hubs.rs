@@ -55,6 +55,8 @@ pub(super) fn world(t: &mut T) -> World {
             last_activity_ms: 1,
             agents: vec![],
             cards: vec![serde_json::from_value(docs_card()).unwrap()],
+            artifacts: vec![],
+            artifacts_total: 0,
         })),
         running: Box::new(|_| false),
         exists: Box::new(move |p| !gone2.lock().unwrap().iter().any(|g| g == p)),
@@ -637,4 +639,45 @@ fn a_hub_that_refuses_the_core_is_never_retried_alone() {
     typed(&mut t, json!({"cmd": "hub_retry", "project": "shop"}));
     w.opened(&mut t, &["shop"]);
     w.welcome(&mut t, "shop");
+}
+
+/// ⌘K's index (architect m_11910): the projects not held, from their
+/// view.json only (never a hub started for it); a held one is never in
+/// it; sent again only when it changed, at most every 5 s; a project the
+/// window stops showing moves into it at the next send.
+#[test]
+fn the_index_lists_the_projects_not_held_from_their_files_only() {
+    let mut t = T::new();
+    t.ready();
+    let mut w = world(&mut t);
+    typed(&mut t, json!({"cmd": "shown", "projects": ["shop"]}));
+    w.opened(&mut t, &["home", "shop"]);
+    w.welcome(&mut t, "shop");
+    t.take();
+    typed(&mut t, json!({"cmd": "index"}));
+    w.until(&mut t, |o| has(o, "index"));
+    let ix = t.take().into_iter().find(|v| v["ev"] == "index").unwrap();
+    let rows = ix["projects"].as_array().unwrap();
+    assert_eq!(rows.iter().map(|r| r["project"].as_str().unwrap()).collect::<Vec<_>>(), ["docs", "mail"], "held home and shop are never in it: {ix}");
+    assert_eq!((rows[0]["up"].as_bool(), rows[0]["written_ms"].as_u64()), (Some(false), Some(1)), "docs: its view, as of when, its hub not up");
+    assert_eq!((rows[1]["up"].as_bool(), rows[1].get("written_ms")), (Some(false), None), "mail: no view yet");
+    let mut open: Vec<&String> = w.open.keys().collect();
+    open.sort();
+    assert_eq!(open, ["home", "shop"], "no hub opened for the index");
+    // nothing changed: nothing more, even past 5 s
+    let later = Instant::now() + Duration::from_secs(6);
+    t.core.tick(later);
+    w.until(&mut t, |_| true);
+    assert!(!has(&t.take(), "index"), "no change, no index");
+    // the window stops showing shop: its hub is let go, and shop moves into
+    // the index, not before 5 s after the last one
+    typed(&mut t, json!({"cmd": "shown", "projects": []}));
+    t.core.tick(later);
+    w.until(&mut t, |_| true);
+    assert!(!has(&t.take(), "index"), "within 5 s of the last check: nothing yet");
+    t.core.tick(later + Duration::from_secs(6));
+    w.until(&mut t, |o| has(o, "index"));
+    let ix = t.take().into_iter().find(|v| v["ev"] == "index").unwrap();
+    let ids: Vec<&str> = ix["projects"].as_array().unwrap().iter().map(|r| r["project"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["shop", "docs", "mail"], "shop is in it now: {ix}");
 }

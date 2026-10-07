@@ -48,6 +48,7 @@ impl Core {
         self.tick_speech();
         self.tick_projects(now);
         self.poll_projects(false);
+        self.tick_index(now);
         self.setup_tick();
     }
 

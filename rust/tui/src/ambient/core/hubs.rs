@@ -66,6 +66,13 @@ pub struct ProjectPorts {
     pub facts: ProjectFacts,
 }
 
+impl Hubs {
+    /// Whether the core holds this project's hub now (⌘K's index leaves it out).
+    pub(super) fn holds(&self, id: &str) -> bool {
+        self.conns.contains_key(id)
+    }
+}
+
 /// One held project's connection.
 struct Conn {
     hub: Hub,
@@ -103,8 +110,8 @@ pub const LINGER: Duration = Duration::from_secs(15);
 
 #[derive(Default)]
 pub(super) struct Hubs {
-    ports: Option<ProjectPorts>,
-    rows: Vec<Row>,
+    pub(super) ports: Option<ProjectPorts>,
+    pub(super) rows: Vec<Row>,
     /// the projects the window shows; None: no window yet
     shown: Option<Vec<String>>,
     conns: BTreeMap<String, Conn>,
@@ -209,7 +216,7 @@ pub fn branch_of_head(head: &str) -> Option<String> {
 
 /// A held hub's own rows as a view (the sidebar's counts).
 fn live_view(project: &str, agents: &[Agent], cards: &[Card]) -> ProjectView {
-    ProjectView { v: 1, project: project.into(), written_ms: 0, stopped_ms: None, last_activity_ms: 0, agents: agents.to_vec(), cards: cards.to_vec() }
+    ProjectView { v: 1, project: project.into(), written_ms: 0, stopped_ms: None, last_activity_ms: 0, agents: agents.to_vec(), cards: cards.to_vec(), artifacts: vec![], artifacts_total: 0 }
 }
 
 impl Core {

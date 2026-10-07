@@ -75,7 +75,9 @@ impl Shell {
         self.setup();
         let cat = self.setup.as_ref().map(|(_, s)| &s.catalog);
         let vision = |m: &str| cat.and_then(|c| c.vision(m));
-        let v = view::of(snap, &project, now, self.projects.writer.last_activity_ms, stopped_ms, &mut self.projects.since, &vision);
+        // ⌘K's index: the same rows as the typed artifacts event
+        let arts = self.artifact_rows(&self.artifacts_ev());
+        let v = view::of(snap, &project, now, self.projects.writer.last_activity_ms, stopped_ms, &mut self.projects.since, &vision, arts);
         let paths = self.opts.paths.clone();
         let (tmp, file) = (paths.state.join("view.json.tmp"), paths.state.join(view::FILE));
         if write_logged(&paths, &tmp, &view::render(&v)) {

@@ -120,9 +120,16 @@ impl Shell {
 
     /// The art store's event as the typed `artifacts`.
     pub(super) fn proto_artifacts(&self, ev: &Value) -> HubEv {
+        HubEv::Artifacts { project: self.project(), items: self.artifact_rows(ev) }
+    }
+
+    /// The art store's event (`artifacts_ev`) as rows: the one builder of
+    /// the typed `artifacts` event and of `view.json`'s artifacts (⌘K's
+    /// index, architect m_11910), so the two never disagree.
+    pub(in crate::daemon) fn artifact_rows(&self, ev: &Value) -> Vec<bise_proto::rows::Artifact> {
         let pages = self.pg.pages.clone();
         let page_url = |id: &str| pages.as_ref().filter(|p| p.store.meta(id).is_some()).map(|p| p.url(id));
-        HubEv::Artifacts { project: self.project(), items: proto_view::artifacts(ev, page_url) }
+        proto_view::artifacts(ev, page_url)
     }
 
     /// An event the hub broadcasts, for the typed connections: `state` →

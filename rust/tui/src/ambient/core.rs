@@ -10,6 +10,7 @@ mod away;
 mod cmd;
 mod dictate;
 mod hubs;
+mod index;
 mod picks;
 mod voice_answer;
 mod setup;
@@ -227,6 +228,8 @@ pub struct Core {
     voice_on: Option<voice_mode::VoiceOn>,
     /// the composer's `@` answers on their way (core/picks.rs)
     picks: picks::Picks,
+    /// ⌘K's index of the projects not held (core/index.rs)
+    index: index::Index,
     /// bar N14: the card in front of him (core/voice_answer.rs)
     in_view: Option<(String, u64)>,
     speaker: Option<Box<dyn Speaker>>,
@@ -302,6 +305,7 @@ impl Core {
             dictation: None,
             voice_on: None,
             picks: picks::Picks::default(),
+            index: index::Index::default(),
             in_view: None,
             speaker: None,
             speech: None,
@@ -365,6 +369,7 @@ impl Core {
             Cmd::HubRetry { project } => self.hub_retry(&project),
             Cmd::CardInView { project, card } => self.in_view = project.zip(card),
             Cmd::Commands => self.pick_commands(),
+            Cmd::Index => self.index_cmd(now),
             Cmd::Skills { project } => self.pick_skills(project),
             Cmd::Files { project, q, rid, limit } => self.pick_files(project, q, rid, limit),
             Cmd::Shot { path, app, title } => self.take_shot(&path, app, title),

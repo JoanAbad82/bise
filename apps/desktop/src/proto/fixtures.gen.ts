@@ -148,6 +148,7 @@ export const core_ev: readonly CoreEv[] = [
   {"ev":"roles","items":[{"about":"your team lead","effort":"high","kind":"chat","model":"anthropic/claude-opus-5-5","name":"main","role":"main","source":"config"},{"about":"the tasks main starts","follows":"main","kind":"chat","model":"anthropic/claude-opus-5-5","name":"agents","role":"agents","source":"default"},{"about":"speech to text","kind":"voice","model":"mistral/voxtral-mini-latest","name":"voice","role":"voice","source":"env"}]},
   {"ev":"app_update","sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","url":"https://github.com/gvergnaud/bise/releases/latest/download/bise-desktop-darwin-arm64.zip","version":"2026.10.2-26"},
   {"error":"a client in an agent's process (perf) can't act as you on hub.sock","ev":"hub_refused","project":"shop-5e6f7a8b"},
+  {"ev":"index","projects":[{"agents":[{"archived":false,"main":true,"name":"main","purpose":"","since_ms":1791100000000,"status":"idle","title":"","waits":0}],"artifacts":[{"agent":"writer","at_ms":1791100300000,"id":"q3-notes","kind":"page","new":true,"title":"Q3 notes","url":"http://127.0.0.1:47438/p/q3-notes","version":2}],"artifacts_total":7,"project":"docs-9a8b7c6d","up":false,"written_ms":1791100400000},{"agents":[],"artifacts":[],"project":"mail-1f2e3d4c","up":true}]},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */
@@ -194,6 +195,7 @@ export const app_cmd: readonly AppCmd[] = [
   {"card":9,"cmd":"card_in_view","project":"acme-1a2b3c4d"},
   {"cmd":"card_in_view"},
   {"cmd":"commands"},
+  {"cmd":"index"},
   {"cmd":"skills","project":"acme-1a2b3c4d"},
   {"cmd":"files","project":"acme-1a2b3c4d","q":"src/ma","rid":7},
   {"cmd":"files","limit":20,"project":"acme-1a2b3c4d","q":"rust/","rid":8},

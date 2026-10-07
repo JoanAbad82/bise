@@ -4,7 +4,7 @@
 // The store comes from StoreContext: the app's one store (bound to
 // window.bise.core) by default, a test's own store through the provider.
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import type { Account, Agent, PickCommand, PickSkill, RoleRow, Artifact, Card, DevServer, Entry, Feature, Found, Model, Job, JsonValue, Merged, Plugin, ProjectRow, Worktree } from '@/proto';
+import type { Account, Agent, Artifact, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, PickSkill, Plugin, ProjectRow, RoleRow, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
 import { diffKey, Store, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder, type VoiceModeState } from './store';
 
@@ -120,6 +120,8 @@ export const useDictation = (id: string | null): Dictation | null => useSlice(`d
 export const useHubRefused = (project: string): string | null => useSlice(`hub_refused:${project}`, (s) => s.hubRefused(project));
 /** Voice mode's state in this window (null: never on here): state, heard, said, muted, note, fail. */
 export const useVoiceMode = (): VoiceModeState | null => useSlice('voice_mode', (s) => s.voiceModeNow());
+/** ⌘K's index (store.askIndex() once): every project the core doesn't hold, from its files, as of written_ms. */
+export const useIndex = (): readonly IndexRow[] => useSlice('index', (s) => s.index());
 export const useCoreState = (): CoreState => useSlice('core', (s) => s.core());
 
 /** A thread's order, before and more (key: threadKey(project, agent)). */

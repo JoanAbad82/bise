@@ -11,7 +11,7 @@
 //!   [`AppCmd`] (app -> core: open, project_add): never a hub's (S3b);
 //! - [`ProjectView`]: S1's `hubs/<id>/view.json` (amb-hub writes it).
 
-use crate::rows::{Agent, Card};
+use crate::rows::{Agent, Artifact, Card};
 use crate::{decode, parse, Pos, Project};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -447,12 +447,17 @@ pub enum CoreEv {
     /// core never reconnects to it until he retries (`hub_retry`) or a
     /// new core starts; commands to it get error {kind: hub_refused}
     HubRefused { project: Project, error: String },
+    /// ⌘K's index (his unified search): the projects this core does NOT
+    /// hold, read from each one's `view.json`, never by starting its hub;
+    /// sent on `index`, then on change at most every 5 s (a held project
+    /// is never in it: its live events say the same)
+    Index { projects: Vec<IndexRow> },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -612,6 +617,8 @@ pub enum AppCmd {
     },
     /// the slash commands: `commands` answers
     Commands,
+    /// ⌘K opened: `index` answers, then again on change (at most every 5 s)
+    Index,
     /// a workspace's skills: `skills` answers
     Skills { project: Project },
     /// an `@` query on a workspace's files: `files` answers with this
@@ -671,6 +678,7 @@ impl AppCmd {
         "hub_retry",
         "card_in_view",
         "commands",
+        "index",
         "skills",
         "files",
         "setup_check",
@@ -697,4 +705,36 @@ pub struct ProjectView {
     pub last_activity_ms: u64,
     pub agents: Vec<Agent>,
     pub cards: Vec<Card>,
+    /// ⌘K's index (architect m_11910): its artifacts as the typed
+    /// `artifacts` event gives them (the same builder), the newest
+    /// [`VIEW_ARTIFACTS`] first; `artifacts_total`: how many it has
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<Artifact>,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub artifacts_total: u32,
+}
+
+/// How many artifacts a `view.json` keeps (it is rewritten on every
+/// change, so it stays small); the newest first.
+pub const VIEW_ARTIFACTS: usize = 50;
+
+fn is_zero(n: &u32) -> bool {
+    *n == 0
+}
+
+/// A project of ⌘K's index (CoreEv `index`): what its `view.json` says,
+/// as of `written_ms` (none: no view yet), and whether its hub runs now
+/// (`up`: a stopped hub fires no timers, so the window never shows a
+/// past next run as coming).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct IndexRow {
+    pub project: Project,
+    pub up: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub written_ms: Option<u64>,
+    pub agents: Vec<Agent>,
+    pub artifacts: Vec<Artifact>,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub artifacts_total: u32,
 }

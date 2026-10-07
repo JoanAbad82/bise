@@ -27,6 +27,7 @@ import type {
   DevServer,
   Entry,
   Found,
+  IndexRow,
   HubEv,
   Job,
   JsonValue,
@@ -94,6 +95,7 @@ export const TAGS = {
   signing: true,
   app_update: true,
   hub_refused: true,
+  index: true,
   refused: true,
 } as const satisfies Record<Ev['ev'], true>;
 
@@ -506,6 +508,10 @@ export class Store {
         // a hub's own refusal of a connection: the core reads it and says
         // hub_refused; it never reaches a window as is
         return;
+      case 'index':
+        // ⌘K's index: the projects the core doesn't hold, from their files
+        this.put('index', ev.projects);
+        return;
       case 'hub_refused':
         // a project's hub refused this core: its words until he retries
         this.put(`hub_refused:${ev.project}`, ev.error);
@@ -742,6 +748,18 @@ export class Store {
   /** Cut the agent off: its voice stops, its running turn is stopped. */
   voiceCut(): void {
     this.command({ cmd: 'voice_cut' });
+  }
+  /**
+   * ⌘K's index (core/index.rs): every project the core doesn't hold now,
+   * from its view.json (agents, the newest artifacts and their total), as of
+   * written_ms, with up (its hub runs). askIndex() once; it comes again on
+   * change, at most every 5 s.
+   */
+  index(): readonly IndexRow[] {
+    return this.slice('index', EMPTY);
+  }
+  askIndex(): void {
+    this.command({ cmd: 'index' });
   }
   /** Why a project's hub refused this core (its words), or null. */
   hubRefused(project: string): string | null {

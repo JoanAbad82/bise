@@ -23,6 +23,8 @@ pub enum Cmd {
     /// The composer's lists (desktop C/A/B, core/picks.rs): the `/`
     /// commands, a workspace's `$` skills, an `@` query's files.
     Commands,
+    /// ⌘K opened (core/index.rs): the index of the projects not held
+    Index,
     Skills { project: String },
     Files { project: String, q: String, rid: u64, limit: Option<u32> },
     Shot { path: PathBuf, app: String, title: String },
@@ -130,8 +132,9 @@ impl Cmd {
                 bise_proto::draft::AppCmd::CardInView { project, card } => Cmd::CardInView { project, card },
                 other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
-            "commands" | "skills" | "files" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+            "commands" | "index" | "skills" | "files" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
                 bise_proto::draft::AppCmd::Commands => Cmd::Commands,
+                bise_proto::draft::AppCmd::Index => Cmd::Index,
                 bise_proto::draft::AppCmd::Skills { project } => Cmd::Skills { project },
                 bise_proto::draft::AppCmd::Files { project, q, rid, limit } => Cmd::Files { project, q, rid, limit },
                 other => return Err(format!("{cmd}: decoded as {other:?}")),

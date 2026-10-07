@@ -3,7 +3,7 @@
 // ids, positions and *_ms are numbers (u64 in Rust, safe below 2^53).
 
 import type { JsonValue } from './json';
-import type { Agent, Card } from './rows';
+import type { Agent, Artifact, Card } from './rows';
 
 /**
  * Selected lines of a thread quoted in a message (❝).
@@ -219,12 +219,12 @@ export type PickFolder = { path: string, locked?: boolean, };
 /**
  * What the core sends the app besides the hubs' events (S3b).
  */
-export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "signing", id: string, url: string, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, } | { "ev": "computer_use", on: boolean, ready: boolean, rows: Array<CuRow>, said?: string | null, flash?: string | null, } | { "ev": "level", who: string, v: number, } | { "ev": "heard", text: string, final: boolean, } | { "ev": "roles", items: Array<RoleRow>, } | { "ev": "commands", items: Array<PickCommand>, } | { "ev": "skills", project: string, items: Array<PickSkill>, } | { "ev": "files", project: string, rid: number, q: string, items: Array<PickFile>, folder?: PickFolder | null, partial?: boolean, } | { "ev": "voice_answer", project: string, card: number, n: number, line: string, ms: number, } | { "ev": "voice_mode", project: string, agent: string, on: boolean, state: string, heard?: string | null, said?: string | null, muted?: boolean, note?: string | null, fail?: string | null, } | { "ev": "dictation", id: string, text: string, final: boolean, cancelled?: boolean, error?: string | null, } | { "ev": "app_update", version: string, url: string, sha256: string, } | { "ev": "hub_refused", project: string, error: string, };
+export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "signing", id: string, url: string, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, } | { "ev": "computer_use", on: boolean, ready: boolean, rows: Array<CuRow>, said?: string | null, flash?: string | null, } | { "ev": "level", who: string, v: number, } | { "ev": "heard", text: string, final: boolean, } | { "ev": "roles", items: Array<RoleRow>, } | { "ev": "commands", items: Array<PickCommand>, } | { "ev": "skills", project: string, items: Array<PickSkill>, } | { "ev": "files", project: string, rid: number, q: string, items: Array<PickFile>, folder?: PickFolder | null, partial?: boolean, } | { "ev": "voice_answer", project: string, card: number, n: number, line: string, ms: number, } | { "ev": "voice_mode", project: string, agent: string, on: boolean, state: string, heard?: string | null, said?: string | null, muted?: boolean, note?: string | null, fail?: string | null, } | { "ev": "dictation", id: string, text: string, final: boolean, cancelled?: boolean, error?: string | null, } | { "ev": "app_update", version: string, url: string, sha256: string, } | { "ev": "hub_refused", project: string, error: string, } | { "ev": "index", projects: Array<IndexRow>, };
 
 /**
  * What the app asks the core itself (never forwarded to a hub).
  */
-export type AppCmd = { "cmd": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "cmd": "project_add", path: string, land?: boolean | null, } | { "cmd": "project_remove", project: string, } | { "cmd": "project_move", project: string, order: number, } | { "cmd": "project_rename", project: string, name: string, } | { "cmd": "prefs_set", key: string, value: JsonValue, } | { "cmd": "sign_in", id: string, } | { "cmd": "sign_in_cancel", id: string, } | { "cmd": "key_set", id: string, key: string, } | { "cmd": "key_remove", id: string, } | { "cmd": "found_scan", dir?: string | null, } | { "cmd": "away_back", away_ms: number, } | { "cmd": "app_version", id: string, built?: string | null, } | { "cmd": "plugins", project?: string | null, } | { "cmd": "plugin_set", project?: string | null, name: string, on: boolean, } | { "cmd": "plugin_login", project?: string | null, name: string, } | { "cmd": "plugin_logout", project?: string | null, name: string, } | { "cmd": "role_set", role: string, model?: string | null, effort?: string | null, } | { "cmd": "setup_check" } | { "cmd": "computer_use", act: string, fix?: string | null, } | { "cmd": "shown", projects: Array<string>, } | { "cmd": "talk_start", page?: TalkPage | null, } | { "cmd": "talk_end" } | { "cmd": "talk_cancel" } | { "cmd": "dictate_start", id: string, } | { "cmd": "dictate_stop", id: string, } | { "cmd": "dictate_cancel", id: string, } | { "cmd": "voice_mode", project: string, agent: string, on: boolean, } | { "cmd": "voice_mute", on: boolean, } | { "cmd": "voice_type", on: boolean, } | { "cmd": "voice_send" } | { "cmd": "voice_cut" } | { "cmd": "hub_retry", project: string, } | { "cmd": "card_in_view", project?: string | null, card?: number | null, } | { "cmd": "commands" } | { "cmd": "skills", project: string, } | { "cmd": "files", project: string, q: string, rid: number, limit?: number | null, };
+export type AppCmd = { "cmd": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "cmd": "project_add", path: string, land?: boolean | null, } | { "cmd": "project_remove", project: string, } | { "cmd": "project_move", project: string, order: number, } | { "cmd": "project_rename", project: string, name: string, } | { "cmd": "prefs_set", key: string, value: JsonValue, } | { "cmd": "sign_in", id: string, } | { "cmd": "sign_in_cancel", id: string, } | { "cmd": "key_set", id: string, key: string, } | { "cmd": "key_remove", id: string, } | { "cmd": "found_scan", dir?: string | null, } | { "cmd": "away_back", away_ms: number, } | { "cmd": "app_version", id: string, built?: string | null, } | { "cmd": "plugins", project?: string | null, } | { "cmd": "plugin_set", project?: string | null, name: string, on: boolean, } | { "cmd": "plugin_login", project?: string | null, name: string, } | { "cmd": "plugin_logout", project?: string | null, name: string, } | { "cmd": "role_set", role: string, model?: string | null, effort?: string | null, } | { "cmd": "setup_check" } | { "cmd": "computer_use", act: string, fix?: string | null, } | { "cmd": "shown", projects: Array<string>, } | { "cmd": "talk_start", page?: TalkPage | null, } | { "cmd": "talk_end" } | { "cmd": "talk_cancel" } | { "cmd": "dictate_start", id: string, } | { "cmd": "dictate_stop", id: string, } | { "cmd": "dictate_cancel", id: string, } | { "cmd": "voice_mode", project: string, agent: string, on: boolean, } | { "cmd": "voice_mute", on: boolean, } | { "cmd": "voice_type", on: boolean, } | { "cmd": "voice_send" } | { "cmd": "voice_cut" } | { "cmd": "hub_retry", project: string, } | { "cmd": "card_in_view", project?: string | null, card?: number | null, } | { "cmd": "commands" } | { "cmd": "index" } | { "cmd": "skills", project: string, } | { "cmd": "files", project: string, q: string, rid: number, limit?: number | null, };
 
 /**
  * The bise page a note talk is about (`talk_start {page}`).
@@ -240,4 +240,18 @@ export type ProjectView = { v: number, project: string, written_ms: number,
  * set at a clean stop, absent while it runs (readers tell a running
  * hub by its pid or a ping, never by a flag here)
  */
-stopped_ms?: number | null, last_activity_ms: number, agents: Array<Agent>, cards: Array<Card>, };
+stopped_ms?: number | null, last_activity_ms: number, agents: Array<Agent>, cards: Array<Card>, 
+/**
+ * ⌘K's index (architect m_11910): its artifacts as the typed
+ * `artifacts` event gives them (the same builder), the newest
+ * [`VIEW_ARTIFACTS`] first; `artifacts_total`: how many it has
+ */
+artifacts?: Array<Artifact>, artifacts_total?: number, };
+
+/**
+ * A project of ⌘K's index (CoreEv `index`): what its `view.json` says,
+ * as of `written_ms` (none: no view yet), and whether its hub runs now
+ * (`up`: a stopped hub fires no timers, so the window never shows a
+ * past next run as coming).
+ */
+export type IndexRow = { project: string, up: boolean, written_ms?: number | null, agents: Array<Agent>, artifacts: Array<Artifact>, artifacts_total?: number, };
