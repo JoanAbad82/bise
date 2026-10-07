@@ -42,7 +42,9 @@
   display: flex;
   flex-direction: column;
   overflow: auto;
-  background: var(--c-surface);
+  /* the paper, solid (ambient m_11885): --c-surface is a 55% glass that read
+     mid-grey in dark over the window */
+  background: var(--c-solid);
 }
 .app-drag {
   flex: none;
