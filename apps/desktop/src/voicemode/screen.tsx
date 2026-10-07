@@ -50,7 +50,7 @@ export function ThreadVoice({ project, agent }: { project: string; agent: string
   if (state === 'typing') {
     return (
       <p className="vm-typing" data-testid="voice.typing">
-        {waits ? FN_WAITS : 'typing: the mic waits · esc back to voice'}
+        {waits ? FN_WAITS : 'typing: the mic waits   esc back to voice'}
       </p>
     );
   }

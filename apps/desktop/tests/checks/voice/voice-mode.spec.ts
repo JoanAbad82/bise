@@ -4,7 +4,7 @@
 //   - the core's voice_mode events swap the composer for the pane (label 'you ⇄ perf · voice
 //     mode'), and each state reads as specced: listening, hearing with his words, sending,
 //     thinking, speaking with the said words, muted, failed with its text; typing brings the
-//     composer back under 'typing: the mic waits';
+//     composer back under 'typing: the mic waits   esc back to voice';
 //   - space tapped sends now, m mutes, esc leaves (the core gets voice_send, voice_mute, voice_mode
 //     off); fn refused while it is on (the core's error on talk_start) reads 'fn waits: voice mode
 //     is on here' on the label line;
