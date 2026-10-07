@@ -1,13 +1,13 @@
 // inbox/card-fit · the inbox card v2 (ambient m_11273, mock site/content/ambient/inbox-card.html): the
-// docked card's text never leaves its box. Passes when, at thread-column widths 720, 520 and 380 px (the
-// mock's; the window is the sidebar + the column) and the 1100 px window,
+// docked card's text never leaves its box. Passes when, at thread-column widths 720 and 520 px (the
+// mock's; the window is the sidebar + the column), the window at its minimum (680) and the 1100 window,
 // in light and dark, with the mock's 3 long French option labels and a 2-option approval:
 //   - every option label sits inside its row, every row inside the card, the header's parts, the
 //     question and the footer's keys inside the card, the card inside the window;
 //   - no label, row, footer or card is wider inside than its box (scrollWidth ≤ clientWidth);
 //   - the card docks in the flow: under the thread's list, over the composer, never over either;
 //   - the header says 'bise asks' (main's card), the project cut on one line.
-// Writes one sheet (light + dark at 720/520/380, the approval, a hover row and a keyboard-on row)
+// Writes one sheet (light + dark at columns 720/520 and the 680 window, the approval, a hover row and a keyboard-on row)
 // for ambient's sign-off. The scripted core (FakeCore), fake data. Owner: amb-home.
 import { writeFileSync } from 'node:fs';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
@@ -59,10 +59,17 @@ const world = () => [
   },
 ];
 
-// the thread column's widths (ambient's mock: 720, 520, 380), the window = the sidebar + the column; and
-// the default window (1100). The sidebar keeps its width at any window (asked amb-win m_11377).
-const WIDTHS = [0, 720, 520, 380] as const;
-const SHEET = [720, 520, 380] as const;
+// the thread column's widths (ambient's mock: 720, 520), the window = the sidebar + the column; the
+// default window (1100). The sidebar keeps its width at any window (amb-win m_11377).
+// The narrow case is the window at its minimum width (amb-mac a9e1b530: minWidth 680, so the
+// column is never under 380 px, ambient m_11426): the thread column there is 680 - the sidebar.
+type Width = { name: string; window: (side: number) => number; sheet: boolean };
+const WIDTHS: readonly Width[] = [
+  { name: 'window 1100', window: () => 1100, sheet: false },
+  { name: 'column 720', window: (side) => Math.round(side) + 720, sheet: true },
+  { name: 'column 520', window: (side) => Math.round(side) + 520, sheet: true },
+  { name: 'window 680 (min)', window: () => 680, sheet: true },
+];
 const HEIGHT = 720;
 
 /** What leaves its box in the docked card (and the dock vs the list and the composer), as lines. */
@@ -97,7 +104,7 @@ function misfits(): string[] {
   return out.length > 0 ? [where, ...out] : out;
 }
 
-test('inbox/card-fit: the docked card keeps every label in its box at 1100/720/520/380 px, light and dark', async () => {
+test('inbox/card-fit: the docked card keeps every label in its box at the 1100 window, columns 720/520 and the 680 minimum, light and dark', async () => {
   test.setTimeout(180_000);
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: `project/${P}` });
@@ -129,14 +136,14 @@ test('inbox/card-fit: the docked card keeps every label in its box at 1100/720/5
     for (const t of ['light', 'dark'] as const) {
       await theme(t);
       for (const w of WIDTHS) {
-        await size(w === 0 ? 1100 : Math.round(side) + w, HEIGHT);
+        await size(w.window(side), HEIGHT);
         await dock(2, QUESTION.id);
         await expect(page.getByTestId(`strip.card.${P}-9`)).toContainText('bise asks');
-        await fits(`${t} ${w === 0 ? 'window 1100' : `column ${String(w)}`} question`);
-        if ((SHEET as readonly number[]).includes(w)) shots.push({ label: `${t} · column ${String(w)} px`, png: await page.screenshot() });
+        await fits(`${t} ${w.name} question`);
+        if (w.sheet) shots.push({ label: `${t} · ${w.name}`, png: await page.screenshot() });
         await dock(1, APPROVAL.id);
-        await fits(`${t} ${w === 0 ? 'window 1100' : `column ${String(w)}`} approval`);
-        if (t === 'dark' && w === 520) shots.push({ label: 'dark · column 520 px · approval', png: await page.screenshot() });
+        await fits(`${t} ${w.name} approval`);
+        if (t === 'dark' && w.name === 'column 520') shots.push({ label: 'dark · column 520 · approval', png: await page.screenshot() });
       }
     }
     // a hover row (light) and a keyboard-on row (dark), at 720
