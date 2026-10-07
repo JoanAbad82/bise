@@ -22,7 +22,7 @@ import { Hint, hintUsed, useHint } from './hints';
 export function projectDot(p: ProjectRow): DotState {
   if (p.missing === true) return 'er';
   if (!p.running) return 'off';
-  if (p.working > 0) return 'wk';
+  // its '2 at work' is the row's words: a project's sign never moves for its agents' work (ambient m_11472)
   if (p.waits > 0) return 'nd';
   return 'ok';
 }

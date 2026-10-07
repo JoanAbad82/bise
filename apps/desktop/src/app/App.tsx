@@ -69,8 +69,34 @@ function testMode(): boolean {
   return (window as Partial<Window>).bise?.test === true;
 }
 
+/**
+ * The working sign '∿' is still while the window is away (ambient m_11472, the TUI's
+ * Motion::Still): unfocused or hidden sets <html data-still>, and the DS's css stops its
+ * animation. The test harness never focuses its offscreen window, so there only hidden counts.
+ */
+function useStill(): void {
+  useEffect(() => {
+    const root = document.documentElement;
+    const set = () => {
+      const still = document.hidden || (!testMode() && !document.hasFocus());
+      if (still) root.dataset.still = '';
+      else delete root.dataset.still;
+    };
+    set();
+    window.addEventListener('focus', set);
+    window.addEventListener('blur', set);
+    document.addEventListener('visibilitychange', set);
+    return () => {
+      window.removeEventListener('focus', set);
+      window.removeEventListener('blur', set);
+      document.removeEventListener('visibilitychange', set);
+    };
+  }, []);
+}
+
 function Shell() {
   useHistoryKeys();
+  useStill();
   const [palette, setPalette] = useState(false);
   const [help, setHelp] = useState(false);
   // L25: the demo tour's 'end' goes when he opens the agent list

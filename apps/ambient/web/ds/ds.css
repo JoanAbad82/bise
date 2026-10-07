@@ -44,7 +44,14 @@
 .b-help{font-size:var(--t-12);color:var(--c-text-3)}
 .b-help.err{color:var(--c-err)}
 .b-dot{display:inline-block;flex:none;width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--c-solid) 0,color-mix(in srgb,var(--c-text-3) 70%,transparent) 55%,transparent 72%)}
-.b-dot.wk{background:radial-gradient(circle at 35% 30%,var(--c-solid) 0,var(--c-text) 50%,transparent 72%);animation:b-breathe 2.4s var(--ease-io) infinite}
+/* working: the TUI's breeze '∿' in the dot's slot (ambient m_11472): opacity only, never a scale or a move; the agent in view pulses (text <-> text-2, 0.8 s), every other one murmurs (the Hush: text-2 <-> text-3, 1.3 s, out of step); still when the window is away or motion is reduced */
+.b-dot.wk{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;background:none;color:var(--c-text-2);font:400 12px/1 var(--font-ui);animation:b-hush 1.3s var(--ease-io) infinite alternate}
+.b-dot.wk::before{content:"∿"}
+.b-row:nth-child(3n+2) .b-dot.wk{animation-delay:-.45s}.b-row:nth-child(3n) .b-dot.wk{animation-delay:-.9s}
+.b-row.on .b-dot.wk,.b-head .b-dot.wk{color:var(--c-text);animation:b-pulse .8s var(--ease-io) infinite alternate;animation-delay:0s}
+:root[data-still] .b-dot.wk,:root[data-still] .b-row.on .b-dot.wk,:root[data-still] .b-head .b-dot.wk{animation:none;color:var(--c-text-2);opacity:1}
+@media (prefers-reduced-motion: reduce){.b-dot.wk,.b-row.on .b-dot.wk,.b-head .b-dot.wk{animation:none;color:var(--c-text-2);opacity:1}}
+.b-dot.nd{background:radial-gradient(circle at 35% 30%,var(--c-solid) 0,var(--c-accent) 48%,transparent 72%);box-shadow:0 0 8px var(--c-accent-line)}
 .b-dot.nd{background:radial-gradient(circle at 35% 30%,var(--c-solid) 0,var(--c-accent) 48%,transparent 72%);box-shadow:0 0 8px var(--c-accent-line)}
 .b-dot.ok{background:radial-gradient(circle at 35% 30%,var(--c-solid) 0,var(--c-ok) 50%,transparent 72%)}
 .b-dot.er{background:radial-gradient(circle at 35% 30%,var(--c-solid) 0,var(--c-err) 50%,transparent 72%)}
@@ -101,7 +108,9 @@
 .b-text code{font:var(--t-13) var(--font-mono);padding:1px 5px;border-radius:5px;background:var(--c-sunken)}
 .b-msg.you .b-text{color:var(--c-text)}
 .b-msg.in{margin-left:36px}
-.b-msg.is-streaming .b-text::after{content:"";display:inline-block;width:7px;height:7px;margin-left:4px;border-radius:50%;background:var(--c-text);animation:b-breathe 1s var(--ease-io) infinite}
+.b-msg.is-streaming .b-text::after{content:"∿";display:inline;margin-left:4px;color:var(--c-text);font:400 12px/1 var(--font-ui);animation:b-pulse .8s var(--ease-io) infinite alternate}
+:root[data-still] .b-msg.is-streaming .b-text::after{animation:none;color:var(--c-text-2)}
+@media (prefers-reduced-motion: reduce){.b-msg.is-streaming .b-text::after{animation:none;color:var(--c-text-2)}}
 .b-msg.is-error .b-text{color:var(--c-text-2)}
 .b-tool{display:flex;align-items:center;gap:8px;margin-top:6px;padding:5px 10px;border-radius:var(--r-2);font-size:var(--t-12);color:var(--c-text-2);background:var(--c-hover);width:fit-content;max-width:100%;white-space:nowrap;overflow:hidden}
 .b-tool .chev{color:var(--c-text-3);transition:transform var(--d-fast) var(--ease-out)}
@@ -270,6 +279,9 @@
 @keyframes b-wave{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
 @keyframes b-drain{from{width:100%}to{width:0}}
 @keyframes b-glow{0%,100%{opacity:.55}50%{opacity:1}}
+/* the working sign '∿': the agent in view (--c-text to about --c-text-2) and the others' Hush (--c-text-2 to about --c-text-3), opacity only */
+@keyframes b-pulse{from{opacity:1}to{opacity:.62}}
+@keyframes b-hush{from{opacity:1}to{opacity:.55}}
 @keyframes b-rise{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1;transform:none}}
 
 .b-bar>i.w5{width:5%}.b-bar>i.w10{width:10%}.b-bar>i.w15{width:15%}.b-bar>i.w20{width:20%}.b-bar>i.w25{width:25%}.b-bar>i.w30{width:30%}.b-bar>i.w35{width:35%}.b-bar>i.w40{width:40%}.b-bar>i.w45{width:45%}.b-bar>i.w50{width:50%}.b-bar>i.w55{width:55%}.b-bar>i.w60{width:60%}.b-bar>i.w65{width:65%}.b-bar>i.w70{width:70%}.b-bar>i.w75{width:75%}.b-bar>i.w80{width:80%}.b-bar>i.w85{width:85%}.b-bar>i.w90{width:90%}.b-bar>i.w95{width:95%}.b-bar>i.w100{width:100%}
