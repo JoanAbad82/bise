@@ -16,6 +16,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, type BrowserWindowConstructorOptions } from 'electron';
 import { HOME_ARG, IPC, READY_LINE, ROUTE_ENV, SURFACE_ARG, type Surface } from '../shared/api';
 import { glassOf } from './glass';
+import { MAIN_SIZE } from './mainsize';
 
 export const OFF = -30000;
 
@@ -68,8 +69,10 @@ export class MainWindow {
   create(route?: string): BrowserWindow {
     const test = this.testMode;
     const win = new BrowserWindow({
-      width: 1100,
-      height: 720,
+      // its narrowest is one column, the sidebar folded (mainsize.ts)
+      width: MAIN_SIZE.width,
+      height: MAIN_SIZE.height,
+      minWidth: MAIN_SIZE.minWidth,
       show: false,
       // focusable false: a stray focus() can never activate the app over his;
       // the harness draws the caret with CDP focus emulation.
