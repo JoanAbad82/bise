@@ -8,7 +8,7 @@
 // amb-win's shell.
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useCoreEvent, useIndex, useProjects, useStore } from '@/store';
-import { caretAtEnd, useKeptText } from '@/app/keep';
+import { caretAtEnd, keep, useKeptText } from '@/app/keep';
 import type { Ev } from '@/store/store';
 import { flatHits, marks, nextScope, SCOPES, searchList, type Hit, type Scope, type SearchList } from '@/search/rank';
 import { searchDataOf } from '@/search/data';
@@ -16,6 +16,19 @@ import { useNow } from './clock';
 import { MAIN } from './route';
 import { useRouter } from './router';
 import './palette.css';
+
+/** The kept view bit: ⌘K open (lead m_11997, keep.ts: an open panel, no age). */
+const OPEN_KEY = 'palette.open';
+
+/** Whether ⌘K is open, kept across a reload or a relaunch like his query (Shell's state). */
+export function usePaletteOpen(): readonly [boolean, (open: boolean) => void] {
+  const [open, setOpen] = useState(() => keep.view(OPEN_KEY) === true);
+  const set = useCallback((on: boolean) => {
+    keep.setView(OPEN_KEY, on ? true : undefined);
+    setOpen(on);
+  }, []);
+  return [open, set];
+}
 
 export const PW = {
   ph: 'search agents, artifacts, scheduled tasks',

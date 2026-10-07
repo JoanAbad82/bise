@@ -76,6 +76,12 @@ test('agents/palette: ⌘K searches agents (archived too), artifacts, scheduled;
     await expect(page.locator(`${T.item(0)} .hint`), 'perf waits on him (the fixture’s card): ⏎ answers').toHaveText('⏎ answer');
     await expect(page.locator(T.group('artifacts')), 'artifacts are searched').toContainText('Perf notes');
     await page.screenshot({ path: test.info().outputPath('light-1400-query.png') });
+    // a reload (or a relaunch) gives back ⌘K open with his query (lead m_11997, keep.ts)
+    await page.waitForTimeout(400);
+    await page.reload();
+    await expect(page.locator(T.palette), '⌘K is still open after a reload').toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(T.field), 'with his query').toHaveValue('perf');
+    await expect(page.locator(T.item(0)), "'perf' finds perf again").toContainText('perf', { timeout: 10_000 });
     await page.keyboard.press('Tab');
     await expect(page.locator(T.scope('agents'))).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator(T.group('artifacts')), 'tab: agents only').toHaveCount(0);

@@ -2,8 +2,8 @@
 // place a protocol change reaches the search. Pure.
 // The agents (archived too), cards and artifacts of the projects the core holds (live slices);
 // the projects it does not hold from amb-core's index (2926a991: their view.json, as of
-// written_ms); the scheduled tasks from amb-feed's typed list (284bd5c6; the index's rows carry
-// none yet: amb-core adds them).
+// written_ms); the scheduled tasks from amb-feed's typed list (284bd5c6) for a held project, from
+// the index row's scheduled (26b2400b, its live timers as of written_ms) for the others.
 import type { Agent, Artifact, Card, IndexRow, ProjectRow, ScheduledTask } from '@/proto';
 import type { SearchData, SearchScheduled } from './rank';
 
@@ -49,6 +49,10 @@ export function searchDataOf(v: StoreView): SearchData {
     const live = v.artifacts(p);
     return live.length > 0 ? live : (idx.get(p)?.artifacts ?? []);
   };
+  const scheduledOfP = (p: string): readonly ScheduledTask[] => {
+    const live = v.scheduled?.(p) ?? [];
+    return live.length > 0 ? live : (idx.get(p)?.scheduled ?? []);
+  };
   return {
     projects: projects.map((p) => ({ id: p.id, name: p.name, home: p.home })),
     agents: projects.flatMap((p) => {
@@ -74,6 +78,6 @@ export function searchDataOf(v: StoreView): SearchData {
     artifacts: projects.flatMap((p) =>
       artifactsOf(p.id).map((a) => ({ project: p.id, id: a.id, title: a.title, kind: a.kind, what: whatOf(a), agent: a.agent, at_ms: a.at_ms })),
     ),
-    scheduled: projects.flatMap((p) => (v.scheduled?.(p.id) ?? []).map((t) => scheduledOf(p.id, t))),
+    scheduled: projects.flatMap((p) => scheduledOfP(p.id).map((t) => scheduledOf(p.id, t))),
   };
 }

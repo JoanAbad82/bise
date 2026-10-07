@@ -30,7 +30,7 @@ import { Sidebar } from './Sidebar';
 import { numbersOf } from '@/agents/model';
 import { CoreLine } from './CoreLine';
 import { UpdateLine } from './UpdateLine';
-import { Palette } from './Palette';
+import { Palette, usePaletteOpen } from './Palette';
 import { Help } from '@/help/Help';
 import { useTheme } from '@/theme';
 import { HELP_EVENT, keyAction, typingIn } from './keys';
@@ -117,7 +117,7 @@ function useStill(): void {
 function Shell() {
   useHistoryKeys();
   useStill();
-  const [palette, setPalette] = useState(false);
+  const [palette, setPalette] = usePaletteOpen();
   const [help, setHelp] = useState(false);
   // L25: the demo tour's 'end' goes when he opens the agent list
   useEffect(() => {

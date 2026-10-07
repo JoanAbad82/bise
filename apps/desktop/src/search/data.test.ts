@@ -38,4 +38,20 @@ describe('search data: held projects live, the others from amb-core index', () =
     });
     expect(d.scheduled).toEqual([{ project: 'sf', id: 48, agent: 'checkout', words: 're-run the flaky checkout test', every: '30m', next_ms: 1_000 }]);
   });
+
+  it("a project the core doesn't hold has its scheduled tasks from its index row (26b2400b); a held one keeps its live list", () => {
+    const task = (id: number, words: string): ScheduledTask => ({ id, agent: 'writer', by: 'main', words, every: 'every day 07:30', done: 3 });
+    const d = searchDataOf({
+      projects: [project('acme', 1), project('docs', 2)],
+      agents: () => [],
+      artifacts: () => [],
+      cards: () => [],
+      scheduled: (p) => (p === 'acme' ? [task(1, 'live check')] : []),
+      index: [
+        { project: 'acme', up: true, agents: [], artifacts: [], scheduled: [task(9, 'stale check')] },
+        { project: 'docs', up: false, written_ms: 5, agents: [], artifacts: [], scheduled: [task(48, 'refresh the Q3 notes')] },
+      ],
+    });
+    expect(d.scheduled.map((t) => `${t.project}#${String(t.id)} ${t.words} · ${t.every}`)).toEqual(['acme#1 live check · day 07:30', 'docs#48 refresh the Q3 notes · day 07:30']);
+  });
 });
