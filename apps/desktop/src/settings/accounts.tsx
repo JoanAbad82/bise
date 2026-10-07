@@ -6,7 +6,16 @@
 import { useState } from 'react';
 import type { Account, AppCmd } from '@/proto';
 import { Button, Chip, Field, Group, Help, type GroupItem } from '@/ds';
-import type { SignInDraft } from './draft';
+
+/**
+ * The expired ChatGPT sign-in (bar V14 / S28 / L2): the agents its expiry stopped (the hub's
+ * signin card's Card.waiting) and the sign-in under way from the app (the core's signing: the
+ * link his browser opened, to copy; useSigning).
+ */
+export interface SignIn {
+  waiting: readonly string[];
+  signing?: { readonly id: string; readonly url: string } | null;
+}
 
 /** He is signed in to one account at least (the first launch's model step goes on). */
 export function signedIn(accounts: readonly Account[]): boolean {
@@ -64,11 +73,11 @@ export interface AccountsProps {
   send: (cmd: AppCmd) => void;
   keyError?: KeyError | null;
   want?: Want | null;
-  /** the expired sign-in: the agents waiting, the sign-in under way (draft.ts until typed) */
-  signin?: SignInDraft | null;
+  /** the expired sign-in: the agents waiting, the sign-in under way */
+  signin?: SignIn | null;
   /** copy the sign-in link (c) */
   copy?: (text: string) => void;
-  /** cancel the sign-in under way (esc) */
+  /** cancel the sign-in under way (esc): AppCmd sign_in_cancel {id} */
   cancelSignIn?: (id: string) => void;
 }
 

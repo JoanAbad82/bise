@@ -9,14 +9,13 @@
 import { useState } from 'react';
 import type { Account, AppCmd, Found, JsonValue, Model, Perm, Plugin, ProjectRow, RoleRow } from '@/proto';
 import type { Held } from './hold';
-import type { SignInDraft } from './draft';
 import type { ApprovalsCmd, ApprovalsEv } from './approvals';
 import { Row, Settings as Frame } from '@/ds';
 import { putPref, type Prefs } from './prefs';
 import { PAGES, PageBody, pageOf, type Page } from './pages';
 import type { ComputerUse } from './computer';
 import type { Perms } from './check';
-import type { KeyError } from './accounts';
+import type { KeyError, SignIn } from './accounts';
 import './settings.css';
 
 export interface SettingsData {
@@ -44,8 +43,8 @@ export interface SettingsData {
   approvals?: ApprovalsEv | null;
   /** the hub's last refusal of an approvals or remove_rule command, in its words */
   approvalsError?: string | null;
-  /** the expired sign-in: the agents waiting (the signin card's), the sign-in under way (bar V14; signing is draft until amb-core types it) */
-  signin?: SignInDraft | null;
+  /** the expired sign-in: the agents waiting (the signin card's), the sign-in under way (bar V14) */
+  signin?: SignIn | null;
   /** his home folder, to say ~ */
   home?: string;
 }
@@ -66,7 +65,7 @@ export interface SettingsPorts {
   approvals?: (c: ApprovalsCmd) => void;
   /** copy a text to his clipboard (the sign-in link, bar V14) */
   copy?: (text: string) => void;
-  /** cancel the sign-in under way (bar V14; draft: AppCmd sign_in_cancel) */
+  /** cancel the sign-in under way (bar V14: AppCmd sign_in_cancel) */
   cancelSignIn?: (id: string) => void;
 }
 

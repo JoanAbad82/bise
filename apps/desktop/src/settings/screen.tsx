@@ -3,7 +3,7 @@
 // through it (store.command: the core's AppCmd). Owner: amb-home.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { JsonValue, Perm, ProjectRow } from '@/proto';
-import { useAccounts, useApprovals, useComputerUse, useCoreEvent, useFound, useModels, usePlugins, usePrefs, useProjects, useRoles, useStore, type Ev } from '@/store';
+import { useAccounts, useApprovals, useComputerUse, useCoreEvent, useFound, useModels, usePlugins, usePrefs, useProjects, useRoles, useSigning, useStore, type Ev } from '@/store';
 import type { KeyError } from './accounts';
 import { heldReady, holdForSetup, releaseHeld, useHeld } from './hold';
 import { useRouter } from '@/app/router';
@@ -99,6 +99,8 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
   const ruleError = useCmdError('remove_rule');
   const approvalsError = (ruleError?.text ?? null) ?? (modeError?.text ?? null);
   const waiting = useSigninWaiting(projects);
+  // the sign-in under way (V14): the link his browser opened, to copy
+  const signing = useSigning();
   const router = useRouter();
   const prefs = prefsOf(usePrefs());
   const { perms } = useHelper();
@@ -122,13 +124,17 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
       keyError={keyError}
       approvals={approvals}
       approvalsError={approvalsError}
-      signin={{ waiting }}
+      signin={{ waiting, signing }}
       ports={{
         send: (cmd) => {
           store.command(cmd);
         },
         approvals: (cmd) => {
           store.command(cmd);
+        },
+        // esc on the sign-in under way (V14): the core ends it (error {cmd: sign_in, '<id>: cancelled'} + accounts)
+        cancelSignIn: (id) => {
+          store.command({ cmd: 'sign_in_cancel', id });
         },
         back: () => {
           router.back();
