@@ -14,6 +14,7 @@
 // harness blocks every navigation; the open goes through main's external opener).
 import { test, expect, textProblems } from '../../harness';
 import { launchReal, realWorld, transcriptHas } from '../world';
+import { expectShownSoft } from './shown';
 
 const T = {
   field: '[data-testid="composer.field"]',
@@ -54,6 +55,9 @@ test('thread/answers: a 40-line markdown answer is drawn whole and readable', as
     expect.soft(inView, 'scrolling brings the last line into view').toBe(true);
     // the answer's own entry: the one that holds the last line
     const entry = list.locator('[data-testid^="thread.entry."]', { hasText: LAST }).last();
+    // in view by its box is not painted (amb-win 35d08ae5): the line and its row are shown
+    await expectShownSoft(last, 'the last line');
+    await expectShownSoft(entry, "the answer's row");
     await expect.soft(entry.getByText('the release plan (line 1)'), 'its first line is in the same entry').toHaveCount(1);
     expect.soft(await entry.locator('li').count(), 'list items are drawn as a list (8 + 4 + 2)').toBeGreaterThanOrEqual(14);
     const pre = entry.locator('pre');

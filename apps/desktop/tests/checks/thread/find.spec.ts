@@ -10,6 +10,7 @@
 //   - esc closes find and the composer keeps the draft.
 import { test, expect } from '../../harness';
 import { launchReal, realWorld, transcriptHas } from '../world';
+import { expectShown } from './shown';
 
 const T = {
   field: '[data-testid="composer.field"]',
@@ -38,6 +39,8 @@ test('thread/find: ⌘F finds every match of a word, ⏎ goes to the next, the d
       await page.keyboard.press('Enter');
       await expect.poll(() => transcriptHas(w, 'bise', 'main', line), { timeout: 15_000, message: `bise's main got "${line}"` }).toBe(true);
       await expect(page.locator(T.thread), 'its answer is drawn').toContainText(new RegExp(`ack: .*${line}`), { timeout: 20_000 });
+      // in the DOM is not on screen (amb-win 35d08ae5)
+      await expectShown(page.locator(T.thread).locator('[data-testid^="thread.entry."]').filter({ hasText: new RegExp(`ack: .*${line}`) }).last(), 'its answer');
     }
     await field.click();
     await page.keyboard.type('brouillon');
@@ -54,6 +57,7 @@ test('thread/find: ⌘F finds every match of a word, ⏎ goes to the next, the d
     await expect(count, 'the count says 4 matches').toHaveText(/^\d+\/4$/, { timeout: 3000 });
     const hit = page.locator(T.hit);
     await expect(hit, 'the current match row is marked').toHaveCount(1);
+    await expectShown(hit, 'the marked row, scrolled to');
     const at1 = await count.innerText();
     const row1 = await hit.getAttribute('data-testid');
     await page.keyboard.press('Enter');
@@ -61,6 +65,7 @@ test('thread/find: ⌘F finds every match of a word, ⏎ goes to the next, the d
     await expect(hit, 'one marked row').toHaveCount(1);
     expect(await hit.getAttribute('data-testid'), 'the marked row moved').not.toBe(row1);
     await expect(hit, 'the marked row holds the word').toContainText(word);
+    await expectShown(hit, 'the next marked row, scrolled to');
     await page.screenshot({ path: test.info().outputPath('next.png') });
     await page.keyboard.press('Escape');
     await expect(page.locator(T.find), 'esc closes find').toBeHidden();

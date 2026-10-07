@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FakeCore, test, expect } from '../../harness';
 import { onWorld } from '../native/world';
+import { expectShown } from './shown';
 
 const HOME = 'bise-home-00000000';
 // main opens only a file that exists (src/main/ipc.ts openFile): a throwaway project folder
@@ -45,6 +46,9 @@ test('thread/file-links: a path in an answer opens in his editor at its line', a
     async ({ s, out }) => {
       const link = s.page.getByTestId('thread.path').first();
       await expect(link, 'the path is drawn as a link').toBeVisible({ timeout: 10_000 });
+      // in the DOM is not on screen (amb-win 35d08ae5): the answer's row and its link are shown
+      await expectShown(s.page.getByTestId('thread.entry.2'), "the answer's row");
+      await expectShown(link, 'the path link');
       await link.click();
       const line = await out.wait(OPEN, () => true, 3000);
       const ask = JSON.parse(line) as { path: string; line?: number };

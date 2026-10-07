@@ -4,6 +4,7 @@
 // amb-win (lead m_10311). The new app on the scripted core: a world whose gift-ui thread holds
 // those entries; the answer read outside the page, in the core's command log.
 import { FakeCore, FakeHelper, launchDesktop, test, expect } from '../../harness';
+import { expectShown } from './shown';
 
 const HOME = 'bise-home-00000000';
 const ASK = 'gift cards: show the balance on the cart page, or only at checkout?';
@@ -61,6 +62,10 @@ test("thread/to-agent: gift-ui's own thread shows its message to main, its quest
     await expect(page.getByTestId('thread.to.4')).toContainText(ASK);
     await expect(page.getByTestId('thread.asks.4')).toHaveText('waits for the reply');
     await expect(page.getByTestId('thread.card.2'), "main's card for it, in its thread").toContainText(ASK);
+    // in the DOM is not on screen (amb-win 35d08ae5): a short thread's rows are shown
+    await expectShown(page.getByTestId('thread.to.3'), 'its message to main');
+    await expectShown(page.getByTestId('thread.to.4'), 'its question');
+    await expectShown(page.getByTestId('thread.card.2.opt.2'), "the card's answer");
     await page.screenshot({ path: test.info().outputPath('to-agent.png') });
     await page.getByTestId('thread.card.2.opt.2').click();
     const cmd = await core.waitCmd((c) => c.cmd === 'answer', 5000);

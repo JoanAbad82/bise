@@ -16,6 +16,7 @@
 // in the runtime's interrupt, not in the app.
 import { test, expect } from '../../harness';
 import { hubOf, hubState, launchReal, realWorld, transcriptHas, type World } from '../world';
+import { expectShown, expectShownSoft } from './shown';
 
 const T = {
   field: '[data-testid="composer.field"]',
@@ -50,6 +51,8 @@ test('thread/interrupt: esc during a long turn stops it in under 1 s, the compos
     await page.keyboard.type(`a long one [[bash: sleep 12]] ${n}`);
     await page.keyboard.press('Enter');
     await expect.poll(() => transcriptHas(w, 'bise', 'main', n), { timeout: 10_000, message: "bise's main got his words" }).toBe(true);
+    // in the DOM is not on screen (amb-win 35d08ae5): his row is shown
+    await expectShown(page.locator(T.thread).locator('[data-testid^="thread.entry."], [data-testid^="thread.pending."]').filter({ hasText: n }).last(), 'his row');
     await expect.poll(() => mainStatus(w), { timeout: 10_000, message: 'bise main works on it' }).toBe('working');
     await page.waitForTimeout(1500); // inside the tool now
     await page.keyboard.type('garde ça');
@@ -58,6 +61,7 @@ test('thread/interrupt: esc during a long turn stops it in under 1 s, the compos
     await page.keyboard.press('Escape');
     await expect.soft(page.locator(T.screen), 'the stop shows in the thread within 1 s').toContainText(/stopping|stopped|interrupted/i, { timeout: 1000 });
     expect.soft(before, 'the stop line is new').not.toMatch(new RegExp(`${n}[\\s\\S]*(stopping|interrupted)`, 'i'));
+    await expectShownSoft(page.locator(T.screen).getByText(/stopping|stopped|interrupted/i).last(), 'the stop line', 500);
     await page.screenshot({ path: test.info().outputPath('stopping.png') });
     let stoppedMs = Infinity;
     while (Date.now() - t0 < 15_000) {

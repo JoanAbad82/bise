@@ -7,6 +7,7 @@
 // it, its strip row names where it comes from ('❝ 1 “…”  main · 3 lines'), and the words follow.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 import { T, fieldText, press } from './target';
+import { expectShown } from '../thread/shown';
 
 const HOME = 'bise-home-00000000';
 const ANSWER = 'le p99 monte quand la compaction de 14 h tourne.\n2,1 s au lieu de 300 ms pendant 12 min.\nalerts propose de la passer à 03:00.';
@@ -48,6 +49,8 @@ test('composer/quote: select an answer in the real thread, type: a quote chip at
     const answer = page.getByTestId('thread.entry.2').locator('.th-md').first();
     await expect(answer, "main's answer is in the thread").toContainText('compaction de 14 h', { timeout: 10_000 });
     await expect(page.locator(T.field), 'the thread has its composer').toBeVisible();
+    // its text in the DOM is not on screen (amb-win 35d08ae5): the row is painted and hit-testable
+    await expectShown(page.getByTestId('thread.entry.2'), "main's answer");
     const b = await answer.boundingBox();
     if (!b) throw new Error('no answer box');
     // from inside the first word to the end of the last line, as a hand drags

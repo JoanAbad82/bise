@@ -4,6 +4,7 @@
 // it as the TUI does: '<selection from="main">…</selection>' in front of his words. Owner: amb-win
 // (lead m_10647). The new app on the scripted core; the send read in the core's command log.
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
+import { expectShown } from './shown';
 
 const HOME = 'bise-home-00000000';
 const ANSWER = 'the p99 climbs when the 14:00 compaction runs.\n2.1 s instead of 300 ms for 12 min.\nalerts suggests moving it to 03:00.';
@@ -43,6 +44,8 @@ test('thread/quote-send: drag selects an answer, typing quotes it with its strip
     const { page } = s;
     const answer = page.getByTestId('thread.entry.2').locator('.th-md').first();
     await expect(answer, 'the answer is drawn, visible').toBeVisible({ timeout: 10_000 });
+    // toBeVisible passed while Virtuoso hid the rows (amb-win 35d08ae5): shown = painted and hit
+    await expectShown(page.getByTestId('thread.entry.2'), "main's answer");
     const b = await answer.boundingBox();
     if (!b) throw new Error('no answer box');
     await page.mouse.move(b.x + 6, b.y + 6);

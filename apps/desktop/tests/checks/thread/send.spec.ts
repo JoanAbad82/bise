@@ -17,6 +17,7 @@
 // Offline (the core gone): thread/send-offline.
 import { test, expect } from '../../harness';
 import { hubOf, hubState, launchReal, realWorld, transcriptHas, tui, tuiReady, type World } from '../world';
+import { expectShownSoft } from './shown';
 
 const T = {
   field: '[data-testid="composer.field"]',
@@ -137,6 +138,10 @@ test('thread/send: cold, his words show at once, every wait is named, main works
     expect.soft(workingMs - holdMs, "ms from ⏎ to main working, the shown hold not counted, vs the TUI's + 500").toBeLessThanOrEqual(tuiMs + 500);
     await expect.poll(() => transcriptHas(w, 'bise', 'main', `hi from qa-flows ${n}`), { timeout: 15_000, message: "the home hub's main got his words" }).toBe(true);
     await expect(page.locator(T.thread), "the model's answer is drawn in the thread").toContainText(`${n} [[slow: 2]] </user_message>`, { timeout: 20_000 });
+    // in the DOM is not on screen (amb-win 35d08ae5): his row and the answer's are shown
+    const rows = page.locator(T.thread).locator('[data-testid^="thread.entry."], [data-testid^="thread.pending."]');
+    await expectShownSoft(rows.filter({ hasText: `hi from qa-flows ${n}` }).last(), 'his row');
+    await expectShownSoft(rows.filter({ hasText: `${n} [[slow: 2]] </user_message>` }).last(), "the answer's row (the list follows the answer)");
     await page.screenshot({ path: test.info().outputPath('answered.png') });
   } finally {
     await s.close();
