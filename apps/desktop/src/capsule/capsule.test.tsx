@@ -87,12 +87,16 @@ describe('the store mapping', () => {
     const d = toSpotData(
       [P({ project: 'home', home: true }), P({ project: 'tel', order: 2, branch: 'dev' }), P({ project: 'shop', order: 1 })],
       (p) => (p === 'tel' ? [A('perf', 'working')] : []),
-      (p) => (p === 'tel' ? [C(4, true)] : []),
+      (p) => (p === 'tel' ? [C(4, true)] : p === 'home' ? [C(2, false)] : []),
       null,
     );
     expect(d.projects.map((p) => [p.id, p.branch])).toEqual([['shop', 'main'], ['tel', 'dev']]);
     expect(d.agents).toMatchObject([{ name: 'perf', project: 'tel', status: 'working' }]);
-    expect(d.cards).toEqual([{ id: 'tel.4', agent: 'perf', project: 'tel', text: 'go?', kind: 'approval', pname: 'tel' }]);
+    // bise's home card leaves the project column empty ('? bise   send the mail…'), a real project names it
+    expect(d.cards).toEqual([
+      { id: 'home.2', agent: 'perf', project: 'home', text: 'go?', kind: 'question', pname: '' },
+      { id: 'tel.4', agent: 'perf', project: 'tel', text: 'go?', kind: 'approval', pname: 'tel' },
+    ]);
     expect(cardKind(C(1, false))).toBe('question');
   });
 });

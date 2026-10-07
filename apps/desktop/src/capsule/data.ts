@@ -27,7 +27,7 @@ export function toSpotData(
     agents: mine.flatMap((p) =>
       agentsOf(p.project).map((a) => ({ name: a.name, project: p.project, status: a.status, title: a.title, purpose: a.purpose, archived: a.archived })),
     ),
-    cards: mine.flatMap((p) => cardsOf(p.project).map((c) => ({ id: `${p.project}.${String(c.id)}`, agent: c.agent, project: p.project, text: c.question, kind: cardKind(c), pname: p.name }))),
+    cards: mine.flatMap((p) => cardsOf(p.project).map((c) => ({ id: `${p.project}.${String(c.id)}`, agent: c.agent, project: p.project, text: c.question, kind: cardKind(c), pname: p.home ? '' : p.name }))),
     front,
   };
 }
