@@ -27,6 +27,8 @@ export interface ComposerProps {
   readonly store?: Store;
   /** "you → bise · opus · high" */
   readonly to?: string;
+  /** K2: ⏎ on an empty field: the screen's act (the TUI's: sign in again after expiry, ...) */
+  readonly onEmptyEnter?: () => void;
   /** a key hint at the label line's right ('esc write a plain message' while it answers a docked card) */
   readonly toEnd?: string;
   readonly placeholder?: string;
@@ -170,6 +172,9 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
         onActions={(a) => {
           if (actions.current === null) cb.current.onReady?.(a);
           actions.current = a;
+        }}
+        onEmptyEnter={() => {
+          cb.current.onEmptyEnter?.();
         }}
       />
     </ComposerFrame>

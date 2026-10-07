@@ -60,3 +60,10 @@ export function biseChip(agents: readonly Pick<Agent, 'main' | 'archived' | 'sta
 export function composerWords(name: string): { label: string; placeholder: string } {
   return { label: `to ${name}`, placeholder: `write to ${name}, then ⏎` };
 }
+
+/** K2, ⏎ on an empty composer (the TUI's sb/keys.rs + input.rs): never an empty send. A sign-in
+ *  that expired and stopped this agent (a 'signin' item waiting on it): sign in again, his ⏎ is
+ *  his click. Else nothing. (The computer-use 'give it back' waits on S29.) Pure. */
+export function emptyEnter(cards: readonly { kind: string; waiting?: readonly string[] | null }[], agent: string): { cmd: 'sign_in'; id: 'chatgpt' } | null {
+  return cards.some((c) => c.kind === 'signin' && (c.waiting ?? []).includes(agent)) ? { cmd: 'sign_in', id: 'chatgpt' } : null;
+}

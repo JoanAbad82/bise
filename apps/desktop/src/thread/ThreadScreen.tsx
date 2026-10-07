@@ -13,7 +13,7 @@ import { Composer, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer';
 import { quoteFrom, quoteKey, quoteText } from './quote';
 import type { Outgoing } from '@/composer/message';
-import { threadKey, useAgents, useCommands, useCoreState, useFiles, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
+import { threadKey, useAgents, useCards, useCommands, useCoreState, useFiles, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
 import { useMenuAction } from '@/app/menu';
 import { useRouter } from '@/app/router';
 import { pickCommands, slashLine, slashOf, windowRun } from './commands';
@@ -30,7 +30,7 @@ import { ThreadInbox, takesWords, useStripCard } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
-import { composerWords } from './head';
+import { composerWords, emptyEnter } from './head';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
 import { entryKey, pendingKey, posOfKey } from './entry';
@@ -722,7 +722,13 @@ export const ThreadComposer = memo(function ThreadComposer({
     [store, project, agent, onSent, onCommand, answer, about],
   );
   // his drafts, history and queue in the keep's file, never lost by a quit (keep.ts)
-  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} {...(toEnd === undefined ? {} : { toEnd })} placeholder={placeholder} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
+  // K2: ⏎ on an empty field does the TUI's act, if one waits (sign in again after expiry)
+  const cards = useCards(project);
+  const onEmptyEnter = useCallback(() => {
+    const act = emptyEnter(cards, agent);
+    if (act !== null) store.command(act);
+  }, [cards, agent, store]);
+  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} {...(toEnd === undefined ? {} : { toEnd })} placeholder={placeholder} onEmptyEnter={onEmptyEnter} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
 });
 
 /** A message about an artifact: `about [its title](its url): his words` (the chip's own link form). Pure. */

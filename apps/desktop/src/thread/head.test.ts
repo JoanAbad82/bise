@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { biseChip, branchLine, composerWords, roleOf, stateChip, STARTING_MS } from './head';
+import { biseChip, branchLine, composerWords, emptyEnter, roleOf, stateChip, STARTING_MS } from './head';
 
 const NOW = 1_791_100_000_000;
 const MIN = 60_000;
@@ -36,5 +36,14 @@ describe("the agent view's head (designer's desktop-screens v6)", () => {
 
   it("the composer: 'to perf', 'write to perf, then ⏎'", () => {
     expect(composerWords('perf')).toEqual({ label: 'to perf', placeholder: 'write to perf, then ⏎' });
+  });
+});
+
+describe('K2: ⏎ on an empty composer', () => {
+  it('signs in again when an expired sign-in stopped this agent, else does nothing', () => {
+    expect(emptyEnter([{ kind: 'signin', waiting: ['perf', 'main'] }], 'perf')).toEqual({ cmd: 'sign_in', id: 'chatgpt' });
+    expect(emptyEnter([{ kind: 'signin', waiting: ['main'] }], 'perf')).toBeNull();
+    expect(emptyEnter([{ kind: 'question', waiting: ['perf'] }], 'perf')).toBeNull();
+    expect(emptyEnter([], 'perf')).toBeNull();
   });
 });

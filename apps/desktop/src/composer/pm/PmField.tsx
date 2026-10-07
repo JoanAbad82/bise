@@ -62,6 +62,8 @@ export interface PmFieldProps {
   readonly onStrip: (strip: JSX.Element | null) => void;
   readonly onBar: (bar: FieldBar) => void;
   readonly onActions: (a: ComposerActions) => void;
+  /** K2: ⏎ on an empty field (never an empty send): the screen's act, if any (sign in again, ...) */
+  readonly onEmptyEnter?: (() => void) | undefined;
 }
 
 /** The draft is written this long after the last change (never on each key of a burst). */
@@ -301,7 +303,10 @@ export function PmField(p: PmFieldProps): JSX.Element {
     const st = state();
     if (st === null) return;
     const segs = segmentsOf(st.doc);
-    if (segs.length === 0 || segs.every((s) => s.kind === 'text' && s.text.trim() === '')) return;
+    if (segs.length === 0 || segs.every((s) => s.kind === 'text' && s.text.trim() === '')) {
+      props.current.onEmptyEnter?.();
+      return;
+    }
     const entry = entryOf(segs);
     const only = segs.length === 1 && segs[0]?.kind === 'text' ? segs[0].text : null;
     const cmd = only === null ? null : commandLine(only, props.current.sources.commands);
