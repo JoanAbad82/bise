@@ -6,7 +6,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Button, Menu, MenuItem } from '@/ds';
 import { useRouter } from '@/app/router';
-import { useAgents, useStore } from '@/store';
+import { useAgents, usePrefs, useStore } from '@/store';
+import { themeOf } from '@/theme';
 import { ThreadComposer } from '@/thread/ThreadScreen';
 import { useAllArtifacts } from './hooks';
 import { kindOf, pathOf, versions, whenWords } from './model';
@@ -36,6 +37,25 @@ export function usePutInMessage(): (project: string, a: { id: string; title: str
 
 const noop = () => undefined;
 
+// 'v' on a row: the artifact it opens shows its versions menu at once (one open, then it's spent)
+let versionsFor: string | null = null;
+/** The next open of this artifact ('project/id') shows its versions. */
+export function openWithVersions(key: string): void {
+  versionsFor = key;
+}
+function takeVersions(key: string): boolean {
+  const on = versionsFor === key;
+  versionsFor = null;
+  return on;
+}
+
+/** ⌘C on a row: its link (the bridge's copy, else the clipboard). */
+export function copyLink(url: string): void {
+  const copy = bridge()?.copy;
+  if (copy !== undefined) void copy(url);
+  else void navigator.clipboard.writeText(url).catch(noop);
+}
+
 /** The page's url at a version: the current one as is, an older one at /v/<n>. Pure. */
 export function versionUrl(url: string, current: number, v: number): string {
   if (v === current) return url;
@@ -45,9 +65,11 @@ export function versionUrl(url: string, current: number, v: number): string {
 export function ArtifactOpen({ project, id }: { project: string; id: string }) {
   const router = useRouter();
   const it = useAllArtifacts(project).find((x) => x.a.id === id);
-  const [menu, setMenu] = useState<'versions' | 'more' | null>(null);
+  // 'v' on a row of the list opens it with its versions shown
+  const [menu, setMenu] = useState<'versions' | 'more' | null>(() => (takeVersions(`${project}/${id}`) ? 'versions' : null));
   const [v, setV] = useState<number | null>(null);
   const [now] = useState(() => Date.now());
+  const theme = themeOf(usePrefs());
   const bise = bridge();
   const store = useStore();
   const put = usePutInMessage();
@@ -93,7 +115,9 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
         <span className="art-open-end">
           <span className="art-drop">
             <Button kind="ghost" onClick={() => { setMenu(menu === 'versions' ? null : 'versions'); }} testId="artifact.version">
-              {`v${String(shown)} · ${shown === a.version ? 'the current one' : 'an older one'} ⌄`}
+              {`v${String(shown)}`}
+              <span className="art-wide">{` · ${shown === a.version ? 'the current one' : 'an older one'}`}</span>
+              {' ⌄'}
             </Button>
             {menu === 'versions' && (
               <Menu testId="artifact.versions">
@@ -107,7 +131,9 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
               </Menu>
             )}
           </span>
-          <Button kind="ghost" onClick={() => { void bise?.openExternal?.(url); }} testId="artifact.browser">open in browser ↗</Button>
+          <Button kind="ghost" onClick={() => { void bise?.openExternal?.(url); }} testId="artifact.browser" title="open in browser">
+            <span className="art-wide">open in browser </span>↗
+          </Button>
           <span className="art-drop">
             <Button kind="ghost" onClick={() => { setMenu(menu === 'more' ? null : 'more'); }} testId="artifact.more">⋯</Button>
             {menu === 'more' && (
@@ -124,7 +150,10 @@ export function ArtifactOpen({ project, id }: { project: string; id: string }) {
       </div>
       <div className="art-open-body">
         {page ? (
-          <iframe className="art-paper" src={url} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups" data-testid="artifact.page" />
+          // the page follows his theme: the kit picks its dark paper by prefers-color-scheme, which
+          // an iframe takes from its element's color-scheme ('light dark': the system's)
+          <iframe className="art-paper" src={url} title={a.title} sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            style={{ colorScheme: theme ?? 'light dark' }} data-testid="artifact.page" />
         ) : (
           <div className="art-empty">this kind opens in your browser: open in browser ↗</div>
         )}

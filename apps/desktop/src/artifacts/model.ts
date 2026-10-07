@@ -53,24 +53,27 @@ export function dayOf(ms: number): string {
   return `${String(d.getFullYear())}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
-/** A day's group title: 'today', 'yesterday', else 'the 1st of October'. */
+/** A day's group title (ambient's day separators): 'today', 'yesterday', else 'sun 5 oct'. */
 export function dayWords(ms: number, now: number): string {
   if (dayOf(ms) === dayOf(now)) return 'today';
   if (dayOf(ms) === dayOf(now - 86_400_000)) return 'yesterday';
   const d = new Date(ms);
-  const n = d.getDate();
-  const th = n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th';
-  return `the ${String(n)}${th} of ${MONTHS[d.getMonth()] ?? ''}`;
+  return `${DAYS[d.getDay()] ?? ''} ${String(d.getDate())} ${MONTHS[d.getMonth()] ?? ''}`;
 }
 
-/** The time column: 14:02 today and yesterday, else the day too ('3 Oct 14:02'). */
-export function whenWords(ms: number, now: number): string {
+/** A row's time, '16:02': its day group already says the day. */
+export function timeOf(ms: number): string {
   const d = new Date(ms);
-  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  if (now - ms < 2 * 86_400_000 && (dayOf(ms) === dayOf(now) || dayOf(ms) === dayOf(now - 86_400_000))) return hm;
-  return `${String(d.getDate())} ${(MONTHS[d.getMonth()] ?? '').slice(0, 3)} ${hm}`;
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** A time out of any day group (the open header, the versions): '14:02' today, else 'yesterday 14:02', 'sun 5 oct 14:02'. */
+export function whenWords(ms: number, now: number): string {
+  const day = dayWords(ms, now);
+  return day === 'today' ? timeOf(ms) : `${day} ${timeOf(ms)}`;
 }
 
 export interface Filter {

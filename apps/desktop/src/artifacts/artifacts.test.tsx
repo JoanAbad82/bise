@@ -6,7 +6,7 @@ import { Store, StoreProvider } from '@/store';
 import { RouterContext, createRouter } from '@/app/router';
 import type { Route } from '@/app/route';
 import { formatRoute, parseRoute } from '@/app/route';
-import { byDay, dayWords, filterItems, glyphOf, kindWords, ALL, versions, whenWords, type Item } from './model';
+import { byDay, dayWords, filterItems, glyphOf, kindWords, ALL, timeOf, versions, whenWords, type Item } from './model';
 import { ArtifactList, ArtifactOpen, ArtifactsScreen, versionUrl } from './index';
 import { putInDraft } from './put';
 import { aboutText } from '@/thread/ThreadScreen';
@@ -28,9 +28,11 @@ describe('artifacts model', () => {
     expect(kindWords(art('b', 'pr'))).toBe('PR');
     expect(dayWords(at(0, 9, 0), NOW)).toBe('today');
     expect(dayWords(at(1, 9, 0), NOW)).toBe('yesterday');
-    expect(dayWords(at(2, 9, 0), NOW)).toBe('the 1st of October');
+    expect(dayWords(at(2, 9, 0), NOW)).toBe('thu 1 oct');
+    expect(timeOf(at(2, 16, 2))).toBe('16:02');
+    expect(whenWords(at(1, 14, 2), NOW)).toBe('yesterday 14:02');
     expect(whenWords(at(0, 14, 2), NOW)).toBe('14:02');
-    expect(whenWords(at(5, 9, 5), NOW)).toBe('28 Sep 09:05');
+    expect(whenWords(at(5, 9, 5), NOW)).toBe('mon 28 sep 09:05');
     expect(versions(art('a', 'page', { version: 2 }), NOW)).toEqual([{ v: 2, words: 'the current one', when: '14:02' }, { v: 1, words: '' }]);
     expect(versionUrl('http://h/p/x', 3, 1)).toBe('http://h/p/x/v/1');
   });
@@ -172,6 +174,39 @@ describe('artifacts screens', () => {
     } finally {
       delete g.bise;
     }
+  });
+
+  it("the keys line says only what works: '⏎ open', 'v versions', '@ put it in a message', '⌘C copy'; v opens with the versions shown, ⌘C copies the link", () => {
+    const copied: string[] = [];
+    const g = globalThis as { bise?: unknown };
+    g.bise = { copy: (t: string) => { copied.push(t); } };
+    try {
+      const router = mount(<ArtifactsScreen />);
+      expect(screen.getByTestId('artifacts.keys').textContent).toBe('⏎ openv versions@ put it in a message⌘C copy');
+      const list = screen.getByTestId('artifacts.list');
+      fireEvent.keyDown(list, { key: 'c', metaKey: true });
+      expect(copied).toEqual(['http://127.0.0.1:47123/p/notes']);
+      fireEvent.keyDown(list, { key: 'v' });
+      expect(router.get()).toEqual({ screen: 'artifacts', project: 'shop-1', id: 'notes' });
+      cleanup();
+      mount(<ArtifactOpen project="shop-1" id="notes" />, { screen: 'artifacts', project: 'shop-1', id: 'notes' });
+      expect(screen.getByTestId('artifact.versions')).toBeTruthy();
+      cleanup();
+      mount(<ArtifactOpen project="shop-1" id="notes" />, { screen: 'artifacts', project: 'shop-1', id: 'notes' });
+      expect(screen.queryByTestId('artifact.versions')).toBeNull();
+    } finally {
+      delete g.bise;
+    }
+  });
+
+  it("the page follows his theme: the iframe's color-scheme is his pref, else the system's", () => {
+    mount(<ArtifactOpen project="shop-1" id="notes" />, { screen: 'artifacts', project: 'shop-1', id: 'notes' });
+    expect(screen.getByTestId('artifact.page').style.colorScheme).toBe('light dark');
+    cleanup();
+    const store = world();
+    store.apply({ ev: 'prefs', prefs: { theme: 'dark' } });
+    render(<StoreProvider store={store}><RouterContext.Provider value={createRouter({ screen: 'artifacts', project: 'shop-1', id: 'notes' })}><ArtifactOpen project="shop-1" id="notes" /></RouterContext.Provider></StoreProvider>);
+    expect(screen.getByTestId('artifact.page').style.colorScheme).toBe('dark');
   });
 });
 

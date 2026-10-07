@@ -3,9 +3,9 @@
 // (amb-win's Panel.tsx mounts <ArtifactList project onOpen />). Both grouped by day; ↑↓ move, ⏎ opens,
 // space looks. Owner: amb-kit.
 import { memo, useState, type KeyboardEvent, type Ref } from 'react';
-import { byDay, glyphOf, keyOf, kindWords, madeBy, pathOf, whenWords, type Item } from './model';
+import { byDay, glyphOf, keyOf, kindWords, madeBy, pathOf, timeOf, type Item } from './model';
 import { useAllArtifacts } from './hooks';
-import { bridge, usePutInMessage } from './Open';
+import { bridge, copyLink, openWithVersions, usePutInMessage } from './Open';
 import './artifacts.css';
 
 export interface RowsProps {
@@ -46,6 +46,16 @@ export function listKey(e: KeyboardEvent, flat: readonly Item[], sel: string | n
     p.onPut(cur);
     return true;
   }
+  // v: open it with its versions shown; ⌘C: copy its link
+  if (cur && e.key === 'v' && !e.metaKey && !e.ctrlKey) {
+    openWithVersions(keyOf(cur));
+    p.onOpen(cur);
+    return true;
+  }
+  if (cur && e.key === 'c' && e.metaKey) {
+    copyLink(cur.a.url);
+    return true;
+  }
   return false;
 }
 
@@ -84,7 +94,7 @@ export function ArtifactRows({ items, now, sel, onSel, onOpen, onLook, onPut, fo
         <div key={g.day} className="art-day" data-testid={`${testId}.day.${g.day}`}>
           <div className="art-day-h">{g.title}</div>
           {g.items.map((it) => (
-            <ArtRow key={keyOf(it)} it={it} now={now} on={sel === keyOf(it)} form={form} testId={`${testId}.row.${it.a.id}`}
+            <ArtRow key={keyOf(it)} it={it} on={sel === keyOf(it)} form={form} testId={`${testId}.row.${it.a.id}`}
               onPick={() => { onSel(keyOf(it)); }} onOpen={() => { onOpen(it); }} />
           ))}
         </div>
@@ -93,8 +103,8 @@ export function ArtifactRows({ items, now, sel, onSel, onOpen, onLook, onPut, fo
   );
 }
 
-const ArtRow = memo(function ArtRow({ it, now, on, form, onPick, onOpen, testId, ref }: {
-  it: Item; now: number; on: boolean; form: 'screen' | 'panel'; onPick: () => void; onOpen: () => void; testId: string; ref?: Ref<HTMLDivElement>;
+const ArtRow = memo(function ArtRow({ it, on, form, onPick, onOpen, testId, ref }: {
+  it: Item; on: boolean; form: 'screen' | 'panel'; onPick: () => void; onOpen: () => void; testId: string; ref?: Ref<HTMLDivElement>;
 }) {
   const a = it.a;
   const title = (
@@ -112,12 +122,12 @@ const ArtRow = memo(function ArtRow({ it, now, on, form, onPick, onOpen, testId,
           {title}
           <span className="art-k">{kindWords(a)}</span>
           <span className="art-by">{madeBy(it)}</span>
-          <span className="art-w">{whenWords(a.at_ms, now)}</span>
+          <span className="art-w">{timeOf(a.at_ms)}</span>
         </>
       ) : (
         <span className="art-two">
           {title}
-          <span className="art-sub">{`${kindWords(a)} · ${madeBy(it, false)} · ${whenWords(a.at_ms, now)}`}</span>
+          <span className="art-sub">{`${kindWords(a)} · ${madeBy(it, false)} · ${timeOf(a.at_ms)}`}</span>
         </span>
       )}
     </div>
