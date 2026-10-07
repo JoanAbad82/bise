@@ -16,6 +16,7 @@ import { ThreadScreen } from '@/thread/ThreadScreen';
 import { useProjects, useStore } from '@/store';
 import { ConfirmBar, InboxScreen } from '@/inbox';
 import { SettingsScreen } from '@/settings';
+import { useSetupFirstOpens } from '@/settings/setup-first';
 import { OnboardingScreen, useFirstLaunch } from '@/setup';
 import { paletteOpen } from '@/setup/useTour';
 import { AgentsScreen } from '@/agents/AgentsScreen';
@@ -157,6 +158,8 @@ function Shell() {
   });
   // a home not onboarded opens on the onboarding once (amb-home c44c926d)
   useFirstLaunch();
+  // R8: a /model the core holds for its provider opens that provider's setup (amb-home)
+  useSetupFirstOpens();
   // his theme pref on <html data-theme> (amb-web's src/theme)
   useTheme();
   useShown();

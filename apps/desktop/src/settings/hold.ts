@@ -6,6 +6,9 @@
 // (the roles on settings · models, amb-win's /model and agent tune) calls modelOrSetup(); the
 // settings screen reads the wait (useHeld), draws the provider's setup, and sends the waiting
 // command when an account of that provider shows signed in (heldReady), then lets it go.
+// R8 (a /model typed in a thread): the core holds that line itself and says setup_first; the wait
+// here then carries no command (the core sends the line once the provider works), and leaving
+// settings with the provider not ready drops it (setup_first_cancel). See setup-first.ts.
 import { useSyncExternalStore } from 'react';
 import type { Account, Model } from '@/proto';
 import type { CoreCmd } from '@/shared/api';
@@ -18,8 +21,18 @@ export interface Held {
   providerName: string;
   /** the model's name for him */
   model: string;
-  /** what is sent once the provider is set up */
-  cmd: CoreCmd;
+  /**
+   * what is sent once the provider is set up; null: the core holds the line itself (R8, a /model
+   * typed in a thread: setup_first) and sends it on its own once the provider works
+   */
+  cmd: CoreCmd | null;
+  /** R8: the thread whose /model the core holds (where he goes back once it runs) */
+  from?: { project: string; agent: string };
+}
+
+/** R8: the core held his /model until its provider works (CoreEv setup_first): the wait it opens. */
+export function heldOfSetupFirst(ev: { project: string; agent: string; provider: string; name: string; model: string }): Held {
+  return { provider: ev.provider, providerName: ev.name, model: ev.model, cmd: null, from: { project: ev.project, agent: ev.agent } };
 }
 
 /** The row of `model` (an id, a short name or an alias; an alias follows its target). */

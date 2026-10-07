@@ -5,7 +5,8 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import type { JsonValue, Perm, ProjectRow } from '@/proto';
 import { useAccounts, useApprovals, useComputerUse, useCoreEvent, useFound, useModels, usePlugins, usePrefs, useProjects, useRoles, useSigning, useStore, type Ev } from '@/store';
 import type { KeyError } from './accounts';
-import { heldReady, holdForSetup, releaseHeld, useHeld } from './hold';
+import { holdForSetup, useHeld } from './hold';
+import { useHeldSetup } from './setup-first';
 import { useRouter } from '@/app/router';
 import { useHelper } from '@/setup/helper';
 import { Settings } from './Settings';
@@ -86,13 +87,10 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
     asked.current = true;
     store.command({ cmd: 'models', project: homeProject });
   }, [onModels, homeProject, models.length, store]);
-  // a model waiting for its provider's setup goes once an account of that provider signs in (L5)
+  // a model waiting for its provider's setup goes once an account of that provider signs in (L5);
+  // the core's held /model (R8) goes by itself, he goes back to its thread, and leaving drops it
   const held = useHeld();
-  useEffect(() => {
-    if (held === null || !heldReady(held, accounts)) return;
-    store.command(held.cmd);
-    releaseHeld();
-  }, [held, accounts, store]);
+  useHeldSetup(held, accounts);
   // approvals (V8): the home project's (the settings route names no project; the mode and the
   // checker are the machine's); a refusal of either command shows under the list
   const approvals = useApprovals(homeProject ?? '');
