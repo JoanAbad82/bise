@@ -29,6 +29,7 @@ tests/ambient_qa_test.py; the daemon only runs them.
 import glob
 import json
 import os
+import re
 import shlex
 import shutil
 import signal
@@ -381,6 +382,8 @@ def daemon(bise, root, n):
             if files is not None:
                 make_repo(ws, files, next((p.get("origin") for p in projects if p["name"] == name), None))
             E = e2e.Env()
+            E.env = world_env(E.env)      # never his keys (main m_10585)
+            fresh_fake(E)
             E.env["PATH"] = bindir + os.pathsep + E.env.get("PATH", "/usr/bin:/bin")
             envs.append(E)
             E.ws = ws
@@ -406,6 +409,8 @@ def daemon(bise, root, n):
                     raise RuntimeError("the %s hub did not start in %.0f s (exit %s): %s" % (
                         name, limit, E.hub.poll(), open(os.path.join(E.tmp, "hub.stderr"), errors="replace").read()[-2000:]))
                 time.sleep(0.1)
+            refuse_leak("the %s hub" % name, E.hub.pid)
+            refuse_leak("the %s fake provider" % name, E.fake.pid)
             E.state = os.path.dirname(sock)
             c = e2e.Client(sock)     # the world's hold: its hello keeps idle-exit away
             holds.append(c)
@@ -450,6 +455,65 @@ def daemon(bise, root, n):
             pass
 
 
+# ---------------------------------------------------------------- his keys, never
+
+# main m_10585 / lead m_10587: world.py passed os.environ (through e2e.Env's clean_env) to the
+# world's hubs, so his real provider keys reached throwaway hubs. Now every process the world starts
+# (hubs, fake providers, and what they start) gets an env built from this ALLOWLIST: the system's
+# few, the world's own paths and the fake provider; never a *KEY*/*TOKEN*/*SECRET*/*PASSWORD* name,
+# except the fake key e2e's model needs.
+ENV_KEEP = {"PATH", "LANG", "LC_ALL", "LC_CTYPE", "USER", "LOGNAME", "SHELL", "TERM", "__CF_USER_TEXT_ENCODING",
+            "HOME", "TMPDIR", "TMP", "TEMP", "TMUX_TMPDIR", "CARGO_HOME", "RUSTUP_HOME", "BISE_APP_ROOT", "SB_CORE_BIN",
+            "BISE_HOME_WORKSPACE", "SB_ONBOARDING", "BISE_APPROVALS", "SB_STATE_DIR", "FAKE_LOG", "PYTHONUNBUFFERED"}
+SECRET = re.compile(r"KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|COOKIE|SESSION_ID", re.I)
+FAKE_KEYS = {"MISTRAL_API_KEY": "fake-key"}
+
+
+def world_env(env):
+    """`env` cut to the allowlist (ENV_KEEP and the world's own BEND_* paths and URLs), no secret-named
+    variable, plus the fake key. Pure."""
+    out = {k: v for k, v in env.items() if (k in ENV_KEEP or k.startswith("BEND_")) and not SECRET.search(k)}
+    out.update(FAKE_KEYS)
+    return out
+
+
+def leaked(env):
+    """The secret-named variables of `env` that aren't the world's fake ones (names only). Pure."""
+    return sorted(k for k, v in env.items() if SECRET.search(k) and FAKE_KEYS.get(k) != v)
+
+
+def proc_env(pid):
+    """A running process's environment (ps -E), for the law below; never printed."""
+    r = subprocess.run(["/bin/ps", "-wwE", "-o", "command=", "-p", str(pid)], capture_output=True, text=True)
+    return dict(re.findall(r" ([A-Za-z_][A-Za-z0-9_]*)=(\S*)", r.stdout))
+
+
+def refuse_leak(what, pid):
+    """The law (main m_10585): a world process holding any real key stops the world, naming the
+    variables only."""
+    names = leaked(proc_env(pid))
+    if names:
+        raise RuntimeError("%s (pid %s) holds secret-named variables: %s (values never shown): the world refuses to run"
+                           % (what, pid, ", ".join(names)))
+
+
+def fresh_fake(E):
+    """e2e.Env starts its fake provider with clean_env (his whole env): replaced at once by one with
+    the world's env, on the same port."""
+    import e2e
+    port = E.env["BEND_PROVIDER_URL"].split("127.0.0.1:")[1].split("/")[0]
+    try:
+        E.fake.kill()
+        E.fake.wait(5)
+    except Exception:  # noqa: BLE001
+        pass
+    E.fake = subprocess.Popen([sys.executable, "-u", os.path.join(e2e.HERE, "fake_provider.py"), port],
+                              stdout=subprocess.PIPE, text=True, env=world_env(dict(E.env, FAKE_LOG=E.fake_log)))
+    line = E.fake.stdout.readline()
+    if not line.startswith("PORT"):
+        raise RuntimeError("the world's fake provider didn't start on port %s: %r" % (port, line))
+
+
 def revive_fake(E, project):
     """A world lives for hours and its fake providers died under one (exit seen by the daemon, no
     traceback; amb-tools' wwin3 run): a dead one is reaped, its exit logged, and a new one started on
@@ -458,7 +522,7 @@ def revive_fake(E, project):
     port = E.env["BEND_PROVIDER_URL"].split("127.0.0.1:")[1].split("/")[0]
     print("world: %s's fake provider exited (%s): restarted on port %s" % (project, E.fake.returncode, port), flush=True)
     E.fake = subprocess.Popen([sys.executable, "-u", os.path.join(e2e.HERE, "fake_provider.py"), port],
-                              stdout=subprocess.PIPE, text=True, env=e2e.clean_env(FAKE_LOG=E.fake_log))
+                              stdout=subprocess.PIPE, text=True, env=world_env(dict(E.env, FAKE_LOG=E.fake_log)))
     line = E.fake.stdout.readline()
     if not line.startswith("PORT"):
         print("world: %s's fake provider didn't come back: %r" % (project, line), flush=True)

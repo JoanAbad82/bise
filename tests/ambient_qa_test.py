@@ -660,6 +660,17 @@ def world_fixtures_seed_every_desktop_shape():
     check(other["data"]["repository"]["b0"]["nodes"] == [], "a repo it doesn't know has no PRs")
     check(len(open(os.path.join(gw, "gh.log")).read().splitlines()) == 5, "every call logged")
     shutil.rmtree(gw, ignore_errors=True)
+    # main m_10585: a world process never holds his keys: the env is an allowlist, and the law refuses a leak
+    his = {"PATH": "/usr/bin", "HOME": "/x/h", "OPENAI_API_KEY": "sk-real", "MISTRAL_API_KEY": "real-m", "ANTHROPIC_FOUNDRY_API_KEY": "a",
+           "OPENROUTER_API_KEY": "o", "GH_TOKEN": "g", "GITHUB_TOKEN": "g", "AWS_SECRET_ACCESS_KEY": "s", "AZURE_OPENAI_KEY": "z",
+           "SLACK_BOT_TOKEN": "x", "SOME_PASSWORD": "p", "BEND_PROVIDER_URL": "http://127.0.0.1:1/v1/chat/completions",
+           "BEND_MODEL": "mistral-small-latest", "SSH_AUTH_SOCK": "/tmp/agent", "EDITOR": "vim", "BISE_HOME": "/Users/x/.bise"}
+    we = world.world_env(his)
+    check(we["MISTRAL_API_KEY"] == "fake-key" and world.leaked(we) == [], "world_env: no key of his, the fake one only: %s" % sorted(we))
+    check(set(we) == {"PATH", "HOME", "MISTRAL_API_KEY", "BEND_PROVIDER_URL", "BEND_MODEL"}, "world_env: the allowlist only: %s" % sorted(we))
+    check(set(world.leaked(his)) >= {"OPENAI_API_KEY", "MISTRAL_API_KEY", "GH_TOKEN", "AWS_SECRET_ACCESS_KEY", "SOME_PASSWORD"},
+          "leaked names every real key (MISTRAL_API_KEY too when it isn't the fake one)")
+    check(world.leaked({"MISTRAL_API_KEY": "fake-key", "PATH": "/bin"}) == [], "the fake key isn't a leak")
     cards = [c for p in world.plan(3) for c in p["cards"]]
     check(any("merge" in c and "\n1. " in c for c in cards) and len(cards) >= 2, "a merge question and a question with options")
     w = os.path.join(world.GATE, "w-test")
