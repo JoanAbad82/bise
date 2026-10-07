@@ -57,8 +57,9 @@ describe('store', () => {
     const v = store.threadOrder(K);
     expect(v.loaded).toBe(true);
     expect([...v.order]).toEqual([...v.order].sort((a, b) => a - b));
-    expect(v.order).toContain(200);
-    expect(v.order).toContain(1);
+    // a later page of older history (pos 2, the hub's order) lands in its place, not at the end
+    expect(v.order.slice(0, 3)).toEqual([1, 2, 3]);
+    expect(v.order.at(-1)).not.toBe(2);
   });
 
   it('an entry replaces only that entry: other entries keep their object', () => {
