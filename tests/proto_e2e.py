@@ -163,6 +163,33 @@ def main():
         c.wait_idle("main", timeout=90)
         check(len(typed(c, "entry")) == k, "no entry after unsubscribe")
 
+        # bar A.1 / A.5 (architect m_10331): typed new, rename, model, effort
+        # reach the TUI's handlers with their fields; a refusal is an error
+        # for that command, a change shows in agents
+        def agent_row(n):
+            ags = typed(c, "agents")
+            return next((a for a in ags[-1]["agents"] if a["name"] == n), None) if ags else None
+        c.send({"cmd": "new", "project": project, "name": "t9", "brief": "-w {{bash: echo t9 ok}}"})
+        c.wait(lambda: agent_row("t9") is not None, 60, "the typed new's agent in agents")
+        check(agent_row("t9").get("worktree") is None, "no worktree read from the brief: %r" % agent_row("t9"))
+        check(c.agent("t9")["objective"].startswith("-w "), "the brief as written: %r" % c.agent("t9"))
+        c.wait_idle("t9", timeout=90)
+        n_err = len(typed(c, "error"))
+        c.send({"cmd": "rename", "project": project, "agent": "t9", "to": "Not Valid"})
+        c.wait(lambda: len(typed(c, "error")) > n_err, 20, "an invalid name: an error")
+        check(typed(c, "error")[-1]["cmd"] == "rename" and "invalid or taken name" in typed(c, "error")[-1]["text"], "rename refused: %r" % typed(c, "error")[-1])
+        c.send({"cmd": "rename", "project": project, "agent": "t9", "to": "t9b"})
+        c.wait(lambda: agent_row("t9b") is not None, 30, "renamed in agents")
+        n_err = len(typed(c, "error"))
+        c.send({"cmd": "model", "project": project, "agent": "t9b", "model": "nope/nothing"})
+        c.wait(lambda: len(typed(c, "error")) > n_err, 20, "an unknown model: an error")
+        check(typed(c, "error")[-1]["cmd"] == "model" and "unknown provider" in typed(c, "error")[-1]["text"], "model refused: %r" % typed(c, "error")[-1])
+        model = agent_row("t9b").get("model")
+        n_err = len(typed(c, "error"))
+        c.send({"cmd": "model", "project": project, "agent": "t9b", "model": model})
+        c.send({"cmd": "effort", "project": project, "agent": "nobody", "effort": "high"})
+        c.wait(lambda: len(typed(c, "error")) > n_err, 20, "an effort for no agent: an error")
+        check(typed(c, "error")[n_err]["cmd"] == "effort", "the known model is no error: %r" % typed(c, "error")[n_err:])
         # a queued send: sb-core holds it until the turn ends (amb-hub
         # 7dcb56ab), then main gets it as his words
         c.send({"cmd": "send", "project": project, "agent": "main", "text": "queued from the window", "mode": "queued"})

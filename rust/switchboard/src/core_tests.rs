@@ -4161,3 +4161,51 @@ fn a_plain_input_waits_behind_an_unclear_route() {
     let fx = t.user(MAIN, "third words");
     assert!(say_to(&fx, MAIN).or_else(|| steer_to(&fx, MAIN)).is_some_and(|s| s.contains("third words")), "{:?}", fx);
 }
+
+/// bar A.1 / A.5 (architect m_10331): a window's typed `new` reaches the
+/// same handler as the TUI's /new with its fields, never parsed again: a
+/// brief that starts with `-w ` or `x: ` stays the objective, word for
+/// word, and makes no worktree and no name of it.
+#[test]
+fn a_typed_new_takes_its_brief_as_written() {
+    let mut t = T::new();
+    let new = |name: Option<&str>, brief: &str, worktree: bool| Input::UserCmd {
+        client: 1,
+        focus: MAIN.into(),
+        cmd: UserCmd::New { name: name.map(str::to_string), brief: brief.into(), worktree, with_changes: false },
+    };
+    t.go(new(Some("flags"), "-w do the thing", false));
+    let a = &t.hub.st.agents["flags"];
+    assert_eq!(a.brief.objective, "-w do the thing", "the brief as written");
+    assert_eq!(a.ws.mode, crate::model::Mode::Shared, "no worktree read from the brief");
+    t.go(new(None, "x: fix the login", false));
+    let named_x = t.hub.st.agents.contains_key("x");
+    assert!(!named_x, "no name read from the brief");
+    assert!(t.hub.st.agents.values().any(|a| a.brief.objective == "x: fix the login"), "{:?}", t.hub.st.agents.keys());
+    // with_changes without a worktree: refused, as the TUI's /new
+    let fx = t.go(Input::UserCmd {
+        client: 1,
+        focus: MAIN.into(),
+        cmd: UserCmd::New { name: Some("wc".into()), brief: "y".into(), worktree: false, with_changes: true },
+    });
+    assert!(fx.iter().any(|e| matches!(e, Effect::ToClient { body, .. } if body["text"] == "--with-changes only works with -w")), "{fx:?}");
+    assert!(!t.hub.st.agents.contains_key("wc"));
+}
+
+/// A typed rename, model and effort: the TUI's handlers. An invalid name
+/// is sb-core's refusal (a notice to that client, an error for a typed
+/// one); model and effort go to the agent named, never main.
+#[test]
+fn a_typed_rename_model_and_effort_take_the_tuis_paths() {
+    let mut t = T::new();
+    t.user(MAIN, "/new fix: corrige le bug");
+    let cmd = |focus: &str, cmd: UserCmd| Input::UserCmd { client: 1, focus: focus.into(), cmd };
+    let fx = t.go(cmd(MAIN, UserCmd::Rename { name: "fix".into(), new_name: "Not Valid".into() }));
+    assert!(fx.iter().any(|e| matches!(e, Effect::ToClient { body, .. } if body["text"].as_str().unwrap_or("").contains("invalid or taken name"))), "{fx:?}");
+    t.go(cmd(MAIN, UserCmd::Rename { name: "fix".into(), new_name: "login".into() }));
+    assert!(t.hub.st.agents.contains_key("login") && !t.hub.st.agents.contains_key("fix"));
+    let fx = t.go(cmd("login", UserCmd::Model { model: Some("mistral/devstral".into()), default: false }));
+    assert!(fx.contains(&Effect::Choose { client: 1, agent: "login".into(), model: Some("mistral/devstral".into()), effort: None, default: false }), "{fx:?}");
+    let fx = t.go(cmd("login", UserCmd::Reasoning { effort: Some("high".into()) }));
+    assert!(fx.contains(&Effect::Choose { client: 1, agent: "login".into(), model: None, effort: Some("high".into()), default: false }), "{fx:?}");
+}

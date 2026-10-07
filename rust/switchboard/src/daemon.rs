@@ -792,9 +792,9 @@ impl Shell {
     /// config.toml for `default`), and say what it runs with now. A
     /// model with another context window: its REPL reloads at its next
     /// idle (same session), so the compaction threshold follows.
-    fn choose(&mut self, agent: &str, model: Option<String>, effort: Option<String>, default: bool) -> String {
+    fn choose(&mut self, agent: &str, model: Option<String>, effort: Option<String>, default: bool) -> Result<String, String> {
         let Some(a) = self.hub.st.agents.get(agent) else {
-            return format!("no agent {}", agent);
+            return Err(format!("no agent {}", agent));
         };
         let (dir, is_main) = (a.dir.clone(), a.is_main);
         let before = self.in_use(&dir, is_main);
@@ -809,13 +809,13 @@ impl Shell {
             } else {
                 format!("efforts: {}", words.join(", "))
             };
-            return format!(
+            return Ok(format!(
                 "{} runs {} (model from {}, {}) · /model <model>, /reasoning <effort>",
                 agent,
                 short(&before),
                 before.model_from,
                 takes
-            );
+            ));
         }
         let path = self.choice_path(&dir);
         let mut choice = bise_catalog::Choice::read(&path);
@@ -823,13 +823,13 @@ impl Shell {
             let setup = self.setup();
             let r = setup.catalog.resolve(m);
             if r.known == bise_catalog::Known::NoProvider {
-                return format!(
+                return Err(format!(
                     "unknown provider for {}: pick a listed model, or add [providers.{}] to config.toml",
                     m, r.provider
-                );
+                ));
             }
             if !r.needs.is_empty() {
-                return format!("{} is not usable yet (needs {})", r.name, r.needs);
+                return Err(format!("{} is not usable yet (needs {})", r.name, r.needs));
             }
             choice.model = r.name.clone();
             // the user's pick: no longer the spawn's ask nor its fallback
@@ -842,15 +842,15 @@ impl Shell {
             };
             let words = target.efforts();
             if words.is_empty() {
-                return format!("{} has no reasoning setting", target.name);
+                return Err(format!("{} has no reasoning setting", target.name));
             }
             if !words.iter().any(|w| w == e) {
-                return format!("{} takes: {}", target.name, words.join(", "));
+                return Err(format!("{} takes: {}", target.name, words.join(", ")));
             }
             choice.effort = e.clone();
         }
         if let Err(e) = choice.write(&path) {
-            return format!("could not save the choice of {}: {}", agent, e);
+            return Err(format!("could not save the choice of {}: {}", agent, e));
         }
         let mut said = String::new();
         if default {
@@ -872,7 +872,7 @@ impl Shell {
             self.reload_repls.insert(dir.clone());
         }
         log_line(&self.opts.paths, &format!("{}: now on {} (was {})", agent, short(&after), short(&before)));
-        format!("✓ {} now on {} from its next call{}", agent, short(&after), said)
+        Ok(format!("✓ {} now on {} from its next call{}", agent, short(&after), said))
     }
 
     fn transcript(&self, dir: &str) -> PathBuf {
@@ -1204,9 +1204,14 @@ impl Shell {
                 }
             }
             Effect::Choose { client, agent, model, effort, default } => {
-                let text = self.choose(&agent, model, effort, default);
-                if let Some(s) = self.clients.get_mut(&client) {
-                    write_json(s, &json!({"ev": "notice", "text": text}));
+                let r = self.choose(&agent, model, effort, default);
+                // a typed `model`/`effort`: an error only when refused, the
+                // change shows in `agents` (architect m_10331)
+                if !self.typed_outcome(client, &r) {
+                    let text = r.unwrap_or_else(|e| e);
+                    if let Some(s) = self.clients.get_mut(&client) {
+                        write_json(s, &json!({"ev": "notice", "text": text}));
+                    }
                 }
                 let snap = self.snapshot();
                 self.broadcast(&snap);

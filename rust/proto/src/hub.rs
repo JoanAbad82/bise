@@ -287,6 +287,37 @@ pub enum HubCmd {
     Features { project: Project },
     /// the PR list opened: `prs` comes again
     Prs { project: Project },
+    /// a new agent (`/new`, bar A.1): `brief` its objective as he wrote
+    /// it (never read for flags), `name` its name (none: one is picked),
+    /// `worktree` its own worktree (`-w`), `with_changes` it takes his
+    /// uncommitted changes there (worktree only). The hub's own /new: a
+    /// refusal is an `error`, the agent shows in the next `agents`
+    New {
+        project: Project,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        brief: String,
+        #[serde(default, skip_serializing_if = "crate::is_false")]
+        worktree: bool,
+        #[serde(default, skip_serializing_if = "crate::is_false")]
+        with_changes: bool,
+    },
+    /// `/rename` (bar A.5): `agent` is called `to` from now on (the old
+    /// name still works); an invalid or taken name is an `error`
+    Rename { project: Project, agent: String, to: String },
+    /// `/model` of one agent (bar A.5): its model from its next call;
+    /// `default` also makes it config.toml's for its role. An unknown or
+    /// unusable model is an `error`; the change shows in `agents`
+    Model {
+        project: Project,
+        agent: String,
+        model: String,
+        #[serde(default, skip_serializing_if = "crate::is_false")]
+        default: bool,
+    },
+    /// `/reasoning` of one agent (bar A.5): its reasoning effort; one its
+    /// model doesn't take is an `error`; the change shows in `agents`
+    Effort { project: Project, agent: String, effort: String },
     /// a held route goes to project `to` instead (a hub id of the
     /// registry, else an error; "bise": his words stay with bise's main,
     /// a cancel); a route that ended already: an error
@@ -303,7 +334,7 @@ pub enum HubCmd {
 }
 
 impl HubCmd {
-    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "route_correct", "route_cancel", "follow"];
+    pub const TAGS: &'static [&'static str] = &["hello", "subscribe", "unsubscribe", "page", "send", "answer", "stop", "archive", "unarchive", "artifacts_seen", "diff", "worktrees", "dev_servers", "merged", "features", "prs", "new", "rename", "model", "effort", "route_correct", "route_cancel", "follow"];
 
     pub fn decode(line: &str) -> Result<HubCmd, String> {
         Self::from_value(parse(line)?)

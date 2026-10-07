@@ -69,7 +69,12 @@ model?: string | null,
  * model without vision, none when the catalog doesn't know it (the
  * window never refuses on a guess)
  */
-vision?: boolean | null, };
+vision?: boolean | null, 
+/**
+ * draft (bar A.5): its reasoning effort (`low`, `high`...), none when
+ * its model has no reasoning setting or the hub didn't say
+ */
+effort?: string | null, };
 
 /**
  * A numbered option of a card.

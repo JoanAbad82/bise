@@ -90,6 +90,7 @@ pub fn agents(snap: &Value, since: &mut Since, now: u64, user_kind: fn(&str) -> 
             // refuses an image when false)
             vision: Some(s(&a, "model")).filter(|m| !m.is_empty()).and_then(|m| vision(&m)),
             model: Some(s(&a, "model")).filter(|m| !m.is_empty()),
+            effort: Some(s(&a, "effort")).filter(|e| !e.is_empty()),
             name,
         });
     }

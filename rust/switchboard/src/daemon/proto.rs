@@ -15,6 +15,7 @@ use crate::proto_view::{self, Live, Since};
 use bise_proto::hub::{HubCmd, HubEv, JobState, Mode};
 use bise_proto::thread::{self as pthread, Ctx, Line, PageRef};
 use bise_proto::PROTO;
+use crate::router::UserCmd;
 
 /// Entries in a `thread` page when the client gives no limit, and at most.
 const LIMIT: usize = 40;
@@ -151,6 +152,20 @@ impl Shell {
         true
     }
 
+    /// A handler's typed result for `client` when it is the typed
+    /// command being stepped: its `error` when refused, nothing when done
+    /// (the change shows in the events). False: not a typed command.
+    pub(super) fn typed_outcome(&mut self, client: ClientId, r: &Result<String, String>) -> bool {
+        let Some((id, cmd)) = self.proto.stepping.clone() else { return false };
+        if id != client {
+            return false;
+        }
+        if let Err(e) = r {
+            self.proto_error(client, &cmd, e);
+        }
+        true
+    }
+
     /// The typed connections still open.
     pub(super) fn typed_ids(&self) -> Vec<ClientId> {
         self.proto.conns.keys().copied().filter(|id| self.clients.contains_key(id)).collect()
@@ -228,6 +243,10 @@ impl Shell {
             | HubCmd::Merged { project }
             | HubCmd::Features { project }
             | HubCmd::Prs { project }
+            | HubCmd::New { project, .. }
+            | HubCmd::Rename { project, .. }
+            | HubCmd::Model { project, .. }
+            | HubCmd::Effort { project, .. }
             | HubCmd::RouteCorrect { project, .. }
             | HubCmd::RouteCancel { project, .. }
             | HubCmd::Follow { project, .. }
@@ -336,6 +355,35 @@ impl Shell {
             HubCmd::Prs { .. } => {
                 let prs = self.prs_ev();
                 self.proto_send(id, &prs);
+            }
+            // bar A.1 and A.5: the TUI's /new, /rename, /model, /reasoning,
+            // their fields straight to the same handlers (Input::UserCmd,
+            // architect m_10331): a refusal comes back as this error, the
+            // change itself in `agents`
+            HubCmd::New { name, brief, worktree, with_changes, .. } => {
+                let cmd = UserCmd::New { name, brief, worktree, with_changes };
+                self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd });
+            }
+            HubCmd::Rename { agent, to, .. } => {
+                if !known(self, &agent) {
+                    return self.proto_error(id, &tag, &format!("no agent {agent}"));
+                }
+                let cmd = UserCmd::Rename { name: agent, new_name: to };
+                self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd });
+            }
+            HubCmd::Model { agent, model, default, .. } => {
+                if !known(self, &agent) {
+                    return self.proto_error(id, &tag, &format!("no agent {agent}"));
+                }
+                let cmd = UserCmd::Model { model: Some(model), default };
+                self.step_typed(id, &tag, Input::UserCmd { client: id, focus: agent, cmd });
+            }
+            HubCmd::Effort { agent, effort, .. } => {
+                if !known(self, &agent) {
+                    return self.proto_error(id, &tag, &format!("no agent {agent}"));
+                }
+                let cmd = UserCmd::Reasoning { effort: Some(effort.to_ascii_lowercase()) };
+                self.step_typed(id, &tag, Input::UserCmd { client: id, focus: agent, cmd });
             }
             // the 2 s hold (sb-core's routing hold): a route that ended
             // already gets sb-core's notice, as an error (step_typed); an

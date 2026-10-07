@@ -158,6 +158,7 @@ mod tests {
             aliases: vec![],
             model: None,
             vision: None,
+            effort: None,
         }
     }
 

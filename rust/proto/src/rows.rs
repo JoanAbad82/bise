@@ -104,6 +104,10 @@ pub struct Agent {
     /// window never refuses on a guess)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vision: Option<bool>,
+    /// draft (bar A.5): its reasoning effort (`low`, `high`...), none when
+    /// its model has no reasoning setting or the hub didn't say
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
 }
 
 /// A numbered option of a card.
