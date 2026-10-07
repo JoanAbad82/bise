@@ -7,6 +7,7 @@ import { newAgent } from '@/agents/actions';
 import { InboxCard } from '@/inbox';
 import type { Card, HelperEv } from '@/proto';
 import { threadKey, useHeard, useLevel, useProjects, useStore } from '@/store';
+import { followPartial, type LivePartial } from '@/shared/partial';
 import type { SpotFront, SpotItem, SpotRoute } from '@/spotlight';
 import { useTheme } from '@/theme';
 import '@/ds/index.css';
@@ -97,6 +98,10 @@ export function CapsuleRoot(): JSX.Element {
   // his question)
   const [last, setLast] = useState<{ text: string; done: boolean } | null>(null);
   const asked = useRef<{ after: number; started: boolean } | null>(null);
+  // main's reply while it is written (the hub's partial, 250 ms at most; shared/partial.ts,
+  // followed in the effect below): it shows from its first words, and the entry that lands after
+  // it takes its place (same text: no change; LiveText fades only what is new)
+  const liveRef = useRef<LivePartial | null>(null);
   useEffect(() => {
     if (home === null) return;
     const key = threadKey(home, 'main');
@@ -111,7 +116,8 @@ export function CapsuleRoot(): JSX.Element {
         .map((pos) => store.entry(key, pos))
         .filter((e) => e?.kind === 'agent')
         .at(-1);
-      const next = typing !== '' ? { text: typing, done: false } : reply !== undefined ? { text: reply.text, done: true } : null;
+      const partial = liveRef.current;
+      const next = partial !== null ? { text: partial.text, done: false } : typing !== '' ? { text: typing, done: false } : reply !== undefined ? { text: reply.text, done: true } : null;
       if (next === null) return;
       if (!a.started) {
         a.started = true;
@@ -120,13 +126,27 @@ export function CapsuleRoot(): JSX.Element {
       setLast(next);
     };
     const offs = [store.subscribe(`typing:${key}`, read), store.subscribe(`order:${key}`, read)];
+    const port = bise?.core;
+    if (port !== undefined) {
+      offs.push(
+        followPartial(port, home, 'main', (live) => {
+          liveRef.current = live;
+          if (live !== null) {
+            read();
+            return;
+          }
+          // cleared (its entry landed, a stop, an error): no more '∿'; an entry, if one comes, replaces it
+          if (asked.current?.started === true) setLast((l) => (l !== null && !l.done ? { ...l, done: true } : l));
+        }),
+      );
+    }
     return () => {
       offs.forEach((off) => {
         off();
       });
       store.unsubscribeThread(home, 'main');
     };
-  }, [store, home]);
+  }, [store, home, bise]);
 
   // the routing hold on his send (bar ⛔3, lead m_9855): shown from the hub's route event at once,
   // gone on its route_done; esc (or fn esc) keeps it with bise, another project corrects it

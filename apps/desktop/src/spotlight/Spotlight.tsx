@@ -9,6 +9,7 @@ import { Spot, SpotGroup, SpotRow, type DotState } from '@/ds';
 import { LivePearl, type Mood } from '@/pearl';
 import { flat, routeList, spotList, type AgentStatus, type SpotData, type SpotItem } from './list';
 import { W, newBrief } from './words';
+import { LiveText } from './LiveText';
 import { caretAtEnd, keep } from '@/app/keep';
 import './spotlight.css';
 
@@ -236,8 +237,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
         {route !== null && <RouteLine route={route} onKeep={p.onRouteKeep} testId={`${testId}.route`} />}
         {ans !== null && (
           <div className="b-spot-answer" data-testid={`${testId}.answer`} aria-live="polite">
-            {ans.shown}
-            {p.answer?.done === false && <span className="cur" />}
+            <LiveText text={ans.shown} live={p.answer?.done === false} testId={`${testId}.answer.text`} />
           </div>
         )}
         {/* one flat keyed list, the group heads as items: a row that stays listed keeps its element

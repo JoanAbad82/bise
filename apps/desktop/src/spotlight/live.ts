@@ -60,7 +60,7 @@ export function inlineRuns(line: string): Run[] {
       }
       continue;
     }
-    buf += line[i];
+    buf += line.charAt(i);
   }
   if (style === 'text') push('text', buf);
   else {

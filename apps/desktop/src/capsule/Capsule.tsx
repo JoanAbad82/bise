@@ -3,10 +3,10 @@
 // place for every view, so a change of view never re-mounts it (bug 2); the spotlight gets a hole
 // where its own pearl would be. The content's size goes to the window (onSize): an answer that
 // doesn't fit grows the panel, and past ANSWER_MAX_LINES it offers the rest in the window (bug 6).
-import { useEffect, useRef, type JSX, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, type JSX, type ReactNode } from 'react';
 import { Menu, MenuItem, MenuSep } from '@/ds';
 import { LivePearl, type Mood } from '@/pearl';
-import { RouteLine, Spotlight, answerLines, type SpotAnswer, type SpotData, type SpotItem, type SpotRoute } from '@/spotlight';
+import { LiveText, RouteLine, Spotlight, answerLines, type SpotAnswer, type SpotData, type SpotItem, type SpotRoute } from '@/spotlight';
 import type { View } from './machine';
 import './capsule.css';
 
@@ -102,11 +102,28 @@ export function Capsule(p: CapsuleProps): JSX.Element {
 
 function Answer({ answer, onOpen }: { answer: SpotAnswer | null; onOpen: () => void }): JSX.Element {
   const a = answer === null ? null : answerLines(answer.text);
+  // it grows line by line up to its 320 px, then scrolls: the newest line stays in view while he
+  // is at the bottom; scrolled up, it never moves (ambient's text-appearing, m_12403)
+  const box = useRef<HTMLDivElement>(null);
+  const atEnd = useRef(true);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (el !== null && atEnd.current) el.scrollTop = el.scrollHeight;
+  }, [a?.shown]);
   return (
-    <div className="b-cap-answer" data-testid="capsule.answer" aria-live="polite" data-glass>
+    <div
+      ref={box}
+      className="b-cap-answer"
+      data-testid="capsule.answer"
+      aria-live="polite"
+      data-glass
+      onScroll={(e) => {
+        const el = e.currentTarget;
+        atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 4;
+      }}
+    >
       <div className="t">
-        {a?.shown ?? ''}
-        {answer?.done === false && <span className="cur" />}
+        <LiveText text={a?.shown ?? ''} live={answer?.done === false} testId="capsule.answer.text" />
       </div>
       {a?.cut === true && (
         <button type="button" className="more" onClick={onOpen} data-testid="capsule.answer.more">

@@ -2,7 +2,26 @@
    read). Tokens only. The panel grows with the content (Spotlight's onHeight). */
 .b-spotlight { width: 100%; }
 .b-spot-answer { padding: 4px 20px 12px 70px; font: var(--t-15)/1.5 var(--font-read); color: var(--c-text); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
-.b-spot-answer .cur { display: inline-block; width: 2px; height: 1.1em; margin-left: 2px; background: var(--c-text); vertical-align: -.2em; animation: b-blink 1s steps(1) infinite; }
 .b-live-pearl { flex: none; }
 .b-spot-route { display: flex; align-items: baseline; gap: 14px; padding: 4px 20px 10px 70px; font: var(--t-15)/1.4 var(--font-read); color: var(--c-text); }
 .b-spot-route .keep { margin-left: auto; padding: 0; border: 0; background: none; font: var(--t-12) var(--font-mono); color: var(--c-text-3); cursor: default; }
+/* bise's answer while it streams and once done (LiveText, ambient's text-appearing spec): only
+   the new words fade in, 180 ms ease-out, staggered (--d); no caret, the '∿' rides after the last
+   word; a text that is not a continuation crossfades once, 120 ms. Shared by the capsule. */
+.b-live .fade { animation: b-live-in 180ms var(--ease-out) var(--d, 0ms) both; }
+.b-live.swap0 { animation: b-live-swap0 120ms var(--ease-out); }
+.b-live.swap1 { animation: b-live-swap1 120ms var(--ease-out); }
+.b-live strong { font-weight: 600; }
+.b-live code, .b-live .box, .b-live .table { font-family: var(--font-mono); font-size: .88em; }
+.b-live code { padding: 0 .25em; border-radius: 4px; background: var(--c-sunken); }
+.b-live .box, .b-live .table { display: block; margin: 6px 0; white-space: pre; overflow-x: auto; }
+.b-live .box { padding: 8px 10px; border-radius: 8px; background: var(--c-sunken); animation: b-live-in 180ms var(--ease-out) both; }
+.b-live .sign { color: var(--c-text-2); animation: b-live-pulse 1.4s var(--ease-out) infinite; }
+.b-live .sign.still { animation: none; }
+@keyframes b-live-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes b-live-swap0 { from { opacity: .55; } to { opacity: 1; } }
+@keyframes b-live-swap1 { from { opacity: .55; } to { opacity: 1; } }
+@keyframes b-live-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) {
+  .b-live .fade, .b-live .box, .b-live.swap0, .b-live.swap1, .b-live .sign { animation: none; }
+}
