@@ -13,7 +13,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { app, ipcMain, Menu } from 'electron';
+import { app, ipcMain, Menu, nativeTheme } from 'electron';
 import { BADGE_LINE, CORE_IPC, IPC, TEST_ENV, TEST_USER_DATA_ENV } from '../shared/api';
 import { Capsule, installCapsuleIpc } from './capsule';
 import { badgeOf, CountKeeper, titleOf } from './counts';
@@ -27,6 +27,7 @@ import { menuTemplate } from './menu';
 import { startTerms, type TermHost } from './term/host';
 import { startTray } from './tray';
 import { testHomeProblem } from './testhome';
+import { themeSourceOf } from './theme';
 import { MainWindow } from './windows';
 
 const testMode = process.env[TEST_ENV] === '1';
@@ -84,6 +85,11 @@ void app.whenReady().then(() => {
       if (ev['ev'] === 'prefs') helper.config(configOfPrefs(ev['prefs']));
     });
   }
+  // his theme for the glass, the frames and the menus (theme.ts): the system's until his prefs come
+  nativeTheme.themeSource = 'system';
+  onCoreEvent((ev) => {
+    if (ev['ev'] === 'prefs') nativeTheme.themeSource = themeSourceOf(ev['prefs']);
+  });
   // the shells' IPC now; their first spawn waits for his login env
   terms = startTerms(testMode, loginEnv);
   // the core waits for his login env (a slow ~/.zshrc), the window doesn't
