@@ -114,7 +114,9 @@ def stamp_skips_build():
     build = os.path.join(w, "build")
     paths = {"target": os.path.join(build, "target"), "bise": os.path.join(build, "target", "debug", "bise"),
              "helper": os.path.join(build, "desktop-try", "bise-mac-helper"), "sign": os.path.join(build, "ambient", "sign"),
-             "app": os.path.join(w, "dist", "bise try.app")}
+             "app": os.path.join(w, "dist", "bise try.app"),
+             "staged_dir": os.path.join(build, "desktop-try", "staged"),
+             "staged": os.path.join(build, "desktop-try", "staged", "mac-arm64", "bise try.app")}
     calls, said = [], []
     real_run, real_say, old_sign = T.subprocess.run, T.say, os.environ.pop("BISE_TRY_SIGN_DIR", None)
 
@@ -155,6 +157,86 @@ def stamp_skips_build():
               "up_to_date: same stamp only")
     finally:
         T.subprocess.run, T.say = real_run, real_say
+        if old_sign is not None:
+            os.environ["BISE_TRY_SIGN_DIR"] = old_sign
+        shutil.rmtree(w, ignore_errors=True)
+
+
+def staged_never_over_a_running_try():
+    """The law of a running try (ambient-lead m_11607), with faked processes and bundles, never a
+    real build: while anything runs from the live 'bise try.app' the build is packed into the
+    staging dir (BISE_PACK_OUT, a fresh dir) and the live bundle isn't touched; the stamp says
+    'staged'; a swap is refused while it runs ('your try is open: quit it to get the new build');
+    once nothing runs: live -> .old, staged -> live, stamp 'live', the next build call is up to
+    date; .old goes once the new core answers; a stamp saying 'staged' with no staged bundle swaps
+    nothing."""
+    w = tempfile.mkdtemp(prefix="dtry-staged-")
+    build = os.path.join(w, "build")
+    staged_dir = os.path.join(build, "desktop-try", "staged")
+    paths = {"target": os.path.join(build, "target"), "bise": os.path.join(build, "target", "debug", "bise"),
+             "helper": os.path.join(build, "desktop-try", "bise-mac-helper"), "sign": os.path.join(build, "ambient", "sign"),
+             "app": os.path.join(w, "dist", "mac-arm64", "bise try.app"),
+             "staged_dir": staged_dir, "staged": os.path.join(staged_dir, "mac-arm64", "bise try.app")}
+    scripts, said, running = [], [], []
+    real_run, real_say, real_pids, real_core = T.subprocess.run, T.say, T.bundle_pids, T.core_up
+    old_sign = os.environ.pop("BISE_TRY_SIGN_DIR", None)
+
+    def mark(app):
+        p = os.path.join(app, "Contents", "build.txt")
+        return open(p).read() if os.path.exists(p) else None
+
+    def pack(app, n):
+        for p in (paths["bise"], paths["helper"], T.packed_bise(app)):
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            open(p, "w").close()
+        with open(os.path.join(app, "Contents", "build.txt"), "w") as f:
+            f.write("build %d" % n)
+
+    def fake_run(cmd, *a, **k):
+        if cmd and cmd[0] == "/usr/bin/lockf":
+            script = cmd[-1]
+            scripts.append(script)
+            pack(paths["staged"] if "BISE_PACK_OUT=" in script else paths["app"], len(scripts))
+            return subprocess.CompletedProcess(cmd, 0)
+        return real_run(cmd, *a, **k)
+    T.subprocess.run, T.say = fake_run, (lambda *a: said.append(" ".join(str(x) for x in a)))
+    T.bundle_pids = lambda app: list(running) if app == paths["app"] else []
+    try:
+        env = dict(os.environ)
+        check(T.build(env, paths) is True and mark(paths["app"]) == "build 1" and T.read_stamp(paths)["where"] == "live",
+              "nothing runs: the build is packed live")
+        # his try opens from the live bundle; the source changes (a new HEAD in the stamp)
+        running.append(77328)
+        T.write_stamp(paths, dict(T.read_stamp(paths), head="0" * 40))
+        del said[:]
+        check(T.build(env, paths) is True and len(scripts) == 2, "a change while it runs builds")
+        check("BISE_PACK_OUT=%s" % staged_dir in scripts[1] and "rm -rf %s" % staged_dir in scripts[1],
+              "into a fresh staging dir: %s" % scripts[1][-400:])
+        check(mark(paths["app"]) == "build 1" and mark(paths["staged"]) == "build 2", "the running bundle is never written over")
+        check(T.read_stamp(paths)["where"] == "staged", "the stamp says staged")
+        check(any("quit it to get the new build" in s for s in said), "it says so: %s" % said)
+        check(T.build(env, paths) is False and len(scripts) == 2, "staged and up to date: no second build")
+        del said[:]
+        check(T.swap_staged(paths) is None and mark(paths["app"]) == "build 1",
+              "no swap while it runs: the live bundle stays")
+        check(said == ["your try is open: quit it to get the new build"], "it says: %s" % said)
+        # he quits: the next --try swaps it in, with no build step
+        running.clear()
+        old = T.swap_staged(paths)
+        check(old == paths["app"] + ".old" and mark(paths["app"]) == "build 2" and mark(old) == "build 1"
+              and not os.path.exists(paths["staged"]), "swapped: live is the staged build, the old one at .old")
+        check(T.read_stamp(paths)["where"] == "live", "the stamp says live")
+        check(T.build(env, paths) is False and len(scripts) == 2, "the swapped build is up to date: no build call")
+        T.core_up = lambda app: app == paths["app"]
+        check(T.finish_swap(old, paths["app"], timeout=5) and not os.path.exists(old), ".old removed once the core answers")
+        # a stamp that says staged with no staged bundle: nothing to swap
+        T.write_stamp(paths, dict(T.read_stamp(paths), where="staged"))
+        check(T.swap_staged(paths) is None and mark(paths["app"]) == "build 2", "no staged bundle: no swap")
+        # the recipe in the stamp doesn't depend on where it's packed
+        check(T.build_script(paths, None, out=staged_dir).replace(" BISE_PACK_OUT=%s" % staged_dir, "")
+              .replace("rm -rf %s\n" % staged_dir, "") == T.build_script(paths, None), "out only adds the staging lines")
+    finally:
+        T.subprocess.run, T.say, T.bundle_pids, T.core_up = real_run, real_say, real_pids, real_core
         if old_sign is not None:
             os.environ["BISE_TRY_SIGN_DIR"] = old_sign
         shutil.rmtree(w, ignore_errors=True)
@@ -287,6 +369,7 @@ def integration():
 if __name__ == "__main__":
     pure()
     stamp_skips_build()
+    staged_never_over_a_running_try()
     if "--pure" not in sys.argv:
         hook_keeps_pid()
         integration()

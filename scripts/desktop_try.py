@@ -232,17 +232,21 @@ def try_paths(env):
     try target), the native helper (one stable path: the EDR deletes fresh unsigned binaries) and
     the new app, packaged by `pnpm dist` in apps/desktop/dist."""
     build = build_dir(env)
+    arch = "mac-arm64" if os.uname().machine == "arm64" else "mac"
+    staged = os.path.join(build, "desktop-try", "staged")
     return {"target": os.path.join(build, "target"), "bise": os.path.join(build, "target", "debug", "bise"),
             "helper": os.path.join(build, "desktop-try", "bise-mac-helper"),
             "sign": os.path.join(build, "ambient", "sign"),
-            "app": os.path.join(DESKTOP, "dist", "mac-arm64" if os.uname().machine == "arm64" else "mac", APP_NAME + ".app")}
+            "app": os.path.join(DESKTOP, "dist", arch, APP_NAME + ".app"),
+            # while his try runs from "app", a build is packed here instead (never over a running bundle)
+            "staged_dir": staged, "staged": os.path.join(staged, arch, APP_NAME + ".app")}
 
 
-def build_script(paths, sign_dir=None):
+def build_script(paths, sign_dir=None, out=None):
     """The one build, run under the heavy lock: bise and its helpers for the try home (repl-live,
     repl-scripted, sb-core next to this checkout), the native helper, then the new app (apps/desktop:
     pnpm install --frozen-lockfile, build, dist = electron-builder --mac --dir, the try's bise packed
-    inside it). Pure."""
+    inside it), into apps/desktop/dist, or into `out` (BISE_PACK_OUT: the staging dir). Pure."""
     q = shlex.quote
     lines = ["set -euo pipefail",
              "export CARGO_TARGET_DIR=%s CARGO_INCREMENTAL=0" % q(paths["target"]),
@@ -255,8 +259,12 @@ def build_script(paths, sign_dir=None):
              "cd %s" % q(DESKTOP),
              "pnpm install --frozen-lockfile",
              "pnpm build",
-             "BISE_PACK_NAME=%s BISE_PACK_APP_ID=%s BISE_PACK_BISE=%s BISE_PACK_HELPER=%s%s pnpm dist"
-             % (q(APP_NAME), q(APP_ID), q(paths["bise"]), q(paths["helper"]), " BISE_PACK_SIGN_DIR=%s" % q(sign_dir) if sign_dir else "")]
+             "BISE_PACK_NAME=%s BISE_PACK_APP_ID=%s BISE_PACK_BISE=%s BISE_PACK_HELPER=%s%s%s pnpm dist"
+             % (q(APP_NAME), q(APP_ID), q(paths["bise"]), q(paths["helper"]), " BISE_PACK_SIGN_DIR=%s" % q(sign_dir) if sign_dir else "",
+                " BISE_PACK_OUT=%s" % q(out) if out else "")]
+    if out:
+        # a fresh staging dir: a half-written bundle from a failed build never gets swapped in
+        lines.insert(lines.index("cd %s" % q(DESKTOP)), "rm -rf %s" % q(out))
     return "\n".join(lines) + "\n"
 
 
@@ -283,42 +291,138 @@ def packed_bise(app):
     return os.path.join(app, "Contents", "Resources", "bin", "bise")
 
 
+def outputs_there(paths, app):
+    """Every output of a try build packed at `app`: the bundle with its bise inside, the try bise,
+    the native helper."""
+    return all(os.path.exists(p) for p in (app, packed_bise(app), paths["bise"], paths["helper"]))
+
+
+def same_source(stamp, saved):
+    """The saved stamp was made from this source and recipe (wherever it was packed)."""
+    return bool(saved) and {k: v for k, v in saved.items() if k != "where"} == stamp
+
+
 def up_to_date(stamp, saved, paths):
-    """The build can be skipped: the saved stamp is this one and every output is there (the packed
-    'bise try.app' with its bise inside, the try bise, the native helper). Pure but for the files."""
-    outs = (paths["app"], packed_bise(paths["app"]), paths["bise"], paths["helper"])
-    return bool(saved) and saved == stamp and all(os.path.exists(p) for p in outs)
+    """The build can be skipped: the saved stamp is this one, packed live, and every output is
+    there (the packed 'bise try.app' with its bise inside, the try bise, the native helper)."""
+    return same_source(stamp, saved) and saved.get("where", "live") == "live" and outputs_there(paths, paths["app"])
+
+
+def read_stamp(paths):
+    try:
+        return json.load(open(stamp_path(paths)))
+    except (OSError, ValueError):
+        return None
+
+
+def write_stamp(paths, stamp):
+    os.makedirs(os.path.dirname(stamp_path(paths)), exist_ok=True)
+    with open(stamp_path(paths) + ".tmp", "w") as f:
+        json.dump(stamp, f)
+    os.replace(stamp_path(paths) + ".tmp", stamp_path(paths))
+
+
+def bundle_pids(app):
+    """Every process running from that bundle (the app, its Electron helpers, its packed bise and
+    the hubs it started), by the bundle's path, any try home: read only, never killed here."""
+    out = subprocess.run(["ps", "-axww", "-o", "pid=,command="], capture_output=True, text=True).stdout
+    pre = app.rstrip("/") + "/Contents/"
+    pids = []
+    for l in out.splitlines():
+        pid, _, cmd = l.strip().partition(" ")
+        if pid.isdigit() and cmd.startswith(pre) and int(pid) != os.getpid():
+            pids.append(int(pid))
+    return pids
 
 
 def build(env, paths):
     """The try build under the heavy lock (/usr/bin/lockf -k ~/.bise/run/heavy.lock nice -n 10),
     only when the stamp says something changed: an up-to-date build opens at once, without queueing
-    behind other heavy jobs. Returns True when it built."""
+    behind other heavy jobs. While a 'bise try' runs from the live bundle (ambient-lead m_11607),
+    the build is packed into the staging dir instead and the stamp says where: 'staged';
+    swap_staged puts it live once nothing runs from it. Returns True when it built."""
     # the stable 'bise ambient dev' identity (amb-mac m_11023): the try's grants survive rebuilds; else ad hoc
     sign = os.environ.get("BISE_TRY_SIGN_DIR") or (paths["sign"] if os.path.isdir(paths["sign"]) else None)
     stamp = build_stamp(env, paths, sign)
-    try:
-        saved = json.load(open(stamp_path(paths)))
-    except (OSError, ValueError):
-        saved = None
+    saved = read_stamp(paths)
     short = stamp["head"][:8] + (" + uncommitted changes" if stamp["changes"] else "")
     if up_to_date(stamp, saved, paths):
         say("up to date (%s), opening" % short)
         return False
+    if same_source(stamp, saved) and saved.get("where") == "staged" and outputs_there(paths, paths["staged"]):
+        say("up to date (%s), staged: your try is open: quit it to get the new build" % short)
+        return False
+    busy = bundle_pids(paths["app"])
     lock = os.path.expanduser("~/.bise/run/heavy.lock")
     os.makedirs(os.path.dirname(lock), exist_ok=True)
-    say("building %s for the try (waits for other heavy jobs first)…" % short)
-    r = subprocess.run(["/usr/bin/lockf", "-k", lock, "nice", "-n", "10", "/bin/bash", "-c", build_script(paths, sign)], env=env)
+    if busy:
+        say("your try is open (pid %d): building %s into staging, never over it (waits for other heavy jobs first)…" % (busy[0], short))
+    else:
+        say("building %s for the try (waits for other heavy jobs first)…" % short)
+    script = build_script(paths, sign, out=paths["staged_dir"] if busy else None)
+    r = subprocess.run(["/usr/bin/lockf", "-k", lock, "nice", "-n", "10", "/bin/bash", "-c", script], env=env)
     if r.returncode != 0:
         raise TryError("the build failed (exit %d)" % r.returncode)
-    for k in ("bise", "app"):
-        if not os.path.exists(paths[k]):
-            raise TryError("no %s at %s after the build" % (k, paths[k]))
-    os.makedirs(os.path.dirname(stamp_path(paths)), exist_ok=True)
-    with open(stamp_path(paths) + ".tmp", "w") as f:
-        json.dump(stamp, f)
-    os.replace(stamp_path(paths) + ".tmp", stamp_path(paths))
+    app = paths["staged"] if busy else paths["app"]
+    for k, p in (("bise", paths["bise"]), ("app", app)):
+        if not os.path.exists(p):
+            raise TryError("no %s at %s after the build" % (k, p))
+    write_stamp(paths, dict(stamp, where="staged" if busy else "live"))
+    if busy:
+        say("staged: your try is open: quit it to get the new build (the next bise-ambient --try swaps it in)")
+    elif os.path.isdir(paths["staged_dir"]):
+        shutil.rmtree(paths["staged_dir"], ignore_errors=True)   # older than what is live now
     return True
+
+
+def swap_staged(paths):
+    """A staged build goes live when nothing runs from the live bundle: live -> <app>.old, staged ->
+    live (renames), the stamp then says 'live'. Returns the .old path to remove once the new app's
+    core answers (finish_swap), or None when there is nothing to swap or the try is open (then
+    untouched: 'your try is open: quit it to get the new build')."""
+    saved = read_stamp(paths)
+    if not saved or saved.get("where") != "staged" or not outputs_there(paths, paths["staged"]):
+        return None
+    if bundle_pids(paths["app"]):
+        say("your try is open: quit it to get the new build")
+        return None
+    app, old = paths["app"], paths["app"] + ".old"
+    if os.path.exists(old):
+        shutil.rmtree(old)
+    os.makedirs(os.path.dirname(app), exist_ok=True)
+    if os.path.exists(app):
+        os.rename(app, old)
+    try:
+        os.rename(paths["staged"], app)
+    except OSError:
+        # another volume: copy next to it, then one rename
+        shutil.rmtree(app + ".new", ignore_errors=True)
+        shutil.copytree(paths["staged"], app + ".new", symlinks=True)
+        os.rename(app + ".new", app)
+        shutil.rmtree(paths["staged_dir"], ignore_errors=True)
+    write_stamp(paths, dict(saved, where="live"))
+    say("swapped in the staged build (%s)" % saved.get("head", "")[:8])
+    return old if os.path.exists(old) else None
+
+
+def core_up(app):
+    """The new app's core runs: its packed bise has a process (the app starts it at launch)."""
+    return any(True for _ in [p for p in bundle_pids(app)
+                              if subprocess.run(["ps", "-o", "command=", "-p", str(p)], capture_output=True, text=True)
+                              .stdout.startswith(packed_bise(app))])
+
+
+def finish_swap(old, app, timeout=60):
+    """Removes the previous bundle (<app>.old) once the swapped-in app's core answers; kept (for a
+    rollback by hand) if it doesn't within the timeout."""
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        if core_up(app):
+            shutil.rmtree(old, ignore_errors=True)
+            return True
+        time.sleep(0.5)
+    say("the new try's core didn't start within %d s: the previous build stays at %s" % (timeout, old))
+    return False
 
 
 def setup(real, tryh, repos, env, bise):
@@ -533,7 +637,11 @@ def main(argv):
     # one try app at a time: an open one is reopened only with --replace; his own app is never touched
     running = app_running(paths["app"], tryh)
     if running and "--replace" not in flags and "--no-open" not in flags:
-        raise TryError("the try is already open (pid %d): bise-ambient --try --replace reopens it, --stop closes it" % running)
+        raise TryError("your try is open (pid %d): quit it to get the new build. bise-ambient --try --replace reopens it, "
+                       "--stop closes it" % running)
+    # a build staged while the try was open goes live now if nothing runs from the live bundle
+    # (never over a running one: swap_staged checks every process of the bundle, not just the pid file)
+    swap_staged(paths)
     if "--no-build" not in flags:
         build(his_env(os.environ), paths)
     bise = paths["bise"]
@@ -556,9 +664,12 @@ def main(argv):
         return 0
     if running:
         quit_app(paths["app"], tryh)
+        swap_staged(paths)      # --replace: the build staged while it ran
     if not os.environ.get("BISE_TRY_OPEN") and not os.path.isdir(paths["app"]):
         raise TryError("no app at %s: build first (without --no-build)" % paths["app"])
     pid = open_app(paths["app"], tryh, env)
+    if os.path.exists(paths["app"] + ".old"):
+        finish_swap(paths["app"] + ".old", paths["app"])     # the previous bundle, once the new core answers
     say("bise desktop is open on the try home %s (%d projects%s). stop it: bise-ambient --try --stop"
         % (tryh, len(done), ", pid %d" % pid if pid else ""))
     return 0

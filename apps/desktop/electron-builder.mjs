@@ -73,7 +73,8 @@ export default {
     }
   },
   productName,
-  directories: { output: 'dist' },
+  // BISE_PACK_OUT: another output dir (the try's staging, while his try runs from dist: amb-tools)
+  directories: { output: process.env['BISE_PACK_OUT'] || 'dist' },
   files: ['out/**', 'package.json'],
   asar: true,
   extraResources: [
