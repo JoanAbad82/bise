@@ -258,4 +258,14 @@ describe('store', () => {
     store.apply({ ev: 'dictation', id: busy, text: '', final: true, error: 'the mic is busy.' });
     expect(store.dictation(busy)).toEqual({ text: '', final: true, cancelled: false, error: 'the mic is busy.' });
   });
+  it("level: each voice's loudness, the last value, a repeat changes nothing", () => {
+    const { store } = fake();
+    expect(store.level('you')).toBe(0);
+    let n = 0;
+    store.subscribe('level:you', () => (n += 1));
+    store.apply({ ev: 'level', who: 'you', v: 0.42 });
+    store.apply({ ev: 'level', who: 'you', v: 0.42 });
+    store.apply({ ev: 'level', who: 'main', v: 0.9 });
+    expect([store.level('you'), store.level('main'), n]).toEqual([0.42, 0.9, 1]);
+  });
 });

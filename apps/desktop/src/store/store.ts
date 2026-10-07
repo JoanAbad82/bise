@@ -70,6 +70,7 @@ export const TAGS = {
   plugins: true,
   computer_use: true,
   dictation: true,
+  level: true,
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */
@@ -357,6 +358,10 @@ export class Store {
       case 'away_summary':
         this.put('away', ev);
         return;
+      case 'level':
+        // a meter's input (~30 Hz): only who reads that voice re-renders
+        if (this.slices.get(`level:${ev.who}`) !== ev.v) this.put(`level:${ev.who}`, ev.v);
+        return;
       case 'dictation':
         // only the window that started it gets it (main's routes); an id
         // this store never started, or one already over, is ignored
@@ -522,6 +527,10 @@ export class Store {
   }
   dictateCancel(id: string): void {
     if (this.dictating.has(id)) this.command({ cmd: 'dictate_cancel', id });
+  }
+  /** A voice's loudness now, 0..1: 'you' (the mic), 'main' (its spoken answer). */
+  level(who: string): number {
+    return this.slice(`level:${who}`, 0);
   }
   dictation(id: string): Dictation | null {
     return this.slice<Dictation | null>(`dictation:${id}`, null);

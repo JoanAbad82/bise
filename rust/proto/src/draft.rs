@@ -242,6 +242,10 @@ pub enum CoreEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         flash: Option<String>,
     },
+    /// a voice's loudness, 0..1, ~30 Hz while it sounds, then a 0: `you`
+    /// (the mic: his talk or a dictation, for a meter) or `main` (main's
+    /// spoken answer). No words, to every window
+    Level { who: String, v: f64 },
     /// a dictation's words (bar I, `dictate_start {id}`), only to the
     /// window that started it (the app's main routes it by `id`), never
     /// to main, never journaled, never in a log. `text` is the WHOLE text
@@ -266,7 +270,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins", "computer_use", "dictation"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins", "computer_use", "level", "dictation"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })

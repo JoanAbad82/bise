@@ -83,6 +83,8 @@ export const useJobs = (project: string): readonly Job[] => useSlice(`jobs:${pro
 export const useDiff = (project: string, agent: string, commit?: string): Diff | null =>
   useSlice(diffKey(project, agent, commit), (s) => s.diff(project, agent, commit));
 export const useAway = (): Away | null => useSlice('away', (s) => s.away());
+/** A voice's loudness now, 0..1 ('you': the mic during a talk or a dictation; 'main': its spoken answer). */
+export const useLevel = (who: 'you' | 'main'): number => useSlice(`level:${who}`, (s) => s.level(who));
 /** A dictation this window started (store.dictateStart()): its whole text so far, final, cancelled, error. */
 export const useDictation = (id: string | null): Dictation | null => useSlice(`dictation:${id ?? ''}`, (s) => (id === null ? null : s.dictation(id)));
 export const useCoreState = (): CoreState => useSlice('core', (s) => s.core());

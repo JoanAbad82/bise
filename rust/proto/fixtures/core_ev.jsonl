@@ -13,3 +13,5 @@
 {"ev":"dictation","id":"d1","text":"fix the login test","final":true}
 {"ev":"dictation","id":"d2","text":"","final":true,"cancelled":true}
 {"ev":"dictation","id":"d3","text":"","final":true,"error":"the mic is busy."}
+{"ev":"level","who":"you","v":0.42}
+{"ev":"level","who":"main","v":0.0}

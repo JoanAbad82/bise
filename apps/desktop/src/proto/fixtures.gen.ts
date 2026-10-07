@@ -101,6 +101,8 @@ export const core_ev: readonly CoreEv[] = [
   {"ev":"dictation","final":true,"id":"d1","text":"fix the login test"},
   {"cancelled":true,"ev":"dictation","final":true,"id":"d2","text":""},
   {"error":"the mic is busy.","ev":"dictation","final":true,"id":"d3","text":""},
+  {"ev":"level","v":0.42,"who":"you"},
+  {"ev":"level","v":0.0,"who":"main"},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */
