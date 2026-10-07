@@ -3,11 +3,12 @@
 //! `welcome`, then `agents` and `cards` now and on each change, and the
 //! threads it subscribes to as entries (`thread`, then `entry`/`typing`
 //! live). Its commands reach the same paths as the TUI's ops (input,
-//! interrupt, `/answer`, `/archive`, `/restore`; a feature's try, merge or
-//! drop is its card's `answer`, never a command of its own, and `features`
-//! comes at hello and on change, as `prs` does, the TUI's `/prs` rows); a
-//! command this hub can't
-//! do gets `error {cmd, text}`, never silence. The rows and the live fold
+//! interrupt; answer, archive, restore, new, rename, model and effort as
+//! `Input::UserCmd`: the TUI's handlers with their fields, no text
+//! rebuilt). A feature's try, merge or drop is its card's `answer`, never
+//! a command of its own; `features` and `prs` (the TUI's `/prs` rows) come
+//! at hello and on change. A command this hub can't do gets `error {cmd,
+//! text}`, never silence. The rows and the live fold
 //! are pure (`crate::proto_view`); this file only wires them.
 
 use super::*;
@@ -307,7 +308,13 @@ impl Shell {
                 if !self.hub.st.open_cards().any(|c| c.id == card) {
                     return self.proto_error(id, &tag, &format!("card {card} isn't open"));
                 }
-                self.client_line(id, json!({"op": "input", "focus": MAIN, "text": format!("/answer {card} {reply}")}));
+                // the reply as he wrote it, never read as a command (architect
+                // m_8366): the TUI's /answer handler with its fields
+                let text = reply.trim().to_string();
+                if text.is_empty() {
+                    return self.proto_error(id, &tag, "an answer needs words or an option's number");
+                }
+                self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd: UserCmd::Answer { card, text } });
             }
             HubCmd::Stop { agent, .. } => {
                 if !known(self, &agent) {
@@ -319,14 +326,13 @@ impl Shell {
                 if !known(self, &agent) {
                     return self.proto_error(id, &tag, &format!("no agent {agent}"));
                 }
-                let text = if force { format!("/archive {agent} --force") } else { format!("/archive {agent}") };
-                self.client_line(id, json!({"op": "input", "focus": MAIN, "text": text}));
+                self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd: UserCmd::Drop { name: Some(agent), force } });
             }
             HubCmd::Unarchive { agent, .. } => {
                 if !known(self, &agent) {
                     return self.proto_error(id, &tag, &format!("no agent {agent}"));
                 }
-                self.client_line(id, json!({"op": "input", "focus": MAIN, "text": format!("/restore {agent}")}));
+                self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd: UserCmd::Restore { name: agent } });
             }
             // the TUI's own `seen`: the clock moves, the list comes again
             HubCmd::ArtifactsSeen { .. } => self.artifacts_op(id, &json!({"do": "seen"})),

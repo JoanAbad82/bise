@@ -190,6 +190,11 @@ def main():
         c.send({"cmd": "effort", "project": project, "agent": "nobody", "effort": "high"})
         c.wait(lambda: len(typed(c, "error")) > n_err, 20, "an effort for no agent: an error")
         check(typed(c, "error")[n_err]["cmd"] == "effort", "the known model is no error: %r" % typed(c, "error")[n_err:])
+        # archive and restore: the TUI's handlers through Input::UserCmd too
+        c.send({"cmd": "archive", "project": project, "agent": "t9b", "force": True})
+        c.wait(lambda: (agent_row("t9b") or {}).get("archived"), 30, "the typed archive archives t9b")
+        c.send({"cmd": "unarchive", "project": project, "agent": "t9b"})
+        c.wait(lambda: agent_row("t9b") and not agent_row("t9b")["archived"], 30, "the typed unarchive restores t9b")
         # a queued send: sb-core holds it until the turn ends (amb-hub
         # 7dcb56ab), then main gets it as his words
         c.send({"cmd": "send", "project": project, "agent": "main", "text": "queued from the window", "mode": "queued"})
