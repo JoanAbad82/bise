@@ -51,6 +51,20 @@ export function save(store: Store, target: string, s: Saved): void {
   else store.setItem(PREFIX + target, JSON.stringify(s));
 }
 
+/** A draft the composer can't read (an unknown entry format) is never dropped: its raw JSON goes
+ *  aside under its own key, the newest last (architect m_11500). */
+export function keepUnread(store: Store, target: string, raw: string): void {
+  const key = `${PREFIX}${target}.unread`;
+  let kept: string[] = [];
+  try {
+    const v: unknown = JSON.parse(store.getItem(key) ?? '[]');
+    if (isStringArray(v)) kept = v;
+  } catch {
+    kept = [];
+  }
+  if (!kept.includes(raw)) store.setItem(key, JSON.stringify([...kept, raw]));
+}
+
 /** `entry` on top of the history, an equal older one dropped, 50 kept. */
 export function remember(s: Saved, entry: string): Saved {
   return { ...s, history: [entry, ...s.history.filter((h) => h !== entry)].slice(0, HISTORY_MAX) };

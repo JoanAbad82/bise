@@ -16,6 +16,7 @@ import { ComposerFrame } from '@/ds';
 import './composer.css';
 import { ChipNode } from './ChipNode';
 import { Brain, type ComposerActions, type FieldBar } from './Brain';
+import { PmField } from './pm/PmField';
 import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, type TipClock } from './keybar';
 import type { Outgoing } from './message';
 import { NO_SOURCES, type ComposerSources, type DictatePort } from './sources';
@@ -61,6 +62,11 @@ function onError(error: Error): void {
   // an editor error must not take the screen down; it is logged, and the text stays
   console.error('composer', error);
 }
+
+/** The field's engine while the TipTap one is built (ambient-lead m_11458, slices 1-3): Lexical
+ *  unless the build says `VITE_BISE_COMPOSER=pm`. The one switch point; it goes in slice 4 with
+ *  the Lexical packages. */
+export const ENGINE: 'lexical' | 'pm' = import.meta.env.VITE_BISE_COMPOSER === 'pm' ? 'pm' : 'lexical';
 
 // module scope: one stable extension, so React never re-creates the editor
 const EXTENSION = defineExtension({
@@ -159,37 +165,61 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
         else actions.current?.submit();
       }}
     >
-      <LexicalExtensionComposer extension={EXTENSION} contentEditable={null}>
-        <ContentEditable
-          className="b-field"
-          data-testid={`${testId}.field`}
-          aria-label={placeholder}
-          aria-multiline
-          spellCheck
-          aria-placeholder={placeholder}
-          placeholder={<span className="ph b-field-ph">{placeholder}</span>}
-        />
-        <Brain
-          target={target}
-          busy={busy}
-          sources={sources}
-          store={store}
-          testId={testId}
-          send={(o) => {
-            cb.current.onSend(o);
-          }}
-          command={(name, args) => {
-            cb.current.onCommand?.(name, args);
-          }}
-          onCanSend={setCanSend}
-          onStrip={setStrip}
-          onBar={setField}
-          onActions={(a) => {
-            if (actions.current === null) cb.current.onReady?.(a);
-            actions.current = a;
-          }}
-        />
-      </LexicalExtensionComposer>
+      {ENGINE === 'pm' ? (
+          <PmField
+            target={target}
+            busy={busy}
+            sources={sources}
+            store={store}
+            testId={testId}
+            placeholder={placeholder}
+            send={(o) => {
+              cb.current.onSend(o);
+            }}
+            command={(name, args) => {
+              cb.current.onCommand?.(name, args);
+            }}
+            onCanSend={setCanSend}
+            onStrip={setStrip}
+            onBar={setField}
+            onActions={(a) => {
+              if (actions.current === null) cb.current.onReady?.(a);
+              actions.current = a;
+            }}
+          />
+      ) : (
+        <LexicalExtensionComposer extension={EXTENSION} contentEditable={null}>
+          <ContentEditable
+            className="b-field"
+            data-testid={`${testId}.field`}
+            aria-label={placeholder}
+            aria-multiline
+            spellCheck
+            aria-placeholder={placeholder}
+            placeholder={<span className="ph b-field-ph">{placeholder}</span>}
+          />
+          <Brain
+            target={target}
+            busy={busy}
+            sources={sources}
+            store={store}
+            testId={testId}
+            send={(o) => {
+              cb.current.onSend(o);
+            }}
+            command={(name, args) => {
+              cb.current.onCommand?.(name, args);
+            }}
+            onCanSend={setCanSend}
+            onStrip={setStrip}
+            onBar={setField}
+            onActions={(a) => {
+              if (actions.current === null) cb.current.onReady?.(a);
+              actions.current = a;
+            }}
+          />
+        </LexicalExtensionComposer>
+      )}
     </ComposerFrame>
   );
 });
