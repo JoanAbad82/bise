@@ -104,6 +104,10 @@ export const core_ev: readonly CoreEv[] = [
   {"error":"the mic is busy.","ev":"dictation","final":true,"id":"d3","text":""},
   {"ev":"level","v":0.42,"who":"you"},
   {"ev":"level","v":0.0,"who":"main"},
+  {"ev":"commands","items":[{"args":[{"kind":"words","words":[{"desc":"in its own git worktree","value":"-w"}]},{"kind":"text"}],"desc":"start an agent: /new [-w] [name:] objective","name":"/new","runnable":false,"runs":"hub"},{"args":[],"desc":"open what waits for you","name":"/inbox","runnable":false,"runs":"window"},{"args":[{"kind":"card"},{"kind":"note"}],"desc":"close an inbox item without answering: /close N [note]","name":"/close","runnable":false,"runs":"hub"}]},
+  {"ev":"skills","items":[{"desc":"make a page for the user","name":"bise-pages"}],"project":"acme-1a2b3c4d"},
+  {"ev":"files","items":[{"dir":false,"path":"src/main.rs"},{"dir":true,"path":"src/math","protected":true}],"partial":true,"project":"acme-1a2b3c4d","q":"src/ma","rid":7},
+  {"ev":"files","folder":{"path":"rust"},"items":[{"dir":true,"path":"rust/tui"}],"project":"acme-1a2b3c4d","q":"rust/","rid":8},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */
@@ -140,6 +144,10 @@ export const app_cmd: readonly AppCmd[] = [
   {"cmd":"dictate_start","id":"d1"},
   {"cmd":"dictate_stop","id":"d1"},
   {"cmd":"dictate_cancel","id":"d1"},
+  {"cmd":"commands"},
+  {"cmd":"skills","project":"acme-1a2b3c4d"},
+  {"cmd":"files","project":"acme-1a2b3c4d","q":"src/ma","rid":7},
+  {"cmd":"files","limit":20,"project":"acme-1a2b3c4d","q":"rust/","rid":8},
 ];
 
 /** rust/proto/fixtures/draft_hub_cmd.jsonl */

@@ -194,6 +194,91 @@ pub struct AwayProject {
     pub failed: u32,
 }
 
+/// How a slash command runs (C, architect m_10724): `hub` (his typed
+/// line goes to the hub's own parser, HubCmd slash), `core` (a window
+/// core command), `window` (the window's own screen or state: the window
+/// alone knows whether it is built).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum Runs {
+    Hub,
+    Core,
+    Window,
+}
+
+/// One value a command's argument can take, as its popup shows it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PickChoice {
+    pub value: String,
+    pub desc: String,
+}
+
+/// What completes one argument of a command (the TUI's commands.rs
+/// `Arg`): fixed words, a list the window has (live agents, archived ones,
+/// open cards, branches, models, efforts, plugins), or free text (`text`
+/// required, `note` optional).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PickArg {
+    Words { words: Vec<PickChoice> },
+    Agent,
+    Archived,
+    Card,
+    Branch,
+    Model,
+    Effort,
+    Plugin,
+    Text,
+    Note,
+}
+
+/// A slash command, as the TUI's `/` popup lists it (commands.rs
+/// COMMANDS: same name, desc, order, args). `runnable`: for `hub` and
+/// `core`, a typed path exists today; for `window`, always false here
+/// (the window owns its screens' readiness and combines the two).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PickCommand {
+    pub name: String,
+    pub desc: String,
+    pub args: Vec<PickArg>,
+    pub runs: Runs,
+    pub runnable: bool,
+}
+
+/// A skill of a workspace, as the TUI's `$` popup lists it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PickSkill {
+    pub name: String,
+    pub desc: String,
+}
+
+/// A file or folder for an `@` query, ranked as the TUI ranks it
+/// (files.rs): `path` relative to the workspace (or as typed for
+/// `@../`, `@~/`, `@/`), `protected`: macOS asks once it is entered.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PickFile {
+    pub path: String,
+    pub dir: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub protected: bool,
+}
+
+/// The folder an `@folder/` query browses, its own row (⏎ inserts a
+/// reference to the folder); `locked`: no access to it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PickFolder {
+    pub path: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub locked: bool,
+}
+
 /// What the core sends the app besides the hubs' events (S3b).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -255,6 +340,25 @@ pub enum CoreEv {
     /// time limit, fn's talk, `cancelled` with an empty text, or `error`:
     /// the start refused (the mic is busy, no mic, no voice model) or the
     /// listener failed, with the words heard so far)
+    /// the slash commands (answer to `commands`, and once at the start):
+    /// the TUI's `/` list as data
+    Commands { items: Vec<PickCommand> },
+    /// a workspace's skills (answer to `skills {project}`): the TUI's `$`
+    Skills { project: Project, items: Vec<PickSkill> },
+    /// an `@` query's files (answer to `files {project, q, rid}`), ranked
+    /// by the TUI's own files.rs: `partial` while the workspace's first
+    /// walk runs (one more answer with the same rid follows), `folder`:
+    /// the browsed folder's own row (`@src/`)
+    Files {
+        project: Project,
+        rid: u64,
+        q: String,
+        items: Vec<PickFile>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        folder: Option<PickFolder>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        partial: bool,
+    },
     Dictation {
         id: String,
         text: String,
@@ -270,7 +374,7 @@ pub enum CoreEv {
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins", "computer_use", "level", "dictation"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "found", "away_summary", "plugins", "computer_use", "level", "dictation", "commands", "skills", "files"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -375,6 +479,19 @@ pub enum AppCmd {
     DictateStop { id: String },
     /// dropped: the mic goes off, one final `dictation` with `cancelled`
     DictateCancel { id: String },
+    /// the slash commands: `commands` answers
+    Commands,
+    /// a workspace's skills: `skills` answers
+    Skills { project: Project },
+    /// an `@` query on a workspace's files: `files` answers with this
+    /// `rid` (a newer rid's answer wins; `limit`: 50 if none)
+    Files {
+        project: Project,
+        q: String,
+        rid: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        limit: Option<u32>,
+    },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
@@ -413,6 +530,9 @@ impl AppCmd {
         "dictate_start",
         "dictate_stop",
         "dictate_cancel",
+        "commands",
+        "skills",
+        "files",
         "setup_check",
     ];
 

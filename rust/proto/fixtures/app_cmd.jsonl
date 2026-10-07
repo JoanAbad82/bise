@@ -30,3 +30,7 @@
 {"cmd":"dictate_start","id":"d1"}
 {"cmd":"dictate_stop","id":"d1"}
 {"cmd":"dictate_cancel","id":"d1"}
+{"cmd":"commands"}
+{"cmd":"skills","project":"acme-1a2b3c4d"}
+{"cmd":"files","project":"acme-1a2b3c4d","q":"src/ma","rid":7}
+{"cmd":"files","project":"acme-1a2b3c4d","q":"rust/","rid":8,"limit":20}

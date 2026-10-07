@@ -17,6 +17,11 @@ pub enum Cmd {
     DictateStart { id: String },
     DictateStop { id: String },
     DictateCancel { id: String },
+    /// The composer's lists (desktop C/A/B, core/picks.rs): the `/`
+    /// commands, a workspace's `$` skills, an `@` query's files.
+    Commands,
+    Skills { project: String },
+    Files { project: String, q: String, rid: u64, limit: Option<u32> },
     Shot { path: PathBuf, app: String, title: String },
     /// S9 (amb-mac m_9035): what the app read of his front app at fn
     /// (talk or spotlight), sent apart from talk_start; `{}` (an excluded
@@ -106,6 +111,12 @@ impl Cmd {
                 bise_proto::draft::AppCmd::DictateStop { id } if !id.trim().is_empty() => Cmd::DictateStop { id },
                 bise_proto::draft::AppCmd::DictateCancel { id } if !id.trim().is_empty() => Cmd::DictateCancel { id },
                 _ => return Err(format!("{cmd}: no id")),
+            },
+            "commands" | "skills" | "files" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+                bise_proto::draft::AppCmd::Commands => Cmd::Commands,
+                bise_proto::draft::AppCmd::Skills { project } => Cmd::Skills { project },
+                bise_proto::draft::AppCmd::Files { project, q, rid, limit } => Cmd::Files { project, q, rid, limit },
+                other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
             "away_back" => Cmd::AwayBack { away_ms: v.get("away_ms").and_then(Value::as_u64).ok_or("away_back: no away_ms")? },
             "fn_context" => match v.get("context") {

@@ -9,6 +9,7 @@ mod away;
 mod cmd;
 mod dictate;
 mod hubs;
+mod picks;
 mod setup;
 mod voice;
 
@@ -216,6 +217,8 @@ pub struct Core {
     talk: Option<Talk>,
     /// the composer's mic (bar I, core/dictate.rs)
     dictation: Option<dictate::Dictation>,
+    /// the composer's `@` answers on their way (core/picks.rs)
+    picks: picks::Picks,
     speaker: Option<Box<dyn Speaker>>,
     speech: Option<Speech>,
     next_utt: UttId,
@@ -287,6 +290,7 @@ impl Core {
             voice_out: None,
             talk: None,
             dictation: None,
+            picks: picks::Picks::default(),
             speaker: None,
             speech: None,
             next_utt: 1,
@@ -345,6 +349,9 @@ impl Core {
             Cmd::DictateStart { id } => self.dictate_start(id, now),
             Cmd::DictateStop { id } => self.dictate_stop(&id, now),
             Cmd::DictateCancel { id } => self.dictate_cancel(&id),
+            Cmd::Commands => self.pick_commands(),
+            Cmd::Skills { project } => self.pick_skills(project),
+            Cmd::Files { project, q, rid, limit } => self.pick_files(project, q, rid, limit),
             Cmd::Shot { path, app, title } => self.take_shot(&path, app, title),
             // the latest fn wins; an excluded app's `{}` clears
             Cmd::AwayBack { away_ms } => self.away_back(away_ms),

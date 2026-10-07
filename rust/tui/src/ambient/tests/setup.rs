@@ -384,3 +384,35 @@ fn check_again_reads_prefs_accounts_and_projects_fresh() {
     assert_eq!(evs(&out, "accounts")[0]["items"][0]["state"], "signed_out", "the removed key, read fresh");
     assert!(evs(&out, "error").is_empty());
 }
+
+/// The composer's lists (desktop C/A/B, core/picks.rs): commands on
+/// request; skills and files for a project of the registry; an unknown
+/// project is an error; an older rid's late answer never reaches the
+/// window after a newer one (architect m_10724).
+#[test]
+fn the_composer_lists_come_on_request_and_an_older_rid_never_wins() {
+    let mut t = T::new();
+    setup(&mut t);
+    t.take();
+    app(&mut t, r#"{"cmd":"commands"}"#);
+    let out = t.take();
+    let c = evs(&out, "commands");
+    assert_eq!(c.len(), 1);
+    assert_eq!(c[0]["items"][0]["name"], crate::commands::COMMANDS[0].name);
+    app(&mut t, r#"{"cmd":"skills","project":"nowhere"}"#);
+    assert!(t.take().iter().any(|v| v["ev"] == "error" && v["cmd"] == "skills"));
+    app(&mut t, r#"{"cmd":"skills","project":"shop"}"#);
+    assert_eq!(evs(&t.take(), "skills")[0]["project"], "shop");
+    // two queries: the newer (rid 2) is asked first, the older comes after
+    app(&mut t, r#"{"cmd":"files","project":"shop","q":"b","rid":2}"#);
+    app(&mut t, r#"{"cmd":"files","project":"shop","q":"a","rid":1}"#);
+    t.until(|o| o.iter().any(|v| v["ev"] == "files" && v["rid"] == 2 && v.get("partial").is_none()));
+    for _ in 0..10 {
+        t.until(|_| true);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let out = t.take();
+    assert!(evs(&out, "files").iter().all(|v| v["rid"] == 2), "{out:#?}");
+    app(&mut t, r#"{"cmd":"files","project":"nowhere","q":"a","rid":3}"#);
+    assert!(t.take().iter().any(|v| v["ev"] == "error" && v["cmd"] == "files"));
+}

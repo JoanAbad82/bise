@@ -15,3 +15,7 @@
 {"ev":"dictation","id":"d3","text":"","final":true,"error":"the mic is busy."}
 {"ev":"level","who":"you","v":0.42}
 {"ev":"level","who":"main","v":0.0}
+{"ev":"commands","items":[{"name":"/new","desc":"start an agent: /new [-w] [name:] objective","args":[{"kind":"words","words":[{"value":"-w","desc":"in its own git worktree"}]},{"kind":"text"}],"runs":"hub","runnable":false},{"name":"/inbox","desc":"open what waits for you","args":[],"runs":"window","runnable":false},{"name":"/close","desc":"close an inbox item without answering: /close N [note]","args":[{"kind":"card"},{"kind":"note"}],"runs":"hub","runnable":false}]}
+{"ev":"skills","project":"acme-1a2b3c4d","items":[{"name":"bise-pages","desc":"make a page for the user"}]}
+{"ev":"files","project":"acme-1a2b3c4d","rid":7,"q":"src/ma","items":[{"path":"src/main.rs","dir":false},{"path":"src/math","dir":true,"protected":true}],"partial":true}
+{"ev":"files","project":"acme-1a2b3c4d","rid":8,"q":"rust/","items":[{"path":"rust/tui","dir":true}],"folder":{"path":"rust"}}

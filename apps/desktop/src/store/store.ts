@@ -30,6 +30,10 @@ import type {
   Mode,
   Model,
   Pr,
+  PickCommand,
+  PickFile,
+  PickFolder,
+  PickSkill,
   Plugin,
   ProjectRow,
   Worktree,
@@ -71,6 +75,9 @@ export const TAGS = {
   computer_use: true,
   dictation: true,
   level: true,
+  commands: true,
+  skills: true,
+  files: true,
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */
@@ -116,6 +123,16 @@ export interface ThreadOrder {
 
 export type Diff = EvOf<'diff'>;
 export type Away = EvOf<'away_summary'>;
+/** An `@` query's answer (core/picks.rs, the TUI's files.rs ranking). */
+export interface FilesAnswer {
+  readonly q: string;
+  readonly items: readonly PickFile[];
+  /** the browsed folder's own row (`@src/`) */
+  readonly folder: PickFolder | null;
+  /** the workspace's first walk still runs: a fuller answer follows */
+  readonly partial: boolean;
+}
+
 /**
  * A dictation (bar I): `text` is the whole text so far (replace the
  * composer's dictated part, never append); `final`: over (stopped, the time
@@ -154,6 +171,12 @@ export class Store {
   private cid = 0;
   /** the dictations this window started and not over yet (bar I) */
   private readonly dictating = new Set<string>();
+  /** the `@` queries on their way: rid -> its project and resolve; each project's newest rid */
+  private rid = 0;
+  private readonly asked = new Map<number, { project: string; resolve: (a: FilesAnswer | null) => void }>();
+  private readonly newestRid = new Map<string, number>();
+  /** commands asked from this core (said again when a core comes up) */
+  private commandsAsked = false;
   /** the last shown set sent (null: none yet); said again to a core that comes back up */
   private shownSet: readonly string[] | null = null;
   /** the threads this window follows (subscribeThread), said again to a core that comes back up */
@@ -358,6 +381,15 @@ export class Store {
       case 'away_summary':
         this.put('away', ev);
         return;
+      case 'commands':
+        this.put('commands', ev.items);
+        return;
+      case 'skills':
+        this.put(`skills:${ev.project}`, ev.items);
+        return;
+      case 'files':
+        this.filesAnswer(ev);
+        return;
       case 'level':
         // a meter's input (~30 Hz): only who reads that voice re-renders
         if (this.slices.get(`level:${ev.who}`) !== ev.v) this.put(`level:${ev.who}`, ev.v);
@@ -395,6 +427,9 @@ export class Store {
     // a new core knows nothing of the window: what it shows is said again
     if (state === 'up') this.sayAgain();
     if (state !== 'down') return;
+    this.commandsAsked = false;
+    for (const a of this.asked.values()) a.resolve(null);
+    this.asked.clear();
     for (const [key, t] of this.threads) {
       if (!t.pending.some((p) => p.state === 'sending')) continue;
       t.pending = t.pending.map((p) => (p.state === 'sending' ? { ...p, state: 'failed', why: 'not sent' } : p));
@@ -409,6 +444,10 @@ export class Store {
    */
   private sayAgain(): void {
     if (this.shownSet !== null) this.command({ cmd: 'shown', projects: [...this.shownSet] });
+    if (this.slices.has('commands') || this.commandsAsked) {
+      this.commandsAsked = false;
+      this.askCommands();
+    }
     for (const s of this.subs.values()) {
       this.command({ cmd: 'subscribe', project: s.project, agent: s.agent, ...(s.limit === undefined ? {} : { limit: s.limit }) });
     }
@@ -513,6 +552,58 @@ export class Store {
    * The composer's mic (bar I): the core records and sends this window the
    * words (useDictation(id)); never to main. Returns the dictation's id.
    */
+  /** The `/` list (the TUI's commands.rs), asked once from each core. */
+  commands(): readonly PickCommand[] {
+    return this.slice('commands', EMPTY);
+  }
+  askCommands(): void {
+    if (this.commandsAsked) return;
+    this.commandsAsked = true;
+    this.command({ cmd: 'commands' });
+  }
+  /** A workspace's `$` list (the TUI's skills.rs); askSkills reads it again. */
+  skills(project: string): readonly PickSkill[] {
+    return this.slice(`skills:${project}`, EMPTY);
+  }
+  askSkills(project: string): void {
+    this.command({ cmd: 'skills', project });
+  }
+  /**
+   * An `@` query's rows, ranked by the core (the TUI's files.rs). Resolves
+   * with the first answer (partial while the first walk runs: the fuller one
+   * then lands in useFiles(project)), or null when a newer query of the
+   * project replaced it or the core went down.
+   */
+  files(project: string, q: string, limit?: number): Promise<FilesAnswer | null> {
+    this.rid += 1;
+    const rid = this.rid;
+    for (const [r, a] of this.asked) {
+      if (a.project !== project) continue;
+      this.asked.delete(r);
+      a.resolve(null);
+    }
+    this.newestRid.set(project, rid);
+    return new Promise((resolve) => {
+      this.asked.set(rid, { project, resolve });
+      this.command({ cmd: 'files', project, q, rid, ...(limit === undefined ? {} : { limit }) });
+    });
+  }
+  /** The newest `@` answer of a project (a partial one, then the full one). */
+  filesNow(project: string): FilesAnswer | null {
+    return this.slice<FilesAnswer | null>(`files:${project}`, null);
+  }
+
+  private filesAnswer(ev: EvOf<'files'>): void {
+    // an older query's late answer never replaces a newer one's
+    if (ev.rid !== this.newestRid.get(ev.project)) return;
+    const a: FilesAnswer = { q: ev.q, items: ev.items, folder: ev.folder ?? null, partial: ev.partial ?? false };
+    this.put(`files:${ev.project}`, a);
+    const asked = this.asked.get(ev.rid);
+    if (asked === undefined) return;
+    this.asked.delete(ev.rid);
+    asked.resolve(a);
+  }
+
   dictateStart(): string {
     this.cid += 1;
     const id = `d${String(this.cid)}-${String(this.now())}`;

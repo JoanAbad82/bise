@@ -61,7 +61,7 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
         module!(cfg, "rows": rows::Status, rows::ReportKind, rows::Report, rows::Agent, rows::Opt, rows::CardPage, rows::Card, rows::Merged, rows::DevServer, rows::Worktree, rows::FeatureTry, rows::Feature, rows::PrState, rows::PrChecks, rows::PrReview, rows::Pr, rows::ModelRole, rows::Model, rows::Artifact),
         module!(cfg, "thread": thread::EntryKind, thread::ToolKind, thread::ToolItem, thread::Tools, thread::EntryCard, thread::PageRef, thread::ReportRef, thread::Entry),
         module!(cfg, "hub": hub::JobState, hub::Job, hub::HubEv, hub::Mode, hub::HubCmd),
-        module!(cfg, "draft": draft::Quote, draft::Queued, draft::DraftHubCmd, draft::ProjectRow, draft::OpenWhat, draft::Account, draft::Found, draft::AwayProject, draft::Plugin, draft::PluginLogin, draft::CuRow, draft::CoreEv, draft::AppCmd, draft::TalkPage, draft::ProjectView),
+        module!(cfg, "draft": draft::Quote, draft::Queued, draft::DraftHubCmd, draft::ProjectRow, draft::OpenWhat, draft::Account, draft::Found, draft::AwayProject, draft::Plugin, draft::PluginLogin, draft::CuRow, draft::Runs, draft::PickChoice, draft::PickArg, draft::PickCommand, draft::PickSkill, draft::PickFile, draft::PickFolder, draft::CoreEv, draft::AppCmd, draft::TalkPage, draft::ProjectView),
         module!(cfg, "helper": helper::HelperEv, helper::Responsible, helper::FnAct, helper::TalkKey, helper::Grant, helper::QuietWhy, helper::Perm, helper::PermAction, helper::HelperCmd),
         module!(cfg, "pty": pty::PtyEv, pty::PtyCmd),
     ]

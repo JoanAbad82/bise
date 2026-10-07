@@ -158,14 +158,61 @@ fix?: string | null,
 apps?: boolean, };
 
 /**
+ * How a slash command runs (C, architect m_10724): `hub` (his typed
+ * line goes to the hub's own parser, HubCmd slash), `core` (a window
+ * core command), `window` (the window's own screen or state: the window
+ * alone knows whether it is built).
+ */
+export type Runs = "hub" | "core" | "window";
+
+/**
+ * One value a command's argument can take, as its popup shows it.
+ */
+export type PickChoice = { value: string, desc: string, };
+
+/**
+ * What completes one argument of a command (the TUI's commands.rs
+ * `Arg`): fixed words, a list the window has (live agents, archived ones,
+ * open cards, branches, models, efforts, plugins), or free text (`text`
+ * required, `note` optional).
+ */
+export type PickArg = { "kind": "words", words: Array<PickChoice>, } | { "kind": "agent" } | { "kind": "archived" } | { "kind": "card" } | { "kind": "branch" } | { "kind": "model" } | { "kind": "effort" } | { "kind": "plugin" } | { "kind": "text" } | { "kind": "note" };
+
+/**
+ * A slash command, as the TUI's `/` popup lists it (commands.rs
+ * COMMANDS: same name, desc, order, args). `runnable`: for `hub` and
+ * `core`, a typed path exists today; for `window`, always false here
+ * (the window owns its screens' readiness and combines the two).
+ */
+export type PickCommand = { name: string, desc: string, args: Array<PickArg>, runs: Runs, runnable: boolean, };
+
+/**
+ * A skill of a workspace, as the TUI's `$` popup lists it.
+ */
+export type PickSkill = { name: string, desc: string, };
+
+/**
+ * A file or folder for an `@` query, ranked as the TUI ranks it
+ * (files.rs): `path` relative to the workspace (or as typed for
+ * `@../`, `@~/`, `@/`), `protected`: macOS asks once it is entered.
+ */
+export type PickFile = { path: string, dir: boolean, protected?: boolean, };
+
+/**
+ * The folder an `@folder/` query browses, its own row (⏎ inserts a
+ * reference to the folder); `locked`: no access to it.
+ */
+export type PickFolder = { path: string, locked?: boolean, };
+
+/**
  * What the core sends the app besides the hubs' events (S3b).
  */
-export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, } | { "ev": "computer_use", on: boolean, ready: boolean, rows: Array<CuRow>, said?: string | null, flash?: string | null, } | { "ev": "level", who: string, v: number, } | { "ev": "dictation", id: string, text: string, final: boolean, cancelled?: boolean, error?: string | null, };
+export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, } | { "ev": "computer_use", on: boolean, ready: boolean, rows: Array<CuRow>, said?: string | null, flash?: string | null, } | { "ev": "level", who: string, v: number, } | { "ev": "commands", items: Array<PickCommand>, } | { "ev": "skills", project: string, items: Array<PickSkill>, } | { "ev": "files", project: string, rid: number, q: string, items: Array<PickFile>, folder?: PickFolder | null, partial?: boolean, } | { "ev": "dictation", id: string, text: string, final: boolean, cancelled?: boolean, error?: string | null, };
 
 /**
  * What the app asks the core itself (never forwarded to a hub).
  */
-export type AppCmd = { "cmd": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "cmd": "project_add", path: string, land?: boolean | null, } | { "cmd": "project_remove", project: string, } | { "cmd": "project_move", project: string, order: number, } | { "cmd": "project_rename", project: string, name: string, } | { "cmd": "prefs_set", key: string, value: JsonValue, } | { "cmd": "sign_in", id: string, } | { "cmd": "key_set", id: string, key: string, } | { "cmd": "key_remove", id: string, } | { "cmd": "found_scan", dir?: string | null, } | { "cmd": "away_back", away_ms: number, } | { "cmd": "plugins", project?: string | null, } | { "cmd": "plugin_set", project?: string | null, name: string, on: boolean, } | { "cmd": "plugin_login", project?: string | null, name: string, } | { "cmd": "plugin_logout", project?: string | null, name: string, } | { "cmd": "setup_check" } | { "cmd": "computer_use", act: string, fix?: string | null, } | { "cmd": "shown", projects: Array<string>, } | { "cmd": "talk_start", page?: TalkPage | null, } | { "cmd": "talk_end" } | { "cmd": "talk_cancel" } | { "cmd": "dictate_start", id: string, } | { "cmd": "dictate_stop", id: string, } | { "cmd": "dictate_cancel", id: string, };
+export type AppCmd = { "cmd": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "cmd": "project_add", path: string, land?: boolean | null, } | { "cmd": "project_remove", project: string, } | { "cmd": "project_move", project: string, order: number, } | { "cmd": "project_rename", project: string, name: string, } | { "cmd": "prefs_set", key: string, value: JsonValue, } | { "cmd": "sign_in", id: string, } | { "cmd": "key_set", id: string, key: string, } | { "cmd": "key_remove", id: string, } | { "cmd": "found_scan", dir?: string | null, } | { "cmd": "away_back", away_ms: number, } | { "cmd": "plugins", project?: string | null, } | { "cmd": "plugin_set", project?: string | null, name: string, on: boolean, } | { "cmd": "plugin_login", project?: string | null, name: string, } | { "cmd": "plugin_logout", project?: string | null, name: string, } | { "cmd": "setup_check" } | { "cmd": "computer_use", act: string, fix?: string | null, } | { "cmd": "shown", projects: Array<string>, } | { "cmd": "talk_start", page?: TalkPage | null, } | { "cmd": "talk_end" } | { "cmd": "talk_cancel" } | { "cmd": "dictate_start", id: string, } | { "cmd": "dictate_stop", id: string, } | { "cmd": "dictate_cancel", id: string, } | { "cmd": "commands" } | { "cmd": "skills", project: string, } | { "cmd": "files", project: string, q: string, rid: number, limit?: number | null, };
 
 /**
  * The bise page a note talk is about (`talk_start {page}`).

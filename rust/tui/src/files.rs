@@ -310,8 +310,9 @@ pub(crate) fn replace_token(input: &str, start: usize, cursor: usize, tok: &str)
     (format!("{head}{tok}{tail}"), start + tok.chars().count())
 }
 
-/// The shared index of the process: the working directory walked in the
-/// background, re-walked when stale, plus the recent picks.
+/// The indexes of the process, one per workspace root (the TUI's own;
+/// the window core's projects, desktop C/A/B), each walked in the
+/// background, re-walked when stale, plus its recent picks.
 struct State {
     root: PathBuf,
     entries: Arc<Vec<Entry>>,
@@ -320,43 +321,60 @@ struct State {
     recent: Vec<String>,
 }
 
-static STATE: Mutex<Option<State>> = Mutex::new(None);
+/// At most this many roots are indexed; the least recently used goes.
+const ROOTS: usize = 4;
 
-fn state() -> std::sync::MutexGuard<'static, Option<State>> {
+/// The indexes, the most recently used first.
+static STATE: Mutex<Vec<State>> = Mutex::new(Vec::new());
+
+fn state() -> std::sync::MutexGuard<'static, Vec<State>> {
     STATE.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// Start indexing `root` in the background (the TUI calls it at startup).
+/// Index `root` in the background (the TUI calls it at startup): first
+/// in the list, a new root walked, the oldest dropped past [`ROOTS`].
 pub(crate) fn start(root: PathBuf) {
-    *state() = Some(State {
-        root,
-        entries: Arc::new(Vec::new()),
-        built: None,
-        walking: false,
-        recent: Vec::new(),
-    });
-    refresh();
+    {
+        let mut g = state();
+        match g.iter().position(|s| s.root == root) {
+            Some(i) => {
+                let s = g.remove(i);
+                g.insert(0, s);
+            }
+            None => {
+                g.insert(0, State { root: root.clone(), entries: Arc::new(Vec::new()), built: None, walking: false, recent: Vec::new() });
+                g.truncate(ROOTS);
+            }
+        }
+    }
+    refresh(&root);
 }
 
-/// Walk again in the background when the index is stale and no walk runs.
-pub(crate) fn refresh() {
-    let root = {
+/// Walk `root` again in the background when its index is stale and no
+/// walk runs.
+fn refresh(root: &Path) {
+    {
         let mut g = state();
-        let Some(s) = g.as_mut() else { return };
+        let Some(s) = g.iter_mut().find(|s| s.root == root) else { return };
         if s.walking || s.built.is_some_and(|t| t.elapsed() < STALE) {
             return;
         }
         s.walking = true;
-        s.root.clone()
-    };
+    }
+    let root = root.to_path_buf();
     let _ = std::thread::Builder::new().name("file-index".into()).spawn(move || {
         let entries = Arc::new(walk(&root, MAX_ENTRIES));
-        if let Some(s) = state().as_mut().filter(|s| s.root == root) {
+        if let Some(s) = state().iter_mut().find(|s| s.root == root) {
             s.entries = entries;
             s.built = Some(Instant::now());
             s.walking = false;
         }
     });
+}
+
+/// `root`'s first walk is not over yet (its searches miss files).
+pub(crate) fn first_walk(root: &Path) -> bool {
+    state().iter().find(|s| s.root == root).is_none_or(|s| s.built.is_none())
 }
 
 /// A search hit: the relative path and whether it is a folder
@@ -372,11 +390,8 @@ pub(crate) struct Hit {
 /// index in the background; this call never waits for a walk). A new
 /// root starts a new index: its popup shows the files a frame later.
 pub(crate) fn search(root: &Path, query: &str, limit: usize) -> Vec<Hit> {
-    if state().as_ref().is_none_or(|s| s.root != root) {
-        start(root.to_path_buf());
-    }
-    refresh();
-    let (entries, recent) = match state().as_ref() {
+    start(root.to_path_buf());
+    let (entries, recent) = match state().iter().find(|s| s.root == root) {
         Some(s) => (s.entries.clone(), s.recent.clone()),
         None => return Vec::new(),
     };
@@ -538,9 +553,49 @@ fn search_outside_in(root: &Path, home: Option<&Path>, query: &str, limit: usize
     Outside { hits, locked: false, loading: false }
 }
 
+/// An `@` query's rows (the TUI's popup and the window core's `files`,
+/// desktop C/A/B: one ranking, no copy): the hits, the browsed folder's
+/// own row (`@src/`: ⏎ still inserts a reference to the folder),
+/// whether the query is outside the workspace (`@../`, `@~/`, `@/`: its
+/// paths go out in a form the tools read, [`sent_path`]) and whether
+/// that folder can't be read.
+pub(crate) struct Pick {
+    pub(crate) hits: Vec<Hit>,
+    pub(crate) this: Option<String>,
+    pub(crate) outside: bool,
+    pub(crate) locked: bool,
+}
+
+/// The rows for `q` in `root`, at most `limit` with the folder's row.
+pub(crate) fn pick(root: &Path, q: &str, limit: usize) -> Pick {
+    let outside = outside(q);
+    let (mut hits, locked) = if outside {
+        let o = search_outside(root, q, limit);
+        (o.hits, o.locked)
+    } else {
+        (search(root, q, limit), false)
+    };
+    // browsing a folder: the folder itself last (↑ from the first row)
+    let this = if outside {
+        // even an empty or locked one: it is what the user typed
+        parent_query(q).map(|_| q.strip_suffix('/').filter(|p| !p.is_empty()).unwrap_or("/"))
+    } else {
+        parent_query(q)
+            .and_then(|_| hits.first())
+            .and_then(|h| h.path.rsplit_once('/'))
+            .map(|(parent, _)| parent)
+            .filter(|parent| parent.to_lowercase() == q.trim_end_matches('/').to_lowercase())
+    }
+    .map(|parent| parent.to_string());
+    if this.is_some() {
+        hits.truncate(limit.saturating_sub(1));
+    }
+    Pick { hits, this, outside, locked }
+}
+
 /// Remember a picked path (boosted in the next searches).
 pub(crate) fn picked(path: &str) {
-    if let Some(s) = state().as_mut() {
+    if let Some(s) = state().first_mut() {
         s.recent.retain(|p| p != path);
         s.recent.insert(0, path.to_string());
         s.recent.truncate(RECENT);

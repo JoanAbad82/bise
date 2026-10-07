@@ -4,9 +4,9 @@
 // The store comes from StoreContext: the app's one store (bound to
 // window.bise.core) by default, a test's own store through the provider.
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import type { Account, Agent, Artifact, Card, DevServer, Entry, Feature, Found, Model, Job, JsonValue, Merged, Plugin, ProjectRow, Worktree } from '@/proto';
+import type { Account, Agent, PickCommand, PickSkill, Artifact, Card, DevServer, Entry, Feature, Found, Model, Job, JsonValue, Merged, Plugin, ProjectRow, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
-import { diffKey, Store, type Away, type Dictation, type Diff, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder } from './store';
+import { diffKey, Store, type Away, type Dictation, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder } from './store';
 
 /**
  * Feeds a store from a core port: its live events, then the state events
@@ -83,6 +83,24 @@ export const useJobs = (project: string): readonly Job[] => useSlice(`jobs:${pro
 export const useDiff = (project: string, agent: string, commit?: string): Diff | null =>
   useSlice(diffKey(project, agent, commit), (s) => s.diff(project, agent, commit));
 export const useAway = (): Away | null => useSlice('away', (s) => s.away());
+/** The `/` commands (the TUI's list; asked from the core on first use). */
+export function useCommands(): readonly PickCommand[] {
+  const store = useStore();
+  useEffect(() => {
+    store.askCommands();
+  }, [store]);
+  return useSlice('commands', (s) => s.commands());
+}
+/** A workspace's `$` skills (the TUI's list; read again each time a screen mounts it). */
+export function useSkills(project: string): readonly PickSkill[] {
+  const store = useStore();
+  useEffect(() => {
+    if (project !== '') store.askSkills(project);
+  }, [store, project]);
+  return useSlice(`skills:${project}`, (s) => s.skills(project));
+}
+/** The newest `@` answer of a project (store.files asks; a partial answer is followed by the full one). */
+export const useFiles = (project: string): FilesAnswer | null => useSlice(`files:${project}`, (s) => s.filesNow(project));
 /** A voice's loudness now, 0..1 ('you': the mic during a talk or a dictation; 'main': its spoken answer). */
 export const useLevel = (who: 'you' | 'main'): number => useSlice(`level:${who}`, (s) => s.level(who));
 /** A dictation this window started (store.dictateStart()): its whole text so far, final, cancelled, error. */

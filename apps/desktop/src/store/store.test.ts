@@ -268,4 +268,31 @@ describe('store', () => {
     store.apply({ ev: 'level', who: 'main', v: 0.9 });
     expect([store.level('you'), store.level('main'), n]).toEqual([0.42, 0.9, 1]);
   });
+  it('C/A/B: commands asked once per core, skills per project, an @ query resolves with its newest rid only', async () => {
+    const { sent, store } = fake();
+    store.askCommands();
+    store.askCommands();
+    expect(sent.filter((c) => c.cmd === 'commands')).toHaveLength(1);
+    store.apply({ ev: 'commands', items: [{ name: '/new', desc: 'start an agent', args: [{ kind: 'text' }], runs: 'hub', runnable: true }] });
+    expect(store.commands().map((c) => c.name)).toEqual(['/new']);
+    store.askSkills(P);
+    store.apply({ ev: 'skills', project: P, items: [{ name: 'bise-pages', desc: 'a page' }] });
+    expect(store.skills(P)).toEqual([{ name: 'bise-pages', desc: 'a page' }]);
+    // two queries: the first is replaced (null), only the newest rid lands
+    const first = store.files(P, 'ma');
+    const second = store.files(P, 'mai');
+    const rids = sent.filter((c) => c.cmd === 'files').map((c) => (c as { rid: number }).rid);
+    expect(await first).toBeNull();
+    store.apply({ ev: 'files', project: P, rid: rids[0] ?? 0, q: 'ma', items: [{ path: 'late.rs', dir: false }] });
+    expect(store.filesNow(P)).toBeNull();
+    store.apply({ ev: 'files', project: P, rid: rids[1] ?? 0, q: 'mai', items: [{ path: 'src/main.rs', dir: false }], partial: true });
+    expect(await second).toEqual({ q: 'mai', items: [{ path: 'src/main.rs', dir: false }], folder: null, partial: true });
+    // the fuller answer of the same rid lands in the slice
+    store.apply({ ev: 'files', project: P, rid: rids[1] ?? 0, q: 'mai', items: [{ path: 'src/main.rs', dir: false }, { path: 'main.md', dir: false }] });
+    expect(store.filesNow(P)?.items).toHaveLength(2);
+    // a core that comes up again is asked the commands again
+    store.setCore('down');
+    store.setCore('up');
+    expect(sent.filter((c) => c.cmd === 'commands')).toHaveLength(2);
+  });
 });

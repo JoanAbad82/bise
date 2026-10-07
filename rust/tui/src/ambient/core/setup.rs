@@ -304,7 +304,7 @@ impl Core {
     }
 
     /// The folder whose plugins a command means: the project's, else bise's home.
-    fn workspace_of(&self, project: Option<&str>) -> Result<PathBuf, String> {
+    pub(super) fn workspace_of(&self, project: Option<&str>) -> Result<PathBuf, String> {
         let s = self.setup.as_ref().ok_or("this core has no setup")?;
         let rows = (s.ports.rows)();
         let row = match project {
