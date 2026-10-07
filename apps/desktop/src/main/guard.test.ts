@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 // guard.ts imports electron (app) and ipc.ts at load; only isOwnPage runs here
 vi.mock('electron', () => ({ app: {}, BrowserWindow: {}, clipboard: {}, ipcMain: {}, session: {}, shell: {} }));
 
-const { isOwnPage } = await import('./guard');
+const { isOwnPage, isPagesFrame } = await import('./guard');
 
 const built = { file: 'file:///Applications/bise.app/Contents/Resources/app.asar/out/renderer/index.html' };
 const dev = { ...built, dev: 'http://localhost:5173/' };
@@ -25,5 +25,21 @@ describe('isOwnPage', () => {
     expect(isOwnPage('http://localhost:5173/', built)).toBe(false);
     expect(isOwnPage('not a url', dev)).toBe(false);
     expect(isOwnPage('javascript:alert(1)', dev)).toBe(false);
+  });
+});
+
+describe('isPagesFrame (an artifact in the window, amb-kit m_11871)', () => {
+  it('the local pages server, any port and path', () => {
+    expect(isPagesFrame('http://127.0.0.1:47438/p/desktop-app')).toBe(true);
+    expect(isPagesFrame('http://127.0.0.1:9/p/x#item')).toBe(true);
+  });
+  it('anything else stays out: https, another host, localhost, credentials, file, junk', () => {
+    expect(isPagesFrame('https://127.0.0.1:47438/p/x')).toBe(false);
+    expect(isPagesFrame('http://example.com/p/x')).toBe(false);
+    expect(isPagesFrame('http://localhost:47438/p/x')).toBe(false);
+    expect(isPagesFrame('http://127.0.0.1.evil.com/p/x')).toBe(false);
+    expect(isPagesFrame('http://u:p@127.0.0.1:47438/p/x')).toBe(false);
+    expect(isPagesFrame('file:///etc/passwd')).toBe(false);
+    expect(isPagesFrame('not a url')).toBe(false);
   });
 });

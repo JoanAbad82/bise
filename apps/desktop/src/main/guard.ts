@@ -6,7 +6,10 @@
 //     in test mode), anything else is dropped;
 //   - no page ever leaves the app's own page: will-navigate and
 //     will-frame-navigate away from it are prevented (a dropped file's file://,
-//     a link without a handler), web links again through openLink;
+//     a link without a handler), web links again through openLink; the one
+//     exception is a subframe on the pages server (http://127.0.0.1:<port>,
+//     amb-kit m_11871: one artifact open in the window, in a sandboxed
+//     iframe), never the main frame; a link that leaves it goes to openLink;
 //   - no <webview>.
 // In test mode also: a window that isn't offscreen is destroyed at birth, and
 // every window's show/showInactive/focus are no-ops, with a 'show' that still
@@ -43,13 +46,24 @@ export function isOwnPage(url: string, own: OwnPage): boolean {
   return false;
 }
 
+/** Pure: may a subframe show `url`? Only the local pages server: http on 127.0.0.1, any port. */
+export function isPagesFrame(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === 'http:' && u.hostname === '127.0.0.1' && u.username === '' && u.password === '';
+  } catch {
+    return false;
+  }
+}
+
 function guardContents(wc: WebContents, own: OwnPage, testMode: boolean): void {
   wc.setWindowOpenHandler(({ url }) => {
     void openLink(url, testMode);
     return { action: 'deny' };
   });
-  const stay = (e: { preventDefault: () => void }, url: string): void => {
+  const stay = (e: { preventDefault: () => void; isMainFrame?: boolean }, url: string): void => {
     if (isOwnPage(url, own)) return;
+    if (e.isMainFrame === false && isPagesFrame(url)) return;
     e.preventDefault();
     void openLink(url, testMode);
   };
