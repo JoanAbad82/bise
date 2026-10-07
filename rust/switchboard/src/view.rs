@@ -49,6 +49,12 @@ pub fn of(
     let mut artifacts = artifacts;
     artifacts.sort_by_key(|a| std::cmp::Reverse(a.at_ms));
     artifacts.truncate(VIEW_ARTIFACTS);
+    // the index keeps each artifact's path (⌘K opens or reveals the file)
+    // but never its versions: uncapped per artifact, in a file rewritten
+    // on every change (architect m_12027); the live event keeps both
+    for a in &mut artifacts {
+        a.versions = Vec::new();
+    }
     ProjectView {
         v: V,
         project: project.to_string(),
@@ -184,6 +190,21 @@ mod tests {
         // an older view (no artifacts field) still reads, with none
         let old = r#"{"v":1,"project":"x","written_ms":1,"last_activity_ms":1,"agents":[],"cards":[]}"#;
         assert_eq!(parse(old).map(|v| (v.artifacts.len(), v.artifacts_total, v.scheduled.len())), Some((0, 0, 0)));
+    }
+
+    /// architect m_12027: the view's artifacts keep their path and drop
+    /// their versions; the typed event's rows keep both.
+    #[test]
+    fn the_views_artifacts_keep_their_path_and_drop_their_versions() {
+        let row = serde_json::json!({"id": "notes", "kind": "file", "title": "notes", "agent": "perf", "v": 3, "ts_ms": 5, "by": "agent",
+            "target": "/w/notes.md", "path": "/w/notes.md", "versions": [{"v": 1, "ts_ms": 1}, {"v": 2, "ts_ms": 3}, {"v": 3, "ts_ms": 5}]});
+        let ev = serde_json::json!({"ev": "artifacts", "rows": [row], "seen_ms": 0});
+        let typed = proto_view::artifacts(&ev, |_| None);
+        let v = of(&snap(), "x-1", 1, 1, None, &mut Since::new(), &|_| None, typed.clone(), vec![]);
+        assert_eq!(v.artifacts[0].path, typed[0].path, "the path stays");
+        assert!(v.artifacts[0].versions.is_empty(), "no versions in the view");
+        assert!(!render(&v).contains("versions"), "{}", render(&v));
+        assert_eq!(v.artifacts[0].id, typed[0].id);
     }
 
     /// ⌘K's index: the view's scheduled tasks are the typed `scheduled`
