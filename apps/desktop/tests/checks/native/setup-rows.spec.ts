@@ -105,23 +105,30 @@ test('setup/computer-use (P.2): on asks the core, its steps show with their fix,
   }, { route: 'settings/computer', core: new FakeCore(worldWith({ computer_use: offEv })) });
 });
 
-test('setup/welcome (S.9 + L1): a fresh home gets hello, then the start-here page, and the first-run text fills the composer unsent', async () => {
+test('setup/welcome (S.9 + L1): a fresh home gets hello, then start-here in his browser, and the first-run text fills the composer unsent', async () => {
   const prefs = core_ev.find((e): e is Extract<CoreEv, { ev: 'prefs' }> => e.ev === 'prefs');
   if (!prefs) throw new Error('no prefs fixture');
   const fresh = { ...prefs, prefs: { ...(prefs.prefs as Record<string, unknown>), onboarded: false } } as Ev;
+  // the hub's start-here page, an artifact of the home project (the lead's pick (a), amb-kit 6d6cd160:
+  // it opens in his browser, not in the app)
+  const START = 'http://127.0.0.1:47123/p/start-here';
+  const startHere: Ev = {
+    ev: 'artifacts',
+    project: 'bise-home-00000000',
+    items: [{ id: 'start-here', kind: 'page', title: 'start here', agent: 'main', version: 1, at_ms: 1791100000000, url: START, new: true }],
+  };
   await onWorld(async ({ s, core, out }) => {
     const { page } = s;
     await expect(page.getByTestId('setup.step.hello'), 'a fresh home opens hello by itself').toBeVisible({ timeout: 3000 });
     await expect(page.getByTestId('setup.step.hello')).toContainText(/i.m bise/);
     await page.getByTestId('setup.skip').click();
-    await sleep(1000);
+    await sleep(1500);
     await page.screenshot({ path: test.info().outputPath('after-hello.png') }); // the frame for the report
-    const body = await text(s);
-    const pageCmd = core.cmds().some((c) => c.cmd === 'page' || c.cmd === 'open');
-    expect.soft(pageCmd || /start here/i.test(body), `the start-here page opens after hello (core got ${JSON.stringify(core.cmds().map((c) => c.cmd))})`).toBe(true);
+    const opened = out.of(EXTERNAL);
+    expect(opened, 'after hello, start-here opens in his browser, once (test mode: the external line)').toEqual([START]);
     const first = page.getByText(/show me what you can do/i).first();
     const has = await first.isVisible().catch(() => false);
-    expect.soft(has, "the first-run text 'show me what you can do' is offered").toBe(true);
+    expect.soft(has, "the first-run text 'show me what you can do' is offered in main's empty thread").toBe(true);
     if (has) {
       const sends = core.cmds().filter((c) => c.cmd === 'send').length;
       await first.click();
@@ -130,6 +137,5 @@ test('setup/welcome (S.9 + L1): a fresh home gets hello, then the start-here pag
       expect.soft(sel, 'it fills the composer, selected').toMatch(/show me what you can do/i);
       expect(core.cmds().filter((c) => c.cmd === 'send').length, 'and nothing is sent').toBe(sends);
     }
-    nothingLeft(out);
-  }, { core: new FakeCore(worldWith({ prefs: fresh })) });
+  }, { core: new FakeCore([...worldWith({ prefs: fresh }), startHere]) });
 });
