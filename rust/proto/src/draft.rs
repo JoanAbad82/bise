@@ -403,12 +403,19 @@ pub enum CoreEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         error: Option<String>,
     },
+    /// bar S.6: a newer desktop app on bise's release channel than the one
+    /// running (`app_version`), read from `latest.json` by
+    /// bise_home::release (its one reader, the one version rule): `url` is
+    /// the zip's, absolute; the app downloads it, checks `sha256` and its
+    /// signature, and swaps itself only on his click. Sent once per
+    /// version, never for the same build or an older one
+    AppUpdate { version: String, url: String, sha256: String },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "dictation", "voice_answer", "commands", "skills", "files", "roles"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "dictation", "voice_answer", "commands", "skills", "files", "roles", "app_update"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -457,6 +464,14 @@ pub enum AppCmd {
     /// he's back at his Mac after `away_ms` (the app's read): the core
     /// answers `away_summary`
     AwayBack { away_ms: u64 },
+    /// bar S.6: the running app's own build (its VERSION's `id` and
+    /// `built`; none in a dev run): the core checks bise's release channel
+    /// now and hourly, and says `app_update` when a newer app is there
+    AppVersion {
+        id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        built: Option<String>,
+    },
     /// the plugins of `project`'s workspace (none: bise's home): `plugins`
     Plugins {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -578,6 +593,7 @@ impl AppCmd {
         "key_remove",
         "found_scan",
         "away_back",
+        "app_version",
         "plugins",
         "plugin_set",
         "plugin_login",

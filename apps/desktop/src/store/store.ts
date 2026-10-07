@@ -90,6 +90,7 @@ export const TAGS = {
   files: true,
   roles: true,
   signing: true,
+  app_update: true,
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */

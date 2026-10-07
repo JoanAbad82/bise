@@ -33,6 +33,9 @@ struct World {
     cu_offs: Vec<bool>,
     /// V17: the role_set writes
     role_sets: Vec<(String, Option<String>, Option<String>)>,
+    /// S.6: the release channel's reads (the channel of the last one)
+    manifest_reads: usize,
+    manifest: Option<std::sync::mpsc::Sender<Done>>,
 }
 
 fn rows() -> Vec<Row> {
@@ -46,6 +49,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
     let (j, k, l, m) = (w.clone(), w.clone(), w.clone(), w.clone());
     let (n, o, q, r, u, v) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
     let (x, y, z) = (w.clone(), w.clone(), w.clone());
+    let mf = w.clone();
     t.core.set_setup(SetupPorts {
         prefs: Box::new(move || a.borrow().prefs.clone()),
         write_prefs: Box::new(move |v| {
@@ -162,6 +166,11 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             }
             y.borrow_mut().role_sets.push((role.into(), model.map(String::from), effort.map(String::from)));
             Ok(())
+        }),
+        manifest: Box::new(move |tx| {
+            let mut w = mf.borrow_mut();
+            w.manifest_reads += 1;
+            w.manifest = Some(tx);
         }),
     });
     w
@@ -508,4 +517,52 @@ fn a_role_set_writes_once_and_the_roles_come_again() {
     assert!(out.iter().any(|v| v["ev"] == "error" && v["cmd"] == "role_set"), "{out:#?}");
     assert!(evs(&out, "roles").is_empty());
     assert_eq!(w.borrow().role_sets.len(), 1);
+}
+
+/// bar S.6: the app says its build, the core reads the channel once (one
+/// read at a time), and says app_update once per newer version between
+/// two app_versions (a reloaded window hears it again); a downgrade or a
+/// failed read say nothing.
+#[test]
+fn app_version_reads_the_channel_and_a_newer_app_is_said_once_per_asking() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    let sha = "ab".repeat(32);
+    let feed = |id: &str, built: &str| {
+        format!(r#"{{"desktop":{{"darwin-arm64":{{"version":"v-{id}","id":"{id}","url":"bise-desktop.zip","sha256":"{sha}","built":"{built}"}}}}}}"#)
+    };
+    app(&mut t, r#"{"cmd":"app_version","id":"d25","built":"2026-10-07T10:00:00Z"}"#);
+    app(&mut t, r#"{"cmd":"app_version","id":"d25","built":"2026-10-07T10:00:00Z"}"#);
+    assert_eq!(w.borrow().manifest_reads, 1, "one read at a time");
+    let answer = |text: Result<String, String>| {
+        let tx = w.borrow().manifest.clone().unwrap();
+        tx.send(Done::Manifest { text, base: "file:///feed".into(), target: "darwin-arm64".into() }).unwrap();
+    };
+    answer(Ok(feed("d26", "2026-10-08T10:00:00Z")));
+    t.until(|o| !evs(o, "app_update").is_empty());
+    let out = t.take();
+    let u = evs(&out, "app_update")[0];
+    assert_eq!((u["version"].as_str(), u["url"].as_str(), u["sha256"].as_str()), (Some("v-d26"), Some("file:///feed/bise-desktop.zip"), Some(sha.as_str())));
+    // the next hour's read (no app_version): the same version isn't said
+    // twice; each answer is taken on the next tick (one tick: until on
+    // anything)
+    answer(Ok(feed("d26", "2026-10-08T10:00:00Z")));
+    t.until(|_| true);
+    assert!(evs(&t.take(), "app_update").is_empty(), "the hourly read: said once");
+    // a window asking again (a reload): it hears the offer again
+    app(&mut t, r#"{"cmd":"app_version","id":"d25","built":"2026-10-07T10:00:00Z"}"#);
+    answer(Ok(feed("d26", "2026-10-08T10:00:00Z")));
+    t.until(|o| !evs(o, "app_update").is_empty());
+    t.take();
+    // a downgrade and a failed read: nothing
+    app(&mut t, r#"{"cmd":"app_version","id":"d25","built":"2026-10-07T10:00:00Z"}"#);
+    answer(Ok(feed("d24", "2026-10-06T10:00:00Z")));
+    t.until(|_| true);
+    app(&mut t, r#"{"cmd":"app_version","id":"d25","built":"2026-10-07T10:00:00Z"}"#);
+    answer(Err("offline".into()));
+    t.until(|_| true);
+    app(&mut t, r#"{"cmd":"commands"}"#);
+    t.until(|o| !evs(o, "commands").is_empty());
+    assert!(evs(&t.take(), "app_update").is_empty());
+    assert_eq!(w.borrow().manifest_reads, 4);
 }

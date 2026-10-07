@@ -39,3 +39,4 @@
 {"cmd":"files","project":"acme-1a2b3c4d","q":"rust/","rid":8,"limit":20}
 {"cmd":"role_set","role":"agents","model":"mistral/devstral-medium-latest","effort":"high"}
 {"cmd":"role_set","role":"small"}
+{"cmd":"app_version","id":"d25","built":"2026-10-07T10:00:00Z"}

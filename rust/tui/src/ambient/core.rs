@@ -5,6 +5,7 @@
 //! listener, synthesizer, speaker, the voice jobs) are fakes in tests.
 
 mod agents_view;
+mod app_update;
 mod away;
 mod cmd;
 mod dictate;

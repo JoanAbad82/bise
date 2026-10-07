@@ -44,6 +44,7 @@ pub const TAGS: &[&str] = &[
     "computer_use",
     "setup_check",
     "role_set",
+    "app_version",
 ];
 
 /// Computer use's setup check stops this long after the page's last
@@ -70,8 +71,8 @@ pub(crate) fn cu_idle(last_check: Instant, now: Instant) -> bool {
 }
 
 pub(crate) struct Setup {
-    ports: SetupPorts,
-    tx: Sender<Done>,
+    pub(super) ports: SetupPorts,
+    pub(super) tx: Sender<Done>,
     rx: Receiver<Done>,
     /// the provider whose sign-in runs (one at a time)
     signing: Option<String>,
@@ -79,13 +80,15 @@ pub(crate) struct Setup {
     logins: Vec<String>,
     /// computer use's page while it is open
     cu: Option<CuLive>,
+    /// the desktop app's update check (bar S.6)
+    pub(super) update: super::app_update::UpdateCheck,
 }
 
 impl Core {
     /// The setup's ports (the binary's live ones, or a test's).
     pub fn set_setup(&mut self, ports: SetupPorts) {
         let (tx, rx) = channel();
-        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), cu: None });
+        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), cu: None, update: Default::default() });
     }
 
     /// What the window needs first: his preferences and his accounts (at
@@ -179,6 +182,11 @@ impl Core {
                     _ => Err(format!("no sign-in open for {id}")),
                 };
                 ("sign_in_cancel", res)
+            }
+            // bar S.6: the app's own build; the core reads the channel
+            AppCmd::AppVersion { id, built } => {
+                self.app_version(id, built);
+                return;
             }
             AppCmd::FoundScan { dir } => {
                 let dir = dir.filter(|d| !d.trim().is_empty()).map(PathBuf::from).unwrap_or_else(|| p.home_dir.clone());
@@ -406,6 +414,7 @@ impl Core {
                     }
                     self.emit_cu(false);
                 }
+                Done::Manifest { text, base, target } => self.on_manifest(text, &base, &target),
                 Done::LoggedIn { name, project, res } => {
                     if let Some(s) = self.setup.as_mut() {
                         s.logins.retain(|n| *n != name);
@@ -417,6 +426,8 @@ impl Core {
                 }
             }
         }
+        // bar S.6: the release channel again once an hour
+        self.update_tick();
     }
 }
 

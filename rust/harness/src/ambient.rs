@@ -113,8 +113,16 @@ fn ambient_projects(exe: std::path::PathBuf, root: std::path::PathBuf) -> (bend_
 /// .switchboard/config.toml, architect m_9130): the add sheet's 'agents
 /// land their work' is trunk, else pr.
 fn ambient_setup() -> bend_tui::ambient::setup::SetupPorts {
-    bend_tui::ambient::setup::live(Box::new(|path, trunk| {
+    let mut p = bend_tui::ambient::setup::live(Box::new(|path, trunk| {
         let mode = if trunk { switchboard::flow::FlowMode::Trunk } else { switchboard::flow::FlowMode::Pr };
         switchboard::flow::save_mode(&switchboard::paths::Paths::for_workspace(path), mode)
-    }))
+    }));
+    // bar S.6: the desktop app's update check reads bise update's channel
+    p.manifest = Box::new(|tx| {
+        std::thread::spawn(move || {
+            let (text, base, target) = crate::update::desktop_manifest();
+            let _ = tx.send(bend_tui::ambient::setup::Done::Manifest { text, base, target });
+        });
+    });
+    p
 }
