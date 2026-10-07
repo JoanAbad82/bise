@@ -8,6 +8,7 @@ import { InboxCard } from '@/inbox';
 import type { Card, HelperEv } from '@/proto';
 import { threadKey, useProjects, useStore } from '@/store';
 import type { SpotFront, SpotItem, SpotRoute } from '@/spotlight';
+import { useTheme } from '@/theme';
 import '@/ds/index.css';
 import { Capsule } from './Capsule';
 import { useSpotData } from './data';
@@ -80,6 +81,7 @@ const frontOf = (ev: Extract<HelperEv, { ev: 'front' }>): SpotFront | null =>
   ev.app === null ? null : { app: ev.app, title: ev.title ?? undefined, url: ev.url ?? undefined, path: ev.path ?? undefined };
 
 export function CapsuleRoot(): JSX.Element {
+  useTheme();
   const store = useStore();
   const bise = (window as Partial<Window>).bise;
   const [m, dispatch] = useReducer(reduce, { state: START, fx: [] });

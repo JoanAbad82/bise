@@ -29,6 +29,7 @@ import { numbersOf } from '@/agents/model';
 import { CoreLine } from './CoreLine';
 import { Palette } from './Palette';
 import { Help } from '@/help/Help';
+import { useTheme } from '@/theme';
 import { HELP_EVENT, keyAction, typingIn } from './keys';
 import { emitAction, useMenuAction } from './menu';
 import { TerminalPanel } from '@/terminal/Terminal';
@@ -97,6 +98,8 @@ function Shell() {
   });
   // a home not onboarded opens on the onboarding once (amb-home c44c926d)
   useFirstLaunch();
+  // his theme pref on <html data-theme> (amb-web's src/theme)
+  useTheme();
   useShown();
   return (
     <div className="app-shell b-ui" data-testid="app.root">
