@@ -32,6 +32,34 @@ if [ ${#specs[@]} -eq 0 ]; then
          tests/checks/agents tests/checks/review tests/checks/spotlight/answer.spec.ts)
 fi
 cd "$desktop" || exit 1
+# checks that change the world for good (review/feature-drop drops the feature that
+# review/feature merges) run last, each on a fresh world of its own
+fresh=(tests/checks/review/feature-drop.spec.ts)
+mine=() later=()
+for s in "${specs[@]}"; do
+  if [ "$s" = "${fresh[0]}" ]; then later+=("$s"); else mine+=("$s"); fi
+done
+# a folder holding a fresh check runs it last too, not in the shared world
+for s in "${mine[@]}"; do
+  case "${fresh[0]}" in "$s"/*) later+=("${fresh[0]}") ;; esac
+done
+grep='real core|thread/|inbox/cmd-i|agents/|review/'
+rc=0
 # the list on stdout, and every annotation (the checks' measured times) in a JSON beside it
-export PLAYWRIGHT_JSON_OUTPUT_NAME="${TMPDIR:-/tmp}/qa-flows-real.json"
-pnpm exec playwright test -c tests/harness/playwright.config.ts "${specs[@]}" -g 'real core|thread/|inbox/cmd-i|agents/|review/' --reporter=list,json
+# (given to Playwright alone, never exported: world up refuses any env value that reaches
+# ~/.bise/hubs, where an agent's TMPDIR lives)
+if [ ${#mine[@]} -gt 0 ]; then
+  PLAYWRIGHT_JSON_OUTPUT_NAME="${TMPDIR:-/tmp}/qa-flows-real.json" pnpm exec playwright test -c tests/harness/playwright.config.ts "${mine[@]}" -g "$grep" --grep-invert 'feature-drop' --reporter=list,json || rc=1
+fi
+n=0
+for s in "${later[@]}"; do
+  n=$((n + 1))
+  down
+  if ! python3 -B "$qa" "${up[@]}" > "${TMPDIR:-/tmp}/qa-flows-world.json" 2>&1; then
+    echo "real.sh: the fresh world for $s didn't come up:" >&2
+    tail -20 "${TMPDIR:-/tmp}/qa-flows-world.json" >&2
+    exit 1
+  fi
+  PLAYWRIGHT_JSON_OUTPUT_NAME="${TMPDIR:-/tmp}/qa-flows-real-fresh$n.json" pnpm exec playwright test -c tests/harness/playwright.config.ts "$s" -g "$grep" --reporter=list,json || rc=1
+done
+exit $rc

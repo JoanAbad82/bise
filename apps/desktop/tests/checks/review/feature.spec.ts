@@ -26,6 +26,19 @@ const T = {
   setupSkip: '[data-testid="setup.skip"]',
 };
 
+/** The feature view (amb-win efe231a3): its screen, state line, cards and answers. */
+const F = {
+  group: '[data-testid="app.sidebar.feature.gift-cards"]',
+  screen: '[data-testid="feature.screen"]',
+  state: '[data-testid="feature.state"]',
+};
+
+/** Opens gift-cards' view by his click on the sidebar's 'ψ gift-cards'. */
+async function openFeature(page: import('@playwright/test').Page): Promise<void> {
+  await page.locator(F.group).click();
+  await expect(page.locator(F.screen), "the sidebar's 'ψ gift-cards' opens the feature view").toHaveAttribute('data-feature', 'gift-cards', { timeout: 5000 });
+}
+
 const flat = (s: string): string => s.replace(/[│╭╮╰╯─┃]/g, ' ').replace(/\s+/g, ' ');
 const git = (cwd: string, ...args: string[]): string =>
   execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' } }).trim();
@@ -85,8 +98,10 @@ test("review/feature: ⌘D lists checkout's branch, its review matches the hub, 
 // which opens his feature_try card; answering it 1 (try) opens feature_merge. Passes when:
 //   - the window shows the feature with its 2 agents, as the TUI's panel does ('ψ gift-cards');
 //   - the try card shows in the window's inbox (⌘I), and in the TUI's;
-//   - nothing merges until his click: shop's main is unchanged before; he tries, then merges, by
-//     his own keys in the window, and only then shop's main has both feature commits.
+//   - from the FEATURE VIEW (sidebar 'ψ gift-cards', amb-win efe231a3): the try card, his 'try it'
+//     click answers it, the view shows the trial as the TUI does ('gift-cards is built to try'), shop's main
+//     doesn't move; then the merge card there, his 'merge' click, and only then shop's main has
+//     both feature commits. The drop is review/feature-drop.spec.ts (a fresh world of its own).
 test('review/feature: a feature with 2 agents shows, is tried and merged only on his click, as in the TUI', async () => {
   test.setTimeout(240_000);
   const w = realWorld();
@@ -126,18 +141,30 @@ test('review/feature: a feature with 2 agents shows, is tried and merged only on
     } finally {
       await page.screenshot({ path: test.info().outputPath('try-card.png') });
     }
-    await item.click();
-    await page.locator(`[data-testid="inbox.card.${project}-${String(tryId)}.opt.1"]`).click();
+    await page.keyboard.press('Escape');
+    // his answers from the FEATURE VIEW: the sidebar's 'ψ gift-cards' opens it, with the try card
+    await openFeature(page);
+    const tcard = page.locator(`[data-testid="feature.card.${String(tryId)}"]`);
+    try {
+      await expect(tcard, 'the feature view shows the try card').toHaveAttribute('data-kind', 'feature_try', { timeout: 10_000 });
+    } finally {
+      await page.screenshot({ path: test.info().outputPath('view-try.png') });
+    }
+    await tcard.locator('[data-testid="feature.opt.1"]').click();
     await expect.poll(async () => (await cards()).some((c) => c.id === tryId), { timeout: 15_000, message: 'his try answers the card' }).toBe(false);
+    await expect(page.locator(F.state), 'the view shows the trial').toHaveAttribute('data-trial', 'true', { timeout: 60_000 });
+    // the TUI says the try in its feed: 'gift-cards is built to try (<sha>): … git checkout gift-cards'
+    await expect.poll(() => flat(t?.screen() ?? ''), { timeout: 10_000, message: "the TUI shows the try ('built to try' / 'on trial')" }).toMatch(/gift-cards is built to try|on trial/);
     await expect.poll(async () => (await cards()).find((c) => c.kind === 'feature_merge')?.id, { timeout: 60_000, message: 'the hub opens the merge card after the try' }).toBeDefined();
     expect(mainHas('gift cards: the balance label'), 'trying is not merging').toBe(false);
+    expect(git(shop.ws, 'rev-parse', 'HEAD'), "shop's main didn't move on the try").toBe(head0);
     const mergeId = (await cards()).find((c) => c.kind === 'feature_merge')?.id ?? -1;
-    const mitem = page.locator(`[data-testid="inbox.item.${project}-${String(mergeId)}"]`);
-    await expect(mitem, "the window's inbox has the merge card").toBeVisible({ timeout: 10_000 });
-    await page.screenshot({ path: test.info().outputPath('merge-card.png') });
-    await mitem.click();
-    await page.locator(`[data-testid="inbox.card.${project}-${String(mergeId)}.opt.1"]`).click();
+    const mcard = page.locator(`[data-testid="feature.card.${String(mergeId)}"]`);
+    await expect(mcard, 'the feature view shows the merge card').toHaveAttribute('data-kind', 'feature_merge', { timeout: 10_000 });
+    await page.screenshot({ path: test.info().outputPath('view-trial.png') });
+    await mcard.locator('[data-testid="feature.opt.1"]').click();
     await expect.poll(() => mainHas('gift cards: the balance label') && mainHas('gift cards: balance(code) for the cart and checkout'), { timeout: 60_000, message: "after his merge, shop's main has both feature commits" }).toBe(true);
+    await expect.poll(async () => (await cards()).some((c) => c.id === mergeId), { timeout: 15_000, message: 'his merge answers the card' }).toBe(false);
     await page.screenshot({ path: test.info().outputPath('merged.png') });
   } finally {
     if (t) {
