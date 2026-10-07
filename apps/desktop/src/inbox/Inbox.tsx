@@ -7,20 +7,22 @@
 //
 // Typing stays smooth (the reset's bug 1): the answer field is an
 // uncontrolled <textarea>, so a key in it changes no state and re-renders
-// nothing; each item keeps its typed words while the screen lives (saved
-// when he leaves the item, never per key). The list's rows are memo'd: moving the keyboard re-renders
-// the two rows that change.
+// nothing; each item keeps its typed words (drafts.ts: saved on input into
+// a plain map, so they outlive the screen; dropped by an answer or a
+// close). The list's rows are memo'd: moving the keyboard re-renders the
+// two rows that change.
 import { memo, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { Card as CardRow } from '@/proto';
 import { Empty, Head, Row } from '@/ds';
 import { dotOf, InboxCard, kindTitle, takesWords } from './InboxCard';
 import { cardKey } from './order';
+import { inboxDrafts, type Drafts } from './drafts';
 import { current, prune, START, step, visible, type Act, type Key } from './model';
 import './inbox.css';
 
 export interface InboxPorts {
   answer: (project: string, card: number, reply: string) => void;
-  /** close without answering (none yet: no close key, no button) */
+  /** close without answering (none: no close key, no button) */
   close?: (project: string, card: number) => void;
   /** esc: back where he was */
   back: () => void;
@@ -36,19 +38,24 @@ export interface InboxProps {
   ports: InboxPorts;
   /** now, for the ages (a test pins it) */
   now?: number;
+  /** each item's typed words (default: the window's, drafts.ts) */
+  drafts?: Drafts;
 }
 
-export function Inbox({ cards, names, ports, now: pinned }: InboxProps) {
+export function Inbox({ cards, names, ports, now: pinned, drafts = inboxDrafts }: InboxProps) {
   const [opened] = useState(() => Date.now());
   const now = pinned ?? opened;
   const [s, setS] = useState(START);
-  // each item's typed words, saved when he leaves it (never per key)
-  const [drafts, setDrafts] = useState<ReadonlyMap<string, string>>(new Map());
   const list = visible(cards, s);
   const cur = current(list, s);
   const curKey = cur ? cardKey(cur) : null;
   const field = useRef<HTMLTextAreaElement>(null);
   const root = useRef<HTMLElement>(null);
+
+  // an item that is gone takes its words with it
+  useEffect(() => {
+    drafts.prune(new Set(cards.map(cardKey)));
+  }, [cards, drafts]);
 
   // the current item takes the keys: its field, or the screen for an approval
   useEffect(() => {
@@ -64,13 +71,8 @@ export function Inbox({ cards, names, ports, now: pinned }: InboxProps) {
   const key = (k: Key) => {
     const text = field.current?.value ?? '';
     const r = step(s, list, k, text);
-    if (curKey !== null) {
-      const next = new Map(drafts);
-      // an act takes its words; leaving keeps them for the way back
-      if (r.act) next.delete(curKey);
-      else if (text !== '') next.set(curKey, text);
-      setDrafts(next);
-    }
+    // an answer or a close takes the item's words; esc and moving keep them
+    if (curKey !== null && (r.act?.t === 'answer' || r.act?.t === 'close')) drafts.drop(curKey);
     setS(prune(r.s, cards));
     if (r.act) run(r.act);
   };
@@ -121,7 +123,10 @@ export function Inbox({ cards, names, ports, now: pinned }: InboxProps) {
                   className="inbox-field"
                   rows={2}
                   placeholder={cur.options.length > 0 ? 'or type your answer' : 'type your answer'}
-                  defaultValue={drafts.get(cardKey(cur)) ?? ''}
+                  defaultValue={drafts.get(cardKey(cur))}
+                  onInput={(e) => {
+                    drafts.keep(cardKey(cur), e.currentTarget.value);
+                  }}
                   aria-label="your answer"
                   data-testid="inbox.answer"
                 />

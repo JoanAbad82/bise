@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Card } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
 import { Inbox, keyOf, type InboxPorts } from './Inbox';
+import { makeDrafts } from './drafts';
 import { InboxCard } from './InboxCard';
 
 afterEach(cleanup);
@@ -72,6 +73,41 @@ describe('Inbox', () => {
     obs.disconnect();
     expect(spy).not.toHaveBeenCalled();
     expect(screen.getAllByTestId(/^inbox\.item\./)).toEqual(rows);
+  });
+
+  it('each item keeps his half answer: another item, esc and back, a new screen; an answer drops it (I6)', () => {
+    const p = ports();
+    const drafts = makeDrafts();
+    const two = cards().filter((c) => c.id !== 10);
+    const type = (text: string) => {
+      const field = screen.getByTestId<HTMLTextAreaElement>('inbox.answer');
+      field.value = text;
+      fireEvent.input(field);
+    };
+    const first = render(<Inbox cards={two} names={{}} ports={p} now={1791100400000} drafts={drafts} />);
+    expect(screen.getByTestId('inbox.card.acme-1a2b3c4d-9')).toBeTruthy();
+    type('cold, th');
+    fireEvent.click(screen.getByTestId('inbox.item.acme-1a2b3c4d-11'));
+    fireEvent.click(screen.getByTestId('inbox.item.acme-1a2b3c4d-9'));
+    expect(screen.getByTestId<HTMLTextAreaElement>('inbox.answer').value).toBe('cold, th');
+    // esc leaves the inbox; the screen comes back later
+    fireEvent.keyDown(screen.getByTestId('inbox.root'), { key: 'Escape' });
+    first.unmount();
+    render(<Inbox cards={two} names={{}} ports={p} now={1791100400000} drafts={drafts} />);
+    expect(screen.getByTestId<HTMLTextAreaElement>('inbox.answer').value).toBe('cold, th');
+    type('cold, then warm');
+    fireEvent.keyDown(screen.getByTestId('inbox.answer'), { key: 'Enter' });
+    expect(p.calls).toEqual(['back', 'answer acme-1a2b3c4d 9 cold, then warm']);
+    expect(drafts.get('acme-1a2b3c4d-9')).toBe('');
+  });
+
+  it('an item that is gone takes its words with it', () => {
+    const drafts = makeDrafts();
+    drafts.keep('acme-1a2b3c4d-9', 'half');
+    drafts.keep('gone-00000000-1', 'old');
+    render(<Inbox cards={cards()} names={{}} ports={ports()} now={1791100400000} drafts={drafts} />);
+    expect(drafts.get('acme-1a2b3c4d-9')).toBe('half');
+    expect(drafts.get('gone-00000000-1')).toBe('');
   });
 
   it('nothing open: says so', () => {

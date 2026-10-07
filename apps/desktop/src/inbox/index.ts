@@ -7,4 +7,5 @@
 export { Inbox, type InboxPorts, type InboxProps } from './Inbox';
 export { InboxCard, kindTitle, takesWords, type InboxCardActs, type InboxCardProps } from './InboxCard';
 export { sortCards, cardKey } from './order';
+export { inboxDrafts, makeDrafts, type Drafts } from './drafts';
 export { InboxScreen, inboxOf } from './screen';
