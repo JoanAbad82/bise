@@ -11,7 +11,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Answer, Markdown } from './Markdown';
-import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, reportLine, schedHead, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
+import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -102,7 +102,7 @@ function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head:
       );
     case 'report':
       // a status line, never the '[report: …]' bracket form (designer D14)
-      return <Marker>{reportLine(e.text, e.report?.kind) ?? e.text}</Marker>;
+      return <Marker>{reportStatus(e.text, e.report?.kind) ?? e.text}</Marker>;
     case 'you':
       return <YouRow e={e} ctx={ctx} head={head} />;
     case 'to_agent':
@@ -149,7 +149,7 @@ function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head:
     default: {
       const who = whoOf(e, ctx);
       // an agent's '[report: blocked] …' message: its status line (designer D14, the TUI's report_parts)
-      const report = reportLine(e.text);
+      const report = reportStatus(e.text);
       if (report !== null) {
         return (
           <div data-testid={`thread.report.${String(e.pos)}`}>
@@ -612,6 +612,17 @@ function ToAgentRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const to = e.to ?? 'main';
   const next = useNeighbor(ctx.tkey, e.pos, 1);
   const carded = e.asks === true && next !== undefined && cardFollows(e, next);
+  // its report to bise ('[report: blocked] …'): a status line, never the tag (designer D14 in agent
+  // threads, cb1f2b44); a blocked one the question card right under it already says: nothing
+  const report = reportStatus(e.text);
+  if (report !== null) {
+    if (carded) return null;
+    return (
+      <div data-testid={`thread.report.${String(e.pos)}`}>
+        <Marker>{report}</Marker>
+      </div>
+    );
+  }
   return (
     <Msg
       from="agent"

@@ -81,6 +81,8 @@ const COMMANDS = [
   ['shortcuts', 'the key list', false, false],
   ['keys', 'the key list', false, false],
   ['theme', 'auto, light or dark', true, false],
+  // keychain-secrets 5426328b: the TUI's /keychain (a window line the hub doesn't run: shown, greyed)
+  ['keychain', 'keep your keys and sign-ins in the macOS keychain: /keychain [on|off]', true, false],
 ] as const;
 
 const ARG_KINDS: Partial<Record<string, readonly ArgKind[]>> = {
@@ -94,6 +96,8 @@ const ARG_KINDS: Partial<Record<string, readonly ArgKind[]>> = {
   answer: ['card', 'text'],
   close: ['card', 'text'],
   new: ['text'],
+  // the TUI's words (commands.rs keychain_choices, picks.rs Arg::Keychain)
+  keychain: [{ words: [{ value: 'on', desc: 'move them to the macOS keychain' }, { value: 'off', desc: 'move them back to files in ~/.bise' }] }],
 };
 
 /** The words the lab's fake mic hears (qa-type's SAID). */

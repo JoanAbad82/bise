@@ -243,6 +243,14 @@ export function reportLine(text: string, kind?: string | null): string | null {
   return words === '' ? k : `${k} · ${words}`;
 }
 
+/** A report's status line in a thread, with its kind's mark as the TUI's report line: '✓ done · …', '✗ failed · …' (designer: '✓ done · <summary>'); the spotlight's preview marks its own lines. Pure. */
+export function reportStatus(text: string, kind?: string | null): string | null {
+  const line = reportLine(text, kind);
+  if (line === null) return null;
+  const k = line.split(' · ')[0] ?? '';
+  return `${k === 'done' ? '✓ ' : k.includes('fail') ? '✗ ' : ''}${line}`;
+}
+
 /** At most this many command and edit lines show; the rest fold into the counted line. */
 export const TOOL_LINES = 6;
 

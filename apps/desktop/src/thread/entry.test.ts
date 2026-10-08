@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, TOOL_LINES, chipOf, dropAuthor, handoffOf, stepTime, toolLines, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, TOOL_LINES, chipOf, dropAuthor, handoffOf, stepTime, toolLines, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -147,6 +147,10 @@ describe('D14 / D15: a report is a status line, a command reads once', () => {
   it("'[report: blocked] waiting for your answer: …' -> 'blocked · waiting for your answer' (the card says the question)", () => {
     expect(reportLine('[report: blocked] waiting for your answer: cart page or checkout only?')).toBe('blocked · waiting for your answer');
     expect(reportLine('[report: done] p95 at 180 ms, nothing to fix.\n- ran 3 times')).toBe('done · p95 at 180 ms, nothing to fix.');
+    expect(reportStatus('[report: done] p95 at 180 ms, nothing to fix.\n- ran 3 times')).toBe('✓ done · p95 at 180 ms, nothing to fix.');
+    expect(reportStatus('[report: failed] the staging token expired.')).toBe('✗ failed · the staging token expired.');
+    expect(reportStatus('[report: blocked] waiting for your answer: x?')).toBe('blocked · waiting for your answer');
+    expect(reportStatus('a plain message')).toBeNull();
     expect(reportLine('a plain answer')).toBeNull();
     expect(reportLine('waiting for your answer: x', 'blocked')).toBe('blocked · waiting for your answer');
   });
