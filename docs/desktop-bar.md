@@ -369,6 +369,21 @@ A row stays even after it passes: it is a regression list.
     - P7, R04: the spotlight's waiting rows show no key of their own; only the foot has ⏎ and esc
       (amb-web).
     - Designer's D7–D9 (amb-home).
+  - **final owners** (ambient-lead m_12614; they replace the ones above where they differ):
+    - D1 (project routes): qa-native first finds out whether the cause is the test setup or the
+      app; amb-win if it's the app.
+    - D2 (agents under projects): amb-win.
+    - D3 (bise's pearl in the sidebar) and D6 (the hint row): amb-web.
+    - D4 (a pink "new"): amb-kit.
+    - D5, R36, R40, R18 (the fake model): amb-tools.
+    - R08 (the fake mic) and the rows whose clicks timed out: qa-native.
+    - The spotlight's waiting-row keys: amb-web.
+    - D7–D9: amb-home.
+    - "Quit bise-desktop": amb-mac, when a slot frees.
+    - R03 (the click reds): amb-win.
+
+    There will be one re-cut once all of these land; ambient-pm gets its sha after qa-native's
+    reshoot.
   - **the 30-minute use** with designer waits for the re-cut: with the project routes missing,
     most of the app can't be reached.
 
