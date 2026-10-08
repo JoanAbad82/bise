@@ -421,7 +421,13 @@ A row stays even after it passes: it is a regression list.
       - New, not red:
         - D11: "every every 30m" in "scheduled here", and the time cut off (amb-win).
         - D12: every agent row ends in an unnamed "0%" (amb-win).
-      - Shots designer still needs: R35 at 1800 on a project thread, and R37 with and without
+      - R35, reshot at 1800 (designer m_12647): green. Answers and his long message sit in the 720
+        column, the prose is capped near 68ch and wraps, and the composer has the same edges.
+      - D3 also hits the thread: bise's head and its name lines show the broken square, which
+        leaves "bise 11:15" indented with nothing before it. One pearl component (amb-web).
+      - D13, not red: "↓ back to the bottom" has no solid fill, so the answer's words show
+        through it (amb-home).
+      - Shots designer still needs: R37 with and without
         thinking (qa-native).
     - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
       dev tool (amb-web's list, or amb-home's commands).
