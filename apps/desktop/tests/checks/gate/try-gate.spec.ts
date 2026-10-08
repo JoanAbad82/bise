@@ -304,11 +304,13 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       // only), then a real ⌘V in the field
       // the same PNG as amb-mac's composer/paste-image check (a 1x1 PNG made no chip on 233c325a)
       const png = path.join(__dirname, '../fixtures/checker.png');
-      const staged = await s.app.evaluate((_e, file) => (globalThis as unknown as { __biseTestClip?: (c: { file: string }) => Promise<boolean> }).__biseTestClip?.({ file }) ?? Promise.resolve(false), png);
-      note('R24', `image staged on the test clipboard: ${String(staged)}`);
+      // amb-mac's composer/paste-image order (green on the packed d94b7996 bundle): the field first, then stage, then ⌘V
       await field.click();
-      await p.keyboard.press('Meta+v');
-      await sleep(1000);
+      const staged = await s.app.evaluate((_e, file) => (globalThis as unknown as { __biseTestClip?: (c: { file: string }) => Promise<boolean> }).__biseTestClip?.({ file }) ?? Promise.resolve(false), png);
+      note('R24', `image staged on the test clipboard: ${String(staged)}; focus before ⌘V: ${await p.evaluate(() => { const a = document.activeElement; return a === null ? 'none' : `${a.tagName}${a.getAttribute('data-testid') !== null ? `[${a.getAttribute('data-testid') ?? ''}]` : ''}`; })}`);
+      await p.keyboard.press('Meta+V');
+      await p.locator('[data-testid^="composer.chip."][data-kind="image"]').first().waitFor({ timeout: 3000 }).catch(() => undefined);
+      await sleep(300);
       await p.keyboard.type('what is this? ');
       await p.keyboard.press('Control+r');
       await sleep(900);
