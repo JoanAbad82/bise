@@ -30,7 +30,7 @@ test('inbox/drafts: each item keeps its own half answer, across items and a reop
   const sock = hubOf(w, 'shop').sock;
   const open = async () => (((await hubState(sock))['cards'] as { text?: string; question?: string }[] | undefined) ?? []).filter((c) => `${c.text ?? ''}${c.question ?? ''}`.includes(n)).length;
   await expect.poll(open, { timeout: 60_000, message: 'both cards are in the hub' }).toBe(2);
-  let s = await launchOn(w, 'inbox', T.root);
+  const s = await launchOn(w, 'inbox', T.root);
   try {
     const { page } = s;
     await expect(page.locator(T.root)).toBeVisible({ timeout: 15_000 });
@@ -47,18 +47,14 @@ test('inbox/drafts: each item keeps its own half answer, across items and a reop
     await expect.soft(page.locator(T.answer), "back on B: B's half answer").toHaveValue(`half of B ${n}`);
     await page.screenshot({ path: test.info().outputPath('drafts.png') });
     expect.soft(await open(), 'nothing was sent: both still open in the hub').toBe(2);
-  } finally {
-    await s.close();
-  }
-  // the window again: the drafts are kept (app/keep-all keeps one; here, two)
-  s = await launchOn(w, 'inbox', T.root);
-  try {
-    const { page } = s;
+    // a reload keeps them (as app/keep-all; a second harness launch has fresh user data, so a
+    // close and relaunch can't tell)
+    await page.reload();
     await expect(page.locator(T.root)).toBeVisible({ timeout: 15_000 });
     await openItem(page, A);
-    await expect.soft(page.locator(T.answer), "after a reopen: A's").toHaveValue(`half of A ${n}`);
+    await expect.soft(page.locator(T.answer), "after a reload: A's").toHaveValue(`half of A ${n}`);
     await openItem(page, B);
-    await expect.soft(page.locator(T.answer), "after a reopen: B's").toHaveValue(`half of B ${n}`);
+    await expect.soft(page.locator(T.answer), "after a reload: B's").toHaveValue(`half of B ${n}`);
     test.info().annotations.push({ type: 'project', description: path.basename(path.dirname(sock)) });
   } finally {
     await s.close();

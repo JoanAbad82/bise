@@ -29,10 +29,12 @@ test('thread/folds: ⌘E opens and closes every fold, space toggles the focused 
     await expect(field, "bise's thread").toBeVisible({ timeout: 10_000 });
     const list = page.locator(T.list);
     for (const tag of ['a', 'b']) {
-      const text = Array.from({ length: 40 }, (_, i) => `${tag} line ${String(i + 1)} of 40 ${n}`).join('\n');
+      // typed line by line, as rows.spec's B11 (the clipboard isn't reliable under the harness)
       await field.click();
-      await page.evaluate((t) => navigator.clipboard.writeText(t), text).catch(() => undefined);
-      await page.keyboard.press('Meta+v');
+      for (let i = 1; i <= 40; i++) {
+        await page.keyboard.type(`${tag} line ${String(i)} of 40 ${n}`);
+        if (i < 40) await page.keyboard.press('Shift+Enter');
+      }
       await page.keyboard.press('Enter');
       await expect(list.getByText(`${tag} line 1 of 40 ${n}`).first(), `his ${tag} message is in`).toBeVisible({ timeout: 20_000 });
     }

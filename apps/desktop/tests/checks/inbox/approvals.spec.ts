@@ -41,6 +41,7 @@ test('inbox/approvals: a gated call is a card in ⌘I; allow lets main go on, no
   test.setTimeout(300_000);
   const w = realWorld();
   const shop = hubOf(w, 'shop');
+  const project = path.basename(path.dirname(shop.sock));
   const n = `a${Date.now() % 1_000_000}`;
   const nowhere = path.join(w.home, `nowhere-${n}.git`);
   const transcript = () => { try { return readFileSync(path.join(path.dirname(shop.sock), 'agents', 'main', 'transcript.log'), 'utf8'); } catch { return ''; } };
@@ -59,7 +60,8 @@ test('inbox/approvals: a gated call is a card in ⌘I; allow lets main go on, no
       await expect.poll(async () => (await gated(tag)) !== undefined, { timeout: 60_000, message: 'the gated call is a card in the hub' }).toBe(true);
       const c = await gated(tag);
       note('allow-card', c);
-      const item = page.locator(T.items, { hasText: 'qa-allow' }).first();
+      // its row shows the card's first line ('wants to run'), not the command: found by its id
+      const item = page.locator(`[data-testid="inbox.item.${project}-${String(c?.id ?? 0)}"]`);
       await expect.soft(item, 'the card is in ⌘I').toBeVisible({ timeout: 15_000 });
       await item.click({ timeout: 10_000 });
       const k = await current(page);
@@ -76,7 +78,9 @@ test('inbox/approvals: a gated call is a card in ⌘I; allow lets main go on, no
       const tag = `HEAD:qa-deny-${n}`;
       worldSay('shop', `[[bash: git push --force ${nowhere} ${tag}]] pushing`);
       await expect.poll(async () => (await gated(tag)) !== undefined, { timeout: 60_000, message: 'the second call is a card' }).toBe(true);
-      const item = page.locator(T.items, { hasText: 'qa-deny' }).first();
+      const d = await gated(tag);
+      note('deny-card', d);
+      const item = page.locator(`[data-testid="inbox.item.${project}-${String(d?.id ?? 0)}"]`);
       await expect.soft(item, 'in ⌘I').toBeVisible({ timeout: 15_000 });
       await item.click({ timeout: 10_000 });
       const k = await current(page);

@@ -67,7 +67,8 @@ test('inbox/keys: ↑↓ ←→ ctrl+n ctrl+p walk the inbox, ctrl+o opens a fol
       await page.keyboard.press('ArrowRight');
       await expect.soft(opt1, '→: option 1 on').toHaveAttribute('aria-selected', 'true', { timeout: 3000 });
       await page.keyboard.press('ArrowLeft');
-      await expect.soft(opt1, '←: none on').toHaveAttribute('aria-selected', 'false', { timeout: 3000 });
+      // the bar doesn't say whether ← from option 1 clears the pick or stays on it: note it, no red
+      note('← after →: option 1 aria-selected', await opt1.getAttribute('aria-selected'));
     });
 
     await test.step('ctrl+n / ctrl+p, with words in the field too', async () => {
@@ -114,6 +115,11 @@ test('inbox/keys: ↑↓ ←→ ctrl+n ctrl+p walk the inbox, ctrl+o opens a fol
       await page.keyboard.press('Meta+/');
       const help = page.locator(T.help);
       await expect.soft(help, '⌘/ opens the key list').toBeVisible({ timeout: 3000 });
+      // ⌘/ opens on 'help' (a short list); tab goes to 'shortcuts', every key (as settings/keys)
+      const count = () => page.locator('[data-testid="help.row"]').count();
+      const onHelp = await count();
+      await page.keyboard.press('Tab');
+      await expect.soft.poll(count, { timeout: 3000, message: 'tab: the shortcuts page' }).toBeGreaterThan(onHelp);
       const keys = await page.locator('[data-testid="help.row"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-keys') ?? ''));
       note('keys', keys);
       for (const k of ['ctrl+n', 'ctrl+p', 'ctrl+o']) expect.soft(keys.some((x) => x.toLowerCase().replace(/\s+/g, '').includes(k)), `the key list has ${k}`).toBe(true);

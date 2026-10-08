@@ -130,6 +130,12 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       note('pr-open', { id, link: linkWords, clicked, url, stdout: out.lines.filter((l) => l.includes('bise-desktop')).slice(-5) });
       expect.soft(clicked, "a click on the PR's number").toBe('ok');
       expect.soft(url, 'its number opens the PR').toContain('/pull/412');
+      // find left the thread up at #412: close it and go back to the end, where the next rows are
+      await page.keyboard.press('Escape');
+      await page.locator(T.field).first().click().catch(() => undefined);
+      await page.keyboard.press('End');
+      await page.keyboard.press('Meta+ArrowDown').catch(() => undefined);
+      await sleep(800);
     });
 
     await test.step('artifact', async () => {

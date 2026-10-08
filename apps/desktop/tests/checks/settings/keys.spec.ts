@@ -7,7 +7,7 @@
 //   - the listed keys that open a screen do it, each from the thread: ⌘I the inbox, ⌘K the agent
 //     palette, ⌘, settings, ⌘F the thread's find, ⌘/ the key list (the rest: annotated, as listed).
 import { test, expect } from '../../harness';
-import { launchReal, realWorld } from '../world';
+import { launchReal, menuKey, realWorld } from '../world';
 
 const T = {
   field: '[data-testid="composer.field"]',
@@ -83,7 +83,9 @@ test('settings/keys: the key list, its two pages and its filter; the listed scre
           continue;
         }
         await field.click().catch(() => undefined);
-        await page.keyboard.press(a.press);
+        // ⌘I is the app menu's item (amb-mac 9d914bbb), not a page key: the menu's own accelerator
+        if (a.keys === '⌘I') await menuKey(s, 'CmdOrCtrl+I');
+        else await page.keyboard.press(a.press);
         const ok = await page.locator(a.shows).first().isVisible({ timeout: 3000 }).catch(() => false) || (await page.locator(a.shows).first().waitFor({ timeout: 3000 }).then(() => true, () => false));
         results[a.keys] = ok ? 'acts' : 'no act';
         expect.soft(ok, `${a.keys} does what the list says`).toBe(true);
