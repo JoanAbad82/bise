@@ -3,12 +3,21 @@
 .inbox-body { display: grid; grid-template-columns: minmax(220px, 34%) 1fr; gap: var(--s-4); min-height: 0; flex: 1; padding: var(--s-3) var(--s-4); }
 .inbox-list { overflow-y: auto; min-height: 0; }
 .inbox-open { min-width: 0; overflow-y: auto; }
-.inbox-field {
-  display: block; width: 100%; box-sizing: border-box; margin-top: var(--s-3); padding: var(--s-2) var(--s-3);
-  font: inherit; font-size: var(--t-14); line-height: var(--lh-read); color: var(--c-text);
-  background: var(--c-sunken); border: 0; border-radius: var(--r-2); box-shadow: 0 0 0 1px var(--c-line); resize: none;
+/* the answer field: its box holds the image chips, then his words (the textarea draws no box) */
+.inbox-answer {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 4px; box-sizing: border-box; margin-top: var(--s-3); padding: var(--s-2) var(--s-3);
+  background: var(--c-sunken); border-radius: var(--r-2); box-shadow: 0 0 0 1px var(--c-line);
 }
-.inbox-field:focus { outline: none; box-shadow: 0 0 0 1px var(--c-focus); }
+.inbox-answer:focus-within { box-shadow: 0 0 0 1px var(--c-focus); }
+.inbox-field {
+  display: block; flex: 1 1 160px; min-width: 0; width: 100%; box-sizing: border-box; margin: 0; padding: 0;
+  font: inherit; font-size: var(--t-14); line-height: var(--lh-read); color: var(--c-text);
+  background: none; border: 0; resize: none;
+}
+.inbox-field:focus { outline: none; }
+/* R41: an image on his answer is the composer's chip: 16 px thumbnail, '[Image #n]' accent on accent-soft */
+.inbox-answer .b-chip.image { height: 20px; padding: 0 7px; margin-top: 1px; color: var(--c-accent); background: var(--c-accent-soft); }
+.inbox-answer .b-chip.image .thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; margin-right: -1px; }
 .inbox-acts { display: flex; justify-content: flex-end; margin-top: var(--s-2); }
 .inbox-acts button, .inbox-page {
   font: inherit; font-size: var(--t-12); color: var(--c-text-2); background: none; border: 0; padding: var(--s-1) var(--s-2);
@@ -79,7 +88,7 @@
 .ic-opt.picked .ic-n { color: var(--c-on-ink); }
 .ic-n { font: 600 12px var(--font-mono); color: var(--c-accent); text-align: center; }
 .ic-l { min-width: 0; }
-.ic .inbox-field { flex: none; }
+.ic .inbox-answer { flex: none; }
 .ic-note { flex: none; margin-top: 8px; font-size: var(--t-12); }
 .ic-foot {
   display: flex; flex-wrap: wrap; gap: 2px 18px; flex: none; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--c-line);
@@ -93,11 +102,3 @@
 .ic.glass { background: transparent; box-shadow: none; border-radius: 0; max-height: none; }
 /* the strip's open item: docked between the thread and the composer's label, the composer's edges */
 .inbox-dock { margin: 0 16px 10px; flex: none; }
-
-/* R41: the images on his answer, as the composer's chips (mono 11, a quiet pill, × removes one) */
-.inbox-images { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--s-2); }
-.inbox-image {
-  display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px;
-  font: 11px var(--font-mono); color: var(--c-text-2); background: var(--c-sunken); box-shadow: 0 0 0 1px var(--c-line);
-}
-.inbox-image button { padding: 0; border: 0; background: none; color: var(--c-text-3); font: inherit; cursor: default; }

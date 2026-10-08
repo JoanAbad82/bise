@@ -18,10 +18,13 @@ import { dotOf, folds, InboxCard, takesWords, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { inboxDrafts, type Drafts } from './drafts';
 import { caretAtEnd } from '@/app/keep';
-import { saveImageFile } from '@/composer/attach';
+import { saveImageFile, thumbnail } from '@/composer/attach';
 import type { SavedImage } from '@/composer/sources';
 import { current, prune, START, step, visible, type Act, type Key } from './model';
 import './inbox.css';
+
+/** An image on his answer: saved in bise's image store, with its chip's thumbnail (none: unreadable). */
+type AnswerImage = SavedImage & { readonly thumb?: string };
 
 export interface InboxPorts {
   answer: (project: string, card: number, reply: string, files?: readonly string[]) => void;
@@ -73,14 +76,15 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
   const curKey = cur ? cardKey(cur) : null;
   const field = useRef<HTMLTextAreaElement>(null);
   const root = useRef<HTMLElement>(null);
-  // R41: the images he pasted or dropped on an item's answer (saved by the window: absolute paths), per item
-  const [images, setImages] = useState<ReadonlyMap<string, readonly SavedImage[]>>(new Map());
-  const imagesOf = (k: string | null): readonly SavedImage[] => (k === null ? [] : (images.get(k) ?? []));
+  // R41: the images he pasted or dropped on an item's answer (saved by the window: absolute paths,
+  // with the thumbnail its chip shows), per item
+  const [images, setImages] = useState<ReadonlyMap<string, readonly AnswerImage[]>>(new Map());
+  const imagesOf = (k: string | null): readonly AnswerImage[] => (k === null ? [] : (images.get(k) ?? []));
   const addImages = (k: string, list: readonly File[]) => {
     for (const f of list) {
       if (!f.type.startsWith('image/')) continue;
-      void saveImageFile(f).then((img) => {
-        if (img !== null) setImages((m) => new Map(m).set(k, [...(m.get(k) ?? []), img]));
+      void Promise.all([saveImageFile(f), thumbnail(f)]).then(([img, thumb]) => {
+        if (img !== null) setImages((m) => new Map(m).set(k, [...(m.get(k) ?? []), thumb === null ? img : { ...img, thumb }]));
       });
     }
   };
@@ -186,6 +190,13 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
       if (cur && curKey !== null && folds(cur.question)) setWhole(whole === curKey ? null : curKey);
       return;
     }
+    // ⌫ at the start of his words takes the last image chip away, as the composer's ⌫ before a chip
+    const f = field.current;
+    if (e.key === 'Backspace' && !e.metaKey && !e.altKey && f !== null && e.target === f && f.selectionStart === 0 && f.selectionEnd === 0 && curKey !== null && imagesOf(curKey).length > 0) {
+      e.preventDefault();
+      dropImages(curKey, imagesOf(curKey).length - 1);
+      return;
+    }
     const k = keyOf(e, field.current?.value ?? '');
     if (k === null || (k.k === 'close' && !ports.close)) return;
     e.preventDefault();
@@ -243,6 +254,15 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
               }}
             >
               {takesWords(cur) && (
+                // the field's box holds the image chips (the composer's: thumbnail + '[Image #n]', accent
+                // on accent-soft, ⌫ at the start of his words removes the last) and then his words
+                <div className="inbox-answer" data-testid="inbox.answer.box">
+                {imagesOf(curKey).map((img, i) => (
+                  <span key={img.path} className="b-chip image" data-kind="image" title={img.path} data-testid={`inbox.answer.image.${String(i + 1)}`}>
+                    {img.thumb !== undefined && <img className="thumb" src={img.thumb} alt="" />}
+                    {`[Image #${String(i + 1)}]`}
+                  </span>
+                ))}
                 <textarea
                   key={cardKey(cur)}
                   ref={field}
@@ -271,23 +291,6 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
                     addImages(curKey, fs);
                   }}
                 />
-              )}
-              {takesWords(cur) && imagesOf(curKey).length > 0 && (
-                <div className="inbox-images" data-testid="inbox.answer.images">
-                  {imagesOf(curKey).map((img, i) => (
-                    <span key={img.path} className="inbox-image" data-testid={`inbox.answer.image.${String(i + 1)}`} title={img.path}>
-                      {`[Image #${String(i + 1)}] ${img.name}`}
-                      <button
-                        type="button"
-                        aria-label={`remove image ${String(i + 1)}`}
-                        onClick={() => {
-                          if (curKey !== null) dropImages(curKey, i);
-                        }}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
                 </div>
               )}
             </InboxCard>

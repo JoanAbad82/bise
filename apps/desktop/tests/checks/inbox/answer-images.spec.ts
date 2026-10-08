@@ -42,8 +42,44 @@ test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked 
 
     await test.step("⌘I: a pasted PNG is a chip; words + ⏎ send answer {files}", async () => {
       await pasteImage(page, field, PNG);
-      await expect(page.getByTestId('inbox.answer.image.1')).toContainText('[Image #1] checker.png', { timeout: 5000 });
+      // the composer's chip inside the field, before his words: thumbnail + '[Image #1]', no file name
+      const chip = page.getByTestId('inbox.answer.image.1');
+      await expect(chip).toHaveText('[Image #1]', { timeout: 5000 });
+      await expect(chip.locator('img.thumb'), 'a 16 px thumbnail').toHaveCount(1);
+      await expect(page.getByTestId('inbox.answer.box').getByTestId('inbox.answer.image.1'), 'inside the field').toHaveCount(1);
+      const look = await chip.evaluate((el) => {
+        const cs = getComputedStyle(el);
+        const root = getComputedStyle(document.documentElement);
+        const probe = (v: string): string => {
+          const d = document.createElement('i');
+          d.style.color = v;
+          document.body.append(d);
+          const c = getComputedStyle(d).color;
+          d.remove();
+          return c;
+        };
+        return { color: cs.color, accent: probe(root.getPropertyValue('--c-accent')), bg: cs.backgroundColor, soft: probe(root.getPropertyValue('--c-accent-soft')), thumb: (el.querySelector('img.thumb') as HTMLElement).getBoundingClientRect().width };
+      });
+      expect(look.color, 'accent words').toBe(look.accent);
+      expect(look.bg, 'on accent-soft').toBe(look.soft);
+      expect(look.thumb).toBe(16);
       await page.screenshot({ path: test.info().outputPath('inbox-image.png') });
+      // ⌫ at the start of the words removes it, as the composer's ⌫ before a chip
+      await page.locator(field).press('Backspace');
+      await expect(chip).toHaveCount(0);
+      await pasteImage(page, field, PNG);
+      await expect(page.getByTestId('inbox.answer.image.1')).toBeVisible({ timeout: 5000 });
+      await page.evaluate(() => {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        document.documentElement.style.setProperty('color-scheme', 'dark');
+      });
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: test.info().outputPath('inbox-image-dark.png') });
+      await page.evaluate(() => {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.documentElement.style.setProperty('color-scheme', 'light');
+      });
+      await page.waitForTimeout(300);
       await page.locator(field).fill('this one, see the shot');
       await page.locator(field).press('Enter');
       await expect.poll(() => answers(core).length, { timeout: 3000 }).toBe(1);
