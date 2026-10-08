@@ -4,9 +4,9 @@
 // (EXTERNAL_LINE, COPY_LINE), never his browser or his clipboard.
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, extname } from 'node:path';
+import { basename, extname, isAbsolute } from 'node:path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, session, shell, type OpenDialogOptions } from 'electron';
-import { COPY_LINE, EXTERNAL_LINE, IPC, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_TEXT_ENV, TEST_PICK_FOLDER_ENV, type MenuAction } from '../shared/api';
+import { COPY_LINE, EXTERNAL_LINE, IPC, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FOLDER_ENV, type MenuAction } from '../shared/api';
 import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
 import { menuTarget } from './menu';
@@ -29,29 +29,77 @@ const MIME: Readonly<Record<string, string>> = {
   '.txt': 'text/plain',
 };
 
+/** Test mode: a file's bytes for a seed (unreadable: null, said on stderr). */
+function readSeedFile(what: string, p: string | undefined): Buffer | null {
+  if (p === undefined || p === '') return null;
+  try {
+    return readFileSync(p);
+  } catch (e) {
+    process.stderr.write(`clip seed: can't read ${what}=${p}: ${String(e)}\n`);
+    return null;
+  }
+}
+
+/** A seed's file item from its path and bytes: its name and its type from the extension (an image is image/png...). */
+export function clipFileOf(path: string, bytes: Uint8Array): ClipFile {
+  return { name: basename(path), type: MIME[extname(path).toLowerCase()] ?? 'application/octet-stream', bytes };
+}
+
 /** Test mode: the clipboard's seed from the env's files (unreadable: left out, said on stderr). */
 function clipSeed(): ClipSeed {
-  const read = (env: string): Buffer | null => {
-    const p = process.env[env];
-    if (p === undefined || p === '') return null;
-    try {
-      return readFileSync(p);
-    } catch (e) {
-      process.stderr.write(`clip seed: can't read ${env}=${p}: ${String(e)}\n`);
-      return null;
-    }
-  };
-  const text = read(TEST_CLIP_TEXT_ENV)?.toString('utf8');
-  const bytes = read(TEST_CLIP_FILE_ENV);
+  const text = readSeedFile(TEST_CLIP_TEXT_ENV, process.env[TEST_CLIP_TEXT_ENV])?.toString('utf8');
   const path = process.env[TEST_CLIP_FILE_ENV] ?? '';
-  const files: ClipFile[] =
-    bytes === null ? [] : [{ name: basename(path), type: MIME[extname(path).toLowerCase()] ?? 'application/octet-stream', bytes: new Uint8Array(bytes) }];
+  const bytes = readSeedFile(TEST_CLIP_FILE_ENV, path);
+  const files: ClipFile[] = bytes === null ? [] : [clipFileOf(path, new Uint8Array(bytes))];
   return { ...(text === undefined ? {} : { text }), files };
+}
+
+let clipNonce = 0;
+
+/**
+ * Test mode: TEST_CLIP_HOOK's seed ({file?: absolute path, text?}) put on every window's private
+ * clipboard at once (lead m_12801: a check stages an image for a real ⌘V while the app runs).
+ * False when nothing usable was given or the file can't be read.
+ */
+async function setClip(raw: unknown): Promise<boolean> {
+  const o = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+  const text = typeof o['text'] === 'string' ? o['text'] : undefined;
+  const path = typeof o['file'] === 'string' && isAbsolute(o['file']) ? o['file'] : undefined;
+  const bytes = path === undefined ? null : readSeedFile('file', path);
+  if (path !== undefined && bytes === null) return false;
+  const files = path === undefined || bytes === null ? [] : [clipFileOf(path, new Uint8Array(bytes))];
+  if (text === undefined && files.length === 0) return false;
+  const seed: ClipSeed = { ...(text === undefined ? {} : { text }), files };
+  const wins = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
+  const nonce = ++clipNonce;
+  // every window answers after its fence has the seed (the IPC is async: a ⌘V right after
+  // the hook would otherwise paste the old buffer)
+  const done = new Promise<boolean>((resolve) => {
+    let left = wins.length;
+    const on = (_e: unknown, n: unknown): void => {
+      if (n !== nonce) return;
+      left -= 1;
+      if (left <= 0) finish(true);
+    };
+    const timer = setTimeout(() => {
+      finish(false);
+    }, 2000);
+    const finish = (ok: boolean): void => {
+      clearTimeout(timer);
+      ipcMain.removeListener(IPC.clipSetDone, on);
+      resolve(ok);
+    };
+    ipcMain.on(IPC.clipSetDone, on);
+    if (left === 0) finish(true);
+  });
+  for (const w of wins) w.webContents.send(IPC.clipSet, seed, nonce);
+  return done;
 }
 
 export function installIpc(testMode: boolean): void {
   if (testMode) {
     ipcMain.handle(IPC.clipSeed, () => clipSeed());
+    (globalThis as unknown as Record<string, unknown>)[TEST_CLIP_HOOK] = setClip;
     // test mode: navigator.clipboard can never read or write his clipboard
     const s = session.defaultSession;
     s.setPermissionCheckHandler((_wc, permission) => !CLIPBOARD_PERMS.has(permission));

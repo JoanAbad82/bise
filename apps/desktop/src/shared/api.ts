@@ -260,6 +260,10 @@ export const IPC = {
   termExit: 'bise:term-exit',
   /** test mode: the preload asks main for the clipboard's seed (the env's files) */
   clipSeed: 'bise:clip-seed',
+  /** test mode: main puts a new seed on every window's private clipboard (TEST_CLIP_HOOK) */
+  clipSet: 'bise:clip-set',
+  /** test mode: a window says it took that seed (its nonce), so the hook answers after it */
+  clipSetDone: 'bise:clip-set-done',
   updateState: 'bise:update-state',
   updateNow: 'bise:update-now',
   updateInstall: 'bise:update-install',
@@ -300,6 +304,14 @@ export const ROUTE_ENV = 'BISE_DESKTOP_ROUTE';
 export const TEST_CLIP_TEXT_ENV = 'BISE_DESKTOP_TEST_CLIPBOARD';
 /** Test mode: the private clipboard starts with this file as a file item (a Finder copy, a screenshot). */
 export const TEST_CLIP_FILE_ENV = 'BISE_DESKTOP_TEST_CLIPBOARD_FILE';
+/**
+ * Test mode only: a function on main's globalThis that puts a new seed on every window's private
+ * clipboard while the app runs, so a check stages an image (or text) for a real ⌘V at any time:
+ * `app.evaluate(({}) => globalThis.__biseTestClip({ file: '/abs/shot.png' }))` (or `{ text }`).
+ * Resolves true once every window has it (so a ⌘V right after pastes it), false when the seed
+ * can't be read or a window doesn't answer within 2 s. Never defined outside test mode.
+ */
+export const TEST_CLIP_HOOK = '__biseTestClip';
 
 /** Test mode: the capsule's changes as stdout lines: `CAPSULE_LINE show top keys` / `CAPSULE_LINE hide`. */
 export const CAPSULE_LINE = 'bise-desktop: capsule';

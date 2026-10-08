@@ -42,6 +42,11 @@ if (fence !== null) {
   ipcRenderer.on(IPC.clip, (_e: IpcRendererEvent, op: ClipOp) => {
     fence.run(op);
   });
+  // a new seed while the app runs (main's TEST_CLIP_HOOK): an image for a real ⌘V
+  ipcRenderer.on(IPC.clipSet, (_e: IpcRendererEvent, seed: ClipSeed, nonce: number) => {
+    fence.seed(seed);
+    ipcRenderer.send(IPC.clipSetDone, nonce);
+  });
   // the env's seed (BISE_DESKTOP_TEST_CLIPBOARD[_FILE]): main reads the files
   void ipcRenderer.invoke(IPC.clipSeed).then((seed: ClipSeed) => {
     if (seed.text !== undefined || (seed.files ?? []).length > 0) fence.seed(seed);
