@@ -407,6 +407,9 @@ def reply_for(conv, seen=0):
         return turn
     if sc:
         turn["text"] = sc.get("reply") or plain(PLAIN_DONE, user)
+        # "stream": {"chunks": N, "every": S}: the answer goes out as N text deltas S seconds apart
+        if isinstance(sc.get("stream"), dict):
+            turn["stream"] = sc["stream"]
         return turn
     # `[[reply: PATH]]`: once every call ran, the answer is that file's text verbatim (long
     # markdown, code blocks, tables: ambient-qa's rich world)
@@ -443,6 +446,31 @@ def pieces(s, n=3):
         return [""]
     k = max(1, -(-len(s) // n))
     return [s[i:i + k] for i in range(0, len(s), k)]
+
+
+def text_pieces(s, turn):
+    """the answer's text deltas: pieces(s) (3), or a script's "stream": {"chunks": N}: exactly N
+    (fewer only when s is shorter), cut evenly"""
+    st = turn.get("stream") or {}
+    if not st.get("chunks") or not s:
+        return pieces(s)
+    n = max(1, min(int(st["chunks"]), len(s)))
+    return [s[i * len(s) // n:(i + 1) * len(s) // n] for i in range(n)]
+
+
+def is_text_delta(family, name, data):
+    """this SSE event carries a piece of the answer's text (not thinking, not a tool call)"""
+    if not isinstance(data, dict):
+        return False
+    if family == "anthropic":
+        return data.get("type") == "content_block_delta" and (data.get("delta") or {}).get("type") == "text_delta"
+    if family == "openai-responses":
+        return name == "response.output_text.delta"
+    if family == "gemini":
+        parts = [p for c in data.get("candidates", []) for p in (c.get("content") or {}).get("parts", [])]
+        return any("text" in p and not p.get("thought") for p in parts)
+    ch = data.get("choices") or [{}]
+    return bool((ch[0].get("delta") or {}).get("content"))
 
 
 # ------------------------------------------------------------------ errors
@@ -513,7 +541,7 @@ def sse_openai_chat(turn, model, include_usage=False, mid_error=False):
         return ev
     for p in pieces(turn["reasoning"]) if turn["reasoning"] else []:
         ev.append(chunk({"content": None, "reasoning_content": p}))
-    for p in pieces(turn["text"]) if turn["text"] else []:
+    for p in text_pieces(turn["text"], turn) if turn["text"] else []:
         ev.append(chunk({"content": p}))
     for i, c in enumerate(turn["calls"]):
         ev.append(chunk({"tool_calls": [{"index": i, "id": c["id"], "type": "function",
@@ -563,7 +591,7 @@ def sse_anthropic(turn, model, mid_error=False):
             deltas.append({"type": "signature_delta", "signature": b["signature"]})
         elif b["type"] == "text":
             first = {"type": "text", "text": ""}
-            deltas = [{"type": "text_delta", "text": p} for p in pieces(b["text"])]
+            deltas = [{"type": "text_delta", "text": p} for p in text_pieces(b["text"], turn)]
         else:
             first = dict(b, input={})
             deltas = [{"type": "input_json_delta", "partial_json": p}
@@ -642,7 +670,7 @@ def sse_responses(turn, model, encrypted=False, mid_error=False):
             text = it["content"][0]["text"]
             add("response.content_part.added", item_id=iid, output_index=oi, content_index=0,
                 part={"type": "output_text", "text": "", "annotations": []})
-            for p in pieces(text):
+            for p in text_pieces(text, turn):
                 add("response.output_text.delta", item_id=iid, output_index=oi, content_index=0, delta=p,
                     logprobs=[])
             add("response.output_text.done", item_id=iid, output_index=oi, content_index=0, text=text,
@@ -683,7 +711,7 @@ def gem_parts(turn):
     (Gemini never splits a functionCall); the first functionCall of a step
     carries the thoughtSignature (Gemini 3)"""
     out = [[{"text": p, "thought": True}] for p in pieces(turn["reasoning"])] if turn["reasoning"] else []
-    out += [[{"text": p}] for p in pieces(turn["text"])] if turn["text"] else []
+    out += [[{"text": p}] for p in text_pieces(turn["text"], turn)] if turn["text"] else []
     calls = [{"functionCall": {"name": c["name"], "args": c["args"]}} for c in turn["calls"]]
     if calls:
         calls[0]["thoughtSignature"] = "fake-thought-sig"
@@ -802,6 +830,29 @@ class H(http.server.BaseHTTPRequestHandler):
                 self.wfile.flush()
         self.wfile.write(b"0\r\n\r\n")
         self.close_connection = True
+
+    def send_sse_paced(self, data_chunks, texts, gap):
+        """a script's "stream": every event at once but the answer's text deltas, which go out
+        `gap` seconds apart (a model writing word by word: the window's text animation)"""
+        self.send_response(200)
+        self.send_header("content-type", "text/event-stream")
+        self.send_header("cache-control", "no-cache")
+        self.send_header("transfer-encoding", "chunked")
+        self.send_header("connection", "close")
+        self.end_headers()
+        self.close_connection = True
+        first = True
+        try:
+            for c, is_text in zip(data_chunks, texts):
+                if is_text and not first:
+                    time.sleep(gap)
+                first = first and not is_text
+                if c:
+                    self.wfile.write(b"%x\r\n%s\r\n" % (len(c), c))
+                    self.wfile.flush()
+            self.wfile.write(b"0\r\n\r\n")
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def send_sse_drip(self, data_chunks, n, gap):
         """[[drip: N S]]: the first chunk at once, N pings S s apart, then
@@ -1021,6 +1072,9 @@ class H(http.server.BaseHTTPRequestHandler):
             elif sse and drip and family == "anthropic":
                 self.drip = self.send_sse_drip([sse_bytes(family, [e]) for e in out],
                                                int(drip.group(1)), float(drip.group(2)))
+            elif sse and turn.get("stream") and float(turn["stream"].get("every") or 0) > 0:
+                self.send_sse_paced([sse_bytes(family, [e]) for e in out],
+                                    [is_text_delta(family, *e) for e in out], float(turn["stream"]["every"]))
             elif sse:
                 self.send_sse([sse_bytes(family, [e]) for e in out])
             else:  # Gemini without alt=sse: one JSON array

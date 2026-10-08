@@ -675,6 +675,18 @@ def rich_world_fixtures():
         role = [{"role": "system", "text": "# bise role line\nyou write…", "calls": 0, "images": []},
                 {"role": "user", "text": "What it was asked: The cart page is slow on mobile: measure first\nIts last report: x", "calls": 0, "images": []}]
         check(fp.reply_for(role)["text"] == "the cart page is slow on mobile", fp.reply_for(role))
+        # "stream": the scripted answer in N text deltas, every family (qa-native m_12784, designer R40)
+        world.put_script(sd, "s", "streamed please", [], "one two three four five six seven eight nine ten eleven twelve")
+        sp = json.load(open(os.path.join(sd, "s.json")))
+        sp["stream"] = {"chunks": 12, "every": 0.25}
+        json.dump(sp, open(os.path.join(sd, "s.json"), "w"))
+        os.utime(sd)
+        st = fp.reply_for([sysm, {"role": "user", "text": "streamed please", "calls": 0, "images": []}])
+        check(st["stream"] == {"chunks": 12, "every": 0.25}, st)
+        for fam in ("anthropic", "openai-chat", "openai-responses", "gemini"):
+            evs = fp.render(fam, st, "fake", True, {})
+            n = sum(fp.is_text_delta(fam, *e) for e in evs)
+            check(n == 12, (fam, n))
     finally:
         for k, v in old.items():
             if v is None:
