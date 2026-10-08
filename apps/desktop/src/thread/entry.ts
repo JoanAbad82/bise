@@ -190,6 +190,54 @@ export function stepTime(ms: number): string {
   return r === 0 ? `${String(m)} m` : `${String(m)} m ${String(r)} s`;
 }
 
+/** The argument a tool is about, in the order the args usually name it. */
+const MAIN_ARGS = ['file_path', 'path', 'command', 'cmd', 'pattern', 'query', 'url', 'file', 'name', 'id', 'text'];
+
+/**
+ * A tool step's words, never its args object (ambient-pm m_12810, designer D15): the hub's
+ * '<tool>: {"file_path":"panels.md"}' reads '<tool> panels.md' (its main argument in words, else its
+ * first string one, else the tool alone); a bash step drops 'bash: ' ('$' says it already). Words
+ * that aren't a tool and JSON stay as they are. Pure.
+ */
+export function toolWords(text: string): string {
+  const t = text.trim();
+  const m = /^([A-Za-z_][\w.-]*):\s*(\{[\s\S]*\})$/.exec(t);
+  if (m !== null) {
+    const tool = m[1] ?? '';
+    let args: unknown;
+    try {
+      args = JSON.parse(m[2] ?? '');
+    } catch {
+      args = undefined;
+    }
+    if (args !== null && typeof args === 'object' && !Array.isArray(args)) {
+      const o = args as Record<string, unknown>;
+      const key = MAIN_ARGS.find((k) => typeof o[k] === 'string' && o[k] !== '') ?? Object.keys(o).find((k) => typeof o[k] === 'string' && o[k] !== '');
+      const arg = key === undefined ? '' : String(o[key]).split('\n')[0]?.trim() ?? '';
+      if (tool === 'bash') return arg !== '' ? arg : tool;
+      return arg !== '' ? `${tool} ${arg}` : tool;
+    }
+  }
+  return t.replace(/^bash:\s+/, '');
+}
+
+/**
+ * A report as the TUI reads it (render.rs report_parts: '[report: <kind>] <body>'), never shown in its
+ * bracket form (designer D14): a status line '<kind> · <first line>'; a blocked agent waiting on his
+ * answer says only that ('blocked · waiting for your answer'): the question card under it says the
+ * question. null: not a report. Pure.
+ */
+export function reportLine(text: string, kind?: string | null): string | null {
+  const m = /^\[report:\s*([^\]]+)\]\s*([\s\S]*)$/.exec(text.trim());
+  const k = (m?.[1] ?? kind ?? '').trim();
+  if (m === null && (kind == null || kind === '')) return null;
+  const body = (m === null ? text : (m[2] ?? '')).trim();
+  const first = body.split('\n')[0]?.trim() ?? '';
+  const waiting = /^waiting for your answer\b/i.exec(first);
+  const words = waiting !== null ? 'waiting for your answer' : first;
+  return words === '' ? k : `${k} · ${words}`;
+}
+
 /** At most this many command and edit lines show; the rest fold into the counted line. */
 export const TOOL_LINES = 6;
 
@@ -204,8 +252,8 @@ export function toolLines(items: readonly { pos: number; at_ms: number; text: st
   items.forEach((t, i) => {
     const next = items[i + 1];
     const time = next !== undefined && t.at_ms > 0 && next.at_ms > t.at_ms ? stepTime(next.at_ms - t.at_ms) : '';
-    if ((t.kind === 'run' || t.kind === 'edit') && lines.length < TOOL_LINES) lines.push({ pos: t.pos, mark: t.kind === 'run' ? '$' : '±', text: t.text, time });
-    else rest.push({ pos: t.pos, text: t.text });
+    if ((t.kind === 'run' || t.kind === 'edit') && lines.length < TOOL_LINES) lines.push({ pos: t.pos, mark: t.kind === 'run' ? '$' : '±', text: toolWords(t.text), time });
+    else rest.push({ pos: t.pos, text: toolWords(t.text) });
   });
   const n = (k: string) => items.filter((t) => t.kind === k).length;
   const shownRun = lines.filter((l) => l.mark === '$').length;

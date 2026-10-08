@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, TOOL_LINES, chipOf, dropAuthor, handoffOf, stepTime, toolLines, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, TOOL_LINES, chipOf, dropAuthor, handoffOf, stepTime, toolLines, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -140,5 +140,28 @@ describe("a project's bise hands off (designer's desktop-screens v6 (3))", () =>
     expect(handoffOf('✚ main → new task @t : x')).toEqual({ agent: 't', brief: 'x' });
     expect(handoffOf('✚ main → new agent @solo')).toEqual({ agent: 'solo', brief: '' });
     expect(handoffOf('session restored · 6 messages')).toBeNull();
+  });
+});
+
+describe('D14 / D15: a report is a status line, a command reads once', () => {
+  it("'[report: blocked] waiting for your answer: …' -> 'blocked · waiting for your answer' (the card says the question)", () => {
+    expect(reportLine('[report: blocked] waiting for your answer: cart page or checkout only?')).toBe('blocked · waiting for your answer');
+    expect(reportLine('[report: done] p95 at 180 ms, nothing to fix.\n- ran 3 times')).toBe('done · p95 at 180 ms, nothing to fix.');
+    expect(reportLine('a plain answer')).toBeNull();
+    expect(reportLine('waiting for your answer: x', 'blocked')).toBe('blocked · waiting for your answer');
+  });
+  it("'bash: bash /Users/…' reads '$ bash /Users/…'; a tool's args object never shows", () => {
+    expect(toolWords('bash: bash /Users/me/x.sh')).toBe('bash /Users/me/x.sh');
+    expect(toolWords('cargo test')).toBe('cargo test');
+    expect(toolWords('edit: {"file_path":"panels.md"}')).toBe('edit panels.md');
+    expect(toolWords('read_file: {"path":"a.rs"}')).toBe('read_file a.rs');
+    expect(toolWords('bash: {"command":"ls -la\\nmore"}')).toBe('ls -la');
+    expect(toolWords('grep: {"pattern":"slow","path":"src"}')).toBe('grep src');
+    expect(toolWords('web_fetch: {"url":"https://x.test"}')).toBe('web_fetch https://x.test');
+    expect(toolWords('todo: {"items":[1,2]}')).toBe('todo');
+    expect(toolWords('looking for the slow query')).toBe('looking for the slow query');
+    const t = toolLines([{ pos: 1, at_ms: 0, text: 'edit: {"file_path":"panels.md"}', kind: 'edit' }, { pos: 2, at_ms: 0, text: 'read_file: {"path":"a.rs"}', kind: 'read' }]);
+    expect(t.lines[0]?.text).toBe('edit panels.md');
+    expect(t.rest[0]?.text).toBe('read_file a.rs');
   });
 });

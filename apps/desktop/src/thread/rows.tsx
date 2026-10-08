@@ -11,7 +11,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Answer, Markdown } from './Markdown';
-import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
+import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, reportLine, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -101,7 +101,8 @@ function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head:
         </Marker>
       );
     case 'report':
-      return <Marker>{e.report ? `${e.report.kind} · ${e.text}` : e.text}</Marker>;
+      // a status line, never the '[report: …]' bracket form (designer D14)
+      return <Marker>{reportLine(e.text, e.report?.kind) ?? e.text}</Marker>;
     case 'you':
       return <YouRow e={e} ctx={ctx} head={head} />;
     case 'to_agent':
@@ -147,6 +148,15 @@ function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head:
       );
     default: {
       const who = whoOf(e, ctx);
+      // an agent's '[report: blocked] …' message: its status line (designer D14, the TUI's report_parts)
+      const report = reportLine(e.text);
+      if (report !== null) {
+        return (
+          <div data-testid={`thread.report.${String(e.pos)}`}>
+            <Marker>{who.from === 'agent' && (e.from ?? ctx.agent) !== ctx.agent ? `${who.name}: ${report}` : report}</Marker>
+          </div>
+        );
+      }
       return (
         <Msg from={who.from} name={who.name} indent={who.indent} time={clock(e.at_ms)} head={head}>
           {e.thinking != null && e.thinking.ms >= THOUGHT_MS && <ThinkingLine pos={e.pos} head={thoughtFor(e.thinking.ms)} body={e.thinking.text} />}
