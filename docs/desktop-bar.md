@@ -731,7 +731,7 @@ tui-parity is re-auditing the terminal against a2039499; its new gaps will come 
 
 | row | status | owner | the smallest next step |
 |---|---|---|---|
-| S.5 + O.4 core down, crash | **fail**: app/core-line red, "copy its path" never turns "copied". native/crash and setup/offline's last-log-line were red before CoreLine got the core's end and last line | amb-win (src/app/CoreLine.tsx) | fix the copied state; qa-native reruns native/crash + native/setup |
+| S.5 + O.4 core down, crash | **closed**, rechecked 10-09 (ambient-lead m_14102). My red here was stale: amb-win's 55d9bcf2 (10-07 20:20, six minutes after this table) fixed it. app/core-line asserts "copied" (`app.core.copy` toHaveText 'copied'), and it is green in test:land (amb-win m_14099) | amb-win | none; qa-native's next gate shot of the core line confirms it as an image |
 | O.6 every control clicks | **fail (soft)**: app/clicks on the real core, '+ add a project' green, one target still red on telemetry's screen | the target's chunk | qa-flows names the target in one line; its owner fixes it |
 | S21 PR news | **fail (flaky)**: news-real found the failing #412 PR row in one run only | amb-win, amb-feed | qa-flows makes the PR step wait on the row's event, not a time |
 | 2.1 / 2.2 / 2.3 in the real thread | built: thread/composer-sources is green in the harness; composer/lists-real's reds were fixed in 516b891a, with **no real-core rerun yet** | amb-web, amb-core | qa-type: `real.sh composer/lists-real` |
@@ -747,7 +747,7 @@ tui-parity is re-auditing the terminal against a2039499; its new gaps will come 
 | V14/S28/L2 expired sign-in | built (a7556130, vitest only); "not covered: the screen's wiring against a real core" | amb-home, amb-core | qa-native: setup/sign-in's expired case on the fake subscription |
 | F1/F2 fold all / one, V3 the help filter | built (677c70cf), no check | amb-win | qa-flows: thread/folds, and a filter case in settings/keys |
 | N2 color alone | built (a824752f), no check | amb-kit | qa-type: ds/contrast with increase contrast on |
-| S9 tool calls | partly: the tools row exists and opens; each call's state and time, its first error line and its output are not confirmed | amb-win, amb-feed | qa-flows adds a failing-call case to thread/rows |
+| S9 tool calls | built, harness green (10-09): amb-win's 65f88c68 gives each call its own row, checked in the harness by thread/tool-rows. The real core next to the TUI is not checked yet | amb-win, amb-feed | qa-flows: the real-core side by side with the TUI on the same world |
 | S40/W3 the divider | partly: the context gauge is in the sidebar (rows-batch2); model, effort and approvals mode under the thread are not confirmed | amb-win | amb-win says where they show; qa-flows: thread/divider |
 | S3 waiting on someone | not built (no land) | amb-win, amb-feed | a typed "waiting on" field on the agent row |
 | S29/L19 computer use, live | not built (no land; P.2 setup passes) | amb-win, amb-core | plan with architect: the "took the wheel" event |
