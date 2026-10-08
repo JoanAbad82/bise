@@ -458,6 +458,12 @@ A row stays even after it passes: it is a regression list.
   - **nits:**
     - D15: "$ bash: bash /…" has one "bash" too many (amb-home).
     - D18: in the empty composer, the placeholder sits on the bottom line of a ~72 px box (amb-home).
+  - **owners checked in the code** (ambient-lead m_12782; they replace the ones above):
+    - D12, D7b, D3b: amb-win (bise's head is ThreadScreen's 'every project' lead and BisePearl).
+    - D14, D15: amb-home (thread rows).
+    - D18: amb-web (Composer.tsx).
+
+    One re-cut once these land.
   - **question** (amb-win): with telemetry's 17 rows, shop and docs fall below the fold. Are the
     stopped rows under 1 h old, and does the current project scroll into view?
   - **still to come:**
