@@ -724,6 +724,19 @@ button.th-sched-head {
 .th-handoff:hover .th-handoff-role {
   color: var(--c-text);
 }
+/* the hub's brief (designer): one dim row 'bise started gift-ui · <objective>', cut with …; open, the
+   whole brief under a thin rail, dim, its markdown at reading size without big headings */
+.th-brief { padding: 2px 0; }
+.th-brief-line {
+  display: flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 0; border: 0; background: none;
+  color: var(--c-text-2); font: var(--t-13) var(--font-ui); text-align: left; cursor: pointer;
+}
+.th-brief-line:hover { color: var(--c-text); }
+.th-brief-chev { flex: none; color: var(--c-text-3); transition: transform var(--d-fast) var(--ease-out); }
+.th-brief[data-open] .th-brief-chev { transform: rotate(90deg); }
+.th-brief-words { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.th-brief-body { margin: 6px 0 2px 3px; padding-left: 12px; border-left: 1px solid var(--c-line); color: var(--c-text-2); font-size: var(--t-14); }
+.th-brief-body :is(h1, h2, h3, h4) { font-size: var(--t-14); font-weight: 600; margin: 8px 0 4px; }
 /* the empty thread (v6 (5)): his first message, then '· checkout is starting: …' text-2 */
 .th-starting {
   color: var(--c-text-2);

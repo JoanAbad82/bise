@@ -11,7 +11,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Answer, Markdown } from './Markdown';
-import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
+import { THOUGHT_MS, briefOf, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -74,6 +74,9 @@ function NameLine({ e, ctx }: { e: Entry; ctx: RowCtx }) {
 }
 
 function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head: boolean; live: boolean; still: boolean }) {
+  // the hub's brief opens a task's thread: one quiet row, the brief folded under it (designer; the TUI's is_brief)
+  const brief = e.kind === 'you' || e.kind === 'from_agent' || e.kind === 'agent' ? briefOf(e.text) : null;
+  if (brief !== null) return <BriefRow pos={e.pos} name={brief.name} objective={brief.objective} body={brief.body} ctx={ctx} />;
   switch (e.kind) {
     case 'tools':
       return <ToolsRow e={e} ctx={ctx} />;
@@ -394,6 +397,36 @@ function NoticeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
         {NOTICE_MARK[level]}
       </span>
       <span>{text}</span>
+    </div>
+  );
+}
+
+/** 'bise started gift-ui · <objective>': the task's brief as one dim row; a click unfolds the whole brief under a rail. */
+function BriefRow({ pos, name, objective, body, ctx }: { pos: number; name: string; objective: string; body: string; ctx: RowCtx }) {
+  const [open, setOpen] = useFold(false, pos);
+  return (
+    <div className="th-brief" data-open={open || undefined} data-testid={`thread.brief.${String(pos)}`}>
+      <button
+        type="button"
+        className="th-brief-line"
+        aria-expanded={open}
+        onClick={() => {
+          setOpen((o) => !o);
+        }}
+      >
+        <span className="th-brief-chev" aria-hidden="true">
+          ▸
+        </span>
+        <span className="th-brief-words">
+          bise started {name}
+          {objective !== '' && ` · ${objective}`}
+        </span>
+      </button>
+      {open && (
+        <div className="th-brief-body" data-testid={`thread.brief.${String(pos)}.body`}>
+          <Markdown text={body} onLink={ctx.onLink} onPath={ctx.onPath} />
+        </div>
+      )}
     </div>
   );
 }

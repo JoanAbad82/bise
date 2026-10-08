@@ -287,3 +287,12 @@ export function handoffOf(text: string): { agent: string; brief: string } | null
   if (m === null) return null;
   return { agent: m[1] ?? '', brief: (m[2] ?? '').split('\n')[0]?.trim() ?? '' };
 }
+
+/** The hub's brief, the first message of a task's thread ('# Task `gift-ui`', then 'Objective: …'; the TUI's is_brief): its name, objective and body without the heading; none for any other text. Pure. */
+export function briefOf(text: string): { name: string; objective: string; body: string } | null {
+  const m = /^# Task `([^`]+)`[^\n]*\n?/.exec(text);
+  if (m === null) return null;
+  const body = text.slice(m[0].length).replace(/^\n+/, '').trimEnd();
+  const objective = /^Objective:\s*(.*)$/m.exec(body)?.[1]?.trim() ?? '';
+  return { name: m[1] ?? '', objective, body };
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, TOOL_LINES, chipOf, dropAuthor, handoffOf, stepTime, toolLines, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, TOOL_LINES, briefOf, chipOf, dropAuthor, handoffOf, stepTime, toolLines, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -175,5 +175,17 @@ describe("N2: a scheduled task's line names the agent, not the task's number", (
     expect(schedHead('main scheduled #1 for dashboards · every 30m · next 16:56')).toBe('main scheduled dashboards · every 30m · next 16:56');
     expect(schedHead('main scheduled #48 for perf · every 2m · 6 times · next 14:22')).toBe('main scheduled perf · every 2m · 6 times · next 14:22');
     expect(schedHead('a plain line')).toBe('a plain line');
+  });
+});
+
+describe('briefOf (the hub brief, the TUI is_brief)', () => {
+  it('reads the name, the objective and the body without its heading', () => {
+    const text = '# Task `gift-ui`\n\nObjective: make the gift page fast\n\nNo end criterion: this is a long-running task. Stay available.\n';
+    expect(briefOf(text)).toEqual({ name: 'gift-ui', objective: 'make the gift page fast', body: 'Objective: make the gift page fast\n\nNo end criterion: this is a long-running task. Stay available.' });
+  });
+  it('is none for any other text, a heading elsewhere included', () => {
+    expect(briefOf('make the gift page fast')).toBeNull();
+    expect(briefOf('see # Task `x`')).toBeNull();
+    expect(briefOf('# Tasks')).toBeNull();
   });
 });

@@ -46,10 +46,6 @@ const PROSE =
 const ASK = 'why is the cold bench three times slower than the warm one on this page?';
 const CONTEXT_BLOCK = '\n\n<screen_context app="Chrome">\nThis is what was in front of the user when they spoke.\nurl: http://localhost:4801/settings\ntitle: settings · bench\n</screen_context>\n';
 
-// today's restored rows stay today when the check runs just after midnight (at 00:06, now - 30 min
-// fell on yesterday and the separator read 'yesterday')
-const restoredAt = (now: number): number => Math.max(now - 30 * MIN, new Date(now).setHours(0, 0, 0, 0));
-
 const world = (now: number) => {
   const y = now - 86_400_000;
   const restored = (pos: number, at: number) => ({ pos, at_ms: at, kind: 'notice', text: 'session restored · 6 messages', notice: { level: 'info', text: 'session restored · 6 messages' } });
@@ -67,8 +63,8 @@ const world = (now: number) => {
         { pos: 2, at_ms: y + 1000, kind: 'thinking', text: 'thought for 0.0s', thinking: { ms: 0, text: '' } },
         { pos: 3, at_ms: y + MIN, kind: 'agent', text: `${PROSE}\n\n${CODE}` },
         { pos: 4, at_ms: y + 2 * MIN, kind: 'agent', text: `the three runs:\n\n${TABLE}` },
-        restored(5, restoredAt(now)),
-        restored(6, restoredAt(now) + 10),
+        restored(5, now - 30 * MIN),
+        restored(6, now - 30 * MIN + 10),
         restored(7, now - 30 * MIN + 20),
         { pos: 8, at_ms: now - 20 * MIN, kind: 'from_agent', from: 'perf', to: 'main', text: 'perf: the parsed copy cuts the cold run to 140 ms.' },
         { pos: 9, at_ms: now - 19 * MIN, kind: 'from_agent', from: 'perf', to: 'main', text: 'perf: landed on sb/perf, tests green.' },
@@ -82,7 +78,10 @@ const world = (now: number) => {
 
 test('thread/reading: one column, no raw context, no empty thinking, one restored row, times on the name line, no avatars', async () => {
   test.setTimeout(150_000);
-  const now = Date.now();
+  // a fixed clock: noon of today, so yesterday's rows (noon + 1, + 2 min) and today's (11:30 to 11:55)
+  // never straddle midnight, whatever the hour the check runs (it was red at 23:5x and 00:05);
+  // the app's 'today' is the real date, which noon of today always shares
+  const now = new Date().setHours(12, 0, 0, 0);
   const core = new FakeCore(world(now) as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: `project/${HOME}` });
   const shots: { label: string; png: Buffer }[] = [];
@@ -170,7 +169,7 @@ test('thread/reading: one column, no raw context, no empty thinking, one restore
 
     // the bottom: one restored row, today's separator, perf's group
     await scroll('bottom');
-    await expect(page.getByTestId('thread.notice.5')).toHaveText(`session restored · ${await clockOf(restoredAt(now))}`);
+    await expect(page.getByTestId('thread.notice.5')).toHaveText(`session restored · ${await clockOf(now - 30 * MIN)}`);
     await expect(page.getByTestId('thread.notice.6')).toHaveCount(0);
     await expect(page.getByTestId('thread.notice.7')).toHaveCount(0);
     await expect(page.getByTestId('thread.day.5')).toHaveText('today');
