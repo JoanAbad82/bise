@@ -3,7 +3,7 @@
 // modules (electron's contextBridge and ipcRenderer). Owner: amb-mac.
 // In test mode it also fences the clipboard (src/main/clipfence.ts): ⌘C ⌘X
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
-import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
 import { HOME_ARG, IPC, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type Surface, type TermOpened, type UpdateState } from '../shared/api';
 import { argValue } from './args';
@@ -67,6 +67,17 @@ const api: BiseApi = {
   openPath: async (path, opts) => (await ipcRenderer.invoke(IPC.openPath, path, opts)) === true,
   quickLook: async (path) => (await ipcRenderer.invoke(IPC.quickLook, path)) === true,
   showInFinder: async (path) => (await ipcRenderer.invoke(IPC.showInFinder, path)) === true,
+  saveImage: async (bytes) => {
+    const p: unknown = await ipcRenderer.invoke(IPC.saveImage, bytes);
+    return typeof p === 'string' ? p : null;
+  },
+  filePath: (file) => {
+    try {
+      return webUtils.getPathForFile(file);
+    } catch {
+      return '';
+    }
+  },
   pickFolder: async () => {
     const p: unknown = await ipcRenderer.invoke(IPC.pickFolder);
     return typeof p === 'string' ? p : null;

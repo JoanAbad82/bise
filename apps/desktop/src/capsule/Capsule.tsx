@@ -36,7 +36,8 @@ export interface CapsuleProps {
   readonly onRouteTo: (project: string) => void;
   /** amb-home's card for a pushed card, by id. */
   readonly card: (id: string) => ReactNode;
-  readonly onAsk: (text: string) => void;
+  /** his ask, with the absolute paths of what he pasted or dropped in the spot (R41; absent when none) */
+  readonly onAsk: (text: string, files?: readonly string[]) => void;
   /** '/new …' in the spotlight: start an agent in bise's home (bar A.1) */
   readonly onNew?: (brief: string) => void;
   readonly onOpen: (item: SpotItem) => void;

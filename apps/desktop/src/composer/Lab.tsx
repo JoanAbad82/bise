@@ -293,8 +293,8 @@ export function SpotlightLab(): JSX.Element {
       <Spotlight
         data={SPOT}
         answer={answer === null ? null : { text: answer, done: true }}
-        onAsk={(text) => {
-          setLog((l) => [...l, JSON.stringify({ ask: text })]);
+        onAsk={(text, files) => {
+          setLog((l) => [...l, JSON.stringify(files === undefined ? { ask: text } : { ask: text, files })]);
           setAnswer(`bise heard: ${text}`);
         }}
         onOpen={(item) => { setLog((l) => [...l, JSON.stringify({ open: item.id })]); }}

@@ -5,6 +5,13 @@
 /* a line about the answer (asked, waiting for the first words; sent to another project): dim */
 .b-spot-answer.note { color: var(--c-text-2); }
 .b-live-pearl { flex: none; }
+/* R41: what he pasted or dropped, chips before his words on the field's line (the composer's
+   image chip: accent on accent-soft, 16 px thumbnail), the words keep the rest of the line */
+.b-spot-field { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.b-spot-field > input { flex: 1; min-width: 4em; }
+.b-spot-files { display: flex; gap: 4px; flex: none; max-width: 60%; overflow: hidden; }
+.b-spot-files .b-chip { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: var(--r-2); font: var(--t-13) var(--font-ui); white-space: nowrap; color: var(--c-accent); background: var(--c-accent-soft); }
+.b-spot-files .b-chip .thumb { width: 16px; height: 16px; border-radius: 3px; object-fit: cover; margin-right: 6px; }
 /* R07-a: the selected agent's last actions in its right column (designer m_13271): the row grows to
    fit, no height tween; name and project stay on the first line; newest last in --c-text, the
    older dim; the time right-aligned dim; a question that waits on him in accent; each line cut with … */

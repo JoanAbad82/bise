@@ -5,6 +5,7 @@
 import { useMemo } from 'react';
 import { useAgents, useArtifacts, useCards, useStore } from '@/store';
 import { prefixFirst } from './tokens';
+import { saveImageFile } from './attach';
 import { NO_SOURCES, type Choice, type ComposerSources, type DictatePort } from './sources';
 
 // K4 (the TUI's attach.rs): `inView` is the agent the composer sends to; its row says its model
@@ -59,7 +60,8 @@ export function useComposerSources(project: string, extra: Partial<ComposerSourc
       filePicked: (path) => {
         store.filePicked(project, path);
       },
-      saveImage: saveImage ?? NO_SOURCES.saveImage,
+      // R41: a pasted or dropped image goes to bise's image store through main, its path in the send's files
+      saveImage: saveImage ?? saveImageFile,
       ...(noVision === undefined ? {} : { noVision }),
       dictate,
       ...(voice === undefined ? {} : { voice }),

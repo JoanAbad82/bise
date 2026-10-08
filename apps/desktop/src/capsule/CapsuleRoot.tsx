@@ -356,10 +356,12 @@ export function CapsuleRoot(): JSX.Element {
       route={route}
       onRouteKeep={keepWithBise}
       onRouteTo={routeTo}
-      onAsk={(text) => {
+      onAsk={(text, files) => {
         if (home === null) return;
         followAsk(home);
-        store.send({ project: home, agent: 'main', text });
+        // R41: the images and files he pasted or dropped ride the send; the hub renders them once,
+        // an image as a block the model sees
+        store.send({ project: home, agent: 'main', text, ...(files === undefined ? {} : { files }) });
         // asked: the spot says so at once (∿), its first words take the line's place (R18)
         setLast({ text: '', done: false });
       }}

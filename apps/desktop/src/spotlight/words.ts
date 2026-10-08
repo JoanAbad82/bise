@@ -20,6 +20,8 @@ export const W = {
   sendQ: (q: string): string => `send “${q}” to bise`,
   keysEmpty: '⏎ open in bise   esc close',
   keysAsk: '⏎ send to bise   ↑↓ move   esc close',
+  // R41: an image or a file in the spot: ⏎ asks bise with it, ⌫ at the start takes the last one away
+  keysFiles: '⏎ send to bise   ⌫ remove   esc close',
   answerMore: 'the rest in bise   ⏎ open',
   // his ask, before bise's first words (R18): it went, the answer comes here
   asked: 'asked bise · the answer shows here',

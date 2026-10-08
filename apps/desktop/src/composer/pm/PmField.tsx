@@ -22,6 +22,7 @@ import { enqueue, historyAt, keepUnread, load, popNewest, remember, save, takeOl
 import { entryOf, entrySegments } from '../entry';
 import { agentRows, argRows, artifactRows, commandLine, commandRows, completion, emojiRows, enterSends, fileRows, move, skillRows, MAX_ROWS, type Pick, type Row } from '../pick';
 import { isImagePath, type ComposerSources, type PickFile } from '../sources';
+import { thumbnail } from '../attach';
 import { argAt, browseText, parentQuery, triggerAt, type Trigger } from '../tokens';
 import { emojiToken, typedEmoji } from '../emoji';
 import { dictated, HOLD_MS } from '../dictate';
@@ -915,22 +916,6 @@ export function PmField(p: PmFieldProps): JSX.Element {
       )}
     </>
   );
-}
-
-/** A small thumbnail of an image file as a data URL (the chip's), or null when it can't be read. */
-async function thumbnail(f: File, side = 48): Promise<string | null> {
-  try {
-    const bmp = await createImageBitmap(f);
-    const k = Math.min(1, side / Math.max(bmp.width, bmp.height));
-    const c = document.createElement('canvas');
-    c.width = Math.max(1, Math.round(bmp.width * k));
-    c.height = Math.max(1, Math.round(bmp.height * k));
-    c.getContext('2d')?.drawImage(bmp, 0, 0, c.width, c.height);
-    bmp.close();
-    return c.toDataURL('image/png');
-  } catch {
-    return null;
-  }
 }
 
 /** Above the box: the chips' strip (`▤ 1 “first words…”  240 lines · 9.8 kB`) and the queue. */

@@ -60,6 +60,14 @@ export interface BiseApi {
   /** The file selected in a Finder window; same fence; test mode prints REVEAL_LINE <path>. */
   readonly showInFinder: (path: string) => Promise<boolean>;
   /**
+   * An image he pasted or dropped (its bytes) put in bise's image store, the
+   * TUI's (src/main/images.ts): its absolute path for a send's files, so the
+   * model sees it (R41). null: not a PNG, JPEG, GIF or WebP, too big, or unwritable.
+   */
+  readonly saveImage: (bytes: Uint8Array) => Promise<string | null>;
+  /** A dropped or Finder-copied file's absolute path (Electron's webUtils); '' for one made in the page (a screenshot paste). */
+  readonly filePath: (file: File) => string;
+  /**
    * Puts text on the clipboard. In test mode: the window's private buffer
    * (⌘V pastes it) and `COPY_LINE <text as JSON>` on stdout, never his clipboard.
    */
@@ -238,6 +246,7 @@ export const IPC = {
   pickFolder: 'bise:pick-folder',
   quickLook: 'bise:quick-look',
   showInFinder: 'bise:show-in-finder',
+  saveImage: 'bise:save-image',
   copy: 'bise:copy',
   menu: 'bise:menu',
   /** test mode: a clipboard item of the menu, played on the window's private buffer */

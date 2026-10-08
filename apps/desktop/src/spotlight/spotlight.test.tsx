@@ -81,6 +81,47 @@ describe('the spotlight', () => {
     expect(onAsk).toHaveBeenCalledWith('why is the hot query slow');
     expect(input.value).toBe('');
   });
+  it('R41: a pasted image and a dropped file are chips, ⏎ asks bise with their paths, ⌫ takes the last away', async () => {
+    const onAsk = vi.fn();
+    const saveImage = vi.fn((f: File) => Promise.resolve({ path: `/store/${f.name}`, name: f.name }));
+    const filePath = (f: File): string => `/Users/me/${f.name}`;
+    const ui = render(<Spotlight data={D} onAsk={onAsk} onOpen={vi.fn()} onClose={vi.fn()} saveImage={saveImage} filePath={filePath} />);
+    const input = ui.getByTestId('spot.input') as HTMLInputElement;
+    const png = new File([new Uint8Array([137, 80, 78, 71])], 'shot.png', { type: 'image/png' });
+    await act(async () => {
+      fireEvent.paste(input, { clipboardData: { files: [png], getData: () => '' } });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(saveImage).toHaveBeenCalledWith(png);
+    expect(ui.getByTestId('spot.file.1').textContent).toBe('[Image #1]');
+    const notes = new File(['q3'], 'q3-notes.md', { type: 'text/markdown' });
+    const drop = new Event('drop', { cancelable: true }) as Event & { dataTransfer: unknown };
+    drop.dataTransfer = { files: [notes] };
+    await act(async () => {
+      window.dispatchEvent(drop);
+      await Promise.resolve();
+    });
+    expect(drop.defaultPrevented).toBe(true);
+    expect(ui.getByTestId('spot.file.2').textContent).toBe('q3-notes.md');
+    expect(ui.getByTestId('spot.frame').textContent).toContain('⌫ remove');
+    // ⌫ at the start: the dropped file goes, the image stays
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Backspace' });
+      await Promise.resolve();
+    });
+    expect(ui.queryByTestId('spot.file.2')).toBeNull();
+    // 'perf' alone would open perf: with an image in the spot ⏎ asks bise with it
+    await act(async () => {
+      fireEvent.input(input, { target: { value: 'perf' } });
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter' });
+      await Promise.resolve();
+    });
+    expect(onAsk).toHaveBeenCalledWith('perf', ['/store/shot.png']);
+    expect(ui.queryByTestId('spot.files')).toBeNull();
+  });
 });
 
 describe('the spotlight rows', () => {

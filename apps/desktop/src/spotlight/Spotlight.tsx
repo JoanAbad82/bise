@@ -14,7 +14,21 @@ import { LiveText } from './LiveText';
 import { shownName } from '@/agents/model';
 import { caretAtEnd, keep } from '@/app/keep';
 import type { PreviewLine } from './preview';
+import { filePathOf, isImageFile, saveImageFile, thumbnail } from '@/composer/attach';
+import type { SavedImage } from '@/composer/sources';
 import './spotlight.css';
+
+/** What he pasted or dropped in the spot (R41): an image saved in bise's image store, or a file by its own path. */
+export interface SpotFile {
+  readonly n: number;
+  readonly path: string;
+  readonly name: string;
+  readonly image: boolean;
+  readonly thumb?: string;
+}
+
+/** A chip's words: an image as the composer's '[Image #n]', a file by its name. */
+export const spotFileLabel = (f: SpotFile): string => (f.image ? `[Image #${String(f.n)}]` : f.name);
 
 /** His typed words' field in the keep (keep.ts). */
 const KEPT = 'spot';
@@ -50,8 +64,13 @@ export interface SpotlightProps {
   readonly onRouteKeep?: () => void;
   /** ⏎ on another project during the hold (route_correct). */
   readonly onRouteTo?: (project: string) => void;
-  /** A sentence for bise (⏎ on 'ask bise', or ⏎ with nothing picked). */
-  readonly onAsk: (text: string) => void;
+  /** A sentence for bise (⏎ on 'ask bise', or ⏎ with nothing picked), with the absolute paths of
+   *  the images and files he pasted or dropped (R41; absent when none). */
+  readonly onAsk: (text: string, files?: readonly string[]) => void;
+  /** A pasted or dropped image into bise's image store (default: window.bise.saveImage). */
+  readonly saveImage?: (file: File) => Promise<SavedImage | null>;
+  /** A dropped file's absolute path (default: window.bise.filePath). */
+  readonly filePath?: (file: File) => string;
   /** '/new …' or 'start an agent: …' (bar A.1): start an agent with that brief; none: it goes to bise as words. */
   readonly onNew?: (brief: string) => void;
   /** Open a card, an agent or an environment in bise's window. */
@@ -149,6 +168,8 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
   // the list follows the words at React's pace; the input itself is never re-rendered by it
   const query = useDeferredValue(text);
   const route = p.route ?? null;
+  // R41: what he pasted or dropped, as chips before his words; they leave with the ask
+  const [files, setFiles] = useState<readonly SpotFile[]>([]);
   const list = useMemo(() => (route === null ? spotList(p.data, query) : routeList(p.data, route.to)), [p.data, query, route]);
   const items = useMemo(() => flat(list), [list]);
   const [sel, setSel] = useState({ q: '', i: 0 });
@@ -180,14 +201,60 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
     };
   }, []);
 
+  /** A chip for each pasted or dropped file, in order: an image saved in bise's image store (with
+   *  its thumbnail), any other file by its own path (none: a page-made non-image, left out). */
+  const addFiles = (list: readonly File[]): void => {
+    const add = (f: Omit<SpotFile, 'n'>): void => {
+      setFiles((now) => [...now, { ...f, n: now.reduce((m, x) => Math.max(m, x.n), 0) + 1 }]);
+    };
+    for (const f of list) {
+      if (isImageFile(f)) {
+        const save = props.current.saveImage ?? saveImageFile;
+        void Promise.all([save(f), thumbnail(f)]).then(([img, thumb]) => {
+          if (img !== null) add({ path: img.path, name: img.name, image: true, ...(thumb === null ? {} : { thumb }) });
+        });
+      } else {
+        const path = (props.current.filePath ?? filePathOf)(f);
+        if (path !== '') add({ path, name: f.name, image: false });
+      }
+    }
+  };
+  const addRef = useRef(addFiles);
+  useEffect(() => {
+    addRef.current = addFiles;
+  });
+
+  // a file dropped anywhere on the spot (its field, its list, the pearl over its hole) is his ask's,
+  // never a navigation of the capsule
+  useEffect(() => {
+    const over = (e: DragEvent): void => {
+      e.preventDefault();
+    };
+    const drop = (e: DragEvent): void => {
+      e.preventDefault();
+      const list = Array.from(e.dataTransfer?.files ?? []);
+      if (list.length > 0) addRef.current(list);
+      input.current?.focus();
+    };
+    window.addEventListener('dragover', over);
+    window.addEventListener('drop', drop);
+    return () => {
+      window.removeEventListener('dragover', over);
+      window.removeEventListener('drop', drop);
+    };
+  }, []);
+
   const send = (q: string): void => {
-    if (q.trim() === '') return;
-    const brief = newBrief(q);
+    const paths = files.map((f) => f.path);
+    if (q.trim() === '' && paths.length === 0) return;
+    const brief = paths.length === 0 ? newBrief(q) : undefined;
     const onNew = props.current.onNew;
     if (brief !== undefined && onNew !== undefined) onNew(brief);
+    else if (paths.length > 0) props.current.onAsk(q.trim(), paths);
     else props.current.onAsk(q.trim());
     if (input.current !== null) input.current.value = ''; // his send: the one write to the input
     setText('');
+    setFiles([]);
     keep.dropText(KEPT);
   };
 
@@ -219,15 +286,22 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
         if (item !== undefined) pick(item);
         return;
       }
-      if (item !== undefined && text === query) pick(item);
+      // R41: with an image or a file in the spot, ⏎ asks bise with it (opening a row would drop it)
+      if (files.length > 0) send(text);
+      else if (item !== undefined && text === query) pick(item);
       else send(text);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       if (route !== null) p.onRouteKeep?.();
       else {
         keep.dropText(KEPT);
+        setFiles([]);
         p.onClose();
       }
+    } else if (e.key === 'Backspace' && files.length > 0 && e.currentTarget.selectionStart === 0 && e.currentTarget.selectionEnd === 0) {
+      // ⌫ at the start of his words takes the last chip away, as the composer's ⌫ before a chip
+      e.preventDefault();
+      setFiles((now) => now.slice(0, -1));
     } else if (e.metaKey && /^[1-9]$/u.test(e.key)) {
       const env = items.find((x) => x.kind === 'env' && x.n === Number(e.key));
       if (env !== undefined) {
@@ -238,7 +312,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
   };
 
   const ans = p.answer ? answerLines(p.answer.text) : null;
-  const keys = route !== null ? W.keysRoute : list.mode === 'new' ? W.keysNew : list.mode === 'ask' ? W.keysAsk : W.keysEmpty;
+  const keys = route !== null ? W.keysRoute : files.length > 0 ? W.keysFiles : list.mode === 'new' ? W.keysNew : list.mode === 'ask' ? W.keysAsk : W.keysEmpty;
 
   return (
     <div ref={box} className="b-spotlight" data-testid={testId}>
@@ -247,6 +321,17 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
         to={W.to}
         pearl={p.pearl ?? <LivePearl mood={p.mood ?? 'rest'} level={p.level} still={p.still} size={40} testId={`${testId}.pearl`} />}
         input={
+          <span className="b-spot-field">
+          {files.length > 0 && (
+            <span className="b-spot-files" data-testid={`${testId}.files`}>
+              {files.map((f) => (
+                <span key={f.n} className="b-chip image" data-kind={f.image ? 'image' : 'file'} title={f.path} data-testid={`${testId}.file.${String(f.n)}`}>
+                  {f.thumb !== undefined && <img className="thumb" src={f.thumb} alt="" />}
+                  {spotFileLabel(f)}
+                </span>
+              ))}
+            </span>
+          )}
           <input
             ref={input}
             type="text"
@@ -261,7 +346,15 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
               keep.setText(KEPT, e.currentTarget.value);
             }}
             onKeyDown={onKeyDown}
+            onPaste={(e) => {
+              // ⌘V of an image (a screenshot, a Finder copy) or a copied file: a chip, never its name as words
+              const list = Array.from(e.clipboardData.files);
+              if (list.length === 0) return;
+              e.preventDefault();
+              addFiles(list);
+            }}
           />
+          </span>
         }
         keys={ans?.cut === true ? W.answerMore : keys}
       >
