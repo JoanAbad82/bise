@@ -184,7 +184,8 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
           sub="i found these repos in your folder. tick the ones bise should work in."
           cta={{ text: n > 0 ? `add ${String(n)} ${n === 1 ? 'project' : 'projects'}` : 'continue without a project', onClick: go, testId: 'setup.next' }}
         >
-          <div className="setup-pick">
+          {/* no repo to filter: 'choose a folder…' alone, centred (designer N5) */}
+          <div className={items.length > 0 ? 'setup-pick' : 'setup-pick alone'}>
             {items.length > 0 && (
               <Field
                 placeholder="filter: type a name or a path"
@@ -211,7 +212,7 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
           {found.length === 0 && s.chosen.length === 0 ? (
             <Help>looking in your folders…</Help>
           ) : rows.length === 0 ? (
-            <Help testId="setup.filter.none">{`no repo matches “${q}”. choose a folder…, or clear the filter.`}</Help>
+            <Help testId="setup.filter.none">{noRepoWords(q)}</Help>
           ) : (
             <div className="setup-list" data-testid="setup.list">
               <Group testId="setup.found" items={rows} />
@@ -267,6 +268,14 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
       </div>
     </section>
   );
+}
+
+/**
+ * The projects step with no repo to show: a filter that matches none says so; with no filter, there is
+ * no repo here (never 'matches ""' or 'clear the filter'; ambient-lead m_12999, designer's N5 words). Pure.
+ */
+export function noRepoWords(q: string): string {
+  return q.trim() === '' ? 'no repos in this folder. choose a folder…, or continue without one.' : `no repo matches “${q.trim()}”. choose a folder…, or clear the filter.`;
 }
 
 /**

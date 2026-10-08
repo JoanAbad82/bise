@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { Account, AppCmd, Found } from '@/proto';
 import { core_ev } from '@/proto/fixtures.gen';
 import { fnAct, next, START, stepOf, ticked } from './model';
-import { homePath, Onboarding, type OnboardingPorts } from './Onboarding';
+import { homePath, noRepoWords, Onboarding, type OnboardingPorts } from './Onboarding';
 import { FirstRun, showsFirstRun } from './FirstRun';
 import { helloOpens, startHereUrl } from './screen';
 
@@ -194,5 +194,13 @@ describe('the first-run text (L1 / M18)', () => {
     expect(showsFirstRun(false, 1)).toBe(true);
     expect(showsFirstRun(true, 1)).toBe(false);
     expect(showsFirstRun(false, 2)).toBe(false);
+  });
+});
+
+describe('the projects step with no repo to show (ambient-lead m_12999)', () => {
+  it("an empty filter says there's no repo yet, never 'matches \"\"' or 'clear the filter'; a filter that matches none says so", () => {
+    expect(noRepoWords('')).toBe('no repos in this folder. choose a folder…, or continue without one.');
+    expect(noRepoWords('   ')).toBe('no repos in this folder. choose a folder…, or continue without one.');
+    expect(noRepoWords('bill')).toBe('no repo matches “bill”. choose a folder…, or clear the filter.');
   });
 });

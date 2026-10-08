@@ -9,6 +9,7 @@
 .setup-pick { display: flex; gap: var(--s-2); width: 100%; margin-top: var(--s-3); }
 .setup-pick .b-field { flex: 1 1 auto; min-width: 0; }
 .setup-pick .b-btn { flex: none; }
+.setup-pick.alone { justify-content: center; }
 /* only the list gives up height: the button, the dots, the field keep theirs (ambient m_11825) */
 .setup .b-onb > :not(.setup-list) { flex: none; }
 .setup .b-onb .b-btn.pri { min-height: 36px; }
