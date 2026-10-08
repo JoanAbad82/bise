@@ -522,9 +522,30 @@
 .ah-chip-btn {
   padding: 0;
   border: 0;
+  border-radius: var(--r-pill);
   background: none;
+  color: var(--c-text-2);
   font: inherit;
   cursor: pointer;
+}
+/* hover, as the head's other buttons (qa-flows' app/clicks: every control changes on hover) */
+.ah-chip-btn:hover {
+  color: var(--c-text);
+}
+.ah-chip-btn .b-chip {
+  transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out);
+}
+.ah-chip-btn:hover .b-chip {
+  color: var(--c-text);
+  background: color-mix(in srgb, var(--c-text) 12%, transparent);
+}
+.ah-chip-btn:hover .b-chip.acc {
+  color: var(--c-accent);
+  background: color-mix(in srgb, var(--c-accent) 22%, transparent);
+}
+.ah-chip-btn:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--c-focus);
 }
 .ah-note {
   color: var(--c-text-3);
