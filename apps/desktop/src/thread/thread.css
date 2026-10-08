@@ -180,6 +180,8 @@
   max-width: var(--th-col);
   padding: 0 24px;
   text-align: center;
+  /* lines split evenly when they wrap (designer m_13749) */
+  text-wrap: balance;
 }
 .th-first .th-noproj {
   margin: 0;
