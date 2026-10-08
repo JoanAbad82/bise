@@ -298,9 +298,13 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
         await p.keyboard.press('Space');
         await sleep(700);
       } else note('R24', 'no answer paragraph to select');
-      // the image: ⌘V needs an image on the clipboard; test mode fences Electron's clipboard, so it waits on
-      // amb-mac's test clipboard image seed (R24): until then ⌘V pastes whatever the fence holds
-      note('R24', "the image chip waits on amb-mac's test clipboard image seed (test mode fences the clipboard)");
+      // the image: a PNG staged on the app's private test clipboard (amb-mac 3d49e9b1: __biseTestClip, test mode
+      // only), then a real ⌘V in the field
+      const png = path.join(w.home, 'tmp', 'qa-native-paste.png');
+      mkdirSync(path.dirname(png), { recursive: true });
+      writeFileSync(png, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'));
+      const staged = await s.app.evaluate((_e, file) => (globalThis as unknown as { __biseTestClip?: (c: { file: string }) => Promise<boolean> }).__biseTestClip?.({ file }) ?? Promise.resolve(false), png);
+      note('R24', `image staged on the test clipboard: ${String(staged)}`);
       await field.click();
       await p.keyboard.press('Meta+v');
       await sleep(1000);
