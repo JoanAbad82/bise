@@ -181,7 +181,7 @@ export function Onboarding({ accounts, found, perms, fn = null, keyError = null,
         <Onb
           {...frame}
           title="your projects"
-          sub="i found these repos in your folder. tick the ones bise should work in."
+          sub={items.length > 0 ? 'i found these repos in your folder. tick the ones bise should work in.' : 'bise works in your repos. choose the folder that has them.'}
           cta={{ text: n > 0 ? `add ${String(n)} ${n === 1 ? 'project' : 'projects'}` : 'continue without a project', onClick: go, testId: 'setup.next' }}
         >
           {/* no repo to filter: 'choose a folder…' alone, centred (designer N5) */}

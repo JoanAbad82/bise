@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, TOOL_LINES, chipOf, dropAuthor, handoffOf, stepTime, toolLines, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, TOOL_LINES, chipOf, dropAuthor, handoffOf, stepTime, toolLines, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -163,5 +163,13 @@ describe('D14 / D15: a report is a status line, a command reads once', () => {
     const t = toolLines([{ pos: 1, at_ms: 0, text: 'edit: {"file_path":"panels.md"}', kind: 'edit' }, { pos: 2, at_ms: 0, text: 'read_file: {"path":"a.rs"}', kind: 'read' }]);
     expect(t.lines[0]?.text).toBe('edit panels.md');
     expect(t.rest[0]?.text).toBe('read_file a.rs');
+  });
+});
+
+describe("N2: a scheduled task's line names the agent, not the task's number", () => {
+  it("'main scheduled #1 for dashboards · every 30m · next 16:56' -> 'main scheduled dashboards · …'", () => {
+    expect(schedHead('main scheduled #1 for dashboards · every 30m · next 16:56')).toBe('main scheduled dashboards · every 30m · next 16:56');
+    expect(schedHead('main scheduled #48 for perf · every 2m · 6 times · next 14:22')).toBe('main scheduled perf · every 2m · 6 times · next 14:22');
+    expect(schedHead('a plain line')).toBe('a plain line');
   });
 });

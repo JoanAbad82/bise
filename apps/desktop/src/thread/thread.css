@@ -448,12 +448,20 @@
 .th-sched {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: baseline;
   color: var(--c-text-3);
 }
-.th-sched .b-fold {
+.th-sched-head {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
   color: inherit;
+  text-align: left;
+}
+button.th-sched-head {
+  cursor: default;
 }
 .th-sched-words {
   flex-basis: 100%;
@@ -515,6 +523,9 @@
   font-weight: 400;
 }
 .ah-role {
+  /* the role first (designer N1): the name and role keep their room, the chip and notes give way */
+  flex: 0 1 auto;
+  min-width: 4em;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--c-text-2);

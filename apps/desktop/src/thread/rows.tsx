@@ -11,7 +11,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Answer, Markdown } from './Markdown';
-import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, reportLine, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
+import { THOUGHT_MS, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, reportLine, schedHead, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -324,17 +324,20 @@ function ScheduledRow({ e }: { e: Entry }) {
         ◷
       </span>
       {words === '' ? (
-        <span className="th-sched-head">{head}</span>
+        <span className="th-sched-head">{schedHead(head)}</span>
       ) : (
-        <Fold
-          open={open}
-          onToggle={() => {
+        // its words open on a click, with no chevron (designer N2: '◷ main scheduled dashboards · every 30m · next 16:56')
+        <button
+          type="button"
+          className="th-sched-head"
+          aria-expanded={open}
+          onClick={() => {
             setOpen((o) => !o);
           }}
-          testId={`thread.scheduled.${e.pos}.head`}
+          data-testid={`thread.scheduled.${e.pos}.head`}
         >
-          {head}
-        </Fold>
+          {schedHead(head)}
+        </button>
       )}
       {open && words !== '' && (
         <div className="th-sched-words" data-testid={`thread.scheduled.${e.pos}.words`}>

@@ -83,7 +83,7 @@ describe('the thread screen', () => {
     expect(v.queryByTestId('thread.voice')).toBeNull();
   });
 
-  it("batch 3b: a scheduled entry is the TUI's '◷ head ▸' row, its words open under it; an ended one has no ▸", () => {
+  it("batch 3b: a scheduled entry is '◷ main scheduled perf · …' (designer N2: no number, no chevron), its words open on a click; an ended one doesn't open", () => {
     const { store } = setup();
     // fixtures pos 33-34 (6e9d68f8): set with words, then ended without
     const v = render(
@@ -94,7 +94,7 @@ describe('the thread screen', () => {
     );
     const set = v.getByTestId('thread.scheduled.33');
     expect(set.textContent).toContain('◷');
-    expect(set.textContent).toContain('main scheduled #48 for perf · every 2m · 6 times · next 14:22');
+    expect(set.textContent).toBe('◷main scheduled perf · every 2m · 6 times · next 14:22');
     expect(set.dataset.id).toBe('48');
     expect(v.queryByTestId('thread.scheduled.33.words')).toBeNull();
     fireEvent.click(v.getByTestId('thread.scheduled.33.head'));

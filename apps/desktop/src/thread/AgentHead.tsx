@@ -6,12 +6,11 @@
 // StartingLine: the empty thread's line. The words are head.ts's. Owner: amb-home.
 import type { ReactNode } from 'react';
 import type { Agent } from '@/proto';
-import { useAgents, useApprovals, useDiff, useModels } from '@/store';
+import { useAgents, useDiff } from '@/store';
 import { useNow } from '@/app/clock';
 import { ago } from '@/agents/model';
 import { useRouter } from '@/app/router';
 import { BisePearl } from '@/app/BisePearl';
-import { metaWords } from './meta';
 import { biseChip, branchLine, roleOf, stateChip, usageLine, type StateChip } from './head';
 
 function Chip({ chip, testId }: { chip: StateChip; testId: string }) {
@@ -24,9 +23,6 @@ function Chip({ chip, testId }: { chip: StateChip; testId: string }) {
 
 /** An agent's head (`starting`: its thread has nothing of its own yet). `more` is the '⋯' button (rename, model; the screen owns its panel); `note` a quiet word after the chip ('voice mode'); its context gauge after it. */
 export function AgentHead({ project, a, more, note, starting = false }: { project: string; a: Agent; more?: ReactNode; note?: string | undefined; starting?: boolean }) {
-  const models = useModels(project);
-  const mode = useApprovals(project)?.mode;
-  const meta = metaWords(models, a.model, a.effort, mode);
   const usage = usageLine(a.usage?.words);
   const now = useNow();
   const router = useRouter();
@@ -53,12 +49,8 @@ export function AgentHead({ project, a, more, note, starting = false }: { projec
           {note}
         </span>
       )}
-      {/* its model, effort and the approvals mode, as the TUI's divider (S40/W3, R10): 'opus · high · auto' */}
-      {meta !== '' && (
-        <span className="ah-note" data-testid="thread.meta">
-          {meta}
-        </span>
-      )}
+      {/* its model, effort and approvals mode ('opus · high · auto') are not in the head (designer N1):
+          they are in its tune panel (⋯) and the TUI's divider */}
       {/* its context gauge, the hub's words as sent (the TUI's divider: '42k · 17%') */}
       {usage !== '' && (
         <span className="ah-note" data-testid="thread.usage">

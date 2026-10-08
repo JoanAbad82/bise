@@ -190,6 +190,11 @@ export function stepTime(ms: number): string {
   return r === 0 ? `${String(m)} m` : `${String(m)} m ${String(r)} s`;
 }
 
+/** A scheduled task's line without its number ('main scheduled #1 for dashboards · …' reads 'main scheduled dashboards · …'; designer N2). Pure. */
+export function schedHead(head: string): string {
+  return head.replace(/\bscheduled #\d+ for /, 'scheduled ');
+}
+
 /** The argument a tool is about, in the order the args usually name it. */
 const MAIN_ARGS = ['file_path', 'path', 'command', 'cmd', 'pattern', 'query', 'url', 'file', 'name', 'id', 'text'];
 

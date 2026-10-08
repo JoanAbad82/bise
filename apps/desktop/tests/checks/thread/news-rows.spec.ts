@@ -35,7 +35,7 @@ test('thread/news-rows: landed, PR news, artifact, answered, approval and agent-
     // batch 3b (6e9d68f8): the scheduled task's ◷ lines, its words open under the set one
     const sched = page.getByTestId('thread.scheduled.33');
     await expect(sched).toContainText('◷');
-    await expect(sched).toContainText('main scheduled #48 for perf · every 2m · 6 times · next 14:22');
+    await expect(sched).toContainText('main scheduled perf · every 2m · 6 times · next 14:22');
     await page.getByTestId('thread.scheduled.33.head').click();
     await expect(page.getByTestId('thread.scheduled.33.words')).toHaveText('check the build');
     await expect(page.getByTestId('thread.scheduled.34')).toContainText('scheduled #48 ended · stopped by you');
