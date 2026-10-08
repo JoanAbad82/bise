@@ -355,8 +355,12 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
             <Tip tip={topTip} snap={tour.snap} />
           </div>
         )}
-        <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} />
-        {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} bise={bise} />}
+        {/* the list and, over an empty one, the first-run block centred in the column (his try:
+            it sat bottom-left at the column's edge) */}
+        <div className="th-main">
+          <Rows tkey={tkey} project={project} agent={agent} bise={bise} listRef={list} />
+          {agent === MAIN && me?.archived !== true && <FirstRunSlot tkey={tkey} project={project} composer={composer} bise={bise} />}
+        </div>
         {stopping && <Marker>stopping {agent}…</Marker>}
         {fresh && <StartingLine a={me} />}
         {!bise && agent !== MAIN && !fresh && <LiveLine a={me} />}
@@ -432,22 +436,27 @@ function FirstRunSlot({ tkey, project, composer, bise }: { tkey: string; project
   // his words in the thread: an entry of his, or a send of his on its way
   const said = pending.length > 0 || view.order.some((pos) => store.entry(tkey, pos)?.kind === 'you');
   if (!view.loaded || !showsFirstRun(said, live)) return null;
-  if (noProject)
-    return (
-      <NoProject
-        onDemo={(text) => {
-          composer.current?.fill(text);
-        }}
-      />
-    );
+  // over an empty list: centred in the thread's column, both ways; under entries of main's: in the
+  // column, at the list's end
+  const centred = view.order.length === 0;
   return (
-    <FirstRun
-      ready={ready}
-      onFill={(text) => {
-        composer.current?.fill(text);
-        setReady(true);
-      }}
-    />
+    <div className={centred ? 'th-first' : 'th-first after'} data-testid="thread.first">
+      {noProject ? (
+        <NoProject
+          onDemo={(text) => {
+            composer.current?.fill(text);
+          }}
+        />
+      ) : (
+        <FirstRun
+          ready={ready}
+          onFill={(text) => {
+            composer.current?.fill(text);
+            setReady(true);
+          }}
+        />
+      )}
+    </div>
   );
 }
 

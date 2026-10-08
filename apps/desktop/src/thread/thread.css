@@ -155,6 +155,49 @@
   flex: 1 1 auto;
 }
 
+/* the list's place: the list fills it; the first-run block over an empty list sits in its middle,
+   on the column's axis (the composer's), both ways (his try d94b7996: bottom-left at x 0) */
+.th-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.th-first {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+.th-first > * {
+  pointer-events: auto;
+}
+.th-first .setup-firstrun {
+  max-width: var(--th-col);
+  padding: 0 24px;
+  text-align: center;
+}
+.th-first .th-noproj {
+  margin: 0;
+}
+/* under entries of main's: in the column, at the list's end */
+.th-first.after {
+  position: static;
+  display: block;
+  flex: 0 0 auto;
+  width: var(--th-col);
+  margin: 0 auto 8px;
+}
+.th-first.after .setup-firstrun {
+  max-width: none;
+  padding: 0;
+  text-align: left;
+}
+
 .th-row {
   position: relative;
   padding: 0 0 2px;

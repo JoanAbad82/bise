@@ -1,5 +1,13 @@
 /* The shell's layout (amb-win): the window fills the Electron window; the
    look is desktop-ds v5's (src/ds, amb-kit), never forked here. */
+/* the window's page never scrolls and has no margin (his try d94b7996: the body's default 8 px
+   margin around a 100vh shell made a window-wide scrollbar): only inner panes scroll */
+html:has(.app-shell),
+body:has(.app-shell) {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
 .app-shell {
   height: 100vh;
   overflow: hidden;
