@@ -317,6 +317,11 @@ pub enum Hub {
     Stopped(String),
     /// event-wake: a watch ended, its JSON (`thread::WakeFold`)
     Wake(String),
+    /// `kept : <text>`: the answer he had read as it streamed in, when
+    /// its turn failed before the answer came (the hub writes it right
+    /// before the failure's line, [`keeps_partial`]): drawn dim, never
+    /// lost (designer m_13334)
+    Kept(String),
     /// a kind this reader doesn't know, or a known kind's line that
     /// doesn't parse: its kind and unescaped text
     Other { kind: String, text: String },
@@ -440,12 +445,32 @@ impl Partial {
         self.len += text.chars().count();
         PartialStep::Text(unescape(&self.esc))
     }
+
+    /// The `sb kept : <text>` line that keeps the text so far in the
+    /// thread (a failed turn, [`keeps_partial`]); None when there is
+    /// nothing to keep (no text, or a block dropped on a bad offset).
+    pub fn kept_line(&self) -> Option<String> {
+        (!self.broken && !self.esc.trim().is_empty()).then(|| format!("sb kept : {}", self.esc))
+    }
+}
+
+/// The lines that end a turn without its answer: a failure, a stall, a
+/// harness restart. The text he already read as it streamed in stays in
+/// the thread (an `sb kept` line written before it), dim, above the
+/// failure. A stop clears it; a retry or a discarded candidate leave it
+/// for what comes next (the next attempt's +0, the answer, the turn end).
+pub fn keeps_partial(rec: &Rec) -> bool {
+    matches!(rec, Rec::Obs(Obs::TurnDone(TurnEnd::Failed(_)) | Obs::TurnStalled(_) | Obs::HarnessRestarted(_)))
 }
 
 /// The lines that end an agent's live answer: its answer came (the
 /// assistant line), the turn ended (done, failed, interrupted, stalled),
-/// a stop, the candidate was thrown away, a retry or a restart starts
-/// another attempt. One rule for the hub and the TUI.
+/// a stop, a restart. One rule for the hub and the TUI. A provider retry
+/// or a discarded candidate does NOT clear it: the text he read stays
+/// until the next attempt's first partial replaces it (a new call id at
+/// +0), and a turn that then fails keeps it (designer m_13334: text he
+/// has read never vanishes; a failure writes `candidate_discarded` right
+/// before its `turn_done: failed`, so clearing there lost the text).
 pub fn clears_partial(rec: &Rec) -> bool {
     matches!(
         rec,
@@ -453,8 +478,6 @@ pub fn clears_partial(rec: &Rec) -> bool {
             Obs::Assistant(_)
                 | Obs::TurnDone(_)
                 | Obs::TurnStalled(_)
-                | Obs::CandidateDiscarded(_)
-                | Obs::ProviderRetry(_)
                 | Obs::HarnessRestarted(_)
         ) | Rec::Hub(Hub::Stopped(_))
             | Rec::Idle
@@ -687,6 +710,7 @@ pub fn hub(rest: &str) -> Hub {
         "scheduled" => Hub::Scheduled(text),
         "stopped" => Hub::Stopped(text),
         "wake" => Hub::Wake(text),
+        "kept" => Hub::Kept(text),
         _ => other(text),
     }
 }

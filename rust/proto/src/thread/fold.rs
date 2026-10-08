@@ -646,6 +646,13 @@ impl Fold<'_> {
                     c.answered = true;
                 }
             }
+            // the answer he read as it streamed in, its turn failed
+            // before it came: a reply, cut (drawn dim)
+            Hub::Kept(text) => {
+                let mut e = Entry::new(pos, ms, EntryKind::Agent, text.trim().to_string());
+                e.cut = true;
+                self.push(e);
+            }
             // a warning, a spawn, computer use, a direct message
             h => {
                 // a message he routed by hand (`you → @docs : …`): its

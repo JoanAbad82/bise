@@ -1178,6 +1178,9 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
         Hub::Stopped(_) => return None,
         // event-wake: a watch ended (its JSON, the fold's WakeFold)
         Hub::Wake(json) => return serde_json::from_str(&json).ok().map(|w| crate::entry_ev::wake_ev(&w)),
+        // a failed turn's text so far, dim above its failure (the reply's
+        // escape: the same renderer reads it)
+        Hub::Kept(text) => Ev::Kept(text.replace('\n', "\\n")),
         // a known kind's line that doesn't parse, as before
         Hub::Other { kind, text } => match kind.as_str() {
             "card-closed" => Ev::Info(format!("card {} ", text)),

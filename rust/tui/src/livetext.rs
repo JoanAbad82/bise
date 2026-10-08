@@ -51,6 +51,14 @@ pub(crate) fn rows(events: &[Ev], text: &str, debug: bool, tick: u32, width: usi
     })
 }
 
+/// A kept answer's rows (`Ev::Kept`, its turn failed before the answer
+/// came): what he read live, as it was, the failure's notice under it
+/// (designer m_13334: text he has read never vanishes). The feed adds
+/// the gap before it, as for a reply.
+pub(crate) fn kept_rows(text: &str, tick: u32, width: usize) -> Vec<Line<'static>> {
+    build(&Ev::Assistant(text.to_string()), false, tick, width)
+}
+
 type Key = (String, usize, bool, bool);
 
 thread_local! {
@@ -130,6 +138,21 @@ mod tests {
 fn main() {", false, 0, 60);
         let fin = crate::feed::build_rows(&[Ev::Assistant("look:\\n```rust\\nfn main() {".into())], 0, false, 60, 0);
         assert_eq!(text_of(&live), text_of(&fin));
+    }
+
+    // a failed turn's kept text is drawn as it was live: the same rows,
+    // dim, at the same place (the feed adds the reply's gap before it)
+    #[test]
+    fn a_kept_answer_stays_as_it_was_live() {
+        let events = vec![Ev::You("hi".into(), crate::wire::Mark::Read, false)];
+        let live = rows(&events, "the plan, in **three** steps", false, 0, 60);
+        let mut all = events.clone();
+        all.push(Ev::Kept("the plan, in **three** steps".into()));
+        let kept = crate::feed::build_rows(&all, 1, false, 60, 0);
+        assert_eq!(text_of(&live), text_of(&kept), "nothing moves when it is kept");
+        let dim = crate::theme::dim();
+        let own = kept_rows("the plan, in **three** steps", 0, 60);
+        assert!(own.iter().flat_map(|l| &l.spans).all(|s| s.style.fg == Some(dim)));
     }
 
     #[test]

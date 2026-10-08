@@ -210,14 +210,64 @@ fn partial_clears_on_every_end() {
         "  obs: turn_done: completed",
         "  obs: turn_done: failed: boom",
         "  obs: turn_done: interrupted",
-        "  obs: candidate_discarded: empty",
-        "  obs: provider_retry: 2/10 · 529 · retry in 4s",
         "sb stopped : by the user",
         "--- idle",
     ] {
         assert!(clears_partial(&read(l)), "{l}");
     }
-    for l in ["  obs: usage: model=m in=1 out=2", "tool #3 bash : ls", "partial #1.0 +0 : x", "  obs: turn_started"] {
+    // a retry or a discarded candidate keeps the text until the next
+    // attempt's first partial, the answer or the turn's end (a failure
+    // writes candidate_discarded before its turn_done: failed)
+    for l in [
+        "  obs: candidate_discarded: empty",
+        "  obs: usage: model=m in=1 out=2",
+        "tool #3 bash : ls",
+        "partial #1.0 +0 : x",
+        "  obs: turn_started",
+        "  obs: provider_retry: 2/10 · 529 · retry in 4s",
+    ] {
         assert!(!clears_partial(&read(l)), "{l}");
     }
+}
+
+// a failed turn keeps the text read so far (designer m_13334); a stop,
+// a completed turn or an answer don't
+#[test]
+fn partial_kept_on_a_failure_only() {
+    for l in ["  obs: turn_done: failed: boom", "  obs: turn_stalled: no progress", "  obs: harness_restarted: crash"] {
+        assert!(keeps_partial(&read(l)), "{l}");
+        assert!(clears_partial(&read(l)), "{l}: kept, then cleared");
+    }
+    for l in [
+        "  obs: turn_done: completed",
+        "  obs: turn_done: interrupted",
+        "  obs: turn_done: failed: interrupted by the user",
+        "  obs: assistant: hi",
+        "sb stopped : by the user",
+        "  obs: provider_retry: 2/10 · 529 · retry in 4s",
+    ] {
+        assert!(!keeps_partial(&read(l)), "{l}");
+    }
+}
+
+// the kept line carries the text as escaped on the wire, read back whole;
+// nothing to keep: no line
+#[test]
+fn partial_kept_line_round_trips() {
+    let mut p = Partial::default();
+    assert_eq!(p.kept_line(), None);
+    p.step("1.0", 0, "first\\nsecond");
+    p.step("1.0", 13, " and more");
+    let l = p.kept_line().expect("a kept line");
+    assert_eq!(read(&l), Rec::Hub(Hub::Kept("first
+second and more".into())));
+    // a new attempt replaces the text (a retry doesn't clear it)
+    p.step("1.1", 0, "again");
+    assert_eq!(read(&p.kept_line().unwrap()), Rec::Hub(Hub::Kept("again".into())));
+    // a broken block keeps nothing
+    p.step("1.1", 9, "x");
+    assert_eq!(p.kept_line(), None);
+    let mut blank = Partial::default();
+    blank.step("2.0", 0, "  ");
+    assert_eq!(blank.kept_line(), None);
 }

@@ -102,7 +102,37 @@ def main():
         check(not any(p["text"] for p in partials(c)[k:]), "nothing after the stop: %r" % partials(c)[k:])
         check(not entries(c, "agent")[-1]["text"] == final or len(entries(c, "agent")) == 1,
               "the stopped answer did not land whole")
-        print("partial_e2e: ok (%d partials, late subscriber, stop)" % len(live))
+
+        # 3. a turn that fails mid-stream keeps what he read (designer
+        # m_13334): the stream breaks, the retry keeps the text (no clear),
+        # the retry fails for good (a final 400), and the hub writes it as
+        # an `sb kept` line right before the failure: a cut reply entry,
+        # then the failure's notice; then the partial is cleared once
+        n = len(partials(c))
+        na = len(entries(c, "agent"))
+        c.send({"cmd": "send", "project": project, "agent": "main", "mode": "now",
+                "text": "[[pieces: 40 0.05]] [[error: cut]] [[error: badname]] [[reply: %s]] fail it" % reply})
+        c.wait(lambda: len(entries(c, "agent")) > na, 120, "the kept answer")
+        kept = entries(c, "agent")[-1]
+        c.wait(lambda: partials(c)[-1]["text"] == "", 30, "the partial cleared after the failure")
+        ps = partials(c)[n:]
+        check(kept.get("cut") is True and kept["text"] and text.startswith(kept["text"]),
+              "a cut reply, a prefix of the answer: %r" % {k: kept.get(k) for k in ("cut", "text")})
+        check([p["text"] for p in ps].count("") == 1 and ps[-1]["text"] == "",
+              "the retry didn't clear it; cleared once at the end: %r" % [len(p["text"]) for p in ps])
+        c0.wait_idle("main", timeout=60)
+        # transcript lines are "<ts>\t<line>"
+        tr = [l.split("\t", 1)[-1] for l in
+              open(os.path.join(E.state, "agents", "main", "transcript.log"), encoding="utf-8").read().splitlines()]
+        kis = [i for i, l in enumerate(tr) if l.startswith("sb kept : ")]
+        check(kis, "an sb kept line in the transcript")
+        ki = kis[-1]
+        check("turn_done: failed" in tr[ki + 1], "the kept line right before the failure: %r" % tr[ki:ki + 2])
+        with c.lock:
+            after = [e["entry"]["kind"] for e in c.events if e.get("ev") == "entry" and "project" in e
+                     and e.get("agent") == "main"]
+        check(after[-2:] == ["agent", "notice"], "the cut reply, then the failure's notice: %r" % after[-4:])
+        print("partial_e2e: ok (%d partials, late subscriber, stop, failure kept)" % len(live))
         ok = True
     finally:
         E.close()

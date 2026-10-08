@@ -825,6 +825,10 @@ impl Shell {
 
     /// A line enters a feed: memory, transcript, every client.
     fn feed(&mut self, name: &str, line: &str) {
+        // a failed turn keeps what streamed in, right above its failure
+        if let Some(kept) = self.partial_kept(name, line) {
+            self.feed(name, &kept);
+        }
         if self.pg.page_waits.contains_key(name) && crate::pages::took_input(line) {
             self.pg.page_waits.remove(name);
         }

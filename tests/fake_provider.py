@@ -33,6 +33,8 @@ the injected <bise_state> block is not one):
   that message fail (N = 1), then the script goes on. KIND: 429, 500,
   overloaded (Anthropic 529, the others 503), stream (a 200 stream that
   breaks with the family's error event; a whole reply gets a 500),
+  cut (the same, but the error event comes after two thirds of the
+  answer's events: the text started streaming, then the stream broke),
   badname (a final 400: the API refusing a tool name, BISE-293).
   Several markers fail in their order. `retry=S` sets Retry-After (1);
 - `[[slow: S]]`: every request for that message waits S seconds (a
@@ -381,6 +383,12 @@ def reply_for(conv, seen=0):
         return turn
     user = script_of(conv[idx]["text"])
     errs = errors_of(user)
+    if seen < len(errs) and errs[seen]["kind"] == "cut":
+        # the answer's text streams in before the break: the turn the
+        # script gives once its errors are over (a fixture never)
+        turn = reply_for(conv, len(errs) + 1)
+        turn["error"] = errs[seen]
+        return turn
     if seen < len(errs):
         turn["error"] = errs[seen]
         return turn
@@ -465,7 +473,7 @@ def error_reply(family, err):
     if kind == "badname":
         # BISE-293: a final 400, the API's words for a tool name off its pattern
         return 400, {}, name_error(family, {"tools": [{"name": "self.compact", "function": {"name": "self.compact"}}]}) or {}
-    status = {"429": 429, "500": 500, "stream": 500}.get(kind, 529 if family == "anthropic" else 503)
+    status = {"429": 429, "500": 500, "stream": 500, "cut": 500}.get(kind, 529 if family == "anthropic" else 503)
     hdr = {"retry-after": str(err.get("retry", 1))} if status in (429, 503, 529) else {}
     if family == "anthropic":
         t, m = {429: ("rate_limit_error", "Number of request tokens has exceeded your per-minute rate limit"),
@@ -1042,12 +1050,16 @@ class H(http.server.BaseHTTPRequestHandler):
                 self.send_sse([data])
             else:
                 self.send(status, data)
-        elif turn["error"] and not (turn["error"]["kind"] == "stream" and stream):
+        elif turn["error"] and not (turn["error"]["kind"] in ("stream", "cut") and stream):
             status, hdr, err = error_reply(family, turn["error"])
             self.send(status, json.dumps(err).encode(), headers=hdr)
         else:
             mid = bool(turn["error"])
             out = render(family, turn, model, stream, body, mid)
+            if mid and turn["error"]["kind"] == "cut":
+                # the text streamed in, then the family's error event
+                full = render(family, turn, model, stream, body)
+                out = full[:len(full) * 2 // 3] + out[-1:]
             if not stream:
                 self.send(200, json.dumps(out).encode())
             elif sse and cut:
