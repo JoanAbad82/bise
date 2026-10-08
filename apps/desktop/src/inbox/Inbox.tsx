@@ -238,8 +238,8 @@ const Item = memo(function Item({ c, n, on, name, onSelect }: { c: CardRow; n: n
       kind="ag"
       dot={c.approval === true || c.urgent ? 'nd' : dotOf(c)}
       name={`${String(n)}  ${titleOf(c)}: ${firstLine(c.question)}`}
+      // the project dim on every item: everything here waits on him, the pink is the dot's (designer D9)
       end={name}
-      needs={c.approval === true}
       on={on}
       onClick={() => {
         onSelect({ k: 'select', key: cardKey(c) });

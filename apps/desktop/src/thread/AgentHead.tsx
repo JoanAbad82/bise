@@ -12,7 +12,7 @@ import { ago } from '@/agents/model';
 import { useRouter } from '@/app/router';
 import { BisePearl } from '@/app/BisePearl';
 import { metaWords } from './meta';
-import { biseChip, branchLine, roleOf, stateChip, type StateChip } from './head';
+import { biseChip, branchLine, roleOf, stateChip, usageLine, type StateChip } from './head';
 
 function Chip({ chip, testId }: { chip: StateChip; testId: string }) {
   return (
@@ -27,6 +27,7 @@ export function AgentHead({ project, a, more, note, starting = false }: { projec
   const models = useModels(project);
   const mode = useApprovals(project)?.mode;
   const meta = metaWords(models, a.model, a.effort, mode);
+  const usage = usageLine(a.usage?.words);
   const now = useNow();
   const router = useRouter();
   const diff = useDiff(project, a.name);
@@ -59,9 +60,9 @@ export function AgentHead({ project, a, more, note, starting = false }: { projec
         </span>
       )}
       {/* its context gauge, the hub's words as sent (the TUI's divider: '42k · 17%') */}
-      {a.usage?.words != null && a.usage.words !== '' && (
+      {usage !== '' && (
         <span className="ah-note" data-testid="thread.usage">
-          {a.usage.words}
+          {usage}
         </span>
       )}
       <span className="ah-end">

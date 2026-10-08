@@ -9,6 +9,18 @@
   flex: 1 1 auto;
   min-height: 0;
 }
+/* the rows that slide under the head fade out over 16 px, never cut (designer D8, signed) */
+.th-list::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 16px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(var(--c-window, var(--paper)), transparent);
+}
 
 /* scrolled up: back to the newest, with what came meanwhile */
 .th-to-end {

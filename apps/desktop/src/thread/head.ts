@@ -40,6 +40,16 @@ export function roleOf(a: Pick<Agent, 'purpose' | 'title'>): string {
   return a.purpose !== '' ? a.purpose : a.title;
 }
 
+/**
+ * The context gauge in the head (designer D7: no unnamed numbers): the hub's words named,
+ * 'context 42k · 17%'; an empty context ('15 · 0%') says nothing worth a place: none. Pure.
+ */
+export function usageLine(words: string | null | undefined): string {
+  const w = (words ?? '').trim();
+  if (w === '' || /(^|\s)0%$/.test(w)) return '';
+  return `context ${w}`;
+}
+
 /** The branch line: 'sb/perf · ± 2 files' (no files known yet: the branch alone; no branch: none). */
 export function branchLine(branch: string | null | undefined, files: number | undefined): string {
   if (branch == null || branch === '') return '';

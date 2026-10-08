@@ -6,7 +6,7 @@
 .inbox-field {
   display: block; width: 100%; box-sizing: border-box; margin-top: var(--s-3); padding: var(--s-2) var(--s-3);
   font: inherit; font-size: var(--t-14); line-height: var(--lh-read); color: var(--c-text);
-  background: var(--c-sunken); border: 0; border-radius: var(--r-2); box-shadow: 0 0 0 1px var(--c-line); resize: vertical;
+  background: var(--c-sunken); border: 0; border-radius: var(--r-2); box-shadow: 0 0 0 1px var(--c-line); resize: none;
 }
 .inbox-field:focus { outline: none; box-shadow: 0 0 0 1px var(--c-focus); }
 .inbox-acts { display: flex; justify-content: flex-end; margin-top: var(--s-2); }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { biseChip, branchLine, composerWords, emptyEnter, roleOf, stateChip, STARTING_MS } from './head';
+import { biseChip, branchLine, composerWords, emptyEnter, roleOf, stateChip, STARTING_MS, usageLine } from './head';
 
 const NOW = 1_791_100_000_000;
 const MIN = 60_000;
@@ -45,5 +45,14 @@ describe('K2: ⏎ on an empty composer', () => {
     expect(emptyEnter([{ kind: 'signin', waiting: ['main'] }], 'perf')).toBeNull();
     expect(emptyEnter([{ kind: 'question', waiting: ['perf'] }], 'perf')).toBeNull();
     expect(emptyEnter([], 'perf')).toBeNull();
+  });
+});
+
+describe('D7: the context gauge in the head is named, an empty one goes', () => {
+  it("'context 42k · 17%'; '15 · 0%' and none: nothing", () => {
+    expect(usageLine('42k · 17%')).toBe('context 42k · 17%');
+    expect(usageLine('15 · 0%')).toBe('');
+    expect(usageLine('')).toBe('');
+    expect(usageLine(null)).toBe('');
   });
 });

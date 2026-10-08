@@ -279,7 +279,7 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
     expect(w.queryByTestId('thread.notdelivered.26')).toBeNull();
   });
 
-  it("usage: the hub's gauge words in the head, as sent", () => {
+  it("usage: the hub's gauge words in the head, named (designer D7: 'context 42k · 17%')", () => {
     const store = new Store(null);
     act(() => {
       store.apply({ ev: 'agents', project: P, agents: [ag('main'), ag('perf', { usage: { model: 'm', context: 42310, window: 256000, words: '42k · 17%', short: '17%' } })] });
@@ -289,7 +289,7 @@ describe("amb-feed's batch 2 rows (b8cb4b1e: thinking, compaction, notices, not 
         <RouterContext value={createRouter({ screen: 'bise' })}><ThreadScreen project={P} agent="perf" /></RouterContext>
       </StoreProvider>,
     );
-    expect(v.getByTestId('thread.usage').textContent).toBe('42k · 17%');
+    expect(v.getByTestId('thread.usage').textContent).toBe('context 42k · 17%');
   });
 });
 
