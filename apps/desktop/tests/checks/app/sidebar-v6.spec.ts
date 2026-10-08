@@ -14,7 +14,6 @@ const HOME = 'bise-home-00000000';
 const P = 'acme-1a2b3c4d';
 const NOW = Date.now();
 const MIN = 60_000;
-const at = (h: number, m: number) => new Date(NOW).setHours(h, m, 0, 0);
 const agent = (name: string, status: string, over: Record<string, unknown> = {}) => ({
   name, main: name === 'main', status, archived: false, title: '', purpose: `${name}'s job`, since_ms: NOW - 2 * MIN, waits: 0, ...over,
 });
@@ -22,8 +21,10 @@ const prefs = (theme: string) => ({
   ev: 'prefs',
   prefs: { onboarded: true, theme, context: { shot: true, url: true, file: true, window_text: false }, excluded_apps: [], quiet: { call: true, share: true, fullscreen: true, focus: true, batch_min: 20, away_card: true }, voice: { fn_hold: true, fn_twice: 'spotlight', language: 'auto' }, shots_keep_days: 7 },
 });
-// the quiet ones are done since early today (folded unless the test runs just after midnight)
-const early = Math.max(at(0, 1), NOW - 5 * 3_600_000);
+// the quiet ones are done 5 h ago: always past the 1 h fold, at any hour (just after midnight they
+// fall on yesterday and the row reads '3 more' rather than '3 more today': both are expected; a
+// clamp to 00:01 left them unfolded then, amb-home m_13988)
+const early = NOW - 5 * 3_600_000;
 const world = () => [
   prefs('light'),
   {
