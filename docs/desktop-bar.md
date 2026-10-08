@@ -464,6 +464,33 @@ A row stays even after it passes: it is a regression list.
     - D18: amb-web (Composer.tsx).
 
     One re-cut once these land.
+  - **ambient-pm's use, from qa-native's reshoot and asks** (13:17 UTC):
+    - **ok:**
+      - R25: the corner click lands on the box and the field gets the focus.
+      - R24's quote: drag, then Space, gives the `❝ 1` chip and its strip. Designer: green; the
+        chip sits low, in D18's family.
+      - The dashboards thread: tool rows grouped, the answers between them.
+      - The ⌘I feature_try card: try it / show the diff / not yet, with 1–3, close and esc later.
+      - Docs' dark-mode feature view.
+      - Spot search: "ingest" finds both agents.
+    - **red:**
+      - R18 (his bug 6): asked in the spot, the fake model answers 52 lines, and the capsule stays on
+        its list, so the answer never shows there (amb-web). I asked qa-native whether the answer
+        landed in bise's thread instead.
+      - Tool rows show raw JSON, `± edit: {"file_path":"panels.md"}`. Same class as D14 and his "je
+        vois du XML rendu"; it should read "± edit panels.md" (amb-home, with D15).
+      - R07-a: an agent selected in the spot shows its objective, not its last actions on the
+        right (amb-web). It was never built rather than broken; ambient-lead says whether it
+        blocks.
+      - Maybe 2.1: `/theme` left the window light, with data-theme unset, while the composer's tip
+        promises that it switches. A red if the driver typed it right; asked qa-native.
+    - **nit:** the spot's section head says "ENVIRONMENTS"; it should say "projects", like the sidebar
+      and ⌘K (amb-web; designer m_12804).
+    - **not judged:**
+      - R24's image: test mode fences Electron's clipboard, so it needs amb-mac's clipboard seed.
+      - R03: no button to hover after ⏎ on the spot's first row.
+      - R34: setup isn't reached in a reshoot-only run.
+      - R40 and the dark theme: next.
   - **question** (amb-win): with telemetry's 17 rows, shop and docs fall below the fold. Are the
     stopped rows under 1 h old, and does the current project scroll into view?
   - **still to come:**
