@@ -798,9 +798,9 @@ export const ThreadComposer = memo(function ThreadComposer({
         onCommand(sl.name, sl.args);
         return;
       }
-      // the docked card's answer: his words, the hub's one /answer path (files go as a message)
-      if (answer !== null && out.files.length === 0) {
-        store.answer(project, answer, out.text);
+      // the docked card's answer: his words and the images he attached, the hub's one /answer path (R41)
+      if (answer !== null) {
+        store.answer(project, answer, out.text, out.files);
         onSent();
         return;
       }

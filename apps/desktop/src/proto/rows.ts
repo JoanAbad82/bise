@@ -80,7 +80,13 @@ effort?: string | null,
  * hub's live usage lines (none after a hub start until its next
  * call, and after a compaction)
  */
-usage?: AgentUsage | null, };
+usage?: AgentUsage | null, 
+/**
+ * R9/S3: whom it waits on, the hub's own fact (the TUI's panel reads
+ * the same field): you (its card or question), or another agent's
+ * reply; none when it waits on nobody
+ */
+waiting_on?: WaitingOn | null, };
 
 /**
  * A numbered option of a card.
@@ -460,6 +466,11 @@ words: string,
  * without a known window (`words::short_words`, amb-win m_10985)
  */
 short: string, };
+
+/**
+ * Whom an agent waits on (R9/S3).
+ */
+export type WaitingOn = { "who": "you" } | { "who": "agent", name: string, } | { "who": "unknown" };
 
 /**
  * How tool calls are approved on this machine (bar V8/W21,

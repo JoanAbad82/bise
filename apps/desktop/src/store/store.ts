@@ -910,8 +910,9 @@ export class Store {
     if (!v.more || v.before === null) return;
     this.command({ cmd: 'page', project, agent, before: v.before, ...(limit === undefined ? {} : { limit }) });
   }
-  answer(project: string, card: number, reply: string): void {
-    this.command({ cmd: 'answer', project, card, reply });
+  /** His answer to card `card`: its words, and the images he pasted or dropped (R41: absolute paths, as a send's files). */
+  answer(project: string, card: number, reply: string, files?: readonly string[]): void {
+    this.command({ cmd: 'answer', project, card, reply, ...(files !== undefined && files.length > 0 ? { files: [...files] } : {}) });
   }
   /** His answer to the hub's yes/no question (a no's line comes back as a notice). */
   confirm(project: string, id: number, yes: boolean): void {

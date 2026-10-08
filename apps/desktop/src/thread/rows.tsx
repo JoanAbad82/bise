@@ -102,7 +102,15 @@ function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head:
       );
     case 'report':
       // a status line, never the '[report: …]' bracket form (designer D14)
-      return <Marker>{reportStatus(e.text, e.report?.kind) ?? e.text}</Marker>;
+    {
+      const line = reportStatus(e.text, e.report?.kind) ?? e.text;
+      // only what waits on him takes the accent: every done or failed line is dim (designer m_13926)
+      return (
+        <div className="th-report" data-waits={line.startsWith('blocked') || undefined} data-testid={`thread.report.${String(e.pos)}`}>
+          <Marker>{line}</Marker>
+        </div>
+      );
+    }
     case 'you':
       return <YouRow e={e} ctx={ctx} head={head} />;
     case 'to_agent':
@@ -152,7 +160,7 @@ function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head:
       const report = reportStatus(e.text);
       if (report !== null) {
         return (
-          <div data-testid={`thread.report.${String(e.pos)}`}>
+          <div className="th-report" data-waits={report.startsWith('blocked') || undefined} data-testid={`thread.report.${String(e.pos)}`}>
             <Marker>{who.from === 'agent' && (e.from ?? ctx.agent) !== ctx.agent ? `${who.name}: ${report}` : report}</Marker>
           </div>
         );
@@ -618,7 +626,7 @@ function ToAgentRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   if (report !== null) {
     if (carded) return null;
     return (
-      <div data-testid={`thread.report.${String(e.pos)}`}>
+      <div className="th-report" data-waits={report.startsWith('blocked') || undefined} data-testid={`thread.report.${String(e.pos)}`}>
         <Marker>{report}</Marker>
       </div>
     );

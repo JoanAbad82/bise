@@ -28,8 +28,18 @@ test('thread/report-rows: an agent\'s reports to bise read as status lines in it
     await expect(page.getByTestId('thread.to.2')).toContainText('i measured it');
     const all = (await page.getByTestId('thread.screen').innerText()).replace(/\s+/g, ' ');
     expect(all, 'no raw report tag').not.toContain('[report:');
+    // the scripted world's perf has older rows after these: the shots show the reports
+    await page.getByTestId('thread.report.3').scrollIntoViewIfNeeded();
     await page.screenshot({ path: test.info().outputPath('report-rows-light.png') });
-    await page.evaluate(() => { document.documentElement.setAttribute('data-theme', 'dark'); });
+    // dark as the app sets it (src/theme applyTheme): the attribute AND the root's color-scheme, which the
+    // ds tokens follow; the attribute alone left the option chips and the send button on light ink
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.style.setProperty('color-scheme', 'dark');
+    });
+    // the option chips and the send button transition their colours: shoot once they end, never mid-way
+    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))));
+    await page.waitForTimeout(250);
     await page.screenshot({ path: test.info().outputPath('report-rows-dark.png') });
   } finally {
     await s.close().catch(() => undefined);

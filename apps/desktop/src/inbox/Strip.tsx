@@ -14,7 +14,7 @@ import { STRIP_KEYS, stripKey, stripList, stripOpen, stripView, stripWords } fro
 import './inbox.css';
 
 export interface StripPorts {
-  answer: (project: string, card: number, reply: string) => void;
+  answer: (project: string, card: number, reply: string, files?: readonly string[]) => void;
   close: (project: string, card: number) => void;
   /** the whole inbox (⌘I) */
   openInbox: () => void;

@@ -894,3 +894,9 @@ button.th-sched-head {
     animation: none;
   }
 }
+
+/* a report's status line: only what waits on him takes the accent (designer m_13905); done, failed,
+   progress read dim like the thread's other done lines */
+.th-report:not([data-waits]) .b-marker {
+  color: var(--c-text-2);
+}

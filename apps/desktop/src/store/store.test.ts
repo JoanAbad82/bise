@@ -237,6 +237,20 @@ describe('store', () => {
     for (const c of sent) expect(hub_cmd.map((h) => h.cmd)).toContain(c.cmd);
   });
 
+  it('R41: an answer carries the images he attached (absolute paths, as a send); none: no files field', () => {
+    const { store, sent } = fake();
+    store.answer(P, 9, 'this one', ['/Users/me/.bise/images/a.png']);
+    store.answer(P, 9, '', ['/Users/me/.bise/images/b.png']);
+    store.answer(P, 10, 'yes', []);
+    store.answer(P, 10, 'yes');
+    expect(sent.filter((c) => c.cmd === 'answer')).toEqual([
+      { cmd: 'answer', project: P, card: 9, reply: 'this one', files: ['/Users/me/.bise/images/a.png'] },
+      { cmd: 'answer', project: P, card: 9, reply: '', files: ['/Users/me/.bise/images/b.png'] },
+      { cmd: 'answer', project: P, card: 10, reply: 'yes' },
+      { cmd: 'answer', project: P, card: 10, reply: 'yes' },
+    ]);
+  });
+
   it('shown is sent deduped, only when the set changes, and again to a core that comes back up', () => {
     const { store, sent } = fake();
     store.shown(['home', P, 'home']);

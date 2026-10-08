@@ -13,8 +13,8 @@ describe('previewLines', () => {
     expect(
       texts([
         e({ pos: 1, kind: 'tools', tools: { count: 2, summary: '', items: [
-          { pos: 2, at_ms: at(9), kind: 'run', text: 'bash: {"command":"cargo test -p core"}' },
-          { pos: 3, at_ms: at(8), kind: 'edit', text: 'edit: {"file_path":"panels.md"}' },
+          { pos: 2, at_ms: at(9), kind: 'run', text: 'bash: {"command":"cargo test -p core"}', state: 'ok' },
+          { pos: 3, at_ms: at(8), kind: 'edit', text: 'edit: {"file_path":"panels.md"}', state: 'ok' },
         ] } }),
         e({ pos: 4, kind: 'agent', text: '**the cache** is warm now\n\nmore' }),
         e({ pos: 5, kind: 'report', text: '[report: done] flush batched\nthe rest', report: { kind: 'done' } }),

@@ -93,3 +93,11 @@
 .ic.glass { background: transparent; box-shadow: none; border-radius: 0; max-height: none; }
 /* the strip's open item: docked between the thread and the composer's label, the composer's edges */
 .inbox-dock { margin: 0 16px 10px; flex: none; }
+
+/* R41: the images on his answer, as the composer's chips (mono 11, a quiet pill, × removes one) */
+.inbox-images { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--s-2); }
+.inbox-image {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 999px;
+  font: 11px var(--font-mono); color: var(--c-text-2); background: var(--c-sunken); box-shadow: 0 0 0 1px var(--c-line);
+}
+.inbox-image button { padding: 0; border: 0; background: none; color: var(--c-text-3); font: inherit; cursor: default; }

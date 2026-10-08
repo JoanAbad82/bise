@@ -5,12 +5,23 @@
 import type { FnContext } from './context';
 import type { Opt, ReportKind } from './rows';
 
-export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped" | "to_agent" | "thinking" | "compacting" | "compacted" | "notice" | "not_delivered" | "landed" | "pr" | "artifact" | "answered" | "approval" | "scheduled" | "unknown";
+export type EntryKind = "you" | "agent" | "from_agent" | "tools" | "card" | "page" | "report" | "stopped" | "to_agent" | "thinking" | "compacting" | "compacted" | "notice" | "not_delivered" | "landed" | "pr" | "artifact" | "answered" | "approval" | "scheduled" | "turn_failed" | "unknown";
 
 /**
  * What a tool call did, for the counted summary.
  */
 export type ToolKind = "read" | "edit" | "run" | "search" | "other";
+
+/**
+ * Where a tool call is: running, done, failed (R11, amb-win S9).
+ */
+export type ToolState = "run" | "ok" | "err" | "unknown";
+
+/**
+ * A file an edit touched, with its lines added and removed (the TUI's
+ * `± file +18 −6`; a move reads `old → new`).
+ */
+export type FileCount = { path: string, add: number, del: number, };
 
 export type ToolItem = { pos: number, at_ms: number, 
 /**
@@ -20,7 +31,37 @@ text: string, kind: ToolKind,
 /**
  * a `sb land`
  */
-land?: boolean, };
+land?: boolean, 
+/**
+ * running until its result line, then ok or err
+ */
+state: ToolState, 
+/**
+ * its duration: the result line's time minus the call line's
+ * ([`words::tool_ms`]); none while it runs or on a replay
+ */
+ms?: number | null, 
+/**
+ * a failed bash call's exit code (`exit 1: …`)
+ */
+exit?: number | null, 
+/**
+ * a failed call's first error line, the TUI's row under it
+ */
+err?: string | null, 
+/**
+ * the full command or args (the runtime's tool_code), [`cap`]ped
+ */
+code?: string | null, 
+/**
+ * its output as the result line gives it, [`cap`]ped
+ */
+out?: string | null, 
+/**
+ * an edit's files with their line counts (the window formats
+ * `+18 −6` from them: counts, like the folds)
+ */
+files?: Array<FileCount>, };
 
 export type Tools = { count: number, 
 /**
@@ -103,6 +144,12 @@ export type ApprovalFold = { ok: boolean, text: string, note?: string, };
 export type Scheduled = { id: number, head: string, words?: string, };
 
 /**
+ * A `turn_failed` entry (R12): why the turn failed, the runtime's words
+ * (a provider's error, a missing key, a budget).
+ */
+export type TurnFailed = { why: string, };
+
+/**
  * One entry of a thread.
  */
 export type Entry = { 
@@ -137,4 +184,4 @@ msg?: number | null,
  * a `thinking` entry's, or an `agent` reply's own: the reasoning
  * before it ("thought for 3.2s", folded)
  */
-thinking?: Thinking | null, notice?: Notice | null, not_delivered?: NotDelivered | null, landed?: Landed | null, pr?: PrNews | null, made?: Made | null, answered?: Answered | null, approval?: ApprovalFold | null, scheduled?: Scheduled | null, };
+thinking?: Thinking | null, notice?: Notice | null, not_delivered?: NotDelivered | null, landed?: Landed | null, pr?: PrNews | null, made?: Made | null, answered?: Answered | null, approval?: ApprovalFold | null, scheduled?: Scheduled | null, turn_failed?: TurnFailed | null, };

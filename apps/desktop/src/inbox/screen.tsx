@@ -47,8 +47,8 @@ export function InboxScreen() {
       tipOf={(c) => <CardTip project={c.project} />}
       ports={{
         inView,
-        answer: (project, card, reply) => {
-          store.answer(project, card, reply);
+        answer: (project, card, reply, files) => {
+          store.answer(project, card, reply, files);
         },
         close: (project, card) => {
           store.close(project, card);
@@ -84,8 +84,8 @@ export function ThreadInbox({ project }: { project: string }) {
       cards={cards}
       tip={<CardTip project={project} />}
       ports={{
-        answer: (p, card, reply) => {
-          store.answer(p, card, reply);
+        answer: (p, card, reply, files) => {
+          store.answer(p, card, reply, files);
         },
         close: (p, card) => {
           store.close(p, card);

@@ -18,11 +18,13 @@ import { dotOf, folds, InboxCard, takesWords, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { inboxDrafts, type Drafts } from './drafts';
 import { caretAtEnd } from '@/app/keep';
+import { saveImageFile } from '@/composer/attach';
+import type { SavedImage } from '@/composer/sources';
 import { current, prune, START, step, visible, type Act, type Key } from './model';
 import './inbox.css';
 
 export interface InboxPorts {
-  answer: (project: string, card: number, reply: string) => void;
+  answer: (project: string, card: number, reply: string, files?: readonly string[]) => void;
   /** close without answering (none: no close key, no button) */
   close?: (project: string, card: number) => void;
   /** esc: back where he was */
@@ -71,6 +73,25 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
   const curKey = cur ? cardKey(cur) : null;
   const field = useRef<HTMLTextAreaElement>(null);
   const root = useRef<HTMLElement>(null);
+  // R41: the images he pasted or dropped on an item's answer (saved by the window: absolute paths), per item
+  const [images, setImages] = useState<ReadonlyMap<string, readonly SavedImage[]>>(new Map());
+  const imagesOf = (k: string | null): readonly SavedImage[] => (k === null ? [] : (images.get(k) ?? []));
+  const addImages = (k: string, list: readonly File[]) => {
+    for (const f of list) {
+      if (!f.type.startsWith('image/')) continue;
+      void saveImageFile(f).then((img) => {
+        if (img !== null) setImages((m) => new Map(m).set(k, [...(m.get(k) ?? []), img]));
+      });
+    }
+  };
+  const dropImages = (k: string, i?: number) => {
+    setImages((m) => {
+      const n = new Map(m);
+      if (i === undefined) n.delete(k);
+      else n.set(k, (m.get(k) ?? []).filter((_, j) => j !== i));
+      return n;
+    });
+  };
 
   // bar N14: the core knows the card in front of him while this window
   // has focus; none when it blurs, leaves the inbox or the list empties
@@ -127,13 +148,25 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
   }, [curKey]);
 
   const run = (a: Act) => {
-    if (a.t === 'answer') ports.answer(a.project, a.card, a.reply);
+    if (a.t === 'answer') {
+      const k = `${a.project}-${String(a.card)}`;
+      const files = imagesOf(k).map((i) => i.path);
+      ports.answer(a.project, a.card, a.reply, files);
+      dropImages(k);
+    }
     else if (a.t === 'close') ports.close?.(a.project, a.card);
     else ports.back();
   };
 
   const key = (k: Key) => {
     const text = field.current?.value ?? '';
+    // R41: ⏎ with images and no words answers with the images alone (the hub takes a files-only answer)
+    if (k.k === 'enter' && cur && curKey !== null && takesWords(cur) && text.trim() === '' && imagesOf(curKey).length > 0) {
+      drafts.drop(curKey);
+      setS(prune({ ...s }, cards));
+      run({ t: 'answer', project: cur.project, card: cur.id, reply: '' });
+      return;
+    }
     const r = step(s, list, k, text);
     // an answer or a close takes the item's words; esc and moving keep them
     if (curKey !== null && (r.act?.t === 'answer' || r.act?.t === 'close')) drafts.drop(curKey);
@@ -222,7 +255,40 @@ export function Inbox({ cards, names, homes, ports, now: pinned, drafts = inboxD
                   }}
                   aria-label="your answer"
                   data-testid="inbox.answer"
+                  onPaste={(e) => {
+                    const fs = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
+                    if (fs.length === 0 || curKey === null) return;
+                    e.preventDefault();
+                    addImages(curKey, fs);
+                  }}
+                  onDragOver={(e) => {
+                    if ([...e.dataTransfer.items].some((i) => i.kind === 'file')) e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    const fs = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'));
+                    if (fs.length === 0 || curKey === null) return;
+                    e.preventDefault();
+                    addImages(curKey, fs);
+                  }}
                 />
+              )}
+              {takesWords(cur) && imagesOf(curKey).length > 0 && (
+                <div className="inbox-images" data-testid="inbox.answer.images">
+                  {imagesOf(curKey).map((img, i) => (
+                    <span key={img.path} className="inbox-image" data-testid={`inbox.answer.image.${String(i + 1)}`} title={img.path}>
+                      {`[Image #${String(i + 1)}] ${img.name}`}
+                      <button
+                        type="button"
+                        aria-label={`remove image ${String(i + 1)}`}
+                        onClick={() => {
+                          if (curKey !== null) dropImages(curKey, i);
+                        }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
               )}
             </InboxCard>
           </div>
