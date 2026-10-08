@@ -431,6 +431,40 @@ A row stays even after it passes: it is a regression list.
         thinking (qa-native).
     - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
       dev tool (amb-web's list, or amb-home's commands).
+- **723648da, 10-08 (the re-cut with every fix): red, not signed, no try build.** `--try` opens with
+  no build step. The world is e9c09378's, with real answers and 30 agents. The shots are in
+  `~/.bise/gate/try-gate/723648da/`.
+  - **now ok** (ambient-pm, flows):
+    - R01: shop's thread; the hint row is whole.
+    - R04: each waiting row in the spotlight shows "↵ answer".
+    - R07: 'p99' then ⏎ opens telemetry › p99 in the window.
+    - R08: the whole 3-line ask is shown.
+    - R10: "new" is pink.
+    - R13: `/version` is no longer in the `/` list.
+    - R26, R27: the folders are open, and the list scrolls above an opaque footer.
+    - R29, R30: the frame holds; the talk grows downward only.
+    - R32.
+    - R36: no raw tags; screen context reads "with Figma · Checkout.fig".
+    - Also ok as before: R02, R05, R06 (the menu now says "bise try"), R11, R16, R17 and R38.
+  - **now ok** (designer, look; m_12776): D2, D3 in the sidebar and agent heads, D4, D6, D10, D11,
+    D13, R22, R23, R33, R35, R37, R14 and R20-talk.
+  - **red** (designer):
+    - D12: every sidebar agent row ends in "0%" (amb-win).
+    - D7b: bise's own head reads "every project · 15 · 0%" (amb-home).
+    - D3b: bise's head pearl is missing at 1100 and 800, or a tiny blurred dot; it should be the
+      sidebar's crisp 14 px pearl (amb-home).
+    - D14: a raw "[report: blocked] waiting for your answer: …" line in shop's thread, right above
+      the question card that already says it. R36's tag check misses this form (amb-home).
+  - **nits:**
+    - D15: "$ bash: bash /…" has one "bash" too many (amb-home).
+    - D18: in the empty composer, the placeholder sits on the bottom line of a ~72 px box (amb-home).
+  - **question** (amb-win): with telemetry's 17 rows, shop and docs fall below the fold. Are the
+    stopped rows under 1 h old, and does the current project scroll into view?
+  - **still to come:**
+    - qa-native redoes R03 (app/clicks), R18, R24/R15, R25 and R34.
+    - The dark theme and R40's frames (the fake answered whole, so the frames are identical).
+    - ambient-pm's use asks: dashboards' tool rows (S9), the ⌘I approval card (O.1), the
+      spotlight preview (R07-a), bise in dark, and the feature review (A.6).
   - **the 30-minute use** with designer waits for the re-cut: with the project routes missing,
     most of the app can't be reached.
 
