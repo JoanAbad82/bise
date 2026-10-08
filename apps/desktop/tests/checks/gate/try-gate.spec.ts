@@ -247,7 +247,7 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       await go(s, `project/${shop}`);
       // the input box: the field's nearest ancestor that also holds the send button (not the hints line under it)
       const b = await field.evaluate((el) => {
-        let e: HTMLElement | null = el;
+        let e: Element | null = el;
         while (e && !e.querySelector('[data-testid="composer.send"]')) e = e.parentElement;
         const r = (e ?? el).getBoundingClientRect();
         return { x: r.x, y: r.y, width: r.width, height: r.height };
@@ -298,13 +298,9 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
         await p.keyboard.press('Space');
         await sleep(700);
       } else note('R24', 'no answer paragraph to select');
-      // the image: a PNG on the app's clipboard (Electron's clipboard, the test's own: test mode fences it), then ⌘V in the field
-      await s.app.evaluate(({ clipboard, nativeImage }) => {
-        // a 1x1 PNG, scaled to 64x40
-        const one = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- NativeImage.resize, typed in Electron's main
-        clipboard.writeImage(one.resize({ width: 64, height: 40 }));
-      });
+      // the image: ⌘V needs an image on the clipboard; test mode fences Electron's clipboard, so it waits on
+      // amb-mac's test clipboard image seed (R24): until then ⌘V pastes whatever the fence holds
+      note('R24', "the image chip waits on amb-mac's test clipboard image seed (test mode fences the clipboard)");
       await field.click();
       await p.keyboard.press('Meta+v');
       await sleep(1000);
