@@ -337,7 +337,40 @@ A row stays even after it passes: it is a regression list.
 
 **Run log** (one line per candidate: the sha, the date, the reds with what i saw, signed or not):
 
-- (first run: the 11:00 candidate, 10-08; qa-native shoots from ~08:30)
+- **12a9efbf, 10-08: red, not signed, no try build.** The shots are in
+  `~/.bise/gate/try-gate/12a9efbf/` (qa-native, 09:25–09:31 UTC). ambient-pm judged the flows by
+  eye; designer judged the look and signs the screens (m_12594).
+  - **ok:** R02, R05 (shot only; the check's result isn't in index.md), R06 (every mac key is in the
+    menu; see P6), R11, R14, R16, R17, R21, R22, R29 (the field's top stays at y −29830 while the
+    capsule's height goes 270 → 141), R30 (the frame doesn't move in 10 s) and R33.
+  - **red:**
+    - R01, R07, R09, R23, R31, R35, R37: every project route says "not found · nothing here at
+      project/shop" (also changes/shop), so ⏎ on an environment and a project's thread lead
+      nowhere (designer D1, amb-win + amb-home).
+    - R26, R27: no agents under any project in the sidebar (D2, amb-win).
+    - R20, R28: bise's row shows a white square with a broken-image mark instead of its pearl
+      (D3, amb-win).
+    - R10: "new" is an ink outline, not pink (D4, amb-kit).
+    - R01: the composer's hint row cuts words at 1100 (D6, amb-home).
+    - R03: two app/clicks reds, the thread head's agents link and the agents rows' buttons
+      (amb-win; one re-cut).
+  - **not judged:** the world or the driver failed, not the app.
+    - R36, R40: the rich world's fake model echoes its input (`ack: <user_message …>`, raw
+      `[[slow: 2]]`), so raw tags and streaming can't be judged. His own bubble shows no raw
+      `<screen_context>` (D5, amb-tools).
+    - R18: the answer is an ack, not 40 lines (amb-tools).
+    - R08: no fake mic in this run (qa-native: `BISE_AMBIENT_FAKE_VOICE`).
+    - R12, R13, R15, R24, R25, R32, R34, R38, R39: not shot, because the driver's clicks timed out
+      after 30 s, most likely on the missing project routes. qa-native reshoots after D1.
+    - R19: the strip wasn't checked by eye (designer or ambient-pm on the reshoot).
+  - **fix in the same pass** (not red):
+    - P6, R06: the menu says "bise-desktop" ("Quit bise-desktop", "Hide bise-desktop"); it should
+      say "bise" (amb-mac).
+    - P7, R04: the spotlight's waiting rows show no key of their own; only the foot has ⏎ and esc
+      (amb-web).
+    - Designer's D7–D9 (amb-home).
+  - **the 30-minute use** with designer waits for the re-cut: with the project routes missing,
+    most of the app can't be reached.
 
 ## Status at ambient-app a2039499: what is left (ambient-pm, for ambient-lead m_12152)
 
