@@ -132,16 +132,20 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
     });
     await each('R34', async () => {
       note('R34', 'the rich world has 3 projects, not 22: the picker is shot as it is');
-      await p.getByTestId('setup.root').waitFor({ timeout: 20_000 });
-      // setup's own steps (hello, permissions, …) to its project picker (setup.list / setup.filter / setup.choose)
+      // a step mounted, not just the root (amb-home m_12866)
+      await p.locator('[data-testid^="setup.step."]').first().waitFor({ timeout: 20_000 });
+      // setup's own steps: hello → permissions → model → projects (the picker: setup.list / setup.filter / setup.choose)
       const picker = p.locator('[data-testid="setup.list"], [data-testid="setup.filter"], [data-testid="setup.choose"]').first();
       const seen: string[] = [];
       for (let i = 0; i < 8 && !(await picker.isVisible().catch(() => false)); i++) {
-        seen.push((await testids(p, 'setup.step.')).join('+'));
+        const step = (await testids(p, 'setup.step.')).join('+');
+        seen.push(step);
         const next = p.getByTestId('setup.next');
         if (!(await next.isVisible().catch(() => false))) break;
-        await next.click({ timeout: 20_000 });
-        await sleep(1500);
+        // the model step's continue stays disabled until one account is signed in (Onboarding.tsx, by design)
+        if (!(await next.isEnabled())) { note('R34', `stopped at ${step}: its continue is disabled (the model step needs a signed-in account; the rich world has none)`); break; }
+        await next.click({ timeout: 10_000 });
+        await sleep(1200);
       }
       note('R34', `setup steps on the way: ${seen.join(' → ')}`);
       if (await picker.isVisible().catch(() => false)) {
