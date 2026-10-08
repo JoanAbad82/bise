@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { flatHits, marks, matchScore, nextScope, searchList, wordScore, type SearchData } from './rank';
+import { asksBise, flatHits, marks, matchScore, nextScope, searchList, sentenceNames, wordScore, type SearchData } from './rank';
 
 const NOW = Date.UTC(2026, 9, 14, 14, 30);
 const MIN = 60_000;
@@ -87,5 +87,42 @@ describe('search: one ranking for ⌘K and the spotlight', () => {
     expect(searchList(D, 'stripe webhook', 'all', NOW).mode).toBe('none');
     const bare: SearchData = { projects: D.projects, agents: D.agents.filter((a) => a.main), artifacts: [], scheduled: [] };
     expect(searchList(bare, '', 'all', NOW).mode).toBe('blank');
+  });
+});
+
+describe("what ⏎ does with a typed line: main's decision m_12973, the spotlight's and ⌘K's", () => {
+  it('one or two words that name something: ⏎ opens; longer, or naming nothing: ⏎ asks bise', () => {
+    expect(asksBise('search', true)).toBe(false);
+    expect(asksBise('checkout v1', true)).toBe(false);
+    expect(asksBise('stripe webhook', false)).toBe(true);
+    expect(asksBise('search ne trouve pas tshirt', true)).toBe(true);
+    expect(asksBise('   ', false)).toBe(false);
+  });
+  it("a sentence names an agent by its name, or by two of its title's 4+ letter words", () => {
+    expect(sentenceNames('search ne trouve pas tshirt', { name: 'search', title: 'search index' })).toBe(true);
+    expect(sentenceNames('why is amb-web slow', { name: 'amb-web', title: '' })).toBe(true);
+    expect(sentenceNames('the product page loads slowly, check its speed', { name: 'perf', title: 'product page speed' })).toBe(true);
+    // one long word of the title (twice) is not enough; nor a short one
+    expect(sentenceNames('the page, the page again', { name: 'perf', title: 'product page speed' })).toBe(false);
+    expect(sentenceNames('pay me', { name: 'checkout', title: 'apple pay on checkout' })).toBe(false);
+  });
+  it("'search' opens search; 'search ne trouve pas tshirt' asks bise, search one row down", () => {
+    const word = searchList(D, 'search', 'all', NOW);
+    expect(word.mode).toBe('found');
+    expect(flatHits(word)[0]?.id).toBe('agent.sf.search');
+    const sentence = searchList(D, 'search ne trouve pas tshirt', 'all', NOW);
+    expect(sentence.mode).toBe('ask');
+    expect(flatHits(sentence).map((h) => h.id)).toEqual(['agent.sf.search']);
+    // a sentence that names nothing still asks, with no rows under it
+    const nothing = searchList(D, 'why is everything so slow today', 'all', NOW);
+    expect(nothing.mode).toBe('ask');
+    expect(flatHits(nothing)).toEqual([]);
+  });
+  it('a sentence lists the archived agents it names too, after the live ones', () => {
+    const l = searchList(D, 'redo the first stripe flow for checkout', 'all', NOW);
+    expect(l.mode).toBe('ask');
+    const ids = flatHits(l).map((h) => h.id);
+    expect(ids).toContain('agent.sf.checkout-v1');
+    expect(ids.indexOf('agent.sf.checkout')).toBeLessThan(ids.indexOf('agent.sf.checkout-v1'));
   });
 });

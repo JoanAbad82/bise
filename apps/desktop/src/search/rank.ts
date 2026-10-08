@@ -112,8 +112,9 @@ export interface Group {
 }
 
 export interface SearchList {
-  /** start: no query; found: a query with hits; none: a query, nothing; blank: nothing to search */
-  readonly mode: 'start' | 'found' | 'none' | 'blank';
+  /** start: no query; found: one or two words with hits (⏎ opens); ask: a sentence (⏎ asks bise,
+   * what it names below); none: one or two words, nothing (⏎ asks bise); blank: nothing to search */
+  readonly mode: 'start' | 'found' | 'ask' | 'none' | 'blank';
   readonly groups: readonly Group[];
 }
 
@@ -156,6 +157,31 @@ export function matchScore(q: string | readonly string[], f: Fields): number {
     total += best;
   }
   return total;
+}
+
+// --- what ⏎ does with a typed line (main's decision m_12973, q-enter) -----------------------------
+// The spotlight and ⌘K decide it here, the same way: one or two words that name something: ⏎ opens
+// it; anything longer (or words that name nothing): ⏎ asks bise, what the sentence names one row
+// down (↓⏎ opens it).
+
+/** How many words still read as a name. */
+export const NAME_WORDS = 2;
+
+/** ⏎ asks bise: the line is longer than a name, or names nothing (`named`: it found something). */
+export function asksBise(q: string, named: boolean): boolean {
+  const n = queryWords(q).length;
+  return n > 0 && (n > NAME_WORDS || !named);
+}
+
+/** A text's words, lowercase, '-' and '_' kept inside a name ('amb-web'). */
+export const textWords = (s: string): string[] => s.toLowerCase().split(/[^\p{L}\p{N}_-]+/u).filter((w) => w !== '');
+
+/** A sentence names an agent: one of its words is the agent's name, or two of its title's 4+ letter words are in it. */
+export function sentenceNames(q: string, a: { readonly name: string; readonly title: string }): boolean {
+  const ws = textWords(q);
+  if (ws.includes(a.name.toLowerCase())) return true;
+  const big = new Set(ws.filter((w) => w.length >= 4));
+  return new Set(textWords(a.title).filter((w) => big.has(w))).size >= 2;
 }
 
 /** The parts of a text the query's words match (for the bold underline), as [start, end) pairs, merged. */
@@ -331,9 +357,15 @@ export function searchList(d: SearchData, q: string, scope: Scope, now: number, 
     return { mode: groups.length === 0 ? 'blank' : 'start', groups };
   }
 
-  const ranked = <T>(xs: readonly T[], hit: (x: T) => Hit, fields: (x: T) => Fields): Hit[] =>
+  // a sentence (main m_12973): bise is asked first; below it, what all its words match, and the
+  // agents it names (archived ones too, after the live ones)
+  const sentence = ws.length > NAME_WORDS;
+  const ranked = <T>(xs: readonly T[], hit: (x: T) => Hit, fields: (x: T) => Fields, named?: (x: T) => boolean): Hit[] =>
     xs
-      .map((x, k) => ({ x, k, s: matchScore(ws, fields(x)) }))
+      .map((x, k) => {
+        const s = matchScore(ws, fields(x));
+        return { x, k, s: s < 0 && sentence && named?.(x) === true ? 0 : s };
+      })
       .filter((y) => y.s >= 0)
       .map((y) => ({ h: { ...hit(y.x), score: y.s }, k: y.k }))
       .sort((a, b) => Number(a.h.archived) - Number(b.h.archived) || b.h.score - a.h.score || b.h.at_ms - a.h.at_ms || a.k - b.k)
@@ -344,6 +376,7 @@ export function searchList(d: SearchData, q: string, scope: Scope, now: number, 
       d.agents,
       (a) => agentHit(a, pname(a.project), now),
       (a) => ({ name: a.main ? ['bise', a.name] : [a.name], about: [a.title, a.purpose ?? ''], where: [pname(a.project)] }),
+      (a) => !a.main && sentenceNames(q, a),
     );
     if (hits.length > 0) groups.push({ id: 'agents', label: 'agents', hits });
   }
@@ -363,7 +396,8 @@ export function searchList(d: SearchData, q: string, scope: Scope, now: number, 
     );
     if (hits.length > 0) groups.push({ id: 'scheduled', label: 'scheduled', hits });
   }
-  return { mode: groups.length === 0 ? 'none' : 'found', groups };
+  const found = groups.length > 0;
+  return { mode: asksBise(q, found) ? (sentence ? 'ask' : 'none') : 'found', groups };
 }
 
 /** The list's hits in keyboard order. */

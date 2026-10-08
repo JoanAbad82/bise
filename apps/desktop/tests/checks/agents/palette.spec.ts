@@ -2,7 +2,8 @@
 // m_11864): over the window, every agent of every project, archived ones too, the artifacts and the
 // scheduled tasks, grouped, keyboard first; the composer keeps its draft. No query: 'recent'. A
 // query: agents (archived last), artifacts, scheduled; tab cycles the scope; ⏎ opens; ⌘⏎ restores
-// an archived agent then opens it; nothing found: '⌘⏎ ask bise' sends the words to bise. Shots light
+// an archived agent then opens it; a sentence (main m_12973): 'ask bise' first, ⏎ asks, ↓⏎ opens
+// the agent it names; two words naming nothing: '⏎ ask bise' sends the words to bise. Shots light
 // and dark, 1400 and 800 wide, for designer's sign-off. Owner: amb-web; the palette is
 // src/app/Palette.tsx in amb-win's shell. The new app on the scripted core's fixture world: bise's
 // home (main) and acme (main, perf working, old-fix archived, the artifact 'Perf notes').
@@ -105,14 +106,37 @@ test('agents/palette: ⌘K searches agents (archived too), artifacts, scheduled;
     await core.waitCmd((c) => c.cmd === 'unarchive' && c.project === ACME && 'agent' in c && c.agent === 'old-fix');
     await expect(thread, '⌘⏎ opened old-fix').toHaveAttribute('data-agent', 'old-fix', { timeout: 5000 });
 
-    // nothing matches: the words, and ⌘⏎ asks bise
+    // a sentence (main m_12973, the spotlight's rule): 'ask bise' is the first row and ⏎ asks;
+    // the agent it names sits one row down, ↓⏎ opens it
+    await openK(page);
+    await page.keyboard.type('why is perf so slow today');
+    await expect(page.locator(T.item(0)), 'a sentence: ask bise first').toHaveAttribute('data-kind', 'ask');
+    await expect(page.locator(T.item(0))).toContainText('ask bise “why is perf so slow today”');
+    await expect(page.locator(`${T.item(0)} .hint`)).toHaveText('⏎ ask');
+    await expect(page.locator(T.item(1)), 'the agent it names, one row down').toContainText('perf');
+    await expect(page.locator(T.keys)).toHaveText('↑↓ choose   ⏎ ask bise   esc close');
+    await page.screenshot({ path: test.info().outputPath('light-1400-sentence.png') });
+    await page.keyboard.press('ArrowDown');
+    await expect(page.locator(T.item(1))).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Enter');
+    await expect(page.locator(T.palette)).toBeHidden({ timeout: 2000 });
+    await expect(thread, '↓⏎ opened perf').toHaveAttribute('data-agent', 'perf', { timeout: 5000 });
+    await openK(page);
+    await page.keyboard.type('why is perf so slow today');
+    await expect(page.locator(T.item(0))).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Enter');
+    await core.waitCmd((c) => c.cmd === 'send' && c.project === HOME && 'text' in c && c.text === 'why is perf so slow today');
+    await expect(page.locator(T.palette)).toBeHidden({ timeout: 2000 });
+    await expect(thread, '⏎ asked bise: its thread').toHaveAttribute('data-project', HOME, { timeout: 5000 });
+
+    // two words that name nothing: the words, and ⏎ asks bise
     await openK(page);
     await page.keyboard.type('stripe webhook');
     await expect(page.locator(T.none)).toContainText('nothing matches “stripe webhook”. archived agents, artifacts and scheduled tasks were searched too.');
     await expect(page.locator(T.none)).toContainText('ask bise “stripe webhook”');
-    await expect(page.locator(T.keys)).toHaveText('⌘⏎ ask bise   esc close');
+    await expect(page.locator(T.keys)).toHaveText('⏎ ask bise   esc close');
     await page.screenshot({ path: test.info().outputPath('light-1400-none.png') });
-    await page.keyboard.press('Meta+Enter');
+    await page.keyboard.press('Enter');
     await core.waitCmd((c) => c.cmd === 'send' && c.project === HOME && 'text' in c && c.text === 'stripe webhook');
     await expect(page.locator(T.palette)).toBeHidden({ timeout: 2000 });
     await expect(thread).toHaveAttribute('data-project', HOME, { timeout: 5000 });

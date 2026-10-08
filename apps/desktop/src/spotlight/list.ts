@@ -2,10 +2,11 @@
 // Empty: waiting for you (the cards), at work (working agents), projects (designer m_12805; the
 // one in front first; what's in front with no project gets its own dim row, no ⌘ number).
 // Typed: 1-2 words that name an agent or a project list those (⏎ opens the first); a sentence puts
-// 'ask bise' first and keeps the agents it names below.
+// 'ask bise' first and keeps the agents it names below, archived ones last (the rule is
+// src/search's asksBise / sentenceNames, ⌘K's too: main m_12973).
 // The inputs are this module's own view types: the screen maps the store's (generated) shapes to
 // them, so a protocol change doesn't reach the list's rules.
-import { matchScore } from '@/search/rank';
+import { asksBise, matchScore, sentenceNames } from '@/search/rank';
 import { W, cardLine, hostOf, newBrief, oneLine, shortPath, words } from './words';
 
 export type AgentStatus = 'waiting' | 'blocked' | 'working' | 'idle' | 'done' | 'failed';
@@ -90,7 +91,6 @@ export function frontProject(front: SpotFront | null | undefined, projects: read
 export function spotList(d: SpotData, text: string): SpotList {
   const q = text.trim();
   const ql = q.toLowerCase();
-  const ws = words(q);
   const pname = (id: string): string => d.projects.find((p) => p.id === id)?.name ?? id;
   const waits = new Set(d.cards.map((c) => `${c.project}/${c.agent}`));
   const live = d.agents
@@ -157,13 +157,15 @@ export function spotList(d: SpotData, text: string): SpotList {
     .sort((x, y) => Number(x.a.archived === true) - Number(y.a.archived === true) || y.s - x.s || ORDER[x.status] - ORDER[y.status] || x.i - y.i)
     .map((x) => agentItem(x.a, x.status));
   const envHit = envs.filter((e) => e.kind === 'env' && (e.name.toLowerCase().startsWith(ql) || (d.projects.find((p) => p.id === e.project)?.path ?? '').toLowerCase().includes(ql)));
-  if (ws.length <= 2 && byName.length + envHit.length > 0) {
+  // what ⏎ does is src/search's rule, ⌘K's too (main m_12973): 1-2 words that name something open it
+  if (!asksBise(q, byName.length + envHit.length > 0)) {
     return { mode: 'names', sections: [{ label: W.found, items: [...byName, ...envHit] }] };
   }
-  // a sentence: bise first; the agents it names (a word is its name, or 2 of its title's long words)
-  const big = new Set(ws.filter((w) => w.length >= 4));
+  // a sentence: bise first; the agents it names (a word is its name, or 2 of its title's long
+  // words), archived ones too, after the live ones
   const named = live
-    .filter((x) => x.a.archived !== true && (ws.includes(x.a.name.toLowerCase()) || words(x.a.title).filter((w) => big.has(w)).length >= 2))
+    .filter((x) => sentenceNames(q, x.a))
+    .sort((x, y) => Number(x.a.archived === true) - Number(y.a.archived === true))
     .map((x) => agentItem(x.a, x.status));
   return { mode: 'ask', sections: [{ label: null, items: [{ kind: 'ask', id: 'ask', text: q }, ...named] }] };
 }

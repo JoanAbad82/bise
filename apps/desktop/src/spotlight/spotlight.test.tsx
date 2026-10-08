@@ -37,6 +37,13 @@ describe('the spotlight list', () => {
     expect(ask.mode).toBe('ask');
     expect(flat(ask).map((i) => i.id)).toEqual(['ask', 'agent.tel.perf']);
   });
+  it("⌘K's rule (main m_12973): a sentence asks first and keeps the archived agents it names too, after the live ones", () => {
+    const old = { name: 'perf-v1', project: 'tel', status: 'done' as const, title: 'slow hot query, first pass', archived: true };
+    const d: SpotData = { ...D, agents: [old, ...D.agents] };
+    expect(spotList(d, 'perf').mode).toBe('names');
+    const ask = spotList(d, 'why is the hot query slow for perf');
+    expect(flat(ask).map((i) => i.id)).toEqual(['ask', 'agent.tel.perf', 'agent.tel.perf-v1']);
+  });
   it('words: card lines and paths as ambient signed them', () => {
     expect(cardLine('t1-97894 is ready to try\n1 commit on t1-97894 · +3 −0')).toBe('t1-97894 is ready to try · 1 commit · +3 −0');
     expect(shortPath('/Users/me/.bise/gate/w-ambtools/h/code/telemetry')).toBe('~/…/w-ambtools/h/code/telemetry');

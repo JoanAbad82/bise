@@ -3,8 +3,9 @@
 // keyboard first. The ranking is src/search's, the bar's spotlight finds with the same rules.
 // No query: 'waiting for you', then 'recent'. tab / shift+tab cycle the scope (all · agents ·
 // artifacts · scheduled), ↑↓ ctrl+n/p move, ⏎ opens (a waiting agent: answers in its thread),
-// ⌘⏎ restores an archived agent then opens it, or sends the query to bise when nothing matches;
-// esc closes. Its own field: the composer keeps its draft. Owner: amb-web (lead m_11864), in
+// ⌘⏎ restores an archived agent then opens it; one or two words that name nothing, or a sentence:
+// ⏎ asks bise (a sentence: 'ask bise' is the first row, what it names one row down, main m_12973,
+// the spotlight's rule from src/search's asksBise); esc closes. Its own field: the composer keeps its draft. Owner: amb-web (lead m_11864), in
 // amb-win's shell.
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useCoreEvent, useIndex, useProjects, useStore } from '@/store';
@@ -37,7 +38,9 @@ export const PW = {
   blank: 'nothing to search yet. your agents, what they make and their scheduled tasks show up here as you work.',
   keys: '↑↓ choose   ⏎ open   tab all · agents · artifacts · scheduled   esc close',
   keysArchived: (scope: Scope): string => `↑↓ choose   ⏎ open   ⌘⏎ restore   ${scope === 'all' ? 'tab agents only' : 'tab all · agents · artifacts · scheduled'}   esc close`,
-  keysNone: '⌘⏎ ask bise   esc close',
+  keysNone: '⏎ ask bise   esc close',
+  keysAsk: '↑↓ choose   ⏎ ask bise   esc close',
+  hintAsk: '⏎ ask',
   keysBlank: 'esc close',
   tabOnly: 'tab agents only',
   hint: (h: Hit): string => (h.archived ? '⏎ open   ⌘⏎ restore' : h.waiting ? '⏎ answer' : '⏎ open'),
@@ -46,6 +49,8 @@ export const PW = {
 /** The key line for a list and its selected row. */
 export function keyLine(l: SearchList, at: Hit | undefined, scope: Scope): string {
   if (l.mode === 'none') return PW.keysNone;
+  // a sentence: the 'ask bise' row is chosen (no hit)
+  if (l.mode === 'ask' && at === undefined) return PW.keysAsk;
   if (l.mode === 'blank') return PW.keysBlank;
   return at?.archived === true ? PW.keysArchived(scope) : PW.keys;
 }
@@ -118,8 +123,12 @@ export function Palette({ onClose }: { onClose: () => void }) {
   );
   const list = useMemo(() => searchList(data, q, scope, now), [data, q, scope, now]);
   const hits = useMemo(() => flatHits(list), [list]);
-  const cur = Math.min(at, Math.max(0, hits.length - 1));
-  const sel = hits[cur];
+  // a sentence (main m_12973): 'ask bise' is the first row, ⏎ asks; the hits come one row down
+  const askRow = list.mode === 'ask';
+  const rows = hits.length + (askRow ? 1 : 0);
+  const cur = Math.min(at, Math.max(0, rows - 1));
+  const onAsk = list.mode === 'none' || (askRow && cur === 0);
+  const sel = askRow ? (cur === 0 ? undefined : hits[cur - 1]) : hits[cur];
   const home = projects.find((p) => p.home)?.project;
 
   useEffect(() => {
@@ -157,18 +166,19 @@ export function Palette({ onClose }: { onClose: () => void }) {
     const up = e.key === 'ArrowUp' || (e.ctrlKey && e.key === 'p');
     if (down || up) {
       e.preventDefault();
-      setAt(Math.max(0, Math.min(hits.length - 1, cur + (down ? 1 : -1))));
+      setAt(Math.max(0, Math.min(rows - 1, cur + (down ? 1 : -1))));
     } else if (e.key === 'Tab') {
       e.preventDefault();
       setScope((s) => nextScope(s, e.shiftKey));
       setAt(0);
     } else if (e.key === 'Enter' && e.metaKey) {
       e.preventDefault();
-      if (list.mode === 'none') ask();
+      if (onAsk) ask();
       else if (sel?.archived === true) open(sel, true);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      open(sel);
+      if (onAsk) ask();
+      else open(sel);
     } else if (e.key === 'Escape' || (e.ctrlKey && e.key === 'c')) {
       e.preventDefault();
       e.stopPropagation();
@@ -177,7 +187,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
     }
   };
 
-  let k = 0;
+  let k = askRow ? 1 : 0;
   return (
     <div
       className="app-palette"
@@ -237,8 +247,27 @@ export function Palette({ onClose }: { onClose: () => void }) {
               </span>
               <p>{PW.none(q.trim())}</p>
               <button type="button" className="app-k-ask" onClick={ask} data-testid="app.palette.ask">
-                {PW.ask(q.trim())} <kbd>⌘⏎</kbd>
+                {PW.ask(q.trim())} <kbd>⏎</kbd>
               </button>
+            </div>
+          )}
+          {askRow && (
+            <div
+              role="option"
+              aria-selected={cur === 0}
+              className={['app-k-row', cur === 0 ? 'on' : ''].filter((c) => c !== '').join(' ')}
+              data-kind="ask"
+              onMouseMove={() => {
+                if (cur !== 0) setAt(0);
+              }}
+              onClick={ask}
+              data-testid="app.palette.item.0"
+            >
+              <span className="g pearl" aria-hidden>
+                <i className="app-k-pearl" />
+              </span>
+              <span className="nm">{PW.ask(q.trim())}</span>
+              <span className="rt">{cur === 0 && <span className="hint"><Pairs text={PW.hintAsk} /></span>}</span>
             </div>
           )}
           {list.groups.map((g) => (
