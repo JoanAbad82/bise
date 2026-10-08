@@ -298,7 +298,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
                     data-testid={`app.palette.item.${String(n)}`}
                   >
                     <span className={`g ${h.tone}`} aria-hidden>
-                      {h.tone === 'pearl' ? <i className="app-k-pearl" /> : h.glyph}
+                      {h.tone === 'pearl' ? <i className="app-k-pearl" /> : h.tone === 'bise' ? <i className="app-k-pearl bise" data-testid={`app.palette.item.${String(n)}.pink`} /> : h.glyph}
                     </span>
                     <span className="nm">
                       <Marked text={h.name} q={q} />

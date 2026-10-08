@@ -83,6 +83,14 @@ describe('search: one ranking for ⌘K and the spotlight', () => {
     expect(l.groups[1]?.hits[0]).toMatchObject({ tone: 'pearl', when: '2 agents at work', where: '' });
   });
 
+  it("a bise waiting on him has the pink pearl in 'waiting for you'; idle, the grey one (designer m_13854)", () => {
+    const asks: SearchData = { ...D, agents: D.agents.map((a) => (a.main && a.project === 'home' ? { ...a, waits: 1, ask: 'which repo first?' } : a)) };
+    const l = searchList(asks, '', 'all', NOW, 'UTC');
+    const w = l.groups.find((g) => g.id === 'waiting')?.hits ?? [];
+    expect(w.find((h) => h.name === 'bise')).toMatchObject({ tone: 'bise', glyph: '', detail: 'which repo first?' });
+    expect(l.groups.find((g) => g.id === 'recent')?.hits.find((h) => h.name === 'bise · storefront')).toMatchObject({ tone: 'pearl' });
+  });
+
   it('nothing matches: none; nothing to search (only the bise rows): blank', () => {
     expect(searchList(D, 'stripe webhook', 'all', NOW).mode).toBe('none');
     const bare: SearchData = { projects: D.projects, agents: D.agents.filter((a) => a.main), artifacts: [], scheduled: [] };

@@ -88,8 +88,9 @@ export interface Hit {
   readonly project: string;
   /** the sign in the glyph column: an agent's status sign, an artifact's kind, ◷ */
   readonly glyph: string;
-  /** the glyph's tone: acc (waits on him), err (failed), ink (working), '' dim */
-  readonly tone: '' | 'acc' | 'err' | 'ink' | 'pearl';
+  /** the glyph's tone: acc (waits on him), err (failed), ink (working), '' dim; a bise's pearl:
+   *  pearl (still, grey), bise (pink: that bise waits on him) */
+  readonly tone: '' | 'acc' | 'err' | 'ink' | 'pearl' | 'bise';
   readonly name: string;
   /** the dim words after the name */
   readonly detail: string;
@@ -253,7 +254,12 @@ const clock = (ms: number, tz?: string): string => new Intl.DateTimeFormat('en-G
 function agentHit(a: SearchAgent, pname: string, now: number): Hit {
   const waiting = !a.archived && a.waits > 0;
   const status: AgentStatus = waiting ? 'waiting' : a.status;
-  const sign = a.archived ? { glyph: '–', tone: '' as const } : a.main ? { glyph: '', tone: 'pearl' as const } : SIGN[status];
+  // a bise waiting on him: the pink pearl, as the sidebar's pink bise row (designer m_13854)
+  const sign = a.archived
+    ? { glyph: '–', tone: '' as const }
+    : a.main
+      ? { glyph: '', tone: waiting ? ('bise' as const) : ('pearl' as const) }
+      : SIGN[status];
   const about = one(a.title || a.purpose || '');
   const name = a.main ? (pname === 'bise' ? 'bise' : `bise · ${pname}`) : a.name;
   const detail = a.archived ? (about === '' ? 'archived' : `archived · ${about}`) : waiting && a.ask !== undefined ? one(a.ask) : a.main ? '' : about;

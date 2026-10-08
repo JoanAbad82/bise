@@ -114,22 +114,30 @@ export function buildMessage(segments: readonly Segment[]): Outgoing {
   const quotes: string[] = [];
   const files: string[] = [];
   let body = '';
+  // an inline label (an image's `[Image #1]`, an artifact's link) gets one space from the words
+  // on each side, as the TUI inserts it: never '[Image #1]what is…' (qa-native's R41 read)
+  let spaceNext = false;
   for (const s of segments) {
     if (s.kind === 'text') {
+      if (spaceNext && /^[^\s.,;:!?)\]]/u.test(s.text)) body += ' ';
+      if (s.text !== '') spaceNext = false;
       body += s.text;
       continue;
     }
     const c = s.chip;
     if (c.kind === 'quote') {
       if (quotes.length < QUOTE_MAX) quotes.push(quoteTag(c.from, c.text, c.at));
-    } else if (c.kind === 'paste') {
-      body += pasteTag(c.n, c.text);
-    } else if (c.kind === 'artifact') {
-      body += `[${c.title.replace(/[[\]]/gu, '')}](${c.url})`;
-    } else {
-      body += chipLabel(c);
-      if (!files.includes(c.path)) files.push(c.path);
+      continue;
     }
+    if (c.kind === 'paste') {
+      body += pasteTag(c.n, c.text);
+      spaceNext = false;
+      continue;
+    }
+    if (c.kind === 'image' && !files.includes(c.path)) files.push(c.path);
+    const label = c.kind === 'artifact' ? `[${c.title.replace(/[[\]]/gu, '')}](${c.url})` : chipLabel(c);
+    body += (/\S$/u.test(body) ? ' ' : '') + label;
+    spaceNext = true;
   }
   // `say …` and `steer …` go out without their word (sb.rs, C45)
   const words = body.trim().replace(/^(?:steer|say) /u, '').trim();

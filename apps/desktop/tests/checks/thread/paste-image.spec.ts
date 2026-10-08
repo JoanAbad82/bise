@@ -76,7 +76,7 @@ test("thread/paste-image: ⌘V of a PNG in bise main's composer is a chip, ⏎ s
     expect(f, "in the image store, the TUI's").toMatch(/\/images\/[0-9a-f]{64}\.png$/u);
     expect(readFileSync(f).equals(readFileSync(PNG_FILE)), `${f} holds the PNG's bytes`).toBe(true);
     const text = typeof sent['text'] === 'string' ? sent['text'] : '';
-    expect(text, 'his words are sent').toContain('what is wrong in this');
+    expect(text, "the label, one space, his words (qa-native's R41 read: never '[Image #1]what…')").toBe('[Image #1] what is wrong in this');
     expect(text, 'no path in his words').not.toContain(f);
   } finally {
     await s.close();

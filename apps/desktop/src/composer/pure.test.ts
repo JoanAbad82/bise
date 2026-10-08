@@ -8,7 +8,7 @@ import DESKTOP_EMOJI from './emoji.tsv?raw';
 import { barMode, barPairs, startTip, tickTip, tipShown, TIPS, TIP_EVERY_MS } from './keybar';
 import { noVisionLine } from './message';
 import { codeRuns, colorLines, proseRuns } from './mdcolor';
-import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Segment } from './message';
+import { buildMessage, chipStrip, isLongPaste, lineCount, nextChipNumber, type Chip, type Segment } from './message';
 import { enqueue, load, popNewest, remember, save, takeOldest, HISTORY_MAX, type Store } from './drafts';
 import { argRows, commandLine, commandRows, completion, enterSends, move, type Row } from './pick';
 import { enterMakesNewline, indent, item, newline, outdentAtStart, subwordLeft, subwordRight, type Op } from './mdlive';
@@ -289,6 +289,20 @@ describe('artifacts in the @ list (commands.rs, W11)', () => {
     ];
     expect(buildMessage(segs)).toEqual({ text: 'see [Pricing draft](http://h/a/pricing) and fix it', files: [] });
     expect(chipStrip({ kind: 'artifact', n: 1, id: 'p', title: 'Perf notes', url: 'http://h/p' })).toBe('↗ Perf notes  http://h/p');
+  });
+  it('a label gets one space from the words, never two (qa-native R41: "[Image #1]what is…")', () => {
+    const a: Chip = { kind: 'image', n: 1, path: '/i/a.png', name: 'a.png' };
+    const b: Chip = { kind: 'image', n: 2, path: '/i/b.png', name: 'b.png' };
+    const art: Chip = { kind: 'artifact', n: 3, id: 'p', title: 'Plan', url: 'http://h/p' };
+    const send = (...parts: (string | Chip)[]): string =>
+      buildMessage(parts.map((p): Segment => (typeof p === 'string' ? { kind: 'text', text: p } : { kind: 'chip', chip: p }))).text;
+    expect(send(a, 'what is wrong')).toBe('[Image #1] what is wrong');
+    expect(send(a, b, 'what is wrong in these')).toBe('[Image #1] [Image #2] what is wrong in these');
+    expect(send('see', a, 'here')).toBe('see [Image #1] here');
+    expect(send('see ', a, ' here')).toBe('see [Image #1] here');
+    expect(send('read', art, ', then fix')).toBe('read [Plan](http://h/p), then fix');
+    expect(send('line one\n', a)).toBe('line one\n[Image #1]');
+    expect(send(a, '', 'go')).toBe('[Image #1] go');
   });
 });
 
