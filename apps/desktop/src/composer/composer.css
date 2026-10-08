@@ -24,10 +24,14 @@
 .b-composer-pick .b-mi .k { overflow: hidden; text-overflow: ellipsis; max-width: 60%; }
 .b-composer { position: relative; }
 /* the key bar (keybar.ts): keys in the text color, what they do dim, 3 spaces between pairs; the tip dim on the right */
-.b-composer .keys { display: flex; gap: 3ch; }
-.b-composer .keys .pairs { display: flex; gap: 3ch; min-width: 0; overflow: hidden; }
+/* never a word cut (designer's try gate D6): the row is one line high and wraps whole items, so
+   what doesn't fit goes to a hidden second line: the tip first (it is last), then whole pairs
+   from the end; a key never leaves its words (each pair is one item, white-space: pre) */
+.b-composer .keys { display: flex; flex-wrap: wrap; column-gap: 3ch; row-gap: 0; align-items: center; box-sizing: border-box; height: calc(7px + 1lh); overflow: hidden; }
+.b-composer .keys .pairs { display: contents; }
+.b-composer .keys .pair { flex: none; }
 .b-composer .keys .kk { color: var(--c-text-2); }
-.b-composer .keys .tip { margin-left: auto; overflow: hidden; text-overflow: ellipsis; }
+.b-composer .keys .tip { flex: none; margin-left: auto; }
 /* the mic control (bar I): its key at rest, a meter and 'listening…' while on; fixed width, so the
    key line never moves when it changes */
 .b-composer .keys .mic { flex: none; display: inline-flex; align-items: center; gap: 6px; min-width: 15ch; padding: 1px 4px; margin: -1px -4px; border: 0; border-radius: var(--r-2); background: none; font: inherit; color: inherit; cursor: default; transition: background var(--d-fast) var(--ease-out), color var(--d-fast) var(--ease-out); }

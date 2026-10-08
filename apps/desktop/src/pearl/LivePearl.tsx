@@ -29,6 +29,10 @@ export interface LivePearlProps {
 }
 
 const HELLO_MS = 1200;
+/** Under this many CSS px the pearl is the still CSS one (no WebGL). */
+export const SMALL = 20;
+/** The moods a small pearl draws in ink; every other one is pink (it calls him or bise is busy). */
+const INK: ReadonlySet<Mood> = new Set<Mood>(['rest', 'still', 'away']);
 const UNIFORMS = ['res', 't', 'flow', 'variant', 'lvl', 'think', 'need', 'done', 'away', 'listen', 'still', 'gather', 'zoom'] as const;
 
 interface Gl {
@@ -143,6 +147,30 @@ export const LivePearl = memo(function LivePearl(props: LivePearlProps): JSX.Ele
     };
   }, []);
 
+  if (props.size < SMALL) {
+    // under 20 px the shader's dot grid (6 px cells) has no room: in the harness the 14 px pearl
+    // drew nothing, on his Mac a white square with a corner smudge (designer's try gate D3). A
+    // small pearl is the still CSS one, pink in a mood that calls him, ink otherwise; no WebGL.
+    const ink = INK.has(props.mood);
+    return (
+      <span
+        className="b-live-pearl sm"
+        style={{
+          width: props.size,
+          height: props.size,
+          display: 'block',
+          borderRadius: '50%',
+          background: ink
+            ? 'radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c-text) 85%, transparent), color-mix(in srgb, var(--c-text) 30%, transparent) 70%)'
+            : 'radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c-accent) 60%, white), var(--c-accent) 70%)',
+        }}
+        data-mood={props.mood}
+        data-tone={ink ? 'ink' : 'pink'}
+        data-testid={props.testId ?? 'pearl'}
+        aria-hidden="true"
+      />
+    );
+  }
   return (
     <canvas
       ref={canvas}

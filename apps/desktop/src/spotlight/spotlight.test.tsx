@@ -50,6 +50,11 @@ describe('the spotlight list', () => {
 });
 
 describe('the spotlight', () => {
+  it("a waiting row shows its own key, like the other rows (ambient-pm's try gate)", () => {
+    const ui = render(<Spotlight data={D} onAsk={vi.fn()} onOpen={vi.fn()} onClose={vi.fn()} />);
+    const row = ui.getByTestId('spot.row.card.c1');
+    expect(row.querySelector('.ky')?.textContent).toBe('↵ answer');
+  });
   it('keeps one input node while the list changes, ⏎ on a sentence asks bise', async () => {
     const onAsk = vi.fn();
     const ui = render(<Spotlight data={D} onAsk={onAsk} onOpen={vi.fn()} onClose={vi.fn()} />);

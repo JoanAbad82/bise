@@ -10,6 +10,8 @@ export const W = {
   envs: 'environments',
   found: 'found',
   askBise: 'ask bise',
+  /** a waiting row's own key, like the other rows' (ambient-pm's try gate): ⏎ answers it */
+  answerKey: '↵ answer',
   openInBise: 'open in bise',
   close: 'close',
   inFront: (what: string): string => (what ? `in front: ${what}` : 'in front'),

@@ -132,7 +132,8 @@ export interface ComposerFrameProps {
 export function boxPress(target: EventTarget | null): boolean {
   const el = target as { closest?: (s: string) => unknown } | null;
   if (el === null || typeof el.closest !== "function") return true;
-  return el.closest('[contenteditable="true"], button, a, input, textarea, [role=button], .b-chip, .b-dock, .b-tabs, .b-quote') === null;
+  // a disabled control (send while the draft is empty) does nothing of its own: the press focuses the field
+  return el.closest('[contenteditable="true"], button:not(:disabled), a, input, textarea, [role=button], .b-chip, .b-dock, .b-tabs, .b-quote') === null;
 }
 /** the composer's frame: tabs, dock, quote, the to-line, the box with the editor and send, the keys */
 export function ComposerFrame({ children, to, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, testId }: ComposerFrameProps) {

@@ -31,6 +31,11 @@ describe("the / list: the TUI's commands in its order, never a silent gap", () =
     expect(extra).toContain('prs');
     expect(extra, 'one row per command').not.toContain('agents');
   });
+  it('leaves /version out of the window\'s list (a terminal dev tool), whatever the core sends', () => {
+    const rows = pickCommands([...core, { name: '/version', desc: 'the version' } as (typeof core)[number]]);
+    expect(rows.map((r) => r.name)).not.toContain('/version');
+    expect(rows.map((r) => r.name)).not.toContain('version');
+  });
   it("before the core answers: the window's own alone", () => {
     expect(pickCommands([])).toEqual(windowCommands);
   });

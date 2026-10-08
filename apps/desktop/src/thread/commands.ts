@@ -142,9 +142,12 @@ function argKind(a: PickArg): ArgKind {
  * the window can run them, then the window's own the TUI has no row for.
  * Before the core answers, the window's own alone.
  */
+/** What bar 2.1 leaves out of the window's / list: /version is a dev tool of the terminal. */
+export const LEFT_OUT: ReadonlySet<string> = new Set(['version']);
+
 export function pickCommands(core: readonly CoreCommand[]): PickCommand[] {
   if (core.length === 0) return [...windowCommands];
-  const rows = core.map(
+  const rows = core.filter((c) => !LEFT_OUT.has(c.name.replace(/^\//, ''))).map(
     (c): PickCommand => ({
       name: c.name,
       desc: c.desc,
