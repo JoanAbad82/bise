@@ -28,7 +28,7 @@ import { PrsScreen } from '@/review/PrsScreen';
 import { EnvironmentsScreen } from '@/review/EnvironmentsScreen';
 import { Skel } from '@/ds';
 import { Main, Win } from '@/ds';
-import { Sidebar } from './Sidebar';
+import { Sidebar, useClosedFolders } from './Sidebar';
 import { Over, Titlebar, useFrame } from './Frame';
 import { Panel } from './Panel';
 import { numbersOf } from '@/agents/model';
@@ -296,8 +296,13 @@ function ScreenOf({ route }: { route: Route }) {
 function useShown() {
   const store = useStore();
   const route = useRoute();
-  const home = useProjects().find((p) => p.home)?.project;
-  const set = shownOf(home, route);
+  const rows = useProjects();
+  const home = rows.find((p) => p.home)?.project;
+  // the sidebar's open folders (open by default, R26) show their agents: their hubs that already
+  // run are shown too (never started for this: a stopped hub stays stopped, battery)
+  const closed = useClosedFolders();
+  const open = rows.filter((p) => !p.home && p.running && !closed.has(p.project)).map((p) => p.project);
+  const set = shownOf(home, route, open);
   const key = set.join('\n');
   // said even empty: the core sends the projects rows (bise's home among
   // them) only after a first shown, so waiting for home would wait forever

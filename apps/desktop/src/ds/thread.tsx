@@ -83,9 +83,26 @@ export function Tool({ children, state, out, onToggle, testId }: ToolProps) {
 }
 
 /** "▸ 4 messages between 2 agents" (▾ once open) */
-export function Fold({ children, open, onToggle, testId }: { children: ReactNode; open?: boolean; onToggle?: MouseEventHandler<HTMLDivElement>; testId?: string }) {
+export function Fold({ children, open, onToggle, testId }: { children: ReactNode; open?: boolean; onToggle?: () => void; testId?: string }) {
+  // a toggle is a button for the keyboard too: a tab stop, space or ⏎ opens and closes it
   return (
-    <div className={cx("b-fold", open && "open")} onClick={onToggle} role={onToggle ? "button" : undefined} aria-expanded={open || false} data-testid={testId}>
+    <div
+      className={cx("b-fold", open && "open")}
+      onClick={onToggle}
+      onKeyDown={
+        onToggle &&
+        ((e) => {
+          if (e.key !== " " && e.key !== "Enter") return;
+          e.preventDefault();
+          e.stopPropagation();
+          onToggle();
+        })
+      }
+      tabIndex={onToggle ? 0 : undefined}
+      role={onToggle ? "button" : undefined}
+      aria-expanded={open || false}
+      data-testid={testId}
+    >
       {open ? "▾ " : "▸ "}{children}
     </div>
   );

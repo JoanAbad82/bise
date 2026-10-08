@@ -373,7 +373,9 @@
   margin-top: auto;
   padding: 6px 0 8px;
   border-top: 1px solid var(--c-line);
-  background: var(--c-sidebar);
+  /* the sidebar's tint on an opaque base: --c-sidebar is see-through (the window's vibrancy), and
+     rows scrolled under the foot showed through it (try gate R31, 30 agents) */
+  background: linear-gradient(var(--c-sidebar), var(--c-sidebar)), var(--c-solid);
 }
 .app-r.ft:hover {
   background: var(--c-hover);
@@ -599,4 +601,9 @@
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* the artifacts row's 'n new': the accent, as the artifacts' 'new' chip (try gate D4) */
+.app-new {
+  color: var(--c-accent);
 }

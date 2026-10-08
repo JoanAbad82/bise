@@ -118,6 +118,8 @@ describe("the projects the window shows (the core's 'shown')", () => {
     expect(shownOf('home-1', { screen: 'bise' })).toEqual(['home-1']);
     expect(shownOf('home-1', { screen: 'thread', project: 'home-1', agent: 'main' })).toEqual(['home-1']);
     expect(shownOf(undefined, { screen: 'review', project: 'shop', agent: 'a' })).toEqual(['shop']);
+    // the sidebar's open folders show their agents (R26): their running hubs too, once each
+    expect(shownOf('home-1', { screen: 'thread', project: 'shop', agent: 'perf' }, ['shop', 'docs'])).toEqual(['home-1', 'shop', 'docs']);
     expect(shownOf(undefined, { screen: 'inbox' })).toEqual([]);
   });
 });

@@ -75,6 +75,18 @@ export function newWords(fresh: number, makers: readonly string[]): string {
   return makers.length === 1 ? `${String(fresh)} new · ${makers[0] ?? ''}` : `${String(fresh)} new`;
 }
 
+/** '2 new · designer': the 'n new' part in the accent, as the artifacts' own 'new' chip (amb-kit, try gate D4); its words say it without the color. */
+function NewEnd({ words }: { words: string }) {
+  if (words === '') return null;
+  const at = words.indexOf(' · ');
+  return (
+    <>
+      <span className="app-new">{at < 0 ? words : words.slice(0, at)}</span>
+      {at < 0 ? '' : words.slice(at)}
+    </>
+  );
+}
+
 /** Each agent's next wake in a project (its scheduled tasks' soonest run), as 'agent ms' lines. */
 function useWakes(project: string): ReadonlyMap<string, number> {
   const store = useStore();
@@ -171,7 +183,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         onClick={() => { router.go({ screen: 'bise' }); }}
         testId="app.sidebar.bise"
       />
-      <SRow kind="top" lead="↗" name="artifacts" end={newWords(fresh, makers)} title={makers.length > 0 ? `new from ${makers.join(', ')}` : undefined}
+      <SRow kind="top" lead="↗" name="artifacts" end={<NewEnd words={newWords(fresh, makers)} />} title={makers.length > 0 ? `new from ${makers.join(', ')}` : undefined}
         on={route.screen === 'artifacts' && route.project === ''}
         onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} testId="app.sidebar.artifacts" />
       <SRow kind="top" lead="◷" name="scheduled" end={scheduled > 0 ? String(scheduled) : ''} on={route.screen === 'scheduled'}
@@ -213,6 +225,23 @@ export function toggleFolder(project: string): void {
     // no storage (a unit test's DOM): kept for this session only
   }
   for (const f of closedSubs) f();
+}
+
+/**
+ * The projects whose folder he closed (the rest are open: R26, folders open
+ * by default). The window shows the open ones' running hubs to the core, so
+ * their agents come and their folders aren't empty (App.tsx useShown).
+ */
+export function useClosedFolders(): ReadonlySet<string> {
+  return useSyncExternalStore(
+    (f) => {
+      closedSubs.add(f);
+      return () => {
+        closedSubs.delete(f);
+      };
+    },
+    () => closed,
+  );
 }
 
 function useFolderOpen(project: string): boolean {

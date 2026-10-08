@@ -166,11 +166,18 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: 
         }}
         testId={`agents.open.${id}`}
       />
-      <p className="ag-line">{lineOf(a)}</p>
-      {a.report != null && (
-        <p className="ag-report" data-testid={`agents.report.${id}`}>
+      {/* one line each, full words on hover, and the report's line always there (empty until one
+          comes): words that come or change never move the buttons under them (qa-flows' app/clicks:
+          a report arriving mid-click put the click on its words) */}
+      <p className="ag-line" title={lineOf(a)}>
+        {lineOf(a)}
+      </p>
+      {a.report != null ? (
+        <p className="ag-report" title={`${a.report.kind} · ${a.report.text}`} data-testid={`agents.report.${id}`}>
           {a.report.kind} · {a.report.text}
         </p>
+      ) : (
+        !a.main && !a.archived && <p className="ag-report" aria-hidden="true" />
       )}
       {!a.main && (
         <div className="ag-acts">
@@ -186,17 +193,6 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: 
             </Button>
           ) : (
             <>
-              {a.status === 'working' && (
-                <Button
-                  kind="ghost"
-                  onClick={() => {
-                    store.stop(project, a.name);
-                  }}
-                  testId={`agents.stop.${id}`}
-                >
-                  stop
-                </Button>
-              )}
               <Button
                 kind="ghost"
                 onClick={() => {
@@ -225,6 +221,19 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: 
                   testId={`agents.review.${id}`}
                 >
                   review
+                </Button>
+              )}
+              {/* last: it comes and goes with the turn, and never moves the buttons before it (a click
+                  aimed at archive stays on archive when it starts; qa-flows' app/clicks) */}
+              {a.status === 'working' && (
+                <Button
+                  kind="ghost"
+                  onClick={() => {
+                    store.stop(project, a.name);
+                  }}
+                  testId={`agents.stop.${id}`}
+                >
+                  stop
                 </Button>
               )}
             </>

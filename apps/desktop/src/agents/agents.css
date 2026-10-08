@@ -47,6 +47,13 @@
 .ag-report {
   margin: 2px 0 0 28px;
   color: var(--c-text-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* no report yet: its line is kept, so one that comes doesn't push the buttons down */
+.ag-report:empty {
+  min-height: 1lh;
 }
 
 .ag-acts {
