@@ -15,7 +15,8 @@ export const W = {
   openInBise: 'open in bise',
   close: 'close',
   inFront: (what: string): string => (what ? `in front: ${what}` : 'in front'),
-  envSub: (branch: string, n: number): string => `${branch} · ${n} agent${n === 1 ? '' : 's'}`,
+  /** the count first: a long path is the part that gets cut (designer N4) */
+  envSub: (branch: string, n: number): string => `${n} agent${n === 1 ? '' : 's'} · ${branch}`,
   sendQ: (q: string): string => `send “${q}” to bise`,
   keysEmpty: '⏎ open in bise   esc close',
   keysAsk: '⏎ send to bise   ↑↓ move   esc close',

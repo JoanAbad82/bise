@@ -28,7 +28,7 @@ describe('the spotlight list', () => {
     expect(l.sections.map((s) => s.label)).toEqual(['waiting for you', 'at work', 'projects']);
     const envs = l.sections[2]?.items ?? [];
     expect(envs[0]).toMatchObject({ kind: 'front', name: 'Pricing · Acme', sub: 'in front: acme.test · Chrome' });
-    expect(envs[1]).toMatchObject({ kind: 'env', name: 'telemetry', n: 1, sub: '~/code/telemetry · main · 2 agents' });
+    expect(envs[1]).toMatchObject({ kind: 'env', name: 'telemetry', n: 1, sub: '2 agents · main · ~/code/telemetry' });
   });
   it('a word names agents and projects; a sentence asks bise first', () => {
     expect(flat(spotList(D, 'perf')).map((i) => i.id)).toEqual(['agent.tel.perf']);

@@ -264,7 +264,7 @@ export function Palette({ onClose }: { onClose: () => void }) {
               data-testid="app.palette.item.0"
             >
               <span className="g pearl" aria-hidden>
-                <i className="app-k-pearl" />
+                <i className="app-k-pearl bise" data-testid="app.palette.ask.pearl" />
               </span>
               <span className="nm">{PW.ask(q.trim())}</span>
               <span className="rt">{cur === 0 && <span className="hint"><Pairs text={PW.hintAsk} /></span>}</span>

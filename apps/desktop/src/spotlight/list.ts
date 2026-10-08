@@ -117,7 +117,7 @@ export function spotList(d: SpotData, text: string): SpotList {
       name: p.name,
       front: p === front,
       n: n <= 9 ? n : null,
-      sub: p === front ? W.inFront(hostOf(d.front?.url ?? '') || shortPath(d.front?.path ?? '') || (d.front?.app ?? '')) : `${shortPath(p.path)} · ${W.envSub(p.branch, p.agents)}`,
+      sub: p === front ? W.inFront(hostOf(d.front?.url ?? '') || shortPath(d.front?.path ?? '') || (d.front?.app ?? '')) : `${W.envSub(p.branch, p.agents)} · ${shortPath(p.path)}`,
     };
   });
 
