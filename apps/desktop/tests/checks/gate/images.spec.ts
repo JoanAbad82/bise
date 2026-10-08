@@ -18,12 +18,12 @@
 // Every path is written in a table (index.md next to the shots, BISE_R41_OUT); the test fails on any
 // path whose request has no image block, naming it.
 // Run: FAKE_BODIES=<file> exported before `qa.py world up --rich`, then this spec through heavy-run.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
 import { FakeHelper, dropFiles, expect, test, type Session } from '../../harness';
-import { launchReal, realWorld } from '../world';
+import { hubOf, launchReal, realWorld, worldSay } from '../world';
 import { capsulePage, CAPSULE, Lines, sleep } from '../native/world';
 
 const PNG = path.join(__dirname, '../fixtures/checker.png');
@@ -232,8 +232,9 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
         note = `staged: ${String(await stage(s))}`;
         await p.keyboard.press('Meta+V');
         await sleep(600);
-        note += `, field after ⌘V: ${JSON.stringify((await ans.inputValue()).slice(0, 80))}, image chips: ${String(await p.locator(CHIP).count())}`;
+        note += `, field after ⌘V: ${JSON.stringify((await ans.inputValue()).slice(0, 80))}, ⌘I image chips: ${String(await p.locator('[data-testid^="inbox.answer.image."]').count())} ${JSON.stringify((await p.getByTestId('inbox.answer.image.1').innerText().catch(() => '')).trim())}`;
         const n = nonce('card');
+        await ans.click();
         await p.keyboard.type(` the balance on the cart page ${n}`);
         await shot('R41-card');
         await p.keyboard.press('Enter');
@@ -241,6 +242,77 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
       } else {
         await shot('R41-card');
         rows.push({ path: '(4) card answer (⌘I)', to: 'shop · gift-ui (asked)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '' }, note: 'no answer field (inbox.answer) on the card' });
+      }
+    }
+
+    // (4b) the thread's docked answer: shop's strip, its first card (main's), an image pasted in the composer + words
+    {
+      await go(s, `project/${shop}`);
+      const r1 = p.getByTestId('strip.row.1');
+      let note = '';
+      if (await r1.isVisible().catch(() => false)) {
+        note = `card: ${JSON.stringify((await r1.innerText()).replace(/\s+/g, ' ').trim().slice(0, 80))}`;
+        await r1.click();
+        await p.getByTestId('strip.dock').waitFor({ timeout: 3000 }).catch(() => undefined);
+        await p.locator(FIELD).click();
+        note += `, staged: ${String(await stage(s))}`;
+        await p.keyboard.press('Meta+V');
+        note += `, image chips: ${String(await chips(p))}`;
+        const n = nonce('dock');
+        await p.keyboard.type(`this one ${n}`);
+        await shot('R41-dock');
+        await p.keyboard.press('Enter');
+        rows.push({ path: '(4b) docked answer in the thread', to: 'shop · the card\'s asker', how: 'paste', seen: await waitSeen(n), note });
+      } else {
+        await shot('R41-dock');
+        rows.push({ path: '(4b) docked answer in the thread', to: 'shop · the card\'s asker', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '' }, note: 'no strip row in shop\'s thread' });
+      }
+    }
+
+    // (5) an agent's question escalated by main with `sb card --for`, answered with an image from ⌘I: the
+    // ASKING agent's request must carry it. The chain runs on the world's fake scripts ($FAKE_SCRIPTS, read
+    // live): shop's main asks gift-ui to ask; gift-ui sends main its question (sb send --expect-reply); main
+    // escalates it with sb card --for <that message's id> (read from main's own transcript).
+    {
+      const sd = path.join(w.world, 'rich', 'scripts');
+      const shopDir = path.dirname(hubOf(w, 'shop').sock);
+      const k = nonce('esc');
+      const put = (name: string, match: string, cmd: string, reply: string): void => {
+        mkdirSync(sd, { recursive: true });
+        const tmp = path.join(sd, `.${name}.tmp`);
+        writeFileSync(tmp, JSON.stringify({ match, calls: [{ tool: 'bash', arg: cmd }], reply }));
+        renameSync(tmp, path.join(sd, `${name}.json`));
+      };
+      const q = `${k}-q which of the two pictures shows the bug?`;
+      put(`r41-esc-1-${String(run)}`, `${k}-start`, `sb send gift-ui "${k}-ask: please ask main which picture shows the bug"`, 'Asked gift-ui.');
+      put(`r41-esc-2-${String(run)}`, `${k}-ask`, `sb send main --expect-reply "${q}"`, 'Asked main.');
+      put(`r41-esc-3-${String(run)}`, `${k}-q`,
+        `id=$(grep -o 'agent_message from="gift-ui"[^>]*' "${shopDir}/agents/main/transcript.log" | grep -o 'id="m_[0-9]*"' | tail -1 | cut -d'"' -f2); echo "for $id"; sb card --for "$id" "${k}-card gift-ui asks: which of the two pictures shows the bug?"`,
+        'I put it in your inbox.');
+      worldSay('shop', `${k}-start please get gift-ui's question to me`);
+      await go(s, 'inbox');
+      const row = p.getByText(new RegExp(`${k}-card|which of the two pictures`)).first();
+      let note = '';
+      const t0 = Date.now();
+      while (!(await row.isVisible().catch(() => false)) && Date.now() - t0 < 90_000) await sleep(1000);
+      if (await row.isVisible().catch(() => false)) {
+        await row.click();
+        await sleep(600);
+        const ans = p.getByTestId('inbox.answer');
+        await ans.click();
+        note = `card shown after ${String(Math.round((Date.now() - t0) / 1000))} s, staged: ${String(await stage(s))}`;
+        await p.keyboard.press('Meta+V');
+        await sleep(600);
+        note += `, ⌘I image chips: ${String(await p.locator('[data-testid^="inbox.answer.image."]').count())}`;
+        const n = nonce('esc-answer');
+        await ans.click();
+        await p.keyboard.type(` the second one ${n}`);
+        await shot('R41-escalated');
+        await p.keyboard.press('Enter');
+        rows.push({ path: '(5) escalated question (sb card --for), ⌘I', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: await waitSeen(n, 60_000), note });
+      } else {
+        await shot('R41-escalated');
+        rows.push({ path: '(5) escalated question (sb card --for), ⌘I', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '' }, note: `no card with '${k}-card' in ⌘I after 90 s (the script chain: shop main -> gift-ui -> main -> sb card --for)` });
       }
     }
   } finally {

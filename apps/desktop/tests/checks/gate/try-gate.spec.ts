@@ -534,6 +534,62 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       await width(s, 1100);
     });
 
+    // ---- the 7b27e678 re-cut's rows (ambient-lead m_13982)
+    // D14 in agent threads: gift-ui's 'blocked · waiting for your answer' pink, p99's '✓ done · …' dim, no raw '[report:'
+    await each('D14b', async () => {
+      for (const [who, route] of [['gift-ui', `agent/${shop}/gift-ui`], ['p99', `agent/${tel}/p99`]] as const) {
+        await go(s, route);
+        const rep = p.locator('.th-report').last();
+        await rep.scrollIntoViewIfNeeded().catch(() => undefined);
+        await sleep(300);
+        await shot('D14b', `D14b-${who}`, p);
+        const raw = (await p.getByTestId('thread.list').innerText().catch(() => '')).includes('[report:');
+        const lines = await p.locator('.th-report').evaluateAll((es) => es.map((e) => `${(e as HTMLElement).innerText.replace(/\s+/g, ' ').trim().slice(0, 60)} [${getComputedStyle(e).color}${e.hasAttribute('data-waits') ? ', waits' : ''}]`));
+        note('D14b', `${who}: raw '[report:' in the thread: ${String(raw)}; report lines: ${JSON.stringify(lines.slice(-3))}`);
+      }
+    });
+    // ⌘K with nothing typed: the 'waiting for you' rows carry bise's pearl, pink
+    await each('KW', async () => {
+      await go(s, 'bise');
+      await p.keyboard.press('Meta+K');
+      await sleep(700);
+      await shot('KW', 'KW-palette-waiting', p);
+      const pearls = await p.locator('[data-testid="app.palette"] [class*="pearl"]').evaluateAll((es) => es.slice(0, 4).map((e) => `${e.getAttribute('class') ?? ''} ${getComputedStyle(e).backgroundColor}/${getComputedStyle(e).backgroundImage.slice(0, 40)}`));
+      const groups = await p.locator('[data-testid^="app.palette.group."]').evaluateAll((es) => es.map((e) => e.getAttribute('data-testid') ?? ''));
+      note('KW', `palette groups: ${groups.join(', ')}; first pearls: ${JSON.stringify(pearls)}`);
+      await p.keyboard.press('Escape');
+      await sleep(300);
+    });
+    // '/keychain' in the window's '/' list
+    await each('SLASH', async () => {
+      await go(s, 'bise');
+      await field.click();
+      await p.keyboard.type('/key');
+      await sleep(700);
+      await shot('SLASH', 'SLASH-keychain', p);
+      const body = await p.locator('body').innerText();
+      note('SLASH', `'/keychain' listed after typing '/key': ${String(/\/?keychain/.test(body))}`);
+      await p.keyboard.press('Escape');
+      await p.keyboard.press('Meta+a');
+      await p.keyboard.press('Backspace');
+    });
+    // dark: the question card's option chips readable (⌘I), then back to light
+    await each('DARK-card', async () => {
+      await go(s, 'settings/general');
+      const ctl = p.getByTestId('settings.pref.theme');
+      await ctl.getByText(/^dark$/i).first().click({ timeout: 10_000 });
+      await sleep(1000);
+      await go(s, 'inbox');
+      await p.getByText(/gift-ui asks/i).first().click({ timeout: 5000 }).catch(() => undefined);
+      await sleep(800);
+      await shot('DARK-card', 'DARK-card-inbox', p);
+      const chipsC = await p.locator('[data-testid*=".opt."]').evaluateAll((es) => es.slice(0, 3).map((e) => `${(e as HTMLElement).innerText.replace(/\s+/g, ' ').trim()}: ${getComputedStyle(e).color} on ${getComputedStyle(e).backgroundColor}`));
+      note('DARK-card', `data-theme ${await p.evaluate(() => document.documentElement.getAttribute('data-theme') ?? '')}, color-scheme ${await p.evaluate(() => getComputedStyle(document.documentElement).colorScheme)}; option chips: ${JSON.stringify(chipsC)}`);
+      await go(s, 'settings/general');
+      await ctl.getByText(/^light$/i).first().click({ timeout: 10_000 }).catch(() => undefined);
+      await sleep(800);
+    });
+
     // ---- ambient-pm's asks on the window (m_12768, m_12769, m_12771, m_12772)
     const docs = await pid('docs');
     await each('ASK-pm-1', async () => {
