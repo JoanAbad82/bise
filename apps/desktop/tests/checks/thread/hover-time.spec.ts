@@ -36,7 +36,7 @@ const world = (today: number) => [
     project: P,
     agent: 'main',
     entries: [
-      { pos: 1, at_ms: OLD, kind: 'tools', text: 'read 3 files', tools: [{ name: 'read', text: 'src/a.rs' }] },
+      { pos: 1, at_ms: OLD, kind: 'tools', text: 'read 3 files', tools: { count: 1, summary: 'read 3 files', items: [{ pos: 10, at_ms: OLD, text: 'src/a.rs', kind: 'read', state: 'ok' }] } },
       { pos: 2, at_ms: today, kind: 'agent', text: 'all good today' },
     ],
     before: null,

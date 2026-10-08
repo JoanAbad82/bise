@@ -11,7 +11,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Answer, Markdown } from './Markdown';
-import { THOUGHT_MS, briefOf, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf } from './entry';
+import { THOUGHT_MS, briefOf, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf, type ToolLine } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -602,16 +602,7 @@ function ToolsRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   return (
     <div className="th-tools" data-testid={`thread.toolrow.${String(e.pos)}`}>
       {t.lines.map((l) => (
-        <div key={l.pos} className={live?.pos === l.pos ? 'th-tool-line live' : 'th-tool-line'} data-testid={`thread.tool.${String(l.pos)}`} data-live={live?.pos === l.pos || undefined}>
-          <span className="th-tool-mark">{live?.pos === l.pos ? '∿' : l.mark}</span> <span className="th-tool-text">{l.text}</span>
-          {live?.pos === l.pos ? (
-            <span className="th-tool-time" data-testid={`thread.tool.${String(l.pos)}.time`}>
-              {liveTime(runFor)}
-            </span>
-          ) : (
-            l.time !== '' && <span className="th-tool-time">{l.time}</span>
-          )}
-        </div>
+        <ToolLineRow key={l.pos} l={l} live={live?.pos === l.pos} runFor={runFor} />
       ))}
       {(t.rest.length > 0 || items.length === 0) && (
         <Tool
@@ -630,6 +621,71 @@ function ToolsRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
         >
           {t.restWords !== '' ? t.restWords : (e.tools?.summary ?? e.text)}
         </Tool>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One call's line (R11/S9, the TUI's tool row): its mark and words; on the right its state ('∿ 12 s'
+ * while it runs, '✓ 0.3 s' dim, '✗ exit 1 · 2.1 s' in the error tone, never by color alone); a
+ * failed call's first error line under it; a click (or ⌘E, the TUI's ctrl+o) opens its code and
+ * output.
+ */
+function ToolLineRow({ l, live, runFor }: { l: ToolLine; live: boolean; runFor: number }) {
+  const [open, setOpen] = useFold(false);
+  const opens = l.code !== '' || l.out !== '';
+  const id = `thread.tool.${String(l.pos)}`;
+  const state = live ? 'run' : l.state;
+  return (
+    <div className="th-tool" data-state={state || undefined}>
+      <div
+        className={live ? 'th-tool-line live' : 'th-tool-line'}
+        data-testid={id}
+        data-live={live || undefined}
+        role={opens ? 'button' : undefined}
+        tabIndex={opens ? 0 : undefined}
+        aria-expanded={opens ? open : undefined}
+        onClick={
+          opens
+            ? () => {
+                setOpen((o) => !o);
+              }
+            : undefined
+        }
+        onKeyDown={
+          opens
+            ? (e) => {
+                if (e.key !== ' ' && e.key !== 'Enter') return;
+                e.preventDefault();
+                setOpen((o) => !o);
+              }
+            : undefined
+        }
+      >
+        <span className="th-tool-mark">{live ? '∿' : l.mark}</span> <span className="th-tool-text">{l.text}</span>
+        {live ? (
+          <span className="th-tool-time" data-testid={`${id}.time`}>
+            {liveTime(runFor)}
+          </span>
+        ) : (
+          l.end !== '' && (
+            <span className={l.state === 'err' ? 'th-tool-time err' : 'th-tool-time'} data-testid={`${id}.end`}>
+              {l.end}
+            </span>
+          )
+        )}
+      </div>
+      {l.err !== '' && (
+        <div className="th-tool-err" data-testid={`${id}.err`}>
+          {l.err}
+        </div>
+      )}
+      {open && opens && (
+        <div className="th-tool-open" data-testid={`${id}.open`}>
+          {l.code !== '' && <pre className="th-tool-code">{l.code}</pre>}
+          {l.out !== '' && <pre className="th-tool-out">{l.out}</pre>}
+        </div>
       )}
     </div>
   );

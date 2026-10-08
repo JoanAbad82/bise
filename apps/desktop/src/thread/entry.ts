@@ -254,23 +254,82 @@ export function reportStatus(text: string, kind?: string | null): string | null 
 /** At most this many command and edit lines show; the rest fold into the counted line. */
 export const TOOL_LINES = 6;
 
+/** A tool call as the hub sends it (proto ToolItem): state, time, exit, error, code and output are R11's. */
+export interface ToolLike {
+  pos: number;
+  at_ms: number;
+  text: string;
+  kind: string;
+  state?: string;
+  ms?: number | null;
+  exit?: number | null;
+  err?: string | null;
+  code?: string | null;
+  out?: string | null;
+}
+
+/** A shown call: its mark, words, its state's words on the right ('✓ 0.3 s', '✗ exit 1 · 2.1 s'), its first error line, and what opens under it. */
+export interface ToolLine {
+  pos: number;
+  mark: '$' | '±' | '·';
+  text: string;
+  /** the step's length until the next one (a replay, no state) */
+  time: string;
+  state: 'run' | 'ok' | 'err' | '';
+  end: string;
+  err: string;
+  code: string;
+  out: string;
+}
+
+/** A call's own time, the TUI's: '0.3 s', '4.1 s', '12 s', '1 m 4 s'. Pure. */
+export function toolTime(ms: number): string {
+  if (ms < 10_000) return `${String(Math.floor(ms / 1000))}.${String(Math.floor((ms % 1000) / 100))} s`;
+  return stepTime(ms);
+}
+
+/** What a call's line says on its right, as the TUI's tool row: ok '✓ 0.3 s' (dim), failed '✗ exit 1 · 0.3 s' (err), a replay its step's length. Pure. */
+export function toolEnd(t: ToolLike, time: string): string {
+  const took = t.ms != null && t.ms > 0 ? toolTime(t.ms) : '';
+  if (t.state === 'ok') return took === '' ? '✓' : `✓ ${took}`;
+  if (t.state === 'err') {
+    const exit = t.exit != null && t.exit !== 0 ? `exit ${String(t.exit)}` : '';
+    return ['✗', [exit, took].filter((x) => x !== '').join(' · ')].filter((x) => x !== '').join(' ');
+  }
+  if (t.state === 'run') return '';
+  return time;
+}
+
 /** A turn's tools: its commands ('$ …') and edits ('± …') as lines with their length (until the next step), and the counted words of the rest ('read 6 files'), which fold. Pure. */
-export function toolLines(items: readonly { pos: number; at_ms: number; text: string; kind: string }[]): {
-  lines: { pos: number; mark: '$' | '±'; text: string; time: string }[];
+export function toolLines(items: readonly ToolLike[]): {
+  lines: ToolLine[];
   rest: { pos: number; text: string }[];
   restWords: string;
 } {
-  const lines: { pos: number; mark: '$' | '±'; text: string; time: string }[] = [];
+  const lines: ToolLine[] = [];
   const rest: { pos: number; text: string }[] = [];
   items.forEach((t, i) => {
     const next = items[i + 1];
     const time = next !== undefined && t.at_ms > 0 && next.at_ms > t.at_ms ? stepTime(next.at_ms - t.at_ms) : '';
-    if ((t.kind === 'run' || t.kind === 'edit') && lines.length < TOOL_LINES) lines.push({ pos: t.pos, mark: t.kind === 'run' ? '$' : '±', text: toolWords(t.text), time });
+    // R11/S9: a failed call always shows as its own line, whatever its kind (the TUI's ✗ row)
+    const failed = t.state === 'err';
+    if (((t.kind === 'run' || t.kind === 'edit') && lines.length < TOOL_LINES) || failed)
+      lines.push({
+        pos: t.pos,
+        mark: t.kind === 'run' ? '$' : t.kind === 'edit' ? '±' : '·',
+        text: toolWords(t.text),
+        time,
+        state: t.state === 'run' || t.state === 'ok' || t.state === 'err' ? t.state : '',
+        end: toolEnd(t, time),
+        err: failed ? (t.err ?? '').trim() : '',
+        code: t.code ?? '',
+        out: t.out ?? '',
+      });
     else rest.push({ pos: t.pos, text: toolWords(t.text) });
   });
-  const n = (k: string) => items.filter((t) => t.kind === k).length;
+  const n = (k: string) => items.filter((t) => t.kind === k && !lines.some((l) => l.pos === t.pos && l.mark === '·')).length;
   const shownRun = lines.filter((l) => l.mark === '$').length;
-  const shownEdit = lines.length - shownRun;
+  const shownEdit = lines.filter((l) => l.mark === '±').length;
   const files = (x: number) => (x === 1 ? '1 file' : `${String(x)} files`);
   const parts: string[] = [];
   if (n('read') > 0) parts.push(`read ${files(n('read'))}`);

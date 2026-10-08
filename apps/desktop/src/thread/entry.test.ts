@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, TOOL_LINES, briefOf, chipOf, dropAuthor, handoffOf, stepTime, toolLines, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, TOOL_LINES, briefOf, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -122,15 +122,40 @@ describe("the agent view's tool rows (designer's desktop-screens v6 (2))", () =>
       { pos: 3, at_ms: T + 39_000, text: 'web/product/Hero.tsx', kind: 'edit' },
       { pos: 4, at_ms: T + 40_000, text: 'reviews', kind: 'search' },
     ]);
-    expect(t.lines).toEqual([
-      { pos: 2, mark: '$', text: 'lighthouse --preset=mobile /p/tee-classic', time: '38 s' },
-      { pos: 3, mark: '±', text: 'web/product/Hero.tsx', time: '1 s' },
+    expect(t.lines.map(({ pos, mark, text, time, end }) => ({ pos, mark, text, time, end }))).toEqual([
+      { pos: 2, mark: '$', text: 'lighthouse --preset=mobile /p/tee-classic', time: '38 s', end: '38 s' },
+      { pos: 3, mark: '±', text: 'web/product/Hero.tsx', time: '1 s', end: '1 s' },
     ]);
     expect(t.rest.map((r) => r.pos)).toEqual([1, 4]);
     expect(t.restWords).toBe('read 1 file, searched once');
     const many = toolLines(Array.from({ length: 8 }, (_, i) => ({ pos: i, at_ms: 0, text: `cmd ${String(i)}`, kind: 'run' })));
     expect(many.lines).toHaveLength(TOOL_LINES);
     expect(many.restWords).toBe('ran 2 commands');
+  });
+
+  it("R11/S9: each call's state on its line as the TUI's: ✓ time, ✗ exit · time with its error line, code and output to open", () => {
+    expect(toolTime(300)).toBe('0.3 s');
+    expect(toolTime(4_120)).toBe('4.1 s');
+    expect(toolTime(12_400)).toBe('12 s');
+    expect(toolTime(64_000)).toBe('1 m 4 s');
+    const t = toolLines([
+      { pos: 1, at_ms: 0, text: 'cargo test', kind: 'run', state: 'ok', ms: 300, code: 'cargo test', out: 'ok: 12 passed' },
+      { pos: 2, at_ms: 0, text: 'npm run lint', kind: 'run', state: 'err', ms: 2_100, exit: 1, err: 'src/a.ts:3 unused x', code: 'npm run lint', out: 'exit 1: src/a.ts:3 unused x' },
+      { pos: 3, at_ms: 0, text: 'read_file: {"path":"gone.rs"}', kind: 'read', state: 'err', err: 'no such file' },
+      { pos: 4, at_ms: 0, text: 'src/b.rs', kind: 'read', state: 'ok', ms: 10 },
+      { pos: 5, at_ms: 0, text: 'cargo build', kind: 'run', state: 'run' },
+    ]);
+    expect(t.lines.map((l) => [l.pos, l.mark, l.state, l.end, l.err])).toEqual([
+      [1, '$', 'ok', '✓ 0.3 s', ''],
+      [2, '$', 'err', '✗ exit 1 · 2.1 s', 'src/a.ts:3 unused x'],
+      [3, '·', 'err', '✗', 'no such file'],
+      [5, '$', 'run', '', ''],
+    ]);
+    expect(t.lines[1]).toMatchObject({ code: 'npm run lint', out: 'exit 1: src/a.ts:3 unused x' });
+    // the failed read is a line: it isn't counted again in the words
+    expect(t.restWords).toBe('read 1 file');
+    expect(toolEnd({ pos: 1, at_ms: 0, text: '', kind: 'run', state: 'err', exit: 0 }, '')).toBe('✗');
+    expect(toolEnd({ pos: 1, at_ms: 0, text: '', kind: 'run', state: 'ok' }, '3 s')).toBe('✓');
   });
 });
 
