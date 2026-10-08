@@ -436,6 +436,42 @@ isn't judging. A row marked ok names the shot that was looked at.
         thinking (qa-native).
     - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
       dev tool (amb-web's list, or amb-home's commands).
+- **7b27e678, 10-09: red, holds the try** (two new reds; the rule above: a new red holds). The
+  no-build proof is green. qa-native's shots are in `~/.bise/gate/try-gate/7b27e678/` (m_14024),
+  its checks are e39e2cee, and designer confirmed (m_14028). ambient-pm looked at R41-dock.png,
+  D14b-gift-ui.png and KW-palette-waiting.png.
+  - **R41: all 9 paths reach the model** (`$FAKE_BODIES`, an image/png image_url block next to his
+    words):
+    - the composer's ⌘V and drop, to main and to an agent;
+    - the spotlight's ⌘V, and a drop on the capsule;
+    - a ⌘I card answer;
+    - the docked answer in a thread;
+    - an escalated question (`sb card --for`), where the agent's own request carries the image.
+
+    The sent text now has its space: "[Image #1] what is…".
+  - **ok:**
+    - D14b (D14b-gift-ui.png): "blocked · waiting for your answer" is a pink status line, with no
+      raw "[report:".
+    - KW (KW-palette-waiting.png): ⌘K's waiting rows have bise's pink pearl.
+    - SLASH: `/keychain` is listed.
+    - DARK-card.
+  - **red, new in this cut:**
+    - (a), R36 (R41-dock.png): the "✓ you answered gift-ui" row prints the hub's image marker raw,
+      `<image name="bd91…" path="/Users/…/images/….png" mime="image/png" b64="…">`. Its unbroken
+      path runs past the column into the panel. It should read "✓ you answered gift-ui · the
+      balance on the cart page", with the usual `[Image #1]` chip and its thumbnail (amb-feed,
+      amb-win). It's new because card answers carried no image before this cut.
+    - (b), R17 (R41-dock.png): under the delivered "you · [Image #1] what is in this picture …" a
+      second greyed "you · sending… [Image #1] …" stays forever. A pending row must go the moment
+      its message lands (amb-win).
+  - **nit:** the docked answer's label wraps to 2 lines. One line, with the question cut by "…"
+    (amb-home).
+  - **flow question** (designer): main's "merge checkout into main?" card says "or type your answer
+    below", and the run answered it with "[Image #1] this one …". In the TUI, a typed answer to
+    main's question goes to main as words (`/answer N text`). So typing isn't wrong in itself, as
+    long as a typed line never merges anything without his clear yes. ambient-pm asked qa-native
+    whether the world's main merged after "this one". If it did, it's a red.
+
 - **cb1f2b44, 10-08: red, no try build.** The no-build proof is green. qa-native shot the touched
   rows and R41 into `~/.bise/gate/try-gate/cb1f2b44/` (m_13848). ambient-pm looked at the shots as
   images.
