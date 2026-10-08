@@ -605,25 +605,37 @@ def world_fixtures_seed_every_desktop_shape():
 
 @test
 def rich_world_fixtures():
-    """qa.py world up --rich: 3 projects with every agent status, 110 messages to telemetry's main (tables, code, lists, every
-    third answered by a markdown file), 30 tool turns (failing bash, edits), filler agents up to --agents, a screen_context
-    block like fn_context.rs's, a try-real dir on the fake provider; needles never in the message"""
+    """qa.py world up --rich: 3 projects with every agent status, 110 different messages to telemetry's main (tables, code,
+    lists), each answered in markdown, one 40+ line answer at least (R18), 30 tool turns (failing bash, edits), filler agents
+    up to --agents, his fn context as the input op's context, a try-real dir on the fake provider; no marker in his words
+    or the briefs (D5)"""
     import world
     ps = world.plan(3, rich=True)
     names = {p["name"]: [a["name"] for a in p["agents"]] for p in ps}
     check({"dashboards", "ingest"} <= set(names["telemetry"]) and "perf" in names["shop"] and "changelog" in names["docs"], names)
     check(world.plan(3) == world.PROJECTS[:3], "the plain world is unchanged")
     d = tempfile.mkdtemp(prefix="aq-rich-")
-    msgs = world.rich_messages(d)
-    check(len(msgs) == 110 and all(m["needle"] not in m["text"] for m in msgs), "needles")
-    bodies = "".join(m["text"] for m in msgs) + "".join(m.get("body", "") for m in msgs)
-    check("|---|" in bodies and "```python" in bodies and "- [ ]" in bodies and sum(1 for m in msgs if m.get("reply")) == 36, "markdown kinds")
+    marker = re.compile(r"\[\[|\{\{|\(#|ack:")
+    msgs = world.rich_messages()
+    check(len(msgs) == 110 and len({m["text"] for m in msgs}) == 110 and len({m["match"] for m in msgs}) == 110, "110 different")
+    check(all(m["needle"] not in m["text"] and m["match"] in m["text"] and not marker.search(m["text"]) for m in msgs), "plain words")
+    for m in msgs:   # a match must pick its own message only (the fake provider takes the longest that matches)
+        check([o["match"] for o in msgs if o["match"] in m["text"]] == [m["match"]], m["match"])
+    replies = "".join(m["reply"] for m in msgs)
+    check("|---|" in replies and "```python" in replies and "- [ ]" in replies and "## " in replies, "markdown kinds")
+    check(max(m["reply"].count("\n") + 1 for m in msgs) >= 40, "a 40-line answer (R18)")
     dash = world.dash_messages()
-    check(len(dash) == 30 and all(m["needle"] not in m["text"] for m in dash), "dash needles")
-    check(sum("sys.exit(1)" in m["text"] for m in dash) == 10 and all("[[edit: " in m["text"] for m in dash), "fails and edits")
-    for m in dash:   # every edit's JSON parses as the fake provider reads it
-        for arg in re.findall(r"\[\[edit: (.*?)\]\]", m["text"], re.S):
-            check(json.loads(arg, strict=False)["file_path"] == "panels.md", arg)
+    check(len(dash) == 30 and len({m["text"] for m in dash}) == 30 and all(m["needle"] not in m["text"] and not marker.search(m["text"]) for m in dash), "dash")
+    calls = [c for m in dash for c in m["calls"]]
+    check(sum("sys.exit(1)" in a for t, a in calls if t == "bash") == 10 and sum(t == "edit" for t, _ in calls) == 30, "fails and edits")
+    check(all(a["file_path"] == "panels.md" for t, a in calls if t == "edit"), "edits on panels.md")
+    briefs = [a["objective"] for p in ps for a in p["agents"]]
+    check(len(set(briefs)) == len(briefs) and not any(marker.search(b) for b in briefs), "plain, different briefs")
+    check(not any(o != b and b in o for b in briefs for o in briefs + [m["text"] for m in msgs] + list(world.SEED_WORDS.values())),
+          "a brief's phrase is in no other message")
+    main = world.main_script(d, ps[0], rich=True)
+    check("{{" not in main and "[[" not in main and "sb spawn dashboards" in main, main)
+    check("{{bash: bash" in world.main_script(d, world.PROJECTS[0]), "the plain world keeps its markers")
     have = len(names["telemetry"])
     check(len(world.crowd(30, have)) == 30 - have and world.crowd(3, have) == [], "filler agents")
     try:
@@ -631,8 +643,44 @@ def rich_world_fixtures():
         check(False, "more filler than names")
     except ValueError:
         pass
-    s = world.screen_message()
-    check(s.startswith("make the apply-code") and '\n\n<screen_context app="Figma">\n' + world.SCREEN_NOTE in s and s.endswith("</screen_context>"), s)
+    s = world.screen_input()
+    check(s["op"] == "input" and s["text"] == world.SCREEN_TEXT and "<" not in s["text"]
+          and set(s["context"]) <= {"app", "title", "url", "file", "selection", "window_text"} and s["context"]["app"] == "Figma", s)
+    sd = os.path.join(d, "scripts")
+    world.put_script(sd, "x", "a phrase", [("bash", "true"), ("edit", {"file_path": "f"})], "the answer", slow=3)
+    sc = json.load(open(os.path.join(sd, "x.json")))
+    check(sc == {"match": "a phrase", "calls": [{"tool": "bash", "arg": "true"}, {"tool": "edit", "arg": {"file_path": "f"}}],
+                 "reply": "the answer", "slow": 3} and os.listdir(sd) == ["x.json"], sc)
+    # the fake provider runs the script for a message holding the phrase, then answers verbatim; FAKE_PLAIN: no echo
+    sys.path.insert(0, os.path.join(qa.REPO, "tests"))
+    import fake_provider as fp
+    old = {k: os.environ.get(k) for k in ("FAKE_SCRIPTS", "FAKE_PLAIN")}
+    os.environ.update(FAKE_SCRIPTS=sd, FAKE_PLAIN="1")
+    try:
+        sysm = {"role": "system", "text": "# Your role: `main`", "calls": 0, "images": []}
+        user = {"role": "user", "text": '<user_message id="m_3">please, a phrase here</user_message>', "calls": 0, "images": []}
+        t1 = fp.reply_for([sysm, user])
+        check([c["name"] for c in t1["calls"]] == ["bash"] and t1["calls"][0]["args"]["arg"] == "true", t1)
+        done1 = [{"role": "assistant", "text": "", "calls": 1, "images": []}, {"role": "tool", "text": "tool bash ok:", "calls": 0, "images": []}]
+        t2 = fp.reply_for([sysm, user] + done1)
+        check(t2["calls"][0]["name"] == "edit" and t2["calls"][0]["args"] == {"file_path": "f"}, t2)
+        t3 = fp.reply_for([sysm, user] + done1 + done1)
+        check(t3["text"] == "the answer" and not t3["calls"], t3)
+        other = {"role": "user", "text": '<user_message id="m_4">something else</user_message>', "calls": 0, "images": []}
+        t4 = fp.reply_for([sysm, other])
+        check(t4["text"] in fp.PLAIN_USER and "ack" not in t4["text"], t4)
+        t5 = fp.reply_for([sysm, other, {"role": "assistant", "text": "", "calls": 1, "images": []},
+                           {"role": "tool", "text": "tool bash failed: exit 1", "calls": 0, "images": []}])
+        check(t5["text"] in fp.PLAIN_FAIL, t5)
+        role = [{"role": "system", "text": "# bise role line\nyou write…", "calls": 0, "images": []},
+                {"role": "user", "text": "What it was asked: The cart page is slow on mobile: measure first\nIts last report: x", "calls": 0, "images": []}]
+        check(fp.reply_for(role)["text"] == "the cart page is slow on mobile", fp.reply_for(role))
+    finally:
+        for k, v in old.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
     real = world.try_real(os.path.join(d, "try-real"), [{"ws": "/w/telemetry", "project": "telemetry"}, {"ws": "/w/shop", "project": "shop"}],
                           "http://127.0.0.1:4242/v1/chat/completions")
     pj = json.load(open(os.path.join(real, "projects.json")))

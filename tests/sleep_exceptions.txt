@@ -5,6 +5,7 @@
 # A new one needs a review (architect): a test waits with wait.until,
 # wait.holds or wait.stable (tests/wait.py).
 fake_provider.py | time.sleep(float(slow.group(1))) | the fake model's [[slow: N]] reply: a slow provider is the input of the tests that use it
+fake_provider.py | time.sleep(float(sc["slow"])) | a $FAKE_SCRIPTS script's "slow": the same slow provider, for a message with no marker in it (ambient-qa's rich world)
 fake_provider.py | time.sleep(gap) | the fake model's [[drip: N S]] and [[split: S]] streams (issue 13): a stream that generates slowly, or pauses inside an event, is the input
 fake_mcp_http.py | time.sleep(float(arguments.get("secs", 1))) | the fake MCP server's `slow` tool: a slow tool call is the input
 fake_openai_auth.py | time.sleep(wait) | the fake ChatGPT auth server's slow_refresh: a slow token refresh is the input
