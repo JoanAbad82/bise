@@ -431,7 +431,17 @@ A row stays even after it passes: it is a regression list.
         thinking (qa-native).
     - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
       dev tool (amb-web's list, or amb-home's commands).
-- **d94b7996, 10-08 (the third re-cut): R24 red, no try build yet.** The no-build proof is green
+- **d94b7996, 10-08: OK for the try** (ambient-pm, after R24's proof below; designer signed the
+  look on 233c325a, and R03 and R34 on this cut).
+  - **R24 proven** (qa-native m_13205): amb-mac's composer/paste-image passes on the packed
+    d94b7996 bundle (1 passed, 1.3 s: the chip visible, the thumbnail drawn). The packed app
+    pastes images. The missing chip in the gate's shot was the driver's order: it staged the image
+    before clicking the field, right after a drag-select and Space. The check clicks, stages, then
+    presses ⌘V. qa-native reruns R24 alone in that order as a confirmation; it doesn't block.
+  - **Not in this build** (the try's notes to main say so): R40, the streamed text (no partial
+    events yet), and R07-a, the spot's preview of an agent's last actions (next round).
+  - **For the next cut:** designer's nits N1–N4, and amb-home's R34 subtitle.
+  - The entry before this one was "R24 red, no try build yet." The no-build proof is green
   (up to date, the stamp untouched, nothing spawned, a clean `--stop`). qa-native reshot R03, R24
   and R34 into `~/.bise/gate/try-gate/d94b7996/` (m_13172).
   - **now ok:**
