@@ -403,10 +403,7 @@ def try_real(dir_, projects, url):
         json.dump({"v": 1, "projects": [{"path": p["ws"], "name": p["project"], "order": i} for i, p in enumerate(projects)]}, f, indent=1)
     base = url.split("/chat/completions")[0]
     with open(os.path.join(dir_, "config.toml"), "w") as f:
-        f.write('[roles]\nmain = "fake/mistral-small-latest"\nclassify = "off"\n\n'
-                '[providers.fake]\nname = "fake"\napi = "openai-chat"\nbase_url = "%s"\nkey_env = "BISE_TRY_FAKE_KEY"\n'
-                'key_command = "echo fake-key"\n'
-                'small_model = "mistral-small-latest"\n' % base)
+        f.write('[roles]\nmain = "fake/mistral-small-latest"\nclassify = "off"\n\n' + FAKE_ACCOUNT % base)
     return dir_
 
 
@@ -690,6 +687,21 @@ def checker_off(home):
             f.write(("\n" if text and not text.endswith("\n") else "") + "[roles]\nclassify = \"off\"\n")
 
 
+FAKE_ACCOUNT = ('[providers.fake]\nname = "fake"\napi = "openai-chat"\nbase_url = "%s"\nkey_env = "BISE_TRY_FAKE_KEY"\n'
+                'key_command = "echo fake-key"\nsmall_model = "mistral-small-latest"\n')
+
+
+def home_account(home, url):
+    """The world's own bise home gets the same signed-in fake account as try-real (qa-native m_12883:
+    the gate's window runs on h/.bise, and setup's model step waits for a signed_in account). Only
+    the provider: no role points at it, so the world's hubs keep their own fake provider."""
+    cfg = os.path.join(home, ".bise", "config.toml")
+    text = open(cfg).read() if os.path.exists(cfg) else ""
+    if "[providers.fake]" not in text:
+        with open(cfg, "a") as f:
+            f.write(("\n" if text and not text.endswith("\n") else "") + "\n" + FAKE_ACCOUNT % url.split("/chat/completions")[0])
+
+
 def approval_command(home, spec):
     """The seeded agent's call the gate asks about: a forced push (tier 0, a card in auto whatever
     the sandbox; a write outside the workspace was let through to the sandbox, no card), to a
@@ -944,6 +956,7 @@ def daemon(bise, root, n, rich=False, agents=0):
         rich_out = rich_seed(world, hubs, holds, agents, 300 * load_factor()) if rich else None
         home_env = envs[[h["home"] for h in hubs].index(True)].env
         real = try_real(os.path.join(world, "try-real"), [h for h in hubs if not h["home"]], home_env["BEND_PROVIDER_URL"])
+        home_account(home, home_env["BEND_PROVIDER_URL"])
         info = {"pid": os.getpid(), "world": world, "home": home, "bise": bise, "root": root, "projects": n,
                 "hubs": hubs, "registry": register(bise, home, [h["ws"] for h in hubs if not h["home"]]),
                 "rich": rich_out, "try_real": real, "up_ms": int(time.time() * 1000)}

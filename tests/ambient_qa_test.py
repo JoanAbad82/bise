@@ -699,6 +699,15 @@ def rich_world_fixtures():
     cfg = open(os.path.join(real, "config.toml")).read()
     check([p["name"] for p in pj["projects"]] == ["telemetry", "shop"] and 'base_url = "http://127.0.0.1:4242/v1"' in cfg
           and 'key_env = "BISE_TRY_FAKE_KEY"' in cfg and 'key_command = "echo fake-key"' in cfg and cfg.count("[roles]") == 1, cfg)
+    # the world's own home gets the same account (the gate's window runs there, qa-native m_12883), once, no role
+    h = os.path.join(d, "h")
+    os.makedirs(os.path.join(h, ".bise"))
+    world.checker_off(h)
+    for _ in range(2):
+        world.home_account(h, "http://127.0.0.1:4343/v1/chat/completions")
+    hc = open(os.path.join(h, ".bise", "config.toml")).read()
+    check(hc.count("[providers.fake]") == 1 and 'base_url = "http://127.0.0.1:4343/v1"' in hc and 'key_command = "echo fake-key"' in hc
+          and "main =" not in hc and 'classify = "off"' in hc, hc)
     shutil.rmtree(d, ignore_errors=True)
 
 
