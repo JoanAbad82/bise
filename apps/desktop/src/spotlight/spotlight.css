@@ -5,6 +5,17 @@
 /* a line about the answer (asked, waiting for the first words; sent to another project): dim */
 .b-spot-answer.note { color: var(--c-text-2); }
 .b-live-pearl { flex: none; }
+/* R07-a: the selected agent's last actions in its right column (designer m_13271): the row grows to
+   fit, no height tween; name and project stay on the first line; newest last in --c-text, the
+   older dim; the time right-aligned dim; a question that waits on him in accent; each line cut with … */
+.b-spot .r:has(.b-spot-acts) { height: auto; min-height: 34px; align-items: start; padding-top: 8px; padding-bottom: 8px; }
+.b-spot .r:has(.b-spot-acts) > :is(b, .pp, .ky) { line-height: 18px; }
+.b-spot-acts { display: grid; gap: 2px; min-width: 0; }
+.b-spot-acts .a { display: flex; gap: 10px; min-width: 0; line-height: 18px; color: var(--c-text-3); }
+.b-spot-acts .a.new { color: var(--c-text); }
+.b-spot-acts .a.ask { color: var(--c-accent); }
+.b-spot-acts .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.b-spot-acts .tm { flex: none; color: var(--c-text-3); font-size: var(--t-12); }
 .b-spot-route { display: flex; align-items: baseline; gap: 14px; padding: 4px 20px 10px 70px; font: var(--t-15)/1.4 var(--font-read); color: var(--c-text); }
 .b-spot-route .keep { margin-left: auto; padding: 0; border: 0; background: none; font: var(--t-12) var(--font-mono); color: var(--c-text-3); cursor: default; }
 /* bise's answer while it streams and once done (LiveText, ambient's text-appearing spec): only

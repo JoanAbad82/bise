@@ -8,6 +8,7 @@ import { Menu, MenuItem, MenuSep } from '@/ds';
 import { LivePearl, type Mood } from '@/pearl';
 import { LiveText, RouteLine, Spotlight, answerLines, type SpotAnswer, type SpotData, type SpotItem, type SpotRoute } from '@/spotlight';
 import type { View } from './machine';
+import type { PreviewLine } from '@/spotlight/preview';
 import './capsule.css';
 
 export const W = {
@@ -39,6 +40,10 @@ export interface CapsuleProps {
   /** '/new …' in the spotlight: start an agent in bise's home (bar A.1) */
   readonly onNew?: (brief: string) => void;
   readonly onOpen: (item: SpotItem) => void;
+  /** The spotlight row the keyboard is on (R07-a: the root follows the selected agent). */
+  readonly onSelect?: (item: SpotItem | null) => void;
+  /** The selected agent's last actions for its row (R07-a). */
+  readonly preview?: { readonly id: string; readonly lines: readonly PreviewLine[] } | null;
   readonly onOpenWindow: (route?: string) => void;
   readonly onClose: () => void;
   /** null: the app can't quit from a page yet (the row shows greyed). */
@@ -86,7 +91,7 @@ export function Capsule(p: CapsuleProps): JSX.Element {
       <div className={`b-cap-pearl${pearl ? '' : ' off'}`}>
         <LivePearl mood={moodOf(v, answering)} level={p.level} still={p.still} size={40} testId="capsule.pearl" />
       </div>
-      {v.kind === 'spot' && <div data-glass className="b-cap-glass"><Spotlight data={p.spot} answer={p.answer} route={p.route} onRouteKeep={p.onRouteKeep} onRouteTo={p.onRouteTo} pearl={<span className="b-cap-hole" />} onAsk={p.onAsk} onNew={p.onNew} onOpen={p.onOpen} onOpenAnswer={() => { p.onOpenWindow('bise'); }} onClose={p.onClose} testId="spot" /></div>}
+      {v.kind === 'spot' && <div data-glass className="b-cap-glass"><Spotlight data={p.spot} answer={p.answer} route={p.route} onRouteKeep={p.onRouteKeep} onRouteTo={p.onRouteTo} pearl={<span className="b-cap-hole" />} onAsk={p.onAsk} onNew={p.onNew} onOpen={p.onOpen} onSelect={p.onSelect} preview={p.preview} onOpenAnswer={() => { p.onOpenWindow('bise'); }} onClose={p.onClose} testId="spot" /></div>}
       {v.kind === 'talk' && (
         <div className="b-cap-talk" data-testid="capsule.talk" data-glass>
           {p.heard !== '' ? p.heard : v.phase === 'listen' ? W.listening : W.thinking}

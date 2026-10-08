@@ -13,6 +13,7 @@ import { W, newBrief } from './words';
 import { LiveText } from './LiveText';
 import { shownName } from '@/agents/model';
 import { caretAtEnd, keep } from '@/app/keep';
+import type { PreviewLine } from './preview';
 import './spotlight.css';
 
 /** His typed words' field in the keep (keep.ts). */
@@ -55,6 +56,12 @@ export interface SpotlightProps {
   readonly onNew?: (brief: string) => void;
   /** Open a card, an agent or an environment in bise's window. */
   readonly onOpen: (item: SpotItem) => void;
+  /** The row the keyboard is on, each time it changes (none: no row): the capsule follows the
+   *  selected agent's thread for its last actions (R07-a). */
+  readonly onSelect?: (item: SpotItem | null) => void;
+  /** The selected agent's last actions (its row id and lines, newest last): its right column
+   *  shows them instead of its objective. None or no line yet: the objective stays. */
+  readonly preview?: { readonly id: string; readonly lines: readonly PreviewLine[] } | null;
   /** Open bise's answer in the window (the rest of a long one). */
   readonly onOpenAnswer?: () => void;
   readonly onClose: () => void;
@@ -68,7 +75,22 @@ export const ANSWER_MAX_LINES = 18;
 
 const DOT: Record<AgentStatus, DotState> = { waiting: 'nd', blocked: 'off', working: 'wk', idle: 'off', done: 'ok', failed: 'er' };
 
-const Row = memo(function Row({ item, on, testId, onPick }: { item: SpotItem; on: boolean; testId: string; onPick: (item: SpotItem) => void }): JSX.Element {
+/** The selected agent's last actions in its right column, newest last (the newest in the text's
+ *  color, the older dim), each with its time at the right; a question that waits on him in accent. */
+function Actions({ lines, testId }: { lines: readonly PreviewLine[]; testId: string }): JSX.Element {
+  return (
+    <span className="b-spot-acts" data-testid={testId}>
+      {lines.map((l, i) => (
+        <span key={l.key} className={cx('a', i === lines.length - 1 && 'new', l.ask && 'ask')} data-testid={`${testId}.${String(i)}`}>
+          <span className="t">{l.text}</span>
+          <span className="tm">{l.time}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+const Row = memo(function Row({ item, on, testId, onPick, acts }: { item: SpotItem; on: boolean; testId: string; onPick: (item: SpotItem) => void; acts?: readonly PreviewLine[] | undefined }): JSX.Element {
   const click = (): void => {
     onPick(item);
   };
@@ -81,7 +103,7 @@ const Row = memo(function Row({ item, on, testId, onPick }: { item: SpotItem; on
     case 'card':
       return <SpotRow lead="nd" name={`${item.mark} ${shownName(item.agent)}`} where={item.pname} what={item.text} hotkey={W.answerKey} on={on} onClick={click} testId={id} />;
     case 'agent':
-      return <SpotRow lead={DOT[item.status]} name={item.name} where={item.pname} what={item.title} on={on} onClick={click} testId={id} />;
+      return <SpotRow lead={DOT[item.status]} name={item.name} where={item.pname} what={on && acts !== undefined && acts.length > 0 ? <Actions lines={acts} testId={`${id}.acts`} /> : item.title} on={on} onClick={click} testId={id} />;
     case 'env':
       return <SpotRow lead="off" name={item.name} what={item.sub} hotkey={item.n === null ? undefined : `⌘${item.n}`} on={on} onClick={click} testId={id} />;
     case 'front':
@@ -135,6 +157,11 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
   useEffect(() => {
     props.current = p;
   });
+  // the row the keyboard is on, told when it changes (R07-a: the capsule follows that agent)
+  const selected = items[index] ?? null;
+  useEffect(() => {
+    props.current.onSelect?.(selected);
+  }, [selected]);
 
   useEffect(() => {
     input.current?.focus();
@@ -256,7 +283,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
               <SpotGroup>{s.label}</SpotGroup>
             </div>
           ),
-          ...s.items.map((item) => <Row key={item.id} item={item} on={items[index]?.id === item.id} testId={testId} onPick={pick} />),
+          ...s.items.map((item) => <Row key={item.id} item={item} on={items[index]?.id === item.id} testId={testId} onPick={pick} acts={p.preview?.id === item.id ? p.preview.lines : undefined} />),
         ])}
       </Spot>
     </div>

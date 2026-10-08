@@ -2,10 +2,11 @@
 // through the store's own slices (a change re-reads only when one of them changed: the snapshot
 // is cached on the identity of the slices it was built from). toSpotData is the pure mapping from
 // the generated row shapes (src/proto) to the spotlight's view types.
-import { useCallback, useRef, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { Agent, Card, ProjectRow } from '@/proto';
-import { useProjects, useStore } from '@/store';
+import { threadKey, useProjects, useStore, useThreadOrder } from '@/store';
 import type { SpotCard, SpotData, SpotFront } from '@/spotlight';
+import { previewLines, type PreviewLine } from '@/spotlight/preview';
 
 export function cardKind(c: Card): SpotCard['kind'] {
   if (c.approval !== true) return 'question';
@@ -30,6 +31,37 @@ export function toSpotData(
     cards: mine.flatMap((p) => cardsOf(p.project).map((c) => ({ id: `${p.project}.${String(c.id)}`, agent: c.agent, project: p.project, text: c.question, kind: cardKind(c), pname: p.home ? '' : p.name }))),
     front,
   };
+}
+
+/** How many of a thread's newest entries the selected agent's preview reads (its last actions). */
+const PREVIEW_PAGE = 12;
+
+/**
+ * R07-a: the agent the spotlight's keyboard is on, followed while it stays there (its thread's
+ * newest page, then live), and its last actions for that row's right column. Another row, or the
+ * spot closing, stops the follow, unless another part of the capsule follows that thread too
+ * (main's thread for his asks: `keep`). None: no agent selected or no actions yet.
+ */
+export function useAgentPreview(sel: { readonly id: string; readonly project: string; readonly name: string } | null, keep: string | null): { readonly id: string; readonly lines: readonly PreviewLine[] } | null {
+  const store = useStore();
+  const key = sel === null ? '' : threadKey(sel.project, sel.name);
+  useEffect(() => {
+    if (sel === null) return;
+    // a short pause: arrows held through the list don't subscribe to every agent on the way
+    const t = window.setTimeout(() => {
+      store.subscribeThread(sel.project, sel.name, PREVIEW_PAGE);
+    }, 120);
+    return () => {
+      window.clearTimeout(t);
+      if (key !== keep) store.unsubscribeThread(sel.project, sel.name);
+    };
+  }, [store, key, keep]);
+  const order = useThreadOrder(key);
+  return useMemo(() => {
+    if (sel === null) return null;
+    const entries = order.order.slice(-PREVIEW_PAGE).flatMap((pos) => store.entry(key, pos) ?? []);
+    return { id: sel.id, lines: previewLines(entries, Date.now()) };
+  }, [sel?.id, order, store, key]);
 }
 
 /** Every project's agents and cards, with what's in front, re-read only when a slice changes. */

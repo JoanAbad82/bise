@@ -14,7 +14,7 @@ import { W } from '@/spotlight/words';
 import { useTheme } from '@/theme';
 import '@/ds/index.css';
 import { Capsule } from './Capsule';
-import { useSpotData } from './data';
+import { useAgentPreview, useSpotData } from './data';
 import { START, step, type CapEvent, type Fx, type State } from './machine';
 
 interface Model {
@@ -93,6 +93,10 @@ export function CapsuleRoot(): JSX.Element {
   const spot = useSpotData(front);
   const projects = useProjects();
   const home = projects.find((p) => p.home)?.project ?? null;
+  // R07-a: the agent row the spotlight's keyboard is on shows its last actions (main's thread
+  // stays followed for his asks: never unsubscribed from here)
+  const [selAgent, setSelAgent] = useState<{ id: string; project: string; name: string } | null>(null);
+  const preview = useAgentPreview(view.kind === 'spot' ? selAgent : null, home === null ? null : threadKey(home, 'main'));
   const still = useMemo(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches, []);
 
   // bise's answer to what he asked: main's thread, subscribed in this window too (qa-flows: the
@@ -362,6 +366,10 @@ export function CapsuleRoot(): JSX.Element {
       onNew={(brief) => {
         // amb-win's newAgent (the TUI's /new): bise's home names it from the brief; it shows in 'at work'
         if (home !== null) newAgent(store, home, { brief });
+      }}
+      preview={preview}
+      onSelect={(item) => {
+        setSelAgent((prev) => (item?.kind !== 'agent' ? null : prev?.id === item.id ? prev : { id: item.id, project: item.project, name: item.name }));
       }}
       onOpen={(item) => {
         // a waiting row answers in place: the card's options and keys, esc back (qa-native R03:
