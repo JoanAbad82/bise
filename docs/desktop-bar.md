@@ -483,7 +483,10 @@ A row stays even after it passes: it is a regression list.
         right (amb-web). It was never built rather than broken. **Not blocking** (ambient-lead
         m_12812): it goes to the next round, and the try's notes to main say "not in this build".
         Raw tool JSON goes to amb-home with D14/D15; R18 and `/theme` go to amb-web.
-      - Maybe 2.1: `/theme` left the window light, with data-theme unset, while the composer's tip
+      - **Not a red after all** (ambient-lead m_12821): qa-native's script typed a bare `/theme`,
+        which opens settings · general as decided in e118d823. `/theme dark` works (the
+        window-commands and app/theme checks), and dark is reshot with `/theme dark`. The first
+        read was: `/theme` left the window light, with data-theme unset, while the composer's tip
         promises that it switches. A red if the driver typed it right; asked qa-native.
     - **nit:** the spot's section head says "ENVIRONMENTS"; it should say "projects", like the sidebar
       and ⌘K (amb-web; designer m_12804).
