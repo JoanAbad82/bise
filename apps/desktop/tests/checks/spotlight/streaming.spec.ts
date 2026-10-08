@@ -36,14 +36,27 @@ test('spotlight/streaming: bise main\'s reply streams in, only new words fade, n
     await expect(input, 'fn+space opens the spotlight').toBeVisible({ timeout: 5000 });
     await input.click();
     await cap.keyboard.type(`why does p99 rise ${Date.now() % 100000}`);
+    const subMain = (c: Record<string, unknown>): boolean => c['cmd'] === 'subscribe' && c['agent'] === 'main' && c['project'] === HOME;
+    const subsBefore = core.cmds().filter(subMain).length;
     await cap.keyboard.press('Enter');
     await core.waitCmd((c) => c['cmd'] === 'send' && c['agent'] === 'main');
+    // R18 (qa-native m_12853): another window's unsubscribe dropped the capsule's follow of main
+    // (one set per project in the core), so the answer never came: the ask follows main again
+    // first, and the fresh page it brings back (main's older answers) is never taken for his answer
+    const cmds = core.cmds();
+    const sendAt = cmds.findIndex((c) => c['cmd'] === 'send' && c['agent'] === 'main');
+    const subAts = cmds.map((c, i) => (subMain(c) ? i : -1)).filter((i) => i >= 0);
+    expect(subAts.length, 'the ask subscribes to main again').toBeGreaterThan(subsBefore);
+    expect(subAts[subsBefore] ?? Infinity, 'before it sends').toBeLessThan(sendAt);
+    await core.send({ ev: 'thread', project: HOME, agent: 'main', entries: [{ pos: 900_000, at_ms: Date.now() - 60_000, kind: 'agent', text: 'an older answer of main' }], before: null, more: false } as unknown as Ev);
+    await cap.waitForTimeout(300);
 
     // 0. his ask shows it went before any word comes back (R18 on 723648da: the spot fell back
     // to its list with no sign of the ask): 'asked bise' with the '∿', in the answer's place
     const answer = cap.locator('[data-testid="spot.answer"]');
     await expect(answer, 'the ask shows at once, before bise answers').toHaveAttribute('data-state', 'asked', { timeout: 1000 });
     await expect(answer).toContainText('asked bise');
+    await expect(answer, 'an older answer in the fresh page is not his').not.toContainText('an older answer');
     await expect(cap.locator('[data-testid="spot.answer.text.sign"]'), "the '∿' while bise writes").toBeVisible();
 
     // 1. the first words, at once, with the sign and no caret

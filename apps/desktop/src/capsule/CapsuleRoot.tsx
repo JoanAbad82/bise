@@ -98,7 +98,19 @@ export function CapsuleRoot(): JSX.Element {
   // capsule's store never had it), streamed (typing) or arriving whole (a new agent entry after
   // his question)
   const [last, setLast] = useState<SpotAnswer | null>(null);
-  const asked = useRef<{ after: number; started: boolean } | null>(null);
+  // rebase: his ask follows main's thread again (R18: another window's unsubscribe used to drop
+  // this one's follow, and the answer never came); until that fresh page lands, an entry already
+  // in it is never his answer, so `after` moves past the page first
+  const asked = useRef<{ after: number; started: boolean; rebase: boolean } | null>(null);
+  const followAsk = useCallback(
+    (h: string): void => {
+      const order = store.threadOrder(threadKey(h, 'main')).order;
+      // (the answer view opens with its first reply, which replaces the last answer then)
+      asked.current = { after: order.length === 0 ? -1 : Math.max(...order), started: false, rebase: true };
+      store.subscribeThread(h, 'main', 20);
+    },
+    [store],
+  );
   // main's reply while it is written (the hub's partial, 250 ms at most; shared/partial.ts,
   // followed in the effect below): it shows from its first words, and the entry that lands after
   // it takes its place (same text: no change; LiveText fades only what is new)
@@ -111,7 +123,9 @@ export function CapsuleRoot(): JSX.Element {
       const a = asked.current;
       if (a === null) return;
       const typing = store.typing(key);
-      const reply = store
+      const reply = a.rebase
+        ? undefined
+        : store
         .threadOrder(key)
         .order.filter((pos) => pos > a.after)
         .map((pos) => store.entry(key, pos))
@@ -126,7 +140,20 @@ export function CapsuleRoot(): JSX.Element {
       }
       setLast(next);
     };
-    const offs = [store.subscribe(`typing:${key}`, read), store.subscribe(`order:${key}`, read)];
+    const offs = [
+      store.subscribe(`typing:${key}`, read),
+      store.subscribe(`order:${key}`, read),
+      // the ask's follow is live again: its fresh page (always before the ask's own entries, one
+      // connection, in order) moves `after` past what it holds; a live entry first (no page: a
+      // core that never dropped the follow) just ends the wait
+      store.onEvent((ev) => {
+        const a = asked.current;
+        if (a === null || !a.rebase || (ev.ev !== 'thread' && ev.ev !== 'entry') || ev.project !== home || ev.agent !== 'main') return;
+        a.rebase = false;
+        if (ev.ev === 'thread') a.after = Math.max(a.after, ...ev.entries.map((e) => e.pos));
+        else read();
+      }),
+    ];
     const port = bise?.core;
     if (port !== undefined) {
       offs.push(
@@ -198,14 +225,10 @@ export function CapsuleRoot(): JSX.Element {
         store.command({ cmd: fx.cmd });
         // what he said goes to bise's main through the core: its reply is the answer view's,
         // as a typed ask's is (without this the talk never reached its answer)
-        if (fx.cmd === 'talk_end' && home !== null) {
-          const order = store.threadOrder(threadKey(home, 'main')).order;
-          // (the answer view opens with its first reply, which replaces the last answer then)
-          asked.current = { after: order.length === 0 ? -1 : Math.max(...order), started: false };
-        }
+        if (fx.cmd === 'talk_end' && home !== null) followAsk(home);
       } else bise?.openWindow(fx.route);
     }
-  }, [m.fx, bise, store, home]);
+  }, [m.fx, bise, store, home, followAsk]);
 
   useEffect(() => {
     if (bise === undefined) return;
@@ -299,8 +322,7 @@ export function CapsuleRoot(): JSX.Element {
       onRouteTo={routeTo}
       onAsk={(text) => {
         if (home === null) return;
-        const order = store.threadOrder(threadKey(home, 'main')).order;
-        asked.current = { after: order.length === 0 ? -1 : Math.max(...order), started: false };
+        followAsk(home);
         store.send({ project: home, agent: 'main', text });
         // asked: the spot says so at once (∿), its first words take the line's place (R18)
         setLast({ text: '', done: false });
