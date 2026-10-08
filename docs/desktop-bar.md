@@ -384,6 +384,34 @@ A row stays even after it passes: it is a regression list.
 
     There will be one re-cut once all of these land; ambient-pm gets its sha after qa-native's
     reshoot.
+  - **reshoot on the same 12a9efbf** (09:32–09:34 UTC): D1 was the screenshot driver's fault, which
+    opened routes by name instead of hub id. Every project screen opens now (ambient-lead m_12618).
+    - **now ok:**
+      - R01 (shop's thread);
+      - R13 (`/`, `@` and `$` list in the real thread; `@` gives agents, then artifacts, then
+        folders);
+      - R31 (sub-agents under the project in the sidebar, artifacts and "scheduled here" on the
+        right);
+      - R32 (the draft survives a reload);
+      - R37;
+      - R38 (Space on a selection gives the `❝ 1` chip and its "answered · main · 1 line" strip);
+      - R39 (older history with a table; "back to the bottom" floats over the rows).
+    - **still red:**
+      - R26: the folders start closed on a fresh keep (amb-win).
+      - R27 / D2: at 30 agents the sidebar's list runs under its footer ("synthetic-checks…"
+        under "add a project") (amb-win).
+      - R25: after a click at the composer's bottom-right corner, the field doesn't have the focus
+        (amb-web).
+      - R01 / D6: the hint row still cuts words ("tip: esc puts your draft awa…") (amb-web).
+      - R20, R28, R10 and R03 as above.
+    - **not judged:**
+      - R36, R40, R18: the fake model still echoes `<agent_message …>` and `[[bash: …]]` (amb-tools).
+      - R24 and R15: the driver made no chips.
+      - R34: no project picker was reached in setup.
+      - R07, R09: no p99 match in the spotlight shot, and no changes row.
+      - R08: no fake mic.
+    - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
+      dev tool (amb-web's list, or amb-home's commands).
   - **the 30-minute use** with designer waits for the re-cut: with the project routes missing,
     most of the app can't be reached.
 
