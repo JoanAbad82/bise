@@ -453,6 +453,87 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       note('D18', `empty composer box ${String(Math.round(geo.box.height))} px tall; the field (placeholder) sits ${String(Math.round(geo.field.top))} px from its top, ${String(Math.round(geo.field.height))} px tall`);
     });
 
+    // ---- the cb1f2b44 re-cut's rows (ambient-lead m_13807, m_13812: designer's N-list of 10-08)
+    // the empty thread (amb-win 442ea0f1 / 2f22e7fc): an idle filler agent that never said anything
+    await each('EMPTY', async () => {
+      await go(s, `agent/${tel}/heatmap`);
+      for (const px of [800, 1024, 1100, 1400]) {
+        await width(s, px);
+        await shot('EMPTY', `EMPTY-${String(px)}`, p);
+      }
+      await width(s, 1100);
+      note('EMPTY', `telemetry › heatmap (a filler agent with no message); entries in its list: ${String(await p.locator('[data-testid="thread.list"] [data-testid^="thread.entry"]').count())}`);
+    });
+    // N1 an agent's head: role first, no 'high · yolo', the gauge 'context 262k'
+    await each('N1', async () => {
+      await go(s, `agent/${tel}/p99`);
+      await shot('N1', 'N1-p99-head', p, { clip: { x: 248, y: 0, width: 852, height: 140 } });
+      const head = (await p.locator('[data-testid^="thread.head"], [data-testid^="agent.head"]').first().innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
+      note('N1', `head text: ${JSON.stringify(head.slice(0, 200))}; 'high · yolo' in it: ${String(/high\s*·\s*yolo/.test(head))}`);
+    });
+    // N2 the scheduled row: '◷ main scheduled dashboards · every 30m · next <time>', no number, no chevron
+    await each('N2', async () => {
+      await go(s, `agent/${tel}/dashboards`);
+      const row = p.locator('[data-testid="thread.list"]').getByText(/scheduled/).first();
+      await row.scrollIntoViewIfNeeded().catch(() => undefined);
+      await sleep(300);
+      await shot('N2', 'N2-scheduled-row', p);
+      note('N2', `the row reads: ${JSON.stringify((await row.innerText().catch(() => '')).replace(/\s+/g, ' ').trim())}`);
+    });
+    // N3 a blocked agent's status line on the column's left edge (no 36 px indent)
+    await each('N3', async () => {
+      await go(s, `agent/${shop}/gift-ui`);
+      await shot('N3', 'N3-gift-ui', p);
+      const geo = await p.evaluate(() => {
+        const list = document.querySelector('[data-testid="thread.list"]');
+        const line = Array.from(list?.querySelectorAll('*') ?? []).filter((e) => /blocked/i.test(e.textContent) && e.children.length === 0).pop();
+        const col = list?.querySelector('p, [data-testid^="thread.entry"]');
+        return { line: line?.textContent.trim().slice(0, 80) ?? '', x: line?.getBoundingClientRect().x ?? -1, col: col?.getBoundingClientRect().x ?? -1 };
+      });
+      note('N3', `blocked line ${JSON.stringify(geo.line)} at x=${String(Math.round(geo.x))}; the column's text starts at x=${String(Math.round(geo.col))}`);
+    });
+    // ⌘K (decision m_12973): a name opens it, a sentence asks bise with the match one row down
+    await each('KQ', async () => {
+      await go(s, 'bise');
+      const pal = p.getByTestId('app.palette');
+      await p.keyboard.press('Meta+K');
+      await pal.waitFor({ timeout: 3000 }).catch(() => undefined);
+      await p.keyboard.type('p99');
+      await sleep(600);
+      await shot('KQ', 'KQ-a-p99', p);
+      const top = async (): Promise<string> => (await p.getByTestId('app.palette.item.0').innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
+      const second = async (): Promise<string> => (await p.getByTestId('app.palette.item.1').innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
+      note('KQ', `⌘K 'p99': top row ${JSON.stringify(await top())}`);
+      await p.keyboard.press('Enter');
+      await sleep(1200);
+      await shot('KQ', 'KQ-b-after-enter', p);
+      note('KQ', `after ⏎: route head ${JSON.stringify((await p.locator('[data-testid^="thread.head"], [data-testid^="agent.head"]').first().innerText().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 80))}`);
+      await p.keyboard.press('Meta+K');
+      await pal.waitFor({ timeout: 3000 }).catch(() => undefined);
+      await p.keyboard.type('why is p99 slow today');
+      await sleep(600);
+      await shot('KQ', 'KQ-c-sentence', p);
+      const pearl = await p.getByTestId('app.palette.ask.pearl').boundingBox().catch(() => null);
+      note('KQ', `⌘K 'why is p99 slow today': top ${JSON.stringify(await top())}, next ${JSON.stringify(await second())}, ask pearl ${pearl === null ? 'none' : `${String(Math.round(pearl.width))}x${String(Math.round(pearl.height))}`} (not sent: esc)`);
+      await p.keyboard.press('Escape');
+      await sleep(400);
+    });
+    // N4 the 'projects' rows, in the ⌘K palette at 1100 and 800 (the spot's are in SPOT-heads / N4-spot)
+    await each('N4', async () => {
+      await go(s, 'bise');
+      for (const px of [1100, 800]) {
+        await width(s, px);
+        await p.keyboard.press('Meta+K');
+        await sleep(700);
+        await shot('N4', `N4-palette-${String(px)}`, p);
+        const rows = await p.locator('[data-testid="app.palette.group.projects"] [data-testid^="app.palette.item."]').evaluateAll((es) => es.map((e) => (e as HTMLElement).innerText.replace(/\s+/g, ' ').trim()));
+        note('N4', `at ${String(px)}, palette projects rows: ${JSON.stringify(rows.slice(0, 4))}`);
+        await p.keyboard.press('Escape');
+        await sleep(300);
+      }
+      await width(s, 1100);
+    });
+
     // ---- ambient-pm's asks on the window (m_12768, m_12769, m_12771, m_12772)
     const docs = await pid('docs');
     await each('ASK-pm-1', async () => {
@@ -511,6 +592,14 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       await helper.send({ ev: 'fn', act: 'key', key: 'space' });
       await out.wait(CAPSULE, (l) => l.startsWith('show'), 5000);
       await sleep(500);
+      // the spot keeps its last words across shows (cb1f2b44: SPOT-heads and SPOT-chip still had R07's 'p99'): start empty
+      const f = cap.getByTestId('spot.input');
+      if ((await f.inputValue().catch(() => '')) !== '') {
+        await f.click().catch(() => undefined);
+        await cap.keyboard.press('Meta+a');
+        await cap.keyboard.press('Backspace');
+        await sleep(300);
+      }
     };
     const hide = async (): Promise<void> => { await helper.send({ ev: 'fn', act: 'esc' }); await sleep(500); };
     await each('R04', async () => {
@@ -591,6 +680,23 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       await shot('SPOT-heads', 'spot-heads', cap, { omitBackground: true });
       const heads = await cap.evaluate(() => Array.from(document.querySelectorAll('h2, h3, [class*="head"], [class*="section"]'), (e: Element) => e.textContent.trim()).filter((t) => t !== '' && t.length < 30 && t === t.toUpperCase()));
       note('SPOT-heads', `section heads: ${[...new Set(heads)].join(', ') || '(read from the shot)'}`);
+      const projects = await cap.locator('[data-testid^="spot.row.project."], [data-testid*="group.projects"] [data-testid^="spot.row"]').evaluateAll((es) => es.map((e) => (e as HTMLElement).innerText.replace(/\s+/g, ' ').trim()));
+      note('SPOT-heads', `N4 spot 'projects' rows: ${JSON.stringify(projects.slice(0, 4))}`);
+      await hide();
+    });
+    // the spotlight's image chip (amb-web cb1f2b44): ⌘V checker.png then words; never sent here (R41 (3) sends it)
+    await each('SPOT-chip', async () => {
+      await spot();
+      await cap.getByTestId('spot.input').click().catch(() => undefined);
+      const staged = await s.app.evaluate((_e, file) => (globalThis as unknown as { __biseTestClip?: (c: { file: string }) => Promise<boolean> }).__biseTestClip?.({ file }) ?? Promise.resolve(false), path.join(__dirname, '../fixtures/checker.png'));
+      await cap.keyboard.press('Meta+V');
+      await sleep(700);
+      await cap.keyboard.type('what is in this picture');
+      await sleep(400);
+      await shot('SPOT-chip', 'SPOT-chip', cap, { omitBackground: true });
+      const drawn = await cap.locator('img').evaluateAll((es) => es.filter((i) => (i as HTMLImageElement).naturalWidth > 0 && i.getBoundingClientRect().width > 0).length);
+      const keys = (await cap.locator('[class*="keys"], [data-testid$=".keys"]').last().innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
+      note('SPOT-chip', `staged ${String(staged)}; drawn images in the capsule: ${String(drawn)}; '[Image #1]' in it: ${String((await cap.locator('body').innerText()).includes('[Image #1]'))}; key line ${JSON.stringify(keys)}`);
       await hide();
     });
     // R08's spoken ask, about three lines long, heard through the core's real talk path
