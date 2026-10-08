@@ -233,6 +233,16 @@
   flex: 1;
   min-width: 0;
 }
+/* a project's end words ('∿ 1' and its pink count) in a box of a kept width: its folder and ⋯
+   buttons before it stay put when the words change */
+.app-r .app-tail {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-width: 56px;
+}
 .app-r.ag {
   padding-left: 23px;
   color: var(--c-text);

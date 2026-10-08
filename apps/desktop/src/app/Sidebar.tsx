@@ -125,14 +125,26 @@ function SRow({ kind, lead, name, end, endErr, count, on, title, onClick, testId
   testId?: string;
   children?: ReactNode;
 }) {
+  const tail = (
+    <>
+      {end != null && end !== '' && <span className={endErr === true ? 'app-m err' : 'app-m'}>{end}</span>}
+      {count !== undefined && count > 0 && <span className="app-cnt">{count}</span>}
+    </>
+  );
   return (
     <div className={`b-row app-r ${kind}${on === true ? ' on' : ''}`} role="button" tabIndex={-1} aria-current={on === true || undefined} title={title}
       onClick={onClick} data-testid={testId}>
       <span className="app-g">{lead}</span>
       <span className="nm">{name}</span>
       {children}
-      {end != null && end !== '' && <span className={endErr === true ? 'app-m err' : 'app-m'}>{end}</span>}
-      {count !== undefined && count > 0 && <span className="app-cnt">{count}</span>}
+      {children != null ? (
+        // a row with buttons (a project's folder, ⋯): its end words in a box of a kept width, so
+        // the buttons never move when they change ('∿ 1' going away moved them under the
+        // pointer: app/clicks)
+        <span className="app-tail">{tail}</span>
+      ) : (
+        tail
+      )}
     </div>
   );
 }
