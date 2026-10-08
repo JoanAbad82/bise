@@ -23,9 +23,9 @@ const D: SpotData = {
 };
 
 describe('the spotlight list', () => {
-  it('empty: waiting for you, at work, environments with what is in front first, no ⌘ on it', () => {
+  it('empty: waiting for you, at work, projects with what is in front first, no ⌘ on it', () => {
     const l = spotList(D, '');
-    expect(l.sections.map((s) => s.label)).toEqual(['waiting for you', 'at work', 'environments']);
+    expect(l.sections.map((s) => s.label)).toEqual(['waiting for you', 'at work', 'projects']);
     const envs = l.sections[2]?.items ?? [];
     expect(envs[0]).toMatchObject({ kind: 'front', name: 'Pricing · Acme', sub: 'in front: acme.test · Chrome' });
     expect(envs[1]).toMatchObject({ kind: 'env', name: 'telemetry', n: 1, sub: '~/code/telemetry · main · 2 agents' });
@@ -109,6 +109,29 @@ describe('the routing hold', () => {
       await Promise.resolve();
     });
     expect(onRouteKeep).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('his ask shows where it is (R18 on 723648da)', () => {
+  it("asked, no word back yet: 'asked bise' dim with the ∿; the first words take its place", () => {
+    const ui = render(<Spotlight data={D} answer={{ text: '', done: false }} onAsk={vi.fn()} onOpen={vi.fn()} onClose={vi.fn()} />);
+    const a = ui.getByTestId('spot.answer');
+    expect(a.dataset.state).toBe('asked');
+    expect(a.className).toContain('note');
+    expect(a.textContent).toContain('asked bise · the answer shows here');
+    expect(ui.getByTestId('spot.answer.text.sign')).toBeTruthy();
+    ui.rerender(<Spotlight data={D} answer={{ text: 'The cold bench', done: false }} onAsk={vi.fn()} onOpen={vi.fn()} onClose={vi.fn()} />);
+    expect(ui.getByTestId('spot.answer').dataset.state).toBe('live');
+    expect(ui.getByTestId('spot.answer').className).not.toContain('note');
+    expect(ui.getByTestId('spot.answer').textContent).not.toContain('asked bise');
+  });
+
+  it('sent to another project: a dim line says where its answer is, no ∿', () => {
+    const ui = render(<Spotlight data={D} answer={{ text: "sent to telemetry · its answer is in telemetry's thread", done: true, note: true }} onAsk={vi.fn()} onOpen={vi.fn()} onClose={vi.fn()} />);
+    const a = ui.getByTestId('spot.answer');
+    expect(a.dataset.state).toBe('went');
+    expect(a.className).toContain('note');
+    expect(ui.queryByTestId('spot.answer.text.sign')).toBeNull();
   });
 });
 

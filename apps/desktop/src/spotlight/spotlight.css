@@ -2,6 +2,8 @@
    read). Tokens only. The panel grows with the content (Spotlight's onHeight). */
 .b-spotlight { width: 100%; }
 .b-spot-answer { padding: 4px 20px 12px 70px; font: var(--t-15)/1.5 var(--font-read); color: var(--c-text); white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+/* a line about the answer (asked, waiting for the first words; sent to another project): dim */
+.b-spot-answer.note { color: var(--c-text-2); }
 .b-live-pearl { flex: none; }
 .b-spot-route { display: flex; align-items: baseline; gap: 14px; padding: 4px 20px 10px 70px; font: var(--t-15)/1.4 var(--font-read); color: var(--c-text); }
 .b-spot-route .keep { margin-left: auto; padding: 0; border: 0; background: none; font: var(--t-12) var(--font-mono); color: var(--c-text-3); cursor: default; }

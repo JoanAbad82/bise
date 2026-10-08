@@ -8,7 +8,8 @@ import { InboxCard } from '@/inbox';
 import type { Card, HelperEv } from '@/proto';
 import { threadKey, useHeard, useLevel, useProjects, useStore } from '@/store';
 import { followPartial, type LivePartial } from '@/shared/partial';
-import type { SpotFront, SpotItem, SpotRoute } from '@/spotlight';
+import type { SpotAnswer, SpotFront, SpotItem, SpotRoute } from '@/spotlight';
+import { W } from '@/spotlight/words';
 import { useTheme } from '@/theme';
 import '@/ds/index.css';
 import { Capsule } from './Capsule';
@@ -96,7 +97,7 @@ export function CapsuleRoot(): JSX.Element {
   // bise's answer to what he asked: main's thread, subscribed in this window too (qa-flows: the
   // capsule's store never had it), streamed (typing) or arriving whole (a new agent entry after
   // his question)
-  const [last, setLast] = useState<{ text: string; done: boolean } | null>(null);
+  const [last, setLast] = useState<SpotAnswer | null>(null);
   const asked = useRef<{ after: number; started: boolean } | null>(null);
   // main's reply while it is written (the hub's partial, 250 ms at most; shared/partial.ts,
   // followed in the effect below): it shows from its first words, and the entry that lands after
@@ -159,7 +160,17 @@ export function CapsuleRoot(): JSX.Element {
     () =>
       store.onEvent((ev) => {
         if (ev.ev === 'route') setRoute({ project: ev.project, rid: ev.rid, to: ev.to, name: ev.name, until: ev.correct_until_ms });
-        else if (ev.ev === 'route_done') setRoute((r) => (r !== null && r.rid === ev.rid && r.project === ev.project ? null : r));
+        else if (ev.ev === 'route_done') {
+          setRoute((r) => (r !== null && r.rid === ev.rid && r.project === ev.project ? null : r));
+          // his ask went to another project's main: its answer is in that thread, never here
+          // (R18: the spot must say where it went, not wait on bise's own thread)
+          const a = asked.current;
+          if (a !== null && !a.started && ev.state === 'sent' && ev.to !== ev.project) {
+            asked.current = null;
+            const name = store.projects().find((p) => p.project === ev.to)?.name ?? ev.to;
+            setLast({ text: W.wentTo(name), done: true, note: true });
+          }
+        }
       }),
     [store],
   );
@@ -291,7 +302,8 @@ export function CapsuleRoot(): JSX.Element {
         const order = store.threadOrder(threadKey(home, 'main')).order;
         asked.current = { after: order.length === 0 ? -1 : Math.max(...order), started: false };
         store.send({ project: home, agent: 'main', text });
-        setLast(null);
+        // asked: the spot says so at once (∿), its first words take the line's place (R18)
+        setLast({ text: '', done: false });
       }}
       onNew={(brief) => {
         // amb-win's newAgent (the TUI's /new): bise's home names it from the brief; it shows in 'at work'

@@ -6,6 +6,7 @@
 // cuts with 'the rest in bise' (⏎ opens it in the window).
 import { memo, useDeferredValue, useEffect, useMemo, useRef, useState, type JSX, type KeyboardEvent, type ReactNode } from 'react';
 import { Spot, SpotGroup, SpotRow, type DotState } from '@/ds';
+import { cx } from '@/ds/cx';
 import { LivePearl, type Mood } from '@/pearl';
 import { flat, routeList, spotList, type AgentStatus, type SpotData, type SpotItem } from './list';
 import { W, newBrief } from './words';
@@ -19,8 +20,10 @@ const KEPT = 'spot';
 
 export interface SpotAnswer {
   readonly text: string;
-  /** bise is still writing it. */
+  /** bise is still writing it. An empty text not done: asked, no word back yet (W.asked shows). */
   readonly done: boolean;
+  /** a line about the answer, not the answer (dim): it went to another project's thread */
+  readonly note?: boolean;
 }
 
 /** A routing hold on what he just sent: bise picked `to`, he can change it until `until` (epoch ms). */
@@ -237,8 +240,11 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
       >
         {route !== null && <RouteLine route={route} onKeep={p.onRouteKeep} testId={`${testId}.route`} />}
         {ans !== null && (
-          <div className="b-spot-answer" data-testid={`${testId}.answer`} aria-live="polite">
-            <LiveText text={ans.shown} live={p.answer?.done === false} testId={`${testId}.answer.text`} />
+          // his ask shows it went (R18 on 723648da: the spot fell back to its list with no sign of
+          // the ask until a word came back): 'asked bise' with the ∿ until the first words, which
+          // take its place; an ask bise sent to another project says where its answer is
+          <div className={cx('b-spot-answer', (p.answer?.note === true || ans.shown === '') && 'note')} data-testid={`${testId}.answer`} data-state={p.answer?.note === true ? 'went' : ans.shown === '' ? 'asked' : p.answer?.done === false ? 'live' : 'done'} aria-live="polite">
+            <LiveText text={ans.shown === '' ? W.asked : ans.shown} live={p.answer?.done === false} testId={`${testId}.answer.text`} />
           </div>
         )}
         {/* one flat keyed list, the group heads as items: a row that stays listed keeps its element

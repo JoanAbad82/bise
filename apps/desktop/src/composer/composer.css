@@ -1,12 +1,18 @@
 /* The composer's own parts inside amb-kit's ComposerFrame: the field, its placeholder, the chips,
    the strip above the box and the @ $ / list. Tokens only (src/ds/tokens.css). */
 .b-composer .in { position: relative; }
+/* one line high when empty (designer's try gate D18): the frame's min-height 48 px is the box's
+   whole height (border-box: as content-box it made a 72 px box with the line at its bottom), and
+   the field's line gets 3 px above and below so one line is the send button's 28 px: empty or one
+   line, the text sits in the middle of a 52 px box; longer drafts grow with send at the bottom */
+.b-composer .box { box-sizing: border-box; }
+.b-composer .box .in { padding-block: 3px; }
 /* one frame (ambient m_10689): the box is the frame, the field inside it is borderless (not the
    design system's .b-field input frame) */
 .b-composer .in .b-field { display: block; height: auto; min-height: 1.45em; max-height: 40vh; overflow-y: auto; padding: 0; border-radius: 0; background: none; box-shadow: none; font: inherit; outline: 0; }
 .b-composer .in .b-field:focus-within { box-shadow: none; }
 .b-composer .b-field .p { margin: 0; }
-.b-composer .b-field-ph { position: absolute; inset: 0 auto auto 0; pointer-events: none; user-select: none; }
+.b-composer .b-field-ph { position: absolute; inset: 3px auto auto 0; pointer-events: none; user-select: none; }
 .b-composer .b-chip.paste, .b-composer .b-chip.quote, .b-composer .b-chip.image, .b-composer .b-chip.artifact { height: 20px; padding: 0 7px; margin: 0 1px; vertical-align: 1px; color: var(--c-accent); background: var(--c-accent-soft); }
 /* the TipTap field (pm/PmField.tsx, behind Composer.tsx ENGINE): its host adds no box; ProseMirror
    needs pre-wrap; the dictation's live words are dim with a pulsing dot, never a frame */

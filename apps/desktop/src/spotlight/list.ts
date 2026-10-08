@@ -1,5 +1,5 @@
 // The spotlight's list (desktop S8, v9; the capsule's spotlist.js, ported in behavior). Pure.
-// Empty: waiting for you (the cards), at work (working agents), environments (the projects, the
+// Empty: waiting for you (the cards), at work (working agents), projects (designer m_12805; the
 // one in front first; what's in front with no project gets its own dim row, no ⌘ number).
 // Typed: 1-2 words that name an agent or a project list those (⏎ opens the first); a sentence puts
 // 'ask bise' first and keeps the agents it names below.

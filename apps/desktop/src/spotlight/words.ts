@@ -7,7 +7,7 @@ export const W = {
   holdFn: 'hold fn to talk',
   waiting: 'waiting for you',
   atWork: 'at work',
-  envs: 'environments',
+  envs: 'projects',
   found: 'found',
   askBise: 'ask bise',
   /** a waiting row's own key, like the other rows' (ambient-pm's try gate): ⏎ answers it */
@@ -20,6 +20,10 @@ export const W = {
   keysEmpty: '⏎ open in bise   esc close',
   keysAsk: '⏎ send to bise   ↑↓ move   esc close',
   answerMore: 'the rest in bise   ⏎ open',
+  // his ask, before bise's first words (R18): it went, the answer comes here
+  asked: 'asked bise · the answer shows here',
+  // bise sent his ask to another project's thread: its answer is there, not here
+  wentTo: (name: string): string => `sent to ${name} · its answer is in ${name}'s thread`,
   // the routing hold (bar ⛔3, lead m_9855): bise picked the project, he has 2 s to change it;
   // the same words as the thread's hold (lead m_11564, e298b066: main is 'bise')
   routeTo: (name: string, s: number): string => (s > 0 ? `→ bise · ${name} · ${s} s to change` : `→ bise · ${name} · sending`),

@@ -39,6 +39,13 @@ test('spotlight/streaming: bise main\'s reply streams in, only new words fade, n
     await cap.keyboard.press('Enter');
     await core.waitCmd((c) => c['cmd'] === 'send' && c['agent'] === 'main');
 
+    // 0. his ask shows it went before any word comes back (R18 on 723648da: the spot fell back
+    // to its list with no sign of the ask): 'asked bise' with the '∿', in the answer's place
+    const answer = cap.locator('[data-testid="spot.answer"]');
+    await expect(answer, 'the ask shows at once, before bise answers').toHaveAttribute('data-state', 'asked', { timeout: 1000 });
+    await expect(answer).toContainText('asked bise');
+    await expect(cap.locator('[data-testid="spot.answer.text.sign"]'), "the '∿' while bise writes").toBeVisible();
+
     // 1. the first words, at once, with the sign and no caret
     await core.send(partial(A));
     const text = cap.locator('[data-testid="spot.answer.text"]');
