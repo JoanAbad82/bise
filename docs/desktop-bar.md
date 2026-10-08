@@ -431,6 +431,20 @@ A row stays even after it passes: it is a regression list.
         thinking (qa-native).
     - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
       dev tool (amb-web's list, or amb-home's commands).
+- **d94b7996, 10-08 (the third re-cut): R24 red, no try build yet.** The no-build proof is green
+  (up to date, the stamp untouched, nothing spawned, a clean `--stop`). qa-native reshot R03, R24
+  and R34 into `~/.bise/gate/try-gate/d94b7996/` (m_13172).
+  - **now ok:**
+    - R03: ⏎ on the spot's first waiting row opens "4 drafts wait for you" in place, with its
+      options (1 review, 2 send all 4) and "1 2 pick · ⏎ open in bise · esc later". esc goes back
+      to the list.
+    - R34: "no repos in this folder. choose a folder…, or continue without one."
+  - **red:** R24 (his bug 3, images). The hook staged checker.png, then a real ⌘V in the field gave
+    no image chip; the quote chip and dictation do show. So it isn't the 1×1 PNG. qa-native is
+    running amb-mac's composer/paste-image check on the same packed bundle, to tell the packed
+    app from its own sequence. Owner: amb-mac or amb-web, depending on what that run shows.
+  - Everything else stands as on 233c325a, signed by designer.
+
 - **233c325a, 10-08 (the second re-cut): 3 rows open, not signed yet, no try build yet.** The
   `--try` no-build proof is green. qa-native reshot the touched rows into
   `~/.bise/gate/try-gate/233c325a/`; qa-flows' app/clicks is green on this sha.
