@@ -40,7 +40,7 @@ export const KEY_SECTIONS: readonly KeySection[] = [
       { keys: '⌘F', action: 'find in the thread', tui: 'ctrl+f' },
       { keys: '⌘D', action: "the agent's changes", tui: '/diff' },
       { keys: '⌘⇧A', action: 'the artifacts', tui: '/artifacts' },
-      { keys: '⌘E', action: 'unfold / fold everything' },
+      { keys: '⌘E', action: 'unfold / fold everything', tui: 'ctrl+o' },
       { keys: '⌘,', action: 'settings' },
       { keys: '⌘/', action: 'this list', tui: '/shortcuts' },
     ],
@@ -67,6 +67,8 @@ export const KEY_SECTIONS: readonly KeySection[] = [
     title: 'the inbox',
     rows: [
       { keys: '↑ ↓', action: 'the previous / next item' },
+      { keys: 'ctrl+p / ctrl+n', action: 'the previous / next item, round from the last to the first' },
+      { keys: 'ctrl+o', action: "open the item's folded lines" },
       { keys: '← →', action: "walk the item's options" },
       { keys: '1 … 9', action: 'pick that option' },
       { keys: '⏎', action: 'pick the option on, or send your typed answer' },

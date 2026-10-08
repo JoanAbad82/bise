@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Card } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
 import { cardKey, sortCards } from './order';
-import { current, prune, START, step, visible, type InboxState, type Key } from './model';
+import { current, prune, START, step, visible, withConfirmOptions, type InboxState, type Key } from './model';
 
 const card = (id: number, kind: string, rank: number | undefined, since_ms: number, project = 'acme', extra: Partial<Card> = {}): Card => ({
   id,
@@ -124,5 +124,32 @@ describe('keys', () => {
     expect(prune(s, list)).toBe(s);
     const later = prune(s, list.slice(1));
     expect(later.gone.size).toBe(0);
+  });
+});
+
+describe("a gated call (the hub's confirm card) gets the TUI's options (qa-flows O.1 on the real core)", () => {
+  const gate = (question: string) =>
+    ({ id: 4, project: 'shop-0feaf4e7', kind: 'confirm', rank: 0, agent: 'main', question, options: [], urgent: true, since_ms: 1 }) as Card;
+  it('a hard rule: allow (1) and no (3), answered by an option', () => {
+    const c = withConfirmOptions(gate('wants to run\n| git push --force /x HEAD:y\nreason: it rewrites the history of y. this one always asks.'));
+    expect(c.options).toEqual([
+      { n: 1, label: 'allow' },
+      { n: 3, label: 'no' },
+    ]);
+    expect(c.approval).toBe(true);
+  });
+  it('rules named: always allow <rules> here is 2; a sandbox rerun says so', () => {
+    expect(withConfirmOptions(gate('wants to run\n| make\nalways: make')).options.map((o) => o.label)).toEqual(['allow', 'always allow make here', 'no']);
+    expect(withConfirmOptions(gate('wants to run it outside the sandbox\n| make\nalways: make')).options.map((o) => o.label)).toEqual([
+      'run it again without the sandbox',
+      'always run it outside the sandbox here',
+      'no',
+    ]);
+  });
+  it('a card with options, or another kind, is left as is', () => {
+    const q = { ...gate('which?'), kind: 'question', options: [{ n: 1, label: 'a' }] };
+    expect(withConfirmOptions(q)).toBe(q);
+    const withOpts = { ...gate('wants to run\n| ls'), options: [{ n: 1, label: 'yes' }] };
+    expect(withConfirmOptions(withOpts)).toBe(withOpts);
   });
 });

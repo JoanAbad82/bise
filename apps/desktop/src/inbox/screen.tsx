@@ -12,13 +12,15 @@ import { useProjects, useStore, useVoiceAnswer } from '@/store';
 import { useRouter } from '@/app/router';
 import { Inbox } from './Inbox';
 import { InboxStrip } from './Strip';
+import { withConfirmOptions } from './model';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
 
 /** Every project's cards, and each project's name, from the projects rows. */
 export function inboxOf(rows: readonly ProjectRow[]) {
   return {
-    cards: rows.flatMap((r) => r.cards ?? []),
+    // a gated call's options are the TUI's (the hub sends none): withConfirmOptions
+    cards: rows.flatMap((r) => (r.cards ?? []).map(withConfirmOptions)),
     names: Object.fromEntries(rows.map((r) => [r.project, r.name])),
     homes: new Set(rows.filter((r) => r.home).map((r) => r.project)),
   };
@@ -68,7 +70,7 @@ export function ThreadInbox({ project }: { project: string }) {
   const store = useStore();
   const router = useRouter();
   const row = rows.find((r) => r.project === project);
-  const cards = useMemo(() => row?.cards ?? [], [row]);
+  const cards = useMemo(() => (row?.cards ?? []).map(withConfirmOptions), [row]);
   const inView = useCallback(
     (c: { project: string; card: number } | null) => {
       store.cardInView(c?.project ?? null, c?.card ?? null);

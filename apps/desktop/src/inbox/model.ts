@@ -129,3 +129,26 @@ function leave(s: InboxState, list: readonly Card[], c: Card): InboxState {
   gone.add(cardKey(c));
   return { cur: next ? cardKey(next) : null, hl: null, gone };
 }
+
+/**
+ * A gated call (the hub's `confirm` card: 'wants to run', '| <command>', 'reason: …', 'always: …')
+ * comes with no options: they are the TUI's (sb/cards.rs confirm_shape): allow, always allow <rules>
+ * here (only when the hub names rules), no; 'no' is always 3, a hard rule has no 2. The hub's gate
+ * reads 1 / 2 / 3 (daemon/gate.rs answer_of). It is answered by an option, never words. Pure.
+ */
+export function withConfirmOptions(c: Card): Card {
+  if (c.kind !== 'confirm' || c.options.length > 0) return c;
+  const lines = c.question.split('\n');
+  const head = lines[0] ?? '';
+  const always = lines.flatMap((l) => (l.startsWith('always: ') ? [l.slice('always: '.length)] : []));
+  const body = lines.flatMap((l) => (l.startsWith('|') ? [l.replace(/^\| ?/, '')] : []));
+  const rerun = head.endsWith('outside the sandbox');
+  const rules = always.join(', ');
+  const alwaysLabel = !rerun ? `always allow ${rules} here` : rules === body.join('\n').trim() ? 'always run it outside the sandbox here' : `always run ${rules} outside the sandbox here`;
+  const options = [
+    { n: 1, label: rerun ? 'run it again without the sandbox' : 'allow' },
+    ...(always.length > 0 ? [{ n: 2, label: alwaysLabel }] : []),
+    { n: 3, label: 'no' },
+  ];
+  return { ...c, options, approval: true };
+}
