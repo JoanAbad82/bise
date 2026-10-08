@@ -480,8 +480,9 @@ A row stays even after it passes: it is a regression list.
       - Tool rows show raw JSON, `± edit: {"file_path":"panels.md"}`. Same class as D14 and his "je
         vois du XML rendu"; it should read "± edit panels.md" (amb-home, with D15).
       - R07-a: an agent selected in the spot shows its objective, not its last actions on the
-        right (amb-web). It was never built rather than broken; ambient-lead says whether it
-        blocks.
+        right (amb-web). It was never built rather than broken. **Not blocking** (ambient-lead
+        m_12812): it goes to the next round, and the try's notes to main say "not in this build".
+        Raw tool JSON goes to amb-home with D14/D15; R18 and `/theme` go to amb-web.
       - Maybe 2.1: `/theme` left the window light, with data-theme unset, while the composer's tip
         promises that it switches. A red if the driver typed it right; asked qa-native.
     - **nit:** the spot's section head says "ENVIRONMENTS"; it should say "projects", like the sidebar
