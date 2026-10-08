@@ -484,6 +484,15 @@ isn't judging. A row marked ok names the shot that was looked at.
       message, and nothing merges.
     - If cb1f2b44, his current build, has it too (amb-home checks the code), main tells him
       today: on a merge or try card, pick 1 or 2; don't type.
+    - **Correction** (amb-home m_14043 via ambient-lead m_14048): the card is a choice of kind
+      "merge", not an approval. sb-core acts only on a digit, and typed words go to main, so a
+      typed line could never merge anything. No safety note to him is needed, for cb1f2b44 or any
+      other build.
+    - The red that stays is the window's flow: it took typed text, with an image, as the card's
+      answer and closed the card. amb-home fixes it for every choice kind (merge, feature_try,
+      feature_merge, update, signin), as the TUI's choice_kind does: words go as a plain message,
+      the label reads "to bise · the merge waits for 1 or 2", the card says "pick 1 or 2", and the
+      label fits on one line. It rides the re-cut with R36 (a) and R17 (b).
 
 - **cb1f2b44, 10-08: red, no try build.** The no-build proof is green. qa-native shot the touched
   rows and R41 into `~/.bise/gate/try-gate/cb1f2b44/` (m_13848). ambient-pm looked at the shots as
