@@ -300,9 +300,8 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       } else note('R24', 'no answer paragraph to select');
       // the image: a PNG staged on the app's private test clipboard (amb-mac 3d49e9b1: __biseTestClip, test mode
       // only), then a real ⌘V in the field
-      const png = path.join(w.home, 'tmp', 'qa-native-paste.png');
-      mkdirSync(path.dirname(png), { recursive: true });
-      writeFileSync(png, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64'));
+      // the same PNG as amb-mac's composer/paste-image check (a 1x1 PNG made no chip on 233c325a)
+      const png = path.join(__dirname, '../fixtures/checker.png');
       const staged = await s.app.evaluate((_e, file) => (globalThis as unknown as { __biseTestClip?: (c: { file: string }) => Promise<boolean> }).__biseTestClip?.({ file }) ?? Promise.resolve(false), png);
       note('R24', `image staged on the test clipboard: ${String(staged)}`);
       await field.click();
@@ -314,7 +313,7 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       await shot('R24', 'R24', p);
       row('R15').files.push('R24.png');
       const chips = await p.locator('[data-testid="composer"] [data-testid*="chip"]').evaluateAll((es) => es.map((e) => `${e.getAttribute('data-testid') ?? ''}:${(e.textContent).trim().slice(0, 30)}`));
-      note('R24', `chips in the composer: ${chips.join(' | ') || 'none'}`);
+      note('R24', `chips in the composer: ${chips.join(' | ') || 'none'}; image chips: ${String(await p.locator('[data-testid^="composer.chip."][data-kind="image"]').count())}`);
       note('R15', 'same shot as R24 (image pasted, quote by Space on a selection, ctrl+r dictation); its chips are listed under R24');
       await p.keyboard.press('Control+r');
       await p.keyboard.press('Meta+a');
@@ -397,6 +396,57 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       await sleep(3500);
       await shot('ASK-designer-2', 'R40-redo-done', p);
       note('ASK-designer-2', 'R40 redo: reply streamed in 12 deltas 250 ms apart (fake script stream key); frames 1-6 from the first words on, ~150 ms apart plus the shot time; -done after the stream');
+    });
+
+    // ---- designer's D rows on the re-cut (docs/desktop-bar.md run log; ambient-lead m_12945)
+    const mainText = (): Promise<string> => p.getByTestId('thread.list').innerText().catch(() => '');
+    await each('D12', async () => {
+      await go(s, `project/${tel}`);
+      await shot('D12', 'D12-sidebar', p, { clip: { x: 0, y: 0, width: 260, height: 760 } });
+      const side = await p.getByTestId('app.sidebar').innerText();
+      note('D12', `sidebar rows ending in a bare '0%': ${String((side.match(/\b0%/g) ?? []).length)}`);
+    });
+    await each('D7b', async () => {
+      for (const px of [1100, 800]) {
+        await go(s, 'bise');
+        await width(s, px);
+        await shot('D7b', `D7b-D3b-bise-${String(px)}`, p);
+        const head = await p.evaluate(() => {
+          const main = document.querySelector('[data-testid="app.main"]');
+          const pearl = main?.querySelector('[data-testid="pearl"], [data-testid*="pearl"]');
+          const r = pearl?.getBoundingClientRect();
+          // the head is the pearl's own block (its parent holds the name and the 'every project' line)
+          const h = pearl?.parentElement;
+          return { pearl: r ? `${String(Math.round(r.width))}x${String(Math.round(r.height))} at ${String(Math.round(r.x))},${String(Math.round(r.y))}` : 'none', head: (h instanceof HTMLElement ? h.innerText : '').replace(/\s+/g, ' ').trim().slice(0, 80) };
+        });
+        note('D7b', `at ${String(px)}: head text ${JSON.stringify(head.head)}; head pearl ${head.pearl} (D3b wants 14 px)`);
+      }
+      await width(s, 1100);
+    });
+    await each('D14', async () => {
+      await go(s, `project/${shop}`);
+      await sleep(800);
+      await shot('D14', 'D14-shop-thread', p);
+      note('D14', `raw '[report:' text in shop's thread: ${String((await mainText()).includes('[report:'))}`);
+    });
+    await each('D15', async () => {
+      await go(s, `agent/${tel}/dashboards`);
+      await sleep(1000);
+      await shot('D15', 'D15-dashboards-tools', p);
+      const t = await mainText();
+      note('D15', `'$ bash: bash' (one bash too many): ${String(t.includes('bash: bash'))}; raw tool JSON ('{"file_path"'): ${String(t.includes('{"file_path"'))}`);
+    });
+    await each('D18', async () => {
+      await go(s, `project/${shop}`);
+      const geo = await field.evaluate((el) => {
+        let e: Element | null = el;
+        while (e && !e.querySelector('[data-testid="composer.send"]')) e = e.parentElement;
+        const box = (e ?? el).getBoundingClientRect();
+        const f = el.getBoundingClientRect();
+        return { box: { x: box.x, y: box.y, width: box.width, height: box.height }, field: { top: f.top - box.top, height: f.height } };
+      });
+      await shot('D18', 'D18-empty-composer', p, { clip: { x: geo.box.x - 10, y: geo.box.y - 30, width: geo.box.width + 20, height: geo.box.height + 60 } });
+      note('D18', `empty composer box ${String(Math.round(geo.box.height))} px tall; the field (placeholder) sits ${String(Math.round(geo.field.top))} px from its top, ${String(Math.round(geo.field.height))} px tall`);
     });
 
     // ---- ambient-pm's asks on the window (m_12768, m_12769, m_12771, m_12772)
@@ -519,6 +569,24 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       await shot('R18', 'R18-window-bise', p);
       note('R18', `the 52-line answer in bise's thread: ${(await p.getByTestId('thread.list').innerText().catch(() => '')).includes('Notification rollout') ? 'yes' : 'no'}`);
       note('R18', `asked in the spot; the fake model answers ${String(body.length)} lines of markdown; capsule ${JSON.stringify(await s.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().includes('surface=capsule'))?.getBounds()))}, its view: ${await cap.getByTestId('capsule').getAttribute('data-view').catch(() => '?')}`);
+      await hide();
+      // end to end again after the window went to settings and back (ambient-lead m_12945)
+      await go(s, 'settings');
+      await go(s, 'bise');
+      await spot();
+      await cap.keyboard.type(phrase);
+      await cap.keyboard.press('Enter');
+      await sleep(8000);
+      await shot('R18', 'R18-after-settings', cap, { omitBackground: true });
+      note('R18', `after the window went to settings and back, the same ask: capsule view ${await cap.getByTestId('capsule').getAttribute('data-view').catch(() => '?')}, the answer drawn in it: ${String((await cap.getByTestId('capsule').innerText().catch(() => '')).includes('Notification rollout'))}`);
+      await hide();
+    });
+    // the spot's section heads (designer: 'projects', not 'environments')
+    await each('SPOT-heads', async () => {
+      await spot();
+      await shot('SPOT-heads', 'spot-heads', cap, { omitBackground: true });
+      const heads = await cap.evaluate(() => Array.from(document.querySelectorAll('h2, h3, [class*="head"], [class*="section"]'), (e: Element) => e.textContent.trim()).filter((t) => t !== '' && t.length < 30 && t === t.toUpperCase()));
+      note('SPOT-heads', `section heads: ${[...new Set(heads)].join(', ') || '(read from the shot)'}`);
       await hide();
     });
     // R08's spoken ask, about three lines long, heard through the core's real talk path
