@@ -188,6 +188,12 @@ pub enum Rec {
     /// steering or a notification the core committed (`history
     /// injected : …`, unescaped)
     Injected(String),
+    /// `partial #<call>.<attempt> +<offset> : <text>`: the answer as it
+    /// streams in (bend/runtime/live-pure.bend), the text since the last
+    /// partial, escaped as on the wire; `off` counts the escaped chars
+    /// this block already sent. Never journaled: the hub keeps the whole
+    /// text in memory ([`Partial`]).
+    Partial { call: String, off: usize, text: String },
     /// any other line (the next line of a message)
     Raw(String),
 }
@@ -345,6 +351,9 @@ pub fn read(line: &str) -> Rec {
     if let Some(r) = line.strip_prefix("subtool ") {
         return sub(r).unwrap_or(Rec::Dropped);
     }
+    if let Some(r) = line.strip_prefix("partial #") {
+        return partial(r).unwrap_or(Rec::Dropped);
+    }
     if let Some(r) = line.strip_prefix("core rejected: ") {
         return Rec::Rejected(r.to_string());
     }
@@ -371,6 +380,85 @@ fn tool(r: &str) -> Option<Rec> {
     let (id, rest) = r.split_once(' ')?;
     let (name, args) = rest.split_once(" : ").unwrap_or((rest, ""));
     Some(Rec::Tool { id: id.parse().ok()?, name: name.trim().to_string(), args: args.to_string() })
+}
+
+fn partial(r: &str) -> Option<Rec> {
+    let (head, text) = r.split_once(" : ").or_else(|| r.strip_suffix(" :").map(|h| (h, "")))?;
+    let (call, off) = head.split_once(" +")?;
+    if call.is_empty() || call.contains(' ') {
+        return None;
+    }
+    Some(Rec::Partial { call: call.to_string(), off: off.parse().ok()?, text: text.to_string() })
+}
+
+/// The live answer of one agent, as the hub keeps it: its call
+/// (`<call>.<attempt>`) and the escaped text of the block in progress.
+/// A delta whose offset doesn't match drops the block's partials until
+/// the next block (a new call, or offset 0), never a guess.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Partial {
+    pub call: String,
+    esc: String,
+    len: usize,
+    broken: bool,
+}
+
+/// What a `partial` line did to the live answer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PartialStep {
+    /// the whole text so far, unescaped: send it
+    Text(String),
+    /// an offset that doesn't match (the first one of the block): its
+    /// log line; later ones of the block are dropped silently
+    Mismatch { call: String, off: usize, have: usize },
+    /// dropped (a block already broken)
+    Drop,
+}
+
+impl Partial {
+    /// The whole text so far, unescaped ("" while the block is dropped).
+    pub fn text(&self) -> String {
+        if self.broken {
+            String::new()
+        } else {
+            unescape(&self.esc)
+        }
+    }
+
+    /// One `partial` line into the live answer.
+    pub fn step(&mut self, call: &str, off: usize, text: &str) -> PartialStep {
+        if off == 0 {
+            *self = Partial { call: call.to_string(), esc: String::new(), len: 0, broken: false };
+        } else if self.broken && self.call == call {
+            return PartialStep::Drop;
+        } else if self.call != call || off != self.len {
+            let have = if self.call == call { self.len } else { 0 };
+            *self = Partial { call: call.to_string(), esc: String::new(), len: 0, broken: true };
+            return PartialStep::Mismatch { call: call.to_string(), off, have };
+        }
+        self.esc.push_str(text);
+        self.len += text.chars().count();
+        PartialStep::Text(unescape(&self.esc))
+    }
+}
+
+/// The lines that end an agent's live answer: its answer came (the
+/// assistant line), the turn ended (done, failed, interrupted, stalled),
+/// a stop, the candidate was thrown away, a retry or a restart starts
+/// another attempt. One rule for the hub and the TUI.
+pub fn clears_partial(rec: &Rec) -> bool {
+    matches!(
+        rec,
+        Rec::Obs(
+            Obs::Assistant(_)
+                | Obs::TurnDone(_)
+                | Obs::TurnStalled(_)
+                | Obs::CandidateDiscarded(_)
+                | Obs::ProviderRetry(_)
+                | Obs::HarnessRestarted(_)
+        ) | Rec::Hub(Hub::Stopped(_))
+            | Rec::Idle
+    )
 }
 
 fn intent(r: &str) -> Option<Rec> {

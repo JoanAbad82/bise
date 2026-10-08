@@ -84,6 +84,11 @@ pub enum HubEv {
     Entry { project: Project, agent: String, entry: Box<Entry> },
     /// a subscribed agent's current step ("" when its turn ends)
     Typing { project: Project, agent: String, text: String },
+    /// a subscribed agent's answer as it streams in (at most ~4 a
+    /// second): `call` its `<call>.<attempt>`, `text` the WHOLE text so
+    /// far (replace, never append); "" when it ends (its entry came, the
+    /// turn ended, a stop, an error, a retry)
+    Partial { project: Project, agent: String, call: String, text: String },
     /// every artifact of the project, at hello and on change; `new`: made
     /// or changed since he last looked (`artifacts_seen` clears it)
     /// `seen_ms`: when he last looked (an item's `new` is after it, not
@@ -347,7 +352,7 @@ pub enum HubEv {
 }
 
 impl HubEv {
-    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "pages", "page_changed", "card_open", "focused", "approvals", "notice", "refused", "error"];
+    pub const TAGS: &'static [&'static str] = &["welcome", "agents", "cards", "thread", "entry", "typing", "partial", "artifacts", "scheduled", "worktrees", "dev_servers", "merged", "features", "prs", "models", "tool_out", "queued_taken", "log", "diff", "branches", "versions", "release", "update", "route", "route_done", "jobs", "job_end", "followed_end", "confirm", "flow", "pages", "page_changed", "card_open", "focused", "approvals", "notice", "refused", "error"];
 
     pub fn decode(line: &str) -> Result<HubEv, String> {
         Self::from_value(parse(line)?)

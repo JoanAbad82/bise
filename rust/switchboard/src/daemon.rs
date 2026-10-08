@@ -309,6 +309,9 @@ struct Shell {
     /// Restarted by a switch: their greeting (restored history) is not
     /// news for the feeds.
     restored: BTreeSet<String>,
+    /// Each agent's answer as it streams in (its `partial` lines, by
+    /// name): memory only, never journaled (daemon/lines.rs).
+    partials: BTreeMap<String, bise_proto::thread::lines::Partial>,
     /// Versions being built (`/version <commit>`), by revision.
     building: BTreeSet<String>,
     /// The `/update` build in bise's source tree (dev-update): HEAD's
@@ -844,6 +847,9 @@ impl Shell {
         for e in events {
             self.broadcast(&e);
         }
+        // after the line: a client that draws the final entry and the
+        // cleared live text in one frame never shows a gap (no jump)
+        self.partial_clear(name, line);
     }
 
     /// One hub event to every client: its typed form (`proto_on`); its
@@ -1609,6 +1615,10 @@ impl Shell {
             return;
         }
         self.recycle_line(dir, line);
+        // the answer as it streams in: memory and clients, never the feed
+        if line.starts_with("partial #") {
+            return self.on_partial(&name, line);
+        }
         if self.restored.contains(dir) {
             if line.contains("obs: session_restored") {
                 self.restored.remove(dir);
@@ -2031,6 +2041,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         switching: BTreeMap::new(),
         switch_spawned: BTreeSet::new(),
         restored: BTreeSet::new(),
+        partials: BTreeMap::new(),
         building: BTreeSet::new(),
         updating: None,
         release: None,

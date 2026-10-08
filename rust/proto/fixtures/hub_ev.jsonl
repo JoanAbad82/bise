@@ -28,6 +28,8 @@
 {"ev":"entry","project":"acme-1a2b3c4d","agent":"perf","entry":{"pos":35,"at_ms":1791100035000,"kind":"wake","text":"cargo test ended · rc 101 · after 3m10s","wake":{"id":3,"ev":"ended","kind":"bg","what":"cargo test","rc":101,"after_ms":190000,"tail":["test cart::total ... FAILED","test result: FAILED. 210 passed; 2 failed"],"msg":57}}}
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":"running the tests"}
 {"ev":"typing","project":"acme-1a2b3c4d","agent":"perf","text":""}
+{"ev":"partial","project":"acme-1a2b3c4d","agent":"perf","call":"17.0","text":"the tests pass:\n- one"}
+{"ev":"partial","project":"acme-1a2b3c4d","agent":"perf","call":"17.0","text":""}
 {"ev":"confirm","project":"acme-1a2b3c4d","id":3,"text":"@perf is working: archive it anyway? (y/n)"}
 {"ev":"approvals","project":"acme-1a2b3c4d","mode":"auto","env":false,"checker":"jev","checker_who":"TypeSafe","checker_model":"jev-1.13","repo":"/Users/me/acme","rules":[{"tool":"bash","pattern":"cargo test *","project":"/Users/me/acme","added":"1791100000000","from":"card #3, perf","added_ms":1791100000000,"what":"cargo test *","note":"from perf"},{"tool":"edit","path":"/Users/me/notes","sandbox":false,"what":"edits to ~/notes","note":"every project · outside the sandbox"}],"flash":true}
 {"ev":"approvals","project":"acme-1a2b3c4d","mode":"yolo","env":true,"checker":"off","checker_who":"","repo":"/Users/me/acme","rules":[]}

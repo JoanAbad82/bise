@@ -27,4 +27,41 @@ impl Shell {
         }
         (out, events)
     }
+
+    /// A `partial` line of `name`: the delta onto its live answer, the
+    /// whole text so far to every client (`partial` event; typed
+    /// connections subscribed to it get HubEv::Partial). A delta whose
+    /// offset doesn't match drops the block (one hub.log line).
+    pub(super) fn on_partial(&mut self, name: &str, line: &str) {
+        use bise_proto::thread::lines::{read, PartialStep, Rec};
+        let Rec::Partial { call, off, text } = read(line) else { return };
+        let p = self.partials.entry(name.to_string()).or_default();
+        match p.step(&call, off, &text) {
+            PartialStep::Text(t) => self.broadcast(&partial_event(name, &call, &t)),
+            PartialStep::Mismatch { call, off, have } => {
+                log_line(&self.opts.paths, &format!("partial of {name} #{call} dropped: offset {off}, the hub has {have}"));
+                // a client keeps no stale text meanwhile
+                self.broadcast(&partial_event(name, &call, ""));
+            }
+            PartialStep::Drop => {}
+        }
+    }
+
+    /// A feed line that ends `name`'s live answer (its entry, the turn's
+    /// end, a stop, a discarded candidate, a retry: lines::clears_partial,
+    /// one rule): cleared once, "" to every client.
+    pub(super) fn partial_clear(&mut self, name: &str, line: &str) {
+        use bise_proto::thread::lines::{clears_partial, read};
+        if !self.partials.contains_key(name) || !clears_partial(&read(line)) {
+            return;
+        }
+        if let Some(p) = self.partials.remove(name) {
+            self.broadcast(&partial_event(name, &p.call, ""));
+        }
+    }
+}
+
+/// The `partial` event (C2): the whole text so far, "" when it ended.
+pub(super) fn partial_event(agent: &str, call: &str, text: &str) -> Value {
+    json!({"ev": "partial", "agent": agent, "call": call, "text": text})
 }

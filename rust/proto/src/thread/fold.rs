@@ -292,7 +292,8 @@ impl Fold<'_> {
         let id_you = self.id_you.take();
         let route = self.route.take();
         match rec {
-            Rec::Empty | Rec::Idle | Rec::Fact => return,
+            // a partial is live only (the hub's memory), never an entry
+            Rec::Empty | Rec::Idle | Rec::Fact | Rec::Partial { .. } => return,
             Rec::Raw(_) => {}
             _ => self.cont = None,
         }

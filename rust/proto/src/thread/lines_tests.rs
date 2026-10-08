@@ -174,3 +174,50 @@ fn an_old_wake_still_reads() {
         assert_eq!(timer_wake(not), None, "{not}");
     }
 }
+
+#[test]
+fn partial_lines_read_as_deltas() {
+    assert_eq!(read("partial #17.0 +0 : Hel"), Rec::Partial { call: "17.0".into(), off: 0, text: "Hel".into() });
+    assert_eq!(read("partial #17.1 +3 : a\\nb : c"), Rec::Partial { call: "17.1".into(), off: 3, text: "a\\nb : c".into() });
+    assert_eq!(read("partial #17.0 +0 :"), Rec::Partial { call: "17.0".into(), off: 0, text: String::new() });
+    assert_eq!(read("partial #17.0 +x : y"), Rec::Dropped);
+    assert_eq!(read("partial #17.0 : y"), Rec::Dropped);
+}
+
+// the hub's live answer: deltas append (offsets in escaped chars), a new
+// block or call starts again, a mismatch drops the block until the next
+#[test]
+fn partial_appends_checks_and_restarts() {
+    let mut p = Partial::default();
+    assert_eq!(p.step("1.0", 0, "a\\n"), PartialStep::Text("a\n".into()));
+    assert_eq!(p.step("1.0", 3, "é"), PartialStep::Text("a\né".into()));
+    // a gap: the first mismatch is logged, the rest of the block dropped
+    assert_eq!(p.step("1.0", 9, "x"), PartialStep::Mismatch { call: "1.0".into(), off: 9, have: 4 });
+    assert_eq!(p.step("1.0", 10, "y"), PartialStep::Drop);
+    // the next block (offset 0) streams again
+    assert_eq!(p.step("1.0", 0, "b"), PartialStep::Text("b".into()));
+    // a retry is another call: it replaces the text
+    assert_eq!(p.step("1.1", 0, "c"), PartialStep::Text("c".into()));
+    // another call that doesn't start at 0: dropped, never glued on
+    assert!(matches!(p.step("2.0", 1, "d"), PartialStep::Mismatch { have: 0, .. }));
+}
+
+// every clear reason ends the live answer; a tool line or usage doesn't
+#[test]
+fn partial_clears_on_every_end() {
+    for l in [
+        "  obs: assistant: hi",
+        "  obs: turn_done: completed",
+        "  obs: turn_done: failed: boom",
+        "  obs: turn_done: interrupted",
+        "  obs: candidate_discarded: empty",
+        "  obs: provider_retry: 2/10 · 529 · retry in 4s",
+        "sb stopped : by the user",
+        "--- idle",
+    ] {
+        assert!(clears_partial(&read(l)), "{l}");
+    }
+    for l in ["  obs: usage: model=m in=1 out=2", "tool #3 bash : ls", "partial #1.0 +0 : x", "  obs: turn_started"] {
+        assert!(!clears_partial(&read(l)), "{l}");
+    }
+}
