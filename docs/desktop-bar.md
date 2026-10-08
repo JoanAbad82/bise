@@ -431,6 +431,43 @@ A row stays even after it passes: it is a regression list.
         thinking (qa-native).
     - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
       dev tool (amb-web's list, or amb-home's commands).
+- **233c325a, 10-08 (the second re-cut): 3 rows open, not signed yet, no try build yet.** The
+  `--try` no-build proof is green. qa-native reshot the touched rows into
+  `~/.bise/gate/try-gate/233c325a/`; qa-flows' app/clicks is green on this sha.
+  - **now ok:**
+    - D12: no bare "0%" in the sidebar.
+    - D7b, D3b: "bise · every project" with its 14 px pearl at 1100 and 800.
+    - D14: no raw "[report:".
+    - D15: no "bash: bash" and no raw tool JSON.
+    - The spot's heads: "waiting for you", "at work", "projects".
+    - R18: a spot ask shows the 52-line answer in the capsule, readable, with "the rest in bise ⏎
+      open". It still does after the window went to settings and back.
+    - Dark: `/theme dark` and settings both work.
+    - The rest of the rows stand as on 723648da.
+  - **open** (one more re-cut):
+    - R03: ⏎ on a waiting row in the spot closes the capsule, and nothing opens to answer
+      (amb-web).
+    - R34: setup's "your projects" with no repo reads 'no repo matches "". choose a folder…, or
+      clear the filter' on an empty filter. Its lead line also says "i found these repos in your
+      folder" when it found none (amb-home). The overflow and the search can't be judged: the
+      harness home has no repos.
+    - R24's image: not proven, because the driver's 1×1 PNG made no chip. Rerun with checker.png
+      (qa-native).
+  - **designer: SIGNED** (m_13005): every row and every screen in the set, D18 included (the
+    composer is 52 px, with the placeholder centred). D14 now reads as a pink status line, "gift-ui:
+    blocked · waiting for your answer".
+  - **designer's nits for the next cut; none blocks this try:**
+    - N1: the agent head reads "dashboards t. idle 262k · high · yolo": role first, "context 262k",
+      and "high · yolo" out of the head (amb-home).
+    - N2: "◷ ‣ main scheduled #1 for…" has two glyphs and an internal "#1" (amb-home).
+    - N3: the blocked status line is indented ~36 px under a list (amb-home).
+    - N4: in the spot's project rows, the path eats the agent count (amb-web).
+    - N5: the copy of R34's empty state (see above).
+  - **R34's copy does not block this try:** ambient-pm agrees with designer, because his folder has
+    repos. It is fixed before the public.
+  - **not in this build:** R40 (no partial events yet) and R07-a (the spot's preview, next
+    round).
+
 - **723648da, 10-08 (the re-cut with every fix): red, not signed, no try build.** `--try` opens with
   no build step. The world is e9c09378's, with real answers and 30 agents. The shots are in
   `~/.bise/gate/try-gate/723648da/`.
