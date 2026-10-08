@@ -868,7 +868,7 @@ def run(fuel: Nat, out: Pv.Out, +rt: Rtp.Rt, +job: Rtp.Job, tr: Rtp.Trans) -> IO
                       do IO<RtEnd>:
                         out2 : Pv.Out <- Dr.emit(out, lines)
                         run(k, out2, rt2, job2, Rtp.transition(rt2, job2))
-                    case Rtp.EModel{+action, +request, +after}:
+                    case Rtp.EModel{+action, +request, +after, +live}:
                       # the real provider call (the hub HTTP client);
                       # the side channel is drained before the result is
                       # applied, so steering sent during the call enters
@@ -878,7 +878,7 @@ def run(fuel: Nat, out: Pv.Out, +rt: Rtp.Rt, +job: Rtp.Job, tr: Rtp.Trans) -> IO
                         +ctx : String <- context_now()
                         +req2 : String <- retool_now(Rtp.rt_tools(rt2), request)
                         nr : Pv.Out & Rem.RemoteRes <- Pv.model_call.req(
-                          out, Rem.with_context(ctx, req2), action)
+                          out, Rem.with_context(ctx, req2), action, live)
                         model_back(nr, rt2, k, action, after,
                           k2 => o3 => +r3 => +c =>
                             run(k2, o3, r3, Rtp.JCmd{c, after},

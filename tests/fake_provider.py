@@ -48,6 +48,10 @@ the injected <bise_state> block is not one):
   in two in the middle (inside an event), S seconds between the halves;
   the log line has its sha256 (`split_sha`): the client must read it
   byte for byte across a pause longer than its quiet slice (issue 13);
+- `[[pieces: N S]]` (streamed): the whole streamed body re-cut every N
+  bytes, S seconds between the pieces, whatever the events: an event
+  split across pieces, an event boundary (and a block's) inside one. The
+  answer streams in slowly (the partial lines, runtime/live-pure.bend);
 - `[[fixture: NAME]]`: the first request for that message is answered
   with the recorded file tests/providers/<family>/NAME.sse (streamed) or
   NAME.json (whole), or NAME.<status>.json (an error with that status),
@@ -102,6 +106,7 @@ FIXTURE = re.compile(r"\[\[fixture: ([\w.-]+)\]\]")
 SLOW = re.compile(r"\[\[slow: ([\d.]+)\]\]")
 DRIP = re.compile(r"\[\[drip: (\d+) ([\d.]+)\]\]")
 SPLIT = re.compile(r"\[\[split: ([\d.]+)\]\]")
+PIECES = re.compile(r"\[\[pieces: (\d+) ([\d.]+)\]\]")
 PLAN = re.compile(r"\[\[plan: ([\w-]+)(?: x(\d+))?\]\]")
 USAGE = {"input": 10, "cached": 2, "output": 5, "reasoning": 3}
 
@@ -838,6 +843,28 @@ class H(http.server.BaseHTTPRequestHandler):
             return sent, True
         return sent, False
 
+    def send_sse_pieces(self, data_chunks, n, gap):
+        """[[pieces: N S]]: the body re-cut every N bytes, S s apart"""
+        crlf = bytes([13, 10])
+        body = b"".join(c for c in data_chunks if c)
+        self.send_response(200)
+        self.send_header("content-type", "text/event-stream")
+        self.send_header("transfer-encoding", "chunked")
+        self.send_header("connection", "close")
+        self.end_headers()
+        self.close_connection = True
+        try:
+            for i in range(0, len(body), max(1, n)):
+                if i:
+                    time.sleep(gap)
+                part = body[i:i + max(1, n)]
+                self.wfile.write(b"%x" % len(part) + crlf + part + crlf)
+                self.wfile.flush()
+            self.wfile.write(b"0" + crlf + crlf)
+            self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
     def send_sse_split(self, data_chunks, gap):
         """[[split: S]]: the body in two writes, cut mid-event, S s apart;
         its sha256."""
@@ -992,6 +1019,7 @@ class H(http.server.BaseHTTPRequestHandler):
         self.drip = None
         split = SPLIT.search(script_of(conv[idx]["text"])) if idx is not None else None
         self.split = None
+        cut = PIECES.search(script_of(conv[idx]["text"])) if idx is not None else None
         model = body.get("model") or self.path.split("/models/")[-1].split(":")[0] or "fake"
         status = 200
         fail = plan_fail(script_of(conv[idx]["text"]) if idx is not None else "", seen) if plan else None
@@ -1022,6 +1050,9 @@ class H(http.server.BaseHTTPRequestHandler):
             out = render(family, turn, model, stream, body, mid)
             if not stream:
                 self.send(200, json.dumps(out).encode())
+            elif sse and cut:
+                self.send_sse_pieces([sse_bytes(family, [e]) for e in out],
+                                     int(cut.group(1)), float(cut.group(2)))
             elif sse and split and family == "anthropic":
                 self.split = self.send_sse_split([sse_bytes(family, [e]) for e in out],
                                                  float(split.group(1)))

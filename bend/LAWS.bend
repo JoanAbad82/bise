@@ -36,6 +36,7 @@ import ./runtime/debug-pure.bend as Dg
 import ./runtime/usage-pure.bend as Us
 import ./runtime/gate-pure.bend as Gt
 import ./runtime/race-pure.bend as Rc
+import ./runtime/live-pure.bend as Lp
 import ./hub/model.bend as HM
 import ./hub/cx.bend as HX
 import ./hub/core.bend as HC
@@ -5834,3 +5835,58 @@ law hub_set_rt_counts_turns:
   for +x: HX.Rt
   {HX.Rt.turns(HC.rt(o, HC.set_rt(o, cx, x), HX.Rt.name(x)))
     == HC.turns_after(HX.Rt.run(HC.rt(o, cx, HX.Rt.name(x))), HX.Rt.run(x), HX.Rt.turns(HC.rt(o, cx, HX.Rt.name(x)))) : Nat}
+
+# ---- the answer as it streams in (runtime/live-pure.bend) ----
+
+# LAW: pieces cut anywhere (an event split across pieces, the next
+# event's start inside a piece) give the same partial as one piece: the
+# text since the last one, at offset 0 of its block.
+law live_pieces_cut_anywhere_same_line:
+  {Con{Lp.emit_line(Lp.take(Lp.feeds(Con{"event: content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}
+event: content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"lo\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n)),
+    Con{Lp.emit_line(Lp.take(Lp.feeds(Con{"event: content_block_delta
+dat", Con{"a: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}
+event", Con{": content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"lo\"}}
+", Nil{}}}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n)), Nil{}}}
+    == Con{"partial #17.0 +0 : Hello", Con{"partial #17.0 +0 : Hello", Nil{}}} : List<&2, String>}
+
+# LAW: a call that is not the agent's answer (compaction, one-shot)
+# streams nothing: no text waits.
+law live_off_streams_nothing:
+  {Lp.has(Lp.feeds(Con{"event: content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hel\"}}
+event: content_block_delta
+data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"lo\"}}
+", Nil{}}, Lp.lv0(False{}, "17.0", Api.Anthropic{}))) == False{} : Bool}
+
+# LAW: thinking never streams, only the answer's text.
+law live_thinking_never_streams:
+  {Lp.emit_line(Lp.take(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"hmm\"}}
+", Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ok\"}}
+", Nil{}}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n))
+    == "partial #17.0 +0 : ok" : String}
+
+# LAW: the offset counts what the block already sent (escaped); a new
+# block starts again at 0 (the hub replaces the text).
+law live_offset_per_block:
+  {Con{Lp.emit_line(Lp.take(Lp.feed(Lp.emit_lv(Lp.take(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ab\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n)), "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"c\"}}
+"), 300n)),
+    Con{Lp.emit_line(Lp.take(Lp.feed(Lp.emit_lv(Lp.take(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"ab\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 0n)), "data: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"c\"}}
+"), 300n)), Nil{}}}
+    == Con{"partial #17.0 +2 : c", Con{"partial #17.0 +0 : c", Nil{}}} : List<&2, String>}
+
+# LAW: at most one partial per every_ms(): due only with text waiting
+# and the last one 250 ms old.
+law live_throttle:
+  {Con{Lp.due(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"a\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 100n),
+    Con{Lp.due(Lp.feeds(Con{"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"a\"}}
+", Nil{}}, Lp.lv0(True{}, "17.0", Api.Anthropic{})), 250n),
+    Con{Lp.due(Lp.lv0(True{}, "17.0", Api.Anthropic{}), 900n), Nil{}}}}
+    == Con{False{}, Con{True{}, Con{False{}, Nil{}}}} : List<&2, Bool>}
