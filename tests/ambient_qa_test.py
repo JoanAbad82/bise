@@ -698,7 +698,7 @@ def rich_world_fixtures():
     pj = json.load(open(os.path.join(real, "projects.json")))
     cfg = open(os.path.join(real, "config.toml")).read()
     check([p["name"] for p in pj["projects"]] == ["telemetry", "shop"] and 'base_url = "http://127.0.0.1:4242/v1"' in cfg
-          and 'key_env = ""' in cfg and cfg.count("[roles]") == 1, cfg)
+          and 'key_env = "BISE_TRY_FAKE_KEY"' in cfg and 'key_command = "echo fake-key"' in cfg and cfg.count("[roles]") == 1, cfg)
     shutil.rmtree(d, ignore_errors=True)
 
 

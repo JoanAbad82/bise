@@ -394,14 +394,18 @@ def agent_reply(agent):
 
 def try_real(dir_, projects, url):
     """A try home's 'real' dir (BISE_TRY_REAL): projects.json (the world's projects, in order) and a
-    config.toml whose main runs on the world's fake provider; never a key. Returns the dir."""
+    config.toml whose main runs on the world's fake provider; never a key of his. The fake provider's
+    key comes from a key_command ('echo fake-key'), so the try core's accounts event lists 'fake' as
+    signed_in and setup's model step can continue to the project picker (qa-native m_12872, R34);
+    key_env names a variable nothing sets, only so the account is listed. Returns the dir."""
     os.makedirs(dir_, exist_ok=True)
     with open(os.path.join(dir_, "projects.json"), "w") as f:
         json.dump({"v": 1, "projects": [{"path": p["ws"], "name": p["project"], "order": i} for i, p in enumerate(projects)]}, f, indent=1)
     base = url.split("/chat/completions")[0]
     with open(os.path.join(dir_, "config.toml"), "w") as f:
         f.write('[roles]\nmain = "fake/mistral-small-latest"\nclassify = "off"\n\n'
-                '[providers.fake]\nname = "fake"\napi = "openai-chat"\nbase_url = "%s"\nkey_env = ""\n'
+                '[providers.fake]\nname = "fake"\napi = "openai-chat"\nbase_url = "%s"\nkey_env = "BISE_TRY_FAKE_KEY"\n'
+                'key_command = "echo fake-key"\n'
                 'small_model = "mistral-small-latest"\n' % base)
     return dir_
 
