@@ -460,6 +460,13 @@ fn draw_feed(app: &mut App, frame: &mut Frame, area: Rect, bar: Option<Rect>) {
     // a message this feed's owner received names it in the `to` column (BISE-90)
     crate::render::set_feed_owner(app.sb.focus_name());
     let (debug, tick) = (app.debug, app.tick);
+    // the answer as it streams in (livetext.rs): its rows go under the
+    // last event, the feed's bottom leaves them room while it follows
+    let live_rows = match app.sb.lives.get(app.sb.focus_name()) {
+        Some(l) => crate::livetext::rows(&app.events, &l.text, debug, tick, area_w),
+        None => Vec::new(),
+    };
+    let ev_h = area_h.saturating_sub(live_rows.len());
     macro_rules! rows_of {
         () => {
             &mut |i: usize| ensure_rows(&app.events, &mut app.cache, i, debug, area_w, tick)
@@ -473,7 +480,7 @@ fn draw_feed(app: &mut App, frame: &mut Frame, area: Rect, bar: Option<Rect>) {
         app.quote_hint = false;
     }
     let mut anchor = if app.follow {
-        bottom_anchor(n, area_h, rows_of!())
+        bottom_anchor(n, ev_h, rows_of!())
     } else {
         move_anchor(app.anchor, app.scroll, n, rows_of!())
     };
@@ -523,11 +530,19 @@ fn draw_feed(app: &mut App, frame: &mut Frame, area: Rect, bar: Option<Rect>) {
             i += 1;
         }
         // a full screen that shows the last row is the tail too
-        if pass == 0 && vis.len() < area_h && anchor != (0, 0) {
-            anchor = bottom_anchor(n, area_h, rows_of!());
+        if pass == 0 && vis.len() < ev_h && anchor != (0, 0) {
+            anchor = bottom_anchor(n, ev_h, rows_of!());
             continue;
         }
         break;
+    }
+    // the live text in the room left under the tail: its last rows while
+    // the feed follows (a reply taller than the screen), else its first
+    // (no event index: hover, clicks and links stop at the last event)
+    if tail_visible && !live_rows.is_empty() {
+        let room = area_h.saturating_sub(vis.len());
+        let from = if app.follow { live_rows.len().saturating_sub(room) } else { 0 };
+        vis.extend(live_rows.into_iter().skip(from).take(room));
     }
     if tail_visible && down && !app.follow {
         app.follow = true;

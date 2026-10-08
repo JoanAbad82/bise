@@ -375,6 +375,8 @@ fn rec_ev(rec: Rec) -> Option<Ev> {
     Some(match rec {
         // the session-log facts (BISE-195) are for the hub's writer
         Rec::Empty | Rec::Fact | Rec::Dropped => return None,
+        // the live answer comes as the hub's `partial` event, not a line
+        Rec::Partial { .. } => return None,
         Rec::Idle => Ev::Idle,
         // switchboard: the hub's own lines in a feed
         Rec::Hub(h) => return sb::hub_ev(h),

@@ -187,6 +187,8 @@ pub const NOTIFICATIONS: &[NoteRow] = &[
     n("job/followedEnd", "followed_end", Scope::Hub),
     n("thread/entry", "entry", Scope::Thread),
     n("thread/typing", "typing", Scope::Thread),
+    // the answer as it streams in (whole text; "" when it ended)
+    n("thread/partial", "partial", Scope::Thread),
     n("route/held", "route", Scope::Hub),
     n("route/done", "route_done", Scope::Hub),
     n("confirm/ask", "confirm", Scope::One),
