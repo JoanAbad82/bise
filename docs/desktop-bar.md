@@ -510,7 +510,11 @@ A row stays even after it passes: it is a regression list.
     - **designer on reshoot 2** (m_12858):
       - Dark is signed: the telemetry and bise threads and settings, with contrast, pink accents,
         the "new" chips, the code block, the inbox card and the composer.
-      - R40 is still not judgeable: the whole answer is there from the first of the 7 frames.
+      - **R40: not in this build** (ambient-lead m_12862). The hub sends no partial events on
+        ambient-app yet; amb-core builds them on main after desktop-hub lands (main m_12379). So
+        every answer arrives whole, and R40 is judged on the build after that land. It is neither
+        a red nor a pass here. Designer's first read was: the whole answer is there from the first
+        of the 7 frames.
         designer asked qa-native for a 50 ms log of the last row's text length during the stream.
         If it jumps from 0 to the final length in one step, that's a red for the thread's
         streaming (amb-win).
