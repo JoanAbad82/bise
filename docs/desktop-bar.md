@@ -505,7 +505,17 @@ A row stays even after it passes: it is a regression list.
     - Still not shot:
       - R03: ⏎ on the spot's first waiting row closes the capsule, so there's nothing to hover.
         app/clicks has one red left: telemetry's fold and menu on the agents screen (amb-win).
-      - R34: setup's next doesn't reach the project picker in 20 s on this world.
+      - R34: setup's next doesn't reach the project picker in 20 s on this world (amb-home
+        triages, ambient-lead m_12855).
+    - **designer on reshoot 2** (m_12858):
+      - Dark is signed: the telemetry and bise threads and settings, with contrast, pink accents,
+        the "new" chips, the code block, the inbox card and the composer.
+      - R40 is still not judgeable: the whole answer is there from the first of the 7 frames.
+        designer asked qa-native for a 50 ms log of the last row's text length during the stream.
+        If it jumps from 0 to the final length in one step, that's a red for the thread's
+        streaming (amb-win).
+      - No sign on 723648da. Designer signs the next cut if D12, D7b, D3b (amb-win e35bc349) and D14
+        (amb-home 9f75a184) read right and R40 shows words arriving.
       - R24's image: waits on amb-mac's clipboard seed.
   - **question** (amb-win): with telemetry's 17 rows, shop and docs fall below the fold. Are the
     stopped rows under 1 h old, and does the current project scroll into view?
