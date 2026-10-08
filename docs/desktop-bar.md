@@ -495,6 +495,18 @@ A row stays even after it passes: it is a regression list.
       - R03: no button to hover after ⏎ on the spot's first row.
       - R34: setup isn't reached in a reshoot-only run.
       - R40 and the dark theme: next.
+  - **reshoot 2** (qa-native m_12850):
+    - Dark: `/theme dark` and settings · general's control both set data-theme=dark. The dark
+      shots are designer's to judge.
+    - R40: redone, with 12 deltas 250 ms apart; designer's to judge.
+    - R18 is confirmed red, but narrower than it looked. The 52-line answer does land in bise's
+      thread (R18-window-bise.png). The capsule stays on its list (640×952) and never shows the
+      answer or says where it went (amb-web, coded and in its harness now).
+    - Still not shot:
+      - R03: ⏎ on the spot's first waiting row closes the capsule, so there's nothing to hover.
+        app/clicks has one red left: telemetry's fold and menu on the agents screen (amb-win).
+      - R34: setup's next doesn't reach the project picker in 20 s on this world.
+      - R24's image: waits on amb-mac's clipboard seed.
   - **question** (amb-win): with telemetry's 17 rows, shop and docs fall below the fold. Are the
     stopped rows under 1 h old, and does the current project scroll into view?
   - **still to come:**
