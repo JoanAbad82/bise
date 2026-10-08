@@ -436,6 +436,59 @@ isn't judging. A row marked ok names the shot that was looked at.
         thinking (qa-native).
     - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
       dev tool (amb-web's list, or amb-home's commands).
+- **cb1f2b44, 10-08: red, no try build.** The no-build proof is green. qa-native shot the touched
+  rows and R41 into `~/.bise/gate/try-gate/cb1f2b44/` (m_13848). ambient-pm looked at the shots as
+  images.
+  - **R41, the model sees his images:** read from `$FAKE_BODIES` on the packed app.
+    - The window composer's ⌘V reaches bise's main and an agent as an image_url block (yes).
+    - A drop on the composer reaches shop's main and an agent (yes).
+    - The spotlight's ⌘V, and a drop on the capsule, reach bise's main (yes).
+    - **Red:** a ⌘I card answer, and with it an escalated question, goes as text only, and the
+      field takes no paste. The fix is amb-feed's 4b927e05, being landed by r41-land as c6ddde31.
+      It isn't in this cut.
+    - The terminal path is img-paste's.
+    - Nit: the window sends "[Image #1]what is…" with no space after the label.
+  - **ok, from the shots:**
+    - R24 (R24.png): the `❝ 1` quote chip, the `[Image #2]` chip with its thumbnail, and
+      dictation listening, all in one composer. The mono "[Image #2] checker.png" line above "to
+      bise" is a known nit.
+    - SPOT-chip (SPOT-chip.png): an image chip with its thumbnail before the words, and "⏎ send to
+      bise ⌫ remove esc close".
+    - R34; N2 ("◷ main scheduled dashboards · every 30m · next 23:42"); and KQ (⌘K 'p99' opens
+      p99, and a sentence puts "ask bise" with the pearl on top).
+  - **red:** N3 (N3-gift-ui.png). Agent threads still show raw report tags: "[report: blocked]
+    waiting for your answer: cart page or checkout only?" in gift-ui, and "[report: done] …" in
+    p99. It's D14 come back on agent threads (bise's own thread is fixed) (amb-home).
+  - **not red:**
+    - N1 (N1-p99-head.png): the head has no "high · yolo", and no context gauge on a done agent.
+      Designer says whether the gauge should show when the agent isn't working.
+    - R07-a: the right column shows p99's 2 actions, which is all it has.
+  - **designer** (m_13855): one red, the rest signed.
+    - Red: N3/D14 in agent threads, as above (amb-home). A report renders as a status line
+      ("blocked · waiting for your answer", "✓ done · <summary>"), or not at all when the question
+      card under it says it.
+    - Green: N1 (the gauge is rightly hidden on a done or idle agent), N2, N3's position, R34, KQ,
+      SPOT-chip, R24, R07-a and the spot's heads.
+    - EMPTY and N4 are signed on amb-win's 2f22e7fc/442ea0f1 and amb-web's f57db910 shots; no
+      reshoot needed.
+    - Nits for the next cut:
+      - An agent's thread opens on the hub's brief as a 28 px "Task" heading with internal words.
+        One quiet row, "bise started gift-ui · …", with the brief folded under it (amb-home).
+      - One space after "[Image #1]" (amb-web).
+      - Bise's pearl in ⌘K's "waiting for you" rows is grey; it should be pink (amb-web).
+  - **verdict: GO tonight, with two known gaps in the notes to main** (ambient-pm, answering
+    ambient-lead m_13861).
+    - N3/D14, raw report tags in agent threads, is red on R36. But his current build, d94b7996,
+      has it too: 233c325a's D14 shot only covered shop's main. So this try brings no regression,
+      and holding it would keep him on a build with the same red and fewer fixes.
+    - R41's card answers are the same case: text only in both builds, and the fix waits on main's
+      gate.
+    - Both gaps are named in the notes. The next cut carries amb-home's fix, and c6ddde31 when it
+      lands.
+  - **gate rule, refined:** a red that his current try build already has may go as a named gap in
+    the notes, by ambient-pm's call. A red that is new, or a fix that came undone, still holds
+    the try.
+
 - **d94b7996, 10-08: OK for the try** (ambient-pm, after R24's proof below; designer signed the
   look on 233c325a, and R03 and R34 on this cut).
   - **R24 proven** (qa-native m_13205): amb-mac's composer/paste-image passes on the packed
