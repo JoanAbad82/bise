@@ -149,6 +149,8 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       }
       note('R34', `setup steps on the way: ${seen.join(' → ')}`);
       if (await picker.isVisible().catch(() => false)) {
+        const stepText = await p.locator('[data-testid^="setup.step."]').first().innerText().catch(() => '');
+        note('R34', `the projects step reads: ${JSON.stringify(stepText.replace(/\s+/g, ' ').trim().slice(0, 240))}`);
         await shot('R34', 'R34-1100', p);
         await width(s, 800);
         await shot('R34', 'R34-800', p);
@@ -648,14 +650,24 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
     await each('R03', async () => {
       await spot();
       await cap.keyboard.press('Enter');
-      await sleep(1000);
+      // d94b7996: ⏎ on a waiting row answers it in place (capsule.card.view: its options and digits); esc goes back
+      const cardView = cap.getByTestId('capsule.card.view');
+      await cardView.waitFor({ timeout: 3000 }).catch(() => undefined);
+      await sleep(600);
       await shot('R03', 'R03-a-after-enter', cap, { omitBackground: true });
-      note('R03', `after ⏎ on the spot's first waiting row: view ${await cap.getByTestId('capsule').getAttribute('data-view').catch(() => '?')}, buttons ${JSON.stringify(await cap.locator('button').evaluateAll((es) => es.map((e) => e.textContent.trim().slice(0, 20)).slice(0, 6)))}`);
-      const btn = cap.locator('[data-testid="capsule"] button').first();
-      await btn.hover({ timeout: 5000 });
-      await sleep(300);
-      await shot('R03', 'R03-card-hover', cap, { omitBackground: true });
-      note('R03', `capsule view: ${await cap.getByTestId('capsule').getAttribute('data-view').catch(() => '?')}; hovered: ${JSON.stringify((await btn.innerText()).trim())}; app/clicks: green on 723648da (real.sh, ambient-lead m_12764)`);
+      const view = async (): Promise<string> => (await cap.getByTestId('capsule').getAttribute('data-view').catch(() => '?')) ?? '?';
+      note('R03', `after ⏎ on the spot's first waiting row: view ${await view()}, card in place: ${String(await cardView.isVisible().catch(() => false))}, text ${JSON.stringify((await cardView.innerText().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 160))}`);
+      const btn = cardView.locator('button').first();
+      if (await btn.isVisible().catch(() => false)) {
+        await btn.hover({ timeout: 5000 });
+        await sleep(300);
+        await shot('R03', 'R03-b-option-hover', cap, { omitBackground: true });
+        note('R03', `hovered the first option: ${JSON.stringify((await btn.innerText()).replace(/\s+/g, ' ').trim())}`);
+      } else note('R03', 'no option button in the card view to hover');
+      await cap.keyboard.press('Escape');
+      await sleep(700);
+      await shot('R03', 'R03-c-after-esc', cap, { omitBackground: true });
+      note('R03', `after esc: view ${await view()}, spot input visible: ${String(await cap.getByTestId('spot.input').isVisible().catch(() => false))}, card view gone: ${String((await cardView.count()) === 0)} (no digit pressed: it would answer the world's card)`);
       await hide();
     });
     // ambient-pm's capsule ask: the spot with 'ingest' typed and its row selected
