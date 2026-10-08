@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react';
 import { newAgent } from '@/agents/actions';
 import { InboxCard } from '@/inbox';
+import { cardKeyOf } from '@/inbox/Strip';
 import type { Card, HelperEv } from '@/proto';
 import { threadKey, useHeard, useLevel, useProjects, useStore } from '@/store';
 import { followPartial, type LivePartial } from '@/shared/partial';
@@ -253,6 +254,37 @@ export function CapsuleRoot(): JSX.Element {
     };
   }, [bise, keepWithBise]);
 
+  // a card opened from the spotlight's waiting row has the keyboard (the spotlight had it): its
+  // digits pick, esc goes back to the list, ⏎ opens it in bise, ⌘⌫ closes it (the strip's keys)
+  const fromSpot = view.kind === 'card' && view.back === true ? view.id : null;
+  useEffect(() => {
+    if (fromSpot === null) return;
+    const [project = '', n = ''] = fromSpot.split(/\.(?=[^.]+$)/u);
+    const onKey = (e: KeyboardEvent): void => {
+      // the ⏎ that opened the card is still bubbling here (React runs this effect inside its
+      // dispatch): the spotlight handled it, so it never opens the inbox and closes again
+      if (e.defaultPrevented || e.isComposing) return;
+      const c = store.cards(project).find((x) => String(x.id) === n);
+      if (c === undefined) return;
+      if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        bise?.openWindow('inbox');
+        dispatch({ ev: 'close' });
+        return;
+      }
+      const k = cardKeyOf(e, c, null);
+      if (k === null) return;
+      e.preventDefault();
+      if (k.t === 'later') dispatch({ ev: 'later' });
+      else if (k.t === 'close') dispatch({ ev: 'card_done', id: fromSpot });
+      else if (k.t === 'pick') store.answer(project, c.id, String(k.n));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [fromSpot, store, bise]);
+
   // the projects this window shows: all of them (the spotlight lists every project's agents and
   // cards, a push may come from any); the core sends their rows, agents and cards only after a
   // 'shown' (amb-core 932b7186), the store dedupes and re-says it to a core that comes back
@@ -283,7 +315,7 @@ export function CapsuleRoot(): JSX.Element {
           surface="glass"
           acts={{
             later: () => {
-              dispatch({ ev: 'close' });
+              dispatch({ ev: 'later' });
             },
             pick: (n) => {
               store.answer(project, c.id, String(n));
@@ -332,6 +364,12 @@ export function CapsuleRoot(): JSX.Element {
         if (home !== null) newAgent(store, home, { brief });
       }}
       onOpen={(item) => {
+        // a waiting row answers in place: the card's options and keys, esc back (qa-native R03:
+        // it opened the inbox and closed the capsule to nothing)
+        if (item.kind === 'card') {
+          dispatch({ ev: 'open_card', id: item.id.replace(/^card\./u, '') });
+          return;
+        }
         bise?.openWindow(routeOf(item));
         dispatch({ ev: 'close' });
       }}

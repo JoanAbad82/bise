@@ -18,7 +18,8 @@ export type View =
   | { readonly kind: 'spot' }
   | { readonly kind: 'talk'; readonly phase: 'listen' | 'think'; readonly handsFree: boolean }
   | { readonly kind: 'answer' }
-  | { readonly kind: 'card'; readonly id: string }
+  /** back: opened from the spotlight's waiting row (⏎ '↵ answer'): esc and its answer go back to the list */
+  | { readonly kind: 'card'; readonly id: string; readonly back?: true }
   | { readonly kind: 'menu' };
 
 export interface State {
@@ -40,6 +41,10 @@ export type CapEvent =
   | { readonly ev: 'card'; readonly id: string }
   /** a card was answered or went away */
   | { readonly ev: 'card_done'; readonly id: string }
+  /** ⏎ on a spotlight waiting row: that card's answer, in place (qa-native R03: it closed to nothing) */
+  | { readonly ev: 'open_card'; readonly id: string }
+  /** the card's 'esc later': back to the spotlight when it came from there, else close */
+  | { readonly ev: 'later' }
   /** esc, a close, or an 'open in bise' that moved him to the window */
   | { readonly ev: 'close' };
 
@@ -78,6 +83,8 @@ function go(s: State, view: View, ...fx: Fx[]): Step {
 const stay = (s: State): Step => ({ state: s, fx: [] });
 const cancelTalk = (s: State): Step => go(s, NONE, { fx: 'hide' }, ...(talking(s.view) ? [{ fx: 'talk', cmd: 'talk_cancel' } as const] : []));
 const close = (s: State): Step => (s.view.kind === 'none' ? stay(s) : go(s, NONE, { fx: 'hide' }));
+/** a card opened from the spotlight goes back to it; any other view closes */
+const back = (s: State): Step => (s.view.kind === 'card' && s.view.back === true ? go(s, { kind: 'spot' }) : close(s));
 
 export function step(s: State, e: CapEvent): Step {
   const v = s.view;
@@ -99,7 +106,7 @@ export function step(s: State, e: CapEvent): Step {
         case 'cancel':
           return v.kind === 'talk' ? cancelTalk(s) : stay(s);
         case 'esc':
-          return talking(v) ? cancelTalk(s) : close(s);
+          return talking(v) ? cancelTalk(s) : back(s);
       }
       return stay(s);
     case 'window':
@@ -117,8 +124,12 @@ export function step(s: State, e: CapEvent): Step {
       return stay({ ...s, held: [...s.held, e.id] });
     case 'card_done': {
       const held = s.held.filter((h) => h !== e.id);
-      return v.kind === 'card' && v.id === e.id ? close({ ...s, held }) : stay({ ...s, held });
+      return v.kind === 'card' && v.id === e.id ? back({ ...s, held }) : stay({ ...s, held });
     }
+    case 'open_card':
+      return v.kind === 'spot' ? go({ ...s, held: s.held.filter((h) => h !== e.id) }, { kind: 'card', id: e.id, back: true }) : stay(s);
+    case 'later':
+      return back(s);
     case 'close':
       return close(s);
   }

@@ -60,6 +60,19 @@ describe('the capsule machine', () => {
     expect(run([...quiet, { ev: 'fn', act: 'key', key: 'space' }]).view).toEqual({ kind: 'spot' });
     expect(run([{ ev: 'fn', act: 'key', key: 'space' }, { ev: 'card', id: 'p.9' }, { ev: 'fn', act: 'esc' }]).view).toEqual({ kind: 'card', id: 'p.9' });
   });
+  it("R03: ⏎ on a spotlight waiting row answers in place, never closes to nothing; esc and the answer go back to the list", () => {
+    const space: CapEvent = { ev: 'fn', act: 'key', key: 'space' };
+    const open: CapEvent = { ev: 'open_card', id: 'p.4' };
+    expect(run([space, open])).toEqual({ view: { kind: 'card', id: 'p.4', back: true }, fx: [{ fx: 'show', at: 'top', keys: true }] });
+    expect(run([space, open, { ev: 'later' }]).view).toEqual({ kind: 'spot' });
+    expect(run([space, open, { ev: 'fn', act: 'esc' }]).view).toEqual({ kind: 'spot' });
+    expect(run([space, open, { ev: 'card_done', id: 'p.4' }]).view).toEqual({ kind: 'spot' });
+    // no hide on the way back: the capsule stays up
+    expect(run([space, open, { ev: 'later' }]).fx).not.toContainEqual({ fx: 'hide' });
+    // only from the spotlight; a pushed card's 'later' still closes
+    expect(run([open]).view).toEqual(NONE);
+    expect(run([{ ev: 'card', id: 'p.9' }, { ev: 'later' }]).view).toEqual(NONE);
+  });
   it('a push is a card new in a project whose cards had loaded', () => {
     const loaded = new Map<string, Loaded>();
     const projects = [{ project: 'tel', waits: 2 }];

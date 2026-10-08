@@ -168,6 +168,33 @@ test("spotlight/streaming: the '∿' after a block moves nothing, tables as the 
     expect(await cap.getByText(/^[?!] main$/).count(), "no '? main' row").toBe(0);
     await cap.screenshot({ path: test.info().outputPath('8-cards.png') });
 
+    // R03 (qa-native's 233c325a reshoot): ⏎ on the first waiting row ('↵ answer') opens that
+    // card's answer in place (its options and keys), never closes the capsule to nothing; esc
+    // goes back to the list; a digit answers it, and once it's gone the list is back
+    const cardView = cap.locator('[data-testid="capsule.card.view"]');
+    await input.click();
+    await cap.keyboard.press('Enter');
+    await expect(cardView, "⏎ on '? bise' shows its card in the capsule").toBeVisible({ timeout: 2000 });
+    await expect(cardView, 'the card is the one picked').toContainText('send the mail to legal?');
+    await expect(cardView, 'its options show').toContainText('yes');
+    // test mode never shows a real window (main only prints CAPSULE_LINE): a hide would come back
+    // as the capsule's state (shown: false) and drop the view to none, so the card still drawn a
+    // beat later is the proof it stayed up
+    await cap.waitForTimeout(400);
+    await expect(cardView, 'the capsule stays up on the card').toBeVisible();
+    await cap.screenshot({ path: test.info().outputPath('8-card-answer.png') });
+    await cap.keyboard.press('Escape');
+    await expect(input, 'esc goes back to the list').toBeVisible({ timeout: 2000 });
+    await expect(cardView).toHaveCount(0);
+    await input.click();
+    await cap.keyboard.press('Enter');
+    await expect(cardView).toBeVisible({ timeout: 2000 });
+    await cap.keyboard.press('1');
+    await core.waitCmd((c) => c['cmd'] === 'answer' && c['card'] === 11 && c['reply'] === '1');
+    await core.send({ ev: 'cards', project: HOME, cards: [card(12, 'main', 'run the release script?', true)] } as unknown as Ev);
+    await expect(input, 'answered: back to the list').toBeVisible({ timeout: 2000 });
+    await expect(cap.locator(`[data-testid="spot.row.card.${HOME}.11"]`)).toHaveCount(0);
+
     await input.click();
     await cap.keyboard.type(`how do the benches compare ${Date.now() % 100000}`);
     await cap.keyboard.press('Enter');
