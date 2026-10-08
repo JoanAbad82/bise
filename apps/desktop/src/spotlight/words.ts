@@ -22,6 +22,11 @@ export const W = {
   keysAsk: '⏎ send to bise   ↑↓ move   esc close',
   // R41: an image or a file in the spot: ⏎ asks bise with it, ⌫ at the start takes the last one away
   keysFiles: '⏎ send to bise   ⌫ remove   esc close',
+  // R41: the 'ask bise' row says what goes with his words (designer m_13808): '2 images · …'
+  withFiles: (images: number, others: number): string => {
+    const one = (n: number, a: string, many: string): string => (n === 0 ? '' : n === 1 ? a : `${String(n)} ${many}`);
+    return [one(images, 'an image', 'images'), one(others, 'a file', 'files')].filter((s) => s !== '').join(', ');
+  },
   answerMore: 'the rest in bise   ⏎ open',
   // his ask, before bise's first words (R18): it went, the answer comes here
   asked: 'asked bise · the answer shows here',

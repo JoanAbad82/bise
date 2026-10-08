@@ -110,6 +110,12 @@ describe('the spotlight', () => {
       await Promise.resolve();
     });
     expect(ui.queryByTestId('spot.file.2')).toBeNull();
+    // the 'ask bise' row says the image goes with his words (designer m_13808)
+    await act(async () => {
+      fireEvent.input(input, { target: { value: 'what is wrong in this' } });
+      await Promise.resolve();
+    });
+    expect(ui.getByTestId('spot.row.ask').textContent).toContain('an image · what is wrong in this');
     // 'perf' alone would open perf: with an image in the spot ⏎ asks bise with it
     await act(async () => {
       fireEvent.input(input, { target: { value: 'perf' } });

@@ -933,7 +933,9 @@ function Strip({ chips, queued, note, testId }: { chips: readonly Chip[]; queued
           <span className="k">queued · sent when this turn ends · ↑ edit</span>
         </div>
       ))}
-      {chips.map((c) => (
+      {/* an image has no strip line in the window: its chip and thumbnail say it (designer m_13808;
+          the TUI keeps its '[Image #1] name' line, it has no thumbnail) */}
+      {chips.filter((c) => c.kind !== 'image').map((c) => (
         <div key={c.n} className="c" data-testid={`${testId}.strip.${c.n}`}>
           {chipStrip(c)}
         </div>

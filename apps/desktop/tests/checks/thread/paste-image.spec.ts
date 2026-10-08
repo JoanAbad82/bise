@@ -59,6 +59,7 @@ test("thread/paste-image: ⌘V of a PNG in bise main's composer is a chip, ⏎ s
     const chip = page.locator('[data-testid^="composer.chip."][data-kind="image"]');
     await expect(chip, 'the pasted PNG is an image chip').toHaveCount(1, { timeout: 5000 });
     expect(await chip.locator('img').first().evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0), 'its thumbnail is drawn').toBe(true);
+    await expect(page.locator('[data-testid^="composer.strip."]').filter({ hasText: '[Image #' }), "no '[Image #1] name' strip line in the window: the chip says it (designer m_13808)").toHaveCount(0);
     await page.keyboard.type('what is wrong in this');
     await page.screenshot({ path: test.info().outputPath('chip.png') });
 

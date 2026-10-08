@@ -79,6 +79,7 @@ test('spotlight/images: ⌘V of an image and an image dropped on the pearl are c
 
     await input.pressSequentially('what is wrong in these');
     await expect(cap.locator('[data-testid="spot.frame"] .keys')).toHaveText('⏎ send to bise   ⌫ remove   esc close');
+    await expect(cap.locator('[data-testid="spot.row.ask"]'), "the ask row says the images go too (designer m_13808)").toContainText('2 images · what is wrong in these');
     await cap.screenshot({ path: test.info().outputPath('light-chips.png') });
     await cap.emulateMedia({ colorScheme: 'dark' });
     await cap.waitForTimeout(200);

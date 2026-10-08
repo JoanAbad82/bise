@@ -109,14 +109,15 @@ function Actions({ lines, testId }: { lines: readonly PreviewLine[]; testId: str
   );
 }
 
-const Row = memo(function Row({ item, on, testId, onPick, acts }: { item: SpotItem; on: boolean; testId: string; onPick: (item: SpotItem) => void; acts?: readonly PreviewLine[] | undefined }): JSX.Element {
+const Row = memo(function Row({ item, on, testId, onPick, acts, withFiles }: { item: SpotItem; on: boolean; testId: string; onPick: (item: SpotItem) => void; acts?: readonly PreviewLine[] | undefined; withFiles?: string | undefined }): JSX.Element {
   const click = (): void => {
     onPick(item);
   };
   const id = `${testId}.row.${item.id}`;
   switch (item.kind) {
     case 'ask':
-      return <SpotRow lead="bise" name={W.askBise} what={item.text} hotkey="↵" on={on} onClick={click} testId={id} />;
+      // with chips in the spot it says they go too ('2 images · what is wrong in these', designer m_13808)
+      return <SpotRow lead="bise" name={W.askBise} what={withFiles === undefined || withFiles === '' ? item.text : item.text === '' ? withFiles : `${withFiles} · ${item.text}`} hotkey="↵" on={on} onClick={click} testId={id} />;
     case 'new':
       return <SpotRow lead="bise" name={W.startAgent} what={item.brief} hotkey="↵" on={on} onClick={click} testId={id} />;
     case 'card':
@@ -312,6 +313,8 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
   };
 
   const ans = p.answer ? answerLines(p.answer.text) : null;
+  const imageCount = files.filter((f) => f.image).length;
+  const filesWords = files.length > 0 ? W.withFiles(imageCount, files.length - imageCount) : undefined;
   const keys = route !== null ? W.keysRoute : files.length > 0 ? W.keysFiles : list.mode === 'new' ? W.keysNew : list.mode === 'ask' ? W.keysAsk : W.keysEmpty;
 
   return (
@@ -376,7 +379,7 @@ export function Spotlight(p: SpotlightProps): JSX.Element {
               <SpotGroup>{s.label}</SpotGroup>
             </div>
           ),
-          ...s.items.map((item) => <Row key={item.id} item={item} on={items[index]?.id === item.id} testId={testId} onPick={pick} acts={p.preview?.id === item.id ? p.preview.lines : undefined} />),
+          ...s.items.map((item) => <Row key={item.id} item={item} on={items[index]?.id === item.id} testId={testId} onPick={pick} acts={p.preview?.id === item.id ? p.preview.lines : undefined} withFiles={item.kind === 'ask' ? filesWords : undefined} />),
         ])}
       </Spot>
     </div>
