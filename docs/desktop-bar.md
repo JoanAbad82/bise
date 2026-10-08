@@ -471,6 +471,19 @@ isn't judging. A row marked ok names the shot that was looked at.
     main's question goes to main as words (`/answer N text`). So typing isn't wrong in itself, as
     long as a typed line never merges anything without his clear yes. ambient-pm asked qa-native
     whether the world's main merged after "this one". If it did, it's a red.
+  - **ruling: red (c), the typed line closed an irreversible card** (ambient-pm m_14045).
+    - The world's main didn't merge (qa-native m_14042), but only because it's a fake.
+    - The hub closed card #1, "merge checkout into main?", as answered by "[Image #1] this one …",
+      a typed line with no 1 or 2. That breaks ambient's decision (c) (ambient#8417, designer
+      m_8778): a plain message never decides anything irreversible.
+    - The fix, in the same re-cut as (a) and (b): on a card that decides something irreversible
+      (merge, feature_try's try or merge, tool approvals), typed text goes to main as a plain
+      message and the card stays open. The label reads "to bise · the merge waits for 1 or 2" and
+      the card says "pick 1 or 2" (amb-home, and amb-feed if the hub needs the card's kind).
+    - Proof on the re-cut: a typed line on the merge card leaves it open, main gets a plain
+      message, and nothing merges.
+    - If cb1f2b44, his current build, has it too (amb-home checks the code), main tells him
+      today: on a merge or try card, pick 1 or 2; don't type.
 
 - **cb1f2b44, 10-08: red, no try build.** The no-build proof is green. qa-native shot the touched
   rows and R41 into `~/.bise/gate/try-gate/cb1f2b44/` (m_13848). ambient-pm looked at the shots as
