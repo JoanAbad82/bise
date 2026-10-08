@@ -20,6 +20,7 @@ import { badgeOf, CountKeeper, titleOf } from './counts';
 import { installGuard } from './guard';
 import { startHelper } from './helper/run';
 import { adoptLoginEnv } from './loginenv';
+import { appName } from './appname';
 import { onCoreEvent, sendToCore, startCore, stopCore } from './core/ipc';
 import { configOfPrefs } from './helper/config';
 import { installIpc, sendClip, sendMenu, setProjectRoots } from './ipc';
@@ -49,11 +50,11 @@ if (testMode) {
   process.env['BISE_TEST_HOME'] ??= process.env['HOME'];
 }
 
-// the menu bar says 'bise' (Quit bise, Hide bise, About bise), not the
-// package's name (qa-native m_9724). A packaged app already has its
-// productName ('bise', or a try build's own: electron-builder.mjs), which also
-// names its userData folder, so it keeps it.
-if (!app.isPackaged) app.setName('bise');
+// the menu bar says 'bise' (Quit bise, Hide bise, About bise), never the
+// package's name 'bise-desktop' (qa-native m_9724, lead m_12625): a packed
+// app takes its bundle's own name (productName: 'bise', or a try build's), which
+// also names its userData folder, so a try never shares his app's (appname.ts)
+app.setName(appName(app.isPackaged, process.platform, process.execPath));
 
 if (testMode) {
   // never his ~/Library/Application Support: the harness's folder, else a fresh temp one
