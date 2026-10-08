@@ -41,6 +41,17 @@ def check(ok, what):
 
 
 def pure():
+    # one heavy slot (main m_13151, ambient-lead m_13161): heavy-run when there, the old lock
+    # without it, nice alone when already in a slot (never both slots, never nested)
+    cmd, lock = ["/bin/bash", "-c", "x"], "/l/heavy.lock"
+    hr = os.path.join(tempfile.mkdtemp(prefix="dt-hr-"), "heavy-run")
+    with open(hr, "w") as f:
+        f.write("#!/bin/sh\n")
+    os.chmod(hr, 0o755)
+    check(T.heavy_argv(cmd, lock, under=False, heavy_run=hr) == [hr] + cmd, "through heavy-run")
+    check(T.heavy_argv(cmd, lock, under=False, heavy_run=hr + "-none") == ["/usr/bin/lockf", "-k", lock, "nice", "-n", "10"] + cmd, "the old lock")
+    check(T.heavy_argv(cmd, lock, under=True, heavy_run=hr) == ["nice", "-n", "10"] + cmd, "in a slot already: no second one")
+    check(T.under_heavy_slot() is False, "this test runs in no slot")
     real = os.path.expanduser("~/.bise")
     tryh = os.path.join(real, "try", "desktop")
     base = {"HOME": "/Users/x", "PATH": "/usr/bin", "BEND_RUN_DIR": real + "/run", "SB_SOCKET": "/s", "BISE_ROLE": "task",
@@ -137,7 +148,8 @@ def stamp_skips_build():
             open(p, "w").close()
 
     def fake_run(cmd, *a, **k):
-        if cmd and cmd[0] == "/usr/bin/lockf":
+        # the build, whatever runs it (heavy-run, the old lockf, or nice alone in a slot): never for real
+        if cmd and cmd[-3:-1] == ["/bin/bash", "-c"]:
             calls.append(cmd)
             outputs(cmd[-1])
             return subprocess.CompletedProcess(cmd, 0)
@@ -206,7 +218,7 @@ def staged_never_over_a_running_try():
             f.write("build %d" % n)
 
     def fake_run(cmd, *a, **k):
-        if cmd and cmd[0] == "/usr/bin/lockf":
+        if cmd and cmd[-3:-1] == ["/bin/bash", "-c"]:
             script = cmd[-1]
             scripts.append(script)
             pack(paths["staged"] if "BISE_PACK_OUT=" in script else paths["app"], len(scripts), root_of(script))

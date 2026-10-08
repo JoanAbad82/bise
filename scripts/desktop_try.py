@@ -302,6 +302,40 @@ def root_path(paths, stamp):
     return os.path.join(os.path.dirname(paths["helper"]), name)
 
 
+HEAVY_RUN = os.path.expanduser("~/.bise/run/heavy-run")
+HEAVY_LOCKS = ("heavy.lock", "heavy2.lock")
+
+
+def under_heavy_slot(pid=None):
+    """True when this process runs under a `lockf … heavy.lock|heavy2.lock` of its own ancestry
+    (a `heavy-run` around it): taking a slot again would hold both, or wait on itself."""
+    pid = pid or os.getpid()
+    for _ in range(32):
+        r = subprocess.run(["ps", "-o", "ppid=,command=", "-p", str(pid)], capture_output=True, text=True)
+        line = r.stdout.strip()
+        if not line:
+            return False
+        ppid, _, cmd = line.partition(" ")
+        head = cmd.split(" ", 1)[0]
+        if head.endswith("lockf") and any("/.bise/run/" + n in cmd for n in HEAVY_LOCKS):
+            return True
+        pid = int(ppid.strip() or 0)
+        if pid <= 1:
+            return False
+    return False
+
+
+def heavy_argv(cmd, lock, under=None, heavy_run=HEAVY_RUN):
+    """The argv that runs `cmd` as one heavy job (main m_13151, ambient-lead m_13161): already in a
+    heavy slot, at nice 10 alone (never a second slot, never nested); else through heavy-run (the
+    first of its two slots that is free); else, on a Mac without heavy-run, the old single lock."""
+    if under_heavy_slot() if under is None else under:
+        return ["nice", "-n", "10"] + cmd
+    if os.access(heavy_run, os.X_OK):
+        return [heavy_run] + cmd
+    return ["/usr/bin/lockf", "-k", lock, "nice", "-n", "10"] + cmd
+
+
 def stamp_path(paths):
     """The try build's stamp, next to its native helper in his build dir."""
     return os.path.join(os.path.dirname(paths["helper"]), "try.stamp")
@@ -402,7 +436,7 @@ def build(env, paths):
         # the same source rebuilt under a running try (its outputs went missing): never its root
         root = "%s-%d" % (root, int(time.time()))
     script = build_script(paths, sign, out=paths["staged_dir"] if busy else None, root=root)
-    r = subprocess.run(["/usr/bin/lockf", "-k", lock, "nice", "-n", "10", "/bin/bash", "-c", script], env=env)
+    r = subprocess.run(heavy_argv(["/bin/bash", "-c", script], lock), env=env)
     if r.returncode != 0:
         raise TryError("the build failed (exit %d)" % r.returncode)
     app = paths["staged"] if busy else paths["app"]
