@@ -410,6 +410,19 @@ A row stays even after it passes: it is a regression list.
       - R34: no project picker was reached in setup.
       - R07, R09: no p99 match in the spotlight shot, and no changes row.
       - R08: no fake mic.
+    - **designer on the reshoot** (m_12630; still not signed):
+      - Fixed: D1 and D2.
+      - Green: R23 in the thread (bold in pale pink, `code` in green); the composer half wasn't
+        shot.
+      - Still red: D3, D5, and D6, where the hint row now also overlaps ("$ skills" runs into the
+        tip).
+      - New red: D10, the same as R27 (the sidebar's 22-30 agents draw over "add a project" and
+        "settings").
+      - New, not red:
+        - D11: "every every 30m" in "scheduled here", and the time cut off (amb-win).
+        - D12: every agent row ends in an unnamed "0%" (amb-win).
+      - Shots designer still needs: R35 at 1800 on a project thread, and R37 with and without
+        thinking (qa-native).
     - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
       dev tool (amb-web's list, or amb-home's commands).
   - **the 30-minute use** with designer waits for the re-cut: with the project routes missing,
