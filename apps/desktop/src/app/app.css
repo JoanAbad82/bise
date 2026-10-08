@@ -607,3 +607,17 @@
 .app-new {
   color: var(--c-accent);
 }
+
+/* an open folder's agents before they come: their rows' places, quiet (no shimmer: nothing moves) */
+.app-skel {
+  display: flex;
+  align-items: center;
+  padding-left: 23px;
+  cursor: default;
+}
+.app-skel-bar {
+  width: 45%;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--c-hover);
+}

@@ -75,6 +75,12 @@ export function newWords(fresh: number, makers: readonly string[]): string {
   return makers.length === 1 ? `${String(fresh)} new · ${makers[0] ?? ''}` : `${String(fresh)} new`;
 }
 
+/** A gauge worth its place: some words, and not an empty context ('0%'). Pure. */
+export function gaugeSays(short: string | null | undefined): boolean {
+  const w = (short ?? '').trim();
+  return w !== '' && !/(^|\s)0%$/.test(w);
+}
+
 /** '2 new · designer': the 'n new' part in the accent, as the artifacts' own 'new' chip (amb-kit, try gate D4); its words say it without the color. */
 function NewEnd({ words }: { words: string }) {
   if (words === '') return null;
@@ -148,6 +154,12 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
   const rows = useProjects();
   const home = rows.find((p) => p.home);
   const inView = projectOf(route);
+  // the route's project comes into view in a long sidebar (designer's R31 read: shop below the fold
+  // on shop's route); nearest edge, so a row already in view never moves
+  useEffect(() => {
+    if (inView === undefined) return;
+    document.querySelector(`[data-testid="app.sidebar.project.${CSS.escape(inView)}"]`)?.scrollIntoView({ block: 'nearest' });
+  }, [inView]);
   const waits = useWaitingTotal();
   const ids = rows.map((p) => p.project).join('\n');
   const fresh = useSum('artifacts', ids, (s, p) => s.artifacts(p).filter((a) => a.new).length);
@@ -188,7 +200,7 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         onClick={() => { router.go({ screen: 'artifacts', project: '' }); }} testId="app.sidebar.artifacts" />
       <SRow kind="top" lead="◷" name="scheduled" end={scheduled > 0 ? String(scheduled) : ''} on={route.screen === 'scheduled'}
         onClick={() => { router.go({ screen: 'scheduled' }); }} testId="app.sidebar.scheduled" />
-      {home !== undefined && inView === home.project && <Agents project={home.project} route={route} />}
+      {home !== undefined && inView === home.project && <Agents project={home.project} route={route} expect={Math.max(0, home.agents - 1)} />}
       <SectionHead>projects</SectionHead>
       {projects.length === 0 && <SRow kind="more" lead="+" name="add a project" end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.empty-add" />}
       {projects.map((p) => (
@@ -307,7 +319,7 @@ const ProjectItem = memo(function ProjectItem({ p, on, route }: { p: ProjectRow;
       {menu && <ProjectMenu p={p} onClose={() => { setMenu(false); }} />}
       {/* its hub refused this core: the hub's words and a retry, open or closed (lead m_11347) */}
       <RefusedLine project={p.project} name={p.name} className="app-refused" testId={`app.sidebar.project.${p.project}.refused`} />
-      {open && <Agents project={p.project} route={route} />}
+      {open && <Agents project={p.project} route={route} expect={Math.max(0, p.agents - 1)} />}
     </>
   );
 });
@@ -359,7 +371,7 @@ function ProjectMenu({ p, onClose }: { p: ProjectRow; onClose: () => void }) {
  * feature's head ('ψ gift-cards', opens the feature) with its agents. Done
  * agents quiet for an hour fold into 'n more today' (one at rest stays).
  */
-function Agents({ project, route }: { project: string; route: Route }) {
+function Agents({ project, route, expect = 0 }: { project: string; route: Route; expect?: number }) {
   const router = useRouter();
   const all = useAgents(project);
   const features = useFeatures(project);
@@ -403,6 +415,18 @@ function Agents({ project, route }: { project: string; route: Route }) {
       );
     return r;
   };
+  // its agents not come yet (the hub's first agents event): their places, kept, so the rows under
+  // them never move when they come (qa-flows' app/clicks: shop's head moved under the pointer)
+  if (all.length === 0 && expect > 0)
+    return (
+      <>
+        {Array.from({ length: expect }, (_, i) => (
+          <div key={i} className="app-r ag app-skel" aria-hidden="true" data-testid={`app.sidebar.project.${project}.skel`}>
+            <span className="app-skel-bar" />
+          </div>
+        ))}
+      </>
+    );
   return (
     <>
       {solo.map(row)}
@@ -447,7 +471,8 @@ function AgentRow({ project, a, route, now, wake }: { project: string; a: Agent;
         <>
           {a.name}
           {/* its context gauge, the TUI panel's short form as the hub sends it (amb-feed c317fc32) */}
-          {a.usage != null && a.usage.short !== '' && (
+          {/* only when it says something: an empty context ('0%') takes no place (designer D12) */}
+          {a.usage != null && gaugeSays(a.usage.short) && (
             <span className="app-gauge" data-testid={`app.sidebar.agent.${a.name}.gauge`}>
               {a.usage.short}
             </span>

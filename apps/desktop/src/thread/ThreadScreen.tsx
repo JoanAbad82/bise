@@ -32,7 +32,7 @@ import { ThreadInbox, takesWords, useStripCard } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
-import { composerWords, emptyEnter } from './head';
+import { composerWords, emptyEnter, usageLine } from './head';
 import { SignInLine, useThreadSignIn } from './signin';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
@@ -260,11 +260,14 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
       </a>
     );
   const lead = bise ? 'every project' : agent === 'main' ? '' : (projectName ?? project);
-  // its context gauge, the hub's words as sent (the TUI's divider: '42k · 17%')
-  const gauge = me?.usage?.words ?? '';
+  // its context gauge, named ('context 42k · 17%'), none while it says nothing ('0%': designer D7b)
+  const gauge = bise ? '' : usageLine(me?.usage?.words);
   const sub = (
     <>
-      {agent === 'main' && countsLink !== null ? (
+      {/* bise's own head: 'every project' alone (designer D7b) */}
+      {bise ? (
+        lead
+      ) : agent === 'main' && countsLink !== null ? (
         lead === '' ? (
           countsLink
         ) : (
@@ -273,7 +276,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
           </>
         )
       ) : (
-        [lead, !bise && agent !== 'main' && me ? lineOf(me) : ''].filter(Boolean).join(' · ')
+        [lead, agent !== 'main' && me ? lineOf(me) : ''].filter(Boolean).join(' · ')
       )}
       {gauge !== '' && (
         <span className="th-gauge" data-testid="thread.usage">
@@ -317,7 +320,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     <FindMarkContext value={mark}>
       <section ref={section} className="th-screen" data-testid="thread.screen" data-project={project} data-agent={agent} data-quoting={quoting} data-answering={answering !== null} onKeyDown={onKeyDown} onKeyDownCapture={onKeyDownCapture}>
         {bise || !me || me.archived ? (
-          <Head title={headTitle} sub={sub} lead={bise ? <BisePearl size={22} /> : undefined} dot={bise || !me ? undefined : dotOf(me.status)} />
+          <Head title={headTitle} sub={sub} lead={bise ? <BisePearl size={14} /> : undefined} dot={bise || !me ? undefined : dotOf(me.status)} />
         ) : agent === MAIN ? (
           <BiseHead project={project} name={projectName ?? project} more={more} />
         ) : (
