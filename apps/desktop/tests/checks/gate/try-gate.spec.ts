@@ -7,7 +7,7 @@
 // writes <id>.png, strips as <id>-1…n, moments as <id>-a/b, and index.md). It shoots and notes what
 // it could not; ambient-pm marks ok/red by eye. Never a gate by itself: no assertion fails the run
 // except a launch that doesn't come up.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { inflateSync } from 'node:zlib';
 import type { Page } from '@playwright/test';
@@ -17,6 +17,8 @@ import { appMenu, capsulePage, clickMenu, flat, Lines, sleep, CAPSULE } from '..
 
 const OUT = process.env['BISE_TRY_GATE_OUT'] ?? '';
 test.skip(OUT === '', 'the try gate runs only with BISE_TRY_GATE_OUT');
+/** BISE_TRY_GATE_ROWS=R03,R18,ASK-…: only these rows (a reshoot), added to index.md as a new section */
+const ONLY = (process.env['BISE_TRY_GATE_ROWS'] ?? '').split(',').map((x) => x.trim()).filter((x) => x !== '');
 
 type Row = { id: string; files: string[]; notes: string[] };
 const rows = new Map<string, Row>();
@@ -42,6 +44,7 @@ async function shot(id: string, name: string, p: Page, o: { omitBackground?: boo
 
 /** runs one row; a failure is written in index.md, never thrown */
 async function each(id: string, body: () => Promise<void>): Promise<void> {
+  if (ONLY.length > 0 && !ONLY.includes(id)) return;
   row(id);
   try {
     await body();
@@ -129,6 +132,7 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
     });
     await each('R34', async () => {
       note('R34', 'the rich world has 3 projects, not 22: the picker is shot as it is');
+      await p.getByTestId('setup.root').waitFor({ timeout: 20_000 });
       // setup's own steps (hello, permissions, …) to its project picker (setup.list / setup.filter / setup.choose)
       const picker = p.locator('[data-testid="setup.list"], [data-testid="setup.filter"], [data-testid="setup.choose"]').first();
       const seen: string[] = [];
@@ -136,8 +140,8 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
         seen.push((await testids(p, 'setup.step.')).join('+'));
         const next = p.getByTestId('setup.next');
         if (!(await next.isVisible().catch(() => false))) break;
-        await next.click({ timeout: 5000 });
-        await sleep(800);
+        await next.click({ timeout: 20_000 });
+        await sleep(1500);
       }
       note('R34', `setup steps on the way: ${seen.join(' → ')}`);
       if (await picker.isVisible().catch(() => false)) {
@@ -237,9 +241,13 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
     });
     await each('R25', async () => {
       await go(s, `project/${shop}`);
-      const box = p.getByTestId('composer');
-      const b = await box.boundingBox();
-      if (!b) throw new Error('no composer box');
+      // the input box: the field's nearest ancestor that also holds the send button (not the hints line under it)
+      const b = await field.evaluate((el) => {
+        let e: HTMLElement | null = el;
+        while (e && !e.querySelector('[data-testid="composer.send"]')) e = e.parentElement;
+        const r = (e ?? el).getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+      });
       await p.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
       await sleep(300);
       await shot('R25', 'R25-a-hover', p);
@@ -273,25 +281,29 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
     // R24 / R15: one composer with a pasted image, a quote of the thread and dictation running
     await each('R24', async () => {
       await go(s, `project/${tel}`);
-      // the quote: a word of the thread selected, then Space (R38's way)
-      await p.getByTestId('thread.list').locator('p').last().dblclick();
-      await sleep(400);
-      await p.keyboard.press('Space');
-      await sleep(600);
-      // the image: a paste of a small PNG into the field, as ⌘V of a screenshot would
-      await field.click();
-      await field.evaluate(async (el) => {
-        const c = document.createElement('canvas');
-        c.width = 64; c.height = 40;
-        const g = c.getContext('2d');
-        if (g) { g.fillStyle = '#d4688a'; g.fillRect(0, 0, 64, 40); }
-        const blob = await new Promise<Blob | null>((r) => { c.toBlob(r, 'image/png'); });
-        if (!blob) return;
-        const dt = new DataTransfer();
-        dt.items.add(new File([blob], 'shot.png', { type: 'image/png' }));
-        el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+      // the quote: a real drag-selection over an answer's words (mouse down, move, up), then Space
+      const para = p.getByTestId('thread.list').locator('p').filter({ hasText: /\w{4,}/ }).last();
+      const pb = await para.boundingBox();
+      if (pb) {
+        await p.mouse.move(pb.x + 4, pb.y + Math.min(10, pb.height / 2));
+        await p.mouse.down();
+        await p.mouse.move(pb.x + Math.min(260, pb.width - 4), pb.y + Math.min(10, pb.height / 2), { steps: 8 });
+        await p.mouse.up();
+        await sleep(500);
+        await shot('R24', 'R24-a-selection', p);
+        await p.keyboard.press('Space');
+        await sleep(700);
+      } else note('R24', 'no answer paragraph to select');
+      // the image: a PNG on the app's clipboard (Electron's clipboard, the test's own: test mode fences it), then ⌘V in the field
+      await s.app.evaluate(({ clipboard, nativeImage }) => {
+        // a 1x1 PNG, scaled to 64x40
+        const one = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- NativeImage.resize, typed in Electron's main
+        clipboard.writeImage(one.resize({ width: 64, height: 40 }));
       });
-      await sleep(800);
+      await field.click();
+      await p.keyboard.press('Meta+v');
+      await sleep(1000);
       await p.keyboard.type('what is this? ');
       await p.keyboard.press('Control+r');
       await sleep(900);
@@ -362,6 +374,79 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       if (await landed.isVisible().catch(() => false)) { await landed.click(); await sleep(1200); await shot('R09', 'R09-b-diff', p); } else note('R09', 'no changes row to open');
     });
 
+    // ---- designer's R40 redo (m_12775): a reply that streams (amb-tools 9a0a1cd7: a script's "stream" key,
+    // 12 text deltas 250 ms apart), a list and a code block; 6 frames ~150 ms apart DURING the stream
+    await each('ASK-designer-2', async () => {
+      const phrase = 'show me the rollout steps as they come';
+      const reply = ['Here is the rollout, step by step:', '', '- ship the ingest batch size fix', '- watch the p99 for one hour', '- then flip the alert to the real percentile', '', '```sh', 'bise run alerts --percentile p99 --window 1h', '```', '', 'I will tell you when the dashboard is up.'].join(String.fromCharCode(10));
+      const dir = path.join(path.dirname(w.home), 'rich', 'scripts');
+      writeFileSync(path.join(dir, 'qa-native-r40.json.tmp'), JSON.stringify({ match: phrase, calls: [], reply, stream: { chunks: 12, every: 0.25 } }));
+      renameSync(path.join(dir, 'qa-native-r40.json.tmp'), path.join(dir, 'qa-native-r40.json'));
+      await sleep(500);
+      await go(s, 'bise');
+      await field.click();
+      await p.keyboard.type(phrase);
+      await p.keyboard.press('Enter');
+      // the first words: then 6 frames 150 ms apart
+      await p.getByText('Here is the rollout', { exact: false }).first().waitFor({ timeout: 20_000 });
+      for (let i = 1; i <= 6; i++) { await shot('ASK-designer-2', `R40-redo-${i}`, p); await sleep(150); }
+      await sleep(3500);
+      await shot('ASK-designer-2', 'R40-redo-done', p);
+      note('ASK-designer-2', 'R40 redo: reply streamed in 12 deltas 250 ms apart (fake script stream key); frames 1-6 from the first words on, ~150 ms apart plus the shot time; -done after the stream');
+    });
+
+    // ---- ambient-pm's asks on the window (m_12768, m_12769, m_12771, m_12772)
+    const docs = await pid('docs');
+    await each('ASK-pm-1', async () => {
+      await go(s, `agent/${tel}/dashboards`);
+      await sleep(1000);
+      await shot('ASK-pm-1', 'ask-ambient-pm-1-dashboards-tools', p);
+    });
+    await each('ASK-pm-2', async () => {
+      await clickMenu(s, 'Go/Inbox');
+      await sleep(1000);
+      const card = p.locator('[data-testid^="inbox.item"]').filter({ hasText: /dark-mode/ }).first();
+      await card.click({ timeout: 10_000 });
+      await sleep(1000);
+      await shot('ASK-pm-2', 'ask-ambient-pm-2-inbox-feature-try', p);
+    });
+    await each('ASK-pm-5', async () => {
+      await go(s, `feature/${docs}/dark-mode`);
+      await sleep(1500);
+      await shot('ASK-pm-5', 'ask-ambient-pm-5-feature-dark-mode', p);
+    });
+    await each('ASK-pm-4', async () => {
+      const theme = (): Promise<string> => p.evaluate(() => document.documentElement.getAttribute('data-theme') ?? '(none)');
+      // 1. '/theme dark' typed in bise's composer: does it change <html data-theme>? (ambient-pm m_12808)
+      await go(s, 'bise');
+      const before = await theme();
+      await field.click();
+      await p.keyboard.type('/theme dark');
+      await sleep(500);
+      await p.keyboard.press('Enter');
+      await sleep(1500);
+      note('ASK-pm-4', `'/theme dark' in bise's composer: data-theme ${before} -> ${await theme()}`);
+      // 2. settings · general's theme control, 'dark' picked (as he would)
+      await go(s, 'settings/general');
+      const ctl = p.getByTestId('settings.pref.theme');
+      await ctl.getByText(/^dark$/i).first().click({ timeout: 10_000 });
+      await sleep(1200);
+      note('ASK-pm-4', `settings · general theme → dark: data-theme ${await theme()}`);
+      await shot('ASK-pm-4', 'ask-ambient-pm-4-settings-dark', p);
+      await go(s, 'bise');
+      await sleep(800);
+      await shot('ASK-pm-4', 'ask-ambient-pm-4-bise-dark', p);
+      // designer's ask (m_12774, m_12803): telemetry's main thread in dark
+      await go(s, `project/${tel}`);
+      await sleep(1000);
+      await shot('ASK-pm-4', 'ask-designer-1-telemetry-dark', p);
+      note('ASK-pm-4', `data-theme on the dark shots: ${await theme()}`);
+      // back to light for the rest
+      await go(s, 'settings/general');
+      await ctl.getByText(/^light$/i).first().click({ timeout: 10_000 }).catch(() => undefined);
+      await sleep(800);
+    });
+
     // ---- the capsule (scripted helper): R04, R07, R19, R29, R18, R02, R05, R08, R14, R20, R30, R03
     const cap = await capsulePage(s);
     const spot = async (): Promise<void> => {
@@ -415,12 +500,21 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       await hide();
     });
     await each('R18', async () => {
+      // a 52-line markdown answer from the world's fake model: a script of its own ($FAKE_SCRIPTS, the rich world's)
+      const phrase = 'walk me through the whole notification rollout plan';
+      const body = ['## Notification rollout', '', ...Array.from({ length: 50 }, (_, i) => (i % 10 === 0 ? `### Step ${String(i / 10 + 1)}` : `- line ${String(i + 1)}: check the **p99** of \`notify-${String(i)}\` before the next region`))];
+      writeFileSync(path.join(path.dirname(w.home), 'rich', 'scripts', 'qa-native-r18.json'), JSON.stringify({ match: phrase, calls: [], reply: body.join(String.fromCharCode(10)) }));
       await spot();
-      await cap.keyboard.type('give me forty lines [[drip: 4 0.2]]');
+      await cap.keyboard.type(phrase);
       await cap.keyboard.press('Enter');
-      await sleep(4000);
+      await sleep(8000);
       await shot('R18', 'R18', cap, { omitBackground: true });
-      note('R18', "the fake model's answer is an ack, not 40 lines: the shot shows how the spot holds the answer it got");
+      // ambient-pm m_12807: did the answer land in bise's thread? the window right after
+      await go(s, 'bise');
+      await sleep(800);
+      await shot('R18', 'R18-window-bise', p);
+      note('R18', `the 52-line answer in bise's thread: ${(await p.getByTestId('thread.list').innerText().catch(() => '')).includes('Notification rollout') ? 'yes' : 'no'}`);
+      note('R18', `asked in the spot; the fake model answers ${String(body.length)} lines of markdown; capsule ${JSON.stringify(await s.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().includes('surface=capsule'))?.getBounds()))}, its view: ${await cap.getByTestId('capsule').getAttribute('data-view').catch(() => '?')}`);
       await hide();
     });
     // R08's spoken ask, about three lines long, heard through the core's real talk path
@@ -478,7 +572,28 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       for (let i = 4; i <= 6; i++) { await shot('R14', `R14-${i}-think`, cap, { omitBackground: true }); await sleep(300); }
     });
     await hide();
-    note('R03', "blocked on amb-win's hover fix (ambient-lead m_12567): reshot on the next sha with app/clicks' result");
+    // R03: a card in the capsule (the spot's first waiting row, ⏎), one of its buttons hovered
+    await each('R03', async () => {
+      await spot();
+      await cap.keyboard.press('Enter');
+      await sleep(1000);
+      await shot('R03', 'R03-a-after-enter', cap, { omitBackground: true });
+      note('R03', `after ⏎ on the spot's first waiting row: view ${await cap.getByTestId('capsule').getAttribute('data-view').catch(() => '?')}, buttons ${JSON.stringify(await cap.locator('button').evaluateAll((es) => es.map((e) => e.textContent.trim().slice(0, 20)).slice(0, 6)))}`);
+      const btn = cap.locator('[data-testid="capsule"] button').first();
+      await btn.hover({ timeout: 5000 });
+      await sleep(300);
+      await shot('R03', 'R03-card-hover', cap, { omitBackground: true });
+      note('R03', `capsule view: ${await cap.getByTestId('capsule').getAttribute('data-view').catch(() => '?')}; hovered: ${JSON.stringify((await btn.innerText()).trim())}; app/clicks: green on 723648da (real.sh, ambient-lead m_12764)`);
+      await hide();
+    });
+    // ambient-pm's capsule ask: the spot with 'ingest' typed and its row selected
+    await each('ASK-pm-3', async () => {
+      await spot();
+      await cap.keyboard.type('ingest');
+      await sleep(800);
+      await shot('ASK-pm-3', 'ask-ambient-pm-3-spot-ingest', cap, { omitBackground: true });
+      await hide();
+    });
   } finally {
     const lines = [
       `# try gate shots`,
@@ -492,7 +607,9 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       ...[...rows.values()].sort((a, b) => a.id.localeCompare(b.id)).map((r) => `| ${r.id} | ${r.files.join('<br>') || '—'} | ${r.notes.join('<br>').replace(/\|/g, '\\|') || ''} |`),
       '',
     ];
-    writeFileSync(path.join(OUT, 'index.md'), lines.join('\n'));
+    const text = lines.join(String.fromCharCode(10));
+    if (ONLY.length > 0) appendFileSync(path.join(OUT, 'index.md'), `${String.fromCharCode(10)}## reshoot: ${ONLY.join(', ')}${String.fromCharCode(10)}${text.split(String.fromCharCode(10)).slice(1).join(String.fromCharCode(10))}`);
+    else writeFileSync(path.join(OUT, 'index.md'), text);
     await s.close().catch(() => undefined);
     helper.dispose();
   }
