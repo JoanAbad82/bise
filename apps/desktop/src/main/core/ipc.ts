@@ -11,6 +11,7 @@ import { configOf } from './env';
 import { Latest } from '../../shared/latest';
 import { CoreProcess } from './process';
 import { DictationRoutes, type Route } from './dictation';
+import { SubRoutes } from './subs';
 
 let core: CoreProcess | null = null;
 // the last state events, for a window or a main-side listener that comes after they went out
@@ -18,6 +19,8 @@ const latest = new Latest();
 const listeners = new Set<(ev: Record<string, unknown>) => void>();
 // a dictation's words go only to the window that started it (dictation.ts)
 const dictations = new DictationRoutes();
+// the threads each window follows: the core has one set per project (subs.ts)
+const subs = new SubRoutes();
 const watched = new Set<number>();
 // how its last run ended (exit.ts), sent with every state: null until it ended once
 let lastExit: CoreExit | null = null;
@@ -54,13 +57,14 @@ function toWindow(r: Route): void {
   w?.webContents.send(CORE_IPC.ev, r.ev);
 }
 
-/** A window that dictates or talks in voice mode: when it's gone (closed, crashed, reloaded), its mic stops. */
+/** A window that dictates, talks in voice mode or follows a thread: when it's gone (closed, crashed, reloaded), its mic stops and its threads are let go. */
 function watch(contents: Electron.WebContents): void {
   if (watched.has(contents.id)) return;
   const id = contents.id;
   watched.add(id);
   const gone = (): void => {
     for (const c of dictations.gone(id)) core?.send(c);
+    for (const c of subs.gone(id)) core?.send(c);
   };
   contents.once('destroyed', () => {
     watched.delete(id);
@@ -88,8 +92,9 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
     dictations.sent(e.sender.id, cmd);
     const name = (cmd as { cmd?: unknown } | null)?.cmd;
     // a window whose mic, voice mode or held /model (R8) must end with it
-    if (name === 'dictate_start' || name === 'voice_mode' || name === 'slash') watch(e.sender);
-    core?.send(cmd);
+    if (name === 'dictate_start' || name === 'voice_mode' || name === 'slash' || name === 'subscribe') watch(e.sender);
+    // an unsubscribe another window still needs stays here (R18)
+    for (const c of subs.sent(e.sender.id, cmd)) core?.send(c);
   });
   ipcMain.handle(CORE_IPC.stateNow, (): CoreState => state);
   ipcMain.handle(CORE_IPC.snapshot, (): Record<string, unknown>[] => latest.snapshot());
@@ -122,7 +127,10 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
       },
       onState: (s) => {
         // a new core starts from nothing: it says its state again
-        if (s === 'starting') latest.clear();
+        if (s === 'starting') {
+          latest.clear();
+          subs.clear();
+        }
         // a core gone took its mic with it: its dictations end
         if (s !== 'up') for (const r of dictations.coreGone()) toWindow(r);
         state = s;
