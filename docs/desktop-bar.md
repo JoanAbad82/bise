@@ -469,6 +469,10 @@ isn't judging. A row marked ok names the shot that was looked at.
       card under it says it.
     - Green: N1 (the gauge is rightly hidden on a done or idle agent), N2, N3's position, R34, KQ,
       SPOT-chip, R24, R07-a and the spot's heads.
+    - EMPTY, reshot anyway on the packed app with a fresh home (qa-native m_13896), is green.
+      ambient-pm looked at EMPTY-1100.png: "bise is here.", "add a project ⌘N" and "show me what
+      you can do", centred, with nothing scrolling, at 800, 1024, 1100 and 1400. Its check is
+      gate/empty.spec.ts.
     - EMPTY and N4 are signed on amb-win's 2f22e7fc/442ea0f1 and amb-web's f57db910 shots; no
       reshoot needed.
     - Nits for the next cut:
