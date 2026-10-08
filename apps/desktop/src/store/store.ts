@@ -633,7 +633,10 @@ export class Store {
 
   /** His words landed in the thread: the oldest pending send with these words goes. */
   private landed(key: string, t: Thread, text: string): void {
-    const i = t.pending.findIndex((p) => p.text.trim() === text.trim());
+    // a send with images comes back with the hub's markers ('<image name="[Image #1]" …>') before
+    // his words: compared without them, else its row stayed 'sending…' forever (qa-native R41)
+    const said = sentWords(text);
+    const i = t.pending.findIndex((p) => sentWords(p.text) === said);
     if (i < 0) return;
     t.pending = t.pending.filter((_, j) => j !== i);
     this.emit(`pending:${key}`);
@@ -951,4 +954,17 @@ function sameOrder(a: readonly number[], b: readonly number[]): boolean {
 
 function sameJson(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * His words as sent, to match a pending send with its echo: the hub's image markers
+ * (`<image name="[Image #1]" path=… mime=… b64=…>`, rust/images marker()) and the composer's
+ * '[Image #n]' labels out, spaces collapsed. Pure.
+ */
+export function sentWords(text: string): string {
+  return text
+    .replace(/<image name="[^"]*" path="[^"]*" mime="[^"]*" b64="[^"]*">/g, ' ')
+    .replace(/\[Image #\d+\]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }

@@ -3,7 +3,7 @@ import { app_cmd, core_ev, hub_cmd, hub_ev } from '@/proto/fixtures.gen';
 import type { Entry } from '@/proto';
 import type { CoreCmd } from '@/shared/api';
 import { allFixtureEvents, replay } from './replay';
-import { Store, TAGS, threadKey, typed } from './store';
+import { sentWords, Store, TAGS, threadKey, typed } from './store';
 
 const P = 'acme-1a2b3c4d';
 const K = threadKey(P, 'perf');
@@ -136,6 +136,20 @@ describe('store', () => {
     store.apply({ ev: 'entry', project: P, agent: 'perf', entry: entry(9, 'again', 'you') });
     expect(store.pending(K).map((p) => p.cid)).not.toContain(first);
     expect(store.pending(K)).toHaveLength(1);
+  });
+
+  it("a send with an image goes when its echo lands with the hub's marker before his words (qa-native R41)", () => {
+    const { store } = fake();
+    store.send({ project: P, agent: 'perf', text: 'what is in this picture?', files: ['/tmp/shot.png'] });
+    store.send({ project: P, agent: 'perf', text: '[Image #1] and this one', files: ['/tmp/b.png'] });
+    expect(store.pending(K)).toHaveLength(2);
+    const marker = '<image name="[Image #1]" path="/tmp/shot.png" mime="image/png" b64="/h/images/ab12.b64">';
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: entry(9, `${marker}
+what is in this picture?`, 'you') });
+    expect(store.pending(K).map((p) => p.text)).toEqual(['[Image #1] and this one']);
+    store.apply({ ev: 'entry', project: P, agent: 'perf', entry: entry(10, `${marker.replace('shot', 'b')} and this one`, 'you') });
+    expect(store.pending(K)).toEqual([]);
+    expect(sentWords('<image name="[Image #2]" path="a b.png" mime="image/png" b64="x">  hi\n there')).toBe('hi there');
   });
 
   it('a send carries the files he attached, typed, and a retry sends them again; no files means no field', () => {
