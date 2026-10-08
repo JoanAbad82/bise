@@ -47,10 +47,12 @@ impl Shell {
         }
     }
 
-    /// The `sb kept` line to write before `line` when `line` ends the
-    /// turn without its answer (lines::keeps_partial: a failure, a stall,
-    /// a harness restart) while `name` has text streamed in: what he read
-    /// stays in the thread, dim, above the failure (designer m_13334).
+    /// The `sb kept` line to write before `line` when `line` ends a
+    /// streamed attempt without its answer (lines::keeps_partial: a
+    /// retry, a discarded candidate, a failure, a stall, a harness
+    /// restart) while `name` has text streamed in: what he read stays in
+    /// the thread, dim, at its place, the notices under it (designer
+    /// m_13334, m_13562).
     pub(super) fn partial_kept(&self, name: &str, line: &str) -> Option<String> {
         use bise_proto::thread::lines::{keeps_partial, read};
         let p = self.partials.get(name)?;
@@ -61,7 +63,8 @@ impl Shell {
     }
 
     /// A feed line that ends `name`'s live answer (its entry, the turn's
-    /// end, a stop, a restart: lines::clears_partial, one rule): cleared
+    /// end, a retry, a discarded candidate, a stop, a restart:
+    /// lines::clears_partial, one rule): cleared
     /// once, "" to every client.
     pub(super) fn partial_clear(&mut self, name: &str, line: &str) {
         use bise_proto::thread::lines::{clears_partial, read};

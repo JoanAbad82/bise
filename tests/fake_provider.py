@@ -26,6 +26,8 @@ the injected <bise_state> block is not one):
   verbatim (markdown kept), instead of "done: …" / "ack: …";
 - `[[ts: CODE]]`: a run_typescript call with that program (CODE without
   `]]`);
+- `[[say: TEXT]]`: every tool-call reply to that message starts with
+  TEXT (text, then the call, in one reply);
 - `[[think: TEXT]]`: every reply to that message starts with reasoning
   TEXT (Anthropic thinking + signature, reasoning_content, a Responses
   reasoning item, Gemini thought parts + thoughtSignature);
@@ -34,7 +36,9 @@ the injected <bise_state> block is not one):
   overloaded (Anthropic 529, the others 503), stream (a 200 stream that
   breaks with the family's error event; a whole reply gets a 500),
   cut (the same, but the error event comes after two thirds of the
-  answer's events: the text started streaming, then the stream broke),
+  answer's events: the text started streaming, then the stream broke;
+  a turn that is a bare tool call streams the `[[reply: PATH]]` text
+  instead, so the retry can answer with the call alone),
   badname (a final 400: the API refusing a tool name, BISE-293).
   Several markers fail in their order. `retry=S` sets Retry-After (1);
 - `[[slow: S]]`: every request for that message waits S seconds (a
@@ -102,6 +106,7 @@ FAMILIES = ("anthropic", "openai-chat", "openai-responses", "gemini")
 MARK = re.compile(r"\[\[(bash|skill|edit|write_file|apply_patch|run_typescript|ts): (.*?)\]\]", re.S)
 INNER = re.compile(r"\{\{(bash): (.*?)\}\}", re.S)
 THINK = re.compile(r"\[\[think: (.*?)\]\]", re.S)
+SAY = re.compile(r"\[\[say: (.*?)\]\]", re.S)
 REPLY = re.compile(r"\[\[reply: ([^\]\n]+)\]\]")
 ERROR = re.compile(r"\[\[error: (\w+)(?: x(\d+))?(?: retry=(\d+))?\]\]")
 FIXTURE = re.compile(r"\[\[fixture: ([\w.-]+)\]\]")
@@ -388,6 +393,12 @@ def reply_for(conv, seen=0):
         # script gives once its errors are over (a fixture never)
         turn = reply_for(conv, len(errs) + 1)
         turn["error"] = errs[seen]
+        rep = REPLY.search(user)
+        if not turn["text"] and rep:
+            try:
+                turn["text"], turn["calls"] = open(rep.group(1).strip(), encoding="utf-8").read(), []
+            except OSError:
+                pass
         return turn
     if seen < len(errs):
         turn["error"] = errs[seen]
@@ -424,6 +435,9 @@ def reply_for(conv, seen=0):
             cmd, desc = arg.split(" @@ ", 1)
             args = {"arg": cmd.strip(), "description": desc.strip()}
         turn["calls"] = [{"id": "call_%d_%d" % (idx, calls_done), "name": tool, "args": args}]
+        say = SAY.search(user)
+        if say:
+            turn["text"] = say.group(1).strip()
         return turn
     if sc:
         turn["text"] = sc.get("reply") or plain(PLAIN_DONE, user)

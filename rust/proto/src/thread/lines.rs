@@ -454,23 +454,34 @@ impl Partial {
     }
 }
 
-/// The lines that end a turn without its answer: a failure, a stall, a
-/// harness restart. The text he already read as it streamed in stays in
-/// the thread (an `sb kept` line written before it), dim, above the
-/// failure. A stop clears it; a retry or a discarded candidate leave it
-/// for what comes next (the next attempt's +0, the answer, the turn end).
+/// The lines that end a streamed attempt without its answer: a provider
+/// retry, a discarded candidate, a failure, a stall, a harness restart.
+/// The text he already read as it streamed in stays in the thread (an
+/// `sb kept` line written right before that line), dim, at the place it
+/// streamed; the notices go under it in arrival order (designer m_13334
+/// and m_13562: text he read never vanishes and never moves). Each of
+/// these lines also clears ([`clears_partial`]), so a next attempt (its
+/// text, its tool calls) never runs with the old text still live. A stop
+/// clears with nothing kept.
 pub fn keeps_partial(rec: &Rec) -> bool {
-    matches!(rec, Rec::Obs(Obs::TurnDone(TurnEnd::Failed(_)) | Obs::TurnStalled(_) | Obs::HarnessRestarted(_)))
+    matches!(
+        rec,
+        Rec::Obs(
+            Obs::TurnDone(TurnEnd::Failed(_))
+                | Obs::TurnStalled(_)
+                | Obs::HarnessRestarted(_)
+                | Obs::ProviderRetry(_)
+                | Obs::CandidateDiscarded(_)
+        )
+    )
 }
 
 /// The lines that end an agent's live answer: its answer came (the
-/// assistant line), the turn ended (done, failed, interrupted, stalled),
-/// a stop, a restart. One rule for the hub and the TUI. A provider retry
-/// or a discarded candidate does NOT clear it: the text he read stays
-/// until the next attempt's first partial replaces it (a new call id at
-/// +0), and a turn that then fails keeps it (designer m_13334: text he
-/// has read never vanishes; a failure writes `candidate_discarded` right
-/// before its `turn_done: failed`, so clearing there lost the text).
+/// assistant line, also written before a reply's tool calls), the turn
+/// ended (done, failed, interrupted, stalled), a provider retry or a
+/// discarded candidate (a new attempt starts empty), a stop, a restart.
+/// One rule for the hub and the TUI; the ones that end an attempt
+/// without its answer keep the text first ([`keeps_partial`]).
 pub fn clears_partial(rec: &Rec) -> bool {
     matches!(
         rec,
@@ -479,6 +490,8 @@ pub fn clears_partial(rec: &Rec) -> bool {
                 | Obs::TurnDone(_)
                 | Obs::TurnStalled(_)
                 | Obs::HarnessRestarted(_)
+                | Obs::ProviderRetry(_)
+                | Obs::CandidateDiscarded(_)
         ) | Rec::Hub(Hub::Stopped(_))
             | Rec::Idle
     )

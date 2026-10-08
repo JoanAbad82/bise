@@ -212,29 +212,30 @@ fn partial_clears_on_every_end() {
         "  obs: turn_done: interrupted",
         "sb stopped : by the user",
         "--- idle",
+        // a new attempt starts empty: its text or its tool calls never
+        // run under the old attempt's live text (architect m_13563)
+        "  obs: candidate_discarded: empty",
+        "  obs: provider_retry: 2/10 · 529 · retry in 4s",
     ] {
         assert!(clears_partial(&read(l)), "{l}");
     }
-    // a retry or a discarded candidate keeps the text until the next
-    // attempt's first partial, the answer or the turn's end (a failure
-    // writes candidate_discarded before its turn_done: failed)
-    for l in [
-        "  obs: candidate_discarded: empty",
-        "  obs: usage: model=m in=1 out=2",
-        "tool #3 bash : ls",
-        "partial #1.0 +0 : x",
-        "  obs: turn_started",
-        "  obs: provider_retry: 2/10 · 529 · retry in 4s",
-    ] {
+    for l in ["  obs: usage: model=m in=1 out=2", "tool #3 bash : ls", "partial #1.0 +0 : x", "  obs: turn_started"] {
         assert!(!clears_partial(&read(l)), "{l}");
     }
 }
 
-// a failed turn keeps the text read so far (designer m_13334); a stop,
-// a completed turn or an answer don't
+// an attempt that ends without its answer keeps the text read so far,
+// at its place, the notices under it (designer m_13334, m_13562); a
+// stop, a completed turn or an answer don't
 #[test]
-fn partial_kept_on_a_failure_only() {
-    for l in ["  obs: turn_done: failed: boom", "  obs: turn_stalled: no progress", "  obs: harness_restarted: crash"] {
+fn partial_kept_when_an_attempt_ends_without_its_answer() {
+    for l in [
+        "  obs: turn_done: failed: boom",
+        "  obs: turn_stalled: no progress",
+        "  obs: harness_restarted: crash",
+        "  obs: provider_retry: 2/10 · 529 · retry in 4s",
+        "  obs: candidate_discarded: empty",
+    ] {
         assert!(keeps_partial(&read(l)), "{l}");
         assert!(clears_partial(&read(l)), "{l}: kept, then cleared");
     }
@@ -244,7 +245,7 @@ fn partial_kept_on_a_failure_only() {
         "  obs: turn_done: failed: interrupted by the user",
         "  obs: assistant: hi",
         "sb stopped : by the user",
-        "  obs: provider_retry: 2/10 · 529 · retry in 4s",
+        "tool #3 bash : ls",
     ] {
         assert!(!keeps_partial(&read(l)), "{l}");
     }
@@ -261,7 +262,7 @@ fn partial_kept_line_round_trips() {
     let l = p.kept_line().expect("a kept line");
     assert_eq!(read(&l), Rec::Hub(Hub::Kept("first
 second and more".into())));
-    // a new attempt replaces the text (a retry doesn't clear it)
+    // a new attempt's first delta replaces the text
     p.step("1.1", 0, "again");
     assert_eq!(read(&p.kept_line().unwrap()), Rec::Hub(Hub::Kept("again".into())));
     // a broken block keeps nothing

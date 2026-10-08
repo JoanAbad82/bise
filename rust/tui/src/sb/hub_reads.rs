@@ -186,7 +186,14 @@ fn apply(app: &mut App, n: &Notification) {
         HubEv::CardOpen { id, .. } => cards::open_view(app, Some(*id)),
         // the hub moved his focus (the agent he was on is gone)
         HubEv::Focused { focus, .. } => super::focus(app, focus),
-        HubEv::Entry { agent, entry, .. } => feed_entries::entry(app, agent, entry),
+        HubEv::Entry { agent, entry, .. } => {
+            // the kept text takes the live text's place in the same frame
+            // (the hub's clear comes a line later)
+            if entry.cut {
+                app.sb.lives.remove(agent);
+            }
+            feed_entries::entry(app, agent, entry)
+        }
         // the answer as it streams in (whole text; "" when it ended):
         // drawn under the focused feed (livetext.rs)
         HubEv::Partial { agent, call, text, .. } => crate::livetext::on_event(&mut app.sb.lives, agent, call, text),
