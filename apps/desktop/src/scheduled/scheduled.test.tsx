@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { formatRoute, parseRoute } from '@/app/route';
-import { ahead, endsWords, nextRunWords, ordinal, runsWords, ScheduledHere, ScheduledView, type ScheduledTask, type Task } from './index';
+import { ahead, endsWords, howOften, nextRunWords, ordinal, runsWords, ScheduledHere, ScheduledView, type ScheduledTask, type Task } from './index';
 import { Store, StoreProvider } from '@/store';
 
 afterEach(cleanup);
@@ -84,5 +84,13 @@ describe('scheduled here (panel A)', () => {
     cleanup();
     render(<StoreProvider store={store}><ScheduledHere project="nowhere" onOpen={() => undefined} /></StoreProvider>);
     expect(screen.queryByTestId('scheduled.here')).toBeNull();
+  });
+});
+
+describe('how often', () => {
+  it("says 'every' once, whether or not the hub's rhythm already has it (designer D11)", () => {
+    expect(howOften(task(1, { every: '5m' }))).toBe('every 5m');
+    expect(howOften(task(1, { every: 'every day 07:30' }))).toBe('every day 07:30');
+    expect(howOften(task(1, { every: 'Every 10m' }))).toBe('Every 10m');
   });
 });

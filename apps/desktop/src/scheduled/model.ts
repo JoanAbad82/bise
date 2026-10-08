@@ -35,7 +35,11 @@ export function ahead(ms: number, now: number): string {
 }
 
 /** 'every 5m', 'every day 07:30'. */
-export const howOften = (t: ScheduledTask): string => `every ${t.every}`;
+export const howOften = (t: ScheduledTask): string => {
+  const e = t.every.trim();
+  // the hub may already say it ('every 5m'): never 'every every 5m' (designer D11)
+  return /^every\b/iu.test(e) ? e : `every ${e}`;
+};
 
 /** The runs: '3 of 24', '3 runs so far'. */
 export function runsWords(t: ScheduledTask): string {
