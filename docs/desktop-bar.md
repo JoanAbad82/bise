@@ -292,6 +292,10 @@ One red row, or an unsigned screen, means no try build. Each row has:
 
 A row stays even after it passes: it is a regression list.
 
+**For every gate run** (the user via main m_13700, ambient-lead m_13706): whoever judges the shots
+(ambient-pm, designer, qa-native) looks at them **as images**. Reading index.md's notes or the DOM
+isn't judging. A row marked ok names the shot that was looked at.
+
 | id | his words (date, where) | right | shot |
 |---|---|---|---|
 | R01 | "La UI est cassé sur ambiant! le layout va pas." (10-03, main#45596) | every screen laid out as signed: nothing overlaps, cut or spills | bise, inbox, settings, agent/shop/main at 1100 and at 800 |
@@ -334,6 +338,7 @@ A row stays even after it passes: it is a regression list.
 | R38 | "une fois que j'ai sélectionné, je voudrais pouvoir appuyer sur Space … pour que ça … cite … cliquer sur Type to Ask About It directement" (10-07, main#68436) | Space on a selection starts the quote; a click on "type to ask about it" puts the quote at the caret | a selection with its pop; then the composer after Space |
 | R39 | "l'app desktop allait se comporter comme le terminal en terme d'historique" (10-07, main#69423) | the thread holds the whole history, as the TUI does: older turns load when he scrolls up | agent/shop/main scrolled to the top |
 | R40 | "une petite animation quand le text apparait comme ce qu'il y a sur claude.ai" (10-07, main#69684) | streamed text appears with the signed animation (stagger capped), and nothing jumps | a streaming answer: a frame strip |
+| R41 | "N'oublie pas que le harness doit être multi-modal et donc que le modèle doit voir ces images que je paste" (10-08, main m_13700) | an image he pastes or drops reaches the model as an image content block, never as a path, a file name or a text tag. Five places: the window's composer, the spotlight, a card answer, an escalated agent question (`sb card --for`) and the terminal | not a shot: qa-native's check reads the fake provider's recorded request bodies (`$FAKE_BODIES`) after one paste in each of the five places. index.md lists each one with the block's type and media type; a path, `<image …>` or `[Image #1]` text in the body is red |
 
 **Run log** (one line per candidate: the sha, the date, the reds with what i saw, signed or not):
 
