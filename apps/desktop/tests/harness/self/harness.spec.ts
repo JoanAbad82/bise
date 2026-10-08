@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { PNG } from 'pngjs';
 import {
-  caretBlinks, changedOutside, dropFiles, expect, FakeCore, FakeHelper, flashes, fps, launchDesktop, launchPage, maxJump, prove, Recorder, replacedNodes, test, textProblems, typeAndWatch,
+  caretBlinks, changedOutside, dropFiles, expect, FakeCore, FakeHelper, flashes, fps, launchDesktop, launchPage, maxJump, prove, Recorder, replacedNodes, shotChanges, test, textProblems, typeAndWatch,
 } from '../index';
 
 /** a frame of a w x h page, filled with grey, `paint` pixels in red */
@@ -48,6 +48,44 @@ test('frames: the Recorder masks the pearls it finds on the page, nothing else',
     expect(frames[0]?.masks).toEqual([{ x: 29, y: 64, width: 15, height: 15 }, { x: 29, y: 64, width: 15, height: 15 }]);
     const changed = changedOutside(frames, { x: 0, y: 0, width: 1, height: 1 }).filter((n) => n > 0);
     expect(changed, 'only the 1 px dot counts, once').toEqual([1]);
+  } finally {
+    await s.close();
+  }
+});
+
+test('frames: shotChanges sees a WebGL canvas redraw (the screencast does not), and a stopped one as still', async () => {
+  // pearl/still went blind on the screencast: the pearl moved and the check saw nothing. This keeps
+  // the sampler the pearl checks use (shotChanges) seeing a WebGL redraw, and 0 once it stops.
+  const s = await launchPage(FIXTURE);
+  try {
+    const ok = await s.page.evaluate(() => {
+      const cv = document.createElement('canvas');
+      cv.width = 68;
+      cv.height = 68;
+      cv.style.cssText = 'position:fixed;left:40px;top:300px;width:68px;height:68px';
+      document.body.append(cv);
+      const gl = cv.getContext('webgl');
+      if (!gl) return false;
+      let i = 0;
+      const w = window as unknown as { glRun: boolean };
+      w.glRun = true;
+      const tick = (): void => {
+        i++;
+        gl.clearColor((i % 30) / 30, 0.2, 1 - (i % 30) / 30, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        if (w.glRun) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+      return true;
+    });
+    expect(ok, 'a WebGL context in the test window').toBe(true);
+    const box = { x: 40, y: 300, width: 68, height: 68 };
+    const running = await shotChanges(s.page, box, 1200);
+    expect(running.filter((n) => n > 3).length, `samples that saw the redraw (${running.join(',')})`).toBeGreaterThan(3);
+    await s.page.evaluate(() => { (window as unknown as { glRun: boolean }).glRun = false; });
+    await s.page.waitForTimeout(200);
+    const stopped = await shotChanges(s.page, box, 1000);
+    expect(stopped.filter((n) => n > 0), 'a stopped canvas is still').toEqual([]);
   } finally {
     await s.close();
   }

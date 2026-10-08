@@ -158,5 +158,23 @@ export function fps(frames: Frame[]): number {
   return span > 0 ? (frames.length - 1) / span : 0;
 }
 
+/**
+ * Per consecutive pair of samples, the pixels that changed in the box, from page.screenshot clips
+ * taken every `everyMs` for `ms`. The screencast (Recorder) does not see a WebGL canvas redraw in
+ * the hidden test window (a pearl in work drew 61 rAF frames and the screencast saw 0 changes in
+ * its box, amb-web's probe), so a check about a canvas samples with this instead. A sample that
+ * never changes is a still box; the harness self-test keeps this sampler seeing a WebGL redraw.
+ */
+export async function shotChanges(page: Page, box: Box, ms: number, everyMs = 100): Promise<number[]> {
+  const clip = { x: Math.floor(box.x), y: Math.floor(box.y), width: Math.ceil(box.width), height: Math.ceil(box.height) };
+  const shots: PNG[] = [];
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    shots.push(PNG.sync.read(await page.screenshot({ clip, animations: 'allow', caret: 'initial' })));
+    await page.waitForTimeout(everyMs);
+  }
+  return pairs(shots).map(([a, b]) => diffPixels(a, b, undefined, 'outside', 1));
+}
+
 /** A frame as a PNG file's bytes (for the report and 'show me'). */
 export const pngBytes = (f: Frame): Buffer => PNG.sync.write(f.png);
