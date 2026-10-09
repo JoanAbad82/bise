@@ -26,7 +26,7 @@ import { configOfPrefs } from './helper/config';
 import { installIpc, sendClip, sendMenu, setProjectRoots } from './ipc';
 import { installKeepIpc } from './keep';
 import { projectRoots } from './reveal';
-import { menuTemplate } from './menu';
+import { hasTestNotify, menuTemplate } from './menu';
 import { startTerms, type TermHost } from './term/host';
 import { startTray } from './tray';
 import { testHomeProblem } from './testhome';
@@ -117,6 +117,8 @@ void app.whenReady().then(() => {
     ipcMain.removeHandler(CORE_IPC.snapshot);
     startCore();
   });
+  // the notifier comes after the windows; Help's test item reaches it once it exists
+  let notifierRef: Notifier | null = null;
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       menuTemplate({
@@ -127,6 +129,14 @@ void app.whenReady().then(() => {
           sendMenu(action, main);
         },
         ...(testMode ? { clip: sendClip } : {}),
+        // a0: try and check builds (their own name) and tests, never his release app
+        ...(hasTestNotify(app.name, testMode)
+          ? {
+              testNotify: () => {
+                notifierRef?.testNotify(join(app.getPath('userData'), 'notify-test.log'));
+              },
+            }
+          : {}),
       }),
     ),
   );
@@ -153,6 +163,7 @@ void app.whenReady().then(() => {
       for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(IPC.notifyState, s);
     },
   });
+  notifierRef = notifier;
   // a quiet moment (a call, screen sharing, full screen): a question still arrives, silent
   helper?.on((ev) => {
     if (ev.ev === 'quiet') notifier.setQuiet(ev.on);

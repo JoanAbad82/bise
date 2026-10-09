@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Card } from '../../proto';
-import { Arrivals, effectOf, knocks, langOf, noteOf, titleOf } from './plan';
+import { Arrivals, bundleIdOf, effectOf, knocks, langOf, ncPrefsOf, noteOf, testNote, titleOf } from './plan';
 
 const card = (o: Partial<Card> = {}): Card => ({
   id: 7,
@@ -92,5 +92,36 @@ describe('notify plan: arrivals and knocks', () => {
     expect(langOf(['fr-FR', 'en-US'])).toBe('fr');
     expect(langOf(['en-GB', 'fr'])).toBe('en');
     expect(langOf([])).toBe('en');
+  });
+});
+
+describe('a0: the test notification and what macOS keeps (lead m_14515)', () => {
+  it("is a real card's notification: 'perf asks · acme', cold / warm, a reply, key 'test'", () => {
+    const n = testNote('en');
+    expect(n.key).toBe('test');
+    expect(n.title).toBe('perf asks · acme');
+    expect(n.actions).toEqual(['cold', 'warm']);
+    expect(n.reply).toBe(true);
+    expect(n.placeholder).toBe('your answer');
+  });
+
+  const xml = (flags: number, auth?: number) => `<plist><dict><key>apps</key><array>
+    <dict><key>bundle-id</key><string>com.apple.FaceTime</string><key>flags</key><integer>41951246</integer></dict>
+    <dict><key>bundle-id</key><string>dev.bise.desktop.try</string><key>flags</key><integer>${flags}</integer>${auth === undefined ? '' : `<key>auth</key><integer>${auth}</integer>`}</dict>
+  </array></dict></plist>`;
+
+  it("reads the app's own entry: flags, auth, the style bits (1 banners, 2 alerts, 0 none)", () => {
+    expect(ncPrefsOf(xml(8 | 6, 7), 'dev.bise.desktop.try')).toEqual({ flags: 14, auth: 7, style: 'banners' });
+    expect(ncPrefsOf(xml(16 | 6), 'dev.bise.desktop.try')).toEqual({ flags: 22, auth: null, style: 'alerts' });
+    expect(ncPrefsOf(xml(6), 'dev.bise.desktop.try')?.style).toBe('none');
+  });
+
+  it('no entry: macOS never registered the app', () => {
+    expect(ncPrefsOf(xml(8), 'dev.bise.desktop')).toBeNull();
+  });
+
+  it("the bundle id from an app's Info.plist", () => {
+    expect(bundleIdOf('<dict><key>CFBundleIdentifier</key>\n\t<string>dev.bise.desktop.try</string></dict>')).toBe('dev.bise.desktop.try');
+    expect(bundleIdOf('<dict></dict>')).toBeNull();
   });
 });

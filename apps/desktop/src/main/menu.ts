@@ -21,6 +21,11 @@ export interface MenuOptions {
    * (src/main/clipfence.ts) instead of being Electron roles.
    */
   readonly clip?: (op: ClipOp) => void;
+  /**
+   * Try and check builds, and tests, never his release app: Help › 'send a test notification'
+   * posts one notification like a real card and records what comes back (a0, lead m_14515).
+   */
+  readonly testNotify?: () => void;
 }
 
 export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
@@ -116,8 +121,16 @@ export function menuTemplate(o: MenuOptions): MenuItemConstructorOptions[] {
     ? { role: 'windowMenu' }
     : { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'close' }] };
 
-  return [...appMenu, file, edit, go, ...view, window];
+  const help: MenuItemConstructorOptions[] =
+    o.testNotify === undefined
+      ? []
+      : [{ role: 'help', submenu: [{ label: 'send a test notification', click: o.testNotify }] }];
+
+  return [...appMenu, file, edit, go, ...view, window, ...help];
 }
+
+/** Whether Help › 'send a test notification' shows: a try or check build (its own name) or a test run, never 'bise'. */
+export const hasTestNotify = (appName: string, testMode: boolean): boolean => testMode || appName !== 'bise';
 
 export type MenuTarget = { readonly send: 'focused' } | { readonly open: string };
 

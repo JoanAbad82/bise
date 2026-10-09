@@ -10,12 +10,13 @@
 // through two main-process globals: __biseTestFocused (whether a bise window has the keys) and
 // __biseTestNotify(key, gesture) (a button, a reply or a click on that notification).
 // Owner: amb-mac.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BrowserWindow, Notification, shell } from 'electron';
 import { NOTIFY_LINE, type NotifyAuth } from '../../shared/api';
 import type { Card } from '../../proto';
-import { Arrivals, cardRoute, effectOf, knocks, noteOf, WORDS, type Gesture, type Lang, type Note, type Place } from './plan';
+import { Arrivals, bundleIdOf, cardRoute, effectOf, knocks, ncPrefsOf, noteOf, testNote, WORDS, type Gesture, type Lang, type Note, type Place } from './plan';
 
 export type NotifyDeps = {
   readonly testMode: boolean;
@@ -186,10 +187,86 @@ export class Notifier {
     else s.n?.close();
   }
 
+  /**
+   * a0 (lead m_14515): Help › 'send a test notification' in a try or check build posts ONE
+   * notification like a real card ('perf asks · acme', cold / warm, Reply) and records, in
+   * <userData>/notify-test.log, what macOS keeps for the app (ncprefs: registered, auth, style)
+   * before and 8 s after, and what comes back (show, failed, button, reply, click, close). It
+   * answers nobody. Test mode: a NOTIFY_LINE {t:'test'}, and his gestures through
+   * __biseTestNotify('test', …) are recorded the same way.
+   */
+  testNotify(logFile: string): void {
+    const log = (o: Record<string, unknown>): void => {
+      const line = JSON.stringify({ at: new Date().toISOString(), ...o });
+      if (this.d.testMode) this.line({ t: 'test-log', ...o });
+      else {
+        try {
+          appendFileSync(logFile, `${line}\n`);
+        } catch {
+          process.stderr.write(`notify-test: ${line}\n`);
+        }
+      }
+    };
+    this.testLog = log;
+    const note = testNote(this.d.lang);
+    this.shown.set(note.key, { note, n: null });
+    if (this.d.testMode) {
+      this.line({ t: 'test', note });
+      return;
+    }
+    const bundle = bundleIdOf(readText(join(process.execPath, '..', '..', 'Info.plist')));
+    const prefs = (when: string): void => {
+      execFile('/bin/sh', ['-c', 'defaults export com.apple.ncprefs - | plutil -convert xml1 -o - -'], { maxBuffer: 8 << 20 }, (err, out) => {
+        log({ t: 'macos', when, bundle, ncprefs: err === null && bundle !== null ? (ncPrefsOf(out, bundle) ?? 'not registered') : `unread: ${err?.message ?? 'no bundle id'}` });
+      });
+    };
+    prefs('before');
+    if (this.authState === 'never') this.setAuth('asked');
+    const n = new Notification({
+      title: note.title,
+      body: note.body,
+      actions: note.actions.map((text) => ({ type: 'button' as const, text })),
+      hasReply: true,
+      replyPlaceholder: note.placeholder,
+      closeButtonText: WORDS[this.d.lang].later,
+    });
+    n.on('show', () => {
+      log({ t: 'show' });
+    });
+    n.on('failed', (_e, error: string) => {
+      log({ t: 'failed', error });
+    });
+    n.on('action', (_e, index: number) => {
+      log({ t: 'button', index, text: note.actions[index] ?? null });
+    });
+    n.on('reply', (_e, reply: string) => {
+      log({ t: 'reply', reply });
+    });
+    n.on('click', () => {
+      log({ t: 'click' });
+    });
+    n.on('close', () => {
+      log({ t: 'close' });
+    });
+    this.shown.set(note.key, { note, n });
+    log({ t: 'posted', title: note.title, actions: note.actions, reply: true });
+    n.show();
+    setTimeout(() => {
+      prefs('after 8 s');
+    }, 8000);
+  }
+
+  private testLog: ((o: Record<string, unknown>) => void) | null = null;
+
   /** His gesture on a notification: an answer through the core, or the window on the inbox. */
   private gesture(key: string, g: Gesture): boolean {
     const s = this.shown.get(key);
     if (s === undefined) return false;
+    // a0's test notification answers nobody: what came back is recorded
+    if (key === 'test') {
+      this.testLog?.({ t: 'gesture', ...g });
+      return true;
+    }
     const e = effectOf(s.note, g);
     if (e.t === 'none') return false;
     if (e.t === 'open') {
@@ -215,5 +292,13 @@ export class Notifier {
       this.d.open(cardRoute(note.project, note.card));
     });
     n.show();
+  }
+}
+
+function readText(path: string): string {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return '';
   }
 }

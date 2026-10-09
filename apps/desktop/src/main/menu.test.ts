@@ -114,3 +114,21 @@ describe('externalUrl (window.bise.openExternal)', () => {
     expect(externalUrl(`https://a.example/${'x'.repeat(9000)}`)).toBeNull();
   });
 });
+
+describe("Help › 'send a test notification' (a0, lead m_14515)", () => {
+  it('try and check builds and tests have it; his release app never does', async () => {
+    const { hasTestNotify, menuTemplate } = await import('./menu');
+    expect(hasTestNotify('bise try', false)).toBe(true);
+    expect(hasTestNotify('bise check', false)).toBe(true);
+    expect(hasTestNotify('bise', true)).toBe(true);
+    expect(hasTestNotify('bise', false)).toBe(false);
+    let clicked = 0;
+    const base = { platform: 'darwin' as const, appName: 'bise try', dev: false, send: () => undefined };
+    const help = menuTemplate({ ...base, testNotify: () => (clicked += 1) }).find((m) => m.role === 'help');
+    const item = (help?.submenu as { label?: string; click?: () => void }[] | undefined)?.[0];
+    expect(item?.label).toBe('send a test notification');
+    item?.click?.();
+    expect(clicked).toBe(1);
+    expect(menuTemplate(base).some((m) => m.role === 'help')).toBe(false);
+  });
+});

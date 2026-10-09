@@ -149,5 +149,60 @@ export class Arrivals {
   }
 }
 
+/** a0's test notification (Help › 'send a test notification'): like a real card, two choices and a reply. */
+export function testNote(lang: Lang): Note {
+  const n = noteOf(
+    {
+      id: 0,
+      project: 'acme',
+      kind: 'question',
+      agent: 'perf',
+      question: 'which bench? (a test notification: pick one, or Reply)',
+      options: [
+        { n: 1, label: 'cold' },
+        { n: 2, label: 'warm' },
+      ],
+      urgent: false,
+      since_ms: 0,
+    },
+    { name: 'acme', home: false },
+    lang,
+    false,
+  );
+  // two choices and Reply, no 'open in bise' (the test answers nobody)
+  return { ...n, key: 'test', actions: n.actions.slice(0, 2), picks: n.picks.slice(0, 2) };
+}
+
+/** What macOS keeps for one app in com.apple.ncprefs (`defaults export com.apple.ncprefs -`, XML). */
+export type NcPrefs = { readonly flags: number; readonly auth: number | null; readonly style: 'none' | 'banners' | 'alerts' | 'unknown' };
+
+/**
+ * His notification settings for `bundleId`, read from ncprefs' XML: null when macOS has no entry
+ * (it never registered the app). The style is flags bits 3-5 (1 banners, 2 alerts, 0 none); the
+ * raw flags are kept, the bits are macOS's private layout.
+ */
+export function ncPrefsOf(xml: string, bundleId: string): NcPrefs | null {
+  const at = xml.indexOf(`<string>${bundleId}</string>`);
+  if (at < 0) return null;
+  const start = xml.lastIndexOf('<dict>', at);
+  const end = xml.indexOf('</dict>', at);
+  if (start < 0 || end < 0) return null;
+  const d = xml.slice(start, end);
+  const num = (key: string): number | null => {
+    const m = new RegExp(`<key>${key}</key>\\s*<integer>(-?\\d+)</integer>`).exec(d);
+    return m?.[1] === undefined ? null : Number(m[1]);
+  };
+  const flags = num('flags');
+  if (flags === null) return null;
+  const bits = (flags >> 3) & 7;
+  const style = bits === 0 ? 'none' : bits === 1 ? 'banners' : bits === 2 ? 'alerts' : 'unknown';
+  return { flags, auth: num('auth'), style };
+}
+
+/** The bundle id in an app's Info.plist (XML), or null. */
+export function bundleIdOf(plist: string): string | null {
+  return /<key>CFBundleIdentifier<\/key>\s*<string>([^<]+)<\/string>/.exec(plist)?.[1] ?? null;
+}
+
 /** Whether a new card knocks: only when no bise window had the keys at its arrival. */
 export const knocks = (focused: boolean): boolean => !focused;
