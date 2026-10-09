@@ -185,6 +185,8 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
   return (
     <Side
       testId="app.sidebar"
+      // the lights' room is drawn in the sticky top below, with the search (his shot m_14497)
+      lights={false}
       foot={
         <>
           <SRow kind="ft" lead="+" name="add a project" end={<kbd>⌘N</kbd>} onClick={add} testId="app.sidebar.add" />
@@ -192,11 +194,18 @@ export function Sidebar({ onSearch }: { onSearch: () => void }) {
         </>
       }
     >
-      <button type="button" className="app-search" onClick={onSearch} data-testid="app.sidebar.search">
-        <span aria-hidden="true">⌕</span>
-        <span className="app-search-w">search or jump</span>
-        <kbd>⌘K</kbd>
-      </button>
+      {/* his shot (ambient-lead m_14497): in a long sidebar the whole column scrolled, so the
+          search field rode up under macOS's lights. The lights' 36 px room and the field stay put
+          at the top; only the rows scroll under them. (In full screen the room stays: the page has
+          no reliable full-screen signal yet, the window size lies in the off-screen harness.) */}
+      <div className="app-side-top" data-testid="app.sidebar.top">
+        <div className="b-lights" data-testid="app.sidebar.lights" />
+        <button type="button" className="app-search" onClick={onSearch} data-testid="app.sidebar.search">
+          <span aria-hidden="true">⌕</span>
+          <span className="app-search-w">search or jump</span>
+          <kbd>⌘K</kbd>
+        </button>
+      </div>
       <SRow
         kind="top"
         lead={<BisePearl size={14} />}

@@ -33,6 +33,20 @@ body:has(.app-shell) {
 .app-shell .b-lights i {
   display: none;
 }
+/* the sidebar's top: macOS's lights' 36 px room and the search field, put at the top of the
+   sidebar's scroll (his shot, ambient-lead m_14497: a long sidebar scrolled the field up under
+   the lights). Opaque, so the rows scrolling under it never show through */
+.app-side-top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0 -8px;
+  padding: 0 8px;
+  background: linear-gradient(var(--c-sidebar), var(--c-sidebar)), var(--c-solid);
+}
 .app-shell .b-head {
   -webkit-app-region: drag;
 }
