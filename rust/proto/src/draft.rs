@@ -186,6 +186,48 @@ pub struct CuRow {
     pub apps: bool,
 }
 
+/// An agent that uses computer use now (S29, `computer_live`): one entry
+/// of the machine's state.json (`bise_computer_use::state::agents`),
+/// idle agents absent.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ComputerAgent {
+    /// `<hub>.<dir>` (docs/issues/18): what `computer {act, key}` takes
+    pub key: String,
+    /// its project; none: its hub is none of his registered projects (an
+    /// agent of another bise: shown, never acted on)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project: Option<Project>,
+    pub agent: String,
+    /// the app or browser it drives ("Chrome", "Figma")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub driving: Option<String>,
+    /// where in it (a site, a window title)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since_ms: Option<u64>,
+    /// he took over (`take`): it waits until `hand_back`
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub paused: bool,
+    /// stopped (`stop`, the TUI's /stop): it asks before it starts again
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub stopped: bool,
+}
+
+/// A still of what an agent drives (`computer_peek`): inline, never
+/// stored (no file, no image store, no log).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PeekShot {
+    /// base64
+    pub data: String,
+    pub mime: String,
+    pub width: u32,
+    pub height: u32,
+    pub at_ms: u64,
+}
+
 /// One project's part of `away_summary` (only a project where something
 /// happened while he was away).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -467,12 +509,27 @@ pub enum CoreEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         cid: Option<u64>,
     },
+    /// S29: every agent using computer use on this machine now (all of
+    /// them, each with its project when its hub is one of his): sent on
+    /// change (state.json read at most every 500 ms) and once at start
+    ComputerLive { items: Vec<ComputerAgent> },
+    /// S29: the answer to `computer {act: peek, key}`: the still, or why
+    /// none (`not_found`: it drives nothing now or he took over;
+    /// `too_soon`: one per 2 s per agent; `no_broker`: computer use
+    /// isn't running)
+    ComputerPeek {
+        key: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        shot: Option<PeekShot>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        why: Option<String>,
+    },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -653,6 +710,17 @@ pub enum AppCmd {
     /// R8: the setup a `setup_first` opened closed without the provider
     /// working: the held `/model` line is dropped
     SetupFirstCancel,
+    /// S29: his act on an agent's computer use, by its `computer_live`
+    /// key: `take` (he takes over: it pauses), `hand_back` (it goes on),
+    /// `stop` (as the TUI's /stop), `peek` (a still, `max_width` px wide
+    /// at most, answered by `computer_peek`). A key not in the last
+    /// `computer_live`, or of no project of his: `error {cmd: computer}`
+    Computer {
+        act: String,
+        key: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        max_width: Option<u32>,
+    },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
@@ -708,6 +776,7 @@ impl AppCmd {
         "setup_first_cancel",
         "setup_check",
         "role_set",
+        "computer",
     ];
 
     pub fn decode(line: &str) -> Result<AppCmd, String> {

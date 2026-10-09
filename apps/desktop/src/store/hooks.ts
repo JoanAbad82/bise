@@ -4,7 +4,7 @@
 // The store comes from StoreContext: the app's one store (bound to
 // window.bise.core) by default, a test's own store through the provider.
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import type { Account, Agent, Artifact, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
+import type { Account, Agent, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
 import { diffKey, Store, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder, type VoiceModeState } from './store';
 
@@ -126,6 +126,37 @@ export const useIndex = (): readonly IndexRow[] => useSlice('index', (s) => s.in
 /** R8: the /model the core holds until its provider works (open that provider's setup; setup_first_cancel drops it). */
 export const useSetupFirst = (): EvOf<'setup_first'> | null => useSlice('setup_first', (s) => s.setupFirst());
 export const useCoreState = (): CoreState => useSlice('core', (s) => s.core());
+/** S29: every agent using computer use now (key, project when his, agent, driving, place, paused, stopped); act with useStore().computer(act, key). */
+export const useComputerLive = (): readonly ComputerAgent[] => useSlice('computer_live', (s) => s.computerLive());
+
+/** How often a shown row asks for a new still (the core allows one per 2 s per agent). */
+export const PEEK_EVERY_MS = 2000;
+
+/**
+ * S29: the latest still of what an agent drives, asked now and every
+ * PEEK_EVERY_MS while the row is mounted, `on` and the window visible;
+ * never stored: only the newest answer stays in memory, dropped when the
+ * row goes. null key: asks nothing.
+ */
+export function usePeek(key: string | null, opts: { on?: boolean; maxWidth?: number } = {}): EvOf<'computer_peek'> | null {
+  const store = useStore();
+  const on = opts.on ?? true;
+  const { maxWidth } = opts;
+  useEffect(() => {
+    if (key === null || !on) return undefined;
+    const doc = (globalThis as { document?: Document }).document;
+    const ask = (): void => {
+      if (doc?.visibilityState !== 'hidden') store.computer('peek', key, maxWidth);
+    };
+    ask();
+    const timer = setInterval(ask, PEEK_EVERY_MS);
+    return () => {
+      clearInterval(timer);
+      store.dropPeek(key);
+    };
+  }, [store, key, on, maxWidth]);
+  return useSlice(`peek:${key ?? ''}`, (s) => (key === null ? null : s.peek(key)));
+}
 
 /** A thread's order, before and more (key: threadKey(project, agent)). */
 export const useThreadOrder = (key: string): ThreadOrder => useSlice(`order:${key}`, (s) => s.threadOrder(key));

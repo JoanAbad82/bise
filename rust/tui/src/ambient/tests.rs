@@ -18,6 +18,7 @@ use std::time::{Duration, Instant};
 
 const WS: &str = "/w/repo";
 
+mod computer;
 mod dictate;
 mod hubs;
 mod setup;
@@ -1030,8 +1031,10 @@ fn the_run_loop_writes_lines_and_ends_with_stdin() {
     tx.send(super::In::Line("garbage".into())).unwrap();
     tx.send(super::In::Line(r#"{"cmd":"hush"}"#.into())).unwrap();
     tx.send(super::In::Eof).unwrap();
-    let mut out = Vec::new();
-    super::run(&mut core, rx, &mut out);
+    let (mut out, mut log) = (Vec::new(), Vec::new());
+    super::run(&mut core, rx, &mut out, &mut log);
+    // the refused line goes to the log, never out
+    assert!(String::from_utf8(log).unwrap().starts_with("ambient-core: "));
     let text = String::from_utf8(out).unwrap();
     assert_eq!(text, format!("{}\n", json!({"ev": "hub", "up": false, "workspace": WS})));
 }

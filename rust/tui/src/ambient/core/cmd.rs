@@ -87,6 +87,8 @@ pub enum Cmd {
     VoiceMode(bise_proto::draft::AppCmd),
     /// try a refused project's hub again (his action)
     HubRetry { project: String },
+    /// S29: his act on an agent's computer use (core/computer.rs)
+    Computer { act: String, key: String, max_width: Option<u32> },
     /// Harness A: the words the fake voice hears at the next talk (only
     /// with the fake voice on; an error otherwise).
     FakeWords { text: String },
@@ -140,6 +142,10 @@ impl Cmd {
                 bise_proto::draft::AppCmd::Skills { project } => Cmd::Skills { project },
                 bise_proto::draft::AppCmd::Files { project, q, rid, limit } => Cmd::Files { project, q, rid, limit },
                 bise_proto::draft::AppCmd::FilePicked { project, path } => Cmd::FilePicked { project, path },
+                other => return Err(format!("{cmd}: decoded as {other:?}")),
+            },
+            "computer" => match bise_proto::draft::AppCmd::decode(line).map_err(|e| format!("{cmd}: {e}"))? {
+                bise_proto::draft::AppCmd::Computer { act, key, max_width } => Cmd::Computer { act, key, max_width },
                 other => return Err(format!("{cmd}: decoded as {other:?}")),
             },
             "away_back" => Cmd::AwayBack { away_ms: v.get("away_ms").and_then(Value::as_u64).ok_or("away_back: no away_ms")? },

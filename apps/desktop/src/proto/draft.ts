@@ -162,6 +162,48 @@ fix?: string | null,
 apps?: boolean, };
 
 /**
+ * An agent that uses computer use now (S29, `computer_live`): one entry
+ * of the machine's state.json (`bise_computer_use::state::agents`),
+ * idle agents absent.
+ */
+export type ComputerAgent = { 
+/**
+ * `<hub>.<dir>` (docs/issues/18): what `computer {act, key}` takes
+ */
+key: string, 
+/**
+ * its project; none: its hub is none of his registered projects (an
+ * agent of another bise: shown, never acted on)
+ */
+project?: string | null, agent: string, 
+/**
+ * the app or browser it drives ("Chrome", "Figma")
+ */
+driving?: string | null, 
+/**
+ * where in it (a site, a window title)
+ */
+place?: string | null, since_ms?: number | null, 
+/**
+ * he took over (`take`): it waits until `hand_back`
+ */
+paused?: boolean, 
+/**
+ * stopped (`stop`, the TUI's /stop): it asks before it starts again
+ */
+stopped?: boolean, };
+
+/**
+ * A still of what an agent drives (`computer_peek`): inline, never
+ * stored (no file, no image store, no log).
+ */
+export type PeekShot = { 
+/**
+ * base64
+ */
+data: string, mime: string, width: number, height: number, at_ms: number, };
+
+/**
  * A role's model (V17, config.toml's `[roles]`, the TUI's `/models`
  * screen as data): `kind` chat or voice; `source`: `config` (set in
  * config.toml), `env` (an env var sets it), `default` (unset: bise picks,
@@ -219,12 +261,12 @@ export type PickFolder = { path: string, locked?: boolean, };
 /**
  * What the core sends the app besides the hubs' events (S3b).
  */
-export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "signing", id: string, url: string, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, } | { "ev": "computer_use", on: boolean, ready: boolean, rows: Array<CuRow>, said?: string | null, flash?: string | null, } | { "ev": "level", who: string, v: number, } | { "ev": "heard", text: string, final: boolean, } | { "ev": "roles", items: Array<RoleRow>, } | { "ev": "commands", items: Array<PickCommand>, } | { "ev": "skills", project: string, items: Array<PickSkill>, } | { "ev": "files", project: string, rid: number, q: string, items: Array<PickFile>, folder?: PickFolder | null, partial?: boolean, } | { "ev": "voice_answer", project: string, card: number, n: number, line: string, ms: number, } | { "ev": "voice_mode", project: string, agent: string, on: boolean, state: string, heard?: string | null, said?: string | null, muted?: boolean, note?: string | null, fail?: string | null, } | { "ev": "dictation", id: string, text: string, final: boolean, cancelled?: boolean, error?: string | null, } | { "ev": "app_update", version: string, url: string, sha256: string, } | { "ev": "hub_refused", project: string, error: string, } | { "ev": "index", projects: Array<IndexRow>, } | { "ev": "setup_first", project: string, agent: string, provider: string, name: string, model: string, cid?: number | null, };
+export type CoreEv = { "ev": "projects", projects: Array<ProjectRow>, } | { "ev": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "ev": "prefs", prefs: JsonValue, } | { "ev": "accounts", items: Array<Account>, } | { "ev": "signing", id: string, url: string, } | { "ev": "found", dir: string, items: Array<Found>, } | { "ev": "away_summary", since_ms: number, done: number, questions: number, failed: number, projects: Array<AwayProject>, } | { "ev": "plugins", project?: string | null, items: Array<Plugin>, } | { "ev": "computer_use", on: boolean, ready: boolean, rows: Array<CuRow>, said?: string | null, flash?: string | null, } | { "ev": "level", who: string, v: number, } | { "ev": "heard", text: string, final: boolean, } | { "ev": "roles", items: Array<RoleRow>, } | { "ev": "commands", items: Array<PickCommand>, } | { "ev": "skills", project: string, items: Array<PickSkill>, } | { "ev": "files", project: string, rid: number, q: string, items: Array<PickFile>, folder?: PickFolder | null, partial?: boolean, } | { "ev": "voice_answer", project: string, card: number, n: number, line: string, ms: number, } | { "ev": "voice_mode", project: string, agent: string, on: boolean, state: string, heard?: string | null, said?: string | null, muted?: boolean, note?: string | null, fail?: string | null, } | { "ev": "dictation", id: string, text: string, final: boolean, cancelled?: boolean, error?: string | null, } | { "ev": "app_update", version: string, url: string, sha256: string, } | { "ev": "hub_refused", project: string, error: string, } | { "ev": "index", projects: Array<IndexRow>, } | { "ev": "setup_first", project: string, agent: string, provider: string, name: string, model: string, cid?: number | null, } | { "ev": "computer_live", items: Array<ComputerAgent>, } | { "ev": "computer_peek", key: string, shot?: PeekShot | null, why?: string | null, };
 
 /**
  * What the app asks the core itself (never forwarded to a hub).
  */
-export type AppCmd = { "cmd": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "cmd": "project_add", path: string, land?: boolean | null, } | { "cmd": "project_remove", project: string, } | { "cmd": "project_move", project: string, order: number, } | { "cmd": "project_rename", project: string, name: string, } | { "cmd": "prefs_set", key: string, value: JsonValue, } | { "cmd": "sign_in", id: string, } | { "cmd": "sign_in_cancel", id: string, } | { "cmd": "key_set", id: string, key: string, } | { "cmd": "key_remove", id: string, } | { "cmd": "found_scan", dir?: string | null, } | { "cmd": "away_back", away_ms: number, } | { "cmd": "app_version", id: string, built?: string | null, } | { "cmd": "plugins", project?: string | null, } | { "cmd": "plugin_set", project?: string | null, name: string, on: boolean, } | { "cmd": "plugin_login", project?: string | null, name: string, } | { "cmd": "plugin_logout", project?: string | null, name: string, } | { "cmd": "role_set", role: string, model?: string | null, effort?: string | null, } | { "cmd": "setup_check" } | { "cmd": "computer_use", act: string, fix?: string | null, } | { "cmd": "shown", projects: Array<string>, } | { "cmd": "talk_start", page?: TalkPage | null, } | { "cmd": "talk_end" } | { "cmd": "talk_cancel" } | { "cmd": "dictate_start", id: string, } | { "cmd": "dictate_stop", id: string, } | { "cmd": "dictate_cancel", id: string, } | { "cmd": "voice_mode", project: string, agent: string, on: boolean, } | { "cmd": "voice_mute", on: boolean, } | { "cmd": "voice_type", on: boolean, } | { "cmd": "voice_send" } | { "cmd": "voice_cut" } | { "cmd": "hub_retry", project: string, } | { "cmd": "card_in_view", project?: string | null, card?: number | null, } | { "cmd": "commands" } | { "cmd": "index" } | { "cmd": "skills", project: string, } | { "cmd": "files", project: string, q: string, rid: number, limit?: number | null, } | { "cmd": "file_picked", project: string, path: string, } | { "cmd": "setup_first_cancel" };
+export type AppCmd = { "cmd": "open", project: string, what: OpenWhat, agent?: string | null, id?: string | null, } | { "cmd": "project_add", path: string, land?: boolean | null, } | { "cmd": "project_remove", project: string, } | { "cmd": "project_move", project: string, order: number, } | { "cmd": "project_rename", project: string, name: string, } | { "cmd": "prefs_set", key: string, value: JsonValue, } | { "cmd": "sign_in", id: string, } | { "cmd": "sign_in_cancel", id: string, } | { "cmd": "key_set", id: string, key: string, } | { "cmd": "key_remove", id: string, } | { "cmd": "found_scan", dir?: string | null, } | { "cmd": "away_back", away_ms: number, } | { "cmd": "app_version", id: string, built?: string | null, } | { "cmd": "plugins", project?: string | null, } | { "cmd": "plugin_set", project?: string | null, name: string, on: boolean, } | { "cmd": "plugin_login", project?: string | null, name: string, } | { "cmd": "plugin_logout", project?: string | null, name: string, } | { "cmd": "role_set", role: string, model?: string | null, effort?: string | null, } | { "cmd": "setup_check" } | { "cmd": "computer_use", act: string, fix?: string | null, } | { "cmd": "shown", projects: Array<string>, } | { "cmd": "talk_start", page?: TalkPage | null, } | { "cmd": "talk_end" } | { "cmd": "talk_cancel" } | { "cmd": "dictate_start", id: string, } | { "cmd": "dictate_stop", id: string, } | { "cmd": "dictate_cancel", id: string, } | { "cmd": "voice_mode", project: string, agent: string, on: boolean, } | { "cmd": "voice_mute", on: boolean, } | { "cmd": "voice_type", on: boolean, } | { "cmd": "voice_send" } | { "cmd": "voice_cut" } | { "cmd": "hub_retry", project: string, } | { "cmd": "card_in_view", project?: string | null, card?: number | null, } | { "cmd": "commands" } | { "cmd": "index" } | { "cmd": "skills", project: string, } | { "cmd": "files", project: string, q: string, rid: number, limit?: number | null, } | { "cmd": "file_picked", project: string, path: string, } | { "cmd": "setup_first_cancel" } | { "cmd": "computer", act: string, key: string, max_width?: number | null, };
 
 /**
  * The bise page a note talk is about (`talk_start {page}`).

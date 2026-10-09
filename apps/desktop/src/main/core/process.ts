@@ -8,7 +8,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { closeSync, openSync, readSync, statSync } from 'node:fs';
 import { Backoff, coreArgs, coreEnv, type CoreConfig } from './env';
 import { exitOf, failedToStart } from './exit';
-import { eventOf, LineSplitter, lineOf } from './lines';
+import { eventOf, LineSplitter, lineOf, notAnEventLog } from './lines';
 import type { CoreExit, CoreState } from '../../shared/api';
 
 /** At most this much of a run's stderr is read back from the log at its end. */
@@ -134,7 +134,7 @@ export class CoreProcess {
       for (const line of lines.feed(chunk)) {
         const ev = eventOf(line);
         if (ev !== null) this.hooks.onEvent(ev);
-        else if (line.trim() !== '') this.hooks.log(`core: not an event: ${line.slice(0, 200)}`);
+        else if (line.trim() !== '') this.hooks.log(notAnEventLog(line));
       }
     });
     child.stdin.on('error', (e) => {

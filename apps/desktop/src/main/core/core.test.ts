@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { CoreExit, CoreState } from '../../shared/api';
 import { Backoff, configOf, coreArgs, coreEnv } from './env';
-import { eventOf, LineSplitter, lineOf, NL } from './lines';
+import { eventOf, LineSplitter, lineOf, NL, notAnEventLog } from './lines';
 import { CoreProcess } from './process';
 
 describe('lines', () => {
@@ -26,6 +26,14 @@ describe('lines', () => {
     expect(lineOf({ ev: 'x' })).toBeNull();
     expect(lineOf('stop')).toBeNull();
     expect(lineOf(null)).toBeNull();
+  });
+
+  it("logs a line that is not an event, never a computer use still's bytes (S29)", () => {
+    expect(notAnEventLog('not an event')).toBe('core: not an event: not an event');
+    expect(notAnEventLog('x'.repeat(300))).toBe(`core: not an event: ${'x'.repeat(200)}`);
+    const broken = '{"ev":"computer_peek","key":"h.perf","shot":{"data":"U0VDUkVU';
+    expect(notAnEventLog(broken)).toBe(`core: not an event: a computer_peek line (${String(broken.length)} bytes, not logged)`);
+    expect(notAnEventLog('"shot":{"data":"U0VDUkVU')).not.toContain('U0VDUkVU');
   });
 });
 
@@ -57,7 +65,7 @@ describe('env', () => {
 });
 
 /** A fake `bise`: answers `ambient-core` with a welcome, echoes each command, exits on {cmd:'quit'}. */
-function fakeBise(dir: string): string {
+function fakeBise(dir: string, after: readonly string[] = ["process.stdout.write('not an event' + NL);"]): string {
   const path = join(dir, 'bise');
   const script = [
     '#!/usr/bin/env node',
@@ -65,7 +73,7 @@ function fakeBise(dir: string): string {
     "const out = (o) => process.stdout.write(JSON.stringify(o) + NL);",
     "process.stderr.write('fake core ' + process.argv.slice(2).join(' ') + NL);",
     "out({ ev: 'welcome', project: 'p', proto: 1, workspace: process.cwd(), name: process.argv.slice(2).join(' ') });",
-    "process.stdout.write('not an event' + NL);",
+    ...after,
     "let rest = '';",
     "process.stdin.setEncoding('utf8');",
     "process.stdin.on('data', (c) => { const parts = (rest + c).split(NL); rest = parts.pop(); for (const l of parts) { const cmd = JSON.parse(l); if (cmd.cmd === 'quit') process.exit(3); out({ ev: 'echo', cmd }); } });",
@@ -126,6 +134,24 @@ describe('CoreProcess', () => {
     expect(core.state).toBe('down');
     expect(core.send({ cmd: 'stop', project: 'p', agent: 'a' })).toBe(false);
     await waitFor(() => readFileSync(logFile, 'utf8').split(NL).filter((l) => l.startsWith('fake core')).length === 2);
+  });
+
+  it("passes a computer use still to the window and never logs it, whole or broken (S29, architect m_14385)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bise-core-test-'));
+    const data = 'U0VDUkVULVNDUkVFTi1CWVRFUw==';
+    const peek = `{"ev":"computer_peek","key":"h.perf","shot":{"data":"${data}","mime":"image/jpeg","width":640,"height":400,"at_ms":9}}`;
+    const events: Record<string, unknown>[] = [];
+    const logs: string[] = [];
+    const core = new CoreProcess(
+      { config: { bise: fakeBise(dir, [`process.stdout.write('${peek}' + NL);`, `process.stdout.write('${peek.slice(0, 80)}' + NL);`, "process.stdout.write('done' + NL);"]), workspace: dir }, env: { PATH: process.env['PATH'] }, scale: 10 },
+      { onEvent: (e) => events.push(e), onState: () => undefined, log: (l) => logs.push(l) },
+    );
+    core.start();
+    await waitFor(() => logs.some((l) => l === 'core: not an event: done'));
+    core.stop();
+    expect(events.find((e) => e['ev'] === 'computer_peek')).toEqual(JSON.parse(peek));
+    expect(logs.some((l) => l.includes('a computer_peek line'))).toBe(true);
+    expect(logs.filter((l) => l.includes('U0VDUkVU') || l.includes('"shot"'))).toEqual([]);
   });
 
   it('a bise that cannot start is down and retried, never a crash', async () => {

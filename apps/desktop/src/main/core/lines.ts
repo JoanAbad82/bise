@@ -1,6 +1,18 @@
 // The core's stdout cut into lines (pure): chunks come in at any boundary,
 // a line is only given out once its newline arrived.
 
+/**
+ * The log line of a core line that is not an event (its first 200
+ * characters). A computer use still is never logged (S29, peek's one
+ * rule): a broken line that holds one says its size only.
+ */
+export function notAnEventLog(line: string): string {
+  if (line.includes('computer_peek') || line.includes('"shot"')) {
+    return `core: not an event: a computer_peek line (${String(line.length)} bytes, not logged)`;
+  }
+  return `core: not an event: ${line.slice(0, 200)}`;
+}
+
 /** The line feed (named: one JSON object per line both ways). */
 export const NL = String.fromCharCode(10);
 const CR = String.fromCharCode(13);

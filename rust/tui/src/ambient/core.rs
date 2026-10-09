@@ -8,6 +8,7 @@ mod agents_view;
 mod app_update;
 mod away;
 mod cmd;
+mod computer;
 mod dictate;
 mod hubs;
 mod index;
@@ -18,6 +19,7 @@ mod voice;
 mod voice_mode;
 
 pub use self::cmd::Cmd;
+pub use self::computer::{peer_hub, ComputerPorts};
 pub use self::hubs::{branch_of_head, ProjectFacts, ProjectPorts, Spawn};
 pub use self::voice_mode::OpenVoiceMode;
 #[cfg(test)]
@@ -262,6 +264,8 @@ pub struct Core {
     hubs: hubs::Hubs,
     /// the window's setup commands (S11, core/setup.rs)
     setup: Option<setup::Setup>,
+    /// computer use live in the window (S29, core/computer.rs)
+    computer: Option<computer::Computer>,
     /// the agents shown (round 10): a history panel open, a preview
     feeds: Vec<agents_view::Feed>,
     /// the typed `subscribe`/`page` sent, answered in order
@@ -322,6 +326,7 @@ impl Core {
             feeds: Vec::new(),
             hubs: Default::default(),
             setup: None,
+            computer: None,
             pending: std::collections::VecDeque::new(),
             target: None,
             last_state: None,
@@ -452,6 +457,7 @@ impl Core {
             }
             Cmd::Typed(v) => self.typed_cmd(v),
             Cmd::App(c) => self.app_cmd(c),
+            Cmd::Computer { act, key, max_width } => self.computer_cmd(&act, &key, max_width, now),
             Cmd::FakeWords { text } => match &self.ports.fake_words {
                 Some(w) => w.set(&text),
                 None => self.error("fake_words: the fake voice is off (harness A only)."),

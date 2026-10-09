@@ -156,6 +156,10 @@ export const core_ev: readonly CoreEv[] = [
   {"error":"a client in an agent's process (perf) can't act as you on hub.sock","ev":"hub_refused","project":"shop-5e6f7a8b"},
   {"ev":"index","projects":[{"agents":[{"archived":false,"main":true,"name":"main","purpose":"","since_ms":1791100000000,"status":"idle","title":"","waits":0}],"artifacts":[{"agent":"writer","at_ms":1791100300000,"id":"q3-notes","kind":"page","new":true,"title":"Q3 notes","url":"http://127.0.0.1:47438/p/q3-notes","version":2}],"artifacts_total":7,"project":"docs-9a8b7c6d","scheduled":[{"agent":"writer","by":"main","done":3,"every":"every day 07:30","id":48,"next_ms":1791140000000,"page":"q3-notes","words":"refresh the Q3 notes"}],"up":false,"written_ms":1791100400000},{"agents":[],"artifacts":[],"project":"mail-1f2e3d4c","up":true}]},
   {"agent":"perf","cid":12,"ev":"setup_first","model":"openrouter/qwen/qwen3-coder","name":"OpenRouter","project":"acme-1a2b3c4d","provider":"openrouter"},
+  {"ev":"computer_live","items":[{"agent":"perf","driving":"Chrome","key":"9f2c4e1a7b3d5e60.perf","place":"amazon.fr","project":"acme-1a2b3c4d","since_ms":1760000000000},{"agent":"docs","driving":"Figma","key":"9f2c4e1a7b3d5e60.docs","paused":true,"place":"Landing v3","project":"acme-1a2b3c4d","since_ms":1760000004000},{"agent":"review","key":"0a1b2c3d4e5f6071.review","stopped":true}]},
+  {"ev":"computer_live","items":[]},
+  {"ev":"computer_peek","key":"9f2c4e1a7b3d5e60.perf","shot":{"at_ms":1760000006000,"data":"/9j/4AAQSkZJRgABAQAAAQABAAD/2w==","height":800,"mime":"image/jpeg","width":1280}},
+  {"ev":"computer_peek","key":"9f2c4e1a7b3d5e60.docs","why":"not_found"},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */
@@ -212,6 +216,8 @@ export const app_cmd: readonly AppCmd[] = [
   {"cmd":"role_set","role":"small"},
   {"built":"2026-10-07T10:00:00Z","cmd":"app_version","id":"d25"},
   {"cmd":"hub_retry","project":"shop-5e6f7a8b"},
+  {"act":"take","cmd":"computer","key":"9f2c4e1a7b3d5e60.perf"},
+  {"act":"peek","cmd":"computer","key":"9f2c4e1a7b3d5e60.perf","max_width":960},
 ];
 
 /** rust/proto/fixtures/draft_hub_cmd.jsonl */

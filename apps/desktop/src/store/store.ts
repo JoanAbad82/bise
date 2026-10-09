@@ -21,6 +21,7 @@ import type {
   Account,
   AwayProject,
   Card,
+  ComputerAgent,
   CoreEv,
   Agent,
   Artifact,
@@ -99,6 +100,8 @@ export const TAGS = {
   hub_refused: true,
   index: true,
   setup_first: true,
+  computer_live: true,
+  computer_peek: true,
   refused: true,
 } as const satisfies Record<Ev['ev'], true>;
 
@@ -315,6 +318,22 @@ export class Store {
   computerUse(): EvOf<'computer_use'> | null {
     return this.slice<EvOf<'computer_use'> | null>('computer_use', null);
   }
+  /** S29: every agent using computer use now (each with its project when it is one of his) */
+  computerLive(): readonly ComputerAgent[] {
+    return this.slice('computer_live', EMPTY);
+  }
+  /** S29: the latest peek answer for an agent's key (a still, or why none); null before one */
+  peek(key: string): EvOf<'computer_peek'> | null {
+    return this.slice<EvOf<'computer_peek'> | null>(`peek:${key}`, null);
+  }
+  /** S29: his act on an agent's computer use by its key (take, hand_back, stop, peek); the rows follow state.json, never optimistic */
+  computer(act: 'take' | 'hand_back' | 'stop' | 'peek', key: string, maxWidth?: number): void {
+    this.command({ cmd: 'computer', act, key, ...(maxWidth === undefined ? {} : { max_width: maxWidth }) });
+  }
+  /** S29: forgets an agent's last still (its row unmounted: no image kept) */
+  dropPeek(key: string): void {
+    if (this.slices.get(`peek:${key}`) != null) this.put(`peek:${key}`, null);
+  }
   /** a workspace's agent plugins (none: bise's home's); null until the core sent them */
   plugins(project?: string): readonly Plugin[] | null {
     return this.slice<readonly Plugin[] | null>(`plugins:${project ?? ''}`, null);
@@ -450,6 +469,14 @@ export class Store {
         return;
       case 'computer_use':
         this.put('computer_use', ev);
+        return;
+      case 'computer_live':
+        // S29: every agent using computer use now, whole each time
+        this.put('computer_live', ev.items);
+        return;
+      case 'computer_peek':
+        // S29: the latest still of that agent replaces the last (memory only)
+        this.put(`peek:${ev.key}`, ev);
         return;
       case 'away_summary':
         this.put('away', ev);

@@ -396,3 +396,27 @@ what is in this picture?`, 'you') });
     expect(sent.filter((c) => c.cmd === 'commands')).toHaveLength(2);
   });
 });
+
+describe('computer use live (S29)', () => {
+  it('keeps the rows whole, the latest still per agent in memory only, and sends acts by key', () => {
+    const { sent, store } = fake();
+    expect(store.computerLive()).toEqual([]);
+    const rows = [{ key: 'h.perf', project: P, agent: 'perf', driving: 'Chrome', place: 'amazon.fr', since_ms: 5 }];
+    store.apply({ ev: 'computer_live', items: rows });
+    expect(store.computerLive()).toEqual(rows);
+    store.apply({ ev: 'computer_live', items: [] });
+    expect(store.computerLive()).toEqual([]);
+    store.computer('take', 'h.perf');
+    store.computer('peek', 'h.perf', 640);
+    expect(sent.slice(-2)).toEqual([
+      { cmd: 'computer', act: 'take', key: 'h.perf' },
+      { cmd: 'computer', act: 'peek', key: 'h.perf', max_width: 640 },
+    ]);
+    const shot = { data: 'QUJD', mime: 'image/jpeg', width: 640, height: 400, at_ms: 9 };
+    store.apply({ ev: 'computer_peek', key: 'h.perf', shot });
+    store.apply({ ev: 'computer_peek', key: 'h.perf', why: 'too_soon' });
+    expect(store.peek('h.perf')).toEqual({ ev: 'computer_peek', key: 'h.perf', why: 'too_soon' });
+    store.dropPeek('h.perf');
+    expect(store.peek('h.perf')).toBeNull();
+  });
+});

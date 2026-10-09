@@ -1206,6 +1206,8 @@ mod tests {
         let hub = paths.proc_hub();
         let tui = switchboard::procs::hub_id(&tui_socket(&paths));
         assert_eq!(key(&tui, "docs"), key(&hub, "docs"));
+        // the desktop core's (S29: its computer_live rows' projects, its acts)
+        assert_eq!(bend_tui::ambient::peer_hub(&state), hub);
         assert_eq!(split(&key(&hub, "docs")), (Some(hub.as_str()), "docs"));
         assert_ne!(hub, "tmp-x-ee85d2ab", "the tag id, not the folder's");
     }

@@ -50,6 +50,7 @@ impl Core {
         self.poll_projects(false);
         self.tick_index(now);
         self.setup_tick();
+        self.tick_computer(now);
     }
 
     fn tick_talk(&mut self, now: Instant) {

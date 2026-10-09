@@ -22,7 +22,7 @@ mod speech;
 #[cfg(test)]
 mod tests;
 
-pub use self::core::{branch_of_head, Cmd, Core, ProjectFacts, ProjectPorts, Ports, Spawn};
+pub use self::core::{branch_of_head, peer_hub, Cmd, Core, ProjectFacts, ProjectPorts, Ports, Spawn};
 pub use self::hub::{Connect, Hub, HubIn};
 
 use std::io::{self, BufRead, Write};
@@ -119,8 +119,10 @@ fn write_out(out: &mut impl Write, evs: Vec<serde_json::Value>) -> bool {
 }
 
 /// The loop of a core: stdin lines and hub events in, ticks, events out.
-/// Returns when stdin closes (or stdout does).
-pub fn run(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write) {
+/// Returns when stdin closes (or stdout does). `log`: the core's log
+/// (stderr, the window's core.log); events never go there, so a peek's
+/// still never does (tests/computer.rs).
+pub fn run(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write, log: &mut impl Write) {
     let mut last_tick = Instant::now();
     loop {
         let wait = TICK.saturating_sub(last_tick.elapsed());
@@ -131,7 +133,9 @@ pub fn run(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write) {
                 }
                 match Cmd::parse(&l) {
                     Ok(c) => core.cmd(c, Instant::now()),
-                    Err(e) => eprintln!("ambient-core: {e}: {}", setup::redact(&l)),
+                    Err(e) => {
+                        let _ = writeln!(log, "ambient-core: {e}: {}", setup::redact(&l));
+                    }
                 }
             }
             Ok(In::Hub(h)) => core.hub(h),
@@ -198,6 +202,8 @@ pub fn core_main(
     let mut core = Core::new(workspace, hub, ports);
     if let Some(p) = projects {
         core.set_projects(p);
+        // the window shows computer use live (S29); the capsule alone doesn't
+        core.set_computer(self::core::ComputerPorts::real());
     }
     if let Some(s) = setup {
         core.set_setup(s);
@@ -207,7 +213,7 @@ pub fn core_main(
     if !write_out(&mut out, fake_ev.into_iter().collect()) {
         return 0;
     }
-    run(&mut core, rx, &mut out);
+    run(&mut core, rx, &mut out, &mut io::stderr());
     0
 }
 
