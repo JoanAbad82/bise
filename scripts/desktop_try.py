@@ -3,6 +3,12 @@
 
   bise-ambient --try [repo…] [--fresh] [--replace]   build, set up the try home, open the app on it
   bise-ambient --try --stop                          quit the try's app and stop its hubs (by pid)
+  scripts/desktop-try.sh --candidate <sha>           a gate candidate in its own dir (<build>/desktop-cand/<sha12>),
+                                                     never the try checkout, stamp or staged dir; prints cand.json
+                                                     (app, root, bise) for the gate's off-screen launcher
+                                                     (or BISE_TRY_CANDIDATE=<sha>)
+  scripts/desktop-try.sh --promote <sha>             the gate passed: the try checkout moves to <sha> and the
+                                                     candidate's bundle + root become the try's build (no rebuild)
 
 (~/.local/bin/bise-ambient execs scripts/desktop-try.sh, which runs this.)
 
@@ -227,37 +233,40 @@ def build_dir(env):
     return os.path.join(state, "build")
 
 
-def try_paths(env):
+def try_paths(env, desktop=DESKTOP):
     """Where the try build goes: the bise (cargo -p bend-harness into <build>/target, the old
     try target), the native helper (one stable path: the EDR deletes fresh unsigned binaries) and
-    the new app, packaged by `pnpm dist` in apps/desktop/dist."""
+    the new app, packaged by `pnpm dist` in apps/desktop/dist (`desktop`: that checkout's apps/desktop,
+    the try checkout's for --promote); candidates under <build>/desktop-cand."""
     build = build_dir(env)
     arch = "mac-arm64" if os.uname().machine == "arm64" else "mac"
     staged = os.path.join(build, "desktop-try", "staged")
     return {"target": os.path.join(build, "target"), "bise": os.path.join(build, "target", "debug", "bise"),
             "helper": os.path.join(build, "desktop-try", "bise-mac-helper"),
             "sign": os.path.join(build, "ambient", "sign"),
-            "app": os.path.join(DESKTOP, "dist", arch, APP_NAME + ".app"),
+            "cand": os.path.join(build, "desktop-cand"), "arch": arch,
+            "app": os.path.join(desktop, "dist", arch, APP_NAME + ".app"),
             # while his try runs from "app", a build is packed here instead (never over a running bundle)
             "staged_dir": staged, "staged": os.path.join(staged, arch, APP_NAME + ".app")}
 
 
-def build_script(paths, sign_dir=None, out=None, root=None):
+def build_script(paths, sign_dir=None, out=None, root=None, repo=REPO):
     """The one build, run under the heavy lock: bise and its helpers for the try home (repl-live,
-    repl-scripted, sb-core next to this checkout), the snapshot app root `root` (root_script), the
+    repl-scripted, sb-core next to the checkout `repo`), the snapshot app root `root` (root_script), the
     native helper, then the new app (apps/desktop: pnpm install --frozen-lockfile, build, dist =
     electron-builder --mac --dir, the try's bise packed inside it), into apps/desktop/dist, or into
-    `out` (BISE_PACK_OUT: the staging dir). Pure."""
+    `out` (BISE_PACK_OUT: the staging dir, a candidate's dir). Pure."""
     q = shlex.quote
+    desktop = os.path.join(repo, "apps", "desktop")
     lines = ["set -euo pipefail",
              "export CARGO_TARGET_DIR=%s CARGO_INCREMENTAL=0" % q(paths["target"]),
-             "cd %s/rust && cargo build -p bend-harness" % q(REPO),
-             "cd %s && scripts/bins.sh repl-live repl-scripted sb-core" % q(REPO),
+             "cd %s/rust && cargo build -p bend-harness" % q(repo),
+             "cd %s && scripts/bins.sh repl-live repl-scripted sb-core" % q(repo),
              "export MACOSX_DEPLOYMENT_TARGET=\"$(scripts/bins.sh macos-target)\"",
              "mkdir -p %s" % q(os.path.dirname(paths["helper"])),
              # ad hoc here; afterPack re-signs the whole app deep with the stable identity
              "apps/desktop/native/mac/build.sh %s" % q(paths["helper"]),
-             "cd %s" % q(DESKTOP),
+             "cd %s" % q(desktop),
              "pnpm install --frozen-lockfile",
              "pnpm build",
              "BISE_PACK_NAME=%s BISE_PACK_APP_ID=%s BISE_PACK_BISE=%s BISE_PACK_HELPER=%s%s%s pnpm dist"
@@ -265,7 +274,7 @@ def build_script(paths, sign_dir=None, out=None, root=None):
                 " BISE_PACK_OUT=%s" % q(out) if out else "")]
     if out:
         # a fresh staging dir: a half-written bundle from a failed build never gets swapped in
-        lines.insert(lines.index("cd %s" % q(DESKTOP)), "rm -rf %s" % q(out))
+        lines.insert(lines.index("cd %s" % q(desktop)), "rm -rf %s" % q(out))
     if root:
         lines[lines.index("mkdir -p %s" % q(os.path.dirname(paths["helper"]))):0] = root_script(root)
     return "\n".join(lines) + "\n"
@@ -341,17 +350,17 @@ def stamp_path(paths):
     return os.path.join(os.path.dirname(paths["helper"]), "try.stamp")
 
 
-def build_stamp(env, paths, sign):
+def build_stamp(env, paths, sign, repo=REPO):
     """What the try build was made from: this checkout's HEAD, a hash of its uncommitted changes
     (git status --porcelain, every untracked file listed, and git diff HEAD, so a second edit of a
     changed file counts) and a hash of the build recipe itself (build_script with these paths and
     this signing). Reads git only, never takes the lock (ambient-lead m_11206)."""
     import hashlib
-    head = run(["git", "-C", REPO, "rev-parse", "HEAD"], env).stdout.strip()
-    status = run(["git", "-C", REPO, "status", "--porcelain", "--untracked-files=all"], env).stdout
-    diff = subprocess.run(["git", "-C", REPO, "diff", "HEAD", "--binary"], env=env, capture_output=True).stdout
+    head = run(["git", "-C", repo, "rev-parse", "HEAD"], env).stdout.strip()
+    status = run(["git", "-C", repo, "status", "--porcelain", "--untracked-files=all"], env).stdout
+    diff = subprocess.run(["git", "-C", repo, "diff", "HEAD", "--binary"], env=env, capture_output=True).stdout
     changes = hashlib.sha256(status.encode() + b"\0" + diff).hexdigest() if status.strip() else ""
-    recipe = hashlib.sha256(build_script(paths, sign).encode()).hexdigest()
+    recipe = hashlib.sha256(build_script(paths, sign, repo=repo).encode()).hexdigest()
     return {"head": head, "changes": changes, "recipe": recipe}
 
 
@@ -509,6 +518,128 @@ def swap_staged(paths):
     write_stamp(paths, live)
     say("swapped in the staged build (%s)" % saved.get("head", "")[:8])
     return old if os.path.exists(old) else None
+
+
+# ---------------------------------------------------------------- candidates (ambient-lead m_14320)
+# A gate candidate is built for one sha in its own dir, <build>/desktop-cand/<sha12>: a detached
+# worktree of that sha (src/), its packed app (dist/<arch>/bise try.app, bise inside), its snapshot
+# app root (root/) and cand.json. Building one never touches the try checkout (try-src), the try
+# stamp or the staged dir, so his next --try still opens what the gate passed. qa-native's gate
+# launcher opens cand.json's app off-screen with BISE_APP_ROOT=its root. Once the gate passes,
+# --promote <sha> moves the try checkout to that sha and the built bundle and root into the try's
+# staged place (no rebuild): they go live at once when no try is open, else at his next --try.
+
+
+def try_checkout(env):
+    """The checkout his bise-ambient --try builds from (~/.local/bin/bise-ambient's TRY_CHECKOUT)."""
+    return env.get("BISE_TRY_CHECKOUT") or os.path.join(env.get("HOME") or os.path.expanduser("~"), ".bise", "dev", "try-src")
+
+
+def resolve_sha(sha, env, repo=REPO):
+    r = subprocess.run(["git", "-C", repo, "rev-parse", "--verify", "-q", "%s^{commit}" % sha], env=env, capture_output=True, text=True)
+    if r.returncode != 0 or not r.stdout.strip():
+        raise TryError("no commit %s in %s" % (sha, repo))
+    return r.stdout.strip()
+
+
+def cand_paths(paths, sha):
+    d = os.path.join(paths["cand"], sha[:12])
+    return {"dir": d, "src": os.path.join(d, "src"), "dist": os.path.join(d, "dist"), "root": os.path.join(d, "root"),
+            "json": os.path.join(d, "cand.json"), "app": os.path.join(d, "dist", paths["arch"], APP_NAME + ".app")}
+
+
+def cand_built(c):
+    """The candidate's bundle (with its bise inside) and its root are there."""
+    return all(os.path.exists(p) for p in (c["app"], packed_bise(c["app"]), os.path.join(c["root"], "repl-live")))
+
+
+def candidate(env, paths, sha, repo=REPO, sign=None):
+    """Builds the packed app for `sha` into its own candidate dir (one heavy slot), unless already
+    built; never the try checkout, the try stamp or the staged dir. Returns cand.json's dict."""
+    sha = resolve_sha(sha, env, repo)
+    c = cand_paths(paths, sha)
+    if os.path.isdir(c["src"]):
+        head = run(["git", "-C", c["src"], "rev-parse", "HEAD"], env).stdout.strip()
+        if head != sha:
+            raise TryError("%s holds %s, not %s: remove that candidate dir first" % (c["src"], head[:8], sha[:8]))
+    else:
+        os.makedirs(c["dir"], exist_ok=True)
+        run(["git", "-C", repo, "worktree", "add", "-q", "--detach", c["src"], sha], env)
+    info = {"sha": sha, "app": c["app"], "root": c["root"], "bise": packed_bise(c["app"]), "dir": c["dir"]}
+    if cand_built(c) and os.path.exists(c["json"]):
+        say("candidate %s is built: %s" % (sha[:8], c["app"]))
+        return dict(json.load(open(c["json"])), **info)
+    say("building candidate %s into %s (waits for a heavy slot)…" % (sha[:8], c["dir"]))
+    script = build_script(paths, sign, out=c["dist"], root=c["root"], repo=c["src"])
+    lock = os.path.expanduser("~/.bise/run/heavy.lock")
+    r = subprocess.run(heavy_argv(["/bin/bash", "-c", script], lock), env=env)
+    if r.returncode != 0:
+        raise TryError("the candidate build failed (exit %d)" % r.returncode)
+    if not cand_built(c):
+        raise TryError("no packed app or root in %s after the build" % c["dir"])
+    info["built_ms"] = int(time.time() * 1000)
+    with open(c["json"] + ".tmp", "w") as f:
+        json.dump(info, f, indent=1)
+    os.replace(c["json"] + ".tmp", c["json"])
+    say("candidate %s built: %s (open it with BISE_APP_ROOT=%s)" % (sha[:8], c["app"], c["root"]))
+    return info
+
+
+def try_module(checkout):
+    """The try checkout's own desktop_try.py: its stamp is the one his next --try computes."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("desktop_try_at_try_src", os.path.join(checkout, "scripts", "desktop_try.py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def promote(env, sha, checkout=None, repo=REPO):
+    """The gate passed: the try checkout moves to `sha` and the candidate's bundle and root become
+    the try's staged build, stamped as the try checkout's own script computes it, so his next --try
+    reuses it (no rebuild); live at once when no try is open. Returns the new stamp."""
+    sha = resolve_sha(sha, env, repo)
+    checkout = checkout or try_checkout(env)
+    probe = cand_paths(try_paths(env), sha)
+    if not cand_built(probe) or not os.path.exists(probe["json"]):
+        raise TryError("no built candidate for %s: scripts/desktop-try.sh --candidate %s first" % (sha[:8], sha[:8]))
+    if not os.path.isdir(os.path.join(checkout, ".git")) and not os.path.isfile(os.path.join(checkout, ".git")):
+        raise TryError("no try checkout at %s" % checkout)
+    dirty = run(["git", "-C", checkout, "status", "--porcelain", "--untracked-files=no"], env).stdout.strip()
+    if dirty:
+        raise TryError("the try checkout %s has changes: never moved over them" % checkout)
+    run(["git", "-C", checkout, "checkout", "-q", "--detach", sha], env)
+    m = try_module(checkout)
+    tp = m.try_paths(env)
+    sign = os.environ.get("BISE_TRY_SIGN_DIR") or (tp["sign"] if os.path.isdir(tp["sign"]) else None)
+    stamp = m.build_stamp(env, tp, sign)
+    if stamp["head"] != sha or stamp["changes"]:
+        raise TryError("the try checkout is not clean at %s after the move" % sha[:8])
+    saved = read_stamp(tp) or {}
+    live_root = saved.get("root") if saved.get("where", "live") == "live" else saved.get("live_root")
+    root = root_path(tp, stamp)
+    if live_root and os.path.realpath(root) == os.path.realpath(live_root):
+        root = "%s-%d" % (root, int(time.time()))
+    for src, dst in ((probe["root"], root), (probe["app"], tp["staged"])):
+        if os.path.exists(dst):
+            shutil.rmtree(dst)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        try:
+            os.rename(src, dst)
+        except OSError:
+            shutil.copytree(src, dst, symlinks=True)
+    new = dict(stamp, where="staged", root=root)
+    if live_root and live_root != root:
+        new["live_root"] = live_root
+    write_stamp(tp, new)
+    # the candidate is used up: its worktree and dir go
+    subprocess.run(["git", "-C", repo, "worktree", "remove", "--force", probe["src"]], env=env, capture_output=True)
+    shutil.rmtree(probe["dir"], ignore_errors=True)
+    if m.swap_staged(tp):
+        say("promoted %s: live now (the previous bundle is kept as .old until the next --try)" % sha[:8])
+    else:
+        say("promoted %s: staged; it goes live at his next bise-ambient --try" % sha[:8])
+    return read_stamp(tp)
 
 
 def core_up(app):
@@ -726,9 +857,26 @@ def stop(real, tryh, app=None):
 def main(argv):
     args = [a for a in argv if not a.startswith("--")]
     flags = {a for a in argv if a.startswith("--")}
-    bad = flags - {"--try", "--stop", "--fresh", "--replace", "--no-build", "--no-open"}
+    bad = flags - {"--try", "--stop", "--fresh", "--replace", "--no-build", "--no-open", "--candidate", "--promote"}
     if bad:
-        raise TryError("unknown option %s (--try [repo…] [--fresh|--replace], --try --stop)" % ", ".join(sorted(bad)))
+        raise TryError("unknown option %s (--try [repo…] [--fresh|--replace], --try --stop, --candidate <sha>, --promote <sha>)"
+                       % ", ".join(sorted(bad)))
+    cand = os.environ.get("BISE_TRY_CANDIDATE") if "--promote" not in flags else None
+    if "--candidate" in flags or cand:
+        # a gate candidate: its own dir, never the try checkout, stamp or staged dir (ambient-lead m_14320)
+        sha = args[0] if args else cand
+        if not sha:
+            raise TryError("--candidate <sha>")
+        mine = his_env(os.environ)
+        paths = try_paths(mine)
+        sign = os.environ.get("BISE_TRY_SIGN_DIR") or (paths["sign"] if os.path.isdir(paths["sign"]) else None)
+        print(json.dumps(candidate(mine, paths, sha, sign=sign)))
+        return 0
+    if "--promote" in flags:
+        if not args:
+            raise TryError("--promote <sha>")
+        print(json.dumps(promote(his_env(os.environ), args[0])))
+        return 0
     real, tryh = homes()
     guard(real, tryh)
     mine = his_env(os.environ)

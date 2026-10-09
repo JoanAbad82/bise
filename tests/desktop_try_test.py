@@ -400,10 +400,96 @@ def integration():
         shutil.rmtree(w, ignore_errors=True)
 
 
+def candidate_then_promote():
+    """ambient-lead m_14320: --candidate <sha> builds into its own dir and never touches the try
+    checkout, the try stamp or the staged dir; built twice, it builds once; --promote <sha> moves the
+    try checkout to it and the built bundle + root in (no build), stamped as the try checkout's own
+    script computes it (his next --try is up to date), and the candidate dir goes. The build is faked."""
+    import re
+    w = tempfile.mkdtemp(prefix="dt-cand-")
+    repo, trysrc = os.path.join(w, "repo"), os.path.join(w, "try-src")
+    genv = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@t")
+    git = lambda *a, cwd=repo: subprocess.run(["git"] + list(a), cwd=cwd, env=genv, check=True, capture_output=True, text=True).stdout.strip()  # noqa: E731
+    os.makedirs(os.path.join(repo, "scripts"))
+    os.makedirs(os.path.join(repo, "tests"))
+    shutil.copy(os.path.join(ROOT, "scripts", "desktop_try.py"), os.path.join(repo, "scripts", "desktop_try.py"))
+    shutil.copy(os.path.join(ROOT, "tests", "bise_env.py"), os.path.join(repo, "tests", "bise_env.py"))
+    with open(os.path.join(repo, ".gitignore"), "w") as f:
+        f.write("dist/\n__pycache__/\n")      # as the real repo's .gitignore: the packed app is no change
+    git("init", "-q", "-b", "main")
+    git("add", "-A")
+    git("-c", "commit.gpgsign=false", "commit", "-q", "-m", "a")
+    a = git("rev-parse", "HEAD")
+    with open(os.path.join(repo, "NEW.md"), "w") as f:
+        f.write("the gate's candidate\n")
+    git("add", "-A")
+    git("-c", "commit.gpgsign=false", "commit", "-q", "-m", "b")
+    b = git("rev-parse", "HEAD")
+    git("worktree", "add", "-q", "--detach", trysrc, a)
+    env = dict(genv, SB_BUILD_DIR=os.path.join(w, "build"), BISE_TRY_CHECKOUT=trysrc)
+    env.pop("BISE_TRY_SIGN_DIR", None)
+    paths = T.try_paths(env)
+    # his current try: live at a, with its root
+    old_root = os.path.join(os.path.dirname(paths["helper"]), "root-old")
+    os.makedirs(old_root)
+    open(os.path.join(old_root, "repl-live"), "w").close()
+    T.write_stamp(paths, {"head": a, "changes": "", "recipe": "r", "where": "live", "root": old_root})
+    before = open(T.stamp_path(paths)).read()
+    builds = []
+    real_run, real_say = T.subprocess.run, T.say
+
+    def fake_run(cmd, *k, **kw):
+        if cmd and cmd[-3:-1] == ["/bin/bash", "-c"]:
+            script = cmd[-1]
+            builds.append(script)
+            out = shlex.split(re.search(r"BISE_PACK_OUT=(\S+)", script).group(1))[0]
+            root = shlex.split(re.findall(r"rm -rf \S+ && mv \S+ (\S+)", script)[-1])[0]
+            app = os.path.join(out, paths["arch"], T.APP_NAME + ".app")
+            for p in (T.packed_bise(app), os.path.join(root, "repl-live"), paths["bise"], paths["helper"]):
+                os.makedirs(os.path.dirname(p), exist_ok=True)
+                open(p, "w").close()
+            with open(os.path.join(app, "Contents", "build.txt"), "w") as f:
+                f.write("candidate %d" % len(builds))
+            return subprocess.CompletedProcess(cmd, 0)
+        return real_run(cmd, *k, **kw)
+    T.subprocess.run, T.say = fake_run, (lambda *x: None)
+    try:
+        info = T.candidate(env, paths, b[:8], repo=repo)
+        c = T.cand_paths(paths, b)
+        check(len(builds) == 1 and info["sha"] == b and info["app"] == c["app"] and T.cand_built(c), "the candidate is built: %s" % info)
+        check("cd %s/rust" % shlex.quote(c["src"]) in builds[0] and "BISE_PACK_OUT=%s" % shlex.quote(c["dist"]) in builds[0],
+              "built from its own worktree into its own dir")
+        check(git("rev-parse", "HEAD", cwd=c["src"]) == b, "the candidate's worktree is at b")
+        check(git("rev-parse", "HEAD", cwd=trysrc) == a, "the try checkout never moved")
+        check(open(T.stamp_path(paths)).read() == before and not os.path.exists(paths["staged_dir"]), "the try stamp and staged dir untouched")
+        check(json.load(open(c["json"]))["root"] == c["root"], "cand.json says where the root is")
+        T.candidate(env, paths, b, repo=repo)
+        check(len(builds) == 1, "built once: %d builds" % len(builds))
+
+        stamp = T.promote(env, b, repo=repo)
+        m = T.try_module(trysrc)
+        tp = m.try_paths(env)
+        check(len(builds) == 1, "promote never builds")
+        check(git("rev-parse", "HEAD", cwd=trysrc) == b, "the try checkout moved to b")
+        check(stamp["head"] == b and stamp["where"] == "live" and stamp.get("old_root") == old_root, "live now (no try open): %s" % stamp)
+        check(open(os.path.join(tp["app"], "Contents", "build.txt")).read() == "candidate 1", "the candidate's bundle is the try's app")
+        check(m.up_to_date(m.build_stamp(env, tp, None), m.read_stamp(tp), tp), "his next --try is up to date: no rebuild")
+        check(not os.path.exists(c["dir"]) and c["src"] not in git("worktree", "list"), "the candidate dir and worktree are gone")
+        try:
+            T.promote(env, b, repo=repo)
+            check(False, "a second promote without a candidate")
+        except T.TryError:
+            pass
+    finally:
+        T.subprocess.run, T.say = real_run, real_say
+        shutil.rmtree(w, ignore_errors=True)
+
+
 if __name__ == "__main__":
     pure()
     stamp_skips_build()
     staged_never_over_a_running_try()
+    candidate_then_promote()
     if "--pure" not in sys.argv:
         hook_keeps_pid()
         integration()

@@ -4,6 +4,8 @@
 #
 #   scripts/desktop-try.sh --try [repo…] [--fresh] [--replace]
 #   scripts/desktop-try.sh --try --stop
+#   scripts/desktop-try.sh --candidate <sha>   (a gate candidate in its own dir)
+#   scripts/desktop-try.sh --promote <sha>     (the gate passed: it becomes his try)
 #
 # ~/.local/bin/bise-ambient runs it for 'bise-ambient --try …'. Everything is in
 # scripts/desktop_try.py (its header says what is isolated and why).
