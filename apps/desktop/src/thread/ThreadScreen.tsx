@@ -28,7 +28,7 @@ import { useTour } from '@/setup/useTour';
 import { takeQuotes } from '@/review/quote';
 import { copyText, QuotePop } from '@/quote/QuotePop';
 import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
-import { InboxBlock, type Answering } from '@/inbox';
+import { ThreadInbox, pickWaits, takesWords, useStripCard } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
@@ -220,10 +220,22 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     ) : (
       title
     );
-  // b1/b2 (his card #476): the inbox block over the composer tells what his words do while one of
-  // its items is open in place: a question's answer ('answering perf · …'), or a plain message
-  // with what an approval waits for; esc folds the item and his words are a message again
-  const [answering, setAnswering] = useState<Answering | null>(null);
+  // inbox card v2 item 7 (ambient m_11273, amb-home 98ac9ea7): while the strip's card is docked
+  // and takes words, the composer answers it; esc makes it a plain message again (that card);
+  // an approval never takes words: his words stay a message and the card keeps waiting
+  const docked = useStripCard(project);
+  const dockedKey = docked === null ? null : `${docked.project}-${String(docked.id)}`;
+  // his esc to a plain message holds across a reload (keep.ts: the answering mode, 10 minutes)
+  const plainKey = `plain:${project}`;
+  const [plainFor, setPlainForState] = useState<string | null>(() => {
+    const v = keep.view(plainKey);
+    return typeof v === 'string' ? v : null;
+  });
+  const setPlainFor = (k: string) => {
+    setPlainForState(k);
+    keep.setView(plainKey, k, true);
+  };
+  const answering = docked !== null && takesWords(docked) && plainFor !== dockedKey ? docked : null;
   // R15: an expired sign-in stopped this agent and his browser is on it: c on the empty composer
   // copies the link, esc cancels (the TUI's resign.rs keys)
   const cardsHere = useCards(project);
@@ -239,6 +251,11 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         return;
       }
     }
+    if (e.key !== 'Escape' || answering === null || dockedKey === null) return;
+    if (!(e.target instanceof HTMLElement) || e.target.closest('[data-testid="composer.field"]') === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setPlainFor(dockedKey);
   };
   // a project's main: its counts (tui-parity W2), else the agent's line
   const all = useAgents(project);
