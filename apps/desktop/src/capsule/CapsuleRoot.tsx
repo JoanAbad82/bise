@@ -1,7 +1,9 @@
 // The capsule surface's root (window.bise.surface === 'capsule'; lead m_9618): fn from the helper
 // and the window's state drive the view (machine.ts), the store gives the spotlight its data and
 // bise's answer, and the effects go to the capsule window (show, hide, size) and the main window
-// (openWindow). A pushed card shows only when nothing else is up (his action first).
+// (openWindow). It never pushes a card (the user's decision 2026-10-09, card #476): a question
+// shows in the window's inbox block when the window is in front, as a native notification when it
+// isn't; here a card opens only from the spotlight's 'waiting for you' rows.
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react';
 import { newAgent } from '@/agents/actions';
 import { InboxCard } from '@/inbox';
@@ -26,45 +28,6 @@ const reduce = (m: Model, e: CapEvent): Model => {
   const s = step(m.state, e);
   return { state: s.state, fx: s.fx };
 };
-
-/** Cards that come this soon after a project's cards first loaded are still its load (the row's
- *  view.json cards, then the hub's own, arrive one after the other), not a push. */
-export const SETTLE_MS = 400;
-
-export interface Loaded {
-  readonly at: number;
-  readonly ids: Set<string>;
-}
-
-/**
- * The cards bise pushes: a project's cards are its inbox until its slice has caught up with its row
- * (`waits`, the hub's count) and settled for SETTLE_MS; after that a card that wasn't there is a
- * push (qa-native: a 'seen' set taken at the first render made the load's last card look pushed and
- * then held the real push behind it).
- */
-export function newCards(
-  loaded: Map<string, Loaded>,
-  projects: readonly { readonly project: string; readonly waits: number }[],
-  cards: readonly { readonly id: string; readonly project: string }[],
-  now: number,
-): string[] {
-  const out: string[] = [];
-  for (const p of projects) {
-    const ids = cards.filter((c) => c.project === p.project).map((c) => c.id);
-    const l = loaded.get(p.project);
-    if (l === undefined) {
-      if (ids.length >= p.waits) loaded.set(p.project, { at: now, ids: new Set(ids) });
-      continue;
-    }
-    const settling = now - l.at < SETTLE_MS;
-    for (const id of ids) {
-      if (l.ids.has(id)) continue;
-      l.ids.add(id);
-      if (!settling) out.push(id);
-    }
-  }
-  return out;
-}
 
 /** The window route for a spotlight row (amb-win's route strings). */
 export function routeOf(item: SpotItem): string | undefined {
@@ -241,7 +204,6 @@ export function CapsuleRoot(): JSX.Element {
       if (ev.ev === 'fn' && ev.act === 'esc' && routeRef.current !== null) keepWithBise();
       else if (ev.ev === 'fn') dispatch({ ev: 'fn', act: ev.act, key: ev.key });
       else if (ev.ev === 'front') setFront(frontOf(ev));
-      else if (ev.ev === 'quiet') dispatch({ ev: 'quiet', on: ev.on });
     });
     const offState = bise.capsule.onState((s) => {
       dispatch({ ev: 'window', shown: s.shown, why: s.why });
@@ -249,7 +211,6 @@ export function CapsuleRoot(): JSX.Element {
     void bise.helperState().then((evs) => {
       for (const ev of evs) {
         if (ev.ev === 'front') setFront(frontOf(ev));
-        else if (ev.ev === 'quiet') dispatch({ ev: 'quiet', on: ev.on });
       }
     });
     return () => {
@@ -260,7 +221,7 @@ export function CapsuleRoot(): JSX.Element {
 
   // a card opened from the spotlight's waiting row has the keyboard (the spotlight had it): its
   // digits pick, esc goes back to the list, ⏎ opens it in bise, ⌘⌫ closes it (the strip's keys)
-  const fromSpot = view.kind === 'card' && view.back === true ? view.id : null;
+  const fromSpot = view.kind === 'card' ? view.id : null;
   useEffect(() => {
     if (fromSpot === null) return;
     const [project = '', n = ''] = fromSpot.split(/\.(?=[^.]+$)/u);
@@ -289,40 +250,18 @@ export function CapsuleRoot(): JSX.Element {
     };
   }, [fromSpot, store, bise]);
 
-  // a card bise pushed is shown without the keys (his keys stay where he is): when he is in bise's
-  // window, main forwards a digit typed there over an empty composer (src/main/digitpick.ts, lead
-  // m_14146), and it picks here like the card's own keys
-  const pushed = view.kind === 'card' && view.back !== true ? view.id : null;
-  useEffect(() => {
-    if (pushed === null || bise === undefined) return;
-    const [project = '', n = ''] = pushed.split(/\.(?=[^.]+$)/u);
-    bise.capsule.card(true);
-    const off = bise.capsule.onKey((d) => {
-      const c = store.cards(project).find((x) => String(x.id) === n);
-      if (c === undefined) return;
-      const k = cardKeyOf(new KeyboardEvent('keydown', { key: String(d) }), c, null);
-      if (k !== null && k.t === 'pick') store.answer(project, c.id, String(k.n));
-    });
-    return () => {
-      off();
-      bise.capsule.card(false);
-    };
-  }, [pushed, store, bise]);
-
   // the projects this window shows: all of them (the spotlight lists every project's agents and
-  // cards, a push may come from any); the core sends their rows, agents and cards only after a
+  // cards); the core sends their rows, agents and cards only after a
   // 'shown' (amb-core 932b7186), the store dedupes and re-says it to a core that comes back
   const shownKey = projects.map((p) => p.project).join('|');
   useEffect(() => {
     store.shown(shownKey === '' ? [] : shownKey.split('|'));
   }, [store, shownKey]);
 
-  // a card bise pushes: new in a project whose cards had loaded (newCards)
-  const loaded = useRef(new Map<string, Loaded>());
+  // the open card was answered or went away (here, in the window, or in the TUI): back to the list
   useEffect(() => {
-    for (const id of newCards(loaded.current, projects, spot.cards, performance.now())) dispatch({ ev: 'card', id });
     if (view.kind === 'card' && !spot.cards.some((c) => c.id === view.id)) dispatch({ ev: 'card_done', id: view.id });
-  }, [spot.cards, projects, view]);
+  }, [spot.cards, view]);
 
   const cardOf = useCallback(
     (id: string) => {

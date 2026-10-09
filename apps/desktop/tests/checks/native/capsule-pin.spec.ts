@@ -8,11 +8,9 @@
 //   (b) a voice session (fn held, then its release): the frame's top-left never moves, the glass
 //       is placed for its 320 px max (its top + 320 still ends 96 px above the Dock line) and never
 //       passes the Dock line
-//   (c) a card bise pushes sits bottom-centre and keeps its bottom while it shows
+//   ((c), a pushed card's place, is gone with the push: b3, the user's decision 2026-10-09)
 import type { Page } from '@playwright/test';
-import { FakeCore, test, expect } from '../../harness';
-import type { Card, CoreEv, HubEv } from '../../../src/proto';
-import { core_ev, hub_ev } from '../../../src/proto/fixtures.gen';
+import { test, expect } from '../../harness';
 import { CAPSULE, capsulePage, capsuleWindow, onWorld, sleep, type World } from './world';
 
 const DISPLAY = { x: -30000, y: -30000, width: 1920, height: 1200 };
@@ -96,38 +94,4 @@ test('native/capsule-pin (b): a voice session never moves the frame, the glass s
     const past = glasses.filter((g) => g.y + g.height > DOCK_LINE - BOTTOM + 2);
     expect(past, 'the glass never passes the Dock line (96 px above the work area)').toEqual([]);
   });
-});
-
-/** the fixture world's cards event, and the same with one more card (a push) */
-function cardsWorld(): { start: (CoreEv | HubEv)[]; push: HubEv } {
-  const start: (CoreEv | HubEv)[] = [...core_ev, ...hub_ev];
-  const cards = hub_ev.find((e): e is Extract<HubEv, { ev: 'cards' }> => e.ev === 'cards');
-  const first = cards?.cards[0];
-  if (!cards || !first) throw new Error('no card in the fixtures');
-  const fresh: Card = { ...first, id: 99, question: 'ship the fix tonight?', since_ms: first.since_ms + 60_000 };
-  return { start, push: { ...cards, cards: [...cards.cards, fresh] } };
-}
-
-test('native/capsule-pin (c): a pushed card sits bottom-centre and keeps its bottom', async () => {
-  const { start, push } = cardsWorld();
-  await onWorld(async (w) => {
-    const cap = await capsulePage(w.s);
-    await sleep(1000);
-    await w.core.send(push);
-    await w.out.wait(CAPSULE, (l) => l.startsWith('show bottom'));
-    await expect(cap.getByTestId('capsule.card'), 'the card is drawn').toBeVisible();
-    await sleep(300);
-    const g = await glass(w, cap, 'capsule.card');
-    expect(Math.abs(DOCK_LINE - BOTTOM - (g.y + g.height)), `its glass bottom is ${BOTTOM} px above the Dock line`).toBeLessThanOrEqual(2);
-    expect(Math.abs(g.x + g.width / 2 - (DISPLAY.x + DISPLAY.width / 2)), 'centred').toBeLessThanOrEqual(2);
-    const first = await frame(w);
-    const seen: Frame[] = [first];
-    for (let i = 0; i < 10; i++) {
-      await sleep(200);
-      seen.push(await frame(w));
-    }
-    await cap.screenshot({ path: test.info().outputPath('card.png') });
-    const moved = seen.filter((f) => f.y + f.height !== first.y + first.height || f.x !== first.x);
-    expect(moved, 'the card keeps its bottom and its left while it shows').toEqual([]);
-  }, { core: new FakeCore(start) });
 });

@@ -1,12 +1,12 @@
 // native/capsule · the capsule's place, its keys and quiet moments (desktop v9 S8, bar O.5; the
 // helper's quiet events, bise_proto::helper QuietWhy). Passes when:
 //   - what he opens (fn space) puts the drawn capsule 170 px under the display's top, centred;
-//     what bise brings (the talk, a card) puts its bottom 96 px above the work area's bottom, centred;
+//     what bise brings (the talk) puts its bottom 96 px above the work area's bottom, centred;
 //     both measured from the glass drawn in the capsule's page, against the window's bounds;
-//   - what bise brings never takes the keys (shown inactive: no 'keys' on CAPSULE_LINE), and no
-//     window of bise is ever focused (the proof also checks it at both ends);
-//   - during a quiet moment (a call, screen sharing, full screen) a new card waits: the capsule stays
-//     hidden; when the moment ends the card shows; his own fn space still opens the spotlight;
+//   - b3 (the user's decision 2026-10-09, card #476): a new card never pops the capsule (the
+//     window's inbox block or the native notification shows it); it waits in the spotlight's
+//     'waiting for you' rows, ⏎ answers it in place, esc goes back; a quiet moment never holds his
+//     own fn space;
 //   - the helper is told his prefs at start (config: the apps fn never reads, right option, meetings).
 // In test mode the display is place.ts's OFF_DISPLAY (1920x1200 at -30000,-30000, no menu bar, no
 // Dock), never one of his. The glass over a full-screen app and his app staying active are the VM pass's.
@@ -72,50 +72,41 @@ test('native/capsule: fn space sits 170 px under the top, the talk 96 px above t
   });
 });
 
-test('native/capsule: a card bise pushes shows at the bottom without the keys', async () => {
+test('native/capsule b3: a new card never pops the capsule; it waits in the spotlight, ⏎ answers it in place', async () => {
+  // the user's decision 2026-10-09 (card #476, ambient-lead m_14205): with the window's inbox block
+  // (b) and the native notification (a), the capsule no longer pushes a card
   const { start, push } = cardsWorld();
-  await onWorld(async ({ s, core, out }) => {
+  await onWorld(async ({ s, helper, core, out }) => {
     const cap = await capsulePage(s);
-    await sleep(1000); // the start world is the inbox's, not a push; he hasn't opened the capsule yet
+    await sleep(1000); // the start world is the inbox's; he hasn't opened the capsule yet
     expect(out.of(CAPSULE), 'nothing shows at start').toEqual([]);
     await core.send(push);
-    expect(await out.wait(CAPSULE, (l) => l.startsWith('show')), 'the card shows at the bottom, never with the keys').toBe('show bottom');
-    await expect(cap.getByTestId('capsule.card'), 'the card is drawn').toBeVisible();
-    // the inbox card v2 on the glass (amb-home 98ac9ea7): its own footer, '⏎ open in bise' and 'esc later'
+    await sleep(1500);
+    expect(out.of(CAPSULE), 'a new card shows nothing in the capsule').toEqual([]);
+    await expect(cap.getByTestId('capsule.card'), 'no card drawn').toHaveCount(0);
+    // a quiet moment changes nothing; his own fn space still opens the spotlight
+    await helper.send({ ev: 'quiet', on: true, why: 'call' });
+    await sleep(200);
+    await helper.send({ ev: 'fn', act: 'key', key: 'space' });
+    expect(await out.wait(CAPSULE, (l) => l.startsWith('show')), 'fn space opens with the keys').toBe('show top keys');
+    await helper.send({ ev: 'quiet', on: false, why: '' });
+    // the new card is a 'waiting for you' row; the spot's first row is a waiting one
+    await expect(cap.getByTestId('spot.frame'), 'the spotlight').toBeVisible();
+    await expect(cap.getByTestId('spot.frame'), 'the new card waits in the spotlight').toContainText('ship the fix tonight?');
+    await cap.screenshot({ path: test.info().outputPath('b3-spot-waiting.png') });
+    // ⏎ on the first waiting row: its answer in place (amb-home's card v2 on the glass), esc back
+    await cap.keyboard.press('Enter');
+    const view = cap.getByTestId('capsule.card.view');
+    await expect(view, 'the card answers in place').toBeVisible();
     await expect(cap.locator('[data-testid="capsule.card"] .ic.glass'), 'the inbox card on the glass').toBeVisible();
-    await expect(cap.getByTestId('capsule.card.view.open'), '⏎ open in bise').toBeVisible();
     await expect(cap.getByTestId('capsule.card.view.later'), 'esc later').toBeVisible();
-    await expect(cap.getByTestId('capsule.card'), 'no old fixed keys line').not.toContainText('1 2 pick');
-    const focused = await s.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((b) => b.isFocused()).length);
-    expect(focused, 'no window of bise is focused').toBe(0);
+    await sleep(300);
+    await cap.screenshot({ path: test.info().outputPath('b3-card-in-place.png') });
+    await cap.keyboard.press('Escape');
+    await expect(view, 'esc goes back to the list').toHaveCount(0);
+    await expect(cap.getByTestId('spot.frame'), 'the spotlight again').toBeVisible();
   }, { core: new FakeCore(start) });
 });
-
-for (const why of ['call', 'sharing', 'full_screen'] as const) {
-  test(`native/capsule: during a quiet moment (${why}) a pushed card waits, fn space still opens`, async () => {
-    const { start, push } = cardsWorld();
-    await onWorld(async ({ s, helper, core, out }) => {
-      const cap = await capsulePage(s);
-      await sleep(1000);
-      await helper.send({ ev: 'quiet', on: true, why });
-      await sleep(200);
-      await core.send(push);
-      await sleep(800);
-      expect(out.of(CAPSULE), `no card shows during ${why}`).toEqual([]);
-      await helper.send({ ev: 'quiet', on: false, why: '' });
-      const shown = await out.wait(CAPSULE, (l) => l.startsWith('show'), 1500).catch(() => null);
-      expect.soft(shown, 'the card shows when the quiet moment ends').toBe('show bottom');
-      if (shown !== null) {
-        await expect(cap.getByTestId('capsule.card')).toBeVisible();
-        return;
-      }
-      // his own action is never held: fn space opens even in a quiet moment
-      await helper.send({ ev: 'quiet', on: true, why });
-      await helper.send({ ev: 'fn', act: 'key', key: 'space' });
-      expect(await out.wait(CAPSULE, (l) => l.startsWith('show'))).toBe('show top keys');
-    }, { core: new FakeCore(start) });
-  });
-}
 
 test('native/capsule: the helper gets his prefs at start (config: excluded apps, right option, meetings)', async () => {
   await onWorld(async ({ helper }) => {
