@@ -70,6 +70,37 @@ export function biseChip(agents: readonly Pick<Agent, 'main' | 'archived' | 'sta
 }
 
 /** The composer's label and placeholder: 'to perf' / 'write to perf, then ⏎'. */
+/**
+ * S40/W3, the TUI's divider (`you → main · model · effort · approvals mode · state · context`,
+ * chrome.rs + sb/panel.rs status_state): what the composer's label line says on its right. The
+ * model as the catalog names it (its label, else the id's last part), its effort, the hub's
+ * approvals mode (yolo / auto), its state ('working · 4 min', 'idle'), its context ('42k · 17%',
+ * the hub's words). Any part it doesn't know is left out. Pure.
+ */
+export function dividerEnd(a: {
+  model?: string | null;
+  modelLabel?: string | null;
+  effort?: string | null;
+  mode?: string | null;
+  status?: string | null;
+  turnMs?: number | null;
+  context?: string | null;
+}): string {
+  const model = (a.modelLabel ?? '').trim() || (a.model ?? '').split('/').at(-1)?.trim() || '';
+  const mode = a.mode === 'yolo' || a.mode === 'auto' ? a.mode : '';
+  const status = (a.status ?? '').trim();
+  const state = status === 'working' && a.turnMs != null && a.turnMs > 0 ? `working · ${turnAge(a.turnMs)}` : status;
+  return [model, (a.effort ?? '').trim(), mode, state, (a.context ?? '').trim()].filter((x) => x !== '').join(' · ');
+}
+
+/** A turn's running time on the divider: '12 s', '4 min', '2 h'. Pure. */
+function turnAge(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${String(s)} s`;
+  const m = Math.floor(s / 60);
+  return m < 60 ? `${String(m)} min` : `${String(Math.floor(m / 60))} h`;
+}
+
 export function composerWords(name: string): { label: string; placeholder: string } {
   return { label: `to ${name}`, placeholder: `write to ${name}, then ⏎` };
 }
@@ -77,6 +108,23 @@ export function composerWords(name: string): { label: string; placeholder: strin
 /** K2, ⏎ on an empty composer (the TUI's sb/keys.rs + input.rs): never an empty send. A sign-in
  *  that expired and stopped this agent (a 'signin' item waiting on it): sign in again, his ⏎ is
  *  his click. Else nothing. (The computer-use 'give it back' waits on S29.) Pure. */
+/**
+ * K2 whole, in the TUI's order (sb/keys.rs): the thread's last row says his message was not
+ * delivered: ⏎ sends it again (BISE-86); else an expired sign-in: sign in again; else nothing. The
+ * TUI's other two acts: 'agent selected: enters it' is the sidebar's and the agents list's own ⏎ in
+ * the window (the composer has no agent selection), and 'give a stopped computer-use agent the
+ * wheel back' waits on S29. Pure.
+ */
+export function emptyEnterAct(
+  cards: readonly { kind: string; waiting?: readonly string[] | null }[],
+  agent: string,
+  last: { kind: string; pos: number } | undefined,
+): { act: 'again'; pos: number } | { act: 'sign_in'; cmd: { cmd: 'sign_in'; id: 'chatgpt' } } | null {
+  if (last?.kind === 'not_delivered') return { act: 'again', pos: last.pos };
+  const s = emptyEnter(cards, agent);
+  return s === null ? null : { act: 'sign_in', cmd: s };
+}
+
 export function emptyEnter(cards: readonly { kind: string; waiting?: readonly string[] | null }[], agent: string): { cmd: 'sign_in'; id: 'chatgpt' } | null {
   return cards.some((c) => c.kind === 'signin' && (c.waiting ?? []).includes(agent)) ? { cmd: 'sign_in', id: 'chatgpt' } : null;
 }

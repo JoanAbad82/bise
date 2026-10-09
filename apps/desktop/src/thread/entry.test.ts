@@ -135,6 +135,9 @@ describe("the agent view's tool rows (designer's desktop-screens v6 (2))", () =>
 
   it("R11/S9: each call's state on its line as the TUI's: ✓ time, ✗ exit · time with its error line, code and output to open", () => {
     expect(toolTime(300)).toBe('0.3 s');
+    // rounded as the TUI's {:.1}, never floored (qa-flows' tools-real: '✓ 0.1s' there)
+    expect(toolTime(60)).toBe('0.1 s');
+    expect(toolTime(2_160)).toBe('2.2 s');
     expect(toolTime(4_120)).toBe('4.1 s');
     expect(toolTime(12_400)).toBe('12 s');
     expect(toolTime(64_000)).toBe('1 m 4 s');

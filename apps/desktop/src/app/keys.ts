@@ -96,6 +96,9 @@ export function keyAction(e: KeyLike, c: KeyCtx): KeyAct | undefined {
     return p ? { go: { screen: 'artifacts', project: p } } : undefined;
   }
   if (only('meta') && e.code === 'KeyE') return { screen: 'fold-all' };
+  // the TUI's ctrl+o (ctrlhint.rs: open everything closed, else close what is open), the composer
+  // focused or not: the window's capture listener takes it before the field (macOS's 'open line')
+  if (only('ctrl') && e.code === 'KeyO') return { screen: 'fold-all' };
   // the key list over the window (amb-web 1e60fbd6, src/help): ⌘/, or ? when not typing
   if (only('meta') && e.code === 'Slash') return { help: true };
   if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey && !c.typing) return { help: true };

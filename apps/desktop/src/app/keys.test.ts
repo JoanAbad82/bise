@@ -36,6 +36,9 @@ describe("the window's keys", () => {
     expect(keyAction(k('KeyD', { metaKey: true }), ctx({ route: { screen: 'thread', project: 'a', agent: 'perf' } }))).toEqual({ go: { screen: 'review', project: 'a', agent: 'perf' } });
     expect(keyAction(k('KeyA', { metaKey: true, shiftKey: true }), ctx())).toEqual({ go: { screen: 'artifacts', project: 'a' } });
     expect(keyAction(k('KeyE', { metaKey: true }), ctx())).toEqual({ screen: 'fold-all' });
+    // the TUI's ctrl+o, typing or not (his cb1f2b44 bug: nothing opened the folds)
+    expect(keyAction(k('KeyO', { ctrlKey: true }), ctx())).toEqual({ screen: 'fold-all' });
+    expect(keyAction(k('KeyO', { ctrlKey: true }), ctx({ typing: true }))).toEqual({ screen: 'fold-all' });
     expect(keyAction(k('Period', { metaKey: true }), ctx())).toEqual({ screen: 'stop' });
     expect(keyAction(k('KeyY', { ctrlKey: true }), ctx())).toEqual({ screen: 'copy-code' });
     expect(keyAction(k('Slash', { metaKey: true }), ctx())).toEqual({ help: true });

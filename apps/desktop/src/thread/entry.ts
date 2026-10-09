@@ -284,7 +284,8 @@ export interface ToolLine {
 
 /** A call's own time, the TUI's: '0.3 s', '4.1 s', '12 s', '1 m 4 s'. Pure. */
 export function toolTime(ms: number): string {
-  if (ms < 10_000) return `${String(Math.floor(ms / 1000))}.${String(Math.floor((ms % 1000) / 100))} s`;
+  // rounded to the tenth as the TUI's {:.1} (a 60 ms call reads '0.1 s' in both, qa-flows m_14191)
+  if (ms < 10_000) return `${(ms / 1000).toFixed(1)} s`;
   return stepTime(ms);
 }
 
@@ -317,7 +318,8 @@ export function toolLines(items: readonly ToolLike[]): {
       lines.push({
         pos: t.pos,
         mark: t.kind === 'run' ? '$' : t.kind === 'edit' ? '±' : '·',
-        text: toolWords(t.text),
+        // a failed read or search says the TUI's verb, like its fold ('read gone.rs', designer m_14103)
+        text: t.kind === 'read' || t.kind === 'search' ? `${t.kind} ${toolWords(t.text).replace(/^\S+\s+/, '')}`.trim() : toolWords(t.text),
         time,
         state: t.state === 'run' || t.state === 'ok' || t.state === 'err' ? t.state : '',
         end: toolEnd(t, time),

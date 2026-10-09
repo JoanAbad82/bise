@@ -13,7 +13,7 @@ import { Composer, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer';
 import { quoteFrom, quoteKey, quoteText } from './quote';
 import type { Outgoing } from '@/composer/message';
-import { threadKey, useAgents, useCards, useCommands, useCoreState, useEntry, useFiles, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
+import { threadKey, useAgents, useApprovals, useModels, useCards, useCommands, useCoreState, useEntry, useFiles, useProjects, usePending, useSkills, useStore, useThreadOrder, useTyping } from '@/store';
 import { usePartialText } from '@/shared/partial';
 import { LIVE, liveKey, useLive, useStill } from './live';
 import { useMenuAction } from '@/app/menu';
@@ -32,7 +32,8 @@ import { ThreadInbox, pickWaits, takesWords, useStripCard } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
-import { composerWords, emptyEnter, usageLine } from './head';
+import { composerWords, dividerEnd, emptyEnter, emptyEnterAct, usageLine } from './head';
+import { useNow } from '@/app/clock';
 import { SignInLine, useThreadSignIn } from './signin';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
@@ -90,6 +91,22 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
   const held = useHeld(store, tkey);
 
   const me = useAgents(project).find((a) => a.name === agent);
+  // S40/W3: the TUI's divider on the composer's label line: model · effort · approvals mode · state · context
+  const approvals = useApprovals(project);
+  const models = useModels(project);
+  const now = useNow();
+  const divider =
+    me === undefined
+      ? ''
+      : dividerEnd({
+          model: me.model,
+          modelLabel: models.find((m) => m.id === me.model)?.label,
+          effort: me.effort,
+          mode: approvals?.mode,
+          status: me.status,
+          turnMs: me.status === 'working' ? (me.turn_ms ?? now - me.since_ms) : null,
+          context: me.usage?.words,
+        });
   // voice mode on this agent: its pane takes the composer's place (amb-home's src/voicemode)
   const voice = useVoiceHere(project, agent);
   const typing = useTyping(tkey);
@@ -385,7 +402,7 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
             // an item only its options decide (an approval, a merge): his words go as a plain message,
             // the label says what it waits for (ambient m_8773: 'to bise · the merge waits for 1 or 2')
             to={answering !== null ? answeringLabel(answering) : docked !== null && pickWaits(docked) !== null ? `${composerWords(title).label} · ${pickWaits(docked) ?? ''}` : composerWords(title).label}
-            toEnd={answering === null ? undefined : 'esc write a plain message'}
+            toEnd={answering === null ? (divider === '' ? undefined : divider) : 'esc write a plain message'}
             placeholder={answering === null ? composerWords(title).placeholder : 'your answer, then ⏎'}
             answer={answering === null ? null : answering.id}
             onStop={stop}
@@ -819,9 +836,17 @@ export const ThreadComposer = memo(function ThreadComposer({
   // K2: ⏎ on an empty field does the TUI's act, if one waits (sign in again after expiry)
   const cards = useCards(project);
   const onEmptyEnter = useCallback(() => {
-    const act = emptyEnter(cards, agent);
-    if (act !== null) store.command(act);
-  }, [cards, agent, store]);
+    // the thread's last row, read at ⏎ (never subscribed: a new entry must not re-render the composer)
+    const key = threadKey(project, agent);
+    const lastPos = store.threadOrder(key).order.at(-1);
+    const lastKind = lastPos === undefined ? undefined : store.entry(key, lastPos)?.kind;
+    const act = emptyEnterAct(cards, agent, lastPos === undefined || lastKind === undefined ? undefined : { kind: lastKind, pos: lastPos });
+    if (act === null) return;
+    // his undelivered message, last in the thread: its own row sends it again (and says so); gone
+    // once sent or dropped, so a second ⏎ does nothing, as the TUI's
+    if (act.act === 'again') document.querySelector<HTMLButtonElement>(`[data-testid="thread.notdelivered.${String(act.pos)}.again"]`)?.click();
+    else store.command(act.cmd);
+  }, [cards, agent, store, project]);
   return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} {...(toEnd === undefined ? {} : { toEnd })} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
 });
 

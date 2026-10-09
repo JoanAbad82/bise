@@ -689,7 +689,8 @@ function ToolLineRow({ l, live, runFor }: { l: ToolLine; live: boolean; runFor: 
           )
         )}
       </div>
-      {l.err !== '' && (
+      {/* open, the box shows the error: the red line above it goes (designer m_14103) */}
+      {l.err !== '' && !(open && opens) && (
         <div className="th-tool-err" data-testid={`${id}.err`}>
           {l.err}
         </div>

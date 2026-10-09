@@ -683,7 +683,8 @@ button.th-sched-head {
 }
 .th-tool-err {
   overflow: hidden;
-  padding-left: 1.6em;
+  /* under the command's first letter: the width of '$ ' (designer m_14103) */
+  padding-left: 2ch;
   font: var(--t-12) / 1.5 var(--font-mono);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -700,10 +701,11 @@ button.th-sched-head {
   box-shadow: 0 0 0 2px var(--c-focus);
 }
 .th-tool-open {
-  margin: 2px 0 6px 1.6em;
-  padding: 6px 10px;
+  /* hangs at 2ch like the error line; the thread's code block box (.th-pre: 10/12 px, r 8) */
+  margin: 2px 0 6px 2ch;
+  padding: 10px 12px;
   border: 1px solid var(--c-line);
-  border-radius: 6px;
+  border-radius: 8px;
   max-height: 320px;
   overflow: auto;
 }
@@ -800,24 +802,33 @@ button.th-sched-head {
   display: flex;
   color: var(--c-accent);
 }
-/* the label is one line, always (designer m_14031): the question is cut with '…' and the way back
-   ('esc write a plain message') keeps its room at the right */
+.th-screen[data-answering='true'] .b-composer .div .end {
+  flex: none;
+}
+/* the label line, one line always (designer m_14031): 'to perf' (or the question, cut with '…')
+   left, on the right the TUI's divider words (S40/W3: model · effort · approvals mode · state ·
+   context) or the way back ('esc write a plain message', which keeps its room) */
 .th-screen .b-composer .div {
+  display: flex;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 .th-screen .b-composer .div .lbl {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .th-screen .b-composer .div .end {
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   margin-left: auto;
   padding-left: 12px;
   color: var(--c-text-3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* bise's own thread before any project (designer's 'no project yet', m_12093): centred, its

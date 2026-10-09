@@ -58,7 +58,7 @@ test("thread/tool-rows: each call says ✓ time or ✗ exit · time with its err
     await expect(page.getByTestId('thread.tool.3.end')).toHaveText('✓ 0.3 s');
     await expect(page.getByTestId('thread.tool.4.end')).toHaveText('✗ exit 1 · 2.1 s');
     await expect(page.getByTestId('thread.tool.4.err'), 'its first error line under it').toHaveText('src/a.ts:3:7 error: x is unused');
-    await expect(line(5), 'a failed read is its own line').toContainText('read_file gone.rs');
+    await expect(line(5), 'a failed read is its own line').toContainText('read gone.rs');
     await expect(page.getByTestId('thread.tool.5.end')).toHaveText('✗');
     await expect(page.getByTestId('thread.tool.5.err')).toHaveText('no such file: gone.rs');
     await expect(line(6), 'a good read folds into the words').toHaveCount(0);
@@ -79,6 +79,7 @@ test("thread/tool-rows: each call says ✓ time or ✗ exit · time with its err
     await line(4).click();
     await expect(page.getByTestId('thread.tool.4.open')).toContainText('npm run lint');
     await expect(page.getByTestId('thread.tool.4.open')).toContainText('exit 1: src/a.ts:3:7 error: x is unused');
+    await expect(page.getByTestId('thread.tool.4.err'), 'open, the box says the error: the red line goes').toHaveCount(0);
     await page.mouse.move(1, 300);
     await page.screenshot({ path: test.info().outputPath('tools-open-light.png') });
     await core.send(prefs('dark') as never);

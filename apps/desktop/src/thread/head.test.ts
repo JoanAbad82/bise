@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { biseChip, branchLine, composerWords, emptyEnter, roleOf, stateChip, STARTING_MS, usageLine } from './head';
+import { biseChip, branchLine, composerWords, dividerEnd, emptyEnter, emptyEnterAct, roleOf, stateChip, STARTING_MS, usageLine } from './head';
 
 const NOW = 1_791_100_000_000;
 const MIN = 60_000;
@@ -45,6 +45,23 @@ describe('K2: ⏎ on an empty composer', () => {
     expect(emptyEnter([{ kind: 'signin', waiting: ['main'] }], 'perf')).toBeNull();
     expect(emptyEnter([{ kind: 'question', waiting: ['perf'] }], 'perf')).toBeNull();
     expect(emptyEnter([], 'perf')).toBeNull();
+  });
+  it("first his undelivered message (the TUI's order, BISE-86): ⏎ sends it again; then the sign-in; else nothing", () => {
+    const signin = [{ kind: 'signin', waiting: ['perf'] }];
+    expect(emptyEnterAct(signin, 'perf', { kind: 'not_delivered', pos: 26 })).toEqual({ act: 'again', pos: 26 });
+    expect(emptyEnterAct(signin, 'perf', { kind: 'agent', pos: 27 })).toEqual({ act: 'sign_in', cmd: { cmd: 'sign_in', id: 'chatgpt' } });
+    expect(emptyEnterAct([], 'perf', { kind: 'agent', pos: 27 })).toBeNull();
+    expect(emptyEnterAct([], 'perf', undefined)).toBeNull();
+  });
+});
+
+describe('S40/W3: the divider says model · effort · approvals mode · state · context', () => {
+  it("as the TUI's divider, leaving out what it doesn't know", () => {
+    expect(dividerEnd({ model: 'mistral/mistral-medium-latest', modelLabel: 'Mistral Medium', effort: 'high', mode: 'auto', status: 'idle', context: '42k · 17%' })).toBe('Mistral Medium · high · auto · idle · 42k · 17%');
+    expect(dividerEnd({ model: 'anthropic/claude-opus-5-5', status: 'working', turnMs: 4 * 60_000 + 3000 })).toBe('claude-opus-5-5 · working · 4 min');
+    expect(dividerEnd({ status: 'working', turnMs: 12_400, mode: 'yolo' })).toBe('yolo · working · 12 s');
+    expect(dividerEnd({ status: 'done', mode: 'unknown', effort: '' })).toBe('done');
+    expect(dividerEnd({})).toBe('');
   });
 });
 
