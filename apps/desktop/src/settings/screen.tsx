@@ -9,6 +9,7 @@ import { holdForSetup, useHeld } from './hold';
 import { useHeldSetup } from './setup-first';
 import { useRouter } from '@/app/router';
 import { useHelper } from '@/setup/helper';
+import { useNotifyAuth } from '@/inbox';
 import { Settings } from './Settings';
 import { pageOf } from './pages';
 import { pickerPort } from './picker';
@@ -106,6 +107,9 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
   // no window.bise outside Electron (a component test): no helper
   const bise = window.bise as typeof window.bise | undefined;
   const helper = bise?.platform === 'darwin';
+  // macOS's notifications permission (amb-mac's window.bise.notify): the general page's row
+  const [notify, setNotify] = useNotifyAuth();
+  const notifyApi = bise?.notify;
   return (
     <Settings
       page={page}
@@ -124,7 +128,16 @@ export function SettingsScreen({ page }: { page?: string | undefined }) {
       approvals={approvals}
       approvalsError={approvalsError}
       signin={{ waiting, signing }}
+      notify={notify}
       ports={{
+        ...(notifyApi
+          ? {
+              notify: (act: 'ask' | 'open') => {
+                if (act === 'ask') void notifyApi.ask().then(setNotify);
+                else notifyApi.openSettings();
+              },
+            }
+          : {}),
         send: (cmd) => {
           store.command(cmd);
         },

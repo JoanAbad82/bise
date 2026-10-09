@@ -9,7 +9,7 @@ export { Inbox, type InboxPorts, type InboxProps } from './Inbox';
 export { InboxCard, kindTitle, titleOf, PICKED_MS, type InboxCardActs, type InboxCardProps } from './InboxCard';
 export { sortCards, cardKey } from './order';
 export { takesWords, pickWaits } from './model';
-export { InboxBlock, openInbox, answeringOf, blockList, type Answering, type Here, type InboxBlockProps } from './Block';
+export { InboxBlock, openInbox, answeringOf, blockList, useNotifyAuth, type Answering, type Here, type InboxBlockProps } from './Block';
 export { inboxDrafts, makeDrafts, type Drafts } from './drafts';
 export { InboxScreen, ThreadInbox, inboxOf } from './screen';
 export { ConfirmBar } from './confirm';

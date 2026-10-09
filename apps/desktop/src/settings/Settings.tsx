@@ -16,6 +16,7 @@ import { PAGES, PageBody, pageOf, type Page } from './pages';
 import type { ComputerUse } from './computer';
 import type { Perms } from './check';
 import type { KeyError, SignIn } from './accounts';
+import type { NotifyAuth } from '@/shared/api';
 import './settings.css';
 
 export interface SettingsData {
@@ -47,6 +48,8 @@ export interface SettingsData {
   signin?: SignIn | null;
   /** his home folder, to say ~ */
   home?: string;
+  /** macOS's notifications permission (window.bise.notify; none: no row on general) */
+  notify?: NotifyAuth | null;
 }
 
 export interface SettingsPorts {
@@ -67,6 +70,8 @@ export interface SettingsPorts {
   copy?: (text: string) => void;
   /** cancel the sign-in under way (bar V14: AppCmd sign_in_cancel) */
   cancelSignIn?: (id: string) => void;
+  /** macOS's notifications: ask (notify.ask(), macOS's alert) or open System Settings › Notifications */
+  notify?: (act: 'ask' | 'open') => void;
 }
 
 export interface SettingsProps extends SettingsData {

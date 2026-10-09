@@ -13,6 +13,7 @@ import { Settings, type SettingsPorts } from './Settings';
 import { appName, excludedApps, flag, getPref, knownApps, onboarded, putPref, type Prefs } from './prefs';
 import { addPaths, offers, ordered } from './projects';
 import { KEY_SECTIONS } from './keys';
+import { notifyRow } from './pages';
 import { checks } from './check';
 
 afterEach(cleanup);
@@ -90,6 +91,28 @@ describe('Settings', () => {
     fireEvent.click(screen.getByTestId('settings.nav.keys'));
     fireEvent.keyDown(screen.getByTestId('settings.root'), { key: 'Escape' });
     expect(p.went).toEqual(['keys', 'back']);
+  });
+
+  it("general: macOS notifications' row asks when never asked, opens System Settings when off or asked, says on, and is gone without the api", () => {
+    expect(notifyRow(null)).toBeNull();
+    expect(notifyRow('never')?.act).toBe('ask');
+    expect(notifyRow('asked')?.act).toBe('open');
+    expect(notifyRow('off')).toEqual({ sub: 'off in macOS: questions wait in bise until you look', act: 'open', button: 'open System Settings' });
+    expect(notifyRow('on')?.act).toBeNull();
+    const acts: string[] = [];
+    const p = { ...ports(), notify: (a: 'ask' | 'open') => acts.push(a) };
+    view('general', p, { notify: 'off' });
+    fireEvent.click(screen.getByTestId('settings.notify.open'));
+    cleanup();
+    view('general', p, { notify: 'never' });
+    fireEvent.click(screen.getByTestId('settings.notify.ask'));
+    expect(acts).toEqual(['open', 'ask']);
+    cleanup();
+    view('general', p, { notify: 'on' });
+    expect(screen.getByTestId('settings.notify.on').textContent).toBe('on');
+    cleanup();
+    view('general', p);
+    expect(screen.queryByTestId('settings.notify.sub')).toBeNull();
   });
 
   it('privacy: an excluded app toggles in the list of ids', () => {

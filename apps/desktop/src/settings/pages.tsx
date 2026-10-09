@@ -17,6 +17,7 @@ import { checks, SetupCheck } from './check';
 import { KEY_SECTIONS } from './keys';
 import { appName, excludedApps, flag, knownApps, num, str, type Prefs } from './prefs';
 import type { SettingsData, SettingsPorts } from './Settings';
+import type { NotifyAuth } from '@/shared/api';
 
 export type Page = 'setup' | 'general' | 'voice' | 'privacy' | 'quiet' | 'models' | 'approvals' | 'projects' | 'plugins' | 'computer' | 'keys';
 
@@ -33,6 +34,26 @@ export const PAGES: readonly { id: Page; title: string; sub: string }[] = [
   { id: 'computer', title: 'computer use', sub: 'agents drive Chrome and your apps, step by step. /computer-use in the terminal.' },
   { id: 'keys', title: 'keys', sub: "every terminal key works here too; ⌘ adds a Mac app's gestures. /help in the terminal." },
 ];
+
+/**
+ * The general page's macOS notifications row (amb-mac m_14410, designer m_14211): what it says and the
+ * one thing it does for each state. 'never' asks; 'asked' and 'off' only System Settings can change
+ * (macOS asks once), so they open it; 'on' does nothing. null (no notify api, not known yet): no row. Pure.
+ */
+export function notifyRow(auth: NotifyAuth | null): { sub: string; act: 'ask' | 'open' | null; button: string } | null {
+  switch (auth) {
+    case null:
+      return null;
+    case 'never':
+      return { sub: "questions can reach you when bise isn't in front", act: 'ask', button: 'turn on' };
+    case 'asked':
+      return { sub: 'macOS asked you; your answer is in System Settings', act: 'open', button: 'open System Settings' };
+    case 'on':
+      return { sub: "questions reach you when bise isn't in front", act: null, button: '' };
+    case 'off':
+      return { sub: 'off in macOS: questions wait in bise until you look', act: 'open', button: 'open System Settings' };
+  }
+}
 
 /** A route's page (none, or one this version doesn't know: general). */
 export function pageOf(id: string | undefined): (typeof PAGES)[number] {
@@ -90,6 +111,7 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
                 />
               ),
             },
+            ...notifyItems(data.notify ?? null, ports.notify),
           ]}
         />
       );
@@ -194,6 +216,35 @@ export function PageBody({ page, prefs, setPref, data, ports }: PageProps) {
     case 'keys':
       return <KeyList />;
   }
+}
+
+function notifyItems(auth: NotifyAuth | null, act: ((a: 'ask' | 'open') => void) | undefined): GroupItem[] {
+  const row = notifyRow(auth);
+  if (row === null) return [];
+  const go = row.act;
+  return [
+    {
+      id: 'notify',
+      label: 'macOS notifications',
+      sub: <span data-testid="settings.notify.sub">{row.sub}</span>,
+      control:
+        go === null ? (
+          <Chip tone="ok" testId="settings.notify.on">
+            on
+          </Chip>
+        ) : (
+          <Button
+            kind={go === 'ask' ? 'pri' : 'ghost'}
+            onClick={() => {
+              act?.(go);
+            }}
+            testId={`settings.notify.${go}`}
+          >
+            {row.button}
+          </Button>
+        ),
+    },
+  ];
 }
 
 function Privacy({ prefs, setPref, tg }: { prefs: Prefs | null; setPref: (key: string, value: JsonValue) => void; tg: (key: string, label: string, sub: string, dflt?: boolean) => GroupItem }) {

@@ -71,9 +71,12 @@ export function asksNotify(auth: NotifyAuth | null, items: number, notNow: numbe
   return auth === 'never' && items > 0 && notNow < 2 && !thisLaunch;
 }
 
-function useNotifyRow(items: number): { show: boolean; on: () => void; later: () => void } {
+/**
+ * macOS's notifications permission as amb-mac's window.bise.notify tells it, live (null: not known yet,
+ * or no notify api: a component test, an older shell), and a setter for ask()'s answer. Settings reads it too.
+ */
+export function useNotifyAuth(): [NotifyAuth | null, (s: NotifyAuth) => void] {
   const [auth, setAuth] = useState<NotifyAuth | null>(null);
-  const [said, setSaid] = useState(() => sessionStorage.getItem(NOT_NOW_LAUNCH) === '1');
   useEffect(() => {
     const api = notifyApi();
     if (api === null) return;
@@ -89,6 +92,12 @@ function useNotifyRow(items: number): { show: boolean; on: () => void; later: ()
       off();
     };
   }, []);
+  return [auth, setAuth];
+}
+
+function useNotifyRow(items: number): { show: boolean; on: () => void; later: () => void } {
+  const [auth, setAuth] = useNotifyAuth();
+  const [said, setSaid] = useState(() => sessionStorage.getItem(NOT_NOW_LAUNCH) === '1');
   return {
     show: asksNotify(auth, items, notNowCount(), said),
     on: () => {
