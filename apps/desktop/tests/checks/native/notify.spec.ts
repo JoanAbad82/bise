@@ -12,7 +12,8 @@
 //   - a new question while a bise window has the keys posts nothing;
 //   - a reply answers with his words; a click opens the window on that card in the inbox;
 //   - the permission: 'never' until asked; ask() answers what macOS said (the test's answer);
-//   - an approval offers its two words as buttons and no reply.
+//   - an approval offers its two words as buttons and no reply;
+//   - during a quiet moment (the helper's call) a new question still knocks, silent.
 import { FakeCore, test, expect } from '../../harness';
 import type { Card, CoreEv, HubEv } from '../../../src/proto';
 import { core_ev, hub_ev } from '../../../src/proto/fixtures.gen';
@@ -20,7 +21,7 @@ import { onWorld, sleep, type World } from './world';
 
 const NOTIFY = 'bise-desktop: notify';
 type Cmd = { cmd?: string; project?: string; card?: number; reply?: string };
-type Line = { t: string; key?: string; route?: string; note?: { key: string; title: string; body: string; actions: string[]; reply: boolean }; cmd?: Cmd };
+type Line = { t: string; key?: string; route?: string; note?: { key: string; title: string; body: string; actions: string[]; reply: boolean; silent: boolean }; cmd?: Cmd };
 
 const cardsEv = hub_ev.find((e): e is Extract<HubEv, { ev: 'cards' }> => e.ev === 'cards');
 if (cardsEv === undefined) throw new Error('no cards in the fixtures');
@@ -97,6 +98,15 @@ test('native/notify: a new question knocks only when bise is not in front; its b
       const ap = await waitLine(w, (l) => l.t === 'post' && l.note?.key === `${P}#102`, 'a notification for the approval');
       expect(ap.note?.actions).toEqual(['merge', 'not yet']);
       expect(ap.note?.reply).toBe(false);
+
+      // a quiet moment (a call): a new question still knocks, silent; back to sound after
+      expect(post.note?.silent, 'a question outside a quiet moment makes its sound').toBe(false);
+      await w.helper.send({ ev: 'quiet', on: true, why: 'call' });
+      await sleep(200);
+      await w.core.send(push([q(100), q(101), q(102, { approval: true, kind: 'merge', question: 'merge gift-cards into main?', options: [{ n: 1, label: 'merge' }, { n: 2, label: 'not yet' }] }), q(103)]));
+      const quiet = await waitLine(w, (l) => l.t === 'post' && l.note?.key === `${P}#103`, 'a notification during the call');
+      expect(quiet.note?.silent, 'during a call it makes no sound').toBe(true);
+      await w.helper.send({ ev: 'quiet', on: false, why: '' });
 
       // the permission: 'never' until asked, then what macOS answered (the test's 'off')
       const page = w.s.page;

@@ -153,6 +153,10 @@ void app.whenReady().then(() => {
       for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(IPC.notifyState, s);
     },
   });
+  // a quiet moment (a call, screen sharing, full screen): a question still arrives, silent
+  helper?.on((ev) => {
+    if (ev.ev === 'quiet') notifier.setQuiet(ev.on);
+  });
   ipcMain.handle(IPC.notifyState, () => notifier.auth());
   ipcMain.handle(IPC.notifyAsk, () => notifier.ask());
   ipcMain.on(IPC.notifySettings, () => {

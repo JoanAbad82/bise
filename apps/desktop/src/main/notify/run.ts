@@ -51,6 +51,8 @@ export class Notifier {
   private readonly shown = new Map<string, { note: Note; n: Notification | null }>();
 
   private authState: NotifyAuth;
+  /** a quiet moment now (the helper: a call, screen sharing, full screen): a question arrives silent */
+  private quiet = false;
 
   constructor(private readonly d: NotifyDeps) {
     if (d.testMode) {
@@ -72,6 +74,11 @@ export class Notifier {
     } catch {
       return 'never';
     }
+  }
+
+  /** The helper's quiet moments: during one, a new question's notification makes no sound. */
+  setQuiet(on: boolean): void {
+    this.quiet = on;
   }
 
   /** The permission now (the inbox's row reads it). */
@@ -137,7 +144,7 @@ export class Notifier {
     // a card leaves when its project's own list drops it (its row's when it has no cards event)
     if (from === 'cards' || !this.withCards.has(project)) for (const k of gone) this.close(k);
     if (fresh.length === 0 || !knocks(this.focused())) return;
-    for (const c of fresh) this.post(noteOf({ ...c, project }, this.places.get(project), this.d.lang, false));
+    for (const c of fresh) this.post(noteOf({ ...c, project }, this.places.get(project), this.d.lang, this.quiet));
   }
 
   private line(o: unknown): void {
