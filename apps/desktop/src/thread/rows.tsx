@@ -305,11 +305,18 @@ function ImageChips({ images, testId }: { images: readonly { name: string; path:
       {images.map((img, i) => (
         <span key={`${img.path}#${String(i)}`} className="b-chip image" data-kind="image" data-testid={`${testId}.image.${String(i + 1)}`}>
           <img className="thumb" src={fileUrl(img.path)} alt="" />
-          {img.name !== '' ? img.name : `[Image #${String(i + 1)}]`}
+          {/* designer's R36 rule: always '[Image #n]' (its order in this message), never the
+              store's file name (a sha .png on real data) */}
+          <span className="lbl">{imageLabel(i)}</span>
         </span>
       ))}
     </div>
   );
+}
+
+/** An answer's n-th image chip label: '[Image #n]', whatever the file is called. Pure. */
+export function imageLabel(i: number): string {
+  return `[Image #${String(i + 1)}]`;
 }
 
 /** A local file's URL for an img (the window's CSP allows file:). Pure. */

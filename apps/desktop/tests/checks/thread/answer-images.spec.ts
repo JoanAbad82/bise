@@ -5,12 +5,19 @@
 // source path, accent on accent-soft); an answer bise gave for him ('answered … for you') shows its
 // chip the same way. Never the hub's marker ('<image', 'b64'), never a path in the row's text.
 // Shots light and dark. Owner: amb-win.
+// Real-shaped data too (designer's R36 red on 387ad740): the store names a pasted image by its sha
+// ('bd913dd2…6569.png'); the chip still reads '[Image #1]' and stays inside the column.
+import { copyFileSync, mkdtempSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { FakeCore, launchDesktop, test, expect } from '../../harness';
 
 const HOME = 'bise-home-00000000';
 const P = 'shop-ab9f3c3b';
-const PNG = path.join(__dirname, '../fixtures/checker.png');
+const SHA = 'bd913dd20e9e8cf0a03080f1df7859b3fd1a7581bd95070815b9330e131d6569.png';
+// his pasted image as the store keeps it: a sha-named file in its own images folder
+const PNG = path.join(mkdtempSync(path.join(os.tmpdir(), 'r36-images-')), SHA);
+copyFileSync(path.join(__dirname, '../fixtures/checker.png'), PNG);
 const NOW = Date.now();
 const MIN = 60_000;
 const prefs = (theme: string) => ({
@@ -35,8 +42,8 @@ const world = () => [
     agent: 'main',
     entries: [
       { pos: 1, at_ms: NOW - 5 * MIN, kind: 'agent', text: 'gift-ui asks: show the balance on the cart page, or only at checkout?' },
-      { pos: 2, at_ms: NOW - 4 * MIN, kind: 'approval', text: 'you answered gift-ui', approval: { ok: true, text: 'you answered gift-ui', note: 'the balance on the cart page', images: [{ name: '[Image #1]', path: PNG }] } },
-      { pos: 3, at_ms: NOW - 3 * MIN, kind: 'answered', text: 'answered gift-ui for you', answered: { agent: 'gift-ui', question: 'which colour for the badge?', answer: 'the green one', why: 'he showed it', images: [{ name: '[Image #1]', path: PNG }] } },
+      { pos: 2, at_ms: NOW - 4 * MIN, kind: 'approval', text: 'you answered gift-ui', approval: { ok: true, text: 'you answered gift-ui', note: 'the balance on the cart page', images: [{ name: SHA, path: PNG }] } },
+      { pos: 3, at_ms: NOW - 3 * MIN, kind: 'answered', text: 'answered gift-ui for you', answered: { agent: 'gift-ui', question: 'which colour for the badge?', answer: 'the green one', why: 'he showed it', images: [{ name: SHA, path: PNG }] } },
     ],
     before: null,
     more: false,
@@ -63,6 +70,16 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
       expect(text, `${id}: never his path`).not.toContain(PNG);
     }
     await expect(page.getByTestId('thread.answered.3.image.1'), "bise's answer for him: the same chip").toHaveText('[Image #1]');
+    // never the store's file name; every chip inside the thread's column
+    for (const id of ['thread.approval.2', 'thread.answered.3']) {
+      expect(await page.getByTestId(id).innerText(), `${id}: never the store's file name`).not.toContain(SHA.slice(0, 8));
+      const fit = await page.getByTestId(`${id}.image.1`).evaluate((el) => {
+        const col = el.closest('[data-testid="thread.list"]') ?? document.body;
+        return { right: el.getBoundingClientRect().right, colRight: col.getBoundingClientRect().right, over: el.scrollWidth - el.clientWidth };
+      });
+      expect(fit.right, `${id}: the chip ends inside the column`).toBeLessThanOrEqual(fit.colRight + 0.5);
+      expect(fit.over, `${id}: its words fit the chip`).toBeLessThanOrEqual(1);
+    }
     // the chip's colours are the accent on its soft fill, as everywhere
     const look = await chip.evaluate((el) => {
       const probe = document.createElement('span');
