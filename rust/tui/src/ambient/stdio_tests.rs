@@ -19,15 +19,8 @@ fn written(t: Took) -> Vec<Value> {
 }
 
 #[test]
-fn the_older_lines_pass_as_they_are() {
-    let mut s = Stdio::older();
-    assert_eq!(s.line_in(r#"{"cmd":"hush"}"#), Took::Cmd { line: r#"{"cmd":"hush"}"#.into(), id: None });
-    assert_eq!(s.out(vec![json!({"ev": "phase", "phase": "idle"})]), vec![r#"{"ev":"phase","phase":"idle"}"#.to_string()]);
-}
-
-#[test]
 fn initialize_first_then_the_held_events_in_order() {
-    let mut s = Stdio::rpc();
+    let mut s = Stdio::new();
     // events before the handshake are held, never written
     assert!(s.out(vec![json!({"ev": "fake_voice", "on": true}), json!({"ev": "prefs", "prefs": {}})]).is_empty());
     // a request before initialize: -32002
@@ -52,12 +45,12 @@ fn initialize_first_then_the_held_events_in_order() {
 
 #[test]
 fn a_request_is_the_parser_s_line_and_its_answer() {
-    let mut s = Stdio::rpc();
+    let mut s = Stdio::new();
     s.line_in(&init());
     s.line_in(INITIALIZED_LINE);
     let Took::Cmd { line, id } = s.line_in(r#"{"jsonrpc":"2.0","id":7,"method":"core/computer","params":{"act":"peek","key":"h.d"}}"#) else { panic!() };
     assert_eq!(serde_json::from_str::<Value>(&line).unwrap(), json!({"cmd": "computer", "act": "peek", "key": "h.d"}));
-    assert_eq!(id, Some(Id::Num(7)));
+    assert_eq!(id, Id::Num(7));
     let ok: Value = serde_json::from_str(&s.answer(Id::Num(7), Ok(()))).unwrap();
     assert_eq!(ok, json!({"jsonrpc": "2.0", "id": 7, "result": {}}));
     let no: Value = serde_json::from_str(&s.answer(Id::Num(8), Err("answer: no card id".into()))).unwrap();

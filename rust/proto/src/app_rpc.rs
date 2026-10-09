@@ -1,5 +1,5 @@
 //! The desktop app <-> its core on stdio as JSON-RPC 2.0 (client-protocol
-//! step 6; envelope [`crate::jsonrpc`]): `bise ambient-core --rpc`.
+//! step 6; envelope [`crate::jsonrpc`]): `bise ambient-core`.
 //!
 //! - the app sends `initialize` ([`AppInit`]) first, gets [`AppInitResult`]
 //!   (the methods and notifications this core serves), then sends
@@ -106,6 +106,11 @@ pub fn core_cmds() -> impl Iterator<Item = &'static str> {
 }
 
 /// Every command tag the app sends a project's hub through the core.
+// TODO(client-protocol step 7, architect m_15060): when ambient-app and
+// client-protocol merge, the hub half's names (hub/<cmd tag>, hub/<ev tag>)
+// become rpc::METHODS/NOTIFICATIONS' names (one owner); this module keeps
+// only core/<tag>. Typing CORE_CMDS/CORE_EVS into AppCmd/CoreEv is its own
+// later chunk (plan v11, 'after the release').
 pub fn hub_cmds() -> impl Iterator<Item = &'static str> {
     HubCmd::TAGS.iter().copied().filter(|t| !NOT_A_METHOD.contains(t))
 }

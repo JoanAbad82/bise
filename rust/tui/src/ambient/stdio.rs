@@ -1,18 +1,13 @@
-//! The core's stdio with the app (pure; client-protocol step 6): one JSON
-//! object per line both ways, either the older lines (`{cmd}` in, `{ev}`
-//! out) or JSON-RPC 2.0 (`bise ambient-core --rpc`, the names are
-//! `bise_proto::app_rpc`'s).
+//! The core's stdio with the app (pure; client-protocol step 6): JSON-RPC
+//! 2.0, one object per line both ways, the names `bise_proto::app_rpc`'s.
 //!
-//! JSON-RPC: `initialize` first (answered with what this core serves),
+//! `initialize` first (answered with what this core serves),
 //! then `initialized`; the events the core makes before it are held and
 //! written after it, in order. A request becomes the command line the
 //! core's parser reads (`Cmd::parse`, one parser for both ways); its
 //! response (`{}`, or the parser's refusal) is written before the events
 //! the command causes. Nothing here logs an event, so a computer-use
 //! still (`core/computer_peek`) never reaches the log.
-//!
-//! TODO(client-protocol step 6, land 2): the older lines go with the
-//! Python e2e's move; `--rpc` becomes the only way.
 
 use bise_proto::app_rpc::{self, AppInit, AppInitResult, INITIALIZE, INITIALIZED};
 use bise_proto::jsonrpc::{code, Id, Message, Response, RpcError};
@@ -21,13 +16,12 @@ use serde_json::{json, Value};
 /// What one stdin line asks of the run loop.
 #[derive(Debug, PartialEq)]
 pub enum Took {
-    /// a command line for `Cmd::parse`; `id`: a request's, to answer
-    Cmd { line: String, id: Option<Id> },
-    /// lines to write now (an answer, a refusal, the held events)
+    /// a command line for `Cmd::parse` and the request's id, to answer
+    Cmd { line: String, id: Id },
+    /// lines to write now (an answer, the held events)
     Write(Vec<String>),
     /// lines to write and one to log (a line the core can't read)
     Refused { write: Vec<String>, log: String },
-    Nothing,
 }
 
 #[derive(Debug, PartialEq)]
@@ -41,28 +35,25 @@ enum Phase {
 
 #[derive(Debug)]
 pub struct Stdio {
-    /// None: the older lines
-    rpc: Option<(Phase, Vec<Value>)>,
+    phase: Phase,
+    /// the events made before `initialized`, in order
+    held: Vec<Value>,
+}
+
+impl Default for Stdio {
+    fn default() -> Stdio {
+        Stdio::new()
+    }
 }
 
 impl Stdio {
-    pub fn older() -> Stdio {
-        Stdio { rpc: None }
-    }
-
-    pub fn rpc() -> Stdio {
-        Stdio { rpc: Some((Phase::New, Vec::new())) }
-    }
-
-    pub fn is_rpc(&self) -> bool {
-        self.rpc.is_some()
+    pub fn new() -> Stdio {
+        Stdio { phase: Phase::New, held: Vec::new() }
     }
 
     /// One stdin line (not blank).
     pub fn line_in(&mut self, line: &str) -> Took {
-        let Some((phase, held)) = self.rpc.as_mut() else {
-            return Took::Cmd { line: line.to_string(), id: None };
-        };
+        let (phase, held) = (&mut self.phase, &mut self.held);
         let log = |why: &str| log_of(why, line);
         let msg = match Message::read(line) {
             Ok(m) => m,
@@ -89,7 +80,7 @@ impl Stdio {
             }
             Message::Request(r) if *phase == Phase::New => err(r.id, code::NOT_INITIALIZED, format!("{}: initialize first", r.method)),
             Message::Request(r) => match app_rpc::cmd_of(&r) {
-                Ok(cmd) => Took::Cmd { line: cmd.to_string(), id: Some(r.id) },
+                Ok(cmd) => Took::Cmd { line: cmd.to_string(), id: r.id },
                 Err(e) => err(r.id, e.code, e.message),
             },
             Message::Notification(n) if n.method == INITIALIZED && *phase == Phase::Answered => {
@@ -112,14 +103,11 @@ impl Stdio {
 
     /// The core's events as lines to write now (held before `initialized`).
     pub fn out(&mut self, evs: Vec<Value>) -> Vec<String> {
-        match self.rpc.as_mut() {
-            None => evs.iter().map(Value::to_string).collect(),
-            Some((Phase::Ready, _)) => evs.iter().filter_map(app_rpc::note).map(|n| Message::Notification(n).encode()).collect(),
-            Some((_, held)) => {
-                held.extend(evs);
-                Vec::new()
-            }
+        if self.phase != Phase::Ready {
+            self.held.extend(evs);
+            return Vec::new();
         }
+        evs.iter().filter_map(app_rpc::note).map(|n| Message::Notification(n).encode()).collect()
     }
 }
 

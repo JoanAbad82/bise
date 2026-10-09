@@ -182,52 +182,12 @@ fn a_peek_goes_out_once_inline_one_in_flight_and_one_per_two_seconds() {
 }
 
 /// Peek's one rule (architect m_14385): a still goes to the window and
-/// nowhere else. Through the real run loop, a peek's bytes are in what
-/// the core writes out and never in its log (stderr, the window's
-/// core.log), which does get the refused line sent with it.
+/// nowhere else. Through the real run loop (JSON-RPC, amb-core m_14730):
+/// initialize, then computer peek requests; the still goes out as a
+/// core/computer_peek notification and never into the log (stderr, the
+/// window's core.log), which does get the refused line sent with it.
 #[test]
 fn a_peek_through_the_run_loop_never_reaches_the_log() {
-    let mut t = T::new();
-    let f = fake(&mut t);
-    *f.file.borrow_mut() = Some((1, perf_in_shop()));
-    let data = "U0VDUkVULVNDUkVFTi1CWVRFUw=="; // "SECRET-SCREEN-BYTES"
-    let still = json!({"data": data, "mime": "image/jpeg", "width": 640, "height": 400, "at_ms": 9});
-    f.answers.lock().unwrap().insert("peek".into(), Ok(still));
-    let (tx, rx) = std::sync::mpsc::channel();
-    let calls = f.calls.clone();
-    let sender = std::thread::spawn(move || {
-        use crate::ambient::In;
-        tx.send(In::Line("not a command".into())).unwrap();
-        // perf's row goes out at the loop's first look: ask until the
-        // broker is asked (a peek before that row is refused)
-        for _ in 0..100 {
-            std::thread::sleep(Duration::from_millis(50));
-            tx.send(In::Line(r#"{"cmd":"computer","act":"peek","key":"hub-shop.perf"}"#.into())).unwrap();
-            if calls.lock().unwrap().iter().any(|(op, _)| op == "peek") {
-                break;
-            }
-        }
-        std::thread::sleep(Duration::from_millis(300));
-        tx.send(In::Eof).unwrap();
-    });
-    let (mut out, mut log) = (Vec::new(), Vec::new());
-    crate::ambient::run(&mut t.core, rx, &mut out, &mut log);
-    sender.join().unwrap();
-    let (out, log) = (String::from_utf8(out).unwrap(), String::from_utf8(log).unwrap());
-    let peeks: Vec<Value> = out.lines().map(|l| serde_json::from_str::<Value>(l).unwrap()).filter(|v| v["ev"] == "computer_peek" && v.get("shot").is_some()).collect();
-    assert_eq!(peeks.len(), 1, "{out}");
-    assert_eq!(peeks[0]["shot"]["data"], data);
-    // the log works (the refused line is in it), the still never is
-    assert!(log.contains("ambient-core: ") && log.contains("not a command"), "{log}");
-    assert!(!log.contains(data) && !log.contains("shot") && !log.contains("computer_peek"), "{log}");
-}
-
-/// The same on JSON-RPC (client-protocol step 6, amb-core m_14730 2a):
-/// initialize, then computer peek requests; the still goes out as a
-/// core/computer_peek notification and never into the log, a refused
-/// request is logged without it.
-#[test]
-fn a_peek_through_the_rpc_loop_never_reaches_the_log() {
     let mut t = T::new();
     let f = fake(&mut t);
     *f.file.borrow_mut() = Some((1, perf_in_shop()));
@@ -254,7 +214,7 @@ fn a_peek_through_the_rpc_loop_never_reaches_the_log() {
         tx.send(In::Eof).unwrap();
     });
     let (mut out, mut log) = (Vec::new(), Vec::new());
-    crate::ambient::run_stdio(&mut t.core, rx, &mut out, &mut log, crate::ambient::Stdio::rpc(), vec![json!({"ev": "fake_voice", "on": true})]);
+    crate::ambient::run(&mut t.core, rx, &mut out, &mut log, vec![json!({"ev": "fake_voice", "on": true})]);
     sender.join().unwrap();
     let (out, log) = (String::from_utf8(out).unwrap(), String::from_utf8(log).unwrap());
     let lines: Vec<Value> = out.lines().map(|l| serde_json::from_str::<Value>(l).unwrap()).collect();

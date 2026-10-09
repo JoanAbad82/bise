@@ -65,8 +65,8 @@ describe('env', () => {
   });
 
   it('runs ambient-core on the workspace, or --home', () => {
-    expect(coreArgs('')).toEqual(['ambient-core', '--home', '--rpc']);
-    expect(coreArgs('/w')).toEqual(['ambient-core', '--workspace', '/w', '--rpc']);
+    expect(coreArgs('')).toEqual(['ambient-core', '--home']);
+    expect(coreArgs('/w')).toEqual(['ambient-core', '--workspace', '/w']);
   });
 
   it("drops the launcher's agent plumbing and the app's own config", () => {
@@ -84,7 +84,7 @@ describe('env', () => {
 });
 
 /**
- * A fake `bise`: speaks JSON-RPC as `ambient-core --rpc` does: answers initialize, then
+ * A fake `bise`: speaks JSON-RPC as `ambient-core` does: answers initialize, then
  * (after initialized) a welcome and `after`'s lines; answers each request {} and echoes
  * it; refuses core/nope; exits on core/quit.
  */
@@ -145,7 +145,7 @@ describe('CoreProcess', () => {
     expect(core.send({ cmd: 'stop', project: 'p', agent: 'a' })).toBe(false);
     core.start();
     await waitFor(() => events.length === 1);
-    expect(events[0]).toMatchObject({ ev: 'welcome', name: `ambient-core --workspace ${dir} --rpc` });
+    expect(events[0]).toMatchObject({ ev: 'welcome', name: `ambient-core --workspace ${dir}` });
     expect(states).toEqual(['starting', 'up']);
     await waitFor(() => logs.some((l) => l.startsWith('core: not an event: not an event')));
 

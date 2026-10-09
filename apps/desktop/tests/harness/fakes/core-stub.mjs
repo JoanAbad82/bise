@@ -4,7 +4,7 @@
 // BISE_DESKTOP_BISE at this file, so no bise, no hub, no provider runs. Arguments are ignored.
 //   stdout  the start world at once, then every line a test sends to the control socket
 //           (a core or hub event each: bise-proto's CoreEv | HubEv)
-//   stdin   the app's requests (JSON-RPC, `--rpc`), each appended to the log as the command it
+//   stdin   the app's requests (JSON-RPC), each appended to the log as the command it
 //           carries (AppCmd | HubCmd): a test reads what the app sent ("a sent message does
 //           nothing" is a send that never reaches here)
 //   stdout  JSON-RPC: initialize answered, the events as notifications once initialized
@@ -42,7 +42,7 @@ function answer(cmd) {
     default: return [];
   }
 }
-// JSON-RPC like `ambient-core --rpc`: the HubEv tags (hub/<tag>) from the generated names
+// JSON-RPC like `ambient-core`: the HubEv tags (hub/<tag>) from the generated names
 const NAMES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'src', 'proto', 'app_methods.gen.ts');
 const notes = JSON.parse(/export const NOTIFICATIONS = (\[.*\]) as const;/.exec(readFileSync(NAMES, 'utf8'))[1]);
 const hubEvs = notes.filter((n) => n.startsWith('hub/')).map((n) => n.slice(4));

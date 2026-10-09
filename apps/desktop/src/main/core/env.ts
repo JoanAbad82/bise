@@ -28,7 +28,7 @@ export function configOf(bise: string | null, env: Readonly<Record<string, strin
 }
 
 export function coreArgs(workspace: string): string[] {
-  return workspace === '' ? ['ambient-core', '--home', '--rpc'] : ['ambient-core', '--workspace', workspace, '--rpc'];
+  return workspace === '' ? ['ambient-core', '--home'] : ['ambient-core', '--workspace', workspace];
 }
 
 /** A variable of the launcher's that the core must never inherit (Support.swift CoreEnv.dropped). */

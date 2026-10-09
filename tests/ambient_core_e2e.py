@@ -1,7 +1,7 @@
 """bise ambient's core against a real hub (docs/ambient-app.md §3-§4).
 
 A real hub (bise sbd, scripted model) on a throwaway repo, and
-`bise ambient-core --workspace <ws>` as the app runs it: stdio JSON lines.
+`bise ambient-core --workspace <ws>` as the app runs it: JSON-RPC on stdio.
 No mic, no speaker, no app: only the typed path (`send`), the task list,
 a question card and its answer by digit, and stdin EOF.
 
@@ -9,7 +9,6 @@ Run: python3 -u tests/ambient_core_e2e.py
 """
 import json
 import os
-import queue
 import subprocess
 import sys
 import threading
@@ -21,16 +20,27 @@ from e2e import EXE, ROOT, check  # noqa: E402
 
 
 class Core:
-    """The core as the app sees it: commands in, events out."""
+    """The core as the app sees it: JSON-RPC on stdio (bise_proto::app_rpc),
+    initialize first; commands in as requests, events out as
+    notifications, kept here as the {ev, ...} events the window's store
+    reads."""
 
     def __init__(self, E):
         self.err = open(os.path.join(E.tmp, "core.stderr"), "a")
         self.p = subprocess.Popen([EXE, "ambient-core", "--workspace", E.ws], cwd=ROOT, env=E.env,
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self.err, text=True)
         self.evs = []
+        self.answers = {}
         self.lock = threading.Lock()
-        self.q = queue.Queue()
+        self.next_id = 1
         threading.Thread(target=self._read, daemon=True).start()
+        self._write({"jsonrpc": "2.0", "id": 0, "method": "initialize",
+                     "params": {"proto": 1, "client": {"name": "ambient_core_e2e", "version": ""}}})
+        wait.until(lambda: self.answer(0) is not None, 30, "initialize's answer")
+        init = self.answer(0)
+        check("result" in init, "initialize answered: %r" % init)
+        self.methods = set(init.get("result", {}).get("methods", []))
+        self._write({"jsonrpc": "2.0", "method": "initialized"})
 
     def _read(self):
         for line in self.p.stdout:
@@ -39,12 +49,33 @@ class Core:
             except ValueError:
                 print("not JSON on stdout: %r" % line)
                 continue
+            if v.get("jsonrpc") != "2.0":
+                print("not JSON-RPC on stdout: %r" % line)
+                continue
             with self.lock:
-                self.evs.append(v)
+                if "method" in v:
+                    family, _, tag = v["method"].partition("/")
+                    if family in ("core", "hub"):
+                        self.evs.append({**(v.get("params") or {}), "ev": tag})
+                elif v.get("id") is not None:
+                    self.answers[v["id"]] = v
+
+    def _write(self, msg):
+        self.p.stdin.write(json.dumps(msg) + "\n")
+        self.p.stdin.flush()
+
+    def answer(self, id):
+        with self.lock:
+            return self.answers.get(id)
 
     def cmd(self, **v):
-        self.p.stdin.write(json.dumps(v) + "\n")
-        self.p.stdin.flush()
+        """A command as the app sends it: hub/<cmd> for a project hub's
+        command with its project, else core/<cmd>; returns its request id."""
+        tag = v.pop("cmd")
+        family = "hub" if v.get("project") is not None and "hub/" + tag in self.methods else "core"
+        id, self.next_id = self.next_id, self.next_id + 1
+        self._write({"jsonrpc": "2.0", "id": id, "method": "%s/%s" % (family, tag), "params": v})
+        return id
 
     def last(self, ev):
         with self.lock:

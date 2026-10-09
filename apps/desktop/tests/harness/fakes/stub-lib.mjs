@@ -5,7 +5,7 @@
 //   stdin        every line the app writes (a command) is appended to the log file, so the test
 //                reads what the app asked for: an effect outside the app
 //   exit         on a line whose cmd is `quitCmd`, or when stdin closes
-//   rpc          (the core stub) JSON-RPC like `ambient-core --rpc` (bise_proto::app_rpc): initialize
+//   rpc          (the core stub) JSON-RPC like `ambient-core` (bise_proto::app_rpc): initialize
 //                answered, the start lines and every event held until `initialized`, then each as its
 //                notification; a request answered {} and logged as the command it carries
 //                ({cmd, ...params}), so a test reads the same log either way

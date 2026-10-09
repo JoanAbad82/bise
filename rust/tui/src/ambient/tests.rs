@@ -1027,16 +1027,25 @@ fn the_run_loop_writes_lines_and_ends_with_stdin() {
         voice_mode: Box::new(|| Err("no voice mode".into())),
     };
     let mut core = Core::new(WS.into(), hub, ports);
+    // an event before initialize is held; a line before it is refused
     tx.send(super::In::Hub(HubIn::Down)).unwrap();
+    tx.send(super::In::Line(r#"{"jsonrpc":"2.0","id":1,"method":"core/hush"}"#.into())).unwrap();
+    tx.send(super::In::Line(r#"{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"proto":1,"client":{"name":"t"}}}"#.into())).unwrap();
+    tx.send(super::In::Line(r#"{"jsonrpc":"2.0","method":"initialized"}"#.into())).unwrap();
     tx.send(super::In::Line("garbage".into())).unwrap();
-    tx.send(super::In::Line(r#"{"cmd":"hush"}"#.into())).unwrap();
+    tx.send(super::In::Line(r#"{"jsonrpc":"2.0","id":2,"method":"core/hush"}"#.into())).unwrap();
     tx.send(super::In::Eof).unwrap();
     let (mut out, mut log) = (Vec::new(), Vec::new());
-    super::run(&mut core, rx, &mut out, &mut log);
-    // the refused line goes to the log, never out
+    super::run(&mut core, rx, &mut out, &mut log, Vec::new());
+    // a refused line goes to the log, never as an event
     assert!(String::from_utf8(log).unwrap().starts_with("ambient-core: "));
-    let text = String::from_utf8(out).unwrap();
-    assert_eq!(text, format!("{}\n", json!({"ev": "hub", "up": false, "workspace": WS})));
+    let lines: Vec<Value> = String::from_utf8(out).unwrap().lines().map(|l| serde_json::from_str(l).unwrap()).collect();
+    assert_eq!(lines[0]["error"]["code"], bise_proto::jsonrpc::code::NOT_INITIALIZED);
+    assert_eq!(lines[1]["id"], 0);
+    assert_eq!(lines[2], json!({"jsonrpc": "2.0", "method": "core/hub", "params": {"up": false, "workspace": WS}}));
+    assert_eq!(lines[3]["error"]["code"], bise_proto::jsonrpc::code::PARSE);
+    assert_eq!(lines[4], json!({"jsonrpc": "2.0", "id": 2, "result": {}}));
+    assert_eq!(lines.len(), 5);
 }
 
 #[test]

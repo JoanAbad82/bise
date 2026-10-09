@@ -1,9 +1,8 @@
 //! bise ambient's Rust core (docs/ambient-app.md §2-§4): `bise
-//! ambient-core --workspace <ws> [--rpc]` is the child of the desktop app,
-//! one JSON object per line on stdin (the app's commands) and stdout
-//! (events for the window): with `--rpc` JSON-RPC 2.0, its names
-//! bise_proto::app_rpc's (stdio.rs; the older lines until land 2 of
-//! client-protocol step 6). It is a client of the workspace's hub like the TUI
+//! ambient-core --workspace <ws>` is the child of the desktop app,
+//! JSON-RPC 2.0 on stdin (the app's commands) and stdout (events for the
+//! window), one object per line, its names bise_proto::app_rpc's
+//! (stdio.rs). It is a client of the workspace's hub like the TUI
 //! (`hub.sock`, hello, `input` to main, `/answer` for cards), runs voice
 //! mode's pieces (the mic only while fn is held, the voice role's
 //! listener, Voxtral TTS on a speaker opened at the first spoken answer)
@@ -21,7 +20,7 @@ pub mod projects;
 /// the window's setup commands' port (S11)
 pub mod setup;
 mod speech;
-/// the stdio with the app: the older lines or JSON-RPC (client-protocol step 6)
+/// the stdio with the app: JSON-RPC (client-protocol step 6)
 pub mod stdio;
 #[cfg(test)]
 mod tests;
@@ -123,21 +122,15 @@ fn write_lines(out: &mut impl Write, lines: Vec<String>) -> bool {
     out.flush().is_ok()
 }
 
-/// The loop of a core on the older lines ([`run_stdio`] with
-/// [`Stdio::older`]).
-// TODO(client-protocol step 6, land 2): goes with the older lines.
-pub fn run(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write, log: &mut impl Write) {
-    run_stdio(core, rx, out, log, Stdio::older(), Vec::new())
-}
-
 /// The loop of a core: stdin lines and hub events in, ticks, events out,
-/// through `stdio` (the older lines or JSON-RPC: stdio.rs). `first`: the
+/// through JSON-RPC (stdio.rs). `first`: the
 /// events of its start, before any line (held like the others until
 /// `initialized`). Returns when stdin closes (or stdout does). `log`: the
 /// core's log (stderr, the window's core.log); events never go there, so
 /// a peek's still never does (tests/computer.rs), and a refused line goes
 /// there redacted (stdio::log_of).
-pub fn run_stdio(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write, log: &mut impl Write, mut stdio: Stdio, first: Vec<serde_json::Value>) {
+pub fn run(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write, log: &mut impl Write, first: Vec<serde_json::Value>) {
+    let mut stdio = Stdio::new();
     let mut last_tick = Instant::now();
     if !write_lines(out, stdio.out(first)) {
         return;
@@ -156,18 +149,17 @@ pub fn run_stdio(core: &mut Core, rx: mpsc::Receiver<In>, out: &mut impl Write, 
                             let _ = writeln!(log, "{}", stdio::log_of(e, &line));
                         }
                         // the answer goes before the events it causes
-                        let answer = id.map(|id| stdio.answer(id, parsed.as_ref().map(|_| ()).map_err(Clone::clone)));
+                        let answer = stdio.answer(id, parsed.as_ref().map(|_| ()).map_err(Clone::clone));
                         if let Ok(c) = parsed {
                             core.cmd(c, Instant::now());
                         }
-                        answer.into_iter().collect()
+                        vec![answer]
                     }
                     stdio::Took::Write(w) => w,
                     stdio::Took::Refused { write, log: why } => {
                         let _ = writeln!(log, "{why}");
                         write
                     }
-                    stdio::Took::Nothing => Vec::new(),
                 };
                 if !write_lines(out, now) {
                     break;
@@ -206,7 +198,6 @@ pub fn core_main(
     user_kind: fn(&str) -> bool,
     projects: Option<(ConnectFor, ProjectFacts)>,
     setup: Option<setup::SetupPorts>,
-    stdio: Stdio,
 ) -> i32 {
     let (tx, rx) = mpsc::channel::<In>();
     let hub = Hub::start(connect, tx.clone(), In::Hub, RETRY);
@@ -247,7 +238,7 @@ pub fn core_main(
         core.app_start();
     }
     let mut out = io::stdout().lock();
-    run_stdio(&mut core, rx, &mut out, &mut io::stderr(), stdio, fake_ev.into_iter().collect());
+    run(&mut core, rx, &mut out, &mut io::stderr(), fake_ev.into_iter().collect());
     0
 }
 

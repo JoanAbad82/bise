@@ -1,4 +1,4 @@
-// The core child: `<bise> ambient-core --rpc`, JSON-RPC 2.0, one object per
+// The core child: `<bise> ambient-core`, JSON-RPC 2.0, one object per
 // line both ways (docs/ambient-app.md §4; client-protocol step 6,
 // bise_proto::app_rpc): `initialize` at each start, 'up' once the core
 // answered it (then `initialized`), each command a request (a refused one
