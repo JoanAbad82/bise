@@ -96,6 +96,13 @@ export class MainWindow {
     win.on('closed', () => {
       if (this.win === win) this.win = null;
     });
+    // macOS full screen hides the lights: the page drops their room (lead m_15020, amb-win)
+    win.on('enter-full-screen', () => {
+      win.webContents.send(IPC.fullScreen, true);
+    });
+    win.on('leave-full-screen', () => {
+      win.webContents.send(IPC.fullScreen, false);
+    });
     if (test) {
       win.webContents.once('did-finish-load', () => {
         process.stdout.write(`${READY_LINE}\n`);

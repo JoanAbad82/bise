@@ -110,6 +110,12 @@ export interface BiseApi {
   readonly quit: () => void;
   /** Main asks this window to go to a route (openWindow while it was open); returns the unsubscribe. */
   readonly onRoute: (listener: (route: string) => void) => () => void;
+  /**
+   * This window in macOS full screen or not: called at once with the state now, then on every
+   * enter / leave (lead m_15020: macOS hides the lights in full screen, so the sidebar's 36 px
+   * room for them goes). Returns the unsubscribe.
+   */
+  readonly onFullScreen: (listener: (full: boolean) => void) => () => void;
   /** `bise ambient-core`, run by main (src/main/core): its events in, typed commands out. */
   readonly core: CorePort;
   /** The terminal panel's shells (src/main/term): one `bise pty` per project, kept while hidden. */
@@ -271,6 +277,8 @@ export const IPC = {
   notifyState: 'bise:notify-state',
   notifyAsk: 'bise:notify-ask',
   notifySettings: 'bise:notify-settings',
+  /** main -> a window: it entered (true) or left (false) full screen; invoke: the state now */
+  fullScreen: 'bise:full-screen',
   openWindow: 'bise:open-window',
   route: 'bise:route',
   quit: 'bise:quit',

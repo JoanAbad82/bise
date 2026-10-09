@@ -20,6 +20,7 @@ interface Pushed {
   [IPC.menu]: MenuAction;
   [IPC.helperEv]: HelperEv;
   [IPC.capsuleState]: CapsuleState;
+  [IPC.fullScreen]: boolean;
   [IPC.notifyState]: NotifyAuth;
   [IPC.route]: string;
   [IPC.termData]: { id: string; bytes: Uint8Array };
@@ -131,6 +132,13 @@ const api: BiseApi = {
     ipcRenderer.send(IPC.openWindow, route);
   },
   onRoute: (listener) => listen(IPC.route, listener),
+  onFullScreen: (listener) => {
+    const off = listen(IPC.fullScreen, listener);
+    void ipcRenderer.invoke(IPC.fullScreen).then((full: unknown) => {
+      listener(full === true);
+    });
+    return off;
+  },
   core: coreBridge(ipcRenderer),
   term: {
     open: async (project, cols, rows) => (await ipcRenderer.invoke(IPC.termOpen, project, cols, rows)) as TermOpened,
