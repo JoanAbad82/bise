@@ -151,7 +151,7 @@ describe("the agent view's tool rows (designer's desktop-screens v6 (2))", () =>
     expect(t.lines.map((l) => [l.pos, l.mark, l.state, l.end, l.err])).toEqual([
       [1, '$', 'ok', '✓ 0.3 s', ''],
       [2, '$', 'err', '✗ exit 1 · 2.1 s', 'src/a.ts:3 unused x'],
-      [3, '·', 'err', '✗', 'no such file'],
+      [3, '', 'err', '✗', 'no such file'],
       [5, '$', 'run', '', ''],
     ]);
     expect(t.lines[1]).toMatchObject({ code: 'npm run lint', out: 'exit 1: src/a.ts:3 unused x' });
@@ -194,7 +194,8 @@ describe('D14 / D15: a report is a status line, a command reads once', () => {
     expect(toolWords('looking for the slow query')).toBe('looking for the slow query');
     const t = toolLines([{ pos: 1, at_ms: 0, text: 'edit: {"file_path":"panels.md"}', kind: 'edit' }, { pos: 2, at_ms: 0, text: 'read_file: {"path":"a.rs"}', kind: 'read' }]);
     expect(t.lines[0]?.text).toBe('edit panels.md');
-    expect(t.rest[0]?.text).toBe('read_file a.rs');
+    // a folded read opens to a row with the TUI's verb (designer m_14269)
+    expect(t.rest[0]?.text).toBe('read a.rs');
   });
 });
 

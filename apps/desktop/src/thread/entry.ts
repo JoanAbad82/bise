@@ -271,7 +271,8 @@ export interface ToolLike {
 /** A shown call: its mark, words, its state's words on the right ('✓ 0.3 s', '✗ exit 1 · 2.1 s'), its first error line, and what opens under it. */
 export interface ToolLine {
   pos: number;
-  mark: '$' | '±' | '·';
+  /** '$' a command, '±' an edit, '' a read, search or other step (its verb says it) */
+  mark: '$' | '±' | '';
   text: string;
   /** the step's length until the next one (a replay, no state) */
   time: string;
@@ -304,32 +305,34 @@ export function toolEnd(t: ToolLike, time: string): string {
 /** A turn's tools: its commands ('$ …') and edits ('± …') as lines with their length (until the next step), and the counted words of the rest ('read 6 files'), which fold. Pure. */
 export function toolLines(items: readonly ToolLike[]): {
   lines: ToolLine[];
-  rest: { pos: number; text: string }[];
+  rest: ToolLine[];
   restWords: string;
 } {
   const lines: ToolLine[] = [];
-  const rest: { pos: number; text: string }[] = [];
+  const rest: ToolLine[] = [];
   items.forEach((t, i) => {
     const next = items[i + 1];
     const time = next !== undefined && t.at_ms > 0 && next.at_ms > t.at_ms ? stepTime(next.at_ms - t.at_ms) : '';
     // R11/S9: a failed call always shows as its own line, whatever its kind (the TUI's ✗ row)
     const failed = t.state === 'err';
-    if (((t.kind === 'run' || t.kind === 'edit') && lines.length < TOOL_LINES) || failed)
-      lines.push({
-        pos: t.pos,
-        mark: t.kind === 'run' ? '$' : t.kind === 'edit' ? '±' : '·',
-        // a failed read or search says the TUI's verb, like its fold ('read gone.rs', designer m_14103)
-        text: t.kind === 'read' || t.kind === 'search' ? `${t.kind} ${toolWords(t.text).replace(/^\S+\s+/, '')}`.trim() : toolWords(t.text),
-        time,
-        state: t.state === 'run' || t.state === 'ok' || t.state === 'err' ? t.state : '',
-        end: toolEnd(t, time),
-        err: failed ? (t.err ?? '').trim() : '',
-        code: t.code ?? '',
-        out: t.out ?? '',
-      });
-    else rest.push({ pos: t.pos, text: toolWords(t.text) });
+    const line: ToolLine = {
+      pos: t.pos,
+      mark: t.kind === 'run' ? '$' : t.kind === 'edit' ? '±' : '',
+      // a read or search says the TUI's verb, like its fold ('read gone.rs', designer m_14103/m_14269)
+      text: t.kind === 'read' || t.kind === 'search' ? `${t.kind} ${toolWords(t.text).replace(/^\S+\s+/, '')}`.trim() : toolWords(t.text),
+      time,
+      state: t.state === 'run' || t.state === 'ok' || t.state === 'err' ? t.state : '',
+      end: toolEnd(t, time),
+      err: failed ? (t.err ?? '').trim() : '',
+      code: t.code ?? '',
+      out: t.out ?? '',
+    };
+    if (((t.kind === 'run' || t.kind === 'edit') && lines.length < TOOL_LINES) || failed) lines.push(line);
+    // the folded ones open to the same rows as the lines (designer m_14269: no bullets, no fill)
+    else rest.push(line);
   });
-  const n = (k: string) => items.filter((t) => t.kind === k && !lines.some((l) => l.pos === t.pos && l.mark === '·')).length;
+  const lined = new Set(lines.filter((l) => l.mark === '').map((l) => l.pos));
+  const n = (k: string) => items.filter((t) => t.kind === k && !lined.has(t.pos)).length;
   const shownRun = lines.filter((l) => l.mark === '$').length;
   const shownEdit = lines.filter((l) => l.mark === '±').length;
   const files = (x: number) => (x === 1 ? '1 file' : `${String(x)} files`);

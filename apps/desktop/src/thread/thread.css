@@ -313,9 +313,18 @@
   padding-left: 40px;
 }
 
+/* a folded steps pill, open: its rows as the tool lines, on the column's edge, no box (designer
+   m_14269: not a filled box of bullets) */
+.th-tools .b-out {
+  margin: 2px 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
 .th-steps {
-  margin: 0;
-  padding-left: 1.2em;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .th-find {
@@ -419,8 +428,13 @@
 .th-compact {
   color: var(--c-text-2);
 }
+/* a thinking row on the column's edge like the tool rows (designer m_14269: the ds fold's 36 px
+   indent goes), its words in text-2 (the agent thinking, not its answer) under the head's words */
+.th-think .b-fold {
+  margin-left: 0;
+}
 .th-think-body {
-  margin: 4px 0 8px 18px;
+  margin: 4px 0 8px 2ch;
   color: var(--c-text-2);
   white-space: pre-wrap;
   font-size: 13px;

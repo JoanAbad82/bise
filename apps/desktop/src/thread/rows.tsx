@@ -650,11 +650,12 @@ function ToolsRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
             setOpen((o) => !o);
           }}
           out={
-            <ul className="th-steps">
+            // the same rows as the lines above: no bullets, no fill (designer m_14269)
+            <div className="th-steps">
               {t.rest.map((r) => (
-                <li key={r.pos}>{r.text}</li>
+                <ToolLineRow key={r.pos} l={r} live={false} runFor={0} />
               ))}
-            </ul>
+            </div>
           }
           testId={`thread.tools.${String(e.pos)}`}
         >

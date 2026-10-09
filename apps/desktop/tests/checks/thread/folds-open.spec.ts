@@ -54,7 +54,7 @@ const world = () => [
 
 /** What shows open: the fold's steps, the thinking's words, the '$' line's output. */
 const opened = (page: Page) => ({
-  steps: page.locator('[data-testid="thread.toolrow.3"] .th-steps li'),
+  steps: page.locator('[data-testid="thread.toolrow.3"] .th-steps .th-tool-line'),
   think: page.locator('[data-testid="thread.think.2"] .th-think-body'),
   out: page.getByTestId('thread.tool.4.open'),
 });
@@ -74,6 +74,11 @@ test("thread/folds-open: a click opens a steps pill, a thinking and a '$' line; 
     // clicks, one at a time
     await pill.click();
     await expect(o.steps, 'a click on the pill shows its rows').toHaveCount(2);
+    // the same rows as the tool lines: the TUI's verb and its time, no bullet, no filled box (designer m_14269)
+    await expect(o.steps.first()).toContainText('read core/loop.rs');
+    await expect(o.steps.first()).toContainText('✓');
+    const fill = await page.locator('[data-testid="thread.toolrow.3"] .b-out').evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(fill, 'no fill under the open rows').toBe('rgba(0, 0, 0, 0)');
     await pill.click();
     await expect(o.steps, 'a second click hides them').toHaveCount(0);
     await page.getByTestId('thread.think.2.head').click();
