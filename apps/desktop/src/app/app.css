@@ -74,6 +74,20 @@ body:has(.app-shell) {
   overflow: auto;
 }
 
+/* b1: the screen fills what the bottom block (inbox + composer) leaves */
+.app-screen {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.app-bottom.th-screen {
+  flex: none;
+  height: auto;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--c-line);
+}
+
 .app-notyet,
 .app-notfound {
   margin: auto;

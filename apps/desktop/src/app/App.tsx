@@ -8,7 +8,8 @@
 // touches, never the shell, the sidebar or the composer.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
-import { formatRoute, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
+import { bottomTarget, formatRoute, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
+import { BottomBlock } from '@/thread/Bottom';
 import { keep } from './keep';
 import { useMainRoutes, useMenuRouting } from './menu';
 import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
@@ -218,8 +219,11 @@ function Current({ top }: { top: ReactNode }) {
       {top}
       <CoreLine />
       <UpdateLine />
-      <ScreenOf key={formatRoute(route)} route={route} />
+      <div className="app-screen">
+        <ScreenOf key={formatRoute(route)} route={route} />
+      </div>
       <RouteConfirm route={route} />
+      <RouteBottom route={route} />
       <RouteTerminal route={route} />
     </Main>
   );
@@ -233,6 +237,17 @@ function Current({ top }: { top: ReactNode }) {
 function RouteConfirm({ route }: { route: Route }) {
   const project = projectOf(route);
   return project === undefined ? null : <ConfirmBar project={project} />;
+}
+
+/**
+ * b1: the one inbox + composer block at the bottom of a screen with no composer of its own,
+ * writing to whom the route says (bottomTarget); kept across screens of the same target (no
+ * route key), so his draft stays when he moves from an agent's review to its changes.
+ */
+function RouteBottom({ route }: { route: Route }) {
+  const home = useProjects().find((p) => p.home)?.project;
+  const t = bottomTarget(route, home);
+  return t === null ? null : <BottomBlock key={`${t.project}/${t.agent}`} project={t.project} agent={t.agent} />;
 }
 
 /** The terminal panel of the project in view (bise's own on bise, the inbox, settings). */

@@ -147,6 +147,30 @@ export function projectOf(r: Route): string | undefined {
   return 'project' in r ? r.project : undefined;
 }
 
+/**
+ * b1 (his card #476: one inbox and one composer at the bottom of every view, like the terminal):
+ * whom the shell's bottom block writes to on a screen with no composer of its own. A thread (and
+ * bise's) has its own; the first launch and the labs none. An agent's review writes to that agent;
+ * a project's screen (agents, changes, a feature, its artifacts…) to its main; a screen of no
+ * project (settings, scheduled, every project's artifacts, ⌘I, not found) to bise's main. Pure.
+ */
+export function bottomTarget(r: Route, home: string | undefined): { project: string; agent: string } | null {
+  switch (r.screen) {
+    case 'thread':
+    case 'bise':
+    case 'onboarding':
+    case 'lab':
+      return null;
+    case 'review':
+      return { project: r.project, agent: r.agent };
+    default: {
+      const p = projectOf(r);
+      if (p !== undefined && p !== '') return { project: p, agent: MAIN };
+      return home === undefined ? null : { project: home, agent: MAIN };
+    }
+  }
+}
+
 /** What the core's `open` asks for (a capsule's or a card's ⏎), as a route. */
 export function routeOfOpen(o: { project: string; what: 'thread' | 'review' | 'artifact' | 'worktree'; agent?: string | null; id?: string | null }): Route {
   const agent = o.agent ?? MAIN;
