@@ -222,6 +222,55 @@ fn a_peek_through_the_run_loop_never_reaches_the_log() {
     assert!(!log.contains(data) && !log.contains("shot") && !log.contains("computer_peek"), "{log}");
 }
 
+/// The same on JSON-RPC (client-protocol step 6, amb-core m_14730 2a):
+/// initialize, then computer peek requests; the still goes out as a
+/// core/computer_peek notification and never into the log, a refused
+/// request is logged without it.
+#[test]
+fn a_peek_through_the_rpc_loop_never_reaches_the_log() {
+    let mut t = T::new();
+    let f = fake(&mut t);
+    *f.file.borrow_mut() = Some((1, perf_in_shop()));
+    let data = "U0VDUkVULVNDUkVFTi1CWVRFUw=="; // "SECRET-SCREEN-BYTES"
+    let still = json!({"data": data, "mime": "image/jpeg", "width": 640, "height": 400, "at_ms": 9});
+    f.answers.lock().unwrap().insert("peek".into(), Ok(still));
+    let (tx, rx) = std::sync::mpsc::channel();
+    let calls = f.calls.clone();
+    let sender = std::thread::spawn(move || {
+        use crate::ambient::In;
+        let line = |s: &str| In::Line(s.to_string());
+        tx.send(line(r#"{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"proto":1,"client":{"name":"t"}}}"#)).unwrap();
+        tx.send(line(r#"{"jsonrpc":"2.0","method":"initialized"}"#)).unwrap();
+        tx.send(line("not a command")).unwrap();
+        tx.send(line(r#"{"jsonrpc":"2.0","id":1,"method":"core/computer","params":{"act":"peek"}}"#)).unwrap();
+        for i in 0..100 {
+            std::thread::sleep(Duration::from_millis(50));
+            tx.send(line(&format!(r#"{{"jsonrpc":"2.0","id":{},"method":"core/computer","params":{{"act":"peek","key":"hub-shop.perf"}}}}"#, i + 2))).unwrap();
+            if calls.lock().unwrap().iter().any(|(op, _)| op == "peek") {
+                break;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(300));
+        tx.send(In::Eof).unwrap();
+    });
+    let (mut out, mut log) = (Vec::new(), Vec::new());
+    crate::ambient::run_stdio(&mut t.core, rx, &mut out, &mut log, crate::ambient::Stdio::rpc(), vec![json!({"ev": "fake_voice", "on": true})]);
+    sender.join().unwrap();
+    let (out, log) = (String::from_utf8(out).unwrap(), String::from_utf8(log).unwrap());
+    let lines: Vec<Value> = out.lines().map(|l| serde_json::from_str::<Value>(l).unwrap()).collect();
+    // every line is JSON-RPC: initialize's result first, then the start's event
+    assert!(lines.iter().all(|v| v["jsonrpc"] == "2.0"), "{out}");
+    assert_eq!(lines[0]["id"], 0, "{out}");
+    assert_eq!(lines[1]["method"], "core/fake_voice", "{out}");
+    let peeks: Vec<&Value> = lines.iter().filter(|v| v["method"] == "core/computer_peek" && v["params"].get("shot").is_some()).collect();
+    assert_eq!(peeks.len(), 1, "{out}");
+    assert_eq!(peeks[0]["params"]["shot"]["data"], data);
+    // the keyless request is refused by the parser: an error answer
+    assert!(lines.iter().any(|v| v["id"] == 1 && v["error"]["code"] == bise_proto::jsonrpc::code::INVALID_PARAMS), "{out}");
+    assert!(log.contains("ambient-core: ") && log.contains("not JSON"), "{log}");
+    assert!(!log.contains(data) && !log.contains("shot") && !log.contains("computer_peek"), "{log}");
+}
+
 /// A key's hub half is what the hub and the TUI hash (harness main.rs's
 /// the_hub_and_the_tui_stop_the_same_key checks the three sides): the
 /// socket as reached, the short link when the natural path is too long.

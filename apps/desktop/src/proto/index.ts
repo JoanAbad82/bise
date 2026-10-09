@@ -11,3 +11,5 @@ export type * from './hub';
 export type * from './draft';
 export type * from './helper';
 export type * from './pty';
+export type * from './jsonrpc';
+export type * from './app_rpc';

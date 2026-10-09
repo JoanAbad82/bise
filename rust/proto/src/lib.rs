@@ -36,12 +36,14 @@
 //! The fixtures (`fixtures/*.jsonl`) are the one source for the Rust
 //! tests, the native helper's laws and the Python e2e.
 
+pub mod app_rpc;
 pub mod approvals;
 pub mod context;
 pub mod diff;
 pub mod draft;
 pub mod helper;
 pub mod hub;
+pub mod jsonrpc;
 pub mod pty;
 pub mod rows;
 pub mod slash;

@@ -4,8 +4,10 @@
 // BISE_DESKTOP_BISE at this file, so no bise, no hub, no provider runs. Arguments are ignored.
 //   stdout  the start world at once, then every line a test sends to the control socket
 //           (a core or hub event each: bise-proto's CoreEv | HubEv)
-//   stdin   the app's commands (AppCmd | HubCmd), appended to the log: a test reads what the app
-//           sent ("a sent message does nothing" is a send that never reaches here)
+//   stdin   the app's requests (JSON-RPC, `--rpc`), each appended to the log as the command it
+//           carries (AppCmd | HubCmd): a test reads what the app sent ("a sent message does
+//           nothing" is a send that never reaches here)
+//   stdout  JSON-RPC: initialize answered, the events as notifications once initialized
 // env: BISE_HARNESS_CORE_EVENTS  the start world: a JSONL file of events; unset = every fixture of
 //                                rust/proto/fixtures (core_ev.jsonl then hub_ev.jsonl), 'none' = nothing
 //      BISE_HARNESS_CORE_SOCK    the unix socket a test writes events to (fakes/core.ts)
@@ -40,4 +42,8 @@ function answer(cmd) {
     default: return [];
   }
 }
-runStub({ start, sock: process.env.BISE_HARNESS_CORE_SOCK, log: process.env.BISE_HARNESS_CORE_LOG, answer });
+// JSON-RPC like `ambient-core --rpc`: the HubEv tags (hub/<tag>) from the generated names
+const NAMES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'src', 'proto', 'app_methods.gen.ts');
+const notes = JSON.parse(/export const NOTIFICATIONS = (\[.*\]) as const;/.exec(readFileSync(NAMES, 'utf8'))[1]);
+const hubEvs = notes.filter((n) => n.startsWith('hub/')).map((n) => n.slice(4));
+runStub({ start, sock: process.env.BISE_HARNESS_CORE_SOCK, log: process.env.BISE_HARNESS_CORE_LOG, answer, rpc: { hubEvs } });

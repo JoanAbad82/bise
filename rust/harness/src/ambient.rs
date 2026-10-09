@@ -5,8 +5,9 @@
 
 use std::io::Write;
 
-/// `bise ambient-core`: the macOS app's core, its child on stdio JSON, a
-/// client of the workspace's hub and of every project's hub.
+/// `bise ambient-core [--rpc]`: the macOS app's core, its child on stdio
+/// JSON (`--rpc`: JSON-RPC, bend_tui::ambient::stdio), a client of the
+/// workspace's hub and of every project's hub.
 pub fn core(args: &[String]) -> std::io::Result<i32> {
     // bise's home is the window's first row: on a fresh install its
     // folder (~/bise) is made here, never reported gone (amb-tools m_9345)
@@ -19,7 +20,9 @@ pub fn core(args: &[String]) -> std::io::Result<i32> {
     let workspace = paths.workspace.to_string_lossy().to_string();
     let projects = ambient_projects(exe.clone(), root.clone());
     let connect = ambient_connector(paths, exe, root);
-    Ok(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects), Some(ambient_setup())))
+    // --rpc: the window speaks JSON-RPC on stdio (client-protocol step 6)
+    let stdio = if args.iter().any(|a| a == "--rpc") { bend_tui::ambient::Stdio::rpc() } else { bend_tui::ambient::Stdio::older() };
+    Ok(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects), Some(ambient_setup()), stdio))
 }
 
 /// `bise ambient`: open the app on this workspace (scripts/desktop.sh).

@@ -3,7 +3,8 @@
 //! compile ts-rs), never hand-edited (architect m_9476).
 //!
 //! - one `.ts` per wire module (hub, draft, thread, rows, diff, context,
-//!   helper, pty) + `json.ts` (serde_json's Value) + `index.ts`;
+//!   helper, pty, jsonrpc, app_rpc) + `json.ts` (serde_json's Value) +
+//!   `index.ts`; `app_methods.gen.ts`: app_rpc's names as constants;
 //! - `fixtures.gen.ts`: every fixture line as a typed constant, so
 //!   `pnpm typecheck` fails when a fixture doesn't fit its generated type;
 //! - u64/i64 come out as `number` (ids, positions, `*_ms`: safe below 2^53),
@@ -15,7 +16,7 @@
 //! stale; `BISE_PROTO_BLESS=1` writes them.
 #![cfg(feature = "ts")]
 
-use bise_proto::{context, diff, draft, helper, hub, pty, rows, thread};
+use bise_proto::{app_rpc, context, diff, draft, helper, hub, jsonrpc, pty, rows, thread};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -64,6 +65,8 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
         module!(cfg, "draft": draft::Quote, draft::Queued, draft::DraftHubCmd, draft::ProjectRow, draft::OpenWhat, draft::Account, draft::Found, draft::AwayProject, draft::Plugin, draft::PluginLogin, draft::CuRow, draft::ComputerAgent, draft::PeekShot, draft::RoleRow, draft::Runs, draft::PickChoice, draft::PickArg, draft::PickCommand, draft::PickSkill, draft::PickFile, draft::PickFolder, draft::CoreEv, draft::AppCmd, draft::TalkPage, draft::ProjectView, draft::IndexRow),
         module!(cfg, "helper": helper::HelperEv, helper::Responsible, helper::FnAct, helper::TalkKey, helper::Grant, helper::QuietWhy, helper::Perm, helper::PermAction, helper::HelperCmd),
         module!(cfg, "pty": pty::PtyEv, pty::PtyCmd),
+        module!(cfg, "jsonrpc": jsonrpc::Id, jsonrpc::Request, jsonrpc::Notification, jsonrpc::Response, jsonrpc::ErrorData, jsonrpc::RpcError),
+        module!(cfg, "app_rpc": app_rpc::AppClient, app_rpc::AppInit, app_rpc::AppInitResult),
     ]
 }
 
@@ -152,6 +155,26 @@ fn render_fixtures() -> String {
     s
 }
 
+/// The app <-> core JSON-RPC names (bise_proto::app_rpc), so the window's
+/// main process maps commands and events from the same owner.
+fn render_app_methods() -> String {
+    let list = |xs: Vec<String>| xs.iter().map(|x| format!("{x:?}")).collect::<Vec<_>>().join(", ");
+    let mut s = String::new();
+    header(&mut s);
+    writeln!(s, "// bise_proto::app_rpc's names: core/<tag> and hub/<tag>, params = the command's or event's fields.").unwrap();
+    writeln!(s).unwrap();
+    writeln!(s, "export const PROTO = {};", bise_proto::PROTO).unwrap();
+    writeln!(s, "export const INITIALIZE = {:?};", app_rpc::INITIALIZE).unwrap();
+    writeln!(s, "export const INITIALIZED = {:?};", app_rpc::INITIALIZED).unwrap();
+    writeln!(s, "/** the tags a command with a project sends to that project's hub (hub/<tag>) */").unwrap();
+    writeln!(s, "export const HUB_CMDS = [{}] as const;", list(app_rpc::hub_cmds().map(str::to_string).collect())).unwrap();
+    writeln!(s, "export const METHODS = [{}] as const;", list(app_rpc::methods())).unwrap();
+    writeln!(s, "export const NOTIFICATIONS = [{}] as const;", list(app_rpc::notifications())).unwrap();
+    writeln!(s, "/** never logged, by the core or the app: a broken or refused one is logged as its name and size */").unwrap();
+    writeln!(s, "export const NO_LOG = [{}] as const;", list(app_rpc::NO_LOG.iter().map(|x| x.to_string()).collect())).unwrap();
+    s
+}
+
 fn render_all() -> BTreeMap<String, String> {
     let cfg = Config::new().with_large_int("number");
     let modules = modules(&cfg);
@@ -171,6 +194,7 @@ fn render_all() -> BTreeMap<String, String> {
     }
     out.insert("index.ts".to_string(), index);
     out.insert("fixtures.gen.ts".to_string(), render_fixtures());
+    out.insert("app_methods.gen.ts".to_string(), render_app_methods());
     out
 }
 

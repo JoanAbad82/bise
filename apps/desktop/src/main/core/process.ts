@@ -1,5 +1,8 @@
-// The core child: `<bise> ambient-core`, one JSON object per line both ways
-// (docs/ambient-app.md §4), as the Swift app runs it (Core.swift): its
+// The core child: `<bise> ambient-core --rpc`, JSON-RPC 2.0, one object per
+// line both ways (docs/ambient-app.md §4; client-protocol step 6,
+// bise_proto::app_rpc): `initialize` at each start, 'up' once the core
+// answered it (then `initialized`), each command a request (a refused one
+// logged), each notification an event for the store. As the Swift app ran it (Core.swift): its
 // stderr appended to a log file, restarted with a backoff when it exits,
 // a write to a core that is down dropped with a log line (the store marks
 // pending sends failed on `down`). Node only (no Electron), so its test
@@ -8,7 +11,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { closeSync, openSync, readSync, statSync } from 'node:fs';
 import { Backoff, coreArgs, coreEnv, type CoreConfig } from './env';
 import { exitOf, failedToStart } from './exit';
-import { eventOf, LineSplitter, lineOf, notAnEventLog } from './lines';
+import { INITIALIZED_LINE, initializeLine, LineSplitter, notAnEventLog, readLine, refusedLog, requestOf } from './lines';
 import type { CoreExit, CoreState } from '../../shared/api';
 
 /** At most this much of a run's stderr is read back from the log at its end. */
@@ -31,6 +34,8 @@ export interface CoreOptions {
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** the delay before a restart, in ms (tests shorten it) */
   readonly scale?: number;
+  /** the app's version, said in initialize */
+  readonly version?: string;
 }
 
 export class CoreProcess {
@@ -43,6 +48,9 @@ export class CoreProcess {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private readonly backoff = new Backoff();
   private stateNow: CoreState = 'down';
+  /** this run's next request id (0 is its initialize) and the methods waiting for their answer */
+  private nextId = 1;
+  private readonly waiting = new Map<number, string>();
 
   constructor(
     private readonly opts: CoreOptions,
@@ -73,20 +81,50 @@ export class CoreProcess {
     this.setState('down');
   }
 
-  /** Writes one command; false when refused (not a command) or the core is down. */
+  /** Writes one command as a request; false when refused (not a command) or the core is not up. */
   send(cmd: unknown): boolean {
-    const line = lineOf(cmd);
-    if (line === null) {
+    const c = this.child;
+    const tag = (cmd as { cmd?: unknown } | null)?.cmd;
+    if (c === null || this.stateNow !== 'up') {
+      if (typeof tag === 'string') this.hooks.log(`core: down, dropped ${tag}`);
+      else this.hooks.log('core: refused a command that is not an object with a string cmd');
+      return false;
+    }
+    const id = this.nextId;
+    const req = requestOf(id, cmd);
+    if (req === null) {
       this.hooks.log('core: refused a command that is not an object with a string cmd');
       return false;
     }
-    const c = this.child;
-    if (c === null || this.stateNow !== 'up') {
-      this.hooks.log(`core: down, dropped ${(cmd as { cmd: string }).cmd}`);
-      return false;
-    }
-    c.stdin.write(line);
+    this.nextId += 1;
+    this.waiting.set(id, req.method);
+    c.stdin.write(req.line);
     return true;
+  }
+
+  /** One line of this run's core. */
+  private line(child: ChildProcessWithoutNullStreams, line: string): void {
+    const l = readLine(line);
+    if (l === null) {
+      if (line.trim() !== '') this.hooks.log(notAnEventLog(line));
+      return;
+    }
+    if (l.kind === 'event') {
+      this.hooks.onEvent(l.ev);
+      return;
+    }
+    if (l.id === 0) {
+      if (l.error !== null) {
+        this.hooks.log(refusedLog('initialize', l.error));
+        return;
+      }
+      child.stdin.write(INITIALIZED_LINE);
+      this.setState('up');
+      return;
+    }
+    const method = l.id === null ? undefined : this.waiting.get(l.id);
+    if (l.id !== null) this.waiting.delete(l.id);
+    if (l.error !== null) this.hooks.log(refusedLog(method ?? 'a request', l.error));
   }
 
   private setState(s: CoreState): void {
@@ -127,15 +165,13 @@ export class CoreProcess {
     }
     if (typeof err === 'number') closeSync(err);
     this.child = child;
+    this.nextId = 1;
+    this.waiting.clear();
     const lines = new LineSplitter();
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => {
       if (g !== this.gen) return;
-      for (const line of lines.feed(chunk)) {
-        const ev = eventOf(line);
-        if (ev !== null) this.hooks.onEvent(ev);
-        else if (line.trim() !== '') this.hooks.log(notAnEventLog(line));
-      }
+      for (const line of lines.feed(chunk)) this.line(child, line);
     });
     child.stdin.on('error', (e) => {
       this.hooks.log(`core: stdin: ${e.message}`);
@@ -143,7 +179,8 @@ export class CoreProcess {
     child.on('spawn', () => {
       if (g !== this.gen) return;
       this.hooks.log(`core: started pid ${String(child.pid)} (${config.workspace || 'home'})`);
-      this.setState('up');
+      // 'up' once it answers: nothing else goes before its initialize
+      child.stdin.write(initializeLine(this.opts.version ?? ''));
     });
     child.on('error', (e) => {
       this.hooks.log(`core: ${e.message}`);

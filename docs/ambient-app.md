@@ -102,6 +102,14 @@ Owned by ambient-lead; a change goes through ambient-lead. The app forwards ever
 the web UI unchanged (`window.ambient.recv(ev)`), adds its own (`app_*`), and forwards the web UI's
 `cmd`s for the core (`window.webkit.messageHandlers.bise.postMessage(cmd)`).
 
+On the wire (client-protocol step 6, ambient-lead m_14728): the desktop app runs
+`bise ambient-core --rpc`, JSON-RPC 2.0 (`bise_proto::jsonrpc`, names in `bise_proto::app_rpc`):
+`initialize` first, then `initialized`; each command below is a request `core/<cmd>` (or `hub/<cmd>`
+for a project's hub's command with its `project`), its params the command's other fields, answered
+`{}` or an error; each event is a notification `core/<ev>` (`hub/<ev>` for a hub's event), its
+params the event's other fields. The tables below name the commands and events by their tags.
+Without `--rpc` the core still speaks the older `{cmd}`/`{ev}` lines (the Python e2e) until land 2.
+
 Commands to the core (stdin):
 
 | cmd | fields | meaning |
