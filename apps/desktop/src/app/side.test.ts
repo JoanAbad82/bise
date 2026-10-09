@@ -102,3 +102,10 @@ describe("the artifacts row's new ones (tui-parity R17)", () => {
     expect(newWords(0, [])).toBe('');
   });
 });
+
+describe('R9/S3: an agent waiting on someone, in the sidebar (the TUI panel)', () => {
+  it("another agent: ⋯ dim, 'waiting on <who>' on hover; him: ? in the accent", () => {
+    expect(signOf(agent('perf', 'working', { waiting_on: { who: 'agent', name: 'main' } }), NOW)).toMatchObject({ g: '⋯', tone: 'dim', end: 'waiting', count: 0, title: 'waiting on bise · product page speed' });
+    expect(signOf(agent('perf', 'idle', { waiting_on: { who: 'you' } }), NOW)).toMatchObject({ g: '?', tone: 'acc', count: 0, title: 'asks you · product page speed' });
+  });
+});

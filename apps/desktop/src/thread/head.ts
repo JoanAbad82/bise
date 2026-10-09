@@ -2,7 +2,7 @@
 // role line, the branch line, the composer's label and placeholder. Pure: AgentHead.tsx draws
 // them. The words are the TUI's. Owner: amb-home.
 import type { Agent } from '@/proto';
-import { ago } from '@/agents/model';
+import { ago, shownName } from '@/agents/model';
 
 /** The state chip: '∿ working · 14 min', 'starting', '? waiting for you' (accent). */
 export interface StateChip {
@@ -17,8 +17,11 @@ export interface StateChip {
 export const STARTING_MS = 20_000;
 
 /** An agent's state chip at `now`. Pure. */
-export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits'>, now: number): StateChip {
-  if (a.waits > 0 || a.status === 'waiting' || a.status === 'blocked') return { text: '? waiting for you', needs: true, live: false };
+export function stateChip(a: Pick<Agent, 'status' | 'since_ms' | 'waits' | 'waiting_on'>, now: number): StateChip {
+  // R9/S3: whom it waits on, the hub's own fact (the TUI's panel reads the same field)
+  if (a.waits > 0 || a.waiting_on?.who === 'you') return { text: '? waiting for you', needs: true, live: false };
+  if (a.waiting_on?.who === 'agent') return { text: `⋯ waiting on ${shownName(a.waiting_on.name)}`, needs: false, live: false };
+  if (a.status === 'waiting' || a.status === 'blocked') return { text: '? waiting for you', needs: true, live: false };
   switch (a.status) {
     case 'working': {
       const since = now - a.since_ms;

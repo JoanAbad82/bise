@@ -63,3 +63,10 @@ describe('the agents list', () => {
     expect(numbersOf('p-num', [main, ag('b')]).get('b')).toBe(2);
   });
 });
+
+describe('R9/S3: the agents list end says whom it waits on', () => {
+  it("'waiting on bise' dim, 'waiting on you' in the accent", () => {
+    expect(endOf(ag('a', { status: 'working', waiting_on: { who: 'agent', name: 'main' } }), T)).toEqual({ text: 'waiting on bise', needs: false });
+    expect(endOf(ag('a', { waiting_on: { who: 'you' } }), T)).toEqual({ text: 'waiting on you', needs: true });
+  });
+});

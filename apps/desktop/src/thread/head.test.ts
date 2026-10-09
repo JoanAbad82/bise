@@ -56,3 +56,15 @@ describe('D7: the context gauge in the head is named, an empty one goes', () => 
     expect(usageLine(null)).toBe('');
   });
 });
+
+describe('R9/S3: whom it waits on, in the state chip', () => {
+  const NOW2 = 1_791_100_000_000;
+  it("'waiting on bise' dim for another agent (main is bise), '? waiting for you' in accent for him", () => {
+    expect(stateChip({ status: 'working', since_ms: NOW2 - 600_000, waits: 0, waiting_on: { who: 'agent', name: 'main' } }, NOW2)).toEqual({ text: '⋯ waiting on bise', needs: false, live: false });
+    expect(stateChip({ status: 'waiting', since_ms: NOW2, waits: 0, waiting_on: { who: 'agent', name: 'docs' } }, NOW2).text).toBe('⋯ waiting on docs');
+    expect(stateChip({ status: 'working', since_ms: NOW2, waits: 0, waiting_on: { who: 'you' } }, NOW2)).toEqual({ text: '? waiting for you', needs: true, live: false });
+  });
+  it('a kind this window does not know changes nothing', () => {
+    expect(stateChip({ status: 'done', since_ms: NOW2, waits: 0, waiting_on: { who: 'unknown' } }, NOW2).text).toBe('✓ done');
+  });
+});

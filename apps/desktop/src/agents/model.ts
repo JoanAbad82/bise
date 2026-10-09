@@ -42,6 +42,9 @@ export function ago(ms: number, now: number): string {
 /** A row's end: what waits on him first (accent), else its state or age. */
 export function endOf(a: Agent, now: number): { text: string; needs: boolean } {
   if (a.waits > 0) return { text: String(a.waits), needs: true };
+  // R9/S3: whom it waits on (the hub's waiting_on): him in accent, another agent dim
+  if (a.waiting_on?.who === 'you') return { text: 'waiting on you', needs: true };
+  if (a.waiting_on?.who === 'agent') return { text: `waiting on ${shownName(a.waiting_on.name)}`, needs: false };
   switch (a.status) {
     case 'working':
       return { text: ago(a.since_ms, now), needs: false };

@@ -132,6 +132,19 @@ function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head:
       );
     case 'compacted':
       return <CompactedRow e={e} />;
+    // R12: a failed turn is its own row with why, in the TUI's words (proto words::turn_failed: '✗ turn
+    // failed: provider 500', a missing key's line; a plan line, its own words, a ▲), never a silent stop
+    case 'turn_failed': {
+      const level = e.turn_failed != null && e.text === e.turn_failed.why ? 'warn' : 'err';
+      return (
+        <div className={`th-notice ${level}`} data-level={level} data-testid={`thread.failed.${String(e.pos)}`}>
+          <span className="th-notice-mark" aria-label={level === 'err' ? 'error' : 'warning'}>
+            {NOTICE_MARK[level]}
+          </span>
+          <span>{e.text}</span>
+        </div>
+      );
+    }
     case 'notice':
       return <NoticeRow e={e} ctx={ctx} />;
     case 'not_delivered':
