@@ -590,6 +590,95 @@ test('try gate: R01–R40 shots of the candidate on the rich world', async () =>
       await sleep(800);
     });
 
+    // ---- the 387ad740 re-cut's rows (ambient-lead m_14310)
+    // his folds (5234894c): a click opens the '▸ N other step' pill, a thinking row and a '$' line;
+    // ctrl+o opens everything with the composer still focused and his draft kept
+    await each('FOLDS', async () => {
+      await go(s, `agent/${tel}/dashboards`);
+      const list = p.getByTestId('thread.list');
+      const pill = list.getByText(/other steps?/).last();
+      const think = p.locator('[data-testid^="thread.think."][data-testid$=".head"]').last();
+      const dollar = list.getByText(/^\$ /).last();
+      const before = (await list.innerText()).length;
+      for (const [name, el] of [['pill', pill], ['thinking', think], ['dollar', dollar]] as const) {
+        const there = await el.isVisible().catch(() => false);
+        if (!there) { note('FOLDS', `${name}: none on screen`); continue; }
+        await el.scrollIntoViewIfNeeded().catch(() => undefined);
+        await shot('FOLDS', `FOLDS-${name}-a-closed`, p);
+        const t0 = (await list.innerText()).length;
+        await el.click().catch(() => undefined);
+        await sleep(500);
+        await shot('FOLDS', `FOLDS-${name}-b-open`, p);
+        note('FOLDS', `${name} (${JSON.stringify((await el.innerText().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 50))}): thread text ${String(t0)} -> ${String((await list.innerText()).length)} chars after a click`);
+      }
+      await go(s, `agent/${tel}/dashboards`);
+      await field.click();
+      await p.keyboard.type('keep this draft');
+      const t1 = (await list.innerText()).length;
+      await p.keyboard.press('Control+o');
+      await sleep(800);
+      await shot('FOLDS', 'FOLDS-ctrl-o', p);
+      const focus = await p.evaluate(() => document.activeElement?.closest('[data-testid="composer.field"]') !== null);
+      note('FOLDS', `ctrl+o: thread text ${String(t1)} -> ${String((await list.innerText()).length)} chars (before any click ${String(before)}); composer focused: ${String(focus)}; draft kept: ${String((await field.innerText()).includes('keep this draft'))}`);
+      await p.keyboard.press('Control+o');
+      await p.keyboard.press('Meta+a');
+      await p.keyboard.press('Backspace');
+    });
+    // ⌥1/⌥2 switch agents from the composer even with words selected in the thread (b5e0599f)
+    await each('ALT', async () => {
+      await go(s, `agent/${tel}/dashboards`);
+      const agentNow = (): Promise<string> => p.getByTestId('thread.screen').getAttribute('data-agent').then((a) => a ?? '?');
+      await field.click();
+      const sel = await p.evaluate(() => {
+        const para = Array.from(document.querySelectorAll('[data-testid="thread.list"] p')).filter((e) => e.textContent.length > 20).pop();
+        if (!para?.firstChild) return '';
+        const r = document.createRange();
+        r.setStart(para.firstChild, 0);
+        r.setEnd(para.firstChild, Math.min(12, para.firstChild.textContent?.length ?? 0));
+        const s2 = window.getSelection();
+        s2?.removeAllRanges();
+        s2?.addRange(r);
+        return s2?.toString() ?? '';
+      });
+      const a0 = await agentNow();
+      await p.keyboard.press('Alt+2');
+      await sleep(900);
+      const a2 = await agentNow();
+      await shot('ALT', 'ALT-after-alt2', p);
+      await p.keyboard.press('Alt+1');
+      await sleep(900);
+      const a1 = await agentNow();
+      note('ALT', `selected ${JSON.stringify(sel)} in the thread, composer clicked first; agent ${a0} -> ⌥2 ${a2} -> ⌥1 ${a1}`);
+    });
+    // the composer's divider line: model · effort · approvals · state · context
+    await each('DIVIDER', async () => {
+      for (const [name, route] of [['dashboards', `agent/${tel}/dashboards`], ['bise', 'bise']] as const) {
+        await go(s, route);
+        const box = await field.evaluate((el) => {
+          let e: Element = el;
+          for (let i = 0; i < 6 && e.parentElement; i++) e = e.parentElement;
+          const r = e.getBoundingClientRect();
+          return { x: r.x, y: r.y, width: r.width, height: r.height };
+        });
+        await shot('DIVIDER', `DIVIDER-${name}`, p, { clip: { x: Math.max(0, box.x - 10), y: Math.max(0, box.y - 50), width: box.width + 20, height: box.height + 80 } });
+        const line = await p.evaluate(() => Array.from(document.querySelectorAll('[class*="divider"], [class*="th-line"], [data-testid*="composer.line"], [data-testid*="composer.meta"], [data-testid*="thread.line"]')).map((e) => (e as HTMLElement).innerText.replace(/\s+/g, ' ').trim()).filter((t) => t.includes('·')).slice(0, 3));
+        note('DIVIDER', `${name}: ${JSON.stringify(line)}`);
+      }
+    });
+    // R9 whom an agent waits on (head, sidebar, agents list) and R12 a '✗ turn failed' row, as the world has them
+    await each('R9R12', async () => {
+      const found: string[] = [];
+      for (const [name, route] of [['gift-ui', `agent/${shop}/gift-ui`], ['search', `agent/${shop}/search`], ['ingest', `agent/${tel}/ingest`]] as const) {
+        await go(s, route);
+        const head = (await p.locator('[data-testid^="thread.head"], [data-testid^="agent.head"]').first().innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
+        const failed = await p.locator('[data-testid^="thread.failed"]').count();
+        found.push(`${name}: head ${JSON.stringify(head.slice(0, 90))}, '✗ turn failed' rows ${String(failed)}`);
+        await shot('R9R12', `R9R12-${name}`, p);
+      }
+      const side = (await p.getByTestId('app.sidebar').innerText()).split('\n').filter((l) => /waiting on|waits/.test(l)).slice(0, 4);
+      note('R9R12', `${found.join(' · ')}; sidebar lines with 'waiting on': ${JSON.stringify(side)}`);
+    });
+
     // ---- ambient-pm's asks on the window (m_12768, m_12769, m_12771, m_12772)
     const docs = await pid('docs');
     await each('ASK-pm-1', async () => {

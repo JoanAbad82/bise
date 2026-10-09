@@ -146,6 +146,7 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
   s.app.process().stdout?.on('data', (d: string) => { out.push(d); });
   const p = s.page;
   const rows: Row[] = [];
+  let r36 = 'not reached';
   const run = Date.now() % 1_000_000;
   const nonce = (k: string): string => `r41-${k}-${String(run)}`;
   const shot = async (name: string, pg: Page = p): Promise<void> => { await pg.screenshot({ path: path.join(OUT, `${name}.png`) }).catch(() => undefined); };
@@ -180,7 +181,12 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
       await p.keyboard.type(`what is in this picture ${n}`);
       await shot(`R41-${key}`);
       await p.keyboard.press('Enter');
-      rows.push({ path: how === 'paste' ? '(1) window composer ⌘V' : '(2) window composer drop', to, how, seen: await waitSeen(n), note });
+      const seen = await waitSeen(n);
+      // R17: one row for that send, never a second greyed 'sending…' copy under the delivered one
+      await sleep(2500);
+      const list = await p.getByTestId('thread.list').innerText().catch(() => '');
+      note += `; R17: rows with his words ${String(list.split(n).length - 1)}, 'sending…' in the thread: ${String(/sending…/.test(list))}`;
+      rows.push({ path: how === 'paste' ? '(1) window composer ⌘V' : '(2) window composer drop', to, how, seen, note });
     };
     await composer('paste-main', 'bise', 'bise · main', 'paste');
     await composer('paste-agent', `agent/${tel}/dashboards`, 'telemetry · dashboards', 'paste');
@@ -261,8 +267,20 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
         const n = nonce('dock');
         await p.keyboard.type(`this one ${n}`);
         await shot('R41-dock');
+        // 4ccfa1d2: a docked item only its options decide (main's merge card) is never answered by typed words:
+        // they go as a plain message, the card stays open, and the docked label is one line
+        const label = await p.evaluate(() => {
+          const el = Array.from(document.querySelectorAll('*')).find((e) => e.children.length === 0 && /^answering /.test(e.textContent.trim()));
+          const r = el?.getBoundingClientRect();
+          return el ? `${el.textContent.trim().slice(0, 60)} (${String(Math.round(r?.height ?? 0))} px tall)` : 'none';
+        });
+        note += `, docked label: ${label}`;
         await p.keyboard.press('Enter');
-        rows.push({ path: '(4b) docked answer in the thread', to: 'shop · the card\'s asker', how: 'paste', seen: await waitSeen(n), note });
+        const seen = await waitSeen(n);
+        await sleep(1500);
+        note += `; after ⏎: an 'answered card' line in the request: ${String(/answered card/.test(seen.text))}, the merge card still in the strip: ${String((await p.locator('[data-testid^="strip.row."]').allInnerTexts()).some((t) => /merge checkout/.test(t)))}`;
+        await shot('R41-dock-after');
+        rows.push({ path: '(4b) docked choice card in the thread: words + image go as a plain message', to: 'shop · main', how: 'paste', seen, note });
       } else {
         await shot('R41-dock');
         rows.push({ path: '(4b) docked answer in the thread', to: 'shop · the card\'s asker', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '' }, note: 'no strip row in shop\'s thread' });
@@ -315,6 +333,27 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
         rows.push({ path: '(5) escalated question (sb card --for), ⌘I', to: 'shop · gift-ui (asked through main)', how: 'paste', seen: { found: false, image: '', text: '', agent: '', family: '' }, note: `no card with '${k}-card' in ⌘I after 90 s (the script chain: shop main -> gift-ui -> main -> sb card --for)` });
       }
     }
+
+    // R36: shop main's 'you answered gift-ui' rows: his words + one image chip, never the hub's '<image' marker or a path
+    {
+      await go(s, `project/${shop}`);
+      await sleep(1500);
+      const heads = p.locator('[data-testid^="thread.answered."][data-testid$=".head"]');
+      const n = await heads.count();
+      const out: string[] = [];
+      for (let i = Math.max(0, n - 2); i < n; i++) {
+        const h = heads.nth(i);
+        const id = (await h.getAttribute('data-testid')) ?? '';
+        const pos = id.split('.')[2] ?? '';
+        const row = p.locator(`[data-testid="${id}"]`).locator('xpath=..');
+        await h.scrollIntoViewIfNeeded().catch(() => undefined);
+        const text = (await row.innerText().catch(() => '')).replace(/\s+/g, ' ').trim();
+        const imgs = await p.locator(`[data-testid="thread.answered.${pos}"] img`).count();
+        out.push(`#${pos} ${JSON.stringify(text.slice(0, 120))}: images ${String(imgs)}, '<image' ${String(text.includes('<image'))}, a path ${String(/\/Users\//.test(text))}`);
+      }
+      await shot('R36-answered');
+      r36 = out.join(' · ') || 'no thread.answered row in shop main\'s thread';
+    }
   } finally {
     const cell = (x: string): string => x.replace(/\|/g, '\\|');
     const lines = [
@@ -322,6 +361,7 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
       '',
       `- run ${new Date().toISOString()}, world ${w.home}, bodies ${BODIES}`,
       '- image: the image block in the message that holds his words (type and media type), else no',
+      `- R36 (shop main's 'you answered' rows, last two): ${r36}`,
       '',
       '| path | sent to | request for | image block | the message\'s text parts | notes |',
       '|---|---|---|---|---|---|',
