@@ -21,6 +21,8 @@ export interface RowProps {
   name: ReactNode;
   sub?: ReactNode;
   dot?: DotState | undefined;
+  /** a sign of its own in the dot's place (the sidebar's '⋯' / '?'); wins over `dot` */
+  lead?: ReactNode;
   /** the end: a time, a count; `needs` draws it in the accent (what waits for him) */
   end?: ReactNode;
   needs?: boolean;
@@ -32,8 +34,8 @@ export interface RowProps {
   ref?: Ref<HTMLDivElement>;
 }
 /** a list row (sidebar, side views, settings nav, any list) */
-export const Row = memo(function Row({ kind, name, sub, dot, end, needs, on, state, onClick, testId, ref }: RowProps) {
-  const lead = kind === "me" ? <Pearl size={22} /> : dot !== undefined ? <Dot state={dot} lg={kind === "pj"} /> : null;
+export const Row = memo(function Row({ kind, name, sub, dot, lead: own, end, needs, on, state, onClick, testId, ref }: RowProps) {
+  const lead = kind === "me" ? <Pearl size={22} /> : own ?? (dot !== undefined ? <Dot state={dot} lg={kind === "pj"} /> : null);
   return (
     <div ref={ref} className={cx("b-row", kind, on && "on", st(state))} onClick={onClick} role={onClick ? "button" : undefined}
       aria-current={on || undefined} data-testid={testId}>

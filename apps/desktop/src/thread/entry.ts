@@ -191,8 +191,12 @@ export function stepTime(ms: number): string {
 }
 
 /** A scheduled task's line without its number ('main scheduled #1 for dashboards · …' reads 'main scheduled dashboards · …'; designer N2). Pure. */
-export function schedHead(head: string): string {
-  return head.replace(/\bscheduled #\d+ for /, 'scheduled ');
+export function schedHead(head: string, agent: string | null = null): string {
+  // never the internal number (designer m_14246): 'scheduled #48 ended' reads 'scheduled perf ended' in
+  // that agent's thread, else 'a scheduled task ended'
+  return head
+    .replace(/\bscheduled #\d+ for /, 'scheduled ')
+    .replace(/\bscheduled #\d+ (?=ended|stopped|failed)/, agent === null ? 'a scheduled task ' : `scheduled ${agent} `);
 }
 
 /** The argument a tool is about, in the order the args usually name it. */

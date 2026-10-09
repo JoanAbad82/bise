@@ -38,7 +38,7 @@ test('thread/news-rows: landed, PR news, artifact, answered, approval and agent-
     await expect(sched).toContainText('main scheduled perf · every 2m · 6 times · next 14:22');
     await page.getByTestId('thread.scheduled.33.head').click();
     await expect(page.getByTestId('thread.scheduled.33.words')).toHaveText('check the build');
-    await expect(page.getByTestId('thread.scheduled.34')).toContainText('scheduled #48 ended · stopped by you');
+    await expect(page.getByTestId('thread.scheduled.34')).toContainText('scheduled perf ended · stopped by you');
     await page.screenshot({ path: test.info().outputPath('perf.png') });
   } finally {
     await s.close();

@@ -100,7 +100,8 @@ describe('the thread screen', () => {
     fireEvent.click(v.getByTestId('thread.scheduled.33.head'));
     expect(v.getByTestId('thread.scheduled.33.words').textContent).toBe('check the build');
     const ended = v.getByTestId('thread.scheduled.34');
-    expect(ended.textContent).toBe('◷scheduled #48 ended · stopped by you');
+    // never the internal number: in perf's thread it names perf (designer m_14246)
+    expect(ended.textContent).toBe('◷scheduled perf ended · stopped by you');
     expect(v.queryByTestId('thread.scheduled.34.head')).toBeNull();
   });
 

@@ -159,6 +159,9 @@ const AgentItem = memo(function AgentItem({ project, a, sel, peek }: { project: 
         kind={a.archived ? 'arch' : 'ag'}
         name={a.main ? 'bise' : a.name}
         dot={a.archived ? undefined : dotOf(a.status)}
+        // R9/S3: one that waits on someone starts with the sidebar's sign, not its status dot (designer m_14246)
+        {...(!a.archived && a.waits === 0 && a.waiting_on?.who === 'agent' ? { lead: <span className="app-sign dim" aria-label="waiting">⋯</span> } : {})}
+        {...(!a.archived && a.waits === 0 && a.waiting_on?.who === 'you' ? { lead: <span className="app-sign acc" aria-label="asks you">?</span> } : {})}
         end={end.text}
         needs={end.needs}
         onClick={() => {

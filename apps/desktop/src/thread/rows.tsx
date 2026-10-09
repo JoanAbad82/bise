@@ -98,10 +98,12 @@ function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head:
     case 'stopped':
       // ⛔6: the hub's typed fact of a stop (amb-core 515aa58d), at its pos
       return (
-        <Marker>
-          ■ {e.text === '' ? 'stopped' : e.text}
-          {e.at_ms > 0 ? ` · ${clock(e.at_ms)}` : ''}
-        </Marker>
+        <div className="th-stopped" data-testid={`thread.stopped.${String(e.pos)}`}>
+          <Marker>
+            ■ {e.text === '' ? 'stopped' : e.text}
+            {e.at_ms > 0 ? ` · ${clock(e.at_ms)}` : ''}
+          </Marker>
+        </div>
       );
     case 'report':
       // a status line, never the '[report: …]' bracket form (designer D14)
@@ -162,7 +164,7 @@ function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head:
       return <ApprovalRow e={e} />;
     // batch 3b (6e9d68f8): a scheduled task's ◷ line
     case 'scheduled':
-      return <ScheduledRow e={e} />;
+      return <ScheduledRow e={e} ctx={ctx} />;
     case 'unknown':
       // a kind from a newer hub: its words, plain and dim
       return (
@@ -363,7 +365,7 @@ function ThinkingLine({ pos, head, body }: { pos: number; head: string; body: st
  * A scheduled task (sb every) set, run or ended, as the TUI's faint '◷ head ▸' row (wire.rs
  * Scheduled): the head is the hub's words as sent; the words it sends open under it (none: no ▸).
  */
-function ScheduledRow({ e }: { e: Entry }) {
+function ScheduledRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
   const [open, setOpen] = useFold(false, e.pos);
   const s = e.scheduled;
   const head = s?.head ?? e.text;
@@ -374,7 +376,7 @@ function ScheduledRow({ e }: { e: Entry }) {
         ◷
       </span>
       {words === '' ? (
-        <span className="th-sched-head">{schedHead(head)}</span>
+        <span className="th-sched-head">{schedHead(head, ctx.agent === 'main' ? null : ctx.agent)}</span>
       ) : (
         // its words open on a click, with no chevron (designer N2: '◷ main scheduled dashboards · every 30m · next 16:56')
         <button
@@ -386,7 +388,7 @@ function ScheduledRow({ e }: { e: Entry }) {
           }}
           data-testid={`thread.scheduled.${e.pos}.head`}
         >
-          {schedHead(head)}
+          {schedHead(head, ctx.agent === 'main' ? null : ctx.agent)}
         </button>
       )}
       {open && words !== '' && (
