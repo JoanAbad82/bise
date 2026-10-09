@@ -28,7 +28,7 @@ import { useTour } from '@/setup/useTour';
 import { takeQuotes } from '@/review/quote';
 import { copyText, QuotePop } from '@/quote/QuotePop';
 import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
-import { ThreadInbox, pickWaits, takesWords, useStripCard } from '@/inbox';
+import { InboxBlock, type Answering } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
@@ -220,22 +220,10 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
     ) : (
       title
     );
-  // inbox card v2 item 7 (ambient m_11273, amb-home 98ac9ea7): while the strip's card is docked
-  // and takes words, the composer answers it; esc makes it a plain message again (that card);
-  // an approval never takes words: his words stay a message and the card keeps waiting
-  const docked = useStripCard(project);
-  const dockedKey = docked === null ? null : `${docked.project}-${String(docked.id)}`;
-  // his esc to a plain message holds across a reload (keep.ts: the answering mode, 10 minutes)
-  const plainKey = `plain:${project}`;
-  const [plainFor, setPlainForState] = useState<string | null>(() => {
-    const v = keep.view(plainKey);
-    return typeof v === 'string' ? v : null;
-  });
-  const setPlainFor = (k: string) => {
-    setPlainForState(k);
-    keep.setView(plainKey, k, true);
-  };
-  const answering = docked !== null && takesWords(docked) && plainFor !== dockedKey ? docked : null;
+  // b1/b2 (his card #476): the inbox block over the composer tells what his words do while one of
+  // its items is open in place: a question's answer ('answering perf · …'), or a plain message
+  // with what an approval waits for; esc folds the item and his words are a message again
+  const [answering, setAnswering] = useState<Answering | null>(null);
   // R15: an expired sign-in stopped this agent and his browser is on it: c on the empty composer
   // copies the link, esc cancels (the TUI's resign.rs keys)
   const cardsHere = useCards(project);
@@ -251,11 +239,6 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         return;
       }
     }
-    if (e.key !== 'Escape' || answering === null || dockedKey === null) return;
-    if (!(e.target instanceof HTMLElement) || e.target.closest('[data-testid="composer.field"]') === null) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setPlainFor(dockedKey);
   };
   // a project's main: its counts (tui-parity W2), else the agent's line
   const all = useAgents(project);
@@ -387,7 +370,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         {/* its hub refused this core: the hub's words and a retry, over the composer (lead m_11347) */}
         <RefusedLine project={project} name={bise ? 'bise' : (projectName ?? project)} className="app-refused th-refused" testId="thread.refused" />
         <CardHint project={project} />
-        <ThreadInbox project={project} />
+        {/* b1/b2: every project's open items, one opened in place (amb-home's InboxBlock, eb3da983) */}
+        <InboxBlock here={bise ? HERE_BISE : { project, agent }} onAnswer={setAnswering} />
         {me?.archived === true ? (
           <History project={project} agent={agent} />
         ) : voice === 'pane' ? (
@@ -399,12 +383,12 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
             project={project}
             agent={agent}
             busy={busy}
-            // an item only its options decide (an approval, a merge): his words go as a plain message,
-            // the label says what it waits for (ambient m_8773: 'to bise · the merge waits for 1 or 2')
-            to={answering !== null ? answeringLabel(answering) : docked !== null && pickWaits(docked) !== null ? `${composerWords(title).label} · ${pickWaits(docked) ?? ''}` : composerWords(title).label}
-            toEnd={answering === null ? (divider === '' ? undefined : divider) : 'esc write a plain message'}
-            placeholder={answering === null ? composerWords(title).placeholder : 'your answer, then ⏎'}
-            answer={answering === null ? null : answering.id}
+            // an open item: the block's words (a question's 'answering perf · …', or an approval's
+            // 'to bise · the merge waits for 1 or 2' where his words stay a plain message, ambient m_8773)
+            to={answering !== null ? answering.label : composerWords(title).label}
+            toEnd={answering?.end ?? (divider === '' ? undefined : divider)}
+            placeholder={answering?.answer != null ? 'your answer, then ⏎' : composerWords(title).placeholder}
+            answer={answerOf(answering)}
             onStop={stop}
             onEscape={escape}
             quoting={quoting}
@@ -754,8 +738,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   toEnd?: string | undefined;
   /** the field's words when empty (the composer's own 'write to …' when none) */
   placeholder: string | undefined;
-  /** the docked card his words answer (item 7), else none */
-  answer: number | null;
+  /** the open card his words answer (the inbox block's, any project's), else none */
+  answer: CardAt | null;
   onStop: () => void;
   /** an esc the composer's lists didn't take (R18): the screen's (route_cancel, stop) */
   onEscape?: () => void;
@@ -817,9 +801,10 @@ export const ThreadComposer = memo(function ThreadComposer({
         onCommand(sl.name, sl.args);
         return;
       }
-      // the docked card's answer: his words and the images he attached, the hub's one /answer path (R41)
+      // the open card's answer (any project's: the block lists them all): his words and the images
+      // he attached, the hub's one /answer path (R41)
       if (answer !== null) {
-        store.answer(project, answer, out.text, out.files);
+        store.answer(answer.project, answer.card, out.text, out.files);
         onSent();
         return;
       }
@@ -853,6 +838,20 @@ export const ThreadComposer = memo(function ThreadComposer({
 /** A message about an artifact: `about [its title](its url): his words` (the chip's own link form). Pure. */
 export function aboutText(a: { title: string; url: string }, text: string): string {
   return `about [${a.title.replace(/[[\]]/gu, '')}](${a.url}): ${text}`;
+}
+
+/** A card of a project, as the composer answers it. */
+export interface CardAt {
+  readonly project: string;
+  readonly card: number;
+}
+
+/** The inbox block's 'where am i' on bise's own view (no project, no agent: 'esc write a plain message'). */
+export const HERE_BISE = { project: null, agent: null } as const;
+
+/** The card his words answer while the block has one open, else none (an approval: none). Pure. */
+export function answerOf(a: { project: string; answer: number | null } | null): CardAt | null {
+  return a === null || a.answer === null ? null : { project: a.project, card: a.answer };
 }
 
 /** The composer's label while it answers a docked card: 'answering perf · which bench do you…' (main is bise). Pure. */

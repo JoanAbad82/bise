@@ -42,9 +42,9 @@ test("thread/answer-docked: the docked card's composer answers it; esc makes it 
   const s = await launchDesktop({ core, route: `project/${P}` });
   try {
     const { page } = s;
-    await expect(page.getByTestId('strip.row.1')).toBeVisible({ timeout: 10_000 });
-    await page.getByTestId('strip.row.1').click();
-    await expect(page.getByTestId('strip.dock'), 'the card docks').toBeVisible({ timeout: 3000 });
+    await expect(page.getByTestId('inbox.block.row.1')).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId('inbox.block.row.1').click();
+    await expect(page.getByTestId('inbox.block.open.1'), 'the card opens in place').toBeVisible({ timeout: 3000 });
     const composer = page.getByTestId('composer');
     await expect(composer, 'the label').toContainText('answering perf · which bench?');
     const field = page.locator('[data-testid="composer.field"]').first();
@@ -68,7 +68,7 @@ test('thread/answer-docked: esc in the field turns it back into a plain message'
   const s = await launchDesktop({ core, route: `project/${P}` });
   try {
     const { page } = s;
-    await page.getByTestId('strip.row.1').click({ timeout: 10_000 });
+    await page.getByTestId('inbox.block.row.1').click({ timeout: 10_000 });
     await expect(page.getByTestId('composer')).toContainText('answering perf');
     const field = page.locator('[data-testid="composer.field"]').first();
     await field.click();

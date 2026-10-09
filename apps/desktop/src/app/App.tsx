@@ -8,8 +8,9 @@
 // touches, never the shell, the sidebar or the composer.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createRouter, RouterContext, useRoute, useRouter } from './router';
-import { bottomTarget, formatRoute, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
+import { bottomTarget, formatRoute, inboxAtOf, parseRoute, projectOf, shownOf, startRouteOf, type Route } from './route';
 import { BottomBlock } from '@/thread/Bottom';
+import { askInbox, useInboxAsks } from './inboxAsk';
 import { keep } from './keep';
 import { useMainRoutes, useMenuRouting } from './menu';
 import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
@@ -74,6 +75,21 @@ export function App() {
 function firstRoute(): Route {
   if (TERMINAL.test(window.location.hash)) {
     panel.show();
+    return { screen: 'bise' };
+  }
+  // the window opened by a notification's click ('inbox?card=…') or ⌘I: bise's view, the card
+  // open in its inbox block (b1/b2: the inbox is a block, never a screen of its own)
+  const m = /^#?route=(.*)$/u.exec(window.location.hash);
+  let start = '';
+  try {
+    start = decodeURIComponent(m?.[1] ?? '');
+  } catch {
+    // a broken escape: not an inbox ask
+  }
+  const inbox = inboxAtOf(start);
+  // a test run's plain '#route=inbox' still asks for the ⌘I screen itself (its checks)
+  if (inbox !== undefined && (inbox.at !== undefined || !testMode())) {
+    askInbox(inbox.at);
     return { screen: 'bise' };
   }
   return (testMode() ? startRouteOf(window.location.hash) : undefined) ?? keptRoute() ?? { screen: 'bise' };
@@ -153,6 +169,8 @@ function Shell() {
   const route = useRoute();
   useMenuRouting(router);
   useMainRoutes(router);
+  // ⌘I / a notification's card: the inbox block opens it in place once the rows list it
+  useInboxAsks();
   // View > Terminal (⌃`): the panel under the screen (the key's own echo is dropped)
   useMenuAction('terminal', () => {
     panel.toggleByMenu(Date.now());

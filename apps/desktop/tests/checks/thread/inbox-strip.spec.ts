@@ -40,16 +40,17 @@ test("thread/inbox-strip: the project's open items show between the thread and t
   const s = await launchDesktop({ core, route: `project/${P}` });
   try {
     const { page } = s;
-    const strip = page.getByTestId('strip');
-    await expect(strip, 'the strip in the thread').toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId('strip.row.1')).toContainText('which bench?');
+    // b1/b2: the strip is amb-home's inbox block now (every project's items, one opened in place)
+    const strip = page.getByTestId('inbox.block');
+    await expect(strip, 'the inbox block in the thread').toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('inbox.block.row.1')).toContainText('which bench?');
     const box = async (id: string) => (await page.getByTestId(id).boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
-    const [list, st, comp] = [await box('thread.list'), await box('strip'), await box('composer')];
+    const [list, st, comp] = [await box('thread.list'), await box('inbox.block'), await box('composer')];
     expect(st.y, 'under the list').toBeGreaterThanOrEqual(list.y + list.height - 1);
     expect(st.y + st.height, 'over the composer').toBeLessThanOrEqual(comp.y + 1);
     await page.screenshot({ path: test.info().outputPath('strip.png') });
-    await page.getByTestId('strip.row.1').click();
-    await expect(page.getByTestId(`strip.card.${P}-9`), 'the card opens in place').toBeVisible({ timeout: 2000 });
+    await page.getByTestId('inbox.block.row.1').click();
+    await expect(page.getByTestId(`inbox.block.card.${P}-9`), 'the card opens in place').toBeVisible({ timeout: 2000 });
   } finally {
     await s.close();
     core.dispose();

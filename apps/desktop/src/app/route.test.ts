@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bottomTarget, formatRoute, MAIN, parseRoute, projectOf, routeOfOpen, shownOf, startRouteOf, type Route } from './route';
+import { bottomTarget, formatRoute, inboxAtOf, MAIN, parseRoute, projectOf, routeOfOpen, shownOf, startRouteOf, type Route } from './route';
 import { createRouter } from './router';
 
 const every: Route[] = [
@@ -136,5 +136,22 @@ describe('b1: the bottom block writes to whom the route says', () => {
     expect(bottomTarget({ screen: 'thread', project: 'shop', agent: 'perf' }, 'home-1')).toBeNull();
     expect(bottomTarget({ screen: 'bise' }, 'home-1')).toBeNull();
     expect(bottomTarget({ screen: 'onboarding' }, 'home-1')).toBeNull();
+  });
+});
+
+describe('inboxAtOf (b1/b2: ⌘I and a notification open the block in place, never a screen)', () => {
+  it("reads 'inbox' as its first item and 'inbox?card=<project>/<id>' as that card", () => {
+    expect(inboxAtOf('inbox')).toEqual({});
+    expect(inboxAtOf('/inbox')).toEqual({});
+    expect(inboxAtOf('inbox?card=shop-ab9f3c3b/12')).toEqual({ at: { project: 'shop-ab9f3c3b', card: 12 } });
+  });
+  it('leaves every other route to the router', () => {
+    expect(inboxAtOf('bise')).toBeUndefined();
+    expect(inboxAtOf('inboxes')).toBeUndefined();
+    expect(inboxAtOf('inbox?card=shop')).toBeUndefined();
+    expect(inboxAtOf('settings/general')).toBeUndefined();
+  });
+  it('gives the ⌘I screen no second inbox under it', () => {
+    expect(bottomTarget({ screen: 'inbox' }, 'home-1')).toBeNull();
   });
 });

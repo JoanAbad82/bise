@@ -83,7 +83,7 @@ test('thread/empty-enter: ⏎ on an empty composer signs in again when an expire
     // the item is gone (signed in): ⏎ on the empty field does nothing at all
     await core.send({ ev: 'cards', project: P, cards: [] } as never);
     await core.send(world([])[1] as never);
-    await expect(page.getByTestId('strip')).toHaveCount(0);
+    await expect(page.getByTestId('inbox.block')).toHaveCount(0);
     const before = core.cmds().length;
     await field.click();
     await page.keyboard.press('Enter');

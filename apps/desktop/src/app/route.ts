@@ -142,6 +142,18 @@ export function parseRoute(path: string): Route {
   }
 }
 
+/**
+ * b1/b2: a route main sends that asks to open the inbox IN PLACE, never a screen: 'inbox' (⌘I with
+ * another window in front) opens its first item, 'inbox?card=<project>/<id>' (a notification's
+ * click, amb-mac 97a5939a) that card. Anything else: undefined. Pure.
+ */
+export function inboxAtOf(path: string): { at?: { project: string; card: number } } | undefined {
+  const m = /^\/?inbox(?:\?card=([^/\s]+)\/(\d+))?\/?$/u.exec(path.trim());
+  if (m === null) return undefined;
+  const [, project, id] = m;
+  return project === undefined || id === undefined ? {} : { at: { project: decodeURIComponent(project), card: Number(id) } };
+}
+
 /** The project a route is about (none: bise's, the inbox, settings...). */
 export function projectOf(r: Route): string | undefined {
   return 'project' in r ? r.project : undefined;
@@ -155,9 +167,11 @@ export function projectOf(r: Route): string | undefined {
  * project (settings, scheduled, every project's artifacts, ⌘I, not found) to bise's main. Pure.
  */
 export function bottomTarget(r: Route, home: string | undefined): { project: string; agent: string } | null {
+  // the ⌘I screen is the inbox whole, with its own answer field: no second inbox under it
   switch (r.screen) {
     case 'thread':
     case 'bise':
+    case 'inbox':
     case 'onboarding':
     case 'lab':
       return null;

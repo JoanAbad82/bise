@@ -254,12 +254,12 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
     // (4b) the thread's docked answer: shop's strip, its first card (main's), an image pasted in the composer + words
     {
       await go(s, `project/${shop}`);
-      const r1 = p.getByTestId('strip.row.1');
+      const r1 = p.getByTestId('inbox.block.row.1');
       let note = '';
       if (await r1.isVisible().catch(() => false)) {
         note = `card: ${JSON.stringify((await r1.innerText()).replace(/\s+/g, ' ').trim().slice(0, 80))}`;
         await r1.click();
-        await p.getByTestId('strip.dock').waitFor({ timeout: 3000 }).catch(() => undefined);
+        await p.getByTestId('inbox.block.open.1').waitFor({ timeout: 3000 }).catch(() => undefined);
         await p.locator(FIELD).click();
         note += `, staged: ${String(await stage(s))}`;
         await p.keyboard.press('Meta+V');
@@ -278,7 +278,7 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
         await p.keyboard.press('Enter');
         const seen = await waitSeen(n);
         await sleep(1500);
-        note += `; after ⏎: an 'answered card' line in the request: ${String(/answered card/.test(seen.text))}, the merge card still in the strip: ${String((await p.locator('[data-testid^="strip.row."]').allInnerTexts()).some((t) => /merge checkout/.test(t)))}`;
+        note += `; after ⏎: an 'answered card' line in the request: ${String(/answered card/.test(seen.text))}, the merge card still in the strip: ${String((await p.locator('[data-testid^="inbox.block.row."]').allInnerTexts()).some((t) => /merge checkout/.test(t)))}`;
         await shot('R41-dock-after');
         rows.push({ path: '(4b) docked choice card in the thread: words + image go as a plain message', to: 'shop · main', how: 'paste', seen, note });
       } else {

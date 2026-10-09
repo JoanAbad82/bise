@@ -103,9 +103,9 @@ test('inbox/answer-images: an image pasted on a card answer (⌘I or the docked 
     await test.step("the docked answer: a PNG pasted in the composer goes with his words", async () => {
       await core.send(projects([card(9, 'which bench?')]) as never);
       await page.getByTestId(`app.sidebar.project.${P}`).click();
-      await expect(page.getByTestId('strip.row.1')).toBeVisible({ timeout: 5000 });
-      await page.getByTestId('strip.row.1').click();
-      await expect(page.getByTestId('strip.dock')).toBeVisible({ timeout: 3000 });
+      await expect(page.getByTestId('inbox.block.row.1')).toBeVisible({ timeout: 5000 });
+      await page.getByTestId('inbox.block.row.1').click();
+      await expect(page.getByTestId('inbox.block.open.1')).toBeVisible({ timeout: 3000 });
       const composer = '[data-testid="composer.field"]';
       await pasteImage(page, composer, PNG);
       await expect(page.locator('[data-testid="composer"]')).toContainText('[Image #1]', { timeout: 5000 });

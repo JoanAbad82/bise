@@ -75,7 +75,7 @@ const HEIGHT = 720;
 /** What leaves its box in the docked card (and the dock vs the list and the composer), as lines. */
 function misfits(): string[] {
   const out: string[] = [];
-  const card = document.querySelector<HTMLElement>('[data-testid="strip.dock"] .ic');
+  const card = document.querySelector<HTMLElement>('[data-testid^="inbox.block.open."] .ic');
   if (!card) return ['no docked card'];
   const r = (e: Element) => e.getBoundingClientRect();
   const inside = (c: DOMRect, p: DOMRect) => c.left >= p.left - 0.5 && c.right <= p.right + 0.5 && c.top >= p.top - 0.5 && c.bottom <= p.bottom + 0.5;
@@ -96,7 +96,7 @@ function misfits(): string[] {
   for (const e of [card, ...Array.from(card.querySelectorAll<HTMLElement>('.ic-opt, .ic-l, .ic-foot, .ic-h'))]) {
     if (e.scrollWidth > e.clientWidth + 1) out.push(`wider inside than its box (${String(e.scrollWidth)} > ${String(e.clientWidth)}): ${name(e)}`);
   }
-  const dock = document.querySelector('[data-testid="strip.dock"]');
+  const dock = document.querySelector('[data-testid^="inbox.block.open."]');
   const list = document.querySelector('[data-testid="thread.list"]');
   const comp = document.querySelector('[data-testid="composer"]');
   if (dock && list && r(dock).top < r(list).bottom - 1) out.push('the card overlaps the thread');
@@ -111,7 +111,7 @@ test('inbox/card-fit: the docked card keeps every label in its box at the 1100 w
   const shots: { label: string; png: Buffer }[] = [];
   try {
     const { page } = s;
-    await expect(page.getByTestId('strip'), 'the strip with the two items').toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('inbox.block'), 'the inbox block with the two items').toBeVisible({ timeout: 10_000 });
     const win = await s.app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().sort((a, b) => (b.getSize()[0] ?? 0) - (a.getSize()[0] ?? 0))[0]?.id ?? -1);
     // the sidebar's width: the window minus the thread column
     const side = await page.evaluate(() => window.innerWidth - (document.querySelector('[data-testid="thread.screen"]')?.getBoundingClientRect().width ?? window.innerWidth));
@@ -126,7 +126,7 @@ test('inbox/card-fit: the docked card keeps every label in its box at the 1100 w
     const dock = async (n: 1 | 2, id: number) => {
       await page.keyboard.press('Escape');
       await page.keyboard.press(`Control+Digit${String(n)}`);
-      await expect(page.getByTestId(`strip.card.${P}-${String(id)}`)).toBeVisible({ timeout: 3000 });
+      await expect(page.getByTestId(`inbox.block.card.${P}-${String(id)}`)).toBeVisible({ timeout: 3000 });
     };
     const fits = async (what: string) => {
       const bad = await page.evaluate(misfits);
@@ -138,7 +138,7 @@ test('inbox/card-fit: the docked card keeps every label in its box at the 1100 w
       for (const w of WIDTHS) {
         await size(w.window(side), HEIGHT);
         await dock(2, QUESTION.id);
-        await expect(page.getByTestId(`strip.card.${P}-9`)).toContainText('bise asks');
+        await expect(page.getByTestId(`inbox.block.card.${P}-9`)).toContainText('bise asks');
         await fits(`${t} ${w.name} question`);
         if (w.sheet) shots.push({ label: `${t} · ${w.name}`, png: await page.screenshot() });
         await dock(1, APPROVAL.id);
@@ -150,12 +150,12 @@ test('inbox/card-fit: the docked card keeps every label in its box at the 1100 w
     await theme('light');
     await size(Math.round(side) + 720, HEIGHT);
     await dock(2, QUESTION.id);
-    await page.getByTestId(`strip.card.${P}-9.opt.2`).hover();
+    await page.getByTestId(`inbox.block.card.${P}-9.opt.2`).hover();
     shots.push({ label: 'light · column 720 px · hover on 2', png: await page.screenshot() });
     await theme('dark');
     await page.mouse.move(0, 0);
     await page.keyboard.press('ArrowRight');
-    await expect(page.getByTestId(`strip.card.${P}-9.opt.1`)).toHaveClass(/\bon\b/);
+    await expect(page.getByTestId(`inbox.block.card.${P}-9.opt.1`)).toHaveClass(/\bon\b/);
     shots.push({ label: 'dark · column 720 px · keyboard on 1', png: await page.screenshot() });
 
     // the sheet: every shot at half size, labelled

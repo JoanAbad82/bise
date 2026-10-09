@@ -52,7 +52,7 @@ test('thread/hints: the first agent and first card hints show once, are marked i
     await core.waitCmd(marks('first_agent'));
     const cardHint = page.getByTestId('app.hint.first_card');
     await expect(cardHint, "the first card's hint").toBeVisible();
-    const strip = (await page.getByTestId('strip').boundingBox()) ?? { y: 0 };
+    const strip = (await page.getByTestId('inbox.block').boundingBox()) ?? { y: 0 };
     expect(((await cardHint.boundingBox()) ?? { y: 1e9 }).y, 'over the strip').toBeLessThan(strip.y);
     await core.waitCmd(marks('first_card'));
     await page.screenshot({ path: test.info().outputPath('hints.png') });
@@ -72,7 +72,7 @@ test('thread/hints: the first agent and first card hints show once, are marked i
   const s2 = await launchDesktop({ core: core2, route: `project/${P}` });
   try {
     const { page } = s2;
-    await expect(page.getByTestId('strip')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('inbox.block')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId('app.sidebar.agent.perf')).toBeVisible();
     await page.waitForTimeout(300);
     await expect(page.getByTestId('app.hint.first_agent')).toHaveCount(0);

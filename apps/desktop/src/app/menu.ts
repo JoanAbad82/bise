@@ -7,7 +7,8 @@
 import { useEffect, useRef } from 'react';
 import type { MenuAction } from '@/shared/api';
 import type { Router } from './router';
-import { parseRoute } from './route';
+import { inboxAtOf, parseRoute } from './route';
+import { askInbox } from './inboxAsk';
 import type { ScreenAction } from './keys';
 import { panel } from '@/terminal/panel';
 
@@ -34,6 +35,11 @@ export function useMenuRouting(router: Router) {
     const bise = (window as Partial<Window>).bise;
     if (bise === undefined) return;
     return bise.onMenu((action) => {
+      // b1/b2: ⌘I opens the inbox block in place, on the screen he is on (never a route)
+      if (action === 'inbox') {
+        askInbox();
+        return;
+      }
       const screen = routeOfMenu(action);
       if (screen !== undefined) router.go({ screen });
       else emitAction(action);
@@ -52,7 +58,13 @@ export function useMainRoutes(router: Router) {
     if (bise === undefined) return;
     return bise.onRoute((route) => {
       // View > Terminal while another window had the keys: show the panel here
-      if (route === 'terminal') panel.show();
+      if (route === 'terminal') {
+        panel.show();
+        return;
+      }
+      // b1/b2: 'inbox' / a notification's 'inbox?card=<project>/<id>' open the block in place
+      const inbox = inboxAtOf(route);
+      if (inbox !== undefined) askInbox(inbox.at);
       else router.go(parseRoute(route));
     });
   }, [router]);

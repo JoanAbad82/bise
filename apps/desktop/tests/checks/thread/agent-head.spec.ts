@@ -173,7 +173,8 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
     expect(art.w, 'fit-content').toBeLessThan(400);
     await expect(page.getByTestId('thread.live')).toHaveText('∿ running the bench three more times · 14 min');
     // (4) the composer's words
-    await expect(page.locator('.th-screen .b-composer .div')).toHaveText('to perf');
+    // the label's left (its right is the S40/W3 divider: 'working · 14 min')
+    await expect(page.locator('.th-screen .b-composer .div .lbl')).toHaveText('to perf');
     await expect(page.locator('[data-testid="composer.field"][aria-placeholder]')).toHaveAttribute('aria-placeholder', 'write to perf, then ⏎');
     // the artifact opens in the window
     await page.getByTestId('thread.artifact.10').click();
@@ -201,11 +202,11 @@ test('thread/agent-head: one row with the role, the state chip, the branch, chan
             await expect(page.getByTestId('thread.head.state')).toHaveText('? waiting for you');
             await expect(page.getByTestId('thread.head.state')).toHaveAttribute('data-needs', 'true');
             // designer m_12065 (4): its question docked above the composer, the label in the accent
-            if (!(await page.getByTestId('strip.dock').isVisible())) await page.getByTestId('strip.row.1').click();
-            await expect(page.getByTestId('strip.dock')).toBeVisible();
+            if (!(await page.getByTestId('inbox.block.open.1').isVisible())) await page.getByTestId('inbox.block.row.1').click();
+            await expect(page.getByTestId('inbox.block.open.1')).toBeVisible();
             await expect(page.getByTestId('thread.starting'), 'a waiting agent is not starting').toHaveCount(0);
             await expect(page.locator('.th-screen .b-composer .div .lbl')).toHaveText(/^answering search · which sizes/);
-            await expect(page.locator('.th-screen .b-composer .div .end')).toHaveText('esc write a plain message');
+            await expect(page.locator('.th-screen .b-composer .div .end')).toHaveText('esc write to search instead');
             await expect(page.getByTestId('thread.screen')).toHaveAttribute('data-answering', 'true');
           }
           if (label === 'bise · storefront') {
