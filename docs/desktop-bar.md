@@ -442,6 +442,26 @@ isn't judging. A row marked ok names the shot that was looked at.
         thinking (qa-native).
     - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
       dev tool (amb-web's list, or amb-home's commands).
+- **ca9ee485: GO** (ambient-pm m_15196 to ambient-lead). It brings R36's chip fix, Help's "send a
+  test notification" and the hub-lag fix 04a47c0e. qa-native shot it off-screen on the packed
+  bundle with the rich world on its own bise, and looked at every shot (m_15188; checks ceea46e2).
+  - **green:**
+    - R36: ambient-pm looked at R41/R36-answered.png as an image. The "[Image #1]" chip with its
+      thumbnail sits inside the column, with the side panel shown or hidden. There's no sha name,
+      no marker and no path.
+    - Help › "send a test notification".
+    - R41 on 8 of 9 paths. The escalated `sb card --for` path wasn't proven here because the
+      world's fake main answered gift-ui itself; it stands on 387ad740's 9/9, since the app
+      didn't change there.
+    - R45–R47 on the real core: no notification while focused, one when away, with the choices,
+      "open in bise" and a reply. An action and a trimmed reply reach the hub, and an answer in ⌘I
+      closes the notification.
+  - **named gap, not new:** a docked answer shows as a "switchboard" row carrying the hub's raw line,
+    'the user answered card #1 ("merge checkout into main? …"): "[Image #1] this one …"'.
+    387ad740's R36-answered.png has the same row, and that's the build he is on. Next cut: it
+    should read like "you answered gift-ui" (amb-win, amb-feed).
+  - **not in this cut:** the traffic lights 5ac7c9dd, b1b, and JSON-RPC over stdio.
+
 - **387ad740, 10-09: first read, still running** (qa-native m_14456; checks 7dd3aa60). The rows
   ran on a copy of the **staged** bundle. His own try is open, so `--try` said "up to date
   (387ad740), staged: your try is open: quit it to get the new build". Not opening over his app is
