@@ -351,7 +351,28 @@ test('gate/images R41: an image he pastes or drops reaches the model as an image
         const imgs = await p.locator(`[data-testid="thread.answered.${pos}"] img`).count();
         out.push(`#${pos} ${JSON.stringify(text.slice(0, 120))}: images ${String(imgs)}, '<image' ${String(text.includes('<image'))}, a path ${String(/\/Users\//.test(text))}`);
       }
+      // every 'you answered' image chip in view (not only the last two rows), with the right panel shown and
+      // hidden (⌥⌘0 toggles it; the panel's state at start depends on the keep): each chip's right edge inside the
+      // thread's column, its label '[Image #n]' (never the store's sha file name)
+      const measure = async (): Promise<string> => {
+        const panel = await p.getByTestId('app.panel').isVisible().catch(() => false);
+        const m = await p.evaluate(() => {
+          const list = document.querySelector('[data-testid="thread.list"]')?.getBoundingClientRect();
+          const els: HTMLElement[] = Array.from(document.querySelectorAll<HTMLElement>('[data-testid^="thread.answered."] .b-chip'));
+          const chips = els.map((c) => c.getBoundingClientRect());
+          return { chips: chips.length, out: list ? chips.filter((c) => c.right > list.right + 0.5).length : -1, labels: els.map((c) => c.innerText.trim()).slice(-4) };
+        });
+        return `panel shown ${String(panel)}: chips ${String(m.chips)}, past the column ${String(m.out)}, labels ${JSON.stringify(m.labels)}`;
+      };
+      const chipRow = p.locator('[data-testid^="thread.answered."] .b-chip').last();
+      await chipRow.scrollIntoViewIfNeeded().catch(() => undefined);
+      out.push(await measure());
       await shot('R36-answered');
+      await p.keyboard.press('Alt+Meta+0');
+      await sleep(800);
+      out.push(await measure());
+      await shot('R36-answered-panel');
+      await p.keyboard.press('Alt+Meta+0');
       r36 = out.join(' · ') || 'no thread.answered row in shop main\'s thread';
     }
   } finally {
