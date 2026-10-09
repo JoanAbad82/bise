@@ -83,6 +83,31 @@ export class Capsule {
       this.win.showInactive();
     }
     this.tell();
+    this.tellWindows();
+  }
+
+  /** A pushed card is up in its page (its keys stay in bise's window, where a digit picks). */
+  private cardUp = false;
+
+  /** The page says a pushed card is up or gone; bise's windows hear it (their preload picks). */
+  setCard(up: boolean): void {
+    if (this.cardUp === up) return;
+    this.cardUp = up;
+    this.tellWindows();
+  }
+
+  card(): boolean {
+    return this.cardUp && this.state.shown;
+  }
+
+  /** A digit from bise's window for the card up (dropped when none is). */
+  key(n: number): void {
+    if (this.card()) this.win.webContents.send(IPC.capsuleKey, n);
+  }
+
+  private tellWindows(): void {
+    const up = this.card();
+    for (const w of BrowserWindow.getAllWindows()) if (w !== this.win && !w.isDestroyed()) w.webContents.send(IPC.cardUp, up);
   }
 
   hide(why: CapsuleState['why'] = 'asked'): void {
@@ -92,6 +117,7 @@ export class Capsule {
     if (this.testMode) process.stdout.write(`${CAPSULE_LINE} hide\n`);
     else this.win.hide();
     this.tell();
+    this.tellWindows();
   }
 
   resize(width: number, height: number, glass?: Rect): void {
@@ -150,6 +176,14 @@ export function installCapsuleIpc(c: Capsule): void {
   });
   ipcMain.on(IPC.capsuleHide, () => {
     c.hide();
+  });
+  // a pushed card: its page says when it's up; a window's digit over an empty composer picks in it
+  ipcMain.on(IPC.capsuleCard, (_e, up: unknown) => {
+    c.setCard(up === true);
+  });
+  ipcMain.handle(IPC.cardUp, () => c.card());
+  ipcMain.on(IPC.windowPick, (_e, n: unknown) => {
+    if (typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 9) c.key(n);
   });
   ipcMain.on(IPC.capsuleSize, (_e, width: unknown, height: unknown, glass: unknown) => {
     if (typeof width !== 'number' || typeof height !== 'number') return;

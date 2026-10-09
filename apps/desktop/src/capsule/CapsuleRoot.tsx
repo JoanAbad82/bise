@@ -289,6 +289,26 @@ export function CapsuleRoot(): JSX.Element {
     };
   }, [fromSpot, store, bise]);
 
+  // a card bise pushed is shown without the keys (his keys stay where he is): when he is in bise's
+  // window, main forwards a digit typed there over an empty composer (src/main/digitpick.ts, lead
+  // m_14146), and it picks here like the card's own keys
+  const pushed = view.kind === 'card' && view.back !== true ? view.id : null;
+  useEffect(() => {
+    if (pushed === null || bise === undefined) return;
+    const [project = '', n = ''] = pushed.split(/\.(?=[^.]+$)/u);
+    bise.capsule.card(true);
+    const off = bise.capsule.onKey((d) => {
+      const c = store.cards(project).find((x) => String(x.id) === n);
+      if (c === undefined) return;
+      const k = cardKeyOf(new KeyboardEvent('keydown', { key: String(d) }), c, null);
+      if (k !== null && k.t === 'pick') store.answer(project, c.id, String(k.n));
+    });
+    return () => {
+      off();
+      bise.capsule.card(false);
+    };
+  }, [pushed, store, bise]);
+
   // the projects this window shows: all of them (the spotlight lists every project's agents and
   // cards, a push may come from any); the core sends their rows, agents and cards only after a
   // 'shown' (amb-core 932b7186), the store dedupes and re-says it to a core that comes back

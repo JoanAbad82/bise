@@ -234,6 +234,13 @@ export interface CapsuleApi {
   readonly size: (width: number, height: number, glass?: { x: number; y: number; width: number; height: number }) => void;
   /** Every change (shown, hidden, the tray's click, a blur); returns the unsubscribe. */
   readonly onState: (listener: (s: CapsuleState) => void) => () => void;
+  /**
+   * The capsule's page says a card bise pushed is up (shown without the keys) or gone, so a
+   * digit typed in bise's window over an empty composer picks in it (lead m_14146).
+   */
+  readonly card: (up: boolean) => void;
+  /** A digit 1-9 main forwards from bise's window while that card is up; returns the unsubscribe. */
+  readonly onKey: (listener: (n: number) => void) => () => void;
 }
 
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */
@@ -258,6 +265,14 @@ export const IPC = {
   capsuleHide: 'bise:capsule-hide',
   capsuleSize: 'bise:capsule-size',
   capsuleState: 'bise:capsule-state',
+  /** capsule page -> main: a pushed card is up (true) or gone */
+  capsuleCard: 'bise:capsule-card',
+  /** main -> capsule page: a digit typed in bise's window for that card */
+  capsuleKey: 'bise:capsule-key',
+  /** main -> bise's windows: a pushed card is up in the capsule (their preload picks with digits) */
+  cardUp: 'bise:card-up',
+  /** a window's preload -> main: a digit over an empty composer while a card is up */
+  windowPick: 'bise:window-pick',
   openWindow: 'bise:open-window',
   route: 'bise:route',
   quit: 'bise:quit',
