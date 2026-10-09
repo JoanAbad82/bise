@@ -102,3 +102,9 @@
 .ic.glass { background: transparent; box-shadow: none; border-radius: 0; max-height: none; }
 /* the strip's open item: docked between the thread and the composer's label, the composer's edges */
 .inbox-dock { margin: 0 16px 10px; flex: none; }
+
+/* b2: the inbox block (Block.tsx) reuses the strip's look; an item's sign on its line, and the open
+   item in place where its line was (the block grows, nothing floats) */
+.inbox-block .ib-sign { flex: none; width: 1em; text-align: center; font: 600 var(--t-12) var(--font-mono); color: var(--c-accent); }
+.inbox-block .ib-sign.acc { color: var(--c-accent); }
+.inbox-block-open { margin: 4px 0; }
