@@ -28,7 +28,7 @@ import { useTour } from '@/setup/useTour';
 import { takeQuotes } from '@/review/quote';
 import { copyText, QuotePop } from '@/quote/QuotePop';
 import { Hint, hintUsed, hintsUserMessage, useHint } from '@/app/hints';
-import { ThreadInbox, takesWords, useStripCard } from '@/inbox';
+import { ThreadInbox, pickWaits, takesWords, useStripCard } from '@/inbox';
 import { dotOf, lineOf, shownName } from '@/agents/model';
 import { Tune } from '@/agents/Tune';
 import { AgentHead, BiseHead, LiveLine, StartingLine } from './AgentHead';
@@ -382,7 +382,9 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
             project={project}
             agent={agent}
             busy={busy}
-            to={answering === null ? composerWords(title).label : answeringLabel(answering)}
+            // an item only its options decide (an approval, a merge): his words go as a plain message,
+            // the label says what it waits for (ambient m_8773: 'to bise · the merge waits for 1 or 2')
+            to={answering !== null ? answeringLabel(answering) : docked !== null && pickWaits(docked) !== null ? `${composerWords(title).label} · ${pickWaits(docked) ?? ''}` : composerWords(title).label}
             toEnd={answering === null ? undefined : 'esc write a plain message'}
             placeholder={answering === null ? composerWords(title).placeholder : 'your answer, then ⏎'}
             answer={answering === null ? null : answering.id}

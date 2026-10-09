@@ -784,6 +784,8 @@ button.th-sched-head {
 .th-brief[data-open] .th-brief-chev { transform: rotate(90deg); }
 .th-brief-words { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .th-brief-body { margin: 6px 0 2px 3px; padding-left: 12px; border-left: 1px solid var(--c-line); color: var(--c-text-2); font-size: var(--t-14); }
+/* bise's note to the agent, not the conversation: its words in --c-text-2 too (the markdown's own text colour) */
+.th-brief-body, .th-brief-body .b-md { --md-text: var(--c-text-2); }
 .th-brief-body :is(h1, h2, h3, h4) { font-size: var(--t-14); font-weight: 600; margin: 8px 0 4px; }
 /* the empty thread (v6 (5)): his first message, then '· checkout is starting: …' text-2 */
 .th-starting {
@@ -798,8 +800,23 @@ button.th-sched-head {
   display: flex;
   color: var(--c-accent);
 }
+/* the label is one line, always (designer m_14031): the question is cut with '…' and the way back
+   ('esc write a plain message') keeps its room at the right */
+.th-screen .b-composer .div {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.th-screen .b-composer .div .lbl {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .th-screen .b-composer .div .end {
+  flex: none;
   margin-left: auto;
+  padding-left: 12px;
   color: var(--c-text-3);
 }
 

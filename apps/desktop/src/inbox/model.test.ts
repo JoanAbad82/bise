@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Card } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
 import { cardKey, sortCards } from './order';
-import { current, prune, START, step, visible, withConfirmOptions, type InboxState, type Key } from './model';
+import { current, digitWords, pickWaits, prune, START, step, takesWords, visible, withConfirmOptions, type InboxState, type Key } from './model';
 
 const card = (id: number, kind: string, rank: number | undefined, since_ms: number, project = 'acme', extra: Partial<Card> = {}): Card => ({
   id,
@@ -151,5 +151,21 @@ describe("a gated call (the hub's confirm card) gets the TUI's options (qa-flows
     expect(withConfirmOptions(q)).toBe(q);
     const withOpts = { ...gate('wants to run\n| ls'), options: [{ n: 1, label: 'yes' }] };
     expect(withConfirmOptions(withOpts)).toBe(withOpts);
+  });
+});
+
+describe('which items his words answer (ambient m_8773, the TUI and hub choice_kind)', () => {
+  const two = [{ n: 1, label: 'merge' }, { n: 2, label: 'not yet' }];
+  it('a question takes words; an approval and every choice item only their options', () => {
+    expect(takesWords({ kind: 'question' })).toBe(true);
+    expect(takesWords({ kind: 'question', approval: true })).toBe(false);
+    for (const kind of ['merge', 'feature_try', 'feature_merge', 'update', 'signin']) expect(takesWords({ kind }), kind).toBe(false);
+  });
+  it("a docked item only options decide says what it waits for; a question says nothing", () => {
+    expect(pickWaits({ kind: 'merge', options: two })).toBe('the merge waits for 1 or 2');
+    expect(pickWaits({ kind: 'question', approval: true, options: two })).toBe('the approval waits for 1 or 2');
+    expect(pickWaits({ kind: 'feature_merge', options: [...two, { n: 3, label: 'drop' }] })).toBe('the merge waits for 1 to 3');
+    expect(pickWaits({ kind: 'question', options: two })).toBeNull();
+    expect(digitWords(1)).toBe('1');
   });
 });

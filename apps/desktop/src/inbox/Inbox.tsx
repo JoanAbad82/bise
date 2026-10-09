@@ -14,13 +14,13 @@
 import { memo, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { Card as CardRow } from '@/proto';
 import { Empty, Head, Row } from '@/ds';
-import { dotOf, folds, InboxCard, takesWords, titleOf } from './InboxCard';
+import { dotOf, folds, InboxCard, titleOf } from './InboxCard';
 import { cardKey } from './order';
 import { inboxDrafts, type Drafts } from './drafts';
 import { caretAtEnd } from '@/app/keep';
 import { saveImageFile, thumbnail } from '@/composer/attach';
 import type { SavedImage } from '@/composer/sources';
-import { current, prune, START, step, visible, type Act, type Key } from './model';
+import { current, prune, START, step, takesWords, visible, type Act, type Key } from './model';
 import './inbox.css';
 
 /** An image on his answer: saved in bise's image store, with its chip's thumbnail (none: unreadable). */

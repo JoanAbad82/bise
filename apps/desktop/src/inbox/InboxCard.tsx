@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Card as CardRow } from '@/proto';
 import { Kbd } from '@/ds';
 import { cardKey } from './order';
+import { takesWords } from './model';
 
 /** A clicked row stays picked (ink) this long before it leaves. */
 export const PICKED_MS = 300;
@@ -205,9 +206,6 @@ function Folded({ text, testId }: { text: string; testId: string }) {
 }
 
 /** Words answer it (a question), not only its options. */
-export function takesWords(c: CardRow): boolean {
-  return c.approval !== true;
-}
 
 /** A card's title: an approval asks like a question ('bise asks', 'search asks'; ambient m_11426:
  * its '!' and its options say it is one, the noun stays in the question), else kindTitle. */

@@ -52,6 +52,17 @@ test("thread/brief-row: the hub's brief is one quiet row 'bise started gift-ui Â
     const body = page.getByTestId('thread.brief.1.body');
     await expect(body).toContainText('No end criterion: this is a long-running task. Stay available.');
     await expect(body).toContainText('Context: the cart team asked');
+    // bise's note to the agent: its words in --c-text-2, never the conversation's --c-text (designer m_14019)
+    const ink = await body.evaluate((el: HTMLElement) => {
+      const words: Element = Array.from(el.querySelectorAll<HTMLParagraphElement>('p')).find((p) => p.textContent.includes('No end criterion')) ?? el;
+      const d = document.createElement('i');
+      d.style.color = getComputedStyle(document.documentElement).getPropertyValue('--c-text-2');
+      document.body.append(d);
+      const want = getComputedStyle(d).color;
+      d.remove();
+      return { got: getComputedStyle(words).color, want };
+    });
+    expect(ink.got, 'the open brief in --c-text-2').toBe(ink.want);
     await page.screenshot({ path: test.info().outputPath('brief-open-light.png') });
     await dark(page, true);
     await page.screenshot({ path: test.info().outputPath('brief-open-dark.png') });

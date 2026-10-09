@@ -56,9 +56,27 @@ export function current(list: readonly Card[], s: InboxState): Card | undefined 
   return list.find((c) => cardKey(c) === s.cur) ?? list[0];
 }
 
-/** Words answer it (a question), not only its options. */
-export function takesWords(c: Card): boolean {
-  return c.approval !== true;
+/** The hub's items with numbered options about a place (the TUI's and the hub's choice_kind): a
+ *  digit answers them; typed words go to main, never as their answer. */
+const CHOICE_KINDS: ReadonlySet<string> = new Set(['merge', 'feature_try', 'feature_merge', 'update', 'signin']);
+
+/** Words answer it (a question), not only its options: never an approval or a choice item, which
+ *  only 1/2 (a click, ⌘⏎) decides (ambient m_8773: a typed line never merges anything). */
+export function takesWords(c: Pick<Card, 'approval' | 'kind'>): boolean {
+  return c.approval !== true && !CHOICE_KINDS.has(c.kind);
+}
+
+/** '1', '1 or 2', '1 to 3': the digits that answer n options, in words. Pure. */
+export function digitWords(n: number): string {
+  return n <= 1 ? '1' : n === 2 ? '1 or 2' : `1 to ${String(n)}`;
+}
+
+/** What a docked item that only its options decide waits for, for the composer's label ('the merge
+ *  waits for 1 or 2'); none for an item his words answer. Pure. */
+export function pickWaits(c: Pick<Card, 'approval' | 'kind' | 'options'>): string | null {
+  if (takesWords(c) || c.options.length === 0) return null;
+  const noun = c.approval === true ? 'approval' : c.kind === 'feature_merge' ? 'merge' : c.kind === 'feature_try' ? 'try' : c.kind === 'signin' ? 'sign-in' : c.kind;
+  return `the ${noun} waits for ${digitWords(c.options.length)}`;
 }
 
 /** ⏎ with nothing typed and no option answers it (done, overlap). */
