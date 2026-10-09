@@ -123,15 +123,42 @@ export type PrNews = { number: number, url: string, text: string, state: PrNewsS
 export type Made = { id: string, agent: string, title: string, kind: string, kind_word: string, v: number, url?: string | null, };
 
 /**
+ * An image he attached: its label (`[Image #1]`, or its file name) and
+ * his source path (the chip's thumbnail). Never the store's b64 path.
+ */
+export type ImageRef = { name: string, path: string, };
+
+/**
  * An `answered` entry: main answered `agent`'s question for him.
  */
-export type Answered = { agent: string, question: string, answer: string, why: string, };
+export type Answered = { agent: string, question: string, 
+/**
+ * his words only, never an image marker or the file list (R41)
+ */
+answer: string, why: string, 
+/**
+ * the images he pasted with it: the window shows each as its chip
+ */
+images?: Array<ImageRef>, 
+/**
+ * his other files (absolute paths)
+ */
+files?: Array<string>, };
 
 /**
  * An `approval` entry: his answer, folded (`you allowed api: rm -rf
  * target`, `you answered perf: both`); `note` the words under it.
  */
-export type ApprovalFold = { ok: boolean, text: string, note?: string, };
+export type ApprovalFold = { ok: boolean, text: string, note?: string, 
+/**
+ * an answer's pasted images (`you answered gift-ui` + his words,
+ * R41): each the window's chip, never a marker in `text`/`note`
+ */
+images?: Array<ImageRef>, 
+/**
+ * an answer's other files (absolute paths)
+ */
+files?: Array<string>, };
 
 /**
  * A `scheduled` entry (batch 3b): a task set or ended (the hub's

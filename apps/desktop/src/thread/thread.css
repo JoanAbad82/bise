@@ -488,6 +488,26 @@
   margin: 2px 0 0 calc(1em + 8px);
   color: var(--c-text-3);
 }
+/* R36: an answer's pasted images, the window's one image chip each, under its words */
+.th-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 0 calc(1em + 8px);
+}
+.th-images .b-chip.image {
+  height: 20px;
+  padding: 0 7px;
+  color: var(--c-accent);
+  background: var(--c-accent-soft);
+}
+.th-images .b-chip.image .thumb {
+  width: 16px;
+  height: 16px;
+  margin-right: 5px;
+  border-radius: 3px;
+  object-fit: cover;
+}
 
 /* batch 3b: a scheduled task's faint ◷ line (the TUI's wire.rs Scheduled), its words under it */
 .th-sched {

@@ -286,8 +286,33 @@ function AnsweredRow({ e }: { e: Entry }) {
         answered {a.agent} for you: {a.question} → <b>{a.answer}</b>
       </NewsLine>
       {a.why !== '' && <div className="th-news-note">{a.why}</div>}
+      <ImageChips images={a.images ?? []} testId={`thread.answered.${e.pos}`} />
     </div>
   );
+}
+
+/**
+ * R36: the images he pasted with an answer, each the one image chip of the window (the composer's,
+ * the spotlight's, ⌘I's): its 16 px thumbnail read from his source path and its label ('[Image #1]');
+ * never the hub's marker or a path in the words.
+ */
+function ImageChips({ images, testId }: { images: readonly { name: string; path: string }[]; testId: string }) {
+  if (images.length === 0) return null;
+  return (
+    <div className="th-images">
+      {images.map((img, i) => (
+        <span key={`${img.path}#${String(i)}`} className="b-chip image" data-kind="image" data-testid={`${testId}.image.${String(i + 1)}`}>
+          <img className="thumb" src={fileUrl(img.path)} alt="" />
+          {img.name !== '' ? img.name : `[Image #${String(i + 1)}]`}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** A local file's URL for an img (the window's CSP allows file:). Pure. */
+export function fileUrl(path: string): string {
+  return `file://${path.split('/').map(encodeURIComponent).join('/')}`;
 }
 
 /** His answer to an approval, folded: allowed or said no, and his words under it. */
@@ -300,6 +325,7 @@ function ApprovalRow({ e }: { e: Entry }) {
         {a.text}
       </NewsLine>
       {a.note != null && a.note !== '' && <div className="th-news-note">{a.note}</div>}
+      <ImageChips images={a.images ?? []} testId={`thread.approval.${e.pos}`} />
     </div>
   );
 }
