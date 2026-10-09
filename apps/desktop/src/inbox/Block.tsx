@@ -10,6 +10,7 @@
 // Owner: amb-home.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Card, ProjectRow } from '@/proto';
+import type { NotifyAuth } from '@/shared/api';
 import { Dot, Kbd } from '@/ds';
 import { useProjects, useStore } from '@/store';
 import { shownName } from '@/agents/model';
@@ -53,6 +54,52 @@ const openers = new Set<(at: OpenAt) => void>();
 /** Open the block in place: on that card (a notification's), else on its first item. */
 export function openInbox(at?: { project: string; card: number }): void {
   for (const f of [...openers]) f(at);
+}
+
+// ---- the notifications' permission row (amb-mac's window.bise.notify, 97a5939a; designer m_14211)
+
+type Notify = { state: () => Promise<NotifyAuth>; onState: (f: (s: NotifyAuth) => void) => () => void; ask: () => Promise<NotifyAuth> };
+const notifyApi = (): Notify | null => (globalThis as { bise?: { notify?: Notify } }).bise?.notify ?? null;
+
+/** 'not now' twice and the row never comes back; once, it waits for the next launch (designer). */
+const NOT_NOW_KEY = 'bise.notify.notnow';
+const NOT_NOW_LAUNCH = 'bise.notify.notnow.launch';
+const notNowCount = (): number => Number(localStorage.getItem(NOT_NOW_KEY) ?? '0') || 0;
+
+/** Whether the permission row shows: macOS never asked, an item waits, 'not now' not said this launch nor twice. Pure. */
+export function asksNotify(auth: NotifyAuth | null, items: number, notNow: number, thisLaunch: boolean): boolean {
+  return auth === 'never' && items > 0 && notNow < 2 && !thisLaunch;
+}
+
+function useNotifyRow(items: number): { show: boolean; on: () => void; later: () => void } {
+  const [auth, setAuth] = useState<NotifyAuth | null>(null);
+  const [said, setSaid] = useState(() => sessionStorage.getItem(NOT_NOW_LAUNCH) === '1');
+  useEffect(() => {
+    const api = notifyApi();
+    if (api === null) return;
+    let live = true;
+    void api.state().then((s) => {
+      if (live) setAuth(s);
+    });
+    const off = api.onState((s) => {
+      setAuth(s);
+    });
+    return () => {
+      live = false;
+      off();
+    };
+  }, []);
+  return {
+    show: asksNotify(auth, items, notNowCount(), said),
+    on: () => {
+      void notifyApi()?.ask().then(setAuth);
+    },
+    later: () => {
+      localStorage.setItem(NOT_NOW_KEY, String(notNowCount() + 1));
+      sessionStorage.setItem(NOT_NOW_LAUNCH, '1');
+      setSaid(true);
+    },
+  };
 }
 
 // ---- the pure parts
@@ -220,6 +267,7 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
     };
   });
 
+  const notify = useNotifyRow(list.length);
   if (list.length === 0) return null;
   const openAt = openCard === undefined ? -1 : list.indexOf(openCard);
   const shown = list.filter((_, i) => i < STRIP_ROWS || i === openAt);
@@ -242,6 +290,17 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
           )}
         </span>
       </div>
+      {notify.show && (
+        <div className="ib-notify" data-testid="inbox.block.notify">
+          <span className="ib-notify-words">questions can reach you when bise isn't in front, as macOS notifications.</span>
+          <button type="button" className="ib-notify-on" onClick={notify.on} data-testid="inbox.block.notify.on">
+            turn on
+          </button>
+          <button type="button" className="ib-notify-later" onClick={notify.later} data-testid="inbox.block.notify.later">
+            not now
+          </button>
+        </div>
+      )}
       {shown.map((c) => {
         const n = list.indexOf(c) + 1;
         const row = names.get(c.project);

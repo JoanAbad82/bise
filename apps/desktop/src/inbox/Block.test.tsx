@@ -7,7 +7,7 @@ import type { CoreCmd, CorePort } from '@/shared/api';
 import { core_ev } from '@/proto/fixtures.gen';
 import { replay, Store, StoreProvider } from '@/store';
 import { createRouter, RouterContext } from '@/app/router';
-import { InboxBlock, openInbox, type Answering, type Here } from './Block';
+import { asksNotify, InboxBlock, openInbox, type Answering, type Here } from './Block';
 
 afterEach(cleanup);
 
@@ -89,5 +89,52 @@ describe('the inbox block (b2)', () => {
     mount();
     fireEvent.keyDown(window, { key: '2', code: 'Digit2', ctrlKey: true });
     expect(screen.getByTestId('inbox.block.open.2')).toBeTruthy();
+  });
+});
+
+describe("the notifications' permission row (amb-mac's notify.ask)", () => {
+  it("shows while macOS was never asked and an item waits; 'not now' once a launch, twice for good", () => {
+    expect(asksNotify('never', 1, 0, false)).toBe(true);
+    expect(asksNotify('never', 0, 0, false)).toBe(false);
+    expect(asksNotify('on', 1, 0, false)).toBe(false);
+    expect(asksNotify('asked', 1, 0, false)).toBe(false);
+    expect(asksNotify('never', 1, 1, true)).toBe(false);
+    expect(asksNotify('never', 1, 1, false)).toBe(true);
+    expect(asksNotify('never', 1, 2, false)).toBe(false);
+  });
+
+  it("'turn on' asks macOS; the row goes once the answer comes", async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    let asked = 0;
+    const g = globalThis as { bise?: unknown };
+    g.bise = { notify: { state: () => Promise.resolve('never'), onState: () => () => undefined, ask: () => { asked += 1; return Promise.resolve('on'); } } };
+    try {
+      mount();
+      expect(await screen.findByTestId('inbox.block.notify')).toBeTruthy();
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('inbox.block.notify.on'));
+        await Promise.resolve();
+      });
+      expect(asked).toBe(1);
+      expect(screen.queryByTestId('inbox.block.notify')).toBeNull();
+    } finally {
+      delete g.bise;
+    }
+  });
+
+  it("'not now' hides it for this launch", async () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    const g = globalThis as { bise?: unknown };
+    g.bise = { notify: { state: () => Promise.resolve('never'), onState: () => () => undefined, ask: () => Promise.resolve('on') } };
+    try {
+      mount();
+      fireEvent.click(await screen.findByTestId('inbox.block.notify.later'));
+      expect(screen.queryByTestId('inbox.block.notify')).toBeNull();
+      expect(localStorage.getItem('bise.notify.notnow')).toBe('1');
+    } finally {
+      delete g.bise;
+    }
   });
 });

@@ -108,3 +108,11 @@
 .inbox-block .ib-sign { flex: none; width: 1em; text-align: center; font: 600 var(--t-12) var(--font-mono); color: var(--c-accent); }
 .inbox-block .ib-sign.acc { color: var(--c-accent); }
 .inbox-block-open { margin: 4px 0; }
+/* the notifications' permission row (amb-mac's notify.ask; designer m_14211): one quiet line at the
+   block's top while macOS was never asked; 'turn on' in the accent, 'not now' dim */
+.inbox-block .ib-notify { display: flex; align-items: baseline; gap: 14px; padding: 4px 2px 6px; font: var(--t-12) var(--font-ui); color: var(--c-text-2); }
+.inbox-block .ib-notify-words { flex: 1; min-width: 0; }
+.inbox-block .ib-notify button { flex: none; padding: 0; border: 0; background: none; font: inherit; cursor: pointer; }
+.inbox-block .ib-notify-on { color: var(--c-accent); }
+.inbox-block .ib-notify-later { color: var(--c-text-3); }
+.inbox-block .ib-notify button:hover { text-decoration: underline; }
