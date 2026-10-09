@@ -33,6 +33,8 @@ import { testHomeProblem } from './testhome';
 import { themeSourceOf } from './theme';
 import { takeRoute, Updates, updateTarget } from './update/run';
 import { MainWindow } from './windows';
+import { Notifier } from './notify/run';
+import { langOf } from './notify/plan';
 
 const testMode = process.env[TEST_ENV] === '1';
 
@@ -138,6 +140,18 @@ void app.whenReady().then(() => {
     main.open(typeof route === 'string' ? route : undefined);
   });
   if (!testMode) startTray(capsule, main);
+  // his questions as macOS notifications when no bise window has the keys (notify/, card #476)
+  const notifier = new Notifier({
+    testMode,
+    lang: langOf(app.getPreferredSystemLanguages()),
+    send: sendToCore,
+    open: (route) => {
+      main.open(route);
+    },
+  });
+  onCoreEvent((ev) => {
+    notifier.onCoreEvent(ev);
+  });
   // the counts outside the app (counts.ts): the Dock's badge, the window's title
   const counts = new CountKeeper();
   onCoreEvent((ev) => {

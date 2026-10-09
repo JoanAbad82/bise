@@ -364,5 +364,8 @@ export const TEST_USER_DATA_ENV = 'BISE_DESKTOP_USER_DATA';
 export const READY_LINE = 'bise-desktop: ready';
 /** Test mode: the update's state on each change (`<line> <json>`). */
 export const UPDATE_LINE = 'bise-desktop: update';
+
+/** Test mode: the macOS notifications are never posted, each step is this line + JSON (src/main/notify). */
+export const NOTIFY_LINE = 'bise-desktop: notify';
 /** Test mode: the app would start again from this bundle now (never done in a test). */
 export const RELAUNCH_LINE = 'bise-desktop: relaunch';
