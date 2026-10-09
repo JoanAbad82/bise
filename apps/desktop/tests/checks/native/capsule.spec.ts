@@ -19,6 +19,8 @@ import { CAPSULE, capsulePage, capsuleWindow, onWorld, sleep, type World } from 
 const DISPLAY = { x: -30000, y: -30000, width: 1920, height: 1200 };
 const TOP = 170;
 const BOTTOM = 96;
+/** the voice view's most glass (src/capsule/machine.ts TALK_FIT.maxHeight) */
+const TALK_MAX = 320;
 
 /** the glass: the drawn panel of the view (the spotlight's frame, the talk), in its page */
 const glassOf = (p: Page, id: string): Promise<{ x: number; y: number; width: number; height: number }> =>
@@ -67,7 +69,12 @@ test('native/capsule: fn space sits 170 px under the top, the talk 96 px above t
     await w.out.wait(CAPSULE, (l) => l.startsWith('show bottom'));
     const bottom = await placed(w, 'capsule.talk');
     expect.soft(bottom.overflow, 'nothing of the talk is drawn past its window (cut off)').toEqual({ x: 0, y: 0 });
-    expect.soft(Math.abs(DISPLAY.y + DISPLAY.height - BOTTOM - bottom.glassBottom), `the talk's glass bottom is ${BOTTOM} px above the work area's bottom`).toBeLessThanOrEqual(2);
+    // the voice view never moves while the words come (2887644d, lead m_11532): placed once so that
+    // its MAX height (TALK_FIT 320) would end BOTTOM px above the work area's bottom, then it grows
+    // down; so its top is fixed there and its bottom never passes that line
+    expect.soft(Math.abs(DISPLAY.y + DISPLAY.height - BOTTOM - TALK_MAX - bottom.glassTop), `the talk's glass top sits where ${TALK_MAX} px of glass would end ${BOTTOM} px above the work area's bottom`).toBeLessThanOrEqual(2);
+    expect.soft(bottom.glassBottom, `the talk's glass never passes ${BOTTOM} px above the work area's bottom`).toBeLessThanOrEqual(DISPLAY.y + DISPLAY.height - BOTTOM + 2);
+    await capsulePage(w.s).then((p) => p.screenshot({ path: test.info().outputPath('talk.png') }));
     expect.soft(Math.abs(bottom.glassMidX - (DISPLAY.x + DISPLAY.width / 2)), 'centred').toBeLessThanOrEqual(2);
   });
 });

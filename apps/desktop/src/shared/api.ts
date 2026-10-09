@@ -94,6 +94,16 @@ export interface BiseApi {
   readonly keep?: { readonly read: () => string | null; readonly write: (text: string) => void };
   /** The capsule's window (src/main/capsule.ts): where it shows, its size. */
   readonly capsule: CapsuleApi;
+  /**
+   * The macOS notifications' permission (the inbox's permission row, designer m_14211): its state
+   * now and on every change, ask() (macOS's own alert follows), and System Settings › Notifications.
+   */
+  readonly notify: {
+    readonly state: () => Promise<NotifyAuth>;
+    readonly onState: (listener: (s: NotifyAuth) => void) => () => void;
+    readonly ask: () => Promise<NotifyAuth>;
+    readonly openSettings: () => void;
+  };
   /** Opens the main window, on `route` when given (the capsule's ⏎, a card's 'open'). */
   readonly openWindow: (route?: string) => void;
   /** Quits bise (the tray dropdown's last row, ⌘Q's twin). */
@@ -234,13 +244,6 @@ export interface CapsuleApi {
   readonly size: (width: number, height: number, glass?: { x: number; y: number; width: number; height: number }) => void;
   /** Every change (shown, hidden, the tray's click, a blur); returns the unsubscribe. */
   readonly onState: (listener: (s: CapsuleState) => void) => () => void;
-  /**
-   * The capsule's page says a card bise pushed is up (shown without the keys) or gone, so a
-   * digit typed in bise's window over an empty composer picks in it (lead m_14146).
-   */
-  readonly card: (up: boolean) => void;
-  /** A digit 1-9 main forwards from bise's window while that card is up; returns the unsubscribe. */
-  readonly onKey: (listener: (n: number) => void) => () => void;
 }
 
 /** What a bise item of the application menu asks the focused window (src/main/menu.ts). */
@@ -265,14 +268,9 @@ export const IPC = {
   capsuleHide: 'bise:capsule-hide',
   capsuleSize: 'bise:capsule-size',
   capsuleState: 'bise:capsule-state',
-  /** capsule page -> main: a pushed card is up (true) or gone */
-  capsuleCard: 'bise:capsule-card',
-  /** main -> capsule page: a digit typed in bise's window for that card */
-  capsuleKey: 'bise:capsule-key',
-  /** main -> bise's windows: a pushed card is up in the capsule (their preload picks with digits) */
-  cardUp: 'bise:card-up',
-  /** a window's preload -> main: a digit over an empty composer while a card is up */
-  windowPick: 'bise:window-pick',
+  notifyState: 'bise:notify-state',
+  notifyAsk: 'bise:notify-ask',
+  notifySettings: 'bise:notify-settings',
   openWindow: 'bise:open-window',
   route: 'bise:route',
   quit: 'bise:quit',
@@ -364,6 +362,12 @@ export const TEST_USER_DATA_ENV = 'BISE_DESKTOP_USER_DATA';
 export const READY_LINE = 'bise-desktop: ready';
 /** Test mode: the update's state on each change (`<line> <json>`). */
 export const UPDATE_LINE = 'bise-desktop: update';
+
+/**
+ * Whether his questions may reach him as macOS notifications: 'never' asked yet, 'asked' (macOS
+ * answers at the first notification; the app can't read it yet), 'on', 'off' (System Settings).
+ */
+export type NotifyAuth = 'never' | 'asked' | 'on' | 'off';
 
 /** Test mode: the macOS notifications are never posted, each step is this line + JSON (src/main/notify). */
 export const NOTIFY_LINE = 'bise-desktop: notify';

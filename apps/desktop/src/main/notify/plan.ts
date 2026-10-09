@@ -110,9 +110,12 @@ export type Effect =
   | { readonly t: 'open'; readonly route: string }
   | { readonly t: 'none' };
 
-/** A button answers with its option (as 1-4 in the window), a reply with his words, the rest opens the inbox. */
+/** The window's route that opens this card in place in the inbox (amb-home's InboxBlock, m_14345). */
+export const cardRoute = (project: string, card: number): string => `inbox?card=${project}/${card}`;
+
+/** A button answers with its option (as 1-4 in the window), a reply with his words, the rest opens that card in the inbox. */
 export function effectOf(n: Note, g: Gesture): Effect {
-  const open: Effect = { t: 'open', route: 'inbox' };
+  const open: Effect = { t: 'open', route: cardRoute(n.project, n.card) };
   if ('click' in g) return open;
   if ('reply' in g) {
     const words = g.reply.trim();

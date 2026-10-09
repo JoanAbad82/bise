@@ -62,9 +62,9 @@ describe('notify plan: what his gesture does (the same answer as the window)', (
   it('a choice answers with its option number', () => {
     expect(effectOf(n, { action: 1 })).toEqual({ t: 'answer', cmd: { cmd: 'answer', project: 'acme-1', card: 7, reply: '2' } });
   });
-  it("'open in bise' and a click on the banner open the inbox", () => {
-    expect(effectOf(n, { action: 2 })).toEqual({ t: 'open', route: 'inbox' });
-    expect(effectOf(n, { click: true })).toEqual({ t: 'open', route: 'inbox' });
+  it("'open in bise' and a click on the banner open that card in the inbox", () => {
+    expect(effectOf(n, { action: 2 })).toEqual({ t: 'open', route: 'inbox?card=acme-1/7' });
+    expect(effectOf(n, { click: true })).toEqual({ t: 'open', route: 'inbox?card=acme-1/7' });
   });
   it('a reply answers with his words; empty or on an approval, nothing', () => {
     expect(effectOf(n, { reply: '  now please ' })).toEqual({ t: 'answer', cmd: { cmd: 'answer', project: 'acme-1', card: 7, reply: 'now please' } });

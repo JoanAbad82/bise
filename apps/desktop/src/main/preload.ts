@@ -5,9 +5,8 @@
 // ⌘V and the menu's clipboard items play on a private buffer, never his.
 import { contextBridge, ipcRenderer, webUtils, type IpcRendererEvent } from 'electron';
 import type { HelperEv } from '../proto';
-import { HOME_ARG, IPC, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type Surface, type TermOpened, type UpdateState } from '../shared/api';
+import { HOME_ARG, IPC, SURFACE_ARG, TEST_ENV, type BiseApi, type CapsuleState, type MenuAction, type NotifyAuth, type Surface, type TermOpened, type UpdateState } from '../shared/api';
 import { argValue } from './args';
-import { emptyField } from './digitpick';
 import { installClipFence, type ClipOp, type ClipSeed, type WinLike } from './clipfence';
 import { coreBridge } from './core/bridge';
 
@@ -21,23 +20,11 @@ interface Pushed {
   [IPC.menu]: MenuAction;
   [IPC.helperEv]: HelperEv;
   [IPC.capsuleState]: CapsuleState;
-  [IPC.capsuleKey]: number;
-  [IPC.cardUp]: boolean;
+  [IPC.notifyState]: NotifyAuth;
   [IPC.route]: string;
   [IPC.termData]: { id: string; bytes: Uint8Array };
   [IPC.termExit]: { id: string; code: number | null };
   [IPC.updateState]: UpdateState;
-}
-
-/** The few parts of a keydown the window's digit pick reads. */
-interface DigitKey {
-  readonly key: string;
-  readonly isComposing: boolean;
-  readonly metaKey: boolean;
-  readonly ctrlKey: boolean;
-  readonly altKey: boolean;
-  preventDefault(): void;
-  stopImmediatePropagation(): void;
 }
 
 // one listener on a channel, its unsubscribe
@@ -49,34 +36,6 @@ function listen<K extends keyof Pushed>(channel: K, listener: (v: Pushed[K]) => 
   return () => {
     ipcRenderer.removeListener(channel, on);
   };
-}
-// bise's window: while a card bise pushed is up in the capsule (shown without the keys, so his
-// keys stay here), a digit 1-9 over an empty composer, or with no field focused, picks in that
-// card; with words in the composer it types (the TUI's rule, lead m_14146). Capture phase, before
-// the page's own handlers.
-if (surface === 'window') {
-  let cardUp = false;
-  ipcRenderer.on(IPC.cardUp, (_e: IpcRendererEvent, up: unknown) => {
-    cardUp = up === true;
-  });
-  void ipcRenderer.invoke(IPC.cardUp).then((up: unknown) => {
-    cardUp = up === true;
-  });
-  const win = globalThis as unknown as WinLike & {
-    readonly document: { readonly activeElement: unknown };
-    addEventListener(t: 'keydown', l: (e: DigitKey) => void, o: { capture: boolean }): void;
-  };
-  win.addEventListener(
-    'keydown',
-    (e: DigitKey) => {
-      if (!cardUp || e.isComposing || e.metaKey || e.ctrlKey || e.altKey || !/^[1-9]$/u.test(e.key)) return;
-      if (!emptyField(win.document.activeElement)) return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      ipcRenderer.send(IPC.windowPick, Number(e.key));
-    },
-    { capture: true },
-  );
 }
 // the page's window (src/main has no DOM types: the fence names what it uses)
 const fence = test ? installClipFence(globalThis as unknown as WinLike, process.platform === 'darwin') : null;
@@ -156,10 +115,14 @@ const api: BiseApi = {
       ipcRenderer.send(IPC.capsuleSize, width, height, glass);
     },
     onState: (listener) => listen(IPC.capsuleState, listener),
-    card: (up) => {
-      ipcRenderer.send(IPC.capsuleCard, up);
+  },
+  notify: {
+    state: async () => (await ipcRenderer.invoke(IPC.notifyState)) as NotifyAuth,
+    onState: (listener) => listen(IPC.notifyState, listener),
+    ask: async () => (await ipcRenderer.invoke(IPC.notifyAsk)) as NotifyAuth,
+    openSettings: () => {
+      ipcRenderer.send(IPC.notifySettings);
     },
-    onKey: (listener) => listen(IPC.capsuleKey, listener),
   },
   quit: () => {
     ipcRenderer.send(IPC.quit);

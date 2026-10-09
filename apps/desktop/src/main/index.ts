@@ -148,6 +148,15 @@ void app.whenReady().then(() => {
     open: (route) => {
       main.open(route);
     },
+    dir: app.getPath('userData'),
+    broadcast: (s) => {
+      for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(IPC.notifyState, s);
+    },
+  });
+  ipcMain.handle(IPC.notifyState, () => notifier.auth());
+  ipcMain.handle(IPC.notifyAsk, () => notifier.ask());
+  ipcMain.on(IPC.notifySettings, () => {
+    notifier.openSettings();
   });
   onCoreEvent((ev) => {
     notifier.onCoreEvent(ev);

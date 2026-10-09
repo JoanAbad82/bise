@@ -10,10 +10,12 @@
 // through two main-process globals: __biseTestFocused (whether a bise window has the keys) and
 // __biseTestNotify(key, gesture) (a button, a reply or a click on that notification).
 // Owner: amb-mac.
-import { BrowserWindow, Notification } from 'electron';
-import { NOTIFY_LINE } from '../../shared/api';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { BrowserWindow, Notification, shell } from 'electron';
+import { NOTIFY_LINE, type NotifyAuth } from '../../shared/api';
 import type { Card } from '../../proto';
-import { Arrivals, effectOf, knocks, noteOf, WORDS, type Gesture, type Lang, type Note, type Place } from './plan';
+import { Arrivals, cardRoute, effectOf, knocks, noteOf, WORDS, type Gesture, type Lang, type Note, type Place } from './plan';
 
 export type NotifyDeps = {
   readonly testMode: boolean;
@@ -22,9 +24,21 @@ export type NotifyDeps = {
   readonly send: (cmd: unknown) => boolean;
   /** the main window, in front, on that route */
   readonly open: (route: string) => void;
+  /** where 'asked' is kept across launches (userData) */
+  readonly dir: string;
+  /** the state to every window */
+  readonly broadcast: (s: NotifyAuth) => void;
 };
 
-type TestGlobals = { __biseTestFocused?: boolean; __biseTestNotify?: (key: string, g: Gesture) => boolean };
+type TestGlobals = {
+  __biseTestFocused?: boolean;
+  __biseTestNotify?: (key: string, g: Gesture) => boolean;
+  /** what macOS answers ask() in a test run ('on' unless the check says) */
+  __biseTestNotifyAuth?: NotifyAuth;
+};
+
+/** System Settings › Notifications. */
+const SETTINGS_URL = 'x-apple.systempreferences:com.apple.Notifications-Settings.extension';
 
 export class Notifier {
   // two sources of a project's cards: its row in the core's projects (every project) and its own
@@ -36,12 +50,66 @@ export class Notifier {
   private readonly places = new Map<string, Place>();
   private readonly shown = new Map<string, { note: Note; n: Notification | null }>();
 
+  private authState: NotifyAuth;
+
   constructor(private readonly d: NotifyDeps) {
     if (d.testMode) {
       const g = globalThis as TestGlobals;
       g.__biseTestFocused = false;
       g.__biseTestNotify = (key, gesture) => this.gesture(key, gesture);
     }
+    this.authState = existsSync(this.authFile()) ? this.readAuth() : 'never';
+  }
+
+  private authFile(): string {
+    return join(this.d.dir, 'notify.json');
+  }
+
+  private readAuth(): NotifyAuth {
+    try {
+      const v = (JSON.parse(readFileSync(this.authFile(), 'utf8')) as { auth?: unknown }).auth;
+      return v === 'asked' || v === 'on' || v === 'off' ? v : 'never';
+    } catch {
+      return 'never';
+    }
+  }
+
+  /** The permission now (the inbox's row reads it). */
+  auth(): NotifyAuth {
+    return this.authState;
+  }
+
+  private setAuth(s: NotifyAuth): void {
+    if (s === this.authState) return;
+    this.authState = s;
+    try {
+      writeFileSync(this.authFile(), JSON.stringify({ auth: s }));
+    } catch {
+      // kept for this run only
+    }
+    this.d.broadcast(s);
+  }
+
+  /**
+   * His 'turn on': macOS's own alert follows. A test run answers with __biseTestNotifyAuth. A real
+   * run can't read macOS's answer yet (Electron has no API for it: the native helper will, after
+   * a0's proof); macOS asks at the first notification, so the state is 'asked'.
+   */
+  ask(): NotifyAuth {
+    if (this.d.testMode) {
+      const a = (globalThis as TestGlobals).__biseTestNotifyAuth ?? 'on';
+      this.line({ t: 'ask', answer: a });
+      this.setAuth(a);
+      return a;
+    }
+    if (this.authState === 'never') this.setAuth('asked');
+    return this.authState;
+  }
+
+  /** System Settings › Notifications (the row when it's off). */
+  openSettings(): void {
+    if (this.d.testMode) this.line({ t: 'settings' });
+    else void shell.openExternal(SETTINGS_URL);
   }
 
   /** The core's events: projects rows (names, and their cards), a project's cards. */
@@ -83,6 +151,8 @@ export class Notifier {
       this.line({ t: 'post', note });
       return;
     }
+    // the very first question while he's elsewhere: macOS's own alert is the ask (designer m_14211)
+    if (this.authState === 'never') this.setAuth('asked');
     const w = WORDS[this.d.lang];
     const n = new Notification({
       title: note.title,
@@ -135,7 +205,7 @@ export class Notifier {
     }
     const n = new Notification({ title: 'bise', body });
     n.on('click', () => {
-      this.d.open('inbox');
+      this.d.open(cardRoute(note.project, note.card));
     });
     n.show();
   }

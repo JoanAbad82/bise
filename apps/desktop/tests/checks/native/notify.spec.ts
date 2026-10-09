@@ -10,7 +10,8 @@
 //   - its second choice answers the hub {cmd:'answer', card, reply:'2'} (the window's path);
 //   - the card leaving its list (answered anywhere) takes the notification away;
 //   - a new question while a bise window has the keys posts nothing;
-//   - a reply answers with his words; a click opens the window on the inbox;
+//   - a reply answers with his words; a click opens the window on that card in the inbox;
+//   - the permission: 'never' until asked; ask() answers what macOS said (the test's answer);
 //   - an approval offers its two words as buttons and no reply.
 import { FakeCore, test, expect } from '../../harness';
 import type { Card, CoreEv, HubEv } from '../../../src/proto';
@@ -89,13 +90,21 @@ test('native/notify: a new question knocks only when bise is not in front; its b
       const r = (await w.core.waitCmd((c) => (c as Cmd).cmd === 'answer' && (c as Cmd).card === 101, 3000)) as Cmd;
       expect(r.reply).toBe('opus, please');
       expect(await gesture(w, `${P}#101`, { click: true })).toBe(true);
-      await waitLine(w, (l) => l.t === 'open' && l.route === 'inbox', 'a click opens the window on the inbox');
+      await waitLine(w, (l) => l.t === 'open' && l.route === `inbox?card=${P}/101`, 'a click opens the window on that card in the inbox');
 
       // an approval: its two words as buttons, no reply
       await w.core.send(push([q(100), q(101), q(102, { approval: true, kind: 'merge', question: 'merge gift-cards into main?', options: [{ n: 1, label: 'merge' }, { n: 2, label: 'not yet' }] })]));
       const ap = await waitLine(w, (l) => l.t === 'post' && l.note?.key === `${P}#102`, 'a notification for the approval');
       expect(ap.note?.actions).toEqual(['merge', 'not yet']);
       expect(ap.note?.reply).toBe(false);
+
+      // the permission: 'never' until asked, then what macOS answered (the test's 'off')
+      const page = w.s.page;
+      expect(await page.evaluate(() => (window as unknown as { bise: { notify: { state: () => Promise<string> } } }).bise.notify.state())).toBe('never');
+      await w.s.app.evaluate(() => { (globalThis as { __biseTestNotifyAuth?: string }).__biseTestNotifyAuth = 'off'; });
+      expect(await page.evaluate(() => (window as unknown as { bise: { notify: { ask: () => Promise<string> } } }).bise.notify.ask())).toBe('off');
+      await waitLine(w, (l) => l.t === 'ask', 'ask() reached macOS (the test line)');
+      expect(await page.evaluate(() => (window as unknown as { bise: { notify: { state: () => Promise<string> } } }).bise.notify.state())).toBe('off');
     },
     { core: new FakeCore(start) },
   );
