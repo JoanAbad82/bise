@@ -25,6 +25,23 @@ const T = {
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 /** '✓ 0.3 s' and '✓ 0.3s' are the same words: spaces aside. */
 const squash = (s: string): string => s.replace(/\s+/g, '');
+/**
+ * A row's end as words and seconds: '✗ exit 1 · 0.2 s' -> { head: '✗exit1·', s: 0.2 }. The window
+ * shows the hub's exact duration (ToolItem.ms, rounded as the TUI's {:.1}, amb-win 5234894c); the
+ * TUI shows its own clock between the start and end events it saw (rust/tui/src/wire.rs
+ * ToolData::bare, Instant::now()), so a call near a tenth can read one tenth apart.
+ */
+const endOf = (s: string): { head: string; s: number } => {
+  const q = squash(s);
+  const m = /([\d.]+)s$/.exec(q);
+  return { head: m ? q.slice(0, m.index) : q, s: m ? Number(m[1]) : NaN };
+};
+/** Same mark, same exit, the same time to a tenth (the two clocks above). */
+const sameEnd = (win: string, tui: string): boolean => {
+  const a = endOf(win);
+  const b = endOf(tui);
+  return a.head === b.head && Math.abs(a.s - b.s) <= 0.1 + 1e-9;
+};
 
 type Line = { id: string; text: string; end: string; endClass: string; err: string };
 
@@ -98,7 +115,7 @@ test("thread/tools-real: a call's state, time, exit and error line as the TUI's 
       note('ok', { window: l?.end, tui: r.end });
       expect.soft(l?.end ?? '', 'window: ✓ and a time').toMatch(/^✓ \d+\.\d s$/);
       expect.soft(l?.err ?? '', 'window: no error line').toBe('');
-      expect.soft(squash(l?.end ?? ''), "the TUI's row says the same").toBe(squash(r.end));
+      expect.soft(sameEnd(l?.end ?? '', r.end), `the TUI's row says the same (window '${l?.end ?? ''}', TUI '${r.end}')`).toBe(true);
     });
 
     await test.step('fail: ✗ exit 1 · time and its first error line, as the TUI; the err tone', async () => {
@@ -108,7 +125,7 @@ test("thread/tools-real: a call's state, time, exit and error line as the TUI's 
       expect.soft(l?.end ?? '', 'window: ✗ exit 1 · a time').toMatch(/^✗ exit 1 · \d+\.\d s$/);
       expect.soft(l?.endClass ?? '', 'window: the err tone').toContain('err');
       expect.soft(l?.err ?? '', "window: the call's first error line").toContain('No such file or directory');
-      expect.soft(squash(l?.end ?? ''), "the TUI's row says the same").toBe(squash(r.end));
+      expect.soft(sameEnd(l?.end ?? '', r.end), `the TUI's row says the same (window '${l?.end ?? ''}', TUI '${r.end}')`).toBe(true);
       expect.soft(r.next, "the TUI's error line under it").toContain('No such file or directory');
       const id = l?.id ?? 'none';
       await page.locator(`[data-testid="${id}"]`).screenshot({ path: test.info().outputPath('fail-line.png') }).catch(() => undefined);
@@ -119,7 +136,7 @@ test("thread/tools-real: a call's state, time, exit and error line as the TUI's 
       const r = tuiRow(calls.long);
       note('long', { window: l?.end, tui: r.end });
       expect.soft(l?.end ?? '', 'window: ✓ and at least 2 s').toMatch(/^✓ [2-9]\.\d s$/);
-      expect.soft(squash(l?.end ?? ''), "the TUI's row says the same").toBe(squash(r.end));
+      expect.soft(sameEnd(l?.end ?? '', r.end), `the TUI's row says the same (window '${l?.end ?? ''}', TUI '${r.end}')`).toBe(true);
     });
 
     await test.step('⌘E opens every call\'s code and output, again closes them', async () => {
