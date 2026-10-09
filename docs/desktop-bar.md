@@ -465,8 +465,20 @@ isn't judging. A row marked ok names the shot that was looked at.
     approval or hub merge item can't be shot in this world, which docks none; the world needs one.
   - **DIVIDER:** "to dashboards … mistral-small · high · yolo · idle · 15 · 0%". The "15" is an
     unnamed number again, as in D7b. Name it or drop it (amb-win); designer calls whether it holds.
-  - **still to come:** R9/R12 (shots are in; designer signed their colours) and R45–R47
-    (notifications, amb-mac 76198d7e).
+  - **last rows** (qa-native m_14511, check 97c35cde; every shot looked at by qa-native):
+    - DOCKOPT green: docs' options-only item docks with "1–3 pick ⌘⌫ close esc later" and no
+      "type your answer". Typed words go to main as a plain message (no "answered card" in
+      `$FAKE_BODIES`), and the card stays docked. The label line fits on one line.
+    - PUSH green: a pushed card takes "1" when the window composer is empty, and the hub records
+      the answer. With words in the composer, a typed "2" stays text and the card still waits.
+    - FOLDS2 can't be shot on this world: the "▸ N other steps" pill and the thinking rows need
+      an agent seeded by amb-tools, or the builders' own shots.
+  - **verdict: GO, with 2 named nits** (ambient-pm m_14485 to ambient-lead):
+    - R36's chip label and its overflow, which his open 7b27e678 shows in a worse form (the raw
+      marker with its path);
+    - the divider's unnamed "15".
+
+    Still to come on the next cut: R45–R47 (notifications, amb-mac).
 
 - **7b27e678, 10-09: red, holds the try** (two new reds; the rule above: a new red holds). The
   no-build proof is green. qa-native's shots are in `~/.bise/gate/try-gate/7b27e678/` (m_14024),
