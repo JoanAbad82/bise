@@ -9,6 +9,13 @@ describe('quoting the thread (his bug 3, quote.rs)', () => {
     expect(quoteKey(k(' '))).toBe('type');
     expect(quoteKey(k('é'))).toBe('type');
     expect(quoteKey(k('ø', { altKey: true }))).toBe('type');
+    // ⌥0-9 are the window's agent keys (read by code; on a U.S. Mac ⌥1 is '¡'), never a quote (m_14132)
+    expect(quoteKey({ ...k('¡', { altKey: true }), code: 'Digit1' })).toBeUndefined();
+    expect(quoteKey({ ...k('º', { altKey: true }), code: 'Digit0' })).toBeUndefined();
+    // ⌥ + a letter stays typing, as in the TUI (⌥c is ©)
+    expect(quoteKey({ ...k('©', { altKey: true }), code: 'KeyC' })).toBe('type');
+    // a plain digit still types after the quote
+    expect(quoteKey({ ...k('1'), code: 'Digit1' })).toBe('type');
     expect(quoteKey(k("'", { metaKey: true }))).toBe('quote');
     expect(quoteKey(k('Tab'))).toBe('quote');
     expect(quoteKey({ ...k('Tab'), shiftKey: true })).toBeUndefined();

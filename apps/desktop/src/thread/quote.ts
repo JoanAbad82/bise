@@ -9,6 +9,8 @@ export interface KeyLike {
   readonly metaKey: boolean;
   readonly ctrlKey: boolean;
   readonly altKey: boolean;
+  /** the physical key (KeyboardEvent.code); the ⌥ digits are read by it */
+  readonly code?: string;
 }
 
 const GRAPHEMES = new Intl.Segmenter();
@@ -23,6 +25,8 @@ export function quoteKey(e: KeyLike & { readonly shiftKey?: boolean }): 'type' |
   // tab: the quote alone, the TUI's key (main m_12004, quote-keys)
   if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey && e.shiftKey !== true) return 'quote';
   if (e.metaKey || e.ctrlKey) return undefined;
+  // ⌥0-9 are the window's agent keys (app/keys.ts, read by code: ⌥1 types '¡'), never a quote (his bug on cb1f2b44, m_14132)
+  if (e.altKey && e.code !== undefined && /^Digit[0-9]$/.test(e.code)) return undefined;
   // one character (a letter, a digit, a space, an accent typed with ⌥): his words begin
   return Array.from(GRAPHEMES.segment(e.key)).length === 1 ? 'type' : undefined;
 }
