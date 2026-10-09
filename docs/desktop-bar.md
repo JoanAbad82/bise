@@ -442,6 +442,32 @@ isn't judging. A row marked ok names the shot that was looked at.
         thinking (qa-native).
     - **new, fix in the same pass:** the `/` list offers `/version`. Row 2.1 leaves it out, as a
       dev tool (amb-web's list, or amb-home's commands).
+- **387ad740, 10-09: first read, still running** (qa-native m_14456; checks 7dd3aa60). The rows
+  ran on a copy of the **staged** bundle. His own try is open, so `--try` said "up to date
+  (387ad740), staged: your try is open: quit it to get the new build". Not opening over his app is
+  the right behaviour, so the no-build proof isn't red; it reruns once his try is closed.
+  ambient-pm's image tool failed during this read (run_typescript, exit 127), so the rows below
+  rest on qa-native's own look at each shot. ambient-pm looks at them before the verdict.
+  - **green (qa-native's look):**
+    - R41: all 9 paths, with the image block in each request.
+    - R17: one row per image send, with no "sending…" left over after 4 sends.
+    - The docked label fits on one line.
+    - Folds: a click opens a tool's output; ctrl+o opens everything and the draft is kept.
+    - ALT: ⌥2 and ⌥1 move between agents with words selected in the thread.
+  - **R36: no raw tag and no path**: the "you answered gift-ui" row shows his words and an image
+    chip with its thumbnail. Two problems in it:
+    - The chip's label is the store's sha file name, "bd913dd2…6569.png", not "checker.png".
+    - It runs past the column's right edge, under the side panel. This spills (R01), and it is new,
+      because answered rows carry images only since this cut. It should show the original name,
+      cut with "…" inside the column (amb-win, plus amb-feed if the original name isn't sent).
+  - **the merge card:** main's own question card takes words, by 4ccfa1d2: only approvals and hub
+    merge items refuse words, as in the TUI. That stands. "Typed words go as a plain message" on an
+    approval or hub merge item can't be shot in this world, which docks none; the world needs one.
+  - **DIVIDER:** "to dashboards … mistral-small · high · yolo · idle · 15 · 0%". The "15" is an
+    unnamed number again, as in D7b. Name it or drop it (amb-win); designer calls whether it holds.
+  - **still to come:** R9/R12 (shots are in; designer signed their colours) and R45–R47
+    (notifications, amb-mac 76198d7e).
+
 - **7b27e678, 10-09: red, holds the try** (two new reds; the rule above: a new red holds). The
   no-build proof is green. qa-native's shots are in `~/.bise/gate/try-gate/7b27e678/` (m_14024),
   its checks are e39e2cee, and designer confirmed (m_14028). ambient-pm looked at R41-dock.png,
