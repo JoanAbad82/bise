@@ -17,7 +17,8 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import type { HelperCmd, HelperEv } from '../../proto';
-import { IPC } from '../../shared/api';
+import { IPC, TEST_ENV } from '../../shared/api';
+import { fnToWindow } from './fnroute';
 import type { HelperConfig } from './config';
 import { decodeEv, encodeCmd, HelperState, LineSplitter, restartDelay, windowMaySend } from './lines';
 
@@ -115,8 +116,30 @@ export class Helper {
     this.state.take(d.ev);
     if (d.ev.ev === 'hello' && this.conf !== null) this.send(this.conf);
     for (const l of this.listeners) l(d.ev);
+    // fn fn with bise's window in front: voice mode there, never the capsule's talk (fnroute.ts)
+    const front = frontWindow();
+    if (front !== null && fnToWindow(d.ev, true)) {
+      front.webContents.send(IPC.fnVoice, null);
+      return;
+    }
     for (const w of BrowserWindow.getAllWindows()) w.webContents.send(IPC.helperEv, d.ev);
   }
+}
+
+/** The capsule panel's page (loaded with ?surface=capsule), never 'the window'. */
+const isCapsule = (w: BrowserWindow): boolean => w.webContents.getURL().includes('surface=capsule');
+
+/**
+ * bise's window when it has the keys (not the capsule), else null. A test run's windows are never
+ * focused (off-screen): there the harness says so with __biseTestFocused (notify/run.ts's global).
+ */
+function frontWindow(): BrowserWindow | null {
+  if (process.env[TEST_ENV] === '1') {
+    if ((globalThis as { __biseTestFocused?: boolean }).__biseTestFocused !== true) return null;
+    return BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && !isCapsule(w)) ?? null;
+  }
+  const w = BrowserWindow.getFocusedWindow();
+  return w !== null && !isCapsule(w) ? w : null;
 }
 
 /** Starts the helper when this run has one, and answers the windows' helper calls either way. */

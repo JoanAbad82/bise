@@ -80,6 +80,12 @@ export interface BiseApi {
    * in this run (not macOS, a test run without the stub): never called.
    */
   readonly onHelper: (listener: (ev: HelperEv) => void) => () => void;
+  /**
+   * fn fn while this window is in front (lead m_16973): main sends it here instead of the
+   * capsule's hands-free talk; the page turns voice mode on for its agent in view, as ctrl+r
+   * twice does. Returns the unsubscribe.
+   */
+  readonly onFnVoice: (listener: () => void) => () => void;
   /** The helper's last state events (hello, front, perms, quiet), for a window that just opened. */
   readonly helperState: () => Promise<HelperEv[]>;
   /** A command to the helper (read_context, perm, shot, route, own_mic, config; never quit). */
@@ -300,6 +306,8 @@ export const IPC = {
   helperEv: 'bise:helper-ev',
   helperState: 'bise:helper-state',
   helperCmd: 'bise:helper-cmd',
+  /** main -> the window in front: fn fn there is voice mode (src/main/helper/fnroute.ts) */
+  fnVoice: 'bise:fn-voice',
   capsuleShow: 'bise:capsule-show',
   capsuleHide: 'bise:capsule-hide',
   capsuleSize: 'bise:capsule-size',

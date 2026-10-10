@@ -19,6 +19,7 @@ const home = argValue(process.argv, HOME_ARG) ?? '';
 interface Pushed {
   [IPC.menu]: MenuAction;
   [IPC.helperEv]: HelperEv;
+  [IPC.fnVoice]: null;
   [IPC.capsuleState]: CapsuleState;
   [IPC.fullScreen]: boolean;
   [IPC.notifyState]: NotifyAuth;
@@ -90,6 +91,10 @@ const api: BiseApi = {
   },
   onMenu: (listener) => listen(IPC.menu, listener),
   onHelper: (listener) => listen(IPC.helperEv, listener),
+  onFnVoice: (listener) =>
+    listen(IPC.fnVoice, () => {
+      listener();
+    }),
   helperState: async () => (await ipcRenderer.invoke(IPC.helperState)) as HelperEv[],
   helper: (cmd) => {
     ipcRenderer.send(IPC.helperCmd, cmd);
