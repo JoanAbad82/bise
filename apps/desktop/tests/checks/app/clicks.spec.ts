@@ -57,9 +57,20 @@ async function audit(page: Page, max = 40): Promise<Audit[]> {
         el.setAttribute('data-qa-n', String(i));
         const r = el.getBoundingClientRect();
         const off = el.getAttribute('aria-disabled') === 'true' || (el as HTMLButtonElement).disabled;
-        return { n: i, id: el.getAttribute('data-testid') ?? `${el.tagName.toLowerCase()}:${el.textContent.trim().slice(0, 24)}`, x: r.x + r.width / 2, y: r.y + r.height / 2, w: r.width, h: r.height, off };
+        const x = r.x + r.width / 2;
+        const y = r.y + r.height / 2;
+        // a control its scroll box clips (a virtual list's row drawn above the visible rows, under
+        // the head) is not on screen: nobody can see or click it (amb-win: thread.tool.8 at y 15)
+        let clipped = false;
+        for (let p = el.parentElement; p !== null && !clipped; p = p.parentElement) {
+          const o = getComputedStyle(p);
+          if (o.overflowX === 'visible' && o.overflowY === 'visible') continue;
+          const c = p.getBoundingClientRect();
+          clipped = x < c.left || x > c.right || y < c.top || y > c.bottom;
+        }
+        return { n: i, id: el.getAttribute('data-testid') ?? `${el.tagName.toLowerCase()}:${el.textContent.trim().slice(0, 24)}`, x, y, w: r.width, h: r.height, off, clipped };
       })
-      .filter((b) => b.w > 2 && b.h > 2 && !b.off && b.x > 0 && b.y > 0 && b.x < window.innerWidth && b.y < window.innerHeight));
+      .filter((b) => b.w > 2 && b.h > 2 && !b.off && !b.clipped && b.x > 0 && b.y > 0 && b.x < window.innerWidth && b.y < window.innerHeight));
   const out: Audit[] = [];
   for (const b of boxes.slice(0, max)) {
     const h = page.locator(`[data-qa-n="${String(b.n)}"]`);

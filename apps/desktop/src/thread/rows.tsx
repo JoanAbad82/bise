@@ -742,12 +742,12 @@ function YouRow({ e, ctx, prev, next }: { e: Entry; ctx: RowCtx; prev: Entry | u
   const to = e.to != null && e.to !== '' && e.to !== ctx.agent ? `to ${e.to}` : undefined;
   // a steer: where it landed in the agent's turn, 'steered · perf read it mid-turn' under it
   const steered = steeredOf(prev, next);
-  const under = steered ? `steered · ${ctx.bise ? 'bise' : ctx.agent} read it mid-turn` : e.at_ms > 0 ? clock(e.at_ms) : undefined;
+  const under = steered ? `steered · ${shownName(ctx.agent)} read it mid-turn` : e.at_ms > 0 ? clock(e.at_ms) : undefined;
   return (
     <YouBubble head={to} under={under} timeAlways={steered || lastOfRun(e, next)} testId={`thread.you.${String(e.pos)}`}>
       {quotes.map((q, i) => (
         <blockquote key={i} className="th-you-quote" data-testid={`thread.you.${String(e.pos)}.quote.${String(i + 1)}`}>
-          {q.source !== '' && <span className="th-you-quote-src">{q.source}</span>}
+          {q.source !== '' && <span className="th-you-quote-src">{shownName(q.source)}</span>}
           <span className="th-you-quote-text">{q.text}</span>
         </blockquote>
       ))}
@@ -1121,7 +1121,7 @@ export const PendingRow = memo(function PendingRow({ ctx, cid }: { ctx: RowCtx; 
  * command takes a queued message back (asked of amb-feed).
  */
 export const QueuedRow = memo(function QueuedRow({ ctx, q }: { ctx: RowCtx; q: { id: number; text: string } }) {
-  const who = ctx.bise ? 'bise' : ctx.agent;
+  const who = shownName(ctx.agent);
   return (
     <div className="th-row th-queued" data-side="you" data-testid={`thread.queued.${String(q.id)}`}>
       <YouBubble under={`queued · sends when ${who}'s turn ends`} state="queued" testId={`thread.queued.${String(q.id)}.bubble`}>

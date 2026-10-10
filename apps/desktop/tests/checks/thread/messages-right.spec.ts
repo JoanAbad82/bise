@@ -128,13 +128,18 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
     await size(1100);
     // at the bottom while the list rests there (the virtual list draws what shows): a quote, its
     // source and text first in his bubble, then his words, never the raw tag; a queued bubble
-    await expect(page.getByTestId('thread.you.14.quote.1')).toContainText('main');
+    // the source by the name the thread shows ('bise' for a main, designer m_16360), as the steer and queued words
+    await expect(page.getByTestId('thread.you.14.quote.1')).toContainText('bise');
+    await expect(page.getByTestId('thread.you.11.under')).toHaveText('steered · bise read it mid-turn');
+    await expect(page.getByTestId('thread.queued.1.bubble.under')).toHaveText("queued · sends when bise's turn ends");
     await expect(page.getByTestId('thread.you.14.quote.1')).toContainText('webp saves another 30%.');
     expect(await page.getByTestId('thread.you.14').innerText()).not.toContain('<selection');
     // queued: a dashed bubble, 'queued · sends when …'s turn ends'
     await expect(page.getByTestId('thread.queued.1.bubble.under')).toHaveText(/^queued · sends when \S+'s turn ends$/u);
     expect(await page.getByTestId('thread.queued.1').locator('.th-bubble').evaluate((b) => getComputedStyle(b).borderTopStyle)).toBe('dashed');
     await page.mouse.move(1, 300);
+    // the loop above ends on dark: light first, for real (designer m_16360: it was dark twice)
+    await theme('light');
     await page.screenshot({ path: test.info().outputPath('cases-light-1100.png') });
     await core.send(prefs('dark') as never);
     await page.waitForTimeout(300);
