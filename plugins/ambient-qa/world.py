@@ -606,7 +606,7 @@ def rich_seed(world, hubs, holds, agents, timeout):
         out_["quoted"] = "telemetry/main: %s" % QUOTE_WORDS
         # QUEUED: behind ingest's 2-hour turn ('working'): it waits for the turn's end, i.e. until world down
         c.wait_status("ingest", ["working", "thinking"], timeout)
-        c.send({"op": "input", "focus": "ingest", "text": QUEUED_TEXT, "queued": True})
+        c.say(QUEUED_TEXT, focus="ingest", mode="queued")
         c.wait(lambda: (c.agent("ingest") or {}).get("queued", 0) >= 1, timeout, "his message queued on ingest")
         out_["queued"] = "telemetry/ingest: %s" % QUEUED_TEXT
         return out_
@@ -845,10 +845,19 @@ def approval_seed(c, home, spec, timeout, scripts=None):
     auto for this session (BISE_APPROVALS is set, so config.toml keeps yolo), an agent's call that
     writes outside its workspace raises the gate's card, the world answers '/answer N no: <note>' as
     him (the hold client is the hub's starter), the call never runs, the hub goes back to yolo."""
+    # client-protocol: approvals/set's result is the approvals state; every client also gets hub/approvals
+    last = {}
+
+    def set_mode(m):
+        r = c.rpc("approvals/set", {"project": c.project(), "mode": m}, timeout)
+        if "error" in r:
+            raise AssertionError("approvals/set %s refused: %r" % (m, r["error"]))
+        last["mode"] = (r.get("result") or {}).get("mode")
+
     def mode():
-        evs = [e for e in list(c.events) if e.get("ev") == "approvals"]
-        return evs[-1].get("mode") if evs else None
-    c.send({"op": "approvals", "mode": "auto"})
+        note = c.hub.get("hub/approvals") or {}
+        return note.get("mode") or last.get("mode")
+    set_mode("auto")
     c.wait(lambda: mode() == "auto", timeout, "the hub in auto")
     try:
         if scripts:
@@ -864,7 +873,9 @@ def approval_seed(c, home, spec, timeout, scripts=None):
         c.wait(lambda: not any(cd.get("id") == card["id"] for cd in c.cards()), timeout, "the approval card closed")
         c.wait_line("main", "sb approval : no : %s" % spec["agent"], timeout)
     finally:
-        c.send({"op": "approvals", "mode": "yolo"})
+        last.clear()
+        c.hub.pop("hub/approvals", None)
+        set_mode("yolo")
         c.wait(lambda: mode() == "yolo", timeout, "the hub back in yolo")
 
 
