@@ -179,8 +179,12 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       await expect.soft(row, "release's force push said no to: an approval row").toBeVisible({ timeout: 15_000 });
       const words = ((await row.textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();
       const tuiScreen = flat(term().screen());
-      note('approval', { window: words, ok: await row.getAttribute('data-ok', { timeout: 2000 }).catch(() => null), tuiHasNote: tuiScreen.includes('use a branch, never force main'), tuiLine: /[^·]{0,60}git push --force[^·]{0,80}/.exec(tuiScreen)?.[0] ?? '' });
-      await expect.soft(row, 'said no').toHaveAttribute('data-ok', 'false');
+      // data-ok sits on the row's wrapper (.th-approval), not on the bubble that carries the
+      // thread.approval.<pos> id (105f0c5d read the bubble: 'no data-ok' was this check's miss;
+      // thread/approval-raw showed the entry's approval.ok false and the wrapper's data-ok 'false')
+      const wrap = row.locator('xpath=ancestor-or-self::*[contains(@class,"th-approval")][1]');
+      note('approval', { window: words, ok: await wrap.getAttribute('data-ok', { timeout: 2000 }).catch(() => null), tuiHasNote: tuiScreen.includes('use a branch, never force main'), tuiLine: /[^·]{0,60}git push --force[^·]{0,80}/.exec(tuiScreen)?.[0] ?? '' });
+      await expect.soft(wrap, 'said no').toHaveAttribute('data-ok', 'false');
       expect.soft(words, "'✕', never color alone").toContain('✕');
       expect.soft(words, 'who it was').toContain('release');
       expect.soft(words, 'his note under it').toContain('use a branch, never force main');
