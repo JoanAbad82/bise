@@ -311,7 +311,8 @@ fn clip_lines(log: &str) -> String {
 }
 
 impl Shell {
-    /// `version` op (`/version` in the TUI, `sb version`): list the
+    /// `/version` (the `version/*` methods, a `slash` line, `sb version`'s
+    /// op): list the
     /// versions, switch to one (built first when needed), roll back.
     /// Answers a text for the user.
     pub(super) fn version_op(&mut self, v: &Value) -> String {
@@ -764,7 +765,7 @@ impl Shell {
         let root = &self.opts.app_root;
         let Some(inst) = Install::of_root(root) else {
             if let Some(c) = asked {
-                self.notice_to(c, "/update updates an installed bise, or bise's source tree: this workspace is neither");
+                self.notice_out(c, Some("slash"), "/update updates an installed bise, or bise's source tree: this workspace is neither");
             }
             return;
         };
@@ -816,7 +817,7 @@ impl Shell {
             UpdateRoute::Release | UpdateRoute::Nothing => self.release_check(Some(client)),
             UpdateRoute::DevHead => {
                 let text = self.dev_update();
-                self.notice_to(client, &text);
+                self.notice_out(client, Some("slash"), &text);
             }
         }
     }

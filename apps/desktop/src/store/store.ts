@@ -104,6 +104,16 @@ export const TAGS = {
   computer_live: true,
   computer_peek: true,
   refused: true,
+  // client-protocol's newer HubEv tags (main 0c3be6b6): known, not applied yet
+  branches: true,
+  card_open: true,
+  flow: true,
+  focused: true,
+  page_changed: true,
+  pages: true,
+  release: true,
+  update: true,
+  versions: true,
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */

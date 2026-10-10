@@ -12,7 +12,7 @@ import { ChangesScreen } from './ChangesScreen';
 
 const P = 'acme-1a2b3c4d';
 const T = 1_791_100_000_000;
-const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, main: false, status: 'idle', archived: false, title: '', purpose: '', since_ms: T, waits: 0, ...over });
+const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: false, status: 'idle', archived: false, title: '', purpose: '', since_ms: T, waits: 0, ...over });
 const feat = (over: Partial<Feature> = {}): Feature => ({
   name: 'gift-cards',
   branch: 'gift-cards',

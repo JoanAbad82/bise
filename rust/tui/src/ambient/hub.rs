@@ -8,11 +8,13 @@ use std::io::{self, BufRead, Write};
 use std::os::unix::net::UnixStream;
 use std::sync::mpsc::Sender;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
-/// Opens a connection to the hub, `{"op":"hello"}` already sent. Called
-/// again after each loss (the first call may start the hub).
+/// Opens a connection to the hub, its first line already sent when the
+/// connector says one (`{"op":"hello"}`; a project's connection says
+/// none: the core's first line is JSON-RPC's `initialize`). Called again
+/// after each loss (the first call may start the hub).
 pub type Connect = Box<dyn FnMut() -> io::Result<UnixStream> + Send>;
 
 /// What the reader thread tells the core.
@@ -30,13 +32,37 @@ pub enum HubIn {
     Refused(String),
 }
 
+/// The hub's refusal of this connection (docs/issues/16): the older
+/// typed `refused`, or JSON-RPC's REFUSED error to `initialize`.
+fn refusal(l: &str) -> Option<String> {
+    if l.contains("\"refused\"") {
+        if let Ok(bise_proto::hub::HubEv::Refused { error }) = bise_proto::hub::HubEv::decode(l) {
+            return Some(error);
+        }
+    }
+    if l.contains(&bise_proto::rpc::code::REFUSED.to_string()) {
+        if let Ok(bise_proto::rpc::Message::Response(r)) = bise_proto::rpc::Message::read(l) {
+            return r.error.filter(|e| e.code == bise_proto::rpc::code::REFUSED).map(|e| e.message);
+        }
+    }
+    None
+}
+
 /// The writer half: None while the hub is away.
 #[derive(Clone, Default)]
 pub struct Hub {
     writer: Arc<Mutex<Option<UnixStream>>>,
     /// [`Hub::close`] said: the reader thread ends at its next turn
     closed: Arc<AtomicBool>,
+    /// [`Hub::hold`] said: the reader doesn't connect until released
+    held: Arc<(Mutex<bool>, Condvar)>,
+    /// [`Hub::backoff`] said: the pauses between attempts grow
+    slow: Arc<AtomicBool>,
 }
+
+/// The pauses of a reader that backs off ([`Hub::backoff`]): 1 s, 2 s,
+/// 5 s, then every 10 s.
+const BACKOFF: [Duration; 4] = [Duration::from_secs(1), Duration::from_secs(2), Duration::from_secs(5), Duration::from_secs(10)];
 
 impl Hub {
     /// Start the reader thread; every [`HubIn`] goes through `wrap` into
@@ -50,10 +76,32 @@ impl Hub {
         let hub = Hub::default();
         let writer = hub.writer.clone();
         let closed = hub.closed.clone();
+        let held = hub.held.clone();
+        let slow = hub.slow.clone();
         std::thread::spawn(move || {
             // Down is said once per loss, not at each failed attempt
             let mut down_said = false;
+            // the pause before the next attempt: `retry`, or the backoff's
+            // next step while it backs off (its count reset when it doesn't)
+            let mut misses = 0usize;
+            let mut pause = move || {
+                if slow.load(Ordering::SeqCst) {
+                    std::thread::sleep(BACKOFF[misses.min(BACKOFF.len() - 1)]);
+                    misses += 1;
+                } else {
+                    misses = 0;
+                    std::thread::sleep(retry);
+                }
+            };
             loop {
+                // held: no attempt (no reconnect loop) until released
+                {
+                    let (on, cv) = &*held;
+                    let mut h = on.lock().unwrap_or_else(|e| e.into_inner());
+                    while *h && !closed.load(Ordering::SeqCst) {
+                        h = cv.wait(h).unwrap_or_else(|e| e.into_inner());
+                    }
+                }
                 if closed.load(Ordering::SeqCst) {
                     return;
                 }
@@ -66,12 +114,12 @@ impl Hub {
                                 return;
                             }
                         }
-                        std::thread::sleep(retry);
+                        pause();
                         continue;
                     }
                 };
                 let Ok(w) = stream.try_clone() else {
-                    std::thread::sleep(retry);
+                    pause();
                     continue;
                 };
                 if let Ok(mut slot) = writer.lock() {
@@ -93,8 +141,7 @@ impl Hub {
                             let l = line.trim_end();
                             // the typed refusal (docs/issues/16): said once,
                             // then this reader ends without reconnecting
-                            let refused = l.contains("\"refused\"").then(|| bise_proto::hub::HubEv::decode(l));
-                            if let Some(Ok(bise_proto::hub::HubEv::Refused { error })) = refused {
+                            if let Some(error) = refusal(l) {
                                 if let Ok(mut slot) = writer.lock() {
                                     *slot = None;
                                 }
@@ -117,7 +164,7 @@ impl Hub {
                 if tx.send(wrap(HubIn::Down)).is_err() {
                     return;
                 }
-                std::thread::sleep(retry);
+                pause();
             }
         });
         hub
@@ -127,9 +174,35 @@ impl Hub {
     /// counts one client less) and the reader thread ends, saying nothing.
     pub fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
+        self.held.1.notify_all();
         if let Ok(mut slot) = self.writer.lock() {
             if let Some(s) = slot.take() {
                 let _ = s.shutdown(std::net::Shutdown::Both);
+            }
+        }
+    }
+
+    /// Back off (`on`): the reader's pauses between attempts grow (1 s,
+    /// 2 s, 5 s, then every 10 s) instead of `retry` (the home hub whose
+    /// move said Late: it may still come up, it is not polled every
+    /// 500 ms; core/home_switch.rs). Off: `retry` again.
+    pub fn backoff(&self, on: bool) {
+        self.slow.store(on, Ordering::SeqCst);
+    }
+
+    /// Hold the connection (`on`): the one open closes and the reader
+    /// makes no attempt until released (the home hub whose move failed:
+    /// no reconnect every `retry`, core/home_switch.rs); released, it
+    /// connects again at once.
+    pub fn hold(&self, on: bool) {
+        let (flag, cv) = &*self.held;
+        *flag.lock().unwrap_or_else(|e| e.into_inner()) = on;
+        cv.notify_all();
+        if on {
+            if let Ok(slot) = self.writer.lock() {
+                if let Some(s) = slot.as_ref() {
+                    let _ = s.shutdown(std::net::Shutdown::Both);
+                }
             }
         }
     }

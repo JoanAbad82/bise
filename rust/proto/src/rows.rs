@@ -5,8 +5,11 @@
 use crate::Project;
 use serde::{Deserialize, Serialize};
 
-/// An agent's status as every view shows it (the hub's words mapped:
-/// starting is working, stopped is done; archived is a flag).
+/// An agent's status as released (v2026.10.2-28, the wire rule in
+/// lib.rs: its six values and their meanings never change): starting is
+/// working, stopped is done; archived is a flag. The hub's exact word
+/// when it is one of those is [`Agent::phase`] (P4b-fix, architect
+/// m_14382).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
@@ -20,6 +23,11 @@ pub enum Status {
 }
 
 impl Status {
+    /// In a turn (or starting one): what a view draws as working.
+    pub fn working(self) -> bool {
+        self == Status::Working
+    }
+
     /// The hub's status word (`model::Status::as_str`): the status and
     /// whether the agent is archived (an archived one shows done).
     pub fn of_hub(word: &str) -> (Status, bool) {
@@ -31,6 +39,33 @@ impl Status {
             "done" | "stopped" => (Status::Done, false),
             "archived" => (Status::Done, true),
             _ => (Status::Idle, false),
+        }
+    }
+}
+
+/// The hub's word when [`Status`] folds it into a released value: its
+/// REPL is starting (status working), or the user stopped it (status
+/// done). New in P4b-fix, with `Unknown` from the start so it may grow.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum Phase {
+    /// its REPL is starting (its first turn not begun)
+    Starting,
+    /// stopped by the user (`sb stop`, a drop on its way)
+    Stopped,
+    /// a phase this version doesn't know (a newer hub)
+    #[serde(other)]
+    Unknown,
+}
+
+impl Phase {
+    /// The phase the hub's status word says, if any.
+    pub fn of_hub(word: &str) -> Option<Phase> {
+        match word {
+            "starting" => Some(Phase::Starting),
+            "stopped" => Some(Phase::Stopped),
+            _ => None,
         }
     }
 }
@@ -60,6 +95,10 @@ pub struct Agent {
     pub name: String,
     pub main: bool,
     pub status: Status,
+    /// the hub's exact word when `status` folds it (starting: working,
+    /// stopped: done)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase: Option<Phase>,
     pub archived: bool,
     /// what it says it does now, else its last report, else its
     /// objective: one line (the TUI's title)
@@ -72,9 +111,14 @@ pub struct Agent {
     pub waits: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent: Option<String>,
-    /// its worktree's branch (none: it works in the shared checkout)
+    /// its worktree's branch (none: it works in the shared checkout), as
+    /// released; the shared checkout's branch is `checkout_branch`
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub branch: Option<String>,
+    /// the branch checked out in the shared checkout it works in (none in
+    /// a worktree: that is `branch`), P4b-fix
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checkout_branch: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub worktree: Option<String>,
     /// how long its turn has run (working only)
@@ -87,10 +131,12 @@ pub struct Agent {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub queued: Vec<crate::draft::Queued>,
     /// its folder in the hub's `agents/` (its name but after a rename):
-    /// where `sb history --project` reads its thread on disk (S2 C);
-    /// none in a view written before this field (read as the name)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dir: Option<String>,
+    /// where `sb history --project` reads its thread on disk (S2 C), and
+    /// the agent's identity across a rename (a client keys agents by it:
+    /// same dir, new name = renamed). Always set by a live hub; '' only
+    /// in a view written before this field (read as the name)
+    #[serde(default)]
+    pub dir: String,
     /// its former names (a rename), which `sb history --agent` takes too
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub aliases: Vec<String>,
@@ -118,6 +164,102 @@ pub struct Agent {
     /// reply; none when it waits on nobody
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub waiting_on: Option<WaitingOn>,
+    /// client-protocol step 4 (P4b, architect m_13999): the facts the
+    /// terminal reads, each from the hub's one source. Where it works:
+    /// the shared checkout (`checkout_branch`) or its own worktree
+    /// (`branch`, `worktree` its path)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<AgentMode>,
+    /// its folder (the shared checkout's or its worktree's)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub path: String,
+    /// its whole objective (`purpose` is its first line)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub objective: String,
+    /// what it says it does now (`sb status --note`)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub note: String,
+    /// what it is doing now, one line (BISE-126; none for main)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub role: String,
+    /// the agents' messages waiting for its turn to end (`queued` is his)
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub msgs_queued: u32,
+    /// main's inbox: the agents' questions waiting for main (BISE-299)
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub inbox: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_ms: Option<u64>,
+    /// its private worktree (BISE-136), none in the shared checkout
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+    /// the id of the place it is in (dev-flow §3.1, the `places` rows)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub place_id: String,
+    /// the reasoning efforts its model takes (the catalog's words)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub efforts: Vec<String>,
+    /// its changes against its base (the `± 9 files so far` door), none
+    /// when nothing changed or not measured yet
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changes: Option<Changes>,
+    /// the pos of its thread's newest entry (`bise_proto::thread::fold`,
+    /// the hub's one fold): a client lights an agent out of view when it
+    /// moves, without subscribing its thread
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_pos: Option<crate::Pos>,
+    /// how many of its turns ended since the hub started (its
+    /// `turn_done` lines, counted live), so a client never misses a turn
+    /// that started and ended between two rows (the queue's next message
+    /// goes at a turn's end): it compares it with what it saw
+    /// (proto-lead m_14731)
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
+    pub turns: u64,
+}
+
+/// Where an agent works (named apart from `hub::Mode`, a send's).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum AgentMode {
+    /// the workspace's checkout, shared with main
+    Shared,
+    /// its own git worktree
+    Worktree,
+    /// a mode this version doesn't know (a newer hub)
+    #[serde(other)]
+    Unknown,
+}
+
+/// An agent's changes against its base: files, lines added, removed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Changes {
+    pub files: u64,
+    pub add: u64,
+    pub del: u64,
+}
+
+/// How a repo's agents land their work (`config.toml`'s `[flow] mode`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum FlowMode {
+    /// every change through a branch and a pull request
+    Pr,
+    /// tested commits straight on the default branch
+    Trunk,
+    /// a flow this version doesn't know (a newer hub)
+    #[serde(other)]
+    Unknown,
+}
+
+fn is_zero_u64(n: &u64) -> bool {
+    *n == 0
+}
+
+fn is_zero(n: &u32) -> bool {
+    *n == 0
 }
 
 /// Whom an agent waits on (R9/S3).
@@ -165,6 +307,27 @@ pub struct AgentUsage {
     /// without a known window (`words::short_words`, amb-win m_10985)
     #[serde(default)]
     pub short: String,
+}
+
+impl AgentUsage {
+    /// The row of a call's usage (`input`/`output` its tokens), `window`
+    /// from the reader's catalog: the hub's one way to fill it.
+    pub fn of(model: &str, input: u64, output: u64, window: Option<u64>) -> AgentUsage {
+        let context = input.saturating_add(output);
+        AgentUsage {
+            model: model.to_string(),
+            context,
+            window,
+            words: crate::thread::words::context_words(context, window),
+            short: crate::thread::words::short_words(context, window),
+        }
+    }
+
+    /// The gauge in full, "42k / 200k tokens · 21%" (the TUI's divider
+    /// while a turn holds; `words::context_label`).
+    pub fn label(&self) -> String {
+        crate::thread::words::context_label(self.context, self.window)
+    }
 }
 
 /// How tool calls are approved on this machine (bar V8/W21,
@@ -289,6 +452,55 @@ pub struct Card {
     /// sign-in stopped, which go on once he signs in
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub waiting: Option<Vec<String>>,
+    /// client-protocol step 4 (P4c-4a): the card's words as the hub wrote
+    /// them, options included (`question` and `options` are parsed from
+    /// them); "" from an older hub
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub text: String,
+    /// the hub's second line under it (a merge's `approved · checks
+    /// pass`, a question answered another way...)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    /// the place it is about (a `places` row's id: a merge, a feature)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+    /// the number of the PR it is about
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr: Option<u64>,
+    /// the page its link opens (the update card's release page)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link: Option<String>,
+    /// the message it answers (`sb card --for`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub for_msg: Option<u64>,
+    /// a page's drafts batched in one card (docs/ambient-pages.md): its
+    /// fields for the capsule's words; none on any other card
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub batch: Option<CardBatch>,
+}
+
+/// A drafts-batch card's fields (the hub's pages/drafts.rs `info`, amb-web
+/// m_6061): `count` drafts titled `title`, `what` they are (`replies`,
+/// `actions`...), `names` each recipient once, `topics` one per draft (or
+/// none), `line` the card's second line as is, `actions` the words of its
+/// actions to close (none when it has none).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CardBatch {
+    #[serde(default)]
+    pub count: u32,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub what: String,
+    #[serde(default)]
+    pub names: Vec<String>,
+    #[serde(default)]
+    pub topics: Vec<String>,
+    #[serde(default)]
+    pub line: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actions: Option<String>,
 }
 
 /// A card kind's rank in reading order, what blocks an agent first: an
@@ -443,6 +655,10 @@ pub struct Feature {
 pub enum PrState {
     Open,
     Draft,
+    /// P4c-4a: a place's PR only (`/prs` lists open and draft ones): a
+    /// merged place goes a tick later, a closed one keeps its box
+    Merged,
+    Closed,
     /// a state this version doesn't know (a newer hub)
     #[serde(other)]
     Unknown,
@@ -495,6 +711,76 @@ pub struct Pr {
     pub words: String,
     /// its `/prs` line after `#<number>`: `sb/x · x, y · <words>`
     pub text: String,
+    /// P4c-4a: a review was asked and none came yet (`review` stays
+    /// `none` then, as it always was: the wire rule)
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub in_review: bool,
+    /// a place's PR (`HubEv::Agents.places`): how old the forge's last
+    /// answer is, when it is late (offline, rate limit); none when fresh,
+    /// and always none in `/prs`'s rows
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stale_ms: Option<u64>,
+}
+
+/// A worktree of the project as the terminal's panel draws it (dev-flow
+/// §3.1, the `places` of the hub's snapshot, P4c-4a): a worktree its
+/// agents share, a feature branch, a solo agent's own worktree. Never
+/// the shared checkout. In its first agent's order; an agent's
+/// `place_id` is its `id`.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Place {
+    /// `wt:<branch>`, `pt:<path>` (a private worktree), `feature:<name>`
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    /// its agents, not archived, in the hub's order
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub agents: Vec<String>,
+    /// the PR of its branch (merged and closed ones too, until it goes)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr: Option<Pr>,
+    /// the held line the hub writes (`waits to land · 2nd`, `no PR yet ·
+    /// 2 commits`): it wins over the PR's words
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lid: Option<String>,
+    /// a feature branch's place (dev-flow §5.1): never a PR
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub feature: bool,
+    /// its try build builds or is on trial
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub trying: bool,
+}
+
+/// A bise page of this hub (docs/ambient-pages.md §2.3): `hub/pages`'
+/// rows (newest first) and `page/changed`'s page. `state`: `ready`,
+/// `updating` (its agent answers his notes)...; the counts and marks are
+/// left out of `page/changed` (its older `page` line has none).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct Page {
+    pub id: String,
+    pub title: String,
+    pub agent: String,
+    pub version: u32,
+    pub url: String,
+    pub at_ms: u64,
+    pub state: String,
+    /// his notes not answered yet
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub open_notes: u32,
+    /// the version he last opened
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opened_version: Option<u32>,
+    /// what on it waits for him (`sb page waiting`'s lines of this page)
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub waiting: u32,
+    /// the meta line of its first heading block
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kicker: Option<String>,
+    /// it holds a question whose card is open (§4.2)
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub asking: bool,
 }
 
 /// The role a model is config.toml's default for.
@@ -663,11 +949,52 @@ pub struct Artifact {
     /// from before it, an older hub)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub versions: Vec<ArtifactVersion>,
+    // the rest of the art store's row, as the terminal's /artifacts reads
+    // it (client-protocol step 4, P4c): left out when empty, so an older
+    // hub's row or an older client still reads
+    /// who added it: `you`, `page` (a bise page), else the agent
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub by: String,
+    /// its agent is archived
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub archived: bool,
+    /// when it was first added (ms)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_ms: Option<u64>,
+    /// the current version's target as the store keeps it: a path or a
+    /// link (a page's: its file)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub target: String,
+    /// the store's copy of the current version (absolute), when it kept one
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub copy: Option<String>,
+    /// its target is a file that is no longer there
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub gone: bool,
+    /// the row's dim words: a page's notes (`2 notes open`), a site's bare
+    /// link
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub detail: String,
+    /// a pull request's link
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr: Option<ArtifactPr>,
+    /// the words a search matches (its links, bare and full; its paths,
+    /// absolute and from the workspace)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keys: Vec<String>,
+}
+
+/// An artifact that is a pull request: its repo (`owner/name`) and number.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ArtifactPr {
+    pub repo: String,
+    pub number: u64,
 }
 
 /// One version of an artifact: its number, when it was made, and the
 /// TUI's /artifacts words for it (a page's 'n notes open', 'no copy: …'),
-/// printed as they are.
+/// printed as they are; its target and the store's copy of it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ArtifactVersion {
@@ -675,6 +1002,10 @@ pub struct ArtifactVersion {
     pub at_ms: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub target: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub copy: Option<String>,
 }
 
 /// A live scheduled task of a project (`sb every`), the `scheduled`
@@ -708,6 +1039,68 @@ pub struct ScheduledTask {
     /// the page it keeps fresh (`--page`)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub page: Option<String>,
+    /// P4c-4a: the hub's how-often label (`every 2m`, `every day
+    /// 07:30`), before `every`'s `once` and times words
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub label: String,
+    /// when it last woke its agent
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_ms: Option<u64>,
+    /// its last runs, oldest first
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub runs: Vec<u64>,
+    /// an ended one (`HubEv::Scheduled.ended` only): when, how, by whom
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ended_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end: Option<ScheduledEnd>,
+    /// who stopped it (`end` is `stopped`): you, or an agent
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stopped_by: Option<WaitingOn>,
+}
+
+/// How a scheduled task ended (the hub's `every::end_of`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum ScheduledEnd {
+    /// it ran its times
+    Times,
+    /// its end time passed
+    Until,
+    /// its agent is gone
+    Gone,
+    /// someone stopped it (`stopped_by`), or an older line said nothing
+    Stopped,
+    /// an end this version doesn't know (a newer hub)
+    #[serde(other)]
+    Unknown,
+}
+
+impl ScheduledEnd {
+    /// The hub's word (`times`, `until`, `gone`, `stopped`), typed; none
+    /// for "" (a live one).
+    pub fn of_word(w: &str) -> Option<ScheduledEnd> {
+        match w {
+            "" => None,
+            "times" => Some(ScheduledEnd::Times),
+            "until" => Some(ScheduledEnd::Until),
+            "gone" => Some(ScheduledEnd::Gone),
+            "stopped" => Some(ScheduledEnd::Stopped),
+            _ => Some(ScheduledEnd::Unknown),
+        }
+    }
+
+    /// Its word, the one `of_word` reads ("" for an unknown one).
+    pub fn word(self) -> &'static str {
+        match self {
+            ScheduledEnd::Times => "times",
+            ScheduledEnd::Until => "until",
+            ScheduledEnd::Gone => "gone",
+            ScheduledEnd::Stopped => "stopped",
+            ScheduledEnd::Unknown => "",
+        }
+    }
 }
 
 #[cfg(test)]
@@ -716,8 +1109,10 @@ mod tests {
 
     #[test]
     fn hub_words_map_to_statuses() {
+        // the released meanings (the wire rule); the exact word is the phase
         assert_eq!(Status::of_hub("starting"), (Status::Working, false));
         assert_eq!(Status::of_hub("stopped"), (Status::Done, false));
+        assert_eq!((Phase::of_hub("starting"), Phase::of_hub("stopped"), Phase::of_hub("working")), (Some(Phase::Starting), Some(Phase::Stopped), None));
         assert_eq!(Status::of_hub("archived"), (Status::Done, true));
         assert_eq!(Status::of_hub("idle"), (Status::Idle, false));
     }

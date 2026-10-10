@@ -7,7 +7,7 @@ import { newWords } from './Sidebar';
 
 const NOW = new Date(2026, 9, 7, 14, 0).getTime();
 const agent = (name: string, status: Agent['status'], over: Partial<Agent> = {}): Agent => ({
-  name, main: false, status, archived: false, title: 'product page speed', purpose: '', since_ms: NOW - 60_000, waits: 0, ...over,
+  name, dir: name, main: false, status, archived: false, title: 'product page speed', purpose: '', since_ms: NOW - 60_000, waits: 0, ...over,
 });
 const row = (over: Partial<ProjectRow> = {}): ProjectRow => ({ project: 'acme-1', name: 'storefront', path: '/x', git: true, home: false, order: 1, agents: 3, working: 0, waits: 0, running: true, ...over });
 

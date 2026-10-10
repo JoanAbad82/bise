@@ -66,7 +66,7 @@ def main():
         c.say("keep going", focus="tt")
         c.wait(lambda: glob.glob(os.path.join(run, "bend-steer-*.txt")), 30, "the steer file in run/")
         c.wait_idle("tt")
-        c.send({"op": "interrupt", "focus": "tt", "agent": "tt"})
+        c.interrupt("tt")
         c.wait(lambda: glob.glob(os.path.join(run, "bend-interrupt-*.txt")), 30, "the interrupt file in run/")
         lines = open(probe).read().split("\n")
         # TMUX_TMPDIR only when a socket fits under it (tools_env::tmux_fits)
@@ -92,10 +92,10 @@ def main():
         # /archive: tmp/ goes, run/ stays
         c.say("/archive tt")
         c.wait(lambda: c.agent("tt")["status"] == "archived"
-               or any(n.get("ev") == "confirm" for n in c.notices()), 30, "tt dropped or a confirmation")
-        conf = [n for n in c.notices() if n.get("ev") == "confirm"]
+               or any(n["kind"] == "confirm" for n in c.notices()), 30, "tt dropped or a confirmation")
+        conf = [n for n in c.notices() if n["kind"] == "confirm"]
         if conf:
-            c.send({"op": "confirm", "id": conf[-1]["id"], "yes": True})
+            c.confirm(conf[-1]["id"], True)
         c.wait_status("tt", "archived", 30)
         c.wait(lambda: not os.path.exists(tmp), 10, "the dropped task's tmp/ removed")
         check(os.path.isdir(run), "its run/ stays")

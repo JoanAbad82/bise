@@ -41,8 +41,18 @@ use theme::*;
 mod theme_detect;
 mod when;
 mod wire;
+// the hub's entries as feed events (client-protocol step 4): the feed
+// from entries (sb/feed_entries.rs) and its parity law
+mod entry_ev;
+// the live reads of a thread's entries (P4d-reads): the feed calls them
+mod entry_reads;
+// client-protocol step 4's before/after numbers (architect m_13977 Q4)
+#[cfg(test)]
+mod bench_first;
 use wire::*;
 mod markdown;
+// the tests' names for markdown's helpers (the code says crate::markdown::)
+#[cfg(test)]
 use markdown::*;
 mod code;
 mod codeblock;
@@ -104,6 +114,7 @@ mod scheduled_screen;
 mod diffbranches;
 mod diffquote;
 mod diffview;
+mod diffwire;
 mod computer_use;
 mod keybar;
 mod keycheck;
@@ -135,7 +146,7 @@ mod feed_render_tests;
 #[cfg(test)]
 mod quiet_send_tests;
 pub use keyprobe::keyprobe;
-pub use sb::{run_switchboard, setup_main, take_reexec, take_refused};
+pub use sb::{init_line, run_switchboard, setup_main, take_reexec, take_refused};
 pub use keycheck::check_model;
 pub use crash::install as install_crash_hook;
 

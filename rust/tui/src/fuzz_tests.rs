@@ -157,16 +157,21 @@ fn hub_line(rng: &mut Rng) -> String {
         4 => json!({"ev": "release", "state": *rng.pick(&["plan", "step", "running", "done", "failed", "error"]),
             "tag": t, "text": t, "commits": [[t, t]], "count": rng.below(30), "tail": [t], "elapsed": rng.below(5000)})
         .to_string(),
-        1 => json!({"ev": "confirm", "id": rng.below(3), "text": t}).to_string(),
+        1 => json!({"jsonrpc": "2.0", "method": "confirm/ask", "params": {"project": "p", "id": rng.below(3), "text": t}}).to_string(),
         2 => json!({"ev": "focus", "focus": agent}).to_string(),
-        3 => json!({"ev": "state", "agents": [
-            {"name": "main", "status": "idle", "objective": t},
-            {"name": "t1", "status": "working", "objective": t, "note": t},
-        ], "cards": [
-            {"id": 1, "agent": "t1", "kind": "question", "text": t}, {"id": 2, "agent": "main", "kind": "report", "text": t},
-        ]})
-        .to_string(),
-        _ => json!({"ev": "line", "agent": agent, "line": line}).to_string(),
+        // hub/agents or hub/cards, as the hub sends them typed (P4c-4b)
+        3 => {
+            let mut t1 = crate::sb::hub_reads::rows_for_tests::agent("t1", "working", &t);
+            t1.note = t.clone();
+            let [agents, cards] = crate::sb::hub_reads::rows_for_tests::lines(
+                vec![crate::sb::hub_reads::rows_for_tests::agent("main", "idle", &t), t1],
+                vec![crate::sb::hub_reads::rows_for_tests::card(1, "question", "t1", &t), crate::sb::hub_reads::rows_for_tests::card(2, "report", "main", &t)],
+            );
+            if rng.below(2) == 0 { agents } else { cards }
+        }
+        // a thread's entry as the hub sends it (P4d): the fold of the
+        // line at a pos that may be known (a changed entry replaces)
+        _ => sb::entries_for_tests::entry_note(agent, rng.below(40) as u64 + 1, &line),
     }
 }
 
@@ -187,6 +192,7 @@ fn fuzz_app() -> App {
     sb::bench::set_workspace(&mut app, at_popup_tests::ws());
     sb::bench::add_agent(&mut app, "t1", "an objective");
     sb::bench::add_agent(&mut app, "notes-👍-agent", "an objective with émojis 🎉 ".repeat(5).as_str());
+    sb::entries_for_tests::subscribed(&mut app, &["main", "t1", "notes-👍-agent"]);
     app
 }
 
@@ -303,7 +309,7 @@ fn popup_on_a_short_terminal_stays_in_the_buffer() {
 #[test]
 fn feed_narrower_than_its_margins_draws() {
     let mut app = fuzz_app();
-    sb::dispatch(&mut app, &json!({"ev": "line", "agent": "main", "line": "  obs: assistant: hello 👍 world"}).to_string());
+    sb::entries_for_tests::lines(&mut app, "main", &["  obs: assistant: hello 👍 world"]);
     for w in 1..6u16 {
         let mut term = Terminal::new(TestBackend::new(w, 20)).unwrap();
         term.draw(|f| sb::draw_sb(&mut app, f)).unwrap();
@@ -350,9 +356,7 @@ fn composer_hit_on_an_empty_area_is_total() {
 #[test]
 fn feed_rows_are_total() {
     let mut app = fuzz_app();
-    for t in ["a", "b 👍", "c"] {
-        sb::dispatch(&mut app, &json!({"ev": "line", "agent": "main", "line": format!("  obs: assistant: {t}")}).to_string());
-    }
+    sb::entries_for_tests::lines(&mut app, "main", &["  obs: assistant: a", "  obs: assistant: b 👍", "  obs: assistant: c"]);
     app.cache.clear();
     assert!(feed::ensure_rows(&app.events, &mut app.cache, 1, false, 20, 0) > 0);
     assert_eq!(feed::ensure_rows(&app.events, &mut app.cache, 99, false, 20, 0), 0);

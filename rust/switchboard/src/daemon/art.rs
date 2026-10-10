@@ -1,6 +1,7 @@
 //! Artifacts and diffs on the hub's side (docs/artifacts.md): the
-//! `artifacts` event and ops, `sb artifact`, the thread lines, the
-//! `diff` and `branches` ops (computed off the hub's loop), each agent's
+//! `artifacts` event (artifacts/seen, artifacts/add's words), `sb
+//! artifact`, the thread lines, `diff/read` and `branches/list`'s answers
+//! (computed off the hub's loop), each agent's
 //! `changes` in the state, and the `landed` line after a land.
 
 use super::*;
@@ -87,40 +88,18 @@ impl Shell {
         }
     }
 
-    /// The TUI's `artifacts` op: the list again, `seen`, `add`.
-    pub(super) fn artifacts_op(&mut self, id: ClientId, v: &Value) {
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
-        match s("do").as_str() {
-            "seen" => {
-                // `at_ms`: when the user looked (an older client: now)
-                let now = now_ms();
-                let at = v.get("at_ms").and_then(|x| x.as_u64()).unwrap_or(now);
-                let _ = self.art_store().saw(at, now);
-                self.artifacts_refresh(true);
-            }
-            "add" => {
-                let title = Some(s("title")).filter(|t| !t.trim().is_empty());
-                let ev = match self.art_add(&s("agent"), &s("target"), title) {
-                    Ok(text) => json!({"ev": "notice", "text": text}),
-                    Err(e) => json!({"ev": "warn", "text": format!("▲ {}", e)}),
-                };
-                if let Some(c) = self.clients.get_mut(&id) {
-                    write_json(c, &ev);
-                }
-                self.artifacts_refresh(true);
-            }
-            _ => {
-                let ev = self.artifacts_ev();
-                self.art.last = ev.to_string();
-                if let Some(c) = self.clients.get_mut(&id) {
-                    write_json(c, &ev);
-                }
-            }
-        }
+    /// artifacts/seen (the TUI's `/artifacts` screen opened): `new` = 0,
+    /// the list to every client.
+    /// `at_ms`: when he looked (none: now); seen moves to it, never past
+    /// now, never back (art-seen 1cfbc07d)
+    pub(super) fn artifacts_seen(&mut self, at_ms: Option<u64>) {
+        let now = now_ms();
+        let _ = self.art_store().saw(at_ms.unwrap_or(now), now);
+        self.artifacts_refresh(true);
     }
 
-    /// `/artifacts add <path or link>` by the user in `agent`'s view (the
-    /// TUI's `artifacts` op and the window's `slash`): the store's add,
+    /// `/artifacts add <path or link>` by the user in `agent`'s view
+    /// (artifacts/add and command/run): the store's add,
     /// its thread lines, and the words for the one who asked (`↗ added:
     /// <title>`) or the store's refusal. The caller sends them and then
     /// `artifacts_refresh(true)`.
@@ -256,34 +235,24 @@ impl Shell {
         }
     }
 
-    /// The `diff` op: an agent's changes, a branch, a range or a PR,
-    /// answered with a `diff` event to that client.
-    pub(super) fn diff_op(&mut self, id: ClientId, v: &Value) {
-        let req = v.get("req").cloned().unwrap_or(Value::Null);
-        let shared = PathBuf::from(&self.hub.workspace);
-        let ask = self.diff_ask(v);
-        let tx = self.tx.clone();
-        std::thread::spawn(move || {
-            let ev = diff_answer(ask, &shared, req);
-            let _ = tx.send(Msg::ToClient { id, v: ev });
-        });
-    }
-
-    /// The typed `diff {project, agent}` (desktop S7): the same answer as
-    /// the op, in bise-proto's shape (`proto_view::diff`), to that client.
-    pub(super) fn diff_typed(&mut self, id: ClientId, project: String, agent: String, commit: Option<String>) {
+    /// The typed `diff` (desktop S7; a branch, a PR or a range since
+    /// client-protocol step 3): the same answer as the op, in bise-proto's
+    /// shape (`proto_view::diff`), to that client. `d` is checked
+    /// (`DiffAsk::check`).
+    pub(super) fn diff_typed(&mut self, id: ClientId, project: String, d: crate::proto_view::DiffAsk) {
         let shared = PathBuf::from(&self.hub.workspace);
         // one commit: the range ask the TUI's door under a land uses
-        let ask = match &commit {
-            Some(c) => self.diff_ask(&json!({"agent": agent, "range": format!("{c}^..{c}")})),
-            None => self.diff_ask(&json!({"agent": agent})),
-        };
+        let ask = self.diff_ask(&d.op());
+        let agent = d.agent.clone().unwrap_or_default();
+        let commit = d.commit.clone();
         // emitter 5: what its change measured (`sb report --result`), from
-        // its latest report
-        let result = self.hub.st.agents.get(&agent).and_then(|a| a.last_report.as_ref()).and_then(|r| r.result.clone());
+        // its latest report (an agent's own change only)
+        let mine = d.range.is_none() && d.commit.is_none();
+        let result = self.hub.st.agents.get(&agent).filter(|_| mine).and_then(|a| a.last_report.as_ref()).and_then(|r| r.result.clone());
+        let req = d.req.map_or(Value::Null, |r| json!(r));
         let tx = self.tx.clone();
         std::thread::spawn(move || {
-            let mut ev = diff_answer(ask, &shared, Value::Null);
+            let mut ev = diff_answer(ask, &shared, req);
             // a binary file's size, read here (the mapper stays pure):
             // its file in the agent's checkout, when it is still there
             for f in ev.get_mut("files").and_then(Value::as_array_mut).into_iter().flatten() {
@@ -300,7 +269,7 @@ impl Shell {
                 *c = commit;
                 *r = result.and_then(|v| serde_json::from_value(v).ok()).map(Box::new);
             }
-            let _ = tx.send(Msg::ToClient { id, v: typed.to_value() });
+            let _ = tx.send(Msg::Typed { to: super::rpc::Typed::Answer(id), v: typed.to_value() });
         });
     }
 
@@ -341,8 +310,9 @@ impl Shell {
         }
     }
 
-    /// The `branches` op: the /diff picker's rows.
-    pub(super) fn branches_op(&mut self, id: ClientId) {
+    /// The /diff picker's rows to client `id`: `branches/list`'s answer.
+    pub(super) fn branches_scan(&mut self, id: ClientId) {
+        let project = self.project();
         let shared = PathBuf::from(&self.hub.workspace);
         // who works on which branch, and the PRs the poller knows
         let mut on: BTreeMap<String, Vec<String>> = BTreeMap::new();
@@ -364,7 +334,8 @@ impl Shell {
                            "uncommitted": false, "pr": null, "landed_ms": null, "add": add, "del": del})
                 })
                 .collect();
-            let _ = tx.send(Msg::ToClient { id, v: json!({"ev": "branches", "base": base, "rows": rows}) });
+            let v = json!({"ev": "branches", "project": project, "base": base, "rows": rows});
+            let _ = tx.send(Msg::Typed { to: super::rpc::Typed::Answer(id), v });
         });
     }
 }
@@ -391,7 +362,7 @@ fn changes_of(place: &Where) -> Value {
     }
 }
 
-/// What the `diff` op asks for.
+/// What a `diff/read` asks for.
 #[derive(Clone, Debug)]
 enum Ask {
     /// name, where, branch, archived

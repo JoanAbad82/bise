@@ -166,9 +166,8 @@ class Env:
         wait.until(lambda: os.path.exists(sock), 20, "the hub's socket %s" % sock, poll=0.05)
         return Client(sock)
 
-    def stop_hub(self):
-        c = Client(os.path.join(self.state, "hub.sock"))
-        c.send({"op": "stop_hub"})
+    def stop_hub(self, keep_agents=False):
+        stop_hub(os.path.join(self.state, "hub.sock"), keep_agents)
         self.hub.wait(timeout=20)
         self.hub = None
 
@@ -203,16 +202,96 @@ def out(cwd, script):
     return subprocess.run(["/bin/sh", "-c", script], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
 
 
+def stop_hub(sock_path, keep_agents=False):
+    """Stop the hub of `sock_path` as `bise switchboard --stop` does
+    (switchboard::client::stop): `initialize`, then `hub/stop` with
+    `keep_agents`; then wait for its socket to go."""
+    s = socket.socket(socket.AF_UNIX)
+    s.connect(sock_path)
+    init = {"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {"proto": PROTO, "client": {"name": "e2e-stop"}}}
+    s.sendall((json.dumps(init) + "\n").encode())
+    s.settimeout(10)
+    f = s.makefile("r")
+    project = None
+    for line in f:
+        try:
+            v = json.loads(line)
+        except ValueError:
+            continue
+        if v.get("id") == 0 and "method" not in v:
+            project = (v.get("result") or {}).get("project")
+            break
+    if not project:
+        s.close()
+        raise AssertionError("initialize refused before hub/stop")
+    stop = {"jsonrpc": "2.0", "id": 1, "method": "hub/stop", "params": {"project": project, "keep_agents": keep_agents}}
+    s.sendall((json.dumps(stop) + "\n").encode())
+    s.settimeout(0.1)
+
+    def gone():
+        # what the hub writes is read away (a full socket buffer would
+        # keep it from stopping), as the CLI does
+        try:
+            s.recv(65536)
+        except (socket.timeout, OSError):
+            pass
+        return not os.path.exists(sock_path)
+
+    try:
+        # as the CLI: a hub that doesn't go in 5 s is left to the caller
+        wait.until(gone, 5, "the hub's socket gone after hub/stop", poll=0.05)
+    except AssertionError:
+        pass
+    finally:
+        s.close()
+
+
+PROTO = 1
+# the one-client notifications notices() lists, by their `kind` (a
+# response's words join them as a notice, as the terminal shows them)
+SAID = {"hub/notice": "notice", "confirm/ask": "confirm"}
+
+
 class Client:
-    def __init__(self, sock_path):
+    """A JSON-RPC 2.0 client of hub.sock (client-protocol): `initialize`
+    first, then the hub-wide notifications (hub/agents, hub/cards...)
+    keep `state`. An agent's lines are its transcript, read where the hub
+    writes them (the older `line` events were those lines, one by one)."""
+
+    def __init__(self, sock_path, name="e2e"):
         self.s = socket.socket(socket.AF_UNIX)
         self.s.connect(sock_path)
+        # the hub's state folder (a short socket's folder is a link to it)
+        self.agents_dir = os.path.join(os.path.realpath(os.path.dirname(sock_path)), "agents")
         self.q = queue.Queue()
         self.events = []
+        # what the hub said to this client (notices())
+        self.said = []
+        # the hub-wide notifications' latest params, by method
+        self.hub = {}
         self.state = None
         self.lock = threading.Lock()
-        self.s.sendall(b'{"op":"hello"}\n')
+        self._tails = {}
+        self._rid = 0
+        self.send({"jsonrpc": "2.0", "id": "e2e-init", "method": "initialize",
+                   "params": {"proto": PROTO, "client": {"name": name, "version": "0"}}})
         threading.Thread(target=self._read, daemon=True).start()
+        init = wait.until(lambda: self._response("e2e-init"), 30, "initialize's result")
+        if "error" in init:
+            raise AssertionError("initialize refused: %r" % init)
+        self.init = init["result"]
+        self._project = self.init["project"]
+        self.send({"jsonrpc": "2.0", "method": "initialized"})
+
+    def _note(self, method, params):
+        """A hub-wide notification: the latest of its kind; agents and
+        cards are the state the helpers read (lock held)."""
+        self.hub[method] = params
+        if method in ("hub/agents", "hub/cards"):
+            st = dict(self.state or {"agents": [], "cards": []})
+            key = method.split("/")[1]
+            st[key] = params.get(key, [])
+            self.state = st
 
     def _read(self):
         f = self.s.makefile("r")
@@ -223,29 +302,135 @@ class Client:
                 continue
             with self.lock:
                 self.events.append(v)
-                if v.get("ev") == "state":
-                    self.state = v
+                # initialize's state, in the reader's order: a notification
+                # read after it is newer (one read before it never is: the
+                # hub answers first)
+                if v.get("id") == "e2e-init" and "result" in v:
+                    for n in v["result"]["hub"]["state"]:
+                        self._note(n["method"], n["params"])
+                elif "method" in v and "id" not in v:
+                    params = v.get("params") or {}
+                    if v["method"] in SAID:
+                        self.said.append(dict(params, kind=SAID[v["method"]]))
+                    elif v["method"].startswith("hub/"):
+                        self._note(v["method"], params)
+                # a response's words (command/run's notice, a refusal)
+                # read as the hub's notice, as the terminal shows them
+                if "jsonrpc" in v and "method" not in v:
+                    words = (v.get("result") or {}).get("notice") or (v.get("error") or {}).get("message")
+                    if words:
+                        self.said.append({"kind": "notice", "text": words, "rpc": v.get("id")})
+
+    def _response(self, rid):
+        with self.lock:
+            return next((e for e in self.events if e.get("id") == rid and "method" not in e), None)
+
+    def notes(self, method):
+        """The params of every `method` notification so far, in order."""
+        with self.lock:
+            return [e.get("params") or {} for e in self.events if e.get("method") == method and "id" not in e]
 
     def send(self, v):
         self.s.sendall((json.dumps(v) + "\n").encode())
 
-    def say(self, text, focus="main"):
-        self.send({"op": "input", "focus": focus, "text": text})
+    def say(self, text, focus="main", **opts):
+        """What he types to `focus` (command/run: the hub's one parser);
+        its answer is not waited for. `opts`: turn/send's (files, via...)
+        through command/run's flattened SendOpts."""
+        self._rid += 1
+        params = dict(opts, project=self.project(), agent=focus, line=text)
+        self.send({"jsonrpc": "2.0", "id": "e2e-%d" % self._rid, "method": "command/run", "params": params})
+
+    def call(self, method, params=None):
+        """A JSON-RPC request, sent: its id (a request whose answer may
+        never come, as a restart's)."""
+        self._rid += 1
+        rid = "e2e-%d" % self._rid
+        msg = {"jsonrpc": "2.0", "id": rid, "method": method}
+        if params is not None:
+            msg["params"] = params
+        self.send(msg)
+        return rid
+
+    def restart(self):
+        """/restart from the hub's side (version/restart), not waited for:
+        the hub goes away."""
+        self.call("version/restart", {"project": self.project()})
+
+    def rpc(self, method, params=None, timeout=30):
+        """A JSON-RPC request on this hello connection (client-protocol):
+        its response, once it comes."""
+        rid = self.call(method, params)
+
+        def got():
+            with self.lock:
+                return next((e for e in self.events if e.get("id") == rid and "method" not in e), None)
+        return wait.until(got, timeout, "the response to %s" % method)
+
+    def project(self):
+        """The hub's id, from initialize's result (no copy of hub_id)."""
+        return self._project
+
+    def interrupt(self, agent):
+        """ctrl+c on `agent` (turn/interrupt): its response."""
+        return self.rpc("turn/interrupt", {"project": self.project(), "agent": agent})
+
+    def confirm(self, cid, yes):
+        """y or n to the hub's question `cid` (confirm/answer): its response."""
+        return self.rpc("confirm/answer", {"project": self.project(), "id": cid, "yes": yes})
+
+    def approvals_set(self, mode=None):
+        """shift+tab (`toggle`), `/approvals yolo|auto`, or with no mode
+        `/approvals`' read (approvals/set): its response."""
+        params = {"project": self.project()}
+        if mode is not None:
+            params["mode"] = mode
+        return self.rpc("approvals/set", params)
+
+    def _tail(self, path):
+        """The lines of transcript `path` so far ("<ts>\\t<line>" each, the
+        hub's write), read on from where the last call stopped."""
+        at, lines, rest = self._tails.get(path, (0, [], b""))
+        try:
+            with open(path, "rb") as f:
+                f.seek(at)
+                got = f.read()
+        except FileNotFoundError:
+            return lines
+        if got:
+            *whole, rest = (rest + got).split(b"\n")
+            for raw in whole:
+                ts, tab, text = raw.decode("utf-8", "replace").partition("\t")
+                lines.append(text if tab and ts.isdigit() else raw.decode("utf-8", "replace"))
+            self._tails[path] = (at + len(got), lines, rest)
+        return lines
 
     def lines(self, agent=None):
-        with self.lock:
-            return [e["line"] for e in self.events if e.get("ev") == "line" and (agent is None or e["agent"] == agent)]
+        """`agent`'s transcript lines (every agent's with none), as the
+        hub wrote them."""
+        names = [agent] if agent else sorted(os.listdir(self.agents_dir)) if os.path.isdir(self.agents_dir) else []
+        return [l for n in names for l in self._tail(os.path.join(self.agents_dir, n, "transcript.log"))]
 
     def notices(self):
+        """What the hub said to this client, in order: hub/notice and
+        confirm/ask's params with their `kind` (notice, confirm), and a
+        response's notice or refusal words as a notice."""
         with self.lock:
-            return [e for e in self.events if e.get("ev") in ("notice", "confirm")]
+            return list(self.said)
 
     def agent(self, name):
+        """`name`'s row of hub/agents with the hub's own words the tests
+        wait on: `status` (the row's phase: starting, stopped; archived;
+        else its status; the row's own in `row_status`) and `waiting_on`
+        ("you" or an agent's name; the row's {who, name} in `waits_on`)."""
         with self.lock:
             st = self.state or {}
         for a in st.get("agents", []):
             if a["name"] == name:
-                return a
+                word = a.get("phase") or ("archived" if a.get("archived") else a["status"])
+                w = a.get("waiting_on") or {}
+                on = {"you": "you", "agent": w.get("name")}.get(w.get("who"))
+                return dict(a, status=word, row_status=a["status"], waiting_on=on, waits_on=a.get("waiting_on"))
         return None
 
     def cards(self):
@@ -311,8 +496,9 @@ def t_spawn_and_auto_reply(E, c):
     check(any("<bise_state>" in r["last_user"] for r in reqs), "the board is injected as the last message")
     # BISE-126: after t1's turn, one one-shot call gives its role line
     # (the fake provider answers "Fake Role Line."; the hub cleans it)
-    c.wait(lambda: c.agent("t1")["role"] == "fake role line", 60, "t1's role line (now %r)" % c.agent("t1").get("role"))
-    check(c.agent("main")["role"] == "", "main has no role line")
+    # hub/agents leaves an empty role out
+    c.wait(lambda: c.agent("t1").get("role") == "fake role line", 60, "t1's role line (now %r)" % c.agent("t1").get("role"))
+    check(c.agent("main").get("role", "") == "", "main has no role line")
     roles = [r for r in E.fake_requests() if r["agent"] == "(role line)"]
     check(len(roles) == 1, "one role-line call for t1's turn: %d" % len(roles))
     check("hello-from-t1" in roles[0]["user"], "the call reads the objective: " + roles[0]["user"][:300])
@@ -322,12 +508,12 @@ def t_spawn_and_auto_reply(E, c):
 
 def t_direct_message_and_note(E, c):
     c.wait_idle("main", "t1")
-    c.send({"op": "focus", "focus": "t1"})
+    check(c.rpc("client/focus", {"project": c.project(), "focus": "t1"}).get("result") == {}, "focus answered")
     c.say("parle-moi directement", focus="t1")
     c.wait_line("t1", "sb you : parle-moi directement")
     c.wait_line("t1", "ack: parle-moi directement")
     c.wait_idle("t1")
-    c.send({"op": "focus", "focus": "main"})
+    check(c.rpc("client/focus", {"project": c.project(), "focus": "main"}).get("result") == {}, "focus answered")
     c.wait_line("main", "sb direct : You talked to @t1 (1 message)")
     c.say("et alors ?")
     c.wait(lambda: any(r["agent"] == "main" and r["user"].endswith("et alors ?") for r in E.fake_requests()), 60,
@@ -370,7 +556,8 @@ def t_escalation_card(E, c):
            "both agents' messages in main's feed")
     c.wait_idle("main", "t3", "t3b")
     check(not c.cards() and not any(seen), "no card in the user's inbox: %r / %r" % (c.cards(), seen))
-    check(isinstance(c.agent("main").get("inbox"), int), "main's inbox count in the state: %r" % c.agent("main"))
+    # hub/agents leaves a 0 count out
+    check(isinstance(c.agent("main").get("inbox", 0), int), "main's inbox count in the state: %r" % c.agent("main"))
     check(any(r["agent"] == "main" and "@t3b is blocked: t3b needs a key" in r["user"] for r in E.fake_requests()),
           "the blocked status went to main")
     msg_id = None
@@ -413,10 +600,10 @@ def t_worktree_drop_restore(E, c):
     check(out(wt, "git log -1 --format=%s") == "wt", "the commit is on the task's branch")
     check(not os.path.exists(os.path.join(E.ws, "wt.txt")), "the workspace is untouched")
     c.say("/archive t4")
-    c.wait(lambda: any(n.get("ev") == "confirm" for n in c.notices()), 30, "a confirmation")
-    conf = [n for n in c.notices() if n.get("ev") == "confirm"][-1]
+    c.wait(lambda: any(n["kind"] == "confirm" for n in c.notices()), 30, "a confirmation")
+    conf = [n for n in c.notices() if n["kind"] == "confirm"][-1]
     check("1 unpushed commit" in conf["text"], conf["text"])
-    c.send({"op": "confirm", "id": conf["id"], "yes": True})
+    check("error" not in c.confirm(conf["id"], True), "the confirm is answered")
     c.wait_status("t4", "archived", 30)
     check(not os.path.exists(wt), "worktree removed")
     check(not os.path.exists(os.path.dirname(wt)), "and its folder")

@@ -18,44 +18,21 @@ use std::time::{Duration, Instant};
 
 const WS: &str = "/w/repo";
 
+mod agents;
+mod capsule;
 mod computer;
 mod dictate;
+mod fake_hub;
+mod home_switch;
 mod hubs;
 mod setup;
 mod voice_mode;
 
+use fake_hub::HubEnd;
+
 /// The hub's `user_kind` (switchboard::model), as main.rs hands it in.
 fn user_kind(kind: &str) -> bool {
     matches!(kind, "question" | "drop" | "confirm" | "merge" | "feature_try" | "feature_merge" | "update")
-}
-
-/// The hub's side of one connection.
-struct HubEnd {
-    w: UnixStream,
-    r: BufReader<UnixStream>,
-}
-
-impl HubEnd {
-    fn say(&mut self, v: Value) {
-        writeln!(self.w, "{v}").unwrap();
-    }
-
-    fn line(&mut self, agent: &str, line: &str) {
-        self.say(json!({"ev": "line", "agent": agent, "line": line, "pos": 1}));
-    }
-
-    /// The next request the core wrote (the connector's hello skipped).
-    fn next(&mut self) -> Value {
-        loop {
-            let mut l = String::new();
-            self.r.read_line(&mut l).expect("the core wrote nothing");
-            let v: Value = serde_json::from_str(l.trim()).unwrap();
-            // the connector's hello, then the core's typed hello (S3b)
-            if v["op"] != "hello" && v["cmd"] != "hello" {
-                return v;
-            }
-        }
-    }
 }
 
 struct T {
@@ -104,11 +81,10 @@ impl T {
     fn make(fake: Option<super::fake::Words>) -> T {
         let (etx, ends) = mpsc::channel::<HubEnd>();
         let connect: super::hub::Connect = Box::new(move || {
-            let (mut core_end, hub_end) = UnixStream::pair()?;
-            core_end.write_all(b"{\"op\":\"hello\"}\n")?;
+            let (core_end, hub_end) = UnixStream::pair()?;
             let r = BufReader::new(hub_end.try_clone()?);
             r.get_ref().set_read_timeout(Some(Duration::from_secs(3)))?;
-            etx.send(HubEnd { w: hub_end, r }).map_err(std::io::Error::other)?;
+            etx.send(HubEnd::new(hub_end, r)).map_err(std::io::Error::other)?;
             Ok(core_end)
         });
         let (tx, rx) = mpsc::channel();
@@ -160,10 +136,13 @@ impl T {
 
     /// Hub events in, a tick, events out, until `done` holds on what
     /// came out since the last `take` (3 s at most).
+    #[track_caller]
     fn until(&mut self, done: impl Fn(&[Value]) -> bool) {
         let t0 = Instant::now();
         loop {
-            while let Ok(h) = self.rx.try_recv() {
+            // the hub's lines until none comes for a moment: the kinds the
+            // fake hub writes at once are read in one batch (one `state`)
+            while let Ok(h) = self.rx.recv_timeout(Duration::from_millis(2)) {
                 self.core.hub(h);
             }
             self.core.tick(Instant::now());
@@ -185,16 +164,32 @@ impl T {
         self.out.extend(self.core.take_out());
     }
 
-    /// The hello replay is over: main's lines are live.
+    /// main's first page answered (what it said before is a replay):
+    /// main's entries are live.
     fn ready(&mut self) {
-        self.hub.say(json!({"ev": "ready"}));
+        self.replay_over();
         self.until(|o| has(o, "phase"));
         self.take();
     }
 
+    /// `initialize` answered, main's thread subscribed, then its first
+    /// page (what main said so far): main's entries are live after it.
+    fn replay_over(&mut self) {
+        self.hub.answer_init();
+        let t0 = Instant::now();
+        while !self.hub.main_subscribed() {
+            assert!(t0.elapsed() < Duration::from_secs(3), "main's thread never subscribed; out: {:#?}", self.out);
+            while let Ok(h) = self.rx.try_recv() {
+                self.core.hub(h);
+            }
+            self.out.extend(self.core.take_out());
+        }
+        self.hub.say(json!({"ev": "ready"}));
+    }
+
     /// Everything the hub said so far is handled (a state round trip).
     fn sync(&mut self) {
-        self.hub.say(json!({"ev": "state", "agents": [], "cards": []}));
+        self.hub.say(json!({"ev": "agents", "project": fake_hub::HOME, "agents": []}));
         self.until(|o| has(o, "state"));
         self.out.retain(|v| v["ev"] != "state");
     }
@@ -262,10 +257,10 @@ fn hub_state_becomes_state_with_agents_and_cards_with_options() {
     );
     // fn + 1 answers with the option's words, as the TUI's box does
     t.cmd(Cmd::Answer { card: 3, reply: "1".into() });
-    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "/answer 3 yes"}));
+    assert_eq!(t.hub.sent(), json!({"cmd": "answer", "card": 3, "reply": "yes"}));
     // words go as they are
     t.cmd(Cmd::Answer { card: 3, reply: "only on desktop".into() });
-    assert_eq!(t.hub.next()["text"], "/answer 3 only on desktop");
+    assert_eq!(t.hub.sent(), json!({"cmd": "answer", "card": 3, "reply": "only on desktop"}));
     // a closed card
     t.cmd(Cmd::Answer { card: 9, reply: "1".into() });
     assert!(has(&t.take(), "error"));
@@ -286,7 +281,7 @@ fn a_page_cards_digit_goes_to_the_page_path() {
     let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
     assert_eq!(st["cards"][0]["options"], json!([{"n": 1, "label": "done"}]));
     t.cmd(Cmd::Answer { card: 3, reply: "1".into() });
-    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "/answer 3 1"}));
+    assert_eq!(t.hub.sent(), json!({"cmd": "answer", "card": 3, "reply": "1"}));
 }
 
 /// Law (pm's C fail 41): fn + digit is never refused on a card that
@@ -316,10 +311,10 @@ b: straight to main"})])
     for i in 0..forms.len() {
         assert_eq!(st["cards"][i]["options"][1]["label"], "straight to main", "{}", forms[i]);
         t.cmd(Cmd::Answer { card: i as u64 + 1, reply: "2".into() });
-        assert_eq!(t.hub.next()["text"], format!("/answer {} straight to main", i + 1), "{}", forms[i]);
+        assert_eq!(t.hub.sent(), json!({"cmd": "answer", "card": i + 1, "reply": "straight to main"}), "{}", forms[i]);
     }
     t.cmd(Cmd::Answer { card: 9, reply: "2".into() });
-    assert_eq!(t.hub.next()["text"], "/answer 9 2");
+    assert_eq!(t.hub.sent(), json!({"cmd": "answer", "card": 9, "reply": "2"}));
     assert!(!has(&t.take(), "error"));
 }
 
@@ -334,7 +329,8 @@ fn an_answer_on_a_replaced_batch_card_reaches_the_hub() {
 {n} replies to Benjamin
 1. review
 2. send all {n}"),
-        "page": {"id": "bugs", "block": "r", "item": "r1", "drafts": true, "url": "http://x/p/bugs#r1"}});
+        "page": {"id": "bugs", "block": "r", "item": "r1", "drafts": true, "url": "http://x/p/bugs#r1"},
+        "batch": {"count": n, "title": "bugs", "what": "replies", "names": ["Benjamin"]}});
     t.hub.say(json!({"ev": "state", "agents": [], "pages": [], "cards": [batch(1, 6)]}));
     t.until(|o| has(o, "state"));
     t.take();
@@ -342,7 +338,7 @@ fn an_answer_on_a_replaced_batch_card_reaches_the_hub() {
     t.until(|o| has(o, "state"));
     t.take();
     t.cmd(Cmd::Answer { card: 1, reply: "2".into() });
-    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "/answer 1 2"}));
+    assert_eq!(t.hub.sent(), json!({"cmd": "answer", "card": 1, "reply": "2"}));
     assert!(!has(&t.take(), "error"));
     t.cmd(Cmd::Answer { card: 5, reply: "2".into() });
     assert!(has(&t.take(), "error"));
@@ -372,7 +368,7 @@ fn a_cards_body_does_not_repeat_its_options() {
     assert_eq!(c[2]["text"], "keep the banner on mobile?");
     // fn + 2 still answers with the option's words
     t.cmd(Cmd::Answer { card: 1, reply: "2".into() });
-    assert_eq!(t.hub.next()["text"], "/answer 1 arrête-le");
+    assert_eq!(t.hub.sent(), json!({"cmd": "answer", "card": 1, "reply": "arrête-le"}));
 }
 
 /// Law (pm's C fail 36): bise's own bookkeeping (main's archive
@@ -402,7 +398,7 @@ fn a_hub_item_digit_goes_as_the_digit() {
         {"id": 7, "kind": "feature_try", "agent": "main", "text": "ambient-app is ready to try\n1. try it\n2. later"}]}));
     t.until(|o| has(o, "state"));
     t.cmd(Cmd::Answer { card: 7, reply: "1".into() });
-    assert_eq!(t.hub.next()["text"], "/answer 7 1");
+    assert_eq!(t.hub.sent(), json!({"cmd": "answer", "card": 7, "reply": "1"}));
 }
 
 #[test]
@@ -415,8 +411,8 @@ fn send_goes_to_main_with_the_shot_marker_and_the_png_is_deleted() {
     assert!(!png.exists(), "the app's PNG goes at once");
     t.cmd(Cmd::Send { text: "  why is this red?  ".into() });
     let req = t.hub.next();
-    assert_eq!(req["op"], "input");
-    assert_eq!(req["focus"], "main");
+    assert_eq!(req["cmd"], "send");
+    assert_eq!(req["agent"], "main");
     let text = req["text"].as_str().unwrap();
     assert!(text.starts_with("why is this red?\n\n<image name=\"[Screen]\" path=\"Chrome · localhost:4801/settings\" mime=\"image/png\" b64=\""), "{text}");
     let ms = bend_images::markers(text);
@@ -433,6 +429,7 @@ fn send_goes_to_main_with_the_shot_marker_and_the_png_is_deleted() {
     t.hub.line("main", "  obs: turn_started");
     t.until(|o| phase_is(o, "working"));
     assert!(b64.exists());
+    t.hub.line("main", "  obs: assistant: it's the CSS.");
     t.hub.line("main", "  obs: turn_done: completed");
     t.until(|o| phase_is(o, "done"));
     assert!(!b64.exists(), "the stored shot is not kept after main's turn");
@@ -514,6 +511,7 @@ fn a_dropped_file_reaches_main_with_his_words() {
 #[test]
 fn a_shot_steered_into_a_running_turn_is_forgotten_at_its_end() {
     let mut t = T::new();
+    t.hub.say(json!({"ev": "state", "agents": [{"name": "main", "main": true, "status": "working"}], "cards": []}));
     t.hub.line("main", "  obs: turn_started");
     t.ready();
     let png = t.dir.join("a.png");
@@ -539,6 +537,8 @@ fn a_shot_steered_into_a_running_turn_is_forgotten_at_its_end() {
 #[test]
 fn a_message_sent_during_an_agents_turn_waits_for_the_next_one() {
     let mut t = T::new();
+    // main's turn runs with no entry of its own yet: its row says so
+    t.hub.say(json!({"ev": "state", "agents": [{"name": "main", "main": true, "status": "working"}], "cards": []}));
     t.hub.line("main", "  obs: turn_started");
     t.ready();
     t.cmd(Cmd::Send { text: "after this".into() });
@@ -556,276 +556,6 @@ fn a_message_sent_during_an_agents_turn_waits_for_the_next_one() {
     assert!(t.take().contains(&json!({"ev": "main", "text": "Here, after it.", "turn": 2})));
 }
 
-#[test]
-fn talk_start_heard_talk_end_is_one_input_and_main_answers_aloud() {
-    let mut t = T::new();
-    t.ready();
-    let png = t.dir.join("fn-down.png");
-    std::fs::write(&png, b"shot").unwrap();
-    t.cmd(Cmd::Shot { path: png, app: "Chrome".into(), title: "the build".into() });
-    t.cmd(Cmd::TalkStart);
-    assert!(phase_is(&t.take(), "listening"));
-    assert_eq!(t.fakes.mic.lock().unwrap().opened, 1);
-    // the mic's blocks go to the listener; its words come back
-    let blocks = t.fakes.mic.lock().unwrap().blocks.clone().unwrap();
-    blocks.send(crate::voicemode::MicBlock { pcm: vec![5000; 320], at: Instant::now() }).unwrap();
-    let heard = t.fakes.listen.lock().unwrap()[0].heard.clone();
-    heard.send(Heard::Text(" is the build".into())).unwrap();
-    t.until(|o| o.iter().any(|v| v["ev"] == "heard" && v["text"] == "is the build" && v["final"] == false));
-    heard.send(Heard::Text(" green".into())).unwrap();
-    t.until(|o| o.iter().any(|v| v["ev"] == "heard" && v["text"] == "is the build green"));
-    assert!(t.take().iter().any(|v| v["ev"] == "level" && v["who"] == "you"));
-    // fn up: the mic closes, the listener flushes
-    t.cmd(Cmd::TalkEnd);
-    assert!(t.fakes.mic.lock().unwrap().blocks.as_ref().is_some());
-    let audio: Vec<ListenMsg> = t.fakes.listen.lock().unwrap()[0].audio.try_iter().collect();
-    assert_eq!(audio, vec![ListenMsg::Audio(vec![5000; 320]), ListenMsg::Flush]);
-    heard.send(Heard::Text("?".into())).unwrap();
-    heard.send(Heard::Flushed).unwrap();
-    t.until(|o| has(o, "sent"));
-    let req = t.hub.next();
-    let text = req["text"].as_str().unwrap();
-    assert!(text.starts_with("is the build green?\n\n<image name=\"[Screen]\" path=\"Chrome · the build\""), "{text}");
-    let out = t.take();
-    assert!(out.contains(&json!({"ev": "heard", "text": "is the build green?", "final": true})));
-    assert!(out.contains(&json!({"ev": "sent", "text": "is the build green?", "voice": true, "shot": true})));
-    // one input only
-    t.hub.w.set_read_timeout(Some(Duration::from_millis(1))).unwrap();
-    t.hub.r.get_ref().set_read_timeout(Some(Duration::from_millis(100))).unwrap();
-    let mut more = String::new();
-    assert!(t.hub.r.read_line(&mut more).is_err() || more.is_empty(), "a second input: {more}");
-    t.hub.r.get_ref().set_read_timeout(Some(Duration::from_secs(3))).unwrap();
-
-    // main's lines: working (with its tool line), main's text, then aloud
-    t.hub.line("main", "  obs: turn_started");
-    t.hub.line("main", "tool_intent #1 : runs the tests");
-    t.hub.line("main", "  obs: assistant: <think>check ci</think>Yes, the build is green.\\nAll 412 tests pass.");
-    t.hub.line("main", "  obs: turn_done: completed");
-    t.until(|o| phase_is(o, "speaking"));
-    let out = t.take();
-    assert_eq!(phases(&out), vec!["working", "working", "speaking"]);
-    assert!(out.iter().any(|v| v["ev"] == "phase" && v["line"] == "runs the tests"));
-    assert!(out.contains(&json!({"ev": "main", "text": "Yes, the build is green.\nAll 412 tests pass.", "turn": 1})));
-    // the voice: sentence by sentence; the speaker's clock lights the words
-    let first = {
-        let s = t.fakes.synth.lock().unwrap();
-        assert_eq!(s.len(), 1);
-        assert!(s[0].text.contains("build is green"), "{}", s[0].text);
-        s[0].events.clone()
-    };
-    first.send(Synth::Audio(vec![0.1; 24_000])).unwrap();
-    first.send(Synth::Done).unwrap();
-    let synth = t.fakes.synth.clone();
-    t.until(move |_| synth.lock().unwrap().len() == 2);
-    t.fakes.speaker.lock().unwrap().clock = Some((1, Duration::from_millis(500)));
-    t.until(|o| o.iter().any(|v| v["ev"] == "word"));
-    let w: Vec<u64> = t.take().iter().filter(|v| v["ev"] == "word").map(|v| v["i"].as_u64().unwrap()).collect();
-    assert!(w[0] <= 4, "{w:?}");
-    let second = t.fakes.synth.lock().unwrap()[1].events.clone();
-    second.send(Synth::Audio(vec![0.1; 24_000])).unwrap();
-    second.send(Synth::Done).unwrap();
-    {
-        let mut s = t.fakes.speaker.lock().unwrap();
-        s.clock = None;
-        s.done.extend([1, 2]);
-    }
-    t.until(|o| phase_is(o, "done"));
-    let out = t.take();
-    // the last word of the message (`pass.`, word 8) is lit
-    assert_eq!(out.iter().rfind(|v| v["ev"] == "word").unwrap(), &json!({"ev": "word", "turn": 1, "i": 8}));
-    assert!(out.contains(&json!({"ev": "level", "who": "main", "v": 0.0})));
-}
-
-fn t_synths(t: &T) -> usize {
-    t.fakes.synth.lock().unwrap().len()
-}
-
-/// Law (ambient-lead m_6513): fn space's typed text has two sends: ⌘⏎
-/// asks main ({cmd: send}, via capsule) and tab starts an agent ({cmd:
-/// start}): main gets 'start an agent for: <text>' with via
-/// capsule-start (the hub's hint: start an agent; one short line), and
-/// only main starts it. Empty words send nothing.
-#[test]
-fn tab_asks_main_to_start_an_agent() {
-    let mut t = T::new();
-    t.ready();
-    t.cmd(Cmd::Start { text: "  fix the login loop on Safari ".into() });
-    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "start an agent for: fix the login loop on Safari", "via": "capsule-start"}));
-    assert!(has(&t.take(), "sent"));
-    t.cmd(Cmd::Start { text: "   ".into() });
-    t.cmd(Cmd::Send { text: "what's running?".into() });
-    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "what's running?", "via": "capsule"}));
-    // its parse from the app's line
-    assert!(matches!(Cmd::parse(r#"{"cmd":"start","text":"x"}"#), Ok(Cmd::Start { .. })));
-}
-
-#[test]
-fn voice_out_only_after_a_voice_input() {
-    let mut t = T::new();
-    t.ready();
-    t.cmd(Cmd::Send { text: "typed".into() });
-    t.hub.next();
-    t.main_turn("Done.");
-    t.until(|o| phase_is(o, "done"));
-    assert!(has(&t.take(), "main"));
-    assert_eq!(t_synths(&t), 0, "a typed message is answered in text");
-    // a voice message: aloud
-    talk(&mut t, "and now?");
-    t.main_turn("Now too.");
-    t.until(|o| phase_is(o, "speaking"));
-    assert_eq!(t_synths(&t), 1);
-    // a typed message after it: text again
-    t.cmd(Cmd::Hush);
-    t.cmd(Cmd::Send { text: "and typed?".into() });
-    t.hub.next();
-    t.main_turn("Typed, so text.");
-    t.until(|o| o.iter().filter(|v| v["ev"] == "main").count() == 2);
-    t.until(|o| phase_is(o, "done"));
-    assert_eq!(t_synths(&t), 1);
-}
-
-#[test]
-fn quiet_is_text_only_and_stops_the_voice() {
-    let mut t = T::new();
-    t.ready();
-    // on a call: a voice message is answered in text
-    t.cmd(Cmd::Quiet { on: true });
-    talk(&mut t, "is it green?");
-    t.main_turn("Green.");
-    t.until(|o| phase_is(o, "done"));
-    assert!(has(&t.take(), "main"));
-    assert_eq!(t_synths(&t), 0, "quiet: no voice");
-    // the call ends: aloud again; a call starting mid-voice stops it
-    t.cmd(Cmd::Quiet { on: false });
-    talk(&mut t, "and now?");
-    t.main_turn("Now aloud.");
-    t.until(|o| phase_is(o, "speaking"));
-    assert_eq!(t_synths(&t), 1);
-    t.cmd(Cmd::Quiet { on: true });
-    assert!(phase_is(&t.take(), "done"));
-    assert_eq!(Cmd::parse(r#"{"cmd":"quiet","on":true,"why":"call"}"#), Ok(Cmd::Quiet { on: true }));
-}
-
-#[test]
-fn only_mains_words_after_its_last_tool_call_are_its_answer() {
-    let mut t = T::new();
-    t.ready();
-    t.cmd(Cmd::Send { text: "draft the plan".into() });
-    t.hub.next();
-    t.hub.line("main", "  obs: turn_started");
-    t.hub.line("main", "  obs: assistant: Spawn first, then start the page.");
-    t.hub.line("main", "tool_intent #1 : starts the page");
-    t.hub.line("main", "  obs: assistant: The plan is on your screen.");
-    t.hub.line("main", "  obs: turn_done: completed");
-    t.until(|o| phase_is(o, "done"));
-    let mains: Vec<Value> = t.take().into_iter().filter(|v| v["ev"] == "main").collect();
-    assert_eq!(mains, vec![json!({"ev": "main", "text": "The plan is on your screen.", "turn": 1})], "planning words never reach the capsule");
-    // words then a tool call and nothing after: no main event
-    t.cmd(Cmd::Send { text: "and the rest".into() });
-    t.hub.next();
-    t.hub.line("main", "  obs: turn_started");
-    t.hub.line("main", "  obs: assistant: Let me check.");
-    t.hub.line("main", "tool #2 bash : ls");
-    t.hub.line("main", "  obs: turn_done: completed");
-    t.until(|o| phase_is(o, "done"));
-    assert!(!has(&t.take(), "main"));
-}
-
-#[test]
-fn stop_watching_goes_to_the_hub_and_timers_ride_the_state() {
-    let mut t = T::new();
-    t.cmd(Cmd::parse(r#"{"cmd":"every_stop","id":3}"#).unwrap());
-    assert_eq!(t.hub.next(), json!({"op": "every_stop", "id": 3}));
-    assert!(Cmd::parse(r#"{"cmd":"every_stop"}"#).is_err());
-    let timers = json!([{"id": 3, "what": "the launch", "every": "15m"}]);
-    t.hub.say(json!({"ev": "state", "agents": [], "cards": [], "pages": [{"id": "w", "opened_version": 2}], "timers": timers}));
-    t.until(|o| has(o, "state"));
-    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
-    assert_eq!(st["timers"], timers);
-    assert_eq!(st["pages"][0]["opened_version"], 2);
-}
-
-#[test]
-fn a_turn_on_input_from_a_page_never_shows_in_the_capsule() {
-    let mut t = T::new();
-    t.ready();
-    // the hub's notes message to main, with its page marker
-    t.hub.line("main", "sb you : you sent 1 note on your page \"plan\" (plan v1): 1. start an agent on b2\\n\\n[from the page: answer on the page; one short line at most]");
-    t.hub.line("main", "  obs: turn_started");
-    t.hub.line("main", "  obs: assistant: I started fixer on b2. It hasn't confirmed yet.");
-    t.hub.line("main", "  obs: turn_done: completed");
-    t.sync();
-    let out = t.take();
-    assert!(!has(&out, "main") && phases(&out).is_empty(), "{out:?}");
-    // his own message after it: shown as usual
-    t.hub.line("main", "sb you : is it done?");
-    t.main_turn("Yes.");
-    t.until(|o| has(o, "main"));
-}
-
-#[test]
-fn voice_answers_off_is_text_only_until_on_again() {
-    let mut t = T::new();
-    t.ready();
-    t.cmd(Cmd::Voice { on: false });
-    talk(&mut t, "is it green?");
-    t.main_turn("Green.");
-    t.until(|o| phase_is(o, "done"));
-    assert_eq!(t_synths(&t), 0, "voice answers off: text only");
-    t.cmd(Cmd::Voice { on: true });
-    talk(&mut t, "and now?");
-    t.main_turn("Now aloud.");
-    t.until(|o| phase_is(o, "speaking"));
-    assert_eq!(t_synths(&t), 1);
-    // turned off mid-voice: it stops, the text stays
-    t.cmd(Cmd::Voice { on: false });
-    assert!(phase_is(&t.take(), "done"));
-    assert_eq!(Cmd::parse(r#"{"cmd":"voice","on":false}"#), Ok(Cmd::Voice { on: false }));
-}
-
-// the window's shown is bise-proto's AppCmd (qa-flows m_9714): the
-// fixture line parses to the projects it names; a bad one is an error
-#[test]
-fn shown_is_the_proto_app_cmd() {
-    assert_eq!(
-        Cmd::parse(r#"{"cmd":"shown","projects":["bise-home-00000000","acme-1a2b3c4d"]}"#),
-        Ok(Cmd::Shown { projects: vec!["bise-home-00000000".into(), "acme-1a2b3c4d".into()] })
-    );
-    assert_eq!(Cmd::parse(r#"{"cmd":"shown","projects":[]}"#), Ok(Cmd::Shown { projects: vec![] }));
-    assert!(Cmd::parse(r#"{"cmd":"shown"}"#).is_err());
-}
-
-#[test]
-fn the_state_carries_pages_url_and_urgent_cards() {
-    let mut t = T::new();
-    t.hub.say(json!({"ev": "state", "agents": [], "pages": [], "pages_url": "http://127.0.0.1:47123",
-        "cards": [{"id": 1, "kind": "confirm", "agent": "a", "text": "run rm?"}, {"id": 2, "kind": "question", "agent": "a", "text": "which?"}]}));
-    t.until(|o| has(o, "state"));
-    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
-    assert_eq!(st["pages_url"], "http://127.0.0.1:47123");
-    assert_eq!((st["cards"][0]["urgent"].as_bool(), st["cards"][1]["urgent"].as_bool()), (Some(true), Some(false)));
-}
-
-/// A batch of drafts' card keeps the hub's fields for the capsule's
-/// words (amb-web m_6061); other cards have none.
-#[test]
-fn a_batch_card_carries_its_fields() {
-    let mut t = T::new();
-    let batch = json!({"count": 3, "title": "inbox", "what": "replies", "names": ["legal", "Lucas", "Marc"]});
-    t.hub.say(json!({"ev": "state", "agents": [], "pages": [],
-        "cards": [{"id": 4, "kind": "question", "agent": "main", "text": "3 drafts wait for you · inbox
-replies to legal, Lucas and Marc
-1. review
-2. send all 3",
-            "page": {"id": "inbox", "block": "replies", "item": "r1", "drafts": true, "url": "http://x/p/inbox#r1"}, "batch": batch},
-            {"id": 5, "kind": "question", "agent": "a", "text": "which?"}]}));
-    t.until(|o| has(o, "state"));
-    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
-    assert_eq!(st["cards"][0]["batch"], batch);
-    assert_eq!(st["cards"][0]["options"][1]["label"], "send all 3");
-    assert!(st["cards"][1].get("batch").is_none());
-}
-
 /// fn held, `words` heard, fn up: sent.
 fn talk(t: &mut T, words: &str) {
     t.cmd(Cmd::TalkStart);
@@ -836,72 +566,6 @@ fn talk(t: &mut T, words: &str) {
     t.until(|o| has(o, "sent"));
     assert_eq!(t.hub.next()["text"], words);
     t.take();
-}
-
-#[test]
-fn hush_and_cut_in_stop_the_speaker() {
-    let mut t = T::new();
-    t.ready();
-    talk(&mut t, "say something");
-    t.main_turn("Something long enough to say.");
-    t.until(|o| phase_is(o, "speaking"));
-    let cancel = t.fakes.synth.lock().unwrap()[0].cancel.clone();
-    t.cmd(Cmd::Hush);
-    assert_eq!(t.fakes.speaker.lock().unwrap().stops, 1);
-    assert!(cancel.load(Ordering::SeqCst), "the voice being made is dropped too");
-    assert!(phase_is(&t.take(), "done"));
-    // hush when nothing speaks: nothing
-    t.cmd(Cmd::Hush);
-    assert!(t.take().is_empty());
-
-    talk(&mut t, "again");
-    t.main_turn("Again, something to say.");
-    t.until(|o| phase_is(o, "speaking"));
-    t.cmd(Cmd::CutIn);
-    assert_eq!(t.fakes.speaker.lock().unwrap().stops, 2);
-    assert!(phase_is(&t.take(), "idle"));
-    t.cmd(Cmd::TalkStart);
-    assert!(phase_is(&t.take(), "listening"));
-
-    // fn down while main speaks, without cut_in first: the voice stops too
-    t.cmd(Cmd::TalkCancel);
-    talk(&mut t, "once more");
-    t.main_turn("Once more, said.");
-    t.until(|o| phase_is(o, "speaking"));
-    t.cmd(Cmd::TalkStart);
-    assert_eq!(t.fakes.speaker.lock().unwrap().stops, 3);
-}
-
-#[test]
-fn talk_cancel_sends_nothing_and_drops_the_shot() {
-    let mut t = T::new();
-    t.ready();
-    let png = t.dir.join("c.png");
-    std::fs::write(&png, b"cancelled").unwrap();
-    t.cmd(Cmd::Shot { path: png, app: "Mail".into(), title: "x".into() });
-    let stored: Vec<_> = std::fs::read_dir(&t.dir).unwrap().collect();
-    assert_eq!(stored.len(), 2);
-    t.cmd(Cmd::TalkStart);
-    let heard = t.fakes.listen.lock().unwrap()[0].heard.clone();
-    heard.send(Heard::Text(" never mind".into())).unwrap();
-    t.cmd(Cmd::TalkCancel);
-    assert!(phase_is(&t.take(), "idle"));
-    assert_eq!(std::fs::read_dir(&t.dir).unwrap().count(), 0, "the shot is gone");
-    t.cmd(Cmd::Send { text: "typed after".into() });
-    assert_eq!(t.hub.next()["text"], "typed after");
-}
-
-#[test]
-fn no_voice_model_keeps_the_text() {
-    let mut t = T::new();
-    t.ready();
-    t.say_ok.store(false, Ordering::SeqCst);
-    talk(&mut t, "hello");
-    t.main_turn("Hi.");
-    t.until(|o| phase_is(o, "done"));
-    let out = t.take();
-    assert!(has(&out, "error") && has(&out, "main"));
-    assert_eq!(t_synths(&t), 0);
 }
 
 #[test]
@@ -920,6 +584,8 @@ fn a_failed_turn_is_phase_failed_with_its_line() {
 #[test]
 fn the_hello_replay_says_where_main_is_but_not_its_old_words() {
     let mut t = T::new();
+    t.hub.say(json!({"ev": "state", "agents": [{"name": "main", "main": true, "status": "working"}], "cards": []}));
+    t.until(|o| has(o, "state"));
     t.take();
     t.hub.line("main", "sb you : an old question");
     t.hub.line("main", "  obs: turn_started");
@@ -928,14 +594,16 @@ fn the_hello_replay_says_where_main_is_but_not_its_old_words() {
     t.hub.line("main", "sb msg-you : docs : an old note");
     t.hub.line("main", "sb you : the question main is on");
     t.hub.line("main", "  obs: turn_started");
-    t.hub.say(json!({"ev": "ready"}));
+    t.replay_over();
     t.until(|o| has(o, "phase"));
     let out = t.take();
     assert_eq!(phases(&out), vec!["working"]);
     assert!(!has(&out, "main"), "nothing of the replay is sent: {out:?}");
     // other agents' lines never move main's phase
     t.hub.line("cookies", "  obs: turn_done: completed");
+    // a turn with no entry of its own ends when main's row stops running
     t.hub.line("main", "  obs: turn_done: completed");
+    t.hub.say(json!({"ev": "state", "agents": [{"name": "main", "main": true, "status": "idle"}], "cards": []}));
     t.until(|o| has(o, "phase"));
     assert_eq!(phases(&t.take()), vec!["done"]);
 }
@@ -963,7 +631,7 @@ fn hub_loss_says_up_false_then_reconnects() {
 fn dead_end() -> HubEnd {
     let (a, _b) = UnixStream::pair().unwrap();
     let r = BufReader::new(a.try_clone().unwrap());
-    HubEnd { w: a, r }
+    HubEnd::new(a, r)
 }
 
 #[test]
@@ -1088,6 +756,8 @@ fn a_tui_user_turn_sends_main_words_as_plain_text() {
 #[test]
 fn msg_you_lines_are_main_words_with_who_wrote_them() {
     let mut t = T::new();
+    // every live agent's thread is the capsule's (its words to him)
+    t.hub.say(json!({"ev": "state", "agents": [{"name": "main", "main": true, "status": "idle"}, {"name": "docs", "status": "working"}], "cards": []}));
     t.ready();
     t.hub.line("docs", "sb msg-you : docs : the **v2** page is up");
     t.until(|o| has(o, "main"));
@@ -1132,22 +802,31 @@ fn pages_ride_the_state_and_a_waited_page_comes_in_front() {
     assert!(!front(&mut t));
 }
 
-/// A note talk on page `id`: its words, then fn up; the hub's
-/// page_voice requests, in order.
+/// A page/voice request on the home connection, as the fake hub gives it
+/// (its HubCmd), without its project (the test workspace's hub id).
+fn voice_req(mut v: Value) -> Value {
+    if let Some(o) = v.as_object_mut() {
+        o.remove("project");
+    }
+    v
+}
+
+/// A note talk on page `id`: its words, then fn up; the hub's page/voice
+/// requests, in order.
 fn note_talk(t: &mut T, id: &str, words: &[&str]) -> Vec<Value> {
     t.cmd(Cmd::PageTalk { page: id.into() });
     let heard = t.fakes.listen.lock().unwrap().last().unwrap().heard.clone();
-    let mut reqs = vec![t.hub.next()];
+    let mut reqs = vec![voice_req(t.hub.next())];
     for w in words {
         heard.send(Heard::Text(format!(" {w}"))).unwrap();
         t.until(|o| o.iter().any(|v| v["ev"] == "heard" && v["final"] == false));
-        reqs.push(t.hub.next());
+        reqs.push(voice_req(t.hub.next()));
         t.out.retain(|v| v["ev"] != "heard");
     }
     t.cmd(Cmd::TalkEnd);
     heard.send(Heard::Flushed).unwrap();
     t.until(|o| o.iter().any(|v| v["ev"] == "heard" && v["final"] == true));
-    reqs.push(t.hub.next());
+    reqs.push(voice_req(t.hub.next()));
     reqs
 }
 
@@ -1159,7 +838,13 @@ fn a_note_talk_goes_to_the_page_never_to_main() {
     t.until(|o| has(o, "state"));
     t.ready();
     let reqs = note_talk(&mut t, "weekly-update", &["make the intro", "shorter"]);
-    let pv = |phase: &str, text: &str| json!({"op": "page_voice", "page": "weekly-update", "phase": phase, "text": text});
+    let pv = |phase: &str, text: &str| {
+        let mut v = json!({"cmd": "page_voice", "page": "weekly-update", "phase": phase});
+        if !text.is_empty() {
+            v["text"] = json!(text);
+        }
+        v
+    };
     assert_eq!(reqs, vec![pv("start", ""), pv("heard", "make the intro"), pv("heard", "make the intro shorter"), pv("end", "make the intro shorter")]);
     let out = t.take();
     // the capsule says where the words go, then idle: no sent, no main phases
@@ -1179,9 +864,9 @@ fn a_note_talk_goes_to_the_page_never_to_main() {
     let reqs = note_talk(&mut t, "weekly-update", &[]);
     assert_eq!(reqs.last().unwrap(), &pv("cancel", ""));
     t.cmd(Cmd::PageTalk { page: "weekly-update".into() });
-    assert_eq!(t.hub.next(), pv("start", ""));
+    assert_eq!(voice_req(t.hub.next()), pv("start", ""));
     t.cmd(Cmd::TalkCancel);
-    assert_eq!(t.hub.next(), pv("cancel", ""));
+    assert_eq!(voice_req(t.hub.next()), pv("cancel", ""));
     assert!(phase_is(&t.take(), "idle"));
 
     // never an input to main
@@ -1189,6 +874,72 @@ fn a_note_talk_goes_to_the_page_never_to_main() {
     t.hub.r.get_ref().set_read_timeout(Some(Duration::from_millis(100))).unwrap();
     let mut more = String::new();
     assert!(t.hub.r.read_line(&mut more).is_err() || more.is_empty(), "more: {more}");
+}
+
+/// After `initialize` the core writes JSON-RPC only (architect m_15183):
+/// no `"op"` line in the core's code but the older door's hello to a hub
+/// before client-protocol (hubs.rs, HubIn::Up), the one release it stays.
+#[test]
+fn the_core_writes_no_op_line_but_the_older_doors_hello() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/ambient");
+    let mut files = vec![root.join("core.rs")];
+    let mut dirs = vec![root.join("core")];
+    while let Some(d) = dirs.pop() {
+        for e in std::fs::read_dir(&d).unwrap().flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                dirs.push(p);
+            } else if p.extension().is_some_and(|x| x == "rs") {
+                files.push(p);
+            }
+        }
+    }
+    let needle = concat!("\"", "op", "\"");
+    let mut at = Vec::new();
+    for f in &files {
+        let text = std::fs::read_to_string(f).unwrap();
+        let code = text.split("#[cfg(test)]").next().unwrap_or("");
+        for l in code.lines().filter(|l| l.contains(needle) && !l.trim_start().starts_with("//")) {
+            at.push(format!("{}: {}", f.strip_prefix(&root).unwrap().display(), l.trim()));
+        }
+    }
+    // TODO(client-protocol, the plan's 'after the release' step, with
+    // Hubs.older_door): none at all
+    assert_eq!(at, vec![r#"core/hubs.rs: c.hub.send(&json!({"op": "hello"}));"#.to_string()]);
+}
+
+/// Law (client-protocol step 5, proto-lead m_15443): an initialized
+/// connection is read as typed events only. The core's code never parses
+/// a feed line (`parse_line`) and never reads an event's `"ev"` tag but in
+/// the older door's typed line of a project hub before client-protocol
+/// (hubs.rs project_line, the one release it stays); its home connection
+/// has no older `state`, `ready`, `page` or `line` arm.
+#[test]
+fn an_initialized_connection_reads_no_older_event() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/ambient");
+    let mut files = vec![root.join("core.rs")];
+    for e in std::fs::read_dir(root.join("core")).unwrap().flatten() {
+        if e.path().extension().is_some_and(|x| x == "rs") {
+            files.push(e.path());
+        }
+    }
+    let tag = concat!("\"", "ev", "\")");
+    let parse = concat!("parse", "_line(");
+    // a match arm on an older event's tag (`"state" => ...`)
+    let arms = ["state", "ready", "page", "line"].map(|k| format!("\"{k}\""));
+    let mut at = Vec::new();
+    for f in &files {
+        let text = std::fs::read_to_string(f).unwrap();
+        let code = text.split("#[cfg(test)]").next().unwrap_or("");
+        let arm = |l: &str| arms.iter().any(|a| l.trim_start().starts_with(a.as_str()) && l.contains("=>"));
+        let older = |l: &str| l.contains(tag) || l.contains(parse) || arm(l);
+        for l in code.lines().filter(|l| older(l) && !l.trim_start().starts_with("//")) {
+            at.push(format!("{}: {}", f.strip_prefix(&root).unwrap().display(), l.trim()));
+        }
+    }
+    // TODO(client-protocol, the plan's 'after the release' step, with
+    // Hubs.older_door): none at all
+    assert_eq!(at, vec![r#"core/hubs.rs: let ev = v.get("ev").and_then(Value::as_str).unwrap_or("");"#.to_string()]);
 }
 
 #[test]
@@ -1221,8 +972,8 @@ fn what_the_capsule_sends_main_says_it_came_from_the_capsule() {
     t.ready();
     t.cmd(Cmd::Send { text: "what's running?".into() });
     assert_eq!(
-        t.hub.next(),
-        json!({"op": "input", "focus": "main", "text": "what's running?", "via": "capsule"})
+        t.hub.sent(),
+        json!({"cmd": "send", "agent": "main", "text": "what's running?", "via": "capsule"})
     );
     // an answer is an /answer command: no via, the hub adds no hint to it
     t.hub.say(json!({"ev": "state", "agents": [], "cards": [
@@ -1230,284 +981,6 @@ fn what_the_capsule_sends_main_says_it_came_from_the_capsule() {
     t.until(|o| has(o, "state"));
     t.cmd(Cmd::Answer { card: 4, reply: "1".into() });
     assert!(t.hub.next().get("via").is_none());
-}
-
-// ---- round 10: the agents (identity10 #data, ambient-lead m_7026) ----
-
-fn agents_state(perf: &str) -> Value {
-    json!({"ev": "state",
-        "agents": [
-            {"name": "main", "main": true, "status": "idle"},
-            {"name": "perf", "status": perf, "objective": "make the e2e fast\nmore", "note": "profiling the hub", "report": "", "created_ms": 5},
-            {"name": "old", "status": "archived", "objective": "an old fix", "report": "fixed in 0.4", "report_ms": 7},
-        ],
-        "cards": [{"id": 9, "kind": "question", "agent": "perf", "text": "which bench?\n1. cold\n2. warm"}],
-        "pages": [{"id": "perf-notes", "title": "Perf notes", "agent": "perf", "version": 2, "url": "http://p/perf-notes", "at_ms": 3}]})
-}
-
-#[test]
-fn agents_rows_carry_status_title_purpose_since_waits_and_archived() {
-    let mut t = T::new();
-    t.ready();
-    t.hub.say(agents_state("working"));
-    t.until(|o| has(o, "state"));
-    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
-    let rows = st["agents"].as_array().unwrap();
-    assert_eq!(rows.len(), 2, "main is not a row, an archived agent is: {rows:?}");
-    let (perf, old) = (&rows[0], &rows[1]);
-    assert_eq!(perf["status"], "working");
-    assert_eq!(perf["title"], "profiling the hub");
-    assert_eq!(perf["purpose"], "make the e2e fast");
-    assert_eq!(perf["waits"], 1);
-    assert_eq!(perf["archived"], false);
-    assert_eq!(perf["followed"], false);
-    assert_eq!(perf["since_ms"], 5, "first sight: its birth");
-    assert_eq!((old["status"].as_str(), old["archived"].as_bool(), old["title"].as_str()), (Some("done"), Some(true), Some("fixed in 0.4")));
-    assert_eq!(old["since_ms"], 7);
-    // the status changes: since moves; follow shows on the row
-    t.hub.say(agents_state("idle"));
-    t.until(|o| has(o, "state"));
-    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
-    assert_eq!(st["agents"][0]["status"], "idle");
-    assert!(st["agents"][0]["since_ms"].as_u64().unwrap() > 1_000_000);
-    t.cmd(Cmd::Follow { agent: "perf".into(), on: true });
-    let st = t.take().into_iter().find(|v| v["ev"] == "state").unwrap();
-    assert_eq!(st["agents"][0]["followed"], true);
-}
-
-#[test]
-fn agents_cmds_parse() {
-    let p = |s: &str| Cmd::parse(s);
-    assert_eq!(p(r#"{"cmd":"agent_preview","agent":"@perf"}"#), Ok(Cmd::AgentPreview { agent: "perf".into() }));
-    assert_eq!(p(r#"{"cmd":"agent_history","agent":"perf"}"#), Ok(Cmd::AgentHistory { agent: "perf".into(), before: None, limit: 60 }));
-    assert_eq!(p(r#"{"cmd":"agent_history","agent":"perf","before":40,"limit":20}"#), Ok(Cmd::AgentHistory { agent: "perf".into(), before: Some(40), limit: 20 }));
-    assert_eq!(p(r#"{"cmd":"agent_send","agent":"perf","text":"hi","mode":"queued"}"#), Ok(Cmd::AgentSend { agent: "perf".into(), text: "hi".into(), queued: true }));
-    assert_eq!(p(r#"{"cmd":"agent_send","agent":"perf","text":"hi","mode":"now"}"#), Ok(Cmd::AgentSend { agent: "perf".into(), text: "hi".into(), queued: false }));
-    assert_eq!(p(r#"{"cmd":"archive","agent":"perf","stop_first":true}"#), Ok(Cmd::Archive { agent: "perf".into(), stop_first: true }));
-    assert_eq!(p(r#"{"cmd":"unarchive","agent":"perf"}"#), Ok(Cmd::Unarchive { agent: "perf".into() }));
-    assert_eq!(p(r#"{"cmd":"follow","agent":"perf","on":false}"#), Ok(Cmd::Follow { agent: "perf".into(), on: false }));
-    assert!(p(r#"{"cmd":"stop"}"#).is_err(), "no agent: the app's bug");
-}
-
-/// perf's feed: his message, a reply, three tool calls, a report.
-fn perf_lines() -> Vec<Line> {
-    let l = |pos: u64, line: &str| (pos, 1_000 + pos, line.to_string());
-    vec![
-        l(1, "sb you : make it fast"),
-        l(2, "  obs: turn_started"),
-        l(3, "  obs: assistant: <think>hmm</think>on it"),
-        l(4, "tool #1 bash : cargo test -q"),
-        l(5, "tool_intent #1 : running the tests"),
-        l(6, "tool_result #1 ok : 3 failed"),
-        l(7, "tool #2 read_file : {\"path\":\"a.rs\"}"),
-        l(8, "tool #3 bash : sb land \"fast\""),
-        l(9, "tool_intent #3 : landing the fix"),
-        l(10, "sb msg-in : ambient-lead m_3 : nice\\nsecond line"),
-        l(11, "tool #4 bash : sb report done \"the e2e takes 40 s\""),
-        l(12, "  obs: turn_done: completed"),
-    ]
-}
-
-const PROJECT: &str = "ws-0000beef";
-
-/// The hub's fold of perf's lines (bise_proto::thread, what the hub
-/// sends): card 9 open, perf-notes published.
-fn hub_fold(lines: &[Line]) -> Vec<Entry> {
-    let pages = |id: &str| {
-        (id == "perf-notes").then(|| PageRef { id: id.into(), title: "Perf notes".into(), v: Some(2), url: "http://p/perf-notes".into() })
-    };
-    thread::fold(lines, &Ctx { open_cards: &[9], page: &pages, provider: &crate::models::provider_name, width: &unicode_width::UnicodeWidthStr::width, offset: &|_| 0, attached: &bise_proto::thread::Attached::plain })
-}
-
-/// The hub's typed hello answered (the target's project).
-fn welcome(t: &mut T) {
-    t.hub.say(json!({"ev": "welcome", "project": PROJECT, "proto": 1, "workspace": "/w", "name": "w"}));
-}
-
-fn thread_ev(agent: &str, entries: &[Entry], before: Option<u64>, more: bool) -> Value {
-    json!({"ev": "thread", "project": PROJECT, "agent": agent, "entries": entries, "before": before, "more": more})
-}
-
-fn entry_ev(agent: &str, e: &Entry) -> Value {
-    json!({"ev": "entry", "project": PROJECT, "agent": agent, "entry": e})
-}
-
-#[test]
-fn a_preview_shows_now_the_last_actions_what_waits_the_report_and_pages() {
-    let mut t = T::new();
-    t.ready();
-    welcome(&mut t);
-    t.hub.say(agents_state("working"));
-    t.until(|o| has(o, "state"));
-    t.take();
-    t.cmd(Cmd::AgentPreview { agent: "perf".into() });
-    assert_eq!(t.hub.next(), json!({"cmd": "subscribe", "agent": "perf", "limit": 8, "project": PROJECT}));
-    t.hub.say(thread_ev("perf", &hub_fold(&perf_lines()), None, false));
-    t.until(|o| has(o, "agent_preview"));
-    let p = t.take().into_iter().find(|v| v["ev"] == "agent_preview").unwrap();
-    let acts: Vec<(&str, &str)> = p["actions"].as_array().unwrap().iter().map(|a| (a["kind"].as_str().unwrap(), a["text"].as_str().unwrap())).collect();
-    assert_eq!(acts, [("message", "on it"), ("tool", "running the tests"), ("tool", "read_file: {\"path\":\"a.rs\"}"), ("land", "landing the fix"), ("report", "the e2e takes 40 s")]);
-    assert_eq!(p["waiting"], json!([{"card_id": 9, "question": "which bench?"}]));
-    assert_eq!(p["last_report"], json!({"kind": "done", "text": "the e2e takes 40 s", "at_ms": 1011}));
-    assert_eq!(p["pages"], json!([{"id": "perf-notes", "title": "Perf notes", "v": 2, "url": "http://p/perf-notes"}]));
-    assert_eq!(p["now"], "profiling the hub");
-    // its next step re-sends the preview: now is that step
-    t.hub.say(json!({"ev": "typing", "project": PROJECT, "agent": "perf", "text": "listing the bench files"}));
-    t.until(|o| o.iter().any(|v| v["ev"] == "agent_preview" && v["now"] == "listing the bench files"));
-    // another agent selected: perf's thread is left, its entries send nothing
-    t.cmd(Cmd::AgentPreview { agent: "old".into() });
-    assert_eq!(t.hub.next(), json!({"cmd": "unsubscribe", "agent": "perf", "project": PROJECT}));
-    assert_eq!(t.hub.next()["agent"], "old");
-    t.take();
-    let mut lines = perf_lines();
-    lines.push((13, 1_013, "  obs: assistant: done".into()));
-    t.hub.say(entry_ev("perf", hub_fold(&lines).last().unwrap()));
-    t.sync();
-    assert!(!t.take().iter().any(|v| v["ev"] == "agent_preview" && v["agent"] == "perf"));
-}
-
-#[test]
-fn a_history_shows_the_hubs_entries_older_and_follows_live() {
-    let mut t = T::new();
-    t.ready();
-    welcome(&mut t);
-    t.hub.say(agents_state("working"));
-    t.until(|o| has(o, "state"));
-    t.take();
-    t.cmd(Cmd::AgentHistory { agent: "perf".into(), before: None, limit: 60 });
-    assert_eq!(t.hub.next(), json!({"cmd": "subscribe", "agent": "perf", "limit": 60, "project": PROJECT}));
-    let mut lines = perf_lines();
-    lines.push((13, 1_013, "sb you : and the cold bench?".into()));
-    t.hub.say(thread_ev("perf", &hub_fold(&lines), None, false));
-    t.until(|o| has(o, "agent_history"));
-    let h = t.take().into_iter().find(|v| v["ev"] == "agent_history").unwrap();
-    let kinds: Vec<&str> = h["entries"].as_array().unwrap().iter().map(|e| e["kind"].as_str().unwrap()).collect();
-    assert_eq!(kinds, ["you", "agent", "tools", "from-agent", "report", "you", "card"], "from_agent is the panel's from-agent");
-    let e = &h["entries"];
-    assert_eq!((e[0]["pos"].as_u64(), e[0]["at_ms"].as_u64(), e[0]["text"].as_str()), (Some(1), Some(1001), Some("make it fast")));
-    assert_eq!(e[1]["text"], "on it", "no thinking");
-    assert_eq!((e[2]["pos"].as_u64(), e[2]["tools"]["count"].as_u64(), e[2]["text"].as_str()), (Some(4), Some(3), Some("read 1 file, ran 2 commands")), "the hub's counted summary");
-    assert_eq!((e[3]["text"].as_str(), e[3]["from"].as_str()), (Some("nice\nsecond line"), Some("ambient-lead")));
-    assert_eq!(e[4]["report"]["kind"], "done");
-    assert_eq!(e[6]["card"], json!({"id": 9, "question": "which bench?", "options": [{"n": 1, "label": "cold"}, {"n": 2, "label": "warm"}], "answered": false}));
-    assert_eq!((h["before"].clone(), h["more"].clone()), (Value::Null, json!(false)));
-    // live: the hub's changed entries and the step pass to the panel
-    lines.push((14, 1_014, "tool #6 bash : sb page publish notes.html --id perf-notes".into()));
-    lines.push((15, 1_015, "tool #7 bash : ls".into()));
-    lines.push((16, 1_016, "tool_intent #7 : listing".into()));
-    for e in hub_fold(&lines).iter().filter(|e| e.pos >= 14) {
-        t.hub.say(entry_ev("perf", e));
-    }
-    t.hub.say(json!({"ev": "typing", "project": PROJECT, "agent": "perf", "text": "listing"}));
-    t.until(|o| o.iter().any(|v| v == &json!({"ev": "agent_typing", "agent": "perf", "text": "listing"})));
-    let out = t.take();
-    let page = out.iter().find(|v| v["ev"] == "agent_entry" && v["entry"]["kind"] == "page").unwrap();
-    assert_eq!(page["entry"]["page"], json!({"id": "perf-notes", "title": "Perf notes", "v": 2, "url": "http://p/perf-notes"}));
-    assert!(out.iter().any(|v| v["ev"] == "agent_entry" && v["entry"]["tools"]["items"][0]["text"] == "listing"));
-    // the same entry again (a replay): nothing
-    t.hub.say(entry_ev("perf", hub_fold(&lines).last().unwrap()));
-    // the card answered (the state has no card now): only its entry says so
-    t.hub.say(json!({"ev": "state", "agents": agents_state("working")["agents"], "cards": []}));
-    t.until(|o| o.iter().any(|v| v["ev"] == "agent_entry" && v["entry"]["card"]["answered"] == true));
-    let out = t.take();
-    assert_eq!(out.iter().filter(|v| v["ev"] == "agent_entry").count(), 1, "the replayed entry sends nothing: {out:?}");
-    // older entries: before the first pos, none at once; else a page of the hub
-    t.cmd(Cmd::AgentHistory { agent: "perf".into(), before: Some(1), limit: 60 });
-    assert_eq!(t.take().into_iter().find(|v| v["ev"] == "agent_history").unwrap()["entries"], json!([]));
-    t.cmd(Cmd::AgentHistory { agent: "perf".into(), before: Some(11), limit: 2 });
-    assert_eq!(t.hub.next(), json!({"cmd": "page", "agent": "perf", "before": 11, "limit": 2, "project": PROJECT}));
-    let older: Vec<Line> = perf_lines().into_iter().take(10).skip(2).collect();
-    let (entries, before, more) = thread::page(&older, &Ctx { open_cards: &[], page: &|_: &str| None, provider: &crate::models::provider_name, width: &unicode_width::UnicodeWidthStr::width, offset: &|_| 0, attached: &bise_proto::thread::Attached::plain }, 2);
-    t.hub.say(thread_ev("perf", &entries, before, more));
-    t.until(|o| has(o, "agent_history"));
-    let h = t.take().into_iter().find(|v| v["ev"] == "agent_history").unwrap();
-    let kinds: Vec<&str> = h["entries"].as_array().unwrap().iter().map(|e| e["kind"].as_str().unwrap()).collect();
-    assert_eq!(kinds, ["tools", "from-agent"], "the hub's page, as the panel's");
-    assert_eq!((h["before"].as_u64(), h["more"].as_bool()), (Some(4), Some(true)));
-    // the panel closes: the thread is left, no more entries
-    t.cmd(Cmd::AgentUnwatch { agent: "perf".into() });
-    assert_eq!(t.hub.next(), json!({"cmd": "unsubscribe", "agent": "perf", "project": PROJECT}));
-    lines.push((17, 1_017, "  obs: assistant: bye".into()));
-    t.hub.say(entry_ev("perf", hub_fold(&lines).last().unwrap()));
-    t.sync();
-    assert!(!has(&t.take(), "agent_entry"));
-}
-
-#[test]
-fn a_reconnection_subscribes_again_and_sends_only_what_changed() {
-    let mut t = T::new();
-    t.ready();
-    welcome(&mut t);
-    t.hub.say(agents_state("working"));
-    t.until(|o| has(o, "state"));
-    t.cmd(Cmd::AgentHistory { agent: "perf".into(), before: None, limit: 60 });
-    assert_eq!(t.hub.next()["cmd"], "subscribe");
-    let mut lines = perf_lines();
-    t.hub.say(thread_ev("perf", &hub_fold(&lines), None, false));
-    t.until(|o| has(o, "agent_history"));
-    t.take();
-    // the hub restarts: the core says hello again; its welcome resubscribes,
-    // never re-sends a command
-    t.hub.w.shutdown(std::net::Shutdown::Both).unwrap();
-    t.hub = t.ends.recv_timeout(Duration::from_secs(3)).expect("reconnected");
-    t.until(|o| o.iter().any(|v| v["ev"] == "hub" && v["up"] == true));
-    t.take();
-    welcome(&mut t);
-    t.hub.say(agents_state("working"));
-    t.until(|o| has(o, "state"));
-    assert_eq!(t.hub.next(), json!({"cmd": "subscribe", "agent": "perf", "limit": 60, "project": PROJECT}));
-    lines.push((13, 1_013, "  obs: assistant: back".into()));
-    t.hub.say(thread_ev("perf", &hub_fold(&lines), None, false));
-    t.until(|o| has(o, "agent_entry"));
-    t.sync();
-    let out = t.take();
-    assert!(!has(&out, "agent_history"), "no new page for an open panel: {out:?}");
-    let pos: Vec<u64> = out.iter().filter(|v| v["ev"] == "agent_entry").map(|v| v["entry"]["pos"].as_u64().unwrap()).collect();
-    assert_eq!(pos, [13], "only the new entry");
-}
-
-#[test]
-fn acts_send_now_queued_stop_archive_unarchive() {
-    let mut t = T::new();
-    t.ready();
-    t.hub.say(agents_state("working"));
-    t.until(|o| has(o, "state"));
-    t.take();
-    t.cmd(Cmd::AgentSend { agent: "perf".into(), text: " look at the cold bench ".into(), queued: false });
-    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "perf", "text": "look at the cold bench", "via": "ambient"}));
-    assert!(t.take().contains(&json!({"ev": "sent", "agent": "perf", "mode": "now"})));
-    // queued while it works: the hub holds it (sb-core), never the core
-    t.cmd(Cmd::AgentSend { agent: "perf".into(), text: "then the warm one".into(), queued: true });
-    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "perf", "text": "then the warm one", "via": "ambient", "queued": true}));
-    let out = t.take();
-    assert!(out.contains(&json!({"ev": "agent_queued", "agent": "perf", "text": "then the warm one"})));
-    assert!(!out.iter().any(|v| v["ev"] == "phase"), "never main's orb");
-    t.hub.say(agents_state("idle"));
-    t.until(|o| has(o, "state"));
-    t.cmd(Cmd::Stop { agent: "perf".into() });
-    assert_eq!(t.hub.next(), json!({"op": "interrupt", "agent": "perf"}), "nothing resent at idle");
-    t.cmd(Cmd::Archive { agent: "perf".into(), stop_first: true });
-    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "/archive perf --force"}));
-    t.cmd(Cmd::Archive { agent: "perf".into(), stop_first: false });
-    assert_eq!(t.hub.next()["text"], "/archive perf");
-    t.cmd(Cmd::Unarchive { agent: "old".into() });
-    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "/restore old"}));
-    t.cmd(Cmd::AgentSend { agent: "nobody".into(), text: "hi".into(), queued: false });
-    assert!(has(&t.take(), "error"));
-}
-
-#[test]
-fn a_preview_of_an_agent_the_hub_does_not_know_comes_at_once() {
-    // the QA scenes inject agents into the page only (m_7106): the core
-    // still answers, empty, so the bar never waits
-    let mut t = T::new();
-    t.ready();
-    t.cmd(Cmd::AgentPreview { agent: "cookies".into() });
-    let p = t.take().into_iter().find(|v| v["ev"] == "agent_preview").expect("a preview at once");
-    assert_eq!(p, json!({"ev": "agent_preview", "agent": "cookies", "now": "", "actions": [], "waiting": [], "last_report": null, "pages": []}));
-    // asked again (the page asks once, the app may relaunch the page): again
-    t.cmd(Cmd::AgentPreview { agent: "cookies".into() });
-    assert!(has(&t.take(), "agent_preview"));
 }
 
 #[test]
@@ -1528,7 +1001,7 @@ fn the_fake_voice_talks_to_main_through_the_real_talk_path() {
     let out = t.take();
     assert!(out.iter().any(|v| v["ev"] == "heard" && v["final"] == true && v["text"] == "what is running now"), "{out:?}");
     assert!(out.iter().any(|v| v["ev"] == "sent" && v["voice"] == true));
-    assert_eq!(t.hub.next(), json!({"op": "input", "focus": "main", "text": "what is running now", "via": "capsule"}));
+    assert_eq!(t.hub.sent(), json!({"cmd": "send", "agent": "main", "text": "what is running now", "via": "capsule"}));
     // main answers: said through the silent speaker, word by word, done
     t.main_turn("two agents work.");
     t.until(|o| phase_is(o, "speaking"));

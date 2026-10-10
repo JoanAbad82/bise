@@ -23,7 +23,8 @@ pub enum EntryKind {
     You,
     /// the agent's own words
     Agent,
-    /// a message from another agent (`from`)
+    /// a message from another agent (`from`; `msg`: its id; `to_you`:
+    /// an old direct reply to him, `msg-in` from `@name`)
     FromAgent,
     /// its tool calls in a row
     Tools,
@@ -90,6 +91,23 @@ pub struct TurnFailed {
 pub struct Thinking {
     pub ms: u64,
     pub text: String,
+}
+
+/// Where his message is (contract C3, BISE-86): `sent` (·), `received`
+/// by the agent (✓, steering), `read` by the model (✓✓: steered, or its
+/// turn started), `failed`: the hub could not deliver it (✗). Only ever
+/// moves up, in that order ([`lines::deliver`], the one rule).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum Delivery {
+    Sent,
+    Received,
+    Read,
+    Failed,
+    /// a mark this reader doesn't know (a newer hub): never moved
+    #[serde(other)]
+    Unknown,
 }
 
 /// How a notice reads: info (dim), warn (▲, what to do), err (✗).
@@ -220,7 +238,10 @@ impl Attached {
 }
 
 /// An `approval` entry: his answer, folded (`you allowed api: rm -rf
-/// target`, `you answered perf: both`); `note` the words under it.
+/// target`, `you answered perf: both`); `note` the words under it;
+/// `card`: the item it answers, for an answer to an item (the hub's
+/// `route` line, BISE-305/307), so a client that folded the answer
+/// itself knows it is the same one.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ApprovalFold {
@@ -235,6 +256,8 @@ pub struct ApprovalFold {
     /// an answer's other files (absolute paths)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub files: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub card: Option<u64>,
 }
 
 /// A `scheduled` entry (batch 3b): a task set or ended (the hub's
@@ -265,6 +288,29 @@ pub enum ToolState {
     #[default]
     #[serde(other)]
     Unknown,
+}
+
+/// What the approvals gate holds a running call for (the hub's `sb gate :
+/// check|card <n>` lines, approvals-design.md §3.1): the checker judges
+/// it (`checking…` after 250 ms), or a card waits on him (`? waiting for
+/// you`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum GateWait {
+    Check,
+    Card,
+    /// a wait this version doesn't know (a newer hub)
+    #[serde(other)]
+    Unknown,
+}
+
+/// A running call held by the gate, since `at_ms` (its gate line's time).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ToolGate {
+    pub wait: GateWait,
+    pub at_ms: u64,
 }
 
 /// A file an edit touched, with its lines added and removed (the TUI's
@@ -326,6 +372,16 @@ pub struct ToolItem {
     #[serde(default)]
     pub id: u64,
     pub at_ms: u64,
+    /// the tool's name (`bash`); "" until the call's `tool` line
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    /// its args as the call line gives them, unescaped, [`cap`]ped
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub args: String,
+    /// the model's one line for it (`tool_intent`, bash and TypeScript
+    /// calls: "running the tests")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intent: Option<String>,
     /// its intent ("running the tests"), else `name: first line of args`
     pub text: String,
     pub kind: ToolKind,
@@ -335,6 +391,10 @@ pub struct ToolItem {
     /// running until its result line, then ok or err
     #[serde(default)]
     pub state: ToolState,
+    /// the approvals gate holds it (running only: the gate's `done` line
+    /// and the call's end clear it)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gate: Option<ToolGate>,
     /// its duration: the result line's time minus the call line's
     /// ([`words::tool_ms`]); none while it runs or on a replay
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -373,6 +433,19 @@ pub struct EntryCard {
     pub question: String,
     pub options: Vec<Opt>,
     pub answered: bool,
+    /// its kind, the same word as the hub's card row (`rows::Card.kind`:
+    /// `question`, `blocked`, `done`, …, an open set; `rows::card_rank`
+    /// reads it); none from an older hub
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// who asked (`rows::Card.agent`, the line's `@name`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    /// how it was closed, the hub's word on its `card-closed` line
+    /// (`answered`, `answered via @docs`, `accepted`, `refused`, …, BISE-31):
+    /// the card fades with it; none while that line hasn't come
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub closed: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -416,6 +489,16 @@ pub struct Entry {
     /// line (the window draws the shot and the app on his message)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<FnContext>,
+    /// a `you` entry's mark (G1): where his message is, by the fold's one
+    /// rule ([`lines::deliver`], the TUI's too)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery: Option<Delivery>,
+    /// an agent wrote this to him (G5, the TUI's level 2): an `agent`
+    /// entry from the hub's `msg-you` (`from`: who), or a `from_agent`
+    /// one that is an old direct reply. A superset: those lines fold to
+    /// the kinds they always did (architect m_14424)
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub to_you: bool,
     /// a `to_agent` entry: who it went to
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub to: Option<String>,
@@ -448,6 +531,16 @@ pub struct Entry {
     pub scheduled: Option<Scheduled>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub turn_failed: Option<TurnFailed>,
+    /// the first entry after a `turn_started` line: a turn starts here
+    /// (the TUI's turn row; a reply's turn ends before the next start)
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub turn_start: bool,
+    /// the newest entry when its turn ended (any end: completed,
+    /// interrupted, failed), with the `turn_done` line's time (BISE-271:
+    /// the hover of the turn's replies); none for a replayed end (no
+    /// time) or one with no entry of its own to carry it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_end_ms: Option<u64>,
 }
 
 impl Entry {
@@ -463,6 +556,8 @@ impl Entry {
             page: None,
             report: None,
             context: None,
+            delivery: (kind == EntryKind::You).then_some(Delivery::Sent),
+            to_you: false,
             to: None,
             asks: false,
             msg: None,
@@ -476,6 +571,8 @@ impl Entry {
             approval: None,
             scheduled: None,
             turn_failed: None,
+            turn_start: false,
+            turn_end_ms: None,
         }
     }
 
@@ -483,8 +580,12 @@ impl Entry {
     /// exactly that payload, and no other kind's: `pr` never comes with
     /// `pr: None`. The kinds without a payload carry none, but for an
     /// `agent` reply's own thinking (one line, one entry: pos is the key).
+    /// A `you` entry has its mark; a message from an agent (to another
+    /// one, or to him) says who wrote it, and no other entry does; only
+    /// an `agent` or a `from_agent` entry is written to him.
     pub fn payload_matches_kind(&self) -> bool {
         let has = [
+            (EntryKind::You, self.delivery.is_some()),
             (EntryKind::Tools, self.tools.is_some()),
             (EntryKind::Card, self.card.is_some()),
             (EntryKind::Page, self.page.is_some()),
@@ -504,7 +605,9 @@ impl Entry {
             EntryKind::Agent => true,
             _ => self.thinking.is_none(),
         };
-        thinking && has.iter().all(|(k, set)| *set == (self.kind == *k))
+        let from = self.from.is_some() == (self.kind == EntryKind::FromAgent || self.to_you);
+        let from = from && (!self.to_you || matches!(self.kind, EntryKind::Agent | EntryKind::FromAgent));
+        thinking && from && has.iter().all(|(k, set)| *set == (self.kind == *k))
     }
 }
 
@@ -553,4 +656,4 @@ pub mod lines;
 pub mod scheduled;
 pub mod when;
 pub mod words;
-pub use fold::fold;
+pub use fold::{fold, tail_start};

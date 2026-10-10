@@ -3,10 +3,13 @@
 //! open steps (steps_hint, read from the page cards). Moved out of
 //! daemon.rs unchanged (architect m_12143).
 
+use super::page_cards::Page;
 use super::*;
 
 impl Shell {
-    /// A client's `input` (after its keys are reloaded): a step of his
+    /// His words (turn/send, command/run's non-command line: proto/cmds.rs
+    /// proto_input, the one caller since the wire's `input` op went in
+    /// client-protocol P3b; its keys reloaded first): a step of his
     /// answered on its card, an answer to a page's question, words bise's
     /// home hub routes to a project, else an input with its files, the
     /// capsule's hint and his open steps. Moved out of daemon.rs's input
@@ -18,11 +21,12 @@ impl Shell {
         // back); never on an answer or a slash command
         // a step of his answered on its card (roadmap D): ticked
         // on its page, the page's agent told there
-        if !self.page_step_answer(id, &s("text")) {
+        let page = self.page_first(id, &s("text"));
+        if !matches!(page, Page::Done) {
             let queued = v.get("queued").and_then(|x| x.as_bool()).unwrap_or(false);
-            let text = match self.page_reply_text(&s("text")) {
-                Some(reply) => reply,
-                None => {
+            let text = match page {
+                Page::Reply(reply) => reply,
+                _ => {
                     // his attached files, rendered once (item H)
                     let said = fn_context::with_files(v, s("text"));
                     // bise's home hub: words about a project go there (daemon/routing.rs)

@@ -2,11 +2,12 @@
 //! entries (consecutive tool calls are one `tools` entry at the first
 //! call's pos; a message on several lines is one entry).
 
-use super::lines::{self, Hub, Obs, Rec};
+use super::lines::{self, Delivered, Hub, Mark, Obs, Rec, ToolMove};
 use super::scheduled;
 use super::words::{self, one_line, summary};
 use super::{Answered, ApprovalFold, Ctx, Entry, EntryCard, EntryKind, Landed, Line, Made, NotDelivered, Notice, PageRef, PrNews, ReportRef, Scheduled, Thinking, ToolItem, ToolKind, Tools};
-use super::{cap, FileCount, ToolState, TurnFailed};
+use super::{cap, Delivery, FileCount, GateWait, ToolGate, ToolState, TurnFailed};
+use crate::Pos;
 use crate::context::FnContext;
 use crate::rows::question;
 
@@ -21,33 +22,39 @@ struct Fold<'a> {
     you: Option<usize>,
     /// the previous line's time (0: a replay), for a thinking's duration
     last_ms: u64,
+    /// the first entry of the current turn (its `turn_started`'s marks)
+    turn: usize,
+    /// a `turn_started` line came: the next entry pushed starts a turn
+    starting: bool,
+    /// the calls its `tool_result` ended (no `tool_finished` yet): their
+    /// finish completes that item, never a row of its own
+    by_result: Vec<u32>,
     ctx: &'a Ctx<'a>,
 }
 
 impl Fold<'_> {
-    fn push(&mut self, e: Entry) -> usize {
+    fn push(&mut self, mut e: Entry) -> usize {
+        e.turn_start = std::mem::take(&mut self.starting);
         self.out.push(e);
         self.out.len() - 1
     }
 
-    fn tool(&mut self, pos: u64, ms: u64, id: u32, name: &str, args: &str) {
-        let args = lines::unescape(args);
-        if name == "bash" {
-            if let Some((kind, text)) = lines::report_in(&args) {
-                let mut e = Entry::new(pos, ms, EntryKind::Report, text);
-                e.report = Some(ReportRef { kind });
-                self.push(e);
-                return;
-            }
-            if let Some(id) = lines::publish_in(&args) {
-                let page = (self.ctx.page)(&id).unwrap_or(PageRef { id: id.clone(), title: id.replace('-', " "), v: None, url: String::new() });
-                let v = page.v.map(|v| format!(" v{v}")).unwrap_or_default();
-                let mut e = Entry::new(pos, ms, EntryKind::Page, format!("{}{v}", page.title));
-                e.page = Some(page);
-                self.push(e);
-                return;
-            }
+    /// One line's tool move (G3, [`lines::tool_move`]: the TUI's rule, a
+    /// row exists from `tool_started`).
+    fn tool_move(&mut self, pos: u64, ms: u64, m: ToolMove) {
+        match m {
+            ToolMove::Start(id) => self.start(pos, ms, id, ToolState::Run),
+            ToolMove::Info { id, name, args } => self.info(pos, ms, id, &name, &args),
+            ToolMove::Intent { id, text } => self.intent(id, &text),
+            ToolMove::Code { id, code } => self.code(id, &code),
+            ToolMove::Result { id, ok, preview } => self.result(id, ok, &preview, ms),
+            ToolMove::Finish { id, ok } => self.finish(pos, ms, id, ok),
         }
+    }
+
+    /// `tool_started`: a running item, in the tools entry it continues
+    /// (or a new one at this line).
+    fn start(&mut self, pos: u64, ms: u64, id: u32, state: ToolState) {
         let e = match self.out.last() {
             Some(e) if e.kind == EntryKind::Tools => self.out.len() - 1,
             _ => {
@@ -60,10 +67,14 @@ impl Fold<'_> {
             pos,
             id: u64::from(id),
             at_ms: ms,
-            text: format!("{name}: {}", one_line(&args.replace("\\N", "\n"), 100)),
-            kind: ToolKind::of(name),
-            land: name == "bash" && args.contains("sb land"),
-            state: ToolState::Run,
+            name: String::new(),
+            args: String::new(),
+            intent: None,
+            text: String::new(),
+            kind: ToolKind::Other,
+            land: false,
+            state,
+            gate: None,
             ms: None,
             exit: None,
             err: None,
@@ -75,7 +86,111 @@ impl Fold<'_> {
         items.push(item);
         let i = items.len() - 1;
         self.tools.push((id, e, i));
+        self.by_result.retain(|&t| t != id);
         self.sum(e);
+    }
+
+    /// `tool #<id> <name> : <args>`: the call's name and args on its
+    /// item; a bash `sb report` or `sb page publish` is a report or a page
+    /// entry instead (its item leaves).
+    fn info(&mut self, pos: u64, ms: u64, id: u32, name: &str, args: &str) {
+        let args = lines::unescape(args);
+        if name == "bash" {
+            if let Some((kind, text)) = lines::report_in(&args) {
+                self.unstart(id);
+                let mut e = Entry::new(pos, ms, EntryKind::Report, text);
+                e.report = Some(ReportRef { kind });
+                self.push(e);
+                return;
+            }
+            if let Some(id_) = lines::publish_in(&args) {
+                self.unstart(id);
+                let page = (self.ctx.page)(&id_).unwrap_or(PageRef { id: id_.clone(), title: id_.replace('-', " "), v: None, url: String::new() });
+                let v = page.v.map(|v| format!(" v{v}")).unwrap_or_default();
+                let mut e = Entry::new(pos, ms, EntryKind::Page, format!("{}{v}", page.title));
+                e.page = Some(page);
+                self.push(e);
+                return;
+            }
+        }
+        let Some(&(_, e, _)) = self.tools.iter().rev().find(|(t, _, _)| *t == id) else { return };
+        let Some(item) = self.item(id) else { return };
+        item.text = item.intent.clone().unwrap_or_else(|| format!("{name}: {}", one_line(&args.replace("\\N", "\n"), 100)));
+        item.kind = ToolKind::of(name);
+        item.land = name == "bash" && args.contains("sb land");
+        item.name = name.to_string();
+        item.args = cap(&args);
+        self.sum(e);
+    }
+
+    /// The item of call `id` leaves (a report's or a page's call): its
+    /// tools entry too when it was its only one.
+    fn unstart(&mut self, id: u32) {
+        let Some(k) = self.tools.iter().rposition(|(t, _, _)| *t == id) else { return };
+        let (_, e, i) = self.tools.remove(k);
+        let Some(t) = self.out[e].tools.as_mut() else { return };
+        t.items.remove(i);
+        for r in self.tools.iter_mut().filter(|r| r.1 == e && r.2 > i) {
+            r.2 -= 1;
+        }
+        if !t.items.is_empty() {
+            self.sum(e);
+            return;
+        }
+        let gone = self.out.remove(e);
+        // its turn's start and end stay on the entries around it
+        if gone.turn_start {
+            match self.out.get_mut(e) {
+                Some(next) => next.turn_start = true,
+                None => self.starting = true,
+            }
+        }
+        if let (Some(t), Some(before)) = (gone.turn_end_ms, e.checked_sub(1).and_then(|b| self.out.get_mut(b))) {
+            before.turn_end_ms.get_or_insert(t);
+        }
+        self.tools.retain(|r| r.1 != e);
+        let shift = |x: usize| if x > e { x - 1 } else { x };
+        for r in self.tools.iter_mut() {
+            r.1 = shift(r.1);
+        }
+        self.cont = self.cont.filter(|&c| c != e).map(shift);
+        self.you = self.you.filter(|&c| c != e).map(shift);
+        self.turn = shift(self.turn);
+    }
+
+    /// `tool_finished`: the running item of call `id` ends, its duration
+    /// from its start ([`words::tool_ms`]), as does the item its
+    /// `tool_result` (the line before it) ended; none: an ended item of
+    /// its own (the TUI's row).
+    fn finish(&mut self, pos: u64, ms: u64, id: u32, ok: bool) {
+        let state = if ok { ToolState::Ok } else { ToolState::Err };
+        let ended = self.by_result.contains(&id);
+        self.by_result.retain(|&t| t != id);
+        match self.item(id) {
+            Some(item) if item.state == ToolState::Run || ended => {
+                item.state = state;
+                item.gate = None;
+                item.ms = words::tool_ms(item.at_ms, ms);
+            }
+            _ => self.start(pos, ms, id, state),
+        }
+    }
+
+    /// `sb gate : check|card|done <n>`: the gate holds the running call
+    /// (the newest; the TUI's rule), or lets it go.
+    fn gate(&mut self, ms: u64, step: lines::GateStep) {
+        let gate = match step {
+            lines::GateStep::Check => Some(ToolGate { wait: GateWait::Check, at_ms: ms }),
+            lines::GateStep::Card => Some(ToolGate { wait: GateWait::Card, at_ms: ms }),
+            lines::GateStep::Done => None,
+        };
+        let out = &mut self.out;
+        let running = self.tools.iter().rev().filter_map(|&(_, e, i)| out[e].tools.as_ref().map(|t| (e, i, t.items[i].state)));
+        if let Some((e, i, _)) = running.into_iter().find(|&(_, _, s)| s == ToolState::Run) {
+            if let Some(t) = out[e].tools.as_mut() {
+                t.items[i].gate = gate;
+            }
+        }
     }
 
     /// The call's item, by its tool id (the last one with that id).
@@ -98,24 +213,35 @@ impl Fold<'_> {
         item.code = Some(cap(&code));
     }
 
-    /// `tool_result`: ok or err, its duration (`ms` 0: a replay, none), a
-    /// failed bash's exit code and its first error line, its output.
+    /// `tool_result`: a failed bash's exit code and its first error line,
+    /// its output. Its state and duration are `tool_finished`'s, the line
+    /// before it; a call still running without one (an older transcript)
+    /// ends here (`ms` 0: a replay, no duration).
     fn result(&mut self, id: u32, ok: bool, preview: &str, ms: u64) {
         let Some(item) = self.item(id) else { return };
         let out = lines::wire_decode(preview);
-        item.state = if ok { ToolState::Ok } else { ToolState::Err };
-        item.ms = words::tool_ms(item.at_ms, ms);
+        let ends = item.state == ToolState::Run;
+        if ends {
+            item.state = if ok { ToolState::Ok } else { ToolState::Err };
+            item.gate = None;
+            item.ms = words::tool_ms(item.at_ms, ms);
+        }
         if !ok {
             item.exit = lines::exit_code(&out);
             item.err = lines::error_line(&out);
         }
         item.out = Some(cap(&out)).filter(|o| !o.is_empty());
+        if ends {
+            self.by_result.push(id);
+        }
     }
 
     fn intent(&mut self, id: u32, text: &str) {
         let Some(&(_, e, i)) = self.tools.iter().rev().find(|(t, _, _)| *t == id) else { return };
-        if let Some(t) = self.out[e].tools.as_mut() {
-            t.items[i].text = one_line(&lines::unescape(text), 120);
+        let intent = one_line(&lines::unescape(text), 120);
+        if let (Some(t), false) = (self.out[e].tools.as_mut(), intent.is_empty()) {
+            t.items[i].text = intent.clone();
+            t.items[i].intent = Some(intent);
         }
         self.sum(e);
     }
@@ -135,25 +261,62 @@ impl Fold<'_> {
             Some(l) => (l, true),
             None => (line, false),
         };
-        let prev = std::mem::replace(&mut self.last_ms, if replayed { 0 } else { ms });
-        let you = self.you.take();
         let rec = lines::read(line);
+        // a thinking counts from the previous line the feed shows (his
+        // line, the turn's start, a tool's lines): a hidden one (the usage
+        // the runtime writes just before the reply, F3) moves nothing
+        let prev = match lines::is_hidden(&rec) {
+            true => self.last_ms,
+            false => std::mem::replace(&mut self.last_ms, if replayed { 0 } else { ms }),
+        };
+        let you = self.you.take();
         match rec {
             Rec::Empty | Rec::Idle | Rec::Fact => return,
             Rec::Raw(_) => {}
             _ => self.cont = None,
         }
+        // his messages' marks (G1, the TUI's rule): a turn's start reads
+        // what he sent since the last one
+        match lines::mark_of(&rec) {
+            Some(m @ Mark::Turn) => {
+                let turn = self.turn.min(self.out.len());
+                lines::deliver(&mut self.out[turn..], &m);
+                self.turn = self.out.len();
+                self.starting = true;
+            }
+            Some(m) => {
+                lines::deliver(&mut self.out, &m);
+            }
+            None => {}
+        }
+        if let Some(m) = lines::tool_move(&rec) {
+            return self.tool_move(pos, if replayed { 0 } else { ms }, m);
+        }
+        // BISE-271: a turn's end keeps its time (a replay's has none)
+        let ended = matches!(rec, Rec::Obs(Obs::TurnDone(_))) && !replayed && ms > 0;
         match rec {
             Rec::Obs(o) => self.obs(pos, ms, o, if replayed { 0 } else { prev }),
-            Rec::Tool { id, name, args } => self.tool(pos, ms, id, &name, &args),
-            Rec::ToolIntent { id, text } => self.intent(id, &text),
-            Rec::ToolCode { id, code } => self.code(id, &code),
-            Rec::ToolResult { id, ok, preview } => self.result(id, ok, &preview, if replayed { 0 } else { ms }),
             Rec::Rejected(r) => self.notice(pos, ms, words::rejected(&r)),
             Rec::Hub(h) => self.hub(pos, ms, h, you),
             // a message's next line
             Rec::Raw(line) => self.more(&line),
             _ => {}
+        }
+        if ended {
+            self.end_turn(ms);
+        }
+    }
+
+    /// The turn ended at `ms`: on the newest entry, unless it carries an
+    /// earlier turn's end (this turn drew nothing of its own) or a turn
+    /// starts after it (a start with no entry yet).
+    fn end_turn(&mut self, ms: u64) {
+        if self.starting {
+            self.starting = false;
+            return;
+        }
+        if let Some(e) = self.out.last_mut().filter(|e| e.turn_end_ms.is_none()) {
+            e.turn_end_ms = Some(ms);
         }
     }
 
@@ -201,9 +364,9 @@ impl Fold<'_> {
         }
     }
 
-    fn approval(&mut self, pos: u64, ms: u64, ok: bool, text: String, note: String) {
+    fn approval(&mut self, pos: u64, ms: u64, ok: bool, text: String, note: String, card: Option<u64>) {
         let mut e = Entry::new(pos, ms, EntryKind::Approval, text.clone());
-        e.approval = Some(ApprovalFold { ok, text, note, images: Vec::new(), files: Vec::new() });
+        e.approval = Some(ApprovalFold { ok, text, note, images: Vec::new(), files: Vec::new(), card });
         self.push(e);
     }
 
@@ -221,6 +384,8 @@ impl Fold<'_> {
 
     fn hub(&mut self, pos: u64, ms: u64, h: Hub, you: Option<usize>) {
         match h {
+            // the approvals gate holds the running call (§3.1)
+            Hub::Gate(step) => self.gate(ms, step),
             Hub::You(text) => {
                 let i = self.push(Entry::new(pos, ms, EntryKind::You, text));
                 (self.cont, self.you) = (Some(i), Some(i));
@@ -242,9 +407,13 @@ impl Fold<'_> {
                     self.scheduled(pos, ms, s);
                 }
             }
-            Hub::MsgIn { from, body, .. } => {
+            // G4: its message id; G5: an old direct reply (`@from`) was
+            // written to him
+            Hub::MsgIn { from, id, body } => {
                 let mut e = Entry::new(pos, ms, EntryKind::FromAgent, body);
+                e.to_you = from.starts_with('@');
                 e.from = Some(from.trim_start_matches('@').to_string());
+                e.msg = id.strip_prefix("m_").and_then(|n| n.parse().ok());
                 self.cont = Some(self.push(e));
             }
             // what this task sent (sb-core's `sent` line)
@@ -266,13 +435,22 @@ impl Fold<'_> {
                 e.not_delivered = Some(NotDelivered { to, text });
                 self.push(e);
             }
-            Hub::MsgYou { body, .. } => {
-                self.cont = Some(self.push(Entry::new(pos, ms, EntryKind::Agent, body)));
+            // G5: an agent writing to him (level 2 in the TUI): the agent
+            // entry it always was, now saying who and to him
+            Hub::MsgYou { from, body } => {
+                let mut e = Entry::new(pos, ms, EntryKind::Agent, body);
+                e.to_you = true;
+                e.from = Some(lines::shown_name(&from));
+                self.cont = Some(self.push(e));
             }
             // `#3 question @docs : text`; a gate's confirm is the tool row's
-            Hub::Card { id: Some(id), kind, body, .. } if kind != "confirm" => {
+            Hub::Card { id: Some(id), kind, body, text } if kind != "confirm" => {
                 let (q, options) = question(&body);
-                let card = EntryCard { id, question: q.clone(), options, answered: !self.ctx.open_cards.contains(&id) };
+                // `#3 question @docs : …`: who asked, the head's third word
+                let head = text.split_once(" : ").map_or(text.as_str(), |(h, _)| h);
+                let agent = head.split_whitespace().nth(2).and_then(|w| w.strip_prefix('@')).map(str::to_string);
+                let answered = !self.ctx.open_cards.contains(&id);
+                let card = EntryCard { id, question: q.clone(), options, answered, kind: Some(kind), agent, closed: None };
                 let mut e = Entry::new(pos, ms, EntryKind::Card, q);
                 e.card = Some(card);
                 self.cont = Some(self.push(e));
@@ -319,16 +497,17 @@ impl Fold<'_> {
             // a gate's card answered, folded (approvals-design.md §9)
             Hub::Approval { how, who, what, note } => {
                 let (ok, text, note) = words::approval(&how, &who, &what, &note);
-                self.approval(pos, ms, ok, text, note);
+                self.approval(pos, ms, ok, text, note, None);
             }
-            // an answer to an item, its fold line (BISE-305/307)
+            // an answer to an item, its fold line (BISE-305/307); the item
+            // it answers, so a client that folded it itself skips it.
             // His answer as written, with his pasted files rendered in (R41,
             // designer m_14030 red a): the words fold, the images and files
             // ride apart, never a marker in the row
-            Hub::Route { who, said, .. } => {
+            Hub::Route { who, card, said } => {
                 let a = (self.ctx.attached)(&said);
                 let (text, note) = words::answered_split(&who, &a.words, self.ctx.width);
-                self.approval(pos, ms, true, text, note);
+                self.approval(pos, ms, true, text, note, Some(card));
                 if let Some(f) = self.out.last_mut().and_then(|e| e.approval.as_mut()) {
                     (f.images, f.files) = (a.images, a.files);
                 }
@@ -344,6 +523,17 @@ impl Fold<'_> {
                 e.to = Some(lines::shown_name(&to)).filter(|t| !t.is_empty());
                 e.msg = id.strip_prefix("m_").and_then(|n| n.parse().ok());
                 self.cont = Some(self.push(e));
+            }
+            // BISE-31: the hub closed a card (`card-closed : #3 answered`):
+            // its entry (the newest card with that id) carries the word and
+            // is sent again; a card this thread never showed: nothing, as
+            // the TUI's line path
+            Hub::CardClosed { id, res } => {
+                let card = self.out.iter_mut().rev().filter_map(|e| e.card.as_mut()).find(|c| c.id == id);
+                if let Some(c) = card {
+                    c.closed = Some(res);
+                    c.answered = true;
+                }
             }
             // a warning, a spawn, computer use, a direct message
             h => {
@@ -367,13 +557,73 @@ impl Fold<'_> {
     }
 }
 
+/// His messages' marks, by [`lines::deliver`] (G1).
+impl Delivered for Entry {
+    fn yours(&self) -> Option<(&str, Delivery)> {
+        (self.kind == EntryKind::You).then_some(())?;
+        Some((self.text.as_str(), self.delivery?))
+    }
+
+    fn set_mark(&mut self, to: Delivery) {
+        if self.kind == EntryKind::You {
+            self.delivery = Some(to);
+        }
+    }
+}
+
 /// An agent's transcript lines as entries, oldest first.
 pub fn fold(lines: &[Line], ctx: &Ctx) -> Vec<Entry> {
-    let mut f = Fold { out: Vec::new(), cont: None, tools: Vec::new(), you: None, last_ms: 0, ctx };
+    let mut f = Fold { out: Vec::new(), cont: None, tools: Vec::new(), you: None, last_ms: 0, turn: 0, starting: false, by_result: Vec::new(), ctx };
     for (pos, ms, l) in lines {
         f.line(*pos, *ms, l);
     }
     f.out
+}
+
+/// Where a live tail of `lines` may start so it folds `entries` from
+/// `entries[want]` on as the whole did (the hub's live fold keeps a few
+/// entries' lines, `proto_view::Live`): that entry's pos, or an earlier
+/// entry's while a call started before the cut has a line at or after it,
+/// or may still get one (no `tool_finished` and no turn end yet). Folded
+/// without its start, such a line (its result, its finish) would be a
+/// row of its own (tui-parity R1: a lone `#2 ✓ 0.0s` a turn later).
+pub fn tail_start(lines: &[Line], entries: &[Entry], want: usize) -> Pos {
+    let Some(first) = entries.get(want) else { return entries.first().map_or(0, |e| e.pos) };
+    // each call: its start's pos and its last line's (MAX: still open)
+    let mut calls: Vec<(Pos, Pos)> = Vec::new();
+    let mut last: Vec<(u32, usize)> = Vec::new();
+    for (pos, _, l) in lines {
+        let rec = lines::read(l.strip_prefix("history ").unwrap_or(l));
+        if matches!(rec, Rec::Obs(Obs::TurnDone(_))) {
+            for c in calls.iter_mut().filter(|c| c.1 == Pos::MAX) {
+                c.1 = *pos;
+            }
+            last.clear();
+            continue;
+        }
+        let Some(m) = lines::tool_move(&rec) else { continue };
+        let id = match &m {
+            ToolMove::Start(id) | ToolMove::Info { id, .. } | ToolMove::Intent { id, .. } | ToolMove::Code { id, .. } | ToolMove::Result { id, .. } | ToolMove::Finish { id, .. } => *id,
+        };
+        if let ToolMove::Start(_) = m {
+            last.retain(|&(i, _)| i != id);
+            last.push((id, calls.len()));
+            calls.push((*pos, Pos::MAX));
+            continue;
+        }
+        let Some(&(_, k)) = last.iter().find(|&&(i, _)| i == id) else { continue };
+        calls[k].1 = match m {
+            ToolMove::Finish { .. } => *pos,
+            _ if calls[k].1 == Pos::MAX => Pos::MAX,
+            _ => calls[k].1.max(*pos),
+        };
+    }
+    let mut cut = first.pos;
+    while let Some(&(start, _)) = calls.iter().find(|&&(start, end)| start < cut && end >= cut) {
+        // the entry the call's row is in: the newest at or before its start
+        cut = entries.iter().rev().find(|e| e.pos <= start).map_or(start, |e| e.pos);
+    }
+    cut
 }
 
 #[cfg(test)]

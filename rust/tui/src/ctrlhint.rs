@@ -668,27 +668,19 @@ mod frame_tests {
     use crate::run::draw_frame;
     use ratatui::backend::TestBackend;
     use ratatui::Terminal;
-    use serde_json::json;
-
-    fn line(app: &mut App, l: &str) {
-        crate::sb::dispatch(app, &json!({"ev": "line", "agent": "main", "line": l}).to_string());
-    }
 
     /// main working, a long bash call (a closed box), two agents, a card.
     pub(super) fn busy_app() -> App {
         let mut app = crate::sb::bench::test_app();
-        let state = json!({"ev": "state", "agents": [
-            {"name": "main", "main": true, "status": "working"},
-            {"name": "docs", "status": "working", "objective": "write the docs"},
-        ], "cards": [{"id": 7, "kind": "question", "agent": "docs", "text": "v1 or v2?", "age_ms": 0}]});
-        crate::sb::dispatch(&mut app, &state.to_string());
-        crate::sb::dispatch(&mut app, &json!({"ev": "ready"}).to_string());
-        line(&mut app, "sb you : ship it");
+        crate::sb::hub_reads::rows_for_tests::apply(
+            &mut app,
+            vec![crate::sb::hub_reads::rows_for_tests::agent("main", "working", ""), crate::sb::hub_reads::rows_for_tests::agent("docs", "working", "write the docs")],
+            vec![crate::sb::hub_reads::rows_for_tests::card(7, "question", "docs", "v1 or v2?")],
+        );
+        crate::sb::hub_reads::ready(&mut app);
         let cmd: String = (1..=60).map(|i| format!("echo {i}")).collect::<Vec<_>>().join("\n");
-        line(&mut app, "  obs: tool_started #4");
-        line(&mut app, "tool #4 bash : echo");
-        line(&mut app, &format!("tool_code #4 : {}", cmd.replace('\\', "\\\\").replace('\n', "\\N")));
-        line(&mut app, "  obs: tool_finished #4 ok");
+        let code = &format!("tool_code #4 : {}", cmd.replace('\\', "\\\\").replace('\n', "\\N"));
+        crate::sb::entries_for_tests::lines(&mut app, "main", &["sb you : ship it", "  obs: tool_started #4", "tool #4 bash : echo", code, "  obs: tool_finished #4 ok"]);
         // BISE-223: a call is one row; opened, its box (and its
         // `▸ n more lines`) is what the hints cover
         for e in app.events.iter_mut() {
@@ -885,14 +877,11 @@ mod frame_tests {
 
     /// Two cards, ctrl+1: the first in the card view.
     fn inbox(app: &mut App) {
-        let state = serde_json::json!({"ev": "state", "agents": [
-            {"name": "main", "main": true, "status": "working"},
-            {"name": "docs", "status": "working", "objective": "write the docs"},
-        ], "cards": [
-            {"id": 7, "kind": "question", "agent": "docs", "text": "v1 or v2?", "age_ms": 0},
-            {"id": 8, "kind": "question", "agent": "docs", "text": "ship?", "age_ms": 0},
-        ]});
-        crate::sb::dispatch(app, &state.to_string());
+        crate::sb::hub_reads::rows_for_tests::apply(
+            app,
+            vec![crate::sb::hub_reads::rows_for_tests::agent("main", "working", ""), crate::sb::hub_reads::rows_for_tests::agent("docs", "working", "write the docs")],
+            vec![crate::sb::hub_reads::rows_for_tests::card(7, "question", "docs", "v1 or v2?"), crate::sb::hub_reads::rows_for_tests::card(8, "question", "docs", "ship?")],
+        );
         crate::input::on_key(app, &KeyEvent::new(KeyCode::Char('1'), KeyModifiers::CONTROL));
         assert!(crate::sb::ctrl_view(app).card_open);
     }

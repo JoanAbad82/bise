@@ -225,9 +225,12 @@ impl Shell {
                 }
             }
             Msg::Page(m) => self.page_msg(m),
-            Msg::ClientNew { id, stream } => self.client_hello(id, stream),
+            Msg::OlderHello { id, stream } => self.older_hello(id, stream),
+            Msg::RpcNew { id, stream, v } => self.rpc_new(id, stream, v),
+            Msg::Typed { to, v } => self.typed_msg(to, v),
             Msg::ClientLine { id, v } => self.client_line(id, v),
             Msg::ClientGone { id } => {
+                self.rpc_gone(id);
                 if self.clients.remove(&id).is_some() {
                     self.step(Input::ClientGone { client: id });
                 }
@@ -256,11 +259,6 @@ impl Shell {
             Msg::Update(v) => self.update_event(v),
             Msg::Changes { name, v } => self.on_changes(name, v),
             Msg::RoutePick { rid, pick } => self.route_picked(rid, pick),
-            Msg::ToClient { id, v } => {
-                if let Some(c) = self.clients.get_mut(&id) {
-                    write_json(c, &v);
-                }
-            }
             Msg::RoleLine { dir, key, line } => self.step(Input::RoleLine { dir, key, line }),
             Msg::TimerName { id, reply } => self.step(Input::TimerName { id, reply }),
             Msg::GateChecked { dir, n, req, out } => self.on_checked(&dir, &n, *req, out),

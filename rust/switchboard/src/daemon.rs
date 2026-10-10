@@ -4,8 +4,9 @@
 //!
 //! - one Bend REPL per live agent, spawned from the app root, with
 //!   BEND_WORKDIR / BEND_EXTRA_PROMPT / BEND_CONTEXT_FILE / SB_AGENT;
-//! - `hub.sock`: clients (`{"op":"hello"}` first, then JSON lines), never
-//!   from an agent's process; `agent.sock`: the agents' `sb` CLI
+//! - `hub.sock`: clients (`{"op":"hello"}` or JSON-RPC's `initialize`
+//!   first, then JSON lines: `daemon/rpc.rs`), never from an agent's
+//!   process; `agent.sock`: the agents' `sb` CLI
 //!   (`{"op":"agent", ...}`, one request, one reply), their
 //!   `SB_SOCKET` (`daemon/accept`, `crate::peer`, docs/issues/16);
 //! - `journal.jsonl`: the durable state; `agents/<dir>/transcript.log`:
@@ -33,6 +34,7 @@ mod projects;
 mod proto;
 mod repl;
 mod repl_starts;
+mod rpc;
 mod recycling;
 mod routing;
 mod release;
@@ -49,7 +51,7 @@ mod worktrees;
 mod xhub;
 mod xread;
 
-use history::{history_line, transcript_page};
+use history::transcript_page;
 use repl::{adopt, adoptable, busy_at, kill_pid, supervise};
 use skills::{skill_roots, skills_fingerprint};
 use versions::version_allowed;
@@ -80,8 +82,6 @@ const BUFFER_LINES: usize = 1000;
 /// ambient-core keys on "[from the page:" to keep that turn off the
 /// capsule; main's rule (prompts.rs, amb-kit 83c1a8af) reads it.
 const PAGE_HINT: &str = "[from the page: answer on the page; one short line at most]";
-/// Lines one `history` page may carry.
-const PAGE_LINES: usize = 2000;
 
 pub struct Opts {
     pub paths: Paths,
@@ -146,7 +146,8 @@ enum Msg {
         reason: String,
         cause: repl_starts::Gone,
     },
-    ClientNew {
+    /// an older client's `{"op":"hello"}` (accept.rs: the stub)
+    OlderHello {
         id: ClientId,
         stream: UnixStream,
     },
@@ -220,10 +221,15 @@ enum Msg {
         name: String,
         v: Value,
     },
-    /// An answer computed off the loop (a `diff`, the `branches`) for
-    /// one client.
-    ToClient {
+    /// a thread's typed event: an answer or a hub-wide notification
+    Typed {
+        to: rpc::Typed,
+        v: Value,
+    },
+    /// a connection whose first line is JSON-RPC's `initialize`
+    RpcNew {
         id: ClientId,
+        stream: UnixStream,
         v: Value,
     },
     /// S2 step 5: BISE_ROUTE_MODEL's answer for the unclear route `rid`
@@ -239,12 +245,11 @@ enum Msg {
 }
 
 impl Msg {
-    /// A client's own message (its hello, a line, its end): the inbox's
-    /// urgent lane (daemon/inbox.rs), one lane so its order holds.
-    /// TODO(client-protocol): its RpcNew and Typed answers join this lane
-    /// when that branch merges (architect m_14659).
+    /// A client's own message (its hello or `initialize`, a line, its end,
+    /// a thread's typed answer to its request): the inbox's urgent lane
+    /// (daemon/inbox.rs), one lane so its order holds (architect m_14659).
     fn is_client(m: &Msg) -> bool {
-        matches!(m, Msg::ClientNew { .. } | Msg::ClientLine { .. } | Msg::ClientGone { .. })
+        matches!(m, Msg::OlderHello { .. } | Msg::RpcNew { .. } | Msg::ClientLine { .. } | Msg::ClientGone { .. } | Msg::Typed { .. })
     }
 }
 
@@ -378,6 +383,8 @@ struct Shell {
     pg: pages::PageState,
     /// the typed protocol's connections (bise desktop S3a, daemon/proto.rs)
     proto: proto::Proto,
+    /// the JSON-RPC connections and the hub-wide watermark (daemon/rpc.rs)
+    rpc: rpc::Rpcs,
     /// view.json's writer (bise desktop S1, daemon/projects.rs)
     projects: projects::Projects,
     /// when the state goes to the clients (daemon/state_gate.rs)
@@ -836,23 +843,13 @@ impl Shell {
         }
     }
 
-    /// One event to every client (serialized once).
+    /// One hub event to every client: its typed form (`proto_on`); its
+    /// older line only to the released core's home connection, for the
+    /// kinds it reads (client-protocol step 5, daemon/rpc.rs DOOR_EVENTS).
     fn broadcast(&mut self, v: &Value) {
         self.proto_on(v);
-        let line = v.to_string();
-        let mut dead: Vec<ClientId> = Vec::new();
-        for (id, s) in self.clients.iter_mut() {
-            if self.proto.typed_only(*id) {
-                continue;
-            }
-            if !write_line(s, &line) {
-                dead.push(*id);
-            }
-        }
-        for id in dead {
-            self.clients.remove(&id);
-            let _ = self.tx.send(Msg::ClientGone { id });
-        }
+        // the released core's home connection, one release (rpc.rs DOOR_EVENTS)
+        self.door_write(v);
     }
 
     fn step(&mut self, input: Input) {
@@ -1081,12 +1078,8 @@ impl Shell {
             }
             Effect::Land { token, job } => self.land(token, *job),
             Effect::ToClient { client, body } => {
-                if self.typed_notice(client, &body) || self.typed_confirm(client, &body) {
-                    return;
-                }
-                if let Some(s) = self.clients.get_mut(&client) {
-                    write_json(s, &body);
-                }
+                // typed, or nothing: no client reads the older line
+                let _ = self.typed_notice(client, &body) || self.typed_confirm(client, &body) || self.rpc_effect(client, &body);
             }
             Effect::Renamed { old, new } => {
                 if let Some(b) = self.buffers.remove(&old) {
@@ -1095,6 +1088,7 @@ impl Shell {
                 if let Some(p) = self.positions.remove(&old) {
                     self.positions.insert(new.clone(), p);
                 }
+                self.proto_renamed(&old, &new);
                 self.broadcast(&json!({"ev": "renamed", "old": old, "new": new}));
             }
             // sent by the loop when the gate allows (daemon/state_gate.rs)
@@ -1104,8 +1098,8 @@ impl Shell {
             Effect::Confirm { card, agent: _, text } => self.on_confirm(card, &text),
             Effect::Flow { client, token, set } => {
                 let (ok, text) = self.flow_cmd(set);
-                if let Some(s) = client.and_then(|c| self.clients.get_mut(&c)) {
-                    write_json(s, &json!({"ev": "notice", "text": text}));
+                if let Some(c) = client {
+                    self.notice_out(c, None, &text);
                 }
                 if let Some(mut s) = token.and_then(|t| self.replies.remove(&t)) {
                     let body = if ok {
@@ -1125,9 +1119,7 @@ impl Shell {
                 // change shows in `agents` (architect m_10331)
                 if !self.typed_outcome(client, &r) {
                     let text = r.unwrap_or_else(|e| e);
-                    if let Some(s) = self.clients.get_mut(&client) {
-                        write_json(s, &json!({"ev": "notice", "text": text}));
-                    }
+                    self.notice_out(client, None, &text);
                 }
                 self.state_now();
                 self.switch_idle_repls();
@@ -1662,171 +1654,51 @@ impl Shell {
         }
     }
 
-    /// A new client: hello, snapshot, the buffered lines of every feed,
-    /// `ready`, the versions, in one write (thousands of lines: one
-    /// syscall, not one per line).
-    fn client_hello(&mut self, id: ClientId, mut stream: UnixStream) {
-        let art_ev = self.artifacts_ev();
-        let mut out = String::new();
-        let mut push = |v: &Value| {
-            out.push_str(&v.to_string());
-            out.push('\n');
-        };
-        push(&json!({
-            "ev": "hello",
-            "workspace": self.hub.workspace,
-            "state_dir": self.opts.paths.state.to_string_lossy(),
-            "exe": self.opts.exe.to_string_lossy(),
-            "version": crate::switch::version_info(&self.opts.app_root),
-            "reload": self.reload_id,
-            "pages_url": self.pg.pages.as_ref().map(|p| p.base()),
-        }));
-        push(&self.snapshot());
-        for name in &self.hub.st.order {
-            for (pos, ts, l) in self.buffers.get(name).into_iter().flatten() {
-                push(&line_event(name, *pos, *ts, l));
-            }
-        }
-        push(&self.approvals_ev(false));
-        push(&json!({"ev": "ready"}));
-        push(&art_ev);
-        push(&self.version_items());
-        if let Some(r) = self.release_hello() {
-            push(&r);
-        }
-        if let Some(u) = self.update_hello() {
-            push(&u);
-        }
-        crate::util::timing(&format!("client hello built ({} bytes)", out.len()));
-        if stream.write_all(out.as_bytes()).is_err() {
+    /// An older client's hello (client-protocol step 5, the stub): the
+    /// hub's exe and reload id, so an older terminal re-executes as this
+    /// version (its `hello` arm follows `exe`); no burst, no older event,
+    /// ever. The connection stays for the released desktop core's door
+    /// (its typed hello, then the lines of daemon/rpc.rs's DOOR table).
+    /// Every client of this version says `initialize` (daemon/rpc.rs).
+    // TODO(client-protocol, the release after the one that ships it): exe
+    // and reload, then the connection closes (the door goes with DOOR)
+    fn older_hello(&mut self, id: ClientId, mut stream: UnixStream) {
+        log_line(&self.opts.paths, "an older client said hello on hub.sock: exe and reload, then the released door only (client-protocol's stub)");
+        if !write_json(&mut stream, &json!({"ev": "hello", "exe": self.opts.exe.to_string_lossy(), "reload": self.reload_id})) {
             return;
         }
-        crate::util::timing("client hello written");
         self.clients.insert(id, stream);
+        self.rpc_older(id);
         self.step(Input::ClientHello { client: id });
     }
 
+    /// A line on a client connection: JSON-RPC (an initialized one), or
+    /// on an older hello's connection (the stub) a line of the released
+    /// door ([`rpc::DOOR`]) as its typed command; anything else is
+    /// refused (one hub.log line).
     fn client_line(&mut self, id: ClientId, v: Value) {
-        if v.get("cmd").is_some() {
-            return self.proto_cmd(id, v);
+        if bise_proto::rpc::is_rpc(&v) {
+            return self.rpc_line(id, v);
         }
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
-        match s("op").as_str() {
-            "version" if s("do") == "items" => {
-                let items = self.version_items();
-                if let Some(c) = self.clients.get_mut(&id) {
-                    write_json(c, &items);
+        match self.rpc_door(id, &v) {
+            // a typed line: as the typed door takes it (hello first)
+            Ok(cmd) if v.get("op").is_none() => self.proto_cmd(id, cmd),
+            // an op line: its typed arm, as that release took the op
+            // with no typed hello (that release's `bise stop`)
+            Ok(cmd) => {
+                let tag = cmd.get("cmd").and_then(Value::as_str).unwrap_or("").to_string();
+                match bise_proto::hub::HubCmd::from_value(cmd) {
+                    Ok(c) => self.proto_run(id, &tag, self.project(), c),
+                    Err(e) => log_line(&self.opts.paths, &format!("hub.sock: the released door's {tag} not typed: {e}")),
                 }
             }
-            "version" if s("do") == "update" => self.update_op(id),
-            "version" => {
-                let text = self.version_op(&v);
-                if let Some(c) = self.clients.get_mut(&id) {
-                    write_json(c, &json!({"ev": "notice", "text": text}));
-                }
-            }
-            "input" => {
-                // BISE-266: a key saved since a REPL started reaches it
-                // before this message does
-                self.keys_changed();
-                // a page's answer, a step, a route or a plain input
-                // (daemon/capsule.rs)
-                self.input(id, &v);
-            }
-            // a note talk's words (§4.1): to the page's frame, never an input
-            "page_voice" => self.page_voice(&v),
-            // older lines of a feed, before a position (the TUI scrolled
-            // to the top of what it holds)
-            "history" => {
-                let agent = s("agent");
-                let before = v.get("before").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
-                let count = v
-                    .get("count")
-                    .and_then(|x| x.as_u64())
-                    .map_or(PAGE_LINES, |c| (c as usize).min(PAGE_LINES));
-                let lines: Vec<Value> = match self.dir_of(&agent) {
-                    Some(dir) => transcript_page(&self.transcript(&dir), before, count)
-                        .into_iter()
-                        .map(|(pos, ts, line)| history_line(pos, ts, &line))
-                        .collect(),
-                    None => Vec::new(),
-                };
-                if let Some(c) = self.clients.get_mut(&id) {
-                    write_json(
-                        c,
-                        &json!({"ev": "history", "agent": agent, "before": before, "lines": lines}),
-                    );
-                }
-            }
-            "focus" => self.step(Input::ClientFocus {
-                client: id,
-                focus: s("focus"),
-            }),
-            "release" => self.release_op(id, &v),
-            // artifacts and diffs (docs/artifacts.md)
-            "artifacts" => self.artifacts_op(id, &v),
-            "diff" => self.diff_op(id, &v),
-            "branches" => self.branches_op(id),
-            // shift+tab, `/approvals [yolo|auto]` (approvals-design.md §8)
-            "approvals" => {
-                let m = match s("mode").as_str() {
-                    "toggle" => Some(self.gates.mode.other()),
-                    w => crate::approvals::Mode::parse(w),
-                };
-                if let Some(m) = m {
-                    self.set_mode(m);
-                    let ev = self.approvals_ev(true);
-                    self.broadcast(&ev);
-                } else {
-                    let mut ev = self.approvals_ev(false);
-                    ev["show"] = json!(true);
-                    if let Some(c) = self.clients.get_mut(&id) {
-                        write_json(c, &ev);
-                    }
-                }
-            }
-            // `/approvals`, backspace on a rule: the user removes it
-            "remove_rule" => {
-                if let Err(e) = self.remove_rule(v.get("rule").unwrap_or(&Value::Null)) {
-                    let mut ev = self.approvals_ev(false);
-                    ev["error"] = json!(e);
-                    if let Some(c) = self.clients.get_mut(&id) {
-                        write_json(c, &ev);
-                    }
-                }
-            }
-            "confirm" => self.step(Input::ClientConfirm {
-                client: id,
-                id: v.get("id").and_then(|x| x.as_u64()).unwrap_or(0),
-                yes: v.get("yes").and_then(|x| x.as_bool()).unwrap_or(false),
-            }),
-            "interrupt" => self.step(Input::ClientInterrupt {
-                client: id,
-                agent: s("agent"),
-            }),
-            // the menu bar's 'stop watching' (amb-mac m_5435), `/scheduled`'s
-            // x (stop) and r (run now)
-            "every_stop" => self.step(Input::EveryStop {
-                id: v.get("id").and_then(|x| x.as_u64()).unwrap_or(0),
-                why: String::new(),
-            }),
-            "every_run" => self.step(Input::EveryRun {
-                id: v.get("id").and_then(|x| x.as_u64()).unwrap_or(0),
-            }),
-            "stop_hub" => {
-                let keep = v
-                    .get("keep_agents")
-                    .and_then(|x| x.as_bool())
-                    .unwrap_or(false);
-                self.view_stopped();
-                let _ = self.tx.send(Msg::Shutdown { keep });
-            }
-            other => {
-                if let Some(c) = self.clients.get_mut(&id) {
-                    write_json(
-                        c,
-                        &json!({"ev": "notice", "text": format!("unknown op: {}", other)}),
-                    );
+            Err(what) => {
+                log_line(&self.opts.paths, &format!("hub.sock refused {what} (not the released door's: client-protocol step 5)"));
+                match v.get("cmd").and_then(Value::as_str) {
+                    // a typed line: its error, as that release's door
+                    // answered a tag it didn't know
+                    Some(tag) => self.proto_error(id, tag, &format!("unknown command: {tag}")),
+                    None => self.notice_out(id, None, &format!("unknown op: {what}")),
                 }
             }
         }
@@ -2143,6 +2015,7 @@ pub fn run(opts: Opts) -> std::io::Result<()> {
         buffers: BTreeMap::new(),
         positions: BTreeMap::new(),
         proto: proto::Proto::default(),
+        rpc: rpc::Rpcs::default(),
         projects: projects::Projects::boot(&paths),
         state_gate: state_gate::StateGate::default(),
         routing: routing::Routing::default(),
@@ -2448,6 +2321,18 @@ fn hash_keys(keys: &[(String, Option<String>)]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// hub-fifo's urgent lane holds a client's own messages, client-protocol's
+    /// too: its `initialize` connection (RpcNew) and a thread's typed answer
+    /// to its request (Typed); the rest waits its turn.
+    #[test]
+    fn a_clients_own_messages_take_the_urgent_lane() {
+        let (a, _b) = UnixStream::pair().unwrap();
+        assert!(Msg::is_client(&Msg::RpcNew { id: 1, stream: a, v: Value::Null }));
+        assert!(Msg::is_client(&Msg::Typed { to: rpc::Typed::Answer(1), v: Value::Null }));
+        assert!(Msg::is_client(&Msg::ClientGone { id: 1 }));
+        assert!(!Msg::is_client(&Msg::In(Input::Tick)));
+    }
 
     /// one rename (no temp file left); only a link is dropped for an
     /// older version's hub.

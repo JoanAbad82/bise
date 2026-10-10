@@ -65,7 +65,7 @@ pub(crate) fn key(app: &mut App, k: &crossterm::event::KeyEvent, popup_open: boo
         let plain = !k.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SUPER);
         match k.code {
             KeyCode::Char('y') | KeyCode::Char('Y') if plain => {
-                sb.send_input(format!("/archive {}", name));
+                sb.call("agent/archive", serde_json::json!({"agent": name, "force": false}), super::rpc::Then::Line);
                 return true;
             }
             KeyCode::Char('n') | KeyCode::Char('N') if plain => return true,
@@ -103,7 +103,7 @@ pub(crate) fn key(app: &mut App, k: &crossterm::event::KeyEvent, popup_open: boo
     match (k.code, k.modifiers) {
         (KeyCode::Char('c'), KeyModifiers::CONTROL) if pending && !interrupt_requested => {
             let f = sb.focus.clone();
-            sb.send(json!({"op": "interrupt", "agent": f}));
+            sb.call("turn/interrupt", json!({"agent": f}), super::rpc::Then::Shown);
             // computer-use-design.md §7.3: it lets go of Chrome and its apps too
             if crate::computer_use::driving(&f).is_some() {
                 crate::computer_use::stop(&sb.dir_of(&f));
@@ -158,7 +158,7 @@ pub(crate) fn key(app: &mut App, k: &crossterm::event::KeyEvent, popup_open: boo
         }
         (KeyCode::Esc, _) if !popup_open => {
             if let Some((id, _)) = sb.confirm.take() {
-                sb.send(json!({"op": "confirm", "id": id, "yes": false}));
+                sb.call("confirm/answer", json!({"id": id, "yes": false}), super::rpc::Then::Shown);
                 return true;
             }
             if sb.selected.is_some() || sb.preview {

@@ -4,8 +4,8 @@
 //! to `bise_proto` rows, and the live fold of a subscribed thread (only
 //! the entries that changed go out).
 
-use bise_proto::rows::{question, Agent, Artifact, ArtifactVersion, Card, CardPage, Report, ReportKind, Status};
-use bise_proto::diff::{DiffFile, DiffLine, Hunk, LineKind};
+use bise_proto::rows::{question, Phase, Agent, Artifact, ArtifactPr, ArtifactVersion, Card, CardPage, AgentMode, Report, ReportKind, Status};
+use bise_proto::diff::{DiffFile, DiffLine, DiffView, Hunk, LineKind};
 use bise_proto::hub::{HubEv, Job as Followed, JobState};
 use bise_proto::thread::lines::unescape;
 use bise_proto::thread::words::one_line;
@@ -17,12 +17,15 @@ use std::path::Path;
 
 pub mod approvals;
 mod dev_servers;
+mod diff_ask;
 mod features;
+pub mod heads;
 mod merged;
 mod models;
 pub mod slash;
 mod worktrees;
 pub use dev_servers::{dev_servers, lsof_ports, server_name, Job};
+pub use diff_ask::DiffAsk;
 pub use features::{features, PlaceCard};
 pub use models::models;
 pub use merged::{landed_line, merged, LOG_FORMAT as MERGED_LOG_FORMAT};
@@ -55,6 +58,8 @@ pub fn agents(
     user_kind: fn(&str) -> bool,
     vision: &dyn Fn(&str) -> Option<bool>,
     usage: &dyn Fn(&str) -> Option<bise_proto::rows::AgentUsage>,
+    // its head (heads.rs): its newest entry's pos and its ended turns
+    head: &dyn Fn(&str) -> (Option<bise_proto::Pos>, u64),
 ) -> Vec<Agent> {
     let list = |k: &str| snap.get(k).and_then(Value::as_array).cloned().unwrap_or_default();
     let cards = list("cards");
@@ -62,7 +67,8 @@ pub fn agents(
     for a in list("agents") {
         let name = s(&a, "name");
         let (status, archived) = Status::of_hub(&s(&a, "status"));
-        let first = ms(&a, "report_ms").filter(|_| status != Status::Working).or(ms(&a, "created_ms")).unwrap_or(now);
+        let working = status.working();
+        let first = ms(&a, "report_ms").filter(|_| !working).or(ms(&a, "created_ms")).unwrap_or(now);
         let at = match since.get(&name) {
             Some((st, at)) if *st == status => *at,
             Some(_) => now,
@@ -70,7 +76,13 @@ pub fn agents(
         };
         since.insert(name.clone(), (status, at));
         let title = [s(&a, "note"), s(&a, "role"), s(&a, "report"), s(&a, "objective")].into_iter().find(|t| !t.is_empty()).unwrap_or_default();
-        let worktree = s(&a, "mode") == "worktree";
+        let mode = match s(&a, "mode").as_str() {
+            "worktree" => Some(AgentMode::Worktree),
+            "shared" => Some(AgentMode::Shared),
+            "" => None,
+            _ => Some(AgentMode::Unknown),
+        };
+        let worktree = mode == Some(AgentMode::Worktree);
         let report = Some(s(&a, "report")).filter(|r| !r.is_empty()).map(|text| Report {
             kind: match status {
                 Status::Done => ReportKind::Done,
@@ -85,20 +97,24 @@ pub fn agents(
         out.push(Agent {
             main: a.get("main").and_then(Value::as_bool).unwrap_or(false),
             status,
+            phase: Phase::of_hub(&s(&a, "status")),
             archived,
             title: one_line(&title, 120),
             purpose: one_line(&s(&a, "objective"), 200),
             since_ms: at,
             waits,
             parent: Some(s(&a, "parent")).filter(|p| !p.is_empty()),
+            // its worktree's branch as released; the shared checkout's
+            // branch apart (P4b-fix, the wire rule)
             branch: Some(s(&a, "branch")).filter(|b| worktree && !b.is_empty()),
+            checkout_branch: Some(s(&a, "branch")).filter(|b| !worktree && !b.is_empty()),
             worktree: Some(s(&a, "path")).filter(|p| worktree && !p.is_empty()),
-            turn_ms: a.get("turn_ms").and_then(Value::as_u64).filter(|_| status == Status::Working),
+            turn_ms: a.get("turn_ms").and_then(Value::as_u64).filter(|_| working),
             report,
             // his queued inputs (sb-core holds them, amb-hub 7dcb56ab)
             queued: a.get("queued_inputs").cloned().and_then(|q| serde_json::from_value(q).ok()).unwrap_or_default(),
             // where its thread is on disk, for stream C's readers (S2 step 3)
-            dir: Some(s(&a, "dir")).filter(|d| !d.is_empty()),
+            dir: Some(s(&a, "dir")).filter(|d| !d.is_empty()).unwrap_or_else(|| name.clone()),
             aliases: a.get("aliases").cloned().and_then(|x| serde_json::from_value(x).ok()).unwrap_or_default(),
             // K4: its model and whether it reads images (the composer
             // refuses an image when false)
@@ -109,6 +125,21 @@ pub fn agents(
             usage: usage(&name),
             // R9/S3: model.rs's waiting_on, the field the TUI's panel reads
             waiting_on: bise_proto::rows::WaitingOn::of_word(&s(&a, "waiting_on")),
+            // P4b: the terminal's facts, each the snapshot's own field
+            mode,
+            path: s(&a, "path"),
+            objective: s(&a, "objective"),
+            note: s(&a, "note"),
+            role: s(&a, "role"),
+            msgs_queued: a.get("queued").and_then(Value::as_u64).unwrap_or(0) as u32,
+            inbox: a.get("inbox").and_then(Value::as_u64).unwrap_or(0) as u32,
+            created_ms: ms(&a, "created_ms"),
+            place: Some(s(&a, "place")).filter(|p| !p.is_empty()),
+            place_id: s(&a, "place_id"),
+            efforts: a.get("efforts").cloned().and_then(|e| serde_json::from_value(e).ok()).unwrap_or_default(),
+            changes: a.get("changes").cloned().and_then(|c| serde_json::from_value(c).ok()),
+            last_pos: head(&name).0,
+            turns: head(&name).1,
             name,
         });
     }
@@ -121,21 +152,67 @@ pub fn agents(
 /// how-often words are bise-proto's, the TUI's (`every_words`). The one
 /// builder: the `scheduled` event and view.json's index both call it.
 pub fn scheduled(timers: &crate::every::Timers) -> Vec<bise_proto::rows::ScheduledTask> {
+    timers.map.values().map(task_row).collect()
+}
+
+/// P4c-4a: the timers that ended in the last week, oldest first, as rows
+/// (the scheduled screen's tab; `HubEv::Scheduled.ended`): the hub's
+/// state's (`Timers::state`) with how they ended (`every::end_of`).
+pub fn scheduled_ended(timers: &crate::every::Timers, now: u64) -> Vec<bise_proto::rows::ScheduledTask> {
+    use bise_proto::rows::{ScheduledEnd, WaitingOn};
     timers
-        .map
-        .values()
-        .map(|t| bise_proto::rows::ScheduledTask {
-            id: t.id,
-            agent: t.agent.clone(),
-            by: t.by.clone(),
-            words: t.text.clone(),
-            name: t.title(),
-            every: bise_proto::thread::scheduled::every_words(&t.sched.label(), t.times),
-            times: t.times,
-            done: t.fired,
-            next_ms: Some(t.next_ms).filter(|ms| *ms > 0),
-            until_ms: t.until_ms,
-            page: t.page.clone().filter(|p| !p.is_empty()),
+        .ended
+        .iter()
+        .filter(|e| e.ended_ms + crate::every::ENDED_SHOWN_MS > now)
+        .map(|e| {
+            let (end, by) = crate::every::end_of(&e.why);
+            let stopped_by = match by.as_str() {
+                "" => None,
+                "user" => Some(WaitingOn::You),
+                name => Some(WaitingOn::Agent { name: name.to_string() }),
+            };
+            bise_proto::rows::ScheduledTask { ended_ms: Some(e.ended_ms), end: ScheduledEnd::of_word(end), stopped_by, ..task_row(&e.timer) }
+        })
+        .collect()
+}
+
+fn task_row(t: &crate::every::Timer) -> bise_proto::rows::ScheduledTask {
+    bise_proto::rows::ScheduledTask {
+        id: t.id,
+        agent: t.agent.clone(),
+        by: t.by.clone(),
+        words: t.text.clone(),
+        name: t.title(),
+        every: bise_proto::thread::scheduled::every_words(&t.sched.label(), t.times),
+        times: t.times,
+        done: t.fired,
+        next_ms: Some(t.next_ms).filter(|ms| *ms > 0),
+        until_ms: t.until_ms,
+        page: t.page.clone().filter(|p| !p.is_empty()),
+        label: t.sched.label(),
+        last_ms: Some(t.last_ms).filter(|ms| *ms > 0),
+        runs: t.runs.clone(),
+        ended_ms: None,
+        end: None,
+        stopped_by: None,
+    }
+}
+
+/// P4c-4a: the snapshot's `places` (`place::views`, the worktrees the
+/// terminal's panel draws) as rows, each PR by the one builder
+/// (`forge::news::pr_row`, `/prs`'s) with its place's agents.
+pub fn places(snap: &Value) -> Vec<bise_proto::rows::Place> {
+    let views: Vec<crate::place::PlaceView> = snap.get("places").cloned().and_then(|p| serde_json::from_value(p).ok()).unwrap_or_default();
+    views
+        .into_iter()
+        .map(|p| bise_proto::rows::Place {
+            pr: p.pr.as_ref().map(|pr| crate::forge::news::pr_row(pr, &p.agents)),
+            id: p.id,
+            branch: p.branch,
+            agents: p.agents,
+            lid: p.lid,
+            feature: p.feature,
+            trying: p.trying,
         })
         .collect()
 }
@@ -169,14 +246,20 @@ fn his(kind: &str, user_kind: fn(&str) -> bool) -> bool {
     user_kind(kind) && kind != "drop"
 }
 
-/// The snapshot's open cards that are his, as rows.
-pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool) -> Vec<Card> {
+/// The snapshot's open cards as rows, in its order: his (`HubEv::Cards`'
+/// `cards`), then the others (`others`, P4c-4a: bise's own, a drop, a
+/// done, a blocked..., which the terminal's inbox draws too). Each with
+/// the snapshot's words (`text`, its `question` and `options` parsed
+/// from them), note, place, PR, link and the message it answers.
+pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool) -> (Vec<Card>, Vec<Card>) {
     let list = snap.get("cards").and_then(Value::as_array).cloned().unwrap_or_default();
+    let opt = |c: &Value, k: &str| Some(s(c, k)).filter(|x| !x.is_empty());
+    let n = |c: &Value, k: &str| c.get(k).and_then(Value::as_u64);
     list.iter()
-        .filter(|c| his(&s(c, "kind"), user_kind))
         .map(|c| {
             let kind = s(c, "kind");
-            let (q, options) = question(c.get("text").and_then(Value::as_str).unwrap_or(""));
+            let text = c.get("text").and_then(Value::as_str).unwrap_or("").to_string();
+            let (q, options) = question(&text);
             let page = c.get("page").filter(|p| p.is_object()).map(|p| CardPage {
                 id: s(p, "id"),
                 url: s(p, "url"),
@@ -184,28 +267,37 @@ pub fn cards(snap: &Value, project: &str, now: u64, user_kind: fn(&str) -> bool)
                 item: Some(s(p, "item")).filter(|i| !i.is_empty()),
             });
             Card {
-                id: c.get("id").and_then(Value::as_u64).unwrap_or(0),
+                id: n(c, "id").unwrap_or(0),
                 project: project.to_string(),
                 urgent: kind == "confirm",
                 approval: Card::approval_kind(&kind),
                 rank: Some(bise_proto::rows::card_rank(&kind)),
-                kind,
                 agent: s(c, "agent"),
                 question: q,
                 options,
-                since_ms: now.saturating_sub(c.get("age_ms").and_then(Value::as_u64).unwrap_or(0)),
+                since_ms: now.saturating_sub(n(c, "age_ms").unwrap_or(0)),
                 page,
                 // V14: the signin card's stopped agents (core.rs signin_waiting)
                 waiting: c.get("waiting").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect()),
+                note: opt(c, "note"),
+                place: opt(c, "place"),
+                pr: n(c, "pr"),
+                link: opt(c, "link"),
+                for_msg: n(c, "for_msg"),
+                // a drafts batch's fields (daemon/page_cards.rs snapshot_pages)
+                batch: c.get("batch").filter(|b| b.is_object()).and_then(|b| serde_json::from_value(b.clone()).ok()),
+                text,
+                kind,
             }
         })
-        .collect()
+        .partition(|c| his(&c.kind, user_kind))
 }
 
 /// The art store's `artifacts` event (daemon/art.rs `artifacts_ev`:
 /// rows + `seen_ms`) as rows. `url`: a page's the page server gives
 /// (`page_url`), else its link or its file (its kept copy first); `new`:
-/// not his own, changed since he last looked.
+/// not his own, changed since he last looked; the rest of each row as
+/// the store gave it (the terminal's /artifacts reads it all).
 pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>) -> Vec<Artifact> {
     let seen = ev.get("seen_ms").and_then(Value::as_u64).unwrap_or(0);
     let rows = ev.get("rows").and_then(Value::as_array).cloned().unwrap_or_default();
@@ -225,9 +317,12 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>) -> Vec<A
                         v: v.get("v").and_then(Value::as_u64).unwrap_or(0) as u32,
                         at_ms: v.get("ts_ms").and_then(Value::as_u64).unwrap_or(0),
                         note: Some(s(v, "note")).filter(|n| !n.is_empty()),
+                        target: s(v, "target"),
+                        copy: Some(s(v, "copy")).filter(|c| !c.is_empty()),
                     })
                     .collect()
             });
+            let pr = r.get("pr").filter(|p| p.is_object()).map(|p| ArtifactPr { repo: s(p, "repo"), number: p.get("number").and_then(Value::as_u64).unwrap_or(0) });
             Artifact {
                 path,
                 versions,
@@ -239,15 +334,26 @@ pub fn artifacts(ev: &Value, page_url: impl Fn(&str) -> Option<String>) -> Vec<A
                 url,
                 kind,
                 id,
+                by: s(r, "by"),
+                archived: r.get("archived").and_then(Value::as_bool).unwrap_or(false),
+                created_ms: r.get("created_ms").and_then(Value::as_u64),
+                copy: Some(s(r, "copy")).filter(|c| !c.is_empty()),
+                gone: r.get("gone").and_then(Value::as_bool).unwrap_or(false),
+                detail: s(r, "detail"),
+                pr,
+                keys: r.get("keys").and_then(Value::as_array).map_or_else(Vec::new, |k| k.iter().filter_map(|x| x.as_str().map(String::from)).collect()),
+                target,
             }
         })
         .collect()
 }
 
 /// The hub's `diff` answer (daemon/art.rs `diff_answer`: files of
-/// `diff::file_json`) as the typed `diff`, or its error. A generated
-/// file's hunks are left out and a file cut for its length keeps what it
-/// has: both say `truncated`, as a binary file (no text to show).
+/// `diff::file_json`) as the typed `diff`, or its error. A file cut for
+/// its length keeps what it has and says `truncated`, as a binary file
+/// (no text to show); a generated file keeps its lines under the same cap
+/// (`generated` is a display flag: the client folds it, architect
+/// m_13436); `image` and each hunk's `head` as `file_json` says them.
 /// A commit's sha as a client may name one: 4 to 40 hex digits (never an
 /// option or a range for git).
 pub fn is_sha(c: &str) -> bool {
@@ -263,9 +369,7 @@ pub fn diff(ev: &Value, project: &str, agent: &str) -> HubEv {
     let files = files
         .iter()
         .map(|f| {
-            let generated = flag(f, "generated");
-            let hunks: Vec<Hunk> = if generated { Vec::new() } else { f.get("hunks").and_then(Value::as_array).into_iter().flatten().map(hunk).collect() };
-            let had = f.get("hunks").and_then(Value::as_array).is_some_and(|h| !h.is_empty());
+            let hunks: Vec<Hunk> = f.get("hunks").and_then(Value::as_array).into_iter().flatten().map(hunk).collect();
             DiffFile {
                 path: s(f, "path"),
                 status: match s(f, "status").as_str() {
@@ -277,13 +381,15 @@ pub fn diff(ev: &Value, project: &str, agent: &str) -> HubEv {
                 .into(),
                 add: f.get("add").and_then(Value::as_u64).unwrap_or(0) as u32,
                 del: f.get("del").and_then(Value::as_u64).unwrap_or(0) as u32,
-                truncated: flag(f, "cut") || flag(f, "binary") || (generated && had),
+                truncated: flag(f, "cut") || flag(f, "binary"),
                 from: Some(s(f, "old_path")).filter(|p| !p.is_empty() && *p != s(f, "path")),
                 binary: flag(f, "binary"),
-                generated,
+                generated: flag(f, "generated"),
+                image: flag(f, "image"),
                 size: f.get("size").and_then(Value::as_u64),
                 hunks,
                 note: None,
+                abs: Some(s(f, "abs")).filter(|a| !a.is_empty()),
             }
         })
         .collect();
@@ -297,6 +403,15 @@ pub fn diff(ev: &Value, project: &str, agent: &str) -> HubEv {
         merged: None,
         commit: None,
         note: Some(s(ev, "note")).filter(|n| !n.is_empty()),
+        view: Box::new(DiffView {
+            title: Some(s(ev, "title")).filter(|t| !t.is_empty()),
+            req: ev.get("req").and_then(Value::as_u64),
+            commits: ev.get("commits").and_then(Value::as_u64),
+            working: flag(ev, "working"),
+            uncommitted: flag(ev, "uncommitted"),
+            landed_ms: ev.get("landed_ms").and_then(Value::as_u64),
+            gone: flag(ev, "gone"),
+        }),
     }
 }
 
@@ -328,7 +443,7 @@ fn hunk(h: &Value) -> Hunk {
         };
         lines.push(line);
     }
-    Hunk { header, lines }
+    Hunk { header, lines, head: Some(head).filter(|h| !h.is_empty()) }
 }
 
 /// An agent's current step from one feed line: its tool intent, "" at
@@ -370,6 +485,12 @@ impl Live {
         self.refold(ctx)
     }
 
+    /// Its newest entry's pos (the last one sent): `hub/agents`'
+    /// `last_pos` without a second fold (heads.rs).
+    pub fn last_pos(&self) -> Option<Pos> {
+        self.sent.keys().next_back().copied()
+    }
+
     /// The fold again (a card answered, a page published): what changed.
     pub fn refold(&mut self, ctx: &Ctx) -> Vec<Entry> {
         let entries = thread::fold(&self.lines, ctx);
@@ -385,9 +506,12 @@ impl Live {
         out
     }
 
+    /// The lines of the newest KEEP entries stay, and every line of a call
+    /// one of them has (its result and finish come after a card line
+    /// written while it runs: `thread::tail_start`).
     fn trim(&mut self, entries: &[Entry]) {
         if entries.len() > KEEP {
-            let cut = entries[entries.len() - KEEP].pos;
+            let cut = thread::tail_start(&self.lines, entries, entries.len() - KEEP);
             self.lines.retain(|l| l.0 >= cut);
             self.sent.retain(|p, _| *p >= cut);
         }
@@ -405,6 +529,29 @@ mod tests {
 
     fn uk(k: &str) -> bool {
         matches!(k, "question" | "drop" | "confirm")
+    }
+
+    /// Law (proto-tests m_15071): a drafts-batch card's `batch` (the
+    /// snapshot's, daemon/page_cards.rs) is hub/cards' `Card.batch` with
+    /// every key and value; any other card has none.
+    #[test]
+    fn a_drafts_batch_card_carries_its_batch() {
+        let batch = json!({"count": 3, "title": "inbox replies", "what": "replies", "names": ["legal", "Lucas", "Marc"],
+            "topics": ["the contract", "the dates", "the invoice"], "line": "replies to legal, Lucas and Marc", "actions": "1 to close"});
+        let snap = json!({"cards": [
+            {"id": 7, "kind": "question", "agent": "main", "text": "send the 3 replies?\n1. send\n2. open the page", "age_ms": 0,
+             "page": {"id": "replies", "block": "drafts", "item": "d1", "drafts": true, "url": "http://p/replies#d1"}, "batch": batch},
+            {"id": 8, "kind": "question", "agent": "main", "text": "ok?", "age_ms": 0}]});
+        let (his, _) = cards(&snap, "p", 10, uk);
+        let typed = serde_json::to_value(his[0].batch.as_ref().expect("its batch")).unwrap();
+        assert_eq!(typed, batch, "every key of the older batch, the same value");
+        assert_eq!(his[1].batch, None);
+        // no actions: left out, as the older null
+        let mut none = batch.clone();
+        none["actions"] = Value::Null;
+        let snap = json!({"cards": [{"id": 7, "kind": "question", "agent": "main", "text": "x", "age_ms": 0, "batch": none}]});
+        let (his, _) = cards(&snap, "p", 10, uk);
+        assert_eq!(his[0].batch.as_ref().map(|b| b.actions.clone()), Some(None));
     }
 
     /// Law (architect m_11874): the `scheduled` row the hub builds from a
@@ -486,35 +633,45 @@ mod tests {
         let mut s = snap();
         s["agents"][1]["model"] = json!("mistral/codestral-latest");
         s["agents"][2]["model"] = json!("ollama/llava");
-        let a = agents(&s, &mut since, 100, uk, &vision, &|_| None);
+        let a = agents(&s, &mut since, 100, uk, &vision, &|_| None, &|_| (None, 0));
         assert_eq!((a[1].model.as_deref(), a[1].vision), (Some("mistral/codestral-latest"), Some(false)), "listed, no vision");
         assert_eq!((a[2].model.as_deref(), a[2].vision), (Some("ollama/llava"), None), "unlisted: never a guess");
         assert_eq!((a[0].model.as_deref(), a[0].vision), (None, None), "no model in the snapshot");
         // his /model switch: the next rows follow
         s["agents"][1]["model"] = json!("anthropic/claude-haiku-4-5");
-        assert_eq!(agents(&s, &mut since, 200, uk, &vision, &|_| None)[1].vision, Some(true));
+        assert_eq!(agents(&s, &mut since, 200, uk, &vision, &|_| None, &|_| (None, 0))[1].vision, Some(true));
     }
 
     #[test]
     fn the_snapshot_becomes_rows() {
         let mut since = Since::new();
-        let a = agents(&snap(), &mut since, 100, uk, &|_| None, &|_| None);
+        let a = agents(&snap(), &mut since, 100, uk, &|_| None, &|_| None, &|_| (None, 0));
         assert_eq!(a.len(), 3);
         let p = &a[1];
         assert_eq!((p.status, p.title.as_str(), p.purpose.as_str(), p.waits), (Status::Working, "profiling the hub", "make the e2e fast", 2));
         assert_eq!((p.branch.as_deref(), p.worktree.as_deref(), p.turn_ms, p.since_ms), (Some("sb/perf"), Some("/w/perf"), Some(4200), 7));
         let o = &a[2];
-        assert_eq!((o.archived, o.status, o.branch.as_deref(), o.since_ms), (true, Status::Done, None, 9));
+        // branch keeps its released meaning (a worktree's); the shared
+        // checkout's branch is checkout_branch (P4b-fix, the wire rule)
+        assert_eq!((o.archived, o.status, o.branch.as_deref(), o.checkout_branch.as_deref(), o.since_ms), (true, Status::Done, None, Some("main"), 9));
+        assert_eq!((p.checkout_branch.as_deref(), p.phase), (None, None));
+        assert_eq!((o.mode, o.worktree.as_deref(), o.path.as_str()), (Some(AgentMode::Shared), None, "/w"));
+        assert_eq!((p.mode, p.path.as_str(), p.objective.as_str(), p.role.as_str(), p.msgs_queued, p.created_ms), (Some(AgentMode::Worktree), "/w/perf", "make the e2e fast\nmore", "profiling the hub", 1, Some(7)));
+        assert_eq!((a[0].dir.as_str(), p.dir.as_str()), ("main", "perf"), "no dir in the snapshot: its name");
+        assert_eq!(p.last_pos, None, "no head given");
         assert_eq!(o.report.as_ref().map(|r| r.kind), Some(ReportKind::Done));
         assert_eq!(p.queued.iter().map(|q| (q.id, q.text.as_str())).collect::<Vec<_>>(), [(3, "then the cold run")]);
         assert!(o.queued.is_empty());
         // a status change moves since; the same keeps it
         let mut s2 = snap();
         s2["agents"][1]["status"] = json!("idle");
-        assert_eq!(agents(&s2, &mut since, 200, uk, &|_| None, &|_| None)[1].since_ms, 200);
-        assert_eq!(agents(&s2, &mut since, 300, uk, &|_| None, &|_| None)[1].since_ms, 200);
-        let c = cards(&snap(), "acme", 5_000, uk);
+        assert_eq!(agents(&s2, &mut since, 200, uk, &|_| None, &|_| None, &|_| (None, 0))[1].since_ms, 200);
+        assert_eq!(agents(&s2, &mut since, 300, uk, &|_| None, &|_| None, &|_| (None, 0))[1].since_ms, 200);
+        let (c, others) = cards(&snap(), "acme", 5_000, uk);
         assert_eq!(c.iter().map(|c| c.id).collect::<Vec<_>>(), [9, 10], "his kinds, no drop");
+        // P4c-4a: bise's own (a drop, a done) are the others, in order
+        assert_eq!(others.iter().map(|c| (c.id, c.kind.as_str())).collect::<Vec<_>>(), [(11, "drop"), (12, "done")]);
+        assert_eq!(c[0].text, "which bench?\n1. cold\n2. warm");
         assert_eq!((c[0].question.as_str(), c[0].options.len(), c[0].since_ms, c[0].urgent), ("which bench?", 2, 4_000, false));
         assert!(c[1].urgent && c[1].page.as_ref().is_some_and(|p| p.block.as_deref() == Some("q1")));
     }
@@ -540,8 +697,8 @@ mod tests {
         assert_eq!(row(3), ("mine", "/w/m.txt", 1, false), "his own is never new");
         let paths: Vec<Option<&str>> = a.iter().map(|x| x.path.as_deref()).collect();
         assert_eq!(paths, [None, Some("/w/deck.pdf"), None, Some("/w/m.txt")], "a path for a file only, never a page or a link");
-        let v = |v: u32, at_ms: u64, note: Option<&str>| ArtifactVersion { v, at_ms, note: note.map(Into::into) };
-        assert_eq!(a[1].versions, [v(1, 80, None), v(2, 90, Some("no copy: too big"))], "the store's versions, oldest first, its words");
+        let notes: Vec<(u32, u64, Option<&str>)> = a[1].versions.iter().map(|x| (x.v, x.at_ms, x.note.as_deref())).collect();
+        assert_eq!(notes, [(1, 80, None), (2, 90, Some("no copy: too big"))], "the store's versions, oldest first, its words");
         assert!(a[0].versions.is_empty(), "a row without versions has none");
     }
 
@@ -553,12 +710,12 @@ mod tests {
             {"path": "Cargo.lock", "status": "M", "add": 9, "del": 9, "binary": false, "generated": true, "cut": false,
              "hunks": [{"old": 1, "new": 1, "head": "", "lines": ["-a", "+b"]}]},
             {"path": "big.rs", "status": "A", "add": 9000, "del": 0, "binary": false, "generated": false, "cut": true, "hunks": []},
-            {"path": "logo.png", "status": "A", "add": 0, "del": 0, "binary": true, "generated": false, "cut": false, "hunks": [], "size": 2100000},
+            {"path": "logo.png", "status": "A", "add": 0, "del": 0, "binary": true, "image": true, "generated": false, "cut": false, "hunks": [], "size": 2100000},
             {"path": "src/codec.rs", "old_path": "src/decode.rs", "status": "R", "add": 0, "del": 0, "binary": false, "generated": false, "cut": false, "hunks": []}]});
         let HubEv::Diff { files, head, base, .. } = diff(&ev, "acme", "perf") else { panic!("a diff") };
         assert_eq!((base.as_str(), head.as_deref()), ("main", Some("sb/perf")));
         let h = &files[0].hunks[0];
-        assert_eq!(h.header, "@@ -10 +10 @@ fn slow()");
+        assert_eq!((h.header.as_str(), h.head.as_deref()), ("@@ -10 +10 @@ fn slow()", Some("fn slow()")));
         let l = |i: usize| (h.lines[i].kind, h.lines[i].old, h.lines[i].new, h.lines[i].text.as_str());
         assert_eq!(l(0), (LineKind::Ctx, Some(10), Some(10), "let r = q();"));
         assert_eq!(l(1), (LineKind::Del, Some(11), None, "r.sort();"));
@@ -566,12 +723,14 @@ mod tests {
         assert_eq!(l(3), (LineKind::Add, None, Some(12), "r.dedup();"));
         assert_eq!(h.lines.len(), 4, "no-newline markers dropped");
         assert_eq!((files[0].status.as_str(), files[0].truncated), ("modified", false));
-        assert!(files[1].truncated && files[1].hunks.is_empty(), "a generated file: counts only, said cut");
+        assert!(!files[1].truncated && files[1].hunks.len() == 1, "a generated file: its lines, the client folds it");
+        assert_eq!(files[1].hunks[0].head, None, "no function context: no head");
         assert!(files[2].truncated && files[2].status == "added", "too long: said cut");
         assert!(files[3].truncated, "binary: nothing to show, said so");
         // amb-web m_8827: each cut says why, a rename its old path
         assert_eq!((files[1].generated, files[1].binary, files[2].generated, files[2].binary), (true, false, false, false), "a plain cut is neither");
-        assert_eq!((files[3].binary, files[3].size), (true, Some(2_100_000)));
+        assert_eq!((files[3].binary, files[3].image, files[3].size), (true, true, Some(2_100_000)));
+        assert!(!files[0].image);
         assert_eq!((files[4].status.as_str(), files[4].from.as_deref()), ("renamed", Some("src/decode.rs")));
         assert_eq!(files[0].from, None, "not renamed: no from");
         assert!(is_sha("e0f3df5") && is_sha(&"a".repeat(40)));
@@ -590,14 +749,50 @@ mod tests {
         let page = thread::fold(&first, &ctx);
         let mut live = Live::start(first, &page);
         assert!(live.push(l(2, "  obs: assistant: on it"), &ctx).is_empty(), "a replay");
-        let e = live.push(l(3, "tool #1 bash : ls"), &ctx);
+        // a tool row exists from its tool_started (G3)
+        let e = live.push(l(3, "  obs: tool_started #1"), &ctx);
         assert_eq!((e.len(), e[0].pos), (1, 3));
-        let e = live.push(l(4, "tool_intent #1 : listing"), &ctx);
+        let e = live.push(l(4, "tool #1 bash : ls"), &ctx);
+        assert_eq!((e.len(), e[0].pos), (1, 3));
+        let e = live.push(l(5, "tool_intent #1 : listing"), &ctx);
         assert_eq!((e.len(), e[0].pos, e[0].tools.as_ref().unwrap().items[0].text.as_str()), (1, 3, "listing"));
-        let e = live.push(l(5, "tool #2 read_file : a"), &ctx);
+        live.push(l(6, "  obs: tool_started #2"), &ctx);
+        let e = live.push(l(7, "tool #2 read_file : a"), &ctx);
         assert_eq!((e[0].pos, e[0].tools.as_ref().unwrap().count), (3, 2), "the same entry grows");
         assert_eq!(step_of("tool_intent #2 : reading a"), Some("reading a".into()));
         assert_eq!(step_of("  obs: turn_done: completed"), Some(String::new()));
         assert_eq!(step_of("tool #2 x : y"), None);
+    }
+
+    /// tui-parity R1 (proto-lead m_15643): a card line written while its
+    /// `sb card` call runs is an entry; once it is the oldest one kept,
+    /// the call's result and finish still fold into the call's row, never
+    /// a lone `#2 ✓` entry a turn later. Every line pushed one by one,
+    /// each change an entry the whole fold has.
+    #[test]
+    fn a_live_tail_never_cuts_a_call_from_its_finish() {
+        let none = |_: &str| None;
+        let open: [u64; 0] = [];
+        let ctx = Ctx { open_cards: &open, page: &none, provider: &|i: &str, _: &str| i.to_string(), width: &unicode_width::UnicodeWidthStr::width, offset: &|_| 0, attached: &crate::attached::split };
+        let mut lines = vec!["sb you : ask me", "  obs: turn_started", "  obs: tool_started #2", "tool #2 bash : sb card \"second?\"", "sb card : #2 question @main : second?"];
+        let filler: Vec<String> = (0..KEEP + 2).map(|i| format!("sb info : note {i}")).collect();
+        lines.extend(filler.iter().map(String::as_str));
+        lines.extend(["tool_result #2 ok : #2", "  obs: tool_finished #2 ok", "  obs: turn_done: completed"]);
+        lines.extend(["sb you : the user answered card #2", "  obs: turn_started", "  obs: assistant: ack", "  obs: turn_done: completed"]);
+        let after: Vec<String> = (0..KEEP).map(|i| format!("sb info : later {i}")).collect();
+        lines.extend(after.iter().map(String::as_str));
+        let all: Vec<Line> = lines.iter().enumerate().map(|(i, l)| (i as u64 + 1, 1_000 + i as u64, l.to_string())).collect();
+        let whole = thread::fold(&all, &ctx);
+        let mut live = Live::start(Vec::new(), &[]);
+        for l in &all {
+            for e in live.push(l.clone(), &ctx) {
+                assert!(whole.iter().any(|w| w.pos == e.pos), "an entry the whole fold hasn't: {e:?}");
+            }
+        }
+        let row = whole.iter().find_map(|e| e.tools.as_ref()).expect("the call's row");
+        assert_eq!((row.count, row.items[0].state), (1, bise_proto::thread::ToolState::Ok));
+        assert_eq!(whole.iter().filter(|e| e.kind == thread::EntryKind::Tools).count(), 1);
+        // KEEP entries past its finish, the call's lines go
+        assert!(live.lines.first().is_some_and(|l| l.0 > 3), "{:?}", live.lines.first());
     }
 }

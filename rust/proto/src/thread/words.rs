@@ -108,6 +108,16 @@ pub fn hub_notice(h: &Hub) -> Option<Notice> {
         Hub::Spawn(t) => notice(NoticeLevel::Info, format!("✚ {t}")),
         Hub::Computer(t) => notice(NoticeLevel::Info, t.clone()),
         Hub::Direct(t) => notice(NoticeLevel::Info, format!("⇄ {t}")),
+        // a message he routed by hand (`you → @docs : thanks`, no item):
+        // the TUI's `→ …` info line
+        Hub::Other { kind, text } if kind == "route" => notice(NoticeLevel::Info, format!("→ {text}")),
+        // any other kind (`info`: '@t1 archived · its worktree removed',
+        // or a known kind's line that doesn't parse): its words, the
+        // TUI's info line (sb.rs hub_ev); a landed line that doesn't
+        // parse says nothing
+        Hub::Other { kind, .. } if kind == "landed" => None,
+        Hub::Other { kind, text } if kind == "card-closed" => notice(NoticeLevel::Info, format!("card {text} ")),
+        Hub::Other { text, .. } => notice(NoticeLevel::Info, text.clone()),
         _ => None,
     }
 }
@@ -135,6 +145,16 @@ pub fn percent(used: u64, window: u64) -> u64 {
     }
     // saturating: a corrupt token count never overflows (debug panics)
     used.saturating_mul(100).saturating_add(window / 2) / window
+}
+
+/// The context gauge in full (the divider while a turn holds, the feed's
+/// usage line): "42k / 200k tokens · 21%", or "42k tokens" without a
+/// known window.
+pub fn context_label(used: u64, window: Option<u64>) -> String {
+    match window {
+        Some(w) => format!("{} / {} tokens · {}%", tokens(used), tokens(w), percent(used, w)),
+        None => format!("{} tokens", tokens(used)),
+    }
 }
 
 /// The context gauge at rest (BISE-303, the divider): "42k · 21%", or

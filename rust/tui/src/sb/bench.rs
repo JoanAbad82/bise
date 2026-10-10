@@ -2,7 +2,10 @@
 //! SB_BENCH_LINES=50000 cargo test --release -p bend-tui bench_long_feed -- --ignored --nocapture`.
 
 use super::*;
-use super::feed::{MAX_EVENTS, PAGE_LINES};
+use super::entries_for_tests::Hub;
+use super::feed::MAX_EVENTS;
+use super::feed_entries::PAGE_ENTRIES;
+use bise_proto::thread::Line;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 use std::time::Instant;
@@ -100,9 +103,9 @@ fn bench_long_feed() {
     let (w, h) = (200u16, 50u16);
     let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
     let t = Instant::now();
+    let mut hub = Hub::new();
     for l in &lines {
-        let j = json!({"ev": "line", "agent": "big", "line": l}).to_string();
-        dispatch(&mut app, &j);
+        hub.line(&mut app, "big", l);
     }
     eprintln!("replay (dispatch, feed out of focus): {:.1} ms", ms(t));
     let t = Instant::now();
@@ -150,8 +153,7 @@ fn bench_long_feed() {
     eprintln!("PageDown frames from the top (worst of 50): {:.2} ms", worst);
     let t = Instant::now();
     for l in lines.iter().take(20) {
-        let j = json!({"ev": "line", "agent": "big", "line": l}).to_string();
-        dispatch(&mut app, &j);
+        hub.line(&mut app, "big", l);
     }
     term.draw(|f| draw_sb(&mut app, f)).unwrap();
     eprintln!("20 live lines + frame: {:.2} ms", ms(t));
@@ -166,16 +168,15 @@ fn bench_long_feed() {
     term.draw(|f| draw_sb(&mut app, f)).unwrap();
     eprintln!("focus away and back + 2 draws: {:.1} ms", ms(t));
 
-    // what the hub does now: the last 1000 lines on connect, with their
-    // positions, then pages of 1000 older lines while the user scrolls up
+    // what the hub does now: the newest entries on subscribe, then pages
+    // of older ones while the user scrolls up
     let mut app = test_app();
     let mut term = Terminal::new(TestBackend::new(w, h)).unwrap();
     let n = lines.len();
     let t = Instant::now();
-    for (i, l) in lines.iter().enumerate().skip(n.saturating_sub(1000)) {
-        let j = json!({"ev": "line", "agent": "big", "line": l, "pos": i + 1}).to_string();
-        dispatch(&mut app, &j);
-    }
+    let mut hub = Hub::new();
+    hub.had("big", lines.iter().enumerate().skip(n.saturating_sub(1000)).map(|(i, l)| (i as u64 + 1, 0, l.clone())));
+    hub.subscribe(&mut app, "big", n > 1000);
     eprintln!("windowed: replay of the last 1000 lines: {:.1} ms", ms(t));
     let t = Instant::now();
     focus(&mut app, "big");
@@ -193,12 +194,9 @@ fn bench_long_feed() {
         if app.win.loading {
             let before = app.win.first_pos.unwrap();
             let from = before.saturating_sub(1000).max(1);
-            let page: Vec<Value> = (from..before)
-                .map(|p| json!({"pos": p, "line": lines[p - 1]}))
-                .collect();
-            let j = json!({"ev": "history", "agent": "big", "before": before, "lines": page}).to_string();
+            let page: Vec<Line> = (from..before).map(|p| (p as u64, 0, lines[p - 1].clone())).collect();
             let t = Instant::now();
-            dispatch(&mut app, &j);
+            hub.page(&mut app, "big", before, page, from > 1);
             worst_page = worst_page.max(ms(t));
             pages += 1;
         }
@@ -285,17 +283,23 @@ fn scrolling_up_then_down_comes_back() {
 
 // ---- the bounded window and the pages of older history ----
 
-fn line(pos: usize) -> String {
-    json!({"ev": "line", "agent": "main", "line": format!("  obs: assistant: message {}", pos), "pos": pos})
-        .to_string()
+/// Line `pos` of main's thread, live.
+fn line(hub: &mut Hub, app: &mut App, pos: usize) {
+    hub.line_at(app, "main", pos as u64, 0, &format!("  obs: assistant: message {}", pos));
+}
+
+/// Line `pos` of main's thread, for a page.
+fn older(pos: usize) -> Line {
+    (pos as u64, 0, format!("  obs: assistant: message {}", pos))
 }
 
 #[test]
 fn a_following_feed_keeps_its_last_events_then_pages_back() {
     let mut app = test_app();
     let mut term = Terminal::new(TestBackend::new(80, 30)).unwrap();
+    let mut hub = Hub::new();
     for p in 1..=5000 {
-        dispatch(&mut app, &line(p));
+        line(&mut hub, &mut app, p);
     }
     assert!(app.events.len() <= MAX_EVENTS, "{}", app.events.len());
     let first = app.win.first_pos.unwrap();
@@ -312,14 +316,10 @@ fn a_following_feed_keeps_its_last_events_then_pages_back() {
     };
     let before = shown(&term);
     let n0 = app.events.len();
-    let page: Vec<Value> = (first.saturating_sub(PAGE_LINES).max(1)..first)
-        .map(|p| json!({"pos": p, "line": format!("  obs: assistant: message {}", p)}))
-        .collect();
+    let from = first.saturating_sub(PAGE_ENTRIES as usize).max(1);
+    let page: Vec<Line> = (from..first).map(older).collect();
     let got = page.len();
-    dispatch(
-        &mut app,
-        &json!({"ev": "history", "agent": "main", "before": first, "lines": page}).to_string(),
-    );
+    hub.page(&mut app, "main", first, page, from > 1);
     assert!(!app.win.loading);
     assert_eq!(app.events.len(), n0 + got);
     assert_eq!(app.win.first_pos, Some(first - got));
@@ -327,27 +327,22 @@ fn a_following_feed_keeps_its_last_events_then_pages_back() {
     term.draw(|f| draw_sb(&mut app, f)).unwrap();
     assert_eq!(shown(&term), before);
     // a stale page (the feed moved since the ask) is ignored
-    dispatch(
-        &mut app,
-        &json!({"ev": "history", "agent": "main", "before": 99999, "lines": [{"pos": 1, "line": "x"}]}).to_string(),
-    );
+    hub.page(&mut app, "main", 99999, vec![(1, 0, "  obs: assistant: x".into())], false);
     assert_eq!(app.events.len(), n0 + got);
     // back to the tail: the next line trims the feed again
     app.scroll += 10_000_000;
     term.draw(|f| draw_sb(&mut app, f)).unwrap();
     assert!(app.follow);
-    dispatch(&mut app, &line(5001));
+    line(&mut hub, &mut app, 5001);
     assert!(app.events.len() <= MAX_EVENTS);
 }
 
 #[test]
 fn a_feed_out_of_focus_is_bounded_too() {
     let mut app = test_app();
+    let mut hub = Hub::new();
     for p in 1..=5000 {
-        dispatch(
-            &mut app,
-            &json!({"ev": "line", "agent": "other", "line": format!("  obs: assistant: m {}", p), "pos": p}).to_string(),
-        );
+        hub.line_at(&mut app, "other", p, 0, &format!("  obs: assistant: m {}", p));
     }
     focus(&mut app, "other");
     assert!(app.events.len() <= MAX_EVENTS);
@@ -358,15 +353,16 @@ fn a_feed_out_of_focus_is_bounded_too() {
 fn clear_empties_the_feed_and_scrolling_up_brings_it_back_in_order() {
     let mut app = test_app();
     let mut term = Terminal::new(TestBackend::new(80, 30)).unwrap();
+    let mut hub = Hub::new();
     for p in 1..=40 {
-        dispatch(&mut app, &line(p));
+        line(&mut hub, &mut app, p);
     }
     handle_input(&mut app, "/clear");
     // only the notice is left
     assert_eq!(app.events.len(), 1);
     assert_eq!(app.win.first_pos, Some(41));
     for p in 41..=42 {
-        dispatch(&mut app, &line(p));
+        line(&mut hub, &mut app, p);
     }
     term.draw(|f| draw_sb(&mut app, f)).unwrap();
     assert!(!app.win.loading);
@@ -376,13 +372,7 @@ fn clear_empties_the_feed_and_scrolling_up_brings_it_back_in_order() {
     app.scroll -= 10;
     term.draw(|f| draw_sb(&mut app, f)).unwrap();
     assert!(app.win.loading);
-    let page: Vec<Value> = (1..41)
-        .map(|p| json!({"pos": p, "line": format!("  obs: assistant: message {}", p)}))
-        .collect();
-    dispatch(
-        &mut app,
-        &json!({"ev": "history", "agent": "main", "before": 41, "lines": page}).to_string(),
-    );
+    hub.page(&mut app, "main", 41, (1..41).map(older).collect(), false);
     assert!(!app.win.loading);
     assert_eq!(app.win.first_pos, Some(1));
     // arrival order: the paged lines, the notice, the lines after it
@@ -405,8 +395,9 @@ fn clear_empties_the_feed_and_scrolling_up_brings_it_back_in_order() {
 #[test]
 fn ctrl_l_clears_like_clear() {
     let mut app = test_app();
+    let mut hub = Hub::new();
     for p in 1..=10 {
-        dispatch(&mut app, &line(p));
+        line(&mut hub, &mut app, p);
     }
     clear_display(&mut app);
     assert!(app.events.is_empty());
@@ -414,32 +405,26 @@ fn ctrl_l_clears_like_clear() {
     assert!(app.follow);
 }
 
-/// A page of replayed history carries each line's time (`ts`, C2
-/// amendment): a pause of 5 minutes between two replayed lines gets its
-/// `· hh:mm ·` mark, as live; a line without `ts` (an older hub) still
-/// reads, and gets no mark.
+/// A page of older entries carries each entry's time (`at_ms`, C2
+/// amendment): a pause of 5 minutes between two of them gets its
+/// `· hh:mm ·` mark, as live; an entry without a time (an older hub's
+/// line) still reads, and gets no mark.
 #[test]
 fn replayed_history_gets_its_time_marks() {
-    use crate::wire::{parse_history, HistLine};
     let t0: u64 = 1_700_000_000_000;
-    let v = json!({"ev": "history", "agent": "main", "before": 10, "lines": [
-        {"pos": 1, "line": "  obs: assistant: one", "ts": t0},
-        {"pos": 2, "line": "  obs: assistant: two", "ts": t0 + 60_000},
-        {"pos": 3, "line": "  obs: assistant: three", "ts": t0 + 60_000 + 5 * 60_000},
-        {"pos": 4, "line": "  obs: assistant: old hub"},
-    ]});
-    let lines = parse_history(&v);
-    assert_eq!(lines[3], HistLine { pos: 4, line: "  obs: assistant: old hub".into(), ts: None });
-    assert_eq!(lines[2].ts, Some(t0 + 360_000));
+    let page: Vec<Line> = vec![
+        (1, t0, "  obs: assistant: one".into()),
+        (2, t0 + 60_000, "  obs: assistant: two".into()),
+        (3, t0 + 60_000 + 5 * 60_000, "  obs: assistant: three".into()),
+        (4, 0, "  obs: assistant: old hub".into()),
+    ];
     let mut app = test_app();
+    let mut hub = Hub::new();
     for p in 10..=12 {
-        dispatch(
-            &mut app,
-            &json!({"ev": "line", "agent": "main", "line": format!("  obs: assistant: live {}", p), "pos": p}).to_string(),
-        );
+        hub.line_at(&mut app, "main", p, 0, &format!("  obs: assistant: live {}", p));
     }
     app.win.first_pos = Some(10);
-    dispatch(&mut app, &v.to_string());
+    hub.page(&mut app, "main", 10, page, false);
     let marks: Vec<(usize, String)> = app
         .events
         .iter()
@@ -454,9 +439,6 @@ fn replayed_history_gets_its_time_marks() {
     // the mark sits right before the line after the pause
     assert!(matches!(&app.events[marks[0].0 + 1], Ev::Assistant(t) if t.contains("three")));
     assert_eq!(app.win.first_pos, Some(1));
-    // an old page (no `ts` at all) reads as before, without marks
-    let old = json!({"lines": [{"pos": 1, "line": "x"}, {"pos": 2, "line": "y"}]});
-    assert_eq!(parse_history(&old).iter().map(|l| l.ts).collect::<Vec<_>>(), vec![None, None]);
 }
 
 /// Find searches the whole thread (user QA 2026-10-04): once what the
@@ -468,9 +450,10 @@ fn find_pages_in_the_older_lines() {
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     let mut app = test_app();
     let mut term = Terminal::new(TestBackend::new(120, 30)).unwrap();
-    for pos in 1001..1011 {
-        dispatch(&mut app, &json!({"ev": "line", "agent": "main", "line": format!("  obs: assistant: new {}", pos), "pos": pos}).to_string());
-    }
+    // the thread's newest entries on subscribe, older ones left for pages
+    let mut hub = Hub::new();
+    hub.had("main", (1001..1011u64).map(|pos| (pos, 0, format!("  obs: assistant: new {}", pos))));
+    hub.subscribe(&mut app, "main", true);
     term.draw(|f| draw_sb(&mut app, f)).unwrap();
     assert!(!app.win.loading, "a following view asks nothing by itself");
     crate::input::on_key(&mut app, &KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL));
@@ -479,13 +462,13 @@ fn find_pages_in_the_older_lines() {
     }
     term.draw(|f| draw_sb(&mut app, f)).unwrap();
     assert!(app.win.loading, "the loaded part is scanned: a page is asked");
-    let page: Vec<Value> = (1..1001)
+    let page: Vec<Line> = (1..1001u64)
         .map(|p| {
             let t = if p == 3 { "the ancient bug" } else { "filler" };
-            json!({"pos": p, "line": format!("  obs: assistant: {} {}", t, p)})
+            (p, 0, format!("  obs: assistant: {} {}", t, p))
         })
         .collect();
-    dispatch(&mut app, &json!({"ev": "history", "agent": "main", "before": 1001, "lines": page}).to_string());
+    hub.page(&mut app, "main", 1001, page, false);
     for _ in 0..100 {
         term.draw(|f| draw_sb(&mut app, f)).unwrap();
         if !app.find.as_ref().unwrap().busy() {

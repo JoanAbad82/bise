@@ -2,21 +2,22 @@
 //! out of `daemon/proto.rs`, no behavior change): the rows (`agents`,
 //! `cards`), `prs`, `models`, `artifacts`, the routes and followed ends,
 //! and what a broadcast changes (`proto_on`: each event again only when
-//! it changed, the subscribed threads' new entries, an agent's usage).
+//! it changed, the subscribed threads' new entries, an agent's usage);
+//! P4b: the repo's `flow`, and each agent's newest entry (`last_pos`,
+//! proto_view/heads.rs: a live line that starts an entry sends the rows
+//! again).
 
 use super::*;
+use crate::daemon::rpc::Typed;
 use bise_proto::hub::JobState;
-use bise_proto::rows::AgentUsage;
-use bise_proto::thread::words;
+use bise_proto::rows::{AgentUsage, FlowMode};
 
 impl Shell {
     /// desktop S2 step 2: sb-core's `route`/`route_done` effects, to every
     /// typed connection (the window and the capsule show the held route).
     pub(in crate::daemon) fn proto_route(&mut self, ev: HubEv) {
         let ids: Vec<ClientId> = self.proto.conns.keys().copied().collect();
-        for id in ids {
-            self.proto_send(id, &ev);
-        }
+        self.proto_note(&ids, &ev);
     }
 
     /// S10: a followed task ended: `job_end` to every typed connection.
@@ -34,10 +35,11 @@ impl Shell {
     }
 
     /// The rows of the snapshot: `agents`, `cards`.
-    pub(super) fn proto_rows(&mut self, snap: &Value) -> (HubEv, HubEv) {
+    pub(in crate::daemon) fn proto_rows(&mut self, snap: &Value) -> (HubEv, HubEv) {
         let project = self.project();
         let now = now_ms();
         self.seed_usage(snap);
+        self.seed_heads(snap);
         // K4: each agent's model read against the hub's catalog (his
         // config.toml merged, re-read when it changes), fresh each time
         self.setup();
@@ -48,13 +50,15 @@ impl Shell {
         let calls = &self.proto.usage;
         let usage = |name: &str| {
             let u = calls.get(name)?;
-            let context = u.input + u.output;
             let window = cat.map(|c| c.context_window(&u.model)).filter(|w| *w > 0);
-            Some(AgentUsage { model: u.model.clone(), context, window, words: words::context_words(context, window), short: words::short_words(context, window) })
+            Some(AgentUsage::of(&u.model, u.input, u.output, window))
         };
-        let agents = proto_view::agents(snap, &mut self.proto.since, now, crate::model::user_kind, &vision, &usage);
-        let cards = proto_view::cards(snap, &project, now, crate::model::user_kind);
-        (HubEv::Agents { project: project.clone(), agents }, HubEv::Cards { project, cards })
+        let heads = &self.proto.heads;
+        let head = |name: &str| (heads.last(name), heads.turns(name));
+        let agents = proto_view::agents(snap, &mut self.proto.since, now, crate::model::user_kind, &vision, &usage, &head);
+        let (cards, others) = proto_view::cards(snap, &project, now, crate::model::user_kind);
+        let places = proto_view::places(snap);
+        (HubEv::Agents { project: project.clone(), agents, places }, HubEv::Cards { project, cards, others })
     }
 
     /// S13 (amb-win m_10985, architect m_10999): an agent the hub has no
@@ -86,12 +90,14 @@ impl Shell {
     /// The typed `prs` (bar A.7): the open PRs of this hub's places, the
     /// rows the TUI's `/prs` draws (forge::news::pr_rows).
     /// ⌘K and the scheduled screen: the live timers as rows, built from
-    /// the hub's typed timer state (proto_view::scheduled, the one builder).
-    pub(super) fn scheduled_ev(&self) -> HubEv {
-        HubEv::Scheduled { project: self.project(), items: proto_view::scheduled(self.hub.timers()) }
+    /// the hub's typed timer state (proto_view::scheduled, the one builder),
+    /// and the ones that ended this week (P4c-4a: the screen's tab).
+    pub(in crate::daemon) fn scheduled_ev(&self) -> HubEv {
+        let timers = self.hub.timers();
+        HubEv::Scheduled { project: self.project(), items: proto_view::scheduled(timers), ended: proto_view::scheduled_ended(timers, now_ms()) }
     }
 
-    pub(super) fn prs_ev(&self) -> HubEv {
+    pub(in crate::daemon) fn prs_ev(&self) -> HubEv {
         let places = crate::place::places(&self.hub.st, &self.hub.prs);
         crate::forge::news::prs_ev(self.project(), &places)
     }
@@ -99,7 +105,7 @@ impl Shell {
     /// The typed `models` (bar A.5): the TUI's `/model` list on this hub
     /// (bise_catalog::picks), with the providers ready for this hub's own
     /// environment: what its REPLs will have (architect m_10427).
-    pub(super) fn models_ev(&mut self) -> HubEv {
+    pub(in crate::daemon) fn models_ev(&mut self) -> HubEv {
         self.proto.models_at = Some(models_mtimes());
         let env = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
         let home = bise_home::Home::from_env();
@@ -119,14 +125,37 @@ impl Shell {
 
     /// The hub's `approvals` event (gate.rs `approvals_ev`, the TUI's) as
     /// the typed one (bar V8/W21); paths in the words as the TUI says them.
-    pub(super) fn proto_approvals(&self, ev: &Value) -> HubEv {
+    pub(in crate::daemon) fn proto_approvals(&self, ev: &Value) -> HubEv {
         let home = std::env::var("HOME").ok();
         proto_view::approvals::approvals(&self.project(), ev, home.as_deref())
     }
 
+    /// The typed `pages` of a snapshot (its `pages` rows and `overdue`,
+    /// `snapshot_pages`): one builder, the older state's own rows.
+    pub(in crate::daemon) fn pages_ev(&self, snap: &Value) -> HubEv {
+        let items = snap.get("pages").and_then(Value::as_array).map_or_else(Vec::new, |a| a.iter().filter_map(|p| serde_json::from_value(p.clone()).ok()).collect());
+        let overdue = snap.get("overdue").and_then(Value::as_u64).map_or(0, |n| u32::try_from(n).unwrap_or(u32::MAX));
+        HubEv::Pages { project: self.project(), items, overdue }
+    }
+
+    /// A hub line whose fields are its typed event's (`versions`,
+    /// `release`, `update`): that event, with this hub's project.
+    pub(in crate::daemon) fn typed_of(&self, v: &Value) -> Option<HubEv> {
+        let mut v = v.clone();
+        v["project"] = json!(self.project());
+        match HubEv::from_value(v) {
+            Ok(HubEv::Unknown { .. }) => None,
+            Ok(ev) => Some(ev),
+            Err(e) => {
+                crate::daemon::log_line(&self.opts.paths, &format!("not typed: {e}"));
+                None
+            }
+        }
+    }
+
     /// The art store's event as the typed `artifacts`.
-    pub(super) fn proto_artifacts(&self, ev: &Value) -> HubEv {
-        HubEv::Artifacts { project: self.project(), items: self.artifact_rows(ev) }
+    pub(in crate::daemon) fn proto_artifacts(&self, ev: &Value) -> HubEv {
+        HubEv::Artifacts { project: self.project(), items: self.artifact_rows(ev), seen_ms: ev.get("seen_ms").and_then(Value::as_u64) }
     }
 
     /// The art store's event (`artifacts_ev`) as rows: the one builder of
@@ -155,25 +184,28 @@ impl Shell {
                 let (a, c) = (agents.encode(), cards.encode());
                 let new = (a != self.proto.last.0, c != self.proto.last.1);
                 self.proto.last = (a, c);
-                for id in &ids {
-                    if new.0 {
-                        self.proto_send(*id, &agents);
-                    }
-                    if new.1 {
-                        self.proto_send(*id, &cards);
-                    }
+                if new.0 {
+                    self.proto_note(&ids, &agents);
+                }
+                if new.1 {
+                    self.proto_note(&ids, &cards);
                 }
                 if new.1 {
                     self.proto_live(|l, ctx| l.refold(ctx));
+                }
+                // P4b: the repo's flow, when it changed
+                let flow = self.flow_ev();
+                let f = flow.encode();
+                if f != self.proto.flow {
+                    self.proto.flow = f;
+                    self.proto_note(&ids, &flow);
                 }
                 // S10: the followed jobs, when they changed
                 let jobs = HubEv::Jobs { project: self.project(), items: proto_view::jobs(v) };
                 let j = jobs.encode();
                 if j != self.proto.jobs {
                     self.proto.jobs = j;
-                    for id in &ids {
-                        self.proto_send(*id, &jobs);
-                    }
+                    self.proto_note(&ids, &jobs);
                 }
                 // bar A.6: a feature made, synced, built, merged or
                 // dropped, its card or its agents (the steps' ends and
@@ -182,9 +214,7 @@ impl Shell {
                 let f = feats.encode();
                 if f != self.proto.features {
                     self.proto.features = f;
-                    for id in &ids {
-                        self.proto_send(*id, &feats);
-                    }
+                    self.proto_note(&ids, &feats);
                 }
                 // bar A.7: a PR opened, closed, reviewed or checked (the
                 // forge poll's report lands as a state change)
@@ -192,9 +222,14 @@ impl Shell {
                 let p = prs.encode();
                 if p != self.proto.prs {
                     self.proto.prs = p;
-                    for id in &ids {
-                        self.proto_send(*id, &prs);
-                    }
+                    self.proto_note(&ids, &prs);
+                }
+                // P4c-5: the pages and his late promises (the snapshot's)
+                let pages = self.pages_ev(v);
+                let p = pages.encode();
+                if p != self.proto.pages {
+                    self.proto.pages = p;
+                    self.proto_note(&ids, &pages);
                 }
                 // ⌘K: a timer set, run, stopped or ended (each comes back
                 // as a state change)
@@ -202,9 +237,7 @@ impl Shell {
                 let s = sched.encode();
                 if s != self.proto.scheduled {
                     self.proto.scheduled = s;
-                    for id in &ids {
-                        self.proto_send(*id, &sched);
-                    }
+                    self.proto_note(&ids, &sched);
                 }
                 // bar A.5: config.toml or auth.json moved (a stat): the
                 // models again when their rows changed
@@ -213,9 +246,7 @@ impl Shell {
                     let m = models.encode();
                     if m != self.proto.models {
                         self.proto.models = m;
-                        for id in &ids {
-                            self.proto_send(*id, &models);
-                        }
+                        self.proto_note(&ids, &models);
                     }
                 }
                 // an agent came, went, started or ended a turn: its
@@ -223,24 +254,38 @@ impl Shell {
                 let key = self.worktrees_key();
                 if key != self.proto.worktrees {
                     self.proto.worktrees = key;
-                    self.worktrees_typed(ids.clone());
-                    self.dev_servers_typed(ids.clone());
+                    self.worktrees_typed(Typed::All(ids.clone()));
+                    self.dev_servers_typed(Typed::All(ids.clone()));
                 }
             }
             // bar V8/W21: the mode switched or a rule left (set_mode,
             // remove_rule broadcast the TUI's event): the typed one to all
             Some("approvals") => {
                 let ev = self.proto_approvals(v);
-                for id in &ids {
-                    self.proto_send(*id, &ev);
+                self.proto_note(&ids, &ev);
+            }
+            // P4c-5: `/version`'s picker (at a build's start and end, a
+            // switch), a release run's steps, `/update`'s build: the
+            // older line's fields are the typed event's
+            // and one page that changed (before the state that lists it)
+            Some("versions" | "release" | "update") => {
+                if let Some(ev) = self.typed_of(v) {
+                    self.proto_note(&ids, &ev);
+                }
+            }
+            // its typed tag is page_changed (the older `page` line keeps
+            // its own meaning)
+            Some("page") => {
+                let mut changed = v.clone();
+                changed["ev"] = json!("page_changed");
+                if let Some(ev) = self.typed_of(&changed) {
+                    self.proto_note(&ids, &ev);
                 }
             }
             // the art store changed (artifacts_refresh broadcasts it)
             Some("artifacts") => {
                 let arts = self.proto_artifacts(v);
-                for id in &ids {
-                    self.proto_send(*id, &arts);
-                }
+                self.proto_note(&ids, &arts);
             }
             Some("line") => {
                 let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
@@ -249,7 +294,8 @@ impl Shell {
                 let ts = v.get("ts").and_then(Value::as_u64).unwrap_or(0);
                 let step = proto_view::step_of(&line);
                 let sent = self.proto_live_of(&agent, |l, ctx| l.push((pos, ts, line.clone()), ctx));
-                if self.proto_usage_line(&agent, &line) {
+                let moved = self.proto_head_line(&agent, (pos, ts, line.clone()));
+                if self.proto_usage_line(&agent, &line) || moved {
                     self.proto_agents_again(&ids);
                 }
                 if let Some(text) = step {
@@ -281,6 +327,49 @@ impl Shell {
         }
     }
 
+    /// P4b: the repo's flow as the typed `flow` (`hub/flow`).
+    pub(in crate::daemon) fn flow_ev(&self) -> HubEv {
+        let flow = self.hub.flow.map(|f| match f {
+            crate::flow::FlowMode::Pr => FlowMode::Pr,
+            crate::flow::FlowMode::Trunk => FlowMode::Trunk,
+        });
+        HubEv::Flow { project: self.project(), flow }
+    }
+
+    /// P4b: an agent's live line for its head (`last_pos`, heads.rs): a
+    /// subscribed thread's live fold gives its newest pos, else the
+    /// head's tail is folded. True when its newest entry moved.
+    fn proto_head_line(&mut self, agent: &str, line: pthread::Line) -> bool {
+        let known = self.proto.conns.values().filter_map(|c| c.subs.get(agent)).filter_map(|l| l.last_pos()).max();
+        let facts = self.facts();
+        self.setup();
+        let setup = &self.setup;
+        let ctx = Ctx { open_cards: &facts.open, page: &|p: &str| facts.page(p), provider: &|i: &str, k: &str| provider_name(setup, i, k), width: &width, offset: &offset, attached: &crate::attached::split };
+        self.proto.heads.push(agent, line, known, &ctx)
+    }
+
+    /// P4b: each agent the heads don't know yet, from the lines the hub
+    /// buffered of it (its transcript's tail at start), folded once.
+    fn seed_heads(&mut self, snap: &Value) {
+        let names: Vec<String> = snap["agents"].as_array().into_iter().flatten().filter_map(|a| a["name"].as_str().map(String::from)).filter(|n| !self.proto.heads.has(n)).collect();
+        if names.is_empty() {
+            return;
+        }
+        let facts = self.facts();
+        self.setup();
+        let setup = &self.setup;
+        let ctx = Ctx { open_cards: &facts.open, page: &|p: &str| facts.page(p), provider: &|i: &str, k: &str| provider_name(setup, i, k), width: &width, offset: &offset, attached: &crate::attached::split };
+        for n in names {
+            let lines: Vec<pthread::Line> = self.buffers.get(&n).into_iter().flatten().map(|(p, ts, l)| (*p as u64, *ts, l.clone())).collect();
+            self.proto.heads.seed(&n, lines, &ctx);
+        }
+    }
+
+    /// P4b: an agent renamed: its head follows it.
+    pub(in crate::daemon) fn proto_renamed(&mut self, old: &str, new: &str) {
+        self.proto.heads.rename(old, new);
+    }
+
     /// The `agents` rows again, to `ids` when they changed (an agent's
     /// context moved between two state broadcasts).
     fn proto_agents_again(&mut self, ids: &[ClientId]) {
@@ -291,9 +380,7 @@ impl Shell {
             return;
         }
         self.proto.last.0 = a;
-        for id in ids {
-            self.proto_send(*id, &agents);
-        }
+        self.proto_note(ids, &agents);
     }
 
     /// Every subscription refolded: the entries that changed go out.

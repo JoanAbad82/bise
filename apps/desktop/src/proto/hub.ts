@@ -4,7 +4,8 @@
 
 import type { FnContext } from './context';
 import type { DiffFile, DiffResult } from './diff';
-import type { Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, Merged, Model, Pr, ScheduledTask, Worktree } from './rows';
+import type { BranchRow, ReleaseEv, UpdateEv, VersionItem } from './ops';
+import type { Agent, ApprovalMode, ApprovalRule, Artifact, Card, CheckerKind, DevServer, Feature, FlowMode, Merged, Model, Page, Place, Pr, ScheduledTask, Worktree } from './rows';
 import type { Entry } from './thread';
 
 export type JobState = "running" | "done" | "failed";
@@ -25,7 +26,7 @@ export type HubEv = { "ev": "welcome", project: string, proto: number, workspace
  * `HubCmd::TAGS` (one owner). Empty: a hub older than the list;
  * the core then compares `proto` with its own.
  */
-cmds: Array<string>, } | { "ev": "agents", project: string, agents: Array<Agent>, } | { "ev": "cards", project: string, cards: Array<Card>, } | { "ev": "thread", project: string, agent: string, entries: Array<Entry>, before: number | null, more: boolean, } | { "ev": "entry", project: string, agent: string, entry: Entry, } | { "ev": "typing", project: string, agent: string, text: string, } | { "ev": "artifacts", project: string, items: Array<Artifact>, } | { "ev": "scheduled", project: string, items: Array<ScheduledTask>, } | { "ev": "worktrees", project: string, items: Array<Worktree>, } | { "ev": "dev_servers", project: string, items: Array<DevServer>, } | { "ev": "merged", project: string, items: Array<Merged>, } | { "ev": "features", project: string, items: Array<Feature>, } | { "ev": "prs", project: string, head: string, items: Array<Pr>, none?: string | null, } | { "ev": "models", project: string, items: Array<Model>, } | { "ev": "tool_out", project: string, agent: string, pos: number, out: string, cut: boolean, 
+cmds: Array<string>, } | { "ev": "agents", project: string, agents: Array<Agent>, places?: Array<Place>, } | { "ev": "cards", project: string, cards: Array<Card>, others?: Array<Card>, } | { "ev": "thread", project: string, agent: string, entries: Array<Entry>, before: number | null, more: boolean, } | { "ev": "entry", project: string, agent: string, entry: Entry, } | { "ev": "typing", project: string, agent: string, text: string, } | { "ev": "artifacts", project: string, items: Array<Artifact>, seen_ms?: number | null, } | { "ev": "scheduled", project: string, items: Array<ScheduledTask>, ended?: Array<ScheduledTask>, } | { "ev": "worktrees", project: string, items: Array<Worktree>, } | { "ev": "dev_servers", project: string, items: Array<DevServer>, } | { "ev": "merged", project: string, items: Array<Merged>, } | { "ev": "features", project: string, items: Array<Feature>, } | { "ev": "prs", project: string, head: string, items: Array<Pr>, none?: string | null, } | { "ev": "models", project: string, items: Array<Model>, } | { "ev": "tool_out", project: string, agent: string, pos: number, out: string, cut: boolean, 
 /**
  * the whole output's size in bytes (the unit of the cap: '4 KB
  * of 18 KB shown'), when the session log answered; none for the
@@ -50,13 +51,33 @@ commit?: string | null,
 /**
  * why there are no files to show (its folder is gone...)
  */
-note?: string | null, } | { "ev": "route", project: string, rid: number, to: string, name: string, text: string, correct_until_ms: number, why: string, } | { "ev": "route_done", project: string, rid: number, state: string, to: string, xid?: number | null, } | { "ev": "jobs", project: string, items: Array<Job>, } | { "ev": "job_end", project: string, agent: string, state: JobState, label: string, summary: string, 
+note?: string | null, title?: string | null, req?: number | null, commits?: number | null, working?: boolean, uncommitted?: boolean, landed_ms?: number | null, gone?: boolean, } | { "ev": "branches", project: string, base: string, rows: Array<BranchRow>, } | { "ev": "versions", project: string, current: string, dev?: boolean, installed?: boolean, items: Array<VersionItem>, } | { "ev": "release" } & ReleaseEv | { "ev": "update" } & UpdateEv | { "ev": "route", project: string, rid: number, to: string, name: string, text: string, correct_until_ms: number, why: string, } | { "ev": "route_done", project: string, rid: number, state: string, to: string, xid?: number | null, } | { "ev": "jobs", project: string, items: Array<Job>, } | { "ev": "job_end", project: string, agent: string, state: JobState, label: string, summary: string, 
 /**
  * draft (J): the job's key (its end's time on that hub), the same
  * as in bise's followed_end of it: a window shows one line per
  * (project, agent, key)
  */
-key?: number | null, } | { "ev": "followed_end", project: string, agent: string, key: number, state: JobState, label: string, summary: string, } | { "ev": "confirm", project: string, id: number, text: string, } | { "ev": "approvals", project: string, mode: ApprovalMode, env: boolean, checker: CheckerKind, 
+key?: number | null, } | { "ev": "followed_end", project: string, agent: string, key: number, state: JobState, label: string, summary: string, } | { "ev": "confirm", project: string, id: number, text: string, } | { "ev": "flow", project: string, flow?: FlowMode | null, } | { "ev": "pages", project: string, items: Array<Page>, overdue: number, } | { "ev": "page_changed", project: string, id: string, title: string, agent: string, version: number, url: string, at_ms: number, state: string, 
+/**
+ * his notes not answered yet
+ */
+open_notes?: number, 
+/**
+ * the version he last opened
+ */
+opened_version?: number | null, 
+/**
+ * what on it waits for him (`sb page waiting`'s lines of this page)
+ */
+waiting?: number, 
+/**
+ * the meta line of its first heading block
+ */
+kicker?: string | null, 
+/**
+ * it holds a question whose card is open (§4.2)
+ */
+asking?: boolean, } | { "ev": "card_open", project: string, id: number, } | { "ev": "focused", project: string, focus: string, } | { "ev": "approvals", project: string, mode: ApprovalMode, env: boolean, checker: CheckerKind, 
 /**
  * who checks: `TypeSafe`, `OpenRouter`, a chat model's id
  */
@@ -92,6 +113,21 @@ kind?: ErrorKind | null, };
 export type Mode = "now" | "queued";
 
 /**
+ * How his words go, the same for `send` and `slash` (architect m_13313:
+ * one struct, flattened, so the wire keeps `send`'s names): `mode` none
+ * is now; `context` what was on his screen at fn (S9): the hub frames it
+ * after his words for the model (switchboard's fn_context::render) and
+ * keeps it on his thread entry; `files` what he attached or dropped
+ * (absolute paths): the hub renders them once after his words
+ * (switchboard's attached::render), an image as an image-store marker
+ * the model sees, any other file by its path, a path that isn't absolute
+ * or doesn't exist left out, never on a slash command; `voice` said in
+ * voice mode; `via` the client part that sent it (`capsule`,
+ * `capsule-start`, `ambient`: the capsule's hint for main).
+ */
+export type SendOpts = { mode?: Mode | null, context?: FnContext | null, files?: Array<string>, voice?: boolean, via?: string | null, };
+
+/**
  * What a client asks a hub.
  */
 export type HubCmd = { "cmd": "hello", proto: number, 
@@ -103,20 +139,12 @@ export type HubCmd = { "cmd": "hello", proto: number,
  * every typed connection is typed_only: S8 removes the mixed
  * case (and this flag's false)
  */
-typed_only?: boolean, } | { "cmd": "subscribe", project: string, agent: string, limit?: number | null, } | { "cmd": "unsubscribe", project: string, agent: string, } | { "cmd": "page", project: string, agent: string, before: number, limit?: number | null, } | { "cmd": "send", project: string, agent: string, text: string, mode: Mode, context?: FnContext | null, 
-/**
- * files he attached or dropped (absolute paths): the hub renders
- * them once after his words (switchboard's attached::render): an
- * image as an image-store marker the model sees, any other file
- * listed by its path; a path that isn't absolute or doesn't exist
- * is left out. Never on a slash command
- */
-files?: Array<string>, 
+typed_only?: boolean, } | { "cmd": "subscribe", project: string, agent: string, limit?: number | null, } | { "cmd": "unsubscribe", project: string, agent: string, } | { "cmd": "page", project: string, agent: string, before: number, limit?: number | null, } | { "cmd": "send", project: string, agent: string, text: string, 
 /**
  * draft (G): the window's id for this send, echoed on its error
  * to this connection only (never journaled: view state)
  */
-cid?: number | null, } | { "cmd": "answer", project: string, card: number, reply: string, files?: Array<string>, } | { "cmd": "close", project: string, card: number, } | { "cmd": "confirm", project: string, id: number, yes: boolean, } | { "cmd": "approvals", project: string, mode?: string | null, } | { "cmd": "remove_rule", project: string, rule: ApprovalRule, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, } | { "cmd": "diff", project: string, agent: string, commit?: string | null, } | { "cmd": "tool_out", project: string, agent: string, pos: number, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "features", project: string, } | { "cmd": "prs", project: string, } | { "cmd": "scheduled", project: string, } | { "cmd": "scheduled_stop", project: string, id: number, } | { "cmd": "models", project: string, } | { "cmd": "new", project: string, name?: string | null, brief: string, worktree?: boolean, with_changes?: boolean, } | { "cmd": "rename", project: string, agent: string, to: string, } | { "cmd": "model", project: string, agent: string, model: string, default?: boolean, } | { "cmd": "effort", project: string, agent: string, effort: string, } | { "cmd": "route_correct", project: string, rid: number, to: string, } | { "cmd": "route_cancel", project: string, rid: number, } | { "cmd": "follow", project: string, agent: string, on: boolean, } | { "cmd": "slash", project: string, agent: string, line: string, cid?: number | null, };
+cid?: number | null, mode?: Mode | null, context?: FnContext | null, files?: Array<string>, voice?: boolean, via?: string | null, } | { "cmd": "answer", project: string, card: number, reply: string, files?: Array<string>, } | { "cmd": "close", project: string, card: number, } | { "cmd": "confirm", project: string, id: number, yes: boolean, } | { "cmd": "approvals", project: string, mode?: string | null, } | { "cmd": "remove_rule", project: string, rule: ApprovalRule, } | { "cmd": "stop", project: string, agent: string, } | { "cmd": "archive", project: string, agent: string, force: boolean, } | { "cmd": "unarchive", project: string, agent: string, } | { "cmd": "artifacts_seen", project: string, at_ms?: number | null, } | { "cmd": "diff", project: string, agent?: string | null, commit?: string | null, branch?: string | null, pr?: number | null, range?: string | null, req?: number | null, } | { "cmd": "tool_out", project: string, agent: string, pos: number, } | { "cmd": "branches", project: string, } | { "cmd": "worktrees", project: string, } | { "cmd": "dev_servers", project: string, } | { "cmd": "merged", project: string, } | { "cmd": "features", project: string, } | { "cmd": "prs", project: string, } | { "cmd": "scheduled", project: string, } | { "cmd": "scheduled_stop", project: string, id: number, } | { "cmd": "models", project: string, } | { "cmd": "new", project: string, name?: string | null, brief: string, worktree?: boolean, with_changes?: boolean, } | { "cmd": "rename", project: string, agent: string, to: string, } | { "cmd": "model", project: string, agent: string, model: string, default?: boolean, } | { "cmd": "effort", project: string, agent: string, effort: string, } | { "cmd": "route_correct", project: string, rid: number, to: string, } | { "cmd": "route_cancel", project: string, rid: number, } | { "cmd": "follow", project: string, agent: string, on: boolean, } | { "cmd": "slash", project: string, agent: string, line: string, cid?: number | null, mode?: Mode | null, context?: FnContext | null, files?: Array<string>, voice?: boolean, via?: string | null, } | { "cmd": "scheduled_run", project: string, id: number, } | { "cmd": "artifacts_add", project: string, agent: string, target: string, title?: string | null, } | { "cmd": "focus", project: string, focus: string, } | { "cmd": "versions", project: string, } | { "cmd": "version_info", project: string, } | { "cmd": "version_switch", project: string, to: string, } | { "cmd": "version_rollback", project: string, } | { "cmd": "version_restart", project: string, to?: string | null, } | { "cmd": "version_update", project: string, } | { "cmd": "release_plan", project: string, dry?: boolean, } | { "cmd": "release_run", project: string, tag: string, commit: string, dry?: boolean, } | { "cmd": "stop_hub", project: string, keep_agents?: boolean, } | { "cmd": "page_voice", project: string, page: string, phase: string, text?: string, };
 
 /**
  * draft: the kind of an [`HubEv::Error`], one enum for every typed

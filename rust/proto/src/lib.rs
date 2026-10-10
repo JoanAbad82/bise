@@ -10,6 +10,11 @@
 //! - [`hub::HubCmd`], tagged `"cmd"`: what a client asks a hub (subscribe
 //!   to a thread, an older page, send, answer, stop, archive, unarchive).
 //!
+//! [`rpc`] is the same protocol as JSON-RPC 2.0 (client-protocol, step 1):
+//! `initialize`, one method per `HubCmd`, one notification per `HubEv`
+//! (tables over their tags), numbered hub-wide notifications; the `cmd`
+//! door above goes when every client speaks it.
+//!
 //! The crate holds every JSON-line contract bise has, each in its own
 //! module (one TS generator, one fixtures convention): the hub protocol
 //! ([`hub`]), the core ↔ app lines (the draft `CoreEv`/`AppCmd`), and
@@ -24,7 +29,16 @@
 //! v1's rule: a name is added, never renamed or retyped. A reader ignores
 //! unknown fields, and an unknown tag decodes to `Unknown { tag, raw }`,
 //! never an error, so an older client survives a newer hub and the
-//! reverse. What has no producer yet lives in [`draft`]: its fixtures
+//! reverse.
+//!
+//! THE WIRE RULE (architect m_14382): on the wire an existing field, list
+//! or enum value never changes meaning, and a line that made an entry of
+//! one kind still makes one of that kind. A new fact goes in a new
+//! optional field or list; a new enum value only in an enum whose
+//! released version already has `Unknown` (an older reader of one without
+//! it fails on the whole event). Its law: `tests/released.rs` reads what
+//! v2026.10.2-28 wrote (`fixtures/released/`) with today's types and
+//! writes it back with every released key and value unchanged. What has no producer yet lives in [`draft`]: its fixtures
 //! are there for the window's fake core, its names may still move until
 //! its stream emits it.
 //!
@@ -33,19 +47,30 @@
 //! one parser of each line kind, which the TUI's `wire.rs`/`sb.rs` call
 //! too, and [`thread::words`] makes the words both show.
 //!
+//! [`ops`] holds the rows of the answers that were the terminal's older
+//! untyped events (`/diff`'s branches, `/version`'s picker), typed for
+//! their methods (client-protocol step 3).
+//!
+//! [`commands`] is the slash commands' catalog (name, usage, arguments,
+//! `client` for the screen ones): the TUI's popup and `/help` read it, a
+//! client over the wire gets it serialized.
+//!
 //! The fixtures (`fixtures/*.jsonl`) are the one source for the Rust
 //! tests, the native helper's laws and the Python e2e.
 
 pub mod app_rpc;
 pub mod approvals;
+pub mod commands;
 pub mod context;
 pub mod diff;
 pub mod draft;
 pub mod helper;
 pub mod hub;
-pub mod jsonrpc;
+pub mod ops;
 pub mod pty;
 pub mod rows;
+pub mod jsonrpc;
+pub mod rpc;
 pub mod slash;
 pub mod thread;
 

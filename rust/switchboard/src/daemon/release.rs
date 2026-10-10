@@ -9,6 +9,10 @@
 //! Events: `plan` (to the client that asked), `step` (done), `running`
 //! (replaced in place by the next one), `done`, `failed`, `error` (no
 //! plan). `BISE_RELEASE_SCRIPT` replaces the script (tests: a fake one).
+//! A client asks with the typed `release/plan`/`release/run` (client-
+//! protocol step 3; the older `release` op is gone): both start through
+//! `release_start`, a refusal is the request's error, and the plan is the
+//! request's typed `release` result.
 
 use super::{Msg, Shell};
 use crate::core::ClientId;
@@ -259,36 +263,29 @@ impl Shell {
         )
     }
 
-    fn send_client(&mut self, id: ClientId, v: &Value) {
-        if let Some(c) = self.clients.get_mut(&id) {
-            super::write_json(c, v);
-        }
-    }
-
-    /// `{"op": "release", "do": "plan"|"run", ...}` from a TUI.
-    pub(super) fn release_op(&mut self, id: ClientId, v: &Value) {
-        let s = |k: &str| v.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
-        let dry = v.get("dry").and_then(|x| x.as_bool()).unwrap_or(false);
+    /// A plan (its event to `id`, from a thread) or a run (its events to
+    /// all) starts; `Err` the words why not (the op's notice, the typed
+    /// `release_plan`/`release_run`'s error).
+    pub(super) fn release_start(&mut self, id: ClientId, what: &str, tag: &str, sha: &str, dry: bool) -> Result<(), String> {
         if !self.release_allowed() {
-            return self.send_client(id, &json!({"ev": "notice", "text": NOT_HERE}));
+            return Err(NOT_HERE.to_string());
         }
         if let Some(r) = &self.release {
-            let text = format!("release {} is running ({}): one at a time", r.tag, took(r.started.elapsed().as_secs()));
-            return self.send_client(id, &json!({"ev": "notice", "text": text}));
+            return Err(format!("release {} is running ({}): one at a time", r.tag, took(r.started.elapsed().as_secs())));
         }
         let repo = self.opts.paths.workspace.clone();
         let sc = script(&repo);
         let tx: Sender<Msg> = self.tx.clone();
-        match s("do").as_str() {
+        match what {
             "plan" => {
                 std::thread::spawn(move || {
                     let _ = tx.send(Msg::Release { client: Some(id), v: plan(&sc, &repo, dry) });
                 });
             }
             "run" => {
-                let (tag, sha) = (s("tag"), s("commit"));
+                let (tag, sha) = (tag.to_string(), sha.to_string());
                 if !tag_ok(&tag) || sha.len() < 7 || !sha.chars().all(|c| c.is_ascii_hexdigit()) {
-                    return self.send_client(id, &json!({"ev": "notice", "text": "release: a tag and a commit, from /release-bise's plan"}));
+                    return Err("release: a tag and a commit, from /release-bise's plan".into());
                 }
                 self.release = Some(ReleaseRun { tag: tag.clone(), started: Instant::now(), last: Value::Null });
                 let log = self.opts.paths.state.join("release.log");
@@ -298,8 +295,9 @@ impl Shell {
                     });
                 });
             }
-            other => self.send_client(id, &json!({"ev": "notice", "text": format!("release: unknown action {}", other)})),
+            other => return Err(format!("release: unknown action {}", other)),
         }
+        Ok(())
     }
 
     /// An event of a plan or a run: to the client that asked, or to all.
@@ -314,13 +312,29 @@ impl Shell {
             _ => {}
         }
         match client {
-            Some(id) => self.send_client(id, &v),
+            // a typed `release_plan` waits for it: its result
+            Some(id) if self.rpc_waits(id, "release_plan") => {
+                let mut v = v;
+                v["project"] = json!(self.project());
+                match bise_proto::hub::HubEv::from_value(v) {
+                    Ok(ev) => self.proto_send(id, &ev),
+                    Err(e) => super::log_line(&self.opts.paths, &format!("release plan not typed: {e}")),
+                }
+            }
+            // every client says `initialize` (the older hello is a stub):
+            // its typed event
+            Some(id) => {
+                if let Some(ev) = self.typed_of(&v) {
+                    self.proto_send(id, &ev);
+                }
+            }
             None => self.broadcast(&v),
         }
     }
 
-    /// For a TUI that connects while a release runs: where it is.
-    pub(super) fn release_hello(&self) -> Option<Value> {
+    /// For a client that connects while a release runs (`initialize`'s
+    /// state, `hub/read`'s): where it is.
+    pub(super) fn release_now(&self) -> Option<Value> {
         let r = self.release.as_ref()?;
         let mut v = if r.last.is_null() { json!({"ev": "release", "state": "running", "text": "starting"}) } else { r.last.clone() };
         v["tag"] = json!(r.tag);

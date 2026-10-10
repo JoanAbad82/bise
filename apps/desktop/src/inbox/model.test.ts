@@ -29,7 +29,7 @@ const fixture = (): Card[] => {
 
 describe('order', () => {
   it("is the TUI's on one hub: the approval first, then the rank-1 items (questions, the sign-in) by id", () => {
-    expect(sortCards(fixture()).map((c) => c.id)).toEqual([10, 9, 11, 14]);
+    expect(sortCards(fixture()).map((c) => c.id)).toEqual([10, 9, 11, 14, 31]);
   });
 
   it('ranks on the hub-sent rank, then the oldest, across projects', () => {

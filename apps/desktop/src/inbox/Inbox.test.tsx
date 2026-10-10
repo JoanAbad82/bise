@@ -55,7 +55,8 @@ describe('Inbox', () => {
   it("lists the fixture's items in the TUI's order and opens the top one", () => {
     render(<Inbox cards={cards()} names={{ 'acme-1a2b3c4d': 'acme' }} ports={ports()} now={1791100400000} />);
     // the sign-in card (bar V14) is an item too, rank 1, after the questions
-    expect(ids()).toEqual(['inbox.item.acme-1a2b3c4d-10', 'inbox.item.acme-1a2b3c4d-9', 'inbox.item.acme-1a2b3c4d-11', 'inbox.item.acme-1a2b3c4d-14']);
+    // then the batch question (31: 'send the 3 replies?'), rank 1, by id
+    expect(ids()).toEqual(['inbox.item.acme-1a2b3c4d-10', 'inbox.item.acme-1a2b3c4d-9', 'inbox.item.acme-1a2b3c4d-11', 'inbox.item.acme-1a2b3c4d-14', 'inbox.item.acme-1a2b3c4d-31']);
     expect(screen.getByTestId('inbox.card.acme-1a2b3c4d-10').textContent).toContain('run rm -rf target?');
     // an approval: options only, no field for words
     expect(screen.queryByTestId('inbox.answer')).toBeNull();
@@ -66,7 +67,7 @@ describe('Inbox', () => {
     render(<Inbox cards={cards()} names={{}} ports={p} now={1791100400000} />);
     fireEvent.keyDown(screen.getByTestId('inbox.root'), { key: '1' });
     expect(p.calls).toEqual(['answer acme-1a2b3c4d 10 1']);
-    expect(ids()).toHaveLength(3);
+    expect(ids()).toHaveLength(4);
     const field = screen.getByTestId<HTMLTextAreaElement>('inbox.answer');
     field.value = 'cold, then warm';
     fireEvent.keyDown(field, { key: 'Enter' });

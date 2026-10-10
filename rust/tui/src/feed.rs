@@ -5,12 +5,14 @@
 use crate::render::*;
 use crate::wire::*;
 use crate::feedsel;
+use bise_proto::thread::lines;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 // a replayed tool has no meaningful duration (the timing is the replay's)
+#[cfg(test)]
 pub(crate) fn hide_replayed_elapsed(events: &mut [Ev], cache: &mut [Option<EventRows>], id: u32) {
     if let Some((i, td)) = last_tool_mut(events, |td| td.id == id) {
         td.elapsed = Some(String::new());
@@ -460,10 +462,7 @@ fn merge_report_and_card(events: &mut [Ev], cache: &mut [Option<EventRows>], ev:
                 let (k, _) = report_parts(text)?;
                 Some((from.clone(), kind_of(k)?, false))
             }
-            Ev::Card { text, .. } => {
-                let (k, name, _) = card_parts(text)?;
-                Some((name.to_string(), kind_of(k)?, true))
-            }
+            Ev::Card { card, .. } => Some((card.agent.clone(), kind_of(&card.kind)?, true)),
             _ => None,
         }
     }
@@ -606,53 +605,41 @@ pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>
         // BISE-86: the hub could not deliver your message: its line gets
         // `✗`; only the newest `not delivered` line keeps its question
         Ev::Undelivered { name, text, .. } => {
-            // your line is the text, or `@name text` from another view
-            let yours = |t: &str| {
-                t == text
-                    || t.strip_prefix('@').and_then(|r| r.split_once(' ')).is_some_and(|(n, r)| n == name && r.trim() == text)
-            };
-            let mut found = false;
             for (i, e) in events.iter_mut().enumerate().rev() {
-                match e {
-                    Ev::Undelivered { open, .. } if *open => {
+                if let Ev::Undelivered { open, .. } = e {
+                    if *open {
                         *open = false;
                         cache[i] = None;
                     }
-                    Ev::You(t, m, ..) if !found && yours(t) && *m != Mark::Failed => {
-                        *m = Mark::Failed;
-                        cache[i] = None;
-                        found = true;
-                    }
-                    _ => {}
                 }
             }
-            // not in this feed (an `@name` line from another view shows
-            // only once delivered): your line comes back, marked
-            if !found {
+            // your line (the text, or `@name text` from another view) gets
+            // `✗` by bise-proto's one rule (G1, the hub's fold too); not in
+            // this feed (an `@name` line from another view shows only once
+            // delivered): your line comes back, marked
+            let m = lines::Mark::Failed { to: name.clone(), text: text.clone() };
+            if !deliver(events, cache, &m) {
                 let t = format!("@{} {}", name, text);
                 push_event(events, cache, Ev::You(t, Mark::Failed, false));
             }
         }
-        // C3: a steering line moves the mark of your message
-        Ev::MarkYou { text, mark, or } => {
-            if !mark_you(events, cache, text, *mark) {
+        // C3: a steering line moves the mark of your message (bise-proto's
+        // one rule, G1: none with its words raises what you sent this turn,
+        // BISE-90); an injected notification with no message of yours
+        // shows its info line
+        Ev::MarkYou { mark, or } => {
+            if !deliver(events, cache, mark) {
                 if let Some(ev) = or {
                     return push_event(events, cache, (**ev).clone());
                 }
-                // BISE-90: the hub steered your message together with an
-                // agent's message and the agents' status, so the steered
-                // text is that whole block (your words on a later line):
-                // it moves the marks of what you sent during this turn
-                mark_this_turn(events, cache, *mark);
             }
             return false;
         }
         // BISE-31: a closed card fades in place (its last line in this
         // feed); not in the feed (an older page): an info line as before
         Ev::CardClosed { id, res } => {
-            let head = format!("#{} ", id);
             let found = events.iter_mut().enumerate().rev().find_map(|(i, e)| match e {
-                Ev::Card { text, closed } if text.starts_with(&head) => Some((i, closed)),
+                Ev::Card { card, closed } if card.id == Some(*id) => Some((i, closed)),
                 _ => None,
             });
             match found {
@@ -677,20 +664,9 @@ pub(crate) fn push_event(events: &mut Vec<Ev>, cache: &mut Vec<Option<EventRows>
             }
         }
         // a turn starts: the model reads what you sent since the last one
-        // (a message at idle goes straight to ✓✓)
+        // (a message at idle goes straight to ✓✓; G1, bise-proto's rule)
         Ev::Turn => {
-            for (i, e) in events.iter_mut().enumerate().rev() {
-                match e {
-                    Ev::Turn => break,
-                    Ev::You(_, m, ..) if matches!(*m, Mark::Sent | Mark::Received) => {
-                        *m = Mark::Read;
-                        if let Some(c) = cache.get_mut(i) {
-                            *c = None;
-                        }
-                    }
-                    _ => {}
-                }
-            }
+            deliver(events, cache, &lines::Mark::Turn);
         }
         // the turn ended: a tool still shown as running was abandoned
         // (interrupt or failed turn) — freeze it so the elapsed stops
@@ -1433,6 +1409,7 @@ pub(crate) fn turn_end_of(events: &[Ev], i: usize) -> Option<u64> {
 /// The local time, `14:31`: the zone from `when::offset_at` (one `date`
 /// per hour, cached; UTC when it fails), not a `date` process per call
 /// (BISE-292).
+#[cfg(test)]
 pub(crate) fn local_hhmm() -> String {
     let ms = crate::when::now_ms();
     let s = (ms / 1000) as i64 + i64::from(crate::when::offset_at(ms));
@@ -1520,51 +1497,38 @@ pub(crate) fn set_everything(events: &mut [Ev], cache: &mut [Option<EventRows>],
 
 // ---- message marks (C3, book §13, BISE-15) ----
 
-/// How far back a steering line looks for your message.
-const MARK_LOOKBACK: usize = 500;
-
-/// The words of a text, for matching a steering line to your message
-/// (the wire flattens its line breaks).
-fn words(t: &str) -> impl Iterator<Item = &str> {
-    t.split_whitespace()
-}
-
-/// Move the mark of your last message with `text` up to `mark` (never
-/// down). False when there is no such message.
-/// Raise to `mark` the marks of your messages since the turn started
-/// (never lowers one; a message at idle started the turn itself).
-fn mark_this_turn(events: &mut [Ev], cache: &mut [Option<EventRows>], mark: Mark) {
-    for (i, e) in events.iter_mut().enumerate().rev() {
-        match e {
-            Ev::Turn => break,
-            Ev::You(_, m, ..) if matches!(*m, Mark::Sent | Mark::Received) && mark > *m => {
-                *m = mark;
-                if let Some(c) = cache.get_mut(i) {
-                    *c = None;
-                }
-            }
-            _ => {}
+/// Mark `m` on the feed by bise-proto's one rule (`lines::deliver`, G1):
+/// the rows whose mark moved are drawn again. False: no message of yours
+/// matched.
+fn deliver(events: &mut [Ev], cache: &mut [Option<EventRows>], m: &lines::Mark) -> bool {
+    let Some(moved) = lines::deliver(events, m) else { return false };
+    for i in moved {
+        if let Some(c) = cache.get_mut(i) {
+            *c = None;
         }
     }
+    true
 }
 
-pub(crate) fn mark_you(events: &mut [Ev], cache: &mut [Option<EventRows>], text: &str, mark: Mark) -> bool {
-    let plain = crate::markdown::unescape_md(text);
-    let from = events.len().saturating_sub(MARK_LOOKBACK);
-    for i in (from..events.len()).rev() {
-        if let Ev::You(t, m, ..) = &mut events[i] {
-            if words(t).eq(words(&plain)) {
-                if mark > *m {
-                    *m = mark;
-                    if let Some(c) = cache.get_mut(i) {
-                        *c = None;
-                    }
-                }
-                return true;
-            }
+/// Your messages and the turns in the feed, as bise-proto's rule reads
+/// them.
+impl lines::Delivered for Ev {
+    fn yours(&self) -> Option<(&str, Mark)> {
+        match self {
+            Ev::You(t, m, ..) => Some((t.as_str(), *m)),
+            _ => None,
         }
     }
-    false
+
+    fn set_mark(&mut self, to: Mark) {
+        if let Ev::You(_, m, ..) = self {
+            *m = to;
+        }
+    }
+
+    fn turn_start(&self) -> bool {
+        matches!(self, Ev::Turn)
+    }
 }
 
 // ---- tool rows: the `▸ n commands` fold (BISE-223) and the edits fold ----

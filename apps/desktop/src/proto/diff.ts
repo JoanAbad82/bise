@@ -6,7 +6,11 @@ export type LineKind = "ctx" | "add" | "del";
 
 export type DiffLine = { kind: LineKind, old?: number | null, new?: number | null, text: string, };
 
-export type Hunk = { header: string, lines: Array<DiffLine>, };
+export type Hunk = { header: string, lines: Array<DiffLine>, 
+/**
+ * git's function context after the `@@` (the terminal's `@@ head @@`)
+ */
+head?: string | null, };
 
 export type DiffFile = { path: string, 
 /**
@@ -14,7 +18,7 @@ export type DiffFile = { path: string,
  */
 status: string, add: number, del: number, hunks: Array<Hunk>, 
 /**
- * its hunks were cut (too long, generated, binary): the review says
+ * its hunks were cut (past the size cap, or binary): the review says
  * so, never shows it as complete
  */
 truncated?: boolean, 
@@ -27,10 +31,14 @@ from?: string | null,
  */
 binary?: boolean, 
 /**
- * a generated file (a lock file, a build output): its lines are
- * left out (`truncated` too when it had some)
+ * a generated file (a lock file, a build output): a display flag,
+ * the client folds it (its lines are sent, under the same size cap)
  */
 generated?: boolean, 
+/**
+ * an image (by its extension): the terminal says so and opens it
+ */
+image?: boolean, 
 /**
  * its size in bytes after the change, for a binary file still there
  * ("a binary file, 2.1 MB")
@@ -39,7 +47,12 @@ size?: number | null,
 /**
  * the agent's word on this file ("new: 4 workers"), from its summary
  */
-note?: string | null, };
+note?: string | null, 
+/**
+ * its absolute path in the checkout the diff was read in (the
+ * terminal's /diff opens it), none when that folder is gone
+ */
+abs?: string | null, };
 
 /**
  * What a change measured, before and after (the review's result line,
@@ -48,3 +61,12 @@ note?: string | null, };
 export type DiffResult = { label: string, sub?: string | null, before: number, after: number, unit: string, series?: Series | null, };
 
 export type Series = { before: Array<number>, after: Array<number>, };
+
+/**
+ * The terminal's `/diff` fields of a `diff` (client-protocol step 3),
+ * next to the review's on the wire: its title ("perf vs main", "range
+ * a..b"), the `req` it answers, the commits ahead of the base, the agent
+ * still working, edits not committed yet, when it landed, its folder
+ * gone.
+ */
+export type DiffView = { title?: string | null, req?: number | null, commits?: number | null, working?: boolean, uncommitted?: boolean, landed_ms?: number | null, gone?: boolean, };

@@ -17,7 +17,8 @@ fn app_with_hub() -> (App, UnixStream) {
     (sb_app(sb, rx, false, 100, crate::voice::Voice::live(false)), b)
 }
 
-/// What the TUI typed to the hub since the last call (`input` ops).
+/// What the TUI sent the hub since the last call: card/answer and
+/// card/close as the lines they replaced, command/run's line.
 fn sent(b: &mut UnixStream) -> Vec<String> {
     let mut s = String::new();
     let mut buf = [0u8; 4096];
@@ -29,8 +30,12 @@ fn sent(b: &mut UnixStream) -> Vec<String> {
     }
     s.lines()
         .filter_map(|l| serde_json::from_str::<Value>(l).ok())
-        .filter(|v| v["op"] == "input")
-        .map(|v| v["text"].as_str().unwrap_or("").to_string())
+        .filter_map(|v| match v["method"].as_str()? {
+            "card/answer" => Some(format!("/answer {} {}", v["params"]["card"], v["params"]["reply"].as_str()?)),
+            "card/close" => Some(format!("/close {}", v["params"]["card"])),
+            "command/run" => v["params"]["line"].as_str().map(str::to_string),
+            _ => None,
+        })
         .collect()
 }
 
@@ -664,14 +669,17 @@ fn the_last_answer_clears_the_inbox() {
 #[test]
 fn an_answer_says_one_line_in_the_thread() {
     let (mut app, mut hub) = app_with_hub();
+    // the thread in view, subscribed before he answers (its first page
+    // replaces the feed), then its entries as the hub sends them
+    let mut thread = super::entries_for_tests::Hub::new();
+    let focus = app.sb.focus.clone();
+    thread.subscribe(&mut app, &focus, false);
     app.sb.cards = cast();
     open(&mut app);
     ctrl(&mut app, 'n');
     assert!(key(&mut app, KeyCode::Char('2'), KeyModifiers::NONE));
     assert_eq!(sent(&mut hub), vec!["/answer 12 both: compress, and lazy-load below the fold"]);
-    let line = |agent: &str, l: &str| {
-        serde_json::json!({"ev": "line", "agent": agent, "line": format!("sb route : {l}")}).to_string()
-    };
+
     let folds = |evs: &[Ev]| -> Vec<String> {
         evs.iter()
             .filter_map(|e| match e {
@@ -682,14 +690,13 @@ fn an_answer_says_one_line_in_the_thread() {
             .collect()
     };
     // the hub's line for it comes back to main's feed: nothing more
-    let focus = app.sb.focus.clone();
-    super::super::dispatch(&mut app, &line(&focus, "you → @perf (answer to card #12) : both: compress, and lazy-load below the fold"));
+    thread.line(&mut app, &focus, "sb route : you → @perf (answer to card #12) : both: compress, and lazy-load below the fold");
     assert_eq!(folds(&app.events), vec!["you answered perf: both"]);
     // an answer given elsewhere: the hub's line, as a fold
-    super::super::dispatch(&mut app, &line(&focus, "you → @docs (answer to card #40) : v2"));
+    thread.line(&mut app, &focus, "sb route : you → @docs (answer to card #40) : v2");
     assert_eq!(folds(&app.events), vec!["you answered perf: both", "you answered docs: v2"]);
     // a message routed by hand stays as it was
-    super::super::dispatch(&mut app, &line(&focus, "you → @docs : thanks"));
+    thread.line(&mut app, &focus, "sb route : you → @docs : thanks");
     assert!(matches!(app.events.last(), Some(Ev::Info(t)) if t == "→ you → @docs : thanks"));
 }
 

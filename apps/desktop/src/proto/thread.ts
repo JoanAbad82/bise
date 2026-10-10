@@ -18,6 +18,19 @@ export type ToolKind = "read" | "edit" | "run" | "search" | "other";
 export type ToolState = "run" | "ok" | "err" | "unknown";
 
 /**
+ * What the approvals gate holds a running call for (the hub's `sb gate :
+ * check|card <n>` lines, approvals-design.md §3.1): the checker judges
+ * it (`checking…` after 250 ms), or a card waits on him (`? waiting for
+ * you`).
+ */
+export type GateWait = "check" | "card" | "unknown";
+
+/**
+ * A running call held by the gate, since `at_ms` (its gate line's time).
+ */
+export type ToolGate = { wait: GateWait, at_ms: number, };
+
+/**
  * A file an edit touched, with its lines added and removed (the TUI's
  * `± file +18 −6`; a move reads `old → new`).
  */
@@ -30,6 +43,19 @@ export type ToolItem = { pos: number,
  */
 id: number, at_ms: number, 
 /**
+ * the tool's name (`bash`); "" until the call's `tool` line
+ */
+name?: string, 
+/**
+ * its args as the call line gives them, unescaped, [`cap`]ped
+ */
+args?: string, 
+/**
+ * the model's one line for it (`tool_intent`, bash and TypeScript
+ * calls: "running the tests")
+ */
+intent?: string | null, 
+/**
  * its intent ("running the tests"), else `name: first line of args`
  */
 text: string, kind: ToolKind, 
@@ -41,6 +67,11 @@ land?: boolean,
  * running until its result line, then ok or err
  */
 state: ToolState, 
+/**
+ * the approvals gate holds it (running only: the gate's `done` line
+ * and the call's end clear it)
+ */
+gate?: ToolGate | null, 
 /**
  * its duration: the result line's time minus the call line's
  * ([`words::tool_ms`]); none while it runs or on a replay
@@ -74,7 +105,23 @@ export type Tools = { count: number,
  */
 summary: string, items: Array<ToolItem>, };
 
-export type EntryCard = { id: number, question: string, options: Array<Opt>, answered: boolean, };
+export type EntryCard = { id: number, question: string, options: Array<Opt>, answered: boolean, 
+/**
+ * its kind, the same word as the hub's card row (`rows::Card.kind`:
+ * `question`, `blocked`, `done`, …, an open set; `rows::card_rank`
+ * reads it); none from an older hub
+ */
+kind?: string | null, 
+/**
+ * who asked (`rows::Card.agent`, the line's `@name`)
+ */
+agent?: string | null, 
+/**
+ * how it was closed, the hub's word on its `card-closed` line
+ * (`answered`, `answered via @docs`, `accepted`, `refused`, …, BISE-31):
+ * the card fades with it; none while that line hasn't come
+ */
+closed?: string | null, };
 
 export type PageRef = { id: string, title: string, v?: number | null, url: string, };
 
@@ -85,6 +132,14 @@ export type ReportRef = { kind: ReportKind, };
  * replay) and what.
  */
 export type Thinking = { ms: number, text: string, };
+
+/**
+ * Where his message is (contract C3, BISE-86): `sent` (·), `received`
+ * by the agent (✓, steering), `read` by the model (✓✓: steered, or its
+ * turn started), `failed`: the hub could not deliver it (✗). Only ever
+ * moves up, in that order ([`lines::deliver`], the one rule).
+ */
+export type Delivery = "sent" | "received" | "read" | "failed" | "unknown";
 
 /**
  * How a notice reads: info (dim), warn (▲, what to do), err (✗).
@@ -152,7 +207,10 @@ files?: Array<string>, };
 
 /**
  * An `approval` entry: his answer, folded (`you allowed api: rm -rf
- * target`, `you answered perf: both`); `note` the words under it.
+ * target`, `you answered perf: both`); `note` the words under it;
+ * `card`: the item it answers, for an answer to an item (the hub's
+ * `route` line, BISE-305/307), so a client that folded the answer
+ * itself knows it is the same one.
  */
 export type ApprovalFold = { ok: boolean, text: string, note?: string, 
 /**
@@ -163,7 +221,7 @@ images?: Array<ImageRef>,
 /**
  * an answer's other files (absolute paths)
  */
-files?: Array<string>, };
+files?: Array<string>, card?: number | null, };
 
 /**
  * A `scheduled` entry (batch 3b): a task set or ended (the hub's
@@ -200,6 +258,18 @@ text: string, from?: string | null, tools?: Tools | null, card?: EntryCard | nul
  */
 context?: FnContext | null, 
 /**
+ * a `you` entry's mark (G1): where his message is, by the fold's one
+ * rule ([`lines::deliver`], the TUI's too)
+ */
+delivery?: Delivery | null, 
+/**
+ * an agent wrote this to him (G5, the TUI's level 2): an `agent`
+ * entry from the hub's `msg-you` (`from`: who), or a `from_agent`
+ * one that is an old direct reply. A superset: those lines fold to
+ * the kinds they always did (architect m_14424)
+ */
+to_you?: boolean, 
+/**
  * a `to_agent` entry: who it went to
  */
 to?: string | null, 
@@ -216,4 +286,16 @@ msg?: number | null,
  * a `thinking` entry's, or an `agent` reply's own: the reasoning
  * before it ("thought for 3.2s", folded)
  */
-thinking?: Thinking | null, notice?: Notice | null, not_delivered?: NotDelivered | null, landed?: Landed | null, pr?: PrNews | null, made?: Made | null, answered?: Answered | null, approval?: ApprovalFold | null, scheduled?: Scheduled | null, turn_failed?: TurnFailed | null, };
+thinking?: Thinking | null, notice?: Notice | null, not_delivered?: NotDelivered | null, landed?: Landed | null, pr?: PrNews | null, made?: Made | null, answered?: Answered | null, approval?: ApprovalFold | null, scheduled?: Scheduled | null, turn_failed?: TurnFailed | null, 
+/**
+ * the first entry after a `turn_started` line: a turn starts here
+ * (the TUI's turn row; a reply's turn ends before the next start)
+ */
+turn_start?: boolean, 
+/**
+ * the newest entry when its turn ended (any end: completed,
+ * interrupted, failed), with the `turn_done` line's time (BISE-271:
+ * the hover of the turn's replies); none for a replayed end (no
+ * time) or one with no entry of its own to carry it
+ */
+turn_end_ms?: number | null, };

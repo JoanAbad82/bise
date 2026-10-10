@@ -229,7 +229,8 @@ what is in this picture?`, 'you') });
 
   it('diffs are kept per agent and per commit; jobs, merged, worktrees per project', () => {
     const { store } = fake();
-    replay(store, hub_ev);
+    // the terminal's /diff answers (a req) left out: the review's diffs only
+    replay(store, hub_ev.filter((e) => !(e.ev === 'diff' && e.req != null)));
     expect(store.diff(P, 'perf')?.files.length).toBeGreaterThan(0);
     expect(store.diff(P, 'old')?.merged).toMatch(/^e0f3df5/);
     expect(store.jobs(P).length).toBeGreaterThan(0);

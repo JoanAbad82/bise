@@ -6,7 +6,7 @@ import { cardOf, focusOf, membersOf, observeTour, resetTours, sentTour, snapOf, 
 
 afterEach(resetTours);
 
-const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1, waits: 0, ...over });
+const ag = (name: string, over: Partial<Agent> = {}): Agent => ({ name, dir: name, main: name === 'main', status: 'idle', archived: false, title: '', purpose: '', since_ms: 1, waits: 0, ...over });
 const card = (id: number, agent: string, rank: number, since_ms = 1): Card => ({ id, project: 'p', kind: 'question', agent, question: 'q?', options: [], urgent: false, since_ms, rank });
 
 const team = [ag('main'), ag('fix-login', { purpose: 'fix the login' }), ag('designer', { purpose: 'bise demo: the designer' }), ag('pm', { purpose: 'Bise demo: the pm' })];

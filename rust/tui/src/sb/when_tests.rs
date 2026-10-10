@@ -5,12 +5,12 @@ use super::*;
 use ratatui::backend::TestBackend;
 use ratatui::Terminal;
 
-fn line(l: &str, pos: usize, ts: Option<u64>) -> String {
-    let mut v = json!({"ev": "line", "agent": "main", "line": l, "pos": pos});
-    if let Some(t) = ts {
-        v["ts"] = json!(t);
+/// main's thread, its lines at their times (the hub's), as entries.
+fn lines(app: &mut App, ls: &[(&str, u64)]) {
+    let mut hub = super::entries_for_tests::Hub::new();
+    for (i, (l, ts)) in ls.iter().enumerate() {
+        hub.line_at(app, "main", i as u64 + 1, *ts, l);
     }
-    v.to_string()
 }
 
 fn screen(term: &Terminal<TestBackend>) -> Vec<String> {
@@ -34,33 +34,42 @@ const HOUR: u64 = 3_600_000;
 fn a_turn_end_keeps_the_hubs_time() {
     let mut app = test_app();
     let t = crate::when::now_ms() - HOUR;
-    dispatch(&mut app, &line("  obs: turn_started", 1, Some(t - 5_000)));
-    dispatch(&mut app, &line("  obs: assistant: done here", 2, Some(t - 1_000)));
-    dispatch(&mut app, &line("  obs: turn_done: completed", 3, Some(t)));
+    // its newest entry carries the turn's end (Entry.turn_end_ms): the
+    // hub's time, not the terminal's
+    let turn = [
+        ("  obs: turn_started", t - 5_000),
+        ("  obs: assistant: done here", t - 1_000),
+        ("  obs: turn_done: completed", t),
+        // an interrupted turn ends too
+        ("  obs: turn_started", t + 1_000),
+        ("  obs: assistant: stopping", t + 1_500),
+        ("  obs: turn_done: interrupted", t + 2_000),
+        // a line the REPL replays has the replay's time: no end
+        ("history   obs: turn_done: completed", t + 3_000),
+    ];
+    lines(&mut app, &turn[..3]);
     assert_eq!(ended(&app), vec![t]);
-    assert_eq!(crate::feed::turn_end_of(&app.events, 1), Some(t));
-    // an interrupted turn ends too
-    dispatch(&mut app, &line("  obs: turn_started", 4, Some(t + 1_000)));
-    dispatch(&mut app, &line("  obs: turn_done: interrupted", 5, Some(t + 2_000)));
+    let i = app.events.iter().position(|e| matches!(e, Ev::Assistant(a) if a.contains("done here"))).unwrap();
+    assert_eq!(crate::feed::turn_end_of(&app.events, i), Some(t));
+    let mut app = test_app();
+    lines(&mut app, &turn);
     assert_eq!(ended(&app), vec![t, t + 2_000]);
-    // a line the REPL replays has the replay's time: no end
-    dispatch(&mut app, &line("history   obs: turn_done: completed", 6, Some(t + 3_000)));
-    assert_eq!(ended(&app).len(), 2);
-    // a hub without `ts`: the time it arrived
-    let before = crate::when::now_ms();
-    dispatch(&mut app, &line("  obs: turn_done: completed", 7, None));
-    assert!(ended(&app)[2] >= before);
 }
 
 #[test]
 fn a_running_turn_has_no_end_yet() {
     let mut app = test_app();
     let t = crate::when::now_ms();
-    dispatch(&mut app, &line("  obs: turn_started", 1, Some(t - 3 * HOUR)));
-    dispatch(&mut app, &line("  obs: assistant: first", 2, Some(t - 3 * HOUR)));
-    dispatch(&mut app, &line("  obs: turn_done: completed", 3, Some(t - 2 * HOUR)));
-    dispatch(&mut app, &line("  obs: turn_started", 4, Some(t)));
-    dispatch(&mut app, &line("  obs: assistant: still going", 5, Some(t)));
+    lines(
+        &mut app,
+        &[
+            ("  obs: turn_started", t - 3 * HOUR),
+            ("  obs: assistant: first", t - 3 * HOUR),
+            ("  obs: turn_done: completed", t - 2 * HOUR),
+            ("  obs: turn_started", t),
+            ("  obs: assistant: still going", t),
+        ],
+    );
     let i = |text: &str| app.events.iter().position(|e| matches!(e, Ev::Assistant(a) if a.contains(text))).unwrap();
     assert_eq!(crate::feed::turn_end_of(&app.events, i("first")), Some(t - 2 * HOUR));
     assert_eq!(crate::feed::turn_end_of(&app.events, i("still going")), None);
@@ -71,10 +80,15 @@ fn the_mouse_over_a_reply_shows_when_its_turn_ended() {
     let mut app = test_app();
     let mut term = Terminal::new(TestBackend::new(100, 30)).unwrap();
     let t = crate::when::now_ms() - HOUR - 60_000;
-    dispatch(&mut app, &line("sb you : hello there", 1, Some(t - 10_000)));
-    dispatch(&mut app, &line("  obs: turn_started", 2, Some(t - 9_000)));
-    dispatch(&mut app, &line("  obs: assistant: the answer is here", 3, Some(t - 1_000)));
-    dispatch(&mut app, &line("  obs: turn_done: completed", 4, Some(t)));
+    lines(
+        &mut app,
+        &[
+            ("sb you : hello there", t - 10_000),
+            ("  obs: turn_started", t - 9_000),
+            ("  obs: assistant: the answer is here", t - 1_000),
+            ("  obs: turn_done: completed", t),
+        ],
+    );
     term.draw(|f| draw_sb(&mut app, f)).unwrap();
     let label = crate::when::ended_now(t);
     assert!(label.ends_with("· 1h ago"), "{}", label);
@@ -122,11 +136,15 @@ fn the_mouse_over_a_reply_shows_when_its_turn_ended() {
 fn a_replayed_feed_marks_its_pauses_with_the_hubs_time() {
     let mut app = test_app();
     let t = crate::when::now_ms() - 3 * HOUR;
-    // the hub's buffered lines at hello: they arrive at once, the
-    // pause is in their `ts`
-    dispatch(&mut app, &line("  obs: assistant: before the pause", 1, Some(t)));
-    dispatch(&mut app, &line("  obs: assistant: after the pause", 2, Some(t + 2 * HOUR)));
-    dispatch(&mut app, &line("  obs: assistant: right after", 3, Some(t + 2 * HOUR + 1_000)));
+    // the thread's first page: its entries arrive at once, the pause is
+    // in their times
+    let mut hub = super::entries_for_tests::Hub::new();
+    hub.had("main", [
+        (1, t, "  obs: assistant: before the pause".to_string()),
+        (2, t + 2 * HOUR, "  obs: assistant: after the pause".to_string()),
+        (3, t + 2 * HOUR + 1_000, "  obs: assistant: right after".to_string()),
+    ]);
+    hub.subscribe(&mut app, "main", false);
     let marks: Vec<String> = app.events.iter().filter_map(|e| if let Ev::TimeMark(m) = e { Some(m.clone()) } else { None }).collect();
     assert_eq!(marks, vec![crate::when::mark_now(t + 2 * HOUR)]);
 }

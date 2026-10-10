@@ -2,9 +2,10 @@
 //! from the Rust types with ts-rs (feature `ts`, so bise and sb never
 //! compile ts-rs), never hand-edited (architect m_9476).
 //!
-//! - one `.ts` per wire module (hub, draft, thread, rows, diff, context,
-//!   helper, pty, jsonrpc, app_rpc) + `json.ts` (serde_json's Value) +
-//!   `index.ts`; `app_methods.gen.ts`: app_rpc's names as constants;
+//! - one `.ts` per wire module (hub, draft, thread, rows, diff, ops,
+//!   context, helper, pty, rpc, commands, app_rpc) + `json.ts`
+//!   (serde_json's Value) + `index.ts`; `methods.gen.ts`: rpc's tables;
+//!   `app_methods.gen.ts`: app_rpc's names as constants;
 //! - `fixtures.gen.ts`: every fixture line as a typed constant, so
 //!   `pnpm typecheck` fails when a fixture doesn't fit its generated type;
 //! - u64/i64 come out as `number` (ids, positions, `*_ms`: safe below 2^53),
@@ -16,7 +17,7 @@
 //! stale; `BISE_PROTO_BLESS=1` writes them.
 #![cfg(feature = "ts")]
 
-use bise_proto::{app_rpc, context, diff, draft, helper, hub, jsonrpc, pty, rows, thread};
+use bise_proto::{app_rpc, commands, context, diff, draft, helper, hub, ops, pty, rows, rpc, thread};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
@@ -58,14 +59,16 @@ fn modules(cfg: &Config) -> Vec<(&'static str, Vec<Decl>)> {
     vec![
         module!(cfg, "json": serde_json::Value),
         module!(cfg, "context": context::FnContext),
-        module!(cfg, "diff": diff::LineKind, diff::DiffLine, diff::Hunk, diff::DiffFile, diff::DiffResult, diff::Series),
-        module!(cfg, "rows": rows::Status, rows::ReportKind, rows::Report, rows::Agent, rows::Opt, rows::CardPage, rows::Card, rows::Merged, rows::DevServer, rows::Worktree, rows::FeatureTry, rows::Feature, rows::PrState, rows::PrChecks, rows::PrReview, rows::Pr, rows::ModelRole, rows::Model, rows::Artifact, rows::ArtifactVersion, rows::ScheduledTask, rows::AgentUsage, rows::WaitingOn, rows::ApprovalMode, rows::CheckerKind, rows::ApprovalRule),
-        module!(cfg, "thread": thread::EntryKind, thread::ToolKind, thread::ToolState, thread::FileCount, thread::ToolItem, thread::Tools, thread::EntryCard, thread::PageRef, thread::ReportRef, thread::Thinking, thread::NoticeLevel, thread::Notice, thread::NotDelivered, thread::Landed, thread::PrNewsState, thread::PrNews, thread::Made, thread::ImageRef, thread::Answered, thread::ApprovalFold, thread::Scheduled, thread::TurnFailed, thread::Entry),
-        module!(cfg, "hub": hub::JobState, hub::Job, hub::HubEv, hub::Mode, hub::HubCmd, hub::ErrorKind),
+        module!(cfg, "diff": diff::LineKind, diff::DiffLine, diff::Hunk, diff::DiffFile, diff::DiffResult, diff::Series, diff::DiffView),
+        module!(cfg, "rows": rows::Status, rows::Phase, rows::ReportKind, rows::Report, rows::Agent, rows::Opt, rows::CardPage, rows::Card, rows::CardBatch, rows::Merged, rows::DevServer, rows::Worktree, rows::FeatureTry, rows::Feature, rows::PrState, rows::PrChecks, rows::PrReview, rows::Pr, rows::Page, rows::Place, rows::ModelRole, rows::Model, rows::Artifact, rows::ArtifactPr, rows::ArtifactVersion, rows::ScheduledTask, rows::ScheduledEnd, rows::AgentUsage, rows::WaitingOn, rows::AgentMode, rows::Changes, rows::FlowMode, rows::ApprovalMode, rows::CheckerKind, rows::ApprovalRule),
+        module!(cfg, "thread": thread::EntryKind, thread::ToolKind, thread::ToolState, thread::GateWait, thread::ToolGate, thread::FileCount, thread::ToolItem, thread::Tools, thread::EntryCard, thread::PageRef, thread::ReportRef, thread::Thinking, thread::Delivery, thread::NoticeLevel, thread::Notice, thread::NotDelivered, thread::Landed, thread::PrNewsState, thread::PrNews, thread::Made, thread::ImageRef, thread::Answered, thread::ApprovalFold, thread::Scheduled, thread::TurnFailed, thread::Entry),
+        module!(cfg, "ops": ops::BranchRow, ops::VersionItem, ops::ReleaseEv, ops::UpdateEv),
+        module!(cfg, "hub": hub::JobState, hub::Job, hub::HubEv, hub::Mode, hub::SendOpts, hub::HubCmd, hub::ErrorKind),
+        module!(cfg, "rpc": rpc::Id, rpc::Request, rpc::Notification, rpc::Response, rpc::ErrorData, rpc::RpcError, rpc::Watermark, rpc::ClientInfo, rpc::InitializeParams, rpc::HubState, rpc::InitializeResult, rpc::CommandsList, rpc::CommandRunResult),
+        module!(cfg, "commands": commands::WordRow, commands::ArgRow, commands::CommandRow),
         module!(cfg, "draft": draft::Quote, draft::Queued, draft::DraftHubCmd, draft::ProjectRow, draft::OpenWhat, draft::Account, draft::Found, draft::AwayProject, draft::Plugin, draft::PluginLogin, draft::CuRow, draft::ComputerAgent, draft::PeekShot, draft::RoleRow, draft::Runs, draft::PickChoice, draft::PickArg, draft::PickCommand, draft::PickSkill, draft::PickFile, draft::PickFolder, draft::CoreEv, draft::AppCmd, draft::TalkPage, draft::ProjectView, draft::IndexRow),
         module!(cfg, "helper": helper::HelperEv, helper::Responsible, helper::FnAct, helper::TalkKey, helper::Grant, helper::QuietWhy, helper::Perm, helper::PermAction, helper::HelperCmd),
         module!(cfg, "pty": pty::PtyEv, pty::PtyCmd),
-        module!(cfg, "jsonrpc": jsonrpc::Id, jsonrpc::Request, jsonrpc::Notification, jsonrpc::Response, jsonrpc::ErrorData, jsonrpc::RpcError),
         module!(cfg, "app_rpc": app_rpc::AppClient, app_rpc::AppInit, app_rpc::AppInitResult),
     ]
 }
@@ -84,6 +87,7 @@ const FIXTURES: &[(&str, &str, &str)] = &[
     ("helper_cmd.jsonl", "HelperCmd", "helper"),
     ("pty_ev.jsonl", "PtyEv", "pty"),
     ("pty_cmd.jsonl", "PtyCmd", "pty"),
+    ("command_run_result.jsonl", "CommandRunResult", "rpc"),
 ];
 
 fn proto_dir() -> PathBuf {
@@ -175,6 +179,40 @@ fn render_app_methods() -> String {
     s
 }
 
+/// The JSON-RPC tables (bise_proto::rpc): each method's HubCmd tag and
+/// result HubEv tag, each notification's HubEv tag and scope, so the
+/// window's client maps them from the same owner (architect m_13089).
+fn render_methods() -> String {
+    let mut s = String::new();
+    header(&mut s);
+    writeln!(s, "// bise_proto::rpc's tables: a method's params are its HubCmd's fields, a notification's its HubEv's.").unwrap();
+    writeln!(s).unwrap();
+    writeln!(s, "export const PROTO = {};", bise_proto::PROTO).unwrap();
+    writeln!(s, "export const OWN_METHODS = [{}] as const;", rpc::OWN_METHODS.iter().map(|m| format!("{m:?}")).collect::<Vec<_>>().join(", ")).unwrap();
+    writeln!(s).unwrap();
+    writeln!(s, "export const METHODS = {{").unwrap();
+    for r in rpc::METHODS {
+        let result = r.result.map_or("null".to_string(), |t| format!("{t:?}"));
+        writeln!(s, "  {:?}: {{ cmd: {:?}, result: {result} }},", r.method, r.cmd).unwrap();
+    }
+    writeln!(s, "}} as const;").unwrap();
+    writeln!(s).unwrap();
+    writeln!(s, "export const NOTIFICATIONS = {{").unwrap();
+    for r in rpc::NOTIFICATIONS {
+        let scope = format!("{:?}", r.scope).to_lowercase();
+        writeln!(s, "  {:?}: {{ ev: {:?}, scope: {scope:?} }},", r.method, r.ev).unwrap();
+    }
+    writeln!(s, "}} as const;").unwrap();
+    writeln!(s).unwrap();
+    writeln!(s, "// the methods whose result is its own type, not a HubEv's fields").unwrap();
+    writeln!(s, "export const RESULTS = {{").unwrap();
+    for (m, t) in rpc::OWN_RESULTS {
+        writeln!(s, "  {m:?}: {t:?},").unwrap();
+    }
+    writeln!(s, "}} as const;").unwrap();
+    s
+}
+
 fn render_all() -> BTreeMap<String, String> {
     let cfg = Config::new().with_large_int("number");
     let modules = modules(&cfg);
@@ -195,6 +233,7 @@ fn render_all() -> BTreeMap<String, String> {
     out.insert("index.ts".to_string(), index);
     out.insert("fixtures.gen.ts".to_string(), render_fixtures());
     out.insert("app_methods.gen.ts".to_string(), render_app_methods());
+    out.insert("methods.gen.ts".to_string(), render_methods());
     out
 }
 

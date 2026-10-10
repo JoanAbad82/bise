@@ -5,10 +5,20 @@
 import type { Queued } from './draft';
 
 /**
- * An agent's status as every view shows it (the hub's words mapped:
- * starting is working, stopped is done; archived is a flag).
+ * An agent's status as released (v2026.10.2-28, the wire rule in
+ * lib.rs: its six values and their meanings never change): starting is
+ * working, stopped is done; archived is a flag. The hub's exact word
+ * when it is one of those is [`Agent::phase`] (P4b-fix, architect
+ * m_14382).
  */
 export type Status = "working" | "idle" | "waiting" | "blocked" | "done" | "failed";
+
+/**
+ * The hub's word when [`Status`] folds it into a released value: its
+ * REPL is starting (status working), or the user stopped it (status
+ * done). New in P4b-fix, with `Unknown` from the start so it may grow.
+ */
+export type Phase = "starting" | "stopped" | "unknown";
 
 export type ReportKind = "progress" | "done" | "failed" | "blocked";
 
@@ -17,7 +27,12 @@ export type Report = { kind: ReportKind, text: string, at_ms: number, };
 /**
  * One agent of a hub.
  */
-export type Agent = { name: string, main: boolean, status: Status, archived: boolean, 
+export type Agent = { name: string, main: boolean, status: Status, 
+/**
+ * the hub's exact word when `status` folds it (starting: working,
+ * stopped: done)
+ */
+phase?: Phase | null, archived: boolean, 
 /**
  * what it says it does now, else its last report, else its
  * objective: one line (the TUI's title)
@@ -36,9 +51,15 @@ since_ms: number,
  */
 waits: number, parent?: string | null, 
 /**
- * its worktree's branch (none: it works in the shared checkout)
+ * its worktree's branch (none: it works in the shared checkout), as
+ * released; the shared checkout's branch is `checkout_branch`
  */
-branch?: string | null, worktree?: string | null, 
+branch?: string | null, 
+/**
+ * the branch checked out in the shared checkout it works in (none in
+ * a worktree: that is `branch`), P4b-fix
+ */
+checkout_branch?: string | null, worktree?: string | null, 
 /**
  * how long its turn has run (working only)
  */
@@ -50,10 +71,12 @@ turn_ms?: number | null, report?: Report | null,
 queued?: Array<Queued>, 
 /**
  * its folder in the hub's `agents/` (its name but after a rename):
- * where `sb history --project` reads its thread on disk (S2 C);
- * none in a view written before this field (read as the name)
+ * where `sb history --project` reads its thread on disk (S2 C), and
+ * the agent's identity across a rename (a client keys agents by it:
+ * same dir, new name = renamed). Always set by a live hub; '' only
+ * in a view written before this field (read as the name)
  */
-dir?: string | null, 
+dir: string, 
 /**
  * its former names (a rename), which `sb history --agent` takes too
  */
@@ -86,7 +109,69 @@ usage?: AgentUsage | null,
  * the same field): you (its card or question), or another agent's
  * reply; none when it waits on nobody
  */
-waiting_on?: WaitingOn | null, };
+waiting_on?: WaitingOn | null, 
+/**
+ * client-protocol step 4 (P4b, architect m_13999): the facts the
+ * terminal reads, each from the hub's one source. Where it works:
+ * the shared checkout (`checkout_branch`) or its own worktree
+ * (`branch`, `worktree` its path)
+ */
+mode?: AgentMode | null, 
+/**
+ * its folder (the shared checkout's or its worktree's)
+ */
+path?: string, 
+/**
+ * its whole objective (`purpose` is its first line)
+ */
+objective?: string, 
+/**
+ * what it says it does now (`sb status --note`)
+ */
+note?: string, 
+/**
+ * what it is doing now, one line (BISE-126; none for main)
+ */
+role?: string, 
+/**
+ * the agents' messages waiting for its turn to end (`queued` is his)
+ */
+msgs_queued?: number, 
+/**
+ * main's inbox: the agents' questions waiting for main (BISE-299)
+ */
+inbox?: number, created_ms?: number | null, 
+/**
+ * its private worktree (BISE-136), none in the shared checkout
+ */
+place?: string | null, 
+/**
+ * the id of the place it is in (dev-flow §3.1, the `places` rows)
+ */
+place_id?: string, 
+/**
+ * the reasoning efforts its model takes (the catalog's words)
+ */
+efforts?: Array<string>, 
+/**
+ * its changes against its base (the `± 9 files so far` door), none
+ * when nothing changed or not measured yet
+ */
+changes?: Changes | null, 
+/**
+ * the pos of its thread's newest entry (`bise_proto::thread::fold`,
+ * the hub's one fold): a client lights an agent out of view when it
+ * moves, without subscribing its thread
+ */
+last_pos?: number | null, 
+/**
+ * how many of its turns ended since the hub started (its
+ * `turn_done` lines, counted live), so a client never misses a turn
+ * that started and ended between two rows (the queue's next message
+ * goes at a turn's end): it compares it with what it saw
+ * (proto-lead m_14731)
+ */
+turns?: number, };
 
 /**
  * A numbered option of a card.
@@ -131,7 +216,48 @@ rank?: number | null,
  * the `signin` card only (bar V14): the agents the expired ChatGPT
  * sign-in stopped, which go on once he signs in
  */
-waiting?: Array<string> | null, };
+waiting?: Array<string> | null, 
+/**
+ * client-protocol step 4 (P4c-4a): the card's words as the hub wrote
+ * them, options included (`question` and `options` are parsed from
+ * them); "" from an older hub
+ */
+text?: string, 
+/**
+ * the hub's second line under it (a merge's `approved · checks
+ * pass`, a question answered another way...)
+ */
+note?: string | null, 
+/**
+ * the place it is about (a `places` row's id: a merge, a feature)
+ */
+place?: string | null, 
+/**
+ * the number of the PR it is about
+ */
+pr?: number | null, 
+/**
+ * the page its link opens (the update card's release page)
+ */
+link?: string | null, 
+/**
+ * the message it answers (`sb card --for`)
+ */
+for_msg?: number | null, 
+/**
+ * a page's drafts batched in one card (docs/ambient-pages.md): its
+ * fields for the capsule's words; none on any other card
+ */
+batch?: CardBatch | null, };
+
+/**
+ * A drafts-batch card's fields (the hub's pages/drafts.rs `info`, amb-web
+ * m_6061): `count` drafts titled `title`, `what` they are (`replies`,
+ * `actions`...), `names` each recipient once, `topics` one per draft (or
+ * none), `line` the card's second line as is, `actions` the words of its
+ * actions to close (none when it has none).
+ */
+export type CardBatch = { count: number, title: string, what: string, names: Array<string>, topics: Array<string>, line: string, actions?: string | null, };
 
 /**
  * A commit that reached the project's trunk today (the changes tab's
@@ -280,7 +406,7 @@ card?: number | null, };
 /**
  * An open pull request's state (merged and closed ones aren't listed).
  */
-export type PrState = "open" | "draft" | "unknown";
+export type PrState = "open" | "draft" | "merged" | "closed" | "unknown";
 
 /**
  * Its checks on the head commit.
@@ -313,7 +439,80 @@ words: string,
 /**
  * its `/prs` line after `#<number>`: `sb/x · x, y · <words>`
  */
-text: string, };
+text: string, 
+/**
+ * P4c-4a: a review was asked and none came yet (`review` stays
+ * `none` then, as it always was: the wire rule)
+ */
+in_review?: boolean, 
+/**
+ * a place's PR (`HubEv::Agents.places`): how old the forge's last
+ * answer is, when it is late (offline, rate limit); none when fresh,
+ * and always none in `/prs`'s rows
+ */
+stale_ms?: number | null, };
+
+/**
+ * A bise page of this hub (docs/ambient-pages.md §2.3): `hub/pages`'
+ * rows (newest first) and `page/changed`'s page. `state`: `ready`,
+ * `updating` (its agent answers his notes)...; the counts and marks are
+ * left out of `page/changed` (its older `page` line has none).
+ */
+export type Page = { id: string, title: string, agent: string, version: number, url: string, at_ms: number, state: string, 
+/**
+ * his notes not answered yet
+ */
+open_notes?: number, 
+/**
+ * the version he last opened
+ */
+opened_version?: number | null, 
+/**
+ * what on it waits for him (`sb page waiting`'s lines of this page)
+ */
+waiting?: number, 
+/**
+ * the meta line of its first heading block
+ */
+kicker?: string | null, 
+/**
+ * it holds a question whose card is open (§4.2)
+ */
+asking?: boolean, };
+
+/**
+ * A worktree of the project as the terminal's panel draws it (dev-flow
+ * §3.1, the `places` of the hub's snapshot, P4c-4a): a worktree its
+ * agents share, a feature branch, a solo agent's own worktree. Never
+ * the shared checkout. In its first agent's order; an agent's
+ * `place_id` is its `id`.
+ */
+export type Place = { 
+/**
+ * `wt:<branch>`, `pt:<path>` (a private worktree), `feature:<name>`
+ */
+id: string, branch?: string | null, 
+/**
+ * its agents, not archived, in the hub's order
+ */
+agents?: Array<string>, 
+/**
+ * the PR of its branch (merged and closed ones too, until it goes)
+ */
+pr?: Pr | null, 
+/**
+ * the held line the hub writes (`waits to land · 2nd`, `no PR yet ·
+ * 2 commits`): it wins over the PR's words
+ */
+lid?: string | null, 
+/**
+ * a feature branch's place (dev-flow §5.1): never a PR
+ */
+feature?: boolean, 
+/**
+ * its try build builds or is on trial
+ */
+trying?: boolean, };
 
 /**
  * The role a model is config.toml's default for.
@@ -404,14 +603,58 @@ path?: string | null,
  * list, no cap (the versions popover); left out when empty (a row
  * from before it, an older hub)
  */
-versions?: Array<ArtifactVersion>, };
+versions?: Array<ArtifactVersion>, 
+/**
+ * who added it: `you`, `page` (a bise page), else the agent
+ */
+by?: string, 
+/**
+ * its agent is archived
+ */
+archived?: boolean, 
+/**
+ * when it was first added (ms)
+ */
+created_ms?: number | null, 
+/**
+ * the current version's target as the store keeps it: a path or a
+ * link (a page's: its file)
+ */
+target?: string, 
+/**
+ * the store's copy of the current version (absolute), when it kept one
+ */
+copy?: string | null, 
+/**
+ * its target is a file that is no longer there
+ */
+gone?: boolean, 
+/**
+ * the row's dim words: a page's notes (`2 notes open`), a site's bare
+ * link
+ */
+detail?: string, 
+/**
+ * a pull request's link
+ */
+pr?: ArtifactPr | null, 
+/**
+ * the words a search matches (its links, bare and full; its paths,
+ * absolute and from the workspace)
+ */
+keys?: Array<string>, };
+
+/**
+ * An artifact that is a pull request: its repo (`owner/name`) and number.
+ */
+export type ArtifactPr = { repo: string, number: number, };
 
 /**
  * One version of an artifact: its number, when it was made, and the
  * TUI's /artifacts words for it (a page's 'n notes open', 'no copy: …'),
- * printed as they are.
+ * printed as they are; its target and the store's copy of it.
  */
-export type ArtifactVersion = { v: number, at_ms: number, note?: string | null, };
+export type ArtifactVersion = { v: number, at_ms: number, note?: string | null, target?: string, copy?: string | null, };
 
 /**
  * A live scheduled task of a project (`sb every`), the `scheduled`
@@ -442,7 +685,33 @@ name?: string, every: string, times?: number | null, done: number, next_ms?: num
 /**
  * the page it keeps fresh (`--page`)
  */
-page?: string | null, };
+page?: string | null, 
+/**
+ * P4c-4a: the hub's how-often label (`every 2m`, `every day
+ * 07:30`), before `every`'s `once` and times words
+ */
+label?: string, 
+/**
+ * when it last woke its agent
+ */
+last_ms?: number | null, 
+/**
+ * its last runs, oldest first
+ */
+runs?: Array<number>, 
+/**
+ * an ended one (`HubEv::Scheduled.ended` only): when, how, by whom
+ */
+ended_ms?: number | null, end?: ScheduledEnd | null, 
+/**
+ * who stopped it (`end` is `stopped`): you, or an agent
+ */
+stopped_by?: WaitingOn | null, };
+
+/**
+ * How a scheduled task ended (the hub's `every::end_of`).
+ */
+export type ScheduledEnd = "times" | "until" | "gone" | "stopped" | "unknown";
 
 /**
  * An agent's context after its last model call (bar S13, the divider's
@@ -477,6 +746,21 @@ short: string, };
  * Whom an agent waits on (R9/S3).
  */
 export type WaitingOn = { "who": "you" } | { "who": "agent", name: string, } | { "who": "unknown" };
+
+/**
+ * Where an agent works (named apart from `hub::Mode`, a send's).
+ */
+export type AgentMode = "shared" | "worktree" | "unknown";
+
+/**
+ * An agent's changes against its base: files, lines added, removed.
+ */
+export type Changes = { files: number, add: number, del: number, };
+
+/**
+ * How a repo's agents land their work (`config.toml`'s `[flow] mode`).
+ */
+export type FlowMode = "pr" | "trunk" | "unknown";
 
 /**
  * How tool calls are approved on this machine (bar V8/W21,

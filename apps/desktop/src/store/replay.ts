@@ -4,9 +4,12 @@
 import { core_ev, hub_ev } from '@/proto/fixtures.gen';
 import type { Ev, Store } from './store';
 
-/** Every fixture event the store applies: the core's, then the hubs'. */
+/** A terminal's `/diff` answer (client-protocol's DiffView: it carries the `req` it answers); the window never asks one. */
+const terminalDiff = (ev: Ev): boolean => ev.ev === 'diff' && ev.req != null;
+
+/** Every fixture event the store applies: the core's, then the hubs' (the terminal's `/diff` answers left out: on the same agent they would stand in for the review's diff). */
 export function allFixtureEvents(): readonly Ev[] {
-  return [...core_ev, ...hub_ev];
+  return [...core_ev, ...hub_ev.filter((ev) => !terminalDiff(ev))];
 }
 
 /** Applies `events` in order; returns how many the store took (unknown tags are skipped). */

@@ -10,41 +10,17 @@ use serde_json::{json, Value};
 /// `CARD_POS + id`, stable, so an answer replaces the same entry.
 pub const CARD_POS: u64 = 1_000_000_000;
 
-/// The hub's status word as the list shows it, and whether it is
-/// archived (an archived row keeps the status it had: done).
-pub fn status(hub: &str) -> (&'static str, bool) {
-    match hub {
-        "starting" | "working" => ("working", false),
-        "waiting" => ("waiting", false),
-        "blocked" => ("blocked", false),
-        "failed" => ("failed", false),
-        "done" | "stopped" => ("done", false),
-        "archived" => ("done", true),
-        _ => ("idle", false),
-    }
-}
-
 /// The first line of a text, clipped.
 pub fn one_line(s: &str, max: usize) -> String {
     let l = s.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
     crate::render::truncate_chars(l, max)
 }
 
-/// A row's title line: what the agent says it does now (its note), else
-/// its last report, else its objective (the TUI's title).
-pub fn title(a: &Value) -> String {
-    let s = |k: &str| a.get(k).and_then(Value::as_str).unwrap_or("").trim().to_string();
-    let t = [s("note"), s("report"), s("objective")].into_iter().find(|t| !t.is_empty()).unwrap_or_default();
-    one_line(&t, 120)
-}
-
 /// A page as an entry or a preview shows it, from the hub's pages.
-pub fn page_ref(id: &str, pages: &[Value]) -> Value {
-    let p = pages.iter().find(|p| p.get("id").and_then(Value::as_str) == Some(id));
-    let s = |k: &str| p.and_then(|p| p.get(k)).and_then(Value::as_str).unwrap_or("").to_string();
-    let title = Some(s("title")).filter(|t| !t.is_empty()).unwrap_or_else(|| id.replace('-', " "));
-    let v = p.and_then(|p| p.get("version")).and_then(Value::as_u64);
-    json!({"id": id, "title": title, "v": v, "url": s("url")})
+pub fn page_ref(id: &str, pages: &[bise_proto::rows::Page]) -> Value {
+    let p = pages.iter().find(|p| p.id == id);
+    let title = p.map(|p| p.title.clone()).filter(|t| !t.is_empty()).unwrap_or_else(|| id.replace('-', " "));
+    json!({"id": id, "title": title, "v": p.map(|p| p.version), "url": p.map_or("", |p| p.url.as_str())})
 }
 
 /// A card as an entry shows it: the question without its options, the
@@ -78,17 +54,4 @@ pub fn actions(entries: &[Value], n: usize) -> Vec<Value> {
     }
     let skip = out.len().saturating_sub(n);
     out.split_off(skip)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn hub_statuses_as_the_list_shows_them() {
-        assert_eq!(status("stopped"), ("done", false));
-        assert_eq!(status("archived"), ("done", true));
-        assert_eq!(status("starting"), ("working", false));
-    }
-
 }

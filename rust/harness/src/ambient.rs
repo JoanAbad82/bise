@@ -3,8 +3,6 @@
 //! its hub connections (the voice target's and every project's, S3b) and
 //! what it reads of the projects. main.rs keeps the dispatch lines.
 
-use std::io::Write;
-
 /// `bise ambient-core`: the desktop app's core, its child on stdio
 /// (JSON-RPC, bend_tui::ambient::stdio), a client of the workspace's hub
 /// and of every project's hub.
@@ -19,8 +17,26 @@ pub fn core(args: &[String]) -> std::io::Result<i32> {
     let exe = std::env::current_exe()?;
     let workspace = paths.workspace.to_string_lossy().to_string();
     let projects = ambient_projects(exe.clone(), root.clone());
+    let home_move = home_move(paths.clone(), root.clone());
     let connect = ambient_connector(paths, exe, root);
-    Ok(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects), Some(ambient_setup())))
+    Ok(bend_tui::ambient::core_main(workspace, connect, switchboard::model::user_kind, Some(projects), Some(ambient_setup()), Some(home_move)))
+}
+
+/// The core's move of an older home hub to its own version (architect
+/// m_15476): the binary's one move, `switch::move_hub` (`bise`'s launch
+/// makes it too), to this core's app root.
+fn home_move(paths: switchboard::paths::Paths, root: std::path::PathBuf) -> bend_tui::ambient::HomeMove {
+    use bend_tui::ambient::MoveEnd;
+    use switchboard::switch::{id_of, move_hub, running_root, Moved, MOVE_BOUND};
+    let (p, r) = (paths.clone(), root.clone());
+    bend_tui::ambient::HomeMove {
+        ids: Box::new(move || (running_root(&p).map(|h| id_of(&h)).unwrap_or_default(), id_of(&r))),
+        run: std::sync::Arc::new(move || match move_hub(&paths, &root, MOVE_BOUND) {
+            Moved::There => MoveEnd::There,
+            Moved::Refused(words) => MoveEnd::Refused(words),
+            Moved::Late => MoveEnd::Late,
+        }),
+    }
 }
 
 /// `bise ambient`: open the app on this workspace (scripts/desktop.sh).
@@ -55,20 +71,18 @@ fn ambient_workspace(args: &[String], core: bool) -> std::path::PathBuf {
 }
 
 /// bise ambient's hub connection: the first call starts the hub when
-/// none runs (`client::connect`, like the TUI); later calls (after a
-/// loss) only connect and say hello: the user may have stopped bise.
-fn ambient_connector(
-    paths: switchboard::paths::Paths,
-    exe: std::path::PathBuf,
-    root: std::path::PathBuf,
-) -> bend_tui::ambient::Connect {
+/// none runs (`client::open`, like the TUI); later calls (after a loss)
+/// only connect: the user may have stopped bise. It says nothing: the
+/// core's first line is JSON-RPC's `initialize` (the home hub's
+/// connection since client-protocol step 5, a project's since P1c).
+fn ambient_connector(paths: switchboard::paths::Paths, exe: std::path::PathBuf, root: std::path::PathBuf) -> bend_tui::ambient::Connect {
     let mut first = true;
     Box::new(move || {
-        if std::mem::take(&mut first) {
-            return switchboard::client::connect(&paths, &exe, &root);
-        }
-        let mut s = std::os::unix::net::UnixStream::connect(paths.socket())?;
-        s.write_all(b"{\"op\":\"hello\"}\n")?;
+        let s = if std::mem::take(&mut first) {
+            switchboard::client::open(&paths, &exe, &root)?
+        } else {
+            std::os::unix::net::UnixStream::connect(paths.socket())?
+        };
         Ok(s)
     })
 }
