@@ -393,6 +393,11 @@ def reply_for(conv, seen=0):
         # "think": the script's first step starts with that reasoning (the window's thinking row)
         if sc.get("think") and calls_done == 0:
             turn["reasoning"] = sc["think"]
+        # "stream" on a call step too (not a duplicate of the reply step's: a call step returns
+        # before it): it paces the first step's reasoning, the thinking row (50703855 removed this
+        # one as a copy, so the bar's thinking came in 3 deltas, not the script's chunks)
+        if isinstance(sc.get("stream"), dict):
+            turn["stream"] = sc["stream"]
     else:
         marks = MARK.findall(user) or INNER.findall(user)
     if calls_done < len(marks):
