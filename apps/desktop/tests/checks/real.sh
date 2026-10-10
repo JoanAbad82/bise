@@ -10,7 +10,7 @@
 set -u
 here=$(cd "$(dirname "$0")" && pwd)
 desktop=$(cd "$here/../.." && pwd)
-qa="$desktop/../../.agents/plugins/ambient-qa/qa.py"
+qa="$desktop/../../dev/plugins/ambient-qa/qa.py"
 up=(world up --projects 2)
 [ -n "${QA_BISE:-}" ] && up+=(--bise "$QA_BISE")
 

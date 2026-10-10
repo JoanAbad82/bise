@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "ambient-qa",
+  "version": "0.1.0",
+  "description": "internal QA of bise's product flows (for the ambient and desktop agents): throwaway hubs (scripted, or the user's model) on fake accounts, pages driven in a throwaway headless Chrome, asks to main measured, scripted product runs with a one-screen report, and bise desktop's QA world (a throwaway home with 2-3 seeded projects) that apps/desktop/tests drive. Never the real workspace (it needs a client the user started), his accounts, his browser or the real main.",
+  "homepage": "https://bise.dev",
+  "license": "Apache-2.0",
+  "extensions": {
+    "dev.bise": { "default": "off" }
+  }
+}

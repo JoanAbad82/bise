@@ -1,5 +1,5 @@
 // The new app on the REAL core and a throwaway world (qa-flows): no scripted core, no hooks.
-// The world is ambient-qa's (.agents/plugins/ambient-qa/world.py): an isolated HOME under ~/.bise/gate
+// The world is ambient-qa's (dev/plugins/ambient-qa/world.py): an isolated HOME under ~/.bise/gate
 // with bise's home hub and 2 seeded projects, every hub on tests/fake_provider.py's scripted
 // model. tests/checks/real.sh brings it up, runs the checks, and takes it down; `realWorld()` only
 // reads it (`qa.py world state`). `launchReal()` starts the built app (out/) with
@@ -18,7 +18,7 @@ import path from 'node:path';
 import { launchDesktop, type LaunchOptions, type Session } from '../harness';
 
 const REPO = path.resolve(__dirname, '..', '..', '..', '..');
-const QA = path.join(REPO, '.agents', 'plugins', 'ambient-qa', 'qa.py');
+const QA = path.join(REPO, 'dev', 'plugins', 'ambient-qa', 'qa.py');
 const GATE = path.join(os.homedir(), '.bise', 'gate') + path.sep;
 
 export type HubInfo = { project: string; home: boolean; ws: string; sock: string; alive: boolean };
