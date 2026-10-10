@@ -1,0 +1,277 @@
+// A thread's news rows: landed, PRs, artifacts, scheduled tasks, compaction,
+// notices, a task's brief, a handoff, a message not delivered. Owner: amb-win.
+// Split out of rows.tsx (pure move).
+import { useState, type ReactNode } from 'react';
+import { Button, Fold, Marker } from '@/ds';
+import type { Entry } from '@/proto';
+import { useAgents, useStore } from '@/store';
+import { useFold } from './folds';
+import { Markdown } from './Markdown';
+import { clock, handoffOf, schedHead } from './entry';
+import { useRouter } from '@/app/router';
+import type { RowCtx } from './rows';
+/** A news line's mark: what it means, never its color alone. */
+export function NewsLine({ mark, tone, testId, children }: { mark: string; tone: 'ok' | 'err' | 'plain' | 'dim'; testId: string; children: ReactNode }) {
+  return (
+    <div className={`th-news ${tone}`} data-testid={testId} data-tone={tone}>
+      <span className="th-news-mark" aria-hidden="true">
+        {mark}
+      </span>
+      <span className="th-news-text">{children}</span>
+    </div>
+  );
+}
+
+/** 'perf landed on main · a1b2c3d · 3 files +42 −18': the sha opens the commit. */
+export function LandedRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const router = useRouter();
+  const l = e.landed;
+  if (l == null) return <Marker>{e.text}</Marker>;
+  return (
+    <NewsLine mark="✓" tone="ok" testId={`thread.landed.${e.pos}`}>
+      {l.agent} landed on {l.target} ·{' '}
+      <button
+        type="button"
+        className="th-news-link"
+        onClick={() => {
+          router.go({ screen: 'commit', project: ctx.project, sha: l.sha });
+        }}
+        data-testid={`thread.landed.${e.pos}.sha`}
+      >
+        {l.sha.slice(0, 7)}
+      </button>
+      {e.text !== '' ? ` · ${e.text}` : ''}
+    </NewsLine>
+  );
+}
+
+/** A PR's news: its number opens it; failing / done / news said by its mark and words. */
+export function PrRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const p = e.pr;
+  if (p == null) return <Marker>{e.text}</Marker>;
+  const [mark, tone] = p.state === 'failing' ? (['▲', 'err'] as const) : p.state === 'done' ? (['✓', 'dim'] as const) : (['•', 'plain'] as const);
+  return (
+    <NewsLine mark={mark} tone={tone} testId={`thread.pr.${e.pos}`}>
+      <button
+        type="button"
+        className="th-news-link"
+        onClick={() => {
+          ctx.onLink(p.url);
+        }}
+        data-testid={`thread.pr.${e.pos}.link`}
+      >
+        PR #{p.number}
+      </button>{' '}
+      · {p.text}
+    </NewsLine>
+  );
+}
+
+/** What an agent made: a card that opens it (its page, else the project's artifacts). */
+export function MadeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const router = useRouter();
+  const m = e.made;
+  if (m == null) return <Marker>{e.text}</Marker>;
+  return (
+    <ArtChip
+      title={m.title}
+      meta={[m.kind_word, m.v > 1 ? `v${String(m.v)}` : ''].filter(Boolean).join(' · ')}
+      onOpen={() => {
+        // designer's v6 (2): an artifact opens in the window, its own screen
+        router.go({ screen: 'artifacts', project: ctx.project, id: m.id });
+      }}
+      testId={`thread.artifact.${String(e.pos)}`}
+    />
+  );
+}
+
+/** An artifact or a page as one line (designer m_12065 (2)): '↗ product page, before / after   page · v2', 1 px line, r 9, fit-content, no thumbnail box. */
+export function ArtChip({ title, meta, onOpen, testId }: { title: string; meta: string; onOpen: () => void; testId: string }) {
+  return (
+    <button type="button" className="th-art" onClick={onOpen} data-testid={testId}>
+      <span className="th-art-title">↗ {title}</span>
+      {meta !== '' && <span className="th-art-meta">{meta}</span>}
+    </button>
+  );
+}
+
+/** The summary its context was compacted to: one folded line. */
+/**
+ * A scheduled task (sb every) set, run or ended, as the TUI's faint '◷ head ▸' row (wire.rs
+ * Scheduled): the head is the hub's words as sent; the words it sends open under it (none: no ▸).
+ */
+export function ScheduledRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const [open, setOpen] = useFold(false, e.pos);
+  const s = e.scheduled;
+  const head = s?.head ?? e.text;
+  const words = s?.words ?? '';
+  return (
+    <div className="th-sched" data-testid={`thread.scheduled.${e.pos}`} data-id={s?.id}>
+      <span className="th-news-mark" aria-hidden="true">
+        ◷
+      </span>
+      {words === '' ? (
+        <span className="th-sched-head">{schedHead(head, ctx.agent === 'main' ? null : ctx.agent)}</span>
+      ) : (
+        // its words open on a click, with no chevron (designer N2: '◷ main scheduled dashboards · every 30m · next 16:56')
+        <button
+          type="button"
+          className="th-sched-head"
+          aria-expanded={open}
+          onClick={() => {
+            setOpen((o) => !o);
+          }}
+          data-testid={`thread.scheduled.${e.pos}.head`}
+        >
+          {schedHead(head, ctx.agent === 'main' ? null : ctx.agent)}
+        </button>
+      )}
+      {open && words !== '' && (
+        <div className="th-sched-words" data-testid={`thread.scheduled.${e.pos}.words`}>
+          {words}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CompactedRow({ e }: { e: Entry }) {
+  const [open, setOpen] = useFold(false, e.pos);
+  const toggle = () => {
+    setOpen((o) => !o);
+  };
+  return (
+    <div className="th-compact" data-testid={`thread.compacted.${e.pos}`}>
+      <Fold open={open} onToggle={e.text === '' ? undefined : toggle} testId={`thread.compacted.${e.pos}.head`}>
+        context compacted
+      </Fold>
+      {open && e.text !== '' && <div className="th-think-body">{e.text}</div>}
+    </div>
+  );
+}
+
+/** A notice's mark by level (the TUI's: info dim, warn ▲, err ✗): the tone is said in a glyph and words, never by color alone. */
+export const NOTICE_MARK = { info: '·', warn: '▲', err: '✗', unknown: '·' } as const;
+
+export function NoticeRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const level = e.notice?.level ?? 'info';
+  const text = e.notice?.text ?? e.text;
+  // a main's handoff (designer's v6 (3)): '→ perf · product page speed', opens its thread
+  const handoff = level === 'info' ? handoffOf(text) : null;
+  if (handoff !== null) return <HandoffRow pos={e.pos} to={handoff.agent} brief={handoff.brief} ctx={ctx} />;
+  // 'session restored · 14:02', one row centred like a day separator (ambient m_11777)
+  if (level === 'info' && text.startsWith('session restored')) {
+    return (
+      <div className="th-day th-restored" data-testid={`thread.notice.${e.pos}`}>
+        <span>{e.at_ms > 0 ? `session restored · ${clock(e.at_ms)}` : 'session restored'}</span>
+      </div>
+    );
+  }
+  return (
+    <div className={`th-notice ${level}`} data-level={level} data-testid={`thread.notice.${e.pos}`}>
+      <span className="th-notice-mark" aria-label={level === 'err' ? 'error' : level === 'warn' ? 'warning' : 'note'}>
+        {NOTICE_MARK[level]}
+      </span>
+      <span>{text}</span>
+    </div>
+  );
+}
+
+/** 'bise started gift-ui · <objective>': the task's brief as one dim row; a click unfolds the whole brief under a rail. */
+export function BriefRow({ pos, name, objective, body, ctx }: { pos: number; name: string; objective: string; body: string; ctx: RowCtx }) {
+  const [open, setOpen] = useFold(false, pos);
+  return (
+    <div className="th-brief" data-open={open || undefined} data-testid={`thread.brief.${String(pos)}`}>
+      <button
+        type="button"
+        className="th-brief-line"
+        aria-expanded={open}
+        onClick={() => {
+          setOpen((o) => !o);
+        }}
+      >
+        <span className="th-brief-chev" aria-hidden="true">
+          ▸
+        </span>
+        <span className="th-brief-words">
+          bise started {name}
+          {objective !== '' && ` · ${objective}`}
+        </span>
+      </button>
+      {open && (
+        <div className="th-brief-body" data-testid={`thread.brief.${String(pos)}.body`}>
+          <Markdown text={body} onLink={ctx.onLink} onPath={ctx.onPath} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** '→ perf · product page speed': who a main handed a job to, its role (else the brief); a click opens its thread. */
+function HandoffRow({ pos, to, brief, ctx }: { pos: number; to: string; brief: string; ctx: RowCtx }) {
+  const router = useRouter();
+  const a = useAgents(ctx.project).find((x) => x.name === to);
+  const role = a !== undefined && a.purpose !== '' ? a.purpose : brief;
+  return (
+    <button
+      type="button"
+      className="th-handoff"
+      onClick={() => {
+        router.go({ screen: 'thread', project: ctx.project, agent: to });
+      }}
+      data-testid={`thread.handoff.${String(pos)}`}
+    >
+      → {to}
+      {role !== '' && <span className="th-handoff-role"> · {role}</span>}
+    </button>
+  );
+}
+
+/** His message didn't reach the agent (BISE-86): send it again, or drop it from view. */
+export function NotDeliveredRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
+  const store = useStore();
+  const [gone, setGone] = useState<'sent' | 'dropped' | null>(null);
+  const nd = e.not_delivered;
+  const to = nd?.to ?? ctx.agent;
+  const text = nd?.text ?? e.text;
+  if (gone === 'dropped') return null;
+  const again = () => {
+    store.send({ project: ctx.project, agent: to, text, mode: 'now' });
+    setGone('sent');
+  };
+  const drop = () => {
+    setGone('dropped');
+  };
+  return (
+    <div
+      className="th-notdelivered"
+      data-testid={`thread.notdelivered.${e.pos}`}
+      tabIndex={-1}
+      onKeyDown={(k) => {
+        if (gone !== null) return;
+        if (k.key === 'Enter') again();
+        else if (k.key === 'Escape') drop();
+        else return;
+        k.preventDefault();
+        k.stopPropagation();
+      }}
+    >
+      <div className="th-notdelivered-head">
+        <span aria-label="error">✗</span> not delivered to {to}
+      </div>
+      <div className="th-notdelivered-text">{text}</div>
+      {gone === 'sent' ? (
+        <div className="th-waits">sent again</div>
+      ) : (
+        <div className="th-notdelivered-acts">
+          <Button kind="ghost" onClick={again} testId={`thread.notdelivered.${e.pos}.again`}>
+            ⏎ send again
+          </Button>
+          <Button kind="ghost" onClick={drop} testId={`thread.notdelivered.${e.pos}.drop`}>
+            esc drop
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
