@@ -293,15 +293,29 @@ test("thread/log-screen: /log opens the raw session (rows, rules, folds), pages 
     await expect(dl.nth(0)).toHaveClass(/rm/);
     await expect(dl.nth(1)).toHaveClass(/ad/);
     await expect(page.getByTestId(`${edit}.args`)).toHaveText("▸ args");
-    // no colour inside prose: bold and inline code in the prose's ink
-    const ink = (sel: string) =>
+    // the prose's markdown colours are the thread's (ds md.css, his ask m_11451; designer m_17580):
+    // bold and inline code read as a .b-md probe outside the screen reads them
+    const colorOf = (sel: string) =>
       page
         .locator(`[data-seq="312"] .lg-prose ${sel}`)
         .first()
         .evaluate((el) => getComputedStyle(el).color);
-    const prose312 = await ink("p");
-    expect(await ink("strong"), "bold in ink").toBe(prose312);
-    expect(await ink("code"), "inline code in ink").toBe(prose312);
+    const md = await page.evaluate(() => {
+      const probe = document.createElement("div");
+      probe.className = "b-md";
+      probe.innerHTML = "<p>a <strong>b</strong> <code>c</code></p>";
+      document.body.append(probe);
+      const of = (s: string) =>
+        getComputedStyle(probe.querySelector(s) as Element).color;
+      const out = { p: of("p"), strong: of("strong"), code: of("code") };
+      probe.remove();
+      return out;
+    });
+    expect(md.strong, "md.css gives bold its own colour").not.toBe(md.p);
+    expect(await colorOf("strong"), "bold in md.css's colour").toBe(md.strong);
+    expect(await colorOf("code"), "inline code in md.css's colour").toBe(
+      md.code,
+    );
     // opens at the end: the newest entry in view
     const list = page.getByTestId("log.list");
     const atEnd = () =>

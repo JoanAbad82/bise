@@ -190,20 +190,8 @@
 .lg-prose > :last-child {
   margin-bottom: 0;
 }
-/* no colour inside prose (designer m_17531): bold is ink 600, inline code mono in ink on the
-   soft box; pink stays for what waits on him */
-.lg-prose .b-md strong,
-.lg-prose .b-md b {
-  color: var(--c-text);
-  font-weight: 600;
-}
-.lg-prose .b-md :not(pre) > code {
-  padding: 1px 4px;
-  border-radius: 4px;
-  background: var(--c-sunken);
-  color: var(--c-text);
-  font: 400 0.88em / 1 var(--font-mono);
-}
+/* the prose's markdown colours are the thread's, ds md.css (the TUI's, his ask m_11451: bold pale
+   pink, code green); designer m_17580 reverted m_17531's ink-only prose, so nothing here */
 .lg-prose.thinking {
   color: var(--c-text-2);
   font-style: italic;
