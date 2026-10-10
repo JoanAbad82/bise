@@ -5,8 +5,8 @@
 // `from` = how much of the answer's text (its rendered characters, in
 // order) was already shown. Past it:
 // - each new word is a span.th-w with its delay: the words of one update
-//   are staggered by min(30 ms, 120 ms ÷ their count), so all start within
-//   120 ms; once faded the thread renders again with `from` at the end and
+//   start evenly spread over ~300 ms (300 ms ÷ their count apart, each fades
+//   in 180 ms; designer m_17507, R40); once faded the thread renders again with `from` at the end and
 //   the spans are gone (plain text again: nothing above re-animates);
 // - a new list item, table row or code box fades as one (th-in), its dash
 //   or frame with it; in code, whole new lines fade (data-from on <code>:
@@ -31,13 +31,17 @@ export interface FadeOpts {
   onTotal?: (n: number) => void;
 }
 
-const STAGGER_MS = 30;
-const SPREAD_MS = 120;
+/** The new words of one update start evenly across this gap (R40: partials land every 400 ms). */
+export const SPREAD_MS = 300;
 const BLOCKS = new Set(['li', 'tr']);
 
-/** The delay between two new words of one update. Pure. */
+/**
+ * The delay between two new words of one update: their start times spread evenly over ~300 ms
+ * (designer m_17507, R40: partials land every 400 ms, so each chunk reads as a steady flow, not a
+ * pulse; 30 ms apart made every chunk land at once). Pure.
+ */
 export function staggerOf(words: number): number {
-  return words <= 0 ? 0 : Math.min(STAGGER_MS, SPREAD_MS / words);
+  return words <= 0 ? 0 : SPREAD_MS / words;
 }
 
 function addClass(n: HNode, c: string): void {

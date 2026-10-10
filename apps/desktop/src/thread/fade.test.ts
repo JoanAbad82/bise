@@ -16,14 +16,18 @@ describe('the new words of a streamed answer fade in (text-appearing v2)', () =>
     expect(tree.children?.[0]?.children?.[0]).toEqual(t('The cold '));
     expect(total).toBe('The cold bench takes 4.1 s'.length);
   });
-  it('the words of one update start within 120 ms: min(30 ms, 120 ms ÷ count)', () => {
-    expect(staggerOf(2)).toBe(30);
-    expect(staggerOf(12)).toBe(10);
+  it('the words of one update start evenly spread over ~300 ms: 300 ms ÷ count apart (R40, designer m_17507)', () => {
+    expect(staggerOf(0)).toBe(0);
+    expect(staggerOf(2)).toBe(150);
+    expect(staggerOf(12)).toBe(25);
     const tree = root(el('p', [t('a b c d e f g h i j k l')]));
     fade({ from: 0 })(tree);
     const delays = spans(tree).map((s) => Number(/(\d+)ms/.exec(String(s.properties?.style))?.[1]));
-    expect(delays[0]).toBe(0);
-    expect(Math.max(...delays)).toBeLessThanOrEqual(120);
+    expect(delays).toEqual([0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275]);
+    // a 4-word chunk: a steady flow across the gap, not a 30 ms burst
+    const four = root(el('p', [t('the index is walked')]));
+    fade({ from: 0 })(four);
+    expect(spans(four).map((s) => Number(/(\d+)ms/.exec(String(s.properties?.style))?.[1]))).toEqual([0, 75, 150, 225]);
   });
   it('nothing fades once everything was shown (the spans are gone: plain text again)', () => {
     const tree = root(el('p', [t('all shown')]));

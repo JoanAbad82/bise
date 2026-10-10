@@ -170,8 +170,8 @@ export const Markdown = memo(function Markdown({
 /** Each Answer's rendered length after its last pass (its next update fades from there). */
 const totals = new WeakMap<object, number>();
 
-/** How long the new words of one update take to fade in (120 ms of stagger + 180 ms of fade). */
-export const FADE_MS = 300;
+/** How long the new words of one update take to fade in (300 ms of spread + 180 ms of fade, R40). */
+export const FADE_MS = 480;
 
 /**
  * An agent's answer, streamed or whole (text-appearing v2): while `live`,
