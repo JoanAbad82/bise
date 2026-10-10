@@ -4,7 +4,7 @@
 // today', and the window's widths (the sidebar slides over under 1000 px,
 // the right panel is open by default from 1100 px). Owner: amb-win. Pure:
 // Sidebar.tsx and App.tsx draw these.
-import type { Agent, ProjectRow } from '@/proto';
+import type { Agent, ComputerAgent, ProjectRow } from '@/proto';
 import { MAIN, type Route } from './route';
 import { shortAge, shownName } from '@/agents/model';
 
@@ -61,6 +61,17 @@ export function signOf(a: Agent, now: number, wake?: number): Sign {
   if (wake !== undefined) return { g: '◷', tone: 'dim', end: hm(wake), endTone: 'dim', count: 0, title: `wakes at ${hm(wake)} · ${what}` };
   if (a.status === 'done') return { g: '✓', tone: 'dim', end: 'done', endTone: 'dim', count: 0, title: `done · ${what}` };
   return { g: '–', tone: 'dim', end: 'stopped', endTone: 'dim', count: 0, title: `stopped · ${what}` };
+}
+
+/**
+ * S29/L19 W3: the core's mark beside an agent that uses his computer (amb-core m_16595): '↖' in
+ * ink while it drives, '?' in the accent when he took the wheel, dim when stopped; its words on
+ * hover; none without a row. Pure.
+ */
+export function computerDot(r: ComputerAgent | undefined): { g: string; tone: Tone; title: string } | null {
+  if (r === undefined) return null;
+  const tone: Tone = r.kind === 'driving' ? 'ink' : r.kind === 'paused' ? 'acc' : 'dim';
+  return { g: r.mark, tone, title: r.words };
 }
 
 /** How long a done agent stays in the sidebar before it folds. */

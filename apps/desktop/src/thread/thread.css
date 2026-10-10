@@ -981,6 +981,83 @@ button.th-sched-head {
   color: var(--c-text);
 }
 
+/* S29/L19 W1: it drives his computer: one line under the head, its acts at the end; W4 the still */
+.th-cu {
+  padding: 0 16px 6px;
+}
+.th-cu-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  font: var(--t-13) var(--font-ui);
+}
+.th-cu-words {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-text);
+  font: inherit;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* the core's colours by kind (amb-core m_16595): driving the working ink, paused accent, stopped dim */
+.th-cu[data-state='paused'] .th-cu-words {
+  color: var(--c-accent);
+}
+.th-cu[data-state='stopped'] .th-cu-words {
+  color: var(--c-text-2);
+}
+.th-cu-act {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-text-2);
+  font: inherit;
+  cursor: pointer;
+}
+.th-cu-act:focus-visible,
+.th-cu-words:focus-visible,
+.th-cu-peek:focus-visible {
+  outline: 2px solid var(--c-text);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+.th-cu-act:hover,
+.th-cu-words:hover {
+  color: var(--c-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.th-cu-peek {
+  display: block;
+  max-width: 480px;
+  margin-top: 6px;
+  padding: 0;
+  border: 1px solid var(--c-line, var(--c-text-3));
+  border-radius: 6px;
+  overflow: hidden;
+  background: none;
+  cursor: zoom-out;
+}
+.th-cu-peek img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.th-cu-none {
+  display: block;
+  padding: 10px 14px;
+  color: var(--c-text-3);
+  font: var(--t-12) var(--font-ui);
+}
+
 /* R15: he signs in again in his browser (the TUI's key bar words) */
 .th-signin {
   display: flex;

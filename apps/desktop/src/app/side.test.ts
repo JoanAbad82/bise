@@ -1,7 +1,7 @@
 // The sidebar's signs and words, the frame's widths (designer's desktop-screens v6/v7, signed).
 import { describe, expect, it } from 'vitest';
 import type { Agent, ProjectRow } from '@/proto';
-import { crumbOf, folds, moreWords, panelAt, panelProject, projectSide, signOf, turnShort } from './side';
+import { computerDot, crumbOf, folds, moreWords, panelAt, panelProject, projectSide, signOf, turnShort } from './side';
 import { keyAction, type KeyLike } from './keys';
 import { newWords } from './Sidebar';
 
@@ -107,5 +107,15 @@ describe('R9/S3: an agent waiting on someone, in the sidebar (the TUI panel)', (
   it("another agent: ⋯ dim, 'waiting on <who>' on hover; him: ? in the accent", () => {
     expect(signOf(agent('perf', 'working', { waiting_on: { who: 'agent', name: 'main' } }), NOW)).toMatchObject({ g: '⋯', tone: 'dim', end: 'waiting', count: 0, title: 'waiting on bise · product page speed' });
     expect(signOf(agent('perf', 'idle', { waiting_on: { who: 'you' } }), NOW)).toMatchObject({ g: '?', tone: 'acc', count: 0, title: 'asks you · product page speed' });
+  });
+});
+
+describe('the computer-use mark beside an agent (S29/L19 W3)', () => {
+  const base = { agent: 'perf', key: 'h.perf', project: 'acme-1' } as const;
+  it("the core's mark: ink while it drives, accent when he took the wheel, dim stopped; its words on hover; none without a row", () => {
+    expect(computerDot({ ...base, kind: 'driving', mark: '↖', words: 'driving Chrome · amazon.fr' })).toEqual({ g: '↖', tone: 'ink', title: 'driving Chrome · amazon.fr' });
+    expect(computerDot({ ...base, kind: 'paused', mark: '?', words: 'you took the wheel · ⏎ give it back' })).toMatchObject({ g: '?', tone: 'acc' });
+    expect(computerDot({ ...base, kind: 'stopped', mark: '↖', words: 'stopped · write to it to go on' })).toMatchObject({ g: '↖', tone: 'dim' });
+    expect(computerDot(undefined)).toBeNull();
   });
 });

@@ -37,6 +37,7 @@ import { useNow } from '@/app/clock';
 import { SignInLine, useThreadSignIn } from './signin';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
 import { EntryRow, PendingRow, QueuedRow, TypingLine, type RowCtx } from './rows';
+import { ComputerLine, computerRowOf, computerState } from './ComputerLine';
 import { entryKey, pendingKey, posOfKey } from './entry';
 import { FindBar } from './FindBar';
 import { NoProject } from './NoProject';
@@ -328,6 +329,8 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
         ) : (
           <AgentHead project={project} a={me} more={more} note={voice !== 'off' ? 'voice mode' : undefined} starting={fresh} />
         )}
+        {/* S29/L19 W1: it drives his computer: one line under the head, from computer_live only */}
+        {!bise && <ComputerLine project={project} agent={agent} />}
         {tuning && me && !me.archived && (
           <Tune
             key={me.name}
@@ -822,6 +825,10 @@ export const ThreadComposer = memo(function ThreadComposer({
       // attached or dropped go with it (amb-core item H: the hub renders them
       // once, an image as a marker the model sees). Tab's queue: amb-web's
       const text = about === undefined ? out.text : aboutText(about, out.text);
+      // S29/L19 W2: stopped until he writes: his message gives the wheel back first (read at send,
+      // never subscribed: the rows moving must not re-render the composer)
+      const cu = computerRowOf(store.computerLive(), project, agent);
+      if (cu !== undefined && computerState(cu) === 'stopped') store.computer('hand_back', cu.key);
       store.send({ project, agent, text, mode: 'now', ...(out.files.length > 0 ? { files: [...out.files] } : {}) });
       onSent();
     },
@@ -831,6 +838,12 @@ export const ThreadComposer = memo(function ThreadComposer({
   // K2: ⏎ on an empty field does the TUI's act, if one waits (sign in again after expiry)
   const cards = useCards(project);
   const onEmptyEnter = useCallback(() => {
+    // S29/L19 W2: he took the wheel: ⏎ on the empty field gives it back ('you took the wheel · ⏎ give it back')
+    const cu = computerRowOf(store.computerLive(), project, agent);
+    if (cu !== undefined && computerState(cu) === 'paused') {
+      store.computer('hand_back', cu.key);
+      return;
+    }
     // the thread's last row, read at ⏎ (never subscribed: a new entry must not re-render the composer)
     const key = threadKey(project, agent);
     const lastPos = store.threadOrder(key).order.at(-1);

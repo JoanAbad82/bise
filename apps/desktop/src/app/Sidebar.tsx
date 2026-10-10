@@ -12,7 +12,7 @@
 import { Fragment, memo, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Dot, Menu, MenuItem, MenuSep, Pearl, SectionHead, Side } from '@/ds';
 import type { Agent, Feature, ProjectRow } from '@/proto';
-import { useAgents, useFeatures, useHubRefused, useProjects, useStore, type Store } from '@/store';
+import { useAgents, useComputerLive, useFeatures, useHubRefused, useProjects, useStore, type Store } from '@/store';
 import { RefusedLine } from './Refused';
 import { groupsOf } from '@/review/feature';
 import { archivedOf, liveOf } from '@/agents/model';
@@ -22,7 +22,7 @@ import { useNow } from './clock';
 import { Tip } from '@/setup';
 import { useTour } from '@/setup/useTour';
 import { Hint, hintUsed, useHint } from './hints';
-import { folds, moreWords, projectSide, signOf } from './side';
+import { computerDot, folds, moreWords, projectSide, signOf } from './side';
 import { useKeptScroll } from './keep';
 import { BisePearl } from './BisePearl';
 
@@ -515,6 +515,8 @@ function distanceShort(f: Feature): string {
 function AgentRow({ project, a, route, now, wake }: { project: string; a: Agent; route: Route; now: number; wake: number | undefined }) {
   const router = useRouter();
   const sign = signOf(a, now, wake);
+  // S29/L19 W3: it uses his computer (rows of another bise have no project: never matched)
+  const cu = computerDot(useComputerLive().find((r) => r.project === project && r.agent === a.name));
   return (
     <SRow
       kind="ag"
@@ -523,6 +525,11 @@ function AgentRow({ project, a, route, now, wake }: { project: string; a: Agent;
       name={
         <>
           {a.name}
+          {cu !== null && (
+            <span className={`app-cu ${cu.tone}`} title={cu.title} data-testid={`app.sidebar.agent.${a.name}.computer`}>
+              {cu.g}
+            </span>
+          )}
           {/* its context gauge, the TUI panel's short form as the hub sends it (amb-feed c317fc32) */}
           {/* only when it says something: an empty context ('0%') takes no place (designer D12) */}
           {a.usage != null && gaugeSays(a.usage.short) && (
