@@ -115,9 +115,13 @@
 .lg-e.at > .lg-h {
   background: var(--c-hover);
 }
-.lg-e.hit > .lg-h .head {
-  text-decoration: underline var(--c-accent-line) 2px;
-  text-underline-offset: 3px;
+/* find: only the matched words, in the selection's tint; the current match stronger
+   (LogScreen's CSS highlights 'lg-find' / 'lg-find-at') */
+::highlight(lg-find) {
+  background-color: color-mix(in srgb, Highlight 45%, transparent);
+}
+::highlight(lg-find-at) {
+  background-color: Highlight;
 }
 
 .lg-h {
@@ -144,6 +148,18 @@
 .lg-h .head {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.lg-h .counts {
+  margin-left: 2ch;
+}
+.lg-h .counts > * + * {
+  margin-left: 1ch;
+}
+.lg-h .counts .ok {
+  color: var(--c-ok);
+}
+.lg-h .counts .er {
+  color: var(--c-err);
 }
 .lg-h .size {
   color: var(--c-text-3);
@@ -174,6 +190,20 @@
 .lg-prose > :last-child {
   margin-bottom: 0;
 }
+/* no colour inside prose (designer m_17531): bold is ink 600, inline code mono in ink on the
+   soft box; pink stays for what waits on him */
+.lg-prose .b-md strong,
+.lg-prose .b-md b {
+  color: var(--c-text);
+  font-weight: 600;
+}
+.lg-prose .b-md :not(pre) > code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--c-sunken);
+  color: var(--c-text);
+  font: 400 0.88em / 1 var(--font-mono);
+}
 .lg-prose.thinking {
   color: var(--c-text-2);
   font-style: italic;
@@ -188,6 +218,29 @@
   font: 400 var(--t-12) / 1.55 var(--font-mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* an edit: the thread's − / + lines (ds .b-dl tints), sign then text, no numbers, no file head */
+.lg-diff {
+  margin: 2px 0;
+  max-width: 100ch;
+  box-shadow: none;
+  background: var(--c-sunken);
+  border-radius: var(--r-2);
+  padding: 6px 0;
+}
+.lg-diff .b-dl {
+  grid-template-columns: 2.4ch minmax(0, 1fr);
+  padding-right: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.lg-diff .b-dl i {
+  padding-right: 0;
+  text-align: center;
+}
+.lg-fold.args {
+  margin-left: 0;
 }
 
 .lg-fold {

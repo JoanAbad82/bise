@@ -282,6 +282,26 @@ test("thread/log-screen: /log opens the raw session (rows, rules, folds), pages 
     await expect(page.getByTestId(`${await id(312)}.body`)).toContainText(
       "all 34 query tests pass now",
     );
+    // designer m_17531: an edit as the thread shows it, '+1 −1' and − / + lines, args one fold below
+    const edit = await id(308);
+    await expect(page.getByTestId(`${edit}.counts`)).toHaveText("+1−1");
+    const dl = page.getByTestId(`${edit}.diff`).locator(".b-dl");
+    await expect(dl).toHaveText([
+      "−sort_by(|a, b| a.cmp(b))",
+      "+sort_unstable()",
+    ]);
+    await expect(dl.nth(0)).toHaveClass(/rm/);
+    await expect(dl.nth(1)).toHaveClass(/ad/);
+    await expect(page.getByTestId(`${edit}.args`)).toHaveText("▸ args");
+    // no colour inside prose: bold and inline code in the prose's ink
+    const ink = (sel: string) =>
+      page
+        .locator(`[data-seq="312"] .lg-prose ${sel}`)
+        .first()
+        .evaluate((el) => getComputedStyle(el).color);
+    const prose312 = await ink("p");
+    expect(await ink("strong"), "bold in ink").toBe(prose312);
+    expect(await ink("code"), "inline code in ink").toBe(prose312);
     // opens at the end: the newest entry in view
     const list = page.getByTestId("log.list");
     const atEnd = () =>
@@ -317,6 +337,9 @@ test("thread/log-screen: /log opens the raw session (rows, rules, folds), pages 
       page.getByTestId(`${await id(306)}.fold`),
       "space folds it again",
     ).toBeVisible();
+    // designer m_17531 (5): a long entry closed, '▸ 34 lines · 1.2 KB'
+    await row(306).scrollIntoViewIfNeeded();
+    await shot("5-log-long-closed.png");
 
     // find: ⌘F, the count at the key line's right, n moves on
     await page.keyboard.press("Meta+f");
@@ -333,6 +356,21 @@ test("thread/log-screen: /log opens the raw session (rows, rules, folds), pages 
     await expect(count).toHaveText(`1 of ${String(total)}`);
     await page.keyboard.press("Enter");
     await expect(count).toHaveText(`2 of ${String(total)}`);
+    // only the matched words are marked (CSS highlights), the current match's on its own
+    const marks = await page.evaluate(() => {
+      const reg = (CSS as unknown as { highlights: Map<string, Set<Range>> })
+        .highlights;
+      const words = (name: string): string[] =>
+        [...(reg.get(name) ?? new Set<Range>())].map((r) =>
+          r.toString().toLowerCase(),
+        );
+      return { all: words("lg-find"), at: words("lg-find-at") };
+    });
+    expect(marks.at.length, "the current match is marked").toBeGreaterThan(0);
+    expect(
+      [...marks.all, ...marks.at].every((w) => w === "query"),
+      `marks hold only the word: ${JSON.stringify(marks)}`,
+    ).toBe(true);
     await shot("3-log-find.png");
     await page.keyboard.press("Escape");
     await expect(count, "esc in the field clears the find").toHaveCount(0);
@@ -372,13 +410,25 @@ test("thread/log-screen: /log opens the raw session (rows, rules, folds), pages 
     await page.evaluate(() => {
       document.documentElement.setAttribute("data-theme", "dark");
     });
-    await page.getByTestId(`${await id(306)}.fold`).click();
-    await row(306).scrollIntoViewIfNeeded();
-    await shot("5-log-dark-result.png");
+    await log.focus();
+    await page.keyboard.press("Shift+G");
+    await expect.poll(atEnd, { timeout: 3000 }).toBeLessThan(4);
+    await shot("6-log-dark-end.png");
+    // what he types right after ⌘F all goes in the field, none to the composer
+    const focusOf = () =>
+      page.evaluate(() => {
+        const a = document.activeElement;
+        return `${a?.tagName ?? "none"}.${a?.getAttribute("data-testid") ?? ""}`;
+      });
+    const before = await focusOf();
     await page.keyboard.press("Meta+f");
+    const after = await focusOf();
+    await expect(find, `focus ${before} -> ${after}`).toHaveCount(1, {
+      timeout: 1000,
+    });
     await page.keyboard.type("slice");
+    await expect(find).toHaveValue("slice");
     await expect(count).toHaveText(/^1 of \d+$/);
-    await shot("6-log-dark-find.png");
     await page.keyboard.press("Escape");
     await page.evaluate(() => {
       document.documentElement.setAttribute("data-theme", "light");

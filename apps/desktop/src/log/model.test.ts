@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LogItem } from "@/proto";
 import {
   codeText,
+  editDiff,
   findCount,
   findRows,
   foldLabel,
@@ -9,6 +10,7 @@ import {
   kindOf,
   kindsIn,
   labelOf,
+  matchesIn,
   ruleKind,
   shortBytes,
   shown,
@@ -22,6 +24,62 @@ const item = (
   role: LogItem["role"],
   over: Partial<LogItem> = {},
 ): LogItem => ({ seq, role, head: `row ${String(seq)}`, ...over });
+
+describe("log model: edits and find marks (designer m_17531)", () => {
+  it("draws an edit's args as − / + lines with its counts", () => {
+    const edit = item(1, "call", {
+      tool: "edit",
+      body: {
+        kind: "code",
+        lang: "json",
+        text: JSON.stringify({
+          file_path: "src/a.rs",
+          old_string: "a\u000Ab",
+          new_string: "c",
+        }),
+      },
+    });
+    expect(editDiff(edit)).toEqual({
+      path: "src/a.rs",
+      add: 1,
+      rm: 2,
+      lines: [
+        { sign: "-", text: "a" },
+        { sign: "-", text: "b" },
+        { sign: "+", text: "c" },
+      ],
+    });
+    const write = item(2, "call", {
+      tool: "write_file",
+      body: {
+        kind: "code",
+        text: JSON.stringify({ path: "n.md", content: "x\u000Ay\u000A" }),
+      },
+    });
+    expect(editDiff(write)?.lines.map((l) => l.sign)).toEqual(["+", "+"]);
+    // not an edit, cut, or not JSON: as written
+    expect(editDiff(item(3, "call", { tool: "bash" }))).toBeNull();
+    expect(
+      editDiff(
+        item(4, "call", {
+          tool: "edit",
+          body: { kind: "code", text: '{"path":"a"', cut: true },
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      editDiff(
+        item(5, "call", { tool: "edit", body: { kind: "code", text: "nope" } }),
+      ),
+    ).toBeNull();
+  });
+
+  it("finds a needle's places, case-insensitive, none for blank", () => {
+    expect(matchesIn("Query the query", "query")).toEqual([0, 10]);
+    expect(matchesIn("aaaa", "aa")).toEqual([0, 2]);
+    expect(matchesIn("abc", "  ")).toEqual([]);
+  });
+});
 
 describe("log model", () => {
   it("labels rows with the TUI's role column words", () => {

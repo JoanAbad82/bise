@@ -15,7 +15,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent,
 } from "react";
 import { flushSync } from "react-dom";
 import type { LogItem } from "@/proto";
@@ -27,6 +26,7 @@ import { Markdown } from "@/thread/Markdown";
 import { Code } from "@/thread/Code";
 import {
   codeText,
+  editDiff,
   findCount,
   findRows,
   foldLabel,
@@ -34,11 +34,13 @@ import {
   kindOf,
   kindsIn,
   labelOf,
+  matchesIn,
   prose,
   ruleKind,
   shown,
   sizeOf,
   timeOf,
+  type EditDiff,
   type Kind,
 } from "./model";
 import "./log.css";
@@ -187,6 +189,29 @@ export function LogScreen({
     [visible, needle],
   );
   const kinds = useMemo(() => kindsIn(rows.map((r) => r.it)), [rows]);
+
+  // the find marks only the matched words, in the selection's tint (the current match's row
+  // stronger), through the CSS highlight API: the rows' DOM stays as drawn (designer m_17531)
+  useLayoutEffect(() => {
+    const reg = typeof CSS === "undefined" ? undefined : CSS.highlights;
+    const el = list.current;
+    if (reg === undefined || el === null) return;
+    const all = new Highlight();
+    const cur = new Highlight();
+    if (needle.trim() !== "") {
+      const current = hits[at];
+      for (const row of el.querySelectorAll<HTMLElement>(".lg-e.hit")) {
+        const mine = row.dataset.key === String(current) ? cur : all;
+        for (const r of rangesIn(row, needle)) mine.add(r);
+      }
+    }
+    reg.set("lg-find", all);
+    reg.set("lg-find-at", cur);
+    return () => {
+      reg.delete("lg-find");
+      reg.delete("lg-find-at");
+    };
+  }, [needle, hits, at, visible, open]);
   const isOpen = (r: Row): boolean => !folds(r.it) || open.has(r.key);
 
   const reveal = (key: number, block: ScrollLogicalPosition = "nearest") => {
@@ -319,16 +344,27 @@ export function LogScreen({
       reload();
     }
   };
+  // the screen's keys on window in the capture phase, as the thread's: they run before
+  // type-anywhere (composer/grab.ts, on document), so f g G j k n r stay /log's and never send
+  // the focus to the composer. Only while the focus is in the screen.
+  const keyRef = useRef(onKey);
+  useLayoutEffect(() => {
+    keyRef.current = onKey;
+  });
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const el = root.current;
+      if (el !== null && el.contains(document.activeElement)) keyRef.current(e);
+    };
+    window.addEventListener("keydown", h, true);
+    return () => {
+      window.removeEventListener("keydown", h, true);
+    };
+  }, []);
 
   const title = `${agent} · session log`;
   return (
-    <section
-      className="lg"
-      data-testid="log"
-      tabIndex={-1}
-      ref={root}
-      onKeyDown={onKey}
-    >
+    <section className="lg" data-testid="log" tabIndex={-1} ref={root}>
       <Head
         title={title}
         sub={<span data-testid="log.sub">read-only · redacted</span>}
@@ -469,6 +505,40 @@ export function LogScreen({
   );
 }
 
+/** A needle's places in a row's words as DOM ranges (a match may span the code's colour spans). */
+function rangesIn(row: HTMLElement, needle: string): Range[] {
+  const nodes: Text[] = [];
+  const walk = document.createTreeWalker(row, NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n !== null; n = walk.nextNode())
+    nodes.push(n as Text);
+  const starts: number[] = [];
+  let text = "";
+  for (const n of nodes) {
+    starts.push(text.length);
+    text += n.data;
+  }
+  // the text node and offset at a place in the joined words
+  const at = (pos: number, end: boolean): [Text, number] | null => {
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const s = starts[i] ?? 0;
+      const node = nodes[i];
+      if (node !== undefined && (end ? pos > s : pos >= s))
+        return [node, pos - s];
+    }
+    return null;
+  };
+  const len = needle.trim().length;
+  return matchesIn(text, needle).flatMap((m) => {
+    const a = at(m, false);
+    const b = at(m + len, true);
+    if (a === null || b === null) return [];
+    const r = document.createRange();
+    r.setStart(a[0], a[1]);
+    r.setEnd(b[0], b[1]);
+    return [r];
+  });
+}
+
 /** ⏎ in the field: the first press goes to the current match, the next ones move on. */
 const cursorIsHit = (
   cursor: number | null,
@@ -525,6 +595,7 @@ function Entry({
   const { it, key } = row;
   const kind = kindOf(it);
   const size = sizeOf(it);
+  const diff = editDiff(it);
   const id = `log.row.${String(key)}`;
   return (
     <div
@@ -548,6 +619,12 @@ function Entry({
         </span>
         <span className="head" data-testid={`${id}.head`}>
           {it.head}
+          {diff !== null && (
+            <span className="counts" data-testid={`${id}.counts`}>
+              {diff.add > 0 && <span className="ok">+{diff.add}</span>}
+              {diff.rm > 0 && <span className="er">−{diff.rm}</span>}
+            </span>
+          )}
         </span>
         {size !== "" && <span className="size">{size}</span>}
       </div>
@@ -557,7 +634,11 @@ function Entry({
             {it.meta !== undefined && it.meta !== "" && (
               <div className="meta">{it.meta}</div>
             )}
-            <Body it={it} />
+            {diff === null ? (
+              <Body it={it} />
+            ) : (
+              <Edit it={it} diff={diff} id={id} />
+            )}
             {it.body.cut === true && <div className="meta">cut at 4 KB</div>}
           </div>
         ) : (
@@ -574,6 +655,37 @@ function Entry({
           </button>
         ))}
     </div>
+  );
+}
+
+/** An edit as the thread shows it: − / + lines in the thread's tints, the raw args one fold below. */
+function Edit({ it, diff, id }: { it: LogItem; diff: EditDiff; id: string }) {
+  const [args, setArgs] = useState(false);
+  return (
+    <>
+      <div className="b-diff lg-diff" data-testid={`${id}.diff`}>
+        {diff.lines.map((l, i) => (
+          <div key={i} className={l.sign === "+" ? "b-dl ad" : "b-dl rm"}>
+            <i>{l.sign === "+" ? "+" : "−"}</i>
+            {l.text}
+          </div>
+        ))}
+      </div>
+      {args ? (
+        <Body it={it} />
+      ) : (
+        <button
+          type="button"
+          className="lg-fold args"
+          data-testid={`${id}.args`}
+          onClick={() => {
+            setArgs(true);
+          }}
+        >
+          ▸ args
+        </button>
+      )}
+    </>
   );
 }
 

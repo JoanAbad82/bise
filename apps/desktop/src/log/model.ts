@@ -172,6 +172,66 @@ export function codeText(it: LogItem): { text: string; lang: string } {
   return { text: b.text, lang: b.lang ?? "text" };
 }
 
+/** An edit as the thread shows it (designer m_17531): its file, '+1 −1', and − / + lines. */
+export interface EditDiff {
+  path: string;
+  add: number;
+  rm: number;
+  lines: { sign: "+" | "-"; text: string }[];
+}
+
+const str = (v: unknown): string | undefined =>
+  typeof v === "string" ? v : undefined;
+const NL = "\u000A";
+/** A text's lines, a last newline ending the last one (not a blank line of its own). */
+const lines = (t: string): string[] =>
+  t === "" ? [] : (t.endsWith(NL) ? t.slice(0, -1) : t).split(NL);
+
+/** An edit or write call's args as a diff (the old lines out, the new ones in); null for the rest. */
+export function editDiff(it: LogItem): EditDiff | null {
+  if (it.role !== "call" || it.body === undefined || it.body.cut === true)
+    return null;
+  if (it.tool !== "edit" && it.tool !== "write_file") return null;
+  let args: Record<string, unknown>;
+  try {
+    const v: unknown = JSON.parse(it.body.text);
+    if (typeof v !== "object" || v === null || Array.isArray(v)) return null;
+    args = v as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const path = str(args.path) ?? str(args.file_path);
+  if (path === undefined) return null;
+  const old = it.tool === "edit" ? (str(args.old) ?? str(args.old_string)) : "";
+  const neu =
+    it.tool === "edit"
+      ? (str(args.new) ?? str(args.new_string))
+      : str(args.content);
+  if (old === undefined || neu === undefined) return null;
+  const rm = lines(old);
+  const add = lines(neu);
+  return {
+    path,
+    add: add.length,
+    rm: rm.length,
+    lines: [
+      ...rm.map((text) => ({ sign: "-" as const, text })),
+      ...add.map((text) => ({ sign: "+" as const, text })),
+    ],
+  };
+}
+
+/** Where a needle sits in a text, case-insensitive: each match's start (the find's marks). */
+export function matchesIn(text: string, needle: string): number[] {
+  const n = needle.trim().toLowerCase();
+  if (n === "") return [];
+  const t = text.toLowerCase();
+  const out: number[] = [];
+  for (let i = t.indexOf(n); i !== -1; i = t.indexOf(n, i + n.length))
+    out.push(i);
+  return out;
+}
+
 /** The rows so far, oldest first: an older page goes before them (it holds seqs below theirs). */
 export function withOlder(
   rows: readonly LogItem[],
