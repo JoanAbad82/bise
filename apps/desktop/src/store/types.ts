@@ -57,6 +57,7 @@ export const TAGS = {
   hub_refused: true,
   index: true,
   setup_first: true,
+  keychain: true,
   computer_live: true,
   computer_peek: true,
   refused: true,

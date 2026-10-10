@@ -517,6 +517,10 @@ export class Store {
         // R8: his /model needs that provider's setup first (the core holds the line)
         this.put('setup_first', ev);
         return;
+      case 'keychain':
+        // N1: where his keys and sign-ins are kept, and the last /keychain move's lines
+        this.put('keychain', ev);
+        return;
       case 'hub_refused':
         // a project's hub refused this core: its words until he retries
         this.put(`hub_refused:${ev.project}`, ev.error);
@@ -730,6 +734,10 @@ export class Store {
   /** R8: the last /model the core holds until its provider works (amb-home's setup opens on it), or null. */
   setupFirst(): EvOf<'setup_first'> | null {
     return this.slice<EvOf<'setup_first'> | null>('setup_first', null);
+  }
+  /** N1: where his keys and sign-ins are (the core's keychain event); none yet: null */
+  keychain(): EvOf<'keychain'> | null {
+    return this.slice<EvOf<'keychain'> | null>('keychain', null);
   }
   private askFiles(project: string, q: string, limit?: number): Promise<FilesAnswer | null> {
     this.rid += 1;
