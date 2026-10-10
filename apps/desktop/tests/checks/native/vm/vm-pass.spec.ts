@@ -128,7 +128,11 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
       row({ row: `keys: ${what}`, pass: has(f.text, re), saw: f.text.map((t) => t.text).join(' | ').slice(0, 240), frame: f.file });
     }
     await vm.vnc.keys('Escape');
-    await vm.vnc.click(120 * scale, 140 * scale); // the sidebar's bise row: a thread, where ⌘F finds
+    // the sidebar's bise row, where Vision reads it (the rows move with the world: a fixed point hit
+    // 'artifacts' in run 2), a thread where ⌘F finds
+    const side = await frame('sidebar');
+    const biseRow = side.text.find((t) => t.text.trim() === 'bise' && t.x < 300 * scale && t.y > 80 * scale);
+    await vm.vnc.click(biseRow ? biseRow.x + biseRow.w / 2 : 120 * scale, biseRow ? biseRow.y + biseRow.h / 2 : 118 * scale);
     await sleep(800);
     await vm.vnc.keys('Meta+f');
     await sleep(1200);
@@ -201,6 +205,10 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
       const fq = await front();
       await qa('fn', 'key', '49');
       await sleep(1200);
+      // the spotlight keeps the last words typed in it ('zebra seven'), which hide the card: clear them
+      await vm.vnc.keys('Meta+a');
+      await vm.vnc.keys('Backspace');
+      await sleep(800);
       const card = await frame('full-screen-card-in-spotlight');
       const fc = await front();
       row({
@@ -269,7 +277,7 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
       await sleep(2000);
       await vm.vnc.keys('Control+Meta+f');
       await sleep(2500);
-      await vm.vnc.keys('Meta+space');
+      await vm.vnc.keys('Meta+Space');
       await sleep(1500);
       const f = await frame(`spotlight-over-${bg}`);
       const sw = (JSON.parse((await qa('windows', 'Spotlight')).trim() || '[]') as Win[]).filter((w) => w.onscreen && w.h > 30).sort((x, y) => y.w * y.h - x.w * x.h)[0];
