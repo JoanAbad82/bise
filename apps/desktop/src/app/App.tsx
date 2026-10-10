@@ -16,6 +16,7 @@ import { useMainRoutes, useMenuRouting } from './menu';
 import { ComposerLab, PearlLab, SpotlightLab } from '@/composer/Lab';
 import { ThreadScreen } from '@/thread/ThreadScreen';
 import { useProjects, useStore } from '@/store';
+import { useFnVoice } from '@/voicemode';
 import { ConfirmBar, InboxScreen } from '@/inbox';
 import { SettingsScreen } from '@/settings';
 import { useSetupFirstOpens } from '@/settings/setup-first';
@@ -171,6 +172,8 @@ function Shell() {
   const route = useRoute();
   useMenuRouting(router);
   useMainRoutes(router);
+  // fn fn with this window in front: voice mode with the thread in view, else bise's own (amb-web's src/voicemode/fn.ts)
+  useFnVoice(router, useStore());
   // ⌘I / a notification's card: the inbox block opens it in place once the rows list it
   useInboxAsks();
   // View > Terminal (⌃`): the panel under the screen (the key's own echo is dropped)

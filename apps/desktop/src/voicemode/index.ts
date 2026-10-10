@@ -6,6 +6,7 @@ export { ThreadVoice, useVoiceHere, useVoiceLit, VoiceTypePearl, type VoiceHere,
 export { VoicePane, type VoicePaneProps } from './VoicePane';
 export { DOUBLE_CTRL_R_MS, TYPING_END, saidFor, typingLabelOf } from './model';
 export { useSaidMs } from './said';
+export { fnVoiceOf, useFnVoice, type FnVoice } from './fn';
 
 /** The composer's key line while he types in voice mode (the page's typing tab). */
 export const VOICE_TYPING_KEYS = '⏎ send   tab back to voice   esc leave';
