@@ -117,7 +117,7 @@ mod tests {
 
     #[test]
     fn same_rows_as_the_final_reply_only_dimmer() {
-        let events = vec![Ev::You("hi".into(), crate::wire::Mark::Read, false)];
+        let events = vec![Ev::You("hi".into(), crate::wire::Mark::Read, false, None)];
         let text = "first line
 
 - a point
@@ -144,7 +144,7 @@ fn main() {", false, 0, 60);
     // dim, at the same place (the feed adds the reply's gap before it)
     #[test]
     fn a_kept_answer_stays_as_it_was_live() {
-        let events = vec![Ev::You("hi".into(), crate::wire::Mark::Read, false)];
+        let events = vec![Ev::You("hi".into(), crate::wire::Mark::Read, false, None)];
         let live = rows(&events, "the plan, in **three** steps", false, 0, 60);
         let mut all = events.clone();
         all.push(Ev::Kept("the plan, in **three** steps".into()));
