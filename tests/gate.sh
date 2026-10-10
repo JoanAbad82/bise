@@ -4,7 +4,11 @@
 #   gate.sh [quick]   what the tree's changes touch, ~5-10 s warm: clippy -D
 #                     warnings (next to the tests, in $target/clippy), the
 #                     tests of the changed crates and of the crates using them; if a .bend file of core/ hub/ vendor/
-#                     or LAWS/PROOF changed: PROOF.bend (4 shards in parallel).
+#                     or LAWS/PROOF changed: PROOF.bend (4 shards in parallel);
+#                     if rust/proto or apps/desktop changed: the desktop's
+#                     `pnpm check` ('skipped' without pnpm or
+#                     apps/desktop/node_modules; full runs it always and
+#                     is red without them).
 #                     The tests run bins.sh's cached sb-core of the tree's
 #                     hub/ vendor/ itself (SB_CORE_BIN = the cache file, one
 #                     compile per source hash for every worktree and the
@@ -336,6 +340,28 @@ sbcore_gone() {  # <file>: say so and true when the sb-core that was built is go
   echo "FAIL sb-core vanished after it was built: an antivirus (EDR) may have removed it ($1)"
 }
 
+# bise desktop's own checks (architect's merge review B3): typecheck, eslint,
+# vitest and its build (`pnpm check`, no Playwright), so a proto change
+# that breaks apps/desktop is red here. A tree without apps/desktop: nothing;
+# without pnpm or node_modules: one 'skipped' line, never silence.
+desktop_check() {
+  [ -d "$root/apps/desktop" ] || return 0
+  # strict (full, the merge/land gate): a missing piece is red, never a skip
+  local miss=""
+  if ! command -v pnpm >/dev/null 2>&1; then miss="no pnpm on PATH"
+  elif [ ! -d "$root/apps/desktop/node_modules" ]; then miss="no node_modules; run pnpm -C apps/desktop install"; fi
+  if [ -n "$miss" ]; then
+    if [ "${1:-}" = strict ]; then echo "FAIL desktop_check: $miss"; return 1; fi
+    echo "skipped desktop_check: $miss"; return 0
+  fi
+  local s=$SECONDS log="$run/desktop_check.log"
+  if (cd "$root/apps/desktop" && pnpm -s check) >"$log" 2>&1; then echo "ok   desktop_check ($((SECONDS - s))s)"; return 0; fi
+  echo "FAIL desktop_check"
+  grep -E "error|Error|FAIL|✗|×" "$log" | head -30
+  cp "$log" "$gdir/sb-gate-desktop_check.log"; echo "log: $gdir/sb-gate-desktop_check.log"
+  return 1
+}
+
 if [ "$mode" = full ]; then
   s=$SECONDS
   export FUZZ_RUNS="${FUZZ_RUNS:-2000}"
@@ -344,6 +370,8 @@ if [ "$mode" = full ]; then
   # apps/desktop/src/proto matches bise-proto every time (a generated file
   # changed by a merge or a rebase can't slip through; quick runs it on a change)
   if [ $rc = 0 ]; then (cd rust && cargo test --offline -q -p bise-proto --features ts --test ts) || { echo "FAIL proto_ts"; rc=1; }; fi
+  # and the desktop itself builds and passes its checks on those types (B3)
+  if [ $rc = 0 ]; then desktop_check strict || rc=1; fi
   # every binary built runs on the macOS target (BISE-164): the Bend ones,
   # bise, and the engine when this tree has one
   bins=(./repl-live ./repl-scripted ./sb-core "${CARGO_TARGET_DIR:-rust/target}/debug/bise")
@@ -441,8 +469,9 @@ for f in $changed; do
     rust/harness/*) add bend-harness ;;
     rust/session/*) add bise-session; add switchboard; add bend-harness ;;
     bend/hub/*|bend/vendor/*) add switchboard ;;
-    rust/proto/*) add bise-proto; add bend-tui; add switchboard; add bend-harness; proto_ts=1 ;;
-    apps/desktop/src/proto/*) proto_ts=1 ;;
+    rust/proto/*) add bise-proto; add bend-tui; add switchboard; add bend-harness; proto_ts=1; desktop=1 ;;
+    apps/desktop/src/proto/*) proto_ts=1; desktop=1 ;;
+    apps/desktop/*) desktop=1 ;;
   esac
 done
 step() {  # <name> <cmd...>: one line when green, the failures and the log when red
@@ -478,6 +507,8 @@ fi
 # bise desktop's TS types (apps/desktop/src/proto) are bise-proto's, generated:
 # a stale or hand-edited file is red (BISE_PROTO_BLESS=1 on that test rewrites them)
 [ "${proto_ts:-0}" = 1 ] && step proto_ts bash -c "cd rust && cargo test --offline -q -p bise-proto --features ts --test ts"
+# then the desktop's own checks on them, when rust/proto or apps/desktop moved (B3)
+if [ "${desktop:-0}" = 1 ]; then desktop_check || exit 1; fi
 wait "$clippy_pid"
 [ "$(cat "$out/clippy.rc")" = 0 ] || fail clippy "$out/clippy.log"
 cat "$out/clippy.res"

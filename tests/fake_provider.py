@@ -393,8 +393,6 @@ def reply_for(conv, seen=0):
         # "think": the script's first step starts with that reasoning (the window's thinking row)
         if sc.get("think") and calls_done == 0:
             turn["reasoning"] = sc["think"]
-        if isinstance(sc.get("stream"), dict):
-            turn["stream"] = sc["stream"]
     else:
         marks = MARK.findall(user) or INNER.findall(user)
     if calls_done < len(marks):
