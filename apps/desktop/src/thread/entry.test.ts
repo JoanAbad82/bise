@@ -221,3 +221,17 @@ describe('briefOf (the hub brief, the TUI is_brief)', () => {
     expect(briefOf('# Tasks')).toBeNull();
   });
 });
+
+describe("his answer to main's own card, the hub's raw line (designer m_15195)", () => {
+  it('reads the card, the question without its options, and his words', async () => {
+    const { answeredCardOf } = await import('./entry');
+    expect(answeredCardOf('the user answered card #1 ("merge checkout into main? (2 files, tests pass) 1. merge 2. not yet"): "[Image #1] this one"')).toEqual({
+      card: 1,
+      question: 'merge checkout into main? (2 files, tests pass)',
+      words: '[Image #1] this one',
+    });
+    expect(answeredCardOf('the user answered card #12 ("which bench?"): "the cold one"')).toEqual({ card: 12, question: 'which bench?', words: 'the cold one' });
+    expect(answeredCardOf('the user answered a question')).toBeNull();
+    expect(answeredCardOf('done: the build is green')).toBeNull();
+  });
+});

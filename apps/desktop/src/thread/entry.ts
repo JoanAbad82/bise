@@ -356,6 +356,22 @@ export function handoffOf(text: string): { agent: string; brief: string } | null
   return { agent: m[1] ?? '', brief: (m[2] ?? '').split('\n')[0]?.trim() ?? '' };
 }
 
+/**
+ * The hub's raw line when he answered main's own card (sb-core's notify_main, until amb-feed folds it
+ * to an approval entry): 'the user answered card #1 ("merge checkout into main? (2 files, tests
+ * pass) 1. merge 2. not yet"): "[Image #1] this one"'. Its card, the question without its numbered
+ * options, and his words; none for any other text. Designer's must-fix (m_15195): never the raw
+ * line or the old product name. Pure.
+ */
+export function answeredCardOf(text: string): { card: number; question: string; words: string } | null {
+  const m = /^the user answered card #(\d+) \("([\s\S]*)"\):\s*"([\s\S]*)"\s*$/.exec(text.trim());
+  if (m === null) return null;
+  const q = (m[2] ?? '').replace(/\s+/gu, ' ').trim();
+  // the card's options ride after its question: ' 1. merge 2. not yet'
+  const question = q.replace(/\s+1\.\s[\s\S]*$/u, '').trim();
+  return { card: Number(m[1]), question, words: (m[3] ?? '').trim() };
+}
+
 /** The hub's brief, the first message of a task's thread ('# Task `gift-ui`', then 'Objective: …'; the TUI's is_brief): its name, objective and body without the heading; none for any other text. Pure. */
 export function briefOf(text: string): { name: string; objective: string; body: string } | null {
   const m = /^# Task `([^`]+)`[^\n]*\n?/.exec(text);

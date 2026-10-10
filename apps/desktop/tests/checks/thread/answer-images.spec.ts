@@ -44,6 +44,8 @@ const world = () => [
       { pos: 1, at_ms: NOW - 5 * MIN, kind: 'agent', text: 'gift-ui asks: show the balance on the cart page, or only at checkout?' },
       { pos: 2, at_ms: NOW - 4 * MIN, kind: 'approval', text: 'you answered gift-ui', approval: { ok: true, text: 'you answered gift-ui', note: 'the balance on the cart page', images: [{ name: SHA, path: PNG }] } },
       { pos: 3, at_ms: NOW - 3 * MIN, kind: 'answered', text: 'answered gift-ui for you', answered: { agent: 'gift-ui', question: 'which colour for the badge?', answer: 'the green one', why: 'he showed it', images: [{ name: SHA, path: PNG }] } },
+      // his answer to main's OWN card, as the hub still sends it: a raw line from 'switchboard' (designer m_15195)
+      { pos: 4, at_ms: NOW - 2 * MIN, kind: 'from_agent', from: 'switchboard', text: 'the user answered card #1 ("merge checkout into main? (2 files, tests pass) 1. merge 2. not yet"): "[Image #1] this one"' },
     ],
     before: null,
     more: false,
@@ -70,6 +72,13 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
       expect(text, `${id}: never his path`).not.toContain(PNG);
     }
     await expect(page.getByTestId('thread.answered.3.image.1'), "bise's answer for him: the same chip").toHaveText('[Image #1]');
+    // main's own card answered: the '✓ you answered' row with the chip, never the hub's raw line
+    const card = page.getByTestId('thread.cardanswer.4');
+    await expect(card).toHaveText('✓you answered: merge checkout into main? (2 files, tests pass) · [Image #1] this one');
+    await expect(page.getByTestId('thread.cardanswer.4.image.1')).toHaveText('[Image #1]');
+    const all = await page.getByTestId('thread.list').innerText();
+    expect(all, 'never the raw line').not.toContain('the user answered card');
+    expect(all, 'never the old product name').not.toContain('switchboard');
     // never the store's file name; every chip inside the thread's column
     for (const id of ['thread.approval.2', 'thread.answered.3']) {
       expect(await page.getByTestId(id).innerText(), `${id}: never the store's file name`).not.toContain(SHA.slice(0, 8));

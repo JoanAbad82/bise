@@ -19,7 +19,8 @@
 
 /* the diff on its way: its words, dim, never a bare bar (designer m_15244) */
 .rv-wait {
-  margin: 8px 0;
+  /* the same left edge as the head's title above it (designer's pixel nit on 5f70331d) */
+  margin: 8px 0 8px 6px;
   color: var(--c-text-3);
 }
 

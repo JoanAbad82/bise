@@ -11,7 +11,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Answer, Markdown } from './Markdown';
-import { THOUGHT_MS, briefOf, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf, type ToolLine } from './entry';
+import { THOUGHT_MS, answeredCardOf, briefOf, chipOf, clock, dayLabel, groupHead, sameDay, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf, type ToolLine } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -77,6 +77,10 @@ function EntryBody({ e, ctx, head, live, still }: { e: Entry; ctx: RowCtx; head:
   // the hub's brief opens a task's thread: one quiet row, the brief folded under it (designer; the TUI's is_brief)
   const brief = e.kind === 'you' || e.kind === 'from_agent' || e.kind === 'agent' ? briefOf(e.text) : null;
   if (brief !== null) return <BriefRow pos={e.pos} name={brief.name} objective={brief.objective} body={brief.body} ctx={ctx} />;
+  // his answer to main's own card, as the hub still sends it (a raw line from 'switchboard'):
+  // the '✓ you answered' row, never the raw line (designer m_15195, ambient-lead m_15382)
+  const answeredCard = e.kind === 'from_agent' || e.kind === 'agent' ? answeredCardOf(e.text) : null;
+  if (answeredCard !== null) return <CardAnsweredRow pos={e.pos} a={answeredCard} />;
   switch (e.kind) {
     case 'tools':
       return <ToolsRow e={e} ctx={ctx} />;
@@ -322,6 +326,30 @@ export function imageLabel(i: number): string {
 /** A local file's URL for an img (the window's CSP allows file:). Pure. */
 export function fileUrl(path: string): string {
   return `file://${path.split('/').map(encodeURIComponent).join('/')}`;
+}
+
+/** His answer to main's own card: '✓ you answered: <question> · <words>', each '[Image #n]' the window's chip. */
+function CardAnsweredRow({ pos, a }: { pos: number; a: { card: number; question: string; words: string } }) {
+  const split = a.words.split(/(\[Image #\d+\])/u).filter((p) => p !== '');
+  // each image's order in his answer (the chip's '[Image #n]'), 0 for words
+  const parts = split.map((p, i) => ({ p, img: /^\[Image #\d+\]$/u.test(p) ? split.slice(0, i + 1).filter((x) => /^\[Image #\d+\]$/u.test(x)).length : 0 }));
+  return (
+    <div className="th-approval" data-testid={`thread.cardanswer.${String(pos)}`} data-card={a.card}>
+      <NewsLine mark="✓" tone="ok" testId={`thread.cardanswer.${String(pos)}.head`}>
+        {`you answered: ${a.question}`}
+        {parts.length > 0 && ' · '}
+        {parts.map(({ p, img }, i) =>
+          img === 0 ? (
+            <span key={i}>{p}</span>
+          ) : (
+            <span key={i} className="b-chip image th-inline-chip" data-kind="image" data-testid={`thread.cardanswer.${String(pos)}.image.${String(img)}`}>
+              <span className="lbl">{imageLabel(img - 1)}</span>
+            </span>
+          ),
+        )}
+      </NewsLine>
+    </div>
+  );
 }
 
 /** His answer to an approval, folded: allowed or said no, and his words under it. */

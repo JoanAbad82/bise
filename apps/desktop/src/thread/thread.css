@@ -476,6 +476,17 @@
   width: 1em;
   text-align: center;
 }
+/* an image his words carried, inline in a news line ('✓ you answered: … · [Image #1] this one') */
+.th-news .th-inline-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  margin: 0 4px 0 0;
+  padding: 0 6px;
+  vertical-align: baseline;
+  color: var(--c-accent);
+  background: var(--c-accent-soft);
+}
 .th-news.ok .th-news-mark {
   color: var(--c-ok, var(--c-text));
 }
