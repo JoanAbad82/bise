@@ -457,6 +457,16 @@ isn't judging. A row marked ok names the shot that was looked at.
   list. amb-win is fixing it. The re-cut also carries the chip glyph 3c209f33 and "4 KB of 18 KB
   shown" 91af5059, and qa-native re-checks those rows.
 
+- **6ef40154: GO for promote** (ambient-pm m_16192 to ambient-lead m_16188). qa-native gated
+  every row GO (m_16185; check 79002287; `~/.bise/gate/try-gate/6ef40154/index.md`):
+  - SCHED at 1100 shows the names on screen; at 800 the task takes the pane;
+  - a chip with no file keeps its 16 px slot with the faint glyph and '[Image #1]';
+  - '… 4 KB of 18 KB shown';
+  - INIT.
+
+  I looked at SCHED-1100, SCHED-800, TOOLLONG and CHIPNOFILE myself. f5ff0e72's other rows stand.
+  This is a GO for his try, not for main: the 6ef40154 status section's not-pass list still holds.
+
 - **19d26863: GO for promote** (ambient-pm m_15901 to ambient-lead). qa-native gated every row
   green (m_15884; checks 0d4500b7). The reruns are at the bottom of
   `~/.bise/gate/try-gate/19d26863/index.md`.
@@ -871,7 +881,7 @@ No app was run, and no heavy job. Words used:
 
 | row | status | owner | the check that would prove it |
 |---|---|---|---|
-| Scheduled list at 1100 (f5ff0e72's one red, gate (4)) | **built-no-check on a gate**: fixed in 6ef40154, and scheduled/screens is green on the built app | amb-home | qa-native: gate/cut (4) on the 6ef40154 re-cut, SCHED.png looked at |
+| Scheduled list at 1100 (f5ff0e72's one red, gate (4)) | **pass (gate 6ef40154)**: at 1100 the list keeps 'what it does · wakes' with the names on screen, and at 800 the task takes the width with '‹ scheduled'. Shots: cut/SCHED-1100 and SCHED-800, looked at by qa-native and ambient-pm | amb-home | none |
 | R40 streaming with the signed animation | **built-no-check on a gate**: amb-core's partial events, and spotlight/streaming (40194604) plus thread/streaming (7c9e6b35) are green in the harness. Never shot on a packed try build. amb-core's streaming bench still waits for a heavy-run slot | amb-core, amb-web, amb-win | the bench, then a qa-native R40 shot on the re-cut (from the first words, frames about 150 ms apart) |
 | R07-a the spotlight's preview of an agent's last actions | **built-no-check on a gate**: spotlight/preview is green in the harness (dece0fe9). The last gate shot (cb1f2b44) showed 2 actions, which was the world's fault | amb-web | qa-native: R07-a on the re-cut, on an agent with 4 actions or more |
 | R37 / FOLDS2: the '▸ N other steps' pill and the thinking rows | **built-no-check**: 5234894c and 55ca0e88 build them. They were never shot: a fake turn draws no kind-other tool and no reasoning (qa-native m_14511) | amb-win; amb-tools for the world | amb-tools seeds an agent with a real kind-other tool item and reasoning; qa-native shoots the pill, the thinking row and "thought N s" |
@@ -884,15 +894,15 @@ No app was run, and no heavy job. Words used:
 | I9/C46/S30 confirmations | **built-no-check**: app/confirm-bar is green in the harness only, with no real run | amb-home | qa-type: `real.sh app/confirm-bar` |
 | 2.1 / 2.2 / 2.3 lists in the real thread | **built-no-check (real)**: thread/composer-sources is green in the harness (2393001f). composer/lists-real was not rerun since 516b891a | amb-web | qa-type: `real.sh composer/lists-real` |
 | K2 ⏎ on an empty composer | **built-no-check**: built in 14c0ef8d, and thread/empty-enter has no result found | amb-win, amb-home | qa-flows: thread/empty-enter |
-| V14/S28/L2 the expired sign-in (with R15 of the re-audit) | **built-no-check**: a7556130 and a7cccb40 are proven by vitest only | amb-home, amb-core | qa-native: setup/sign-in's expired case on the fake subscription |
+| V14/S28/L2 the expired sign-in (with R15 of the re-audit) | **pass (harness, 10-10)**: settings/sign-in-expired is green on the built app with the scripted core (1ad161dd). It covers 'sign in again', the inbox item, the waiting line, and '✓ signed in' that clears both. The thread's side stays with K2's thread/empty-enter | amb-home, amb-core | none for the bar; a real-core run is optional |
 | C15/W20/V6 a branch's diff by name | **built-no-check**: ee6d11de is proven by vitest only, with no window check | amb-win | qa-flows: `/diff sb/x` opens the branch screen with its files |
-| S.4 where bise works (no terminal) | **built-no-check**: 14c0ef8d has a harness spec, with no result found | amb-home | qa-flows posts its result |
+| S.4 where bise works (no terminal) | **pass (harness, 10-10)**: settings › projects ('add a project', the sidebar's ⌘N). settings/projects-add is green on the built app (1ad161dd) | amb-home | none |
 | V3 the help filter | **built-no-check**: built in 677c70cf, and no land names a filter case in settings/keys | amb-win | qa-flows: a filter case in settings/keys |
-| N2 color alone | **built-no-check**: a824752f, with no check | amb-kit | qa-type: a contrast check with increase contrast on |
+| N2 color alone | **pass (harness, 10-10)**: ds/contrast is green on the built app (1ad161dd). With increase contrast on, every status dot has its words and its own glyph (∿ working, ✓ done, ! error), and the shots were looked at | amb-kit, amb-home | none |
 | S29/L19 computer use, live | **not built** | amb-win, amb-core | plan the "took the wheel" event with architect first |
 | S.1 no CLI (VM) | **not run**: native/vm/vm-pass is opt-in | amb-mac, qa-native | one VM pass when a heavy slot is free |
 | B16 narrow window | **not checked** | ambient-pm | my hand pass, on the re-cut |
-| Nits still open | **open**: the docked p99 answer's row in telemetry's thread was not shot (19d26863). The ⌘I 4 KB output cut was not reached, because no output on the world is long enough (f5ff0e72 (3)) | amb-win, amb-tools | qa-native on the re-cut, with a long tool output in the world |
+| Nits still open | **open**: the docked p99 answer's row in telemetry's thread was not shot (19d26863). The 4 KB output cut now passes on gate 6ef40154: `seq 1 4000` reads '… 4 KB of 18 KB shown' (cut/TOOLLONG, looked at) | amb-win, amb-tools | qa-native's next gate on amb-tools' 63eb6c0a world (with R37/FOLDS2) |
 
 Beyond the rows, the merge needs three more things: designer's GO and mine on the 6ef40154 re-cut,
 architect's review, and his next try with no must-fix.
