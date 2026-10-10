@@ -98,7 +98,9 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
       for (let x = Math.round(shot0.width / 2); x < shot0.width; x++) {
         const i = (y * shot0.width + x) * 4;
         const r = shot0.data[i] ?? 0, g = shot0.data[i + 1] ?? 0, b = shot0.data[i + 2] ?? 0;
-        if (r > 170 && g < 150 && b > 120 && r - g > 60) { sx += x; sy += y; k++; }
+        // the pearl's pink over the menu bar (measured on a 2x frame: about 245,180,200): red well over
+        // green and blue over green; the menu bar's blue, white text and grey icons never match
+        if (r > 200 && r - g > 45 && b - g > 10) { sx += x; sy += y; k++; }
       }
     }
     if (k > 4) {
