@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, lastOfRun, quotesOf, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, lastOfRun, quotesOf, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -282,5 +282,12 @@ describe('messages-right v1: a quote, a steer', () => {
     const order = [1, 2, 3];
     expect(placeSteered(order, () => undefined)).toBe(order);
     expect(placeSteered(order, (p) => (p === 2 ? 2 : null))).toBe(order);
+  });
+
+  it("his message's delivery mark is the TUI's: ✓ got it, ✓✓ read it, ▲ not sent; sent, unknown or none show the time alone", () => {
+    expect(deliveryMark('received', 'perf')).toEqual({ glyph: '✓', tip: 'perf got it', tone: 'got' });
+    expect(deliveryMark('read', 'perf')).toEqual({ glyph: '✓✓', tip: 'perf read it', tone: 'read' });
+    expect(deliveryMark('failed', 'perf')).toEqual({ glyph: '▲ not sent', tip: "perf didn't get it", tone: 'failed' });
+    for (const d of ['sent', 'unknown', null, undefined] as const) expect(deliveryMark(d, 'perf'), String(d)).toBeNull();
   });
 });

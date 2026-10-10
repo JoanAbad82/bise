@@ -12,7 +12,7 @@ import { refusedLead } from '@/app/Refused';
 import { useHoldOf, type Hold } from './routes';
 import { useFold } from './folds';
 import { Answer, Markdown } from './Markdown';
-import { THOUGHT_MS, answeredCardOf, briefOf, chipOf, clock, dayLabel, groupHead, lastOfRun, quotesOf, sameDay, sideOf, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf, type ToolLine } from './entry';
+import { THOUGHT_MS, answeredCardOf, briefOf, chipOf, clock, dayLabel, deliveryMark, groupHead, lastOfRun, quotesOf, sameDay, sideOf, dropAuthor, handoffOf, reportStatus, schedHead, stripContext, thoughtNothing, toolLines, whoOf, type ToolLine } from './entry';
 import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
@@ -770,7 +770,22 @@ function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | undefin
   const steered = e.steered_at != null;
   // his turn by voice (designer's voice-window page (1)): 'said · 0:06' under it, how long he talked
   const saidMs = useSaidMs(ctx.project, ctx.agent, text);
-  const under = steered ? `steered · ${shownName(ctx.agent)} read it mid-turn` : saidMs !== null ? saidFor(saidMs) : e.at_ms > 0 ? clock(e.at_ms) : undefined;
+  // the delivery mark after the time or the 'said' line (designer's messages-right v3); a steered
+  // one's 'steered · … read it mid-turn' line is its ✓✓, so it gets none
+  const mark = steered ? null : deliveryMark(e.delivery, shownName(to !== undefined && e.to != null ? e.to : ctx.agent));
+  const lead = steered ? `steered · ${shownName(ctx.agent)} read it mid-turn` : saidMs !== null ? saidFor(saidMs) : e.at_ms > 0 ? clock(e.at_ms) : undefined;
+  const under =
+    mark === null ? (
+      lead
+    ) : (
+      <>
+        {lead}
+        {lead !== undefined && ' '}
+        <span className="th-mark" data-tone={mark.tone} title={mark.tip} aria-label={mark.tip} data-testid={`thread.you.${String(e.pos)}.mark`}>
+          {mark.glyph}
+        </span>
+      </>
+    );
   return (
     <YouBubble head={to} under={under} timeAlways={steered || saidMs !== null || lastOfRun(e, next)} testId={`thread.you.${String(e.pos)}`}>
       {quotes.map((q, i) => (

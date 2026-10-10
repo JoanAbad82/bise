@@ -1264,6 +1264,17 @@ button.th-sched-head {
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+/* his message's delivery mark after the time (designer's messages-right v3): ✓ got it faint,
+   ✓✓ read it dim, never the accent; not sent in the error tone */
+.th-mark[data-tone='got'] {
+  color: var(--c-text-3);
+}
+.th-mark[data-tone='read'] {
+  color: var(--c-text-2);
+}
+.th-mark[data-tone='failed'] {
+  color: var(--c-err);
+}
 /* a bubble inside a run: its time on hover only */
 /* a bubble inside a run: its time on hover only, beside the bubble, taking no room (so a run's
    bubbles sit 4 px apart, designer m_16246) */

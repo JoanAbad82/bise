@@ -454,6 +454,25 @@ export function lastOfRun(e: Entry, next: Entry | undefined): boolean {
   return e.at_ms <= 0 || next.at_ms <= 0 || next.at_ms - e.at_ms > RUN_MS;
 }
 
+/**
+ * His message's delivery mark after the time under its bubble (designer's messages-right v3, 'got it,
+ * read it'; the TUI's render.rs mark_span): '✓' faint when the agent got it, '✓✓' dim when it read
+ * it, never the accent; a tooltip says who. A failed one says '▲ not sent' in the error tone (its
+ * 'send again' is the not-delivered row's). Sent, unknown or none: no mark, the time alone. Pure.
+ */
+export function deliveryMark(d: Entry['delivery'], who: string): { glyph: string; tip: string; tone: 'got' | 'read' | 'failed' } | null {
+  switch (d) {
+    case 'received':
+      return { glyph: '✓', tip: `${who} got it`, tone: 'got' };
+    case 'read':
+      return { glyph: '✓✓', tip: `${who} read it`, tone: 'read' };
+    case 'failed':
+      return { glyph: '▲ not sent', tip: `${who} didn't get it`, tone: 'failed' };
+    default:
+      return null;
+  }
+}
+
 /** The hub's brief, the first message of a task's thread ('# Task `gift-ui`', then 'Objective: …'; the TUI's is_brief): its name, objective and body without the heading; none for any other text. Pure. */
 export function briefOf(text: string): { name: string; objective: string; body: string } | null {
   const m = /^# Task `([^`]+)`[^\n]*\n?/.exec(text);
