@@ -31,3 +31,12 @@ describe("bise's /update line", () => {
     expect(hubUpdateLine(null)).toBeNull();
   });
 });
+
+describe('the crash report head', () => {
+  it("names its file with home as '~'", async () => {
+    const { reportWhere } = await import('./ReportScreen');
+    expect(reportWhere('/Users/g/.bise/reports/crash-14-02.md', '/Users/g')).toBe('~/.bise/reports/crash-14-02.md');
+    expect(reportWhere('/tmp/r.md', '/Users/g')).toBe('/tmp/r.md');
+    expect(reportWhere('/Users/gx/r.md', '/Users/g')).toBe('/Users/gx/r.md');
+  });
+});

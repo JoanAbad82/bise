@@ -37,6 +37,7 @@ import { numbersOf } from '@/agents/model';
 import { CoreLine } from './CoreLine';
 import { HubUpdateLine, UpdateLine } from './UpdateLine';
 import { HubMoments } from './HubMoments';
+import { ReportScreen } from './ReportScreen';
 import { Palette, usePaletteOpen } from './Palette';
 import { Help } from '@/help/Help';
 import { useTheme } from '@/theme';
@@ -308,6 +309,9 @@ function ScreenOf({ route }: { route: Route }) {
     case 'scheduled':
       // every project's live scheduled tasks (amb-kit's src/scheduled)
       return <ScheduledScreen />;
+    case 'report':
+      // the last crash report (CoreLine's 'show the report')
+      return <ReportScreen />;
     case 'inbox':
       return <InboxScreen />;
     case 'settings':

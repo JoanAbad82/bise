@@ -17,6 +17,7 @@ const every: Route[] = [
   { screen: 'settings' },
   { screen: 'settings', page: 'projects' },
   { screen: 'onboarding' },
+  { screen: 'report' },
   { screen: 'lab', lab: 'composer' },
   { screen: 'lab', lab: 'pearl' },
 ];

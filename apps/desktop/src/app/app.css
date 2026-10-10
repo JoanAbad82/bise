@@ -726,3 +726,30 @@ body:has(.app-shell) {
   border-radius: 4px;
   background: var(--c-hover);
 }
+
+/* the last crash report, opened in the window (designer's voice-window part 2) */
+.app-report {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.app-report .b-head .end {
+  display: flex;
+  gap: 8px;
+}
+.app-report-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 16px 24px;
+}
+.app-report-text {
+  max-width: var(--th-col, 720px);
+  margin: 0 auto;
+}
+.app-report-body > .app-dim {
+  max-width: var(--th-col, 720px);
+  margin: 24px auto 0;
+  color: var(--c-text-3);
+}

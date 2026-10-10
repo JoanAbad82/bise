@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import type { BiseApi, CoreExit, CoreState } from '@/shared/api';
 import { useCoreState } from '@/store';
+import { useRouter } from './router';
 
 /** How long a first start may take before the line says so. */
 export const QUIET_START_MS = 2000;
@@ -90,6 +91,7 @@ function useCoreExit(): CoreExit | null {
 }
 
 export function CoreLine() {
+  const router = useRouter();
   const state = useCoreState();
   const exit = useCoreExit();
   const [wasUp, setWasUp] = useState(false);
@@ -154,7 +156,7 @@ export function CoreLine() {
             </button>
           )}
           {v.report && path !== null && (
-            <button type="button" className="app-core-btn" data-testid="app.core.report" onClick={() => void bise()?.showInFinder(path)}>
+            <button type="button" className="app-core-btn" data-testid="app.core.report" onClick={() => { router.go({ screen: 'report' }); }}>
               show the report
             </button>
           )}
