@@ -1070,7 +1070,7 @@ Still not pass:
 | TP-N2 /log | **in progress**: amb-feed's typed read is on its branch log-read; amb-web's screen waits on its shape | amb-feed, amb-web | qa-flows: thread/log |
 | 'said ✓✓' (a spoken turn's mark) | **built-no-check on a gate**: amb-win's unit test and d85bd249; no world has a spoken turn | amb-win, amb-tools | a world with a spoken turn, then qa-native |
 | HEADFIT's context note | **built-no-check on a gate**: amb-home's thread/head-fit is green in the harness; the rich world has no context note | amb-tools, qa-native | a world with a usage note |
-| S.1 no CLI (VM) | **not run**: native/vm/vm-pass is opt-in | amb-mac, qa-native | one VM pass when a heavy slot is free |
+| S.1 no CLI (VM) | **not run, prepped** (amb-mac m_17354): 15 rows (TCC, the fn tap, the tray, ⌘F, fn held, fn fn, fn space, esc, full screen, the glass, ⌘Q). It needs the 27 GB tart image pulled again, a kit and one packed app, and it runs after amb-core's bench, on ambient-lead's ok. 2 of its rows are stale against b3 and fn fn voice, and amb-mac updates them | amb-mac, qa-native | the VM pass; amb-mac sends the result to ambient-lead and ambient-pm |
 
 Beyond the rows, the merge needs four more things:
 
