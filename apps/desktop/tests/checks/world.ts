@@ -85,15 +85,20 @@ export function launchReal(w: World, o: LaunchOptions & { workspace?: string } =
 }
 
 /**
- * One hub's state, read from its socket like any client: {op: hello}, then the first state line.
- * The fields are the hub's own (agents, cards, ...): what the app's actions must change.
+ * One JSON-RPC exchange with a hub, as any client of hub.sock since client-protocol
+ * (docs/client-protocol.md; the old {op: hello} lines get 'the released door only' and no state):
+ * `initialize`, `initialized`, then `method` if given. Returns initialize's result and the call's.
  */
-export function hubState(sock: string, timeoutMs = 10_000): Promise<Record<string, unknown>> {
+function hubRpc(sock: string, method: string | null, params: Record<string, unknown>, timeoutMs: number): Promise<{ init: Record<string, unknown>; result: unknown }> {
   return new Promise((resolve, reject) => {
     const c = net.createConnection(sock);
     let buf = '';
-    const t = setTimeout(() => { c.destroy(); reject(new Error(`no state from ${sock} in ${timeoutMs} ms`)); }, timeoutMs);
-    c.on('connect', () => { c.write(JSON.stringify({ op: 'hello', client: 'qa-flows' }) + '\n'); });
+    let init: Record<string, unknown> | null = null;
+    const done = (f: () => void) => { clearTimeout(t); c.destroy(); f(); };
+    const t = setTimeout(() => { done(() => { reject(new Error(`no answer from ${sock} in ${String(timeoutMs)} ms`)); }); }, timeoutMs);
+    c.on('connect', () => {
+      c.write(JSON.stringify({ jsonrpc: '2.0', id: 'qa-init', method: 'initialize', params: { proto: 1, client: { name: 'qa-flows', version: '0' }, capabilities: {} } }) + '\n');
+    });
     c.on('data', (d) => {
       buf += d.toString();
       for (;;) {
@@ -101,19 +106,58 @@ export function hubState(sock: string, timeoutMs = 10_000): Promise<Record<strin
         if (i < 0) break;
         const line = buf.slice(0, i);
         buf = buf.slice(i + 1);
+        let m: Record<string, unknown>;
         try {
-          const m = JSON.parse(line) as Record<string, unknown>;
-          if (m['ev'] === 'state' || m['agents'] !== undefined) {
-            clearTimeout(t);
-            c.destroy();
-            resolve((m['state'] as Record<string, unknown> | undefined) ?? m);
+          m = JSON.parse(line) as Record<string, unknown>;
+        } catch {
+          continue;
+        }
+        if (m['error'] !== undefined && (m['id'] === 'qa-init' || m['id'] === 'qa-call')) {
+          done(() => { reject(new Error(`${String(m['id'])}: ${JSON.stringify(m['error'])}`)); });
+          return;
+        }
+        if (m['id'] === 'qa-init') {
+          init = (m['result'] as Record<string, unknown> | undefined) ?? {};
+          c.write(JSON.stringify({ jsonrpc: '2.0', method: 'initialized' }) + '\n');
+          if (method === null) {
+            const got = init;
+            done(() => { resolve({ init: got, result: null }); });
             return;
           }
-        } catch { /* a partial or foreign line */ }
+          c.write(JSON.stringify({ jsonrpc: '2.0', id: 'qa-call', method, params }) + '\n');
+        } else if (m['id'] === 'qa-call' && init !== null) {
+          const got = init;
+          done(() => { resolve({ init: got, result: m['result'] }); });
+          return;
+        }
       }
     });
     c.on('error', (e) => { clearTimeout(t); reject(e); });
   });
+}
+
+/**
+ * One hub's state, read from its socket like any client: initialize's `hub.state` (one hub-wide
+ * notification of each kind, as sent now), their params merged: agents, cards, ... what the
+ * app's actions must change.
+ */
+export async function hubState(sock: string, timeoutMs = 10_000): Promise<Record<string, unknown>> {
+  const { init } = await hubRpc(sock, null, {}, timeoutMs).catch((e: unknown) => {
+    throw new Error(`no state from ${sock}: ${String(e)}`);
+  });
+  const notes = ((init['hub'] as { state?: { method?: string; params?: Record<string, unknown> }[] } | undefined)?.state) ?? [];
+  const out: Record<string, unknown> = { project: init['project'] };
+  for (const n of notes) Object.assign(out, n.params ?? {});
+  return out;
+}
+
+/** One hub method by JSON-RPC (e.g. approvals/set {project, mode}); `project` is filled from initialize when absent. */
+export async function hubCall(sock: string, method: string, params: Record<string, unknown> = {}, timeoutMs = 10_000): Promise<unknown> {
+  if (params['project'] === undefined) {
+    const { init } = await hubRpc(sock, null, {}, timeoutMs);
+    params = { ...params, project: init['project'] };
+  }
+  return (await hubRpc(sock, method, params, timeoutMs)).result;
 }
 
 /** Whether that agent's transcript in that hub holds the words: the hub really got them. */
@@ -223,7 +267,10 @@ export function tuiAgents(screen: string): { n: number; glyph: string; name: str
   const at = panel.indexOf('agents');
   if (at < 0) return [];
   const out: { n: number; glyph: string; name: string }[] = [];
-  for (const row of panel.slice(at + 1)) {
+  for (const raw of panel.slice(at + 1)) {
+    // the first-run tip box ('new: your agents… ⌥ 1 to look inside') can end on the panel's left
+    // edge on the agent rows' lines (qa-native, packed e3f7e598): its border chars lead the row
+    const row = raw.replace(/^[│╮╯╭╰─┐┘\s]+/u, '');
     // a feature's agents come under its own head ('ψ gift-cards'), after a blank line
     if (row === '' || row.startsWith('ψ ')) continue;
     if (row === 'inbox') break;

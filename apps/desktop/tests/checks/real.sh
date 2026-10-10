@@ -62,6 +62,18 @@ rc=0
 # the list on stdout, and every annotation (the checks' measured times) in a JSON beside it
 # (given to Playwright alone, never exported: world up refuses any env value that reaches
 # ~/.bise/hubs, where an agent's TMPDIR lives)
+# thread/news-real reads the seeded news rows of shop's thread: it runs first, in the same world,
+# before the inbox checks fill that thread with their own asks (e3f7e598's batch: run last, its
+# rows had scrolled out of reach). Playwright orders files by path, so it gets its own call.
+first=tests/checks/thread/news-real.spec.ts rest=()
+for s in ${mine[@]+"${mine[@]}"}; do
+  if [ "$s" = "$first" ]; then
+    PLAYWRIGHT_JSON_OUTPUT_NAME="${TMPDIR:-/tmp}/qa-flows-real-first.json" pnpm exec playwright test -c tests/harness/playwright.config.ts "$s" -g "$grep" --reporter=list,json || rc=1
+  else
+    rest+=("$s")
+  fi
+done
+mine=(${rest[@]+"${rest[@]}"})
 if [ ${#mine[@]} -gt 0 ]; then
   PLAYWRIGHT_JSON_OUTPUT_NAME="${TMPDIR:-/tmp}/qa-flows-real.json" pnpm exec playwright test -c tests/harness/playwright.config.ts "${mine[@]}" -g "$grep" --grep-invert 'feature-drop' --reporter=list,json || rc=1
 fi

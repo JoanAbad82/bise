@@ -8,29 +8,17 @@
 //   - allow (a click on its option) closes the card and main goes on: the call runs (its output,
 //     the push's error on a missing path, reaches main's transcript);
 //   - a second call, no: the card closes and the call never runs.
-import net from 'node:net';
+
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { test, expect } from '../../harness';
-import { hubOf, hubState, launchOn, realWorld, worldSay } from '../world';
+import { hubCall, hubOf, hubState, launchOn, realWorld, worldSay } from '../world';
 import type { Page } from '@playwright/test';
 
 const T = {
   root: '[data-testid="inbox.root"]',
   items: '[data-testid^="inbox.item."]',
 };
-
-/** One old-protocol op on a hub's socket, as the TUI and amb-tools' seed send it. */
-function hubOp(sock: string, op: Record<string, unknown>): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const c = net.createConnection(sock);
-    c.on('connect', () => {
-      c.write(`${JSON.stringify({ op: 'hello', client: 'qa-flows' })}\n${JSON.stringify(op)}\n`);
-      setTimeout(() => { c.destroy(); resolve(); }, 800);
-    });
-    c.on('error', reject);
-  });
-}
 
 async function current(page: Page): Promise<string> {
   const ids = await page.locator('[data-testid^="inbox.card."]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid') ?? ''));
@@ -48,7 +36,7 @@ test('inbox/approvals: a gated call is a card in ⌘I; allow lets main go on, no
   const cards = async () => ((await hubState(shop.sock))['cards'] as { id: number; text?: string; question?: string; kind?: string }[] | undefined) ?? [];
   const gated = async (tag: string) => (await cards()).find((c) => `${c.text ?? ''}${c.question ?? ''}`.includes(tag));
   const note = (type: string, v: unknown) => test.info().annotations.push({ type, description: typeof v === 'string' ? v : JSON.stringify(v) });
-  await hubOp(shop.sock, { op: 'approvals', mode: 'auto' });
+  await hubCall(shop.sock, 'approvals/set', { mode: 'auto' });
   const s = await launchOn(w, 'inbox', T.root);
   const { page } = s;
   try {
@@ -94,7 +82,7 @@ test('inbox/approvals: a gated call is a card in ⌘I; allow lets main go on, no
       await page.screenshot({ path: test.info().outputPath('denied.png') });
     });
   } finally {
-    await hubOp(shop.sock, { op: 'approvals', mode: 'yolo' }).catch(() => undefined);
+    await hubCall(shop.sock, 'approvals/set', { mode: 'yolo' }).catch(() => undefined);
     await s.close();
   }
 });

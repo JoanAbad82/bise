@@ -71,6 +71,18 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
     await expect(page.locator(T.list), "back in shop's thread").toBeVisible({ timeout: 10_000 });
   };
   const note = (type: string, v: unknown) => test.info().annotations.push({ type, description: typeof v === 'string' ? v : JSON.stringify(v) });
+  /** A row the virtual list doesn't draw (far up a long thread): brought into view with the thread's find, as he would. */
+  const reach = async (row: ReturnType<typeof page.locator>, words: string) => {
+    if ((await row.count()) > 0) return;
+    await page.locator(T.field).first().click();
+    await page.keyboard.press('Meta+f');
+    const field = page.locator('[data-testid="thread.find.field"]');
+    if (!(await field.isVisible({ timeout: 3000 }).catch(() => false))) return;
+    await field.fill(words);
+    await page.keyboard.press('Enter');
+    await row.first().waitFor({ timeout: 10_000 }).catch(() => undefined);
+    note(`find:${words.slice(0, 30)}`, ((await page.locator('[data-testid="thread.find.count"]').textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim());
+  };
   try {
     await expect(page.locator(T.field).first(), "shop's main thread").toBeVisible({ timeout: 15_000 });
     t = tui(w, 'shop');
@@ -155,7 +167,10 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       const title = `the logo ${n}`;
       worldSay('shop', `[[bash: sb artifact add https://x.test/logo-${n} --title "${title}"]] made it`);
       const row = list.locator(T.artifact).filter({ hasText: title }).first();
-      await expect.soft(row, 'an artifact card with its title').toBeVisible({ timeout: 30_000 });
+      await expect.poll(() => transcriptHas(w, 'shop', 'main', title), { timeout: 30_000, message: 'main ran the artifact add' }).toBe(true).catch(() => undefined);
+      await sleep(1500);
+      await reach(row, title);
+      await expect.soft(row, 'an artifact card with its title').toBeVisible({ timeout: 15_000 });
       await sleep(1000);
       note('artifact', { window: ((await row.textContent().catch(() => '')) ?? '').trim(), tuiHas: flat(term().screen()).includes(title) });
       expect.soft(flat(term().screen()), 'the TUI shows it too').toContain(title);
@@ -176,6 +191,8 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
     // (telemetry), receipts' message to checkout (shop)
     await test.step('approval: his no with its note (seeded)', async () => {
       const row = list.locator(T.approval).filter({ hasText: 'git push --force' }).first();
+      await page.keyboard.press('Escape');
+      await reach(row, 'you said no to release');
       await expect.soft(row, "release's force push said no to: an approval row").toBeVisible({ timeout: 15_000 });
       const words = ((await row.textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();
       const tuiScreen = flat(term().screen());

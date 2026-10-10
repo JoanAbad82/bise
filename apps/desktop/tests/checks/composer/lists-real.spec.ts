@@ -24,7 +24,15 @@ import { T, caretOf, fieldText, press } from './target';
 
 const REPO = path.resolve(__dirname, '../../../../..');
 /** commands.rs COMMANDS' names, in order (the TUI's dev-build rows are not in it) */
-const COMMANDS = [...readFileSync(path.join(REPO, 'rust/tui/src/commands.rs'), 'utf8').matchAll(/name: "(\/[a-z-]+)"/g)].map((m) => m[1] ?? '');
+// the list moved to bise-proto (rust/proto/src/commands.rs, one table for the TUI and the window);
+// tui/src/commands.rs no longer names them, so read both and keep what is there
+const COMMANDS = ['rust/proto/src/commands.rs', 'rust/tui/src/commands.rs'].flatMap((f) => {
+  try {
+    return [...readFileSync(path.join(REPO, f), 'utf8').matchAll(/name: "(\/[a-z-]+)"/g)].map((m) => m[1] ?? '');
+  } catch {
+    return [];
+  }
+}).filter((n, i, all) => n !== '' && all.indexOf(n) === i);
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 // ---- the TUI's popup, read from its screen
