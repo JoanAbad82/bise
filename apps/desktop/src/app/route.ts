@@ -11,6 +11,7 @@
 //   agents/<p>                 a project's agents list
 //   changes/<p>                a project's changes (branches, merged today)
 //   review/<p>/<a>             an agent's change, to review and merge
+//   log/<p>/<a>                an agent's raw session, read-only (/log, amb-web's src/log)
 //   feature/<p>/<name>         a feature: its branch, agents, try / merge / drop
 //   prs/<p>                    its open pull requests (the TUI's /prs)
 //   commit/<p>/<sha>           one commit already on main, read-only
@@ -29,6 +30,8 @@ export type Route =
   | { screen: 'changes'; project: string }
   | { screen: 'prs'; project: string }
   | { screen: 'review'; project: string; agent: string }
+  /** an agent's raw session log (/log, the TUI's logview.rs) */
+  | { screen: 'log'; project: string; agent: string }
   | { screen: 'feature'; project: string; name: string }
   | { screen: 'commit'; project: string; sha: string }
   | { screen: 'branch'; project: string; branch: string }
@@ -75,6 +78,8 @@ export function formatRoute(r: Route): string {
       return `${r.screen}/${r.project}`;
     case 'review':
       return `review/${r.project}/${r.agent}`;
+    case 'log':
+      return `log/${r.project}/${r.agent}`;
     case 'feature':
       return `feature/${r.project}/${r.name}`;
     case 'commit':
@@ -121,7 +126,8 @@ export function parseRoute(path: string): Route {
     case 'environments':
       return one !== undefined ? { screen: head, project: one } : nf;
     case 'review':
-      return a !== undefined && b !== undefined ? { screen: 'review', project: a, agent: b } : nf;
+    case 'log':
+      return a !== undefined && b !== undefined ? { screen: head, project: a, agent: b } : nf;
     case 'feature':
       return a !== undefined && b !== undefined ? { screen: 'feature', project: a, name: b } : nf;
     case 'commit':

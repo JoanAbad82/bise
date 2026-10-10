@@ -116,6 +116,7 @@ export function panelProject(route: Route, home: string | undefined, projects: n
     case 'agents':
     case 'changes':
     case 'review':
+    case 'log':
     case 'feature':
     case 'prs':
     case 'commit':
@@ -141,6 +142,8 @@ export function crumbOf(route: Route, name: (project: string) => string): string
       return [name(route.project), route.screen];
     case 'review':
       return [name(route.project), route.agent, 'changes'];
+    case 'log':
+      return [name(route.project), route.agent, 'session log'];
     case 'feature':
       return [name(route.project), `ψ ${route.name}`];
     case 'commit':

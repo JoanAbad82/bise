@@ -47,6 +47,8 @@ function answer(cmd) {
     case 'page': return of(['thread'], (ev) => ev.before !== null && ev.before !== undefined);
     case 'diff': return of(['diff'], (ev) => (cmd.commit ? ev.merged === cmd.commit : !ev.merged));
     case 'worktrees': case 'dev_servers': case 'merged': return of([cmd.cmd]);
+    // /log: the world's pages of that agent's session, the newest (no before) or the one before a seq
+    case 'log': return of(['log'], (ev) => (cmd.before === undefined ? (ev.items[0]?.seq ?? 0) >= Math.max(...evs.filter((e) => e.ev === 'log' && same(e, cmd)).map((e) => e.items[0]?.seq ?? 0)) : (ev.items.at(-1)?.seq ?? 0) < cmd.before)).slice(-1);
     default: return [];
   }
 }

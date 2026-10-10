@@ -75,6 +75,9 @@ export function windowRun(name: string, args: string, at: { project: string; age
     }
     case 'prs':
       return go({ screen: 'prs', project: at.project });
+    case 'log':
+      // N2: the raw session of the agent in view (or the one named), read-only (amb-web's src/log)
+      return go({ screen: 'log', project: at.project, agent: arg === '' ? at.agent : arg });
     // a window command with words of its own (/artifacts add <url>, /plugins enable <x>) is the hub's
     case 'artifacts':
       return arg === '' ? go({ screen: 'artifacts', project: at.project }) : undefined;

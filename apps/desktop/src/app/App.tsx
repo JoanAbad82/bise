@@ -25,6 +25,7 @@ import { paletteOpen } from '@/setup/useTour';
 import { AgentsScreen } from '@/agents/AgentsScreen';
 import { ChangesScreen } from '@/review/ChangesScreen';
 import { ReviewScreen } from '@/review/ReviewScreen';
+import { LogScreen } from '@/log/LogScreen';
 import { FeatureScreen } from '@/review/FeatureScreen';
 import { BranchScreen } from '@/review/BranchScreen';
 import { PrsScreen } from '@/review/PrsScreen';
@@ -297,6 +298,9 @@ function ScreenOf({ route }: { route: Route }) {
       return <Known project={route.project}>{() => <ReviewScreen project={route.project} agent={route.agent} />}</Known>;
     case 'prs':
       return <Known project={route.project}>{() => <PrsScreen project={route.project} />}</Known>;
+    case 'log':
+      // the agent's raw session, read-only (/log, amb-web's src/log)
+      return <Known project={route.project}>{() => <LogScreen key={`${route.project}/${route.agent}`} project={route.project} agent={route.agent} />}</Known>;
     case 'feature':
       return <Known project={route.project}>{() => <FeatureScreen project={route.project} name={route.name} />}</Known>;
     case 'commit':
