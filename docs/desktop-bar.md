@@ -457,6 +457,30 @@ isn't judging. A row marked ok names the shot that was looked at.
   list. amb-win is fixing it. The re-cut also carries the chip glyph 3c209f33 and "4 KB of 18 KB
   shown" 91af5059, and qa-native re-checks those rows.
 
+- **f640424d: GO for promote, with (a) and (b) as named gaps** (ambient-pm to ambient-lead m_16431,
+  from qa-native m_16423; check 697d506e; `~/.bise/gate/try-gate/f640424d/index.md`).
+  - Green:
+    - his messages on the right and agents' on the left, at 1100 and 600, in light and dark
+      (24 px edges, 4 px within a run, corners 16/16/6, the quote and its source in the bubble);
+    - the queued bubble: dashed, 'queued · sends when ingest's turn ends', no buttons;
+    - '✓ you answered' on the right;
+    - type-anywhere: 'a', 'é', a text paste and an image paste land in the composer with the
+      caret at the end, arrows and esc are untouched, and ⌘K still opens;
+    - an inbox draft survives a reload (I6/B3);
+    - INIT, LIGHTS, the inbox block, and R41 on one path.
+  - Red (a): the steered message gets no 'steered · dashboards read it mid-turn' line. It shows
+    as a second bubble above the tool rows. His try 6ef40154 has no steered line either, and
+    amb-feed's steered event is not in the build yet. So it is a gap his try already has, not a
+    regression, and it goes as a named gap (amb-win, amb-feed).
+  - Red (b): ctrl+o in the inbox leaves a 16-line ask at its first 5 lines. This is the I8 gap
+    that 6ef40154 already has. The cut has amb-home's 32675894, which was green on real.sh, so the
+    packed app differs from the real-core run. It goes as a named gap (amb-home).
+  - Not proven: R37/FOLDS2 and the docked p99 row. The 7335fde7 messages seed lands after the
+    63eb6c0a bar turns, so neither is on screen. This needs a world without that seed, or the
+    check scrolling up to them.
+  - By the gate rules, a red his current try already has may go as a named gap, and neither red
+    is new or a fix that came undone against 6ef40154. Both stay not-pass for the merge into main.
+
 - **6ef40154: GO for promote** (ambient-pm m_16192 to ambient-lead m_16188). qa-native gated
   every row GO (m_16185; check 79002287; `~/.bise/gate/try-gate/6ef40154/index.md`):
   - SCHED at 1100 shows the names on screen; at 800 the task takes the pane;
