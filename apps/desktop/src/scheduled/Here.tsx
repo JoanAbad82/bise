@@ -19,7 +19,7 @@ export function ScheduledHere({ project, onOpen, testId = 'scheduled.here' }: { 
         <button key={keyOf(x)} type="button" className="sch-here-row" onClick={onOpen} data-testid={`${testId}.row.${String(x.t.id)}`}>
           <span className="sch-here-g" aria-hidden="true">◷</span>
           <span className="sch-here-two">
-            <span className="sch-here-t">{asks(x.t)}</span>
+            <span className="sch-here-t" title={x.t.words}>{asks(x.t)}</span>
             <span className="sch-here-sub">
               {`${x.t.agent} · ${howOften(x.t)}${typeof x.t.next_ms === 'number' ? ` · ${ahead(x.t.next_ms, now)}` : ''}`}
             </span>

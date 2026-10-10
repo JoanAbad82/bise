@@ -90,7 +90,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
         ) : (
           <div className="sch-list" role="listbox" data-testid="scheduled.list">
             <div className="sch-row sch-cols" aria-hidden="true">
-              <span>what it asks</span>
+              <span>what it does</span>
               <span>wakes</span>
               <span>how often</span>
               <span>next run</span>
@@ -99,7 +99,7 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
               <div key={keyOf(x)} className={`sch-row${keyOf(x) === selKey ? ' on' : ''}${cur && keyOf(cur) === keyOf(x) ? ' open' : ''}`} role="option"
                 aria-selected={keyOf(x) === selKey} data-testid={`scheduled.row.${String(x.t.id)}`}
                 onClick={() => { setSel(keyOf(x)); setOpen(keyOf(x)); setAsking(false); }}>
-                <span className="sch-asks">{asks(x.t)}</span>
+                <span className="sch-asks" title={x.t.words}>{asks(x.t)}</span>
                 <span className="sch-dim">{wakes(x)}</span>
                 <span className="sch-dim">{howOften(x.t)}</span>
                 <span className="sch-next">{nextWords(x.t, now)}</span>

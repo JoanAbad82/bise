@@ -64,8 +64,9 @@ export function endsWords(t: ScheduledTask, now: number): string {
   return "when it's stopped";
 }
 
-/** What it asks: its words' first line. */
-export const asks = (t: ScheduledTask): string => t.words.split('\n')[0]?.trim() ?? '';
+/** What it does, as lists show it: the hub's short name (sched-names), else its words' first line
+ * (an older hub sends no name). The words themselves show on open and hover. */
+export const asks = (t: ScheduledTask): string => t.name?.trim() || (t.words.split('\n')[0]?.trim() ?? '');
 
 /** 'deploy-watch · storefront' (the project left out for one project's list). */
 export const wakes = (x: Task, withProject = true): string => (withProject && x.projectName !== '' ? `${x.t.agent} · ${x.projectName}` : x.t.agent);

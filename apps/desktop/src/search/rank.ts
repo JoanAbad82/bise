@@ -56,6 +56,8 @@ export interface SearchScheduled {
   readonly id: number;
   /** the agent it wakes */
   readonly agent: string;
+  /** the hub's short name (sched-names); absent from an older hub: the words' first line shows */
+  readonly name?: string;
   readonly words: string;
   /** '30 min', 'day 07:30' */
   readonly every: string;
@@ -318,7 +320,7 @@ function scheduledHit(s: SearchScheduled, pname: string, tz?: string): Hit {
     project: s.project,
     glyph: '◷',
     tone: '',
-    name: one(s.words),
+    name: one(s.name?.trim() || s.words),
     detail: '',
     where: `${s.agent} · ${pname}`,
     when: s.next_ms !== undefined && s.next_ms > 0 ? `next ${clock(s.next_ms, tz)}` : `every ${s.every}`,
@@ -398,7 +400,7 @@ export function searchList(d: SearchData, q: string, scope: Scope, now: number, 
     const hits = ranked(
       d.scheduled,
       (s) => scheduledHit(s, pname(s.project), tz),
-      (s) => ({ name: [s.words], about: [s.agent, `#${String(s.id)}`], where: [pname(s.project)] }),
+      (s) => ({ name: s.name ? [s.name, s.words] : [s.words], about: [s.agent, `#${String(s.id)}`], where: [pname(s.project)] }),
     );
     if (hits.length > 0) groups.push({ id: 'scheduled', label: 'scheduled', hits });
   }

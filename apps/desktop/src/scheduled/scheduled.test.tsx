@@ -85,6 +85,17 @@ describe('scheduled here (panel A)', () => {
     render(<StoreProvider store={store}><ScheduledHere project="nowhere" onOpen={() => undefined} /></StoreProvider>);
     expect(screen.queryByTestId('scheduled.here')).toBeNull();
   });
+
+  it("sched-names: a named task shows its name, its words on hover; an older hub's (no name) its words' first line", () => {
+    const store = new Store(null);
+    store.apply({ ev: 'projects', projects: [{ project: 'shop-1', name: 'storefront', path: '/x/shop' }] });
+    store.apply({ ev: 'scheduled', project: 'shop-1', items: [task(4, { name: 'deploy watch' }), task(7, { next_ms: NOW + 3_600_000 })] });
+    render(<StoreProvider store={store}><ScheduledHere project="shop-1" onOpen={() => undefined} /></StoreProvider>);
+    const named = screen.getByTestId('scheduled.here.row.4').querySelector('.sch-here-t');
+    expect(named?.textContent).toBe('deploy watch');
+    expect(named?.getAttribute('title')).toBe('check the deploy of storefront\nsay so only when it fails');
+    expect(screen.getByTestId('scheduled.here.row.7').querySelector('.sch-here-t')?.textContent).toBe('check the deploy of storefront');
+  });
 });
 
 describe('how often', () => {

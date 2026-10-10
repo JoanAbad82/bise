@@ -25,6 +25,7 @@ const scheduledOf = (project: string, t: ScheduledTask): SearchScheduled => ({
   project,
   id: t.id,
   agent: t.agent,
+  ...(t.name ? { name: t.name } : {}),
   words: t.words,
   every: t.every.replace(/^every /u, ''),
   ...(t.next_ms == null ? {} : { next_ms: t.next_ms }),

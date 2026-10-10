@@ -37,6 +37,15 @@ describe('search data: held projects live, the others from amb-core index', () =
       scheduled: (p) => (p === 'sf' ? [task] : []),
     });
     expect(d.scheduled).toEqual([{ project: 'sf', id: 48, agent: 'checkout', words: 're-run the flaky checkout test', every: '30m', next_ms: 1_000 }]);
+    // sched-names: the hub's short name rides along (absent from an older hub, as above)
+    const named = searchDataOf({
+      projects: [project('sf', 1)],
+      agents: () => [],
+      artifacts: () => [],
+      cards: () => [],
+      scheduled: (p) => (p === 'sf' ? [{ ...task, name: 'flaky checkout' }] : []),
+    });
+    expect(named.scheduled[0]?.name).toBe('flaky checkout');
   });
 
   it("a project the core doesn't hold has its scheduled tasks from its index row (26b2400b); a held one keeps its live list", () => {

@@ -85,7 +85,7 @@ test("thread/tool-rows: each call says ✓ time or ✗ exit · time with its err
     expect(ask).toMatchObject({ cmd: 'tool_out', project: P, agent: 'perf', pos: 4 });
     await core.send({ ev: 'tool_out', project: P, agent: 'perf', pos: 4, out: 'exit 1: src/a.ts:3:7 error: x is unused\nsrc/b.ts:9:1 warning: y is never read\n2 problems (1 error, 1 warning)', cut: true } as never);
     await expect(page.getByTestId('thread.tool.4.out'), 'the real output replaces the preview').toContainText('2 problems (1 error, 1 warning)');
-    await expect(page.getByTestId('thread.tool.4.cut'), 'and says it was cut').toHaveText('… cut: the first 4 KB');
+    await expect(page.getByTestId('thread.tool.4.cut'), 'and says it was cut').toHaveText('… cut after 4 KB');
     await page.mouse.move(1, 300);
     await page.screenshot({ path: test.info().outputPath('tools-open-light.png') });
     await core.send(prefs('dark') as never);

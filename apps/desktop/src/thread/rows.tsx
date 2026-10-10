@@ -780,7 +780,7 @@ function ToolLineRow({ l, live, runFor, project, agent }: { l: ToolLine; live: b
           )}
           {full !== null && 'cut' in full && full.cut && (
             <div className="th-tool-cut" data-testid={`${id}.cut`}>
-              … cut: the first 4 KB
+              … cut after 4 KB
             </div>
           )}
           {full !== null && 'error' in full && out === '' && (
