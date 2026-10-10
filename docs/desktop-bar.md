@@ -457,6 +457,33 @@ isn't judging. A row marked ok names the shot that was looked at.
   list. amb-win is fixing it. The re-cut also carries the chip glyph 3c209f33 and "4 KB of 18 KB
   shown" 91af5059, and qa-native re-checks those rows.
 
+- **beb70fe6: HOLD, only for the fold jump** (ambient-pm m_17094 to ambient-lead m_17060, from
+  qa-native m_17057 and m_17088; spec cd460f03; `~/.bise/gate/try-gate/beb70fe6/index.md` v2,
+  rerun 18:00).
+  - Green on the packed app, rich world:
+    - QEDIT: the dashed queued bubble, edit · drop, and a refusal that shows the hub's words;
+    - VOICE: every state in light and dark, the lit answer, '∿ speaking', the 1100 keys on one
+      line, and mic refused;
+    - CRASH: 'keeps crashing: 3 times in 10 min… signal 11', 'bise is back.', the report view;
+    - **INBOXH**: at 720 the card grows from 396 to 460 px, line 16 is in the frame, and it
+      folds back. This closes the ctrl+o gap (b) (amb-home 31de3192);
+    - FIRSTRUN under a long ask;
+    - ARCHIVED;
+    - INIT, the sidebar, LIGHTS and the inbox block;
+    - R41 (4), (4b) and (5), R36 and DOCKROW;
+    - MSGRIGHT and STEERED;
+    - **P99ROW** in the frame, with a crop;
+    - **FOLDS2**: the thinking row opens to the reasoning.
+  - Amber: voice/voice-real expects the answer to carry his words, and the rich world answers
+    'On it.' The app is right, so the check goes to amb-core.
+  - **Red, new (amb-win)**: a click on '▸ 1 other step', or on the thinking row, jumps the view
+    635 px. The pill is 391 px from the top before the click and 243 px above the window after
+    it, and the frame lands on the steered turn at the end. I looked at FOLDS2-pill-a-closed and
+    -b-open myself. His try 9108fdae never showed a thinking row, so this can't go as a gap his
+    try already has.
+  - The fix: keep the clicked row's top in place when a fold opens. Then qa-native reshoots
+    FOLDS2 alone, and it is a GO.
+
 - **9108fdae: GO for promote, with one amber and three rows open** (ambient-pm, from qa-native
   m_16816; check af83ea41; `~/.bise/gate/try-gate/9108fdae/index.md`). Every shot was looked at
   by qa-native.
