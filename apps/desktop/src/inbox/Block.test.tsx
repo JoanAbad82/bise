@@ -7,6 +7,7 @@ import type { CoreCmd, CorePort } from '@/shared/api';
 import { core_ev } from '@/proto/fixtures.gen';
 import { replay, Store, StoreProvider } from '@/store';
 import { createRouter, RouterContext } from '@/app/router';
+import { emitAction } from '@/app/menu';
 import { asksNotify, InboxBlock, openInbox, type Answering, type Here } from './Block';
 
 afterEach(cleanup);
@@ -14,11 +15,19 @@ afterEach(cleanup);
 const P = 'acme-1a2b3c4d';
 const NOW = 1791100400000;
 
-const mount = (here: Here = { project: P, agent: 'perf' }) => {
+/** core_ev with card 9's question made `lines` long (a long ask folds in the block). */
+const withLong = (lines: number): typeof core_ev =>
+  core_ev.map((e) =>
+    e.ev !== 'projects'
+      ? e
+      : { ...e, projects: e.projects.map((r) => ({ ...r, cards: r.cards?.map((c) => (c.id === 9 ? { ...c, question: Array.from({ length: lines }, (_, i) => `line ${String(i + 1)} of the long ask`).join(String.fromCharCode(10)) } : c)) })) },
+  );
+
+const mount = (here: Here = { project: P, agent: 'perf' }, events: typeof core_ev = core_ev) => {
   const sent: CoreCmd[] = [];
   const port: CorePort = { send: (c) => sent.push(c), onEvent: () => () => undefined, onState: () => () => undefined, state: () => Promise.resolve('up') };
   const store = new Store(port);
-  replay(store, core_ev);
+  replay(store, events);
   const told: (Answering | null)[] = [];
   render(
     <StoreProvider store={store}>
@@ -61,6 +70,21 @@ describe('the inbox block (b2)', () => {
     fireEvent.keyDown(window, { key: 'ArrowRight' });
     fireEvent.keyDown(window, { key: 'Enter', metaKey: true });
     expect(hub()).toEqual([{ cmd: 'answer', project: P, card: 10, reply: '1' }]);
+  });
+
+  it("ctrl+o (the window's 'fold-all'), focus anywhere, opens the open item's long ask whole, again folds it (I8, qa-native f640424d)", () => {
+    mount({ project: P, agent: 'perf' }, withLong(16));
+    fireEvent.click(screen.getByTestId('inbox.block.row.2'));
+    const card = () => screen.getByTestId('inbox.block.open.2').textContent;
+    expect(card()).not.toContain('line 14 of the long ask');
+    act(() => {
+      emitAction('fold-all');
+    });
+    expect(card()).toContain('line 16 of the long ask');
+    act(() => {
+      emitAction('fold-all');
+    });
+    expect(card()).not.toContain('line 14 of the long ask');
   });
 
   it('↑↓ walk the items, esc folds the block', () => {

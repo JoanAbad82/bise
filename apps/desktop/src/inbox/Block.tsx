@@ -14,7 +14,8 @@ import type { NotifyAuth } from '@/shared/api';
 import { Dot, Kbd } from '@/ds';
 import { useProjects, useStore } from '@/store';
 import { shownName } from '@/agents/model';
-import { age, dotOf, InboxCard } from './InboxCard';
+import { age, dotOf, folds, InboxCard } from './InboxCard';
+import { useMenuAction } from '@/app/menu';
 import { cardKey, sortCards } from './order';
 import { pickWaits, takesWords, withConfirmOptions } from './model';
 import { STRIP_KEYS, STRIP_ROWS, stripKey, stripWords } from './stripRows';
@@ -164,9 +165,18 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
   const names = useMemo(() => new Map(rows.map((r) => [r.project, r])), [rows]);
   const openCard = list.find((c) => cardKey(c) === open);
 
+  // ctrl+o (and ⌘E), focus anywhere, the composer's too: the window's capture listener sends
+  // 'fold-all' (app/keys.ts, the TUI's ctrl+o); the open item's folded lines open whole, again fold
+  // them (bar I8, qa-native f640424d); another item opens folded
+  const [whole, setWhole] = useState<string | null>(null);
+  useMenuAction('fold-all', () => {
+    if (openCard !== undefined && folds(openCard.question)) setWhole((w) => (w === open ? null : open));
+  });
+
   const openTo = (k: string | null) => {
     setOpen(k);
     setOn(null);
+    setWhole(null);
   };
 
   // ⌘I and a notification click: that card, else the first item
@@ -330,7 +340,7 @@ export function InboxBlock({ here, onAnswer, now: pinned }: InboxBlockProps) {
                 {...(row?.home === true ? { home: true } : {})}
                 now={now}
                 on={on}
-                full={false}
+                full={whole === cardKey(c)}
                 acts={{
                   pick: (o) => {
                     pick(c, o);
