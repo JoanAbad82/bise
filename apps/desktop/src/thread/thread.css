@@ -434,6 +434,10 @@
 .th-card-line:hover {
   color: var(--c-text);
 }
+/* its '?' waits on him: the accent, as in the sidebar and the inbox rows (designer m_15708) */
+.th-card-mark {
+  color: var(--c-accent);
+}
 
 /* amb-feed's batch 2 rows (b8cb4b1e) */
 .th-think,

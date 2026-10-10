@@ -883,8 +883,18 @@ function CardRow({ e, ctx }: { e: Entry; ctx: RowCtx }) {
         openInbox({ project: ctx.project, card: c.id });
       }}
     >
-      {cardLine(shownName(ctx.agent), c.question, follows)}
+      <CardLineWords text={cardLine(shownName(ctx.agent), c.question, follows)} />
     </button>
+  );
+}
+
+/** The line's '?' in the accent, like every '?' that waits on him; its words dim (designer m_15708). */
+function CardLineWords({ text }: { text: string }) {
+  return (
+    <>
+      <span className="th-card-mark">{text.slice(0, 1)}</span>
+      {text.slice(1)}
+    </>
   );
 }
 
