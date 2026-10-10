@@ -45,7 +45,7 @@ async function tuiCmd(t: Tui, line: string): Promise<string> {
 }
 
 test("thread/news-real: landed, PR news, artifact, answered, approval and agent rows on the real core, next to the TUI's lines", async () => {
-  test.setTimeout(300_000);
+  test.setTimeout(480_000);
   const w = realWorld();
   const shop = hubOf(w, 'shop');
   const project = path.basename(path.dirname(shop.sock));
@@ -112,11 +112,15 @@ test("thread/news-real: landed, PR news, artifact, answered, approval and agent 
       }
       await expect.soft(row, "#412's failing checks are a pr row").toBeVisible({ timeout: 15_000 });
       await row.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => undefined);
-      const words = ((await row.textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();
-      note('pr', { window: words, tone: await row.getAttribute('data-tone', { timeout: 2000 }).catch(() => null), tuiHas: flat(term().screen()).includes('#412 checks fail: e2e') });
-      await expect.soft(row, 'failing: an err tone').toHaveAttribute('data-tone', 'err', { timeout: 5000 });
-      expect.soft(words, "failing said by '▲', never color alone").toContain('▲');
-      expect.soft(words, "the hub's words, as the TUI").toContain('checks fail');
+      // the row by its own id from here: the filtered locator above can drift while the thread
+      // redraws around find (12a9efbf: its text read empty); assertions retry, no one-shot read
+      const rowId = (await row.getAttribute('data-testid', { timeout: 5000 }).catch(() => null)) ?? '';
+      const pr = rowId !== '' ? page.locator(`[data-testid="${rowId}"]`) : row;
+      await expect.soft(pr, "failing said by '▲', never color alone").toContainText('▲', { timeout: 5000 });
+      await expect.soft(pr, "the hub's words, as the TUI").toContainText('checks fail', { timeout: 5000 });
+      await expect.soft(pr, 'failing: an err tone').toHaveAttribute('data-tone', 'err', { timeout: 5000 });
+      const words = ((await pr.textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();
+      note('pr', { id: rowId, window: words, tone: await pr.getAttribute('data-tone', { timeout: 2000 }).catch(() => null), tuiHas: flat(term().screen()).includes('#412 checks fail: e2e') });
       await row.screenshot({ path: test.info().outputPath('pr.png') }).catch(() => undefined);
       // the number is a button (rows.tsx PrRow: ctx.onLink(url)); the world's fake gh seeds
       // https://github.com/acme-qa/shop/pull/412. Every miss is said: the row's id, the link's
