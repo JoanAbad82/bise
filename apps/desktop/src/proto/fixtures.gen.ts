@@ -51,7 +51,7 @@ export const hub_ev: readonly HubEv[] = [
   {"ev":"dev_servers","items":[{"agent":"perf","cmd":"pnpm dev","name":"dev server","port":5173,"up":true,"url":"http://localhost:5173"},{"agent":"docs","cmd":"python3 -m http.server","name":"http server","up":true}],"project":"acme-1a2b3c4d"},
   {"ev":"worktrees","items":[{"agent":"perf","ahead":2,"behind":0,"branch":"sb/perf","dirty":true,"path":"/Users/camille/.bise/worktrees/acme-1a2b3c4d/perf/acme"},{"ahead":0,"behind":0,"branch":"main","dirty":false,"path":"/Users/camille/acme"},{"ahead":0,"behind":3,"branch":"","dirty":false,"head":"e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e","path":"/Users/camille/acme-try"}],"project":"acme-1a2b3c4d"},
   {"agent":"perf","cut":false,"ev":"tool_out","out":"running 40 tests\ntest query::slow ... FAILED\n\nfailures:\n    query::slow","pos":4,"project":"acme-1a2b3c4d"},
-  {"agent":"perf","cut":true,"ev":"tool_out","out":"fn a() {}","pos":7,"project":"acme-1a2b3c4d"},
+  {"agent":"perf","cut":true,"ev":"tool_out","out":"fn a() {}","pos":7,"project":"acme-1a2b3c4d","total":18432},
   {"agent":"old","base":"main","ev":"diff","files":[],"merged":"e0f3df5a9c1b2d3e4f5a6b7c8d9e0f1a2b3c4d5e","note":"old is archived and its folder is gone","project":"acme-1a2b3c4d"},
   {"correct_until_ms":1791100402000,"ev":"route","name":"acme","project":"bise-home-00000000","rid":3,"text":"why does p99 rise","to":"acme-1a2b3c4d","why":"Safari: grafana.acme.test"},
   {"ev":"route_done","project":"bise-home-00000000","rid":3,"state":"sent","to":"acme-1a2b3c4d","xid":7},
