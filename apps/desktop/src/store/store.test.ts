@@ -471,4 +471,35 @@ describe("a diff that answers another view's req (lead m_16528)", () => {
     store.apply({ ev: 'diff', project: P, agent: 'perf', base: 'HEAD~2', files: [] });
     expect(store.diff(P, 'perf'), 'no req: the review asked it').toMatchObject({ base: 'HEAD~2' });
   });
+  it("main's newer hub tags (amb-feed m_16785): state per project; the moments only through onEvent", () => {
+    const { store, sent } = fake();
+    const seen: string[] = [];
+    store.onEvent((ev) => seen.push(ev.ev));
+    store.apply({ ev: 'branches', project: P, base: 'main', rows: [{ branch: 'sb/perf', agents: ['perf'], commits: 2, uncommitted: 1 }] });
+    expect(store.branches(P)).toEqual({ base: 'main', rows: [{ branch: 'sb/perf', agents: ['perf'], commits: 2, uncommitted: 1 }] });
+    store.apply({ ev: 'versions', project: P, current: '9f0e2aa', items: [{ rev: '9f0e2aa', subject: 'fix', marks: ['current'] }] });
+    expect(store.versions(P)).toEqual({ current: '9f0e2aa', dev: false, installed: false, items: [{ rev: '9f0e2aa', subject: 'fix', marks: ['current'] }] });
+    expect(store.flow(P), 'before the hub said').toBeNull();
+    store.apply({ ev: 'flow', project: P, flow: 'pr' });
+    expect(store.flow(P)).toBe('pr');
+    store.apply({ ev: 'flow', project: P });
+    expect(store.flow(P), 'not set').toBeNull();
+    store.apply({ ev: 'pages', project: P, items: [], overdue: 2 });
+    expect(store.pages(P)).toEqual({ items: [], overdue: 2 });
+    store.apply({ ev: 'update', project: P, state: 'building', rev: '1152b33', elapsed: 130 });
+    expect(store.hubUpdate(P)).toMatchObject({ state: 'building', rev: '1152b33', elapsed: 130 });
+    store.apply({ ev: 'update', project: P, state: 'failed', rev: '1152b33', text: "couldn't build", tail: ['error'] });
+    expect(store.hubUpdate(P), 'whole each time').toMatchObject({ state: 'failed', text: "couldn't build", tail: ['error'] });
+    expect(store.hubUpdate(P)).not.toHaveProperty('elapsed');
+    store.apply({ ev: 'release', project: P, state: 'plan', tag: 'v2026.10.3' });
+    expect(store.release(P)).toMatchObject({ state: 'plan', tag: 'v2026.10.3' });
+    // moments: read through onEvent, nothing kept
+    store.apply({ ev: 'card_open', project: P, id: 13 });
+    store.apply({ ev: 'focused', project: P, focus: 'main' });
+    expect(seen.filter((t) => t === 'card_open' || t === 'focused')).toEqual(['card_open', 'focused']);
+    // asks
+    store.askBranches(P);
+    store.askVersions(P);
+    expect(sent.slice(-2)).toEqual([{ cmd: 'branches', project: P }, { cmd: 'versions', project: P }]);
+  });
 });

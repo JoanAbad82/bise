@@ -4,9 +4,9 @@
 // The store comes from StoreContext: the app's one store (bound to
 // window.bise.core) by default, a test's own store through the provider.
 import { createContext, createElement, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
-import type { Account, Agent, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
+import type { Account, Agent, FlowMode, ReleaseEv, UpdateEv, Artifact, ComputerAgent, Card, DevServer, Entry, Feature, Found, IndexRow, Job, JsonValue, Merged, Model, PickCommand, PickSkill, Plugin, ProjectRow, RoleRow, ScheduledTask, Worktree } from '@/proto';
 import type { CorePort, CoreState } from '@/shared/api';
-import { diffKey, toolOutKey, Store, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type ThreadOrder, type VoiceModeState } from './store';
+import { diffKey, toolOutKey, Store, type ToolOut, type Away, type Confirm, type Dictation, type HubLine, type Diff, type FilesAnswer, type Ev, type EvOf, type Pending, type PrsList, type BranchesList, type VersionsList, type PagesList, type ThreadOrder, type VoiceModeState } from './store';
 
 /**
  * Feeds a store from a core port: its live events, then the state events
@@ -84,6 +84,14 @@ export const useScheduled = (project: string): readonly ScheduledTask[] => useSl
 export const useWorktrees = (project: string): readonly Worktree[] => useSlice(`worktrees:${project}`, (s) => s.worktrees(project));
 export const useDevServers = (project: string): readonly DevServer[] => useSlice(`dev_servers:${project}`, (s) => s.devServers(project));
 export const useMerged = (project: string): readonly Merged[] => useSlice(`merged:${project}`, (s) => s.merged(project));
+/** a project's branches (ask with store.askBranches); null before the answer */
+export const useBranches = (project: string): BranchesList | null => useSlice(`branches:${project}`, (s) => s.branches(project));
+export const useVersions = (project: string): VersionsList | null => useSlice(`versions:${project}`, (s) => s.versions(project));
+export const useFlow = (project: string): FlowMode | null => useSlice(`flow:${project}`, (s) => s.flow(project));
+export const usePages = (project: string): PagesList | null => useSlice(`pages:${project}`, (s) => s.pages(project));
+/** /update's build in bise's source tree (amb-feed m_16785): 'updating bise…', then its end */
+export const useHubUpdate = (project: string): UpdateEv | null => useSlice(`update:${project}`, (s) => s.hubUpdate(project));
+export const useRelease = (project: string): ReleaseEv | null => useSlice(`release:${project}`, (s) => s.release(project));
 export const usePrs = (project: string): PrsList | null => useSlice(`prs:${project}`, (s) => s.prs(project));
 export const useModels = (project: string): readonly Model[] => useSlice(`models:${project}`, (s) => s.models(project));
 export const useFeatures = (project: string): readonly Feature[] => useSlice(`features:${project}`, (s) => s.features(project));

@@ -46,6 +46,12 @@ import type {
   ProjectRow,
   ScheduledTask,
   Worktree,
+  BranchRow,
+  FlowMode,
+  Page,
+  ReleaseEv,
+  UpdateEv,
+  VersionItem,
 } from '@/proto';
 import type { CoreCmd, CorePort, CoreState } from '@/shared/api';
 
@@ -104,7 +110,9 @@ export const TAGS = {
   computer_live: true,
   computer_peek: true,
   refused: true,
-  // client-protocol's newer HubEv tags (main 0c3be6b6): known, not applied yet
+  // client-protocol's newer HubEv tags (main 0c3be6b6), applied since amb-win's (amb-feed m_16785):
+  // state per project (branches, versions, flow, pages, release, update), moments read through
+  // onEvent (page_changed, card_open, focused)
   branches: true,
   card_open: true,
   flow: true,
@@ -117,6 +125,26 @@ export const TAGS = {
 } as const satisfies Record<Ev['ev'], true>;
 
 /** A raw event from the core as a typed one, or null (not an object, or a tag the store doesn't know). */
+/** A project's branches, the hub's answer to branches (the /diff branch picker; amb-feed m_16785). */
+export interface BranchesList {
+  readonly base: string;
+  readonly rows: readonly BranchRow[];
+}
+
+/** bise's versions as its hub sees them (/version: current, the list, dev/installed). */
+export interface VersionsList {
+  readonly current: string;
+  readonly dev: boolean;
+  readonly installed: boolean;
+  readonly items: readonly VersionItem[];
+}
+
+/** His pages, newest first, and how many of his promises are late (never a card). */
+export interface PagesList {
+  readonly items: readonly Page[];
+  readonly overdue: number;
+}
+
 /** A project's PR list (the prs event without its tag). */
 export interface PrsList {
   readonly head: string;
@@ -383,6 +411,38 @@ export class Store {
     return this.slice(`models:${project}`, EMPTY);
   }
   /** a project's open PRs as the TUI's /prs (amb-feed 66faffe3): its head, rows, and the 'none' words; null until the hub sent them */
+  /** a project's branches (the answer to branches); null before one */
+  branches(project: string): BranchesList | null {
+    return this.slice<BranchesList | null>(`branches:${project}`, null);
+  }
+  /** bise's versions (state at hello, again after versions) */
+  versions(project: string): VersionsList | null {
+    return this.slice<VersionsList | null>(`versions:${project}`, null);
+  }
+  /** the repo's flow mode: null before the hub said, or when it is not set */
+  flow(project: string): FlowMode | null {
+    return this.slice<FlowMode | null>(`flow:${project}`, null);
+  }
+  /** his pages and the late promises' count; null before the hub said */
+  pages(project: string): PagesList | null {
+    return this.slice<PagesList | null>(`pages:${project}`, null);
+  }
+  /** /update's build in bise's source tree, its latest step; null when none ran */
+  hubUpdate(project: string): UpdateEv | null {
+    return this.slice<UpdateEv | null>(`update:${project}`, null);
+  }
+  /** a /release-bise run (dev builds), its latest step; null when none ran */
+  release(project: string): ReleaseEv | null {
+    return this.slice<ReleaseEv | null>(`release:${project}`, null);
+  }
+  /** ask a project's branches (the answer: branches) */
+  askBranches(project: string): void {
+    this.command({ cmd: 'branches', project });
+  }
+  /** ask bise's versions again (the answer: versions) */
+  askVersions(project: string): void {
+    this.command({ cmd: 'versions', project });
+  }
   prs(project: string): PrsList | null {
     return this.slice<PrsList | null>(`prs:${project}`, null);
   }
@@ -479,6 +539,25 @@ export class Store {
       case 'models':
       case 'jobs':
         this.put(`${ev.ev}:${ev.project}`, ev.items);
+        return;
+      case 'branches':
+        // the answer to branches (scanned on a thread): the review's branch picker
+        this.put(`branches:${ev.project}`, { base: ev.base, rows: ev.rows } satisfies BranchesList);
+        return;
+      case 'versions':
+        this.put(`versions:${ev.project}`, { current: ev.current, dev: ev.dev === true, installed: ev.installed === true, items: ev.items } satisfies VersionsList);
+        return;
+      case 'flow':
+        // the repo's [flow] mode; none = not set
+        this.put(`flow:${ev.project}`, ev.flow ?? null);
+        return;
+      case 'pages':
+        this.put(`pages:${ev.project}`, { items: ev.items, overdue: ev.overdue } satisfies PagesList);
+        return;
+      case 'release':
+      case 'update':
+        // a /release-bise run (dev builds) or /update's build: its latest step, whole each time
+        this.put(`${ev.ev}:${ev.project}`, ev);
         return;
       case 'prs':
         this.put(`prs:${ev.project}`, { head: ev.head, items: ev.items, none: ev.none ?? null } satisfies PrsList);
@@ -625,7 +704,11 @@ export class Store {
       case 'job_end':
       case 'followed_end':
       case 'open':
-        // one-shot: read through onEvent
+      case 'page_changed':
+      case 'card_open':
+      case 'focused':
+        // one-shot: read through onEvent (page_changed: a 'v2 published' moment before the next
+        // pages; card_open: open that card in the inbox; focused: this connection's thread moved)
         return;
     }
   }

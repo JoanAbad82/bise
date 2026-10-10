@@ -2,9 +2,12 @@
 // window.bise.update). 'ready': 'bise <version> is ready · restart', his click swaps the app and
 // reopens it on the screen he is on (nothing installs without the click); 'went_bad': the new app
 // didn't start right, 'go back' to the previous one. Downloading and failed say nothing to him
-// (failed's why is for the log). Owner: amb-win.
+// (failed's why is for the log). HubUpdateLine: bise's own /update build (the hub's update event).
+// Owner: amb-win.
 import { useEffect, useState } from 'react';
 import type { BiseApi, UpdateState } from '@/shared/api';
+import type { UpdateEv } from '@/proto';
+import { useHubUpdate, useProjects } from '@/store';
 import { useRoute } from './router';
 import { formatRoute } from './route';
 
@@ -63,6 +66,40 @@ export function UpdateLine() {
           {busy ? (line.act === 'restart' ? 'restarting…' : 'going back…') : line.act}
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * /update's build in bise's source tree (the hub's update, amb-feed m_16785), on bise's home: while
+ * it builds 'updating bise · 1152b33 · 2 min'; failed: the hub's words with the build's last lines
+ * dim under them; built: nothing here (the switch says the rest in main's thread). Pure.
+ */
+export function hubUpdateLine(u: UpdateEv | null): { text: string; tail: readonly string[]; failed: boolean } | null {
+  if (u === null) return null;
+  if (u.state === 'building') {
+    const s = u.elapsed ?? 0;
+    const took = s >= 60 ? ` · ${String(Math.floor(s / 60))} min` : s > 0 ? ` · ${String(s)} s` : '';
+    return { text: `updating bise · ${u.rev}${took}`, tail: [], failed: false };
+  }
+  if (u.state === 'failed') return { text: `▲ ${u.text ?? `couldn't build ${u.rev}`}`, tail: (u.tail ?? []).slice(-3), failed: true };
+  return null;
+}
+
+export function HubUpdateLine() {
+  const home = useProjects().find((p) => p.home)?.project ?? '';
+  const line = hubUpdateLine(useHubUpdate(home));
+  if (line === null) return null;
+  return (
+    <div className="app-core app-update" role="status" data-testid="app.hubupdate" data-state={line.failed ? 'failed' : 'building'}>
+      <div className="app-core-head">
+        <span>{line.text}</span>
+      </div>
+      {line.tail.length > 0 && (
+        <div className="app-core-last" data-testid="app.hubupdate.tail">
+          {line.tail.join('\n')}
+        </div>
+      )}
     </div>
   );
 }

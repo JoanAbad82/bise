@@ -35,7 +35,8 @@ import { Over, Titlebar, useFrame } from './Frame';
 import { Panel } from './Panel';
 import { numbersOf } from '@/agents/model';
 import { CoreLine } from './CoreLine';
-import { UpdateLine } from './UpdateLine';
+import { HubUpdateLine, UpdateLine } from './UpdateLine';
+import { HubMoments } from './HubMoments';
 import { Palette, usePaletteOpen } from './Palette';
 import { Help } from '@/help/Help';
 import { useTheme } from '@/theme';
@@ -237,6 +238,8 @@ function Current({ top }: { top: ReactNode }) {
       {top}
       <CoreLine />
       <UpdateLine />
+      <HubUpdateLine />
+      <HubMoments />
       <div className="app-screen">
         <ScreenOf key={formatRoute(route)} route={route} />
       </div>
