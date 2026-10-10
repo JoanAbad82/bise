@@ -271,7 +271,7 @@ model and effort, hub confirmations). Each such event gets a fixture the UI repl
 |---|---|---|---|---|---|
 | N2 color alone | NO_COLOR: every color cue has a plain stand-in | turn on macOS increase contrast | every state still reads without its color (a glyph or a word) | amb-kit | qa-type `ds/contrast` |
 
-B16 (how a narrow window lays out) was not checked by tui-parity; ambient-pm checks it on the hand pass.
+B16 (how a narrow window lays out) was not checked by tui-parity. ambient-pm did the hand pass on gate e3f7e598, and it passes at the window's 680 px minimum (see the status table).
 
 ### tui-parity's re-audit at e3f7e598 (b54fa95a): the rows still open (ambient-pm's calls)
 
@@ -480,6 +480,21 @@ isn't judging. A row marked ok names the shot that was looked at.
   every 30m"). The task names show only in the opened pane's head ("fake timer name"), not in the
   list. amb-win is fixing it. The re-cut also carries the chip glyph 3c209f33 and "4 KB of 18 KB
   shown" 91af5059, and qa-native re-checks those rows.
+
+- **e3f7e598: GO for promote, and B16 passes** (ambient-pm m_17331 to ambient-lead m_17326, from
+  qa-native m_17319; `~/.bise/gate/try-gate/e3f7e598/index.md`).
+  - HEADFIT is green:
+    - at 1400, the head is whole;
+    - at 1100 with the panel, the branch drops first, and gift-ui's role is cut with '…' before
+      its chip;
+    - at 800, the name and role move to the titlebar's crumb.
+
+    All in light and dark.
+  - R07-a is green: p99's last 4 actions show in the spot's right column.
+  - The quick set is green.
+  - B16: I did the hand pass on the 680 px shots (see the status table).
+  - Still not proven on a gate: computer use, because qa-flows' check waits on the TUI being
+    ready.
 
 - **29ec1b92: GO for promote** (ambient-pm to ambient-lead m_17219, from qa-native m_17218;
   checks dc8acf60; `~/.bise/gate/try-gate/29ec1b92/index.md`; designer has the sheet). Every shot
@@ -1027,7 +1042,7 @@ No app was run, and no heavy job. Words used:
 |---|---|---|---|
 | Scheduled list at 1100 (f5ff0e72's one red, gate (4)) | **pass (gate 6ef40154)**: at 1100 the list keeps 'what it does · wakes' with the names on screen, and at 800 the task takes the width with '‹ scheduled'. Shots: cut/SCHED-1100 and SCHED-800, looked at by qa-native and ambient-pm | amb-home | none |
 | R40 streaming with the signed animation | **built-no-check on a gate**: amb-core's partial events, and spotlight/streaming (40194604) plus thread/streaming (7c9e6b35) are green in the harness. Never shot on a packed try build. amb-core's streaming bench still waits for a heavy-run slot | amb-core, amb-web, amb-win | the bench, then a qa-native R40 shot on the re-cut (from the first words, frames about 150 ms apart) |
-| R07-a the spotlight's preview of an agent's last actions | **built-no-check on a gate**: spotlight/preview is green in the harness (dece0fe9). The last gate shot (cb1f2b44) showed 2 actions, which was the world's fault | amb-web | qa-native: R07-a on the re-cut, on an agent with 4 actions or more |
+| R07-a the spotlight's preview of an agent's last actions | **pass (gate e3f7e598)**: in the ⌘K spot, with 'p99' selected, the right column shows its last 4 actions, the newest last | amb-web | none |
 | R37 / FOLDS2: the '▸ N other steps' pill and the thinking rows | **built-no-check**: 5234894c and 55ca0e88 build them. They were never shot: a fake turn draws no kind-other tool and no reasoning (qa-native m_14511) | amb-win; amb-tools for the world | amb-tools seeds an agent with a real kind-other tool item and reasoning; qa-native shoots the pill, the thinking row and "thought N s" |
 | S21 PR news | **fail**: in news-real on the real core (12a9efbf), the PR #412 click is green, but the PR row's text read empty and the test hit 300 s. No rerun since | amb-win, amb-feed | qa-flows: `real.sh thread/news-real`, waiting on the row's event |
 | O.6 on the real core | **fail (stale)**: on the real core, app/clicks was red only on the thread.agents hover (12a9efbf). b1 changed the screens since, and there is no real rerun | amb-win | qa-flows: `real.sh app/clicks` |
@@ -1045,7 +1060,7 @@ No app was run, and no heavy job. Words used:
 | N2 color alone | **pass (harness, 10-10)**: ds/contrast is green on the built app (1ad161dd). With increase contrast on, every status dot has its words and its own glyph (∿ working, ✓ done, ! error), and the shots were looked at | amb-kit, amb-home | none |
 | S29/L19 computer use, live | **pass (real core), not proven on a gate**: built in amb-win 69269638 + e93879d4 and amb-core bf199372. qa-flows' thread/computer-use is green on the real core next to the TUI (20c44bf9). On 9108fdae the gate's run of it skipped itself, because its seam probe failed | amb-win, amb-core, qa-native | qa-native: the gate's computer-use run on the next cut, with the seam probe fixed |
 | S.1 no CLI (VM) | **not run**: native/vm/vm-pass is opt-in | amb-mac, qa-native | one VM pass when a heavy slot is free |
-| B16 narrow window | **not checked** | ambient-pm | my hand pass, on the re-cut |
+| B16 narrow window | **pass (hand pass on gate e3f7e598)**: the window's minimum is 680 px (MAIN_SIZE.minWidth). At 680 I looked at a long thread, a thread with tools, the inbox with a card open, settings · models, scheduled with a task open, review, and the sidebar folded and then over the thread. Nothing is cut, overlapping or scrolled sideways, and the keys and the composer sit on one line. The app can't reach 600 or 520 by itself. There, the tool times pass the edge and settings squeezes main's label against its select; that matters only if the minimum is ever lowered | ambient-pm | none |
 | Nits still open | **open**: the docked p99 answer's row in telemetry's thread was not shot (19d26863). The 4 KB output cut now passes on gate 6ef40154: `seq 1 4000` reads '… 4 KB of 18 KB shown' (cut/TOOLLONG, looked at) | amb-win, amb-tools | qa-native's next gate on amb-tools' 63eb6c0a world (with R37/FOLDS2) |
 
 Beyond the rows, the merge needs three more things: designer's GO and mine on the 6ef40154 re-cut,
