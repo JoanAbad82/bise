@@ -41,6 +41,10 @@ const world = () => [
   thread('alpha'),
 ];
 
+const must = <T,>(v: T | null | undefined, why: string): T => {
+  if (v == null) throw new Error(why);
+  return v;
+};
 const field = (page: Page) => page.getByTestId('composer.field');
 const fieldFocused = (page: Page) => field(page).evaluate((el) => el.contains(document.activeElement));
 /** The caret is collapsed at the field's very end. */
@@ -164,6 +168,105 @@ test('composer/type-anywhere: a key or a paste with no field focused lands in th
     await expect(field(page), "alpha's composer got nothing").toHaveText('');
     await page.screenshot({ path: test.info().outputPath('5-settings-keeps.png') });
     await cdp.detach();
+  } finally {
+    await s.close();
+  }
+});
+
+// designer m_16238, ambient-lead m_16248: a key or a paste that lands in the composer never scrolls
+// the thread; the caret appears, his reading place stays (±1 px).
+test('composer/type-anywhere: with the thread scrolled up, a key and a paste land in the composer and the thread does not move', async () => {
+  test.setTimeout(60_000);
+  const long = {
+    ev: 'thread',
+    project: P,
+    agent: 'main',
+    entries: Array.from({ length: 80 }, (_, i) => ({ pos: i + 1, at_ms: 1791100001000 + i * 1000, kind: 'agent', text: `line ${i + 1} of main's long thread, enough words to fill a row` })),
+    before: null,
+    more: false,
+  };
+  const core = new FakeCore([...world().filter((e) => !(e.ev === 'thread' && (e as { agent?: string }).agent === 'main')), long] as never);
+  const s = await launchDesktop({ helper: new FakeHelper(), core, route: `agent/${P}/main` });
+  try {
+    const { page, app } = s;
+    await expect(page.getByTestId('thread.screen'), "main's thread").toHaveAttribute('data-agent', 'main', { timeout: 10_000 });
+    await expect(page.getByTestId('thread.entry.80'), 'the thread opens at its end').toBeVisible({ timeout: 10_000 });
+    const top = () =>
+      page.evaluate(() => {
+        const el = document.querySelector<HTMLElement>('.th-list [data-virtuoso-scroller="true"]');
+        return el === null ? -1 : el.scrollTop;
+      });
+    // scrolled up, far from the end, the way he does it: a wheel up unsticks the list from its
+    // end (ThreadList's stick); a scrollTop set from a script would be pulled back to the end
+    const end = await top();
+    const box = must(await page.locator('.th-list [data-virtuoso-scroller="true"]').boundingBox(), 'the thread list is on screen');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    // up by small steps, to the middle: neither end, so a move either way shows
+    expect(end, 'a thread long enough to scroll').toBeGreaterThan(800);
+    for (let i = 0; i < 20 && (await top()) > end - 600; i += 1) {
+      await page.mouse.wheel(0, -150);
+      await page.waitForTimeout(80);
+    }
+    await page.waitForTimeout(300);
+    const mid = await top();
+    expect(mid, 'the thread scrolls up').toBeLessThan(end - 300);
+    expect(mid, 'not at the top either').toBeGreaterThan(0);
+    await expect(page.getByTestId('thread.entry.80'), 'scrolled up: the last line is out of view').not.toBeInViewport();
+    // the row he reads: the one in the middle of the list, and its y on screen
+    const reading = () =>
+      page.evaluate(() => {
+        const el = document.querySelector<HTMLElement>('.th-list [data-virtuoso-scroller="true"]');
+        const r = el?.getBoundingClientRect();
+        const row = r === undefined ? null : document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest<HTMLElement>('[data-testid^="thread.entry."]');
+        return row == null ? null : { id: row.dataset.testid ?? '', y: row.getBoundingClientRect().top };
+      });
+    const yOf = (id: string) => page.evaluate((t) => document.querySelector(`[data-testid="${t}"]`)?.getBoundingClientRect().top ?? null, id);
+    const stays = async (was: { id: string; y: number }, why: string) => {
+      await page.waitForTimeout(300); // the frames after: a list that re-measures moves late
+      const y = await yOf(was.id);
+      expect(y, `${why}: the row he reads (${was.id}) is still drawn`).not.toBeNull();
+      expect(Math.abs((y ?? 0) - was.y), `${why}: the row he reads stays (was y ${String(was.y)}, now ${String(y)})`).toBeLessThanOrEqual(1);
+    };
+    // focus on no field: a click on the row under the pointer, the way he does it. Not a
+    // locator click: Playwright scrolls its target into view first, a script scroll that the
+    // virtual list then re-measures and corrects ~100 ms later (846 px on this thread), which
+    // is not his
+    const clickAway = async () => {
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+      await page.evaluate(() => document.getSelection()?.removeAllRanges());
+      expect(await fieldFocused(page), 'the composer has no focus').toBe(false);
+      await page.waitForTimeout(300);
+    };
+    await clickAway();
+    const was = must(await reading(), 'a row in the middle of the list');
+    expect(await top(), 'scrolled up, not at the end').toBeLessThan(end - 300);
+
+    // a click in the composer
+    await field(page).click();
+    expect(await fieldFocused(page), 'the click focused the composer').toBe(true);
+    await stays(was, 'a click in the composer');
+
+    // a key, focus on no field: it lands in the composer
+    await clickAway();
+    const was1 = must(await reading(), 'a row in the middle of the list, before the key');
+    await page.keyboard.press('a');
+    await expect(field(page), "'a' lands in the composer").toHaveText('a');
+    expect(await fieldFocused(page), 'the composer has the focus').toBe(true);
+    await stays(was1, 'a key');
+
+    // a paste, focus on no field: it lands in the composer
+    const seeded = await app.evaluate(
+      (_e, text) => (globalThis as unknown as { __biseTestClip?: (o: unknown) => Promise<boolean> }).__biseTestClip?.({ text }) ?? false,
+      ' pasted',
+    );
+    expect(seeded, "main's test hook took the text").toBe(true);
+    await clickAway();
+    const was2 = must(await reading(), 'a row in the middle of the list, before the paste');
+    await page.keyboard.press('Meta+V');
+    await expect(field(page), 'the paste lands in the composer').toHaveText('a pasted');
+    await stays(was2, 'a paste');
+    expect(Math.abs(was2.y - was.y) <= 1 && was2.id === was.id, `three clicks on the list put him nowhere else (${was.id} ${String(was.y)} -> ${was2.id} ${String(was2.y)})`).toBe(true);
+    await page.screenshot({ path: test.info().outputPath('6-no-scroll.png') });
   } finally {
     await s.close();
   }
