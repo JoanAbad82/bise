@@ -386,6 +386,43 @@ export function sideOf(e: Entry | undefined): 'you' | 'them' {
   return 'them';
 }
 
+/** A quote he sent in front of his words: its source ('main', 'src/q.rs:10-11') and its text. */
+export interface SentQuote {
+  readonly source: string;
+  readonly text: string;
+}
+
+const SELECTION = /^\s*<selection((?:\s+\w+="[^"]*")*)\s*>\n?([\s\S]*?)\n?<\/selection>\s*/u;
+
+/**
+ * The quotes the composer put in front of his words (buildMessage's `<selection from="main"
+ * file=".." new="10-11">…</selection>`, quote.rs), and his words after them: his bubble draws each
+ * quote with its rail and source above his words (messages-right v1). None: all words. Pure.
+ */
+export function quotesOf(text: string): { quotes: SentQuote[]; words: string } {
+  const quotes: SentQuote[] = [];
+  let rest = text;
+  for (let m = SELECTION.exec(rest); m !== null; m = SELECTION.exec(rest)) {
+    const attrs = new Map(Array.from((m[1] ?? '').matchAll(/(\w+)="([^"]*)"/gu), (a) => [a[1] ?? '', a[2] ?? '']));
+    const file = attrs.get('file') ?? '';
+    const lines = attrs.get('new') ?? attrs.get('old') ?? '';
+    const source = file !== '' ? `${file}${lines !== '' ? `:${lines}` : ''}` : (attrs.get('from') ?? '');
+    quotes.push({ source, text: (m[2] ?? '').replaceAll('</selection >', '</selection>') });
+    rest = rest.slice(m[0].length);
+  }
+  return { quotes, words: quotes.length === 0 ? text : rest };
+}
+
+/**
+ * Did his message land in the middle of the agent's turn (a steer: ⏎ while it works)? The hub
+ * says nothing of it yet (asked of amb-feed), so the thread tells: the agent's work runs right
+ * before it and goes on right after it. Pure.
+ */
+export function steeredOf(prev: Entry | undefined, next: Entry | undefined): boolean {
+  const work = (x: Entry | undefined): boolean => x !== undefined && (x.kind === 'tools' || x.kind === 'thinking');
+  return work(prev) && next !== undefined && (work(next) || next.kind === 'agent');
+}
+
 /** His bubbles closer than this make one run: its time shows under the last one only. */
 export const RUN_MS = 2 * 60_000;
 

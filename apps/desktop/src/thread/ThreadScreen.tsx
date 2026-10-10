@@ -36,7 +36,7 @@ import { composerWords, dividerEnd, emptyEnter, emptyEnterAct, usageLine } from 
 import { useNow } from '@/app/clock';
 import { SignInLine, useThreadSignIn } from './signin';
 import { ThreadList, type ThreadListHandle } from './ThreadList';
-import { EntryRow, PendingRow, TypingLine, type RowCtx } from './rows';
+import { EntryRow, PendingRow, QueuedRow, TypingLine, type RowCtx } from './rows';
 import { entryKey, pendingKey, posOfKey } from './entry';
 import { FindBar } from './FindBar';
 import { NoProject } from './NoProject';
@@ -556,10 +556,16 @@ const Rows = memo(function Rows({ tkey, project, agent, bise, listRef }: { tkey:
     if (sent > last.current) listRef.current?.scrollToEnd();
     last.current = sent;
   }, [sent, listRef]);
-  const tail = pending.length === 0 ? undefined : (
+  // his messages the hub holds until this agent's turn ends (rows::Agent.queued, draft): dashed
+  // bubbles at the bottom, oldest first; a sent one becomes his normal bubble (messages-right v1)
+  const queued = useAgents(project).find((a) => a.name === agent)?.queued;
+  const tail = pending.length === 0 && (queued ?? []).length === 0 ? undefined : (
     <div className="th-tail">
       {pending.map((p) => (
         <PendingRow key={pendingKey(String(p.cid))} ctx={ctx} cid={p.cid} />
+      ))}
+      {(queued ?? []).map((q) => (
+        <QueuedRow key={`q:${String(q.id)}`} ctx={ctx} q={q} />
       ))}
     </div>
   );

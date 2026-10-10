@@ -1090,8 +1090,12 @@ button.th-sched-head {
   align-self: stretch;
 }
 /* 16 px when the side changes, 4 px between his bubbles in a run */
-.th-row[data-turn='true'] {
-  padding-top: 16px;
+/* 16 px in all: his row ends on 4 px, an agent's on 2 px */
+.th-row[data-turn='true'][data-side='you'] {
+  padding-top: 14px;
+}
+.th-row[data-turn='true'][data-side='them'] {
+  padding-top: 12px;
 }
 .th-row[data-side='you'][data-head='true']:not([data-turn='true']) {
   padding-top: 0;
@@ -1159,7 +1163,17 @@ button.th-sched-head {
   text-align: right;
 }
 /* a bubble inside a run: its time on hover only */
+/* a bubble inside a run: its time on hover only, beside the bubble, taking no room (so a run's
+   bubbles sit 4 px apart, designer m_16246) */
+.th-you {
+  position: relative;
+}
 .th-you-under.th-hover {
+  position: absolute;
+  right: calc(100% + 8px);
+  bottom: 2px;
+  margin: 0;
+  white-space: nowrap;
   opacity: 0;
   transition: opacity var(--d-fast) var(--ease-out);
 }
@@ -1206,4 +1220,20 @@ button.th-sched-head {
   .th-you {
     max-width: min(85%, calc(100% - 48px));
   }
+}
+/* a quote he sent: first in his bubble, its rail and its source, then his words */
+.th-you-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 8px;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--c-line-strong, var(--c-line));
+  color: var(--c-text-2);
+  font: var(--t-13)/1.45 var(--font-read);
+  white-space: pre-wrap;
+}
+.th-you-quote-src {
+  font: var(--t-12) var(--font-ui);
+  color: var(--c-text-3);
 }

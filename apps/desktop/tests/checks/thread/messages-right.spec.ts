@@ -26,7 +26,8 @@ const world = () => [
     ],
   },
   { ev: 'welcome', project: P, proto: 1, workspace: '/nowhere/shop', name: 'shop' },
-  { ev: 'agents', project: P, agents: [ag('main'), ag('perf')] },
+  // a message the hub holds until main's turn ends (rows::Agent.queued): a dashed bubble at the bottom
+  { ev: 'agents', project: P, agents: [{ ...ag('main'), queued: [{ id: 1, text: 'then open a PR', created_ms: NOW - MIN }] }, ag('perf')] },
   {
     ev: 'thread',
     project: P,
@@ -44,6 +45,13 @@ const world = () => [
       // his answer to a card: his side, '✓ you answered perf' over his words
       { pos: 8, at_ms: NOW - 8 * MIN, kind: 'approval', text: 'you answered perf: 1 · merge', approval: { ok: true, text: 'you answered perf: 1 · merge' } },
       { pos: 9, at_ms: NOW - 6 * MIN, kind: 'agent', text: 'merged. the thumbnails are 380 KB now.' },
+      // a steer (amb-tools' 7335fde7 seed): his words land between the agent's work of one turn
+      { pos: 10, at_ms: NOW - 5 * MIN, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 10, at_ms: NOW - 5 * MIN, text: 'pnpm bench', kind: 'run', state: 'ok', ms: 6000 }] } },
+      { pos: 11, at_ms: NOW - 4 * MIN, kind: 'you', text: 'also try webp' },
+      { pos: 12, at_ms: NOW - 4 * MIN + 2000, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 12, at_ms: NOW - 4 * MIN + 2000, text: 'pnpm bench --webp', kind: 'run', state: 'ok', ms: 4000 }] } },
+      { pos: 13, at_ms: NOW - 3 * MIN, kind: 'agent', text: 'webp saves another 30%, as you asked mid-way.' },
+      // a quote he sent (the composer's <selection>): first in his bubble, its rail and source
+      { pos: 14, at_ms: NOW - 2 * MIN, kind: 'you', text: '<selection from="main">\nwebp saves another 30%.\n</selection>\nis that on the tablets too?' },
     ],
     before: null,
     more: false,
@@ -97,7 +105,7 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
         const rows = await boxes();
         const his = rows.filter((r) => r.side === 'you');
         const theirs = rows.filter((r) => r.side === 'them');
-        expect(his.map((r) => r.id), `${t} ${String(w)}: his rows on his side`).toEqual(['thread.entry.1', 'thread.entry.3', 'thread.entry.4', 'thread.entry.6', 'thread.entry.8']);
+        expect(his.map((r) => r.id), `${t} ${String(w)}: his rows on his side`).toEqual(['thread.entry.1', 'thread.entry.3', 'thread.entry.4', 'thread.entry.6', 'thread.entry.8', 'thread.entry.11', 'thread.entry.14', 'thread.queued.1']);
         for (const r of his) {
           expect.soft(r.box, `${t} ${String(w)} ${r.id}: a bubble`).not.toBeNull();
           if (r.box === null) continue;
@@ -118,6 +126,19 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
       }
     }
     await size(1100);
+    // at the bottom while the list rests there (the virtual list draws what shows): a quote, its
+    // source and text first in his bubble, then his words, never the raw tag; a queued bubble
+    await expect(page.getByTestId('thread.you.14.quote.1')).toContainText('main');
+    await expect(page.getByTestId('thread.you.14.quote.1')).toContainText('webp saves another 30%.');
+    expect(await page.getByTestId('thread.you.14').innerText()).not.toContain('<selection');
+    // queued: a dashed bubble, 'queued · sends when …'s turn ends'
+    await expect(page.getByTestId('thread.queued.1.bubble.under')).toHaveText(/^queued · sends when \S+'s turn ends$/u);
+    expect(await page.getByTestId('thread.queued.1').locator('.th-bubble').evaluate((b) => getComputedStyle(b).borderTopStyle)).toBe('dashed');
+    await page.mouse.move(1, 300);
+    await page.screenshot({ path: test.info().outputPath('cases-light-1100.png') });
+    await core.send(prefs('dark') as never);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: test.info().outputPath('cases-dark-1100.png') });
     // the time: under the last bubble of a 2 min run; on hover for the one before
     const op = (id: string) => page.getByTestId(id).evaluate((e) => Number(getComputedStyle(e).opacity));
     expect(await op('thread.you.4.under'), 'the last of the run shows its time').toBe(1);
@@ -130,6 +151,20 @@ test('thread/messages-right: his words on the right in a bubble, agents on the l
     // his answer to a card: '✓ you answered perf' dim over his words
     await expect(page.getByTestId('thread.approval.8.head')).toHaveText('✓you answered perf');
     await expect(page.getByTestId('thread.approval.8.words')).toHaveText('1 · merge');
+    // designer m_16246: the bottom-right corner 6 px, the others 16; a run's bubbles 4 px apart
+    const corners = await page.getByTestId('thread.you.1').locator('.th-bubble').evaluate((b) => {
+      const s = getComputedStyle(b);
+      return [s.borderTopLeftRadius, s.borderTopRightRadius, s.borderBottomRightRadius, s.borderBottomLeftRadius];
+    });
+    expect(corners).toEqual(['16px', '16px', '6px', '16px']);
+    const gap = await page.evaluate(() => {
+      const a = document.querySelector('[data-testid="thread.you.3"] .th-bubble')?.getBoundingClientRect();
+      const b = document.querySelector('[data-testid="thread.you.4"] .th-bubble')?.getBoundingClientRect();
+      return a && b ? b.top - a.bottom : -1;
+    });
+    expect(Math.round(gap), "a run's bubbles 4 px apart").toBe(4);
+    // a steer: 'steered · bise read it mid-turn' under it (bise: this is shop's main, named bise)
+    await expect(page.getByTestId('thread.you.11.under')).toHaveText(/^steered · \S+ read it mid-turn$/u);
   } finally {
     await s.close();
     core.dispose();

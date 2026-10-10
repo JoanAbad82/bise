@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, lastOfRun, sideOf, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, lastOfRun, quotesOf, sideOf, steeredOf, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -261,5 +261,21 @@ describe('messages-right v1: whose side a row is on', () => {
     expect(lastOfRun(e('you', 'a'), e('you', 'b', at + RUN_MS + 1))).toBe(true);
     expect(lastOfRun(e('you', 'a'), e('agent', 'b', at + 1000))).toBe(true);
     expect(lastOfRun(e('you', 'a'), undefined)).toBe(true);
+  });
+});
+
+describe('messages-right v1: a quote, a steer', () => {
+  const e = (kind: string): Entry => ({ pos: 1, at_ms: 1, kind, text: '' }) as unknown as Entry;
+  it("reads the composer's quotes in front of his words, with their source", () => {
+    expect(quotesOf('<selection from="main">\nAgreed on the api.\n</selection>\nis that still true?')).toEqual({ quotes: [{ source: 'main', text: 'Agreed on the api.' }], words: 'is that still true?' });
+    expect(quotesOf('<selection from="perf vs main" file="src/q.rs" new="10-11">\nfn a() {}\n</selection>\nwhy?').quotes).toEqual([{ source: 'src/q.rs:10-11', text: 'fn a() {}' }]);
+    expect(quotesOf('no quote here')).toEqual({ quotes: [], words: 'no quote here' });
+  });
+  it("a steer lands in the agent's work: its tools before, its work or answer right after", () => {
+    expect(steeredOf(e('tools'), e('tools'))).toBe(true);
+    expect(steeredOf(e('tools'), e('agent'))).toBe(true);
+    expect(steeredOf(e('agent'), e('tools'))).toBe(false);
+    expect(steeredOf(e('tools'), undefined)).toBe(false);
+    expect(steeredOf(e('tools'), e('you'))).toBe(false);
   });
 });

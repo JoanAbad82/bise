@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay, threadKey } from '@/store';
-import { approvalParts, cutWords, EntryRow, type RowCtx, withoutImageMarks } from './rows';
+import { answeredMark, approvalParts, cutWords, EntryRow, type RowCtx, withoutImageMarks } from './rows';
 import { ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
 
@@ -225,5 +225,14 @@ describe('his answer to a card, on his side', () => {
     expect(approvalParts('you answered main: this one')).toEqual({ head: 'you answered main', words: 'this one' });
     expect(approvalParts('you answered gift-ui')).toEqual({ head: 'you answered gift-ui', words: '' });
     expect(approvalParts('you answered perf: 1 · merge')).toEqual({ head: 'you answered perf', words: '1 · merge' });
+  });
+});
+
+describe("his answer's mark", () => {
+  it('✓ only when the hub says allowed, ✕ only when it says no, a neutral · when it says nothing (lead m_16314)', () => {
+    expect(answeredMark(true)).toBe('✓');
+    expect(answeredMark(false)).toBe('✕');
+    expect(answeredMark(undefined)).toBe('·');
+    expect(answeredMark(null)).toBe('·');
   });
 });
