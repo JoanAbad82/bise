@@ -432,7 +432,13 @@ by: string,
 /**
  * its words, what the agent reads at each run
  */
-words: string, every: string, times?: number | null, done: number, next_ms?: number | null, until_ms?: number | null, 
+words: string, 
+/**
+ * its name, what the lists show (sched-names): the hub's model's or
+ * `--name`, else the plain fallback of its words; always filled by
+ * the hub (empty only from an older one)
+ */
+name?: string, every: string, times?: number | null, done: number, next_ms?: number | null, until_ms?: number | null, 
 /**
  * the page it keeps fresh (`--page`)
  */
