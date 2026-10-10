@@ -142,3 +142,71 @@ test("thread/delivery: ✓ got it faint, ✓✓ read it dim after the time under
     await s.close();
   }
 });
+
+// designer m_17197: one frame with a ✓ bubble, a ✓✓ bubble, a steered one and a spoken one
+// ('said · 0:0N ✓✓'), light and dark at 1100. The spoken turn goes through voice mode as the core
+// sends it (hearing -> sending -> his entry), then voice mode closes so the composer is back.
+test('thread/delivery: the four marks in one frame (✓, ✓✓, steered, said ✓✓), light and dark', async () => {
+  test.setTimeout(90_000);
+  const A = 'acme-1a2b3c4d';
+  const ASKED = 'now do the same for the tablet sizes';
+  const vm = (state: string, extra: Record<string, unknown> = {}) => ({ ev: 'voice_mode', project: A, agent: 'perf', on: true, state, ...extra });
+  const core = new FakeCore([
+    prefs('light'),
+    {
+      ev: 'projects',
+      projects: [
+        { project: 'bise-home-00000000', name: 'bise', path: '/nowhere', git: false, home: true, order: 0, agents: 1, working: 0, waits: 0, running: true },
+        { project: A, name: 'acme', path: '/nowhere/acme', git: true, home: false, order: 1, agents: 2, working: 0, waits: 0, running: true },
+      ],
+    },
+    { ev: 'roles', items: [{ about: 'speech to text', kind: 'voice', model: 'mistral/voxtral-mini-latest', name: 'voice', role: 'voice', source: 'env' }] },
+    { ev: 'welcome', project: A, proto: 1, workspace: '/nowhere/acme', name: 'acme' },
+    { ev: 'agents', project: A, agents: [ag('main'), ag('perf')] },
+    {
+      ev: 'thread',
+      project: A,
+      agent: 'perf',
+      entries: [
+        { pos: 1, at_ms: NOW - 20 * MIN, kind: 'you', msg_id: 21, delivery: 'read', text: 'cap the thumbnails at 400 KB' },
+        { pos: 2, at_ms: NOW - 18 * MIN, kind: 'agent', text: 'capped. running the bench three more times…' },
+        { pos: 3, at_ms: NOW - 12 * MIN + 1000, kind: 'you', msg_id: 22, delivery: 'read', steered_at: 4, text: 'also try webp' },
+        { pos: 4, at_ms: NOW - 12 * MIN, kind: 'tools', text: 'ran 1 command', tools: { count: 1, summary: 'ran 1 command', items: [{ pos: 4, at_ms: NOW - 12 * MIN, text: 'pnpm bench --webp', kind: 'run', state: 'ok', ms: 4000 }] } },
+        { pos: 5, at_ms: NOW - 10 * MIN, kind: 'agent', text: 'webp saves another 30%. still benching the phones…' },
+        { pos: 6, at_ms: NOW - 8 * MIN, kind: 'you', msg_id: 23, delivery: 'received', text: 'and keep the old jpegs for a week' },
+        { pos: 7, at_ms: NOW - 6 * MIN, kind: 'agent', text: 'done: phones 380 KB, the old jpegs stay until friday.' },
+      ],
+      before: null,
+      more: false,
+    },
+  ] as unknown as ConstructorParameters<typeof FakeCore>[0]);
+  const s = await launchDesktop({ core, route: `agent/${A}/perf`, size: '1100x760' });
+  try {
+    const { page } = s;
+    await expect(page.getByTestId('thread.you.6')).toBeVisible({ timeout: 10_000 });
+    // his spoken turn: ∿ turns voice mode on, heard for ~1 s, sent, then his entry lands (read: perf was idle)
+    await page.getByTestId('composer.voice').click();
+    await core.waitCmd((c) => c.cmd === 'voice_mode', 3000);
+    await core.send(vm('listening') as never);
+    await core.send(vm('hearing', { heard: ASKED }) as never);
+    await page.waitForTimeout(1100);
+    await core.send(vm('sending', { heard: ASKED }) as never);
+    await core.send(vm('thinking') as never);
+    await core.send({ ev: 'entry', project: A, agent: 'perf', entry: { pos: 8, at_ms: Date.now(), kind: 'you', msg_id: 24, delivery: 'read', text: ASKED } } as never);
+    await expect(page.getByTestId('thread.you.8.under')).toHaveText(/^said · 0:0[1-3] ✓✓$/u, { timeout: 3000 });
+    await core.send({ ev: 'entry', project: A, agent: 'perf', entry: { pos: 9, at_ms: Date.now(), kind: 'agent', text: 'on it: the 768 and 1024 sizes.' } } as never);
+    await core.send({ ev: 'voice_mode', project: A, agent: 'perf', on: false, state: 'listening' } as never);
+    await expect(page.getByTestId('thread.you.6.under')).toHaveText(/^\d\d:\d\d ✓$/u);
+    await expect(page.getByTestId('thread.you.1.under')).toHaveText(/^\d\d:\d\d ✓✓$/u);
+    await expect(page.getByTestId('thread.you.3.under')).toHaveText(/^steered · perf read it mid-turn$/u);
+    for (const t of ['light', 'dark'] as const) {
+      await core.send(prefs(t) as never);
+      await expect.poll(() => page.evaluate(() => document.documentElement.dataset['theme']), { timeout: 5000 }).toBe(t);
+      await page.mouse.move(1, 300);
+      await page.waitForTimeout(300);
+      await page.screenshot({ path: test.info().outputPath(`marks-${t}-1100.png`) });
+    }
+  } finally {
+    await s.close();
+  }
+});
