@@ -2,7 +2,7 @@
 //! a fake world behind the Setup port, no HOME, no browser, no key store.
 
 use super::*;
-use crate::ambient::setup::{CuPorts, Done, Entry, RegistryOp, SetupPorts};
+use crate::ambient::setup::{CuPorts, Done, Entry, KeychainPort, RegistryOp, SetupPorts};
 use bise_home::projects::Row;
 use bise_proto::draft::{Account, Plugin, PluginLogin, RoleRow};
 use std::cell::RefCell;
@@ -36,6 +36,11 @@ struct World {
     /// S.6: the release channel's reads (the channel of the last one)
     manifest_reads: usize,
     manifest: Option<std::sync::mpsc::Sender<Done>>,
+    /// N1: where the fake keeps the secrets ('file' at start), the moves asked (true: to the
+    /// keychain) and the running move's channel, to end it from the test
+    keychain: Option<String>,
+    keychain_moves: Vec<bool>,
+    keychain_tx: Option<std::sync::mpsc::Sender<Done>>,
 }
 
 fn rows() -> Vec<Row> {
@@ -50,6 +55,7 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
     let (n, o, q, r, u, v) = (w.clone(), w.clone(), w.clone(), w.clone(), w.clone(), w.clone());
     let (x, y, z) = (w.clone(), w.clone(), w.clone());
     let mf = w.clone();
+    let (kn, ks) = (w.clone(), w.clone());
     t.core.set_setup(SetupPorts {
         prefs: Box::new(move || a.borrow().prefs.clone()),
         write_prefs: Box::new(move |v| {
@@ -172,6 +178,14 @@ fn setup(t: &mut T) -> Rc<RefCell<World>> {
             w.manifest_reads += 1;
             w.manifest = Some(tx);
         }),
+        keychain: KeychainPort {
+            now: Box::new(move || kn.borrow().keychain.clone().unwrap_or_else(|| "file".into())),
+            switch: Box::new(move |on, tx| {
+                let mut w = ks.borrow_mut();
+                w.keychain_moves.push(on);
+                w.keychain_tx = Some(tx);
+            }),
+        },
     });
     w
 }
@@ -570,4 +584,78 @@ fn app_version_reads_the_channel_and_a_newer_app_is_said_once_per_asking() {
     t.until(|o| !evs(o, "commands").is_empty());
     assert!(evs(&t.take(), "app_update").is_empty());
     assert_eq!(w.borrow().manifest_reads, 4);
+}
+
+/// N1: the fake move ends: where the secrets are now, and its lines.
+fn keychain_ends(t: &mut T, w: &Rc<RefCell<World>>, store: &str, lines: &[&str], failed: bool) {
+    let tx = w.borrow_mut().keychain_tx.take().expect("a move runs");
+    if !failed {
+        w.borrow_mut().keychain = Some(store.into());
+    }
+    // what came before the move's end stays with the caller's earlier take
+    let _ = t.take();
+    tx.send(Done::Keychain { lines: lines.iter().map(|l| (*l).to_string()).collect(), failed }).unwrap();
+    t.until(|o| evs(o, "keychain").iter().any(|e| e["moving"] == false));
+}
+
+#[test]
+fn keychain_says_where_the_secrets_are_at_start_and_on_ask() {
+    let mut t = T::new();
+    let _w = setup(&mut t);
+    t.core.app_start();
+    t.out.extend(t.core.take_out());
+    let o = t.take();
+    let k = evs(&o, "keychain");
+    assert_eq!(k.len(), 1, "once at start: {o:?}");
+    assert_eq!(k[0]["store"], "file");
+    assert_eq!(k[0]["moving"], false);
+    app(&mut t, r#"{"cmd":"keychain"}"#);
+    let o = t.take();
+    assert_eq!(evs(&o, "keychain").len(), 1, "a bare keychain asks: {o:?}");
+}
+
+#[test]
+fn keychain_on_moves_the_secrets_on_its_thread_and_says_the_lines_at_its_end() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    app(&mut t, r#"{"cmd":"keychain","to":"on"}"#);
+    assert_eq!(w.borrow().keychain_moves, vec![true], "the port moves them to the keychain");
+    let o = t.take();
+    let k = evs(&o, "keychain");
+    assert_eq!(k.last().unwrap()["moving"], true, "moving while it runs: {o:?}");
+    // a second move while one runs is refused, never queued
+    app(&mut t, r#"{"cmd":"keychain","to":"off"}"#);
+    assert_eq!(w.borrow().keychain_moves, vec![true], "never queued");
+    let o = t.take();
+    assert!(evs(&o, "error").iter().any(|e| e["cmd"] == "keychain"), "refused with a line: {o:?}");
+    keychain_ends(&mut t, &w, "keychain", &["moved 3 items to the macOS keychain"], false);
+    let o = t.take();
+    let k = evs(&o, "keychain");
+    let last = k.last().unwrap();
+    assert_eq!(last["store"], "keychain");
+    assert_eq!(last["moving"], false);
+    assert_eq!(last["lines"][0], "moved 3 items to the macOS keychain");
+    assert!(last.get("failed").is_none());
+    // and back
+    app(&mut t, r#"{"cmd":"keychain","to":"off"}"#);
+    assert_eq!(w.borrow().keychain_moves, vec![true, false]);
+    keychain_ends(&mut t, &w, "file", &["moved 3 items back to files in ~/.bise"], false);
+    let o = t.take();
+    assert_eq!(evs(&o, "keychain").last().unwrap()["store"], "file");
+}
+
+#[test]
+fn a_failed_keychain_move_says_it_and_another_word_is_refused() {
+    let mut t = T::new();
+    let w = setup(&mut t);
+    app(&mut t, r#"{"cmd":"keychain","to":"on"}"#);
+    keychain_ends(&mut t, &w, "file", &["the keychain is locked: nothing moved"], true);
+    let o = t.take();
+    let last = evs(&o, "keychain").last().copied().unwrap().clone();
+    assert_eq!(last["store"], "file");
+    assert_eq!(last["failed"], true);
+    app(&mut t, r#"{"cmd":"keychain","to":"maybe"}"#);
+    let o = t.take();
+    assert!(evs(&o, "error").iter().any(|e| e["cmd"] == "keychain" && e["text"].as_str().unwrap_or("").contains("on or off")), "{o:?}");
+    assert_eq!(w.borrow().keychain_moves, vec![true], "no move for a wrong word");
 }

@@ -566,12 +566,26 @@ pub enum CoreEv {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         why: Option<String>,
     },
+    /// N1 (the TUI's /keychain): where his keys and sign-ins are kept,
+    /// `keychain` (the macOS keychain) or `file` (files in ~/.bise), and
+    /// the last move's lines (item names and counts, never a secret);
+    /// `moving` while a move runs on its own thread (a locked keychain
+    /// asks ~2 s an item). Sent at the core's start, on `keychain`, and at
+    /// a move's start and end
+    Keychain {
+        store: String,
+        moving: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        lines: Vec<String>,
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        failed: bool,
+    },
     #[serde(skip)]
     Unknown { tag: String, raw: Value },
 }
 
 impl CoreEv {
-    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek"];
+    pub const TAGS: &'static [&'static str] = &["projects", "open", "prefs", "accounts", "signing", "found", "away_summary", "plugins", "computer_use", "level", "heard", "dictation", "voice_mode", "voice_answer", "commands", "skills", "files", "roles", "app_update", "hub_refused", "index", "setup_first", "computer_live", "computer_peek", "keychain"];
 
     pub fn decode(line: &str) -> Result<CoreEv, String> {
         decode(parse(line)?, "ev", Self::TAGS, |tag, raw| CoreEv::Unknown { tag, raw })
@@ -752,6 +766,14 @@ pub enum AppCmd {
     /// R8: the setup a `setup_first` opened closed without the provider
     /// working: the held `/model` line is dropped
     SetupFirstCancel,
+    /// N1 (the TUI's /keychain [on|off]): `on` moves his keys and sign-ins
+    /// to the macOS keychain, `off` back to files in ~/.bise, none just
+    /// asks where they are; answered by `keychain` (a second move while
+    /// one runs: `error {cmd: keychain}`, never queued)
+    Keychain {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to: Option<String>,
+    },
     /// S29: his act on an agent's computer use, by its `computer_live`
     /// key: `take` (he takes over: it pauses), `hand_back` (it goes on),
     /// `stop` (as the TUI's /stop), `peek` (a still, `max_width` px wide
@@ -816,6 +838,7 @@ impl AppCmd {
         "files",
         "file_picked",
         "setup_first_cancel",
+        "keychain",
         "setup_check",
         "role_set",
         "computer",

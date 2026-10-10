@@ -207,6 +207,9 @@ export const core_ev: readonly CoreEv[] = [
   {"ev":"computer_live","items":[]},
   {"ev":"computer_peek","key":"9f2c4e1a7b3d5e60.perf","shot":{"at_ms":1760000006000,"data":"/9j/4AAQSkZJRgABAQAAAQABAAD/2w==","height":800,"mime":"image/jpeg","width":1280}},
   {"ev":"computer_peek","key":"9f2c4e1a7b3d5e60.docs","why":"not_found"},
+  {"ev":"keychain","moving":false,"store":"file"},
+  {"ev":"keychain","lines":["moved 3 items to the macOS keychain: auth.json's 2 sign-ins, 1 MCP login"],"moving":false,"store":"keychain"},
+  {"ev":"keychain","moving":true,"store":"file"},
 ];
 
 /** rust/proto/fixtures/app_cmd.jsonl */
@@ -265,6 +268,8 @@ export const app_cmd: readonly AppCmd[] = [
   {"cmd":"hub_retry","project":"shop-5e6f7a8b"},
   {"act":"take","cmd":"computer","key":"9f2c4e1a7b3d5e60.perf"},
   {"act":"peek","cmd":"computer","key":"9f2c4e1a7b3d5e60.perf","max_width":960},
+  {"cmd":"keychain","to":"on"},
+  {"cmd":"keychain"},
 ];
 
 /** rust/proto/fixtures/draft_hub_cmd.jsonl */

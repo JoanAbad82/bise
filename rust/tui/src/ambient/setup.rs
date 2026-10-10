@@ -43,6 +43,9 @@ pub enum Done {
     /// `latest.json` (Err: why not), the channel's base URL, this Mac's
     /// target
     Manifest { text: Result<String, String>, base: String, target: String },
+    /// N1: a /keychain move ended: its lines (item names and counts,
+    /// never a secret) and whether it failed
+    Keychain { lines: Vec<String>, failed: bool },
 }
 
 /// A repo the walk found.
@@ -143,6 +146,52 @@ pub struct SetupPorts {
     /// the binary wires `bise update`'s own fetch; none here (a core
     /// without it never offers an update)
     pub manifest: ManifestFn,
+    /// N1 (the TUI's /keychain): where the secrets are and the move
+    pub keychain: KeychainPort,
+}
+
+/// N1: his keys and sign-ins, in the macOS keychain or in files. `now`
+/// says where (`keychain` or `file`); `switch(to_keychain, tx)` moves
+/// them on its own thread and sends `Done::Keychain` at its end. The live
+/// one is bise_catalog's secrets_cli::switch (the TUI's /keychain); a
+/// test's is a fake (never /usr/bin/security).
+pub struct KeychainPort {
+    pub now: Box<dyn Fn() -> String>,
+    pub switch: Box<dyn Fn(bool, Sender<Done>)>,
+}
+
+/// The keychain port bise uses: bise_catalog's secrets_cli, as the TUI's
+/// keychain.rs (auth.json and the MCP logins; off macOS its line says so).
+pub fn live_keychain() -> KeychainPort {
+    // the TUI's own paths and setting (architect m_17309: one builder, crate::keychain's)
+    use crate::keychain::paths;
+    KeychainPort {
+        now: Box::new(|| store_word(crate::keychain::now()).into()),
+        switch: Box::new(|on, tx| {
+            std::thread::spawn(move || {
+                let to = if on { bise_secrets::Store::Keychain } else { bise_secrets::Store::File };
+                // a panic in the move still ends it (amb-core m_17305): else the core stays
+                // 'moving' and refuses every later /keychain until a restart
+                let done = std::panic::catch_unwind(|| bise_catalog::secrets_cli::switch(&paths(), &bend_plugins::oauth::store_dir(), Some(to), cfg!(target_os = "macos")));
+                let d = match done {
+                    Ok(o) => Done::Keychain { lines: o.lines, failed: o.failed },
+                    Err(why) => {
+                        let why = why.downcast_ref::<&str>().map(|s| (*s).to_string()).or_else(|| why.downcast_ref::<String>().cloned()).unwrap_or_else(|| "an error".into());
+                        Done::Keychain { lines: vec![format!("the move stopped: {why}")], failed: true }
+                    }
+                };
+                let _ = tx.send(d);
+            });
+        }),
+    }
+}
+
+/// The event's word for where the secrets are.
+pub fn store_word(s: bise_secrets::Store) -> &'static str {
+    match s {
+        bise_secrets::Store::Keychain => "keychain",
+        _ => "file",
+    }
 }
 
 /// Each role's model and effort as the TUI's `/models` screen reads
@@ -478,6 +527,7 @@ pub fn live(flow: FlowFn) -> SetupPorts {
         plugin_logout: Box::new(|ws, name| crate::plugins::logout(ws, name).map(|_| ())),
         // the harness binary sets bise update's fetch (crate harness)
         manifest: Box::new(|_| {}),
+        keychain: live_keychain(),
         cu: CuPorts {
             is_on: Box::new(crate::computer_use::is_on),
             set_on: Box::new(crate::computer_use::set_on),

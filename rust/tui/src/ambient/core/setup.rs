@@ -46,6 +46,7 @@ pub const TAGS: &[&str] = &[
     "role_set",
     "app_version",
     "setup_first_cancel",
+    "keychain",
 ];
 
 /// Computer use's setup check stops this long after the page's last
@@ -85,6 +86,10 @@ pub(crate) struct Setup {
     pub(super) update: super::app_update::UpdateCheck,
     /// R8: his `/model` line held until its provider works
     held: Option<Held>,
+    /// N1: a /keychain move runs (a second one is refused, never queued)
+    keychain_moving: bool,
+    /// N1: the last move's lines and whether it failed
+    keychain_said: (Vec<String>, bool),
 }
 
 /// R8 (the TUI's sb.rs /model, architect m_12214): a `/model <model>`
@@ -114,7 +119,7 @@ impl Core {
     /// The setup's ports (the binary's live ones, or a test's).
     pub fn set_setup(&mut self, ports: SetupPorts) {
         let (tx, rx) = channel();
-        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), cu: None, update: Default::default(), held: None });
+        self.setup = Some(Setup { ports, tx, rx, signing: None, logins: Vec::new(), cu: None, update: Default::default(), held: None, keychain_moving: false, keychain_said: (Vec::new(), false) });
     }
 
     /// R8: his `/model <model>` in `agent`'s view, before it goes to the
@@ -167,6 +172,45 @@ impl Core {
         self.emit_prefs();
         self.emit_accounts();
         self.emit_roles();
+        self.emit_keychain();
+    }
+
+    /// N1: where his secrets are, and the last move's lines.
+    fn emit_keychain(&mut self) {
+        let Some(s) = &self.setup else { return };
+        let store = (s.ports.keychain.now)();
+        let (lines, failed) = s.keychain_said.clone();
+        let mut ev = json!({"ev": "keychain", "store": store, "moving": s.keychain_moving});
+        if !lines.is_empty() {
+            ev["lines"] = json!(lines);
+        }
+        if failed {
+            ev["failed"] = json!(true);
+        }
+        self.emit(ev);
+    }
+
+    /// N1 (the TUI's /keychain [on|off]): none says where; `on`/`off`
+    /// starts the move on its thread (its end on the tick).
+    fn keychain(&mut self, to: Option<String>) -> Result<(), String> {
+        let on = match to.as_deref() {
+            None => {
+                self.emit_keychain();
+                return Ok(());
+            }
+            Some("on") => true,
+            Some("off") => false,
+            Some(_) => return Err("/keychain takes on or off.".into()),
+        };
+        let Some(s) = self.setup.as_mut() else { return Err("this core has no setup".into()) };
+        if s.keychain_moving {
+            return Err("a move of your keys is still running: wait for its end".into());
+        }
+        s.keychain_moving = true;
+        s.keychain_said = (Vec::new(), false);
+        (s.ports.keychain.switch)(on, s.tx.clone());
+        self.emit_keychain();
+        Ok(())
     }
 
     /// Each role's model and effort (V17).
@@ -226,6 +270,7 @@ impl Core {
                 }
                 ("key_set", res)
             }
+            AppCmd::Keychain { to } => ("keychain", self.keychain(to)),
             AppCmd::KeyRemove { id } => {
                 let res = (p.key_remove)(&id);
                 if res.is_ok() {
@@ -496,6 +541,13 @@ impl Core {
                     self.emit_cu(false);
                 }
                 Done::Manifest { text, base, target } => self.on_manifest(text, &base, &target),
+                Done::Keychain { lines, failed } => {
+                    if let Some(s) = self.setup.as_mut() {
+                        s.keychain_moving = false;
+                        s.keychain_said = (lines, failed);
+                    }
+                    self.emit_keychain();
+                }
                 Done::LoggedIn { name, project, res } => {
                     if let Some(s) = self.setup.as_mut() {
                         s.logins.retain(|n| *n != name);

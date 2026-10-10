@@ -38,3 +38,6 @@
 {"ev":"computer_live","items":[]}
 {"ev":"computer_peek","key":"9f2c4e1a7b3d5e60.perf","shot":{"data":"/9j/4AAQSkZJRgABAQAAAQABAAD/2w==","mime":"image/jpeg","width":1280,"height":800,"at_ms":1760000006000}}
 {"ev":"computer_peek","key":"9f2c4e1a7b3d5e60.docs","why":"not_found"}
+{"ev":"keychain","store":"file","moving":false}
+{"ev":"keychain","store":"keychain","moving":false,"lines":["moved 3 items to the macOS keychain: auth.json's 2 sign-ins, 1 MCP login"]}
+{"ev":"keychain","store":"file","moving":true}

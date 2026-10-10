@@ -13,7 +13,8 @@ use crate::wire::Ev;
 /// (an error, the line) from the move in its thread.
 static LINES: Mutex<Vec<(bool, String)>> = Mutex::new(Vec::new());
 
-fn paths() -> bise_catalog::auth_cli::Paths {
+/// auth.json's paths for a move (also the window's, ambient/setup.rs's live_keychain).
+pub(crate) fn paths() -> bise_catalog::auth_cli::Paths {
     let h = bise_home::Home::from_env();
     bise_catalog::auth_cli::Paths { auth_file: h.auth_file(), config: h.config_file(), env_files: vec![], home: Some(h.user_home().to_path_buf()) }
 }
