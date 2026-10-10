@@ -68,6 +68,7 @@ export const TAGS = {
   features: true,
   prs: true,
   models: true,
+  tool_out: true,
   diff: true,
   route: true,
   route_done: true,

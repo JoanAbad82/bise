@@ -23,7 +23,12 @@ export type ToolState = "run" | "ok" | "err" | "unknown";
  */
 export type FileCount = { path: string, add: number, del: number, };
 
-export type ToolItem = { pos: number, at_ms: number, 
+export type ToolItem = { pos: number, 
+/**
+ * the call's number in its transcript (`tool #N`, the runtime's
+ * per-process count: not unique in a thread, `pos` is)
+ */
+id: number, at_ms: number, 
 /**
  * its intent ("running the tests"), else `name: first line of args`
  */
