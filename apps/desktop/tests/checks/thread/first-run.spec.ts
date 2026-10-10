@@ -59,3 +59,35 @@ test("thread/first-run: main's empty thread offers 'show me what you can do'; a 
     core.dispose();
   }
 });
+
+test('thread/first-run: a long ask open in the inbox block leaves no room: the first-run words go, never over the block (amb-home m_16909)', async () => {
+  const long = ['which plan for the cart?', ...Array.from({ length: 8 }, (_, i) => `line ${String(i + 2)}: the cart page loads its totals twice when the coupon field is open`)].join('\n');
+  const card = { id: 21, project: HOME, kind: 'question', rank: 1, agent: 'main', question: long, options: [{ n: 1, label: 'fix totals first' }, { n: 2, label: 'ship as is' }], urgent: false, since_ms: 1791100000000 };
+  const w = world().map((e) => (e.ev === 'projects' ? { ...e, projects: (e as { projects: Record<string, unknown>[] }).projects.map((p) => (p['home'] === true ? { ...p, waits: 1, cards: [card] } : p)) } : e));
+  const core = new FakeCore([...w, { ev: 'cards', project: HOME, cards: [card] }] as unknown as ConstructorParameters<typeof FakeCore>[0]);
+  const s = await launchDesktop({ core, size: '1100x720' });
+  try {
+    const { page } = s;
+    const block = page.getByTestId('inbox.block');
+    await expect(block).toBeVisible({ timeout: 10_000 });
+    // ⌃1 opens the item in place (the block lists it folded first)
+    await page.keyboard.press('Control+Digit1');
+    await expect(page.getByTestId(`inbox.block.card.${HOME}-21`)).toBeVisible({ timeout: 5000 });
+    await page.waitForTimeout(300);
+    const boxes = await page.evaluate(() => {
+      const r = (sel: string) => {
+        const el = document.querySelector(sel);
+        if (!el) return null;
+        const b = el.getBoundingClientRect();
+        return b.height === 0 || getComputedStyle(el).display === 'none' ? null : { top: b.top, bottom: b.bottom };
+      };
+      return { first: r('[data-testid="thread.first"] .setup-firstrun') ?? r('[data-testid="thread.first"]'), block: r('[data-testid="inbox.block"]') };
+    });
+    await page.screenshot({ path: test.info().outputPath('first-run-under-a-long-ask.png') });
+    expect(boxes.block).not.toBeNull();
+    if (boxes.first !== null) expect(boxes.first.bottom, 'the first-run words end above the inbox block').toBeLessThanOrEqual((boxes.block?.top ?? 0) + 1);
+  } finally {
+    await s.close();
+    core.dispose();
+  }
+});

@@ -163,6 +163,17 @@
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  /* its height is the room left above the bottom block (the inbox, the composer): the first-run
+     block asks it whether it fits (amb-home m_16909: a long ask open in the inbox squeezed it, and
+     its words drew over the inbox block) */
+  container: th-main / size;
+}
+/* no room for the first-run words (a long ask open in the inbox): they go, never over the block */
+@container th-main (max-height: 180px) {
+  /* (the parent in the selector: it must win over .th-first's own display, written after) */
+  .th-main > .th-first {
+    display: none;
+  }
 }
 .th-first {
   position: absolute;
@@ -186,11 +197,13 @@
 .th-first .th-noproj {
   margin: 0;
 }
-/* under entries of main's: in the column, at the list's end */
+/* under entries of main's: in the column, at the list's end (it gives way, clipped, before it
+   ever spills past the list's room) */
 .th-first.after {
   position: static;
   display: block;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-height: 0;
   width: var(--th-col);
   margin: 0 auto 8px;
 }
