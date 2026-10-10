@@ -38,14 +38,14 @@ a picked file first (`composer/sources.ts:79`); R15 the expired ChatGPT sign-in 
 (`app/Sidebar.tsx:209`); R19 inbox arrows as the TUI's cards (`inbox/Inbox.tsx:332`); R20 esc on
 the `/` list clears the text (`composer/pm/PmField.tsx:777`).
 
-**Still open at e3f7e598 (4):**
+**Still open at e3f7e598 (4).** Owners and calls live in `docs/desktop-bar.md` section T (the TP- rows):
 
 | # | owner | still missing or different | smallest proof |
 |---|---|---|---|
-| R6 | amb-web (ambient-lead m_17247) | part missing: ⇧⇥ in the composer doesn't switch the approvals mode (the TUI's key, with its 3 s flash); typed `/approvals yolo` and the mode on the label line are done | ⇧⇥ in the composer flips yolo ↔ auto and the label line shows it |
-| N1 | amb-home (ambient-lead m_17247) | `/keychain on\|off` is a window command in the catalog (`rust/proto/src/commands.rs`, client) with no `windowRun` case and no settings page: the `/` list shows it greyed "not yet" | `/keychain on` ⏎ moves the secrets as the TUI does, or settings shows the switch |
-| N2 | amb-web, after R6 (ambient-lead m_17247: built, the user wants parity) | `/log` (the agent's raw session, `rust/tui/src/logview.rs`, shipped to everyone in 92f72225) has no window screen and isn't in the window's `/` list (it is not in the proto catalog) | `/log` ⏎ opens the agent's raw session (full history and one request's context, redacted), listed in the `/` list |
-| R18 | decided, stays (ambient-lead m_17247) | differs on purpose: esc stops the turn in the window (bar ⛔6, green); ctrl+c is copy on the Mac, so the TUI's ctrl+c stop has no place there | none |
+| R6 | bar row TP-R6 (owner there) | part missing: ⇧⇥ in the composer doesn't switch the approvals mode (the TUI's key, with its 3 s flash); typed `/approvals yolo` and the mode on the label line are done | ⇧⇥ in the composer flips yolo ↔ auto and the label line shows it |
+| N1 | bar row TP-N1 (owner there) | `/keychain on\|off` is a window command in the catalog (`rust/proto/src/commands.rs`, client) with no `windowRun` case and no settings page: the `/` list shows it greyed "not yet" | `/keychain on` ⏎ moves the secrets as the TUI does, or settings shows the switch |
+| N2 | bar row TP-N2, in scope, blocks main (ambient-pm m_17249: amb-feed's catalog + amb-win's screen) | `/log` (the agent's raw session, `rust/tui/src/logview.rs`, shipped to everyone in 92f72225) has no window screen and isn't in the window's `/` list (it is not in the proto catalog) | `/log` ⏎ opens the agent's raw session (full history and one request's context, redacted), listed in the `/` list |
+| R18 | decided, bar K7 (ambient-lead m_17247, ambient-pm m_17249) | esc stops the turn in the window on purpose (⛔6, green), and the window must ALSO stop on ctrl+c as the TUI does (ambient-pm) | ctrl+c while a turn runs stops it (qa-flows thread/interrupt) |
 
 Left out on purpose: `/version` (dev tool, bar 2.1), `/release-bise` (dev). Not re-checked: the
 first audit's planned rows beyond these lines, and a narrow window (B16).
