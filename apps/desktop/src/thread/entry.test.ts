@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Entry } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
-import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, lastOfRun, quotesOf, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
+import { GROUP_GAP_MS, RUN_MS, TOOL_LINES, briefOf, deliveryMark, editWords, lastOfRun, quotesOf, sideOf, placeSteered, chipOf, dropAuthor, handoffOf, stepTime, toolEnd, toolLines, toolTime, clock, dayLabel, entryKey, findText, groupHead, pendingKey, posOfKey, reportLine, reportStatus, schedHead, toolWords, sameDay, stripContext, whenOf, whoOf } from './entry';
 import { search } from './find';
 
 const e = (over: Partial<Entry>): Entry => ({ pos: 1, at_ms: 0, kind: 'agent', text: '', ...over });
@@ -289,5 +289,28 @@ describe('messages-right v1: a quote, a steer', () => {
     expect(deliveryMark('read', 'perf')).toEqual({ glyph: '✓✓', tip: 'perf read it', tone: 'read' });
     expect(deliveryMark('failed', 'perf')).toEqual({ glyph: '▲ not sent', tip: "perf didn't get it", tone: 'failed' });
     for (const d of ['sent', 'unknown', null, undefined] as const) expect(deliveryMark(d, 'perf'), String(d)).toBeNull();
+  });
+});
+
+describe("an edit's line counts on its tool line (designer m_12065, hub-rows ToolItem.files)", () => {
+  it("names the file, a move's two names, several as 'and N more', and sums the lines", () => {
+    expect(editWords([{ path: 'web/product/Hero.tsx', add: 18, del: 6 }])).toEqual({ text: 'Hero.tsx', counts: '+18 −6' });
+    expect(editWords([{ path: 'src/old.rs → src/new.rs', add: 0, del: 0 }])).toEqual({ text: 'old.rs → new.rs', counts: '' });
+    expect(editWords([{ path: 'a/x.rs', add: 3, del: 1 }, { path: 'b/y.rs', add: 2, del: 0 }, { path: 'z.md', add: 1, del: 4 }])).toEqual({ text: 'x.rs and 2 more', counts: '+6 −5' });
+    expect(editWords([])).toBeNull();
+    expect(editWords(undefined)).toBeNull();
+  });
+
+  it("an edit line reads '± <file>' with its counts; one with no files keeps its words", () => {
+    const { lines } = toolLines([
+      { pos: 1, at_ms: 0, text: 'patching the query', kind: 'edit', files: [{ path: 'src/query.rs', add: 1, del: 1 }] },
+      { pos: 2, at_ms: 0, text: 'apply_patch: src/lib.rs', kind: 'edit' },
+      { pos: 3, at_ms: 0, text: 'cargo test', kind: 'run' },
+    ]);
+    expect(lines.map((l) => [l.mark, l.text, l.counts])).toEqual([
+      ['±', 'query.rs', '+1 −1'],
+      ['±', lines[1]?.text ?? '', ''],
+      ['$', 'cargo test', ''],
+    ]);
   });
 });

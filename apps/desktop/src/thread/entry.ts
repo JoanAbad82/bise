@@ -270,6 +270,8 @@ export interface ToolLike {
   err?: string | null;
   code?: string | null;
   out?: string | null;
+  /** an edit's files with their line counts (hub-rows: ToolItem.files; a move's path is 'old → new') */
+  files?: readonly { path: string; add: number; del: number }[] | null;
 }
 
 /** A shown call: its mark, words, its state's words on the right ('✓ 0.3 s', '✗ exit 1 · 2.1 s'), its first error line, and what opens under it. */
@@ -285,6 +287,26 @@ export interface ToolLine {
   err: string;
   code: string;
   out: string;
+  /** an edit's line counts, '+18 −6' (dim after its words); '' when the hub has none */
+  counts: string;
+}
+
+const base = (p: string): string => p.split('/').filter(Boolean).pop() ?? p;
+
+/**
+ * An edit's words from its files (designer m_12065, '± Hero.tsx +18 −6'): the file's name (a move
+ * 'old.rs → new.rs'), 'and N more' for several, and the lines added and deleted over all of them.
+ * None or no counts: null (the call's own words stay). Pure.
+ */
+export function editWords(files: ToolLike['files']): { text: string; counts: string } | null {
+  if (files == null || files.length === 0) return null;
+  const first = files[0];
+  if (first === undefined) return null;
+  const name = first.path.includes(' → ') ? first.path.split(' → ').map(base).join(' → ') : base(first.path);
+  const more = files.length > 1 ? ` and ${String(files.length - 1)} more` : '';
+  const add = files.reduce((n, f) => n + f.add, 0);
+  const del = files.reduce((n, f) => n + f.del, 0);
+  return { text: `${name}${more}`, counts: add === 0 && del === 0 ? '' : `+${String(add)} −${String(del)}` };
 }
 
 /** A call's own time, the TUI's: '0.3 s', '4.1 s', '12 s', '1 m 4 s'. Pure. */
@@ -320,11 +342,13 @@ export function toolLines(items: readonly ToolLike[]): {
     const time = next !== undefined && t.at_ms > 0 && next.at_ms > t.at_ms ? stepTime(next.at_ms - t.at_ms) : '';
     // R11/S9: a failed call always shows as its own line, whatever its kind (the TUI's ✗ row)
     const failed = t.state === 'err';
+    const edit = t.kind === 'edit' ? editWords(t.files) : null;
     const line: ToolLine = {
       pos: t.pos,
       mark: t.kind === 'run' ? '$' : t.kind === 'edit' ? '±' : '',
       // a read or search says the TUI's verb, like its fold ('read gone.rs', designer m_14103/m_14269)
-      text: t.kind === 'read' || t.kind === 'search' ? `${t.kind} ${toolWords(t.text).replace(/^\S+\s+/, '')}`.trim() : toolWords(t.text),
+      text: t.kind === 'read' || t.kind === 'search' ? `${t.kind} ${toolWords(t.text).replace(/^\S+\s+/, '')}`.trim() : t.kind === 'edit' ? (edit?.text ?? toolWords(t.text)) : toolWords(t.text),
+      counts: t.kind === 'edit' ? (edit?.counts ?? '') : '',
       time,
       state: t.state === 'run' || t.state === 'ok' || t.state === 'err' ? t.state : '',
       end: toolEnd(t, time),

@@ -942,6 +942,11 @@ function ToolLineRow({ l, live, runFor, project, agent }: { l: ToolLine; live: b
         }
       >
         <span className="th-tool-mark">{live ? '∿' : l.mark}</span> <span className="th-tool-text">{l.text}</span>
+        {l.counts !== '' && (
+          <span className="th-tool-count" data-testid={`${id}.count`}>
+            {l.counts}
+          </span>
+        )}
         {live ? (
           <span className="th-tool-time" data-testid={`${id}.time`}>
             {liveTime(runFor)}
