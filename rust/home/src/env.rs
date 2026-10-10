@@ -20,7 +20,10 @@
 //! ([`crate::Home::exports`], with their stamp), plus what the child needs.
 //! Names not in the table (`PATH`, proxies, locale, API keys, the Bend
 //! runtime's own `BEND_*` knobs) always pass. A unit test fails when a Rust
-//! source names a bise variable that is not in [`VARS`].
+//! source names a bise variable that is not in [`VARS`]. The desktop app
+//! starts its children (the core, `bise pty`) with the same rule from a
+//! generated copy of the internal and test names
+//! (`apps/desktop/src/main/env_vars.gen.ts`, pinned by a test here).
 //!
 //! Not covered: the Bend runtime's own children. An agent's bash commands
 //! inherit its REPL's environment as the hub built it (that is how `sb`
@@ -145,7 +148,7 @@ pub const VARS: &[Var] = &[
     internal("BISE_OWNERS", "the agents a process belongs to (BISE-243)"),
     internal("BISE_PAGES_EXPORT", "the public pages' export folder, for the mirror command the hub runs (pages/mirror.rs)"),
     user("BISE_POINTER", "mouse pointer shapes on or off"),
-    test("BISE_PROTO_BLESS", "bise-proto's ts test rewrites apps/desktop/src/proto instead of failing on stale files"),
+    test_input("BISE_PROTO_BLESS", "the generated TS tests (bise-proto's ts test, bise_home's env table) rewrite their files in apps/desktop instead of failing on stale ones"),
     user("BISE_RECYCLE_TOKENS", "context tokens an agent's REPL reads before the hub restarts it at idle (0: never)"),
     user("BISE_REDUCE_MOTION", "fewer animations"),
     test("BISE_RELEASE_CHECK_SECS", "how often the hub checks for a release (tests)"),

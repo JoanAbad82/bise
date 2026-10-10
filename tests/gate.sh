@@ -471,6 +471,8 @@ for f in $changed; do
     bend/hub/*|bend/vendor/*) add switchboard ;;
     rust/proto/*) add bise-proto; add bend-tui; add switchboard; add bend-harness; proto_ts=1; desktop=1 ;;
     apps/desktop/src/proto/*) proto_ts=1; desktop=1 ;;
+    # bise_home's test the_desktop_copy_is_generated pins it to env::VARS (before apps/desktop/*: case takes the first match)
+    apps/desktop/src/main/env_vars.gen.ts) add bise-home; desktop=1 ;;
     apps/desktop/*) desktop=1 ;;
   esac
 done

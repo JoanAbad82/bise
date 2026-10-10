@@ -55,6 +55,30 @@ fn every_tag_is_exactly_one_name() {
     assert!(n.contains(&"core/computer_live".to_string()) && n.contains(&"core/computer_peek".to_string()));
 }
 
+/// docs/issues/24: the untyped lists only shrink. A new command or event is
+/// an `AppCmd` / `CoreEv` variant; typing a listed tag takes its row out
+/// of the list and out of these pins in the same sha.
+#[test]
+fn the_untyped_lists_only_shrink() {
+    const CMDS_PINNED: &[&str] = &[
+        "fn_context", "shot", "send", "start", "answer", "hush", "cut_in", "quiet", "voice", "every_stop",
+        "fake_words", "agent_preview", "agent_history", "agent_unwatch", "agent_send", "follow", "stop", "archive", "unarchive",
+    ];
+    const EVS_PINNED: &[&str] = &[
+        "state", "main", "hub", "sent", "word", "phase", "page", "agent_entry", "agent_history", "agent_preview",
+        "agent_queued", "agent_typing", "fake_voice",
+    ];
+    for (list, pinned, what) in [(CORE_CMDS, CMDS_PINNED, "CORE_CMDS"), (CORE_EVS, EVS_PINNED, "CORE_EVS")] {
+        for t in list {
+            assert!(pinned.contains(t), "{what} gained {t}: type it (an AppCmd / CoreEv variant), never a new untyped tag (docs/issues/24)");
+        }
+        for t in pinned {
+            assert!(list.contains(t), "{t} left {what}: drop it from the pin here too, in the same sha (docs/issues/24)");
+        }
+    }
+    assert!(CORE_CMDS.len() <= 19 && CORE_EVS.len() <= 13);
+}
+
 #[test]
 fn every_command_goes_through_its_request_and_back() {
     let mut id = 0;

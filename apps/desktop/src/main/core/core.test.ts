@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { CoreExit, CoreState } from '../../shared/api';
-import { Backoff, configOf, coreArgs, coreEnv } from './env';
+import { Backoff, configOf, coreArgs } from './env';
 import { initializeLine, INITIALIZED_LINE, LineSplitter, NL, notAnEventLog, readLine, refusedLog, requestOf } from './lines';
 import { CoreProcess } from './process';
 
@@ -67,11 +67,6 @@ describe('env', () => {
   it('runs ambient-core on the workspace, or --home', () => {
     expect(coreArgs('')).toEqual(['ambient-core', '--home']);
     expect(coreArgs('/w')).toEqual(['ambient-core', '--workspace', '/w']);
-  });
-
-  it("drops the launcher's agent plumbing and the app's own config", () => {
-    const env = coreEnv({ HOME: '/h', PATH: '/bin', SB_AGENT: 'x', BISE_ROLE: 'r', BEND_HUB_SOCKET: 's', TERM: 'xterm', GHOSTTY_X: '1', BISE_DESKTOP_BISE: '/b', ELECTRON_RUN_AS_NODE: '1', BISE_HOME: '/bh' });
-    expect(env).toEqual({ HOME: '/h', PATH: '/bin', BISE_HOME: '/bh' });
   });
 
   it('backs off 0.5 doubling to 30, back to 0.5 after a healthy run', () => {

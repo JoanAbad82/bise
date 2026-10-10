@@ -1,8 +1,8 @@
 // How the core is started (pure), as the Swift app did (its
 // Core.swift, Support.swift CoreEnv/BisePick/Backoff): `<bise> ambient-core
 // --workspace <ws>`, or `--home` with no workspace; never PATH's `bise`
-// (a path or nothing: lead m_8079); the env without the launcher's agent
-// plumbing; a restart backoff that resets after a healthy run.
+// (a path or nothing: lead m_8079); a restart backoff that resets after a
+// healthy run. Its environment is ../childenv.ts's, shared with `bise pty`.
 
 /**
  * The workspace the core runs on (set by the launcher, scripts/desktop.sh open, or the harness in
@@ -29,25 +29,6 @@ export function configOf(bise: string | null, env: Readonly<Record<string, strin
 
 export function coreArgs(workspace: string): string[] {
   return workspace === '' ? ['ambient-core', '--home'] : ['ambient-core', '--workspace', workspace];
-}
-
-/** A variable of the launcher's that the core must never inherit (Support.swift CoreEnv.dropped). */
-export function dropped(k: string): boolean {
-  if (k.startsWith('SB_') || k.startsWith('BISE_AGENT') || k.startsWith('GHOSTTY_')) return true;
-  if (k === 'BISE_ROLE' || k === 'BEND_STDIN') return true;
-  if (k.startsWith('BEND_') && k.endsWith('SOCKET')) return true;
-  if (k === 'TERM' || k === 'TERM_PROGRAM' || k === 'TERM_PROGRAM_VERSION') return true;
-  // the app's own config and Electron's: not the core's
-  if (k.startsWith('BISE_DESKTOP_') || k.startsWith('ELECTRON_')) return true;
-  return false;
-}
-
-export function coreEnv(base: Readonly<Record<string, string | undefined>>): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [k, v] of Object.entries(base)) {
-    if (v !== undefined && !dropped(k)) env[k] = v;
-  }
-  return env;
 }
 
 /** The restart delay (seconds): 0.5 doubling to 30, back to 0.5 after a run of 60 s or more. */

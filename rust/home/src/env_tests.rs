@@ -99,6 +99,40 @@ fn the_python_copy_matches() {
     assert_eq!(list("TEST"), of(Kind::Test), "tests/bise_env.py TEST");
 }
 
+/// The desktop app's copy (apps/desktop/src/main/env_vars.gen.ts): the
+/// internal and test names, generated from [`VARS`] so the app's
+/// `childEnv` (src/main/childenv.ts) drops what `env_for` drops. A stale
+/// or hand-edited file is red; `BISE_PROTO_BLESS=1` rewrites it (one bless
+/// for every generated TS file, like bise-proto's).
+fn desktop_ts() -> String {
+    let mut s = String::new();
+    s.push_str("// generated from bise_home::env::VARS (rust/home/src/env_tests.rs), never hand-edited:\n");
+    s.push_str("// BISE_PROTO_BLESS=1 cargo test -p bise-home --lib env::tests\n");
+    for (k, what, kind) in [
+        ("INTERNAL_VARS", "set by bise for one child: no child ever inherits one", Kind::Internal),
+        ("TEST_VARS", "a knob of the tests: a child gets one only in test mode", Kind::Test),
+    ] {
+        s.push_str(&format!("\n/** {what} */\nexport const {k} = [\n"));
+        for v in VARS.iter().filter(|v| v.kind == kind) {
+            s.push_str(&format!("  '{}',\n", v.name));
+        }
+        s.push_str("] as const;\n");
+    }
+    s
+}
+
+#[test]
+fn the_desktop_copy_is_generated() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../apps/desktop/src/main/env_vars.gen.ts");
+    let want = desktop_ts();
+    if test_setting("BISE_PROTO_BLESS").is_some() {
+        std::fs::write(&path, &want).unwrap();
+        return;
+    }
+    let have = std::fs::read_to_string(&path).unwrap_or_default();
+    assert!(have == want, "{} is stale: BISE_PROTO_BLESS=1 cargo test -p bise-home --lib env::tests", path.display());
+}
+
 /// A parent full of junk internal variables and the user's settings.
 fn parent() -> Vec<(OsString, OsString)> {
     [

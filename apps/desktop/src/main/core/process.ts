@@ -9,7 +9,8 @@
 // drives a fake core script.
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { closeSync, openSync, readSync, statSync } from 'node:fs';
-import { Backoff, coreArgs, coreEnv, type CoreConfig } from './env';
+import { childEnv } from '../childenv';
+import { Backoff, coreArgs, type CoreConfig } from './env';
 import { constants } from 'node:os';
 import { crashLoop, exitOf, failedToStart, reasonOf } from './exit';
 import { INITIALIZED_LINE, initializeLine, LineSplitter, notAnEventLog, readLine, refusedLog, requestOf } from './lines';
@@ -35,6 +36,8 @@ export interface CoreOptions {
   /** the core's stderr goes here (appended); none: ignored */
   readonly logFile?: string;
   readonly env?: Readonly<Record<string, string | undefined>>;
+  /** test mode: the core gets the test settings of main's env too (childenv.ts) */
+  readonly test?: boolean;
   /** the delay before a restart, in ms (tests shorten it) */
   readonly scale?: number;
   /** the app's version, said in initialize */
@@ -182,7 +185,7 @@ export class CoreProcess {
     let child: ChildProcessWithoutNullStreams;
     try {
       child = spawn(config.bise, coreArgs(config.workspace), {
-        env: coreEnv(this.opts.env ?? process.env),
+        env: childEnv(this.opts.env ?? process.env, this.opts.test === true),
         ...(config.workspace === '' ? {} : { cwd: config.workspace }),
         stdio: ['pipe', 'pipe', err],
       }) as ChildProcessWithoutNullStreams;

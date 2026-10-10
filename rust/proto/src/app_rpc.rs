@@ -29,7 +29,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 /// The core's commands that have no [`AppCmd`] variant yet (cmd.rs parses
-/// them by hand): each is `core/<tag>`.
+/// them by hand): each is `core/<tag>`. Shrink-only (docs/issues/24, law
+/// `the_untyped_lists_only_shrink`): never add a tag here.
 pub const CORE_CMDS: &[&str] = &[
     "fn_context",
     "shot",
@@ -53,7 +54,7 @@ pub const CORE_CMDS: &[&str] = &[
 ];
 
 /// The core's events that have no [`CoreEv`] variant yet: each is
-/// `core/<tag>`.
+/// `core/<tag>`. Shrink-only, like [`CORE_CMDS`] (docs/issues/24).
 pub const CORE_EVS: &[&str] = &[
     "state",
     "main",

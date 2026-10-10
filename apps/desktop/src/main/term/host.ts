@@ -22,6 +22,7 @@ import type { PtyEv } from '../../proto';
 import { IPC, TERM_LINE, type TermOpened } from '../../shared/api';
 import { onCoreEvent } from '../core/ipc';
 import { LineSplitter } from '../helper/lines';
+import { childEnv } from '../childenv';
 import { binPath } from '../paths';
 import { Batcher, clampSize, decodePtyEv, encodePtyCmd, evictee, folderOf, MAX_SHELLS, MAX_WRITE, ptyBin } from './lines';
 
@@ -82,7 +83,8 @@ export class TermHost {
     const bise = ptyBin(process.env, this.testMode, core);
     if (bise === null) return { error: 'no bise to run the shell' };
     const args = ['pty', '--cwd', folder, '--cols', String(size.cols), '--rows', String(size.rows), ...(this.testMode ? ['--shell', '/bin/sh'] : [])];
-    const child = spawn(bise, args, { stdio: ['pipe', 'pipe', 'pipe'] });
+    // main's env (his login shell's merged in) minus bise's internals, as the core gets it
+    const child = spawn(bise, args, { env: childEnv(process.env, this.testMode), stdio: ['pipe', 'pipe', 'pipe'] });
     const shell: Shell = { id, child, waiting: null, alive: true };
     this.shells.set(id, shell);
     const lines = new LineSplitter();

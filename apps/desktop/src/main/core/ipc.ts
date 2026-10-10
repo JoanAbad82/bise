@@ -147,7 +147,7 @@ export function startCore(env: Readonly<Record<string, string | undefined>> = pr
     n.show();
   };
   core = new CoreProcess(
-    { config, logFile, env },
+    { config, logFile, env, test },
     {
       report: (e, tail) => {
         lastReport = writeReport(
