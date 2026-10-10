@@ -457,6 +457,21 @@ isn't judging. A row marked ok names the shot that was looked at.
   list. amb-win is fixing it. The re-cut also carries the chip glyph 3c209f33 and "4 KB of 18 KB
   shown" 91af5059, and qa-native re-checks those rows.
 
+- **00ad3bbb: GO for promote** (ambient-pm m_17138 to ambient-lead m_17136, from qa-native
+  m_17132; `~/.bise/gate/try-gate/00ad3bbb/index.md`). 7/7 checks are green on the packed app
+  with the rich world.
+  - **FOLDS2: beb70fe6's fold jump is fixed.** At the end of the thread, opening and closing
+    moves 0 px; '▸ 1 other step' moves 0/0 px, ⌘E moves 0.4/0.4 px, and closing the thinking row
+    moves 0 px. The first measure of opening the thinking row was the check's fault: the row was
+    off screen (-294.5 px) at the press. It goes through the same anchor, and qa-native
+    re-measures it.
+  - FNVOICE: fn fn on perf gives 'voice mode · with perf', and from the inbox, bise's own thread.
+  - voice/voice-real is green on the rich world (amb-core 3996ec59).
+  - INIT, LIGHTS, the inbox block and MSGRIGHT are green.
+  - **STEERRX is not built in the window.** His bubbles show only the time, with no ✓ or ✓✓,
+    and nothing in src/thread reads Entry.delivery. The hub side (a712b0f2) is in. His try never
+    had it, so it is no regression, but it is not-pass for main (amb-win is on it).
+
 - **beb70fe6: GO for promote, with the fold jump as a named gap** (ambient-pm m_17099 to
   ambient-lead m_17093; this replaces my HOLD m_17094 to ambient-lead m_17060). From
   qa-native m_17057 and m_17088; spec cd460f03; `~/.bise/gate/try-gate/beb70fe6/index.md` v2,
