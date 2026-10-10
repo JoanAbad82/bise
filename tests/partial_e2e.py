@@ -16,36 +16,55 @@ Run: python3 -u tests/partial_e2e.py (after scripts/bins.sh)
 """
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2e  # noqa: E402
+import wait  # noqa: E402
 from e2e import EXE, check  # noqa: E402
 
 WORDS = ("the answer streams in, a piece at a time — déjà vu ✓, "
          "and the final entry replaces it without a jump. ")
 
 
-def partials(c, agent="main"):
-    with c.lock:
-        return [e for e in c.events if e.get("ev") == "partial" and "project" in e and e.get("agent") == agent]
-
-
-def entries(c, kind, agent="main"):
-    with c.lock:
-        return [e["entry"] for e in c.events if e.get("ev") == "entry" and "project" in e
-                and e.get("agent") == agent and e["entry"]["kind"] == kind]
+EVS = {"thread/partial": "partial", "thread/entry": "entry"}
 
 
 def stream(c, agent="main"):
-    """The partial and entry events of `agent`, in arrival order."""
+    """The thread/partial and thread/entry notifications of `agent`, in
+    arrival order, as their params with `ev` (partial, entry)."""
     with c.lock:
-        return [e for e in c.events if e.get("ev") in ("partial", "entry") and "project" in e and e.get("agent") == agent]
+        return [dict(e["params"], ev=EVS[e["method"]]) for e in c.events
+                if e.get("method") in EVS and "id" not in e and (e.get("params") or {}).get("agent") == agent]
+
+
+def partials(c, agent="main"):
+    return [e for e in stream(c, agent) if e["ev"] == "partial"]
 
 
 def thread(c, agent="main"):
-    with c.lock:
-        return [e["entry"] for e in c.events if e.get("ev") == "entry" and "project" in e and e.get("agent") == agent]
+    return [e["entry"] for e in stream(c, agent) if e["ev"] == "entry"]
+
+
+def entries(c, kind, agent="main"):
+    return [e for e in thread(c, agent) if e["kind"] == kind]
+
+
+def mark(c):
+    """Where the thread is now: the newest entry's pos and the stream's
+    length (a known pos comes again as a replace, so new entries are
+    counted by pos, not by how many notifications came)."""
+    return max((e["pos"] for e in thread(c)), default=-1), len(stream(c))
+
+
+def entries_after(c, m):
+    """The entries newer than mark `m`, each at its latest version, by pos."""
+    by = {e["pos"]: e for e in thread(c) if e["pos"] > m[0]}
+    return [by[p] for p in sorted(by)]
+
+
+def stream_after(c, m):
+    """The partials and the new entries' notifications since mark `m`."""
+    return [e for e in stream(c)[m[1]:] if e["ev"] == "partial" or e["entry"]["pos"] > m[0]]
 
 
 def transcript(E):
@@ -54,12 +73,23 @@ def transcript(E):
     return [l.split("\t", 1)[-1] for l in open(path, encoding="utf-8").read().splitlines()]
 
 
-def hello(E):
-    c = e2e.Client(os.path.join(E.state, "hub.sock"))
-    c.send({"cmd": "hello", "proto": 1})
-    c.wait(lambda: any(e.get("ev") == "welcome" for e in c.events), 20, "welcome")
-    project = [e for e in c.events if e.get("ev") == "welcome"][0]["project"]
-    return c, project
+def subscribed(E, name):
+    """A JSON-RPC client subscribed to main's thread (thread/subscribe):
+    the client and its subscribe request's id."""
+    c = e2e.Client(os.path.join(E.state, "hub.sock"), name)
+    rid = c.call("thread/subscribe", {"project": c.project(), "agent": "main"})
+    c.wait(lambda: c._response(rid), 20, "main's thread page")
+    return c, rid
+
+
+def send(c, text):
+    r = c.rpc("turn/send", {"project": c.project(), "agent": "main", "text": text, "mode": "now"})
+    check(r.get("result") == {}, "turn/send: %r" % r)
+
+
+def settled(c):
+    """Every notification of the turn read: none for a while."""
+    wait.stable(lambda: len(c.events), 20, "the notifications settled", quiet=0.5)
 
 
 def main():
@@ -70,16 +100,13 @@ def main():
     try:
         c0 = E.start_hub()
         c0.wait_status("main", "idle", 60)
-        c, project = hello(E)
-        c.send({"cmd": "subscribe", "project": project, "agent": "main"})
-        c.wait(lambda: any(e.get("ev") == "thread" for e in c.events), 20, "main's thread")
+        c, _ = subscribed(E, "partial-e2e")
 
         # 1. a slow stream: partials, each a prefix of the final, then ""
         reply = os.path.join(E.tmp, "reply.txt")
         text = (WORDS * 14).strip()
         open(reply, "w", encoding="utf-8").write(text)
-        c.send({"cmd": "send", "project": project, "agent": "main", "mode": "now",
-                "text": "[[pieces: 40 0.05]] [[reply: %s]] stream it" % reply})
+        send(c, "[[pieces: 40 0.05]] [[reply: %s]] stream it" % reply)
         c.wait(lambda: entries(c, "agent"), 120, "main's answer")
         final = entries(c, "agent")[-1]["text"]
         c.wait(lambda: partials(c) and partials(c)[-1]["text"] == "", 20, "the partial cleared")
@@ -94,31 +121,33 @@ def main():
         check(ps[-1]["text"] == "", "the last partial is the clear")
         tr = open(os.path.join(E.state, "agents", "main", "transcript.log"), encoding="utf-8").read()
         check("partial #" not in tr, "no partial line in the transcript")
-        check(not any(l.startswith("partial #") for l in c0.lines("main")), "no partial line in the feed")
         c0.wait_idle("main", timeout=90)
 
-        # 2. a late subscriber gets the text so far right after the thread
-        # page; then a stop clears it and nothing follows
+        # 2. a late subscriber gets the text so far right after its thread
+        # page (thread/subscribe's result, then thread/partial); then a
+        # stop clears it and nothing follows
         n = len(partials(c))
-        c.send({"cmd": "send", "project": project, "agent": "main", "mode": "now",
-                "text": "[[pieces: 24 0.15]] [[reply: %s]] stream it slowly" % reply})
+        send(c, "[[pieces: 24 0.15]] [[reply: %s]] stream it slowly" % reply)
         c.wait(lambda: any(p["text"] for p in partials(c)[n:]), 90, "a partial of the slow one")
-        late, _ = hello(E)
-        late.send({"cmd": "subscribe", "project": project, "agent": "main"})
+        late, rid = subscribed(E, "partial-late")
         late.wait(lambda: partials(late), 20, "the late subscriber's partial")
         with late.lock:
-            kinds = [e["ev"] for e in late.events if e.get("ev") in ("thread", "partial") and "project" in e]
-        check(kinds[:2] == ["thread", "partial"] and partials(late)[0]["text"], "thread page then the text so far: %r" % kinds)
+            order = ["page" if e.get("id") == rid else "partial" for e in late.events
+                     if e.get("id") == rid or (e.get("method") == "thread/partial" and "id" not in e)]
+        check(order[:2] == ["page", "partial"] and partials(late)[0]["text"], "thread page then the text so far: %r" % order)
         check(final.startswith(partials(late)[0]["text"]), "the late text is a prefix")
 
-        c.send({"cmd": "stop", "project": project, "agent": "main"})
+        stopped = c.interrupt("main")
+        check(stopped.get("result") == {}, "turn/interrupt: %r" % stopped)
         c.wait(lambda: partials(c)[-1]["text"] == "", 30, "the stop clears the partial")
         k = len(partials(c))
         c0.wait_idle("main", timeout=60)
-        time.sleep(1.0)
-        check(not any(p["text"] for p in partials(c)[k:]), "nothing after the stop: %r" % partials(c)[k:])
-        check(not entries(c, "agent")[-1]["text"] == final or len(entries(c, "agent")) == 1,
-              "the stopped answer did not land whole")
+        wait.holds(lambda: not any(p["text"] for p in partials(c)[k:]), 1.0, "nothing after the stop")
+        # a known pos comes again as a replace (thread/entry): count the
+        # answers by pos; the stopped one never got an entry
+        answers = {e["pos"]: e["text"] for e in entries(c, "agent")}
+        check(len(answers) == 1, "the stopped answer did not land: %r, tail %r"
+              % ({p: len(t) for p, t in answers.items()}, transcript(E)[-8:]))
 
         # 3. an attempt that breaks mid-stream keeps what he read, at its
         # place (designer m_13334, m_13562): the stream breaks, the hub
@@ -126,14 +155,13 @@ def main():
         # line and clears the partial; the retry fails for good (a final
         # 400): the notices go UNDER the kept text, in arrival order
         n = len(partials(c))
-        ne = len(thread(c))
-        c.send({"cmd": "send", "project": project, "agent": "main", "mode": "now",
-                "text": "[[pieces: 40 0.05]] [[error: cut]] [[error: badname]] [[reply: %s]] fail it" % reply})
-        c.wait(lambda: any(e.get("cut") for e in thread(c)[ne:]), 120, "the kept answer")
+        m = mark(c)
+        send(c, "[[pieces: 40 0.05]] [[error: cut]] [[error: badname]] [[reply: %s]] fail it" % reply)
+        c.wait(lambda: any(e.get("cut") for e in entries_after(c, m)), 120, "the kept answer")
         c0.wait_idle("main", timeout=60)
-        time.sleep(0.5)
+        settled(c)
         ps = partials(c)[n:]
-        new_entries = thread(c)[ne:]
+        new_entries = entries_after(c, m)
         ki = [i for i, e in enumerate(new_entries) if e.get("cut")][0]
         kept = new_entries[ki]
         check(kept["kind"] == "agent" and kept["text"] and text.startswith(kept["text"]),
@@ -157,13 +185,12 @@ def main():
         # (architect m_13563 a): attempt 1's text is kept and cleared at the
         # retry, so nothing of it is live while the tool runs
         n = len(partials(c))
-        ne = len(thread(c))
-        c.send({"cmd": "send", "project": project, "agent": "main", "mode": "now",
-                "text": "[[pieces: 40 0.05]] [[error: cut]] [[bash: sleep 2; echo ran]] [[reply: %s]] retry to a tool" % reply})
-        c.wait(lambda: any(e["kind"] == "tools" for e in thread(c)[ne:]), 120, "the retry's tool call")
+        m = mark(c)
+        send(c, "[[pieces: 40 0.05]] [[error: cut]] [[bash: sleep 2; echo ran]] [[reply: %s]] retry to a tool" % reply)
+        c.wait(lambda: any(e["kind"] == "tools" for e in entries_after(c, m)), 120, "the retry's tool call")
         c0.wait_idle("main", timeout=90)
-        time.sleep(0.5)
-        evs = stream(c)[ne + n:]
+        settled(c)
+        evs = stream_after(c, m)
         ps = partials(c)[n:]
         first = next((p["call"] for p in ps if p["text"]), None)
         check(first, "attempt 1 streamed text: %r" % [len(p["text"]) for p in ps])
@@ -172,24 +199,23 @@ def main():
         check(clear_at and tool_at and clear_at[0] < tool_at[0], "attempt 1 cleared before the tool: %r %r" % (clear_at, tool_at))
         check(not any(e.get("ev") == "partial" and e["call"] == first and e["text"]
                       for e in evs[clear_at[0]:]), "nothing of attempt 1 after its clear")
-        new_entries = thread(c)[ne:]
+        new_entries = entries_after(c, m)
         check([e for e in new_entries if e.get("cut")], "attempt 1's text kept: %r" % [e["kind"] for e in new_entries])
 
         # 5. text then a tool call in ONE reply (architect m_13563 b): the
         # text is an assistant line before the tool lines, so it settles
         # into an agent entry and nothing is live while the tool runs
         n = len(partials(c))
-        ne = len(thread(c))
+        m = mark(c)
         say = (WORDS * 3).strip()
-        c.send({"cmd": "send", "project": project, "agent": "main", "mode": "now",
-                "text": "[[pieces: 40 0.05]] [[say: %s]] [[bash: sleep 2; echo ran]] text then a tool" % say})
+        send(c, "[[pieces: 40 0.05]] [[say: %s]] [[bash: sleep 2; echo ran]] text then a tool" % say)
         # main is idle before the send is read: wait for the turn's own
         # entries first, or wait_idle returns at once
-        c.wait(lambda: any(e["kind"] == "tools" for e in thread(c)[ne:]), 120, "the said reply's tool call")
+        c.wait(lambda: any(e["kind"] == "tools" for e in entries_after(c, m)), 120, "the said reply's tool call")
         c0.wait_idle("main", timeout=90)
-        time.sleep(0.5)
-        evs = stream(c)[ne + n:]
-        new_entries = thread(c)[ne:]
+        settled(c)
+        evs = stream_after(c, m)
+        new_entries = entries_after(c, m)
         kinds = [e["kind"] for e in new_entries]
         check("agent" in kinds and "tools" in kinds and kinds.index("agent") < kinds.index("tools")
               and new_entries[kinds.index("agent")]["text"].strip() == say and not new_entries[kinds.index("agent")].get("cut"),

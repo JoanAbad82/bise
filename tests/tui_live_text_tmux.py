@@ -12,9 +12,9 @@ python3 -u tests/tui_live_text_tmux.py
 """
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import wait  # noqa: E402
 from tui_tmux import tui_session, run, MAIN_IDLE  # noqa: E402
 
 COLS, ROWS = 100, 40
@@ -50,13 +50,16 @@ def main():
         t.wait("streaming first words", 60)
         words = ("streaming", "until the whole", "settles in place", "then more of")
         seen = []
-        deadline = time.time() + 60
-        while time.time() < deadline:
+
+        def sample():
+            # one screen per poll: the live rows as they grow
             s = t.screen()
             seen.append(rows_with(s, words))
-            if "ack:" in s or len(seen[-1]) >= 4:
-                break
-            time.sleep(0.1)
+            return "ack:" in s or len(seen[-1]) >= 4
+        try:
+            wait.until(sample, 60, "the live text grown to 4 rows")
+        except AssertionError:
+            pass  # the rows seen so far are checked below, as before
         t.wait_re(MAIN_IDLE, 90)
         final = rows_with(t.screen(), words)
         assert final, t.screen()
@@ -79,8 +82,7 @@ def main():
         t.keys("C-c")  # the TUI's interrupt (its hint: 'ctrl+c interrupt')
         t.wait_gone("zebra quartz", 20)
         t.wait_re(MAIN_IDLE, 60)
-        time.sleep(1.0)
-        assert "zebra quartz" not in t.screen(), t.screen()
+        wait.holds(lambda: "zebra quartz" not in t.screen(), 1.0, "nothing of the stopped answer comes back")
         print("PASS tui live text (%d live screens, settled in place, stop cleared)" % len(live))
 
 
