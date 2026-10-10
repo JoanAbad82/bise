@@ -70,7 +70,20 @@ async function audit(page: Page, max = 40): Promise<Audit[]> {
         }
         return { n: i, id: el.getAttribute('data-testid') ?? `${el.tagName.toLowerCase()}:${el.textContent.trim().slice(0, 24)}`, x, y, w: r.width, h: r.height, off, clipped };
       })
-      .filter((b) => b.w > 2 && b.h > 2 && !b.off && !b.clipped && b.x > 0 && b.y > 0 && b.x < window.innerWidth && b.y < window.innerHeight));
+      .filter((b) => b.w > 2 && b.h > 2 && !b.off && b.x > 0 && b.y > 0 && b.x < window.innerWidth && b.y < window.innerHeight)
+      .filter((b) => {
+        if (b.clipped) (window as unknown as { __qaClipped?: string[] }).__qaClipped = [...((window as unknown as { __qaClipped?: string[] }).__qaClipped ?? []), b.id];
+        return !b.clipped;
+      }));
+  // the controls skipped as clipped, said per screen (its route), never silent: one that should
+  // be on screen but got scrolled away by a bug shows here instead of vanishing from the audit
+  const clipped = await page.evaluate(() => {
+    const g = window as unknown as { __qaClipped?: string[] };
+    const ids = g.__qaClipped ?? [];
+    g.__qaClipped = [];
+    return ids;
+  });
+  test.info().annotations.push({ type: `clipped, skipped @ ${page.url().split('#')[1] ?? page.url()}`, description: JSON.stringify(clipped) });
   const out: Audit[] = [];
   for (const b of boxes.slice(0, max)) {
     const h = page.locator(`[data-qa-n="${String(b.n)}"]`);
