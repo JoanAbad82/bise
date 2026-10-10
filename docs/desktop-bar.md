@@ -457,6 +457,26 @@ isn't judging. A row marked ok names the shot that was looked at.
   list. amb-win is fixing it. The re-cut also carries the chip glyph 3c209f33 and "4 KB of 18 KB
   shown" 91af5059, and qa-native re-checks those rows.
 
+- **29ec1b92: GO for promote** (ambient-pm to ambient-lead m_17219, from qa-native m_17218;
+  checks dc8acf60; `~/.bise/gate/try-gate/29ec1b92/index.md`; designer has the sheet). Every shot
+  was looked at by qa-native, on the packed app.
+  - **STEERRX is now green, which closes 00ad3bbb's open row.**
+    - On the rich world, '✓✓ dashboards read it' sits under all 5 of his read bubbles, in text-2
+      and not the accent. The steered bubble carries only its 'steered · … read it mid-turn' line.
+    - thread/delivery is green for '✓ got it', '▲ not sent', 'to perf' and the hover, at 1100 and
+      600, in light and dark.
+  - **TOOLCOUNT is green.**
+    - On the rich world: '± panels.md +2 −2'.
+    - On FakeCore (gate/counts): one file '+18 −6'; a move 'old.rs → new.rs'; 'a.rs and 2 more
+      +9 −4', summed; a command with no count. The counts are dim, at 1100 and 600, in light and
+      dark.
+  - **FOLDS2 holds**: 0 px at the end of the thread, 0 px for thinking open and close (now
+    measured on screen), 0 px for the pill, 0.2 px for ⌘E.
+  - INIT and MSGRIGHT are green.
+  - Open: 'said ✓✓' was not shot, because no world has a spoken turn with a mark. amb-win's
+    unit test and d85bd249 cover it, so for main it is built-no-check, not a hold.
+  - Designer signed the marks and the counts.
+
 - **00ad3bbb: GO for promote** (ambient-pm m_17138 to ambient-lead m_17136, from qa-native
   m_17132; `~/.bise/gate/try-gate/00ad3bbb/index.md`). 7/7 checks are green on the packed app
   with the rich world.
