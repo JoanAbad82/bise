@@ -840,3 +840,16 @@ fn a_typed_card_number_never_picks_a_setup_card() {
     assert_eq!(values("docs"), vec!["994".to_string()]);
     assert_eq!(values("").len(), 3);
 }
+
+/// Never a card's kind id in its title (designer m_15412): a merge, a try,
+/// an update or a sign-in asks like a question; its text says what it asks.
+#[test]
+fn a_card_title_never_shows_its_kind_id() {
+    for kind in ["merge", "feature_try", "feature_merge", "update", "signin", "confirm", "approval", "setup", "anything_new"] {
+        let t = kind_title(kind, "perf");
+        assert_eq!(t, "perf asks", "{kind}");
+        assert!(!t.contains(kind), "{kind}: {t}");
+    }
+    assert_eq!(kind_title("question", "perf"), "perf asks");
+    assert_eq!(kind_title("done", "perf"), "perf is done");
+}

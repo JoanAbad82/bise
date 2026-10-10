@@ -5,7 +5,20 @@ import type { Card } from '@/proto';
 import { hub_ev } from '@/proto/fixtures.gen';
 import { Inbox, keyOf, type InboxPorts } from './Inbox';
 import { makeDrafts } from './drafts';
-import { InboxCard, PICKED_MS } from './InboxCard';
+import { glyphOf, InboxCard, kindTitle, PICKED_MS } from './InboxCard';
+
+describe("a card's head (designer m_15412)", () => {
+  it('never shows a kind id: a merge, a try, an update asks like a question, with the mark of what only its options decide', () => {
+    for (const kind of ['merge', 'feature_try', 'feature_merge', 'update', 'signin', 'confirm', 'setup']) {
+      expect(kindTitle(kind, 'perf'), kind).toBe('perf asks');
+    }
+    expect(kindTitle('feature_merge', 'main')).toBe('bise asks');
+    const merge = { id: 10, project: 'acme', kind: 'feature_merge', rank: 2, agent: 'perf', question: 'merge sb/perf into main?', options: [{ n: 1, label: 'merge' }, { n: 2, label: 'not yet' }], urgent: false, since_ms: 0 } as unknown as Card;
+    expect(glyphOf(merge)).toBe('!');
+    expect(glyphOf({ ...merge, kind: 'question' })).toBe('?');
+    expect(glyphOf({ ...merge, kind: 'question', approval: true })).toBe('!');
+  });
+});
 
 afterEach(() => {
   cleanup();

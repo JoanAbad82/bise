@@ -176,9 +176,10 @@ export function pickKeys(n: number): string {
   return n === 1 ? '1' : n === 2 ? '1 2' : `1–${String(n)}`;
 }
 
-/** '!' an approval (or an urgent item), '?' the rest. */
+/** '!' an approval, an item only its options decide (a merge, a try…), or an urgent one; '?' the rest
+ * (the block's folded line says the same, designer m_15412). */
 export function glyphOf(c: CardRow): string {
-  return c.approval === true || c.urgent ? '!' : '?';
+  return c.approval === true || c.urgent || !takesWords(c) ? '!' : '?';
 }
 
 /** A long question's first lines (bar I8): more than FOLD_AT lines show
@@ -233,7 +234,9 @@ export function kindTitle(kind: string, agent0: string): string {
     case 'done':
       return `${agent} is done`;
     default:
-      return `${agent}: ${kind}`;
+      // never a card's kind id (designer m_15412): any other kind asks like a question; its text
+      // says what it asks ('merge sb/perf into main?')
+      return `${agent} asks`;
   }
 }
 
