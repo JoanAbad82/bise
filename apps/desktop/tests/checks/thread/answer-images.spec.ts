@@ -46,6 +46,8 @@ const world = () => [
       { pos: 3, at_ms: NOW - 3 * MIN, kind: 'answered', text: 'answered gift-ui for you', answered: { agent: 'gift-ui', question: 'which colour for the badge?', answer: 'the green one', why: 'he showed it', images: [{ name: SHA, path: PNG }] } },
       // his answer to main's OWN card, as the hub still sends it: a raw line from 'switchboard' (designer m_15195)
       { pos: 4, at_ms: NOW - 2 * MIN, kind: 'from_agent', from: 'switchboard', text: 'the user answered card #1 ("merge checkout into main? (2 files, tests pass) 1. merge 2. not yet"): "[Image #1] this one"' },
+      // the same answer as a newer hub sends it (amb-feed c02ad231): ONE typed approval row, the raw line gone
+      { pos: 5, at_ms: NOW - 1 * MIN, kind: 'approval', text: 'you answered main: [Image #1] this one', approval: { ok: true, text: 'you answered main: [Image #1] this one', images: [{ name: SHA, path: PNG }] } },
     ],
     before: null,
     more: false,
@@ -80,6 +82,10 @@ test("thread/answer-images: 'you answered gift-ui' shows his words and the image
     const ys = await Promise.all(['head', 'words', 'image.1'].map(async (k) => (await page.getByTestId(`thread.cardanswer.4.${k}`).boundingBox())?.y ?? 0));
     expect(ys[0] ?? 0, 'his words under the question').toBeLessThan(ys[1] ?? 0);
     expect(ys[1] ?? 0, 'the chip under his words').toBeLessThan(ys[2] ?? 0);
+    // a newer hub's typed row: the chip is the image, so his words never say '[Image #1]' too (designer m_15891)
+    await expect(page.getByTestId('thread.approval.5.head')).toHaveText('✓you answered main: this one');
+    await expect(page.getByTestId('thread.approval.5.image.1')).toHaveText('[Image #1]');
+    expect(await page.getByTestId('thread.approval.5').innerText(), 'the mark once: the chip').toMatch(/^[^[]*\[Image #1\][^[]*$/u);
     const all = await page.getByTestId('thread.list').innerText();
     expect(all, 'never the raw line').not.toContain('the user answered card');
     expect(all, 'never the old product name').not.toContain('switchboard');

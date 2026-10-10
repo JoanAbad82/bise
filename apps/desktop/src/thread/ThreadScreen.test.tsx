@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay, threadKey } from '@/store';
-import { EntryRow, type RowCtx } from './rows';
+import { EntryRow, type RowCtx, withoutImageMarks } from './rows';
 import { ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
 
@@ -200,5 +200,13 @@ describe('the thread screen', () => {
     const row = v.getByTestId('thread.entry.901');
     expect(row.querySelector('strong')?.textContent).toBe('done');
     expect(row.querySelector('pre')?.textContent).toBe('a  b\n');
+  });
+});
+
+describe('his answer with images', () => {
+  it("the chips are the images: '[Image #n]' leaves his words (designer m_15891)", () => {
+    expect(withoutImageMarks('you answered main: [Image #1] this one')).toBe('you answered main: this one');
+    expect(withoutImageMarks('[Image #1] [Image #2]')).toBe('');
+    expect(withoutImageMarks('this one [Image #2], not that')).toBe('this one, not that');
   });
 });

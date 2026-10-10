@@ -335,7 +335,7 @@ export function fileUrl(path: string): string {
  */
 function CardAnsweredRow({ pos, a }: { pos: number; a: { card: number; question: string; words: string } }) {
   const images = a.words.match(/\[Image #\d+\]/gu) ?? [];
-  const words = a.words.replace(/\[Image #\d+\]/gu, ' ').replace(/\s+/gu, ' ').trim();
+  const words = withoutImageMarks(a.words);
   return (
     <div className="th-approval" data-testid={`thread.cardanswer.${String(pos)}`} data-card={a.card}>
       <NewsLine mark="✓" tone="ok" testId={`thread.cardanswer.${String(pos)}.head`}>
@@ -355,16 +355,28 @@ function CardAnsweredRow({ pos, a }: { pos: number; a: { card: number; question:
   );
 }
 
+/**
+ * His words without the '[Image #n]' marks the hub kept in them: the chips under the row are the
+ * images, so the words never say them a second time (designer m_15891). Pure.
+ */
+export function withoutImageMarks(words: string): string {
+  return words.replace(/\[Image #\d+\]/gu, ' ').replace(/\s+/gu, ' ').replace(/\s+([:,.])/gu, '$1').trim();
+}
+
 /** His answer to an approval, folded: allowed or said no, and his words under it. */
 function ApprovalRow({ e }: { e: Entry }) {
   const a = e.approval;
   if (a == null) return <Marker>{e.text}</Marker>;
+  // the chips draw his images: their marks leave the words (once, never twice)
+  const chips = (a.images ?? []).length > 0;
+  const say = (s: string): string => (chips ? withoutImageMarks(s).replace(/:$/u, '') : s);
+  const note = a.note == null ? '' : say(a.note);
   return (
     <div className="th-approval" data-testid={`thread.approval.${e.pos}`} data-ok={a.ok}>
       <NewsLine mark={a.ok ? '✓' : '✕'} tone={a.ok ? 'ok' : 'dim'} testId={`thread.approval.${e.pos}.head`}>
-        {a.text}
+        {say(a.text)}
       </NewsLine>
-      {a.note != null && a.note !== '' && <div className="th-news-note">{a.note}</div>}
+      {note !== '' && <div className="th-news-note">{note}</div>}
       <ImageChips images={a.images ?? []} testId={`thread.approval.${e.pos}`} />
     </div>
   );
