@@ -90,7 +90,7 @@ export function InboxCard({ card, project, home, acts, on = null, now, keys, not
   const where = project ?? card.project;
   const el = (
     <div
-      className={`ic ${surface}${driving ? ' driving' : ''}`}
+      className={`ic ${surface}${driving ? ' driving' : ''}${full === true ? ' whole' : ''}`}
       role="group"
       data-testid={id}
       onMouseMove={
