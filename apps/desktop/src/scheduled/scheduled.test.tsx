@@ -48,7 +48,11 @@ describe('the scheduled screen', () => {
     expect(screen.getByTestId('scheduled.count').textContent).toBe('active · 2');
     const root = screen.getByTestId('scheduled.screen');
     fireEvent.keyDown(root, { key: 'Enter' });
-    expect(screen.getByTestId('scheduled.pane').textContent).toContain('scheduled task #4 · deploy-watch');
+    // its name (else its words' first line), never its id; who it wakes beside it (designer m_15929)
+    expect(screen.getByTestId('scheduled.pane.title').textContent).toBe('check the deploy of storefrontdeploy-watch · storefront');
+    expect(screen.getByTestId('scheduled.pane').textContent).not.toContain('#4');
+    // the act, then its key: 'stop' + a dim 'x'
+    expect(screen.getByTestId('scheduled.stop').textContent).toBe('stop x');
     expect(screen.getByTestId('scheduled.pane').textContent).toContain('the 7th of 24 · 14:22');
     expect(screen.getByTestId('scheduled.pane.words').textContent).toContain('say so only when it fails');
     expect(screen.queryByTestId('scheduled.run')).toBeNull();

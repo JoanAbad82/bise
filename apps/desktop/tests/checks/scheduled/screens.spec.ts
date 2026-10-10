@@ -32,13 +32,14 @@ function world(now: number, theme: 'light' | 'dark') {
     },
     {
       ev: 'scheduled', project: SHOP, items: [
-        { id: 4, agent: 'deploy-watch', by: 'main', words: 'check the deploy of the storefront: if the error rate is over 1% or a check is red, tell me with the failing step', every: '5m', times: 24, done: 6, next_ms: now + 3 * M },
-        { id: 7, agent: 'perf', by: 'perf', words: 'rerun the product page bench and update the page', every: '1h', done: 3, next_ms: now + 41 * M, page: 'product-page' },
+        // names as sched-names gives them (amb-win's same 3 fixture names; id 9 stays nameless: the fallback)
+        { id: 4, name: 'deploy watch', agent: 'deploy-watch', by: 'main', words: 'check the deploy of the storefront: if the error rate is over 1% or a check is red, tell me with the failing step', every: '5m', times: 24, done: 6, next_ms: now + 3 * M },
+        { id: 7, name: 'bench rerun', agent: 'perf', by: 'perf', words: 'rerun the product page bench and update the page', every: '1h', done: 3, next_ms: now + 41 * M, page: 'product-page' },
       ],
     },
     {
       ev: 'scheduled', project: ACME, items: [
-        { id: 2, agent: 'main', by: 'you', words: 'the morning page: what changed overnight and what waits on me', every: 'day 07:30', done: 12, next_ms: next0730(now) },
+        { id: 2, name: 'morning page', agent: 'main', by: 'you', words: 'the morning page: what changed overnight and what waits on me', every: 'day 07:30', done: 12, next_ms: next0730(now) },
         { id: 9, agent: 'api', by: 'main', words: 'watch the checkout PR until its checks are green', every: '10m', times: 6, done: 2, next_ms: now + 8 * M, until_ms: now + 2 * 60 * M },
       ],
     },
@@ -108,6 +109,31 @@ test('scheduled/screens: the list and one task, light and dark, 1400 and 800', a
     await page.getByTestId('scheduled.stop').click();
     await expect(page.getByTestId('scheduled.ask')).toBeVisible({ timeout: 5000 });
     await page.screenshot({ path: test.info().outputPath('task-stop-dark-800.png') });
+    await page.getByTestId('scheduled.ask.keep').click();
+    await expect(page.getByTestId('scheduled.ask'), "'keep' puts the act back").toHaveCount(0);
+
+    // designer m_15929: the opened head is its name with who it wakes dim, never '#4'; 'stop' with a dim 'x'
+    await size(1400);
+    await expect(page.getByTestId('scheduled.pane.title')).toHaveText('deploy watchdeploy-watch · storefront');
+    await expect(page.getByTestId('scheduled.stop')).toHaveText('stop x');
+
+    // panel A's 'scheduled here' on storefront's thread, and a ⌘K hit on a task's name, each light and dark
+    await page.getByTestId(`app.sidebar.project.${SHOP}`).click();
+    const here = page.getByTestId('scheduled.here');
+    await expect(here, "storefront's panel lists its tasks").toBeVisible({ timeout: 5000 });
+    await expect(here).toContainText('deploy watch');
+    for (const t of ['light', 'dark'] as const) {
+      await theme(t);
+      await page.screenshot({ path: test.info().outputPath(`here-${t}-1400.png`) });
+    }
+    await page.keyboard.press('Meta+K');
+    await expect(page.getByTestId('app.palette')).toBeVisible({ timeout: 3000 });
+    await page.keyboard.type('deploy watch');
+    await expect(page.getByTestId('app.palette'), 'the task is found by its name').toContainText('deploy watch', { timeout: 3000 });
+    for (const t of ['light', 'dark'] as const) {
+      await theme(t);
+      await page.screenshot({ path: test.info().outputPath(`palette-${t}-1400.png`) });
+    }
   } finally {
     await s.close();
   }

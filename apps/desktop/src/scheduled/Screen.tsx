@@ -117,7 +117,11 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
         <aside className="sch-pane" data-testid="scheduled.pane">
           <Button kind="ghost" onClick={() => { setOpen(null); setAsking(false); }} testId="scheduled.back">‹ scheduled</Button>
           {/* the head, then its words once (designer m_12105: no title repeating the quote) */}
-          <div className="sch-k3" data-testid="scheduled.pane.title">{`scheduled task #${String(cur.t.id)} · ${cur.t.agent}`}</div>
+          {/* its name, never its id; who it wakes dim beside it, as the TUI's opened head (designer m_15929) */}
+          <div className="sch-title" data-testid="scheduled.pane.title">
+            {asks(cur.t)}
+            <span className="sch-k3-sub">{wakes(cur)}</span>
+          </div>
           <div className="sch-label">the words it sends</div>
           <blockquote className="sch-quote" data-testid="scheduled.pane.words">{cur.t.words}</blockquote>
           <dl className="sch-kv">
@@ -140,8 +144,9 @@ export function ScheduledView({ tasks, ports, now: pinned }: { tasks: readonly T
             </div>
           ) : (
             <div className="sch-acts">
-              {ports.runNow && <Button kind="pri" onClick={() => { ports.runNow?.(cur.project, cur.t.id); }} testId="scheduled.run">run now R</Button>}
-              <Button kind="danger" onClick={() => { setAsking(true); }} testId="scheduled.stop">stop X</Button>
+              {/* the act, then its key dim, as the list foot's '⏎ open   x stop' (designer m_15929) */}
+              {ports.runNow && <Button kind="pri" onClick={() => { ports.runNow?.(cur.project, cur.t.id); }} testId="scheduled.run">run now <span className="sch-key">r</span></Button>}
+              <Button kind="danger" onClick={() => { setAsking(true); }} testId="scheduled.stop">stop <span className="sch-key">x</span></Button>
             </div>
           )}
         </aside>
