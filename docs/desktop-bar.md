@@ -1036,7 +1036,52 @@ No app was run, and no heavy job. Words used:
 - **Section T**: the rows the a2039499 section listed as passing, plus I3/R19 and I8 in the key
   list (dd0934d2, settings/keys reads it). V3's help filter is in the table below.
 
-### What is not pass
+### What is not pass now (refreshed at e3f7e598, after qa-flows' batch 0b142a2f; ambient-lead m_17230)
+
+These went to pass after the table below:
+
+- **qa-flows' merge-to-main batch on the real core at 2f3f47c4 (0b142a2f, m_17342): 12 of 12
+  green.**
+  - S21 thread/news-real: the PR row '▲ checks fail: e2e' opens the PR.
+  - O.6 app/clicks on the real core, and O.6 composer/controls.
+  - O.1 inbox/approvals and approvals-cmd-i: allow lets main go on, no means it never runs.
+  - I3/I8 inbox/keys, I6 inbox/drafts, I9 app/confirm-bar.
+  - 2.1–2.3 composer/lists-real.
+  - K2 thread/empty-enter.
+  - C15 review/branch-real: '/diff <branch>' opens its review and files.
+  - V3 settings/keys: the 'inbox' filter.
+- **The gates:**
+  - R37/FOLDS2: the thinking row and the pill on beb70fe6, with no jump on 00ad3bbb and
+    29ec1b92;
+  - P99ROW on beb70fe6;
+  - the 4 KB cut and SCHED on 6ef40154;
+  - STEERRX and TOOLCOUNT on 29ec1b92;
+  - R07-a, HEADFIT and B16 on e3f7e598.
+- **amb-home 1ad161dd**: V14, S.4 and N2.
+
+Still not pass:
+
+| row | status | owner | the check that would prove it |
+|---|---|---|---|
+| R40 streaming with the signed animation | **built-no-check on a gate**: green in the harness (spotlight/streaming, thread/streaming), and never shot on a packed try. amb-core's bench waits for a heavy slot | amb-core, amb-web, amb-win | the bench, then qa-native's R40 frames on a cut |
+| S29/L19 computer use on a gate | **pass on the real core** (qa-flows 20c44bf9). Not proven on a gate: the gate's run waits on the TUI being ready | qa-flows, qa-native | the gate's thread/computer-use on the next cut |
+| TP-R6 ⇧⇥ approvals mode, and TP-K7b ctrl+c stops a turn | **built-no-check**: amb-web 21002943 | amb-web | qa-flows: a composer ⇧⇥ case, and thread/interrupt with ctrl+c |
+| TP-N1 /keychain on, /keychain off | **in progress**: the core landed in 8acd83b9; the window side is being built | amb-home | qa-flows: /keychain on the fake keychain |
+| TP-N2 /log | **in progress**: amb-feed's typed read is on its branch log-read; amb-web's screen waits on its shape | amb-feed, amb-web | qa-flows: thread/log |
+| 'said ✓✓' (a spoken turn's mark) | **built-no-check on a gate**: amb-win's unit test and d85bd249; no world has a spoken turn | amb-win, amb-tools | a world with a spoken turn, then qa-native |
+| HEADFIT's context note | **built-no-check on a gate**: amb-home's thread/head-fit is green in the harness; the rich world has no context note | amb-tools, qa-native | a world with a usage note |
+| S.1 no CLI (VM) | **not run**: native/vm/vm-pass is opt-in | amb-mac, qa-native | one VM pass when a heavy slot is free |
+
+Beyond the rows, the merge needs four more things:
+
+- designer's GO and mine on the cut that carries these;
+- architect's review;
+- his next try with no must-fix;
+- the harness-only passes run once on the real core: O.6 composer/controls, I9 app/confirm-bar,
+  K2 thread/empty-enter, V14, S.4 and N2. These are optional by my call: each one is a
+  window-side screen with a scripted core that mirrors the proto.
+
+### What was not pass at 6ef40154 (kept for the record; rows marked as they passed)
 
 | row | status | owner | the check that would prove it |
 |---|---|---|---|
