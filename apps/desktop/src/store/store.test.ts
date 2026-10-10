@@ -402,7 +402,7 @@ describe('computer use live (S29)', () => {
   it('keeps the rows whole, the latest still per agent in memory only, and sends acts by key', () => {
     const { sent, store } = fake();
     expect(store.computerLive()).toEqual([]);
-    const rows = [{ key: 'h.perf', project: P, agent: 'perf', driving: 'Chrome', place: 'amazon.fr', since_ms: 5 }];
+    const rows = [{ key: 'h.perf', project: P, agent: 'perf', driving: 'Chrome', place: 'amazon.fr', since_ms: 5, kind: 'driving' as const, mark: '↖', words: 'driving Chrome · amazon.fr' }];
     store.apply({ ev: 'computer_live', items: rows });
     expect(store.computerLive()).toEqual(rows);
     store.apply({ ev: 'computer_live', items: [] });

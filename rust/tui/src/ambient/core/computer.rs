@@ -20,9 +20,10 @@
 
 use super::*;
 use bise_computer_use::cli::StopOutcome;
+use bise_computer_use::live as cu_live;
 use bise_computer_use::state::{self as cu_state, Live};
 use bise_home::projects::Row;
-use bise_proto::draft::{ComputerAgent, CoreEv, PeekShot};
+use bise_proto::draft::{ComputerAgent, CoreEv, LiveKind, PeekShot};
 use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
@@ -107,10 +108,14 @@ pub(super) struct Computer {
 }
 
 impl Computer {
+    /// The rows, each with its line in `live::line`'s words (no age, not
+    /// ASCII: the window draws `↖` and `·`); an entry with no line (holds
+    /// nothing) is not a row.
     fn items(&self) -> Vec<ComputerAgent> {
         self.live
             .iter()
-            .map(|a| ComputerAgent {
+            .filter_map(|a| Some((a, cu_live::line(a, None, false)?)))
+            .map(|(a, l)| ComputerAgent {
                 key: a.key.clone(),
                 project: a.hub.as_ref().and_then(|h| self.hubs.iter().find(|(_, x)| x == h)).map(|(id, _)| id.clone()),
                 agent: a.name.clone(),
@@ -119,6 +124,13 @@ impl Computer {
                 since_ms: a.since_ms,
                 paused: a.paused,
                 stopped: a.stopped,
+                kind: match l.kind {
+                    cu_live::Kind::Driving => LiveKind::Driving,
+                    cu_live::Kind::Paused => LiveKind::Paused,
+                    cu_live::Kind::Stopped => LiveKind::Stopped,
+                },
+                mark: l.mark.to_string(),
+                words: l.words,
             })
             .collect()
     }

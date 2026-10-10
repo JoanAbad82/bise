@@ -213,6 +213,27 @@ pub struct ComputerAgent {
     /// stopped (`stop`, the TUI's /stop): it asks before it starts again
     #[serde(default, skip_serializing_if = "crate::is_false")]
     pub stopped: bool,
+    /// its line under its head, from `bise_computer_use::live::line` (the
+    /// TUI's status row draws the same): how to colour it, the mark, the
+    /// words (`driving Chrome · amazon.fr`). No age in them: the window
+    /// adds ` · 2 min` from `since_ms` to a driving line, and builds no
+    /// other word.
+    pub kind: LiveKind,
+    pub mark: String,
+    pub words: String,
+}
+
+/// How a computer-use line is coloured (`bise_computer_use::live::Kind`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub enum LiveKind {
+    /// it drives an app now (the working colour)
+    Driving,
+    /// he took the wheel: it waits on him (accent)
+    Paused,
+    /// stopped until he writes to it (dim)
+    Stopped,
 }
 
 /// A still of what an agent drives (`computer_peek`): inline, never

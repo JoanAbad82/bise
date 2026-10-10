@@ -191,7 +191,20 @@ paused?: boolean,
 /**
  * stopped (`stop`, the TUI's /stop): it asks before it starts again
  */
-stopped?: boolean, };
+stopped?: boolean, 
+/**
+ * its line under its head, from `bise_computer_use::live::line` (the
+ * TUI's status row draws the same): how to colour it, the mark, the
+ * words (`driving Chrome · amazon.fr`). No age in them: the window
+ * adds ` · 2 min` from `since_ms` to a driving line, and builds no
+ * other word.
+ */
+kind: LiveKind, mark: string, words: string, };
+
+/**
+ * How a computer-use line is coloured (`bise_computer_use::live::Kind`).
+ */
+export type LiveKind = "driving" | "paused" | "stopped";
 
 /**
  * A still of what an agent drives (`computer_peek`): inline, never

@@ -92,8 +92,10 @@ fn computer_live_maps_each_agent_to_its_project_and_goes_only_on_change() {
     assert_eq!(
         t.tick_at(t0, 500),
         [json!({"ev": "computer_live", "items": [
-            {"key": "elsewhere.review", "agent": "review", "stopped": true},
-            {"key": "hub-shop.perf", "project": "shop", "agent": "perf", "driving": "Chrome", "place": "amazon.fr", "since_ms": 5},
+            {"key": "elsewhere.review", "agent": "review", "stopped": true,
+             "kind": "stopped", "mark": "↖", "words": "stopped · write to it to go on"},
+            {"key": "hub-shop.perf", "project": "shop", "agent": "perf", "driving": "Chrome", "place": "amazon.fr", "since_ms": 5,
+             "kind": "driving", "mark": "↖", "words": "driving Chrome · amazon.fr"},
         ]})],
         "shop's agent has its project; another bise's has none"
     );
@@ -104,10 +106,26 @@ fn computer_live_maps_each_agent_to_its_project_and_goes_only_on_change() {
     // a new mtime that pauses perf: the rows again
     *f.file.borrow_mut() = Some((3, state(json!({"hub-shop.perf": {"hub": "hub-shop", "name": "perf", "driving": "Chrome", "paused": true}}))));
     let out = t.tick_at(t0, 2000);
-    assert_eq!(out[0]["items"], json!([{"key": "hub-shop.perf", "project": "shop", "agent": "perf", "driving": "Chrome", "paused": true}]));
+    assert_eq!(
+        out[0]["items"],
+        json!([{"key": "hub-shop.perf", "project": "shop", "agent": "perf", "driving": "Chrome", "paused": true,
+                "kind": "paused", "mark": "?", "words": "you took the wheel · ⏎ give it back"}])
+    );
+    // stopped by him while it drove: his words (was, stopped_by), and an
+    // entry that holds nothing is no row
+    *f.file.borrow_mut() = Some((4, state(json!({
+        "hub-shop.perf": {"hub": "hub-shop", "name": "perf", "stopped": true, "was": "Chrome", "stopped_by": "you"},
+        "hub-shop.idle": {"hub": "hub-shop", "name": "idle"},
+    }))));
+    let out = t.tick_at(t0, 2500);
+    assert_eq!(
+        out[0]["items"],
+        json!([{"key": "hub-shop.perf", "project": "shop", "agent": "perf", "stopped": true,
+                "kind": "stopped", "mark": "↖", "words": "you stopped it driving Chrome · write to it to go on"}])
+    );
     // the file gone: no agent uses computer use
     *f.file.borrow_mut() = None;
-    assert_eq!(t.tick_at(t0, 2500), [json!({"ev": "computer_live", "items": []})]);
+    assert_eq!(t.tick_at(t0, 3000), [json!({"ev": "computer_live", "items": []})]);
 }
 
 #[test]
