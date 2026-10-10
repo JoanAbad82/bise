@@ -4511,7 +4511,8 @@ law user_queued_never_answers_a_card:
   for +cx: HX.Cx<o>
   for +to: String
   for +text: String
-  {HC.user_says(o, cx, to, text, True{}) == HC.says.card(o, None{}, cx, to, text, True{}) : HX.Cx<o>}
+  for +parts: String
+  {HC.user_says(o, cx, to, text, True{}, parts) == HC.says.card(o, None{}, cx, to, text, True{}, parts) : HX.Cx<o>}
 
 def any_queued(xs: List<&2, HM.Msg>) -> Bool:
   match xs:
@@ -4559,8 +4560,9 @@ law card_confirm_words_refused:
   for +cx: HX.Cx<o>
   for +c: HM.Card
   for +text: String
+  for +parts: String
   for e: {HC.confirm_ok(text) == False{} : Bool}
-  {HC.answer.kind(o, HC.KConfirm{}, cx, c, text) == HC.words_refused(o, cx, c, HC.confirm_opts()) : HX.Cx<o>}
+  {HC.answer.kind(o, HC.KConfirm{}, cx, c, text, parts) == HC.words_refused(o, cx, c, HC.confirm_opts()) : HX.Cx<o>}
 
 # LAW: `no` and `no: <why>` (any case, lead m_10900) are deny aliases: the
 # card gets the same verdict path as its option 3, with his words as the
@@ -4570,8 +4572,9 @@ law card_confirm_no_alias:
   for +cx: HX.Cx<o>
   for +c: HM.Card
   for +text: String
+  for +parts: String
   for e: {HC.is_no(String.to_lower(String.trim(text))) == True{} : Bool}
-  {HC.answer.kind(o, HC.KConfirm{}, cx, c, text) == HC.answer.confirm(o, True{}, cx, c, text) : HX.Cx<o>}
+  {HC.answer.kind(o, HC.KConfirm{}, cx, c, text, parts) == HC.answer.confirm(o, True{}, cx, c, text) : HX.Cx<o>}
 
 # LAW: only `no` itself or its `no:` prefix: words that start like it stay
 # words.
@@ -4592,8 +4595,9 @@ law card_choice_words_refused:
   for +cx: HX.Cx<o>
   for +c: HM.Card
   for +text: String
+  for +parts: String
   for e: {HC.is_option(HM.Card.text(c), text) == False{} : Bool}
-  {HC.answer.kind(o, HC.KChoice{}, cx, c, text) == HC.words_refused(o, cx, c, "one of its numbers") : HX.Cx<o>}
+  {HC.answer.kind(o, HC.KChoice{}, cx, c, text, parts) == HC.words_refused(o, cx, c, "one of its numbers") : HX.Cx<o>}
 
 # ---- bise's cross-hub messages (desktop S2, hub/xhub.bend) ----
 # Local laws on xhub.bend's decisions and xhub-model.bend's state: the
@@ -4749,7 +4753,8 @@ law route_plain_waits_behind_unclear:
   for +to: String
   for +text: String
   for +queued: Bool
-  {HC.user_input.behind(o, Some{d}, cx, to, text, queued) == HC.route_behind(o, cx, text, d) : HX.Cx<o>}
+  for +parts: String
+  {HC.user_input.behind(o, Some{d}, cx, to, text, queued, parts) == HC.route_behind(o, cx, text, d) : HX.Cx<o>}
 
 # LAW: ... which is no earlier than any unclear route's due, so the
 # unclear one fires first (acts_due keeps the acts' order) and both reach
@@ -5551,23 +5556,83 @@ law main_card_answer_routes_once:
   for +cx: HX.Cx<o>
   for +c: HM.Card
   for +text: String
-  {HC.answer.q.main(o, cx, c, text)
+  for +parts: String
+  {HC.answer.q.main(o, cx, c, text, parts)
     == HC.close_card(o,
-      HC.line(o,
+      HC.route_line(o,
         HC.notify_main(o, cx, HC.cat([HC.MAIN_ANSWER_HEAD(), HC.ns(HM.Card.id(c)), " (\"", HM.one_line(HM.Card.text(c)), "\"): \"", HM.one_line(text), "\""])),
-        HM.MAIN(), "route", HC.cat(["you → @", HM.MAIN(), " (answer to card #", HC.ns(HM.Card.id(c)), ") : ", text])),
+        HC.cat(["you → @", HM.MAIN(), " (answer to card #", HC.ns(HM.Card.id(c)), ") : ", text]), parts),
       HM.Card.id(c), "answered") : HX.Cx<o>}
 
 # LAW: his message's feed line is followed, in the same step, by its id
 # ('sb you-id : m_N'): the clients key his entry by it (nothing else may
-# fall between them); the REPL and the model get the same delivery.
+# fall between them); the REPL and the model get the same delivery. A
+# message with no parts writes exactly these two lines (an older client's,
+# an agent-made one: the feed is what it always was).
 law you_line_carries_its_id:
   for -o: HM.St
   for +cx: HX.Cx<o>
   for +name: String
   for +m: HM.Msg
+  for e: {String.is_empty(HM.Msg.parts(m)) == True{} : Bool}
   {HC.deliver.line(o, False{}, True{}, cx, name, m)
     == HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m))) : HX.Cx<o>}
+
+# ---- his message's parts (msg-parts) ----
+# The clients send his message as typed parts (bise_proto::parts: his
+# words, quotes, pastes, images, files) beside the text the model gets.
+# sb-core keeps them on the message, opaque (Msg.parts, "" none), and
+# writes them at the delivery, so the clients draw his message from them.
+
+# LAW: a message with parts writes them on one 'you-parts' line right
+# after its you-id (the clients put them on that entry); the you line
+# and its id come first, as always.
+law you_parts_follow_the_id:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +name: String
+  for +m: HM.Msg
+  for e: {String.is_empty(HM.Msg.parts(m)) == False{} : Bool}
+  {HC.deliver.line(o, False{}, True{}, cx, name, m)
+    == HC.line(o, HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m))), name, "you-parts", HM.Msg.parts(m)) : HX.Cx<o>}
+
+# LAW: parts never change what he said: the same message with or without
+# parts writes the same lines (his text, its id), the parts only after
+# them. The model reads the text; the parts are for the clients.
+law parts_never_change_text:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +name: String
+  for +m: HM.Msg
+  for +p: String
+  {HC.deliver.line(o, False{}, True{}, cx, name, HM.Msg.with_parts(m, p))
+    == HC.parts_line(o, HC.deliver.line(o, False{}, True{}, cx, name, HM.Msg.with_parts(m, "")), name, "you-parts", p) : HX.Cx<o>}
+
+# LAW: a line with no parts is no line: a route line (an answer to a card,
+# a message to another agent) with none is the route line alone.
+law no_parts_no_line:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +text: String
+  {HC.route_line(o, cx, text, "") == HC.line(o, cx, HM.MAIN(), "route", text) : HX.Cx<o>}
+
+# LAW: a route line with parts is followed by one 'route-parts' line.
+law route_parts_follow_the_route:
+  for -o: HM.St
+  for +cx: HX.Cx<o>
+  for +text: String
+  for +parts: String
+  for e: {String.is_empty(parts) == False{} : Bool}
+  {HC.route_line(o, cx, text, parts) == HC.line(o, HC.line(o, cx, HM.MAIN(), "route", text), HM.MAIN(), "route-parts", parts) : HX.Cx<o>}
+
+# LAW: his answer to a question card reaches the asker with his parts on
+# the message (the asker's thread draws it like any message of his).
+law answer_keeps_its_parts:
+  for +to: String
+  for +text: String
+  for +r: Maybe<&2, Nat>
+  for +parts: String
+  {HC.Snd.parts(HC.answer.snd(to, text, r, parts)) == parts : String}
 
 # LAW: a steered receipt names the steer-mode deliveries since the last
 # one, on one feed line at this point of the turn, and marks them seen.

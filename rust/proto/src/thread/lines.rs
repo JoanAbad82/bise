@@ -263,6 +263,13 @@ pub enum Hub {
     SteerRx(Vec<u64>),
     /// his fn context, the raw JSON (S9)
     Context(String),
+    /// `you-parts : <json>`: the parts of the 'you' line before it (its
+    /// you-id between them; sb-core writes all three in one step), the
+    /// raw JSON of a `Vec<parts::Part>` (msg-parts)
+    YouParts(String),
+    /// `route-parts : <json>`: the parts of the route line right before
+    /// it (his answer to a card, his message to another agent)
+    RouteParts(String),
     /// BISE-86: `undelivered : {name} : {text}`
     Undelivered { to: String, text: String },
     /// what the feed's owner received: `{from} m_<n> : {text}`; `from`
@@ -493,6 +500,10 @@ pub fn hub(rest: &str) -> Hub {
             _ => other(text),
         },
         "context" => Hub::Context(raw.to_string()),
+        // raw: the JSON has no newline to unescape, and its own `\n`
+        // escapes must stay as they are
+        "you-parts" => Hub::YouParts(raw.to_string()),
+        "route-parts" => Hub::RouteParts(raw.to_string()),
         "undelivered" => {
             let (name, t) = raw.split_once(" : ").unwrap_or((raw, ""));
             Hub::Undelivered { to: field(name), text: field(t) }

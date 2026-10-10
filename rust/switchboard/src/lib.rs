@@ -12,6 +12,8 @@
 //! - `sweep`: where task worktrees live, and their cleanup;
 //! - `tools_env`: the agents' PATH, git and rg (BISE-166);
 //! - `agents_md`: the AGENTS.md files an agent's prompt carries (BISE-232);
+//! - `parts_in`: his message's typed parts as a client sends them, checked
+//!   and rendered to the model's text (msg-parts);
 //! - `daemon`: the imperative shell (sockets, journal, feeds), with
 //!   `daemon/repl` (REPL processes) and `daemon/versions` (`/version`);
 //! - `transcript`: reading a thread (positions, cursors, origin);
@@ -51,6 +53,7 @@ pub mod land;
 pub mod land_pick;
 pub mod model;
 pub mod pages;
+pub mod parts_in;
 pub mod paths;
 pub mod peer;
 pub use bise_peer::os as peer_os;

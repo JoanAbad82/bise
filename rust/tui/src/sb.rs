@@ -1068,6 +1068,9 @@ pub(crate) fn hub_ev(h: Hub) -> Option<Ev> {
         // S9: the fn context of the 'you' line before it (the window's
         // thread shows it on his message; the TUI doesn't)
         Hub::Context(_) => return None,
+        // his parts (msg-parts): the hub's fold puts them on his entry;
+        // the line itself is no row
+        Hub::YouParts(_) | Hub::RouteParts(_) => return None,
         // his message's id: on his message right before it (no row)
         Hub::YouId(id) => Ev::YouId(id),
         // sb-core's receipts: ✓ (received) then ✓✓ (read) on the

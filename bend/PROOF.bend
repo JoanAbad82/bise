@@ -2575,6 +2575,20 @@ def hub_d_line(-o: HM.St, +cx: HX.Cx<o>, +a: String, +k: String, +t: String) -> 
         case HX.Core{d, fx, p, f, q, v}:
           {==}
 
+# a line written or not (pick_lazy on a Bool) keeps the core state
+def hub_d_pick_line(-o: HM.St, b: Bool, +cx: HX.Cx<o>, +a: String, +k: String, +t: String)
+    -> {HX.d(o, HC.pick_lazy(HX.Cx<o>, b, u => cx, u => HC.line(o, cx, a, k, t))) == HX.d(o, cx) : HM.St}:
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      hub_d_line(o, cx, a, k, t)
+
+# his parts' line (msg-parts) keeps the core state, written or not
+def hub_d_parts_line(-o: HM.St, +cx: HX.Cx<o>, +a: String, +k: String, +p: String)
+    -> {HX.d(o, HC.parts_line(o, cx, a, k, p)) == HX.d(o, cx) : HM.St}:
+  hub_d_pick_line(o, String.is_empty(p), cx, a, k, p)
+
 # a delivered message's feed line (or none, for a steer_leftover) keeps the state
 def hub_d_dline(-o: HM.St, again: Bool, you: Bool, +cx: HX.Cx<o>, +name: String, +m: HM.Msg)
     -> {HX.d(o, HC.deliver.line(o, again, you, cx, name, m)) == HX.d(o, cx) : HM.St}:
@@ -2582,10 +2596,13 @@ def hub_d_dline(-o: HM.St, again: Bool, you: Bool, +cx: HX.Cx<o>, +name: String,
     case True{} _:
       {==}
     case False{} True{}:
-      Equal.trans(HM.St, HX.d(o, HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m)))),
-        HX.d(o, HC.line(o, cx, name, "you", HM.Msg.text(m))), HX.d(o, cx),
-        hub_d_line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m))),
-        hub_d_line(o, cx, name, "you", HM.Msg.text(m)))
+      +ln = HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m)))
+      Equal.trans(HM.St, HX.d(o, HC.parts_line(o, ln, name, "you-parts", HM.Msg.parts(m))), HX.d(o, ln), HX.d(o, cx),
+        hub_d_parts_line(o, ln, name, "you-parts", HM.Msg.parts(m)),
+        Equal.trans(HM.St, HX.d(o, ln),
+          HX.d(o, HC.line(o, cx, name, "you", HM.Msg.text(m))), HX.d(o, cx),
+          hub_d_line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m))),
+          hub_d_line(o, cx, name, "you", HM.Msg.text(m))))
     case False{} False{}:
       hub_d_line(o, cx, name, "msg-in", HC.cat([HM.Msg.from(m), " ", HC.mid(HM.Msg.id(m)), " : ", HM.Msg.text(m)]))
 
@@ -3287,16 +3304,32 @@ def hub_rts_line(-o: HM.St, cx: HX.Cx<o>, +a: String, +k: String, +t: String) ->
     case HX.Cx{c, r}:
       {==}
 
+# a line written or not keeps the runtimes (msg-parts' parts line)
+def hub_rts_pick_line(-o: HM.St, b: Bool, +cx: HX.Cx<o>, +a: String, +k: String, +t: String)
+    -> {hub_rts(o, HC.pick_lazy(HX.Cx<o>, b, u => cx, u => HC.line(o, cx, a, k, t))) == hub_rts(o, cx) : List<&2, HX.Rt>}:
+  match b:
+    case True{}:
+      {==}
+    case False{}:
+      hub_rts_line(o, cx, a, k, t)
+
+def hub_rts_parts_line(-o: HM.St, +cx: HX.Cx<o>, +a: String, +k: String, +p: String)
+    -> {hub_rts(o, HC.parts_line(o, cx, a, k, p)) == hub_rts(o, cx) : List<&2, HX.Rt>}:
+  hub_rts_pick_line(o, String.is_empty(p), cx, a, k, p)
+
 def hub_rts_dline(-o: HM.St, again: Bool, you: Bool, +cx: HX.Cx<o>, +name: String, +m: HM.Msg)
     -> {hub_rts(o, HC.deliver.line(o, again, you, cx, name, m)) == hub_rts(o, cx) : List<&2, HX.Rt>}:
   match again you:
     case True{} _:
       {==}
     case False{} True{}:
-      Equal.trans(List<&2, HX.Rt>, hub_rts(o, HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m)))),
-        hub_rts(o, HC.line(o, cx, name, "you", HM.Msg.text(m))), hub_rts(o, cx),
-        hub_rts_line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m))),
-        hub_rts_line(o, cx, name, "you", HM.Msg.text(m)))
+      +ln = HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m)))
+      Equal.trans(List<&2, HX.Rt>, hub_rts(o, HC.parts_line(o, ln, name, "you-parts", HM.Msg.parts(m))), hub_rts(o, ln), hub_rts(o, cx),
+        hub_rts_parts_line(o, ln, name, "you-parts", HM.Msg.parts(m)),
+        Equal.trans(List<&2, HX.Rt>, hub_rts(o, ln),
+          hub_rts(o, HC.line(o, cx, name, "you", HM.Msg.text(m))), hub_rts(o, cx),
+          hub_rts_line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m))),
+          hub_rts_line(o, cx, name, "you", HM.Msg.text(m))))
     case False{} False{}:
       hub_rts_line(o, cx, name, "msg-in", HC.cat([HM.Msg.from(m), " ", HC.mid(HM.Msg.id(m)), " : ", HM.Msg.text(m)]))
 
@@ -3630,7 +3663,7 @@ def hub_str_eq_sound(+a: String, +b: String, e: {String.eq(a, b) == True{} : Boo
 
 # ---- L4 support: a delivery only shrinks queues ----
 
-def hub_is_q_deliv(st: HM.MSt) -> {HM.is_queued(HM.MRec.st(HM.rec_op(HM.MRec{HM.Msg{0n, 0n, "", "", None{}, False{}, False{}, "", 0n, False{}, False{}, None{}}, st, False{}}, HM.OSt{HM.Delivered{}}))) == False{} : Bool}:
+def hub_is_q_deliv(st: HM.MSt) -> {HM.is_queued(HM.MRec.st(HM.rec_op(HM.MRec{HM.Msg{0n, 0n, "", "", None{}, False{}, False{}, "", 0n, False{}, False{}, None{}, ""}, st, False{}}, HM.OSt{HM.Delivered{}}))) == False{} : Bool}:
   {==}
 
 def hub_rt_put_other.pick(c: Bool, +h: HX.Rt, +t: List<&2, HX.Rt>, +a: String, +n: String, +run: HM.Run, +w: Bool, +tm: Maybe<&2, Nat>, +k: Nat,
@@ -5510,7 +5543,7 @@ def Laws.wake_drop_ends(o, cx, n):
 
 # ---- queued user input (the window's "send queued") ----
 
-def Laws.user_queued_never_answers_a_card(o, cx, to, text):
+def Laws.user_queued_never_answers_a_card(o, cx, to, text, parts):
   {==}
 
 def Laws.user_queued_waits_for_turn_end(o, cx, name, q, m):
@@ -5525,7 +5558,7 @@ def Laws.busy_batch_has_no_queued(xs):
       {==}
     case Con{h, t}:
       match h:
-        case HM.Msg{i, th, f, to, r, e, a, tx, c, p, q, v}:
+        case HM.Msg{i, th, f, to, r, e, a, tx, c, p, q, v, pa}:
           match q:
             case True{}:
               Laws.busy_batch_has_no_queued(t)
@@ -5646,7 +5679,7 @@ def Laws.route_unclear_waits_pick_ms(x, tm, text, via, now, context):
 def Laws.route_pick_only_unclear(o, cx, to, name, why):
   {==}
 
-def Laws.route_plain_waits_behind_unclear(o, cx, d, to, text, queued):
+def Laws.route_plain_waits_behind_unclear(o, cx, d, to, text, queued, parts):
   {==}
 
 # the latest unclear due with `d` folded in is no earlier than `d`
@@ -5740,11 +5773,11 @@ def Laws.unknown_kind_skipped(j, n):
 
 # ---- the composer rule ----
 
-def Laws.card_confirm_words_refused(o, cx, c, text, e):
+def Laws.card_confirm_words_refused(o, cx, c, text, parts, e):
   %Equal.sym(Bool, HC.confirm_ok(text), False{}, e) : {HC.answer.confirm(o, _, cx, c, text) == HC.words_refused(o, cx, c, HC.confirm_opts()) : HX.Cx<o>}
   {==}
 
-def Laws.card_confirm_no_alias(o, cx, c, text, e):
+def Laws.card_confirm_no_alias(o, cx, c, text, parts, e):
   %Equal.sym(Bool, HC.is_no(String.to_lower(String.trim(text))), True{}, e) : {HC.answer.confirm(o, HC.confirm_pick(_, String.trim(text)), cx, c, text) == HC.answer.confirm(o, True{}, cx, c, text) : HX.Cx<o>}
   {==}
 
@@ -5757,7 +5790,7 @@ def Laws.card_confirm_now_is_words():
 def Laws.card_confirm_no_thanks_is_words():
   {==}
 
-def Laws.card_choice_words_refused(o, cx, c, text, e):
+def Laws.card_choice_words_refused(o, cx, c, text, parts, e):
   %Equal.sym(Bool, HC.is_option(HM.Card.text(c), text), False{}, e) : {HC.answer.choice(o, _, cx, c, text) == HC.words_refused(o, cx, c, "one of its numbers") : HX.Cx<o>}
   {==}
 
@@ -5801,10 +5834,33 @@ def Laws.unknown_agent_is_no_task(o, cx, agent, e):
   %Equal.sym(Bool, HC.has_agent(o, cx, agent), False{}, e) : {Bool.and(_, Bool.not(String.eq(agent, HM.MAIN()))) == False{} : Bool}
   {==}
 
-def Laws.main_card_answer_routes_once(o, cx, c, text):
+def Laws.main_card_answer_routes_once(o, cx, c, text, parts):
   {==}
 
-def Laws.you_line_carries_its_id(o, cx, name, m):
+def Laws.you_line_carries_its_id(o, cx, name, m, e):
+  +ln = HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m)))
+  %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), True{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.line(o, ln, name, "you-parts", HM.Msg.parts(m))) == ln : HX.Cx<o>}
+  {==}
+
+def Laws.you_parts_follow_the_id(o, cx, name, m, e):
+  +ln = HC.line(o, HC.line(o, cx, name, "you", HM.Msg.text(m)), name, "you-id", HC.mid(HM.Msg.id(m)))
+  %Equal.sym(Bool, String.is_empty(HM.Msg.parts(m)), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.line(o, ln, name, "you-parts", HM.Msg.parts(m))) == HC.line(o, ln, name, "you-parts", HM.Msg.parts(m)) : HX.Cx<o>}
+  {==}
+
+def Laws.parts_never_change_text(o, cx, name, m, p):
+  match m:
+    case HM.Msg{i, th, f, to, r, ex, a, tx, c, pl, q, v, pa}:
+      {==}
+
+def Laws.no_parts_no_line(o, cx, text):
+  {==}
+
+def Laws.route_parts_follow_the_route(o, cx, text, parts, e):
+  +ln = HC.line(o, cx, HM.MAIN(), "route", text)
+  %Equal.sym(Bool, String.is_empty(parts), False{}, e) : {HC.pick_lazy(HX.Cx<o>, _, u => ln, u => HC.line(o, ln, HM.MAIN(), "route-parts", parts)) == HC.line(o, ln, HM.MAIN(), "route-parts", parts) : HX.Cx<o>}
+  {==}
+
+def Laws.answer_keeps_its_parts(to, text, r, parts):
   {==}
 
 def Laws.steered_receipt_names_the_new_ones(o, cx, agent, h, t, total):

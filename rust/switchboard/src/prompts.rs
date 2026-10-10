@@ -335,6 +335,7 @@ mod tests {
             plain: false,
             queued: false,
             via: None,
+            parts: String::new(),
         }
     }
 

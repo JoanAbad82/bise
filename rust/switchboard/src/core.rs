@@ -522,6 +522,9 @@ pub enum Input {
         /// The window's "send queued": a plain text or `@agent` text waits
         /// for the end of the agent's turn (sb-core's queued-mode path).
         queued: bool,
+        /// his message's parts as JSON (msg-parts, `parts_in::said`; ""
+        /// none): kept on sb-core's message, written at its delivery
+        parts: String,
     },
     ClientFocus {
         client: ClientId,
@@ -2429,10 +2432,11 @@ impl Hub {
                 focus,
                 text,
                 queued,
-            } => self.user_input(&mut fx, env, client, &focus, &text, queued),
+                parts,
+            } => self.user_input(&mut fx, env, client, &focus, &text, queued, &parts),
             Input::UserCmd { client, focus, cmd } => {
                 let focus = self.focus_of(client, &focus);
-                self.user_cmd(&mut fx, env, client, focus, cmd, false)
+                self.user_cmd(&mut fx, env, client, focus, cmd, false, "")
             }
             Input::ClientFocus { client, focus } => self.set_focus(&mut fx, env, client, &focus),
             Input::ClientGone { client } => {

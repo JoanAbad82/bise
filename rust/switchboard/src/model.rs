@@ -268,6 +268,10 @@ pub struct Msg {
     /// (RFC 0003 §5.1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via: Option<String>,
+    /// his message's parts as JSON (msg-parts, sb-core's opaque
+    /// `Msg.parts`; "" none): written after its 'you' line at delivery
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub parts: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

@@ -38,7 +38,7 @@ type MSt is Data:
 type Msg is Data:
   Msg{id: Nat, thread: Nat, from: String, to: String, reply_to: Maybe<&2, Nat>,
     expect: Bool, auto: Bool, text: String, created: Nat, plain: Bool,
-    queued: Bool, via: Maybe<&2, String>}
+    queued: Bool, via: Maybe<&2, String>, parts: String}
 
 # a message, its delivery state and whether it got its (first) reply
 type MRec is Data:
@@ -219,7 +219,7 @@ def St.x(x: St) -> XH.Xs:
 
 def Msg.id(x: Msg) -> Nat:
   match x:
-    case Msg{+id, _, _, _, _, _, _, _, _, _, _, _}:
+    case Msg{+id, _, _, _, _, _, _, _, _, _, _, _, _}:
       id
 
 # the first entry whose key is `k`
@@ -503,7 +503,7 @@ def apply.settle.if(ok: Bool, +msgs: List<&2, MRec>, +id: Nat) -> List<&2, MRec>
 
 def Msg.to(x: Msg) -> String:
   match x:
-    case Msg{_, _, _, +to, _, _, _, _, _, _, _, _}:
+    case Msg{_, _, _, +to, _, _, _, _, _, _, _, _, _}:
       to
 
 def apply.settle.go(orig: Maybe<&2, MRec>, +msgs: List<&2, MRec>, +id: Nat, +from: String) -> List<&2, MRec>:
@@ -523,17 +523,17 @@ def apply.settle(r: Maybe<&2, Nat>, +msgs: List<&2, MRec>, +from: String) -> Lis
 
 def Msg.reply_to(x: Msg) -> Maybe<&2, Nat>:
   match x:
-    case Msg{_, _, _, _, +reply_to, _, _, _, _, _, _, _}:
+    case Msg{_, _, _, _, +reply_to, _, _, _, _, _, _, _, _}:
       reply_to
 
 def Msg.from(x: Msg) -> String:
   match x:
-    case Msg{_, _, +from, _, _, _, _, _, _, _, _, _}:
+    case Msg{_, _, +from, _, _, _, _, _, _, _, _, _, _}:
       from
 
 def Msg.thread(x: Msg) -> Nat:
   match x:
-    case Msg{_, +thread, _, _, _, _, _, _, _, _, _, _}:
+    case Msg{_, +thread, _, _, _, _, _, _, _, _, _, _, _}:
       thread
 
 def apply(+st: St, e: Ev) -> St:
@@ -749,7 +749,7 @@ def queued_for(+st: St, +n: String) -> List<&2, Msg>:
 
 def Msg.expect(x: Msg) -> Bool:
   match x:
-    case Msg{_, _, _, _, _, +expect, _, _, _, _, _, _}:
+    case Msg{_, _, _, _, _, +expect, _, _, _, _, _, _, _}:
       expect
 
 def unanswered_in(xs: List<&2, MRec>, +ns: List<&2, String>) -> List<&2, Msg>:
@@ -805,33 +805,47 @@ def init(+workspace: String) -> St:
 
 def Msg.auto(x: Msg) -> Bool:
   match x:
-    case Msg{_, _, _, _, _, _, +auto, _, _, _, _, _}:
+    case Msg{_, _, _, _, _, _, +auto, _, _, _, _, _, _}:
       auto
 
 def Msg.text(x: Msg) -> String:
   match x:
-    case Msg{_, _, _, _, _, _, _, +text, _, _, _, _}:
+    case Msg{_, _, _, _, _, _, _, +text, _, _, _, _, _}:
       text
 
 def Msg.created(x: Msg) -> Nat:
   match x:
-    case Msg{_, _, _, _, _, _, _, _, +created, _, _, _}:
+    case Msg{_, _, _, _, _, _, _, _, +created, _, _, _, _}:
       created
 
 def Msg.plain(x: Msg) -> Bool:
   match x:
-    case Msg{_, _, _, _, _, _, _, _, _, +plain, _, _}:
+    case Msg{_, _, _, _, _, _, _, _, _, +plain, _, _, _}:
       plain
 
 def Msg.queued(x: Msg) -> Bool:
   match x:
-    case Msg{_, _, _, _, _, _, _, _, _, _, +queued, _}:
+    case Msg{_, _, _, _, _, _, _, _, _, _, +queued, _, _}:
       queued
 
 def Msg.via(x: Msg) -> Maybe<&2, String>:
   match x:
-    case Msg{_, _, _, _, _, _, _, _, _, _, _, +via}:
+    case Msg{_, _, _, _, _, _, _, _, _, _, _, +via, _}:
       via
+
+# his message's parts (msg-parts): the clients' JSON (bise_proto::parts),
+# opaque here, "" for none; sb-core never decides on them, it keeps them
+# with the message and writes them at its delivery (deliver.line)
+def Msg.parts(x: Msg) -> String:
+  match x:
+    case Msg{_, _, _, _, _, _, _, _, _, _, _, _, +parts}:
+      parts
+
+# the same message with parts `p` (law parts_never_change_text)
+def Msg.with_parts(x: Msg, +p: String) -> Msg:
+  match x:
+    case Msg{+i, +th, +f, +to, +r, +e, +a, +tx, +c, +pl, +q, +v, _}:
+      Msg{i, th, f, to, r, e, a, tx, c, pl, q, v, p}
 
 # the last `max` chars, after an ellipsis when cut (util::clip_tail)
 def clip_tail.pick(fits: Bool, +s: String, +max: Nat) -> String:

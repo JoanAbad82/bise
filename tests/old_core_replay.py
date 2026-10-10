@@ -61,6 +61,16 @@ FIXTURE = [
     {"type": "wake_set", "watch": {"id": 2, "agent": "main", "spec": {"kind": "bg", "slot": "/t/bg/0", "cmd": "make"},
                                    "max_text": "", "set_at": 1000, "max_at": 86401000, "quiet": True}},
     {"type": "wake_end", "id": 1, "why": "hit", "at": 1200},
+    # msg-parts (architect m_17621): his messages with their parts (an
+    # older sb-core ignores the key and keeps the message, its text whole):
+    # a plain one, a queued one, one to another agent (a route; steered or
+    # not is the delivery's, never the journal's)
+    dict(msg(4, "user", "main"), msg=dict(msg(4, "user", "main")["msg"], plain=True,
+         parts='[{"kind":"quote","from":"main","text":"q"},{"kind":"text","text":"m4"}]')),
+    dict(msg(5, "user", "main"), msg=dict(msg(5, "user", "main")["msg"], plain=True, queued=True,
+         parts='[{"kind":"text","text":"m5"}]')),
+    dict(msg(6, "user", "perf"), msg=dict(msg(6, "user", "perf")["msg"], plain=True,
+         parts='[{"kind":"paste","n":1,"text":"x"},{"kind":"text","text":"m6"}]')),
 ]
 NEW = [i for i, e in enumerate(FIXTURE)
        if e["type"].startswith(("x_", "act_", "wake_")) or e["type"] in ("follow", "job_end", "every_name")]
@@ -106,7 +116,7 @@ def main():
         view = call({"t": "view_all"})
         assert core.poll() is None, "the base's sb-core died on the journal"
         text = json.dumps(view)
-        assert all(("m%d" % i) in text for i in (1, 2, 3)), "the messages are rebuilt: %s" % text[:500]
+        assert all(("m%d" % i) in text for i in (1, 2, 3, 4, 5, 6)), "the messages are rebuilt: %s" % text[:500]
         # sched-names: a timer with a name is rebuilt (an older base drops the name)
         timers = view.get("view", view).get("timers", [])
         assert sorted(t["id"] for t in timers) == [1, 2], "the timers are rebuilt: %r" % timers

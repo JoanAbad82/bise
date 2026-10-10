@@ -39,6 +39,9 @@ pub enum UserCmd {
     Answer {
         card: u64,
         text: String,
+        /// his answer's parts as JSON (msg-parts: `HubCmd::Answer.parts`;
+        /// "" for a typed `/answer` line)
+        parts: String,
     },
     /// `/close N`: close attention card N without answering it.
     Close {
@@ -269,6 +272,7 @@ pub fn parse(line: &str, focus: &str) -> UserCmd {
                 Ok(card) if !text.trim().is_empty() => UserCmd::Answer {
                     card,
                     text: text.trim().to_string(),
+                    parts: String::new(),
                 },
                 Ok(_) => UserCmd::Invalid("usage: /answer <card> <answer>".into()),
                 Err(e) => UserCmd::Invalid(format!("{} (usage: /answer <card> <answer>)", e)),
@@ -439,7 +443,8 @@ mod tests {
             parse("/answer #3 v2", MAIN),
             UserCmd::Answer {
                 card: 3,
-                text: "v2".into()
+                text: "v2".into(),
+                parts: String::new()
             }
         );
         assert_eq!(

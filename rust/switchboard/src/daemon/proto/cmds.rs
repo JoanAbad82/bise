@@ -85,8 +85,21 @@ impl Shell {
                 let (entries, before, more) = pthread::page(&lines, &ahead, &ctx, limit.map_or(LIMIT, |l| (l as usize).clamp(1, MAX_LIMIT)));
                 self.proto_send(id, &HubEv::Thread { project, agent, entries, before, more });
             }
-            HubCmd::Send { agent, text, opts, cid, .. } => self.proto_input(id, &tag, agent, text, opts, cid),
-            HubCmd::Answer { card, reply, files, .. } => {
+            HubCmd::Send { agent, text, opts, cid, parts, .. } if parts.is_empty() => self.proto_input(id, &tag, agent, text, opts, cid, String::new()),
+            // msg-parts: the model's text from his parts, the parts kept
+            // on his message (a part this hub doesn't know: refused)
+            HubCmd::Send { agent, opts, cid, parts, .. } => match crate::parts_in::said(&parts, &opts.files, &bise_home::Home::from_env().images_dir()) {
+                Ok(s) => self.proto_input(id, &tag, agent, s.text, opts, cid, s.parts),
+                Err(e) => self.proto_error_cid(id, &tag, &e, cid, cid.map(|_| "refused")),
+            },
+            HubCmd::Answer { card, reply, files, parts, .. } => {
+                let (reply, parts) = match parts.is_empty() {
+                    true => (reply, String::new()),
+                    false => match crate::parts_in::said(&parts, &files, &bise_home::Home::from_env().images_dir()) {
+                        Ok(s) => (s.text, s.parts),
+                        Err(e) => return self.proto_error(id, &tag, &e),
+                    },
+                };
                 // a page's card first (daemon/page_cards.rs, as the input
                 // op had it): a step ticked, a drafts or replaced batch
                 // card answered there; a question's digit becomes its
@@ -109,7 +122,7 @@ impl Shell {
                 // after his words by the send path's one render, so an
                 // image reaches the asking agent's model as an image
                 let text = if files.is_empty() { text } else { super::fn_context::render_files(&text, &files) };
-                self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd: UserCmd::Answer { card, text } });
+                self.step_typed(id, &tag, Input::UserCmd { client: id, focus: MAIN.into(), cmd: UserCmd::Answer { card, text, parts } });
                 self.page_answers();
             }
             // the TUI's /close handler with its field (Input::UserCmd, no
@@ -377,7 +390,7 @@ impl Shell {
             // `send`'s path (architect m_13089 change 3)
             HubCmd::Slash { agent, line, cid, opts, .. } => {
                 if !line.trim_start().starts_with('/') {
-                    return self.proto_input(id, &tag, agent, line, opts, cid);
+                    return self.proto_input(id, &tag, agent, line, opts, cid, String::new());
                 }
                 if opts.queued() {
                     return self.proto_error_cid(id, &tag, QUEUED_COMMAND, cid, cid.map(|_| "refused"));
@@ -391,7 +404,10 @@ impl Shell {
     /// His words to `agent` (`send`, and `slash`'s line that isn't a
     /// command): the `input` op's path with its fields, its notices back
     /// as errors with `cid`.
-    fn proto_input(&mut self, id: ClientId, tag: &str, agent: String, text: String, opts: SendOpts, cid: Option<u64>) {
+    /// `parts`: his parts' JSON (msg-parts, `parts_in::said`; "" none),
+    /// carried on the op to sb-core's message.
+    #[allow(clippy::too_many_arguments)]
+    fn proto_input(&mut self, id: ClientId, tag: &str, agent: String, text: String, opts: SendOpts, cid: Option<u64>, parts: String) {
         if !self.hub.st.agents.contains_key(&agent) {
             return self.proto_error_cid(id, tag, &format!("no agent {agent}"), cid, cid.map(|_| "refused"));
         }
@@ -415,6 +431,9 @@ impl Shell {
         }
         if let Some(via) = opts.via {
             op["via"] = json!(via);
+        }
+        if !parts.is_empty() {
+            op["parts"] = json!(parts);
         }
         // BISE-266: a key saved since a REPL started reaches it before
         // this message does; then the input handler (daemon/capsule.rs:

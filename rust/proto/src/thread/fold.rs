@@ -9,6 +9,7 @@ use super::{Answered, ApprovalFold, Ctx, Entry, EntryCard, EntryKind, Landed, Li
 use super::{cap, Delivery, FileCount, GateWait, ToolGate, ToolState, TurnFailed};
 use crate::Pos;
 use crate::context::FnContext;
+use crate::parts::Part;
 use crate::rows::question;
 
 struct Fold<'a> {
@@ -25,6 +26,12 @@ struct Fold<'a> {
     /// after the 'you' line sb-core wrote, before its id); no second
     /// context attaches through it
     ctx_you: Option<usize>,
+    /// the 'you' entry whose you-id the previous line was: its you-parts
+    /// line comes right after (msg-parts, sb-core's same step)
+    id_you: Option<usize>,
+    /// the entry the previous line, a route line, made: its route-parts
+    /// line comes right after
+    route: Option<usize>,
     /// the previous line's time (0: a replay), for a thinking's duration
     last_ms: u64,
     /// the first entry of the current turn (its `turn_started`'s marks)
@@ -164,6 +171,8 @@ impl Fold<'_> {
         self.cont = self.cont.filter(|&c| c != e).map(shift);
         self.you = self.you.filter(|&c| c != e).map(shift);
         self.ctx_you = self.ctx_you.filter(|&c| c != e).map(shift);
+        self.id_you = self.id_you.filter(|&c| c != e).map(shift);
+        self.route = self.route.filter(|&c| c != e).map(shift);
         self.turn = shift(self.turn);
     }
 
@@ -280,6 +289,8 @@ impl Fold<'_> {
         };
         let you = self.you.take();
         let ctx_you = self.ctx_you.take();
+        let id_you = self.id_you.take();
+        let route = self.route.take();
         match rec {
             Rec::Empty | Rec::Idle | Rec::Fact => return,
             Rec::Raw(_) => {}
@@ -307,7 +318,7 @@ impl Fold<'_> {
         match rec {
             Rec::Obs(o) => self.obs(pos, ms, o, if replayed { 0 } else { prev }),
             Rec::Rejected(r) => self.notice(pos, ms, words::rejected(&r)),
-            Rec::Hub(h) => self.hub(pos, ms, h, you, ctx_you),
+            Rec::Hub(h) => self.hub(pos, ms, h, [you, ctx_you, id_you, route]),
             // a message's next line
             Rec::Raw(line) => self.more(&line),
             _ => {}
@@ -392,7 +403,11 @@ impl Fold<'_> {
         self.push(e);
     }
 
-    fn hub(&mut self, pos: u64, ms: u64, h: Hub, you: Option<usize>, ctx_you: Option<usize>) {
+    /// `cur`: the cursors the previous line left: the 'you' entry it
+    /// pushed, the one whose context it was, the one whose id it was, the
+    /// entry its route line made.
+    fn hub(&mut self, pos: u64, ms: u64, h: Hub, cur: [Option<usize>; 4]) {
+        let [you, ctx_you, id_you, route] = cur;
         match h {
             // the approvals gate holds the running call (§3.1)
             Hub::Gate(step) => self.gate(ms, step),
@@ -416,6 +431,21 @@ impl Fold<'_> {
             Hub::YouId(id) => {
                 if let Some(i) = you.or(ctx_you) {
                     self.out[i].msg_id = Some(id);
+                }
+                self.id_you = you.or(ctx_you);
+            }
+            // his parts (msg-parts): on the 'you' entry whose id the line
+            // before was, or the entry the route line before made; a
+            // stray or unreadable one is dropped (the entry keeps the
+            // parts its text reads as)
+            Hub::YouParts(raw) => {
+                if let (Some(i), Ok(p)) = (id_you, serde_json::from_str::<Vec<Part>>(&raw)) {
+                    self.out[i].parts = p;
+                }
+            }
+            Hub::RouteParts(raw) => {
+                if let (Some(i), Ok(p)) = (route, serde_json::from_str::<Vec<Part>>(&raw)) {
+                    self.out[i].parts = p;
                 }
             }
             // the agent read these steered messages here, mid-turn: each
@@ -573,9 +603,12 @@ impl Fold<'_> {
                 let a = (self.ctx.attached)(&said);
                 let (text, note) = words::answered_split(&who, &a.words, self.ctx.width);
                 self.approval(pos, ms, true, text, note, Some(card));
+                // TODO(msg-parts sha d): images/files go when the desktop
+                // draws the answer from Entry.parts (architect m_17621)
                 if let Some(f) = self.out.last_mut().and_then(|e| e.approval.as_mut()) {
                     (f.images, f.files) = (a.images, a.files);
                 }
+                self.route = self.out.len().checked_sub(1);
             }
             // agent to agent in main's thread (the window groups the run);
             // the hub's own timer wakes and stop notes are the agents'
@@ -642,7 +675,21 @@ impl Delivered for Entry {
 
 /// An agent's transcript lines as entries, oldest first.
 pub fn fold(lines: &[Line], ctx: &Ctx) -> Vec<Entry> {
-    let mut f = Fold { out: Vec::new(), cont: None, tools: Vec::new(), you: None, ctx_you: None, last_ms: 0, turn: 0, starting: false, by_result: Vec::new(), woke: Vec::new(), ctx };
+    let mut f = Fold {
+        out: Vec::new(),
+        cont: None,
+        tools: Vec::new(),
+        you: None,
+        ctx_you: None,
+        id_you: None,
+        route: None,
+        last_ms: 0,
+        turn: 0,
+        starting: false,
+        by_result: Vec::new(),
+        woke: Vec::new(),
+        ctx,
+    };
     for (pos, ms, l) in lines {
         f.line(*pos, *ms, l);
     }
