@@ -194,12 +194,45 @@ test('native/vm-pass: real keys, real fn, focus, full screen, TCC, glass, tray o
       const push = JSON.stringify({ ...cards, cards: [...(cards.cards ?? []), { ...first, id: 98, question: 'ship the fix tonight?' }] });
       await sh(`${Q}/node -e 'const c=require("net").createConnection("${Q}/core.sock",()=>c.end(process.argv[1]+"\\n"))' '${push.replace(/'/g, "'\\''")}'`);
       await sleep(1500);
-      const card = await frame('full-screen-card');
+      // b3 (8eebf588): a new card never pops the capsule; it waits in the spotlight
+      const quiet = capsule(await wins());
+      const fq = await front();
+      await qa('fn', 'key', '49');
+      await sleep(1200);
+      const card = await frame('full-screen-card-in-spotlight');
       const fc = await front();
-      row({ row: 'full screen: a pushed card draws over it, TextEdit keeps the keys', pass: capsule(await wins()) !== undefined && has(card.text, /ship the fix/i) && fc === 'com.apple.TextEdit', saw: `capsule ${JSON.stringify(capsule(await wins()))}, front ${fc}`, frame: card.file });
+      row({
+        row: 'full screen: a card waits in the spotlight over a full-screen app, TextEdit keeps the keys',
+        pass: quiet === undefined && fq === 'com.apple.TextEdit' && capsule(await wins()) !== undefined && has(card.text, /ship the fix/i) && fc === 'com.apple.TextEdit',
+        saw: `before fn space: capsule ${JSON.stringify(quiet)}, front ${fq}; after: capsule ${JSON.stringify(capsule(await wins()))}, front ${fc}`,
+        frame: card.file,
+      });
+      await vm.vnc.keys('Escape');
+      await sleep(800);
     }
     await vm.vnc.keys('Control+Meta+f');
     await sleep(2500);
+
+    // fn fn with bise's window in front: voice mode on the agent in view, never the capsule (dba197c7)
+    await sh('open -a /Applications/bise.app', true);
+    await sleep(2000);
+    const fb = await front();
+    const b3 = (await coreCmds()).length;
+    await qa('fn', 'twice');
+    await sleep(1500);
+    const vf = await frame('fn-fn-window');
+    const afterVoice = (await coreCmds()).slice(b3);
+    const capVoice = capsule(await wins());
+    row({
+      row: "fn fn with bise's window in front: voice mode on the agent in view, no capsule talk",
+      pass: fb === 'dev.bise.desktop' && afterVoice.includes('voice_mode') && !afterVoice.includes('talk_start') && capVoice === undefined,
+      saw: `front ${fb}; core ${afterVoice.join(',')}; capsule ${JSON.stringify(capVoice)}`,
+      frame: vf.file,
+    });
+    await qa('fn', 'twice');
+    await sleep(800);
+    await sh('open -a TextEdit', true);
+    await sleep(1500);
 
     // the glass: the same capsule over black, then white: what's behind shows through
     const glass: number[] = [];
