@@ -178,7 +178,17 @@ export function transcriptHas(w: World, project: string, agent: string, words: s
 function panelOf(screen: string): string[] {
   const lines = screen.split('\n');
   const col = (lines[0] ?? '').indexOf('┬');
+  // no '┬' (the top border is the title bar): the panel's width from its 'agents' head line
+  // ('│  agents   │'), cut from each line's right border. Not by '│': the first-run tip box
+  // ('new: your agents…', qa-native e3f7e598) drawn just left of the panel puts its own corners and
+  // borders on the agent rows' lines, so the cell before the last '│' can be the whole feed.
+  const head = col < 0 ? lines.find((l) => /│\s+agents\s+│\s*$/.test(l)) : undefined;
+  const width = head ? head.lastIndexOf('│') - head.lastIndexOf('│', head.lastIndexOf('agents')) - 1 : -1;
   return lines.map((l) => {
+    if (col < 0 && width > 0) {
+      const end = l.lastIndexOf('│');
+      return end > width ? l.slice(end - width, end).trim() : '';
+    }
     if (col < 0) {
       const cells = l.split('│');
       return (cells.length >= 3 ? (cells[cells.length - 2] ?? '') : '').trim();
