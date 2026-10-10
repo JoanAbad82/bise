@@ -336,6 +336,16 @@ function Thumb({ path }: { path?: string }) {
   return <img className="thumb" src={fileUrl(path)} alt="" onError={() => { setGone(true); }} />;
 }
 
+/**
+ * The line under a cut output (designer m_15928): '… 4 KB of 18 KB shown' when the hub knows the
+ * whole size (bytes, the cap's unit; shown = the out's UTF-8 bytes), else '… cut after 4 KB'. Pure.
+ */
+export function cutWords(out: string, total?: number): string {
+  const kb = (b: number): string => `${String(Math.max(1, Math.round(b / 1024)))} KB`;
+  if (total == null || total <= 0) return '… cut after 4 KB';
+  return `… ${kb(new TextEncoder().encode(out).length)} of ${kb(total)} shown`;
+}
+
 /** An answer's n-th image chip label: '[Image #n]', whatever the file is called. Pure. */
 export function imageLabel(i: number): string {
   return `[Image #${String(i + 1)}]`;
@@ -810,7 +820,7 @@ function ToolLineRow({ l, live, runFor, project, agent }: { l: ToolLine; live: b
           )}
           {full !== null && 'cut' in full && full.cut && (
             <div className="th-tool-cut" data-testid={`${id}.cut`}>
-              … cut after 4 KB
+              {cutWords(full.out, full.total)}
             </div>
           )}
           {full !== null && 'error' in full && out === '' && (

@@ -431,6 +431,9 @@ describe("a tool call's real output (amb-feed dece0fe9)", () => {
     expect(sent.filter((c) => c.cmd === 'tool_out')).toEqual([{ cmd: 'tool_out', project: P, agent: 'perf', pos: 4 }]);
     store.apply({ ev: 'tool_out', project: P, agent: 'perf', pos: 4, out: 'running 40 tests', cut: true });
     expect(store.toolOut(P, 'perf', 4)).toEqual({ out: 'running 40 tests', cut: true });
+    // the whole size, when the hub read the session log (amb-feed a928ab09)
+    store.apply({ ev: 'tool_out', project: P, agent: 'perf', pos: 5, out: 'running 40 tests', cut: true, total: 18_432 });
+    expect(store.toolOut(P, 'perf', 5)).toEqual({ out: 'running 40 tests', cut: true, total: 18_432 });
     store.askToolOut(P, 'perf', 4);
     expect(sent.filter((c) => c.cmd === 'tool_out'), 'answered: never asked again').toHaveLength(1);
     store.askToolOut(P, 'perf', 9);

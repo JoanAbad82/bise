@@ -470,7 +470,7 @@ export class Store {
       case 'tool_out': {
         const key = toolOutKey(ev.project, ev.agent, ev.pos);
         this.toolAsks.delete(key);
-        this.put(key, { out: ev.out, cut: ev.cut } satisfies ToolOut);
+        this.put(key, { out: ev.out, cut: ev.cut, ...(ev.total == null ? {} : { total: ev.total }) } satisfies ToolOut);
         return;
       }
       case 'diff':
@@ -1003,7 +1003,8 @@ export class Store {
 
 /** The listener key of a diff slice (hooks.ts subscribes with it). */
 /** A tool call's output: its real lines and whether they were cut, or the hub's refusal. */
-export type ToolOut = { readonly out: string; readonly cut: boolean } | { readonly error: string };
+/** total: the whole output's bytes, only when the hub read the session log (amb-feed a928ab09). */
+export type ToolOut = { readonly out: string; readonly cut: boolean; readonly total?: number } | { readonly error: string };
 
 /** The slice key of one call's output (pos is the key: ToolItem.id repeats). Pure. */
 export function toolOutKey(project: string, agent: string, pos: number): string {

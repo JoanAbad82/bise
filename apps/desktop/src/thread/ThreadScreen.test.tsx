@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CoreCmd, CorePort } from '@/shared/api';
 import { Store, StoreProvider, replay, threadKey } from '@/store';
-import { EntryRow, type RowCtx, withoutImageMarks } from './rows';
+import { cutWords, EntryRow, type RowCtx, withoutImageMarks } from './rows';
 import { ThreadScreen } from './ThreadScreen';
 import { createRouter, RouterContext } from '@/app/router';
 
@@ -208,5 +208,13 @@ describe('his answer with images', () => {
     expect(withoutImageMarks('you answered main: [Image #1] this one')).toBe('you answered main: this one');
     expect(withoutImageMarks('[Image #1] [Image #2]')).toBe('');
     expect(withoutImageMarks('this one [Image #2], not that')).toBe('this one, not that');
+  });
+});
+
+describe('a cut tool output', () => {
+  it("says how much shows when the hub knows the whole size, else only that it was cut (amb-feed a928ab09)", () => {
+    expect(cutWords('x'.repeat(4096), 18 * 1024)).toBe('… 4 KB of 18 KB shown');
+    expect(cutWords('é'.repeat(2048), 9000)).toBe('… 4 KB of 9 KB shown');
+    expect(cutWords('x'.repeat(4096))).toBe('… cut after 4 KB');
   });
 });
