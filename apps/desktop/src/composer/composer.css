@@ -54,3 +54,5 @@
 .b-composer .keys .mic .meter i { width: 2px; height: calc(3px + 7px * var(--lvl, 0)); border-radius: 1px; background: var(--c-text-2); transition: height 60ms linear; }
 .b-composer .keys .mic .meter i:nth-child(2), .b-composer .keys .mic .meter i:nth-child(4) { height: calc(3px + 5px * var(--lvl, 0)); }
 @media (prefers-reduced-motion: reduce) { .b-composer .keys .mic .meter i { transition: none; } }
+/* voice mode's ∿ (designer's voice-window page (1)): next to dictate, as wide as its words */
+.b-composer .keys .mic.voice { min-width: 0; }

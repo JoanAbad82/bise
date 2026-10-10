@@ -7,7 +7,7 @@
 //
 // Mounted once per screen (React never re-creates the editor: the initial config is read once,
 // the callbacks go through refs). The frame around it is amb-kit's ComposerFrame.
-import { memo, useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react';
 import { ComposerFrame } from '@/ds';
 import './composer.css';
 import type { ComposerActions, FieldBar } from './actions';
@@ -47,6 +47,8 @@ export interface ComposerProps {
   readonly onStop?: () => void;
   /** The composer's actions for the screen (dictation's words at the caret, focus), once mounted. */
   readonly onReady?: (a: ComposerActions) => void;
+  /** in the box at its left, before the field (voice mode's grey pearl while he types) */
+  readonly lead?: ReactNode;
   readonly testId?: string;
 }
 
@@ -60,7 +62,7 @@ export function writeTo(to: string | undefined): string {
 const TIP_KEY = 'bise.composer.v1.tip';
 
 export const Composer = memo(function Composer(props: ComposerProps): JSX.Element {
-  const { target, busy = false, sources = NO_SOURCES, to, toEnd, placeholder = writeTo(to), keys, voice = null, quoting = false, testId = 'composer' } = props;
+  const { target, busy = false, sources = NO_SOURCES, to, toEnd, placeholder = writeTo(to), keys, voice = null, quoting = false, lead, testId = 'composer' } = props;
   const store = useMemo<Store>(() => props.store ?? window.localStorage, [props.store]);
   // the latest callbacks, read by the editor's handlers without re-creating them
   const cb = useRef(props);
@@ -120,6 +122,7 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
       onBoxDown={() => {
         actions.current?.focusEnd();
       }}
+      lead={lead}
       keys={
         <>
           {sources.dictate !== undefined && (
@@ -132,6 +135,22 @@ export const Composer = memo(function Composer(props: ComposerProps): JSX.Elemen
               }}
               testId={testId}
             />
+          )}
+          {sources.voice !== undefined && keys === undefined && (
+            // voice mode with the agent in view (designer's voice-window page (1)): ∿, or ctrl+r twice
+            <button
+              type="button"
+              className="mic voice"
+              onMouseDown={(e) => {
+                e.preventDefault(); // the field keeps the caret
+              }}
+              onClick={sources.voice}
+              aria-label="voice mode"
+              title="voice mode · ⌃R ⌃R"
+              data-testid={`${testId}.voice`}
+            >
+              <span className="kk">∿</span> voice
+            </button>
           )}
           <span className="pairs" data-testid={`${testId}.keys`} data-mode={keys === undefined ? mode : 'fixed'}>
             {keys ??

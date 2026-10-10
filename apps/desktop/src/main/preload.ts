@@ -125,6 +125,11 @@ const api: BiseApi = {
       ipcRenderer.send(IPC.notifySettings);
     },
   },
+  voice: {
+    openMicSettings: () => {
+      ipcRenderer.send(IPC.micSettings);
+    },
+  },
   quit: () => {
     ipcRenderer.send(IPC.quit);
   },

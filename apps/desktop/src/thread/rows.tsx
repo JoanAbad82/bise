@@ -17,6 +17,7 @@ import { useToday } from '@/app/clock';
 import { useRouter } from '@/app/router';
 import { useIsCurrent } from './findmark';
 import { shownName } from '@/agents/model';
+import { saidFor, useSaidMs, useVoiceLit } from '@/voicemode';
 
 /** What a row needs of its thread. */
 export interface RowCtx {
@@ -193,14 +194,36 @@ function EntryBody({ e, ctx, head, next, live, still }: { e: Entry; ctx: RowCtx;
           </div>
         );
       }
-      return (
-        <Msg from={who.from} name={who.name} indent={who.indent} time={clock(e.at_ms)} head={head}>
-          {e.thinking != null && e.thinking.ms >= THOUGHT_MS && <ThinkingLine pos={e.pos} head={thoughtFor(e.thinking.ms)} body={e.thinking.text} />}
-          <Answer text={dropAuthor(e.text, e.from ?? ctx.agent)} live={live} still={still} onLink={ctx.onLink} onPath={ctx.onPath} />
-        </Msg>
-      );
+      return <AgentMsg e={e} ctx={ctx} who={who} head={head} live={live} still={still} />;
     }
   }
+}
+
+/** An agent's message; while voice mode says it aloud (designer's voice-window page (1)): the
+ *  words said in ink, the rest faint, '∿ speaking' under it while it talks, 'you cut in' when he
+ *  did (amb-core's voice_mode.lit); else its answer as always. */
+function AgentMsg({ e, ctx, who, head, live, still }: { e: Entry; ctx: RowCtx; who: ReturnType<typeof whoOf>; head: boolean; live: boolean; still: boolean }) {
+  const text = dropAuthor(e.text, e.from ?? ctx.agent);
+  const lit = useVoiceLit(ctx.project, ctx.agent, e.pos, e.text, text);
+  const mark =
+    lit?.mark == null ? undefined : (
+      <div className="vm-mark" data-testid={`thread.voice.${String(e.pos)}`} data-mark={lit.mark}>
+        {lit.mark === 'cut' ? 'you cut in' : '∿ speaking'}
+      </div>
+    );
+  return (
+    <Msg from={who.from} name={who.name} indent={who.indent} time={clock(e.at_ms)} head={head} after={mark}>
+      {e.thinking != null && e.thinking.ms >= THOUGHT_MS && <ThinkingLine pos={e.pos} head={thoughtFor(e.thinking.ms)} body={e.thinking.text} />}
+      {lit !== null && lit.unsaid !== '' ? (
+        <div className="b-text vm-lit" data-testid={`thread.lit.${String(e.pos)}`}>
+          <span className="vm-said">{lit.said}</span>
+          <span className="vm-unsaid">{lit.unsaid}</span>
+        </div>
+      ) : (
+        <Answer text={text} live={live} still={still} onLink={ctx.onLink} onPath={ctx.onPath} />
+      )}
+    </Msg>
+  );
 }
 
 /** A news line's mark: what it means, never its color alone. */
@@ -743,9 +766,11 @@ function YouRow({ e, ctx, next }: { e: Entry; ctx: RowCtx; next: Entry | undefin
   // a steer: the hub's receipt says where the agent read it (the list placed it there), with
   // 'steered · perf read it mid-turn' under it (amb-feed 9633cd2a; no more guessing from neighbors)
   const steered = e.steered_at != null;
-  const under = steered ? `steered · ${shownName(ctx.agent)} read it mid-turn` : e.at_ms > 0 ? clock(e.at_ms) : undefined;
+  // his turn by voice (designer's voice-window page (1)): 'said · 0:06' under it, how long he talked
+  const saidMs = useSaidMs(ctx.project, ctx.agent, text);
+  const under = steered ? `steered · ${shownName(ctx.agent)} read it mid-turn` : saidMs !== null ? saidFor(saidMs) : e.at_ms > 0 ? clock(e.at_ms) : undefined;
   return (
-    <YouBubble head={to} under={under} timeAlways={steered || lastOfRun(e, next)} testId={`thread.you.${String(e.pos)}`}>
+    <YouBubble head={to} under={under} timeAlways={steered || saidMs !== null || lastOfRun(e, next)} testId={`thread.you.${String(e.pos)}`}>
       {quotes.map((q, i) => (
         <blockquote key={i} className="th-you-quote" data-testid={`thread.you.${String(e.pos)}.quote.${String(i + 1)}`}>
           {q.source !== '' && <span className="th-you-quote-src">{shownName(q.source)}</span>}

@@ -22,6 +22,9 @@ export const STATE_TAGS: ReadonlySet<string> = new Set([
   'merged',
   'jobs',
   'plugins',
+  // each role's model: sent at the core's start, so a window that loads later needs it kept
+  // (settings' roles, the voice bar's 'Voxtral · Mistral')
+  'roles',
   // the sidebar's '◷ scheduled n' and each agent's next wake (desktop-screens v6)
   'scheduled',
   // a project's hub refused this core: kept until its hub welcomes it again

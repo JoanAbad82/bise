@@ -125,6 +125,8 @@ export interface ComposerFrameProps {
   /** the whole frame is the input: a press on its padding or empty area (not on the editor, a chip, a
    * button, the dock, the tabs or a quote) calls this to focus the editor, the caret at the end (his round 2) */
   onBoxDown?: () => void;
+  /** in the box at its left, before the editor (voice mode's grey pearl while he types) */
+  lead?: ReactNode;
   testId?: string;
 }
 
@@ -136,7 +138,7 @@ export function boxPress(target: EventTarget | null): boolean {
   return el.closest('[contenteditable="true"], button:not(:disabled), a, input, textarea, [role=button], .b-chip, .b-dock, .b-tabs, .b-quote') === null;
 }
 /** the composer's frame: tabs, dock, quote, the to-line, the box with the editor and send, the keys */
-export function ComposerFrame({ children, to, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, testId }: ComposerFrameProps) {
+export function ComposerFrame({ children, to, send, onSend, disabled, keys, quote, dock, tabs, focus, onBoxDown, lead, testId }: ComposerFrameProps) {
   return (
     <div className={cx("b-composer", disabled && "is-disabled")} data-testid={testId}
       onMouseDown={onBoxDown && ((e) => {
@@ -150,6 +152,7 @@ export function ComposerFrame({ children, to, send, onSend, disabled, keys, quot
       {quote}
       {to != null && <div className="div">{to}</div>}
       <div className={cx("box", focus && "is-focus")} data-testid={sub(testId, "box")}>
+        {lead}
         <div className="in">{children}</div>
         <button type="button" className={cx("send", send === "stop" ? "stop" : send === "off" && "off")} onClick={onSend}
           disabled={send === "off" || disabled} aria-label={send === "stop" ? "stop" : "send"} data-testid={sub(testId, send === "stop" ? "stop" : "send")}>

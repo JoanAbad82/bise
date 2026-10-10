@@ -24,6 +24,13 @@ describe('Latest', () => {
     expect(l.snapshot()).toEqual([]);
   });
 
+  it("keeps the roles: a window that loads later still knows the voice role's model", () => {
+    const l = new Latest();
+    l.keep({ ev: 'roles', items: [{ role: 'voice', model: 'mistral/voxtral-mini-latest' }] });
+    l.keep({ ev: 'roles', items: [{ role: 'voice', model: 'mistral/voxtral-small' }] });
+    expect(l.snapshot()).toEqual([{ ev: 'roles', items: [{ role: 'voice', model: 'mistral/voxtral-small' }] }]);
+  });
+
   it('a window that loads late gets the state the earlier events made (amb-tools m_9703)', async () => {
     // main saw every fixture event before this window existed
     const l = new Latest();

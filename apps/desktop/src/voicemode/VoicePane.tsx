@@ -1,87 +1,48 @@
-// Voice mode's pane (ambient's spec m_11632): it takes the composer's place, same frame and width,
-// ~2 rows taller. The label line ('you ⇄ perf · voice mode'), his row (the word 'you' and 24 bars
-// from his level), the agent's row (its pearl, its name, its bars), the words line (listening,
-// his heard words, sending…, thinking, the said words, muted, the fail), and the key line under
-// the frame, each pair a button. Focus sits on the pane: space and m never type. Draws props
-// only; ThreadVoice (screen.tsx) feeds it. Owner: amb-home.
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+// Voice mode's bar (designer's voice-window page (1)): it takes the composer's box and place. The
+// label line ('voice · with perf', the voice model at its right), the box (the live pearl 40 px at
+// its left, the words in the middle: his live words in ink while he talks, else a dim state line,
+// a failure in --c-err; mute and leave on its right), and the key line under it (only the keys
+// that do something now, each a button). Focus sits on the bar: space and m never type. Draws
+// props only; ThreadVoice (screen.tsx) feeds it. Owner: amb-home (the page's v2: amb-web).
+import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { LivePearl } from '@/pearl';
-import { keyAct, labelOf, nameOf, pairsOf, spaceHeld, spaceUp, wordsOf, yourTurn, HOLD_MS, type Act, type VoiceState } from './model';
+import { buttonsOf, failedPairs, failOf, keyAct, labelOf, pairsOf, poseOf, spaceHeld, spaceUp, wordsOf, HOLD_MS, type Act, type VoiceState } from './model';
 import './voicemode.css';
-
-/** How many bars a row has. */
-export const BARS = 24;
 
 export interface VoicePaneProps {
   state: VoiceState;
   agent: string;
   heard?: string | null | undefined;
-  said?: string | null | undefined;
   fail?: string | null | undefined;
-  /** his level, 0..1 (level 'you') */
+  /** the label line's right: the voice model ('Voxtral · Mistral'), '' when unknown */
+  model?: string;
+  /** muted while the agent spoke: its voice goes on ('speaking · ○ muted', its pearl speaks) */
+  speaking?: boolean;
+  /** his level, 0..1 (level 'you'): the pearl follows his voice while he talks */
   you: number;
-  /** the agent's level, 0..1 (level 'agent') */
+  /** the agent's level, 0..1 (level 'agent'): the pearl follows its voice while it speaks */
   them: number;
   /** the label line's words for a while (fn waits); none: the label */
   label?: string | null;
   onAct: (a: Act) => void;
 }
 
-/** A row of bars from a level that moves: the newest on the right, flat when `live` is off. */
-function useBars(level: number, live: boolean): number[] {
-  const [bars, setBars] = useState<number[]>(() => Array.from({ length: BARS }, () => 0));
-  const [last, setLast] = useState(level);
-  if (level !== last) {
-    setLast(level);
-    if (live) setBars((b) => [...b.slice(1), Math.max(0, Math.min(1, level))]);
-  }
-  return live ? bars : Array.from({ length: BARS }, () => 0);
-}
-
-function Bars({ values, tone, testId }: { values: readonly number[]; tone: 'accent' | 'text' | 'flat'; testId: string }) {
-  return (
-    <span className={`vm-bars ${tone}`} data-testid={testId} aria-hidden="true">
-      {values.map((v, i) => (
-        <i key={i} style={{ height: `${String(Math.round(2 + 16 * (tone === 'flat' ? 0 : v)))}px` }} />
-      ))}
-    </span>
-  );
-}
-
-/** The window is in front: the bars move; behind, they freeze flat (the words keep coming). */
-function useFront(): boolean {
-  const [front, setFront] = useState(() => (typeof document === 'undefined' ? true : document.hasFocus()));
-  useEffect(() => {
-    const on = () => {
-      setFront(true);
-    };
-    const off = () => {
-      setFront(false);
-    };
-    window.addEventListener('focus', on);
-    window.addEventListener('blur', off);
-    return () => {
-      window.removeEventListener('focus', on);
-      window.removeEventListener('blur', off);
-    };
-  }, []);
-  return front;
-}
-
-export function VoicePane({ state, agent, heard, said, fail, you, them, label, onAct }: VoicePaneProps) {
+export function VoicePane({ state, agent, heard, fail, model = '', speaking = false, you, them, label, onAct }: VoicePaneProps) {
   const root = useRef<HTMLElement>(null);
-  const front = useFront();
-  const mine = useBars(you, front && yourTurn(state));
-  const theirs = useBars(them, front && state === 'speaking');
-  const words = wordsOf(state, heard, said, fail);
-  const name = nameOf(agent);
+  const words = wordsOf(state, agent, heard, { speaking });
+  const failed = state === 'failed' ? failOf(fail) : null;
+  // muted: only his side greys; the agent's voice and pearl go on
+  const pose = state === 'muted' && speaking ? 'speak' : poseOf(state);
+  const level = pose === 'speak' ? them : pose === 'listen' ? you : 0;
+  const grey = state === 'failed' || (state === 'muted' && !speaking);
+  const on = state !== 'muted' && state !== 'failed';
 
-  // focus sits on the pane while it shows (space and m never type)
+  // focus sits on the bar while it shows (space and m never type)
   useEffect(() => {
     root.current?.focus();
   }, []);
 
-  // space: a tap sends now, a hold while it speaks cuts in (at once)
+  // space: a tap sends now (his turn) or cuts in (it works); a hold keeps the floor or cuts in (at once)
   const down = useRef<number | null>(null);
   const held = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -130,40 +91,67 @@ export function VoicePane({ state, agent, heard, said, fail, you, them, label, o
       data-testid="voice.pane"
       data-state={state}
     >
-      <p className={`vm-label${label != null ? ' waits' : ''}`} data-testid="voice.label">
-        {label ?? labelOf(agent)}
-      </p>
-      <div className="vm-frame">
-        <div className="vm-row" data-testid="voice.you">
-          <span className="vm-who">you</span>
-          <Bars values={mine} tone={yourTurn(state) && front ? 'accent' : 'flat'} testId="voice.you.bars" />
-        </div>
-        <div className="vm-row" data-testid="voice.agent">
-          <span className="vm-pearl">
-            <LivePearl mood={state === 'speaking' ? 'speak' : 'listen'} level={state === 'speaking' && front ? them : 0} size={22} testId="voice.pearl" />
+      <div className={`vm-label${label != null ? ' waits' : ''}`}>
+        <span data-testid="voice.label">{label ?? labelOf(agent)}</span>
+        {model !== '' && (
+          <span className="end" data-testid="voice.model">
+            {model}
           </span>
-          <b className="vm-who">{name}</b>
-          <Bars values={theirs} tone={state === 'speaking' && front ? 'text' : 'flat'} testId="voice.agent.bars" />
-        </div>
+        )}
+      </div>
+      <div className={`vm-bar${on ? ' on' : ''}`} data-testid="voice.bar">
+        <span className={`vm-pearl${grey ? ' grey' : ''}`} data-pose={pose}>
+          <LivePearl mood={pose} level={level} size={40} testId="voice.pearl" />
+        </span>
         <p className={`vm-words ${words.kind}`} data-testid="voice.words">
-          {words.kind === 'listening' && <span className="vm-dot">●</span>}
-          {words.kind === 'thinking' && <span className="vm-sign">∿</span>}
-          {words.kind === 'muted' && <span>○</span>}
-          {words.kind === 'listening' || words.kind === 'thinking' || words.kind === 'muted' ? ` ${words.text}` : words.text}
-          {state === 'hearing' && (
-            <span className="vm-more">
-              {'   keep talking, or '}
-              <kbd>space</kbd> send now
-            </span>
+          {failed !== null ? (
+            <>
+              <span className="err">{failed.words}</span>
+              {failed.hint !== '' && <span className="dim"> {failed.hint}</span>}
+            </>
+          ) : words.kind === 'heard' ? (
+            <>
+              {words.text}
+              {state === 'hearing' && <span className="dim"> …</span>}
+            </>
+          ) : words.text.startsWith('● ') ? (
+            <>
+              <span className="vm-dot">●</span>
+              {words.text.slice(1)}
+            </>
+          ) : (
+            words.text
           )}
         </p>
+        <span className="vm-btns">
+          {buttonsOf(state, failed).map((p) => (
+            <button
+              key={p.act}
+              type="button"
+              tabIndex={-1}
+              onMouseDown={(e) => {
+                e.preventDefault(); // the bar keeps focus (space and m)
+              }}
+              onClick={() => {
+                onAct(p.act);
+              }}
+              data-testid={`voice.btn.${p.act}`}
+            >
+              {p.words}
+              {p.key !== '' && <kbd>{p.key}</kbd>}
+            </button>
+          ))}
+        </span>
       </div>
       <div className="vm-keys" data-testid="voice.keys">
-        {pairsOf(state).map((p) => (
+        {(failed !== null ? failedPairs(failed) : pairsOf(state)).map((p) => (
           <button
             key={p.act}
             type="button"
             tabIndex={-1}
+            onMouseDown={(e) => {
+              e.preventDefault();
+            }}
             onClick={() => {
               onAct(p.act);
             }}

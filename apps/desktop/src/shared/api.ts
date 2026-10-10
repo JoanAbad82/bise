@@ -104,6 +104,11 @@ export interface BiseApi {
     readonly ask: () => Promise<NotifyAuth>;
     readonly openSettings: () => void;
   };
+  /** Voice mode's failed line (designer's voice-window (1)): 'open settings' opens System Settings ›
+   *  Privacy › Microphone (test mode: EXTERNAL_LINE with its URL on stdout, nothing opens). */
+  readonly voice: {
+    readonly openMicSettings: () => void;
+  };
   /** Opens the main window, on `route` when given (the capsule's ⏎, a card's 'open'). */
   readonly openWindow: (route?: string) => void;
   /** Quits bise (the tray dropdown's last row, ⌘Q's twin). */
@@ -302,6 +307,8 @@ export const IPC = {
   notifyState: 'bise:notify-state',
   notifyAsk: 'bise:notify-ask',
   notifySettings: 'bise:notify-settings',
+  /** a window -> main: open System Settings › Privacy › Microphone (voice mode's failed line) */
+  micSettings: 'bise:mic-settings',
   /** main -> a window: it entered (true) or left (false) full screen; invoke: the state now */
   fullScreen: 'bise:full-screen',
   openWindow: 'bise:open-window',
@@ -373,6 +380,8 @@ export const CAPSULE_LINE = 'bise-desktop: capsule';
 
 /** Test mode's stdout lines for effects that would leave the app. */
 export const EXTERNAL_LINE = 'bise-desktop: external';
+/** System Settings › Privacy › Microphone (window.bise.voice.openMicSettings). */
+export const MIC_SETTINGS_URL = 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone';
 export const OPEN_PATH_LINE = 'bise-desktop: open-path';
 
 /** Test mode: window.bise.quickLook's line on stdout, `QUICKLOOK_LINE <path>`. */

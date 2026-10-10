@@ -7,11 +7,12 @@
 // scripted helper (FakeHelper). Run: tests/checks/real.sh voice/voice-real.spec.ts
 // Passes when, on shop's checkout (its own thread):
 //   - ctrl+r twice in the composer turns voice mode on there: the pane in the composer's place,
-//     labelled 'you ⇄ checkout · voice mode' (the pane follows the core's voice_mode events only);
+//     labelled 'voice mode · with checkout' (the pane follows the core's voice_mode events only);
 //   - his heard words show in the pane and reach checkout on shop's hub (its transcript), never
 //     shop's main;
-//   - checkout's answer comes back said: the pane turns 'speaking' with the answer's words;
-//   - fn while it is on is refused by the core: the label line says 'fn waits: voice mode is on here';
+//   - checkout's answer comes back said: the pane turns 'speaking', the answer's words in the thread;
+//   - fn while it is on is refused by the core: the label line says 'fn talks to bise again when
+//     you leave voice mode' for 3 s;
 //   - esc ends it: the core's voice_mode off takes the pane away and the composer is back.
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -24,7 +25,9 @@ const T = {
   pane: '[data-testid="voice.pane"]',
   label: '[data-testid="voice.label"]',
   words: '[data-testid="voice.words"]',
+  list: '[data-testid="thread.list"]',
 };
+const FN_WAITS = 'fn talks to bise again when you leave voice mode';
 const AGENT = 'checkout';
 const REPO = path.resolve(__dirname, '..', '..', '..', '..', '..');
 const WAV = path.join(REPO, 'rust', 'tui', 'src', 'voicemode', 'testdata', 'sentence.wav');
@@ -69,7 +72,7 @@ test('voice/voice-real (real core): ctrl+r twice on checkout, his words reach it
       await page.keyboard.press('Control+r');
       await expect(pane, "the pane (the core's voice_mode on)").toBeVisible({ timeout: 10_000 });
       note('pane_ms', Date.now() - t0);
-      await expect.soft(page.locator(T.label)).toHaveText(`you ⇄ ${AGENT} · voice mode`);
+      await expect.soft(page.locator(T.label)).toHaveText(`voice mode · with ${AGENT}`);
       await expect.soft(page.locator(T.field), 'the composer gave its place').toHaveCount(0);
     });
 
@@ -82,7 +85,9 @@ test('voice/voice-real (real core): ctrl+r twice on checkout, his words reach it
 
     await test.step("checkout's answer comes back said", async () => {
       await expect(pane, 'speaking').toHaveAttribute('data-state', 'speaking', { timeout: 45_000 });
-      await expect.soft(page.locator(T.words), "the answer's words").toContainText(n, { timeout: 10_000 });
+      // the bar says only 'speaking' (/p/voice-window); the answer's words are in the thread
+      await expect.soft(page.locator(T.words), 'the bar').toHaveText('speaking');
+      await expect.soft(page.locator(T.list), "the answer's words in the thread").toContainText(n, { timeout: 10_000 });
       note('said', ((await page.locator(T.words).textContent()) ?? '').trim());
       await page.screenshot({ path: test.info().outputPath('speaking.png') });
       // its voice ends: the pane listens again
@@ -91,10 +96,10 @@ test('voice/voice-real (real core): ctrl+r twice on checkout, his words reach it
 
     await test.step('fn while it is on: refused, the label line says so', async () => {
       await helper.send({ ev: 'fn', act: 'talk_start', by: 'fn' });
-      await expect(page.locator(T.label), 'fn waits').toHaveText('fn waits: voice mode is on here', { timeout: 5000 });
+      await expect(page.locator(T.label), 'fn waits').toHaveText(FN_WAITS, { timeout: 5000 });
       await helper.send({ ev: 'fn', act: 'talk_end' });
       await page.screenshot({ path: test.info().outputPath('fn-waits.png') });
-      await expect.soft(page.locator(T.label), 'the label again after 3 s').toHaveText(`you ⇄ ${AGENT} · voice mode`, { timeout: 6000 });
+      await expect.soft(page.locator(T.label), 'the label again after 3 s').toHaveText(`voice mode · with ${AGENT}`, { timeout: 6000 });
     });
 
     await test.step('esc ends it: the core says off, the composer is back', async () => {

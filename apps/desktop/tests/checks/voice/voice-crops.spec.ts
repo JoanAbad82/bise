@@ -83,7 +83,7 @@ test('voice/voice-crops: each voice mode state as its own 2x crop, light + dark'
         const entries = document.querySelectorAll('[data-testid^="thread.entry."]');
         const last: DOMRect | null = entries.length > 0 ? (entries[entries.length - 1]?.getBoundingClientRect() ?? null) : null;
         const bottom = q('[data-testid="voice.keys"]') ?? q('[data-testid="composer.field"]');
-        const pane = q('[data-testid="voice.pane"]') ?? q('[data-testid="voice.typing"]');
+        const pane = q('[data-testid="voice.pane"]') ?? q('[data-testid="composer"]');
         if (last === null || bottom === null || pane === null) return null;
         const left = Math.min(last.left, pane.left) - 24;
         const right = Math.max(last.right, pane.right) + 24;
@@ -104,7 +104,8 @@ test('voice/voice-crops: each voice mode state as its own 2x crop, light + dark'
       for (const [state, extra] of STATES) {
         await core.send(vm(state, extra) as never);
         if (state === 'typing') {
-          await expect(page.getByTestId('voice.typing')).toBeVisible({ timeout: 2000 });
+          // typing: the composer is back with its grey pearl (/p/voice-window)
+          await expect(page.getByTestId('voice.typing.pearl')).toBeVisible({ timeout: 2000 });
         } else {
           await expect(page.getByTestId('voice.pane')).toHaveAttribute('data-state', state, { timeout: 2000 });
         }
@@ -117,10 +118,10 @@ test('voice/voice-crops: each voice mode state as its own 2x crop, light + dark'
       await core.send(vm('listening') as never);
       await expect(page.getByTestId('voice.pane')).toHaveAttribute('data-state', 'listening', { timeout: 2000 });
       await core.send({ ev: 'error', cmd: 'talk_start', text: 'voice mode is on with perf · ⌃R to leave' } as never);
-      await expect(page.getByTestId('voice.label')).toHaveText('fn waits: voice mode is on here', { timeout: 2000 });
+      await expect(page.getByTestId('voice.label')).toHaveText('fn talks to bise again when you leave voice mode', { timeout: 2000 });
       await shoot(`${t}-fn-refused`);
       // the label line again (3 s) before the next theme's stills
-      await expect(page.getByTestId('voice.label')).toHaveText('you ⇄ perf · voice mode', { timeout: 6000 });
+      await expect(page.getByTestId('voice.label')).toHaveText('voice mode · with perf', { timeout: 6000 });
     }
     await cdp.send('Emulation.clearDeviceMetricsOverride');
   } finally {

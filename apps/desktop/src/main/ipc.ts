@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, extname, isAbsolute } from 'node:path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, session, shell, type OpenDialogOptions } from 'electron';
-import { COPY_LINE, EXTERNAL_LINE, IPC, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FOLDER_ENV, type MenuAction } from '../shared/api';
+import { COPY_LINE, EXTERNAL_LINE, IPC, MIC_SETTINGS_URL, OPEN_PATH_LINE, QUICKLOOK_LINE, REVEAL_LINE, TEST_CLIP_FILE_ENV, TEST_CLIP_HOOK, TEST_CLIP_TEXT_ENV, TEST_PICK_FOLDER_ENV, type MenuAction } from '../shared/api';
 import { cleanLine, cleanPath, openPlan } from './openpath';
 import type { ClipFile, ClipOp, ClipSeed } from './clipfence';
 import { menuTarget } from './menu';
@@ -109,6 +109,15 @@ export function installIpc(testMode: boolean): void {
     });
   }
   ipcMain.handle(IPC.openExternal, (_e, raw: unknown): Promise<boolean> => openLink(raw, testMode));
+  // voice mode's failed line: System Settings › Privacy › Microphone, the one settings URL a window may open
+  ipcMain.on(IPC.micSettings, () => {
+    if (testMode) {
+      process.stdout.write(`${EXTERNAL_LINE} ${MIC_SETTINGS_URL}
+`);
+      return;
+    }
+    void shell.openExternal(MIC_SETTINGS_URL);
+  });
   ipcMain.handle(IPC.openPath, (_e, raw: unknown, opts: unknown): Promise<boolean> => openFile(raw, opts, testMode));
   ipcMain.handle(IPC.quickLook, (e, raw: unknown): boolean => quickLook(BrowserWindow.fromWebContents(e.sender), raw, testMode));
   ipcMain.handle(IPC.showInFinder, (_e, raw: unknown): boolean => showInFinder(raw, testMode));

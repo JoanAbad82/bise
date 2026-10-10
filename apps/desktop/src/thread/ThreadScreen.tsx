@@ -7,7 +7,7 @@
 // when its keys change (an entry or a send comes or goes); each row reads
 // its own data; the composer is memo'd with stable props, so neither an
 // entry, a step nor a send ever re-renders it.
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { Button, Head, Marker } from '@/ds';
 import { Composer, useComposerSources } from '@/composer';
 import type { ComposerActions } from '@/composer';
@@ -47,7 +47,7 @@ import { createFindMark, FindMarkContext } from './findmark';
 import { trackRoutes, useHeld } from './routes';
 import { absolute } from './paths';
 import { createFolds, FoldsContext } from './folds';
-import { ThreadVoice, useVoiceHere } from '@/voicemode';
+import { ThreadVoice, TYPING_END, typingLabelOf, useVoiceHere, VoiceTypePearl, VOICE_TYPING_KEYS } from '@/voicemode';
 
 export interface ThreadScreenProps {
   project: string;
@@ -389,9 +389,12 @@ export function ThreadScreen({ project, agent, bise = false, projectName }: Thre
             agent={agent}
             busy={busy}
             // an open item: the block's words (a question's 'answering perf · …', or an approval's
-            // 'to bise · the merge waits for 1 or 2' where his words stay a plain message, ambient m_8773)
-            to={answering !== null ? answering.label : composerWords(title).label}
-            toEnd={answering?.end ?? (divider === '' ? undefined : divider)}
+            // 'to bise · the merge waits for 1 or 2' where his words stay a plain message, ambient m_8773);
+            // voice mode while he types: 'to perf · voice paused', 'tab back to voice' (designer's voice-window (1))
+            to={voice === 'typing' ? typingLabelOf(agent) : answering !== null ? answering.label : composerWords(title).label}
+            toEnd={voice === 'typing' ? TYPING_END : (answering?.end ?? (divider === '' ? undefined : divider))}
+            keys={voice === 'typing' ? VOICE_TYPING_KEYS : undefined}
+            lead={voice === 'typing' ? <VoiceTypePearl /> : undefined}
             placeholder={answering?.answer != null ? 'your answer, then ⏎' : composerWords(title).placeholder}
             answer={answerOf(answering)}
             onStop={stop}
@@ -745,6 +748,8 @@ export const ThreadComposer = memo(function ThreadComposer({
   onReady,
   onSent,
   about,
+  keys,
+  lead,
 }: {
   project: string;
   agent: string;
@@ -765,6 +770,10 @@ export const ThreadComposer = memo(function ThreadComposer({
   onSent: () => void;
   /** the artifact his words are about (an open artifact's composer): sent as `about [title](url): …` */
   about?: { id: string; title: string; url: string };
+  /** a fixed key line (voice mode while he types: '⏎ send   tab back to voice   esc leave') */
+  keys?: string | undefined;
+  /** in the box at its left (voice mode's grey pearl while he types) */
+  lead?: ReactNode;
 }) {
   const store = useStore();
   const router = useRouter();
@@ -858,7 +867,7 @@ export const ThreadComposer = memo(function ThreadComposer({
     if (act.act === 'again') document.querySelector<HTMLButtonElement>(`[data-testid="thread.notdelivered.${String(act.pos)}.again"]`)?.click();
     else store.command(act.cmd);
   }, [cards, agent, store, project]);
-  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} {...(toEnd === undefined ? {} : { toEnd })} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} testId="composer" />;
+  return <Composer target={about === undefined ? `${project}/${agent}` : `${project}/${agent}/artifact/${about.id}`} busy={busy} sources={sources} store={keptStorage} to={to} {...(toEnd === undefined ? {} : { toEnd })} placeholder={placeholder} onEmptyEnter={onEmptyEnter} {...(onEscape === undefined ? {} : { onEscape })} quoting={quoting} onSend={onSend} onCommand={onCommand} onStop={onStop} onReady={onReady} {...(keys === undefined ? {} : { keys })} lead={lead} testId="composer" />;
 });
 
 /** A message about an artifact: `about [its title](its url): his words` (the chip's own link form). Pure. */
