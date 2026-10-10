@@ -17,6 +17,39 @@ Status, for the desktop app:
 Sources are `file:line` under `rust/tui/src/` unless the path says otherwise; desktop paths are
 under `apps/desktop/src/`. Read from the source on `ambient-app` at 9c85cc18; nothing was run.
 
+## Re-audit at ambient-app e3f7e598 (for the merge into main)
+
+The 20 open lines below (R1-R20) were read again against ambient-app e3f7e598 (code only,
+nothing run), and the TUI's slash catalogs were matched against the window's. **18 are done, 1
+is part missing, 1 differs by decision; 2 new gaps** (TUI commands the window doesn't run).
+
+Done since a2039499, with where: R1 the hub runs typed `/stop`, `/version`, `/restart`,
+`/update`, `/approvals` (`rust/switchboard/src/proto_view/slash.rs:55`); R2 `/plugins
+enable|disable|login|logout x`, R3 `/theme light|dark|auto` and `/computer-use off|uninstall`,
+R4 `/scheduled`, R5 `/quit`, R7 `/diff <branch>` (all `apps/desktop/src/thread/commands.ts`
+`windowRun`); R8 `/model` on a provider with no key opens its setup first (`store/store.ts:723`);
+R9 "⋯ waiting on docs" (`thread/head.ts:23`, `app/side.ts:49`); R10 model · effort · approvals
+mode on the composer's label line (`thread/ThreadScreen.tsx:95`); R11 a call's `✗ exit 1 · 2.1 s`
+and its first error line (`thread/entry.ts:277`); R12 a failed turn's own row
+(`thread/rows.tsx:152`); R13 agent-to-agent runs folded (`thread/runs.ts`); R14 the `@` list ranks
+a picked file first (`composer/sources.ts:79`); R15 the expired ChatGPT sign-in in the thread
+(`thread/signin.tsx`); R16 computer use's marks and "you took the wheel" (`thread/AgentHead.tsx:64`,
+`app/side.ts:67`; `/stop` lets go of Chrome on the hub, 7230a30e); R17 "↗ 1 new · designer"
+(`app/Sidebar.tsx:209`); R19 inbox arrows as the TUI's cards (`inbox/Inbox.tsx:332`); R20 esc on
+the `/` list clears the text (`composer/pm/PmField.tsx:777`).
+
+**Still open at e3f7e598 (4):**
+
+| # | owner | still missing or different | smallest proof |
+|---|---|---|---|
+| R6 | amb-win | part missing: ⇧⇥ in the composer doesn't switch the approvals mode (the TUI's key, with its 3 s flash); typed `/approvals yolo` and the mode on the label line are done | ⇧⇥ in the composer flips yolo ↔ auto and the label line shows it |
+| N1 | amb-win (+ amb-core for the catalog) | `/keychain on\|off` is a window command in the catalog (`rust/proto/src/commands.rs`, client) with no `windowRun` case and no settings page: the `/` list shows it greyed "not yet" | `/keychain on` ⏎ moves the secrets as the TUI does, or settings shows the switch |
+| N2 | lead's call | `/log` (the agent's raw session, `rust/tui/src/logview.rs`, shipped to everyone in 92f72225) has no window screen and isn't in the window's `/` list (it is not in the proto catalog) | say if the window gets it; else none |
+| R18 | lead's call (⛔6) | differs on purpose: esc stops the turn in the window (TUI: ctrl+c) | none |
+
+Left out on purpose: `/version` (dev tool, bar 2.1), `/release-bise` (dev). Not re-checked: the
+first audit's planned rows beyond these lines, and a narrow window (B16).
+
 ## Re-audit at ambient-app a2039499
 
 The 117 rows that were MISSING, part missing or differs at 9c85cc18 were read again against
