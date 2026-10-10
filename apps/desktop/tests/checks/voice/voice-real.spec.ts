@@ -14,7 +14,7 @@
 //   - fn while it is on is refused by the core: the label line says 'fn talks to bise again when
 //     you leave voice mode' for 3 s;
 //   - esc ends it: the core's voice_mode off takes the pane away and the composer is back.
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { FakeHelper, test, expect, type Session } from '../../harness';
 import { hubOf, launchReal, realWorld, transcriptHas, type World } from '../world';
@@ -31,6 +31,20 @@ const FN_WAITS = 'fn talks to bise again when you leave voice mode';
 const AGENT = 'checkout';
 const REPO = path.resolve(__dirname, '..', '..', '..', '..', '..');
 const WAV = path.join(REPO, 'rust', 'tui', 'src', 'voicemode', 'testdata', 'sentence.wav');
+
+/** That agent's last answer as its hub logged it (transcript.log: `<ms>\tobs: assistant: <text, \n escaped>`). */
+function lastAnswer(w: World, project: string, agent: string): string {
+  const f = path.join(path.dirname(hubOf(w, project).sock), 'agents', agent, 'transcript.log');
+  const lines = existsSync(f) ? readFileSync(f, 'utf8').split('\n') : [];
+  const said = lines.map((l) => l.slice(l.indexOf('\t') + 1).trimStart()).filter((l) => l.startsWith('obs: assistant: '));
+  return (said.at(-1) ?? '').slice('obs: assistant: '.length).replace(/\\n/g, '\n').trim();
+}
+
+/** The answer's first words as the thread shows them: its first line, markdown marks dropped, 40 chars at most. */
+function firstWords(text: string): string {
+  const line = text.split('\n').find((l) => l.trim() !== '') ?? '';
+  return line.replace(/[*_`#>]/g, '').trim().slice(0, 40).trim();
+}
 
 /** The app on checkout's thread with voice mode's fakes; a fresh world's first-run setup is skipped first. */
 async function launchVoice(w: World, route: string, heard: string): Promise<{ s: Session; helper: FakeHelper }> {
@@ -85,6 +99,21 @@ test('voice/voice-real (real core): ctrl+r twice on checkout, his words reach it
 
     let litPos = '';
     await test.step("checkout's answer comes back said, its row lit while it speaks", async () => {
+      // every ink the thread shows, recorded as the DOM changes: a short answer ('On it.' on the
+      // rich world) can be all said between two polls
+      await page.evaluate(() => {
+        const seen: { pos: string; said: string }[] = [];
+        (window as unknown as { __ink: typeof seen }).__ink = seen;
+        const look = () => {
+          for (const el of Array.from(document.querySelectorAll('[data-testid^="thread.lit."]'))) {
+            const pos = (el.getAttribute('data-testid') ?? '').replace('thread.lit.', '');
+            const said = el.querySelector('.vm-said')?.textContent ?? '';
+            const last = seen.filter((s) => s.pos === pos).at(-1);
+            if (last?.said !== said) seen.push({ pos, said });
+          }
+        };
+        new MutationObserver(look).observe(document.body, { subtree: true, childList: true, characterData: true });
+      });
       await expect(pane, 'speaking').toHaveAttribute('data-state', 'speaking', { timeout: 45_000 });
       // the bar says only 'speaking' (/p/voice-window); the answer's words are in the thread
       await expect.soft(page.locator(T.words), 'the bar').toHaveText('speaking');
@@ -97,18 +126,17 @@ test('voice/voice-real (real core): ctrl+r twice on checkout, his words reach it
       await expect.soft(mark).toHaveText('∿ speaking');
       litPos = ((await mark.getAttribute('data-testid')) ?? '').replace('thread.voice.', '');
       note('lit_pos', litPos);
-      await expect(page.getByTestId(`thread.entry.${litPos}`), "the lit row is checkout's answer").toContainText(n);
-      const ink = page.locator(`[data-testid="thread.lit.${litPos}"] .vm-said`);
-      await expect(ink, 'its said words in ink, the rest faint, while it speaks').toBeAttached({ timeout: 5000 });
-      const inked: string[] = [];
-      while ((await pane.getAttribute('data-state')) === 'speaking' && inked.length < 40) {
-        const t = await ink.textContent({ timeout: 200 }).catch(() => null);
-        if (t !== null && inked.at(-1) !== t) inked.push(t);
-        await page.waitForTimeout(150);
-      }
-      note('inked', inked);
-      expect.soft(inked.every((t, i) => i === 0 || t.startsWith(inked[i - 1] ?? '')), 'the ink only grows').toBe(true);
+      // checkout's answer as its hub has it (any world's fake: 'ack: <his words>' or 'On it.')
+      const answer = lastAnswer(w, 'shop', AGENT);
+      note('answer', answer);
+      expect(answer, "checkout's answer in its transcript").not.toBe('');
+      await expect(page.getByTestId(`thread.entry.${litPos}`), "the lit row is checkout's answer").toContainText(firstWords(answer));
       await page.screenshot({ path: test.info().outputPath('speaking.png') });
+      await expect.soft(pane, 'its voice ends').not.toHaveAttribute('data-state', 'speaking', { timeout: 30_000 });
+      const inked = (await page.evaluate(() => (window as unknown as { __ink: { pos: string; said: string }[] }).__ink)).filter((s) => s.pos === litPos).map((s) => s.said);
+      note('inked', inked);
+      expect(inked.length, 'its said words in ink, the rest faint, while it spoke').toBeGreaterThan(0);
+      expect.soft(inked.every((t, i) => i === 0 || t.startsWith(inked[i - 1] ?? '')), 'the ink only grows').toBe(true);
       // its voice ends: the pane listens again
       await expect.soft(pane, 'listening after the answer').toHaveAttribute('data-state', 'listening', { timeout: 30_000 });
       await expect.soft(page.getByTestId(`thread.voice.${litPos}`), "no '∿ speaking' once it stopped talking").toHaveCount(0);
