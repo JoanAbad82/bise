@@ -165,11 +165,12 @@ changes?: Changes | null,
  */
 last_pos?: number | null, 
 /**
- * how many of its turns ended since the hub started (its
- * `turn_done` lines, counted live), so a client never misses a turn
- * that started and ended between two rows (the queue's next message
- * goes at a turn's end): it compares it with what it saw
- * (proto-lead m_14731)
+ * how many of its turns ended since sb-core started (sb-core's own
+ * count: +1 each time its run leaves busy, in the same view as its
+ * status, issue 22), so a client never misses a turn that started
+ * and ended between two rows (the queue's next message goes at a
+ * turn's end): it compares it with what it saw (proto-lead m_14731).
+ * Back to 0 when sb-core restarts: a lower count is a new baseline
  */
 turns?: number, };
 

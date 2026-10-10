@@ -263,6 +263,21 @@ context?: FnContext | null,
  */
 delivery?: Delivery | null, 
 /**
+ * a `you` entry: his message's id (`m_12` is 12), from the
+ * `sb you-id : m_12` line sb-core writes right after his 'you' line.
+ * None for an older transcript (nothing guessed). A `from_agent`
+ * entry's id is its `msg`, as before
+ */
+msg_id?: number | null, 
+/**
+ * the message reached the agent mid-turn (steered): the transcript
+ * position of the `sb steered` receipt that names it, i.e. where in
+ * the turn the agent read it (always after this entry's `pos`; one
+ * receipt gives all its ids the same). None: not steered, or an
+ * older transcript
+ */
+steered_at?: number | null, 
+/**
  * an agent wrote this to him (G5, the TUI's level 2): an `agent`
  * entry from the hub's `msg-you` (`from`: who), or a `from_agent`
  * one that is an old direct reply. A superset: those lines fold to
