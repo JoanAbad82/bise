@@ -33,7 +33,7 @@
 .vm-btns button:hover { background: var(--c-hover); color: var(--c-text); }
 .vm-btns kbd { font: var(--t-11) var(--font-mono); color: var(--c-text-3); }
 /* the key line: the composer's (keys in text-2, what they do dim, 3ch between pairs) */
-.vm-keys { display: flex; flex-wrap: wrap; column-gap: 3ch; row-gap: 0; padding: 7px 4px 0; font: var(--t-11) var(--font-mono); color: var(--c-text-3); white-space: pre; }
+.vm-keys { display: flex; flex-wrap: nowrap; overflow: hidden; column-gap: 3ch; row-gap: 0; padding: 7px 4px 0; font: var(--t-11) var(--font-mono); color: var(--c-text-3); white-space: pre; }
 .vm-keys button { flex: none; font: inherit; color: inherit; background: none; border: 0; padding: 0; white-space: pre; cursor: default; }
 .vm-keys button:hover { color: var(--c-text-2); }
 .vm-keys kbd { font: inherit; color: var(--c-text-2); }

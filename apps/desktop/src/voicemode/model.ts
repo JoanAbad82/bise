@@ -103,21 +103,32 @@ export function buttonsOf(s: VoiceState, fail: Fail | null): readonly Pair[] {
   return [{ key: 'm', words: 'mute', act: 'mute' }, leave];
 }
 
-/** A failure's line: its words (in --c-err) and what to do (dim); `settings`: the mic is refused. */
+/** How many pairs the key line can drop when it doesn't fit on one line (designer m_16975). */
+export const KEY_TRIMS = 2;
+
+/** The key line with its first `n` trims gone: 'tab type' first, then 'm mute' (both are buttons
+ *  or obvious); 'esc leave' always stays, last. The keys still work: only their words go. */
+export function trimPairs(pairs: readonly Pair[], n: number): readonly Pair[] {
+  const order: readonly (readonly Act[])[] = [['type'], ['mute', 'unmute']];
+  const gone = new Set<Act>(order.slice(0, Math.max(0, n)).flat());
+  return pairs.filter((p) => !gone.has(p.act));
+}
+
+/** A failure's line (in --c-err); `settings`: the mic is refused (its 'open settings' button
+ *  says where to allow it, so the line carries no hint: designer m_16975). */
 export interface Fail {
   readonly words: string;
-  readonly hint: string;
   readonly settings: boolean;
 }
 
 /** The core's fail words as the bar's line. The mic refused by macOS reads the page's words with
- *  where to allow it and an 'open settings' button; any other failure is its own words. */
+ *  an 'open settings' button; any other failure is its own words. */
 export function failOf(fail: string | null | undefined): Fail {
   const raw = (fail ?? '').trim();
   const mic = /\b(mic|microphone)\b/iu.test(raw) && /(denied|refused|permission|not allowed|privacy|is off|authori[sz])/iu.test(raw);
-  if (mic) return { words: "▲ bise can't hear you: the mic is off for bise.", hint: 'System Settings › Privacy › Microphone', settings: true };
+  if (mic) return { words: "▲ bise can't hear you: the mic is off for bise.", settings: true };
   const words = raw === '' ? 'voice mode failed.' : raw;
-  return { words: words.startsWith('▲') ? words : `▲ ${words}`, hint: '', settings: false };
+  return { words: words.startsWith('▲') ? words : `▲ ${words}`, settings: false };
 }
 
 /** The words in the middle of the bar: the kind of line and its text. */

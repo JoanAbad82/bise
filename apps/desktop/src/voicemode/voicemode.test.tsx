@@ -4,7 +4,7 @@
 // on keys and clicks.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { buttonsOf, failedPairs, failOf, keyAct, labelOf, modelOf, pairsOf, saidFor, spaceHeld, spaceUp, splitLit, stateOf, typingLabelOf, wordsOf, HOLD_MS, type Act } from './model';
+import { buttonsOf, failedPairs, failOf, keyAct, labelOf, modelOf, pairsOf, saidFor, spaceHeld, spaceUp, splitLit, stateOf, trimPairs, typingLabelOf, wordsOf, HOLD_MS, KEY_TRIMS, type Act } from './model';
 import { forgetSaid, noteSaid, saidMs } from './said';
 import { VoicePane } from './VoicePane';
 
@@ -48,14 +48,24 @@ describe("voice mode, designer's voice-window page (1)", () => {
     expect(wordsOf('muted', 'perf', null).text).toBe('○ muted');
   });
 
-  it('the bar right: mute or unmute and leave; a refused mic fails with where to allow it and open settings', () => {
+  it("the key line stays one line: 'tab type' goes first, then 'm mute'; 'esc leave' stays last", () => {
+    const cut = (s: Parameters<typeof pairsOf>[0], n: number) => trimPairs(pairsOf(s), n).map((p) => `${p.key} ${p.words}`).join('   ');
+    expect(cut('listening', 0)).toBe('space send   hold space keep the floor   m mute   tab type   esc leave');
+    expect(cut('listening', 1)).toBe('space send   hold space keep the floor   m mute   esc leave');
+    expect(cut('listening', 2)).toBe('space send   hold space keep the floor   esc leave');
+    expect(cut('muted', 2)).toBe('esc leave');
+    expect(cut('typing', 2)).toBe('⏎ send   tab back to voice   esc leave');
+    expect(KEY_TRIMS).toBe(2);
+  });
+
+  it('the bar right: mute or unmute and leave; a refused mic fails with its words and open settings, no hint', () => {
     expect(buttonsOf('listening', null).map((p) => `${p.words} ${p.key}`)).toEqual(['mute m', 'leave esc']);
     expect(buttonsOf('muted', null).map((p) => `${p.words} ${p.key}`)).toEqual(['unmute m', 'leave esc']);
     const mic = failOf('microphone access denied');
-    expect(mic).toEqual({ words: "▲ bise can't hear you: the mic is off for bise.", hint: 'System Settings › Privacy › Microphone', settings: true });
+    expect(mic).toEqual({ words: "▲ bise can't hear you: the mic is off for bise.", settings: true });
     expect(buttonsOf('failed', mic).map((p) => p.act)).toEqual(['settings', 'leave']);
     const down = failOf("▲ Voxtral didn't answer. try again or tab to type");
-    expect(down).toEqual({ words: "▲ Voxtral didn't answer. try again or tab to type", hint: '', settings: false });
+    expect(down).toEqual({ words: "▲ Voxtral didn't answer. try again or tab to type", settings: false });
     expect(buttonsOf('failed', down).map((p) => p.act)).toEqual(['leave']);
     expect(failOf('the mic is busy.').settings).toBe(false);
   });
@@ -118,7 +128,7 @@ describe("voice mode, designer's voice-window page (1)", () => {
     fireEvent.click(screen.getByTestId('voice.key.type'));
     expect(acts).toEqual(['send', 'cut', 'mute', 'type']);
     rerender(<VoicePane state="failed" agent="perf" fail="microphone permission denied" you={0} them={0} onAct={(a) => acts.push(a)} />);
-    expect(screen.getByTestId('voice.words').textContent).toBe("▲ bise can't hear you: the mic is off for bise. System Settings › Privacy › Microphone");
+    expect(screen.getByTestId('voice.words').textContent).toBe("▲ bise can't hear you: the mic is off for bise.");
     fireEvent.click(screen.getByTestId('voice.btn.settings'));
     expect(acts.at(-1)).toBe('settings');
     rerender(<VoicePane state="listening" agent="main" you={0} them={0} label="fn talks to bise again when you leave voice mode" onAct={(a) => acts.push(a)} />);

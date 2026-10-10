@@ -4,9 +4,9 @@
 // a failure in --c-err; mute and leave on its right), and the key line under it (only the keys
 // that do something now, each a button). Focus sits on the bar: space and m never type. Draws
 // props only; ThreadVoice (screen.tsx) feeds it. Owner: amb-home (the page's v2: amb-web).
-import { useEffect, useRef, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { LivePearl } from '@/pearl';
-import { buttonsOf, failedPairs, failOf, keyAct, labelOf, pairsOf, poseOf, spaceHeld, spaceUp, wordsOf, HOLD_MS, type Act, type VoiceState } from './model';
+import { buttonsOf, failedPairs, failOf, keyAct, labelOf, pairsOf, poseOf, spaceHeld, spaceUp, trimPairs, wordsOf, HOLD_MS, KEY_TRIMS, type Act, type VoiceState } from './model';
 import './voicemode.css';
 
 export interface VoicePaneProps {
@@ -41,6 +41,33 @@ export function VoicePane({ state, agent, heard, fail, model = '', speaking = fa
   useEffect(() => {
     root.current?.focus();
   }, []);
+
+  // the key line stays one line: when it overflows, drop 'tab type', then 'm mute' (designer
+  // m_16975). A new state or a new width starts from the whole line again.
+  const all = failed !== null ? failedPairs(failed) : pairsOf(state);
+  const keysRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  // the trim belongs to one line at one width: anything else reads as 0 (no reset effect)
+  // (its words too: listening's 'send' and hearing's 'send now' are the same acts, not the same width)
+  const fit = `${all.map((p) => `${p.key} ${p.words}`).join(' · ')}|${String(width)}`;
+  const [trimAt, setTrimAt] = useState({ fit: '', n: 0 });
+  const trim = trimAt.fit === fit ? trimAt.n : 0;
+  useLayoutEffect(() => {
+    const el = keysRef.current;
+    if (el !== null && trim < KEY_TRIMS && el.scrollWidth > el.clientWidth + 1) setTrimAt({ fit, n: trim + 1 });
+  }, [fit, trim]);
+  useEffect(() => {
+    const el = keysRef.current;
+    if (el === null || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      setWidth(Math.round(el.clientWidth));
+    });
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
+  const keys = trimPairs(all, trim);
 
   // space: a tap sends now (his turn) or cuts in (it works); a hold keeps the floor or cuts in (at once)
   const down = useRef<number | null>(null);
@@ -105,10 +132,7 @@ export function VoicePane({ state, agent, heard, fail, model = '', speaking = fa
         </span>
         <p className={`vm-words ${words.kind}`} data-testid="voice.words">
           {failed !== null ? (
-            <>
-              <span className="err">{failed.words}</span>
-              {failed.hint !== '' && <span className="dim"> {failed.hint}</span>}
-            </>
+            <span className="err">{failed.words}</span>
           ) : words.kind === 'heard' ? (
             <>
               {words.text}
@@ -143,8 +167,8 @@ export function VoicePane({ state, agent, heard, fail, model = '', speaking = fa
           ))}
         </span>
       </div>
-      <div className="vm-keys" data-testid="voice.keys">
-        {(failed !== null ? failedPairs(failed) : pairsOf(state)).map((p) => (
+      <div ref={keysRef} className="vm-keys" data-testid="voice.keys" data-trim={trim}>
+        {keys.map((p) => (
           <button
             key={p.act}
             type="button"

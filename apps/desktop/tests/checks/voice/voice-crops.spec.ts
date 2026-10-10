@@ -60,6 +60,22 @@ const STATES: readonly [string, Record<string, unknown>][] = [
   ['failed', { fail: 'the voice model is unreachable.' }],
   ['typing', {}],
 ];
+const NARROW = 1100;
+const NARROW_STATES: readonly [string, Record<string, unknown>][] = [
+  ['listening', {}],
+  ['hearing', { heard: 'why is the cold bench so much slower than the warm one' }],
+  ['speaking', { said: ANSWER }],
+  ['muted', { muted: true }],
+  ['failed', { fail: 'microphone access denied' }],
+];
+/** the whole key line per state, before any trim (model.ts pairsOf / failedPairs) */
+const FULL: Record<string, readonly string[]> = {
+  listening: ['space send', 'hold space keep the floor', 'm mute', 'tab type', 'esc leave'],
+  hearing: ['space send now', 'hold space keep the floor', 'm mute', 'tab type', 'esc leave'],
+  speaking: ['hold space cut in', 'm mute', 'tab type', 'esc leave'],
+  muted: ['m unmute', 'tab type', 'esc leave'],
+  failed: ['tab type instead', 'esc leave'],
+};
 
 test('voice/voice-crops: each voice mode state as its own 2x crop, light + dark', async () => {
   test.setTimeout(120_000);
@@ -94,8 +110,10 @@ test('voice/voice-crops: each voice mode state as its own 2x crop, light + dark'
     const shoot = async (name: string) => {
       const clip = await box();
       expect(clip, `${name}: the last message and the pane are on screen`).not.toBeNull();
-      if (clip === null) return;
-      writeFileSync(test.info().outputPath(`voice-${name}@2x.png`), await page.screenshot({ clip }));
+      if (clip === null) return null;
+      const png = await page.screenshot({ clip });
+      writeFileSync(test.info().outputPath(`voice-${name}@2x.png`), png);
+      return png;
     };
 
     for (const t of ['light', 'dark'] as const) {
@@ -123,7 +141,56 @@ test('voice/voice-crops: each voice mode state as its own 2x crop, light + dark'
       // the label line again (3 s) before the next theme's stills
       await expect(page.getByTestId('voice.label')).toHaveText('voice mode · with perf', { timeout: 6000 });
     }
+
+    // at 1100 (designer m_16975): the key line never wraps ('tab type' goes first, then 'm mute',
+    // 'esc leave' stays last), and a refused mic reads its words with [open settings] [leave esc]
+    // and no hint
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width: NARROW, height: H, deviceScaleFactor: 2, mobile: false });
+    const narrow: string[] = [];
+    const cells: { label: string; png: Buffer }[] = [];
+    for (const t of ['light', 'dark'] as const) {
+      await core.send(prefs(t) as never);
+      await expect.poll(() => page.evaluate(() => document.documentElement.dataset['theme']), { timeout: 5000 }).toBe(t);
+      for (const [state, extra] of NARROW_STATES) {
+        await core.send(vm(state, extra) as never);
+        await expect(page.getByTestId('voice.pane')).toHaveAttribute('data-state', state, { timeout: 2000 });
+        await page.waitForTimeout(250);
+        const line = await page.getByTestId('voice.keys').evaluate((el) => {
+          const keys = Array.from(el.querySelectorAll('[data-testid^="voice.key."]'));
+          return {
+            words: keys.map((k) => k.textContent.trim()),
+            tops: new Set(keys.map((k) => Math.round(k.getBoundingClientRect().top))).size,
+            over: el.scrollWidth - el.clientWidth,
+          };
+        });
+        const name = state === 'failed' ? 'mic-refused' : state;
+        expect(line.tops, `${t} ${name} at ${NARROW}: the key line is one line`).toBe(1);
+        expect(line.over, `${t} ${name} at ${NARROW}: no key cut off`).toBeLessThanOrEqual(1);
+        expect(line.words.at(-1), `${t} ${name}: esc leave last`).toBe('esc leave');
+        // what goes, in order: tab type, then m mute; the rest of the line stays
+        const all = FULL[state] ?? [];
+        const kept = all.filter((w) => line.words.includes(w));
+        expect(line.words, `${t} ${name}: only tab type, then m mute, drop`).toEqual(kept);
+        const gone = all.filter((w) => !line.words.includes(w));
+        const order = ['tab type', 'm mute', 'm unmute'].filter((w) => all.includes(w));
+        expect(gone, `${t} ${name}: tab type goes first, then m mute`).toEqual(order.slice(0, gone.length));
+        if (state === 'failed') {
+          await expect(page.getByTestId('voice.words')).toHaveText("▲ bise can't hear you: the mic is off for bise.");
+          await expect(page.locator('[data-testid^="voice.btn."]')).toHaveText(['open settings', 'leaveesc']);
+        }
+        narrow.push(`${t} ${name}: ${line.words.join('   ')}`);
+        const png = await shoot(`${NARROW}-${t}-${name}`);
+        if (png !== null) cells.push({ label: `${NARROW} · ${t} · ${name} · ${line.words.join('   ')}`, png });
+      }
+    }
+    writeFileSync(test.info().outputPath(`key-lines-${NARROW}.txt`), `${narrow.join('\n')}\n`);
     await cdp.send('Emulation.clearDeviceMetricsOverride');
+    // designer's one sheet: the 1100 crops, light then dark, each with its key line
+    const figs = cells.map((c) => `<figure><figcaption>${c.label}</figcaption><img src="data:image/png;base64,${c.png.toString('base64')}"></figure>`).join('');
+    await page.setContent(
+      `<style>body{margin:0;background:#777;font:12px ui-monospace,monospace;color:#eee}main{display:grid;grid-template-columns:repeat(2,max-content);gap:12px;padding:12px}figure{margin:0}figcaption{margin:0 0 4px}img{display:block;zoom:.5;border-radius:6px}</style><main>${figs}</main>`,
+    );
+    writeFileSync(test.info().outputPath(`voice-crops-${NARROW}-sheet.png`), await page.screenshot({ fullPage: true }));
   } finally {
     await s.close();
     core.dispose();

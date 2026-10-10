@@ -63,7 +63,7 @@ const STATES: readonly [string, Record<string, unknown>, string][] = [
   ['thinking', {}, '∿ perf is on it'],
   ['speaking', { said: ANSWER }, 'speaking'],
   ['muted', { muted: true }, 'speaking · ○ muted'],
-  ['failed', { fail: 'microphone access denied' }, "▲ bise can't hear you: the mic is off for bise. System Settings › Privacy › Microphone"],
+  ['failed', { fail: 'microphone access denied' }, "▲ bise can't hear you: the mic is off for bise."],
   ['typing', {}, ''],
 ];
 const KEYS: Record<string, string> = {
@@ -81,6 +81,7 @@ test("voice/voice-mode: ∿ and ctrl+r twice, every state in the composer's box,
   const core = new FakeCore(world() as unknown as ConstructorParameters<typeof FakeCore>[0]);
   const s = await launchDesktop({ core, route: `agent/${P}/perf` });
   const shots: { label: string; png: Buffer }[] = [];
+  const keyLines: string[] = [];
   try {
     const { page } = s;
     const field = page.locator('[data-testid="composer.field"]');
@@ -124,10 +125,19 @@ test("voice/voice-mode: ∿ and ctrl+r twice, every state in the composer's box,
           await expect(page.getByTestId('voice.label')).toHaveText('voice mode · with perf');
           await expect(page.getByTestId('voice.model')).toHaveText('Voxtral · Mistral');
           await expect(page.getByTestId('voice.words')).toHaveText(words);
-          // each pair is its own button (the gap is CSS): read them pair by pair
-          await expect
-            .poll(async () => (await page.locator('[data-testid^="voice.key."]').allTextContents()).map((s) => s.trim()).join('   '))
-            .toBe(KEYS[state] ?? '');
+          // each pair is its own button (the gap is CSS): read them pair by pair. The line stays one
+          // line (designer m_16975): when it doesn't fit, 'tab type' goes first, then 'm mute';
+          // 'esc leave' always stays, last
+          const trim = Number((await page.getByTestId('voice.keys').getAttribute('data-trim')) ?? '0');
+          const gone = ['tab type', 'm mute', 'm unmute'].slice(0, trim === 0 ? 0 : trim === 1 ? 1 : 3);
+          const want = (KEYS[state] ?? '').split('   ').filter((p) => !gone.includes(p)).join('   ');
+          await expect.poll(async () => (await page.locator('[data-testid^="voice.key."]').allTextContents()).map((s) => s.trim()).join('   ')).toBe(want);
+          expect(want.endsWith('esc leave'), `${state}: esc leave last`).toBe(true);
+          const tops = await page.locator('[data-testid^="voice.key."]').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+          expect(new Set(tops).size, `${state}: the key line is one line`).toBe(1);
+          const over = await page.getByTestId('voice.keys').evaluate((e) => e.scrollWidth - e.clientWidth);
+          expect(over, `${state}: no key cut off`).toBeLessThanOrEqual(1);
+          keyLines.push(`${t} ${state}: trim ${trim} · ${want}`);
           expect(await inWindow(), `${state}: the bar inside the window`).toBe(true);
           // his live words stay in the bar, never in the thread before they go
           if (state === 'hearing') await expect(page.getByText(ASKED, { exact: true })).toHaveCount(0);
@@ -218,6 +228,7 @@ test("voice/voice-mode: ∿ and ctrl+r twice, every state in the composer's box,
       `<style>body{margin:0;background:#777;font:12px ui-monospace,monospace;color:#eee}main{display:flex;flex-wrap:wrap;gap:10px;padding:10px;align-items:flex-start}figure{margin:0}figcaption{margin:0 0 3px}img{display:block;zoom:.4;border-radius:6px}</style><main>${cells}</main>`,
     );
     writeFileSync(test.info().outputPath('voice-mode-sheet.png'), await page.screenshot({ fullPage: true }));
+    writeFileSync(test.info().outputPath('key-lines.txt'), `${keyLines.join('\n')}\n`);
     for (const [n, x] of shots.entries()) writeFileSync(test.info().outputPath(`${String(n).padStart(2, '0')}-${x.label.replace(/[^a-z0-9]+/giu, '-')}.png`), x.png);
   } finally {
     await s.close();
