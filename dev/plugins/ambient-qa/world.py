@@ -47,7 +47,7 @@ from world_fixtures import (  # noqa: E402
     LIST, LOCK, LOG_LINE, LOG_LINES, LONG, LONG_OUT_BYTES, METRICS,
     P99_ANSWER, P99_ASK, PROJECTS, QUEUED_TEXT, QUOTED, QUOTE_REPLY, QUOTE_WORDS,
     REGIONS, RICH_AGENTS, RICH_DROPPED, SCREEN_CONTEXT, SCREEN_REPLY, SCREEN_TEXT, SEED_WORDS,
-    STEER_REPLY, STEER_TEXT, STEER_TURN, SUBJECTS, TABLE, agent_reply, bar_turns,
+    STEER_REPLY, STEER_TEXT, STEER_TURN, SUBJECTS, TABLE, USAGE_TURN, agent_reply, bar_turns,
     crowd, dash_messages, long_answer, plan, put_script, queued_count, quoted_message,
     rich_messages, screen_input, scripts_dir)
 from world_seed import (  # noqa: E402
@@ -651,7 +651,7 @@ __all__ = [
     'LOG_LINES', 'LONG', 'LONG_OUT_BYTES', 'METRICS', 'P99_ANSWER', 'P99_ASK',
     'PROJECTS', 'QUEUED_TEXT', 'QUOTED', 'QUOTE_REPLY', 'QUOTE_WORDS', 'REGIONS',
     'RICH_AGENTS', 'RICH_DROPPED', 'SCREEN_CONTEXT', 'SCREEN_REPLY', 'SCREEN_TEXT', 'SEED_WORDS',
-    'STEER_REPLY', 'STEER_TEXT', 'STEER_TURN', 'SUBJECTS', 'TABLE', 'agent_reply',
+    'STEER_REPLY', 'STEER_TEXT', 'STEER_TURN', 'SUBJECTS', 'TABLE', 'USAGE_TURN', 'agent_reply',
     'agent_script', 'approval_command', 'approval_seed', 'ask_file', 'bar_turns', 'checker_off',
     'crowd', 'dash_messages', 'fake_gh', 'feature_script', 'home_account', 'long_answer',
     'main_script', 'make_repo', 'marker', 'plan', 'put_script', 'queued_count',

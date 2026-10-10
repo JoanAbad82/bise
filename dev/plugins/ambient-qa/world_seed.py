@@ -12,8 +12,8 @@ import time
 from world_fixtures import (  # noqa: E402
     HERE, LONG_OUT_BYTES, P99_ANSWER, P99_ASK, QUEUED_TEXT, QUOTE_REPLY, QUOTE_WORDS, RICH_DROPPED,
     SCREEN_REPLY, SCREEN_TEXT, SEED_WORDS, STEER_REPLY, STEER_TEXT, STEER_TURN, agent_reply, bar_turns,
-    crowd, dash_messages, plan, put_script, queued_count, quoted_message, rich_messages, screen_input,
-    scripts_dir)
+    USAGE_TURN, crowd, dash_messages, plan, put_script, queued_count, quoted_message, rich_messages,
+    screen_input, scripts_dir)
 
 def try_real(dir_, projects, url):
     """A try home's 'real' dir (BISE_TRY_REAL): projects.json (the world's projects, in order) and a
@@ -269,9 +269,19 @@ def rich_seed(world, hubs, holds, agents, timeout):
         c.wait_status("ingest", ["working", "thinking"], timeout)
         return "telemetry/ingest"
 
+    def usage():
+        # HEADFIT: p99's last model call is this one, so its head carries 'context 44k · 17%'
+        # (after 'answered': main's answer gives p99 one more turn, which would reset the gauge)
+        c, t = by["telemetry"], USAGE_TURN
+        put_script(sd, "usage", t["text"], (), t["reply"], usage=t["usage"])
+        turn("telemetry", "p99", t["text"], t["reply"][:30])
+        c.wait(lambda: ((c.agent("p99") or {}).get("usage") or {}).get("words") == t["words"], timeout,
+               "p99's head: context %s" % t["words"])
+        return "telemetry/p99: context %s" % t["words"]
+
     for name, fn in (("main_thread", long_main), ("tool_thread", dash), ("bar", bar), ("scheduled", scheduled), ("crowd", more_agents),
                      ("pages", pages), ("screen_context", screen), ("feature_approval", approval), ("archived", archived),
-                     ("answered", answered), ("working", working), ("messages", messages)):
+                     ("answered", answered), ("working", working), ("messages", messages), ("usage", usage)):
         part(name, fn)
     return out
 

@@ -400,17 +400,27 @@ SEED_WORDS = {"telemetry": "get the team going on telemetry: the p99, the alert 
               "docs": "get the team going on the docs"}
 
 
-def put_script(d, name, match, calls=(), reply="", slow=None):
+def put_script(d, name, match, calls=(), reply="", slow=None, usage=None):
     """One script for the world's fake providers ($FAKE_SCRIPTS): a user message holding `match` makes
-    `calls` [(tool, arg)], then answers `reply`. Written atomically."""
+    `calls` [(tool, arg)], then answers `reply`; `usage` {"input", "output"}: the token counts its
+    calls report. Written atomically."""
     os.makedirs(d, exist_ok=True)
     s = {"match": match, "calls": [{"tool": t, "arg": a} for t, a in calls], "reply": reply}
     if slow:
         s["slow"] = slow
+    if usage:
+        s["usage"] = usage
     tmp = os.path.join(d, ".%s.tmp" % name)
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(s, f)
     os.replace(tmp, os.path.join(d, name + ".json"))
+
+
+# HEADFIT's context note (ambient-lead m_17350): p99's last call reports 43,800 + 200 tokens, so its
+# head reads 'context 44k · 17%' (mistral/mistral-small-latest, a 262,144-token window)
+USAGE_TURN = {"text": "how much of your context have the p99 notes taken?",
+              "reply": "About 44k tokens so far, most of it the per-host latency tables.",
+              "usage": {"input": 43800, "output": 200}, "words": "44k · 17%"}
 
 
 def scripts_dir(world):

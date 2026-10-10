@@ -106,6 +106,12 @@ PLAN = re.compile(r"\[\[plan: ([\w-]+)(?: x(\d+))?\]\]")
 USAGE = {"input": 10, "cached": 2, "output": 5, "reasoning": 3}
 
 
+def usage_of(turn):
+    """The call's token counts: USAGE, or a script's own "usage" {"input", "output", ...} (the
+    rich world's agent whose head carries 'context 44k · 17%', ambient-lead m_17350)."""
+    return dict(USAGE, **(turn.get("usage") or {}))
+
+
 # ---------------------------------------------------------------- requests
 # Each family's request becomes one neutral conversation: a list of
 # {"role": system|user|assistant|tool, "text", "calls" (tool calls made),
@@ -398,6 +404,9 @@ def reply_for(conv, seen=0):
         # one as a copy, so the bar's thinking came in 3 deltas, not the script's chunks)
         if isinstance(sc.get("stream"), dict):
             turn["stream"] = sc["stream"]
+        # "usage": this script's calls report these token counts (usage_of)
+        if isinstance(sc.get("usage"), dict):
+            turn["usage"] = sc["usage"]
     else:
         marks = MARK.findall(user) or INNER.findall(user)
     if calls_done < len(marks):
@@ -551,6 +560,7 @@ def think_block(text):
 
 
 def whole_openai_chat(turn, model):
+    u = usage_of(turn)
     m = {"role": "assistant", "content": turn["text"]}
     if turn["reasoning"] and mistral_blocks(model):
         m["content"] = [think_block(turn["reasoning"])] + ([{"type": "text", "text": turn["text"]}] if turn["text"] else [])
@@ -563,10 +573,10 @@ def whole_openai_chat(turn, model):
     return {"id": "fake", "object": "chat.completion", "created": 0, "model": model,
             "choices": [{"index": 0, "message": m,
                          "finish_reason": "tool_calls" if turn["calls"] else "stop"}],
-            "usage": {"prompt_tokens": USAGE["input"], "completion_tokens": USAGE["output"],
-                      "total_tokens": USAGE["input"] + USAGE["output"],
-                      "prompt_tokens_details": {"cached_tokens": USAGE["cached"]},
-                      "completion_tokens_details": {"reasoning_tokens": USAGE["reasoning"]}}}
+            "usage": {"prompt_tokens": u["input"], "completion_tokens": u["output"],
+                      "total_tokens": u["input"] + u["output"],
+                      "prompt_tokens_details": {"cached_tokens": u["cached"]},
+                      "completion_tokens_details": {"reasoning_tokens": u["reasoning"]}}}
 
 
 def sse_openai_chat(turn, model, include_usage=False, mid_error=False):
@@ -613,19 +623,20 @@ def anth_blocks(turn):
     return out
 
 
-def anth_usage(output):
-    return {"input_tokens": USAGE["input"] - USAGE["cached"], "cache_creation_input_tokens": 0,
-            "cache_read_input_tokens": USAGE["cached"], "output_tokens": output}
+def anth_usage(turn, output):
+    u = usage_of(turn)
+    return {"input_tokens": u["input"] - u["cached"], "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": u["cached"], "output_tokens": output}
 
 
 def whole_anthropic(turn, model):
     return {"id": "msg_fake", "type": "message", "role": "assistant", "model": model,
             "content": anth_blocks(turn), "stop_reason": "tool_use" if turn["calls"] else "end_turn",
-            "stop_sequence": None, "usage": anth_usage(USAGE["output"])}
+            "stop_sequence": None, "usage": anth_usage(turn, usage_of(turn)["output"])}
 
 
 def sse_anthropic(turn, model, mid_error=False):
-    start = dict(whole_anthropic(turn, model), content=[], stop_reason=None, usage=anth_usage(1))
+    start = dict(whole_anthropic(turn, model), content=[], stop_reason=None, usage=anth_usage(turn, 1))
     ev = [("message_start", {"type": "message_start", "message": start}), ("ping", {"type": "ping"})]
     if mid_error:
         ev.append(("error", {"type": "error", "error": {"type": "overloaded_error", "message": "Overloaded"}}))
@@ -649,7 +660,7 @@ def sse_anthropic(turn, model, mid_error=False):
     ev.append(("message_delta", {"type": "message_delta",
                                  "delta": {"stop_reason": "tool_use" if turn["calls"] else "end_turn",
                                            "stop_sequence": None},
-                                 "usage": {"output_tokens": USAGE["output"]}}))
+                                 "usage": {"output_tokens": usage_of(turn)["output"]}}))
     ev.append(("message_stop", {"type": "message_stop"}))
     return ev
 
@@ -677,13 +688,14 @@ def resp_items(turn, encrypted):
 
 
 def whole_responses(turn, model, encrypted=False, status="completed"):
+    u = usage_of(turn)
     return {"id": "resp_fake", "object": "response", "created_at": 0, "status": status,
             "error": None, "incomplete_details": None, "model": model,
             "output": resp_items(turn, encrypted) if status == "completed" else [],
-            "usage": {"input_tokens": USAGE["input"], "input_tokens_details": {"cached_tokens": USAGE["cached"]},
-                      "output_tokens": USAGE["output"],
-                      "output_tokens_details": {"reasoning_tokens": USAGE["reasoning"]},
-                      "total_tokens": USAGE["input"] + USAGE["output"]} if status == "completed" else None}
+            "usage": {"input_tokens": u["input"], "input_tokens_details": {"cached_tokens": u["cached"]},
+                      "output_tokens": u["output"],
+                      "output_tokens_details": {"reasoning_tokens": u["reasoning"]},
+                      "total_tokens": u["input"] + u["output"]} if status == "completed" else None}
 
 
 def sse_responses(turn, model, encrypted=False, mid_error=False):
@@ -735,20 +747,21 @@ def sse_responses(turn, model, encrypted=False, mid_error=False):
     return ev
 
 
-def gem_usage(final):
-    u = {"promptTokenCount": USAGE["input"], "totalTokenCount": USAGE["input"]}
+def gem_usage(final, turn=None):
+    n = usage_of(turn or {})
+    u = {"promptTokenCount": n["input"], "totalTokenCount": n["input"]}
     if final:
-        u.update(candidatesTokenCount=USAGE["output"], thoughtsTokenCount=USAGE["reasoning"],
-                 cachedContentTokenCount=USAGE["cached"],
-                 totalTokenCount=USAGE["input"] + USAGE["output"] + USAGE["reasoning"])
+        u.update(candidatesTokenCount=n["output"], thoughtsTokenCount=n["reasoning"],
+                 cachedContentTokenCount=n["cached"],
+                 totalTokenCount=n["input"] + n["output"] + n["reasoning"])
     return u
 
 
-def gem_chunk(parts, model, finish=None):
+def gem_chunk(parts, model, finish=None, turn=None):
     cand = {"content": {"parts": parts, "role": "model"}, "index": 0}
     if finish:
         cand["finishReason"] = finish
-    return {"candidates": [cand], "usageMetadata": gem_usage(bool(finish)),
+    return {"candidates": [cand], "usageMetadata": gem_usage(bool(finish), turn),
             "modelVersion": model, "responseId": "fake-response"}
 
 
@@ -766,16 +779,16 @@ def gem_parts(turn):
 
 
 def whole_gemini(turn, model):
-    return gem_chunk([p for ps in gem_parts(turn) for p in ps], model, "STOP")
+    return gem_chunk([p for ps in gem_parts(turn) for p in ps], model, "STOP", turn)
 
 
 def sse_gemini(turn, model, mid_error=False):
     ps = gem_parts(turn)
     if mid_error:
-        return [(None, gem_chunk(ps[0], model)),
+        return [(None, gem_chunk(ps[0], model, None, turn)),
                 (None, {"error": {"code": 503, "message": "The model is overloaded. Please try again later.",
                                   "status": "UNAVAILABLE"}})]
-    return [(None, gem_chunk(p, model, "STOP" if i == len(ps) - 1 else None)) for i, p in enumerate(ps)]
+    return [(None, gem_chunk(p, model, "STOP" if i == len(ps) - 1 else None, turn)) for i, p in enumerate(ps)]
 
 
 def render(family, turn, model="fake", stream=True, body=None, mid_error=False):
